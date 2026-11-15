@@ -5,3 +5,4 @@
 export * from "./behavior.ts";
 export * from "./motion.ts";
 export * from "./senses.ts";
+export * from "./vision.ts";

@@ -25,13 +25,20 @@ function pad(g: Ctx, x: number, y: number, r: number) {
   g.stroke();
 }
 
-function ringArc(g: Ctx, x: number, y: number, r: number, centre: number) {
+/** A lit arrowhead on the clickpad's ring, pointing out at `angle` (0 right, π/2 down). */
+function ringArrow(g: Ctx, x: number, y: number, r: number, angle: number) {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  const tip = r * 0.92;
+  const base = r * 0.5;
+  const half = r * 0.32;
   g.beginPath();
-  g.arc(x, y, r * 0.78, centre - 0.5, centre + 0.5);
-  g.lineWidth = r * 0.3;
-  g.lineCap = "round";
-  g.strokeStyle = LIT;
-  g.stroke();
+  g.moveTo(x + c * tip, y + s * tip);
+  g.lineTo(x + c * base - s * half, y + s * base + c * half);
+  g.lineTo(x + c * base + s * half, y + s * base - c * half);
+  g.closePath();
+  g.fillStyle = LIT;
+  g.fill();
 }
 
 /** Draws a glyph centred on (x, y), `size` across. `t` (seconds) animates the moving ones. */
@@ -85,17 +92,13 @@ export function drawGlyph(g: Ctx, glyph: Glyph, x: number, y: number, size: numb
     case "arrows": {
       pad(g, x, y, r);
       if (glyph !== "upDown") {
-        ringArc(g, x, y, r, 0);
-        ringArc(g, x, y, r, Math.PI);
+        ringArrow(g, x, y, r, 0);
+        ringArrow(g, x, y, r, Math.PI);
       }
       if (glyph !== "leftRight") {
-        ringArc(g, x, y, r, Math.PI / 2);
-        ringArc(g, x, y, r, -Math.PI / 2);
+        ringArrow(g, x, y, r, Math.PI / 2);
+        ringArrow(g, x, y, r, -Math.PI / 2);
       }
-      g.beginPath();
-      g.arc(x, y, r * 0.3, 0, TAU);
-      g.fillStyle = "#dfe8f1";
-      g.fill();
       break;
     }
     case "playPause": {

@@ -9,10 +9,10 @@ export type FoodKind = "sugar" | "honey" | "berry" | "water";
 
 /** What the player can drop, and how each tastes to a fly (0 to 1). */
 export const FOODS: Readonly<Record<FoodKind, { name: string; sweet: number; r: number }>> = {
-  sugar: { name: "Sugar", sweet: 1, r: 1.6 },
-  honey: { name: "Honey", sweet: 1, r: 2.2 },
-  berry: { name: "Raspberry", sweet: 0.8, r: 2.6 },
-  water: { name: "Water", sweet: 0, r: 2 },
+  sugar: { name: "Sugar", sweet: 1, r: 0.9 },
+  honey: { name: "Honey", sweet: 1, r: 1.6 },
+  berry: { name: "Raspberry", sweet: 0.8, r: 1.6 },
+  water: { name: "Water", sweet: 0, r: 1.5 },
 };
 
 export type Food = {
