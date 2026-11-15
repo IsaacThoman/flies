@@ -45,6 +45,7 @@ export const STATE_STATS = ["simMs", "wallMs", "spikes", "active"] as const;
 export interface NativeBrainBridge {
   /** Starts loading the brain. Call once. */
   start(seed: number): void;
+  /** "loading" from before `start` until the brain is running. */
   status(): BrainStatus;
   /** What went wrong, or "" */
   error(): string;

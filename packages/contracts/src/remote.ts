@@ -40,7 +40,8 @@ export const REMOTE_TOUCH_EVENT = "remotetouch";
 /**
  * The host leaves the app when Back is pressed at the root of the game (as
  * tvOS apps must). The game tells it whether it is there by setting this
- * property on `window`; the host reads it when the press begins. In a browser
- * nothing reads it.
+ * property on `window` by plain assignment (the host watches for the
+ * assignment, so don't define it with `Object.defineProperty`); the host uses
+ * the value it has when the press begins. In a browser nothing reads it.
  */
 export const AT_ROOT_PROPERTY = "__flyAtRoot";
