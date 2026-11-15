@@ -125,9 +125,13 @@ desktop browser.
 - **Canvas**: `getContext('webgl2')` on one canvas (the screen canvas; a second WebGL canvas
   gets `null`) and `getContext('2d')` on any number of others. No WebGL 1, no
   `OffscreenCanvas`, no `toDataURL` (returns `data:,`) or `toBlob` (gives `null`).
-- **WebGL 2**: all of it that three.js uses, on OpenGL ES 3.0. Extensions as the GPU has them;
-  on the simulator `EXT_color_buffer_float` is missing (three warns at start-up), so keep
-  render targets `UnsignedByteType` unless a device check says otherwise. No timer queries, no
+- **WebGL 2**: all of it that three.js uses, on OpenGL ES 3.0. Extensions as the GPU has them.
+  The simulator has `EXT_color_buffer_half_float` but not `EXT_color_buffer_float`: `RGBA16F`
+  render targets work (the test scene checks one), `RGBA32F` ones are incomplete. three warns
+  "EXT_color_buffer_float extension not supported" at start-up because it asks for that
+  extension whenever it makes an `RGBA16F` target, which `PMREMGenerator` does for the
+  reflections; they render all the same. Use `HalfFloatType` or `UnsignedByteType` render
+  targets, never `FloatType`. No timer queries, no
   transform feedback, no `KHR_parallel_shader_compile`: a shader compiles the first time it's
   drawn, which stalls that frame; warm materials up (`renderer.compile`) while the splash is up.
   `antialias: true` gives a 4x MSAA default framebuffer; the game's look wants `false`.
@@ -271,6 +275,11 @@ with a `drive`, and checks what the scene reports:
 - three touches arrive, and the finger lifts where it was;
 - text measured and drawn on a 2D canvas, used as a `CanvasTexture`;
 - the render target reads back correctly both ways, with timings;
+- the game's two render passes (`apps/web/src/stage.ts`): the depth clear between the backdrop
+  and the table takes effect, in a render target and on the screen; an `RGBA16F` target renders
+  and keeps values over 1; and the game's lawn and table top seen from a fly's height, which
+  must be clipped, are all table at the bottom of the picture. The last is asserted on any
+  renderer but the simulator's, which gets it wrong (see below); the check prints how wrong;
 - a generated beep plays and ends; a WAV decodes; `localStorage` keeps a value; `fetch` reads
   a bundled file;
 - the brain bridge: the stand-in loads the bundled connectome and reports its neuron and
@@ -282,6 +291,30 @@ with a `drive`, and checks what the scene reports:
 It saves a screenshot in a temporary folder outside the repo and prints its path, then shuts the
 simulator down and deletes it. It takes about 15 seconds after the build. The simulator draws
 OpenGL ES in software, so it says nothing about speed.
+
+### The simulator's renderer loses clipped triangles
+
+The simulator draws OpenGL ES with Apple's software renderer ("Apple Software Renderer",
+`APPLE-22.0.12` on tvOS 26, `APPLE-24.0.2` on tvOS 27), and its clipper is broken: some triangles
+that have to be clipped (against the near plane, or against the sides of the picture) are
+dropped, whole or in part. Which ones depends on where their vertices are and in what order they
+come; a triangle that needs no clipping is always drawn. In the game, close to the fly, this
+punches wedges out of the table top and the napkin, all meeting at the table's middle (the
+table top is one fan of 96 triangles), through which the lawn of the backdrop pass shows, and
+cuts stripes out of the jars. The whole-table view, where nothing needs much clipping, looks as
+it does in a browser.
+
+It is not the host: the same three.js triangles, one per draw, are dropped with or without
+multisampling, depth testing, culling or primitive restart, on the screen or in a render
+target, and the host passes draws to GL untouched. Drawn by the Mac's GPU in Chromium (ANGLE on Metal), every one matches the same
+triangle clipped by hand. On an Apple TV, OpenGL ES runs on the GPU, which clips in hardware,
+so the device should not show it; until a device has run the test scene, that is a strong
+expectation, not a measurement (its `clipping` report must say `wrong: 0`).
+
+There is no clean way round it in the simulator: the renderer ignores `gl_ClipDistance`
+(`GL_APPLE_clip_distance` is listed, but a distance of -1 clips nothing), and the only other
+fixes are clipping on the CPU or another renderer. Judge the look of anything near the camera
+in a browser.
 
 ## What isn't verified
 
@@ -299,6 +332,8 @@ No Apple TV was connected while this was built, so none of this has run on one:
   and that lifting the finger reads exactly (0, 0) as assumed; that a click doesn't also arrive
   as a GameController button (none is read, so it shouldn't); that Play/Pause reaches the app
   as a press (it isn't the Now Playing app); and that Back at the root really leaves the app.
+- **Clipping**: that the device's GPU draws the triangles the simulator loses (above). Run the
+  test scene on it and read `clipping` in its `report` lines.
 - **Audio** on a TV's speakers, and with other apps' music playing.
 - The home-screen icon's parallax and the Top Shelf banner on the home screen.
 
