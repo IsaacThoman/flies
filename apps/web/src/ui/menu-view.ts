@@ -58,8 +58,9 @@ export class MenuView {
       const focused = i === menu.focus;
       drawItem(g, item, x, y, width, row, focused, focused ? this.#press.value : 0);
     }
-    if (menu.scroll > 0) text(g, "▲", x + width / 2, this.#rowY(0) - 8, { size: 12, align: "center", color: INK_SOFT });
-    if (end < menu.items.length) text(g, "▼", x + width / 2, this.#rowY(menu.rows) + 6, { size: 12, align: "center", color: INK_SOFT });
+    // At the list's right edge, clear of a heading centred over it.
+    if (menu.scroll > 0) text(g, "▲ more", x + width - 4, this.#rowY(0) - 8, { size: 11, align: "right", color: INK_SOFT });
+    if (end < menu.items.length) text(g, "▼ more", x + width - 4, this.#rowY(menu.rows) + 6, { size: 11, align: "right", color: INK_SOFT });
     const focused = menu.focused;
     if (focused) bubbleRing(g, x, this.#ring.value - (focused.kind === "action" ? 2 : 0), width, row, row / 2, t);
   }
