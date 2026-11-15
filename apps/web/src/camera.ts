@@ -25,23 +25,25 @@ type Shot = {
   fov: number;
   /** How quickly the camera follows (1/s). */
   ease: number;
+  /** Aim this far (mm) above the fly, so it sits low in the picture with the horizon behind. */
+  lift?: number;
 };
 
 const SHOTS: Record<View, Shot> = {
-  follow: { distance: 20, height: 5, around: 0.35, relative: true, table: false, orbit: 0, fov: 40, ease: 1.6 },
-  close: { distance: 11, height: 3.5, around: 1.2, relative: true, table: false, orbit: 0.05, fov: 38, ease: 2 },
+  follow: { distance: 20, height: 4.5, around: 0.35, relative: true, table: false, orbit: 0, fov: 40, ease: 1.6, lift: 1.4 },
+  close: { distance: 10, height: 2.2, around: 1.2, relative: true, table: false, orbit: 0.05, fov: 38, ease: 2, lift: 0.5 },
   table: { distance: 560, height: 170, around: 0.25, relative: false, table: true, orbit: 0.03, fov: 40, ease: 1.2 },
   above: { distance: 6, height: 70, around: 0, relative: true, table: false, orbit: 0, fov: 40, ease: 1.6 },
 };
 
 /** The wallpaper's shots, each held a while: [shot, seconds]. */
 const WALLPAPER: readonly Shot[] = [
-  { distance: 26, height: 8, around: 2.4, relative: false, table: false, orbit: 0.06, fov: 36, ease: 0.5 },
-  { distance: 380, height: 150, around: -0.4, relative: false, table: true, orbit: 0.02, fov: 38, ease: 0.35 },
-  { distance: 14, height: 3, around: 1.4, relative: true, table: false, orbit: -0.04, fov: 34, ease: 0.6 },
-  { distance: 60, height: 6, around: -2.6, relative: false, table: false, orbit: 0.03, fov: 40, ease: 0.4 },
-  { distance: 40, height: 45, around: 0.6, relative: true, table: false, orbit: 0.05, fov: 38, ease: 0.45 },
-  { distance: 600, height: 380, around: 0.9, relative: false, table: true, orbit: -0.015, fov: 36, ease: 0.3 },
+  { distance: 24, height: 3.5, around: 2.4, relative: false, table: false, orbit: 0.05, fov: 36, ease: 0.5, lift: 4 },
+  { distance: 420, height: 90, around: -0.4, relative: false, table: true, orbit: 0.02, fov: 38, ease: 0.35 },
+  { distance: 12, height: 2, around: 1.4, relative: true, table: false, orbit: -0.04, fov: 34, ease: 0.6, lift: 1.5 },
+  { distance: 60, height: 5, around: -2.6, relative: false, table: false, orbit: 0.03, fov: 40, ease: 0.4, lift: 8 },
+  { distance: 34, height: 22, around: 0.6, relative: true, table: false, orbit: 0.05, fov: 38, ease: 0.45, lift: 6 },
+  { distance: 600, height: 220, around: 0.9, relative: false, table: true, orbit: -0.015, fov: 36, ease: 0.3 },
 ];
 
 const CLEARANCE = 2.5;
@@ -104,7 +106,7 @@ export class CameraDirector {
     const p = body.position;
     const focus = this.#goal;
     if (shot.table) focus.set(p.x * 0.35, 60 + p.y * 0.3, p.z * 0.35);
-    else focus.set(p.x, p.y + 0.8, p.z);
+    else focus.set(p.x, p.y + 0.8 + (shot.lift ?? 0), p.z);
 
     // The angle round the focus: behind the fly turns with it, slowly.
     const want = (shot.relative ? body.yaw + Math.PI : 0) + shot.around + this.#orbit;
