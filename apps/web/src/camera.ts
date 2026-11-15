@@ -30,7 +30,7 @@ type Shot = {
 const SHOTS: Record<View, Shot> = {
   follow: { distance: 20, height: 5, around: 0.35, relative: true, table: false, orbit: 0, fov: 40, ease: 1.6 },
   close: { distance: 11, height: 3.5, around: 1.2, relative: true, table: false, orbit: 0.05, fov: 38, ease: 2 },
-  table: { distance: 520, height: 300, around: 0.25, relative: false, table: true, orbit: 0.03, fov: 40, ease: 1.2 },
+  table: { distance: 560, height: 170, around: 0.25, relative: false, table: true, orbit: 0.03, fov: 40, ease: 1.2 },
   above: { distance: 6, height: 70, around: 0, relative: true, table: false, orbit: 0, fov: 40, ease: 1.6 },
 };
 
@@ -75,9 +75,18 @@ export class CameraDirector {
     this.#orbit = 0;
   }
 
+  /** Pins the camera (for screenshots and tests): eye and target, or null to let it move. */
+  pinned: { eye: THREE.Vector3Like; target: THREE.Vector3Like } | null = null;
+
   /** Moves the camera on by `dt` seconds, framing the fly. */
   update(body: FlyBody, dt: number) {
     this.#time += dt;
+    if (this.pinned) {
+      this.camera.position.copy(this.pinned.eye);
+      this.camera.lookAt(this.pinned.target.x, this.pinned.target.y, this.pinned.target.z);
+      this.camera.updateMatrixWorld();
+      return;
+    }
     let shot: Shot;
     if (this.wallpaper) {
       this.#shotTime += dt;
@@ -94,7 +103,7 @@ export class CameraDirector {
     this.#orbit += shot.orbit * dt;
     const p = body.position;
     const focus = this.#goal;
-    if (shot.table) focus.set(p.x * 0.35, 10 + p.y * 0.3, p.z * 0.35);
+    if (shot.table) focus.set(p.x * 0.35, 60 + p.y * 0.3, p.z * 0.35);
     else focus.set(p.x, p.y + 0.8, p.z);
 
     // The angle round the focus: behind the fly turns with it, slowly.

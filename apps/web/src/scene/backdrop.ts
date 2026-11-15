@@ -10,7 +10,7 @@ import type { Daylight } from "./light.ts";
 /** The lawn is this far below the table top, mm (a café table is 75 cm tall). */
 export const LAWN_Y = -760;
 /** The lake's surface, mm. */
-export const LAKE_Y = -2600;
+export const LAKE_Y = -3400;
 
 const SKY_VS = /* glsl */ `
 varying vec3 vDir;
@@ -135,21 +135,68 @@ function cloudTexture() {
   return canvasTexture(canvas, { srgb: false });
 }
 
-/** The height of the hills at a point (mm), with the lake bed and the lawn carved out. */
+function grassTexture() {
+  const { canvas, g } = canvas2d(256, 256);
+  g.fillStyle = "#7fd14a";
+  g.fillRect(0, 0, 256, 256);
+  const rnd = random(3);
+  for (let i = 0; i < 2600; i++) {
+    const x = rnd.range(0, 256);
+    const y = rnd.range(0, 256);
+    const shade = rnd.next();
+    g.strokeStyle = shade > 0.6 ? "rgba(190, 240, 110, 0.7)" : shade > 0.3 ? "rgba(70, 160, 50, 0.6)" : "rgba(120, 210, 70, 0.6)";
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + rnd.range(-2, 2), y - rnd.range(4, 9));
+    g.stroke();
+  }
+  const texture = canvasTexture(canvas, { repeat: true });
+  texture.repeat.set(160, 160);
+  return texture;
+}
+
+function daisyTexture() {
+  const { canvas, g } = canvas2d(64, 64);
+  g.fillStyle = "#ffffff";
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
+    g.beginPath();
+    g.ellipse(32 + Math.cos(a) * 15, 32 + Math.sin(a) * 15, 13, 5, a, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.fillStyle = "#ffd21a";
+  g.beginPath();
+  g.arc(32, 32, 8, 0, Math.PI * 2);
+  g.fill();
+  return canvasTexture(canvas);
+}
+
+/** The lake: an ellipse toward -z, its centre and radii (mm). */
+const LAKE = { z: -210_000, rx: 340_000, rz: 150_000 };
+
+const smooth = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+/** The height of the land at a point (mm): the lawn round the table, sloping down to the lake toward -z, rolling hills elsewhere, mountains far off. */
 export function hillHeight(x: number, z: number): number {
   const r = Math.hypot(x, z);
-  const a = Math.atan2(z, x);
-  const rolling = 9000 * Math.sin(a * 3 + 1.3) + 6000 * Math.sin(a * 7 + r * 0.00002) + 4000 * Math.sin(x * 0.000031 + z * 0.000017);
-  const rise = Math.max(0, r - 60000) * 0.11;
-  let y = LAWN_Y + Math.min(1, Math.max(0, (r - 25000) / 90000)) * (rolling + 12000) + rise;
-  // The lake: a wide bay toward -z beyond the lawn.
-  const lakeX = x / 260000;
-  const lakeZ = (z + 230000) / 170000;
-  const inLake = 1 - (lakeX * lakeX + lakeZ * lakeZ);
-  if (inLake > 0) y = Math.min(y, LAKE_Y - 1500 * Math.min(1, inLake * 6));
-  // The bank down from the lawn.
-  if (z < -24000 && inLake <= 0.02) y = Math.min(y, LAWN_Y + (inLake + 0.02) * -40000);
-  return y;
+  const a = Math.atan2(x, -z);
+  // How much this direction looks out over the lake (1 straight toward it).
+  const lakeward = 1 - smooth(0.7, 1.3, Math.abs(a));
+  const rolling = 7000 * Math.sin(a * 3 + 1.3) + 5000 * Math.sin(a * 7 + r * 0.00002) + 3000 * Math.sin(x * 0.000031 + z * 0.000017);
+  const hills = smooth(18_000, 120_000, r) * (rolling + 11_000) + Math.max(0, r - 500_000) * 0.16;
+  // Down toward the shore on the lake side.
+  const lx = x / LAKE.rx;
+  const lz = (z - LAKE.z) / LAKE.rz;
+  const toLake = Math.sqrt(lx * lx + lz * lz);
+  const shore = LAWN_Y - 2600 * smooth(1.6, 1.0, toLake);
+  if (toLake < 1) return LAKE_Y - 2500 * smooth(1, 0.7, toLake);
+  // Beyond the lake the hills rise again.
+  const beyond = smooth(1.0, 1.6, toLake);
+  return lakeward > 0 && z < 0 ? shore * lakeward + (LAWN_Y + hills * (1 - lakeward * (1 - beyond))) * (1 - lakeward) + hills * beyond * lakeward : LAWN_Y + hills;
 }
 
 export type Backdrop = {
@@ -194,10 +241,11 @@ export function buildBackdrop(light: Daylight): Backdrop {
   for (let i = 0; i <= rings; i++) radii.push(1500 * Math.pow(1_500_000 / 1500, i / rings));
   const positions: number[] = [];
   const colors: number[] = [];
-  const grass = new THREE.Color("#6cc443");
-  const meadow = new THREE.Color("#a6dc4f");
-  const dark = new THREE.Color("#3f9a3a");
-  const sand = new THREE.Color("#e8dcae");
+  const grass = new THREE.Color("#79d64b");
+  const meadow = new THREE.Color("#b8ec5a");
+  const dark = new THREE.Color("#4fae3e");
+  const sand = new THREE.Color("#f2e6b8");
+  const far = new THREE.Color("#8fb8d8");
   const c = new THREE.Color();
   const vertex = (r: number, a: number) => {
     const x = Math.cos(a) * r;
@@ -206,8 +254,9 @@ export function buildBackdrop(light: Daylight): Backdrop {
     positions.push(x, y, z);
     const shore = y < LAKE_Y + 600 ? 1 : 0;
     const k = 0.5 + 0.5 * Math.sin(x * 0.00011 + z * 0.00007) * Math.cos(z * 0.00013);
-    c.copy(grass).lerp(meadow, k * 0.7).lerp(dark, Math.min(1, Math.max(0, (y - 4000) / 30000)) * 0.6);
+    c.copy(grass).lerp(meadow, k * 0.7).lerp(dark, Math.min(1, Math.max(0, (y - 4000) / 30000)) * 0.5);
     if (shore) c.copy(sand);
+    c.lerp(far, smooth(250_000, 1_200_000, r) * 0.85);
     colors.push(c.r, c.g, c.b);
   };
   for (let i = 0; i < rings; i++) {
@@ -217,11 +266,11 @@ export function buildBackdrop(light: Daylight): Backdrop {
       const r0 = radii[i];
       const r1 = radii[i + 1];
       vertex(r0, a0);
+      vertex(r1, a1);
       vertex(r1, a0);
-      vertex(r1, a1);
       vertex(r0, a0);
-      vertex(r1, a1);
       vertex(r0, a1);
+      vertex(r1, a1);
     }
   }
   const hillGeometry = new THREE.BufferGeometry();
@@ -231,6 +280,22 @@ export function buildBackdrop(light: Daylight): Backdrop {
   const hills = new THREE.Mesh(hillGeometry, new THREE.MeshLambertMaterial({ vertexColors: true }));
   freeze(hills);
   scene.add(hills);
+
+  // The lawn round the table: grass you can almost see the blades of, and daisies.
+  const lawn = new THREE.Mesh(new THREE.CircleGeometry(26_000, 48).rotateX(-Math.PI / 2).translate(0, LAWN_Y + 4, 0), new THREE.MeshLambertMaterial({ map: grassTexture(), color: "#ffffff" }));
+  freeze(lawn);
+  scene.add(lawn);
+  const daisyRnd = random(31);
+  const daisies = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: daisyTexture(), transparent: true, alphaTest: 0.4 }), 260);
+  for (let i = 0; i < 260; i++) {
+    const a = daisyRnd.range(0, Math.PI * 2);
+    const r = 500 + Math.pow(daisyRnd.next(), 0.7) * 9000;
+    const size = daisyRnd.range(28, 46);
+    daisies.setMatrixAt(i, new THREE.Matrix4().compose(new THREE.Vector3(Math.cos(a) * r, LAWN_Y + 10 + daisyRnd.range(0, 40), Math.sin(a) * r), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), daisyRnd.range(0, 6)), new THREE.Vector3(size, 1, size)));
+  }
+  daisies.computeBoundingSphere();
+  freeze(daisies);
+  scene.add(daisies);
 
   // The lake.
   const waterUniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { time: { value: 0 } }]);
@@ -246,8 +311,8 @@ export function buildBackdrop(light: Daylight): Backdrop {
   const rnd = random(5);
   const tree = new Batch();
   const treeMaterial = new THREE.MeshLambertMaterial({ vertexColors: true });
-  tree.add(treeMaterial, paint(new THREE.CylinderGeometry(0.06, 0.09, 1, 6).translate(0, 0.5, 0), "#8a5a34"));
-  tree.add(treeMaterial, paint(new THREE.IcosahedronGeometry(0.55, 1).translate(0, 1.25, 0), (p) => (p.y > 1.35 ? "#9be35a" : "#4fb83a")));
+  tree.add(treeMaterial, paint(new THREE.CylinderGeometry(0.05, 0.08, 1, 6).translate(0, 0.5, 0), "#9a6a40"));
+  tree.add(treeMaterial, paint(new THREE.IcosahedronGeometry(0.55, 2).translate(0, 1.25, 0), (p) => (p.y > 1.45 ? "#b6f070" : p.y > 1.15 ? "#78d84a" : "#4fb83a")));
   const holder = new THREE.Group();
   const [treeMesh] = tree.build(holder);
   const placed: THREE.Matrix4[] = [];
@@ -257,12 +322,12 @@ export function buildBackdrop(light: Daylight): Backdrop {
   const p = new THREE.Vector3();
   for (let tries = 0; tries < 2000 && placed.length < 160; tries++) {
     const a = rnd.range(0, Math.PI * 2);
-    const r = rnd.range(32_000, 420_000);
+    const r = rnd.range(45_000, 420_000);
     const x = Math.cos(a) * r;
     const z = Math.sin(a) * r;
     const y = hillHeight(x, z);
     if (y < LAKE_Y + 1200) continue;
-    const size = rnd.range(5000, 11000) * (r > 200_000 ? 1.6 : 1);
+    const size = rnd.range(3500, 6500) * (r > 200_000 ? 1.8 : 1);
     q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd.range(0, 6.28));
     placed.push(m.compose(p.set(x, y - 200, z), q, s.set(size, size * rnd.range(0.9, 1.3), size)).clone());
   }
@@ -325,7 +390,7 @@ export function buildBackdrop(light: Daylight): Backdrop {
       cloudUniforms.shade.value.copy(daylight.cloud).lerp(daylight.middle, 0.45);
       // The clouds drift slowly with the breeze.
       const arr = cloudAttr.array as Float32Array;
-      for (let i = 0; i < cloudCount; i++) arr[i * 4] = drift[i * 4] + Math.sin(time * 0.01 + i) * 20_000 + time * 300;
+      for (let i = 0; i < cloudCount; i++) arr[i * 4] = drift[i * 4] + Math.sin(time * 0.004 + i) * 60_000;
       cloudAttr.needsUpdate = true;
     },
   };

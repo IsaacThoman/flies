@@ -92,7 +92,7 @@ function ginghamTexture(color: string) {
   }
   g.globalAlpha = 1;
   const texture = canvasTexture(canvas, { repeat: true });
-  texture.repeat.set(3, 3);
+  texture.repeat.set(1.6, 1.6);
   return texture;
 }
 
@@ -123,12 +123,12 @@ function domeGeometry(solid: Solid, rings: number, segments: number) {
   for (let i = 0; i < rings; i++) {
     for (let j = 0; j < segments; j++) {
       point(i, j);
-      point(i + 1, j);
       point(i + 1, j + 1);
+      point(i + 1, j);
       if (i > 0) {
         point(i, j);
-        point(i + 1, j + 1);
         point(i, j + 1);
+        point(i + 1, j + 1);
       }
     }
   }
@@ -141,12 +141,12 @@ function domeGeometry(solid: Solid, rings: number, segments: number) {
 export function buildTable(): Table {
   const group = new THREE.Group();
   const rnd = random(11);
-  const glossy = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.22, metalness: 0 });
-  const juicy = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.12, metalness: 0, envMapIntensity: 1.3 });
-  const matte = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0 });
-  const tableMaterial = new THREE.MeshStandardMaterial({ map: tableTexture(), roughness: 0.3, metalness: 0 });
+  const glossy = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.22, metalness: 0, envMapIntensity: 0.6 });
+  const juicy = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.16, metalness: 0, envMapIntensity: 0.55 });
+  const matte = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, envMapIntensity: 0.5 });
+  const tableMaterial = new THREE.MeshStandardMaterial({ map: tableTexture(), roughness: 0.3, metalness: 0, envMapIntensity: 0.5 });
   const cloth = new THREE.MeshStandardMaterial({ map: ginghamTexture("#e8344e"), roughness: 0.85, side: THREE.DoubleSide });
-  const glass = new THREE.MeshStandardMaterial({ color: "#e6f6ff", roughness: 0.04, metalness: 0, transparent: true, opacity: 0.22, depthWrite: false, envMapIntensity: 1.6 });
+  const glass = new THREE.MeshStandardMaterial({ color: "#e6f6ff", roughness: 0.04, metalness: 0, transparent: true, opacity: 0.14, depthWrite: false, envMapIntensity: 1.4 });
   const liquid = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.1, transparent: true, opacity: 0.72, depthWrite: false });
   const batch = new Batch();
   const seen: THREE.Object3D[] = [];
@@ -196,7 +196,7 @@ export function buildTable(): Table {
   jamGlass.renderOrder = 3;
   freeze(jamGlass);
   group.add(jamGlass);
-  batch.add(juicy, paint(new THREE.CylinderGeometry(jf.r - 1.2, jf.r - 1.2, jamTop - 16, 40).translate(jf.x, (jamTop - 16) / 2 + 1, jf.z), "#b3062f"));
+  batch.add(juicy, paint(new THREE.CylinderGeometry(jf.r - 1.2, jf.r - 1.2, jamTop - 16, 40).translate(jf.x, (jamTop - 16) / 2 + 1, jf.z), "#d4123e"));
   const cover = new THREE.CylinderGeometry(jf.r + 3, jf.r + 9, 13, 48, 3, true);
   {
     const pos = cover.attributes.position;
@@ -232,13 +232,21 @@ export function buildTable(): Table {
   const leafColor = (p: THREE.Vector3) => (p.y > 0 ? "#3fbf3a" : "#2c8f2a");
   {
     const bf = berry.footprint as { x: number; z: number; rx: number; rz: number; angle: number };
-    // The leaves sit at one end of its long axis.
-    const end = new THREE.Vector3(bf.x + Math.sin(bf.angle) * bf.rz * 0.92, 8, bf.z + Math.cos(bf.angle) * bf.rz * 0.92);
-    for (let i = 0; i < 6; i++) {
-      const leaf = new THREE.ConeGeometry(3.2, 12, 4).rotateZ(Math.PI / 2).translate(6, 0, 0).scale(1, 0.35, 1);
-      const m = mat4(end, new THREE.Euler(0.4 * Math.sin(i * 2.1), (i / 6) * Math.PI * 2, 0.5 * Math.cos(i)));
-      batch.add(matte, paint(leaf, leafColor), m);
+    // The green sepals, a star lying over one end of its long axis.
+    const ex = bf.x + Math.sin(bf.angle) * bf.rz * 0.78;
+    const ez = bf.z + Math.cos(bf.angle) * bf.rz * 0.78;
+    const ey = topHeight(berry, ex, ez);
+    const sepal = new THREE.Shape();
+    sepal.moveTo(0, -2.2);
+    sepal.quadraticCurveTo(5, -1.2, 11, 0);
+    sepal.quadraticCurveTo(5, 1.2, 0, 2.2);
+    sepal.closePath();
+    for (let i = 0; i < 7; i++) {
+      const leaf = new THREE.ShapeGeometry(sepal, 4).rotateX(-Math.PI / 2);
+      const m = mat4({ x: ex, y: ey + 0.6, z: ez }, new THREE.Euler(0.25 * Math.sin(i * 1.7), (i / 7) * Math.PI * 2 + bf.angle, -0.35, "YXZ"));
+      batch.add(matte, paint(leaf, (p) => (p.y > ey + 1 ? "#62d84a" : "#2fa83a")), m);
     }
+    batch.add(matte, paint(new THREE.CylinderGeometry(0.9, 1.2, 7, 6).rotateZ(0.5).translate(ex + 1, ey + 3, ez), "#3c9a2e"));
   }
   // Seeds on the whole strawberry, following its surface.
   const seeds: THREE.Matrix4[] = [];

@@ -179,11 +179,12 @@ test("the native driver waits for the host, then packs senses in order and decod
   assert.equal(sent.scalars[SENSE_ORDER.indexOf("sweet")], 0.75);
   assert.equal(sent.scalars[SENSE_ORDER.indexOf("bumpLeft")], 0.5);
   assert.equal(sent.scalars[SENSE_ORDER.indexOf("grounded")], 0);
-  assert.equal(driver.state, null, "no state yet");
+  const latest = (): BrainState | null => driver.state;
+  assert.equal(latest(), null, "no state yet");
   fake.produce(0.6);
   now = 120;
   driver.tick(16, senses);
-  const first = driver.state;
+  const first = latest();
   assert.ok(first);
   assert.ok(Math.abs(first.command.walk - 0.6) < 1e-6);
   assert.equal(first.stats.spikes, 1234);
@@ -194,7 +195,7 @@ test("the native driver waits for the host, then packs senses in order and decod
   assert.equal(driver.stateAt, 120, "the same state isn't new");
   fake.produce(0.2);
   driver.tick(16, senses);
-  assert.equal(driver.state, first, "decoded into the same object");
+  assert.equal(latest(), first, "decoded into the same object");
   assert.ok(Math.abs(first.command.walk - 0.2) < 1e-6);
 });
 

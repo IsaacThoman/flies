@@ -12,6 +12,7 @@ import type { Remote } from "./input.ts";
 import { Life } from "./life.ts";
 import { loadSettings } from "./settings.ts";
 import type { Settings } from "./settings.ts";
+import { Bubbles } from "./scene/bubbles.ts";
 import { Stage } from "./stage.ts";
 import { Overlay } from "./ui/overlay.ts";
 import { drawLoading } from "./ui/loading.ts";
@@ -26,12 +27,15 @@ export class Game {
   readonly fly: FlyView;
   readonly meter = new BrainMeter();
   readonly overlay = new Overlay();
+  readonly bubbles: Bubbles;
+  readonly #gust = { x: 0, y: 0, z: 0 };
   /** Seconds since the game started. */
   time = 0;
   /** JavaScript time of the last frame, ms, and a smoothed average. */
   frameMs = 0;
   frameMsAverage = 0;
   #datasetAt = 0;
+  #awakeAt = 0;
 
   constructor(canvas: HTMLCanvasElement, remote: Remote, brain: BrainDriver) {
     this.canvas = canvas;
@@ -43,6 +47,8 @@ export class Game {
     this.life = new Life(world, brain);
     this.fly = new FlyView(this.stage.scene, world);
     this.director = new CameraDirector(world, DISPLAY_ASPECT);
+    this.bubbles = new Bubbles(this.stage.scene, world);
+    this.life.stimuli.looming = this.bubbles.looming;
   }
 
   get brain(): BrainDriver {
@@ -58,9 +64,12 @@ export class Game {
     this.fly.update(life.body, life.intent, life.eating, dt);
     director.update(life.body, dt);
     stage.update(this.time, dt, director.camera);
+    this.bubbles.update(this.time, dt, director.camera, stage.light.sunDirection, this.#gust);
 
     this.overlay.dirty = true;
-    this.overlay.redraw(dt, (g) => drawLoading(g, this.time, this.brain));
+    const showLoading = this.brain.status !== "running" || this.time < this.#awakeAt + 1.5;
+    if (this.brain.status !== "running") this.#awakeAt = this.time;
+    this.overlay.redraw(dt, (g) => showLoading && drawLoading(g, this.time, this.brain));
 
     stage.beginFrame();
     stage.render(director.camera, dt);

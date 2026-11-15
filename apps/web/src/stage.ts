@@ -15,6 +15,31 @@ import type { Table } from "./scene/table.ts";
 export const NEAR = { near: 0.5, far: 4000 };
 export const FAR = { near: 200, far: 3_000_000 };
 
+/**
+ * What glossy things reflect: a soft sky, bright at the horizon, over a pale
+ * green ground, with the sun's glow. Simpler than the backdrop, so reflections
+ * stay clean and colours stay true.
+ */
+function buildEnvironment(light: Daylight) {
+  const scene = new THREE.Scene();
+  const material = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    uniforms: { zenith: { value: light.zenith }, horizon: { value: light.horizon }, ground: { value: light.groundColor }, sunDir: { value: light.sunDirection }, sunColor: { value: light.sunColor } },
+    vertexShader: "varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+    fragmentShader: `uniform vec3 zenith; uniform vec3 horizon; uniform vec3 ground; uniform vec3 sunDir; uniform vec3 sunColor; varying vec3 vDir;
+      void main() {
+        vec3 d = normalize(vDir);
+        vec3 c = mix(horizon, zenith, smoothstep(0.0, 0.7, d.y));
+        c = mix(c, mix(horizon, ground, 0.55) * 0.9, smoothstep(0.0, -0.25, d.y));
+        c += sunColor * pow(max(dot(d, sunDir), 0.0), 64.0) * 3.0;
+        gl_FragColor = vec4(c, 1.0);
+      }`,
+  });
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), material));
+  return scene;
+}
+
 export type FrameCost = { calls: number; triangles: number; textures: number; geometries: number };
 
 export class Stage {
@@ -27,6 +52,7 @@ export class Stage {
   readonly sun: THREE.DirectionalLight;
   readonly cost: FrameCost = { calls: 0, triangles: 0, textures: 0, geometries: 0 };
   #pmrem: THREE.PMREMGenerator;
+  #envScene: THREE.Scene;
   #env: THREE.WebGLRenderTarget | null = null;
   #envDirty = true;
   #lowRes: THREE.WebGLRenderTarget | null = null;
@@ -50,6 +76,7 @@ export class Stage {
     this.sun = new THREE.DirectionalLight(this.light.sunColor, this.light.sunIntensity);
     this.scene.add(this.hemi, this.sun);
     this.#pmrem = new THREE.PMREMGenerator(renderer);
+    this.#envScene = buildEnvironment(this.light);
     this.#applyLight();
   }
 
@@ -88,10 +115,7 @@ export class Stage {
     this.#envDirty = false;
     this.#envAge = 0;
     const old = this.#env;
-    const fog = this.backdrop.scene.fog;
-    this.backdrop.scene.fog = null;
-    this.#env = this.#pmrem.fromScene(this.backdrop.scene, 0.04, FAR.near, FAR.far);
-    this.backdrop.scene.fog = fog;
+    this.#env = this.#pmrem.fromScene(this.#envScene, 0.02, 0.1, 100);
     this.scene.environment = this.#env.texture;
     old?.dispose();
   }
