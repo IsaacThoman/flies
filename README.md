@@ -43,9 +43,22 @@ The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
 beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot), **Light** (morning, midday, golden hour,
-dusk, night) and **View** (follow, close up, whole table, from above, and
-through the fly's eyes). The screen always shows what each button does now,
-and a caption at the top says what the fly is doing.
+dusk, night) and **View** (close up, follow, wide, whole table, from above,
+and through the fly's eyes; Up brings the camera in, Down takes it out). The
+screen always shows what each button does now, and a caption at the top says
+what the fly is doing.
+
+The camera (`apps/web/src/camera.ts`) works like a patient nature cameraman.
+In Follow the fly is about 170 pixels long, seen from low down and a little
+behind its side, with the table, the fruit or the lake behind it; Close up is
+about twice that, Wide about a third. It keeps its place round the fly and
+moves only when it has to (the fly has turned its back for more than a
+second, something is in the way, or there is fruit or a jar to have behind
+it), never crossing over the fly when it can help it. Every move is a
+critically damped spring, so nothing overshoots or pops; walking it keeps
+pace a little ahead, and in a jump it pulls back, widens and whips round
+after the fly. It is never inside anything, nor closer to the fly than most of
+the shot's distance.
 
 After a minute with no press (Settings: 30 s to 5 min, or never) the hints,
 the shelf and the pointer fade, and the camera takes long slow shots: the

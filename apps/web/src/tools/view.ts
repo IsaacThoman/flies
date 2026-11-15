@@ -218,6 +218,7 @@ export class HandsView {
   #s = new THREE.Vector3();
   #p = new THREE.Vector3();
   #n = new THREE.Vector3();
+  #right = new THREE.Vector3();
   #rnd = random(9);
   #counts: Record<FoodKind, number> = { sugar: 0, honey: 0, berry: 0, water: 0 };
   /** 0 hides the pointer and tool (the wallpaper), 1 shows them. */
@@ -305,9 +306,12 @@ export class HandsView {
       const map = this.#icons.get(id)!;
       if (icon.material.map !== map) icon.material.map = map;
       icon.material.opacity = this.opacity;
-      const s = size * 0.55;
+      // Floating up and to the right of the ring, so it stays off a fly standing just behind it.
+      const s = size * 0.5;
       icon.scale.set(s, s, 1);
-      icon.position.set(p.x, p.y + size * 0.75 + Math.sin(time * 2.4) * size * 0.05, p.z);
+      this.#right.setFromMatrixColumn(camera.matrixWorld, 0);
+      const bob = Math.sin(time * 2.4) * size * 0.05;
+      icon.position.set(p.x + this.#right.x * size * 0.85, p.y + size * 0.6 + bob, p.z + this.#right.z * size * 0.85);
       icon.visible = id !== "feather";
     } else this.#icon.visible = false;
 

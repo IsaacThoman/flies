@@ -13,15 +13,16 @@ import type { TimeOfDay } from "../scene/light.ts";
 export type ToolId = "feed" | "swoop" | "feather" | "blow" | "light" | "view";
 
 export type Variant = { id: string; label: string };
-export type Tool = { id: ToolId; name: string; verb: string; hold: boolean; variants: readonly Variant[] };
+export type Tool = { id: ToolId; name: string; verb: string; hold: boolean; variants: readonly Variant[]; /** The kind chosen at the start, if not the first. */ initial?: number };
 
 export const TOOLS: readonly Tool[] = [
   { id: "feed", name: "Feed", verb: "Drop", hold: false, variants: [{ id: "sugar", label: "Sugar" }, { id: "honey", label: "Honey" }, { id: "berry", label: "Raspberry" }, { id: "water", label: "Water" }] },
   { id: "swoop", name: "Swoop", verb: "Throw the ball", hold: false, variants: [{ id: "ball", label: "Beach ball" }] },
   { id: "feather", name: "Tickle", verb: "Tickle", hold: true, variants: [{ id: "feather", label: "Feather" }] },
   { id: "blow", name: "Blow", verb: "Blow", hold: true, variants: [{ id: "gentle", label: "Gently" }, { id: "strong", label: "Hard" }] },
-  { id: "light", name: "Light", verb: "", hold: false, variants: [{ id: "morning", label: "Morning" }, { id: "noon", label: "Midday" }, { id: "golden", label: "Golden hour" }, { id: "dusk", label: "Dusk" }, { id: "night", label: "Night" }] },
-  { id: "view", name: "View", verb: "", hold: false, variants: [{ id: "follow", label: "Follow" }, { id: "close", label: "Close up" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }] },
+  { id: "light", name: "Light", verb: "", hold: false, initial: 1, variants: [{ id: "morning", label: "Morning" }, { id: "noon", label: "Midday" }, { id: "golden", label: "Golden hour" }, { id: "dusk", label: "Dusk" }, { id: "night", label: "Night" }] },
+  // Nearest first, so Up brings the camera in and Down takes it out.
+  { id: "view", name: "View", verb: "", hold: false, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }] },
 ];
 
 /** The beach ball: how big (mm), how fast it swoops (mm/s), and how long a swoop lasts (s). */
@@ -73,7 +74,7 @@ const v3 = (x = 0, y = 0, z = 0): Vec3 => ({ x, y, z });
 
 export class Hands {
   tool = 0;
-  readonly variants: number[] = TOOLS.map(() => 0);
+  readonly variants: number[] = TOOLS.map((t) => t.initial ?? 0);
   /** The pointer's place in the world and the way the surface there faces. */
   readonly pointer = v3();
   readonly normal = v3(0, 1, 0);
