@@ -129,3 +129,30 @@ test("with food to eat, the body brings its mouth to it", () => {
   const mouth = body.point(MOUTH_AHEAD, 0, 0, { x: 0, y: 0, z: 0 });
   assert.ok(Math.hypot(mouth.x - meal.x, mouth.z - meal.z) < meal.r, `mouth ${JSON.stringify(mouth)}`);
 });
+
+test("walking, it climbs into the lemonade's saucer, over the rim and down to the pool", () => {
+  const world = createPicnic();
+  const saucer = SOLIDS.find((s) => s.name === "saucer")!.footprint as { x: number; z: number; r: number };
+  // From outside, facing the jar.
+  const body = new FlyBody(world, { x: saucer.x + saucer.r + 4, z: saucer.z, yaw: -Math.PI / 2 });
+  let peak = 0;
+  for (let t = 0; t < 4; t += DT) {
+    body.step(intent({ speed: 6, walking: true }), still, DT);
+    peak = Math.max(peak, body.position.y);
+    assert.notEqual(body.mode, "airborne", "never falls");
+  }
+  assert.ok(peak > 3.5, "over the rim");
+  assert.ok(Math.abs(body.position.y - 0.8) < 1e-6, `in the moat at ${body.position.y}`);
+});
+
+test("walking, it climbs the whole strawberry to the top", () => {
+  const world = createPicnic();
+  const berry = SOLIDS.find((s) => s.name === "strawberry")!.footprint as { x: number; z: number; rx: number };
+  const body = new FlyBody(world, { x: berry.x - 30, z: berry.z, yaw: Math.PI / 2 });
+  let peak = 0;
+  for (let t = 0; t < 8; t += DT) {
+    body.step(intent({ speed: 8, walking: true }), still, DT);
+    peak = Math.max(peak, body.position.y);
+  }
+  assert.ok(peak > 20, `reached ${peak.toFixed(1)} mm`);
+});

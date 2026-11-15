@@ -11,12 +11,15 @@ export const TABLE_RADIUS = 320;
 /** What each solid is, for the scene builder to draw it: the names below. */
 export const SOLIDS: readonly Solid[] = [
   // A tall jar of lemonade with a lid and a paper straw: the highest perch.
+  // It stands in a saucer: up a gentle slope, a rounded rim to walk along, and
+  // down into a moat where lemonade has dripped and pooled.
+  { name: "saucer", footprint: { kind: "circle", x: -112, z: -64, r: 62 }, top: { kind: "dish", well: 0.8, rim: 4, inner: 0.72, lip: 0.88 } },
   { name: "lemonade", footprint: { kind: "circle", x: -112, z: -64, r: 34 }, top: { kind: "flat", y: 112 } },
   { name: "straw", footprint: { kind: "circle", x: -102, z: -56, r: 3.5 }, top: { kind: "flat", y: 178 } },
   // A short jam jar, its lid covered with a gingham cloth.
   { name: "jam", footprint: { kind: "circle", x: 104, z: -98, r: 31 }, top: { kind: "flat", y: 66 } },
-  // A whole strawberry lying on its side, and a half one, cut face up.
-  { name: "strawberry", footprint: { kind: "ellipse", x: 18, z: 52, rx: 17, rz: 22, angle: 0.5 }, top: { kind: "dome", base: 0, height: 26, power: 0.62 } },
+  // A whole strawberry lying on its side, its foot spreading onto the cloth so a fly can walk up and over it, and a half one, cut face up.
+  { name: "strawberry", footprint: { kind: "ellipse", x: 18, z: 52, rx: 19, rz: 24, angle: 0.5 }, top: { kind: "dome", base: 0, height: 22, power: 1.15 } },
   { name: "strawberry half", footprint: { kind: "ellipse", x: 64, z: 62, rx: 16, rz: 20, angle: -0.4 }, top: { kind: "dome", base: 0, height: 9, power: 1 } },
   // Two cherries.
   { name: "cherry", footprint: { kind: "circle", x: -54, z: 96, r: 11 }, top: { kind: "dome", base: 11, height: 11, power: 0.5 } },
@@ -41,8 +44,8 @@ export const SOLIDS: readonly Solid[] = [
   { name: "crumb", footprint: { kind: "ellipse", x: 6, z: -26, rx: 2.6, rz: 1.9, angle: 0.7 }, top: { kind: "dome", base: 0, height: 1.5, power: 1 } },
   { name: "crumb", footprint: { kind: "ellipse", x: 14, z: -31, rx: 1.8, rz: 1.5, angle: -0.3 }, top: { kind: "dome", base: 0, height: 1.1, power: 1 } },
   // Two lemon pips, fallen from the slice in the lemonade.
-  { name: "pip", footprint: { kind: "ellipse", x: -68, z: -24, rx: 1.0, rz: 1.8, angle: 0.9 }, top: { kind: "dome", base: 0, height: 0.95, power: 1 } },
-  { name: "pip", footprint: { kind: "ellipse", x: -61, z: -31, rx: 0.95, rz: 1.7, angle: -0.5 }, top: { kind: "dome", base: 0, height: 0.9, power: 1 } },
+  { name: "pip", footprint: { kind: "ellipse", x: -46, z: -14, rx: 1.0, rz: 1.8, angle: 0.9 }, top: { kind: "dome", base: 0, height: 0.95, power: 1 } },
+  { name: "pip", footprint: { kind: "ellipse", x: -40, z: -21, rx: 0.95, rz: 1.7, angle: -0.5 }, top: { kind: "dome", base: 0, height: 0.9, power: 1 } },
 ];
 
 /** A patch of food built into the table: it can be eaten down and slowly comes back. */
@@ -61,6 +64,10 @@ export const PATCHES: readonly FoodPatch[] = [
   { name: "honey", x: 30, z: -64, r: 7, sweet: 1 },
   { name: "jam", x: 72, z: -58, r: 6, sweet: 0.95 },
   { name: "strawberry juice", x: 64, z: 62, r: 9, sweet: 0.8 },
+  // A bruise on top of the whole strawberry, for a fly that climbs it.
+  { name: "strawberry juice", x: 18, z: 52, r: 4, sweet: 0.7 },
+  // Lemonade dripped down the jar and pooled in the saucer's moat, on the side toward the middle of the table.
+  { name: "lemonade", x: -77.7, z: -45.7, r: 6, sweet: 0.7 },
   { name: "orange", x: -128, z: 54, r: 18, sweet: 0.6 },
   { name: "sugar", x: 126, z: 61, r: 8, sweet: 1 },
   { name: "sugar", x: 112, z: 56, r: 5, sweet: 1 },
@@ -76,7 +83,7 @@ export const START = { x: -8, z: -8, heading: 0.6 };
 /** Flat things lying on the table that change nothing for the fly: they are drawn, not felt. */
 export const DECOR = {
   napkin: { x: -10, z: 30, size: 150, angle: 0.18 },
-  leaf: { x: -170, z: -40, length: 70, angle: -0.6 },
+  leaf: { x: -200, z: 0, length: 70, angle: -0.6 },
   /** Specks of biscuit no taller than half a millimetre, well under a step: where they lie, how far round, and how many. */
   crumbs: [
     { x: 4, z: -30, r: 14, count: 46 },

@@ -79,6 +79,7 @@ export class Game implements Shell {
   #changedAt = -10;
   #touched = false;
   #lastMeals = 0;
+  #paddleIn = 0;
   #air = new THREE.Vector3();
   #ndc = new THREE.Vector3();
   #ndc2 = new THREE.Vector2();
@@ -224,6 +225,7 @@ export class Game implements Shell {
       this.eyes.beforeStep();
       life.step(dt, now);
       this.#reactions();
+      this.#paddle(dt);
     }
     this.meter.update(life.brain, now);
     // Peaks of the brief things scripts wait for, held for a few seconds.
@@ -300,6 +302,18 @@ export class Game implements Shell {
     if (he.dropped) this.audio.play("drop");
     if (he.landed) this.audio.play("land", 0.6);
     if (he.swooped) this.audio.play("swoop");
+  }
+
+  /** A fly walking, landing or drinking in the pool of lemonade sets rings spreading on it. */
+  #paddle(dt: number) {
+    this.#paddleIn -= dt;
+    const food = this.life.senses.tasting.food;
+    if (food?.name !== "lemonade" || this.#paddleIn > 0) return;
+    const body = this.life.body;
+    const moving = Math.abs(body.groundSpeed) > 0.5 || Math.abs(body.turnRate) > 0.3;
+    if (!moving && !this.life.eating && !body.events.landed) return;
+    this.stage.table.ripple(body.position.x, body.position.z, body.events.landed ? 1 : moving ? 0.45 : 0.2);
+    this.#paddleIn = moving ? 0.45 : 1.4;
   }
 
   /** 1 close to the camera, falling off with distance. */

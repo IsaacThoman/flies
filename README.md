@@ -24,7 +24,11 @@ of the brain's commands, how it moves, what its eyes see) and `packages/ui`
 
 The fly lives on a round café table by a lake: lemonade, a jam jar, a
 strawberry and a half, cherries, a slice of orange, a green apple, sugar cubes,
-a drip of honey, a smear of jam, dew. At the fly's own scale there are
+a drip of honey, a smear of jam, dew. The lemonade jar stands in a saucer:
+up a gentle slope, a rounded rim to walk along, and down into a moat where
+lemonade has dripped and pooled; drops from the jar, and the fly's own feet,
+set rings spreading on the pool. The whole strawberry spreads at its foot so a
+fly can walk up and over it, and there is juice on top. At the fly's own scale there are
 biscuit crumbs (the big ones are boulders it can climb), two lemon pips, specks
 and grains of spilt sugar, and the napkin is woven thread by thread in the
 table's shader, with a stitched hem and the creases where it was folded, so it

@@ -36,6 +36,7 @@ export const STEP_UP = 0.9;
 export const STEP_DOWN = 0.9;
 /** It can stand on slopes up to this steep (cosine of the angle from level). */
 export const MAX_SLOPE_COS = Math.cos((65 * Math.PI) / 180);
+const MAX_SLOPE_TAN = Math.tan((65 * Math.PI) / 180);
 /** Gravity, mm/s². */
 export const GRAVITY = 9810;
 /** Lift and forward thrust from the wings at full drive, mm/s². Wings at 0.6 hold its weight. */
@@ -273,14 +274,24 @@ export class FlyBody {
     const p = this.position;
     const x = p.x + mx;
     const z = p.z + mz;
-    // The head (or the tail, backing up) mustn't go into anything either.
+    // The head (or the tail, backing up) mustn't go into anything either. A
+    // wall is a rise of more than a step between points a third of the way
+    // apart, beyond what the steepest slope it can stand on would climb; a
+    // slope it can walk up is not one.
     const length = Math.hypot(mx, mz);
     if (length > 0) {
       const sign = mx * Math.sin(this.yaw) + mz * Math.cos(this.yaw) >= 0 ? 1 : -1;
       const reach = HEAD_AHEAD * FLY_LENGTH * sign;
-      const hx = x + Math.sin(this.yaw) * reach;
-      const hz = z + Math.cos(this.yaw) * reach;
-      if (!world.onTable(hx, hz) || world.heightAt(hx, hz) - p.y > STEP_UP) return "blocked";
+      const allowed = STEP_UP + (Math.abs(reach) / 3) * MAX_SLOPE_TAN;
+      let y = p.y;
+      for (let k = 1; k <= 3; k++) {
+        const hx = x + (Math.sin(this.yaw) * reach * k) / 3;
+        const hz = z + (Math.cos(this.yaw) * reach * k) / 3;
+        if (!world.onTable(hx, hz)) return "blocked";
+        const h = world.heightAt(hx, hz);
+        if (h - y > allowed) return "blocked";
+        y = Math.max(y, h);
+      }
     }
     const next = world.surface(x, z, this.#probe);
     if (!next.onTable) return "blocked";

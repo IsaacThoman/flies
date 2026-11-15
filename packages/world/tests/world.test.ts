@@ -139,3 +139,38 @@ test("the biscuit crumbs and the lemon pips are low and round enough to walk up 
   assert.ok(climbable("crumb"));
   assert.ok(climbable("pip"));
 });
+
+test("a fly can walk up the whole strawberry and over its top, where there is juice", () => {
+  assert.ok(climbable("strawberry"));
+  const f = solid("strawberry").footprint as { x: number; z: number };
+  assert.ok(world.heightAt(f.x, f.z) > 15);
+  const juice = new Pantry(world, PATCHES).touching(f.x, world.heightAt(f.x, f.z), f.z, 0.5);
+  assert.ok(juice && juice.sweet > 0, "something sweet on top");
+});
+
+test("the lemonade stands in a saucer with a rim to walk along and lemonade pooled inside", () => {
+  const saucer = solid("saucer");
+  const f = saucer.footprint as { x: number; z: number; r: number };
+  const lemonade = solid("lemonade").footprint as { r: number };
+  const n = createSurface();
+  // Every step from the table, up over the rim and down into the moat, can be stood on.
+  let peak = 0;
+  for (let r = f.r + 1; r > lemonade.r + 0.5; r -= 0.25) {
+    const s = world.surface(f.x + r, f.z, n);
+    assert.ok(s.normal.y >= STANDABLE, `too steep ${r} mm out`);
+    peak = Math.max(peak, s.y);
+  }
+  assert.ok(peak > 3, "a rim");
+  // The rim's crest is level enough to walk along.
+  const crest = (saucer.top as { lip: number }).lip * f.r;
+  assert.ok(world.surface(f.x, f.z - crest, n).normal.y > 0.99);
+  // The moat is lower than the rim, and has lemonade in it.
+  const pantry = new Pantry(world, PATCHES);
+  const pool = PATCHES.find((p) => p.name === "lemonade")!;
+  const floor = world.heightAt(pool.x, pool.z);
+  assert.ok(floor < peak - 2);
+  assert.ok(pantry.touching(pool.x, floor, pool.z, 0.3)?.name === "lemonade");
+  // A ray from above lands in the moat.
+  const down = world.raycast({ x: pool.x, y: 50, z: pool.z }, { x: 0, y: -1, z: 0 }, hit());
+  assert.ok(down && Math.abs(down.point.y - floor) < 1e-4);
+});

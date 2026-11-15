@@ -17,7 +17,12 @@ export type Table = {
   /** What the fly's eyes see of the table: the big shapes, without the small details. */
   seen: THREE.Object3D[];
   update(time: number): void;
+  /** Sets a ring spreading on the pool of lemonade in the saucer, from a point on it (a drip, a fly's foot), 0 to 1 strong. */
+  ripple(x: number, z: number, strength: number): void;
 };
+
+/** How many rings can spread on the pool at once. */
+const RIPPLES = 4;
 
 const byName = (name: string) => SOLIDS.filter((s) => s.name === name);
 const one = (name: string) => byName(name)[0];
@@ -266,6 +271,7 @@ export function buildTable(): Table {
   const liquid = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.1, transparent: true, opacity: 0.72, depthWrite: false });
   const batch = new Batch();
   const seen: THREE.Object3D[] = [];
+  const materials: THREE.MeshStandardMaterial[] = [];
 
   // The table: a glossy white disc with a rounded rim on a white pedestal.
   const top = new THREE.Mesh(new THREE.CircleGeometry(TABLE_RADIUS, 96).rotateX(-Math.PI / 2), tableMaterial);
@@ -304,6 +310,92 @@ export function buildTable(): Table {
   const strawTop = (straw.top as { y: number }).y;
   batch.add(glossy, paint(new THREE.CylinderGeometry(sf.r, sf.r, strawTop - 50, 12, 24).translate(sf.x, (strawTop + 50) / 2, sf.z), (p) => (Math.floor((p.y - 50) / 7) % 2 === 0 ? "#ff5f9e" : "#ffffff")));
 
+  // The saucer under the jar, its glaze following its shape in the world exactly, and the lemonade pooled in its moat.
+  const saucer = one("saucer");
+  const pool = PATCHES.find((p) => p.name === "lemonade")!;
+  const ripples = new Float32Array(RIPPLES * 4).fill(-100);
+  const poolUniforms = { uTime: { value: 0 }, uRipples: { value: ripples } };
+  {
+    const f = saucer.footprint as { x: number; z: number; r: number };
+    const top = saucer.top as { inner: number; lip: number };
+    const profile: THREE.Vector2[] = [];
+    for (let i = 0; i <= 48; i++) {
+      const r = lf.r - 2 + ((f.r - lf.r + 2) * i) / 48;
+      profile.push(new THREE.Vector2(r, topHeight(saucer, f.x + Math.min(r, f.r * 0.9999), f.z)));
+    }
+    // Outside in, so its faces point up.
+    profile.reverse();
+    batch.add(juicy, paint(new THREE.LatheGeometry(profile, 72).translate(f.x, 0, f.z), (p) => {
+      const s = Math.hypot(p.x - f.x, p.z - f.z) / f.r;
+      if (Math.abs(s - top.lip) < 0.025) return "#ffffff";
+      if (Math.abs(s - (top.lip + 0.065)) < 0.01) return "#1f8fd0";
+      return s < top.inner + 0.02 ? "#86d3f0" : "#45b4e6";
+    }));
+    // The pool: a blob round the patch, kept to the moat's flat floor.
+    const pc = { x: pool.x - f.x, z: pool.z - f.z };
+    const shape = new THREE.Shape();
+    for (let i = 0; i <= 40; i++) {
+      const a = (i / 40) * Math.PI * 2;
+      const rr = pool.r * (0.95 + Math.sin(a * 3 + 1) * 0.08 + Math.sin(a * 5) * 0.04);
+      let x = pc.x + Math.cos(a) * rr;
+      let z = pc.z + Math.sin(a) * rr;
+      const d = Math.hypot(x, z);
+      const k = Math.min(top.inner * f.r - 0.4, Math.max(lf.r + 0.6, d)) / d;
+      x *= k;
+      z *= k;
+      if (i === 0) shape.moveTo(x, -z);
+      else shape.lineTo(x, -z);
+    }
+    const well = (saucer.top as { well: number }).well;
+    const poolMaterial = new THREE.MeshStandardMaterial({ color: "#ffd84a", roughness: 0.03, transparent: true, opacity: 0.78, envMapIntensity: 2, depthWrite: false });
+    poolMaterial.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, poolUniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying vec2 vTable;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvTable = (modelMatrix * vec4(transformed, 1.0)).xz;");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", `#include <common>\nvarying vec2 vTable;\nuniform float uTime;\nuniform vec4 uRipples[${RIPPLES}];`)
+        .replace(
+          "#include <normal_fragment_maps>",
+          /* glsl */ `#include <normal_fragment_maps>
+{
+  // Rings spreading from each disturbance at 6 mm/s, a millimetre apart, dying away; they bend the reflection and catch the light.
+  vec2 slope = vec2(0.0);
+  float shade = 0.0;
+  for (int i = 0; i < ${RIPPLES}; i++) {
+    vec4 r = uRipples[i];
+    float age = uTime - r.z;
+    if (age < 0.0 || age > 4.0) continue;
+    vec2 d = vTable - r.xy;
+    float dist = length(d) + 1e-4;
+    float front = age * 6.0;
+    float behind = front - dist;
+    if (behind < 0.0) continue;
+    float fade = exp(-behind * 0.5) * exp(-age * 0.8) * r.w * smoothstep(0.0, 0.5, behind);
+    slope += d / dist * sin(behind * 6.0) * fade * 0.6;
+    shade += cos(behind * 6.0) * fade;
+  }
+  diffuseColor.rgb *= 1.0 + shade * 0.22;
+  vec3 tilted = normalize(vec3(-slope.x, 1.0, -slope.y));
+  normal = normalize((viewMatrix * vec4(tilted, 0.0)).xyz);
+}`,
+        );
+    };
+    poolMaterial.customProgramCacheKey = () => "pool";
+    const poolMesh = new THREE.Mesh(new THREE.ShapeGeometry(shape, 1).rotateX(-Math.PI / 2).translate(f.x, well + 0.05, f.z), poolMaterial);
+    poolMesh.renderOrder = 2;
+    freeze(poolMesh);
+    group.add(poolMesh);
+    seen.push(poolMesh);
+    materials.push(poolMaterial);
+  }
+  let nextRipple = 0;
+  let nextDrip = 2;
+  const ripple = (x: number, z: number, strength: number) => {
+    ripples.set([x, z, poolUniforms.uTime.value, strength], nextRipple * 4);
+    nextRipple = (nextRipple + 1) % RIPPLES;
+  };
+
   // The jam jar, with a gingham cover tied with a ribbon.
   const jam = one("jam");
   const jf = jam.footprint as { x: number; z: number; r: number };
@@ -336,7 +428,7 @@ export function buildTable(): Table {
   // Strawberries: a whole one with seeds and leaves, and a half one, cut face up.
   const berry = one("strawberry");
   batch.add(juicy, paint(domeGeometry(berry, 14, 40), (p) => {
-    const k = Math.min(1, p.y / 24);
+    const k = Math.min(1, p.y / 20);
     return new THREE.Color("#c3001f").lerp(new THREE.Color("#ff3048"), k);
   }));
   const half = one("strawberry half");
@@ -569,8 +661,18 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
   seen.push(...batch.build(group));
   return {
     group,
-    materials: [glossy, juicy, matte, tableMaterial, cloth, glass, liquid, dewMaterial],
+    materials: [glossy, juicy, matte, tableMaterial, cloth, glass, liquid, dewMaterial, ...materials],
     seen,
-    update() {},
+    update(time: number) {
+      poolUniforms.uTime.value = time;
+      // Now and then a drop of dew runs down the jar into the pool.
+      if (time > nextDrip) {
+        const a = rnd.range(0, Math.PI * 2);
+        const r = Math.sqrt(rnd.next()) * pool.r * 0.7;
+        ripple(pool.x + Math.cos(a) * r, pool.z + Math.sin(a) * r, rnd.range(0.4, 1));
+        nextDrip = time + rnd.range(3, 9);
+      }
+    },
+    ripple,
   };
 }

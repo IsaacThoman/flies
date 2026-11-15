@@ -22,7 +22,42 @@ export type Top =
    * height both its radius), power 1 a paraboloid that meets its base at a
    * slope a fly can walk up.
    */
-  | { kind: "dome"; base: number; height: number; power: number };
+  | { kind: "dome"; base: number; height: number; power: number }
+  /**
+   * A dish, round its footprint's middle: a flat well (`well` high) out to
+   * `inner` of the way to the edge, rising to a rounded rim (`rim` high) at
+   * `lip`, then down a gentle outside to the table at the edge. Each slope is
+   * a smoothstep, so the rim's crest and both feet are level.
+   */
+  | { kind: "dish"; well: number; rim: number; inner: number; lip: number };
+
+/** The highest point of a top. */
+export function topPeak(top: Top): number {
+  return top.kind === "flat" ? top.y : top.kind === "dome" ? top.base + top.height : top.rim;
+}
+
+const smooth = (t: number) => t * t * (3 - 2 * t);
+const smoothSlope = (t: number) => 6 * t * (1 - t);
+
+/** A dish's height at normalised distance s from its middle, and its slope dy/ds. */
+function dishProfile(top: Extract<Top, { kind: "dish" }>, s: number, out: { y: number; dy: number }) {
+  if (s <= top.inner) {
+    out.y = top.well;
+    out.dy = 0;
+  } else if (s <= top.lip) {
+    const w = top.lip - top.inner;
+    const t = (s - top.inner) / w;
+    out.y = top.well + (top.rim - top.well) * smooth(t);
+    out.dy = ((top.rim - top.well) * smoothSlope(t)) / w;
+  } else {
+    const w = 1 - top.lip;
+    const t = Math.min(1, (s - top.lip) / w);
+    out.y = top.rim * (1 - smooth(t));
+    out.dy = (-top.rim * smoothSlope(t)) / w;
+  }
+  return out;
+}
+const scratchProfile = { y: 0, dy: 0 };
 
 export type Solid = {
   name: string;
@@ -88,6 +123,7 @@ export function topHeight(solid: Solid, x: number, z: number): number {
   const { top } = solid;
   if (top.kind === "flat") return top.y;
   const s2 = Math.min(1, footprintS2(solid.footprint, x, z));
+  if (top.kind === "dish") return dishProfile(top, Math.sqrt(s2), scratchProfile).y;
   return top.base + top.height * Math.pow(1 - s2, top.power);
 }
 
@@ -106,7 +142,11 @@ export function topNormal(solid: Solid, x: number, z: number, out: Vec3): Vec3 {
   }
   const s2 = Math.min(0.999999, footprintS2(f, x, z));
   // dy/d(s²)
-  const k = -top.height * top.power * Math.pow(1 - s2, top.power - 1);
+  let k: number;
+  if (top.kind === "dish") {
+    const s = Math.sqrt(s2);
+    k = s > 1e-9 ? dishProfile(top, s, scratchProfile).dy / (2 * s) : 0;
+  } else k = -top.height * top.power * Math.pow(1 - s2, top.power - 1);
   let gx: number;
   let gz: number;
   if (f.kind === "circle") {

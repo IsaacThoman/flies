@@ -14,6 +14,7 @@
 import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
 import type { FlyBody } from "@fly/body";
+import { topPeak } from "@fly/world";
 import type { RayHit, World } from "@fly/world";
 
 export type View = "close" | "follow" | "wide" | "table" | "above";
@@ -355,8 +356,7 @@ export class CameraDirector {
     const hit = world.raycast(from, d, this.#hit);
     if (hit && hit.solid >= 0 && hit.t < 400) {
       const solid = world.solids[hit.solid];
-      const top = solid.top.kind === "flat" ? solid.top.y : solid.top.base + solid.top.height;
-      score += Math.min(1, top / 30) * (1 - hit.t / 500) * 0.8;
+      score += Math.min(1, topPeak(solid.top) / 30) * (1 - hit.t / 500) * 0.8;
     }
     return score;
   }
