@@ -1,0 +1,10 @@
+{
+  "name": "@fly/world",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Where the fly lives: an exact description of the picnic table, what can be stood on, bumped into and eaten.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
