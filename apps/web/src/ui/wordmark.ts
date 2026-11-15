@@ -23,8 +23,6 @@ export function drawWordmark(g: CanvasRenderingContext2D, x: number, y: number, 
   face.addColorStop(1, "#bfe9ff");
   g.fillStyle = face;
   g.fillText(word, x, y);
-  // A strip of gloss across the top of the letters.
-  g.globalCompositeOperation = "source-atop";
   g.restore();
   // A tiny fly orbiting the word.
   const a = t * 0.9;
