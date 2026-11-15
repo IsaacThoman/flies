@@ -23,7 +23,7 @@ import { timeFromClock } from "./scene/light.ts";
 import { loadSettings, saveSettings } from "./settings.ts";
 import type { Settings } from "./settings.ts";
 import { Stage } from "./stage.ts";
-import { BALL_RADIUS, Hands } from "./tools/hands.ts";
+import { BALL_RADIUS, Hands, SWOOP_BEARING } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
 import { drawHud } from "./ui/hud.ts";
 import type { HudState } from "./ui/hud.ts";
@@ -86,6 +86,7 @@ export class Game implements Shell {
   #clockAt = 0;
   #air = new THREE.Vector3();
   #middle = new THREE.Vector3();
+  #floorAt = (x: number, z: number) => this.life.world.heightAt(x, z);
   #ndc = new THREE.Vector3();
   #ndc2 = new THREE.Vector2();
   #ray = new THREE.Raycaster();
@@ -245,6 +246,8 @@ export class Game implements Shell {
     this.peaks.loom = Math.max(this.peaks.loom * fade, life.sensed.loomLeft, life.sensed.loomRight);
     this.peaks.looming = Math.max(this.peaks.looming * fade, rates?.["vision.looming left"] ?? 0, rates?.["vision.looming right"] ?? 0);
     this.fly.update(life.body, life.intent, life.eating, paused ? 0 : dt);
+    // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
+    director.prefer = this.hands.current.id === "swoop" && this.nav.current === "play" && !this.wallpaper ? Math.PI - SWOOP_BEARING : null;
     director.update(life.body, dt);
     if (this.time > this.#clockAt) this.#followLight();
     stage.update(this.time, dt, director.camera);
@@ -256,7 +259,7 @@ export class Game implements Shell {
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
     for (let i = 0; i < this.bubbles.popped.length; i++) this.audio.play("pop", this.#nearness(this.bubbles.popped[i]) * 0.7, 0.9 + Math.random() * 0.3);
     this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
-    this.handsView.update(this.hands, life.pantry, director.camera, this.time, dt, (x, z) => life.world.heightAt(x, z));
+    this.handsView.update(this.hands, life.pantry, director.camera, this.time, dt, this.#floorAt, life.body.position);
     const near = Math.max(0, Math.min(1, 1 - (director.camera.position.distanceTo(this.fly.root.position) - 15) / 120));
     const wings = paused ? 0 : life.body.mode === "airborne" ? Math.max(0.15, life.intent.wings) : life.intent.wingPose * 0.6;
     this.audio.follow(wings, paused ? 0 : Math.abs(life.body.groundSpeed) / 12, near, dt);

@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { FOODS } from "@fly/world";
-import type { FoodKind, Pantry } from "@fly/world";
+import type { FoodKind, Pantry, Vec3 } from "@fly/world";
 import { canvas2d, canvasTexture, paint, random } from "../scene/build.ts";
 import { BALL_RADIUS, TOOLS } from "./hands.ts";
 import type { Hands, ToolId } from "./hands.ts";
@@ -157,6 +157,38 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolId, x: numbe
   g.restore();
 }
 
+/** The feather's length, mm: a small plume next to a fly 2.5 mm long. */
+const FEATHER_SIZE = 7.5;
+
+/** A downy pink plume: a pale quill, barbs sweeping back from it, fluffier toward the base. Tip at the bottom. */
+function featherTexture() {
+  const { canvas, g } = canvas2d(64, 192);
+  const rnd = random(5);
+  g.lineCap = "round";
+  for (let i = 0; i < 70; i++) {
+    const t = i / 70;
+    const y = 8 + t * 176;
+    // Widest a third of the way from the quill end, narrowing to the tip.
+    const width = Math.sin(Math.min(1, (1 - t) * 1.25) * Math.PI * 0.95) * 26 + 3;
+    const fluffy = t < 0.25 ? 1 - t * 4 : 0;
+    for (const side of [-1, 1]) {
+      g.strokeStyle = `rgba(${255}, ${150 + rnd.range(0, 60)}, ${200 + rnd.range(0, 40)}, ${0.55 + rnd.range(0, 0.35)})`;
+      g.lineWidth = 1.2 + fluffy * 1.5;
+      g.beginPath();
+      g.moveTo(32, y);
+      g.quadraticCurveTo(32 + side * width * 0.6, y - 4 - fluffy * 6, 32 + side * width * rnd.range(0.85, 1.05), y - 12 - fluffy * 10 + rnd.range(-3, 3));
+      g.stroke();
+    }
+  }
+  g.strokeStyle = "rgba(255, 245, 250, 0.95)";
+  g.lineWidth = 2.5;
+  g.beginPath();
+  g.moveTo(32, 2);
+  g.lineTo(32, 186);
+  g.stroke();
+  return canvasTexture(canvas);
+}
+
 function shadowTexture() {
   const { canvas, g } = canvas2d(64, 64);
   const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -168,14 +200,24 @@ function shadowTexture() {
   return canvasTexture(canvas);
 }
 
+/** A gust: two curling strokes, white with a soft blue edge so they show on the white cloth. */
 function puffTexture() {
-  const { canvas, g } = canvas2d(64, 64);
-  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, "rgba(255,255,255,0.9)");
-  grad.addColorStop(0.5, "rgba(220,245,255,0.45)");
-  grad.addColorStop(1, "rgba(220,245,255,0)");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 64, 64);
+  const { canvas, g } = canvas2d(128, 64);
+  g.lineCap = "round";
+  const stroke = (y: number, curl: number, width: number) => {
+    g.beginPath();
+    g.moveTo(10, y);
+    g.bezierCurveTo(45, y - 10, 80, y + 8, 104, y - 2);
+    g.arc(104 - curl, y - 2, curl, 0, -Math.PI * 1.3, true);
+    g.lineWidth = width + 4;
+    g.strokeStyle = "rgba(60, 150, 230, 0.45)";
+    g.stroke();
+    g.lineWidth = width;
+    g.strokeStyle = "rgba(255, 255, 255, 0.95)";
+    g.stroke();
+  };
+  stroke(24, 9, 4);
+  stroke(44, 6, 3);
   return canvasTexture(canvas);
 }
 
@@ -219,6 +261,7 @@ export class HandsView {
   #p = new THREE.Vector3();
   #n = new THREE.Vector3();
   #right = new THREE.Vector3();
+  #iconSide = 1;
   #rnd = random(9);
   #counts: Record<FoodKind, number> = { sugar: 0, honey: 0, berry: 0, water: 0 };
   /** 0 hides the pointer and tool (the wallpaper), 1 shows them. */
@@ -263,13 +306,9 @@ export class HandsView {
     this.#ballShadow.renderOrder = 2;
     this.#ballShadow.visible = false;
     this.group.add(this.#ballShadow);
-    // A pink feather: a curved vane with a quill.
-    const shape = new THREE.Shape();
-    shape.moveTo(0, 0);
-    shape.quadraticCurveTo(4, 9, 1.2, 22);
-    shape.quadraticCurveTo(-3, 10, 0, 0);
-    const vane = paint(new THREE.ShapeGeometry(shape, 10), (p) => (Math.abs(p.x - p.y * 0.05) < 0.25 ? "#fff3fa" : p.y > 15 ? "#ff9ccc" : "#ffc6e3"));
-    this.#feather = new THREE.Mesh(vane, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: THREE.DoubleSide }));
+    // A pink feather, its tip on the pointer and its quill up toward where you sit.
+    this.#feather = new THREE.Mesh(new THREE.PlaneGeometry(FEATHER_SIZE * 0.38, FEATHER_SIZE).translate(0, FEATHER_SIZE / 2, 0), new THREE.MeshStandardMaterial({ map: featherTexture(), transparent: true, alphaTest: 0.05, roughness: 0.8, side: THREE.DoubleSide, depthWrite: false }));
+    this.#feather.renderOrder = 6;
     this.#feather.visible = false;
     this.group.add(this.#feather);
     this.#puffs = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: puffTexture(), transparent: true, depthWrite: false, opacity: 0.7 }), PUFFS);
@@ -288,7 +327,7 @@ export class HandsView {
     this.#foods.get(kind)!.setMatrixAt(i, this.#m.compose(this.#p.set(x, y, z), this.#q, this.#s.setScalar(scale)));
   }
 
-  update(hands: Hands, pantry: Pantry, camera: THREE.Camera, time: number, dt: number, floorAt: (x: number, z: number) => number) {
+  update(hands: Hands, pantry: Pantry, camera: THREE.Camera, time: number, dt: number, floorAt: (x: number, z: number) => number, fly: Vec3) {
     const showPointer = this.opacity > 0.01;
     const p = hands.pointer;
     const ring = this.#ring;
@@ -306,12 +345,15 @@ export class HandsView {
       const map = this.#icons.get(id)!;
       if (icon.material.map !== map) icon.material.map = map;
       icon.material.opacity = this.opacity;
-      // Floating up and to the right of the ring, so it stays off a fly standing just behind it.
-      const s = size * 0.5;
+      // Floating up beside the ring, on the side away from the fly, so it never covers it.
+      const s = size * 0.45;
       icon.scale.set(s, s, 1);
-      this.#right.setFromMatrixColumn(camera.matrixWorld, 0);
+      const r = this.#right.setFromMatrixColumn(camera.matrixWorld, 0);
+      const away = (p.x - fly.x) * r.x + (p.z - fly.z) * r.z;
+      this.#iconSide += ((away < -0.2 ? -1 : away > 0.2 ? 1 : this.#iconSide >= 0 ? 1 : -1) - this.#iconSide) * Math.min(1, dt * 4);
       const bob = Math.sin(time * 2.4) * size * 0.05;
-      icon.position.set(p.x + this.#right.x * size * 0.85, p.y + size * 0.6 + bob, p.z + this.#right.z * size * 0.85);
+      const out = size * 1.35 * this.#iconSide;
+      icon.position.set(p.x + r.x * out, p.y + size * 0.3 + bob, p.z + r.z * out);
       icon.visible = id !== "feather";
     } else this.#icon.visible = false;
 
@@ -345,28 +387,34 @@ export class HandsView {
     const feather = this.#feather;
     feather.visible = showPointer && hands.current.id === "feather";
     if (feather.visible) {
-      const wiggle = hands.stroking ? Math.sin(time * 18) * 0.5 : Math.sin(time * 2) * 0.1;
-      feather.position.set(p.x + Math.sin(time * 18) * (hands.stroking ? 0.8 : 0), p.y + 0.3, p.z);
-      feather.rotation.set(-0.9 + wiggle * 0.3, time * 0.3, wiggle);
+      // Leaning back toward the camera, swaying; stroking, it brushes to and fro.
+      const wiggle = hands.stroking ? Math.sin(time * 14) * 0.5 : Math.sin(time * 2) * 0.12;
+      this.#right.setFromMatrixColumn(camera.matrixWorld, 0);
+      const brush = hands.stroking ? Math.sin(time * 14) * 0.5 : 0;
+      feather.position.set(p.x + this.#right.x * brush, p.y + 0.15, p.z + this.#right.z * brush);
+      feather.quaternion.copy(camera.quaternion);
+      feather.rotateX(-0.5);
+      feather.rotateZ(0.35 + wiggle * 0.35);
       (feather.material as THREE.MeshStandardMaterial).opacity = this.opacity;
     }
 
     // Puffs stream from the camera side through the pointer while blowing.
     this.#puffTimer += dt;
     const puffs = this.#puffState;
-    if (hands.blowing && this.#puffTimer > 0.04) {
+    if (hands.blowing && this.#puffTimer > 0.1) {
       this.#puffTimer = 0;
       const d = hands.puffDirection;
       const s = this.#puffState[this.#nextPuff];
       this.#nextPuff = (this.#nextPuff + 1) % PUFFS;
       const r = this.#rnd;
       s.age = 0;
-      s.x = p.x - d.x * 40 + r.range(-4, 4);
-      s.y = p.y + 8 + r.range(-3, 3);
-      s.z = p.z - d.z * 40 + r.range(-4, 4);
-      const speed = hands.variant.id === "strong" ? 160 : 80;
+      // From a little way upwind of the spot, low, so they pass the fly rather than the lens.
+      s.x = p.x - d.x * 6 + r.range(-1.5, 1.5);
+      s.y = p.y + 0.8 + r.range(-0.4, 1.2);
+      s.z = p.z - d.z * 6 + r.range(-1.5, 1.5);
+      const speed = hands.variant.id === "strong" ? 40 : 20;
       s.vx = d.x * speed;
-      s.vy = r.range(-6, 6);
+      s.vy = r.range(-2, 2);
       s.vz = d.z * speed;
     }
     let live = 0;
@@ -378,8 +426,8 @@ export class HandsView {
       s.x += s.vx * dt;
       s.y += s.vy * dt;
       s.z += s.vz * dt;
-      const size = 4 + s.age * 14;
-      this.#m.compose(this.#p.set(s.x, s.y, s.z), cam, this.#s.setScalar(size * Math.sin(Math.min(1, s.age) * Math.PI)));
+      const size = (0.6 + s.age * 0.8) * Math.sin(Math.min(1, s.age) * Math.PI);
+      this.#m.compose(this.#p.set(s.x, s.y, s.z), cam, this.#s.set(size * 2, size, size));
       this.#m.toArray(m, live * 16);
       live++;
     }

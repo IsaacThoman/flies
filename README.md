@@ -77,7 +77,10 @@ it), never crossing over the fly when it can help it. Every move is a
 critically damped spring, so nothing overshoots or pops; walking it keeps
 pace a little ahead, and in a jump it pulls back, widens and whips round
 after the fly. It is never inside anything, nor closer to the fly than most of
-the shot's distance.
+the shot's distance. With the ball in hand it goes round to the side across the
+fly from where the ball will come, so the dive is seen past the fly. Behind the
+loading screen and the title it keeps the fly small and to the left, clear of
+the menus.
 
 After a minute with no press (Settings: 30 s to 5 min, or never) the hints,
 the shelf and the pointer fade, and the camera takes long slow shots: the

@@ -101,6 +101,12 @@ export class CameraDirector {
   lively = false;
   /** On the loading screen and the title, which have their own shot. */
   title = false;
+  /**
+   * Where to stand when something is about to happen that should be seen
+   * from there (the ball's dive, seen past the fly): the camera's angle round
+   * the fly less the fly's heading. Null to choose freely.
+   */
+  prefer: number | null = null;
   /** Pins the camera (for screenshots and art): eye and target, or null to let it move. */
   pinned: { eye: THREE.Vector3Like; target: THREE.Vector3Like; fov?: number } | null = null;
   #world: World;
@@ -287,15 +293,18 @@ export class CameraDirector {
     const facing = Math.sin(this.#azimuth - heading) >= 0 ? 1 : -1;
     let best = -Infinity;
     let bestAngle = this.#goal;
+    const preferring = this.prefer !== null && !this.wallpaper && !this.title && shot.side !== Math.PI;
+    const side = preferring ? Math.abs(this.prefer!) : shot.side;
     for (let sideSign = -1; sideSign <= 1; sideSign += 2) {
-      // Straight behind or in front there's only one side.
-      if (sideSign === 1 && (shot.side === Math.PI || shot.side === 0)) continue;
+      // Straight behind or in front there's only one side; a preferred side is one side.
+      if (sideSign === 1 && (side === Math.PI || side === 0)) continue;
+      if (preferring && sideSign !== Math.sign(this.prefer!)) continue;
       for (let k = -TRIES; k <= TRIES; k++) {
-        const angle = wrap(heading + sideSign * (shot.side + k * TRY_STEP) + this.#orbit);
+        const angle = wrap(heading + sideSign * (side + k * TRY_STEP) + this.#orbit);
         let score = this.#score(angle, distance, height, shot);
         if (score === -Infinity) continue;
         score -= Math.abs(k) * 0.2;
-        if (this.#started) {
+        if (this.#started && !preferring) {
           if (sideSign !== facing) score -= 0.5;
           score -= Math.abs(wrap(angle - this.#azimuth)) * 0.25;
         }
@@ -311,7 +320,13 @@ export class CameraDirector {
     }
     // Stay put while where it is making for still works and nothing is much better.
     const current = this.#score(this.#goal, distance, height, shot);
-    const offPreferred = Math.abs(Math.abs(wrap(this.#goal - heading - this.#orbit)) - shot.side);
+    const offPreferred = Math.abs(Math.abs(wrap(this.#goal - heading - this.#orbit)) - side);
+    // Making for a preferred side: go now, if where it's headed isn't already on it.
+    if (preferring && Math.abs(wrap(this.#goal - heading - this.prefer!)) > TRY_STEP * (TRIES + 0.5)) {
+      this.#goal = bestAngle;
+      this.#pendingFor = 0;
+      return;
+    }
     const currentScore = current - (offPreferred / TRY_STEP) * 0.2 - Math.abs(wrap(this.#goal - this.#azimuth)) * 0.25;
     if (current === -Infinity) {
       this.#goal = bestAngle;
