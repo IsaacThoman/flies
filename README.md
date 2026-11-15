@@ -3,15 +3,202 @@
 A fruit fly that lives on your Apple TV. It isn't scripted: a simulation of
 the fly's whole nervous system, 166,700 neurons wired as they are in the real
 animal, decides what it does from what it sees, tastes and feels. Feed it,
-startle it and watch it with the remote.
-
-This is being built. `docs/architecture.md` describes the design.
+startle it, tickle it and watch it with the remote; leave it alone and it is a
+living wallpaper.
 
 ```sh
 npm install
 npm run brain:fetch   # the packed connectome, 38 MB, once
 npm run dev           # the game in a browser
+npm test              # unit tests (Node)
+node apps/web/e2e/play.e2e.ts   # plays the game in headless Chromium with the real brain
 ```
 
+`docs/architecture.md` describes the parts and the rules. This file is about
+the game (`apps/web`) and its packages: `packages/world` (where the fly can
+stand, what it bumps into and eats), `packages/body` (its senses, what it makes
+of the brain's commands, how it moves, what its eyes see) and `packages/ui`
+(the menu kit).
+
+## Playing
+
+The fly lives on a round café table by a lake: lemonade, a jam jar, a
+strawberry and a half, cherries, a slice of orange, a green apple, sugar cubes,
+a drip of honey, a smear of jam, dew. Everything is built in code.
+
+In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
+Back, space for Play/Pause) and dragging the mouse over the picture is the
+touch surface.
+
+| On the remote | Does |
+| --- | --- |
+| Swipe on the touch surface | Moves your hand (the glowing ring) across the table. Until you do, it waits just in front of the fly's mouth, and it drifts back there after 15 s. |
+| Left / Right | Picks a tool from the shelf. |
+| Up / Down | Picks the tool's kind: which food, how hard to blow, the time of day, the camera. |
+| Select | Uses the tool: drops food, throws the ball. Hold it to tickle or blow. On Light and View it steps round the choices. |
+| Play/Pause, or Back | The pause menu. Play/Pause or Back again carries on. |
+| Back on the title | Leaves the app. |
+
+The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
+beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
+the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
+from where you sit toward the spot), **Light** (morning, midday, golden hour,
+dusk, night) and **View** (follow, close up, whole table, from above, and
+through the fly's eyes). The screen always shows what each button does now,
+and a caption at the top says what the fly is doing.
+
+After a minute with no press (Settings: 30 s to 5 min, or never) the hints,
+the shelf and the pointer fade, and the camera takes long slow shots: the
+wallpaper. Any press or touch brings the controls back and does nothing else.
+
+The title also offers **Just watch** (the wallpaper straight away), **Inside
+its brain** (live: every sense going in, every command coming out with the
+neurons it is read from and their firing rates, spikes a second, active
+neurons), **About the fly**, and **Settings** (sound and outdoor volume, pixel
+size, wallpaper timing and camera, the eyes' detail, button hints, frame
+stats).
+
+## The fly's senses
+
+Each frame `packages/body/src/senses.ts` works out what the body feels and
+`apps/web/src/life.ts` hands it to the brain:
+
+| Sense | From |
+| --- | --- |
+| `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
+| `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms, as in the desktop pet. |
+| `touch` | The feather: 0.4 resting on the fly, 1 stroking. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
+| `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, or past the table's edge. |
+| `wind` | Its own speed through the air (its velocity less the air's: a puff, or flying, or falling), full at 1 m/s. |
+| `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
+| `grounded` | On its feet. |
+
+## What the body adds
+
+The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
+with the desktop pet's thresholds, smoothing and hysteresis: walk above 0.3
+until below 0.15, back up when `back` beats `walk` by 0.15, take off as
+`escape` rises past 0.5, groom and wing poses above 0.2, feed above 0.15 until
+below 0.05, commands older than 500 ms ignored). Steering is continuous: `turn`
+sets the yaw rate (3 rad/s at full turn walking, a third of that standing, 5
+in the air).
+
+Things the body does that the brain did not decide, each written down where it
+lives (`packages/body/src/motion.ts` unless noted):
+
+- **Physics.** It stays on the surface it walks on and tilts with it, slides
+  along what it walks into, steps up nothing taller than 0.9 mm, and falls off
+  ledges and slopes steeper than 65°. In the air it has weight, drag (7/s) and
+  the push of its wings: lift in proportion to the `wings` command (0.6 holds
+  its weight) and thrust along its heading.
+- **The take-off's direction.** The escape command launches it (380 to 620 mm/s
+  up and 160 to 340 away, by how far past 0.5 it went); the direction is the
+  body's: away from the ball if the ball is in the air, else straight ahead.
+- **Staying in the world.** It doesn't walk off the table's edge, and in the
+  air it is drawn back inside 360 mm of the middle and below 320 mm.
+- **Turning from a wall.** Pressed against a wall it faces for 2 s, it turns
+  away (about 125°). The brain feels the wall on its antennae, but nothing in
+  the model turns it.
+- **Landing.** Coming down on something it can stand on puts it on its feet.
+- **Lining its mouth up with food.** Once the brain wants to feed and its feet
+  or mouth are on something sweet, the body shuffles the last millimetre to put
+  its mouth on it. Stopping is the brain's (sugar stops DNg100); the shuffle
+  isn't.
+- **The pose.** Grooming is shown only while it stands, and a bout lingers
+  about 1.5 s after the command fades (as in the pet). The crouch follows the
+  raw escape command.
+
+The caption ("Walking", "Eating honey", "Grooming", "Flying") names what the
+body is doing on the brain's commands; "Inside its brain" shows the commands
+and the neurons themselves.
+
+## Flight
+
+Flight is simple physics driven by the brain's flight motor neurons. With this
+connectome the wings beat hard only while something looms (the escape) and a
+little in wind, and losing ground contact doesn't start flight (see
+`packages/brain/README.md`). So in practice a take-off is a short powered jump that comes down wherever it
+comes down, steered by `turn`, sometimes onto the sugar or the fruit.
+
+## The eyes
+
+`apps/web/src/eyes/eyes.ts` and `packages/body/src/vision.ts`. Every 50 ms
+(Settings, The fly's eyes: Low is 16×16 views at 20 Hz, High 32×32 at 30 Hz,
+Off sends no light) the world is rendered round the fly's head as six 90° views
+of a low-detail layer of the scene (sky, table, fruit and jars, ball, bubbles,
+food, feather; never the menus or the pointer), read back once, and resampled
+to each facet (bilinear, by the facet's direction in the head frame).
+Brightness is weighted as a fly's outer photoreceptors (Rh1, mostly blue-green)
+see it, 0.1 R + 0.45 G + 0.45 B, so a blue sky is bright to it. While the ball
+is in the air the eyes refresh every frame: the looming detectors answer how
+fast dark area grows, and at 20 Hz a throw set off the escape about one time in
+six against one in two at 60 Hz.
+
+The ball is dark in green and blue for the same reason: the eyes answer
+darkening, not brightening. It dives in low from the fly's front-right, where
+the connectome's looming pathway is strongest and where the fly is seen
+against the bright table, stops just short, hangs a moment and veers away. It
+casts a shadow. With all that, the fly takes off about half the time: that is
+the model's answer, not a dice roll in the game.
+
+**View → Fly's eyes** shows the same picture to the player: one dot per facet
+(the brain's 1,772, or, for a brain without eyes, a stand-in layout labelled as
+such), laid out by where each looks, left eye on the left.
+
+## The frame
+
+The game renders 640×480, laid out for 16:9 (the picture is squeezed into the
+4:3 buffer and stretched back out), with no antialiasing and a pixel ratio of
+1; Settings → Pixels renders the world at 320×240 or 214×160 under crisp
+640×480 menus. The backdrop (sky, clouds, hills, lollipop trees, lawn, daisies,
+lake) and the table are two passes with their own depth ranges. Static things
+are merged by material into a handful of meshes with vertex colours and frozen
+matrices; seeds, sugar grains, dew, trees, daisies, clouds, bubbles, puffs and
+food are instanced. Menus and hints are one 2D canvas drawn over the frame,
+uploaded only when something on it changes (at most 30 times a second; the
+in-game shimmer at 10).
+
+Measured in Chromium on an M-series Mac (Settings → Frame stats shows it live,
+and the canvas's `data-calls`, `data-triangles`, `data-frame-ms` and
+`data-eyes-ms`): playing, 24 draws and about 100,000 triangles a frame; on a
+frame the eyes refresh, about 65 draws and 230,000 triangles, the eyes' own
+part about 40 draws and 1.5 to 2.5 ms (mostly the read-back). JavaScript per
+frame about 1.3 to 2.5 ms in the browser. The end-to-end test fails above 150
+draws or 500,000 triangles. Nothing here has been measured on an Apple TV yet.
+
+## Remote and host
+
+The game reads the remote only as `packages/contracts/src/remote.ts` describes,
+and sets `window.__flyAtRoot` while on the title (or loading), where Back
+leaves the app. Arrow presses that arrive during a fast swipe are taken as the
+swipe's and ignored. In a browser the brain is `packages/brain` in a Web Worker
+(`apps/web/src/brain/worker-driver.ts`), fed `brain/connectome.bin`, which the
+dev and preview servers serve and the production build copies in
+(`vite.config.ts`). On the Apple TV it is `globalThis.__native.brain`
+(`apps/web/src/brain/native-driver.ts`), which allocates nothing per frame.
+Sound is synthesised into buffers at start-up (no oscillators or filters):
+wing buzz following the wings, patter while it walks, the outdoors (breeze,
+lake, birds), and small sounds for the tools and menus. Settings are kept in
+`localStorage`.
+
+## Tests
+
+`npm test` runs, without a browser: the world's standing, bumping, ray and food
+queries; the body's thresholds, motion, collisions, falls, flight, landing,
+wall turning and mouth alignment; every sense; the facet layout, cube mapping
+and resampling; both brain drivers against fakes and the worker's host; the
+brain meter; the menu kit's focus, values, scrolling and navigation.
+
+`node apps/web/e2e/play.e2e.ts` plays the game with the real brain: the title
+appears once the brain wakes, the menus are walked with the keys, honey is
+tasted and eaten, the ball is thrown until the fly takes off, Play/Pause
+pauses and resumes, the wallpaper comes and goes, Back reaches the root, and
+the frame stays within its draw budget. `node scripts/play.ts` drives and
+screenshots the game step by step (see the comment at its top).
+
+## Credits
+
 The wiring is the [FlyEM male CNS connectome](https://male-cns.janelia.org/)
-(Janelia Research Campus, CC-BY 4.0).
+(Janelia Research Campus, CC-BY 4.0). The neuron model follows Shiu et al.,
+"A Drosophila computational brain model reveals sensorimotor processing",
+Nature 634 (2024).

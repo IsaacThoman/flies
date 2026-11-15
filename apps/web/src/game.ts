@@ -335,7 +335,11 @@ export class Game implements Shell {
     for (const press of remote.presses) {
       const screen = this.nav.current;
       if (screen === "play") this.#playPress(press.button, press.repeat);
-      else this.screens[screen].press(press.button, press.repeat);
+      else if (press.button === "playPause" && this.paused && !press.repeat) {
+        // Play/Pause carries on from anywhere in the pause menu, as on any TV.
+        this.audio.play("select");
+        this.play();
+      } else this.screens[screen].press(press.button, press.repeat);
     }
     if (this.nav.current === "play" && (remote.dx !== 0 || remote.dy !== 0)) this.#movePointer(remote.dx, remote.dy);
   }
@@ -450,6 +454,10 @@ export class Game implements Shell {
     const s = life.sensed;
     d.screen = this.#loading ? "loading" : this.nav.current;
     d.stack = this.nav.stack.join(">");
+    const shown = this.nav.current;
+    const menu = shown === "play" ? null : (this.screens[shown] as { menu?: { focused?: { id: string } } }).menu;
+    d.focus = menu?.focused?.id ?? "";
+    d.atRoot = String((window as unknown as Record<string, unknown>)[AT_ROOT_PROPERTY]);
     d.wallpaper = String(this.wallpaper);
     d.brain = life.brain.status;
     d.neurons = String(life.brain.neurons);

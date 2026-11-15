@@ -105,9 +105,9 @@ export class BrainScreen implements Screen {
     text(g, sub, x + 30, y + 66, { size: 14, color: SOFT });
 
     // The network's activity: a glowing trace of spikes per second.
-    const gx = x + 300;
-    const gy = y + 26;
-    const gw = w - 330;
+    const gx = x + 430;
+    const gy = y + 22;
+    const gw = w - 452;
     const gh = 70;
     roundedRect(g, gx, gy, gw, gh, 14);
     g.fillStyle = "rgba(0, 16, 50, 0.5)";
