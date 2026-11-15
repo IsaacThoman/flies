@@ -23,7 +23,8 @@
     "tvos:typecheck": "tsc -p apps/tvos",
     "tvos:art": "node scripts/placeholder-art.ts",
     "brain:fetch": "node packages/brain/scripts/fetch.ts",
-    "brain:pack": "node packages/brain/scripts/pack.ts"
+    "brain:pack": "node packages/brain/scripts/pack.ts",
+    "fly:viewer": "vite --config packages/fly/viewer/vite.config.ts"
   },
   "dependencies": {
     "three": "^0.186.1"

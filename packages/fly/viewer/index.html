@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fly viewer</title>
+    <style>
+      :root { color-scheme: light; font: 13px/1.35 system-ui, sans-serif; }
+      body { margin: 0; background: #0d2238; color: #eaf4ff; display: flex; height: 100vh; overflow: hidden; }
+      #stage { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; }
+      #stage canvas { display: block; }
+      #stage.game canvas { image-rendering: pixelated; }
+      #panel { width: 270px; padding: 12px; overflow-y: auto; background: #102a44; box-shadow: -2px 0 8px #0006; }
+      #panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #8fc4ff; margin: 14px 0 6px; }
+      label { display: grid; grid-template-columns: 62px 1fr 42px; align-items: center; gap: 6px; margin: 3px 0; }
+      label.check { display: flex; gap: 6px; }
+      output { text-align: right; font-variant-numeric: tabular-nums; color: #bcd; }
+      button { margin: 2px; padding: 3px 8px; background: #1d4a73; color: inherit; border: 1px solid #2f6a9e; border-radius: 4px; cursor: pointer; }
+      button:hover { background: #26608f; }
+      select { background: #1d4a73; color: inherit; border: 1px solid #2f6a9e; }
+      #stats { font: 11px/1.4 ui-monospace, monospace; color: #9bc; white-space: pre; }
+      body.shot #panel { display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="panel">
+      <h2>Pose</h2>
+      <div id="sliders"></div>
+      <label class="check"><input type="checkbox" id="airborne" /> airborne</label>
+      <h2>Presets</h2>
+      <div id="presets"></div>
+      <h2>View</h2>
+      <label class="check"><input type="checkbox" id="turntable" /> turntable</label>
+      <label class="check"><input type="checkbox" id="roam" checked /> walk over the ground</label>
+      <label class="check"><input type="checkbox" id="game" /> in-game size (640×480)</label>
+      <label>length px<input type="range" id="gamePx" min="30" max="300" step="1" value="100" /><output id="gamePxOut">100</output></label>
+      <label class="check"><input type="checkbox" id="env" /> environment map</label>
+      <label class="check"><input type="checkbox" id="shadows" checked /> shadows</label>
+      <label>slow-mo<select id="timescale"><option value="1">1×</option><option value="0.25">¼×</option><option value="0.1">⅒×</option><option value="0">paused</option></select></label>
+      <label>frame rate<select id="fps"><option value="0">display</option><option value="60">60</option><option value="30">30</option></select></label>
+      <div id="cameras"></div>
+      <h2>Stats</h2>
+      <div id="stats"></div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
