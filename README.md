@@ -11,7 +11,7 @@ npm install
 npm run brain:fetch   # the packed connectome, 38 MB, once
 npm run dev           # the game in a browser
 npm test              # unit tests (Node)
-node apps/web/e2e/play.e2e.ts   # plays the game in headless Chromium with the real brain
+npm run e2e           # plays the game in headless Chromium with the real brain
 ```
 
 `docs/architecture.md` describes the parts and the rules. This file is about
@@ -189,7 +189,7 @@ wall turning and mouth alignment; every sense; the facet layout, cube mapping
 and resampling; both brain drivers against fakes and the worker's host; the
 brain meter; the menu kit's focus, values, scrolling and navigation.
 
-`node apps/web/e2e/play.e2e.ts` plays the game with the real brain: the title
+`npm run e2e` plays the game with the real brain: the title
 appears once the brain wakes, the menus are walked with the keys, honey is
 tasted and eaten, the ball is thrown until the fly takes off, Play/Pause
 pauses and resumes, the wallpaper comes and goes, Back reaches the root, and
