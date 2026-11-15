@@ -118,9 +118,7 @@ export class SenseTracker {
         if (both || left > 0) loomLeft = Math.max(loomLeft, loom);
         if (both || left < 0) loomRight = Math.max(loomRight, loom);
       }
-      if (this.#sizes.size > input.looming.length) {
-        for (const id of this.#sizes.keys()) if (!input.looming.some((thing) => thing.id === id)) this.#sizes.delete(id);
-      }
+      // (Things that stop looming keep their last size: the list is small and fixed.)
     } else {
       this.#sizes.clear();
     }
@@ -132,16 +130,8 @@ export class SenseTracker {
     this.#touch = release(this.#touch, Math.max(clamp01(input.stroke), hit), RELEASE, dt);
 
     // Antennae: just ahead of the head, one each side. Each feels a wall it presses into.
-    const pressing = (side: 1 | -1) => {
-      const tip = body.point(HEAD_AHEAD + ANTENNA_AHEAD, HEAD_UP, side * ANTENNA_SIDE, this.#probe);
-      if (!world.onTable(tip.x, tip.z)) return body.onFeet;
-      const floor = body.onFeet ? body.position.y + STEP_UP : tip.y;
-      return world.heightAt(tip.x, tip.z) > floor;
-    };
-    const blockedLeft = pressing(1);
-    const blockedRight = pressing(-1);
-    this.#bumpLeft = release(this.#bumpLeft, blockedLeft ? 1 : 0, RELEASE, dt);
-    this.#bumpRight = release(this.#bumpRight, blockedRight ? 1 : 0, RELEASE, dt);
+    this.#bumpLeft = release(this.#bumpLeft, this.#pressing(body, world, 1) ? 1 : 0, RELEASE, dt);
+    this.#bumpRight = release(this.#bumpRight, this.#pressing(body, world, -1) ? 1 : 0, RELEASE, dt);
 
     // Wind: its own speed through the air.
     const v = body.velocity;
@@ -176,6 +166,13 @@ export class SenseTracker {
     out.sweet = clamp01(sweet);
     out.grounded = body.onFeet;
     return out;
+  }
+
+  #pressing(body: FlyBody, world: World, side: 1 | -1) {
+    const tip = body.point(HEAD_AHEAD + ANTENNA_AHEAD, HEAD_UP, side * ANTENNA_SIDE, this.#probe);
+    if (!world.onTable(tip.x, tip.z)) return body.onFeet;
+    const floor = body.onFeet ? body.position.y + STEP_UP : tip.y;
+    return world.heightAt(tip.x, tip.z) > floor;
   }
 
   #eye(state: EyeState, seen: number, dt: number) {

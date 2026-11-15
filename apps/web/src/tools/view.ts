@@ -279,6 +279,14 @@ export class HandsView {
     this.group.add(this.#puffs);
   }
 
+  #place(kind: FoodKind, x: number, y: number, z: number, scale: number, spin: number) {
+    const i = this.#counts[kind];
+    if (i >= MAX_FOOD) return;
+    this.#counts[kind] = i + 1;
+    this.#q.setFromAxisAngle(UP, spin);
+    this.#foods.get(kind)!.setMatrixAt(i, this.#m.compose(this.#p.set(x, y, z), this.#q, this.#s.setScalar(scale)));
+  }
+
   update(hands: Hands, pantry: Pantry, camera: THREE.Camera, time: number, dt: number, floorAt: (x: number, z: number) => number) {
     const showPointer = this.opacity > 0.01;
     const p = hands.pointer;
@@ -306,16 +314,8 @@ export class HandsView {
     // Food: falling, and lying where it fell, shrinking as it is eaten.
     const counts = this.#counts;
     for (const kind of KINDS) counts[kind] = 0;
-    const place = (kind: FoodKind, x: number, y: number, z: number, scale: number, spin: number) => {
-      const mesh = this.#foods.get(kind)!;
-      const i = counts[kind];
-      if (i >= MAX_FOOD) return;
-      counts[kind] = i + 1;
-      this.#q.setFromAxisAngle(UP, spin);
-      mesh.setMatrixAt(i, this.#m.compose(this.#p.set(x, y, z), this.#q, this.#s.setScalar(scale)));
-    };
-    for (const f of hands.falling) place(f.kind, f.x, f.y, f.z, 1, f.y * 0.3);
-    for (const food of pantry.foods) if (food.kind !== "patch") place(food.kind, food.x, food.y, food.z, 0.35 + 0.65 * Math.cbrt(food.amount), food.id * 1.7);
+    for (const f of hands.falling) this.#place(f.kind, f.x, f.y, f.z, 1, f.y * 0.3);
+    for (const food of pantry.foods) if (food.kind !== "patch") this.#place(food.kind, food.x, food.y, food.z, 0.35 + 0.65 * Math.cbrt(food.amount), food.id * 1.7);
     for (const [kind, mesh] of this.#foods) {
       const n = counts[kind];
       mesh.count = n;

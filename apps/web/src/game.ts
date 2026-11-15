@@ -23,7 +23,7 @@ import type { Settings } from "./settings.ts";
 import { Stage } from "./stage.ts";
 import { BALL_RADIUS, Hands } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
-import { caption, drawHud } from "./ui/hud.ts";
+import { drawHud } from "./ui/hud.ts";
 import type { HudState } from "./ui/hud.ts";
 import { drawLoading } from "./ui/loading.ts";
 import { Overlay } from "./ui/overlay.ts";
@@ -73,7 +73,8 @@ export class Game implements Shell {
   #loading = true;
   #awakeAt = -1;
   #datasetAt = 0;
-  #hudKey = "";
+  /** What the HUD last drew, to tell when it needs drawing again. */
+  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false };
   #hudAt = 0;
   #changedAt = -10;
   #touched = false;
@@ -86,6 +87,7 @@ export class Game implements Shell {
   #eye = { x: 0, y: 0, z: 0 };
   #lastScreen: ScreenId | "loading" = "loading";
   #hud: HudState;
+  #eyesInfo = { facets: 0, standIn: false, ms: 0, calls: 0 };
 
   constructor(canvas: HTMLCanvasElement, remote: Remote, brain: BrainDriver) {
     this.canvas = canvas;
@@ -425,10 +427,25 @@ export class Game implements Shell {
       hud.changed = this.time - this.#changedAt;
       hud.spikes = this.meter.spikesPerSecond;
       hud.brainRunning = this.brain.status === "running";
-      hud.eyes = this.#showEyes() ? { facets: this.eyes.facets, standIn: this.eyes.standIn, ms: this.eyes.costMs, calls: this.eyes.costCalls } : null;
-      const key = `${this.hands.tool}:${this.hands.variants[this.hands.tool]}:${caption(hud.activity, hud.food)}:${this.hands.following}:${this.#touched}:${hud.hints}`;
-      if (key !== this.#hudKey || hud.changed < 0.3 || this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS) {
-        this.#hudKey = key;
+      if (this.#showEyes()) {
+        const e = this.#eyesInfo;
+        e.facets = this.eyes.facets;
+        e.standIn = this.eyes.standIn;
+        e.ms = this.eyes.costMs;
+        e.calls = this.eyes.costCalls;
+        hud.eyes = e;
+      } else hud.eyes = null;
+      const k = this.#hudKey;
+      const changed = k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes;
+      if (changed || hud.changed < 0.3 || this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS) {
+        k.tool = this.hands.tool;
+        k.variant = this.hands.variants[this.hands.tool];
+        k.activity = hud.activity;
+        k.food = hud.food;
+        k.following = this.hands.following;
+        k.touched = this.#touched;
+        k.hints = hud.hints;
+        k.eyes = !!hud.eyes;
         this.#hudAt = this.time;
         overlay.dirty = true;
       }

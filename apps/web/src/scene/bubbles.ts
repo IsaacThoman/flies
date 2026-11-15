@@ -59,6 +59,7 @@ export class Bubbles {
   #rnd = random(23);
   #uniforms = { light: { value: new THREE.Vector3() }, time: { value: 0 } };
   #order: number[] = [];
+  #distance = new Float64Array(BUBBLES);
   #world: World;
   #pool = Array.from({ length: BUBBLES }, () => new THREE.Vector3());
 
@@ -131,8 +132,19 @@ export class Bubbles {
     const cy = camera.position.y;
     const cz = camera.position.z;
     const bubbles = this.#bubbles;
-    const distance = (i: number) => (bubbles[i].x - cx) ** 2 + (bubbles[i].y - cy) ** 2 + (bubbles[i].z - cz) ** 2;
-    this.#order.sort((a, b) => distance(b) - distance(a));
+    const order = this.#order;
+    const d = this.#distance;
+    for (let i = 0; i < bubbles.length; i++) d[i] = (bubbles[i].x - cx) ** 2 + (bubbles[i].y - cy) ** 2 + (bubbles[i].z - cz) ** 2;
+    // Insertion sort, far to near: a dozen bubbles, nearly in order from the last frame.
+    for (let i = 1; i < order.length; i++) {
+      const k = order[i];
+      let j = i - 1;
+      while (j >= 0 && d[order[j]] < d[k]) {
+        order[j + 1] = order[j];
+        j--;
+      }
+      order[j + 1] = k;
+    }
     const m = this.mesh.instanceMatrix.array as Float32Array;
     for (let k = 0; k < this.#order.length; k++) {
       const b = bubbles[this.#order[k]];
