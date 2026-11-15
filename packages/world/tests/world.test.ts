@@ -1,0 +1,116 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { FOODS, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TABLE_RADIUS, World, createPicnic, createSurface } from "../src/index.ts";
+import type { RayHit } from "../src/index.ts";
+
+const world = createPicnic();
+const solid = (name: string) => SOLIDS.find((s) => s.name === name)!;
+const hit = (): RayHit => ({ point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 0 }, solid: -2, t: 0 });
+
+test("the bare table is level at 0 and ends at its edge", () => {
+  const s = world.surface(0, -150, createSurface());
+  assert.equal(s.y, 0);
+  assert.equal(s.solid, -1);
+  assert.equal(s.onTable, true);
+  assert.deepEqual(s.normal, { x: 0, y: 1, z: 0 });
+  assert.equal(world.surface(TABLE_RADIUS + 1, 0, createSurface()).onTable, false);
+});
+
+test("flat tops stand at their height, the highest one wins where they overlap", () => {
+  const lemonade = solid("lemonade").footprint as { x: number; z: number };
+  assert.equal(world.heightAt(lemonade.x - 20, lemonade.z), 112);
+  // The stacked sugar cube sits over the two below it.
+  assert.equal(world.heightAt(126, 61), 32);
+  assert.equal(world.heightAt(111, 56), 16);
+});
+
+test("domes rise to their full height in the middle and meet their base at the edge", () => {
+  const cherry = solid("cherry").footprint as { x: number; z: number; r: number };
+  assert.ok(Math.abs(world.heightAt(cherry.x, cherry.z) - cherry.r * 2) < 1e-9);
+  const half = solid("strawberry half");
+  const f = half.footprint as { x: number; z: number; rx: number; rz: number; angle: number };
+  assert.ok(Math.abs(world.heightAt(f.x, f.z) - 9) < 1e-9);
+  // Near the edge of its long axis it's nearly down at the table.
+  const x = f.x + Math.sin(f.angle) * f.rz * 0.99;
+  const z = f.z + Math.cos(f.angle) * f.rz * 0.99;
+  assert.ok(world.heightAt(x, z) < 0.3);
+});
+
+test("a dome's normal leans away from its middle", () => {
+  const apple = solid("apple").footprint as { x: number; z: number; r: number };
+  const s = world.surface(apple.x + apple.r * 0.5, apple.z, createSurface());
+  assert.ok(s.normal.x > 0.3 && s.normal.y > 0.5);
+  assert.ok(Math.abs(Math.hypot(s.normal.x, s.normal.y, s.normal.z) - 1) < 1e-9);
+});
+
+test("the way out of a wall points away from it, and off the table back toward the middle", () => {
+  const jam = solid("jam").footprint as { x: number; z: number; r: number };
+  const n = { x: 0, y: 0, z: 0 };
+  assert.equal(world.wallNormal(jam.x - jam.r + 0.5, jam.z, 1, n), true);
+  assert.ok(n.x < -0.99);
+  assert.equal(world.wallNormal(0, -150, 1, n), false);
+  assert.equal(world.wallNormal(TABLE_RADIUS + 5, 0, 1, n), true);
+  assert.ok(n.x < -0.99);
+});
+
+test("rays land on tops, sides and the table, and miss the sky", () => {
+  const lemonade = solid("lemonade").footprint as { x: number; z: number };
+  const down = world.raycast({ x: lemonade.x - 10, y: 400, z: lemonade.z }, { x: 0, y: -1, z: 0 }, hit());
+  assert.ok(down);
+  assert.ok(Math.abs(down.point.y - 112) < 1e-9);
+  assert.equal(SOLIDS[down.solid].name, "lemonade");
+  // Straight at the jar's side from the right.
+  const side = world.raycast({ x: lemonade.x + 200, y: 40, z: lemonade.z }, { x: -1, y: 0, z: 0 }, hit());
+  assert.ok(side);
+  assert.ok(Math.abs(side.point.x - (lemonade.x + 34)) < 1e-6);
+  assert.ok(side.normal.x > 0.99);
+  const table = world.raycast({ x: 0, y: 100, z: -150 }, { x: 0, y: -1, z: 0 }, hit());
+  assert.equal(table?.solid, -1);
+  assert.equal(world.raycast({ x: 0, y: 100, z: 0 }, { x: 0, y: 1, z: 0 }, hit()), null);
+  assert.equal(world.raycast({ x: TABLE_RADIUS + 50, y: 100, z: 0 }, { x: 0, y: -1, z: 0 }, hit()), null);
+});
+
+test("a slanted ray meets a dome on its surface", () => {
+  const apple = solid("apple").footprint as { x: number; z: number; r: number };
+  const d = { x: -Math.SQRT1_2, y: -Math.SQRT1_2, z: 0 };
+  const h = world.raycast({ x: apple.x + 200, y: 260, z: apple.z }, d, hit());
+  assert.ok(h);
+  assert.equal(SOLIDS[h.solid].name, "apple");
+  assert.ok(Math.abs(h.point.y - world.heightAt(h.point.x, h.point.z)) < 0.01);
+});
+
+test("the pantry knows what is tasted where", () => {
+  const pantry = new Pantry(world, PATCHES);
+  const honey = PATCHES.find((p) => p.name === "honey")!;
+  assert.equal(pantry.touching(honey.x, 0, honey.z, 0.3)?.name, "honey");
+  assert.equal(pantry.touching(honey.x + honey.r + 5, 0, honey.z, 0.3), null);
+  // Too far above it to taste.
+  assert.equal(pantry.touching(honey.x, 10, honey.z, 0.3), null);
+  const sugarTop = pantry.touching(126, 32, 61, 0.3);
+  assert.equal(sugarTop?.name, "sugar");
+});
+
+test("eating takes food down, dropped food is gone when eaten, patches come back", () => {
+  const pantry = new Pantry(new World([], 300), [{ name: "honey", x: 0, z: 0, r: 5, sweet: 1 }]);
+  const patch = pantry.foods[0];
+  pantry.eat(patch, 1, 1);
+  assert.ok(patch.amount < 1 && patch.amount > 0.5);
+  pantry.update(PATCH_RECOVERY);
+  assert.equal(patch.amount, 1);
+  const sugar = pantry.drop("sugar", 50, 0);
+  assert.equal(sugar.sweet, FOODS.sugar.sweet);
+  for (let i = 0; i < 100; i++) pantry.eat(sugar, 1, 0.1);
+  assert.equal(pantry.foods.includes(sugar), false);
+  // Water is touched but isn't sweet.
+  const water = pantry.drop("water", 80, 0);
+  assert.equal(pantry.touching(80, 0, 0, 0.3), water);
+  assert.equal(water.sweet, 0);
+});
+
+test("at most a few dropped foods at once: the oldest makes way", () => {
+  const pantry = new Pantry(new World([], 300));
+  const first = pantry.drop("berry", 0, 0);
+  for (let i = 0; i < MAX_DROPPED; i++) pantry.drop("sugar", i * 10, 0);
+  assert.equal(pantry.foods.length, MAX_DROPPED);
+  assert.equal(pantry.foods.includes(first), false);
+});

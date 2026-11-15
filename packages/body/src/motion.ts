@@ -51,8 +51,9 @@ export const AIR_RADIUS = 360;
 export const AIR_CEILING = 320;
 /** Seconds pressed against a wall it faces before the body turns it away. */
 export const WALL_PATIENCE = 2;
-/** Turning away from a wall, rad/s. */
+/** Turning away from a wall, rad/s, and how far it turns (rad). */
 export const WALL_TURN = 2;
+export const WALL_AWAY = 2.2;
 /** Shuffling to bring its mouth to food it is eating, mm/s, and how close (mm) is close enough. */
 export const FEED_ALIGN_SPEED = 4;
 export const FEED_ALIGN_SLOP = 0.25;
@@ -100,6 +101,8 @@ export class FlyBody {
   turnRate = 0;
   #world: World;
   #pressed = 0;
+  #awayLeft = 0;
+  #awayDir = 1;
   #probe = createSurface();
   #wall = v3();
 
@@ -205,14 +208,20 @@ export class FlyBody {
     }
 
     // Pressed against a wall it faces for a while: the body turns it away.
-    if (this.blocked && speed > 0) this.#pressed += dt;
-    else this.#pressed = 0;
-    if (this.#pressed >= WALL_PATIENCE && world.wallNormal(this.point(HEAD_AHEAD + 0.2, 0, 0, scratchA).x, scratchA.z, p.y + STEP_UP, this.#wall)) {
-      // Turn the way that brings its heading toward the wall's outward normal soonest.
-      const leftOf = this.#wall.x * Math.cos(this.yaw) - this.#wall.z * Math.sin(this.yaw);
-      yawRate = (leftOf >= 0 ? 1 : -1) * WALL_TURN;
+    if (this.#awayLeft > 0) {
+      this.#awayLeft -= dt;
+      yawRate = this.#awayDir * WALL_TURN;
       speed = 0;
-      if (this.#pressed >= WALL_PATIENCE + 1.2) this.#pressed = 0;
+    } else {
+      if (this.blocked && speed > 0) this.#pressed += dt;
+      else this.#pressed = 0;
+      if (this.#pressed >= WALL_PATIENCE && world.wallNormal(this.point(HEAD_AHEAD + 0.2, 0, 0, scratchA).x, scratchA.z, p.y + STEP_UP, this.#wall)) {
+        // Turn the way that brings its heading round to the wall's outward normal soonest, about a third of a turn.
+        const leftOf = this.#wall.x * Math.cos(this.yaw) - this.#wall.z * Math.sin(this.yaw);
+        this.#awayDir = leftOf >= 0 ? 1 : -1;
+        this.#awayLeft = WALL_AWAY / WALL_TURN;
+        this.#pressed = 0;
+      }
     }
 
     this.yaw = wrap(this.yaw + yawRate * dt);
@@ -227,8 +236,8 @@ export class FlyBody {
       if (result === "blocked") {
         // Slide along what's in the way.
         const ahead = scratchA;
-        ahead.x = p.x + mx;
-        ahead.z = p.z + mz;
+        ahead.x = p.x + mx + fx * HEAD_AHEAD * FLY_LENGTH * Math.sign(speed);
+        ahead.z = p.z + mz + fz * HEAD_AHEAD * FLY_LENGTH * Math.sign(speed);
         if (world.wallNormal(ahead.x, ahead.z, p.y + STEP_UP, this.#wall)) {
           const into = mx * this.#wall.x + mz * this.#wall.z;
           if (into < 0) {
@@ -264,6 +273,15 @@ export class FlyBody {
     const p = this.position;
     const x = p.x + mx;
     const z = p.z + mz;
+    // The head (or the tail, backing up) mustn't go into anything either.
+    const length = Math.hypot(mx, mz);
+    if (length > 0) {
+      const sign = mx * Math.sin(this.yaw) + mz * Math.cos(this.yaw) >= 0 ? 1 : -1;
+      const reach = HEAD_AHEAD * FLY_LENGTH * sign;
+      const hx = x + Math.sin(this.yaw) * reach;
+      const hz = z + Math.cos(this.yaw) * reach;
+      if (!world.onTable(hx, hz) || world.heightAt(hx, hz) - p.y > STEP_UP) return "blocked";
+    }
     const next = world.surface(x, z, this.#probe);
     if (!next.onTable) return "blocked";
     const rise = next.y - p.y;
