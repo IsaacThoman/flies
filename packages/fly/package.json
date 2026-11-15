@@ -1,0 +1,10 @@
+{
+  "name": "@fly/fly",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The fly's body: a 3D model that knows how a fly moves.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
