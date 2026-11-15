@@ -42,11 +42,11 @@ const SHELF: Shot = {
   time: "morning",
 };
 
-// The launch image: what the loading screen shows behind its panel, with the wordmark.
+// The launch image: what the loading screen shows (the fly small and to the left, as the camera's title shot frames it), with the wordmark.
 const SPLASH: Shot = {
   layer: "all",
   fly: { x: -14, z: 56 },
-  camera: { around: Math.PI + 0.4, distance: 9, height: 1.5, fov: 32, aimAbove: 1.7 },
+  camera: { around: Math.PI + 0.4, distance: 16, height: 2.2, fov: 30, aimAbove: 1.0, shiftRight: 4.3 },
   turn: -0.6,
   time: "noon",
   wordmark: { y: 0.31, size: 0.133 },

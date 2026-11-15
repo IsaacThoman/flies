@@ -188,17 +188,19 @@ The game renders 640×480, laid out for 16:9 (the picture is squeezed into the
 640×480 menus. The backdrop (sky, clouds, hills, lollipop trees, lawn, daisies,
 lake) and the table are two passes with their own depth ranges. Static things
 are merged by material into a handful of meshes with vertex colours and frozen
-matrices; seeds, sugar grains, dew, trees, daisies, clouds, bubbles, puffs and
-food are instanced. Menus and hints are one 2D canvas drawn over the frame,
+matrices (the crumbs, pips and saucer go into those too, and the small things'
+contact shadows are one merged mesh); seeds, sugar grains, dew, trees,
+daisies, clouds, bubbles, fireflies, puffs and food are instanced. Menus and hints are one 2D canvas drawn over the frame,
 uploaded only when something on it changes (at most 30 times a second; the
 in-game shimmer at 10).
 
 Measured in Chromium on an M-series Mac (Settings → Frame stats shows it live,
 and the canvas's `data-calls`, `data-triangles`, `data-frame-ms` and
-`data-eyes-ms`): playing, 24 draws and about 100,000 triangles a frame; on a
-frame the eyes refresh, about 65 draws and 230,000 triangles, the eyes' own
-part about 40 draws and 1.5 to 2.5 ms (mostly the read-back). JavaScript per
-frame about 1.3 to 2.5 ms in the browser. The end-to-end test fails above 150
+`data-eyes-ms`): playing, 23 draws and about 105,000 triangles a frame; on a
+frame the eyes refresh, about 70 draws and 280,000 triangles (the most the
+end-to-end run sees is about 85 draws and 300,000), the eyes' own part about 45
+draws and 1.5 to 2.5 ms (mostly the read-back). JavaScript per frame about 1 to
+2.5 ms in the browser. The end-to-end test fails above 150
 draws or 500,000 triangles. Nothing here has been measured on an Apple TV yet.
 
 ## Remote and host
@@ -222,7 +224,11 @@ lake, birds), and small sounds for the tools and menus. Settings are kept in
 queries; the body's thresholds, motion, collisions, falls, flight, landing,
 wall turning and mouth alignment; every sense; the facet layout, cube mapping
 and resampling; both brain drivers against fakes and the worker's host; the
-brain meter; the menu kit's focus, values, scrolling and navigation.
+brain meter; the menu kit's focus, values, scrolling and navigation; the
+camera (the fly's size on screen in each view, kept in the picture through a
+long wandering walk and a jump, never inside anything, never jumping); the
+bubbles (low ones pass the fly, settle as domes, burst on it and are felt);
+that the crumbs, pips, strawberry and saucer can be walked over.
 
 `npm run e2e` plays the game with the real brain: the title
 appears once the brain wakes, the menus are walked with the keys, honey is
