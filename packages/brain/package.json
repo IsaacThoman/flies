@@ -1,0 +1,14 @@
+{
+  "name": "@fly/brain",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A spiking simulation of the fruit fly's nervous system, wired from the male CNS connectome, that drives the fly.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "data:pack": "node scripts/pack.ts",
+    "data:fetch": "node scripts/fetch.ts"
+  }
+}
