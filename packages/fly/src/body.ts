@@ -53,7 +53,7 @@ const C = {
 
 // roughness, clearcoat, sheen, region
 const M = {
-  thorax: [0.55, 0.3, 0.6, 0] as Mat,
+  thorax: [0.55, 0.3, 0.6, 2] as Mat,
   head: [0.5, 0.35, 0.4, 0] as Mat,
   eye: [0.3, 0, 0.35, 1] as Mat,
   ocellus: [0.12, 1, 0, 0] as Mat,
@@ -84,10 +84,11 @@ function thoraxPoint(u: number, v: number, out: number[]) {
   const front = smooth(0.45, 1, sz);
   const hump = sy > 0 ? 0.03 * sy * sy * Math.exp(-(((sz - 0.15) / 0.6) ** 2)) : 0;
   const belly = sy < 0 ? 0.85 : 1;
-  // Square-ish shoulders in plan: the sides stay full almost to the front.
-  out[0] = cx + rx * sx * (1 - 0.28 * front * front) * (1 - 0.06 * sy * sy);
-  out[1] = cy - 0.03 * front + ry * sy * (1 - 0.45 * front * front) * belly + hump;
-  out[2] = cz + rz * sz * (sz > 0 ? 1 - 0.08 * sy * sy : 1);
+  // Broad rounded shoulders in plan: the front is blunted rather than pointed.
+  const blunt = sz > 0 ? Math.pow(sz, 0.65) : sz;
+  out[0] = cx + rx * sx * (1 - 0.18 * front * front) * (1 - 0.06 * sy * sy);
+  out[1] = cy - 0.03 * front + ry * sy * (1 - 0.35 * front * front) * belly + hump;
+  out[2] = cz + rz * blunt * (sz > 0 ? 1 - 0.12 * sy * sy : 1);
 }
 
 function scutellumPoint(u: number, v: number, out: number[]) {
@@ -220,7 +221,7 @@ export function buildBody(): THREE.BufferGeometry {
 
   // Thorax: scutum above, pleura on the sides, sternum below.
   b.surface({
-    joint: J.thorax, pivot: PIVOT.thorax, nu: 40, nv: 28, point: thoraxPoint, mat: M.thorax,
+    joint: J.thorax, pivot: PIVOT.thorax, nu: 32, nv: 24, point: thoraxPoint, mat: M.thorax,
     color: (p) => {
       const up = (p[1] - THORAX.centre[1]) / THORAX.radii[1];
       const lateral = Math.abs(p[0]);
@@ -230,12 +231,14 @@ export function buildBody(): THREE.BufferGeometry {
       const stripe = Math.exp(-(((lateral - 0.045) / 0.012) ** 2)) * smooth(0.5, 0.85, up) * smooth(-0.05, 0.1, p[2]);
       return mix(c, C.scutumStripe, 0.5 * stripe);
     },
+    // The microchaetae: a hair every hundredth of a body length or so, over the whole thorax.
+    eye: (u, v) => [u * 86, v * 57],
   });
-  b.surface({ joint: J.thorax, pivot: PIVOT.thorax, nu: 24, nv: 12, point: scutellumPoint, mat: [0.42, 0.45, 0.4, 0], color: () => C.scutellum });
+  b.surface({ joint: J.thorax, pivot: PIVOT.thorax, nu: 18, nv: 8, point: scutellumPoint, mat: [0.42, 0.45, 0.4, 0], color: () => C.scutellum });
 
   // Head capsule, with the ocellar triangle on top and the pale face below.
   b.surface({
-    joint: J.head, pivot: PIVOT.neck, nu: 32, nv: 20, point: headPoint, mat: M.head,
+    joint: J.head, pivot: PIVOT.neck, nu: 24, nv: 16, point: headPoint, mat: M.head,
     color: (p) => {
       const up = (p[1] - HEAD.centre[1]) / HEAD.radii[1], fwd = (p[2] - HEAD.centre[2]) / HEAD.radii[2];
       let c = mix(C.face, C.frons, smooth(-0.15, 0.25, up));
@@ -250,13 +253,13 @@ export function buildBody(): THREE.BufferGeometry {
     rings: [{ p: [0, -0.02, -0.015], r: 0.055 }, { p: [0, -0.012, 0.01], r: 0.058 }, { p: [0, -0.005, 0.035], r: 0.06 }],
   });
   for (const mirror of [false, true]) {
-    b.surface({ joint: J.head, pivot: PIVOT.neck, nu: 40, nv: 22, point: eyePoint, mat: M.eye, color: () => C.eye, eye: eyeGrid, mirror });
+    b.surface({ joint: J.head, pivot: PIVOT.neck, nu: 32, nv: 16, point: eyePoint, mat: M.eye, color: () => C.eye, eye: eyeGrid, mirror });
   }
   // Ocelli: three simple eyes in a triangle on the vertex.
   const ocelli: Vec3[] = [[0, 0.453, 0.418], [0.017, 0.452, 0.392], [-0.017, 0.452, 0.392]];
   for (const o of ocelli) {
     b.surface({
-      joint: J.head, pivot: PIVOT.neck, nu: 10, nv: 6, mat: M.ocellus, color: () => C.ocellus,
+      joint: J.head, pivot: PIVOT.neck, nu: 8, nv: 4, mat: M.ocellus, color: () => C.ocellus,
       point: (u, v, out) => {
         const [sx, sy, sz] = sphere(u, v);
         out[0] = o[0] + 0.0105 * sx; out[1] = o[1] + 0.007 * sy; out[2] = o[2] + 0.0105 * sz;
@@ -272,7 +275,7 @@ export function buildBody(): THREE.BufferGeometry {
 
   // Abdomen: six visible segments, each tergite darker along its back edge, the male's last two dark all over.
   b.surface({
-    joint: J.abdomen, pivot: PIVOT.abdomen, nu: 40, nv: 36, point: abdomenPoint,
+    joint: J.abdomen, pivot: PIVOT.abdomen, nu: 32, nv: 30, point: abdomenPoint,
     split: { joint: J.abdomenTip, pivot: PIVOT.abdomenTip, where: (p) => p[2] < PIVOT.abdomenTip[2] },
     mat: (p) => ((p[1] - ABDOMEN.centre[1]) / ABDOMEN.radii[1] < -0.5 ? M.membrane : M.abdomen),
     color: (p) => {
@@ -299,7 +302,7 @@ export function buildBody(): THREE.BufferGeometry {
     b.tube({ joint: J.haltere + (mirror ? 1 : 0), rings, sides: 6, color: C.haltereStalk, mat: M.soft, mirror });
     const k = scale(dir, HALTERE.stalk + HALTERE.knob * 0.7);
     b.surface({
-      joint: J.haltere + (mirror ? 1 : 0), pivot: [0, 0, 0], nu: 12, nv: 8, mat: [0.35, 0.5, 0.4, 0], color: () => C.haltereKnob, mirror,
+      joint: J.haltere + (mirror ? 1 : 0), pivot: [0, 0, 0], nu: 8, nv: 6, mat: [0.35, 0.5, 0.4, 0], color: () => C.haltereKnob, mirror,
       point: (u, v, out) => {
         const [sx, sy, sz] = sphere(u, v);
         out[0] = k[0] + HALTERE.knob * sx; out[1] = k[1] + HALTERE.knob * 0.85 * sy; out[2] = k[2] + HALTERE.knob * 1.15 * sz;
@@ -313,10 +316,10 @@ export function buildBody(): THREE.BufferGeometry {
 
 function antenna(b: MeshBuilder, mirror: boolean) {
   const joint = J.antenna + (mirror ? 1 : 0);
-  const ellipsoid = (centre: number[], axis: number[], len: number, w: number, th: number, color: Rgb, mat: Mat) => {
+  const ellipsoid = (centre: number[], axis: number[], len: number, w: number, th: number, color: Rgb, mat: Mat, nu = 8, nv = 5) => {
     const x = unit(axis), side = unit(cross(x, [0, 0, 1])), up = cross(side, x);
     b.surface({
-      joint, pivot: [0, 0, 0], nu: 14, nv: 10, mat, color: () => color, mirror,
+      joint, pivot: [0, 0, 0], nu, nv, mat, color: () => color, mirror,
       point: (u, v, out) => {
         const [sx, sy, sz] = sphere(u, v);
         for (let k = 0; k < 3; k++) out[k] = centre[k] + x[k] * len * sz + side[k] * w * sx + up[k] * th * sy;
@@ -331,7 +334,7 @@ function antenna(b: MeshBuilder, mirror: boolean) {
   const funAxis = unit([0.15, -0.9, 0.38]);
   const funBase = scale(pedicelAxis, 0.024);
   const fun = add(funBase, scale(funAxis, 0.026));
-  ellipsoid(fun, funAxis, 0.029, 0.016, 0.011, C.funiculus, M.soft);
+  ellipsoid(fun, funAxis, 0.029, 0.016, 0.011, C.funiculus, M.soft, 12, 8);
 
   // The arista: a feathery bristle from the top of the third segment, with branches above and below.
   const root = add(funBase, add(scale(funAxis, 0.008), [0.01, 0, 0.005]));
@@ -358,14 +361,14 @@ function proboscis(b: MeshBuilder) {
   // Each piece is built along its joint's x axis; the rig points the axes.
   const tube = (joint: number, length: number, r0: number, r1: number, color: Rgb, mat: Mat) => {
     const rings: Ring[] = [0, 0.33, 0.66, 1].map((t) => ({ p: [length * t, 0, 0], r: r0 + (r1 - r0) * t }));
-    b.tube({ joint, rings, sides: 10, color, mat, caps: true });
+    b.tube({ joint, rings, sides: 8, color, mat, caps: true });
   };
   tube(J.rostrum, PROBOSCIS.rostrum, 0.026, 0.021, C.rostrum, M.soft);
   tube(J.haustellum, PROBOSCIS.haustellum, 0.017, 0.014, C.haustellum, M.leg);
   // The labellum: two soft lobes whose undersides carry the food channels (pseudotracheae).
   for (const side of [1, -1]) {
     b.surface({
-      joint: J.labellum, pivot: [0, 0, 0], nu: 14, nv: 10, mat: M.soft,
+      joint: J.labellum, pivot: [0, 0, 0], nu: 10, nv: 6, mat: M.soft,
       color: (p) => {
         const channels = 0.5 + 0.5 * Math.cos(Math.atan2(p[1], p[2] * side) * 7);
         return mix(C.labellum, C.haustellum, 0.35 * channels * smooth(0.02, 0.035, p[0]));
@@ -382,7 +385,7 @@ function proboscis(b: MeshBuilder) {
 function addLeg(b: MeshBuilder, leg: number) {
   const spec = LEGS[legPair(leg)], pair = legPair(leg);
   const base = J.leg + leg * LEG_SEGMENTS;
-  const seg = (k: number, length: number, profile: (t: number) => number, color: Rgb | ((t: number) => Rgb), n = 6, sides = 8) => {
+  const seg = (k: number, length: number, profile: (t: number) => number, color: Rgb | ((t: number) => Rgb), n = 6, sides = 6) => {
     const rings: Ring[] = [];
     for (let i = 0; i <= n; i++) {
       const t = i / n;
@@ -403,7 +406,7 @@ function addLeg(b: MeshBuilder, leg: number) {
     const rings: Ring[] = [0, 0.5, 1].map((t) => ({ p: [tip + 0.002 + 0.009 * t, -0.001 - 0.005 * t * t, side * (0.003 + 0.004 * t)], r: 0.0024 * (1 - 0.8 * t) }));
     b.tube({ joint: base + 4, rings, sides: 4, color: C.claw, mat: M.claw });
     b.surface({
-      joint: base + 4, pivot: [0, 0, 0], nu: 8, nv: 6, mat: M.soft, color: () => C.pulvillus,
+      joint: base + 4, pivot: [0, 0, 0], nu: 6, nv: 4, mat: M.soft, color: () => C.pulvillus,
       point: (u, v, out) => {
         const [sx, sy, sz] = sphere(u, v);
         out[0] = tip + 0.002 + 0.005 * sz; out[1] = -0.004 + 0.0028 * sy; out[2] = side * 0.0035 + 0.003 * sx;

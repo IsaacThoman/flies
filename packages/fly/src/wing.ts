@@ -64,7 +64,7 @@ export function buildWingTexture(width = 256, height = 128): THREE.DataTexture {
         }
       }
       // A faint grey toward the base, where the fine hairs are densest.
-      const smoke = 0.2 + 0.08 * (1 - x);
+      const smoke = 0.13 + 0.07 * (1 - x);
       const a = smoke + (0.88 - smoke) * v;
       const o = (j * width + i) * 4;
       for (let c = 0; c < 3; c++) data[o + c] = Math.round(membrane[c] + (vein[c] - membrane[c]) * v);

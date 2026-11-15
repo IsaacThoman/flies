@@ -22,9 +22,9 @@ export const PIVOT = {
 
 export const THORAX = { centre: [0, 0.335, 0.135] as Vec3, radii: [0.15, 0.155, 0.2] as Vec3 };
 export const SCUTELLUM = { centre: [0, 0.43, -0.058] as Vec3, radii: [0.075, 0.034, 0.062] as Vec3 };
-export const HEAD = { centre: [0, 0.335, 0.398] as Vec3, radii: [0.155, 0.13, 0.092] as Vec3 };
+export const HEAD = { centre: [0, 0.335, 0.392] as Vec3, radii: [0.155, 0.13, 0.095] as Vec3 };
 /** The compound eye: an ellipsoid turned out and a little forward. */
-export const EYE = { centre: [0.058, 0.34, 0.408] as Vec3, radii: [0.106, 0.12, 0.09] as Vec3, yaw: 0.3 };
+export const EYE = { centre: [0.058, 0.34, 0.403] as Vec3, radii: [0.106, 0.12, 0.092] as Vec3, yaw: 0.3 };
 export const ABDOMEN = { centre: [0, 0.295, -0.25] as Vec3, radii: [0.128, 0.11, 0.25] as Vec3 };
 /** Where each abdominal segment (A1 to A6) ends, as a fraction of the abdomen from front to tip. */
 export const ABDOMINAL_SEGMENTS = [0.12, 0.3, 0.47, 0.63, 0.8, 1];

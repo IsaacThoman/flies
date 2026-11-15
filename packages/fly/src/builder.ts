@@ -9,7 +9,7 @@ import * as THREE from "three";
 import type { Vec3 } from "./anatomy.ts";
 
 export type Rgb = [number, number, number];
-/** roughness, clearcoat, sheen, region (1 = compound eye) */
+/** roughness, clearcoat, sheen, region (1 = compound eye, 2 = cuticle with fine hairs) */
 export type Mat = readonly [number, number, number, number];
 
 const linear = new THREE.Color();
@@ -32,7 +32,7 @@ export type SurfacePart = {
   mat: Mat | ((p: number[], u: number, v: number) => Mat);
   /** Builds the mirror image (x negated) instead: the right-hand copy of a left part. */
   mirror?: boolean;
-  /** Facet-grid coordinates for the compound eye. */
+  /** Pattern coordinates: the facet grid of a compound eye, or the fine hairs on the thorax. */
   eye?: (u: number, v: number) => [number, number];
   /** Hands the vertices where `where` holds to a second joint. */
   split?: { joint: number; pivot: Vec3; where: (p: number[], u: number, v: number) => boolean };
@@ -145,7 +145,7 @@ export class MeshBuilder {
     const rad = rings.map((r) => r.r);
     // Rounded ends: extra rings closing toward the axis.
     if (part.caps) {
-      const capRings = 3;
+      const capRings = 2;
       const start: number[][] = [], startR: number[] = [], end: number[][] = [], endR: number[] = [];
       const dir0 = unit(sub(pts[1], pts[0])), dirN = unit(sub(pts[pts.length - 1], pts[pts.length - 2]));
       for (let k = capRings; k >= 1; k--) {

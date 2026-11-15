@@ -472,7 +472,7 @@ export class FlyRig {
       const elevation = lift + 0.07 * Math.sin(2 * TAU * phase) * blur;
       const rotation = 0.7 * Math.sin(TAU * phase) * blur;
       const strokeAngle = (Math.PI / 2 + 0.13) * (1 - open) + sweepAngle * open;
-      const elev = -0.07 * (1 - open) + elevation * open;
+      const elev = -0.1 * (1 - open) + elevation * open;
       const alpha = (c === 0 ? 1 : 0) * (1 - blur) + blur * (0.16 + (c === bright ? 0.2 : 0));
 
       // Left wing relative to the thorax: hinge, stroke plane, sweep, elevation, rotation.

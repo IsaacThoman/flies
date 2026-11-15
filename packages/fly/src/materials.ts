@@ -98,12 +98,27 @@ const SKY_REFLECTION = /* glsl */ `
 #endif
 `;
 
+// Fine hairs (microchaetae) on the thorax: a jittered lattice of short dark
+// hairs lying back along the body, fading out like the facets do.
+const HAIRS = /* glsl */ `
+if (vFlyMat.w > 1.5) {
+  vec2 g = vFlyEye;
+  vec2 gw = fwidth(g);
+  float detail = 1.0 - smoothstep(0.2, 0.55, max(gw.x, gw.y));
+  vec2 cell = floor(g);
+  vec2 jitter = fract(sin(vec2(dot(cell, vec2(127.1, 311.7)), dot(cell, vec2(269.5, 183.3)))) * 43758.5453) - 0.5;
+  vec2 f = fract(g) - 0.5 - jitter * 0.5;
+  float hair = 1.0 - smoothstep(0.1, 0.18, length(vec2(f.x * 2.4, f.y * 0.8)));
+  diffuseColor.rgb *= 1.0 - 0.5 * hair * detail;
+}
+`;
+
 // Compound eye: a hexagonal lattice of facets, each a little dome, fading
 // out when facets get smaller than a pixel (by their screen-space
 // derivatives), plus the pseudopupil: the dark spot where you look straight
 // down the ommatidia, which follows the viewer across the eye.
 const EYE = /* glsl */ `
-if (vFlyMat.w > 0.5) {
+if (vFlyMat.w > 0.5 && vFlyMat.w < 1.5) {
   vec2 g = vFlyEye;
   vec2 gw = fwidth(g);
   float detail = 1.0 - smoothstep(0.3, 0.85, max(gw.x, gw.y));
@@ -145,7 +160,7 @@ export function createBodyMaterial(uniforms: FlyUniforms): THREE.MeshPhysicalMat
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>\nvarying vec4 vFlyMat;\nvarying vec2 vFlyEye;\n${SKY}`)
       .replace("#include <roughnessmap_fragment>", "float roughnessFactor = vFlyMat.x;")
-      .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>\n${EYE}`)
+      .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>\n${EYE}\n${HAIRS}`)
       .replace(
         "#include <lights_physical_fragment>",
         `#include <lights_physical_fragment>
@@ -221,7 +236,7 @@ export function createWingMaterial(uniforms: FlyUniforms, map: THREE.Texture): T
         "#include <opaque_fragment>",
         `{
   float flyA0 = diffuseColor.a;
-  vec3 flyShine = totalSpecular * vFlyAlpha * 1.4;
+  vec3 flyShine = totalSpecular * vFlyAlpha;
   float flyA1 = min(1.0, flyA0 + dot(flyShine, vec3(0.2126, 0.7152, 0.0722)));
   outgoingLight = (totalDiffuse * flyA0 + flyShine) / max(flyA1, 1e-4);
   diffuseColor.a = flyA1;
