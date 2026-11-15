@@ -56,6 +56,9 @@ type Report = {
   text: { width: number; inked: number } | null;
   readback: { ok: boolean; reads: number; meanMs: number; maxMs: number; frameMs: number; plainFrameMs: number } | null;
   readbackAsync: { ok: boolean; reads: number; meanMs: number; meanFrames: number; frameMs: number } | null;
+  layers: { target: boolean; screen: boolean } | null;
+  clipping: { renderer: string; wrong: number; pixels: number } | null;
+  halfFloat: boolean | null;
   audio: { beeps: number; ended: number; decoded: { length: number; sampleRate: number } | null };
   storage: boolean | null; fetched: string | null;
   brain: { neurons?: number; connections?: number; facets?: number[]; rates?: string[]; states?: number; command?: Record<string, number>; maxSimMsAfterBurst?: number; error?: string } | null;
@@ -121,6 +124,15 @@ try {
   // The eye's readback, both ways.
   assert.ok(r.readback?.ok && r.readback.reads > 0, `readRenderTargetPixels: ${JSON.stringify(r.readback)}`);
   assert.ok(r.readbackAsync?.ok, `readRenderTargetPixelsAsync: ${JSON.stringify(r.readbackAsync)}`);
+  // The game's two passes: the depth clear between them, on a render target and on the screen.
+  assert.deepEqual(r.layers, { target: true, screen: true }, 'the table pass draws over the backdrop pass');
+  assert.equal(r.halfFloat, true, 'an RGBA16F render target (reflections) renders and keeps values over 1');
+  // Clipping is the GPU's. Apple's software renderer, which the simulator draws with, loses some
+  // of the triangles it clips; any other renderer must get every pixel.
+  const c = r.clipping;
+  assert.ok(c && c.pixels > 0, 'the clipping check ran');
+  const softwareClipping = /Apple Software Renderer/.test(c.renderer);
+  if (!softwareClipping) assert.equal(c.wrong, 0, `clipping on ${c.renderer}: ${c.wrong} of ${c.pixels} table pixels wrong`);
   // Audio, storage, files.
   assert.equal(r.audio.beeps, 1, 'one beep');
   assert.equal(r.audio.ended, 1, 'the beep ended');
@@ -139,6 +151,7 @@ try {
   assert.equal(b.command?.escape, 0, 'grounded');
   assert.ok((b.maxSimMsAfterBurst ?? 0) > 0 && (b.maxSimMsAfterBurst ?? 0) <= 100, `a step simulates at most 100 ms: ${b.maxSimMsAfterBurst}`);
 
+  if (softwareClipping) console.log(`Clipping: ${c.wrong} of ${c.pixels} table pixels wrong, as expected of ${c.renderer} (docs/apple-tv.md, "The simulator's renderer"); not checked here`);
   console.log(`All checks passed in ${Math.round((Date.now() - started) / 1000)} s (${r.frames} frames).`);
   console.log(`readPixels on a ${32}x${16} target (simulator, software GL): sync ${r.readback?.meanMs} ms mean, ${r.readback?.maxMs} ms max; ` +
     `frame ${r.readback?.frameMs} ms with it, ${r.readback?.plainFrameMs} ms without; async resolves in ${r.readbackAsync?.meanFrames} frames (${r.readbackAsync?.meanMs} ms), frame ${r.readbackAsync?.frameMs} ms`);

@@ -6,6 +6,8 @@
 //   - the remote's events: keys (with repeats), touches, and Back at the root;
 //   - a small render target read back with readPixels, timed, synchronously then through
 //     three's readRenderTargetPixelsAsync (a pixel-pack buffer and a fence);
+//   - the game's two render passes, read back: the depth clear between them, clipping, and a
+//     half-float target;
 //   - Web Audio: a beep from generated samples with a gain ramp, and decodeAudioData;
 //   - localStorage and fetch of the app's own files;
 //   - the brain bridge, end to end, against the stand-in brain (tests/brain-stand-in).
@@ -35,6 +37,9 @@ const report = {
   text: null as null | { width: number; inked: number },
   readback: null as null | { ok: boolean; reads: number; meanMs: number; maxMs: number; frameMs: number; plainFrameMs: number },
   readbackAsync: null as null | { ok: boolean; reads: number; meanMs: number; meanFrames: number; frameMs: number },
+  layers: null as null | { target: boolean; screen: boolean },
+  clipping: null as null | { renderer: string; wrong: number; pixels: number },
+  halfFloat: null as null | boolean,
   audio: { beeps: 0, ended: 0, decoded: null as null | { length: number; sampleRate: number } },
   storage: null as null | boolean,
   fetched: null as null | string,
@@ -142,6 +147,88 @@ function summariseReadback() {
   }
 }
 
+// The game's two passes (apps/web/src/stage.ts, renderPasses): the backdrop with the camera's near
+// and far planes at 200 and 3,000,000, the depth buffer cleared, then the table with them at 0.5 and
+// 4000. Checked once, read back:
+//   - layers: a backdrop quad that is nearer, in its own depth range, than the table's quad, so the
+//     table shows only if the clear took effect; into a render target and into the screen. Nothing
+//     here needs clipping, so any GL must get it exactly right.
+//   - clipping: the game's own lawn and table top, fans of big triangles seen from a fly's height.
+//     Most of them reach behind the camera or off the picture and must be clipped; the bottom of
+//     the picture is all table. A GPU gets this right; the simulator's software renderer doesn't.
+//   - halfFloat: an RGBA16F target, which three's PMREMGenerator uses for reflections, renders and
+//     keeps values over 1.
+const PASS_W = 160, PASS_H = 120;
+const passTarget = new THREE.WebGLRenderTarget(PASS_W, PASS_H, { depthBuffer: true });
+const passPixels = new Uint8Array(PASS_W * PASS_H * 4);
+const passCamera = new THREE.PerspectiveCamera(50, PASS_W / PASS_H, 1, 2);
+const flat = (color: string) => new THREE.MeshBasicMaterial({ color });
+/** A quad facing the camera, z mm away, over x0..x1 of the picture's width and the middle 80% of its height. */
+function facing(z: number, x0: number, x1: number, color: string) {
+  const h = Math.tan(THREE.MathUtils.degToRad(passCamera.fov / 2)) * z, w = h * passCamera.aspect;
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry((x1 - x0) * w, 1.6 * h), flat(color));
+  quad.position.set(((x0 + x1) / 2) * w, 0, -z);
+  return quad;
+}
+// Pure primaries read back the same in any colour space.
+const layerBackdrop = new THREE.Scene().add(facing(1000, -0.8, 0.8, '#00ff00'), facing(2000, -0.8, 0.8, '#ff0000'));
+const layerTable = new THREE.Scene().add(facing(100, -0.8, 0, '#0000ff'));
+const lawn = new THREE.Scene().add(new THREE.Mesh(new THREE.CircleGeometry(26_000, 48).rotateX(-Math.PI / 2).translate(0, -756, 0), flat('#00ff00')));
+const tableTop = new THREE.Scene().add(new THREE.Mesh(new THREE.CircleGeometry(320, 96).rotateX(-Math.PI / 2), flat('#0000ff')));
+const flyCamera = new THREE.PerspectiveCamera(40, PASS_W / PASS_H, 1, 2);
+flyCamera.position.set(100, 4.5, 50);
+flyCamera.lookAt(80, 1, 20);
+
+function twoPasses(backdrop: THREE.Scene, table: THREE.Scene, view: THREE.PerspectiveCamera) {
+  renderer.clear(true, true, false);
+  view.near = 200; view.far = 3_000_000; view.updateProjectionMatrix();
+  renderer.render(backdrop, view);
+  renderer.clearDepth();
+  view.near = 0.5; view.far = 4000; view.updateProjectionMatrix();
+  renderer.render(table, view);
+}
+const rgbAt = (p: Uint8Array, x: number, y: number) => [...p.subarray((y * PASS_W + x) * 4, (y * PASS_W + x) * 4 + 3)].join();
+const layered = (p: Uint8Array) => rgbAt(p, PASS_W / 4, PASS_H / 2) === '0,0,255' && rgbAt(p, (PASS_W * 3) / 4, PASS_H / 2) === '0,255,0' && rgbAt(p, 2, 2) === '0,0,0';
+
+function checkPasses() {
+  const gl = renderer.getContext();
+  const debug = gl.getExtension('WEBGL_debug_renderer_info');
+  renderer.autoClear = false;
+  renderer.setClearColor('#000000', 1);
+  renderer.setRenderTarget(passTarget);
+  twoPasses(layerBackdrop, layerTable, passCamera);
+  renderer.readRenderTargetPixels(passTarget, 0, 0, PASS_W, PASS_H, passPixels);
+  const target = layered(passPixels);
+  renderer.setRenderTarget(null);
+  renderer.setViewport(0, 0, PASS_W, PASS_H);
+  twoPasses(layerBackdrop, layerTable, passCamera);
+  gl.readPixels(0, 0, PASS_W, PASS_H, gl.RGBA, gl.UNSIGNED_BYTE, passPixels);
+  const screen = layered(passPixels);
+  renderer.setViewport(0, 0, 640, 480);
+  report.layers = { target, screen };
+
+  renderer.setRenderTarget(passTarget);
+  twoPasses(lawn, tableTop, flyCamera);
+  renderer.readRenderTargetPixels(passTarget, 0, 0, PASS_W, PASS_H, passPixels);
+  let wrong = 0, pixels = 0;
+  // The table's far edge is above the middle of the picture; everything below is table.
+  for (let y = 0; y < PASS_H * 0.45; y++) for (let x = 0; x < PASS_W; x++, pixels++) if (rgbAt(passPixels, x, y) !== '0,0,255') wrong++;
+  report.clipping = { renderer: String(debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)), wrong, pixels };
+
+  const half = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, depthBuffer: false });
+  renderer.setRenderTarget(half);
+  renderer.setClearColor(new THREE.Color(0.25, 0.5, 2), 1);
+  renderer.clear(true, false, false);
+  const complete = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+  const value = new Float32Array(4);
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.FLOAT, value);
+  report.halfFloat = complete && value[2] > 1.5;
+  half.dispose();
+
+  renderer.setRenderTarget(null);
+  renderer.autoClear = true;
+}
+
 // Web Audio: a beep built from samples, with a gain ramp; and a WAV decoded.
 let audio: AudioContext | null = null;
 function beep() {
@@ -232,6 +319,7 @@ const frame = (now: number) => {
   frameTimes.push(now);
   cube.rotation.y += dt / 1000;
   cube.rotation.x += (dt / 1000) * 0.6;
+  if (report.frames === 5) checkPasses();
   readback();
   renderer.render(scene, camera);
   tickBrain(dt);
