@@ -16,6 +16,13 @@ import type { Life } from "../life.ts";
 import type { EyesDetail } from "../settings.ts";
 import type { Stage } from "../stage.ts";
 
+/**
+ * Where the picture's dark panel sits, in clip space (-1 to 1, y up): below
+ * the caption and above the View label, with room inside for the HUD's
+ * heading over the dots and the eyes' names under them (ui/hud.ts).
+ */
+export const PICTURE_PANEL = { left: -0.84, right: 0.84, top: 0.78, bottom: -0.46 };
+
 /** The layer the eyes see. */
 export const EYE_LAYER = 1;
 /** Each view's size in pixels, and how many times a second they refresh, by detail. */
@@ -240,9 +247,9 @@ export class Eyes {
       for (let i = 0; i < d.length / 3; i++) {
         const azimuth = Math.atan2(d[i * 3], d[i * 3 + 1]);
         const elevation = Math.asin(Math.max(-1, Math.min(1, d[i * 3 + 2])));
-        // Equirectangular, squeezed into the middle of the 4:3 frame (it is shown stretched to 16:9).
-        positions[k * 3] = (azimuth / Math.PI) * 0.8;
-        positions[k * 3 + 1] = (elevation / (Math.PI / 2)) * 0.62 + 0.04;
+        // Equirectangular, in the panel between its heading and its labels (PICTURE_PANEL; the frame is shown stretched to 16:9).
+        positions[k * 3] = (azimuth / Math.PI) * 0.76;
+        positions[k * 3 + 1] = (elevation / (Math.PI / 2)) * 0.45 + 0.09;
         sides[k] = side;
         k++;
       }
@@ -253,14 +260,15 @@ export class Eyes {
     light.setUsage(THREE.DynamicDrawUsage);
     geometry.setAttribute("light", light);
     geometry.setAttribute("side", new THREE.BufferAttribute(sides, 1));
-    const size = Math.max(2, Math.min(8, 240 / Math.sqrt(n)));
+    const size = Math.max(2, Math.min(7, 200 / Math.sqrt(n)));
     const points = new THREE.Points(geometry, new THREE.ShaderMaterial({ vertexShader: PICTURE_VS, fragmentShader: PICTURE_FS, uniforms: { size: { value: size } }, depthTest: false, depthWrite: false, transparent: true }));
     points.frustumCulled = false;
     // Over the backing: both are in the transparent list, drawn in this order.
     points.renderOrder = 1;
     const scene = new THREE.Scene();
-    const backing = new THREE.Mesh(new THREE.PlaneGeometry(1.76, 1.36), new THREE.MeshBasicMaterial({ color: "#020a1c", transparent: true, opacity: 0.88, depthTest: false, depthWrite: false }));
-    backing.position.set(0, 0.04, 0);
+    const p = PICTURE_PANEL;
+    const backing = new THREE.Mesh(new THREE.PlaneGeometry(p.right - p.left, p.top - p.bottom), new THREE.MeshBasicMaterial({ color: "#020a1c", transparent: true, opacity: 0.88, depthTest: false, depthWrite: false }));
+    backing.position.set((p.left + p.right) / 2, (p.top + p.bottom) / 2, 0);
     scene.add(backing, points);
     scene.matrixWorldAutoUpdate = false;
     backing.updateMatrixWorld();

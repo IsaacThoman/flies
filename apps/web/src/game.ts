@@ -121,6 +121,7 @@ export class Game implements Shell {
     this.#hud = { hands: this.hands, activity: "waiting", food: null, hints: true, teachSwipe: true, changed: 10, spikes: 0, brainRunning: false, eyes: null };
     this.applySettings(false);
     this.director.startWallpaper();
+    this.director.title = true;
   }
 
   get brain(): BrainDriver {
@@ -185,6 +186,8 @@ export class Game implements Shell {
 
   #syncCamera() {
     const current = this.nav.current;
+    // The title and what's opened from it (not from a game in play) keep the title's shot.
+    this.director.title = this.#loading || (this.nav.stack[0] === "title" && !this.nav.stack.includes("play"));
     if (current === "title" || this.wallpaper) {
       if (!this.director.wallpaper) this.director.startWallpaper();
     } else if (!this.paused) {

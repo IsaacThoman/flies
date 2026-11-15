@@ -8,6 +8,7 @@ import { DESIGN_HEIGHT, DESIGN_WIDTH } from "../display.ts";
 import type { Activity } from "../life.ts";
 import { TOOLS } from "../tools/hands.ts";
 import type { Hands } from "../tools/hands.ts";
+import { PICTURE_PANEL } from "../eyes/eyes.ts";
 import { drawToolIcon } from "../tools/view.ts";
 
 export type HudState = {
@@ -110,16 +111,19 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState) {
   }
 
   if (s.eyes) {
-    // The picture of what its eyes take in is drawn under this layer; label it for what it is.
-    text(g, "Through the fly's eyes", cx, 70, { size: 20, align: "center", color: "#eaf6ff", outline: "rgba(0, 20, 60, 0.8)" });
+    // The picture of what its eyes take in is drawn under this layer, in its panel; label it for what it is, inside the panel.
+    const top = ((1 - PICTURE_PANEL.top) / 2) * DESIGN_HEIGHT;
+    const bottom = ((1 - PICTURE_PANEL.bottom) / 2) * DESIGN_HEIGHT;
+    const right = ((PICTURE_PANEL.right + 1) / 2) * DESIGN_WIDTH;
+    text(g, "Through the fly's eyes", cx, top + 22, { size: 18, align: "center", color: "#eaf6ff" });
     const sub = s.eyes.standIn
       ? `A picture of the light on ${s.eyes.facets.toLocaleString("en-US")} facets, laid out as its eyes look. Its brain doesn't see this yet.`
       : `The light on each of its ${s.eyes.facets.toLocaleString("en-US")} facets, as its brain receives it now.`;
-    text(g, sub, cx, 92, { size: 13, align: "center", color: "#cfe8ff", outline: "rgba(0, 20, 60, 0.8)", outlineWidth: 3 });
-    text(g, "left eye", cx - 200, 380, { size: 12, align: "center", color: "#9fdcff" });
-    text(g, "ahead", cx, 380, { size: 12, align: "center", color: "#9fdcff" });
-    text(g, "right eye", cx + 200, 380, { size: 12, align: "center", color: "#9fdcff" });
-    text(g, `${s.eyes.calls} draws · ${s.eyes.ms.toFixed(1)} ms a refresh`, DESIGN_WIDTH - 16, 92, { size: 11, align: "right", color: "#cfe8ff" });
+    text(g, sub, cx, top + 42, { size: 12, align: "center", color: "#cfe8ff" });
+    text(g, "left eye", cx - 190, bottom - 12, { size: 12, align: "center", color: "#9fdcff" });
+    text(g, "ahead", cx, bottom - 12, { size: 12, align: "center", color: "#9fdcff" });
+    text(g, "right eye", cx + 190, bottom - 12, { size: 12, align: "center", color: "#9fdcff" });
+    text(g, `${s.eyes.calls} draws · ${s.eyes.ms.toFixed(1)} ms a refresh`, right - 10, top + 16, { size: 10, align: "right", color: "#7fa8cc" });
   }
 
   // What the fly is doing, from its brain, at the top.

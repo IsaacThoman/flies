@@ -40,6 +40,8 @@ export type Shot = {
   orbit?: number;
   /** Looks round for something worth having behind the fly. */
   scout?: boolean;
+  /** Where the fly sits across the picture: this fraction of the half-width to the right (negative: left). */
+  across?: number;
 };
 
 /** The player's views. In ordinary play (Follow) the fly is 120 to 200 pixels long; Close up and Wide are the choices either side. */
@@ -50,6 +52,9 @@ export const SHOTS: Record<View, Shot> = {
   table: { around: "table", distance: 560, height: 170, side: 0.25, low: 0, fov: 40, settle: 1.6, orbit: 0.03 },
   above: { around: "fly", distance: 3.2, height: 13, side: Math.PI, low: 0, fov: 34, settle: 1.4 },
 };
+
+/** Behind the loading screen and the title: the fly small and to the left, clear of the wordmark and the menu on the right. */
+const TITLE: Shot = { around: "fly", distance: 18, height: 2.2, side: 1.75, low: 0.1, fov: 30, settle: 3, orbit: 0.01, scout: true, across: -0.56 };
 
 /** The wallpaper's shots, in turn: medium, portrait, wide among the fruit, the whole table, low across the cloth, from above. */
 const WALLPAPER: readonly Shot[] = [
@@ -94,6 +99,8 @@ export class CameraDirector {
   wallpaper = false;
   /** Lets the wallpaper change shots more often. */
   lively = false;
+  /** On the loading screen and the title, which have their own shot. */
+  title = false;
   /** Pins the camera (for screenshots and art): eye and target, or null to let it move. */
   pinned: { eye: THREE.Vector3Like; target: THREE.Vector3Like; fov?: number } | null = null;
   #world: World;
@@ -137,7 +144,7 @@ export class CameraDirector {
 
   /** The shot being taken now. */
   get shot(): Shot {
-    return this.wallpaper ? WALLPAPER[this.#shot] : SHOTS[this.view];
+    return this.title ? TITLE : this.wallpaper ? WALLPAPER[this.#shot] : SHOTS[this.view];
   }
 
   /** Moves the camera on by `dt` seconds, framing the fly. */
@@ -154,7 +161,7 @@ export class CameraDirector {
       cam.updateMatrixWorld();
       return;
     }
-    if (this.wallpaper) {
+    if (this.wallpaper && !this.title) {
       this.#shotTime += dt;
       if (this.#shotTime > (this.lively ? 14 : 24)) {
         this.#shotTime = 0;
@@ -247,10 +254,12 @@ export class CameraDirector {
     // Aimed ahead by about what the spring lags, so a jump stays in the picture; never more than a few body lengths.
     const speed = Math.hypot(v.x, v.y, v.z);
     const lead = shot.around === "fly" && speed > 0 ? Math.min(aimSettle, MAX_LEAD / speed) : 0;
+    // To put the fly to one side, aim the other way along the camera's right.
+    const aside = -(shot.across ?? 0) * ground * Math.tan((this.#fov * Math.PI) / 360) * this.camera.aspect;
     const a = this.#aim;
-    a.x = damp(a.x, focus.x + v.x * lead, s, 3, aimSettle, dt);
+    a.x = damp(a.x, focus.x + v.x * lead + Math.cos(az) * aside, s, 3, aimSettle, dt);
     a.y = damp(a.y, focus.y + lift + v.y * lead, s, 4, aimSettle, dt);
-    a.z = damp(a.z, focus.z + v.z * lead, s, 5, aimSettle, dt);
+    a.z = damp(a.z, focus.z + v.z * lead - Math.sin(az) * aside, s, 5, aimSettle, dt);
     this.#started = true;
 
     cam.position.copy(eye);
