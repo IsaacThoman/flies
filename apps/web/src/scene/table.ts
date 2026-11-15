@@ -319,13 +319,13 @@ export function buildTable(): Table {
     const f = saucer.footprint as { x: number; z: number; r: number };
     const top = saucer.top as { inner: number; lip: number };
     const profile: THREE.Vector2[] = [];
-    for (let i = 0; i <= 48; i++) {
-      const r = lf.r - 2 + ((f.r - lf.r + 2) * i) / 48;
+    for (let i = 0; i <= 32; i++) {
+      const r = lf.r - 2 + ((f.r - lf.r + 2) * i) / 32;
       profile.push(new THREE.Vector2(r, topHeight(saucer, f.x + Math.min(r, f.r * 0.9999), f.z)));
     }
     // Outside in, so its faces point up.
     profile.reverse();
-    batch.add(juicy, paint(new THREE.LatheGeometry(profile, 72).translate(f.x, 0, f.z), (p) => {
+    batch.add(juicy, paint(new THREE.LatheGeometry(profile, 56).translate(f.x, 0, f.z), (p) => {
       const s = Math.hypot(p.x - f.x, p.z - f.z) / f.r;
       if (Math.abs(s - top.lip) < 0.025) return "#ffffff";
       if (Math.abs(s - (top.lip + 0.065)) < 0.01) return "#1f8fd0";

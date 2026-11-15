@@ -20,7 +20,8 @@ export const TOOLS: readonly Tool[] = [
   { id: "swoop", name: "Swoop", verb: "Throw the ball", hold: false, variants: [{ id: "ball", label: "Beach ball" }] },
   { id: "feather", name: "Tickle", verb: "Tickle", hold: true, variants: [{ id: "feather", label: "Feather" }] },
   { id: "blow", name: "Blow", verb: "Blow", hold: true, variants: [{ id: "gentle", label: "Gently" }, { id: "strong", label: "Hard" }] },
-  { id: "light", name: "Light", verb: "", hold: false, initial: 1, variants: [{ id: "morning", label: "Morning" }, { id: "noon", label: "Midday" }, { id: "golden", label: "Golden hour" }, { id: "dusk", label: "Dusk" }, { id: "night", label: "Night" }] },
+  // "Now" follows the clock, so the wallpaper's light changes with the day outside.
+  { id: "light", name: "Light", verb: "", hold: false, variants: [{ id: "clock", label: "Now" }, { id: "morning", label: "Morning" }, { id: "noon", label: "Midday" }, { id: "golden", label: "Golden hour" }, { id: "dusk", label: "Dusk" }, { id: "night", label: "Night" }] },
   // Nearest first, so Up brings the camera in and Down takes it out.
   { id: "view", name: "View", verb: "", hold: false, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }] },
 ];
@@ -130,9 +131,9 @@ export class Hands {
     return true;
   }
 
-  /** The time of day chosen on the Light tool. */
-  get timeOfDay(): TimeOfDay {
-    return TOOLS[4].variants[this.variants[4]].id as TimeOfDay;
+  /** The time of day chosen on the Light tool: one of the five, or the time outside by the clock. */
+  get timeOfDay(): TimeOfDay | "clock" {
+    return TOOLS[4].variants[this.variants[4]].id as TimeOfDay | "clock";
   }
 
   /** The view chosen on the View tool ("eyes" is the fly's-eye picture). */

@@ -36,6 +36,15 @@ stays crisp however close the camera comes. Drops of water are clear in the
 middle and bright at the edge, and focus the sun into a spot on the table.
 Everything is built in code.
 
+Soap bubbles drift over the table on the breeze, and a few small ones skim
+low past the fly; one that comes down on something level settles there as a
+dome until it bursts. A bubble that reaches the fly, or that it walks into,
+bursts on it, and it feels the film break (`touch`, below). The light follows
+the clock unless you choose a time: morning, midday, golden hour, dusk and
+night, eased from one to the next; by day a cloud now and then passes over the
+sun and the light dims by a fifth for a few seconds. At dusk and at night
+fireflies drift round the table and blink.
+
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
 Back, space for Play/Pause) and dragging the mouse over the picture is the
 touch surface.
@@ -52,8 +61,8 @@ touch surface.
 The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
 beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
-from where you sit toward the spot), **Light** (morning, midday, golden hour,
-dusk, night) and **View** (close up, follow, wide, whole table, from above,
+from where you sit toward the spot), **Light** (now, which follows the clock,
+or morning, midday, golden hour, dusk, night) and **View** (close up, follow, wide, whole table, from above,
 and through the fly's eyes; Up brings the camera in, Down takes it out). The
 screen always shows what each button does now, and a caption at the top says
 what the fly is doing.
@@ -90,7 +99,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | --- | --- |
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
 | `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms, as in the desktop pet. |
-| `touch` | The feather: 0.4 resting on the fly, 1 stroking. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
+| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
 | `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, or past the table's edge. |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, or flying, or falling), full at 1 m/s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |

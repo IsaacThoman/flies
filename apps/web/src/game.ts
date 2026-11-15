@@ -18,6 +18,8 @@ import { FlyView } from "./fly-view.ts";
 import type { Remote } from "./input.ts";
 import { Life } from "./life.ts";
 import { Bubbles } from "./scene/bubbles.ts";
+import { Fireflies } from "./scene/fireflies.ts";
+import { timeFromClock } from "./scene/light.ts";
 import { loadSettings, saveSettings } from "./settings.ts";
 import type { Settings } from "./settings.ts";
 import { Stage } from "./stage.ts";
@@ -57,6 +59,7 @@ export class Game implements Shell {
   readonly handsView: HandsView;
   readonly audio = new Audio();
   readonly eyes: Eyes;
+  readonly fireflies: Fireflies;
   readonly nav = new Navigator<ScreenId>("title");
   readonly screens: Record<MenuScreenId, Screen>;
   /** Seconds since the game started. */
@@ -80,7 +83,9 @@ export class Game implements Shell {
   #touched = false;
   #lastMeals = 0;
   #paddleIn = 0;
+  #clockAt = 0;
   #air = new THREE.Vector3();
+  #middle = new THREE.Vector3();
   #ndc = new THREE.Vector3();
   #ndc2 = new THREE.Vector2();
   #ray = new THREE.Raycaster();
@@ -94,7 +99,8 @@ export class Game implements Shell {
     this.canvas = canvas;
     this.remote = remote;
     this.settings = loadSettings();
-    this.stage = new Stage(canvas, "noon");
+    this.stage = new Stage(canvas, timeFromClock(new Date()));
+    this.fireflies = new Fireflies(this.stage.scene);
     const world = createPicnic();
     this.life = new Life(world, brain);
     this.fly = new FlyView(this.stage.scene, world);
@@ -237,9 +243,13 @@ export class Game implements Shell {
     this.peaks.looming = Math.max(this.peaks.looming * fade, rates?.["vision.looming left"] ?? 0, rates?.["vision.looming right"] ?? 0);
     this.fly.update(life.body, life.intent, life.eating, paused ? 0 : dt);
     director.update(life.body, dt);
+    if (this.time > this.#clockAt) this.#followLight();
     stage.update(this.time, dt, director.camera);
+    this.#clouds();
+    this.fireflies.update(this.time, stage.light.stars, director.camera);
     this.#air.set(this.hands.air.x, this.hands.air.y, this.hands.air.z);
-    this.bubbles.update(this.time, paused ? 0 : dt, director.camera, stage.light.sunDirection, this.#air);
+    const middle = this.#middle.set(life.body.position.x, life.body.position.y + 0.75, life.body.position.z);
+    this.bubbles.update(this.time, paused ? 0 : dt, director.camera, stage.light.sunDirection, this.#air, middle);
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
     for (let i = 0; i < this.bubbles.popped.length; i++) this.audio.play("pop", this.#nearness(this.bubbles.popped[i]) * 0.7, 0.9 + Math.random() * 0.3);
     this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
@@ -282,7 +292,8 @@ export class Game implements Shell {
   #feel() {
     const { stimuli } = this.life;
     const hands = this.hands;
-    stimuli.stroke = hands.stroke;
+    // The feather, or a bubble that burst on it last frame.
+    stimuli.stroke = Math.max(hands.stroke, this.bubbles.brushed);
     stimuli.air = hands.air;
     // Things that could loom: the ball and the bubbles.
     stimuli.looming.length = 0;
@@ -302,6 +313,26 @@ export class Game implements Shell {
     if (he.dropped) this.audio.play("drop");
     if (he.landed) this.audio.play("land", 0.6);
     if (he.swooped) this.audio.play("swoop");
+  }
+
+  /** Sets the light to the Light tool's choice; on "Now", to the time outside, looked at again every half minute. */
+  #followLight() {
+    const chosen = this.hands.timeOfDay;
+    this.stage.setTime(chosen === "clock" ? timeFromClock(new Date()) : chosen);
+    this.#clockAt = this.time + 30;
+  }
+
+  /**
+   * Now and then by day a cloud passes over the sun: the sunlight dims by a
+   * fifth over a few seconds and comes back. The fly's eyes see it as they see
+   * everything else.
+   */
+  #clouds() {
+    const t = this.time;
+    // Two slow waves beating together: a cloud only where both are high, a minute or two apart.
+    const cover = Math.max(0, Math.sin(t * 0.071) * Math.sin(t * 0.0237 + 1.3) - 0.55) / 0.45;
+    const day = 1 - Math.min(1, this.stage.light.stars * 2);
+    this.stage.sun.intensity = this.stage.light.sunIntensity * (1 - cover * cover * 0.2 * day);
   }
 
   /** A fly walking, landing or drinking in the pool of lemonade sets rings spreading on it. */
@@ -399,7 +430,7 @@ export class Game implements Shell {
   #variantChanged() {
     this.audio.play("tick");
     this.#changedAt = this.time;
-    if (this.hands.current.id === "light") this.stage.setTime(this.hands.timeOfDay);
+    if (this.hands.current.id === "light") this.#followLight();
     if (this.hands.current.id === "view") this.#syncCamera();
   }
 

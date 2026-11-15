@@ -1,9 +1,13 @@
 // Soap bubbles drifting over the table on the breeze, in one instanced draw.
 // They are part of the fly's world, not decoration painted over it: a bubble
 // drifting close grows in the fly's eyes like anything else, and one that
-// touches something pops.
+// touches something pops. A few small ones drift low past the fly; one that
+// comes down on something level settles there as a dome, as a soap bubble
+// does on a wet table, until it bursts. Walking or flying into a bubble
+// bursts it, and the fly feels the film break as a light touch.
 
 import * as THREE from "three";
+import { FLY_LENGTH } from "@fly/body";
 import type { Looming } from "@fly/body";
 import type { World } from "@fly/world";
 import { random } from "./build.ts";
@@ -42,10 +46,14 @@ void main() {
   gl_FragColor = vec4(c * (0.6 + rim * 0.6) + vec3(spec + spec2), alpha);
 }`;
 
-type Bubble = { x: number; y: number; z: number; r: number; phase: number; speed: number; age: number; popping: number };
+type Bubble = { x: number; y: number; z: number; r: number; phase: number; speed: number; age: number; popping: number; low: boolean; landed: number };
 
 /** How many bubbles drift at once. */
 export const BUBBLES = 12;
+/** How many of them drift low, near the fly. */
+const LOW = 4;
+/** How hard a bubble bursting on the fly touches it (the feather resting is 0.4). */
+export const BUBBLE_TOUCH = 0.3;
 /** The breeze they drift on, mm/s (toward +x and a little toward the lake). */
 const BREEZE = { x: 38, z: -9 };
 
@@ -62,6 +70,9 @@ export class Bubbles {
   #distance = new Float64Array(BUBBLES);
   #world: World;
   #pool = Array.from({ length: BUBBLES }, () => new THREE.Vector3());
+  #surface = { y: 0, normal: { x: 0, y: 1, z: 0 }, solid: -1, onTable: true };
+  /** A bubble burst on the fly this frame: how hard it felt it (0 if none). */
+  brushed = 0;
 
   constructor(parent: THREE.Object3D, world: World) {
     this.#world = world;
@@ -72,7 +83,7 @@ export class Bubbles {
     this.mesh.renderOrder = 6;
     parent.add(this.mesh);
     for (let i = 0; i < BUBBLES; i++) {
-      const b = this.#spawn();
+      const b = this.#spawn(undefined, i < LOW ? { x: 0, y: 0, z: 0 } : null);
       // Spread out along their path at the start.
       b.x += this.#rnd.range(0, 900);
       this.#bubbles.push(b);
@@ -81,13 +92,23 @@ export class Bubbles {
     }
   }
 
-  #spawn(into?: Bubble): Bubble {
+  /** A new bubble upwind: high over the table, or, with `near`, small and low a little upwind of that point. */
+  #spawn(into?: Bubble, near: { x: number; y: number; z: number } | null = null): Bubble {
     const rnd = this.#rnd;
-    const b = into ?? { x: 0, y: 0, z: 0, r: 0, phase: 0, speed: 0, age: 0, popping: 0 };
-    b.x = -520 + rnd.range(-80, 0);
-    b.z = rnd.range(-260, 260);
-    b.y = rnd.range(25, 260);
-    b.r = rnd.range(6, 26);
+    const b = into ?? { x: 0, y: 0, z: 0, r: 0, phase: 0, speed: 0, age: 0, popping: 0, low: false, landed: 0 };
+    b.low = near !== null;
+    b.landed = 0;
+    if (near) {
+      b.x = near.x - rnd.range(50, 160);
+      b.z = near.z + rnd.range(-14, 14);
+      b.r = rnd.range(2.2, 6);
+      b.y = this.#world.heightAt(b.x, b.z) + b.r + rnd.range(0.3, 3);
+    } else {
+      b.x = -520 + rnd.range(-80, 0);
+      b.z = rnd.range(-260, 260);
+      b.y = rnd.range(25, 260);
+      b.r = rnd.range(6, 26);
+    }
     b.phase = rnd.range(0, Math.PI * 2);
     b.speed = rnd.range(0.7, 1.3);
     b.age = 0;
@@ -103,29 +124,57 @@ export class Bubbles {
     }
   }
 
-  update(time: number, dt: number, camera: THREE.Camera, sun: THREE.Vector3, gust: THREE.Vector3Like) {
+  /** Moves the bubbles on. `fly` is the fly's middle: a bubble that reaches it bursts on it. */
+  update(time: number, dt: number, camera: THREE.Camera, sun: THREE.Vector3, gust: THREE.Vector3Like, fly: THREE.Vector3Like) {
     this.#uniforms.time.value = time;
     this.#uniforms.light.value.copy(sun).transformDirection(camera.matrixWorldInverse);
     this.popped.length = 0;
+    this.brushed = 0;
     const world = this.#world;
     for (let i = 0; i < this.#bubbles.length; i++) {
       const b = this.#bubbles[i];
       b.age += dt;
       if (b.popping > 0) {
         b.popping += dt;
-        if (b.popping > 0.12) this.#spawn(b);
+        if (b.popping > 0.12) this.#spawn(b, b.low ? fly : null);
         continue;
       }
-      b.x += (BREEZE.x * b.speed + gust.x * 0.4) * dt;
-      b.z += (BREEZE.z * b.speed + gust.z * 0.4 + Math.sin(time * 0.3 + b.phase) * 10) * dt;
-      b.y += (Math.sin(time * 0.5 + b.phase) * 6 + gust.y * 0.4 - 2) * dt;
-      // Touching the table or anything on it pops it.
-      if (b.y - b.r < world.heightAt(b.x, b.z) + 0.5 || b.y < b.r) {
-        b.popping = 0.001;
-        const v = this.#pool[i].set(b.x, b.y, b.z);
-        this.popped.push(v);
+      let burst = false;
+      if (b.landed > 0) {
+        // Settled: creeps with the breeze, and bursts in the end.
+        b.landed -= dt;
+        b.x += (BREEZE.x * 0.04 + gust.x * 0.1) * dt;
+        b.z += (BREEZE.z * 0.04 + gust.z * 0.1) * dt;
+        const s = world.surface(b.x, b.z, this.#surface);
+        burst = b.landed <= 0 || Math.abs(s.y - b.y) > 0.3 || !s.onTable;
+      } else {
+        b.x += (BREEZE.x * b.speed + gust.x * 0.4) * dt;
+        b.z += (BREEZE.z * b.speed + gust.z * 0.4 + Math.sin(time * 0.3 + b.phase) * 10) * dt;
+        // Low ones skim the table, barely rising or falling.
+        b.y += ((b.low ? Math.sin(time * 0.5 + b.phase) * 0.6 - 0.6 : Math.sin(time * 0.5 + b.phase) * 6 - 2) + gust.y * 0.4) * dt;
+        const s = world.surface(b.x, b.z, this.#surface);
+        if (b.y - b.r < s.y + 0.5 || b.y < b.r) {
+          // A small one coming down on something level settles as a dome (a little wider: the same air, half a sphere); anything else pops.
+          if (b.r < 8 && s.onTable && s.normal.y > 0.97 && Math.abs(b.y - b.r - s.y) < 2) {
+            b.y = s.y;
+            b.r *= 1.26;
+            b.landed = this.#rnd.range(6, 14);
+          } else burst = true;
+        }
       }
-      if (b.x > 640 || Math.abs(b.z) > 700) this.#spawn(b);
+      // Into the fly, or the fly into it (the fly about as round as half its length).
+      if (!burst && Math.hypot(b.x - fly.x, b.y - fly.y, b.z - fly.z) < b.r + FLY_LENGTH / 2) {
+        burst = true;
+        this.brushed = BUBBLE_TOUCH;
+      }
+      if (burst) {
+        b.popping = 0.001;
+        this.popped.push(this.#pool[i].set(b.x, b.y, b.z));
+        continue;
+      }
+      if (b.x > 640 || Math.abs(b.z) > 700) this.#spawn(b, b.low ? fly : null);
+      // A low one that has drifted well past the fly comes round again.
+      else if (b.low && b.landed <= 0 && b.x - fly.x > 120) this.#spawn(b, fly);
     }
     // Far to near, for the transparency.
     const cx = camera.position.x;

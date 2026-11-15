@@ -8,6 +8,16 @@ export type TimeOfDay = "morning" | "noon" | "golden" | "dusk" | "night";
 export const TIMES: readonly TimeOfDay[] = ["morning", "noon", "golden", "dusk", "night"];
 export const TIME_NAMES: Record<TimeOfDay, string> = { morning: "Morning", noon: "Midday", golden: "Golden hour", dusk: "Dusk", night: "Night" };
 
+/** The time of day outside, by the clock: what "Now" on the Light tool shows. */
+export function timeFromClock(date: Date): TimeOfDay {
+  const h = date.getHours() + date.getMinutes() / 60;
+  if (h >= 5.5 && h < 9) return "morning";
+  if (h >= 9 && h < 16.5) return "noon";
+  if (h >= 16.5 && h < 19) return "golden";
+  if (h >= 19 && h < 21) return "dusk";
+  return "night";
+}
+
 type Palette = {
   zenith: string;
   middle: string;
