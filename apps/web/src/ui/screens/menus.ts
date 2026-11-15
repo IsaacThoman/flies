@@ -30,7 +30,7 @@ export function titleScreen(shell: Shell) {
     },
     onBack: () => shell.back(),
     backdrop(g, t) {
-      drawWordmark(g, 250, 100, 78, t);
+      drawWordmark(g, 250, 100, 60, t);
       // How the brain is doing, quietly, under the name.
       const brain = shell.brain;
       const awake = brain.status === "running";

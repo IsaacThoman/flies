@@ -1,10 +1,10 @@
-// The game's name as a glossy wordmark: "fruit fly" in round white letters
+// The game's name as a glossy wordmark: "apple tv fly" in round white letters
 // with a candy outline, and a little fly for the dot of the i.
 
 import { FONT, TAU } from "@fly/ui";
 
 export function drawWordmark(g: CanvasRenderingContext2D, x: number, y: number, size: number, t: number) {
-  const word = "fruit fly";
+  const word = "apple tv fly";
   g.save();
   g.font = `700 ${size}px ${FONT}`;
   g.textAlign = "center";
@@ -23,10 +23,11 @@ export function drawWordmark(g: CanvasRenderingContext2D, x: number, y: number, 
   face.addColorStop(1, "#bfe9ff");
   g.fillStyle = face;
   g.fillText(word, x, y);
+  const reach = g.measureText(word).width * 0.56;
   g.restore();
   // A tiny fly orbiting the word.
   const a = t * 0.9;
-  const fx = x + Math.cos(a) * size * 2.6;
+  const fx = x + Math.cos(a) * reach;
   const fy = y - size * 0.95 + Math.sin(a * 2) * size * 0.12;
   g.save();
   g.translate(fx, fy);

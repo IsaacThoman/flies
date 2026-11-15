@@ -15,7 +15,7 @@ const format = (n: number) => Math.round(n).toLocaleString("en-US");
 export function drawLoading(g: CanvasRenderingContext2D, t: number, brain: BrainDriver) {
   const progress = "progress" in brain ? Number((brain as { progress: number }).progress) : 0;
   const phase = "phase" in brain ? String((brain as { phase: string }).phase) : brain.status === "running" ? "done" : "build";
-  drawWordmark(g, DESIGN_WIDTH / 2, 150, 76, t);
+  drawWordmark(g, DESIGN_WIDTH / 2, 150, 64, t);
   const w = 440;
   const h = 132;
   const x = (DESIGN_WIDTH - w) / 2;
