@@ -1,0 +1,202 @@
+#include "io.hpp"
+
+#include <initializer_list>
+#include <stdexcept>
+#include <string_view>
+#include <unordered_set>
+
+#include "fdlibm.hpp"
+
+namespace fly::io {
+
+namespace {
+
+using Condition = std::function<bool(std::string_view)>;
+
+Condition is(std::string value) {
+  return [value = std::move(value)](std::string_view s) { return s == value; };
+}
+Condition one_of(std::initializer_list<const char*> values) {
+  std::vector<std::string> list(values.begin(), values.end());
+  return [list = std::move(list)](std::string_view s) {
+    for (const std::string& each : list) {
+      if (s == each) return true;
+    }
+    return false;
+  };
+}
+Condition starts_with(std::string prefix) {
+  return [prefix = std::move(prefix)](std::string_view s) { return s.substr(0, prefix.size()) == prefix; };
+}
+
+NeuronQuery query(std::initializer_list<std::pair<Category, Condition>> conditions) {
+  NeuronQuery q;
+  for (const auto& [column, condition] : conditions) q[column] = condition;
+  return q;
+}
+
+/** One side's part of a selection. */
+NeuronQuery sided(NeuronQuery q, Side side) {
+  q[kSide] = is(side == kLeft ? "left" : "right");
+  return q;
+}
+
+const NeuronQuery kLooming = query({{kType, one_of({"LPLC2", "LC4"})}});
+const NeuronQuery kAntenna = query({{kSuperClass, is("cb_sensory")}, {kType, starts_with("JO-")}});
+
+// Nothing in the data says which taste neurons are sweet-sensing. These were
+// chosen by what they do in this model: built greedily from the head's taste
+// neuron types, each added for raising the proboscis motor neuron MN9's rate
+// most (packages/brain/README.md; `probe.ts --superClass cb_sensory --class
+// gustatory --each type --target MN9 --greedy`).
+Condition sweet_types() { return one_of({"dorsal_tpGRN", "LB3d", "PhG9", "LB3c", "LB2a", "LB4a", "LB3b", "PhG1c", "PhG3"}); }
+constexpr const char* kSweetDescription = "Head taste neurons dorsal_tpGRN, LB3d, PhG9, LB3c, LB2a, LB4a, LB3b, PhG1c, PhG3";
+
+uint64_t output_synapses(const Connectome& c, const std::vector<uint32_t>& neurons) {
+  uint64_t total = 0;
+  for (uint32_t i : neurons) {
+    for (uint32_t e = c.ptr(i); e < c.ptr(i + 1); e++) total += c.count(e);
+  }
+  return total;
+}
+
+/** The rate factor for one side of a balanced pair: below 1 for the side with more output synapses. */
+double balance_factor(const Connectome& c, const std::vector<uint32_t>& mine, const std::vector<uint32_t>& theirs) {
+  const auto a = static_cast<double>(output_synapses(c, mine));
+  const auto b = static_cast<double>(output_synapses(c, theirs));
+  return a > b && a > 0 ? b / a : 1;
+}
+
+}  // namespace
+
+std::vector<InputSpec> senses() {
+  return {
+      {"loomLeft", "Looming detectors (LPLC2, LC4) of the left eye", sided(kLooming, kLeft), 100, "", kLoomLeft, kLeft},
+      {"loomRight", "Looming detectors (LPLC2, LC4) of the right eye", sided(kLooming, kRight), 100, "", kLoomRight, kLeft},
+      {"touch head", "Mechanosensory bristle neurons of the head (BM types)", query({{kSuperClass, is("cb_sensory")}, {kType, starts_with("BM")}}), 50,
+       "", kTouch, kLeft},
+      {"touch body", "Mechanosensory bristle neurons of the thorax, abdomen and legs",
+       query({{kSuperClass, is("vnc_sensory")}, {kSubClass, is("mechanosensory_bristle")}}), 10, "", kTouch, kLeft},
+      {"bumpLeft", "Johnston's organ neurons of the left antenna", sided(kAntenna, kLeft), 100, "bumpRight", kBumpLeft, kLeft},
+      {"bumpRight", "Johnston's organ neurons of the right antenna", sided(kAntenna, kRight), 100, "bumpLeft", kBumpRight, kLeft},
+      {"wind", "Wind- and gravity-sensitive Johnston's organ neurons of both antennae", query({{kSuperClass, is("cb_sensory")}, {kSubClass, is("wind_gravity")}}),
+       100, "", kWind, kLeft},
+      {"sweet", kSweetDescription, query({{kSuperClass, is("cb_sensory")}, {kClass, is("gustatory")}, {kType, sweet_types()}}), 100, "", kSweet, kLeft},
+      {"grounded", "Campaniform sensilla (load sensors) of the legs, firing tonically while standing",
+       query({{kSuperClass, one_of({"vnc_sensory", "sensory_ascending"})}, {kSubClass, is("campaniform_sensilla")}}), 20, "", kGrounded, kLeft},
+  };
+}
+
+// Spontaneous input, always on: the visual scene a fly at rest still sees.
+// Every visual projection neuron except the looming detectors (nothing is
+// looming at rest) fires at a low background rate, set per eye by the
+// internal state (see state.hpp). The two eyes are balanced (see
+// InputSpec::balance): the right eye's neurons have 19% more output synapses.
+std::vector<InputSpec> background() {
+  std::vector<InputSpec> out;
+  for (Side side : {kLeft, kRight}) {
+    const std::string name = side == kLeft ? "left" : "right";
+    const std::string other = side == kLeft ? "right" : "left";
+    out.push_back({"background " + name, "Visual projection neurons of the " + name + " eye except LPLC2 and LC4",
+                   query({{kSuperClass, is("visual_projection")}, {kSide, is(name)}, {kType, [](std::string_view t) { return t != "LPLC2" && t != "LC4"; }}}),
+                   6, "background " + other, kSenseCount, side});
+  }
+  return out;
+}
+
+std::vector<ReadoutSpec> readouts() {
+  return {
+      {"DNg100", "BDN2, forward walking", query({{kType, is("DNg100")}}), 150},
+      {"DNa02 left", "Steering, left", query({{kType, is("DNa02")}, {kSide, is("left")}}), 150},
+      {"DNa02 right", "Steering, right", query({{kType, is("DNa02")}, {kSide, is("right")}}), 150},
+      {"MDN", "Moonwalker, backward walking", query({{kType, is("MDN")}}), 150},
+      {"DNp01", "Giant fiber, escape take-off", query({{kType, is("DNp01")}}), 40},
+      {"flight", "Indirect flight power muscle motor neurons", query({{kType, one_of({"DLM1-4", "DLMn/a", "DVM1a-c", "DVMn/2a", "DVMn/3a"})}}), 100},
+      {"DNg12", "Head-grooming descending neurons DNg12_a, _b and _c", query({{kType, one_of({"DNg12_a", "DNg12_b", "DNg12_c"})}}), 150},
+      {"MN9", "Proboscis extension motor neuron", query({{kType, is("MN9")}}), 150},
+  };
+}
+
+Wiring wire(const Connectome& c) {
+  Wiring w;
+  for (InputSpec& spec : senses()) {
+    std::vector<uint32_t> neurons = c.find(spec.select);
+    const double rate = spec.max_rate;
+    w.senses.push_back({std::move(spec), std::move(neurons), rate});
+  }
+  for (InputSpec& spec : background()) {
+    std::vector<uint32_t> neurons = c.find(spec.select);
+    const double rate = spec.max_rate;
+    w.background.push_back({std::move(spec), std::move(neurons), rate});
+  }
+  for (std::vector<Group>* groups : {&w.senses, &w.background}) {
+    for (Group& each : *groups) {
+      for (const Group& other : *groups) {
+        if (other.spec.name == each.spec.balance) {
+          each.max_rate = each.spec.max_rate * balance_factor(c, each.neurons, other.neurons);
+          break;
+        }
+      }
+    }
+  }
+  for (ReadoutSpec& spec : readouts()) {
+    std::vector<uint32_t> neurons = c.find(spec.select);
+    w.readouts.push_back({std::move(spec), std::move(neurons)});
+  }
+  const auto empty = [](const std::string& name, const std::string& description) {
+    return std::runtime_error("The connectome has no neurons for \"" + name + "\" (" + description + ")");
+  };
+  for (const std::vector<Group>* groups : {&w.senses, &w.background}) {
+    for (const Group& group : *groups) {
+      if (group.neurons.empty()) throw empty(group.spec.name, group.spec.description);
+    }
+  }
+  for (const ReadoutGroup& group : w.readouts) {
+    if (group.neurons.empty()) throw empty(group.spec.name, group.spec.description);
+  }
+  std::unordered_set<uint32_t> driven;
+  for (const std::vector<Group>* groups : {&w.senses, &w.background}) {
+    for (const Group& group : *groups) driven.insert(group.neurons.begin(), group.neurons.end());
+  }
+  for (const ReadoutGroup& group : w.readouts) {
+    for (uint32_t i : group.neurons) {
+      if (driven.count(i) != 0) throw std::runtime_error("Neuron " + std::to_string(i) + " is both driven and read (readout \"" + group.spec.name + "\")");
+    }
+  }
+  return w;
+}
+
+double intensity(const Senses& s, Sense sense) {
+  switch (sense) {
+    case kLoomLeft: return js::clamp(s.loom_left, 0, 1);
+    case kLoomRight: return js::clamp(s.loom_right, 0, 1);
+    case kTouch: return js::clamp(s.touch, 0, 1);
+    case kBumpLeft: return js::clamp(s.bump_left, 0, 1);
+    case kBumpRight: return js::clamp(s.bump_right, 0, 1);
+    case kWind: return js::clamp(s.wind, 0, 1);
+    case kSweet: return js::clamp(s.sweet, 0, 1);
+    case kGrounded: return s.grounded ? 1 : 0;
+    case kSenseCount: break;
+  }
+  return 0;
+}
+
+// Rate, Hz, at which each command reaches 1.
+constexpr double kWalk = 40, kTurn = 40, kBack = 40, kEscape = 200, kWings = 120, kGroom = 60, kFeed = 40;
+
+Command decode(const std::vector<double>& r) {
+  Command c;
+  c.walk = js::clamp(r[kDNg100] / kWalk, 0, 1);
+  // DNa02 drives turning toward its own side; positive is toward the fly's right.
+  c.turn = js::clamp((r[kDNa02Right] - r[kDNa02Left]) / kTurn, -1, 1);
+  c.back = js::clamp(r[kMDN] / kBack, 0, 1);
+  c.escape = js::clamp(r[kDNp01] / kEscape, 0, 1);
+  c.wings = js::clamp(r[kFlight] / kWings, 0, 1);
+  c.groom = js::clamp(r[kDNg12] / kGroom, 0, 1);
+  c.feed = js::clamp(r[kMN9] / kFeed, 0, 1);
+  return c;
+}
+
+double smooth(double previous, double sample, double dt, double tau) { return previous + (sample - previous) * -fdlibm::expm1(-dt / tau); }
+
+}  // namespace fly::io
