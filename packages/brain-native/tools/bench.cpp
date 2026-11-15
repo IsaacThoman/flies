@@ -7,6 +7,9 @@
 // Each regime runs a simulated second untimed first. Single-threaded.
 
 #include <sys/resource.h>
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#endif
 
 #include <chrono>
 #include <cstdio>
@@ -21,12 +24,18 @@ namespace {
 
 double megabytes(long bytes) { return static_cast<double>(bytes) / (1024.0 * 1024.0); }
 
-long peak_rss() {
+// Memory in use now: on Apple platforms the footprint, which is what Xcode
+// shows and what the system counts against an app; elsewhere the peak
+// resident size.
+long footprint() {
+#if defined(__APPLE__)
+  task_vm_info_data_t info{};
+  mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+  if (task_info(mach_task_self(), TASK_VM_INFO, reinterpret_cast<task_info_t>(&info), &count) != KERN_SUCCESS) return 0;
+  return static_cast<long>(info.phys_footprint);
+#else
   rusage usage{};
   getrusage(RUSAGE_SELF, &usage);
-#if defined(__APPLE__)
-  return usage.ru_maxrss;
-#else
   return usage.ru_maxrss * 1024;
 #endif
 }
@@ -85,7 +94,7 @@ int main(int argc, char** argv) {
       return 1;
     }
   }
-  const long before = peak_rss();
+  const long before = footprint();
   char error[512];
   const auto started = std::chrono::steady_clock::now();
   fly_brain* brain = fly_brain_create(data.data(), data.size(), seed, error, sizeof error);
@@ -94,18 +103,18 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "%s\n", error);
     return 1;
   }
-  const long built = peak_rss();
-  // The host need not keep the file once the brain is built.
-  std::vector<uint8_t>().swap(data);
+  const long built = footprint();
   std::printf("built %u neurons, %u connections in %.0f ms\n", fly_brain_neurons(brain), fly_brain_connections(brain), build_ms);
-  std::printf("peak resident memory: %.1f MB with the file read, %.1f MB while building\n", megabytes(before), megabytes(built));
+  // The host need not keep the file once the brain is built.
+  std::printf("memory: %.1f MB with the file read, %.1f MB with the brain built (the brain and building it: %.1f MB)\n", megabytes(before), megabytes(built),
+              megabytes(built - before));
 
   const fly_senses rest{0, 0, 0, 0, 0, 0, 0, 1, nullptr, nullptr};
   const fly_senses everything{1, 1, 1, 1, 1, 1, 1, 1, nullptr, nullptr};
   regime(brain, "at rest (standing)", rest, seconds);
   regime(brain, "every sense at full strength", everything, seconds);
   regime(brain, "at rest again", rest, seconds);
-  std::printf("peak resident memory overall: %.1f MB\n", megabytes(peak_rss()));
+  std::printf("memory at the end: %.1f MB\n", megabytes(footprint()));
   fly_brain_destroy(brain);
   return 0;
 }

@@ -307,6 +307,9 @@ void Simulation::merge_tail(uint32_t* out, uint32_t sorted, uint32_t fired) {
   }
 }
 
+// How many spikes ahead delivery prefetches connections (8 to 16 measure the same).
+constexpr uint32_t kPrefetchAhead = 12;
+
 void Simulation::step() {
   const auto slot = static_cast<uint32_t>(steps_ % delay_steps_);
   uint32_t* const out = ring_[slot].data();
@@ -317,9 +320,17 @@ void Simulation::step() {
   if (arriving > 0) {
     const uint32_t* const ptr = ptr_.data();
     const Edge* const edges = edges_.data();
+    const size_t edge_count = edges_.size();
     const uint8_t* const silent = silent_.data();
     uint64_t events = 0;
     for (uint32_t k = 0; k < arriving; k++) {
+      // A spiking neuron's connections are a few cache lines far from the
+      // last one's and rarely cached, so ask for them a few spikes early.
+      if (k + kPrefetchAhead < arriving) {
+        const uint32_t ahead = ptr[out[k + kPrefetchAhead]];
+        __builtin_prefetch(edges + ahead);
+        if (ahead + 16 < edge_count) __builtin_prefetch(edges + ahead + 16);
+      }
       const uint32_t pre = out[k];
       if (silent[pre] != 0) continue;
       const uint32_t start = ptr[pre];
