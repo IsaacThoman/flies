@@ -129,7 +129,7 @@ if (detail > 0.0) {
   float along = warpOnTop ? f.x : f.y;
   float bulge = pow(sin(3.14159 * across), 0.55) * (0.88 + 0.12 * sin(3.14159 * along));
   // A thread's own colour shows a little through the one over it, as in real cloth seen close.
-  vec3 thread = mix(warpOnTop ? warp : weft, (warp + weft) * 0.5, 0.35) * (0.74 + 0.26 * bulge);
+  vec3 thread = mix(warpOnTop ? warp : weft, (warp + weft) * 0.5, 0.55) * (0.8 + 0.2 * bulge);
   cloth = mix(cloth, thread, detail);
 }
 // The hem: folded under (a touch darker) and stitched in blue.
