@@ -1,0 +1,154 @@
+// Checks the Apple TV app in a tvOS simulator with its test scene (tests/scene.ts) and the
+// stand-in brain: builds it (unless --no-build), boots a fresh simulator, launches the app with
+// scripted remote input (the launch config's "drive"), and checks what the scene saw. Saves a
+// screenshot outside the repo, then shuts the simulator down and deletes it.
+//
+//   node apps/tvos/tests/simulator.tvos.ts [--no-build] [--runtime tvOS-26-0]
+//
+// The simulator draws OpenGL ES in software, so this checks correctness, not speed.
+import assert from 'node:assert/strict';
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync, openSync, readSync, closeSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { BUNDLE_ID, appPath } from '../../../scripts/tvos.ts';
+
+const root = path.join(import.meta.dirname, '../../..');
+const args = process.argv.slice(2);
+const runtime = args.includes('--runtime') ? args[args.indexOf('--runtime') + 1] : 'tvOS-27-0';
+const TIMEOUT_MS = 10 * 60_000;
+
+const drive = [
+  ['wait', { ready: 'true' }, 180_000],
+  ['press', 'ArrowRight', 650],
+  ['press', 'Enter', 100],
+  ['swipe', 'ArrowUp'],
+  ['touch', 0.5, -0.25, true],
+  ['touch', 0.6, -0.2, true],
+  ['touch', 0.6, -0.2, false],
+  ['press', 'Escape', 100],
+  // Play/Pause puts the scene at its root, so this Back press belongs to tvOS.
+  ['press', 'MediaPlayPause', 100],
+  ['sleep', 500],
+  ['press', 'Escape', 100],
+  ['wait', { brain: 'running' }, 180_000],
+];
+
+function xcrun(...a: string[]) {
+  const r = spawnSync('xcrun', a, { encoding: 'utf8' });
+  if (r.status !== 0) throw Error(`xcrun ${a.join(' ')}: ${r.stderr}`);
+  return r.stdout.trim();
+}
+
+/** The neuron and connection counts in the bundled connectome's header. */
+function connectomeCounts() {
+  const fd = openSync(path.join(root, 'packages/brain/data/connectome.bin'), 'r');
+  const head = Buffer.alloc(4096);
+  readSync(fd, head, 0, head.length, 0);
+  closeSync(fd);
+  const header = head.subarray(12).toString('utf8');
+  const number = (key: string) => Number(new RegExp(`"${key}":(\\d+)`).exec(header)?.[1]);
+  return { neurons: number('neurons'), connections: number('connections') };
+}
+
+type Report = {
+  frames: number; keys: string[]; touches: number; lastTouch: { x: number; y: number; touching: boolean } | null;
+  text: { width: number; inked: number } | null;
+  readback: { ok: boolean; reads: number; meanMs: number; maxMs: number; frameMs: number; plainFrameMs: number } | null;
+  readbackAsync: { ok: boolean; reads: number; meanMs: number; meanFrames: number; frameMs: number } | null;
+  audio: { beeps: number; ended: number; decoded: { length: number; sampleRate: number } | null };
+  storage: boolean | null; fetched: string | null;
+  brain: { neurons?: number; connections?: number; facets?: number[]; rates?: string[]; states?: number; command?: Record<string, number>; maxSimMsAfterBurst?: number; error?: string } | null;
+};
+type Stats = { fps: number; jsMs: { mean: number }; execMs: { mean: number }; drawsPerFrame: number };
+const complete = (r: Report) => !!(r.readbackAsync && r.audio.decoded && r.audio.ended && r.fetched && (r.brain?.states ?? 0) > 2);
+
+if (!args.includes('--no-build')) {
+  const r = spawnSync('node', ['scripts/tvos.ts', 'build', '--sim', '--test-scene', '--stand-in-brain'], { cwd: root, stdio: 'inherit' });
+  assert.equal(r.status, 0, 'build the app');
+}
+
+const started = Date.now();
+const udid = xcrun('simctl', 'create', 'apple-tv-fly-check', 'com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-1080p', `com.apple.CoreSimulator.SimRuntime.${runtime}`);
+console.log(`simulator ${udid} (${runtime})`);
+const output: string[] = [];
+let app: ReturnType<typeof spawn> | null = null;
+try {
+  xcrun('simctl', 'boot', udid);
+  xcrun('simctl', 'bootstatus', udid, '-b');
+  xcrun('simctl', 'install', udid, appPath(true));
+  const config = { script: 'game.js', url: 'http://fly.local/', fit: 'fill', pixelated: true, stats: 5, drive };
+  app = spawn('xcrun', ['simctl', 'launch', '--console-pty', udid, BUNDLE_ID, '--config', JSON.stringify(config)], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let latest: Report | null = null, lastStats: Stats | null = null, done = false;
+  const read = (chunk: Buffer) => {
+    for (const line of chunk.toString().split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      output.push(line);
+      const m = /report (\{.*\})$/.exec(line);
+      const stats = /stats (\{.*\})$/.exec(line);
+      if (m) latest = JSON.parse(m[1]) as Report;
+      else if (stats) lastStats = JSON.parse(stats[1]) as Stats;
+      else console.log(line.length > 300 ? `${line.slice(0, 300)}…` : line);
+      if (line.includes('drive: done')) done = true;
+    }
+  };
+  app.stdout?.on('data', read);
+  app.stderr?.on('data', read);
+  await new Promise<void>((resolve, reject) => {
+    const poll = setInterval(() => {
+      if (done && latest && complete(latest)) { clearInterval(poll); resolve(); }
+      if (Date.now() - started > TIMEOUT_MS) { clearInterval(poll); reject(new Error(`timed out; last report ${JSON.stringify(latest)}`)); }
+      if (output.some((l) => l.includes('drive: timed out'))) { clearInterval(poll); reject(new Error('the drive timed out')); }
+    }, 500);
+  });
+  const shot = path.join(mkdtempSync(path.join(tmpdir(), 'apple-tv-fly-')), 'simulator.png');
+  xcrun('simctl', 'io', udid, 'screenshot', shot);
+  const r = latest as unknown as Report;
+  console.log(`\nreport ${JSON.stringify(r, null, 2)}\n`);
+
+  // The remote: a held button repeats after 400 ms then every 100 ms; Back at the root isn't the game's.
+  const repeats = r.keys.filter((k) => k === 'ArrowRight+').length;
+  assert.ok(repeats >= 2 && repeats <= 4, `ArrowRight held 650 ms repeated ${repeats} times (expected about 3)`);
+  assert.deepEqual(r.keys.filter((k) => k !== 'ArrowRight+'), [
+    'ArrowRight', 'ArrowRight^', 'Enter', 'Enter^', 'ArrowUp', 'ArrowUp^', 'Escape', 'Escape^', 'MediaPlayPause', 'MediaPlayPause^',
+  ], 'the keys the scene saw');
+  assert.ok(output.some((l) => l.includes('Back at the root goes to tvOS')), 'Back at the root went to tvOS');
+  assert.equal(r.touches, 3, 'three remotetouch events');
+  const t = r.lastTouch;
+  assert.ok(t && Math.abs(t.x - 0.6) < 1e-6 && Math.abs(t.y + 0.2) < 1e-6 && !t.touching, `the finger lifted where it was: ${JSON.stringify(t)}`);
+  // Text on a 2D canvas.
+  assert.ok(r.text && r.text.width > 50 && r.text.inked > 100, `canvas text measured and drawn: ${JSON.stringify(r.text)}`);
+  // The eye's readback, both ways.
+  assert.ok(r.readback?.ok && r.readback.reads > 0, `readRenderTargetPixels: ${JSON.stringify(r.readback)}`);
+  assert.ok(r.readbackAsync?.ok, `readRenderTargetPixelsAsync: ${JSON.stringify(r.readbackAsync)}`);
+  // Audio, storage, files.
+  assert.equal(r.audio.beeps, 1, 'one beep');
+  assert.equal(r.audio.ended, 1, 'the beep ended');
+  assert.ok(r.audio.decoded && r.audio.decoded.length > 0, 'decodeAudioData');
+  assert.equal(r.storage, true, 'localStorage');
+  assert.equal(r.fetched, 'game.js', 'fetch of a bundled file');
+  // The brain bridge, against the stand-in (tests/brain-stand-in/stand_in_brain.cpp).
+  const b = r.brain ?? {};
+  assert.equal(b.error, undefined, `brain error: ${b.error}`);
+  assert.deepEqual({ neurons: b.neurons, connections: b.connections }, connectomeCounts(), 'the connectome arrived whole');
+  assert.deepEqual(b.facets, [8, 8], 'eye facets');
+  assert.deepEqual(b.rates, ['standin.ticks', 'standin.simulatedMs'], 'rate names');
+  assert.ok(Math.abs((b.command?.turn ?? 0) - 0.6) < 1e-3, `turn follows the light (right 0.8, left 0.2): ${b.command?.turn}`);
+  assert.equal(b.command?.walk, 0.8, 'walk');
+  assert.equal(b.command?.feed, 0.5, 'feed follows sweet');
+  assert.equal(b.command?.escape, 0, 'grounded');
+  assert.ok((b.maxSimMsAfterBurst ?? 0) > 0 && (b.maxSimMsAfterBurst ?? 0) <= 100, `a step simulates at most 100 ms: ${b.maxSimMsAfterBurst}`);
+
+  console.log(`All checks passed in ${Math.round((Date.now() - started) / 1000)} s (${r.frames} frames).`);
+  console.log(`readPixels on a ${32}x${16} target (simulator, software GL): sync ${r.readback?.meanMs} ms mean, ${r.readback?.maxMs} ms max; ` +
+    `frame ${r.readback?.frameMs} ms with it, ${r.readback?.plainFrameMs} ms without; async resolves in ${r.readbackAsync?.meanFrames} frames (${r.readbackAsync?.meanMs} ms), frame ${r.readbackAsync?.frameMs} ms`);
+  const s = lastStats as Stats | null;
+  assert.ok(s && s.fps > 0, 'the host logs frame stats');
+  console.log(`Frame stats: ${s.fps} fps, ${s.jsMs.mean} ms JavaScript and ${s.execMs.mean} ms GL a frame, ${s.drawsPerFrame} draws`);
+  console.log(`Screenshot: ${shot}`);
+} finally {
+  app?.kill();
+  spawnSync('xcrun', ['simctl', 'terminate', udid, BUNDLE_ID], { stdio: 'ignore' });
+  spawnSync('xcrun', ['simctl', 'shutdown', udid], { stdio: 'ignore' });
+  spawnSync('xcrun', ['simctl', 'delete', udid], { stdio: 'ignore' });
+}

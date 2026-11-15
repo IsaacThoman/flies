@@ -1,0 +1,5 @@
+{
+  // Type checks the Apple TV app's runtime, test scene and checks: tsc -p apps/tvos
+  "extends": "../../tsconfig.json",
+  "include": ["runtime", "tests", "vite.config.ts"]
+}
