@@ -31,8 +31,6 @@ export class FlyView {
   #q = new THREE.Quaternion();
   #yaw = new THREE.Quaternion();
   #tilt = new THREE.Quaternion();
-  #pitchRoll = new THREE.Quaternion();
-  #euler = new THREE.Euler();
   #world: World;
   #shadowNormal = new THREE.Vector3();
 
@@ -72,12 +70,8 @@ export class FlyView {
     this.#up.set(body.up.x, body.up.y, body.up.z);
     this.#yaw.setFromAxisAngle(AXIS_Y, body.yaw);
     this.#tilt.setFromUnitVectors(AXIS_Y, this.#up);
+    // In the air the model pitches and rolls itself from the pose (the FlyModel contract); here only its heading and the ground's tilt.
     this.#q.copy(this.#tilt).multiply(this.#yaw);
-    if (airborne) {
-      this.#euler.set(-pose.pitch, 0, pose.roll, "YXZ");
-      this.#pitchRoll.setFromEuler(this.#euler);
-      this.#q.multiply(this.#pitchRoll);
-    }
     this.root.quaternion.copy(this.#q);
 
     // The shadow lies on whatever is under the fly, softer and wider the higher it is.
