@@ -22,7 +22,7 @@
     "tvos": "node scripts/tvos.ts",
     "tvos:check": "node apps/tvos/tests/simulator.tvos.ts",
     "tvos:typecheck": "tsc -p apps/tvos",
-    "tvos:art": "node scripts/placeholder-art.ts",
+    "tvos:art": "node scripts/art.ts",
     "brain:fetch": "node packages/brain/scripts/fetch.ts",
     "brain:pack": "node packages/brain/scripts/pack.ts",
     "fly:viewer": "vite --config packages/fly/viewer/vite.config.ts"

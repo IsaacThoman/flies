@@ -78,8 +78,8 @@ package's release flags (`-O2 -DNDEBUG -ffp-contract=off`). `--stand-in-brain` c
 checking the bridge. The build stops with a message if the brain folder has no sources.
 
 The home-screen icon, Top Shelf banners and launch image come from `assets/`
-([assets/README.md](../assets/README.md)); the ones there are placeholders drawn by
-`npm run tvos:art`.
+([assets/README.md](../assets/README.md)); `npm run tvos:art` renders them from the game
+itself.
 
 ### The launch config
 
