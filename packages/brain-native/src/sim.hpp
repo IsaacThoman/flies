@@ -25,6 +25,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace fly {
@@ -82,6 +83,34 @@ class PoissonInput {
   double next_ = std::numeric_limits<double>::infinity();
 };
 
+/**
+ * Independent Bernoulli trials for each neuron each step, each neuron with a
+ * probability of its own. Drawn by thinning: candidates come at the highest
+ * probability, skipping geometric gaps as PoissonInput does, and each is kept
+ * with its own probability over the highest. That costs one draw per
+ * candidate, about (neurons × highest probability) a step.
+ */
+class RatedPoissonInput {
+ public:
+  RatedPoissonInput(std::vector<uint32_t> neurons, uint32_t seed) : neurons_(std::move(neurons)), random_(seed), p_(neurons_.size(), 0) {}
+
+  /** Each neuron's chance of firing in a step is its rate times scale (rates in Hz and the step in seconds), at most 1. */
+  void set_probabilities(std::span<const double> rates, double scale);
+  /** Writes this step's firing neurons into out, in group order; returns how many. */
+  uint32_t sample(uint32_t* out);
+  const std::vector<uint32_t>& neurons() const { return neurons_; }
+
+ private:
+  double gap();
+
+  std::vector<uint32_t> neurons_;
+  js::Mulberry32 random_;
+  std::vector<double> p_;
+  double max_ = 0;
+  double log_miss_ = 0;
+  double next_ = std::numeric_limits<double>::infinity();
+};
+
 class Simulation {
  public:
   /** One connection: its target and its weight, count × gain[pre] × postScale[post]. */
@@ -122,8 +151,17 @@ class Simulation {
 
   /** Adds a group of neurons driven as independent Poisson trains; returns its index. Each draws from its own stream. */
   uint32_t add_input(const std::string& name, std::span<const uint32_t> neurons, double rate_hz = 0);
-  /** Changes an input's rate, Hz per neuron, from the next step on. */
+  /** Changes a group input's rate, Hz per neuron, from the next step on. */
   void set_rate(uint32_t input, double rate_hz);
+  /**
+   * Adds a group of neurons each driven as its own Poisson train, at a rate
+   * of its own (set_rates; all 0 to begin with); returns its index. The
+   * neurons keep the order given, which is the order of the rates, and must
+   * be distinct. It draws from its own stream, like a group input.
+   */
+  uint32_t add_rated_input(const std::string& name, std::span<const uint32_t> neurons);
+  /** Changes each neuron's rate, Hz, of a rated input from the next step on, in the order its neurons were given. */
+  void set_rates(uint32_t input, std::span<const double> rates_hz);
 
   /** Adds a group of neurons whose spikes drain_readouts counts; returns its index. */
   uint32_t add_readout(const std::string& name, std::span<const uint32_t> neurons);
@@ -151,10 +189,14 @@ class Simulation {
     int32_t hold;
   };
 
+  // Inputs in the order they were added, which seeds each one's stream. A
+  // group input has one rate for all its neurons; a rated input one per
+  // neuron.
   struct Input {
     std::string name;
     double rate;
-    PoissonInput source;
+    bool on;
+    std::variant<PoissonInput, RatedPoissonInput> source;
   };
 
   template <bool kCleanup>
@@ -163,6 +205,7 @@ class Simulation {
   void join(uint32_t i);
   void merge_tail(uint32_t* out, uint32_t sorted, uint32_t fired);
   std::vector<uint32_t> members(std::span<const uint32_t> neurons, const std::string& what) const;
+  void check_name(const std::string& name) const;
 
   uint32_t neurons_;
   double dt_;

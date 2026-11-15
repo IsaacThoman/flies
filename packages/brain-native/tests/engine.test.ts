@@ -1,16 +1,17 @@
 // The native engine (src/sim.cpp) against sim.ts on random networks, over
 // every option the engine has, including the ones the brain doesn't use yet
-// (a per-neuron bias, the graded input vision will need; a per-target weight
-// scale; drive reset and adaptation on and off; other steps, delays,
-// refractory periods and cleanup intervals): each step's spikes and active
-// count, and every neuron's v, g and a at the end, bit for bit.
+// (a per-neuron bias; a per-target weight scale; drive reset and adaptation
+// on and off; other steps, delays, refractory periods and cleanup intervals)
+// and rated inputs, a rate per neuron as the eyes drive the lamina, with
+// rates from 0 to past one spike a step changed mid-run: each step's spikes
+// and active count, and every neuron's v, g and a at the end, bit for bit.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Simulation, mulberry32 } from "../../brain/src/sim.ts";
 import { build, harness, hex32, noCompiler } from "./compare.ts";
 
-type Change = { step: number; input: number; rate: number } | { step: number; bias: number[] | null };
+type Change = { step: number; input: number; rate: number } | { step: number; bias: number[] | null } | { step: number; rated: number; rates: number[] };
 
 type Spec = {
   ptr: number[];
@@ -30,6 +31,8 @@ type Spec = {
   resetDrive: boolean;
   adaptation: { increment: number; tau: number } | null;
   inputs: { neurons: number[]; rate: number }[];
+  /** Added after `inputs`, each its neurons in their order (distinct). */
+  rated: { neurons: number[] }[];
   changes: Change[];
   steps: number;
 };
@@ -58,6 +61,21 @@ function randomSpec(seed: number): Spec {
   });
   const bias = () => Array.from({ length: n }, () => f(random() < 0.05 ? 7.5 + random() * 3 : random() < 0.05 ? -2 * random() : 0));
   const pick = (k: number) => Array.from({ length: k }, () => Math.floor(random() * n));
+  const distinct = (k: number) => {
+    const out = new Set<number>();
+    while (out.size < k) out.add(Math.floor(random() * n));
+    return [...out];
+  };
+  const rated = [{ neurons: distinct(40) }, { neurons: distinct(8) }];
+  // Each neuron's rate: silent, slow, fast, or one spike a step and more (probability 1).
+  const rates = (k: number) => {
+    const kind = random();
+    return Array.from({ length: k }, () => {
+      const r = random();
+      if (kind < 0.1) return 0;
+      return r < 0.3 ? 0 : r < 0.8 ? random() * 200 : r < 0.95 ? 200 + random() * 400 : kind < 0.3 ? 1e308 : 3000 + random() * 3000;
+    });
+  };
   const steps = 1500;
   const changes: Change[] = [];
   if (random() < 0.7) changes.push({ step: 0, bias: bias() });
@@ -65,6 +83,10 @@ function randomSpec(seed: number): Spec {
     const step = Math.floor(random() * steps);
     const r = random();
     changes.push(r < 0.6 ? { step, input: Math.floor(random() * 3), rate: r < 0.1 ? 0 : random() * 300 } : { step, bias: r < 0.7 ? null : bias() });
+  }
+  for (let k = 0; k < 12; k++) {
+    const which = Math.floor(random() * rated.length);
+    changes.push({ step: Math.floor(random() * steps), rated: which, rates: rates(rated[which].neurons.length) });
   }
   changes.sort((a, b) => a.step - b.step);
   return {
@@ -89,6 +111,7 @@ function randomSpec(seed: number): Spec {
       { neurons: pick(30), rate: 5 + random() * 30 },
       { neurons: pick(5), rate: 0 },
     ],
+    rated,
     changes,
     steps,
   };
@@ -116,12 +139,14 @@ function typescript(spec: Spec): string[] {
     },
   );
   spec.inputs.forEach((input, k) => sim.addInput(`input ${k}`, input.neurons, input.rate));
+  spec.rated.forEach((input, k) => sim.addRatedInput(`rated ${k}`, input.neurons));
   const lines: string[] = [];
   let next = 0;
   for (let s = 0; s < spec.steps; s++) {
     while (next < spec.changes.length && spec.changes[next].step === s) {
       const change = spec.changes[next++];
       if ("rate" in change) sim.setRate(`input ${change.input}`, change.rate);
+      else if ("rates" in change) sim.setRates(`rated ${change.rated}`, change.rates);
       else sim.setBias(change.bias ? Float32Array.from(change.bias) : null);
     }
     sim.step();

@@ -8,13 +8,16 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { READOUTS } from "../../brain/src/io.ts";
-import { createBrain } from "../../brain/src/runtime.ts";
-import type { FlyBrain } from "../../brain/src/runtime.ts";
+import type { EyeColumn } from "../../brain/src/eye-columns.ts";
+import { buildEyes } from "../../brain/src/eyes.ts";
+import { loadConnectome } from "../../brain/src/format.ts";
+import { FlyBrain, createBrain } from "../../brain/src/runtime.ts";
 import { mulberry32 } from "../../brain/src/sim.ts";
 import type { Simulation } from "../../brain/src/sim.ts";
+import { BATTERY, facetAngles, render } from "../../brain/src/stimuli.ts";
+import type { Scene } from "../../brain/src/stimuli.ts";
 import { RESTING_SENSES } from "../../brain/src/types.ts";
-import type { BrainSenses } from "../../brain/src/types.ts";
+import type { BrainSenses, EyeMap } from "../../brain/src/types.ts";
 
 export const PACKAGE = fileURLToPath(new URL("..", import.meta.url));
 export const CONNECTOME = fileURLToPath(new URL("../../brain/data/connectome.bin", import.meta.url));
@@ -50,6 +53,9 @@ export const hex32 = (x: number) => {
 
 export type Tick = { dt: number; senses: BrainSenses; what: string };
 
+/** Columns for the eyes in place of eye-columns.ts's (runtime.ts's eyeColumns option). */
+export type Columns = { readonly right: readonly EyeColumn[]; readonly left: readonly EyeColumn[] };
+
 const SCALAR = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet"] as const;
 type Scalar = (typeof SCALAR)[number];
 
@@ -59,8 +65,11 @@ type Scalar = (typeof SCALAR)[number];
  * out-of-range values, and tick lengths from 0 to the longest allowed, in
  * cycles until `seconds` of fly time. A few invalid ticks are in there too.
  * Intensities are single precision, as the C interface takes them.
+ *
+ * Given eyes, each cycle then opens them (see sight()), with light as
+ * Float32Arrays, as the C interface takes it.
  */
-export function scenario(seconds: number, seed = 1): Tick[] {
+export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
   const random = mulberry32(seed);
   const ticks: Tick[] = [];
   let total = 0;
@@ -100,13 +109,165 @@ export function scenario(seconds: number, seed = 1): Tick[] {
     hold(500, 16, () => ({ wind: 7, touch: -1, sweet: Number.NaN, loomLeft: Number.POSITIVE_INFINITY }), "out-of-range senses");
     for (const dt of [-1, Number.NaN, 1000.5, Number.POSITIVE_INFINITY]) add(dt, {}, "an invalid tick");
     hold(5000, 16, () => ({}), "rest at the end of a cycle");
+    if (eyes) sight(eyes, cycle, random, add, hold);
   }
   return ticks;
 }
 
-/** The harness's input for these ticks. */
-export function script(ticks: readonly Tick[]): string {
-  return ticks.map(({ dt, senses }) => [hex64(dt), ...SCALAR.map((s: Scalar) => hex32(senses[s])), senses.grounded ? 1 : 0].join(" ")).join("\n") + "\n";
+type Add = (dt: number, senses: Partial<BrainSenses>, what: string) => void;
+type Hold = (ms: number, dt: number | (() => number), senses: (elapsed: number) => Partial<BrainSenses>, what: string) => void;
+
+/** Luminances the light arrays can hold that are no ordinary luminance, and the edges of the ordinary ones. */
+const ODD_LUMINANCES = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1, 7, 2, -0, 0, 1, 1e-40, 1.4e-45, 1 - 2 ** -24, 1 + 2 ** -23, 0.5, -1e-30];
+
+/**
+ * The eyes' part of a cycle: a steady scene and a steady checkerboard, every
+ * stimulus of stimuli.ts's battery (looms, receding, dimming and brightening,
+ * bars, dots, gratings, flicker) from its steady ground, light switched off
+ * and on mid-stimulus, light with the other senses and with all of them at
+ * once, odd luminances (NaN, infinite, negative, above 1, subnormal) and
+ * random ones, light over long, short and empty ticks, a steady scene held
+ * for seconds and then changed, and light that doesn't fit the eyes (an eye's
+ * array too short, too long or empty, an eye left out, both left out), which
+ * both must refuse with the same message and nothing changed.
+ */
+function sight(eyes: EyeMap, cycle: number, random: () => number, add: Add, hold: Hold) {
+  const angles = facetAngles(eyes);
+  const sizes = { left: eyes.left.directions.length / 3, right: eyes.right.directions.length / 3 };
+  const frame = (scene: Scene, t: number) => {
+    const light = { left: new Float32Array(sizes.left), right: new Float32Array(sizes.right) };
+    render(scene, t, angles, light);
+    return light;
+  };
+  const uniform = (level: number) => frame(() => level, 0);
+  const grey = uniform(0.5);
+  const tick = cycle % 2 === 0 ? 16 : 33;
+  const scene = (name: string) => BATTERY.find((s) => s.name === name)!;
+  const show = (s: { scene: Scene }, ms: number, dt: number | (() => number), what: string, others: (t: number) => Partial<BrainSenses> = () => ({})) =>
+    hold(ms, dt, (t) => ({ ...others(t), light: frame(s.scene, t / 1000) }), what);
+
+  hold(2000, tick, () => ({ light: grey }), "a steady grey scene");
+  show(scene("static checkerboard"), 3000, tick, "a steady checkerboard appears");
+  for (const stimulus of BATTERY) {
+    const ground = uniform(stimulus.ground);
+    hold(300, tick, () => ({ light: ground }), `the ground of ${stimulus.name}`);
+    show(stimulus, Math.min(1200, stimulus.seconds * 1000), tick, stimulus.name);
+  }
+
+  const loom = scene("loom right");
+  let k = 0;
+  hold(1200, 16, (t) => (k++ % 10 < 5 ? { light: frame(loom.scene, t / 1000) } : {}), "a loom, the eyes opening and shutting every 5 ticks");
+  show(scene("grating, clockwise"), 400, 16, "a grating, the eyes open again");
+  hold(300, 16, () => ({}), "the eyes shut mid-grating");
+  show(scene("grating, anticlockwise"), 600, 16, "the eyes open on a grating");
+
+  const everything = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1 };
+  show(scene("grating, clockwise"), 1500, 16, "a grating with every other sense at full strength", () => everything);
+  show(loom, 1000, 1000 / 60, "a loom while held and dragged", () => ({ touch: 0.4, wind: 0.5, grounded: false }));
+  show(scene("flicker"), 1000, 16, "flicker while sweet", () => ({ sweet: 1 }));
+  show(scene("bar right, front to back"), 1000, 16, "a bar with random senses", () =>
+    Object.fromEntries(["loomLeft", "touch", "bumpRight", "wind"].map((s) => [s, random() < 0.5 ? random() : 0])),
+  );
+
+  const odd = () => {
+    const light = { left: new Float32Array(sizes.left), right: new Float32Array(sizes.right) };
+    for (const each of [light.left, light.right]) for (let f = 0; f < each.length; f++) each[f] = ODD_LUMINANCES[Math.floor(random() * ODD_LUMINANCES.length)];
+    return light;
+  };
+  hold(500, 16, () => ({ light: odd() }), "odd luminances");
+  for (const level of ODD_LUMINANCES) add(16, { light: uniform(level) }, `every facet ${level}`);
+  hold(300, 16, () => {
+    const light = { left: new Float32Array(sizes.left), right: new Float32Array(sizes.right) };
+    for (const each of [light.left, light.right]) for (let f = 0; f < each.length; f++) each[f] = random();
+    return { light };
+  }, "random luminances");
+  hold(500, 16, () => ({ light: odd(), wind: 7, touch: -1, sweet: Number.NaN }), "odd luminances and out-of-range senses");
+
+  for (const dt of [1000, 1000]) add(dt, { light: frame(loom.scene, 0.5) }, "the longest ticks with light");
+  for (let n = 0; n < 5; n++) add(100, { light: frame(scene("grating right, upward").scene, n / 10) }, "100 ms ticks with light");
+  for (let n = 0; n < 4; n++) add(0, { light: frame(scene("flicker").scene, n / 8) }, "empty ticks with light");
+  for (let n = 0; n < 12; n++) add(0.25, { light: frame(scene("flicker").scene, n / 8) }, "0.25 ms ticks with light");
+  for (let n = 0; n < 20; n++) add(7.3, { light: frame(scene("dot right, upward").scene, n * 0.0073) }, "7.3 ms ticks with light");
+
+  const bright = uniform(0.8);
+  for (let n = 0; n < 3; n++) add(1000, { light: bright }, "a steady scene for seconds");
+  hold(200, 16, () => ({ light: frame(scene("dim").scene, 0) }), "then dimmed");
+  hold(400, 16, () => ({ light: bright }), "and bright again");
+
+  const lit = (t: number) => frame(scene("grating right, front to back").scene, t);
+  const wrong: [string, () => unknown][] = [
+    ["the left eye's light a facet short", () => ({ left: new Float32Array(Math.max(0, sizes.left - 1)), right: lit(0).right })],
+    ["the right eye's light a facet long", () => ({ left: lit(0).left, right: new Float32Array(sizes.right + 1) })],
+    ["the left eye's light empty", () => ({ left: new Float32Array(0), right: lit(0).right })],
+    ["the left eye left out", () => ({ right: lit(0).right })],
+    ["the right eye left out", () => ({ left: lit(0).left })],
+    ["both eyes left out", () => ({})],
+  ];
+  for (const [what, light] of wrong) {
+    hold(100, 16, (t) => ({ light: lit(t / 1000) }), "a grating");
+    add(16, { light: light() as BrainSenses["light"] }, what);
+  }
+  add(Number.NaN, { light: { left: new Float32Array(1), right: new Float32Array(1) } }, "an invalid tick with light that doesn't fit");
+  hold(300, 16, () => ({}), "the eyes shut at the end");
+}
+
+/** The harness's input for these ticks, and the light frames it refers to (see tools/harness.cpp). */
+export function script(ticks: readonly Tick[]): { input: string; frames: Uint8Array } {
+  const index = new Map<ArrayLike<number>, number>();
+  const chunks: Uint8Array[] = [];
+  const ref = (frame: ArrayLike<number> | undefined) => {
+    if (frame === undefined) return "x";
+    let k = index.get(frame);
+    if (k === undefined) {
+      if (!(frame instanceof Float32Array)) throw new Error("light for the harness must be Float32Arrays");
+      k = index.size;
+      index.set(frame, k);
+      const count = new Uint8Array(4);
+      new DataView(count.buffer).setUint32(0, frame.length, true);
+      chunks.push(count, new Uint8Array(frame.buffer, frame.byteOffset, frame.byteLength));
+    }
+    return String(k);
+  };
+  const lines = ticks.map(({ dt, senses }) => {
+    const light = senses.light ? `${ref(senses.light.left)},${ref(senses.light.right)}` : "-";
+    return [hex64(dt), ...SCALAR.map((s: Scalar) => hex32(senses[s])), senses.grounded ? 1 : 0, light].join(" ");
+  });
+  const frames = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+  let at = 0;
+  for (const c of chunks) {
+    frames.set(c, at);
+    at += c.length;
+  }
+  return { input: lines.join("\n") + "\n", frames };
+}
+
+/** The harness's file of columns. */
+export function columnsFile(columns: Columns): string {
+  return (["left", "right"] as const).flatMap((side) => columns[side].map((row) => `${side} ${row.join(" ")}\n`)).join("");
+}
+
+/** The eye map of a connectome, as the brain builds it; null without eyes, or when the columns don't fit it. */
+export function eyeMap(data: ArrayBuffer, columns?: Columns): EyeMap | null {
+  try {
+    return buildEyes(loadConnectome(data), columns)?.map ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** FNV-1a over the bits of both retinas' rates, as doubles (tools/harness.cpp has the same). */
+function retinaDigest(brain: FlyBrain): string {
+  if (!brain.vision) return "-";
+  const bits = new DataView(new ArrayBuffer(8));
+  let h = 2166136261;
+  for (const side of ["left", "right"] as const) {
+    for (const x of brain.vision.retina[side].rates) {
+      bits.setFloat64(0, x, true);
+      h = Math.imul(h ^ bits.getUint32(0, true), 16777619) >>> 0;
+      h = Math.imul(h ^ bits.getUint32(4, true), 16777619) >>> 0;
+    }
+  }
+  return h.toString(16).padStart(8, "0");
 }
 
 /** FNV-1a over the bits of every neuron's v, g and a (tools/harness.cpp has the same). */
@@ -123,21 +284,22 @@ export function digest(sim: Simulation): string {
 }
 
 /** What the harness prints for these ticks, computed by the TypeScript brain. */
-export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick[]): string[] {
+export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick[], columns?: Columns): string[] {
   let brain: FlyBrain;
   try {
-    // createBrain makes a FlyBrain; the comparison reads its internal state too.
-    brain = createBrain(data, { seed }) as FlyBrain;
+    // createBrain makes a FlyBrain; the comparison reads its internal state too. Only FlyBrain takes other columns.
+    brain = columns ? new FlyBrain(loadConnectome(data), { seed, eyeColumns: columns }) : (createBrain(data, { seed }) as FlyBrain);
   } catch (error) {
     return [`error ${(error as Error).message}`];
   }
-  const lines = [`ready ${brain.neurons} ${brain.connections} ${READOUTS.map((r) => r.name).join("|")}`];
+  const names = Object.keys(brain.rates);
+  const lines = [`ready ${brain.neurons} ${brain.connections} ${names.join("|")}`];
   let tick = 0;
   for (const { dt, senses } of ticks) {
     try {
       const { command, stats } = brain.tick(dt, senses);
       const c = [command.walk, command.turn, command.back, command.escape, command.wings, command.groom, command.feed];
-      const rates = READOUTS.map((r) => stats.rates[r.name]);
+      const rates = names.map((name) => stats.rates[name]);
       lines.push(
         [
           `${stats.spikes} ${stats.active} ${hex64(stats.simMs)}`,
@@ -146,6 +308,7 @@ export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick
           c.map(hex32).join(" "),
           rates.map(hex32).join(" "),
           [brain.state.arousal.value, brain.state.scene.left.value, brain.state.scene.right.value].map(hex64).join(" "),
+          retinaDigest(brain),
           tick++ % 50 === 49 ? digest(brain.sim) : "-",
         ].join(" | "),
       );
@@ -157,8 +320,20 @@ export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick
 }
 
 /** The same from the native brain. */
-export function native(dir: string, path: string, seed: number, ticks: readonly Tick[]): string[] {
-  return harness(dir, ["brain", path, String(seed)], script(ticks));
+export function native(dir: string, path: string, seed: number, ticks: readonly Tick[], columns?: Columns): string[] {
+  const { input, frames } = script(ticks);
+  const temp = mkdtempSync(join(tmpdir(), "fly-brain-native-"));
+  try {
+    const args = ["brain", path, String(seed), "--light", join(temp, "frames")];
+    writeFileSync(join(temp, "frames"), frames);
+    if (columns) {
+      writeFileSync(join(temp, "columns"), columnsFile(columns));
+      args.push("--columns", join(temp, "columns"));
+    }
+    return harness(dir, args, input);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
 }
 
 /** The first line where the two differ, described, or null when every line is the same. */

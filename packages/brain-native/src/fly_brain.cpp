@@ -8,6 +8,8 @@
 #include <cstdio>
 #include <exception>
 #include <new>
+#include <span>
+#include <stdexcept>
 #include <string>
 
 #include "brain.hpp"
@@ -54,10 +56,16 @@ void fly_brain_destroy(fly_brain* brain) { delete brain; }
 uint32_t fly_brain_neurons(const fly_brain* brain) { return brain->brain.neurons(); }
 uint32_t fly_brain_connections(const fly_brain* brain) { return brain->brain.connections(); }
 
-// No eyes yet, as in runtime.ts (FlyBrain.eyes is null).
-uint32_t fly_brain_facets(const fly_brain*, int) { return 0; }
-const float* fly_brain_eye_directions(const fly_brain*, int) { return nullptr; }
-float fly_brain_eye_acceptance(const fly_brain*) { return 0; }
+uint32_t fly_brain_facets(const fly_brain* brain, int side) {
+  return side == 0 || side == 1 ? brain->brain.facets(static_cast<fly::io::Side>(side)) : 0;
+}
+
+const float* fly_brain_eye_directions(const fly_brain* brain, int side) {
+  const auto& eyes = brain->brain.eyes();
+  return eyes && (side == 0 || side == 1) ? (*eyes)[static_cast<size_t>(side)].directions.data() : nullptr;
+}
+
+float fly_brain_eye_acceptance(const fly_brain* brain) { return brain->brain.eyes() ? static_cast<float>(fly::eyes::acceptance()) : 0; }
 
 uint32_t fly_brain_rate_count(const fly_brain* brain) { return static_cast<uint32_t>(brain->brain.rate_names().size()); }
 
@@ -68,6 +76,22 @@ const char* fly_brain_rate_name(const fly_brain* brain, uint32_t index) {
 
 int fly_brain_tick(fly_brain* brain, double dt_ms, const fly_senses* senses, fly_command* command, fly_stats* stats, float* rates, char* error,
                    size_t error_size) {
+  fly::Light light;
+  // Both pointers NULL: the eyes are shut. One NULL: that eye is left out, which the brain refuses.
+  if (brain != nullptr && senses != nullptr && (senses->light_left != nullptr || senses->light_right != nullptr)) {
+    light.open = true;
+    if (senses->light_left != nullptr) light.left = std::span<const float>(senses->light_left, brain->brain.facets(fly::io::kLeft));
+    if (senses->light_right != nullptr) light.right = std::span<const float>(senses->light_right, brain->brain.facets(fly::io::kRight));
+  }
+  return fly::tick(brain, dt_ms, senses, light, command, stats, rates, error, error_size);
+}
+
+}  // extern "C"
+
+namespace fly {
+
+int tick(fly_brain* brain, double dt_ms, const fly_senses* senses, const Light& light, fly_command* command, fly_stats* stats, float* rates, char* error,
+         size_t error_size) {
   const bool ok = guarded(error, error_size, [&] {
     if (brain == nullptr || senses == nullptr) throw std::invalid_argument("fly_brain_tick needs a brain and its senses");
     fly::io::Senses in;
@@ -79,8 +103,6 @@ int fly_brain_tick(fly_brain* brain, double dt_ms, const fly_senses* senses, fly
     in.wind = senses->wind;
     in.sweet = senses->sweet;
     in.grounded = senses->grounded != 0;
-    // Ignored for now; fly_brain_facets() says there are no facets to fill.
-    const fly::Light light{};
     fly::TickStats out;
     const fly::io::Command c = brain->brain.tick(dt_ms, in, light, out);
     if (command != nullptr) {
@@ -96,4 +118,4 @@ int fly_brain_tick(fly_brain* brain, double dt_ms, const fly_senses* senses, fly
   return ok ? 0 : 1;
 }
 
-}  // extern "C"
+}  // namespace fly

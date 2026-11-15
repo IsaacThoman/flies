@@ -34,6 +34,38 @@ double PoissonInput::gap() {
   return std::floor(fdlibm::log(1 - random_.next()) / log_miss_);
 }
 
+void RatedPoissonInput::set_probabilities(std::span<const double> rates, double scale) {
+  double max = 0;
+  for (size_t k = 0; k < p_.size(); k++) {
+    const double p = js::min(1, js::max(0, rates[k] * scale));
+    p_[k] = p;
+    if (p > max) max = p;
+  }
+  max_ = max;
+  log_miss_ = fdlibm::log1p(-max);
+  next_ = gap();
+}
+
+uint32_t RatedPoissonInput::sample(uint32_t* out) {
+  const auto size = static_cast<double>(neurons_.size());
+  const double max = max_;
+  double at = next_;
+  uint32_t n = 0;
+  while (at < size) {
+    const auto k = static_cast<size_t>(at);
+    if (random_.next() * max < p_[k]) out[n++] = neurons_[k];
+    at += 1 + gap();
+  }
+  next_ = at - size;
+  return n;
+}
+
+double RatedPoissonInput::gap() {
+  if (max_ <= 0) return std::numeric_limits<double>::infinity();
+  if (max_ >= 1) return 0;
+  return std::floor(fdlibm::log(1 - random_.next()) / log_miss_);
+}
+
 Simulation::Simulation(std::vector<uint32_t> ptr, std::vector<Edge> edges, const SimulationOptions& options)
     : ptr_(std::move(ptr)), edges_(std::move(edges)) {
   if (ptr_.empty()) throw std::invalid_argument("ptr must have at least one entry");
@@ -132,22 +164,60 @@ std::vector<uint32_t> Simulation::members(std::span<const uint32_t> neurons, con
   return unique;
 }
 
-uint32_t Simulation::add_input(const std::string& name, std::span<const uint32_t> neurons, double rate_hz) {
+void Simulation::check_name(const std::string& name) const {
   for (const Input& input : inputs_) {
     if (input.name == name) throw std::invalid_argument("There is already an input called \"" + name + "\"");
   }
+}
+
+uint32_t Simulation::add_input(const std::string& name, std::span<const uint32_t> neurons, double rate_hz) {
+  check_name(name);
   const auto index = static_cast<uint32_t>(inputs_.size());
-  inputs_.push_back(Input{name, 0, PoissonInput(members(neurons, "input \"" + name + "\""), js::input_seed(seed_, index))});
+  inputs_.push_back(Input{name, 0, false, PoissonInput(members(neurons, "input \"" + name + "\""), js::input_seed(seed_, index))});
   set_rate(index, rate_hz);
   return index;
 }
 
 void Simulation::set_rate(uint32_t index, double rate_hz) {
   Input& input = inputs_.at(index);
+  auto* source = std::get_if<PoissonInput>(&input.source);
+  if (source == nullptr) throw std::invalid_argument("\"" + input.name + "\" has a rate per neuron; use setRates");
   if (!(rate_hz >= 0)) throw std::invalid_argument("Input rates must be zero or more");
   if (rate_hz == input.rate) return;
   input.rate = rate_hz;
-  input.source.set_probability((rate_hz * dt_) / 1000);
+  input.on = rate_hz > 0;
+  source->set_probability((rate_hz * dt_) / 1000);
+}
+
+uint32_t Simulation::add_rated_input(const std::string& name, std::span<const uint32_t> neurons) {
+  check_name(name);
+  for (uint32_t i : neurons) {
+    if (i >= neurons_) throw std::invalid_argument("input \"" + name + "\": no neuron " + std::to_string(i));
+  }
+  std::vector<uint32_t> sorted(neurons.begin(), neurons.end());
+  std::sort(sorted.begin(), sorted.end());
+  if (std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end()) throw std::invalid_argument("input \"" + name + "\": a neuron is listed twice");
+  const auto index = static_cast<uint32_t>(inputs_.size());
+  inputs_.push_back(
+      Input{name, 0, false, RatedPoissonInput(std::vector<uint32_t>(neurons.begin(), neurons.end()), js::input_seed(seed_, index))});
+  return index;
+}
+
+void Simulation::set_rates(uint32_t index, std::span<const double> rates_hz) {
+  Input& input = inputs_.at(index);
+  auto* source = std::get_if<RatedPoissonInput>(&input.source);
+  if (source == nullptr) throw std::invalid_argument("\"" + input.name + "\" has one rate for all its neurons; use setRate");
+  const size_t size = source->neurons().size();
+  if (rates_hz.size() != size) {
+    throw std::invalid_argument("\"" + input.name + "\" has " + std::to_string(size) + " neurons, not " + std::to_string(rates_hz.size()));
+  }
+  bool on = false;
+  for (double rate : rates_hz) {
+    if (!(rate >= 0)) throw std::invalid_argument("Input rates must be zero or more");
+    if (rate > 0) on = true;
+  }
+  input.on = on;
+  source->set_probabilities(rates_hz, dt_ / 1000);
 }
 
 uint32_t Simulation::add_readout(const std::string& name, std::span<const uint32_t> neurons) {
@@ -358,8 +428,8 @@ void Simulation::step() {
   // 3. Poisson inputs.
   uint32_t* const picked = scratch_.data();
   for (Input& input : inputs_) {
-    if (input.rate == 0) continue;
-    const uint32_t m = input.source.sample(picked);
+    if (!input.on) continue;
+    const uint32_t m = std::visit([picked](auto& source) { return source.sample(picked); }, input.source);
     for (uint32_t k = 0; k < m; k++) {
       const uint32_t i = picked[k];
       Neuron& s = state[i];

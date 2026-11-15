@@ -43,6 +43,7 @@ class Connectome {
   uint32_t neurons() const { return neurons_; }
   uint32_t connections() const { return connections_; }
 
+  uint32_t root_id(uint32_t i) const { return u32(root_id_ + 4 * static_cast<size_t>(i)); }
   uint32_t ptr(uint32_t i) const { return u32(ptr_ + 4 * static_cast<size_t>(i)); }
   uint32_t post(size_t k) const { return u32(post_ + 4 * k); }
   uint16_t count(size_t k) const { return u16(count_ + 2 * k); }
@@ -51,6 +52,9 @@ class Connectome {
   }
   const std::string& value(Category column, uint32_t i) const { return tables_[column][code(column, i)]; }
   const std::vector<std::string>& table(Category column) const { return tables_[column]; }
+
+  /** The neuron index for a root ID, or -1 (format.ts's indexOf). */
+  int64_t index_of(uint32_t root_id) const;
 
   /** Indices, ascending, of the neurons matching every condition (format.ts's find). */
   std::vector<uint32_t> find(const NeuronQuery& query) const;
@@ -63,6 +67,7 @@ class Connectome {
 
   uint32_t neurons_ = 0;
   uint32_t connections_ = 0;
+  const uint8_t* root_id_ = nullptr;
   const uint8_t* ptr_ = nullptr;
   const uint8_t* post_ = nullptr;
   const uint8_t* count_ = nullptr;

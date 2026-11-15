@@ -119,11 +119,11 @@ Connectome::Connectome(const uint8_t* data, size_t length) {
   post_ = at[2];
   count_ = at[3];
   for (int c = 0; c < kCategories; c++) codes_[c] = at[4 + c];
-  const uint8_t* root_id = at[0];
+  root_id_ = at[0];
   const uint8_t* nt_confidence = at[11];
 
   for (uint32_t i = 1; i < neurons_; i++) {
-    if (le32(root_id + 4 * static_cast<size_t>(i)) <= le32(root_id + 4 * static_cast<size_t>(i - 1))) {
+    if (root_id(i) <= root_id(i - 1)) {
       fail("Corrupt connectome: root IDs are not strictly ascending");
     }
   }
@@ -162,6 +162,20 @@ Connectome::Connectome(const uint8_t* data, size_t length) {
     tables_[c].reserve(size);
     for (uint32_t item : table->items) tables_[c].push_back(doc.at(item).string);
   }
+}
+
+int64_t Connectome::index_of(uint32_t id) const {
+  // Root IDs are strictly ascending (checked above), so a binary search finds the one index format.ts's does.
+  int64_t lo = 0;
+  int64_t hi = static_cast<int64_t>(neurons_) - 1;
+  while (lo <= hi) {
+    const int64_t mid = (lo + hi) / 2;
+    const uint32_t at = root_id(static_cast<uint32_t>(mid));
+    if (at == id) return mid;
+    if (at < id) lo = mid + 1;
+    else hi = mid - 1;
+  }
+  return -1;
 }
 
 std::vector<uint32_t> Connectome::find(const NeuronQuery& query) const {

@@ -2,13 +2,15 @@
 
 #include <chrono>
 #include <stdexcept>
+#include <string_view>
+#include <unordered_set>
 
 #include "json.hpp"
 #include "params.hpp"
 
 namespace fly {
 
-Brain::Brain(const Connectome& connectome, uint32_t seed)
+Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& columns)
     : neurons_(connectome.neurons()),
       connections_(connectome.connections()),
       wiring_(io::wire(connectome)),
@@ -22,13 +24,57 @@ Brain::Brain(const Connectome& connectome, uint32_t seed)
     rate_names_.push_back(group.spec.name);
     rates_.push_back(0);
   }
+  // The eyes come after every other input, so their streams leave the
+  // others' as they were.
+  eyes_ = eyes::build(connectome, columns);
+  if (eyes_) {
+    for (io::Side side : {io::kLeft, io::kRight}) retinas_.emplace_back((*eyes_)[side]);
+    std::unordered_set<uint32_t> read;
+    for (const io::ReadoutGroup& group : wiring_.readouts) read.insert(group.neurons.begin(), group.neurons.end());
+    for (io::Side side : {io::kLeft, io::kRight}) {
+      const char* name = side == io::kLeft ? "left" : "right";
+      for (uint32_t i : retinas_[side].neurons()) {
+        if (read.count(i) != 0) throw std::runtime_error("Neuron " + std::to_string(i) + " is both driven by the " + name + " eye and read");
+      }
+      eye_inputs_[side] = sim_.add_rated_input(std::string("eye ") + name, retinas_[side].neurons());
+    }
+    for (io::Side side : {io::kLeft, io::kRight}) {
+      for (const vision::Stage& stage : vision::stages()) {
+        std::vector<uint32_t> neurons;
+        if (stage.lamina) {
+          neurons = retinas_[side].neurons();
+        } else {
+          NeuronQuery select = stage.select;
+          const std::string side_name = side == io::kLeft ? "left" : "right";
+          select[kSide] = [side_name](std::string_view s) { return s == side_name; };
+          neurons = connectome.find(select);
+        }
+        if (neurons.empty()) continue;
+        sim_.add_readout(vision::stage_name(stage, side), neurons);
+        rate_names_.push_back(vision::stage_name(stage, side));
+        rates_.push_back(0);
+        vision_sizes_.push_back(static_cast<double>(neurons.size()));
+      }
+    }
+  }
 }
 
-io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light&, TickStats& stats) {
+io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& light, TickStats& stats) {
   if (!(dt_ms >= 0 && dt_ms <= kMaxTickMs)) throw std::invalid_argument("tick takes 0 to 1000 ms, not " + json::number_to_string(dt_ms));
   const auto started = std::chrono::steady_clock::now();
   const uint64_t spikes_before = sim_.spikes();
   const double time_before = sim_.time();
+  // Checked before anything moves, so a bad picture leaves the brain as it was.
+  if (light.open && eyes_) {
+    for (io::Side side : {io::kLeft, io::kRight}) {
+      const auto& given = side == io::kLeft ? light.left : light.right;
+      const uint32_t facets = retinas_[side].facets();
+      if (!given || given->size() != facets) {
+        throw std::invalid_argument(std::string("The ") + (side == io::kLeft ? "left" : "right") + " eye has " + std::to_string(facets) +
+                                    " facets, but the light gives " + (given ? std::to_string(given->size()) : "undefined"));
+      }
+    }
+  }
   for (size_t k = 0; k < wiring_.senses.size(); k++) {
     const io::Group& group = wiring_.senses[k];
     sim_.set_rate(sense_inputs_[k], group.max_rate * io::intensity(senses, group.spec.sense));
@@ -43,6 +89,10 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light&, Ti
       const io::Group& group = wiring_.background[k];
       sim_.set_rate(background_inputs_[k], group.max_rate * js::clamp(level[group.spec.side], 0, 1));
     }
+    for (size_t side = 0; side < retinas_.size(); side++) {
+      const std::span<const float>* seen = light.open ? &*(side == io::kLeft ? light.left : light.right) : nullptr;
+      if (retinas_[side].step(chunk, seen)) sim_.set_rates(eye_inputs_[side], retinas_[side].rates());
+    }
     const double before = sim_.time();
     sim_.advance(chunk);
     const double ran = sim_.time() - before;
@@ -51,6 +101,10 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light&, Ti
     for (size_t r = 0; r < wiring_.readouts.size(); r++) {
       const double hz = (counts_[r] / static_cast<double>(wiring_.readouts[r].neurons.size()) / ran) * 1000;
       rates_[r] = io::smooth(rates_[r], hz, ran, wiring_.readouts[r].spec.tau);
+    }
+    const size_t first = wiring_.readouts.size();
+    for (size_t v = 0; v < vision_sizes_.size(); v++) {
+      rates_[first + v] = io::smooth(rates_[first + v], (counts_[first + v] / vision_sizes_[v] / ran) * 1000, ran, vision::kTau);
     }
   }
   stats.sim_ms = sim_.time() - time_before;

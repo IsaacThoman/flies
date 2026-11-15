@@ -7,22 +7,32 @@
 
 #include "exact.hpp"
 
+#include <array>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
 
 #include "connectome.hpp"
+#include "eyes.hpp"
 #include "io.hpp"
 #include "sim.hpp"
 #include "state.hpp"
+#include "vision.hpp"
 
 namespace fly {
 
-/** What the eyes see, luminance 0 to 1 per facet; empty with the eyes shut. */
+/**
+ * What the eyes see (types.ts's BrainSenses.light): luminance 0 to 1 per
+ * facet, in the order of the eyes' facets. Not open: the eyes are shut. Open,
+ * each eye needs its facets' worth; an eye left out, or a wrong length, is
+ * refused as runtime.ts refuses it.
+ */
 struct Light {
-  std::span<const float> left;
-  std::span<const float> right;
+  bool open = false;
+  std::optional<std::span<const float>> left;
+  std::optional<std::span<const float>> right;
 };
 
 struct TickStats {
@@ -41,22 +51,34 @@ class Brain {
   /** Longest tick accepted, ms. */
   static constexpr double kMaxTickMs = 1000;
 
-  /** Throws FormatError or std::runtime_error when the connectome lacks a group the brain needs. */
-  Brain(const Connectome& connectome, uint32_t seed);
+  /**
+   * Throws FormatError or std::runtime_error when the connectome lacks a
+   * group the brain needs. The eyes' columns are eye-columns.ts's unless the
+   * tests give their own (runtime.ts's eyeColumns option).
+   */
+  Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& columns = eyes::kEyeColumns);
 
   uint32_t neurons() const { return neurons_; }
   uint32_t connections() const { return connections_; }
 
   /**
    * Advances the simulation by dt_ms of fly time under these senses; throws
-   * std::invalid_argument for a dt outside 0 to kMaxTickMs. The eyes are not
-   * wired up yet: light is ignored, as in runtime.ts.
+   * std::invalid_argument for a dt outside 0 to kMaxTickMs or light that
+   * doesn't fit the eyes, before anything moves. Without eyes, light is
+   * ignored.
    */
   io::Command tick(double dt_ms, const io::Senses& senses, const Light& light, TickStats& stats);
 
   /** Smoothed mean rate of each readout group, Hz, in the order of rate_names(). */
   const std::vector<double>& rates() const { return rates_; }
   const std::vector<std::string>& rate_names() const { return rate_names_; }
+
+  /** The eyes, when this connectome has them. */
+  const std::optional<eyes::Eyes>& eyes() const { return eyes_; }
+  /** Facets of an eye; 0 without eyes. */
+  uint32_t facets(io::Side side) const { return eyes_ ? (*eyes_)[side].facets() : 0; }
+  /** Each eye's input stage; empty without eyes. */
+  const std::vector<vision::Retina>& retinas() const { return retinas_; }
 
   const Simulation& sim() const { return sim_; }
   const InternalState& state() const { return state_; }
@@ -72,6 +94,12 @@ class Brain {
   std::vector<double> rates_;
   std::vector<std::string> rate_names_;
   std::vector<uint32_t> counts_;
+  std::optional<eyes::Eyes> eyes_;
+  // Indexed by io::Side, as are their rated inputs.
+  std::vector<vision::Retina> retinas_;
+  std::array<uint32_t, 2> eye_inputs_{};
+  // The vision.<stage> readouts, which follow the others in rates(): each one's size.
+  std::vector<double> vision_sizes_;
 };
 
 }  // namespace fly

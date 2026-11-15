@@ -1,10 +1,15 @@
 // Wall time per simulated second of the native brain on the real connectome,
-// at rest and with every sense at full strength, through the C interface in
-// 16 ms ticks as the game sends them:
+// through the C interface in 16 ms ticks as the game sends them: at rest and
+// with every sense at full strength, the eyes shut, then with the eyes open on
+// the scenes of a frames file, then at rest again:
 //
-//   fly-brain-bench <connectome.bin> [seconds=10] [seed=1]
+//   fly-brain-bench <connectome.bin> [seconds=10] [seed=1] [frames]
 //
-// Each regime runs a simulated second untimed first. Single-threaded.
+// Each regime runs a simulated second untimed first. The frames file is what
+// scripts/bench.ts writes: for each scene a line-free run of frames, left eye
+// then right eye each tick, each a u32 count and that many f32
+// (tools/harness.cpp's format), the untimed second's ticks and then the timed
+// ones; the scenes' names are the arguments after it. Single-threaded.
 
 #include <sys/resource.h>
 #if defined(__APPLE__)
@@ -15,6 +20,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <string>
 #include <vector>
 
 #include "fly_brain.h"
@@ -40,12 +46,48 @@ long footprint() {
 #endif
 }
 
-void regime(fly_brain* brain, const char* label, const fly_senses& senses, double seconds) {
+// The most the footprint has been (the peak resident size off Apple platforms).
+long peak() {
+#if defined(__APPLE__)
+  task_vm_info_data_t info{};
+  mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+  if (task_info(mach_task_self(), TASK_VM_INFO, reinterpret_cast<task_info_t>(&info), &count) != KERN_SUCCESS) return 0;
+  return static_cast<long>(info.ledger_phys_footprint_peak);
+#else
+  return footprint();
+#endif
+}
+
+// The next tick's light from the frames file, read outside the timing.
+struct Frames {
+  std::ifstream file;
+  std::vector<float> eye[2];
+
+  void next(fly_senses& senses) {
+    for (std::vector<float>& frame : eye) {
+      uint32_t count = 0;
+      file.read(reinterpret_cast<char*>(&count), 4);
+      frame.resize(count);
+      file.read(reinterpret_cast<char*>(frame.data()), static_cast<std::streamsize>(4 * static_cast<size_t>(count)));
+    }
+    if (!file) {
+      std::fputs("the frames file ended early\n", stderr);
+      std::exit(1);
+    }
+    senses.light_left = eye[0].data();
+    senses.light_right = eye[1].data();
+  }
+};
+
+void regime(fly_brain* brain, const char* label, fly_senses senses, double seconds, Frames* frames = nullptr) {
   const double tick = 16;
   fly_command command;
   fly_stats stats;
   char error[256];
-  for (double t = 0; t < 1000; t += tick) fly_brain_tick(brain, tick, &senses, &command, &stats, nullptr, error, sizeof error);
+  for (double t = 0; t < 1000; t += tick) {
+    if (frames != nullptr) frames->next(senses);
+    fly_brain_tick(brain, tick, &senses, &command, &stats, nullptr, error, sizeof error);
+  }
   const uint64_t events_before = brain->brain.sim().events();
   double wall = 0;
   double sim = 0;
@@ -53,6 +95,7 @@ void regime(fly_brain* brain, const char* label, const fly_senses& senses, doubl
   uint64_t spikes = 0;
   int ticks = 0;
   while (sim < seconds * 1000) {
+    if (frames != nullptr) frames->next(senses);
     const auto started = std::chrono::steady_clock::now();
     if (fly_brain_tick(brain, tick, &senses, &command, &stats, nullptr, error, sizeof error) != 0) {
       std::fprintf(stderr, "%s\n", error);
@@ -76,7 +119,7 @@ void regime(fly_brain* brain, const char* label, const fly_senses& senses, doubl
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    std::fputs("usage: fly-brain-bench <connectome.bin> [seconds=10] [seed=1]\n", stderr);
+    std::fputs("usage: fly-brain-bench <connectome.bin> [seconds=10] [seed=1] [frames scene...]\n", stderr);
     return 2;
   }
   const double seconds = argc > 2 ? std::atof(argv[2]) : 10;
@@ -113,8 +156,12 @@ int main(int argc, char** argv) {
   const fly_senses everything{1, 1, 1, 1, 1, 1, 1, 1, nullptr, nullptr};
   regime(brain, "at rest (standing)", rest, seconds);
   regime(brain, "every sense at full strength", everything, seconds);
+  if (argc > 4) {
+    Frames frames{std::ifstream(argv[4], std::ios::binary), {}};
+    for (int scene = 5; scene < argc; scene++) regime(brain, argv[scene], rest, seconds, &frames);
+  }
   regime(brain, "at rest again", rest, seconds);
-  std::printf("memory at the end: %.1f MB\n", megabytes(footprint()));
+  std::printf("memory at the end: %.1f MB (at most %.1f MB, the file read included)\n", megabytes(footprint()), megabytes(peak()));
   fly_brain_destroy(brain);
   return 0;
 }

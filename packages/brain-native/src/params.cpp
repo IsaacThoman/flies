@@ -1,5 +1,6 @@
 #include "params.hpp"
 
+#include <map>
 #include <memory>
 
 #include "fdlibm.hpp"
@@ -65,6 +66,54 @@ std::vector<std::string> transmitters(const Connectome& c) {
   return out;
 }
 
+namespace {
+
+bool digit(char c) { return c >= '0' && c <= '9'; }
+bool lower(char c) { return c >= 'a' && c <= 'z'; }
+bool letter(char c) { return lower(c) || (c >= 'A' && c <= 'Z'); }
+
+// s from `at` on is one or more digits, then nothing but `tail` characters: \d+[...]*$.
+bool digits_then(std::string_view s, size_t at, bool (*tail)(char)) {
+  size_t k = at;
+  while (k < s.size() && digit(s[k])) k++;
+  if (k == at) return false;
+  for (; k < s.size(); k++) {
+    if (!tail(s[k])) return false;
+  }
+  return true;
+}
+
+}  // namespace
+
+bool columnar_class(std::string_view s) {
+  const auto in = [&](size_t k, char lo, char hi) { return k < s.size() && s[k] >= lo && s[k] <= hi; };
+  // The alternatives, each matched against the whole string.
+  if (s.size() == 2 && s[0] == 'L' && in(1, '1', '5')) return true;
+  if (s.size() == 2 && s[0] == 'C' && in(1, '2', '3')) return true;
+  if ((s.size() == 2 || (s.size() == 3 && in(2, 'a', 'd'))) && s[0] == 'T' && in(1, '1', '5')) return true;
+  if (s.starts_with("Tm") && digits_then(s, 2, letter)) return true;
+  if (s.starts_with("TmY") && digits_then(s, 3, lower)) return true;
+  if (s.starts_with("Y") && digits_then(s, 1, digit)) return true;
+  if (s.starts_with("Mi") && digits_then(s, 2, digit)) return true;
+  return false;
+}
+
+std::vector<uint8_t> columnar(const Connectome& c) {
+  std::vector<uint32_t> candidates;
+  for (uint32_t i = 0; i < c.neurons(); i++) {
+    if (c.value(kSuperClass, i) == "ol_intrinsic" && columnar_class(c.value(kType, i))) candidates.push_back(i);
+  }
+  // Counted by the strings, as params.ts does, so a table that repeats a value counts it as one.
+  std::map<std::pair<std::string, std::string>, uint32_t> counts;
+  const auto key = [&](uint32_t i) { return std::pair{c.value(kType, i), c.value(kSide, i)}; };
+  for (uint32_t i : candidates) counts[key(i)]++;
+  std::vector<uint8_t> out(c.neurons(), 0);
+  for (uint32_t i : candidates) {
+    if (counts[key(i)] >= kColumnarMinCells) out[i] = 1;
+  }
+  return out;
+}
+
 float transmitter_gain(const std::string& t) {
   if (t == "ACH") return static_cast<float>(kExcitatory);
   if (t == "GABA" || t == "GLUT" || t == "HIST") return static_cast<float>(-kInhibitory);
@@ -86,6 +135,12 @@ Simulation build(const Connectome& c, uint32_t seed) {
   {
     const std::vector<std::string> nt = transmitters(c);
     for (uint32_t i = 0; i < n; i++) gain[i] = transmitter_gain(nt[i]);
+  }
+  {
+    const std::vector<uint8_t> graded = columnar(c);
+    for (uint32_t i = 0; i < n; i++) {
+      if (graded[i] != 0) gain[i] = static_cast<float>(static_cast<double>(gain[i]) * kGraded);
+    }
   }
   const auto saturated = std::make_unique<std::array<uint16_t, 65536>>(saturated_counts());
   std::vector<uint32_t> ptr(static_cast<size_t>(n) + 1);

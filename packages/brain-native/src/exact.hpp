@@ -17,6 +17,7 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 #if defined(__FAST_MATH__)
 #error "The brain must be compiled without fast math (-ffast-math, Xcode's Relax IEEE Compliance): it would change its results."
@@ -43,6 +44,40 @@ inline double max(double a, double b) {
 inline double min(double a, double b) {
   if (a == b) return std::signbit(a) ? a : b;
   return a < b ? a : b;
+}
+
+/**
+ * Math.hypot of two numbers, as V8 computes it (src/builtins/math.tq): each
+ * scaled by the larger magnitude, the squares added with Kahan's
+ * compensation, the root scaled back. It has nothing implementation-defined
+ * but this algorithm, and sqrt is exact.
+ */
+inline double hypot(double x, double y) {
+  const double values[2] = {x, y};
+  double abs[2] = {0, 0};
+  bool nan = false;
+  double max = 0;
+  for (int i = 0; i < 2; i++) {
+    if (std::isnan(values[i])) {
+      nan = true;
+    } else {
+      abs[i] = std::fabs(values[i]);
+      if (abs[i] > max) max = abs[i];
+    }
+  }
+  if (std::isinf(max)) return max;
+  if (nan) return std::numeric_limits<double>::quiet_NaN();
+  if (max == 0) return 0;
+  double sum = 0;
+  double compensation = 0;
+  for (double each : abs) {
+    const double n = each / max;
+    const double summand = n * n - compensation;
+    const double preliminary = sum + summand;
+    compensation = (preliminary - sum) - summand;
+    sum = preliminary;
+  }
+  return std::sqrt(sum) * max;
 }
 
 /** io.ts's clamp: NaN and infinities read as 0. */

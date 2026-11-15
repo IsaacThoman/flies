@@ -1,43 +1,101 @@
 // The native brain against the TypeScript one on the small synthetic
 // connectome the TypeScript tests use (packages/brain/src/test-helpers.ts), so
 // these run without the real data: every tick of the scripted senses bit for
-// bit, the same refusals with the same messages for broken files, and the
-// same outcome on randomly corrupted ones. The fuzzing also runs under the
-// sanitizers.
+// bit, with its four-column eyes open and without eyes, the same refusals with
+// the same messages for broken files and broken eye columns, and the same
+// outcome on randomly corrupted ones. The fuzzing and the eyes also run under
+// the sanitizers.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loadConnectome } from "../../brain/src/format.ts";
 import { mulberry32 } from "../../brain/src/sim.ts";
-import { syntheticConnectome } from "../../brain/src/test-helpers.ts";
-import { build, firstDifference, native, noCompiler, scenario, tempFile, typescript } from "./compare.ts";
-import type { Tick } from "./compare.ts";
+import { syntheticConnectome, syntheticEyeColumns } from "../../brain/src/test-helpers.ts";
+import type { EyeMap } from "../../brain/src/types.ts";
+import { build, eyeMap, firstDifference, native, noCompiler, scenario, tempFile, typescript } from "./compare.ts";
+import type { Columns, Tick } from "./compare.ts";
 
 const synthetic = syntheticConnectome();
 const bufferOf = (bytes: Uint8Array) => bytes.slice().buffer;
+const columns = syntheticEyeColumns(synthetic);
+const eyes = eyeMap(bufferOf(synthetic.bytes), columns)!;
 
-function compare(dir: string, bytes: Uint8Array, seed: number, ticks: readonly Tick[]) {
+function compare(dir: string, bytes: Uint8Array, seed: number, ticks: readonly Tick[], eyeColumns?: Columns) {
   const file = tempFile(bytes);
   try {
-    const expected = typescript(bufferOf(bytes), seed, ticks);
-    const actual = native(dir, file.path, seed, ticks);
+    const expected = typescript(bufferOf(bytes), seed, ticks, eyeColumns);
+    const actual = native(dir, file.path, seed, ticks, eyeColumns);
     return { expected, actual, difference: firstDifference(expected, actual, ticks) };
   } finally {
     file.remove();
   }
 }
 
+const spikesOf = (lines: readonly string[]) => lines.slice(1).reduce((sum, line) => sum + (line.startsWith("error") ? 0 : Number(line.split(" ")[0])), 0);
+const retinaDigests = (lines: readonly string[]) => new Set(lines.slice(1).filter((line) => !line.startsWith("error")).map((line) => line.split(" | ")[6]));
+
+// Light for an eyeless brain, which it must ignore whatever it is: four facets an eye, looking anywhere.
+const NOWHERE: EyeMap = { left: { directions: new Float32Array(12).fill(0.5) }, right: { directions: new Float32Array(12).fill(-0.5) }, acceptance: 0.05 };
+
 test("every tick of 70 simulated seconds is the TypeScript's, bit for bit, for several seeds", { skip: noCompiler }, () => {
   const dir = build();
   for (const seed of [1, 3, 0xdeadbeef]) {
-    const ticks = scenario(70, seed);
+    // Without eyes (eye-columns.ts's body IDs are not in this connectome), light given and ignored.
+    const ticks = scenario(70, seed, NOWHERE);
     const { expected, difference } = compare(dir, synthetic.bytes, seed, ticks);
     assert.equal(difference, null, `seed ${seed}: ${difference}`);
     // The comparison means something: the fly did things, and some ticks were refused.
-    const spikes = expected.slice(1).reduce((sum, line) => sum + (line.startsWith("error") ? 0 : Number(line.split(" ")[0])), 0);
-    assert.ok(spikes > 50_000, `${spikes} spikes`);
+    assert.ok(spikesOf(expected) > 50_000, `${spikesOf(expected)} spikes`);
     assert.ok(expected.some((line) => line.startsWith("error tick takes 0 to 1000 ms")));
+    assert.ok(!expected.some((line) => line.includes("facets")));
   }
+});
+
+test("with its eyes open every tick is the TypeScript's, bit for bit, for several seeds", { skip: noCompiler }, () => {
+  const dir = build();
+  for (const seed of [1, 3, 0xdeadbeef]) {
+    const ticks = scenario(70, seed, eyes);
+    const { expected, difference } = compare(dir, synthetic.bytes, seed, ticks, columns);
+    assert.equal(difference, null, `seed ${seed}: ${difference}`);
+    assert.match(expected[0], /\|vision\.lamina left\|.*\|vision\.looming right$/);
+    // The eyes did something: their rates changed many times, and light that doesn't fit was refused.
+    assert.ok(retinaDigests(expected).size > 100, `${retinaDigests(expected).size} different retina states`);
+    assert.ok(expected.includes("error The left eye has 4 facets, but the light gives 3"));
+    assert.ok(expected.includes("error The left eye has 4 facets, but the light gives undefined"));
+  }
+});
+
+/** The synthetic eye's columns with one changed. */
+function withColumn(side: "left" | "right", k: number, change: (row: number[]) => void): Columns {
+  const out = { left: columns.left.map((row) => [...row]), right: columns.right.map((row) => [...row]) };
+  change(out[side][k]);
+  return out as unknown as Columns;
+}
+const idOf = (label: string, k = 0) => 1000 + synthetic.index[label][k];
+
+const BROKEN_EYES: [string, Columns][] = [
+  ["an L1 that is an L2", withColumn("left", 1, (row) => (row[3] = idOf("L2 left", 3)))],
+  ["an L3 of the other side", withColumn("right", 2, (row) => (row[5] = idOf("L3 left", 0)))],
+  ["an L2 that is a descending neuron", withColumn("right", 0, (row) => (row[4] = idOf("DNa02 right")))],
+  ["an L1 listed twice", withColumn("right", 3, (row) => (row[3] = idOf("L1 right", 0)))],
+  ["an L1 not in the connectome", withColumn("left", 0, (row) => (row[3] = 999999))],
+  ["a column with no cells", withColumn("left", 2, (row) => (row[3] = row[4] = row[5] = 0))],
+  ["no L1 in either eye", { left: columns.left.map((row) => [row[0], row[1], row[2], 0, row[4], row[5]]), right: columns.right.map((row) => [row[0], row[1], row[2], 0, row[4], row[5]]) } as unknown as Columns],
+  ["no right eye", { left: columns.left, right: [] }],
+  ["no left eye", { left: [], right: columns.right }],
+  ["one facet an eye", { left: columns.left.slice(0, 1), right: columns.right.slice(3) }],
+  ["a column far from the centre", withColumn("right", 1, (row) => ((row[0] = 255), (row[1] = 0)))],
+];
+
+test("broken or odd eye columns come out as in TypeScript", { skip: noCompiler }, () => {
+  const dir = build();
+  const problems: string[] = [];
+  for (const [what, eyeColumns] of BROKEN_EYES) {
+    const map = eyeMap(bufferOf(synthetic.bytes), eyeColumns);
+    const { difference } = compare(dir, synthetic.bytes, 1, scenario(1, 1, map ?? NOWHERE), eyeColumns);
+    if (difference) problems.push(`${what}: ${difference}`);
+  }
+  assert.deepEqual(problems, []);
 });
 
 /** The bytes with the header's text changed, the sections moved to follow it. */
@@ -193,8 +251,9 @@ for (const mode of ["release", "sanitize"] as const) {
   test(`randomly corrupted connectomes come out as in TypeScript (${mode} build)`, { skip: noCompiler }, () => {
     const dir = build(mode);
     let refused = 0;
-    for (const [what, bytes] of corruptions(mode === "release" ? 400 : 120)) {
-      const { expected, actual } = compare(dir, bytes, 1, FEW);
+    for (const [k, [what, bytes]] of corruptions(mode === "release" ? 400 : 120).entries()) {
+      // Every other one with the synthetic eye, whose body IDs the corruption may move or retype.
+      const { expected, actual } = compare(dir, bytes, 1, FEW, k % 2 === 1 ? columns : undefined);
       if (expected[0].startsWith("error")) refused++;
       for (let k = 0; k < Math.max(expected.length, actual.length); k++) {
         assert.ok(sameOutcome(expected[k] ?? "", actual[k] ?? ""), `${what}, line ${k}:\n  typescript ${expected[k]}\n  native     ${actual[k]}`);
@@ -205,7 +264,11 @@ for (const mode of ["release", "sanitize"] as const) {
 }
 
 test("the sanitizer build runs the scripted senses clean and gets the same answers", { skip: noCompiler }, () => {
-  const ticks = scenario(30, 2);
-  const { difference } = compare(build("sanitize"), synthetic.bytes, 2, ticks);
+  const ticks = scenario(30, 2, eyes);
+  const { difference } = compare(build("sanitize"), synthetic.bytes, 2, ticks, columns);
   assert.equal(difference, null, difference ?? "");
+  for (const [what, eyeColumns] of BROKEN_EYES.slice(0, 4)) {
+    const result = compare(build("sanitize"), synthetic.bytes, 1, FEW, eyeColumns);
+    assert.equal(result.difference, null, `${what}: ${result.difference}`);
+  }
 });
