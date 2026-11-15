@@ -587,21 +587,24 @@ export function buildTable(): Table {
   }
 
   // A drip of honey and a smear of jam: flat, glossy puddles.
-  const puddle = (x: number, z: number, r: number, color: string, wobble: number) => {
+  // Smooth-edged even at the fly's scale, deep in the middle and lighter at the rim where it thins.
+  const puddle = (x: number, z: number, r: number, color: string, wobble: number, rim: string) => {
     const shape = new THREE.Shape();
-    for (let i = 0; i <= 24; i++) {
-      const a = (i / 24) * Math.PI * 2;
+    for (let i = 0; i <= 72; i++) {
+      const a = (i / 72) * Math.PI * 2;
       const rr = r * (1 + Math.sin(a * 3 + wobble) * 0.12 + Math.sin(a * 5 + wobble * 2) * 0.06);
       if (i === 0) shape.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
       else shape.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
     }
-    const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.25, bevelEnabled: true, bevelThickness: 0.35, bevelSize: 0.6, bevelSegments: 2 });
-    batch.add(juicy, paint(geometry.rotateX(-Math.PI / 2).translate(x, 0.05, z), color));
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.15, bevelEnabled: true, bevelThickness: 0.4, bevelSize: 0.7, bevelSegments: 4, curveSegments: 1 });
+    const deep = new THREE.Color(color);
+    const thin = new THREE.Color(rim);
+    batch.add(juicy, paint(geometry.rotateX(-Math.PI / 2).translate(x, 0.05, z), (p) => thin.clone().lerp(deep, Math.min(1, Math.max(0, (p.y - 0.1) / 0.45)))));
   };
   const honey = PATCHES.find((p) => p.name === "honey")!;
   const jamPatch = PATCHES.find((p) => p.name === "jam")!;
-  puddle(honey.x, honey.z, honey.r, "#ffae1a", 1);
-  puddle(jamPatch.x, jamPatch.z, jamPatch.r, "#b5002c", 3);
+  puddle(honey.x, honey.z, honey.r, "#f29200", 1, "#ffd25e");
+  puddle(jamPatch.x, jamPatch.z, jamPatch.r, "#a3002a", 3, "#ff4a6a");
 
   // A fallen leaf, thin enough to walk over.
   {
