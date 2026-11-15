@@ -114,3 +114,28 @@ test("at most a few dropped foods at once: the oldest makes way", () => {
   assert.equal(pantry.foods.length, MAX_DROPPED);
   assert.equal(pantry.foods.includes(first), false);
 });
+
+/** The steepest slope a fly can stand on (packages/body, MAX_SLOPE_COS): 65° from level. */
+const STANDABLE = Math.cos((65 * Math.PI) / 180);
+
+/** Whether a fly could walk over every part of a solid's top, from the table up. */
+function climbable(name: string) {
+  return SOLIDS.filter((s) => s.name === name).every((s) => {
+    const f = s.footprint as { x: number; z: number; rx: number; rz: number };
+    const n = createSurface();
+    for (let i = -20; i <= 20; i++) {
+      for (let j = -20; j <= 20; j++) {
+        const x = f.x + (i / 20) * f.rx * 1.05;
+        const z = f.z + (j / 20) * f.rz * 1.05;
+        if (world.surface(x, z, n).normal.y < STANDABLE) return false;
+      }
+    }
+    return true;
+  });
+}
+
+test("the biscuit crumbs and the lemon pips are low and round enough to walk up and over", () => {
+  assert.ok(SOLIDS.some((s) => s.name === "crumb") && SOLIDS.some((s) => s.name === "pip"));
+  assert.ok(climbable("crumb"));
+  assert.ok(climbable("pip"));
+});

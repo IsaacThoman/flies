@@ -36,6 +36,13 @@ export const SOLIDS: readonly Solid[] = [
   { name: "dew", footprint: { kind: "circle", x: 22, z: 8, r: 2 }, top: { kind: "dome", base: 0, height: 1.5, power: 0.5 } },
   { name: "dew", footprint: { kind: "circle", x: -70, z: -12, r: 2.6 }, top: { kind: "dome", base: 0, height: 2, power: 0.5 } },
   { name: "dew", footprint: { kind: "circle", x: 58, z: -44, r: 3.4 }, top: { kind: "dome", base: 0, height: 2.6, power: 0.5 } },
+  // Crumbs of a biscuit near where the fly starts: boulders at its scale, low and round enough to climb.
+  { name: "crumb", footprint: { kind: "ellipse", x: -2, z: -33, rx: 3.2, rz: 2.4, angle: 0.4 }, top: { kind: "dome", base: 0, height: 1.9, power: 1 } },
+  { name: "crumb", footprint: { kind: "ellipse", x: 6, z: -26, rx: 2.6, rz: 1.9, angle: 0.7 }, top: { kind: "dome", base: 0, height: 1.5, power: 1 } },
+  { name: "crumb", footprint: { kind: "ellipse", x: 14, z: -31, rx: 1.8, rz: 1.5, angle: -0.3 }, top: { kind: "dome", base: 0, height: 1.1, power: 1 } },
+  // Two lemon pips, fallen from the slice in the lemonade.
+  { name: "pip", footprint: { kind: "ellipse", x: -68, z: -24, rx: 1.0, rz: 1.8, angle: 0.9 }, top: { kind: "dome", base: 0, height: 0.95, power: 1 } },
+  { name: "pip", footprint: { kind: "ellipse", x: -61, z: -31, rx: 0.95, rz: 1.7, angle: -0.5 }, top: { kind: "dome", base: 0, height: 0.9, power: 1 } },
 ];
 
 /** A patch of food built into the table: it can be eaten down and slowly comes back. */
@@ -59,6 +66,8 @@ export const PATCHES: readonly FoodPatch[] = [
   { name: "sugar", x: 112, z: 56, r: 5, sweet: 1 },
   { name: "sugar", x: 140, z: 66, r: 5, sweet: 1 },
   { name: "spilt sugar", x: 98, z: 40, r: 6, sweet: 1 },
+  // A few grains of sugar spilt near where the fly starts: something to find on a walk.
+  { name: "spilt sugar", x: -36, z: -24, r: 4, sweet: 1 },
 ];
 
 /** Where the fly first stands, and which way it faces (radians from +x toward -z). */
@@ -68,6 +77,12 @@ export const START = { x: -8, z: -8, heading: 0.6 };
 export const DECOR = {
   napkin: { x: -10, z: 30, size: 150, angle: 0.18 },
   leaf: { x: -170, z: -40, length: 70, angle: -0.6 },
+  /** Specks of biscuit no taller than half a millimetre, well under a step: where they lie, how far round, and how many. */
+  crumbs: [
+    { x: 4, z: -30, r: 14, count: 46 },
+    { x: -40, z: 30, r: 10, count: 18 },
+    { x: 46, z: 12, r: 9, count: 14 },
+  ],
 };
 
 export function createPicnic(): World {

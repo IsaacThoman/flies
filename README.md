@@ -24,7 +24,13 @@ of the brain's commands, how it moves, what its eyes see) and `packages/ui`
 
 The fly lives on a round café table by a lake: lemonade, a jam jar, a
 strawberry and a half, cherries, a slice of orange, a green apple, sugar cubes,
-a drip of honey, a smear of jam, dew. Everything is built in code.
+a drip of honey, a smear of jam, dew. At the fly's own scale there are
+biscuit crumbs (the big ones are boulders it can climb), two lemon pips, specks
+and grains of spilt sugar, and the napkin is woven thread by thread in the
+table's shader, with a stitched hem and the creases where it was folded, so it
+stays crisp however close the camera comes. Drops of water are clear in the
+middle and bright at the edge, and focus the sun into a spot on the table.
+Everything is built in code.
 
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
 Back, space for Play/Pause) and dragging the mouse over the picture is the

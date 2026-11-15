@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { DECOR, PATCHES, SOLIDS, TABLE_RADIUS, topHeight, topNormal } from "@fly/world";
 import type { Solid } from "@fly/world";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { Batch, canvas2d, canvasTexture, freeze, mat4, paint, random } from "./build.ts";
 import { LAWN_Y } from "./backdrop.ts";
 
@@ -34,25 +35,7 @@ function tableTexture() {
   base.addColorStop(1, "#dfe9f2");
   g.fillStyle = base;
   g.fillRect(0, 0, S, S);
-  // A blue gingham napkin.
-  const { napkin } = DECOR;
-  const n = tableUV(napkin.x, napkin.z, S);
-  const size = (napkin.size / (TABLE_RADIUS * 2)) * S;
-  g.save();
-  g.translate(n.px, n.py);
-  g.rotate(-napkin.angle);
-  g.fillStyle = "#ffffff";
-  g.fillRect(-size / 2, -size / 2, size, size);
-  const check = size / 12;
-  for (let i = 0; i < 12; i++) {
-    g.fillStyle = "rgba(70, 150, 230, 0.45)";
-    g.fillRect(-size / 2 + i * check, -size / 2, check / 2, size);
-    g.fillRect(-size / 2, -size / 2 + i * check, size, check / 2);
-  }
-  g.strokeStyle = "rgba(40, 110, 200, 0.6)";
-  g.lineWidth = 3;
-  g.strokeRect(-size / 2 + 6, -size / 2 + 6, size - 12, size - 12);
-  g.restore();
+  // The napkin is woven in the shader (clothShader), so it stays crisp however close the camera comes.
   // Soft contact shadows under everything standing on the table.
   const shadow = (x: number, z: number, r: number, strength: number) => {
     const c = tableUV(x + r * 0.15, z + r * 0.2, S);
@@ -66,7 +49,7 @@ function tableTexture() {
   for (const solid of SOLIDS) {
     const f = solid.footprint;
     const r = f.kind === "circle" ? f.r : f.kind === "ellipse" ? Math.max(f.rx, f.rz) : Math.max(f.hx, f.hz) * 1.3;
-    if (solid.name === "straw" || solid.name === "dew") continue;
+    if (solid.name === "straw" || solid.name === "dew" || solid.name === "crumb" || solid.name === "pip") continue;
     shadow(f.x, f.z, r, solid.name === "lemonade" || solid.name === "jam" ? 0.32 : 0.26);
   }
   // A wet ring left by the lemonade jar.
@@ -78,6 +61,100 @@ function tableTexture() {
   g.stroke();
   const texture = canvasTexture(canvas);
   return texture;
+}
+
+/**
+ * The blue gingham napkin, drawn thread by thread on the table's material: a
+ * plain weave of white and blue threads (a thread is blue where it crosses a
+ * blue band, so where blue meets blue the square is dark and where blue meets
+ * white it is light), with a stitched hem, the creases where it was folded in
+ * four, and a hairline of shadow round its edge. Threads too fine for the
+ * pixels fade into their average, so it never shimmers; from across the table
+ * it is plain gingham.
+ */
+function clothShader(material: THREE.MeshStandardMaterial) {
+  const { napkin } = DECOR;
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uNapkin = { value: new THREE.Vector4(napkin.x, napkin.z, napkin.size / 2, napkin.angle) };
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vTable;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvTable = (modelMatrix * vec4(transformed, 1.0)).xz;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        /* glsl */ `#include <common>
+uniform vec4 uNapkin;
+varying vec2 vTable;
+const float CHECK = ${(napkin.size / 12).toFixed(3)};
+const float PITCH = 0.22;
+// 1 in the blue half of each check, softened by how many checks a pixel covers.
+float band(float x) {
+  float t = x / CHECK;
+  float tri = abs(fract(t) - 0.5) * 2.0;
+  float w = fwidth(t) * 1.5 + 0.004;
+  return smoothstep(0.5 - w, 0.5 + w, tri);
+}
+vec3 napkinUV() {
+  vec2 d = vTable - uNapkin.xy;
+  float c = cos(uNapkin.w), s = sin(uNapkin.w);
+  vec2 uv = vec2(d.x * c - d.y * s, d.x * s + d.y * c);
+  return vec3(uv, max(abs(uv.x), abs(uv.y)) - uNapkin.z);
+}`,
+      )
+      .replace(
+        "#include <map_fragment>",
+        /* glsl */ `#include <map_fragment>
+vec3 nap = napkinUV();
+vec2 uv = nap.xy;
+float edge = nap.z;
+float aa = fwidth(edge) + 0.02;
+float inside = 1.0 - smoothstep(-aa, aa, edge);
+vec2 th = uv / PITCH;
+float detail = 1.0 - smoothstep(0.18, 0.42, max(fwidth(th.x), fwidth(th.y)));
+const vec3 WHITE = vec3(0.96);
+const vec3 BLUE = vec3(0.13, 0.40, 0.86);
+vec3 warp = mix(WHITE, BLUE, band(uv.y));
+vec3 weft = mix(WHITE, BLUE, band(uv.x));
+vec3 cloth = (warp + weft) * 0.5 * 0.95;
+if (detail > 0.0) {
+  // Plain weave: warp and weft take turns on top at each crossing; each thread is round, with a dark gap beside it.
+  vec2 f = fract(th);
+  bool warpOnTop = mod(floor(th.x) + floor(th.y), 2.0) < 1.0;
+  float across = warpOnTop ? f.y : f.x;
+  float along = warpOnTop ? f.x : f.y;
+  float bulge = pow(sin(3.14159 * across), 0.55) * (0.88 + 0.12 * sin(3.14159 * along));
+  // A thread's own colour shows a little through the one over it, as in real cloth seen close.
+  vec3 thread = mix(warpOnTop ? warp : weft, (warp + weft) * 0.5, 0.35) * (0.74 + 0.26 * bulge);
+  cloth = mix(cloth, thread, detail);
+}
+// The hem: folded under (a touch darker) and stitched in blue.
+float hem = smoothstep(-2.6, -2.4, edge);
+cloth *= 1.0 - hem * 0.06;
+float stitchLine = 1.0 - smoothstep(0.07, 0.07 + fwidth(edge) + 0.03, abs(edge + 1.7));
+float along = (abs(uv.x) > abs(uv.y) ? uv.y : uv.x) / 1.7;
+float dash = step(0.35, fract(along));
+cloth = mix(cloth, vec3(0.03, 0.16, 0.5), stitchLine * dash * 0.85);
+diffuseColor.rgb *= mix(vec3(1.0), cloth, inside);
+// A hairline of shadow where the cloth's edge stands off the table.
+diffuseColor.rgb *= 1.0 - (1.0 - inside) * (1.0 - smoothstep(0.0, 0.6, edge)) * 0.25;`,
+      )
+      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.92, inside);")
+      .replace(
+        "#include <normal_fragment_maps>",
+        /* glsl */ `#include <normal_fragment_maps>
+{
+  // Where it was folded in four: two soft ridges across the middle.
+  vec3 nap2 = napkinUV();
+  float inside2 = 1.0 - step(0.0, nap2.z);
+  vec2 slope = vec2(-nap2.x * exp(-nap2.x * nap2.x / 3.0), -nap2.y * exp(-nap2.y * nap2.y / 3.0)) * 0.06 * inside2;
+  vec3 tilted = normalize(vec3(-slope.x, 1.0, -slope.y));
+  float c = cos(uNapkin.w), s = sin(uNapkin.w);
+  tilted = vec3(tilted.x * c + tilted.z * s, tilted.y, -tilted.x * s + tilted.z * c);
+  normal = normalize((viewMatrix * vec4(tilted, 0.0)).xyz);
+}`,
+      );
+  };
+  material.customProgramCacheKey = () => "napkin";
 }
 
 function ginghamTexture(color: string) {
@@ -94,6 +171,44 @@ function ginghamTexture(color: string) {
   const texture = canvasTexture(canvas, { repeat: true });
   texture.repeat.set(1.6, 1.6);
   return texture;
+}
+
+/** A soft ellipse on the table: a shadow, or with `light` the bright spot a drop of water focuses the sun into. */
+type Spot = { x: number; z: number; rx: number; rz: number; angle: number; strength: number; light?: boolean };
+
+/** Soft shadows under the small things on the table, where things touch it, and the light focused under drops: one merged mesh of blurred ellipses. */
+function contactShadows(spots: readonly Spot[]) {
+  const { canvas, g } = canvas2d(64, 64);
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.45, "rgba(255,255,255,0.6)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  const pieces = spots.map((spot) => {
+    const quad = new THREE.PlaneGeometry(spot.rx * 2, spot.rz * 2).rotateX(-Math.PI / 2).rotateY(spot.angle).translate(spot.x + spot.rx * 0.12, 0.015, spot.z + spot.rz * 0.15);
+    const tone = new Float32Array(quad.attributes.position.count * 4);
+    const [r, g, b] = spot.light ? [1, 0.99, 0.92] : [0.12, 0.2, 0.32];
+    for (let i = 0; i < tone.length; i += 4) tone.set([r, g, b, spot.strength], i);
+    quad.setAttribute("tone", new THREE.BufferAttribute(tone, 4));
+    return quad;
+  });
+  const geometry = mergeGeometries(pieces);
+  for (const piece of pieces) piece.dispose();
+  const material = new THREE.ShaderMaterial({
+    uniforms: { map: { value: canvasTexture(canvas, { srgb: false }) } },
+    vertexShader: "attribute vec4 tone; varying vec2 vUv; varying vec4 vTone; void main() { vUv = uv; vTone = tone; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+    fragmentShader: "uniform sampler2D map; varying vec2 vUv; varying vec4 vTone; void main() { gl_FragColor = vec4(vTone.rgb, texture2D(map, vUv).r * vTone.a); }",
+    transparent: true,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.renderOrder = 1;
+  freeze(mesh);
+  return mesh;
 }
 
 /** The top of a domed solid as a mesh: a polar grid over its footprint, at exactly its height. */
@@ -145,6 +260,7 @@ export function buildTable(): Table {
   const juicy = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.16, metalness: 0, envMapIntensity: 0.55 });
   const matte = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, envMapIntensity: 0.5 });
   const tableMaterial = new THREE.MeshStandardMaterial({ map: tableTexture(), roughness: 0.3, metalness: 0, envMapIntensity: 0.5 });
+  clothShader(tableMaterial);
   const cloth = new THREE.MeshStandardMaterial({ map: ginghamTexture("#e8344e"), roughness: 0.85, side: THREE.DoubleSide });
   const glass = new THREE.MeshStandardMaterial({ color: "#e6f6ff", roughness: 0.04, metalness: 0, transparent: true, opacity: 0.14, depthWrite: false, envMapIntensity: 1.4 });
   const liquid = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.1, transparent: true, opacity: 0.72, depthWrite: false });
@@ -343,6 +459,41 @@ export function buildTable(): Table {
   freeze(grainMesh);
   group.add(grainMesh);
 
+  // Crumbs and pips at the fly's own scale, with soft shadows under them (one merged draw, see contactShadows).
+  const shadows: Spot[] = [];
+  const crumbColor = (p: THREE.Vector3) => {
+    const speck = Math.sin(p.x * 13.1 + p.z * 7.7) * Math.sin(p.z * 11.3 - p.x * 5.1 + p.y * 9);
+    return speck > 0.55 ? "#b5722e" : speck < -0.7 ? "#f6dca0" : p.y > 0.6 ? "#e9b464" : "#d39446";
+  };
+  for (const crumb of byName("crumb")) {
+    const f = crumb.footprint as { x: number; z: number; rx: number; rz: number; angle: number };
+    batch.add(matte, paint(domeGeometry(crumb, 6, 18), crumbColor));
+    shadows.push({ x: f.x, z: f.z, rx: f.rx * 1.25, rz: f.rz * 1.25, angle: f.angle, strength: 0.5 });
+  }
+  for (const pip of byName("pip")) {
+    const f = pip.footprint as { x: number; z: number; rx: number; rz: number; angle: number };
+    batch.add(juicy, paint(domeGeometry(pip, 5, 16), (p) => (p.y > 0.7 ? "#fff8dc" : "#f1e2a8")));
+    shadows.push({ x: f.x, z: f.z, rx: f.rx * 1.3, rz: f.rz * 1.25, angle: f.angle, strength: 0.4 });
+  }
+  // Specks of biscuit, too small to feel underfoot (picnic.ts, DECOR.crumbs).
+  for (const cluster of DECOR.crumbs) {
+    for (let i = 0; i < cluster.count; i++) {
+      const a = rnd.range(0, Math.PI * 2);
+      const r = Math.sqrt(rnd.next()) * cluster.r;
+      const size = rnd.range(0.12, 0.42) * (r < cluster.r * 0.4 ? 1.3 : 1);
+      const speck = new THREE.IcosahedronGeometry(1, 0);
+      const pos = speck.attributes.position;
+      for (let k = 0; k < pos.count; k++) {
+        const j = 0.75 + 0.5 * Math.abs(Math.sin(pos.getX(k) * 5.3 + pos.getZ(k) * 3.1 + i));
+        pos.setXYZ(k, pos.getX(k) * j, Math.max(-0.1, pos.getY(k)) * j * 0.7, pos.getZ(k) * j);
+      }
+      const x = cluster.x + Math.cos(a) * r;
+      const z = cluster.z + Math.sin(a) * r;
+      batch.add(matte, paint(speck, crumbColor), mat4({ x, y: 0, z }, new THREE.Euler(0, rnd.range(0, 6.3), 0), { x: size, y: size, z: size * rnd.range(0.7, 1.3) }));
+      if (size > 0.3) shadows.push({ x, z, rx: size * 1.6, rz: size * 1.6, angle: 0, strength: 0.3 });
+    }
+  }
+
   // A drip of honey and a smear of jam: flat, glossy puddles.
   const puddle = (x: number, z: number, r: number, color: string, wobble: number) => {
     const shape = new THREE.Shape();
@@ -377,6 +528,9 @@ export function buildTable(): Table {
     const f = drop.footprint as { x: number; z: number; r: number };
     const h = (drop.top as { height: number }).height;
     dew.push(mat4({ x: f.x, y: 0, z: f.z }, new THREE.Euler(), { x: f.r, y: h, z: f.r }));
+    // The drop's shadow, with the sun it gathers focused bright in the middle.
+    shadows.push({ x: f.x, z: f.z, rx: f.r * 1.5, rz: f.r * 1.5, angle: 0, strength: 0.28 });
+    shadows.push({ x: f.x - f.r * 0.25, z: f.z - f.r * 0.3, rx: f.r * 0.7, rz: f.r * 0.7, angle: 0, strength: 0.75, light: true });
   }
   for (let i = 0; i < 40; i++) {
     const a = rnd.range(-0.4, 2.2) + Math.PI * 0.4;
@@ -388,13 +542,29 @@ export function buildTable(): Table {
     m.compose(new THREE.Vector3(lf.x + n.x * (lf.r + 0.1), y, lf.z + n.z * (lf.r + 0.1)), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n), new THREE.Vector3(r, r * 0.6, r * 1.2));
     dew.push(m);
   }
-  const dewMaterial = new THREE.MeshStandardMaterial({ color: "#f2fbff", roughness: 0.02, transparent: true, opacity: 0.55, envMapIntensity: 2.2, depthWrite: false });
+  const dewMaterial = new THREE.MeshStandardMaterial({ color: "#cfe6f5", roughness: 0.04, transparent: true, envMapIntensity: 2.4, depthWrite: false });
+  // Water: clear where you look straight through it, mirror-bright at its edge, with the dark band a lens makes of what's behind it.
+  dewMaterial.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <opaque_fragment>",
+      /* glsl */ `float facing = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
+float edge = pow(1.0 - facing, 2.0);
+float lens = smoothstep(0.25, 0.55, 1.0 - facing) * (1.0 - smoothstep(0.75, 0.97, 1.0 - facing));
+outgoingLight *= 1.0 - lens * 0.45;
+outgoingLight += vec3(0.08, 0.1, 0.12) * (1.0 - edge);
+diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec3(0.3)) * 0.15, 0.0, 1.0);
+#include <opaque_fragment>`,
+    );
+  };
+  dewMaterial.customProgramCacheKey = () => "dew";
   const dewMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), dewMaterial, dew.length);
   dew.forEach((m, i) => dewMesh.setMatrixAt(i, m));
   dewMesh.computeBoundingSphere();
   dewMesh.renderOrder = 4;
   freeze(dewMesh);
   group.add(dewMesh);
+
+  group.add(contactShadows(shadows));
 
   seen.push(...batch.build(group));
   return {
