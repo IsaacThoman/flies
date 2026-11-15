@@ -46,7 +46,7 @@ export type Shot = {
 
 /** The player's views. In ordinary play (Follow) the fly is 120 to 200 pixels long; Close up and Wide are the choices either side. */
 export const SHOTS: Record<View, Shot> = {
-  close: { around: "fly", distance: 6.2, height: 0.9, side: 1.25, low: 0, fov: 30, settle: 1.6, scout: true },
+  close: { around: "fly", distance: 6.2, height: 0.9, side: 1.25, low: -0.12, fov: 30, settle: 1.6, scout: true },
   follow: { around: "fly", distance: 11, height: 1.6, side: 1.85, low: 0.12, fov: 30, settle: 1.8, scout: true },
   wide: { around: "fly", distance: 30, height: 6, side: 2.1, low: 0.18, fov: 34, settle: 2.2, scout: true },
   table: { around: "table", distance: 560, height: 170, side: 0.25, low: 0, fov: 40, settle: 1.6, orbit: 0.03 },
