@@ -10,9 +10,9 @@
 // result.
 //
 // Unlike the rest of the brain, this file is compiled with floating-point
-// contraction on, because V8 is: Node builds it with clang's default, which
-// fuses a multiply and an add within an expression wherever the machine has
-// a fused multiply-add. On arm64 (Apple silicon, the Apple TV) that changes
+// contraction on, because V8 is: Node on macOS builds it with clang's
+// default, which fuses a multiply and an add within an expression wherever
+// the machine has a fused multiply-add. On arm64 (Apple silicon, the Apple TV) that changes
 // the last bit of about one sin or cos in fifty, so with contraction off this
 // file would no longer be Node's Math. Where there is no fused multiply-add
 // (x86-64 without -mfma) neither build fuses and they agree again.
