@@ -34,6 +34,11 @@ export type FlyAnchor = "mouth" | "head" | "leftEye" | "rightEye" | "back";
  * right-handed with y up), and is 1 unit long from the front of its head to
  * the tip of its abdomen, centred on the origin. The game moves, turns and
  * scales `object`; the model animates everything inside it.
+ *
+ * Two things the game must hold to. On the ground it moves `object` by exactly
+ * the pose's `speed` and `turn`, or the feet slide. And in the air it leaves
+ * pitch and roll to the model: it passes them in the pose and does not also
+ * rotate `object` by them.
  */
 export interface FlyModel {
   readonly object: Object3D;
