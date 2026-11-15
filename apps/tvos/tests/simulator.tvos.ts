@@ -77,7 +77,7 @@ try {
   xcrun('simctl', 'boot', udid);
   xcrun('simctl', 'bootstatus', udid, '-b');
   xcrun('simctl', 'install', udid, appPath(true));
-  const config = { script: 'game.js', url: 'http://fly.local/', fit: 'fill', pixelated: true, stats: 5, drive };
+  const config = { script: 'game.js', url: 'http://fly.local/', fit: 'fill', pixelated: true, stats: 2, drive };
   app = spawn('xcrun', ['simctl', 'launch', '--console-pty', udid, BUNDLE_ID, '--config', JSON.stringify(config)], { stdio: ['ignore', 'pipe', 'pipe'] });
   let latest: Report | null = null, lastStats: Stats | null = null, done = false;
   const read = (chunk: Buffer) => {
