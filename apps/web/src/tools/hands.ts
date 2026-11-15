@@ -25,10 +25,15 @@ export const TOOLS: readonly Tool[] = [
 ];
 
 /** The beach ball: how big (mm), how fast it swoops (mm/s), and how long a swoop lasts (s). */
-export const BALL_RADIUS = 22;
+export const BALL_RADIUS = 34;
 export const SWOOP_SECONDS = 1.6;
-/** It passes this far (mm) above the pointer. */
-export const SWOOP_CLEARANCE = 16;
+/** Where the ball comes from, radians round from straight ahead toward the fly's right. */
+export const SWOOP_BEARING = 0.9;
+/** The shares of a swoop spent diving in and hanging there at the end of the dive; the rest is veering away. */
+export const SWOOP_DIVE = 0.2;
+export const SWOOP_HOLD = 0.15;
+/** The dive stops with the ball's surface this far (mm) from the spot. */
+export const SWOOP_CLEARANCE = 2;
 /** The feather touches the fly within this distance of its middle (mm). Resting there is a light touch, stroking a full one. */
 export const FEATHER_REACH = 3.2;
 export const FEATHER_REST = 0.4;
@@ -171,7 +176,7 @@ export class Hands {
     const tool = this.current.id;
     if (input.use) {
       if (tool === "feed") this.#drop(this.variant.id as FoodKind);
-      else if (tool === "swoop") this.#swoop(input.eye);
+      else if (tool === "swoop") this.#swoop(fly.yaw);
     }
 
     // Falling food lands and becomes food.
@@ -186,7 +191,7 @@ export class Hands {
       }
     }
 
-    // The ball along its arc.
+    // The ball: diving at the spot, faster and faster, then veering away.
     const ball = this.ball;
     if (ball.active) {
       ball.t += dt / SWOOP_SECONDS;
@@ -194,14 +199,14 @@ export class Hands {
       if (ball.t >= 1) {
         ball.active = false;
         ball.position.y = -1e4;
+      } else if (ball.t < SWOOP_DIVE) {
+        // Straight in at a steady speed: it grows faster and faster in the fly's eyes.
+        lerp(ball.position, ball.from, ball.via, ball.t / SWOOP_DIVE);
+      } else if (ball.t < SWOOP_DIVE + SWOOP_HOLD) {
+        copy(ball.position, ball.via);
       } else {
-        const t = ball.t;
-        const a = (1 - t) * (1 - t);
-        const b = 2 * (1 - t) * t;
-        const c = t * t;
-        ball.position.x = a * ball.from.x + b * ball.via.x + c * ball.to.x;
-        ball.position.y = a * ball.from.y + b * ball.via.y + c * ball.to.y;
-        ball.position.z = a * ball.from.z + b * ball.via.z + c * ball.to.z;
+        const k = (ball.t - SWOOP_DIVE - SWOOP_HOLD) / (1 - SWOOP_DIVE - SWOOP_HOLD);
+        lerp(ball.position, ball.via, ball.to, k * k);
       }
     }
 
@@ -250,33 +255,36 @@ export class Hands {
     this.events.dropped = kind;
   }
 
-  #swoop(eye: Vec3) {
+  #swoop(yaw: number) {
     const ball = this.ball;
     if (ball.active) {
       this.events.blocked = true;
       return;
     }
-    // In from high up beside the camera, down past the pointer, and away on the far side.
+    // In low from ahead of the fly and to its right, diving at the spot until just short
+    // of it, then away up past it. Low, it is seen against the bright table and horizon
+    // (a fly's eyes answer darkening); the fly's looming pathway is strongest on its right
+    // (packages/brain/README.md, The eyes); and a fly sees little behind it.
     const p = this.pointer;
-    const dx = p.x - eye.x;
-    const dz = p.z - eye.z;
-    const d = Math.hypot(dx, dz) || 1;
-    const ux = dx / d;
-    const uz = dz / d;
-    // A little from one side, so it is seen coming.
-    const sx = -uz;
-    const sz = ux;
-    ball.from.x = p.x - ux * 420 + sx * 160;
-    ball.from.y = p.y + 260;
-    ball.from.z = p.z - uz * 420 + sz * 160;
-    ball.to.x = p.x + ux * 420 - sx * 120;
-    ball.to.y = p.y + 300;
-    ball.to.z = p.z + uz * 420 - sz * 120;
-    // The control point that puts the middle of the curve just over the pointer.
-    const mid = { x: p.x, y: p.y + BALL_RADIUS + SWOOP_CLEARANCE, z: p.z };
-    ball.via.x = 2 * mid.x - (ball.from.x + ball.to.x) / 2;
-    ball.via.y = 2 * mid.y - (ball.from.y + ball.to.y) / 2;
-    ball.via.z = 2 * mid.z - (ball.from.z + ball.to.z) / 2;
+    const a = yaw - SWOOP_BEARING;
+    const ux = Math.sin(a);
+    const uz = Math.cos(a);
+    ball.from.x = p.x + ux * 330;
+    ball.from.y = p.y + 70;
+    ball.from.z = p.z + uz * 330;
+    // Where the dive ends: its surface SWOOP_CLEARANCE short of the spot, along the way it came.
+    const fx = ball.from.x - p.x;
+    const fy = ball.from.y - (p.y + 2);
+    const fz = ball.from.z - p.z;
+    const fl = Math.hypot(fx, fy, fz);
+    const stop = BALL_RADIUS + SWOOP_CLEARANCE;
+    ball.via.x = p.x + (fx / fl) * stop;
+    ball.via.y = p.y + 2 + (fy / fl) * stop;
+    ball.via.z = p.z + (fz / fl) * stop;
+    // Away up and over to the side it came from.
+    ball.to.x = p.x + ux * 200 + uz * 160;
+    ball.to.y = p.y + 400;
+    ball.to.z = p.z + uz * 200 - ux * 160;
     ball.t = 0;
     ball.active = true;
     copy(ball.position, ball.from);
@@ -285,6 +293,12 @@ export class Hands {
 }
 
 const surface = { y: 0, normal: { x: 0, y: 1, z: 0 }, solid: -1, onTable: true };
+
+function lerp(out: Vec3, a: Vec3, b: Vec3, k: number) {
+  out.x = a.x + (b.x - a.x) * k;
+  out.y = a.y + (b.y - a.y) * k;
+  out.z = a.z + (b.z - a.z) * k;
+}
 
 function copy(to: Vec3, from: Vec3) {
   to.x = from.x;

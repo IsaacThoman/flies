@@ -76,7 +76,7 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolId, x: numbe
       break;
     }
     case "swoop": {
-      const colors = ["#ff4d6d", "#ffffff", "#2fa8ff", "#ffffff", "#ffd23a", "#ffffff"];
+      const colors = ["#b0183a", "#4a2060", "#e0284a", "#4a2060", "#b0183a", "#2c4a3a"];
       for (let i = 0; i < 6; i++) {
         g.fillStyle = colors[i];
         g.beginPath();
@@ -157,6 +157,17 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolId, x: numbe
   g.restore();
 }
 
+function shadowTexture() {
+  const { canvas, g } = canvas2d(64, 64);
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(20, 30, 50, 0.75)");
+  grad.addColorStop(0.55, "rgba(20, 30, 50, 0.45)");
+  grad.addColorStop(1, "rgba(20, 30, 50, 0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return canvasTexture(canvas);
+}
+
 function puffTexture() {
   const { canvas, g } = canvas2d(64, 64);
   const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -196,6 +207,7 @@ export class HandsView {
   #icons = new Map<ToolId, THREE.Texture>();
   #foods = new Map<FoodKind, THREE.InstancedMesh>();
   #ball: THREE.Mesh;
+  #ballShadow: THREE.Mesh;
   #feather: THREE.Mesh;
   #puffs: THREE.InstancedMesh;
   #puffState = Array.from({ length: PUFFS }, () => ({ age: 1, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 }));
@@ -213,7 +225,7 @@ export class HandsView {
 
   /** The things here that are really in the fly's world, for its eyes: the ball, the feather and the food. */
   get seen(): THREE.Object3D[] {
-    return [this.#ball, this.#feather, ...this.#foods.values()];
+    return [this.#ball, this.#ballShadow, this.#feather, ...this.#foods.values()];
   }
 
   constructor(parent: THREE.Object3D) {
@@ -237,14 +249,19 @@ export class HandsView {
       this.#foods.set(kind, mesh);
       this.group.add(mesh);
     }
-    // A beach ball: six coloured panels.
-    const colors = [new THREE.Color("#ff4d6d"), new THREE.Color("#ffffff"), new THREE.Color("#2fa8ff"), new THREE.Color("#ffffff"), new THREE.Color("#ffd23a"), new THREE.Color("#ffffff")];
+    // A beach ball in deep colours. It has to look dark to a fly, whose eyes answer darkening and see mostly blue-green light (packages/body/src/vision.ts), so the colours are dark in green and blue.
+    const colors = [new THREE.Color("#7a0f26"), new THREE.Color("#2a1236"), new THREE.Color("#a3122c"), new THREE.Color("#2a1236"), new THREE.Color("#7a0f26"), new THREE.Color("#1a2a22")];
     this.#ball = new THREE.Mesh(
-      paint(new THREE.SphereGeometry(BALL_RADIUS, 36, 20), (p) => (Math.abs(p.y) > BALL_RADIUS * 0.93 ? new THREE.Color("#ffffff") : colors[Math.floor(((Math.atan2(p.z, p.x) / (Math.PI * 2) + 1) % 1) * 6)])),
+      paint(new THREE.SphereGeometry(BALL_RADIUS, 36, 20), (p) => (Math.abs(p.y) > BALL_RADIUS * 0.93 ? new THREE.Color("#3a1a20") : colors[Math.floor(((Math.atan2(p.z, p.x) / (Math.PI * 2) + 1) % 1) * 6)])),
       new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.25, envMapIntensity: 0.8 }),
     );
     this.#ball.visible = false;
     this.group.add(this.#ball);
+    // Its shadow on the table: darker and sharper the lower it comes.
+    this.#ballShadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+    this.#ballShadow.renderOrder = 2;
+    this.#ballShadow.visible = false;
+    this.group.add(this.#ballShadow);
     // A pink feather: a curved vane with a quill.
     const shape = new THREE.Shape();
     shape.moveTo(0, 0);
@@ -262,7 +279,7 @@ export class HandsView {
     this.group.add(this.#puffs);
   }
 
-  update(hands: Hands, pantry: Pantry, camera: THREE.Camera, time: number, dt: number) {
+  update(hands: Hands, pantry: Pantry, camera: THREE.Camera, time: number, dt: number, floorAt: (x: number, z: number) => number) {
     const showPointer = this.opacity > 0.01;
     const p = hands.pointer;
     const ring = this.#ring;
@@ -308,9 +325,17 @@ export class HandsView {
 
     const ball = hands.ball;
     this.#ball.visible = ball.active;
+    this.#ballShadow.visible = ball.active;
     if (ball.active) {
       this.#ball.position.set(ball.position.x, ball.position.y, ball.position.z);
       this.#ball.rotation.set(ball.spin, ball.spin * 0.6, 0);
+      // Cast straight down: the sun is high, and a soft blob is what a fly would notice.
+      const floor = floorAt(ball.position.x, ball.position.z);
+      const height = Math.max(0, ball.position.y - BALL_RADIUS - floor);
+      const size = BALL_RADIUS * 2 * (1.1 + height / 120);
+      this.#ballShadow.position.set(ball.position.x, floor + 0.05, ball.position.z);
+      this.#ballShadow.scale.set(size, 1, size);
+      (this.#ballShadow.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - height / 220);
     }
 
     const feather = this.#feather;

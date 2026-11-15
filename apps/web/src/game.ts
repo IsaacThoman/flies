@@ -21,7 +21,7 @@ import { Bubbles } from "./scene/bubbles.ts";
 import { loadSettings, saveSettings } from "./settings.ts";
 import type { Settings } from "./settings.ts";
 import { Stage } from "./stage.ts";
-import { Hands } from "./tools/hands.ts";
+import { BALL_RADIUS, Hands } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
 import { caption, drawHud } from "./ui/hud.ts";
 import type { HudState } from "./ui/hud.ts";
@@ -68,6 +68,8 @@ export class Game implements Shell {
   wallpaper = false;
   /** 0 to 1: how much of the menus and hints show (they fade for the wallpaper). */
   uiAlpha = 1;
+  /** Recent peaks of the giant fibre's escape command, the hand-wired loom, and the eyes' looming detectors (Hz). */
+  readonly peaks = { escape: 0, loom: 0, looming: 0 };
   #loading = true;
   #awakeAt = -1;
   #datasetAt = 0;
@@ -222,15 +224,22 @@ export class Game implements Shell {
       this.#reactions();
     }
     this.meter.update(life.brain, now);
+    // Peaks of the brief things scripts wait for, held for a few seconds.
+    const command = life.brain.state?.command;
+    const rates = life.brain.state?.stats.rates;
+    const fade = Math.exp(-dt / 3);
+    this.peaks.escape = Math.max(this.peaks.escape * fade, command?.escape ?? 0);
+    this.peaks.loom = Math.max(this.peaks.loom * fade, life.sensed.loomLeft, life.sensed.loomRight);
+    this.peaks.looming = Math.max(this.peaks.looming * fade, rates?.["vision.looming left"] ?? 0, rates?.["vision.looming right"] ?? 0);
     this.fly.update(life.body, life.intent, life.eating, paused ? 0 : dt);
     director.update(life.body, dt);
     stage.update(this.time, dt, director.camera);
     this.#air.set(this.hands.air.x, this.hands.air.y, this.hands.air.z);
     this.bubbles.update(this.time, paused ? 0 : dt, director.camera, stage.light.sunDirection, this.#air);
-    if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, 22);
+    if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
     for (let i = 0; i < this.bubbles.popped.length; i++) this.audio.play("pop", this.#nearness(this.bubbles.popped[i]) * 0.7, 0.9 + Math.random() * 0.3);
     this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
-    this.handsView.update(this.hands, life.pantry, director.camera, this.time, dt);
+    this.handsView.update(this.hands, life.pantry, director.camera, this.time, dt, (x, z) => life.world.heightAt(x, z));
     const near = Math.max(0, Math.min(1, 1 - (director.camera.position.distanceTo(this.fly.root.position) - 15) / 120));
     const wings = paused ? 0 : life.body.mode === "airborne" ? Math.max(0.15, life.intent.wings) : life.intent.wingPose * 0.6;
     this.audio.follow(wings, paused ? 0 : Math.abs(life.body.groundSpeed) / 12, near, dt);
@@ -239,7 +248,7 @@ export class Game implements Shell {
 
     stage.beginFrame();
     stage.render(director.camera, dt);
-    this.eyes.render(dt, this.#showEyes(), paused);
+    this.eyes.render(dt, this.#showEyes(), paused, this.hands.ball.active);
     stage.renderer.render(this.overlay.scene, this.overlay.camera);
     stage.measure();
     remote.endFrame();
@@ -459,6 +468,9 @@ export class Game implements Shell {
     d.food = String(life.pantry.foods.filter((f) => f.kind !== "patch").length);
     d.takeoffs = String(life.takeOffs);
     d.escape = (life.brain.state?.command.escape ?? 0).toFixed(3);
+    d.escapePeak = this.peaks.escape.toFixed(3);
+    d.loomPeak = this.peaks.loom.toFixed(3);
+    d.loomingHz = this.peaks.looming.toFixed(1);
     d.feed = (life.brain.state?.command.feed ?? 0).toFixed(3);
     d.eyes = this.eyes.inUse ? "brain" : this.eyes.active ? "picture" : "off";
     d.calls = String(this.stage.cost.calls);

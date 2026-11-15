@@ -19,7 +19,14 @@ import type { Stage } from "../stage.ts";
 /** The layer the eyes see. */
 export const EYE_LAYER = 1;
 /** Each view's size in pixels, and how many times a second they refresh, by detail. */
-export const DETAIL = { low: { resolution: 16, hz: 15 }, high: { resolution: 32, hz: 30 } } as const;
+export const DETAIL = { low: { resolution: 16, hz: 20 }, high: { resolution: 32, hz: 30 } } as const;
+/**
+ * While something is coming at the fly fast (the ball), the eyes refresh every
+ * frame: a fly's looming detectors answer how quickly the dark area grows, and
+ * a 20 Hz picture blunts that (escape take-offs went from about one throw in
+ * six to one in two).
+ */
+export const URGENT_HZ = 60;
 
 const PICTURE_VS = /* glsl */ `
 attribute float light;
@@ -68,7 +75,7 @@ export class Eyes {
   #light: { left: Float32Array; right: Float32Array } | null = null;
   #since = 0;
   #sky: THREE.Mesh;
-  #picture: { scene: THREE.Scene; camera: THREE.Camera; points: THREE.Points; light: THREE.BufferAttribute; map: EyeMap } | null = null;
+  picture: { scene: THREE.Scene; camera: THREE.Camera; points: THREE.Points; light: THREE.BufferAttribute; map: EyeMap } | null = null;
   #head = new THREE.Vector3();
   #q = new THREE.Quaternion();
   #yaw = new THREE.Quaternion();
@@ -100,6 +107,9 @@ export class Eyes {
     this.#sky.frustumCulled = false;
     stage.scene.add(this.#sky);
     for (const object of stage.table.seen) object.layers.enable(EYE_LAYER);
+    // Lights answer to layers too: the eyes' views need them.
+    stage.hemi.layers.enable(EYE_LAYER);
+    stage.sun.layers.enable(EYE_LAYER);
   }
 
   /** Marks things the eyes should see (the ball, the bubbles, food). */
@@ -139,7 +149,7 @@ export class Eyes {
    * Refreshes the eyes when due, and draws the picture over the frame when
    * asked. Call after the world has been rendered.
    */
-  render(dt: number, showPicture: boolean, paused: boolean) {
+  render(dt: number, showPicture: boolean, paused: boolean, urgent = false) {
     this.active = this.inUse || showPicture;
     if (!this.active) {
       this.costMs = 0;
@@ -148,7 +158,8 @@ export class Eyes {
     }
     const detail = DETAIL[this.detail === "high" ? "high" : "low"];
     this.#since += dt;
-    if (!paused && (this.#since >= 1 / detail.hz || !this.#light)) {
+    const hz = urgent ? URGENT_HZ : detail.hz;
+    if (!paused && (this.#since >= 1 / hz - 1e-3 || !this.#light)) {
       this.#since = 0;
       this.#refresh(detail.resolution);
     }
@@ -208,14 +219,14 @@ export class Eyes {
     this.updates++;
     this.costCalls = renderer.info.render.calls - callsBefore;
     this.costMs = performance.now() - started;
-    if (this.#picture) this.#fillPicture();
+    if (this.picture) this.#fillPicture();
   }
 
   /** The picture of what the eyes take in: every facet a dot, both eyes laid out by where they look. */
   #drawPicture() {
     const map = this.map;
-    if (!this.#picture || this.#picture.map !== map) this.#buildPicture(map);
-    const picture = this.#picture!;
+    if (!this.picture || this.picture.map !== map) this.#buildPicture(map);
+    const picture = this.picture!;
     this.#stage.renderer.render(picture.scene, picture.camera);
   }
 
@@ -243,8 +254,10 @@ export class Eyes {
     geometry.setAttribute("light", light);
     geometry.setAttribute("side", new THREE.BufferAttribute(sides, 1));
     const size = Math.max(2, Math.min(8, 240 / Math.sqrt(n)));
-    const points = new THREE.Points(geometry, new THREE.ShaderMaterial({ vertexShader: PICTURE_VS, fragmentShader: PICTURE_FS, uniforms: { size: { value: size } }, depthTest: false, depthWrite: false }));
+    const points = new THREE.Points(geometry, new THREE.ShaderMaterial({ vertexShader: PICTURE_VS, fragmentShader: PICTURE_FS, uniforms: { size: { value: size } }, depthTest: false, depthWrite: false, transparent: true }));
     points.frustumCulled = false;
+    // Over the backing: both are in the transparent list, drawn in this order.
+    points.renderOrder = 1;
     const scene = new THREE.Scene();
     const backing = new THREE.Mesh(new THREE.PlaneGeometry(1.76, 1.36), new THREE.MeshBasicMaterial({ color: "#020a1c", transparent: true, opacity: 0.88, depthTest: false, depthWrite: false }));
     backing.position.set(0, 0.04, 0);
@@ -252,13 +265,13 @@ export class Eyes {
     scene.matrixWorldAutoUpdate = false;
     backing.updateMatrixWorld();
     points.updateMatrixWorld();
-    this.#picture?.points.geometry.dispose();
-    this.#picture = { scene, camera: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), points, light, map };
+    this.picture?.points.geometry.dispose();
+    this.picture = { scene, camera: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), points, light, map };
     this.#fillPicture();
   }
 
   #fillPicture() {
-    const picture = this.#picture;
+    const picture = this.picture;
     const light = this.#light;
     if (!picture || !light || picture.map !== this.#map) return;
     const array = picture.light.array as Float32Array;

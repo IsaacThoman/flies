@@ -89,15 +89,24 @@ export function createSampler(directions: Float32Array, resolution: number): Sam
   return { count, resolution, index, weight };
 }
 
+/**
+ * How a fly weights red, green and blue light. Its outer photoreceptors
+ * (R1-R6, rhodopsin Rh1), which feed the lamina cells the brain's eyes are
+ * driven through, are most sensitive to blue-green light and barely to red, so
+ * a blue sky is bright to a fly where human luminance would call it dim. A
+ * rough three-band stand-in for Rh1's spectral sensitivity, not a fit.
+ */
+export const FLY_RGB = [0.1, 0.45, 0.45] as const;
+
 /** Brightness (0 to 1) of each facet, from the read-back picture. Allocates nothing. */
 export function sample(pixels: Uint8Array, sampler: Sampler, out: Float32Array) {
   const { index, weight, count } = sampler;
+  const [wr, wg, wb] = FLY_RGB;
   for (let i = 0; i < count; i++) {
     let sum = 0;
     for (let k = 0; k < 4; k++) {
       const p = index[i * 4 + k];
-      // Luminance of linear RGB.
-      sum += weight[i * 4 + k] * (0.2126 * pixels[p] + 0.7152 * pixels[p + 1] + 0.0722 * pixels[p + 2]);
+      sum += weight[i * 4 + k] * (wr * pixels[p] + wg * pixels[p + 1] + wb * pixels[p + 2]);
     }
     out[i] = sum / 255;
   }
