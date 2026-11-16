@@ -33,7 +33,7 @@ All of `dist/`, as it is, to any folder of the host. About 17 MB:
 | `brain/connectome.<n>.<hash>.bin` | the brain, in four parts of at most 4 MiB, 14.2 MB in all | the same | `application/octet-stream` (any will do) |
 | `brain/fly-brain.0.<hash>.wasm` | the brain's simulation as WebAssembly, 268 KB (106 KB gzipped) | the same | `application/wasm` (what hosts send for `.wasm`; any will do) |
 | `brain/anatomy.<n>.<hash>.bin` | where each neuron is (`packages/brain/src/anatomy.ts`), 0.9 MB, if `npm run brain:fetch` built it; nothing loads it yet | the same | the same |
-| `.well-known/apple-app-site-association` | which links open the iPhone and iPad app, only when built with `APPLE_TEAM_ID` ([deploy.md](deploy.md#the-iphone-and-ipad-apps-links)); it must be at the host's root, with no redirect, and is never kept by the service worker | `no-cache` | `application/json` |
+| `.well-known/apple-app-site-association` | which links open the iPhone and iPad app, on by default (`APPLE_TEAM_ID=0` disables it; [deploy.md](deploy.md#the-iphone-and-ipad-apps-links)); it must be at the host's root, with no redirect, and is never kept by the service worker | `no-cache` | `application/json` |
 
 Every file whose contents can change has its contents in its name, so it can
 be kept forever; the few that can't (the page, its manifest, the service

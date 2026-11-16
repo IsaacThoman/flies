@@ -37,9 +37,9 @@ Coolify v4 with its default Traefik proxy.
    (`FLY_SITE_URL` overrides it; don't set it, or every preview gets
    production's). Behind Cloudflare (proxied DNS or a tunnel) set
    `CLIENT_IP_HEADERS=CF-Connecting-IP X-Forwarded-For` (see
-   [visitors' addresses](#visitors-addresses)). Once the Team ID is known,
-   set `APPLE_TEAM_ID` as a build variable ([the iPhone and iPad app's
-   links](#the-iphone-and-ipad-apps-links)).
+   [visitors' addresses](#visitors-addresses)). App links are on by default;
+   `APPLE_TEAM_ID` overrides the team, or `0` disables them ([the iPhone and
+   iPad app's links](#the-iphone-and-ipad-apps-links)).
 5. **Deploy**, and check `https://flies.isaacthoman.com/`. Coolify shows a
    service healthy when its Docker health check passes: `web` serves its
    entry file to itself on `127.0.0.1:8080/healthz`, and `rooms` answers
@@ -80,7 +80,7 @@ git clone --branch main https://github.com/IsaacThoman/flies.git
 cd flies
 cp .env.example .env
 # Edit .env: FLY_SITE_URL=https://flies.isaacthoman.com/, HTTP_PORT if 8080 is taken,
-# and, once known, APPLE_TEAM_ID (see The iPhone and iPad app's links)
+# app links need no setting (see The iPhone and iPad app's links)
 docker compose up -d --build --wait
 ```
 
@@ -286,32 +286,37 @@ The iPhone and iPad app reaches the same `wss://flies.isaacthoman.com/rooms`
 
 ## The iPhone and iPad app's links
 
-With `APPLE_TEAM_ID` set (a build variable in Coolify, or in `.env`), the build writes
+By default the build writes
 `/.well-known/apple-app-site-association`: the site's side of the app's
 Associated Domains. It says that a table's link (`/?table=<code>`, and nothing
 else on the site) opens the Flies app where it is installed, and that the
 site's passwords are the app's too, for AutoFill. It names the app as
-`<APPLE_TEAM_ID>.com.isaacthoman.flies`. The Team ID is on
+`PX72AL9366.com.isaacthoman.flies`, using the Apple apps' default team from
+`scripts/appleConfig.ts`. No setting is needed for a normal Docker or Coolify
+deploy. To use another team, set `APPLE_TEAM_ID` (a build variable in Coolify,
+or in `.env`) and rebuild. The Team ID is on
 [the developer account](https://developer.apple.com/account) under
-Membership details: ten capital letters and digits. It is the owner's to give;
-nothing here guesses it.
+Membership details: ten capital letters and digits. It is public, and appears
+in every signed app.
 
 ```sh
-# Coolify: add APPLE_TEAM_ID=<the Team ID> to the environment variables, and redeploy.
-# By hand: put it in .env, then
 docker compose up -d --build --wait
 curl -i https://flies.isaacthoman.com/.well-known/apple-app-site-association
 ```
 
 That must answer 200 with `Content-Type: application/json` and no redirect,
 as Apple requires; Caddy serves it so (the file has no extension), and never
-answers that path with the game's page. Left blank, the build writes no file
+answers that path with the game's page. To turn it off, set `APPLE_TEAM_ID=0`
+and rebuild/redeploy: the build writes no file
 and the path is a 404: phones then open table links in Safari, which plays
 them as well. A value that isn't a Team ID stops the build rather than
-publish an association that names nobody. Apple's devices fetch the file
+publish an association that names nobody. Unset or blank uses the default team.
+The fallback is inside the build script, so Coolify's build arguments cannot
+bypass it. Apple's devices fetch the file
 through Apple's CDN, which can take hours to see a change. The app's own side
-is a build flag and a capability in the developer account (docs/ios.md,
-"On a device, and in TestFlight").
+is enabled by default in TestFlight releases, with Associated Domains already
+enabled on the App ID (docs/ios.md, "On a device, and in TestFlight"). Set the
+repository variable `IOS_LINKS=0` to omit the entitlement from releases.
 
-`scripts/checkDeploy.ts` checks the file's type when the build has one, and
-that the path is a 404 when it doesn't.
+`scripts/checkDeploy.ts` checks the file's type, contents and absence of redirects
+when the build has one, and that the path is a 404 when it doesn't.

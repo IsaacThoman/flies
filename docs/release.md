@@ -75,6 +75,21 @@ Turn it on once the capability is registered (below). Without it, the Apple TV's
 game's own weather and clock rather than the weather outside. The iPhone and iPad app has no
 WeatherKit.
 
+## Invite links
+
+TestFlight releases build the iPhone and iPad app with `IOS_LINKS=1` by default, adding
+Associated Domains so table links open the app and password AutoFill offers the site's
+passwords. The capability is already enabled on `com.isaacthoman.flies`. To leave it out of
+releases, set the repository variable `IOS_LINKS` to `0` (Settings → Secrets and variables →
+Actions → Variables); unset or empty defaults to `1`.
+
+The web build publishes `/.well-known/apple-app-site-association` by default for
+`PX72AL9366.com.isaacthoman.flies`, using the team shared in `scripts/appleConfig.ts`.
+`APPLE_TEAM_ID` overrides the web build's team; unset or blank uses that default. To turn off
+the site's association, set the build variable `APPLE_TEAM_ID=0` and rebuild/redeploy
+([deploy.md](deploy.md#the-iphone-and-ipad-apps-links)). Local iOS builds and archives still
+need `IOS_LINKS=1` explicitly; omit it or use `IOS_LINKS=0` to leave the entitlement out.
+
 ## One-time setup
 
 Done once, by the account holder, before the first release:
@@ -84,7 +99,8 @@ Done once, by the account holder, before the first release:
    - tick **WeatherKit** under both **Capabilities** and **App Services**
      ([apple-tv.md](apple-tv.md#turning-it-on-for-the-owner), steps 1 and 2), then set the
      `TVOS_WEATHERKIT` variable to `1`. Recommended: it's what gives the Apple TV the real sky;
-   - tick **Associated Domains**, for the invite links that open a table in the app.
+   - **Associated Domains** is already enabled for the invite links that open a table in the
+     app. Enable it on any replacement App ID before releasing with links on.
 
    Both apps use the one App ID.
 2. **App Store Connect record**: create one app, **Flies**, with bundle ID
@@ -116,8 +132,9 @@ Done once, by the account holder, before the first release:
 
    The workflow selects `/Applications/Xcode_27.1.app`. Change that line if the runner image
    moves on.
-5. **The team**: `PX72AL9366`, the default in `scripts/tvos.ts`, which the iPhone and iPad app
-   shares. Signing in CI is automatic, with that team. A different team goes in the
-   repository variable `APPLE_TEAM_ID`.
+5. **The team**: `PX72AL9366`, shared by the Apple apps and the web build in
+   `scripts/appleConfig.ts`. Signing in CI is automatic, with that team. A different team goes
+   in the repository variable `APPLE_TEAM_ID`; set it separately as the site's build variable
+   too, so its association names the same app.
 6. **Merge commits** stay allowed for the dev-to-main pull request, with GitHub's default
    message (above).
