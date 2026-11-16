@@ -4,10 +4,10 @@
 //
 // (a) the response matrix: each sense alone at full strength for 1 s, and
 //     rest, with every command's mean and peak and the latency to its peak,
-//     then the pet's looming pulse;
+//     then the game's fallback looming pulse;
 // (b) seizure recovery: every sense, every pair and all at once at full
 //     strength for 2 s, then back to rest;
-// (c) behaviour at rest over --minutes of fly time, as the pet would act on it;
+// (c) behaviour at rest over --minutes of fly time, through the diagnostic observer;
 // (d) wall time per simulated second at rest, under some typical stimulation
 //     and with everything at once;
 // (e) the eyes: every stimulus of the vision battery (src/stimuli.ts), alone
@@ -20,7 +20,7 @@
 
 import { parseArgs } from "node:util";
 import { DEFAULT_CONNECTOME_PATH, readConnectomeFile } from "../src/node.ts";
-import { PetObserver } from "../src/pet.ts";
+import { BehaviorObserver } from "../src/observer.ts";
 import { FlyBrain } from "../src/runtime.ts";
 import { RESTING_SENSES } from "../src/types.ts";
 import type { BrainCommand, BrainSenses } from "../src/types.ts";
@@ -101,8 +101,8 @@ for (const [name, senses] of cases) {
 console.log("\n    Mean readout rates over the same second, Hz:");
 for (const line of rateLines) console.log(line);
 
-// The pet's looming pulse: full (or half) strength for 80 ms, then fading to 0 over 200 ms.
-console.log("\n    The pet's looming pulse in the left eye (held 80 ms, fading over 200 ms), after 2 s of rest:");
+// The game's fallback looming pulse: full (or half) strength for 80 ms, then fading to 0 over 200 ms.
+console.log("\n    The game's fallback looming pulse in the left eye (held 80 ms, fading over 200 ms), after 2 s of rest:");
 for (const strength of [1, 0.5]) {
   const b = brain();
   rest(b, 2000);
@@ -166,20 +166,20 @@ let bandHigh: number;
 {
   const minutes = Number(values.minutes);
   const b = brain();
-  const pet = new PetObserver();
-  for (let t = 0; t < minutes * 60_000; t += TICK) pet.observe(b.tick(TICK, RESTING_SENSES).command, TICK / 1000);
-  const t = pet.tally;
-  console.log(`\n(c) Behaviour at rest over ${minutes} minutes, through the pet's thresholds (on its feet, free to move):`);
+  const observer = new BehaviorObserver();
+  for (let t = 0; t < minutes * 60_000; t += TICK) observer.observe(b.tick(TICK, RESTING_SENSES).command, TICK / 1000);
+  const t = observer.tally;
+  console.log(`\n(c) Behaviour at rest over ${minutes} minutes, through the diagnostic observer (on its feet, free to move):`);
   console.log(`    walking forwards  ${((100 * t.walking) / t.seconds).toFixed(1)}% of the time, in ${t.walkBouts} bouts (mean ${(t.walking / Math.max(1, t.walkBouts)).toFixed(1)} s)`);
   console.log(`    walking backwards ${t.backing.toFixed(1)} s in ${t.backBouts} bouts`);
-  console.log(`    turn-arounds      ${t.turnsLeft} toward the fly's left, ${t.turnsRight} toward its right`);
+  console.log(`    turn events      ${t.turnsLeft} toward the fly's left, ${t.turnsRight} toward its right`);
   console.log(`    escapes           ${t.escapes}`);
   console.log(`    peaks             ${COMMANDS.map((c) => `${c} ${t.peak[c].toFixed(2)}`).join(", ")}`);
 }
 
 // (d) Cost.
 {
-  // The pet's pulse (80 ms at full strength, fading over 200 ms) at the start of every second, in the left eye.
+  // The fallback looming pulse (80 ms at full strength, fading over 200 ms) at the start of every second, in the left eye.
   const loomEverySecond = (seconds = 10) => {
     const b = brain();
     rest(b, 2000);
@@ -202,9 +202,9 @@ let bandHigh: number;
   console.log("\n(d) Wall time per simulated second, one thread, 10 s each after 2 s of rest:");
   const rows: [string, BrainSenses][] = [
     ["rest", RESTING_SENSES],
-    ["the pointer resting on it (touch 0.4)", { ...RESTING_SENSES, touch: 0.4 }],
+    ["the feather resting on the fly (touch 0.4)", { ...RESTING_SENSES, touch: 0.4 }],
     ["a full looming pulse every second", RESTING_SENSES],
-    ["held and dragged (touch 1, wind 0.5, airborne)", { ...RESTING_SENSES, touch: 1, wind: 0.5, grounded: false }],
+    ["touch and wind while airborne (touch 1, wind 0.5)", { ...RESTING_SENSES, touch: 1, wind: 0.5, grounded: false }],
     ["everything at once at full strength", apply(Object.keys(FULL) as (ScalarSense)[])],
   ];
   for (const [name, senses] of rows) {

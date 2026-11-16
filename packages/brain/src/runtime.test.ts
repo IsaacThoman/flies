@@ -113,7 +113,7 @@ test("createBrain runs the synthetic connectome end to end", () => {
     assert.ok(Number.isFinite(value), key);
     assert.ok(value >= (key === "turn" ? -1 : 0) && value <= 1, `${key} ${value}`);
   }
-  // Any dt adds up: 0, a fraction of a step, and the longest the pet sends.
+  // Any dt adds up: 0, a fraction of a step, and a 100 ms tick.
   let total = 0;
   for (const dt of [0, 0.4, 0.6, 3.3, 100, 16]) total += brain.tick(dt, RESTING_SENSES).stats.simMs;
   assert.ok(Math.abs(total - 120.3) <= 1, `${total} ms simulated`);

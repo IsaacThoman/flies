@@ -99,7 +99,7 @@ What more speed would cost:
 - **Threads.** The sweep and delivery split cleanly by neuron and the result can be kept exact (each neuron's sum stays in delivery order if each thread owns a range of targets), but it means a worker pool next to the renderer and per-step synchronisation about a thousand times a second.
 - **Single precision.** Computing in floats would roughly halve the sweep's cost and vectorise four-wide, and end the agreement with the TypeScript: the TypeScript would have to change first, and the browser would pay for it in `Math.fround` calls.
 - **4-byte connections** (target and saturated count packed, the weight looked up per presynaptic gain) would save 25 MB and some delivery bandwidth, for a more specialised layout tied to the operating point.
-- **A dimmer lamina.** The TypeScript's README notes that halving `RETINA.maxRate` halves the spikes a rotating grating causes, at the price of most of the motion pathway; that is a change to the model, made there first.
+- **A dimmer lamina.** The TypeScript's README notes that halving `RETINA.maxRate` halves the spikes a rotating grating causes, at the price of most of the motion pathway; that would change the model in both `packages/brain` and `packages/brain-native`.
 
 ## The eyes
 
@@ -124,7 +124,7 @@ regions.ts's catalog of the nervous system by region (packages/brain/README.md, 
 
 ## When the model changes
 
-The TypeScript is the reference; the model changes there first (and in the desktop pet's copy before that, see `docs/architecture.md`). Then:
+The model is developed directly in this repository. `packages/brain` is the TypeScript reference; keep this native implementation equivalent when changing it:
 
 1. Port the change into the file of the same name: `params.cpp` for the operating point, `io.cpp` for groups, scales and decoding, `state.cpp`, `sim.cpp`, `eyes.cpp`, `vision.cpp`, `regions.cpp`, `brain.cpp` for runtime.ts, `connectome.cpp` for format.ts. A new eye table: `node packages/brain-native/scripts/eye-columns.ts`. Write each expression as the TypeScript writes it, in the same order, doubles from floats. Keep the TypeScript's comments' substance.
 2. A new `Math` function: take it from the same `ieee754.cc` into `fdlibm.cpp` and add it to `math.test.ts`. Never `<cmath>`'s, except `sqrt`, `floor`, `trunc` and `fabs`, which are exact everywhere.

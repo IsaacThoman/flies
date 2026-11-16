@@ -50,10 +50,9 @@ browser produces the same events from the keyboard and mouse.
 4. **The TV is slow at JavaScript.** See `AGENTS.md`.
 5. **Everything is drawn in engine.** Menus too. No DOM.
 
-## The brain package's home
+## The brain belongs to this project
 
-`packages/brain` is shared with the Computerbug desktop pet
-(github.com/IsaacThoman/ladybug, `packages/brain`), where the model was built
-and calibrated. It was copied from there, and the two are kept in step by
-hand: changes to the model itself are made there first. `src/pet.ts` and the
-parts of its README about the pet describe that other body.
+The brain began as a copy of the [Computerbug desktop pet's](https://github.com/IsaacThoman/ladybug).
+It is now independent: model changes are made here directly, with no need to
+keep either project in step with the other. `packages/brain` is the TypeScript
+reference and `packages/brain-native` is this game's matching C++ implementation.
