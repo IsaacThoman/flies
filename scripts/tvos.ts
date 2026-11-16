@@ -1,7 +1,7 @@
 // Builds the Apple TV app (apps/tvos/) and runs it on a paired Apple TV or a tvOS simulator.
 // See docs/apple-tv.md.
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { CANVAS_OPS, GL_OPS, OP } from '../apps/tvos/runtime/ops.ts';
 import { writeAssetCatalog } from './tvosAssets.ts';
@@ -76,6 +76,12 @@ function prepare({ testScene, standInBrain, standInWeather }: BuildOptions) {
   rmSync(www, { recursive: true, force: true });
   mkdirSync(path.join(www, 'brain'), { recursive: true });
   run('npx', ['rolldown', 'apps/tvos/runtime/index.ts', '--format', 'iife', '--minify', '--file', 'apps/tvos/www/runtime.js']);
+  if (testScene) {
+    // The bridge scene's own readiness flag cannot catch a missing signal in the game.
+    run('npx', ['vite', 'build', '--config', 'apps/tvos/vite.config.ts', '--logLevel', 'warn']);
+    cpSync(path.join(appDir, 'dist'), www, { recursive: true });
+    renameSync(path.join(www, 'game.js'), path.join(www, 'real-game.js'));
+  }
   run('npx', ['vite', 'build', '--config', 'apps/tvos/vite.config.ts', '--logLevel', 'warn'], root, testScene ? { ...process.env, TVOS_ENTRY: TEST_SCENE } : process.env);
   cpSync(path.join(appDir, 'dist'), www, { recursive: true });
   cpSync(CONNECTOME, path.join(www, 'brain/connectome.bin'));

@@ -18,6 +18,7 @@ import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
 import { gameUp, openGame, readState, startServer, waitFor } from "../../../scripts/play.ts";
 import { PLACES } from "../src/places/catalog.ts";
+import type { Game } from "../src/game.ts";
 
 /** The frame's budget on the Apple TV. */
 const MAX_CALLS = 150;
@@ -62,6 +63,44 @@ const step = (name: string) => console.log(`· ${name}`);
 let failed = false;
 
 try {
+  step("the first drawn frame lifts the native splash, once");
+  assert.equal((await readState(page)).ready, "true", "the first published game state is ready");
+  const startup = await browser.newPage();
+  await startup.addInitScript(() => {
+    let next: FrameRequestCallback;
+    window.requestAnimationFrame = (callback) => { next = callback; return 1; };
+    (globalThis as unknown as { __drawFrame: () => void }).__drawFrame = () => next(performance.now());
+  });
+  await startup.goto(url);
+  await startup.waitForFunction(() => !!(globalThis as unknown as { __fly?: unknown }).__fly, null, { polling: 100 });
+  const firstFrame = await startup.evaluate(async () => {
+    const { __fly: game, __drawFrame: draw } = globalThis as unknown as { __fly: Game; __drawFrame: () => void };
+    const canvas = document.getElementById("game") as HTMLCanvasElement;
+    const before = canvas.dataset.ready;
+    let writes = 0, renders = 0, early = false;
+    const observer = new MutationObserver((changes) => { writes += changes.length; });
+    observer.observe(canvas, { attributes: true, attributeFilter: ["data-ready"] });
+    const renderer = game.stage.renderer;
+    const render = renderer.render;
+    renderer.render = function (scene, camera) {
+      renders++;
+      early ||= canvas.dataset.ready === "true";
+      render.call(this, scene, camera);
+    };
+    draw();
+    renderer.render = render;
+    const after = canvas.dataset.ready;
+    await Promise.resolve();
+    draw();
+    await Promise.resolve();
+    observer.disconnect();
+    return { before, after, renders, early, writes };
+  });
+  assert.equal(firstFrame.before, undefined, "not ready before drawing");
+  assert.ok(firstFrame.renders > 0 && !firstFrame.early, "not ready until rendering finishes");
+  assert.equal(firstFrame.after, "true", "ready immediately after the first frame");
+  assert.equal(firstFrame.writes, 1, "readiness is only published once");
+  await startup.close();
   step("the brain wakes and the title appears");
   const awake = await waitFor(page, "brain=running,screen=title", 90_000);
   assert.equal(awake.neurons, "166700");

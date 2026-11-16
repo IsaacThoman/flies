@@ -95,6 +95,7 @@ export class Game implements Shell {
   /** Recent peaks of the giant fibre's escape command, the hand-wired loom, and the eyes' looming detectors (Hz). */
   readonly peaks = { escape: 0, loom: 0, looming: 0 };
   #loading = true;
+  #ready = false;
   #awakeAt = -1;
   #datasetAt = 0;
   /** What the HUD last drew, to tell when it needs drawing again. */
@@ -412,6 +413,11 @@ export class Game implements Shell {
     this.inset.update(dt, insetWanted(this.settings.eyesInset, this.#loading ? "loading" : this.nav.current, this.wallpaper, showEyes, this.eyes.detail === "off"), this.wallpaper, director.shotChanges);
     this.eyes.render(dt, showEyes, paused, this.hands.ball.active, this.inset.watching);
     stage.renderer.render(this.overlay.scene, this.overlay.camera);
+    if (!this.#ready) {
+      // The TV's splash can give way once both the world and its loading panel are drawn.
+      this.canvas.dataset.ready = "true";
+      this.#ready = true;
+    }
     stage.measure();
     remote.endFrame();
     this.hands.clearEvents();
