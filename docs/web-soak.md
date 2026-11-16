@@ -8,6 +8,7 @@ sound started by a remote press. There is no simulated or accelerated time.
 npm run e2e:soak
 npm run soak:web -- --cycles 200 --minutes 5 --wallpaper-minutes 100 --csv /tmp/web-soak.csv
 npm run soak:web -- --phases climate,eyes --minutes 10 --interval 10
+npm run soak:web -- --phases wallpaper --places picnic --wallpaper-time noon --wallpaper-weather clear --wallpaper-minutes 60
 ```
 
 `e2e:soak` is the separate, roughly two-minute CI check beside `npm run e2e`:
@@ -23,13 +24,16 @@ The default full run uses 200 circuits, 30 minutes per interaction phase, and
 | `--cycles 200` | Full four-place circuits in the places phase. |
 | `--minutes 30` | Minimum real minutes per other interaction phase. Climate finishes a complete matrix even if this takes longer. |
 | `--wallpaper-minutes 60` | Real minutes per place, in four parallel isolated contexts. |
+| `--places picnic,windowsill,lab,bar` | Places to run wallpaper in; interaction phases still visit every place. |
+| `--wallpaper-time clock` | Clock or a held daylight preset (morning/noon/golden/dusk/night). |
+| `--wallpaper-weather now` | Forecast or a held weather preset (clear/overcast/mist/rain). |
 | `--interval 10` | Sample interval in seconds. Overruns skip a tick; GCs never queue indefinitely. |
 | `--csv /tmp/soak.csv` | Incremental samples; default a unique file in the OS temporary directory. |
 | `--url http://localhost:5173/` | Use an existing server; otherwise start and stop Vite. |
 | `--quick` | Four circuits and strict resource assertions. Keep the places phase when selecting phases. |
 
 Interaction runs in a fifth context alongside wallpaper. Each wallpaper page
-is pinned to its place and follows the real clock and forecast. The interaction
+is pinned to its place and by default follows the real clock and forecast. The interaction
 page waits for `data-moving` to clear between places; climate visits every
 weather and all five daylight presets plus the clock, holding each combination
 for 12 seconds. Tools use every variant and hold continuous tools; menus visit
@@ -39,8 +43,8 @@ remain covered by the ordinary e2e test and the web-release work.
 
 The harness warms persistent tool meshes, icon textures, eye pictures, pixel
 modes and ambience buffers before sampling. Checkpoints after place changes
-compare a fresh place with the same settings and view. Other phases end with
-those same checkpoints; their in-flight counts are deliberately variable.
+compare a fresh place with the same settings and view. Other phases repeat
+those same checkpoints between stress rounds each minute and when they finish; their in-flight counts are deliberately variable.
 Only checkpoints within the same phase/place, and continuous wallpaper, get
 trend verdicts. At least four samples are required. Disjoint early/late
 quarters are averaged and their difference divided by elapsed hours. A small

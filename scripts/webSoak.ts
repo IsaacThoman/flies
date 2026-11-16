@@ -111,6 +111,12 @@ export async function run(args = process.argv.slice(2)) {
   const quick = args.includes("--quick");
   const minutes = Number(flag("--minutes", quick ? "0.25" : "30"));
   const wallpaperMinutes = Number(flag("--wallpaper-minutes", "60"));
+  const wallpaperTime = flag("--wallpaper-time", "clock");
+  const wallpaperWeather = flag("--wallpaper-weather", "now");
+  const wallpaperPlaces = flag("--places", PLACES.map((p) => p.id).join(",")).split(",");
+  assert.ok(["clock", ...TIMES].includes(wallpaperTime), "invalid --wallpaper-time");
+  assert.ok(["now", ...WEATHERS].includes(wallpaperWeather), "invalid --wallpaper-weather");
+  assert.ok(wallpaperPlaces.length && wallpaperPlaces.every((id) => PLACES.some((p) => p.id === id)), "invalid --places");
   const cycles = Number(flag("--cycles", quick ? "4" : "200"));
   const interval = Number(flag("--interval", quick ? "5" : "10")) * 1000;
   const phases = flag("--phases", quick ? "places" : PHASES.join(",")).split(",") as Phase[];
@@ -221,6 +227,11 @@ export async function run(args = process.argv.slice(2)) {
         continue;
       }
       const until = Date.now() + minutes * 60_000;
+      let checkpointAt = Date.now() + 60_000;
+      const checkpoints = async () => {
+        await canonical(page);
+        for (const place of PLACES) { await move(page, place.id); await page.waitForTimeout(2500); await sample(true); }
+      };
       do {
         if (p === "climate") {
           for (const place of PLACES) {
@@ -274,20 +285,23 @@ export async function run(args = process.argv.slice(2)) {
           }
         }
         await sample();
+        if (Date.now() >= checkpointAt) {
+          // Repeat matched states during stress phases, not just once when they finish.
+          await checkpoints();
+          checkpointAt = Date.now() + 60_000;
+        }
       } while (Date.now() < until);
-      await canonical(page);
-      // Matched states distinguish retained resources from the cost of a different view/menu.
-      for (const place of PLACES) { await move(page, place.id); await page.waitForTimeout(2500); await sample(true); }
+      await checkpoints();
     }
   }
   try {
     const jobs: Promise<void>[] = [];
     if (phases.some((p) => p !== "wallpaper")) jobs.push(lane("interaction", interaction));
-    if (phases.includes("wallpaper")) for (const place of PLACES) jobs.push(lane(place.id, async (page, sample, phase) => {
+    if (phases.includes("wallpaper")) for (const place of PLACES.filter((p) => wallpaperPlaces.includes(p.id))) jobs.push(lane(place.id, async (page, sample, phase) => {
       await move(page, place.id);
       await page.evaluate((id) => { const g = globalThis.__fly; g.settings.place = id; g.settings.eyesInset = "wallpaper"; g.applySettings(); g.watch(); }, place.id);
-      await choose(page, "light", "clock");
-      await choose(page, "weather", "now");
+      await choose(page, "light", wallpaperTime);
+      await choose(page, "weather", wallpaperWeather);
       phase("wallpaper");
       const until = Date.now() + wallpaperMinutes * 60_000;
       while (Date.now() < until) { await sample(); await page.waitForTimeout(Math.min(1000, until - Date.now())); }
