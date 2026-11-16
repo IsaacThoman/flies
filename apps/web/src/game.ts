@@ -468,6 +468,11 @@ export class Game implements Shell {
       moving.t = VEIL_OUT;
       return;
     }
+    // A place built in steps is finished a step a frame before the veil lifts.
+    if (moving.arrived && this.stage.buildMore()) {
+      moving.t = VEIL_OUT;
+      return;
+    }
     const k = moving.arrived ? 1 - (moving.t - VEIL_OUT) / VEIL_IN : moving.t / VEIL_OUT;
     this.stage.veil = Math.max(0, Math.min(1, k * k * (3 - 2 * k)));
     if (moving.arrived && moving.t >= VEIL_OUT + VEIL_IN) {
@@ -1426,6 +1431,7 @@ export class Game implements Shell {
     d.view = this.hands.view;
     d.place = this.#here;
     d.placeMs = this.stage.buildMs.toFixed(0);
+    d.placeStepMs = this.stage.buildStepMs.toFixed(0);
     d.moving = this.#moving ? this.#moving.to : "";
     d.speed = this.meter.speed.toFixed(2);
     d.gl = this.glLost ? "lost" : "ok";

@@ -22,6 +22,14 @@ export type SceneSet = {
   seen: THREE.Object3D[];
   /** Moves it on. The weather is for a place that shows it (rain on a pane, wet things), the camera for one that draws what is near it in more detail; one that doesn't can leave them. */
   update(time: number, light: Daylight, weather: Weather, camera: THREE.Camera): void;
+  /**
+   * Builds the next part of a place too big to build in one frame: true
+   * while there is more. The game calls it once a frame behind the veil and
+   * lifts the veil once it is done, so no one frame is long (stage.ts builds
+   * all of it at once when there is no veil, at start). Optional: a place
+   * left without it is built whole by `buildSet`.
+   */
+  more?(): boolean;
   /** Sets a ring spreading on a pool (a FoodPatch with `pool`), from a point on it, 0 to 1 strong. */
   ripple(x: number, z: number, strength: number): void;
   /**

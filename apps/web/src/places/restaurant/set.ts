@@ -161,43 +161,53 @@ export function buildRestaurant(): SceneSet {
   const clear = clearMaterial(shared, mask);
   const eyeSolid = solidMaterial(shared, { value: 0 }, true);
 
-  const b = new Builder(solid, clear);
-  buildShell(b);
-  const owned = new Map<PartName, Solid[]>();
-  for (const s of RESTAURANT_SOLIDS) {
-    const part = owner(s);
-    if (part) owned.set(part, [...(owned.get(part) ?? []), s]);
-  }
-  for (const [name, part] of Object.entries(PARTS)) part.build(b, owned.get(name as PartName) ?? []);
-
-  const order = { renderOrder: new Map([[clear, 3]]) };
-  const far = b.far.build(group, order);
-  // The fly's eyes: the shell and every stand-in, none folded away, and the openings bright.
-  const farSolid = far.find((m) => m.material === solid)!;
-  const eye = new THREE.Mesh(farSolid.geometry, eyeSolid);
-  eye.layers.set(EYE_LAYER);
-  eye.frustumCulled = false;
-  freeze(eye);
-  group.add(eye);
-  for (const m of far) m.frustumCulled = false;
   // The shop front's glass, with the rain on it: the street's (glass.ts), between the frames.
   const glass = buildShopGlass();
   group.add(glass.mesh);
   const glows = buildGlows(shared.uNight);
   group.add(glows.mesh);
+  // The fly's eyes see the shell and every stand-in, none folded away, and the openings bright: the far mesh again, once it is built.
+  const eye = new THREE.Mesh(new THREE.BufferGeometry(), eyeSolid);
+  eye.layers.set(EYE_LAYER);
+  eye.frustumCulled = false;
+  freeze(eye);
+  group.add(eye);
 
   type Shown = { spec: AreaSpec; group: THREE.Group; shown: boolean; lit: Lit | null };
-  const areas: Shown[] = AREAS.map((spec, i) => {
-    const holder = new THREE.Group();
-    freeze(holder);
-    holder.visible = false;
-    b.near.get(spec.id)?.build(holder, order);
-    group.add(holder);
-    const surface = surfaceOf(spec);
-    const lit = surface === null ? null : lighting(spec, surface);
-    if (lit) rings(spec, lit, i);
-    return { spec, group: holder, shown: false, lit };
-  });
+  const areas: Shown[] = [];
+  const b = new Builder(solid, clear);
+  const owned = new Map<PartName, Solid[]>();
+  for (const s of RESTAURANT_SOLIDS) {
+    const part = owner(s);
+    if (part) owned.set(part, [...(owned.get(part) ?? []), s]);
+  }
+  const order = new Map([[clear, 3]]);
+  // The room is built in steps, a frame's work each behind the veil (SceneSet.more): the shell, each part, then the far mesh and each area's detail merged.
+  const steps: (() => void)[] = [
+    () => buildShell(b),
+    ...Object.entries(PARTS).map(([name, part]) => () => part.build(b, owned.get(name as PartName) ?? [])),
+    () => {
+      const far = b.far.build(group, order);
+      for (const m of far) m.frustumCulled = false;
+      eye.geometry.dispose();
+      eye.geometry = far.find((m) => m.material === solid)!.geometry;
+    },
+    // A few areas' detail at a time.
+    ...Array.from({ length: Math.ceil(AREAS.length / 5) }, (_, k) => () => {
+      for (const spec of AREAS.slice(k * 5, k * 5 + 5)) {
+        const holder = new THREE.Group();
+        freeze(holder);
+        holder.visible = false;
+        b.near.get(spec.id)?.build(holder, order);
+        group.add(holder);
+        const surface = surfaceOf(spec);
+        const lit = surface === null ? null : lighting(spec, surface);
+        if (lit) rings(spec, lit, spec.id);
+        areas.push({ spec, group: holder, shown: false, lit });
+      }
+    }),
+  ];
+  let step = 0;
   let casting: Lit | null = null;
   const noLight: Lit = { cast: new Float32Array(CASTERS * 4), tint: new Float32Array(CASTERS * 4), bottom: new Float32Array(CASTERS), box: new THREE.Vector4(1, -1, 1, -1), y: new THREE.Vector2(1, -1), rings: new Float32Array(24) };
   const useLight = (lit: Lit) => {
@@ -224,6 +234,10 @@ export function buildRestaurant(): SceneSet {
     group,
     materials: [solid, clear, eyeSolid],
     seen: [eye],
+    more() {
+      if (step < steps.length) steps[step++]();
+      return step < steps.length;
+    },
     update(time: number, light: Daylight, weather: Weather, camera?: THREE.Camera) {
       shared.uTime.value = time;
       const night = light.stars;

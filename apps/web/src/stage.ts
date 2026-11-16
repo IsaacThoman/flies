@@ -73,6 +73,8 @@ export class Stage {
   veil = 0;
   /** How long building the place shown took, ms: all JavaScript, so on the Apple TV many times this. */
   buildMs = 0;
+  /** The longest of the frames it was built in (SceneSet.more), ms: what one frame behind the veil cost. */
+  buildStepMs = 0;
 
   constructor(canvas: HTMLCanvasElement, time: TimeOfDay, scene: Scene) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance", stencil: false });
@@ -88,7 +90,10 @@ export class Stage {
     const started = performance.now();
     this.backdrop = scene.buildBackdrop(this.light);
     this.set = scene.buildSet();
+    // Nothing is shown yet: the rest of it at once.
+    while (this.set.more?.());
     this.buildMs = performance.now() - started;
+    this.buildStepMs = this.buildMs;
     this.scene.add(this.set.group);
     this.hemi = new THREE.HemisphereLight(this.light.skyColor, this.light.groundColor, this.light.hemiIntensity);
     this.sun = new THREE.DirectionalLight(this.light.sunColor, this.light.sunIntensity);
@@ -117,9 +122,21 @@ export class Stage {
     this.backdrop = scene.buildBackdrop(this.light);
     this.set = scene.buildSet();
     this.buildMs = performance.now() - started;
+    this.buildStepMs = this.buildMs;
     this.scene.add(this.set.group);
     this.#applyLight();
     this.#envDirty = true;
+  }
+
+  /** Builds the next part of the place shown, if it is built in steps (SceneSet.more): true while there is more. */
+  buildMore(): boolean {
+    if (!this.set.more) return false;
+    const started = performance.now();
+    const more = this.set.more();
+    const ms = performance.now() - started;
+    this.buildMs += ms;
+    this.buildStepMs = Math.max(this.buildStepMs, ms);
+    return more;
   }
 
   setTime(time: TimeOfDay) {
