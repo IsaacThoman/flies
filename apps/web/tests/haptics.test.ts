@@ -5,13 +5,12 @@ import type { Device } from "../src/input.ts";
 
 type Effect = { duration: number; weakMagnitude: number; strongMagnitude: number };
 
-function setup(device: Device, effects = 7) {
+function setup(device: Device) {
   const devices = { current: device };
   const played: Effect[] = [];
   const buzzed: (number | number[])[] = [];
   const pad = { connected: true, vibrationActuator: { playEffect: (_type: "dual-rumble", e: Effect) => (played.push({ ...e }), Promise.resolve("complete")) } };
   const haptics = new Haptics(devices, () => [null, { connected: true, vibrationActuator: null }, pad], (p) => (buzzed.push(Array.isArray(p) ? [...p] : p), true));
-  haptics.setVolume(effects);
   return { devices, played, buzzed, haptics };
 }
 
@@ -24,19 +23,14 @@ test("nothing rumbles where nothing can: the remote, a mouse, a keyboard", () =>
   }
 });
 
-test("a pad feels each one-off on its motors, as strong as the effects are loud, and not at all with them off", () => {
+test("a pad feels each one-off at its designed strength", () => {
   const { played, haptics } = setup("pad");
-  haptics.feel("drop");
-  assert.deepEqual(played, [{ startDelay: 0, duration: FEELS.drop.ms, weakMagnitude: FEELS.drop.weak, strongMagnitude: FEELS.drop.strong }]);
-  haptics.setVolume(3.5);
-  haptics.feel("takeoff");
-  assert.equal(played[1].strongMagnitude, FEELS.takeoff.strong / 2);
-  haptics.setVolume(10);
-  haptics.feel("takeoff");
-  assert.equal(played[2].strongMagnitude, FEELS.takeoff.strong, "louder than designed doesn't rumble harder");
-  haptics.setVolume(0);
-  haptics.feel("swoop");
-  assert.equal(played.length, 3);
+  for (const kind of ["drop", "land", "swoop", "takeoff"] as const) {
+    haptics.feel(kind);
+    const feel = FEELS[kind];
+    assert.deepEqual(played.at(-1), { startDelay: 0, duration: feel.ms, weakMagnitude: feel.weak, strongMagnitude: feel.strong });
+  }
+  assert.equal(played.length, 4);
 });
 
 test("a refusal is two knocks, the second after the first has played (a new effect would cut it short)", () => {

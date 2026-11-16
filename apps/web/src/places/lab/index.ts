@@ -42,7 +42,6 @@ export const lab: Scene = {
   },
   // It sees the weather through its windows: a grey day dims the daylight from them and greys the view, mist veils it, rain falls past them.
   open: 0.4,
-  ambience: "lab",
   bubbles: false,
   fireflies: false,
 };

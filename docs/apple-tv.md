@@ -5,9 +5,9 @@ WebView: tvOS's WebKit is private API. Instead an Objective-C++ host runs the sc
 public JavaScriptCore framework, with a small browser in TypeScript (`apps/tvos/runtime`) that
 fakes enough of the DOM and Web APIs for three.js and the game. three's ordinary
 `WebGLRenderer` draws through a home-made WebGL 2 that records calls into shared command
-buffers, which native code replays on OpenGL ES 3.0. 2D canvases are CoreGraphics, Web Audio is
-AVAudioEngine, and the fly's brain is C++ on a thread of its own. Built with WeatherKit, a Swift
-service tells the game the weather outside. Public APIs only, so it can go through App Review.
+buffers, which native code replays on OpenGL ES 3.0. 2D canvases are CoreGraphics, and the fly's
+brain is C++ on a thread of its own. Built with WeatherKit, a Swift service tells the game the
+weather outside. Public APIs only, so it can go through App Review.
 
 The host is the one built for aerodance (github.com/IsaacThoman/aerodance, `apps/tvos`), which
 holds 60 fps there on an Apple TV 4K; its `docs/apple-tv.md` records the measurements and the
@@ -17,7 +17,7 @@ benchmarks). See [What came from aerodance](#what-came-from-aerodance).
 
 ## How it works
 
-Five threads:
+Four threads:
 
 | Thread | Owns | Code |
 | --- | --- | --- |
@@ -25,7 +25,6 @@ Five threads:
 | JavaScript | The JavaScriptCore context: runs `runtime.js`, then `game.js`, animation frames from a `CADisplayLink`, timers, events | `src/Host.mm`, `runtime/` |
 | Render | The OpenGL ES context: replays WebGL and 2D canvas commands a frame behind JavaScript, presents | `src/Renderer.mm`, `src/Executor.mm`, `src/Canvas2D.mm` |
 | Brain | The `fly_brain`: loads the connectome, steps the simulation whenever time is waiting | `src/BrainBridge.mm`, `packages/brain-native` |
-| Audio | AVAudioEngine's render callback: the Web Audio graph, mixed per sample | `src/Audio.mm` |
 
 Built with WeatherKit, the weather outside is found on the main thread (Core Location, timers)
 and in Swift's own tasks (the request), and read from the JavaScript thread
@@ -197,16 +196,6 @@ desktop browser.
   link, 60 Hz; a frame isn't started while two are still on their way to the screen),
   `requestIdleCallback`, `queueMicrotask`, `performance.now()` (no marks or measures),
   `console` (to the device console), `reportError`.
-- **Web Audio**: `AudioContext` (`currentTime`, `resume`/`suspend`, `getOutputTimestamp`,
-  `outputLatency`), `GainNode`, `AudioBufferSourceNode` (`start` with offset and duration,
-  `stop`, `loop`, `playbackRate`, `ended`), `AudioBuffer` (`getChannelData`,
-  `copyTo/FromChannel`), `createBuffer` for generated sounds, `decodeAudioData` (what
-  AVAudioFile reads, such as WAV, AIFF, CAF, MP3 and AAC/M4A; not Ogg), `AudioParam` automation
-  (`setValueAtTime`, linear and exponential ramps, `setTargetAtTime`, `setValueCurveAtTime`,
-  `cancelScheduledValues`), and `DynamicsCompressorNode` as a pass-through (the output is hard
-  clipped at full scale). Nothing else: no oscillators, filters, panners, analysers,
-  convolvers, `AudioWorklet` or media elements; build sounds as buffers. The context needs no
-  user gesture. The session is ambient: other apps' music keeps playing under the fly's sounds.
 - **Misc**: `crypto.getRandomValues`, `crypto.randomUUID` (no `crypto.subtle`),
   `structuredClone`, `atob`/`btoa`, `TextEncoder`/`TextDecoder` (UTF-8, UTF-16LE, Latin-1),
   `AbortController`, `DOMException`, `ResizeObserver` (fires once, at the screen's size),
@@ -447,24 +436,10 @@ commands; this is not a fully asynchronous native transfer.
 
 Measured 15 November 2026 on Rufus, Apple TV 4K (3rd generation, AppleTV14,1), tvOS 27.2.1
 (24K157): signed Release, 640×480, mode 2, real 166,700-neuron connectome, Low eyes except for
-the High-eye interaction phase, sound enabled. Both runs were detached, with 10-second stats
-written to the app's cache; no console, GPU timing or GL debug was attached.
+the High-eye interaction phase. The runs were detached, with 10-second stats written to the
+app's cache; no console, GPU timing or GL debug was attached.
 
-The previous code initially averaged about 60 FPS, with JavaScript p95 around 21–22 ms on
-eye-refresh frames. After the first remote press started sound, its three per-frame audio
-targets accumulated without limit. The native mixer evaluated their entire history for each
-sample while holding the graph lock, so JavaScript's audio calls progressively waited longer.
-The seven-minute baseline fell below 1 FPS by about four minutes, with individual JavaScript
-frames taking seconds. Memory stayed around 136–137 MB: this was growing work, not a large
-memory spike. That baseline stayed on the night title/wallpaper; it is not a matched scene
-benchmark against every phase below.
-
-`audio/follow.ts` now rebases only the three parameters owned by the frame loop, retaining an
-anchor and a target while preserving exponential smoothing. The one-hour synthetic regression
-test checks both the smoothed values and the bounded JavaScript/native command timeline. Eye
-readback is asynchronous as described above; neither fix changes the neural model.
-
-The fixed build completed `tvos:soak --minutes 20` in 23 minutes 3 seconds: interaction phases
+The measured build completed `tvos:soak --minutes 20` in 23 minutes 3 seconds: interaction phases
 followed by ten minutes each of midday and night wallpaper. It was left running on Rufus.
 
 | Phase | FPS in steady 10-second windows | Mean JavaScript per frame | Highest window's JavaScript p95 | Memory |
@@ -502,8 +477,7 @@ with a `drive`, and checks what the scene reports:
   and keeps values over 1; and the game's lawn and table top seen from a fly's height, which
   must be clipped, are all table at the bottom of the picture. The last is asserted on any
   renderer but the simulator's, which gets it wrong (see below); the check prints how wrong;
-- a generated beep plays and ends; a WAV decodes; `localStorage` keeps a value; `fetch` reads
-  a bundled file;
+- `localStorage` keeps a value; `fetch` reads a bundled file;
 - the brain bridge: the stand-in loads the bundled connectome and reports its neuron and
   connection counts (so the file arrived whole), its eyes, its rate names; all 83 of its rates
   arrive, as many as the real brain reports; the commands it answers prove the senses and both
@@ -563,7 +537,6 @@ No Apple TV was connected while this was built, so none of this has run on one:
   as a press (it isn't the Now Playing app); and that Back at the root really leaves the app.
 - **Clipping**: that the device's GPU draws the triangles the simulator loses (above). Run the
   test scene on it and read `clipping` in its `report` lines.
-- **Audio** on a TV's speakers, and with other apps' music playing.
 - **The weather outside**: no build with the WeatherKit capability has been signed or run, so
   WeatherKit has never answered this app. Unchecked: the location prompt on a TV and the
   location a TV gives; signing with the explicit profile; real conditions, sunrise and sunset
@@ -576,7 +549,7 @@ No Apple TV was connected while this was built, so none of this has run on one:
 ## What came from aerodance
 
 Copied and adapted: the host (`Host.mm`, `JSHost.h`, `Host.h`), the command executor
-(`Renderer`, `Executor`, `Canvas2D`, `Fonts.mm`), Web Audio (`Audio.mm`, `runtime/audio.ts`),
+(`Renderer`, `Executor`, `Canvas2D`, `Fonts.mm`),
 the runtime (`dom.ts`, `web.ts`, `webgl.ts`, `canvas2d.ts`, `color.ts`, `glConstants.ts`,
 `ops.ts`, `native.ts`), the frame-stats and `drive` hooks (`runtime/report.ts`), the XcodeGen
 spec, the privacy manifest, the build script, the asset-catalog pipeline and App Store archiving
@@ -590,5 +563,5 @@ Changed or added: the remote (its own `Remote` class; Play/Pause is its own key;
 the touch surface through GameController; the root flag pushed from JavaScript instead of polled
 from the game's state), the brain bridge and its stand-in, real WebGL fences, `FontFace` in
 place of fonts bundled by file name, `sessionStorage` in memory instead of sharing
-`localStorage`'s store, an ambient audio session, readiness from `data-ready`, nearest-neighbour
+`localStorage`'s store, readiness from `data-ready`, nearest-neighbour
 stretch by default, the test scene and the simulator check, and placeholder art drawn by script.

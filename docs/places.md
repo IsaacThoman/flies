@@ -11,7 +11,7 @@ A place is two things, kept apart on purpose:
 | | Where | What |
 | --- | --- | --- |
 | Its world | `packages/world/src/<place>.ts`, a `Place` | Exactly what the fly's body meets: the table top, what stands on it, its food, where the fly starts, how high it may fly. No three.js. |
-| Its scene | `apps/web/src/places/<id>/index.ts`, a `Scene` | How it looks and sounds: its light through the day, the table and everything on it, everything beyond, the camera's view of the whole place, its ambient sound. |
+| Its scene | `apps/web/src/places/<id>/index.ts`, a `Scene` | How it looks: its light through the day, the table and everything on it, everything beyond, the camera's view of the whole place. |
 
 The scene is built from the world's description, so that what the fly stands
 on is exactly what is drawn. `apps/web/src/places/types.ts` is the contract;
@@ -158,14 +158,6 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   surface under it and of what is over it, and anything standing between it
   and the fly (a wall behind it, a table top over the fly) brings it in front
   of that: taken out by hand in a room, it stops at the walls.
-- **Sound** (`ambience`): an `Ambience` in `apps/web/src/audio/sounds.ts`, a loop
-  synthesised sample by sample (the Apple TV's audio has no oscillators or
-  filters), built the first time it is needed. Its optional `rain` (0 to 1,
-  0.3 if left out) is how loud rain is heard there: 1 out in it, less through
-  walls and glass. Its optional `birds` is how loud the birds outside are (1
-  out among them, less and muffled through glass; none if left out): they
-  call by day, mostly keep quiet in the rain, and go to roost from dusk. A gust blowing at the fly (`Felt.air`, below) is heard as
-  a rush of air wherever it blows.
 - **Goings-on** (`SceneSet.live`, optional): the place's own life, called each
   frame the fly lives with an `Around`: where the fly is, the world, the
   pantry, the weather, and `quiet` (nobody has touched the remote for a

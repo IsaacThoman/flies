@@ -58,7 +58,6 @@ export const restaurant: Scene = {
   },
   // Big windows: a grey day greys it, and after dark the street's lamps and the room's own light it.
   open: 0.5,
-  ambience: "restaurant",
   bubbles: false,
   fireflies: false,
 };

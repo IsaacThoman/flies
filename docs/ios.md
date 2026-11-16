@@ -9,9 +9,9 @@ stops it when it can't be seen, decides when the screen may sleep, and adds hapt
 nothing of the game and knows nothing of it beyond the state the game publishes on its canvas for
 scripts and hosts.
 
-iOS has what tvOS lacks: a public WebKit with a JIT, WebGL 2, module workers and Web Audio. So the
-iPhone and iPad run the same game the browser does, and there is one game for the web, the phone
-and the tablet; only the Apple TV needs its own host ([apple-tv.md](apple-tv.md)).
+iOS has what tvOS lacks: a public WebKit with a JIT, WebGL 2 and module workers. So the iPhone
+and iPad run the same game the browser does, and there is one game for the web, the phone and
+the tablet; only the Apple TV needs its own host ([apple-tv.md](apple-tv.md)).
 
 ## Why a web view
 
@@ -20,7 +20,7 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
 - The web build runs from the bundle as it is: the module script, the brain's module worker, the
   brain fetched through the scheme handler with real progress (then the 38 MB connectome; now
   the web build's 14 MB of gzipped parts, below), WebGL 2 with the eyes'
-  asynchronous read-back (`data-eyes="brain"`, a picture every 50 ms), Web Audio, `localStorage`.
+  asynchronous read-back (`data-eyes="brain"`, a picture every 50 ms), `localStorage`.
   The page is a secure context; it is not cross-origin isolated (no `SharedArrayBuffer`), which it
   doesn't need.
 - The TypeScript brain keeps real time (the meter's speed 1.00) and its steps take 8 to 30% of the
@@ -41,8 +41,8 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
   to a fifth less time than the TypeScript, in half the memory; packages/brain-native, In a
   browser.)
 - Retargeting the Apple TV's host (JavaScriptCore without the JIT, WebGL replayed on OpenGL ES)
-  would throw away the JIT, Metal and the browser's audio for a hand-written browser on a
-  deprecated graphics API, to run the same page worse.
+  would throw away the JIT and Metal for a hand-written browser on a deprecated graphics API,
+  to run the same page worse.
 
 ## How it works
 
@@ -50,7 +50,7 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
 | --- | --- |
 | The app | UIKit: the window, the launch image, the power policy, haptics, the scheme handler serving `www/` |
 | WebKit's page process (WebContent) | The game's JavaScript, and the brain in a Web Worker on a thread of its own |
-| WebKit's GPU process | WebGL 2 on Metal, and Web Audio |
+| WebKit's GPU process | WebGL 2 on Metal |
 | WebKit's networking process | Storage (`localStorage`) |
 
 | File | What it does |
@@ -58,7 +58,7 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
 | `src/App.swift` | The app and its one scene: one window, since a second would be a second fly with a second brain |
 | `src/GameViewController.swift` | The web view, edge to edge; the launch image over it until the game is ready; the safe area; stopping the game when it can't be seen; a reload if iOS ends the page's process |
 | `src/BundleSchemeHandler.swift` | Serves `www/` at `fly://app/`: memory-mapped, in 1 MB slices, one per turn of the main run loop, so the brain's progress is real and nothing outside `www/` is served |
-| `src/PageScripts.swift` | What the app adds to the page: the ambient audio session, and a watch on the canvas's state |
+| `src/PageScripts.swift` | What the app adds to the page: a watch on the canvas's state |
 | `src/Power.swift` | When the screen may sleep and when the game must stop (below) |
 | `src/Haptics.swift` | The feather on the fly, and its take-offs, felt through the glass |
 | `src/Report.swift` | Reports for checks and measurements (below); off unless asked for |
@@ -72,11 +72,6 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
   cover, in CSS pixels, assigned to `window.__flySafeArea` (`SAFE_AREA_PROPERTY`,
   `packages/contracts/src/screen.ts`) followed by a `resize` event, whenever it changes. The page
   is laid out edge to edge (`contentInsetAdjustmentBehavior = .never`) and is told, not inset.
-- **The audio session.** `navigator.audioSession.type = "ambient"` before the page's scripts run:
-  the fly's sound obeys the silent switch and plays under other apps' music instead of stopping
-  it, as on the Apple TV. Sound starts when the page's own code says (the player's first touch,
-  `apps/web/src/page.ts`); WebKit is told to ask for no gesture of its own
-  (`mediaTypesRequiringUserActionForPlayback`).
 - **Nothing else.** The app defines no `globalThis.__native`: the game takes its presence to mean
   the Apple TV's host (its brain, and no browser input), so a future native bridge on iOS must
   come with a narrower test in `apps/web/src/main.ts`.
@@ -134,7 +129,7 @@ rate, its brain still at real time, until the window is uncovered or the app lea
 Stopping takes the web view out of the window and puts a still of its last frame in its place. A
 page out of a window is hidden, and the game sleeps as in a hidden browser tab
 (`apps/web/src/page.ts`): no frames, so the fly's life and the brain stop with them (the worker is
-only ever given time by the frame loop), and no sound. Shown again it carries on where it was:
+only ever given time by the frame loop). Shown again it carries on where it was:
 the game's step is capped at 100 ms and the brain's at 100 ms of fly time, so nothing jumps, and
 after more than half a minute away the sky and the weather are put where the clock has them.
 WebKit hides an app's page in the background by itself; the still is for the heat, when the app
@@ -281,8 +276,6 @@ No iPhone or iPad was connected while this was built. Everything above ran in th
   simulator reports no battery (so on battery throughout) and is never hot. The policy's table is
   unit-tested; its effect is not measured.
 - **Low Power Mode**, which the simulator can't turn on.
-- **Audio**: the silent switch, mixing under another app's music, and an interruption by a call
-  (WebKit's own handling; the simulator has no calls).
 - **Haptics**, which the simulator can't play.
 - **A hardware keyboard's Escape and Return** on a device; their arrows, space and Enter were
   seen to reach the page in a simulator with a keyboard attached.

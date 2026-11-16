@@ -1,8 +1,8 @@
 # Browser soak
 
 Run `npm install` and `npm run brain:fetch` first. The harness uses Playwright's
-headless Chromium with the GPU enabled, a real brain worker in every page, and
-sound started by a remote press. There is no simulated or accelerated time.
+headless Chromium with the GPU enabled and a real brain worker in every page.
+There is no simulated or accelerated time.
 
 ```
 npm run e2e:soak
@@ -40,7 +40,7 @@ The interaction page waits for `data-moving` to clear between places; climate vi
 weather and all five daylight presets plus the clock, holding each combination
 for 12 seconds, waiting for each weather to arrive, recording every combination,
 and taking a fresh-place checkpoint after every weather. Tools use every variant
-and hold continuous tools; menus visit the menu, about and all four
+and hold continuous tools; menus visit the menu, about and all three
 settings tabs, repeatedly pausing and resuming. Eyes alternate Off/Low/High,
 all eye/nervous-system inset and X-ray settings, the full eye picture, and Inside it.
 They also cycle every stats kind, corner size, opacity and visibility; canonical
@@ -56,8 +56,8 @@ The fast check lists the real scene actors before and after an arrival with a
 peer present, verifying every retained descendant by identity: the eyes' sky,
 fly and X-ray, bubbles, hands, fireflies, footprints and remote models.
 
-The harness warms persistent tool meshes, icon textures, eye pictures, every
-place's pixel-mode shader variants and ambience buffers before sampling.
+The harness warms persistent tool meshes, icon textures, eye pictures, and every
+place's pixel-mode shader variants before sampling.
 Place changes reset adaptive quality so baseline counts use the same render
 target; uninterrupted wallpaper retains its normal adaptive behavior.
 Checkpoints after place changes
@@ -71,12 +71,12 @@ series flat; raw values and hourly rates remain visible. This is evidence for
 the duration tested, not proof of an infinite bound. A growing count needs
 investigation; changing camera draw counts or lazy uploads alone are not leaks.
 
-Wallpaper samples also verify that game time, completed eye readbacks and running audio time keep advancing. Adaptive quality, FPS, pixel mode and eye detail are recorded so a cheaper picture cannot disguise a slowdown.
+Wallpaper samples also verify that game time and completed eye readbacks keep advancing. Adaptive quality, FPS, pixel mode and eye detail are recorded so a cheaper picture cannot disguise a slowdown.
 
 Each fixed-interval sample forces `HeapProfiler.collectGarbage` in the page and
 brain worker, then records page `Performance.getMetrics` heap bytes, worker
 `Runtime.getHeapUsage`, ArrayBuffer backing storage in both isolates,
-`Memory.getDOMCounters` nodes/listeners, CDP WebAudio live nodes, localStorage
+`Memory.getDOMCounters` nodes/listeners, localStorage
 characters, and the canvas's renderer geometries/textures/programs, calls,
 triangles, CPU frame milliseconds and brain speed (simulated/real time).
 The worker's live `WebAssembly.Memory` buffers are counted separately: V8's
@@ -84,14 +84,10 @@ backing-store metric omits them. Inspector handles are released after each query
 The CSV includes screen/tab/brain engine/weather/time/view/eyes/inset/variant for context.
 
 The browser cannot report per-page GPU allocation bytes or the TV's resident
-memory, thermal behavior, native audio graph cost, native automation timeline,
-or actual scanout pacing. Three's resource counts are not GPU bytes; JS heaps
-exclude most native allocations. Chromium automatically collects some finished
-audio graphs that the TV's shim retains. The audio lifetime and automation
-regressions therefore exercise the actual TV shim with a recording native
-bridge as well as the browser soak. Forced GC and concurrent pages perturb
-frame timings, so use a single wallpaper phase or the real device for precise
-performance comparisons.
+memory, thermal behavior or actual scanout pacing. Three's resource counts
+are not GPU bytes; JS heaps exclude most native allocations. Forced GC and
+concurrent pages perturb frame timings, so use a single wallpaper phase or the
+real device for precise performance comparisons.
 
 Room sockets bound both unread traffic and stalled sends. A reader that stops
 draining reconnects for a fresh snapshot instead of retaining and replaying old

@@ -293,9 +293,9 @@ what more speed would cost.
 `apps/web/src/page.ts`, in a browser only:
 
 - **Hidden**, the fly's life and its brain stop with the frames (the game
-  skips them even where a browser keeps frames coming for a hidden page) and
-  the sound is suspended. Shown again, it carries on from where it was, the
-  first frame no longer than any other; after more than half a minute away,
+  skips them even where a browser keeps frames coming for a hidden page).
+  Shown again, it carries on from where it was, the first frame no longer
+  than any other; after more than half a minute away,
   the sky and the weather are put where the clock and the forecast have them
   now, before that frame is drawn, not eased there from where they were.
 - **A frozen or sleeping page** (a laptop lid closed with the tab showing, a
@@ -306,8 +306,6 @@ what more speed would cost.
 - **The screen stays awake** (the Screen Wake Lock API) while the wallpaper
   shows in a visible tab, and is let go otherwise. Browsers without it, or that
   refuse it, let the screen sleep as usual.
-- **Sound** starts on the first press, tap or click, from inside that event,
-  as Safari requires.
 - **A lost graphics context** (a GPU reset, a phone reclaiming memory) is
   waited out with the fly living on unseen, and when it is given back three.js
   rebuilds its state and the game draws its reflections again.
@@ -315,7 +313,7 @@ what more speed would cost.
   page as it was, asleep since it left, or loads it afresh from the caches.
 - **Days open**: `npm run soak:web -- --built` leaves the built game running
   from a subfolder, with its service worker. It samples page and brain-worker
-  heaps after collection, three.js resources, audio and DOM counts, frame cost
+  heaps after collection, three.js resources, DOM counts, frame cost
   and brain speed. Place circuits, weather/daylight, tools, menus, eyes and
   uninterrupted wallpaper are separate phases; `npm run e2e:soak` is the fast
   resource regression. See [the soak guide](web-soak.md) for durations,

@@ -40,7 +40,6 @@ export const bar: Scene = {
   },
   // It sees the weather through its street window.
   open: 0.35,
-  ambience: "bar",
   bubbles: false,
   fireflies: false,
 };

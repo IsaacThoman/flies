@@ -3,7 +3,7 @@
 //   menu ─┬─ Play
 //         ├─ Watch
 //         ├─ About
-//         ├─ Settings: Wallpaper | On screen | Sound | Picture, as tabs
+//         ├─ Settings: Wallpaper | On screen | Picture, as tabs
 //         └─ Online (in a browser): rooms with others (online.ts)
 //
 // The menu is the title, at launch and from play alike (Back, Play/Pause or
@@ -12,7 +12,7 @@
 // Every setting is two steps from it.
 
 import { Menu, choiceValue, indexOf } from "@fly/ui";
-import type { ChoiceItem, MenuItem, Option, SliderItem } from "@fly/ui";
+import type { ChoiceItem, MenuItem, Option } from "@fly/ui";
 import { INK_SOFT, font, glassPanel, orb, text } from "@fly/ui";
 import type { PixelSize } from "../../display.ts";
 import { PLACES } from "../../places/catalog.ts";
@@ -106,7 +106,6 @@ const ON_OFF: Option<boolean>[] = [
 ];
 
 const choice = <K extends keyof Settings>(id: K, label: string, options: Option<Settings[K]>[]): ChoiceItem<Settings[K]> => ({ kind: "choice", id, label, options, index: 0 });
-const volume = (id: "effects" | "ambience", label: string): SliderItem => ({ kind: "slider", id, label, min: 0, max: 10, step: 1, value: 0 });
 
 /**
  * The settings, a page for each part of the game, every one a step from the
@@ -136,10 +135,6 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       choice("overlayOpacity", "Opacity", OPACITY),
       choice("xray", "X-ray", SHOWN),
     ],
-  },
-  sound: {
-    heading: "Sound",
-    rows: () => [volume("effects", "Effects"), volume("ambience", "Surroundings")],
   },
   picture: {
     heading: "Picture",

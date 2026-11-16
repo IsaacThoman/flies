@@ -8,7 +8,6 @@
 //     three's readRenderTargetPixelsAsync (a pixel-pack buffer and a fence);
 //   - the game's two render passes, read back: the depth clear between them, clipping, and a
 //     half-float target;
-//   - Web Audio: a beep from generated samples with a gain ramp, and decodeAudioData;
 //   - localStorage and fetch of the app's own files;
 //   - the brain bridge, end to end, against the stand-in brain (tests/brain-stand-in);
 //   - the weather bridge, against the stand-in weather service (tests/weather-stand-in).
@@ -41,7 +40,6 @@ const report = {
   layers: null as null | { target: boolean; screen: boolean },
   clipping: null as null | { renderer: string; wrong: number; pixels: number },
   halfFloat: null as null | boolean,
-  audio: { beeps: 0, ended: 0, decoded: null as null | { length: number; sampleRate: number } },
   storage: null as null | boolean,
   fetched: null as null | string,
   brain: null as null | Record<string, unknown>,
@@ -231,40 +229,11 @@ function checkPasses() {
   renderer.autoClear = true;
 }
 
-// Web Audio: a beep built from samples, with a gain ramp; and a WAV decoded.
-let audio: AudioContext | null = null;
-function beep() {
-  audio ??= new AudioContext();
-  const rate = audio.sampleRate, buffer = audio.createBuffer(1, Math.round(rate * 0.15), rate);
-  const samples = buffer.getChannelData(0);
-  for (let i = 0; i < samples.length; i++) samples[i] = Math.sin((2 * Math.PI * 880 * i) / rate) * 0.3;
-  const gain = audio.createGain();
-  gain.gain.setValueAtTime(1, audio.currentTime);
-  gain.gain.linearRampToValueAtTime(0, audio.currentTime + 0.15);
-  gain.connect(audio.destination);
-  const source = audio.createBufferSource();
-  source.buffer = buffer;
-  source.connect(gain);
-  source.addEventListener('ended', () => { report.audio.ended++; });
-  source.start();
-  report.audio.beeps++;
-}
-function wav(samples: number, rate: number) {
-  const b = new DataView(new ArrayBuffer(44 + samples * 2));
-  const text = (o: number, s: string) => { for (let i = 0; i < s.length; i++) b.setUint8(o + i, s.charCodeAt(i)); };
-  text(0, 'RIFF'); b.setUint32(4, 36 + samples * 2, true); text(8, 'WAVE'); text(12, 'fmt ');
-  b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 1, true); b.setUint32(24, rate, true);
-  b.setUint32(28, rate * 2, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true); text(36, 'data'); b.setUint32(40, samples * 2, true);
-  for (let i = 0; i < samples; i++) b.setInt16(44 + i * 2, Math.sin(i / 10) * 8000, true);
-  return b.buffer;
-}
-
 // The remote.
 const atRoot = window as unknown as Record<string, boolean>;
 window.addEventListener('keydown', (e) => {
   report.keys.push(`${e.key}${e.repeat ? '+' : ''}`);
   drawLabel(e.key);
-  if (e.key === 'Enter') beep();
   // Play/Pause takes the scene to its "root": Back then belongs to tvOS.
   if (e.key === 'MediaPlayPause') atRoot[AT_ROOT_PROPERTY] = true;
 });
@@ -277,11 +246,10 @@ window.addEventListener(REMOTE_TOUCH_EVENT, (event) => {
   (dot.material as THREE.MeshBasicMaterial).color.set(touch.touching ? '#ffe14d' : '#888888');
 });
 
-// Storage, files, decoding.
+// Storage and files.
 localStorage.setItem('fly.test', String(Number(localStorage.getItem('fly.test') ?? 0) + 1));
 report.storage = Number(localStorage.getItem('fly.test')) > 0 && localStorage.length > 0;
 void fetch('config.json').then((r) => r.json()).then((c: { script?: string }) => { report.fetched = c.script ?? 'no script'; }, (e: unknown) => { report.fetched = `failed: ${String(e)}`; });
-void new AudioContext().decodeAudioData(wav(4410, 22050)).then((b) => { report.audio.decoded = { length: b.length, sampleRate: b.sampleRate }; });
 
 // The brain: senses with the left eye dark and the right bright, sweet on the mouthparts.
 const brain = (globalThis as unknown as { __native?: { brain?: NativeBrainBridge } }).__native?.brain;

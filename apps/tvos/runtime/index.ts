@@ -10,7 +10,6 @@ import * as gl from './webgl.ts';
 import { CanvasGradient, CanvasPattern, CanvasRenderingContext2D, ImageData, Path2D, TextMetricsLite } from './canvas2d.ts';
 import * as dom from './dom.ts';
 import * as web from './web.ts';
-import { audioEnded, installAudio } from './audio.ts';
 import { installHooks } from './report.ts';
 
 const N = native;
@@ -153,7 +152,6 @@ const observers = new Set<ResizeObserverShim>();
 define('ResizeObserver', ResizeObserverShim);
 define('IntersectionObserver', class { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } });
 define('MutationObserver', class { observe() {} disconnect() {} takeRecords() { return []; } });
-installAudio(g);
 
 // Only WebGL 2, and no workers: the brain is native (globalThis.__native.brain).
 g.WebGLRenderingContext = undefined;
@@ -205,7 +203,6 @@ const host = {
     dom.documentShim.dispatchEvent(new dom.EventShim('visibilitychange'));
   },
   error: web.reportError,
-  audioEnded,
   frames: () => frameCount,
   commands: gl.commands,
 };
