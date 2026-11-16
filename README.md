@@ -506,6 +506,11 @@ over 60), and the abdomen swells with it: up to 12% wider and deeper and 5%
 longer, round numbers chosen to be seen. Another player's fly at a table
 doesn't show it: the crop isn't sent to the room.
 
+With them go the fly's daily clock and its need for sleep (`packages/body/src/rhythm.ts`),
+not senses but internal state the connectome can't supply: the morning and evening
+oscillators, the clock's push toward sleep, sleep pressure and how deeply it sleeps (below,
+Sleep and the daily rhythm).
+
 ## What the body adds
 
 The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
@@ -565,9 +570,33 @@ lives (`packages/body/src/motion.ts` unless noted):
   about 1.5 s after the command fades. The crouch follows the
   raw escape command.
 
-The caption ("Walking", "Eating honey", "Grooming", "Flying") names what the
+The caption ("Walking", "Eating honey", "Grooming", "Flying", "Asleep") names what the
 body is doing on the brain's commands; the stats' In and out shows the
 commands and the neurons themselves.
+
+## Sleep and the daily rhythm
+
+The fly keeps the real time of day, whatever light is chosen: its clock follows the
+device's clock and, on an Apple TV that knows them, today's real sunrise and sunset
+(otherwise the game's summer day, 05:40 to 20:10). Like a male fly's, its day has a
+morning peak of activity round dawn and an evening one round dusk, each beginning
+about three hours ahead, a siesta between them, and sleep through the night. Sleep
+pressure builds while it is awake (over about 12 hours) and discharges while it sleeps
+(over about 3): a fly kept awake by play, or woken again and again at night, is
+sleepier, and it starts each visit as sleepy as the hour would leave a fly left to itself.
+
+None of this moves the fly. The body works the clock and the pressure out
+(`packages/body/src/rhythm.ts`) and tells the brain, which drives the clock neurons
+and the sleep-promoting neurons the connectome has and shifts its made-up arousal; it
+is the brain that stops walking (`packages/brain/README.md`, Sleep and the daily rhythm,
+says how, with what is real and what stands in). The body only watches: five minutes
+or more without moving is sleep, as the field scores it, and stillness deepens it.
+Asleep, the fly settles a little lower on its legs, its head bowed, without the idle
+glances and shifts of its feet (the pose's `sleep`, `packages/fly`), and the caption says
+"Asleep". Asleep, the feather resting on it or a raindrop doesn't wake it; stroking it
+nearly always does within a few seconds, and a swoop does. Moving at all wakes it. The canvas's `data-rhythm` gives the hour, the
+clock, the pressure, the depth and how long it has been still.
+
 
 ## Flight
 
