@@ -226,8 +226,8 @@ TV has (`places/restaurant/`):
   nothing folded away and the shop front's openings bright: the big shapes,
   six times a refresh, so it is kept lean.
 - **Reach.** `SceneCamera.reach` (mm, 4,000 if not said) is how far the
-  camera sees: the near pass's far plane, the camera's, and the fly's eyes'. The restaurant's
-  is 12 m. The near plane stays at 0.5 mm, so a distant depth is coarse:
+  camera sees: the near pass's far plane, the camera's, and the fly's eyes'.
+  The restaurant's is 12 m. The near plane stays at 0.5 mm, so a distant depth is coarse:
   nothing is drawn coplanar, stains and print are in the shaders, and what
   rests on a surface sinks into it a hair.
 - **Light.** Still a hemisphere and one "sun" from the stage, the sun coming
@@ -241,6 +241,10 @@ TV has (`places/restaurant/`):
   street lamp and the pendant as blocks; the things of the area the camera is
   in shadow them exactly, as upright columns (`light.ts`); soft shadows on
   the floor under everything are painted once from the layout.
+- **Built in steps.** The whole room is several times the picnic's work to
+  build, so it is built a part a frame behind the veil (`SceneSet.more`): the
+  game holds the veil until it is done, and no one frame is longer than the
+  picnic's whole build.
 
 ## Rules
 
@@ -259,7 +263,9 @@ TV has (`places/restaurant/`):
   a new place should stay close to that, near the fly and in its whole view.
 - **Building is a pause behind the veil.** `data-place-ms` on the canvas says
   how long the place took to build: the picnic 36 ms in desktop Chromium, so
-  about half a second on the TV. Keep it there.
+  about half a second on the TV. Keep it there, or build in steps
+  (`SceneSet.more`, above): then `data-place-step-ms` is the longest frame
+  of it, and that is what to keep there.
 - **Register it** in `catalog.ts` and `index.ts`. `apps/web/tests/places.test.ts`
   then checks it like every other place: the fly starts standing on the table,
   its food can be tasted where it lies with room over it for a fly, it has
