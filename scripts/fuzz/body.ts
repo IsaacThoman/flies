@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mulberry32 } from "@fly/brain";
-import { FLY_HEIGHT, FlyBody, MAX_SLOPE_COS, createIntent } from "@fly/body";
+import { BODY_REACH, FEET_REACH, FLY_HEIGHT, FlyBody, MAX_SLOPE_COS, STEP_UP, createIntent } from "@fly/body";
 import type { Forces } from "@fly/body";
 import { BAR, LAB, PICNIC, RESTAURANT, WINDOWSILL, World, createSurface } from "@fly/world";
 import type { Place, Vec3 } from "@fly/world";
@@ -35,6 +35,76 @@ export function checkBody(body: FlyBody, world: World) {
   assert.ok(p.y < world.place.ceiling + CEILING_EXCURSION, "escaped the ceiling's restoring force");
   if (body.events.landed && !body.events.tookOff) assert.ok(body.onFeet, "landing did not put it on its feet");
 }
+
+/** How high the middle of its head, thorax and abdomen are over its feet, in body lengths. */
+const BODY_MIDDLE = 0.32;
+/** How far (mm) a point it reaches may be inside something. */
+export const REACH_SLOP = 0.02;
+const offset = { x: 0, y: 0, z: 0 };
+const middle = { x: 0, y: 0, z: 0 };
+const point = { x: 0, y: 0, z: 0 };
+
+/** How deep (mm) the way from `from` to `to`, both at the height `y`, has gone into something: 0 if `to` is in nothing. */
+function depthInside(world: World, from: Vec3, to: Vec3, y: number) {
+  if (world.solidAt(to.x, y, to.z) < 0) return 0;
+  let a = 0;
+  let b = 1;
+  for (let i = 0; i < 24; i++) {
+    const m = (a + b) / 2;
+    if (world.solidAt(from.x + (to.x - from.x) * m, y, from.z + (to.z - from.z) * m) >= 0) b = m;
+    else a = m;
+  }
+  return Math.hypot(to.x - from.x, to.z - from.z) * (1 - a);
+}
+
+/**
+ * Its head, thorax and abdomen, and on its feet its legs, are never inside
+ * anything: through a wall or a pane, or sunk into a slope too steep to
+ * stand on. They are where the world feels them, level with its heading
+ * (the drawn fly is tilted to what it stands on, so on a slope they lie
+ * along it). On its feet it may stand at a slope it could walk up, and what
+ * rises less than a step is what it steps up onto: only a wall, or a slope
+ * too steep for it, past a step over its feet counts. In the air, anything
+ * at all does.
+ */
+export function checkReach(body: FlyBody, world: World) {
+  const p = body.position;
+  if (!body.onFeet) {
+    body.point(0, BODY_MIDDLE, 0, middle);
+    for (let k = 0; k < BODY_REACH.length; k += 2) {
+      body.point(BODY_REACH[k], BODY_MIDDLE, BODY_REACH[k + 1], point);
+      const depth = depthInside(world, middle, point, point.y);
+      if (depth > REACH_SLOP) assert.fail(`body ${k / 2} inside ${world.solids[world.solidAt(point.x, point.y, point.z)]?.name} by ${depth.toFixed(3)} mm`);
+    }
+    return;
+  }
+  offset.x = p.x;
+  offset.y = p.y + STEP_UP + 1e-6;
+  offset.z = p.z;
+  let foot = "";
+  sides.length = 0;
+  for (let k = 0; k < BODY_REACH.length + FEET_REACH.length; k += 2) {
+    const feet = k >= BODY_REACH.length;
+    const reach = feet ? FEET_REACH : BODY_REACH;
+    const j = feet ? k - BODY_REACH.length : k;
+    body.point(reach[j], 0, reach[j + 1], point);
+    const length = Math.hypot(point.x - p.x, point.z - p.z);
+    // A little past it, for what it is up against.
+    const ray = world.raycast(offset, { x: (point.x - p.x) / length, y: 0, z: (point.z - p.z) / length }, hit, length + 0.05);
+    if (!ray || ray.normal.y >= MAX_SLOPE_COS) continue;
+    const level = Math.hypot(ray.normal.x, ray.normal.z);
+    sides.push(ray.normal.x / level, ray.normal.z / level);
+    if (length - ray.t <= REACH_SLOP) continue;
+    const what = `${feet ? "foot" : "body"} ${j / 2} into ${world.solids[ray.solid]?.name} by ${(length - ray.t).toFixed(3)} mm`;
+    if (!feet) assert.fail(what);
+    foot ||= what;
+  }
+  // Its legs only where it stands between things facing each other, against both, closer than its legs reach: it can't stand clear of them.
+  if (!foot) return;
+  for (let a = 0; a < sides.length; a += 2) for (let b = a + 2; b < sides.length; b += 2) if (sides[a] * sides[b] + sides[a + 1] * sides[b + 1] < -0.5) return;
+  assert.fail(foot);
+}
+const sides: number[] = [];
 
 export function checkWalkSweep(before: Vec3, body: FlyBody, world: World, wasOnFeet: boolean) {
   if (!wasOnFeet || !body.onFeet) return;
@@ -147,6 +217,7 @@ export function fuzzBody(id: string, seed: number, duration: number, highStarts 
     try {
       body.step(intent, forces, dt);
       checkBody(body, world);
+      checkReach(body, world);
       if (body.yaw === before.yaw) checkWalkSweep(before.position, body, world, before.mode !== "airborne");
       if (time >= nextProbe) {
         checkRecovery(body, world);
