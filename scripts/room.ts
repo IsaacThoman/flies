@@ -106,12 +106,13 @@ async function open(i: number): Promise<Tab> {
   return { i, page, errors };
 }
 
-/** Steps along the shelf to a tool, as the remote would. */
+/** Steps along the shelf to a tool, as the remote would, a step at a time as the game shows each (its state is published every 200 ms). */
 async function tool(tab: Tab, id: string) {
   for (let n = 0; n < 12; n++) {
-    if ((await readState(tab.page)).tool === id) return;
+    const at = (await readState(tab.page)).tool;
+    if (at === id) return;
     await tab.page.keyboard.press("ArrowRight");
-    await tab.page.waitForTimeout(120);
+    await waitFor(tab.page, `tool~^(?!${at}$)`, 2000);
   }
 }
 
@@ -394,6 +395,7 @@ try {
         mark("tab 0 drops honey at its own fly's mouth");
         await tool(a, "feed");
         await a.page.keyboard.press("ArrowDown");
+        await waitFor(a.page, "variant=honey", 2000);
         await a.page.keyboard.press("Enter");
         await a.page.waitForTimeout(400);
         await shoot("honey", true);
@@ -413,6 +415,7 @@ try {
       [30, async () => {
         await tool(a, "blow");
         await a.page.keyboard.press("ArrowDown");
+        await waitFor(a.page, "variant=strong", 2000);
       }],
       [34, async () => {
         const target = await flyAt(a, 2);
@@ -440,7 +443,10 @@ try {
       [55, async () => {
         mark("tab 0 makes it rain");
         await tool(a, "weather");
-        for (let n = 0; n < 4; n++) await a.page.keyboard.press("ArrowDown");
+        for (let n = 0; n < 4; n++) {
+          await a.page.keyboard.press("ArrowDown");
+          await a.page.waitForTimeout(250);
+        }
       }],
       [62, async () => {
         await shoot("rain", false);
