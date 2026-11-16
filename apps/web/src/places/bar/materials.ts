@@ -434,7 +434,9 @@ reflectedLight.directDiffuse *= mix(1.0, barAO, 0.55);
 reflectedLight.indirectSpecular *= mix(1.0, barAO, 0.8);
 #ifdef USE_CLEARCOAT
 // The reflections are a soft sky, not the room: on the varnish, at a fly's grazing angle, they would veil the wood. Let the lamps, the candle and the window shine in it instead.
-clearcoatSpecularIndirect *= mix(1.0, barAO, 0.8) * (barK == K_TOP || barK == K_WOOD ? 0.3 : 1.0);
+// The counter mirrors the room, which is dark but for the window: by day a bright sky all round would grey the walnut.
+float barRoom = barK == K_TOP ? mix(0.3, 1.0, smoothstep(0.1, 0.75, -barWorldDir(reflect(-geometryViewDir, geometryClearcoatNormal)).x)) : 1.0;
+clearcoatSpecularIndirect *= mix(1.0, barAO, 0.8) * (barK == K_TOP || barK == K_WOOD ? 0.3 * barRoom : 1.0);
 #endif
 if (barK == K_TOP || barK == K_WOOD) reflectedLight.indirectSpecular *= 0.5;`;
 
