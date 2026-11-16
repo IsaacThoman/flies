@@ -14,7 +14,7 @@
 
 import { Menu, choiceValue, indexOf } from "@fly/ui";
 import type { ChoiceItem, MenuItem, Option, SliderItem } from "@fly/ui";
-import { INK_SOFT, glassPanel, orb, text } from "@fly/ui";
+import { INK_SOFT, font, glassPanel, orb, text } from "@fly/ui";
 import type { PixelSize } from "../../display.ts";
 import { PLACES } from "../../places/catalog.ts";
 import { WALLPAPER_DELAYS } from "../../settings.ts";
@@ -56,7 +56,10 @@ export function titleScreen(shell: Shell) {
       const label = awake ? `Brain awake · ${brain.neurons.toLocaleString("en-US")} neurons` : brain.status === "failed" ? "Its brain couldn't wake" : "Its brain is waking…";
       glassPanel(g, status.x, status.y, status.w, status.h, 17, { alpha: 0.85, shadow: false });
       orb(g, status.x + 20, status.y + 17, 8, awake ? "green" : brain.status === "failed" ? "pink" : "orange");
-      text(g, label, status.x + 36, status.y + 18, { size: status.size, color: INK_SOFT, baseline: "middle" });
+      // Smaller, if it must be, to stay in its pane.
+      g.font = font(status.size);
+      const size = Math.min(status.size, Math.floor((status.size * (status.w - 48)) / g.measureText(label).width));
+      text(g, label, status.x + 36, status.y + 18, { size, color: INK_SOFT, baseline: "middle" });
     },
   });
 }

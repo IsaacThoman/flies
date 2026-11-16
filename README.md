@@ -417,7 +417,12 @@ the real weather), **On screen** (everything that can show over the world:
 what it sees, its nervous system and its stats in the corners, what the
 stats are of, the corners' size and opacity, and the X-ray), **Sound**
 (effects, surroundings) and **Picture** (pixel size, the eyes' detail,
-button hints, frame stats).
+button hints, frame stats). In a browser it also has **Together**, a table
+shared with others. The menu never scrolls either: on a screen too short for
+its rows (a phone on its side) they are in two columns, Left and Right going
+across, Up and Down along the list as ever. Where the settings' tabs are too
+narrow to read (the smallest phones), they are one choice, the tab shown
+between arrows.
 
 ## The fly's senses
 

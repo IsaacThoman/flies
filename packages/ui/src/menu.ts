@@ -49,6 +49,12 @@ export class Menu {
   scroll = 0;
   /** How many rows fit; the focus is kept inside them. */
   rows: number;
+  /**
+   * Laid out in this many columns, filled one after the other (where one
+   * column of every item doesn't fit): Left and Right go across, between
+   * actions, and Up and Down along the list as ever.
+   */
+  columns = 1;
   /** How many rows there is room for, however many items there are now. */
   #room: number;
 
@@ -163,8 +169,16 @@ export class Menu {
         return MOVED;
       }
       case "left":
-      case "right":
+      case "right": {
+        if (this.columns > 1 && this.focused?.kind === "action") {
+          const next = this.focus + (button === "left" ? -1 : 1) * Math.ceil(this.items.length / this.columns);
+          if (next < 0 || next >= this.items.length || this.items[next].disabled) return repeat ? NONE : BLOCKED;
+          this.focus = next;
+          this.#keepInView();
+          return MOVED;
+        }
         return this.#step(button === "left" ? -1 : 1, repeat);
+      }
       case "select": {
         if (repeat) return NONE;
         const item = this.focused;
