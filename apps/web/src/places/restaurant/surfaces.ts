@@ -37,9 +37,12 @@ vec3 rWood(vec2 p, vec3 early, vec3 late, float plank, out float figure) {
   float along = p.x + seed * 4000.0;
   float warp = rFbm(vec2(along * 0.0021, seed * 9.0 + across * 0.004)) * 30.0 + rNoise(vec2(along * 0.011, across * 0.03 + seed)) * 4.0;
   float arch = sqrt(abs(across - 20.0 * (seed - 0.5)) * 40.0 + (0.5 + 0.5 * sin(along * 0.0037 + seed * 6.0)) * 1600.0);
-  float ring = (arch + warp) / (2.2 + seed * 1.4);
+  float ring = (arch + warp + 6.0 * rNoise(vec2(along * 0.025, seed * 5.0))) / (2.2 + seed * 1.4);
+  // Each year's ring its own width and its own darkness, as trees grow.
+  ring += 1.2 * rNoise(vec2(ring * 0.45, seed * 7.0));
   float fr = fract(ring);
-  float lw = smoothstep(0.55, 0.86, fr) * (1.0 - smoothstep(0.93, 1.0, fr));
+  float year = rHash1(floor(ring) + seed * 31.0);
+  float lw = smoothstep(0.55, 0.86, fr) * (1.0 - smoothstep(0.93, 1.0, fr)) * (0.55 + 0.45 * year);
   lw = mix(lw, 0.24, smoothstep(0.2, 0.55, fwidth(ring)));
   vec3 c = mix(early * (0.9 + 0.2 * seed), late, lw * 0.85);
   vec2 fib = vec2(along * 0.09, across * 1.7);

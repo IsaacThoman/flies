@@ -140,9 +140,12 @@ const ROOM_LIGHTS = /* glsl */ `
   // The stage's reflections are a soft sky round everything: as diffuse light indoors they would fill every shadow, and in polish they would show a sky; what is reflected is the room (light.ts, rRoom).
   iblIrradiance *= 0.15;
   vec3 seen = rWorldDir(reflect(-geometryViewDir, geometryNormal));
-  radiance = mix(radiance, rRoom(vWorld, seen, material.roughness), 0.85);
+  // Where the surface's bumps turn faster than a pixel, what it reflects is blurred over them, not a glitter of the lights.
+  float turning = clamp(length(fwidth(seen)) * 1.5, 0.0, 1.0);
+  radiance = mix(radiance, rRoom(vWorld, seen, max(material.roughness, turning)), 0.85);
   #ifdef USE_CLEARCOAT
-  clearcoatRadiance = mix(clearcoatRadiance, rRoom(vWorld, rWorldDir(reflect(-geometryViewDir, geometryClearcoatNormal)), material.clearcoatRoughness), 0.85);
+  vec3 seenCoat = rWorldDir(reflect(-geometryViewDir, geometryClearcoatNormal));
+  clearcoatRadiance = mix(clearcoatRadiance, rRoom(vWorld, seenCoat, max(material.clearcoatRoughness, clamp(length(fwidth(seenCoat)) * 1.5, 0.0, 1.0))), 0.85);
   #endif
   irradiance += rRoomLight(vWorld, wn);
   if (uPendant.w > 0.0) {
