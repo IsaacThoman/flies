@@ -3,7 +3,10 @@
 // is built and drawn is in its own folder, and places/index.ts puts them
 // together; this list stays free of three.js so logic can use it.
 
-export const PLACES = [{ id: "picnic", name: "Picnic table", to: "the picnic table", surface: "table" }] as const;
+export const PLACES = [
+  { id: "picnic", name: "Picnic table", to: "the picnic table", surface: "table" },
+  { id: "lab", name: "Lab bench", to: "the lab bench", surface: "bench" },
+] as const;
 
 export type PlaceId = (typeof PLACES)[number]["id"];
 export type PlaceInfo = (typeof PLACES)[number];

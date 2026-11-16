@@ -310,27 +310,51 @@ export class Hands {
     ball.from.x = p.x + ux * 330;
     ball.from.y = p.y + 70;
     ball.from.z = p.z + uz * 330;
-    // Where the dive ends: its surface SWOOP_CLEARANCE short of the spot, along the way it came.
-    const fx = ball.from.x - p.x;
-    const fy = ball.from.y - (p.y + 2);
-    const fz = ball.from.z - p.z;
-    const fl = Math.hypot(fx, fy, fz);
-    const stop = BALL_RADIUS + SWOOP_CLEARANCE;
-    ball.via.x = p.x + (fx / fl) * stop;
-    ball.via.y = p.y + 2 + (fy / fl) * stop;
-    ball.via.z = p.z + (fz / fl) * stop;
-    // Away up and over to the side it came from.
-    ball.to.x = p.x + ux * 200 + uz * 160;
-    ball.to.y = p.y + 400;
-    ball.to.z = p.z + uz * 200 - ux * 160;
+    // Coming in higher over anything standing in its way, rather than through it.
+    for (let tries = 0; ; tries++) {
+      // Where the dive ends: its surface SWOOP_CLEARANCE short of the spot, along the way it came.
+      const fx = ball.from.x - p.x;
+      const fy = ball.from.y - (p.y + 2);
+      const fz = ball.from.z - p.z;
+      const fl = Math.hypot(fx, fy, fz);
+      const stop = BALL_RADIUS + SWOOP_CLEARANCE;
+      ball.via.x = p.x + (fx / fl) * stop;
+      ball.via.y = p.y + 2 + (fy / fl) * stop;
+      ball.via.z = p.z + (fz / fl) * stop;
+      if (tries === 8 || !this.#through(ball.from, ball.via)) break;
+      ball.from.y += 40;
+    }
+    // Away up and over to the side it came from; or the other side, or back the way it came, if that is clear.
+    for (const side of [1, -1, 0]) {
+      ball.to.x = p.x + ux * 200 + uz * 160 * side;
+      ball.to.y = p.y + 400;
+      ball.to.z = p.z + uz * 200 - ux * 160 * side;
+      if (!this.#through(ball.via, ball.to)) break;
+    }
     ball.t = 0;
     ball.active = true;
     copy(ball.position, ball.from);
     this.events.swooped = true;
   }
+
+  /** Whether the ball, going straight from `a` to `b`, would pass through anything standing on the table that is taller than its middle. */
+  #through(a: Vec3, b: Vec3) {
+    const steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / 8);
+    const r = BALL_RADIUS * 0.8;
+    for (let i = 0; i <= steps; i++) {
+      const k = i / steps;
+      const x = a.x + (b.x - a.x) * k;
+      const y = a.y + (b.y - a.y) * k;
+      const z = a.z + (b.z - a.z) * k;
+      for (let j = 0; j < RING.length; j += 2) if (this.#world.heightAt(x + RING[j] * r, z + RING[j + 1] * r) > y) return true;
+    }
+    return false;
+  }
 }
 
 const surface = { y: 0, normal: { x: 0, y: 1, z: 0 }, solid: -1, onTable: true };
+/** The ball's middle and eight points round it, as x, z pairs of unit length or less. */
+const RING = [0, 0, ...Array.from({ length: 8 }, (_, i) => [Math.cos((i * Math.PI) / 4), Math.sin((i * Math.PI) / 4)]).flat()];
 
 function lerp(out: Vec3, a: Vec3, b: Vec3, k: number) {
   out.x = a.x + (b.x - a.x) * k;

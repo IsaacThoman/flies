@@ -59,8 +59,8 @@ try {
   await press("ArrowDown");
   await waitFor(page, "focus=settings");
   await press("Enter");
-  await waitFor(page, "screen=settings,focus=effects,atRoot=false");
-  await press("ArrowDown", 2);
+  await waitFor(page, "screen=settings,focus=place,atRoot=false");
+  await press("ArrowDown", 3);
   await waitFor(page, "focus=pixels");
   await press("Escape");
   await waitFor(page, "screen=title,focus=settings");
@@ -89,7 +89,8 @@ try {
   await press("ArrowDown", 2);
   await waitFor(page, "time=noon");
   await page.waitForTimeout(2000);
-  await press("ArrowRight", 2);
+  // Past View and Place, round to the start of the shelf.
+  await press("ArrowRight", 3);
   await waitFor(page, "tool=feed");
 
   step("feeding: honey at its mouth, tasted, eaten");
