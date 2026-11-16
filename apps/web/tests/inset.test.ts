@@ -4,7 +4,7 @@ import { EYE_COLUMNS, facetDirection } from "@fly/brain";
 import type { EyeMap } from "@fly/brain";
 import { standInEyes } from "@fly/body";
 import { DESIGN_HEIGHT, DESIGN_WIDTH, RENDER_HEIGHT, RENDER_WIDTH } from "../src/display.ts";
-import { CORNERS, INSET_PICTURE, InsetPlacement, insetRect, insetWanted, layoutFacets } from "../src/eyes/inset.ts";
+import { CORNERS, CORNER_HOLD, INSET_PICTURE, InsetPlacement, insetRect, insetWanted, layoutFacets } from "../src/eyes/inset.ts";
 import type { InsetWanted } from "../src/eyes/inset.ts";
 import { DEFAULT_SETTINGS, loadSettings } from "../src/settings.ts";
 
@@ -70,6 +70,15 @@ test("it fades in, moves on a corner at each new wallpaper shot (fading out and 
   assert.equal(placement.alpha, 1);
   run(placement, 2, "fade", true, 9);
   assert.equal(placement.corner, "bottom-left", "new shots don't move it while it isn't wanted");
+});
+
+test("in a wallpaper that never changes shot it still moves on a corner every so often", () => {
+  const placement = new InsetPlacement();
+  run(placement, CORNER_HOLD - 1, "show", true, 0);
+  assert.equal(placement.corner, CORNERS[0]);
+  run(placement, 4, "show", true, 0);
+  assert.equal(placement.corner, CORNERS[1]);
+  assert.equal(placement.alpha, 1);
 });
 
 test("when the controls come back it returns to the top right, the corner they leave clear", () => {

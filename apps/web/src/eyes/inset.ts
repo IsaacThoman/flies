@@ -11,7 +11,8 @@
 //
 // A panel left in one place for hours can burn into an OLED screen, so in the
 // wallpaper it moves to another corner each time the camera moves on to a new
-// shot.
+// shot, and at least every CORNER_HOLD seconds (the wallpaper that follows the
+// fly never changes shot).
 
 import * as THREE from "three";
 import type { EyeMap } from "@fly/brain";
@@ -39,6 +40,8 @@ const DOT_WIDEST = 8;
 /** Seconds to fade in, and out (out sooner: the controls are coming back, or it is moving on). */
 const FADE_IN = 1;
 const FADE_OUT = 0.5;
+/** The longest it stays in one corner of the wallpaper, seconds. */
+export const CORNER_HOLD = 60;
 
 /** Frame pixels per design unit, across (the frame is squeezed into 4:3 and shown stretched to 16:9). */
 const ACROSS = RENDER_WIDTH / DESIGN_WIDTH;
@@ -84,10 +87,17 @@ export class InsetPlacement {
   alpha = 0;
   #goal = 0;
   #shotChanges = -1;
+  /** Seconds shown in this corner of the wallpaper. */
+  #held = 0;
 
   update(dt: number, wanted: InsetWanted, wallpaper: boolean, shotChanges: number) {
-    if (!wallpaper) this.#goal = 0;
-    else if (wanted === "show" && this.#shotChanges >= 0 && shotChanges !== this.#shotChanges) this.#goal = (this.#goal + 1) % CORNERS.length;
+    if (!wallpaper) {
+      this.#goal = 0;
+      this.#held = 0;
+    } else if (wanted === "show" && this.#shotChanges >= 0 && (shotChanges !== this.#shotChanges || this.#held > CORNER_HOLD)) {
+      this.#goal = (this.#goal + 1) % CORNERS.length;
+      this.#held = 0;
+    }
     this.#shotChanges = shotChanges;
     const goal = CORNERS[this.#goal];
     if (wanted === "hide") {
@@ -95,8 +105,10 @@ export class InsetPlacement {
       this.corner = goal;
       return;
     }
-    if (wanted === "show" && this.corner === goal) this.alpha = Math.min(1, this.alpha + dt / FADE_IN);
-    else this.alpha = Math.max(0, this.alpha - dt / FADE_OUT);
+    if (wanted === "show" && this.corner === goal) {
+      this.alpha = Math.min(1, this.alpha + dt / FADE_IN);
+      if (wallpaper) this.#held += dt;
+    } else this.alpha = Math.max(0, this.alpha - dt / FADE_OUT);
     if (this.alpha === 0) this.corner = goal;
   }
 }

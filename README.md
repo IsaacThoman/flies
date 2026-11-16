@@ -83,13 +83,15 @@ loading screen and the title it keeps the fly small and to the left, clear of
 the menus.
 
 After a minute with no press (Settings: 30 s to 5 min, or never) the hints,
-the shelf and the pointer fade, and the camera takes long slow shots: the
-wallpaper. Any press or touch brings the controls back and does nothing else.
+the shelf and the pointer fade, and the camera settles beside the fly and
+follows it: the wallpaper. Settings can have it take long slow shots of the
+fly from one angle after another instead (Calm), or change them more often
+(Lively). Any press or touch brings the controls back and does nothing else.
 A small picture of what the fly's eyes see sits in a corner of the wallpaper
 (Settings, What it sees: off, in the wallpaper, or always, which keeps it in
 the top right while you play too). Each time the wallpaper moves on to a new
-shot it fades out and comes back in the next corner, so it is never left in
-one place long enough to mark an OLED screen.
+shot, and at least once a minute, it fades out and comes back in the next
+corner, so it is never left in one place long enough to mark an OLED screen.
 
 The title also offers **Just watch** (the wallpaper straight away), **Inside
 its brain** (live: every sense going in, every command coming out with the
