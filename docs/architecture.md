@@ -12,8 +12,10 @@ does, from what it sees, tastes and feels in the world.
 | `packages/brain` | The nervous system: 166,700 spiking neurons wired from the FlyEM male CNS connectome (CC-BY 4.0). TypeScript. Its README is the reference for the model and its limits. |
 | `packages/brain-native` | The same simulation in C++, behind the C interface in `include/fly_brain.h`, for the Apple TV, and built as WebAssembly for browsers. |
 | `packages/fly` | The fly's body: a 3D model that knows how a fly moves its legs, wings and mouthparts, with its nervous system drawn inside it. |
-| `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver, the weather outside. |
+| `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver, the weather outside, a table's line to its room. |
+| `packages/net` | How flies share a table: the wire format, the room's clock, other flies as they are heard of, the shared food, balls and bubbles, and what a player may do. Runs in a browser and in Node. |
 | `apps/web` | The game: the world, the fly's life in it, its senses, the remote's tools, menus, sound. Runs in a browser as it is. |
+| `apps/server` | The room server for tables of up to eight people's flies (`docs/online.md`): one Node process over WebSockets. It runs no brains and draws nothing. |
 | `apps/tvos` | The Apple TV app: a native host that runs the web build's JavaScript in JavaScriptCore and draws it through OpenGL ES. |
 | `apps/ios` | The iPhone and iPad app: the web build in a `WKWebView`, served from the app's bundle, in a small Swift shell ([ios.md](ios.md)). |
 
@@ -50,6 +52,13 @@ presses is whatever was drawn there, or the fly's world under it; in play,
 camera. A host that
 wraps the web build says what its screen's notch covers through
 `packages/contracts/src/screen.ts`.
+
+At a table with others (`docs/online.md`) each fly still lives entirely on
+its own device. The room server passes each fly's state to the others and
+keeps the rest of the world there (the place, the food, the balls, the light
+and the weather, when visitors come). Another player's fly is a body this
+fly's eyes see and its body bumps into; their tools reach it through the
+world, as yours do. Nothing else passes from fly to fly.
 
 ## Rules
 

@@ -69,6 +69,9 @@ export const PATCHES: readonly FoodPatch[] = [
 ];
 
 /** Where the fly first stands, and which way it faces. */
+/** The breeze over the picnic, mm/s: toward +x and a little toward the lake. Bubbles drift on it, and the rain slants with it. */
+export const BREEZE = { x: 38, z: -9 };
+
 export const START = { x: -8, z: -8, yaw: 0.6 };
 
 /** Flat things lying on the table that change nothing for the fly: they are drawn, not felt. */

@@ -13,5 +13,7 @@ export default defineConfig({
   base: "./",
   build: { outDir: path.join(import.meta.dirname, "dist"), emptyOutDir: true, target: "es2022" },
   worker: { format: "es" },
+  // Tables with others: the room server (npm run rooms) on the same origin, as the site's web server has it.
+  server: { proxy: { "/rooms": { target: `ws://localhost:${process.env.ROOMS_PORT ?? 8787}`, ws: true } } },
   plugins: [brain(), webApp()],
 });

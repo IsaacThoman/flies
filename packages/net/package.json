@@ -1,0 +1,13 @@
+{
+  "name": "@fly/net",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "How flies share a table: the wire format, the room's clock, other flies as they are heard of, the shared food, thrown balls and bubbles, and what a player may do. Runs in a browser and in Node.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@fly/world": "*"
+  }
+}

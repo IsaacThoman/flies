@@ -4,8 +4,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { random } from "../src/scene/build.ts";
-import { EVERY, FIRST, GAP, HAPPENINGS, Pace } from "../src/places/picnic/pace.ts";
-import type { Happening } from "../src/places/picnic/pace.ts";
+import { EVERY, FIRST, GAP, HAPPENINGS, Pace } from "@fly/world";
+import type { Happening } from "@fly/world";
 
 const STEP = 0.5;
 

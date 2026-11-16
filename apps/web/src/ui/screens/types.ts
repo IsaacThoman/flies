@@ -12,7 +12,10 @@ import type { Sound } from "../../audio/sounds.ts";
 /** The settings' tabs. */
 export type SettingsPage = "wallpaper" | "sound" | "picture";
 /** The menu (the title, at launch and from play alike), play, and what the menu opens. */
-export type ScreenId = "title" | "play" | "settings" | "about" | "brain";
+export type ScreenId = "title" | "play" | "settings" | "about" | "brain" | "together";
+
+/** The table this device is at, as the screens show it: whether this player started it, and the others there. */
+export type TableNow = { readonly starting: boolean; readonly joined: boolean; readonly others: readonly { readonly id: number; readonly colour: string }[] };
 
 /** The game, as the screens see it. */
 export interface Shell {
@@ -39,6 +42,14 @@ export interface Shell {
   /** The settings changed: apply and save them. */
   applySettings(): void;
   sound(sound: Sound): void;
+  /** Playing with others: whether this device can at all, and the table it is at (null alone). */
+  readonly canPlayTogether: boolean;
+  readonly table: TableNow | null;
+  /** Starts a table, here; hands its link on (from a press: the share sheet or the clipboard); takes another's fly off it (the starter); leaves it. */
+  startTable(): void;
+  shareTable(): Promise<"shared" | "copied" | "failed">;
+  removeFly(id: number): void;
+  leaveTable(): void;
 }
 
 /**

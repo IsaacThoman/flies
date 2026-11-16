@@ -14,6 +14,7 @@ npm test              # unit tests (Node)
 npm run e2e           # plays the game in headless Chromium with the real brain, then the built site
 npm run build         # the web build, plain files for any static host (docs/web.md)
 npm run ios           # the iPhone and iPad app in a simulator (docs/ios.md)
+npm run rooms         # the room server for tables with others (docs/online.md)
 ```
 
 `docs/architecture.md` describes the parts and the rules. This file is about
@@ -24,10 +25,16 @@ of the brain's commands, how it moves, what its eyes see) and `packages/ui`
 (the menu kit). `docs/places.md` is about the places the fly can live and how
 to add one, and `docs/web.md` about the web build: getting the brain to a
 browser, running well on what people have, being a good tab, and hosting.
-For a Docker Compose stack with automatic HTTPS on your own server, see
+`docs/online.md` is about tables with others: up to eight people's flies at
+one table, joined by a link, and the room server between them. For a Docker
+Compose stack with automatic HTTPS on your own server, see
 [Self-hosting Flies](docs/deploy.md).
 
 ## Playing
+
+In a browser, Together (on the menu) starts a table and
+shares its link: whoever opens it sits their fly down beside yours, up to
+eight, each marked with a dab of its player's colour (`docs/online.md`).
 
 The fly can live in more than one place (`docs/places.md`), and the player can
 carry it from one to another: the **Place** tool, or Settings → Wallpaper →
@@ -379,8 +386,8 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | --- | --- |
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
 | `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
-| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
-| `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, or past the table's edge. |
+| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
+| `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, another fly's body, or past the table's edge. |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
 | `grounded` | On its feet. |
@@ -417,6 +424,11 @@ lives (`packages/body/src/motion.ts` unless noted):
   or mouth are on something sweet, the body shuffles the last millimetre to put
   its mouth on it. Stopping is the brain's (sugar stops DNg100); the shuffle
   isn't.
+- **Other flies** (`packages/body/src/crowd.ts`, at a table with others:
+  `docs/online.md`). Two flies can't stand in the same spot: walking into
+  another fly's body it is pushed back out, so it stops against it or slides
+  past, and flying into one it bounces off. Each device moves only its own
+  fly, out of where it sees the others.
 - **The pose.** Grooming is shown only while it stands, and a bout lingers
   about 1.5 s after the command fades. The crouch follows the
   raw escape command.

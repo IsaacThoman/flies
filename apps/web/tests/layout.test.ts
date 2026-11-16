@@ -25,7 +25,7 @@ const FINGER = 40;
 const inside = (r: Rect, a: Rect, slack = 0.5) => r.x >= a.x - slack && r.y >= a.y - slack && r.x + r.w <= a.x + a.w + slack && r.y + r.h <= a.y + a.h + slack;
 const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-function shell(frame: Frame, glyphs: Shell["glyphs"] = null): Shell {
+function shell(frame: Frame, glyphs: Shell["glyphs"] = null, together = true): Shell {
   return {
     settings: { ...DEFAULT_SETTINGS },
     brain: { status: "running", neurons: 166700, connections: 6242118, state: null } as unknown as Shell["brain"],
@@ -41,6 +41,13 @@ function shell(frame: Frame, glyphs: Shell["glyphs"] = null): Shell {
     watch() {},
     applySettings() {},
     sound() {},
+    // With "Together" on the title and the pause menu, as in a browser: the longest they are.
+    canPlayTogether: together,
+    table: null,
+    startTable() {},
+    shareTable: async () => "failed",
+    removeFly() {},
+    leaveTable() {},
   };
 }
 
@@ -65,7 +72,8 @@ test("on the TV everything is where it always was", () => {
   assert.ok(near(title.status.x, 72) && title.status.y === 128 && title.status.w === 356 && title.status.size === 15);
   assert.ok(near(title.fly.across, -0.56) && title.fly.low === 0.1);
 
-  const s = shell(TV_FRAME, "remote");
+  // The Apple TV has no way to a table yet.
+  const s = shell(TV_FRAME, "remote", false);
   const settings = settingsScreen(s);
   // Sized for its longest tab (Wallpaper: the tabs and six rows), so it keeps its size from tab to tab.
   assert.deepEqual(settings.pane.panel, { x: 157, y: 37, w: 540, h: 378 });
@@ -149,8 +157,10 @@ test("every menu fits inside the safe area at every shape, its rows big enough f
       for (let i = 0; i < hits.count; i++) if (hits.get(i)!.kind === "row") shown++;
       assert.equal(shown, rows, `${name}: ${screen.id}`);
     }
-    // The menu's five rows always all show.
-    assert.equal(titleScreen(s).menu.rows, 5, `${name}: the menu doesn't scroll`);
+    // The menu's six rows (with Together) all show, but on a phone on its side, too short for them: there it scrolls by a row or two.
+    const menu = titleScreen(s).menu;
+    if (name === "a phone on its side") assert.ok(menu.rows >= 4, `${name}: ${menu.rows} of the menu's rows show`);
+    else assert.equal(menu.rows, menu.items.length, `${name}: the menu doesn't scroll`);
   }
 });
 

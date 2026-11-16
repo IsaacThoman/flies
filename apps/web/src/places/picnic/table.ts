@@ -6,8 +6,8 @@
 
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { DECOR, PATCHES, SOLIDS, TABLE_RADIUS, topHeight, topNormal } from "@fly/world";
-import type { Solid } from "@fly/world";
+import { DECOR, HAPPENINGS, PATCHES, SOLIDS, TABLE_RADIUS, topHeight, topNormal } from "@fly/world";
+import type { Happening, Solid } from "@fly/world";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { Batch, canvas2d, canvasTexture, freeze, mat4, paint, random } from "../../scene/build.ts";
 import { shaded } from "../../scene/shade.ts";
@@ -868,6 +868,9 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
       }
     },
     ripple,
+    happen(kind, random) {
+      if ((HAPPENINGS as readonly string[]).includes(kind)) goings.happen(kind as Happening, random);
+    },
     live(dt, around) {
       goings.live(dt, around);
     },

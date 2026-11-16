@@ -106,7 +106,7 @@ function renderTo(target: THREE.WebGLRenderTarget, shot: ArtShot) {
   stage.set.group.visible = showTable;
   bubbles.mesh.visible = showTable;
   fly.root.visible = showFly;
-  fly.shadow.visible = showTable;
+  if (fly.shadow) fly.shadow.visible = showTable;
   r.render(stage.scene, camera);
   r.setRenderTarget(null);
 }

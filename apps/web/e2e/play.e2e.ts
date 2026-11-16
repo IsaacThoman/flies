@@ -116,7 +116,9 @@ try {
   await waitFor(page, "ring=true,focus=play");
   await press("ArrowDown", 4);
   await waitFor(page, "focus=settings");
-  await press("ArrowDown");
+  await press("ArrowDown", 2);
+  await waitFor(page, "focus=together");
+  await press("ArrowUp");
   await waitFor(page, "focus=settings");
   await press("Enter");
   await waitFor(page, "screen=settings,stack=title>settings,focus=page,tab=wallpaper,atRoot=false");

@@ -3,6 +3,7 @@ services:
     image: flies-web:local
     build:
       context: .
+      target: web
       args:
         FLY_SITE_URL: ${FLY_SITE_URL:-}
     environment:
@@ -30,11 +31,29 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Add the Node WebSocket service here as `rooms`, listening on 0.0.0.0:3000.
-  # Caddy preserves /rooms and handles WebSocket upgrades on the same origin.
-  # No published port or depends_on is needed; web works while rooms is absent.
-  # Override ROOMS_HOST / ROOMS_PORT if the service name or port changes.
+  # Tables of people's flies (docs/online.md): WebSockets at /rooms, which
+  # Caddy proxies on the site's own origin. No published port, and no
+  # depends_on: the site works while it is down. A deploy restarts it with
+  # SIGTERM; it keeps its tables in the rooms_data volume and every device
+  # comes back to its table.
+  rooms:
+    image: flies-rooms:local
+    build:
+      context: .
+      target: rooms
+    environment:
+      PORT: ${ROOMS_PORT:-3000}
+    volumes:
+      - rooms_data:/data
+    restart: unless-stopped
+    stop_grace_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   caddy_data:
   caddy_config:
+  rooms_data:
