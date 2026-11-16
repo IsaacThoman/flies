@@ -20,7 +20,7 @@ import { pieces } from "./standins.ts";
 const LEATHER = "#7a2018";
 const q = BANQUETTE;
 /** The piping along the seat's front edge, and along the back's roll. */
-const PIPE = { r: 3, seat: { x: q.x0 + 3.2, y: q.seat - 12 - 3.4 }, roll: { x: q.back.x0 + 3, y: q.back.top - 30 - 3 } };
+const PIPE = { r: 3, seat: { x: q.x0 + 3.2 }, roll: { x: q.back.x0 + 3, y: q.back.top - 30 - 3 } };
 /** The seat's front, from under its piping down to the plinth: a roll at the top, the face set back below it. */
 const FRONT: P[] = [
   [q.x0 + 5, q.seat - 12 - 6.5],
@@ -106,8 +106,8 @@ export function buildBanquette(b: Builder, solids: readonly Solid[]) {
     const xSteps = 20;
     const e = 0.2;
     const seatVertex = (x: number, z: number, edge: boolean) => {
-      // Its front edge tucked down onto the piping.
-      const y = edge ? PIPE.seat.y + PIPE.r * 0.8 : seatAt(x, z);
+      // Its front edge tucked just under the piping's crest.
+      const y = seatAt(x, z) - (edge ? 0.3 : 0);
       const nx = -(seatAt(x + e, z) - seatAt(x - e, z)) / (2 * e);
       const nz = -(seatAt(x, z + e) - seatAt(x, z - e)) / (2 * e);
       const l = Math.hypot(nx, 1, nz);
@@ -119,7 +119,8 @@ export function buildBanquette(b: Builder, solids: readonly Solid[]) {
     prism(leather, FRONT, "z", za, zb, false);
     prism(wood, PLINTH, "z", za, zb, false);
     const pipe = (x: number, y: number) => new THREE.CylinderGeometry(PIPE.r, PIPE.r, zb - za, 10).rotateX(Math.PI / 2).translate(x, y, (za + zb) / 2);
-    b.detail(area, pipe(PIPE.seat.x, PIPE.seat.y), LEATHER, KIND.leather);
+    // The seat's piping, its crest at the seat's height there.
+    b.detail(area, pipe(PIPE.seat.x, seatAt(PIPE.seat.x, za) - 0.1 - PIPE.r), LEATHER, KIND.leather);
     b.detail(area, pipe(PIPE.roll.x, PIPE.roll.y), LEATHER, KIND.leather);
 
     // The back's face, buttoned: smoothed out into the seat, under the roll (in a crease for its piping) and at either end.
@@ -168,28 +169,28 @@ export function buildBanquette(b: Builder, solids: readonly Solid[]) {
       prev = next;
     }
 
-    // The roll along the back's top, at the world's heights: round from the face over to the wall.
+    // The roll along the back's top, at the world's heights: rounded across from the face over to the wall, level along.
     const backAt = (x: number, z: number) => topHeight(back, x, z);
     const rollSteps = 12;
+    const rollX = (i: number) => face + ((q.x1 - face) * i) / rollSteps;
+    const rollSection = Array.from({ length: rollSteps + 1 }, (_, i): P => [rollX(i), backAt(rollX(i), za)]);
     grid(leather, rollSteps, zSteps, (i, k) => {
-      const t = (i / rollSteps) * Math.PI;
-      const x = face + 60 - 60 * Math.cos(t);
+      const x = rollX(i);
       const z = zAt(k);
-      const y = i === 0 || i === rollSteps ? rollBase : backAt(x, z);
-      const nz = i === 0 || i === rollSteps ? 0 : -(backAt(x, z + e) - backAt(x, z - e)) / (2 * e);
-      const nx = -Math.cos(t) / 60;
-      const ny = Math.sin(t) / 30;
-      const l = Math.hypot(nx, ny, nz * ny);
-      return [x, y, z, nx / l, ny / l, (nz * ny) / l];
+      const xa = Math.max(face, x - e);
+      const xb = Math.min(q.x1, x + e);
+      const nx = -(backAt(xb, z) - backAt(xa, z)) / (xb - xa);
+      const l = Math.hypot(nx, 1);
+      return [x, backAt(x, z), z, nx / l, 1 / l, 0];
     });
 
-    // Its ends, where it stops: leather over the plinth.
+    // Its ends, where it stops: leather over the plinth, the roll's end rounded with it.
     for (const [end, facing] of [
       [q.z0, -1],
       [q.z1, 1],
     ] as const) {
       if (Math.abs(end - za) > 1 && Math.abs(end - zb) > 1) continue;
-      const outline: P[] = [...FRONT.slice().reverse(), [PIPE.seat.x, q.seat - 12], [face, q.seat - 12], [face, rollBase], [q.x1, rollBase], [q.x1, 95]];
+      const outline: P[] = [...FRONT.slice().reverse(), [PIPE.seat.x, q.seat - 12], [face, q.seat - 12], ...rollSection, [q.x1, 95]];
       cap(leather, outline, "z", end, facing);
       cap(wood, [[q.x0, 0], [q.x1, 0], [q.x1, 95], [q.x0 + 2, 95], [q.x0, 86]], "z", end, facing);
     }
@@ -197,7 +198,7 @@ export function buildBanquette(b: Builder, solids: readonly Solid[]) {
     b.detail(area, wood.geometry(), "#d8c0b0", KIND.mahogany);
 
     // From afar: one section along it, the seat and the back.
-    const far: P[] = [[q.x1, rollBase], [face + 60, q.back.top], [face, rollBase], [face, q.seat - 3], [(q.x0 + q.x1) / 2, q.seat], [q.x0, q.seat - 12], [q.x0, 0]];
+    const far: P[] = [...[12, 9, 6, 3, 0].map((i) => rollSection[i]), [face, q.seat - 3], [(q.x0 + q.x1) / 2, q.seat], [q.x0, q.seat - 12], [q.x0, 0]];
     const stand = prism(new Faces(), far, "z", za, zb, false);
     for (const [end, facing] of [
       [q.z0, -1],

@@ -6,13 +6,13 @@
 import * as THREE from "three";
 import { ON_PASS, PASS, RESTAURANT_PATCHES } from "@fly/world";
 import type { Solid } from "@fly/world";
-import { mat4, random } from "../../scene/build.ts";
 import { areaNamed } from "./areas.ts";
 import type { Builder } from "./builder.ts";
-import { box, scatter } from "./geometry.ts";
+import { box } from "./geometry.ts";
 import { KIND } from "./kinds.ts";
 import { generic } from "./standins.ts";
-import { Faces, REST_KIND, cap, dishProfile, film, plateStack, prism, revolve } from "./rest-shapes.ts";
+import { coulis, tartCrumbs } from "./rest-crumbs.ts";
+import { Faces, REST_KIND, cap, dishProfile, plateStack, prism, revolve } from "./rest-shapes.ts";
 import type { P } from "./rest-shapes.ts";
 
 const china = "#f4f2ec";
@@ -99,35 +99,11 @@ export function buildPass(b: Builder, solids: readonly Solid[]) {
   const dessert = solids.find((s) => s.name === "dessert plate")!;
   b.detail(area, revolve(new Faces(), dishProfile(dessert), 48, ON_PASS.dessert.x, ON_PASS.dessert.z).geometry(), china, KIND.ceramic);
   const well = top + ON_PASS.dessert.well;
-  const coulis = RESTAURANT_PATCHES.find((p) => p.name === "coulis")!;
-  // Dragged by a fork: a long smear, a blob where it began, a few drops.
-  // Each a body of the purée's own colour under a wet film.
-  const smear = (r: number, wobble: number, thick: number, matrix: () => THREE.Matrix4) => {
-    b.detail(area, film(new Faces(), r * 0.96, wobble, thick * 0.7).geometry(), "#8c0c22", KIND.glossy, matrix());
-    b.detail(area, film(new Faces(), r, wobble, thick).geometry(), "#a01028", KIND.film, matrix());
-  };
-  smear(coulis.r * 0.62, 1.3, 0.3, () => mat4({ x: coulis.x, y: well, z: coulis.z }, new THREE.Euler(0, 0.5, 0), { x: 1.7, y: 1, z: 0.55 }));
-  smear(coulis.r * 0.42, 4.1, 0.34, () => mat4({ x: coulis.x + 14, y: well, z: coulis.z - 8 }));
-  const rng = random(31);
-  for (let i = 0; i < 4; i++) {
-    const a = rng.range(0, Math.PI * 2);
-    const d = rng.range(coulis.r * 1.1, coulis.r * 1.6);
-    const at = { x: coulis.x + Math.cos(a) * d, y: well, z: coulis.z + Math.sin(a) * d };
-    smear(rng.range(1.2, 2.4), i, 0.22, () => mat4(at));
-  }
   const crumbs = RESTAURANT_PATCHES.find((p) => p.name === "tart crumbs")!;
-  const grain = new THREE.IcosahedronGeometry(1, 0);
-  const placed: { matrix: THREE.Matrix4; color: THREE.Color }[] = [];
-  const pastry = [new THREE.Color("#d9a35c"), new THREE.Color("#c48a44"), new THREE.Color("#e6c08a")];
-  for (let i = 0; i < 46; i++) {
-    const a = rng.range(0, Math.PI * 2);
-    const d = crumbs.r * Math.sqrt(rng.next()) * 1.3;
-    const size = i < 6 ? rng.range(1.4, 2.6) : rng.range(0.3, 1.1);
-    // Flat enough not to matter to a fly: none stands more than 0.4 mm proud of the glaze.
-    placed.push({ matrix: mat4({ x: crumbs.x + Math.cos(a) * d, y: well, z: crumbs.z + Math.sin(a) * d }, new THREE.Euler(0, rng.range(0, 6.3), 0), { x: size, y: 0.4, z: size * rng.range(0.6, 1) }), color: pastry[i % 3] });
-  }
-  b.detailPainted(area, scatter(grain, placed, KIND.crumb), KIND.crumb);
-  grain.dispose();
+  const smear = RESTAURANT_PATCHES.find((p) => p.name === "coulis")!;
+  // The crumbs strewn no further than the well's flat, the coulis dragged out across it, away from them.
+  tartCrumbs(b, area, crumbs.x, crumbs.z, crumbs.r, well, 24, 31);
+  coulis(b, area, smear.x, smear.z, smear.r, well, -2.16, 34, 37);
 
   // The clean plates, stacked rim on rim.
   const stack = ON_PASS.stack;

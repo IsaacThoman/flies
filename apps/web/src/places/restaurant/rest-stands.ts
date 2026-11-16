@@ -1,12 +1,12 @@
 // The host's stand by the door, with the menus, the reservations book and
 // the bowl of mints on it; and the service station against the back wall,
-// with its tray of cutlery, its plates, the carafe of water and six tumblers
-// upturned to dry on a cloth. Both are panelled mahogany: their panels, doors
+// with its tray of cutlery, its plates, the carafe of water (full into its
+// open neck) and six tumblers upturned to dry on a cloth. Both are panelled mahogany: their panels, doors
 // and drawers are sunk into their faces, never proud of them, and what lies
 // in the tray lies flat.
 
 import * as THREE from "three";
-import { HOST_STAND, ON_HOST, ON_STATION, RESTAURANT_PATCHES, STATION } from "@fly/world";
+import { HOST_STAND, ON_HOST, ON_STATION, RESTAURANT_PATCHES, STATION, topHeight } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { mat4 } from "../../scene/build.ts";
 import { areaNamed } from "./areas.ts";
@@ -14,7 +14,7 @@ import type { Builder } from "./builder.ts";
 import { box, scatter } from "./geometry.ts";
 import { KIND } from "./kinds.ts";
 import { stackShade } from "./rest-pass.ts";
-import { Faces, REST_KIND, boxDish, cap, dishProfile, edges, film, flat, inset, plateStack, prism, recess, revolve, ring } from "./rest-shapes.ts";
+import { Faces, REST_KIND, boxDish, cap, dishProfile, edges, film, flat, inset, plateStack, prism, recess, revolve, ring, simplify } from "./rest-shapes.ts";
 import type { P, Plane, Rect } from "./rest-shapes.ts";
 import { generic } from "./standins.ts";
 
@@ -222,25 +222,38 @@ export function buildStation(b: Builder, solids: readonly Solid[]) {
   const plates = ON_STATION.plates;
   b.detail(area, revolve(new Faces(), plateStack(plates.r, top, plates.height, 18), 48, plates.x, plates.z).geometry(), stackShade(plates.x, plates.z, plates.r, top + plates.height, china), KIND.ceramic);
 
-  // The carafe: its glass a few millimetres thick round the world's shape, water standing in it.
+  // The carafe: glass a few millimetres thick under the world's shape, full of water up into its neck, where the water is the mouth's floor.
   const c = ON_STATION.carafe;
-  const shoulder = top + c.shoulder;
-  const glass: P[] = [[c.r - 1.4, top - 0.1], [c.r, top + 1.4], [c.r, shoulder - 1]];
-  for (let i = 1; i <= 8; i++) {
-    const r = c.r - ((c.r - c.neck) * i) / 8;
-    glass.push([r, shoulder + c.crown * (1 - (r / c.r) ** 2)]);
-  }
-  const neckTop = top + c.top;
+  const body = solids.find((s) => s.name === "carafe")!;
+  const mouth = solids.find((s) => s.name === "carafe neck")!;
+  const dome = (r: number) => topHeight(body, c.x + r, c.z);
+  const felt = (r: number) => Math.max(dome(r), r <= c.neck ? topHeight(mouth, c.x + r, c.z) : -Infinity);
+  // Finely over the neck's walls, where they rise steeply; the water's floor and the shoulder are gentle.
+  const step = 0.05;
+  const steep = Math.floor(c.neck * 0.7);
+  const samples: P[] = [];
+  for (let r = 0; r < steep; r += 0.5) samples.push([r, felt(r)]);
+  for (let i = 0; steep + i * step < c.neck + 1; i++) samples.push([steep + i * step, felt(steep + i * step)]);
+  for (let r = Math.ceil(c.neck + 1); r <= c.r; r++) samples.push([r, felt(r)]);
+  // Where the neck's inside comes down to the water: the lowest point inside its lip.
+  let lip = 0;
+  for (let i = 0; samples[i][0] <= c.neck; i++) if (samples[i][1] > samples[lip][1]) lip = i;
+  let low = 0;
+  for (let i = 0; i < lip; i++) if (samples[i][1] < samples[low][1]) low = i;
+  const rw = samples[low][0];
   const t2 = 2.4;
-  glass.push([c.neck, neckTop - 1.2], [c.neck - 0.8, neckTop], [c.neck - t2 + 0.6, neckTop], [c.neck - t2, neckTop - 1.2]);
-  for (let i = 8; i >= 1; i--) {
-    const r = c.r - ((c.r - c.neck) * i) / 8;
-    glass.push([r - t2, shoulder + c.crown * (1 - (r / c.r) ** 2) - t2]);
-  }
-  glass.push([c.r - t2, shoulder - 2], [c.r - t2, top + 5], [c.r - t2 - 3, top + 4], [0, top + 4]);
-  b.detail(area, revolve(new Faces(), glass, 40, c.x, c.z).geometry(), "#eef6f4", KIND.glass);
-  const level = top + 150;
-  b.detail(area, revolve(new Faces(), [[0, top + 4.1], [c.r - t2 - 0.3, top + 4.1], [c.r - t2 - 0.3, level - 1.5], [c.r - t2 - 1.2, level], [0, level]], 40, c.x, c.z).geometry(), "#cfe4e4", KIND.water);
+  // The shoulder's inside, from the neck out to the body's wall, `by` further in.
+  const shoulderIn = (r0: number, r1: number, by: number) => Array.from({ length: 9 }, (_, i): P => {
+    const r = r0 + ((r1 - r0) * i) / 8;
+    return [r, dome(r) - t2 - by];
+  });
+  const inner = c.r - t2;
+  const glass: P[] = [[c.r - 1.4, top - 0.1], [c.r, top + 1.4], ...simplify(samples.slice(low).reverse(), 0.1), ...shoulderIn(rw, inner, 0), [inner, top + c.shoulder - 2], [inner, top + 5], [inner - 3, top + 4], [0, top + 4]];
+  b.detail(area, revolve(new Faces(), glass, 36, c.x, c.z).geometry(), "#eef6f4", KIND.glass);
+  // The water's edge just into the glass, so no ring of air is left round it.
+  const wet = rw + 0.15;
+  const water: P[] = [[0, top + 4.1], [inner - 0.3, top + 4.1], [inner - 0.3, top + c.shoulder - 2.3], ...shoulderIn(wet, inner - 0.3, 0.3).reverse(), ...simplify(samples.filter(([r]) => r <= wet).reverse(), 0.1)];
+  b.detail(area, revolve(new Faces(), water, 36, c.x, c.z).geometry(), "#cfe4e4", KIND.water);
 
   // The tumblers upturned to dry, on a cloth: each a thick base up top and its rim down on the linen.
   const tb = ON_STATION.tumbler;

@@ -7,7 +7,8 @@
 // the mirror and the brackets are behind the wall's face, the cornice above
 // the fly's ceiling. Detail is gathered in sheets (backbar-sheet.ts) and
 // handed to each area in one go; far off the cabinets are their felt boxes
-// with the panels sunk in, the shelves boards, and each bottle a spike.
+// with the panels sunk in, the shelves boards, and each bottle a coarse
+// copy of itself.
 
 import * as THREE from "three";
 import { BOTTLES, ZINC_BAR } from "@fly/world";
@@ -326,7 +327,8 @@ export const backbar: Part = {
     bottles(s, stocked);
     s.flush(b);
     farBoxes(b);
-    farBottles(b, stocked);
+    // The window's are seen nearer when they give way to their detail.
+    farBottles(b, stocked, (bottle) => bottle.z > back.z1);
     mirror(b);
   },
   solid: {

@@ -38,18 +38,7 @@ export class Faces {
   #n = new Float32Array(9 * 64);
   #used = 0;
 
-  #put(v: readonly number[]) {
-    const i = this.#used;
-    this.#p[i] = v[0];
-    this.#p[i + 1] = v[1];
-    this.#p[i + 2] = v[2];
-    this.#n[i] = v[3];
-    this.#n[i + 1] = v[4];
-    this.#n[i + 2] = v[5];
-    this.#used = i + 3;
-  }
-
-  /** A triangle (x, y, z, nx, ny, nz at each corner), wound to face the way its corners' normals do. */
+  /** A triangle (x, y, z, nx, ny, nz at each corner), wound to face the way its corners' normals do: tens of thousands, so written straight in. */
   tri(a: readonly number[], b: readonly number[], c: readonly number[]) {
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
     const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
@@ -63,14 +52,31 @@ export class Faces {
       this.#p = p;
       this.#n = n;
     }
-    this.#put(a);
-    if (cx * (a[3] + b[3] + c[3]) + cy * (a[4] + b[4] + c[4]) + cz * (a[5] + b[5] + c[5]) < 0) {
-      this.#put(c);
-      this.#put(b);
-    } else {
-      this.#put(b);
-      this.#put(c);
-    }
+    const flip = cx * (a[3] + b[3] + c[3]) + cy * (a[4] + b[4] + c[4]) + cz * (a[5] + b[5] + c[5]) < 0;
+    const second = flip ? c : b;
+    const third = flip ? b : c;
+    const p = this.#p;
+    const n = this.#n;
+    const i = this.#used;
+    p[i] = a[0];
+    p[i + 1] = a[1];
+    p[i + 2] = a[2];
+    n[i] = a[3];
+    n[i + 1] = a[4];
+    n[i + 2] = a[5];
+    p[i + 3] = second[0];
+    p[i + 4] = second[1];
+    p[i + 5] = second[2];
+    n[i + 3] = second[3];
+    n[i + 4] = second[4];
+    n[i + 5] = second[5];
+    p[i + 6] = third[0];
+    p[i + 7] = third[1];
+    p[i + 8] = third[2];
+    n[i + 6] = third[3];
+    n[i + 7] = third[4];
+    n[i + 8] = third[5];
+    this.#used = i + 9;
   }
 
   quad(a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[]) {
@@ -129,14 +135,24 @@ export function revolve(faces: Faces, profile: readonly P[], segments: number, x
     cos.push(Math.cos(t));
     sin.push(Math.sin(t));
   }
-  const row = (p: P, n: P) => {
-    const out: number[][] = [];
-    for (let k = 0; k <= segments; k++) out.push([x + p[0] * cos[k], p[1], z + p[0] * sin[k], n[0] * cos[k], n[1], n[0] * sin[k]]);
-    return out;
+  // Two rows of corners, filled afresh for each band: thousands of bands, so no new arrays for each.
+  const ring = () => Array.from({ length: segments + 1 }, () => [0, 0, 0, 0, 0, 0]);
+  const a = ring();
+  const b = ring();
+  const row = (out: number[][], p: P, n: P) => {
+    for (let k = 0; k <= segments; k++) {
+      const v = out[k];
+      v[0] = x + p[0] * cos[k];
+      v[1] = p[1];
+      v[2] = z + p[0] * sin[k];
+      v[3] = n[0] * cos[k];
+      v[4] = n[1];
+      v[5] = n[0] * sin[k];
+    }
   };
   for (const s of strips(profile)) {
-    const a = row(s.a, s.na);
-    const b = row(s.b, s.nb);
+    row(a, s.a, s.na);
+    row(b, s.b, s.nb);
     for (let j = 0; j < segments; j++) faces.quad(a[j], a[j + 1], b[j + 1], b[j]);
   }
   return faces;
@@ -246,6 +262,33 @@ export function edges(faces: Faces, pl: Plane, r: Rect, w0: number, w1: number) 
   ];
   for (const [au, av, bu, bv, nu, nv] of sides) faces.quad(point(pl, au, av, w0, nu, nv, 0), point(pl, bu, bv, w0, nu, nv, 0), point(pl, bu, bv, w1, nu, nv, 0), point(pl, au, av, w1, nu, nv, 0));
   return faces;
+}
+
+/** A finely sampled profile with every point dropped that lies within `tolerance` (mm) of the line its neighbours left make (Douglas and Peucker's way). */
+export function simplify(points: readonly P[], tolerance: number): P[] {
+  const keep = new Uint8Array(points.length);
+  keep[0] = keep[points.length - 1] = 1;
+  const stack: [number, number][] = [[0, points.length - 1]];
+  while (stack.length) {
+    const [i, j] = stack.pop()!;
+    const [ax, ay] = points[i];
+    const dx = points[j][0] - ax;
+    const dy = points[j][1] - ay;
+    const l = Math.hypot(dx, dy) || 1;
+    let far = -1;
+    let most = tolerance;
+    for (let k = i + 1; k < j; k++) {
+      const d = Math.abs((points[k][0] - ax) * dy - (points[k][1] - ay) * dx) / l;
+      if (d > most) {
+        most = d;
+        far = k;
+      }
+    }
+    if (far < 0) continue;
+    keep[far] = 1;
+    stack.push([i, far], [far, j]);
+  }
+  return points.filter((_, k) => keep[k]);
 }
 
 /** A round dish's top as a lathe's profile from its foot up and over its rim into its well, at exactly the world's heights. */

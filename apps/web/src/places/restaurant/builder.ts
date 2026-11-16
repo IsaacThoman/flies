@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import { freeze } from "../../scene/build.ts";
 import type { ColorFn } from "../../scene/build.ts";
-import { CLEAR } from "./kinds.ts";
+import { AREA_STRIDE, CLEAR } from "./kinds.ts";
 import { part } from "./geometry.ts";
 
 type Color = THREE.ColorRepresentation | ColorFn;
@@ -111,6 +111,13 @@ export class Builder {
   /** Detail already painted and tagged (many small things scattered at once): clear or solid by its kind. */
   detailPainted(area: number, geometry: THREE.BufferGeometry, kind: number) {
     this.#nearBatch(area).add(this.#material(kind), geometry);
+  }
+
+  /** A stand-in already painted and tagged (many small things at once), solid or clear by its kind: its kinds take its area here. */
+  standInPainted(area: number, geometry: THREE.BufferGeometry, kind: number) {
+    const kinds = geometry.attributes.kind.array as Float32Array;
+    for (let i = 0; i < kinds.length; i++) kinds[i] += AREA_STRIDE * area;
+    this.far.add(this.#material(kind), geometry);
   }
 
   /** A stand-in for an area, folded away while the area is drawn in detail. */

@@ -2,8 +2,9 @@
 // tall) is turned once at exactly its felt shape (the body's column, the
 // shoulder's dome, the neck and its rounded top), cut into what it is made
 // of (glass empty and full, label, capsule or stopper) and copied wherever
-// a bottle of it stands, each copy its own drink. Far off, a bottle is a
-// dark spike of twelve triangles. The fridge's bottles behind its glass are
+// a bottle of it stands, each copy its own drink. Far off, a bottle is the
+// same in a few dozen triangles and the same looks, so it hardly changes
+// as its detail comes and goes. The fridge's bottles behind its glass are
 // smaller, plainer and opaque: dark shapes against its light.
 
 import * as THREE from "three";
@@ -11,8 +12,8 @@ import { BOTTLE_SHAPES } from "@fly/world";
 import type { BottleKind } from "@fly/world";
 import { random } from "../../scene/build.ts";
 import type { Builder } from "./builder.ts";
-import { KIND } from "./kinds.ts";
-import { look } from "./backbar-sheet.ts";
+import { CLEAR, KIND } from "./kinds.ts";
+import { Sheet, look } from "./backbar-sheet.ts";
 import type { Look, Sheets } from "./backbar-sheet.ts";
 
 /** How far inside its felt shape a bottle is drawn (mm). */
@@ -28,7 +29,13 @@ const CAP = 12;
 const COLLAR = 13;
 
 type Row = { a: number; y: number; square: boolean };
+/** A band's quad as two triangles, counter-clockwise seen from outside: round the axis the other way to the angle. */
+const CORNERS = [0, 2, 1, 0, 3, 2];
+/** A triangle's corners in the order made, and the other way round. */
+const ORDER = [0, 1, 2];
+const FLIPPED = [0, 2, 1];
 type Piece = { pos: Float32Array; nor: Float32Array; role: Uint8Array; count: number };
+type Gather = { pos: number[]; nor: number[]; role: number[] };
 type Template = { clear: Piece; solid: Piece };
 
 /**
@@ -38,8 +45,8 @@ type Template = { clear: Piece; solid: Piece };
  * square ones flat.
  */
 function turn(rows: readonly Row[], segments: number, role: (y: number, angle: number) => number): Template {
-  const clear: number[] = [];
-  const solid: number[] = [];
+  const clear: Gather = { pos: [], nor: [], role: [] };
+  const solid: Gather = { pos: [], nor: [], role: [] };
   const dir = (th: number, square: boolean) => {
     const c = Math.cos(th);
     const s = Math.sin(th);
@@ -109,22 +116,14 @@ function turn(rows: readonly Row[], segments: number, role: (y: number, angle: n
           [Math.cos(t0) * n1[0], n1[1], Math.sin(t0) * n1[0]],
         ];
       }
-      // Counter-clockwise seen from outside: round the axis the other way to the angle.
-      for (const k of [0, 2, 1, 0, 3, 2]) out.push(p[k][0], p[k][1], p[k][2], ns[k][0], ns[k][1], ns[k][2], r);
+      for (const k of CORNERS) {
+        out.pos.push(p[k][0], p[k][1], p[k][2]);
+        out.nor.push(ns[k][0], ns[k][1], ns[k][2]);
+        out.role.push(r);
+      }
     }
   }
-  const piece = (a: number[]): Piece => {
-    const count = a.length / 7;
-    const pos = new Float32Array(count * 3);
-    const nor = new Float32Array(count * 3);
-    const role = new Uint8Array(count);
-    for (let i = 0; i < count; i++) {
-      pos.set(a.slice(i * 7, i * 7 + 3), i * 3);
-      nor.set(a.slice(i * 7 + 3, i * 7 + 6), i * 3);
-      role[i] = a[i * 7 + 6];
-    }
-    return { pos, nor, role, count };
-  };
+  const piece = (g: Gather): Piece => ({ pos: new Float32Array(g.pos), nor: new Float32Array(g.nor), role: new Uint8Array(g.role), count: g.role.length });
   return { clear: piece(clear), solid: piece(solid) };
 }
 
@@ -201,38 +200,38 @@ function template(kind: BottleKind, fill: number) {
 }
 
 /** A drink: its glass and what is in it, its label, and how it is closed. */
-type Drink = { glass: Look; full: Look; cork: Look; label: Look; band: Look; cap: Look; far: THREE.Color };
+type Drink = { glass: Look; full: Look; cork: Look; label: Look; band: Look; cap: Look };
 
 /** Kinds of the back bar's own: clear flint glass empty, with a clear spirit in it, and dark with red wine or rum; the fridge's lit lining and what stands in it. */
 export const BB_KINDS = { flint: 116, gin: 117, dark: 118, inside: 80, cold: 81 } as const;
 
 const tinted = (c: THREE.ColorRepresentation) => look(KIND.bottle, c);
 const flint = look(BB_KINDS.flint, "#e6f0ec");
-const drink = (glass: Look, full: Look, label: THREE.ColorRepresentation, band: THREE.ColorRepresentation, cap: Look, far: THREE.ColorRepresentation): Drink => ({ glass, full, cork: look(KIND.bottle, "#8a6a44"), label: look(KIND.label, label), band: look(KIND.label, band), cap, far: new THREE.Color(far) });
+const drink = (glass: Look, full: Look, label: THREE.ColorRepresentation, band: THREE.ColorRepresentation, cap: Look): Drink => ({ glass, full, cork: look(KIND.bottle, "#8a6a44"), label: look(KIND.label, label), band: look(KIND.label, band), cap });
 
 /** What each kind of bottle may hold. */
 const DRINKS: Readonly<Record<BottleKind, readonly Drink[]>> = {
   wine: [
-    drink(tinted("#10301a"), look(BB_KINDS.dark, "#1a0608"), "#ece2c8", "#6a1418", look(KIND.glossy, "#5c0e18"), "#0d1a10"),
-    drink(tinted("#5a6a26"), tinted("#9c8a3a"), "#f2eee2", "#2a3a5a", look(KIND.brass, "#d8b060"), "#3a4018"),
-    drink(tinted("#14261a"), look(BB_KINDS.dark, "#140a06"), "#d8c49a", "#1a1a1a", look(KIND.glossy, "#121212"), "#0c140e"),
+    drink(tinted("#10301a"), look(BB_KINDS.dark, "#1a0608"), "#ece2c8", "#6a1418", look(KIND.glossy, "#5c0e18")),
+    drink(tinted("#5a6a26"), tinted("#9c8a3a"), "#f2eee2", "#2a3a5a", look(KIND.brass, "#d8b060")),
+    drink(tinted("#14261a"), look(BB_KINDS.dark, "#140a06"), "#d8c49a", "#1a1a1a", look(KIND.glossy, "#121212")),
   ],
   spirit: [
-    drink(flint, tinted("#b05e18"), "#1a1612", "#b08a3a", look(KIND.oak, "#ffffff"), "#5a2c0c"),
-    drink(flint, tinted("#7a300e"), "#efe4cc", "#6a1010", look(KIND.glossy, "#1a1210"), "#3a160a"),
-    drink(tinted("#3a2a1a"), look(BB_KINDS.dark, "#2e1206"), "#e2c88a", "#1a1a1a", look(KIND.oak, "#c8a888"), "#1e0e06"),
-    drink(flint, tinted("#b8121c"), "#f4f0e6", "#b8121c", look(KIND.glossy, "#e8e4dc"), "#5a0a0e"),
+    drink(flint, tinted("#b05e18"), "#1a1612", "#b08a3a", look(KIND.oak, "#ffffff")),
+    drink(flint, tinted("#7a300e"), "#efe4cc", "#6a1010", look(KIND.glossy, "#1a1210")),
+    drink(tinted("#3a2a1a"), look(BB_KINDS.dark, "#2e1206"), "#e2c88a", "#1a1a1a", look(KIND.oak, "#c8a888")),
+    drink(flint, tinted("#b8121c"), "#f4f0e6", "#b8121c", look(KIND.glossy, "#e8e4dc")),
   ],
   square: [
-    drink(flint, look(BB_KINDS.gin, "#e8f4f2"), "#f2f0ea", "#24467e", look(KIND.steel, "#ffffff"), "#4a5a5c"),
-    drink(flint, tinted("#4e8c1c"), "#e8dcb8", "#2e5a1a", look(KIND.glossy, "#1e3a14"), "#24420e"),
-    drink(flint, tinted("#9a5012"), "#121212", "#d8d0c0", look(KIND.glossy, "#121212"), "#3e1e08"),
+    drink(flint, look(BB_KINDS.gin, "#e8f4f2"), "#f2f0ea", "#24467e", look(KIND.steel, "#ffffff")),
+    drink(flint, tinted("#4e8c1c"), "#e8dcb8", "#2e5a1a", look(KIND.glossy, "#1e3a14")),
+    drink(flint, tinted("#9a5012"), "#121212", "#d8d0c0", look(KIND.glossy, "#121212")),
   ],
   tall: [
-    drink(flint, look(BB_KINDS.gin, "#f2f2ea"), "#ece6d6", "#7a1414", look(KIND.wax, "#8a1212"), "#4c5050"),
-    drink(flint, tinted("#9a3612"), "#e2c890", "#5a1a0a", look(KIND.glossy, "#3a1a0e"), "#3c1406"),
-    drink(flint, tinted("#e2c21c"), "#f4f0e0", "#3a6a1a", look(KIND.brass, "#e0c070"), "#6a5a0c"),
-    drink(tinted("#1a3a20"), tinted("#2a6a1a"), "#1a1a1a", "#c8a050", look(KIND.wax, "#1a3a14"), "#10240c"),
+    drink(flint, look(BB_KINDS.gin, "#f2f2ea"), "#ece6d6", "#7a1414", look(KIND.wax, "#8a1212")),
+    drink(flint, tinted("#9a3612"), "#e2c890", "#5a1a0a", look(KIND.glossy, "#3a1a0e")),
+    drink(flint, tinted("#e2c21c"), "#f4f0e0", "#3a6a1a", look(KIND.brass, "#e0c070")),
+    drink(tinted("#1a3a20"), tinted("#2a6a1a"), "#1a1a1a", "#c8a050", look(KIND.wax, "#1a3a14")),
   ],
 };
 
@@ -276,38 +275,170 @@ export function bottles(s: Sheets, list: readonly Stocked[]) {
 
 /** A template copied to (x, y, z), turned `yaw` round y, each role its look. */
 function copy(s: Sheets, t: Template, x: number, y: number, z: number, yaw: number, area: number, looks: readonly Look[]) {
-  const c = Math.cos(yaw);
-  const sn = Math.sin(yaw);
   for (const piece of [t.clear, t.solid]) {
-    if (!piece.count) continue;
-    const { pos, nor, role } = piece;
-    const sheet = s.sheet(area, looks[role[0]].kind);
-    sheet.reserve(piece.count);
-    for (let i = 0; i < piece.count; i++) {
-      const px = pos[i * 3];
-      const pz = pos[i * 3 + 2];
-      const nx = nor[i * 3];
-      const nz = nor[i * 3 + 2];
-      sheet.put(x + px * c + pz * sn, y + pos[i * 3 + 1], z - px * sn + pz * c, nx * c + nz * sn, nor[i * 3 + 1], -nx * sn + nz * c, looks[role[i]]);
-    }
+    if (piece.count) s.sheet(area, looks[piece.role[0]].kind).copy(piece, x, y, z, yaw, looks);
   }
 }
 
-/** Far off: a spike of twelve triangles, four sides up the body and four to the neck's top, in the drink's dark colour. */
-export function farBottles(b: Builder, list: readonly Stocked[]) {
+/** A ring of a far bottle: its corners' angles from the way it faces (ascending, the first shared with the ring it meets), out to `r`, at `y`. */
+type Ring = { angles: readonly number[]; r: number; y: number };
+
+/** A polygon's corners' angles, `sides` of them from `start`. */
+const corners = (sides: number, start: number) => Array.from({ length: sides }, (_, i) => start + (i / sides) * Math.PI * 2);
+/** How much further out a polygon's corners are than the round it stands for, to be as wide on average over the ways it is seen. */
+const wide = (sides: number) => Math.PI / (sides * Math.sin(Math.PI / sides));
+
+/**
+ * Far off, a round bottle's body is a hexagon with a corner toward the
+ * room, its neck three-sided; a square bottle's body is its box. Those seen
+ * nearer at the switch (the window's) are finer: an octagon with a face
+ * toward the room, its shoulder rounded in two, its neck four-sided.
+ */
+const SHAPES = {
+  round: { body: corners(6, 0), neck: corners(3, 0) },
+  square: { body: corners(4, Math.PI / 4), neck: corners(3, Math.PI / 4) },
+  fineRound: { body: corners(8, Math.PI / 8), neck: corners(4, Math.PI / 8) },
+  fineSquare: { body: corners(4, Math.PI / 4), neck: corners(4, Math.PI / 4) },
+};
+
+/** What each part of a far bottle is drawn as. */
+type Role = "glass" | "full" | "label" | "band" | "cap";
+
+/**
+ * Far off, a bottle in forty to fifty triangles (`fine`: seventy), in the
+ * looks its detail has: the body to its shoulder, full to where it is
+ * filled, its label on the faces toward the room; the shoulder narrowing to
+ * the neck; the capsule, or the stopper's head, closing it. They go to the
+ * far mesh painted and tagged as they are made, each area's in a piece.
+ */
+export function farBottles(b: Builder, list: readonly Stocked[], fine: (bottle: Stocked) => boolean) {
+  const sheets = new Map<number, Sheet>();
+  // A triangle's corners as they are made: x, y, z and the normal, three times.
+  const corner = new Float64Array(18);
   for (const bottle of list) {
     const s = BOTTLE_SHAPES[bottle.kind];
+    const dress = DRESS[bottle.kind];
     const d = bottle.drink;
     const square = bottle.kind === "square";
-    const a = square ? s.r * 0.75 * Math.SQRT2 : s.r;
-    const shoulder = s.body - s.r * 0.6;
-    const g = new THREE.CylinderGeometry(a, a, shoulder, 4, 1, true).translate(0, shoulder / 2, 0);
-    const top = new THREE.ConeGeometry(a, s.top - shoulder, 4, 1, true).translate(0, shoulder + (s.top - shoulder) / 2, 0);
-    // Corners toward the room, so its two lit sides read as round; a square bottle's faces square to the felt box.
-    const m = new THREE.Matrix4().makeRotationY(square ? Math.PI / 4 : 0).setPosition(bottle.x, bottle.on, bottle.z);
-    b.standIn(bottle.area, g, d.far, KIND.bottleFar, m);
-    b.standIn(bottle.area, top, d.far, KIND.bottleFar, m);
+    const span = square ? s.r * 0.75 : s.r;
+    const R = span - INSET;
+    const n = s.neck - INSET;
+    const h = s.r * 0.6;
+    const yb = s.body - h;
+    const yn = yb + h * (1 - (n / span) ** 2);
+    const fill = bottle.fill;
+    const looks = {} as Record<Role, Look>;
+    for (const [role, l] of [["glass", d.glass], ["full", d.full], ["label", d.label], ["band", d.band], ["cap", d.cap]] as const) looks[role] = { kind: l.kind, color: l.color };
+    const c = Math.cos(bottle.facing);
+    const sn = Math.sin(bottle.facing);
+    // Corner `k`: out along an angle and up, its normal leaning out (along `nth`) and up, turned to face the way the bottle does.
+    const put = (k: number, th: number, r: number, y: number, no: number, nu: number, nth = th) => {
+      const px = r * Math.cos(th);
+      const pz = r * Math.sin(th);
+      const nx = no * Math.cos(nth);
+      const nz = no * Math.sin(nth);
+      const o = k * 6;
+      corner[o] = bottle.x + px * c + pz * sn;
+      corner[o + 1] = bottle.on + y;
+      corner[o + 2] = bottle.z - px * sn + pz * c;
+      corner[o + 3] = nx * c + nz * sn;
+      corner[o + 4] = nu;
+      corner[o + 5] = -nx * sn + nz * c;
+    };
+    // The three corners made, in `role`'s look, wound to face the way their normals do.
+    const tri = (role: Role) => {
+      const l = looks[role];
+      const key = bottle.area * 2 + (l.kind >= CLEAR ? 1 : 0);
+      let sheet = sheets.get(key);
+      if (!sheet) sheets.set(key, (sheet = new Sheet()));
+      const p = corner;
+      const ux = p[6] - p[0], uy = p[7] - p[1], uz = p[8] - p[2];
+      const wx = p[12] - p[0], wy = p[13] - p[1], wz = p[14] - p[2];
+      const cx = uy * wz - uz * wy, cy = uz * wx - ux * wz, cz = ux * wy - uy * wx;
+      const out = cx * (p[3] + p[9] + p[15]) + cy * (p[4] + p[10] + p[16]) + cz * (p[5] + p[11] + p[17]) > 0;
+      sheet.reserve(3);
+      for (const k of out ? ORDER : FLIPPED) sheet.put(p[k * 6], p[k * 6 + 1], p[k * 6 + 2], p[k * 6 + 3], p[k * 6 + 4], p[k * 6 + 5], l);
+    };
+
+    // The body: each face up from the foot in bands, changing where it is filled to and, on the faces toward the room, where the label is.
+    const smooth = fine(bottle);
+    const { body, neck } = SHAPES[smooth ? (square ? "fineSquare" : "fineRound") : square ? "square" : "round"];
+    const rb = square ? R * Math.SQRT2 : R * wide(body.length);
+    const [l0, l1, half] = dress.label;
+    const [b0, b1] = dress.band ?? [0, 0];
+    for (let k = 0; k < body.length; k++) {
+      const a0 = body[k];
+      const a1 = k + 1 < body.length ? body[k + 1] : body[0] + Math.PI * 2;
+      const mid = (a0 + a1) / 2;
+      const labelled = Math.abs(Math.atan2(Math.sin(mid), Math.cos(mid))) < half;
+      const rows = [0, yb, ...(fill > 0 && fill < yb ? [fill] : []), ...(labelled ? [l0, l1, ...(dress.band ?? [])] : [])].sort((p, q) => p - q);
+      for (let i = 0; i + 1 < rows.length; i++) {
+        const y0 = rows[i];
+        const y1 = rows[i + 1];
+        if (y1 - y0 < 0.01) continue;
+        const m = (y0 + y1) / 2;
+        const role = labelled && m > l0 && m < l1 ? "label" : labelled && m > b0 && m < b1 ? "band" : m < fill ? "full" : "glass";
+        // A square bottle's faces are flat; a round one's shaded round.
+        const n0 = square ? mid : a0;
+        const n1 = square ? mid : a1;
+        put(0, a0, rb, y0, 1, 0, n0);
+        put(1, a1, rb, y0, 1, 0, n1);
+        put(2, a1, rb, y1, 1, 0, n1);
+        tri(role);
+        put(1, a1, rb, y1, 1, 0, n1);
+        put(2, a0, rb, y1, 1, 0, n0);
+        tri(role);
+      }
+    }
+
+    // The shoulder, from the body's top to the neck (by way of its middle, when fine); the neck to the capsule; the capsule, tapering to a flat top.
+    const rn = n * wide(neck.length);
+    const top = s.top - n * 0.2;
+    const zip = (role: Role, lo: Ring, hi: Ring) => {
+      const dr = lo.r - hi.r;
+      const dy = hi.y - lo.y;
+      const l = Math.hypot(dr, dy) || 1;
+      const no = dy / l;
+      const nu = dr / l;
+      const angle = (ring: Ring, i: number) => (i < ring.angles.length ? ring.angles[i] : ring.angles[i - ring.angles.length] + Math.PI * 2);
+      let i = 0;
+      let j = 0;
+      while (i < lo.angles.length || j < hi.angles.length) {
+        put(0, angle(lo, i), lo.r, lo.y, no, nu);
+        if (j >= hi.angles.length || (i < lo.angles.length && angle(lo, i + 1) <= angle(hi, j + 1))) {
+          put(1, angle(lo, i + 1), lo.r, lo.y, no, nu);
+          put(2, angle(hi, j), hi.r, hi.y, no, nu);
+          i++;
+        } else {
+          put(1, angle(hi, j + 1), hi.r, hi.y, no, nu);
+          put(2, angle(hi, j), hi.r, hi.y, no, nu);
+          j++;
+        }
+        tri(role);
+      }
+    };
+    const shoulder: Ring = { angles: body, r: rb, y: yb };
+    const base: Ring = { angles: neck, r: rn, y: yn };
+    const capped: Ring = { angles: neck, r: rn, y: dress.cap };
+    const crown: Ring = { angles: neck, r: rn * 0.7, y: top };
+    const full = (y0: number, y1: number) => (fill > (y0 + y1) / 2 ? "full" : "glass");
+    if (smooth) {
+      const a = (R + n) / 2;
+      const middle: Ring = { angles: body, r: rb * (a / R), y: yb + h * (1 - ((a + INSET) / span) ** 2) };
+      zip(full(yb, middle.y), shoulder, middle);
+      zip(full(middle.y, yn), middle, base);
+    } else zip(full(yb, yn), shoulder, base);
+    zip(full(yn, dress.cap), base, capped);
+    zip("cap", capped, crown);
+    for (let k = 1; k + 1 < neck.length; k++) {
+      put(0, neck[0], crown.r, top, 0, 1);
+      put(1, neck[k], crown.r, top, 0, 1);
+      put(2, neck[k + 1], crown.r, top, 0, 1);
+      tri("cap");
+    }
   }
+  // Each area's sheets, solid and clear, as its stand-ins.
+  for (const [key, sheet] of sheets) b.standInPainted(key >> 1, sheet.geometry(), key & 1 ? CLEAR : 0);
 }
 
 /** The fridge's bottles: beer, white wine, water, soda; (radius, height) up the outside. */

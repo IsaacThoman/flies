@@ -279,7 +279,8 @@ export const ON_HOST = {
 export const ON_STATION = {
   tray: { x: -2060, z: -2760, hx: 160, hz: 110, well: 4, rim: 55 },
   plates: { x: -1700, z: -2800, r: 135, height: 90 },
-  carafe: { x: -1420, z: -2700, r: 55, shoulder: 200, crown: 40, neck: 22, top: 280, mouth: 60 },
+  // Its mouth as deep as the neck, down to where the body's dome closes it.
+  carafe: { x: -1420, z: -2700, r: 55, shoulder: 200, crown: 40, neck: 22, top: 280, mouth: 40 },
   tumblers: Array.from({ length: 6 }, (_, i) => ({ x: -1330 + (i % 3) * 80, z: -2880 + Math.floor(i / 3) * 80 })) as readonly { x: number; z: number }[],
   tumbler: { r: 35, height: 95 },
 };

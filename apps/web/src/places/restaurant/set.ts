@@ -253,7 +253,8 @@ export function buildRestaurant(): SceneSet {
       shared.uPendant.value.w = PENDANT * lit;
       shared.uFridge.value.setRGB(0.55, 0.68, 0.85);
       shared.uExit.value.setRGB(0.02, 0.5, 0.18);
-      shared.uKitchen.value.setRGB(0.05, 0.055, 0.06).multiplyScalar(0.6 + night);
+      // The kitchen past the pass: its own windows' daylight, and a strip light left on at night.
+      shared.uKitchen.value.setRGB(0.3, 0.31, 0.3).multiplyScalar(1 - night).add(glow.setRGB(0.05, 0.055, 0.06).multiplyScalar(0.6 + night));
       shared.uHeat.value.setRGB(0.5, 0.12, 0.03).multiplyScalar(0.4 + 0.6 * night);
       // The sky through the glass by day, and the street's glow after dark.
       glow.copy(light.skyColor).lerp(light.horizon, 0.3).multiplyScalar(3.4 * (1 - night) + 0.05);

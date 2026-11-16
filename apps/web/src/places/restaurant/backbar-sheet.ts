@@ -56,6 +56,38 @@ export class Sheet {
     this.#kind[i] = l.kind;
   }
 
+  /** A template's triangles (`role` of each corner picks its look) copied to (x, y, z), turned `yaw` round y: thousands of corners, so written straight in. */
+  copy(t: { pos: Float32Array; nor: Float32Array; role: Uint8Array; count: number }, x: number, y: number, z: number, yaw: number, looks: readonly Look[]) {
+    this.reserve(t.count);
+    const c = Math.cos(yaw);
+    const sn = Math.sin(yaw);
+    const p = this.#pos;
+    const n = this.#nor;
+    const col = this.#col;
+    const kind = this.#kind;
+    let o = this.count * 3;
+    for (let i = 0; i < t.count; i++) {
+      const i3 = i * 3;
+      const px = t.pos[i3];
+      const pz = t.pos[i3 + 2];
+      const nx = t.nor[i3];
+      const nz = t.nor[i3 + 2];
+      const l = looks[t.role[i]];
+      p[o] = x + px * c + pz * sn;
+      p[o + 1] = y + t.pos[i3 + 1];
+      p[o + 2] = z - px * sn + pz * c;
+      n[o] = nx * c + nz * sn;
+      n[o + 1] = t.nor[i3 + 1];
+      n[o + 2] = -nx * sn + nz * c;
+      col[o] = l.color.r;
+      col[o + 1] = l.color.g;
+      col[o + 2] = l.color.b;
+      kind[this.count + i] = l.kind;
+      o += 3;
+    }
+    this.count += t.count;
+  }
+
   geometry() {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(this.#pos.slice(0, this.count * 3), 3));
