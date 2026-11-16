@@ -7,6 +7,7 @@
 // nothing but a uniform, and the fly's eyes get a copy that folds nothing.
 
 import * as THREE from "three";
+import type { WallClock } from "../../scene/clock.ts";
 import { streetLightUniforms } from "./traffic.ts";
 import { AREA_STRIDE, KINDS_GLSL } from "./kinds.ts";
 import { CASTERS, NOISE, SHADE, hookedLights } from "./light.ts";
@@ -26,7 +27,7 @@ export const RIPPLES = 4;
 /** The uniforms every material in the room shares, filled by the set's update. */
 export type Shared = ReturnType<typeof sharedUniforms>;
 
-export function sharedUniforms(floorAO: THREE.Texture) {
+export function sharedUniforms(floorAO: THREE.Texture, clock: WallClock) {
   return {
     uTime: { value: 0 },
     uNight: { value: 0 },
@@ -51,6 +52,8 @@ export function sharedUniforms(floorAO: THREE.Texture) {
     /** Rings, stains and smears on that area's table top: x, z, radius, and what (0 wine, 1 coffee, 2 water). */
     uRings: { value: new Float32Array(6 * 4) },
     uRipples: { value: new Float32Array(RIPPLES * 4).fill(-100) },
+    /** The clock's hands (scene/clock.ts). */
+    uClockHands: clock.hands,
     ...streetLightUniforms,
   };
 }

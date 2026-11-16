@@ -14,6 +14,7 @@ import { BANQUETTE, BOTTLES, CHAIR, DINING_ROOM, ESPRESSO, HOST_STAND, PASS, RES
 import type { Solid } from "@fly/world";
 import { EYE_LAYER } from "../../eyes/eyes.ts";
 import { canvasTexture, freeze } from "../../scene/build.ts";
+import { WallClock } from "../../scene/clock.ts";
 import type { Daylight } from "../../scene/light.ts";
 import type { Weather } from "../../scene/weather.ts";
 import type { SceneSet } from "../types.ts";
@@ -155,7 +156,9 @@ function rings(area: AreaSpec, lit: Lit, seed: number) {
 
 export function buildRestaurant(): SceneSet {
   const group = new THREE.Group();
-  const shared = sharedUniforms(floorShadows());
+  // The clock over the bar tells the real time.
+  const clock = new WallClock();
+  const shared = sharedUniforms(floorShadows(), clock);
   const mask = { value: 0 };
   const solid = solidMaterial(shared, mask);
   const clear = clearMaterial(shared, mask);
@@ -240,6 +243,7 @@ export function buildRestaurant(): SceneSet {
     },
     update(time: number, light: Daylight, weather: Weather, camera?: THREE.Camera) {
       shared.uTime.value = time;
+      clock.update();
       const night = light.stars;
       shared.uNight.value = night;
       updateStreetLight(time, light, weather);

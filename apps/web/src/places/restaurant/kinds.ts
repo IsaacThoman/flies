@@ -79,6 +79,8 @@ export const KIND = {
   bottleFar: 38,
   /** A squashed grape on the floor. */
   grape: 39,
+  /** The clock's face: an enamel dial with its marks and hands, telling the real time. */
+  dial: 40,
   /** Clear glass: wine glasses, shakers, the vase, the cloche, the caddy. */
   glass: 96,
   /** Red wine and white, left in the glasses. */

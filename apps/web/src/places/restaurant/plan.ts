@@ -54,5 +54,16 @@ export const FANS = [
   { x: 1400, z: -400 },
 ].map((f) => ({ ...f, y: height - 520, r: 640 }));
 
+/**
+ * The clock over the bar, high on the left wall above the mirror's cornice
+ * and out of the fly's reach: its dial (scene/clock.ts) facing the room, the
+ * case's depth and the bezel's width.
+ */
+export const CLOCK = {
+  dial: { centre: { x: -DINING_ROOM.hx + 62, y: 2770, z: -550 }, up: { x: 0, y: 1, z: 0 }, right: { x: 0, y: 0, z: -1 }, radius: 196 },
+  depth: 62,
+  bezel: 22,
+};
+
 /** The room's corners, for whatever needs the room's size. */
 export const ROOM = { x0: -hx, x1: hx, z0: -hz, z1: hz, height };

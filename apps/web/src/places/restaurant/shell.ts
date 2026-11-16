@@ -15,7 +15,7 @@ import { box, lathe } from "./geometry.ts";
 import { KIND } from "./kinds.ts";
 import { BACK_MIRROR } from "./backbar.ts";
 import { DIFFUSERS } from "./live.ts";
-import { FANS, FRONT, KITCHEN, OUT_OF_REACH, WAINSCOT } from "./plan.ts";
+import { CLOCK, FANS, FRONT, KITCHEN, OUT_OF_REACH, WAINSCOT } from "./plan.ts";
 import { mat4 } from "../../scene/build.ts";
 
 const { hx, hz, height } = DINING_ROOM;
@@ -293,6 +293,18 @@ export function buildShell(b: Builder) {
     b.shell(box(d.x0 + 20, 20, d.z0 - 1, d.x1 - 20, d.bottom - 30, d.z0), "#ffffff", KIND.brass);
     b.shell(new THREE.CylinderGeometry(14, 14, d.x1 - d.x0 - 200, 12).rotateZ(Math.PI / 2).translate((d.x0 + d.x1) / 2, 1050, d.z0 - 2), "#ffffff", KIND.brass);
     for (const x of [d.x0 + 110, d.x1 - 110]) b.shell(new THREE.CylinderGeometry(8, 8, 40, 8).rotateX(Math.PI / 2).translate(x, 1050, d.z0 + 15), "#ffffff", KIND.brass);
+  }
+
+  // The clock over the bar: a black enamel case, a brass bezel, the face (its marks and hands are drawn on it: surfaces.ts).
+  {
+    const { dial, depth, bezel } = CLOCK;
+    const c = dial.centre;
+    const r = dial.radius;
+    const turned = (profile: [number, number][], color: string, kind: number) =>
+      b.shell(lathe(profile, 48).rotateZ(-Math.PI / 2).translate(-hx, c.y, c.z), color, kind);
+    turned([[r + bezel + 14, 0], [r + bezel + 16, 8], [r + bezel + 12, depth - 22], [r + bezel, depth - 16]], "#141414", KIND.enamel);
+    turned([[r + bezel, depth - 16], [r + bezel + 2, depth - 6], [r + bezel - 6, depth + 2], [r + 3, depth + 1], [r, depth - 2]], "#ffffff", KIND.brass);
+    b.shell(new THREE.CircleGeometry(r + 0.5, 64).rotateY(Math.PI / 2).translate(c.x - 2, c.y, c.z), "#f4eedf", KIND.dial);
   }
 
   // The ventilation's diffusers, square louvres in the tin (live.ts).

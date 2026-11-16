@@ -7,12 +7,14 @@
 // variables the material then uses (materials.ts).
 
 import { DINING_ROOM, ZINC_BAR } from "@fly/world";
-import { EXIT, PENDANT_LIGHT, ROOM } from "./plan.ts";
+import { CLOCK_GLSL, onDial } from "../../scene/clock.ts";
+import { CLOCK, EXIT, PENDANT_LIGHT, ROOM } from "./plan.ts";
 
 const f = (n: number) => n.toFixed(1);
 
-/** Functions the surfaces share: wood, marble, the floor's lattice, the zinc's hammering. */
+/** Functions the surfaces share: wood, marble, the floor's lattice, the zinc's hammering, the clock's dial. */
 export const SURFACE_HEAD = /* glsl */ `
+${CLOCK_GLSL}
 float rAO;
 float rRough;
 float rMetal;
@@ -440,6 +442,24 @@ if (rK == K_BOTTLE_FAR) {
 }
 if (rK == K_KITCHEN) rRough = 0.5;
 if (rK == K_FLOWER || rK == K_BOTTLE_FAR) rCoatRough = 0.06;
+if (rK == K_DIAL) {
+  // A station clock's face: a mark for every minute, bolder for the hours, black hands, a red sweep second hand; no numbers.
+  vec2 q = ${onDial(CLOCK.dial)}.xy;
+  float px = length(fwidth(q)) + 1e-4;
+  float ink = max(clockTicks(q, 60.0, 0.86, 0.94, 0.012, px), clockTicks(q, 12.0, 0.72, 0.94, 0.045, px));
+  ink = max(ink, clockRing(q, 0.96, 0.975, px));
+  ink = max(ink, clockHand(q, uClockHands.x, 0.55, 0.12, 0.07, 0.05, px));
+  ink = max(ink, clockHand(q, uClockHands.y, 0.84, 0.14, 0.055, 0.035, px));
+  float second = max(clockHand(q, uClockHands.z, 0.86, 0.22, 0.012, 0.012, px), clockSpot(q, clockAlong(uClockHands.z, 0.62), 0.045, px));
+  vec3 face = mix(vec3(0.93, 0.9, 0.82), vec3(0.04, 0.04, 0.045), ink);
+  face = mix(face, vec3(0.7, 0.08, 0.06), second);
+  face = mix(face, vec3(0.1, 0.1, 0.1), clockSpot(q, vec2(0.0), 0.03, px));
+  // Aged: a little yellowed toward the rim, where the light catches the glass.
+  diffuseColor.rgb = face * (1.0 - 0.08 * smoothstep(0.5, 1.0, length(q)));
+  rRough = 0.25;
+  rCoat = 0.8;
+  rCoatRough = 0.05;
+}
 `;
 
 /** After every kind's look (the parts' too): the shadows gathered where things meet. */
