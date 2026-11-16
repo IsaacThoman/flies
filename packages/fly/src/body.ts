@@ -216,6 +216,22 @@ function addBristles(b: MeshBuilder, specs: BristleSpec[], point: (u: number, v:
   }
 }
 
+/**
+ * Where each macrochaeta's root is in the rest space, left side (the right
+ * mirrors it), with the joint it moves with: its sense cell is there.
+ */
+export function bristleSockets(): { joint: number; at: Vec3 }[] {
+  const out: { joint: number; at: Vec3 }[] = [];
+  const p = [0, 0, 0];
+  for (const [specs, point, joint] of [[HEAD_BRISTLES, headPoint, J.head], [THORAX_BRISTLES, thoraxPoint, J.thorax], [SCUTELLAR, scutellumPoint, J.thorax]] as const) {
+    for (const s of specs) {
+      point(s.u, s.v, p);
+      out.push({ joint, at: [p[0], p[1], p[2]] });
+    }
+  }
+  return out;
+}
+
 export function buildBody(): THREE.BufferGeometry {
   const b = new MeshBuilder();
 

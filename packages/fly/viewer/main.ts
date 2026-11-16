@@ -10,7 +10,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { RESTING_POSE } from "@fly/contracts";
 import type { FlyAnchor, FlyPose } from "@fly/contracts";
-import { createFly } from "../src/index.ts";
+import { NERVE_PARTS, createFly, createNervesPanelMaterial } from "../src/index.ts";
 
 const params = new URLSearchParams(location.search);
 const stage = document.getElementById("stage")!;
@@ -65,7 +65,8 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 const environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
 const fly = createFly();
-fly.object.traverse((o) => { o.castShadow = true; });
+// The nervous system is inside the body and casts no shadow of its own.
+fly.object.traverse((o) => { o.castShadow = o.name !== "fly-nerves"; });
 scene.add(fly.object);
 
 const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 200);
@@ -75,7 +76,7 @@ controls.target.set(0, 0.25, 0);
 controls.enableDamping = true;
 
 const pose: FlyPose = { ...RESTING_POSE };
-const state = { turntable: false, roam: true, game: false, gamePx: 100, timescale: 1, fps: 0, heading: 0, height: 0, time: 0 };
+const state = { turntable: false, roam: true, game: false, gamePx: 100, timescale: 1, fps: 0, heading: 0, height: 0, time: 0, glow: "none", part: 0 };
 
 // --- Controls ---------------------------------------------------------------
 type Slider = { key: keyof FlyPose; min: number; max: number; step: number };
@@ -145,6 +146,9 @@ bind("turntable", (el) => { state.turntable = el.checked; });
 bind("roam", (el) => { state.roam = el.checked; });
 bind("game", (el) => setGame(el.checked, state.gamePx));
 bind("gamePx", (el) => { document.getElementById("gamePxOut")!.textContent = el.value; setGame(state.game, Number(el.value)); });
+bind("xray", (el) => { fly.nerves.xray = Number(el.value); document.getElementById("xrayOut")!.textContent = el.value; });
+bind("part", (el) => { state.part = Number(el.value); document.getElementById("partOut")!.textContent = NERVE_PARTS[state.part]?.id ?? ""; });
+(document.getElementById("glow") as HTMLSelectElement).addEventListener("change", (e) => { state.glow = (e.target as HTMLSelectElement).value; });
 bind("env", (el) => { scene.environment = el.checked ? environment : null; });
 bind("shadows", (el) => { sun.castShadow = el.checked; });
 (document.getElementById("timescale") as HTMLSelectElement).addEventListener("change", (e) => { state.timescale = Number((e.target as HTMLSelectElement).value); });
@@ -229,6 +233,7 @@ function advance(dt: number) {
   state.height += (target - state.height) * (1 - Math.exp(-dt / (pose.airborne ? 0.25 : 0.12)));
   if (!pose.airborne && state.height < 0.002) state.height = 0;
   o.position.y = state.height;
+  testGlow(state.time);
   fly.update(pose, dt);
   if (state.turntable) camera.position.sub(controls.target).applyAxisAngle(new THREE.Vector3(0, 1, 0), dt * 0.5).add(controls.target);
   // The camera follows the fly over the ground.
@@ -239,9 +244,60 @@ function advance(dt: number) {
   sun.target.position.set(o.position.x, 0, o.position.z);
 }
 
+/**
+ * Test patterns for looking at the drawing: every part, one role, one part,
+ * or a wave travelling through the parts in their order (eyes inward, then
+ * down the cord and out). The game lights it from the brain instead.
+ */
+function testGlow(t: number) {
+  const glow = fly.nerves.glow;
+  for (let i = 0; i < NERVE_PARTS.length; i++) {
+    const role = NERVE_PARTS[i].role;
+    let g = 0;
+    if (state.glow === "all") g = 0.8;
+    else if (state.glow === role) g = 0.9;
+    else if (state.glow === "part") g = i === state.part ? 1 : 0;
+    else if (state.glow === "levels") g = (i % 6) / 5;
+    else if (state.glow === "wave") g = Math.max(0, 1 - Math.abs(((t * 12) % (NERVE_PARTS.length + 10)) - i) / 4);
+    glow[i] = g;
+  }
+}
+
+// The nervous system as the game's corner panel draws it (from above, at
+// rest), large over the stage, to look at its drawing closely.
+const panelScene = new THREE.Scene();
+const panelUniforms = {
+  uPanel: { value: new THREE.Vector4() },
+  uView: { value: new THREE.Vector4() },
+  uPicture: { value: new THREE.Vector4() },
+  uBackdrop: { value: null },
+  uAlpha: { value: 1 },
+};
+let panelMesh: THREE.Mesh | null = null;
+/** Shows the panel's view of the nervous system, `size` pixels square, showing `span` body lengths across; 0 hides it. */
+function showPanel(size: number, span = 0.7, top = 0.6) {
+  if (panelMesh) panelScene.remove(panelMesh);
+  panelMesh = null;
+  if (size <= 0) return;
+  const frame = renderer.getDrawingBufferSize(new THREE.Vector2());
+  const material = createNervesPanelMaterial(fly.nerves.glowUniform, fly.nerves.rest, { width: frame.x, height: frame.y }, panelUniforms);
+  panelMesh = new THREE.Mesh(fly.nerves.geometry, material);
+  panelMesh.frustumCulled = false;
+  panelScene.add(panelMesh);
+  const scale = size / span;
+  panelUniforms.uPanel.value.set(0, 0, size, size);
+  panelUniforms.uView.value.set(size / 2, top * scale, scale, scale);
+  panelUniforms.uPicture.value.set(0, 0, size, size);
+}
+
 function render() {
   controls.update();
   renderer.render(scene, camera);
+  if (panelMesh) {
+    renderer.autoClear = false;
+    renderer.render(panelScene, camera);
+    renderer.autoClear = true;
+  }
 }
 
 const statsEl = document.getElementById("stats")!;
@@ -293,6 +349,21 @@ const api = {
     resize();
   },
   anchor: (name: FlyAnchor) => fly.anchor(name, anchor).toArray(),
+  xray(amount: number, glow = "all", part = 0) {
+    fly.nerves.xray = amount;
+    state.glow = glow;
+    state.part = typeof part === "string" ? NERVE_PARTS.findIndex((p) => p.id === part) : part;
+  },
+  parts: () => NERVE_PARTS.map((p) => p.id),
+  panel: showPanel,
+  /** Shows only the meshes named (fly-body, fly-wings, fly-nerves), or all of them. */
+  only(...names: string[]) {
+    fly.object.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.visible = !names.length || names.includes(o.name); });
+  },
+  background(color: string | null) {
+    sky.visible = ground.visible = color === null;
+    scene.background = color === null ? null : new THREE.Color(color);
+  },
   info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, steps: [...fly.rig.gait.steps] }),
   reset() {
     fly.object.position.set(0, 0, 0);
