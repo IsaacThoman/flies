@@ -15,7 +15,10 @@ permissions:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    # arm64, as the brain's bit-for-bit tests need: Node's V8 fuses multiply-adds in Math.sin and
+    # Math.cos there, as the committed WebAssembly does, and not on x86-64
+    # (packages/brain-native/README.md).
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
