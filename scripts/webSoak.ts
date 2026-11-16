@@ -107,6 +107,10 @@ async function choose(page: Page, tool: string, variant: string) {
 }
 
 async function canonical(page: Page) {
+  if ((await readState(page)).wallpaper === "true") {
+    await page.keyboard.press("Enter");
+    await waitFor(page, "wallpaper=false");
+  }
   await page.evaluate(() => {
     const g = globalThis.__fly;
     g.play();
@@ -381,6 +385,7 @@ export async function run(args = process.argv.slice(2)) {
           for (const shown of ["off", "always", "wallpaper"] as const) for (const kind of ["brain", "day", "both"] as const) for (const size of ["small", "medium", "large"] as const) for (const opacity of ["full", "soft", "faint"] as const) {
             await page.evaluate(({ shown, kind, size, opacity }) => {
               const g = globalThis.__fly;
+              if (shown === "wallpaper") g.watch();
               g.settings.statsPanel = shown; g.settings.statsKind = kind;
               g.settings.overlaySize = size; g.settings.overlayOpacity = opacity;
               g.applySettings();
