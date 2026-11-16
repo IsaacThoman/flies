@@ -46,10 +46,8 @@ Neurons are numbered in ascending root ID order. The sections:
 
 ## Anatomy sidecar
 
-This display-only data was added in this repository's copy of the brain package.
-The Computerbug desktop pet's copy ([IsaacThoman/ladybug](https://github.com/IsaacThoman/ladybug))
-doesn't have it. Nothing in the simulation, `REGIONS`, region rates, native brain,
-or game loading consumes it yet.
+This data is for display. Nothing in the simulation, `REGIONS`, region rates,
+native brain or game loading consumes it yet.
 
 ### Source and getting it
 
