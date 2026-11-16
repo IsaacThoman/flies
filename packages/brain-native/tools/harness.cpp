@@ -130,7 +130,7 @@ std::vector<std::vector<float>> read_frames(const char* path) {
     std::memcpy(&count, bytes.data() + at, 4);
     at += 4;
     std::vector<float> frame(count);
-    std::memcpy(frame.data(), bytes.data() + at, 4 * static_cast<size_t>(count));
+    if (count > 0) std::memcpy(frame.data(), bytes.data() + at, 4 * static_cast<size_t>(count));
     at += 4 * static_cast<size_t>(count);
     frames.push_back(std::move(frame));
   }
