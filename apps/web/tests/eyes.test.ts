@@ -38,7 +38,7 @@ function setup() {
     light: {},
     current: { camera: {} },
   } as unknown as Stage;
-  return { eyes: new Eyes(stage, life), life, reads };
+  return { eyes: new Eyes(stage, life), life, reads, stage };
 }
 
 const settled = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -98,4 +98,26 @@ test("a rejected eye read can recover on the next refresh", async (t) => {
   reads[1].finish();
   await settled();
   assert.equal(eyes.updates, 1);
+});
+
+test("eyes refresh a frame late rather than in a frame that rebuilt the reflections", async () => {
+  const { eyes, reads, stage } = setup();
+  eyes.render(1 / 60, false);
+  reads[0].finish();
+  await settled();
+  stage.reflected = true;
+  eyes.render(1, false);
+  assert.equal(reads.length, 1, "not in the reflections' frame");
+  stage.reflected = false;
+  eyes.render(1 / 60, false);
+  assert.equal(reads.length, 2, "the next frame");
+  reads[1].finish();
+  await settled();
+});
+
+test("eyes with no picture yet refresh even in a frame that rebuilt the reflections", () => {
+  const { eyes, reads, stage } = setup();
+  stage.reflected = true;
+  eyes.render(1 / 60, false);
+  assert.equal(reads.length, 1);
 });

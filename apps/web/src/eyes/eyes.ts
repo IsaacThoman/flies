@@ -229,8 +229,11 @@ export class Eyes {
     this.#since += dt;
     this.#sinceSampled += dt;
     const hz = urgent ? URGENT_HZ : detail.hz * this.rate;
-    // One read in flight: a slow GPU must not accumulate pictures or sampling work.
-    if (!this.#pending && (this.#since >= 1 / hz - 1e-3 || !this.#light)) {
+    // One read in flight: a slow GPU must not accumulate pictures or sampling work. A frame that
+    // rebuilt the reflections (34 draws) already costs about what the eyes' faces do: they refresh
+    // on the next, a frame late, rather than double the frame's draws.
+    const due = this.#since >= 1 / hz - 1e-3 && !this.#stage.reflected;
+    if (!this.#pending && (due || !this.#light)) {
       this.#since = 0;
       this.#refresh(detail.resolution);
     }
