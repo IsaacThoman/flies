@@ -202,7 +202,11 @@ quiet room: low voices, a glass or two touching, ice settling.
 It plays as well with a finger, a mouse or trackpad, a keyboard or a game pad
 as with the remote. Your hand is a glowing ring on the table; until you move
 it, it waits just in front of the fly's mouth, and it drifts back there 15 s
-after you last did.
+after you last did. The ring answers the hand: using a tool presses it in and
+it springs back, holding Tickle or Blow keeps it in a little, and a press it
+can't act on (the ball still in the air, Up past the last kind) shakes it.
+Food that lands sets a faint ring spreading round it. None of this is in the
+fly's world.
 
 | On the remote | Does |
 | --- | --- |
@@ -563,7 +567,8 @@ three draws, only while it rains: the streaks (one quad a drop, placed and
 moved entirely in the shader from the time), the splashes (a pool of 56, each
 a ring and a crown of droplets, one instanced draw) and the beads on the fruit;
 the table's own beads and puddles are in its shader, as many as there are
-pixels for. Each visitor is one draw while it is about, the gull's shadow is
+pixels for. The ripple round food that has just landed is one draw for under
+a second. Each visitor is one draw while it is about, the gull's shadow is
 in the table's and the fly's own shading, and nothing is allocated per frame.
 Menus and hints are one 2D canvas drawn over the frame,
 uploaded only when something on it changes (at most 30 times a second; the

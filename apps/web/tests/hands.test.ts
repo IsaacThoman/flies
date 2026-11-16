@@ -84,3 +84,26 @@ test("frame end clears every hands event even when a pause skips the regular upd
   hands.clearEvents();
   assert.deepEqual(hands.events, { dropped: null, landed: null, swooped: false, toolChanged: false, variantChanged: false, blocked: false });
 });
+
+test("food lands on what is under it, and the hands say where and which way it faces, for its ripple", () => {
+  const place: Place = { ...bare, solids: [{ name: "pot", footprint: { kind: "circle", x: 0, z: 30, r: 10 }, top: { kind: "flat", y: 12 } }] };
+  const world = new World(place);
+  const hands = new Hands(world);
+  const pantry = new Pantry(world);
+  const fly = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true };
+  const eye = { x: 0, y: 5, z: -10 };
+  hands.following = false;
+  hands.pointer.x = 2;
+  hands.pointer.z = 31;
+  hands.update(0, { use: true, holding: true, eye }, fly, pantry);
+  hands.clearEvents();
+  let landed = false;
+  for (let i = 0; i < 60 && !landed; i++) {
+    hands.update(1 / 60, { use: false, holding: false, eye }, fly, pantry);
+    landed = hands.events.landed === "sugar";
+    hands.clearEvents();
+  }
+  assert.ok(landed);
+  assert.deepEqual(hands.landedAt, { x: 2, y: 12, z: 31 });
+  assert.deepEqual(hands.landedNormal, { x: 0, y: 1, z: 0 });
+});

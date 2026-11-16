@@ -13,6 +13,10 @@ import type { Hands, ToolId } from "./hands.ts";
 const KINDS: readonly FoodKind[] = ["sugar", "honey", "berry", "water"];
 const MAX_FOOD = 8;
 const PUFFS = 24;
+/** How far (a share of its size) a use presses the ring in, a held tool keeps it in, and how long food's landing ripples (s). */
+const PRESS_IN = 0.22;
+const HOLD_IN = 0.1;
+const RIPPLE_SECONDS = 0.8;
 
 function ringTexture() {
   const { canvas, g } = canvas2d(128, 128);
@@ -293,6 +297,15 @@ function foodGeometry(kind: FoodKind) {
 export class HandsView {
   readonly group = new THREE.Group();
   #ring: THREE.Mesh;
+  /** The ring's impression spreading where food lands. */
+  #ripple: THREE.Mesh;
+  #rippleAge = RIPPLE_SECONDS;
+  #rippleSize = 1;
+  /** Seconds since the hand last did something (pressed in) or was refused (shaken), and how far a held tool holds it in. */
+  #pressAge = 9;
+  #shakeAge = 9;
+  #held = false;
+  #hold = 0;
   #icon: THREE.Sprite;
   #icons = new Map<ToolId, THREE.Texture>();
   #foods = new Map<FoodKind, THREE.InstancedMesh>();
@@ -325,6 +338,11 @@ export class HandsView {
     this.#ring = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: ringTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
     this.#ring.renderOrder = 8;
     this.group.add(this.#ring);
+    const ringMaterial = this.#ring.material as THREE.MeshBasicMaterial;
+    this.#ripple = new THREE.Mesh(this.#ring.geometry, new THREE.MeshBasicMaterial({ map: ringMaterial.map, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+    this.#ripple.renderOrder = 8;
+    this.#ripple.visible = false;
+    this.group.add(this.#ripple);
     for (const tool of TOOLS) this.#icons.set(tool.id, iconTexture(tool.id));
     this.#icon = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.#icons.get("feed"), transparent: true, depthTest: false, depthWrite: false }));
     this.#icon.renderOrder = 9;
@@ -380,13 +398,27 @@ export class HandsView {
     const p = hands.pointer;
     const ring = this.#ring;
     ring.visible = showPointer;
+    // The hand answers what it does, as a finger feels a press: using a tool pushes the ring
+    // in and it springs back, holding one keeps it in a little, and a refusal shakes it.
+    const ev = hands.events;
+    const holding = hands.stroking || hands.blowing;
+    if (ev.dropped !== null || ev.swooped || (holding && !this.#held)) this.#pressAge = 0;
+    if (ev.blocked) this.#shakeAge = 0;
+    this.#held = holding;
+    this.#pressAge += dt;
+    this.#shakeAge += dt;
+    this.#hold += ((holding ? HOLD_IN : 0) - this.#hold) * Math.min(1, dt * 12);
     if (showPointer) {
       this.#n.set(hands.normal.x, hands.normal.y, hands.normal.z);
       ring.quaternion.setFromUnitVectors(UP, this.#n);
       // Sized to look the same however far the camera is.
-      const size = camera.position.distanceTo(this.#p.set(p.x, p.y, p.z)) * 0.13 * (1 + Math.sin(time * 4) * 0.06);
+      const distance = camera.position.distanceTo(this.#p.set(p.x, p.y, p.z)) * 0.13;
+      const press = this.#pressAge < 1 ? Math.exp(-this.#pressAge * 7) * Math.cos(this.#pressAge * 24) * PRESS_IN : 0;
+      const size = distance * (1 + Math.sin(time * 4) * 0.06) * (1 - press - this.#hold);
       ring.scale.set(size, 1, size);
-      ring.position.set(p.x + this.#n.x * 0.05, p.y + this.#n.y * 0.05, p.z + this.#n.z * 0.05);
+      const r = this.#right.setFromMatrixColumn(camera.matrixWorld, 0);
+      const shake = this.#shakeAge < 0.6 ? Math.sin(this.#shakeAge * 45) * Math.exp(-this.#shakeAge * 9) * distance * 0.12 : 0;
+      ring.position.set(p.x + this.#n.x * 0.05 + r.x * shake, p.y + this.#n.y * 0.05, p.z + this.#n.z * 0.05 + r.z * shake);
       (ring.material as THREE.MeshBasicMaterial).opacity = this.opacity;
       const icon = this.#icon;
       const id = hands.current.id;
@@ -396,7 +428,6 @@ export class HandsView {
       // Floating up beside the ring, on the side away from the fly, so it never covers it.
       const s = size * 0.45;
       icon.scale.set(s, s, 1);
-      const r = this.#right.setFromMatrixColumn(camera.matrixWorld, 0);
       const away = (p.x - fly.x) * r.x + (p.z - fly.z) * r.z;
       this.#iconSide += ((away < -0.2 ? -1 : away > 0.2 ? 1 : this.#iconSide >= 0 ? 1 : -1) - this.#iconSide) * Math.min(1, dt * 4);
       const bob = Math.sin(time * 2.4) * size * 0.05;
@@ -404,6 +435,26 @@ export class HandsView {
       icon.position.set(p.x + r.x * out, p.y + size * 0.3 + bob, p.z + r.z * out);
       icon.visible = id !== "feather";
     } else this.#icon.visible = false;
+
+    // Food landing leaves the ring's impression, spreading and fading where it fell.
+    if (ev.landed !== null) {
+      this.#rippleAge = 0;
+      // Starting at the food's edge (the ring's bright band is about 0.38 of its texture across).
+      this.#rippleSize = FOODS[ev.landed].r / 0.38;
+      const n = hands.landedNormal;
+      this.#n.set(n.x, n.y, n.z);
+      this.#ripple.quaternion.setFromUnitVectors(UP, this.#n);
+      this.#ripple.position.set(hands.landedAt.x + n.x * 0.05, hands.landedAt.y + n.y * 0.05, hands.landedAt.z + n.z * 0.05);
+    }
+    this.#rippleAge += dt;
+    const ripple = this.#ripple;
+    ripple.visible = showPointer && this.#rippleAge < RIPPLE_SECONDS;
+    if (ripple.visible) {
+      const k = this.#rippleAge / RIPPLE_SECONDS;
+      const size = this.#rippleSize * (1 + 1.4 * (1 - (1 - k) * (1 - k)));
+      ripple.scale.set(size, 1, size);
+      (ripple.material as THREE.MeshBasicMaterial).opacity = (1 - k) * (1 - k) * 0.8 * this.opacity;
+    }
 
     // Food: falling, and lying where it fell, shrinking as it is eaten.
     const counts = this.#counts;
