@@ -115,6 +115,9 @@ export class Hands {
   stroking = false;
   readonly looming: Looming[] = [{ id: 1, position: this.ball.position, r: BALL_RADIUS }];
   readonly events: HandsEvents = { dropped: null, landed: null, swooped: false, toolChanged: false, variantChanged: false, blocked: false };
+  /** Where the last food landed, and the way the surface there faces. */
+  readonly landedAt = v3();
+  readonly landedNormal = v3(0, 1, 0);
   /** What the fly stands on where it is now ("table", "sill"), for the name of the whole-place view. */
   surface = "table";
   /** The Weather tool's "Now" is the real weather outside: it is called "Outside". */
@@ -269,6 +272,11 @@ export class Hands {
         this.falling.splice(i, 1);
         pantry.drop(f.kind, f.x, f.z);
         ev.landed = f.kind;
+        const s = world.surface(f.x, f.z, surface);
+        this.landedAt.x = f.x;
+        this.landedAt.y = s.y;
+        this.landedAt.z = f.z;
+        copy(this.landedNormal, s.normal);
       }
     }
 
