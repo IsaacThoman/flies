@@ -263,11 +263,10 @@ with its GPU. They say the app works, not how a phone runs it.
    `npm run ios -- build` (Xcode's automatic signing makes the profile; `-allowProvisioningUpdates`
    is passed) and `npm run ios -- run --device <udid>` (`xcrun devicectl list devices` gives the
    UDID). Without `--report` it runs as from the home screen.
-3. For TestFlight: in App Store Connect, open the Flies record and add iOS as a platform
-   (Add Platform). Raise `CURRENT_PROJECT_VERSION` in `apps/version.yml` for each upload. Then
-   `npm run ios -- build`, open `apps/ios/Flies.xcodeproj` in Xcode, Product → Archive,
-   and Distribute App → App Store Connect. Add the iPhone and iPad screenshots, the privacy
-   answers (no data collected) and a TestFlight group.
+3. For TestFlight: releases upload it, with the Apple TV app, when `dev` is merged into `main`
+   ([release.md](release.md)), once the one-time setup there is done. By hand,
+   `npm run ios -- archive --version <x.y.z> --upload`. Add the iPhone and iPad screenshots
+   in App Store Connect.
 
 ## What isn't verified
 

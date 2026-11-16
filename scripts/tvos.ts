@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { CANVAS_OPS, GL_OPS, OP } from '../apps/tvos/runtime/ops.ts';
+import { archive, ARCHIVE_USAGE, archiveOptions } from './apple.ts';
 import { writeAssetCatalog } from './tvosAssets.ts';
 
 const root = path.join(import.meta.dirname, '..');
@@ -35,10 +36,15 @@ const USAGE = `Usage: npm run tvos -- <command> [options]
         install the built app and launch it with a launch config (default: www/config.json,
         as from the home screen), printing its console. --detached (device only) launches
         without attaching; config.logFile saves logs to Library/Caches/performance.log
+  archive --version <x.y.z> [--build-number <n>] [--upload]
+        bundle the game as build does and archive the app for the App Store (see Archive
+        options and docs/release.md)
 
 Signing uses TVOS_TEAM_ID (default ${DEFAULT_TEAM_ID}) and TVOS_BUNDLE_ID (default ${DEFAULT_BUNDLE_ID}).
 TVOS_WEATHERKIT=1 builds in the weather outside (WeatherKit and Core Location), which signing for
-a device needs an explicit App ID with the WeatherKit capability for: see docs/apple-tv.md.`;
+a device needs an explicit App ID with the WeatherKit capability for: see docs/apple-tv.md.
+
+${ARCHIVE_USAGE}`;
 
 function run(command: string, args: string[], cwd = root, env: NodeJS.ProcessEnv = process.env) {
   const result = spawnSync(command, args, { cwd, env, stdio: 'inherit' });
@@ -130,6 +136,11 @@ function main() {
   const has = (name: string) => { const i = args.indexOf(name); if (i >= 0) args.splice(i, 1); return i >= 0; };
   if (!cmd || cmd === 'help' || cmd === '--help') return console.log(USAGE);
   if (cmd === 'build') return build({ sim: has('--sim'), testScene: has('--test-scene'), standInBrain: has('--stand-in-brain'), standInWeather: has('--stand-in-weather') });
+  if (cmd === 'archive') {
+    const options = archiveOptions(flag('--version'), flag('--build-number'), has('--upload'));
+    const env = prepare({ sim: false, testScene: false, standInBrain: false, standInWeather: false });
+    return archive({ appDir, platform: 'tvOS', teamId: TEAM_ID, env }, options);
+  }
   if (cmd === 'run') {
     const sim = flag('--sim'), device = flag('--device'), config = flag('--config') ?? readFileSync(path.join(www, 'config.json'), 'utf8');
     if (!sim && !device) throw Error('run needs --sim <udid> or --device <udid>');

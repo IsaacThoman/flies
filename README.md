@@ -29,6 +29,7 @@ browser, running well on what people have, being a good tab, and hosting.
 one table, joined by a link, and the room server between them. For a Docker
 Compose stack on your own server, behind your own HTTPS reverse proxy, see
 [Self-hosting Flies](docs/deploy.md).
+Releases to TestFlight, and setting them up, are in [docs/release.md](docs/release.md).
 
 ## Playing
 

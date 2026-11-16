@@ -35,18 +35,21 @@
     "fly:viewer": "vite --config packages/fly/viewer/vite.config.ts",
     "fuzz": "node scripts/fuzz.ts",
     "soak:web": "node scripts/webSoak.ts",
-    "e2e:soak": "node scripts/webSoak.ts --quick"
+    "e2e:soak": "node scripts/webSoak.ts --quick",
+    "release": "semantic-release"
   },
   "dependencies": {
     "three": "^0.186.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@semantic-release/exec": "^7.1.0",
     "@types/node": "^26.6.6",
     "@types/three": "^0.186.0",
     "eslint": "^10.15.0",
     "globals": "^17.14.0",
     "playwright": "1.58.2",
+    "semantic-release": "^25.0.9",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.2",
     "vite": "^8.3.4"
