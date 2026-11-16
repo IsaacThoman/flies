@@ -13,7 +13,7 @@ import type { Solid } from "@fly/world";
 import { Batch, canvas2d, canvasTexture, freeze, paint, random } from "../../scene/build.ts";
 import type { ColorFn } from "../../scene/build.ts";
 import type { SceneSet } from "../types.ts";
-import { SUNBEAM, benchMaterial, clearMaterial, finish, sunbeam, surfaceMaterial } from "./materials.ts";
+import { SUNBEAM, benchMaterial, clearMaterial, finish, glints, sunbeam, surfaceMaterial } from "./materials.ts";
 import type { Finish } from "./materials.ts";
 import { DISPLAY, INK, PAGES, labelRegion, pagesRegion, paperMaterial, paperTexture, tapeRegion } from "./paper.ts";
 import type { Region } from "./paper.ts";
@@ -27,6 +27,7 @@ export const SHADE = { x: 108, y: 248, z: -14, aim: { x: 6, y: 0, z: 40 } };
 const LAMP_CANDELA = 125_000;
 
 const UP = new THREE.Vector3(0, 1, 0);
+const WHITE = new THREE.Color("#ffffff");
 const byName = (name: string) => LAB_SOLIDS.filter((s) => s.name === name);
 const one = (name: string) => byName(name)[0];
 
@@ -272,14 +273,14 @@ function dropMaterial(page: THREE.Texture) {
 export function buildBench(): SceneSet {
   const group = new THREE.Group();
   const rnd = random(23);
-  const glow = { value: 0 };
-  const lampWay = { value: new THREE.Vector3(SHADE.x, SHADE.y, SHADE.z).normalize() };
+  const shine = glints();
+  shine.uLampDir.value.set(SHADE.x, SHADE.y, SHADE.z).normalize();
   const beam = sunbeam();
-  const surface = surfaceMaterial(glow, lampWay, beam);
-  const clear = clearMaterial(glow, lampWay);
+  const surface = surfaceMaterial(shine, beam);
+  const clear = clearMaterial(shine);
   const atlas = paperTexture();
   const paper = paperMaterial(atlas, beam);
-  const bench = benchMaterial(benchTexture(), beam);
+  const bench = benchMaterial(benchTexture(), beam, shine);
   /** The big shapes, which the fly's eyes see; the fine detail, which they don't; glass and paper. */
   const big = new Batch();
   const fine = new Batch();
@@ -761,10 +762,12 @@ export function buildBench(): SceneSet {
       beam.uSunDir.value.copy(light.sunDirection);
       beam.uSunColor.value.copy(light.sunColor);
       beam.uSunBeam.value = light.sunIntensity * SUNBEAM * (1 - on);
+      // The windows as glossy things see them: the sky outside, bright by day, glowing at dusk, dark at night.
+      shine.uWindow.value.copy(light.cloud).lerp(WHITE, 0.55 * (1 - light.stars)).multiplyScalar(1.4 * (1 - 0.8 * light.stars));
       if (on === lit) return;
       lit = on;
       spot.intensity = on * LAMP_CANDELA;
-      glow.value = on;
+      shine.uGlow.value = on;
     },
     ripple() {},
   };
