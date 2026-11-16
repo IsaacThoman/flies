@@ -168,8 +168,8 @@ export class World {
 
   /**
    * Where a ray first meets the world: a column's top or side, or the table.
-   * `dir` must be a unit vector. Null when it misses everything (into the sky,
-   * or past the table's edge).
+   * `dir` must be a unit vector; `maxDistance` bounds a swept movement. Null
+   * when it misses everything (into the sky, or past the table's edge).
    */
   raycast(origin: Vec3, dir: Vec3, out: RayHit, maxDistance = Infinity): RayHit | null {
     let bestT = maxDistance;

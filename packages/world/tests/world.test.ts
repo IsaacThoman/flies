@@ -233,3 +233,11 @@ test("the world can become another place, and the pantry sets out that place's f
   assert.equal(w.onTable(0, 31), false);
   assert.deepEqual(pantry.foods.map((f) => f.name), ["jam"]);
 });
+
+test("a bounded ray stops at its segment end, for both the floor and a solid", () => {
+  const w = new World({ floor: { kind: "rect", hx: 100, hz: 100 }, solids: [{ name: "pane", footprint: { kind: "box", x: 0, z: 0, hx: 0.5, hz: 20, angle: 0 }, top: { kind: "flat", y: 100 } }], patches: [], start: { x: -10, z: 0, yaw: 0 }, ceiling: 100 });
+  assert.equal(w.raycast({ x: -10, y: 20, z: 0 }, { x: 1, y: 0, z: 0 }, hit(), 9), null);
+  assert.equal(w.raycast({ x: -10, y: 20, z: 0 }, { x: 1, y: 0, z: 0 }, hit(), 10)?.t, 9.5);
+  assert.equal(w.raycast({ x: -10, y: 20, z: 0 }, { x: 0, y: -1, z: 0 }, hit(), 19), null);
+  assert.equal(w.raycast({ x: -10, y: 20, z: 0 }, { x: 0, y: -1, z: 0 }, hit(), 20)?.t, 20);
+});

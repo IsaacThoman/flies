@@ -26,7 +26,8 @@
     "tvos:art": "node scripts/art.ts",
     "brain:fetch": "node packages/brain/scripts/fetch.ts",
     "brain:pack": "node packages/brain/scripts/pack.ts",
-    "fly:viewer": "vite --config packages/fly/viewer/vite.config.ts"
+    "fly:viewer": "vite --config packages/fly/viewer/vite.config.ts",
+    "fuzz": "node scripts/fuzz.ts"
   },
   "dependencies": {
     "three": "^0.186.1"

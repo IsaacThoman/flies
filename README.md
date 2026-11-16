@@ -437,6 +437,10 @@ they were left, the shelf on Feed and the hints for what was used gone,
 and the frame stays within its draw budget. `node scripts/play.ts` drives and
 screenshots the game step by step (see the comment at its top).
 
+Longer headless body and real-brain soaks run with `npm run fuzz`. See
+[the fuzzing guide](docs/fuzzing.md) for seeds, duration, place selection,
+invariants, failure replay and open design cases.
+
 ## Credits
 
 The wiring is the [FlyEM male CNS connectome](https://male-cns.janelia.org/)
