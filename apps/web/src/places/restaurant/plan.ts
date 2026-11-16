@@ -48,10 +48,10 @@ export const HEAT = { x0: PASS.shelf.x - PASS.lamps.hx + 20, x1: PASS.shelf.x + 
 /** Above this the fly never flies (the place's ceiling): what hangs higher (fans, the cornice) is out of its reach. */
 export const OUT_OF_REACH = RESTAURANT.ceiling;
 
-/** The ceiling fans, still for the night, hanging below the tin. */
+/** The ceiling fans, still for the night, hanging below the tin: over the middle of the room, clear of the corner the whole view looks from. */
 export const FANS = [
-  { x: -700, z: 1400 },
-  { x: 1400, z: -400 },
+  { x: -1500, z: 1250 },
+  { x: 500, z: -100 },
 ].map((f) => ({ ...f, y: height - 520, r: 640 }));
 
 /**
