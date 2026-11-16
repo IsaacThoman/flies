@@ -141,7 +141,8 @@ export type LampUniform = { value: THREE.Vector3 };
 /**
  * The one material for nearly everything opaque on the bench: three's
  * standard material with its finish per vertex. Foam (the plugs, the fly pad,
- * the wipe) is open-celled: pits about a third of a millimetre across. Fly
+ * the wipe) is open-celled: round pores a tenth to a third of a millimetre
+ * across. Fly
  * food is grains of cornmeal set in molasses: bumps of about the same size.
  * Both fade to their average where a pixel covers several, so they never
  * shimmer.
@@ -170,10 +171,19 @@ if (vSurface.z != 0.0) {
   // Two octaves of smooth noise, cut into blobs: pores in foam, grains in cornmeal, irregular as both are.
   float n = labNoise(q) * 0.65 + labNoise(q * 2.3 + 7.1) * 0.35;
   if (vSurface.z > 0.0) {
-    // Foam: dark pits where the noise is low, between the cell walls.
-    float pit = 1.0 - smoothstep(0.24, 0.36, n);
-    diffuseColor.rgb *= mix(1.0, mix(0.94, 1.0 - pit * 0.3, labDetail), vSurface.z);
-    labBump = -pit * vSurface.z * labDetail;
+    // Foam: round open pores where the cell walls part, a tenth to a third of a millimetre across, some cells without, and the odd larger one.
+    vec3 c1 = q * 1.6;
+    vec3 h1 = labHash3(floor(c1) + 0.5);
+    float d1 = length(fract(c1) - 0.5 - (h1 - 0.5) * 0.45);
+    float pit = (1.0 - smoothstep(0.1 + h1.x * 0.16, 0.17 + h1.x * 0.18, d1)) * step(0.3, h1.y);
+    vec3 c2 = q * 0.55 + 3.7;
+    vec3 h2 = labHash3(floor(c2) + 0.5);
+    float d2 = length(fract(c2) - 0.5 - (h2 - 0.5) * 0.4);
+    pit = max(pit, (1.0 - smoothstep(0.09 + h2.x * 0.08, 0.15 + h2.x * 0.1, d2)) * step(0.7, h2.y));
+    // Fading to their average where a pixel spans several, so they never shimmer.
+    float fine = 1.0 - smoothstep(0.25, 0.6, size * 1.6);
+    diffuseColor.rgb *= mix(1.0, mix(0.95, 1.0 - pit * (0.32 - n * 0.12), fine), vSurface.z);
+    labBump = -pit * vSurface.z * fine;
   } else {
     // Cornmeal: rounded grains, some lighter, some darker, with molasses between.
     float grain = smoothstep(0.5, 0.66, n);
