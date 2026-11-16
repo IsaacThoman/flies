@@ -32,6 +32,7 @@ jobs:
       - run: npm run build
 
   e2e:
+    # The game in headless Chromium with the real brain, then the built site (npm run e2e).
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -43,3 +44,37 @@ jobs:
       - uses: ./.github/actions/brain
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
+
+  release:
+    # A push to main with something new since the last v* tag (release.config.mjs) tags it and
+    # creates a GitHub Release, once the checks pass. A run whose commit main has moved past
+    # releases nothing; the run for the newer commit does.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [checks, e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - id: release
+        run: npm run release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  testflight:
+    needs: release
+    if: needs.release.outputs.version != ''
+    uses: ./.github/workflows/testflight.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+    # A called workflow sees no secrets, its environment's included, unless the caller passes them.
+    secrets: inherit
