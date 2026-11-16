@@ -29,6 +29,7 @@ import { Fingers, canvasPoint, openGame, readState, screenOf, startServer, targe
 
 import type { Game } from "../src/game.ts";
 import { dropFood, feedHoney } from "./feeding.ts";
+import { disableScreensaver } from "./settings.ts";
 
 /** The frame's budget on the Apple TV, as play.e2e.ts holds it to. */
 const MAX_CALLS = 150;
@@ -93,6 +94,7 @@ function budget(page: Page) {
 
 async function fingers() {
   const { browser, page, errors } = await openGame({ url, device: "iPhone 15" });
+  await disableScreensaver(page);
   // What a native host on a phone with a notch says it covers.
   await page.setViewportSize({ width: 393, height: 852 });
   await page.evaluate(() => {
@@ -210,7 +212,7 @@ async function fingers() {
     await waitForGameTime(page, 0.5);
     assert.equal((await readState(page)).food, before.food, "no food dropped by the tap that woke it");
     assert.equal(woke.tool, "feed");
-    await game(page, "(g.settings.wallpaperAfter = 60)");
+    await game(page, "(g.settings.wallpaperAfter = 0)");
 
     cost.stop();
     assert.ok(cost.seen.calls > 0 && cost.seen.calls < MAX_CALLS, `${cost.seen.calls} draws`);
@@ -224,6 +226,7 @@ async function fingers() {
 
 async function mouse() {
   const { browser, page, errors } = await openGame({ url, width: 1280, height: 720 });
+  await disableScreensaver(page);
   const cost = budget(page);
   const click = async (kind: string, index?: number) => {
     const p = await canvasPoint(page, await targetOf(page, kind, index));
@@ -366,7 +369,7 @@ async function mouse() {
     assert.equal((await readState(page)).wallpaper, "true", "a nudge doesn't wake it");
     await page.mouse.move(p.x + 260, p.y + 80, { steps: 10 });
     await waitFor(page, "wallpaper=false");
-    await game(page, "(g.settings.wallpaperAfter = 60)");
+    await game(page, "(g.settings.wallpaperAfter = 0)");
 
     cost.stop();
     assert.ok(cost.seen.calls > 0 && cost.seen.calls < MAX_CALLS, `${cost.seen.calls} draws`);

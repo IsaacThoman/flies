@@ -404,7 +404,7 @@ the air, the pad's right stick pressed in), or a view chosen on the View tool,
 the cameraman takes it at once, at the named view nearest your zoom or the one chosen.
 The screensaver takes it too, and gives your zoom back after.
 
-After a minute with no press (Settings → Screensaver: 30 s to 5 min, or never)
+After 30 seconds with no press (Settings → Screensaver: 15 s to 5 min, or never)
 the hints, the shelf and the pointer fade, and the camera settles beside the
 fly and follows it: the screensaver. A mouse resting on the desk doesn't keep it
 away, and a nudge of the desk doesn't end it; a mouse moved as if meant does.

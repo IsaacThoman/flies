@@ -28,6 +28,7 @@ export const OVERLAY_SIZES: Record<OverlaySize, number> = { small: 0.75, medium:
 export const OVERLAY_OPACITIES: Record<OverlayOpacity, number> = { full: 1, soft: 0.7, faint: 0.45 };
 
 export const WALLPAPER_DELAYS: Option<number>[] = [
+  { value: 15, label: "15 s" },
   { value: 30, label: "30 s" },
   { value: 60, label: "1 min" },
   { value: 120, label: "2 min" },
@@ -71,7 +72,7 @@ export type Settings = {
 
 export const DEFAULT_SETTINGS: Settings = {
   pixels: "classic",
-  wallpaperAfter: 60,
+  wallpaperAfter: 30,
   wallpaperCamera: "follow",
   eyes: "low",
   eyesInset: "always",
