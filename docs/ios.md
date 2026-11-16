@@ -235,11 +235,11 @@ Simulator or T3 Code's device panel does), and XCUITest's own Return and Escape 
 page on iOS (its newline does, as Enter; WebKit's own tests send a hardware Escape to the page).
 
 Measured by it over several runs, 16 November 2026, fresh iPhone 18 Pro simulator, iOS 27.0, M5
-Pro shared with other work: the brain awake and the title up 20 to 28 s after the first launch
+Pro shared with other work: the brain awake and the title up 20 to 31 s after the first launch
 (WebKit compiling everything for the first time), a relaunch drawing its first screen in about
-4 s (2.2 s on a simulator used before); 48 to 59 fps on the title, as busy as the Mac was; the
+4 s (2.2 s on a simulator used before); 32 to 59 fps on the title, as busy as the Mac was; the
 brain at real time, its steps taking 18 to 31% of what they simulate; the peak footprints 29 to
-65 MB for the app, 190 to 262 MB for WebKit's page process, 38 to 47 MB for its GPU process,
+65 MB for the app, 190 to 319 MB for WebKit's page process, 38 to 47 MB for its GPU process,
 9 to 11 MB for its networking process. On the Mac at a load average of 180 on its 18 cores the
 check still passed, the brain still at real time, but at 33 fps with 18 ms of JavaScript a frame,
 and 56 s to the first title; and a busy Mac makes the web build's adaptive picture (web.md,
