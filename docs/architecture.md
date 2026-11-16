@@ -10,7 +10,7 @@ does, from what it sees, tastes and feels in the world.
 | Path | What it is |
 | --- | --- |
 | `packages/brain` | The nervous system: 166,700 spiking neurons wired from the FlyEM male CNS connectome (CC-BY 4.0). TypeScript. Its README is the reference for the model and its limits. |
-| `packages/brain-native` | The same simulation in C++, behind the C interface in `include/fly_brain.h`, for the Apple TV. |
+| `packages/brain-native` | The same simulation in C++, behind the C interface in `include/fly_brain.h`, for the Apple TV, and built as WebAssembly for browsers. |
 | `packages/fly` | The fly's body: a 3D model that knows how a fly moves its legs, wings and mouthparts, with its nervous system drawn inside it. |
 | `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver, the weather outside. |
 | `apps/web` | The game: the world, the fly's life in it, its senses, the remote's tools, menus, sound. Runs in a browser as it is. |
@@ -26,9 +26,10 @@ commands read from the fly's own descending and motor neurons: walk, turn,
 back up, take off, beat the wings, groom, feed. The game moves the body
 accordingly and poses the model (`FlyPose`).
 
-In a browser, and so in the iPhone and iPad app, the brain is `packages/brain` in a Web Worker,
-fed a compressed form of the connectome that the page downloads once and keeps (the app has it in
-its bundle); the browser build is plain files for any static host (`docs/web.md`). On the Apple TV
+In a browser, and so in the iPhone and iPad app, the brain runs in a Web Worker, fed a compressed
+form of the connectome that the page downloads once and keeps (the app has it in its bundle):
+`packages/brain-native` built as WebAssembly where the browser can run it, `packages/brain` itself
+where it can't; the browser build is plain files for any static host (`docs/web.md`). On the Apple TV
 JavaScript has no JIT and is far too slow for it, so the host runs
 `packages/brain-native` on its own thread and exposes it as
 `globalThis.__native.brain` (`NativeBrainBridge`). The game only ever sees a

@@ -3,7 +3,8 @@
 // and what its brain costs. For docs/web.md's numbers.
 //
 //   npm run build && node scripts/measure.ts [--browser chromium|webkit|firefox] [--cpu 4]
-//       [--network slow] [--scenario watch|play] [--level auto|0-5] [--seconds 60] [--out run.json]
+//       [--network slow] [--scenario watch|play] [--level auto|0-5] [--brain auto|wasm|typescript]
+//       [--seconds 60] [--out run.json]
 //
 // --cpu slows Chromium's page (the frames) by that factor. Chromium won't slow
 // a worker that way, so the brain is measured directly instead: the wall time
@@ -12,9 +13,13 @@
 // a CPU 4 and 6 times slower. --network slow is a 1.6 Mbit/s, 150 ms
 // connection. --level pins the picture's level instead of letting the game
 // choose. "watch" is the wallpaper; "play" throws the ball every 3 s, which
-// keeps the eyes and the brain busiest. WEBKIT_PATH and FIREFOX_PATH name
-// other browser builds.
+// keeps the eyes and the brain busiest. --brain picks the brain built as
+// WebAssembly or the TypeScript one (the page's ?brain=) instead of letting
+// the page choose. The report says which ran, how long its worker took to
+// build it, and, in Chromium, the memory of the page's processes, the worker
+// and its brain included. WEBKIT_PATH and FIREFOX_PATH name other browser builds.
 
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -30,16 +35,39 @@ const { values } = parseArgs({
     network: { type: "string", default: "normal" },
     scenario: { type: "string", default: "watch" },
     level: { type: "string", default: "auto" },
+    brain: { type: "string", default: "auto" },
     seconds: { type: "string", default: "60" },
     out: { type: "string" },
   },
 });
 const cpu = Number(values.cpu);
 const seconds = Number(values.seconds);
-if (!["chromium", "webkit", "firefox"].includes(values.browser) || !["watch", "play"].includes(values.scenario) || !/^(auto|[0-5])$/.test(values.level)) {
-  throw new Error("--browser chromium|webkit|firefox, --scenario watch|play, --level auto|0-5");
+if (
+  !["chromium", "webkit", "firefox"].includes(values.browser) ||
+  !["watch", "play"].includes(values.scenario) ||
+  !/^(auto|[0-5])$/.test(values.level) ||
+  !["auto", "wasm", "typescript"].includes(values.brain)
+) {
+  throw new Error("--browser chromium|webkit|firefox, --scenario watch|play, --level auto|0-5, --brain auto|wasm|typescript");
 }
 if (values.browser !== "chromium" && (cpu !== 1 || values.network !== "normal")) throw new Error("--cpu and --network need Chromium");
+
+/** Resident memory of the page's process, MB: the page and its workers, the brain's among them. */
+function pageMemory(profile: string): number | null {
+  try {
+    const table = execFileSync("ps", ["-ax", "-o", "pid=,ppid=,rss=,command="], { encoding: "utf8", maxBuffer: 1 << 26 })
+      .split("\n")
+      .map((line) => /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/.exec(line))
+      .filter((m) => m !== null)
+      .map((m) => ({ pid: Number(m[1]), ppid: Number(m[2]), rss: Number(m[3]), command: m[4] }));
+    const root = table.find((p) => p.command.includes(profile) && !p.command.includes("--type="));
+    if (!root) return null;
+    const renderers = table.filter((p) => p.ppid === root.pid && /--type=renderer/.test(p.command) && !/--extension-process/.test(p.command));
+    return renderers.reduce((sum, p) => sum + p.rss, 0) / 1024;
+  } catch {
+    return null;
+  }
+}
 
 /** Playwright's WebKit, or the newest in its cache. */
 function webkitPath() {
@@ -78,7 +106,7 @@ try {
     }
   }
   const started = Date.now();
-  await page.goto(site.url);
+  await page.goto(values.brain === "auto" ? site.url : `${site.url}?brain=${values.brain}`);
   const progress: [number, number][] = [];
   for (;;) {
     const s = await readState(page);
@@ -90,6 +118,8 @@ try {
     await page.waitForTimeout(100);
   }
   report.title = (Date.now() - started) / 1000;
+  report.engine = (await readState(page)).brainEngine;
+  report.buildMs = await page.evaluate(() => (globalThis as unknown as { __fly: { brain: { buildMs?: number | null } } }).__fly.brain.buildMs ?? null);
   report.download = { samples: progress.length, steady: progress.every(([, n], i) => i === 0 || n >= progress[i - 1][1]) };
 
   // Every tick the brain answers, seen once: the game asks the governor about each frame after it has read the brain's state.
@@ -150,6 +180,7 @@ try {
     on6xSlowerCpu: cost && Math.min(1, 1 / (cost * 6)),
   };
   report.levels = [...new Set(samples.map((s) => s.quality))];
+  if (values.browser === "chromium") report.memoryMB = pageMemory(profile);
   report.end = Object.fromEntries(["quality", "fps", "pixels", "eyesDetail", "eyesRate", "calls", "triangles"].map((key) => [key, samples.at(-1)?.[key]]));
 } catch (error) {
   report.failed = error instanceof Error ? error.message : String(error);

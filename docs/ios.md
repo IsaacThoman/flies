@@ -2,7 +2,8 @@
 
 `apps/ios` is the game on an iPhone or an iPad: the web build, unchanged, in a `WKWebView` that
 fills the window, served from the app's own bundle through a custom URL scheme. No network and no
-local server. The brain is the browser's: `packages/brain` in a Web Worker. The app itself is a
+local server. The brain is the browser's, in a Web Worker: `packages/brain-native` built as
+WebAssembly on iOS and iPadOS 18.4 and later, `packages/brain` before that. The app itself is a
 small Swift shell that does what a host should: it serves the page, tells the game the safe area,
 stops it when it can't be seen, decides when the screen may sleep, and adds haptics. It draws
 nothing of the game and knows nothing of it beyond the state the game publishes on its canvas for
@@ -35,7 +36,10 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
   half the time (its README), and in the simulator the brain is about 25% of a core out of the
   app's 45% or so in all (WebKit's page process about 35% with the brain, its GPU process 7%, the
   app 4%), so roughly a quarter of the app's CPU. That is a power question for a device to
-  answer, not a speed one; see [What isn't verified](#what-isnt-verified).
+  answer, not a speed one; see [What isn't verified](#what-isnt-verified). (Since then the
+  browser runs the C++ itself, built as WebAssembly, in the same worker: in WebKit about a tenth
+  to a fifth less time than the TypeScript, in half the memory; packages/brain-native, In a
+  browser.)
 - Retargeting the Apple TV's host (JavaScriptCore without the JIT, WebGL replayed on OpenGL ES)
   would throw away the JIT, Metal and the browser's audio for a hand-written browser on a
   deprecated graphics API, to run the same page worse.
@@ -93,13 +97,14 @@ and whenever it is shown again). The app adds no input of its own.
 The web build cuts the brain into gzipped parts of at most 4 MiB, named for their contents
 ([web.md](web.md)), and the page fetches them, checks each against the SHA-256 the build
 recorded, and keeps each in the browser's cache (the Cache API) for next time. In the app the
-parts are in the bundle (`www/brain/`, 14 MB) and come through the scheme handler. The page there
+parts are in the bundle (`www/brain/`, 14 MB, and the WebAssembly brain, 268 KB) and come through
+the scheme handler; the module is compiled from its bytes, so its `Content-Type` doesn't matter. The page there
 is a secure context, so it has the Cache API and `crypto.subtle`: every part's digest is checked.
 But the Cache API keeps only `http` and `https` responses, so keeping a `fly://` part fails
 quietly and nothing is copied: every launch reads the 14 MB from the bundle, as fast as the
 phone's storage gives it, and the bundle is the only copy on the phone. Measured in the
-simulator: the `fly-brain` cache holds nothing after a first launch or a relaunch (the check
-asserts it), and WebKit's storage for the app stays at about 240 KB. (The app's caches folder
+simulator: the `fly-brain` and `fly-brain-module` caches hold nothing after a first launch or a
+relaunch (the check asserts it, and that the brain running is the WebAssembly one), and WebKit's storage for the app stays at about 240 KB. (The app's caches folder
 grows by about 20 MB, WebKit's own compiled Metal shaders, which make every launch after the first
 quicker.) A damaged part is caught by its digest, and the loading screen's **Try again** fetches it
 again through the same handler.

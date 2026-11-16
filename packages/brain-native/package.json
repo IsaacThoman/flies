@@ -1,0 +1,10 @@
+{
+  "name": "@fly/brain-native",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The fly's brain in C++ (for the Apple TV), and the same built as WebAssembly for browsers.",
+  "exports": {
+    ".": "./wasm/brain.ts"
+  }
+}

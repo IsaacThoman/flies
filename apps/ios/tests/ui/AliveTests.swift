@@ -1,6 +1,6 @@
 import XCTest
 
-/// The fly is alive in the app: the brain is read from the app's bundle, wakes and keeps time, and
+/// The fly is alive in the app: the brain is read from the app's bundle, runs as WebAssembly, wakes and keeps time, and
 /// nothing of it is copied into the browser's cache, then or on a relaunch; frames are drawn; a tap
 /// on the title's first row starts play; it stops in the background and carries on in front; and a
 /// setting changed in one run is still there in the next after the app is killed. Run by `npm run ios:check`
@@ -72,7 +72,7 @@ final class AliveTests: XCTestCase {
     let relaunched = try wait("the setting kept across a relaunch", timeout: 180) { $0.data("brain") == "running" && $0.data("eyes") == "off" }
     try assertBrainFromBundle(relaunched)
 
-    print("check: {\"awakeS\":\(awake),\"fps\":\(Double(drawn) / 4),\"speed\":\(state.speed),\"brainLoad\":\(load),\"spikesPerSecond\":\(state.data("spikesPerSecond") ?? "0"),\"frameMs\":\(state.data("frameMs") ?? "0"),\"quality\":\(state.data("quality") ?? "0"),\"keyboard\":\(keyboard)}")
+    print("check: {\"awakeS\":\(awake),\"fps\":\(Double(drawn) / 4),\"speed\":\(state.speed),\"brainLoad\":\(load),\"spikesPerSecond\":\(state.data("spikesPerSecond") ?? "0"),\"frameMs\":\(state.data("frameMs") ?? "0"),\"quality\":\(state.data("quality") ?? "0"),\"engine\":\"\(state.data("brainEngine") ?? "")\",\"keyboard\":\(keyboard)}")
     if let path = ProcessInfo.processInfo.environment["FLY_SCREENSHOT"] {
       try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: path))
     }
@@ -83,6 +83,7 @@ final class AliveTests: XCTestCase {
   /// none of it.
   private func assertBrainFromBundle(_ state: Report) throws {
     XCTAssertEqual(state.data("from"), "network", "the brain fetched from the bundle")
+    XCTAssertEqual(state.data("brainEngine"), "wasm", "the brain built as WebAssembly (iOS 18.4 and later)")
     XCTAssertTrue(state.cached == nil || state.cached == 0, "nothing of the brain in the browser's cache: \(String(describing: state.cached))")
   }
 

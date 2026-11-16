@@ -92,15 +92,22 @@ export interface Brain {
   tick(dtMs: number, senses: BrainSenses): BrainState;
 }
 
+/** Which build of the brain runs: this TypeScript, or packages/brain-native's C++ as WebAssembly or native code. */
+export type BrainEngine = "typescript" | "wasm" | "native";
+
 /** Messages to the worker that runs the brain. */
 export type BrainRequest =
-  /** The packed connectome (see format.ts). Transferred, not copied. */
-  | { type: "init"; data: ArrayBuffer }
+  /**
+   * The packed connectome (see format.ts), and the brain to build from it:
+   * this one, or, given `module`, packages/brain-native built as WebAssembly
+   * (its fly-brain.wasm), the same simulation compiled. Transferred, not copied.
+   */
+  | { type: "init"; data: ArrayBuffer; module?: ArrayBuffer }
   | { type: "tick"; dtMs: number; senses: BrainSenses };
 
 /** Messages from the worker. Every "tick" gets exactly one "state". */
 export type BrainResponse =
-  | { type: "ready"; neurons: number; connections: number; eyes: EyeMap | null }
+  | { type: "ready"; neurons: number; connections: number; eyes: EyeMap | null; engine: BrainEngine }
   | { type: "state"; state: BrainState }
   | { type: "error"; message: string };
 

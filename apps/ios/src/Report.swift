@@ -127,7 +127,10 @@ final class Report {
   // What the browser's cache holds for the brain (apps/web/src/brain/download.ts), for a check that nothing is copied there.
   const cached = () => {
     if (typeof caches === "undefined") return void (__hostReport.cached = null);
-    caches.open("fly-brain").then((cache) => cache.keys()).then((keys) => (__hostReport.cached = keys.length), () => (__hostReport.cached = -1));
+    Promise.all(["fly-brain", "fly-brain-module"].map((name) => caches.open(name).then((cache) => cache.keys()))).then(
+      (kept) => (__hostReport.cached = kept.reduce((n, keys) => n + keys.length, 0)),
+      () => (__hostReport.cached = -1),
+    );
   };
   setInterval(cached, 1000);
   addEventListener("pointerdown", () => __hostReport.pointers++, true);

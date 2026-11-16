@@ -87,7 +87,7 @@ try {
   const passed = output.filter((l) => /^Test Case .* passed/.test(l)).length;
   const check = output.map((l) => /check: (\{.*\})$/.exec(l)?.[1]).find(Boolean);
   assert.ok(check, 'the UI test reported its measurements');
-  const m = JSON.parse(check) as { awakeS: number; fps: number; speed: number; brainLoad: number; spikesPerSecond: number; frameMs: number };
+  const m = JSON.parse(check) as { awakeS: number; fps: number; speed: number; brainLoad: number; spikesPerSecond: number; frameMs: number; engine: string };
   // The relaunch's own log: how soon it drew its first screen.
   const container = xcrun('simctl', 'get_app_container', udid, BUNDLE_ID, 'data');
   const log = path.join(container, 'Library/Caches/report.log');
@@ -95,7 +95,7 @@ try {
 
   console.log(`\nAll ${passed} tests passed in ${Math.round((Date.now() - started) / 1000)} s.`);
   console.log(`First launch: the brain awake and the title up ${m.awakeS.toFixed(1)} s after launch; the relaunch drew its first screen ${firstScreen ?? '?'} ms after the app started.`);
-  console.log(`On the title: ${m.fps.toFixed(0)} fps, ${m.frameMs} ms JavaScript a frame; the brain at ${m.speed.toFixed(2)}x real time, ${m.spikesPerSecond} spikes a second, its steps taking ${(m.brainLoad * 100).toFixed(0)}% of the time they simulate (of one of this Mac's cores).`);
+  console.log(`On the title: ${m.fps.toFixed(0)} fps, ${m.frameMs} ms JavaScript a frame; the brain (${m.engine}) at ${m.speed.toFixed(2)}x real time, ${m.spikesPerSecond} spikes a second, its steps taking ${(m.brainLoad * 100).toFixed(0)}% of the time they simulate (of one of this Mac's cores).`);
   console.log(`Peak memory: ${[...peaks].map(([name, mb]) => `${name.replace('com.apple.WebKit.', 'WebKit ')} ${mb.toFixed(0)} MB`).join(', ') || 'not sampled'}.`);
   console.log(`Screenshot: ${existsSync(screenshot) ? screenshot : 'none'}; test results: ${path.join(evidence, 'result.xcresult')}`);
 } finally {

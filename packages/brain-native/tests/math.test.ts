@@ -1,5 +1,6 @@
-// The native brain's exp, log, log1p, expm1, sin and cos (src/fdlibm.cpp)
-// against V8's Math functions, bit for bit, on the arguments the brain gives
+// The native brain's exp, log, log1p, expm1, sin and cos (src/fdlibm.cpp),
+// built natively and as WebAssembly (where wasm.sh makes each contracted
+// multiply-add a correctly rounded fma), against V8's Math functions, bit for bit, on the arguments the brain gives
 // them and on a spread of others: the whole saturation table, step and chunk
 // decays, smoothing, Poisson probabilities and gaps, Box-Muller and the
 // logistic, then random doubles of every magnitude and the special values.
@@ -7,7 +8,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mulberry32 } from "../../brain/src/sim.ts";
-import { build, harness, hex64, noCompiler } from "./compare.ts";
+import { BUILDS, harness, hex64 } from "./compare.ts";
 
 function inputs(): number[] {
   const random = mulberry32(77);
@@ -35,9 +36,9 @@ function inputs(): number[] {
   return xs;
 }
 
-test("exp, log, log1p, expm1, sin and cos are V8's to the bit", { skip: noCompiler }, () => {
+for (const target of BUILDS) test(`exp, log, log1p, expm1, sin and cos are V8's to the bit (${target.name})`, { skip: target.skip }, () => {
   const xs = inputs();
-  const lines = harness(build(), ["math"], xs.map(hex64).join("\n") + "\n");
+  const lines = harness(target.dir(), ["math"], xs.map(hex64).join("\n") + "\n");
   assert.equal(lines.length, xs.length);
   const functions = [Math.exp, Math.log, Math.log1p, Math.expm1, Math.sin, Math.cos];
   const names = ["exp", "log", "log1p", "expm1", "sin", "cos"];

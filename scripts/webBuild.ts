@@ -13,6 +13,7 @@ import { encodeWire } from "../apps/web/src/brain/wire.ts";
 const root = path.join(import.meta.dirname, "..");
 const CONNECTOME = path.join(root, "packages/brain/data/connectome.bin");
 const ANATOMY = path.join(root, "packages/brain/data/anatomy.bin");
+const MODULE = path.join(root, "packages/brain-native/wasm/fly-brain.wasm");
 const WIRE_SOURCE = path.join(root, "apps/web/src/brain/wire.ts");
 /** Encoding takes a few seconds, so the result is kept here between runs, by what it was made from. */
 const CACHE = path.join(root, "node_modules/.cache/fly-brain");
@@ -35,19 +36,21 @@ type Built = BrainFile & { dir: string };
  * A data file for the browser (apps/web/src/brain/download.ts): gzipped, cut
  * into parts named `<name>.<n>.<hash>.bin` for their contents, and kept in
  * node_modules/.cache under `key` (what it was made from), so it is made once.
+ * Or, for a file a host should serve as what it is, not gzipped and named
+ * with its own extension.
  */
-export function dataFile(name: string, key: string, make: () => Uint8Array): Built {
-  const dir = path.join(CACHE, `${name}-${sha256(key + PART_BYTES)}`);
+export function dataFile(name: string, key: string, make: () => Uint8Array, { gzip = true, extension = "bin" } = {}): Built {
+  const dir = path.join(CACHE, `${name}-${sha256(key + PART_BYTES + gzip + extension)}`);
   const meta = path.join(dir, "parts.json");
   if (!fs.existsSync(meta)) {
-    const zipped = gzipSync(make(), { level: 9 });
+    const zipped = gzip ? gzipSync(make(), { level: 9 }) : make();
     const parts: BrainFile["parts"] = [];
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(dir, { recursive: true });
     for (let at = 0, i = 0; at < zipped.length; at += PART_BYTES, i++) {
       const bytes = zipped.subarray(at, at + PART_BYTES);
       const digest = sha256(bytes);
-      const url = `brain/${name}.${i}.${digest.slice(0, 16)}.bin`;
+      const url = `brain/${name}.${i}.${digest.slice(0, 16)}.${extension}`;
       fs.writeFileSync(path.join(dir, path.basename(url)), bytes);
       parts.push({ url, bytes: bytes.length, sha256: digest });
     }
@@ -63,6 +66,16 @@ export function brainFile(): Built | null {
   return dataFile("connectome", sha256(raw) + fs.readFileSync(WIRE_SOURCE, "utf8"), () => encodeWire(new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength)));
 }
 
+/**
+ * The brain built as WebAssembly (packages/brain-native/wasm/fly-brain.wasm,
+ * committed), as a data file of one part: not gzipped, so a host serves it as
+ * application/wasm and may compress it on the way as it does any other.
+ */
+export function moduleFile(): Built {
+  const raw = fs.readFileSync(MODULE);
+  return dataFile("fly-brain", sha256(raw), () => new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength), { gzip: false, extension: "wasm" });
+}
+
 /** Where each neuron is (packages/brain/src/anatomy.ts), as a data file, when brain:fetch has built it. */
 export function anatomyFile(): Built | null {
   if (!fs.existsSync(ANATOMY)) return null;
@@ -71,8 +84,9 @@ export function anatomyFile(): Built | null {
 }
 
 /**
- * Tells the game where its data files are (`__FLY_BRAIN__`, read by
- * apps/web/src/brain/create.ts, and `__FLY_ANATOMY__`, which nothing reads
+ * Tells the game where its data files are (`__FLY_BRAIN__` and
+ * `__FLY_BRAIN_MODULE__`, read by apps/web/src/brain/create.ts, and
+ * `__FLY_ANATOMY__`, which nothing reads
  * yet: the neurons' positions, to be loaded the same way with a cache of their
  * own), serves their parts from the dev and preview servers, and puts them in
  * the build.
@@ -85,7 +99,7 @@ export function brain(): Plugin {
     for (const file of files) {
       const part = file.parts.find((p) => url === `${base}${p.url}`);
       if (!part) continue;
-      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader("Content-Type", part.url.endsWith(".wasm") ? "application/wasm" : "application/octet-stream");
       res.setHeader("Content-Length", String(part.bytes));
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       fs.createReadStream(path.join(file.dir, path.basename(part.url))).pipe(res);
@@ -98,10 +112,13 @@ export function brain(): Plugin {
     name: "fly-brain",
     config() {
       const connectome = brainFile();
+      const module = moduleFile();
       const anatomy = anatomyFile();
       if (!connectome) console.warn("connectome.bin is missing (npm run brain:fetch): the game will have no brain");
-      files = [connectome, anatomy].filter((f) => f !== null);
-      return { define: { __FLY_BRAIN__: JSON.stringify(info(connectome)), __FLY_ANATOMY__: JSON.stringify(info(anatomy)) } };
+      files = [connectome, module, anatomy].filter((f) => f !== null);
+      return {
+        define: { __FLY_BRAIN__: JSON.stringify(info(connectome)), __FLY_BRAIN_MODULE__: JSON.stringify(info(module)), __FLY_ANATOMY__: JSON.stringify(info(anatomy)) },
+      };
     },
     configResolved(config) {
       base = config.base.startsWith("/") ? config.base : "/";

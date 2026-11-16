@@ -104,8 +104,10 @@ missing assets, then loads the real brain with progress and reloads fully
 offline from the service worker and brain cache. To inspect headers by hand,
 use `curl -I` on `/`, `/index.html`, `/sw.js`, `/manifest.webmanifest` and the
 actual hashed paths under `dist/assets/` and `dist/brain/` (see
-[the web build](web.md#what-to-upload)). `.wasm` files, if added, are served
-as `application/wasm`; brain parts never get a `Content-Encoding` header.
+[the web build](web.md#what-to-upload)). The brain's WebAssembly module
+(`brain/fly-brain.0.<hash>.wasm`, committed, so the image needs no toolchain
+for it) is served as `application/wasm` and may be compressed; the
+connectome's parts never get a `Content-Encoding` header.
 
 ## The room server slot
 

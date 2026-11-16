@@ -1376,6 +1376,7 @@ export class Game implements Shell {
     d.atRoot = String((window as unknown as Record<string, unknown>)[AT_ROOT_PROPERTY]);
     d.wallpaper = String(this.wallpaper);
     d.brain = life.brain.status;
+    d.brainEngine = life.brain.engine ?? "";
     d.neurons = String(life.brain.neurons);
     d.activity = life.activity;
     d.mode = life.body.mode;
