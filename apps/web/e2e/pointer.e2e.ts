@@ -175,7 +175,7 @@ async function fingers() {
     await waitFor(page, "screen=title,ring=false");
     await tapOn("row", 3);
     await waitFor(page, "screen=settings,tab=wallpaper");
-    await tapOn("tab", 3);
+    await tapOn("tab", 2);
     await waitFor(page, "tab=picture");
     const pixels = await game<number>(page, "g.screens.settings.menu.items.findIndex((i) => i.id === 'pixels')");
     await tapOn("step", pixels);
