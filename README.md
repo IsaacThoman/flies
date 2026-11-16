@@ -375,12 +375,35 @@ fly from one angle after another instead (Calm), or change them more often
 (Lively). Any press, touch, tap, click, key or deliberate move of the mouse
 brings the controls back and does nothing else.
 A small picture of what the fly's eyes see sits in a corner of the wallpaper
-(Settings → Wallpaper → What it sees: off, in the wallpaper, or always, which keeps it in
+(Settings → On screen → What it sees: off, in the wallpaper, or always, which keeps it in
 the top right while you play too), and under it a picture of its nervous
 system at work (Nervous system, the same choices). Each time the wallpaper
 moves on to a new shot, and at least once a minute, they fade out and come
-back together in the next corner, so neither is left in one place long
-enough to mark an OLED screen.
+back together in the next corner, so none is left in one place long
+enough to mark an OLED screen. The corners aren't chosen: a picture pinned
+to one would sit there for hours in a wallpaper, its glass edge and its
+words the sharpest, brightest things on screen, which is how an OLED screen
+is marked, and keeping them moving costs nothing. Instead Size (small,
+medium, the default, or large) and Opacity (solid, the default, soft or
+faint, which also dims them for the screen) set how much of the wallpaper
+they take.
+
+**Stats** (`apps/web/src/stats/`; On screen → Stats, off by default, then
+Stats of: its brain, its day, or both) is a small panel of numbers, each a
+figure and a word: the brain's spikes a second, neurons active and speed
+against real time (from the brain's meter, as on "Inside its brain"), under
+a trace of its last twenty seconds; and, headed by what the fly is doing now
+(the HUD's caption, so it can be read in the wallpaper too), its day: how far
+it has walked, its meals, its take-offs, and its time flying and grooming.
+The day is counted from what the fly's life did (`life.ts`: its legs' steps
+on its feet, a meal from its first taste, each leap into the air, each
+second it was flying or grooming), once each, kept across launches as
+`flies.day` and begun again at midnight. The panel sits across the screen
+from the other pictures, at the same edge (at the top left while you play),
+and moves round with them; on a screen too narrow for that, under them; its
+cells two to a row on a narrow screen, and its brain beside its day on a
+short one. It is drawn again only when a figure it shows changes, at most
+four times a second.
 
 There is one menu: the title at launch, and the same menu from play (Back,
 Play/Pause, or the button at the top left), with the fly living on behind it.
@@ -389,9 +412,17 @@ every sense going in, every command coming out with the neurons it is read
 from and their firing rates, spikes a second, active neurons), **About**, and
 **Settings**: a row of tabs over each part of the game, every setting two
 steps from the menu and none scrolling: **Wallpaper** (when it starts, how
-its camera films, where the fly lives, what it sees and its nervous system
-in a corner, the X-ray, and, on an Apple TV that can tell, the real weather), **Sound** (effects, surroundings)
-and **Picture** (pixel size, the eyes' detail, button hints, frame stats).
+its camera films, where the fly lives, and, on an Apple TV that can tell,
+the real weather), **On screen** (everything that can show over the world:
+what it sees, its nervous system and its stats in the corners, what the
+stats are of, the corners' size and opacity, and the X-ray), **Sound**
+(effects, surroundings) and **Picture** (pixel size, the eyes' detail,
+button hints, frame stats). In a browser it also has **Together**, a table
+shared with others. The menu never scrolls either: on a screen too short for
+its rows (a phone on its side) they are in two columns, Left and Right going
+across, Up and Down along the list as ever. Where the settings' tabs are too
+narrow to read (the smallest phones), they are one choice, the tab shown
+between arrows.
 
 ## The fly's senses
 
@@ -505,7 +536,7 @@ title, over a menu, or while View → Fly's eyes is up.
 The fly's brain, nerve cord and nerves can be watched at work, in two ways
 that draw the same model with the same glow, so they never disagree:
 
-- **The X-ray** (Settings → Wallpaper → X-ray: off, in the wallpaper, or
+- **The X-ray** (Settings → On screen → X-ray: off, in the wallpaper, or
   always; or View → Inside it while playing, which also brings the camera in
   close). The fly's cuticle turns to smoky glass, faint across its face and
   stronger at its edges, still glossy, and its nervous system shows through
@@ -516,7 +547,7 @@ that draw the same model with the same glow, so they never disagree:
   self: its brain would be a smudge of a few pixels. It is sorted with the
   places' glass jars by distance, so a jar in front of the fly is in front of
   it.
-- **The panel** (Settings → Wallpaper → Nervous system: off, in the
+- **The panel** (Settings → On screen → Nervous system: off, in the
   wallpaper, the default, or always): the same model from above, head up,
   the fly's left on the left, standing at rest so that it holds still,
   cropped to the brain and the cord, labelled "Its nervous system". It shares

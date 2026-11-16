@@ -42,7 +42,7 @@ export function soakConfig(minutes = 30) {
   wait({ focus: "settings" });
   press("Enter");
   wait({ screen: "settings", focus: "page" });
-  press("ArrowRight", 2);
+  press("ArrowRight", 3);
   wait({ tab: "picture" });
   press("ArrowDown", 2);
   wait({ focus: "eyes" });

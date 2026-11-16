@@ -19,7 +19,7 @@ import type { FlyNervesModel, NervesPanelUniforms } from "@fly/fly";
 import { glassPanel, roundedRect, text } from "@fly/ui";
 import { TV_FRAME, pixelsPerUnit } from "../display.ts";
 import type { Frame } from "../display.ts";
-import { INSET_PANEL, insetLayout } from "../eyes/inset.ts";
+import { INSET_PANEL, cornerScale, insetLayout } from "../eyes/inset.ts";
 import type { ShowWhen } from "../settings.ts";
 import { CORNERS, CornerPlacement } from "../ui/corners.ts";
 import type { Corner, CornerDeck, CornerWanted } from "../ui/corners.ts";
@@ -64,20 +64,19 @@ export type NervesLayout = {
  * label, and, while playing, of the hint at the bottom right), as big as
  * what it sees would be at its width, and smaller if it must be to fit.
  */
-export function nervesLayout(frame: Frame, hud: HudLayout = hudLayout(frame)): NervesLayout {
+export function nervesLayout(frame: Frame, hud: HudLayout = hudLayout(frame), size = 1): NervesLayout {
   const a = safeRect(frame);
-  const eyes = insetLayout(frame, hud);
+  const eyes = insetLayout(frame, hud, size);
   const { margin } = INSET_PANEL;
   const { width: W, height: H } = NERVES_PANEL;
   const top = eyes.rects["top-right"].y;
   const foot = Math.min(eyes.rects["bottom-right"].y + eyes.rects["bottom-right"].height, hud.rightY - 20);
   const eyesHeight = eyes.rects["top-right"].height, eyesWidth = eyes.rects["top-right"].width;
-  const full = Math.min(1, (a.w * 0.42) / W);
+  const full = cornerScale(a, W, size);
   const under = Math.min(full, Math.min(foot - (top + eyesHeight + GAP), eyes.rects["bottom-right"].y - GAP - top) / H);
-  // Beside it, toward the middle: clear of the caption if they are level with it.
-  const level = top < hud.captionY + 20;
-  const sideRoom = a.w / 2 - margin - eyesWidth - GAP - (level ? 120 : 0);
-  const beside = Math.min(full, (foot - top) / H, sideRoom / W);
+  // Beside it, toward the middle: under the caption, where what it sees is level with it.
+  const besideTop = top < hud.captionY + 20 ? hud.captionY + 23 : top;
+  const beside = Math.min(full, (foot - besideTop) / H, (a.w / 2 - margin - eyesWidth - GAP) / W);
   const across = under < SMALLEST_UNDER && beside > under;
   const scale = Math.max(0.05, across ? beside : under);
   const width = W * scale, height = H * scale;
@@ -90,7 +89,7 @@ export function nervesLayout(frame: Frame, hud: HudLayout = hudLayout(frame)): N
     const e = eyes.rects[c];
     const alone = { x: left ? a.x + margin : a.x + a.w - margin - width, y: up ? top : foot - height, width, height };
     const next = across
-      ? { x: left ? e.x + e.width + GAP : e.x - GAP - width, y: up ? top : foot - height, width, height }
+      ? { x: left ? e.x + e.width + GAP : e.x - GAP - width, y: up ? besideTop : foot - height, width, height }
       : { x: alone.x, y: up ? e.y + e.height + GAP : e.y - GAP - height, width, height };
     rects[c] = [alone, next];
     origins[c] = [at(alone), at(next)];
@@ -136,12 +135,12 @@ export class NervesPanel {
     this.mesh.visible = false;
     // Under the overlay's quad: both are in the transparent list, drawn in this order.
     this.mesh.renderOrder = -1;
-    this.layout(TV_FRAME, hudLayout(TV_FRAME));
+    this.layout(TV_FRAME, hudLayout(TV_FRAME), 1);
   }
 
-  /** The screen changed shape: its size and corners follow, and its glass is drawn again. */
-  layout(frame: Frame, hud: HudLayout) {
-    const layout = nervesLayout(frame, hud);
+  /** The screen changed shape, or the pictures' size: its size and corners follow, and its glass is drawn again. */
+  layout(frame: Frame, hud: HudLayout, size: number) {
+    const layout = nervesLayout(frame, hud, size);
     this.#layout = layout;
     const { width, height } = layout.panel;
     if (this.#canvas.width !== width || this.#canvas.height !== height) {
@@ -165,12 +164,17 @@ export class NervesPanel {
     return this.mesh.visible ? this.placement.corner : "hidden";
   }
 
-  /** Once a frame, after the corner deck, with its place there (nervesSlot). */
-  update(dt: number, wanted: CornerWanted, deck: CornerDeck, slot: number) {
+  /** Where it is with the deck at a corner, at its place there. */
+  at(corner: Corner, slot: number) {
+    return this.#layout.rects[corner][slot];
+  }
+
+  /** Once a frame, after the corner deck, with its place there (nervesSlot); `opacity` is Settings'. */
+  update(dt: number, wanted: CornerWanted, deck: CornerDeck, slot: number, opacity: number) {
     this.placement.update(dt, wanted, deck.goal, slot);
     this.mesh.visible = this.placement.alpha > 0;
     if (!this.mesh.visible) return;
-    this.#uniforms.uAlpha.value = this.placement.alpha;
+    this.#uniforms.uAlpha.value = this.placement.alpha * opacity;
     const origin = this.#layout.origins[this.placement.corner][this.placement.slot];
     const panel = this.#uniforms.uPanel.value;
     panel.x = origin.x;

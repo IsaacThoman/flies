@@ -9,7 +9,7 @@ import type { RemoteButton } from "@fly/contracts";
 import { World } from "@fly/world";
 import type { Place } from "@fly/world";
 import { TV_DESIGN_HEIGHT as DESIGN_HEIGHT, TV_FRAME } from "../src/display.ts";
-import { DEFAULT_SETTINGS, KEPT, loadLearned, loadSettings, loadShelf, saveLearned, saveSettings, saveShelf } from "../src/settings.ts";
+import { DEFAULT_SETTINGS, KEPT, loadDay, loadLearned, loadSettings, loadShelf, saveDay, saveLearned, saveSettings, saveShelf } from "../src/settings.ts";
 import type { Settings } from "../src/settings.ts";
 import { Hands, TOOLS } from "../src/tools/hands.ts";
 import type { MenuScreen } from "../src/ui/screens/menu-screen.ts";
@@ -34,9 +34,34 @@ const NOW = Date.UTC(2026, 10, 16, 20);
 
 test("settings come back as they were saved", () => {
   const store = memory();
-  const settings: Settings = { effects: 3, ambience: 0, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "lively", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", hints: false, stats: true, realWeather: false, place: "lab", scene: "bar" };
+  const settings: Settings = { effects: 3, ambience: 0, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "lively", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, stats: true, realWeather: false, place: "lab", scene: "bar" };
   saveSettings(settings, store);
   assert.deepEqual(loadSettings(store), settings);
+});
+
+test("everything new on screen is off by default, and what was already there is as it was", () => {
+  assert.equal(DEFAULT_SETTINGS.statsPanel, "off", "no stats unless asked for");
+  assert.equal(DEFAULT_SETTINGS.xray, "off");
+  // As before there were sizes and opacities: what it sees and its nervous system in the wallpaper, at their own size, solid.
+  assert.equal(DEFAULT_SETTINGS.eyesInset, "wallpaper");
+  assert.equal(DEFAULT_SETTINGS.nerves, "wallpaper");
+  assert.equal(DEFAULT_SETTINGS.overlaySize, "medium");
+  assert.equal(DEFAULT_SETTINGS.overlayOpacity, "full");
+  // A save from before them keeps its corners' settings under the same keys, and takes the new ones' defaults.
+  const old = loadSettings(settingsSaved({ eyesInset: "always", nerves: "off", xray: "wallpaper", stats: true }));
+  assert.deepEqual(old, { ...DEFAULT_SETTINGS, eyesInset: "always", nerves: "off", xray: "wallpaper", stats: true });
+});
+
+test("the fly's day comes back on the same day, and starts again from nothing on another; a broken count is nothing", () => {
+  const store = memory();
+  const day = { date: "2026-11-16", walked: 412.5, meals: 3, takeOffs: 7, flown: 12.25, groomed: 80 };
+  saveDay(day, store);
+  assert.deepEqual(loadDay("2026-11-16", store), day);
+  assert.deepEqual(loadDay("2026-11-17", store), { date: "2026-11-17", walked: 0, meals: 0, takeOffs: 0, flown: 0, groomed: 0 });
+  const broken = memory({ "flies.day": JSON.stringify({ date: "2026-11-16", walked: -4, meals: "3", takeOffs: null, flown: 5, groomed: Infinity }) });
+  assert.deepEqual(loadDay("2026-11-16", broken), { date: "2026-11-16", walked: 0, meals: 0, takeOffs: 0, flown: 5, groomed: 0 });
+  for (const raw of ["", "{", "[]", "null"]) assert.deepEqual(loadDay("2026-11-16", memory({ "flies.day": raw })).meals, 0, raw);
+  assert.equal(loadDay("2026-11-16", null).walked, 0);
 });
 
 test("a save from an older build keeps what it has and takes today's defaults for the rest", () => {
@@ -77,6 +102,10 @@ test("each setting keeps only a value the game can use", () => {
     eyesInset: ["sometimes", "corner"],
     nerves: ["glowing", 1],
     xray: ["on", true],
+    statsPanel: ["on", true, 1],
+    statsKind: ["all", "everything", 0],
+    overlaySize: ["huge", 1.3, "toString"],
+    overlayOpacity: ["clear", 0.5, "__proto__"],
     hints: ["yes", 1],
     stats: [0, "on"],
     realWeather: ["off", 0],
@@ -202,7 +231,7 @@ const press = (screen: MenuScreen, ...buttons: RemoteButton[]) => buttons.forEac
 function eachTab(screen: MenuScreen, visit: (tab: string) => void) {
   screen.enter();
   screen.menu.focusOn("page");
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     visit(settingsTab(screen));
     press(screen, "right");
   }
@@ -214,6 +243,13 @@ test("the settings are a row of tabs over each part's settings: Left and Right o
   screen.enter();
   assert.equal(screen.menu.focused?.id, "page", "it opens on the tabs");
   assert.equal(settingsTab(screen), "wallpaper");
+  press(screen, "right");
+  assert.equal(settingsTab(screen), "screen");
+  assert.deepEqual(
+    screen.menu.items.slice(1).map((item) => item.id),
+    ["eyesInset", "nerves", "statsPanel", "statsKind", "overlaySize", "overlayOpacity", "xray"],
+    "everything that can show over the world, in one place",
+  );
   press(screen, "right");
   assert.equal(settingsTab(screen), "sound");
   assert.deepEqual(screen.menu.items.slice(1).map((item) => item.id), ["effects", "ambience"]);
@@ -263,7 +299,7 @@ test("a tab shows the settings as they are when it opens, and a change is kept a
   // Camera: Follow, then Calm.
   press(screen, "down", "down", "right");
   assert.equal(shell.settings.wallpaperCamera, "calm");
-  press(screen, "up", "up", "right");
+  press(screen, "up", "up", "right", "right");
   const effects = screen.menu.item("effects");
   assert.ok(effects?.kind === "slider" && effects.value === 2);
   press(screen, "down", "left");

@@ -1,7 +1,10 @@
-// The pictures that sit in a corner over the world: what the fly sees, and its
-// nervous system at work. They share one corner and move on together; the
-// first is at the corner itself (eyes/inset.ts lays it out), the second next
-// to it (nerves/panel.ts), so they never overlap.
+// The pictures that sit in a corner over the world: what the fly sees, its
+// nervous system at work, and its stats. They share one corner and move on
+// together: the first is at the corner itself (eyes/inset.ts lays it out),
+// the second next to it (nerves/panel.ts), and the stats across the screen
+// from them at the same edge (stats/panel.ts), so none covers another. Each
+// is laid out at every corner for every screen, so any other picture (who is
+// at an online table, say) can join them as one more of these.
 //
 // A picture left in one place for hours can burn into an OLED screen, so in
 // the wallpaper they move to another corner each time the camera moves on to a
@@ -45,16 +48,35 @@ export class CornerDeck {
   }
 }
 
+/** The corner across the screen from another, at the same edge. */
+export const across = (corner: Corner): Corner =>
+  corner === "top-right" ? "top-left" : corner === "top-left" ? "top-right" : corner === "bottom-left" ? "bottom-right" : "bottom-left";
+
+/** Design units. */
+export type CornerRect = { x: number; y: number; width: number; height: number };
+const overlaps = (a: CornerRect, b: CornerRect) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+/** One of the pictures: its placement, and where it is with the deck at `corner`, at `slot` there. */
+export type CornerPicture = { readonly placement: CornerPlacement; at(corner: Corner, slot: number): CornerRect };
+
 /**
- * What a picture may do when it wants to show at `slot` of the corner the
- * deck is going to: wait (fade) while the other still shows anywhere but
- * beside it there, still fading out of the corner they are leaving or of the
- * place this one wants. So the two arrive together and never overlap, even as
- * one comes in and the other goes (on a short screen a stack at a top corner
+ * What `picture` may do when it wants to show at `slot` of the corner the
+ * deck is going to: wait (fade) while any other still shows anywhere but
+ * clear of it there, still fading out of the corner they are leaving or of
+ * the place this one wants. So they arrive together and never overlap, even
+ * as one comes in and another goes (on a short screen a stack at a top corner
  * reaches down past a picture at the bottom corner under it).
  */
-export function waitFor(wanted: CornerWanted, deck: CornerDeck, slot: number, other: CornerPlacement): CornerWanted {
-  return wanted === "show" && other.alpha > 0 && (other.corner !== deck.goal || other.slot === slot) ? "fade" : wanted;
+export function waitFor(wanted: CornerWanted, deck: CornerDeck, slot: number, picture: CornerPicture, all: readonly CornerPicture[]): CornerWanted {
+  if (wanted !== "show") return wanted;
+  const mine = picture.at(deck.goal, slot);
+  for (let i = 0; i < all.length; i++) {
+    const other = all[i];
+    const p = other.placement;
+    if (other === picture || p.alpha <= 0) continue;
+    if (p.corner !== deck.goal || overlaps(other.at(p.corner, p.slot), mine)) return "fade";
+  }
+  return wanted;
 }
 
 /** One picture's place and how much of it shows. */

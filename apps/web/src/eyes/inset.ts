@@ -47,19 +47,30 @@ export type InsetLayout = {
 };
 
 /**
+ * The most a picture in a corner may be, as a share of its full size, at a
+ * size from Settings (1 is the full size): that size, but at most about two
+ * fifths of the safe area's width at the full size, and half of it larger,
+ * so that there is room across the screen for the stats.
+ */
+export const cornerScale = (a: { w: number }, width: number, size: number) => Math.min(size, (a.w * Math.min(0.5, 0.42 * size)) / width);
+
+/**
  * Where its corners are: in from the safe area's edges, clear of the caption
  * at the top (under it, on a screen too narrow to sit beside it) and of the
  * shelf and the tool's label at the bottom (over them, where the shelf runs
  * under the corner), so the one it keeps to while playing covers nothing.
+ * `size` is Settings' (OVERLAY_SIZES).
  */
-export function insetLayout(frame: Frame, hud: HudLayout = hudLayout(frame)): InsetLayout {
+export function insetLayout(frame: Frame, hud: HudLayout = hudLayout(frame), size = 1): InsetLayout {
   const a = safeRect(frame);
   const { margin } = INSET_PANEL;
-  const scale = Math.min(1, (a.w * 0.42) / INSET_PANEL.width);
+  let scale = cornerScale(a, INSET_PANEL.width, size);
+  // Larger, on a short screen it would reach the hint at the bottom right while playing.
+  const beside = (width: number) => a.w / 2 - 120 - margin - 8 >= width;
+  scale = Math.min(scale, (hud.rightY - 15 - (beside(INSET_PANEL.width * scale) ? a.y + margin : hud.captionY + 23)) / INSET_PANEL.height);
   const width = INSET_PANEL.width * scale;
   const height = INSET_PANEL.height * scale;
-  const beside = a.w / 2 - 120 - margin - 8 >= width;
-  const top = beside ? a.y + margin : hud.captionY + 23;
+  const top = beside(width) ? a.y + margin : hud.captionY + 23;
   const under = hud.shelfLeft > a.x + margin + width;
   const bottom = under ? a.y + a.h - margin - height : hud.labelY - 25 - height;
   const ppu = pixelsPerUnit(frame);
@@ -244,9 +255,9 @@ export class EyesInset {
     this.mesh.renderOrder = -1;
   }
 
-  /** The screen changed shape: its size and corners follow, its panel is drawn again and its dots laid out again. */
-  layout(frame: Frame, hud: HudLayout) {
-    const layout = insetLayout(frame, hud);
+  /** The screen changed shape, or the pictures' size: its size and corners follow, its panel is drawn again and its dots laid out again. */
+  layout(frame: Frame, hud: HudLayout, size: number) {
+    const layout = insetLayout(frame, hud, size);
     this.#layout = layout;
     const { width, height } = layout.panel;
     if (this.#canvas.width !== width || this.#canvas.height !== height) {
@@ -267,8 +278,13 @@ export class EyesInset {
     return this.mesh.visible ? this.placement.corner : "hidden";
   }
 
-  /** Once a frame, after the corner deck and before the eyes render and the overlay is drawn. */
-  update(dt: number, wanted: CornerWanted, deck: CornerDeck) {
+  /** Where it is with the deck at a corner. */
+  at(corner: Corner) {
+    return this.#layout.rects[corner];
+  }
+
+  /** Once a frame, after the corner deck and before the eyes render and the overlay is drawn; `opacity` is Settings'. */
+  update(dt: number, wanted: CornerWanted, deck: CornerDeck, opacity: number) {
     const eyes = this.#eyes;
     const light = eyes.light;
     this.watching = wanted === "show";
@@ -287,7 +303,7 @@ export class EyesInset {
       this.#light!.needsUpdate = true;
     }
     const uniforms = this.#material.uniforms;
-    uniforms.alpha.value = this.placement.alpha;
+    uniforms.alpha.value = this.placement.alpha * opacity;
     const origin = this.#layout.origins[this.placement.corner];
     (uniforms.origin.value as THREE.Vector2).set(origin.x, origin.y);
   }
