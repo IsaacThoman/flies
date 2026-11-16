@@ -22,7 +22,7 @@ declare global { var __fly: Game; }
 const PHASES = ["places", "climate", "tools", "menus", "eyes", "wallpaper"] as const;
 type Phase = typeof PHASES[number];
 type Sample = { seconds: number; phase: string; place: string; checkpoint: boolean; [metric: string]: number | string | boolean };
-const STATE = ["screen", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden", "xray", "nervesInset"];
+const STATE = ["screen", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden", "xray", "nerves"];
 const CLOCKS = ["gameSeconds", "audioSeconds", "eyesUpdates"];
 const METRICS = ["geometries", "textures", "programs", "calls", "triangles", "heap", "backing", "workerHeap", "workerBacking", "nodes", "listeners", "audioNodes", "frameMs", "brainSpeed", "storage"];
 
@@ -90,6 +90,7 @@ async function choose(page: Page, tool: string, variant: string) {
     while (hands.variant.id !== variant) if (!hands.stepVariant(1)) throw Error(`No ${variant} on ${tool}`);
   }, { tool, variant });
   await waitFor(page, `tool=${tool},variant=${variant}`);
+  if (tool === "view") await page.evaluate(() => globalThis.__fly.play());
 }
 
 async function canonical(page: Page) {
@@ -220,6 +221,7 @@ export async function run(args = process.argv.slice(2)) {
       for (const tool of TOOLS) for (const variant of tool.variants) {
         if (tool.id === "place") continue;
         await choose(page, tool.id, variant.id);
+        if (variant.id === "inside") await page.waitForTimeout(1500);
         if (["feed", "swoop", "feather", "blow"].includes(tool.id)) await page.keyboard.press("Enter", { delay: 200 });
       }
       for (const pixels of ["chunky", "chunkier", "classic"] as const) {
@@ -320,7 +322,7 @@ export async function run(args = process.argv.slice(2)) {
             }, { eyes, inset });
             for (const view of ["eyes", "inside", "follow"]) {
               await choose(page, "view", view);
-              await page.waitForTimeout(500);
+              await page.waitForTimeout(view === "inside" ? 1500 : 500);
               await sample();
             }
           }
