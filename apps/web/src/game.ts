@@ -96,7 +96,7 @@ export class Game implements Shell {
   #eye = { x: 0, y: 0, z: 0 };
   #lastScreen: ScreenId | "loading" = "loading";
   #hud: HudState;
-  #eyesInfo = { facets: 0, standIn: false, ms: 0, calls: 0 };
+  #eyesInfo = { facets: 0, standIn: false, sent: false, ms: 0, calls: 0 };
 
   constructor(canvas: HTMLCanvasElement, remote: Remote, brain: BrainDriver) {
     this.canvas = canvas;
@@ -488,6 +488,7 @@ export class Game implements Shell {
         const e = this.#eyesInfo;
         e.facets = this.eyes.facets;
         e.standIn = this.eyes.standIn;
+        e.sent = this.eyes.inUse;
         e.ms = this.eyes.costMs;
         e.calls = this.eyes.costCalls;
         hud.eyes = e;

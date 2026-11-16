@@ -25,7 +25,7 @@ export type HudState = {
   spikes: number;
   brainRunning: boolean;
   /** Looking through the fly's eyes: how many facets, whether they're a stand-in, and what they cost. */
-  eyes: { facets: number; standIn: boolean; ms: number; calls: number } | null;
+  eyes: { facets: number; standIn: boolean; sent: boolean; ms: number; calls: number } | null;
 };
 
 const CAPTIONS: Record<Activity, string> = {
@@ -116,9 +116,12 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState) {
     const bottom = ((1 - PICTURE_PANEL.bottom) / 2) * DESIGN_HEIGHT;
     const right = ((PICTURE_PANEL.right + 1) / 2) * DESIGN_WIDTH;
     text(g, "Through the fly's eyes", cx, top + 22, { size: 18, align: "center", color: "#eaf6ff" });
+    const facets = s.eyes.facets.toLocaleString("en-US");
     const sub = s.eyes.standIn
-      ? `A picture of the light on ${s.eyes.facets.toLocaleString("en-US")} facets, laid out as its eyes look. Its brain doesn't see this yet.`
-      : `The light on each of its ${s.eyes.facets.toLocaleString("en-US")} facets, as its brain receives it now.`;
+      ? `A picture of the light on ${facets} facets, laid out as its eyes look. Its brain doesn't see this yet.`
+      : s.eyes.sent
+        ? `The light on each of its ${facets} facets, as its brain receives it now.`
+        : `The light on each of its ${facets} facets. Its eyes are off in Settings, so its brain isn't sent this.`;
     text(g, sub, cx, top + 42, { size: 12, align: "center", color: "#cfe8ff" });
     text(g, "left eye", cx - 190, bottom - 12, { size: 12, align: "center", color: "#9fdcff" });
     text(g, "ahead", cx, bottom - 12, { size: 12, align: "center", color: "#9fdcff" });
