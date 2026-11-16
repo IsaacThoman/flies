@@ -106,7 +106,8 @@ export class Bubbles {
       b.x = near.x - rnd.range(50, 160);
       b.z = near.z + rnd.range(-14, 14);
       b.r = rnd.range(2.2, 6);
-      b.y = this.#world.heightAt(b.x, b.z, near.y) + b.r + rnd.range(1.8, 4);
+      // Over whatever stands there at the fly's height, not over something above it.
+      b.y = this.#world.heightAt(b.x, b.z, this.#world.topAbove(b.x, near.y, b.z)) + b.r + rnd.range(1.8, 4);
     } else {
       b.x = -520 + rnd.range(-80, 0);
       b.z = rnd.range(-260, 260);
@@ -162,7 +163,8 @@ export class Bubbles {
       b.z += (BREEZE.z * b.speed + gust.z * 0.4 + Math.sin(time * 0.3 + b.phase) * 10) * dt;
       // Low ones bob without sinking, so most pass the fly before touching the table.
       b.y += ((b.low ? Math.sin(time * 0.5 + b.phase) * 0.6 : Math.sin(time * 0.5 + b.phase) * 6 - 2) + gust.y * 0.4) * dt;
-      const s = world.surface(b.x, b.z, this.#surface, b.y);
+      // Under it, or the top of what it has drifted into.
+      const s = world.surface(b.x, b.z, this.#surface, world.topAbove(b.x, b.y, b.z));
       let burst = b.y - b.r < s.y + 0.5 || b.y < b.r;
       // Raindrops hitting it.
       if (!burst && this.rain > 0 && this.#rnd.next() < this.rain * dt * 0.5) burst = true;
