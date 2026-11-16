@@ -115,8 +115,8 @@ night their windows light up and the stars and the moon come out. Under a grey
 sky the window's shadows go soft; on cold mornings and damp days the glass
 mists at its foot; in mist the houses fade to ghosts; in the rain it falls
 across the garden, drops bead on the pane and run down it, and it stays
-streaked as it dries. It sounds of the kitchen's hush, the fridge, birds
-muffled by the glass, and rain on the pane. There are no bubbles or fireflies
+streaked as it dries. It sounds of the kitchen's hush, the fridge, birds in
+the garden muffled by the glass by day, and rain on the pane. There are no bubbles or fireflies
 indoors.
 
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
@@ -384,7 +384,8 @@ dev and preview servers serve and the production build copies in
 (`apps/web/src/brain/native-driver.ts`), which allocates nothing per frame.
 Sound is synthesised into buffers at start-up (no oscillators or filters):
 wing buzz following the wings, patter while it walks, each place's own
-surroundings (the picnic's breeze, lake and birds, quieter in the rain), rain
+surroundings (the picnic's breeze and lake; birds by day, quieter in the
+rain and gone to roost at night, muffled behind the windowsill's glass), rain
 and the rush of a gust, and small sounds for the
 tools and menus. The settings, the shelf's kept choices and what the hints
 have taught are in
