@@ -49,7 +49,8 @@ their chord. Dedicated regressions check thin walls and a grazing box corner.
 Every 30 simulated seconds, recovery probes remove wind and wings, require a
 landing inside 20 seconds, then try eight walking headings (3 seconds each)
 and take-off headings. At least one walking heading must travel 3 mm and at
-least one launch must rise 2 mm. These checks sample recovery; they are not an
+least one launch must rise 2 mm, except under something lower than that over
+its body, where walking out is the only way. These checks sample recovery; they are not an
 exhaustive proof of every point in the world.
 
 The life fuzzer uses `InProcessBrain`, a synchronous `BrainDriver` backed by
@@ -71,8 +72,10 @@ Separate tests guarantee carries during walking, flight and eating even when
 a random run misses a short flight.
 
 `npm test` uses three five-minute body seeds per place, the restaurant
-included, and a short fixed-seed real-brain run in each place, including
-eating. The real-brain tests share one
+included, and in a small diner of slabs (`packages/world/tests/diner.ts`)
+with rails just over the floor, one too low to pass under and one the fly
+just fits beneath; and a short fixed-seed real-brain run in each place,
+including eating. The real-brain tests share one
 brain to avoid rebuilding the connectome repeatedly, and skip with an explicit
 message when the data is absent. Longer runs belong behind `npm run fuzz`.
 
@@ -105,8 +108,10 @@ shelf's end falls down the wall's kitchen side and hangs there against it,
 with nothing beyond the floor to land on: put there, it fails the recovery
 probe. The body runs have not reached it from the room yet. Its first find was a fly
 falling onto the steep outside of the bar's fruit bowl, through it into the
-zinc under it, which hung there rather than sliding off: now a regression in
-`packages/body/tests/slabs.test.ts`.
+zinc under it, which hung there rather than sliding off. The diner's first
+was a take-off from under its high rail that went nowhere: a fly that rose
+into an underside stopped dead there, rather than going on along under it.
+Both are regressions in `packages/body/tests/slabs.test.ts`.
 
 
 ## Ordinary-frame cost

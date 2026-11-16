@@ -3,7 +3,7 @@ import { mulberry32 } from "@fly/brain";
 import { FLY_HEIGHT, FlyBody, MAX_SLOPE_COS, createIntent } from "@fly/body";
 import type { Forces } from "@fly/body";
 import { BAR, LAB, PICNIC, RESTAURANT, WINDOWSILL, World, createSurface } from "@fly/world";
-import type { Vec3 } from "@fly/world";
+import type { Place, Vec3 } from "@fly/world";
 
 export const places = { picnic: PICNIC, windowsill: WINDOWSILL, lab: LAB, bar: BAR, restaurant: RESTAURANT };
 export type PlaceId = keyof typeof places;
@@ -80,7 +80,8 @@ export function checkRecovery(body: FlyBody, world: World) {
     }
     if (canWalk) break;
   }
-  let canJump = false;
+  // Under something lower than a jump over its body, it can only walk out.
+  let canJump = world.underside(landed.position.x, landed.position.z, landed.position.y) < landed.position.y + FLY_HEIGHT + 2;
   for (let direction = 0; direction < 8 && !canJump; direction++) {
     const jump = clone(landed, world);
     jump.yaw = direction * Math.PI / 4;
@@ -116,9 +117,10 @@ export function randomStart(world: World, random: () => number, highStarts = fal
   throw new Error("could not sample a standable start");
 }
 
-export function fuzzBody(id: PlaceId, seed: number, duration: number, highStarts = false) {
+/** Fuzzes the body in one of the places, or in `place` (a test's own) under that name. */
+export function fuzzBody(id: string, seed: number, duration: number, highStarts = false, place: Place = places[id as PlaceId]) {
   const random = mulberry32(seed);
-  const world = new World(places[id]);
+  const world = new World(place);
   const body = new FlyBody(world, randomStart(world, random, highStarts));
   let intent = createIntent();
   const forces: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };

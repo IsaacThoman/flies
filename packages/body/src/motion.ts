@@ -430,14 +430,36 @@ export class FlyBody {
             this.blocked = fx * hit.normal.x + fz * hit.normal.z < -0.3;
           }
         } else if (hit.normal.y < 0) {
-          // Rose into an underside: stopped with its body just under it, and bounced back down.
-          p.x = hit.point.x;
-          p.z = hit.point.z;
-          p.y = solidBottom(world.solids[hit.solid]) - FLY_HEIGHT;
+          // Rose into an underside: its body kept just under it, bounced back down, and on along under it
+          // the rest of the way unless something stands in that way.
+          const y = solidBottom(world.solids[hit.solid]) - FLY_HEIGHT;
           if (v.y > 0) {
             this.events.hit = Math.max(this.events.hit, v.y);
             v.y *= -0.4;
           }
+          const hx = hit.point.x;
+          const hz = hit.point.z;
+          const rest = Math.hypot(p.x - hx, p.z - hz);
+          if (rest > 1e-9) {
+            origin.x = hx;
+            origin.y = y + 1e-6;
+            origin.z = hz;
+            dir.x = (p.x - hx) / rest;
+            dir.y = 0;
+            dir.z = (p.z - hz) / rest;
+            const stop = world.raycast(origin, dir, this.#flightHit, rest, FLY_HEIGHT - SLACK);
+            if (stop) {
+              p.x = hx;
+              p.z = hz;
+              const into = v.x * stop.normal.x + v.z * stop.normal.z;
+              if (stop.normal.y === 0 && into < 0) {
+                v.x -= into * stop.normal.x * 1.4;
+                v.z -= into * stop.normal.z * 1.4;
+                this.events.hit = Math.max(this.events.hit, -into);
+              }
+            }
+          }
+          p.y = y;
         } else if (hit.normal.y >= MAX_SLOPE_COS && !world.onTable(hit.point.x, hit.point.z)) {
           // Keep sliding back across an outside wall's top, without perching on it.
           p.y = Math.max(p.y, hit.point.y);

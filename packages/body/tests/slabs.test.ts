@@ -152,3 +152,14 @@ test("falling onto the steep outside of the bar's fruit bowl, it slides off rath
   assert.equal(body.onFeet, true);
   assert.ok(bar.underside(body.position.x, body.position.z, body.position.y) >= body.position.y + FLY_HEIGHT);
 });
+
+test("taking off from under something it barely fits beneath, it slides out along the underside rather than stopping dead", () => {
+  // Found by the body fuzzer (the diner, seed 1): every launch from under the high rail went nowhere.
+  const body = new FlyBody(world, { x: 123, z: 227, yaw: 0, y: 0 });
+  body.step(intent({ takeOff: 1 }), still, DT);
+  for (let t = 0; t < 0.5 && body.position.z < 231; t += DT) {
+    assert.ok(world.underside(body.position.x, body.position.z, body.position.y) >= body.position.y + FLY_HEIGHT - 1e-9);
+    body.step(intent({ wings: 0.8 }), still, DT);
+  }
+  assert.ok(body.position.z > 230, `still under the rail at ${body.position.z}`);
+});
