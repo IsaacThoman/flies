@@ -55,7 +55,7 @@ export class Life {
   #forces: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
   #wasEating = false;
   #proboscis = 0;
-  readonly #sent: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0 };
+  readonly #sent: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0, wingbeat: 0 };
 
   constructor(world: World, brain: BrainDriver) {
     this.world = world;
@@ -124,6 +124,7 @@ export class Life {
     sent.grounded = felt.grounded;
     sent.maleTaste = felt.maleTaste;
     sent.hunger = this.hunger.level;
+    sent.wingbeat = felt.wingbeat;
     if (this.light) sent.light = this.light;
     else delete sent.light;
     brain.tick(dt * 1000, sent);

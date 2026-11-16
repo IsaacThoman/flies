@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
-import { BACKGROUND, HUNGER, READOUTS, SCALES, SENSES, backgroundRates, balanceFactor, decode, hungerOf, intensity, outputSynapses, senseRates, smooth, sweetOutputGain, wire } from "./io.ts";
+import { BACKGROUND, HUNGER, READOUTS, SCALES, SENSES, WINGBEAT_RATE, backgroundRates, balanceFactor, decode, hungerOf, intensity, outputSynapses, senseRates, smooth, sweetOutputGain, wire } from "./io.ts";
 import { OPERATING_POINT, buildWeights, completenessFactors } from "./params.ts";
 import { REGIONS, REGION_RATE_NAMES } from "./regions.ts";
 import { createBrain, FlyBrain, MAX_TICK_MS } from "./runtime.ts";
@@ -87,10 +87,19 @@ test("a male's taste drives only the front legs' LgLG1a and LgAG1, picked by roo
   const taste = wiring.senses.find((s) => s.spec.sense === "maleTaste")!;
   assert.deepEqual([...taste.neurons], [...synthetic.index["LgAG1"], ...synthetic.index["LgLG1a"]]);
   assert.ok(!taste.neurons.includes(synthetic.index["LgLG1a mid leg"][0]));
-  assert.ok(SENSES.filter((s) => s.afterEyes).every((s) => s === SENSES[SENSES.length - 1]), "only the last sense comes after the eyes");
+  const after = SENSES.filter((s) => s.afterEyes);
+  assert.deepEqual(after, SENSES.slice(SENSES.length - after.length), "only the last senses come after the eyes");
   // (seeing.test.ts's fingerprint holds that the inputs before it draw what they drew without it.)
   const brain = new FlyBrain(c, { eyeColumns: syntheticEyeColumns(synthetic) });
   assert.deepEqual([...brain.sim.members("maleTaste")], [...taste.neurons]);
+});
+
+test("grounded drives the legs' load sensors, and wingbeat every other campaniform sensillum: the wings' and halteres'", () => {
+  const wiring = wire(load());
+  const neurons = (sense: string) => [...wiring.senses.find((s) => s.spec.sense === sense)!.neurons];
+  assert.deepEqual(neurons("grounded"), synthetic.index["campaniform"]);
+  assert.deepEqual(neurons("wingbeat"), synthetic.index["wing campaniform"]);
+  assert.equal(senseRates(wiring, { ...RESTING_SENSES, wingbeat: 0.5 }).get("wingbeat"), WINGBEAT_RATE / 2);
 });
 
 test("balancing turns down the side whose neurons make more synapses", () => {

@@ -17,7 +17,7 @@
 namespace fly::io {
 
 /** The senses that are one intensity each (types.ts's BrainSenses less light). */
-enum Sense : uint8_t { kLoomLeft, kLoomRight, kTouch, kBumpLeft, kBumpRight, kWind, kSweet, kGrounded, kMaleTaste, kSenseCount };
+enum Sense : uint8_t { kLoomLeft, kLoomRight, kTouch, kBumpLeft, kBumpRight, kWind, kSweet, kGrounded, kMaleTaste, kWingbeat, kSenseCount };
 
 struct Senses {
   double loom_left = 0, loom_right = 0, touch = 0, bump_left = 0, bump_right = 0, wind = 0, sweet = 0;
@@ -25,6 +25,7 @@ struct Senses {
   double male_taste = 0;
   /** Internal state, not a sense (types.ts's BrainSenses.hunger): 0 just fed to 1 starved; anything not a number counts as 1. */
   double hunger = 1;
+  double wingbeat = 0;
 };
 
 struct Command {

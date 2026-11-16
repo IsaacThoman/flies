@@ -69,6 +69,11 @@ const std::vector<uint32_t> kForelegMaleTaste = {
     91673,  92777,  94281,  94719,  94995,  95900,  105964, 108436, 111872, 816710,
 };
 
+// The legs' campaniform sensilla, and the rate the wings' and halteres' fire
+// at full flight power (io.ts's LEG_CAMPANIFORM and WINGBEAT_RATE say why).
+constexpr const char* kLegCampaniform = "SNpp53";
+constexpr double kWingbeatRate = 100;
+
 uint64_t output_synapses(const Connectome& c, const std::vector<uint32_t>& neurons) {
   uint64_t total = 0;
   for (uint32_t i : neurons) {
@@ -100,10 +105,15 @@ std::vector<InputSpec> senses() {
       {"wind", "Wind- and gravity-sensitive Johnston's organ neurons of both antennae", query({{kSuperClass, is("cb_sensory")}, {kSubClass, is("wind_gravity")}}),
        100, "", kWind, kLeft},
       {"sweet", kSweetDescription, query({{kSuperClass, is("cb_sensory")}, {kClass, is("gustatory")}, {kType, sweet_types()}}), 100, "", kSweet, kLeft},
-      {"grounded", "Campaniform sensilla (load sensors) of the legs, firing tonically while standing",
-       query({{kSuperClass, one_of({"vnc_sensory", "sensory_ascending"})}, {kSubClass, is("campaniform_sensilla")}}), 20, "", kGrounded, kLeft},
+      {"grounded", "Campaniform sensilla (load sensors) of the legs (SNpp53), firing tonically while standing",
+       query({{kSubClass, is("campaniform_sensilla")}, {kType, is(kLegCampaniform)}}), 20, "", kGrounded, kLeft},
       {"maleTaste", "Front legs' taste neurons for a male's pheromones: LgLG1a (ppk23 M cells) and LgAG1 (Gr32a/Gr33a)",
        query({{kType, one_of({"LgLG1a", "LgAG1"})}}), 50, "", kMaleTaste, kLeft, kForelegMaleTaste, true},
+      {"wingbeat", "Campaniform sensilla (strain sensors) of the wings and halteres, firing with each stroke",
+       query({{kSuperClass, one_of({"vnc_sensory", "sensory_ascending"})},
+              {kSubClass, is("campaniform_sensilla")},
+              {kType, [](std::string_view t) { return t != kLegCampaniform; }}}),
+       kWingbeatRate, "", kWingbeat, kLeft, {}, true},
   };
 }
 
@@ -202,6 +212,7 @@ double intensity(const Senses& s, Sense sense) {
     case kSweet: return js::clamp(s.sweet, 0, 1);
     case kGrounded: return s.grounded ? 1 : 0;
     case kMaleTaste: return js::clamp(s.male_taste, 0, 1);
+    case kWingbeat: return js::clamp(s.wingbeat, 0, 1);
     case kSenseCount: break;
   }
   return 0;

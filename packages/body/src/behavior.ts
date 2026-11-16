@@ -37,10 +37,10 @@ export const AIR_TURN_RATE = 5;
  * fired: 0.4, 80 Hz. The giant fiber is the fly's high-threshold escape
  * pathway, silent in ordinary life and firing for a fast, close loom (von Reyn
  * et al. 2014), so the line sits just above what DNp01 does otherwise. Measured:
- * at most 0.23 in 10 minutes at rest and under 0.3 under every other sense
+ * at most 0.25 in 10 minutes at rest and under 0.3 under every other sense
  * (packages/brain/README.md), and 0.30 at most in two minutes of the game at
- * midday with the eyes open. A real loom seen through the eyes reaches 0.56 to
- * 0.84 for a dark disc (the README's battery) and 0.34 to 0.72 for the Swoop
+ * midday with the eyes open. A real loom seen through the eyes reaches 0.49 to
+ * 0.87 for a dark disc (the README's battery) and 0.34 to 0.72 for the Swoop
  * tool's ball, which at 0.5 set the fly off in about half its throws at midday
  * and almost never at dusk; the hand-wired looming pulse, 1. 200 Hz for 1 is
  * the hand-wired pulse's full drive of every looming detector at once, which no
@@ -57,12 +57,14 @@ export const ESCAPE_REFRACTORY = 1.5;
  * In a fly, losing contact with the ground under the feet starts the wings
  * beating and keeps them going until the feet touch something again (Fraenkel
  * 1932; a fly held by its back in the air flies for as long as its feet find
- * nothing to hold). In this connectome it works the other way round: the leg
- * mechanosensors that fire while it stands excite the flight power motor
- * neurons, so leaving the ground takes drive away, and after an escape seen
- * through the eyes `wings` stays at 0.3 to 0.4, below the 0.6 that holds the
- * fly up (packages/brain/README.md). So the body keeps a floor under the
- * wings' drive while it is off its feet:
+ * nothing to hold). The model has nothing that does it: leaving the ground
+ * silences only the legs' 13 load sensors (`grounded`), which changes nothing
+ * measurable, and the wings' own strain sensors (`wingbeat`, FlyBody.wingbeat)
+ * feed each stroke back to the flight power motor neurons too weakly to keep
+ * them going (at full power they give `wings` about 0.3). After an escape seen
+ * through the eyes `wings` peaks at 0.3 to 0.5, below the 0.6 that holds the
+ * fly up, and falls away (packages/brain/README.md). So the body keeps a floor
+ * under the wings' drive while it is off its feet:
  *
  * - A take-off goes straight into it: the giant fiber drives the jump muscle
  *   (TTM) and, through the PSI, the wings' power muscles, so the first
@@ -85,6 +87,11 @@ export const ESCAPE_REFRACTORY = 1.5;
  * it takes off at all (the giant fiber), its own wing drive, which raises the
  * floor whenever it is higher (a fly kept looming at keeps flying hard), and
  * its steering in the air (`turn`).
+ *
+ * The wings' sensors feel the strokes the floor makes, so the brain's own
+ * `wings` rises in the air (0.19 to 0.23 on average in a swoop's flight,
+ * against 0.07 to 0.14 without them), but never to the floor: without it a
+ * take-off is the same hop either way (README, Flight). The floor stays.
  */
 export const TARSAL_ONSET = 0.05;
 export const FLIGHT_WINGS = 0.62;
@@ -107,10 +114,11 @@ export const FEED_OFF = 0.05;
  * Sings, on its feet, when `sing` passes SING_ON, until it falls below SING_OFF.
  *
  * `sing` is pIP10, the song command neuron (read at 40 Hz). Measured at rest
- * (10 minutes, seeds 1 to 3, packages/brain/README.md) it peaks at 0.16: two
- * spikes of the pair within its smoothing, and nothing a fly alone does
- * drives it further. SING_ON is two and a half times that, so a lone fly
- * never sings; P1, the courtship neurons that drive pIP10, take it to 1.
+ * (10 minutes, seeds 1 to 3, packages/brain/README.md) it peaks at 0.08, and
+ * has reached 0.16: two spikes of the pair within its smoothing, and nothing
+ * a fly alone does drives it further. SING_ON is two and a half times that,
+ * so a lone fly never sings; P1, the courtship neurons that drive pIP10, take
+ * it to 1.
  */
 export const SING_ON = 0.4;
 export const SING_OFF = 0.2;

@@ -63,6 +63,7 @@ const FULL: { [K in ScalarSense]: BrainSenses[K] } = {
   sweet: 1,
   grounded: false,
   maleTaste: 1,
+  wingbeat: 1,
 };
 const label = (key: ScalarSense) => (key === "grounded" ? "airborne" : key);
 const apply = (keys: readonly (ScalarSense)[]): BrainSenses => {

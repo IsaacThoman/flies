@@ -131,6 +131,14 @@ export class FlyBody {
   groundSpeed = 0;
   /** Its yaw rate last frame, rad/s. */
   turnRate = 0;
+  /**
+   * How hard its wings beat after its last step, 0 to 1, as their own strain
+   * sensors feel it (the brain's `wingbeat`): in the air the drive it flew
+   * with (Intent.wings); on its feet only as far as the pose opens them
+   * (Intent.wingPose), so 0 with them folded; 0 in the step it lands in, as
+   * tarsal contact stops a fly's wings.
+   */
+  wingbeat = 0;
   #world: World;
   #pressed = 0;
   #awayLeft = 0;
@@ -182,7 +190,7 @@ export class FlyBody {
     this.velocity.x = this.velocity.y = this.velocity.z = 0;
     this.mode = "standing";
     this.blocked = false;
-    this.groundSpeed = this.turnRate = 0;
+    this.groundSpeed = this.turnRate = this.wingbeat = 0;
     this.#pressed = this.#awayLeft = 0;
     this.events.tookOff = this.events.jumped = this.events.landed = false;
     this.events.hit = 0;
@@ -197,19 +205,15 @@ export class FlyBody {
     ev.hit = 0;
     if (!(dt > 0) || !Number.isFinite(dt)) return;
     if (this.mode !== "airborne" && intent.takeOff !== null) this.#takeOff(intent.takeOff, forces.threat);
-    // Ordinary frames need no subdivision bookkeeping.
-    if (dt <= 1 / 60) {
-      if (this.mode === "airborne") this.#fly(intent, forces, dt);
-      else this.#walk(intent, forces, dt);
-      return;
-    }
+    const flying = this.mode === "airborne";
     // Long frames must not destabilize drag or skip a wall between samples.
-    const steps = Math.ceil(dt / (1 / 60));
+    const steps = dt <= 1 / 60 ? 1 : Math.ceil(dt / (1 / 60));
     const h = dt / steps;
     for (let i = 0; i < steps; i++) {
       if (this.mode === "airborne") this.#fly(intent, forces, h);
       else this.#walk(intent, forces, h);
     }
+    this.wingbeat = this.mode === "airborne" ? intent.wings : flying ? 0 : intent.wingPose;
   }
 
   #takeOff(strength: number, threat: Vec3 | null) {

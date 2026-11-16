@@ -59,6 +59,7 @@ const SENSES = [
   ["sweet", "Sweet"],
   ["grounded", "On legs"],
   ["maleTaste", "Male taste"],
+  ["wingbeat", "Wingbeat"],
   ["light", "Light"],
   ["hunger", "Hunger"],
 ] as const;

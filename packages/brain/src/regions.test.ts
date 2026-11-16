@@ -167,6 +167,7 @@ test("on the real connectome the senses' and the commands' neurons are where the
   within(sense("touch body"), "bristles");
   within(sense("sweet"), "mouthparts");
   within(sense("grounded"), "proprioceptors");
+  within(sense("wingbeat"), "proprioceptors");
   for (const side of ["left", "right"]) within(c.find({ type: ["L1", "L2", "L3"], side }), `lamina-${side}`);
   for (const name of ["DNg100", "DNa02 left", "DNa02 right", "MDN", "DNp01", "DNg12"]) within(read(name), "descending-left", "descending-right");
   within(read("flight"), "flight-motor");

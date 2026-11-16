@@ -61,7 +61,7 @@ const started = performance.now();
 const brain = createBrain(data, { seed });
 console.log(`built in ${(performance.now() - started).toFixed(0)} ms`);
 regime(brain, "at rest (standing)", RESTING_SENSES);
-const everything = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: true, maleTaste: 1 };
+const everything = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: true, maleTaste: 1, wingbeat: 1 };
 regime(brain, "every sense at full strength", everything);
 
 // The scenes, as report.ts (e) has them; each tick's frames are kept for the native run.
