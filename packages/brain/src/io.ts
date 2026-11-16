@@ -5,8 +5,11 @@
 import type { Connectome, NeuronQuery } from "./format.ts";
 import type { BrainCommand, BrainSenses } from "./types.ts";
 
-/** A group of neurons, picked by annotation. */
-export type Selection = NeuronQuery;
+/**
+ * A group of neurons, picked by annotation and, where the annotations in the
+ * wiring don't say enough (which leg a sensory neuron comes from), also by root ID.
+ */
+export type Selection = NeuronQuery & { rootIds?: readonly number[] };
 
 export type InputSpec = {
   /** Name of the Poisson input in the simulation. */
@@ -28,6 +31,12 @@ export type InputSpec = {
    * reconstructed than the other.
    */
   balance?: string;
+  /**
+   * Added to the simulation after the eyes, so that its random stream leaves
+   * every input that came before it as it was: a sense added later changes
+   * nothing until it is felt.
+   */
+  afterEyes?: boolean;
 };
 
 /** The senses that are one intensity each; `light` is a picture, handled apart. */
@@ -60,6 +69,26 @@ const ANTENNA: NeuronQuery = { superClass: "cb_sensory", type: /^JO-[CE]/ };
 // most (README; `probe.ts --superClass cb_sensory --class gustatory --each type
 // --target MN9 --greedy`).
 export const SWEET_TYPES = ["dorsal_tpGRN", "LB3d", "PhG9", "LB3c", "LB2a", "LB4a", "LB3b", "PhG1c", "PhG3"];
+
+// The front legs' taste neurons that answer a male's cuticle. A male's
+// forelegs carry pheromone-sensing taste neurons: in each of their
+// pheromone-sensing taste bristles one ppk23 neuron answers male pheromones
+// (7-tricosene, the M cell) and one female ones (the F cell, ppk25 too;
+// Thistle et al. 2012, Lu et al. 2012, Toda et al. 2012), and Gr32a bitter
+// neurons answer 7-tricosene too (Miyamoto & Amrein 2008; Wang et al. 2011).
+// Both keep males from courting males. Which types they are in this dataset is
+// the proposal of Tastekin et al. (2025, the male CNS's taste connectome):
+// LgLG1a is fru+ ppk23+ ppk25- (the M cell's identity) and LgAG1 the Gr33a
+// (with Gr32a) bitter neurons. Both types are on every leg; these are the front
+// legs' (entry nerve ProLN in FlyEM's annotations, which the packed wiring
+// doesn't carry; `scripts/song.ts` checks them against the anatomy file).
+export const FORELEG_MALE_TASTE = {
+  LgLG1a: [
+    807958, 808071, 808278, 808369, 808379, 808524, 809798, 810164, 811797, 812809, 813636, 814020, 814544, 814710, 815091, 815110, 816273, 816447, 816927,
+    816972, 817352, 817570, 818574, 819815, 820449, 821805, 823278, 823555, 824934, 905725, 907867, 911569, 912149, 933097,
+  ],
+  LgAG1: [91673, 92777, 94281, 94719, 94995, 95900, 105964, 108436, 111872, 816710],
+} as const;
 
 export const SENSES: readonly SenseSpec[] = [
   { sense: "loomLeft", name: "loomLeft", description: "Looming detectors (LPLC2, LC4) of the left eye", select: sided(LOOMING, "left"), maxRate: 100 },
@@ -113,6 +142,16 @@ export const SENSES: readonly SenseSpec[] = [
     select: { superClass: ["vnc_sensory", "sensory_ascending"], subClass: "campaniform_sensilla" },
     maxRate: 20,
   },
+  {
+    sense: "maleTaste",
+    name: "maleTaste",
+    description: "Front legs' taste neurons for a male's pheromones: LgLG1a (ppk23 M cells) and LgAG1 (Gr32a/Gr33a)",
+    select: { type: ["LgLG1a", "LgAG1"], rootIds: [...FORELEG_MALE_TASTE.LgLG1a, ...FORELEG_MALE_TASTE.LgAG1] },
+    // A round number, of the order of what a contact chemoreceptor fires for
+    // its ligand (tens of spikes a second); at 100 the answer is the same (README).
+    maxRate: 50,
+    afterEyes: true,
+  },
 ];
 
 /**
@@ -140,6 +179,7 @@ export const READOUTS: readonly ReadoutSpec[] = [
   { name: "flight", description: "Indirect flight power muscle motor neurons", select: { type: ["DLM1-4", "DLMn/a", "DVM1a-c", "DVMn/2a", "DVMn/3a"] }, tau: 100 },
   { name: "DNg12", description: "Head-grooming descending neurons DNg12_a, _b and _c", select: { type: ["DNg12_a", "DNg12_b", "DNg12_c"] }, tau: 150 },
   { name: "MN9", description: "Proboscis extension motor neuron", select: { type: "MN9" }, tau: 150 },
+  { name: "pIP10", description: "Courtship song command descending neurons", select: { type: "pIP10" }, tau: 150 },
 ];
 
 /** Rate, Hz, at which each command reaches 1 (decode says which readouts each is read from). */
@@ -151,6 +191,7 @@ export const SCALES = {
   wings: 120,
   groom: 60,
   feed: 40,
+  sing: 40,
 } as const;
 
 const clamp = (value: number, min: number, max: number) => (Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : 0);
@@ -167,6 +208,7 @@ export function decode(rates: Readonly<Record<string, number>>): BrainCommand {
     wings: clamp(r("flight") / SCALES.wings, 0, 1),
     groom: clamp(r("DNg12") / SCALES.groom, 0, 1),
     feed: clamp(r("MN9") / SCALES.feed, 0, 1),
+    sing: clamp(r("pIP10") / SCALES.sing, 0, 1),
   };
 }
 
@@ -194,7 +236,11 @@ export function smooth(previous: number, sample: number, dt: number, tau: number
 
 /** The neurons a selection picks. */
 export function select(connectome: Connectome, selection: Selection): Uint32Array {
-  return connectome.find(selection);
+  const { rootIds, ...query } = selection;
+  const found = connectome.find(query);
+  if (!rootIds) return found;
+  const wanted = new Set(rootIds);
+  return found.filter((i) => wanted.has(connectome.rootId[i]));
 }
 
 /** Output synapses of a group of neurons. */

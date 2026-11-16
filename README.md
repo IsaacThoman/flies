@@ -437,11 +437,11 @@ and moves round with them; on a screen too narrow for that, under them; its
 cells two to a row on a narrow screen, and its brain beside its day on a
 short one. In and out, also headed by what the fly is doing, is a bar for
 each sense going into the brain as the body sends it (a loom at either eye,
-touch, either antenna, wind, sweet, weight on its legs, and the light, the
-mean over every facet) and for each command coming out (walk, steer, back
-up, escape, wings, groom, feed), with the firing rate of the neurons each is
-read from (DNg100, the two DNa02s, MDN, DNp01, the flight motor neurons,
-DNg12, MN9) in Hz: the senses beside the commands, under them on a narrow
+touch, either antenna, wind, sweet, weight on its legs, a male's taste on
+its front legs, and the light, the mean over every facet) and for each
+command coming out (walk, steer, back up, escape, wings, groom, feed, sing),
+with the firing rate of the neurons each is read from (DNg100, the two DNa02s,
+MDN, DNp01, the flight motor neurons, DNg12, MN9, pIP10) in Hz: the senses beside the commands, under them on a narrow
 screen, or split in two on a short one. It is drawn again only when a figure
 or a bar it shows changes, at most four times a second.
 
@@ -476,6 +476,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
 | `grounded` | On its feet. |
+| `maleTaste` | A front leg's tarsus on another fly's body, while it stands (at a table with others; every fly there is a male): the taste of a male's cuticle, 1 while touching, easing out over 0.3 s. |
 
 ## What the body adds
 
@@ -483,7 +484,8 @@ The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
 with thresholds, smoothing and hysteresis: walk above 0.3
 until below 0.15, back up when `back` beats `walk` by 0.15, take off as
 `escape` rises past 0.4 (the giant fiber at 80 Hz: why there, in `behavior.ts`), groom and wing poses above 0.2, feed above 0.15 until
-below 0.05, commands older than 500 ms ignored). Steering is continuous: `turn`
+below 0.05, sing above 0.4 until below 0.2 and only on its feet (pIP10, the
+song command neuron: why there, in `behavior.ts`), commands older than 500 ms ignored). Steering is continuous: `turn`
 sets the yaw rate (3 rad/s at full turn walking, a third of that standing, 5
 in the air).
 
@@ -517,6 +519,14 @@ lives (`packages/body/src/motion.ts` unless noted):
   another fly's body it is pushed back out, so it stops against it or slides
   past, and flying into one it bounces off. Each device moves only its own
   fly, out of where it sees the others.
+- **The song's wing.** Singing, it holds out the wing on the side
+  of the nearest other fly (else the one it last sang with; a male extends the
+  wing nearer the one he courts), vibrating too fast to see as strokes. The
+  song is shown, not heard. In
+  practice it never does: nothing it meets reaches the courtship neurons (P1)
+  that make pIP10 sing, a male's taste and the sight of one included
+  (`packages/brain/README.md`, Courtship). Another player's fly is not shown
+  singing (the table doesn't carry it).
 - **The pose.** Grooming is shown only while it stands, and a bout lingers
   about 1.5 s after the command fades. The crouch follows the
   raw escape command.

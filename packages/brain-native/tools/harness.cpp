@@ -4,13 +4,13 @@
 //
 //   fly-brain-harness brain <connectome.bin> <seed> [--light <frames>] [--columns <columns>]
 //     ticks from stdin, one per line:
-//       <dt, f64 bits> <loomLeft> <loomRight> <touch> <bumpLeft> <bumpRight> <wind> <sweet>  (f32 bits)  <grounded 0|1>  [<light>]
+//       <dt, f64 bits> <loomLeft> <loomRight> <touch> <bumpLeft> <bumpRight> <wind> <sweet> <maleTaste>  (f32 bits)  <grounded 0|1>  [<light>]
 //     where <light> is - (the eyes shut) or <left>,<right>, each the index of a frame in the frames file or x for an eye left out.
 //     The frames file is the frames one after another, each a u32 count and that many f32 (little-endian). Light the C
 //     interface can express goes through fly_brain_tick; the rest (a wrong length, both eyes left out) through fly::tick.
 //     The columns file replaces eye-columns.ts's table, a line per column: <left|right> <hex1> <hex2> <kind> <L1> <L2> <L3>.
 //     Prints "ready <neurons> <connections> <rate names, |-separated>" or "error <message>", then per tick
-//       <spikes> <active> <simMs> | <command, f64 ×7> | <rates, f64> | <command as the C interface gives it, f32 ×7> | <rates, f32>
+//       <spikes> <active> <simMs> | <command, f64 ×8> | <rates, f64> | <command as the C interface gives it, f32 ×8> | <rates, f32>
 //       | <arousal> <scene left> <scene right> (f64) | <digest of both retinas' rates, or - without eyes>
 //       | <digest of every neuron's v, g and a every 50th tick, else ->
 //     or "error <message>".
@@ -205,10 +205,10 @@ int brain(const char* path, uint32_t seed, const Options& options) {
   uint32_t tick = 0;
   while (std::getline(std::cin, line)) {
     std::istringstream in(line);
-    std::string dt, v[7], light = "-";
+    std::string dt, v[8], light = "-";
     int grounded = 0;
-    in >> dt >> v[0] >> v[1] >> v[2] >> v[3] >> v[4] >> v[5] >> v[6] >> grounded >> light;
-    fly_senses senses{f32(v[0]), f32(v[1]), f32(v[2]), f32(v[3]), f32(v[4]), f32(v[5]), f32(v[6]), grounded, nullptr, nullptr};
+    in >> dt >> v[0] >> v[1] >> v[2] >> v[3] >> v[4] >> v[5] >> v[6] >> v[7] >> grounded >> light;
+    fly_senses senses{f32(v[0]), f32(v[1]), f32(v[2]), f32(v[3]), f32(v[4]), f32(v[5]), f32(v[6]), grounded, nullptr, nullptr, f32(v[7])};
     fly_command command;
     fly_stats stats;
     int failed;
@@ -242,11 +242,11 @@ int brain(const char* path, uint32_t seed, const Options& options) {
     }
     const fly::io::Command c = fly::io::decode(b->brain.rates());
     std::string out = std::to_string(stats.spikes) + " " + std::to_string(stats.active) + " " + hex64(stats.sim_ms) + " |";
-    for (double x : {c.walk, c.turn, c.back, c.escape, c.wings, c.groom, c.feed}) out += " " + hex64(x);
+    for (double x : {c.walk, c.turn, c.back, c.escape, c.wings, c.groom, c.feed, c.sing}) out += " " + hex64(x);
     out += " |";
     for (double x : b->brain.rates()) out += " " + hex64(x);
     out += " |";
-    for (float x : {command.walk, command.turn, command.back, command.escape, command.wings, command.groom, command.feed}) out += " " + hex32(x);
+    for (float x : {command.walk, command.turn, command.back, command.escape, command.wings, command.groom, command.feed, command.sing}) out += " " + hex32(x);
     out += " |";
     for (float x : rates) out += " " + hex32(x);
     const fly::InternalState& state = b->brain.state();

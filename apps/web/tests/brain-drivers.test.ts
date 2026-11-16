@@ -12,7 +12,7 @@ import { BrainLoadError } from "../src/brain/download.ts";
 import { LOAD_TIMEOUT_MS, MAX_TICK_MS, MAX_WAIT_STEP_MS, STALL_MS, WorkerBrainDriver } from "../src/brain/worker-driver.ts";
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-const state = (walk = 0.5): BrainState => ({ command: { walk, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0 }, stats: { simMs: 10, wallMs: 1, spikes: 500, active: 100, rates: {} } });
+const state = (walk = 0.5): BrainState => ({ command: { walk, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 }, stats: { simMs: 10, wallMs: 1, spikes: 500, active: 100, rates: {} } });
 
 function fakeWorker() {
   const sent: { request: BrainRequest; transfer?: Transferable[] }[] = [];

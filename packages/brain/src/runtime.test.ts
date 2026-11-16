@@ -21,7 +21,7 @@ const close = (a: number, b: number, tolerance = 1e-9) => Math.abs(a - b) <= tol
 
 test("decode turns readout rates into commands with the documented scales", () => {
   const zero = decode({});
-  assert.deepEqual(zero, { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0 });
+  assert.deepEqual(zero, { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 });
   const half = decode({
     DNg100: SCALES.walk / 2,
     "DNa02 right": SCALES.turn / 2,
@@ -30,14 +30,15 @@ test("decode turns readout rates into commands with the documented scales", () =
     flight: SCALES.wings / 2,
     DNg12: SCALES.groom / 2,
     MN9: SCALES.feed / 2,
+    pIP10: SCALES.sing / 2,
   });
   for (const value of Object.values(half)) assert.ok(close(value, 0.5));
   // Turning is right minus left, toward the side whose DNa02 fires more.
   assert.ok(close(decode({ "DNa02 left": SCALES.turn / 4 }).turn, -0.25));
   assert.ok(close(decode({ "DNa02 left": 10, "DNa02 right": 10 }).turn, 0));
   // Clamped to the contract's ranges, and nonsense reads as 0.
-  const huge = decode({ DNg100: 1e6, "DNa02 left": 1e6, MDN: 1e6, DNp01: 1e6, flight: 1e6, DNg12: 1e6, MN9: 1e6 });
-  assert.deepEqual(huge, { walk: 1, turn: -1, back: 1, escape: 1, wings: 1, groom: 1, feed: 1 });
+  const huge = decode({ DNg100: 1e6, "DNa02 left": 1e6, MDN: 1e6, DNp01: 1e6, flight: 1e6, DNg12: 1e6, MN9: 1e6, pIP10: 1e6 });
+  assert.deepEqual(huge, { walk: 1, turn: -1, back: 1, escape: 1, wings: 1, groom: 1, feed: 1, sing: 1 });
   assert.equal(decode({ DNg100: Number.NaN }).walk, 0);
   assert.equal(decode({ DNg100: -5 }).walk, 0);
 });
@@ -78,6 +79,18 @@ test("each sense drives its groups at its intensity times the stated maximum", (
   const background = backgroundRates(wiring, { left: 0.5, right: 2 });
   assert.equal(background.get("background left"), BACKGROUND[0].maxRate * 0.5);
   assert.equal(background.get("background right"), BACKGROUND[1].maxRate);
+});
+
+test("a male's taste drives only the front legs' LgLG1a and LgAG1, picked by root ID, and is added after every other input", () => {
+  const c = load();
+  const wiring = wire(c);
+  const taste = wiring.senses.find((s) => s.spec.sense === "maleTaste")!;
+  assert.deepEqual([...taste.neurons], [...synthetic.index["LgAG1"], ...synthetic.index["LgLG1a"]]);
+  assert.ok(!taste.neurons.includes(synthetic.index["LgLG1a mid leg"][0]));
+  assert.ok(SENSES.filter((s) => s.afterEyes).every((s) => s === SENSES[SENSES.length - 1]), "only the last sense comes after the eyes");
+  // (seeing.test.ts's fingerprint holds that the inputs before it draw what they drew without it.)
+  const brain = new FlyBrain(c, { eyeColumns: syntheticEyeColumns(synthetic) });
+  assert.deepEqual([...brain.sim.members("maleTaste")], [...taste.neurons]);
 });
 
 test("balancing turns down the side whose neurons make more synapses", () => {
@@ -171,6 +184,7 @@ test("createBrain runs the synthetic connectome end to end", () => {
   assert.ok(run({ sweet: 1 }).command.feed > 0.3);
   assert.ok(run({ touch: 1 }).command.back > 0.3);
   assert.ok(run({ wind: 1 }).command.groom > 0.3);
+  assert.ok(run({ maleTaste: 1 }).command.sing > 0.3);
 });
 
 test("createBrain explains what is wrong with a bad buffer or a bad call", () => {

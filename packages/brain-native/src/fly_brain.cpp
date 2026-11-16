@@ -103,11 +103,13 @@ int tick(fly_brain* brain, double dt_ms, const fly_senses* senses, const Light& 
     in.wind = senses->wind;
     in.sweet = senses->sweet;
     in.grounded = senses->grounded != 0;
+    in.male_taste = senses->male_taste;
     fly::TickStats out;
     const fly::io::Command c = brain->brain.tick(dt_ms, in, light, out);
     if (command != nullptr) {
       *command = fly_command{static_cast<float>(c.walk),  static_cast<float>(c.turn),  static_cast<float>(c.back), static_cast<float>(c.escape),
-                             static_cast<float>(c.wings), static_cast<float>(c.groom), static_cast<float>(c.feed)};
+                             static_cast<float>(c.wings), static_cast<float>(c.groom), static_cast<float>(c.feed),
+                             static_cast<float>(c.sing)};
     }
     if (stats != nullptr) *stats = fly_stats{out.sim_ms, out.wall_ms, static_cast<uint32_t>(out.spikes), out.active};
     if (rates != nullptr) {

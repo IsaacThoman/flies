@@ -29,6 +29,12 @@ export type BrainSenses = {
    * the eyes are shut: the visual system gets no input.
    */
   light?: { left: ArrayLike<number>; right: ArrayLike<number> };
+  /**
+   * The front legs touching another male fly: the taste of his cuticle's
+   * pheromones (7-tricosene) on the forelegs' taste bristles. Every other fly
+   * this one meets is a male.
+   */
+  maleTaste: number;
 };
 
 /**
@@ -61,6 +67,8 @@ export type BrainCommand = {
   groom: number;
   /** Feeding: extending the mouthparts. */
   feed: number;
+  /** Courtship song: one wing out and vibrating (pIP10, the song command neuron). */
+  sing: number;
 };
 
 export type BrainStats = {
@@ -120,4 +128,5 @@ export const RESTING_SENSES: BrainSenses = {
   wind: 0,
   sweet: 0,
   grounded: true,
+  maleTaste: 0,
 };

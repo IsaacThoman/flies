@@ -32,7 +32,7 @@ const mean = (b: FlyBrain, ms: number, senses: BrainSenses) => {
   }
   return Object.fromEntries(Object.entries(sum).map(([k, v]) => [k, v / n])) as BrainCommand;
 };
-const FULL: BrainSenses = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false };
+const FULL: BrainSenses = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1 };
 const only = (key: keyof BrainSenses): BrainSenses => ({ ...RESTING_SENSES, [key]: FULL[key] });
 const SENSES = Object.keys(FULL) as (keyof BrainSenses)[];
 
@@ -49,6 +49,7 @@ test("every group finds its neurons in the real connectome, and none is both dri
     wind: 475,
     sweet: 88,
     grounded: 426,
+    maleTaste: 44,
     "background left": 4424,
     "background right": 4466,
     DNg100: 2,
@@ -59,6 +60,7 @@ test("every group finds its neurons in the real connectome, and none is both dri
     flight: 24,
     DNg12: 26,
     MN9: 2,
+    pIP10: 2,
   });
   const driven = new Set([...wiring.senses, ...wiring.background].flatMap((g) => [...g.neurons]));
   for (const group of wiring.readouts) for (const i of group.neurons) assert.ok(!driven.has(i), `${group.spec.name} neuron ${i} is also driven`);
@@ -185,6 +187,23 @@ test("at rest it walks in bouts, turns both ways and never escapes (3 minutes of
   assert.ok(t.turnsLeft >= 1 && t.turnsRight >= 1, `${t.turnsLeft} turns left, ${t.turnsRight} right`);
   assert.equal(t.escapes, 0);
   assert.ok(t.peak.escape < 0.3, `escape reached ${t.peak.escape}`);
+  // The body sings past 0.4 (packages/body's SING_ON): alone, it never comes near.
+  assert.ok(t.peak.sing < 0.25, `sing reached ${t.peak.sing}`);
+});
+
+test("a male's taste on its front legs doesn't make it sing; P1, the courtship neurons, does, through pIP10", { skip }, () => {
+  // Every sense at full strength alone, the taste of a male among them, stays well under the body's 0.4.
+  for (const sense of SENSES) {
+    const b = brain();
+    run(b, 1000);
+    let peak = 0;
+    for (let t = 0; t < 3000; t += TICK) peak = Math.max(peak, b.tick(TICK, only(sense)).command.sing);
+    assert.ok(peak < 0.25, `${sense}: sing reached ${peak}`);
+  }
+  // pC1_1 to pC1_19, P1 in the male CNS, at 30 Hz: pIP10 sings.
+  const b = brain();
+  b.sim.addInput("P1", connectome!.filter((i) => /^pC1_\d/.test(connectome!.columns.type.value(i))), 30);
+  assert.ok(mean(b, 1000, RESTING_SENSES).sing > 0.9);
 });
 
 test("it builds in under 2 CPU s and runs within its cost bounds, with room to spare", { skip }, () => {

@@ -18,7 +18,7 @@
 namespace {
 constexpr double kMaxStepMs = 100;
 // SENSE_ORDER, COMMAND_ORDER and STATE_STATS in packages/contracts/src/brain.ts.
-constexpr int kScalars = 8, kCommands = 7, kStats = 4;
+constexpr int kScalars = 9, kCommands = 8, kStats = 4;
 enum Status { kLoading, kRunning, kFailed };
 
 struct BrainHost {
@@ -105,7 +105,7 @@ void *Run(void *) {
     }
     fly_senses senses = {
       scalars[0], scalars[1], scalars[2], scalars[3], scalars[4], scalars[5], scalars[6], scalars[7] > 0.5f,
-      eyes ? light[0].data() : nullptr, eyes ? light[1].data() : nullptr,
+      eyes ? light[0].data() : nullptr, eyes ? light[1].data() : nullptr, scalars[8],
     };
     fly_command c = {};
     fly_stats stats = {};
@@ -117,7 +117,7 @@ void *Run(void *) {
     }
     std::lock_guard<std::mutex> g(gBrain.stateLock);
     float *s = gBrain.state.data();
-    const float head[kCommands + kStats] = { c.walk, c.turn, c.back, c.escape, c.wings, c.groom, c.feed,
+    const float head[kCommands + kStats] = { c.walk, c.turn, c.back, c.escape, c.wings, c.groom, c.feed, c.sing,
                                              (float)stats.sim_ms, (float)stats.wall_ms, (float)stats.spikes, (float)stats.active };
     std::copy(head, head + kCommands + kStats, s);
     std::copy(rates.begin(), rates.end(), s + kCommands + kStats);
