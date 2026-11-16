@@ -4,6 +4,7 @@
 export * from "./shapes.ts";
 export * from "./world.ts";
 export * from "./picnic.ts";
+export * from "./windowsill.ts";
 export * from "./lab.ts";
 export * from "./bar.ts";
 export * from "./pantry.ts";

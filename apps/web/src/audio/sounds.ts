@@ -359,11 +359,60 @@ function chirp(ctx: BaseAudioContext, seed: number) {
   });
 }
 
+/**
+ * A kitchen: the hush of the room, the fridge humming, and now and then a bird
+ * outside, muffled by the glass. Twelve seconds that loop without a seam: the
+ * hum is whole cycles of mains, and the room's noise is cross-faded into itself.
+ */
+function kitchenLoop(ctx: BaseAudioContext) {
+  const r = noise(13);
+  const seconds = 12;
+  const length = seconds * RATE;
+  // The hum repeats every cycle of the mains (50 Hz), harmonics and all: worked out once.
+  const cycle = new Float32Array(RATE / 50);
+  for (let i = 0; i < cycle.length; i++) {
+    const a = (TAU * i) / cycle.length;
+    cycle[i] = Math.sin(a) * 0.4 + Math.sin(2 * a) * 0.5 + Math.sin(3 * a + 1) * 0.3 + Math.sin(4 * a + 2) * 0.18 + Math.sin(6 * a) * 0.08;
+  }
+  const fade = 3000;
+  const hush = new Float32Array(length + fade);
+  let a = 0;
+  let b = 0;
+  for (let i = 0; i < hush.length; i++) {
+    a += (r() - a) * 0.012;
+    b += (a - b) * 0.04;
+    hush[i] = b;
+  }
+  // Birdsong behind the glass: phrases of quick upward notes (when each starts, s; how many notes; how high), low-passed by the glass.
+  const song = new Float32Array(length);
+  for (const [at, notes, base] of [[2.4, 3, 3000], [6.1, 5, 2600], [9.3, 2, 3300]]) {
+    let low = 0;
+    const from = Math.round(at * RATE);
+    const to = Math.min(length, from + Math.round((notes * 0.13 + 0.05) * RATE));
+    for (let i = from; i < to; i++) {
+      const u = (i - from) / RATE;
+      const k = Math.floor(u / 0.13);
+      const v = u - k * 0.13;
+      const call = k < notes ? attack(v, 0.006) * Math.exp(-v * 26) * Math.sin(TAU * (base + v * 6500 + (k % 2) * 260) * v) : 0;
+      low += (call - low) * 0.22;
+      song[i] = low;
+    }
+  }
+  return render(ctx, seconds, (_t, i) => {
+    const room = i < fade ? hush[i] * (i / fade) + hush[length + i] * (1 - i / fade) : hush[i];
+    // The compressor's hum swells and settles: whole cycles of it over the loop.
+    const breathe = 0.7 + 0.3 * Math.sin((TAU * 2 * i) / length) * Math.sin((TAU * 3 * i) / length + 1);
+    return room * 1.2 + cycle[i % cycle.length] * breathe * 0.035 + song[i] * 0.06;
+  });
+}
+
 /** The sound of a place, under everything else: its loop, and whether birds call now and then. */
-export type Ambience = "outdoors" | "lab" | "bar";
+export type Ambience = "outdoors" | "kitchen" | "lab" | "bar";
 
 const AMBIENCES: Record<Ambience, { loop: (ctx: BaseAudioContext) => AudioBuffer; birds: boolean; /** How loud rain is there, 0 to 1: outdoors in it, or muffled by walls and glass (0.3 if not said). */ rain?: number }> = {
   outdoors: { loop: outdoorsLoop, birds: true, rain: 1 },
+  // Rain on the window pane, close by: louder than through a wall.
+  kitchen: { loop: kitchenLoop, birds: false, rain: 0.5 },
   lab: { loop: labLoop, birds: false },
   bar: { loop: barLoop, birds: false },
 };
