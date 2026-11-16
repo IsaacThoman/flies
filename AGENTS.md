@@ -11,7 +11,9 @@ the rules the whole thing is built on.
   package's `tests/` folder: `npm test`. Also `npm run lint` and
   `npm run typecheck`. All three must pass.
 - `npm run dev` serves the game in a browser, where the keyboard is the
-  remote (arrows, Enter, Escape, space) and the mouse is its touch surface.
+  remote (arrows, Enter, Escape, space) and the mouse or a finger points at
+  the screen. `scripts/play.ts` drives it at any size or as a phone or a
+  tablet (taps, drags, pinches, clicks, the wheel).
 - The game draws everything itself, menus included. There is no DOM to
   query: tests and scripts wait on the canvas's `data-*` state.
 - The packed connectome is not in git: `npm run brain:fetch` (38 MB).
