@@ -1,0 +1,10 @@
+{
+  "name": "@fly/net",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "How flies share a table: the wire format, the room's clock, interpolating other flies, and the shared food. Runs in a browser and in Node.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

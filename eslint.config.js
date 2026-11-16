@@ -7,11 +7,11 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["apps/web/src/**/*.ts", "packages/{fly,world,body,ui,contracts}/src/**/*.ts"],
+    files: ["apps/web/src/**/*.ts", "packages/{fly,world,body,ui,contracts,net}/src/**/*.ts"],
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ["packages/brain/**/*.ts", "scripts/**/*.ts", "**/tests/**/*.ts", "**/*.test.ts", "**/vite.config.ts"],
+    files: ["packages/brain/**/*.ts", "apps/room/**/*.ts", "scripts/**/*.ts", "**/tests/**/*.ts", "**/*.test.ts", "**/vite.config.ts"],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
 );

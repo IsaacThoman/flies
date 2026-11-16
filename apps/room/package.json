@@ -1,0 +1,13 @@
+{
+  "name": "@fly/room",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The room server for flies sharing a table: who is there, the shared world, and passing each fly's state on. A spike.",
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
+  }
+}
