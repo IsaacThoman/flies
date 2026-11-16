@@ -54,13 +54,15 @@ void main() {
   vec2 uv = d.xz / (h + 0.08) * 1.4 + vec2(uTime * 0.004, 0.0);
   float n = vnoise(uv) * 0.55 + vnoise(uv * 2.3 + 4.1) * 0.3 + vnoise(uv * 5.1 + 9.7) * 0.15;
   float cloud = smoothstep(0.62 - 0.55 * uCloud, 0.85 - 0.3 * uCloud, n) * smoothstep(0.0, 0.1, h);
-  c = mix(c, uSkyLow * (0.75 + 0.35 * n), cloud * 0.8);
+  vec3 grey = vec3(dot(uSkyLow, vec3(0.3, 0.59, 0.11))) * vec3(0.97, 0.98, 1.0);
+  c = mix(c, mix(uSkyLow, grey, uCloud) * (0.75 + 0.35 * n), cloud * 0.85);
   c += uSunColor * pow(max(dot(d, uSunDir), 0.0), 12.0) * 0.35 * (1.0 - uCloud);
   // The city's light on the haze and the undersides of the clouds.
   c += uGlow * (1.0 - smoothstep(0.0, 0.45, h)) * (0.5 + cloud + uCloud * 0.6);
   vec3 cell = floor(d * 260.0);
-  float star = step(0.9985, hash21(cell.xy + cell.z * 7.31)) * smoothstep(0.08, 0.35, h);
-  c += vec3(star * uStars * (1.0 - uCloud) * (1.0 - cloud) * (0.7 + 0.3 * sin(uTime * 2.3 + cell.x)));
+  // Few stars over a city: the brightest, through its glow.
+  float star = step(0.9993, hash21(cell.xy + cell.z * 7.31)) * smoothstep(0.08, 0.35, h);
+  c += vec3(star * uStars * (1.0 - uCloud) * (1.0 - cloud) * (0.45 + 0.25 * sin(uTime * 2.3 + cell.x)));
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
 }`;
@@ -200,7 +202,7 @@ void main() {
   }
   // The wet: darker, and shining; water lies in the hollows the wetter it is.
   float wet = uWet;
-  puddle = smoothstep(0.75 - 0.35 * wet, 0.85 - 0.35 * wet, hold) * smoothstep(0.3, 0.8, wet);
+  puddle = smoothstep(0.7 - 0.35 * wet, 0.9 - 0.35 * wet, hold) * smoothstep(0.3, 0.8, wet);
   albedo *= 1.0 - 0.45 * wet - 0.3 * puddle;
   vec3 c = outsideLight(p, n, v, albedo, 8.0, 0.0);
   float gloss = (wet * 0.55 * rough + puddle * 0.45) * step(0.5, n.y);
@@ -657,20 +659,23 @@ export function buildStreet(light: Daylight): SceneBackdrop {
       const dark = t.dark;
       const day = 1 - dark;
       u.uTime.value = time;
-      u.uDark.value = dark;
+      // Lit windows show after dark, and a few on a grey day.
+      u.uDark.value = Math.max(dark, 0.35 * weather.cloud);
       const up = THREE.MathUtils.smoothstep(daylight.sunDirection.y, -0.02, 0.12);
       u.uSun.value.copy(daylight.sunColor).multiplyScalar(1.7 * day * up * (1 - 0.85 * weather.cloud) * (1 - 0.6 * weather.mist));
       u.uSkyHigh.value.copy(daylight.middle);
       u.uSkyLow.value.copy(daylight.haze);
       // The sky's light, and at night the city's own glow; the sunlit street throws some back up.
-      u.uSky.value.copy(daylight.middle).lerp(daylight.haze, 0.55).multiplyScalar(0.12 + 0.3 * day).add(scratch.setRGB(0.012, 0.011, 0.012).multiplyScalar(dark));
+      u.uSky.value.copy(daylight.middle).lerp(daylight.haze, 0.55);
+      const lum = u.uSky.value.r * 0.3 + u.uSky.value.g * 0.59 + u.uSky.value.b * 0.11;
+      u.uSky.value.lerp(scratch.setRGB(lum, lum, lum * 1.03), 0.8 * weather.cloud).multiplyScalar(0.12 + 0.3 * day).add(scratch.setRGB(0.012, 0.011, 0.012).multiplyScalar(dark));
       u.uBounce.value.copy(daylight.sunColor).multiplyScalar(0.14 * day * up * (1 - 0.7 * weather.cloud)).add(scratch.copy(u.uSky.value).multiplyScalar(0.4));
-      u.uLampLight.value.copy(LAMP).multiplyScalar(16 * t.lamps);
+      u.uLampLight.value.copy(LAMP).multiplyScalar(13 * t.lamps);
       u.uNeon.value.copy(NEON).multiplyScalar(1.4 * t.neon);
       u.uBarLight.value.copy(BAR).multiplyScalar(5 * dark);
       u.uShopLight.value.copy(SHOP).multiplyScalar(7 * dark);
       u.uHomeLight.value.copy(HOME).multiplyScalar(1.5 * dark);
-      u.uLit.value = 0.05 + 0.4 * dark;
+      u.uLit.value = 0.05 + 0.4 * dark + 0.1 * weather.cloud;
       u.uWet.value = weather.wet;
       u.uRain.value = weather.rain;
       u.uByDay.value = day > 0.5 ? 1 : 0;

@@ -116,7 +116,7 @@ vec3 outsideLight(vec3 p, vec3 n, vec3 v, vec3 albedo, float sharp, float shine)
       vec3 l = uLamps[i];
       vec3 to = l - p;
       // Each lantern lights a pool round its foot: most of its light goes down.
-      float down = 0.35 + 0.65 * smoothstep(0.0, 0.7, to.y / length(to));
+      float down = 0.12 + 0.88 * smoothstep(-0.1, 0.7, to.y / length(to));
       pointLight(p, n, v, l, uLampLight * down, sharp, d, sp);
     }
   }
