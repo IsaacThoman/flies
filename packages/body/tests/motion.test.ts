@@ -159,3 +159,21 @@ test("walking, it climbs the whole strawberry to the top", () => {
   }
   assert.ok(peak > 20, `reached ${peak.toFixed(1)} mm`);
 });
+
+test("a long frame cannot walk through a thin wall", () => {
+  const world = new World({ floor: { kind: "rect", hx: 100, hz: 100 }, solids: [{ name: "pane", footprint: { kind: "box", x: 0, z: 0, hx: 0.5, hz: 20, angle: 0 }, top: { kind: "flat", y: 100 } }], patches: [], start: { x: -10, z: 0, yaw: Math.PI / 2 }, ceiling: 320 });
+  const body = new FlyBody(world, world.place.start);
+  body.step(intent({ speed: 16, walking: true }), still, 2);
+  assert.ok(body.position.x < -0.5, `crossed pane to ${body.position.x}`);
+});
+
+test("long frames keep flight stable and report a landing anywhere within the frame", () => {
+  const body = new FlyBody(openTable(300), { x: 0, z: 0, yaw: 0 });
+  body.step(intent({ takeOff: 1, wings: 1 }), still, 1);
+  assert.ok(body.position.y < 700, `climbed to ${body.position.y}`);
+  assert.ok(Math.hypot(body.position.x, body.position.z) < 500);
+  body.step(intent(), still, 2);
+  assert.equal(body.mode, "standing");
+  assert.equal(body.events.landed, true);
+  assert.equal(body.position.y, 0);
+});

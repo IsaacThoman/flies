@@ -153,10 +153,15 @@ export class FlyBody {
     ev.jumped = false;
     ev.landed = false;
     ev.hit = 0;
-    if (!(dt > 0)) return;
+    if (!(dt > 0) || !Number.isFinite(dt)) return;
     if (this.mode !== "airborne" && intent.takeOff !== null) this.#takeOff(intent.takeOff, forces.threat);
-    if (this.mode === "airborne") this.#fly(intent, forces, dt);
-    else this.#walk(intent, forces, dt);
+    // Long frames must not destabilize drag or skip a wall between samples.
+    const steps = Math.ceil(dt / (1 / 60));
+    const h = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      if (this.mode === "airborne") this.#fly(intent, forces, h);
+      else this.#walk(intent, forces, h);
+    }
   }
 
   #takeOff(strength: number, threat: Vec3 | null) {
