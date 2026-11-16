@@ -31,10 +31,10 @@ type Exports = {
 /** The longest tick the brain takes, ms (runtime.ts's MAX_TICK_MS). */
 const MAX_TICK_MS = 1000;
 const ERROR_BYTES = 512;
-// fly_brain.h's structs as wasm32 lays them out: fly_senses is seven floats, an int and two pointers;
-// fly_command seven floats; fly_stats two doubles and two uint32s.
-const SENSES_BYTES = 40;
-const COMMAND_BYTES = 28;
+// fly_brain.h's structs as wasm32 lays them out: fly_senses is seven floats, an int, two pointers and two floats (maleTaste, hunger);
+// fly_command eight floats; fly_stats two doubles and two uint32s.
+const SENSES_BYTES = 48;
+const COMMAND_BYTES = 32;
 const STATS_BYTES = 24;
 const SCALARS = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet"] as const;
 
@@ -174,6 +174,9 @@ class WasmBrain implements Brain {
     }
     view.setUint32(s + 32, left, true);
     view.setUint32(s + 36, right, true);
+    view.setFloat32(s + 40, senses.maleTaste, true);
+    // Left out, hunger is 1: the brain as it was before it had one.
+    view.setFloat32(s + 44, senses.hunger ?? 1, true);
     const failed = e.fly_brain_tick(this.#brain, dtMs, s, this.#command, this.#stats, this.#rates, this.#error, ERROR_BYTES);
     // The tick may have grown the memory, which leaves the old views empty.
     this.#views();
@@ -183,7 +186,7 @@ class WasmBrain implements Brain {
     const rates: Record<string, number> = {};
     for (let r = 0; r < this.#names.length; r++) rates[this.#names[r]] = out[(this.#rates >> 2) + r];
     return {
-      command: { walk: out[c], turn: out[c + 1], back: out[c + 2], escape: out[c + 3], wings: out[c + 4], groom: out[c + 5], feed: out[c + 6] },
+      command: { walk: out[c], turn: out[c + 1], back: out[c + 2], escape: out[c + 3], wings: out[c + 4], groom: out[c + 5], feed: out[c + 6], sing: out[c + 7] },
       stats: {
         simMs: this.#view.getFloat64(this.#stats, true),
         wallMs: this.#view.getFloat64(this.#stats + 8, true),

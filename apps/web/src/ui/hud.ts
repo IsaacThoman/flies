@@ -54,6 +54,7 @@ const CAPTIONS: Record<Activity, string> = {
   grooming: "Grooming",
   feeding: "Eating",
   tasting: "Tasting",
+  singing: "Singing",
   flying: "Flying",
   falling: "Falling",
   waiting: "Waiting for its brain",

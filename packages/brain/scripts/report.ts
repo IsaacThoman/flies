@@ -1,6 +1,9 @@
 // What the brain does, measured on the real connectome:
 //
-//   node packages/brain/scripts/report.ts [--minutes 10] [--seed 1] [--path connectome.bin]
+//   node packages/brain/scripts/report.ts [--minutes 10] [--seed 1] [--hunger 0..1] [--path connectome.bin]
+//
+// --hunger sends that hunger with every tick (BrainSenses.hunger); left out,
+// the brain is what it was before it had a hunger.
 //
 // (a) the response matrix: each sense alone at full strength for 1 s, and
 //     rest, with every command's mean and peak and the latency to its peak,
@@ -22,7 +25,7 @@ import { parseArgs } from "node:util";
 import { DEFAULT_CONNECTOME_PATH, readConnectomeFile } from "../src/node.ts";
 import { BehaviorObserver } from "../src/observer.ts";
 import { FlyBrain } from "../src/runtime.ts";
-import { RESTING_SENSES } from "../src/types.ts";
+import { RESTING_SENSES as WITHOUT_HUNGER } from "../src/types.ts";
 import type { BrainCommand, BrainSenses } from "../src/types.ts";
 import type { ScalarSense } from "../src/io.ts";
 import { BATTERY, facetAngles, render } from "../src/stimuli.ts";
@@ -32,13 +35,15 @@ const { values } = parseArgs({
   options: {
     minutes: { type: "string", default: "10" },
     seed: { type: "string", default: "1" },
+    hunger: { type: "string" },
     path: { type: "string", default: DEFAULT_CONNECTOME_PATH },
   },
 });
 const seed = Number(values.seed);
+const RESTING_SENSES: BrainSenses = values.hunger === undefined ? WITHOUT_HUNGER : { ...WITHOUT_HUNGER, hunger: Number(values.hunger) };
 const connectome = readConnectomeFile(values.path);
 const TICK = 16;
-const COMMANDS = ["walk", "turn", "back", "escape", "wings", "groom", "feed"] as const;
+const COMMANDS = ["walk", "turn", "back", "escape", "wings", "groom", "feed", "sing"] as const;
 
 const brain = () => new FlyBrain(connectome, { seed });
 const rest = (b: FlyBrain, ms: number) => {
@@ -57,6 +62,7 @@ const FULL: { [K in ScalarSense]: BrainSenses[K] } = {
   wind: 1,
   sweet: 1,
   grounded: false,
+  maleTaste: 1,
 };
 const label = (key: ScalarSense) => (key === "grounded" ? "airborne" : key);
 const apply = (keys: readonly (ScalarSense)[]): BrainSenses => {
@@ -65,7 +71,7 @@ const apply = (keys: readonly (ScalarSense)[]): BrainSenses => {
   return senses as BrainSenses;
 };
 
-console.log(`Fly brain report: ${connectome.neurons.toLocaleString("en-US")} neurons, ${connectome.connections.toLocaleString("en-US")} connected pairs, seed ${seed}`);
+console.log(`Fly brain report: ${connectome.neurons.toLocaleString("en-US")} neurons, ${connectome.connections.toLocaleString("en-US")} connected pairs, seed ${seed}${values.hunger === undefined ? "" : `, hunger ${values.hunger}`}`);
 
 // (a) The response matrix.
 console.log("\n(a) Response matrix. 2 s of rest, then 1 s of the sense at full strength (or nothing, for rest).");

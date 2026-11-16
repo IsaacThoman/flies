@@ -19,8 +19,15 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
       sim_(params::build(connectome, seed)),
       // A separate stream from the Poisson inputs', which input_seed derives from the same seed.
       state_(seed ^ 0x5bd1e995u) {
-  for (const io::Group& group : wiring_.senses) sense_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
+  sense_inputs_.assign(wiring_.senses.size(), 0);
+  for (size_t k = 0; k < wiring_.senses.size(); k++) {
+    if (!wiring_.senses[k].spec.after_eyes) sense_inputs_[k] = sim_.add_input(wiring_.senses[k].spec.name, wiring_.senses[k].neurons);
+  }
   for (const io::Group& group : wiring_.background) background_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
+  // Hunger scales how strongly the sweet neurons' spikes reach their targets (io.ts, HUNGER).
+  for (const io::Group& group : wiring_.senses) {
+    if (group.spec.sense == io::kSweet) sweet_gain_ = sim_.add_output_gain(group.spec.name, group.neurons);
+  }
   for (const io::ReadoutGroup& group : wiring_.readouts) {
     sim_.add_readout(group.spec.name, group.neurons);
     rate_names_.push_back(group.spec.name);
@@ -35,8 +42,8 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
     rate_names_.push_back(regions::rate_name(id));
     rates_.push_back(0);
   }
-  // The eyes come after every other input, so their streams leave the
-  // others' as they were.
+  // The eyes come after every other input but the senses added since
+  // (after_eyes), so their streams leave the others' as they were.
   eyes_ = eyes::build(connectome, columns);
   if (eyes_) {
     for (io::Side side : {io::kLeft, io::kRight}) retinas_.emplace_back((*eyes_)[side]);
@@ -68,6 +75,9 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
       }
     }
   }
+  for (size_t k = 0; k < wiring_.senses.size(); k++) {
+    if (wiring_.senses[k].spec.after_eyes) sense_inputs_[k] = sim_.add_input(wiring_.senses[k].spec.name, wiring_.senses[k].neurons);
+  }
 }
 
 io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& light, TickStats& stats) {
@@ -90,6 +100,9 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
     const io::Group& group = wiring_.senses[k];
     sim_.set_rate(sense_inputs_[k], group.max_rate * io::intensity(senses, group.spec.sense));
   }
+  const double hunger = io::hunger_of(senses);
+  sim_.set_output_gain(sweet_gain_, io::sweet_output_gain(hunger));
+  state_.set_hunger(hunger);
   double left = dt_ms;
   while (left > 1e-9) {
     const double chunk = js::min(kChunkMs, left);

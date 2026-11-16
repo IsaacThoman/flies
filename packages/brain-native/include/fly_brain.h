@@ -23,11 +23,19 @@ typedef struct fly_senses {
   /** Luminance per facet, 0 to 1, fly_brain_facets() values each; both NULL with the eyes shut. */
   const float* light_left;
   const float* light_right;
+  /** The front legs touching another male fly: the taste of his pheromones, 0 to 1. */
+  float male_taste;
+  /**
+   * Internal state, not a sense: how hungry it is, 0 just fed to 1 starved
+   * (BrainSenses.hunger). 1, or NAN, for a host that keeps no account of
+   * hunger: the brain as it was before it had one. Not 0: that is a fed fly.
+   */
+  float hunger;
 } fly_senses;
 
 /** What the brain wants done. All 0 to 1 except turn, which runs -1 (hard left) to 1 (hard right). */
 typedef struct fly_command {
-  float walk, turn, back, escape, wings, groom, feed;
+  float walk, turn, back, escape, wings, groom, feed, sing;
 } fly_command;
 
 typedef struct fly_stats {

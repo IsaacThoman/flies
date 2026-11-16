@@ -1,5 +1,6 @@
 #include "io.hpp"
 
+#include <cmath>
 #include <initializer_list>
 #include <stdexcept>
 #include <string_view>
@@ -42,7 +43,14 @@ NeuronQuery sided(NeuronQuery q, Side side) {
 }
 
 const NeuronQuery kLooming = query({{kType, one_of({"LPLC2", "LC4"})}});
-const NeuronQuery kAntenna = query({{kSuperClass, is("cb_sensory")}, {kType, starts_with("JO-")}});
+// Pushing the antenna deflects it and holds it there. The Johnston's organ
+// neurons that answer a sustained push or pull are zones C and E (Kamikouchi et
+// al. 2009; Yorozu et al. 2009; Hampel et al. 2020), and they drive antennal
+// grooming (Hampel et al. 2015, 2020). A and B answer sound and vibration; F
+// drives grooming too, but answers neither a push nor vibration (what it senses
+// is unknown, Hampel et al. 2020).
+const NeuronQuery kAntenna = query({{kSuperClass, is("cb_sensory")},
+                                    {kType, [](std::string_view s) { return s.size() > 3 && s.starts_with("JO-") && (s[3] == 'C' || s[3] == 'E'); }}});
 
 // Nothing in the data says which taste neurons are sweet-sensing. These were
 // chosen by what they do in this model: built greedily from the head's taste
@@ -51,6 +59,15 @@ const NeuronQuery kAntenna = query({{kSuperClass, is("cb_sensory")}, {kType, sta
 // gustatory --each type --target MN9 --greedy`).
 Condition sweet_types() { return one_of({"dorsal_tpGRN", "LB3d", "PhG9", "LB3c", "LB2a", "LB4a", "LB3b", "PhG1c", "PhG3"}); }
 constexpr const char* kSweetDescription = "Head taste neurons dorsal_tpGRN, LB3d, PhG9, LB3c, LB2a, LB4a, LB3b, PhG1c, PhG3";
+
+// The front legs' taste neurons that answer a male's cuticle: LgLG1a (ppk23
+// M cells) and LgAG1 (Gr32a/Gr33a) of the front legs, by root ID (io.ts's
+// FORELEG_MALE_TASTE says why).
+const std::vector<uint32_t> kForelegMaleTaste = {
+    807958, 808071, 808278, 808369, 808379, 808524, 809798, 810164, 811797, 812809, 813636, 814020, 814544, 814710, 815091, 815110, 816273, 816447, 816927,
+    816972, 817352, 817570, 818574, 819815, 820449, 821805, 823278, 823555, 824934, 905725, 907867, 911569, 912149, 933097,
+    91673,  92777,  94281,  94719,  94995,  95900,  105964, 108436, 111872, 816710,
+};
 
 uint64_t output_synapses(const Connectome& c, const std::vector<uint32_t>& neurons) {
   uint64_t total = 0;
@@ -77,13 +94,16 @@ std::vector<InputSpec> senses() {
        "", kTouch, kLeft},
       {"touch body", "Mechanosensory bristle neurons of the thorax, abdomen and legs",
        query({{kSuperClass, is("vnc_sensory")}, {kSubClass, is("mechanosensory_bristle")}}), 10, "", kTouch, kLeft},
-      {"bumpLeft", "Johnston's organ neurons of the left antenna", sided(kAntenna, kLeft), 100, "bumpRight", kBumpLeft, kLeft},
-      {"bumpRight", "Johnston's organ neurons of the right antenna", sided(kAntenna, kRight), 100, "bumpLeft", kBumpRight, kLeft},
+      {"bumpLeft", "Displacement-sensitive Johnston's organ neurons (zones C and E) of the left antenna", sided(kAntenna, kLeft), 100, "", kBumpLeft, kLeft},
+      {"bumpRight", "Displacement-sensitive Johnston's organ neurons (zones C and E) of the right antenna", sided(kAntenna, kRight), 100, "", kBumpRight,
+       kLeft},
       {"wind", "Wind- and gravity-sensitive Johnston's organ neurons of both antennae", query({{kSuperClass, is("cb_sensory")}, {kSubClass, is("wind_gravity")}}),
        100, "", kWind, kLeft},
       {"sweet", kSweetDescription, query({{kSuperClass, is("cb_sensory")}, {kClass, is("gustatory")}, {kType, sweet_types()}}), 100, "", kSweet, kLeft},
       {"grounded", "Campaniform sensilla (load sensors) of the legs, firing tonically while standing",
        query({{kSuperClass, one_of({"vnc_sensory", "sensory_ascending"})}, {kSubClass, is("campaniform_sensilla")}}), 20, "", kGrounded, kLeft},
+      {"maleTaste", "Front legs' taste neurons for a male's pheromones: LgLG1a (ppk23 M cells) and LgAG1 (Gr32a/Gr33a)",
+       query({{kType, one_of({"LgLG1a", "LgAG1"})}}), 50, "", kMaleTaste, kLeft, kForelegMaleTaste, true},
   };
 }
 
@@ -114,6 +134,7 @@ std::vector<ReadoutSpec> readouts() {
       {"flight", "Indirect flight power muscle motor neurons", query({{kType, one_of({"DLM1-4", "DLMn/a", "DVM1a-c", "DVMn/2a", "DVMn/3a"})}}), 100},
       {"DNg12", "Head-grooming descending neurons DNg12_a, _b and _c", query({{kType, one_of({"DNg12_a", "DNg12_b", "DNg12_c"})}}), 150},
       {"MN9", "Proboscis extension motor neuron", query({{kType, is("MN9")}}), 150},
+      {"pIP10", "Courtship song command descending neurons", query({{kType, is("pIP10")}}), 150},
   };
 }
 
@@ -121,6 +142,10 @@ Wiring wire(const Connectome& c) {
   Wiring w;
   for (InputSpec& spec : senses()) {
     std::vector<uint32_t> neurons = c.find(spec.select);
+    if (!spec.root_ids.empty()) {
+      const std::unordered_set<uint32_t> wanted(spec.root_ids.begin(), spec.root_ids.end());
+      std::erase_if(neurons, [&](uint32_t i) { return wanted.count(c.root_id(i)) == 0; });
+    }
     const double rate = spec.max_rate;
     w.senses.push_back({std::move(spec), std::move(neurons), rate});
   }
@@ -176,13 +201,21 @@ double intensity(const Senses& s, Sense sense) {
     case kWind: return js::clamp(s.wind, 0, 1);
     case kSweet: return js::clamp(s.sweet, 0, 1);
     case kGrounded: return s.grounded ? 1 : 0;
+    case kMaleTaste: return js::clamp(s.male_taste, 0, 1);
     case kSenseCount: break;
   }
   return 0;
 }
 
+double hunger_of(const Senses& s) { return std::isfinite(s.hunger) ? js::min(1, js::max(0, s.hunger)) : 1; }
+
+// io.ts's HUNGER.sated: a just-fed fly's sweet neurons pass on 1/1.4 of a starved one's.
+constexpr double kSated = 1 / 1.4;
+
+double sweet_output_gain(double hunger) { return kSated + (1 - kSated) * hunger; }
+
 // Rate, Hz, at which each command reaches 1.
-constexpr double kWalk = 40, kTurn = 40, kBack = 40, kEscape = 200, kWings = 120, kGroom = 60, kFeed = 40;
+constexpr double kWalk = 40, kTurn = 40, kBack = 40, kEscape = 200, kWings = 120, kGroom = 60, kFeed = 40, kSing = 40;
 
 Command decode(const std::vector<double>& r) {
   Command c;
@@ -194,6 +227,7 @@ Command decode(const std::vector<double>& r) {
   c.wings = js::clamp(r[kFlight] / kWings, 0, 1);
   c.groom = js::clamp(r[kDNg12] / kGroom, 0, 1);
   c.feed = js::clamp(r[kMN9] / kFeed, 0, 1);
+  c.sing = js::clamp(r[kPIP10] / kSing, 0, 1);
   return c;
 }
 

@@ -86,10 +86,10 @@ test("every facet gets a dot on whole pixels inside the picture, left eye on the
   }
 });
 
-test("the setting is kept with the others, in the wallpaper by default", () => {
-  assert.equal(DEFAULT_SETTINGS.eyesInset, "wallpaper");
-  const store = { getItem: () => JSON.stringify({ eyesInset: "always" }), setItem() {} };
-  assert.equal(loadSettings(store).eyesInset, "always");
+test("the picture shows while playing by default, and a saved wallpaper choice is kept", () => {
+  assert.equal(DEFAULT_SETTINGS.eyesInset, "always");
+  const store = { getItem: () => JSON.stringify({ eyesInset: "wallpaper" }), setItem() {} };
+  assert.equal(loadSettings(store).eyesInset, "wallpaper");
 });
 
 test("at every shape each corner is inside the safe area and clear of the caption, the menu's button, the shelf and the label", () => {

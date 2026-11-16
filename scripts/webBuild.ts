@@ -21,7 +21,7 @@ const CACHE = path.join(root, "node_modules/.cache/fly-brain");
 const sha256 = (data: Uint8Array | string) => createHash("sha256").update(data).digest("hex");
 
 /** The name the app is installed under: what the title screen's wordmark says. */
-export const APP_NAME = "Flies";
+export const APP_NAME = "flies";
 export const DESCRIPTION =
   "A fruit fly that lives on your screen. Nothing it does is scripted: a simulation of its whole nervous system, 166,700 neurons wired from the FlyEM male CNS connectome (Janelia Research Campus, CC-BY 4.0), decides what it does.";
 /** The colour round the picture and behind the loading screen (apps/web/index.html). */

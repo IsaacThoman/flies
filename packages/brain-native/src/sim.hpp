@@ -163,6 +163,15 @@ class Simulation {
   /** Changes each neuron's rate, Hz, of a rated input from the next step on, in the order its neurons were given. */
   void set_rates(uint32_t input, std::span<const double> rates_hz);
 
+  /**
+   * Adds a group of neurons whose outgoing weights set_output_gain scales, all
+   * together (sim.ts's addOutputGain): how strongly each spike of theirs
+   * reaches its targets, not whether they fire. Starts at 1; returns its index.
+   */
+  uint32_t add_output_gain(const std::string& name, std::span<const uint32_t> neurons);
+  /** Scales a group's outgoing weights by factor (above 0) times their weights at 1, from the next spike delivered on. */
+  void set_output_gain(uint32_t group, double factor);
+
   /** Adds a group of neurons whose spikes drain_readouts counts; returns its index. */
   uint32_t add_readout(const std::string& name, std::span<const uint32_t> neurons);
   /** Spikes in each readout since the last drain, by index; then zeroes them. */
@@ -255,6 +264,16 @@ class Simulation {
 
   std::vector<Input> inputs_;
   std::vector<uint32_t> scratch_;
+
+  // Groups whose outgoing weights are scaled together: each group's edges,
+  // those edges' weights at factor 1, and the factor now.
+  struct OutputGain {
+    std::string name;
+    std::vector<uint32_t> edges;
+    std::vector<float> base;
+    double factor = 1;
+  };
+  std::vector<OutputGain> output_gains_;
 
   std::vector<std::string> readout_names_;
   std::vector<std::vector<uint32_t>> readout_members_;

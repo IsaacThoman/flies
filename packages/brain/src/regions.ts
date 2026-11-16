@@ -138,8 +138,8 @@ export const REGIONS: readonly Region[] = [
       description: "Visual centrifugal neurons: from the central brain out into the optic lobe.",
       place: (side) => `from the ${side} side of the central brain out through the optic stalk into the ${side} optic lobe`,
     },
-    { neurons: 283, fullHz: 9.3 },
-    { neurons: 280, fullHz: 9.3 },
+    { neurons: 283, fullHz: 12 },
+    { neurons: 280, fullHz: 12 },
   ),
   {
     id: "antenna-smell",
@@ -157,8 +157,8 @@ export const REGIONS: readonly Region[] = [
       description: "Johnston's organ neurons (JO-*), which sense the antenna's third segment moving: touch on the antenna (bump), wind and gravity, sound. `bump` drives all of a side's, `wind` the wind- and gravity-sensitive ones.",
       place: (side) => `the ${side} antenna's second segment (the pedicel); their axons go to the ${side} antennal mechanosensory and motor centre at the bottom of the brain`,
     },
-    { neurons: 348, fullHz: 150 },
-    { neurons: 324, fullHz: 150 },
+    { neurons: 348, fullHz: 110 },
+    { neurons: 324, fullHz: 110 },
   ),
   {
     id: "head-bristles",
@@ -243,8 +243,8 @@ export const REGIONS: readonly Region[] = [
       description: "Neurons whose type is named for the ventrolateral neuropils (AVLP, PVLP, PLP, WED, AOTU), where most visual projection neurons end.",
       place: (side) => `the ${side} brain hemisphere's outer side next to the optic lobe, from front to back`,
     },
-    { neurons: 2336, fullHz: 7.8 },
-    { neurons: 2345, fullHz: 7.8 },
+    { neurons: 2336, fullHz: 8.6 },
+    { neurons: 2345, fullHz: 8.6 },
   ),
   ...pair(
     "inferior-ventromedial",
@@ -263,8 +263,8 @@ export const REGIONS: readonly Region[] = [
       description: "Neurons whose type is named for the gnathal ganglion (GNG) or the neuropils around it (antennal mechanosensory and motor centre AMMC, saddle SAD, flange FLA, prow PRW), and the subesophageal projection neurons: taste, the mouthparts and the antennae's touch.",
       place: (side) => `the bottom of the brain on the ${side}, below the oesophagus, down to where the neck connective leaves`,
     },
-    { neurons: 1193, fullHz: 17 },
-    { neurons: 1207, fullHz: 17 },
+    { neurons: 1193, fullHz: 21 },
+    { neurons: 1207, fullHz: 21 },
   ),
   {
     id: "central-brain-other",
@@ -300,8 +300,8 @@ export const REGIONS: readonly Region[] = [
       description: "Descending neurons, the brain's commands to the body (all the command readouts but the flight and proboscis motor neurons are among them), and the few sensory neurons whose axons descend with them.",
       place: (side) => `the neck connective's ${side} half: from cell bodies in the ${side} side of the brain down through the neck into the ventral nerve cord`,
     },
-    { neurons: 662, fullHz: 16 },
-    { neurons: 654, fullHz: 16 },
+    { neurons: 662, fullHz: 19 },
+    { neurons: 654, fullHz: 19 },
   ),
   ...pair(
     "ascending",
@@ -310,8 +310,8 @@ export const REGIONS: readonly Region[] = [
       description: "Ascending neurons: from the ventral nerve cord up to the brain, telling it what the body is doing.",
       place: (side) => `the neck connective's ${side} half: from cell bodies in the ${side} side of the ventral nerve cord up through the neck into the brain`,
     },
-    { neurons: 930, fullHz: 8.2 },
-    { neurons: 907, fullHz: 8.2 },
+    { neurons: 930, fullHz: 8.8 },
+    { neurons: 907, fullHz: 8.8 },
   ),
   ...pair(
     "front-leg-motor",
@@ -340,8 +340,8 @@ export const REGIONS: readonly Region[] = [
       description: "Motor neurons of the hind leg. Their output is muted in the model (no predicted transmitter).",
       place: (side) => `the ventral nerve cord's metathoracic neuromere (the back of the thorax), ${side} leg neuropil; axons out through the ${side} metathoracic leg nerve`,
     },
-    { neurons: 66, fullHz: 7.4 },
-    { neurons: 64, fullHz: 7.4 },
+    { neurons: 66, fullHz: 8.8 },
+    { neurons: 64, fullHz: 8.8 },
   ),
   {
     id: "flight-motor",
@@ -350,7 +350,7 @@ export const REGIONS: readonly Region[] = [
     place: "the dorsal part of the ventral nerve cord (the tectulum) over the mesothoracic and metathoracic neuromeres, both sides; axons out the dorsal nerves to the wing and haltere muscles",
     side: "both",
     neurons: 89,
-    fullHz: 65,
+    fullHz: 69,
   },
   {
     id: "neck-motor",
@@ -368,7 +368,7 @@ export const REGIONS: readonly Region[] = [
     place: "the abdominal ganglion at the back end of the ventral nerve cord, both sides; axons out the abdominal nerves",
     side: "both",
     neurons: 214,
-    fullHz: 31,
+    fullHz: 32,
   },
   {
     id: "leg-sensory",
@@ -422,8 +422,8 @@ export const REGIONS: readonly Region[] = [
       description: "The ventral nerve cord's own interneurons. The annotations don't say which neuromere each is in.",
       place: (side) => `the ventral nerve cord's ${side} half, all along it, from the prothoracic neuromere at the front to the abdominal ganglion at the back`,
     },
-    { neurons: 6474, fullHz: 5.1 },
-    { neurons: 6448, fullHz: 5.1 },
+    { neurons: 6474, fullHz: 5.5 },
+    { neurons: 6448, fullHz: 5.5 },
   ),
   {
     id: "cord-midline",
@@ -432,7 +432,7 @@ export const REGIONS: readonly Region[] = [
     place: "the ventral nerve cord, along its midline",
     side: "midline",
     neurons: 277,
-    fullHz: 34,
+    fullHz: 35,
   },
   {
     id: "cord-efferent",
@@ -441,7 +441,7 @@ export const REGIONS: readonly Region[] = [
     place: "the ventral nerve cord, mostly along its midline; axons out to muscles and organs",
     side: "both",
     neurons: 128,
-    fullHz: 9.1,
+    fullHz: 9.8,
   },
   {
     id: "unplaced",
@@ -450,7 +450,7 @@ export const REGIONS: readonly Region[] = [
     place: "anywhere; not placed",
     side: "both",
     neurons: 75,
-    fullHz: 6.9,
+    fullHz: 7.8,
   },
 ];
 

@@ -170,6 +170,10 @@ export class Simulation {
   #partOf: Uint8Array | null = null;
   #partCounts = new Uint32Array(0);
 
+  // Groups whose outgoing weights are scaled by a factor (setOutputGain): each
+  // group's edges, those edges' weights at factor 1, and the factor now.
+  #outputGains: { name: string; edges: Uint32Array; base: Float32Array; factor: number }[] = [];
+
   #recording: Uint32Array | null = null;
   #carryMs = 0;
   #sweepResult = new Uint32Array(2);
@@ -272,6 +276,41 @@ export class Simulation {
       }
       this.#silent[i] = silent;
     }
+    for (const group of this.#outputGains) {
+      for (let k = 0; k < group.edges.length; k++) group.base[k] = weight[group.edges[k]];
+      this.#scaleOutputs(group);
+    }
+  }
+
+  /**
+   * Adds a named group of neurons whose outgoing weights setOutputGain
+   * scales, all together: how strongly each spike of theirs reaches its
+   * targets (their transmitter release), not whether they fire. At factor 1,
+   * where it starts, every weight is what it was.
+   */
+  addOutputGain(name: string, neurons: ArrayLike<number>) {
+    if (this.#outputGains.some((g) => g.name === name)) throw new Error(`There is already an output gain called "${name}"`);
+    const members = this.#members(neurons, `output gain "${name}"`);
+    const edges: number[] = [];
+    for (const i of members) for (let e = this.#ptr[i]; e < this.#ptr[i + 1]; e++) edges.push(e);
+    const list = Uint32Array.from(edges);
+    this.#outputGains.push({ name, edges: list, base: Float32Array.from(list, (e) => this.#weight[e]), factor: 1 });
+  }
+
+  /** Scales a group's outgoing weights by `factor` (above 0) times their weights at 1, from the next spike delivered on. */
+  setOutputGain(name: string, factor: number) {
+    const group = this.#outputGains.find((g) => g.name === name);
+    if (!group) throw new Error(`No output gain called "${name}"`);
+    // Above 0, so a group that delivers its spikes keeps delivering them (see #silent).
+    if (!(factor > 0 && Number.isFinite(factor))) throw new Error("An output gain must be a positive number");
+    if (factor === group.factor) return;
+    group.factor = factor;
+    this.#scaleOutputs(group);
+  }
+
+  #scaleOutputs(group: { edges: Uint32Array; base: Float32Array; factor: number }) {
+    const weight = this.#weight;
+    for (let k = 0; k < group.edges.length; k++) weight[group.edges[k]] = group.base[k] * group.factor;
   }
 
   /**

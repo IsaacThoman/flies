@@ -72,6 +72,23 @@ export class Crowd implements Bodies {
     return false;
   }
 
+  /** Which side of the fly the nearest other fly is on: 1 its left, -1 its right, 0 with none here. */
+  sideOf(body: FlyBody): 1 | -1 | 0 {
+    let best = Infinity;
+    let left = 0;
+    for (let i = 0; i < this.count; i++) {
+      const n = this.neighbours[i];
+      const dx = n.x - body.position.x;
+      const dz = n.z - body.position.z;
+      const d = dx * dx + dz * dz;
+      if (d >= best) continue;
+      best = d;
+      // In the fly's frame its left is (cos yaw, 0, -sin yaw).
+      left = dx * Math.cos(body.yaw) - dz * Math.sin(body.yaw);
+    }
+    return left > 0 ? 1 : left < 0 ? -1 : 0;
+  }
+
   /**
    * After the body has moved this frame: pushes it out of any fly it is in,
    * where the world lets it go, and bounces it off one it meets in the air.

@@ -17,15 +17,18 @@
 namespace fly::io {
 
 /** The senses that are one intensity each (types.ts's BrainSenses less light). */
-enum Sense : uint8_t { kLoomLeft, kLoomRight, kTouch, kBumpLeft, kBumpRight, kWind, kSweet, kGrounded, kSenseCount };
+enum Sense : uint8_t { kLoomLeft, kLoomRight, kTouch, kBumpLeft, kBumpRight, kWind, kSweet, kGrounded, kMaleTaste, kSenseCount };
 
 struct Senses {
   double loom_left = 0, loom_right = 0, touch = 0, bump_left = 0, bump_right = 0, wind = 0, sweet = 0;
   bool grounded = false;
+  double male_taste = 0;
+  /** Internal state, not a sense (types.ts's BrainSenses.hunger): 0 just fed to 1 starved; anything not a number counts as 1. */
+  double hunger = 1;
 };
 
 struct Command {
-  double walk = 0, turn = 0, back = 0, escape = 0, wings = 0, groom = 0, feed = 0;
+  double walk = 0, turn = 0, back = 0, escape = 0, wings = 0, groom = 0, feed = 0, sing = 0;
 };
 
 enum Side : uint8_t { kLeft, kRight };
@@ -46,6 +49,10 @@ struct InputSpec {
   /** The sense that sets its rate (for a sense), or the eye (for the background). */
   Sense sense;
   Side side;
+  /** When not empty, only the neurons among these root IDs (io.ts's Selection.rootIds). */
+  std::vector<uint32_t> root_ids = {};
+  /** Added to the simulation after the eyes (io.ts's InputSpec.afterEyes). */
+  bool after_eyes = false;
 };
 
 struct ReadoutSpec {
@@ -63,7 +70,7 @@ std::vector<InputSpec> background();
 std::vector<ReadoutSpec> readouts();
 
 /** decode() reads the readouts by these positions in readouts(). */
-enum Readout : uint8_t { kDNg100, kDNa02Left, kDNa02Right, kMDN, kDNp01, kFlight, kDNg12, kMN9 };
+enum Readout : uint8_t { kDNg100, kDNa02Left, kDNa02Right, kMDN, kDNp01, kFlight, kDNg12, kMN9, kPIP10 };
 
 struct Group {
   InputSpec spec;
@@ -87,6 +94,12 @@ Wiring wire(const Connectome& connectome);
 
 /** Each sense's intensity, 0..1 (grounded as 0 or 1). */
 double intensity(const Senses& senses, Sense sense);
+
+/** How hungry the senses say it is, 0..1: 1 (as it was before hunger) when not a number (io.ts's hungerOf). */
+double hunger_of(const Senses& senses);
+
+/** The sweet taste neurons' output gain at this hunger (io.ts's sweetOutputGain and HUNGER, which say why). */
+double sweet_output_gain(double hunger);
 
 /** Commands from the smoothed readout rates, Hz. */
 Command decode(const std::vector<double>& rates);

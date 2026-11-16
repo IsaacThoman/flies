@@ -48,7 +48,7 @@ export const REDRAWS = 4;
 const VALUE = { size: 13, color: "#ffffff" };
 const UNIT = { size: 9, color: "rgba(220, 240, 255, 0.72)" };
 
-/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0. */
+/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger, internal state, 1 when left out. */
 const SENSES = [
   ["loomLeft", "Loom L"],
   ["loomRight", "Loom R"],
@@ -58,7 +58,9 @@ const SENSES = [
   ["wind", "Wind"],
   ["sweet", "Sweet"],
   ["grounded", "On legs"],
+  ["maleTaste", "Male taste"],
   ["light", "Light"],
+  ["hunger", "Hunger"],
 ] as const;
 /** What comes out, and the neurons each is read from, by their rates' names in stats.rates. */
 const COMMANDS = [
@@ -69,6 +71,7 @@ const COMMANDS = [
   { key: "wings", label: "Wings", rates: ["flight"] },
   { key: "groom", label: "Groom", rates: ["DNg12"] },
   { key: "feed", label: "Feed", rates: ["MN9"] },
+  { key: "sing", label: "Sing", rates: ["pIP10"] },
 ] as const;
 const RATES = COMMANDS.reduce((n, c) => n + c.rates.length, 0);
 /** How many numbers in and out it shows: the senses, the commands, then each command's rates. */
@@ -76,7 +79,8 @@ export const SIGNALS = SENSES.length + COMMANDS.length + RATES;
 
 /** In and out, design units: a heading over each column, then a row each, a name, a bar and, for a command, its neurons' rates. */
 const SUB = 13;
-const ROW = 12;
+// 11, so that the eight commands still show big enough to read on a small phone on its side.
+const ROW = 11;
 const NAME = { in: 50, out: 42 };
 const BAR = { width: 44, height: 5 };
 const HZ = 36;
@@ -296,7 +300,7 @@ export function readSignals(s: StatsState, out: Float32Array) {
   let i = 0;
   for (let k = 0; k < SENSES.length; k++) {
     const key = SENSES[k][0];
-    out[i++] = step(key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : sensed[key]);
+    out[i++] = step(key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : key === "hunger" ? (sensed.hunger ?? 1) : sensed[key]);
   }
   const command = s.brain?.command;
   for (let k = 0; k < COMMANDS.length; k++) out[i++] = command ? step(command[COMMANDS[k].key]) : 0;

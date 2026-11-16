@@ -104,10 +104,15 @@ const fly = <T>(page: Page, js: string) => page.evaluate(`(() => { const g = glo
 /** How near `seer` draws player `id`'s fly to where its own tab (`own`) has it, mm: each is drawn a moment in the past, so the nearest of a few looks. */
 async function drawnApart(seer: Page, own: Page, id: number) {
   let apart = Infinity;
-  for (let i = 0; i < 6; i++) {
-    const [seen, at] = await Promise.all([readState(seer), fly<{ x: number; z: number }>(own, "({ x: g.life.body.position.x, z: g.life.body.position.z })")]);
+  // On its feet: a fly in flight (a second or two at a quarter of a metre a second, if something startled it) is drawn
+  // the network's delay behind, tens of millimetres. Six looks at it standing or walking, over at most 20 s.
+  for (let looked = 0, i = 0; looked < 6 && i < 80; i++) {
+    const [seen, at] = await Promise.all([readState(seer), fly<{ x: number; z: number; flying: boolean }>(own, "({ x: g.life.body.position.x, z: g.life.body.position.z, flying: !g.life.body.onFeet })")]);
     const o = othersOf(seen).find((o) => o.id === id)!;
-    apart = Math.min(apart, Math.hypot(o.x - at.x, o.z - at.z));
+    if (!at.flying) {
+      apart = Math.min(apart, Math.hypot(o.x - at.x, o.z - at.z));
+      looked++;
+    }
     await seer.waitForTimeout(250);
   }
   return apart;
@@ -231,8 +236,8 @@ try {
   const has = (s: Record<string, string>) => foodsOf(s).has(sugar);
   await waitUntil(a.page, "the sugar on tab 0's table", has, 5000);
   await waitUntil(b.page, "the sugar on tab 1's table", has, 5000);
-  const eating = await waitUntil(a.page, "tab 0's fly eating the sugar", (s) => (foodsOf(s).get(sugar) ?? 1) < 0.97, 30_000)
-    .then(() => true, () => false);
+  await waitUntil(a.page, "tab 0's fly eating the sugar", (s) => (foodsOf(s).get(sugar) ?? 1) < 0.97, 30_000)
+    .catch(() => {});
   for (let i = 0; i < 3; i++) {
     const left = foodsOf(await readState(a.page)).get(sugar) ?? 0;
     const since = Date.now();
@@ -240,9 +245,16 @@ try {
     console.log(`  ${left.toFixed(3)} of the sugar left on tab 0, on tab 1 within ${Date.now() - since} ms`);
     await a.page.waitForTimeout(700);
   }
-  if (eating) await waitFor(a.page, "granted>0", 5000);
-  const fed = await readState(a.page);
-  console.log(`  ${eating ? "its fly ate" : "its fly didn't eat (its brain's choice), so nothing changed"}: ${fed.predicted} by its own count, ${fed.granted} by the room's`);
+  const pages = [a.page, b.page];
+  const states = await Promise.all(pages.map(readState));
+  const eater = states.findIndex((s) => Number(s.predicted) > 0);
+  if (eater >= 0) {
+    const fed = await waitFor(pages[eater], "granted>0", 5000);
+    console.log(`  tab ${eater}'s fly ate: ${fed.predicted} by its own count, ${fed.granted} by the room's`);
+  } else {
+    const fed = states[0];
+    console.log(`  its fly didn't eat (its brain's choice), so nothing changed: ${fed.predicted} by its own count, ${fed.granted} by the room's`);
+  }
 
   step("a hidden tab's fly rests at the other's table, and lives again when the tab is shown");
   await hide(b.page, true);

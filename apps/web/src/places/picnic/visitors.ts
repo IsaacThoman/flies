@@ -46,8 +46,21 @@ function wingTexture() {
   const S = 256;
   const { canvas, g } = canvas2d(S, S);
   g.scale(2, 2);
-  const fore = new Path2D("M0 34 C30 14 70 2 112 6 Q125 9 122 22 C116 40 104 58 92 66 C64 73 30 70 0 62 Z");
-  const hind = new Path2D("M0 60 C40 58 80 62 100 80 C108 92 101 110 85 120 C64 130 34 126 16 116 C6 104 0 90 0 74 Z");
+  // Drawn with commands: the Apple TV's Path2D can't read SVG path strings, and an empty clip would hide the wings.
+  const fore = new Path2D();
+  fore.moveTo(0, 34);
+  fore.bezierCurveTo(30, 14, 70, 2, 112, 6);
+  fore.quadraticCurveTo(125, 9, 122, 22);
+  fore.bezierCurveTo(116, 40, 104, 58, 92, 66);
+  fore.bezierCurveTo(64, 73, 30, 70, 0, 62);
+  fore.closePath();
+  const hind = new Path2D();
+  hind.moveTo(0, 60);
+  hind.bezierCurveTo(40, 58, 80, 62, 100, 80);
+  hind.bezierCurveTo(108, 92, 101, 110, 85, 120);
+  hind.bezierCurveTo(64, 130, 34, 126, 16, 116);
+  hind.bezierCurveTo(6, 104, 0, 90, 0, 74);
+  hind.closePath();
   const both = new Path2D();
   both.addPath(fore);
   both.addPath(hind);

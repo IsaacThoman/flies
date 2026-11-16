@@ -91,6 +91,8 @@ class Brain {
   InternalState state_;
   std::vector<uint32_t> sense_inputs_;
   std::vector<uint32_t> background_inputs_;
+  // The sweet neurons' output gain, which hunger sets (io::sweet_output_gain).
+  uint32_t sweet_gain_ = 0;
   std::vector<double> rates_;
   std::vector<std::string> rate_names_;
   std::vector<uint32_t> counts_;

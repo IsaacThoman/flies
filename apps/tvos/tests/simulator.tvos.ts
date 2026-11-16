@@ -164,12 +164,13 @@ try {
   assert.equal(b.error, undefined, `brain error: ${b.error}`);
   assert.deepEqual({ neurons: b.neurons, connections: b.connections }, connectomeCounts(), 'the connectome arrived whole');
   assert.deepEqual(b.facets, [8, 8], 'eye facets');
-  assert.deepEqual(b.rates, ['standin.ticks', 'standin.simulatedMs', 'standin.rate82'], 'rate names');
-  assert.equal(b.rateCount, 83, 'as many rates as the real brain reports');
-  assert.equal(b.lastRate, 82, 'the last rate arrived');
+  assert.deepEqual(b.rates, ['standin.ticks', 'standin.simulatedMs', 'standin.rate83'], 'rate names');
+  assert.equal(b.rateCount, 84, 'as many rates as the real brain reports');
+  assert.equal(b.lastRate, 83, 'the last rate arrived');
   assert.ok(Math.abs((b.command?.turn ?? 0) - 0.6) < 1e-3, `turn follows the light (right 0.8, left 0.2): ${b.command?.turn}`);
   assert.equal(b.command?.walk, 0.8, 'walk');
   assert.equal(b.command?.feed, 0.5, 'feed follows sweet');
+  assert.equal(b.command?.sing, 0.25, 'sing follows the taste of a male, the last sense');
   assert.equal(b.command?.escape, 0, 'grounded');
   assert.ok((b.maxSimMsAfterBurst ?? 0) > 0 && (b.maxSimMsAfterBurst ?? 0) <= 100, `a step simulates at most 100 ms: ${b.maxSimMsAfterBurst}`);
   // The weather bridge: only what the game needs crosses into JavaScript, and never where.

@@ -69,14 +69,19 @@ test("flying into another fly, it bounces off and feels the hit", () => {
   body.position.y = 5;
   body.velocity.x = 300;
   let hit = 0;
+  let back = Infinity;
   for (let i = 0; i < 10; i++) {
     body.step(intent({ wings: 0.6 }), still, DT);
     crowd.resolve(body, DT);
     hit = Math.max(hit, body.events.hit);
+    // Once it has hit (its wings then turn it to its new course and carry it round the other fly).
+    if (hit > 0 && back === Infinity) {
+      back = body.velocity.x;
+      assert.ok(body.position.x < 0, "not through it");
+    }
   }
-  assert.ok(body.velocity.x < 0, "bounced back");
+  assert.ok(back < 0, "bounced back");
   assert.ok(hit > 200, `hit at ${hit} mm/s`);
-  assert.ok(body.position.x < 0);
 });
 
 test("alone, there is nothing to meet", () => {
@@ -86,4 +91,31 @@ test("alone, there is nothing to meet", () => {
   crowd.resolve(body, DT);
   assert.equal(crowd.touch, 0);
   assert.equal(crowd.inside(0, 0.75, 0, 0), false);
+});
+
+test("a front leg on another fly tastes him, on its feet; the nearest other fly's side is known", () => {
+  const world = openTable(200);
+  const body = new FlyBody(world, { x: 0, z: 0, yaw: 0 });
+  const crowd = new Crowd(world);
+  const senses = new SenseTracker();
+  const pantry = new Pantry(world, []);
+  const feel = () => senses.update({ dt: DT, body, world, pantry, looming: [], stroke: 0, air: { x: 0, y: 0, z: 0 }, eyesOpen: true, proboscis: 0, bodies: crowd });
+  assert.equal(feel().maleTaste, 0);
+  assert.equal(crowd.sideOf(body), 0);
+  // Another fly crossways ahead, its body under the front legs' tarsi, more to the fly's left (it faces +z; its left is +x).
+  Object.assign(crowd.add()!, { x: 0.7, y: 0, z: 2.4, yaw: Math.PI / 2 });
+  assert.equal(feel().maleTaste, 1);
+  assert.equal(crowd.sideOf(body), 1);
+  crowd.neighbours[0].x = -0.7;
+  assert.equal(crowd.sideOf(body), -1);
+  // Too far ahead for the legs to reach: the taste eases out.
+  crowd.neighbours[0].z = 4;
+  const fading = feel().maleTaste;
+  assert.ok(fading > 0 && fading < 1, `${fading}`);
+  for (let i = 0; i < 60; i++) feel();
+  assert.equal(feel().maleTaste, 0);
+  // Off its feet, its legs are on nothing.
+  crowd.neighbours[0].z = 2.4;
+  body.mode = "airborne";
+  assert.equal(feel().maleTaste, 0);
 });

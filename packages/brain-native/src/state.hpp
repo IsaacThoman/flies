@@ -8,9 +8,12 @@
 // deviation 1 and forgets its past over tau seconds. An eye's background level
 // is
 //
-//   logistic(arousal.weight × arousal + scene.weight × scene[eye] + bias)
+//   logistic(arousal.weight × arousal + scene.weight × scene[eye] + bias
+//            + hunger.weight × (hunger - 1))
 //
-// from 0 to 1, multiplying that eye's maximum background rate.
+// from 0 to 1, multiplying that eye's maximum background rate. The hunger
+// term stands in for starvation-induced hyperactivity; state.ts says why and
+// where its weight comes from.
 
 #ifndef FLY_STATE_HPP
 #define FLY_STATE_HPP
@@ -48,6 +51,7 @@ class InternalState {
   static constexpr double kArousalTau = 10, kArousalWeight = 1.6;
   static constexpr double kSceneTau = 4, kSceneWeight = 1.5;
   static constexpr double kBias = -1;
+  static constexpr double kHungerWeight = 0.8;
 
   explicit InternalState(uint32_t seed) : normal_(seed) {}
 
@@ -55,6 +59,8 @@ class InternalState {
   void step(double dt);
   /** The background level of one eye, 0 to 1. */
   double level(io::Side eye) const;
+  /** How hungry the fly is, 0..1 (io::hunger_of); set by the brain each tick. */
+  void set_hunger(double hunger) { hunger_ = hunger; }
   double arousal() const { return arousal_.value; }
   double scene(io::Side eye) const { return scene_[eye].value; }
 
@@ -62,6 +68,7 @@ class InternalState {
   Normals normal_;
   Wander arousal_{kArousalTau};
   Wander scene_[2] = {{kSceneTau}, {kSceneTau}};
+  double hunger_ = 1;
 };
 
 }  // namespace fly

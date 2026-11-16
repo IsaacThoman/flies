@@ -114,6 +114,63 @@ export function sample(pixels: Uint8Array, sampler: Sampler, out: Float32Array) 
 }
 
 /**
+ * Light adaptation: the eyes' working range follows the scene's overall
+ * brightness. A fly's photoreceptors adapt their gain (and close their
+ * pupil, the pigment granules that shade the rhabdomere) so that they code
+ * contrast across many log units of light, from dusk to full sun; dusk is
+ * still far above the light at which their own noise takes over. The
+ * picture's brightness is the screen's, not the world's: dusk renders at 0.15
+ * and night at 0.07 to 0.09 where midday renders at 0.6 to 0.66 (the picnic,
+ * the fly's right eye). The brain's input stage measures contrast against the
+ * ambient level plus a floor of 0.05 for black (RETINA.floor), which at those
+ * levels stands where the photoreceptors' noise would and cut a dark ball's
+ * contrast from 0.89 at midday to 0.70 at dusk and 0.63 at night. So the
+ * picture is scaled up toward the level midday has (ADAPT_LEVEL), by at most
+ * ADAPT_GAIN: dusk's ball then has a contrast of 0.86, and night's 0.76.
+ * Midday is left as it is: the gain never goes below 1. Real flies do see
+ * worse in dim light (fewer photons, a slower, noisier response), and a cap of
+ * 4, which brought night up to midday's level, also made a quiet night's
+ * scene set the fly off more often with nothing thrown at it (measured while
+ * the bubbles were still drawn as bright as by day: 9 to 12 take-offs in 4
+ * minutes, against 2 to 3 with no adaptation and 6 to 10 at 2); 2 is the
+ * smaller step.
+ *
+ * It follows the picture's mean over ADAPT_SECONDS. Real light adaptation is
+ * quick and dark adaptation takes minutes; one slow time constant keeps the
+ * gain from moving with the fly's gaze or a passing ball (which darkens a
+ * quarter of what the two eyes see for half a second, moving the gain by
+ * about 3%), and the brain takes its slow changes calmly: after night jumps to
+ * midday the picture dims back from white over seconds, and the giant fiber
+ * stays at its resting level (escape 0.15 to 0.18 against 0.14 to 0.15, at a
+ * time constant of 4 or 8 s; 0.22 at 2 s).
+ */
+export const ADAPT_LEVEL = 0.5;
+export const ADAPT_GAIN = 2;
+export const ADAPT_SECONDS = 4;
+
+export class Adaptation {
+  /** The picture's mean brightness it has adapted to, before the gain; negative until the first picture. */
+  level = -1;
+  gain = 1;
+
+  /** Scales both eyes' light in place, `dt` seconds after the last picture. Allocates nothing. */
+  apply(light: { left: Float32Array; right: Float32Array }, dt: number) {
+    let sum = 0;
+    for (let i = 0; i < light.left.length; i++) sum += light.left[i];
+    for (let i = 0; i < light.right.length; i++) sum += light.right[i];
+    const n = light.left.length + light.right.length;
+    if (n === 0) return;
+    const mean = sum / n;
+    const step = Number.isFinite(dt) ? Math.max(0, dt) : 0;
+    this.level = this.level < 0 ? mean : this.level + (mean - this.level) * (1 - Math.exp(-step / ADAPT_SECONDS));
+    this.gain = Math.min(ADAPT_GAIN, Math.max(1, ADAPT_LEVEL / Math.max(1e-6, this.level)));
+    if (this.gain === 1) return;
+    for (let i = 0; i < light.left.length; i++) light.left[i] = Math.min(1, light.left[i] * this.gain);
+    for (let i = 0; i < light.right.length; i++) light.right[i] = Math.min(1, light.right[i] * this.gain);
+  }
+}
+
+/**
  * A stand-in for the brain's eyes, until it has its own: about `perEye`
  * facets per eye, evenly spread over each eye's field (from a little past
  * straight ahead round to behind, and from well below to above), in the head

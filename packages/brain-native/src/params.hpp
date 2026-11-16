@@ -61,6 +61,14 @@ bool columnar_class(std::string_view type);
  */
 std::vector<uint8_t> columnar(const Connectome& connectome);
 
+/**
+ * params.ts's completenessFactors for its COMPLETENESS_FIXES, Johnston's organ
+ * zones C, E and F: per neuron, the factor on its gain (1 for most). For each
+ * zone, the side whose neurons have fewer output synapses gets the ratio of the
+ * other side's to its own; params.ts says why.
+ */
+std::vector<double> completeness(const Connectome& connectome);
+
 /** mV per synapse for a transmitter. */
 float transmitter_gain(const std::string& transmitter);
 

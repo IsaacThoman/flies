@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as THREE from "three";
 import type { FlyAnchor, FlyPose } from "@fly/contracts";
-import { BODY_JOINTS, FOOT_CLEARANCE, J, LEG_COUNT, LEG_SEGMENTS, LEGS, WING_JOINTS, legPair } from "../src/anatomy.ts";
+import { BODY_JOINTS, FOOT_CLEARANCE, J, LEG_COUNT, LEG_SEGMENTS, LEGS, WING, WING_COPIES, WING_JOINTS, legPair } from "../src/anatomy.ts";
 import { createFly } from "../src/index.ts";
 import { Walker, pose } from "./helpers.ts";
 
@@ -78,7 +78,7 @@ test("the posed fly stays inside the bounds three culls it by", () => {
   const fly = createFly();
   const sphere = (meshes(fly.object)[0].geometry.boundingSphere)!;
   const poses: FlyPose[] = [
-    pose(), pose({ speed: 8 }), pose({ groom: 1 }), pose({ feed: 1 }), pose({ crouch: 1 }), pose({ wings: 1 }),
+    pose(), pose({ speed: 8 }), pose({ groom: 1 }), pose({ feed: 1, fullness: 1 }), pose({ crouch: 1 }), pose({ wings: 1 }),
     pose({ airborne: true, wings: 1, pitch: 1.5, roll: 1.5 }), pose({ airborne: true, wings: 1, pitch: -1.5, roll: -1.5 }),
   ];
   for (const p of poses) {
@@ -190,7 +190,7 @@ test("every pose value across its range, extremes and rapid changes, stays finit
     // Hold a pose for a while, or change everything every frame.
     const p: FlyPose = {
       speed: pick(-5, 15), turn: pick(-10, 10), airborne: rand() < 0.3, wings: pick(0, 1), groom: pick(0, 1),
-      feed: pick(0, 1), crouch: pick(0, 1), pitch: pick(-2, 2), roll: pick(-2, 2),
+      feed: pick(0, 1), crouch: pick(0, 1), pitch: pick(-2, 2), roll: pick(-2, 2), sing: pick(-1, 1), fullness: pick(0, 1),
     };
     const hold = rand() < 0.5 ? 1 : 1 + Math.floor(rand() * 40);
     const dt = rand() < 0.05 ? wild[Math.floor(rand() * wild.length)] : rand() * 0.05;
@@ -198,9 +198,24 @@ test("every pose value across its range, extremes and rapid changes, stays finit
     check();
   }
   // Each value alone at its extremes, flipping every frame.
-  for (const key of ["speed", "turn", "wings", "groom", "feed", "crouch", "pitch", "roll"] as const) {
+  for (const key of ["speed", "turn", "wings", "groom", "feed", "crouch", "pitch", "roll", "fullness"] as const) {
     for (let f = 0; f < 120; f++) fly.update(pose({ [key]: f % 2 ? 1e6 : -1e6, airborne: f % 3 === 0 }), DT);
     check();
+  }
+});
+
+test("a full crop swells the abdomen, and only the abdomen", () => {
+  const empty = createFly();
+  const full = createFly();
+  run(empty, pose(), 3);
+  run(full, pose({ fullness: 1 }), 3);
+  const column = (joints: Float32Array, joint: number, axis: number) => Math.hypot(joints[joint * 12 + axis], joints[joint * 12 + 4 + axis], joints[joint * 12 + 8 + axis]);
+  for (const [axis, swell] of [[0, 1.12], [1, 1.12], [2, 1.05]]) {
+    const ratio = column(full.rig.joints, J.abdomen, axis) / column(empty.rig.joints, J.abdomen, axis);
+    assert.ok(Math.abs(ratio - swell) < 0.005, `axis ${axis}: ${ratio}`);
+  }
+  for (const joint of [0, J.head, J.thorax]) {
+    for (let k = 0; k < 12; k++) assert.equal(full.rig.joints[joint * 12 + k], empty.rig.joints[joint * 12 + k]);
   }
 });
 
@@ -261,4 +276,26 @@ test("update is quick with a JIT", () => {
   }));
   console.log(`  update: ${micros.toFixed(1)} CPU µs in Node with its JIT (best of three)`);
   assert.ok(micros < 50, `${micros.toFixed(1)} CPU µs per update; budget 50`);
+});
+
+test("singing holds one wing out to its side, the other folded", () => {
+  // Where a wing copy's tip is, from its hinge, in the model's space (+x the fly's left, +z ahead).
+  const tip = (fly: ReturnType<typeof createFly>, copy: number) => {
+    const f = fly.rig.wings, o = copy * 12, l = WING.length;
+    return { x: f[o] * l, z: f[o + 8] * l };
+  };
+  const out = (fly: ReturnType<typeof createFly>, side: 0 | 1) => (side === 0 ? 1 : -1) * tip(fly, side * WING_COPIES).x;
+  const rest = createFly();
+  run(rest, pose(), 2);
+  for (const side of [0, 1] as const) assert.ok(out(rest, side) < 0.3 * WING.length && tip(rest, side * WING_COPIES).z < 0, `folded back at rest (${side})`);
+  for (const [sing, singing] of [[1, 0], [-1, 1]] as const) {
+    const fly = createFly();
+    run(fly, pose({ sing }), 2);
+    assert.ok(out(fly, singing) > 0.85 * WING.length, `sing ${sing}: the singing wing is out (${out(fly, singing).toFixed(2)})`);
+    assert.ok(out(fly, (1 - singing) as 0 | 1) < 0.3 * WING.length, `sing ${sing}: the other stays folded`);
+  }
+  // Not in the air: there both wings beat alike.
+  const flying = createFly();
+  run(flying, pose({ sing: 1, airborne: true, wings: 1 }), 2);
+  assert.ok(Math.abs(out(flying, 0) - out(flying, 1)) < 1e-6);
 });

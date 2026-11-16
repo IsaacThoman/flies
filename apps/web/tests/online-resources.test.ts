@@ -8,7 +8,7 @@ import { OtherFlies } from "../src/online/others.ts";
 const gradient = { addColorStop() {} };
 const context = new Proxy({}, { get: () => () => gradient });
 (globalThis as { document?: unknown }).document = { createElement: () => ({ getContext: () => context }) };
-(globalThis as { Path2D?: unknown }).Path2D = class { addPath() {} };
+(globalThis as { Path2D?: unknown }).Path2D = class { addPath() {} moveTo() {} bezierCurveTo() {} quadraticCurveTo() {} closePath() {} };
 
 function owned(root: THREE.Object3D) {
   const resources = new Set<THREE.BufferGeometry | THREE.Material>();

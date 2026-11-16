@@ -251,9 +251,9 @@ localStorage.setItem('fly.test', String(Number(localStorage.getItem('fly.test') 
 report.storage = Number(localStorage.getItem('fly.test')) > 0 && localStorage.length > 0;
 void fetch('config.json').then((r) => r.json()).then((c: { script?: string }) => { report.fetched = c.script ?? 'no script'; }, (e: unknown) => { report.fetched = `failed: ${String(e)}`; });
 
-// The brain: senses with the left eye dark and the right bright, sweet on the mouthparts.
+// The brain: senses with the left eye dark and the right bright, sweet on the mouthparts, a male tasted.
 const brain = (globalThis as unknown as { __native?: { brain?: NativeBrainBridge } }).__native?.brain;
-const scalars = new Float32Array([0, 0, 0, 0, 0, 0, 0.5, 1]);
+const scalars = new Float32Array([0, 0, 0, 0, 0, 0, 0.5, 1, 0.25]);
 let light: [Float32Array, Float32Array] | null = null;
 let state = new Float32Array(0);
 let brainFrames = 0, burst = false, maxSimMs = 0, lastCount = 0;

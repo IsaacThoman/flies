@@ -1,5 +1,6 @@
 // Plays the game in a real (GPU-rendered, headless) Chromium with the real
-// brain: boots it, waits for the brain, walks the menus with the keys, feeds
+// brain: boots it, waits for the brain, walks the menus with the keys (stepping
+// through where the fly lives carries it only where the choice rests), feeds
 // the fly and checks its taste senses and feed command, throws the ball until the fly takes
 // off, checks the wallpaper comes and goes with what it sees and its nervous
 // system in a corner, that the X-ray comes where the fly is big enough,
@@ -18,7 +19,7 @@
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
 import { gameUp, openGame, readState, startServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
-import { feedHoney } from "./feeding.ts";
+import { dropFood, feedHoney } from "./feeding.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import type { Game } from "../src/game.ts";
 
@@ -128,6 +129,32 @@ try {
   await waitFor(page, "focus=wallpaperAfter");
   await press("ArrowDown", 2);
   await waitFor(page, "focus=place");
+  // Where it lives: stepped through, the fly is carried only to the place it rests on, then (leaving the row) at once back.
+  await page.evaluate(() => {
+    const game = (globalThis as unknown as { __fly: Game; __carried: string[] }).__fly;
+    const carried: string[] = ((globalThis as unknown as { __carried: string[] }).__carried = []);
+    const moveTo = game.moveTo.bind(game);
+    game.moveTo = (id, table) => {
+      carried.push(id);
+      moveTo(id, table);
+    };
+  });
+  const carried = () => page.evaluate(() => (globalThis as unknown as { __carried: string[] }).__carried);
+  // Each in turn, then the first three places, a step at a time, quicker than it settles.
+  await press("ArrowRight", 3);
+  assert.deepEqual(await carried(), [], "nowhere on the way");
+  await waitFor(page, `place=${PLACES[2].id},moving=`, 30_000);
+  assert.deepEqual(await carried(), [PLACES[2].id], "once, to where it rested");
+  await press("ArrowLeft", 2);
+  await press("ArrowUp");
+  await waitFor(page, `place=${PLACES[0].id},moving=`, 30_000);
+  assert.deepEqual(await carried(), [PLACES[2].id, PLACES[0].id], "leaving the row settles it");
+  // Back to living in each in turn, which carries it nowhere.
+  await press("ArrowDown");
+  await press("ArrowLeft");
+  await waitForGameTime(page, 1.5);
+  assert.deepEqual(await carried(), [PLACES[2].id, PLACES[0].id]);
+  assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.settings.place), "turns");
   await press("ArrowUp", 3);
   await waitFor(page, "focus=page");
   await press("ArrowRight");
@@ -180,11 +207,7 @@ try {
   step("feeding: honey at its mouth reaches taste senses and the brain produces a feed command");
   await press("ArrowDown");
   await waitFor(page, "tool=feed,variant=honey");
-  await feedHoney(page, async () => {
-    const before = Number((await readState(page)).food);
-    await press("Enter");
-    await waitFor(page, `food>${before}`);
-  });
+  await feedHoney(page, () => dropFood(page, () => press("Enter")));
   // Whether it walks off the honey is the brain's choice; footprint generation is also checked with a deterministic walker.
   await waitForGameTime(page, 2);
   const printed = Number((await readState(page)).prints);
@@ -231,20 +254,29 @@ try {
   assert.equal(back.tool, "swoop", "the press that woke it did nothing else");
   assert.equal(back.screen, "play");
 
-  step("what it sees: only in the wallpaper by default; on Always while playing too, but never over the full picture or a menu");
-  await waitFor(page, "eyesInset=hidden");
+  step("what it sees: while playing by default, but never over the full picture or a menu; on Wallpaper it hides while playing");
   await page.evaluate(() => {
-    const settings = (globalThis as unknown as { __fly: { settings: { wallpaperAfter: number; eyesInset: string } } }).__fly.settings;
-    settings.wallpaperAfter = 60;
-    settings.eyesInset = "always";
+    (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 60;
   });
-  await waitFor(page, "eyesInset=top-right");
+  await waitFor(page, "screen=play,wallpaper=false,eyesInset=top-right");
+  await press("Escape");
+  await waitFor(page, "screen=title,eyesInset=hidden");
+  await press("Enter");
+  await waitFor(page, "screen=play,eyesInset=top-right");
   await toTool("view");
   await waitFor(page, "tool=view,view=follow");
   await press("ArrowDown", 4);
   await waitFor(page, "view=eyes,eyesInset=hidden");
   await press("ArrowUp", 4);
   await waitFor(page, "view=follow,eyesInset=top-right");
+  await page.evaluate(() => {
+    (globalThis as unknown as { __fly: Game }).__fly.settings.eyesInset = "wallpaper";
+  });
+  await waitFor(page, "wallpaper=false,eyesInset=hidden");
+  await page.evaluate(() => {
+    (globalThis as unknown as { __fly: Game }).__fly.settings.eyesInset = "always";
+  });
+  await waitFor(page, "eyesInset=top-right");
 
   step("its nervous system: in the corner with what it sees, the fly as glass where it is big enough to see inside, never over the full picture");
   await page.evaluate(() => {

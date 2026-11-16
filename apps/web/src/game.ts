@@ -69,6 +69,7 @@ import { hudLayout, loadingLayout, playRoom, titleLayout, touchSlop } from "./ui
 import type { HudLayout, LoadingLayout } from "./ui/layout.ts";
 import { LOADING_HITS, arriving, drawLoading } from "./ui/loading.ts";
 import { Overlay } from "./ui/overlay.ts";
+import { Settle } from "./ui/settle.ts";
 import { AboutScreen } from "./ui/screens/about.ts";
 import { settingsScreen, settingsTab, titleScreen } from "./ui/screens/menus.ts";
 import type { MenuScreen } from "./ui/screens/menu-screen.ts";
@@ -238,6 +239,11 @@ export class Game implements Shell {
   #moving: { to: PlaceId; t: number; arrived: boolean } | null = null;
   /** Seconds of wallpaper spent where it is now. */
   #stayed = 0;
+  /** A place stepped to in Settings, waiting for the player to settle on it. */
+  #placeChoice = new Settle(
+    () => this.#choosingPlace(),
+    () => this.#settlePlace(),
+  );
   /** The shelf's choices a launch comes back to, as saved. */
   #shelf: ShelfChoices;
   /** What the hints have taught, as saved; and how many times that has changed, for the HUD to redraw. */
@@ -637,8 +643,8 @@ export class Game implements Shell {
   applySettings(save = true) {
     const s = this.settings;
     this.haptics.enabled = s.rumble;
-    // At a table, the table's place is the starter's to choose, with the Place tool.
-    if (!this.online && s.place !== "turns" && isPlaceId(s.place) && s.place !== this.#here) this.moveTo(s.place);
+    // Stepped to in Settings, a place waits until the player settles on it: carried to each on the way, the fly would build every one.
+    this.#placeChoice.changed();
     // The player chose a picture: take it at its word until the device shows it can't keep up.
     if (save && this.quality && (s.pixels !== this.#chosen.pixels || s.eyes !== this.#chosen.eyes)) this.quality.reset();
     this.#chosen.pixels = s.pixels;
@@ -704,6 +710,17 @@ export class Game implements Shell {
     this.stage.contextRestored();
     this.eyes.contextRestored();
     this.overlay.dirty = true;
+  }
+
+  /** Whether the player is on Settings' "Where it lives". */
+  #choosingPlace() {
+    return this.nav.current === "settings" && this.screens.settings.menu.focused?.id === "place";
+  }
+
+  /** Carries the fly to the place it lives in, if it lives in one and isn't there. At a table, the table's place is the starter's to choose, with the Place tool. */
+  #settlePlace() {
+    const place = this.settings.place;
+    if (!this.online && place !== "turns" && isPlaceId(place) && place !== this.#here) this.moveTo(place);
   }
 
   /** Carries the fly to another place: the world fades out, the place is built behind the veil, and fades in. */
@@ -832,6 +849,7 @@ export class Game implements Shell {
     }
 
     this.#input(dt);
+    this.#placeChoice.update(dt);
     this.#move(dt);
     this.#table(dt);
     this.#browse(dt);
@@ -873,7 +891,7 @@ export class Game implements Shell {
     this.peaks.loom = Math.max(this.peaks.loom * fade, life.sensed.loomLeft, life.sensed.loomRight);
     this.peaks.looming = Math.max(this.peaks.looming * fade, rates?.["vision.looming left"] ?? 0, rates?.["vision.looming right"] ?? 0);
     this.glow.update(life.brain.regionRates, dt);
-    this.fly.update(life.body, life.intent, life.eating, dt);
+    this.fly.update(life.body, life.intent, life.eating, life.hunger.fullness, dt, life.songSide);
     this.prints.update(this.fly.model, life.body.onFeet, this.fly.pose.groom > 0.02, life.world, life.pantry, this.time);
     this.online?.send(this.#playerNow());
     // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
@@ -888,6 +906,7 @@ export class Game implements Shell {
     this.#air.set(this.hands.air.x + this.#felt.air.x, this.hands.air.y + this.#felt.air.y, this.hands.air.z + this.#felt.air.z);
     this.bubbles.rain = stage.weather.rain;
     const middle = this.#middle.set(life.body.position.x, life.body.position.y + 0.75, life.body.position.z);
+    this.bubbles.lightBy(stage.light);
     this.bubbles.update(this.time, dt, director.camera, stage.light.sunDirection, this.#air, middle);
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
     this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
@@ -1634,12 +1653,14 @@ export class Game implements Shell {
     d.tool = this.hands.current.id;
     d.variant = this.hands.variant.id;
     d.pointer = this.hands.following ? "following" : "free";
-    d.senses = `loom ${s.loomLeft.toFixed(2)}/${s.loomRight.toFixed(2)} touch ${s.touch.toFixed(2)} bump ${s.bumpLeft.toFixed(2)}/${s.bumpRight.toFixed(2)} wind ${s.wind.toFixed(2)} sweet ${s.sweet.toFixed(2)} grounded ${s.grounded ? 1 : 0}`;
+    d.senses = `loom ${s.loomLeft.toFixed(2)}/${s.loomRight.toFixed(2)} touch ${s.touch.toFixed(2)} bump ${s.bumpLeft.toFixed(2)}/${s.bumpRight.toFixed(2)} wind ${s.wind.toFixed(2)} sweet ${s.sweet.toFixed(2)} grounded ${s.grounded ? 1 : 0} male ${s.maleTaste.toFixed(2)}`;
     d.loom = Math.max(s.loomLeft, s.loomRight).toFixed(3);
     d.touch = s.touch.toFixed(3);
     d.wind = s.wind.toFixed(3);
     d.sweet = s.sweet.toFixed(3);
     d.eaten = life.eaten.toFixed(3);
+    d.hunger = life.hunger.level.toFixed(3);
+    d.fullness = life.hunger.fullness.toFixed(3);
     d.meals = String(life.meals);
     d.food = String(life.pantry.foods.filter(isDropped).length);
     d.prints = String(this.prints.prints.count(this.time));
@@ -1649,6 +1670,8 @@ export class Game implements Shell {
     d.loomPeak = this.peaks.loom.toFixed(3);
     d.loomingHz = this.peaks.looming.toFixed(1);
     d.feed = (life.brain.state?.command.feed ?? 0).toFixed(3);
+    d.sing = (life.brain.state?.command.sing ?? 0).toFixed(3);
+    d.maleTaste = s.maleTaste.toFixed(3);
     d.eyes = this.eyes.inUse ? "brain" : this.eyes.active ? "picture" : "off";
     d.eyesInset = this.inset.state;
     d.nerves = this.nerves.state;
@@ -1666,6 +1689,7 @@ export class Game implements Shell {
     d.frameMs = this.frameMsAverage.toFixed(2);
     d.eyesMs = this.eyes.costMs.toFixed(2);
     d.eyesUpdates = String(this.eyes.updates);
+    d.eyesGain = this.eyes.gain.toFixed(2);
     d.spikesPerSecond = String(Math.round(this.meter.spikesPerSecond));
     d.time = this.stage.light.time;
     d.hours = this.stage.light.hours === null ? "" : this.stage.light.hours.toFixed(2);
