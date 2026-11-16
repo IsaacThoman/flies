@@ -14,6 +14,8 @@ import { shaded } from "../../scene/shade.ts";
 import type { SceneSet } from "../types.ts";
 import { LAWN_Y } from "./backdrop.ts";
 import { Goings } from "./life.ts";
+import { HAPPENINGS } from "./pace.ts";
+import type { Happening } from "./pace.ts";
 import { outside } from "./outside.ts";
 
 /** How many rings can spread on the pool at once. */
@@ -736,6 +738,9 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
       }
     },
     ripple,
+    happen(kind, random) {
+      if ((HAPPENINGS as readonly string[]).includes(kind)) goings.happen(kind as Happening, random);
+    },
     live(dt, around) {
       goings.live(dt, around);
     },

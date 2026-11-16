@@ -24,6 +24,8 @@ export type FlyUniforms = {
   uPixels: { value: number };
   /** Strength of the painted sky reflection used when there is no environment map. */
   uSky: { value: number };
+  /** A dab of paint on the thorax, as researchers mark flies: its colour, and 1 to show it (0 for none). */
+  uMark: { value: THREE.Vector4 };
 };
 
 const JOINT_PARS = (uniform: string, count: number) => /* glsl */ `
@@ -113,6 +115,16 @@ if (vFlyMat.w > 1.5) {
 }
 `;
 
+// A dab of enamel paint on the middle of the scutum, over the hairs, its edge
+// a little soft as paint dries round on a curved back.
+const MARK = /* glsl */ `
+if (vFlyMat.w > 1.5 && uMark.w > 0.0) {
+  vec2 flyDab = (vFlyEye - vec2(21.5, 33.0)) / vec2(4.2, 4.8);
+  float flyPaint = 1.0 - smoothstep(0.8, 1.0, dot(flyDab, flyDab));
+  diffuseColor.rgb = mix(diffuseColor.rgb, uMark.rgb, flyPaint * uMark.w);
+}
+`;
+
 // Compound eye: a hexagonal lattice of facets, each a little dome, fading
 // out when facets get smaller than a pixel (by their screen-space
 // derivatives), plus the pseudopupil: the dark spot where you look straight
@@ -155,12 +167,12 @@ export function createBodyMaterial(uniforms: FlyUniforms): THREE.MeshPhysicalMat
     sheen: 1, sheenRoughness: 0.55, sheenColor: 0xffffff, ior: 1.5,
   });
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, { uJoints: uniforms.uJoints, uPixels: uniforms.uPixels, uSky: uniforms.uSky });
+    Object.assign(shader.uniforms, { uJoints: uniforms.uJoints, uPixels: uniforms.uPixels, uSky: uniforms.uSky, uMark: uniforms.uMark });
     bodyVertex(shader, true);
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>\nvarying vec4 vFlyMat;\nvarying vec2 vFlyEye;\n${SKY}`)
+      .replace("#include <common>", `#include <common>\nvarying vec4 vFlyMat;\nvarying vec2 vFlyEye;\nuniform vec4 uMark;\n${SKY}`)
       .replace("#include <roughnessmap_fragment>", "float roughnessFactor = vFlyMat.x;")
-      .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>\n${EYE}\n${HAIRS}`)
+      .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>\n${EYE}\n${HAIRS}\n${MARK}`)
       .replace(
         "#include <lights_physical_fragment>",
         `#include <lights_physical_fragment>

@@ -314,6 +314,8 @@ export class HandsView {
   #counts: Record<FoodKind, number> = { sugar: 0, honey: 0, berry: 0, water: 0 };
   /** 0 hides the pointer and tool (the wallpaper), 1 shows them. */
   opacity = 1;
+  /** The tool's picture floats by the ring (not for another player's hand, whose ring is enough). */
+  icon = true;
 
   /** The things here that are really in the fly's world, for its eyes: the ball, the feather and the food. */
   get seen(): THREE.Object3D[] {
@@ -367,6 +369,11 @@ export class HandsView {
     this.group.add(this.#puffs);
   }
 
+  /** Colours the pointer's ring: another player's hand at a shared table shows in their colour. */
+  tint(colour: THREE.ColorRepresentation) {
+    (this.#ring.material as THREE.MeshBasicMaterial).color.set(colour);
+  }
+
   #place(kind: FoodKind, x: number, y: number, z: number, scale: number, spin: number) {
     const i = this.#counts[kind];
     if (i >= MAX_FOOD) return;
@@ -402,7 +409,7 @@ export class HandsView {
       const bob = Math.sin(time * 2.4) * size * 0.05;
       const out = size * 1.35 * this.#iconSide;
       icon.position.set(p.x + r.x * out, p.y + size * 0.3 + bob, p.z + r.z * out);
-      icon.visible = id !== "feather";
+      icon.visible = this.icon && id !== "feather";
     } else this.#icon.visible = false;
 
     // Food: falling, and lying where it fell, shrinking as it is eaten.

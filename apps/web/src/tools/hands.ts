@@ -255,6 +255,9 @@ export class Hands {
       if (ball.t >= 1) {
         ball.active = false;
         ball.position.y = -1e4;
+      } else if (ball.t < 0) {
+        // Not thrown yet (at a shared table a throw starts a moment later, the same moment for everyone there): it waits where it will dive from.
+        copy(ball.position, ball.from);
       } else if (ball.t < SWOOP_DIVE) {
         // Straight in at a steady speed: it grows faster and faster in the fly's eyes.
         lerp(ball.position, ball.from, ball.via, ball.t / SWOOP_DIVE);

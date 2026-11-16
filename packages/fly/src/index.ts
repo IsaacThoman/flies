@@ -15,7 +15,11 @@ import { buildWingGeometry, buildWingTexture } from "./wing.ts";
 export type { FlyRig } from "./rig.ts";
 
 /** A FlyModel with its rig exposed, for the viewer and the tests. */
-export type FlyModelWithRig = FlyModel & { readonly rig: FlyRig };
+export type FlyModelWithRig = FlyModel & {
+  readonly rig: FlyRig;
+  /** Paints a dab of colour on its thorax, as researchers mark flies to tell them apart (at a shared table); null for none. */
+  mark(colour: THREE.ColorRepresentation | null): void;
+};
 
 export function createFly(): FlyModelWithRig {
   const rig = new FlyRig();
@@ -26,6 +30,7 @@ export function createFly(): FlyModelWithRig {
     uWingHaze: { value: 0 },
     uPixels: { value: 240 },
     uSky: { value: 0.55 },
+    uMark: { value: new THREE.Vector4(0, 0, 0, 0) },
   };
 
   const object = new THREE.Group();
@@ -68,6 +73,10 @@ export function createFly(): FlyModelWithRig {
     update(pose: FlyPose, dt: number) {
       rig.update(pose, dt);
       uniforms.uWingHaze.value = rig.wingHaze;
+    },
+    mark(colour: THREE.ColorRepresentation | null) {
+      const c = new THREE.Color(colour ?? 0);
+      uniforms.uMark.value.set(c.r, c.g, c.b, colour === null ? 0 : 1);
     },
     anchor(name: FlyAnchor, out: THREE.Vector3) {
       rig.anchorLocal(name, point);

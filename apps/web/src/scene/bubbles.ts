@@ -10,6 +10,8 @@ import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
 import type { Looming } from "@fly/body";
 import type { World } from "@fly/world";
+import { POP_SECONDS } from "@fly/net";
+import type { TableBubbles } from "@fly/net";
 import { random } from "./build.ts";
 
 const VS = /* glsl */ `
@@ -77,6 +79,14 @@ export class Bubbles {
   enabled = true;
   /** How hard it is raining (the weather's rain, 0 to 1). */
   rain = 0;
+  /**
+   * At a shared table the high bubbles are the table's, the same on every
+   * device (packages/net, TableBubbles), at its clock (room seconds); this
+   * device's fly bursting one is told with `burst`. The low ones that bob
+   * past the fly stay each device's own.
+   */
+  table: { bubbles: TableBubbles; time: number; burst: (slot: number, cycle: number, at: number) => void } | null = null;
+  #announced = new Float64Array(BUBBLES).fill(-1);
 
   constructor(parent: THREE.Object3D, world: World) {
     this.#world = world;
@@ -134,9 +144,37 @@ export class Bubbles {
   popNear(point: THREE.Vector3Like, reach: number) {
     if (!this.enabled) return;
     for (const b of this.#bubbles) {
-      if (b.popping > 0) continue;
+      // The table's are burst by the table (a ball's path is known to every device).
+      if (b.popping > 0 || (this.table && !b.low)) continue;
       if (Math.hypot(b.x - point.x, b.y - point.y, b.z - point.z) < b.r + reach) b.popping = 0.001;
     }
+  }
+
+  /** A high bubble at a shared table: where the table's is now, burst as it is, or burst by this fly. */
+  #fromTable(i: number, b: Bubble, fly: THREE.Vector3Like) {
+    const table = this.table!;
+    const slot = i - LOW;
+    const s = table.bubbles.slots[slot];
+    const t = table.time;
+    if (!s) return;
+    b.r = s.r;
+    b.phase = s.phase;
+    if (table.bubbles.alive(s, t)) {
+      table.bubbles.position(s, t, b);
+      b.popping = 0;
+      if (Math.hypot(b.x - fly.x, b.y - fly.y, b.z - fly.z) < b.r + FLY_LENGTH / 2 && table.bubbles.pop(slot, s.cycle, t)) {
+        this.brushed = BUBBLE_TOUCH;
+        table.burst(slot, s.cycle, t);
+      } else return;
+    }
+    if (s.poppedAt >= 0 && t - s.poppedAt < POP_SECONDS) {
+      table.bubbles.position(s, s.poppedAt, b);
+      b.popping = t - s.poppedAt + 0.001;
+      if (this.#announced[i] !== s.poppedAt) {
+        this.#announced[i] = s.poppedAt;
+        this.popped.push(this.#pool[i].set(b.x, b.y, b.z));
+      }
+    } else b.popping = 1;
   }
 
   /** Moves the bubbles on. `fly` is the fly's middle: a bubble that reaches it bursts on it. */
@@ -151,6 +189,10 @@ export class Bubbles {
     for (let i = 0; i < this.#bubbles.length; i++) {
       const b = this.#bubbles[i];
       b.age += dt;
+      if (this.table && !b.low) {
+        this.#fromTable(i, b, fly);
+        continue;
+      }
       if (b.popping > 0) {
         b.popping += dt;
         b.wait -= dt;

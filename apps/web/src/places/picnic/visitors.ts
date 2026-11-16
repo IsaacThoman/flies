@@ -104,6 +104,8 @@ function wingTexture() {
 
 export class Butterfly {
   readonly mesh: THREE.Mesh;
+  /** Where its chances come from: its own, or at a shared table the room's for this visit (packages/net), so every device sees the same visit. */
+  random: () => number = Math.random;
   readonly looming: Looming = { id: 3001, position: { x: 0, y: -1e4, z: 0 }, r: WING };
   active = false;
   readonly #flap = { value: 0 };
@@ -156,15 +158,15 @@ export class Butterfly {
 
   /** Comes in from off the table, over a point or two (perhaps settling on one), and away the other side. */
   start(world: World, fly: Vec3) {
-    const a = Math.random() * TAU;
+    const a = this.random() * TAU;
     const out = 620;
     const clear = (x: number, z: number) => Math.hypot(x - fly.x, z - fly.z) > BUTTERFLY_CLEAR + 20;
     this.#legs = [];
-    const stops = 1 + Math.floor(Math.random() * 2.5);
+    const stops = 1 + Math.floor(this.random() * 2.5);
     let perched = false;
     for (let i = 0; i < 20 && this.#legs.length < stops; i++) {
-      if (!perched && Math.random() < 0.6) {
-        const perch = PERCHES[Math.floor(Math.random() * PERCHES.length)];
+      if (!perched && this.random() < 0.6) {
+        const perch = PERCHES[Math.floor(this.random() * PERCHES.length)];
         if (clear(perch.x, perch.z)) {
           // Settling from above it.
           const top = world.heightAt(perch.x, perch.z);
@@ -174,15 +176,15 @@ export class Butterfly {
           continue;
         }
       }
-      const r = Math.sqrt(Math.random()) * 250;
-      const b = Math.random() * TAU;
+      const r = Math.sqrt(this.random()) * 250;
+      const b = this.random() * TAU;
       const x = Math.cos(b) * r;
       const z = Math.sin(b) * r;
-      if (clear(x, z)) this.#legs.push({ x, y: world.heightAt(x, z) + 30 + Math.random() * 70, z, perch: false });
+      if (clear(x, z)) this.#legs.push({ x, y: world.heightAt(x, z) + 30 + this.random() * 70, z, perch: false });
     }
-    const away = a + Math.PI + (Math.random() - 0.5) * 2;
-    this.#legs.push({ x: Math.cos(away) * out, y: 120 + Math.random() * 80, z: Math.sin(away) * out, perch: false });
-    this.#p.set(Math.cos(a) * out, 90 + Math.random() * 80, Math.sin(a) * out);
+    const away = a + Math.PI + (this.random() - 0.5) * 2;
+    this.#legs.push({ x: Math.cos(away) * out, y: 120 + this.random() * 80, z: Math.sin(away) * out, perch: false });
+    this.#p.set(Math.cos(a) * out, 90 + this.random() * 80, Math.sin(a) * out);
     this.#v.set(0, 0, 0);
     this.#leg = 0;
     this.#perched = 0;
@@ -218,8 +220,8 @@ export class Butterfly {
         }
         if (leg.perch) {
           p.set(leg.x, leg.y, leg.z);
-          this.#perched = 6 + Math.random() * 9;
-          this.#open = Math.random() * 3;
+          this.#perched = 6 + this.random() * 9;
+          this.#open = this.random() * 3;
         } else this.#leg++;
       }
       // Toward the next point, slowing to settle; away from the fly if it is close.
@@ -316,6 +318,8 @@ if (vColor.r > 0.5 && vColor.g < 0.4) {
 
 export class Ladybird {
   readonly mesh: THREE.Mesh;
+  /** Where its chances come from: its own, or at a shared table the room's for this visit (packages/net), so every device sees the same visit. */
+  random: () => number = Math.random;
   readonly looming: Looming = { id: 3002, position: { x: 0, y: -1e4, z: 0 }, r: 3.5 };
   active = false;
   readonly #stride = { value: 0 };
@@ -352,17 +356,17 @@ export class Ladybird {
   start(fly: Vec3) {
     let a = 0;
     for (let i = 0; i < 20; i++) {
-      a = Math.random() * TAU;
+      a = this.random() * TAU;
       if (Math.hypot(Math.cos(a) * TABLE_RADIUS - fly.x, Math.sin(a) * TABLE_RADIUS - fly.z) > 140) break;
     }
-    this.#exit = a + Math.PI + (Math.random() - 0.5) * 1.6;
+    this.#exit = a + Math.PI + (this.random() - 0.5) * 1.6;
     this.#p.x = Math.cos(a) * (TABLE_RADIUS - 3);
     this.#p.z = Math.sin(a) * (TABLE_RADIUS - 3);
     this.#heading = Math.atan2(-this.#p.x, -this.#p.z);
     this.#rim = 0;
     this.#leaving = false;
     this.#age = 0;
-    this.#seed = Math.random() * 100;
+    this.#seed = this.random() * 100;
     this.active = true;
     this.mesh.visible = true;
   }
@@ -544,6 +548,8 @@ type LooseState = "off" | "falling" | "lying" | "sliding" | "dropping";
 /** The table's own leaf, and a loose one that comes down on a gust. */
 export class Leaves {
   readonly resting: THREE.Mesh;
+  /** Where its chances come from: its own, or at a shared table the room's for this visit (packages/net), so every device sees the same visit. */
+  random: () => number = Math.random;
   readonly loose: THREE.Mesh;
   readonly looming: Looming = { id: 3003, position: { x: 0, y: -1e4, z: 0 }, r: 15 };
   state: LooseState = "off";
@@ -590,20 +596,20 @@ export class Leaves {
     const speed = Math.hypot(gust.x, gust.z) || 1;
     const wx = gust.x / speed;
     const wz = gust.z / speed;
-    this.#fall = 2.6 + Math.random() * 1.2;
+    this.#fall = 2.6 + this.random() * 1.2;
     const drift = Math.min(420, speed * 0.35 * this.#fall);
     for (let tries = 0; tries < 12; tries++) {
-      const r = Math.sqrt(Math.random()) * (TABLE_RADIUS - 40);
-      const a = Math.random() * TAU;
+      const r = Math.sqrt(this.random()) * (TABLE_RADIUS - 40);
+      const a = this.random() * TAU;
       const x = Math.cos(a) * r;
       const z = Math.sin(a) * r;
       if (Math.hypot(x - fly.x, z - fly.z) < 30 || Math.hypot(x - DECOR.leaf.x, z - DECOR.leaf.z) < 50) continue;
       this.#to.set(x, 0.14, z);
-      this.#from.set(x - wx * drift, 240 + Math.random() * 80, z - wz * drift);
+      this.#from.set(x - wx * drift, 240 + this.random() * 80, z - wz * drift);
       if (!this.#clearAllWay(world)) continue;
       this.#side = Math.atan2(wx, wz) + Math.PI / 2;
-      this.#yaw = Math.random() * TAU;
-      this.#spin = (Math.random() - 0.5) * 1.5;
+      this.#yaw = this.random() * TAU;
+      this.#spin = (this.random() - 0.5) * 1.5;
       this.#t = 0;
       this.#brushed = false;
       this.state = "falling";

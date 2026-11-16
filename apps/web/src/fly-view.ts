@@ -5,11 +5,12 @@
 
 import * as THREE from "three";
 import { createFly } from "@fly/fly";
-import type { FlyModel, FlyPose } from "@fly/contracts";
+import type { FlyModelWithRig } from "@fly/fly";
+import type { FlyPose } from "@fly/contracts";
 import { RESTING_POSE } from "@fly/contracts";
 import { FLY_LENGTH } from "@fly/body";
 import type { FlyBody, Intent } from "@fly/body";
-import type { World } from "@fly/world";
+import type { Vec3, World } from "@fly/world";
 import { canvas2d, canvasTexture } from "./scene/build.ts";
 import { shaded } from "./scene/shade.ts";
 
@@ -25,7 +26,7 @@ function shadowTexture() {
 }
 
 export class FlyView {
-  readonly model: FlyModel;
+  readonly model: FlyModelWithRig;
   readonly root = new THREE.Group();
   readonly pose: FlyPose = { ...RESTING_POSE };
   readonly shadow: THREE.Mesh;
@@ -72,11 +73,14 @@ export class FlyView {
     pose.pitch = airborne ? Math.max(-0.6, Math.min(0.8, Math.atan2(v.y, Math.max(60, horizontal)) * 0.6)) : 0;
     pose.roll = airborne ? Math.max(-0.6, Math.min(0.6, -body.turnRate * 0.12)) : 0;
     this.model.update(pose, dt);
+    this.place(body.position, body.yaw, body.up);
+  }
 
-    const p = body.position;
+  /** Puts the model where a fly is, facing `yaw` and tilted to `up`, with its shadow; pose it first (another player's fly is posed from what its device sent). */
+  place(p: Vec3, yaw: number, up: Vec3) {
     this.root.position.set(p.x, p.y, p.z);
-    this.#up.set(body.up.x, body.up.y, body.up.z);
-    this.#yaw.setFromAxisAngle(AXIS_Y, body.yaw);
+    this.#up.set(up.x, up.y, up.z);
+    this.#yaw.setFromAxisAngle(AXIS_Y, yaw);
     this.#tilt.setFromUnitVectors(AXIS_Y, this.#up);
     // In the air the model pitches and rolls itself from the pose (the FlyModel contract); here only its heading and the ground's tilt.
     this.#q.copy(this.#tilt).multiply(this.#yaw);
@@ -87,12 +91,23 @@ export class FlyView {
     const height = Math.max(0, p.y - surface.y);
     const size = FLY_LENGTH * (1.1 + height * 0.02);
     const fade = Math.max(0, 1 - height / 120);
-    this.shadow.visible = surface.onTable && fade > 0.02;
+    this.shadow.visible = this.root.visible && surface.onTable && fade > 0.02;
     this.shadow.position.set(p.x, surface.y + 0.02, p.z);
     this.#shadowNormal.set(surface.normal.x, surface.normal.y, surface.normal.z);
     this.shadow.quaternion.setFromUnitVectors(AXIS_Y, this.#shadowNormal).multiply(this.#yaw);
     this.shadow.scale.set(size * 0.6, 1, size);
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = fade;
+  }
+
+  /** Takes it out of the world (another player's fly, when its player leaves). */
+  dispose() {
+    this.root.removeFromParent();
+    this.shadow.removeFromParent();
+    this.model.dispose();
+    this.shadow.geometry.dispose();
+    const material = this.shadow.material as THREE.MeshBasicMaterial;
+    material.map?.dispose();
+    material.dispose();
   }
 }
 
