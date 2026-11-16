@@ -7,6 +7,7 @@ import { test } from "node:test";
 import type { TableSocket, TableSocketStatus, TextEntry, TextRequest } from "@fly/contracts";
 import { CLOSE, MAX_PLAYERS, PROTOCOL } from "@fly/net";
 import type { RoomWire } from "@fly/net";
+import { HitMap } from "@fly/ui";
 import type { ActionItem, FieldItem } from "@fly/ui";
 import { TV_FRAME } from "../src/display.ts";
 import { Lobby } from "../src/online/lobby.ts";
@@ -14,7 +15,9 @@ import { suggestName } from "../src/online/invite.ts";
 import { placeInfo } from "../src/places/catalog.ts";
 import { DEFAULT_SETTINGS } from "../src/settings.ts";
 import { OnlineScreen } from "../src/ui/screens/online.ts";
+import { NativeTextEntry } from "../src/ui/text-entry.ts";
 import type { Knock, NewRoom, Shell, TableNow } from "../src/ui/screens/types.ts";
+import { blankCanvas, writtenOn } from "./canvas.ts";
 
 /** Typing as a browser's input would: the test types, and presses Return or Escape. */
 class FakeTyping implements TextEntry {
@@ -53,7 +56,7 @@ const ROOMS: RoomWire[] = [
   { code: "cccccccccc", name: "Packed", place: "picnic", flies: MAX_PLAYERS, locked: false },
 ];
 
-function world() {
+function world(canShare = true) {
   const typing = new FakeTyping();
   const did: string[] = [];
   const state = { rooms: null as RoomWire[] | null, table: null as TableNow | null, knock: null as Knock | null, ended: null as Shell["tableEnded"], started: null as NewRoom | null };
@@ -89,6 +92,7 @@ function world() {
       return state.rooms;
     },
     typing,
+    canShare,
     startRoom(room) {
       state.started = room;
       did.push(`start ${room.name}`);
@@ -148,7 +152,7 @@ test("an open room is joined by choosing it; a locked one shows its door, where 
   const join = () => screen.menu.items.find((i) => i.id === "join")!;
   assert.equal(join().disabled, true, "nothing to go in with yet");
   press("select");
-  assert.deepEqual(typing.request, { id: "password", kind: "password", value: "", max: 64 });
+  assert.deepEqual(typing.request, { id: "password", kind: "password", value: "", max: 64, label: "Password" });
   typing.type("hunter2");
   step();
   const field = screen.menu.items[0] as FieldItem;
@@ -181,11 +185,11 @@ test("while the door opens it says so, and once in, the room's own face: its nam
   state.knock = { code: "bbbbbbbbbb", name: "Secret Sugar", wrong: false, seq: 1 };
   step();
   assert.equal(screen.view, "door");
-  state.table = { name: null, starting: false, joined: false, others: [] };
+  state.table = { name: null, code: "bbbbbbbbbb", link: "https://x/?table=bbbbbbbbbb", starting: false, joined: false, others: [] };
   step();
   assert.equal(screen.view, "door", "on its way in");
   assert.deepEqual(screen.menu.items.map((i) => [i.id, i.label, !!i.disabled]), [["password", "Password", true], ["join", "Joining…", true]]);
-  state.table = { name: "Secret Sugar", starting: false, joined: true, others: [{ id: 1, colour: "#ffd21f" }] };
+  state.table = { name: "Secret Sugar", code: "bbbbbbbbbb", link: "https://x/?table=bbbbbbbbbb", starting: false, joined: true, others: [{ id: 1, colour: "#ffd21f" }] };
   state.knock = null;
   step();
   assert.equal(screen.view, "room");
@@ -193,6 +197,48 @@ test("while the door opens it says so, and once in, the room's own face: its nam
   screen.press("down", false);
   screen.press("select", false);
   assert.deepEqual(did, ["leave"]);
+});
+
+test("at a room, its QR code and its code beside the menu, once in; Share only where a link can be handed on", () => {
+  for (const canShare of [true, false]) {
+    const { screen, state, step } = world(canShare);
+    state.table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://x/?table=abcdefghjk", starting: false, joined: true, others: [] };
+    step();
+    assert.deepEqual(screen.menu.items.map((i) => i.id), canShare ? ["share", "leave"] : ["leave"]);
+    const g = blankCanvas();
+    screen.draw(g, 0, new HitMap());
+    // The code in two halves, read in groups of five and typed as one.
+    assert.deepEqual(writtenOn(g).filter((w) => /^[a-z]{5}$/.test(w.text)).map((w) => w.text), ["abcde", "fghjk"]);
+  }
+  // On the way in there is no card yet.
+  const { screen, state, step } = world();
+  state.table = { name: null, code: "abcdefghjk", link: "https://x/?table=abcdefghjk", starting: false, joined: false, others: [] };
+  step();
+  const g = blankCanvas();
+  screen.draw(g, 0, new HitMap());
+  assert.ok(!writtenOn(g).some((w) => w.text === "abcde"));
+});
+
+test("on the Apple TV a field is typed on the system's keyboard: the whole of it at once, Back giving up, another field or leaving taking it down", () => {
+  const asked: { title: string; value: string; kind: string; done: (text: string | null) => void }[] = [];
+  let closed = 0;
+  const typing = new NativeTextEntry({ ask: (title, value, kind, done) => asked.push({ title, value, kind, done }), close: () => closed++ });
+  typing.begin({ id: "code", kind: "code", value: "", max: 10, label: "Code" });
+  assert.deepEqual([typing.active, asked[0].title, asked[0].kind], ["code", "Code", "code"]);
+  assert.equal(typing.take(), null, "nothing until the keyboard answers");
+  asked[0].done("ABCDEFGHJKLM");
+  assert.deepEqual([typing.active, typing.value, typing.caret, typing.take(), typing.take()], [null, "ABCDEFGHJK", 10, "done", null], "as typed, to the field's length");
+  typing.begin({ id: "password", kind: "password", value: "old", max: 32, label: "Password" });
+  asked[1].done(null);
+  assert.deepEqual([typing.value, typing.take()], ["old", "cancel"], "going back keeps what it held");
+  typing.begin({ id: "name", kind: "name", value: "a", max: 24 });
+  typing.begin({ id: "password", kind: "new-password", value: "", max: 32 });
+  asked[2].done(null);
+  assert.equal(typing.active, "password", "an answer to a question since given up is no one's");
+  typing.end();
+  assert.equal(closed, 1);
+  asked[3].done("late");
+  assert.deepEqual([typing.active, typing.value, typing.take()], [null, "", null]);
 });
 
 test("a new room: a name suggested, the place the fly is in, listed, no password; a name that can't be one is said so; Create makes it", () => {
@@ -240,7 +286,7 @@ test("a code typed and Return joins its room; one that can't be a code is said s
   const { screen, typing, did, press, focus, step } = world();
   focus("code");
   press("select");
-  assert.deepEqual(typing.request, { id: "code", kind: "code", value: "", max: 10 });
+  assert.deepEqual(typing.request, { id: "code", kind: "code", value: "", max: 10, label: "Code" });
   typing.type("nope");
   typing.finish("done");
   step();

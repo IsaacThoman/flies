@@ -4,6 +4,7 @@
 // build` into apps/tvos/dist/, with the web build's public files beside it.
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
+import { appSite } from '../../scripts/webBuild.ts';
 
 const root = (path: string) => fileURLToPath(new URL(`../../${path}`, import.meta.url));
 
@@ -11,7 +12,8 @@ export default defineConfig({
   root: root('apps/web'),
   publicDir: root('apps/web/public'),
   // Classic scripts have no import.meta; the host's page URL stands in for the script's.
-  define: { 'import.meta.url': JSON.stringify('http://fly.local/game.js') },
+  // The app's room server and the site its invitations open (apps/web/src/online/invite.ts).
+  define: { 'import.meta.url': JSON.stringify('http://fly.local/game.js'), ...appSite() },
   worker: { format: 'iife' },
   build: {
     outDir: root('apps/tvos/dist'),

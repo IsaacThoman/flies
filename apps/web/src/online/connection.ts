@@ -56,6 +56,8 @@ export class TableLine {
   /** When to open the line again (s, by `update`'s clock), and how many tries since it last worked. */
   #retryAt = 0;
   #tries = 0;
+  /** Shown again while the line may have closed unseen (a host closes it in the background): if it has, open it again at once. */
+  #hurried = false;
   #time = 0;
   readonly #text = (m: string) => this.#receiveText(m);
   readonly #binary = (view: DataView) => this.#receiveBinary(view);
@@ -156,6 +158,7 @@ export class TableLine {
       this.#dropped(socket);
       return;
     }
+    this.#hurried = false;
     if (this.status !== "joined") return;
     const now = performance.now();
     const every = this.#pings < FIRST_PINGS ? PING_FIRST_EVERY : PING_EVERY;
@@ -175,14 +178,17 @@ export class TableLine {
       return;
     }
     if (this.status === "joined") this.status = "lost";
-    const wait = socket.closeCode === CLOSE.restart ? RESTART_SPREAD[0] + Math.random() * (RESTART_SPREAD[1] - RESTART_SPREAD[0]) : RETRY[Math.min(this.#tries, RETRY.length - 1)] * (0.8 + Math.random() * 0.4);
+    const wait = this.#hurried ? 0 : socket.closeCode === CLOSE.restart ? RESTART_SPREAD[0] + Math.random() * (RESTART_SPREAD[1] - RESTART_SPREAD[0]) : RETRY[Math.min(this.#tries, RETRY.length - 1)] * (0.8 + Math.random() * 0.4);
+    this.#hurried = false;
     this.#tries++;
     this.#retryAt = this.#time + wait;
   }
 
   /** Comes back now rather than when the next try is due: the page has just been shown again, or the network is back. */
   hurry() {
-    if (!this.#socket && this.status !== "refused") this.#retryAt = this.#time;
+    if (this.status === "refused") return;
+    if (this.#socket) this.#hurried = true;
+    else this.#retryAt = this.#time;
   }
 
   /** Leaves the table: says so, and closes the line for good. */

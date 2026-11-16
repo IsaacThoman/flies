@@ -70,6 +70,8 @@ export class Stage {
   #envScene: THREE.Scene;
   #env: THREE.WebGLRenderTarget | null = null;
   #envDirty = true;
+  /** The reflections were rebuilt this frame: the eyes wait a frame rather than add their own passes to it. */
+  reflected = false;
   /** The light the reflections were last built from, to tell when they are out of date. */
   #envLight = { zenith: new THREE.Color(), horizon: new THREE.Color(), ground: new THREE.Color(), sun: new THREE.Color(), direction: new THREE.Vector3() };
   #lowRes: THREE.WebGLRenderTarget | null = null;
@@ -229,6 +231,7 @@ export class Stage {
     if (!this.#envDirty || (this.#env && this.#envAge < 0.4)) return;
     this.#envDirty = false;
     this.#envAge = 0;
+    this.reflected = true;
     const l = this.light;
     const e = this.#envLight;
     e.zenith.copy(l.zenith);
@@ -316,6 +319,7 @@ export class Stage {
   /** Starts a frame's cost count. */
   beginFrame() {
     this.renderer.info.reset();
+    this.reflected = false;
   }
 
   /** The frame's cost so far. */

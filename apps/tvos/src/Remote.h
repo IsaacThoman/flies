@@ -9,6 +9,10 @@
 @interface Remote : NSObject
 - (instancetype)initWithHost:(JSHost *)host;
 
+/** While the system's keyboard is up the remote is its: the game gets nothing, and what it was
+ *  holding is let go as the keyboard comes up. */
+@property(nonatomic) BOOL muted;
+
 /** UIKit presses. Each returns the presses the game didn't take, for the responder chain:
  *  Back at the root of the game, and buttons the game has no key for. */
 - (NSSet<UIPress *> *)pressesBegan:(NSSet<UIPress *> *)presses;

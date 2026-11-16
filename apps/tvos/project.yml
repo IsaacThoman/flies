@@ -4,13 +4,16 @@
 name: Flies
 # The version, shared with the iPhone and iPad app (version.yml); the weather outside, off unless
 # scripts/tvos.ts turns it on: the service (weather.yml), and WeatherKit's entitlement and location
-# usage string (weatherkit.yml).
+# usage string (weatherkit.yml); and plain ws:// to a local room server, only in builds for one
+# (local-rooms.yml).
 include:
   - ../version.yml
   - path: weather.yml
     enable: ${TVOS_WEATHER}
   - path: weatherkit.yml
     enable: ${TVOS_WEATHERKIT_ENTITLED}
+  - path: local-rooms.yml
+    enable: ${TVOS_LOCAL_ROOMS}
 options:
   deploymentTarget:
     tvOS: "26.0"

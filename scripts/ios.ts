@@ -14,25 +14,31 @@ const www = path.join(appDir, 'www');
 export const BUNDLE_ID = process.env.IOS_BUNDLE_ID || TVOS_BUNDLE_ID;
 const TEAM_ID = process.env.IOS_TEAM_ID || TVOS_TEAM_ID;
 const CONNECTOME = path.join(root, 'packages/brain/data/connectome.bin');
+/** Table links open the app, and AutoFill offers the site's passwords: off unless the App ID has Associated Domains (docs/ios.md). */
+const LINKS = /^(1|true|yes|on)$/i.test(process.env.IOS_LINKS ?? '');
 
 const USAGE = `Usage: npm run ios -- [<command>] [options]
 
-  (no command) [--sim <udid>] [--report <seconds>]
+  (no command) [--sim <udid>] [--report <seconds>] [--rooms <url>]
         build for the simulator, then run it in the given simulator, or the one iOS simulator
         that is booted
   build [--sim] [--debug] [--for-testing]
         build the web app (apps/web) with the brain into apps/ios/www/, generate the Xcode
         project and build the app for an iPhone or iPad (or, with --sim, the iOS simulator).
         --for-testing (implies --debug) also builds the tests that npm run ios:check runs
-  run (--sim <udid> | --device <udid>) [--debug] [--report <seconds>]
+  run (--sim <udid> | --device <udid>) [--debug] [--report <seconds>] [--rooms <url>]
         install the built app and launch it, printing its console. --report prints the game's
-        state that often (docs/ios.md, "Reports")
+        state that often (docs/ios.md, "Reports"); --rooms points its tables at another room
+        server, such as ws://127.0.0.1:8787/rooms (npm run rooms)
   archive --version <x.y.z> [--build-number <n>] [--upload]
         build the web app as build does and archive the app for the App Store (see Archive
         options and docs/release.md)
 
 Signing uses IOS_TEAM_ID and IOS_BUNDLE_ID, which default to the Apple TV app's
-(TVOS_TEAM_ID, TVOS_BUNDLE_ID: now ${TEAM_ID} and ${BUNDLE_ID}).
+(TVOS_TEAM_ID, TVOS_BUNDLE_ID: now ${TEAM_ID} and ${BUNDLE_ID}). IOS_LINKS=1 builds in universal
+links and the site's passwords (the Associated Domains entitlement), which signing for a device
+needs the App ID to have the capability for first: see docs/ios.md, "Universal links".
+ROOMS_URL=<url> builds in another room server than the site's.
 
 ${ARCHIVE_USAGE}`;
 
@@ -54,7 +60,7 @@ function prepare() {
   run('npx', ['vite', 'build', '--outDir', www, '--emptyOutDir', '--logLevel', 'warn']);
   const brain = path.join(www, 'brain');
   if (!existsSync(brain) || !readdirSync(brain).some((f) => f.startsWith('connectome.'))) throw Error('The web build has no brain in it');
-  const env = { ...process.env, IOS_TEAM_ID: TEAM_ID, IOS_BUNDLE_ID: BUNDLE_ID };
+  const env = { ...process.env, IOS_TEAM_ID: TEAM_ID, IOS_BUNDLE_ID: BUNDLE_ID, IOS_LINKS: String(LINKS) };
   run('xcodegen', ['generate', '--quiet'], appDir, env);
   return env;
 }
@@ -74,11 +80,11 @@ export function build(options: BuildOptions) {
     ...(options.sim ? ['CODE_SIGN_IDENTITY=-', 'CODE_SIGN_STYLE=Manual', 'DEVELOPMENT_TEAM=', 'ARCHS=arm64'] : ['-allowProvisioningUpdates', '-allowProvisioningDeviceRegistration']),
     '-quiet', options.forTesting ? 'build-for-testing' : 'build',
   ], appDir, env);
-  console.log(`Built ${path.relative(root, appPath(options.sim, debug))}${options.forTesting ? ' and its tests' : ''}`);
+  console.log(`Built ${path.relative(root, appPath(options.sim, debug))}${options.forTesting ? ' and its tests' : ''}${LINKS ? ' with universal links' : ''}`);
 }
 
-function launch(target: { sim?: string; device?: string }, debug: boolean, report: string | undefined) {
-  const args = report ? ['-FlyReport', report] : [];
+function launch(target: { sim?: string; device?: string }, debug: boolean, report: string | undefined, rooms: string | undefined) {
+  const args = [...(report ? ['-FlyReport', report] : []), ...(rooms ? ['-FlyRooms', rooms] : [])];
   if (target.sim) {
     // Already booted is fine.
     spawnSync('xcrun', ['simctl', 'boot', target.sim], { stdio: 'ignore' });
@@ -110,19 +116,21 @@ function main() {
   if (cmd === 'help' || has('--help')) return console.log(USAGE);
   if (!cmd) {
     const sim = flag('--sim') ?? bootedSimulator();
-    const report = flag('--report');
+    const report = flag('--report'), rooms = flag('--rooms');
     build({ sim: true, debug: false, forTesting: false });
-    return launch({ sim }, false, report);
+    return launch({ sim }, false, report, rooms);
   }
   if (cmd === 'build') return build({ sim: has('--sim'), debug: has('--debug'), forTesting: has('--for-testing') });
   if (cmd === 'archive') {
+    // A release reaches the site's room server; ROOMS_URL is for development builds.
+    if (process.env.ROOMS_URL) throw Error('An archive is a release: unset ROOMS_URL, which points a development build at another room server.');
     const options = archiveOptions(flag('--version'), flag('--build-number'), has('--upload'));
     return archive({ appDir, platform: 'iOS', teamId: TEAM_ID, env: prepare() }, options);
   }
   if (cmd === 'run') {
-    const sim = flag('--sim'), device = flag('--device'), report = flag('--report');
+    const sim = flag('--sim'), device = flag('--device'), report = flag('--report'), rooms = flag('--rooms');
     if (!sim && !device) throw Error('run needs --sim <udid> or --device <udid>');
-    return launch({ sim, device }, has('--debug'), report);
+    return launch({ sim, device }, has('--debug'), report, rooms);
   }
   throw Error(`Unknown command ${cmd}\n\n${USAGE}`);
 }

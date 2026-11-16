@@ -7,7 +7,8 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { chromium } from "playwright";
 import { fullChromiumPath, gpuFlags, readState, waitFor } from "./play.ts";
-import { cacheControl, TYPES } from "./serve.ts";
+import { cacheControl, contentType } from "./serve.ts";
+import { SITE_ASSOCIATION } from "./webBuild.ts";
 
 const { values } = parseArgs({ options: { url: { type: "string", default: "http://localhost/" }, dir: { type: "string", default: "dist" } } });
 const base = new URL(values.url);
@@ -23,8 +24,7 @@ console.log("· HEAD every built file: MIME type, cache lifetime, byte ranges, n
 for (const file of files) {
   const response = await fetch(new URL(file, base), { method: "HEAD", headers: { "Accept-Encoding": "gzip" } });
   assert.equal(response.status, 200, file);
-  const type = TYPES[path.extname(file)] ?? (file.endsWith(".wasm") ? "application/wasm" : "application/octet-stream");
-  assert.equal(response.headers.get("content-type")?.split(";")[0], type.split(";")[0], file);
+  assert.equal(response.headers.get("content-type")?.split(";")[0], contentType(file).split(";")[0], file);
   assert.equal(response.headers.get("cache-control"), cacheControl(file), file);
   if (/\.bin$|\.png$/.test(file)) {
     assert.equal(response.headers.get("content-encoding"), null, file);
@@ -37,7 +37,8 @@ const spa = await fetch(new URL("a-page-that-does-not-exist", base));
 assert.equal(spa.status, 200);
 assert.equal(spa.headers.get("cache-control"), "no-cache");
 assert.match(spa.headers.get("content-type") ?? "", /^text\/html/);
-for (const file of ["brain/missing.bin", "assets/missing.js"]) {
+// Without APPLE_TEAM_ID the build has no association, and Apple's devices must be told so, not handed the page.
+for (const file of ["brain/missing.bin", "assets/missing.js", ...(files.includes(SITE_ASSOCIATION) ? [] : [SITE_ASSOCIATION])]) {
   assert.equal((await fetch(new URL(file, base))).status, 404, file);
 }
 const script = files.find((file) => /^assets\/index-.*\.js$/.test(file));

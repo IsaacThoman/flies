@@ -39,9 +39,10 @@
 	handle {
 		root * /srv
 		route {
-			# Missing data or scripts must be 404s, never the SPA entry.
+			# Missing data or scripts must be 404s, never the SPA entry; so must the
+			# app site association when the build has none (no APPLE_TEAM_ID).
 			@spa {
-				not path /assets/* /brain/* /sw.js /manifest.webmanifest *.wasm
+				not path /assets/* /brain/* /sw.js /manifest.webmanifest *.wasm /.well-known/*
 				not file {path}
 			}
 			rewrite @spa /index.html
@@ -57,6 +58,9 @@
 			header @binary Content-Type application/octet-stream
 			@wasm path *.wasm
 			header @wasm Content-Type application/wasm
+			# It has no extension; Apple's devices read it only as JSON.
+			@association path /.well-known/apple-app-site-association
+			header @association Content-Type application/json
 
 			# Brain parts are gzip streams decoded by the worker; PNGs are compressed too.
 			encode zstd gzip {

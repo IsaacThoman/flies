@@ -57,6 +57,7 @@ static NSString *KeyForPress(UIPressType type) {
 // The dpad reads exactly (0, 0) once the finger has lifted; the position stays where it was, as
 // the contract asks. Whether a finger is down comes from UIKit's touches when it has any.
 - (void)dpadX:(float)x y:(float)y {
+  if (_muted) return;
   if (x == 0 && y == 0) {
     if (!_uikitTouching) [self touchAtX:_x y:_y touching:NO];
     return;
@@ -66,11 +67,12 @@ static NSString *KeyForPress(UIPressType type) {
 
 - (void)touching:(BOOL)touching {
   _uikitTouching = touching;
+  if (_muted) return;
   [self touchAtX:_x y:_y touching:touching];
 }
 
 - (void)touchAtX:(float)x y:(float)y touching:(BOOL)touching {
-  if (x == _x && y == _y && touching == _touching) return;
+  if (_muted || (x == _x && y == _y && touching == _touching)) return;
   _x = std::clamp(x, -1.f, 1.f);
   _y = std::clamp(y, -1.f, 1.f);
   _touching = touching;
@@ -101,14 +103,26 @@ static NSString *KeyForPress(UIPressType type) {
 }
 
 - (void)tap:(NSString *)key {
-  if (_held[key]) return;
+  if (_muted || _held[key]) return;
   [_host sendKey:key code:key type:@"keydown" repeat:NO];
   [_host sendKey:key code:key type:@"keyup" repeat:NO];
+}
+
+- (void)setMuted:(BOOL)muted {
+  _muted = muted;
+  if (!muted) return;
+  // Released as far as the game knows: no key left down repeating, no finger left on the surface.
+  for (NSString *key in _held.allKeys) [self keyUp:key];
+  if (_touching) {
+    _touching = NO;
+    [_host sendTouchX:_x y:_y touching:NO];
+  }
 }
 
 // Whether the game takes a press is decided once, when it begins: a Back press that began at
 // the root goes to tvOS (which leaves the app) even if the game moves on meanwhile.
 - (NSSet<UIPress *> *)pressesBegan:(NSSet<UIPress *> *)presses {
+  if (_muted) return presses;
   NSMutableSet *others = [NSMutableSet set];
   for (UIPress *press in presses) {
     NSString *key = KeyForPress(press.type);
@@ -131,6 +145,10 @@ static NSString *KeyForPress(UIPressType type) {
 }
 
 - (void)scriptedPress:(NSString *)key holdMs:(double)ms {
+  if (_muted) {
+    HostLog(0, [NSString stringWithFormat:@"input: %@ goes to the keyboard, not the game", key]);
+    return;
+  }
   if ([key isEqual:@"Escape"] && _host.atRoot) {
     HostLog(0, @"input: Back at the root goes to tvOS, which leaves the app");
     return;

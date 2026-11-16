@@ -62,7 +62,8 @@ replace('navigator', {
   platform: 'AppleTV', vendor: 'Apple Computer, Inc.', language: 'en-US', languages: ['en-US', 'en'], onLine: true,
   hardwareConcurrency: 6, maxTouchPoints: 0, cookieEnabled: false, webdriver: false, deviceMemory: 4,
   userActivation: { hasBeenActive: true, isActive: true }, getGamepads: () => [], vibrate: () => false,
-  sendBeacon: () => false, clipboard: { writeText: () => Promise.reject(new Error('no clipboard')) },
+  // No clipboard and no share sheet: a page that looks for them finds none.
+  sendBeacon: () => false,
 });
 
 // document and DOM classes, with the web build's canvas (apps/web/index.html)
