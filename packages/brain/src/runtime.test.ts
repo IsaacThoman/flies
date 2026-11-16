@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
 import { BACKGROUND, READOUTS, SCALES, SENSES, backgroundRates, balanceFactor, decode, intensity, outputSynapses, senseRates, smooth, wire } from "./io.ts";
+import { REGIONS, REGION_RATE_NAMES } from "./regions.ts";
 import { createBrain, FlyBrain, MAX_TICK_MS } from "./runtime.ts";
 import { InternalState, Wander, normals } from "./state.ts";
 import { bufferOf, syntheticConnectome, syntheticEyeColumns } from "./test-helpers.ts";
@@ -107,7 +108,7 @@ test("createBrain runs the synthetic connectome end to end", () => {
   let state = brain.tick(16, RESTING_SENSES);
   assert.equal(state.stats.simMs, 16);
   assert.ok(state.stats.wallMs >= 0);
-  assert.deepEqual(Object.keys(state.stats.rates).sort(), READOUTS.map((r) => r.name).sort());
+  assert.deepEqual(Object.keys(state.stats.rates), [...READOUTS.map((r) => r.name), ...REGION_RATE_NAMES]);
   for (const [key, value] of Object.entries(state.command)) {
     assert.ok(Number.isFinite(value), key);
     assert.ok(value >= (key === "turn" ? -1 : 0) && value <= 1, `${key} ${value}`);
@@ -191,10 +192,11 @@ test("the eyes: shut, the brain is the same as one without them; open, darkness 
   const brain = seeing();
   assert.ok(brain.eyes);
   assert.equal(brain.eyes.right.directions.length, 12);
-  // The eyes add the vision.<stage> rates the connectome has neurons for, after the readouts.
+  // The eyes add the vision.<stage> rates the connectome has neurons for, after the readouts and the regions.
   const names = Object.keys(brain.tick(10, RESTING_SENSES).stats.rates);
   assert.deepEqual(names.slice(0, READOUTS.length), READOUTS.map((r) => r.name));
-  assert.deepEqual(names.slice(READOUTS.length), ["lamina", "lobula", "looming"].flatMap((stage) => [`vision.${stage} left`]).concat(["lamina", "lobula", "looming"].map((stage) => `vision.${stage} right`)));
+  assert.deepEqual(names.slice(READOUTS.length, READOUTS.length + REGIONS.length), REGION_RATE_NAMES);
+  assert.deepEqual(names.slice(READOUTS.length + REGIONS.length), ["lamina", "lobula", "looming"].flatMap((stage) => [`vision.${stage} left`]).concat(["lamina", "lobula", "looming"].map((stage) => `vision.${stage} right`)));
   assert.ok(VISION_STAGES.every(({ stage }) => stage !== "lamina" || names.includes(`vision.${stage} left`)));
 
   // Shut eyes: spike for spike the brain without eyes, whatever else is going on.

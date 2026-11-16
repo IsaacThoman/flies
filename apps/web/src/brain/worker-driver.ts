@@ -4,6 +4,7 @@
 // beyond that is dropped, so a slow brain runs slower than real time instead
 // of falling further behind.
 
+import { REGION_RATE_NAMES } from "@fly/brain";
 import type { BrainRequest, BrainResponse, BrainSenses, BrainState, EyeMap } from "@fly/brain";
 import type { BrainDriver, BrainStatus } from "@fly/contracts";
 
@@ -30,6 +31,7 @@ export class WorkerBrainDriver implements BrainDriver {
   eyes: EyeMap | null = null;
   state: BrainState | null = null;
   stateAt = 0;
+  readonly regionRates = new Float32Array(REGION_RATE_NAMES.length);
   /** How much of the connectome has arrived, 0 to 1, while loading; then 1. */
   progress = 0;
   /** "download" while the connectome arrives, "build" while the worker wires it up. */
@@ -113,6 +115,7 @@ export class WorkerBrainDriver implements BrainDriver {
         this.#inFlight = false;
         this.state = response.state;
         this.stateAt = this.#now();
+        for (let r = 0; r < REGION_RATE_NAMES.length; r++) this.regionRates[r] = response.state.stats.rates[REGION_RATE_NAMES[r]] ?? 0;
         break;
       case "error":
         this.#fail(response.message);

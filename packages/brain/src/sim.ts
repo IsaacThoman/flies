@@ -166,6 +166,10 @@ export class Simulation {
   #watchPtr = new Uint32Array(0);
   #watchIds = new Uint32Array(0);
 
+  // Which part of a partition each neuron is in, and each part's spikes since the last drain.
+  #partOf: Uint8Array | null = null;
+  #partCounts = new Uint32Array(0);
+
   #recording: Uint32Array | null = null;
   #carryMs = 0;
   #sweepResult = new Uint32Array(2);
@@ -401,6 +405,24 @@ export class Simulation {
     return into;
   }
 
+  /**
+   * Counts every spike by the part of a partition of the neurons its neuron
+   * is in: `partOf[i]` (below `parts`) for neuron i. Unlike a readout, this
+   * costs one increment a spike whichever neuron fires, so it can cover them all.
+   */
+  setPartition(partOf: Uint8Array, parts: number) {
+    if (partOf.length !== this.neurons) throw new Error(`A partition needs a part for each of the ${this.neurons} neurons, not ${partOf.length}`);
+    for (let i = 0; i < partOf.length; i++) if (partOf[i] >= parts) throw new Error(`Neuron ${i} is in part ${partOf[i]}, but there are ${parts}`);
+    this.#partOf = Uint8Array.from(partOf);
+    this.#partCounts = new Uint32Array(parts);
+  }
+
+  /** Spikes in each part of the partition since the last drain, into `into` (at least as long as the parts); then zeroes them. */
+  drainPartition(into: Uint32Array) {
+    into.set(this.#partCounts);
+    this.#partCounts.fill(0);
+  }
+
   /** The neurons of a readout or input, deduplicated and ascending. */
   members(name: string): Uint32Array {
     const r = this.#readoutNames.indexOf(name);
@@ -441,7 +463,7 @@ export class Simulation {
     return steps;
   }
 
-  /** Back to rest at time 0, with the inputs reseeded. Wiring, inputs, rates, readouts and bias stay. */
+  /** Back to rest at time 0, with the inputs reseeded. Wiring, inputs, rates, readouts, the partition and bias stay. */
   reset() {
     const state = this.#state;
     for (let i = 0; i < this.neurons; i++) {
@@ -460,6 +482,7 @@ export class Simulation {
     this.stats.spikes = 0;
     this.stats.events = 0;
     this.#readoutCounts.fill(0);
+    this.#partCounts.fill(0);
     this.#recording?.fill(0);
     this.#inputs.forEach((input, k) => {
       if (input.rates) {
@@ -597,6 +620,11 @@ export class Simulation {
         if (watched[i] === 0) continue;
         for (let m = watchPtr[i], end = watchPtr[i + 1]; m < end; m++) counts[watchIds[m]]++;
       }
+    }
+    const partOf = this.#partOf;
+    if (partOf !== null) {
+      const counts = this.#partCounts;
+      for (let k = 0; k < fired; k++) counts[partOf[out[k]]]++;
     }
   }
 

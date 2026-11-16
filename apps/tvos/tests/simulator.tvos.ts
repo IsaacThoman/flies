@@ -61,7 +61,7 @@ type Report = {
   halfFloat: boolean | null;
   audio: { beeps: number; ended: number; decoded: { length: number; sampleRate: number } | null };
   storage: boolean | null; fetched: string | null;
-  brain: { neurons?: number; connections?: number; facets?: number[]; rates?: string[]; states?: number; command?: Record<string, number>; maxSimMsAfterBurst?: number; error?: string } | null;
+  brain: { neurons?: number; connections?: number; facets?: number[]; rates?: string[]; states?: number; command?: Record<string, number>; maxSimMsAfterBurst?: number; rateCount?: number; lastRate?: number; error?: string } | null;
 };
 type Stats = { fps: number; jsMs: { mean: number }; execMs: { mean: number }; drawsPerFrame: number };
 const complete = (r: Report) => !!(r.readbackAsync && r.audio.decoded && r.audio.ended && r.fetched && (r.brain?.states ?? 0) > 2);
@@ -83,20 +83,28 @@ try {
   const config = { script: 'game.js', url: 'http://fly.local/', fit: 'fill', pixelated: true, stats: 2, drive };
   app = spawn('xcrun', ['simctl', 'launch', '--console-pty', udid, BUNDLE_ID, '--config', JSON.stringify(config)], { stdio: ['ignore', 'pipe', 'pipe'] });
   let latest: Report | null = null, lastStats: Stats | null = null, done = false;
-  const read = (chunk: Buffer) => {
-    for (const line of chunk.toString().split(/\r?\n/)) {
-      if (!line.trim()) continue;
-      output.push(line);
-      const m = /report (\{.*\})$/.exec(line);
-      const stats = /stats (\{.*\})$/.exec(line);
-      if (m) latest = JSON.parse(m[1]) as Report;
-      else if (stats) lastStats = JSON.parse(stats[1]) as Stats;
-      else console.log(line.length > 300 ? `${line.slice(0, 300)}…` : line);
-      if (line.includes('drive: done')) done = true;
-    }
+  const handle = (line: string) => {
+    if (!line.trim()) return;
+    output.push(line);
+    const m = /report (\{.*\})$/.exec(line);
+    const stats = /stats (\{.*\})$/.exec(line);
+    if (m) latest = JSON.parse(m[1]) as Report;
+    else if (stats) lastStats = JSON.parse(stats[1]) as Stats;
+    else console.log(line.length > 300 ? `${line.slice(0, 300)}…` : line);
+    if (line.includes('drive: done')) done = true;
   };
-  app.stdout?.on('data', read);
-  app.stderr?.on('data', read);
+  // A chunk can end partway through a line (the console's pseudo-terminal hands it over a
+  // kilobyte or so at a time), so the rest of it waits for the next chunk.
+  const reader = () => {
+    let partial = '';
+    return (chunk: Buffer) => {
+      const lines = (partial + chunk.toString()).split(/\r?\n/);
+      partial = lines.pop() ?? '';
+      lines.forEach(handle);
+    };
+  };
+  app.stdout?.on('data', reader());
+  app.stderr?.on('data', reader());
   await new Promise<void>((resolve, reject) => {
     const poll = setInterval(() => {
       if (done && latest && complete(latest)) { clearInterval(poll); resolve(); }
@@ -144,7 +152,9 @@ try {
   assert.equal(b.error, undefined, `brain error: ${b.error}`);
   assert.deepEqual({ neurons: b.neurons, connections: b.connections }, connectomeCounts(), 'the connectome arrived whole');
   assert.deepEqual(b.facets, [8, 8], 'eye facets');
-  assert.deepEqual(b.rates, ['standin.ticks', 'standin.simulatedMs'], 'rate names');
+  assert.deepEqual(b.rates, ['standin.ticks', 'standin.simulatedMs', 'standin.rate82'], 'rate names');
+  assert.equal(b.rateCount, 83, 'as many rates as the real brain reports');
+  assert.equal(b.lastRate, 82, 'the last rate arrived');
   assert.ok(Math.abs((b.command?.turn ?? 0) - 0.6) < 1e-3, `turn follows the light (right 0.8, left 0.2): ${b.command?.turn}`);
   assert.equal(b.command?.walk, 0.8, 'walk');
   assert.equal(b.command?.feed, 0.5, 'feed follows sweet');

@@ -285,7 +285,7 @@ void new AudioContext().decodeAudioData(wav(4410, 22050)).then((b) => { report.a
 const brain = (globalThis as unknown as { __native?: { brain?: NativeBrainBridge } }).__native?.brain;
 const scalars = new Float32Array([0, 0, 0, 0, 0, 0, 0.5, 1]);
 let light: [Float32Array, Float32Array] | null = null;
-const state = new Float32Array(COMMAND_ORDER.length + STATE_STATS.length + 2);
+let state = new Float32Array(0);
 let brainFrames = 0, burst = false, maxSimMs = 0, lastCount = 0;
 function tickBrain(dtMs: number) {
   if (!brain) { report.brain = { error: 'no __native.brain' }; return; }
@@ -295,7 +295,11 @@ function tickBrain(dtMs: number) {
   if (!light) {
     const [left, right] = [brain.eyeDirections(0), brain.eyeDirections(1)];
     light = [new Float32Array(left.length / 3).fill(0.2), new Float32Array(right.length / 3).fill(0.8)];
-    report.brain = { neurons: brain.neurons(), connections: brain.connections(), facets: [left.length / 3, right.length / 3], acceptance: brain.eyeAcceptance(), rates: brain.rateNames() };
+    const rates = brain.rateNames();
+    state = new Float32Array(COMMAND_ORDER.length + STATE_STATS.length + rates.length);
+    // The first two and the last of the rates' names; all of them would make the report line long.
+    const names = [rates[0], rates[1], rates[rates.length - 1]];
+    report.brain = { neurons: brain.neurons(), connections: brain.connections(), facets: [left.length / 3, right.length / 3], acceptance: brain.eyeAcceptance(), rates: names, rateCount: rates.length };
   }
   brain.submit(dtMs, scalars, light[0], light[1]);
   // Once, a burst of 600 ms submitted at once: at most 100 ms of it may be simulated in one step.
@@ -306,7 +310,7 @@ function tickBrain(dtMs: number) {
     const simMs = state[COMMAND_ORDER.length + STATE_STATS.indexOf('simMs')];
     if (burst) maxSimMs = Math.max(maxSimMs, simMs);
     const command = Object.fromEntries(COMMAND_ORDER.map((k, i) => [k, Math.round(state[i] * 1000) / 1000]));
-    Object.assign(report.brain ?? {}, { states: count, command, simMs, maxSimMsAfterBurst: maxSimMs, simulatedMs: state[COMMAND_ORDER.length + STATE_STATS.length + 1] });
+    Object.assign(report.brain ?? {}, { states: count, command, simMs, maxSimMsAfterBurst: maxSimMs, simulatedMs: state[COMMAND_ORDER.length + STATE_STATS.length + 1], lastRate: state[state.length - 1] });
   }
 }
 brain?.start(7);
