@@ -400,6 +400,9 @@ export class FlyBody {
             this.events.hit = Math.max(this.events.hit, -into);
             this.blocked = fx * hit.normal.x + fz * hit.normal.z < -0.3;
           }
+        } else if (hit.normal.y >= MAX_SLOPE_COS && !world.onTable(hit.point.x, hit.point.z)) {
+          // Keep sliding back across an outside wall's top, without perching on it.
+          p.y = Math.max(p.y, hit.point.y);
         } else if (hit.normal.y >= MAX_SLOPE_COS) {
           p.x = hit.point.x;
           p.z = hit.point.z;
@@ -413,6 +416,13 @@ export class FlyBody {
       const before = world.heightAt(px, pz);
       if (py >= under.y - STEP_UP || before >= under.y - 1e-6) {
         // Came down onto it from above.
+        if (!under.onTable && under.normal.y >= MAX_SLOPE_COS) {
+          p.y = under.y;
+          if (v.y < 0) v.y = 0;
+          this.groundSpeed = 0;
+          this.#easeUp(levelUp, dt);
+          return;
+        }
         if (under.normal.y >= MAX_SLOPE_COS) {
           this.events.hit = Math.max(this.events.hit, -v.y);
           p.y = under.y;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { LAB, SOLIDS, World, createPicnic } from "@fly/world";
+import { LAB, SOLIDS, WINDOWSILL, World, createPicnic } from "@fly/world";
 import type { Food } from "@fly/world";
 import { FlyBody, MOUTH_AHEAD, WALL_PATIENCE, createIntent } from "../src/index.ts";
 import type { Forces, Intent } from "../src/index.ts";
@@ -235,4 +235,17 @@ test("being placed elsewhere clears the old wall turn, motion and contact", () =
   body.step(intent({ speed: 10 }), still, DT);
   assert.equal(body.yaw, 0, "no turn carried over from the old wall");
   assert.ok(body.position.z > -150, "walks immediately on the new floor");
+});
+
+test("the top of a wall beyond the sill cannot strand a landed fly", () => {
+  const world = new World(WINDOWSILL);
+  const body = new FlyBody(world, { x: 319.64246689820015, z: -127.12441457700562, yaw: 1.6266740085034517 });
+  body.position.y = 561.7095573431452;
+  body.mode = "airborne";
+  Object.assign(body.velocity, { x: 190.55379881361213, y: -166.33772141858546, z: -103.20124930930517 });
+  body.step(intent(), still, 0.015151695601475305);
+  assert.equal(body.onFeet, false, "outside walls are barriers, not off-floor perches");
+  run(body, intent(), 20);
+  assert.equal(body.onFeet, true);
+  assert.equal(world.onTable(body.position.x, body.position.z), true);
 });
