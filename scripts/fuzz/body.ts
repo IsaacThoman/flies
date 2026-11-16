@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { mulberry32 } from "@fly/brain";
 import { FLY_HEIGHT, FlyBody, MAX_SLOPE_COS, createIntent } from "@fly/body";
 import type { Forces } from "@fly/body";
-import { BAR, LAB, PICNIC, RESTAURANT, WINDOWSILL, World, createSurface } from "@fly/world";
+import { GREENHOUSE, BAR, LAB, PICNIC, RESTAURANT, WINDOWSILL, World, createSurface } from "@fly/world";
 import type { Place, Vec3 } from "@fly/world";
 
-export const places = { picnic: PICNIC, windowsill: WINDOWSILL, lab: LAB, bar: BAR, restaurant: RESTAURANT };
+export const places = { greenhouse: GREENHOUSE, picnic: PICNIC, windowsill: WINDOWSILL, lab: LAB, bar: BAR, restaurant: RESTAURANT };
 export type PlaceId = keyof typeof places;
 export const CEILING_EXCURSION = 400;
 export const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
