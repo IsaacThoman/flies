@@ -44,8 +44,8 @@ test("every group finds its neurons in the real connectome, and none is both dri
     loomRight: 146,
     "touch head": 932,
     "touch body": 2206,
-    bumpLeft: 348,
-    bumpRight: 324,
+    bumpLeft: 203,
+    bumpRight: 132,
     wind: 475,
     sweet: 88,
     grounded: 426,
@@ -153,20 +153,23 @@ test("left and right mirror each other: either eye's loom escapes alike, and a s
   assert.ok(ratio > 1 / 1.6 && ratio < 1.6, `left ${turns[0]} against right ${turns[1]}`);
 });
 
-test("touch makes it back away, wind makes it groom, sweet makes it feed, and looming opens the wings", { skip }, () => {
+test("touch makes it back away, wind or a push on either antenna makes it groom, sweet makes it feed, and looming opens the wings", { skip }, () => {
   const restB = brain();
   run(restB, 1000);
   const rest = mean(restB, 1000, RESTING_SENSES);
-  for (const [sense, command] of [
-    ["touch", "back"],
-    ["wind", "groom"],
-    ["sweet", "feed"],
-    ["loomLeft", "wings"],
+  // A push on an antenna grooms past 0.2, where the body starts to show it.
+  for (const [sense, command, over] of [
+    ["touch", "back", 0.3],
+    ["wind", "groom", 0.3],
+    ["bumpLeft", "groom", 0.2],
+    ["bumpRight", "groom", 0.2],
+    ["sweet", "feed", 0.3],
+    ["loomLeft", "wings", 0.3],
   ] as const) {
     const b = brain();
     run(b, 1000);
     const response = mean(b, 1000, only(sense));
-    assert.ok(response[command] > 0.3, `${sense}: ${command} ${response[command]}`);
+    assert.ok(response[command] > over, `${sense}: ${command} ${response[command]}`);
     assert.ok(rest[command] < 0.1, `at rest: ${command} ${rest[command]}`);
   }
 });

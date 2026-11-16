@@ -42,7 +42,14 @@ NeuronQuery sided(NeuronQuery q, Side side) {
 }
 
 const NeuronQuery kLooming = query({{kType, one_of({"LPLC2", "LC4"})}});
-const NeuronQuery kAntenna = query({{kSuperClass, is("cb_sensory")}, {kType, starts_with("JO-")}});
+// Pushing the antenna deflects it and holds it there. The Johnston's organ
+// neurons that answer a sustained push or pull are zones C and E (Kamikouchi et
+// al. 2009; Yorozu et al. 2009; Hampel et al. 2020), and they drive antennal
+// grooming (Hampel et al. 2015, 2020). A and B answer sound and vibration; F
+// drives grooming too, but answers neither a push nor vibration (what it senses
+// is unknown, Hampel et al. 2020).
+const NeuronQuery kAntenna = query({{kSuperClass, is("cb_sensory")},
+                                    {kType, [](std::string_view s) { return s.size() > 3 && s.starts_with("JO-") && (s[3] == 'C' || s[3] == 'E'); }}});
 
 // Nothing in the data says which taste neurons are sweet-sensing. These were
 // chosen by what they do in this model: built greedily from the head's taste
@@ -77,8 +84,9 @@ std::vector<InputSpec> senses() {
        "", kTouch, kLeft},
       {"touch body", "Mechanosensory bristle neurons of the thorax, abdomen and legs",
        query({{kSuperClass, is("vnc_sensory")}, {kSubClass, is("mechanosensory_bristle")}}), 10, "", kTouch, kLeft},
-      {"bumpLeft", "Johnston's organ neurons of the left antenna", sided(kAntenna, kLeft), 100, "bumpRight", kBumpLeft, kLeft},
-      {"bumpRight", "Johnston's organ neurons of the right antenna", sided(kAntenna, kRight), 100, "bumpLeft", kBumpRight, kLeft},
+      {"bumpLeft", "Displacement-sensitive Johnston's organ neurons (zones C and E) of the left antenna", sided(kAntenna, kLeft), 100, "", kBumpLeft, kLeft},
+      {"bumpRight", "Displacement-sensitive Johnston's organ neurons (zones C and E) of the right antenna", sided(kAntenna, kRight), 100, "", kBumpRight,
+       kLeft},
       {"wind", "Wind- and gravity-sensitive Johnston's organ neurons of both antennae", query({{kSuperClass, is("cb_sensory")}, {kSubClass, is("wind_gravity")}}),
        100, "", kWind, kLeft},
       {"sweet", kSweetDescription, query({{kSuperClass, is("cb_sensory")}, {kClass, is("gustatory")}, {kType, sweet_types()}}), 100, "", kSweet, kLeft},

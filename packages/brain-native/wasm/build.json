@@ -9,9 +9,9 @@
     "src/eyes.cpp": "c0bdef0c06c810eaba378c3a08ec09a999b6501210ccfbe9ecd250addc59588a",
     "src/fdlibm.cpp": "4420beeefa36941b85190d5dfa9fb59fa32dda57bef99e34162da6472c02aac6",
     "src/fly_brain.cpp": "ebc7eee30253d55f2a7b558492d96c9519cc3b564de61816fae54025c4b4374f",
-    "src/io.cpp": "6ee82cf7837adadb302496b1f644adda7c456a6e6eea6ff71aaf2d89cb0999b6",
+    "src/io.cpp": "e1be742806f8fc62627161922e46133ae53a2b55827195d6343f75854a765700",
     "src/json.cpp": "752d0e1d4753e314531d0d8dedacdfdb7773cf4eff72ea54b0eaa0d0b384aa5b",
-    "src/params.cpp": "1791453d3de17028fbff15f8db3c805a9405c04ac3ac9eaeff8b7e63575c382f",
+    "src/params.cpp": "11e9817f313b4bdb0630a5b4c165fc937d3e345c3e970f86a6fbc63393b5f4b8",
     "src/regions.cpp": "63e216cb7eb18c9e3e060939745a0d681619f7415f60cd693b5b2cd80a15b917",
     "src/sim.cpp": "2711a8737e13b96c09aa6b99e081a31fbf2f7b2ed327c29f3250e12ae923ee83",
     "src/state.cpp": "bd3f75a27d1cc7d9e7fb605cc060751169446d772d2a230f5fc51ffbcbc450d5",
@@ -24,7 +24,7 @@
     "src/fly_brain_internal.hpp": "70567db81da1a283377674b68ad4c277b0b991579e3dfc8045f9f312aabdc0f8",
     "src/io.hpp": "6ea9cf3b73c7cb6fb285abdc9181a506260e60fa2b6090355e0d002592c7b6e4",
     "src/json.hpp": "c6502967fc9e32ab4bf1a2003f89c9d41e86847bbde9b2761d8e5e1e2df6948a",
-    "src/params.hpp": "1e86a889559c2ae28e636c2962a5d6b913f59aff8aaed1731a18df162070a237",
+    "src/params.hpp": "0f711c04a24daf368c08d414de794ab6f98df31d10451c8bc357757ee9bf7be6",
     "src/regions.hpp": "9e89f95cedb61fa4f7a4be5727f5a6f8132b590c679b4f4d8d3e463b9a6403b5",
     "src/sim.hpp": "31f8fddbd14af2fabd55871547051a5f750b329ae2b2969e592750f90d90a754",
     "src/state.hpp": "da8b13b9affad5dcb2a94fce35cdc26e2e0557ff3b2325583915393d035ac10a",
@@ -32,7 +32,7 @@
     "tools/harness.cpp": "236fb01c009ababd630f39469c2df57e9db965f91be957291535b23fd1abda9b"
   },
   "modules": {
-    "fly-brain.wasm": "f280e308469957c1852d14421b18790cad19456787be3da3355ab00b46542d4d",
-    "fly-brain-harness.wasm": "c1facb496e861ca8c4504fcb74bae5dcd2b945db74b2e4ac799b08a69616f402"
+    "fly-brain.wasm": "ba7ffd9bccbf9680a479b82f1a47b100b5f29b22d200844315148878fff837d6",
+    "fly-brain-harness.wasm": "52f0d4b778e2a822c3b93380938c609deeb486f326730f081487ba29f9983a76"
   }
 }
