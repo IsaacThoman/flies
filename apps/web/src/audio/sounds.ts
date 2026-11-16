@@ -179,6 +179,118 @@ function labLoop(ctx: BaseAudioContext) {
   return render(ctx, seconds, (_t, i) => data[i], rate);
 }
 
+/**
+ * A quiet bar: a few people talking low across the room (no words: voiced
+ * sound through formants that move as speech does, in phrases, muffled by
+ * the distance), the room's low hum, and now and then two glasses touching,
+ * ice settling, a glass set down. Twenty seconds that loop, rendered at a
+ * low rate (it is all below 4 kHz) and joined by cross-fading the tail into
+ * the head, so the join is a lull like any other.
+ */
+function barLoop(ctx: BaseAudioContext) {
+  const rate = 8000;
+  const seconds = 20;
+  const length = seconds * rate;
+  const join = Math.round(rate * 0.6);
+  const out = new Float32Array(length + join);
+  const r = noise(31);
+  // The room: a low, slow rumble.
+  let a = 0;
+  let b = 0;
+  for (let i = 0; i < out.length; i++) {
+    a += (r() - a) * 0.027;
+    b += (a - b) * 0.04;
+    out[i] = b * 0.8;
+  }
+  // Voices: phrases of syllables, each a glottal buzz through two resonances gliding toward a vowel.
+  const voices = [
+    { seed: 41, f0: 118, gain: 0.05 },
+    { seed: 42, f0: 196, gain: 0.035 },
+    { seed: 43, f0: 142, gain: 0.03 },
+  ];
+  const murmur = new Float32Array(out.length);
+  for (const v of voices) {
+    const rv = noise(v.seed);
+    const rnd = () => (rv() + 1) / 2;
+    let t = 0.3 + rnd() * 2;
+    while (t < seconds + 0.3) {
+      const end = t + 1.4 + rnd() * 2.6;
+      const syllables: { at: number; len: number; f1: number; f2: number; amp: number }[] = [];
+      for (let s = t; s < end; s += 0.16 + rnd() * 0.14) syllables.push({ at: s, len: 0.12 + rnd() * 0.12, f1: 320 + rnd() * 450, f2: 950 + rnd() * 1250, amp: 0.4 + rnd() * 0.6 });
+      let phase = 0;
+      let f1 = syllables[0].f1;
+      let f2 = syllables[0].f2;
+      let y1 = 0;
+      let y2 = 0;
+      let z1 = 0;
+      let z2 = 0;
+      const i0 = Math.floor(t * rate);
+      const i1 = Math.min(murmur.length, Math.ceil((end + 0.3) * rate));
+      let k = 0;
+      // Everything that changes slowly (the syllable's loudness, the pitch, the resonances) is worked out a block at a time.
+      for (let block = i0; block < i1; block += 32) {
+        const time = block / rate;
+        while (k < syllables.length - 1 && time > syllables[k].at + syllables[k].len) k++;
+        const syl = syllables[k];
+        const u = (time - syl.at) / syl.len;
+        const env = u > 0 && u < 1 ? Math.sin(Math.PI * u) ** 1.5 * syl.amp * v.gain * 6 : 0;
+        f1 += (syl.f1 - f1) * 0.25;
+        f2 += (syl.f2 - f2) * 0.25;
+        const r1 = Math.exp((-Math.PI * 90) / rate);
+        const r2 = Math.exp((-Math.PI * 140) / rate);
+        const a1 = 2 * r1 * Math.cos((TAU * f1) / rate);
+        const a2 = -r1 * r1;
+        const g1 = 1 - r1;
+        const b1 = 2 * r2 * Math.cos((TAU * f2) / rate);
+        const b2 = -r2 * r2;
+        const g2 = (1 - r2) * 0.6;
+        // Speech falls in pitch through a phrase, and wavers.
+        const step = (v.f0 * (1.06 - (0.14 * (time - t)) / (end - t)) * (1 + 0.04 * Math.sin(time * 5.1 + v.seed))) / rate;
+        const last = Math.min(i1, block + 32);
+        for (let i = block; i < last; i++) {
+          phase += step;
+          if (phase >= 1) phase -= 1;
+          const source = (1 - 2 * phase) * 0.6 + rv() * 0.25;
+          const y = g1 * source + a1 * y1 + a2 * y2;
+          y2 = y1;
+          y1 = y;
+          const z = g2 * source + b1 * z1 + b2 * z2;
+          z2 = z1;
+          z1 = z;
+          murmur[i] += (y + z) * env;
+        }
+      }
+      t = end + 0.5 + rnd() * 1.6;
+    }
+  }
+  // Across the room: muffled.
+  let m = 0;
+  for (let i = 0; i < out.length; i++) {
+    m += (murmur[i] - m) * 0.56;
+    out[i] += m;
+  }
+  const at = (time: number, len: number, synth: (t: number) => number) => {
+    const i0 = Math.round(time * rate);
+    for (let i = 0; i < len * rate && i0 + i < out.length; i++) out[i0 + i] += synth(i / rate);
+  };
+  // Glass: a few inharmonic partials, the higher ones dying first.
+  const ring = (f: number, t: number, decay: number) => Math.exp(-t * decay) * (Math.sin(TAU * f * t) + Math.sin(TAU * f * 2.32 * t) * 0.5 * Math.exp(-t * decay) + Math.sin(TAU * f * 2.71 * t) * 0.3 * Math.exp(-t * decay * 2));
+  // Two glasses touching.
+  at(3.6, 1.4, (t) => attack(t, 0.0006) * (ring(1380, t, 5) + ring(1460, Math.max(0, t - 0.003), 6) * 0.8) * 0.035);
+  // Ice settling in a glass: a few small knocks, and the glass answering faintly.
+  for (const [dt, f] of [[0, 2500], [0.07, 2800], [0.16, 2350], [0.21, 2650]]) at(11.4 + dt, 0.3, (t) => attack(t, 0.0004) * (Math.exp(-t * 90) * Math.sin(TAU * f * t) + Math.exp(-t * 22) * Math.sin(TAU * f * 0.5 * t) * 0.3) * 0.022);
+  // A glass set down on the wood.
+  at(16.3, 0.5, (t) => attack(t, 0.0008) * (Math.exp(-t * 35) * Math.sin(TAU * 170 * t) * 0.8 + ring(1300, t, 16) * 0.2) * 0.04);
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = out[i];
+  for (let i = 0; i < join; i++) {
+    const k = i / join;
+    data[i] = out[i] * k + out[length + i] * (1 - k);
+  }
+  return buffer;
+}
+
 /** A bird's chirp: quick upward sweeps. */
 function chirp(ctx: BaseAudioContext, seed: number) {
   const r = noise(seed);
@@ -193,11 +305,12 @@ function chirp(ctx: BaseAudioContext, seed: number) {
 }
 
 /** The sound of a place, under everything else: its loop, and whether birds call now and then. */
-export type Ambience = "outdoors" | "lab";
+export type Ambience = "outdoors" | "lab" | "bar";
 
 const AMBIENCES: Record<Ambience, { loop: (ctx: BaseAudioContext) => AudioBuffer; birds: boolean }> = {
   outdoors: { loop: outdoorsLoop, birds: true },
   lab: { loop: labLoop, birds: false },
+  bar: { loop: barLoop, birds: false },
 };
 
 type Loop = { source: AudioBufferSourceNode; gain: GainNode };
