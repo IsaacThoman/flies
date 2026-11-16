@@ -2,15 +2,30 @@
 // looking at it and for scripted checks. Starts its own Vite server unless
 // --url is given.
 //
-//   node scripts/play.ts [--url http://localhost:5173/] [--size 1280x720] [--headed] <step>...
+//   node scripts/play.ts [--url http://localhost:5173/] [--size 1280x720] [--device "iPhone 15"] [--landscape] [--headed] <step>...
 //
-// Steps run in order:
+// --device takes one of Playwright's device descriptors (a phone or a tablet,
+// with its screen, touch and pixel ratio); --landscape turns it on its side.
+// --size sets the window's size (with a device, its screen's).
+//
+// Steps run in order. Points on the screen (x,y) run from 0 to 1 across and
+// down the canvas.
 //   wait:<cond>[,<cond>...]   until the canvas's data-* state matches: key=value, key~regex, key>n, key<n
 //   key:<Key>[*n]             press a key (Enter, Escape, ArrowLeft, " ", ...), n times
 //   hold:<Key>:<ms>           hold a key down
-//   drag:<x0>,<y0>:<x1>,<y1>  drag the mouse (the touch surface) between points in -1..1 surface units
+//   swipe:<x0>,<y0>:<x1>,<y1> a finger across the remote's touch surface, in its -1..1 units (y up)
+//   move:<x>,<y>              move the mouse there
+//   click:<x>,<y>[:<ms>]      click the mouse there (held for ms)
+//   mousedrag:<x0>,<y0>:<x1>,<y1>[:<button>]  drag the mouse (button: left, right)
+//   wheel:<x>,<y>:<dy>[:ctrl] the wheel there (ctrl: a trackpad's pinch)
+//   tap:<x>,<y>[:<ms>]        a finger taps there (held for ms)
+//   touchdrag:<x0>,<y0>:<x1>,<y1>[:<ms>]  a finger drags between points
+//   pinch:<x>,<y>:<from>:<to> two fingers about a point, from one spread to another (shares of the width)
+//   tapon:<kind>[:<index>]    a finger taps the middle of a target drawn on screen (from the game's hit map: tool, kind, label, go, menu, row, step, back...)
+//   clickon:<kind>[:<index>]  the mouse clicks one
+//   resize:<w>x<h>            the window (or the device's screen) changes shape
 //   sleep:<ms>                wait
-//   shot:<file.png>           screenshot the game as shown (16:9)
+//   shot:<file.png>           screenshot the game as shown
 //   state                     print the data-* state
 //   eval:<js>                 evaluate in the page and print the result
 //   reload                    reload the page (what the game saved stays), and wait for the game
@@ -21,8 +36,8 @@ import type { ChildProcess } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { chromium } from "playwright";
-import type { Page } from "playwright";
+import { chromium, devices } from "playwright";
+import type { BrowserContextOptions, CDPSession, Page } from "playwright";
 
 const root = path.join(import.meta.dirname, "..");
 
@@ -105,27 +120,140 @@ export async function waitFor(page: Page, spec: string, timeout = 60_000) {
   }
 }
 
-/** Drags the mouse across the canvas, as a finger across the touch surface (x, y in -1..1, y up). */
-export async function drag(page: Page, from: [number, number], to: [number, number], steps = 12) {
-  const box = await page.locator("#game").boundingBox();
-  if (!box) throw new Error("No canvas");
-  const at = ([x, y]: [number, number]) => [box.x + ((x + 1) / 2) * box.width, box.y + ((1 - y) / 2) * box.height] as const;
-  await page.mouse.move(...at(from));
-  await page.mouse.down();
-  for (let i = 1; i <= steps; i++) {
-    const k = i / steps;
-    await page.mouse.move(...at([from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k]));
+type Pt = [number, number];
+
+/** A finger across the remote's touch surface (x, y in -1..1, y up), as the Apple TV host sends it. */
+export async function swipe(page: Page, from: Pt, to: Pt, steps = 12) {
+  for (let i = 0; i <= steps + 1; i++) {
+    const k = Math.min(1, i / steps);
+    const touching = i <= steps;
+    await page.evaluate(([x, y, t]) => window.dispatchEvent(new CustomEvent("remotetouch", { detail: { x, y, touching: t } })), [from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k, touching] as const);
     await page.waitForTimeout(16);
   }
-  await page.mouse.up();
 }
 
 /** Until the game is drawing and has published its state. */
 export const gameUp = (page: Page) => page.waitForFunction(() => !!(document.getElementById("game") as HTMLCanvasElement | null)?.dataset.screen, null, { timeout: 30_000 });
 
-export async function openGame({ url, width = 1280, height = 720, headed = false }: { url: string; width?: number; height?: number; headed?: boolean }) {
+/** A point on the canvas (0 to 1 across and down) in the page's CSS pixels. */
+export async function canvasPoint(page: Page, [x, y]: Pt) {
+  const box = await page.locator("#game").boundingBox();
+  if (!box) throw new Error("No canvas");
+  return { x: box.x + x * box.width, y: box.y + y * box.height, width: box.width, height: box.height };
+}
+
+/** Drags the mouse between points on the canvas. */
+export async function mouseDrag(page: Page, from: Pt, to: Pt, button: "left" | "right" = "left", steps = 12) {
+  const a = await canvasPoint(page, from);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down({ button });
+  for (let i = 1; i <= steps; i++) {
+    const k = i / steps;
+    const p = await canvasPoint(page, [from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k]);
+    await page.mouse.move(p.x, p.y);
+    await page.waitForTimeout(16);
+  }
+  await page.mouse.up({ button });
+}
+
+/** Fingers on the screen, through the DevTools protocol (Playwright's touchscreen only taps). */
+export class Fingers {
+  #cdp: CDPSession;
+  #page: Page;
+
+  private constructor(page: Page, cdp: CDPSession) {
+    this.#page = page;
+    this.#cdp = cdp;
+  }
+
+  static async on(page: Page) {
+    return new Fingers(page, await page.context().newCDPSession(page));
+  }
+
+  async #send(type: "touchStart" | "touchMove" | "touchEnd", points: Pt[]) {
+    const touchPoints = [];
+    for (let i = 0; i < points.length; i++) {
+      const p = await canvasPoint(this.#page, points[i]);
+      touchPoints.push({ x: p.x, y: p.y, id: i, radiusX: 8, radiusY: 8, force: 1 });
+    }
+    await this.#cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : touchPoints });
+  }
+
+  async tap(at: Pt, ms = 60) {
+    await this.#send("touchStart", [at]);
+    await this.#page.waitForTimeout(ms);
+    await this.#send("touchEnd", []);
+  }
+
+  async drag(from: Pt, to: Pt, ms = 400, steps = 14) {
+    await this.#send("touchStart", [from]);
+    for (let i = 1; i <= steps; i++) {
+      const k = i / steps;
+      await this.#page.waitForTimeout(ms / steps);
+      await this.#send("touchMove", [[from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k]]);
+    }
+    await this.#send("touchEnd", []);
+  }
+
+  /** Two fingers either side of a point, `from` apart (a share of the width) to `to` apart. */
+  async pinch(at: Pt, from: number, to: number, steps = 14) {
+    const pair = (d: number): Pt[] => [[at[0] - d / 2, at[1]], [at[0] + d / 2, at[1]]];
+    await this.#send("touchStart", pair(from));
+    for (let i = 1; i <= steps; i++) {
+      await this.#page.waitForTimeout(24);
+      await this.#send("touchMove", pair(from + (to - from) * (i / steps)));
+    }
+    await this.#send("touchEnd", []);
+  }
+}
+
+/** The middle of a target drawn on screen (0 to 1 across and down the canvas), found in the game's hit map by its kind and index. */
+export async function targetOf(page: Page, kind: string, index?: number): Promise<Pt> {
+  const found = await page.evaluate(
+    ([kind, index]) => {
+      const game = (globalThis as unknown as { __fly: { overlay: { hits: { count: number; get(i: number): { kind: string; index: number; value: number; x: number; y: number; w: number; h: number } } }; shape: { design: { width: number; height: number } } } }).__fly;
+      const hits = game.overlay.hits;
+      for (let i = hits.count - 1; i >= 0; i--) {
+        const h = hits.get(i);
+        if (h.kind === kind && (index === null || h.index === index || (kind === "kind" && h.value === index))) return [(h.x + h.w / 2) / game.shape.design.width, (h.y + h.h / 2) / game.shape.design.height];
+      }
+      return null;
+    },
+    [kind, index ?? null] as const,
+  );
+  if (!found) throw new Error(`Nothing drawn on screen is a ${kind}${index === undefined ? "" : ` ${index}`}`);
+  return found as Pt;
+}
+
+/** Where something in the fly's world is on the screen (0 to 1 across and down the canvas): the fly's middle, or the hand. */
+export async function screenOf(page: Page, what: "fly" | "hand"): Promise<Pt> {
+  return (await page.evaluate((what) => {
+    type V = { x: number; y: number; z: number; project(c: unknown): V };
+    const game = (globalThis as unknown as { __fly: { director: { camera: { position: { constructor: new (x: number, y: number, z: number) => V } } }; life: { body: { position: V } }; hands: { pointer: V } } }).__fly;
+    const camera = game.director.camera;
+    const p = what === "fly" ? game.life.body.position : game.hands.pointer;
+    const v = new camera.position.constructor(p.x, p.y + (what === "fly" ? 0.75 : 0), p.z).project(camera);
+    return [(v.x + 1) / 2, (1 - v.y) / 2];
+  }, what)) as Pt;
+}
+
+export type OpenOptions = { url: string; width?: number; height?: number; headed?: boolean; device?: string; landscape?: boolean };
+
+/** The browser context for a window of a size, or a device (a phone, a tablet) held either way. */
+export function contextFor({ width = 1280, height = 720, device, landscape = false }: OpenOptions): BrowserContextOptions {
+  if (!device) return { viewport: { width, height } };
+  const d = devices[device];
+  if (!d) throw new Error(`No such device: ${device}`);
+  const v = d.viewport;
+  const [w, h] = landscape ? [Math.max(v.width, v.height), Math.min(v.width, v.height)] : [v.width, v.height];
+  return { ...d, viewport: { width: w, height: h }, screen: { width: w, height: h } };
+}
+
+export async function openGame(options: OpenOptions) {
+  const { url, headed = false } = options;
   const browser = await chromium.launch({ headless: !headed, executablePath: chromiumPath(), args: gpuFlags() });
-  const page = await browser.newPage({ viewport: { width, height } });
+  const context = await browser.newContext(contextFor(options));
+  const page = await context.newPage();
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
@@ -139,12 +267,16 @@ export async function openGame({ url, width = 1280, height = 720, headed = false
 async function main() {
   const args = process.argv.slice(2);
   let url = "";
-  let size = "1280x720";
+  let size = "";
   let headed = false;
+  let device: string | undefined;
+  let landscape = false;
   const steps: string[] = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--url") url = args[++i];
     else if (args[i] === "--size") size = args[++i];
+    else if (args[i] === "--device") device = args[++i];
+    else if (args[i] === "--landscape") landscape = true;
     else if (args[i] === "--headed") headed = true;
     else steps.push(args[i]);
   }
@@ -154,8 +286,11 @@ async function main() {
     url = started.url;
     server = started.server;
   }
-  const [width, height] = size.split("x").map(Number);
-  const { browser, page, errors } = await openGame({ url, width, height, headed });
+  const [width, height] = (size || "1280x720").split("x").map(Number);
+  const { browser, page, errors } = await openGame({ url, width: size || !device ? width : undefined, height: size || !device ? height : undefined, headed, device, landscape });
+  if (device && size) await page.setViewportSize({ width, height });
+  const fingers = await Fingers.on(page);
+  const pt = (spec: string) => spec.split(",").map(Number) as Pt;
   try {
     for (const step of steps) {
       const [kind, ...rest] = step.split(":");
@@ -172,9 +307,36 @@ async function main() {
         await page.keyboard.down(key === "Space" ? " " : key);
         await page.waitForTimeout(Number(ms));
         await page.keyboard.up(key === "Space" ? " " : key);
-      } else if (kind === "drag") {
-        const [a, b] = arg.split(":").map((p) => p.split(",").map(Number) as [number, number]);
-        await drag(page, a, b);
+      } else if (kind === "swipe") {
+        const [a, b] = rest.map(pt);
+        await swipe(page, a, b);
+      } else if (kind === "move") {
+        const p = await canvasPoint(page, pt(rest[0]));
+        await page.mouse.move(p.x, p.y, { steps: 8 });
+      } else if (kind === "click") {
+        const p = await canvasPoint(page, pt(rest[0]));
+        await page.mouse.move(p.x, p.y, { steps: 4 });
+        await page.mouse.down();
+        await page.waitForTimeout(Number(rest[1] ?? 40));
+        await page.mouse.up();
+      } else if (kind === "mousedrag") await mouseDrag(page, pt(rest[0]), pt(rest[1]), rest[2] === "right" ? "right" : "left");
+      else if (kind === "wheel") {
+        const p = await canvasPoint(page, pt(rest[0]));
+        await page.mouse.move(p.x, p.y);
+        if (rest[2] === "ctrl") await page.keyboard.down("Control");
+        await page.mouse.wheel(0, Number(rest[1]));
+        if (rest[2] === "ctrl") await page.keyboard.up("Control");
+      } else if (kind === "tap") await fingers.tap(pt(rest[0]), Number(rest[1] ?? 60));
+      else if (kind === "tapon") await fingers.tap(await targetOf(page, rest[0], rest[1] === undefined ? undefined : Number(rest[1])));
+      else if (kind === "clickon") {
+        const p = await canvasPoint(page, await targetOf(page, rest[0], rest[1] === undefined ? undefined : Number(rest[1])));
+        await page.mouse.click(p.x, p.y);
+      }
+      else if (kind === "touchdrag") await fingers.drag(pt(rest[0]), pt(rest[1]), Number(rest[2] ?? 400));
+      else if (kind === "pinch") await fingers.pinch(pt(rest[0]), Number(rest[1]), Number(rest[2]));
+      else if (kind === "resize") {
+        const [w, h] = arg.split("x").map(Number);
+        await page.setViewportSize({ width: w, height: h });
       } else if (kind === "sleep") await page.waitForTimeout(Number(arg));
       else if (kind === "shot") {
         await page.locator("#game").screenshot({ path: path.resolve(arg) });
