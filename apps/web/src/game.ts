@@ -114,7 +114,7 @@ export class Game implements Shell {
   #eye = { x: 0, y: 0, z: 0 };
   #lastScreen: ScreenId | "loading" = "loading";
   #hud: HudState;
-  #eyesInfo = { facets: 0, standIn: false, sent: false };
+  #eyesInfo = { facets: 0, standIn: false, off: false };
   /** Where the fly is now. */
   #here: PlaceId;
   /** Being carried to another place: where, and seconds since the veil began to fall. */
@@ -637,7 +637,7 @@ export class Game implements Shell {
         const e = this.#eyesInfo;
         e.facets = this.eyes.facets;
         e.standIn = this.eyes.standIn;
-        e.sent = this.eyes.inUse;
+        e.off = this.eyes.detail === "off";
         hud.eyes = e;
       } else hud.eyes = null;
       const k = this.#hudKey;

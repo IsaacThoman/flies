@@ -288,7 +288,9 @@ not a dice roll in the game.
 
 **View → Fly's eyes** shows the same picture to the player: one dot per facet
 (the brain's 1,772, or, for a brain without eyes, a stand-in layout labelled as
-such), laid out by where each looks, left eye on the left.
+such), laid out by where each looks, left eye on the left. It is titled and
+nothing more while it is what the brain is sent; a line under the title says
+so when it isn't (a stand-in, or the eyes off in Settings).
 
 **What it sees** (`apps/web/src/eyes/inset.ts`) is that picture small, in a
 corner over the camera's: the same layout and colours, the dots snapped to the

@@ -28,8 +28,8 @@ export type HudState = {
   /** Spikes per second, for the brain's pulse. */
   spikes: number;
   brainRunning: boolean;
-  /** Looking through the fly's eyes: how many facets, and whether they're a stand-in or what its brain is sent. */
-  eyes: { facets: number; standIn: boolean; sent: boolean } | null;
+  /** Looking through the fly's eyes: how many facets, whether they're a stand-in, and whether they're off in Settings. */
+  eyes: { facets: number; standIn: boolean; off: boolean } | null;
 };
 
 /** How far apart the tools are on the shelf. */
@@ -128,13 +128,14 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState) {
     const top = ((1 - PICTURE_PANEL.top) / 2) * DESIGN_HEIGHT;
     const bottom = ((1 - PICTURE_PANEL.bottom) / 2) * DESIGN_HEIGHT;
     text(g, "Through the fly's eyes", cx, top + 22, { size: 18, align: "center", color: "#eaf6ff" });
-    const facets = s.eyes.facets.toLocaleString("en-US");
-    const sub = s.eyes.standIn
-      ? `A picture of the light on ${facets} facets, laid out as its eyes look. Its brain doesn't see this yet.`
-      : s.eyes.sent
-        ? `The light on each of its ${facets} facets, as its brain receives it now.`
+    // The heading is the truth when its brain is sent this; only when it isn't does the picture need a word more.
+    if (s.eyes.standIn || s.eyes.off) {
+      const facets = s.eyes.facets.toLocaleString("en-US");
+      const sub = s.eyes.standIn
+        ? `A picture of the light on ${facets} facets, laid out as its eyes look. Its brain doesn't see this yet.`
         : `The light on each of its ${facets} facets. Its eyes are off in Settings, so its brain isn't sent this.`;
-    text(g, sub, cx, top + 42, { size: 12, align: "center", color: "#cfe8ff" });
+      text(g, sub, cx, top + 42, { size: 12, align: "center", color: "#cfe8ff" });
+    }
     text(g, "left eye", cx - 190, bottom - 12, { size: 12, align: "center", color: "#9fdcff" });
     text(g, "ahead", cx, bottom - 12, { size: 12, align: "center", color: "#9fdcff" });
     text(g, "right eye", cx + 190, bottom - 12, { size: 12, align: "center", color: "#9fdcff" });
