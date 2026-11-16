@@ -20,23 +20,66 @@ the worked example.
 
 ## The world
 
-The world is a height field in millimetres, y up, the table top at y = 0 and
-centred on the origin. A fruit fly is about 2.5 mm long; it steps up nothing
-taller than 0.9 mm and can't stand on anything steeper than 65°.
+The world is in millimetres, y up, its floor at y = 0 and centred on the
+origin: a table top, a sill, a bench or a bar, or a room's own floor (the
+restaurant's). A fruit fly is about 2.5 mm long; it steps up nothing taller
+than 0.9 mm, can't stand on anything steeper than 65°, and needs 1.3 mm of
+room over its feet (`FLY_HEIGHT`, up to its folded wings).
 
 - **The floor** is a disc (`{ kind: "circle", r }`) or a rectangle
   (`{ kind: "rect", hx, hz }`, half-sizes). The fly can't walk off it, and in
   the air it is drawn back over it once past its edge.
-- **Solids** are columns standing on it: a footprint (circle, ellipse or box,
-  turned by an angle) and a top (flat, a dome, or a dish). Nothing is hollow
-  and nothing overhangs: the fly can't go under anything. A wall or a window
-  pane is a tall thin box; solids may stand beyond the floor's edge, and still
-  stop the camera standing inside them.
+- **Solids** are a footprint (circle, ellipse or box, turned by an angle) and
+  a top (flat, a dome, or a dish). Without a `bottom` a solid is a column
+  standing on the floor. With one it is a slab, solid only from its bottom up
+  to its top, with air beneath it: a table top on its legs, a chair seat, a
+  shelf, a lamp. Its top's heights stay absolute, and a dish slab's outside
+  falls to its bottom (a plate on a table top). A slab may rest on another's
+  top (`bottom` equal to it: a plate on a table, a bottle on a shelf), and
+  faces may meet: heights within `TOUCH` (a millionth of a millimetre) are
+  the same. A wall or a window pane is a tall thin box; solids may stand
+  beyond the floor's edge, and still stop the camera standing inside them.
+  Nothing is hollow other than a slab's underside: a gap under a slab lower
+  than the fly's 1.3 mm is as good as solid to it.
 - **Patches** are the place's own food, eaten down and coming back over 90 s.
   Mark a liquid one `pool: true` and the fly's feet set rings spreading on it
-  (through `SceneSet.ripple`).
-- **The start** is where the fly first stands and its yaw. **The ceiling** is
-  how high it may fly before it is drawn back down.
+  (through `SceneSet.ripple`). Where one point has several surfaces over it,
+  its `y` says which it lies on: the surface there at or below `y` (left out,
+  the highest).
+- **The start** is where the fly first stands, its yaw and, with slabs, its
+  `y` (the surface at or below it, as for patches). **The ceiling** is how
+  high it may fly before it is drawn back down.
+
+Over one point there can be several surfaces, one above another (the floor,
+a chair seat, the table top over both), so the world's questions about a
+point say which by a height (`packages/world/src/world.ts`): `surface` and
+`heightAt` give the highest surface at or below one, and how far the air over
+it goes (`underside`); `underside` where the air over a height ends;
+`solidAt` whether a point is inside anything; `topAbove` where a point inside
+something comes out at the top; `wallNormal` the way out of whatever fills a
+band of heights; and `raycast` meets tops from above, undersides from below
+and sides between them, sweeping a body's height when asked. With no height
+given, `surface` is the highest there is, which over a room with a ceiling
+slab is its top: say where the start, the food and anything else is.
+
+The fly stands on the surface under its feet. Walking, that is the highest
+surface within a step of them, with room over it for its body; an underside
+lower than that, there or under its head, is a wall it walks into, and one
+higher is nothing to it. In the air its feet sweep the way it goes with its
+body over them: an underside stops it with its body just under it and
+bounces it back down; it lands on what it comes down onto from above (the
+top within a step under its feet, or of what its feet went into), never on
+something it is under; beside a slab it falls past it.
+
+The world files every solid in a grid of flat arrays, its cells 32 mm or,
+in a bigger place, doubled until there are no more than 16,384 of them (the
+restaurant's are 64 mm); a solid over more than 1,024 cells (the
+restaurant's ceiling) is instead on a short list every query checks. A ray
+walks the cells it crosses, nearest first, so a long one costs what it
+passes. Circles and boxes at angle 0 are the cheapest footprints and flat
+the cheapest top; a ray finds a dome or a dish by sampling it, so keep big
+things flat. `World.load` files the restaurant's 415 solids in about a
+tenth of a millisecond in desktop Node.
 
 Anything drawn but not in the world must be flat enough not to matter to a fly
 (under half a millimetre, like the picnic's specks of biscuit), or out of its
@@ -91,7 +134,10 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   any wall). `vista` is the way the best of the view lies: with nothing
   standing behind the fly, the camera likes to have that there. Every other
   shot, the wallpaper's included, stays on the fly and is shared by every
-  place.
+  place. Wherever it is, the camera keeps out of everything and clear of the
+  surface under it and of what is over it, and anything standing between it
+  and the fly (a wall behind it, a table top over the fly) brings it in front
+  of that: taken out by hand in a room, it stops at the walls.
 - **Sound** (`ambience`): an `Ambience` in `apps/web/src/audio/sounds.ts`, a loop
   synthesised sample by sample (the Apple TV's audio has no oscillators or
   filters), built the first time it is needed. Its optional `rain` (0 to 1,
@@ -139,5 +185,7 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   about half a second on the TV. Keep it there.
 - **Register it** in `catalog.ts` and `index.ts`. `apps/web/tests/places.test.ts`
   then checks it like every other place: the fly starts standing on the table,
-  its food can be tasted where it lies, it has every time of day, and every
-  shot keeps the camera out of everything with the fly in the picture.
+  its food can be tasted where it lies with room over it for a fly, it has
+  every time of day, and every shot keeps the camera out of everything with
+  the fly in the picture. Add it to the fuzzers' places too
+  (`scripts/fuzz/body.ts`).

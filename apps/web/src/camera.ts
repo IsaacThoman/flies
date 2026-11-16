@@ -115,8 +115,9 @@ const ZOOM_FARTHEST = 1.3;
 
 /** How far (mm) the camera keeps above whatever is under it, and from anything in the way. */
 const CLEARANCE = 1.1;
-/** What stands in the line of sight but not in it from this much higher (of the eye's distance) is a bump it grazes, not in the way. */
+/** What stands in the line of sight but not in it from this much higher (of the eye's distance, up to a few body lengths) is a bump it grazes, not in the way. */
 const RAISE = 0.15;
+const RAISE_MOST = 4 * FLY_LENGTH;
 /** Something this near the fly's middle (mm) is right by it: the camera goes round it rather than in to it. */
 const BY_THE_FLY = 2 * FLY_LENGTH;
 /** The fly's middle, above its feet, mm. */
@@ -435,7 +436,7 @@ export class CameraDirector {
     const clear = Math.max(hit.t * 0.5, hit.t - CLEARANCE / Math.max(0.25, -(d.x * hit.normal.x + d.y * hit.normal.y + d.z * hit.normal.z)));
     if (world.solidAt(x, y, z) >= 0) return clear;
     if (hit.t < BY_THE_FLY) return Infinity;
-    const graze = Math.max(CLEARANCE, wanted * RAISE);
+    const graze = Math.max(CLEARANCE, Math.min(RAISE_MOST, wanted * RAISE));
     const r = this.#from;
     const length = Math.hypot(x - focus.x, y + graze - focus.y, z - focus.z);
     r.x = (x - focus.x) / length;
