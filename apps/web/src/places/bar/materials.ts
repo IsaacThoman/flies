@@ -9,6 +9,8 @@
 import * as THREE from "three";
 import { BAR_DECOR, BAR_TOP } from "@fly/world";
 import { canvasTexture } from "../../scene/build.ts";
+import { CLOCK_GLSL, onDial } from "../../scene/clock.ts";
+import type { Dial } from "../../scene/clock.ts";
 import { casterUniforms, patch } from "./light.ts";
 import type { Caster } from "./light.ts";
 
@@ -34,6 +36,12 @@ export const KIND = {
   nut: 13,
   /** Maraschino cherries: glossy, and red light comes back out of them. */
   cherry: 14,
+  /** The clock's face: its enamel, its markings and its hands, drawn in the shader. */
+  dial: 15,
+  /** The walls above the panelling: flocked paper, its damask drawn in the shader. */
+  paper: 16,
+  /** The paintings: brushwork and old varnish over the colours they are painted in. */
+  canvas: 17,
   glass: 20,
   beer: 21,
   cocktail: 22,
@@ -59,8 +67,8 @@ const KINDS = Object.entries(KIND)
 /** How many rings can spread at once, on any liquid. */
 export const RIPPLES = 4;
 
-/** The warm lights of the room at night: the back bar's shelf lights and the wall lights, as positions. */
-export type Wash = { shelves: readonly number[]; shelfX: readonly [number, number]; shelfZ: number; sconces: readonly THREE.Vector3Like[] };
+/** The warm lights of the room at night: the back bar's shelf lights (stopping either side of the pier, `gap`), the wall lights, and the little lamp over the clock, as positions. */
+export type Wash = { shelves: readonly number[]; shelfX: readonly [number, number]; shelfZ: number; gap: readonly [number, number]; sconces: readonly THREE.Vector3Like[]; clockLamp: THREE.Vector3Like };
 
 export type Shared = {
   time: { value: number };
@@ -129,6 +137,7 @@ function solidHead(wash: Wash) {
 ${KINDS}
 ${WOOD}
 ${NAPKIN}
+${CLOCK_GLSL}
 uniform sampler2D uContact;
 // The two coasters: where, how big, and which print.
 uniform vec4 uCoasters[2];
@@ -145,13 +154,37 @@ float barRough;
 float barMetal;
 vec2 barSlope;
 float barFlat;
+// Where a fragment of the clock's face is on it, in its radii.
+vec2 barDial;
+// The clock's hour and minute hands: blued steel, each a shaft through a hollow moon to a point, a round counterweight behind.
+float barMoonHand(vec2 q, float angle, float len, float at, float moon, float w, float tail, float px) {
+  vec2 c = clockAlong(angle, at);
+  float ring = clockSpot(q, c, moon, px) * (1.0 - clockSpot(q, c, moon * 0.56, px));
+  float shaft = clockHand(q, angle, at - moon * 0.7, tail, w, w * 0.7, px);
+  float start = at + moon * 0.75;
+  float tip = clockHand(q, angle, len, -start, w * 1.1 / (1.0 - start / len), 0.0, px);
+  return max(max(ring, shaft), max(tip, clockSpot(q, clockAlong(angle, -tail), w * 1.05, px)));
+}
+float barHands(vec2 q, float px) {
+  return max(barMoonHand(q, uClockHands.x, 0.57, 0.41, 0.095, 0.058, 0.13, px), barMoonHand(q, uClockHands.y, 0.86, 0.66, 0.072, 0.044, 0.17, px));
+}
+float barSecondHand(vec2 q, float px) {
+  return max(clockHand(q, uClockHands.z, 0.88, 0.2, 0.015, 0.009, px), clockSpot(q, clockAlong(uClockHands.z, -0.17), 0.034, px));
+}
 // The room's warm lights at night, washing the walls and the back bar: the light they give to a surface here.
 vec3 barWash(vec3 p, vec3 n) {
   vec3 w = vec3(0.0);
   if (p.z < ${(wash.shelfZ + 140).toFixed(1)} && p.x > ${wash.shelfX[0].toFixed(1)} && p.x < ${wash.shelfX[1].toFixed(1)}) {
     ${wash.shelves.map((y) => `{ float b = ${y.toFixed(1)} - 14.0 - p.y; if (b > -6.0) w += vec3(1.0, 0.62, 0.3) * exp(-max(b, 0.0) / 150.0) * smoothstep(-6.0, 4.0, b); }`).join("\n    ")}
     float ends = smoothstep(${wash.shelfX[0].toFixed(1)}, ${(wash.shelfX[0] + 260).toFixed(1)}, p.x) * smoothstep(${wash.shelfX[1].toFixed(1)}, ${(wash.shelfX[1] - 260).toFixed(1)}, p.x);
-    w *= 0.9 * ends;
+    // Where the shelves stop for the pier, so does their light.
+    w *= 0.9 * ends * smoothstep(0.0, 40.0, abs(p.x - ${((wash.gap[0] + wash.gap[1]) / 2).toFixed(1)}) - ${((wash.gap[1] - wash.gap[0]) / 2).toFixed(1)});
+  }
+  {
+    // The little lamp over the clock: down and out over its face, and a little round about.
+    vec3 d = vec3(${wash.clockLamp.x.toFixed(1)}, ${wash.clockLamp.y.toFixed(1)}, ${wash.clockLamp.z.toFixed(1)}) - p;
+    float dd = dot(d, d);
+    w += vec3(1.0, 0.7, 0.42) * 1.3 * exp(-dd / 70000.0) * smoothstep(-6.0, 20.0, d.y) * (0.45 + 0.55 * max(dot(n, d) * inversesqrt(dd + 1.0), 0.0));
   }
   ${wash.sconces
     .map((s) => `{ vec3 d = vec3(${s.x.toFixed(1)}, ${s.y.toFixed(1)}, ${s.z.toFixed(1)}) - p; float dd = dot(d, d); w += vec3(1.0, 0.6, 0.3) * 60000.0 / (dd + 20000.0) * (0.35 + 0.65 * max(dot(n, d) * inversesqrt(dd), 0.0)); }`)
@@ -255,6 +288,30 @@ if (barK == K_GLOSSY) {
   barVarnish = 0.8;
 }
 if (barK == K_MATTE) barRough = 0.88;
+if (barK == K_PAPER || barK == K_CANVAS) {
+  vec3 an = abs(vWorldNormal);
+  vec2 wp = vec2(an.z > an.x ? vWorld.x : vWorld.z, vWorld.y);
+  if (barK == K_PAPER) {
+    // Flocked paper: ogees in a half drop, a quatrefoil in each, in velvet a shade darker than the satin ground.
+    vec2 t = wp / vec2(170.0, 240.0);
+    float col = floor(t.x + 0.5);
+    float x = t.x - col;
+    float y = fract(t.y + 0.5 * mod(col, 2.0));
+    float aa = fwidth(t.x) * 1.5;
+    float lattice = 1.0 - smoothstep(0.03, 0.045 + aa, abs(abs(x) - 0.47 * sin(3.14159 * y)));
+    vec2 c = vec2(x, (y - 0.5) * 1.41);
+    float petals = 1.0 - smoothstep(-aa, aa, length(c) - 0.15 * (0.78 + 0.22 * cos(atan(c.y, c.x) * 4.0)));
+    float flock = mix(0.25, max(lattice, petals), barDetail(t * 14.0));
+    diffuseColor.rgb *= mix(1.08, 0.74, flock);
+    barRough = mix(0.5, 0.95, flock);
+  } else {
+    // Oil paint: strokes laid across, a little raised, under varnish gone amber, darkest toward the frame.
+    vec2 sp = wp * vec2(0.05, 0.2);
+    diffuseColor.rgb *= (0.8 + barNoise(sp) * 0.3 + (barNoise(sp * 3.1 + 7.0) - 0.5) * 0.25 * barDetail(sp * 3.1)) * vec3(1.0, 0.94, 0.8);
+    barRough = 0.35;
+    barVarnish = 0.4;
+  }
+}
 if (barK == K_MIRROR) {
   // An old mirror: the silvering gone smoky and spotted, most at its edges and corners, where the damp got in.
   vec2 mp = vWorld.xy * 0.012;
@@ -266,6 +323,9 @@ if (barK == K_MIRROR) {
   barRough = 0.06 + spots * 0.4;
 }
 if (barK == K_BOTTLE) {
+  // Glass with spirit in it: deepest where you look straight through it, the glass itself toward its edges, pale with what it reflects.
+  float facing = abs(dot(normalize(vWorldNormal), normalize(cameraPosition - vWorld)));
+  diffuseColor.rgb = mix(diffuseColor.rgb * mix(0.6, 1.15, facing), vec3(0.62, 0.68, 0.66), pow(1.0 - facing, 3.0) * 0.55);
   barRough = 0.08;
   barVarnish = 1.0;
 }
@@ -343,8 +403,42 @@ if (barK == K_LIME || barK == K_FLESH) {
   }
 }`;
 
+/**
+ * The clock's face: enamel gone the colour of old ivory, a railway track of
+ * minutes, tapered batons for the hours (a pair at twelve), and the hands,
+ * each casting a soft shadow down onto the face from the lamp above it.
+ */
+const dialColor = (dial: Dial) => /* glsl */ `
+if (barK == K_DIAL) {
+  vec2 q = ${onDial(dial)}.xy;
+  barDial = q;
+  float px = length(fwidth(q));
+  float r = length(q);
+  vec3 face = mix(vec3(0.95, 0.91, 0.8), vec3(0.84, 0.76, 0.58), clamp(smoothstep(0.5, 1.02, r) * 0.6 + (barFbm(q * 5.0 + 3.0) - 0.5) * 0.3, 0.0, 1.0));
+  float ink = clockRing(q, 0.872, 0.884, px) + clockRing(q, 0.952, 0.964, px) + clockTicks(q, 60.0, 0.884, 0.952, 0.011, px);
+  float sector = 0.5235988;
+  float at = floor(atan(q.x, q.y) / sector + 0.5) * sector;
+  float hour = abs(at) < 0.01
+    ? max(clockHand(q, -0.07, 0.86, -0.66, -0.13, 0.045, px), clockHand(q, 0.07, 0.86, -0.66, -0.13, 0.045, px))
+    : clockHand(q, at, 0.86, -0.66, -0.15, 0.06, px);
+  vec3 c = mix(face, vec3(0.1, 0.075, 0.06), min(ink + hour, 1.0) * 0.92);
+  vec2 off = vec2(-0.02, 0.035);
+  float spx = px * 3.0 + 0.015;
+  c *= 1.0 - max(barHands(q + off, spx), barSecondHand(q + off * 1.3, spx)) * 0.32;
+  float hands = barHands(q, px);
+  c = mix(c, vec3(0.03, 0.04, 0.08), hands);
+  c = mix(c, vec3(0.5, 0.05, 0.04), barSecondHand(q, px));
+  c = mix(c, vec3(0.62, 0.45, 0.2), clockSpot(q, vec2(0.0), 0.05, px));
+  c = mix(c, vec3(0.08, 0.06, 0.04), clockSpot(q, vec2(0.0), 0.017, px));
+  diffuseColor.rgb = c;
+  barRough = mix(0.34, 0.22, hands);
+  barVarnish = 0.25;
+}`;
+
 const SOLID_EMISSIVE = /* glsl */ `
 if (barK == K_LAMP) totalEmissiveRadiance += diffuseColor.rgb * (0.04 + uLamps * 1.15);
+// The clock's face is lit round its rim from behind the bezel, a soft ring of light in the evening.
+if (barK == K_DIAL) totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.66, 0.34) * uLamps * (0.05 + 0.45 * smoothstep(0.93, 1.0, length(barDial)));
 if (barK == K_BOTTLE && !barOnCounter) {
   // Lit from behind by the shelf lights: the liquid glows where you look through it, the glass shines at its edges.
   float facing = abs(dot(normalize(vWorldNormal), normalize(cameraPosition - vWorld)));
@@ -371,7 +465,9 @@ reflectedLight.directDiffuse *= mix(1.0, barAO, 0.55);
 reflectedLight.indirectSpecular *= mix(1.0, barAO, 0.8);
 #ifdef USE_CLEARCOAT
 // The reflections are a soft sky, not the room: on the varnish, at a fly's grazing angle, they would veil the wood. Let the lamps, the candle and the window shine in it instead.
-clearcoatSpecularIndirect *= mix(1.0, barAO, 0.8) * (barK == K_TOP || barK == K_WOOD ? 0.3 : 1.0);
+// The counter mirrors the room, which is dark but for the window: by day a bright sky all round would grey the walnut.
+float barRoom = barK == K_TOP ? mix(0.3, 1.0, smoothstep(0.1, 0.75, -barWorldDir(reflect(-geometryViewDir, geometryClearcoatNormal)).x)) : 1.0;
+clearcoatSpecularIndirect *= mix(1.0, barAO, 0.8) * (barK == K_TOP || barK == K_WOOD ? 0.3 * barRoom : 1.0);
 #endif
 if (barK == K_TOP || barK == K_WOOD) reflectedLight.indirectSpecular *= 0.5;`;
 
@@ -402,7 +498,7 @@ function contactTexture(casters: readonly { x: number; z: number; r: number; str
 }
 
 /** The solid things' material: one for the counter, everything on it and the room. */
-export function solidMaterial(casters: readonly Caster[], contact: readonly { x: number; z: number; r: number; strength: number }[], wash: Wash, shared: Shared, flame: THREE.Vector3, lime: { x: number; z: number; rx: number; angle: number; base: number; height: number }, coasters: readonly { x: number; z: number; r: number }[]) {
+export function solidMaterial(casters: readonly Caster[], contact: readonly { x: number; z: number; r: number; strength: number }[], wash: Wash, shared: Shared, flame: THREE.Vector3, lime: { x: number; z: number; rx: number; angle: number; base: number; height: number }, coasters: readonly { x: number; z: number; r: number }[], clock: { dial: Dial; hands: { value: THREE.Vector3 } }) {
   const material = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.6, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 0.9 });
   const uniforms = {
     ...casterUniforms(casters),
@@ -416,13 +512,14 @@ export function solidMaterial(casters: readonly Caster[], contact: readonly { x:
     uLimeAngle: { value: lime.angle },
     uLimeHeight: { value: lime.height },
     uCoasters: { value: [...coasters].sort((a, b) => a.x - b.x).map((c, i) => new THREE.Vector4(c.x, c.z, c.r, i)) },
+    uClockHands: clock.hands,
   };
   patch(material, {
     key: "solid",
     uniforms,
     casters: casters.length,
     head: solidHead(wash),
-    color: SOLID_COLOR,
+    color: SOLID_COLOR + dialColor(clock.dial),
     surface: "roughnessFactor = barRough;\nmetalnessFactor = barMetal;",
     normal: SOLID_NORMAL,
     emissive: SOLID_EMISSIVE,

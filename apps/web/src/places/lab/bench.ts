@@ -13,7 +13,7 @@ import type { Solid } from "@fly/world";
 import { Batch, canvas2d, canvasTexture, freeze, paint, random } from "../../scene/build.ts";
 import type { ColorFn } from "../../scene/build.ts";
 import type { SceneSet } from "../types.ts";
-import { SUNBEAM, benchMaterial, clearMaterial, finish, sunbeam, surfaceMaterial } from "./materials.ts";
+import { SUNBEAM, benchMaterial, clearMaterial, finish, glints, sunbeam, surfaceMaterial } from "./materials.ts";
 import type { Finish } from "./materials.ts";
 import { DISPLAY, INK, PAGES, labelRegion, pagesRegion, paperMaterial, paperTexture, tapeRegion } from "./paper.ts";
 import type { Region } from "./paper.ts";
@@ -27,6 +27,7 @@ export const SHADE = { x: 108, y: 248, z: -14, aim: { x: 6, y: 0, z: 40 } };
 const LAMP_CANDELA = 125_000;
 
 const UP = new THREE.Vector3(0, 1, 0);
+const WHITE = new THREE.Color("#ffffff");
 const byName = (name: string) => LAB_SOLIDS.filter((s) => s.name === name);
 const one = (name: string) => byName(name)[0];
 
@@ -272,14 +273,14 @@ function dropMaterial(page: THREE.Texture) {
 export function buildBench(): SceneSet {
   const group = new THREE.Group();
   const rnd = random(23);
-  const glow = { value: 0 };
-  const lampWay = { value: new THREE.Vector3(SHADE.x, SHADE.y, SHADE.z).normalize() };
+  const shine = glints();
+  shine.uLampDir.value.set(SHADE.x, SHADE.y, SHADE.z).normalize();
   const beam = sunbeam();
-  const surface = surfaceMaterial(glow, lampWay, beam);
-  const clear = clearMaterial(glow, lampWay);
+  const surface = surfaceMaterial(shine, beam);
+  const clear = clearMaterial(shine);
   const atlas = paperTexture();
   const paper = paperMaterial(atlas, beam);
-  const bench = benchMaterial(benchTexture(), beam);
+  const bench = benchMaterial(benchTexture(), beam, shine);
   /** The big shapes, which the fly's eyes see; the fine detail, which they don't; glass and paper. */
   const big = new Batch();
   const fine = new Batch();
@@ -337,6 +338,12 @@ export function buildBench(): SceneSet {
     add(big, new RoundedBoxGeometry(MICROSCOPE.hx * 2, H, MICROSCOPE.hz * 2, 3, 2.5).translate(0, H / 2, 0), (p) => (p.y < 3 ? "#d9d7cf" : cream), ENAMEL);
     // A dark band round the base's foot, and the black stage plate let into its top with a chrome ring.
     add(fine, new THREE.BoxGeometry(MICROSCOPE.hx * 2 + 0.6, 4, MICROSCOPE.hz * 2 + 0.6).translate(0, 4, 0), dark, SATIN);
+    // The seam where the casting meets its cover; the switch and its green light on the front; vents in its end, behind the dimmer.
+    add(fine, new THREE.BoxGeometry(MICROSCOPE.hx * 2 + 0.3, 0.6, MICROSCOPE.hz * 2 + 0.3).translate(0, H - 8, 0), "#b9b5aa", ENAMEL);
+    add(fine, new RoundedBoxGeometry(14, 8, 2.4, 2, 0.8).translate(-70, 15, MICROSCOPE.hz + 0.6), "#26282c", SATIN);
+    add(fine, new THREE.BoxGeometry(12, 3.4, 0.6).rotateX(0.25).translate(-70, 16.2, MICROSCOPE.hz + 1.8), "#3a3d42", SATIN);
+    add(fine, new THREE.CylinderGeometry(1.4, 1.4, 0.8, 12).rotateX(Math.PI / 2).translate(-52, 15, MICROSCOPE.hz + 0.3), "#5ee08a", { rough: 0.3, glow: 2 });
+    for (let i = 0; i < 6; i++) add(fine, new THREE.BoxGeometry(0.6, 1.8, 22).translate(MICROSCOPE.hx + 0.1, 11 + (i % 2) * 6, -72 + Math.floor(i / 2) * 26), "#2a2b2e", SATIN);
     add(big, new THREE.CylinderGeometry(52, 52, 0.3, 64).translate(0, H + 0.15, 14), "#141518", { rough: 0.18 });
     add(fine, new THREE.TorusGeometry(52.4, 0.7, 6, 64).rotateX(Math.PI / 2).translate(0, H, 14), "#d8dadd", CHROME);
     // Two spring clips on the stage, flat enough not to matter underfoot.
@@ -649,6 +656,10 @@ export function buildBench(): SceneSet {
     big.add(surface, piece(new RoundedBoxGeometry(TIMER.hx * 2, TIMER.height, TIMER.hz * 2, 3, 5).translate(0, TIMER.height / 2, 0), (p) => (p.y > TIMER.height - 2 ? "#e4e6e7" : "#cfd3d6"), SATIN), m);
     sheets.add(paper, paperPiece(new THREE.PlaneGeometry(48, 22).rotateX(-Math.PI / 2).translate(0, TIMER.height + 0.02, -8), "#a9b6a0", labelRegion(DISPLAY)), m);
     for (let i = 0; i < 3; i++) fine.add(surface, piece(new THREE.CylinderGeometry(4.5, 4.8, 0.9, 20).translate(-15 + i * 15, TIMER.height + 0.25, 15), ["#d24e3a", "#3a7fd2", "#5a5f66"][i], { rough: 0.45 }), m);
+    // The seam between its two halves, and the grey rubber band round its foot that keeps it from sliding.
+    fine.add(surface, piece(new THREE.BoxGeometry(TIMER.hx * 2 - 4, 0.5, TIMER.hz * 2 + 0.2).translate(0, 13, 0), "#9fa4a8", SATIN), m);
+    fine.add(surface, piece(new THREE.BoxGeometry(TIMER.hx * 2 + 0.2, 0.5, TIMER.hz * 2 - 4).translate(0, 13, 0), "#9fa4a8", SATIN), m);
+    fine.add(surface, piece(new RoundedBoxGeometry(TIMER.hx * 2 + 0.6, 3, TIMER.hz * 2 + 0.6, 2, 1.4).translate(0, 1.5, 0), "#7d8287", RUBBER), m);
   }
 
   // The box of pipette tips: a blue box, a white plate of yellow tips, a clear lid.
@@ -657,6 +668,10 @@ export function buildBench(): SceneSet {
     const f = box.footprint as { x: number; z: number; hx: number; hz: number; angle: number };
     const m = frame(f.x, f.z, f.angle);
     big.add(surface, piece(new RoundedBoxGeometry(f.hx * 2 - 2, 46, f.hz * 2 - 2, 2, 2).translate(0, 23, 0), "#2f6fb5", SATIN), m);
+    // Moulded ribs up its long sides, a lip where the lid closes, and a strip of tape with what is in it.
+    for (const side of [-1, 1]) for (let i = -3; i <= 3; i++) fine.add(surface, piece(new THREE.BoxGeometry(3, 32, 2).translate(i * 15, 22, side * (f.hz - 1)), "#2c68aa", SATIN), m);
+    fine.add(surface, piece(new RoundedBoxGeometry(f.hx * 2, 3, f.hz * 2, 2, 1).translate(0, 44.5, 0), "#2a62a3", SATIN), m);
+    sheets.add(paper, paperPiece(new THREE.PlaneGeometry(52, 15).rotateY(Math.PI).translate(-2, 30, -f.hz - 0.1), "#f6f2df", labelRegion(5)), m);
     big.add(surface, piece(new THREE.BoxGeometry(f.hx * 2 - 4, 2, f.hz * 2 - 4).translate(0, 47, 0), "#f4f4f1", SATIN), m);
     const tips: THREE.BufferGeometry[] = [];
     for (let i = 0; i < 12; i++) {
@@ -672,16 +687,17 @@ export function buildBench(): SceneSet {
   {
     const wipe = one("wipe");
     // Its folds are a little below the world's dome (never above it), and its faces flat, so the creases catch the light.
-    const geometry = solidTop(wipe, 12, 36);
+    const geometry = solidTop(wipe, 22, 64);
     const pos = geometry.attributes.position;
-    const crease = (x: number, z: number) => Math.abs(Math.sin(x * 0.29 + Math.sin(z * 0.23) * 2.2) + Math.sin(z * 0.37 - x * 0.15) * 0.8 + Math.sin((x + z) * 0.61) * 0.35);
+    // Sharp ridges where the folds meet, a little deeper up on the heap than at its foot, never more than a millimetre or two under where the fly stands.
+    const crease = (x: number, z: number) => Math.abs(Math.sin(x * 0.21 + Math.sin(z * 0.17) * 2.2) + Math.sin(z * 0.3 - x * 0.13) * 0.8 + Math.sin((x + z) * 0.5) * 0.35) + Math.abs(Math.sin(x * 0.9 - z * 0.7 + Math.sin(z * 0.5) * 1.5)) * 0.3;
     for (let i = 0; i < pos.count; i++) {
       const y = pos.getY(i);
-      if (y > 0.3) pos.setY(i, Math.max(0.2, y - crease(pos.getX(i), pos.getZ(i)) * 0.7));
+      if (y > 0.3) pos.setY(i, Math.max(0.2, y - crease(pos.getX(i), pos.getZ(i)) * (0.55 + 0.45 * THREE.MathUtils.smoothstep(y, 3, 12))));
     }
     geometry.deleteAttribute("normal");
     geometry.computeVertexNormals();
-    big.add(surface, piece(geometry, "#f2f3f5", { rough: 0.95, texture: 0.25 }));
+    big.add(surface, piece(geometry, "#f2f3f5", { rough: 0.95, texture: 0.12 }));
   }
 
   // Fly food spilt when the vials were filled: flat drips, and dried crumbs to climb.
@@ -746,10 +762,12 @@ export function buildBench(): SceneSet {
       beam.uSunDir.value.copy(light.sunDirection);
       beam.uSunColor.value.copy(light.sunColor);
       beam.uSunBeam.value = light.sunIntensity * SUNBEAM * (1 - on);
+      // The windows as glossy things see them: the sky outside, bright by day, glowing at dusk, dark at night.
+      shine.uWindow.value.copy(light.cloud).lerp(WHITE, 0.55 * (1 - light.stars)).multiplyScalar(1.4 * (1 - 0.8 * light.stars));
       if (on === lit) return;
       lit = on;
       spot.intensity = on * LAMP_CANDELA;
-      glow.value = on;
+      shine.uGlow.value = on;
     },
     ripple() {},
   };
