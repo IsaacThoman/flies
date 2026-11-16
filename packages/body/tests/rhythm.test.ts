@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { RHYTHM, Rhythm, SUMMER, clockAt, pressureAfter, usualPressure } from "../src/rhythm.ts";
 
@@ -77,4 +79,13 @@ test("the clock runs on between settings and is put right by them", () => {
   assert.equal(r.clock.morning, 1);
   r.setTime(12, { sunrise: 12, sunset: 20 });
   assert.equal(r.clock.morning, 1);
+});
+
+test("a step allocates nothing but boxed numbers, even without a JIT", () => {
+  const probe = fileURLToPath(new URL("rhythm-allocation-probe.ts", import.meta.url));
+  const result = spawnSync(process.execPath, ["--no-opt", "--no-maglev", "--no-sparkplug", probe], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  const { numberSize, sizes } = JSON.parse(result.stdout) as { numberSize: number; sizes: Record<string, string[]> };
+  const others = Object.entries(sizes).filter(([size]) => Number(size) !== numberSize);
+  assert.deepEqual(others, [], `allocations other than ${numberSize}-byte numbers`);
 });
