@@ -3,6 +3,9 @@ dist
 build
 .DS_Store
 *.log
+.env
+.env.*
+!.env.example
 
 # The packed connectome (about 38 MB): npm run brain:fetch
 packages/brain/data/

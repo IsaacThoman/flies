@@ -304,6 +304,12 @@ iPad's home-screen app 18.4+.
 
 ## Where to host it
 
+For the owner's Docker server at `flies.isaacthoman.com`, use the
+[self-hosting instructions](deploy.md): a multi-stage web image, Caddy with
+automatic HTTPS and the headers above, and a Compose stack with a slot for
+the future multiplayer room server. The options below are managed static
+hosts for anyone who prefers those.
+
 Checked against each host's own documentation on 16 November 2026. Each
 takes files built elsewhere: the connectome isn't in git, so a CI job fetches
 it, builds, and uploads `dist/`, and the repository can stay private. Whatever
@@ -320,7 +326,7 @@ own cache.
 | Traffic | [100 GB a month, soft](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits): about 6,900 first visits | [free and unlimited](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/) for static files | [credits](https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/how-credits-work/): the free 300 a month buy at most 15 GB, about 1,000 first visits |
 | Cost | free for a public repository | free (Workers Paid, $5 a month, isn't needed) | free, then $9 a month |
 
-**Cloudflare Workers static assets**, free, is the one to use: no limit on
+**Cloudflare Workers static assets**, free, is the managed option to use: no limit on
 static traffic, a file cap this build is far under, headers when wanted, a
 [subdirectory](https://developers.cloudflare.com/workers/static-assets/routing/advanced/serving-a-subdirectory/)
 if the site should live under one, and Cloudflare's own

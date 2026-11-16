@@ -22,6 +22,8 @@ of the brain's commands, how it moves, what its eyes see) and `packages/ui`
 (the menu kit). `docs/places.md` is about the places the fly can live and how
 to add one, and `docs/web.md` about the web build: getting the brain to a
 browser, running well on what people have, being a good tab, and hosting.
+For a Docker Compose stack with automatic HTTPS on your own server, see
+[Self-hosting Flies](docs/deploy.md).
 
 ## Playing
 
