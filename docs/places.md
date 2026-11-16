@@ -34,7 +34,12 @@ taller than 0.9 mm and can't stand on anything steeper than 65°.
   stop the camera standing inside them.
 - **Patches** are the place's own food, eaten down and coming back over 90 s.
   Mark a liquid one `pool: true` and the fly's feet set rings spreading on it
-  (through `SceneSet.ripple`).
+  (through `SceneSet.ripple`). What the fly's feet carry off a patch for its
+  footprints (a colour, or nothing for something dry) is found by the patch's
+  name in `apps/web/src/scene/prints.ts`, and `apps/web/tests/prints.test.ts`
+  asks it of every patch. A solid whose drawn top isn't the world's smooth
+  one (a drink, a head of foam, something drawn rougher) is named there too,
+  so that no print floats over it.
 - **The start** is where the fly first stands and its yaw. **The ceiling** is
   how high it may fly before it is drawn back down.
 

@@ -104,7 +104,9 @@ export class Pantry {
    */
   touching(x: number, y: number, z: number, reach: number): Food | null {
     let best: Food | null = null;
-    for (const food of this.foods) {
+    // Indexed: asked several times a frame, and an iterator is an allocation without a JIT.
+    for (let i = 0; i < this.foods.length; i++) {
+      const food = this.foods[i];
       if (food.amount <= 0 || Math.abs(y - food.y) > TASTE_HEIGHT + reach) continue;
       const d = food.r + reach;
       const dx = x - food.x;
