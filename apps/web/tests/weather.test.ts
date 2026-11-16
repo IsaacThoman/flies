@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { KINDS, WEATHERS, forecast, hourOfDay } from "@fly/world";
 import type { WeatherKind } from "@fly/world";
-import { WeatherNow, kindOf, wetten } from "../src/scene/weather.ts";
+import { WeatherNow, kindOf, wetten, forecast as sceneForecast } from "../src/scene/weather.ts";
 
 /** Some week a few years from now, in local hours since the epoch. */
 const START = 500_000;
@@ -32,7 +32,7 @@ test("over two months it wanders through every kind, clear most of all, each las
   let last: WeatherKind | null = null;
   const days = 60;
   for (let m = 0; m < days * 24 * 60; m += 5) {
-    const kind = kindOf(forecast(START + m / 60, mix()));
+    const kind = kindOf(forecast(START + m / 60, mix())) as WeatherKind;
     hours[kind] += 5 / 60;
     if (kind !== last) runs++;
     last = kind;
@@ -86,13 +86,43 @@ test("opened after rain, the table is still wet", () => {
   let after = -1;
   let raining = false;
   for (let m = 0; m < 60 * 24 * 60 && after < 0; m += 5) {
-    forecast(START + m / 60, w);
+    sceneForecast(START + 180 * 24 + m / 60, w);
     if (w.rain > 0.5) raining = true;
-    else if (raining && w.rain === 0) after = START + m / 60 + 0.1;
+    else if (raining && w.rain === 0) after = START + 180 * 24 + m / 60 + 0.1;
   }
   assert.ok(after > 0, "it rained in two months");
   const now = new WeatherNow();
   now.follow(after, true);
   assert.ok(now.wet > 0.3, `wet ${now.wet.toFixed(2)}`);
-  assert.equal(now.rain, forecast(after, mix()).rain);
+  assert.equal(now.rain, sceneForecast(after, mix()).rain);
+});
+
+test("precipitation phase and electrical activity clear when another kind is chosen", () => {
+  const w = new WeatherNow();
+  for (const kind of ["snow", "storm", "sleet", "heavyRain"] as const) {
+    w.choose(kind, true);
+    assert.equal(w.kind, kind);
+    w.choose("clear");
+    for (let i = 0; i < 301; i++) w.update(1 / 60);
+    assert.equal(w.kind, "clear");
+    assert.equal(w.snow, 0);
+    assert.equal(w.heavy, 0);
+    assert.equal(w.storm, 0);
+    assert.equal(w.lightning, 0);
+  }
+});
+
+test("snow settles gradually, persists after the fall, and melts into wetness", () => {
+  const w = new WeatherNow();
+  w.choose("snow", true);
+  assert.equal(w.snowCover, 0);
+  for (let i = 0; i < 1200; i++) w.update(0.1);
+  assert.ok(w.snowCover > 0.8 && w.wet < 0.01);
+  w.choose("clear", true);
+  const cover = w.snowCover;
+  w.update(1);
+  assert.ok(w.snowCover < cover && w.snowCover > 0.8);
+  assert.ok(w.wet > 0);
+  for (let i = 0; i < 9000; i++) w.update(0.1);
+  assert.ok(w.snowCover < 0.01);
 });

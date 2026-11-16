@@ -404,7 +404,7 @@ const OUTSIDE_FS = /* glsl */ `
 uniform sampler2D map;
 uniform vec3 high; uniform vec3 low; uniform vec3 sunDir; uniform vec3 sunColor;
 uniform float glow; uniform float stars; uniform float time;
-uniform float cover; uniform float mist; uniform float rain; uniform vec3 veil;
+uniform float cover; uniform float mist; uniform float rain; uniform float snow; uniform vec3 veil;
 uniform vec4 scenery; uniform vec4 mask; uniform vec4 band;
 varying vec3 vWorld;
 varying vec2 vUv;
@@ -456,6 +456,16 @@ void main() {
     float streak = (1.0 - smoothstep(0.0, wide, abs(f.x - x))) * smoothstep(0.0, 0.06, f.y - y * 0.7) * (1.0 - smoothstep(0.1, 0.3, f.y - y * 0.7));
     c = mix(c, mix(veil, vec3(1.0), 0.4), streak * step(hash(cell), rain * 0.8) * 0.4);
   }
+  if (snow > 0.01) {
+    for (int layer=0;layer<3;layer++) {
+      float scale = 40.0 + float(layer)*27.0;
+      vec2 p = d.xy / max(-d.z,0.3) * scale + vec2(time*0.45,time*(1.0+float(layer)*0.6));
+      vec2 cell = floor(p); vec2 q = fract(p)-0.5;
+      q.x += sin(time*0.8+hash(cell)*6.28)*0.2;
+      float flake = 1.0 - smoothstep(0.03,0.08+fwidth(p.x),length(q));
+      c = mix(c,vec3(0.8,0.87,0.95),flake*step(hash(cell+3.0),snow)*0.7);
+    }
+  }
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
 }`;
@@ -486,7 +496,20 @@ export function buildRoom(light: Daylight): SceneBackdrop {
       .replace("#include <opaque_fragment>", "outgoingLight *= mix(mix(0.08, 1.0, uDay), 1.0, vAlways);\n#include <opaque_fragment>");
   };
   glows.customProgramCacheKey = () => "lab-glows";
+  const frost = { value: 0 };
   const glassMaterial = new THREE.MeshBasicMaterial({ color: "#cfe0ee", transparent: true, opacity: 0.08, depthWrite: false });
+  glassMaterial.onBeforeCompile = shader => {
+    shader.uniforms.uFrost = frost;
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vPane;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPane=position;');
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uFrost; varying vec3 vPane;')
+      .replace('#include <opaque_fragment>', `float edge = 1.0 - smoothstep(0.0, 180.0, vPane.y - ${WINDOWS.y0.toFixed(1)});
+float crystal = pow(abs(sin(vPane.x*0.06+vPane.y*0.08)),10.0);
+float ice=uFrost*edge*(0.45+0.55*crystal);
+outgoingLight=mix(outgoingLight,vec3(0.7,0.82,0.95),ice);
+diffuseColor.a+=ice*0.85;
+#include <opaque_fragment>`);
+  };
 
   const solid: THREE.BufferGeometry[] = [];
   const pics: THREE.BufferGeometry[] = [];
@@ -765,6 +788,7 @@ export function buildRoom(light: Daylight): SceneBackdrop {
     cover: { value: 0 },
     mist: { value: 0 },
     rain: { value: 0 },
+    snow: { value: 0 },
     veil: { value: new THREE.Color() },
     scenery: { value: uv(PICTURES.scenery) },
     mask: { value: uv(PICTURES.mask) },
@@ -806,6 +830,8 @@ export function buildRoom(light: Daylight): SceneBackdrop {
       outsideUniforms.cover.value = weather.cloud;
       outsideUniforms.mist.value = weather.mist;
       outsideUniforms.rain.value = weather.rain;
+      outsideUniforms.snow.value = weather.snow;
+      frost.value = weather.snowCover;
       outsideUniforms.veil.value.copy(daylight.cloud).lerp(daylight.haze, 0.5).lerp(WHITE, 0.3 * (1 - daylight.stars));
     },
   };

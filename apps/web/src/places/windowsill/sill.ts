@@ -1041,6 +1041,7 @@ export function buildSill(): SceneSet {
       // The glass becomes a mirror of the lit room as it gets dark outside.
       u.uNight.value = lamp * Math.min(1, light.stars * 1.2);
       u.uRain.value = weather.rain;
+      u.uFrost.value = weather.snowCover;
       u.uWet.value = weather.wet;
       u.uTime.value = time;
       u.uOutside.value.copy(light.horizon).lerp(light.middle, 0.4).multiplyScalar(1 - 0.85 * light.stars);

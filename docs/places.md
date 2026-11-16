@@ -124,7 +124,7 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   the "sun" is the light coming in at the window and the sky what is seen
   through it; a lamp at night can be a warm "sun". `stars` (0 to 1) is how
   dark it is. `env` scales the reflections in the set's `materials`.
-- **Weather** (`scene/weather.ts`): clear, overcast, mist or light rain, from
+- **Weather** (`scene/weather.ts`): clear, overcast, mist, light/heavy rain, thunderstorm, snow or sleet, from
   the Weather tool or, on "Now", the weather outside where the Apple TV can
   tell it (`scene/outside.ts`), else a forecast worked out from the clock. Every
   place gets its light from it without doing anything, as much as its
@@ -134,7 +134,7 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   and takes most of the sun's light (much less of the night's), mist whitens the
   horizon and the haze. Showing it in the place itself is up to the place,
   and optional: `SceneSet.update` and `SceneBackdrop.update` are handed the
-  `Weather` (`cloud`, `mist`, `rain`, `wet`, `wind`, each 0 to 1, and its
+  `Weather` (`cloud`, `mist`, `rain`, `wet`, `wind`, `heavy`, `storm`, `snow`, `snowCover`, `lightning`, each 0 to 1, and its
   `kind`) as their last argument, which a place that ignores it can leave off.
   A windowsill can run rain down its pane by `rain` and leave it streaked by
   `wet`; the picnic's rain, wet table, overcast deck, mist and rainbow are
@@ -269,3 +269,49 @@ TV has (`places/restaurant/`):
   every time of day, and every shot keeps the camera out of everything with
   the fly in the picture. Add it to the fuzzers' places too
   (`scripts/fuzz/body.ts`).
+
+### Storms and winter precipitation
+
+The Weather tool also holds Heavy rain, Thunderstorm, Snow or Sleet. Heavy
+rain reuses the instanced rain pass with denser windblown sheets and faster
+drops. Storm gusts go to `Felt.air`; heavier drops use the existing touch
+path, never a movement command. Thunderstorms are **silent**. Lightning
+changes the existing hemisphere and directional lights and the cloud colours;
+a distant fork sometimes shows through the picnic's cloud deck. The fly's
+six eye renders use those same scene lights. No escape, looming or motor
+input is manufactured for lightning.
+
+The current retina has no ON response: sudden brightening produces zero
+L1/L2/L3 input rates. The flash's falling edge can excite its OFF pathway as
+the adapted light falls again. `apps/web/tests/storm.test.ts` checks this
+with the unchanged retina. This is a limit of the model, not evidence that
+a fly detected a lightning strike or was startled by it. Short flashes can
+also fall between eye refreshes. No brain code is changed here.
+
+Snowflakes are instanced and animated in the shader. Exposed upward picnic
+surfaces and the windowsill garden acquire a cosmetic dusting, less than
+0.35 mm (no added collision surface). It grows over roughly a minute and
+melts over minutes, faster in rain, leaving wetness. Snowfall is not rain:
+it does not trigger raindrop touch. Flakes through the windows remain
+outside. Frost grows at the lab and windowsill pane edges with the dusting;
+it is a visual illustration of winter, not a measured pane temperature.
+Bar and restaurant receive the shared weather light only, as their scene
+files are outside this experiment's scope. Their precipitation and glass
+shaders are unchanged; they do not yet show snowflakes or frost.
+
+WeatherKit's heavyRain and electrical storm conditions retain their kinds;
+snow, blowing snow, heavy snow and blizzards fall as snow, flurries more
+sparsely, and sleet/wintry mix combine rain and snow. Hail and freezing rain
+use rain as a visual approximation; no ice collision or hail impact is
+modelled. WeatherKit visibility, cloud and wind still blend over minutes.
+The invented forecast assumes northern temperate seasons (winter snow,
+summer storms); it makes no claim about local temperature or hemisphere.
+`packages/net/src/weather.ts` extends the world's original forecast for both
+the room server and clients without changing `packages/world`.
+
+**Cold proposal, not implemented:** real fruit flies become sluggish in the
+cold, but temperature and metabolic slowing are not modelled by this brain.
+Do not infer a cold response from a fly standing still in snow. A future
+labelled physiological stand-in could scale body/brain time with a documented
+temperature curve, with explicit owner approval and tests distinguishing it
+from neural decisions. That proposal is not active in this change.

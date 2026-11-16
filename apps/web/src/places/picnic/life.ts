@@ -202,6 +202,11 @@ export class Goings {
     }
 
     this.#stepGust(dt);
+    // Storm wind reaches the same felt air as the visible rain's slant.
+    const stormWind = weather.heavy * 500 * Math.pow(0.5 + 0.5 * Math.sin(this.#time * 0.43 + 1.2), 3);
+    outside.gust.x += Math.cos(BREEZE_ANGLE) * stormWind;
+    outside.gust.z += Math.sin(BREEZE_ANGLE) * stormWind;
+    outside.gust.strength = Math.min(1, outside.gust.strength + stormWind / 600);
     felt.air.x += outside.gust.x;
     felt.air.z += outside.gust.z;
     const brushed = this.#leaves.step(dt, this.#time, world, fly, outside.gust);
@@ -450,7 +455,7 @@ export class Goings {
 
   /** Rain landing: splashes round the fly and over the table, rings in the lemonade, and now and then a drop on the fly. */
   #rainOn(dt: number, around: Around) {
-    const rain = around.weather.rain;
+    const rain = around.weather.rain * (1 + 2 * around.weather.heavy);
     if (rain < 0.01) return;
     const { world, fly, felt } = around;
     const s = this.#splashes;

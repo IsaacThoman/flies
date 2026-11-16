@@ -12,7 +12,7 @@ import type { View } from "../camera.ts";
 import { PLACES } from "../places/catalog.ts";
 import type { PlaceId } from "../places/catalog.ts";
 import type { TimeOfDay } from "../scene/light.ts";
-import type { WeatherKind } from "@fly/world";
+import type { WeatherKind } from "../scene/weather.ts";
 
 export type ToolId = "feed" | "swoop" | "feather" | "blow" | "light" | "weather" | "view" | "place";
 
@@ -27,7 +27,7 @@ export const TOOLS: readonly Tool[] = [
   // "Now" follows the clock, so the wallpaper's light changes with the day outside.
   { id: "light", name: "Light", verb: "", hold: false, variants: [{ id: "clock", label: "Now" }, { id: "morning", label: "Morning" }, { id: "noon", label: "Midday" }, { id: "golden", label: "Golden hour" }, { id: "dusk", label: "Dusk" }, { id: "night", label: "Night" }] },
   // "Now" is the weather outside where the Apple TV can tell it ("Outside"), else wanders as a forecast worked out from the clock would; the others hold.
-  { id: "weather", name: "Weather", verb: "", hold: false, variants: [{ id: "now", label: "Now" }, { id: "clear", label: "Clear" }, { id: "overcast", label: "Overcast" }, { id: "mist", label: "Mist" }, { id: "rain", label: "Rain" }] },
+  { id: "weather", name: "Weather", verb: "", hold: false, variants: [{ id: "now", label: "Now" }, { id: "clear", label: "Clear" }, { id: "overcast", label: "Overcast" }, { id: "mist", label: "Mist" }, { id: "rain", label: "Rain" }, { id: "heavyRain", label: "Heavy rain" }, { id: "storm", label: "Thunderstorm" }, { id: "snow", label: "Snow" }, { id: "sleet", label: "Sleet" }] },
   // Nearest first, so Up brings the camera in and Down takes it out; then through its eyes, and inside it (close up, its body as glass).
   { id: "view", name: "View", verb: "", hold: false, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }, { id: "inside", label: "Inside it" }] },
   // Where it lives: Up and Down choose, Select carries it there. Only when there is somewhere else to go.
@@ -177,7 +177,7 @@ export class Hands {
     return TOOLS[LIGHT_TOOL].variants[this.variants[LIGHT_TOOL]].id as TimeOfDay | "clock";
   }
 
-  /** The weather chosen on the Weather tool: one of the four, or the forecast's ("now"). */
+  /** The weather chosen on the Weather tool: a kind, or the forecast's ("now"). */
   get weather(): WeatherKind | "now" {
     return TOOLS[WEATHER_TOOL].variants[this.variants[WEATHER_TOOL]].id as WeatherKind | "now";
   }

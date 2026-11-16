@@ -26,6 +26,7 @@ export function windowGlass() {
     uLampColor: { value: new THREE.Color("#ffd29a") },
     uRain: { value: 0 },
     uWet: { value: 0 },
+    uFrost: { value: 0 },
     uTime: { value: 0 },
     /** The light outside, as a drop shows it (a drop is a lens: the sky in it is at its foot). */
     uOutside: { value: new THREE.Color() },
@@ -52,6 +53,7 @@ uniform vec3 uRoom;
 uniform vec3 uLampColor;
 uniform float uRain;
 uniform float uWet;
+uniform float uFrost;
 uniform float uTime;
 uniform vec3 uOutside;
 uniform vec3 uGlint;
@@ -143,6 +145,11 @@ void main() {
     c = c * (1.0 - wet.a) + (wet.rgb + room * mirror) * wet.a;
     a = a + wet.a * (1.0 - a);
   }
+  float rim = max(1.0 - smoothstep(0.0, 100.0, vWorld.y), smoothstep(470.0, 600.0, abs(vWorld.x)));
+  float fern = pow(abs(sin(vWorld.x * 0.16 + vWorld.y * 0.1)), 12.0);
+  float frost = uFrost * rim * (0.35 + 0.65 * fern) * (0.55 + 0.45 * vnoise(vWorld.xy * 0.12));
+  c = c * (1.0 - frost) + mix(uOutside, vec3(0.85, 0.92, 1.0), 0.6) * frost;
+  a += frost * (1.0 - a);
   gl_FragColor = vec4(c / max(a, 1e-3), a);
 }`,
   });

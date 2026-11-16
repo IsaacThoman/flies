@@ -37,6 +37,7 @@ attribute vec4 drop;
 uniform vec3 uOffset;
 uniform vec3 uFall;
 uniform float uRain;
+uniform float uHeavy;
 uniform float uHalfHeight;
 uniform vec4 uJars[2];
 varying vec2 vUv;
@@ -45,7 +46,7 @@ const float WIDTH = 0.45;
 const float SHUTTER = 0.011;
 float hash(vec3 p) { return fract(sin(dot(p, vec3(91.7, 13.1, 47.3))) * 43758.5453); }
 void main() {
-  float size = drop.w;
+  float size = drop.w * mix(1.0, 0.62, uHeavy);
   // Where the drop is in the box round the camera, the box moving with the camera and the rain falling through it.
   vec3 rel = mod(drop.xyz * size + uOffset - cameraPosition + 0.5 * size, size) - 0.5 * size;
   vec3 head = cameraPosition + rel;
@@ -65,8 +66,9 @@ void main() {
     vec2 d = head.xz - uJars[i].xy;
     if (dot(d, d) < uJars[i].z * uJars[i].z && head.y < uJars[i].w) dry = 0.0;
   }
-  float shown = step(hash(drop.xyz), uRain);
-  vAlpha = shown * inBox * dry * smoothstep(5.0, 30.0, dist) * (WIDTH / width);
+  float sheet = 0.55 + 0.45 * sin(head.x * 0.003 + head.z * 0.002 + uOffset.y * 0.001);
+  float shown = step(hash(drop.xyz), uRain * mix(1.0, 1.0 + sheet, uHeavy));
+  vAlpha = shown * inBox * dry * smoothstep(5.0, 30.0, dist) * (WIDTH / width * (1.0 + uHeavy * 0.5));
   vUv = position.xy;
   gl_Position = projectionMatrix * viewMatrix * vec4(at, 1.0);
 }`;
@@ -167,6 +169,7 @@ export class Rain {
     uOffset: { value: new THREE.Vector3() },
     uFall: { value: new THREE.Vector3(0, -FALL_SPEED, 0) },
     uRain: { value: 0 },
+    uHeavy: { value: 0 },
     uHalfHeight: { value: 240 },
     uJars: { value: [new THREE.Vector4(), new THREE.Vector4()] },
     uColor: { value: new THREE.Color() },
@@ -255,9 +258,11 @@ export class Rain {
     this.#streaks.visible = rain > 0.01;
     if (this.#streaks.visible) {
       s.uRain.value = Math.min(1, rain * 1.1);
-      s.uFall.value.set(wind.x, -FALL_SPEED, wind.z);
+      const speed = FALL_SPEED * (1 + weather.heavy * 0.7);
+      s.uHeavy.value = weather.heavy;
+      s.uFall.value.set(wind.x * (1 + weather.heavy), -speed, wind.z * (1 + weather.heavy));
       const o = s.uOffset.value;
-      o.set((o.x + wind.x * dt) % WRAP, (o.y - FALL_SPEED * dt) % WRAP, (o.z + wind.z * dt) % WRAP);
+      o.set((o.x + wind.x * dt) % WRAP, (o.y - speed * dt) % WRAP, (o.z + wind.z * dt) % WRAP);
       // Drops are lit by the sky behind and round them: pale, a little brighter than the haze.
       s.uColor.value.copy(light.haze).lerp(light.skyColor, 0.5).multiplyScalar(1.25 + light.sunIntensity * 0.15);
       s.uShade.value.copy(light.groundColor).lerp(light.haze, 0.3).multiplyScalar(0.45);

@@ -13,3 +13,4 @@ export * from "./ball.ts";
 export * from "./bubbles.ts";
 export * from "./random.ts";
 export * from "./limits.ts";
+export * from "./weather.ts";

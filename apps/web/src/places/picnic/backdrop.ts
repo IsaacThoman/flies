@@ -1,3 +1,4 @@
+import { snowDust } from "../../scene/snow.ts";
 // Everything far beyond the table: sky, clouds, rolling hills with lollipop
 // trees, the lawn the table stands on, and the lake. Drawn in its own pass
 // with its own depth range (the table is millimetres from the camera, the
@@ -33,6 +34,7 @@ const SKY_FS = /* glsl */ `
 uniform vec3 zenith; uniform vec3 middle; uniform vec3 horizon;
 uniform vec3 sunDir; uniform vec3 sunColor; uniform float glow; uniform float stars; uniform float time;
 uniform vec3 ground;
+uniform float flash;
 uniform float cover; uniform float mist; uniform float bow; uniform vec2 drift;
 varying vec3 vDir;
 float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
@@ -80,6 +82,13 @@ void main() {
     c += vec3(0.04) * bow * fade * smoothstep(0.72, 0.6, a);
   }
   if (h < 0.0) c = mix(horizon, ground, smoothstep(0.0, -0.08, h));
+  if (flash > 0.02 && h > 0.025 && h < 0.4) {
+    float y = h;
+    float fork = 0.13 + sin(floor(y * 85.0) * 5.3) * 0.012 + y * 0.3;
+    float bolt = 1.0 - smoothstep(0.001, 0.003 + fwidth(d.x), abs(d.x - fork));
+    float branch = 1.0 - smoothstep(0.001, 0.003 + fwidth(d.x), abs(d.x - (0.15 - y * 0.5 + sin(floor(y * 100.0)) * 0.008)));
+    c += vec3(0.7, 0.8, 1.0) * (bolt + branch * step(y, 0.18)) * flash * 2.5;
+  }
   gl_FragColor = vec4(c, 1.0);
 }`;
 
@@ -305,6 +314,7 @@ export function buildBackdrop(light: Daylight): SceneBackdrop {
   scene.matrixWorldAutoUpdate = true;
 
   const skyUniforms = {
+    flash: { value: 0 },
     zenith: { value: light.zenith },
     middle: { value: light.middle },
     horizon: { value: light.horizon },
@@ -542,6 +552,15 @@ gl_Position = projectionMatrix * mvPosition;`,
   boat.visible = false;
   scene.add(gull, boat);
 
+  const snowCover = { value: 0 };
+  const snowy = new Set<THREE.Material>();
+  scene.traverse(o => {
+    if (!(o instanceof THREE.Mesh)) return;
+    const m = o.material;
+    if ((m instanceof THREE.MeshStandardMaterial || m instanceof THREE.MeshLambertMaterial) && !snowy.has(m)) {
+      snowy.add(m); snowDust(m, snowCover);
+    }
+  });
   const drift = new Float32Array(sortedClouds);
   let last = -1;
   const deck = skyUniforms.drift.value;
@@ -549,6 +568,8 @@ gl_Position = projectionMatrix * mvPosition;`,
   return {
     scene,
     update(time, camera, daylight, weather: Weather) {
+      snowCover.value = weather.snowCover;
+      skyUniforms.flash.value = weather.lightning;
       const dt = last < 0 ? 0 : Math.min(0.1, Math.max(0, time - last));
       last = time;
       sky.position.copy(camera.position);

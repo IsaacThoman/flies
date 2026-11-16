@@ -386,7 +386,7 @@ export type WorldWire = { light: string; weather: string };
 
 /** The Light and Weather tools' kinds, as they travel. */
 export const TABLE_LIGHTS = ["clock", "morning", "noon", "golden", "dusk", "night"] as const;
-export const TABLE_WEATHERS = ["now", "clear", "overcast", "mist", "rain"] as const;
+export const TABLE_WEATHERS = ["now", "clear", "overcast", "mist", "rain", "heavyRain", "storm", "snow", "sleet"] as const;
 
 /** A player at the table: who, in what colour, and whether its device has stopped. */
 export type PlayerWire = { id: number; colour: string; away: boolean };

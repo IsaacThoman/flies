@@ -107,7 +107,7 @@ test("the time of day a clock hour is called", () => {
   assert.equal(timeAt(3), "night");
 });
 
-const clear: Weather = { ...KINDS.clear, wet: 0, kind: "clear" };
+const clear: Weather = { ...KINDS.clear, wet: 0, heavy: 0, storm: 0, snow: 0, snowCover: 0, lightning: 0, kind: "clear" };
 
 test("a chosen time eases in over a couple of seconds and then is exactly its palette", () => {
   const palettes = SCENES.picnic.palettes;
@@ -140,7 +140,7 @@ test("following the clock eases there from a chosen time, then moves with it; se
 test("a room open to the weather only through its windows feels it less", () => {
   const out = new Daylight("noon", ROOM);
   const room = new Daylight("noon", ROOM, 0.4);
-  const grey: Weather = { ...KINDS.overcast, wet: 0, kind: "overcast" };
+  const grey: Weather = { ...KINDS.overcast, wet: 0, heavy: 0, storm: 0, snow: 0, snowCover: 0, lightning: 0, kind: "overcast" };
   out.update(0, grey);
   room.update(0, grey);
   assert.ok(room.sunIntensity > out.sunIntensity * 2, "more of its daylight left");

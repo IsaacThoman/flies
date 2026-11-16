@@ -1,3 +1,4 @@
+import { Snow, snowDust } from "../../scene/snow.ts";
 // The view from the kitchen window: a back garden with a striped lawn, an
 // apple tree and a washing line, a fence with hollyhocks, and over it the
 // backs of a little street of houses, their chimneys and roofs against the
@@ -90,6 +91,9 @@ export function buildBackdrop(light: Daylight): SceneBackdrop {
   scene.matrixWorldAutoUpdate = true;
   const rnd = random(41);
 
+  const snow = new Snow(14000, GARDEN_Y, true);
+  scene.add(snow.mesh);
+  const snowCover = { value: 0 };
   const skyUniforms = {
     zenith: { value: light.zenith },
     middle: { value: light.middle },
@@ -128,6 +132,7 @@ export function buildBackdrop(light: Daylight): SceneBackdrop {
       .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(1.0, 0.72, 0.36) * vGlow * uNight * 1.3;");
   };
   lambert.customProgramCacheKey = () => "windowsill-outside";
+  snowDust(lambert, snowCover);
   const batch = new Batch();
   const lit = (g: THREE.BufferGeometry, c: THREE.ColorRepresentation | ((p: THREE.Vector3, n: THREE.Vector3) => THREE.ColorRepresentation | THREE.Color), glow = 0) => {
     const painted = paint(g, c as THREE.ColorRepresentation);
@@ -554,6 +559,8 @@ void main() {
     return {
     scene,
     update(time: number, camera: THREE.Camera, daylight: Daylight, weather: Weather) {
+      snow.update(time, daylight, weather);
+      snowCover.value = weather.snowCover;
       sky.position.copy(camera.position);
       sky.updateMatrixWorld();
       // By day the light coming in is the sun's; from dusk the "sun" is the kitchen's lamp, and outside it is the moon.
