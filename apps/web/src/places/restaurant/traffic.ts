@@ -199,7 +199,7 @@ vec3 streetLight(vec3 p, vec3 n) {
     beam *= beam;
     beam *= beam;
     float behind = max(-ahead, 0.0);
-    light += (vec3(1.0, 0.95, 0.86) * beam + vec3(0.12, 0.0, 0.0) * behind * behind) * (car.w * k);
+    light += (vec3(1.0, 0.95, 0.86) * beam + vec3(0.04, 0.0, 0.0) * behind * behind) * (car.w * k);
   }
   return light * ${f(1 / Math.PI)};
 }
