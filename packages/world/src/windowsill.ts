@@ -128,6 +128,44 @@ export const BASIL_TIPS: readonly { x: number; z: number; top: number }[] = [
  */
 export const ALARM_CLOCK = { x: 128, z: -70, r: 38, y: 45, depth: 30, bezel: 5, bells: { x: 16, r: 12, base: 84 }, hammer: { r: 3, base: 88 } };
 
+/** A jar of honey in the corner by the bottle, its lid screwed on: the honey the spoon was dipped in. */
+export const HONEY_JAR = { x: 289, z: -80, r: 20, top: 70 };
+
+/**
+ * A postcard from the seaside propped up at the end of the sill, standing on
+ * its edge with its top leaning on the wall of the window's opening, its
+ * picture to the sill: its foot `foot` mm out from the wall, `width` along
+ * it round `z`, `length` from its foot to its top.
+ */
+export const POSTCARD = { foot: 8, z: 4, width: 105, length: 148 };
+
+/** The postcard as the fly feels it: a wall of card, and between it and the wall a wedge it can't get into, in slices as thick as a fly's toe. */
+function postcardSolids(): Solid[] {
+  const { foot, z, width, length } = POSTCARD;
+  const lean = Math.asin(foot / length);
+  const out: Solid[] = [];
+  for (let k = 0; k < foot; k++) {
+    // How high the card stands over a slice: where it is k mm in from its foot.
+    const y = (k / foot) * length * Math.cos(lean);
+    out.push({ name: "postcard", footprint: { kind: "box", x: SILL.hx - foot + k + 0.5, z, hx: 0.5, hz: width / 2, angle: 0 }, top: { kind: "flat", y: Math.max(y, 1) } });
+  }
+  return out;
+}
+
+/** Pebbles, shells and a piece of sea glass brought home from the beach, in little groups along the back of the sill: low and smooth enough to climb. */
+export const PEBBLES: readonly { name: string; x: number; z: number; rx: number; rz: number; angle: number; height: number }[] = [
+  { name: "pebble", x: -160, z: -90, rx: 10, rz: 7, angle: 0.2, height: 6 },
+  { name: "sea glass", x: -138, z: -94, rx: 7, rz: 5, angle: -0.4, height: 3.5 },
+  { name: "shell", x: -114, z: -90, rx: 9, rz: 7, angle: 0.7, height: 7 },
+  { name: "pebble", x: 21, z: -90, rx: 12, rz: 8.5, angle: 0.3, height: 7.5 },
+  { name: "pebble", x: 41, z: -94, rx: 8, rz: 6.5, angle: -0.6, height: 5.5 },
+  { name: "pebble", x: 58, z: -86, rx: 10, rz: 7.5, angle: 1.2, height: 6.5 },
+  { name: "shell", x: 77, z: -94, rx: 8.5, rz: 7.5, angle: 0.4, height: 5 },
+  { name: "shell", x: 182, z: -92, rx: 8, rz: 7, angle: -0.3, height: 5 },
+  { name: "pebble", x: 204, z: -95, rx: 11, rz: 6, angle: 0.1, height: 4 },
+  { name: "pebble", x: 222, z: -97, rx: 6, rz: 5, angle: 0.5, height: 4.5 },
+];
+
 /** The steepest a fly stands on, as rise over run. */
 const STANDABLE_SLOPE = Math.tan((65 * Math.PI) / 180);
 
@@ -188,6 +226,9 @@ export const SILL_SOLIDS: readonly Solid[] = [
   ...BASIL_CROWN.map((c): Solid => ({ name: "basil", footprint: { kind: "circle", x: BASIL_POT.x + c.x, z: BASIL_POT.z + c.z, r: c.r }, top: { kind: "dome", base: c.base, height: c.top - c.base, power: c.power } })),
   ...BASIL_TIPS.map((t): Solid => ({ name: "basil tip", footprint: { kind: "circle", x: t.x, z: t.z, r: 6 }, top: { kind: "dome", base: t.top - 4, height: 4, power: 0.5 } })),
   ...clockSolids(),
+  ...PEBBLES.map((p): Solid => ({ name: p.name, footprint: { kind: "ellipse", x: p.x, z: p.z, rx: p.rx, rz: p.rz, angle: p.angle }, top: { kind: "dome", base: 0, height: p.height, power: 0.85 } })),
+  { name: "honey jar", footprint: { kind: "circle", x: HONEY_JAR.x, z: HONEY_JAR.z, r: HONEY_JAR.r }, top: { kind: "flat", y: HONEY_JAR.top } },
+  ...postcardSolids(),
   // The fruit bowl: up its outside, round its rim and down into it, among a peach and two plums.
   { name: "bowl", footprint: { kind: "circle", x: FRUIT_BOWL.x, z: FRUIT_BOWL.z, r: FRUIT_BOWL.r }, top: { kind: "dish", well: 6, rim: 28, inner: 0.4, lip: 0.72 } },
   { name: "peach", footprint: { kind: "circle", x: FRUIT_BOWL.x - 8, z: FRUIT_BOWL.z - 6, r: 26 }, top: { kind: "dome", base: 32, height: 26, power: 0.5 } },
@@ -249,7 +290,7 @@ export const SILL_DECOR = {
     { x: 150, z: 20, r: 9, count: 12 },
   ],
   /** A fallen basil leaf, dried flat. */
-  leaf: { x: -130, z: -82, length: 26, angle: 0.9 },
+  leaf: { x: -112, z: 46, length: 26, angle: 0.4 },
 };
 
 export const WINDOWSILL: Place = { floor: { kind: "rect", hx: SILL.hx, hz: SILL.hz }, solids: SILL_SOLIDS, patches: SILL_PATCHES, start: SILL_START, ceiling: 260 };

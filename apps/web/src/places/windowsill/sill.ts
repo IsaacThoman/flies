@@ -4,7 +4,7 @@
 // into a few meshes; the small things are instanced.
 
 import * as THREE from "three";
-import { ALARM_CLOCK, BANANA, BASIL_CROWN, WINE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_DECOR, SILL_PATCHES, SILL_SOLIDS, TEASPOON, WINDOW, bananaAt, inside, topHeight, topNormal, topPeak } from "@fly/world";
+import { ALARM_CLOCK, BANANA, BASIL_CROWN, HONEY_JAR, POSTCARD, WINE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_DECOR, SILL_PATCHES, SILL_SOLIDS, TEASPOON, WINDOW, bananaAt, inside, topHeight, topNormal, topPeak } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { Batch, freeze, mat4, paint, random } from "../../scene/build.ts";
 import { WallClock } from "../../scene/clock.ts";
@@ -15,7 +15,7 @@ import { ALARM_DIAL, CLOCK_FACES } from "./clocks.ts";
 import { waterMaterial, windowGlass } from "./glass.ts";
 import { FRAME_HEAD, createSunlight, sunlit } from "./light.ts";
 import type { Ball, Column } from "./light.ts";
-import { buildRoom } from "./room.ts";
+import { TILE_TOP, buildRoom } from "./room.ts";
 import { buildSeen } from "./seen.ts";
 import { blend, clayMaterial, fruitMaterial, glazeMaterial, leafMaterial, notLeaf, paintMaterial, plasterMaterial, tag, tileMaterial, tone, towelMaterial } from "./surfaces.ts";
 import type { Contact } from "./surfaces.ts";
@@ -46,7 +46,6 @@ const rod = (a: THREE.Vector3, b: THREE.Vector3, r: number, segments = 8) => {
     .applyQuaternion(new THREE.Quaternion().setFromUnitVectors(UP, along.normalize()))
     .translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
 };
-
 
 /** A round thing's surface turned from a profile of [radius, height] points, at (x, z). */
 const lathe = (profile: readonly (readonly [number, number])[], segments: number, x: number, z: number) =>
@@ -237,7 +236,7 @@ function casters(): { balls: Ball[]; columns: Column[] } {
     { x: WINE_BOTTLE.x, z: WINE_BOTTLE.z, r: WINE_BOTTLE.r, top: WINE_BOTTLE.shoulder + 14 },
     { x: WINE_BOTTLE.x, z: WINE_BOTTLE.z, r: WINE_BOTTLE.neck, top: WINE_BOTTLE.top },
     { x: FRUIT_BOWL.x, z: FRUIT_BOWL.z, r: FRUIT_BOWL.r * 0.78, top: 28 },
-    { x: BASIL_POT.x, z: BASIL_POT.z, r: BASIL_POT.saucer, top: 6 },
+    { x: HONEY_JAR.x, z: HONEY_JAR.z, r: HONEY_JAR.r, top: HONEY_JAR.top },
     { x: PEACH_PLATE.x, z: PEACH_PLATE.z, r: PEACH_PLATE.r * 0.9, top: 5 },
   ];
   return { balls, columns };
@@ -251,6 +250,7 @@ function contacts(): Contact[] {
     { x: WINE_BOTTLE.x, z: WINE_BOTTLE.z, r: WINE_BOTTLE.r, dark: 0.55 },
     { x: PEACH_PLATE.x, z: PEACH_PLATE.z, r: PEACH_PLATE.r * 0.95, dark: 0.35 },
     { x: TEASPOON.x, z: TEASPOON.z, r: TEASPOON.rx, dark: 0.25 },
+    { x: HONEY_JAR.x, z: HONEY_JAR.z, r: HONEY_JAR.r, dark: 0.45 },
     // Under the alarm clock's belly, and its feet.
     { x: ALARM_CLOCK.x, z: ALARM_CLOCK.z, r: ALARM_CLOCK.r * 0.7, dark: 0.3 },
     ...[-1, 1].map((side) => ({ x: ALARM_CLOCK.x + side * CLOCK_FOOT, z: ALARM_CLOCK.z, r: 4, dark: 0.45 })),
@@ -260,9 +260,9 @@ function contacts(): Contact[] {
     bananaAt(t, p);
     out.push({ x: p.x, z: p.z, r: BANANA.radius(t) * 0.75, dark: 0.32 });
   }
-  for (const s of [...byName("crumb"), ...byName("drop")]) {
+  for (const s of [...byName("crumb"), ...byName("drop"), ...byName("pebble"), ...byName("shell"), ...byName("sea glass")]) {
     const f = s.footprint as { x: number; z: number; r?: number; rx?: number };
-    out.push({ x: f.x, z: f.z, r: (f.r ?? f.rx ?? 1) * 0.9, dark: s.name === "crumb" ? 0.45 : 0.2 });
+    out.push({ x: f.x, z: f.z, r: (f.r ?? f.rx ?? 1) * 0.9, dark: s.name === "drop" ? 0.2 : 0.45 });
   }
   return out;
 }
@@ -287,7 +287,7 @@ export function buildSill(): SceneSet {
   const rnd = random(23);
   const { balls, columns } = casters();
   const sunlight = createSunlight(balls, columns);
-  const paintM = paintMaterial(sunlight, contacts(), SILL_DECOR.ring, byName("crumb").map((c) => ({ x: c.footprint.x, z: c.footprint.z, r: (c.footprint as { rx: number }).rx, height: topPeak(c.top) })));
+  const paintM = paintMaterial(sunlight, contacts(), SILL_DECOR.ring, [...byName("crumb"), ...byName("pebble"), ...byName("shell"), ...byName("sea glass")].map((c) => ({ x: c.footprint.x, z: c.footprint.z, r: (c.footprint as { rx: number }).rx, height: topPeak(c.top) })));
   const plaster = plasterMaterial(sunlight);
   const tiles = tileMaterial(sunlight);
   const clay = clayMaterial(sunlight);
@@ -368,11 +368,15 @@ export function buildSill(): SceneSet {
     add(metal, paint(new THREE.CapsuleGeometry(3, 34, 4, 10).rotateZ(Math.PI / 2 - 0.35).translate(-12, y - 5, WINDOW.glass + mullion.depth + 15), "#d4ad55"));
   }
 
-  // The wall the window is set in: its reveals either side, the soffit over the sill, and the reveals outside the glass.
+  // The wall the window is set in: its reveals either side, tiled as the wall round the window is up to the tiles' rounded edge, the soffit over the sill, and the reveals outside the glass.
   const WALL = "#f4ead8";
   for (const side of [-1, 1]) {
     const x = side * SILL.hx;
-    add(plaster, paint(new THREE.PlaneGeometry(WINDOW.wall - back, WINDOW.head + 40).rotateY((-side * Math.PI) / 2).translate(x, (WINDOW.head - 40) / 2, (WINDOW.wall + back) / 2), WALL));
+    const reveal = (y0: number, y1: number) => new THREE.PlaneGeometry(WINDOW.wall - back, y1 - y0).rotateY((-side * Math.PI) / 2).translate(x, (y0 + y1) / 2, (WINDOW.wall + back) / 2);
+    add(tiles, paint(reveal(-40, TILE_TOP), "#f7f5ef"));
+    add(plaster, paint(reveal(TILE_TOP, WINDOW.head), WALL));
+    glazed(new THREE.CylinderGeometry(4, 4, WINDOW.wall - back, 8).rotateX(Math.PI / 2).translate(x, TILE_TOP, (WINDOW.wall + back) / 2), "#f2efe6", 0);
+    glazed(new THREE.CylinderGeometry(4, 4, TILE_TOP + 48, 8).translate(x, (TILE_TOP - 48) / 2, WINDOW.wall), "#f2efe6", 0);
     add(plaster, paint(new THREE.PlaneGeometry(back + 420, WINDOW.head + 80).rotateY((-side * Math.PI) / 2).translate(x, WINDOW.head / 2 - 40, (back - 420) / 2), "#e9dcc6"));
   }
   add(plaster, paint(new THREE.PlaneGeometry(SILL.hx * 2, WINDOW.wall + 420).rotateX(Math.PI / 2).translate(0, WINDOW.head, (WINDOW.wall - 420) / 2), "#efe4d0"));
@@ -672,7 +676,8 @@ export function buildSill(): SceneSet {
   // The banana: ripe past yellow, freckled, its tip black and its stalk green-brown.
   add(fruit, tag(bananaGeometry(), "skin", 1));
 
-  // The bottle of wine: green glass, the wine dark inside it, a cream label, a cork.
+  // The bottle of wine: green glass, the wine dark inside it, a cream label, a cork. Its glass and the honey jar's are one draw.
+  const glassBatch = new Batch();
   {
     const { x, z, r, shoulder, neck, top } = WINE_BOTTLE;
     const glassProfile: [number, number][] = [[0, 2], [r - 6, 2], [r - 1, 0.5], [r, 4], [r, shoulder]];
@@ -681,11 +686,7 @@ export function buildSill(): SceneSet {
       glassProfile.push([neck + (r - neck) * Math.cos(a), shoulder + Math.sin(a) * 28]);
     }
     glassProfile.push([neck, top - 22], [neck + 1.6, top - 20], [neck + 1.6, top - 12], [neck, top - 10]);
-    const g = lathe(glassProfile, 48, x, z);
-    const glass = new THREE.Mesh(paint(g, (p) => (p.y > top - 22 ? tone("#2e5a2a") : tone("#2f6b34"))), bottleGlass);
-    glass.renderOrder = 4;
-    freeze(glass);
-    group.add(glass);
+    glassBatch.add(bottleGlass, paint(lathe(glassProfile, 48, x, z), (p) => (p.y > top - 22 ? tone("#2e5a2a") : tone("#2f6b34"))));
     fruity(lathe([[0, 3], [r - 2, 3], [r - 2, 95], [0, 95]], 40, x, z), "#2a0710", 0);
     // The label, facing the room: cream paper, a claret band along its top, gilt rules, and a crest.
     add(plaster, paint(new THREE.CylinderGeometry(r + 0.4, r + 0.4, 84, 48, 24, true, -1.2, 2.4).translate(x, 112, z), (p) => {
@@ -697,6 +698,25 @@ export function buildSill(): SceneSet {
       return tone("#f2ead6");
     }));
     clayed(new THREE.CylinderGeometry(neck - 2.6, neck - 2.6, 22, 16).translate(x, top - 11, z), "#c79a64", 0);
+  }
+
+  // The jar of honey, full: the honey glowing through the glass with the light through it, clear glass at its shoulder, a gold lid, a paper label.
+  {
+    const { x, z, r, top } = HONEY_JAR;
+    const lid = top - 9;
+    fruity(lathe([[0, 0], [r - 2.5, 0], [r - 0.3, 1.2], [r, 4], [r, lid - 7], [r - 1, lid - 6], [0, lid - 6]], 36, x, z), "#d0861a", 7);
+    glassBatch.add(bottleGlass, paint(lathe([[r, lid - 7.5], [r, lid - 6], [r - 2.4, lid - 3], [r - 3.4, lid - 1]], 36, x, z), "#d9e0d8"));
+    add(metal, paint(lathe([[r - 3.6, lid - 1], [r + 0.5, lid], [r + 0.7, lid + 1], [r + 0.7, top - 1], [r + 0.2, top], [0, top]], 36, x, z), "#d0a64e"));
+    add(plaster, paint(new THREE.CylinderGeometry(r + 0.15, r + 0.15, 24, 36, 12, true, -2.4, 2.4).translate(x, 26, z), (p) => (Math.abs(p.y - 26) > 9.5 ? tone("#8a5a22") : tone("#f2e6c8"))));
+  }
+  const [glassMesh] = glassBatch.build(group);
+  glassMesh.renderOrder = 4;
+
+  // The postcard, propped at the end of the sill against the wall of the window's opening: card, its picture painted on its face (surfaces.ts).
+  {
+    const { foot, z, width, length } = POSTCARD;
+    const lean = Math.asin(foot / length);
+    add(plaster, paint(new THREE.BoxGeometry(0.4, length, width).translate(0, length / 2, 0).rotateZ(-lean).translate(SILL.hx - foot, 0, z), "#f6f2e6"));
   }
 
   // Half a peach, cut face up on a small plate, its stone in it.
@@ -774,6 +794,33 @@ export function buildSill(): SceneSet {
     specks.setAttribute("position", new THREE.Float32BufferAttribute(points, 3));
     specks.computeVertexNormals();
     fruity(specks, toastColor, 6);
+  }
+
+  // Beach finds, smooth and dry: pebbles (grey granite with a band of white quartz across it, a white one, dark slate), shells (cockles, ribbed and banded, and a whelk, its whorls striped), and a piece of green sea glass, frosted, that glows with the light through it.
+  {
+    const along = (f: { x: number; z: number; angle: number }, p: THREE.Vector3) => (p.x - f.x) * Math.cos(f.angle) - (p.z - f.z) * Math.sin(f.angle);
+    const pebbles: ((p: THREE.Vector3, f: { x: number; z: number; angle: number }) => THREE.Color)[] = [
+      (p, f) => (Math.abs(along(f, p) * 0.6 + 1.2) < 1.4 ? tone("#f0eee6") : tone("#8e8a83")),
+      () => tone("#e4dfd3"),
+      () => tone("#5c6269"),
+      () => tone("#9a948a"),
+    ];
+    byName("pebble").forEach((pebble, i) => {
+      const f = pebble.footprint as { x: number; z: number; angle: number };
+      clayed(topGeometry(pebble, 4, 20), (p) => pebbles[i % pebbles.length](p, f), 0);
+    });
+    byName("shell").forEach((shell, i) => {
+      const f = shell.footprint as { x: number; z: number; angle: number };
+      const whelk = i === 0;
+      glazed(topGeometry(shell, 4, 36), (p) => {
+        const a = Math.atan2(p.z - f.z, p.x - f.x);
+        const r = Math.hypot(p.x - f.x, p.z - f.z);
+        if (whelk) return Math.sin(a + r * 1.3) > 0.3 ? tone("#8a5a3a") : tone("#e8dcc6");
+        const rib = Math.cos(a * 18) > 0.2;
+        return Math.sin(r * 1.6) > 0.55 ? tone(i % 2 ? "#d9846a" : "#c3895a") : rib ? tone("#efe1c8") : tone("#dcc4a2");
+      }, 0);
+    });
+    for (const glass of byName("sea glass")) fruity(topGeometry(glass, 4, 20), "#7fb89a", 7);
   }
 
   // The tea towel, folded on the sill, its end hanging over the front edge.

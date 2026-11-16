@@ -13,6 +13,9 @@ import { tag, tone } from "./surfaces.ts";
 /** The kitchen's floor and ceiling, its far wall and side walls, mm (the sill is 1.05 m from the floor). */
 export const ROOM = { floor: -1050, ceiling: WINDOW.ceiling, far: 2900, side: 1700, worktop: -180 };
 
+/** How high the tiles round the window come, mm. */
+export const TILE_TOP = 300;
+
 /** The clock on the far wall: a drum `depth` deep, its dial the cream middle of its face, inside a green rim (clocks.ts draws its hands). */
 export const WALL_CLOCK = { r: 150, dial: 132, depth: 30, face: { x: -150, y: 720, z: ROOM.far - 6 - 15 } };
 
@@ -35,7 +38,6 @@ export function buildRoom(m: Materials) {
   const metal = (g: THREE.BufferGeometry, c: THREE.ColorRepresentation) => pieces.push([m.metal, paint(g, c)]);
   const { floor, ceiling, far, side, worktop } = ROOM;
   const wall = WINDOW.wall;
-  const TILE_TOP = 300;
   const WALL = "#f4ead8";
   const CUPBOARD = "#8fb1a1";
 

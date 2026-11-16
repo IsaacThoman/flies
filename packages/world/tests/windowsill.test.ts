@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ALARM_CLOCK, BANANA, BASIL_CROWN, BASIL_POT, BASIL_TIPS, FRUIT_BOWL, Pantry, SILL, SILL_PATCHES, SILL_SOLIDS, WINDOW, WINDOWSILL, World, bananaAt, createSurface, inside, topHeight } from "../src/index.ts";
+import { ALARM_CLOCK, BANANA, BASIL_CROWN, BASIL_POT, BASIL_TIPS, FRUIT_BOWL, HONEY_JAR, PEBBLES, POSTCARD, Pantry, SILL, SILL_PATCHES, SILL_SOLIDS, WINDOW, WINDOWSILL, World, bananaAt, createSurface, inside, topHeight } from "../src/index.ts";
 import type { RayHit } from "../src/index.ts";
 
 const world = new World(WINDOWSILL);
@@ -125,6 +125,46 @@ test("the alarm clock stands on the sill: a fly can land on its case and walk ac
   for (const name of ["bowl", "bottle"]) {
     const f = solid(name).footprint as { x: number; z: number; r: number };
     assert.ok(Math.abs(f.x - x) > f.r + r, `clear of the ${name}`);
+  }
+});
+
+test("the honey jar's lid is a perch, and the postcard propped at the end of the sill is a wall a fly can't get behind", () => {
+  const s = createSurface();
+  assert.ok(world.surface(HONEY_JAR.x + 5, HONEY_JAR.z - 4, s).y === HONEY_JAR.top && s.normal.y > 0.99, "the lid");
+  assert.ok(HONEY_JAR.top < WINDOWSILL.ceiling);
+  const n = { x: 0, y: 0, z: 0 };
+  // At the card's foot it rises sheer from the sill, facing the sill's middle; behind it the wedge up to the wall is solid, higher toward the wall, as the card leans.
+  assert.ok(world.wallNormal(SILL.hx - POSTCARD.foot + 0.1, POSTCARD.z, 0.5, n) && n.x < -0.99, "its face");
+  let last = 0;
+  for (let x = SILL.hx - POSTCARD.foot + 1.5; x < SILL.hx; x += 1) {
+    const y = world.heightAt(x, POSTCARD.z + POSTCARD.width / 2 - 1);
+    assert.ok(y > last, `higher toward the wall at ${x}`);
+    last = y;
+  }
+  assert.ok(last > POSTCARD.length * 0.8, "up to its top");
+  assert.equal(world.heightAt(SILL.hx - POSTCARD.foot - 0.5, POSTCARD.z), 0, "the sill in front of it");
+  assert.equal(world.heightAt(SILL.hx - 4, POSTCARD.z + POSTCARD.width / 2 + 0.5), 0, "the sill beside it");
+});
+
+test("the pebbles, shells and sea glass at the back of the sill can be climbed from the sill, and are clear of everything else", () => {
+  const s = createSurface();
+  for (const p of PEBBLES) {
+    let last = 0;
+    // From the sill up its side and over its top, the long way.
+    for (let u = -p.rx - 1; u <= 0; u += 0.1) {
+      world.surface(p.x + u * Math.cos(p.angle), p.z - u * Math.sin(p.angle), s);
+      if (s.y > 0) assert.ok(s.normal.y >= STANDABLE || s.y < 0.9, `${p.name} too steep ${u.toFixed(1)} mm out`);
+      assert.ok(s.y - last < 0.9, `${p.name}: a step ${u.toFixed(1)} mm out`);
+      last = s.y;
+    }
+    assert.equal(last, p.height);
+    for (const other of SILL_SOLIDS) {
+      if (other.name === p.name && other.footprint.x === p.x) continue;
+      assert.ok(!inside(other.footprint, p.x, p.z) && !inside(other.footprint, p.x + p.rx, p.z) && !inside(other.footprint, p.x - p.rx, p.z), `${p.name} clear of the ${other.name}`);
+    }
+    // How far it reaches toward the window, turned as it lies.
+    const reach = Math.hypot(p.rx * Math.sin(p.angle), p.rz * Math.cos(p.angle));
+    assert.ok(p.z - reach > WINDOW.glass + WINDOW.rail.depth, `${p.name} on the sill, in front of the ledge`);
   }
 });
 
