@@ -10,7 +10,7 @@ import * as THREE from "three";
 import type { WallClock } from "../../scene/clock.ts";
 import { streetLightUniforms } from "./traffic.ts";
 import { AREA_STRIDE, KINDS_GLSL } from "./kinds.ts";
-import { CASTERS, NOISE, SHADE, hookedLights } from "./light.ts";
+import { CASTERS, KEY_LIGHT, NOISE, SHADE, hookedLights } from "./light.ts";
 import { PARTS } from "./parts.ts";
 import type { PartGlsl } from "./parts.ts";
 import { SURFACE_COLOR, SURFACE_EMISSIVE, SURFACE_FINISH, SURFACE_HEAD } from "./surfaces.ts";
@@ -114,6 +114,7 @@ function patch(material: THREE.MeshPhysicalMaterial, p: Patch) {
       return fs.replace(find, `${find}\n${add}`);
     };
     let fs = shader.fragmentShader.replace("#include <common>", `#include <common>\nvarying float vKind;\nvarying vec3 vWorld;\nvarying vec3 vWorldNormal;\n${KINDS_GLSL}\n${NOISE}\n${SHADE}\n${p.head}`);
+    fs = at(fs, "lights_pars_begin", KEY_LIGHT);
     fs = at(fs, "color_fragment", p.color);
     fs = at(fs, "metalnessmap_fragment", p.surface);
     fs = at(fs, "normal_fragment_maps", "if (dot(rBump, rBump) > 0.0) normal = normalize(normal + (viewMatrix * vec4(rBump, 0.0)).xyz);\n" + (p.normal ?? ""));
@@ -198,6 +199,11 @@ rAlpha = 1.0;
 rRough = 0.04;
 rBump = vec3(0.0);
 if (rK == K_GLASS || rK == K_FRIDGE_GLASS) diffuseColor.rgb *= 0.04;
+if (rK == K_GLASS) {
+  // Seen edge-on, a wall of glass is looked through its thickness: green, and nearly opaque.
+  float side = 1.0 - abs(dot(normalize(vWorldNormal), normalize(cameraPosition - vWorld)));
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.085, 0.07), smoothstep(0.6, 0.98, side));
+}
 if (rK == K_WINE) rAlpha = 0.86;
 if (rK == K_WHITE_WINE) rAlpha = 0.45;
 if (rK == K_WATER) { diffuseColor.rgb *= 0.15; rAlpha = 0.2; }
@@ -232,7 +238,11 @@ const CLEAR_FINAL = /* glsl */ `
 {
   float facing = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
   float edge = pow(1.0 - facing, 2.5);
-  if (rK == K_GLASS) rAlpha = 0.04 + edge * 0.7 + min(dot(outgoingLight, vec3(0.1)), 0.15);
+  if (rK == K_GLASS) {
+    rAlpha = 0.05 + edge * 0.85 + min(dot(outgoingLight, vec3(0.12)), 0.25);
+    // Its edges catch the room's light and the lights' glints.
+    outgoingLight += (rRoomLight(vWorld, -normalize(vWorldNormal)) * 0.15 + rKeyLight(vWorld) * 0.04) * pow(edge, 1.5);
+  }
   if (rK == K_FRIDGE_GLASS) rAlpha = 0.08 + edge * 0.5;
   if (rK == K_WINE || rK == K_WHITE_WINE || rK == K_BOTTLE) rAlpha = min(1.0, rAlpha + edge * 0.3);
   if (rK == K_FILM || rK == K_WATER) rAlpha = min(1.0, rAlpha + edge * 0.5 + dot(outgoingLight, vec3(0.05)));

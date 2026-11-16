@@ -222,7 +222,7 @@ if (rK >= K_TOP_PRINT && rK <= K_TOP_CHINA) {
       // A crystal of sugar: clear, so the room's light comes through it and out of every face, brightest at its edges; now and then a facet flashes.
       diffuseColor.rgb = vec3(0.97, 0.96, 0.94);
       float flash = step(0.86, rHash(floor(vWorld.xz * 2.5) + rN.xz * 3.0));
-      rEmit += diffuseColor.rgb * rRoomLight(vWorld, vec3(0.0, 1.0, 0.0)) * (0.6 + flash * 0.6);
+      rEmit += diffuseColor.rgb * (rRoomLight(vWorld, vec3(0.0, 1.0, 0.0)) * 0.6 + rKeyLight(vWorld) * 0.12) * (1.0 + flash);
       rRough = 0.1;
       rCoat = 1.0;
       rCoatRough = 0.03;

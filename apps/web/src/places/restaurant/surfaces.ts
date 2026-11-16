@@ -558,6 +558,8 @@ if (rK == K_EXIT) {
   rEmit += face * uExit.g * 0.6;
 }
 if (rK == K_OPENING) rEmit += vec3(1.0) * uOpening;
+// Sugar, wax and petals let the light in and give it back out of their shaded sides.
+if (rK == K_SUGAR || rK == K_WAX || rK == K_FLOWER) rEmit += diffuseColor.rgb * rKeyLight(vWorld) * (rK == K_SUGAR ? 0.12 : 0.06);
 if (rK == K_MIRROR) {
   // A mirror shows the room (its reflections, light.ts rRoom), and the lamp left on over the bar as a bright disc where the eye would see its image, a glow round it.
   vec3 v = normalize(vWorld - cameraPosition);

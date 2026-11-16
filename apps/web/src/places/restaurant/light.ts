@@ -229,6 +229,29 @@ vec3 rPendantDir(vec3 p, out vec3 color) {
   return dir;
 }`;
 
+/**
+ * The main lights falling on a point as if it faced up: the sun (or the
+ * street lamp's glint) through the glass, the street's light, the lit
+ * pendant, each shadowed. For things the light goes into and comes out of
+ * again on every side (sugar, salt, wax, petals): placed after three.js's
+ * light uniforms.
+ */
+export const KEY_LIGHT = /* glsl */ `
+vec3 rKeyLight(vec3 p) {
+  vec3 k = vec3(0.0);
+  #if NUM_DIR_LIGHTS > 0
+  vec3 s = rWorldDir(directionalLights[0].direction);
+  k += directionalLights[0].color * max(s.y, 0.0) * rSun(directionalLights[0].direction);
+  #endif
+  k += streetLight(p, vec3(0.0, 1.0, 0.0)) * rStreetShadow(p) * 3.14159;
+  if (uPendant.w > 0.0) {
+    vec3 c;
+    vec3 d = rPendantDir(p, c);
+    k += c * max(d.y, 0.0) * rPendantShadow(p);
+  }
+  return k;
+}`;
+
 /** The light loop with a hook after the sun is found. */
 export function hookedLights() {
   let chunk = THREE.ShaderChunk.lights_fragment_begin;
