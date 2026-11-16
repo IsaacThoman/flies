@@ -636,6 +636,7 @@ export class Game implements Shell {
 
   applySettings(save = true) {
     const s = this.settings;
+    this.haptics.enabled = s.rumble;
     // At a table, the table's place is the starter's to choose, with the Place tool.
     if (!this.online && s.place !== "turns" && isPlaceId(s.place) && s.place !== this.#here) this.moveTo(s.place);
     // The player chose a picture: take it at its word until the device shows it can't keep up.

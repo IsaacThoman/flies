@@ -33,6 +33,37 @@ test("a pad feels each one-off at its designed strength", () => {
   assert.equal(played.length, 4);
 });
 
+test("rumble off sends nothing to pads or phones, for one-offs and held tools; on resumes them", () => {
+  for (const device of ["pad", "touch"] as const) {
+    const { played, buzzed, haptics } = setup(device);
+    haptics.enabled = false;
+    for (const kind of Object.keys(FEELS) as (keyof typeof FEELS)[]) haptics.feel(kind);
+    for (let frame = 0; frame < 60; frame++) {
+      haptics.held(1, 0, 1 / 60);
+      haptics.held(0, 1, 1 / 60);
+    }
+    assert.equal(played.length + buzzed.length, 0, device);
+    haptics.enabled = true;
+    haptics.feel("drop");
+    haptics.held(1, 0, 1 / 60);
+    assert.equal(played.length + buzzed.length, 2, device);
+  }
+});
+
+test("turning rumble off silences a queued second knock", () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const { played, haptics } = setup("pad");
+    haptics.feel("blocked");
+    assert.equal(played.length, 1);
+    haptics.enabled = false;
+    mock.timers.tick(FEELS.blocked.again!);
+    assert.equal(played.length, 1);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 test("a refusal is two knocks, the second after the first has played (a new effect would cut it short)", () => {
   mock.timers.enable({ apis: ["setTimeout"] });
   try {

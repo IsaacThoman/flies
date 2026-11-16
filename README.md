@@ -339,7 +339,9 @@ dropped and a softer one when it lands, a swell as the ball dives, two quick
 knocks when a press can't do anything, light pulses while the feather is on
 the fly, a low one while you blow, and a knock when the fly takes off. A
 phone that can vibrate (Android) buzzes for the same; the iPhone and iPad app
-plays its own haptics. It is never felt in the wallpaper. The hints always
+plays its own haptics. Settings → Picture → Rumble turns the pad and Android
+rumble off; it starts on and is kept between launches. It is never felt in
+the wallpaper. The hints always
 show the thing last used, and the screen hides the system's cursor, text
 selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
@@ -452,7 +454,7 @@ its camera films, where the fly lives, and, on an Apple TV that can tell,
 the real weather), **On screen** (everything that can show over the world:
 what it sees, its nervous system and its stats in the corners, what the
 stats are of, the corners' size and opacity, and the X-ray), and **Picture**
-(pixel size, the eyes' detail, button hints, frame stats). In a browser it
+(pixel size, the eyes' detail, button hints, rumble, frame stats). In a browser it
 also has **Online**, rooms shared with others. The menu never scrolls
 either: on a screen too short for its rows (a phone on its side) they are
 in two columns, Left and Right going across, Up and Down along the list as
