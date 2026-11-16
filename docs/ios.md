@@ -1,8 +1,8 @@
 # The iPhone and iPad app
 
 `apps/ios` is the game on an iPhone or an iPad: the web build, unchanged, in a `WKWebView` that
-fills the window, served from the app's own bundle through a custom URL scheme. No network and no
-local server. The brain is the browser's, in a Web Worker: `packages/brain-native` built as
+fills the window, served from the app's own bundle through a custom URL scheme. No local server,
+and no network except a table's line to its room ([Tables with others](#tables-with-others)). The brain is the browser's, in a Web Worker: `packages/brain-native` built as
 WebAssembly on iOS and iPadOS 18.4 and later, `packages/brain` before that. The app itself is a
 small Swift shell that does what a host should: it serves the page, tells the game the safe area,
 stops it when it can't be seen, decides when the screen may sleep, and adds haptics. It draws
@@ -55,7 +55,8 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
 
 | File | What it does |
 | --- | --- |
-| `src/App.swift` | The app and its one scene: one window, since a second would be a second fly with a second brain |
+| `src/App.swift` | The app and its one scene: one window, since a second would be a second fly with a second brain; a table's link that opened it, or reached it while running |
+| `src/Links.swift` | Which links are a table's, and the page's address: the room server and the table |
 | `src/GameViewController.swift` | The web view, edge to edge; the launch image over it until the game is ready; the safe area; stopping the game when it can't be seen; a reload if iOS ends the page's process |
 | `src/BundleSchemeHandler.swift` | Serves `www/` at `fly://app/`: memory-mapped, in 1 MB slices, one per turn of the main run loop, so the brain's progress is real and nothing outside `www/` is served |
 | `src/PageScripts.swift` | What the app adds to the page: a watch on the canvas's state |
@@ -72,6 +73,10 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
   cover, in CSS pixels, assigned to `window.__flySafeArea` (`SAFE_AREA_PROPERTY`,
   `packages/contracts/src/screen.ts`) followed by a `resize` event, whenever it changes. The page
   is laid out edge to edge (`contentInsetAdjustmentBehavior = .never`) and is told, not inset.
+- **A table.** The page's address carries the table a link opened the app for (`?table=`), and a
+  room server other than the site's when one was asked for (`?rooms=`); a link that reaches the
+  running app is handed to the game as `INVITE_EVENT` (`packages/contracts/src/invite.ts`). See
+  [Tables with others](#tables-with-others).
 - **Nothing else.** The app defines no `globalThis.__native`: the game takes its presence to mean
   the Apple TV's host (its brain, and no browser input), so a future native bridge on iOS must
   come with a narrower test in `apps/web/src/main.ts`.
@@ -154,6 +159,136 @@ published five times a second). Off with the Haptics switch in the app's page of
 or with the system's own. The game's Rumble setting controls game pads and
 Android vibration; these native iPhone and iPad haptics use the Haptics switch.
 
+## Tables with others
+
+A table ([online.md](online.md)) works in the app as it does in a browser: the game's own
+`BrowserSocket`, the page's WebSocket, to the apps' room server, `wss://flies.isaacthoman.com/rooms`
+(`apps/web/src/online/invite.ts`). The links it hands on are the site's,
+`https://flies.isaacthoman.com/?table=<code>`, never `fly://`.
+
+### The socket: the web view's own
+
+Tried in the simulator (iPhone 18 Pro Max, iOS 27.0), November 2026, from a page at `fly://app/`:
+
+| To | |
+| --- | --- |
+| `ws://127.0.0.1:<port>/rooms`, `ws://localhost:<port>/rooms` | opened, in about 0.1 s |
+| `ws://<the Mac's LAN address>:<port>/rooms`, `ws://<the Mac's name>.local:<port>/rooms` | opened |
+| a public `wss://` server | opened, and echoed |
+| plain `ws://` to a host named on the internet (two tried, one of them a name for 127.0.0.1) | refused at once (1006) |
+
+The page is a secure context, and WebKit doesn't take its plain `ws://` to an address or a local
+name for mixed content. What refuses the named hosts is App Transport Security, whose documented
+exceptions are IP addresses, `localhost` and `.local` names: every other host needs TLS. That is
+all a room server needs (`wss` in production, an address or a `.local` name for development), so
+**the app has no ATS exception, in any build**.
+
+So the app bridges nothing. The socket already lives off the page's thread, in WebKit's networking
+process; the game's line to the room is the same code as in every browser, and is tested there
+(`apps/web/e2e/tables.e2e.ts`); a native socket would add a hop through a script message handler
+and two processes for each of the 20 states a second each way, to do what the web view already
+does. (The Apple TV needs its bridge because its runtime has no WebSocket at all.)
+
+### Which room server
+
+The site's, unless told otherwise, for development and checks:
+
+- **`ROOMS_URL` when the app is built** (`ROOMS_URL=ws://192.168.1.20:8787/rooms npm run ios -- build`),
+  read by the web build (`appSite`, `scripts/webBuild.ts`). For a build to hand to a phone.
+- **`-FlyRooms <url>` when it is launched** (`npm run ios -- --rooms ws://127.0.0.1:8787/rooms`,
+  `npm run ios -- run --device <udid> --rooms ws://<the Mac>.local:8787/rooms`, or the scheme's
+  arguments in Xcode): the app loads the page with `?rooms=<url>`, which the game takes over
+  either (`roomsUrl`). The check uses it.
+
+From the simulator the Mac is `127.0.0.1`; from a phone on the same network it is the Mac's address
+or `<name>.local` (`scutil --get LocalHostName`), with `npm run rooms` listening on every address,
+as it does.
+
+### Away, and back
+
+iOS suspends an app in the background, so away is the usual state on a phone. As the app goes,
+WebKit hides the page and the app takes the web view out of the window (When the game runs, above):
+the game says at once that its fly is resting (`Online.away`, the away flag in its state) and stops
+with its frames. The room keeps the fly there, resting, for 10 minutes.
+
+Coming back, the line may or may not still be open. In the simulator WebKit's networking process
+kept it open through 10 s in the background; on a phone iOS suspends that process too, and the room
+drops a line whose pings go unanswered for 15 to 30 s. Either way the game carries on: shown again
+it hurries a dropped line (`Online.wake`), says hello with its key and where its fly is, and the
+room gives back the same seat and colour. The check drops the line from the room's side while the
+app is away, as a phone's would be dropped, and sees it back at the table about 2 s after it is in
+front again ([Checking it](#checking-it)).
+
+### Sharing the link
+
+`navigator.share` is there in the web view and opens the system's share sheet (the link, Copy,
+Messages and the rest) as in Safari; the game's Share the link calls it from the tap (`share()`,
+`apps/web/src/online/invite.ts`). On an iPad WebKit shows the sheet as a popover pointing at the
+tap. So the app adds nothing for it. Both seen in the simulators.
+
+### Universal links
+
+A table's link opens the app where it is installed, instead of Safari, when both sides say so:
+
+- **The site** serves `/.well-known/apple-app-site-association`, naming the app by its team and
+  bundle ID, `<TEAMID>.com.isaacthoman.flies`: `applinks` for its own page with a `table` of ten
+  characters (in the components form, so nothing else on the site opens the app), and
+  `webcredentials` for password AutoFill. The web build writes it only when `APPLE_TEAM_ID` is set
+  ([deploy.md](deploy.md#the-iphone-and-ipad-apps-links)); without it there is no file, and links
+  open in Safari, which plays them as well.
+- **The app** has the Associated Domains entitlement (`applinks:flies.isaacthoman.com` and
+  `webcredentials:flies.isaacthoman.com`) only when it is built with `IOS_LINKS=1`
+  (`apps/ios/links.yml`, merged into `project.yml` as `apps/tvos/weatherkit.yml` is for the Apple
+  TV). It is off by default because signing a device build with it needs the App ID to have the
+  capability, which is the owner's to turn on in the developer account. Nothing here changes
+  signing, the team or the App ID.
+
+The app takes a link (`src/Links.swift`, unit-tested) only if it is https, to
+`flies.isaacthoman.com`, its own page, with a `table` that could be a table's code; anything else
+is ignored. The game is given the code and nothing more, so a link can't point it at another room
+server.
+
+- **Opened by a link** (the scene's connection options): the page is loaded as
+  `fly://app/index.html?table=<code>` (with `?rooms=` too, if asked for), and the game sits down
+  there as it starts, as a browser opening the link would.
+- **A link while it runs** (`scene(_:continue:)`): the app dispatches `INVITE_EVENT` with the link on
+  the page, and the game leaves the table it is at, if any, and sits down at that one. A link that
+  arrives before the game has started waits until it has.
+- **For checks**, `-FlyInvite <link>` at launch goes through the same test as a link that opened
+  the app. `-FlyInviteLater <link>` hands the link to the running app through
+  `scene(_:continue:)`, as iOS hands over a universal link, when the check posts a Darwin
+  notification (`com.isaacthoman.flies.invite-now`) from the UI test's process. XCUITest can't do
+  it itself: its `XCUIApplication.open(_:)` with an https link starts the app afresh, with the link
+  as a URL to open, which a universal link never is.
+
+### Typing names and passwords
+
+A room's name and password are typed into fields the game draws, with the keys going to one hidden
+`<input>` (the room list's `apps/web/src/ui/text-entry.ts`, being built on `feat-online-rooms`).
+Tried in the web view with an input like that one (fixed at the top left, 1 px, transparent, a
+16 px font, focused with `preventScroll`):
+
+- **Focused during the tap** (in its `pointerup`), the phone's keyboard comes up and what is typed
+  reaches the input (`keydown` and `input`, the value as typed). **Focused a frame later**, the
+  input has focus but no keyboard comes up: WebKit shows it only for focus that comes from the
+  player's own touch. So the field must be focused in the tap's handler, as the room list does
+  (`#typeOnTap`). A hardware keyboard types into it either way.
+- **A password field** (`type="password"`, `autocomplete="current-password"`) brings the keyboard
+  with AutoFill's Passwords button over it, in the app as in Safari. With the site's
+  `webcredentials` and the app's entitlement (above), AutoFill also suggests the passwords saved
+  for `flies.isaacthoman.com` and offers to save a new one (`new-password`, for a new room); without
+  them it offers only the list of all passwords. Seeing that needs a signed build on a device.
+- **The keyboard covers the bottom of the canvas.** On the iPhone 18 Pro Max it takes 415 of 956
+  points: `visualViewport.height` drops to 541 and `visualViewport` fires `resize`, while
+  `innerHeight` stays 956, no window `resize` comes, and the page isn't scrolled. WebKit's form bar
+  (up, down, Done) sits on the keyboard. The app tells the page nothing more, because this is what
+  Safari on a phone tells the same page, so one rule serves both: the room list must keep the field
+  being typed into, and its Join, above `visualViewport.height` while that is smaller than the
+  page, and lay out again when it grows back. Return (`enterkeyhint="done"`) and Done both end the
+  typing.
+- Nothing in the app stands in the way: the web view is the first responder, and the page's own
+  focus decides the rest.
+
 ## Building and running
 
 Needs a Mac with Xcode 27 and XcodeGen (`brew install xcodegen`), and the connectome
@@ -165,6 +300,8 @@ npm run ios -- --sim <udid> --report 2    # ...in that simulator, printing repor
 npm run ios -- build                      # for an iPhone or iPad
 npm run ios -- build --sim [--debug]
 npm run ios -- run --device <udid>        # install and launch, printing the console
+npm run ios -- --rooms ws://127.0.0.1:8787/rooms   # ...at tables on a room server of your own (npm run rooms)
+IOS_LINKS=1 npm run ios -- build          # with universal links and the site's passwords (Associated Domains)
 npm run ios:check                         # the simulator check (below)
 npm run tvos:art -- --only ios/           # render the icon and launch image again
 ```
@@ -172,8 +309,8 @@ npm run tvos:art -- --only ios/           # render the icon and launch image aga
 `build` writes the asset catalog from `assets/ios` (`scripts/iosAssets.ts`), builds the web app
 with the root Vite config into `apps/ios/www/` (17 MB, the brain's parts included; the same files
 `npm run build` makes for a web host), generates
-`Flies.xcodeproj` from `apps/ios/project.yml` and builds it. Release by default; `--debug`
-makes the page inspectable in Safari's Web Inspector.
+`Flies.xcodeproj` from `apps/ios/project.yml` (with `links.yml` merged in under `IOS_LINKS=1`)
+and builds it. Release by default; `--debug` makes the page inspectable in Safari's Web Inspector.
 
 ### The app's identity
 
@@ -211,7 +348,11 @@ browser's cache holds of the brain, where the menu's first row is, and the app's
 power and thermal state, as `report {json}` on the console and in
 `Library/Caches/report.log` (replaced each launch), and as the value of an accessibility element,
 `fly-report`, for UI tests. The page's errors and console warnings are passed on as they happen.
-`-FlySettings <json>` changes the game's settings through its own code once it has started.
+`-FlySettings <json>` changes the game's settings through its own code once it has started. The
+report includes the table in the page's address; the canvas's state says how the line is
+(`data-online`), the seat, its colour, the reconnects and the others there. `-FlyRooms <url>`,
+`-FlyInvite <link>` and `-FlyInviteLater <link>` are in [Tables with others](#tables-with-others);
+like the rest, they do nothing unless given.
 
 ## Checking it
 
@@ -220,17 +361,25 @@ power and thermal state, as `report {json}` on the console and in
 simulator, runs them, then shuts it down and deletes it:
 
 - unit tests (`tests/unit`): the power policy's table; what the scheme handler serves (the site,
-  nothing outside it, JavaScript as JavaScript); when haptics play;
-- the UI test (`tests/ui/AliveTests.swift`), driving the app as a person would: the brain is read
+  nothing outside it, JavaScript as JavaScript); when haptics play; which links are a table's, and
+  the page and script the game is given for one;
+- the UI tests, driving the app as a person would. `tests/ui/AliveTests.swift`: the brain is read
   from the bundle, wakes, and the title shows, with nothing of the brain in the browser's cache;
   frames go on being drawn and the brain keeps real time; a tap on the title's first row starts
   play; away for 6 s (another app over the whole screen), most of that time passes with the brain
   stopped, and in front again it carries on at real time; a setting changed in one run, the app
-  killed, is there in the next, and the relaunch again copies nothing of the brain into the cache;
+  killed, is there in the next, and the relaunch again copies nothing of the brain into the cache.
+  `tests/ui/TablesTests.swift`, against a room server the check starts on a port of its own, with a
+  fake fly (`scripts/tables.ts`) starting each of two tables: the app, launched by the first
+  table's link (`-FlyInvite`, `-FlyRooms`), sits down and sees the fly there; play starts; away for
+  10 s, the room has its fly resting, and the check drops its line meanwhile; in front again it is
+  back at the table in the same seat and colour, `data-online` joined, the reconnect counted, and
+  the room heard it come back to its seat, not take a new one; then the second table's link, handed
+  to it while it runs (`-FlyInviteLater`), takes it there in the same run of the app;
 - the memory of the app and of WebKit's processes, sampled from the Mac while it runs.
 
-It prints what it measured, saves a screenshot and the test results outside the repo and prints
-where. About two minutes after the build. Whether a keyboard reaches the game it reports but
+It prints what it measured, saves two screenshots (the title, and play at a table), the test
+results and the app's log outside the repo, and prints where. About two minutes after the build. Whether a keyboard reaches the game it reports but
 doesn't require: a headless simulator, as the check makes, has no keyboard attached (one shown in
 Simulator or T3 Code's device panel does), and XCUITest's own Return and Escape never reach a web
 page on iOS (its newline does, as Enter; WebKit's own tests send a hardware Escape to the page).
@@ -254,7 +403,8 @@ with its GPU. They say the app works, not how a phone runs it.
 1. The app ID is the Apple TV app's, `com.isaacthoman.flies`: Xcode's automatic signing registers
    it with the first signed build if it isn't in the
    [developer account](https://developer.apple.com/account) yet. The iPhone and iPad app needs no
-   capabilities of its own. With a different `IOS_BUNDLE_ID`, the same goes for that one.
+   capabilities of its own, unless built with `IOS_LINKS=1` (below). With a different
+   `IOS_BUNDLE_ID`, the same goes for that one.
 2. For a device: enable Developer Mode on it (Settings, Privacy & Security), connect it, then
    `npm run ios -- build` (Xcode's automatic signing makes the profile; `-allowProvisioningUpdates`
    is passed) and `npm run ios -- run --device <udid>` (`xcrun devicectl list devices` gives the
@@ -263,6 +413,26 @@ with its GPU. They say the app works, not how a phone runs it.
    ([release.md](release.md)), once the one-time setup there is done. By hand,
    `npm run ios -- archive --version <x.y.z> --upload`. Add the iPhone and iPad screenshots
    in App Store Connect.
+4. For table links that open the app, and the site's passwords in it (universal links, above), in
+   this order:
+   1. Find the Team ID: [developer account](https://developer.apple.com/account), Membership
+      details (ten capital letters and digits).
+   2. On the server, set `APPLE_TEAM_ID=<that ID>` in `.env` and redeploy the site
+      ([deploy.md](deploy.md#the-iphone-and-ipad-apps-links)). Check it:
+      `curl -i https://flies.isaacthoman.com/.well-known/apple-app-site-association` answers 200,
+      `application/json`, no redirect, naming `<TEAMID>.com.isaacthoman.flies`. Apple's CDN
+      fetches it from there (`https://app-site-association.cdn-apple.com/a/v1/flies.isaacthoman.com`
+      shows what it has), and can take a while to see a change.
+   3. In the developer account, Certificates, Identifiers & Profiles → Identifiers →
+      `com.isaacthoman.flies`, turn on Associated Domains and save. (Xcode may say the profile
+      must be made again; automatic signing does that on the next build.)
+   4. Build with it: `IOS_LINKS=1 npm run ios -- build`, then `npm run ios -- run --device <udid>`.
+      For TestFlight, set `IOS_LINKS=1` in the release workflow's environment
+      (`.github/workflows/testflight.yml`, [release.md](release.md)) or archive by hand with it.
+   5. On the phone: send yourself a table's link (Start a table in a browser, Share the link) in
+      Messages or Notes and tap it: the app opens and sits down at that table. A link typed into
+      Safari's address bar opens the page in Safari, by design. A password typed into a room in the
+      app is offered for saving under flies.isaacthoman.com, and offered again in Safari and the app.
 
 ## What isn't verified
 
@@ -285,3 +455,9 @@ No iPhone or iPad was connected while this was built. Everything above ran in th
   10 frames a second), and what the fly costs there unseen.
 - The launch image and icon on a home screen, and Stage Manager's own window sizes beyond the
   windowed iPad layout seen in the simulator.
+- **A table across a real suspension**: when a phone's line drops (the check drops it from the
+  room's side instead), on Wi-Fi and on a cellular network, and the production room server over
+  `wss`, which wasn't running while this was built (a public `wss` server stood in for it).
+- **Universal links and AutoFill with the site's passwords**, which need the Team ID, the
+  capability and a signed build (On a device, step 4); the simulator check hands the app a link
+  the way iOS does, but not from Messages.

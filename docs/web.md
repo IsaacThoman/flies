@@ -33,10 +33,11 @@ All of `dist/`, as it is, to any folder of the host. About 17 MB:
 | `brain/connectome.<n>.<hash>.bin` | the brain, in four parts of at most 4 MiB, 14.2 MB in all | the same | `application/octet-stream` (any will do) |
 | `brain/fly-brain.0.<hash>.wasm` | the brain's simulation as WebAssembly, 268 KB (106 KB gzipped) | the same | `application/wasm` (what hosts send for `.wasm`; any will do) |
 | `brain/anatomy.<n>.<hash>.bin` | where each neuron is (`packages/brain/src/anatomy.ts`), 0.9 MB, if `npm run brain:fetch` built it; nothing loads it yet | the same | the same |
+| `.well-known/apple-app-site-association` | which links open the iPhone and iPad app, only when built with `APPLE_TEAM_ID` ([deploy.md](deploy.md#the-iphone-and-ipad-apps-links)); it must be at the host's root, with no redirect, and is never kept by the service worker | `no-cache` | `application/json` |
 
 Every file whose contents can change has its contents in its name, so it can
-be kept forever; the three that can't (the page, its manifest and the service
-worker) are small and must be asked for again each time (`no-cache`, which
+be kept forever; the few that can't (the page, its manifest, the service
+worker, and the app association when there is one) are small and must be asked for again each time (`no-cache`, which
 still lets a browser revalidate and keep the page in its back-forward cache;
 not `no-store`). `scripts/serve.ts` serves exactly this.
 
@@ -364,6 +365,9 @@ as it is, with no network:
 - the page is a secure context there, so `crypto.subtle` checks each part's
   digest; where it is missing the check is skipped, and gzip's own check and
   the connectome's loader catch damage;
+- its WebSocket and `navigator.share` work as in Safari, so a table with
+  others needs nothing of the app beyond the room server's address and the
+  site's links, which the game knows it is in an app for (`fly:`);
 - or the app runs the C++ brain itself and exposes it as
   `globalThis.__native.brain` (`NativeBrainBridge` in
   `packages/contracts/src/brain.ts`), as the Apple TV app does: the game then

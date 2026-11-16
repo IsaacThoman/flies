@@ -25,3 +25,4 @@ apps/ios/build/
 apps/ios/src/generated/
 apps/ios/*.xcodeproj
 apps/ios/Info.plist
+apps/ios/Flies.entitlements

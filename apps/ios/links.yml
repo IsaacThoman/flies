@@ -1,0 +1,13 @@
+# The site's table links open the app (universal links), and password AutoFill offers the site's
+# passwords in it: merged into project.yml only with IOS_LINKS=1, since signing for a device then
+# needs the App ID to have the Associated Domains capability, which the owner turns on
+# (docs/ios.md, "Universal links"). The site says the same from its side, in
+# /.well-known/apple-app-site-association (docs/deploy.md).
+targets:
+  Flies:
+    entitlements:
+      path: Flies.entitlements
+      properties:
+        com.apple.developer.associated-domains:
+          - applinks:flies.isaacthoman.com
+          - webcredentials:flies.isaacthoman.com

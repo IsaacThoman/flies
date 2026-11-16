@@ -9,12 +9,22 @@ import path from "node:path";
 import { after, before, test } from "node:test";
 import { gunzipSync } from "node:zlib";
 import { build } from "vite";
+import { siteAssociation } from "../../../scripts/webBuild.ts";
 
 const root = path.join(import.meta.dirname, "../../..");
 const out = mkdtempSync(path.join(tmpdir(), "fly-web-build-"));
+/** A team for the build to name in the site's association, as the owner's would be (docs/deploy.md). */
+const TEAM = "ABCDE12345";
 
 before(async () => {
-  await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "silent", build: { outDir: out, emptyOutDir: true } });
+  const team = process.env.APPLE_TEAM_ID;
+  process.env.APPLE_TEAM_ID = TEAM;
+  try {
+    await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "silent", build: { outDir: out, emptyOutDir: true } });
+  } finally {
+    if (team === undefined) delete process.env.APPLE_TEAM_ID;
+    else process.env.APPLE_TEAM_ID = team;
+  }
 });
 after(() => rmSync(out, { recursive: true, force: true }));
 
@@ -28,12 +38,13 @@ const read = (file: string) => readFileSync(path.join(out, file), "utf8");
 const TEXT = /\.(html|js|css|webmanifest|json)$/;
 
 /**
- * Web addresses that are in the code but never fetched: an XML namespace
- * three.js names when it makes an element, and a paper cited in a comment in
- * one of its shaders. Anything else is a request to somebody else's server
- * until shown otherwise.
+ * Web addresses that are in the code but never fetched by a browser at a
+ * site: an XML namespace three.js names when it makes an element, a paper
+ * cited in a comment in one of its shaders, and Flies' own site, which only
+ * the apps (which aren't at a site) use, for their room server and the links
+ * they hand on (apps/web/src/online/invite.ts). Anything else is a request to
+ * somebody else's server until shown otherwise.
  */
-// The site is named for the apps' invitations and room server (online/invite.ts); a page at a site uses its own.
 const NOT_REQUESTS = new Set(["http://www.w3.org/1999/xhtml", "https://jcgt.org/published/0007/04/01/", "https://flies.isaacthoman.com/"]);
 
 test("nothing in the build asks another site for anything: no fonts, scripts, analytics or CDNs", () => {
@@ -66,7 +77,7 @@ test("every path is relative, so the site works from any folder", () => {
 
 test("what may be kept forever has its contents in its name; the few that may not are small", () => {
   const unhashed = files().filter((f) => !/[.-][A-Za-z0-9_-]{8,}\.[a-z]+$/.test(f));
-  assert.deepEqual(unhashed.sort(), ["index.html", "manifest.webmanifest", "sw.js"]);
+  assert.deepEqual(unhashed.sort(), [".well-known/apple-app-site-association", "index.html", "manifest.webmanifest", "sw.js"]);
   for (const file of unhashed) assert.ok(statSync(path.join(out, file)).size < 8_000, `${file} is small`);
 });
 
@@ -82,9 +93,23 @@ test("the page is an installable app, credits the connectome, and its service wo
   for (const icon of manifest.icons) assert.ok(existsSync(path.join(out, icon.src)), icon.src);
   const sw = read("sw.js");
   const kept = JSON.parse(/addAll\((\[[^\]]*\])\)/.exec(sw)![1]) as string[];
-  const expected = files().filter((f) => !["index.html", "sw.js"].includes(f) && !f.startsWith("brain/") && !/preview-/.test(f));
+  const expected = files().filter((f) => !["index.html", "sw.js"].includes(f) && !f.startsWith("brain/") && !f.startsWith(".well-known/") && !/preview-/.test(f));
   assert.deepEqual(kept.filter((f) => f !== "./").sort(), expected.sort());
   assert.ok(kept.includes("./"));
+});
+
+test("given the owner's team, the site vouches for the app: table links open it, and its passwords are the site's", () => {
+  const app = `${TEAM}.com.isaacthoman.flies`;
+  assert.deepEqual(JSON.parse(read(".well-known/apple-app-site-association")), {
+    applinks: { details: [{ appIDs: [app], components: [{ "/": "/", "?": { table: "??????????" }, comment: "A table's link" }] }] },
+    webcredentials: { apps: [app] },
+  });
+});
+
+test("without a team there is no association, and a team that can't be one stops the build", () => {
+  assert.equal(siteAssociation(undefined), null);
+  assert.equal(siteAssociation(""), null);
+  for (const team of ["TEAMID", "abcde12345", "ABCDE12345 ", "<TEAMID>"]) assert.throws(() => siteAssociation(team), /APPLE_TEAM_ID/, team);
 });
 
 test("the brain is beside the page in its wire form, in parts named for their contents, each a few MB (and the neurons' positions, if built, the same way)", { skip: !existsSync(path.join(root, "packages/brain/data/connectome.bin")) && "no connectome (npm run brain:fetch)" }, () => {

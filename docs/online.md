@@ -9,8 +9,9 @@ place, the food, thrown balls, the light and the weather, and the seed and
 clock the bubbles and visitors come from. Each fly sees the others with its
 own eyes and meets them with its own body. Nothing else passes between flies.
 
-This is the web's and the Apple TV's, whose host bridges a native WebSocket
-(below). The iPhone app joins later.
+This is the web's, the Apple TV's, whose host bridges a native WebSocket,
+and the iPhone and iPad app's, whose web view has a WebSocket of its own
+(below).
 
 ## Playing
 
@@ -328,7 +329,7 @@ holds eight flies to the frame's budget on every screen shape, and checks
 that single-player opens no connection. `npm run tables -- --clients 4 --seconds 120`
 is a longer run with several tabs and fake flies, summing up what each saw.
 
-## The Apple TV and the iPhone, later
+## The Apple TV and the iPhone
 
 The game reaches the room only through `TableSocket`
 (`packages/contracts/src/socket.ts`): send, and once a frame drain what has
@@ -354,6 +355,11 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
   check sits the app in a room of eight; eight on a real Apple TV still has
   to be measured (`npm run tvos:soak -- --table`, `docs/apple-tv.md`,
   "Playing together").
-- **iPhone and iPad (stage 3).** The same bridge, and the system share
-  sheet. iOS suspends a backgrounded app, so away is the normal state there;
-  the 10 minutes and coming back are what make it work.
+- **iPhone and iPad.** No bridge: the app is the web build in a web view,
+  whose own WebSocket reaches `wss://flies.isaacthoman.com/rooms` (and a room
+  server of your own at an address or a `.local` name, for development), and
+  whose `navigator.share` is the system share sheet. The links it shares are
+  the site's; with `APPLE_TEAM_ID` on the site and the app built with
+  `IOS_LINKS=1`, they open the app (universal links). iOS suspends a
+  backgrounded app, so away is the normal state there; the 10 minutes and
+  coming back are what make it work. `docs/ios.md`, "Tables with others".

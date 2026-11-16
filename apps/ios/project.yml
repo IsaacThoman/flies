@@ -1,9 +1,12 @@
 # XcodeGen spec for the iPhone and iPad app; scripts/ios.ts generates the project and builds it.
 # The team and bundle ID come from IOS_TEAM_ID and IOS_BUNDLE_ID (which fall back to the Apple
-# TV app's: the two are one app in the App Store), the version from ../version.yml.
+# TV app's: the two are one app in the App Store), the version from ../version.yml, and the
+# Associated Domains entitlement from links.yml only when scripts/ios.ts is told IOS_LINKS=1.
 name: Flies
 include:
   - ../version.yml
+  - path: links.yml
+    enable: ${IOS_LINKS}
 options:
   deploymentTarget:
     iOS: "26.0"

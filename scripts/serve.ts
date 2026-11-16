@@ -11,6 +11,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { SITE_ASSOCIATION } from "./webBuild.ts";
 
 export const TYPES: Readonly<Record<string, string>> = {
   ".html": "text/html; charset=utf-8",
@@ -22,6 +23,9 @@ export const TYPES: Readonly<Record<string, string>> = {
   ".svg": "image/svg+xml",
   ".wasm": "application/wasm",
 };
+
+/** A built file's type: by its extension, and the site's association with the app, which has none, as JSON (Apple's devices ask for that). */
+export const contentType = (file: string) => TYPES[path.extname(file)] ?? (file === SITE_ASSOCIATION ? "application/json" : "application/octet-stream");
 
 /** Files named for their contents (assets/, brain/) can be kept for a year; the page, its manifest and the service worker must be asked for again each time. */
 export const cacheControl = (file: string) => (/^(assets|brain)\//.test(file) ? "public, max-age=31536000, immutable" : "no-cache");
@@ -60,7 +64,7 @@ export async function serveSite({ dir, base = "/", port = 0, cut }: SiteOptions)
     }
     const size = fs.statSync(full).size;
     const headers: Record<string, string> = {
-      "Content-Type": TYPES[path.extname(file)] ?? "application/octet-stream",
+      "Content-Type": contentType(file),
       "Cache-Control": cacheControl(file),
       "Accept-Ranges": "bytes",
     };
