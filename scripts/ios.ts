@@ -3,6 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
+import { archive, ARCHIVE_USAGE, archiveOptions } from './apple.ts';
 import { writeIosAssetCatalog } from './iosAssets.ts';
 import { BUNDLE_ID as TVOS_BUNDLE_ID, TEAM_ID as TVOS_TEAM_ID } from './tvos.ts';
 
@@ -26,9 +27,14 @@ const USAGE = `Usage: npm run ios -- [<command>] [options]
   run (--sim <udid> | --device <udid>) [--debug] [--report <seconds>]
         install the built app and launch it, printing its console. --report prints the game's
         state that often (docs/ios.md, "Reports")
+  archive --version <x.y.z> [--build-number <n>] [--upload]
+        build the web app as build does and archive the app for the App Store (see Archive
+        options and docs/release.md)
 
 Signing uses IOS_TEAM_ID and IOS_BUNDLE_ID, which default to the Apple TV app's
-(TVOS_TEAM_ID, TVOS_BUNDLE_ID: now ${TEAM_ID} and ${BUNDLE_ID}).`;
+(TVOS_TEAM_ID, TVOS_BUNDLE_ID: now ${TEAM_ID} and ${BUNDLE_ID}).
+
+${ARCHIVE_USAGE}`;
 
 function run(command: string, args: string[], cwd = root, env: NodeJS.ProcessEnv = process.env) {
   const result = spawnSync(command, args, { cwd, env, stdio: 'inherit' });
@@ -109,6 +115,10 @@ function main() {
     return launch({ sim }, false, report);
   }
   if (cmd === 'build') return build({ sim: has('--sim'), debug: has('--debug'), forTesting: has('--for-testing') });
+  if (cmd === 'archive') {
+    const options = archiveOptions(flag('--version'), flag('--build-number'), has('--upload'));
+    return archive({ appDir, platform: 'iOS', teamId: TEAM_ID, env: prepare() }, options);
+  }
   if (cmd === 'run') {
     const sim = flag('--sim'), device = flag('--device'), report = flag('--report');
     if (!sim && !device) throw Error('run needs --sim <udid> or --device <udid>');

@@ -71,6 +71,7 @@ npm run tvos -- run --device <udid> --detached --config '{"script":"game.js","st
 npm run tvos:soak -- --device <udid> --minutes 30
 npm run tvos:check                       # the simulator check (below)
 npm run tvos:check -- --weatherkit       # ...with the real weather service
+npm run tvos -- archive --version 0.1.1   # archive for the App Store (docs/release.md)
 ```
 
 `build`:
@@ -578,11 +579,12 @@ Copied and adapted: the host (`Host.mm`, `JSHost.h`, `Host.h`), the command exec
 (`Renderer`, `Executor`, `Canvas2D`, `Fonts.mm`), Web Audio (`Audio.mm`, `runtime/audio.ts`),
 the runtime (`dom.ts`, `web.ts`, `webgl.ts`, `canvas2d.ts`, `color.ts`, `glConstants.ts`,
 `ops.ts`, `native.ts`), the frame-stats and `drive` hooks (`runtime/report.ts`), the XcodeGen
-spec, the privacy manifest, the build script and the asset-catalog pipeline.
+spec, the privacy manifest, the build script, the asset-catalog pipeline and App Store archiving
+(`scripts/apple.ts`, [release.md](release.md)).
 
 Left out: phone pairing and the relay, WebSocket and EventSource, HTTP `fetch` and the
 log/report uploads, the page's file store, `crypto.subtle`, React-specific mount points, songs,
-the benchmarks and their natives, Now Playing, App Store archiving.
+the benchmarks and their natives, Now Playing.
 
 Changed or added: the remote (its own `Remote` class; Play/Pause is its own key; key repeat;
 the touch surface through GameController; the root flag pushed from JavaScript instead of polled
