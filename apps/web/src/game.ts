@@ -14,6 +14,7 @@ import { CameraDirector } from "./camera.ts";
 import type { View } from "./camera.ts";
 import { DISPLAY_ASPECT } from "./display.ts";
 import { Eyes } from "./eyes/eyes.ts";
+import { EyesInset, insetWanted } from "./eyes/inset.ts";
 import { FlyView } from "./fly-view.ts";
 import type { Remote } from "./input.ts";
 import { Life } from "./life.ts";
@@ -59,6 +60,7 @@ export class Game implements Shell {
   readonly handsView: HandsView;
   readonly audio = new Audio();
   readonly eyes: Eyes;
+  readonly inset: EyesInset;
   readonly fireflies: Fireflies;
   readonly nav = new Navigator<ScreenId>("title");
   readonly screens: Record<MenuScreenId, Screen>;
@@ -112,6 +114,8 @@ export class Game implements Shell {
     this.eyes = new Eyes(this.stage, this.life);
     this.eyes.see(this.bubbles.mesh);
     for (const object of this.handsView.seen) this.eyes.see(object);
+    this.inset = new EyesInset(this.eyes);
+    this.overlay.scene.add(this.inset.mesh);
     this.screens = {
       title: titleScreen(this),
       pause: pauseScreen(this),
@@ -268,7 +272,9 @@ export class Game implements Shell {
 
     stage.beginFrame();
     stage.render(director.camera, dt);
-    this.eyes.render(dt, this.#showEyes(), paused, this.hands.ball.active);
+    const showEyes = this.#showEyes();
+    this.inset.update(dt, insetWanted(this.settings.eyesInset, this.#loading ? "loading" : this.nav.current, this.wallpaper, showEyes, this.eyes.detail === "off"), this.wallpaper, director.shotChanges);
+    this.eyes.render(dt, showEyes, paused, this.hands.ball.active, this.inset.watching);
     stage.renderer.render(this.overlay.scene, this.overlay.camera);
     stage.measure();
     remote.endFrame();
@@ -549,6 +555,7 @@ export class Game implements Shell {
     d.loomingHz = this.peaks.looming.toFixed(1);
     d.feed = (life.brain.state?.command.feed ?? 0).toFixed(3);
     d.eyes = this.eyes.inUse ? "brain" : this.eyes.active ? "picture" : "off";
+    d.eyesInset = this.inset.state;
     d.calls = String(this.stage.cost.calls);
     d.triangles = String(this.stage.cost.triangles);
     d.frameMs = this.frameMsAverage.toFixed(2);

@@ -101,6 +101,8 @@ export class CameraDirector {
   lively = false;
   /** On the loading screen and the title, which have their own shot. */
   title = false;
+  /** How many times the wallpaper has moved on to its next shot by itself, for things that move with it. */
+  shotChanges = 0;
   /**
    * Where to stand when something is about to happen that should be seen
    * from there (the ball's dive, seen past the fly): the camera's angle round
@@ -174,6 +176,7 @@ export class CameraDirector {
         this.#shot = (this.#shot + 1) % WALLPAPER.length;
         this.#orbit = 0;
         this.#scoutIn = 0;
+        this.shotChanges++;
       }
     }
     const shot = this.shot;
