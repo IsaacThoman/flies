@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { soakConfig } from "../../../scripts/tvosSoak.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import { TIMES } from "../src/scene/light.ts";
-import { WEATHERS } from "../src/scene/weather.ts";
+import { WEATHERS } from "@fly/world";
 
 test("the device soak visits every place, weather and daylight and divides wallpaper time among them", () => {
   const config = soakConfig(60);

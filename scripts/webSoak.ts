@@ -8,21 +8,24 @@ import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { build } from "vite";
 import { serveSite } from "./serve.ts";
+import { startServer as startRooms } from "../apps/server/src/server.ts";
+import { fakeFly } from "./tables.ts";
+import { HANDS, HOLDING, PLAYING } from "@fly/net";
 import type { CDPSession, Page } from "playwright";
 import type { Game } from "../apps/web/src/game.ts";
 import { PLACES } from "../apps/web/src/places/catalog.ts";
 import type { PlaceId } from "../apps/web/src/places/catalog.ts";
 import { TIMES } from "../apps/web/src/scene/light.ts";
-import { WEATHERS } from "../apps/web/src/scene/weather.ts";
+import { WEATHERS } from "@fly/world";
 import { TOOLS } from "../apps/web/src/tools/hands.ts";
 import { chromiumPath, fullChromiumPath, gameUp, gpuFlags, readState, startServer, waitFor } from "./play.ts";
 
 declare global { var __fly: Game; }
 
-const PHASES = ["places", "climate", "tools", "menus", "eyes", "wallpaper"] as const;
+const PHASES = ["places", "climate", "tools", "menus", "eyes", "tables", "wallpaper"] as const;
 type Phase = typeof PHASES[number];
 type Sample = { seconds: number; phase: string; place: string; checkpoint: boolean; [metric: string]: number | string | boolean };
-const STATE = ["screen", "tab", "brainEngine", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden", "xray", "nerves"];
+const STATE = ["screen", "tab", "brainEngine", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden", "xray", "nerves", "prints"];
 const CLOCKS = ["gameSeconds", "audioSeconds", "eyesUpdates"];
 const METRICS = ["geometries", "textures", "programs", "calls", "triangles", "heap", "backing", "workerHeap", "workerBacking", "workerWasm", "nodes", "listeners", "audioNodes", "frameMs", "brainSpeed", "storage"];
 
@@ -135,7 +138,7 @@ export async function run(args = process.argv.slice(2)) {
   assert.ok(wallpaperPlaces.length && wallpaperPlaces.every((id) => PLACES.some((p) => p.id === id)), "invalid --places");
   const cycles = Number(flag("--cycles", quick ? "4" : "200"));
   const interval = Number(flag("--interval", quick ? "5" : "10")) * 1000;
-  const phases = flag("--phases", quick ? "places" : PHASES.join(",")).split(",") as Phase[];
+  const phases = flag("--phases", quick ? "places,tables" : PHASES.join(",")).split(",") as Phase[];
   assert.ok(phases.length && phases.every((p) => PHASES.includes(p)), `--phases: ${PHASES.join(",")}`);
   assert.ok([minutes, wallpaperMinutes, cycles, interval].every((n) => Number.isFinite(n) && n > 0), "durations, cycles and interval must be positive");
   const csv = path.resolve(flag("--csv", path.join(os.tmpdir(), `web-soak-${Date.now()}.csv`)));
@@ -143,6 +146,7 @@ export async function run(args = process.argv.slice(2)) {
   let server: ChildProcess | undefined;
   let site: Awaited<ReturnType<typeof serveSite>> | undefined;
   let built: string | undefined;
+  let rooms: Awaited<ReturnType<typeof startRooms>> | undefined;
   let url = flag("--url", "");
   if (!url && args.includes("--built")) {
     built = mkdtempSync(path.join(os.tmpdir(), "fly-soak-"));
@@ -306,7 +310,7 @@ export async function run(args = process.argv.slice(2)) {
         } else if (p === "menus") {
           await page.keyboard.press(" ");
           await waitFor(page, "screen=title");
-          for (const screen of ["brain", "about", "settings"] as const) {
+          for (const screen of ["brain", "about", "settings", "together"] as const) {
             await page.evaluate((screen) => globalThis.__fly.open(screen), screen);
             await waitFor(page, `screen=${screen}`);
             if (screen === "settings") {
@@ -332,6 +336,28 @@ export async function run(args = process.argv.slice(2)) {
           await waitFor(page, "screen=title");
           await page.keyboard.press("Escape");
           await waitFor(page, "screen=play");
+        } else if (p === "tables") {
+          await page.evaluate(() => globalThis.__fly.startTable());
+          await waitFor(page, "online=joined", 30_000);
+          const code = await page.evaluate(() => globalThis.__fly.online!.code);
+          const peer = await fakeFly(`ws://127.0.0.1:${rooms!.port}/rooms`, code, 0, new Set());
+          try {
+            const at = await page.evaluate(() => globalThis.__fly.life.body.position);
+            peer.state.flags = HANDS | HOLDING | PLAYING;
+            Object.assign(peer.state.hand, { x: at.x, y: at.y, z: at.z, eyeX: at.x, eyeY: at.y + 10, eyeZ: at.z + 10, tool: TOOLS.findIndex((t) => t.id === "blow"), variant: 1 });
+            await waitFor(page, `others~${peer.id}:1`, 30_000);
+            assert.ok(await page.evaluate(() => globalThis.__fly.online!.others.list.every((o) => {
+              for (let p = o.view.root.parent; p; p = p.parent) if (p === globalThis.__fly.stage.scene) return true;
+              return false;
+            })), "joined fly is attached to the visible place");
+            await page.waitForTimeout(1500);
+            await sample(false, true);
+          } finally {
+            peer.close();
+            await page.evaluate(() => globalThis.__fly.leaveTable());
+            await waitFor(page, "table=");
+          }
+          await page.waitForTimeout(500);
         } else if (p === "eyes") {
           for (const eyes of ["off", "high", "low"] as const) for (const inset of ["off", "always", "wallpaper"] as const) {
             await page.evaluate(({ eyes, inset }) => {
@@ -357,6 +383,12 @@ export async function run(args = process.argv.slice(2)) {
     }
   }
   try {
+    if (phases.includes("tables")) {
+      rooms = await startRooms({ port: 0, dataDir: null, log: () => {} });
+      const at = new URL(url);
+      at.searchParams.set("rooms", `ws://127.0.0.1:${rooms.port}/rooms`);
+      url = at.href;
+    }
     const jobs: Promise<void>[] = [];
     if (phases.some((p) => p !== "wallpaper")) jobs.push(lane("interaction", interaction));
     if (phases.includes("wallpaper")) for (const place of PLACES.filter((p) => wallpaperPlaces.includes(p.id))) jobs.push(lane(place.id, async (page, sample, phase) => {
@@ -373,7 +405,7 @@ export async function run(args = process.argv.slice(2)) {
     assert.deepEqual(errors, [], "browser errors");
     if (quick) {
       for (const place of PLACES) for (const metric of ["geometries", "textures", "programs"]) {
-        const rows = samples.filter((s) => s.checkpoint && s.phase === "interaction:places" && s.place === place.id);
+        const rows = samples.filter((s) => s.checkpoint && ["interaction:places", "interaction:tables"].includes(s.phase) && s.place === place.id);
         const baseline = Number(rows[0]?.[metric]);
         assert.ok(rows.length >= 3, `${place.id}: need three matched checkpoints`);
         for (const row of rows) assert.ok(Number(row[metric]) <= baseline + (metric === "programs" ? 2 : metric === "geometries" ? 1 : 0), `${place.id}: ${metric} ${baseline} → ${row[metric]}`);
@@ -381,6 +413,7 @@ export async function run(args = process.argv.slice(2)) {
     }
   } finally {
     await browser.close(); server?.kill();
+    await rooms?.stop();
     await site?.close();
     if (built) rmSync(built, { recursive: true, force: true });
     const groups = new Map<string, Sample[]>();

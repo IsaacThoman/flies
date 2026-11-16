@@ -39,6 +39,8 @@ const FAKE_PACE = 8;
 
 export type FakeFly = {
   readonly id: number;
+  /** Tests can drive its hand through the existing wire instead of implementing a second peer. */
+  readonly state: FlyState;
   close(): void;
 };
 
@@ -105,7 +107,7 @@ export function fakeFly(rooms: string, table: string, k: number, fakes: Set<numb
         world = new World(WORLDS[m.place]);
         at = m.at;
         timer ??= setInterval(walk, 50);
-        resolve({ id: m.id, close: () => ws.close() });
+        resolve({ id: m.id, state, close: () => ws.close() });
       } else if (m.type === "place") {
         state.epoch = m.epoch;
         world = new World(WORLDS[m.place]);

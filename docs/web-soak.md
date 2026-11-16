@@ -12,7 +12,8 @@ npm run soak:web -- --phases wallpaper --places picnic --wallpaper-time noon --w
 ```
 
 `e2e:soak` is the separate, roughly two-minute CI check beside `npm run e2e`:
-four circuits (16 place visits), with assertions that textures return exactly
+four circuits (16 place visits), then table join/leave churn and four cleanup
+visits, with assertions that textures return exactly
 to each place's warmed baseline. Geometry may vary by one and programs by two:
 the fireflies' first appearance uploads a persistent mesh and its program.
 The default full run uses 200 circuits, 30 minutes per interaction phase, and
@@ -20,7 +21,7 @@ The default full run uses 200 circuits, 30 minutes per interaction phase, and
 
 | Option | Meaning |
 | --- | --- |
-| `--phases places,climate,tools,menus,eyes,wallpaper` | Select phases; default all, or only places with `--quick`. |
+| `--phases places,climate,tools,menus,eyes,tables,wallpaper` | Select phases; default all, or places/tables with `--quick`. |
 | `--cycles 200` | Full four-place circuits in the places phase. |
 | `--minutes 30` | Minimum real minutes per other interaction phase. Climate finishes a complete matrix even if this takes longer. |
 | `--wallpaper-minutes 60` | Real minutes per place, in four parallel isolated contexts. |
@@ -43,6 +44,12 @@ and hold continuous tools; menus visit the menu, brain, about and all three
 settings tabs, repeatedly pausing and resuming. Eyes alternate Off/Low/High,
 all eye/nervous-system inset and X-ray settings, the full eye picture, and Inside it. Input and lifecycle behavior
 remain covered by the ordinary e2e test and the web-release work.
+
+Tables starts an in-process room server and repeatedly joins a synthetic peer,
+drives its held Blow tool through the real wire, and leaves. The browser's brain
+still runs in real time. Cleanup checkpoints and the fast check catch resources
+retained by remote hands or pooled fly models. The joined model must also remain
+attached to the visible scene after place changes. Menus include Together.
 
 The harness warms persistent tool meshes, icon textures, eye pictures, pixel
 modes and ambience buffers before sampling. Checkpoints after place changes

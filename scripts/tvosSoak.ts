@@ -3,7 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { PLACES } from "../apps/web/src/places/catalog.ts";
 import { TIMES } from "../apps/web/src/scene/light.ts";
-import { WEATHERS } from "../apps/web/src/scene/weather.ts";
+import { WEATHERS } from "@fly/world";
 
 type Step = ["wait", Record<string, string>] | ["press", string] | ["sleep", number] | ["log", string];
 
