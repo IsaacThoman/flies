@@ -239,7 +239,7 @@ Pro shared with other work: the brain awake and the title up 20 to 31 s after th
 (WebKit compiling everything for the first time), a relaunch drawing its first screen in about
 4 s (2.2 s on a simulator used before); 27 to 59 fps on the title, as busy as the Mac was; the
 brain at real time, its steps taking 18 to 40% of what they simulate; the peak footprints 29 to
-65 MB for the app, 190 to 331 MB for WebKit's page process, 38 to 47 MB for its GPU process,
+65 MB for the app, 190 to 335 MB for WebKit's page process, 38 to 47 MB for its GPU process,
 9 to 11 MB for its networking process. On the Mac at a load average of 180 on its 18 cores the
 check still passed, the brain still at real time, but at 33 fps with 18 ms of JavaScript a frame,
 and 56 s to the first title; and a busy Mac makes the web build's adaptive picture (web.md,
