@@ -163,3 +163,16 @@ test("taking off from under something it barely fits beneath, it slides out alon
   }
   assert.ok(body.position.z > 230, `still under the rail at ${body.position.z}`);
 });
+
+test("beyond the floor on the pass's shelf, drawn back toward the room against the plates stacked there, it slides round them", () => {
+  // Found by the body fuzzer (restaurant, seed 4, high starts): held behind the stack, inside the wall's thickness.
+  const bar = new World(RESTAURANT);
+  const body = new FlyBody(bar, { x: 0, z: 0, yaw: 0 });
+  Object.assign(body.position, { x: 2063.836918377752, y: 1130, z: -3094.0348167647403 });
+  Object.assign(body.velocity, { x: 91.85827166460899, y: 0, z: -3.8746351082156405 });
+  body.yaw = 0.3678361286124522;
+  body.mode = "airborne";
+  for (let t = 0; t < 20 && body.mode === "airborne"; t += DT) body.step(intent(), still, DT);
+  assert.equal(body.onFeet, true);
+  assert.ok(bar.onTable(body.position.x, body.position.z));
+});

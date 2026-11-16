@@ -17,7 +17,8 @@
 //   take-off is the escape command's; its direction is the body's: away
 //   from a threat it knows of, else straight ahead.
 // - Staying in the world: it doesn't walk off the table, and in the air is
-//   drawn back toward it near the edges of the world.
+//   drawn back toward it near the edges of the world, sliding round
+//   anything standing in its way back.
 // - Turning away from a wall it has been pressed against, facing it, for
 //   WALL_PATIENCE seconds. The brain feels the wall on its antennae, but
 //   nothing in the model turns it away.
@@ -26,7 +27,7 @@
 //   (FEED_ALIGN): stopping is the brain's doing, the last shuffle isn't.
 
 import type { Food, RayHit, Surface, Vec3, World } from "@fly/world";
-import { TOUCH, createSurface, solidBottom, topHeight } from "@fly/world";
+import { TOUCH, createSurface, sideNormal, solidBottom, topHeight } from "@fly/world";
 import type { Intent } from "./behavior.ts";
 import { ease } from "./behavior.ts";
 
@@ -506,25 +507,55 @@ export class FlyBody {
       this.events.hit = Math.max(this.events.hit, -into);
     } else if (onIt || under.underside < Math.max(p.y, under.y) + FLY_HEIGHT) {
       // Flew into its side, or its body into something over it: back out, bounced off.
+      const mx = p.x - px;
+      const mz = p.z - pz;
       p.x = px;
       p.z = pz;
       p.y = this.#within(px, pz, py, p.y);
-      if (world.wallNormal(p.x + v.x * dt, p.z + v.z * dt, p.y, this.#wall, p.y + FLY_HEIGHT)) {
-        const into = v.x * this.#wall.x + v.z * this.#wall.z;
+      const wall = this.#wall;
+      if (world.wallNormal(p.x + v.x * dt, p.z + v.z * dt, p.y, wall, p.y + FLY_HEIGHT)) {
+        const into = v.x * wall.x + v.z * wall.z;
         if (into < 0) {
-          v.x -= into * this.#wall.x * 1.4;
-          v.z -= into * this.#wall.z * 1.4;
+          v.x -= into * wall.x * 1.4;
+          v.z -= into * wall.z * 1.4;
           this.events.hit = Math.max(this.events.hit, -into);
-          this.blocked = fx * this.#wall.x + fz * this.#wall.z < -0.3;
+          this.blocked = fx * wall.x + fz * wall.z < -0.3;
         }
       } else {
         v.x *= -0.3;
         v.z *= -0.3;
       }
+      // Beyond the floor, drawn back over it against something in the way, it slides round that rather than being held there.
+      const held = world.onTable(px, pz) ? -1 : world.solidAt(px + mx, p.y + FLY_HEIGHT / 2, pz + mz);
+      if (held >= 0) {
+        sideNormal(world.solids[held].footprint, px, pz, wall);
+        const along = mx * wall.x + mz * wall.z;
+        this.#slide(mx - along * wall.x, mz - along * wall.z);
+      }
     }
     this.groundSpeed = 0;
     // In the air its "up" follows level flight.
     this.#easeUp(levelUp, dt);
+  }
+
+  /** Moves it level by (mx, mz) in the air, if nothing is in the way and there is room for its body there. */
+  #slide(mx: number, mz: number) {
+    const world = this.#world;
+    const p = this.position;
+    const length = Math.hypot(mx, mz);
+    if (length < 1e-9) return;
+    const origin = this.#flightOrigin;
+    origin.x = p.x;
+    origin.y = p.y + 1e-6;
+    origin.z = p.z;
+    const dir = this.#flightDir;
+    dir.x = mx / length;
+    dir.y = 0;
+    dir.z = mz / length;
+    if (world.raycast(origin, dir, this.#flightHit, length, FLY_HEIGHT - SLACK)) return;
+    if (world.underside(p.x + mx, p.z + mz, p.y) < p.y + FLY_HEIGHT) return;
+    p.x += mx;
+    p.z += mz;
   }
 
   /** A height at (x, z) as near `to` as the air it was in at `from` allows: on the surface under it or above, its body clear of what is over it. */
