@@ -494,7 +494,9 @@ function opticLobe(type: string): string {
 
 // Central brain cells by the neuropil their type is named for (the hemibrain's
 // and FlyWire's convention: the neuropil with most of the type's synapses),
-// grouped as Ito et al. (2014) group the neuropils.
+// grouped as Ito et al. (2014) group the neuropils, but with fewer groups:
+// their inferior, ventromedial and lateral complex groups are one region, and
+// their periesophageal neuropils and the GNG another, the subesophageal zone.
 const CENTRAL_BRAIN: readonly (readonly [string, readonly string[]])[] = [
   ["superior-protocerebrum", ["SMP", "SLP", "SIP", "aSP"]],
   ["lateral-horn", ["LH"]],
