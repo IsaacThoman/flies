@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/build
+**/generated
+packages/brain/data
+apps/tvos/www
+apps/tvos/*.xcodeproj
+*.log
+.DS_Store

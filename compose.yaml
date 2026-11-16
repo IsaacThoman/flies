@@ -1,0 +1,40 @@
+services:
+  web:
+    image: flies-web:local
+    build:
+      context: .
+      args:
+        FLY_SITE_URL: ${FLY_SITE_URL:-}
+    environment:
+      FLIES_DOMAIN: ${FLIES_DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      ROOMS_HOST: ${ROOMS_HOST:-rooms}
+      ROOMS_PORT: ${ROOMS_PORT:-3000}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Add the Node WebSocket service here as `rooms`, listening on 0.0.0.0:3000.
+  # Caddy preserves /rooms and handles WebSocket upgrades on the same origin.
+  # No published port or depends_on is needed; web works while rooms is absent.
+  # Override ROOMS_HOST / ROOMS_PORT if the service name or port changes.
+
+volumes:
+  caddy_data:
+  caddy_config:
