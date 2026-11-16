@@ -8,6 +8,7 @@
 // behind a fly a few millimetres from the camera, are one instanced draw.
 
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { BAR_TOP } from "@fly/world";
 import { Batch, freeze, mat4, random } from "../../scene/build.ts";
 import type { Dial } from "../../scene/clock.ts";
@@ -43,6 +44,8 @@ export const WASH: Wash = { shelves: BACK.shelves, shelfX: [-720, 1320], shelfZ:
 const PENDANT_LIGHT = 300_000;
 
 const box = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0).translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+/** A box with its edges rounded over by `radius`, in so many steps: upholstery, a chair's seat. */
+const rounded = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, radius: number, steps = 2) => new RoundedBoxGeometry(x1 - x0, y1 - y0, z1 - z0, steps, radius).translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
 /** A turned shape standing out of the back wall toward the room: (radius, out from the wall) pairs, from the wall out. */
 const turned = (profile: readonly (readonly [number, number])[], segments: number, at: THREE.Vector3Like) => lathe(profile, segments).rotateX(Math.PI / 2).translate(at.x, at.y, at.z);
 
@@ -400,10 +403,13 @@ export function buildRoom(around: Batch, solid: THREE.Material, clear: THREE.Mat
     add(lathe([[60, -30], [40, 40], [0, 42]], 20).translate(0, 0, -10), "#ffb870", KIND.lamp, m);
   }
 
-  // A banquette along the far wall, two tables and their chairs, pictures on the walls.
-  add(box(80, floor, front - 560, 2200, floor + 450, front - 40), "#5a1a14", KIND.glossy);
-  add(box(80, floor + 450, front - 200, 2200, floor + 950, front - 40), "#4a140f", KIND.glossy);
-  for (let x = 220; x < 2200; x += 260) add(new THREE.SphereGeometry(1, 8, 6).scale(10, 10, 4), "#2a0a08", KIND.glossy, mat4({ x, y: floor + 760, z: front - 200 }, new THREE.Euler()));
+  // A banquette along the far wall, two tables and their chairs, pictures on the walls. The banquette is buttoned leather, its seat
+  // and back stuffed round, on a dark plinth.
+  add(box(100, floor, front - 520, 2180, floor + 300, front - 40), "#2a1a14", KIND.wood);
+  add(rounded(80, floor + 290, front - 560, 2200, floor + 450, front - 60, 45), "#5a1a14", KIND.glossy);
+  add(rounded(80, floor + 440, front - 210, 2200, floor + 960, front - 30, 55), "#4a140f", KIND.glossy);
+  const button = new THREE.SphereGeometry(1, 8, 6).scale(10, 10, 4);
+  for (const [y, from] of [[floor + 800, 220], [floor + 620, 350]]) for (let x = from; x < 2150; x += 260) add(button.clone(), "#2a0a08", KIND.glossy, mat4({ x, y, z: front - 210 }, new THREE.Euler()));
   const tables = [
     { x: 650, z: 1300 },
     { x: 1650, z: 1250 },
@@ -417,9 +423,9 @@ export function buildRoom(around: Batch, solid: THREE.Material, clear: THREE.Mat
       const cx = t.x + Math.sin(a) * 420;
       const cz = t.z + Math.cos(a) * 420;
       const m = mat4({ x: cx, y: floor, z: cz }, new THREE.Euler(0, a + Math.PI, 0));
-      add(box(-210, 440, -200, 210, 480, 200), "#ffffff", KIND.wood, m);
-      for (const [lx, lz] of [[-180, -170], [180, -170], [-180, 170], [180, 170]]) add(box(lx - 16, 0, lz - 16, lx + 16, 440, lz + 16), "#e0d0c0", KIND.wood, m);
-      add(box(-200, 480, 170, 200, 900, 200), "#ffffff", KIND.wood, m);
+      add(rounded(-210, 440, -200, 210, 480, 200, 14, 1), "#ffffff", KIND.wood, m);
+      for (const [lx, lz] of [[-180, -170], [180, -170], [-180, 170], [180, 170]]) add(new THREE.CylinderGeometry(17, 13, 440, 10).translate(lx, 220, lz), "#e0d0c0", KIND.wood, m);
+      add(rounded(-200, 470, 166, 200, 900, 200, 14, 1), "#ffffff", KIND.wood, m);
     }
   }
   // Hung at the height pictures are, their middles about 1.45 m from the floor, where the band of wall seen past the fly reaches them.
