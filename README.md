@@ -106,13 +106,14 @@ bottle of red wine that has dripped a pool on the sill, where drips and the
 fly's feet set rings spreading, as they do on the saucer's water; a teaspoon
 with honey in it, crumbs of toast and spilt sugar, drops from watering the
 basil, and a linen tea towel woven thread by thread in its shader. A fly can
-stand on the rail at the foot of the glass but never get through it. Outside
-are a garden with a striped lawn, an apple tree and washing moving in the
-breeze, a picket fence with hollyhocks and foxgloves, and the backs of a little
-street of houses with smoke from their chimneys, a church spire, clouds and
-passing birds; at night their windows light up and the stars and the moon come
-out. It sounds of the kitchen's hush, the fridge, and birds muffled by the
-glass. There are no bubbles or fireflies indoors.
+stand on the rail at the foot of the glass but never get through it, and nor
+can the ball, which comes round from where it has room. Outside are a garden
+with a striped lawn, an apple tree and washing moving in the breeze, a picket
+fence with hollyhocks and foxgloves, and the backs of a little street of houses
+with smoke from their chimneys, a church spire, clouds and passing birds; at
+night their windows light up and the stars and the moon come out. It sounds of
+the kitchen's hush, the fridge, and birds muffled by the glass. There are no
+bubbles or fireflies indoors.
 
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
 wiring was traced: a stereo microscope with a fly pad on its stage (its base and
@@ -307,9 +308,10 @@ six against one in two at 60 Hz.
 
 The ball is dark in green and blue for the same reason: the eyes answer
 darkening, not brightening. It dives in low from the fly's front-right (higher
-over anything standing in its way), where the connectome's looming pathway is
-strongest and where the fly is seen against the bright table, stops just short,
-hangs a moment and veers away on a side that is clear. It casts a shadow. With
+over anything standing in its way, and round what it can't come in over, such
+as a window), where the connectome's looming pathway is strongest and where the
+fly is seen against the bright table, stops just short, hangs a moment and
+veers away on a side that is clear. It casts a shadow. With
 all that, the fly takes off about half the time: that is the model's answer,
 not a dice roll in the game.
 
@@ -416,7 +418,8 @@ bubbles (low ones mostly pass the fly, pop on surfaces without settling,
 keep coming, and burst on the fly and are felt);
 that the crumbs, pips, strawberry and saucer can be walked over, and at the
 windowsill the banana, the bowl and the basil's saucer, with the glass a wall
-and a ledge at its foot.
+and a ledge at its foot; that the ball comes over what is in its way, and
+round a window.
 
 `npm run e2e` plays the game with the real brain: the title
 appears once the brain wakes, the menus are walked with the keys, honey is

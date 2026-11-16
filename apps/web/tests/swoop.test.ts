@@ -1,16 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Pantry, World } from "@fly/world";
+import { Pantry, SILL, WINDOW, WINDOWSILL, World } from "@fly/world";
 import type { Place, Vec3 } from "@fly/world";
 import { Hands, SWOOP_BEARING, TOOLS } from "../src/tools/hands.ts";
 
 const bare: Place = { floor: { kind: "rect", hx: 500, hz: 500 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 300 };
 
-/** Throws the ball at a fly standing at the middle facing +z, and follows it through its swoop. */
-function swoop(place: Place) {
+/** Throws the ball at a fly standing at the middle facing +z (or where and as asked), and follows it through its swoop. */
+function swoop(place: Place, fly = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true }) {
   const world = new World(place);
   const hands = new Hands(world);
-  const fly = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true };
   const pantry = new Pantry(world);
   hands.tool = TOOLS.findIndex((t) => t.id === "swoop");
   const eye: Vec3 = { x: 0, y: 5, z: -10 };
@@ -45,4 +44,21 @@ test("the ball comes in over something standing in its way, and veers away clear
   const { hands, path, world } = swoop(place);
   assert.ok(hands.ball.from.y > 120, "starts higher");
   for (const p of path) assert.ok(world.heightAt(p.x, p.z) <= p.y, `the ball's middle went into the jar at ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)}`);
+});
+
+test("what it can't come in over, a window or a wall, it comes round: at the windowsill the ball stays on the room's side of the glass", () => {
+  const world = new World(WINDOWSILL);
+  for (const at of [{ x: 0, z: -80 }, { x: 260, z: -40 }, { x: -260, z: 60 }]) {
+    for (let k = 0; k < 8; k++) {
+      const yaw = (k / 8) * Math.PI * 2;
+      const { hands, path } = swoop(WINDOWSILL, { position: { x: at.x, y: world.heightAt(at.x, at.z), z: at.z }, yaw, onFeet: true });
+      const where = `from ${at.x}, ${at.z} facing ${yaw.toFixed(2)}`;
+      assert.ok(hands.ball.from.z > WINDOW.glass, `${where}: it came from outside`);
+      for (const p of path) {
+        const at = `${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)}`;
+        assert.ok(p.z > WINDOW.glass || p.y > WINDOW.head, `${where}: through the glass at ${at}`);
+        assert.ok(Math.abs(p.x) < SILL.hx || p.z > WINDOW.wall, `${where}: into the wall at ${at}`);
+      }
+    }
+  }
 });
