@@ -157,8 +157,8 @@ test("left and right mirror each other: either eye's loom escapes alike, and a s
 });
 
 test("a fed fly leaves alone sugar that a starved one feeds on", { skip }, () => {
-  // Sugar at 0.5 for 3 s after 2 s of rest, seeds 1 to 3: the body feeds above 0.15. Measured: fed 0.09 to 0.13, starved
-  // 0.22 to 0.25. (At 0.6 a fed fly is now on the line, 0.14 to 0.17, since `grounded` stopped driving the wings' sensors.)
+  // Sugar at 0.5 for 3 s after 2 s of rest, seeds 1 to 3: the body feeds above 0.15. Measured: fed 0.10 to 0.14, starved
+  // 0.22 to 0.25. At 0.6 a fed fly feeds (0.16 to 0.18) since `grounded` stopped driving the wings' sensors at rest.
   const feed = (hunger: number) => {
     let sum = 0;
     for (const seed of [1, 2, 3]) {

@@ -21,9 +21,11 @@
 // params.ts), so hunger acts here, on the same background the arousal sets.
 // It is 0 at hunger 1, where the brain is what it was before it had a hunger
 // (io.ts, HUNGER), and lowers the background as the fly is fed. Its weight is
-// the one fitted number here: it makes a just-fed fly walk at rest 1/1.6 as
-// much as a starved one (report.ts section c), as Yu et al. measured: about
-// 60% more locomotion in starved flies than fed ones (their Figure 1d).
+// the one fitted number here, to a tenth: it makes a just-fed fly walk at rest
+// about 1/1.6 as much as a starved one (report.ts section c, 10 minutes, seeds
+// 1 to 3: 1/1.52 to 1/1.59 at 0.9, 1/1.63 to 1/1.75 at 1), as Yu et al.
+// measured: about 60% more locomotion in starved flies than fed ones (their
+// Figure 1d).
 
 import { mulberry32 } from "./sim.ts";
 
@@ -31,7 +33,7 @@ export const INTERNAL_STATE = {
   arousal: { tau: 10, weight: 1.6 },
   scene: { tau: 4, weight: 1.5 },
   bias: -1,
-  hunger: { weight: 0.8 },
+  hunger: { weight: 0.9 },
 } as const;
 
 export type InternalStateParameters = {

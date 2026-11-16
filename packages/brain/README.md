@@ -515,33 +515,33 @@ Left out: L1's sustained component and L2's slight rectification; neural superpo
 
 | Stimulus | L2 | L3 | Tm4 | Tm1 | Mi1 | T4 | T5 (a, b, c, d) | LC4 | LPLC2 | HS | VS | H2 | giant fiber | escape peak (control) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| loom, right eye, 40 ms | 21 | 34 | 15 | 3.0 | 0.1 | 0 | 0.2, 0.2, 0.5, 0.2 | 11 | 2.1 | 3.9 | 0.3 | 6.2 | 38 | 0.76 (0.10) |
-| loom, right eye, 10 ms | 51 | 76 | 35 | 7.4 | 0.1 | 0 | 0.3, 0.3, 1.1, 0.6 | 27 | 4.5 | 10 | 1.0 | 2.3 | 88 | 0.78 |
-| loom, right eye, 160 ms | 7.3 | 16 | 4.8 | 1.1 | 0.2 | 0 | 0.1, 0.1, 0.2, 0.1 | 3.7 | 0.9 | 1.0 | 0.3 | 2.3 | 13 | 0.56 |
-| loom, left eye, 40 ms | 21 | 34 | 11 | 3.1 | 0.2 | 0 | 0.1, 0.1, 0.2, 0.2 | 4.1 | 0.3 | 3.0 | 0.8 | 2.7 | 20 | 0.45 |
-| receding disc, right eye | 1.5 | 2.1 | 1.2 | 0.3 | 0.1 | 0 | 0.1, 0.1, 0.2, 0.1 | 2.5 | 0.8 | 5.1 | 0.4 | 5.9 | 13 | 0.29 |
-| dimming, whole field | 29 | 123 | 13 | 3.6 | 3.1 | 0 | 0, 0, 0.1, 0.1 | 4.7 | 1.0 | 1.8 | 0.6 | 1.0 | 17 | 0.64 |
-| brightening, whole field | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.10 |
-| bar, right eye, front to back | 7.6 | 9.4 | 5.7 | 1.9 | 0 | 0 | 0.4, 0.3, 0.6, 0.4 | 7.9 | 1.1 | 19 | 1.6 | 6.5 | 38 | 0.41 |
-| bar, right eye, back to front | 7.5 | 9.2 | 5.7 | 1.9 | 0 | 0 | 0.3, 0.3, 0.6, 0.4 | 8.2 | 0.8 | 8.8 | 1.0 | 15 | 35 | 0.38 |
-| dot, right eye, front to back | 0.3 | 0.4 | 0.3 | 0.1 | 0 | 0 | 0.1 each | 1.0 | 0.1 | 1.8 | 0.1 | 1.8 | 1.2 | 0.12 |
-| grating, right eye, front to back | 54 | 66 | 36 | 11 | 0.1 | 0 | 0.7, 0.3, 1.1, 0.6 | 20 | 3.2 | 42 | 2.5 | 0.5 | 92 | 0.53 |
-| grating, right eye, back to front | 54 | 66 | 36 | 11 | 0.1 | 0 | 0.4, 0.5, 1.1, 0.7 | 20 | 2.9 | 9.3 | 2.0 | 18 | 88 | 0.48 |
-| grating, right eye, upward | 54 | 66 | 37 | 11 | 0.1 | 0 | 0.5, 0.4, 2.0, 0.8 | 23 | 3.3 | 19 | 0.6 | 5.5 | 98 | 0.51 |
-| grating, right eye, downward | 54 | 66 | 37 | 11 | 0.1 | 0 | 0.5, 0.4, 1.5, 1.1 | 22 | 3.0 | 14 | 7.1 | 8.5 | 97 | 0.48 |
-| flicker, 4 Hz, whole field | 51 | 56 | 30 | 8.2 | 0.1 | 0 | 0.1, 0.1, 0.4, 0.2 | 17 | 1.0 | 5.1 | 1.3 | 1.0 | 66 | 0.78 |
-| steady checkerboard, after 3 s | 0 | 28 | 0 | 0 | 1.0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.8 | 0.14 (0.15) |
+| loom, right eye, 40 ms | 21 | 34 | 15 | 3.0 | 0.1 | 0 | 0.2, 0.2, 0.5, 0.3 | 11 | 2.0 | 3.9 | 0.3 | 5.4 | 40 | 0.79 (0.14) |
+| loom, right eye, 10 ms | 51 | 76 | 35 | 7.3 | 0.1 | 0 | 0.3, 0.3, 1.0, 0.5 | 27 | 4.4 | 7.0 | 1.8 | 4.7 | 91 | 0.84 (0.10) |
+| loom, right eye, 160 ms | 7.3 | 16 | 4.8 | 1.1 | 0.2 | 0 | 0.1, 0.1, 0.2, 0.1 | 3.7 | 0.9 | 0.8 | 0.3 | 2.8 | 13 | 0.54 (0.23) |
+| loom, left eye, 40 ms | 21 | 34 | 11 | 3.1 | 0.2 | 0 | 0.1, 0.1, 0.2, 0.2 | 4.1 | 0.3 | 2.4 | 0.7 | 3.6 | 21 | 0.41 (0.14) |
+| receding disc, right eye | 1.5 | 2.1 | 1.2 | 0.3 | 0.1 | 0 | 0.1, 0.1, 0.2, 0.1 | 2.4 | 0.8 | 4.3 | 0.3 | 7.1 | 11 | 0.25 (0.14) |
+| dimming, whole field | 29 | 123 | 13 | 3.6 | 3.0 | 0 | 0, 0, 0.1, 0.1 | 4.5 | 1.0 | 1.2 | 0.4 | 1.0 | 15 | 0.67 (0.14) |
+| brightening, whole field | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.14 (0.14) |
+| bar, right eye, front to back | 7.6 | 9.4 | 5.7 | 1.9 | 0 | 0 | 0.4, 0.3, 0.6, 0.4 | 8.0 | 1.1 | 20 | 1.4 | 7.6 | 39 | 0.54 (0.14) |
+| bar, right eye, back to front | 7.5 | 9.2 | 5.7 | 1.9 | 0 | 0 | 0.4, 0.3, 0.6, 0.4 | 7.9 | 0.9 | 9.2 | 1.0 | 17 | 35 | 0.36 (0.14) |
+| dot, right eye, front to back | 0.3 | 0.4 | 0.3 | 0.1 | 0 | 0 | 0.1 each | 1.0 | 0 | 1.4 | 0.1 | 1.8 | 0.6 | 0.11 (0.14) |
+| grating, right eye, front to back | 54 | 66 | 36 | 11 | 0.1 | 0 | 0.7, 0.3, 1.1, 0.6 | 20 | 3.3 | 42 | 2.9 | 0.5 | 92 | 0.43 (0.14) |
+| grating, right eye, back to front | 54 | 66 | 36 | 11 | 0.1 | 0 | 0.4, 0.4, 1.1, 0.7 | 20 | 2.9 | 8.8 | 1.9 | 16 | 90 | 0.49 (0.14) |
+| grating, right eye, upward | 54 | 66 | 37 | 11 | 0.1 | 0 | 0.5, 0.4, 2.0, 0.8 | 23 | 3.2 | 19 | 0.6 | 4.0 | 100 | 0.49 (0.14) |
+| grating, right eye, downward | 54 | 66 | 37 | 11 | 0.1 | 0 | 0.5, 0.4, 1.5, 1.1 | 23 | 3.0 | 15 | 7.2 | 8.0 | 97 | 0.45 (0.14) |
+| flicker, 4 Hz, whole field | 51 | 56 | 29 | 8.2 | 0.1 | 0 | 0.1, 0.1, 0.4, 0.2 | 17 | 1.0 | 5.1 | 1.3 | 1.5 | 65 | 0.85 (0.14) |
+| steady checkerboard, after 3 s | 0 | 28 | 0 | 0 | 1.0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.3 | 0.17 (0.23) |
 
 Read across, stage by stage:
 
 - **Lamina to medulla.** Darkening reaches the OFF pathway: L2 drives Tm1, Tm2 and Tm4, L3 drives Tm9 and Mi9. Tm4 follows best (it gets 113 L2 synapses and few inhibitory ones); Tm1 and Tm2 reach a fifth of L2's rate, held down by the medulla's inhibitory amacrine cells (Pm2, Dm, Mi13).
 - **The ON pathway is silent.** L1 inhibits Mi1 and Tm3 (glutamate through GluClα), as in the fly, and in the fly brightening releases them. Here they are silent at rest, and a silent model neuron can't be released from inhibition; brightening does nothing anywhere. With no Mi1 or Tm3, T4 never fires, and motion is seen only through T5 (OFF edges).
-- **T5 and the lobula plate.** T5 responds weakly (about 1 Hz on average), but each subtype prefers the direction it does in the fly: T5a front to back (0.7 against 0.4 Hz), T5b back to front (0.5 against 0.3), T5c up (2.0 against 1.5), T5d down (1.1 against 0.8). The lobula plate tangential cells, which pool many T5s, make it plain: HS prefers front-to-back motion (42 against 9.3 Hz; a direction selectivity index of 0.64), H2 back to front (18 against 0.5), VS downward (7.1 against 0.6), as they do in the fly. Seeds 2 and 3 give the same preferences.
-- **Looming.** LC4 and LPLC2 respond to looming, and the giant fiber (DNp01) and the other looming-sensitive descending neurons (DNp02, DNp04, DNp11) follow. A disc looming at the right eye passes the body's take-off threshold (escape 0.4, where the giant fiber counts as having fired: `packages/body/src/behavior.ts`) at 10 and 40 ms (0.76 to 0.84 over seeds 1 to 3) and above the horizon (0.81 to 0.83); slowly (160 ms) it reaches 0.53 to 0.67; receding, 0.29 to 0.33. Small dots don't reach the lobula at all (escape 0.11 to 0.15, as at rest).
-- **Not selective enough.** Anything that darkens much of the field drives LC4 too: whole-field dimming reaches escape 0.64 to 0.75 (flies do jump when the lights go off, so this is not wrong in itself), a 4 Hz flicker 0.76 to 0.78, a high-contrast grating covering one eye 0.38 to 0.53 and a wide dark bar 0.27 to 0.52, at or past the body's threshold. Scenes in the game don't come near that: with the eyes open at midday, walking and resting, escape peaked at 0.34 in 5 minutes. LC4 here answers dark area, not expansion: T4 and T5, which give LPLC2 its preference for expansion, are too weak to shape it, and LC4 takes most of its drive from T2, TmY3, Tm4 and Tm2, columnar cells of the OFF side that answer any darkening.
-- **Left and right differ.** The same loom at the left eye drives the left LC4 a third as hard as the right one is driven, and LPLC2 a seventh, and reaches escape 0.30 to 0.52; at the front, 0.41 to 0.61. The eye map is mirror-symmetric and both eyes' lamina are driven alike, so the difference is in the wiring beyond: the left optic lobe has fewer synapses in this dataset. Its intrinsic neurons make 12.8 million against the right's 16.0 million, and along the looming pathway each step is thinner (L2 to Tm4, 74 synapses per cell against 113; Tm4 to LC4, 172 against 246; T2 to LC4, 255 against 372), which compounds from stage to stage. With both eyes dimmed alike, L2 fires the same on both sides (28 Hz) and Tm4 already differs (11 against 16 Hz). That is most likely the left lobe being less completely reconstructed rather than a real difference between the fly's eyes.
+- **T5 and the lobula plate.** T5 responds weakly (about 1 Hz on average), but each subtype prefers the direction it does in the fly: T5a front to back (0.7 against 0.4 Hz), T5b back to front (0.4 against 0.3), T5c up (2.0 against 1.5), T5d down (1.1 against 0.8). The lobula plate tangential cells, which pool many T5s, make it plain: HS prefers front-to-back motion (42 against 8.8 Hz; a direction selectivity index of 0.65), H2 back to front (16 against 0.5), VS downward (7.2 against 0.6), as they do in the fly. Seeds 2 and 3 give the same preferences.
+- **Looming.** LC4 and LPLC2 respond to looming, and the giant fiber (DNp01) and the other looming-sensitive descending neurons (DNp02, DNp04, DNp11) follow. A disc looming at the right eye passes the body's take-off threshold (escape 0.4, where the giant fiber counts as having fired: `packages/body/src/behavior.ts`) at 10 and 40 ms (0.72 to 0.87 over seeds 1 to 3) and above the horizon (0.80 to 0.87); slowly (160 ms) it reaches 0.49 to 0.62; receding, 0.25 to 0.37. Small dots barely reach the lobula (escape 0.11 to 0.21, near rest).
+- **Not selective enough.** Anything that darkens much of the field drives LC4 too: whole-field dimming reaches escape 0.67 to 0.76 (flies do jump when the lights go off, so this is not wrong in itself), a 4 Hz flicker 0.80 to 0.85, a high-contrast grating covering one eye 0.43 to 0.56 and a wide dark bar 0.33 to 0.54, at or past the body's threshold. Scenes in the game don't come near that: with the eyes open at midday, walking and resting, escape peaked at 0.34 in 5 minutes. LC4 here answers dark area, not expansion: T4 and T5, which give LPLC2 its preference for expansion, are too weak to shape it, and LC4 takes most of its drive from T2, TmY3, Tm4 and Tm2, columnar cells of the OFF side that answer any darkening.
+- **Left and right differ.** The same loom at the left eye drives the left LC4 a third as hard as the right one is driven, and LPLC2 a seventh, and reaches escape 0.39 to 0.51; at the front, 0.44 to 0.62. The eye map is mirror-symmetric and both eyes' lamina are driven alike, so the difference is in the wiring beyond: the left optic lobe has fewer synapses in this dataset. Its intrinsic neurons make 12.8 million against the right's 16.0 million, and along the looming pathway each step is thinner (L2 to Tm4, 74 synapses per cell against 113; Tm4 to LC4, 172 against 246; T2 to LC4, 255 against 372), which compounds from stage to stage. With both eyes dimmed alike, L2 fires the same on both sides (28 Hz) and Tm4 already differs (11 against 16 Hz). That is most likely the left lobe being less completely reconstructed rather than a real difference between the fly's eyes.
 - **Steering.** A rotation turns the fly with it, weakly: seen from above, a clockwise rotation (front to back in the right eye) gives turn +0.01, +0.03, +0.17 (seeds 1 to 3) against −0.03, −0.04, +0.06 anticlockwise, the direction of the optomotor response in each. While `grounded` drove the wings' and halteres' sensors too (Senses) it was +0.11, +0.10, +0.19 against −0.05, −0.08, +0.08: their tonic drive raised the steering neurons' rates under the grating (seed 1, clockwise: the right DNa02 at 5.4 Hz with it, 2.5 without). In the game, `packages/body` turns continuously at a yaw rate proportional to `turn`. In one eye, any grating turns the fly toward that eye, front to back most.
-- **Walking.** Dimming makes it walk (walk 0.19 to 0.30 against 0.03 to 0.08), and gratings stop it (0.00 to 0.04 against 0.04 to 0.17).
+- **Walking.** Dimming makes it walk (walk 0.22 to 0.39 against 0.00 to 0.11), and gratings suppress it when it is present (0.00 to 0.04 against 0.00 to 0.22).
 - **A steady scene** drives nothing once adapted to: 3 s after a checkerboard appears only L3's sustained response remains (and Mi9, Mi1 from it), and nothing beyond the medulla.
 
 Not reached at all: the small-object detectors (LC11, LC10, LC17), the ON pathway and T4, and anything that depends on them.
@@ -630,24 +630,24 @@ It acts in two places, each a stand-in for something the connectome lacks, and n
 
 **On the sweet taste neurons' output** (`io.ts`, `HUNGER`). Starvation does not make sugar-sensing taste neurons fire faster: their spiking to sucrose is the same in fed and starved flies. It raises the calcium that enters their terminals for each spike, and so what they release, through dopamine acting on their DopEcR receptors (Inagaki et al. 2012, Cell 148: 583, Figure 6 and S5). The dopamine comes from TH-VUM, a neuron in the subesophageal zone that fires at about 1 Hz just after a meal and 25 Hz after 24 hours without food; silencing it lowers the probability of extending the proboscis to sucrose, exciting it raises it (Marella et al. 2012, Neuron 73: 941). Dopamine's output is muted in this model (The operating point) and neuropeptides aren't in the connectome at all, so the brain scales the sweet neurons' outgoing synapses directly: each of their spikes reaches its targets with `sweetOutputGain(hunger)` times its usual weight (the engine's `addOutputGain` and `setOutputGain`, which touch only those 2,591 connections and leave their firing as it was). The gain is 1/1.4 just fed and 1 starved, linear between (a round assumption). The 1.4 is the measured effect of dopamine on those terminals: a bath of it raised the calcium sucrose brings in 1.3 to 1.4 fold (ibid., Figure 6G), taken here as release one for one. Release rises more steeply than calcium at most synapses, so if anything that understates it.
 
-**On the made-up arousal** (`state.ts`). Starved flies walk more: about 60% more than fed ones in a day's starvation (Yu et al. 2016, eLife 5: e15693, Figure 1d; Lee & Park 2004, Genetics 167: 311; Yang et al. 2015, PNAS 112: 5219), through the adipokinetic hormone acting on octopaminergic neurons, none of which the model has. Hunger adds `hunger.weight × (hunger − 1)` to the logistic that sets the visual background's level (Spontaneous behaviour): 0 at hunger 1, lower as the fly is fed. Its weight, 0.8, is the one number here fitted to a measurement, so that a just-fed fly walks 1/1.6 as much as a starved one at rest. It was fitted while `grounded` drove the wings' and halteres' sensors too (Senses); since, a just-fed fly walks 1/1.46 to 1/1.49 as much (the table below).
+**On the made-up arousal** (`state.ts`). Starved flies walk more: about 60% more than fed ones in a day's starvation (Yu et al. 2016, eLife 5: e15693, Figure 1d; Lee & Park 2004, Genetics 167: 311; Yang et al. 2015, PNAS 112: 5219), through the adipokinetic hormone acting on octopaminergic neurons, none of which the model has. Hunger adds `hunger.weight × (hunger − 1)` to the logistic that sets the visual background's level (Spontaneous behaviour): 0 at hunger 1, lower as the fly is fed. Its weight, 0.9, is the one number here fitted to a measurement, to a tenth, so that a just-fed fly walks about 1/1.6 as much as a starved one at rest: 1/1.52 to 1/1.59 over seeds 1 to 3 (the table below; at 1, 1/1.63 to 1/1.75). It was 0.8 while `grounded` drove the wings' and halteres' sensors too (Senses), which gave the same; with them silent at rest, 0.8 gave only 1/1.46 to 1/1.49.
 
 Everything after that is the network. `node packages/brain/scripts/hunger.ts` measures it (about five minutes). Sugar held for 3 s after 2 s of rest, MN9's mean rate and `feed`'s, over seeds 1 to 3:
 
 | Sugar | Hunger 0 (just fed) | Hunger 0.5 | Hunger 1 (starved, as before) |
 |---|---|---|---|
-| 0.25 | 0.1 Hz, feed 0.00 | 0.7 Hz, feed 0.02 | 1.4 Hz, feed 0.03 |
-| 0.4 | 2.2 Hz, feed 0.05 | 3.8 Hz, feed 0.10 | 6.3 Hz, feed 0.16 |
-| 0.6 | 6.1 Hz, feed 0.15 | 9.6 Hz, feed 0.24 | 13.4 Hz, feed 0.34 |
-| 0.8 | 11.3 Hz, feed 0.28 | 15.1 Hz, feed 0.38 | 19.5 Hz, feed 0.49 |
-| 1 | 15.8 Hz, feed 0.39 | 20.9 Hz, feed 0.52 | 25.2 Hz, feed 0.62 |
+| 0.25 | 0.1 Hz, feed 0.00 | 0.4 Hz, feed 0.01 | 1.4 Hz, feed 0.03 |
+| 0.4 | 1.9 Hz, feed 0.05 | 3.9 Hz, feed 0.10 | 6.3 Hz, feed 0.16 |
+| 0.6 | 6.8 Hz, feed 0.17 | 9.3 Hz, feed 0.23 | 13.4 Hz, feed 0.34 |
+| 0.8 | 11.3 Hz, feed 0.28 | 15.2 Hz, feed 0.38 | 19.5 Hz, feed 0.49 |
+| 1 | 16.1 Hz, feed 0.40 | 20.7 Hz, feed 0.52 | 25.2 Hz, feed 0.62 |
 
 As a proboscis extension test: of 20 flies (seeds 1 to 20), how many the body starts feeding within 1 s of the sugar touching (`Behavior`, feed past 0.15):
 
 | Sugar | Hunger 0 | Hunger 0.5 | Hunger 1 |
 |---|---|---|---|
 | 0.25 | 0/20 | 0/20 | 1/20 |
-| 0.4 | 3/20 | 17/20 | 20/20 |
+| 0.4 | 2/20 | 17/20 | 20/20 |
 | 0.6 | 20/20 | 20/20 | 20/20 |
 | 1 | 20/20 | 20/20 | 20/20 |
 
@@ -657,18 +657,18 @@ Does a fed fly stop sooner? A meal on one dropped lump of sugar, eaten as the ga
 
 | Hunger at the start | Held: feeding, eaten | Falling as it eats: feeding, eaten |
 |---|---|---|
-| 0 | 8.0, 8.8, 8.0 s; 86, 88, 87% | 8.7, 9.3, 8.1 s; 86, 87, 87% |
-| 0.5 | 7.4, 6.8, 7.1 s; 90, 89, 91% | 8.2, 8.7, 7.5 s; 86, 89, 87% |
-| 1 | 6.2, 6.2, 5.6 s; 91, 91, 90% | 6.3, 6.6, 6.7 s; 85, 85, 88% |
+| 0 | 8.6, 8.5, 8.4 s; 88, 87, 87% | 8.6, 8.8, 8.4 s; 87, 88, 87% |
+| 0.5 | 7.1, 6.8, 7.5 s; 91, 89, 91% | 8.0, 8.1, 7.6 s; 88, 88, 86% |
+| 1 | 6.2, 6.2, 5.6 s; 91, 91, 90% | 6.8, 7.5, 6.9 s; 87, 89, 89% |
 
-A little: a fed fly feeds more slowly, so its meal takes longer, and it gives up while more is left (12 to 14% of the lump against 9 to 10%, hunger held), because the taste of what is left falls below what its weaker sweet neurons pass on sooner. A real fly's meal ends mostly from inside, which this one doesn't have (below).
+A little: a fed fly feeds more slowly, so its meal takes longer, and it gives up while more is left (12 to 13% of the lump against 9 to 10%, hunger held), because the taste of what is left falls below what its weaker sweet neurons pass on sooner. A real fly's meal ends mostly from inside, which this one doesn't have (below).
 
 At rest (`report.ts --hunger <h>`, section c, 10 minutes, seeds 1 to 3; these tables measured again when `grounded` was narrowed to the legs' load sensors, Senses):
 
 | Hunger | Walking forwards | Bouts |
 |---|---|---|
-| 0 (just fed) | 33.4%, 30.8%, 35.7% | 91, 98, 105 |
-| 0.5 | 40.4%, 38.0%, 43.4% | 91, 108, 115 |
+| 0 (just fed) | 32.0%, 29.2%, 33.2% | 90, 87, 99 |
+| 0.5 | 40.0%, 37.5%, 42.5% | 95, 102, 116 |
 | 1 (starved, as before) | 48.6%, 45.9%, 52.9% | 93, 100, 127 |
 
 Cost: a tick resets the sweet neurons' output gain whenever hunger has changed, which in the game is every frame: 2,591 weights rewritten, 3 to 11 µs a time in the TypeScript on an M5 Pro (`hunger.ts` section d), under 1% of a 16 ms tick's 2 ms at rest; the C++ does the same writes. The hunger term in the arousal is one multiply-add per chunk. Left out, hunger costs nothing: the gain stays at 1 and is never reset.

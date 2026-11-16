@@ -37,10 +37,10 @@ export const AIR_TURN_RATE = 5;
  * fired: 0.4, 80 Hz. The giant fiber is the fly's high-threshold escape
  * pathway, silent in ordinary life and firing for a fast, close loom (von Reyn
  * et al. 2014), so the line sits just above what DNp01 does otherwise. Measured:
- * at most 0.23 in 10 minutes at rest and under 0.3 under every other sense
+ * at most 0.25 in 10 minutes at rest and under 0.3 under every other sense
  * (packages/brain/README.md), and 0.30 at most in two minutes of the game at
- * midday with the eyes open. A real loom seen through the eyes reaches 0.56 to
- * 0.84 for a dark disc (the README's battery) and 0.34 to 0.72 for the Swoop
+ * midday with the eyes open. A real loom seen through the eyes reaches 0.49 to
+ * 0.87 for a dark disc (the README's battery) and 0.34 to 0.72 for the Swoop
  * tool's ball, which at 0.5 set the fly off in about half its throws at midday
  * and almost never at dusk; the hand-wired looming pulse, 1. 200 Hz for 1 is
  * the hand-wired pulse's full drive of every looming detector at once, which no

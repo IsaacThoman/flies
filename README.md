@@ -497,7 +497,7 @@ what takes a real fly an hour takes this one a minute. Nothing else does. A
 fly starts at 0.7, hungry enough to go and look for food.
 
 What changes, all through the brain: a just-fed fly leaves weak sugar alone
-that a hungry one stops to eat (sweetness 0.4, as the bar's beer foam: 3 flies
+that a hungry one stops to eat (sweetness 0.4, as the bar's beer foam: 2 flies
 in 20 start to feed, against 20 in 20 starved), takes strong sugar less
 eagerly and leaves a little more of it, and walks about a third less.
 
