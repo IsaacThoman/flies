@@ -10,6 +10,7 @@ import { backgroundRates, decode, senseRates, smooth, wire } from "./io.ts";
 import type { Wiring } from "./io.ts";
 import { OPERATING_POINT, buildWeights } from "./params.ts";
 import type { OperatingPoint } from "./params.ts";
+import { REGIONS, REGION_RATE_NAMES, REGION_TAU, regionOf } from "./regions.ts";
 import { Simulation } from "./sim.ts";
 import { InternalState, INTERNAL_STATE } from "./state.ts";
 import type { InternalStateParameters } from "./state.ts";
@@ -49,10 +50,14 @@ export class FlyBrain implements Brain {
   readonly wiring: Wiring;
   readonly state: InternalState;
   readonly spontaneous: boolean;
+  /** Each neuron's region, an index into REGIONS. */
+  readonly regions: Uint8Array;
   /** Smoothed mean rate of each readout group, Hz. */
   readonly rates: Record<string, number> = {};
   #counts: Record<string, number> = {};
   #vision: { name: string; size: number }[] = [];
+  #regionSizes = new Uint32Array(REGIONS.length);
+  #regionCounts = new Uint32Array(REGIONS.length);
 
   constructor(connectome: ReturnType<typeof loadConnectome>, options: BrainOptions = {}) {
     const seed = options.seed ?? 1;
@@ -68,6 +73,11 @@ export class FlyBrain implements Brain {
       this.sim.addReadout(spec.name, neurons);
       this.rates[spec.name] = 0;
     }
+    // Every region is reported, after the readouts, whether or not it has neurons (an empty one stays at 0).
+    this.regions = regionOf(connectome);
+    for (const r of this.regions) this.#regionSizes[r]++;
+    this.sim.setPartition(this.regions, REGIONS.length);
+    for (const name of REGION_RATE_NAMES) this.rates[name] = 0;
     // The eyes come after every other input, so their streams leave the
     // others' as they were: with the eyes shut, the brain is the same.
     const eyes = buildEyes(connectome, options.eyeColumns);
@@ -133,6 +143,13 @@ export class FlyBrain implements Brain {
       for (const { spec, neurons } of this.wiring.readouts) {
         const hz = (this.#counts[spec.name] / neurons.length / ran) * 1000;
         this.rates[spec.name] = smooth(this.rates[spec.name], hz, ran, spec.tau);
+      }
+      this.sim.drainPartition(this.#regionCounts);
+      for (let r = 0; r < REGIONS.length; r++) {
+        const size = this.#regionSizes[r];
+        if (size === 0) continue;
+        const name = REGION_RATE_NAMES[r];
+        this.rates[name] = smooth(this.rates[name], (this.#regionCounts[r] / size / ran) * 1000, ran, REGION_TAU);
       }
       for (const { name, size } of this.#vision) {
         this.rates[name] = smooth(this.rates[name], (this.#counts[name] / size / ran) * 1000, ran, VISION_TAU);

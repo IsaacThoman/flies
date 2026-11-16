@@ -18,6 +18,13 @@ export interface BrainDriver {
   readonly eyes: EyeMap | null;
   /** The brain's latest answer, or null before the first. */
   readonly state: BrainState | null;
+  /**
+   * Each region's smoothed firing rate, Hz, in the order of `REGIONS`
+   * (`@fly/brain`), as of `state`: its `region.<id>` rate, for reading every
+   * frame without allocating. Filled in place, so keep the reference; 0
+   * before the first state, and for a region the brain doesn't report.
+   */
+  readonly regionRates: Float32Array;
   /** `performance.now()` when `state` arrived. */
   readonly stateAt: number;
   /**

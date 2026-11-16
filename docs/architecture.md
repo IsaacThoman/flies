@@ -40,8 +40,9 @@ browser produces the same events from the keyboard and mouse.
 1. **The brain decides.** Nothing the fly does is scripted around the brain.
    The body may add reflexes the model has no way to produce, and each one is
    written down as such where it lives and in the README. No neuron is both
-   driven and read. Every departure from the connectome is documented in
-   `packages/brain/README.md`.
+   driven and read by a command; what is read only for display (the regions,
+   the vision stages) feeds no command. Every departure from the connectome is
+   documented in `packages/brain/README.md`.
 2. **Say what is real.** Anything shown to the player as "the brain doing X"
    has to be the brain doing X.
 3. **640×480.** The game renders at 640×480 and is stretched to the screen,

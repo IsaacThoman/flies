@@ -8,7 +8,8 @@
 //     tell the light arrays arrived, and on the right sides;
 //   - walk is always 0.8; feed follows `sweet`; escape is 1 while grounded is 0;
 //   - the stats count ticks (spikes) and the simulated time of each (sim_ms); the rates are the
-//     ticks so far and the total simulated time.
+//     ticks so far and the total simulated time, then numbered ones (each its own index) up to as
+//     many as the real brain reports with its eyes and regions, so a test can tell they all arrive.
 //
 // Each tick takes kTickMs of wall time, so a test can watch submitted time pile up.
 #include "fly_brain.h"
@@ -23,6 +24,17 @@
 namespace {
 constexpr uint32_t kFacets = 8;
 constexpr int kTickMs = 20;
+// The real brain's: 8 command readouts, 63 regions, 12 vision stages.
+constexpr uint32_t kRates = 83;
+
+const std::vector<std::string> &RateNames() {
+  static const std::vector<std::string> names = [] {
+    std::vector<std::string> out = {"standin.ticks", "standin.simulatedMs"};
+    for (uint32_t k = 2; k < kRates; k++) out.push_back("standin.rate" + std::to_string(k));
+    return out;
+  }();
+  return names;
+}
 
 uint32_t HeaderNumber(const std::string &header, const char *key) {
   size_t at = header.find(std::string("\"") + key + "\":");
@@ -71,8 +83,8 @@ uint32_t fly_brain_facets(const fly_brain *, int) { return kFacets; }
 const float *fly_brain_eye_directions(const fly_brain *brain, int side) { return brain->directions[side ? 1 : 0].data(); }
 float fly_brain_eye_acceptance(const fly_brain *) { return 0.1f; }
 
-uint32_t fly_brain_rate_count(const fly_brain *) { return 2; }
-const char *fly_brain_rate_name(const fly_brain *, uint32_t index) { return index == 0 ? "standin.ticks" : "standin.simulatedMs"; }
+uint32_t fly_brain_rate_count(const fly_brain *) { return kRates; }
+const char *fly_brain_rate_name(const fly_brain *, uint32_t index) { return index < kRates ? RateNames()[index].c_str() : nullptr; }
 
 int fly_brain_tick(fly_brain *brain, double dt_ms, const fly_senses *senses, fly_command *command, fly_stats *stats, float *rates, char *error, size_t error_size) {
   if (!(dt_ms >= 0 && dt_ms <= 1000)) {
@@ -94,6 +106,10 @@ int fly_brain_tick(fly_brain *brain, double dt_ms, const fly_senses *senses, fly
   stats->wall_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
   stats->spikes = (uint32_t)brain->ticks;
   stats->active = 0;
-  if (rates) { rates[0] = (float)brain->ticks; rates[1] = (float)brain->simulated; }
+  if (rates) {
+    rates[0] = (float)brain->ticks;
+    rates[1] = (float)brain->simulated;
+    for (uint32_t k = 2; k < kRates; k++) rates[k] = (float)k;
+  }
   return 0;
 }

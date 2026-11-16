@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { BrainRequest, BrainResponse, BrainSenses, BrainState } from "@fly/brain";
-import { RESTING_SENSES } from "@fly/brain";
+import { REGION_RATE_NAMES, RESTING_SENSES } from "@fly/brain";
 import { COMMAND_ORDER, SENSE_ORDER, STATE_STATS } from "@fly/contracts";
 import type { BrainStatus, NativeBrainBridge } from "@fly/contracts";
 import { createBrainHost } from "../src/brain/host.ts";
@@ -48,9 +48,16 @@ test("the worker driver loads the connectome, transfers it and runs once the wor
   driver.tick(16, RESTING_SENSES);
   assert.equal(worker.sent.length, 2);
   now = 5;
-  worker.reply({ type: "state", state: state() });
+  const regions = driver.regionRates;
+  assert.equal(regions.length, REGION_RATE_NAMES.length);
+  const answer = state();
+  answer.stats.rates["region.mouthparts"] = 12.5;
+  worker.reply({ type: "state", state: answer });
   assert.equal(driver.state?.command.walk, 0.5);
   assert.equal(driver.stateAt, 5);
+  assert.equal(driver.regionRates, regions, "filled in place");
+  assert.equal(regions[REGION_RATE_NAMES.indexOf("region.mouthparts")], 12.5);
+  assert.equal(regions.reduce((sum, x) => sum + x, 0), 12.5, "a region the brain doesn't report reads 0");
 });
 
 test("one tick at a time: time spent waiting goes out with the next, up to a cap", async () => {
@@ -132,7 +139,8 @@ function fakeBridge() {
   let status: BrainStatus = "loading";
   let count = 0;
   const submitted: { dt: number; scalars: number[]; left: Float32Array | null }[] = [];
-  const rates = ["DNg100", "MN9"];
+  // Two regions, not in the catalog's order: the driver finds them by name.
+  const rates = ["DNg100", "MN9", "region.mouthparts", "region.retina-left"];
   const values = new Float32Array(COMMAND_ORDER.length + STATE_STATS.length + rates.length);
   const bridge: NativeBrainBridge = {
     start: () => {},
@@ -157,6 +165,8 @@ function fakeBridge() {
       values[0] = walk;
       values[COMMAND_ORDER.length + 2] = 1234;
       values[COMMAND_ORDER.length + STATE_STATS.length] = 33;
+      values[COMMAND_ORDER.length + STATE_STATS.length + 2] = walk * 10;
+      values[COMMAND_ORDER.length + STATE_STATS.length + 3] = 7;
       count++;
     },
   };
@@ -190,6 +200,11 @@ test("the native driver waits for the host, then packs senses in order and decod
   assert.equal(first.stats.spikes, 1234);
   assert.equal(first.stats.rates.DNg100, 33);
   assert.equal(driver.stateAt, 120);
+  const regions = driver.regionRates;
+  const mouthparts = REGION_RATE_NAMES.indexOf("region.mouthparts");
+  assert.ok(Math.abs(regions[mouthparts] - 6) < 1e-5);
+  assert.equal(regions[REGION_RATE_NAMES.indexOf("region.retina-left")], 7);
+  assert.ok(Math.abs(regions.reduce((sum, x) => sum + x, 0) - 13) < 1e-5, "a region the brain doesn't report reads 0");
   now = 140;
   driver.tick(16, senses);
   assert.equal(driver.stateAt, 120, "the same state isn't new");
@@ -197,6 +212,8 @@ test("the native driver waits for the host, then packs senses in order and decod
   driver.tick(16, senses);
   assert.equal(latest(), first, "decoded into the same object");
   assert.ok(Math.abs(first.command.walk - 0.2) < 1e-6);
+  assert.equal(driver.regionRates, regions, "and the regions into the same array");
+  assert.ok(Math.abs(regions[mouthparts] - 2) < 1e-5);
 });
 
 test("the native driver passes the eyes' light through its own arrays, and reports a failing host", () => {

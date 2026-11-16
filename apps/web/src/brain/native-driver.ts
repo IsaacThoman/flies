@@ -3,6 +3,7 @@
 // this wrapper allocates nothing per frame: the senses go out through reused
 // arrays, and each new state is decoded into the same objects.
 
+import { REGION_RATE_NAMES } from "@fly/brain";
 import type { BrainSenses, BrainState, EyeMap } from "@fly/brain";
 import { COMMAND_ORDER, SENSE_ORDER, STATE_STATS } from "@fly/contracts";
 import type { BrainDriver, BrainStatus, NativeBrainBridge } from "@fly/contracts";
@@ -18,12 +19,15 @@ export class NativeBrainDriver implements BrainDriver {
   eyes: EyeMap | null = null;
   state: BrainState | null = null;
   stateAt = 0;
+  readonly regionRates = new Float32Array(REGION_RATE_NAMES.length);
   readonly #bridge: NativeBrainBridge;
   readonly #now: () => number;
   readonly #scalars = new Float32Array(SENSE_ORDER.length);
   #lightLeft: Float32Array | null = null;
   #lightRight: Float32Array | null = null;
   #rateNames: string[] = [];
+  // Where each region's rate is in a state, or -1 when the brain doesn't report it.
+  readonly #regionAt = new Int32Array(REGION_RATE_NAMES.length).fill(-1);
   #out = new Float32Array(COMMAND_ORDER.length + STATE_STATS.length);
   #seen = 0;
   #decoded: BrainState = {
@@ -97,8 +101,13 @@ export class NativeBrainDriver implements BrainDriver {
     this.neurons = bridge.neurons();
     this.connections = bridge.connections();
     this.#rateNames = bridge.rateNames();
-    this.#out = new Float32Array(COMMAND_ORDER.length + STATE_STATS.length + this.#rateNames.length);
+    const first = COMMAND_ORDER.length + STATE_STATS.length;
+    this.#out = new Float32Array(first + this.#rateNames.length);
     for (const name of this.#rateNames) this.#decoded.stats.rates[name] = 0;
+    REGION_RATE_NAMES.forEach((name, r) => {
+      const k = this.#rateNames.indexOf(name);
+      this.#regionAt[r] = k < 0 ? -1 : first + k;
+    });
     const left = bridge.eyeDirections(0);
     const right = bridge.eyeDirections(1);
     if (left.length > 0 && right.length > 0) {
@@ -119,6 +128,9 @@ export class NativeBrainDriver implements BrainDriver {
     stats.spikes = out[i++];
     stats.active = out[i++];
     for (const name of this.#rateNames) stats.rates[name] = out[i++];
+    const regions = this.regionRates;
+    const at = this.#regionAt;
+    for (let r = 0; r < regions.length; r++) regions[r] = at[r] < 0 ? 0 : out[at[r]];
   }
 
   #fail(error: unknown) {

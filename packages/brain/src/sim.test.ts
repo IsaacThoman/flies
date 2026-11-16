@@ -389,6 +389,35 @@ test("readouts count each member's spikes, overlapping or not, until drained", (
   assert.equal(sim.recording, null);
 });
 
+test("a partition counts every spike by its neuron's part until drained, and changes nothing else", () => {
+  const setup = randomSetup(7);
+  const plain = runEngine(setup, 0).sim;
+  const sim = runEngine(setup, 0).sim;
+  const parts = 5;
+  const partOf = Uint8Array.from({ length: sim.neurons }, (_, i) => (i * 7) % parts);
+  sim.setPartition(partOf, parts);
+  partOf.fill(0);
+  sim.setRecording(true);
+  sim.advance(800);
+  plain.advance(800);
+  assert.deepEqual(sim.stats, plain.stats, "the same run with and without it");
+  const recorded = sim.recording!;
+  const expected = new Uint32Array(parts);
+  for (let i = 0; i < sim.neurons; i++) expected[(i * 7) % parts] += recorded[i];
+  const counts = new Uint32Array(parts);
+  sim.drainPartition(counts);
+  assert.deepEqual(counts, expected, "counted by the parts as given, not as the caller's array is now");
+  assert.equal(counts.reduce((a, x) => a + x, 0), sim.stats.spikes);
+  sim.drainPartition(counts);
+  assert.deepEqual([...counts], [0, 0, 0, 0, 0]);
+  sim.advance(100);
+  sim.reset();
+  sim.drainPartition(counts);
+  assert.deepEqual([...counts], [0, 0, 0, 0, 0], "reset clears the counts");
+  assert.throws(() => sim.setPartition(new Uint8Array(sim.neurons - 1), parts), /needs a part for each of the \d+ neurons, not \d+/);
+  assert.throws(() => sim.setPartition(new Uint8Array(sim.neurons).fill(parts), parts), /Neuron 0 is in part 5, but there are 5/);
+});
+
 test("advance runs whole steps and carries the remainder", () => {
   const setup = randomSetup(3);
   const sim = runEngine(setup, 0).sim;

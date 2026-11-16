@@ -170,6 +170,15 @@ class Simulation {
   /** A readout's neurons, deduplicated and ascending. */
   const std::vector<uint32_t>& readout_members(uint32_t readout) const { return readout_members_[readout]; }
 
+  /**
+   * Counts every spike by the part of a partition of the neurons its neuron
+   * is in: part_of[i] (below parts) for neuron i. Unlike a readout, this costs
+   * one increment a spike whichever neuron fires, so it can cover them all.
+   */
+  void set_partition(std::vector<uint8_t> part_of, uint32_t parts);
+  /** Spikes in each part since the last drain, by part; then zeroes them. */
+  void drain_partition(std::vector<uint32_t>& into);
+
   /** The neurons that spiked in the last step, ascending. */
   std::span<const uint32_t> last_spikes() const;
 
@@ -253,6 +262,10 @@ class Simulation {
   // Neuron -> readouts, as CSR.
   std::vector<uint32_t> watch_ptr_;
   std::vector<uint32_t> watch_ids_;
+
+  // Which part of a partition each neuron is in (empty for none), and each part's spikes since the last drain.
+  std::vector<uint8_t> part_of_;
+  std::vector<uint32_t> part_counts_;
 
   uint64_t steps_ = 0;
   uint64_t spikes_ = 0;

@@ -252,7 +252,12 @@ implemented in `src/BrainBridge.mm` over `packages/brain-native/include/fly_brai
 - The brain thread sleeps until time is waiting, takes all of it as one `fly_brain_tick`, and
   publishes the result.
 - `read(out)` copies the latest state (`COMMAND_ORDER`, then `STATE_STATS`, then one rate per
-  `rateNames()` entry) into a `Float32Array` and returns how many states there have been.
+  `rateNames()` entry) into a `Float32Array` and returns how many states there have been. The real
+  brain reports 83 rates: the eight command readouts, the 63 regions (`region.<id>`) and the 12
+  vision stages. Nothing on this side assumes a count: the bridge sizes everything from
+  `fly_brain_rate_count`, and the stand-in reports as many rates so the simulator check sees them
+  all arrive. `NativeBrainDriver` copies the regions into its `regionRates` in the catalog's order,
+  without allocating.
 
 In the simulator the real brain (`packages/brain-native` as of 15 November) loads in about 150 ms
 and keeps up with real time at 60 submits a second, on an M5 Pro. How fast it runs on an Apple TV
@@ -353,9 +358,10 @@ with a `drive`, and checks what the scene reports:
 - a generated beep plays and ends; a WAV decodes; `localStorage` keeps a value; `fetch` reads
   a bundled file;
 - the brain bridge: the stand-in loads the bundled connectome and reports its neuron and
-  connection counts (so the file arrived whole), its eyes, its rate names; the commands it
-  answers prove the senses and both light arrays arrived on the right sides; a 600 ms burst of
-  submits is simulated in steps of at most 100 ms;
+  connection counts (so the file arrived whole), its eyes, its rate names; all 83 of its rates
+  arrive, as many as the real brain reports; the commands it answers prove the senses and both
+  light arrays arrived on the right sides; a 600 ms burst of submits is simulated in steps of at
+  most 100 ms;
 - the host's frame stats.
 
 It saves a screenshot in a temporary folder outside the repo and prints its path, then shuts the

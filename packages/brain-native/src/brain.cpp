@@ -4,9 +4,11 @@
 #include <stdexcept>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 
 #include "json.hpp"
 #include "params.hpp"
+#include "regions.hpp"
 
 namespace fly {
 
@@ -22,6 +24,15 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   for (const io::ReadoutGroup& group : wiring_.readouts) {
     sim_.add_readout(group.spec.name, group.neurons);
     rate_names_.push_back(group.spec.name);
+    rates_.push_back(0);
+  }
+  // Every region is reported, after the readouts, whether or not it has neurons (an empty one stays at 0).
+  std::vector<uint8_t> region_of = regions::of(connectome);
+  region_sizes_.assign(regions::ids().size(), 0);
+  for (uint8_t r : region_of) region_sizes_[r]++;
+  sim_.set_partition(std::move(region_of), static_cast<uint32_t>(regions::ids().size()));
+  for (const std::string& id : regions::ids()) {
+    rate_names_.push_back(regions::rate_name(id));
     rates_.push_back(0);
   }
   // The eyes come after every other input, so their streams leave the
@@ -103,8 +114,16 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
       rates_[r] = io::smooth(rates_[r], hz, ran, wiring_.readouts[r].spec.tau);
     }
     const size_t first = wiring_.readouts.size();
+    sim_.drain_partition(region_counts_);
+    for (size_t r = 0; r < region_sizes_.size(); r++) {
+      if (region_sizes_[r] == 0) continue;
+      double& rate = rates_[first + r];
+      rate = io::smooth(rate, (region_counts_[r] / region_sizes_[r] / ran) * 1000, ran, regions::kTau);
+    }
+    // The vision readouts follow the regions in rates() but the readouts in the simulation's counts.
+    const size_t vision_first = first + region_sizes_.size();
     for (size_t v = 0; v < vision_sizes_.size(); v++) {
-      rates_[first + v] = io::smooth(rates_[first + v], (counts_[first + v] / vision_sizes_[v] / ran) * 1000, ran, vision::kTau);
+      rates_[vision_first + v] = io::smooth(rates_[vision_first + v], (counts_[first + v] / vision_sizes_[v] / ran) * 1000, ran, vision::kTau);
     }
   }
   stats.sim_ms = sim_.time() - time_before;

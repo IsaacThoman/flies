@@ -246,6 +246,24 @@ void Simulation::drain_readouts(std::vector<uint32_t>& into) {
   std::fill(readout_counts_.begin(), readout_counts_.end(), 0);
 }
 
+void Simulation::set_partition(std::vector<uint8_t> part_of, uint32_t parts) {
+  if (part_of.size() != neurons_) {
+    throw std::invalid_argument("A partition needs a part for each of the " + std::to_string(neurons_) + " neurons, not " + std::to_string(part_of.size()));
+  }
+  for (size_t i = 0; i < part_of.size(); i++) {
+    if (part_of[i] >= parts) {
+      throw std::invalid_argument("Neuron " + std::to_string(i) + " is in part " + std::to_string(part_of[i]) + ", but there are " + std::to_string(parts));
+    }
+  }
+  part_of_ = std::move(part_of);
+  part_counts_.assign(parts, 0);
+}
+
+void Simulation::drain_partition(std::vector<uint32_t>& into) {
+  into = part_counts_;
+  std::fill(part_counts_.begin(), part_counts_.end(), 0);
+}
+
 std::span<const uint32_t> Simulation::last_spikes() const {
   if (last_slot_ < 0) return {};
   return {ring_[static_cast<size_t>(last_slot_)].data(), ring_length_[static_cast<size_t>(last_slot_)]};
@@ -454,6 +472,11 @@ void Simulation::step() {
       const uint32_t i = out[k];
       for (uint32_t m = watch_ptr_[i]; m < watch_ptr_[i + 1]; m++) readout_counts_[watch_ids_[m]]++;
     }
+  }
+  if (!part_of_.empty()) {
+    const uint8_t* const part_of = part_of_.data();
+    uint32_t* const counts = part_counts_.data();
+    for (uint32_t k = 0; k < fired; k++) counts[part_of[out[k]]]++;
   }
 }
 

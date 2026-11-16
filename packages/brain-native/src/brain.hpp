@@ -98,7 +98,10 @@ class Brain {
   // Indexed by io::Side, as are their rated inputs.
   std::vector<vision::Retina> retinas_;
   std::array<uint32_t, 2> eye_inputs_{};
-  // The vision.<stage> readouts, which follow the others in rates(): each one's size.
+  // The regions, which follow the readouts in rates(): each one's size and its spikes in a chunk.
+  std::vector<double> region_sizes_;
+  std::vector<uint32_t> region_counts_;
+  // The vision.<stage> readouts, which follow the regions in rates(): each one's size.
   std::vector<double> vision_sizes_;
 };
 

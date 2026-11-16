@@ -24,6 +24,8 @@
 //   fly-brain-harness hypot                            two f64 bits a line; prints Math.hypot of them.
 //   fly-brain-harness patterns                         a cell type a line; prints 0|1 for params.ts's columnar classes, then the
 //     T4/T5 and lobula patterns of vision.ts.
+//   fly-brain-harness regions <connectome.bin>         prints "ready <region ids, |-separated>", then each neuron's region
+//     (an index into them) on one line; or "error <message>".
 
 #include <cinttypes>
 #include <cstdio>
@@ -44,6 +46,7 @@
 #include "io.hpp"
 #include "json.hpp"
 #include "params.hpp"
+#include "regions.hpp"
 #include "sim.hpp"
 #include "vision.hpp"
 
@@ -391,6 +394,24 @@ int patterns() {
   return 0;
 }
 
+int regions(const char* path) {
+  const std::vector<uint8_t> data = read_file(path);
+  std::vector<uint8_t> regions;
+  try {
+    regions = fly::regions::of(fly::Connectome(data.data(), data.size()));
+  } catch (const std::exception& e) {
+    std::printf("error %s\n", e.what());
+    return 0;
+  }
+  std::string out = "ready ";
+  for (size_t k = 0; k < fly::regions::ids().size(); k++) out += (k > 0 ? "|" : "") + fly::regions::ids()[k];
+  std::puts(out.c_str());
+  out.clear();
+  for (size_t i = 0; i < regions.size(); i++) out += (i > 0 ? " " : "") + std::to_string(regions[i]);
+  std::puts(out.c_str());
+  return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -401,7 +422,8 @@ int main(int argc, char** argv) {
   if (mode == "math") return math();
   if (mode == "hypot") return hypot();
   if (mode == "patterns") return patterns();
+  if (mode == "regions" && argc >= 3) return regions(argv[2]);
   std::fputs("usage: fly-brain-harness brain <connectome.bin> <seed> [--light <frames>] [--columns <columns>] | eyes <connectome.bin> [--columns <columns>]"
-             " | engine | math | hypot | patterns\n", stderr);
+             " | engine | math | hypot | patterns | regions <connectome.bin>\n", stderr);
   return 2;
 }

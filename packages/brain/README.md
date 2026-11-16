@@ -1,6 +1,6 @@
 # @ladybug/brain
 
-A spiking simulation of the male fruit fly's whole central nervous system, about 167,000 neurons wired as they are in the real animal, that drives the desktop pet. `src/types.ts` is the contract with the pet; this package turns senses into firing of the fly's sensory neurons (and, for the eyes, of the first neurons behind the photoreceptors) and reads its descending and motor neurons back out as commands. `createBrain(data, { seed })` (`src/runtime.ts`) builds one from the packed connectome in about 0.3 s; it uses no Node APIs, so it runs in the pet's Web Worker.
+A spiking simulation of the male fruit fly's whole central nervous system, about 167,000 neurons wired as they are in the real animal, that drives the desktop pet. `src/types.ts` is the contract with the pet; this package turns senses into firing of the fly's sensory neurons (and, for the eyes, of the first neurons behind the photoreceptors) and reads its descending and motor neurons back out as commands, and, for display, how fast every part of the nervous system fires (Regions). `createBrain(data, { seed })` (`src/runtime.ts`) builds one from the packed connectome in about 0.3 s; it uses no Node APIs, so it runs in the pet's Web Worker.
 
 ## Data
 
@@ -52,7 +52,7 @@ Neurons are numbered in ascending root ID order. The sections:
 
 Engine defaults: dt 0.5 ms, tauMem 20 ms, tauSyn 5 ms, threshold 7 mV, refractory 2.2 ms, delay 1.8 ms, no drive reset, no adaptation. `gain` is per presynaptic neuron and signed (`gainByTransmitter` builds one from the predicted transmitter); 0 mutes a neuron's output. The brain runs it at the operating point below.
 
-Only neurons with state cost anything. A neuron joins the active set when a spike reaches it or an input fires it, and leaves once v, g and a have decayed below `epsilon` and it is not refractory; that check runs every 16 steps. The rest cut is the only difference from stepping every neuron, and the tests hold the engine to a dense reference bit for bit, with and without the reset and adaptation. Inputs are named groups driven as independent Poisson trains (sampled per spike, not per neuron per step), either all at one rate (`addInput`, `setRate`) or each neuron at a rate of its own (`addRatedInput`, `setRates`, which the eyes use: candidates are drawn at the fastest neuron's rate and each kept with its own rate over that, so the cost is per candidate, about neurons × fastest rate × dt). Each input draws from its own stream, seeded by the order inputs were added, so adding one leaves the others' spikes as they were. Readouts are named groups whose spikes are counted. Runs are deterministic for a seed, and the dense reference holds both kinds of input to the same spikes bit for bit.
+Only neurons with state cost anything. A neuron joins the active set when a spike reaches it or an input fires it, and leaves once v, g and a have decayed below `epsilon` and it is not refractory; that check runs every 16 steps. The rest cut is the only difference from stepping every neuron, and the tests hold the engine to a dense reference bit for bit, with and without the reset and adaptation. Inputs are named groups driven as independent Poisson trains (sampled per spike, not per neuron per step), either all at one rate (`addInput`, `setRate`) or each neuron at a rate of its own (`addRatedInput`, `setRates`, which the eyes use: candidates are drawn at the fastest neuron's rate and each kept with its own rate over that, so the cost is per candidate, about neurons × fastest rate × dt). Each input draws from its own stream, seeded by the order inputs were added, so adding one leaves the others' spikes as they were. Readouts are named groups whose spikes are counted; a partition (`setPartition`) counts every spike by the part its neuron is in, for one increment a spike whichever neuron fires (the regions use it). Runs are deterministic for a seed, and the dense reference holds both kinds of input to the same spikes bit for bit.
 
 On an M5 Pro (`node packages/brain/scripts/bench.ts`, engine defaults), wall time per simulated second:
 
@@ -261,9 +261,212 @@ Not reproduced:
 - **Seeing, in part**: brightening and everything that needs the ON pathway (T4); small objects; looming as distinct from any large darkening (dimming, flicker and high-contrast gratings take the fly near or past take-off); and the left eye's looming pathway is weaker than the right's. See Seeing.
 - **Symmetry**: mirrored looms give the same escape, and a scene on either side steers toward that side, but the left-hand steering pathway is ~25% stronger, so spontaneous turns lean left.
 
+## Regions
+
+`src/regions.ts`. For display, the brain reports how fast each part of the nervous system fires: every neuron is in exactly one of 63 regions that a drawing of the fly can place in its body, and each region's mean firing rate over all its neurons, smoothed over 100 ms as the vision stages are (`REGION_TAU`), is `stats.rates["region.<id>"]`, after the eight readouts and before the vision stages. They are display only, like the vision stages: they read every neuron, the driven ones included, and no command reads them (`decode` reads the readouts by name). They change nothing in the simulation: the fingerprint test and the native comparisons give the same spikes as before they existed.
+
+The region readout was added in this repository's copy of the brain. `packages/brain` is shared by hand with the Computerbug desktop pet (github.com/IsaacThoman/ladybug), which doesn't have it yet.
+
+`REGIONS` is the catalog, in the order of the rates: each region's `id`, a short `name` (without the side), a `description` of what it is and which neurons are in it, its `place` in the body in words for whoever draws it, its `side` (`left` or `right` by soma side, `midline`, or `both` sides together), its `neurons` here and its `fullHz` (below). Left and right regions come in pairs, left first, alike but for their side.
+
+### How neurons are placed
+
+The packed file has no positions and no neuropil per neuron (FlyEM's own annotation table has a soma position for 84% of them; it isn't packed), so each neuron is placed by its annotations: super class, class, sub class, cell type and soma side. Where a type's name says which neuropil it belongs to, that decides; where nothing places a neuron, it goes to its part of the body's catch-all rather than to a guess. A neuron of a left/right region whose soma is on the midline or has no side goes to the catch-all too. `regionOf(connectome)` gives each neuron's region; `scripts/regions.ts` prints what each region holds (below).
+
+- **Eyes and optic lobes**, each side. The photoreceptors (`ol_sensory`) are the retina; the visual projection and visual centrifugal neurons are regions of their own. The optic lobe's 89,403 intrinsic neurons go by type, after the naming of Fischbach and Dittrich (1989) and the male optic lobe's inventory (Nern et al. 2025):
+  - **lamina**: its own cell types as Tuthill et al. (2013) list them, less the photoreceptors: L1-L5, the amacrine Lai, T1, the centrifugal C2 and C3 and the wide-field Lawf1 and Lawf2 (C2, C3 and the Lawfs take their input in the medulla and feed it back), and the lamina tangential Lat cells: 15,025.
+  - **medulla**: the types named for it (Mi, Dm, Pm, Cm, the accessory medulla's aMe, MeVPMe, ME_unclear) and l-LNv, and the columnar types whose dendrites are in it and whose axons cross to the lobula or lobula plate: Tm, TmY, MeLo, T2, T2a and T3 (vision.ts's medulla stage is Tm1-Tm9 and Mi cells): 56,469.
+  - **lobula**: Li, the lobula tangential LT cells, LC14 (joining the two lobulas), LO_unclear: 1,669.
+  - **lobula plate**: LPi, Tlp, H1, LOP_unclear, and T4 and T5, whose dendrites are in the medulla and the lobula but whose axons make the lobula plate's four layers, and which are its input (vision.ts's T4/T5 stage): 14,726.
+  - **optic lobe, other**: what spans neuropils with no single home or is unclear across them, or untyped: the Y cells (1,367), LOLP1, CT1, Am1, dCal1, MeVPLp2, MeVPOL1, Pm7_Li28 (one type of both a Pm and an Li), the *_unclear types of two neuropils, 46 untyped cells, and the two visual projection neurons to be confirmed: 1,516.
+- **Head sensory neurons** (`cb_sensory`): olfactory, hygrosensory and thermosensory ones are one region for both antennae and palps (2,730, 414 of them with no side recorded); Johnston's organ (`JO-*`) by side; the head's bristles (`BM*`) one region; the mouthparts' taste (class gustatory) and touch (TPMN, aPhM) one region, on the midline; the rest (unknown modality, untyped, to be confirmed) the head's catch-all.
+- **Central brain** (`cb_intrinsic`): by class first, Kenyon cells, MBONs and DANs (with APL, DPM, MB-C) to the mushroom body, the antennal lobe's ALPN, ALLN, ALIN and ALON to the antennal lobe, CX (with the FB and FS types) to the central complex, one midline region since its neuropils straddle the midline, and the subesophageal projection neurons (SEZPN) to the subesophageal zone. The 23,542 with no class by the neuropil their type is named for (the hemibrain's and FlyWire's convention: the neuropil with most of the type's synapses), grouped as Ito et al. (2014) group the neuropils, with some of their groups merged: SMP, SLP, SIP, aSP the superior protocerebrum; LH* the lateral horn; AVLP, PVLP, PLP, WED, AOTU, TuTu, VLP the ventrolateral protocerebrum; the inferior (CL, ICL, SCL, IB, ATL, CRE, aIPg), ventromedial (VES, PS, IPS, SPS, GOR, EPA) and lateral complex (LAL, TuBu) neuropils one region; the GNG and the periesophageal neuropils (AMMC, SAD, FLA, PRW, CAN) the subesophageal zone. The rest is *central brain, other* (6,644): 5,244 of the CB types, named only by number, 859 untyped, types named for something other than a neuropil (pC1, mAL, the clock neurons, the octopaminergic VUM and other modulatory neurons), and the 84 with their cell bodies on the midline.
+- **Head motor neurons** (`cb_motor`, 107, mostly the proboscis's and pharynx's) and the **neuroendocrine and enteric** neurons (`cb_endocrine`, `ENS`, `cb_efferent`): one region each.
+- **The neck**: descending neurons (with the 12 `sensory_descending`) and ascending neurons, by side.
+- **Ventral nerve cord motor neurons** by sub class: front, middle and hind leg (`fl`, `ml`, `hl`) by side; wings, halteres and the unassigned ones leaving through the dorsal nerves (`wm`, `hm`, `xm`) one region; neck (`nm`); abdomen (`ad`).
+- **Body sensory neurons** (`vnc_sensory`, `sensory_ascending`) by sub class, where it names a place: legs (`leg`, `leg_bristle`); wings, halteres and thorax (`wing`, `wing_bristle`, `haltere`, `notum`, `neck`); abdomen. Where it names only the organ: proprioceptors (`campaniform_sensilla`, `chordotonal_organ`, `hair_plate`) and body bristles (`mechanosensory_bristle`, `taste_bristle`). Most have no side recorded, so these are both sides together.
+- **Ventral nerve cord interneurons** (`vnc_intrinsic`) by side; those with their soma on the midline, and the cord neurons to be confirmed (`vnc_tbc`), on the midline. The packed file doesn't say which neuromere an interneuron is in (FlyEM's annotation table does, as `somaNeuromere`, for all but 9 of them; it isn't packed), so each side is one region along the whole cord. Efferent and neuroendocrine neurons of the cord (`vnc_efferent`, `vnc_endocrine`, `efferent_ascending`, `efferent_descending`) one region.
+- **Unplaced**: what nothing above places, 75 here: descending and ascending neurons with their soma on the midline or no side, and sensory neurons whose class or organ is to be confirmed.
+
+What each region holds, by what put them there (super class, class or sub class where the rule reads it, and the type's prefix, its letters before the first digit), largest first (`node packages/brain/scripts/regions.ts`):
+
+| Region | Neurons | What put them there (neurons) |
+|---|---|---|
+| `retina-left` | 2,349 | ol_sensory · visual · R 2,345; ol_sensory · HBeyelet 4 |
+| `retina-right` | 3,749 | ol_sensory · visual · R 3,746; ol_sensory · HBeyelet 3 |
+| `lamina-left` | 7,474 | ol_intrinsic · L 4,418; ol_intrinsic · C 1,758; ol_intrinsic · T 885; ol_intrinsic · Lawf 372; ol_intrinsic · Lai 36; ol_intrinsic · Lat 5 |
+| `lamina-right` | 7,551 | ol_intrinsic · L 4,466; ol_intrinsic · C 1,766; ol_intrinsic · T 892; ol_intrinsic · Lawf 372; ol_intrinsic · Lai 50; ol_intrinsic · Lat 5 |
+| `medulla-left` | 28,185 | ol_intrinsic · Tm 9,942; ol_intrinsic · Mi 4,780; ol_intrinsic · Dm 4,090; ol_intrinsic · TmY 3,836; ol_intrinsic · T 2,705; ol_intrinsic · Cm 1,558; 12 more groups 1,274 |
+| `medulla-right` | 28,284 | ol_intrinsic · Tm 9,919; ol_intrinsic · Mi 4,809; ol_intrinsic · Dm 4,085; ol_intrinsic · TmY 3,860; ol_intrinsic · T 2,737; ol_intrinsic · Cm 1,594; 13 more groups 1,280 |
+| `lobula-left` | 827 | ol_intrinsic · Li 767; ol_intrinsic · ol_bilateral · LC 43; ol_intrinsic · LO_unclear 11; ol_intrinsic · Li_unclear 3; ol_intrinsic · LT 2; ol_intrinsic · ol_bilateral · LT 1 |
+| `lobula-right` | 842 | ol_intrinsic · Li 791; ol_intrinsic · ol_bilateral · LC 45; ol_intrinsic · LO_unclear 3; ol_intrinsic · LT 2; ol_intrinsic · ol_bilateral · LT 1 |
+| `lobula-plate-left` | 7,365 | ol_intrinsic · T 6,790; ol_intrinsic · LPi 376; ol_intrinsic · Tlp 192; ol_intrinsic · LPi_unclear 4; ol_intrinsic · LOP_unclear 2; ol_intrinsic · ol_bilateral · H 1 |
+| `lobula-plate-right` | 7,361 | ol_intrinsic · T 6,795; ol_intrinsic · LPi 375; ol_intrinsic · Tlp 188; ol_intrinsic · LOP_unclear 2; ol_intrinsic · ol_bilateral · H 1 |
+| `optic-other-left` | 758 | ol_intrinsic · Y 677; ol_intrinsic · LOLP 37; ol_intrinsic · untyped 24; ol_intrinsic · ME_LO_unclear 4; ol_intrinsic · LOP_ME_unclear 4; ol_intrinsic · LO_ME_unclear 2; 10 more groups 10 |
+| `optic-other-right` | 758 | ol_intrinsic · Y 690; ol_intrinsic · LOLP 32; ol_intrinsic · untyped 22; ol_intrinsic · LA_ME_unclear 3; ol_intrinsic · LpMe_unclear 2; ol_intrinsic · Am 1; 8 more groups 8 |
+| `visual-projection-left` | 4,589 | visual_projection · LC 2,068; visual_projection · MeTu 501; visual_projection · MeVP 395; visual_projection · LLPC 378; visual_projection · LoVP 336; visual_projection · TmY 243; 28 more groups 668 |
+| `visual-projection-right` | 4,612 | visual_projection · LC 2,096; visual_projection · MeTu 508; visual_projection · MeVP 415; visual_projection · LLPC 382; visual_projection · LoVP 328; visual_projection · TmY 234; 29 more groups 649 |
+| `visual-centrifugal-left` | 283 | visual_centrifugal · LPT 103; visual_centrifugal · LoVC 57; visual_centrifugal · MeVC 28; visual_centrifugal · aMe 24; visual_centrifugal · LT 16; visual_centrifugal · OCC 12; 14 more groups 43 |
+| `visual-centrifugal-right` | 280 | visual_centrifugal · LPT 106; visual_centrifugal · LoVC 51; visual_centrifugal · MeVC 28; visual_centrifugal · aMe 21; visual_centrifugal · LT 17; visual_centrifugal · OCC 12; 15 more groups 45 |
+| `antenna-smell` | 2,730 | cb_sensory · olfactory · ORN_VA 541; cb_sensory · olfactory · ORN_VM 447; cb_sensory · olfactory · ORN_DA 354; cb_sensory · olfactory · ORN_DL 329; cb_sensory · olfactory · ORN_DM 316; cb_sensory · olfactory · ORN_VL 225; 8 more groups 518 |
+| `johnston-left` | 348 | cb_sensory · mechanosensory · JO-EV 101; cb_sensory · mechanosensory · JO-B 57; cb_sensory · mechanosensory · JO-ED 56; cb_sensory · mechanosensory · JO-FV 36; cb_sensory · mechanosensory · JO-A 18; cb_sensory · mechanosensory · JO-CA 17; 8 more groups 63 |
+| `johnston-right` | 324 | cb_sensory · mechanosensory · JO-unclear 95; cb_sensory · mechanosensory · JO-EV 75; cb_sensory · mechanosensory · JO-ED 35; cb_sensory · mechanosensory · JO-FV 34; cb_sensory · mechanosensory · JO-A-unclear 24; cb_sensory · mechanosensory · JO-B 18; 6 more groups 43 |
+| `head-bristles` | 932 | cb_sensory · mechanosensory · BM_InOm 745; cb_sensory · mechanosensory · BM 69; cb_sensory · mechanosensory · BM_Taste 40; cb_sensory · mechanosensory · BM_vOcci_vPoOr 26; cb_sensory · mechanosensory · BM_Vib 22; cb_sensory · mechanosensory · BM_MaPa 15; 2 more groups 15 |
+| `mouthparts` | 374 | cb_sensory · gustatory · LB 165; cb_sensory · mechanosensory · TPMN 60; cb_sensory · gustatory · claw_tpGRN 50; cb_sensory · gustatory · PhG 48; cb_sensory · mechanosensory · aPhM 39; cb_sensory · gustatory · dorsal_tpGRN 10; 1 more groups 2 |
+| `head-sensory-other` | 174 | cb_sensory · unknown_sensory · untyped 48; cb_sensory · mechanosensory · untyped 28; cb_sensory · unknown_sensory · ENS 26; cb_sensory · unknown_sensory · GNG 24; cb_sensory · untyped 20; cb_sensory_tbc · untyped 14; 4 more groups 14 |
+| `antennal-lobe-left` | 572 | cb_intrinsic · ALLN · lLN 82; cb_intrinsic · ALLN · v 61; cb_intrinsic · ALPN · M_vPNml 55; cb_intrinsic · ALPN · M_lvPNm 41; cb_intrinsic · ALLN · CB 38; cb_intrinsic · ALPN · VP 33; 38 more groups 262 |
+| `antennal-lobe-right` | 570 | cb_intrinsic · ALLN · lLN 79; cb_intrinsic · ALLN · v 57; cb_intrinsic · ALPN · M_vPNml 56; cb_intrinsic · ALPN · M_lvPNm 42; cb_intrinsic · ALLN · CB 38; cb_intrinsic · ALPN · VP 33; 37 more groups 265 |
+| `mushroom-body-left` | 2,241 | cb_intrinsic · Kenyon_Cell · KCg-m 689; cb_intrinsic · Kenyon_Cell · KCab-m 310; cb_intrinsic · Kenyon_Cell · KCab-c 277; cb_intrinsic · Kenyon_Cell · KCab-s 234; cb_intrinsic · Kenyon_Cell · KCapbp-ap 230; cb_intrinsic · DAN · PAM 158; 11 more groups 343 |
+| `mushroom-body-right` | 2,269 | cb_intrinsic · Kenyon_Cell · KCg-m 653; cb_intrinsic · Kenyon_Cell · KCab-s 423; cb_intrinsic · Kenyon_Cell · KCapbp-ap 260; cb_intrinsic · Kenyon_Cell · KCab-m 226; cb_intrinsic · Kenyon_Cell · KCab-c 211; cb_intrinsic · DAN · PAM 158; 10 more groups 338 |
+| `central-complex` | 2,979 | cb_intrinsic · CX · FB 575; cb_intrinsic · CX · FS 306; cb_intrinsic · CX · ER 282; cb_intrinsic · CX · FC 277; cb_intrinsic · CX · PFNp_b 136; cb_intrinsic · CX · vDeltaA_a 70; 62 more groups 1,333 |
+| `superior-protocerebrum-left` | 1,969 | cb_intrinsic · SMP 1,038; cb_intrinsic · SLP 670; cb_intrinsic · SIP 236; cb_intrinsic · aSP 22; cb_intrinsic · aSP-g 1; cb_intrinsic · SMPp&v 1; 1 more groups 1 |
+| `superior-protocerebrum-right` | 1,961 | cb_intrinsic · SMP 1,038; cb_intrinsic · SLP 663; cb_intrinsic · SIP 237; cb_intrinsic · aSP 20; cb_intrinsic · aSP-g 1; cb_intrinsic · SMP_unclear 1; 1 more groups 1 |
+| `lateral-horn-left` | 1,016 | cb_intrinsic · LHAV 409; cb_intrinsic · LHPV 366; cb_intrinsic · LHAD 109; cb_intrinsic · LHPD 82; cb_intrinsic · LH 27; cb_intrinsic · LHCENT 22; 1 more groups 1 |
+| `lateral-horn-right` | 1,010 | cb_intrinsic · LHAV 407; cb_intrinsic · LHPV 364; cb_intrinsic · LHAD 107; cb_intrinsic · LHPD 83; cb_intrinsic · LH 26; cb_intrinsic · LHCENT 22; 1 more groups 1 |
+| `ventrolateral-protocerebrum-left` | 2,336 | cb_intrinsic · AVLP 1,058; cb_intrinsic · WED 368; cb_intrinsic · PLP 359; cb_intrinsic · PVLP 316; cb_intrinsic · AOTU 153; cb_intrinsic · WEDPN 77; 4 more groups 5 |
+| `ventrolateral-protocerebrum-right` | 2,345 | cb_intrinsic · AVLP 1,060; cb_intrinsic · WED 370; cb_intrinsic · PLP 357; cb_intrinsic · PVLP 320; cb_intrinsic · AOTU 156; cb_intrinsic · WEDPN 76; 5 more groups 6 |
+| `inferior-ventromedial-left` | 1,919 | cb_intrinsic · CL 500; cb_intrinsic · PS 465; cb_intrinsic · LAL 333; cb_intrinsic · CRE 182; cb_intrinsic · VES 147; cb_intrinsic · IB 105; 7 more groups 187 |
+| `inferior-ventromedial-right` | 1,933 | cb_intrinsic · CL 509; cb_intrinsic · PS 475; cb_intrinsic · LAL 332; cb_intrinsic · CRE 179; cb_intrinsic · VES 143; cb_intrinsic · IB 104; 7 more groups 191 |
+| `subesophageal-left` | 1,193 | cb_intrinsic · GNG 768; cb_intrinsic · SAD 147; cb_intrinsic · PRW 134; cb_intrinsic · AMMC 100; cb_intrinsic · FLA 28; cb_intrinsic · SEZPN · Z_lvPNm 4; 4 more groups 12 |
+| `subesophageal-right` | 1,207 | cb_intrinsic · GNG 779; cb_intrinsic · SAD 146; cb_intrinsic · PRW 132; cb_intrinsic · AMMC 102; cb_intrinsic · FLA 31; cb_intrinsic · SEZPN · Z_lvPNm 5; 4 more groups 12 |
+| `central-brain-other` | 6,644 | cb_intrinsic · CB 5,244; cb_intrinsic · untyped 859; cb_intrinsic · pC 156; cb_intrinsic · mAL_m 98; cb_intrinsic · mAL 43; cb_intrinsic · GNG 36; 40 more groups 208 |
+| `head-motor` | 107 | cb_motor · MN 48; cb_motor · GNG 27; cb_motor · MNx 13; cb_motor · CvN 8; cb_motor · CEM 6; cb_motor · PS 4; 1 more groups 1 |
+| `brain-endocrine` | 126 | ENS · untyped 50; cb_endocrine · IPC 16; cb_endocrine · DNES 16; cb_endocrine · PI 8; cb_endocrine · untyped 7; cb_endocrine · ITP 7; 5 more groups 22 |
+| `descending-left` | 662 | descending_neuron · DNg 215; descending_neuron · DNge 211; descending_neuron · DNp 81; descending_neuron · DNpe 79; descending_neuron · DNa 16; descending_neuron · DNb 12; 14 more groups 48 |
+| `descending-right` | 654 | descending_neuron · DNge 212; descending_neuron · DNg 210; descending_neuron · DNp 81; descending_neuron · DNpe 77; descending_neuron · DNa 16; descending_neuron · DNb 12; 14 more groups 46 |
+| `ascending-left` | 930 | ascending_neuron · AN 811; ascending_neuron · ANXXX 103; ascending_neuron · IN 10; ascending_neuron · vMS 2; ascending_neuron · untyped 2; ascending_neuron · dMS 1; 1 more groups 1 |
+| `ascending-right` | 907 | ascending_neuron · AN 790; ascending_neuron · ANXXX 106; ascending_neuron · IN 5; ascending_neuron · untyped 3; ascending_neuron · vMS 2; ascending_neuron · dMS 1 |
+| `front-leg-motor-left` | 68 | vnc_motor · fl · accessory_tibia_flexor 10; vnc_motor · fl · ltm 8; vnc_motor · fl · trochanter_flexor 8; vnc_motor · fl · tibia_flexor 5; vnc_motor · fl · Ta/depressor 5; vnc_motor · fl · tergopleural_pleural_promotor 4; 11 more groups 28 |
+| `front-leg-motor-right` | 67 | vnc_motor · fl · accessory_tibia_flexor 9; vnc_motor · fl · trochanter_flexor 7; vnc_motor · fl · ltm 7; vnc_motor · fl · Fe/reductor 6; vnc_motor · fl · tibia_flexor 5; vnc_motor · fl · tergopleural_pleural_promotor 4; 12 more groups 29 |
+| `middle-leg-motor-left` | 58 | vnc_motor · ml · MNml 12; vnc_motor · ml · trochanter_flexor 7; vnc_motor · ml · ltm 6; vnc_motor · ml · accessory_tibia_flexor 6; vnc_motor · ml · tibia_flexor 5; vnc_motor · ml · Sternal/posterior/rotator 4; 9 more groups 18 |
+| `middle-leg-motor-right` | 58 | vnc_motor · ml · MNml 12; vnc_motor · ml · trochanter_flexor 7; vnc_motor · ml · ltm 6; vnc_motor · ml · accessory_tibia_flexor 6; vnc_motor · ml · tibia_flexor 5; vnc_motor · ml · Sternal/posterior/rotator 4; 9 more groups 18 |
+| `hind-leg-motor-left` | 66 | vnc_motor · hl · MNhl 11; vnc_motor · hl · tibia_flexor 9; vnc_motor · hl · accessory_trochanter_flexor 8; vnc_motor · hl · ltm 8; vnc_motor · hl · accessory_tibia_flexor 8; vnc_motor · hl · Sternal/posterior/rotator 4; 10 more groups 18 |
+| `hind-leg-motor-right` | 64 | vnc_motor · hl · MNhl 10; vnc_motor · hl · accessory_tibia_flexor 8; vnc_motor · hl · tibia_flexor 8; vnc_motor · hl · ltm 7; vnc_motor · hl · trochanter_flexor 5; vnc_motor · hl · accessory_trochanter_flexor 4; 10 more groups 22 |
+| `flight-motor` | 89 | vnc_motor · wm · hg 8; vnc_motor · wm · DLM 8; vnc_motor · wm · DVMn/ 8; vnc_motor · wm · DVM 6; vnc_motor · hm · MNhm 6; vnc_motor · wm · b 6; 14 more groups 47 |
+| `neck-motor` | 24 | vnc_motor · nm · MNnm 18; vnc_motor · nm · ADNM 4; vnc_motor · nm · FNM 2 |
+| `abdomen-motor` | 214 | vnc_motor · ad · MNad 214 |
+| `leg-sensory` | 1,640 | vnc_sensory · leg_bristle · LgLG 667; vnc_sensory · leg · untyped 381; vnc_sensory · leg · SNta 135; vnc_sensory · leg · SNxx 99; vnc_sensory · leg · SNxxxx 95; vnc_sensory · leg · SNppxx 80; 10 more groups 183 |
+| `thorax-sensory` | 868 | vnc_sensory · wing_bristle · WG 385; vnc_sensory · notum · SNta 214; sensory_ascending · haltere · SApp 148; vnc_sensory · haltere · SNpp 51; vnc_sensory · wing · SNxx 26; vnc_sensory · wing · SNpp 19; 9 more groups 25 |
+| `abdomen-sensory` | 1,143 | vnc_sensory · abdomen · SNxx 670; vnc_sensory · abdomen · untyped 358; vnc_sensory · abdomen · SNpp 65; vnc_sensory · abdomen · SNch 35; sensory_ascending · abdomen · SAxx 12; sensory_ascending · abdomen · untyped 3 |
+| `proprioceptors` | 964 | vnc_sensory · chordotonal_organ · SNpp 396; sensory_ascending · campaniform_sensilla · SApp 251; vnc_sensory · campaniform_sensilla · SNpp 152; vnc_sensory · hair_plate · SNpp 112; vnc_sensory · campaniform_sensilla · SApp 23; sensory_ascending · chordotonal_organ · SApp 22; 3 more groups 8 |
+| `bristles` | 2,276 | vnc_sensory · mechanosensory_bristle · SNta 2,204; vnc_sensory · taste_bristle · SNch 68; vnc_sensory · mechanosensory_bristle · SNxx 2; vnc_sensory · taste_bristle · LgLG 2 |
+| `cord-interneurons-left` | 6,474 | vnc_intrinsic · IN 5,785; vnc_intrinsic · INXXX 502; vnc_intrinsic · untyped 92; vnc_intrinsic · TN 18; vnc_intrinsic · vMS 17; vnc_intrinsic · GFC 16; 7 more groups 44 |
+| `cord-interneurons-right` | 6,448 | vnc_intrinsic · IN 5,761; vnc_intrinsic · INXXX 507; vnc_intrinsic · untyped 92; vnc_intrinsic · GFC 18; vnc_intrinsic · vMS 17; vnc_intrinsic · TN 17; 7 more groups 36 |
+| `cord-midline` | 277 | vnc_intrinsic · IN 219; vnc_tbc · untyped 38; vnc_intrinsic · untyped 10; vnc_intrinsic · vPR 9; vnc_intrinsic · INXXX 1 |
+| `cord-efferent` | 128 | vnc_efferent · EN 51; vnc_efferent · ENXXX 23; vnc_efferent · untyped 16; vnc_endocrine · LK 12; efferent_ascending · EA 6; efferent_descending · DNg 4; 7 more groups 16 |
+| `unplaced` | 75 | vnc_sensory_tbc · untyped 36; vnc_sensory · untyped 14; ascending_neuron · AN 7; descending_neuron · DNge 6; ascending_neuron · ANXXX 2; descending_neuron · DNpe 2; 6 more groups 8 |
+
+### How fast each fires, and fullHz
+
+A display shows a region at `rate / fullHz`, clamped to 1. `fullHz` is measured (`scripts/regions.ts`, seed 1): each region's rate at rest, its mean over a minute after 2 s of rest, and its peak, the highest its smoothed rate reaches under any stimulus report.ts runs: each sense alone at full strength for 1 s, every sense at once, the pet's looming pulse in the left eye, and every stimulus of the vision battery with the eyes open, each from a fresh brain. `fullHz` is the peak, but at least four times the rate at rest, so that rest is at most a quarter of full (a faint glow where a region is busy at rest), and at least 5 Hz, so that a region where only a few of its neurons ever fire never looks busy; a left/right pair shares the larger of its two, so that the display shows where one side fires more than the other; rounded up to two significant figures.
+
+| Region | Neurons | Rest (Hz) | Peak (Hz) | Under | fullHz |
+|---|---|---|---|---|---|
+| `retina-left` | 2,349 | 0 | 0.03 | grating, anticlockwise | 5 |
+| `retina-right` | 3,749 | 0 | 0.02 | grating right, front to back | 5 |
+| `lamina-left` | 7,474 | 0 | 38.9 | loom left | 41 |
+| `lamina-right` | 7,551 | 0 | 40.2 | loom right fast | 41 |
+| `medulla-left` | 28,185 | 0 | 11.8 | loom left | 15 |
+| `medulla-right` | 28,284 | 0 | 14.5 | loom right fast | 15 |
+| `lobula-left` | 827 | 0.02 | 9.71 | loom left | 16 |
+| `lobula-right` | 842 | 0.03 | 15.8 | loom right fast | 16 |
+| `lobula-plate-left` | 7,365 | 0 | 0.31 | grating, anticlockwise | 5 |
+| `lobula-plate-right` | 7,361 | 0 | 0.70 | grating right, upward | 5 |
+| `optic-other-left` | 758 | 0.02 | 0.79 | grating, anticlockwise | 5 |
+| `optic-other-right` | 758 | 0.06 | 0.96 | grating, clockwise | 5 |
+| `visual-projection-left` | 4,589 | 1.94 | 6.31 | everything at once | 12 |
+| `visual-projection-right` | 4,612 | 2.90 | 3.60 | everything at once | 12 |
+| `visual-centrifugal-left` | 283 | 1.34 | 9.24 | everything at once | 9.3 |
+| `visual-centrifugal-right` | 280 | 1.77 | 9.15 | everything at once | 9.3 |
+| `antenna-smell` | 2,730 | 0 | 0 | - | 5 |
+| `johnston-left` | 348 | 0 | 85.4 | everything at once | 150 |
+| `johnston-right` | 324 | 0 | 144.3 | everything at once | 150 |
+| `head-bristles` | 932 | 0 | 47.9 | touch | 48 |
+| `mouthparts` | 374 | 0 | 21.5 | sweet | 22 |
+| `head-sensory-other` | 174 | 0 | 1.08 | sweet | 5 |
+| `antennal-lobe-left` | 572 | 0 | 0.69 | everything at once | 5 |
+| `antennal-lobe-right` | 570 | 0 | 0.64 | everything at once | 5 |
+| `mushroom-body-left` | 2,241 | 0 | 0.13 | everything at once | 5 |
+| `mushroom-body-right` | 2,269 | 0.01 | 0.13 | loomLeft | 5 |
+| `central-complex` | 2,979 | 0 | 0.51 | everything at once | 5 |
+| `superior-protocerebrum-left` | 1,969 | 0 | 0.63 | everything at once | 5 |
+| `superior-protocerebrum-right` | 1,961 | 0.01 | 0.81 | everything at once | 5 |
+| `lateral-horn-left` | 1,016 | 0 | 0.58 | everything at once | 5 |
+| `lateral-horn-right` | 1,010 | 0 | 0.59 | everything at once | 5 |
+| `ventrolateral-protocerebrum-left` | 2,336 | 0.99 | 7.73 | everything at once | 7.8 |
+| `ventrolateral-protocerebrum-right` | 2,345 | 1.82 | 7.71 | everything at once | 7.8 |
+| `inferior-ventromedial-left` | 1,919 | 0.13 | 3.64 | everything at once | 5 |
+| `inferior-ventromedial-right` | 1,933 | 0.20 | 3.83 | everything at once | 5 |
+| `subesophageal-left` | 1,193 | 0.21 | 16.7 | everything at once | 17 |
+| `subesophageal-right` | 1,207 | 0.28 | 14.8 | everything at once | 17 |
+| `central-brain-other` | 6,644 | 0.12 | 3.18 | everything at once | 5 |
+| `head-motor` | 107 | 3.00 | 27.3 | everything at once | 28 |
+| `brain-endocrine` | 126 | 0 | 0.56 | wind | 5 |
+| `descending-left` | 662 | 0.38 | 16.0 | everything at once | 16 |
+| `descending-right` | 654 | 0.53 | 14.8 | everything at once | 16 |
+| `ascending-left` | 930 | 0.39 | 8.11 | everything at once | 8.2 |
+| `ascending-right` | 907 | 0.36 | 8.06 | everything at once | 8.2 |
+| `front-leg-motor-left` | 68 | 0.13 | 10.8 | wind | 11 |
+| `front-leg-motor-right` | 67 | 0.10 | 8.90 | wind | 11 |
+| `middle-leg-motor-left` | 58 | 0.30 | 9.66 | loomRight | 9.7 |
+| `middle-leg-motor-right` | 58 | 0.31 | 8.05 | everything at once | 9.7 |
+| `hind-leg-motor-left` | 66 | 0.76 | 5.61 | everything at once | 7.4 |
+| `hind-leg-motor-right` | 64 | 0.66 | 7.34 | loomRight | 7.4 |
+| `flight-motor` | 89 | 8.90 | 65.0 | everything at once | 65 |
+| `neck-motor` | 24 | 5.36 | 12.7 | sweet | 22 |
+| `abdomen-motor` | 214 | 0.55 | 30.4 | everything at once | 31 |
+| `leg-sensory` | 1,640 | 0 | 0 | - | 5 |
+| `thorax-sensory` | 868 | 0 | 0 | - | 5 |
+| `abdomen-sensory` | 1,143 | 0 | 0 | - | 5 |
+| `proprioceptors` | 964 | 8.67 | 9.37 | loom right slow | 35 |
+| `bristles` | 2,276 | 0 | 9.77 | touch | 9.8 |
+| `cord-interneurons-left` | 6,474 | 0.33 | 5.07 | everything at once | 5.1 |
+| `cord-interneurons-right` | 6,448 | 0.26 | 5.04 | everything at once | 5.1 |
+| `cord-midline` | 277 | 0.52 | 34.0 | everything at once | 34 |
+| `cord-efferent` | 128 | 0.15 | 9.00 | everything at once | 9.1 |
+| `unplaced` | 75 | 0.06 | 6.85 | everything at once | 6.9 |
+
+What it shows:
+
+- **At rest** the busy regions are the ones the made-up visual background drives (the visual projection neurons, at 2-3 Hz, wandering with it, and the ventrolateral protocerebrum they end in, and the visual centrifugal neurons), the legs' load sensors (proprioceptors, 8.7 Hz, of which `grounded` drives 426 at 20 Hz) and what they drive (the wing and haltere motor neurons, 8.9 Hz; the neck motor neurons, 5.4 Hz), and the head motor neurons (3 Hz). On the display's scale these show at 11 to 25% of full; the descending and ascending neurons, the cord's interneurons and the leg motor neurons, at 0.1 to 0.8 Hz, at 1 to 10%.
+- **Never fire**: the retina, smell, and the legs', the wings, halteres and thorax's and the abdomen's sensory neurons. No sense drives them: the light enters one synapse in, at the lamina (The eyes), the model has no sense of smell, and among the body's sensory neurons only the bristles and the proprioceptors are driven. What reaches them in the wiring doesn't fire them either. The photoreceptors' input is 96% inhibitory (Dm9 and the other photoreceptors' histamine; the retina's peak, 0.03 Hz under a grating, is a handful of them); the others get synapses onto their axon terminals, more of them inhibitory than excitatory, and the excitatory ones mostly from other sensory neurons like themselves, which nothing drives. They stay dark, as they should.
+- **Barely fire**, under 1.1 Hz at their peak, and stay faint: the mushroom body (0.13 Hz), lateral horn, superior protocerebrum, antennal lobe and central complex (0.5 to 0.8 Hz), the lobula plate (0.7: T4 never fires because the ON pathway is silent, and T5 fires at about 1 Hz, Seeing), the optic lobe's other cells, the neuroendocrine neurons and the head's other sensory neurons. With no smell nothing reaches the olfactory centres, and the other senses reach the higher centres of the brain only weakly in this model.
+- **Fire, but drive nothing**: every motor region (their output is muted: no predicted transmitter, Operating point), and the dopaminergic neurons in the mushroom body region (their output is muted as modulatory). Their rates are their own; what they would do downstream isn't modelled.
+
+### Cost
+
+What the readout adds: one increment a spike, whichever neuron fires (49,000 a second at rest, 970,000 under the grating across both eyes), and every 10 ms chunk 63 smoothings; a byte a neuron for the partition; and, when the brain is built, classifying every neuron, 12 to 20 ms of string checks here and a few ms natively (in the native bench's runs the TypeScript brain built in 149 to 163 ms after against 155 to 159 before, the native one in 51 to 52 ms against 46 to 49). Measured on an M5 Pro against the commit before, runs alternating between the two, it is within the runs' own spread everywhere:
+
+| Wall time per simulated second | Before | After |
+|---|---|---|
+| report.ts (d), at rest (three runs each) | 0.127-0.145 s | 0.128-0.131 s |
+| report.ts (d), the pointer resting on it | 0.151-0.166 s | 0.150-0.164 s |
+| report.ts (d), held and dragged | 0.174-0.209 s | 0.177-0.186 s |
+| report.ts (d), everything at once | 0.225-0.264 s | 0.226-0.242 s |
+| the native bench's TypeScript, at rest (two runs each) | 0.148-0.154 s | 0.122-0.125 s |
+| the native bench's TypeScript, the grating across both eyes | 0.506-0.518 s | 0.439-0.499 s |
+| the native bench's native brain, at rest | 0.073 s | 0.069-0.070 s |
+| the native bench's native brain, the grating across both eyes | 0.217-0.251 s | 0.226-0.254 s |
+| scripts/bench.ts, the bare engine (no partition), looming at ±0.07 mV | 0.106-0.107 s | 0.107-0.118 s |
+
+Where after is faster, that is the same noise (the machine was in use, and runs of the same code differ by up to 20%). The spikes and active neurons are the same in every run, before and after, and a whole report.ts, before and after, prints the same in every line but the wall times.
+
+### Reading them
+
+`REGIONS[r]` and `REGION_RATE_NAMES[r]` (`"region." + id`) are in the same order. A display that reads them every frame should not look them up by name: a `BrainDriver` (`packages/contracts`) has `regionRates`, a `Float32Array` in the order of `REGIONS`, filled in place from each new state (0 for a region the brain doesn't report):
+
+```ts
+import { REGIONS } from "@fly/brain";
+
+const rates = driver.regionRates; // keep the reference: it is filled in place
+for (let r = 0; r < REGIONS.length; r++) glow[r] = Math.min(1, rates[r] / REGIONS[r].fullHz);
+```
+
+`fullHz` is a linear scale; a display that wants faint rest to show more can put a curve on `rate / fullHz` (a square root lifts 4% to 20%).
+
 ## Cost
 
-On an M5 Pro, one thread (`report.ts` section d), wall time per simulated second: 0.12 s at rest, 0.14 s with the pointer resting on it (touch 0.4), 0.13 s with a full looming pulse every second, 0.16 s held and dragged (touch 1, wind 0.5, airborne: just over the 0.15 s aimed for), 0.21 s with every sense at full strength at once. Building the brain takes about 0.3 s. Almost all of it is the sweep over active neurons: at rest about 65,000 of them, nearly all genuinely depolarised by the background.
+On an M5 Pro, one thread (`report.ts` section d), wall time per simulated second: 0.12 s at rest, 0.14 s with the pointer resting on it (touch 0.4), 0.13 s with a full looming pulse every second, 0.16 s held and dragged (touch 1, wind 0.5, airborne: just over the 0.15 s aimed for), 0.21 s with every sense at full strength at once. Building the brain takes about 0.3 s. Almost all of it is the sweep over active neurons: at rest about 65,000 of them, nearly all genuinely depolarised by the background. The regions' readout costs nothing that can be measured (Regions).
 
 With the eyes open (`report.ts` section e): a steady scene costs what shut eyes do (0.122 to 0.125 s against 0.123 in interleaved runs: the input stage only checks whether the light has changed), a disc looming at one eye over and over 0.21 to 0.23 s, a 4 Hz whole-field flicker 0.33 to 0.38 s, and the worst case of the battery, a high-contrast grating drifting across both eyes, 0.39 to 0.42 s (three runs), under the 0.5 s aimed for. The eyes' input itself is cheap (one random draw per candidate spike, and nothing at all once adapted); what costs is the optic lobe answering, with the active set growing to about 120,000 neurons. Real screens move less of the field at lower contrast than that grating. If it ever needs cutting, halving the lamina's scale (`RETINA.maxRate` 100) halves the spikes the rotating grating causes (529,000 a second against 1,016,000), at the price of most of the motion pathway (Seeing).
 
@@ -275,10 +478,12 @@ With the eyes open (`report.ts` section e): a steady scene costs what shut eyes 
 
 `node packages/brain/scripts/vision.ts` runs the vision battery and prints, for each stimulus against its control, the change in mean rate of each stage's cell types (lamina, medulla, T4 and the T5 subtypes, lobula columnar types, lobula plate tangential cells, descending neurons) and the commands (Seeing). `--only <regex>` picks stimuli, `--set graded=3` and the like change the operating point, `--retina maxRate=100` and the like the input stage, `--seed` the seed. About 20 s.
 
+`node packages/brain/scripts/regions.ts` prints the two tables of Regions: what each region holds, and its rate at rest and its peak under every stimulus report.ts runs, with its `fullHz`, and says whether every `fullHz` is still what the rule gives. About half a minute; `--seed` changes the seed.
+
 `node packages/brain/scripts/eyes.ts --columns <xlsx>` regenerates `src/eye-columns.ts` (The eyes).
 
 `node packages/brain/scripts/bench.ts` times the bare engine.
 
 ## Tests
 
-`npm test -w @ladybug/brain`. Without the real data: the format, the packer, the engine against a dense reference, and the runtime on a small synthetic connectome (`src/test-helpers.ts`): decoding, the sense-to-rate mapping, left/right balancing, that no neuron is both driven and read, `createBrain` end to end and its errors, determinism, and a four-column eye on it (shut, the brain is spike for spike the one without eyes; open, darkness reaches the lamina, the looming detectors and the giant fiber). Also without the data: the column table, the viewing directions (unit vectors, none alike, mirrored, the frontal overlap, the dorsal rim looking up), and the input stage (adaptation, contrast, transient and sustained cells, steady scenes costing nothing, skipping steps exactly). With `data/connectome.bin` (skipped without it), `src/behaviour.test.ts` checks the requirements: the real groups and their disjointness, no seizure after each sense and all at once, loom → escape timing, escape below 0.3 otherwise, mirrored looms and steering, touch → back, wind → groom, sweet → feed, loom → wings, three minutes of resting behaviour (walking 20–70% of the time in at least 15 bouts, turns both ways, no escapes; 10 minutes is in `report.ts`), and construction time and cost with twice the budgets' margins; `src/eyes.test.ts` that every column's cells are the right type and side; and `src/seeing.test.ts` the eyes: shut, the same spikes as the commit before the eyes (a fingerprint); a loom at the right eye passing escape 0.5 and dots and a receding disc not; a steady scene sending the lamina nothing; HS preferring front-to-back and H2 back-to-front motion and a rotation turning the fly with it; and no seizure after a loom, a grating or a flicker, alone and with every other sense. It takes about a minute and a half.
+`npm test -w @ladybug/brain`. Without the real data: the format, the packer, the engine against a dense reference, and the runtime on a small synthetic connectome (`src/test-helpers.ts`): decoding, the sense-to-rate mapping, left/right balancing, that no neuron is both driven and read, `createBrain` end to end and its errors, determinism, and a four-column eye on it (shut, the brain is spike for spike the one without eyes; open, darkness reaches the lamina, the looming detectors and the giant fiber). Also without the data: the regions' catalog (unique ids, every field filled in, pairs alike but for their side), their rules on examples of every kind of neuron and every catch-all, and on the synthetic brain that every region is reported after the readouts, an empty one at 0, and that no command reads them; the engine's partition (every spike counted by its neuron's part, the run unchanged); the column table, the viewing directions (unit vectors, none alike, mirrored, the frontal overlap, the dorsal rim looking up), and the input stage (adaptation, contrast, transient and sustained cells, steady scenes costing nothing, skipping steps exactly). With `data/connectome.bin` (skipped without it), `src/behaviour.test.ts` checks the requirements: the real groups and their disjointness, no seizure after each sense and all at once, loom → escape timing, escape below 0.3 otherwise, mirrored looms and steering, touch → back, wind → groom, sweet → feed, loom → wings, three minutes of resting behaviour (walking 20–70% of the time in at least 15 bouts, turns both ways, no escapes; 10 minutes is in `report.ts`), and construction time and cost with twice the budgets' margins; `src/eyes.test.ts` that every column's cells are the right type and side; `src/regions.test.ts` the partition (every neuron in one region, as many in each as the catalog says, none empty), that the senses' and the readouts' neurons are in the regions the catalog says, and that the region rates respond where they should (at rest the descending neurons stay under 1.5 Hz; the looming pulse raises them more than threefold and the wing and haltere motor neurons with them; a disc looming at the left eye drives the left lamina, medulla and lobula more than twice as hard as the right ones; sweet drives the mouthparts, the head motor neurons and the subesophageal zone); and `src/seeing.test.ts` the eyes: shut, the same spikes as the commit before the eyes (a fingerprint); a loom at the right eye passing escape 0.5 and dots and a receding disc not; a steady scene sending the lamina nothing; HS preferring front-to-back and H2 back-to-front motion and a rotation turning the fly with it; and no seizure after a loom, a grating or a flicker, alone and with every other sense. It takes about a minute and a half.

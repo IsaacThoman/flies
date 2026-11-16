@@ -91,7 +91,8 @@ for (const [name, senses] of cases) {
         at[c] = t;
       }
     }
-    for (const [k, v] of Object.entries(stats.rates)) rates[k] = (rates[k] ?? 0) + v;
+    // The regions have their own script, regions.ts.
+    for (const [k, v] of Object.entries(stats.rates)) if (!k.startsWith("region.")) rates[k] = (rates[k] ?? 0) + v;
   }
   const cells = COMMANDS.map((c) => pad(`${fixed(sum[c] / n)} /${fixed(peak[c])} ${Math.abs(peak[c]) > 0.05 ? String(at[c]).padStart(4) : "   -"}`, 20));
   console.log(`    ${pad(name, 10)}${cells.join("")}`);
