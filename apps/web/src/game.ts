@@ -1102,7 +1102,10 @@ export class Game implements Shell {
       }
     }
     if (playing && (remote.dx !== 0 || remote.dy !== 0)) this.#movePointer(remote.dx, remote.dy);
-    if (playing) this.#steer(dt);
+    if (playing) {
+      this.#steer(dt);
+      this.#controls.glide(dt, this.#target);
+    }
     if (pointers) {
       for (const g of pointers.gestures) this.#gesture(g);
       this.#followAim();
@@ -1265,6 +1268,9 @@ export class Game implements Shell {
       zoom: (factor) => this.#zoomCamera(factor),
       holdCamera: (held) => {
         this.director.hand.held = held;
+      },
+      keepCamera: () => {
+        if (this.hands.view !== "eyes") this.director.hand.kept = true;
       },
       handBack: () => this.#handBack(),
     };

@@ -295,6 +295,44 @@ test("turned by hand the camera goes round the fly at once, stays where it was p
   assert.ok(worst < 0.5, `smoothly: ${worst.toFixed(2)} mm in a frame at most`);
 });
 
+test("put somewhere by a mouse, the camera orbits freely: it stays at that angle and height round the fly however the fly turns, and zooms straight in, until it is handed back or a view is chosen", () => {
+  const director = new CameraDirector(world, 16 / 9, picnic.camera);
+  const body = fakeBody(-8, -8, 0.6);
+  settle(director, body, 6);
+  const middle = new THREE.Vector3(body.position.x, body.position.y + 0.3 * FLY_LENGTH, body.position.z);
+  const way = () => director.camera.position.clone().sub(middle).normalize();
+  director.hand.held = true;
+  director.hand.kept = true;
+  director.turnBy(1.2, 0.35);
+  director.hand.held = false;
+  director.update(body, 1 / 60);
+  const put = director.camera.position.clone();
+  // The fly turns right round where it stands, and the cameraman would have followed it round.
+  body.yaw += 2.5;
+  watch(director, body, HAND_HOLD * 4);
+  assert.ok(director.handled, "still the player's");
+  assert.ok(director.camera.position.distanceTo(put) < 0.3, `left where it was put: ${director.camera.position.distanceTo(put).toFixed(2)} mm off`);
+  // Brought in from Follow to Close up, which the cameraman films from another side: straight in, not round.
+  const from = way();
+  for (let i = 0; i < 3; i++) {
+    director.zoomBy(1 / 1.2);
+    assert.ok(watch(director, body, 0.3) < 1, "no jumps");
+  }
+  watch(director, body, 2);
+  assert.ok(way().angleTo(from) < 0.03, `the same way round: ${way().angleTo(from).toFixed(3)} rad`);
+  // Handed back, the cameraman has it again: its own side, its own height.
+  director.handBack(true);
+  watch(director, body, 4);
+  assert.ok(!director.handled && way().angleTo(from) > 0.3, `the cameraman's again: ${way().angleTo(from).toFixed(2)} rad round`);
+  // A named view chosen on the View tool is the cameraman's shot too.
+  director.hand.kept = true;
+  director.turnBy(-1, 0.2);
+  director.update(body, 1 / 60);
+  director.setView("wide");
+  assert.ok(watch(director, body, 6) < 2, "smoothly");
+  assert.ok(!director.handled, "the chosen view, not where the hand left it");
+});
+
 test("brought in or taken out by hand it goes smoothly along one range, from the eyes' facets to the whole table, and stays where it is left", () => {
   const director = new CameraDirector(world, 16 / 9, picnic.camera);
   // Well away from the table's middle, so the fly is in the picture only if the camera keeps it there.

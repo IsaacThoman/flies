@@ -25,8 +25,11 @@
 // cameraman carries on from there, moving only when it would have anyway.
 // Brought in or taken out (the wheel, a pinch, the View tool), it goes
 // smoothly along one range, from the facets of the fly's eyes out to the whole
-// place, and stays there: the named views are points along it. Wherever the
-// hand has taken it, `handBack` gives it back to the cameraman at once.
+// place, and stays there: the named views are points along it. A camera a
+// mouse or a trackpad has turned or zoomed is kept where it was put, at that
+// angle round the fly and that height, for as long as the player likes: the
+// cameraman leaves it alone. Wherever the hand has taken it, `handBack` gives
+// it back to the cameraman at once, and so does choosing a named view.
 
 import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
@@ -182,9 +185,10 @@ export class CameraDirector {
   /**
    * The player's hand on the camera: `held` while a finger, a button, a key
    * or a stick is turning it; `pitch`, how far (radians) it has been swung up
-   * or down from the shot's height.
+   * or down from the shot's height; `kept`, put somewhere by a mouse or a
+   * trackpad, which orbit freely, and left there until it is handed back.
    */
-  readonly hand = { held: false, pitch: 0 };
+  readonly hand = { held: false, pitch: 0, kept: false };
   /**
    * Where the screens leave room for the fly, from their layout: in the
    * title's shot, its place across and down the picture (as a Shot's
@@ -267,14 +271,14 @@ export class CameraDirector {
     this.camera.updateProjectionMatrix();
   }
 
-  /** Takes the camera to one of the named views, at the shots' own unhurried pace. */
+  /** Takes the camera to one of the named views, at the shots' own unhurried pace: a view chosen is the cameraman's shot, so the hand lets go of it. */
   setView(view: View) {
     if (view === this.view) return;
     this.view = view;
     this.#above = view === "above";
     this.#reach = this.#reachOfView(view);
     this.#orbit = 0;
-    this.#scoutIn = 0;
+    this.handBack(true);
   }
 
   #reachOfView(view: View) {
@@ -299,7 +303,7 @@ export class CameraDirector {
 
   /** The player has the camera, or had it a moment ago: the cameraman leaves it where it is. */
   get handled() {
-    return this.hand.held || this.#handFor > 0 || Math.abs(this.hand.pitch) > 0.01;
+    return this.hand.held || this.hand.kept || this.#handFor > 0 || Math.abs(this.hand.pitch) > 0.01;
   }
 
   /**
@@ -559,10 +563,10 @@ export class CameraDirector {
     return world.raycast(focus, r, this.#hit, length) ? clear : Infinity;
   }
 
-  /** While the hand is on the camera it stays put; let go a while, the tilt and the turn of the whole table ease back. */
+  /** While the hand is on the camera, or has kept it, it stays put; let go a while, the tilt and the turn of the whole table ease back. */
   #easeHand(dt: number) {
     const hand = this.hand;
-    if (hand.held) {
+    if (hand.held || hand.kept) {
       this.#handFor = HAND_HOLD;
       this.#handV.fill(0);
       return;
@@ -618,6 +622,7 @@ export class CameraDirector {
   /** Gives the camera back to the cameraman now: it takes the best place round the fly at once, the tilt eases back, and (unless `keepZoom`) the zoom goes to the named view it is nearest. */
   handBack(keepZoom = false) {
     this.hand.held = false;
+    this.hand.kept = false;
     this.#handFor = 0;
     this.#rechoose = true;
     this.#scoutIn = 0;

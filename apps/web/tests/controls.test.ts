@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Hit } from "@fly/ui";
-import { DRAG_ROUND, NOTCH_ZOOM, PlayControls } from "../src/controls.ts";
+import { DRAG_ROUND, NOTCH_EASE, NOTCH_ZOOM, PlayControls } from "../src/controls.ts";
 import type { PlayTarget, ToolUse } from "../src/controls.ts";
 import type { Gesture } from "../src/input.ts";
 import { HUD_HITS } from "../src/ui/hud.ts";
@@ -28,6 +28,7 @@ function rig(tool: ToolUse = "once") {
     turn: (yaw, pitch) => asked.push(`turn ${yaw.toFixed(2)} ${pitch.toFixed(2)}`),
     zoom: (factor) => asked.push(`zoom ${factor.toFixed(3)}`),
     holdCamera: (held) => asked.push(held ? "hold" : "let go"),
+    keepCamera: () => asked.push("keep"),
     handBack: () => asked.push("hand back"),
   };
   let now = 0;
@@ -87,14 +88,13 @@ test("a double click or tap in the air gives the camera back to the cameraman", 
   assert.ok(asked.includes("hand back"));
 });
 
-test("the wheel and the trackpad: a notch, a scroll and a pinch bring the camera in or out; a sideways scroll turns it; over the shelf they step the tools", () => {
+test("a trackpad: a scroll and a pinch bring the camera in or out, and a sideways scroll turns it; over the shelf the wheel and the trackpad step the tools", () => {
   const { asked, send, tick } = rig();
-  send(true, wheel(100, true), wheel(-100, true));
-  assert.deepEqual(asked, [`zoom ${NOTCH_ZOOM.toFixed(3)}`, `zoom ${(1 / NOTCH_ZOOM).toFixed(3)}`], "a click of the wheel: out, then in");
-  asked.length = 0;
   send(true, wheel(-20, false), wheel(-6, false, true), wheel(0, false, false, 30));
-  assert.ok(asked[0].startsWith("zoom 0.9") && Number(asked[1].split(" ")[1]) < 1, `a trackpad's scroll up and its pinch both bring it in: ${asked}`);
-  assert.ok(asked[2].startsWith("turn 0.18"), "across: round");
+  const moves = asked.filter((a) => a !== "keep");
+  assert.ok(moves[0].startsWith("zoom 0.9") && Number(moves[1].split(" ")[1]) < 1, `a trackpad's scroll up and its pinch both bring it in: ${asked}`);
+  assert.ok(moves[2].startsWith("turn 0.18"), "across: round");
+  assert.equal(asked.filter((a) => a === "keep").length, 3, "and the camera stays where they put it");
   asked.length = 0;
   const overShelf: Gesture = { type: "wheel", x: 0.5, y: 0.9, dx: 0, dy: 100, notch: true, zoom: false };
   send(true, overShelf);
@@ -106,6 +106,57 @@ test("the wheel and the trackpad: a notch, a scroll and a pinch bring the camera
   tick(400);
   for (let i = 0; i < 7; i++) send(true, { ...overShelf, dy: 20, notch: false });
   assert.deepEqual(asked, ["tool 1"]);
+});
+
+test("a click of the mouse wheel eases in over a fifth of a second or so, and a turn of the wheel runs its clicks together into one glide", () => {
+  const { asked, send, controls, target } = rig();
+  let zoom = 1;
+  const steps: number[] = [];
+  target.zoom = (factor) => {
+    zoom *= factor;
+    steps.push(factor);
+  };
+  const frames = (seconds: number) => {
+    for (let t = 0; t < seconds; t += 1 / 60) controls.glide(1 / 60, target);
+  };
+  send(true, wheel(100, true));
+  assert.deepEqual(asked, ["keep"], "nothing yet, but the camera is the mouse's");
+  frames(0.1);
+  assert.ok(zoom > 1 && zoom < NOTCH_ZOOM, `on its way out: ${zoom.toFixed(3)}`);
+  frames(10 * NOTCH_EASE);
+  assert.ok(Math.abs(zoom - NOTCH_ZOOM) < 1e-9, `the whole click: ${zoom}`);
+  assert.ok(Math.max(...steps) < Math.pow(NOTCH_ZOOM, 0.3), "never a hop");
+  const done = steps.length;
+  frames(1);
+  assert.equal(steps.length, done, "and then still");
+  // Four clicks in quick succession, in: the camera keeps moving between them, and arrives four clicks in.
+  zoom = 1;
+  steps.length = 0;
+  for (let i = 0; i < 4; i++) {
+    send(true, wheel(-100, true));
+    frames(0.05);
+  }
+  assert.ok(steps.length >= 10 && steps.every((f) => f < 1), "a glide in, a frame at a time");
+  frames(1);
+  assert.ok(Math.abs(zoom - Math.pow(NOTCH_ZOOM, -4)) < 1e-9, `four clicks in all: ${zoom}`);
+  // Let go of everything (the wallpaper came), the rest of a click is dropped.
+  send(true, wheel(100, true));
+  controls.reset();
+  steps.length = 0;
+  frames(1);
+  assert.deepEqual(steps, []);
+});
+
+test("a mouse orbits freely: a drag that turns the camera keeps it where it is put; a finger's drag doesn't, nor a click in the air", () => {
+  const { asked, send } = rig();
+  send(true, down(0.5, 0.2), drag(0.6, 0.15), up(0.6, 0.15, false));
+  assert.ok(asked.includes("keep"), `${asked}`);
+  asked.length = 0;
+  send(true, down(0.5, 0.2), up(0.5, 0.2));
+  assert.ok(!asked.includes("keep"), "a click that turned nothing keeps nothing");
+  asked.length = 0;
+  send(false, down(0.5, 0.2, 0, true), drag(0.6, 0.15), up(0.6, 0.15, false));
+  assert.ok(asked.includes("turn -0.30 -0.08") && !asked.includes("keep"), `a finger's camera goes back to the cameraman after a while: ${asked}`);
 });
 
 test("two fingers: spread brings the camera in, moved together they turn it; a finger already down lets go", () => {
