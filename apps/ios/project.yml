@@ -20,7 +20,8 @@ targets:
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: Flies
+        CFBundleDisplayName: flies
+        CFBundleName: flies
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # src/Launch.storyboard: the launch image, generated into src/generated/Assets.xcassets.

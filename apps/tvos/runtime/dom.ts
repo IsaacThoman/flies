@@ -542,7 +542,7 @@ export class DocumentShim extends NodeShim {
   hidden = false;
   visibilityState = 'visible';
   readyState = 'complete';
-  title = 'Flies';
+  title = 'flies';
   cookie = '';
   readonly defaultView = globalThis;
   constructor() {
