@@ -9,6 +9,7 @@ It implements `FlyModel` from `packages/contracts/src/fly.ts`:
 ```sh
 npm run fly:viewer          # the workbench, on http://localhost:5287
 node --test packages/fly/tests/
+node --test packages/fly/tests/update.budget.ts   # its speed, alone
 ```
 
 ## Anatomy, and what each part is made of

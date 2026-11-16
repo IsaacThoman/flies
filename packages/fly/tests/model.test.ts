@@ -263,21 +263,6 @@ test("update allocates nothing but boxed numbers, even without a JIT", () => {
   assert.deepEqual(others, [], `allocations other than ${numberSize}-byte numbers`);
 });
 
-test("update is quick with a JIT", () => {
-  const fly = createFly();
-  const poses = [pose({ speed: 3, turn: 1 }), pose({ groom: 1 }), pose({ feed: 1, wings: 0.5 }), pose({ airborne: true, wings: 1, pitch: 0.4, roll: 0.3 })];
-  for (let i = 0; i < 20000; i++) fly.update(poses[(i >> 6) & 3], DT);
-  // CPU time excludes other agents' turns on the cores; the best sample excludes an occasional GC.
-  const micros = Math.min(...Array.from({ length: 3 }, () => {
-    const start = process.cpuUsage();
-    for (let i = 0; i < 5000; i++) fly.update(poses[(i >> 6) & 3], DT);
-    const used = process.cpuUsage(start);
-    return (used.user + used.system) / 5000;
-  }));
-  console.log(`  update: ${micros.toFixed(1)} CPU µs in Node with its JIT (best of three)`);
-  assert.ok(micros < 50, `${micros.toFixed(1)} CPU µs per update; budget 50`);
-});
-
 test("singing holds one wing out to its side, the other folded", () => {
   // Where a wing copy's tip is, from its hinge, in the model's space (+x the fly's left, +z ahead).
   const tip = (fly: ReturnType<typeof createFly>, copy: number) => {
