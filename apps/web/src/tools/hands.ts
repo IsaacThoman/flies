@@ -27,8 +27,8 @@ export const TOOLS: readonly Tool[] = [
   { id: "light", name: "Light", verb: "", hold: false, variants: [{ id: "clock", label: "Now" }, { id: "morning", label: "Morning" }, { id: "noon", label: "Midday" }, { id: "golden", label: "Golden hour" }, { id: "dusk", label: "Dusk" }, { id: "night", label: "Night" }] },
   // "Now" is the weather outside where the Apple TV can tell it ("Outside"), else wanders as a forecast worked out from the clock would; the others hold.
   { id: "weather", name: "Weather", verb: "", hold: false, variants: [{ id: "now", label: "Now" }, { id: "clear", label: "Clear" }, { id: "overcast", label: "Overcast" }, { id: "mist", label: "Mist" }, { id: "rain", label: "Rain" }] },
-  // Nearest first, so Up brings the camera in and Down takes it out.
-  { id: "view", name: "View", verb: "", hold: false, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }] },
+  // Nearest first, so Up brings the camera in and Down takes it out; then through its eyes, and inside it (close up, its body as glass).
+  { id: "view", name: "View", verb: "", hold: false, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }, { id: "inside", label: "Inside it" }] },
   // Where it lives: Up and Down choose, Select carries it there. Only when there is somewhere else to go.
   ...(PLACES.length > 1 ? [{ id: "place", name: "Place", verb: "Go", hold: false, variants: PLACES.map((p) => ({ id: p.id, label: p.name })) } satisfies Tool] : []),
 ];
@@ -194,9 +194,9 @@ export class Hands {
     if (PLACE_TOOL >= 0) this.variants[PLACE_TOOL] = Math.max(0, PLACES.findIndex((p) => p.id === id));
   }
 
-  /** The view chosen on the View tool ("eyes" is the fly's-eye picture). */
-  get view(): View | "eyes" {
-    return TOOLS[VIEW_TOOL].variants[this.variants[VIEW_TOOL]].id as View | "eyes";
+  /** The view chosen on the View tool ("eyes" is the fly's-eye picture; "inside", close up with its body as glass). */
+  get view(): View | "eyes" | "inside" {
+    return TOOLS[VIEW_TOOL].variants[this.variants[VIEW_TOOL]].id as View | "eyes" | "inside";
   }
 
   /** Chooses a view on the View tool (the camera brought in or taken out by hand). */

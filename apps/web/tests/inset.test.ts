@@ -5,11 +5,11 @@ import type { EyeMap } from "@fly/brain";
 import { standInEyes } from "@fly/body";
 import { TV_DESIGN_HEIGHT as DESIGN_HEIGHT, TV_DESIGN_WIDTH as DESIGN_WIDTH, TV_HEIGHT as RENDER_HEIGHT, TV_WIDTH as RENDER_WIDTH } from "../src/display.ts";
 import { TV_FRAME } from "../src/display.ts";
-import { CORNERS, CORNER_HOLD, INSET_PICTURE, InsetPlacement, insetLayout, insetRect, insetWanted, layoutFacets } from "../src/eyes/inset.ts";
+import { INSET_PICTURE, insetLayout, insetRect, insetWanted, layoutFacets } from "../src/eyes/inset.ts";
+import { CORNERS } from "../src/ui/corners.ts";
 import { TOOLS } from "../src/tools/hands.ts";
 import { hudLayout, safeRect } from "../src/ui/layout.ts";
 import { frames } from "./shapes.ts";
-import type { InsetWanted } from "../src/eyes/inset.ts";
 import { DEFAULT_SETTINGS, loadSettings } from "../src/settings.ts";
 
 type Rect = { x: number; y: number; width: number; height: number };
@@ -30,11 +30,6 @@ const HUD = {
   stats: { x: DESIGN_WIDTH - 320, y: 458, width: 320, height: 20 },
 };
 
-/** Steps the placement for `seconds` at 60 fps. */
-function run(placement: InsetPlacement, seconds: number, wanted: InsetWanted, wallpaper: boolean, shotChanges: number) {
-  for (let t = 0; t < seconds; t += 1 / 60) placement.update(1 / 60, wanted, wallpaper, shotChanges);
-}
-
 test("it shows only in play, never over the loading screen, the title, a menu or the full picture, nor with the eyes off", () => {
   for (const screen of ["loading", "title", "pause", "settings", "about", "brain"]) {
     assert.equal(insetWanted("always", screen, false, false, false), "hide", screen);
@@ -47,61 +42,6 @@ test("it shows only in play, never over the loading screen, the title, a menu or
   assert.equal(insetWanted("always", "play", true, false, false), "show");
   assert.equal(insetWanted("wallpaper", "play", true, false, false), "show");
   assert.equal(insetWanted("wallpaper", "play", false, false, false), "fade", "the controls are back: it fades with them");
-});
-
-test("it fades in, moves on a corner at each new wallpaper shot (fading out and back in), and goes at once when hidden", () => {
-  const placement = new InsetPlacement();
-  run(placement, 0.5, "show", true, 0);
-  assert.equal(placement.corner, "top-right");
-  assert.ok(placement.alpha > 0.2 && placement.alpha < 0.8, `fading in: ${placement.alpha}`);
-  run(placement, 1, "show", true, 0);
-  assert.equal(placement.alpha, 1);
-
-  const visited: string[] = [placement.corner];
-  for (let shot = 1; shot <= 4; shot++) {
-    placement.update(1 / 60, "show", true, shot);
-    assert.equal(placement.corner, visited[visited.length - 1], "it fades out where it is before it moves");
-    run(placement, 0.6, "show", true, shot);
-    assert.notEqual(placement.corner, visited[visited.length - 1]);
-    run(placement, 1.2, "show", true, shot);
-    assert.equal(placement.alpha, 1);
-    visited.push(placement.corner);
-  }
-  assert.deepEqual(visited, [...CORNERS, CORNERS[0]], "each corner in turn, and round again");
-
-  run(placement, 3, "show", true, 5);
-  assert.equal(placement.corner, "bottom-left");
-  run(placement, 0.1, "hide", true, 5);
-  assert.equal(placement.alpha, 0, "a menu or the full picture: gone at once");
-  run(placement, 2, "show", true, 5);
-  assert.equal(placement.corner, "bottom-left", "back where it was");
-  assert.equal(placement.alpha, 1);
-  run(placement, 2, "fade", true, 9);
-  assert.equal(placement.corner, "bottom-left", "new shots don't move it while it isn't wanted");
-});
-
-test("in a wallpaper that never changes shot it still moves on a corner every so often", () => {
-  const placement = new InsetPlacement();
-  run(placement, CORNER_HOLD - 1, "show", true, 0);
-  assert.equal(placement.corner, CORNERS[0]);
-  run(placement, 4, "show", true, 0);
-  assert.equal(placement.corner, CORNERS[1]);
-  assert.equal(placement.alpha, 1);
-});
-
-test("when the controls come back it returns to the top right, the corner they leave clear", () => {
-  const placement = new InsetPlacement();
-  run(placement, 2, "show", true, 0);
-  run(placement, 3, "show", true, 1);
-  assert.equal(placement.corner, "bottom-left");
-  placement.update(1 / 60, "show", false, 1);
-  assert.equal(placement.corner, "bottom-left");
-  assert.ok(placement.alpha < 1, "fading out first");
-  run(placement, 3, "show", false, 1);
-  assert.equal(placement.corner, "top-right");
-  assert.equal(placement.alpha, 1);
-  run(placement, 1, "fade", false, 1);
-  assert.equal(placement.alpha, 0, "only wanted in the wallpaper: gone with it");
 });
 
 test("each corner is on screen and clear of the caption and the shelf; the one used while playing is clear of every hint too", () => {

@@ -5,7 +5,8 @@
 
 import * as THREE from "three";
 import { createFly } from "@fly/fly";
-import type { FlyModel, FlyPose } from "@fly/contracts";
+import type { FlyModelWithRig } from "@fly/fly";
+import type { FlyPose } from "@fly/contracts";
 import { RESTING_POSE } from "@fly/contracts";
 import { FLY_LENGTH } from "@fly/body";
 import type { FlyBody, Intent } from "@fly/body";
@@ -25,7 +26,7 @@ function shadowTexture() {
 }
 
 export class FlyView {
-  readonly model: FlyModel;
+  readonly model: FlyModelWithRig;
   readonly root = new THREE.Group();
   readonly pose: FlyPose = { ...RESTING_POSE };
   readonly shadow: THREE.Mesh;
@@ -45,6 +46,8 @@ export class FlyView {
       const material = (o as THREE.Mesh).material;
       if (material instanceof THREE.MeshStandardMaterial) materials.add(material);
     });
+    // The X-ray's glass body takes the passing shadow as the body does.
+    for (const material of this.model.nerves.materials) if (material instanceof THREE.MeshStandardMaterial) materials.add(material);
     for (const material of materials) shaded(material);
     this.root.add(this.model.object);
     parent.add(this.root);

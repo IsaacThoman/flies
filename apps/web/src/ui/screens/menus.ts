@@ -113,8 +113,10 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       choice("wallpaperCamera", "Camera", CAMERA),
       // Only when there is somewhere else to live.
       ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE)] : []),
-      // Then the pictures that can show in a corner, each off, in the wallpaper, or always.
+      // Then the pictures that can show in a corner, and the fly seen through, each off, in the wallpaper, or always.
       choice("eyesInset", "What it sees", SHOWN),
+      choice("nerves", "Nervous system", SHOWN),
+      choice("xray", "X-ray", SHOWN),
       // Whether the sky follows the weather outside, only where the Apple TV can tell it.
       ...(shell.weatherOutside ? [choice("realWeather", "Real weather", ON_OFF)] : []),
     ],

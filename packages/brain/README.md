@@ -769,6 +769,8 @@ for (let r = 0; r < REGIONS.length; r++) glow[r] = Math.min(1, rates[r] / REGION
 
 `fullHz` is a linear scale; a display that wants faint rest to show more can put a curve on `rate / fullHz` (a square root lifts 4% to 20%).
 
+The game's X-ray and nervous-system panel are such a display (`apps/web/src/nerves/`; the top-level README, Its nervous system, says how a rate is drawn and where each region is).
+
 ## Cost
 
 On an M5 Pro, one thread (`report.ts` section d), wall time per simulated second: 0.12 s at rest, 0.14 s with the feather resting on the fly (touch 0.4), 0.13 s with a full looming pulse every second, 0.16 s with touch and wind while airborne (touch 1, wind 0.5: just over the 0.15 s aimed for), 0.21 s with every sense at full strength at once. Building the brain takes about 0.3 s. Almost all of it is the sweep over active neurons: at rest about 65,000 of them, nearly all genuinely depolarised by the background. The regions' readout costs nothing that can be measured (Regions).

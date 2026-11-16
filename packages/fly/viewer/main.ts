@@ -267,6 +267,7 @@ function testGlow(t: number) {
 // rest), large over the stage, to look at its drawing closely.
 const panelScene = new THREE.Scene();
 const panelUniforms = {
+  uFrame: { value: new THREE.Vector2() },
   uPanel: { value: new THREE.Vector4() },
   uView: { value: new THREE.Vector4() },
   uPicture: { value: new THREE.Vector4() },
@@ -280,7 +281,8 @@ function showPanel(size: number, span = 0.7, top = 0.6) {
   panelMesh = null;
   if (size <= 0) return;
   const frame = renderer.getDrawingBufferSize(new THREE.Vector2());
-  const material = createNervesPanelMaterial(fly.nerves.glowUniform, fly.nerves.rest, { width: frame.x, height: frame.y }, panelUniforms);
+  panelUniforms.uFrame.value.copy(frame);
+  const material = createNervesPanelMaterial(fly.nerves.glowUniform, fly.nerves.rest, panelUniforms);
   panelMesh = new THREE.Mesh(fly.nerves.geometry, material);
   panelMesh.frustumCulled = false;
   panelScene.add(panelMesh);

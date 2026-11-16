@@ -142,6 +142,8 @@ transformed = flyApply(flyJ, transformed);`,
 }
 
 export type NervesPanelUniforms = {
+  /** The frame's size in pixels. */
+  uFrame: { value: THREE.Vector2 };
   /** The panel's top left and size in frame pixels. */
   uPanel: { value: THREE.Vector4 };
   /** Where the model's origin falls in the panel (frame pixels from its top left), and frame pixels per body length across and down. */
@@ -157,13 +159,14 @@ export type NervesPanelUniforms = {
  * The panel: the same nervous system seen from above, head up, the fly's left
  * on the left, posed by `rest` (the rig's frames for a fly standing at rest,
  * so the drawing holds still), drawn into a rectangle of the frame with its
- * backdrop. `frame` is the frame's size in pixels.
+ * backdrop.
  */
-export function createNervesPanelMaterial(glow: { value: Float32Array }, rest: Float32Array, frame: { width: number; height: number }, uniforms: NervesPanelUniforms): THREE.ShaderMaterial {
+export function createNervesPanelMaterial(glow: { value: Float32Array }, rest: Float32Array, uniforms: NervesPanelUniforms): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: { ...uniforms, uGlow: glow, uJoints: { value: rest } },
     vertexShader: /* glsl */ `
 ${VERTEX_PARS}
+uniform vec2 uFrame;
 uniform vec4 uPanel;
 uniform vec4 uView;
 varying vec2 vUv;
@@ -189,7 +192,7 @@ void main() {
   }
   vAt = px;
   px += uPanel.xy;
-  gl_Position = vec4(px.x / ${(frame.width / 2).toFixed(1)} - 1.0, 1.0 - px.y / ${(frame.height / 2).toFixed(1)}, 0.0, 1.0);
+  gl_Position = vec4(px.x / (uFrame.x * 0.5) - 1.0, 1.0 - px.y / (uFrame.y * 0.5), 0.0, 1.0);
 }`,
     fragmentShader: /* glsl */ `
 uniform sampler2D uBackdrop;
