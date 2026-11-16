@@ -10,12 +10,13 @@ import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 import { BAR_DECOR, BAR_PATCHES, BAR_SOLIDS, BAR_TOP, SYRUP_RING, topHeight } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { Batch, freeze, mat4, random } from "../../scene/build.ts";
+import { WallClock } from "../../scene/clock.ts";
 import type { SceneSet } from "../types.ts";
 import { lathe, part, puddle, ringPuddle, scatter, sweepRect, topGeometry } from "./geometry.ts";
 import type { Caster } from "./light.ts";
 import { KIND, RIPPLES, clearMaterial, solidMaterial } from "./materials.ts";
 import type { Shared } from "./materials.ts";
-import { WASH, buildRoom } from "./room.ts";
+import { DIAL, WASH, buildRoom } from "./room.ts";
 
 const byName = (name: string) => BAR_SOLIDS.filter((s) => s.name === name);
 const one = (name: string) => byName(name)[0];
@@ -180,7 +181,8 @@ export function buildBar(): SceneSet {
     return { x: f.x, z: f.z, r: s.name === "coaster" ? r * 1.02 : r, strength };
   });
   const lime = one("lime");
-  const solid = solidMaterial(casters, contact, WASH, shared, flameAt, { ...ellipse(lime), ...(lime.top as { base: number; height: number }) }, byName("coaster").map(circle));
+  const clock = new WallClock();
+  const solid = solidMaterial(casters, contact, WASH, shared, flameAt, { ...ellipse(lime), ...(lime.top as { base: number; height: number }) }, byName("coaster").map(circle), { dial: DIAL, hands: clock.hands });
   const clear = clearMaterial(casters, shared, new THREE.Vector4(bf.x, bf.z, bf.r - 2, 140), (cocktail.top as { well: number }).well);
   /** What stands on the counter (the fly's eyes see its big shapes), its small details, and the room round it (they see neither). */
   const onCounter = new Batch();
@@ -492,6 +494,7 @@ export function buildBar(): SceneSet {
       flicker.value = f;
       candle.intensity = CANDLE_LIGHT * lit * f;
       room.update(time, light);
+      clock.update();
       // The flame sways, and its light with it.
       lightAt[12] = flameAt.x + Math.sin(time * 2.3) * 0.4;
       lightAt[14] = flameAt.z + Math.sin(time * 1.7 + 1) * 0.3;

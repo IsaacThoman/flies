@@ -1,5 +1,6 @@
 // The room round the counter: a small, warm bar. Bottles on glass shelves
-// before an old mirror behind the bar, lit from under each shelf; pendant
+// before an old mirror behind the bar, lit from under each shelf, and a clock
+// in the pier between them that tells the real time; pendant
 // lamps over the counter; stools, a banquette and two tables; dark green
 // walls over walnut panelling; a street window off the counter's end. All of
 // it is in the near pass (it is within a few metres), merged into the same
@@ -9,14 +10,25 @@
 import * as THREE from "three";
 import { BAR_TOP } from "@fly/world";
 import { Batch, freeze, mat4, random } from "../../scene/build.ts";
+import type { Dial } from "../../scene/clock.ts";
 import type { Daylight } from "../../scene/light.ts";
 import { lathe, part, scatter } from "./geometry.ts";
 import { ROOM, WINDOW } from "./light.ts";
 import { KIND } from "./materials.ts";
 import type { Shared, Wash } from "./materials.ts";
 
-/** The back bar: its counter's top, its glass shelves, and the bays between its pilasters. */
-const BACK = { top: -190, front: -640, shelves: [70, 370, 670], cornice: 1000, bays: [[-690, 270], [330, 1290]] as const, depth: 200 };
+/** The back bar: its counter's top, its glass shelves, and the bays between its pilasters and the pier. */
+const BACK = { top: -190, front: -640, shelves: [70, 370, 670], cornice: 1000, bays: [[-690, -150], [150, 1290]] as const, depth: 200 };
+/** The pier between the bays, across from the middle of the counter: its sides and its face. */
+const PIER = { x0: BACK.bays[0][1], x1: BACK.bays[1][0], front: ROOM.back + 100 };
+/**
+ * The clock's dial, set in the pier facing the counter. Seen past a fly on
+ * the counter the back bar shows from the counter's height to about 150 mm
+ * above it, so that is where the clock hangs.
+ */
+export const DIAL: Dial = { centre: { x: (PIER.x0 + PIER.x1) / 2, y: 95, z: PIER.front + 39.5 }, up: { x: 0, y: 1, z: 0 }, right: { x: 1, y: 0, z: 0 }, radius: 88 };
+/** The little brass lamp over the clock. */
+const CLOCK_LAMP = { x: DIAL.centre.x, y: 252, z: PIER.front + 74 };
 /** The pendant lamps over the counter: where each bulb hangs. */
 const PENDANTS = [-262, 40, 342].map((x) => ({ x, y: 600, z: -24 }));
 const SCONCES = [
@@ -26,11 +38,13 @@ const SCONCES = [
   { x: ROOM.left + 70, y: 520, z: 1400 },
 ];
 /** The room's warm light at night, for the material to wash its walls with (materials.ts). */
-export const WASH: Wash = { shelves: BACK.shelves, shelfX: [-720, 1320], shelfZ: ROOM.back, sconces: SCONCES };
+export const WASH: Wash = { shelves: BACK.shelves, shelfX: [-720, 1320], shelfZ: ROOM.back, gap: [PIER.x0, PIER.x1], sconces: SCONCES, clockLamp: CLOCK_LAMP };
 /** Light from a pendant, candela-like for a millimetre world: about as bright on the counter as the daylight. */
 const PENDANT_LIGHT = 300_000;
 
 const box = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0).translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+/** A turned shape standing out of the back wall toward the room: (radius, out from the wall) pairs, from the wall out. */
+const turned = (profile: readonly (readonly [number, number])[], segments: number, at: THREE.Vector3Like) => lathe(profile, segments).rotateX(Math.PI / 2).translate(at.x, at.y, at.z);
 
 const GLOW_VS = /* glsl */ `
 attribute vec3 aPos;
@@ -229,7 +243,7 @@ export function buildRoom(around: Batch, solid: THREE.Material, clear: THREE.Mat
       add(box(x0 + (i + 0.5) * w - 8, BACK.top - 260, BACK.front + 10, x0 + (i + 0.5) * w + 8, BACK.top - 200, BACK.front + 22), "#c89648", KIND.metal);
     }
     add(new THREE.PlaneGeometry(x1 - x0, BACK.cornice - BACK.top).translate((x0 + x1) / 2, (BACK.top + BACK.cornice) / 2, back + 6), "#4a443a", KIND.mirror);
-    for (const x of [x0 + 35, (BACK.bays[0][1] + BACK.bays[1][0]) / 2, x1 - 35]) add(box(x - 32, BACK.top, back, x + 32, BACK.cornice, back + 70), "#a88a74", KIND.wood);
+    for (const x of [x0 + 35, x1 - 35]) add(box(x - 32, BACK.top, back, x + 32, BACK.cornice, back + 70), "#a88a74", KIND.wood);
     add(box(x0 - 30, BACK.cornice, back, x1 + 30, BACK.cornice + 70, back + 110), "#8a6a58", KIND.wood);
     add(box(x0 - 50, BACK.cornice + 70, back, x1 + 50, BACK.cornice + 95, back + 135), "#7a5a48", KIND.wood);
     for (const y of BACK.shelves) {
@@ -239,6 +253,32 @@ export function buildRoom(around: Batch, solid: THREE.Material, clear: THREE.Mat
         for (const x of [a + 40, b - 40]) add(box(x - 6, y - 40, back + 6, x + 6, y - 10, back + BACK.depth - 30), "#c89648", KIND.metal);
       }
     }
+  }
+
+  // The pier between the bays and its clock: an old drop-dial in a turned walnut case with a brass bezel and an ivory face (its
+  // hands are drawn on the face, materials.ts), and a little brass lamp over it for the evening.
+  {
+    const { x0, x1, front: f } = PIER;
+    add(box(x0, BACK.top, back, x1, BACK.cornice, f), "#a88a74", KIND.wood);
+    add(box(x0 - 12, BACK.top, back, x1 + 12, BACK.top + 46, f + 12), "#7a5a48", KIND.wood);
+    add(box(x0 - 12, BACK.cornice - 56, back, x1 + 12, BACK.cornice, f + 12), "#7a5a48", KIND.wood);
+    add(box(x0 + 30, 330, f, x1 - 30, BACK.cornice - 96, f + 10), "#b08a74", KIND.wood);
+    const c = DIAL.centre;
+    const wall = { x: c.x, y: c.y, z: f };
+    add(turned([[124, 0], [124, 12], [121, 17], [116, 20], [113, 22], [112, 27], [108, 30], [103, 31], [101, 33]], 64, wall), "#8a6a58", KIND.wood);
+    add(turned([[101, 32], [102, 36], [100, 40], [96, 42.5], [92, 42], [89.5, 40]], 64, wall), "#d0a050", KIND.metal);
+    add(new THREE.CircleGeometry(92, 64).translate(c.x, c.y, c.z), "#ffffff", KIND.dial);
+    // The drop below the dial, with a brass keyhole.
+    const drop = new THREE.Shape([new THREE.Vector2(-82, 0), new THREE.Vector2(82, 0), new THREE.Vector2(64, -112)]);
+    drop.quadraticCurveTo(0, -158, -64, -112);
+    add(new THREE.ExtrudeGeometry(drop, { depth: 24, bevelEnabled: true, bevelThickness: 3, bevelSize: 3, bevelSegments: 2, curveSegments: 10 }).translate(c.x, c.y - 80, f), "#8a6a58", KIND.wood);
+    add(new THREE.CylinderGeometry(7, 7, 4, 16).rotateX(Math.PI / 2).translate(c.x, c.y - 165, f + 28), "#d0a050", KIND.metal);
+    const l = CLOCK_LAMP;
+    add(box(l.x - 30, l.y - 8, f, l.x + 30, l.y + 32, f + 8), "#c8964a", KIND.metal);
+    for (const dx of [-60, 60]) add(new THREE.CylinderGeometry(4, 4, 52, 8).rotateX(Math.PI / 2).translate(l.x + dx, l.y + 14, f + 30), "#c8964a", KIND.metal);
+    // A brass trough along x, open underneath, a bulb's strip inside.
+    add(new THREE.CylinderGeometry(24, 24, 210, 16, 1, true, -0.35, Math.PI + 0.7).rotateZ(Math.PI / 2).translate(l.x, l.y + 6, f + 74), "#c8964a", KIND.metal);
+    add(box(l.x - 96, l.y + 4, f + 64, l.x + 96, l.y + 12, f + 84), "#ffe0b0", KIND.lamp);
   }
 
   // Bottles on every shelf and on the back counter, each its own spirit, lit from below by the shelf lights.
@@ -259,14 +299,15 @@ export function buildRoom(around: Batch, solid: THREE.Material, clear: THREE.Mat
   for (const y of BACK.shelves) {
     for (const [a, b] of BACK.bays) {
       let x = a + 30;
-      while (x < b - 50) {
+      while (x < b - 100) {
         const scale = rnd.range(0.82, 0.95);
         const r = place(x + 45 * scale, y, back + 60 + rnd.range(0, 70), scale);
         x += r * 2 + rnd.range(6, 22);
       }
     }
   }
-  for (let x = BACK.bays[0][0]; x < BACK.bays[1][1] - 60; x += rnd.range(120, 260)) place(x, BACK.top, back + 80 + rnd.range(0, 120), 0.9);
+  // None in front of the clock.
+  for (let x = BACK.bays[0][0]; x < BACK.bays[1][1] - 60; x += rnd.range(120, 260)) if (x < PIER.x0 - 60 || x > PIER.x1 + 60) place(x, BACK.top, back + 80 + rnd.range(0, 120), 0.9);
   templates.forEach((template, i) => {
     if (placed[i].length) around.add(solid, bottles(template, placed[i]));
   });
@@ -285,7 +326,7 @@ export function buildRoom(around: Batch, solid: THREE.Material, clear: THREE.Mat
       add(new THREE.CylinderGeometry(8, 10, 60, 10).translate(x + dx, y + 260, z + 72), "#d8a656", KIND.metal);
       add(new THREE.CylinderGeometry(9, 12, 130, 10).translate(x + dx, y + 375, z + 40), dx === 0 ? "#1a1410" : "#5a2a14", KIND.glossy);
     }
-    for (const [sx, sz] of [[-420, 0], [-330, 30]]) add(lathe([[0, 0], [42, 0], [46, 120], [40, 150], [30, 175], [12, 205], [0, 210]], 20, sx, z + sz).translate(0, y, 0), "#c8ccd0", KIND.metal);
+    for (const [sx, sz] of [[-300, 0], [-215, 30]]) add(lathe([[0, 0], [42, 0], [46, 120], [40, 150], [30, 175], [12, 205], [0, 210]], 20, sx, z + sz).translate(0, y, 0), "#c8ccd0", KIND.metal);
     add(lathe([[0, 0], [70, 0], [120, 60], [124, 66], [0, 30]], 24, 1050, z).translate(0, y, 0), "#e8e4dc", KIND.glossy);
     for (let i = 0; i < 7; i++) {
       const a = (i / 7) * Math.PI * 2;
@@ -405,12 +446,16 @@ export function buildRoom(around: Batch, solid: THREE.Material, clear: THREE.Mat
       for (let x = a + 40; x < b; x += rnd.range(60, 150)) list.push({ x, y: y + rnd.range(30, 200), z: back + rnd.range(60, 140), color: rnd.next() < 0.5 ? "#ffb060" : "#ffd8a0", size: rnd.range(0.2, 0.5), by: "lamps" });
     }
   }
+  list.push({ x: CLOCK_LAMP.x, y: CLOCK_LAMP.y, z: CLOCK_LAMP.z + 4, color: "#ffc070", size: 0.35, by: "lamps" });
   for (const t of tables) {
     list.push({ x: t.x + 60, y: floor + 840, z: t.z - 40, color: "#ff8a30", size: 0.7, by: "candle" });
     list.push({ x: t.x + 60, y: floor + 830, z: t.z - 40, color: "#ff7020", size: 80, halo: true, by: "candle" });
   }
   // By day, the light from the window catching the brass and glass.
-  for (let i = 0; i < 18; i++) list.push({ x: rnd.range(BACK.bays[0][0], BACK.bays[1][1]), y: BACK.shelves[i % 3] + rnd.range(150, 240), z: back + rnd.range(50, 160), color: "#fff4e0", size: rnd.range(0.15, 0.35), by: "day" });
+  for (let i = 0; i < 18; i++) {
+    const x = rnd.range(BACK.bays[0][0], BACK.bays[1][1] - (PIER.x1 - PIER.x0));
+    list.push({ x: x < PIER.x0 ? x : x + PIER.x1 - PIER.x0, y: BACK.shelves[i % 3] + rnd.range(150, 240), z: back + rnd.range(50, 160), color: "#fff4e0", size: rnd.range(0.15, 0.35), by: "day" });
+  }
   const glow = glows(list, shared);
   group.add(glow.mesh);
 
