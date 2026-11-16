@@ -22,7 +22,7 @@ import type { Daylight } from "../../scene/light.ts";
 import type { SceneBackdrop } from "../types.ts";
 import { buildBuildings, rowOfBuildings } from "./street/buildings.ts";
 import { f, lighting, NOISE, SHOP_FLOOR, STOREY, VERTEX } from "./street/glsl.ts";
-import { CORNER_BAR, LAMPS, LATE_SHOP, STREET } from "./street/layout.ts";
+import { CORNER_BAR, HEADLAMPS, LAMPS, LATE_SHOP, STREET } from "./street/layout.ts";
 import { KIND, Pieces } from "./street/pieces.ts";
 import { car, PAINTS, buildProps } from "./street/props.ts";
 import { traffic } from "./traffic.ts";
@@ -33,6 +33,7 @@ const BAR = new THREE.Color(1.0, 0.56, 0.26);
 const SHOP = new THREE.Color(0.82, 0.92, 1.0);
 const HOME = new THREE.Color(1.0, 0.7, 0.42);
 const CAR_LENGTH = 4400;
+const PAINTED = PAINTS.map((c) => new THREE.Color(c));
 
 const SKY_VS = /* glsl */ `
 varying vec3 vDir;
@@ -105,7 +106,7 @@ vec3 seen(vec3 p, vec3 r) {
         float fx = fract((h.x - b.x) / (b.y - b.x) * nb);
         float fy = fract((v - ${f(SHOP_FLOOR)}) / ${f(STOREY)});
         float win = band(fx, 0.3, 0.7, 0.06) * band(fy, 0.22, 0.82, 0.06) * step(v, b.z - ${f(STREET.pavement + 900)});
-        c += vec3(1.0, 0.68, 0.38) * 0.9 * win * windowLit(vec2(cell, s), b.w);
+        c += vec3(1.0, 0.68, 0.38) * 0.9 * win * windowLit(vec2(cell + floor(b.x / 100.0), s), b.w);
       } else {
         float bar = band(h.x, ${f(CORNER_BAR.x0)}, ${f(CORNER_BAR.x1)}, 200.0) * band(v, 500.0, 3200.0, 200.0);
         float shop = band(h.x, ${f(LATE_SHOP.x0)}, ${f(LATE_SHOP.x1)}, 200.0) * band(v, 300.0, 3100.0, 200.0);
@@ -135,7 +136,7 @@ vec3 glints(vec3 p, vec3 r, vec2 spread) {
     vec4 car = uCars[i];
     if (car.w <= 0.0) continue;
     float toward = sign(cameraPosition.x - car.x) * car.z;
-    vec3 l = vec3(car.x + car.z * 2250.0, ${f(STREET.road + 650)}, car.y);
+    vec3 l = vec3(car.x + car.z * 2250.0, ${f(STREET.road + HEADLAMPS)}, car.y);
     c += streak(p, r, l, vec3(1.0, 0.95, 0.86) * car.w * 0.05 * (0.3 + 0.7 * step(0.0, toward)), spread);
     c += streak(p, r, l - vec3(car.z * 4500.0, -100.0, 0.0), vec3(1.0, 0.08, 0.04) * car.w * 0.02, spread);
   }
@@ -465,13 +466,12 @@ varying float vSpread;
 void main() {
   vec3 at = aAt.xyz;
   float on = aAt.w < -0.5 ? uLampOn : uNeonOn;
-  if (aAt.w > -0.5 && aAt.w < 0.5) on = uNeonOn;
   if (aAt.w > 0.5) {
     // A car's lamp: along the car (a share of its length), up, across.
     vec4 car = aAt.w < 1.5 ? uCarAt[0] : uCarAt[1];
     vec4 look = aAt.w < 1.5 ? uCarLook[0] : uCarLook[1];
     at = vec3(car.x + at.x * look.w * car.z, ${f(STREET.road)} + at.y, car.y + at.z * car.z);
-    on = step(0.0, car.w) * uHeadOn * min(car.w, 1.0);
+    on = uHeadOn * car.w;
   }
   vec4 mv = modelViewMatrix * vec4(at, 1.0);
   float dist = max(-mv.z, 1.0);
@@ -529,12 +529,12 @@ void main() {
   for (int i = 0; i < 2; i++) {
     vec4 car = uCars[i];
     if (car.w <= 0.0) continue;
-    vec3 d = p - vec3(car.x + car.z * 2300.0, ${f(STREET.road + 650)}, car.y);
+    vec3 d = p - vec3(car.x + car.z * 2300.0, ${f(STREET.road + HEADLAMPS)}, car.y);
     float ahead = max(d.x * car.z, 0.0) / (length(d) + 1.0);
     lit += vec3(1.0, 0.95, 0.86) * car.w * 0.02 * pow(ahead, 6.0) / (1.0 + dot(d, d) * 1e-7);
   }
   // Rain is seen where it is lit: in front of the lamps and the headlamps, hardly at all in the dark between.
-  gl_FragColor = vec4(lit, a * clamp(dot(lit, vec3(1.0)), 0.04, 0.4));
+  gl_FragColor = vec4(lit, a * clamp(dot(lit, vec3(1.0)), 0.02, 0.4));
   #include <colorspace_fragment>
 }`;
 
@@ -579,7 +579,7 @@ export function buildStreet(light: Daylight): SceneBackdrop {
   sky.frustumCulled = false;
   scene.add(sky);
 
-  // The ground: the pavements, the kerbs' faces, the road, the far pavement, the side street, and a dark plain under everything beyond.
+  // The ground: the pavements, the kerbs' faces, the road, the far pavement and the side street.
   const ground = new THREE.Mesh(groundGeometry(), new THREE.ShaderMaterial({ uniforms: u, vertexShader: `varying vec3 vWorld; varying vec3 vNormal; void main() { vWorld = (modelMatrix * vec4(position, 1.0)).xyz; vNormal = normal; gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0); }`, fragmentShader: `${LIGHTING}\n${GROUND_FS}` }));
   freeze(ground);
   scene.add(ground);
@@ -616,7 +616,7 @@ export function buildStreet(light: Daylight): SceneBackdrop {
   look.push(NEON.r * 0.12, NEON.g * 0.12, NEON.b * 0.12, 500);
   for (const slot of [1, 2]) {
     for (const s of [-1, 1]) {
-      at.push(0.505, 650, s * 620, slot);
+      at.push(0.505, HEADLAMPS - 30, s * 620, slot);
       look.push(3, 2.9, 2.7, 70);
       at.push(-0.505, 760, s * 620, slot);
       look.push(1.6, 0.05, 0.03, 50);
@@ -688,8 +688,8 @@ export function buildStreet(light: Daylight): SceneBackdrop {
         const c = t.cars[i];
         u.uCars.value[i].set(c.x, c.z, c.heading, c.on * t.headlamps);
         u.uCarAt.value[i].set(c.x, c.z, c.heading, c.on);
-        scratch.set(PAINTS[c.look % PAINTS.length]);
-        u.uCarLook.value[i].set(scratch.r, scratch.g, scratch.b, c.length);
+        const paint = PAINTED[c.look % PAINTED.length];
+        u.uCarLook.value[i].set(paint.r, paint.g, paint.b, c.length);
       }
       skyUniforms.uStars.value = daylight.stars;
       skyUniforms.uCloud.value = weather.cloud;

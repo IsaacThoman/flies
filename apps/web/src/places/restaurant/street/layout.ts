@@ -30,6 +30,12 @@ export const STREET = {
   reach: 90_000,
 };
 
+/** The door's glass starts over its bottom rail (mm up from the floor). */
+export const DOOR_RAIL = 250;
+
+/** A car's headlamps' height over the road. */
+export const HEADLAMPS = 680;
+
 /** A street lamp: where its lantern is. */
 export type Lamp = { x: number; y: number; z: number };
 

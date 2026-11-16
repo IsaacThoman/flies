@@ -4,7 +4,7 @@
 // neon and the lit shops, the lit windows that come and go through the
 // night, and the haze of distance, mist and rain.
 
-import { CORNER_BAR, LAMPS, LATE_SHOP, STREET } from "./layout.ts";
+import { CORNER_BAR, HEADLAMPS, LAMPS, LATE_SHOP, STREET } from "./layout.ts";
 import type { Building } from "./buildings.ts";
 
 export const f = (n: number) => n.toFixed(1);
@@ -123,7 +123,7 @@ vec3 outsideLight(vec3 p, vec3 n, vec3 v, vec3 albedo, float sharp, float shine)
   for (int i = 0; i < 2; i++) {
     vec4 car = uCars[i];
     if (car.w <= 0.0) continue;
-    vec3 l = vec3(car.x + car.z * 2300.0, ${f(STREET.road + 680)}, car.y);
+    vec3 l = vec3(car.x + car.z * 2300.0, ${f(STREET.road + HEADLAMPS)}, car.y);
     vec3 to = normalize(p - l);
     float beam = max(to.x * car.z, 0.0);
     beam *= beam;

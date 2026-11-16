@@ -26,7 +26,7 @@ import * as THREE from "three";
 import { DINING_ROOM, SHOPFRONT } from "@fly/world";
 import type { Daylight } from "../../scene/light.ts";
 import type { Weather } from "../../scene/weather.ts";
-import { CORNER_BAR, NEAR_LAMP, STREET } from "./street/layout.ts";
+import { CORNER_BAR, DOOR_RAIL, HEADLAMPS, NEAR_LAMP, STREET } from "./street/layout.ts";
 
 /** Each lane of the road: where it runs, which way, and how often a car may come along it (s): one at a time, so the room has at most one car's light per lane. */
 const LANES = [
@@ -35,8 +35,6 @@ const LANES = [
 ];
 /** Of the times a car may come, how many it does. */
 const BUSY = 0.62;
-/** The headlamps' height over the road, and how far apart a car's head and tail lights are from its middle. */
-export const LAMP_HEIGHT = 680;
 
 /** A car on the road now. */
 export type Car = {
@@ -67,7 +65,7 @@ export const TRAFFIC = {
 };
 
 /** A number from 0 to 1 for an integer and a salt, the same every time. */
-export function hash(n: number, salt: number) {
+function hash(n: number, salt: number) {
   let h = Math.imul((n | 0) ^ Math.imul(salt, 0x9e3779b1), 0x85ebca6b);
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
   h ^= h >>> 16;
@@ -132,8 +130,6 @@ const GLASS = SHOPFRONT.glass;
 const { door, mullion, transom, ledge } = SHOPFRONT;
 /** The big panes' mullions are evenly spaced: the nearest one is found with a modulus. */
 const BAY = SHOPFRONT.mullions[1] - SHOPFRONT.mullions[0];
-/** The door's bottom rail: its glass starts above it. */
-const DOOR_RAIL = 250;
 
 /** The lamps' and the neon's light, as linear RGB at a metre. */
 const LAMP_LIGHT = new THREE.Color(1.0, 0.72, 0.42).multiplyScalar(25);
@@ -195,7 +191,7 @@ vec3 streetLight(vec3 p, vec3 n) {
   for (int i = 0; i < 2; i++) {
     vec4 car = uStreetCar[i];
     if (car.w <= 0.0) continue;
-    float k = streetReach(p, n, vec3(car.x, ${f(STREET.road + LAMP_HEIGHT)}, car.y), 220.0, l);
+    float k = streetReach(p, n, vec3(car.x, ${f(STREET.road + HEADLAMPS)}, car.y), 220.0, l);
     // Along its heading, from the car to the point: the headlamps throw ahead in a cone, the tail lights a dim red behind.
     float ahead = -l.x * car.z;
     float beam = max(ahead, 0.0);

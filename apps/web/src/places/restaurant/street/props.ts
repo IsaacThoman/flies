@@ -10,7 +10,7 @@ import { LAMPS, PARKED, STREET } from "./layout.ts";
 import { BY_DAY, KIND, Pieces } from "./pieces.ts";
 
 /** Car paints, by a car's look. */
-export const PAINTS = ["#1d2a44", "#b9bcc0", "#e9e6df", "#7a1c1e", "#18191b", "#2f4a3a", "#d8a62a", "#4a5560", "#6c2a4a", "#3a6a8a"];
+export const PAINTS: readonly string[] = ["#1d2a44", "#b9bcc0", "#e9e6df", "#7a1c1e", "#18191b", "#2f4a3a", "#d8a62a", "#4a5560", "#6c2a4a", "#3a6a8a"];
 const TYRE = "#141414";
 const CAR_WIDTH = 1760;
 
@@ -19,11 +19,11 @@ const CAR_WIDTH = 1760;
  * long: the body, the cabin's glass, the roof, wheels and bumpers, and its
  * lamps (white at the front, red behind).
  */
-export function car(pieces: Pieces, length: number, paint: THREE.ColorRepresentation, x: number, y: number, z: number, flip = false, kind = 0) {
+export function car(pieces: Pieces, length: number, paint: THREE.ColorRepresentation, x: number, y: number, z: number, flip = false) {
   const L = length;
   const W = CAR_WIDTH;
   const at = new THREE.Matrix4().makeTranslation(x, y, z).multiply(new THREE.Matrix4().makeRotationY(flip ? Math.PI : 0));
-  const put = (g: THREE.BufferGeometry, color: THREE.ColorRepresentation, k: number) => pieces.add(g.applyMatrix4(at), color, k + kind);
+  const put = (g: THREE.BufferGeometry, color: THREE.ColorRepresentation, k: number) => pieces.add(g.applyMatrix4(at), color, k);
   const side = (points: [number, number][], width: number) => new THREE.ExtrudeGeometry(new THREE.Shape(points.map(([a, b]) => new THREE.Vector2(a, b))), { depth: width, bevelEnabled: false, curveSegments: 1 }).translate(0, 0, -width / 2);
   put(side([[-L / 2, 300], [L / 2, 300], [L / 2, 700], [L / 2 - 180, 790], [L / 2 - 1000, 880], [-L / 2 + 250, 910], [-L / 2, 820]], W), paint, KIND.paint);
   put(side([[L / 2 - 1050, 870], [-L / 2 + 330, 900], [-L / 2 + 950, 1400], [L / 2 - 1850, 1390]], W - 110), "#20262b", KIND.glass);

@@ -16,12 +16,11 @@ import { PENDANTS, SHOPFRONT } from "@fly/world";
 import type { Daylight } from "../../scene/light.ts";
 import type { Weather } from "../../scene/weather.ts";
 import { NOISE } from "./street/glsl.ts";
+import { DOOR_RAIL } from "./street/layout.ts";
 
 const f = (n: number) => n.toFixed(1);
 /** The lamp left on over the bar, where its diffuser is. */
 const LAMP = { x: PENDANTS.x, y: PENDANTS.bottom, z: PENDANTS.zs[PENDANTS.lit] };
-/** The door's glass starts over its bottom rail. */
-const DOOR_RAIL = 250;
 
 const VS = /* glsl */ `
 varying vec3 vWorld;
