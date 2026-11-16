@@ -11,7 +11,15 @@ import type { RemoteButton } from "@fly/contracts";
 
 export type Option<V> = { value: V; label: string };
 
-export type ActionItem = { kind: "action"; id: string; label: string; disabled?: boolean; hint?: string };
+export type ActionItem = {
+  kind: "action";
+  id: string;
+  label: string;
+  disabled?: boolean;
+  hint?: string;
+  /** A dot of colour at its left: what it is about, where words would be too many (a fly at a table, by its player's colour). */
+  swatch?: string;
+};
 /** A choice; `tabs` draws its options side by side, every one to be pressed, as the tabs across the top of a page. */
 export type ChoiceItem<V = unknown> = { kind: "choice"; id: string; label: string; options: readonly Option<V>[]; index: number; disabled?: boolean; hint?: string; tabs?: boolean };
 export type SliderItem = { kind: "slider"; id: string; label: string; min: number; max: number; step: number; value: number; disabled?: boolean; hint?: string };

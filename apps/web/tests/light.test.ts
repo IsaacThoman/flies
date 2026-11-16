@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { SCENES } from "../src/places/index.ts";
 import { BELOW, Daylight, SETTING, TIMES, aboveHorizon, blankLight, clockLight, timeAt } from "../src/scene/light.ts";
 import type { Light, Palette, Palettes, TimeOfDay } from "../src/scene/light.ts";
-import { KINDS } from "../src/scene/weather.ts";
+import { KINDS } from "@fly/world";
 import type { Weather } from "../src/scene/weather.ts";
 
 /** Palettes unlike the picnic's: a room whose "sun" is a window, high all day, and a lamp at night. */

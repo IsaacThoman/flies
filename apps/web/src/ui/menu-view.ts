@@ -127,6 +127,7 @@ function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: n
 function drawItem(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, press: number, hits: HitMap, index: number, track: { x: number; w: number }) {
   if (item.kind === "action") {
     pill(g, x, y, w, h, item.label, { focused, hover, disabled: item.disabled, press });
+    if (item.swatch) swatch(g, x + h * 0.62, y + h / 2 - (focused ? 2 : 0) + press * 2, h * 0.22, item.swatch);
     return;
   }
   // A row of glass with the label on the left and the value on the right.
@@ -150,11 +151,25 @@ function drawItem(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: num
   }
 }
 
+/** A dot of colour, ringed so that a pale one shows on the glass. */
+function swatch(g: CanvasRenderingContext2D, x: number, y: number, r: number, colour: string) {
+  g.save();
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  g.fillStyle = colour;
+  g.fill();
+  g.lineWidth = Math.max(1, r * 0.22);
+  g.strokeStyle = "rgba(20, 40, 70, 0.45)";
+  g.stroke();
+  g.restore();
+}
+
 /** A narrow row: an action as ever; a choice's or slider's label small on top, its value under it, the width of the row. */
 function drawStacked(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, press: number, hits: HitMap, index: number, track: { x: number; w: number }) {
   if (item.kind === "action") {
     const ph = Math.min(h, 42);
     pill(g, x, y + (h - ph) / 2, w, ph, item.label, { focused, hover, disabled: item.disabled, press });
+    if (item.swatch) swatch(g, x + ph * 0.62, y + h / 2 - (focused ? 2 : 0) + press * 2, ph * 0.22, item.swatch);
     return;
   }
   pill(g, x, y, w, h, "", { focused: false, hover, color: "glass", disabled: item.disabled });

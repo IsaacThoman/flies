@@ -1,6 +1,7 @@
 // What the game keeps between launches, in localStorage: the player's
-// settings, the few choices on the shelf worth coming back to, and what the
-// button hints have already taught. A save from
+// settings, the few choices on the shelf worth coming back to, what the
+// button hints have already taught, and this device's key and table for
+// playing with others. A save from
 // another build, or a broken one, never stops the game: anything that isn't
 // one of today's values is left at its default.
 
@@ -92,6 +93,7 @@ const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean 
 const SETTINGS_KEY = "flies.settings";
 const SHELF_KEY = "flies.shelf";
 const LEARNED_KEY = "flies.learned";
+const TABLE_KEY = "flies.table";
 
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 
@@ -198,4 +200,19 @@ export function loadLearned(store: Storage | null = storage()): Learned {
 
 export function saveLearned(learned: Learned, store: Storage | null = storage()) {
   write(store, LEARNED_KEY, learned);
+}
+
+/** This device at tables with others: its own key, made the first time and kept (a returning player is known by it), and the table it is at, if any. */
+export type TableSeat = { key: string; table: string | null };
+
+export function loadTableSeat(make: () => string, store: Storage | null = storage()): TableSeat {
+  const saved = read(store, TABLE_KEY);
+  const key = typeof saved?.key === "string" && saved.key.length >= 16 ? saved.key : make();
+  const table = typeof saved?.table === "string" ? saved.table : null;
+  if (saved?.key !== key) write(store, TABLE_KEY, { key, table });
+  return { key, table };
+}
+
+export function saveTableSeat(seat: TableSeat, store: Storage | null = storage()) {
+  write(store, TABLE_KEY, seat);
 }

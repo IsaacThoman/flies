@@ -4,10 +4,10 @@
 // draw, and nothing is drawn that isn't there.
 
 import * as THREE from "three";
-import { FOODS, isDropped } from "@fly/world";
+import { BALL_RADIUS, FOODS, isDropped } from "@fly/world";
 import type { FoodKind, Pantry, Vec3 } from "@fly/world";
 import { canvas2d, canvasTexture, paint, random } from "../scene/build.ts";
-import { BALL_RADIUS, TOOLS } from "./hands.ts";
+import { TOOLS } from "./hands.ts";
 import type { Hands, ToolId } from "./hands.ts";
 
 const KINDS: readonly FoodKind[] = ["sugar", "honey", "berry", "water"];
@@ -273,6 +273,13 @@ function puffTexture() {
   return canvasTexture(canvas);
 }
 
+/** The textures every hand draws with, made the first time one is wanted: another player's hand at a table draws with the same ones. */
+let textures: { ring: THREE.Texture; icons: Map<ToolId, THREE.Texture>; feather: THREE.Texture; shadow: THREE.Texture; puff: THREE.Texture } | null = null;
+
+function sharedTextures() {
+  return (textures ??= { ring: ringTexture(), icons: new Map(TOOLS.map((t) => [t.id, iconTexture(t.id)])), feather: featherTexture(), shadow: shadowTexture(), puff: puffTexture() });
+}
+
 function foodGeometry(kind: FoodKind) {
   const r = FOODS[kind].r;
   switch (kind) {
@@ -307,7 +314,7 @@ export class HandsView {
   #held = false;
   #hold = 0;
   #icon: THREE.Sprite;
-  #icons = new Map<ToolId, THREE.Texture>();
+  #icons: Map<ToolId, THREE.Texture>;
   #foods = new Map<FoodKind, THREE.InstancedMesh>();
   #ball: THREE.Mesh;
   #ballShadow: THREE.Mesh;
@@ -327,6 +334,8 @@ export class HandsView {
   #counts: Record<FoodKind, number> = { sugar: 0, honey: 0, berry: 0, water: 0 };
   /** 0 hides the pointer and tool (the wallpaper), 1 shows them. */
   opacity = 1;
+  /** The tool's picture floats by the ring (not for another player's hand at a table, whose ring in their colour is enough). */
+  icon = true;
 
   /** The things here that are really in the fly's world, for its eyes: the ball, the feather and the food. */
   get seen(): THREE.Object3D[] {
@@ -335,7 +344,9 @@ export class HandsView {
 
   constructor(parent: THREE.Object3D) {
     parent.add(this.group);
-    this.#ring = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: ringTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+    const shared = sharedTextures();
+    this.#icons = shared.icons;
+    this.#ring = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: shared.ring, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
     this.#ring.renderOrder = 8;
     this.group.add(this.#ring);
     const ringMaterial = this.#ring.material as THREE.MeshBasicMaterial;
@@ -343,7 +354,6 @@ export class HandsView {
     this.#ripple.renderOrder = 8;
     this.#ripple.visible = false;
     this.group.add(this.#ripple);
-    for (const tool of TOOLS) this.#icons.set(tool.id, iconTexture(tool.id));
     this.#icon = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.#icons.get("feed"), transparent: true, depthTest: false, depthWrite: false }));
     this.#icon.renderOrder = 9;
     this.group.add(this.#icon);
@@ -368,21 +378,27 @@ export class HandsView {
     this.#ball.visible = false;
     this.group.add(this.#ball);
     // Its shadow on the table: darker and sharper the lower it comes.
-    this.#ballShadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+    this.#ballShadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: shared.shadow, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
     this.#ballShadow.renderOrder = 2;
     this.#ballShadow.visible = false;
     this.group.add(this.#ballShadow);
     // A pink feather, its tip on the pointer and its quill up toward where you sit.
-    this.#feather = new THREE.Mesh(new THREE.PlaneGeometry(FEATHER_SIZE * 0.38, FEATHER_SIZE).translate(0, FEATHER_SIZE / 2, 0), new THREE.MeshStandardMaterial({ map: featherTexture(), transparent: true, alphaTest: 0.05, roughness: 0.8, side: THREE.DoubleSide, depthWrite: false }));
+    this.#feather = new THREE.Mesh(new THREE.PlaneGeometry(FEATHER_SIZE * 0.38, FEATHER_SIZE).translate(0, FEATHER_SIZE / 2, 0), new THREE.MeshStandardMaterial({ map: shared.feather, transparent: true, alphaTest: 0.05, roughness: 0.8, side: THREE.DoubleSide, depthWrite: false }));
     this.#feather.renderOrder = 6;
     this.#feather.visible = false;
     this.group.add(this.#feather);
-    this.#puffs = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: puffTexture(), transparent: true, depthWrite: false, opacity: 0.7 }), PUFFS);
+    this.#puffs = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: shared.puff, transparent: true, depthWrite: false, opacity: 0.7 }), PUFFS);
     this.#puffs.frustumCulled = false;
     this.#puffs.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.#puffs.renderOrder = 7;
     this.#puffs.visible = false;
     this.group.add(this.#puffs);
+  }
+
+  /** Colours the pointer's ring and its ripple: another player's hand at a table shows in their colour. */
+  tint(colour: THREE.ColorRepresentation) {
+    (this.#ring.material as THREE.MeshBasicMaterial).color.set(colour);
+    (this.#ripple.material as THREE.MeshBasicMaterial).color.set(colour);
   }
 
   #place(kind: FoodKind, x: number, y: number, z: number, scale: number, spin: number) {
@@ -433,7 +449,7 @@ export class HandsView {
       const bob = Math.sin(time * 2.4) * size * 0.05;
       const out = size * 1.35 * this.#iconSide;
       icon.position.set(p.x + r.x * out, p.y + size * 0.3 + bob, p.z + r.z * out);
-      icon.visible = id !== "feather";
+      icon.visible = this.icon && id !== "feather";
     } else this.#icon.visible = false;
 
     // Food landing leaves the ring's impression, spreading and fading where it fell.

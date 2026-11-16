@@ -12,7 +12,7 @@
 
 import type { NativeWeatherBridge, OutsideConditions, OutsideStatus, WeatherAttribution } from "@fly/contracts";
 import { CLOCK_SUNRISE, CLOCK_SUNSET } from "./light.ts";
-import type { Mix } from "./weather.ts";
+import type { Mix } from "@fly/world";
 
 /** An observation older than this (ms) is too old to be the weather now. */
 export const STALE = 2 * 3_600_000;
