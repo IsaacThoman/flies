@@ -9,6 +9,7 @@ import { TOOLS, Hands } from "../src/tools/hands.ts";
 import { HUD_HITS, drawHud } from "../src/ui/hud.ts";
 import type { HudState } from "../src/ui/hud.ts";
 import { hudLayout, loadingLayout, safeRect, titleLayout } from "../src/ui/layout.ts";
+import { LOADING_HITS, drawLoading } from "../src/ui/loading.ts";
 import type { Rect } from "../src/ui/layout.ts";
 import { AboutScreen } from "../src/ui/screens/about.ts";
 import { BrainScreen } from "../src/ui/screens/brain.ts";
@@ -213,5 +214,25 @@ test("with a remote, a keyboard or a pad in hand, the hints keep clear of the sh
         }
       }
     }
+  }
+});
+
+test("the loading screen and its failure panel: where they always were on the TV, and at every shape inside the safe area, with Try again a finger can press", () => {
+  const tv = loadingLayout(TV_FRAME);
+  assert.deepEqual(tv.failure, { x: 167, y: 274, w: 520, h: 150 });
+  assert.deepEqual(tv.retry, { x: 337, y: 378, w: 180, h: 34 });
+  const failed = { status: "failed", error: "", neurons: 0, failure: "download", phase: "download", progress: 0.4, source: { received: 4e6, total: 14.2e6, from: "network" }, retry() {} } as unknown as Parameters<typeof drawLoading>[2];
+  for (const [name, frame] of frames()) {
+    const l = loadingLayout(frame);
+    const a = safeRect(frame);
+    for (const [part, r] of Object.entries({ panel: l.panel, failure: l.failure, retry: l.retry })) assert.ok(inside(r, a), `${name}: the ${part} inside the safe area`);
+    assert.ok(inside(l.retry, l.failure), `${name}: Try again inside its panel`);
+    assert.ok(l.wordmark.y + l.wordmark.size * 0.25 <= l.failure.y && l.wordmark.y - l.wordmark.size * 0.8 >= a.y, `${name}: the name clear of the panes, inside the safe area`);
+    if (frame.coarse) assert.ok(l.retry.h * frame.unit >= 42 && l.retry.w * frame.unit >= 120, `${name}: Try again ${(l.retry.w * frame.unit).toFixed(0)}×${(l.retry.h * frame.unit).toFixed(0)} px`);
+    const hits = new HitMap();
+    hits.begin("loading");
+    drawLoading(blankCanvas(), 0, failed, l, hits);
+    const hit = hits.at(l.retry.x + l.retry.w / 2, l.retry.y + l.retry.h / 2);
+    assert.equal(hit?.kind, LOADING_HITS.retry, `${name}: Try again is where it is drawn`);
   }
 });

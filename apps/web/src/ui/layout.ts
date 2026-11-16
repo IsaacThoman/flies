@@ -275,8 +275,10 @@ export function loadingLayout(frame: Frame): LoadingLayout {
   const failure = pane(520, 150);
   const rw = Math.min(180, failure.w - 40);
   const retry = { x: failure.x + (failure.w - rw) / 2, y: failure.y + failure.h - 46, w: rw, h: 34 };
-  const size = wordmarkFor(a.w, 64);
-  const wordmark = { x: a.x + a.w / 2, y: a.y + Math.max(size * 0.9 + 12, a.h * (150 / 480)), size };
+  // The name over the taller of the two panes, its letters (from 0.8 of its size above the baseline to a quarter below) clear of it.
+  const room = failure.y - a.y - 16;
+  const size = Math.min(wordmarkFor(a.w, 64), room / 1.05);
+  const wordmark = { x: a.x + a.w / 2, y: Math.min(a.y + Math.max(size * 0.9 + 12, a.h * (150 / 480)), failure.y - 8 - size * 0.25), size };
   // As on the title: on a wide screen to the left; on a tall one between the name and the pane.
   const fly = a.w >= a.h * 1.2 ? { across: -0.56, low: 0.1 } : spot(frame, wordmark.x, (wordmark.y + panel.y) / 2);
   return { wordmark, panel, failure, retry, fly };
