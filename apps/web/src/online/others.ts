@@ -85,9 +85,9 @@ export class OtherFlies {
   readonly #world: World;
   readonly #pool: FlyView[] = [];
   /** What the eyes see of every other fly, and the distant ones as they are drawn. */
-  readonly #eyes: THREE.InstancedMesh;
-  readonly #far: THREE.InstancedMesh;
-  readonly #shadows: THREE.InstancedMesh;
+  readonly #eyes: THREE.InstancedMesh<THREE.BufferGeometry, THREE.Material>;
+  readonly #far: THREE.InstancedMesh<THREE.BufferGeometry, THREE.Material>;
+  readonly #shadows: THREE.InstancedMesh<THREE.BufferGeometry, THREE.Material>;
   readonly #m = new THREE.Matrix4();
   readonly #q = new THREE.Quaternion();
   readonly #yaw = new THREE.Quaternion();
@@ -146,10 +146,13 @@ export class OtherFlies {
   /** Takes them all out of the world: this player left the table. */
   dispose() {
     this.clear();
-    for (const view of this.#pool) view.root.removeFromParent();
-    this.#eyes.removeFromParent();
-    this.#far.removeFromParent();
-    this.#shadows.removeFromParent();
+    for (const view of this.#pool) { view.model.dispose(); view.root.removeFromParent(); }
+    this.#pool.length = 0;
+    const meshes = [this.#eyes, this.#far, this.#shadows];
+    for (const mesh of meshes) { mesh.dispose(); mesh.removeFromParent(); }
+    for (const geometry of new Set(meshes.map((m) => m.geometry))) geometry.dispose();
+    // The soft shadow's texture is shared with this device's own fly.
+    for (const material of new Set(meshes.map((m) => m.material))) material.dispose();
   }
 
   /** What was heard of them is from somewhere else now (the table moved, the line was opened again). */
