@@ -30,6 +30,7 @@ class FakeContext {
       connect: (to: { gain: ReturnType<typeof param> }) => void (source.out = to),
       start: () => started.push({ buffer: source.buffer!, loop: source.loop, gain: source.out?.gain.value ?? 1, level: source.out?.gain ?? param(1), rate: source.playbackRate.value }),
       stop: () => void this.stopped++,
+      addEventListener: () => {},
     };
     return source;
   }

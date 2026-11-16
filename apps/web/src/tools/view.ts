@@ -395,6 +395,21 @@ export class HandsView {
     this.group.add(this.#puffs);
   }
 
+  dispose() {
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    this.group.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) geometries.add(mesh.geometry);
+      if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
+      for (const material of Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : []) materials.add(material);
+    });
+    // Textures and the sprite quad belong to every hand; only this view's meshes and materials end here.
+    for (const geometry of geometries) geometry.dispose();
+    for (const material of materials) material.dispose();
+    this.group.removeFromParent();
+  }
+
   /** Colours the pointer's ring and its ripple: another player's hand at a table shows in their colour. */
   tint(colour: THREE.ColorRepresentation) {
     (this.#ring.material as THREE.MeshBasicMaterial).color.set(colour);

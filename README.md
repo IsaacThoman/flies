@@ -900,7 +900,7 @@ service's state: `none` without one, `off`, `fed`, `locating`, `fetching`,
 `data-outside-age` (seconds) say where the weather comes from and how old it
 is. `node scripts/play.ts` drives and screenshots the game step by step (see
 the comment at its top); `node scripts/measure.ts` measures it on a throttled
-CPU and in other browsers, and `node scripts/webSoak.ts` leaves it running
+CPU and in other browsers, and `npm run soak:web -- --built` leaves it running
 for a long time, moving between places, watching what it holds on to.
 
 Longer headless body and real-brain soaks run with `npm run fuzz`. See
