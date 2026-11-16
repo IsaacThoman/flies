@@ -24,6 +24,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Coolify reads only compose.yaml, so check it separately from plain hosting.
+      - run: node scripts/checkCompose.ts
       # The web build carries the brain.
       - uses: ./.github/actions/brain
       - run: npm run lint

@@ -5,13 +5,73 @@ runs during its build, never in the web container; the room server for
 tables with others is a second, small Node service (below). Both `linux/amd64` and
 `linux/arm64` are supported. Nothing is deployed by the repository itself.
 
+There are two ways to run it. [Coolify](#coolify) builds and runs
+`compose.yaml` behind its Traefik, for production and for each pull request.
+On [your own host](#first-start), `docker compose` also merges
+`compose.override.yaml`, which publishes the site on a host port for your own
+reverse proxy and names the images for rollback. `compose.yaml` publishes no
+port and fixes no image tag or container name, so that previews never
+collide with production. `node scripts/checkCompose.ts`, run in CI, keeps it
+that way.
+
+## Coolify
+
+Coolify v4 with its default Traefik proxy.
+
+1. **New resource**: your private repository through Coolify's GitHub App
+   (its webhooks are what start previews), branch `main`, build pack
+   **Docker Compose**, Docker Compose location `/compose.yaml`. Leave **Raw
+   Docker Compose Deployment** off: Coolify then names each preview's
+   services, volumes and network apart from production's and writes the
+   Traefik routes.
+2. **Domains**: give `web` `https://flies.isaacthoman.com`. It answers on
+   port 80, which `expose` tells Coolify, so the domain needs no `:80`. Give
+   `rooms` no domain: `web` proxies `/rooms` to it.
+3. **Advanced**: turn **Gzip compression** off. Caddy already compresses what is
+   worth it, and Traefik would gzip the brain's parts again, which are gzip
+   files already, without their lengths or byte ranges. Leave **Connect to
+   Predefined Network** off and container names Coolify's own: on the shared
+   `coolify` network, `rooms` could name another application's container.
+4. **Environment variables**: none are needed. Coolify supplies
+   `SERVICE_URL_WEB`, the address each build bakes in for link previews
+   (`FLY_SITE_URL` overrides it; don't set it, or every preview gets
+   production's). Behind Cloudflare (proxied DNS or a tunnel) set
+   `CLIENT_IP_HEADERS=CF-Connecting-IP X-Forwarded-For` (see
+   [visitors' addresses](#visitors-addresses)).
+5. **Deploy**, and check `https://flies.isaacthoman.com/`. Coolify shows a
+   service healthy when its Docker health check passes: `web` serves its
+   entry file to itself on `127.0.0.1:8080/healthz`, and `rooms` answers
+   `/health` on its port.
+
+Traefik passes the WebSocket upgrades on `/rooms` without settings, and its
+idle limits don't close a table: the room server pings every connection each
+15 s. Its tables are in the volume Coolify names `<uuid>_rooms-data`
+(Persistent Storage). Keep it across deploys, and don't tick volume deletion
+if you delete the resource.
+
+If Cloudflare reaches the server over plain HTTP (a tunnel to port 80, or
+Flexible SSL), enter the domain as `http://…` so that Traefik doesn't
+redirect it back to HTTPS in a loop; Cloudflare gives visitors HTTPS.
+
+### Pull request previews
+
+Turn on **Preview Deployments** in the resource's settings, with a URL
+template under a wildcard DNS name, such as `{{pr_id}}.flies.example.com`.
+Each pull request's preview gets its own build at its own address (baked in
+as its `SERVICE_URL_WEB`), its own containers and network, and its own empty
+rooms volume, `<uuid>_rooms-data-pr-<n>`. Coolify renames a preview's
+services `<name>-pr-<n>`, and its `web` reaches `rooms-pr-<n>`, read from
+`COOLIFY_BRANCH` (the Caddyfile), never production's rooms. Closing the pull
+request removes the preview's containers but leaves that volume; remove it
+with `docker volume rm <uuid>_rooms-data-pr-<n>`.
+
 ## First start
 
 Flies sits behind your own reverse proxy, which terminates HTTPS for
 `flies.isaacthoman.com`. Use a Linux server with Docker Engine, the Compose
 v2 plugin and Git installed. Caddy in the web container answers plain HTTP,
 for any host name, on `HTTP_PORT` (8080 unless set, so it can share a host
-with a proxy on 80 and 443).
+with a proxy on 80 and 443), which `compose.override.yaml` publishes.
 
 ```sh
 git clone --branch main https://github.com/IsaacThoman/flies.git
@@ -39,16 +99,8 @@ The site must reach visitors over `https://`: the service worker and the
 Cache API, which keep the game and its 14 MB brain for later visits, work
 only in a secure context. Plain HTTP is enough on `localhost` alone.
 
-The room server limits password guesses and new rooms by address, so it
-must see each visitor's own. Caddy believes `X-Forwarded-For` only from
-`TRUSTED_PROXIES` (Caddy's [`trusted_proxies`](https://caddyserver.com/docs/caddyfile/options#trusted-proxies)
-ranges: `private_ranges` unless set, which covers a proxy on the same host,
-reaching the container through Docker's bridge, or on the LAN). It reads the
-header from the right, so a visitor cannot claim another address, and hands
-the rooms service just the visitor's. If your proxy reaches the server from
-a public address, set it, for example `TRUSTED_PROXIES=203.0.113.7/32`, with
-spaces between several. Without that, every visitor counts as the
-proxy, and one person's guesses lock everyone out.
+It must also pass on each visitor's address: see
+[visitors' addresses](#visitors-addresses).
 
 Caddy as the proxy, which upgrades WebSockets and sets both headers itself:
 
@@ -102,6 +154,33 @@ cache, plus room for a rollback image. Serving needs far less: the site is
 about 17 MB, and the fly's simulation runs in each visitor's browser. A
 small server is sufficient; budget bandwidth for about 14.2 MB per first
 brain download. No database is needed.
+
+## Visitors' addresses
+
+The room server limits password guesses and new rooms by address, so it
+must see each visitor's own. Caddy believes `X-Forwarded-For` only from
+`TRUSTED_PROXIES` (Caddy's [`trusted_proxies`](https://caddyserver.com/docs/caddyfile/options#trusted-proxies)
+ranges: `private_ranges` unless set). It reads the header from the right, so
+a visitor cannot claim another address, and hands the rooms service just the
+visitor's. Without the right setting, every visitor counts as the proxy, and
+one person's guesses lock everyone out.
+
+- **Coolify**: Traefik reaches `web` over a Docker network, inside
+  `private_ranges`, and replaces any `X-Forwarded-For` a visitor sends with
+  the address it sees. Nothing to set.
+- **Your own proxy** on the same host, through Docker's bridge, or on the LAN
+  is inside `private_ranges` too. If it reaches the server from a public
+  address, set it, for example `TRUSTED_PROXIES=203.0.113.7/32`, with spaces
+  between several.
+- **Behind Cloudflare**, the address the proxy sees is Cloudflare's or the
+  tunnel's. Set `CLIENT_IP_HEADERS=CF-Connecting-IP X-Forwarded-For` (Caddy's
+  [`client_ip_headers`](https://caddyserver.com/docs/caddyfile/options#client-ip-headers):
+  the first one present names the visitor), and let the server be reached only
+  through Cloudflare, since anyone who reaches it directly could send that
+  header.
+
+A visitor whose own address is private (on your LAN) is counted as the
+proxy.
 
 ## Updates and rollback
 
@@ -173,7 +252,7 @@ first start and every update bring up with the site. It needs nothing beyond
 and `/rooms/*` on the site's own origin, WebSocket upgrades included, to
 `rooms:3000`, and browsers connect to `wss://flies.isaacthoman.com/rooms`
 through your proxy. It counts visitors by the address Caddy passes on in
-`X-Forwarded-For` (`TRUST_PROXY=1`; see [your reverse proxy](#your-reverse-proxy)). It
+`X-Forwarded-For` (`TRUST_PROXY=1`; see [visitors' addresses](#visitors-addresses)). It
 has no public port, and no `depends_on`: the site works while it is down
 (only `/rooms` answers 502 then).
 
