@@ -15,7 +15,8 @@ export const OBSERVER = {
   /** turn × seconds per diagnostic event, and how fast that leaks (1/s). */
   turnThreshold: 0.5,
   turnLeak: 0.5,
-  escapeOn: 0.5,
+  /** As the body's (packages/body/src/behavior.ts, ESCAPE_ON). */
+  escapeOn: 0.4,
   escapeRearm: 0.3,
   /** s between take-offs. */
   escapeRefractory: 1.5,
