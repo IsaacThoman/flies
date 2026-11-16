@@ -164,6 +164,12 @@ export class FlyBody {
     ev.hit = 0;
     if (!(dt > 0) || !Number.isFinite(dt)) return;
     if (this.mode !== "airborne" && intent.takeOff !== null) this.#takeOff(intent.takeOff, forces.threat);
+    // Ordinary frames need no subdivision bookkeeping.
+    if (dt <= 1 / 60) {
+      if (this.mode === "airborne") this.#fly(intent, forces, dt);
+      else this.#walk(intent, forces, dt);
+      return;
+    }
     // Long frames must not destabilize drag or skip a wall between samples.
     const steps = Math.ceil(dt / (1 / 60));
     const h = dt / steps;

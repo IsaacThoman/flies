@@ -59,6 +59,13 @@ export class World {
   floor!: Floor;
   #radii = new Float64Array(0);
   #span: [number, number] = [0, 0];
+  #bounds = new Float64Array(0);
+  #all: number[] = [];
+  #cells = new Map<number, Map<number, number[]>>();
+  #visited = new Uint32Array(0);
+  #epoch = 0;
+  #candidates = new Uint32Array(0);
+  #candidateCount = 0;
 
   constructor(place: Place) {
     this.load(place);
@@ -69,6 +76,44 @@ export class World {
     this.solids = place.solids;
     this.floor = place.floor;
     this.#radii = Float64Array.from(place.solids, (s) => footprintRadius(s.footprint));
+    this.#bounds = new Float64Array(place.solids.length * 5);
+    this.#all = Array.from(place.solids, (_, i) => i);
+    this.#visited = new Uint32Array(place.solids.length);
+    this.#epoch = 0;
+    this.#cells.clear();
+    this.#candidates = new Uint32Array(place.solids.length);
+    this.#candidateCount = 0;
+    // The world is static between carries: short moves need only nearby solids.
+    for (let i = 0; i < place.solids.length; i++) {
+      const { footprint: f, top } = place.solids[i];
+      let rx: number;
+      let rz: number;
+      if (f.kind === "circle") rx = rz = f.r;
+      else {
+        const c = Math.cos(f.angle);
+        const s = Math.sin(f.angle);
+        rx = f.kind === "box" ? Math.abs(c) * f.hx + Math.abs(s) * f.hz : Math.hypot(c * f.rx, s * f.rz);
+        rz = f.kind === "box" ? Math.abs(s) * f.hx + Math.abs(c) * f.hz : Math.hypot(s * f.rx, c * f.rz);
+      }
+      rx += 1e-8;
+      rz += 1e-8;
+      const b = i * 5;
+      this.#bounds[b] = f.x - rx;
+      this.#bounds[b + 1] = f.x + rx;
+      this.#bounds[b + 2] = f.z - rz;
+      this.#bounds[b + 3] = f.z + rz;
+      this.#bounds[b + 4] = top.kind === "flat" ? top.y : top.kind === "dome" ? top.base + top.height : Math.max(top.well, top.rim);
+      this.#bounds[b + 4] += 1e-8;
+      for (let z = Math.floor((f.z - rz) / CELL); z <= Math.floor((f.z + rz) / CELL); z++) {
+        let row = this.#cells.get(z);
+        if (!row) this.#cells.set(z, row = new Map());
+        for (let x = Math.floor((f.x - rx) / CELL); x <= Math.floor((f.x + rx) / CELL); x++) {
+          let cell = row.get(x);
+          if (!cell) row.set(x, cell = []);
+          cell.push(i);
+        }
+      }
+    }
   }
 
   /** Over the table top (inside the floor's edge). */
@@ -110,7 +155,9 @@ export class World {
   surface(x: number, z: number, out: Surface): Surface {
     let best = -1;
     let y = 0;
-    for (let i = 0; i < this.solids.length; i++) {
+    const candidates = this.#cellAt(x, z);
+    for (let k = 0; k < candidates.length; k++) {
+      const i = candidates[k];
       const solid = this.solids[i];
       const f = solid.footprint;
       const r = this.#radii[i];
@@ -150,7 +197,9 @@ export class World {
     }
     let best = -1;
     let height = y;
-    for (let i = 0; i < this.solids.length; i++) {
+    const candidates = this.#cellAt(x, z);
+    for (let k = 0; k < candidates.length; k++) {
+      const i = candidates[k];
       const solid = this.solids[i];
       const f = solid.footprint;
       const r = this.#radii[i];
@@ -185,16 +234,23 @@ export class World {
         setHit(out, x, 0, z, 0, 1, 0, -1, t);
       }
     }
-    for (let i = 0; i < this.solids.length; i++) {
+    const bounded = Number.isFinite(bestT);
+    const endX = bounded ? origin.x + dir.x * bestT : origin.x;
+    const endZ = bounded ? origin.z + dir.z * bestT : origin.z;
+    const minX = bounded ? Math.min(origin.x, endX) : -Infinity;
+    const maxX = bounded ? Math.max(origin.x, endX) : Infinity;
+    const minZ = bounded ? Math.min(origin.z, endZ) : -Infinity;
+    const maxZ = bounded ? Math.max(origin.z, endZ) : Infinity;
+    const minY = bounded ? Math.min(origin.y, origin.y + dir.y * bestT) : -Infinity;
+    const candidates = bounded ? this.#near(minX, maxX, minZ, maxZ) : this.#all;
+    const count = bounded ? this.#candidateCount : candidates.length;
+    for (let k = 0; k < count; k++) {
+      const i = candidates[k];
       const solid = this.solids[i];
       const f = solid.footprint;
-      const r = this.#radii[i];
-      if (Number.isFinite(bestT) && (
-        f.x + r < Math.min(origin.x, origin.x + dir.x * bestT) ||
-        f.x - r > Math.max(origin.x, origin.x + dir.x * bestT) ||
-        f.z + r < Math.min(origin.z, origin.z + dir.z * bestT) ||
-        f.z - r > Math.max(origin.z, origin.z + dir.z * bestT)
-      )) continue;
+      const b = i * 5;
+      if (this.#bounds[b + 4] < minY || this.#bounds[b] > maxX || this.#bounds[b + 1] < minX ||
+        this.#bounds[b + 2] > maxZ || this.#bounds[b + 3] < minZ) continue;
       const span = prismSpan(f, origin.x, origin.z, dir.x, dir.z, this.#span);
       if (!span) continue;
       const t0 = Math.max(span[0], 0);
@@ -223,8 +279,59 @@ export class World {
     }
     return found ? out : null;
   }
+
+  #cellAt(x: number, z: number): readonly number[] {
+    return this.#cells.get(Math.floor(z / CELL))?.get(Math.floor(x / CELL)) ?? NO_SOLIDS;
+  }
+
+  #near(minX: number, maxX: number, minZ: number, maxZ: number): ArrayLike<number> {
+    const x0 = Math.floor(minX / CELL);
+    const x1 = Math.floor(maxX / CELL);
+    const z0 = Math.floor(minZ / CELL);
+    const z1 = Math.floor(maxZ / CELL);
+    if (x0 === x1 && z0 === z1) {
+      const cell = this.#cellAt(minX, minZ);
+      this.#candidateCount = cell.length;
+      return cell;
+    }
+    // Long camera rays cost less to scan than to enumerate many cells.
+    if ((x1 - x0 + 1) * (z1 - z0 + 1) > 16) {
+      this.#candidateCount = this.#all.length;
+      return this.#all;
+    }
+    this.#epoch = (this.#epoch + 1) >>> 0;
+    if (this.#epoch === 0) {
+      this.#visited.fill(0);
+      this.#epoch = 1;
+    }
+    let count = 0;
+    for (let z = z0; z <= z1; z++) {
+      const row = this.#cells.get(z);
+      if (!row) continue;
+      for (let x = x0; x <= x1; x++) {
+        const cell = row.get(x);
+        if (!cell) continue;
+        for (let k = 0; k < cell.length; k++) {
+          const i = cell[k];
+          if (this.#visited[i] !== this.#epoch) {
+            this.#visited[i] = this.#epoch;
+            count++;
+          }
+        }
+      }
+    }
+    this.#candidateCount = count;
+    if (count === 0) return NO_SOLIDS;
+    const candidates = this.#candidates;
+    let next = 0;
+    // Preserve description order for overlapping solids at exactly equal heights.
+    for (let i = 0; i < this.#visited.length; i++) if (this.#visited[i] === this.#epoch) candidates[next++] = i;
+    return candidates;
+  }
 }
 
+const CELL = 32;
+const NO_SOLIDS: readonly number[] = [];
 const scratchSurface = createSurface();
 const scratchNormal: Vec3 = { x: 0, y: 1, z: 0 };
 

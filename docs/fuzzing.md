@@ -16,7 +16,7 @@ npm run fuzz -- --kind life --place windowsill --seeds 1,2,3 --duration 1200
 - `--seeds 1,2,3` lists actual unsigned 32-bit seeds, not a seed count.
 - `--duration 3600` is simulated **seconds per seed per place**, default one
   hour. Thus three seeds at 21600 seconds give 18 hours per place.
-- `--high-starts` also samples standing surfaces above the place's flight
+- `--high-starts` also samples standing surfaces up to 400 mm above the place's flight
   ceiling in the body fuzzer. Ordinary random starts are standable surfaces
   inside the floor, below that ceiling; every run also exercises the normal
   start. High starts also explore the window frame, far above the documented
@@ -72,14 +72,30 @@ Sustained maximum wings or wind can hold a fly beyond them; checks allow
 with those drives removed. Making those boundaries hard would change the
 body's documented physics.
 
-An artificial start atop the windowsill's 560 mm frame, above its 260 mm
-flight ceiling, can leave the fly behind the window when blown over its
-head. The glass then blocks the restoring force's way home. Reproduce with:
+The windowsill used to have a 560 mm frame that could be sampled by high
+starts, letting a fly fall behind the window. The window and surrounding wall
+now extend to the kitchen ceiling (1350 mm), above the entire 660 mm flight
+excursion volume, matching the plaster already drawn above the opening.
+Room-wall tops are outside even the high-start domain. The former reproduction
+now passes:
 
 ```sh
 npm run fuzz -- --kind body --place windowsill --seeds 4 --duration 2017 --high-starts
 ```
 
-This needs a decision about the playable volume or out-of-world recovery;
-the harness does not add a scripted climb or teleport around the brain.
 The basil's drawn leaves are also a separate scenery/collision design task.
+
+
+## Ordinary-frame cost
+
+`node --expose-gc scripts/bodyCost.ts --baseline <git-ref> --steps 10000 --rounds 15`
+compares the body and world query code from a git revision with the current
+code, on identical current place geometry. Walking and airborne starts are
+precomputed from seed 42. Construction, placement and explicit collection
+happen outside the timer; two warm-up batches precede measured batches,
+whose before/after order alternates. It reports median CPU microseconds per
+1/60 s step using Node's thread CPU timer (process CPU time on older Node),
+so other tasks descheduling this busy machine do not inflate the results.
+These are Node measurements, not a measurement of JavaScriptCore on the TV.
+The benchmark extracts only source files into a temporary directory and
+removes them before exiting.
