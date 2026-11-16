@@ -127,7 +127,7 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
   screen: {
     heading: "On screen",
     rows: () => [
-      choice("eyesInset", "What it sees", SHOWN),
+      choice("eyesInset", "Fly POV", SHOWN),
       choice("nerves", "Nervous system", SHOWN),
       choice("statsPanel", "Stats", SHOWN),
       choice("statsKind", "Stats of", STATS),

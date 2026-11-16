@@ -341,7 +341,7 @@ export class EyesInset {
     roundedRect(g, p.x - 2, p.y - 2, p.width + 4, p.height + 4, 6);
     g.fillStyle = "rgba(0, 16, 50, 0.5)";
     g.fill();
-    text(g, sent ? "What it sees" : "A picture it doesn't see", LABEL.x, LABEL.y, { size: LABEL.size, color: LABEL.color });
+    text(g, sent ? "Fly POV" : "A picture it doesn't see", LABEL.x, LABEL.y, { size: LABEL.size, color: LABEL.color });
     this.#texture.needsUpdate = true;
     this.#sent = sent;
   }

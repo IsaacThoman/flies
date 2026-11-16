@@ -204,7 +204,7 @@ export class NervesPanel {
     roundedRect(g, p.x - 2, p.y - 2, p.width + 4, p.height + 4, 6);
     g.fillStyle = "rgba(0, 16, 50, 0.5)";
     g.fill();
-    text(g, "Its nervous system", LABEL.x, LABEL.y, { size: LABEL.size, color: LABEL.color });
+    text(g, "Nervous system", LABEL.x, LABEL.y, { size: LABEL.size, color: LABEL.color });
     this.#texture.needsUpdate = true;
   }
 }
