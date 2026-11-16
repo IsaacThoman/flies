@@ -23,3 +23,11 @@ Fresh independent reviewers receive only the rubric, neutral evidence directorie
 ## Score log
 
 Baseline evidence and independent scoring pending.
+
+## Reproducibility and measurement limits
+
+The retained fixture uses the fly's world-defined start; eye offsets for follow, close, wide and screensaver are (-9, 2.4, 6), (-5.6, 1.6, 2.8), (-12, 6, 28), and (-9.5, 2.2, 5.5) mm, aimed 0.8 mm above its feet. Their vertical fields of view are 30°, 30°, 34°, and 28°. Whole-sill eye/target are (30,130,680)/(0,140,-70), 44°; whole-bench (190,250,710)/(0,95,-45), 42°. UI is hidden. Time-dependent scene animation uses the same 30-second phase. The normal stage update applies each settled palette and weather.
+
+Initial L8 evidence is excluded: its fixture bypassed stage light application, had unsettled HUD fades and unpinned camera scouting. Three independent assessments scored it, but those numbers do not measure the product consistently and are not used to select changes. The fixture was corrected and baseline evidence recaptured as R4, with fresh independent reviewers. No game-camera code was changed.
+
+R4 build measurements: windowsill 65.3 ms, lab 56.0 ms. Steady screenshot draw counts: windowsill 21–23, lab 18–19. UI and fly-eye passes are excluded in this visual fixture; these counts are for comparisons within the experiment. Construction timings on the shared desktop are noisy and do not establish Apple TV frame performance.

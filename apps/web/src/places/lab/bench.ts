@@ -289,7 +289,7 @@ export function buildBench(): SceneSet {
   const shadows: Spot[] = [];
   const seen: THREE.Object3D[] = [];
 
-  const ENAMEL: Finish = { rough: 0.32 };
+  const ENAMEL: Finish = { rough: 0.23 };
   const SATIN: Finish = { rough: 0.55 };
   const MATTE: Finish = { rough: 0.85 };
   const RUBBER: Finish = { rough: 0.7 };
@@ -519,7 +519,7 @@ export function buildBench(): SceneSet {
     }
     profile.push(new THREE.Vector2(r * 0.975, 1.2));
     profile.reverse();
-    big.add(surface, piece(new THREE.LatheGeometry(profile, 64).translate(x, 0, z), (p) => (p.y > agar - 0.2 ? "#6a1a45" : "#3e0d27"), { rough: 0.17 }));
+    big.add(surface, piece(new THREE.LatheGeometry(profile, 64).translate(x, 0, z), (p) => (p.y > agar - 0.2 ? "#64113c" : "#30091d"), { rough: 0.1 }));
     const yeast = new THREE.Shape();
     const { yeast: y } = LAB_DECOR;
     for (let i = 0; i <= 36; i++) {
