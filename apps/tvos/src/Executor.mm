@@ -5,6 +5,7 @@
 #import "Canvas2D.h"
 #import "generated/ops.h"
 #import <Accelerate/Accelerate.h>
+#include <algorithm>
 #include <cmath>
 
 #define FL(i) (*(const float *)&w[i])
@@ -85,6 +86,7 @@ void Executor::run(const int32_t *w, int count) {
     }
     i += words;
   }
+  if (!reads_.empty()) pollReads();
   if (!fences_.empty()) pollFences();
   frameExecMs_ += NowMs() - t0;
   frameWords_ += count;
@@ -103,6 +105,12 @@ void Executor::pollFences() {
 /** clientWaitSync with a timeout: waits for the fence (and those before it) on this thread. */
 int Executor::clientWait(int jsId, uint64_t timeoutNs) {
   if (jsId <= __atomic_load_n(fencesDone_, __ATOMIC_ACQUIRE)) return GL_ALREADY_SIGNALED;
+  // Waiting is what was asked: a fence held behind a read gets its read now.
+  for (size_t i = 0; i < reads_.size(); i++) {
+    if (std::find(reads_[i].fences.begin(), reads_[i].fences.end(), jsId) == reads_[i].fences.end()) continue;
+    for (size_t k = 0; k <= i; k++) finishRead();
+    break;
+  }
   for (auto &[id, sync] : fences_) {
     if (id != jsId) continue;
     GLenum r = glClientWaitSync(sync, GL_SYNC_FLUSH_COMMANDS_BIT, timeoutNs);
@@ -113,6 +121,7 @@ int Executor::clientWait(int jsId, uint64_t timeoutNs) {
 }
 
 void Executor::endFrame(uint64_t frame) {
+  if (!reads_.empty()) pollReads();
   if (!fences_.empty()) pollFences();
   double gpuMs = -1;
   if (gpuTiming_) {
@@ -455,6 +464,90 @@ void Executor::readPixels(GLint x, GLint y, GLsizei w, GLsizei h, GLenum format,
   }
 }
 
+/** Starts a read into the bound pixel-pack buffer (see reads_): false if it has to be read at once. */
+bool Executor::deferRead(GLint x, GLint y, GLsizei w, GLsizei h, GLenum format, GLenum type, GLintptr offset) {
+  // Plain RGBA8 reads, as three's readRenderTargetPixelsAsync makes; a multisampled default framebuffer is resolved first.
+  if (format != GL_RGBA || type != GL_UNSIGNED_BYTE || !boundPixelPack_ || packRowLength_ || packSkipPixels_ || packSkipRows_ || w <= 0 || h <= 0) return false;
+  if (readFB_ == 0 && msaaFBO_) return false;
+  if (readPending_) {
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer(readFB_));
+    initAttachments(readFB_);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer(drawFB_));
+  }
+  // The copy has to hold the same bytes a read would give: eight bits a channel, not sRGB.
+  GLint readBuffer = GL_COLOR_ATTACHMENT0, encoding = 0, red = 0, alpha = 0, kind = 0;
+  glGetIntegerv(GL_READ_BUFFER, &readBuffer);
+  if (readBuffer == GL_NONE) return false;
+  glGetFramebufferAttachmentParameteriv(GL_READ_FRAMEBUFFER, readBuffer, GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING, &encoding);
+  glGetFramebufferAttachmentParameteriv(GL_READ_FRAMEBUFFER, readBuffer, GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE, &red);
+  glGetFramebufferAttachmentParameteriv(GL_READ_FRAMEBUFFER, readBuffer, GL_FRAMEBUFFER_ATTACHMENT_ALPHA_SIZE, &alpha);
+  glGetFramebufferAttachmentParameteriv(GL_READ_FRAMEBUFFER, readBuffer, GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE, &kind);
+  if (encoding != GL_LINEAR || red != 8 || alpha != 8 || kind != GL_UNSIGNED_NORMALIZED) return false;
+  GLuint fbo = 0, rb = 0;
+  for (auto it = staging_.begin(); it != staging_.end(); ++it) {
+    if ((GLsizei)(*it)[2] != w || (GLsizei)(*it)[3] != h) continue;
+    fbo = (*it)[0];
+    rb = (*it)[1];
+    staging_.erase(it);
+    break;
+  }
+  if (!fbo) {
+    glGenRenderbuffers(1, &rb);
+    glBindRenderbuffer(GL_RENDERBUFFER, rb);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, w, h);
+    glBindRenderbuffer(GL_RENDERBUFFER, name(renderbuffer_));
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+    glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rb);
+  } else {
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+  }
+  // A blit ignores the masks but not the scissor.
+  if (scissorTest_) glDisable(GL_SCISSOR_TEST);
+  glBlitFramebuffer(x, y, x + w, y + h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+  if (scissorTest_) glEnable(GL_SCISSOR_TEST);
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer(drawFB_));
+  reads_.push_back({ fbo, rb, glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0), w, h, name(boundPixelPack_), offset, packAlignment_, {} });
+  return true;
+}
+
+/** The oldest read: its copy into the buffer it was meant for, then the fences held behind it. */
+void Executor::finishRead() {
+  PendingRead r = std::move(reads_.front());
+  reads_.pop_front();
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, r.fbo);
+  glBindBuffer(GL_PIXEL_PACK_BUFFER, r.pbo);
+  glPixelStorei(GL_PACK_ALIGNMENT, r.alignment);
+  if (packRowLength_) glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+  if (packSkipPixels_) glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
+  if (packSkipRows_) glPixelStorei(GL_PACK_SKIP_ROWS, 0);
+  glReadPixels(0, 0, r.width, r.height, GL_RGBA, GL_UNSIGNED_BYTE, (void *)r.offset);
+  glPixelStorei(GL_PACK_ALIGNMENT, packAlignment_);
+  if (packRowLength_) glPixelStorei(GL_PACK_ROW_LENGTH, packRowLength_);
+  if (packSkipPixels_) glPixelStorei(GL_PACK_SKIP_PIXELS, packSkipPixels_);
+  if (packSkipRows_) glPixelStorei(GL_PACK_SKIP_ROWS, packSkipRows_);
+  glBindBuffer(GL_PIXEL_PACK_BUFFER, name(boundPixelPack_));
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer(readFB_));
+  glDeleteSync(r.copied);
+  staging_.push_back({ r.fbo, r.rb, (GLuint)r.width, (GLuint)r.height });
+  if (staging_.size() > 4) {
+    glDeleteFramebuffers(1, &staging_.front()[0]);
+    glDeleteRenderbuffers(1, &staging_.front()[1]);
+    staging_.erase(staging_.begin());
+  }
+  for (int id : r.fences) fences_.push_back({ id, glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0) });
+  if (!r.fences.empty()) glFlush();
+}
+
+/** Reads whatever has been copied by now, oldest first, without waiting. */
+void Executor::pollReads() {
+  while (!reads_.empty()) {
+    GLenum r = glClientWaitSync(reads_.front().copied, 0, 0);
+    if (r != GL_ALREADY_SIGNALED && r != GL_CONDITION_SATISFIED) return;
+    finishRead();
+  }
+}
+
 // On A10X, copying the drawable with glCopyTexSubImage2D synchronously waits for
 // the source rendering (~10 ms). A same-format GPU blit keeps that dependency on
 // the GPU. Specialize only complete, in-bounds RGBA8 copies of the non-MSAA
@@ -500,7 +593,9 @@ void Executor::runGL(int op, const int32_t *w, int words) {
     case OP_PRESENT: present(); break;
     case OP_RESIZE_DEFAULT_FB: resizeDefault(w[1], w[2], w[3], w[4], w[5], w[6]); break;
     case OP_RELEASE_IMAGE: gPayloads.releaseImage(w[1]); break;
-    case OP_READ_PIXELS: readPixels(w[1], w[2], w[3], w[4], w[5], w[6], (void *)(intptr_t)w[7]); break;
+    case OP_READ_PIXELS:
+      if (!deferRead(w[1], w[2], w[3], w[4], w[5], w[6], w[7])) readPixels(w[1], w[2], w[3], w[4], w[5], w[6], (void *)(intptr_t)w[7]);
+      break;
 
     case OP_ACTIVE_TEXTURE: activeUnit_ = w[1] - GL_TEXTURE0; glActiveTexture(w[1]); break;
     case OP_BLEND_COLOR: glBlendColor(FL(1), FL(2), FL(3), FL(4)); break;
@@ -530,6 +625,9 @@ void Executor::runGL(int op, const int32_t *w, int words) {
         default:
           if (w[1] == GL_UNPACK_ALIGNMENT) unpackAlignment_ = w[2];
           else if (w[1] == GL_PACK_ALIGNMENT) packAlignment_ = w[2];
+          else if (w[1] == GL_PACK_ROW_LENGTH) packRowLength_ = w[2];
+          else if (w[1] == GL_PACK_SKIP_PIXELS) packSkipPixels_ = w[2];
+          else if (w[1] == GL_PACK_SKIP_ROWS) packSkipRows_ = w[2];
           else if (w[1] == GL_UNPACK_ROW_LENGTH) unpackRowLength_ = w[2];
           else if (w[1] == GL_UNPACK_IMAGE_HEIGHT) unpackImageHeight_ = w[2];
           else if (w[1] == GL_UNPACK_SKIP_PIXELS) unpackSkipPixels_ = w[2];
@@ -571,7 +669,10 @@ void Executor::runGL(int op, const int32_t *w, int words) {
       GLuint n = name(w[2]);
       if (!n) break;
       switch (w[1]) {
-        case K_BUFFER: glDeleteBuffers(1, &n); break;
+        case K_BUFFER:
+          for (const PendingRead &r : reads_) if (r.pbo == n) { flushReads(); break; }
+          glDeleteBuffers(1, &n);
+          break;
         case K_TEXTURE: glDeleteTextures(1, &n); rgba8Textures_.erase(w[2]); break;
         case K_PROGRAM: glDeleteProgram(n); break;
         case K_SHADER: glDeleteShader(n); break;
@@ -594,6 +695,7 @@ void Executor::runGL(int op, const int32_t *w, int words) {
     }
     case OP_BIND_BUFFER:
       if (w[1] == GL_PIXEL_UNPACK_BUFFER) boundPixelUnpack_ = w[2];
+      if (w[1] == GL_PIXEL_PACK_BUFFER) boundPixelPack_ = w[2];
       glBindBuffer(w[1], name(w[2]));
       break;
     case OP_BIND_BUFFER_BASE: glBindBufferBase(w[1], w[2], name(w[3])); break;
@@ -610,6 +712,7 @@ void Executor::runGL(int op, const int32_t *w, int words) {
     case OP_BIND_VERTEX_ARRAY: glBindVertexArray(name(w[1])); break;
 
     case OP_BUFFER_DATA: {
+      if (w[1] == GL_PIXEL_PACK_BUFFER) flushReads();
       std::vector<uint8_t> holder;
       size_t length;
       const uint8_t *data = payload(w + 3, holder, &length);
@@ -617,13 +720,14 @@ void Executor::runGL(int op, const int32_t *w, int words) {
       break;
     }
     case OP_BUFFER_SUB_DATA: {
+      if (w[1] == GL_PIXEL_PACK_BUFFER) flushReads();
       std::vector<uint8_t> holder;
       size_t length;
       const uint8_t *data = payload(w + 3, holder, &length);
       glBufferSubData(w[1], w[2], length, data);
       break;
     }
-    case OP_COPY_BUFFER_SUB_DATA: glCopyBufferSubData(w[1], w[2], w[3], w[4], w[5]); break;
+    case OP_COPY_BUFFER_SUB_DATA: flushReads(); glCopyBufferSubData(w[1], w[2], w[3], w[4], w[5]); break;
 
     case OP_SHADER_SOURCE: {
       std::string src = gPayloads.takeString(w[2]);
@@ -764,7 +868,11 @@ void Executor::runGL(int op, const int32_t *w, int words) {
     case OP_CLEAR_BUFFERIV: glClearBufferiv(w[1], w[2], (const GLint *)(w + 3)); break;
     case OP_CLEAR_BUFFERUIV: glClearBufferuiv(w[1], w[2], (const GLuint *)(w + 3)); break;
     case OP_CLEAR_BUFFERFI: glClearBufferfi(w[1], w[2], FL(3), w[4]); break;
-    case OP_FENCE_SYNC: fences_.push_back({ w[1], glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0) }); glFlush(); break;
+    case OP_FENCE_SYNC:
+      if (reads_.empty()) fences_.push_back({ w[1], glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0) });
+      else reads_.back().fences.push_back(w[1]);
+      glFlush();
+      break;
     case OP_BEGIN_QUERY: glBeginQuery(w[1], name(w[2])); break;
     case OP_END_QUERY: glEndQuery(w[1]); break;
     default:
@@ -928,6 +1036,7 @@ id Executor::query(int kind, const double *a, void *out, size_t outLength) {
       return @(1);
     }
     case Q_BUFFER_SUB_DATA: {
+      flushReads();
       GLenum target = a[0]; GLintptr offset = a[1]; GLsizeiptr length = a[2];
       void *src = glMapBufferRange(target, offset, length, GL_MAP_READ_BIT);
       if (src && out) memcpy(out, src, std::min((size_t)length, outLength));
@@ -939,7 +1048,7 @@ id Executor::query(int kind, const double *a, void *out, size_t outLength) {
       return @(1);
     case Q_FB_STATUS: return @(glCheckFramebufferStatus((GLenum)a[0]));
     case Q_IS_ENABLED: return @(glIsEnabled((GLenum)a[0]));
-    case Q_FINISH: glFinish(); return @(1);
+    case Q_FINISH: flushReads(); glFinish(); return @(1);
     case Q_INTERNALFORMAT: {
       GLint count = 0;
       glGetInternalformativ(a[0], a[1], GL_NUM_SAMPLE_COUNTS, 1, &count);

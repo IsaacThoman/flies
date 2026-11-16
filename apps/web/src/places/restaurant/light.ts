@@ -17,22 +17,19 @@ import { CHAIR, PASS, STOOL, TABLES, TABLE_TOPS, ZINC_BAR } from "@fly/world";
 import { EXIT, FRIDGE, FRONT, HEAT, PENDANT_LIGHT } from "./plan.ts";
 import { CORNER_BAR, NEAR_LAMP } from "./street/layout.ts";
 import { STREET_LIGHT_GLSL } from "./traffic.ts";
+import { litOnly } from "../../scene/lit.ts";
+import { noiseGlsl } from "../../scene/noise.ts";
 
 /** How many things cast exact shadows at once: those of the area the camera is in. */
 export const CASTERS = 16;
 
 const f = (n: number) => n.toFixed(1);
 
-/** Hash, value noise and a few octaves of it; and how much of a pattern a pixel can show. */
+/** Hash, value noise (scene/noise.ts) and a few octaves of it; and how much of a pattern a pixel can show. */
 export const NOISE = /* glsl */ `
 float rHash(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
 float rHash1(float n) { return fract(sin(n * 127.1) * 43758.5453); }
-float rNoise(vec2 p) {
-  vec2 i = floor(p);
-  vec2 u = fract(p);
-  u = u * u * (3.0 - 2.0 * u);
-  return mix(mix(rHash(i), rHash(i + vec2(1.0, 0.0)), u.x), mix(rHash(i + vec2(0.0, 1.0)), rHash(i + vec2(1.0, 1.0)), u.x), u.y);
-}
+${noiseGlsl("rNoise", "uNoise")}
 float rFbm(vec2 p) { return rNoise(p) * 0.55 + rNoise(p * 2.1 + 3.1) * 0.3 + rNoise(p * 4.3 + 7.7) * 0.15; }
 // 1 where a pattern this fine can be shown, fading to 0 where it would shimmer.
 float rDetail(vec2 p) { return 1.0 - smoothstep(0.3, 0.8, max(fwidth(p.x), fwidth(p.y))); }
@@ -41,16 +38,23 @@ vec3 rWorldPoint(vec3 v) { return (vec4(v - viewMatrix[3].xyz, 0.0) * viewMatrix
 vec3 rWorldDir(vec3 v) { return normalize((vec4(v, 0.0) * viewMatrix).xyz); }
 `;
 
-/** Lambert's formula: how much of a surface's view a rectangle of light fills, 0 to 1 (exact for an unshadowed rectangle wholly above the surface). */
+/**
+ * Lambert's formula: how much of a surface's view a rectangle of light fills,
+ * 0 to 1 (exact for an unshadowed rectangle wholly above the surface). Each
+ * edge's angle over its sine is the rational fit three.js's own area lights
+ * use (LTC_EdgeVectorFormFactor, with the 1/2π in it), well within a
+ * thousandth of acos and without its cost.
+ */
 const RECT = /* glsl */ `
-float rEdge(vec3 a, vec3 b, vec3 n) {
-  vec3 c = cross(a, b);
-  float l = length(c);
-  return l < 1e-6 ? 0.0 : acos(clamp(dot(a, b), -0.9999, 0.9999)) * dot(n, c) / l;
+vec3 rEdge(vec3 a, vec3 b) {
+  float x = dot(a, b);
+  float y = abs(x);
+  float v = (0.8543985 + (0.4965155 + 0.0145206 * y) * y) / (3.4175940 + (4.1616724 + y) * y);
+  return cross(a, b) * (x > 0.0 ? v : 0.5 * inversesqrt(max(1.0 - x * x, 1e-7)) - v);
 }
 float rRect(vec3 p, vec3 n, vec3 a, vec3 b, vec3 c, vec3 d) {
   vec3 va = normalize(a - p), vb = normalize(b - p), vc = normalize(c - p), vd = normalize(d - p);
-  return max(0.0, (rEdge(va, vb, n) + rEdge(vb, vc, n) + rEdge(vc, vd, n) + rEdge(vd, va, n)) * 0.15915);
+  return max(0.0, dot(n, rEdge(va, vb) + rEdge(vb, vc) + rEdge(vc, vd) + rEdge(vd, va)));
 }`;
 
 /** The shop front's openings: how much of the light from far along `s` gets to `p` through the glass, between the frames. */
@@ -73,9 +77,47 @@ float rGlass(vec3 p, vec3 s) {
   return open;
 }`;
 
-const pedestals = TABLES.filter((t) => t.kind !== "four");
-const fours = TABLES.filter((t) => t.kind === "four");
-const seats = TABLES.flatMap((t) => t.chairs.filter((c) => c.upturned === undefined));
+type Disc = { x: number; z: number; r: number; square: boolean };
+
+const pedestals: Disc[] = TABLES.filter((t) => t.kind !== "four").map((t) => ({ x: t.x, z: t.z, r: t.kind === "round" ? TABLE_TOPS.round.r : TABLE_TOPS.square.half, square: t.kind === "square" }));
+const fours: Disc[] = TABLES.filter((t) => t.kind === "four").map((t) => ({ x: t.x, z: t.z, r: TABLE_TOPS.four.half, square: true }));
+const seats: Disc[] = TABLES.flatMap((t) => t.chairs.filter((c) => c.upturned === undefined)).map((c) => ({ x: c.x, z: c.z, r: CHAIR.seat.r, square: false }));
+const stools: Disc[] = STOOL.zs.map((z) => ({ x: STOOL.x, z, r: STOOL.seat.r, square: false }));
+
+/**
+ * The level discs (or squares) at height `y` in a light's way: where the way
+ * crosses that height (q, at t along it, its penumbra w there), and each disc
+ * shadowing by how far q is from its middle. They are gathered by where they
+ * stand into a few groups, each with a circle round all of it, and a group
+ * the way crosses well clear of is passed over: every disc in it would have
+ * let all the light through (a square's corner is √2 of its half out).
+ */
+function discs(y: number, list: readonly Disc[], cell = 1500) {
+  const groups = new Map<string, Disc[]>();
+  for (const d of list) {
+    const key = `${Math.floor(d.x / cell)},${Math.floor(d.z / cell)}`;
+    groups.set(key, [...(groups.get(key) ?? []), d]);
+  }
+  const tests = [...groups.values()].map((group) => {
+    const xs = group.map((d) => Number(f(d.x)));
+    const zs = group.map((d) => Number(f(d.z)));
+    const cx = Number(f((Math.min(...xs) + Math.max(...xs)) / 2));
+    const cz = Number(f((Math.min(...zs) + Math.max(...zs)) / 2));
+    const bound = Math.max(...group.map((d, i) => Math.hypot(xs[i] - cx, zs[i] - cz) + (d.square ? Math.SQRT2 : 1) * Number(f(d.r))));
+    const shade = group.map((d) => {
+      const at = `vec2(${f(d.x)}, ${f(d.z)})`;
+      const k = d.square ? `max(abs(q.x - ${f(d.x)}), abs(q.y - ${f(d.z)}))` : `length(q - ${at})`;
+      return `lit *= smoothstep(${f(d.r)} - w, ${f(d.r)} + w, ${k});`;
+    });
+    return `if (length(q - vec2(${f(cx)}, ${f(cz)})) < ${f(bound + 0.1)} + w * ${group.some((d) => d.square) ? "1.4143" : "1.0"}) {\n        ${shade.join("\n        ")}\n      }`;
+  });
+  return `t = (${f(y)} - p.y) / d.y;
+    if (t >= 0.5 && t <= far) {
+      q = p.xz + d.xz * t;
+      w = 1.5 + t * soft;
+      ${tests.join("\n      ")}
+    }`;
+}
 
 /**
  * The big things in the light's way, as blocks: the zinc and the bar's body,
@@ -93,28 +135,23 @@ float rBox(vec3 o, vec3 d, vec3 lo, vec3 hi, float far) {
   float t1 = min(min(mx.x, mx.y), mx.z);
   return (t1 > max(t0, 0.0) && t0 < far) ? 0.0 : 1.0;
 }
-// A level disc (or square) at height y in the way: crossed at t, and how far from its middle there.
-float rDisc(vec3 o, vec3 d, vec2 c, float y, float r, bool square, float soft, float far) {
-  if (abs(d.y) < 1e-4) return 1.0;
-  float t = (y - o.y) / d.y;
-  if (t < 0.5 || t > far) return 1.0;
-  vec2 q = o.xz + d.xz * t - c;
-  float k = square ? max(abs(q.x), abs(q.y)) : length(q);
-  float w = 1.5 + t * soft;
-  return smoothstep(r - w, r + w, k);
-}
 float rBlocks(vec3 p, vec3 d, float far, float soft) {
   float lit = rBox(p, d, vec3(${f(ZINC_BAR.zinc.x - ZINC_BAR.zinc.hx)}, ${f(ZINC_BAR.zinc.bottom)}, ${f(ZINC_BAR.zinc.z - ZINC_BAR.zinc.hz)}), vec3(${f(ZINC_BAR.zinc.x + ZINC_BAR.zinc.hx)}, ${f(ZINC_BAR.zinc.top)}, ${f(ZINC_BAR.zinc.z + ZINC_BAR.zinc.hz)}), far)
     * rBox(p, d, vec3(${f(ZINC_BAR.front.x - ZINC_BAR.front.hx)}, 0.0, ${f(ZINC_BAR.zinc.z - ZINC_BAR.front.hz)}), vec3(${f(ZINC_BAR.front.x + ZINC_BAR.front.hx)}, ${f(ZINC_BAR.zinc.bottom)}, ${f(ZINC_BAR.zinc.z + ZINC_BAR.front.hz)}), far);
+  // A level way crosses no level disc.
+  if (abs(d.y) < 1e-4) return lit;
+  float t;
+  vec2 q;
+  float w;
   if (p.y < ${f(TABLE_TOPS.round.bottom)}) {
-    ${pedestals.map((t) => `lit *= rDisc(p, d, vec2(${f(t.x)}, ${f(t.z)}), ${f(TABLE_TOPS.round.bottom)}, ${f(t.kind === "round" ? TABLE_TOPS.round.r : TABLE_TOPS.square.half)}, ${t.kind === "square"}, soft, far);`).join("\n    ")}
-    ${fours.map((t) => `lit *= rDisc(p, d, vec2(${f(t.x)}, ${f(t.z)}), ${f(TABLE_TOPS.four.bottom)}, ${f(TABLE_TOPS.four.half)}, true, soft, far);`).join("\n    ")}
+    ${discs(TABLE_TOPS.round.bottom, pedestals)}
+    ${discs(TABLE_TOPS.four.bottom, fours)}
   }
   if (p.y < ${f(CHAIR.seat.bottom)}) {
-    ${seats.map((c) => `lit *= rDisc(p, d, vec2(${f(c.x)}, ${f(c.z)}), ${f(CHAIR.seat.bottom)}, ${f(CHAIR.seat.r)}, false, soft, far);`).join("\n    ")}
+    ${discs(CHAIR.seat.bottom, seats)}
   }
   if (p.y < ${f(STOOL.seat.bottom)}) {
-    ${STOOL.zs.map((z) => `lit *= rDisc(p, d, vec2(${f(STOOL.x)}, ${f(z)}), ${f(STOOL.seat.bottom)}, ${f(STOOL.seat.r)}, false, soft, far);`).join("\n    ")}
+    ${discs(STOOL.seat.bottom, stools)}
   }
   return lit;
 }`;
@@ -127,6 +164,8 @@ float rBlocks(vec3 p, vec3 d, float far, float soft) {
  */
 const CAST = /* glsl */ `
 uniform vec4 uCast[${CASTERS}];
+// How many of them there are: the rest of the slots are empty.
+uniform int uCastCount;
 uniform vec4 uCastTint[${CASTERS}];
 uniform float uCastBottom[${CASTERS}];
 uniform vec4 uCastBox;
@@ -138,10 +177,10 @@ vec3 rCast(vec3 p, vec3 l, float size, bool sun) {
   vec2 dxz = d.xz;
   float dd = max(dot(dxz, dxz), 1e-6);
   float len = sqrt(dd + d.y * d.y);
-  for (int i = 0; i < ${CASTERS}; i++) {
+  for (int i = 0; i < uCastCount; i++) {
     vec4 o = uCast[i];
     // Nothing on or above a caster's top is in its shadow (a flat thing's top is wider than its disc).
-    if (o.z <= 0.0 || p.y > o.w - 0.5) continue;
+    if (p.y > o.w - 0.5) continue;
     vec2 c = o.xy - p.xz;
     if (dot(c, c) < (o.z + 0.4) * (o.z + 0.4)) continue;
     float along = dot(c, dxz) / dd;
@@ -153,6 +192,8 @@ vec3 rCast(vec3 p, vec3 l, float size, bool sun) {
     if (hi < 0.0 || lo > 1.0) continue;
     float dist = length(c - dxz * t);
     float w = (sun ? size * t * len : size * t / max(1.0 - t, 0.03)) + 0.35;
+    // Clear of its penumbra, it lets all the light by.
+    if (dist >= o.z + w) continue;
     float s = 1.0 - smoothstep(o.z - w, o.z + w, dist);
     vec4 tint = uCastTint[i];
     // Glass with something in it gathers the light into a bright line down its shadow.
@@ -164,9 +205,8 @@ vec3 rCast(vec3 p, vec3 l, float size, bool sun) {
 // Soft contact shadow round the casters' feet, on what they stand on.
 float rCastAO(vec3 p) {
   float ao = 1.0;
-  for (int i = 0; i < ${CASTERS}; i++) {
+  for (int i = 0; i < uCastCount; i++) {
     vec4 o = uCast[i];
-    if (o.z <= 0.0) continue;
     float above = p.y - uCastBottom[i];
     if (above < -1.0 || above > o.z) continue;
     float e = length(p.xz - o.xy) - o.z;
@@ -252,13 +292,9 @@ vec3 rKeyLight(vec3 p) {
   return k;
 }`;
 
-/** The light loop with a hook after the sun is found. */
+/** The light loop with a hook after the sun is found, its shadow and shading worked out only where it can add anything (scene/lit.ts). */
 export function hookedLights() {
-  let chunk = THREE.ShaderChunk.lights_fragment_begin;
-  const find = "getDirectionalLightInfo( directionalLight, directLight );";
-  if (!chunk.includes(find)) throw new Error(`three.js light chunk changed: ${find}`);
-  chunk = chunk.replace(find, `${find}\n\t\tdirectLight.color *= rSun( directionalLight.direction );`);
-  return chunk;
+  return litOnly(THREE.ShaderChunk.lights_fragment_begin, [["getDirectionalLightInfo( directionalLight, directLight );", "rSun( directionalLight.direction )"]]);
 }
 
 /**

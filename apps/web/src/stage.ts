@@ -286,10 +286,22 @@ export class Stage {
   render(camera: THREE.PerspectiveCamera, dt: number) {
     const r = this.renderer;
     this.#refreshEnvironment(dt);
-    r.setRenderTarget(this.#lowRes);
-    r.clear(true, true, false);
-    this.renderPasses(camera);
-    if (this.#lowRes && this.#blit) {
+    if (this.veil >= 1) {
+      // Nothing of the world shows through a black veil, but a place being built behind it is still
+      // drawn, so that its buffers and programs are on the GPU before it lifts: into one pixel, as
+      // shading a whole frame of a large place would make each of those frames as slow as the GPU.
+      r.setRenderTarget(null);
+      r.clear(true, true, false);
+      r.setScissor(0, 0, 1, 1);
+      r.setScissorTest(true);
+      this.renderPasses(camera);
+      r.setScissorTest(false);
+    } else {
+      r.setRenderTarget(this.#lowRes);
+      r.clear(true, true, false);
+      this.renderPasses(camera);
+    }
+    if (this.veil < 1 && this.#lowRes && this.#blit) {
       r.setRenderTarget(null);
       r.clear(true, true, false);
       r.render(this.#blit.scene, this.#blit.camera);

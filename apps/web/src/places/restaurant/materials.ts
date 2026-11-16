@@ -8,6 +8,7 @@
 
 import * as THREE from "three";
 import type { WallClock } from "../../scene/clock.ts";
+import { noiseTexture } from "../../scene/noise.ts";
 import { streetLightUniforms } from "./traffic.ts";
 import { AREA_STRIDE, KINDS_GLSL } from "./kinds.ts";
 import { CASTERS, KEY_LIGHT, NOISE, SHADE, hookedLights } from "./light.ts";
@@ -46,8 +47,10 @@ export function sharedUniforms(floorAO: THREE.Texture, clock: WallClock) {
     uRoomTone: { value: new THREE.Color() },
     uWindowSeen: { value: new THREE.Color() },
     uFloorAO: { value: floorAO },
+    uNoise: { value: noiseTexture() },
     /** The casters of the area the camera is in, and the box they shadow (x0, x1, z0, z1 and y0, y1). */
     uCast: { value: new Float32Array(CASTERS * 4) },
+    uCastCount: { value: 0 },
     uCastTint: { value: new Float32Array(CASTERS * 4) },
     uCastBottom: { value: new Float32Array(CASTERS) },
     uCastBox: { value: new THREE.Vector4(1, -1, 1, -1) },
@@ -153,9 +156,12 @@ const ROOM_LIGHTS = /* glsl */ `
     vec3 color;
     vec3 dir = rPendantDir(vWorld, color);
     lamp.direction = normalize((viewMatrix * vec4(dir, 0.0)).xyz);
-    lamp.color = color * rPendantShadow(vWorld);
-    lamp.visible = true;
-    RE_Direct(lamp, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);
+    // Its shadow and its shading only where it can add anything (scene/lit.ts).
+    if (color != vec3(0.0) && (dot(geometryNormal, lamp.direction) > 0.0 || dot(geometryClearcoatNormal, lamp.direction) > 0.0)) {
+      lamp.color = color * rPendantShadow(vWorld);
+      lamp.visible = true;
+      RE_Direct(lamp, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);
+    }
   }
   vec3 street = streetLight(vWorld, wn);
   if (street.r + street.g + street.b > 0.0) reflectedLight.directDiffuse += street * rStreetShadow(vWorld) * diffuseColor.rgb;
