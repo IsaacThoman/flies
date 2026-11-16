@@ -61,3 +61,16 @@ for (const id of Object.keys(places) as PlaceId[]) {
     brain.dispose();
   });
 }
+
+test("eating in the new place starts a new meal even when carried mid-meal", () => {
+  const brain = new Commands();
+  brain.state.command.feed = 1;
+  const life = new Life(new World(places.picnic), brain);
+  life.pantry.drop("honey", life.body.position.x, life.body.position.z);
+  life.step(1 / 60, performance.now());
+  assert.equal(life.meals, 1);
+  life.move(places.lab);
+  life.pantry.drop("honey", life.body.position.x, life.body.position.z);
+  life.step(1 / 60, performance.now());
+  assert.equal(life.meals, 2);
+});
