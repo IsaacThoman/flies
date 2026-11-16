@@ -69,14 +69,19 @@ test("flying into another fly, it bounces off and feels the hit", () => {
   body.position.y = 5;
   body.velocity.x = 300;
   let hit = 0;
+  let back = Infinity;
   for (let i = 0; i < 10; i++) {
     body.step(intent({ wings: 0.6 }), still, DT);
     crowd.resolve(body, DT);
     hit = Math.max(hit, body.events.hit);
+    // Once it has hit (its wings then turn it to its new course and carry it round the other fly).
+    if (hit > 0 && back === Infinity) {
+      back = body.velocity.x;
+      assert.ok(body.position.x < 0, "not through it");
+    }
   }
-  assert.ok(body.velocity.x < 0, "bounced back");
+  assert.ok(back < 0, "bounced back");
   assert.ok(hit > 200, `hit at ${hit} mm/s`);
-  assert.ok(body.position.x < 0);
 });
 
 test("alone, there is nothing to meet", () => {

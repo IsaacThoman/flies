@@ -15,7 +15,10 @@
 //   into, falls off ledges, and in the air has weight, drag and its wings'
 //   force, and bounces off what it flies into, an underside included. A
 //   take-off is the escape command's; its direction is the body's: away
-//   from a threat it knows of, else straight ahead.
+//   from a threat it knows of, else straight ahead. In the air it turns to
+//   face its course (VANE_RATE).
+// - Flight itself, once its feet are off the ground, is held up by the
+//   tarsal reflex in behavior.ts (TARSAL_ONSET), not the brain.
 // - Staying in the world: it doesn't walk off the table, and in the air is
 //   drawn back toward it near the edges of the world, sliding round
 //   anything standing in its way back.
@@ -59,6 +62,16 @@ export const DRAG = 7;
 /** A take-off's speed, mm/s, upward and away, from the weakest to the strongest. */
 export const TAKEOFF_UP = [380, 620] as const;
 export const TAKEOFF_AWAY = [160, 340] as const;
+/**
+ * In the air it turns to face the way it is going through the air, at up to
+ * VANE_RATE (1/s, of the angle between) once it moves at VANE_SPEED (mm/s) or
+ * more, and the brain's `turn` steers on top. A fly's thrust is along its
+ * body, and it flies forwards: a take-off's jump away from a threat, which
+ * leaves it facing where it faced, would otherwise have its wings carry it
+ * straight back.
+ */
+export const VANE_RATE = 8;
+export const VANE_SPEED = 150;
 /** In the air, past the table's edge (or above the place's ceiling), it's drawn back this hard per mm, mm/s². */
 export const AIR_PULL = 40;
 /** Seconds pressed against a wall it faces before the body turns it away. */
@@ -371,8 +384,14 @@ export class FlyBody {
     const world = this.#world;
     const p = this.position;
     const v = this.velocity;
-    this.yaw = wrap(this.yaw + intent.airYawRate * dt);
-    this.turnRate = intent.airYawRate;
+    // Facing its course, and steered by the brain: the body's, see VANE_RATE.
+    const sx = v.x - forces.air.x;
+    const sz = v.z - forces.air.z;
+    const course = Math.hypot(sx, sz);
+    const vane = course > 1e-6 ? wrap(Math.atan2(sx, sz) - this.yaw) * VANE_RATE * Math.min(1, course / VANE_SPEED) : 0;
+    const yawRate = intent.airYawRate + vane;
+    this.yaw = wrap(this.yaw + yawRate * dt);
+    this.turnRate = yawRate;
     const fx = Math.sin(this.yaw);
     const fz = Math.cos(this.yaw);
     const w = intent.wings;

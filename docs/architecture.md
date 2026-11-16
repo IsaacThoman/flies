@@ -66,7 +66,13 @@ world, as yours do. Nothing else passes from fly to fly.
 
 1. **The brain decides.** Nothing the fly does is scripted around the brain.
    The body may add reflexes the model has no way to produce, and each one is
-   written down as such where it lives and in the README. No neuron is both
+   written down as such where it lives and in the README. The largest is
+   flight itself: in a fly, losing the ground under its feet keeps the wings
+   beating (the tarsal reflex), and in this connectome it does the opposite,
+   so once the giant fiber has taken the fly off, the body holds its wings at
+   flight power for a while and lets it glide down (`packages/body/src/behavior.ts`,
+   the README's Flight). The brain still decides whether to go, steers, and can
+   drive its wings harder; how long it stays up is the stand-in's. No neuron is both
    driven and read by a command; what is read only for display (the regions,
    the vision stages) feeds no command. Every departure from the connectome is
    documented in `packages/brain/README.md`.

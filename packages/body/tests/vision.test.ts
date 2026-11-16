@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FACES, createSampler, headToBody, project, sample, standInEyes } from "../src/index.ts";
+import { ADAPT_GAIN, ADAPT_LEVEL, ADAPT_SECONDS, Adaptation, FACES, createSampler, headToBody, project, sample, standInEyes } from "../src/index.ts";
 
 const cross = (a: readonly number[], b: readonly number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 
@@ -56,4 +56,53 @@ test("the stand-in eyes have about the asked number of facets, each on its own s
     assert.ok(x < 0.13, "left eye looks left or ahead");
     assert.ok(Math.abs(Math.hypot(x, y, z) - 1) < 1e-5);
   }
+});
+
+const picture = (v: number) => ({ left: new Float32Array(100).fill(v), right: new Float32Array(100).fill(v) });
+
+test("light adaptation: midday is left alone, a dim picture is raised toward midday's level, by at most ADAPT_GAIN", () => {
+  const bright = new Adaptation();
+  const day = picture(0.62);
+  bright.apply(day, 0.05);
+  assert.equal(bright.gain, 1);
+  assert.equal(day.left[0], Math.fround(0.62));
+  const golden = new Adaptation();
+  const evening = picture(0.36);
+  golden.apply(evening, 0.05);
+  assert.ok(Math.abs(evening.right[0] - ADAPT_LEVEL) < 1e-6, "golden hour's picture is seen at midday's level");
+  const night = new Adaptation();
+  const dark = picture(0.08);
+  night.apply(dark, 0.05);
+  assert.equal(night.gain, ADAPT_GAIN);
+  assert.ok(Math.abs(dark.left[0] - 0.08 * ADAPT_GAIN) < 1e-6);
+  // Contrast is kept: a dark ball on the dusk table stays as dark against it.
+  const ball = picture(0.15);
+  ball.left[0] = 0.01;
+  new Adaptation().apply(ball, 0.05);
+  assert.ok(Math.abs(ball.left[0] / ball.left[1] - 0.01 / 0.15) < 1e-6);
+  // Nothing goes past white.
+  const glare = picture(0.1);
+  glare.right[3] = 0.9;
+  new Adaptation().apply(glare, 0.05);
+  assert.equal(glare.right[3], 1);
+});
+
+test("light adaptation is slow: a passing ball barely moves it, and it settles to a new level over seconds", () => {
+  const a = new Adaptation();
+  a.apply(picture(0.3), 1 / 60);
+  const settled = a.gain;
+  // A quarter of what the eyes see dark for half a second.
+  for (let t = 0; t < 0.5; t += 1 / 60) {
+    const passing = picture(0.3);
+    passing.right.fill(0.01, 0, 50);
+    a.apply(passing, 1 / 60);
+  }
+  assert.ok(Math.abs(a.gain / settled - 1) < 0.05, `${settled.toFixed(2)} to ${a.gain.toFixed(2)}`);
+  // The light goes from dusk to midday: in a frame it hardly changes; after ADAPT_SECONDS several times over, it is midday's.
+  const b = new Adaptation();
+  b.apply(picture(0.15), 1 / 60);
+  b.apply(picture(0.62), 1 / 60);
+  assert.equal(b.gain, ADAPT_GAIN);
+  for (let t = 0; t < ADAPT_SECONDS * 5; t += 1 / 60) b.apply(picture(0.62), 1 / 60);
+  assert.equal(b.gain, 1);
 });
