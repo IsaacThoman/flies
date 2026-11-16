@@ -1,7 +1,8 @@
 // The lab round the bench, in the far pass: a row of windows behind it with a
-// black-topped bench under them, shelves of fly stocks and an incubator to the
-// left, a sink, a whiteboard and the door to the right, a desk with a dark
-// monitor and a fridge behind, fluorescent panels overhead. Soft and calm:
+// black-topped bench under them, shelves of fly stocks, gloves and an
+// incubator to the left, a centrifuge, a water bath, a sink, a whiteboard and
+// the door to the right, a desk with a dark monitor and a fridge behind,
+// fluorescent panels overhead. Soft and calm:
 // a background. The day comes in at the windows: by day the sun lays their
 // shapes across the floor and the far wall; at night only the lamp on the
 // bench is on, and its light spills a little way into the dark room. A wall
@@ -557,7 +558,7 @@ export function buildRoom(light: Daylight): SceneBackdrop {
     add(new THREE.TorusGeometry(r + 5, 6, 8, 48).translate(x, y, z + 0.5), "#2e3033");
     add(new THREE.CircleGeometry(r + 4, 48).translate(x, y, z), "#f6f5f0");
   }
-  // The left wall: shelves of fly stocks, a poster, and the incubator.
+  // The left wall: shelves of fly stocks, a poster, the incubator, and gloves.
   {
     const x0 = LEFT_X;
     for (const z of [-1500, -600]) {
@@ -581,8 +582,17 @@ export function buildRoom(light: Daylight): SceneBackdrop {
     add(box(x0 + 761, x0 + 772, 950, 1020, z - 200, z + 200), "#2a2c30");
     glow(facing(90, 34, x0 + 773, 985, z + 120, Math.PI / 2), "#ff6a4a", true);
     glow(facing(16, 16, x0 + 773, 985, z - 140, Math.PI / 2), "#7dffa0", true);
+    // Between the shelves and the incubator, boxes of gloves in a rack on the wall, a glove pulled half out of each.
+    const gz = 165;
+    add(box(x0, x0 + 10, 160, 450, gz - 215, gz + 215), "#e4e5e2");
+    [["#3f6fd0", "#8fb4f0"], ["#7a5cc4", "#c3b0ee"], ["#e9eef2", "#9fd0e6"]].forEach(([carton, glove], i) => {
+      const z0 = gz + (i - 1) * 135;
+      add(box(x0 + 10, x0 + 80, 175, 425, z0 - 62, z0 + 62), carton);
+      add(new THREE.CylinderGeometry(26, 26, 2, 16).scale(1, 1, 1.5).rotateZ(Math.PI / 2).translate(x0 + 80.5, 330, z0), "#2a2c33");
+      add(new THREE.SphereGeometry(22, 10, 6).scale(0.8, 1.3, 1).translate(x0 + 86, 345, z0 + 6), glove);
+    });
   }
-  // The right wall: the sink, a towel dispenser, the whiteboard, the door and a lab coat.
+  // The right wall: a centrifuge, a water bath and pipettes, the sink, a towel dispenser, the whiteboard, the door and a lab coat.
   {
     const x1 = RIGHT_X;
     add(box(x1 - 700, x1, FLOOR_Y, -30, -900, 700), "#c4c7ca");
@@ -591,6 +601,29 @@ export function buildRoom(light: Daylight): SceneBackdrop {
       add(box(x1 - 722, x1 - 712, -150, -60, z + 240, z + 270), trim);
     }
     add(box(x1 - 710, x1, -30, 0, -910, 710), "#2b2d30");
+    // Further along, toward the windows, a short bench with a centrifuge, a water bath and a stand of pipettes.
+    add(box(x1 - 600, x1, FLOOR_Y, -30, -1880, -930), "#c4c7ca");
+    for (const z of [-1870, -1400]) add(box(x1 - 612, x1 - 600, FLOOR_Y + 110, -60, z, z + 460), "#7fa3a6");
+    add(box(x1 - 610, x1, -30, 0, -1890, -925), "#2b2d30");
+    add(box(x1 - 450, x1 - 120, 0, 230, -1830, -1480), "#dfe2e3");
+    add(new THREE.SphereGeometry(150, 20, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.3, 1).translate(x1 - 285, 230, -1655), "#56616c");
+    add(box(x1 - 456, x1 - 450, 120, 200, -1790, -1520), "#2f3338");
+    glow(facing(70, 26, x1 - 457, 175, -1700, -Math.PI / 2), "#7dffa0", true);
+    add(box(x1 - 470, x1 - 110, 0, 190, -1310, -980), "#b9bec3");
+    add(box(x1 - 465, x1 - 115, 190, 205, -1305, -985), "#c9ced2");
+    add(box(x1 - 476, x1 - 470, 40, 150, -1250, -1040), "#2f3338");
+    glow(facing(60, 24, x1 - 477, 120, -1150, -Math.PI / 2), "#ff6a4a", true);
+    add(new THREE.CylinderGeometry(70, 75, 16, 20).translate(x1 - 560, 8, -1395), "#3b4048");
+    add(new THREE.CylinderGeometry(6, 6, 330, 8).translate(x1 - 560, 165, -1395), "#c9ccd0");
+    add(new THREE.CylinderGeometry(80, 80, 10, 20).translate(x1 - 560, 330, -1395), "#3b4048");
+    ["#d24e3a", "#e6c34a", "#3a7fd2", "#2e9e6a"].forEach((top, i) => {
+      const a = i * (Math.PI / 2) + 0.4;
+      const px = x1 - 560 + Math.cos(a) * 62;
+      const pz = -1395 + Math.sin(a) * 62;
+      add(new THREE.CylinderGeometry(13, 9, 190, 8).translate(px, 225, pz), "#ecebe6");
+      add(new THREE.CylinderGeometry(4, 2, 70, 6).translate(px, 95, pz), "#e2e2de");
+      add(new THREE.CylinderGeometry(9, 9, 22, 8).translate(px, 330, pz), top);
+    });
     add(box(x1 - 560, x1 - 140, -6, 1, -380, 220), "#8f969c");
     add(box(x1 - 540, x1 - 160, -4, 2, -360, 200), "#5d6368");
     const tap = new THREE.CatmullRomCurve3([new THREE.Vector3(x1 - 90, 0, -80), new THREE.Vector3(x1 - 90, 330, -80), new THREE.Vector3(x1 - 160, 400, -80), new THREE.Vector3(x1 - 260, 330, -80)]);
