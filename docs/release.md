@@ -58,8 +58,8 @@ npm run ios -- archive --version 0.1.1 --upload     # and uploads to TestFlight
 
 ## The weather outside
 
-The Apple TV app has WeatherKit only when built with `TVOS_WEATHERKIT=1` (docs/apple-tv.md,
-"The weather outside"). Its entitlement needs the WeatherKit capability on the App ID, without
+The Apple TV app has WeatherKit only when built with `TVOS_WEATHERKIT=1`
+([apple-tv.md](apple-tv.md#turning-it-on-for-the-owner)). Its entitlement needs the WeatherKit capability on the App ID, without
 which signing fails. Releases build it in when the repository variable `TVOS_WEATHERKIT` is `1`
 (Settings → Secrets and variables → Actions → Variables), and leave it out otherwise.
 
@@ -73,8 +73,9 @@ Done once, by the account holder, before the first release:
 
 1. **App ID and capabilities** ([Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list)):
    - register an explicit App ID for `com.isaacthoman.flies`, if a signed build hasn't already;
-   - tick **WeatherKit** under both **Capabilities** and **App Services**, then set the
-     `TVOS_WEATHERKIT` variable to `1`;
+   - tick **WeatherKit** under both **Capabilities** and **App Services**
+     ([apple-tv.md](apple-tv.md#turning-it-on-for-the-owner), steps 1 and 2), then set the
+     `TVOS_WEATHERKIT` variable to `1`. Recommended: it's what gives the Apple TV the real sky;
    - tick **Associated Domains**, for the invite links that open a table in the app.
 
    Both apps use the one App ID.

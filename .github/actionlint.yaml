@@ -1,0 +1,3 @@
+# xcode-27 is a GitHub-hosted runner label of the account's own (docs/release.md), unknown to actionlint.
+self-hosted-runner:
+  labels: [xcode-27]
