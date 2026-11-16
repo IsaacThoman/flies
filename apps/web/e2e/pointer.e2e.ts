@@ -310,6 +310,8 @@ async function mouse() {
     await waitFor(page, `view=close,looking=false`);
 
     step("mouse: a drag from the table, a right-drag and a middle-drag turn the camera, and drop nothing; a double click in the air, or R, gives it back");
+    // These camera waits can outlast the default idle delay on a loaded machine.
+    await game(page, "(g.settings.wallpaperAfter = 60)");
     for (const button of ["left", "right", "middle"] as const) {
       const food = (await readState(page)).food;
       const a = await canvasPoint(page, [0.45, 0.7]);
