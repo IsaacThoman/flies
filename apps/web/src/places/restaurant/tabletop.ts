@@ -1,13 +1,82 @@
-// What is on the tables: the start table's sugar, vase, votive and spilt
-// packet, the shakers, a glass of wine left, the ketchup and a menu, the
-// bread basket, an espresso cup; crumbs, sugar, rings; and what is on the
-// floor.
+// What is on the tables: the start table's sugar caddy, bud vase, votive,
+// torn packet and the glass of wine left there; salt and pepper on most
+// tables; the ketchup and a menu, the bread basket, an espresso cup; the
+// crumbs, sugar and drops of wine the world has as food; and the food on the
+// floor (the soda by the bar, a grape under a window table). Shapes are in
+// tabletop-glass.ts and tabletop-food.ts, their own kinds' looks in
+// tabletop-glsl.ts.
 
+import { RESTAURANT_PATCHES, START_TABLE } from "@fly/world";
+import type { Solid } from "@fly/world";
+import { random } from "../../scene/build.ts";
+import { AREAS, areaAt, areaOf, distanceTo } from "./areas.ts";
 import type { Part } from "./parts.ts";
-import { generic } from "./standins.ts";
+import { breadBasket, espresso, grains, grape, leftCrumbs, menu, soda, tornPacket, wineDrops } from "./tabletop-food.ts";
+import { budVase, ketchup, shakers, sugarCaddy, votive, wineGlass } from "./tabletop-glass.ts";
+import { TABLETOP_CLEAR, TABLETOP_SOLID } from "./tabletop-glsl.ts";
+
+/** The world's food by name, in order. */
+const food = (name: string) => RESTAURANT_PATCHES.filter((p) => p.name === name);
+
+/** The area a point is in, or the nearest one: food on the floor in no area is drawn with what is near it. */
+function areaNear(x: number, y: number, z: number) {
+  const inside = areaAt(x, y, z);
+  if (inside) return inside;
+  let best = AREAS[0];
+  for (const a of AREAS) if (distanceTo(a, x, y, z) < distanceTo(best, x, y, z)) best = a;
+  return best.id;
+}
 
 export const tabletop: Part = {
   build(b, solids) {
-    for (const s of solids) generic(b, s, true, true);
+    const named = (name: string) => solids.filter((s) => s.name === name);
+    const one = (name: string): Solid => {
+      const s = named(name)[0];
+      if (!s) throw new Error(`No ${name} on the tables`);
+      return s;
+    };
+    const rnd = random(108);
+
+    // The start table.
+    const start = areaOf(one("sugar caddy"));
+    sugarCaddy(b, start, one("sugar caddy"));
+    budVase(b, start, one("bud vase"), one("flower stem"), one("flower"));
+    votive(b, start, one("votive"));
+    const [spill, onPacket] = food("sugar");
+    grains(b, start, tornPacket(b, start, one("sugar packet"), spill, onPacket, rnd));
+    wineGlass(b, start, one("glass foot"), one("glass stem"), one("wine glass"));
+    wineDrops(b, start, food("wine ring"), (one("sugar packet").bottom ?? 0), rnd);
+    leftCrumbs(b, start, START_TABLE.ring.x + 60, START_TABLE.ring.z - 70, one("sugar packet").bottom ?? 0, rnd, 6);
+
+    // Salt and pepper, in pairs; a few crumbs left by each pair.
+    const pairs = named("shaker");
+    shakers(b, pairs, areaOf);
+    pairs.forEach((s, i) => {
+      if (i % 2 === 0 && areaOf(s) !== start) leftCrumbs(b, areaOf(s), s.footprint.x - 60, s.footprint.z - 40, s.bottom ?? 0, rnd, 10);
+    });
+
+    // The left window table: the ketchup and the menu with ketchup on it.
+    const bottle = one("ketchup");
+    ketchup(b, areaOf(bottle), bottle, one("ketchup neck"), one("ketchup cap"));
+    const card = one("menu");
+    menu(b, areaOf(card), card, food("ketchup")[1], rnd);
+
+    // The right window table: the bread basket, crumbs in it and brushed off it.
+    const basket = one("bread basket");
+    const [inBasket, onTable] = food("crumbs");
+    breadBasket(b, areaOf(basket), basket, one("bread"), inBasket, rnd);
+    leftCrumbs(b, areaOf(basket), onTable.x, onTable.z, onTable.y ?? basket.bottom ?? 0, rnd, 45, onTable.r);
+
+    // The banquette: the espresso cup.
+    const saucer = one("saucer");
+    espresso(b, areaOf(saucer), saucer, one("espresso cup"), rnd);
+
+    // On the floor.
+    const [spilt] = food("soda");
+    soda(b, areaNear(spilt.x, 1, spilt.z), spilt, rnd);
+    const [trodden] = food("grape");
+    grape(b, areaNear(trodden.x, 1, trodden.z), trodden, rnd);
   },
+  solid: TABLETOP_SOLID,
+  clear: TABLETOP_CLEAR,
 };
