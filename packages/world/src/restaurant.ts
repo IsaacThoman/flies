@@ -35,13 +35,13 @@ export const SHOPFRONT = {
 /**
  * The zinc bar: its top (`zinc`), the panelled front under it set back to
  * leave an overhang on the customers' side, the bartender's lower working
- * counter behind it (`underbar`), the brass foot rail, and the back bar
+ * counter behind it (`underbar`, against the front's back, leaving no slot), the brass foot rail, and the back bar
  * against the left wall: cabinets (the drinks fridge's glass doors in their
  * face, `fridge`), and shelves of bottles above against the mirror.
  */
 export const ZINC_BAR = {
   zinc: { x: -2850, z: -600, hx: 300, hz: 1700, bottom: 1045, top: 1080 },
-  front: { x: -2900, hx: 220, hz: 1660 },
+  front: { x: -2915, hx: 235, hz: 1660 },
   underbar: { x: -3285, hx: 135, z0: -2250, z1: 1050, top: 860 },
   rail: { x: -2610, half: 25, bottom: 175, top: 225 },
   back: { x0: -DINING_ROOM.hx, x1: -3700, z0: -2400, z1: 1300, top: 900 },
@@ -49,7 +49,13 @@ export const ZINC_BAR = {
   shelves: { x0: -DINING_ROOM.hx, x1: -3960, z0: -2000, z1: 900, tops: [1360, 1720, 2080] as readonly number[], thick: 25 },
 };
 
-/** The kitchen pass in the back wall: the opening, its steel shelf (out over the dining room and back into the kitchen), the heat lamps under its head, and the ticket rail on the wall above. */
+/**
+ * The kitchen pass in the back wall: the opening, its steel shelf (out over
+ * the dining room and back into the kitchen), the heat lamps under its head,
+ * the ticket rail on the wall above, and the kitchen's bench behind the wall
+ * at the shelf's height, beyond the floor: a fly drawn back out of the
+ * kitchen can't fall down behind the wall.
+ */
 export const PASS = {
   x0: 900,
   x1: 2500,
@@ -59,6 +65,7 @@ export const PASS = {
   lamps: { hx: 760, z0: -3130, z1: -3010, bottom: 1800, top: 1880 },
   rail: { hx: 720, z0: -3000, z1: -2975, bottom: 1920, top: 1945 },
   tickets: [1300, 1500, 2050] as readonly number[],
+  kitchen: { x0: 500, x1: 2900, z0: -3800, z1: -3150, top: 1130 },
   /** The kitchen's swing door, in the back wall right of the pass, with a round window: drawn flat in the wall. */
   door: { x0: 2750, x1: 3550, head: 2150 },
 };
@@ -229,16 +236,14 @@ export const ESPRESSO = { x: 3400, z: -260, saucer: { r: 60, well: 4, rim: 12 },
 /** On the zinc: the fruit bowl near the front end, the cutting board with a cut lemon, the bar mat with a shaker tin drying on it, and a cake under a glass cloche at the back end. */
 export const ON_BAR = {
   bowl: { x: -2800, z: 800, r: 150, well: 12, rim: 80, inner: 0.55, lip: 0.9 },
+  // Each wholly inside the bowl's lip, touching its neighbours at most.
   oranges: [
-    { x: -2840, z: 760, r: 38 },
-    { x: -2760, z: 830, r: 37 },
-    { x: -2825, z: 860, r: 36 },
+    { x: -2845, z: 760, r: 38 },
+    { x: -2760, z: 825, r: 37 },
+    { x: -2830, z: 870, r: 36 },
   ] as readonly { x: number; z: number; r: number }[],
-  lemons: [
-    { x: -2735, z: 735, rx: 40, rz: 29, angle: 0.6 },
-    { x: -2880, z: 830, rx: 39, rz: 28, angle: -0.9 },
-  ] as readonly { x: number; z: number; rx: number; rz: number; angle: number }[],
-  peach: { x: -2770, z: 900, r: 35 },
+  lemons: [{ x: -2895, z: 830, rx: 34, rz: 25, angle: -1.265 }] as readonly { x: number; z: number; rx: number; rz: number; angle: number }[],
+  peach: { x: -2740, z: 745, r: 34 },
   board: { x: -2790, z: 330, hx: 150, hz: 100, angle: 0.2, thick: 18 },
   halfLemon: { x: -2830, z: 300, r: 32, height: 30 },
   slices: [
@@ -256,7 +261,7 @@ export const ON_BAR = {
 /** On the pass: a dessert plate sent back with crumbs and a smear of coulis, and a stack of clean plates. */
 export const ON_PASS = {
   dessert: { x: 1500, z: -2870, r: 120, well: 3, rim: 15, inner: 0.62, lip: 0.82 },
-  stack: { x: 2080, z: -2960, r: 135, height: 65 },
+  stack: { x: 2080, z: -2880, r: 115, height: 65 },
 };
 
 /** On the host's stand: the menus (the top one sticky), the reservations book, and a bowl of mints. */
@@ -503,12 +508,13 @@ function barThings(): Solid[] {
 }
 
 function passThings(): Solid[] {
-  const { shelf, lamps, rail, tickets } = PASS;
+  const { shelf, lamps, rail, tickets, kitchen } = PASS;
   const z = -DINING_ROOM.hz;
   const out: Solid[] = [
     solid("pass", box(shelf.x, (shelf.z0 + shelf.z1) / 2, shelf.hx, (shelf.z1 - shelf.z0) / 2), flat(shelf.top), PASS.sill),
     solid("heat lamp", box(shelf.x, (lamps.z0 + lamps.z1) / 2, lamps.hx, (lamps.z1 - lamps.z0) / 2), flat(lamps.top), lamps.bottom),
     solid("ticket rail", box(shelf.x, (rail.z0 + rail.z1) / 2, rail.hx, (rail.z1 - rail.z0) / 2), flat(rail.top), rail.bottom),
+    solid("kitchen bench", box((kitchen.x0 + kitchen.x1) / 2, (kitchen.z0 + kitchen.z1) / 2, (kitchen.x1 - kitchen.x0) / 2, (kitchen.z1 - kitchen.z0) / 2), flat(kitchen.top)),
   ];
   for (const x of [shelf.x - lamps.hx + 60, shelf.x + lamps.hx - 60]) out.push(solid("bracket", box(x, (lamps.z0 + lamps.z1) / 2, 10, 10), flat(PASS.head), lamps.top));
   // Order slips hanging from the rail: paper, a fifth of a millimetre either side of its middle.
@@ -582,7 +588,7 @@ export const RESTAURANT_PATCHES: readonly FoodPatch[] = [
   // Sugar left in the bottom of an espresso cup.
   { name: "espresso", x: ESPRESSO.x, z: ESPRESSO.z, y: TABLE + ESPRESSO.saucer.well + ESPRESSO.cup.well, r: 10, sweet: 0.9 },
   // At the bar: the bruised peach in the fruit bowl, the cut lemon, wine left in two glasses, syrup on the bar mat, crumbs of cake at the edge of its plate.
-  { name: "peach", x: ON_BAR.peach.x + 18, z: ON_BAR.peach.z + 14, y: ZINC + ON_BAR.bowl.well + ON_BAR.peach.r * 1.9, r: 10, sweet: 0.9 },
+  { name: "peach", x: ON_BAR.peach.x + 4, z: ON_BAR.peach.z - 4, y: ZINC + ON_BAR.bowl.well + ON_BAR.peach.r * 1.9, r: 10, sweet: 0.9 },
   ...ON_BAR.slices.map((s): FoodPatch => ({ name: "lemon", x: s.x, z: s.z, y: ZINC + ON_BAR.board.thick + ON_BAR.sliceThick, r: 10, sweet: 0.3 })),
   { name: "red wine", x: WINE_GLASSES[1].x, z: WINE_GLASSES[1].z, y: ZINC + WINE_GLASS.bowl.well, r: 12, sweet: 0.7, pool: true },
   { name: "white wine", x: WINE_GLASSES[2].x, z: WINE_GLASSES[2].z, y: ZINC + WINE_GLASS.bowl.well, r: 12, sweet: 0.65, pool: true },
