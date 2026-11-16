@@ -16,9 +16,10 @@
 //
 // The reference can't follow other processes thrashing the caches and memory the
 // work shares (four copies of the brain at once each cost a third more on an M5
-// Pro), so the budgets live in *.budget.ts files, which npm test runs one at a
-// time after everything else. Only this thread's CPU counts: the JIT's and GC's
-// helper threads aren't the work.
+// Pro, and with the machine buried under ten times its cores in other work, the
+// brain with everything at once comes close to its budget), so the budgets live
+// in *.budget.ts files, which npm test runs one at a time after everything else.
+// Only this thread's CPU counts: the JIT's and GC's helper threads aren't the work.
 //
 // After a change of Node that moves the reference, `node scripts/cpuBudget.ts`
 // on an M5 Pro, with nothing else busy, prints the new REFERENCE_MS.
