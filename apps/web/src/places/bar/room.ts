@@ -136,8 +136,8 @@ const SPIRITS = ["#c8701e", "#d6e6dc", "#2a7a3a", "#c0101c", "#6a2c0c", "#2a5ec8
 /** A bottle as a template: liquid up to `fill` of its height takes the bottle's colour, the empty neck is pale glass, the cap dark. */
 function bottleTemplate(profile: readonly (readonly [number, number])[], fill: number) {
   const height = profile[profile.length - 1][1];
-  const geometry = lathe(profile, 11).toNonIndexed();
-  geometry.computeVertexNormals();
+  // The lathe's own normals, smooth round the bottle.
+  const geometry = lathe(profile, 14).toNonIndexed();
   const pos = geometry.attributes.position;
   const tint = new Float32Array(pos.count);
   const colors = new Float32Array(pos.count * 3);
@@ -172,6 +172,29 @@ function bottles(template: THREE.BufferGeometry, placed: readonly { matrix: THRE
       colors[o + 2] = base[i * 3 + 2];
     }
   }
+  return geometry;
+}
+
+type Label = { matrix: THREE.Matrix4; paper: THREE.Color; ink: THREE.Color };
+
+/** Labels: a band of paper half round the front of each bottle, printed with a rule at its head and foot and a band across its middle. Each stands far enough off the glass that its flat faces clear the bottle's between their corners. */
+function labels(placed: readonly Label[]) {
+  const template = new THREE.LatheGeometry([0, 0.045, 0.41, 0.59, 0.955, 1].map((v) => new THREE.Vector2(1, v - 0.5)), 8, 0, Math.PI).toNonIndexed();
+  const geometry = scatter(template, placed.map(({ matrix, paper }) => ({ matrix, color: paper })), KIND.plain);
+  // Inked: the faces whose middle is in a printed band.
+  const ys = template.attributes.position.array as Float32Array;
+  const n = ys.length / 3;
+  const inked: boolean[] = [];
+  for (let i = 0; i < n; i += 3) {
+    const v = (ys[i * 3 + 1] + ys[i * 3 + 4] + ys[i * 3 + 7]) / 3 + 0.5;
+    const ink = v < 0.045 || v > 0.955 || (v > 0.41 && v < 0.59);
+    inked.push(ink, ink, ink);
+  }
+  const colors = geometry.attributes.color.array as Float32Array;
+  placed.forEach(({ ink }, k) => {
+    for (let i = 0; i < n; i++) if (inked[i]) colors.set([ink.r, ink.g, ink.b], (k * n + i) * 3);
+  });
+  template.dispose();
   return geometry;
 }
 
@@ -284,15 +307,20 @@ export function buildRoom(around: Batch, solid: THREE.Material, clear: THREE.Mat
   // Bottles on every shelf and on the back counter, each its own spirit, lit from below by the shelf lights.
   const templates = BOTTLES.flatMap((p) => [bottleTemplate(p, 0.88), bottleTemplate(p, 0.55)]);
   const placed: { matrix: THREE.Matrix4; color: THREE.Color }[][] = templates.map(() => []);
-  const labels: { matrix: THREE.Matrix4; color: THREE.Color }[] = [];
-  const labelColors = ["#f2e8d0", "#1a1a1a", "#d8c890", "#8a1a1a", "#f0f0e8", "#2a3a5a"].map((c) => new THREE.Color(c));
+  const printed: Label[] = [];
+  const papers = ["#f2e8d0", "#1a1a1a", "#d8c890", "#8a1a1a", "#f0f0e8", "#2a3a5a"].map((c) => new THREE.Color(c));
+  // Dark inks on pale paper, gold on dark.
+  const inks = ["#7a1414", "#1a2a4a", "#141414", "#9a7424"].map((c) => new THREE.Color(c));
+  const gold = new THREE.Color("#c8a050");
   const place = (x: number, y: number, z: number, scale: number) => {
     const t = Math.floor(rnd.next() * templates.length);
     const r = BOTTLES[t >> 1][2][0];
     placed[t].push({ matrix: mat4({ x, y, z }, new THREE.Euler(0, rnd.range(0, 6.3), 0), { x: scale, y: scale, z: scale }), color: new THREE.Color(SPIRITS[Math.floor(rnd.next() * SPIRITS.length)]) });
     if (rnd.next() < 0.8) {
       const h = rnd.range(50, 90) * scale;
-      labels.push({ matrix: mat4({ x, y: y + rnd.range(40, 70) * scale + h / 2, z }, new THREE.Euler(0, rnd.range(-0.5, 0.5) - Math.PI / 2, 0), { x: (r + 0.8) * scale, y: h, z: (r + 0.8) * scale }), color: labelColors[Math.floor(rnd.next() * labelColors.length)] });
+      const paper = papers[Math.floor(rnd.next() * papers.length)];
+      const ink = paper.r + paper.g + paper.b > 1.5 ? inks[Math.floor(rnd.next() * inks.length)] : gold;
+      printed.push({ matrix: mat4({ x, y: y + rnd.range(40, 70) * scale + h / 2, z }, new THREE.Euler(0, rnd.range(-0.5, 0.5) - Math.PI / 2, 0), { x: (r + 1.4) * scale, y: h, z: (r + 1.4) * scale }), paper, ink });
     }
     return r * scale;
   };
@@ -311,8 +339,7 @@ export function buildRoom(around: Batch, solid: THREE.Material, clear: THREE.Mat
   templates.forEach((template, i) => {
     if (placed[i].length) around.add(solid, bottles(template, placed[i]));
   });
-  // Labels: a band of paper half round the front of each.
-  around.add(solid, scatter(new THREE.CylinderGeometry(1, 1, 1, 10, 1, true, 0, Math.PI), labels, KIND.plain));
+  around.add(solid, labels(printed));
 
   // On the back counter: the beer taps, two shakers, a bowl of lemons and limes.
   {

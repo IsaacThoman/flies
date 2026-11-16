@@ -295,6 +295,9 @@ if (barK == K_MIRROR) {
   barRough = 0.06 + spots * 0.4;
 }
 if (barK == K_BOTTLE) {
+  // Glass with spirit in it: deepest where you look straight through it, the glass itself toward its edges, pale with what it reflects.
+  float facing = abs(dot(normalize(vWorldNormal), normalize(cameraPosition - vWorld)));
+  diffuseColor.rgb = mix(diffuseColor.rgb * mix(0.6, 1.15, facing), vec3(0.62, 0.68, 0.66), pow(1.0 - facing, 3.0) * 0.55);
   barRough = 0.08;
   barVarnish = 1.0;
 }
