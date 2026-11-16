@@ -575,16 +575,25 @@ export class Audio {
     gain.gain.value = 0;
     source.connect(gain);
     gain.connect(out);
+    this.#disconnectWhenEnded(source, gain);
     source.start();
     return { source, gain };
+  }
+
+  #disconnectWhenEnded(source: AudioBufferSourceNode, gain?: GainNode) {
+    // The TV retains every node connected to a bus, even after its input ends.
+    source.addEventListener("ended", () => {
+      source.disconnect();
+      gain?.disconnect();
+    }, { once: true });
   }
 
   setVolumes(effects: number, ambience: number) {
     const ctx = this.ctx;
     if (!ctx || !this.#effects || !this.#ambient) return;
     // Volumes 0 to 10, on a gentle curve.
-    this.#effects.gain.setTargetAtTime((effects / 10) ** 2 * 0.8, ctx.currentTime, 0.05);
-    this.#ambient.gain.setTargetAtTime((ambience / 10) ** 2 * 0.5, ctx.currentTime, 0.2);
+    followParam(this.#effects.gain, (effects / 10) ** 2 * 0.8, ctx.currentTime, 0.05);
+    followParam(this.#ambient.gain, (ambience / 10) ** 2 * 0.5, ctx.currentTime, 0.2);
   }
 
   tools(events: HandsEvents) {
@@ -626,12 +635,14 @@ export class Audio {
     const source = ctx.createBufferSource();
     source.buffer = this.#buffers[sound];
     source.playbackRate.value = rate;
+    let gain: GainNode | undefined;
     if (volume !== 1) {
-      const gain = ctx.createGain();
+      gain = ctx.createGain();
       gain.gain.value = volume;
       source.connect(gain);
       gain.connect(this.#effects);
     } else source.connect(this.#effects);
+    this.#disconnectWhenEnded(source, gain);
     source.start();
   }
 
@@ -658,12 +669,14 @@ export class Audio {
       const chirps = birds < 1 ? this.#muffled : this.#chirps;
       source.buffer = chirps[Math.floor(Math.random() * chirps.length)];
       source.playbackRate.value = 0.9 + Math.random() * 0.25;
+      let gain: GainNode | undefined;
       if (birds < 1) {
-        const gain = ctx.createGain();
+        gain = ctx.createGain();
         gain.gain.value = birds;
         source.connect(gain);
         gain.connect(this.#ambient);
       } else source.connect(this.#ambient);
+      this.#disconnectWhenEnded(source, gain);
       source.start();
     }
   }

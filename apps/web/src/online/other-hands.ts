@@ -132,6 +132,6 @@ export class OtherHand {
   }
 
   dispose() {
-    this.view.group.removeFromParent();
+    this.view.dispose();
   }
 }

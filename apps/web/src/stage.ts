@@ -43,7 +43,15 @@ function buildEnvironment(light: Daylight) {
 
 const VEIL_CAMERA = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-export type FrameCost = { calls: number; triangles: number; textures: number; geometries: number };
+/** Three keeps light uniforms by light ID for a scene's lifetime, even after those lights leave. */
+export function renewScene(scene: THREE.Scene): THREE.Scene {
+  const next = new THREE.Scene();
+  next.environment = scene.environment;
+  while (scene.children.length) next.add(scene.children[0]);
+  return next;
+}
+
+export type FrameCost = { calls: number; triangles: number; textures: number; geometries: number; programs: number };
 
 export class Stage {
   readonly renderer: THREE.WebGLRenderer;
@@ -54,9 +62,10 @@ export class Stage {
   backdrop: SceneBackdrop;
   set: SceneSet;
   readonly scene = new THREE.Scene();
+  #renderScene = new THREE.Scene().add(this.scene);
   readonly hemi: THREE.HemisphereLight;
   readonly sun: THREE.DirectionalLight;
-  readonly cost: FrameCost = { calls: 0, triangles: 0, textures: 0, geometries: 0 };
+  readonly cost: FrameCost = { calls: 0, triangles: 0, textures: 0, geometries: 0, programs: 0 };
   #pmrem: THREE.PMREMGenerator;
   #envScene: THREE.Scene;
   #env: THREE.WebGLRenderTarget | null = null;
@@ -111,6 +120,8 @@ export class Stage {
     this.scene.remove(this.set.group);
     disposeAll(this.set.group);
     disposeAll(this.backdrop.scene);
+    // Actors that spawn later retain their parent, while only the renderer's light cache must expire.
+    this.#renderScene = renewScene(this.#renderScene);
     this.current = scene;
     this.light.use(scene.palettes, scene.open);
     const started = performance.now();
@@ -121,6 +132,8 @@ export class Stage {
     this.#applyLight();
     this.#envDirty = true;
   }
+
+  get renderScene(): THREE.Scene { return this.#renderScene; }
 
   setTime(time: TimeOfDay) {
     this.light.set(time);
@@ -179,6 +192,7 @@ export class Stage {
     const old = this.#env;
     this.#env = this.#pmrem.fromScene(this.#envScene, 0.02, 0.1, 100);
     this.scene.environment = this.#env.texture;
+    this.#renderScene.environment = this.#env.texture;
     old?.dispose();
   }
 
@@ -236,7 +250,7 @@ export class Stage {
   }
 
   /** The two passes, into whatever target is set: the backdrop, then the table over it. */
-  renderPasses(camera: THREE.PerspectiveCamera, scene: THREE.Scene = this.scene) {
+  renderPasses(camera: THREE.PerspectiveCamera, scene: THREE.Scene = this.#renderScene) {
     const r = this.renderer;
     const { near, far } = camera;
     camera.near = FAR.near;
@@ -264,6 +278,7 @@ export class Stage {
     this.cost.triangles = info.render.triangles;
     this.cost.textures = info.memory.textures;
     this.cost.geometries = info.memory.geometries;
+    this.cost.programs = info.programs?.length ?? 0;
     return this.cost;
   }
 }

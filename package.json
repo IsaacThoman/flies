@@ -33,7 +33,9 @@
     "brain:pack": "node packages/brain/scripts/pack.ts",
     "brain:wasm": "packages/brain-native/wasm.sh",
     "fly:viewer": "vite --config packages/fly/viewer/vite.config.ts",
-    "fuzz": "node scripts/fuzz.ts"
+    "fuzz": "node scripts/fuzz.ts",
+    "soak:web": "node scripts/webSoak.ts",
+    "e2e:soak": "node scripts/webSoak.ts --quick"
   },
   "dependencies": {
     "three": "^0.186.1"
