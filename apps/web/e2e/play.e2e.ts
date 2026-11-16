@@ -143,6 +143,11 @@ try {
   await press("ArrowDown");
   await waitFor(page, "focus=pixels");
   await press("ArrowDown", 3);
+  await waitFor(page, "focus=rumble");
+  await press("ArrowLeft");
+  assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.haptics.enabled), false);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("flies.settings")!).rumble), false);
+  await press("ArrowDown");
   await waitFor(page, "focus=stats");
   await press("Escape");
   await waitFor(page, "screen=title,focus=settings");
@@ -336,6 +341,7 @@ try {
   await page.reload();
   await gameUp(page);
   await waitFor(page, "brain=running,screen=title", 90_000);
+  assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.haptics.enabled), false, "rumble stays off after reloading");
   await press("Enter");
   const again = await waitFor(page, "screen=play");
   assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["feed", "sugar", "wide", "noon", "clear"]);

@@ -57,6 +57,8 @@ export type Settings = {
   overlayOpacity: OverlayOpacity;
   /** Show what the buttons do. */
   hints: boolean;
+  /** Feel the tools and the fly through a game pad or a phone that can vibrate. */
+  rumble: boolean;
   /** Small frame-cost counters in a corner. */
   stats: boolean;
   /** On the Weather and Light tools' "Now", the real weather and sunrise and sunset outside, where the Apple TV can tell them. */
@@ -80,6 +82,7 @@ export const DEFAULT_SETTINGS: Settings = {
   overlaySize: "medium",
   overlayOpacity: "full",
   hints: true,
+  rumble: true,
   stats: false,
   realWeather: true,
   place: "turns",

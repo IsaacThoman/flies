@@ -34,9 +34,16 @@ const NOW = Date.UTC(2026, 10, 16, 20);
 
 test("settings come back as they were saved", () => {
   const store = memory();
-  const settings: Settings = { pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "lively", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, stats: true, realWeather: false, place: "lab", scene: "bar" };
+  const settings: Settings = { pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "lively", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, rumble: false, stats: true, realWeather: false, place: "lab", scene: "bar" };
   saveSettings(settings, store);
   assert.deepEqual(loadSettings(store), settings);
+});
+
+test("rumble starts on, including saves without the setting or with an invalid value", () => {
+  assert.equal(DEFAULT_SETTINGS.rumble, true);
+  assert.equal(loadSettings(null).rumble, true);
+  assert.equal(loadSettings(settingsSaved({ hints: false, effects: 0 })).rumble, true);
+  for (const rumble of [null, 0, 1, "off"]) assert.equal(loadSettings(settingsSaved({ rumble })).rumble, true);
 });
 
 test("everything new on screen is off by default, and what was already there is as it was", () => {
@@ -93,6 +100,7 @@ test("a broken save, or none, is the defaults; nothing throws", () => {
 
 test("each setting keeps only a value the game can use", () => {
   const bad: Record<keyof Settings, unknown[]> = {
+    rumble: [0, 1, "off", null],
     pixels: ["huge", "toString", "__proto__", 2],
     wallpaperAfter: [-30, "60"],
     wallpaperCamera: ["drone", 0],
@@ -249,7 +257,7 @@ test("the settings are a row of tabs over each part's settings: Left and Right o
   );
   press(screen, "right");
   assert.equal(settingsTab(screen), "picture");
-  assert.deepEqual(screen.menu.items.slice(1).map((item) => item.id), ["pixels", "eyes", "hints", "stats"]);
+  assert.deepEqual(screen.menu.items.slice(1).map((item) => item.id), ["pixels", "eyes", "hints", "rumble", "stats"]);
   press(screen, "down");
   assert.equal(screen.menu.focused?.id, "pixels");
   press(screen, "up");
@@ -315,4 +323,22 @@ test("every value a tab offers is one a save keeps", () => {
       }
     }
   });
+});
+
+test("the Rumble row applies Off and On like the other on/off settings", () => {
+  const shell = fakeShell();
+  const screen = settingsScreen(shell);
+  screen.enter();
+  press(screen, "right", "right");
+  const rumble = screen.menu.item("rumble");
+  assert.ok(rumble?.kind === "choice");
+  assert.equal(rumble.label, "Rumble");
+  assert.equal(rumble.options[rumble.index].label, "On");
+  screen.menu.focusOn("rumble");
+  press(screen, "left");
+  assert.equal(shell.settings.rumble, false);
+  assert.equal(rumble.options[rumble.index].label, "Off");
+  press(screen, "right");
+  assert.equal(shell.settings.rumble, true);
+  assert.deepEqual(shell.asked, ["apply", "apply"]);
 });

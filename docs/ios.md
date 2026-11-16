@@ -151,7 +151,8 @@ fly's own touch sense while the feather is on it (`data-touch` above 0.35 with `
 `feather`: resting on it 0.4, stroking 1), and a knock when it takes off. Both follow the fly's published
 state, so they are what happened to the fly. They come up to 200 ms late (the canvas's state is
 published five times a second). Off with the Haptics switch in the app's page of the Settings app,
-or with the system's own.
+or with the system's own. The game's Rumble setting controls game pads and
+Android vibration; these native iPhone and iPad haptics use the Haptics switch.
 
 ## Building and running
 

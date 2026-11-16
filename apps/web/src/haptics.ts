@@ -6,7 +6,7 @@
 // blow, and a knock when the fly takes off. It is the player's: nothing here
 // reaches the fly. Where there is nothing to rumble (the Apple TV's remote, a
 // mouse, a keyboard, a phone without vibrate, whose own app plays haptics of
-// its own) it does nothing.
+// its own) it does nothing. Settings → Picture → Rumble turns it off.
 
 import type { Device } from "./input.ts";
 
@@ -29,6 +29,7 @@ export const FEELS: Readonly<Record<Feel, { strong: number; weak: number; ms: nu
 export const HOLD_EVERY = 140;
 
 export class Haptics {
+  enabled = true;
   #holdIn = 0;
   readonly #devices: { readonly current: Device };
   readonly #pads: () => readonly (PadLike | null)[];
@@ -56,7 +57,7 @@ export class Haptics {
    */
   held(feather: number, blow: number, dt: number) {
     const amount = Math.max(feather, blow);
-    if (amount <= 0) {
+    if (!this.enabled || amount <= 0) {
       this.#holdIn = 0;
       return;
     }
@@ -69,6 +70,7 @@ export class Haptics {
   }
 
   #play(strong: number, weak: number, ms: number, again?: number) {
+    if (!this.enabled) return;
     const device = this.#devices.current;
     if (device === "pad") {
       const pads = this.#pads();
