@@ -9,8 +9,9 @@ and the iPhone and iPad app (`apps/ios`) go together, as one app, "Flies", at on
 2. To release, open a pull request from `dev` into `main` and merge it with a **merge commit**,
    not a squash, so `main` keeps `dev`'s history and the two don't drift apart.
 3. CI (`.github/workflows/ci.yml`), which checks every pull request and every push to `dev`
-   and `main` (lint, both typechecks, the unit tests, the web build and `npm run e2e`, with the
-   connectome fetched and cached by `.github/actions/brain`), runs the checks on `main`. When they pass, the `release` job
+   and `main` (lint, both typechecks, the unit tests and the web build on arm64, with the connectome
+   fetched and cached by `.github/actions/brain`; and `npm run e2e`, which reports without
+   blocking), runs the checks on `main`. When they pass, the `release` job
    runs [semantic-release](https://semantic-release.org) (`release.config.mjs`). It works out
    the next version from the commits since the last `v*` tag, tags the release `v<version>` and
    creates a GitHub Release whose notes are those commits' titles.
