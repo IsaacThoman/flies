@@ -6,11 +6,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
 import { BACKGROUND, READOUTS, SCALES, SENSES, backgroundRates, balanceFactor, decode, intensity, outputSynapses, senseRates, smooth, wire } from "./io.ts";
+import { REGIONS, REGION_RATE_NAMES } from "./regions.ts";
 import { createBrain, FlyBrain, MAX_TICK_MS } from "./runtime.ts";
 import { InternalState, Wander, normals } from "./state.ts";
-import { bufferOf, syntheticConnectome } from "./test-helpers.ts";
+import { bufferOf, syntheticConnectome, syntheticEyeColumns } from "./test-helpers.ts";
 import { RESTING_SENSES } from "./types.ts";
 import type { BrainSenses } from "./types.ts";
+import { VISION_STAGES } from "./vision.ts";
 
 const synthetic = syntheticConnectome();
 const load = () => loadConnectome(bufferOf(synthetic.bytes));
@@ -106,12 +108,12 @@ test("createBrain runs the synthetic connectome end to end", () => {
   let state = brain.tick(16, RESTING_SENSES);
   assert.equal(state.stats.simMs, 16);
   assert.ok(state.stats.wallMs >= 0);
-  assert.deepEqual(Object.keys(state.stats.rates).sort(), READOUTS.map((r) => r.name).sort());
+  assert.deepEqual(Object.keys(state.stats.rates), [...READOUTS.map((r) => r.name), ...REGION_RATE_NAMES]);
   for (const [key, value] of Object.entries(state.command)) {
     assert.ok(Number.isFinite(value), key);
     assert.ok(value >= (key === "turn" ? -1 : 0) && value <= 1, `${key} ${value}`);
   }
-  // Any dt adds up: 0, a fraction of a step, and the longest the pet sends.
+  // Any dt adds up: 0, a fraction of a step, and a 100 ms tick.
   let total = 0;
   for (const dt of [0, 0.4, 0.6, 3.3, 100, 16]) total += brain.tick(dt, RESTING_SENSES).stats.simMs;
   assert.ok(Math.abs(total - 120.3) <= 1, `${total} ms simulated`);
@@ -181,4 +183,43 @@ test("the internal state wanders around 0 with unit spread, reproducibly", () =>
   // Off, nothing spontaneous happens.
   const quiet = new FlyBrain(load(), { spontaneous: false });
   for (let t = 0; t < 500; t += 16) assert.equal(quiet.tick(16, { ...RESTING_SENSES, grounded: false }).stats.spikes, 0);
+});
+
+test("the eyes: shut, the brain is the same as one without them; open, darkness reaches the lamina and on", () => {
+  const columns = syntheticEyeColumns(synthetic);
+  const seeing = () => new FlyBrain(load(), { seed: 4, eyeColumns: columns });
+  assert.equal(createBrain(bufferOf(synthetic.bytes)).eyes, null);
+  const brain = seeing();
+  assert.ok(brain.eyes);
+  assert.equal(brain.eyes.right.directions.length, 12);
+  // The eyes add the vision.<stage> rates the connectome has neurons for, after the readouts and the regions.
+  const names = Object.keys(brain.tick(10, RESTING_SENSES).stats.rates);
+  assert.deepEqual(names.slice(0, READOUTS.length), READOUTS.map((r) => r.name));
+  assert.deepEqual(names.slice(READOUTS.length, READOUTS.length + REGIONS.length), REGION_RATE_NAMES);
+  assert.deepEqual(names.slice(READOUTS.length + REGIONS.length), ["lamina", "lobula", "looming"].flatMap((stage) => [`vision.${stage} left`]).concat(["lamina", "lobula", "looming"].map((stage) => `vision.${stage} right`)));
+  assert.ok(VISION_STAGES.every(({ stage }) => stage !== "lamina" || names.includes(`vision.${stage} left`)));
+
+  // Shut eyes: spike for spike the brain without eyes, whatever else is going on.
+  const blind = new FlyBrain(load(), { seed: 4 });
+  const eyes = seeing();
+  const senses = [RESTING_SENSES, { ...RESTING_SENSES, loomLeft: 0.6, touch: 1 }, { ...RESTING_SENSES, sweet: 1, grounded: false }];
+  for (let k = 0; k < 90; k++) {
+    const s = senses[Math.floor(k / 30)];
+    const a = blind.tick(16, s);
+    const b = eyes.tick(16, s);
+    assert.equal(b.stats.spikes, a.stats.spikes, `tick ${k}`);
+    assert.deepEqual(b.command, a.command);
+  }
+
+  // Open: a steady scene, then the right eye goes dark. Its L2s drive the right LPLC2 and the giant fiber.
+  const light = { left: [1, 1, 1, 1], right: [1, 1, 1, 1] };
+  let state = brain.tick(200, { ...RESTING_SENSES, light });
+  assert.equal(state.stats.rates["vision.lamina right"], 0);
+  light.right = [0, 0, 0, 0];
+  for (let t = 0; t < 200; t += 10) state = brain.tick(10, { ...RESTING_SENSES, light });
+  assert.ok(state.stats.rates["vision.lamina right"] > 20, `lamina ${state.stats.rates["vision.lamina right"]}`);
+  assert.ok(state.stats.rates["vision.looming right"] > 5, `looming ${state.stats.rates["vision.looming right"]}`);
+  assert.equal(state.stats.rates["vision.lamina left"], 0);
+  assert.ok(state.stats.rates.DNp01 > 5, `giant fiber ${state.stats.rates.DNp01} Hz`);
+  assert.throws(() => brain.tick(10, { ...RESTING_SENSES, light: { left: [1], right: [1, 1, 1, 1] } }), /left eye has 4 facets, but the light gives 1/);
 });

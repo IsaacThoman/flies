@@ -1,6 +1,6 @@
 // What the brain is wired to: which neurons each sense drives, which neurons
 // each command is read from, and the arithmetic between firing rates and the
-// pet's 0..1 values. No Node APIs; this runs in the pet's Web Worker.
+// game's 0..1 values. No Node APIs; this runs in the browser game's Web Worker.
 
 import type { Connectome, NeuronQuery } from "./format.ts";
 import type { BrainCommand, BrainSenses } from "./types.ts";

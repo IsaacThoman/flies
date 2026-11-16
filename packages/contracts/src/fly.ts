@@ -29,11 +29,29 @@ export const RESTING_POSE: FlyPose = { speed: 0, turn: 0, airborne: false, wings
 export type FlyAnchor = "mouth" | "head" | "leftEye" | "rightEye" | "back";
 
 /**
+ * The fly's nervous system, drawn inside its body: the game says how brightly
+ * each part glows and how far the body has turned to glass to show it.
+ */
+export interface FlyNerves {
+  /** Its parts, in the order of `glow`: sensory neurons, central ones, or motor and neurosecretory ones. */
+  readonly parts: readonly { readonly id: string; readonly role: "sensory" | "central" | "motor" }[];
+  /** How brightly each part glows, 0 to 1, a float a part (padded past the last). The game fills it in place. */
+  readonly glow: Float32Array;
+  /** 0, the ordinary fly, to 1: its cuticle a glassy shell with the nervous system glowing inside (the X-ray). */
+  xray: number;
+}
+
+/**
  * The fly's body. In `object`'s own space the fly stands on the plane y = 0
  * with its feet on it, faces +z, has +x on its LEFT (so the space is
  * right-handed with y up), and is 1 unit long from the front of its head to
  * the tip of its abdomen, centred on the origin. The game moves, turns and
  * scales `object`; the model animates everything inside it.
+ *
+ * Two things the game must hold to. On the ground it moves `object` by exactly
+ * the pose's `speed` and `turn`, or the feet slide. And in the air it leaves
+ * pitch and roll to the model: it passes them in the pose and does not also
+ * rotate `object` by them.
  */
 export interface FlyModel {
   readonly object: Object3D;
@@ -41,5 +59,6 @@ export interface FlyModel {
   update(pose: FlyPose, dt: number): void;
   /** Where a point on the fly is now, in world space. */
   anchor(name: FlyAnchor, out: Vector3): Vector3;
+  readonly nerves: FlyNerves;
   dispose(): void;
 }

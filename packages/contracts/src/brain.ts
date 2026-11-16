@@ -2,7 +2,7 @@
 // TypeScript simulation in a browser, or native code on its own thread in the
 // Apple TV app, where JavaScript is too slow for it.
 
-import type { BrainSenses, BrainState, EyeMap } from "@fly/brain";
+import type { BrainEngine, BrainSenses, BrainState, EyeMap } from "@fly/brain";
 
 export type BrainStatus = "loading" | "running" | "failed";
 
@@ -16,8 +16,17 @@ export interface BrainDriver {
   readonly connections: number;
   /** Where the eyes' facets look, once running; null if this brain has no eyes. */
   readonly eyes: EyeMap | null;
+  /** Which build of the brain runs, once running, for tests and measurements; a stand-in has none. */
+  readonly engine?: BrainEngine | null;
   /** The brain's latest answer, or null before the first. */
   readonly state: BrainState | null;
+  /**
+   * Each region's smoothed firing rate, Hz, in the order of `REGIONS`
+   * (`@fly/brain`), as of `state`: its `region.<id>` rate, for reading every
+   * frame without allocating. Filled in place, so keep the reference; 0
+   * before the first state, and for a region the brain doesn't report.
+   */
+  readonly regionRates: Float32Array;
   /** `performance.now()` when `state` arrived. */
   readonly stateAt: number;
   /**
@@ -45,6 +54,7 @@ export const STATE_STATS = ["simMs", "wallMs", "spikes", "active"] as const;
 export interface NativeBrainBridge {
   /** Starts loading the brain. Call once. */
   start(seed: number): void;
+  /** "loading" from before `start` until the brain is running. */
   status(): BrainStatus;
   /** What went wrong, or "" */
   error(): string;

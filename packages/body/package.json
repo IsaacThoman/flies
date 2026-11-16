@@ -1,0 +1,10 @@
+{
+  "name": "@fly/body",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The fly's life in the world: its senses, how it moves on the brain's commands, and what its eyes see.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

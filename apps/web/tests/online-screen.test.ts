@@ -1,0 +1,317 @@
+// Online's rooms, as the screen shows them and as the remote works them: the
+// list as the room server says it, a locked room's door, a new room, a code;
+// and the line that lists the rooms.
+
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type { TableSocket, TableSocketStatus, TextEntry, TextRequest } from "@fly/contracts";
+import { CLOSE, MAX_PLAYERS, PROTOCOL } from "@fly/net";
+import type { RoomWire } from "@fly/net";
+import type { ActionItem, FieldItem } from "@fly/ui";
+import { TV_FRAME } from "../src/display.ts";
+import { Lobby } from "../src/online/lobby.ts";
+import { suggestName } from "../src/online/invite.ts";
+import { placeInfo } from "../src/places/catalog.ts";
+import { DEFAULT_SETTINGS } from "../src/settings.ts";
+import { OnlineScreen } from "../src/ui/screens/online.ts";
+import type { Knock, NewRoom, Shell, TableNow } from "../src/ui/screens/types.ts";
+
+/** Typing as a browser's input would: the test types, and presses Return or Escape. */
+class FakeTyping implements TextEntry {
+  active: string | null = null;
+  value = "";
+  caret = 0;
+  request: TextRequest | null = null;
+  #ended: "done" | "cancel" | null = null;
+  begin(request: TextRequest) {
+    this.request = request;
+    this.active = request.id;
+    this.value = request.value;
+    this.caret = request.value.length;
+  }
+  end() {
+    this.active = null;
+  }
+  type(text: string) {
+    this.value += text;
+    this.caret = this.value.length;
+  }
+  finish(how: "done" | "cancel") {
+    this.active = null;
+    this.#ended = how;
+  }
+  take() {
+    const e = this.#ended;
+    this.#ended = null;
+    return e;
+  }
+}
+
+const ROOMS: RoomWire[] = [
+  { code: "aaaaaaaaaa", name: "Sunny Crumbs", place: "bar", flies: 3, locked: false },
+  { code: "bbbbbbbbbb", name: "Secret Sugar", place: "lab", flies: 1, locked: true },
+  { code: "cccccccccc", name: "Packed", place: "picnic", flies: MAX_PLAYERS, locked: false },
+];
+
+function world() {
+  const typing = new FakeTyping();
+  const did: string[] = [];
+  const state = { rooms: null as RoomWire[] | null, table: null as TableNow | null, knock: null as Knock | null, ended: null as Shell["tableEnded"], started: null as NewRoom | null };
+  const shell: Shell = {
+    settings: { ...DEFAULT_SETTINGS },
+    brain: { status: "running" } as unknown as Shell["brain"],
+    meter: {} as Shell["meter"],
+    life: {} as Shell["life"],
+    weatherOutside: false,
+    weatherAttribution: () => null,
+    shape: TV_FRAME,
+    glyphs: null,
+    open() {},
+    back: () => did.push("back"),
+    play() {},
+    watch() {},
+    applySettings() {},
+    sound() {},
+    canPlayOnline: true,
+    get table() {
+      return state.table;
+    },
+    get tableEnded() {
+      return state.ended;
+    },
+    get knock() {
+      return state.knock;
+    },
+    door(room) {
+      state.knock = room && { ...room, wrong: false, seq: (state.knock?.seq ?? 0) + 1 };
+    },
+    here: "windowsill",
+    get rooms() {
+      return state.rooms;
+    },
+    typing,
+    startRoom(room) {
+      state.started = room;
+      did.push(`start ${room.name}`);
+    },
+    joinRoom: (code, password) => did.push(`join ${code}${password ? ` ${password}` : ""}`),
+    shareTable: async () => "copied",
+    removeFly: (id) => did.push(`remove ${id}`),
+    leaveTable: () => did.push("leave"),
+  };
+  const screen = new OnlineScreen(shell);
+  screen.enter();
+  const step = () => screen.update(1 / 60);
+  const press = (button: Parameters<OnlineScreen["press"]>[0]) => {
+    screen.press(button, false);
+    step();
+  };
+  /** Moves the focus to the item `id`, as the arrows do. */
+  const focus = (id: string) => {
+    for (let i = 0; i < 20 && screen.menu.focused?.id !== id; i++) press(screen.menu.items.findIndex((it) => it.id === id) > screen.menu.focus ? "down" : "up");
+    assert.equal(screen.menu.focused?.id, id);
+  };
+  return { screen, shell, state, typing, did, step, press, focus };
+}
+
+test("the rooms: a new one, a code, then each listed room by its name, its place's colour, its flies as pips and a padlock; a full one can't be chosen", () => {
+  const { screen, state, step } = world();
+  assert.equal(screen.view, "rooms");
+  assert.deepEqual(screen.menu.items.map((i) => i.id), ["new", "code", "looking"], "until the room server has said");
+  state.rooms = ROOMS;
+  step();
+  const rows = screen.menu.items as ActionItem[];
+  assert.deepEqual(rows.map((i) => i.id), ["new", "code", "room:aaaaaaaaaa", "room:bbbbbbbbbb", "room:cccccccccc"]);
+  assert.deepEqual([rows[2].label, rows[2].swatch, rows[2].count, rows[2].locked], ["Sunny Crumbs", placeInfo("bar").colour, [3, MAX_PLAYERS], false]);
+  assert.equal(rows[3].locked, true);
+  assert.equal(rows[4].disabled, true, "full");
+  // The list changes as the room server says: a room empties out of it.
+  state.rooms = ROOMS.slice(1);
+  step();
+  assert.deepEqual(screen.menu.items.map((i) => i.id), ["new", "code", "room:bbbbbbbbbb", "room:cccccccccc"]);
+  state.rooms = [];
+  step();
+  assert.deepEqual(screen.menu.items.map((i) => i.id), ["new", "code", "none"]);
+});
+
+test("an open room is joined by choosing it; a locked one shows its door, where the password typed and Return go in", () => {
+  const { screen, state, typing, did, press, focus, step } = world();
+  state.rooms = ROOMS;
+  step();
+  focus("room:aaaaaaaaaa");
+  press("select");
+  assert.deepEqual(did, ["join aaaaaaaaaa"]);
+
+  focus("room:bbbbbbbbbb");
+  press("select");
+  assert.equal(screen.view, "door");
+  assert.equal(screen.menu.focused?.id, "password");
+  const join = () => screen.menu.items.find((i) => i.id === "join")!;
+  assert.equal(join().disabled, true, "nothing to go in with yet");
+  press("select");
+  assert.deepEqual(typing.request, { id: "password", kind: "password", value: "", max: 64 });
+  typing.type("hunter2");
+  step();
+  const field = screen.menu.items[0] as FieldItem;
+  assert.equal(field.value, "hunter2");
+  assert.equal(field.secret, true, "shown as dots");
+  typing.finish("done");
+  step();
+  assert.deepEqual(did.at(-1), "join bbbbbbbbbb hunter2");
+
+  // The room said no: the door again, saying so where its name was.
+  state.knock = { code: "bbbbbbbbbb", name: "Secret Sugar", wrong: true, seq: 9 };
+  state.ended = "locked";
+  step();
+  assert.equal(screen.view, "door");
+  assert.equal(screen.note, "wrong");
+  assert.equal((screen.menu.items[0] as FieldItem).value, "", "to type again");
+  // Typing again, the note goes.
+  press("select");
+  assert.equal(screen.note, "");
+  // Back is the list again.
+  typing.finish("cancel");
+  step();
+  press("back");
+  assert.equal(screen.view, "rooms");
+  assert.equal(state.knock, null);
+});
+
+test("while the door opens it says so, and once in, the room's own face: its name, its link, leaving it", () => {
+  const { screen, state, did, step } = world();
+  state.knock = { code: "bbbbbbbbbb", name: "Secret Sugar", wrong: false, seq: 1 };
+  step();
+  assert.equal(screen.view, "door");
+  state.table = { name: null, starting: false, joined: false, others: [] };
+  step();
+  assert.equal(screen.view, "door", "on its way in");
+  assert.deepEqual(screen.menu.items.map((i) => [i.id, i.label, !!i.disabled]), [["password", "Password", true], ["join", "Joining…", true]]);
+  state.table = { name: "Secret Sugar", starting: false, joined: true, others: [{ id: 1, colour: "#ffd21f" }] };
+  state.knock = null;
+  step();
+  assert.equal(screen.view, "room");
+  assert.deepEqual(screen.menu.items.map((i) => i.id), ["share", "leave"], "only the starter removes flies");
+  screen.press("down", false);
+  screen.press("select", false);
+  assert.deepEqual(did, ["leave"]);
+});
+
+test("a new room: a name suggested, the place the fly is in, listed, no password; a name that can't be one is said so; Create makes it", () => {
+  const { screen, state, typing, did, press, focus, step } = world();
+  focus("new");
+  press("select");
+  assert.equal(screen.view, "new");
+  assert.equal(screen.menu.focused?.id, "create", "ready to go as it is");
+  const name = screen.menu.items[0] as FieldItem;
+  assert.match(name.value, /^\S+ \S+$/);
+  assert.deepEqual(screen.menu.items.map((i) => i.id), ["name", "place", "listed", "password", "create"]);
+
+  focus("name");
+  press("select");
+  assert.equal(typing.request?.kind, "name");
+  typing.value = "";
+  typing.type("fly 🪰");
+  typing.finish("done");
+  step();
+  focus("listed");
+  press("right");
+  focus("password");
+  press("select");
+  assert.equal(typing.request?.kind, "new-password", "for a password manager to keep");
+  typing.type("pw");
+  typing.finish("done");
+  step();
+  focus("create");
+  press("select");
+  assert.equal(screen.note, "name");
+  assert.equal(did.length, 0);
+
+  focus("name");
+  press("select");
+  typing.value = "";
+  typing.type("  Late   Night ");
+  typing.finish("done");
+  step();
+  focus("create");
+  press("select");
+  assert.deepEqual(state.started, { name: "Late Night", listed: false, password: "pw", place: "windowsill" });
+});
+
+test("a code typed and Return joins its room; one that can't be a code is said so", () => {
+  const { screen, typing, did, press, focus, step } = world();
+  focus("code");
+  press("select");
+  assert.deepEqual(typing.request, { id: "code", kind: "code", value: "", max: 10 });
+  typing.type("nope");
+  typing.finish("done");
+  step();
+  assert.equal(screen.note, "code");
+  press("select");
+  typing.value = "";
+  typing.type("ABCDEFGHJK");
+  typing.finish("done");
+  step();
+  assert.deepEqual(did, ["join abcdefghjk"]);
+});
+
+test("a room that turned the device away for being full, or gone, says so", () => {
+  const { screen, state, step } = world();
+  state.ended = "full";
+  step();
+  assert.equal(screen.note, "full");
+});
+
+test("suggested names are two words, from a few each", () => {
+  const seen = new Set<string>();
+  for (let i = 0; i < 200; i++) seen.add(suggestName());
+  assert.ok(seen.size > 50);
+  for (const name of seen) assert.match(name, /^[A-Z][a-z]+ [A-Z][a-z]+$/);
+});
+
+class FakeSocket implements TableSocket {
+  status: TableSocketStatus = "connecting";
+  closeCode = 0;
+  closeReason = "";
+  readonly sent: string[] = [];
+  readonly inbox: string[] = [];
+  send(data: string | Uint8Array) {
+    if (typeof data === "string") this.sent.push(data);
+  }
+  drain(text: (m: string) => void) {
+    for (const m of this.inbox.splice(0)) text(m);
+  }
+  close() {
+    this.status = "closed";
+  }
+}
+
+test("the lobby asks to browse once open, takes each list it is told (only well-formed rooms), and opens again when it drops", () => {
+  const sockets: FakeSocket[] = [];
+  const lobby = new Lobby(() => {
+    const s = new FakeSocket();
+    sockets.push(s);
+    return s;
+  }, "ws://rooms");
+  lobby.update(0.016);
+  assert.deepEqual(sockets[0].sent, []);
+  sockets[0].status = "open";
+  lobby.update(0.016);
+  assert.deepEqual(sockets[0].sent.map((m) => JSON.parse(m)), [{ type: "browse", v: PROTOCOL }]);
+  assert.equal(lobby.rooms, null);
+  sockets[0].inbox.push(JSON.stringify({ type: "rooms", rooms: [ROOMS[0], { code: "x", name: 3 }] }));
+  lobby.update(0.016);
+  assert.deepEqual(lobby.rooms, [ROOMS[0]]);
+  assert.equal(lobby.status, "open");
+
+  sockets[0].status = "closed";
+  sockets[0].closeCode = 1006;
+  lobby.update(0.016);
+  assert.equal(lobby.status, "lost");
+  assert.deepEqual(lobby.rooms, [ROOMS[0]], "the last list it had, until it hears again");
+  lobby.update(1);
+  assert.equal(sockets.length, 2, "again");
+  sockets[1].status = "closed";
+  sockets[1].closeCode = CLOSE.version;
+  lobby.update(0.016);
+  assert.equal(lobby.status, "version", "a newer room server: the page reloads");
+});

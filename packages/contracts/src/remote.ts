@@ -1,8 +1,8 @@
 // The Apple TV remote, as the game sees it.
 //
 // Everything arrives as DOM events on `window`, so the same game code runs in
-// a browser (keyboard and mouse) and in the tvOS host (which has no real DOM
-// and synthesises these events from the remote).
+// a browser (whose keyboard sends the same keys) and in the tvOS host (which
+// has no real DOM and synthesises these events from the remote).
 
 export type RemoteButton = "up" | "down" | "left" | "right" | "select" | "back" | "playPause";
 
@@ -31,8 +31,9 @@ export const REMOTE_KEYS: Readonly<Record<string, RemoteButton>> = {
  * A finger on the remote's touch surface: a `remotetouch` CustomEvent on
  * `window`, sent whenever the finger lands, moves or lifts. `x` and `y` run
  * from -1 to 1 across the surface with y up, (0, 0) at its centre; they keep
- * their last value when `touching` goes false. In a browser the mouse over
- * the canvas stands in for it (pressed = touching).
+ * their last value when `touching` goes false. A browser has no such
+ * surface: its pointer points at the screen itself (scripts can still send
+ * these, to play as the remote).
  */
 export type RemoteTouch = { x: number; y: number; touching: boolean };
 export const REMOTE_TOUCH_EVENT = "remotetouch";
@@ -40,7 +41,8 @@ export const REMOTE_TOUCH_EVENT = "remotetouch";
 /**
  * The host leaves the app when Back is pressed at the root of the game (as
  * tvOS apps must). The game tells it whether it is there by setting this
- * property on `window`; the host reads it when the press begins. In a browser
- * nothing reads it.
+ * property on `window` by plain assignment (the host watches for the
+ * assignment, so don't define it with `Object.defineProperty`); the host uses
+ * the value it has when the press begins. In a browser nothing reads it.
  */
 export const AT_ROOT_PROPERTY = "__flyAtRoot";

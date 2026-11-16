@@ -1,47 +1,129 @@
-// A placeholder scene: enough to prove the renderer, the frame loop and the
-// remote all work, in a browser and on the Apple TV. The game replaces it.
+// Boots the game: the screen, what the player holds, the brain and the frame
+// loop. In a browser also the page's lifecycle (page.ts) and the frame rate
+// this device can afford (quality.ts); if it can't draw at all, it says so.
 
-import * as THREE from "three";
-import { REMOTE_KEYS, REMOTE_TOUCH_EVENT } from "@fly/contracts";
-import type { RemoteTouch } from "@fly/contracts";
-
-/** The whole game renders at this size and is stretched to the screen. */
-export const RENDER_WIDTH = 640;
-export const RENDER_HEIGHT = 480;
+import { AT_ROOT_PROPERTY } from "@fly/contracts";
+import { HitMap } from "@fly/ui";
+import { Display } from "./display.ts";
+import { createBrainDriver } from "./brain/create.ts";
+import { Game } from "./game.ts";
+import type { Inputs } from "./game.ts";
+import { Devices, Gamepads, Keyboard, Pointers, Remote, initialDevice } from "./input.ts";
+import { Page } from "./page.ts";
+import { Quality } from "./quality.ts";
+import { loadingLayout } from "./ui/layout.ts";
+import { drawFailure } from "./ui/loading.ts";
+import { drawWordmark } from "./ui/wordmark.ts";
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
-renderer.setPixelRatio(1);
-renderer.setSize(RENDER_WIDTH, RENDER_HEIGHT, false);
+// The Apple TV host: the remote is all there is, and the screen never changes.
+const native = !!(globalThis as { __native?: unknown }).__native;
+const display = new Display(native);
+const devices = new Devices(initialDevice(native, display.frame.coarse));
+const remote = new Remote(window, undefined, devices, native ? "remote" : "keys");
+const inputs: Inputs = { devices };
+if (!native) {
+  const pointers = new Pointers(() => canvas.getBoundingClientRect(), undefined, devices);
+  pointers.attach(canvas);
+  inputs.pointers = pointers;
+  inputs.keyboard = new Keyboard(window, remote, devices);
+  inputs.pads = new Gamepads(remote, devices, () => navigator.getGamepads?.() ?? [], window);
+}
+(window as unknown as Record<string, unknown>)[AT_ROOT_PROPERTY] = true;
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color("#8fd0ff");
-// Laid out for a 16:9 screen; the 4:3 buffer is stretched to fill it.
-const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 100);
-camera.position.set(0, 1.2, 4);
-camera.lookAt(0, 0, 0);
-scene.add(new THREE.HemisphereLight("#ffffff", "#6aa84f", 2));
+let game: Game | null = null;
+try {
+  game = new Game(canvas, remote, createBrainDriver(), display, inputs);
+} catch (error) {
+  if (native) throw error;
+  cannotDraw(error);
+}
 
-const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: "#e5483e" }));
-scene.add(cube);
-
-window.addEventListener("keydown", (event) => {
-  const button = REMOTE_KEYS[event.key];
-  if (button) canvas.dataset.lastButton = button;
-});
-window.addEventListener(REMOTE_TOUCH_EVENT, (event) => {
-  const { x, y } = (event as CustomEvent<RemoteTouch>).detail;
-  cube.position.set(x, y, 0);
-});
-
-let last = performance.now();
-const frame = (now: number) => {
-  const dt = Math.min((now - last) / 1000, 0.1);
-  last = now;
-  cube.rotation.y += dt;
-  cube.rotation.x += dt * 0.6;
-  renderer.render(scene, camera);
-  canvas.dataset.ready = "true";
+if (game) {
+  (globalThis as { __fly?: Game }).__fly = game;
+  let page: Page | null = null;
+  if (!native) {
+    game.quality = new Quality(storage());
+    game.applySettings(false);
+    page = new Page(game, canvas);
+    Page.keepForOffline();
+  }
+  let last = performance.now();
+  // How often the display offers a frame (ms, smoothed), and when the next one the game draws is due.
+  let offeredEvery = 1000 / 60;
+  let offered = -1;
+  let due = 0;
+  const frame = (now: number) => {
+    requestAnimationFrame(frame);
+    // Browsers stop frames for a hidden tab, but not all of them always (an occluded window, a headless one): the fly's life stops anyway.
+    if (page?.asleep) {
+      offered = -1;
+      return;
+    }
+    if (offered >= 0) offeredEvery += (Math.min(100, now - offered) - offeredEvery) * 0.1;
+    offered = now;
+    const every = game.quality ? 1000 / game.quality.current.fps : 0;
+    // Only a display well over the game's rate is held back (120 Hz, or 60 Hz when the game wants 30): one just
+    // over it would otherwise lose a frame every few seconds, a judder in every pan.
+    if (every > offeredEvery * 1.33) {
+      if (now < due - offeredEvery / 2) return;
+      due = Math.max(due + every, now);
+    }
+    page?.update();
+    const dt = Math.min(Math.max(0, (now - last) / 1000), 0.1);
+    last = now;
+    game.frame(dt, now);
+  };
   requestAnimationFrame(frame);
-};
-requestAnimationFrame(frame);
+}
+
+function storage() {
+  try {
+    return typeof localStorage === "undefined" ? null : localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** No WebGL 2 (or it couldn't start): the failure, drawn in 2D on the same canvas at the screen's shape, and a reload to try again. */
+function cannotDraw(error: unknown) {
+  console.error(error);
+  const g = canvas.getContext("2d");
+  if (canvas.dataset) {
+    canvas.dataset.screen = "loading";
+    canvas.dataset.brain = "failed";
+    canvas.dataset.failure = "webgl";
+  }
+  if (!g) return;
+  const start = performance.now();
+  const hits = new HitMap();
+  const draw = () => {
+    display.update();
+    const frame = display.frame;
+    if (canvas.width !== frame.width || canvas.height !== frame.height) {
+      canvas.width = frame.width;
+      canvas.height = frame.height;
+    }
+    const t = (performance.now() - start) / 1000;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    const sky = g.createLinearGradient(0, 0, 0, frame.height);
+    sky.addColorStop(0, "#5aa9ec");
+    sky.addColorStop(1, "#cfeaff");
+    g.fillStyle = sky;
+    g.fillRect(0, 0, frame.width, frame.height);
+    g.setTransform(frame.width / frame.design.width, 0, 0, frame.height / frame.design.height, 0, 0);
+    const layout = loadingLayout(frame);
+    drawWordmark(g, layout.wordmark.x, layout.wordmark.y, layout.wordmark.size, t);
+    hits.begin("loading");
+    drawFailure(g, "webgl", "", null, layout, hits);
+    requestAnimationFrame(draw);
+  };
+  draw();
+  // Anything at all tries again: there is nothing else to do here.
+  const retry = (event: Event) => {
+    if (event instanceof KeyboardEvent && event.key !== "Enter") return;
+    location.reload();
+  };
+  window.addEventListener("keydown", retry);
+  canvas.addEventListener("pointerup", retry);
+}

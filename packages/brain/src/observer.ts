@@ -1,35 +1,35 @@
-// How the desktop pet acts on the commands, reduced to what the brain's
-// behaviour statistics need. The thresholds mirror
-// apps/desktop/src/brain/behavior.ts (which this package can't import); if
-// they change there, change them here.
+// Fixed diagnostics keep resting-behaviour measurements comparable without
+// running the body or world. Turn events measure sustained steering commands;
+// the live body in packages/body steers continuously instead.
 
 import type { BrainCommand } from "./types.ts";
 
-export const PET = {
-  /** 1/s; how quickly the pet's smoothed command follows the brain. */
+export const OBSERVER = {
+  /** 1/s; how quickly the smoothed command follows the brain. */
   smoothing: 12,
   walkOn: 0.3,
   walkOff: 0.15,
   backOn: 0.3,
   backOff: 0.15,
   backMargin: 0.15,
-  /** turn × seconds that turns it around, and how fast that leaks (1/s). */
+  /** turn × seconds per diagnostic event, and how fast that leaks (1/s). */
   turnThreshold: 0.5,
   turnLeak: 0.5,
-  escapeOn: 0.5,
+  /** As the body's (packages/body/src/behavior.ts, ESCAPE_ON). */
+  escapeOn: 0.4,
   escapeRearm: 0.3,
   /** s between take-offs. */
   escapeRefractory: 1.5,
 } as const;
 
-export type PetTally = {
+export type BehaviorTally = {
   seconds: number;
   /** Seconds spent walking forwards, and the number of separate bouts. */
   walking: number;
   walkBouts: number;
   backing: number;
   backBouts: number;
-  /** Turn-arounds toward the fly's left and right. */
+  /** Diagnostic turn events toward the fly's left and right. */
   turnsLeft: number;
   turnsRight: number;
   escapes: number;
@@ -39,9 +39,9 @@ export type PetTally = {
 
 const ease = (rate: number, dt: number) => 1 - Math.exp(-rate * dt);
 
-/** Feeds commands through the pet's thresholds and counts what it would do (always free to move, on its feet). */
-export class PetObserver {
-  readonly tally: PetTally = {
+/** Measures commands without simulating obstacles or flight; these tallies are diagnostics, not body motion. */
+export class BehaviorObserver {
+  readonly tally: BehaviorTally = {
     seconds: 0,
     walking: 0,
     walkBouts: 0,
@@ -67,22 +67,22 @@ export class PetObserver {
       t.peak[key] = key === "turn" ? (Math.abs(command.turn) > Math.abs(t.peak.turn) ? command.turn : t.peak.turn) : Math.max(t.peak[key], command[key]);
     }
     if (!this.#smoothed) this.#smoothed = { walk: command.walk, turn: command.turn, back: command.back };
-    else for (const key of ["walk", "turn", "back"] as const) this.#smoothed[key] += (command[key] - this.#smoothed[key]) * ease(PET.smoothing, dt);
+    else for (const key of ["walk", "turn", "back"] as const) this.#smoothed[key] += (command[key] - this.#smoothed[key]) * ease(OBSERVER.smoothing, dt);
     const { walk, turn, back } = this.#smoothed;
 
     this.#refractory = Math.max(0, this.#refractory - dt);
-    if (command.escape < PET.escapeRearm) this.#armed = true;
-    if (this.#armed && this.#refractory <= 0 && command.escape >= PET.escapeOn) {
+    if (command.escape < OBSERVER.escapeRearm) this.#armed = true;
+    if (this.#armed && this.#refractory <= 0 && command.escape >= OBSERVER.escapeOn) {
       this.#armed = false;
-      this.#refractory = PET.escapeRefractory;
+      this.#refractory = OBSERVER.escapeRefractory;
       this.#turned = 0;
       t.escapes++;
     }
 
     const wasWalking = this.#walking && !this.#backing;
     const wasBacking = this.#backing;
-    this.#walking = this.#walking ? walk >= PET.walkOff : walk > PET.walkOn;
-    this.#backing = this.#backing ? back >= PET.backOff && back >= walk : back > PET.backOn && back > walk + PET.backMargin;
+    this.#walking = this.#walking ? walk >= OBSERVER.walkOff : walk > OBSERVER.walkOn;
+    this.#backing = this.#backing ? back >= OBSERVER.backOff && back >= walk : back > OBSERVER.backOn && back > walk + OBSERVER.backMargin;
     const walkingNow = this.#walking && !this.#backing;
     if (walkingNow) {
       t.walking += dt;
@@ -93,8 +93,8 @@ export class PetObserver {
       if (!wasBacking) t.backBouts++;
     }
 
-    this.#turned = this.#turned * (1 - ease(PET.turnLeak, dt)) + turn * dt;
-    if (Math.abs(this.#turned) >= PET.turnThreshold) {
+    this.#turned = this.#turned * (1 - ease(OBSERVER.turnLeak, dt)) + turn * dt;
+    if (Math.abs(this.#turned) >= OBSERVER.turnThreshold) {
       if (this.#turned > 0) t.turnsRight++;
       else t.turnsLeft++;
       this.#turned = 0;

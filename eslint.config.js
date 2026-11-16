@@ -3,15 +3,15 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["**/dist", "**/build", "**/node_modules", "**/generated", "apps/tvos/www", "packages/brain/data"] },
+  { ignores: ["**/dist", "**/build", "**/node_modules", "**/generated", "apps/tvos/www", "apps/ios/www", "packages/brain/data"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["apps/web/src/**/*.ts", "packages/{fly,world,body,ui,contracts}/src/**/*.ts"],
+    files: ["apps/web/src/**/*.ts", "packages/{fly,world,body,ui,contracts,net}/src/**/*.ts"],
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ["packages/brain/**/*.ts", "scripts/**/*.ts", "**/tests/**/*.ts", "**/*.test.ts", "**/vite.config.ts"],
+    files: ["packages/brain/**/*.ts", "apps/server/**/*.ts", "scripts/**/*.ts", "**/tests/**/*.ts", "**/*.test.ts", "**/vite.config.ts"],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
 );

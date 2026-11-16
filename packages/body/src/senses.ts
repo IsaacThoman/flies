@@ -1,0 +1,193 @@
+// What the fly's body feels each frame, as the brain's senses.
+//
+// Left and right are the fly's own. Each sense is measured from what happens
+// to the body in the world; none of them is set because of what the fly is
+// "supposed" to do next.
+
+import type { BrainSenses } from "@fly/brain";
+import type { Food, Pantry, Vec3, World } from "@fly/world";
+import { ease } from "./behavior.ts";
+import { FLY_HEIGHT, HEAD_AHEAD, HEAD_UP, MOUTH_AHEAD, MOUTH_UP, STEP_UP } from "./motion.ts";
+import type { FlyBody } from "./motion.ts";
+import type { Bodies } from "./crowd.ts";
+
+/**
+ * Something the fly could see coming: a ball of radius `r` at `position`. Its
+ * looming is how fast it grows in the eye, measured each frame.
+ */
+export type Looming = { id: number; position: Vec3; r: number };
+
+export type SenseInput = {
+  dt: number;
+  body: FlyBody;
+  world: World;
+  pantry: Pantry;
+  /** Things that could loom. Ignored while the eyes are in use: then the eyes see them. */
+  looming: readonly Looming[];
+  /** Something touching it from outside (a feather), 0 to 1. */
+  stroke: number;
+  /** The air's own velocity at the fly, mm/s. */
+  air: Vec3;
+  /** The brain's eyes see the world: no hand-wired looming then. */
+  eyesOpen: boolean;
+  /** How far the proboscis reaches now (0 to 1, the feeding pose), adding to what the mouth can taste. */
+  proboscis: number;
+  /** Other flies' bodies, which the antennae press on as on a wall (at a table with others). */
+  bodies?: Bodies;
+};
+
+/** Angular expansion (rad/s) below which nothing looms, and at which it looms fully. */
+export const LOOM_MIN_RATE = 0.8;
+export const LOOM_FULL_RATE = 4;
+/** Only something at least this big in the eye (rad) looms. */
+export const LOOM_MIN_ANGLE = 0.08;
+/** A loom is held this long (s) at its peak, then fades out over LOOM_DECAY. */
+export const LOOM_HOLD = 0.08;
+export const LOOM_DECAY = 0.2;
+/** Something within this slope of straight ahead, behind, above or below looms in both eyes. */
+export const LOOM_BOTH_SLOPE = 0.35;
+/** Touch and bump ease out over about this long (s) once they stop. */
+export const RELEASE = 0.3;
+/** Hitting something in the air at this speed (mm/s) or more is a full touch. */
+export const HIT_FULL_SPEED = 400;
+/** Its own speed through the air at which wind is full, mm/s. */
+export const WIND_FULL_SPEED = 1000;
+const WIND_SMOOTHING = 15;
+/** How far ahead of the head and to each side the antennae reach, in body lengths. */
+export const ANTENNA_AHEAD = 0.2;
+export const ANTENNA_SIDE = 0.12;
+/** How far the mouthparts reach, mm, plus the proboscis's reach when extended. */
+export const MOUTH_REACH = 0.3;
+export const PROBOSCIS_REACH = 0.4;
+/** Where its feet are: around its middle, within this radius (mm). */
+export const FOOT_SPREAD = 0.9;
+
+const clamp01 = (value: number) => (Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0);
+
+/** Follows a rising target at once and eases out toward a falling one over about `seconds`. */
+function release(value: number, target: number, seconds: number, dt: number) {
+  if (target >= value) return target;
+  const next = value + (target - value) * ease(3 / seconds, dt);
+  return next - target < 0.005 ? target : next;
+}
+
+type EyeState = { value: number; hold: number };
+
+/** The food it is touching: under its feet, or at its mouth. */
+export type Tasting = { food: Food | null; byMouth: boolean };
+
+export class SenseTracker {
+  readonly senses: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true };
+  readonly tasting: Tasting = { food: null, byMouth: false };
+  /** How large each looming thing was in the eye last frame (rad), by id. */
+  #sizes = new Map<number, number>();
+  #eyes: { left: EyeState; right: EyeState } = { left: { value: 0, hold: 0 }, right: { value: 0, hold: 0 } };
+  #touch = 0;
+  #bumpLeft = 0;
+  #bumpRight = 0;
+  #wind = 0;
+  #head: Vec3 = { x: 0, y: 0, z: 0 };
+  #probe: Vec3 = { x: 0, y: 0, z: 0 };
+
+  update(input: SenseInput): BrainSenses {
+    const dt = Number.isFinite(input.dt) ? Math.max(0, input.dt) : 0;
+    const { body, world, pantry } = input;
+    const out = this.senses;
+    const head = body.point(HEAD_AHEAD, HEAD_UP, 0, this.#head);
+
+    // Looming: how fast something grows in each eye.
+    let loomLeft = 0;
+    let loomRight = 0;
+    if (!input.eyesOpen) {
+      const sin = Math.sin(body.yaw);
+      const cos = Math.cos(body.yaw);
+      for (const thing of input.looming) {
+        const dx = thing.position.x - head.x;
+        const dy = thing.position.y - head.y;
+        const dz = thing.position.z - head.z;
+        const d = Math.max(thing.r * 1.0001, Math.hypot(dx, dy, dz));
+        const size = 2 * Math.asin(Math.min(1, thing.r / d));
+        const before = this.#sizes.get(thing.id);
+        this.#sizes.set(thing.id, size);
+        if (before === undefined || dt <= 0 || size < LOOM_MIN_ANGLE) continue;
+        const rate = (size - before) / dt;
+        const loom = clamp01((rate - LOOM_MIN_RATE) / (LOOM_FULL_RATE - LOOM_MIN_RATE));
+        if (loom <= 0) continue;
+        // In the fly's frame: its left is (cos yaw, 0, -sin yaw), ahead is (sin yaw, 0, cos yaw).
+        const left = dx * cos - dz * sin;
+        const ahead = dx * sin + dz * cos;
+        const rest = Math.hypot(ahead, dy);
+        const both = Math.abs(left) <= LOOM_BOTH_SLOPE * rest;
+        if (both || left > 0) loomLeft = Math.max(loomLeft, loom);
+        if (both || left < 0) loomRight = Math.max(loomRight, loom);
+      }
+      // (Things that stop looming keep their last size: the list is small and fixed.)
+    } else {
+      this.#sizes.clear();
+    }
+    this.#eye(this.#eyes.left, loomLeft, dt);
+    this.#eye(this.#eyes.right, loomRight, dt);
+
+    // Touch: stroked from outside, or hitting something in flight.
+    const hit = clamp01(body.events.hit / HIT_FULL_SPEED);
+    this.#touch = release(this.#touch, Math.max(clamp01(input.stroke), hit), RELEASE, dt);
+
+    // Antennae: just ahead of the head, one each side. Each feels a wall it presses into.
+    this.#bumpLeft = release(this.#bumpLeft, this.#pressing(body, world, 1, input.bodies) ? 1 : 0, RELEASE, dt);
+    this.#bumpRight = release(this.#bumpRight, this.#pressing(body, world, -1, input.bodies) ? 1 : 0, RELEASE, dt);
+
+    // Wind: its own speed through the air.
+    const v = body.velocity;
+    const airspeed = Math.hypot(v.x - input.air.x, v.y - input.air.y, v.z - input.air.z);
+    this.#wind += (clamp01(airspeed / WIND_FULL_SPEED) - this.#wind) * ease(WIND_SMOOTHING, dt);
+    if (this.#wind < 0.005) this.#wind = 0;
+
+    // Taste: with the feet and the mouthparts, while it stands.
+    const tasting = this.tasting;
+    tasting.food = null;
+    tasting.byMouth = false;
+    let sweet = 0;
+    if (body.onFeet) {
+      const mouth = body.point(MOUTH_AHEAD, MOUTH_UP, 0, this.#probe);
+      const reach = MOUTH_REACH + PROBOSCIS_REACH * clamp01(input.proboscis);
+      const atMouth = pantry.touching(mouth.x, body.position.y, mouth.z, reach);
+      const underfoot = pantry.touching(body.position.x, body.position.y, body.position.z, FOOT_SPREAD);
+      const best = !atMouth ? underfoot : !underfoot ? atMouth : atMouth.sweet * atMouth.amount >= underfoot.sweet * underfoot.amount ? atMouth : underfoot;
+      if (best) {
+        tasting.food = best;
+        tasting.byMouth = best === atMouth;
+        sweet = best.sweet * Math.min(1, best.amount * 4);
+      }
+    }
+
+    out.loomLeft = clamp01(this.#eyes.left.value);
+    out.loomRight = clamp01(this.#eyes.right.value);
+    out.touch = clamp01(this.#touch);
+    out.bumpLeft = clamp01(this.#bumpLeft);
+    out.bumpRight = clamp01(this.#bumpRight);
+    out.wind = clamp01(this.#wind);
+    out.sweet = clamp01(sweet);
+    out.grounded = body.onFeet;
+    return out;
+  }
+
+  /** On its feet, a wall it would walk into (something between a step and its height over its feet); in the air, the tip inside something. */
+  #pressing(body: FlyBody, world: World, side: 1 | -1, bodies: Bodies | undefined) {
+    const tip = body.point(HEAD_AHEAD + ANTENNA_AHEAD, HEAD_UP, side * ANTENNA_SIDE, this.#probe);
+    if (bodies?.inside(tip.x, tip.y, tip.z, 0)) return true;
+    if (!world.onTable(tip.x, tip.z)) return body.onFeet;
+    const feet = body.position.y;
+    return body.onFeet ? world.underside(tip.x, tip.z, feet + STEP_UP) < feet + FLY_HEIGHT : world.solidAt(tip.x, tip.y, tip.z) >= 0;
+  }
+
+  #eye(state: EyeState, seen: number, dt: number) {
+    if (seen >= state.value && seen > 0) {
+      state.value = seen;
+      state.hold = LOOM_HOLD;
+    } else if (state.hold > 0) {
+      state.hold = Math.max(0, state.hold - dt);
+    } else {
+      state.value = Math.max(seen, state.value - dt / LOOM_DECAY);
+    }
+  }
+}

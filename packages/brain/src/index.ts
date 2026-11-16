@@ -5,7 +5,7 @@
 
 export { createBrain } from "./runtime.ts";
 export { RESTING_SENSES } from "./types.ts";
-export type { Brain, BrainCommand, BrainRequest, BrainResponse, BrainSenses, BrainState, BrainStats, Eye, EyeMap } from "./types.ts";
+export type { Brain, BrainCommand, BrainEngine, BrainRequest, BrainResponse, BrainSenses, BrainState, BrainStats, Eye, EyeMap } from "./types.ts";
 export {
   CATEGORY_COLUMNS,
   CATEGORY_NAMES,
@@ -17,5 +17,15 @@ export {
   writeConnectome,
 } from "./format.ts";
 export type { CategoryColumn, CategoryName, Connectome, ConnectomeData, ConnectomeHeader, ConnectomeSource, NeuronQuery, SectionInfo } from "./format.ts";
-export { PoissonInput, Simulation, gainByTransmitter, inputSeed, mulberry32 } from "./sim.ts";
+export { ACCEPTANCE, EYE_GEOMETRY, buildEyes, facetDirection } from "./eyes.ts";
+export type { EyeCells, Eyes, Side } from "./eyes.ts";
+export { COLUMN_KINDS, EYE_COLUMNS } from "./eye-columns.ts";
+export type { EyeColumn } from "./eye-columns.ts";
+export { REGIONS, REGION_RATE_NAMES, REGION_TAU, regionIdOf, regionName, regionOf } from "./regions.ts";
+export type { Annotations, Region, RegionSide } from "./regions.ts";
+export { RETINA, Retina, VISION_STAGES, stageName } from "./vision.ts";
+export type { RetinaParameters } from "./vision.ts";
+export { PoissonInput, RatedPoissonInput, Simulation, gainByTransmitter, inputSeed, mulberry32 } from "./sim.ts";
 export type { Network, SimulationOptions, SimulationStats } from "./sim.ts";
+export { ANATOMY_CATEGORIES, AnatomyFormatError, anatomicalPosition, cordSegments, loadAnatomy, writeAnatomy } from "./anatomy.ts";
+export type { Anatomy, AnatomyCategory, AnatomyData, AnatomyHeader, Bounds, CordSegment, Position } from "./anatomy.ts";

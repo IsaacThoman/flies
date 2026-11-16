@@ -1,0 +1,10 @@
+{
+  "name": "@fly/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A small in-engine menu kit: menu state and focus, kept apart from the canvas drawing.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

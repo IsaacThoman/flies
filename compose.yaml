@@ -1,0 +1,60 @@
+services:
+  web:
+    image: flies-web:local
+    build:
+      context: .
+      target: web
+      args:
+        FLY_SITE_URL: ${FLY_SITE_URL:-}
+    environment:
+      ROOMS_HOST: ${ROOMS_HOST:-rooms}
+      ROOMS_PORT: ${ROOMS_PORT:-3000}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-private_ranges}
+    # Plain HTTP for your own HTTPS reverse proxy (docs/deploy.md), off 80 so
+    # it can share a host with one.
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    # Without certificates Caddy keeps nothing worth a volume; this stops the
+    # image's declared /data and /config from leaving anonymous ones behind.
+    tmpfs:
+      - /data
+      - /config
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Tables of people's flies (docs/online.md): WebSockets at /rooms, which
+  # Caddy proxies on the site's own origin. No published port, and no
+  # depends_on: the site works while it is down. A deploy restarts it with
+  # SIGTERM; it keeps its tables in the rooms_data volume and every device
+  # comes back to its table.
+  rooms:
+    image: flies-rooms:local
+    build:
+      context: .
+      target: rooms
+    environment:
+      PORT: ${ROOMS_PORT:-3000}
+      # Caddy passes on the client's address, which rate limits count by.
+      TRUST_PROXY: "1"
+    volumes:
+      - rooms_data:/data
+    restart: unless-stopped
+    stop_grace_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  rooms_data:
