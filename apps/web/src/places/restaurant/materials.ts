@@ -42,6 +42,9 @@ export function sharedUniforms(floorAO: THREE.Texture, clock: WallClock) {
     uPendant: { value: new THREE.Vector4() },
     uPendantColor: { value: new THREE.Color("#ffc890") },
     uOpening: { value: 0 },
+    /** The room as polish reflects it, and the shop front's glass from inside (light.ts, rRoom). */
+    uRoomTone: { value: new THREE.Color() },
+    uWindowSeen: { value: new THREE.Color() },
     uFloorAO: { value: floorAO },
     /** The casters of the area the camera is in, and the box they shadow (x0, x1, z0, z1 and y0, y1). */
     uCast: { value: new Float32Array(CASTERS * 4) },
@@ -133,8 +136,13 @@ function patch(material: THREE.MeshPhysicalMaterial, p: Patch) {
 const ROOM_LIGHTS = /* glsl */ `
 {
   vec3 wn = rWorldDir(geometryNormal);
-  // The stage's reflections are a soft sky round everything: as diffuse light indoors they would fill every shadow.
+  // The stage's reflections are a soft sky round everything: as diffuse light indoors they would fill every shadow, and in polish they would show a sky; what is reflected is the room (light.ts, rRoom).
   iblIrradiance *= 0.15;
+  vec3 seen = rWorldDir(reflect(-geometryViewDir, geometryNormal));
+  radiance = mix(radiance, rRoom(vWorld, seen, material.roughness), 0.85);
+  #ifdef USE_CLEARCOAT
+  clearcoatRadiance = mix(clearcoatRadiance, rRoom(vWorld, rWorldDir(reflect(-geometryViewDir, geometryClearcoatNormal)), material.clearcoatRoughness), 0.85);
+  #endif
   irradiance += rRoomLight(vWorld, wn);
   if (uPendant.w > 0.0) {
     IncidentLight lamp;

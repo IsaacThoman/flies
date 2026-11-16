@@ -260,6 +260,8 @@ export function buildRestaurant(): SceneSet {
       shared.uWindow.value.copy(glow);
       shared.uSunSoft.value = 0.03 + 0.12 * Math.max(0, 1 - light.sunIntensity / 3) + 0.1 * night;
       shared.uOpening.value = 0.25 + 1.1 * (1 - night);
+      shared.uRoomTone.value.copy(light.zenith).lerp(light.horizon, 0.5).multiplyScalar(0.5);
+      shared.uWindowSeen.value.copy(light.middle).lerp(light.haze, 0.6).multiplyScalar(1.4 * (1 - night) + 0.1);
 
       if (!camera) return;
       eyeAt.setFromMatrixPosition(camera.matrixWorld);

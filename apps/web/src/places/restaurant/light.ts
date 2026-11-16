@@ -15,7 +15,7 @@
 import * as THREE from "three";
 import { CHAIR, PASS, STOOL, TABLES, TABLE_TOPS, ZINC_BAR } from "@fly/world";
 import { EXIT, FRIDGE, FRONT, HEAT, PENDANT_LIGHT } from "./plan.ts";
-import { NEAR_LAMP } from "./street/layout.ts";
+import { CORNER_BAR, NEAR_LAMP } from "./street/layout.ts";
 import { STREET_LIGHT_GLSL } from "./traffic.ts";
 
 /** How many things cast exact shadows at once: those of the area the camera is in. */
@@ -235,6 +235,53 @@ export function hookedLights() {
 }
 
 /**
+ * The room as a polished or glass surface sees it along a reflected ray:
+ * the shop front (the sky by day, the dark street by night, its lamp and the
+ * neon across the road as bright spots), the lit pendant's diffuser
+ * overhead, and the room's own dim tone round them; blurred by how rough the
+ * surface is. This stands in for the stage's reflections, which are a sky
+ * all round, so that the marble, the zinc, the glaze and the glass show the
+ * room's lights moving over them as the camera moves.
+ */
+const ROOM_SEEN = /* glsl */ `
+uniform vec3 uRoomTone;
+uniform vec3 uWindowSeen;
+vec3 rRoom(vec3 p, vec3 r, float rough) {
+  float blur = 0.004 + rough * rough * 0.9;
+  // The room round about: the floor dark below, the walls, the ceiling a little brighter.
+  vec3 c = uRoomTone * (0.55 + 0.35 * smoothstep(-0.6, 0.8, r.y));
+  if (r.z > 0.01 && p.z < ${f(FRONT.z)}) {
+    float t = (${f(FRONT.z)} - p.z) / r.z;
+    vec3 q = p + r * t;
+    float w = 3.0 + t * blur;
+    float open = rBand(q.x, ${f(FRONT.x0)}, ${f(FRONT.door.x1)}, w) * rBand(q.y, q.x < ${f(FRONT.door.x0)} ? ${f(FRONT.sill)} : ${f(FRONT.door.bottom)}, ${f(FRONT.head)}, w);
+    ${FRONT.bars.map((m) => `open *= smoothstep(${f(FRONT.bar)} - w, ${f(FRONT.bar)} + w, abs(q.x - ${f(m)}));`).join("\n    ")}
+    open *= smoothstep(20.0 - w, 20.0 + w, abs(q.y - ${f((FRONT.transom.y0 + FRONT.transom.y1) / 2)}));
+    // Brighter up the glass, where the sky is, than down it, where the street is.
+    vec3 outside = uWindowSeen * mix(0.55, 1.15, smoothstep(${f(FRONT.sill)}, ${f(FRONT.head)}, q.y));
+    c = mix(c, outside, open);
+    // The lamp outside and the neon across the road, small and bright, through the glass.
+    vec3 l = vec3(${f(NEAR_LAMP.x)}, ${f(NEAR_LAMP.y)}, ${f(NEAR_LAMP.z)}) - p;
+    float ld = length(l);
+    float a = acos(clamp(dot(r, l / ld), -1.0, 1.0));
+    c += uStreetLamp * 6.0 * (1.0 - smoothstep(180.0 / ld, 180.0 / ld + blur * 0.6 + 0.004, a)) * open;
+    vec3 n = vec3(${f(CORNER_BAR.neon.x)}, ${f(CORNER_BAR.neon.y)}, ${f(CORNER_BAR.neon.z)}) - p;
+    float nd = length(n);
+    float na = acos(clamp(dot(r, n / nd), -1.0, 1.0));
+    c += uStreetFar * 0.04 * (1.0 - smoothstep(600.0 / nd, 600.0 / nd + blur * 0.4 + 0.003, na)) * open;
+  }
+  // The lit pendant's diffuser overhead, and the glow round it.
+  if (uPendant.w > 0.0 && r.y > 0.02 && p.y < ${f(PENDANT_LIGHT.y)}) {
+    float t = (${f(PENDANT_LIGHT.y)} - p.y) / r.y;
+    vec2 q = p.xz + r.xz * t - vec2(${f(PENDANT_LIGHT.x)}, ${f(PENDANT_LIGHT.z)});
+    float w = 3.0 + t * blur;
+    float d = length(q);
+    c += uPendantColor * uPendant.w * ${(1 / 620_000).toExponential(3)} * ((1.0 - smoothstep(${f(PENDANT_LIGHT.r)} - w, ${f(PENDANT_LIGHT.r)} + w, d)) * 2.5 + exp(-d * d / (t * t * 0.08 + 40000.0)) * 0.3);
+  }
+  return c;
+}`;
+
+/**
  * Light for the sun: through the glass, past the blocks, and on the casters'
  * area shadowed by them. The pendant: past the blocks and the casters.
  */
@@ -245,6 +292,7 @@ ${BLOCKS}
 ${CAST}
 ${ROOM_LIGHT}
 ${STREET_LIGHT_GLSL}
+${ROOM_SEEN}
 bool rCasting;
 vec3 rSun(vec3 dirView) {
   vec3 s = rWorldDir(dirView);

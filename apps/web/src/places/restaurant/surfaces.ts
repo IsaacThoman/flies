@@ -113,6 +113,23 @@ vec3 rDimples(vec2 p) {
   return vec3(-to * 0.12, sqrt(f1));
 }
 
+// Grains packed together (a stone's crystals, a glaze's crazing): the offset to the nearest grain's middle, its own number, and how near the wall to the next (0 on it).
+vec4 rGrains(vec2 p) {
+  vec2 cell = floor(p);
+  vec2 fr = fract(p);
+  float f1 = 9.0;
+  float f2 = 9.0;
+  vec2 to = vec2(0.0);
+  vec2 id = vec2(0.0);
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+    vec2 g = vec2(float(i), float(j));
+    vec2 r = g + vec2(rHash(cell + g), rHash(cell + g + 17.3)) * 0.85 - fr;
+    float d = dot(r, r);
+    if (d < f1) { f2 = f1; f1 = d; to = r; id = cell + g; } else if (d < f2) f2 = d;
+  }
+  return vec4(to, rHash(id + 0.71), sqrt(f2) - sqrt(f1));
+}
+
 // The pressed tin: squares of a raised bead round a medallion of rings and petals; its height (0 to 1) at a point.
 float rTinHeight(vec2 p) {
   vec2 c = mod(p, 610.0) - 305.0;
@@ -160,6 +177,14 @@ if (rK == K_TILE) {
   float inside = 1.0 - smoothstep(PENNY - 0.35 - fwidth(r), PENNY + 0.15, r);
   inside *= 1.0 - chipped;
   inside *= 1.0 - gone;
+  // Close up the glaze is crazed, grime in its fine cracks, and pinholed; the grout is sand.
+  vec4 craze = rGrains(vWorld.xz / 4.2 + pc.zw * 3.7);
+  float crazed = rDetail(vWorld.xz / 4.2);
+  penny *= 1.0 - (1.0 - smoothstep(0.0, 0.035 + fwidth(craze.w) * 1.5, craze.w)) * crazed * mix(0.18, 0.05, black);
+  vec2 pin = vWorld.xz / 0.7;
+  penny *= 1.0 - step(0.993, rHash(floor(pin))) * (1.0 - smoothstep(0.15, 0.35, length(fract(pin) - 0.5))) * rDetail(pin) * 0.5;
+  vec2 sand = vWorld.xz * 3.0;
+  grout *= 0.85 + 0.3 * rNoise(sand) * rDetail(sand);
   vec3 c = mix(grout, penny, inside);
   c = mix(c, vec3(0.32, 0.3, 0.27), gone * smoothstep(PENNY + 1.0, PENNY - 1.0, r));
   // Worn where feet go: dull, a little grey, along the bar and from the door.
@@ -188,11 +213,32 @@ if (rK == K_TILE) {
 if (rK == K_MARBLE) {
   float vein;
   float seed = rHash(floor(vWorld.xz / 1300.0 + 0.5));
-  diffuseColor.rgb *= rMarble(vWorld.xz + vWorld.y * vec2(0.3, 0.7), seed, vein);
+  vec2 mp = vWorld.xz + vWorld.y * vec2(0.3, 0.7);
+  diffuseColor.rgb *= rMarble(mp, seed, vein);
+  // Close up: hairline veins at a few centimetres and at millimetres, wandering, faint.
+  vec2 h1 = mp * 0.045 + seed * 7.0;
+  float hv1 = rFbm(h1 + rFbm(h1 * 0.5) * 1.6);
+  float hair1 = (1.0 - smoothstep(0.0, 0.012 + fwidth(hv1) * 1.5, abs(hv1 - 0.47))) * rDetail(h1 * 12.0);
+  vec2 h2 = mp * 0.32 + seed * 3.0;
+  float hv2 = rFbm(h2 + rNoise(h2 * 0.7) * 1.2);
+  float hair2 = (1.0 - smoothstep(0.0, 0.02 + fwidth(hv2) * 1.5, abs(hv2 - 0.5))) * rDetail(h2 * 6.0) * smoothstep(0.35, 0.7, rNoise(mp * 0.02 + 5.0));
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.5, 0.52, 0.55), hair1 * 0.45 + hair2 * 0.3);
+  // Its grains: calcite crystals under a millimetre, each a little different, catching the light at its own angle.
+  vec4 grain = rGrains(mp / 0.7 + rNoise(mp * 0.3) * 0.6);
+  float gd = rDetail(mp / 0.7);
+  diffuseColor.rgb *= 1.0 + (grain.z - 0.5) * 0.04 * gd - (1.0 - smoothstep(0.0, 0.1, grain.w)) * 0.015 * gd;
+  // Most lie flat under the polish; one in thirty is a facet tilted to the light, and glints.
+  float glint = step(0.967, grain.z) * gd;
+  rBump = vec3(grain.x, 0.0, grain.y) * (0.03 + glint * 0.5) * gd;
+  // Wiped, not polished: smudged in arcs where a cloth went round, dust settled where it didn't.
+  float smudge = smoothstep(0.45, 0.8, rFbm(mp * 0.012 + vec2(seed * 3.0, 1.0))) * (0.5 + 0.5 * sin(length(mp - vec2(-300.0, 2300.0)) * 0.09 + rNoise(mp * 0.02) * 4.0));
+  vec2 dp = mp / 0.35;
+  float speck = step(0.996, rHash(floor(dp))) * (1.0 - smoothstep(0.2, 0.45, length(fract(dp) - 0.5))) * rDetail(dp);
+  diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.55, 0.53, 0.5), vec3(0.98), rHash(floor(dp) + 3.0)), speck * 0.7);
   // A faint polish, worn by years of plates and elbows.
-  rRough = 0.38 + vein * 0.08;
-  rCoat = 0.3;
-  rCoatRough = 0.22;
+  rRough = 0.26 + vein * 0.08 + smudge * 0.22 + speck * 0.3 - glint * 0.18;
+  rCoat = 0.42 * (1.0 - smudge * 0.5);
+  rCoatRough = 0.12 + smudge * 0.15;
   // Rings where glasses and cups stood, a wine stain, a smear: each the rim of a ring, a little dull.
   for (int i = 0; i < 6; i++) {
     vec4 ring = uRings[i];
@@ -278,10 +324,15 @@ if (rK == K_ZINC) {
   c = mix(c, vec3(0.78, 0.79, 0.78), marks * 0.45);
   // Elbows have polished the front edge bright.
   float edge = smoothstep(${f(-2570)} - 120.0, ${f(-2570)}, vWorld.x);
+  // Close up: fine scratches, most along the bar where glasses were slid, and white blooms of oxide where water sat.
+  vec2 sp = vec2(zp.y * 0.12 + rNoise(zp * 0.02) * 4.0, zp.x * 2.6);
+  float scratch = (1.0 - smoothstep(0.0, 0.035, abs(rNoise(sp) - 0.5))) * rDetail(sp) * smoothstep(0.35, 0.7, rNoise(zp * 0.012 + 2.0));
+  float bloom = smoothstep(0.68, 0.82, rFbm(zp * 0.35 + 9.0)) * smoothstep(0.4, 0.7, rFbm(zp * 0.02)) * rDetail(zp * 0.35);
+  c = mix(c, vec3(0.74, 0.75, 0.73), bloom * 0.35 + scratch * 0.18);
   diffuseColor.rgb *= c;
   // Old zinc is dull: grey, half metal, the hammering catching what light there is; only the front edge is bright.
   rMetal = mix(0.45, 0.75, edge);
-  rRough = mix(0.46, 0.28, edge) + marks * 0.12 + patina * 0.1;
+  rRough = mix(0.46, 0.28, edge) + marks * 0.12 + patina * 0.1 + bloom * 0.2 - scratch * 0.12;
   // The dimples tilt the surface across its own two ways.
   vec3 bu = abs(rN.y) > 0.6 ? vec3(1.0, 0.0, 0.0) : abs(rN.x) > abs(rN.z) ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
   vec3 bv = abs(rN.y) > 0.6 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
