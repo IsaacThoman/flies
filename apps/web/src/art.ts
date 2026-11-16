@@ -77,7 +77,7 @@ function arrange(shot: ArtShot) {
   camera.updateMatrixWorld();
   // Placed, then posed: the pose eases in, so give it a few seconds.
   Object.assign(intent, createIntent(), { live: true });
-  fly.update(body, intent, false, 1 / 60);
+  fly.update(body, intent, false, 0, 1 / 60);
   const pose = { ...fly.pose, ...shot.pose };
   for (let i = 0; i < 200; i++) fly.model.update(pose, 1 / 60);
   for (let i = 0; i < 240; i++) bubbles.update(i / 60, 1 / 60, camera, stage.light.sunDirection, new THREE.Vector3(), new THREE.Vector3(0, -1e4, 0));

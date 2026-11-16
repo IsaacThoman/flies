@@ -104,6 +104,7 @@ int tick(fly_brain* brain, double dt_ms, const fly_senses* senses, const Light& 
     in.sweet = senses->sweet;
     in.grounded = senses->grounded != 0;
     in.male_taste = senses->male_taste;
+    in.hunger = senses->hunger;
     fly::TickStats out;
     const fly::io::Command c = brain->brain.tick(dt_ms, in, light, out);
     if (command != nullptr) {

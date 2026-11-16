@@ -9,7 +9,7 @@
 // shifting now and then), is animation, not behaviour: it never moves the
 // fly, and it stops whenever the pose asks for anything else.
 
-import { copy, identity, multiply, rotateX, rotateY, rotateZ, scaleX, setFrame, transformPoint, translate } from "./affine.ts";
+import { copy, identity, multiply, rotateX, rotateY, rotateZ, scale, scaleX, setFrame, transformPoint, translate } from "./affine.ts";
 import {
   BODY_JOINTS, EYE, FOOT_CLEARANCE, HEAD, J, LEG_COUNT, LEG_SEGMENTS, LEGS, PIVOT, PROBOSCIS, THORAX,
   WING_COPIES, WING_JOINTS, legPair, legSide,
@@ -42,6 +42,14 @@ const toward = (x: number, target: number, rate: number, dt: number) => (target 
 /** Smoothstep on 0..1: eases a linear blend in and out. */
 const ease = (x: number) => x * x * (3 - 2 * x);
 const clamp01 = (x: number) => Math.min(1, Math.max(0, finite(x)));
+
+/**
+ * How much a full crop swells the abdomen: wider and deeper by this fraction,
+ * longer by `long`. The crop lies in the front of the abdomen and a fly's
+ * abdomen visibly distends after a big meal; these are round numbers chosen
+ * to be seen, not measured.
+ */
+const SWELL = { wide: 0.12, long: 0.05 };
 
 /** Flight posture of the claws, tarsi and knees, thorax-relative, left side: front legs folded under the head, the others trailing. */
 const TUCK: readonly { foot: Vec3; distal: Vec3; basal: Vec3; knee: Vec3 }[] = [
@@ -86,6 +94,7 @@ export class FlyRig {
   private sing = 0;
   /** The singing wing: 1 the left, -1 the right; it fades out on the side it sang with. */
   private singSide: 1 | -1 = 1;
+  private fullness = 0;
 
   private groomPhase = 0;
   private boutPhase = 0;
@@ -150,6 +159,8 @@ export class FlyRig {
     const sing = Math.max(-1, Math.min(1, finite(pose.sing)));
     if (sing !== 0) this.singSide = sing > 0 ? 1 : -1;
     this.sing += (Math.abs(sing) * (airborne ? 0 : 1) - this.sing) * lag(dt, 0.06);
+    // The crop fills over a meal and empties over minutes: a slow lag only keeps a jump from showing.
+    this.fullness += (clamp01(pose.fullness ?? 0) - this.fullness) * lag(dt, 0.5);
 
     // Take-off: the legs stay extended against the ground for a moment as the
     // body leaves it, then fold. Landing: they reach back out to their homes.
@@ -221,6 +232,8 @@ export class FlyRig {
     this.child(abd, 0, PIVOT.abdomen, PIVOT.thorax, 1);
     rotateX(jt, abd, 0.012 * breathe - 0.08 * this.flight + 0.03 * this.feed + 0.04 * this.crouch);
     rotateY(jt, abd, -sway * 0.5);
+    const swell = this.fullness;
+    scale(jt, abd, 1 + SWELL.wide * swell, 1 + SWELL.wide * swell, 1 + SWELL.long * swell);
     this.child(tip, abd, PIVOT.abdomenTip, PIVOT.abdomen, 1);
     rotateX(jt, tip, 0.008 * breathe - 0.05 * this.flight + 0.02 * this.crouch);
 

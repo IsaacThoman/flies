@@ -60,7 +60,7 @@ export class FlyView {
   }
 
   /** Places and poses the model for this frame; `songSide` is the wing it sings with (1 its left, -1 its right). */
-  update(body: FlyBody, intent: Intent, eating: boolean, dt: number, songSide: 1 | -1 = 1) {
+  update(body: FlyBody, intent: Intent, eating: boolean, fullness: number, dt: number, songSide: 1 | -1 = 1) {
     const pose = this.pose;
     const airborne = body.mode === "airborne";
     pose.speed = body.groundSpeed / FLY_LENGTH;
@@ -75,6 +75,7 @@ export class FlyView {
     const horizontal = Math.hypot(v.x, v.z);
     pose.pitch = airborne ? Math.max(-0.6, Math.min(0.8, Math.atan2(v.y, Math.max(60, horizontal)) * 0.6)) : 0;
     pose.roll = airborne ? Math.max(-0.6, Math.min(0.6, -body.turnRate * 0.12)) : 0;
+    pose.fullness = fullness;
     this.model.update(pose, dt);
     this.place(body.position, body.yaw, body.up);
   }

@@ -5,11 +5,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
-import { BACKGROUND, READOUTS, SCALES, SENSES, backgroundRates, balanceFactor, decode, intensity, outputSynapses, senseRates, smooth, wire } from "./io.ts";
+import { BACKGROUND, HUNGER, READOUTS, SCALES, SENSES, backgroundRates, balanceFactor, decode, hungerOf, intensity, outputSynapses, senseRates, smooth, sweetOutputGain, wire } from "./io.ts";
 import { OPERATING_POINT, buildWeights, completenessFactors } from "./params.ts";
 import { REGIONS, REGION_RATE_NAMES } from "./regions.ts";
 import { createBrain, FlyBrain, MAX_TICK_MS } from "./runtime.ts";
-import { InternalState, Wander, normals } from "./state.ts";
+import { INTERNAL_STATE, InternalState, Wander, normals } from "./state.ts";
 import { bufferOf, packSynthetic, syntheticConnectome, syntheticEyeColumns } from "./test-helpers.ts";
 import { RESTING_SENSES } from "./types.ts";
 import type { BrainSenses } from "./types.ts";
@@ -238,6 +238,44 @@ test("the internal state wanders around 0 with unit spread, reproducibly", () =>
   // Off, nothing spontaneous happens.
   const quiet = new FlyBrain(load(), { spontaneous: false });
   for (let t = 0; t < 500; t += 16) assert.equal(quiet.tick(16, { ...RESTING_SENSES, grounded: false }).stats.spikes, 0);
+});
+
+test("hunger: left out it is 1, the brain as it was; lower, the sweet neurons pass on less and the background quietens", () => {
+  assert.equal(hungerOf(RESTING_SENSES), 1);
+  for (const [given, taken] of [[0, 0], [0.25, 0.25], [1, 1], [-3, 0], [7, 1], [Number.NaN, 1], [Number.NEGATIVE_INFINITY, 1]]) {
+    assert.equal(hungerOf({ ...RESTING_SENSES, hunger: given }), taken, `hunger ${given}`);
+  }
+  assert.equal(sweetOutputGain(1), 1);
+  assert.equal(sweetOutputGain(0), HUNGER.sated);
+  assert.ok(Math.abs(HUNGER.sated * 1.4 - 1) < 1e-12);
+  assert.ok(sweetOutputGain(0.5) > HUNGER.sated && sweetOutputGain(0.5) < 1);
+
+  // The hunger term is 0 at 1 and lowers both eyes' background below it.
+  const a = new InternalState(4);
+  for (let k = 0; k < 100; k++) a.step(0.01);
+  const { arousal, scene, bias } = INTERNAL_STATE;
+  const without = 1 / (1 + Math.exp(-(arousal.weight * a.arousal.value + scene.weight * a.scene.left.value + bias)));
+  assert.equal(a.level("left"), without);
+  a.hunger = 0;
+  assert.ok(a.level("left") < without && a.level("right") < 1);
+
+  const run = (hunger: number | undefined, ms = 600) => {
+    const brain = new FlyBrain(load(), { seed: 5 });
+    const rates: string[] = [];
+    let feed = 0;
+    for (let t = 0; t < ms; t += 16) {
+      const state = brain.tick(16, { ...RESTING_SENSES, sweet: 0.6, hunger });
+      rates.push(JSON.stringify(state.stats.rates));
+      feed += state.command.feed;
+    }
+    return { rates, feed, state: brain.state.level("left") };
+  };
+  const before = run(undefined);
+  assert.deepEqual(run(1).rates, before.rates, "hunger 1 is the brain without hunger, spike for spike");
+  assert.deepEqual(run(Number.NaN).rates, before.rates);
+  const fed = run(0);
+  assert.ok(fed.feed < before.feed, `fed ${fed.feed}, hungry ${before.feed}`);
+  assert.ok(fed.state < before.state);
 });
 
 test("the eyes: shut, the brain is the same as one without them; open, darkness reaches the lamina and on", () => {

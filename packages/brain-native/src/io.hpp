@@ -23,6 +23,8 @@ struct Senses {
   double loom_left = 0, loom_right = 0, touch = 0, bump_left = 0, bump_right = 0, wind = 0, sweet = 0;
   bool grounded = false;
   double male_taste = 0;
+  /** Internal state, not a sense (types.ts's BrainSenses.hunger): 0 just fed to 1 starved; anything not a number counts as 1. */
+  double hunger = 1;
 };
 
 struct Command {
@@ -92,6 +94,12 @@ Wiring wire(const Connectome& connectome);
 
 /** Each sense's intensity, 0..1 (grounded as 0 or 1). */
 double intensity(const Senses& senses, Sense sense);
+
+/** How hungry the senses say it is, 0..1: 1 (as it was before hunger) when not a number (io.ts's hungerOf). */
+double hunger_of(const Senses& senses);
+
+/** The sweet taste neurons' output gain at this hunger (io.ts's sweetOutputGain and HUNGER, which say why). */
+double sweet_output_gain(double hunger);
 
 /** Commands from the smoothed readout rates, Hz. */
 Command decode(const std::vector<double>& rates);

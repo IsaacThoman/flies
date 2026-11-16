@@ -873,7 +873,7 @@ export class Game implements Shell {
     this.peaks.loom = Math.max(this.peaks.loom * fade, life.sensed.loomLeft, life.sensed.loomRight);
     this.peaks.looming = Math.max(this.peaks.looming * fade, rates?.["vision.looming left"] ?? 0, rates?.["vision.looming right"] ?? 0);
     this.glow.update(life.brain.regionRates, dt);
-    this.fly.update(life.body, life.intent, life.eating, dt, life.songSide);
+    this.fly.update(life.body, life.intent, life.eating, life.hunger.fullness, dt, life.songSide);
     this.prints.update(this.fly.model, life.body.onFeet, this.fly.pose.groom > 0.02, life.world, life.pantry, this.time);
     this.online?.send(this.#playerNow());
     // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
@@ -1641,6 +1641,8 @@ export class Game implements Shell {
     d.wind = s.wind.toFixed(3);
     d.sweet = s.sweet.toFixed(3);
     d.eaten = life.eaten.toFixed(3);
+    d.hunger = life.hunger.level.toFixed(3);
+    d.fullness = life.hunger.fullness.toFixed(3);
     d.meals = String(life.meals);
     d.food = String(life.pantry.foods.filter(isDropped).length);
     d.prints = String(this.prints.prints.count(this.time));

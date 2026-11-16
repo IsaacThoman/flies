@@ -74,3 +74,21 @@ test("eating in the new place starts a new meal even when carried mid-meal", () 
   life.step(1 / 60, performance.now());
   assert.equal(life.meals, 2);
 });
+
+test("what it eats feeds its hunger, which goes to the brain, and fills its crop", () => {
+  const brain = new Commands();
+  const life = new Life(new World(places.picnic), brain);
+  const start = life.hunger.level;
+  life.step(1 / 60, performance.now());
+  assert.equal(life.sensed.hunger, start, "the brain is sent the hunger");
+  assert.ok(life.hunger.level > start, "it grows hungrier while it doesn't eat");
+
+  brain.state.command.feed = 1;
+  life.pantry.drop("sugar", life.body.position.x, life.body.position.z, life.body.position.y);
+  const before = life.hunger.level;
+  for (let i = 0; i < 60; i++) life.step(1 / 60, performance.now());
+  assert.ok(life.eaten > 0);
+  assert.ok(life.hunger.level < before - 0.1, `${life.hunger.level} after eating, ${before} before`);
+  assert.ok(life.hunger.fullness > 0.1);
+  assert.ok(life.sensed.hunger! < before - 0.1, "and the brain is sent the lower hunger");
+});

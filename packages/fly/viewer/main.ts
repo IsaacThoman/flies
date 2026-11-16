@@ -89,6 +89,7 @@ const SLIDERS: Slider[] = [
   { key: "crouch", min: 0, max: 1, step: 0.01 },
   { key: "pitch", min: -1, max: 1, step: 0.01 },
   { key: "roll", min: -1, max: 1, step: 0.01 },
+  { key: "fullness", min: 0, max: 1, step: 0.01 },
 ];
 const inputs = new Map<keyof FlyPose, { input: HTMLInputElement; out: HTMLOutputElement }>();
 for (const s of SLIDERS) {
@@ -121,6 +122,7 @@ const PRESETS: Record<string, Partial<FlyPose>> = {
   back: { speed: -0.8 },
   groom: { groom: 0.8 },
   feed: { feed: 1 },
+  "after a meal": { fullness: 1 },
   buzz: { wings: 0.4 },
   crouch: { crouch: 1, wings: 0 },
   fly: { airborne: true, wings: 1, pitch: 0.5 },

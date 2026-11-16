@@ -8,9 +8,22 @@
 // deviation 1 and forgets its past over `tau` seconds. An eye's background
 // level is
 //
-//   logistic(arousal.weight × arousal + scene.weight × scene[eye] + bias)
+//   logistic(arousal.weight × arousal + scene.weight × scene[eye] + bias
+//            + hunger.weight × (hunger - 1))
 //
 // from 0 to 1, multiplying that eye's maximum background rate.
+//
+// The hunger term is a stand-in too, for starvation-induced hyperactivity:
+// starved flies walk more, through the fat body's adipokinetic hormone on
+// octopaminergic neurons (Lee & Park 2004, Genetics 167: 311; Yang et al.
+// 2015, PNAS 112: 5219; Yu et al. 2016, eLife 5: e15693). Neither the hormone
+// nor octopamine's effects are in the model (octopamine's output is muted,
+// params.ts), so hunger acts here, on the same background the arousal sets.
+// It is 0 at hunger 1, where the brain is what it was before it had a hunger
+// (io.ts, HUNGER), and lowers the background as the fly is fed. Its weight is
+// the one fitted number here: it makes a just-fed fly walk at rest 1/1.6 as
+// much as a starved one (report.ts section c), as Yu et al. measured: about
+// 60% more locomotion in starved flies than fed ones (their Figure 1d).
 
 import { mulberry32 } from "./sim.ts";
 
@@ -18,12 +31,14 @@ export const INTERNAL_STATE = {
   arousal: { tau: 10, weight: 1.6 },
   scene: { tau: 4, weight: 1.5 },
   bias: -1,
+  hunger: { weight: 0.8 },
 } as const;
 
 export type InternalStateParameters = {
   arousal: { tau: number; weight: number };
   scene: { tau: number; weight: number };
   bias: number;
+  hunger: { weight: number };
 };
 
 /** A zero-mean, unit-variance Ornstein-Uhlenbeck process with time constant tau (s). */
@@ -69,6 +84,8 @@ export class InternalState {
   readonly parameters: InternalStateParameters;
   readonly arousal: Wander;
   readonly scene: { left: Wander; right: Wander };
+  /** How hungry the fly is, 0..1 (io.ts, hungerOf); set by the brain each tick. */
+  hunger = 1;
 
   constructor(seed: number, parameters: InternalStateParameters = INTERNAL_STATE) {
     this.parameters = parameters;
@@ -86,7 +103,7 @@ export class InternalState {
 
   /** The background level of one eye, 0 to 1. */
   level(eye: "left" | "right") {
-    const { arousal, scene, bias } = this.parameters;
-    return logistic(arousal.weight * this.arousal.value + scene.weight * this.scene[eye].value + bias);
+    const { arousal, scene, bias, hunger } = this.parameters;
+    return logistic(arousal.weight * this.arousal.value + scene.weight * this.scene[eye].value + bias + hunger.weight * (this.hunger - 1));
   }
 }
