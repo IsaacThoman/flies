@@ -43,9 +43,9 @@ stays crisp however close the camera comes. Drops of water are clear in the
 middle and bright at the edge, and focus the sun into a spot on the table.
 Everything is built in code.
 
-Soap bubbles drift over the table on the breeze, and a few small ones skim
-low past the fly; one that comes down on something level settles there as a
-dome until it bursts. A bubble that reaches the fly, or that it walks into,
+Soap bubbles drift over the table on the breeze, and a few small ones bob
+low past the fly; one that touches the table or anything standing on it
+pops. A bubble that reaches the fly, or that it walks into,
 bursts on it, and it feels the film break (`touch`, below). At dusk and at
 night fireflies drift round the table and blink.
 
@@ -366,7 +366,8 @@ camera (the fly's size on screen in each view, kept in the picture through a
 long wandering walk and a jump, never inside anything, never jumping); the
 corner picture of what it sees (when it shows, its way round the corners, clear
 of the hints, every facet a dot inside it); the
-bubbles (low ones pass the fly, settle as domes, burst on it and are felt);
+bubbles (low ones mostly pass the fly, pop on surfaces without settling,
+keep coming, and burst on the fly and are felt);
 that the crumbs, pips, strawberry and saucer can be walked over.
 
 `npm run e2e` plays the game with the real brain: the title
