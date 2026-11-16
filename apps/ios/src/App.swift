@@ -22,8 +22,12 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     window.makeKeyAndVisible()
     self.window = window
     self.game = game
+    game.visible = scene.activationState != .background
   }
 
-  func sceneDidBecomeActive(_ scene: UIScene) { game?.frontmost = true }
-  func sceneWillResignActive(_ scene: UIScene) { game?.frontmost = false }
+  // Seen, or not: a scene in the foreground is on screen, focused or not (an iPad's window beside
+  // another app's, or under Control Center); iOS moves it to the background when nothing of it
+  // can be seen (the home screen, another app over the whole screen, the lock screen).
+  func sceneWillEnterForeground(_ scene: UIScene) { game?.visible = true }
+  func sceneDidEnterBackground(_ scene: UIScene) { game?.visible = false }
 }

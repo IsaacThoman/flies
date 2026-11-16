@@ -4,15 +4,16 @@ import UIKit
 ///
 /// The brain keeps a core busy and the world is drawn 60 times a second, so a phone that watched
 /// the wallpaper for as long as it liked would go flat in a few hours and grow warm doing it. The
-/// screen is held on only while the wallpaper is showing, the app is in front and nothing says to
-/// save power: indefinitely on a charger, for `onBattery` on battery (after which the phone locks
-/// as its own auto-lock setting says), and never in Low Power Mode or once the phone is hot.
-/// When the phone is critically hot the game is paused, as when it isn't in front.
+/// screen is held on only while the wallpaper can be seen and nothing says to save power:
+/// indefinitely on a charger, for `onBattery` on battery (after which the phone locks as its own
+/// auto-lock setting says), and never in Low Power Mode or once the phone is hot. The game runs
+/// whenever it can be seen, focused or not, except when the phone is critically hot.
 struct PowerPolicy: Equatable {
   /// The longest the wallpaper keeps the screen on, on battery, after the last touch.
   static let onBattery: TimeInterval = 10 * 60
 
-  var frontmost = false
+  /// Some of the app's window is on screen (its scene is in the foreground).
+  var visible = false
   var wallpaper = false
   /// When the wallpaper last began; nil while it isn't showing.
   var wallpaperSince: Date?
@@ -20,8 +21,8 @@ struct PowerPolicy: Equatable {
   var lowPower = false
   var thermal = ProcessInfo.ThermalState.nominal
 
-  /// The game runs: in front and not critically hot.
-  var running: Bool { frontmost && thermal != .critical }
+  /// The game runs: seen, and the phone not critically hot.
+  var running: Bool { visible && thermal != .critical }
 
   /// Until when the screen should be kept on, or nil to let it sleep as usual.
   func screenOnUntil() -> Date? {
@@ -50,9 +51,9 @@ final class Power {
     readDevice()
   }
 
-  var frontmost: Bool {
-    get { policy.frontmost }
-    set { change { $0.frontmost = newValue } }
+  var visible: Bool {
+    get { policy.visible }
+    set { change { $0.visible = newValue } }
   }
 
   var wallpaper: Bool {

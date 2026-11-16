@@ -7,7 +7,7 @@ final class PowerPolicyTests: XCTestCase {
   private let start = Date(timeIntervalSinceReferenceDate: 1000)
 
   private func watching(_ edit: (inout PowerPolicy) -> Void = { _ in }) -> PowerPolicy {
-    var policy = PowerPolicy(frontmost: true, wallpaper: true, wallpaperSince: start, charging: true)
+    var policy = PowerPolicy(visible: true, wallpaper: true, wallpaperSince: start, charging: true)
     edit(&policy)
     return policy
   }
@@ -21,9 +21,9 @@ final class PowerPolicyTests: XCTestCase {
     XCTAssertEqual(watching { $0.charging = false }.screenOnUntil(), start.addingTimeInterval(PowerPolicy.onBattery))
   }
 
-  func testOnlyTheWallpaperInFrontKeepsTheScreenOn() {
+  func testOnlyTheWallpaperOnScreenKeepsTheScreenOn() {
     XCTAssertNil(watching { $0.wallpaper = false; $0.wallpaperSince = nil }.screenOnUntil(), "playing: the touches keep it on")
-    XCTAssertNil(watching { $0.frontmost = false }.screenOnUntil())
+    XCTAssertNil(watching { $0.visible = false }.screenOnUntil())
   }
 
   func testSavingPowerOrAHotPhoneLetsTheScreenSleep() {
@@ -32,10 +32,10 @@ final class PowerPolicyTests: XCTestCase {
     XCTAssertNil(watching { $0.thermal = .critical }.screenOnUntil())
   }
 
-  func testTheGameRunsInFrontUnlessCriticallyHot() {
+  func testTheGameRunsWhenSeenUnlessCriticallyHot() {
     XCTAssertTrue(watching().running)
     XCTAssertTrue(watching { $0.thermal = .serious }.running)
     XCTAssertFalse(watching { $0.thermal = .critical }.running)
-    XCTAssertFalse(watching { $0.frontmost = false }.running)
+    XCTAssertFalse(watching { $0.visible = false }.running)
   }
 }

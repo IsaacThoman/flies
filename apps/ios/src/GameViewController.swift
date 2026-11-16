@@ -2,13 +2,14 @@ import UIKit
 import WebKit
 
 /// The game: the web build in a web view that fills the window edge to edge, with the launch image
-/// over it until the game has drawn its first screen.
+/// over it until the game has drawn its first screen (`data-ready`, as the Apple TV's host waits for).
 ///
-/// While the game shouldn't run (the app isn't in front: the app switcher, Control Center, a call,
-/// the background; or the phone is critically hot), the web view leaves the window and a still of
-/// its last frame takes its place. Out of a window the page is hidden: its animation frames stop,
-/// so the fly's life and the brain stop with them, and its sound is suspended. Back in front it
-/// carries on from where it was.
+/// While the game shouldn't run (nothing of the app can be seen, or the phone is critically hot),
+/// the web view leaves the window and a still of its last frame takes its place. Out of a window
+/// the page is hidden, and the game sleeps as it does in a hidden browser tab (apps/web/src/page.ts):
+/// no frames, so the fly's life and the brain stop with them, and no sound. Shown again it carries
+/// on from where it was. WebKit hides the page of an app in the background by itself; only the heat
+/// needs this, but one way for both keeps them the same.
 final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, UIScrollViewDelegate {
   private let webView: WKWebView
   private let schemeHandler: BundleSchemeHandler
@@ -24,8 +25,8 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
     schemeHandler = BundleSchemeHandler(root: www)
     let configuration = WKWebViewConfiguration()
     configuration.setURLSchemeHandler(schemeHandler, forURLScheme: BundleSchemeHandler.scheme)
-    // Sound starts when the page's own code says (the player's first press or touch, or the app
-    // coming back to the front), without WebKit asking for a gesture of its own.
+    // Sound starts when the page's own code says (the player's first press or touch, or the game
+    // waking), without WebKit asking for a gesture of its own.
     configuration.mediaTypesRequiringUserActionForPlayback = []
     configuration.allowsInlineMediaPlayback = true
     configuration.userContentController.addUserScript(WKUserScript(source: PageScripts.host, injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -39,10 +40,10 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
-  /// The app's window is in front and taking input (from the scene's activation).
-  var frontmost: Bool {
-    get { power.frontmost }
-    set { power.frontmost = newValue }
+  /// Some of the app's window can be seen (its scene is in the foreground, focused or not).
+  var visible: Bool {
+    get { power.visible }
+    set { power.visible = newValue }
   }
 
   override func loadView() {
@@ -93,8 +94,8 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
   func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
     guard let body = message.body as? [String: Any] else { return }
     report?.received(body)
+    if body["ready"] as? Bool == true { reveal() }
     guard let screen = body["screen"] as? String else { return }
-    reveal()
     let wallpaper = body["wallpaper"] as? Bool ?? false
     power.wallpaper = wallpaper
     haptics.update(screen: screen, wallpaper: wallpaper, tool: body["tool"] as? String,
@@ -134,10 +135,8 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
       view.insertSubview(webView, at: 0)
       still?.removeFromSuperview()
       still = nil
-      webView.setAllMediaPlaybackSuspended(false)
       webView.becomeFirstResponder()
     } else {
-      webView.setAllMediaPlaybackSuspended(true)
       let still = webView.snapshotView(afterScreenUpdates: false) ?? UIView()
       still.frame = webView.frame
       still.autoresizingMask = [.flexibleWidth, .flexibleHeight]

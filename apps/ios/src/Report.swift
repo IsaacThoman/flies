@@ -3,8 +3,9 @@ import WebKit
 
 /// For checks and measurements (`-FlyReport <seconds>` on the command line, as `npm run ios:check`
 /// launches it; off from the home screen). That often it reports the canvas's state, how fast the
-/// brain runs against real time and what that costs it, frames, taps the page saw, and the app's
-/// own memory, power and thermal state, as `report {json}` on the console and in
+/// brain runs against real time and what that costs it, frames, taps and keys the page saw, what
+/// the browser's cache holds of the brain, where the menu's first row is, and the app's own
+/// memory, power and thermal state, as `report {json}` on the console and in
 /// `Library/Caches/report.log`, and as the value of an accessibility element, `fly-report`, where
 /// a UI test can read it. The page's errors and console warnings are passed on as they happen.
 /// `-FlySettings <json>` changes the game's settings through its own code once it has started, as
@@ -123,6 +124,12 @@ final class Report {
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
+  // What the browser's cache holds for the brain (apps/web/src/brain/download.ts), for a check that nothing is copied there.
+  const cached = () => {
+    if (typeof caches === "undefined") return void (__hostReport.cached = null);
+    caches.open("fly-brain").then((cache) => cache.keys()).then((keys) => (__hostReport.cached = keys.length), () => (__hostReport.cached = -1));
+  };
+  setInterval(cached, 1000);
   addEventListener("pointerdown", () => __hostReport.pointers++, true);
   addEventListener("keydown", () => __hostReport.keys++, true);
   const tell = (line) => webkit.messageHandlers.\(PageScripts.channel).postMessage({ console: line });
@@ -148,6 +155,15 @@ final class Report {
 
   private static let read = """
   (() => {
+    // Where the first row of the menu showing is, 0 to 1 across and down (the canvas fills the page), for a UI test to tap.
+    const firstRow = (fly) => {
+      const hits = fly?.overlay?.hits, design = fly?.shape?.design;
+      for (let i = (hits?.count ?? 0) - 1; i >= 0; i--) {
+        const h = hits.get(i);
+        if (h.kind === "row" && h.index === 0) return [(h.x + h.w / 2) / design.width, (h.y + h.h / 2) / design.height];
+      }
+      return null;
+    };
     const canvas = document.getElementById("game");
     const fly = globalThis.__fly;
     const r = globalThis.__hostReport;
@@ -160,6 +176,10 @@ final class Report {
       keys: r.keys,
       brainWallMs: Math.round(r.brainWallMs),
       brainSimMs: Math.round(r.brainSimMs),
+      brainKept: fly?.life?.brain?.source?.kept ?? null,
+      cached: r.cached ?? null,
+      digest: !!globalThis.crypto?.subtle,
+      firstRow: firstRow(fly),
       visibility: document.visibilityState,
       audio: fly?.audio?.ctx?.state ?? null,
       audioSession: navigator.audioSession?.type ?? null,

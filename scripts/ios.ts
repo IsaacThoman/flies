@@ -1,7 +1,7 @@
 // Builds the iPhone and iPad app (apps/ios/) and runs it in an iOS simulator or on a device.
 // See docs/ios.md.
 import { spawnSync } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { writeIosAssetCatalog } from './iosAssets.ts';
 import { BUNDLE_ID as TVOS_BUNDLE_ID, TEAM_ID as TVOS_TEAM_ID } from './tvos.ts';
@@ -20,7 +20,7 @@ const USAGE = `Usage: npm run ios -- [<command>] [options]
         build for the simulator, then run it in the given simulator, or the one iOS simulator
         that is booted
   build [--sim] [--debug] [--for-testing]
-        build the web app (apps/web) with the connectome into apps/ios/www/, generate the Xcode
+        build the web app (apps/web) with the brain into apps/ios/www/, generate the Xcode
         project and build the app for an iPhone or iPad (or, with --sim, the iOS simulator).
         --for-testing (implies --debug) also builds the tests that npm run ios:check runs
   run (--sim <udid> | --device <udid>) [--debug] [--report <seconds>]
@@ -44,9 +44,10 @@ function prepare() {
   if (spawnSync('xcodegen', ['--version']).error) throw Error('XcodeGen is needed to generate the Xcode project: brew install xcodegen');
   writeIosAssetCatalog(path.join(root, 'assets/ios'), path.join(appDir, 'src/generated/Assets.xcassets'));
   rmSync(www, { recursive: true, force: true });
-  // The web build as a browser gets it, the connectome included (vite.config.ts).
+  // The web build as a browser gets it, the brain's parts included (vite.config.ts, docs/web.md).
   run('npx', ['vite', 'build', '--outDir', www, '--emptyOutDir', '--logLevel', 'warn']);
-  if (!existsSync(path.join(www, 'brain/connectome.bin'))) throw Error('The web build has no brain/connectome.bin');
+  const brain = path.join(www, 'brain');
+  if (!existsSync(brain) || !readdirSync(brain).some((f) => f.startsWith('connectome.'))) throw Error('The web build has no brain in it');
   const env = { ...process.env, IOS_TEAM_ID: TEAM_ID, IOS_BUNDLE_ID: BUNDLE_ID };
   run('xcodegen', ['generate', '--quiet'], appDir, env);
   return env;

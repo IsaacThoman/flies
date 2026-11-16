@@ -1,8 +1,9 @@
 import XCTest
 
-/// The fly is alive in the app: the brain wakes and keeps time, frames are drawn, a tap reaches the
-/// game, it stops in the background and carries on in front, and a setting changed in one run is
-/// still there in the next after the app is killed. Run by `npm run ios:check`
+/// The fly is alive in the app: the brain is read from the app's bundle, wakes and keeps time, and
+/// nothing of it is copied into the browser's cache, then or on a relaunch; frames are drawn; a tap
+/// on the title's first row starts play; it stops in the background and carries on in front; and a
+/// setting changed in one run is still there in the next after the app is killed. Run by `npm run ios:check`
 /// (apps/ios/tests/simulator.ios.ts), which reads the `check:` lines this prints.
 ///
 /// The game's state comes from the app's report (`-FlyReport`, src/Report.swift): the canvas's
@@ -31,10 +32,12 @@ final class AliveTests: XCTestCase {
     XCTAssertGreaterThan(drawn, 100, "frames drawn in 4 s")
     XCTAssertGreaterThan(state.speed, 0.8, "the brain against real time")
     let load = state.brainSimMs > 0 ? state.brainWallMs / state.brainSimMs : 0
+    try assertBrainFromBundle(state)
 
-    // A tap on the screen reaches the page, where the game reads the pointer.
-    app.webViews.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-    try wait("the tap") { $0.pointers >= 1 }
+    // A tap on the title's first row (Visit the fly) reaches the game and starts play.
+    let row = try XCTUnwrap(state.firstRow, "the title's first row on screen")
+    app.webViews.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: row[0], dy: row[1])).tap()
+    try wait("play, from a tap") { $0.data("screen") == "play" && $0.pointers >= 1 }
 
     // A hardware keyboard reaches the game, if the simulator has one: a simulator shown in
     // Simulator (or T3 Code's device panel) does; a headless one, as this check makes, doesn't.
@@ -42,14 +45,17 @@ final class AliveTests: XCTestCase {
     app.typeKey(XCUIKeyboardKey.downArrow.rawValue, modifierFlags: [])
     let keyboard = (try? wait("a key", timeout: 3) { $0.keys > before }) != nil
 
-    // Away (another app in front) for 6 s the brain doesn't run; in front again it carries on.
+    // Away (another app over the whole screen) for 6 s the brain doesn't run; in front again it
+    // carries on. It lives on while it can still be seen as the other app slides in and out, so
+    // what is held to account is how much of the time away passed with it stopped.
     let away = try report()
     XCUIApplication(bundleIdentifier: "com.apple.Preferences").activate()
     sleep(6)
     XCTAssertNotEqual(app.state, .runningForeground, "in the background")
     app.activate()
     let back = try wait("in front again") { $0.visible && $0.frames > away.frames }
-    XCTAssertLessThan(back.brainSimMs - away.brainSimMs, 2500, "fly time while away for 6 s")
+    let stopped = (back.atMs - away.atMs) - (back.brainSimMs - away.brainSimMs)
+    XCTAssertGreaterThan(stopped, 4000, "ms of the time away with the brain stopped")
     let resumed = try wait("the brain carrying on") { $0.frames > back.frames + 60 && $0.brainSimMs > back.brainSimMs + 1000 }
     XCTAssertGreaterThan(resumed.speed, 0.8, "the brain against real time after coming back")
 
@@ -62,12 +68,21 @@ final class AliveTests: XCTestCase {
     app.terminate()
     app.launchArguments = reporting
     app.launch()
-    try wait("the setting kept across a relaunch", timeout: 180) { $0.data("brain") == "running" && $0.data("eyes") == "off" }
+    let relaunched = try wait("the setting kept across a relaunch", timeout: 180) { $0.data("brain") == "running" && $0.data("eyes") == "off" }
+    try assertBrainFromBundle(relaunched)
 
-    print("check: {\"awakeS\":\(awake),\"fps\":\(Double(drawn) / 4),\"speed\":\(state.speed),\"brainLoad\":\(load),\"spikesPerSecond\":\(state.data("spikesPerSecond") ?? "0"),\"frameMs\":\(state.data("frameMs") ?? "0"),\"keyboard\":\(keyboard)}")
+    print("check: {\"awakeS\":\(awake),\"fps\":\(Double(drawn) / 4),\"speed\":\(state.speed),\"brainLoad\":\(load),\"spikesPerSecond\":\(state.data("spikesPerSecond") ?? "0"),\"frameMs\":\(state.data("frameMs") ?? "0"),\"quality\":\(state.data("quality") ?? "0"),\"keyboard\":\(keyboard)}")
     if let path = ProcessInfo.processInfo.environment["FLY_SCREENSHOT"] {
       try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: path))
     }
+  }
+
+  /// The brain came through the app's URL scheme from its bundle ("network" to the page: fetched,
+  /// not from the browser's cache), and the cache, which can't keep that scheme's responses, holds
+  /// none of it.
+  private func assertBrainFromBundle(_ state: Report) throws {
+    XCTAssertEqual(state.data("from"), "network", "the brain fetched from the bundle")
+    XCTAssertTrue(state.cached == nil || state.cached == 0, "nothing of the brain in the browser's cache: \(String(describing: state.cached))")
   }
 
   @discardableResult
@@ -99,20 +114,26 @@ final class AliveTests: XCTestCase {
   private struct Report {
     let raw: String
     private let page: [String: Any]
+    private let host: [String: Any]
 
     init?(_ raw: String) {
-      guard let json = try? JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any], let page = json["page"] as? [String: Any] else { return nil }
+      guard let json = try? JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any], let page = json["page"] as? [String: Any],
+            let host = json["host"] as? [String: Any] else { return nil }
       self.raw = raw
       self.page = page
+      self.host = host
     }
 
     func data(_ key: String) -> String? { (page["dataset"] as? [String: Any])?[key] as? String }
     var frames: Int { page["frames"] as? Int ?? 0 }
     var pointers: Int { page["pointers"] as? Int ?? 0 }
     var keys: Int { page["keys"] as? Int ?? 0 }
+    var cached: Int? { page["cached"] as? Int }
+    var firstRow: [Double]? { page["firstRow"] as? [Double] }
     var speed: Double { page["speed"] as? Double ?? 0 }
     var brainWallMs: Double { page["brainWallMs"] as? Double ?? 0 }
     var brainSimMs: Double { page["brainSimMs"] as? Double ?? 0 }
     var visible: Bool { page["visibility"] as? String == "visible" }
+    var atMs: Double { (host["atMs"] as? Double) ?? 0 }
   }
 }
