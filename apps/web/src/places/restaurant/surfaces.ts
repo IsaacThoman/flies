@@ -235,19 +235,33 @@ if (rK == K_IRON) {
   rRough = 0.55;
 }
 if (rK == K_CANE) {
-  // Woven cane: strands one way and the other and on the diagonals, the holes between them dark.
-  vec2 cp = vWorld.xz / 3.2;
-  float d = rDetail(cp);
-  float s1 = abs(fract(cp.x) - 0.5);
-  float s2 = abs(fract(cp.y) - 0.5);
-  float s3 = abs(fract((cp.x + cp.y) * 0.7071) - 0.5);
-  float strand = max(max(smoothstep(0.32, 0.18, s1), smoothstep(0.32, 0.18, s2)), smoothstep(0.3, 0.15, s3) * 0.9);
-  float over = step(0.5, fract(cp.x * 0.5 + floor(cp.y) * 0.5));
-  vec3 c = mix(vec3(0.07, 0.05, 0.03), vec3(0.78, 0.6, 0.34) * (0.85 + 0.25 * over), strand);
-  diffuseColor.rgb *= mix(vec3(0.6, 0.46, 0.27), c, d);
-  rRough = 0.55;
-  rCoat = 0.25 * strand * d;
-  rBump = vec3(s1 - 0.25, 0.0, s2 - 0.25) * 0.3 * d;
+  // Cane woven the café chair's way: pairs of strands across and along, single strands on both diagonals over them, leaving octagonal holes. Each strand round, glossy, honey-coloured, a little uneven along its length.
+  vec2 cp = vWorld.xz / 7.0;
+  float d = rDetail(cp * 4.0);
+  vec2 f = fract(cp) - 0.5;
+  const float W = 0.075;
+  float pairX = abs(abs(f.x) - 0.11);
+  float pairZ = abs(abs(f.y) - 0.11);
+  vec2 g = fract(vec2(cp.x + cp.y, cp.x - cp.y) * 0.5 + 0.25) - 0.5;
+  float diagA = abs(g.x) * 1.414;
+  float diagB = abs(g.y) * 1.414;
+  // How far up each strand's round back a point is: 0 off it, 1 on its crest.
+  float hx = sqrt(max(0.0, 1.0 - (pairX / W) * (pairX / W)));
+  float hz = sqrt(max(0.0, 1.0 - (pairZ / W) * (pairZ / W)));
+  float ha = sqrt(max(0.0, 1.0 - (diagA / W) * (diagA / W)));
+  float hb = sqrt(max(0.0, 1.0 - (diagB / W) * (diagB / W)));
+  float top = max(max(hx, hz) * 0.8, max(ha, hb));
+  float on = smoothstep(0.0, 0.25, top);
+  float along = rNoise(vec2(hx > hz ? vWorld.z : vWorld.x, ha > hb ? vWorld.x - vWorld.z : vWorld.x + vWorld.z) * 0.15);
+  vec3 strand = mix(vec3(0.74, 0.55, 0.3), vec3(0.86, 0.68, 0.42), along) * (0.62 + 0.38 * top);
+  vec3 c = mix(vec3(0.05, 0.035, 0.025), strand, on);
+  diffuseColor.rgb *= mix(vec3(0.55, 0.41, 0.24), c, d);
+  rRough = mix(0.6, 0.38, on * d);
+  rCoat = 0.35 * on * d;
+  rAO *= mix(1.0, 0.65 + 0.35 * on, d);
+  // The strands' round backs tilt the light across them.
+  vec2 tilt = vec2(sign(f.x) * (abs(f.x) - 0.11) / W * hx, sign(f.y) * (abs(f.y) - 0.11) / W * hz) * 0.5;
+  rBump = vec3(tilt.x, 0.0, tilt.y) * 0.5 * d * on;
 }
 if (rK == K_ZINC) {
   vec3 dim = rDimples(vWorld.xz);
