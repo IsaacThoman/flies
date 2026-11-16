@@ -33,14 +33,6 @@ for (const [tool, sound] of [["feed", "drop"], ["swoop", "swoop"]] as const) {
     update(1 / 60);
     audio.tools(hands.events);
     assert.deepEqual(sounds, [{ sound, volume: 1 }]);
-    hands.clearEvents();
-
-    // The pause menu skips updates; it must not leave an event to replay on resume.
-    hands.clearEvents();
-    audio.tools(hands.events);
-    update(1 / 60);
-    audio.tools(hands.events);
-    assert.deepEqual(sounds, [{ sound, volume: 1 }]);
   });
 }
 
@@ -100,4 +92,28 @@ test("food dropped where the pointer is under a table falls from under its top o
   for (let i = 0; i < 60; i++) hands.update(1 / 60, { use: false, holding: false, eye }, fly, pantry);
   assert.equal(pantry.foods.length, 1);
   assert.equal(pantry.foods[0].y, 0);
+});
+
+test("food lands on what is under it, and the hands say where and which way it faces, for its ripple", () => {
+  const place: Place = { ...bare, solids: [{ name: "pot", footprint: { kind: "circle", x: 0, z: 30, r: 10 }, top: { kind: "flat", y: 12 } }] };
+  const world = new World(place);
+  const hands = new Hands(world);
+  const pantry = new Pantry(world);
+  const fly = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true };
+  const eye = { x: 0, y: 5, z: -10 };
+  hands.following = false;
+  hands.pointer.x = 2;
+  hands.pointer.y = 12;
+  hands.pointer.z = 31;
+  hands.update(0, { use: true, holding: true, eye }, fly, pantry);
+  hands.clearEvents();
+  let landed = false;
+  for (let i = 0; i < 60 && !landed; i++) {
+    hands.update(1 / 60, { use: false, holding: false, eye }, fly, pantry);
+    landed = hands.events.landed === "sugar";
+    hands.clearEvents();
+  }
+  assert.ok(landed);
+  assert.deepEqual(hands.landedAt, { x: 2, y: 12, z: 31 });
+  assert.deepEqual(hands.landedNormal, { x: 0, y: 1, z: 0 });
 });

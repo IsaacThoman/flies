@@ -1,9 +1,11 @@
 // Picks the brain for where the game runs: the host's native brain on the
-// Apple TV, otherwise packages/brain in a Web Worker, fed the connectome the
-// build put beside the page (download.ts).
+// Apple TV, otherwise one in a Web Worker, fed the connectome the build put
+// beside the page (download.ts): packages/brain-native built as WebAssembly
+// wherever the browser can run it, packages/brain's TypeScript elsewhere.
 
+import { wasmBrainSupported } from "@fly/brain-native";
 import type { BrainDriver } from "@fly/contracts";
-import { BrainDownload } from "./download.ts";
+import { BRAIN_MODULE_CACHE, BrainDownload, BrainFiles } from "./download.ts";
 import type { BrainFile } from "./download.ts";
 import { NativeBrainDriver, nativeBridge } from "./native-driver.ts";
 import { WorkerBrainDriver } from "./worker-driver.ts";
@@ -11,9 +13,23 @@ import type { BrainWorkerFactory } from "./worker-driver.ts";
 
 // Set by the web build and its dev server (vite.config.ts); not by the Apple TV's, which has its own brain.
 declare const __FLY_BRAIN__: BrainFile | null | undefined;
+declare const __FLY_BRAIN_MODULE__: BrainFile | null | undefined;
 
 /** The connectome the build serves, or null when it was built without one. */
 export const BRAIN_FILE: BrainFile | null = typeof __FLY_BRAIN__ === "undefined" ? null : __FLY_BRAIN__;
+/** The WebAssembly brain the build serves (fly-brain.wasm), as one part. */
+export const BRAIN_MODULE: BrainFile | null = typeof __FLY_BRAIN_MODULE__ === "undefined" ? null : __FLY_BRAIN_MODULE__;
+
+/**
+ * Which brain the worker runs: the WebAssembly one wherever this browser can
+ * run it, the TypeScript one otherwise. `?brain=typescript` or `?brain=wasm`
+ * in the page's address picks one, for tests and for comparing the two.
+ */
+export function workerEngine(search: string, supported = wasmBrainSupported()): "wasm" | "typescript" {
+  const asked = new URLSearchParams(search).get("brain");
+  if (asked === "wasm" || asked === "typescript") return asked;
+  return supported ? "wasm" : "typescript";
+}
 
 const createWorker: BrainWorkerFactory = (onMessage, onError) => {
   if (typeof Worker === "undefined") throw new Error("This browser can't run the fly's brain in the background (Worker is not defined).");
@@ -43,13 +59,13 @@ const missing = {
 export function createBrainDriver(): BrainDriver {
   const bridge = nativeBridge();
   if (bridge) return new NativeBrainDriver(bridge, { seed: (Math.random() * 0x7fffffff) | 0 });
-  const source = BRAIN_FILE
-    ? new BrainDownload(BRAIN_FILE, document.baseURI, {
-        fetch: (...args) => fetch(...args),
-        caches: typeof caches === "undefined" ? null : caches,
-        subtle: globalThis.crypto?.subtle ?? null,
-        online: () => navigator.onLine !== false,
-      })
-    : missing;
+  const env = {
+    fetch: (...args: Parameters<typeof fetch>) => fetch(...args),
+    caches: typeof caches === "undefined" ? null : caches,
+    subtle: globalThis.crypto?.subtle ?? null,
+    online: () => navigator.onLine !== false,
+  };
+  const module = BRAIN_MODULE && workerEngine(location.search) === "wasm" ? new BrainDownload(BRAIN_MODULE, document.baseURI, env, BRAIN_MODULE_CACHE) : null;
+  const source = BRAIN_FILE ? new BrainFiles(new BrainDownload(BRAIN_FILE, document.baseURI, env), module) : missing;
   return new WorkerBrainDriver({ createWorker, source });
 }

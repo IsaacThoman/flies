@@ -6,19 +6,20 @@
 // crosses the lake, or there is something new on the table to find. Each
 // reaches the fly only through its senses (places/types.ts, Felt): the wind
 // it feels, a drop or a leaf landing on it, what it sees. None is timed to it
-// or aimed at it.
+// or aimed at it. At a table with others the table says when each comes,
+// and its chances are the table's, so every device sees the same visit; the
+// visitors keep clear of whichever fly is nearest them.
 
 import * as THREE from "three";
 import type { Food, Vec3, World } from "@fly/world";
-import { PATCHES, SOLIDS, TABLE_RADIUS } from "@fly/world";
+import { BREEZE, PATCHES, Pace, SOLIDS, TABLE_RADIUS } from "@fly/world";
+import type { Happening } from "@fly/world";
 import { paint } from "../../scene/build.ts";
 import type { Daylight } from "../../scene/light.ts";
 import { SHADE, shaded } from "../../scene/shade.ts";
 import type { Weather } from "../../scene/weather.ts";
 import type { Around } from "../types.ts";
 import { outside } from "./outside.ts";
-import { Pace } from "./pace.ts";
-import type { Happening } from "./pace.ts";
 import { Rain } from "./rain.ts";
 import { Butterfly, Ladybird, Leaves } from "./visitors.ts";
 
@@ -30,7 +31,7 @@ const smooth = (a: number, b: number, x: number) => {
 const range = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
 /** The way the breeze blows over the picnic (toward +x and a little toward the lake, as the bubbles drift). */
-export const BREEZE_ANGLE = Math.atan2(-9, 38);
+export const BREEZE_ANGLE = Math.atan2(BREEZE.z, BREEZE.x);
 /** How hard a raindrop landing on the fly touches it (a bubble bursting on it is 0.3), and on average how many seconds pass between one and the next in light rain. */
 export const RAIN_TOUCH = 0.25;
 export const RAIN_HIT_EVERY = 40;
@@ -108,6 +109,9 @@ export class Goings {
   #splashes = { near: 0, close: 0, far: 0, pool: 0 };
   #time = 0;
   #last = -1;
+  /** This visit's chances: the device's own, or the table's (`happen`). */
+  #random: () => number = Math.random;
+  #around: Around | null = null;
 
   constructor(ripple: (x: number, z: number, strength: number) => void) {
     this.#ripple = ripple;
@@ -152,22 +156,58 @@ export class Goings {
     if (sun.y > 0.05) SHADE.uShadeSun.value.set(sun.x / sun.y, 1, sun.z / sun.y);
   }
 
+  #range(lo: number, hi: number) {
+    return lo + this.#random() * (hi - lo);
+  }
+
+  /** At a table with others: the table says this happens now, with this random stream. Something already about isn't started again. */
+  happen(kind: Happening, random: () => number) {
+    const around = this.#around;
+    const busy = (kind === "butterfly" && this.#butterfly.active) || (kind === "ladybird" && this.#ladybird.active) || (kind === "gull" && outside.gull.on) || (kind === "boat" && outside.boat.on) || (kind === "leaf" && !this.#leaves.free) || (kind === "gust" && this.#gust.on);
+    if (!around || busy) return;
+    this.#random = this.#butterfly.random = this.#ladybird.random = this.#leaves.random = random;
+    this.#start(kind, around);
+  }
+
+  /** The fly a visitor at `p` keeps clear of: the nearest at a table with others, else this one. */
+  #nearest(p: Vec3, around: Around): Readonly<Vec3> {
+    let best = around.fly;
+    const shared = around.shared;
+    if (!shared) return best;
+    let d = Math.hypot(p.x - best.x, p.z - best.z);
+    for (let i = 0; i < shared.others.length; i++) {
+      const o = shared.others[i];
+      const e = Math.hypot(p.x - o.x, p.z - o.z);
+      if (e < d) {
+        d = e;
+        best = o;
+      }
+    }
+    return best;
+  }
+
   live(dt: number, around: Around) {
     this.#time += dt;
+    this.#around = around;
     const { world, fly, felt, weather } = around;
     this.#world = world;
-    this.#fly = fly;
+    // Visits are planned round one fly: this one, or at a table with others the one every device agrees on.
+    this.#fly = around.shared ? around.shared.anchor : fly;
     this.#pace.gustiness = 0.4 + weather.wind * 1.6;
-    const next = this.#pace.tick(dt, around.quiet, (h) => this.#can(h, weather));
-    if (next) this.#start(next, around);
+    // At a table, the table's pace says when; alone, this one's.
+    const next = around.shared ? null : this.#pace.tick(dt, around.quiet, (h) => this.#can(h, weather));
+    if (next) {
+      this.#random = this.#butterfly.random = this.#ladybird.random = this.#leaves.random = Math.random;
+      this.#start(next, around);
+    }
 
     this.#stepGust(dt);
     felt.air.x += outside.gust.x;
     felt.air.z += outside.gust.z;
     const brushed = this.#leaves.step(dt, this.#time, world, fly, outside.gust);
     if (brushed > 0) felt.touch = Math.max(felt.touch, brushed);
-    this.#butterfly.step(dt, this.#time, world, fly);
-    this.#ladybird.step(dt, this.#time, world, fly);
+    this.#butterfly.step(dt, this.#time, world, this.#nearest(this.#butterfly.looming.position, around));
+    this.#ladybird.step(dt, this.#time, world, this.#nearest(this.#ladybird.looming.position, around));
     if (weather.rain > 0.3) this.#ladybird.hurryOff();
     this.#stepGull(dt, weather);
     this.#stepBoat(dt, weather);
@@ -202,12 +242,13 @@ export class Goings {
   }
 
   #start(h: Happening, around: Around) {
-    const { world, fly, weather } = around;
+    const { world, weather } = around;
+    const fly = around.shared ? around.shared.anchor : around.fly;
     switch (h) {
       case "gust":
         this.#startGust(weather, 1);
         // Now and then a gust brings a crumb tumbling across the table.
-        if (Math.random() < 0.35) this.#gust.crumb = range(0.8, 2.5);
+        if (this.#random() < 0.35) this.#gust.crumb = this.#range(0.8, 2.5);
         break;
       case "leaf":
         // A leaf comes down on a gust of its own.
@@ -227,9 +268,9 @@ export class Goings {
         this.#juice(around);
         break;
       case "boat": {
-        const from = Math.random() < 0.5 ? -1 : 1;
-        Object.assign(outside.boat, { on: true, x: from * 270_000, z: range(-250_000, -160_000), heading: from < 0 ? Math.PI / 2 : -Math.PI / 2, heel: 0 });
-        this.#boat.speed = range(1600, 2600) * -from;
+        const from = this.#random() < 0.5 ? -1 : 1;
+        Object.assign(outside.boat, { on: true, x: from * 270_000, z: this.#range(-250_000, -160_000), heading: from < 0 ? Math.PI / 2 : -Math.PI / 2, heel: 0 });
+        this.#boat.speed = this.#range(1600, 2600) * -from;
         break;
       }
     }
@@ -239,9 +280,9 @@ export class Goings {
     const g = this.#gust;
     g.on = true;
     g.t = 0;
-    g.length = range(4, 10);
-    g.peak = range(220, 520) * (0.5 + weather.wind) * strength;
-    g.angle = BREEZE_ANGLE + range(-0.6, 0.6);
+    g.length = this.#range(4, 10);
+    g.peak = this.#range(220, 520) * (0.5 + weather.wind) * strength;
+    g.angle = BREEZE_ANGLE + this.#range(-0.6, 0.6);
     g.crumb = -1;
   }
 
@@ -271,13 +312,13 @@ export class Goings {
   /** A gull gliding high over, its shadow crossing the table somewhere (wherever its line takes it). */
   #startGull() {
     const g = this.#gull;
-    const r = Math.sqrt(Math.random()) * 220;
-    const a = Math.random() * TAU;
+    const r = Math.sqrt(this.#random()) * 220;
+    const a = this.#random() * TAU;
     g.x = Math.cos(a) * r;
     g.z = Math.sin(a) * r;
-    g.heading = Math.random() * TAU;
-    g.speed = range(750, 1150);
-    g.height = range(6000, 9000);
+    g.heading = this.#random() * TAU;
+    g.speed = this.#range(750, 1150);
+    g.height = this.#range(6000, 9000);
     g.length = 60_000 / g.speed;
     g.t = 0;
     outside.gull.on = true;
@@ -324,9 +365,9 @@ export class Goings {
     if (!slot) return;
     const berries = SOLIDS.filter((s) => s.name === "strawberry" || s.name === "strawberry half");
     for (let tries = 0; tries < 10; tries++) {
-      const berry = berries[Math.floor(Math.random() * berries.length)];
+      const berry = berries[Math.floor(this.#random() * berries.length)];
       const f = berry.footprint as { x: number; z: number; rx: number; rz: number; angle: number };
-      const t = Math.random() * TAU;
+      const t = this.#random() * TAU;
       const u = Math.cos(t) * (f.rx + 1.8);
       const v = Math.sin(t) * (f.rz + 1.8);
       const x = f.x + u * Math.cos(f.angle) + v * Math.sin(f.angle);
@@ -335,7 +376,7 @@ export class Goings {
       slot.food = around.pantry.add("strawberry juice", x, z, 1.1, 0.8);
       slot.to.set(x, slot.food.y, z);
       slot.from.copy(slot.to);
-      this.#show(slot, range(...JUICE_LASTS), 4);
+      this.#show(slot, this.#range(...JUICE_LASTS), 4);
       return;
     }
   }
@@ -347,8 +388,8 @@ export class Goings {
     if (!slot || !world) return;
     const level = (x: number, z: number) => world.onTable(x, z) && world.heightAt(x, z) < 0.05;
     for (let tries = 0; tries < 10; tries++) {
-      const r = Math.sqrt(Math.random()) * 270;
-      const a = Math.random() * TAU;
+      const r = Math.sqrt(this.#random()) * 270;
+      const a = this.#random() * TAU;
       const x = Math.cos(a) * r;
       const z = Math.sin(a) * r;
       if (Math.hypot(x - this.#fly.x, z - this.#fly.z) < 30) continue;
@@ -358,7 +399,7 @@ export class Goings {
       for (let k = 0; k <= 6 && clear; k++) clear = level(slot.from.x + (x - slot.from.x) * (k / 6), slot.from.z + (z - slot.from.z) * (k / 6));
       if (!clear) continue;
       slot.food = null;
-      this.#show(slot, range(...CRUMB_LASTS), 1.3);
+      this.#show(slot, this.#range(...CRUMB_LASTS), 1.3);
       return;
     }
   }

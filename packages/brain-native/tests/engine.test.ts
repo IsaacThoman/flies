@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Simulation, mulberry32 } from "../../brain/src/sim.ts";
-import { build, harness, hex32, noCompiler } from "./compare.ts";
+import { BUILDS, harness, hex32 } from "./compare.ts";
 
 type Change = { step: number; input: number; rate: number } | { step: number; bias: number[] | null } | { step: number; rated: number; rates: number[] };
 
@@ -156,15 +156,15 @@ function typescript(spec: Spec): string[] {
   return lines;
 }
 
-test("the engine is sim.ts's to the bit on random networks with every option", { skip: noCompiler }, () => {
-  const dir = build();
+for (const target of BUILDS) test(`the engine is sim.ts's to the bit on random networks with every option (${target.name})`, { skip: target.skip }, () => {
+  const dir = target.dir();
   let spikes = 0;
   for (let seed = 1; seed <= 40; seed++) {
     const spec = randomSpec(seed);
     const expected = typescript(spec);
     const actual = harness(dir, ["engine"], JSON.stringify(spec));
     const k = expected.findIndex((line, m) => line !== actual[m]);
-    assert.equal(k, -1, `seed ${seed}, line ${k}:\n  typescript ${expected[k]}\n  native     ${actual[k]}`);
+    assert.equal(k, -1, `seed ${seed}, line ${k}:\n  typescript ${expected[k]}\n  C++        ${actual[k]}`);
     assert.equal(actual.length, expected.length);
     spikes += expected.slice(0, spec.steps).reduce((sum, line) => sum + (line.split(": ")[1].length > 0 ? line.split(": ")[1].split(" ").length : 0), 0);
   }

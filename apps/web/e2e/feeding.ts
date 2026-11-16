@@ -1,0 +1,42 @@
+import assert from "node:assert/strict";
+import type { Page } from "playwright";
+import { waitForGameTime } from "../../../scripts/play.ts";
+import type { Game } from "../src/game.ts";
+
+/** The brain can leave a meal. Retry at its new mouth position, keeping the guaranteed path separate from its choice to eat. */
+export async function feedHoney(page: Page, drop: () => Promise<void>) {
+  let sweet = 0, feed = 0, eaten = 0;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.hands.release());
+    await waitForGameTime(page, 0.4);
+    const observation = page.evaluate(() => new Promise<{ sweet: number; feed: number; eaten: number }>((resolve, reject) => {
+      const g = (globalThis as unknown as { __fly: Game }).__fly;
+      const until = g.time + 4;
+      const before = g.life.eaten;
+      let sweet = 0, feed = 0, frame = 0;
+      const timer = setTimeout(() => {
+        cancelAnimationFrame(frame);
+        reject(new Error("feeding: the game did not advance four seconds in 120 s"));
+      }, 120_000);
+      const sample = () => {
+        sweet = Math.max(sweet, g.life.sensed.sweet);
+        feed = Math.max(feed, g.life.brain.state?.command.feed ?? 0);
+        if (g.time >= until) {
+          clearTimeout(timer);
+          resolve({ sweet, feed, eaten: g.life.eaten - before });
+        } else frame = requestAnimationFrame(sample);
+      };
+      sample();
+    }));
+    // Attach both handlers immediately so a failed input cannot leave the probe's rejection unhandled.
+    const [, result] = await Promise.all([drop(), observation]);
+    sweet = Math.max(sweet, result.sweet);
+    feed = Math.max(feed, result.feed);
+    eaten += result.eaten;
+    console.log(`  drop ${attempt}: sweet ${result.sweet.toFixed(3)}, feed ${result.feed.toFixed(3)}, eaten ${result.eaten.toFixed(3)}`);
+    if (sweet > 0 && feed > 0.05 && eaten > 0.05) break;
+  }
+  assert.ok(sweet > 0, "five drops: honey never reached the taste senses");
+  assert.ok(feed > 0.05, "five drops: the brain never produced a feed command");
+  if (eaten <= 0.05) console.log("  tasted and commanded feeding; chose not to stay and eat within five drops (consumption is covered by life.test.ts)");
+}

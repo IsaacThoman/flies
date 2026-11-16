@@ -8,6 +8,7 @@
 // the trees and runs across the grass and the water.
 
 import * as THREE from "three";
+import { TABLE_RADIUS } from "@fly/world";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { Batch, canvas2d, canvasTexture, freeze, paint, random } from "../../scene/build.ts";
 import type { Daylight } from "../../scene/light.ts";
@@ -378,9 +379,11 @@ export function buildBackdrop(light: Daylight): SceneBackdrop {
   freeze(hills);
   scene.add(hills);
 
-  // The lawn round the table: grass you can almost see the blades of, and daisies.
+  // The lawn round the table: grass you can almost see the blades of, mown in stripes, and daisies.
   // A gust runs across it in waves of lighter and darker grass, as the blades bend.
-  const lawnUniforms = { uWave: { value: new THREE.Vector3() }, uTime: { value: 0 } };
+  // The table shades it, where the sunlight carried up from the grass meets the table top or the
+  // pedestal, and under the table less of the sky reaches it.
+  const lawnUniforms = { uWave: { value: new THREE.Vector3() }, uTime: { value: 0 }, uSunDir: { value: light.sunDirection } };
   const lawnMaterial = new THREE.MeshLambertMaterial({ map: grassTexture(), color: "#ffffff" });
   lawnMaterial.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, lawnUniforms);
@@ -388,8 +391,28 @@ export function buildBackdrop(light: Daylight): SceneBackdrop {
       .replace("#include <common>", "#include <common>\nvarying vec2 vLawn;")
       .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLawn = position.xz;");
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", "#include <common>\nvarying vec2 vLawn;\nuniform vec3 uWave;\nuniform float uTime;")
-      .replace("#include <map_fragment>", "#include <map_fragment>\nfloat along = dot(vLawn, uWave.xy);\ndiffuseColor.rgb *= 1.0 + uWave.z * 0.16 * sin(along * 0.0021 - uTime * 3.2) * (0.6 + 0.4 * sin(dot(vLawn, vec2(-uWave.y, uWave.x)) * 0.0009));");
+      .replace("#include <common>", "#include <common>\nvarying vec2 vLawn;\nuniform vec3 uWave;\nuniform float uTime;\nuniform vec3 uSunDir;")
+      .replace(
+        "#include <map_fragment>",
+        /* glsl */ `#include <map_fragment>
+float along = dot(vLawn, uWave.xy);
+diffuseColor.rgb *= 1.0 + uWave.z * 0.16 * sin(along * 0.0021 - uTime * 3.2) * (0.6 + 0.4 * sin(dot(vLawn, vec2(-uWave.y, uWave.x)) * 0.0009));
+diffuseColor.rgb *= 1.0 + 0.05 * smoothstep(-0.15, 0.15, sin(dot(vLawn, vec2(0.96, 0.28)) * 0.0036)) - 0.025 + 0.04 * sin(vLawn.x * 0.0011 + sin(vLawn.y * 0.0013) * 2.0) * sin(vLawn.y * 0.0009 + 1.7);`,
+      )
+      .replace(
+        "#include <lights_fragment_end>",
+        /* glsl */ `#include <lights_fragment_end>
+{
+  vec3 sd = normalize(uSunDir);
+  float rise = ${(-(LAWN_Y + 4)).toFixed(1)};
+  vec2 slant = sd.xz / max(sd.y, 0.04);
+  float top = 1.0 - smoothstep(${(TABLE_RADIUS - 18).toFixed(1)}, ${(TABLE_RADIUS + 18).toFixed(1)}, length(vLawn + slant * rise));
+  float t = clamp(-dot(vLawn, slant) / max(dot(slant, slant), 1e-4), 0.0, rise);
+  float post = 1.0 - smoothstep(22.0, 40.0, length(vLawn + slant * t));
+  reflectedLight.directDiffuse *= 1.0 - max(top, post) * 0.88;
+  reflectedLight.indirectDiffuse *= 0.6 + 0.4 * smoothstep(${(TABLE_RADIUS * 0.4).toFixed(1)}, ${(TABLE_RADIUS * 1.5).toFixed(1)}, length(vLawn));
+}`,
+      );
   };
   lawnMaterial.customProgramCacheKey = () => "lawn";
   const lawn = new THREE.Mesh(new THREE.CircleGeometry(26_000, 48).rotateX(-Math.PI / 2).translate(0, LAWN_Y + 4, 0), lawnMaterial);

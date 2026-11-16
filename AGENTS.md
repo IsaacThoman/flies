@@ -17,11 +17,17 @@ the rules the whole thing is built on.
 - The game draws everything itself, menus included. There is no DOM to
   query: tests and scripts wait on the canvas's `data-*` state.
 - The packed connectome is not in git: `npm run brain:fetch` (38 MB).
+- Browsers run the brain's C++ built as WebAssembly, committed in
+  `packages/brain-native/wasm/`: after changing anything in
+  `packages/brain-native`, `npm run brain:wasm` (it downloads wasi-sdk once)
+  and commit what it makes; the tests fail until then.
 - The Apple TV has no JIT. JavaScript there costs roughly 16 times what it
   does in a desktop browser, and the cost follows the number of objects and
   draw calls, not what they draw. Merge and instance geometry, keep draw calls
   low, allocate nothing per frame, and keep per-frame JavaScript small. The
   brain does not run in JavaScript on the TV.
+- Tests wait on game time or canvas state, not wall-clock sleeps; speed budgets use CPU time.
+  The brain chooses: observe its inputs and commands, and bound retries for its choices.
 - Comments say why, not what. No dead code, no leftover experiments.
 
 ## Commits and pull requests

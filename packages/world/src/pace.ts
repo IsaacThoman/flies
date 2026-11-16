@@ -2,7 +2,8 @@
 // own long clock, and never two starting close together, so that over hours
 // of watching the table is visited and left alone in turn and never busy.
 // The clocks run only while nobody is using the remote. Nothing here looks
-// at the fly: they are not timed to it.
+// at the fly: they are not timed to it. A shared table's server paces its
+// visits with the same clocks (apps/server).
 
 export type Happening = "gust" | "gull" | "leaf" | "butterfly" | "ladybird" | "juice" | "boat";
 export const HAPPENINGS: readonly Happening[] = ["gust", "gull", "leaf", "butterfly", "ladybird", "juice", "boat"];

@@ -13,19 +13,28 @@ npm run dev           # the game in a browser
 npm test              # unit tests (Node)
 npm run e2e           # plays the game in headless Chromium with the real brain, then the built site
 npm run build         # the web build, plain files for any static host (docs/web.md)
+npm run ios           # the iPhone and iPad app in a simulator (docs/ios.md)
+npm run rooms         # the room server for tables with others (docs/online.md)
 ```
 
 `docs/architecture.md` describes the parts and the rules. This file is about
-the game (`apps/web`) and its packages: `packages/world` (where the fly can
+the game (`apps/web`), which is also the iPhone and iPad app
+([docs/ios.md](docs/ios.md)), and its packages: `packages/world` (where the fly can
 stand, what it bumps into and eats), `packages/body` (its senses, what it makes
 of the brain's commands, how it moves, what its eyes see) and `packages/ui`
 (the menu kit). `docs/places.md` is about the places the fly can live and how
 to add one, and `docs/web.md` about the web build: getting the brain to a
 browser, running well on what people have, being a good tab, and hosting.
-For a Docker Compose stack with automatic HTTPS on your own server, see
+`docs/online.md` is about tables with others: up to eight people's flies at
+one table, joined by a link, and the room server between them. For a Docker
+Compose stack with automatic HTTPS on your own server, see
 [Self-hosting Flies](docs/deploy.md).
 
 ## Playing
+
+In a browser, Together (on the menu) starts a table and
+shares its link: whoever opens it sits their fly down beside yours, up to
+eight, each marked with a dab of its player's colour (`docs/online.md`).
 
 The fly can live in more than one place (`docs/places.md`), and the player can
 carry it from one to another: the **Place** tool, or Settings → Wallpaper →
@@ -33,19 +42,29 @@ Where it lives. Living in each in turn (the default), it moves on after 20 minut
 wallpaper. It is the same fly, its brain running on; the world fades out, the
 place is built behind the veil, and it is set down there.
 
-The first place is the picnic: a round café table by a lake: lemonade, a jam jar, a
-strawberry and a half, cherries, a slice of orange, a green apple, sugar cubes,
-a drip of honey, a smear of jam, dew. The lemonade jar stands in a saucer:
-up a gentle slope, a rounded rim to walk along, and down into a moat where
-lemonade has dripped and pooled; drops from the jar, and the fly's own feet,
-set rings spreading on the pool. The whole strawberry spreads at its foot so a
-fly can walk up and over it, and there is juice on top. At the fly's own scale there are
-biscuit crumbs (the big ones are boulders it can climb), two lemon pips, specks
-and grains of spilt sugar, and the napkin is woven thread by thread in the
-table's shader, with a stitched hem and the creases where it was folded, so it
-stays crisp however close the camera comes. Drops of water are clear in the
-middle and bright at the edge, and focus the sun into a spot on the table.
-Everything is built in code.
+The first place is the picnic: a round café table by a lake: lemonade, a jam
+jar, a strawberry and a half, cherries, a slice of orange, a green apple,
+sugar cubes, a drip of honey, a smear of jam, dew. The lemonade jar stands in
+a saucer: up a gentle slope, a rounded rim to walk along, and down into a moat
+where lemonade has dripped and pooled; drops from the jar, and the fly's own
+feet, set rings spreading on the pool. Its lid is pressed with a rolled rim
+and a raised ring and knurled round its side, and the straw goes through it by
+a grommet. The whole strawberry spreads at its foot so a fly can walk up and
+over it, and there is juice on top; its seeds sit in little pits. At the fly's
+own scale there are biscuit crumbs (the big ones are boulders it can climb),
+two lemon pips, specks and grains of spilt sugar, and the napkin and the jam
+jar's cover are woven thread by thread, the napkin with a stitched hem and the
+creases where it was folded, so they stay crisp however close the camera
+comes. The table's white enamel shows its use: spots where dew dried, arcs
+where it was wiped that catch the low sun, hairline scratches, pollen, a chip
+or two at the rim, and the sticky ring a jar of lemonade once left. The apple
+is freckled and streaked with blush, russet round its stalk; the orange's
+segments are packed with juice sacs; the jam has pieces of fruit and seeds in
+it, behind glass that brightens at its edge; the sugar cubes are pressed from
+crystals that glint. Drops of water are clear in the middle and bright at the
+edge, and focus the sun into a spot on the table. On the lawn below, the table
+casts its shadow, and the grass is mown in stripes. Everything is built in
+code.
 
 Soap bubbles drift over the table on the breeze, and a few small ones bob
 low past the fly; one that touches the table or anything standing on it
@@ -63,6 +82,14 @@ cloud now and then passes over the sun and the light dims by a
 fifth for a few seconds. The hours are a fixed summer day's (sunrise about
 5:40, sunset about 20:10), unless the Apple TV can tell the real sunrise and
 sunset (the weather outside, below).
+
+Indoors the clocks (the alarm clock on the windowsill and the one on the
+kitchen wall, the lab's on its wall, the bar's behind the bar) tell the real
+time, whatever light you have chosen: a clock that showed another time would be a
+broken one, and a twelve-hour dial can't tell three in the afternoon from
+three in the morning, so it never looks wrong under the night's light. Its
+hands are drawn in its dial's shader, turned by the time each frame, so they
+cost no draw and stay sharp however close the camera comes.
 
 So does the weather, unless you choose one (the **Weather** tool): clear,
 overcast, mist or light rain. On "Now" it follows a forecast worked out from
@@ -126,55 +153,71 @@ leaf are in the fly's world only as things it sees (and, for a brain without
 eyes, things that can loom); they keep clear of it, and none of it is aimed
 or timed at the fly: what it does about any of it is its brain's.
 
-The windowsill is the deep sill of a cottage kitchen window, painted cream over
-sage over pine, its old gloss crazed where the sun bakes it and chipped along
-its front edge. The light comes in through the panes of a casement window, so
-the frame, the mullion and the glazing bars lay their shadows across the sill
-and the kitchen and swing round with the day; by day the room throws some of it
-back, and from dusk the lamp over the kitchen table lights it and the glass
-turns to a dark mirror with the lamp in it. On the sill: a spongeware bowl with
-a peach and two plums, whose side a fly can walk up, round its rim and down to
-where plum juice has run; an overripe, freckled banana it can climb from its
-tip, split near the stalk; half a peach on a plate with its stone; a pot of
-basil in a saucer with water round the pot's foot, its rim and soil a perch; a
-bottle of red wine that has dripped a pool on the sill, where drips and the
-fly's feet set rings spreading, as they do on the saucer's water; a teaspoon
-with honey in it, crumbs of toast and spilt sugar, drops from watering the
-basil, and a linen tea towel woven thread by thread in its shader. A fly can
-stand on the rail at the foot of the glass but never get through it, and nor
-can the ball, which comes round from where it has room. Outside are a garden
-with a striped lawn, an apple tree and washing moving in the breeze, a picket
-fence with hollyhocks and foxgloves, and the backs of a little street of houses
-with smoke from their chimneys, a church spire, clouds and passing birds; at
-night their windows light up and the stars and the moon come out. Under a grey
-sky the window's shadows go soft; on cold mornings and damp days the glass
-mists at its foot; in mist the houses fade to ghosts; in the rain it falls
-across the garden, drops bead on the pane and run down it, and it stays
-streaked as it dries. It sounds of the kitchen's hush, the fridge, birds in
-the garden muffled by the glass by day, and rain on the pane. There are no bubbles or fireflies
-indoors.
+The windowsill is the deep sill of a cottage kitchen window, painted cream
+over sage over pine, its old gloss crazed where the sun bakes it and chipped
+along its front edge, its bottom rail flaking and tide-marked where
+condensation runs down the glass. The light comes in through the panes of a
+casement window, so the frame, the mullion and the glazing bars lay their
+shadows across the sill and the kitchen and swing round with the day; by day
+the room throws some of it back, and from dusk the lamp over the kitchen table
+lights it and the glass turns to a dark mirror with the lamp in it. The white
+tiles round the window turn into its reveals. On the sill: a red enamel
+wind-up alarm clock with two bells and its alarm set for half past six, which
+a fly can land on and walk across; a spongeware bowl with a peach and two
+plums, whose side a fly can walk up, round its rim and down to where plum
+juice has run; an overripe, freckled banana it can climb from its tip, split
+near the stalk; half a peach on a plate with its stone; a pot of basil in a
+saucer with water round the pot's foot, a bushy mound of broad, glossy, veined
+leaves in opposite pairs, coming into flower, that a fly can land on; a bottle
+of red wine that has dripped a pool on the sill, where drips and the fly's
+feet set rings spreading, as they do on the saucer's water; a teaspoon with
+honey in it and the jar it came from, glowing when the sun is behind it;
+crumbs of toast and spilt sugar, drops from watering the basil, pebbles,
+shells and a piece of sea glass from the beach along the back, a postcard of a
+lighthouse propped at the end, and a linen tea towel woven thread by thread in
+its shader. A fly can stand on the rail at the foot of the glass but never get
+through it, and nor can the ball, which comes round from where it has room.
+Across the kitchen are the dresser with its plates and cups, the range in its
+chimney breast with pans and tins on the mantel and the kitchen clock over it,
+a doorway and the fridge. Outside are a garden with a striped lawn, an apple
+tree and washing moving in the breeze, a picket fence with hollyhocks and
+foxgloves, and the backs of a little street of houses with smoke from their
+chimneys, a church spire, clouds and passing birds; at night their windows
+light up and the stars and the moon come out. Under a grey sky the window's
+shadows go soft; on cold mornings and damp days the glass mists at its foot;
+in mist the houses fade to ghosts; in the rain it falls across the garden,
+drops bead on the pane and run down it, and it stays streaked as it dries. It
+sounds of the kitchen's hush, the fridge, birds in the garden muffled by the
+glass by day, and rain on the pane. There are no bubbles or fireflies indoors.
 
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
-wiring was traced: a stereo microscope with a fly pad on its stage (its base and
-pillar are solid; a fly can land on it), a rack of plugged vials with pupae up
-their walls, a vial with its foam plug pulled half out and cornmeal food at the
-bottom, a foil-capped beaker, a wash bottle, a box of pipette tips, a lab timer
-and a desk lamp. The fly can eat from a dish of grape-juice agar poured to the
-brim (land on it, walk off over the rim) and from drips of food spilt when the
-vials were filled. At its own scale there are dried crumbs of food to climb,
-grains of cornmeal, forceps whose arms it can walk along, a fine paintbrush, a
-crumpled wipe to climb, and an open notebook, thin enough to step onto, written
-in squiggles with a cross, a tally of counts and a sketch of a fly; a drop of
-water on the page magnifies the writing under it. The epoxy's flecks, the
-foam's pores, the cornmeal's grains and the ink are worked out in the shaders,
-crisp however close the camera comes, and glossy things show the windows and
-the ceiling's panels in them. By day fluorescent panels light the room evenly
-and the sun comes in at the windows behind the bench, laying their shapes,
-frames and blinds across the bench and the floor, long and warm at golden hour;
-from dusk the panels are off, a desk lamp pools warm light on the bench, and
-the room is dark round it but for lit windows across the way. It sounds of the
-air handling, the lights' hum, a fridge's compressor starting and stopping, and
-a distant beep now and then. There are no bubbles or fireflies indoors.
+wiring was traced: a stereo microscope with a fly pad on its stage (its base
+and pillar are solid; a fly can land on it), a rack of plugged vials with
+pupae up their walls, a vial with its foam plug pulled half out and cornmeal
+food at the bottom, a foil-capped beaker, a wash bottle, a box of pipette
+tips, a lab timer and a desk lamp. The fly can eat from a dish of grape-juice
+agar poured to the brim (land on it, walk off over the rim) and from drips of
+food spilt when the vials were filled. At its own scale there are dried crumbs
+of food to climb, grains of cornmeal, forceps whose arms it can walk along, a
+fine paintbrush, a crumpled wipe to climb, and an open notebook, thin enough
+to step onto, written in squiggles with a cross, a tally of counts and a
+sketch of a fly; a drop of water on the page magnifies the writing under it.
+The epoxy's flecks, the foam's open pores, the cornmeal's grains and the ink
+are worked out in the shaders, crisp however close the camera comes, and the
+satin bench and the glossy things show the windows, in the colour of the sky
+outside, and the ceiling's panels in them. Between two of the windows hangs a
+wall clock that tells the real time, its red second hand sweeping round. Round
+the room are shelves of fly stocks, boxes of gloves, an incubator, a
+centrifuge and a water bath, a sink, a whiteboard, and a spider plant on the
+sill trailing its runners. By day fluorescent panels light the room evenly and
+the sun comes in at the windows behind the bench, laying their shapes, frames
+and blinds across the bench and the floor, long and warm at golden hour; from
+dusk the panels are off, a desk lamp pools warm light on the bench, and the
+room is dark round it but for lit windows across the way. Under a grey sky the
+view outside goes flat and grey, in mist it fades to a pale veil, and in the
+rain it falls past the windows. It sounds of the air handling, the lights'
+hum, a fridge's compressor starting and stopping, and a distant beep now and
+then. There are no bubbles or fireflies indoors.
 
 The bar is the walnut counter of a small, warm bar in the evening: a cocktail
 on the rocks with a wedge of lime on its rim, a tall beer with its head of
@@ -183,19 +226,41 @@ maraschino cherries, printed card coasters, a folded paper napkin, and a
 candle in a storm lantern whose cap is a perch and whose flame is out of
 reach. A sticky ring of syrup marks where a glass stood; the cherries' syrup,
 the lime, the beer's head and the cocktail itself are sweet too (a fly that
-lands in the drink can climb out up the meniscus onto the rim), and spilt
-beer takes its feet as rings, as does the cocktail when the ice settles. At
-the fly's scale the walnut's grain and open pores show under the varnish,
-with fine scratches and the milky rings of old glasses; salt crystals and
-bits of peanut lie about; the cold glasses are beaded with condensation and
-bubbles rise through the beer. Behind the bar, bottles glow on glass shelves
-before an old mirror, under brass pendant lamps; off the counter's end a
+lands in the drink can climb out up the meniscus onto the rim), and spilt beer
+takes its feet as rings, as does the cocktail when the ice settles. At the
+fly's scale the walnut's grain and open pores show under the varnish, with
+fine scratches and the milky rings of old glasses; salt crystals and bits of
+peanut lie about; the cold glasses are beaded with condensation and bubbles
+rise through the beer. Behind the bar, labelled bottles glow on glass shelves
+before an old mirror, under brass pendant lamps, and in the walnut pier
+between the shelves hangs an old drop-dial clock with a brass bezel and an
+ivory face. It tells the real time: its blued hands turn and a red second hand
+sweeps, and in the evening a little brass lamp lights its face. The walls are
+papered in green flock over walnut panelling and hung with paintings, and a
+buttoned leather banquette runs along the far wall; off the counter's end a
 window looks over a square to a row of houses. By day the room is unlit and
-the light is the window's, falling away from it; at golden hour the sun comes
-in low across the counter and the glasses throw long shadows coloured by what
-is in them; at dusk and night the lamps, the flickering candle and the back
-bar light it, and lights out of focus glow behind the fly. It sounds like a
-quiet room: low voices, a glass or two touching, ice settling.
+the light is the window's, falling away from it, and the varnish mirrors the
+dark room and the bright window; at golden hour the sun comes in low across
+the counter and the glasses throw long shadows coloured by what is in them; at
+dusk and night the lamps, the flickering candle and the back bar light it, and
+lights out of focus glow behind the fly. It sounds like a quiet room: low
+voices, a glass or two touching, ice settling.
+
+Wherever it lives, a fly that has stood in something sticky or wet leaves
+footprints (`apps/web/src/scene/prints.ts`): faint prints of the two pads of
+its feet, each where its gait set that foot down, lying on whatever it walks
+on (the table, a fruit, a jar's rim, the sill). Honey leaves them amber; jam,
+raspberry, wine and syrup red; the juices, lemonade, beer, the agar and the
+lab's fly food their own colours. Water (dropped, the basil's saucer, a drop
+or dew) leaves darker wet prints that dry in about half a minute; sticky ones
+fade over a minute and a half. A foot carries only a little: the first steps
+off the food print clearly, the next fainter and then only now and then, and
+after ten or so it is clean, until it walks back into food. Sugar and crumbs
+are dry and leave nothing. There are none on a drink, a head of foam or
+anything drawn rougher than the fly feels it, and they stay behind when the
+fly is carried somewhere else. They are only drawn: the fly doesn't taste or
+feel its own prints, they aren't food, and nothing about them reaches its
+brain.
 
 The restaurant is a whole room, not a tabletop: a small city bistro, closed
 for the night. The fly starts on a round marble table in the window, between
@@ -233,7 +298,11 @@ no bubbles or fireflies indoors.
 It plays as well with a finger, a mouse or trackpad, a keyboard or a game pad
 as with the remote. Your hand is a glowing ring on the table; until you move
 it, it waits just in front of the fly's mouth, and it drifts back there 15 s
-after you last did.
+after you last did. The ring answers the hand: using a tool presses it in and
+it springs back, holding Tickle or Blow keeps it in a little, and a press it
+can't act on (the ball still in the air, Up past the last kind) shakes it.
+Food that lands sets a faint ring spreading round it. None of this is in the
+fly's world.
 
 | On the remote | Does |
 | --- | --- |
@@ -241,29 +310,42 @@ after you last did.
 | Left / Right | Picks a tool from the shelf. |
 | Up / Down | Picks the tool's kind: which food, how hard to blow, the time of day, the weather, the camera. |
 | Select | Uses the tool: drops food, throws the ball. Hold it to tickle or blow. On Light, Weather and View it steps round the choices. |
-| Play/Pause, or Back | The pause menu. Play/Pause or Back again carries on. |
-| Back on the title | Leaves the app. |
+| Play/Pause, or Back | The menu. Play/Pause, or Play on it, carries on. |
+| Back on the menu | Leaves the app. |
 
 Pointing, the screen itself is what you press, and there are no button hints:
 
 | | With a finger | With a mouse or trackpad |
 | --- | --- | --- |
 | Your hand | Where you touch the table. Touching the fly is touching the fly, not the table behind it. | Under the cursor, on whatever it is over (the cursor is hidden there: the ring is the cursor). |
-| Feed, Swoop | Tap where you mean (drag to aim, lift to drop). | Click there. |
+| Feed, Swoop | Tap where you mean. | Click there. |
 | Tickle, Blow | Touch and hold, and drag: the feather strokes the fly while you hold it on it, and rests on it lightly while the hand is there; the puff follows the finger. | Hold the button, and drag. Hovering over the fly rests the feather on it. |
 | Light, Weather, View, Place | The arrows either side of the tool's label (or a tap on the label, or a swipe along it) step its kind; tapping the tool again does too. Place has a Go button for somewhere the fly isn't. | The same, or the wheel over the label. |
-| The camera | Pinch to bring it in or take it out: it follows the fingers and settles into the nearest view (close up, follow, wide, the whole table). Drag across the air off the table, or with two fingers, to look round the fly; let go, and it eases back to where the cameraman had it. | The wheel steps between the views; a trackpad's pinch follows the fingers and settles. Drag across the air, or with the right button anywhere, to look round. A trackpad's sideways scroll looks round too. |
+| Closer and farther | Pinch. | The wheel, a trackpad's scroll up and down, or its pinch. |
+| Round the fly | Drag anywhere but with the feather or the air in hand on the table (they go where the finger goes); or drag with two fingers. | Drag (the same), or drag with the right or middle button anywhere. A trackpad's sideways scroll. |
+| The camera back | Double-tap the air. | Double-click the air. |
 | Tools | Tap one on the shelf. | Click one; the wheel over the shelf steps along it. |
-| Menus | Tap a row; a choice's arrows step it, a slider follows the finger, a long list scrolls when dragged. The round button at the top left of a pane, or a tap outside it, goes back. | The same; rows light up under the cursor, and the wheel scrolls. |
-| The pause menu | The round button at the top left. | The same. |
+| Menus | Tap a row, a tab, a choice's arrows; a slider follows the finger. The round button at the top left, or a tap outside the pane, goes back. | The same, and a right click goes back. Hovering only brightens what is under the cursor: the focus ring is the remote's and the keys'. |
+| The menu | The round button at the top left. | The same. |
 
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
 Back, space for Play/Pause), its hints drawn as keys; the number keys pick a
-tool and + and − bring the camera in and take it out. A standard game pad
-(the Gamepad API) is the remote too: A is Select, B Back, Start Play/Pause,
-the d-pad and the shoulder buttons the arrows, the left stick moves your hand
-(and steps through a menu), the right stick looks round, the triggers bring
-the camera in and take it out; its hints are drawn as its buttons. The hints
+tool, + and − held bring the camera in and take it out, Q and E held turn it
+round the fly, and R (or Home) gives it back to the cameraman. After a mouse
+or a finger the menus show no focus; the first arrow shows it, on what was
+last pressed. A standard game pad (the Gamepad API) is the remote too: A is
+Select, B Back, Start Play/Pause, the d-pad and the shoulder buttons the
+arrows, the left stick moves your hand (and steps through a menu), the right
+stick turns the camera round (pressed in, gives it back), the triggers bring
+it in and take it out as far as they are pressed; its hints are drawn as its
+buttons. A pad that can
+rumble (`apps/web/src/haptics.ts`) is felt in the hand: a tick when food is
+dropped and a softer one when it lands, a swell as the ball dives, two quick
+knocks when a press can't do anything, light pulses while the feather is on
+the fly, a low one while you blow, and a knock when the fly takes off. A
+phone that can vibrate (Android) buzzes for the same; the iPhone and iPad app
+plays its own haptics. It is as strong as the effects are loud, and off with
+them; it is never felt in the wallpaper. The hints
 always show the thing last used, and the screen hides the system's cursor,
 text selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
@@ -304,8 +386,18 @@ pace a little ahead, and in a jump it pulls back, widens and whips round
 after the fly. It is never inside anything, nor closer to the fly than most of
 the shot's distance. With the ball in hand it goes round to the side across the
 fly from where the ball will come, so the dive is seen past the fly. Behind the
-loading screen and the title it keeps the fly small and to the left, clear of
-the menus.
+loading screen and the menu it keeps the fly small and to the left, clear of
+them.
+
+You can take the camera from the cameraman. Closer and farther is one smooth
+range, from the facets of the fly's eyes out to the whole table (where it
+turns from the fly to the table's middle); the named views are points on it,
+and the View tool names the one it is nearest. It stays wherever you leave it.
+Turned round the fly, it stays where you put it for five seconds after you let
+go; then the cameraman carries on from there, moving only when it would have
+anyway. Handed back (R, a double click or tap in the air, the pad's right
+stick pressed in), the cameraman takes it at once, at the named view nearest your zoom.
+The wallpaper takes it too, and gives your zoom back after.
 
 After a minute with no press (Settings → Wallpaper: 30 s to 5 min, or never)
 the hints, the shelf and the pointer fade, and the camera settles beside the
@@ -323,11 +415,13 @@ moves on to a new shot, and at least once a minute, they fade out and come
 back together in the next corner, so neither is left in one place long
 enough to mark an OLED screen.
 
-The title also offers **Just watch** (the wallpaper straight away), **Inside
-its brain** (live: every sense going in, every command coming out with the
-neurons it is read from and their firing rates, spikes a second, active
-neurons), **About the fly**, and **Settings**, a page for each part of the
-game, every setting a step from the top: **Wallpaper** (when it starts, how
+There is one menu: the title at launch, and the same menu from play (Back,
+Play/Pause, or the button at the top left), with the fly living on behind it.
+It has **Play**, **Watch** (the wallpaper straight away), **Brain** (live:
+every sense going in, every command coming out with the neurons it is read
+from and their firing rates, spikes a second, active neurons), **About**, and
+**Settings**: a row of tabs over each part of the game, every setting two
+steps from the menu and none scrolling: **Wallpaper** (when it starts, how
 its camera films, where the fly lives, what it sees and its nervous system
 in a corner, the X-ray, and, on an Apple TV that can tell, the real weather), **Sound** (effects, surroundings)
 and **Picture** (pixel size, the eyes' detail, button hints, frame stats).
@@ -341,8 +435,8 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | --- | --- |
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
 | `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
-| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
-| `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, or past the table's edge. |
+| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
+| `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, another fly's body, or past the table's edge. |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
 | `grounded` | On its feet. |
@@ -379,6 +473,11 @@ lives (`packages/body/src/motion.ts` unless noted):
   or mouth are on something sweet, the body shuffles the last millimetre to put
   its mouth on it. Stopping is the brain's (sugar stops DNg100); the shuffle
   isn't.
+- **Other flies** (`packages/body/src/crowd.ts`, at a table with others:
+  `docs/online.md`). Two flies can't stand in the same spot: walking into
+  another fly's body it is pushed back out, so it stops against it or slides
+  past, and flying into one it bounces off. Each device moves only its own
+  fly, out of where it sees the others.
 - **The pose.** Grooming is shown only while it stands, and a bout lingers
   about 1.5 s after the command fades. The crouch follows the
   raw escape command.
@@ -594,18 +693,24 @@ three draws, only while it rains: the streaks (one quad a drop, placed and
 moved entirely in the shader from the time), the splashes (a pool of 56, each
 a ring and a crown of droplets, one instanced draw) and the beads on the fruit;
 the table's own beads and puddles are in its shader, as many as there are
-pixels for. Each visitor is one draw while it is about, the gull's shadow is
+pixels for. The ripple round food that has just landed is one draw for under
+a second. Each visitor is one draw while it is about, the gull's shadow is
 in the table's and the fly's own shading, and nothing is allocated per frame.
+The footprints are one instanced draw while any are left (at most 128, two
+triangles each), multiplied into what they lie on, so they need no light; a
+print is written only when a foot is set down, and fades in the shader.
 Menus and hints are one 2D canvas drawn over the frame,
 uploaded only when something on it changes (at most 30 times a second; the
 in-game shimmer at 10).
 
 Measured in Chromium on an M-series Mac (Settings → Picture → Frame stats shows it live,
 and the canvas's `data-calls`, `data-triangles`, `data-frame-ms` and
-`data-eyes-ms`): playing, 23 draws and about 105,000 triangles a frame (in
+`data-eyes-ms`): playing, 23 draws and about 106,000 triangles a frame (in
 rain 26 and 118,000, and about 0.07 ms more JavaScript; with a butterfly, a
 ladybird, a falling leaf, the gull, the boat and a drop of juice all about at
-once, a draw for each in view and 0.04 ms); on a
+once, a draw for each in view and 0.04 ms; with footprints, one more draw
+and at most 256 triangles, and about 7 µs of JavaScript a frame in V8's
+interpreter); on a
 frame the eyes refresh, about 70 draws and 280,000 triangles (the most the
 end-to-end run sees is about 85 draws and 300,000), the eyes' own part about 45
 draws and 1.5 to 2.5 ms (mostly the read-back). JavaScript per frame about 1 to
@@ -651,15 +756,21 @@ wing buzz following the wings, patter while it walks, each place's own
 surroundings (the picnic's breeze and lake; birds by day, quieter in the
 rain and gone to roost at night, muffled behind the windowsill's glass), rain
 and the rush of a gust, and small sounds for the
-tools and menus. The settings, the shelf's kept choices and what the hints
+tools and menus. The held tools are heard while they work: the feather
+rustles, swelling with each brush, while it strokes the fly, and a breath of
+air blows while you hold Blow, deeper and softer gently, higher and louder
+hard. Each starts when the tool begins and is let go when it stops, so
+nothing plays, or costs anything, in between. The settings, the shelf's kept choices and what the hints
 have taught are in
 `localStorage` (`apps/web/src/settings.ts`); from a save made by another
 build, or a broken one, only what this build can use is kept.
 
 ## Tests
 
-`npm test` runs, without a browser: the sky by the clock (each palette at its
-hour, nothing jumping minute to minute through a whole day, the sun up by day
+`npm test` runs, without a browser: the clocks' hands (where they point at
+given times, in any time zone, moving on smoothly); the sky by the clock (each
+palette at its hour, nothing jumping minute to minute through a whole day, the
+sun up by day
 and the moon by night, or a lamp's light on and still through the night, for
 every place's palettes and an indoor-like set; a room sees less of the
 weather); the
@@ -707,10 +818,13 @@ the brain inside the head and the cord on the thorax's floor, the nerves
 inside the legs in every pose; nothing allocated per frame); the
 bubbles (low ones mostly pass the fly, pop on surfaces without settling,
 keep coming, and burst on the fly and are felt);
-that the crumbs, pips, strawberry and saucer can be walked over, and at the
-windowsill the banana, the bowl and the basil's saucer, with the glass a wall
-and a ledge at its foot; that the ball comes over what is in its way, and
-round a window.
+that the crumbs, pips, strawberry and saucer can be walked over, and the
+lemonade's lid and straw are drawn where the fly stands; at the windowsill the
+banana, the bowl, the basil's saucer and its crown, the alarm clock and its
+bells, the honey jar and the finds from the beach, with the glass a wall and
+a ledge at its foot, and no hollow where a falling fly could be caught; that
+the bar's clock is out of reach and seen over the counter from anywhere on
+it; that the ball comes over what is in its way, and round a window.
 
 `npm test` also checks the frame at every shape (the pixel count, the design
 units, the safe area), every layout at eleven shapes (inside the safe area,
@@ -722,11 +836,12 @@ points at in the world, and the camera's framing at every aspect, held and let
 go.
 
 `npm run e2e` plays the game with the real brain: the title
-appears once the brain wakes, the menus are walked with the keys, honey is
-tasted and eaten, the ball is thrown until the fly takes off, Play/Pause
-pauses and resumes, the wallpaper comes and goes with what it sees in a
+appears once the brain wakes, the menus and the settings' tabs are walked with
+the keys (the first arrow only showing the focus), honey is tasted and eaten,
+the ball is thrown until the fly takes off, Play/Pause and Back open the menu
+and carry on, the wallpaper comes and goes with what it sees in a
 corner, with its nervous system under it (and, set to always, they stay while
-playing but not over View → Fly's eyes or the pause menu), the X-ray comes in
+playing but not over View → Fly's eyes or the menu), the X-ray comes in
 the follow shot, goes in the wide one and comes with View → Inside it, the fly is carried to every place, the weather
 outside, fed as the Apple TV would give it, is what "Now" shows until it is
 too old, Back reaches the root, a reload finds the settings, the view, the
@@ -734,9 +849,11 @@ light and the weather as they were left, the shelf on Feed and the hints for
 what was used gone, and the frame stays within its draw budget. Then
 `apps/web/e2e/pointer.e2e.ts` plays it with fingers on a phone with a notch
 (the menus and the shelf tapped, honey dropped and eaten, the feather and the
-puff held on the fly, a pinch, a look round, the phone turned on its side,
-the wallpaper woken by a tap that does nothing else) and with a mouse and keys
-on a desktop. Then it builds the site and serves it from a folder of a static
+puff held on the fly, a pinch, a look round that stays a while, the phone
+turned on its side, the wallpaper woken by a tap that does nothing else) and
+with a mouse and keys on a desktop (hovering moves no focus, the wheel zooms
+smoothly and stays, drags with each button turn the camera without dropping
+food, R and a double click give it back, a trackpad's pinch and + zoom too). Then it builds the site and serves it from a folder of a static
 server (`apps/web/e2e/web.e2e.ts`): a first visit on a slow connection that
 breaks off partway counts the brain's bytes and carries on from the break, a
 second loads with the network off, a hidden tab sleeps and wakes without a

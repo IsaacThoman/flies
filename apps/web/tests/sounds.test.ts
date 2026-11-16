@@ -10,7 +10,8 @@ class FakeContext {
   state = "running";
   currentTime = 0;
   destination = {};
-  started: { buffer: FakeBuffer; loop: boolean; gain: number; level: ReturnType<typeof param> }[] = [];
+  started: { buffer: FakeBuffer; loop: boolean; gain: number; level: ReturnType<typeof param>; rate: number }[] = [];
+  stopped = 0;
   createGain() {
     const node = { gain: param(1), out: null as unknown, connect: (to: unknown) => void (node.out = to) };
     return node;
@@ -27,8 +28,8 @@ class FakeContext {
       playbackRate: param(1),
       out: null as { gain: ReturnType<typeof param> } | null,
       connect: (to: { gain: ReturnType<typeof param> }) => void (source.out = to),
-      start: () => started.push({ buffer: source.buffer!, loop: source.loop, gain: source.out!.gain.value, level: source.out!.gain }),
-      stop: () => {},
+      start: () => started.push({ buffer: source.buffer!, loop: source.loop, gain: source.out?.gain.value ?? 1, level: source.out?.gain ?? param(1), rate: source.playbackRate.value }),
+      stop: () => void this.stopped++,
     };
     return source;
   }
@@ -153,4 +154,29 @@ test("the restaurant hears rain through its shop windows, and muffled birds only
   for (const c of day) assert.equal(c.gain, 0.12, "quiet through the shop windows");
   assert.ok(anHour("restaurant", 0, 1).chirps.length < day.length * 0.3, "mostly quiet in the rain");
   assert.equal(anHour("restaurant", 1, 0).chirps.length, 0, "no birds in the closed restaurant at night");
+});
+
+test("a held tool is heard from when it starts to when it stops, and nothing is made in between", () => {
+  const ctx = new FakeContext();
+  (globalThis as { AudioContext?: unknown }).AudioContext = function () {
+    return ctx;
+  };
+  const audio = new Audio();
+  audio.start(10, 10);
+  const loops = ctx.started.length;
+  audio.held(0, 0);
+  assert.equal(ctx.started.length, loops, "nothing while nothing is held");
+  for (let frame = 0; frame < 120; frame++) audio.held(1, 0);
+  assert.equal(ctx.started.length, loops + 1, "the feather's rustle, once");
+  assert.ok(ctx.started.at(-1)!.loop);
+  for (let frame = 0; frame < 60; frame++) audio.held(0, 0);
+  assert.equal(ctx.stopped, 1, "let go when it stops");
+  audio.held(0, 0.55);
+  audio.held(0, 0.55);
+  audio.held(0, 0);
+  audio.held(0, 1);
+  const [gentle, hard] = ctx.started.slice(-2);
+  assert.equal(ctx.started.length, loops + 3);
+  assert.ok(hard.rate > gentle.rate, "blowing hard is higher and brighter than blowing gently");
+  assert.ok(energy(gentle.buffer.data) > 0 && edge(ctx.started[loops].buffer.data) > edge(gentle.buffer.data), "the feather hisses higher than the breath");
 });

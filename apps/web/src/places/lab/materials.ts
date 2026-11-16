@@ -93,13 +93,15 @@ float labNoise(vec3 p) {
 
 /**
  * What a glossy thing on the bench sees reflected, besides the sky-like
- * gradient of the room the stage gives every place: the bright windows
- * behind the bench and the ceiling's panels by day, the lamp's bulb at night.
+ * gradient of the room the stage gives every place: the windows behind the
+ * bench, the colour of the sky outside them (bright by day, glowing at dusk,
+ * dark at night), the ceiling's panels by day, the lamp's bulb at night.
  * In world directions from the bench; `soft` widens them for rougher things.
  */
 export const GLINTS = /* glsl */ `
 uniform float uGlow;
 uniform vec3 uLampDir;
+uniform vec3 uWindow;
 float labBox(vec2 p, vec2 lo, vec2 hi, float soft) {
   vec2 a = smoothstep(lo - soft, lo + soft, p) * (1.0 - smoothstep(hi - soft, hi + soft, p));
   return a.x * a.y;
@@ -114,7 +116,7 @@ vec3 labGlints(vec3 r, float soft) {
     for (int i = -1; i <= 1; i++) w += labBox(p, vec2(float(i) * ${(WINDOWS.xs[2] / -BACK_Z).toFixed(4)} - ${(WINDOWS.hw / -BACK_Z).toFixed(4)}, ${(WINDOWS.y0 / -BACK_Z).toFixed(4)}), vec2(float(i) * ${(WINDOWS.xs[2] / -BACK_Z).toFixed(4)} + ${(WINDOWS.hw / -BACK_Z).toFixed(4)}, ${(WINDOWS.y1 / -BACK_Z).toFixed(4)}), soft);
     float frame = 1.0 - (1.0 - smoothstep(0.004, 0.012 + soft, abs(fract(p.x / ${(WINDOWS.hw / -BACK_Z).toFixed(4)} + 0.5) - 0.5) * ${(WINDOWS.hw / -BACK_Z).toFixed(4)})) * 0.9;
     float blinds = p.y > ${(WINDOWS.blinds / -BACK_Z).toFixed(4)} ? 0.45 : 1.0;
-    c += vec3(0.95, 0.98, 1.0) * w * frame * blinds * day * 1.4;
+    c += uWindow * w * frame * blinds;
   }
   if (r.y > 0.2) {
     // The panels overhead, in metres across the ceiling.
@@ -132,26 +134,28 @@ vec3 labReflect(vec3 n) {
   return normalize((vec4(v, 0.0) * viewMatrix).xyz);
 }`;
 
-/** How brightly the lamp's bulb and the inside of its shade glow: set from the darkness each frame. */
-export type GlowUniform = { value: number };
-
-/** The lamp, for the glints: which way it is from the bench (a unit vector in the world). */
-export type LampUniform = { value: THREE.Vector3 };
+/**
+ * The glints' uniforms: how brightly the lamp's bulb and the inside of its
+ * shade glow (set from the darkness each frame), which way the lamp is from
+ * the bench (a unit vector in the world), and the windows' light as glossy
+ * things see it (set from the sky each frame).
+ */
+export type Glints = { uGlow: { value: number }; uLampDir: { value: THREE.Vector3 }; uWindow: { value: THREE.Color } };
+export const glints = (): Glints => ({ uGlow: { value: 0 }, uLampDir: { value: new THREE.Vector3(0, 1, 0) }, uWindow: { value: new THREE.Color() } });
 
 /**
  * The one material for nearly everything opaque on the bench: three's
  * standard material with its finish per vertex. Foam (the plugs, the fly pad,
- * the wipe) is open-celled: pits about a third of a millimetre across. Fly
+ * the wipe) is open-celled: round pores a tenth to a third of a millimetre
+ * across. Fly
  * food is grains of cornmeal set in molasses: bumps of about the same size.
  * Both fade to their average where a pixel covers several, so they never
  * shimmer.
  */
-export function surfaceMaterial(glow: GlowUniform, lamp: LampUniform, beam: Sunbeam): THREE.MeshStandardMaterial {
+export function surfaceMaterial(shine: Glints, beam: Sunbeam): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 1, envMapIntensity: 0.7 });
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uGlow = glow;
-    shader.uniforms.uLampDir = lamp;
-    Object.assign(shader.uniforms, beam);
+    Object.assign(shader.uniforms, shine, beam);
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nattribute vec4 surface;\nvarying vec4 vSurface;\nvarying vec3 vWorld;")
       .replace("#include <begin_vertex>", `#include <begin_vertex>\nvSurface = surface;\n${WORLD_VS}`);
@@ -170,10 +174,19 @@ if (vSurface.z != 0.0) {
   // Two octaves of smooth noise, cut into blobs: pores in foam, grains in cornmeal, irregular as both are.
   float n = labNoise(q) * 0.65 + labNoise(q * 2.3 + 7.1) * 0.35;
   if (vSurface.z > 0.0) {
-    // Foam: dark pits where the noise is low, between the cell walls.
-    float pit = 1.0 - smoothstep(0.24, 0.36, n);
-    diffuseColor.rgb *= mix(1.0, mix(0.94, 1.0 - pit * 0.3, labDetail), vSurface.z);
-    labBump = -pit * vSurface.z * labDetail;
+    // Foam: round open pores where the cell walls part, a tenth to a third of a millimetre across, some cells without, and the odd larger one.
+    vec3 c1 = q * 1.6;
+    vec3 h1 = labHash3(floor(c1) + 0.5);
+    float d1 = length(fract(c1) - 0.5 - (h1 - 0.5) * 0.45);
+    float pit = (1.0 - smoothstep(0.1 + h1.x * 0.16, 0.17 + h1.x * 0.18, d1)) * step(0.3, h1.y);
+    vec3 c2 = q * 0.55 + 3.7;
+    vec3 h2 = labHash3(floor(c2) + 0.5);
+    float d2 = length(fract(c2) - 0.5 - (h2 - 0.5) * 0.4);
+    pit = max(pit, (1.0 - smoothstep(0.09 + h2.x * 0.08, 0.15 + h2.x * 0.1, d2)) * step(0.7, h2.y));
+    // Fading to their average where a pixel spans several, so they never shimmer.
+    float fine = 1.0 - smoothstep(0.25, 0.6, size * 1.6);
+    diffuseColor.rgb *= mix(1.0, mix(0.95, 1.0 - pit * (0.32 - n * 0.12), fine), vSurface.z);
+    labBump = -pit * vSurface.z * fine;
   } else {
     // Cornmeal: rounded grains, some lighter, some darker, with molasses between.
     float grain = smoothstep(0.5, 0.66, n);
@@ -222,11 +235,10 @@ if (vSurface.x < 0.25) {
  * Clear glass and plastic: nearly invisible face on, bright at the edges where
  * it turns away, as a vial or a beaker is. Vertex colours tint each piece.
  */
-export function clearMaterial(glow: GlowUniform, lamp: LampUniform): THREE.MeshStandardMaterial {
+export function clearMaterial(shine: Glints): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.06, metalness: 0, transparent: true, depthWrite: false, envMapIntensity: 1.5, side: THREE.DoubleSide });
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uGlow = glow;
-    shader.uniforms.uLampDir = lamp;
+    Object.assign(shader.uniforms, shine);
     shader.fragmentShader = shader.fragmentShader.replace("#include <lights_pars_begin>", `#include <lights_pars_begin>\n${GLINTS}`).replace(
       "#include <opaque_fragment>",
       /* glsl */ `float facing = abs(dot(normal, normalize(vViewPosition)));
@@ -245,19 +257,25 @@ diffuseColor.a = clamp(0.1 + edge * 0.8 + dot(outgoingLight, vec3(0.33)) * 0.1, 
  * The bench's epoxy top: pale grey resin, flecked finely darker and lighter
  * as cast resin is, satin, with the soft shadows and old stains of the
  * painted map over it. The flecks are worked out per pixel, a tenth of a
- * millimetre and up, and fade to their average from further off.
+ * millimetre and up, and fade to their average from further off. Its satin
+ * shows the windows and the panels softly, more as it turns away.
  */
-export function benchMaterial(map: THREE.Texture, beam: Sunbeam): THREE.MeshStandardMaterial {
+export function benchMaterial(map: THREE.Texture, beam: Sunbeam, shine: Glints): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({ map, roughness: 0.42, metalness: 0, envMapIntensity: 0.5 });
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, beam);
+    Object.assign(shader.uniforms, beam, shine);
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vWorld;")
       .replace("#include <begin_vertex>", `#include <begin_vertex>\n${WORLD_VS}`);
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>\nvarying vec3 vWorld;\n${NOISE}`)
-      .replace("#include <lights_pars_begin>", `#include <lights_pars_begin>\n${WINDOW_LIGHT}`)
-      .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>\n${BEAM_FRAGMENT}`)
+      .replace("#include <lights_pars_begin>", `#include <lights_pars_begin>\n${GLINTS}\n${WINDOW_LIGHT}`)
+      .replace(
+        "#include <lights_fragment_end>",
+        /* glsl */ `#include <lights_fragment_end>
+${BEAM_FRAGMENT}
+reflectedLight.indirectSpecular += labGlints(labReflect(normal), 0.06) * (0.02 + 0.22 * pow(1.0 - max(dot(normal, normalize(vViewPosition)), 0.0), 4.0));`,
+      )
       .replace(
         "#include <map_fragment>",
         /* glsl */ `#include <map_fragment>

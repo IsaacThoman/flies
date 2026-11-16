@@ -83,7 +83,7 @@ test("the X-ray: asked for by the setting or the View tool, and only where the f
   assert.equal(xrayWanted("off", "play", true, false), false);
   assert.equal(xrayWanted("wallpaper", "play", false, false), false);
   assert.equal(xrayWanted("wallpaper", "play", true, false), true);
-  assert.equal(xrayWanted("always", "pause", false, false), true, "behind the pause menu, the fly as it was");
+  assert.equal(xrayWanted("always", "settings", false, false), true, "behind the menus, the fly as it is");
   assert.equal(xrayWanted("off", "play", false, true), true, "View → Inside it");
   assert.equal(xrayWanted("off", "play", true, true), false, "the wallpaper goes by the setting");
   assert.equal(xrayWanted("always", "loading", true, false), false);

@@ -44,7 +44,6 @@ const HEADING = 19;
 
 export class AboutScreen implements Screen {
   readonly id = "about" as const;
-  readonly pauses = true;
   readonly #shell: Shell;
   #lines: { text: string; heading: boolean; bullet?: boolean }[] | null = null;
   #attributed = false;

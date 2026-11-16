@@ -4,8 +4,9 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { KINDS, WEATHERS, WeatherNow, forecast, hourOfDay, kindOf, wetten } from "../src/scene/weather.ts";
-import type { WeatherKind } from "../src/scene/weather.ts";
+import { KINDS, WEATHERS, forecast, hourOfDay } from "@fly/world";
+import type { WeatherKind } from "@fly/world";
+import { WeatherNow, kindOf, wetten } from "../src/scene/weather.ts";
 
 /** Some week a few years from now, in local hours since the epoch. */
 const START = 500_000;

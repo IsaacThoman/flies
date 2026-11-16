@@ -45,7 +45,12 @@ room over its feet (`FLY_HEIGHT`, up to its folded wings).
   Mark a liquid one `pool: true` and the fly's feet set rings spreading on it
   (through `SceneSet.ripple`). Where one point has several surfaces over it,
   its `y` says which it lies on: the surface there at or below `y` (left out,
-  the highest).
+  the highest). What the fly's feet carry off a patch for its footprints (a
+  colour, or nothing for something dry) is found by the patch's name in
+  `apps/web/src/scene/prints.ts`, and `apps/web/tests/prints.test.ts` asks it
+  of every patch. A solid whose drawn top isn't the world's smooth one (a
+  drink, a head of foam, something drawn rougher) is named there too, so that
+  no print floats over it.
 - **The start** is where the fly first stands, its yaw and, with slabs, its
   `y` (the surface at or below it, as for patches). **The ceiling** is how
   high it may fly before it is drawn back down.
@@ -82,6 +87,12 @@ passes. Circles and boxes at angle 0 are the cheapest footprints and flat
 the cheapest top; a ray finds a dome or a dish by sampling it, so keep big
 things flat. `World.load` files the restaurant's 415 solids in about a
 tenth of a millisecond in desktop Node.
+
+A round thing lying on its side (the windowsill's alarm clock) is a row of thin
+flat-topped boxes following its curve to a fraction of a millimetre. Don't let
+domes overlap so that they leave a hollow where they meet: a falling fly can
+be caught in it. A plant's leaves can't have air under them: the windowsill's
+basil is a solid crown the fly lands on, with every leaf drawn within it.
 
 Anything drawn but not in the world must be flat enough not to matter to a fly
 (under half a millimetre, like the picnic's specks of biscuit), or out of its
@@ -126,7 +137,8 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   `kind`) as their last argument, which a place that ignores it can leave off.
   A windowsill can run rain down its pane by `rain` and leave it streaked by
   `wet`; the picnic's rain, wet table, overcast deck, mist and rainbow are
-  worked examples (`places/picnic/rain.ts`, `table.ts`, `backdrop.ts`). Rain
+  worked examples (`places/picnic/rain.ts`, `table.ts`, `backdrop.ts`), and
+  the lab shows it in the view through its windows (`places/lab/room.ts`). Rain
   bursts the bubbles and sends the fireflies to shelter wherever they are.
 - **What the fly's eyes see** (`SceneSet.seen`): the big shapes only. They are
   rendered six times at 16 or 32 pixels for the brain's eyes, so the small
@@ -135,8 +147,12 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   (`around: "table"` circles the table's middle; keep it on the room side of
   any wall). A room gives `focus`: the point the view circles, how much it
   follows the fly from there, and how far toward the fly it aims, so that it
-  stays inside the room and keeps the fly in the picture wherever it goes. `vista` is the way the best of the view lies: with nothing
-  standing behind the fly, the camera likes to have that there. Every other
+  stays inside the room and keeps the fly in the picture wherever it goes.
+  `vista` is the way the best of the view lies: with nothing standing behind
+  the fly, the camera likes to have that there. A wall or a window standing
+  past the table's edge counts for nothing behind the fly; the view counts
+  for about as much as something tall standing some 280 mm behind it. Every
+  other
   shot, the wallpaper's included, stays on the fly and is shared by every
   place. Wherever it is, the camera keeps out of everything and clear of the
   surface under it and of what is over it, and anything standing between it
@@ -164,6 +180,14 @@ reach (beyond the floor's edge, above it, or in the backdrop).
 - **A shadow passing over** (`scene/shade.ts`, optional): `shaded(material)`
   teaches a lit material to take a shadow cast from high up (the picnic's
   gull), set in `SHADE`; the fly takes it already.
+- **A clock** (`scene/clock.ts`, optional): a `WallClock`, updated in the
+  place's `update`, turns a dial's hands to the real time by a uniform; the
+  hands are drawn in the dial's own material (`CLOCK_GLSL`, found by where the
+  dial is in the world, `onDial`), so they cost no draw. It tells the real
+  time under any chosen light. The windowsill's, the lab's and the bar's are
+  worked examples. Behind a fly on the table, the medium shot frames only from
+  the table up to about a seventh of the way back, so anything meant to be
+  seen behind the fly, a clock included, stands low.
 - **Bubbles and fireflies** are built for the picnic's open air and size; a
   place says whether it has them.
 - **The Place tool's name** for it, what it is carried "to", and what the fly
@@ -230,7 +254,7 @@ TV has (`places/restaurant/`):
   things by material (`Batch` in `apps/web/src/scene/build.ts`), instance
   repeated ones, freeze their matrices, put detail in shaders and textures
   rather than meshes, allocate nothing per frame, and keep `update` small.
-  The picnic draws in about 23 calls and 105,000 triangles while playing
+  The picnic draws in about 23 calls and 106,000 triangles while playing
   (Settings → Picture → Frame stats, or the canvas's `data-calls` and `data-triangles`);
   a new place should stay close to that, near the fly and in its whole view.
 - **Building is a pause behind the veil.** `data-place-ms` on the canvas says

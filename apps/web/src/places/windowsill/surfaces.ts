@@ -5,7 +5,7 @@
 // Detail finer than a pixel fades into its average, so nothing shimmers.
 
 import * as THREE from "three";
-import { SILL } from "@fly/world";
+import { POSTCARD, SILL, WINDOW } from "@fly/world";
 import { sunlit } from "./light.ts";
 import type { Sunlight } from "./light.ts";
 
@@ -81,7 +81,10 @@ const withVarying = (shader: Shader, attribute: string, varying: string) => {
 
 /** Where the bottoms of things stand on the sill, for the soft dark where they meet it: x, z, radius, how dark. */
 export type Contact = { x: number; z: number; r: number; dark: number };
-const MAX_CONTACTS = 24;
+const MAX_CONTACTS = 40;
+/** Crumbs and pebbles at the fly's scale, too small for the light's casters, which throw their own little shadows on the sill: where, how wide, how high. */
+export type Lump = { x: number; z: number; r: number; height: number };
+const MAX_LUMPS = 16;
 
 /**
  * Painted timber: the sill and the window's frame. Gloss paint over pine,
@@ -92,12 +95,14 @@ const MAX_CONTACTS = 24;
  * On the sill's top the things standing on it darken it where they meet it,
  * and a glass once left a ring.
  */
-export function paintMaterial(sunlight: Sunlight, contacts: readonly Contact[], ring: { x: number; z: number; r: number }) {
+export function paintMaterial(sunlight: Sunlight, contacts: readonly Contact[], ring: { x: number; z: number; r: number }, lumps: readonly Lump[]) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0, envMapIntensity: 0.55 });
   const spots = Array.from({ length: MAX_CONTACTS }, (_, i) => (contacts[i] ? new THREE.Vector4(contacts[i].x, contacts[i].z, contacts[i].r, contacts[i].dark) : new THREE.Vector4(1e5, 1e5, 0, 0)));
+  const shadows = Array.from({ length: MAX_LUMPS }, (_, i) => (lumps[i] ? new THREE.Vector4(lumps[i].x, lumps[i].z, lumps[i].r, lumps[i].height) : new THREE.Vector4(1e5, 1e5, 0, 0)));
   sunlit(material, sunlight, "paint", {
     extra: (shader) => {
       shader.uniforms.uContacts = { value: spots };
+      shader.uniforms.uLumps = { value: shadows };
       shader.uniforms.uRing = { value: new THREE.Vector3(ring.x, ring.z, ring.r) };
       withVarying(shader, "grain", "vGrain");
       shader.fragmentShader = shader.fragmentShader
@@ -106,9 +111,11 @@ export function paintMaterial(sunlight: Sunlight, contacts: readonly Contact[], 
           /* glsl */ `#include <common>
 ${NOISE}\n${BUMP}
 uniform vec4 uContacts[${MAX_CONTACTS}];
+uniform vec4 uLumps[${MAX_LUMPS}];
 uniform vec3 uRing;
 float paintRough;
 float paintHeight;
+float paintHeightRail;
 float sillTop;`,
         )
         .replace(
@@ -116,6 +123,7 @@ float sillTop;`,
           /* glsl */ `#include <color_fragment>
 {
   vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix);
+  paintHeightRail = 0.0;
   // Bare, oiled wood (the worktop, the table) is 2 or 3; painted 0 or 1.
   bool bareWood = vGrain > 1.5;
   vec3 along = mod(vGrain, 2.0) < 0.5 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
@@ -134,6 +142,8 @@ float sillTop;`,
   sillTop = step(0.9, wn.y) * (1.0 - step(0.5, abs(vWorld.y)));
   // Worn most along the rounded front edge, where hands and cups knock it, and at its ends.
   float arris = smoothstep(${SILL.hz - 18}.0, ${SILL.hz}.0, vWorld.z) * smoothstep(-24.0, -2.0, vWorld.y) * step(-40.0, vWorld.y);
+  // The bottom rail of the window, where condensation runs down the glass and stands: its paint is worn most of all, and stained.
+  float rail = step(${(WINDOW.glass - 1).toFixed(1)}, vWorld.z) * (1.0 - step(${(WINDOW.glass + WINDOW.rail.depth + 0.5).toFixed(1)}, vWorld.z)) * (1.0 - step(${(WINDOW.rail.top + 0.5).toFixed(1)}, vWorld.y)) * step(0.0, vWorld.y);
   float wear = arris + smoothstep(${SILL.hx - 24}.0, ${SILL.hx}.0, abs(vWorld.x)) * 0.5;
   vec3 w = vWorld + wn * 3.0;
   float knocks = vnoise3(w * 0.06) * 0.4 + vnoise3(w * 0.23) * 0.38 + vnoise3(w * 0.9) * 0.22 * resolved(1.2) + 0.11 * (1.0 - resolved(1.2));
@@ -157,6 +167,20 @@ float sillTop;`,
   vec3 c = mix(mix(paint, undercoat, chipped), wood, bare);
   // The chip's edge: the top coat's thickness, catching dirt.
   c *= 1.0 - lip * 0.28;
+  if (rail > 0.0) {
+    // Flakes a millimetre or two across where the wet has lifted the paint, down to grey wood; tide lines along it where standing water dried; grime in the corner.
+    vec2 rp = vec2(vWorld.x, vWorld.y + vWorld.z);
+    float flake = smoothstep(0.67, 0.71, vnoise(rp * 0.45) * 0.7 + vnoise(rp * 1.9) * 0.3) * resolved(0.3);
+    float lines = 0.0;
+    for (int i = 0; i < 3; i++) {
+      float h = 2.5 + float(i) * 3.4 + 1.1 * sin(vWorld.x * 0.07 + float(i) * 2.1);
+      lines = max(lines, 1.0 - smoothstep(0.12, 0.22 + fwidth(vWorld.y), abs(vWorld.y - h)));
+    }
+    float grime = 1.0 - smoothstep(0.0, 2.5, vWorld.y);
+    c = mix(c, vec3(0.52, 0.47, 0.4) * (0.9 + 0.2 * vnoise(rp * 3.0)), flake * 0.85);
+    c *= 1.0 - lines * 0.22 * resolved(0.15) - grime * 0.3;
+    paintHeightRail = -flake * 0.08;
+  }
   // Where the sun has baked it, the old gloss has crazed into a fine net of cracks, long along the grain, with dirt in them.
   float crazed = smoothstep(0.6, 0.85, vnoise3(vWorld * 0.015 + 4.0)) * (1.0 - bare) * resolved(0.25) * window;
   float crack = 0.0;
@@ -189,7 +213,7 @@ float sillTop;`,
   paintRough = bareWood ? 0.42 + 0.1 * grain : mix(mix(0.22 + brush * 0.12, 0.5, chipped), 0.72, bare);
   // Gloss paint's orange-peel, the grain under it, the brush's furrows, the step down into a chip, the cracks.
   float peel = vnoise(vec2(u, v) * 1.3) * resolved(0.5);
-  paintHeight = (grain * 0.012 + brush * 0.014 + peel * 0.01) * (1.0 - bare) * resolved(0.3) - chipped * 0.06 - bare * 0.05 - crack * 0.02 + speck * 0.04;
+  paintHeight = (grain * 0.012 + brush * 0.014 + peel * 0.01) * (1.0 - bare) * resolved(0.3) - chipped * 0.06 - bare * 0.05 - crack * 0.02 + speck * 0.04 + paintHeightRail;
   if (sillTop > 0.5) {
     // A ring left by a glass: a hairline of dried wine, darker where it pooled at its edge.
     float d = abs(length(vWorld.xz - uRing.xy) - uRing.z);
@@ -216,13 +240,86 @@ if (sillTop > 0.5) {
   }
   reflectedLight.indirectDiffuse *= open;
   reflectedLight.indirectSpecular *= open;
-  reflectedLight.directDiffuse *= mix(1.0, open, 0.35);
+  // The crumbs' and pebbles' shadows, each a ball half sunk in the sill, soft-edged.
+  vec3 toSun = normalize(uSun);
+  float lit = 1.0;
+  for (int i = 0; i < ${MAX_LUMPS}; i++) {
+    vec4 c = uLumps[i];
+    vec3 d = vec3(c.x, c.w * 0.3, c.y) - vWorld;
+    float along = dot(d, toSun);
+    if (along <= 0.0) continue;
+    float miss = length(d - toSun * along);
+    lit *= 1.0 - (1.0 - smoothstep(c.z * 0.55, c.z * 0.95 + along * 0.02, miss)) * 0.75;
+  }
+  reflectedLight.directDiffuse *= mix(1.0, open, 0.35) * lit;
+  reflectedLight.directSpecular *= lit;
 }`,
         );
     },
   });
   return material;
 }
+
+/**
+ * Leaves: the basil's, glossy and quilted between their veins, and the
+ * tulips' in the kitchen. `vein` (a two-float attribute) is where a point is
+ * on its leaf: along it from stalk to tip (0 to 1) and across it from the
+ * midrib (-1 to 1); below -1 along, it isn't a leaf's blade (a stem, a
+ * flower). Lit from behind, a leaf glows green with the sun through it; its
+ * underside is paler.
+ */
+export function leafMaterial(sunlight: Sunlight) {
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.36, metalness: 0, envMapIntensity: 0.3, side: THREE.DoubleSide });
+  sunlit(material, sunlight, "leaf", {
+    extra: (shader) => {
+      shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nattribute vec2 vein;\nvarying vec2 vVein;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvVein = vein;");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", `#include <common>\n${NOISE}\n${BUMP}\nvarying vec2 vVein;\nfloat leafHeight;\nfloat leafRough;`)
+        .replace(
+          "#include <color_fragment>",
+          /* glsl */ `#include <color_fragment>
+leafHeight = 0.0;
+leafRough = 0.36;
+if (vVein.x > -1.0) {
+  float u = vVein.x;
+  float w = abs(vVein.y);
+  float aa = fwidth(w) + 0.004;
+  // The midrib, pale and raised; side veins running from it toward the tip, five or six a side; the blade puckered between them.
+  float rib = 1.0 - smoothstep(0.035, 0.035 + aa * 1.5, w);
+  float along = (u - 0.42 * pow(w, 1.15)) * 6.0;
+  float va = fwidth(along) + 0.02;
+  float side = (1.0 - smoothstep(0.05, 0.05 + va, abs(fract(along) - 0.5) * 2.0 - 0.9)) * smoothstep(0.04, 0.1, w) * (1.0 - smoothstep(0.82, 0.95, w)) * smoothstep(0.06, 0.16, u);
+  float pucker = sin(3.14159 * fract(along)) * sin(3.14159 * min(w * 1.15, 1.0));
+  vec3 c = diffuseColor.rgb * (0.9 + 0.16 * pucker);
+  c = mix(c, c * vec3(1.25, 1.3, 1.05) + vec3(0.05, 0.06, 0.0), max(rib, side * 0.55));
+  if (!gl_FrontFacing) c = mix(c, vec3(dot(c, vec3(0.3, 0.55, 0.15))) * vec3(0.95, 1.08, 0.85), 0.3) * 1.12;
+  diffuseColor.rgb = c;
+  leafHeight = (pucker * 0.25 + rib * 0.2 - side * 0.12) * resolved(0.6);
+  leafRough = 0.24 + 0.12 * (1.0 - pucker);
+}`,
+        )
+        .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = leafRough;")
+        .replace("#include <normal_fragment_maps>", "#include <normal_fragment_maps>\nnormal = bumped(normal, leafHeight);")
+        .replace(
+          "#include <lights_fragment_end>",
+          /* glsl */ `#include <lights_fragment_end>
+{
+  vec3 wn = inverseTransformDirection(normal, viewMatrix);
+  vec3 sunDirView = normalize((viewMatrix * vec4(uSun, 0.0)).xyz);
+  float behind = max(dot(-normal, sunDirView), 0.0) * max(dot(normalize(-vViewPosition), -sunDirView), 0.0);
+  reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.9, 1.1, 0.5) * behind * 0.6 * sunReach(vWorld, -wn) * directionalLights[0].color;
+}`,
+        );
+    },
+  });
+  return material;
+}
+
+/** Marks a geometry's points as not on a leaf's blade, for the leaf material. */
+export const notLeaf = (geometry: THREE.BufferGeometry) => {
+  geometry.setAttribute("vein", new THREE.BufferAttribute(new Float32Array(geometry.attributes.position.count * 2).fill(-9), 2));
+  return geometry;
+};
 
 /**
  * Terracotta, and the soil in the pot: unglazed clay with fine pores and a
@@ -260,7 +357,9 @@ export function clayMaterial(sunlight: Sunlight) {
  * honey), 1 a banana (freckles, darker brown where it is bruised, ridged), 2 a
  * peach's fuzz (a soft sheen at its edges), 3 a plum's bloom (dusty pale over
  * deep purple), 4 a peach's cut flesh (fibres running out from the stone,
- * wet), 5 the peach's stone (deeply wrinkled).
+ * wet), 5 the peach's stone (deeply wrinkled), 6 toast (a dry, open crumb,
+ * its little holes dark), 7 honey in its jar and sea glass (glowing with the
+ * light through them).
  */
 export function fruitMaterial(sunlight: Sunlight, stone: THREE.Vector2) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0, envMapIntensity: 0.6 });
@@ -311,11 +410,20 @@ export function fruitMaterial(sunlight: Sunlight, stone: THREE.Vector2) {
     c *= 0.92 + 0.16 * fibres;
     skinRough = 0.1;
     skinHeight = fibres * 0.04;
-  } else {
+  } else if (kind == 5) {
     float wrinkle = abs(vnoise3(p * 0.9) - 0.5) * 2.0;
     c *= 0.65 + 0.5 * wrinkle;
     skinRough = 0.8;
     skinHeight = -wrinkle * 0.5 * resolved(0.4);
+  } else if (kind == 7) {
+    skinRough = 0.12;
+  } else {
+    // Toast: the crumb's open cells, a tenth of a millimetre and more across, dark where they open; matte and dry.
+    float cells = vnoise3(p * 3.1) * 0.65 + vnoise3(p * 7.3) * 0.35;
+    float hole = smoothstep(0.6, 0.74, cells) * resolved(0.25);
+    c *= (0.88 + 0.2 * vnoise3(p * 1.1)) * (1.0 - hole * 0.5);
+    skinRough = 0.88;
+    skinHeight = (vnoise3(p * 2.0) * 0.05 - hole * 0.06) * resolved(0.3);
   }
   diffuseColor.rgb = c;
 }`,
@@ -326,7 +434,13 @@ export function fruitMaterial(sunlight: Sunlight, stone: THREE.Vector2) {
           "#include <lights_fragment_end>",
           /* glsl */ `#include <lights_fragment_end>
 // Fuzz and bloom catch the light at the skin's edge.
-reflectedLight.indirectDiffuse += sheen * pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 3.0) * diffuseColor.rgb * 0.9;`,
+reflectedLight.indirectDiffuse += sheen * pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 3.0) * diffuseColor.rgb * 0.9;
+if (int(vSkin + 0.5) == 7) {
+  // Honey and sea glass let the light through: lit from behind, they glow.
+  vec3 sunDirView = normalize((viewMatrix * vec4(uSun, 0.0)).xyz);
+  float behind = max(dot(-normal, sunDirView), 0.0) * (0.35 + 0.65 * max(dot(normalize(vViewPosition), sunDirView), 0.0));
+  reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(1.0, 0.8, 0.45) * behind * 1.4 * sunReach(vWorld, -inverseTransformDirection(normal, viewMatrix)) * directionalLights[0].color;
+}`,
         );
       shader.uniforms.uStone = { value: stone };
     },
@@ -334,14 +448,19 @@ reflectedLight.indirectDiffuse += sheen * pow(1.0 - abs(dot(normal, normalize(vV
   return material;
 }
 
-/** Glazed things: speckled stoneware, the fridge, the plates on the dresser. */
-export function glazeMaterial(sunlight: Sunlight) {
+/**
+ * Glazed things: speckled stoneware, the fridge, the plates on the dresser,
+ * the clocks' enamel and their dials, on which `faces` draws the hands
+ * (clocks.ts) turned by `hands`.
+ */
+export function glazeMaterial(sunlight: Sunlight, faces: { hands: { value: THREE.Vector3 }; common: string; color: string }) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.24, metalness: 0, envMapIntensity: 0.45 });
   sunlit(material, sunlight, "glaze", {
     lamp: true,
     extra: (shader) => {
       withVarying(shader, "speckle", "vSpeckle");
-      shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${NOISE}\n${BUMP}`).replace(
+      shader.uniforms.uClockHands = faces.hands;
+      shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${NOISE}\n${BUMP}\n${faces.common}`).replace(
         "#include <color_fragment>",
         /* glsl */ `#include <color_fragment>
 {
@@ -363,7 +482,8 @@ export function glazeMaterial(sunlight: Sunlight) {
     float blue = inDab * mix(smoothstep(0.42 - laceAa, 0.42 + laceAa, lace), 1.0, smoothstep(0.58, 0.68, dab));
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.13, 0.27, 0.6), blue * 0.9);
   }
-}`,
+}
+${faces.color}`,
       );
     },
   });
@@ -388,7 +508,8 @@ export function tileMaterial(sunlight: Sunlight) {
 {
   vec3 wn = inverseTransformDirection(normalize(vNormal), viewMatrix);
   bool floorTile = wn.y > 0.7;
-  vec2 q = floorTile ? vWorld.xz / 300.0 : vec2(abs(wn.x) > 0.7 ? vWorld.z : vWorld.x, vWorld.y + 180.0) / vec2(150.0, 75.0);
+  // On the walls the courses run from the window's corners, round them into its reveals and out along the wall.
+  vec2 q = floorTile ? vWorld.xz / 300.0 : vec2(abs(wn.x) > 0.7 ? ${WINDOW.wall.toFixed(1)} - vWorld.z : abs(vWorld.x) - ${SILL.hx.toFixed(1)}, vWorld.y + 180.0) / vec2(150.0, 75.0);
   // Every other course shifted by half a tile on the walls.
   if (!floorTile) q.x += 0.5 * mod(floor(q.y), 2.0);
   vec2 id = floor(q);
@@ -415,9 +536,18 @@ export function tileMaterial(sunlight: Sunlight) {
   return material;
 }
 
-/** Limewashed plaster and painted wood in the room: soft, a little uneven where it was trowelled, sandy up close. */
+/**
+ * Limewashed plaster and painted wood in the room: soft, a little uneven
+ * where it was trowelled, sandy up close. Paper too: the bottle's label, the
+ * honey's, and the postcard propped at the end of the sill, whose picture
+ * (a lighthouse on a headland over a blue sea, a red sail, a beach) is
+ * painted here on its face.
+ */
 export function plasterMaterial(sunlight: Sunlight) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0, envMapIntensity: 0.35 });
+  const { foot, z, width, length } = POSTCARD;
+  const lean = Math.asin(foot / length);
+  const v3 = (x: number, y: number, z: number) => `vec3(${x.toFixed(4)}, ${y.toFixed(4)}, ${z.toFixed(4)})`;
   sunlit(material, sunlight, "plaster", {
     lamp: true,
     extra: (shader) => {
@@ -432,6 +562,44 @@ export function plasterMaterial(sunlight: Sunlight) {
   float sand = vnoise3(p * 1.3) * resolved(0.5) + 0.5 * (1.0 - resolved(0.5));
   diffuseColor.rgb *= 0.95 + 0.07 * trowel + 0.03 * sand;
   plasterHeight = trowel * 0.6 + sand * 0.05;
+  // The postcard's face: across it (0 to 1, left to right seen from the sill) and up it (0 at its foot).
+  vec3 d = p - ${v3(SILL.hx - foot, 0, z - width / 2)};
+  float u = d.z / ${width.toFixed(1)};
+  float v = dot(d, ${v3(Math.sin(lean), Math.cos(lean), 0)}) / ${length.toFixed(1)};
+  float n = dot(d, ${v3(-Math.cos(lean), Math.sin(lean), 0)});
+  if (n > 0.05 && n < 0.6 && u > 0.0 && u < 1.0 && v > 0.0 && v < 1.0) {
+    plasterHeight = 0.0;
+    // The picture inside a white border, wider at its foot.
+    vec2 q = vec2((u - 0.06) / 0.88, (v - 0.1) / 0.84);
+    vec3 c = vec3(0.97, 0.96, 0.92);
+    if (q.x > 0.0 && q.x < 1.0 && q.y > 0.0 && q.y < 1.0) {
+      float horizon = 0.5 + 0.015 * sin(q.x * 9.0);
+      vec3 sky = mix(vec3(0.66, 0.84, 0.97), vec3(0.12, 0.42, 0.86), smoothstep(horizon, 0.95, q.y));
+      // A cloud.
+      float cloud = smoothstep(0.62, 0.5, length((q - vec2(0.3, 0.84)) * vec2(1.0, 2.2))) + smoothstep(0.5, 0.38, length((q - vec2(0.44, 0.88)) * vec2(1.2, 2.6)));
+      sky = mix(sky, vec3(1.0), clamp(cloud, 0.0, 1.0) * 0.9);
+      // The sea, deep blue with white horses, paler toward the shore.
+      float waves = smoothstep(0.75, 0.95, sin(q.x * 60.0 + sin(q.y * 90.0) * 2.0) * sin(q.y * 140.0)) * resolved(0.4);
+      vec3 sea = mix(vec3(0.16, 0.42, 0.66), vec3(0.06, 0.24, 0.5), smoothstep(0.26, horizon, q.y));
+      sea = mix(sea, vec3(0.92, 0.96, 1.0), waves * 0.7);
+      vec3 sand = mix(vec3(0.93, 0.84, 0.62), vec3(0.8, 0.68, 0.46), smoothstep(0.18, 0.26, q.y));
+      c = q.y > horizon ? sky : q.y > 0.24 + 0.02 * sin(q.x * 14.0) ? sea : sand;
+      // The headland on the right, green over grey rock, and the lighthouse on it, banded red and white, its lamp lit.
+      float land = 0.4 + 0.24 * smoothstep(0.5, 0.95, q.x) - 0.03 * sin(q.x * 23.0);
+      if (q.y < land && q.x > 0.48) c = mix(vec3(0.52, 0.48, 0.42), vec3(0.3, 0.62, 0.22), smoothstep(land - 0.2, land - 0.12, q.y));
+      float tower = abs(q.x - 0.78) - mix(0.065, 0.045, (q.y - 0.6) / 0.24);
+      if (tower < 0.0 && q.y > 0.6 && q.y < 0.84) c = mod(floor((q.y - 0.6) / 0.06), 2.0) < 1.0 ? vec3(0.95, 0.94, 0.9) : vec3(0.78, 0.12, 0.1);
+      if (abs(q.x - 0.78) < 0.045 && q.y > 0.84 && q.y < 0.89) c = vec3(1.0, 0.86, 0.4);
+      if (abs(q.x - 0.78) < 0.055 - (q.y - 0.89) * 0.9 && q.y > 0.89 && q.y < 0.94) c = vec3(0.15, 0.14, 0.13);
+      // A red sail out on the sea.
+      vec2 b = q - vec2(0.26, 0.4);
+      if (b.y > 0.0 && b.y < 0.1 && b.x > 0.0 && b.x < 0.07 * (1.0 - b.y / 0.1)) c = vec3(0.82, 0.18, 0.12);
+      if (abs(b.y + 0.008) < 0.008 && abs(b.x - 0.03) < 0.05) c = vec3(0.3, 0.2, 0.15);
+    }
+    // Printed: a fine dot screen, and the card's own cream.
+    c *= 0.96 + 0.04 * vnoise(vec2(u, v) * 900.0) * resolved(0.2);
+    diffuseColor.rgb = c;
+  }
 }`,
         )
         .replace("#include <normal_fragment_maps>", "#include <normal_fragment_maps>\nnormal = bumped(normal, plasterHeight);");

@@ -13,7 +13,7 @@ import { LOADING_HITS, drawLoading } from "../src/ui/loading.ts";
 import type { Rect } from "../src/ui/layout.ts";
 import { AboutScreen } from "../src/ui/screens/about.ts";
 import { BrainScreen } from "../src/ui/screens/brain.ts";
-import { pauseScreen, settingsPages, settingsScreen, titleScreen } from "../src/ui/screens/menus.ts";
+import { settingsScreen, titleScreen } from "../src/ui/screens/menus.ts";
 import type { Shell } from "../src/ui/screens/types.ts";
 import { createPicnic } from "@fly/world";
 import { blankCanvas, writtenOn } from "./canvas.ts";
@@ -25,7 +25,7 @@ const FINGER = 40;
 const inside = (r: Rect, a: Rect, slack = 0.5) => r.x >= a.x - slack && r.y >= a.y - slack && r.x + r.w <= a.x + a.w + slack && r.y + r.h <= a.y + a.h + slack;
 const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-function shell(frame: Frame, glyphs: Shell["glyphs"] = null): Shell {
+function shell(frame: Frame, glyphs: Shell["glyphs"] = null, together = true): Shell {
   return {
     settings: { ...DEFAULT_SETTINGS },
     brain: { status: "running", neurons: 166700, connections: 6242118, state: null } as unknown as Shell["brain"],
@@ -39,9 +39,15 @@ function shell(frame: Frame, glyphs: Shell["glyphs"] = null): Shell {
     back() {},
     play() {},
     watch() {},
-    title() {},
     applySettings() {},
     sound() {},
+    // With "Together" on the title and the pause menu, as in a browser: the longest they are.
+    canPlayTogether: together,
+    table: null,
+    startTable() {},
+    shareTable: async () => "failed",
+    removeFly() {},
+    leaveTable() {},
   };
 }
 
@@ -66,18 +72,13 @@ test("on the TV everything is where it always was", () => {
   assert.ok(near(title.status.x, 72) && title.status.y === 128 && title.status.w === 356 && title.status.size === 15);
   assert.ok(near(title.fly.across, -0.56) && title.fly.low === 0.1);
 
-  const s = shell(TV_FRAME, "remote");
-  const pause = pauseScreen(s);
-  assert.deepEqual(pause.pane.panel, { x: 257, y: 52, w: 340, h: 352 });
-  assert.deepEqual(pause.pane.list, { x: 285, y: 122, width: 284, row: 40, gap: 12, compact: false });
-  assert.deepEqual(pause.pane.heading, { y: 98, size: 28 });
+  // The Apple TV has no way to a table yet.
+  const s = shell(TV_FRAME, "remote", false);
   const settings = settingsScreen(s);
-  assert.deepEqual(settings.pane.panel, { x: 257, y: 105, w: 340, h: 242 });
-  const pages = settingsPages(s);
-  assert.deepEqual(pages.picture.pane.panel, { x: 157, y: 87, w: 540, h: 278 });
-  assert.deepEqual(pages.sound.pane.panel, { x: 157, y: 135, w: 540, h: 182 });
-  assert.equal(pages.picture.pane.list.row, 36);
-  assert.equal(pages.picture.menu.rows, pages.picture.menu.items.length);
+  // Sized for its longest tab (Wallpaper: the tabs and six rows), so it keeps its size from tab to tab.
+  assert.deepEqual(settings.pane.panel, { x: 157, y: 37, w: 540, h: 378 });
+  assert.deepEqual(settings.pane.list, { x: 185, y: 63, width: 484, row: 36, gap: 12, compact: false });
+  assert.equal(settings.menu.rows, settings.menu.items.length);
 
   const loading = loadingLayout(TV_FRAME);
   assert.deepEqual(loading.panel, { x: 207, y: 292, w: 440, h: 132 });
@@ -141,7 +142,7 @@ test("every menu fits inside the safe area at every shape, its rows big enough f
   for (const [name, frame] of frames()) {
     const a = safeRect(frame);
     const s = shell(frame);
-    for (const screen of [titleScreen(s), pauseScreen(s), settingsScreen(s), ...Object.values(settingsPages(s))]) {
+    for (const screen of [titleScreen(s), settingsScreen(s)]) {
       const { panel, list, rows } = screen.pane;
       assert.ok(inside(panel, a), `${name}: ${screen.id} inside the safe area: ${JSON.stringify(panel)}`);
       assert.ok(list.y + rows * (list.row + list.gap) - list.gap <= panel.y + panel.h + 1e-6, `${name}: ${screen.id}'s rows inside its pane`);
@@ -156,8 +157,10 @@ test("every menu fits inside the safe area at every shape, its rows big enough f
       for (let i = 0; i < hits.count; i++) if (hits.get(i)!.kind === "row") shown++;
       assert.equal(shown, rows, `${name}: ${screen.id}`);
     }
-    // The pause menu's five rows always all show.
-    assert.equal(pauseScreen(s).menu.rows, 5, `${name}: the pause menu doesn't scroll`);
+    // The menu's six rows (with Together) all show, but on a phone on its side, too short for them: there it scrolls by a row or two.
+    const menu = titleScreen(s).menu;
+    if (name === "a phone on its side") assert.ok(menu.rows >= 4, `${name}: ${menu.rows} of the menu's rows show`);
+    else assert.equal(menu.rows, menu.items.length, `${name}: the menu doesn't scroll`);
   }
 });
 

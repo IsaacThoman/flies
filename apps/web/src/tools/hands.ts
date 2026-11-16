@@ -6,13 +6,13 @@
 
 import type { Looming } from "@fly/body";
 import { FLY_LENGTH, MOUTH_AHEAD, STEP_UP } from "@fly/body";
-import { createSurface } from "@fly/world";
+import { BALL_RADIUS, SWOOP_SECONDS, createSurface, swoopAt } from "@fly/world";
 import type { FoodKind, Pantry, Vec3, World } from "@fly/world";
 import type { View } from "../camera.ts";
 import { PLACES } from "../places/catalog.ts";
 import type { PlaceId } from "../places/catalog.ts";
 import type { TimeOfDay } from "../scene/light.ts";
-import type { WeatherKind } from "../scene/weather.ts";
+import type { WeatherKind } from "@fly/world";
 
 export type ToolId = "feed" | "swoop" | "feather" | "blow" | "light" | "weather" | "view" | "place";
 
@@ -42,9 +42,6 @@ const LIGHT_TOOL = TOOLS.findIndex((t) => t.id === "light");
 const WEATHER_TOOL = TOOLS.findIndex((t) => t.id === "weather");
 const VIEW_TOOL = TOOLS.findIndex((t) => t.id === "view");
 
-/** The beach ball: how big (mm), how fast it swoops (mm/s), and how long a swoop lasts (s). */
-export const BALL_RADIUS = 34;
-export const SWOOP_SECONDS = 1.6;
 /** Where the ball comes from, radians round from straight ahead toward the fly's right. */
 export const SWOOP_BEARING = 0.9;
 /**
@@ -54,9 +51,6 @@ export const SWOOP_BEARING = 0.9;
  * SWOOP_BEARING, in order, until both are clear.
  */
 export const SWOOP_TURNS = [0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, -0.4, -0.8, -1.2, -1.6, -2, -2.4];
-/** The shares of a swoop spent diving in and hanging there at the end of the dive; the rest is veering away. */
-export const SWOOP_DIVE = 0.2;
-export const SWOOP_HOLD = 0.15;
 /** The dive stops with the ball's surface this far (mm) from the spot. */
 export const SWOOP_CLEARANCE = 2;
 /** The feather touches the fly within this distance of its middle (mm). Resting there is a light touch, stroking a full one. */
@@ -65,8 +59,9 @@ export const FEATHER_REST = 0.4;
 /** Air speed of a puff at the pointer (mm/s), and how far round it the puff is felt (mm). */
 export const PUFF_SPEED = { gentle: 450, strong: 1300 } as const;
 export const PUFF_RADIUS = 30;
-/** Food falls from this high (mm) and takes this long to land (s). */
+/** Food falls from this high (mm), and falls this fast (mm/s²). */
 export const DROP_HEIGHT = 30;
+export const FALL = 2400;
 /** Seconds after the last touch before the pointer drifts back to the fly. */
 export const POINTER_RETURN = 15;
 
@@ -116,10 +111,15 @@ export class Hands {
   stroking = false;
   readonly looming: Looming[] = [{ id: 1, position: this.ball.position, r: BALL_RADIUS }];
   readonly events: HandsEvents = { dropped: null, landed: null, swooped: false, toolChanged: false, variantChanged: false, blocked: false };
+  /** Where the last food landed, and the way the surface there faces. */
+  readonly landedAt = v3();
+  readonly landedNormal = v3(0, 1, 0);
   /** What the fly stands on where it is now ("table", "sill"), for the name of the whole-place view. */
   surface = "table";
   /** The Weather tool's "Now" is the real weather outside: it is called "Outside". */
   outside = false;
+  /** Tools whose kind can't be changed now: at a table with others, the light, the weather and the place are the starter's to choose. */
+  fixed: ReadonlySet<ToolId> = new Set();
   #idle = 0;
   #world: World;
 
@@ -157,6 +157,10 @@ export class Hands {
   /** Steps through the current tool's kinds (up and down, or round and round with `wrap`); false when it has only one or is at the end. */
   stepVariant(dir: -1 | 1, wrap = false): boolean {
     const n = this.current.variants.length;
+    if (this.fixed.has(this.current.id)) {
+      this.events.blocked = true;
+      return false;
+    }
     let next = this.variants[this.tool] + dir;
     if (wrap && n > 1) next = (next + n) % n;
     if (n <= 1 || next < 0 || next >= n) {
@@ -264,12 +268,17 @@ export class Hands {
     // Falling food lands and becomes food.
     for (let i = this.falling.length - 1; i >= 0; i--) {
       const f = this.falling[i];
-      f.vy -= 2400 * dt;
+      f.vy -= FALL * dt;
       f.y += f.vy * dt;
       if (f.y <= f.floor) {
         this.falling.splice(i, 1);
         pantry.drop(f.kind, f.x, f.z, f.floor);
         ev.landed = f.kind;
+        const s = world.surface(f.x, f.z, surface, f.floor);
+        this.landedAt.x = f.x;
+        this.landedAt.y = s.y;
+        this.landedAt.z = f.z;
+        copy(this.landedNormal, s.normal);
       }
     }
 
@@ -281,15 +290,7 @@ export class Hands {
       if (ball.t >= 1) {
         ball.active = false;
         ball.position.y = -1e4;
-      } else if (ball.t < SWOOP_DIVE) {
-        // Straight in at a steady speed: it grows faster and faster in the fly's eyes.
-        lerp(ball.position, ball.from, ball.via, ball.t / SWOOP_DIVE);
-      } else if (ball.t < SWOOP_DIVE + SWOOP_HOLD) {
-        copy(ball.position, ball.via);
-      } else {
-        const k = (ball.t - SWOOP_DIVE - SWOOP_HOLD) / (1 - SWOOP_DIVE - SWOOP_HOLD);
-        lerp(ball.position, ball.via, ball.to, k * k);
-      }
+      } else swoopAt(ball.from, ball.via, ball.to, ball.t, ball.position);
     }
 
     // The feather: resting on the fly, or stroking it while Select is held.

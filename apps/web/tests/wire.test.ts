@@ -40,8 +40,18 @@ test("it decodes however the bytes are split as they arrive", () => {
     for (let at = 0; at < wire.length; at += size) decoder.write(wire.subarray(at, at + size));
     const back = decoder.finish();
     assert.deepEqual(new Uint8Array(back), raw, `chunks of ${size}`);
-    assert.doesNotThrow(() => loadConnectome(back));
+    assert.doesNotThrow(() => loadConnectome(back.buffer));
   }
+});
+
+test("it decodes into the bytes it is given, as the WebAssembly brain's memory gives them", async () => {
+  const raw = sample();
+  const memory = new ArrayBuffer(raw.length + 4096);
+  // An 8-byte-aligned place in the middle of a bigger buffer, as malloc gives one.
+  const into = await unpackConnectome(buffer(gzipSync(encodeWire(raw))), (bytes) => new Uint8Array(memory, 1024, bytes));
+  assert.equal(into.buffer, memory);
+  assert.equal(into.byteOffset, 1024);
+  assert.deepEqual(into, raw);
 });
 
 test("gzipped, it unpacks to the connectome; anything else is refused", async () => {

@@ -1,10 +1,12 @@
-// A screen that is a menu on a pane of glass: the title, the pause menu and
-// the settings are all one of these, with different items and actions.
+// A screen that is a menu on a pane of glass: the title and the settings are
+// each one of these, with different items and actions.
 //
-// The remote moves its focus and presses; a pointer focuses what it hovers
-// over, presses what it taps, slides sliders, steps choices by their arrows
-// and scrolls the list by dragging it. Tapping outside the pane, or its back
-// button, is Back.
+// The remote moves its focus and presses. A pointer presses what it clicks
+// or taps (which then has the focus, for the arrows to carry on from),
+// slides sliders, steps choices by their arrows, picks tabs and scrolls the
+// list by dragging it; hovering only brightens what it is over, and the
+// focus ring is hidden while it is in use. Tapping outside the pane, or its
+// back button, is Back.
 
 import type { RemoteButton } from "@fly/contracts";
 import { INK, glassPanel, hintChip, hintWidth, iconButton, text } from "@fly/ui";
@@ -18,7 +20,6 @@ import type { Point, Screen, ScreenId, Shell } from "./types.ts";
 
 export type MenuScreenOptions = {
   id: ScreenId;
-  pauses: boolean;
   menu: Menu;
   /** The pane's title, or none (the title screen draws its own wordmark). */
   heading?: string;
@@ -40,7 +41,6 @@ const SCROLL_SLOP = 10;
 
 export class MenuScreen implements Screen {
   readonly id: ScreenId;
-  readonly pauses: boolean;
   readonly view: MenuView;
   #options: MenuScreenOptions;
   #shell: Shell;
@@ -49,12 +49,13 @@ export class MenuScreen implements Screen {
   /** What a pointer went down on: a slider it is sliding, or the list it may drag. */
   #held: { slider: number; scroll: number; dragging: boolean } | null = null;
   #wheel = 0;
+  /** The row a mouse is over, or -1. */
+  #hover = -1;
 
   constructor(shell: Shell, options: MenuScreenOptions) {
     this.#shell = shell;
     this.#options = options;
     this.id = options.id;
-    this.pauses = options.pauses;
     this.#pane = options.place(shell.shape);
     options.menu.setRows(this.#pane.rows);
     this.view = new MenuView(options.menu, this.#pane.list);
@@ -115,15 +116,20 @@ export class MenuScreen implements Screen {
     const menu = this.menu;
     const hit = p.hit;
     switch (p.type) {
-      case "hover":
-        if (hit && hit.kind !== SCREEN_HITS.panel && hit.kind !== SCREEN_HITS.back && hit.kind !== MENU_HITS.more && menu.focusIndex(hit.index)) this.#outcome({ kind: "moved" });
+      case "hover": {
+        const over = hit && hit.kind !== SCREEN_HITS.panel && hit.kind !== SCREEN_HITS.back && hit.kind !== MENU_HITS.more && !menu.items[hit.index]?.disabled ? hit.index : -1;
+        if (over !== this.#hover) {
+          this.#hover = over;
+          this.#dirty = true;
+        }
         break;
+      }
       case "down":
         this.#held = { slider: -1, scroll: menu.scroll, dragging: false };
         if (hit?.kind === MENU_HITS.track) {
           this.#held.slider = hit.index;
           this.#slide(hit.index, p.x);
-        } else if (hit && (hit.kind === MENU_HITS.row || hit.kind === MENU_HITS.step) && menu.focusIndex(hit.index)) this.#dirty = true;
+        }
         break;
       case "drag": {
         const held = this.#held;
@@ -145,6 +151,7 @@ export class MenuScreen implements Screen {
           if (!this.#options.root) this.#outcome({ kind: "back" });
         } else if (hit.kind === SCREEN_HITS.back) this.#outcome({ kind: "back" });
         else if (hit.kind === MENU_HITS.step) this.#outcome(menu.stepAt(hit.index, hit.value < 0 ? -1 : 1));
+        else if (hit.kind === MENU_HITS.tab) this.#outcome(menu.chooseAt(hit.index, hit.value));
         else if (hit.kind === MENU_HITS.more) {
           if (menu.scrollBy(hit.value * menu.rows)) this.#outcome({ kind: "moved" });
         } else if (hit.kind === MENU_HITS.row && menu.items[hit.index]?.kind !== "slider") this.#outcome(menu.tap(hit.index));
@@ -188,12 +195,18 @@ export class MenuScreen implements Screen {
     glassPanel(g, panel.x, panel.y, panel.w, panel.h, 28);
     const head = this.#pane.heading;
     if (heading && head) text(g, heading, panel.x + panel.w / 2, head.y, { size: head.size, align: "center", color: INK });
-    if (this.#shell.glyphs === null && !this.#options.root && head) {
-      const b = backButton(panel, head.y);
+    // For a pointer, a way back: by the heading, or, with none, beside the first row (a row of tabs leaves room for it).
+    const pointing = this.#shell.glyphs === null;
+    const backed = pointing && !this.#options.root;
+    this.view.tabInset = backed && !head ? 44 : 0;
+    this.view.draw(g, t, hits, !pointing, pointing ? this.#hover : -1);
+    if (backed) {
+      const list = this.#pane.list;
+      const b = head ? backButton(panel, head.y) : { x: list.x + 17, y: list.y + list.row / 2, r: 17 };
       iconButton(g, b.x, b.y, b.r, "back");
-      hits.add(SCREEN_HITS.back, b.x - 24, b.y - 24, 48, 48);
+      // Over the row it sits beside.
+      hits.add(SCREEN_HITS.back, b.x - 22, b.y - 22, 44, 44);
     }
-    this.view.draw(g, t, hits);
     drawMenuHints(g, t, this.#shell);
   }
 }

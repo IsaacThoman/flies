@@ -1,0 +1,484 @@
+// The wire between a fly's device and the table it is at (docs/online.md has
+// the whole format). Two kinds of message share one WebSocket:
+//
+// - Binary, for what goes many times a second: each fly's state, from its
+//   device up to the room and from the room down to everyone else in one
+//   batch; and the bites a fly takes, which must not be lost. Fixed layouts,
+//   little-endian, quantised to what the eye and the body need.
+// - JSON text, for what happens now and then: joining, the clock, food
+//   dropped, a ball thrown, the light and the place chosen, a visitor.
+//
+// The first message on a connection is the client's `hello` with PROTOCOL;
+// the room refuses a version it doesn't speak.
+
+import type { BubbleSnapshot } from "./bubbles.ts";
+
+/** Bumped whenever a layout or a message changes meaning. */
+export const PROTOCOL = 1;
+
+/** Where the room server answers WebSockets, on the site's own host. */
+export const ROOMS_PATH = "/rooms";
+
+/** Binary message types: the first byte. */
+export const FLY = 1;
+export const FLIES = 2;
+export const BITES = 3;
+
+/** At most this many flies at a table. Player ids are 1 to this: one byte on the wire. */
+export const MAX_PLAYERS = 8;
+
+/** How often a device sends its fly, and the room sends the batch, ms. */
+export const SEND_EVERY = 50;
+
+/** Flag bits in a fly's state. */
+export const AIRBORNE = 1;
+/** Its device has stopped (a hidden tab, a sleeping phone): the fly isn't living, and stands still. */
+export const AWAY = 2;
+export const EATING = 4;
+/** The player's hand is out on the table (playing, not the wallpaper): the pointer and tool follow. */
+export const HANDS = 8;
+/** Select is held: tickling or blowing. */
+export const HOLDING = 16;
+/** Someone is at the remote (not the wallpaper, a press within the last minute): the room's visitors wait. */
+export const PLAYING = 32;
+
+/** Position in 1/50 mm (±655 mm), the hand's pointer in 1/20 mm (±1.6 m), the camera in 1/10 mm (±3.3 m). */
+const POS = 50;
+const POINTER = 20;
+const EYE = 10;
+const YAW = 65536 / (Math.PI * 2);
+
+/** Bytes of a fly's state after the type (or, in a batch, the id) byte, without and with the hand. */
+export const STATE_BYTES = 32;
+export const HANDS_BYTES = 14;
+/** One bite: the food's id (u32) and how much (f32). */
+const BITE_BYTES = 8;
+export const MAX_BITES = 16;
+
+export type Pose = { speed: number; turn: number; wings: number; groom: number; feed: number; crouch: number; pitch: number; roll: number };
+
+export type Hand = {
+  x: number;
+  y: number;
+  z: number;
+  /** Where the player's camera is, for the way a puff blows. */
+  eyeX: number;
+  eyeY: number;
+  eyeZ: number;
+  /** The tool's index on the shelf, and its kind. */
+  tool: number;
+  variant: number;
+};
+
+/** One fly as it travels. */
+export type FlyState = {
+  /** The player it belongs to (set by the room in a batch). */
+  id: number;
+  flags: number;
+  /** Which place the table was in when this was sent (the room's count of moves, wrapping at 256): a state from before a move is dropped. */
+  epoch: number;
+  /** The sender's count, wrapping at 65536. */
+  seq: number;
+  /** Room time when the fly was here, ms. */
+  t: number;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  /** The surface's normal under it, x and z (y follows). */
+  upX: number;
+  upZ: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  pose: Pose;
+  hand: Hand;
+};
+
+export const createFlyState = (): FlyState => ({
+  id: 0,
+  flags: 0,
+  epoch: 0,
+  seq: 0,
+  t: 0,
+  x: 0,
+  y: 0,
+  z: 0,
+  yaw: 0,
+  upX: 0,
+  upZ: 0,
+  vx: 0,
+  vy: 0,
+  vz: 0,
+  pose: { speed: 0, turn: 0, wings: 0, groom: 0, feed: 0, crouch: 0, pitch: 0, roll: 0 },
+  hand: { x: 0, y: 0, z: 0, eyeX: 0, eyeY: 0, eyeZ: 0, tool: 0, variant: 0 },
+});
+
+export function copyFlyState(from: FlyState, to: FlyState) {
+  to.id = from.id;
+  to.flags = from.flags;
+  to.epoch = from.epoch;
+  to.seq = from.seq;
+  to.t = from.t;
+  to.x = from.x;
+  to.y = from.y;
+  to.z = from.z;
+  to.yaw = from.yaw;
+  to.upX = from.upX;
+  to.upZ = from.upZ;
+  to.vx = from.vx;
+  to.vy = from.vy;
+  to.vz = from.vz;
+  const p = to.pose;
+  const q = from.pose;
+  p.speed = q.speed;
+  p.turn = q.turn;
+  p.wings = q.wings;
+  p.groom = q.groom;
+  p.feed = q.feed;
+  p.crouch = q.crouch;
+  p.pitch = q.pitch;
+  p.roll = q.roll;
+  const h = to.hand;
+  const g = from.hand;
+  h.x = g.x;
+  h.y = g.y;
+  h.z = g.z;
+  h.eyeX = g.eyeX;
+  h.eyeY = g.eyeY;
+  h.eyeZ = g.eyeZ;
+  h.tool = g.tool;
+  h.variant = g.variant;
+}
+
+const i16 = (v: number) => Math.max(-32768, Math.min(32767, Math.round(v)));
+const i8 = (v: number) => Math.max(-128, Math.min(127, Math.round(v)));
+const u8 = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+
+/** Bytes a fly's state takes after the type (and, in a batch, the id) byte. */
+export const stateLength = (flags: number) => STATE_BYTES + (flags & HANDS ? HANDS_BYTES : 0);
+
+/** Writes a fly's state at `at` (after its type or id byte). Returns where it ends. */
+export function writeState(view: DataView, at: number, s: FlyState): number {
+  view.setUint8(at, s.flags & 0xff);
+  view.setUint8(at + 1, s.epoch & 0xff);
+  view.setUint16(at + 2, s.seq & 0xffff, true);
+  view.setUint32(at + 4, Math.max(0, Math.round(s.t)) >>> 0, true);
+  view.setInt16(at + 8, i16(s.x * POS), true);
+  view.setInt16(at + 10, i16(s.y * POS), true);
+  view.setInt16(at + 12, i16(s.z * POS), true);
+  const yaw = ((s.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  view.setUint16(at + 14, Math.round(yaw * YAW) & 0xffff, true);
+  view.setInt8(at + 16, i8(s.upX * 127));
+  view.setInt8(at + 17, i8(s.upZ * 127));
+  view.setInt16(at + 18, i16(s.vx), true);
+  view.setInt16(at + 20, i16(s.vy), true);
+  view.setInt16(at + 22, i16(s.vz), true);
+  const p = s.pose;
+  view.setInt8(at + 24, i8(p.speed * 4));
+  view.setInt8(at + 25, i8(p.turn * 16));
+  view.setUint8(at + 26, u8(p.wings * 255));
+  view.setUint8(at + 27, u8(p.groom * 255));
+  view.setUint8(at + 28, u8(p.feed * 255));
+  view.setUint8(at + 29, u8(p.crouch * 255));
+  view.setInt8(at + 30, i8(p.pitch * 150));
+  view.setInt8(at + 31, i8(p.roll * 200));
+  let end = at + STATE_BYTES;
+  if (s.flags & HANDS) {
+    const h = s.hand;
+    view.setInt16(end, i16(h.x * POINTER), true);
+    view.setInt16(end + 2, i16(h.y * POINTER), true);
+    view.setInt16(end + 4, i16(h.z * POINTER), true);
+    view.setInt16(end + 6, i16(h.eyeX * EYE), true);
+    view.setInt16(end + 8, i16(h.eyeY * EYE), true);
+    view.setInt16(end + 10, i16(h.eyeZ * EYE), true);
+    view.setUint8(end + 12, u8(h.tool));
+    view.setUint8(end + 13, u8(h.variant));
+    end += HANDS_BYTES;
+  }
+  return end;
+}
+
+/** Reads a fly's state at `at` into `s`. Returns where it ends, or -1 if the message is too short. */
+export function readState(view: DataView, at: number, s: FlyState): number {
+  if (at + STATE_BYTES > view.byteLength) return -1;
+  const flags = view.getUint8(at);
+  if (at + stateLength(flags) > view.byteLength) return -1;
+  s.flags = flags;
+  s.epoch = view.getUint8(at + 1);
+  s.seq = view.getUint16(at + 2, true);
+  s.t = view.getUint32(at + 4, true);
+  s.x = view.getInt16(at + 8, true) / POS;
+  s.y = view.getInt16(at + 10, true) / POS;
+  s.z = view.getInt16(at + 12, true) / POS;
+  s.yaw = view.getUint16(at + 14, true) / YAW;
+  s.upX = view.getInt8(at + 16) / 127;
+  s.upZ = view.getInt8(at + 17) / 127;
+  s.vx = view.getInt16(at + 18, true);
+  s.vy = view.getInt16(at + 20, true);
+  s.vz = view.getInt16(at + 22, true);
+  const p = s.pose;
+  p.speed = view.getInt8(at + 24) / 4;
+  p.turn = view.getInt8(at + 25) / 16;
+  p.wings = view.getUint8(at + 26) / 255;
+  p.groom = view.getUint8(at + 27) / 255;
+  p.feed = view.getUint8(at + 28) / 255;
+  p.crouch = view.getUint8(at + 29) / 255;
+  p.pitch = view.getInt8(at + 30) / 150;
+  p.roll = view.getInt8(at + 31) / 200;
+  let end = at + STATE_BYTES;
+  if (flags & HANDS) {
+    const h = s.hand;
+    h.x = view.getInt16(end, true) / POINTER;
+    h.y = view.getInt16(end + 2, true) / POINTER;
+    h.z = view.getInt16(end + 4, true) / POINTER;
+    h.eyeX = view.getInt16(end + 6, true) / EYE;
+    h.eyeY = view.getInt16(end + 8, true) / EYE;
+    h.eyeZ = view.getInt16(end + 10, true) / EYE;
+    h.tool = view.getUint8(end + 12);
+    h.variant = view.getUint8(end + 13);
+    end += HANDS_BYTES;
+  }
+  return end;
+}
+
+/** The biggest FLY message: type, state, hand. */
+export const FLY_MAX = 1 + STATE_BYTES + HANDS_BYTES;
+
+/** Encodes the device's own fly into `out` (at least FLY_MAX bytes). Returns its length. */
+export function encodeFly(out: DataView, s: FlyState): number {
+  out.setUint8(0, FLY);
+  return writeState(out, 1, s);
+}
+
+/** A batch: type, count, then each fly's id and state. */
+export function batchLength(states: readonly FlyState[], count = states.length) {
+  let n = 2;
+  for (let i = 0; i < count; i++) n += 1 + stateLength(states[i].flags);
+  return n;
+}
+
+/** The biggest batch: every other fly at the table, each with its hand. */
+export const FLIES_MAX = 2 + MAX_PLAYERS * (1 + STATE_BYTES + HANDS_BYTES);
+
+export function encodeFlies(out: DataView, states: readonly FlyState[], count = states.length): number {
+  out.setUint8(0, FLIES);
+  out.setUint8(1, count);
+  let at = 2;
+  for (let i = 0; i < count; i++) {
+    out.setUint8(at, states[i].id);
+    at = writeState(out, at + 1, states[i]);
+  }
+  return at;
+}
+
+/**
+ * Reads a batch, handing every fly's state in turn to `each` (the same
+ * `scratch` object each time: copy what you keep). Returns how many, or -1
+ * if the batch is broken.
+ */
+export function decodeFlies(view: DataView, scratch: FlyState, each: (s: FlyState) => void): number {
+  if (view.byteLength < 2 || view.getUint8(0) !== FLIES) return -1;
+  const count = view.getUint8(1);
+  let at = 2;
+  for (let i = 0; i < count; i++) {
+    if (at >= view.byteLength) return -1;
+    scratch.id = view.getUint8(at);
+    at = readState(view, at + 1, scratch);
+    if (at < 0) return -1;
+    each(scratch);
+  }
+  return count;
+}
+
+/** Bites a fly took: the sender's count (for the room's acknowledgement), then each food's id and how much. */
+export type Bite = { food: number; amount: number };
+
+export const bitesLength = (count: number) => 4 + count * BITE_BYTES;
+
+export function encodeBites(out: DataView, seq: number, bites: readonly Bite[], count = bites.length): number {
+  const n = Math.min(count, MAX_BITES);
+  out.setUint8(0, BITES);
+  out.setUint16(1, seq & 0xffff, true);
+  out.setUint8(3, n);
+  for (let i = 0; i < n; i++) {
+    out.setUint32(4 + i * BITE_BYTES, bites[i].food >>> 0, true);
+    out.setFloat32(8 + i * BITE_BYTES, bites[i].amount, true);
+  }
+  return bitesLength(n);
+}
+
+/** Reads bites; `each` is called with each (food id, amount). Returns the sequence number, or -1 if broken. */
+export function decodeBites(view: DataView, each: (food: number, amount: number) => void): number {
+  if (view.byteLength < 4 || view.getUint8(0) !== BITES) return -1;
+  const n = view.getUint8(3);
+  if (n > MAX_BITES || view.byteLength < bitesLength(n)) return -1;
+  for (let i = 0; i < n; i++) each(view.getUint32(4 + i * BITE_BYTES, true), view.getFloat32(8 + i * BITE_BYTES, true));
+  return view.getUint16(1, true);
+}
+
+// The JSON messages.
+
+export type V3 = [number, number, number];
+/** Where a fly stands: x, z and its yaw. */
+export type Spot = [x: number, z: number, yaw: number];
+
+/** A food as it travels: id, kind ("patch", a dropped kind, or "found"), name, x, z, reach, sweetness, how much is left, a pool. */
+export type FoodWire = [id: number, kind: string, name: string, x: number, z: number, r: number, sweet: number, amount: number, pool: 0 | 1];
+
+/** A ball in flight: who threw it, when (room ms) the swoop starts, and its path. */
+export type BallWire = { by: number; at: number; from: V3; via: V3; to: V3 };
+
+/** Something the place does, reproduced on every device from its seed. */
+export type HappeningWire = { kind: string; seed: number; at: number };
+
+/** The table's light and weather, as the Light and Weather tools name them ("clock" and "now" follow the table's clock). */
+export type WorldWire = { light: string; weather: string };
+
+/** The Light and Weather tools' kinds, as they travel. */
+export const TABLE_LIGHTS = ["clock", "morning", "noon", "golden", "dusk", "night"] as const;
+export const TABLE_WEATHERS = ["now", "clear", "overcast", "mist", "rain"] as const;
+
+/** A player at the table: who, in what colour, and whether its device has stopped. */
+export type PlayerWire = { id: number; colour: string; away: boolean };
+
+/** What the one who starts a table says of it. */
+export type TableStart = {
+  place: string;
+  light: string;
+  weather: string;
+  /** Their time zone (an IANA name, if the device knows it) and its offset from UTC now, minutes east: the table's clock is theirs. */
+  zone: string;
+  offset: number;
+};
+
+export type ClientMessage =
+  | {
+      type: "hello";
+      v: number;
+      /** The table's code, from the invitation. */
+      table: string;
+      /** This device's own key, kept on it: a returning player is known by it. */
+      key: string;
+      /** Starting the table, if it doesn't exist yet. */
+      start?: TableStart;
+      /** Where this device's fly is, coming back to the table after a moment away (a reconnection). */
+      at?: Spot;
+    }
+  | { type: "ping"; t: number }
+  | { type: "drop"; id: number; kind: string; x: number; z: number; at: number }
+  | ({ type: "ball" } & Omit<BallWire, "by">)
+  | { type: "world"; light?: string; weather?: string }
+  | { type: "place"; place: string }
+  | { type: "remove"; id: number }
+  | { type: "pop"; slot: number; cycle: number; at: number }
+  | { type: "found"; id: number; name: string; x: number; z: number; r: number; sweet: number }
+  | { type: "bye" };
+
+/** Why the room turned a device away (and closed its connection with the matching code). */
+export type Refusal = "version" | "full" | "removed" | "unknown" | "busy" | "malformed" | "elsewhere";
+
+/** WebSocket close codes for each refusal, and for a deploy restarting the server (try again shortly). */
+export const CLOSE: Readonly<Record<Refusal | "restart" | "left", number>> = {
+  version: 4001,
+  full: 4002,
+  removed: 4003,
+  unknown: 4004,
+  busy: 4005,
+  malformed: 4006,
+  elsewhere: 4007,
+  left: 4010,
+  restart: 1012,
+};
+
+export type ServerMessage =
+  | {
+      type: "welcome";
+      v: number;
+      /** This player at the table, and its colour. */
+      id: number;
+      colour: string;
+      /** Who started the table: they can remove a fly, and choose the place, the light and the weather. */
+      starter: number;
+      /** The table's seed, for its bubbles and its visitors. */
+      seed: number;
+      /** Room time now, ms, and the wall clock then (ms since 1970). */
+      now: number;
+      wall: number;
+      /** The table's clock: the starter's offset from UTC now, minutes east. */
+      offset: number;
+      place: string;
+      /** The room's count of moves, as fly states carry it. */
+      epoch: number;
+      world: WorldWire;
+      players: PlayerWire[];
+      foods: FoodWire[];
+      balls: BallWire[];
+      happenings: HappeningWire[];
+      /** Each of the table's bubbles as it stands. */
+      bubbles: BubbleSnapshot;
+      /** Where this player's fly is to stand: where it was, coming back; where the table finds room for it, new. */
+      at: Spot;
+    }
+  | { type: "refused"; reason: Refusal }
+  | { type: "pong"; t: number; now: number }
+  | ({ type: "joined" } & PlayerWire)
+  | { type: "away"; id: number; away: boolean }
+  | { type: "left"; id: number }
+  | { type: "drop"; by: number; id: number; kind: string; x: number; z: number; at: number }
+  | ({ type: "ball" } & BallWire)
+  | ({ type: "world"; offset: number } & WorldWire)
+  /** The table is carried to another place: everyone's fly is set down there, where `spots` says. */
+  | { type: "place"; place: string; epoch: number; foods: FoodWire[]; spots: Record<number, Spot> }
+  | ({ type: "happening" } & HappeningWire)
+  | { type: "pop"; slot: number; cycle: number; at: number }
+  | { type: "found"; food: FoodWire }
+  /**
+   * What is left of the food that changed, what is gone, how much this
+   * player has eaten by the room's account, and the last of its bites the
+   * room has counted.
+   */
+  | { type: "food"; ack: number; amounts: [number, number][]; gone: number[]; eaten: number };
+
+/** Each player's colour, as a dab of paint on the thorax: bright enamels, as researchers mark flies. By player id. */
+export const COLOURS = ["#ffd21f", "#2fb8ff", "#ff4fa3", "#59e05a", "#ff7a1a", "#f4f4f4", "#a466ff", "#ff2a2a"] as const;
+
+/**
+ * Food a player drops is named by its device, so its fly can eat it before
+ * the room has heard of it: the player's id times this, plus the device's count.
+ */
+export const DROP_ID = 1_000_000;
+/** Food the place puts out (a drop of juice, a crumb) is named from where it is: this plus a hash. */
+export const FOUND_ID = 900_000_000;
+
+/** Whose a dropped food is, from its id (0 if it isn't one). */
+export const dropOwner = (id: number) => (id >= DROP_ID && id < FOUND_ID ? Math.floor(id / DROP_ID) : 0);
+
+/** A found food's id, the same on every device that puts it at the same spot. */
+export function foundId(name: string, x: number, z: number) {
+  let h = 2166136261;
+  const key = `${name}|${Math.round(x * 2)}|${Math.round(z * 2)}`;
+  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
+  return FOUND_ID + ((h >>> 0) % 90_000_000);
+}
+
+/** Sequence numbers wrap at 65536: whether `a` is at or after `b`. */
+export const seqAtOrAfter = (a: number, b: number) => ((a - b) & 0xffff) < 0x8000;
+
+/** A table's code: what its invitation carries. Ten letters and digits that can't be mistaken for one another (about 50 bits). */
+export const CODE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
+export const CODE_LENGTH = 10;
+export const isTableCode = (code: unknown): code is string => typeof code === "string" && code.length === CODE_LENGTH && [...code].every((c) => CODE_ALPHABET.includes(c));
+
+/** A new table code from random bytes (crypto.getRandomValues's, in a browser or in Node). */
+export function tableCode(random: (bytes: Uint8Array<ArrayBuffer>) => Uint8Array): string {
+  const bytes = random(new Uint8Array(CODE_LENGTH));
+  let code = "";
+  // 256 is not a multiple of the alphabet's 31 letters: the few high bytes that would favour the first letters are drawn again.
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    let b = bytes[i];
+    while (b >= 248) b = random(new Uint8Array(1))[0];
+    code += CODE_ALPHABET[b % CODE_ALPHABET.length];
+  }
+  return code;
+}

@@ -41,6 +41,12 @@ export type SceneSet = {
    * it is still.
    */
   live?(dt: number, around: Around): void;
+  /**
+   * At a table with others the table says when a goings-on happens, and each
+   * device starts it from the same random stream (`random`), so all see the
+   * same visit; the place's own pace is off (`Around.shared`). Optional.
+   */
+  happen?(kind: string, random: () => number): void;
 };
 
 /** What a place's goings-on are given each frame, and where they leave what the fly feels. */
@@ -59,7 +65,11 @@ export type Around = {
   readonly quiet: boolean;
   /** Cleared by the game each frame, filled in by the place. */
   readonly felt: Felt;
+  /** At a table with others (apps/web/src/online): the other flies there, as this device sees them, and the one every device plans visits round. */
+  readonly shared: SharedTable | null;
 };
+
+export type SharedTable = { readonly others: readonly Readonly<Vec3>[]; readonly anchor: Readonly<Vec3> };
 
 /** What the place does to the fly this frame, all through its senses. */
 export type Felt = {

@@ -97,15 +97,15 @@ test("a scroller stops at its ends", () => {
 });
 
 test("the navigator walks back to its root and no further", () => {
-  const nav = new Navigator<"title" | "play" | "pause" | "settings">("title");
+  const nav = new Navigator<"title" | "play" | "about" | "settings">("title");
   assert.equal(nav.atRoot, true);
   nav.push("play");
-  nav.push("pause");
-  nav.push("pause");
+  nav.push("about");
+  nav.push("about");
   nav.push("settings");
-  assert.deepEqual(nav.stack, ["title", "play", "pause", "settings"]);
+  assert.deepEqual(nav.stack, ["title", "play", "about", "settings"]);
   assert.equal(nav.pop(), true);
-  assert.equal(nav.current, "pause");
+  assert.equal(nav.current, "about");
   nav.reset();
   assert.equal(nav.current, "title");
   assert.equal(nav.pop(), false);
