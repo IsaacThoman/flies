@@ -8,7 +8,7 @@ import { CLOSE, PROTOCOL, TABLE_LIGHTS, TABLE_WEATHERS } from "@fly/net";
 import type { ClientMessage, ServerMessage } from "@fly/net";
 import { WORLDS } from "@fly/world";
 import { TableLine } from "../src/online/connection.ts";
-import { invitedTo, inviteLink, roomsUrl } from "../src/online/invite.ts";
+import { APP_ROOMS, APP_SITE, inApp, invitedTo, inviteLink, roomsUrl } from "../src/online/invite.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import { TOOLS } from "../src/tools/hands.ts";
 
@@ -133,6 +133,21 @@ test("an invitation is the page's address with the table's code, and the room se
   assert.equal(roomsUrl("https://flies.example/?table=abcdefghjk"), "wss://flies.example/rooms");
   assert.equal(roomsUrl("http://localhost:5173/"), "ws://localhost:5173/rooms");
   assert.equal(roomsUrl("http://localhost:5173/?rooms=ws://127.0.0.1:9/rooms"), "ws://127.0.0.1:9/rooms");
+});
+
+test("the apps aren't at a site: their room server and the links they hand on are Flies' own", () => {
+  // Built without ROOMS_URL or FLY_SITE_URL (the defines are absent under Node).
+  assert.equal(APP_SITE, "https://flies.isaacthoman.com/");
+  assert.equal(APP_ROOMS, "wss://flies.isaacthoman.com/rooms");
+  assert.equal(inApp(true, "http://fly.local/"), true, "the Apple TV's host");
+  assert.equal(inApp(false, "fly://app/index.html"), true, "the iPhone and iPad app's web view");
+  assert.equal(inApp(false, "https://flies.example/"), false);
+  assert.equal(roomsUrl("http://fly.local/", true), APP_ROOMS);
+  assert.equal(roomsUrl("fly://app/index.html?table=abcdefghjk", true), APP_ROOMS);
+  // A room server for development, named in the page's address (the TV's launch config, the phone's launch argument).
+  assert.equal(roomsUrl("http://fly.local/?rooms=ws://127.0.0.1:8787/rooms", true), "ws://127.0.0.1:8787/rooms");
+  assert.equal(inviteLink("fly://app/index.html?table=zzzzzzzzzz&rooms=ws://x/rooms", "abcdefghjk", true), "https://flies.isaacthoman.com/?table=abcdefghjk");
+  assert.equal(inviteLink("http://fly.local/", "abcdefghjk", true), "https://flies.isaacthoman.com/?table=abcdefghjk");
 });
 
 test("the table knows every place, light and weather the game does, by the same names", () => {

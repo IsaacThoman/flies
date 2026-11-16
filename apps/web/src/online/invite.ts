@@ -2,10 +2,26 @@
 // all the permission there is, but for a locked room's password; this
 // device's own key, kept on it; where the room server is; handing the link
 // on (the system's share sheet where there is one, else the clipboard); and
-// a name for a new room.
+// a name for a new room. The apps (the Apple TV's, and the iPhone and
+// iPad's, whose page is fly://app/) aren't at a site: their room server and
+// the links they hand on are the site's, which opens the app where it is
+// installed (docs/online.md).
 
 import { ROOMS_PATH, isTableCode, tableCode } from "@fly/net";
 import type { TableStart } from "@fly/net";
+
+declare const __FLY_ROOMS__: string | undefined;
+declare const __FLY_SITE__: string | undefined;
+
+/** The site the apps' invitations open: FLY_SITE_URL when the app was built, else Flies' own. */
+export const APP_SITE = typeof __FLY_SITE__ === "string" && __FLY_SITE__ ? __FLY_SITE__ : "https://flies.isaacthoman.com/";
+/** The apps' room server: ROOMS_URL when the app was built (a room server for development), else the site's. */
+export const APP_ROOMS = typeof __FLY_ROOMS__ === "string" && __FLY_ROOMS__ ? __FLY_ROOMS__ : new URL(ROOMS_PATH, APP_SITE).href.replace(/^http/, "ws");
+
+/** Whether the page runs in one of the apps: the Apple TV's host, or the iPhone and iPad app's web view. */
+export function inApp(native: boolean, href: string): boolean {
+  return native || new URL(href).protocol === "fly:";
+}
 
 const random = (bytes: Uint8Array<ArrayBuffer>) => crypto.getRandomValues(bytes);
 
@@ -25,9 +41,9 @@ export function invitedTo(href: string): string | null {
   return isTableCode(code) ? code : null;
 }
 
-/** The address to share for a table: this page's, with the table's code. */
-export function inviteLink(href: string, code: string): string {
-  const url = new URL(href);
+/** The address to share for a table: this page's (the site's, in an app), with the table's code. */
+export function inviteLink(href: string, code: string, app = false): string {
+  const url = new URL(app ? APP_SITE : href);
   url.search = "";
   url.hash = "";
   url.searchParams.set("table", code);
@@ -43,11 +59,12 @@ export function showInAddress(code: string | null) {
   history.replaceState(history.state, "", url.href);
 }
 
-/** The room server: this site's own /rooms, or another named by ?rooms= (for development and scripts). */
-export function roomsUrl(href: string): string {
+/** The room server: another named by ?rooms= (for development and scripts), else an app's, else this site's own /rooms. */
+export function roomsUrl(href: string, app = false): string {
   const page = new URL(href);
   const named = page.searchParams.get("rooms");
   if (named) return named;
+  if (app) return APP_ROOMS;
   const url = new URL(ROOMS_PATH, page);
   url.protocol = page.protocol === "https:" ? "wss:" : "ws:";
   url.search = "";

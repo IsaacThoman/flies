@@ -11,8 +11,8 @@
 import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
 import { REGIONS } from "@fly/brain";
-import type { BrainDriver, RemoteButton, WeatherAttribution } from "@fly/contracts";
-import { AT_ROOT_PROPERTY } from "@fly/contracts";
+import type { BrainDriver, OpenTableSocket, RemoteButton, WeatherAttribution } from "@fly/contracts";
+import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
 import { Navigator } from "@fly/ui";
 import type { GlyphSet, Hit } from "@fly/ui";
 import { BALL_RADIUS, Pantry, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
@@ -31,11 +31,12 @@ import type { TableStart } from "@fly/net";
 import { TAP_SLOP } from "./input.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
 import { Life } from "./life.ts";
-import { inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart } from "./online/invite.ts";
+import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart } from "./online/invite.ts";
 import type { Shared } from "./online/invite.ts";
 import { Lobby } from "./online/lobby.ts";
 import { Online } from "./online/online.ts";
 import type { Ended, PlayerNow, TableHost } from "./online/online.ts";
+import { nativeSocketBridge, nativeSockets } from "./online/native-socket.ts";
 import { BrowserSocket } from "./online/socket.ts";
 import { isPlaceId, nextPlace, placeInfo } from "./places/catalog.ts";
 import type { PlaceId } from "./places/catalog.ts";
@@ -278,6 +279,9 @@ export class Game implements Shell {
   #glyphsDrawn: GlyphSet | null | undefined = undefined;
   /** This device's key and table, as kept; and what the table hears of the player each send. */
   #seat: TableSeat;
+  /** How this device opens a line to a room (null: it can't), and whether it is one of the apps (docs/online.md). */
+  readonly #openSocket: OpenTableSocket | null;
+  readonly #app: boolean;
   readonly #player: PlayerNow = { away: false, playing: false, handsOut: false, holding: false, eye: { x: 0, y: 0, z: 0 } };
   readonly #tableHost: TableHost;
   readonly #titleItems: number;
@@ -359,19 +363,28 @@ export class Game implements Shell {
       onWorld: (settle) => this.#followLight(settle),
     };
     this.#seat = loadTableSeat(newDeviceKey);
-    this.typing = this.canPlayOnline && typeof document !== "undefined" ? new BrowserTextEntry() : null;
+    [this.#openSocket, this.#app] = tableLines();
+    // The Apple TV's host types with its own keyboard screen, not a page's <input>.
+    this.typing = this.canPlayOnline && typeof document !== "undefined" && !(globalThis as { __native?: unknown }).__native ? new BrowserTextEntry() : null;
     // Invited to a room, or still at the one it was at when it last closed: it sits down there.
     if (this.canPlayOnline) {
       const code = invitedTo(location.href) ?? this.#seat.table;
       if (code) this.#sit(code, null);
       // A phone's keyboard comes up only for a field focused during the tap itself: the frame that handles the tap is too late.
       if (inputs.pointers) this.#typeOnTap(canvas);
+      // A link opened while the app runs (a universal link on a phone): this room, leaving any other.
+      window.addEventListener?.(INVITE_EVENT, (event) => {
+        const code = invitedTo(String((event as CustomEvent<unknown>).detail));
+        if (!code || this.online?.code === code) return;
+        this.leaveTable();
+        this.joinRoom(code);
+      });
     }
   }
 
-  /** Rooms with others need a WebSocket: a browser's (the Apple TV and iPhone hosts will bridge theirs). */
+  /** Rooms with others need a line to the room server: a WebSocket, or the Apple TV host's. */
   get canPlayOnline() {
-    return typeof WebSocket !== "undefined" && typeof location !== "undefined" && /^https?:$/.test(location.protocol);
+    return this.#openSocket !== null;
   }
 
   /** Makes a room and sits at it, under this light and weather: its link can be shared at once. */
@@ -405,7 +418,7 @@ export class Game implements Shell {
   /** The list of rooms is open while Online is up and this device is at none (on its other faces too, so that coming back to the list finds it as it is). */
   #browse(dt: number) {
     const wanted = this.nav.current === "online" && !this.online && this.canPlayOnline;
-    if (wanted && !this.#lobby) this.#lobby = new Lobby((url) => new BrowserSocket(url), roomsUrl(location.href));
+    if (wanted && !this.#lobby && this.#openSocket) this.#lobby = new Lobby(this.#openSocket, roomsUrl(location.href, this.#app));
     else if (!wanted && this.#lobby) {
       this.#lobby.close();
       this.#lobby = null;
@@ -435,7 +448,7 @@ export class Game implements Shell {
 
   /** The link to the table this device is at. */
   get tableLink(): string | null {
-    return this.online && typeof location !== "undefined" ? inviteLink(location.href, this.online.code) : null;
+    return this.online && typeof location !== "undefined" ? inviteLink(location.href, this.online.code, this.#app) : null;
   }
 
   /** Hands the table's link on: the share sheet, or the clipboard. Called from a press. */
@@ -464,8 +477,9 @@ export class Game implements Shell {
 
   #sit(code: string, start: TableStart | null, password: string | null = null) {
     this.tableEnded = null;
+    if (!this.#openSocket) return;
     this.#alone = this.life.pantry;
-    this.online = new Online(this.#tableHost, (url) => new BrowserSocket(url), roomsUrl(location.href), code, this.#seat.key, start, password);
+    this.online = new Online(this.#tableHost, this.#openSocket, roomsUrl(location.href, this.#app), code, this.#seat.key, start, password);
     this.#seat.table = code;
     saveTableSeat(this.#seat);
     showInAddress(code);
@@ -1739,4 +1753,19 @@ export class Game implements Shell {
     d.looking = String(this.director.handled);
     d.reach = this.director.reach.toFixed(1);
   }
+}
+
+/**
+ * How this device reaches a room, and whether it is one of the apps: the Apple TV's host bridges
+ * a native WebSocket; a browser, and the iPhone and iPad app's web view (fly://), have their own.
+ * A page opened from a file has no site to find a room at.
+ */
+function tableLines(): [OpenTableSocket | null, boolean] {
+  if (typeof location === "undefined") return [null, false];
+  const bridge = nativeSocketBridge();
+  const native = !!(globalThis as { __native?: unknown }).__native;
+  const app = inApp(native, location.href);
+  if (bridge) return [nativeSockets(bridge), true];
+  if (typeof WebSocket === "undefined" || (!app && !/^https?:$/.test(location.protocol))) return [null, app];
+  return [(url) => new BrowserSocket(url), app];
 }

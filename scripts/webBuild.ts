@@ -137,6 +137,16 @@ const SERVICE_WORKER = path.join(root, "apps/web/src/offline/sw.ts");
 const ICONS = path.join(root, "assets/web");
 
 /**
+ * Where the apps (the Apple TV's, the iPhone and iPad's) find the room server and which site their
+ * invitations open, read by apps/web/src/online/invite.ts: `ROOMS_URL` (a room server for
+ * development, such as ws://192.168.1.20:8787/rooms) and `FLY_SITE_URL`, else Flies' own site.
+ * A browser at a site uses that site's.
+ */
+export function appSite(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  return { __FLY_ROOMS__: JSON.stringify(env.ROOMS_URL ?? ""), __FLY_SITE__: JSON.stringify(env.FLY_SITE_URL ?? "") };
+}
+
+/**
  * The parts that make the page an app: the manifest with its icons, the
  * service worker that keeps the page for opening offline (it leaves the brain
  * to the page, download.ts), and, given FLY_SITE_URL, absolute links for
