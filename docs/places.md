@@ -269,3 +269,18 @@ TV has (`places/restaurant/`):
   every time of day, and every shot keeps the camera out of everything with
   the fly in the picture. Add it to the fuzzers' places too
   (`scripts/fuzz/body.ts`).
+
+## Checking the picnic's picture
+
+Compare the picnic at 1920×1080 with `scripts/play.ts`, keeping its chunky
+internal resolution. Hold the same fly pose and camera for title, follow,
+close, wide, whole table, screensaver, fruit and glass studies; repeat under
+midday, golden hour, dusk, night and midday rain. Pinned poses belong only in
+the capture harness: ordinary play remains the brain's choice.
+
+Judge composition at TV distance, light and colour, materials, millimetre
+scale, detail without clutter, life and weather, and rendering artefacts.
+Record `data-calls` and `data-place-ms` alongside the pictures. Compare calls
+at the same eye-refresh phase: frames that refresh the brain's six eye views
+include those extra draws. Compare repeated builds on the same machine;
+wall-clock build times on a busy machine vary considerably.
