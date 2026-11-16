@@ -8,7 +8,7 @@
 
 import type { OpenTableSocket, TableSocket } from "@fly/contracts";
 import { CLOSE, FLIES, FLY_MAX, MAX_BITES, RoomClock, bitesLength, encodeBites, encodeFly } from "@fly/net";
-import type { Bite, ClientMessage, FlyState, Refusal, ServerMessage } from "@fly/net";
+import type { Bite, ClientMessage, FlyState, Refusal, ServerMessage, WireScale } from "@fly/net";
 
 /** The clock is asked often at first, to settle quickly, then once a second. */
 const FIRST_PINGS = 6;
@@ -111,9 +111,10 @@ export class TableLine {
     this.#socket?.send(text);
   }
 
-  sendFly(state: FlyState) {
+  /** Sends this device's fly, at the scale of the place it is in. */
+  sendFly(scale: WireScale, state: FlyState) {
     if (this.status !== "joined" || !this.#socket) return;
-    const n = encodeFly(this.#fly, state);
+    const n = encodeFly(this.#fly, scale, state);
     let view = this.#flyViews.get(n);
     if (!view) this.#flyViews.set(n, (view = new Uint8Array(this.#fly.buffer, 0, n)));
     this.bytesOut += n;

@@ -3,9 +3,10 @@
 // ceiling's diffusers stirs: a slow draught falling from each and spreading
 // as it falls, felt where it is (Felt.air) and nowhere else. It is a field
 // fixed to the room, the same whoever is in it: not aimed at the fly, not
-// timed to it.
+// timed to it. When it runs is its clock's (@fly/world), at a table the
+// room's.
 
-import { DINING_ROOM } from "@fly/world";
+import { DINING_ROOM, VentilationClock } from "@fly/world";
 import { random } from "../../scene/build.ts";
 import type { Around } from "../types.ts";
 
@@ -18,36 +19,26 @@ export const DIFFUSERS: readonly { x: number; z: number }[] = [
 /** Its throw straight under a diffuser, a metre and a half down (mm/s), and how wide it spreads there (mm). */
 const THROW = 180;
 const SPREAD = 450;
-/** Seconds it runs, at the least and the most, and minutes between runs. */
-const RUN = [50, 110] as const;
-const REST = [4, 9] as const;
-/** Seconds of quiet before it first comes on, and how long it takes to come up to speed and to die away. */
-const FIRST = 40;
+/** Seconds it takes to come up to speed and to die away. */
 const RAMP = 8;
 
 export class Ventilation {
-  #rnd = random(71);
-  #quiet = 0;
-  #wait = FIRST;
-  /** Seconds left of this run (0: off), and how hard it blows now, 0 to 1. */
-  #left = 0;
+  readonly #next = random(71).next;
+  readonly #clock = new VentilationClock(this.#next);
+  /** How hard it blows now, 0 to 1. */
   #on = 0;
   #time = 0;
 
-  /** Moves it on, and adds the draught where the fly is to what it feels. */
+  /** At a table, the room says a run starts now: as long as `random` says, alike on every device. */
+  run(random: () => number) {
+    this.#clock.start(random);
+  }
+
+  /** Moves it on, and adds the draught where the fly is to what it feels. At a table only the room starts it. */
   step(dt: number, around: Around) {
     this.#time += dt;
-    if (around.quiet) this.#quiet += dt;
-    else this.#quiet = 0;
-    if (this.#left > 0) this.#left = Math.max(0, this.#left - dt);
-    else if (this.#quiet > FIRST) {
-      this.#wait -= dt;
-      if (this.#wait <= 0) {
-        this.#left = this.#rnd.range(RUN[0], RUN[1]);
-        this.#wait = this.#rnd.range(REST[0], REST[1]) * 60;
-      }
-    }
-    this.#on += ((this.#left > 0 ? 1 : 0) - this.#on) * Math.min(1, dt / RAMP);
+    if (this.#clock.tick(dt, around.quiet) && !around.shared) this.#clock.start(this.#next);
+    this.#on += ((this.#clock.left > 0 ? 1 : 0) - this.#on) * Math.min(1, dt / RAMP);
     if (this.#on < 0.01) return;
     const { fly, felt } = around;
     const drop = Math.max(200, DINING_ROOM.height - fly.y);

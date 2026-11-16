@@ -25,18 +25,26 @@ export const AHEAD = 500;
 const RETURN_PACE = 20;
 const RETURN_SECONDS = 10;
 /** A fly may be this far past the floor's edge in the air, and this far above the place's ceiling, mm. */
-const AIR_BEYOND = 400;
+export const AIR_BEYOND = 400;
 const AIR_ABOVE = 100;
+/** A fly may be this far into what it stands on, mm (rounding on the wire, a step), and this far off it on its feet. */
+const SUNK = 1.5;
+const OFF = 3;
+/** The air a fly needs over where it is set down, mm: its height, with room to spare. */
+const CLEAR = 2;
 
-/** Whether a fly could be here at all: over the floor (or in the air not far past it), never inside what stands on it, on its feet only on something. */
+/**
+ * Whether a fly could be here at all: over the floor (or in the air not far
+ * past it), never inside anything, on its feet only on something: whichever
+ * surface is under it, the floor beneath a table or the table.
+ */
 export function couldBe(world: World, x: number, y: number, z: number, airborne: boolean): boolean {
   if (!Number.isFinite(x + y + z)) return false;
   if (y > world.place.ceiling + AIR_ABOVE) return false;
   const over = world.onTable(x, z);
   if (!over) return airborne && world.beyond(x, z, inward) < AIR_BEYOND;
-  const floor = world.heightAt(x, z);
-  if (y < floor - 1.5) return false;
-  return airborne || Math.abs(y - floor) <= 3;
+  if (y < -SUNK || world.solidAt(x, y + SUNK, z) >= 0) return false;
+  return airborne || Math.abs(y - world.heightAt(x, z, y + OFF)) <= OFF;
 }
 
 const inward = { x: 0, y: 0, z: 0 };
@@ -87,8 +95,8 @@ export class Leash {
       const k = allowed / moved;
       x = last.x + dx * k;
       z = last.z + dz * k;
-      // On its feet it stands on whatever is there.
-      y = flying ? last.y + dy * k : world.heightAt(x, z);
+      // On its feet it stands on whatever is there, at the height it has come to.
+      y = flying ? last.y + dy * k : world.heightAt(x, z, last.y + dy * k + OFF);
       result = "shortened";
     }
     if (result === "held" || !couldBe(world, x, y, z, flying)) {
@@ -123,11 +131,17 @@ function copyInto(from: FlyState, to: FlyState) {
   Object.assign(to.hand, from.hand);
 }
 
-/** Whether a fly coming back after `seconds` away may be at `at`, having been last at (x, z): somewhere it could stand, within a walk of there. */
-export function mayReturnTo(world: World, at: Spot, x: number, z: number, seconds: number): boolean {
-  const [ax, az] = at;
-  if (!Number.isFinite(ax + az + at[2]) || !world.onTable(ax, az)) return false;
-  return Math.hypot(ax - x, az - z) <= RETURN_PACE * Math.min(RETURN_SECONDS, Math.max(0, seconds)) + 3;
+/**
+ * Whether a fly coming back after `seconds` away may be at `at`, having
+ * been last at (x, y, z): somewhere it could stand, within a walk of there
+ * (not the table over the floor it was on).
+ */
+export function mayReturnTo(world: World, at: Spot, x: number, y: number, z: number, seconds: number): boolean {
+  const [ax, az, yaw, ay] = at;
+  if (!Number.isFinite(ax + az + yaw) || (ay !== undefined && !Number.isFinite(ay)) || !world.onTable(ax, az)) return false;
+  const standing = world.surface(ax, az, surface, ay);
+  if (standing.underside < standing.y + CLEAR) return false;
+  return Math.hypot(ax - x, standing.y - y, az - z) <= RETURN_PACE * Math.min(RETURN_SECONDS, Math.max(0, seconds)) + 3;
 }
 
 /** How far apart flies are set down round the place's start, mm: a few body lengths, so they find each other. */
@@ -137,23 +151,29 @@ const LEVEL = 0.95;
 
 /**
  * Where player `id`'s fly is set down in a place: the first on the place's
- * start, the others round it facing it, each on somewhere level. The same
- * on every device and in the room.
+ * start, the others round it facing it, each on somewhere level at the
+ * start's height (on the start's table, not the floor under it) with air
+ * over it. The same on every device and in the room.
  */
 export function spawnSpot(world: World, id: number): Spot {
   const start = world.place.start;
-  if (id <= 1) return [start.x, start.z, start.yaw];
-  const level = (x: number, z: number) => world.onTable(x, z) && world.surface(x, z, surface).normal.y >= LEVEL && Math.abs(surface.y - world.heightAt(start.x, start.z)) < 0.5;
+  const y = world.heightAt(start.x, start.z, start.y);
+  if (id <= 1) return [start.x, start.z, start.yaw, y];
+  const level = (x: number, z: number) => {
+    if (!world.onTable(x, z)) return false;
+    const s = world.surface(x, z, surface, y + 0.5);
+    return s.normal.y >= LEVEL && Math.abs(s.y - y) < 0.5 && s.underside >= s.y + CLEAR;
+  };
   for (let ring = 1; ring <= 6; ring++) {
     for (let turn = 0; turn < 12; turn++) {
       // The golden angle spreads them round; each try further round, then further out.
       const a = id * 2.39996 + turn * 0.52;
       const x = start.x + Math.cos(a) * SPREAD * ring;
       const z = start.z + Math.sin(a) * SPREAD * ring;
-      if (level(x, z)) return [x, z, Math.atan2(start.x - x, start.z - z)];
+      if (level(x, z)) return [x, z, Math.atan2(start.x - x, start.z - z), surface.y];
     }
   }
-  return [start.x, start.z, start.yaw];
+  return [start.x, start.z, start.yaw, y];
 }
 
 const surface = createSurface();

@@ -13,7 +13,7 @@
 import type { World } from "@fly/world";
 import { createSurface } from "@fly/world";
 import type { FlyBody } from "./motion.ts";
-import { FLY_LENGTH, MAX_SLOPE_COS, STEP_UP } from "./motion.ts";
+import { FLY_HEIGHT, FLY_LENGTH, MAX_SLOPE_COS, STEP_UP } from "./motion.ts";
 
 /** Half the length of a fly's capsule's segment and its radius, mm: a fly about 2.5 mm long and, with its legs gathered, 1.5 mm wide. */
 export const BODY_HALF = 0.42 * FLY_LENGTH;
@@ -124,11 +124,11 @@ export class Crowd implements Bodies {
     }
   }
 
-  /** Moves a standing fly aside over the surface, if it can stand there; otherwise it stays (and stays pressed). */
+  /** Moves a standing fly aside over the surface it is on (not onto a table over it), if it can stand there; otherwise it stays (and stays pressed). */
   #shove(body: FlyBody, dx: number, dz: number) {
     const p = body.position;
-    const next = this.#world.surface(p.x + dx, p.z + dz, this.#surface);
-    if (!next.onTable || Math.abs(next.y - p.y) > STEP_UP || next.normal.y < MAX_SLOPE_COS) return;
+    const next = this.#world.surface(p.x + dx, p.z + dz, this.#surface, p.y + STEP_UP);
+    if (!next.onTable || Math.abs(next.y - p.y) > STEP_UP || next.normal.y < MAX_SLOPE_COS || next.underside < next.y + FLY_HEIGHT) return;
     p.x += dx;
     p.z += dz;
     p.y = next.y;

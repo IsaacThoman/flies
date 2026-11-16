@@ -9,15 +9,15 @@
 // from, and when a visitor comes. No brains, no drawing and no sockets here
 // (server.ts), so a whole table can run in a test.
 
-import { BALL_RADIUS, Pace, World, WORLDS, forecast, hourOfDay } from "@fly/world";
+import { BALL_RADIUS, Pace, VentilationClock, World, WORLDS, forecast, hourOfDay } from "@fly/world";
 import type { Happening } from "@fly/world";
 import {
   AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_PLAYERS, PLAYING, PROTOCOL, Rate, TABLE_LIGHTS, TABLE_WEATHERS,
   TableBubbles, TableFood, ballProgress, createFlyState, decodeBites, encodeFlies, mayReturnTo, mix, readState, spawnSpot,
-  stream, tableHours, toWire,
+  stream, tableHours, toWire, wireScale,
 } from "@fly/net";
 import type {
-  BallWire, ClientMessage, FlyState, FoodWire, HappeningWire, PlayerWire, Refusal, ServerMessage, Spot, TableStart, V3, WorldWire,
+  BallWire, ClientMessage, FlyState, FoodWire, HappeningWire, PlayerWire, Refusal, ServerMessage, Spot, TableStart, V3, WireScale, WorldWire,
 } from "@fly/net";
 
 /** A fly whose device has stopped (or gone) is kept at the table, resting, this long (ms); then it leaves. */
@@ -28,8 +28,10 @@ export const SILENT_AFTER = 5_000;
 const FOOD_EVERY = 100;
 /** Happenings a newcomer is told of, if they began this recently (ms): any older are somewhere else by now. */
 const HAPPENING_KEPT = 5_000;
-/** Seconds each visitor keeps the table busy, roughly, so the table doesn't send another of it meanwhile. */
-const BUSY: Readonly<Record<Happening, number>> = { gust: 10, gull: 80, leaf: 40, butterfly: 100, ladybird: 120, juice: 0, boat: 240 };
+/** What a place's goings-on can be: the picnic's visitors, and the restaurant's ventilation coming on. */
+export type Going = Happening | "ventilation";
+/** Seconds each visitor keeps the table busy, roughly, so the table doesn't send another of it meanwhile (the ventilation keeps its own clock). */
+const BUSY: Readonly<Record<Going, number>> = { gust: 10, gull: 80, leaf: 40, butterfly: 100, ladybird: 120, juice: 0, boat: 240, ventilation: 0 };
 
 /** A device's line to the table. */
 export type Link = {
@@ -94,7 +96,7 @@ export type TableOptions = {
 };
 
 const isV3 = (v: unknown): v is V3 => Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === "number" && Number.isFinite(x) && Math.abs(x) < 10_000);
-const isSpot = (v: unknown): v is Spot => isV3(v);
+const isSpot = (v: unknown): v is Spot => Array.isArray(v) && (v.length === 3 || v.length === 4) && v.every((x) => typeof x === "number" && Number.isFinite(x) && Math.abs(x) < 10_000);
 const finite = (...xs: unknown[]) => xs.every((x) => typeof x === "number" && Number.isFinite(x));
 const clampTime = (t: unknown, now: number) => (typeof t === "number" && Number.isFinite(t) ? Math.max(now - 2000, Math.min(now + 1000, t)) : now);
 
@@ -124,6 +126,8 @@ export class Table {
   readonly worldWire: WorldWire;
   place: string;
   epoch: number;
+  /** How fly states go on the wire in this place. */
+  scale: WireScale;
   bubbles: TableBubbles | null = null;
   /** Keys that were removed from the table, hashed: they can't sit down again. */
   readonly removed: Set<string>;
@@ -136,7 +140,8 @@ export class Table {
   readonly #fresh: FlyState[] = [];
   readonly #others: FlyState[] = [];
   #pace: Pace;
-  readonly #busy = new Map<Happening, number>();
+  readonly #busy = new Map<Going, number>();
+  #ventilation: VentilationClock | null = null;
   #happenings = 0;
   #foodAt = 0;
   #lastTick: number;
@@ -151,6 +156,7 @@ export class Table {
     this.place = Object.hasOwn(WORLDS, start.place) ? start.place : "picnic";
     this.epoch = record?.epoch ?? 0;
     this.world = new World(WORLDS[this.place]);
+    this.scale = wireScale(this.world.place);
     this.food = new TableFood(this.world, this.world.place.patches);
     this.worldWire = { light: TABLE_LIGHTS.includes(start.light as never) ? start.light : "clock", weather: TABLE_WEATHERS.includes(start.weather as never) ? start.weather : "now" };
     this.#starter = starterKey;
@@ -238,9 +244,10 @@ export class Table {
     return new Pace({ next, range: (lo, hi) => lo + (hi - lo) * next() });
   }
 
-  /** What follows the place: its bubbles (only the picnic has them), and nothing of what was happening in the last. */
+  /** What follows the place: its bubbles (only the picnic has them), the restaurant's ventilation, and nothing of what was happening in the last. */
   #settle() {
     this.bubbles = this.place === "picnic" ? new TableBubbles(mix(this.seed, this.epoch), this.world, TABLE_BUBBLES) : null;
+    this.#ventilation = this.place === "restaurant" ? new VentilationClock(stream(mix(this.seed, this.epoch, 0x7e47))) : null;
     this.balls.length = 0;
     this.happenings.length = 0;
     this.#busy.clear();
@@ -289,7 +296,9 @@ export class Table {
       if (seat.link) seat.link.close(CLOSE.elsewhere, "elsewhere");
       const s = seat.state;
       const away = (wall - seat.lastSeen) / 1000;
-      at = message.at && isSpot(message.at) && mayReturnTo(this.world, message.at, s.x, s.z, away) ? message.at : [s.x, s.z, s.yaw];
+      // Where it is counts only in the place the table is in: a device away while the table moved has its fly somewhere else.
+      const here = message.epoch === this.epoch && isSpot(message.at);
+      at = here && mayReturnTo(this.world, message.at!, s.x, s.y, s.z, away) ? message.at! : [s.x, s.z, s.yaw, s.y];
     } else {
       let id = 1;
       while (this.seats.has(id) && id <= MAX_PLAYERS) id++;
@@ -309,7 +318,8 @@ export class Table {
     s.x = at[0];
     s.z = at[1];
     s.yaw = at[2];
-    s.y = this.world.heightAt(s.x, s.z);
+    s.y = this.world.heightAt(s.x, s.z, at[3]);
+    at = [s.x, s.z, s.yaw, s.y];
     s.flags = 0;
     s.t = now;
     s.epoch = this.epoch;
@@ -346,7 +356,7 @@ export class Table {
     const others = this.#others;
     others.length = 0;
     for (const p of this.seats.values()) if (p !== seat && p.present) others.push(p.state);
-    if (others.length) link.send(new Uint8Array(this.#batch.buffer, 0, encodeFlies(this.#batch, others)));
+    if (others.length) link.send(new Uint8Array(this.#batch.buffer, 0, encodeFlies(this.#batch, this.scale, others)));
     // Everyone else sees it come, or wake if they were already seeing it rest.
     this.#broadcast(shown ? { type: "away", id: seat.id, away: false } : { type: "joined", ...this.#player(seat) }, seat);
     this.#options.log?.("joined", { table: this.code, player: seat.id, returning });
@@ -413,8 +423,8 @@ export class Table {
         return;
       case "drop": {
         if (!finite(m.id, m.x, m.z) || typeof m.kind !== "string" || !seat.rates.drops.take(now)) return;
-        const food = this.food.drop(seat.id, m.id, m.kind, m.x, m.z);
-        if (food) this.#broadcast({ type: "drop", by: seat.id, id: food.id, kind: food.kind, x: food.x, z: food.z, at: clampTime(m.at, now) }, seat);
+        const food = this.food.drop(seat.id, m.id, m.kind, m.x, m.z, finite(m.y) ? m.y : undefined);
+        if (food) this.#broadcast({ type: "drop", by: seat.id, id: food.id, kind: food.kind, x: food.x, z: food.z, y: food.y, at: clampTime(m.at, now) }, seat);
         return;
       }
       case "ball": {
@@ -449,7 +459,7 @@ export class Table {
         return;
       case "found": {
         if (!finite(m.id, m.x, m.z, m.r, m.sweet) || !seat.rates.found.take(now)) return;
-        const food = this.food.found(m.id, m.name, m.x, m.z, m.r, m.sweet);
+        const food = this.food.found(m.id, m.name, m.x, m.z, m.r, m.sweet, finite(m.y) ? m.y : undefined);
         if (food) this.#broadcast({ type: "found", food: toWire(food) }, seat);
         return;
       }
@@ -472,6 +482,7 @@ export class Table {
     this.place = place;
     this.epoch = (this.epoch + 1) & 0xff;
     this.world.load(WORLDS[place]);
+    this.scale = wireScale(this.world.place);
     this.food.reset(this.world.place.patches);
     this.food.flush();
     this.#pace = this.#newPace();
@@ -483,7 +494,7 @@ export class Table {
       spots[seat.id] = spot;
       const s = seat.state;
       [s.x, s.z, s.yaw] = spot;
-      s.y = this.world.heightAt(s.x, s.z);
+      s.y = this.world.heightAt(s.x, s.z, spot[3]);
       s.flags &= ~AIRBORNE;
       s.t = now;
       s.epoch = this.epoch;
@@ -513,7 +524,8 @@ export class Table {
     const type = view.getUint8(0);
     if (type === FLY) {
       const s = this.#scratch;
-      if (readState(view, 1, s) < 0 || s.epoch !== this.epoch) return;
+      // Read at this place's scale: one from before a move comes out wrong, and is dropped by its epoch before anything uses it.
+      if (readState(view, 1, this.scale, s) < 0 || s.epoch !== this.epoch) return;
       const result = seat.leash.admit(this.world, seat.state, s, this.now);
       if (result === "refused") return;
       if (result !== "taken") seat.shortened++;
@@ -522,7 +534,7 @@ export class Table {
     } else if (type === BITES) {
       const st = seat.state;
       const now = this.now;
-      const seq = decodeBites(view, (food, amount) => this.food.bite(seat.id, food, amount, st.x, st.z, now));
+      const seq = decodeBites(view, (food, amount) => this.food.bite(seat.id, food, amount, st.x, st.y, st.z, now));
       if (seq >= 0) seat.ack = seq;
     }
   }
@@ -560,7 +572,7 @@ export class Table {
       others.length = 0;
       for (const s of fresh) if (s.id !== p.id) others.push(s);
       if (others.length === 0) continue;
-      const bytes = encodeFlies(this.#batch, others);
+      const bytes = encodeFlies(this.#batch, this.scale, others);
       p.link.send(new Uint8Array(this.#batch.buffer, 0, bytes));
     }
   }
@@ -610,7 +622,7 @@ export class Table {
       bubbles.rain = this.#rain();
       bubbles.update(now / 1000);
     }
-    if (this.place === "picnic") this.#visitors(dt, now);
+    if (this.place === "picnic" || this.#ventilation) this.#visitors(dt, now);
   }
 
   /** The place's goings-on start when nobody at the table is using the remote, as alone. */
@@ -624,13 +636,19 @@ export class Table {
         break;
       }
     }
+    const vent = this.#ventilation;
+    if (vent) {
+      // Its run is as long as every device draws from the run's seed.
+      if (vent.tick(dt, quiet)) vent.start(stream(mix(this.happen("ventilation", now).seed)));
+      return;
+    }
     this.#pace.gustiness = 0.4 + this.#weather().wind * 1.6;
     const next = this.#pace.tick(dt, quiet, (h) => this.#can(h, now));
     if (next) this.happen(next, now);
   }
 
   /** Starts a happening now (the pace's, or one asked for), told to everyone with the seed they reproduce it from. */
-  happen(kind: Happening, now = this.now): HappeningWire {
+  happen(kind: Going, now = this.now): HappeningWire {
     const h: HappeningWire = { kind, seed: mix(this.seed, 0x4a99, ++this.#happenings), at: now };
     this.happenings.push(h);
     if (this.happenings.length > 16) this.happenings.shift();

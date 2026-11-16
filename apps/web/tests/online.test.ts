@@ -135,9 +135,8 @@ test("an invitation is the page's address with the table's code, and the room se
   assert.equal(roomsUrl("http://localhost:5173/?rooms=ws://127.0.0.1:9/rooms"), "ws://127.0.0.1:9/rooms");
 });
 
-test("the table knows every place but the restaurant, and every light and weather the game does, by the same names", () => {
-  // A room is too big for the table's wire (packages/world/src/places.ts).
-  assert.deepEqual(Object.keys(WORLDS).sort(), PLACES.map((p) => p.id).filter((id) => id !== "restaurant").sort());
+test("the table knows every place, light and weather the game does, by the same names", () => {
+  assert.deepEqual(Object.keys(WORLDS).sort(), PLACES.map((p) => p.id).sort());
   assert.deepEqual([...TABLE_LIGHTS], TOOLS.find((t) => t.id === "light")!.variants.map((v) => v.id));
   assert.deepEqual([...TABLE_WEATHERS], TOOLS.find((t) => t.id === "weather")!.variants.map((v) => v.id));
 });
