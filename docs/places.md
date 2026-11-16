@@ -114,6 +114,14 @@ reach (beyond the floor's edge, above it, or in the backdrop).
 - **A shadow passing over** (`scene/shade.ts`, optional): `shaded(material)`
   teaches a lit material to take a shadow cast from high up (the picnic's
   gull), set in `SHADE`; the fly takes it already.
+- **A clock** (`scene/clock.ts`, optional): a `WallClock`, updated in the
+  place's `update`, turns a dial's hands to the real time by a uniform; the
+  hands are drawn in the dial's own material (`CLOCK_GLSL`, found by where the
+  dial is in the world, `onDial`), so they cost no draw. It tells the real
+  time under any chosen light. The windowsill's, the lab's and the bar's are
+  worked examples. Behind a fly on the table, the medium shot frames only from
+  the table up to about a seventh of the way back, so anything meant to be
+  seen behind the fly, a clock included, stands low.
 - **Bubbles and fireflies** are built for the picnic's open air and size; a
   place says whether it has them.
 - **The Place tool's name** for it, what it is carried "to", and what the fly

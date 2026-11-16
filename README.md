@@ -35,19 +35,29 @@ Where it lives. Living in each in turn (the default), it moves on after 20 minut
 wallpaper. It is the same fly, its brain running on; the world fades out, the
 place is built behind the veil, and it is set down there.
 
-The first place is the picnic: a round café table by a lake: lemonade, a jam jar, a
-strawberry and a half, cherries, a slice of orange, a green apple, sugar cubes,
-a drip of honey, a smear of jam, dew. The lemonade jar stands in a saucer:
-up a gentle slope, a rounded rim to walk along, and down into a moat where
-lemonade has dripped and pooled; drops from the jar, and the fly's own feet,
-set rings spreading on the pool. The whole strawberry spreads at its foot so a
-fly can walk up and over it, and there is juice on top. At the fly's own scale there are
-biscuit crumbs (the big ones are boulders it can climb), two lemon pips, specks
-and grains of spilt sugar, and the napkin is woven thread by thread in the
-table's shader, with a stitched hem and the creases where it was folded, so it
-stays crisp however close the camera comes. Drops of water are clear in the
-middle and bright at the edge, and focus the sun into a spot on the table.
-Everything is built in code.
+The first place is the picnic: a round café table by a lake: lemonade, a jam
+jar, a strawberry and a half, cherries, a slice of orange, a green apple,
+sugar cubes, a drip of honey, a smear of jam, dew. The lemonade jar stands in
+a saucer: up a gentle slope, a rounded rim to walk along, and down into a moat
+where lemonade has dripped and pooled; drops from the jar, and the fly's own
+feet, set rings spreading on the pool. Its lid is pressed with a rolled rim
+and a raised ring and knurled round its side, and the straw goes through it by
+a grommet. The whole strawberry spreads at its foot so a fly can walk up and
+over it, and there is juice on top; its seeds sit in little pits. At the fly's
+own scale there are biscuit crumbs (the big ones are boulders it can climb),
+two lemon pips, specks and grains of spilt sugar, and the napkin and the jam
+jar's cover are woven thread by thread, the napkin with a stitched hem and the
+creases where it was folded, so they stay crisp however close the camera
+comes. The table's white enamel shows its use: spots where dew dried, arcs
+where it was wiped that catch the low sun, hairline scratches, pollen, a chip
+or two at the rim, and the sticky ring a jar of lemonade once left. The apple
+is freckled and streaked with blush, russet round its stalk; the orange's
+segments are packed with juice sacs; the jam has pieces of fruit and seeds in
+it, behind glass that brightens at its edge; the sugar cubes are pressed from
+crystals that glint. Drops of water are clear in the middle and bright at the
+edge, and focus the sun into a spot on the table. On the lawn below, the table
+casts its shadow, and the grass is mown in stripes. Everything is built in
+code.
 
 Soap bubbles drift over the table on the breeze, and a few small ones bob
 low past the fly; one that touches the table or anything standing on it
@@ -65,6 +75,14 @@ cloud now and then passes over the sun and the light dims by a
 fifth for a few seconds. The hours are a fixed summer day's (sunrise about
 5:40, sunset about 20:10), unless the Apple TV can tell the real sunrise and
 sunset (the weather outside, below).
+
+Indoors there is a clock in each place (the windowsill's on the sill, the
+lab's on the wall, the bar's behind the bar), and it tells the real time,
+whatever light you have chosen: a clock that showed another time would be a
+broken one, and a twelve-hour dial can't tell three in the afternoon from
+three in the morning, so it never looks wrong under the night's light. Its
+hands are drawn in its dial's shader, turned by the time each frame, so they
+cost no draw and stay sharp however close the camera comes.
 
 So does the weather, unless you choose one (the **Weather** tool): clear,
 overcast, mist or light rain. On "Now" it follows a forecast worked out from
@@ -157,26 +175,33 @@ the garden muffled by the glass by day, and rain on the pane. There are no bubbl
 indoors.
 
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
-wiring was traced: a stereo microscope with a fly pad on its stage (its base and
-pillar are solid; a fly can land on it), a rack of plugged vials with pupae up
-their walls, a vial with its foam plug pulled half out and cornmeal food at the
-bottom, a foil-capped beaker, a wash bottle, a box of pipette tips, a lab timer
-and a desk lamp. The fly can eat from a dish of grape-juice agar poured to the
-brim (land on it, walk off over the rim) and from drips of food spilt when the
-vials were filled. At its own scale there are dried crumbs of food to climb,
-grains of cornmeal, forceps whose arms it can walk along, a fine paintbrush, a
-crumpled wipe to climb, and an open notebook, thin enough to step onto, written
-in squiggles with a cross, a tally of counts and a sketch of a fly; a drop of
-water on the page magnifies the writing under it. The epoxy's flecks, the
-foam's pores, the cornmeal's grains and the ink are worked out in the shaders,
-crisp however close the camera comes, and glossy things show the windows and
-the ceiling's panels in them. By day fluorescent panels light the room evenly
-and the sun comes in at the windows behind the bench, laying their shapes,
-frames and blinds across the bench and the floor, long and warm at golden hour;
-from dusk the panels are off, a desk lamp pools warm light on the bench, and
-the room is dark round it but for lit windows across the way. It sounds of the
-air handling, the lights' hum, a fridge's compressor starting and stopping, and
-a distant beep now and then. There are no bubbles or fireflies indoors.
+wiring was traced: a stereo microscope with a fly pad on its stage (its base
+and pillar are solid; a fly can land on it), a rack of plugged vials with
+pupae up their walls, a vial with its foam plug pulled half out and cornmeal
+food at the bottom, a foil-capped beaker, a wash bottle, a box of pipette
+tips, a lab timer and a desk lamp. The fly can eat from a dish of grape-juice
+agar poured to the brim (land on it, walk off over the rim) and from drips of
+food spilt when the vials were filled. At its own scale there are dried crumbs
+of food to climb, grains of cornmeal, forceps whose arms it can walk along, a
+fine paintbrush, a crumpled wipe to climb, and an open notebook, thin enough
+to step onto, written in squiggles with a cross, a tally of counts and a
+sketch of a fly; a drop of water on the page magnifies the writing under it.
+The epoxy's flecks, the foam's open pores, the cornmeal's grains and the ink
+are worked out in the shaders, crisp however close the camera comes, and the
+satin bench and the glossy things show the windows, in the colour of the sky
+outside, and the ceiling's panels in them. Between two of the windows hangs a
+wall clock that tells the real time, its red second hand sweeping round. Round
+the room are shelves of fly stocks, boxes of gloves, an incubator, a
+centrifuge and a water bath, a sink, a whiteboard, and a spider plant on the
+sill trailing its runners. By day fluorescent panels light the room evenly and
+the sun comes in at the windows behind the bench, laying their shapes, frames
+and blinds across the bench and the floor, long and warm at golden hour; from
+dusk the panels are off, a desk lamp pools warm light on the bench, and the
+room is dark round it but for lit windows across the way. Under a grey sky the
+view outside goes flat and grey, in mist it fades to a pale veil, and in the
+rain it falls past the windows. It sounds of the air handling, the lights'
+hum, a fridge's compressor starting and stopping, and a distant beep now and
+then. There are no bubbles or fireflies indoors.
 
 The bar is the walnut counter of a small, warm bar in the evening: a cocktail
 on the rocks with a wedge of lime on its rim, a tall beer with its head of
@@ -185,19 +210,25 @@ maraschino cherries, printed card coasters, a folded paper napkin, and a
 candle in a storm lantern whose cap is a perch and whose flame is out of
 reach. A sticky ring of syrup marks where a glass stood; the cherries' syrup,
 the lime, the beer's head and the cocktail itself are sweet too (a fly that
-lands in the drink can climb out up the meniscus onto the rim), and spilt
-beer takes its feet as rings, as does the cocktail when the ice settles. At
-the fly's scale the walnut's grain and open pores show under the varnish,
-with fine scratches and the milky rings of old glasses; salt crystals and
-bits of peanut lie about; the cold glasses are beaded with condensation and
-bubbles rise through the beer. Behind the bar, bottles glow on glass shelves
-before an old mirror, under brass pendant lamps; off the counter's end a
+lands in the drink can climb out up the meniscus onto the rim), and spilt beer
+takes its feet as rings, as does the cocktail when the ice settles. At the
+fly's scale the walnut's grain and open pores show under the varnish, with
+fine scratches and the milky rings of old glasses; salt crystals and bits of
+peanut lie about; the cold glasses are beaded with condensation and bubbles
+rise through the beer. Behind the bar, labelled bottles glow on glass shelves
+before an old mirror, under brass pendant lamps, and in the walnut pier
+between the shelves hangs an old drop-dial clock with a brass bezel and an
+ivory face. It tells the real time: its blued hands turn and a red second hand
+sweeps, and in the evening a little brass lamp lights its face. The walls are
+papered in green flock over walnut panelling and hung with paintings, and a
+buttoned leather banquette runs along the far wall; off the counter's end a
 window looks over a square to a row of houses. By day the room is unlit and
-the light is the window's, falling away from it; at golden hour the sun comes
-in low across the counter and the glasses throw long shadows coloured by what
-is in them; at dusk and night the lamps, the flickering candle and the back
-bar light it, and lights out of focus glow behind the fly. It sounds like a
-quiet room: low voices, a glass or two touching, ice settling.
+the light is the window's, falling away from it, and the varnish mirrors the
+dark room and the bright window; at golden hour the sun comes in low across
+the counter and the glasses throw long shadows coloured by what is in them; at
+dusk and night the lamps, the flickering candle and the back bar light it, and
+lights out of focus glow behind the fly. It sounds like a quiet room: low
+voices, a glass or two touching, ice settling.
 
 It plays as well with a finger, a mouse or trackpad, a keyboard or a game pad
 as with the remote. Your hand is a glowing ring on the table; until you move
@@ -661,8 +692,10 @@ build, or a broken one, only what this build can use is kept.
 
 ## Tests
 
-`npm test` runs, without a browser: the sky by the clock (each palette at its
-hour, nothing jumping minute to minute through a whole day, the sun up by day
+`npm test` runs, without a browser: the clocks' hands (where they point at
+given times, in any time zone, moving on smoothly); the sky by the clock (each
+palette at its hour, nothing jumping minute to minute through a whole day, the
+sun up by day
 and the moon by night, or a lamp's light on and still through the night, for
 every place's palettes and an indoor-like set; a room sees less of the
 weather); the
