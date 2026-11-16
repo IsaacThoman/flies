@@ -288,6 +288,9 @@ export function buildRestaurant(): SceneSet {
       flyAt.set(around.fly.x, around.fly.y, around.fly.z);
       ventilation.step(dt, around);
     },
+    happen(kind, random) {
+      if (kind === "ventilation") ventilation.run(random);
+    },
     ripple(x: number, z: number, strength: number) {
       ripples.set([x, z, shared.uTime.value, strength], nextRipple * 4);
       nextRipple = (nextRipple + 1) % RIPPLES;

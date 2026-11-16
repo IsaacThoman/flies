@@ -11,5 +11,6 @@ export * from "./restaurant.ts";
 export * from "./pantry.ts";
 export * from "./forecast.ts";
 export * from "./pace.ts";
+export * from "./ventilation.ts";
 export * from "./swoop.ts";
 export * from "./places.ts";

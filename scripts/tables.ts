@@ -28,8 +28,8 @@ import { performance } from "node:perf_hooks";
 import { chromium } from "playwright";
 import type { Browser, Page } from "playwright";
 import { FLY_LENGTH } from "@fly/body";
-import { FLY_MAX, MAX_PLAYERS, PROTOCOL, createFlyState, decodeFlies, encodeFly } from "@fly/net";
-import type { ServerMessage, Spot, TableStart } from "@fly/net";
+import { FLY_MAX, MAX_PLAYERS, PROTOCOL, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, wireScale } from "@fly/net";
+import type { ServerMessage, Spot, TableStart, WireScale } from "@fly/net";
 import { World, WORLDS } from "@fly/world";
 import { startServer as startRooms } from "../apps/server/src/server.ts";
 import { chromiumPath, gpuFlags, readState, startServer, waitFor } from "./play.ts";
@@ -57,6 +57,7 @@ export function fakeFly(rooms: string, table: string, k: number, fakes: Set<numb
     const heard = createFlyState();
     const out = new DataView(new ArrayBuffer(FLY_MAX));
     let world: World | null = null;
+    let scale: WireScale = TABLETOP_SCALE;
     let id = 0;
     let at: Spot = [0, 0, 0];
     let centre: { id: number; x: number; z: number } | null = null;
@@ -77,20 +78,21 @@ export function fakeFly(rooms: string, table: string, k: number, fakes: Set<numb
       state.t = t;
       state.x = cx + Math.cos(a) * radius;
       state.z = cz + Math.sin(a) * radius;
-      state.y = world.heightAt(state.x, state.z);
+      // On the surface it was set down on (the table, not the floor under it), or what it walks onto there.
+      state.y = world.heightAt(state.x, state.z, (at[3] ?? Infinity) + 1);
       // Facing the way round it walks.
       state.yaw = Math.atan2(-Math.sin(a), Math.cos(a));
       state.vx = -Math.sin(a) * FAKE_PACE;
       state.vz = Math.cos(a) * FAKE_PACE;
       state.pose.speed = FAKE_PACE / FLY_LENGTH;
       state.pose.turn = turn;
-      ws.send(new Uint8Array(out.buffer, 0, encodeFly(out, state)));
+      ws.send(new Uint8Array(out.buffer, 0, encodeFly(out, scale, state)));
     };
     ws.onopen = () => ws.send(JSON.stringify({ type: "hello", v: PROTOCOL, table, key: randomBytes(16).toString("hex"), ...(start ? { start } : {}) }));
     ws.onmessage = (event) => {
       if (typeof event.data !== "string") {
-        decodeFlies(new DataView(event.data as ArrayBuffer), heard, (s) => {
-          if (fakes.has(s.id) || (centre && s.id > centre.id)) return;
+        decodeFlies(new DataView(event.data as ArrayBuffer), scale, heard, (s) => {
+          if (s.epoch !== state.epoch || fakes.has(s.id) || (centre && s.id > centre.id)) return;
           centre = { id: s.id, x: s.x, z: s.z };
         });
         return;
@@ -103,12 +105,14 @@ export function fakeFly(rooms: string, table: string, k: number, fakes: Set<numb
         roomAt = m.now;
         localAt = performance.now();
         world = new World(WORLDS[m.place]);
+        scale = wireScale(world.place);
         at = m.at;
         timer ??= setInterval(walk, 50);
         resolve({ id: m.id, close: () => ws.close() });
       } else if (m.type === "place") {
         state.epoch = m.epoch;
         world = new World(WORLDS[m.place]);
+        scale = wireScale(world.place);
         at = m.spots[id] ?? at;
         centre = null;
       } else if (m.type === "left" && centre?.id === m.id) centre = null;

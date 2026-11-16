@@ -4,7 +4,9 @@
 // see each other where each is; they share the food one drops, and agree on
 // how much is left; a hidden tab's fly rests at the other's and lives again
 // when shown; the room server restarts and both come back to it as they
-// were; the starter takes the other's fly off and it is alone again; alone,
+// were; the starter carries the table to the restaurant, where both are set
+// down on the window table and see each other at a room's scale; the
+// starter takes the other's fly off and it is alone again; alone,
 // nothing of tables happens at all; and a full table (one tab, seven fake
 // flies from Node walking round its fly) keeps the frame to the Apple TV's
 // budget on every screen shape, followed and close up.
@@ -97,6 +99,18 @@ const seesFly = (page: Page, id: number, resting = false, timeout = 10_000) =>
 
 const fly = <T>(page: Page, js: string) => page.evaluate(`(() => { const g = globalThis.__fly; return ${js}; })()`) as Promise<T>;
 
+/** How near `seer` draws player `id`'s fly to where its own tab (`own`) has it, mm: each is drawn a moment in the past, so the nearest of a few looks. */
+async function drawnApart(seer: Page, own: Page, id: number) {
+  let apart = Infinity;
+  for (let i = 0; i < 6; i++) {
+    const [seen, at] = await Promise.all([readState(seer), fly<{ x: number; z: number }>(own, "({ x: g.life.body.position.x, z: g.life.body.position.z })")]);
+    const o = othersOf(seen).find((o) => o.id === id)!;
+    apart = Math.min(apart, Math.hypot(o.x - at.x, o.z - at.z));
+    await seer.waitForTimeout(250);
+  }
+  return apart;
+}
+
 /** Hides the page or shows it again, as switching tabs does. */
 const hide = (page: Page, hidden: boolean) =>
   page.evaluate((h) => {
@@ -179,14 +193,7 @@ try {
   assert.equal(second.starter, "1");
   await seesFly(a.page, 2);
   await seesFly(b.page, 1);
-  // Each drawn a moment in the past: compare where one tab draws the other with where the other has it, a few times.
-  let apart = Infinity;
-  for (let i = 0; i < 6; i++) {
-    const [seen, own] = await Promise.all([readState(a.page), fly<{ x: number; z: number }>(b.page, "({ x: g.life.body.position.x, z: g.life.body.position.z })")]);
-    const o = othersOf(seen).find((o) => o.id === 2)!;
-    apart = Math.min(apart, Math.hypot(o.x - own.x, o.z - own.z));
-    await a.page.waitForTimeout(250);
-  }
+  const apart = await drawnApart(a.page, b.page, 2);
   console.log(`  tab 0 draws tab 1's fly within ${apart.toFixed(2)} mm of where it is, ${othersOf(await readState(a.page))[0].delay} ms behind`);
   assert.ok(apart < DRAWN_WITHIN, `tab 0 draws tab 1's fly ${apart.toFixed(2)} mm from where it is`);
 
@@ -235,6 +242,18 @@ try {
   await seesFly(a.page, 2, false, 10_000);
   await seesFly(b.page, 1, false, 10_000);
   console.log(`  back after ${(await readState(a.page)).reconnects} and ${(await readState(b.page)).reconnects} tries`);
+
+  step("the starter carries the table to the restaurant: both flies are set down on the window table, and each sees the other where it is");
+  await fly(a.page, "g.online.choosePlace('restaurant')");
+  for (const t of [a, b]) await waitFor(t.page, "place=restaurant,moving=,epoch=1", 60_000);
+  await seesFly(a.page, 2, false, 10_000);
+  await seesFly(b.page, 1, false, 10_000);
+  const heights = await Promise.all([a, b].map((t) => fly<number>(t.page, "g.life.body.position.y")));
+  // On the window table's top, 760 mm up: past a tabletop's wire, so only a room's scale carries them.
+  for (const y of heights) assert.ok(y > 700, `set down ${y.toFixed(1)} mm up, on the table`);
+  const roomApart = await drawnApart(a.page, b.page, 2);
+  console.log(`  in the restaurant tab 0 draws tab 1's fly within ${roomApart.toFixed(2)} mm of where it is`);
+  assert.ok(roomApart < DRAWN_WITHIN, `in the restaurant tab 0 draws tab 1's fly ${roomApart.toFixed(2)} mm from where it is`);
 
   step("the starter takes the other's fly off the table: that tab is alone again, and the fly gone from the starter's");
   await fly(a.page, "g.removeFly(2)");

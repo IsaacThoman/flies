@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BAR, LAB, PICNIC, WINDOWSILL, World, createPicnic } from "@fly/world";
+import { RESTAURANT, RESTAURANT_START, TABLE_TOPS, World, WORLDS, createPicnic } from "@fly/world";
 import { AIRBORNE, Leash, MAX_FLIGHT, MAX_PLAYERS, MAX_WALK, Rate, couldBe, createFlyState, mayReturnTo, spawnSpot } from "../src/index.ts";
 
 const world = createPicnic();
@@ -63,23 +63,62 @@ test("a state from the future, an old one, or from somewhere a fly can't be is n
 });
 
 test("coming back, a fly may be where it walked to meanwhile, but not across the table", () => {
-  assert.ok(mayReturnTo(world, [start.x + 20, start.z, 0], start.x, start.z, 2));
-  assert.ok(!mayReturnTo(world, [start.x + 250, start.z, 0], start.x, start.z, 2));
-  assert.ok(mayReturnTo(world, [start.x + 150, start.z, 0], start.x, start.z, 9));
-  assert.ok(!mayReturnTo(world, [start.x + 250, start.z, 0], start.x, start.z, 3600), "however long it was away");
-  assert.ok(!mayReturnTo(world, [5000, 0, 0], start.x, start.z, 2));
+  assert.ok(mayReturnTo(world, [start.x + 20, start.z, 0], start.x, 0, start.z, 2));
+  assert.ok(!mayReturnTo(world, [start.x + 250, start.z, 0], start.x, 0, start.z, 2));
+  assert.ok(mayReturnTo(world, [start.x + 150, start.z, 0], start.x, 0, start.z, 9));
+  assert.ok(!mayReturnTo(world, [start.x + 250, start.z, 0], start.x, 0, start.z, 3600), "however long it was away");
+  assert.ok(!mayReturnTo(world, [5000, 0, 0], start.x, 0, start.z, 2));
 });
 
 test("every player's fly is set down on somewhere level near the place's start, apart from the others, in every place", () => {
-  for (const place of [PICNIC, WINDOWSILL, LAB, BAR]) {
+  for (const [id, place] of Object.entries(WORLDS)) {
     const w = new World(place);
     const spots = Array.from({ length: MAX_PLAYERS }, (_, i) => spawnSpot(w, i + 1));
-    assert.deepEqual(spots[0], [place.start.x, place.start.z, place.start.yaw]);
-    for (const [x, z] of spots) assert.ok(w.onTable(x, z) && couldBe(w, x, w.heightAt(x, z), z, false));
+    const height = w.heightAt(place.start.x, place.start.z, place.start.y);
+    assert.deepEqual(spots[0], [place.start.x, place.start.z, place.start.yaw, height], id);
+    for (const [x, z, , y] of spots) {
+      assert.ok(w.onTable(x, z) && couldBe(w, x, y!, z, false), `${id}: somewhere it could stand`);
+      assert.ok(Math.abs(y! - height) < 0.5, `${id}: at the start's height`);
+      assert.ok(w.solidAt(x, y! + 1, z) < 0, `${id}: with air over it`);
+    }
     for (let i = 0; i < spots.length; i++) {
-      for (let j = i + 1; j < spots.length; j++) assert.ok(Math.hypot(spots[i][0] - spots[j][0], spots[i][1] - spots[j][1]) > 2.5, `${i + 1} and ${j + 1} apart`);
+      for (let j = i + 1; j < spots.length; j++) assert.ok(Math.hypot(spots[i][0] - spots[j][0], spots[i][1] - spots[j][1]) > 2.5, `${id}: ${i + 1} and ${j + 1} apart`);
     }
   }
+});
+
+test("in the restaurant the flies are set down on the window table, not on the ceiling over it or the floor under it", () => {
+  const room = new World(RESTAURANT);
+  for (let id = 1; id <= MAX_PLAYERS; id++) assert.equal(spawnSpot(room, id)[3], TABLE_TOPS.round.top);
+});
+
+test("in a room the leash knows the table from the floor under it: a fly may stand on either, never inside the table", () => {
+  const room = new World(RESTAURANT);
+  // Beside the window table's foot, under its top.
+  const x = RESTAURANT_START.x + 200;
+  const z = RESTAURANT_START.z;
+  const top = TABLE_TOPS.round.top;
+  assert.ok(couldBe(room, x, top, z, false), "on the table");
+  assert.ok(couldBe(room, x, 0, z, false), "on the floor under it");
+  assert.ok(couldBe(room, x, 300, z, true), "flying under it");
+  assert.ok(!couldBe(room, x, top - 10, z, true), "inside the table top");
+  assert.ok(!couldBe(room, x, 300, z, false), "standing on the air under it");
+  assert.ok(couldBe(room, 4400, 1500, 0, true) && !couldBe(room, 4800, 1500, 0, true), "in the air not far past the floor's edge");
+  // Walking under the table, cut short, it stays on the floor.
+  const leash = new Leash();
+  const last = createFlyState();
+  last.x = x;
+  last.z = z - 100;
+  last.t = 1000;
+  const next = createFlyState();
+  next.x = x;
+  next.z = z + 100;
+  next.t = 1100;
+  assert.equal(leash.admit(room, last, next, 1100), "shortened");
+  assert.equal(last.y, 0);
+  // Coming back, it may be on the table it was on, but not on the floor under it.
+  assert.ok(mayReturnTo(room, [x + 5, z, 0, top], x, top, z, 2));
+  assert.ok(!mayReturnTo(room, [x + 5, z, 0, 0], x, top, z, 2));
 });
 
 test("a rate allows a few at once, then so many a minute", () => {
