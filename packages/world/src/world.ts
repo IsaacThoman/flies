@@ -18,8 +18,8 @@ export type Place = {
   solids: readonly Solid[];
   /** The place's own food, eaten down and slowly coming back. */
   patches: readonly FoodPatch[];
-  /** Where the fly first stands, and its yaw (radians; 0 faces +z). */
-  start: { x: number; z: number; yaw: number };
+  /** Where the fly first stands, and its yaw (radians; 0 faces +z): on the surface at or below `y` (the highest, if left out). */
+  start: { x: number; z: number; yaw: number; y?: number };
   /** In the air it is drawn back below this height, mm. */
   ceiling: number;
 };

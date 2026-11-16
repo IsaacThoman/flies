@@ -10,6 +10,8 @@ export type FoodPatch = {
   name: string;
   x: number;
   z: number;
+  /** The height it lies at, where there is more than one surface over (x, z) (a table, the floor under it): the surface there at or below this. Left out, the highest. */
+  y?: number;
   /** How far from (x, z) it tastes, mm. */
   r: number;
   /** 0 to 1. */
