@@ -510,6 +510,9 @@ with a `drive`, and checks what the scene reports:
   `idle` once stopped (with `--weatherkit`, the real service: above);
 - the host's frame stats.
 
+It then launches the bundled real game with the same stand-in brain and waits for its own
+`data-ready="true"`. The test scene's readiness signal cannot stand in for the game's.
+
 It saves a screenshot in a temporary folder outside the repo and prints its path, then shuts the
 simulator down and deletes it. It takes about 15 seconds after the build. The simulator draws
 OpenGL ES in software, so it says nothing about speed.

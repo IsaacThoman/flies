@@ -1,8 +1,8 @@
 // Checks the Apple TV app in a tvOS simulator with its test scene (tests/scene.ts), the
 // stand-in brain and the stand-in weather service: builds it (unless --no-build), boots a fresh
 // simulator, launches the app with scripted remote input (the launch config's "drive"), and
-// checks what the scene saw. Saves a screenshot outside the repo, then shuts the simulator down
-// and deletes it.
+// checks what the scene saw, then the real game's readiness signal. Saves a screenshot outside
+// the repo, then shuts the simulator down and deletes it.
 //
 // With --weatherkit it builds the real weather service instead (TVOS_WEATHERKIT=1), grants the
 // app location and sets the simulator's, and checks the service locates, asks WeatherKit, and
@@ -119,13 +119,15 @@ try {
   };
   app.stdout?.on('data', reader());
   app.stderr?.on('data', reader());
-  await new Promise<void>((resolve, reject) => {
+  const waitUntil = (complete: () => boolean) => new Promise<void>((resolve, reject) => {
+    const waiting = Date.now();
     const poll = setInterval(() => {
-      if (done && latest && complete(latest)) { clearInterval(poll); resolve(); }
-      if (Date.now() - started > TIMEOUT_MS) { clearInterval(poll); reject(new Error(`timed out; last report ${JSON.stringify(latest)}`)); }
+      if (complete()) { clearInterval(poll); resolve(); }
+      if (Date.now() - waiting > TIMEOUT_MS) { clearInterval(poll); reject(new Error(`timed out; last report ${JSON.stringify(latest)}`)); }
       if (output.some((l) => l.includes('drive: timed out'))) { clearInterval(poll); reject(new Error('the drive timed out')); }
     }, 500);
   });
+  await waitUntil(() => !!(done && latest && complete(latest)));
   const shot = path.join(mkdtempSync(path.join(tmpdir(), 'apple-tv-fly-')), 'simulator.png');
   xcrun('simctl', 'io', udid, 'screenshot', shot);
   const r = latest as unknown as Report;
@@ -212,6 +214,17 @@ try {
   assert.ok(s && s.fps > 0, 'the host logs frame stats');
   console.log(`Frame stats: ${s.fps} fps, ${s.jsMs.mean} ms JavaScript and ${s.execMs.mean} ms GL a frame, ${s.drawsPerFrame} draws`);
   console.log(`Screenshot: ${shot}`);
+
+  app.kill();
+  output.length = 0;
+  done = false;
+  const gameConfig = { ...config, script: 'real-game.js', drive: [['wait', { ready: 'true' }, 180_000]] };
+  app = spawn('xcrun', ['simctl', 'launch', '--console-pty', '--terminate-running-process', udid, BUNDLE_ID, '--config', JSON.stringify(gameConfig)], { stdio: ['ignore', 'pipe', 'pipe'] });
+  app.stdout?.on('data', reader());
+  app.stderr?.on('data', reader());
+  await waitUntil(() => done);
+  assert.ok(output.some((l) => l.includes('drive: {"ready":"true"}')), 'the real game publishes readiness without the test scene');
+  console.log('The real game published readiness after drawing its first frame.');
 } finally {
   app?.kill();
   spawnSync('xcrun', ['simctl', 'terminate', udid, BUNDLE_ID], { stdio: 'ignore' });
