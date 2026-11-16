@@ -15,6 +15,7 @@ does, from what it sees, tastes and feels in the world.
 | `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver, the weather outside. |
 | `apps/web` | The game: the world, the fly's life in it, its senses, the remote's tools, menus, sound. Runs in a browser as it is. |
 | `apps/tvos` | The Apple TV app: a native host that runs the web build's JavaScript in JavaScriptCore and draws it through OpenGL ES. |
+| `apps/ios` | The iPhone and iPad app: the web build in a `WKWebView`, served from the app's bundle, in a small Swift shell ([ios.md](ios.md)). |
 
 ## How it fits together
 
@@ -25,9 +26,9 @@ commands read from the fly's own descending and motor neurons: walk, turn,
 back up, take off, beat the wings, groom, feed. The game moves the body
 accordingly and poses the model (`FlyPose`).
 
-In a browser the brain is `packages/brain` in a Web Worker, fed a compressed
-form of the connectome that the page downloads once and keeps; the browser
-build is plain files for any static host (`docs/web.md`). On the Apple TV
+In a browser, and so in the iPhone and iPad app, the brain is `packages/brain` in a Web Worker,
+fed a compressed form of the connectome that the page downloads once and keeps (the app has it in
+its bundle); the browser build is plain files for any static host (`docs/web.md`). On the Apple TV
 JavaScript has no JIT and is far too slow for it, so the host runs
 `packages/brain-native` on its own thread and exposes it as
 `globalThis.__native.brain` (`NativeBrainBridge`). The game only ever sees a

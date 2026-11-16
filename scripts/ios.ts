@@ -1,0 +1,125 @@
+// Builds the iPhone and iPad app (apps/ios/) and runs it in an iOS simulator or on a device.
+// See docs/ios.md.
+import { spawnSync } from 'node:child_process';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
+import path from 'node:path';
+import { writeIosAssetCatalog } from './iosAssets.ts';
+import { BUNDLE_ID as TVOS_BUNDLE_ID, TEAM_ID as TVOS_TEAM_ID } from './tvos.ts';
+
+const root = path.join(import.meta.dirname, '..');
+const appDir = path.join(root, 'apps/ios');
+const www = path.join(appDir, 'www');
+// The Apple TV app's, unless told otherwise: the two are one app in the App Store (universal purchase).
+export const BUNDLE_ID = process.env.IOS_BUNDLE_ID || TVOS_BUNDLE_ID;
+const TEAM_ID = process.env.IOS_TEAM_ID || TVOS_TEAM_ID;
+const CONNECTOME = path.join(root, 'packages/brain/data/connectome.bin');
+
+const USAGE = `Usage: npm run ios -- [<command>] [options]
+
+  (no command) [--sim <udid>] [--report <seconds>]
+        build for the simulator, then run it in the given simulator, or the one iOS simulator
+        that is booted
+  build [--sim] [--debug] [--for-testing]
+        build the web app (apps/web) with the brain into apps/ios/www/, generate the Xcode
+        project and build the app for an iPhone or iPad (or, with --sim, the iOS simulator).
+        --for-testing (implies --debug) also builds the tests that npm run ios:check runs
+  run (--sim <udid> | --device <udid>) [--debug] [--report <seconds>]
+        install the built app and launch it, printing its console. --report prints the game's
+        state that often (docs/ios.md, "Reports")
+
+Signing uses IOS_TEAM_ID and IOS_BUNDLE_ID, which default to the Apple TV app's
+(TVOS_TEAM_ID, TVOS_BUNDLE_ID: now ${TEAM_ID} and ${BUNDLE_ID}).`;
+
+function run(command: string, args: string[], cwd = root, env: NodeJS.ProcessEnv = process.env) {
+  const result = spawnSync(command, args, { cwd, env, stdio: 'inherit' });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw Error(`${command} ${args.slice(0, 3).join(' ')} failed (exit ${result.status})`);
+}
+
+type BuildOptions = { sim: boolean; debug: boolean; forTesting: boolean };
+
+/** Builds www/ and generates the Xcode project; returns xcodebuild's environment. */
+function prepare() {
+  if (!existsSync(CONNECTOME)) throw Error(`The connectome isn't there (${path.relative(root, CONNECTOME)}): npm run brain:fetch`);
+  if (spawnSync('xcodegen', ['--version']).error) throw Error('XcodeGen is needed to generate the Xcode project: brew install xcodegen');
+  writeIosAssetCatalog(path.join(root, 'assets/ios'), path.join(appDir, 'src/generated/Assets.xcassets'));
+  rmSync(www, { recursive: true, force: true });
+  // The web build as a browser gets it, the brain's parts included (vite.config.ts, docs/web.md).
+  run('npx', ['vite', 'build', '--outDir', www, '--emptyOutDir', '--logLevel', 'warn']);
+  const brain = path.join(www, 'brain');
+  if (!existsSync(brain) || !readdirSync(brain).some((f) => f.startsWith('connectome.'))) throw Error('The web build has no brain in it');
+  const env = { ...process.env, IOS_TEAM_ID: TEAM_ID, IOS_BUNDLE_ID: BUNDLE_ID };
+  run('xcodegen', ['generate', '--quiet'], appDir, env);
+  return env;
+}
+
+const configuration = (debug: boolean) => (debug ? 'Debug' : 'Release');
+export const derivedData = path.join(appDir, 'build');
+export const appPath = (sim: boolean, debug = false) =>
+  path.join(derivedData, `Build/Products/${configuration(debug)}-${sim ? 'iphonesimulator' : 'iphoneos'}/Flies.app`);
+
+export function build(options: BuildOptions) {
+  const env = prepare();
+  const debug = options.debug || options.forTesting;
+  run('xcodebuild', [
+    '-project', 'Flies.xcodeproj', '-scheme', 'Flies', '-configuration', configuration(debug),
+    '-destination', options.sim ? 'generic/platform=iOS Simulator' : 'generic/platform=iOS', '-derivedDataPath', derivedData,
+    // Signed to run locally in the simulator, as test runners must be.
+    ...(options.sim ? ['CODE_SIGN_IDENTITY=-', 'CODE_SIGN_STYLE=Manual', 'DEVELOPMENT_TEAM=', 'ARCHS=arm64'] : ['-allowProvisioningUpdates', '-allowProvisioningDeviceRegistration']),
+    '-quiet', options.forTesting ? 'build-for-testing' : 'build',
+  ], appDir, env);
+  console.log(`Built ${path.relative(root, appPath(options.sim, debug))}${options.forTesting ? ' and its tests' : ''}`);
+}
+
+function launch(target: { sim?: string; device?: string }, debug: boolean, report: string | undefined) {
+  const args = report ? ['-FlyReport', report] : [];
+  if (target.sim) {
+    // Already booted is fine.
+    spawnSync('xcrun', ['simctl', 'boot', target.sim], { stdio: 'ignore' });
+    run('xcrun', ['simctl', 'install', target.sim, appPath(true, debug)]);
+    run('xcrun', ['simctl', 'launch', '--console-pty', '--terminate-running-process', target.sim, BUNDLE_ID, ...args]);
+  } else {
+    const device = target.device ?? '';
+    run('xcrun', ['devicectl', 'device', 'install', 'app', '--device', device, '--quiet', appPath(false, debug)]);
+    run('xcrun', ['devicectl', 'device', 'process', 'launch', '--device', device, '--terminate-existing', '--console', BUNDLE_ID, ...args]);
+  }
+}
+
+/** The one booted iOS simulator, for running without --sim. */
+function bootedSimulator(): string {
+  const list = spawnSync('xcrun', ['simctl', 'list', 'devices', 'booted', '--json'], { encoding: 'utf8' });
+  const devices = Object.entries(JSON.parse(list.stdout).devices as Record<string, { udid: string; name: string }[]>)
+    .filter(([runtime]) => runtime.includes('.iOS-')).flatMap(([, d]) => d);
+  if (devices.length === 1) return devices[0].udid;
+  throw Error(devices.length
+    ? `More than one iOS simulator is booted (${devices.map((d) => `${d.name} ${d.udid}`).join(', ')}): choose one with --sim <udid>`
+    : 'No iOS simulator is booted: boot one (xcrun simctl boot <udid>) or choose one with --sim <udid>');
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  const flag = (name: string) => { const i = args.indexOf(name); return i < 0 ? undefined : args.splice(i, 2)[1] ?? ''; };
+  const has = (name: string) => { const i = args.indexOf(name); if (i >= 0) args.splice(i, 1); return i >= 0; };
+  const cmd = args[0]?.startsWith('--') ? undefined : args.shift();
+  if (cmd === 'help' || has('--help')) return console.log(USAGE);
+  if (!cmd) {
+    const sim = flag('--sim') ?? bootedSimulator();
+    const report = flag('--report');
+    build({ sim: true, debug: false, forTesting: false });
+    return launch({ sim }, false, report);
+  }
+  if (cmd === 'build') return build({ sim: has('--sim'), debug: has('--debug'), forTesting: has('--for-testing') });
+  if (cmd === 'run') {
+    const sim = flag('--sim'), device = flag('--device'), report = flag('--report');
+    if (!sim && !device) throw Error('run needs --sim <udid> or --device <udid>');
+    return launch({ sim, device }, has('--debug'), report);
+  }
+  throw Error(`Unknown command ${cmd}\n\n${USAGE}`);
+}
+
+if (import.meta.main) {
+  try { main(); } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+}

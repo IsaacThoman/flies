@@ -25,6 +25,8 @@
     "tvos:soak": "node scripts/tvosSoak.ts",
     "tvos:typecheck": "tsc -p apps/tvos",
     "tvos:art": "node scripts/art.ts",
+    "ios": "node scripts/ios.ts",
+    "ios:check": "node apps/ios/tests/simulator.ios.ts",
     "brain:fetch": "node packages/brain/scripts/fetch.ts",
     "brain:pack": "node packages/brain/scripts/pack.ts",
     "fly:viewer": "vite --config packages/fly/viewer/vite.config.ts",

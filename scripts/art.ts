@@ -1,8 +1,7 @@
-// Renders the Apple TV app's icon, Top Shelf banners and launch image, and
-// the web app's icons and link preview, from the game itself
-// (apps/web/src/art.ts) into assets/, at the sizes and in the layers
-// assets/README.md lists. Starts its own Vite server and a headless
-// Chromium.
+// Renders the apps' art from the game itself (apps/web/src/art.ts) into assets/: the Apple TV
+// app's icon, Top Shelf banners and launch image, the web app's icons and link preview, and the
+// iPhone and iPad app's icon and launch image, at the sizes and in the layers assets/README.md
+// lists. Starts its own Vite server and a headless Chromium.
 //
 //   node scripts/art.ts [--out <dir>] [--only <path prefix>]   (default: all of them, into assets/)
 
@@ -61,12 +60,21 @@ const WEB_MASKABLE: Shot = { ...WEB_ICON, camera: { ...WEB_ICON.camera, distance
 const FAVICON: Shot = { ...ICON, layer: "fly", camera: { around: Math.PI + 0.4, distance: 1.2, height: 4.0, fov: 34, aimAbove: 0.3 }, turn: -0.9 };
 // The link preview: the launch image's shot at the shape link previews use.
 const PREVIEW: Shot = { ...SPLASH, camera: { ...SPLASH.camera, distance: 14, shiftRight: 3.6 }, wordmark: { y: 0.3, size: 0.15 } };
+// The iPhone and iPad icon is the web app's, at 1024, opaque (the system rounds the corners), and
+// the same at night for the dark appearance. Their launch image: the fly in the middle of a square
+// that the launch screen crops to the screen's shape, from a tall phone's narrow strip to a wide
+// iPad's band, so the fly is in every crop; no wordmark, since where the loading screen puts it
+// depends on the screen.
+const IOS_LAUNCH: Shot = { ...ICON, layer: "all", camera: { ...ICON.camera, distance: 26, height: 3.4, fov: 30, aimAbove: 0.9 } };
 
 const jobs: { file: string; shot: ArtShot }[] = [];
 for (const [file, size] of [["icon-512", 512], ["icon-192", 192], ["apple-touch-icon", 180]] as const) jobs.push({ file: `web/${file}.png`, shot: { ...WEB_ICON, width: size, height: size } });
 jobs.push({ file: "web/icon-maskable-512.png", shot: { ...WEB_MASKABLE, width: 512, height: 512 } });
 jobs.push({ file: "web/favicon.png", shot: { ...FAVICON, width: 64, height: 64 } });
 jobs.push({ file: "web/preview.png", shot: { ...PREVIEW, width: 1200, height: 630 } });
+jobs.push({ file: "ios/icon.png", shot: { ...WEB_ICON, width: 1024, height: 1024 } });
+jobs.push({ file: "ios/icon-dark.png", shot: { ...WEB_ICON, time: "night", width: 1024, height: 1024 } });
+jobs.push({ file: "ios/launch.png", shot: { ...IOS_LAUNCH, width: 2048, height: 2048 } });
 for (const [w, h] of [[1280, 768], [800, 480], [400, 240]]) {
   for (const [name, layer] of ICON_LAYERS) jobs.push({ file: `tv-icon/${w}x${h}/${name}.png`, shot: { ...ICON, layer, width: w, height: h } });
 }
