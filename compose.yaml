@@ -7,17 +7,18 @@ services:
       args:
         FLY_SITE_URL: ${FLY_SITE_URL:-}
     environment:
-      FLIES_DOMAIN: ${FLIES_DOMAIN:-localhost}
-      ACME_EMAIL: ${ACME_EMAIL:-}
       ROOMS_HOST: ${ROOMS_HOST:-rooms}
       ROOMS_PORT: ${ROOMS_PORT:-3000}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-private_ranges}
+    # Plain HTTP for your own HTTPS reverse proxy (docs/deploy.md), off 80 so
+    # it can share a host with one.
     ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
-      - "${HTTPS_PORT:-443}:443/udp"
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config
+      - "${HTTP_PORT:-8080}:80"
+    # Without certificates Caddy keeps nothing worth a volume; this stops the
+    # image's declared /data and /config from leaving anonymous ones behind.
+    tmpfs:
+      - /data
+      - /config
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
@@ -43,6 +44,8 @@ services:
       target: rooms
     environment:
       PORT: ${ROOMS_PORT:-3000}
+      # Caddy passes on the client's address, which rate limits count by.
+      TRUST_PROXY: "1"
     volumes:
       - rooms_data:/data
     restart: unless-stopped
@@ -54,6 +57,4 @@ services:
         max-file: "3"
 
 volumes:
-  caddy_data:
-  caddy_config:
   rooms_data:
