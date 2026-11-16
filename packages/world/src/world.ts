@@ -11,7 +11,7 @@
 // which by a height: the surface at or below it, the underside above it.
 
 import type { FoodPatch } from "./pantry.ts";
-import { inside, prismSpan, sideNormal, solidBottom, topHeight, topNormal } from "./shapes.ts";
+import { inside, prismSpan, sideNormal, solidBottom, topHeight, topNormal, topPeak } from "./shapes.ts";
 import type { Solid, Vec3 } from "./shapes.ts";
 
 /** The top the fly lives on, centred on the origin at y = 0: a disc, or a rectangle with half-sizes hx and hz. */
@@ -152,7 +152,7 @@ export class World {
       bounds[b + 2] = p.z - rz;
       bounds[b + 3] = p.z + rz;
       const top = solid.top;
-      bounds[b + 4] = (top.kind === "flat" ? top.y : top.kind === "dome" ? top.base + top.height : Math.max(top.well, top.rim)) + 1e-8;
+      bounds[b + 4] = (top.kind === "dish" ? Math.max(top.well, top.rim) : topPeak(top)) + 1e-8;
       bounds[b + 5] = solidBottom(solid);
       minX = Math.min(minX, bounds[b]);
       maxX = Math.max(maxX, bounds[b + 1]);

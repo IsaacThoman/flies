@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mulberry32 } from "@fly/brain";
-import { Pantry, RESTAURANT, World, createSurface, topHeight } from "../src/index.ts";
+import { Pantry, RESTAURANT, World, createSurface, topHeight, topNormal } from "../src/index.ts";
 import type { RayHit, Solid } from "../src/index.ts";
 import { DINER } from "./diner.ts";
 
@@ -167,4 +167,30 @@ test("the restaurant's start and food lie where they say", () => {
     assert.ok(food.y <= patch.y! + 1e-6 && food.y > patch.y! - 40, `${food.name} at ${food.y}, said ${patch.y}`);
     assert.ok(w.underside(food.x, food.z, food.y) > food.y + 1.3, `${food.name} has room over it for a fly`);
   }
+});
+
+test("a vault is rounded across its box's narrow side and level along its length, turned or not", () => {
+  const top = { kind: "vault", base: 200, height: 25, power: 0.5 } as const;
+  const rail: Solid = { name: "rail", footprint: { kind: "box", x: 10, z: 0, hx: 25, hz: 1000, angle: 0 }, top, bottom: 175 };
+  const turned: Solid = { name: "rail", footprint: { kind: "box", x: 0, z: 0, hx: 1000, hz: 25, angle: 0.7 }, top, bottom: 175 };
+  const normal = { x: 0, y: 0, z: 0 };
+  // Along its crest it is level to its very ends, where a dome would have fallen away.
+  for (const along of [0, 500, 990]) assert.equal(topHeight(rail, 10, along), 225);
+  assert.ok(Math.abs(topHeight(rail, 10 + 15, 900) - (200 + 25 * Math.sqrt(1 - 0.36))) < 1e-9);
+  // Its normal leans across it, never along it.
+  topNormal(rail, 10 + 15, 900, normal);
+  assert.ok(normal.x > 0.5 && Math.abs(normal.z) < 1e-12 && normal.y > 0);
+  // Turned, it is the same across its own width.
+  const c = Math.cos(0.7);
+  const s = Math.sin(0.7);
+  const at = (u: number, v: number) => [u * c + v * s, -u * s + v * c] as const;
+  const [x, z] = at(700, 15);
+  assert.ok(Math.abs(topHeight(turned, x, z) - topHeight(rail, 10 + 15, 0)) < 1e-9);
+  topNormal(turned, x, z, normal);
+  const [ax, az] = at(1, 0);
+  assert.ok(Math.abs(normal.x * ax + normal.z * az) < 1e-9, "no lean along its length");
+  // The world meets its crest from above where the box says.
+  const world = new World({ floor: { kind: "rect", hx: 2000, hz: 2000 }, solids: [rail], patches: [], start: { x: 500, z: 0, yaw: 0 }, ceiling: 500 });
+  const ray = world.raycast({ x: 10, y: 400, z: 950 }, { x: 0, y: -1, z: 0 }, hit());
+  assert.ok(ray && Math.abs(ray.point.y - 225) < 1e-6 && ray.solid === 0);
 });

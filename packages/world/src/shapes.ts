@@ -24,6 +24,13 @@ export type Top =
    */
   | { kind: "dome"; base: number; height: number; power: number }
   /**
+   * A box's top rounded across its narrower side and level along its length
+   * (a rail, a tube, a cushion): y = base + height × (1 − s²)^power, s from 0
+   * along its middle line to 1 at its long edges. A dome over a long box would
+   * sag along its length; this doesn't. Only on a box.
+   */
+  | { kind: "vault"; base: number; height: number; power: number }
+  /**
    * A dish, round its footprint's middle: a flat well (`well` high) out to
    * `inner` of the way to the edge, rising to a rounded rim (`rim` high) at
    * `lip`, then down a gentle outside to its bottom at the edge (the floor,
@@ -34,7 +41,7 @@ export type Top =
 
 /** The highest point of a top. */
 export function topPeak(top: Top): number {
-  return top.kind === "flat" ? top.y : top.kind === "dome" ? top.base + top.height : top.rim;
+  return top.kind === "flat" ? top.y : top.kind === "dish" ? top.rim : top.base + top.height;
 }
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
@@ -124,10 +131,18 @@ export function footprintS2(f: Footprint, x: number, z: number): number {
 
 export const inside = (f: Footprint, x: number, z: number) => footprintS2(f, x, z) < 1;
 
+/** A vault's s² at a point: across the box's narrower side only. */
+function vaultS2(f: Footprint, x: number, z: number): number {
+  if (f.kind !== "box") throw new Error("A vault's top needs a box");
+  const { u, v } = local(f, x, z, scratch);
+  return Math.min(1, f.hx <= f.hz ? (u / f.hx) ** 2 : (v / f.hz) ** 2);
+}
+
 /** The top's height at a point inside the footprint. */
 export function topHeight(solid: Solid, x: number, z: number): number {
   const { top } = solid;
   if (top.kind === "flat") return top.y;
+  if (top.kind === "vault") return top.base + top.height * Math.pow(1 - vaultS2(solid.footprint, x, z), top.power);
   const s2 = Math.min(1, footprintS2(solid.footprint, x, z));
   if (top.kind === "dish") return dishProfile(top, solidBottom(solid), Math.sqrt(s2), scratchProfile).y;
   return top.base + top.height * Math.pow(1 - s2, top.power);
@@ -140,7 +155,19 @@ export function topHeight(solid: Solid, x: number, z: number): number {
  */
 export function topNormal(solid: Solid, x: number, z: number, out: Vec3): Vec3 {
   const { top, footprint: f } = solid;
-  if (top.kind === "flat" || f.kind === "box") {
+  if (top.kind === "vault" && f.kind === "box") {
+    const s2 = Math.min(0.999999, vaultS2(f, x, z));
+    const k = -top.height * top.power * Math.pow(1 - s2, top.power - 1);
+    const { u, v } = local(f, x, z, scratch);
+    const across = f.hx <= f.hz;
+    const back = world(f, across ? (k * 2 * u) / (f.hx * f.hx) : 0, across ? 0 : (k * 2 * v) / (f.hz * f.hz), scratchXZ);
+    const length = Math.hypot(back.x, 1, back.z);
+    out.x = -back.x / length;
+    out.y = 1 / length;
+    out.z = -back.z / length;
+    return out;
+  }
+  if (top.kind === "flat" || top.kind === "vault" || f.kind === "box") {
     out.x = 0;
     out.y = 1;
     out.z = 0;

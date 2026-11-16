@@ -52,9 +52,10 @@ export const ZINC_BAR = {
 /**
  * The kitchen pass in the back wall: the opening, its steel shelf (out over
  * the dining room and back into the kitchen), the heat lamps under its head,
- * the ticket rail on the wall above, and the kitchen's bench behind the wall
- * at the shelf's height, beyond the floor: a fly drawn back out of the
- * kitchen can't fall down behind the wall.
+ * the ticket rail on the wall above, and behind the wall, beyond the floor,
+ * the kitchen's bench at the shelf's height between the pass's deep side
+ * walls: a fly blown through the pass is held in front of it, to be drawn
+ * back out, never down behind the wall or along it out of the way back.
  */
 export const PASS = {
   x0: 900,
@@ -65,7 +66,7 @@ export const PASS = {
   lamps: { hx: 760, z0: -3130, z1: -3010, bottom: 1800, top: 1880 },
   rail: { hx: 720, z0: -3000, z1: -2975, bottom: 1920, top: 1945 },
   tickets: [1300, 1500, 2050] as readonly number[],
-  kitchen: { x0: 500, x1: 2900, z0: -3800, z1: -3150, top: 1130 },
+  kitchen: { x0: 880, x1: 2520, z0: -3800, z1: -3150, top: 1130, wall: 150 },
   /** The kitchen's swing door, in the back wall right of the pass, with a round window: drawn flat in the wall. */
   door: { x0: 2750, x1: 3550, head: 2150 },
 };
@@ -286,6 +287,7 @@ const box = (x: number, z: number, hx: number, hz: number, angle = 0): Footprint
 const circle = (x: number, z: number, r: number): Footprint => ({ kind: "circle", x, z, r });
 const flat = (y: number): Top => ({ kind: "flat", y });
 const dome = (base: number, height: number, power: number): Top => ({ kind: "dome", base, height, power });
+const vault = (base: number, height: number, power: number): Top => ({ kind: "vault", base, height, power });
 const solid = (name: string, footprint: Footprint, top: Top, bottom?: number): Solid => (bottom === undefined ? { name, footprint, top } : { name, footprint, top, bottom });
 
 function room(): Solid[] {
@@ -311,7 +313,7 @@ function shopfront(): Solid[] {
   return [
     solid("ledge", box((ledge.x0 + ledge.x1) / 2, SHOPFRONT.glass - ledge.depth / 2, (ledge.x1 - ledge.x0) / 2, ledge.depth / 2), flat(ledge.top)),
     ...[...mullions, door.x0, door.x1].map((x) => solid("mullion", box(x, z, mullion.half, mullion.depth / 2), flat(DINING_ROOM.height))),
-    solid("transom", box(0, SHOPFRONT.glass - transom.depth / 2, DINING_ROOM.hx, transom.depth / 2), dome(transom.y + transom.half - 8, 8, 0.5), transom.y - transom.half),
+    solid("transom", box(0, SHOPFRONT.glass - transom.depth / 2, DINING_ROOM.hx, transom.depth / 2), vault(transom.y + transom.half - 8, 8, 1), transom.y - transom.half),
   ];
 }
 
@@ -322,7 +324,7 @@ function bar(): Solid[] {
     solid("bar front", box(front.x, zinc.z, front.hx, front.hz), flat(zinc.bottom)),
     solid("underbar", box(underbar.x, (underbar.z0 + underbar.z1) / 2, underbar.hx, (underbar.z1 - underbar.z0) / 2), flat(underbar.top)),
     // A brass tube: rounded over its top, its lower half felt as the box it sits in.
-    solid("foot rail", box(rail.x, zinc.z, rail.half, front.hz - 10), dome(rail.top - rail.half, rail.half, 0.5), rail.bottom),
+    solid("foot rail", box(rail.x, zinc.z, rail.half, front.hz - 10), vault(rail.top - rail.half, rail.half, 0.5), rail.bottom),
     solid("back bar", box((back.x0 + back.x1) / 2, (back.z0 + back.z1) / 2, (back.x1 - back.x0) / 2, (back.z1 - back.z0) / 2), flat(back.top)),
   ];
   // The rail's brackets, back to the bar's front.
@@ -378,7 +380,7 @@ function chair(c: ChairPlace): Solid[] {
       out.push(solid("chair leg", circle(front.x, front.z, leg.r), flat(seat.bottom)));
       out.push(solid("chair post", circle(rear.x, rear.z, leg.r), dome(post.top - post.crown, post.crown, 0.5)));
     }
-    out.push(solid("chair rail", box(back.x, back.z, rail.half, rail.depth, c.yaw), dome(rail.top - rail.depth, rail.depth, 0.5), rail.bottom));
+    out.push(solid("chair rail", box(back.x, back.z, rail.half, rail.depth, c.yaw), vault(rail.top - rail.depth, rail.depth, 0.5), rail.bottom));
     out.push(solid("chair rail", box(back.x, back.z, mid.half, mid.depth, c.yaw), flat(mid.top), mid.bottom));
     return out;
   }
@@ -515,6 +517,7 @@ function passThings(): Solid[] {
     solid("heat lamp", box(shelf.x, (lamps.z0 + lamps.z1) / 2, lamps.hx, (lamps.z1 - lamps.z0) / 2), flat(lamps.top), lamps.bottom),
     solid("ticket rail", box(shelf.x, (rail.z0 + rail.z1) / 2, rail.hx, (rail.z1 - rail.z0) / 2), flat(rail.top), rail.bottom),
     solid("kitchen bench", box((kitchen.x0 + kitchen.x1) / 2, (kitchen.z0 + kitchen.z1) / 2, (kitchen.x1 - kitchen.x0) / 2, (kitchen.z1 - kitchen.z0) / 2), flat(kitchen.top)),
+    ...[kitchen.x0 - kitchen.wall / 2, kitchen.x1 + kitchen.wall / 2].map((x) => solid("kitchen wall", box(x, (kitchen.z0 + kitchen.z1) / 2, kitchen.wall / 2, (kitchen.z1 - kitchen.z0) / 2), flat(DINING_ROOM.height))),
   ];
   for (const x of [shelf.x - lamps.hx + 60, shelf.x + lamps.hx - 60]) out.push(solid("bracket", box(x, (lamps.z0 + lamps.z1) / 2, 10, 10), flat(PASS.head), lamps.top));
   // Order slips hanging from the rail: paper, a fifth of a millimetre either side of its middle.
@@ -546,8 +549,8 @@ function standsAndWalls(): Solid[] {
     solid("carafe", circle(os.carafe.x, os.carafe.z, os.carafe.r), dome(st.top + os.carafe.shoulder, os.carafe.crown, 1), st.top),
     solid("carafe neck", circle(os.carafe.x, os.carafe.z, os.carafe.neck), flat(st.top + os.carafe.top), st.top + os.carafe.shoulder),
     ...os.tumblers.map((t) => solid("tumbler", circle(t.x, t.z, os.tumbler.r), flat(st.top + os.tumbler.height), st.top)),
-    solid("banquette", box((q.x0 + q.x1) / 2, (q.z0 + q.z1) / 2, (q.x1 - q.x0) / 2, (q.z1 - q.z0) / 2), dome(q.seat - 12, 12, 1)),
-    solid("banquette back", box((q.back.x0 + q.x1) / 2, (q.z0 + q.z1) / 2, (q.x1 - q.back.x0) / 2, (q.z1 - q.z0) / 2), dome(q.back.top - 30, 30, 0.5)),
+    solid("banquette", box((q.x0 + q.x1) / 2, (q.z0 + q.z1) / 2, (q.x1 - q.x0) / 2, (q.z1 - q.z0) / 2), vault(q.seat - 12, 12, 1)),
+    solid("banquette back", box((q.back.x0 + q.x1) / 2, (q.z0 + q.z1) / 2, (q.x1 - q.back.x0) / 2, (q.z1 - q.z0) / 2), vault(q.back.top - 30, 30, 1)),
     solid("mirror", box(w.mirror.x, w.mirror.z, w.mirror.hx, w.mirror.hz), flat(w.mirror.top), w.mirror.bottom),
     solid("chalkboard", box(w.chalkboard.x, w.chalkboard.z, w.chalkboard.hx, w.chalkboard.hz), flat(w.chalkboard.top), w.chalkboard.bottom),
     solid("print", box(w.print.x, w.print.z, w.print.hx, w.print.hz), flat(w.print.top), w.print.bottom),
