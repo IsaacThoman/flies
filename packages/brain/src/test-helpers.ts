@@ -7,13 +7,14 @@
 import type { EyeColumn } from "./eye-columns.ts";
 import { CATEGORY_NAMES, writeConnectome } from "./format.ts";
 import type { CategoryName, ConnectomeData } from "./format.ts";
+import { FORELEG_MALE_TASTE } from "./io.ts";
 
-export type SyntheticNeuron = { type: string; superClass: string; class?: string; subClass?: string; side?: string; nt?: string; nerve?: string };
+export type SyntheticNeuron = { type: string; superClass: string; class?: string; subClass?: string; side?: string; nt?: string; nerve?: string; rootId?: number };
 
 /** Packs neurons and [pre, post, synapses] edges into connectome bytes. */
 export function packSynthetic(neurons: readonly SyntheticNeuron[], edges: readonly [number, number, number][]): Uint8Array {
   const n = neurons.length;
-  const value = (i: number, name: CategoryName) => (neurons[i] as Record<string, string | undefined>)[name] ?? "";
+  const value = (i: number, name: CategoryName) => (neurons[i] as unknown as Record<string, string | undefined>)[name] ?? "";
   const columns = {} as ConnectomeData["columns"];
   for (const name of CATEGORY_NAMES) {
     const table = [...new Set(["", ...neurons.map((_, i) => value(i, name))])].sort();
@@ -27,7 +28,7 @@ export function packSynthetic(neurons: readonly SyntheticNeuron[], edges: readon
   for (let i = 0; i < n; i++) ptr[i + 1] += ptr[i];
   return writeConnectome({
     synapses: sorted.reduce((sum, [, , count]) => sum + count, 0),
-    rootId: Uint32Array.from({ length: n }, (_, i) => 1000 + i),
+    rootId: Uint32Array.from(neurons, (each, i) => each.rootId ?? 1000 + i),
     ptr,
     post: Uint32Array.from(sorted, ([, post]) => post),
     count: Uint16Array.from(sorted, ([, , count]) => count),
@@ -42,7 +43,8 @@ export type Synthetic = { bytes: Uint8Array; index: Record<string, number[]>; ne
 /**
  * Every group the brain needs, a few neurons each, with:
  * looming detectors -> giant fiber -> flight motor neurons; head bristles ->
- * MDN; wind JO -> DNg12; sweet taste -> MN9; each eye's LC10a -> that side's
+ * MDN; wind JO -> DNg12; sweet taste -> MN9; a male's taste on the front
+ * legs -> pIP10; each eye's LC10a -> that side's
  * DNa02 and DNg100. Each eye also has four columns of L1, L2 and L3 (see
  * syntheticEyeColumns), whose L2s drive that eye's LPLC2. Leave groups out
  * with `without`, or change their annotations with `change`, to get broken
@@ -51,12 +53,12 @@ export type Synthetic = { bytes: Uint8Array; index: Record<string, number[]>; ne
 export function syntheticConnectome({ without = [], change = {} }: { without?: readonly string[]; change?: Record<string, Partial<SyntheticNeuron>> } = {}): Synthetic {
   const neurons: SyntheticNeuron[] = [];
   const index: Record<string, number[]> = {};
-  const add = (label: string, count: number, neuron: SyntheticNeuron) => {
+  const add = (label: string, count: number, neuron: SyntheticNeuron, rootIds?: readonly number[]) => {
     if (without.includes(label)) return;
     index[label] = [];
     for (let k = 0; k < count; k++) {
       index[label].push(neurons.length);
-      neurons.push({ ...neuron, ...change[label] });
+      neurons.push({ ...neuron, ...change[label], ...(rootIds ? { rootId: rootIds[k] } : {}) });
     }
   };
   for (const side of ["left", "right"]) {
@@ -81,6 +83,13 @@ export function syntheticConnectome({ without = [], change = {} }: { without?: r
   add("DNg12", 2, { type: "DNg12_a", superClass: "descending_neuron", side: "left", nt: "ACH" });
   add("MN9", 2, { type: "MN9", superClass: "cb_motor", side: "left" });
   add("interneuron", 2, { type: "GNG001", superClass: "cb_intrinsic", side: "center", nt: "GABA" });
+  add("pIP10", 2, { type: "pIP10", superClass: "descending_neuron", side: "left", nt: "ACH" });
+  // The front legs' male-taste neurons are picked by root ID (io.ts), so these
+  // carry real ones, last because root IDs ascend; a mid leg's LgLG1a, by an ID
+  // that isn't the front legs', must be left out.
+  add("LgLG1a mid leg", 1, { type: "LgLG1a", superClass: "vnc_sensory", class: "gustatory", side: "left", nt: "ACH" }, [90000]);
+  add("LgAG1", 1, { type: "LgAG1", superClass: "sensory_ascending", class: "gustatory", side: "left", nt: "ACH" }, FORELEG_MALE_TASTE.LgAG1);
+  add("LgLG1a", 2, { type: "LgLG1a", superClass: "vnc_sensory", class: "gustatory", side: "left", nt: "ACH" }, FORELEG_MALE_TASTE.LgLG1a);
 
   const edges: [number, number, number][] = [];
   const wire = (from: string, to: string, count: number) => {
@@ -101,6 +110,8 @@ export function syntheticConnectome({ without = [], change = {} }: { without?: r
   wire("interneuron", "MN9", 60);
   wire("campaniform", "interneuron", 5);
   wire("bristle", "MDN", 20);
+  wire("LgLG1a", "pIP10", 120);
+  wire("LgAG1", "pIP10", 120);
   return { bytes: packSynthetic(neurons, edges), index, neurons };
 }
 

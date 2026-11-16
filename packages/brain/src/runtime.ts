@@ -67,7 +67,7 @@ export class FlyBrain implements Brain {
     this.wiring = wire(connectome);
     const weights = buildWeights(connectome, point);
     this.sim = new Simulation(weights.network, { ...point.neuron, gain: weights.gain, seed });
-    for (const { spec, neurons } of this.wiring.senses) this.sim.addInput(spec.name, neurons);
+    for (const { spec, neurons } of this.wiring.senses) if (!spec.afterEyes) this.sim.addInput(spec.name, neurons);
     for (const { spec, neurons } of this.wiring.background) this.sim.addInput(spec.name, neurons);
     for (const { spec, neurons } of this.wiring.readouts) {
       this.sim.addReadout(spec.name, neurons);
@@ -78,8 +78,8 @@ export class FlyBrain implements Brain {
     for (const r of this.regions) this.#regionSizes[r]++;
     this.sim.setPartition(this.regions, REGIONS.length);
     for (const name of REGION_RATE_NAMES) this.rates[name] = 0;
-    // The eyes come after every other input, so their streams leave the
-    // others' as they were: with the eyes shut, the brain is the same.
+    // The eyes come after every other input but the senses added since
+    // (afterEyes), so their streams leave the others' as they were: with the eyes shut, the brain is the same.
     const eyes = buildEyes(connectome, options.eyeColumns);
     this.eyes = eyes?.map ?? null;
     this.vision = null;
@@ -102,6 +102,7 @@ export class FlyBrain implements Brain {
         }
       }
     }
+    for (const { spec, neurons } of this.wiring.senses) if (spec.afterEyes) this.sim.addInput(spec.name, neurons);
     // A separate stream from the Poisson inputs', which inputSeed derives from the same seed.
     this.state = new InternalState((seed ^ 0x5bd1e995) >>> 0, options.internalState ?? INTERNAL_STATE);
     this.spontaneous = options.spontaneous ?? true;

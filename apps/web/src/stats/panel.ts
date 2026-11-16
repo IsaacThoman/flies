@@ -58,6 +58,7 @@ const SENSES = [
   ["wind", "Wind"],
   ["sweet", "Sweet"],
   ["grounded", "On legs"],
+  ["maleTaste", "Male taste"],
   ["light", "Light"],
 ] as const;
 /** What comes out, and the neurons each is read from, by their rates' names in stats.rates. */
@@ -69,6 +70,7 @@ const COMMANDS = [
   { key: "wings", label: "Wings", rates: ["flight"] },
   { key: "groom", label: "Groom", rates: ["DNg12"] },
   { key: "feed", label: "Feed", rates: ["MN9"] },
+  { key: "sing", label: "Sing", rates: ["pIP10"] },
 ] as const;
 const RATES = COMMANDS.reduce((n, c) => n + c.rates.length, 0);
 /** How many numbers in and out it shows: the senses, the commands, then each command's rates. */
@@ -76,7 +78,8 @@ export const SIGNALS = SENSES.length + COMMANDS.length + RATES;
 
 /** In and out, design units: a heading over each column, then a row each, a name, a bar and, for a command, its neurons' rates. */
 const SUB = 13;
-const ROW = 12;
+// 11, so that the eight commands still show big enough to read on a small phone on its side.
+const ROW = 11;
 const NAME = { in: 50, out: 42 };
 const BAR = { width: 44, height: 5 };
 const HZ = 36;

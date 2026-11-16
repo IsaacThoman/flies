@@ -62,6 +62,17 @@ export const GROOM_LINGER = 1.5;
 /** Feeds when `feed` passes FEED_ON with food in reach, until it falls below FEED_OFF. */
 export const FEED_ON = 0.15;
 export const FEED_OFF = 0.05;
+/**
+ * Sings, on its feet, when `sing` passes SING_ON, until it falls below SING_OFF.
+ *
+ * `sing` is pIP10, the song command neuron (read at 40 Hz). Measured at rest
+ * (10 minutes, seeds 1 to 3, packages/brain/README.md) it peaks at 0.16: two
+ * spikes of the pair within its smoothing, and nothing a fly alone does
+ * drives it further. SING_ON is two and a half times that, so a lone fly
+ * never sings; P1, the courtship neurons that drive pIP10, take it to 1.
+ */
+export const SING_ON = 0.4;
+export const SING_OFF = 0.2;
 
 const posed = (value: number) => Math.max(0, (value - POSE_FLOOR) / (1 - POSE_FLOOR));
 const clamp = (value: number, min: number, max: number) => (Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : 0);
@@ -93,6 +104,10 @@ export type Intent = {
   feed: number;
   /** The raw latest `escape`, for display. */
   escape: number;
+  /** Singing its courtship song: one wing out and vibrating. */
+  singing: boolean;
+  /** The smoothed `sing`: how hard. */
+  sing: number;
 };
 
 export const createIntent = (): Intent => ({
@@ -109,15 +124,17 @@ export const createIntent = (): Intent => ({
   feeding: false,
   feed: 0,
   escape: 0,
+  singing: false,
+  sing: 0,
 });
 
-type Channel = "walk" | "turn" | "back" | "wings" | "groom" | "feed";
-const CHANNELS: readonly Channel[] = ["walk", "turn", "back", "wings", "groom", "feed"];
+type Channel = "walk" | "turn" | "back" | "wings" | "groom" | "feed" | "sing";
+const CHANNELS: readonly Channel[] = ["walk", "turn", "back", "wings", "groom", "feed", "sing"];
 
 /** Turns the brain's latest command into what the body is asked to do. Allocates nothing per frame. */
 export class Behavior {
   readonly intent = createIntent();
-  #smoothed: Record<Channel, number> = { walk: 0, turn: 0, back: 0, wings: 0, groom: 0, feed: 0 };
+  #smoothed: Record<Channel, number> = { walk: 0, turn: 0, back: 0, wings: 0, groom: 0, feed: 0, sing: 0 };
   #fresh = false;
   #grooming = 0;
   #armed = false;
@@ -149,12 +166,16 @@ export class Behavior {
     s.wings += (clamp(command.wings, 0, 1) - s.wings) * k;
     s.groom += (clamp(command.groom, 0, 1) - s.groom) * k;
     s.feed += (clamp(command.feed, 0, 1) - s.feed) * k;
+    s.sing += (clamp(command.sing, 0, 1) - s.sing) * k;
 
     out.live = true;
     out.walking = out.walking ? s.walk >= WALK_OFF : s.walk > WALK_ON;
     out.backing = out.backing ? s.back >= BACK_OFF && s.back >= s.walk : s.back > BACK_ON && s.back > s.walk + BACK_MARGIN;
     out.feeding = out.feeding ? s.feed >= FEED_OFF : s.feed > FEED_ON;
     out.feed = s.feed;
+    // Males sing standing or walking, not in the air.
+    out.singing = onFeet && (out.singing ? s.sing >= SING_OFF : s.sing > SING_ON);
+    out.sing = s.sing;
     out.speed = out.backing
       ? -WALK_SPEED * BACK_SPEED
       : out.walking

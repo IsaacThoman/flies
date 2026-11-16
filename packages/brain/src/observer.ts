@@ -50,7 +50,7 @@ export class BehaviorObserver {
     turnsLeft: 0,
     turnsRight: 0,
     escapes: 0,
-    peak: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0 },
+    peak: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 },
   };
   #smoothed: { walk: number; turn: number; back: number } | null = null;
   #walking = false;

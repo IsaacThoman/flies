@@ -27,7 +27,7 @@ Each frame the game works out what the fly's body feels (what each facet of
 its eyes sees, what its feet and mouthparts taste, touch, wind, whether it is
 on its feet) and hands that to a `BrainDriver`. The brain answers with
 commands read from the fly's own descending and motor neurons: walk, turn,
-back up, take off, beat the wings, groom, feed. The game moves the body
+back up, take off, beat the wings, groom, feed, sing. The game moves the body
 accordingly and poses the model (`FlyPose`).
 
 In a browser, and so in the iPhone and iPad app, the brain runs in a Web Worker, fed a compressed

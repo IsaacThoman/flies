@@ -28,6 +28,15 @@ const smooth = (e0: number, e1: number, x: number) => {
 const finite = (x: number) => (Number.isFinite(x) ? x : 0);
 /** The fraction of the way a first-order lag with time constant `tau` closes in `dt`. */
 const lag = (dt: number, tau: number) => 1 - Math.exp(-dt / tau);
+/**
+ * A singing wing: held out nearly square to the body (its stroke angle, 0
+ * being straight out to the side; 70 to 90 degrees from the body axis in
+ * courting males), level, and vibrated through a small arc far too fast to
+ * see as strokes (the song's 150 to 250 Hz), so it shows as a haze.
+ */
+const SONG_ANGLE = 0.25;
+const SONG_ARC = 0.18;
+const SONG_LIFT = 0.04;
 /** Moves `x` toward `target` by at most `rate` per second: limbs take a moment to get anywhere. */
 const toward = (x: number, target: number, rate: number, dt: number) => (target > x ? Math.min(target, x + rate * dt) : Math.max(target, x - rate * dt));
 /** Smoothstep on 0..1: eases a linear blend in and out. */
@@ -74,6 +83,9 @@ export class FlyRig {
   private dipVelocity = 0;
   private speed = 0;
   private turn = 0;
+  private sing = 0;
+  /** The singing wing: 1 the left, -1 the right; it fades out on the side it sang with. */
+  private singSide: 1 | -1 = 1;
 
   private groomPhase = 0;
   private boutPhase = 0;
@@ -113,7 +125,7 @@ export class FlyRig {
     }
     this.home.set(this.restHome);
     this.gait = new Gait(this.home);
-    this.update({ speed: 0, turn: 0, airborne: false, wings: 0, groom: 0, feed: 0, crouch: 0, pitch: 0, roll: 0 }, 0);
+    this.update({ speed: 0, turn: 0, airborne: false, wings: 0, groom: 0, feed: 0, crouch: 0, pitch: 0, roll: 0, sing: 0 }, 0);
   }
 
   update(pose: FlyPose, dt: number): void {
@@ -135,6 +147,9 @@ export class FlyRig {
     this.flight += ((airborne ? 1 : 0) - this.flight) * lag(dt, airborne ? 0.06 : 0.12);
     this.pitch += (Math.max(-1.6, Math.min(1.6, finite(pose.pitch))) - this.pitch) * lag(dt, 0.06);
     this.roll += (Math.max(-1.6, Math.min(1.6, finite(pose.roll))) - this.roll) * lag(dt, 0.06);
+    const sing = Math.max(-1, Math.min(1, finite(pose.sing)));
+    if (sing !== 0) this.singSide = sing > 0 ? 1 : -1;
+    this.sing += (Math.abs(sing) * (airborne ? 0 : 1) - this.sing) * lag(dt, 0.06);
 
     // Take-off: the legs stay extended against the ground for a moment as the
     // body leaves it, then fold. Landing: they reach back out to their homes.
@@ -153,7 +168,7 @@ export class FlyRig {
 
     const ground = 1 - ease(this.tuck);
     const walking = Math.min(1, Math.sqrt(this.speed * this.speed + 0.12 * this.turn * this.turn) * 2);
-    const busy = Math.max(walking, this.groom, this.feed, this.crouch, this.flight, this.open);
+    const busy = Math.max(walking, this.groom, this.feed, this.crouch, this.flight, this.open, this.sing);
     this.updateIdle(dt, busy);
 
     // Grooming rhythm: sweeps over the eyes alternate with bouts of rubbing the legs together.
@@ -455,42 +470,51 @@ export class FlyRig {
 
   private wingFrames(): void {
     const wf = this.wings, f = this.frame, jt = this.joints;
-    const open = this.open, fly = this.flight;
+    const fly = this.flight;
     const strength = Math.max(this.beat, fly);
-    const blur = open * smooth(0, 0.08, strength);
     const amplitude = (0.35 + 1.4 * this.beat) * (1 - fly) + (2.45 + 0.3 * this.beat) * fly;
     const mean = 0.75 * (1 - fly) + 0.2 * fly;
-    const lift = 0.16 * (1 - fly) + 0.04 * fly + 0.25 * this.crouch * (1 - open);
-    const tilt = 0.3 * fly * open;
+    const lift = 0.16 * (1 - fly) + 0.04 * fly + 0.25 * this.crouch;
+    const tilt = 0.3 * fly * this.open;
     const jitter = (this.random() * 0.5) / WING_COPIES;
     const bright = Math.floor(this.random() * WING_COPIES);
-    this.wingHaze = blur * 0.5;
+    let haze = 0;
 
-    for (let c = 0; c < WING_COPIES; c++) {
-      const phase = jitter + blur * (c / WING_COPIES) * 0.5;
-      const sweepAngle = mean + 0.5 * amplitude * Math.cos(TAU * phase);
-      const elevation = lift + 0.07 * Math.sin(2 * TAU * phase) * blur;
-      const rotation = 0.7 * Math.sin(TAU * phase) * blur;
-      const strokeAngle = (Math.PI / 2 + 0.13) * (1 - open) + sweepAngle * open;
-      const elev = -0.1 * (1 - open) + elevation * open;
-      const alpha = (c === 0 ? 1 : 0) * (1 - blur) + blur * (0.16 + (c === bright ? 0.2 : 0));
+    // The left wing (w 0) and the right (w 1, its mirror image); the singing one held out on its own.
+    for (let w = 0; w < 2; w++) {
+      const song = (w === 0) === (this.singSide > 0) ? this.sing : 0;
+      const open = Math.max(this.open, song);
+      const blur = open * smooth(0, 0.08, Math.max(strength, song));
+      haze = Math.max(haze, blur);
+      const arc = amplitude * (1 - song) + SONG_ARC * song;
+      const centre = mean * (1 - song) + SONG_ANGLE * song;
+      const raise = (lift - 0.25 * this.crouch * open) * (1 - song) + SONG_LIFT * song;
+      for (let c = 0; c < WING_COPIES; c++) {
+        const phase = jitter + blur * (c / WING_COPIES) * 0.5;
+        const sweepAngle = centre + 0.5 * arc * Math.cos(TAU * phase);
+        const elevation = raise + 0.07 * Math.sin(2 * TAU * phase) * blur;
+        const rotation = 0.7 * Math.sin(TAU * phase) * blur;
+        const strokeAngle = (Math.PI / 2 + 0.13) * (1 - open) + sweepAngle * open;
+        const elev = -0.1 * (1 - open) + elevation * open;
+        const alpha = (c === 0 ? 1 : 0) * (1 - blur) + blur * (0.16 + (c === bright ? 0.2 : 0));
 
-      // Left wing relative to the thorax: hinge, stroke plane, sweep, elevation, rotation.
-      identity(f, 0);
-      translate(f, 0, PIVOT.wing[0] - PIVOT.thorax[0], PIVOT.wing[1] - PIVOT.thorax[1], PIVOT.wing[2] - PIVOT.thorax[2]);
-      rotateX(f, 0, tilt);
-      rotateY(f, 0, strokeAngle);
-      rotateZ(f, 0, elev);
-      rotateX(f, 0, rotation * open + Math.PI / 2);
-      multiply(wf, c * 12, jt, 0, f, 0);
-      this.wingAlpha[c] = alpha;
-
-      // The right wing is its mirror image (and lies just under the left where they overlap).
-      mirrorFrame(f, 0);
-      f[7] -= 0.004 * (1 - open);
-      multiply(wf, (WING_COPIES + c) * 12, jt, 0, f, 0);
-      this.wingAlpha[WING_COPIES + c] = alpha;
+        // A left wing relative to the thorax: hinge, stroke plane, sweep, elevation, rotation.
+        identity(f, 0);
+        translate(f, 0, PIVOT.wing[0] - PIVOT.thorax[0], PIVOT.wing[1] - PIVOT.thorax[1], PIVOT.wing[2] - PIVOT.thorax[2]);
+        rotateX(f, 0, tilt);
+        rotateY(f, 0, strokeAngle);
+        rotateZ(f, 0, elev);
+        rotateX(f, 0, rotation * open + Math.PI / 2);
+        if (w === 1) {
+          // The right wing is the mirror image (and lies just under the left where they overlap).
+          mirrorFrame(f, 0);
+          f[7] -= 0.004 * (1 - open);
+        }
+        multiply(wf, (w * WING_COPIES + c) * 12, jt, 0, f, 0);
+        this.wingAlpha[w * WING_COPIES + c] = alpha;
+      }
     }
+    this.wingHaze = haze * 0.5;
   }
 }
 

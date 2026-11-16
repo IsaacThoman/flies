@@ -38,7 +38,7 @@ const { values } = parseArgs({
 const seed = Number(values.seed);
 const connectome = readConnectomeFile(values.path);
 const TICK = 16;
-const COMMANDS = ["walk", "turn", "back", "escape", "wings", "groom", "feed"] as const;
+const COMMANDS = ["walk", "turn", "back", "escape", "wings", "groom", "feed", "sing"] as const;
 
 const brain = () => new FlyBrain(connectome, { seed });
 const rest = (b: FlyBrain, ms: number) => {
@@ -57,6 +57,7 @@ const FULL: { [K in ScalarSense]: BrainSenses[K] } = {
   wind: 1,
   sweet: 1,
   grounded: false,
+  maleTaste: 1,
 };
 const label = (key: ScalarSense) => (key === "grounded" ? "airborne" : key);
 const apply = (keys: readonly (ScalarSense)[]): BrainSenses => {
