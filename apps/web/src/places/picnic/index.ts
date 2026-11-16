@@ -24,10 +24,6 @@ export const picnic: Scene = {
   buildBackdrop,
   camera: {
     whole: { around: "table", distance: 560, height: 170, side: 0.25, low: 0, fov: 40, settle: 1.6, orbit: 0.03 },
-    wide: [
-      { around: "table", distance: 470, height: 110, side: -0.4, low: 0, fov: 38, settle: 4.5, orbit: 0.02 },
-      { around: "table", distance: 600, height: 220, side: 0.9, low: 0, fov: 36, settle: 4.5, orbit: -0.015 },
-    ],
     // The lake.
     vista: { x: 0, z: -1 },
   },

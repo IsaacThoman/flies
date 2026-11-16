@@ -7,7 +7,7 @@ import { test } from "node:test";
 import * as THREE from "three";
 import { FlyBody, createIntent } from "@fly/body";
 import { Pantry, World, createSurface } from "@fly/world";
-import { CameraDirector, wallpaperShots } from "../src/camera.ts";
+import { CameraDirector, WALLPAPER } from "../src/camera.ts";
 import { PLACES, nextPlace } from "../src/places/catalog.ts";
 import { SCENES } from "../src/places/index.ts";
 import { TIMES } from "../src/scene/light.ts";
@@ -59,7 +59,7 @@ for (const info of PLACES) {
     assert.ok(place.ceiling > 0);
   });
 
-  test(`${info.name}: every wallpaper shot and the whole-place view keep the camera out of everything, with the fly in the picture`, () => {
+  test(`${info.name}: the whole-place view and every wallpaper shot keep the camera out of everything, with the fly in the picture`, () => {
     const world = new World(place);
     const { x, z, yaw } = place.start;
     const body = { position: { x, y: world.heightAt(x, z), z }, velocity: { x: 0, y: 0, z: 0 }, yaw, mode: "standing" } as unknown as FlyBody;
@@ -74,8 +74,10 @@ for (const info of PLACES) {
     director.setView("table");
     check("whole place");
     director.startWallpaper();
-    const shots = wallpaperShots(scene.camera).length;
-    for (let i = 0; i < shots; i++) {
+    director.wallpaperStyle = "follow";
+    check("wallpaper, following");
+    director.wallpaperStyle = "calm";
+    for (let i = 0; i < WALLPAPER.length; i++) {
       check(`wallpaper shot ${i}`);
       director.startWallpaper();
     }

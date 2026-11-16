@@ -1,5 +1,5 @@
 // The camera: the views the player can choose between, and the wallpaper's
-// slow, unhurried shots when nobody is holding the remote.
+// slow, unhurried filming of the fly when nobody is holding the remote.
 //
 // It works like a patient nature cameraman. Round the fly it keeps a place
 // (an angle round it, a distance and a height) and moves that place only
@@ -56,20 +56,20 @@ export const SHOTS: Record<Exclude<View, "table">, Shot> = {
 /** Behind the loading screen and the title: the fly small and to the left, clear of the wordmark and the menu on the right. */
 const TITLE: Shot = { around: "fly", distance: 18, height: 2.2, side: 1.75, low: 0.1, fov: 30, settle: 3, orbit: 0.01, scout: true, across: -0.56 };
 
-/** The wallpaper's shots of the fly: medium, portrait, wide among the things on the table, low across it, from above. The place's two wide shots go between them (`wallpaperShots`). */
-const WALLPAPER_FLY: readonly Shot[] = [
+/** How the wallpaper films: one framing that follows the fly, or a round of shots held for a long or a shorter while. */
+export type WallpaperStyle = "follow" | "calm" | "lively";
+
+/** The wallpaper that just follows the fly: one medium shot, kept to the fly's side, never changing. */
+const FOLLOW: Shot = { around: "fly", distance: 11, height: 1.6, side: 1.7, low: 0.1, fov: 28, settle: 3.5, scout: true };
+
+/** The wallpaper's round of shots, in turn: medium, portrait, wide among the fruit, low across the cloth, from above. All stay on the fly: pulling out to the whole table and back reads as zooming. */
+export const WALLPAPER: readonly Shot[] = [
   { around: "fly", distance: 11, height: 1.6, side: 1.7, low: 0.1, fov: 28, settle: 3.5, orbit: 0.012, scout: true },
   { around: "fly", distance: 5.5, height: 0.8, side: 1.1, low: 0.05, fov: 28, settle: 3.5, orbit: -0.01, scout: true },
   { around: "fly", distance: 42, height: 7, side: 2.3, low: 0.22, fov: 32, settle: 4, orbit: 0.008, scout: true },
   { around: "fly", distance: 18, height: 1.1, side: 2.0, low: 0.16, fov: 24, settle: 4, orbit: 0.01, scout: true },
   { around: "fly", distance: 4.5, height: 15, side: Math.PI, low: 0, fov: 34, settle: 3.5, orbit: 0.02 },
 ];
-
-/** The wallpaper's shots in turn, for a place: three of the fly, the whole place, two of the fly, the whole place again. */
-export function wallpaperShots(scene: SceneCamera): Shot[] {
-  const [a, b, c, d, e] = WALLPAPER_FLY;
-  return [a, b, c, scene.wide[0], d, e, scene.wide[1]];
-}
 
 /** How far (mm) the camera keeps above whatever is under it. */
 const CLEARANCE = 1.1;
@@ -101,8 +101,7 @@ export class CameraDirector {
   readonly camera: THREE.PerspectiveCamera;
   view: View = "follow";
   wallpaper = false;
-  /** Lets the wallpaper change shots more often. */
-  lively = false;
+  wallpaperStyle: WallpaperStyle = "follow";
   /** On the loading screen and the title, which have their own shot. */
   title = false;
   /**
@@ -115,7 +114,6 @@ export class CameraDirector {
   pinned: { eye: THREE.Vector3Like; target: THREE.Vector3Like; fov?: number } | null = null;
   #world: World;
   #scene!: SceneCamera;
-  #wallpaperShots: Shot[] = [];
   /** The camera's place: the point it circles (smoothed), its angle round it, distance, height, and where it aims. */
   #center = new THREE.Vector3();
   #aim = new THREE.Vector3();
@@ -151,8 +149,6 @@ export class CameraDirector {
   /** The place's own shots, for a place the fly has just been carried to: the camera starts afresh there. */
   useScene(scene: SceneCamera) {
     this.#scene = scene;
-    this.#wallpaperShots = wallpaperShots(scene);
-    this.#shot %= this.#wallpaperShots.length;
     this.#started = false;
   }
 
@@ -166,8 +162,8 @@ export class CameraDirector {
   /** The shot being taken now. */
   get shot(): Shot {
     if (this.title) return TITLE;
-    if (this.wallpaper) return this.#wallpaperShots[this.#shot];
-    return this.view === "table" ? this.#scene.whole : SHOTS[this.view];
+    if (!this.wallpaper) return this.view === "table" ? this.#scene.whole : SHOTS[this.view];
+    return this.wallpaperStyle === "follow" ? FOLLOW : WALLPAPER[this.#shot];
   }
 
   /** Moves the camera on by `dt` seconds, framing the fly. */
@@ -184,11 +180,11 @@ export class CameraDirector {
       cam.updateMatrixWorld();
       return;
     }
-    if (this.wallpaper && !this.title) {
+    if (this.wallpaper && !this.title && this.wallpaperStyle !== "follow") {
       this.#shotTime += dt;
-      if (this.#shotTime > (this.lively ? 14 : 24)) {
+      if (this.#shotTime > (this.wallpaperStyle === "lively" ? 14 : 24)) {
         this.#shotTime = 0;
-        this.#shot = (this.#shot + 1) % this.#wallpaperShots.length;
+        this.#shot = (this.#shot + 1) % WALLPAPER.length;
         this.#orbit = 0;
         this.#scoutIn = 0;
       }
@@ -418,7 +414,7 @@ export class CameraDirector {
   startWallpaper() {
     this.wallpaper = true;
     this.#shotTime = 0;
-    this.#shot = (this.#shot + 1) % this.#wallpaperShots.length;
+    this.#shot = (this.#shot + 1) % WALLPAPER.length;
     this.#scoutIn = 0;
   }
 

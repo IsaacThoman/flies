@@ -188,7 +188,7 @@ export class Game implements Shell {
     if (s.place !== "turns" && isPlaceId(s.place) && s.place !== this.#here) this.moveTo(s.place);
     this.stage.setPixels(s.pixels);
     this.audio.setVolumes(s.effects, s.ambience);
-    this.director.lively = s.wallpaperCamera === "lively";
+    this.director.wallpaperStyle = s.wallpaperCamera;
     this.eyes.detail = s.eyes;
     if (save) saveSettings(s);
   }

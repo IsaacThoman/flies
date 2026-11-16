@@ -11,7 +11,7 @@ A place is two things, kept apart on purpose:
 | | Where | What |
 | --- | --- | --- |
 | Its world | `packages/world/src/<place>.ts`, a `Place` | Exactly what the fly's body meets: the table top, what stands on it, its food, where the fly starts, how high it may fly. No three.js. |
-| Its scene | `apps/web/src/places/<id>/index.ts`, a `Scene` | How it looks and sounds: its light through the day, the table and everything on it, everything beyond, the camera's wide shots, its ambient sound. |
+| Its scene | `apps/web/src/places/<id>/index.ts`, a `Scene` | How it looks and sounds: its light through the day, the table and everything on it, everything beyond, the camera's view of the whole place, its ambient sound. |
 
 The scene is built from the world's description, so that what the fly stands
 on is exactly what is drawn. `apps/web/src/places/types.ts` is the contract;
@@ -55,11 +55,12 @@ reach (beyond the floor's edge, above it, or in the backdrop).
 - **What the fly's eyes see** (`SceneSet.seen`): the big shapes only. They are
   rendered six times at 16 or 32 pixels for the brain's eyes, so the small
   details stay out.
-- **The camera** (`SceneCamera`): `whole` is View → Whole table, and `wide` the
-  wallpaper's two shots of the whole place (`around: "table"` circles the
-  table's middle; keep them on the room side of any wall). `vista` is the way
-  the best of the view lies: with nothing standing behind the fly, the camera
-  likes to have that there. The shots round the fly are shared by every place.
+- **The camera** (`SceneCamera`): `whole` is View → Whole table
+  (`around: "table"` circles the table's middle; keep it on the room side of
+  any wall). `vista` is the way the best of the view lies: with nothing
+  standing behind the fly, the camera likes to have that there. Every other
+  shot, the wallpaper's included, stays on the fly and is shared by every
+  place.
 - **Sound** (`ambience`): an `Ambience` in `apps/web/src/audio/sounds.ts`, a loop
   synthesised sample by sample (the Apple TV's audio has no oscillators or
   filters), built the first time it is needed.

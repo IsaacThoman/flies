@@ -138,3 +138,29 @@ test("a jump stays mostly in the picture, the fly is framed again soon after it 
   // A hop is over in a quarter of a second; the camera whips round after it but can't be there at once.
   assert.ok(inPicture / frames > 0.6, `in the picture ${inPicture} of ${frames} frames in the air`);
 });
+
+test("the following wallpaper keeps the fly the same size for minutes on end", () => {
+  const director = new CameraDirector(world, 16 / 9, picnic.camera);
+  director.startWallpaper();
+  const body = fakeBody(-8, -8, 0.6);
+  settle(director, body, 8);
+  const first = lengthOnScreen(director.camera, body);
+  for (let minute = 0; minute < 3; minute++) {
+    settle(director, body, 20);
+    const length = lengthOnScreen(director.camera, body);
+    assert.ok(Math.abs(length - first) < first * 0.05, `${first.toFixed(0)} px, then ${length.toFixed(0)} px`);
+  }
+});
+
+test("the wallpaper's round of shots never leaves the fly for the whole table", () => {
+  for (const style of ["calm", "lively"] as const) {
+    const director = new CameraDirector(world, 16 / 9, picnic.camera);
+    director.wallpaperStyle = style;
+    director.startWallpaper();
+    const body = fakeBody(-8, -8, 0.6);
+    for (let t = 0; t < 240; t += 1 / 30) {
+      director.update(body, 1 / 30);
+      assert.equal(director.shot.around, "fly", `${style} at ${t.toFixed(0)} s`);
+    }
+  }
+});

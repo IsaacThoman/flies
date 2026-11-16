@@ -30,10 +30,9 @@ export type SceneBackdrop = {
   update(time: number, camera: THREE.Camera, light: Daylight): void;
 };
 
-/** The shots of the whole place: View → Whole table, and the wallpaper's two wide shots between its shots of the fly. */
+/** The camera's view of the whole place (View → Whole table); the shots round the fly are every place's. */
 export type SceneCamera = {
   whole: Shot;
-  wide: readonly [Shot, Shot];
   /** Which way the best of the view lies, on the ground (a unit vector): with nothing standing behind the fly, the camera likes to have it there. */
   vista: { x: number; z: number };
 };

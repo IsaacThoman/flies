@@ -79,6 +79,7 @@ const WALLPAPER: Option<number>[] = [
   { value: 0, label: "Never" },
 ];
 const CAMERA: Option<Settings["wallpaperCamera"]>[] = [
+  { value: "follow", label: "Follow" },
   { value: "calm", label: "Calm" },
   { value: "lively", label: "Lively" },
 ];
