@@ -3,6 +3,25 @@ import type { Page } from "playwright";
 import { waitForGameTime } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
 
+/**
+ * Does what drops food, then waits for it to land: a new dropped food, not a
+ * higher count of them, which the fly finishing another at that moment hides.
+ */
+export async function dropFood(page: Page, drop: () => Promise<void>) {
+  const newest = () =>
+    page.evaluate(() => {
+      const foods = (globalThis as unknown as { __fly: Game }).__fly.life.pantry.foods;
+      return Math.max(0, ...foods.filter((f) => f.kind !== "patch" && f.kind !== "found").map((f) => f.id));
+    });
+  const before = await newest();
+  await drop();
+  const started = Date.now();
+  while ((await newest()) <= before) {
+    if (Date.now() - started > 60_000) throw new Error("no food landed within 60 s of dropping it");
+    await waitForGameTime(page, 0.1);
+  }
+}
+
 /** The brain can leave a meal. Retry at its new mouth position, keeping the guaranteed path separate from its choice to eat. */
 export async function feedHoney(page: Page, drop: () => Promise<void>) {
   let sweet = 0, feed = 0, eaten = 0;

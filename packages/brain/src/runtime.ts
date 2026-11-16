@@ -6,7 +6,7 @@ import type { EyeColumn } from "./eye-columns.ts";
 import { buildEyes } from "./eyes.ts";
 import type { Eyes } from "./eyes.ts";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
-import { backgroundRates, decode, senseRates, smooth, wire } from "./io.ts";
+import { backgroundRates, decode, hungerOf, senseRates, smooth, sweetOutputGain, wire } from "./io.ts";
 import type { Wiring } from "./io.ts";
 import { OPERATING_POINT, buildWeights } from "./params.ts";
 import type { OperatingPoint } from "./params.ts";
@@ -58,6 +58,8 @@ export class FlyBrain implements Brain {
   #vision: { name: string; size: number }[] = [];
   #regionSizes = new Uint32Array(REGIONS.length);
   #regionCounts = new Uint32Array(REGIONS.length);
+  // The sweet neurons' input, whose output gain hunger sets.
+  #sweet = "";
 
   constructor(connectome: ReturnType<typeof loadConnectome>, options: BrainOptions = {}) {
     const seed = options.seed ?? 1;
@@ -69,6 +71,12 @@ export class FlyBrain implements Brain {
     this.sim = new Simulation(weights.network, { ...point.neuron, gain: weights.gain, seed });
     for (const { spec, neurons } of this.wiring.senses) if (!spec.afterEyes) this.sim.addInput(spec.name, neurons);
     for (const { spec, neurons } of this.wiring.background) this.sim.addInput(spec.name, neurons);
+    // Hunger scales how strongly the sweet neurons' spikes reach their targets (io.ts, HUNGER).
+    for (const { spec, neurons } of this.wiring.senses) {
+      if (spec.sense !== "sweet") continue;
+      this.#sweet = spec.name;
+      this.sim.addOutputGain(spec.name, neurons);
+    }
     for (const { spec, neurons } of this.wiring.readouts) {
       this.sim.addReadout(spec.name, neurons);
       this.rates[spec.name] = 0;
@@ -121,6 +129,9 @@ export class FlyBrain implements Brain {
       }
     }
     for (const [name, rate] of senseRates(this.wiring, senses)) this.sim.setRate(name, rate);
+    const hunger = hungerOf(senses);
+    this.sim.setOutputGain(this.#sweet, sweetOutputGain(hunger));
+    this.state.hunger = hunger;
     let left = dtMs;
     while (left > 1e-9) {
       const chunk = Math.min(CHUNK_MS, left);

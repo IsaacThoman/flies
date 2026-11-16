@@ -443,7 +443,7 @@ cells two to a row on a narrow screen, and its brain beside its day on a
 short one. In and out, also headed by what the fly is doing, is a bar for
 each sense going into the brain as the body sends it (a loom at either eye,
 touch, either antenna, wind, sweet, weight on its legs, a male's taste on
-its front legs, and the light, the mean over every facet) and for each
+its front legs, and the light, the mean over every facet), and its hunger, and for each
 command coming out (walk, steer, back up, escape, wings, groom, feed, sing),
 with the firing rate of the neurons each is read from (DNg100, the two DNa02s,
 MDN, DNp01, the flight motor neurons, DNg12, MN9, pIP10) in Hz: the senses beside the commands, under them on a narrow
@@ -482,6 +482,28 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
 | `grounded` | On its feet. |
 | `maleTaste` | A front leg's tarsus on another fly's body, while it stands (at a table with others; every fly there is a male): the taste of a male's cuticle, 1 while touching, easing out over 0.3 s. |
+| `hunger` | Not a sense: how hungry it is (below). |
+
+**Hunger** (`packages/body/src/hunger.ts`). The body keeps account of how
+hungry the fly is, from 0 just fed to 1 starved, and of how full its crop is.
+Hunger rises toward 1 with a time constant of 12 minutes; what it eats brings
+it down by the food's sweetness times how much it ate, so a whole lump of
+sugar takes a starved fly to fed. The brain is sent it every frame: it sets how
+strongly the sweet taste neurons pass on what they taste and how restless the
+fly is (`packages/brain/README.md`, Hunger). A real fly gets hungry over hours
+and is starved after a day, so hunger runs 60 times faster than life here:
+what takes a real fly an hour takes this one a minute. Nothing else does. A
+fly starts at 0.7, hungry enough to go and look for food.
+
+What changes, all through the brain: a just-fed fly leaves weak sugar alone
+that a hungry one stops to eat (sweetness 0.4, as the bar's beer foam: 4 flies
+in 20 start to feed, against 19 in 20 starved), takes strong sugar less
+eagerly and leaves a little more of it, and walks about a third less.
+
+The crop fills with what it eats and empties by half every minute (an hour,
+over 60), and the abdomen swells with it: up to 12% wider and deeper and 5%
+longer, round numbers chosen to be seen. Another player's fly at a table
+doesn't show it: the crop isn't sent to the room.
 
 ## What the body adds
 

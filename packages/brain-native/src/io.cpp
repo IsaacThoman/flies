@@ -1,5 +1,6 @@
 #include "io.hpp"
 
+#include <cmath>
 #include <initializer_list>
 #include <stdexcept>
 #include <string_view>
@@ -205,6 +206,13 @@ double intensity(const Senses& s, Sense sense) {
   }
   return 0;
 }
+
+double hunger_of(const Senses& s) { return std::isfinite(s.hunger) ? js::min(1, js::max(0, s.hunger)) : 1; }
+
+// io.ts's HUNGER.sated: a just-fed fly's sweet neurons pass on 1/1.4 of a starved one's.
+constexpr double kSated = 1 / 1.4;
+
+double sweet_output_gain(double hunger) { return kSated + (1 - kSated) * hunger; }
 
 // Rate, Hz, at which each command reaches 1.
 constexpr double kWalk = 40, kTurn = 40, kBack = 40, kEscape = 200, kWings = 120, kGroom = 60, kFeed = 40, kSing = 40;

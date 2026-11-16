@@ -39,8 +39,8 @@ export type InputSpec = {
   afterEyes?: boolean;
 };
 
-/** The senses that are one intensity each; `light` is a picture, handled apart. */
-export type ScalarSense = Exclude<keyof BrainSenses, "light">;
+/** The senses that are one intensity each; `light` is a picture, handled apart, and `hunger` internal state, not a sense. */
+export type ScalarSense = Exclude<keyof BrainSenses, "light" | "hunger">;
 export type SenseSpec = InputSpec & { sense: ScalarSense };
 
 export type ReadoutSpec = {
@@ -210,6 +210,41 @@ export function decode(rates: Readonly<Record<string, number>>): BrainCommand {
     feed: clamp(r("MN9") / SCALES.feed, 0, 1),
     sing: clamp(r("pIP10") / SCALES.sing, 0, 1),
   };
+}
+
+/**
+ * Hunger (BrainSenses.hunger) acts on the sweet taste neurons' output, not on
+ * how fast they fire. Starvation leaves sugar-sensing taste neurons' spiking
+ * as it was but raises the calcium that enters their terminals for each
+ * spike, through dopamine on their DopEcR receptors, and so how much they
+ * release (Inagaki et al. 2012, Cell 148: 583): what the dopaminergic TH-VUM
+ * neuron does, firing at about 1 Hz just after a meal and 25 Hz after a day
+ * without food (Marella et al. 2012, Neuron 73: 941). Its own output is muted
+ * here, as every dopaminergic neuron's is (params.ts), so this gain stands in
+ * for it.
+ *
+ * `sated` is the gain just after a meal against 1 for a day's starvation:
+ * dopamine raises the sugar-evoked calcium in the terminals 1.3 to 1.4 fold
+ * (ibid., Figure 6G), taken here as release, one for one, so a fed fly's
+ * sweet neurons pass on 1/1.4 of a starved one's. Release grows faster than
+ * calcium at most synapses, so if anything this understates it. Between the
+ * two the gain is linear in hunger, a round assumption.
+ *
+ * At 1 the brain is what it was before it had a hunger. That is a hungry
+ * fly: the sweet neurons were chosen for driving the proboscis to extend
+ * (Senses), as starved flies' do in the assays that found them.
+ */
+export const HUNGER = { sated: 1 / 1.4 } as const;
+
+/** How hungry the senses say it is, 0..1: 1 (as it was before hunger) when left out or not a number. */
+export function hungerOf(senses: BrainSenses): number {
+  const hunger = senses.hunger;
+  return typeof hunger === "number" && Number.isFinite(hunger) ? Math.min(1, Math.max(0, hunger)) : 1;
+}
+
+/** The sweet taste neurons' output gain at this hunger (0..1): HUNGER.sated just fed, 1 starved. */
+export function sweetOutputGain(hunger: number): number {
+  return HUNGER.sated + (1 - HUNGER.sated) * hunger;
 }
 
 /** Each sense's intensity, 0..1 (grounded as 0 or 1). */

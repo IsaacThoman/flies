@@ -18,7 +18,9 @@
 namespace {
 constexpr double kMaxStepMs = 100;
 // SENSE_ORDER, COMMAND_ORDER and STATE_STATS in packages/contracts/src/brain.ts.
-constexpr int kScalars = 9, kCommands = 8, kStats = 4;
+constexpr int kScalars = 10, kCommands = 8, kStats = 4;
+// Where hunger is among the scalars; a game that sends fewer keeps no account of it, which is 1.
+constexpr int kHunger = 9;
 enum Status { kLoading, kRunning, kFailed };
 
 struct BrainHost {
@@ -105,7 +107,7 @@ void *Run(void *) {
     }
     fly_senses senses = {
       scalars[0], scalars[1], scalars[2], scalars[3], scalars[4], scalars[5], scalars[6], scalars[7] > 0.5f,
-      eyes ? light[0].data() : nullptr, eyes ? light[1].data() : nullptr, scalars[8],
+      eyes ? light[0].data() : nullptr, eyes ? light[1].data() : nullptr, scalars[8], scalars[kHunger],
     };
     fly_command c = {};
     fly_stats stats = {};
@@ -195,6 +197,7 @@ NATIVE(B_submit) {
     std::lock_guard<std::mutex> g(gBrain.inputLock);
     gBrain.pendingMs = std::min(gBrain.pendingMs + dt, kMaxStepMs);
     std::fill(gBrain.scalars, gBrain.scalars + kScalars, 0.f);
+    gBrain.scalars[kHunger] = 1.f;
     if (scalars) std::copy(scalars, scalars + std::min<size_t>(ns, kScalars), gBrain.scalars);
     gBrain.eyesOpen = left && right && gBrain.facets[0] && gBrain.facets[1];
     if (gBrain.eyesOpen) {

@@ -189,6 +189,30 @@ void Simulation::set_rate(uint32_t index, double rate_hz) {
   source->set_probability((rate_hz * dt_) / 1000);
 }
 
+uint32_t Simulation::add_output_gain(const std::string& name, std::span<const uint32_t> neurons) {
+  for (const OutputGain& group : output_gains_) {
+    if (group.name == name) throw std::invalid_argument("There is already an output gain called \"" + name + "\"");
+  }
+  OutputGain group{name, {}, {}, 1};
+  for (uint32_t i : members(neurons, "output gain \"" + name + "\"")) {
+    for (uint32_t e = ptr_[i]; e < ptr_[i + 1]; e++) {
+      group.edges.push_back(e);
+      group.base.push_back(edges_[e].weight);
+    }
+  }
+  output_gains_.push_back(std::move(group));
+  return static_cast<uint32_t>(output_gains_.size() - 1);
+}
+
+void Simulation::set_output_gain(uint32_t index, double factor) {
+  OutputGain& group = output_gains_.at(index);
+  // Above 0, so a group that delivers its spikes keeps delivering them (see silent_).
+  if (!(factor > 0 && std::isfinite(factor))) throw std::invalid_argument("An output gain must be a positive number");
+  if (factor == group.factor) return;
+  group.factor = factor;
+  for (size_t k = 0; k < group.edges.size(); k++) edges_[group.edges[k]].weight = static_cast<float>(static_cast<double>(group.base[k]) * factor);
+}
+
 uint32_t Simulation::add_rated_input(const std::string& name, std::span<const uint32_t> neurons) {
   check_name(name);
   for (uint32_t i : neurons) {

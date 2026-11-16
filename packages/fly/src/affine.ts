@@ -97,6 +97,13 @@ export function scaleX(m: Affine, o: number, s: number): void {
   m[o] *= s; m[o + 4] *= s; m[o + 8] *= s;
 }
 
+/** Scales the frame's three axes: how the abdomen swells. */
+export function scale(m: Affine, o: number, sx: number, sy: number, sz: number): void {
+  for (let r = 0; r < 12; r += 4) {
+    m[o + r] *= sx; m[o + r + 1] *= sy; m[o + r + 2] *= sz;
+  }
+}
+
 /** Writes m · (x, y, z, 1) to out[oi..oi+2]. */
 export function transformPoint(m: Affine, o: number, x: number, y: number, z: number, out: Affine, oi: number): void {
   out[oi] = m[o] * x + m[o + 1] * y + m[o + 2] * z + m[o + 3];

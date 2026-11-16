@@ -455,6 +455,50 @@ test("bias drives a lone neuron tonically and keeps it active; muted neurons del
   assert.equal(sim.potential(2), 0);
 });
 
+test("an output gain scales a group's outgoing weights and nothing else, and at 1 changes nothing", () => {
+  // 0 -> 2 with 3 synapses and 1 -> 2 with 4, at 0.5 mV a synapse.
+  const net: Network = { ptr: Uint32Array.from([0, 1, 2, 2]), post: Uint32Array.from([2, 2]), count: Uint16Array.from([3, 4]) };
+  const drive = (kicked: number, factor: number | null) => {
+    const sim = new Simulation(net, { gain: Float32Array.from([0.5, 0.5, 0]) });
+    sim.addInput("kick", [kicked], 0);
+    if (factor !== null) {
+      sim.addOutputGain("taste", [0]);
+      sim.setOutputGain("taste", factor);
+    }
+    sim.setRate("kick", 1e6);
+    sim.step();
+    sim.setRate("kick", 0);
+    sim.advance(3);
+    return sim.drive(2);
+  };
+  const plain = drive(0, null);
+  assert.ok(plain > 0);
+  assert.equal(drive(0, 1), plain, "at 1, bit for bit what it was");
+  assert.ok(Math.abs(drive(0, 1.4) / plain - 1.4) < 1e-6);
+  assert.ok(Math.abs(drive(0, 0.5) / plain - 0.5) < 1e-6);
+  assert.equal(drive(1, 0.5), drive(1, null), "a neuron outside the group is untouched");
+
+  const sim = new Simulation(net, { gain: Float32Array.from([0.5, 0.5, 0]) });
+  sim.addOutputGain("taste", [0]);
+  assert.throws(() => sim.addOutputGain("taste", [1]), /already/);
+  assert.throws(() => sim.setOutputGain("smell", 1), /No output gain/);
+  for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) assert.throws(() => sim.setOutputGain("taste", bad), /positive/);
+  // Weights set again afterwards keep the factor.
+  sim.setOutputGain("taste", 2);
+  sim.setWeights(Float32Array.from([1, 1, 0]));
+  sim.addInput("kick", [0], 1e6);
+  sim.step();
+  sim.setRate("kick", 0);
+  sim.advance(3);
+  const doubled = sim.drive(2);
+  const again = new Simulation(net, { gain: Float32Array.from([2, 1, 0]) });
+  again.addInput("kick", [0], 1e6);
+  again.step();
+  again.setRate("kick", 0);
+  again.advance(3);
+  assert.equal(doubled, again.drive(2));
+});
+
 test("resetDrive clears the drive at each spike, so one strong input fires a neuron once", () => {
   // 0 -> 1 with 100 synapses of 1 mV: one spike gives neuron 1 a drive of 100 mV.
   const net: Network = { ptr: Uint32Array.from([0, 1, 1]), post: Uint32Array.from([1]), count: Uint16Array.from([100]) };

@@ -236,8 +236,8 @@ try {
   const has = (s: Record<string, string>) => foodsOf(s).has(sugar);
   await waitUntil(a.page, "the sugar on tab 0's table", has, 5000);
   await waitUntil(b.page, "the sugar on tab 1's table", has, 5000);
-  const eating = await waitUntil(a.page, "tab 0's fly eating the sugar", (s) => (foodsOf(s).get(sugar) ?? 1) < 0.97, 30_000)
-    .then(() => true, () => false);
+  await waitUntil(a.page, "tab 0's fly eating the sugar", (s) => (foodsOf(s).get(sugar) ?? 1) < 0.97, 30_000)
+    .catch(() => {});
   for (let i = 0; i < 3; i++) {
     const left = foodsOf(await readState(a.page)).get(sugar) ?? 0;
     const since = Date.now();
@@ -245,9 +245,16 @@ try {
     console.log(`  ${left.toFixed(3)} of the sugar left on tab 0, on tab 1 within ${Date.now() - since} ms`);
     await a.page.waitForTimeout(700);
   }
-  if (eating) await waitFor(a.page, "granted>0", 5000);
-  const fed = await readState(a.page);
-  console.log(`  ${eating ? "its fly ate" : "its fly didn't eat (its brain's choice), so nothing changed"}: ${fed.predicted} by its own count, ${fed.granted} by the room's`);
+  const pages = [a.page, b.page];
+  const states = await Promise.all(pages.map(readState));
+  const eater = states.findIndex((s) => Number(s.predicted) > 0);
+  if (eater >= 0) {
+    const fed = await waitFor(pages[eater], "granted>0", 5000);
+    console.log(`  tab ${eater}'s fly ate: ${fed.predicted} by its own count, ${fed.granted} by the room's`);
+  } else {
+    const fed = states[0];
+    console.log(`  its fly didn't eat (its brain's choice), so nothing changed: ${fed.predicted} by its own count, ${fed.granted} by the room's`);
+  }
 
   step("a hidden tab's fly rests at the other's table, and lives again when the tab is shown");
   await hide(b.page, true);
