@@ -46,11 +46,50 @@ Everything is built in code.
 Soap bubbles drift over the table on the breeze, and a few small ones skim
 low past the fly; one that comes down on something level settles there as a
 dome until it bursts. A bubble that reaches the fly, or that it walks into,
-bursts on it, and it feels the film break (`touch`, below). The light follows
-the clock unless you choose a time: morning, midday, golden hour, dusk and
-night, eased from one to the next; by day a cloud now and then passes over the
-sun and the light dims by a fifth for a few seconds. At dusk and at night
-fireflies drift round the table and blink.
+bursts on it, and it feels the film break (`touch`, below). At dusk and at
+night fireflies drift round the table and blink.
+
+The sky follows the clock unless you choose a time (the **Light** tool):
+between each place's five palettes the colours ease with the hour, the sun
+rises out of the morning's side, crosses through each palette's place and
+sets, and the moon rises after it (indoors, where a lamp lights the evening,
+it comes on and stays), so dawn and dusk come over half an hour or more. A
+room sees less of the weather than the open air (`docs/places.md`). By day a
+cloud now and then passes over the sun and the light dims by a
+fifth for a few seconds. The hours are a fixed summer day's (sunrise about
+5:40, sunset about 20:10): the TV doesn't know where it is.
+
+So does the weather, unless you choose one (the **Weather** tool): clear,
+overcast, mist or light rain. On "Now" it follows a forecast worked out from
+the clock, the same for everyone at the same hour and on any restart: spells
+of a few hours each, changing over an hour, in systems a day or two long, so
+some days are fine and some grey. Mist forms only in the early morning and
+burns off before noon; clouds gather before rain and clear after it.
+Overcast greys every place's sky and takes the sun's light away, and mist
+whitens the distance. At the picnic rain falls past the camera, splashes on
+the table, the fruit and the lemonade's pool (crowns of droplets, rings in
+the wet), beads the table and the fruit, soaks the napkin darker, speckles
+the lake, keeps the birds quiet and is heard; the table dries over the next
+half hour or so, and if the sun comes out while it's wet a rainbow stands
+opposite it. Rain bursts the bubbles, and the fireflies shelter from it. A
+drop landing on the fly is felt (`touch`).
+
+While nobody is using the remote (the wallpaper, or a minute of play without
+a press), the picnic has its own goings-on, about ten an hour, never two
+starting within 45 s of each other, each only when the time of day and the
+weather allow it: a gust (the fly feels it as `wind`; the bubbles are blown
+on, the table's leaf lifts, ripples run over the napkin, the trees sway and it
+runs across the grass and the lake, and it is heard), a gull gliding high over
+whose shadow sweeps the table (the fly's eyes see it darken), a leaf coming
+down on a gust to lie where it lands until another blows it off the table, a
+butterfly that flutters over and may settle on the fruit a while, a ladybird
+that walks across and around anything standing, a sailboat crossing the lake,
+and now and then something new to find: a drop of juice seeping from a
+strawberry, or a crumb blown in on a gust, put out in the pantry for the fly
+to find by walking and tasting. The butterfly, the ladybird and the falling
+leaf are in the fly's world only as things it sees (and, for a brain without
+eyes, things that can loom); they keep clear of it, and none of it is aimed
+or timed at the fly: what it does about any of it is its brain's.
 
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
 wiring was traced: a stereo microscope with a fly pad on its stage (its base and
@@ -103,8 +142,8 @@ touch surface.
 | --- | --- |
 | Swipe on the touch surface | Moves your hand (the glowing ring) across the table. Until you do, it waits just in front of the fly's mouth, and it drifts back there after 15 s. |
 | Left / Right | Picks a tool from the shelf. |
-| Up / Down | Picks the tool's kind: which food, how hard to blow, the time of day, the camera. |
-| Select | Uses the tool: drops food, throws the ball. Hold it to tickle or blow. On Light and View it steps round the choices. |
+| Up / Down | Picks the tool's kind: which food, how hard to blow, the time of day, the weather, the camera. |
+| Select | Uses the tool: drops food, throws the ball. Hold it to tickle or blow. On Light, Weather and View it steps round the choices. |
 | Play/Pause, or Back | The pause menu. Play/Pause or Back again carries on. |
 | Back on the title | Leaves the app. |
 
@@ -112,7 +151,8 @@ The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
 beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot), **Light** (now, which follows the clock,
-or morning, midday, golden hour, dusk, night), **View** (close up, follow, wide, the whole table, from above,
+or morning, midday, golden hour, dusk, night), **Weather** (now, which
+follows the forecast, or clear, overcast, mist, rain), **View** (close up, follow, wide, the whole table, from above,
 and through the fly's eyes; Up brings the camera in, Down takes it out) and
 **Place** (where it lives; Up and Down choose, Select carries it there). The
 screen always shows what each button does now, and a caption at the top says
@@ -160,9 +200,9 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | --- | --- |
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
 | `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms, as in the desktop pet. |
-| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
+| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
 | `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, or past the table's edge. |
-| `wind` | Its own speed through the air (its velocity less the air's: a puff, or flying, or falling), full at 1 m/s. |
+| `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
 | `grounded` | On its feet. |
 
@@ -181,7 +221,8 @@ lives (`packages/body/src/motion.ts` unless noted):
 
 - **Physics.** It stays on the surface it walks on and tilts with it, slides
   along what it walks into, steps up nothing taller than 0.9 mm, and falls off
-  ledges and slopes steeper than 65°. In the air it has weight, drag (7/s) and
+  ledges and slopes steeper than 65°. In the air it has weight, drag (7/s, through
+  the air, which a puff or a gust moves) and
   the push of its wings: lift in proportion to the `wings` command (0.6 holds
   its weight) and thrust along its heading.
 - **The take-off's direction.** The escape command launches it (380 to 620 mm/s
@@ -259,13 +300,23 @@ lake) and the table are two passes with their own depth ranges. Static things
 are merged by material into a handful of meshes with vertex colours and frozen
 matrices (the crumbs, pips and saucer go into those too, and the small things'
 contact shadows are one merged mesh); seeds, sugar grains, dew, trees,
-daisies, clouds, bubbles, fireflies, puffs and food are instanced. Menus and hints are one 2D canvas drawn over the frame,
+daisies, clouds, bubbles, fireflies, puffs and food are instanced. Rain is
+three draws, only while it rains: the streaks (one quad a drop, placed and
+moved entirely in the shader from the time), the splashes (a pool of 56, each
+a ring and a crown of droplets, one instanced draw) and the beads on the fruit;
+the table's own beads and puddles are in its shader, as many as there are
+pixels for. Each visitor is one draw while it is about, the gull's shadow is
+in the table's and the fly's own shading, and nothing is allocated per frame.
+Menus and hints are one 2D canvas drawn over the frame,
 uploaded only when something on it changes (at most 30 times a second; the
 in-game shimmer at 10).
 
 Measured in Chromium on an M-series Mac (Settings → Frame stats shows it live,
 and the canvas's `data-calls`, `data-triangles`, `data-frame-ms` and
-`data-eyes-ms`): playing, 23 draws and about 105,000 triangles a frame; on a
+`data-eyes-ms`): playing, 23 draws and about 105,000 triangles a frame (in
+rain 26 and 118,000, and about 0.07 ms more JavaScript; with a butterfly, a
+ladybird, a falling leaf, the gull, the boat and a drop of juice all about at
+once, a draw for each in view and 0.04 ms); on a
 frame the eyes refresh, about 70 draws and 280,000 triangles (the most the
 end-to-end run sees is about 85 draws and 300,000), the eyes' own part about 45
 draws and 1.5 to 2.5 ms (mostly the read-back). JavaScript per frame about 1 to
@@ -288,13 +339,23 @@ dev and preview servers serve and the production build copies in
 (`apps/web/src/brain/native-driver.ts`), which allocates nothing per frame.
 Sound is synthesised into buffers at start-up (no oscillators or filters):
 wing buzz following the wings, patter while it walks, each place's own
-surroundings (the picnic's breeze, lake and birds), and small sounds for the
+surroundings (the picnic's breeze, lake and birds, quieter in the rain), rain
+and the rush of a gust, and small sounds for the
 tools and menus. Settings are kept in
 `localStorage`.
 
 ## Tests
 
-`npm test` runs, without a browser: the world's standing, bumping, ray and food
+`npm test` runs, without a browser: the sky by the clock (each palette at its
+hour, nothing jumping minute to minute through a whole day, the sun up by day
+and the moon by night, or a lamp's light on and still through the night, for
+every place's palettes and an indoor-like set; a room sees less of the
+weather); the
+weather (the same forecast for the same hour, changing slowly over a month,
+every kind over two months with clear the commonest, mist only in the morning
+and rain only under cloud, wetting and drying); the pacing of the picnic's
+goings-on (none while the remote is in use, never two close together, each
+about as often as it should be); the world's standing, bumping, ray and food
 queries, round and rectangular tops, and becoming another place; every place
 (the fly starts standing, its food can be tasted where it lies, every time of
 day, every shot keeps the camera out of everything with the fly in view); the body's thresholds, motion, collisions, falls, flight, landing,
