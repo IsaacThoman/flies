@@ -1,6 +1,9 @@
 // Unattended physical-device run with the real brain, sound, eyes and remote input.
 // Logs stay on the TV: copy Library/Caches/performance.log from the app container.
 import { spawnSync } from "node:child_process";
+import { PLACES } from "../apps/web/src/places/catalog.ts";
+import { TIMES } from "../apps/web/src/scene/light.ts";
+import { WEATHERS } from "../apps/web/src/scene/weather.ts";
 
 type Step = ["wait", Record<string, string>] | ["press", string] | ["sleep", number] | ["log", string];
 
@@ -60,15 +63,58 @@ export function soakConfig(minutes = 30) {
   press("MediaPlayPause");
   press("ArrowUp", 4);
   wait({ view: "follow" });
-  wait({ wallpaper: "true" });
-  phase("daylight wallpaper", minutes * 30000);
-  press("Enter");
-  wait({ wallpaper: "false" });
-  press("ArrowLeft", 2);
-  press("ArrowDown", 3);
-  wait({ time: "night" });
-  wait({ wallpaper: "true" });
-  phase("night wallpaper", minutes * 30000);
+  // The shelf is on View. Clamp each choice from its first variant, regardless of saved settings.
+  const tools = ["feed", "swoop", "feather", "blow", "light", "weather", "view", "place"];
+  let tool = tools.indexOf("view");
+  const choose = (id: string, variant: number) => {
+    const next = tools.indexOf(id);
+    press(next > tool ? "ArrowRight" : "ArrowLeft", Math.abs(next - tool));
+    tool = next;
+    wait({ tool: id });
+    press("ArrowUp", id === "light" ? 5 : 4);
+    press("ArrowDown", variant);
+  };
+  for (const [index, place] of PLACES.entries()) {
+    choose("place", index);
+    press("Enter");
+    wait({ place: place.id, moving: "" });
+    // Pin the place: a long wallpaper phase must not trigger the normal 20-minute rotation.
+    press("MediaPlayPause");
+    wait({ screen: "pause" });
+    press("ArrowUp", 4);
+    press("ArrowDown", 3);
+    press("Enter");
+    wait({ screen: "settings" });
+    press("ArrowUp", 2);
+    press("Enter");
+    wait({ screen: "wallpaper" });
+    press("ArrowUp", 4);
+    press("ArrowDown", 2);
+    wait({ focus: "place" });
+    press("ArrowLeft", PLACES.length);
+    press("ArrowRight", index + 1);
+    press("MediaPlayPause");
+    wait({ screen: "play" });
+    for (const [weatherIndex, weather] of WEATHERS.entries()) {
+      choose("weather", weatherIndex + 1);
+      wait({ variant: weather });
+      for (const [timeIndex, time] of TIMES.entries()) {
+        choose("light", timeIndex + 1);
+        wait({ time });
+        phase(`${place.id} ${weather} ${time}`, 5000);
+      }
+    }
+    choose("weather", 1);
+    wait({ variant: "clear" });
+    for (const [variant, time] of [[2, "noon"], [5, "night"]] as const) {
+      choose("light", variant);
+      wait({ time });
+      wait({ wallpaper: "true" });
+      phase(`${place.id} ${time} wallpaper`, minutes * 60000 / (PLACES.length * 2));
+      press("Enter");
+      wait({ wallpaper: "false" });
+    }
+  }
   drive.push(["log", "soak complete"]);
   return { script: "game.js", stats: 10, logFile: true, drive };
 }
