@@ -2,7 +2,7 @@
 // TypeScript simulation in a browser, or native code on its own thread in the
 // Apple TV app, where JavaScript is too slow for it.
 
-import type { BrainSenses, BrainState, EyeMap } from "@fly/brain";
+import type { BrainEngine, BrainSenses, BrainState, EyeMap } from "@fly/brain";
 
 export type BrainStatus = "loading" | "running" | "failed";
 
@@ -16,6 +16,8 @@ export interface BrainDriver {
   readonly connections: number;
   /** Where the eyes' facets look, once running; null if this brain has no eyes. */
   readonly eyes: EyeMap | null;
+  /** Which build of the brain runs, once running, for tests and measurements; a stand-in has none. */
+  readonly engine?: BrainEngine | null;
   /** The brain's latest answer, or null before the first. */
   readonly state: BrainState | null;
   /**

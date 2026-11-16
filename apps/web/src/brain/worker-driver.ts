@@ -1,11 +1,13 @@
-// The brain in a browser: packages/brain in a Web Worker, fed the packed
-// connectome. At most one tick is with the worker at a time; fly time that
+// The brain in a browser, in a Web Worker, fed the packed connectome: the C++
+// of packages/brain-native built as WebAssembly where the browser runs it,
+// otherwise packages/brain itself (brain.worker.ts). At most one tick is with
+// the worker at a time; fly time that
 // passes while it is busy goes out with the next tick, up to MAX_TICK_MS, and
 // beyond that is dropped, so a slow brain runs slower than real time instead
 // of falling further behind.
 
 import { REGION_RATE_NAMES } from "@fly/brain";
-import type { BrainRequest, BrainResponse, BrainSenses, BrainState, EyeMap } from "@fly/brain";
+import type { BrainEngine, BrainRequest, BrainResponse, BrainSenses, BrainState, EyeMap } from "@fly/brain";
 import type { BrainDriver, BrainStatus } from "@fly/contracts";
 import { BrainLoadError } from "./download.ts";
 import type { LoadFailure } from "./download.ts";
@@ -29,9 +31,10 @@ export const LOAD_TIMEOUT_MS = 30_000;
  */
 export const MAX_WAIT_STEP_MS = 250;
 
-/** Where the connectome comes from (download.ts), as the loading screen follows it. */
+/** Where the brain's files come from (download.ts), as the loading screen follows them. */
 export interface BrainSource {
-  load(onProgress: () => void): Promise<ArrayBuffer>;
+  /** The connectome in its wire form, and the WebAssembly brain to build from it, or null for the TypeScript one. */
+  load(onProgress: () => void): Promise<{ data: ArrayBuffer; module: ArrayBuffer | null }>;
   /** Forgets a kept copy the brain couldn't be built from. */
   discard(): Promise<void>;
   readonly received: number;
@@ -46,7 +49,8 @@ export type BrainFailure = LoadFailure | "brain";
 const DAMAGED = /damaged|incomplete|isn't the fly's brain|longer than|Corrupt connectome|Truncated connectome|Not a connectome/;
 
 function failureOf(message: string, building: boolean): BrainFailure {
-  if (/DecompressionStream|Worker is not defined|module worker/i.test(message)) return "unsupported";
+  // A WebAssembly brain this browser can't compile (ours never mention WebAssembly).
+  if (/DecompressionStream|Worker is not defined|module worker|WebAssembly/i.test(message)) return "unsupported";
   if (/allocation failed|out of memory|Invalid array buffer length/i.test(message)) return "memory";
   return building && DAMAGED.test(message) ? "damaged" : "brain";
 }
@@ -59,6 +63,10 @@ export class WorkerBrainDriver implements BrainDriver {
   neurons = 0;
   connections = 0;
   eyes: EyeMap | null = null;
+  /** Which brain the worker built, once running. */
+  engine: BrainEngine | null = null;
+  /** How long the worker took to unpack the connectome and build the brain from it, ms, once running. */
+  buildMs: number | null = null;
   state: BrainState | null = null;
   stateAt = 0;
   readonly regionRates = new Float32Array(REGION_RATE_NAMES.length);
@@ -72,6 +80,7 @@ export class WorkerBrainDriver implements BrainDriver {
   #attempt = 0;
   #lastTickAt = -1;
   #buildingMs = 0;
+  #postedAt = 0;
   #waitedMs = 0;
   #inFlight = false;
   #pendingMs = 0;
@@ -109,7 +118,7 @@ export class WorkerBrainDriver implements BrainDriver {
     const attempt = ++this.#attempt;
     this.#buildingMs = 0;
     this.source.load(() => {}).then(
-      (data) => {
+      ({ data, module }) => {
         if (this.#disposed || attempt !== this.#attempt || this.status !== "loading") return;
         this.phase = "build";
         try {
@@ -117,7 +126,9 @@ export class WorkerBrainDriver implements BrainDriver {
             (response) => attempt === this.#attempt && this.#receive(response),
             (message) => attempt === this.#attempt && this.#fail(message),
           );
-          this.#worker.post({ type: "init", data }, [data]);
+          this.#postedAt = this.#now();
+          if (module) this.#worker.post({ type: "init", data, module }, [data, module]);
+          else this.#worker.post({ type: "init", data }, [data]);
         } catch (error) {
           this.#fail(error instanceof Error ? error.message : String(error), "unsupported");
         }
@@ -173,6 +184,8 @@ export class WorkerBrainDriver implements BrainDriver {
         this.neurons = response.neurons;
         this.connections = response.connections;
         this.eyes = response.eyes;
+        this.engine = response.engine;
+        this.buildMs = this.#now() - this.#postedAt;
         this.status = "running";
         this.phase = "done";
         break;

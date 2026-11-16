@@ -17,6 +17,7 @@ export class NativeBrainDriver implements BrainDriver {
   neurons = 0;
   connections = 0;
   eyes: EyeMap | null = null;
+  engine: "native" | null = null;
   state: BrainState | null = null;
   stateAt = 0;
   readonly regionRates = new Float32Array(REGION_RATE_NAMES.length);
@@ -115,6 +116,7 @@ export class NativeBrainDriver implements BrainDriver {
       this.#lightLeft = new Float32Array(left.length / 3);
       this.#lightRight = new Float32Array(right.length / 3);
     }
+    this.engine = "native";
     this.status = "running";
   }
 

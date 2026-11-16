@@ -8,11 +8,13 @@
 //
 //   node packages/brain-native/scripts/bench.ts [--seconds 10] [--seed 1]
 //
-// Single-threaded both. The native build is build.sh's release build, and it
-// is given the very frames the TypeScript sees.
+// Then the same brain built as WebAssembly (wasm/fly-brain.wasm, through
+// wasm/brain.ts, as a browser's worker runs it), in this Node's V8. Single
+// threaded all. The native build is build.sh's release build; the
+// WebAssembly and native brains are given the very frames the TypeScript sees.
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -21,7 +23,8 @@ import { BATTERY, facetAngles, render } from "../../brain/src/stimuli.ts";
 import type { Scene, Stimulus } from "../../brain/src/stimuli.ts";
 import { RESTING_SENSES } from "../../brain/src/types.ts";
 import type { Brain, BrainSenses } from "../../brain/src/types.ts";
-import { CONNECTOME, build, readBuffer } from "../tests/compare.ts";
+import { CONNECTOME, WASM, build, readBuffer } from "../tests/compare.ts";
+import { WasmBrainModule } from "../wasm/brain.ts";
 
 const { values } = parseArgs({ options: { seconds: { type: "string", default: "10" }, seed: { type: "string", default: "1" } } });
 const seconds = Number(values.seconds);
@@ -73,7 +76,10 @@ const scenes: { label: string; ground: number; scene: Scene }[] = [
 ];
 const warm = Math.ceil(1000 / TICK);
 const frames: Uint8Array[] = [];
+const lights: Light[][] = [];
 for (const { label, ground, scene } of scenes) {
+  const seen: Light[] = [];
+  lights.push(seen);
   regime(brain, label, RESTING_SENSES, (tick) => {
     const light = { left: new Float32Array(angles.left.az.length), right: new Float32Array(angles.right.az.length) };
     render(tick < warm ? () => ground : scene, ((tick - warm) * TICK) / 1000, angles, light);
@@ -82,6 +88,7 @@ for (const { label, ground, scene } of scenes) {
       new DataView(count.buffer).setUint32(0, eye.length, true);
       frames.push(count, new Uint8Array(eye.buffer));
     }
+    seen.push(light);
     return light;
   });
 }
@@ -89,8 +96,24 @@ regime(brain, "at rest again", RESTING_SENSES);
 const memory = process.memoryUsage();
 const kept = frames.reduce((n, f) => n + f.length, 0);
 console.log(
-  `resident memory ${(memory.rss / 2 ** 20).toFixed(1)} MB (array buffers ${(memory.arrayBuffers / 2 ** 20).toFixed(1)} MB, ${(kept / 2 ** 20).toFixed(1)} MB of them the frames kept for the native run)`,
+  `resident memory ${(memory.rss / 2 ** 20).toFixed(1)} MB (array buffers ${(memory.arrayBuffers / 2 ** 20).toFixed(1)} MB, ${(kept / 2 ** 20).toFixed(1)} MB of them the frames kept for the other runs)`,
 );
+
+console.log("\nWebAssembly (wasm/fly-brain.wasm, Node's V8)");
+const compiling = performance.now();
+const wasm = await WasmBrainModule.instantiate(readFileSync(join(WASM, "fly-brain.wasm")));
+const compiled = performance.now();
+const raw = readFileSync(CONNECTOME);
+wasm.connectomeSpace(raw.length).set(raw);
+const building = performance.now();
+const fast = wasm.create(seed);
+console.log(`compiled in ${(compiled - compiling).toFixed(0)} ms, built in ${(performance.now() - building).toFixed(0)} ms`);
+regime(fast, "at rest (standing)", RESTING_SENSES);
+regime(fast, "every sense at full strength", everything);
+scenes.forEach(({ label }, s) => regime(fast, label, RESTING_SENSES, (tick) => lights[s][tick]));
+regime(fast, "at rest again", RESTING_SENSES);
+console.log(`the module's memory ${(wasm.memoryBytes / 2 ** 20).toFixed(1)} MB`);
+lights.length = 0;
 
 console.log("\nNative (build.sh release)");
 const dir = mkdtempSync(join(tmpdir(), "fly-brain-bench-"));

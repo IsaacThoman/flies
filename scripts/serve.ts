@@ -20,6 +20,7 @@ export const TYPES: Readonly<Record<string, string>> = {
   ".webmanifest": "application/manifest+json",
   ".png": "image/png",
   ".svg": "image/svg+xml",
+  ".wasm": "application/wasm",
 };
 
 /** Files named for their contents (assets/, brain/) can be kept for a year; the page, its manifest and the service worker must be asked for again each time. */

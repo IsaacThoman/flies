@@ -41,7 +41,7 @@ The TypeScript keeps neuron state in `Float32Array`s and computes in doubles, ev
 
 ## How it is tested
 
-`npm test` runs `tests/*.test.ts` with the rest of the repository; `node --test 'packages/brain-native/tests/*.test.ts'` runs just these, in about 30 seconds. They build the library first (`build.sh`, a no-op when nothing changed) and skip, saying why, when there is no compiler; the real-connectome test also skips without `packages/brain/data/connectome.bin`.
+`npm test` runs `tests/*.test.ts` with the rest of the repository; `node --test 'packages/brain-native/tests/*.test.ts'` runs just these, in a minute or two. They build the library first (`build.sh`, a no-op when nothing changed) and skip, saying why, when there is no compiler; the real-connectome tests also skip without `packages/brain/data/connectome.bin`. Every comparison below runs twice: with the native harness, and with the same harness built as WebAssembly (`wasm/fly-brain-harness.wasm`, committed), run in the test's own Node under WASI, which needs no compiler (see "In a browser").
 
 Both builds write the same line per tick (`tests/compare.ts` from the TypeScript, `tools/harness.cpp` from the native brain, through the C interface): spikes, active neurons, simulated time, the seven commands and every rate (the regions and the vision groups included) as doubles and as the C interface's floats, the internal state's three processes, a digest of both retinas' rates, and every 50 ticks a digest of every neuron's v, g and a. Numbers are written as the hex of their bits, so equal lines are bit-identical results. The light goes to the harness as a file of the very `Float32Array`s the TypeScript was given.
 
@@ -55,11 +55,12 @@ The scripted senses (`scenario()`) run in cycles. Each starts with about 40 simu
 | `engine.test.ts` | The engine alone against sim.ts on 40 random networks covering every option, including those the brain doesn't use yet: a per-neuron bias, changed mid-run; a per-target weight scale; drive reset and adaptation on and off; steps of 0.1 to 1 ms; delays and refractory periods of 1 to 50 steps; cleanup every 1, 3 or 16 steps; and two rated inputs (a rate per neuron, as the eyes drive the lamina) whose rates change mid-run among silent, slow, fast and past one spike a step. Every step's spikes and active count, and every neuron's v, g and a at the end. |
 | `regions.test.ts` | The region ids, in order, and every neuron's region (`fly-brain-harness regions`) are regions.ts's: on the real connectome, and on a made-up one with every string the rules compare and near misses of each (a character more or fewer, another case, a prefix, non-ASCII) in each column the rules read, on every side. The region rates are compared with the others, tick by tick, above. |
 | `math.test.ts` | exp, log, log1p, expm1, sin and cos against V8's on the brain's own arguments (the whole saturation table among them), 50,000 random doubles of every magnitude, and the special values. |
-| `build.test.ts` | Warning-free under `-Wall -Wextra -Wpedantic -Werror` in both builds; `src/` holds only the library; no fused multiply-add outside fdlibm (arm64). |
+| `build.test.ts` | Warning-free under `-Wall -Wextra -Wpedantic -Werror` in both builds; `src/` holds only the library; no fused multiply-add outside fdlibm (arm64); where wasi-sdk is at hand, `wasm.sh` makes the committed modules again, byte for byte. |
+| `wasm.test.ts` | The module browsers get, `wasm/fly-brain.wasm` through `wasm/brain.ts`, against the TypeScript `createBrain`, every tick, as far as the C interface shows it (commands and rates as floats, spikes, active neurons, simulated time, every refusal and its message): on the synthetic connectome for two seeds, and a whole cycle on the real one with its eyes, whose map is the TypeScript's to the float. The committed modules were built from today's sources (`wasm/build.json`). |
 
 A difference shows as the first line that differs, with the tick, what the script was doing and its length. Changing any one rounding in the engine is caught (a test of the tests: adding the input's adaptation step in single precision instead of double fails the engine test on one neuron's adaptation in its last bit, with the spikes still the same, which is why state is compared and not only spikes). The same goes for the eyes: rounding the retina's ambient level to a float in its Weber fraction fails both the synthetic and the real comparison at the first tick a sustained cell responds, on the retina digest, with the spikes still the same; drawing the rated input's next gap before its keep draw fails the engine test.
 
-The real-connectome comparison was also run under the sanitizers: the whole cycle with the eyes open, 102 simulated seconds, identical, nothing reported.
+The real-connectome comparison was also run under the sanitizers: the whole cycle with the eyes open, 102 simulated seconds, identical, nothing reported. And for the WebAssembly build: compiling fdlibm.cpp without its fused multiply-adds (below) fails the math test on `sin(-0.4666666666666667)` in its last bit, and the synthetic comparisons with it.
 
 ## Building
 
@@ -69,6 +70,41 @@ packages/brain-native/build.sh sanitize   # build/sanitize: the same with ASan a
 ```
 
 `clang++` from the Xcode command line tools is all it takes (`CXX` picks another compiler). The harness's modes are described at the top of `tools/harness.cpp`.
+
+## In a browser: WebAssembly
+
+The same sources, built as WebAssembly, are the brain a browser runs wherever it can (apps/web/src/brain/, docs/web.md): `wasm/fly-brain.wasm`, 268 KB (106 KB gzipped), behind the C interface, and `wasm/brain.ts`, which wraps it as packages/brain's `Brain`, so the browser's worker runs one or the other unchanged.
+
+```sh
+npm run brain:wasm                         # wasm.sh: wasm/fly-brain.wasm, wasm/fly-brain-harness.wasm, wasm/build.json
+packages/brain-native/wasm.sh --check      # builds into build/wasm/ and fails unless that is what wasm/ holds
+```
+
+- **The toolchain is wasi-sdk 34** (clang and wasm-ld of LLVM 23, wasi-libc, and libc++ built with WebAssembly's exceptions): one archive per host (180 MB) that `wasm.sh` downloads once into `build/` and checks against its digest, nothing to install, no Python, no JavaScript glue; `WASI_SDK_PATH` uses another copy. Emscripten would give the same code with a JavaScript runtime and a multi-gigabyte SDK to maintain; this module imports seven WASI calls (an empty environment, the clock, and a stderr only an abort writes to), which `brain.ts` answers in forty lines. Apple's clang has the WebAssembly back end but no linker or C library for it.
+- **The modules are committed**, so `npm install`, `npm test` and `npm run build` need no toolchain (there is no CI to build them). `wasm/build.json` holds the digest of every source and of the modules: `wasm.test.ts` fails as soon as a source changes without them being rebuilt, and, where wasi-sdk is present, `build.test.ts` rebuilds them and requires the same bytes. They are deterministic for a toolchain and sources; whether every host's wasi-sdk makes the same bytes (arm64 macOS made these) hasn't been checked.
+- **Exceptions are WebAssembly's own**, in the standard form (`exnref`), which is how wasi-sdk's libc++ is built. The library throws to report bad data and refusals, as on the TV; WebAssembly with exnref is Chrome and Edge 137+, Firefox 131+, Safari 18.4+ (iOS and iPadOS 18.4+). `wasmBrainSupported()` validates a two-instruction module that needs it, and a browser without it gets the TypeScript brain.
+- **Exactness.** Everything above holds as it is: WebAssembly's floating point is IEEE double and single precision, each operation rounded once, with no fused multiply-add, no excess precision and no fast math, so the rest of the brain compiles to the very operations it does natively. The exception is V8's math (`fdlibm.cpp`), which is Node's only with the fused multiply-adds arm64 gives it. WebAssembly has none, and clang would split each contracted multiply-add in two; `wasm.sh` compiles that one file to LLVM IR and turns each `llvm.fmuladd` into `llvm.fma`, which becomes a call to wasi-libc's `fma`, computed in software and correctly rounded: one rounding, as the instruction does. So the WebAssembly brain is the arm64 brain, the Apple TV's, bit for bit, in any engine on any machine (it is no longer at the mercy of the engine's `Math`, as the TypeScript is: see "Other JavaScript engines don't agree with Node" above). The software `fma` (with its `scalbn`) took about 7% of the time in a profile of rest, every sense and a grating.
+- **The connectome is written straight into the module's memory**: `WasmBrainModule.connectomeSpace(bytes)` mallocs room for it, the worker's decoder (apps/web/src/brain/wire.ts) unzips into that, and `create()` builds the brain and frees it. No copy of the 40 MB is made in JavaScript. A WebAssembly memory never shrinks, so the freed 40 MB stays in it, reused by nothing: the module holds 95 MB once the brain is built, against about 180 MB for the TypeScript brain.
+- **Tested** as above: every comparison runs `fly-brain-harness.wasm` too, in Node's WASI, compared line for line with the TypeScript, internal state, retinas and the digest of every neuron included; and `wasm.test.ts` runs the shipped module through `brain.ts`.
+- **What it differs in, as the TV's brain does**: the senses and the commands and rates cross the C interface as floats, where the TypeScript keeps doubles (see "Where it can't be the same"). The eyes' acceptance is the TypeScript's double rounded to a float.
+
+Speed, in seconds of one core per simulated second (the least of six alternating one-second runs on a machine shared with other jobs; `node packages/brain-native/scripts/bench.ts` gives the same for Node, the native build alongside):
+
+| | TypeScript | WebAssembly | |
+| --- | --- | --- | --- |
+| Node 26 (V8), at rest | 0.099 | 0.113 | 0.9× |
+| Node 26, every sense at full strength | 0.31 | 0.31 | 1.0× |
+| Node 26, a grating across both eyes | 0.56 | 0.56 | 1.0× |
+| Chromium 159, at rest | 0.11 | 0.071 | 1.6× |
+| Chromium, every sense | 0.34 | 0.23 | 1.5× |
+| Chromium, a grating | 0.63 | 0.45 | 1.4× |
+| Chromium, a disc looming | 0.29 | 0.20 | 1.4× |
+| WebKit 26, at rest | 0.069 | 0.061 | 1.1× |
+| WebKit, every sense | 0.23 | 0.19 | 1.2× |
+| WebKit, a grating | 0.46 | 0.40 | 1.1× |
+| WebKit, a disc looming | 0.23 | 0.21 | 1.1× |
+
+The native build does the same in about 0.069 at rest and 0.21 with every sense, so WebAssembly costs 1.4 to 1.7 times native here, about what is usual. It doesn't make the brain two to four times faster than the TypeScript, as native code is: both engines' optimising compilers turn the TypeScript's typed-array loops into nearly the same machine code as they do this. What it gains is in Chromium, where the TypeScript runs half again slower than in Node (likely the V8 sandbox Chrome enables and Node doesn't, which guards typed-array accesses and leaves WebAssembly's memory alone; not verified), and in memory: half the TypeScript's. Neither -O3, `-msimd128` (clang finds nothing to vectorise that it may) nor LTO (which wasi-sdk's exceptions don't yet support) changed it; the sweep and the delivery are 85% of the time, as natively, and compile to what they should.
 
 ## Speed and memory
 
@@ -128,8 +164,9 @@ The model is developed directly in this repository. `packages/brain` is the Type
 
 1. Port the change into the file of the same name: `params.cpp` for the operating point, `io.cpp` for groups, scales and decoding, `state.cpp`, `sim.cpp`, `eyes.cpp`, `vision.cpp`, `regions.cpp`, `brain.cpp` for runtime.ts, `connectome.cpp` for format.ts. A new eye table: `node packages/brain-native/scripts/eye-columns.ts`. Write each expression as the TypeScript writes it, in the same order, doubles from floats. Keep the TypeScript's comments' substance.
 2. A new `Math` function: take it from the same `ieee754.cc` into `fdlibm.cpp` and add it to `math.test.ts`. Never `<cmath>`'s, except `sqrt`, `floor`, `trunc` and `fabs`, which are exact everywhere.
-3. Run the tests. If a comparison fails, the message names the first tick that differs and what was happening; the engine test narrows it to a step and a neuron. Extend the scenario if the change adds something it doesn't exercise.
-4. When Node's V8 moves to a new version, run `math.test.ts`: if V8 changed its math, copy the routines again from that version.
+3. `npm run brain:wasm` and commit `wasm/`: the WebAssembly build is committed, and `wasm.test.ts` fails while its sources differ from what it was built from.
+4. Run the tests. If a comparison fails, the message names the first tick that differs and what was happening; the engine test narrows it to a step and a neuron. Extend the scenario if the change adds something it doesn't exercise.
+5. When Node's V8 moves to a new version, run `math.test.ts`: if V8 changed its math, copy the routines again from that version.
 
 ## Found in the TypeScript
 

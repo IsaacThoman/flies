@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/body/package.json packages/body/package.json
 COPY packages/brain/package.json packages/brain/package.json
+COPY packages/brain-native/package.json packages/brain-native/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/fly/package.json packages/fly/package.json
 COPY packages/ui/package.json packages/ui/package.json

@@ -2,7 +2,9 @@
 // served as plain files from a folder on a static host (scripts/serve.ts,
 // docs/web.md), in a real GPU-rendered Chromium. The first load, on a slow
 // connection that breaks off partway, counts the brain's bytes as they come
-// and carries on from where it broke; the second loads with the network off,
+// and carries on from where it broke, and runs the brain built as
+// WebAssembly, served as application/wasm; `?brain=typescript` runs the
+// TypeScript one from the same kept connectome; the second loads with the network off,
 // from the service worker and the brain's cache; a tab hidden for a while
 // (headless Chromium can't hide one, so the page is told it is) stops the
 // fly's life and its sound and wakes without a jump; a lost graphics context
@@ -34,7 +36,7 @@ const CUT_AT = 3_000_000;
 const out = mkdtempSync(path.join(tmpdir(), "fly-web-e2e-"));
 await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "warn", build: { outDir: out, emptyOutDir: true } });
 let cuts = 0;
-const site = await serveSite({ dir: out, base: "/some/folder/fly/", cut: (file) => (file.startsWith("brain/") && cuts++ === 0 ? CUT_AT : null) });
+const site = await serveSite({ dir: out, base: "/some/folder/fly/", cut: (file) => (file.startsWith("brain/connectome.") && cuts++ === 0 ? CUT_AT : null) });
 const browser = await chromium.launch({ executablePath: fullChromiumPath(), args: gpuFlags() });
 const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
 const page = await context.newPage();
@@ -56,6 +58,10 @@ const shot = async (name: string) => {
   if (shots) await page.locator("#game").screenshot({ path: path.join(shots, `${name}.png`) });
 };
 const brainRequests = () => site.requests.filter((r) => r.path.includes("/brain/"));
+const moduleTypes: string[] = [];
+context.on("response", (response) => {
+  if (response.url().endsWith(".wasm")) moduleTypes.push(response.headers()["content-type"] ?? "");
+});
 let failed = false;
 
 try {
@@ -81,10 +87,14 @@ try {
   console.log(`  ${(total / 1e6).toFixed(1)} MB, awake after ${((Date.now() - started) / 1000).toFixed(1)} s`);
   assert.equal(awake.from, "network");
   assert.equal(awake.neurons, "166700");
+  assert.equal(awake.brainEngine, "wasm", "the brain built as WebAssembly");
+  assert.deepEqual(moduleTypes, ["application/wasm"]);
+  assert.ok(total > 14_000_000, `the connectome and the module counted (${total} bytes)`);
   await shot("2-title");
 
   step("the connection broke off partway, and the download carried on from there");
-  const first = brainRequests().filter((r) => r.path === brainRequests()[0].path);
+  const firstPart = brainRequests().find((r) => r.path.includes("/brain/connectome."))!.path;
+  const first = brainRequests().filter((r) => r.path === firstPart);
   assert.equal(first.length, 2, "asked for again once");
   assert.equal(first[0].range, null);
   // From what had arrived: up to the cut, less what was still on its way when the connection went.
@@ -101,10 +111,21 @@ try {
   const offline = await waitFor(page, "brain=running,screen=title", 60_000);
   console.log(`  awake after ${((Date.now() - again) / 1000).toFixed(1)} s`);
   assert.equal(offline.from, "cache");
+  assert.equal(offline.brainEngine, "wasm");
   // The browser's own check for a new service worker escapes Playwright's offline switch; nothing of the page's may.
   const reached = site.requests.slice(before).filter((r) => !r.path.endsWith("/sw.js"));
   assert.deepEqual(reached.map((r) => r.path), [], "nothing reached the server");
   await context.setOffline(false);
+
+  step("?brain=typescript runs the TypeScript brain on the kept connectome, without the module");
+  const asked = site.requests.length;
+  await page.goto(`${site.url}?brain=typescript`);
+  const typescript = await waitFor(page, "brain=running,screen=title", 60_000);
+  assert.equal(typescript.brainEngine, "typescript");
+  assert.equal(typescript.from, "cache");
+  assert.deepEqual(site.requests.slice(asked).filter((r) => r.path.includes("/brain/")), [], "nothing of the brain fetched");
+  await page.goto(site.url);
+  await waitFor(page, "brain=running,screen=title,brainEngine=wasm", 60_000);
 
   step("the wallpaper keeps the screen awake");
   await page.keyboard.press("ArrowDown");

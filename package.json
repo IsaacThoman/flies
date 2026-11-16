@@ -29,6 +29,7 @@
     "ios:check": "node apps/ios/tests/simulator.ios.ts",
     "brain:fetch": "node packages/brain/scripts/fetch.ts",
     "brain:pack": "node packages/brain/scripts/pack.ts",
+    "brain:wasm": "packages/brain-native/wasm.sh",
     "fly:viewer": "vite --config packages/fly/viewer/vite.config.ts",
     "fuzz": "node scripts/fuzz.ts"
   },

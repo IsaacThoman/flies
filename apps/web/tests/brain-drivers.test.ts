@@ -4,6 +4,7 @@ import type { BrainRequest, BrainResponse, BrainSenses, BrainState } from "@fly/
 import { REGION_RATE_NAMES, RESTING_SENSES } from "@fly/brain";
 import { COMMAND_ORDER, SENSE_ORDER, STATE_STATS } from "@fly/contracts";
 import type { BrainStatus, NativeBrainBridge } from "@fly/contracts";
+import { workerEngine } from "../src/brain/create.ts";
 import { createBrainHost } from "../src/brain/host.ts";
 import { BrainMeter } from "../src/brain/meter.ts";
 import { NativeBrainDriver } from "../src/brain/native-driver.ts";
@@ -33,8 +34,8 @@ function fakeWorker() {
   };
 }
 
-/** A connectome source that hands over `data`, or fails as `error` says, as told. */
-function fakeSource(load: () => Promise<ArrayBuffer>) {
+/** A source that hands over the connectome `load` gives (and `module`, the WebAssembly brain, if any), or fails as it says. */
+function fakeSource(load: () => Promise<ArrayBuffer>, module: ArrayBuffer | null = null) {
   const source = {
     received: 0,
     total: 100,
@@ -46,7 +47,7 @@ function fakeSource(load: () => Promise<ArrayBuffer>) {
       source.loads++;
       source.received = 50;
       onProgress();
-      return load();
+      return { data: await load(), module };
     },
     discard: async () => void source.discarded++,
   };
@@ -66,9 +67,10 @@ test("the worker driver loads the connectome, transfers it and runs once the wor
   assert.equal(driver.progress, 1);
   assert.equal(worker.sent[0].request.type, "init");
   assert.deepEqual(worker.sent[0].transfer, [data]);
-  worker.reply({ type: "ready", neurons: 166700, connections: 6, eyes: null });
+  worker.reply({ type: "ready", neurons: 166700, connections: 6, eyes: null, engine: "typescript" });
   assert.equal(driver.status, "running");
   assert.equal(driver.neurons, 166700);
+  assert.equal(driver.engine, "typescript");
   driver.tick(16, RESTING_SENSES);
   assert.equal(worker.sent.length, 2);
   now = 5;
@@ -88,9 +90,21 @@ const running = async (now: () => number = () => 0) => {
   const worker = fakeWorker();
   const driver = new WorkerBrainDriver({ createWorker: worker.factory, source: fakeSource(async () => new ArrayBuffer(8)), now });
   await flush();
-  worker.reply({ type: "ready", neurons: 1, connections: 1, eyes: null });
+  worker.reply({ type: "ready", neurons: 1, connections: 1, eyes: null, engine: "typescript" });
   return { worker, driver };
 };
+
+test("given the WebAssembly brain, the worker driver transfers it with the connectome", async () => {
+  const worker = fakeWorker();
+  const data = new ArrayBuffer(16);
+  const module = new ArrayBuffer(8);
+  const driver = new WorkerBrainDriver({ createWorker: worker.factory, source: fakeSource(async () => data, module) });
+  await flush();
+  assert.deepEqual(worker.sent[0].request, { type: "init", data, module });
+  assert.deepEqual(worker.sent[0].transfer, [data, module]);
+  worker.reply({ type: "ready", neurons: 1, connections: 1, eyes: null, engine: "wasm" });
+  assert.equal(driver.engine, "wasm");
+});
 
 test("one tick at a time: time spent waiting goes out with the next, up to a cap", async () => {
   const { worker, driver } = await running();
@@ -161,6 +175,12 @@ test("a crash, a missing or damaged connectome and a slow build each fail as wha
   await flush();
   assert.equal(noWorkers.failure, "unsupported");
 
+  const noModule = fakeWorker();
+  const compiling = new WorkerBrainDriver({ createWorker: noModule.factory, source: fakeSource(async () => new ArrayBuffer(8), new ArrayBuffer(8)) });
+  await flush();
+  noModule.reply({ type: "error", message: "WebAssembly.compile(): invalid opcode 0x1f" });
+  assert.equal(compiling.failure, "unsupported", "a browser that can't compile the WebAssembly brain");
+
   const slow = fakeWorker();
   let t = 0;
   const slowDriver = new WorkerBrainDriver({ createWorker: slow.factory, source: fakeSource(async () => new ArrayBuffer(8)), now: () => t });
@@ -192,21 +212,30 @@ test("trying again loads again, and a kept copy the brain couldn't be built from
   await flush();
   assert.equal(source.discarded, 1);
   assert.equal(source.loads, 3);
-  worker.reply({ type: "ready", neurons: 1, connections: 1, eyes: null });
+  worker.reply({ type: "ready", neurons: 1, connections: 1, eyes: null, engine: "typescript" });
   assert.equal(driver.status, "running");
 });
 
-test("the worker host builds the brain once and answers every tick", () => {
+test("the worker host builds the brain once and answers every tick", async () => {
   const posted: BrainResponse[] = [];
-  const host = createBrainHost(() => ({ neurons: 3, connections: 2, eyes: null, tick: () => state(0.25) }), (r) => posted.push(r));
+  const brain = { neurons: 3, connections: 2, eyes: null, tick: () => state(0.25) };
+  const host = createBrainHost(async () => ({ brain, engine: "wasm" }), (r) => posted.push(r));
   host({ type: "tick", dtMs: 10, senses: RESTING_SENSES });
   assert.equal(posted[0].type, "error");
   host({ type: "init", data: new ArrayBuffer(1) });
-  assert.deepEqual(posted[1], { type: "ready", neurons: 3, connections: 2, eyes: null });
-  host({ type: "tick", dtMs: 10, senses: RESTING_SENSES });
-  assert.equal(posted[2].type, "state");
   host({ type: "init", data: new ArrayBuffer(1) });
-  assert.equal(posted[3].type, "error");
+  assert.equal(posted[1].type, "error", "already being built");
+  await flush();
+  assert.deepEqual(posted[2], { type: "ready", neurons: 3, connections: 2, eyes: null, engine: "wasm" });
+  host({ type: "tick", dtMs: 10, senses: RESTING_SENSES });
+  assert.equal(posted[3].type, "state");
+  host({ type: "init", data: new ArrayBuffer(1) });
+  assert.equal(posted[4].type, "error");
+
+  const failing: BrainResponse[] = [];
+  createBrainHost(() => Promise.reject(new Error("Corrupt connectome: x")), (r) => failing.push(r))({ type: "init", data: new ArrayBuffer(1) });
+  await flush();
+  assert.deepEqual(failing, [{ type: "error", message: "Corrupt connectome: x" }]);
 });
 
 function fakeBridge() {
@@ -312,4 +341,12 @@ test("the meter measures spikes per second of fly time", () => {
   // 500 spikes per 10 ms of fly time.
   assert.ok(Math.abs(meter.spikesPerSecond - 50_000) < 1);
   assert.ok(meter.speed > 0.9 && meter.speed < 1.1);
+});
+
+test("the worker runs the WebAssembly brain where the browser can, and ?brain= picks one", () => {
+  assert.equal(workerEngine("", true), "wasm");
+  assert.equal(workerEngine("", false), "typescript");
+  assert.equal(workerEngine("?brain=typescript", true), "typescript");
+  assert.equal(workerEngine("?x=1&brain=wasm", false), "wasm", "forced, even where it will fail: for tests");
+  assert.equal(workerEngine("?brain=fast", true), "wasm");
 });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
-import { ATTEMPTS, BRAIN_CACHE, BrainDownload, BrainLoadError } from "../src/brain/download.ts";
+import { ATTEMPTS, BRAIN_CACHE, BRAIN_MODULE_CACHE, BrainDownload, BrainFiles, BrainLoadError } from "../src/brain/download.ts";
 import type { BrainFile } from "../src/brain/download.ts";
 
 const BASE = "https://fly.example/app/";
@@ -237,4 +237,34 @@ test("a second data file in a cache of its own leaves the brain's parts alone", 
   const again = new BrainDownload(brain.file, BASE, { fetch: net.fetch, caches: caches.storage, ...quick });
   await again.load();
   assert.equal(again.from, "cache");
+});
+
+test("the WebAssembly brain comes first and is kept in a cache of its own, counted with the connectome", async () => {
+  const brain = brainFile();
+  const module = new Uint8Array(3_000).map((_, i) => i * 7);
+  const moduleFile: BrainFile = { bytes: module.length, parts: [{ url: "brain/fly-brain.0.abc.wasm", bytes: module.length, sha256: sha(module) }] };
+  const served = new Map([...brain.served, [`${BASE}brain/fly-brain.0.abc.wasm`, module]]);
+  const net = server(served);
+  const caches = cacheStorage();
+  const env = { fetch: net.fetch, caches: caches.storage, ...quick };
+  const files = new BrainFiles(new BrainDownload(brain.file, BASE, env), new BrainDownload(moduleFile, BASE, env, BRAIN_MODULE_CACHE));
+  assert.equal(files.total, brain.whole.length + module.length);
+  assert.equal(files.from, null);
+  const seen: number[] = [];
+  const loaded = await files.load(() => seen.push(files.received));
+  assert.deepEqual(new Uint8Array(loaded.data), brain.whole);
+  assert.deepEqual(new Uint8Array(loaded.module!), module);
+  assert.equal(net.requests[0].url, `${BASE}brain/fly-brain.0.abc.wasm`, "the small file first");
+  assert.equal(seen.at(-1), files.total);
+  assert.equal(files.from, "network");
+  await settle();
+  assert.deepEqual([...new Set(caches.opened)].sort(), [BRAIN_CACHE, BRAIN_MODULE_CACHE].sort());
+
+  const again = new BrainFiles(new BrainDownload(brain.file, BASE, env), new BrainDownload(moduleFile, BASE, env, BRAIN_MODULE_CACHE));
+  await again.load();
+  assert.equal(again.from, "cache");
+  assert.equal(net.requests.length, brain.file.parts.length + 1, "nothing fetched the second time");
+
+  const plain = await new BrainFiles(new BrainDownload(brain.file, BASE, env), null).load();
+  assert.equal(plain.module, null, "the TypeScript brain needs no module");
 });
