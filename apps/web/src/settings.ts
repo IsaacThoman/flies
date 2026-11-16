@@ -4,6 +4,7 @@
 // another build, or a broken one, never stops the game: anything that isn't
 // one of today's values is left at its default.
 
+import type { Option } from "@fly/ui";
 import type { WallpaperStyle } from "./camera.ts";
 import { PIXEL_SIZES } from "./display.ts";
 import type { PixelSize } from "./display.ts";
@@ -15,6 +16,14 @@ import type { ToolId } from "./tools/hands.ts";
 export type EyesDetail = "off" | "low" | "high";
 /** When something shows over the picture: never, in the wallpaper, or while playing too. */
 export type ShowWhen = "off" | "wallpaper" | "always";
+
+export const WALLPAPER_DELAYS: Option<number>[] = [
+  { value: 30, label: "30 s" },
+  { value: 60, label: "1 min" },
+  { value: 120, label: "2 min" },
+  { value: 300, label: "5 min" },
+  { value: 0, label: "Never" },
+];
 
 export type Settings = {
   /** 0 to 10. */
@@ -61,7 +70,7 @@ const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean 
   effects: volume,
   ambience: volume,
   pixels: (v) => Object.hasOwn(PIXEL_SIZES, v),
-  wallpaperAfter: (v) => v >= 0,
+  wallpaperAfter: (v) => WALLPAPER_DELAYS.some((delay) => delay.value === v),
   wallpaperCamera: (v) => ["follow", "calm", "lively"].includes(v),
   eyes: (v) => ["off", "low", "high"].includes(v),
   eyesInset: showWhen,

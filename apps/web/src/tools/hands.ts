@@ -213,9 +213,6 @@ export class Hands {
 
   update(dt: number, input: HandsInput, fly: { position: Vec3; yaw: number; onFeet: boolean }, pantry: Pantry) {
     const ev = this.events;
-    ev.dropped = null;
-    ev.landed = null;
-    ev.swooped = false;
     const world = this.#world;
     this.#idle += dt;
     if (!this.following && this.#idle > POINTER_RETURN) this.following = true;
@@ -303,6 +300,9 @@ export class Hands {
 
   /** Clears the per-frame events the screen has read. */
   clearEvents() {
+    this.events.dropped = null;
+    this.events.landed = null;
+    this.events.swooped = false;
     this.events.toolChanged = false;
     this.events.variantChanged = false;
     this.events.blocked = false;

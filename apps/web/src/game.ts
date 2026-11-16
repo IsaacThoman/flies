@@ -458,10 +458,7 @@ export class Game implements Shell {
     if (ev.landed) this.audio.play("land", this.#nearness(life.body.position) * 0.5);
     if (life.meals > this.#lastMeals) this.audio.play("eat", this.#nearness(life.body.position));
     this.#lastMeals = life.meals;
-    const he = this.hands.events;
-    if (he.dropped) this.audio.play("drop");
-    if (he.landed) this.audio.play("land", 0.6);
-    if (he.swooped) this.audio.play("swoop");
+    this.audio.tools(this.hands.events);
   }
 
   /** Sets the light and the weather to the tools' choices; on "Now", to the clock's, looked at again every few seconds. With `settle`, there at once. */
@@ -583,7 +580,8 @@ export class Game implements Shell {
           this.#copyEye();
           hands.update(0, { use: true, holding: true, eye: this.#eye }, this.life.body, this.life.pantry);
           if (hands.events.blocked) this.audio.play("blocked");
-          if (hands.events.dropped || hands.events.swooped) this.#learn(hands.current.id);
+          if (hands.events.dropped) this.#learn("feed");
+          if (hands.events.swooped) this.#learn("swoop");
         }
         break;
       case "back":
