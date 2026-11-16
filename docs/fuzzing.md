@@ -40,12 +40,18 @@ walking, backing and flight drives; varies frames from 10 microseconds to two
 seconds; blows gusts up to 600 mm/s; and starts elsewhere every simulated
 minute. Each step checks finite coordinates, velocities, normals and motion
 scalars, nonpenetration (its feet out of every solid, and its body's 1.3 mm
-over them clear of every underside, walking or flying), standing on the
+over them clear of every underside, walking or flying), its reach (`checkReach`:
+its head, thorax and abdomen out of everything in the air, and on its feet
+those and its legs out of every side, and every slope too steep to stand on,
+past a step over its feet; its legs only where it stands between two things
+facing each other, against both, closer than they reach), standing on the
 surface at or below its feet (height, slope, floor, and the surface it
 thinks it stands on), landing events and bounded excursions from the floor
 and ceiling. Straight walking paths are
 also ray-checked for tunneling; bent sliding paths cannot be checked using
-their chord. Dedicated regressions check thin walls and a grazing box corner.
+their chord. Dedicated regressions check thin walls and a grazing box corner,
+and what the body reaches at panes, walls, corners, a card thinner than its
+head, a slab's edge and a gap narrower than its legs (`packages/body/tests/reach.test.ts`).
 Every 30 simulated seconds, recovery probes remove wind and wings, require a
 landing inside 20 seconds, then try eight walking headings (3 seconds each)
 and take-off headings. At least one walking heading must travel 3 mm and at

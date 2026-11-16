@@ -13,7 +13,9 @@
 //
 // - Physics: it stays on the surface it walks on, slides along what it walks
 //   into, falls off ledges, and in the air has weight, drag and its wings'
-//   force, and bounces off what it flies into, an underside included. A
+//   force, and bounces off what it flies into, an underside included. Its
+//   head, abdomen and legs keep out of what they reach (#clear), which can
+//   turn it between things too close for it as it faces (#turnToFit). A
 //   take-off is the escape command's; its direction is the body's: away
 //   from a threat it knows of, else straight ahead. In the air it turns to
 //   face its course (VANE_RATE).

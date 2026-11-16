@@ -79,6 +79,21 @@ what its feet went into), never on something it is under; beside a slab it
 falls past it. Under something less than 2 mm higher than its body, it can
 only walk out.
 
+Its body reaches past its feet: its head and its abdomen's tip half a body
+length ahead and behind, its thorax's sides, and on its feet its six legs,
+out to 1.65 mm ahead and 1.3 mm to the side (`BODY_REACH` and `FEET_REACH` in
+`packages/body/src/motion.ts`, where the drawn fly's are). After every step
+these are kept out of the sides of things, and of slopes too steep to stand
+on: a fly flying at a pane bounces off it with its head on the room's side, a
+fly turning beside a wall swings its legs clear of it, one walking into a wall
+stops with its front feet at it. Moved out of one thing into another, it is
+moved again; between two things too close for it as it faces, they turn it a
+quarter turn if it fits so; where nothing fits its legs (closer than 2.65 mm),
+only its body is kept out. On its feet what rises less than a step under its
+body is what it steps up onto, and a slope it could walk up is not in its way.
+So nothing it can reach may be closer to a wall than that: a gap narrower than
+the fly's legs is a gap it only stands in with its legs against both sides.
+
 The world files every solid in a grid of flat arrays, its cells 32 mm or,
 in a bigger place, doubled until there are no more than 16,384 of them (the
 restaurant's are 64 mm); a solid over more than 1,024 cells (the
