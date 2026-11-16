@@ -280,7 +280,7 @@ vec3 rRoom(vec3 p, vec3 r, float rough) {
     vec2 q = p.xz + r.xz * t - vec2(${f(PENDANT_LIGHT.x)}, ${f(PENDANT_LIGHT.z)});
     float w = 3.0 + t * blur;
     float d = length(q);
-    c += uPendantColor * uPendant.w * ${(1 / 620_000).toExponential(3)} * ((1.0 - smoothstep(${f(PENDANT_LIGHT.r)} - w, ${f(PENDANT_LIGHT.r)} + w, d)) * 2.5 + exp(-d * d / (t * t * 0.08 + 40000.0)) * 0.3);
+    c += uPendantColor * uPendant.w * ${(1 / 620_000).toExponential(3)} * ((1.0 - smoothstep(${f(PENDANT_LIGHT.r)} - w, ${f(PENDANT_LIGHT.r)} + w, d)) * 1.6 + exp(-d * d / (t * t * 0.02 + 40000.0)) * 0.08);
   }
   return c;
 }`;
