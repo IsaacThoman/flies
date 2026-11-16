@@ -6,7 +6,7 @@ A spiking simulation of the male fruit fly's whole central nervous system, about
 
 The wiring is the [FlyEM male CNS](https://male-cns.janelia.org/) connectome from Janelia Research Campus, published under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/). Anything that ships the packed file, or shows behaviour derived from it, should credit "FlyEM male CNS connectome, Janelia Research Campus (CC-BY 4.0)". The packed file records the dataset, license and URL in its header.
 
-It is not in git. The quickest way to get it is to download the packed file (21 MB) from the original data release, hosted in `IsaacThoman/ladybug`; the download is checked against a known hash:
+It is not in git. The quickest way to get it is to download the packed file (21 MB) from the original data release, hosted in `IsaacThoman/ladybug`; the download is checked against a known hash. The same command downloads FlyEM's public annotations, checks their pinned hash and builds the optional anatomy sidecar locally:
 
 ```sh
 npm run brain:fetch
@@ -43,6 +43,309 @@ Neurons are numbered in ascending root ID order. The sections:
 - `ntConfidence` u8[N]: predicted transmitter confidence, 0 to 100 (0 when blank).
 
 `loadConnectome(buffer)` validates everything and returns typed-array views into the buffer, with `find({ type: "DNp01" })`, `find({ superClass: /^visual/, side: "left" })`, `filter(i => ...)` and `indexOf(rootId)` for picking neurons.
+
+## Anatomy sidecar
+
+This data is for display. Nothing in the simulation, `REGIONS`, region rates,
+native brain or game loading consumes it yet.
+
+### Source and getting it
+
+`npm run brain:fetch` leaves both `connectome.bin` and `anatomy.bin` in
+`packages/brain/data/` (gitignored). With `--out <path>`, anatomy is written beside
+that connectome. It downloads the existing packed wiring unchanged, then the
+[public FlyEM annotation Feather](https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather),
+listed on the [official download page](https://male-cns.janelia.org/download/).
+No new binary needs hosting. The annotation download is 14,483,314 bytes,
+211,577 bodies, version `v1.0-minconf-0.5`, SHA-256
+`2177e246113e4cfbf1e7772ec37c6da1955ff22e8063d0b1f833101f99a9a3b2`.
+The packer refuses changed/incomplete bytes before decoding them. An unreachable
+source or a changed annotation hash fails the fetch command, explicitly reports
+that anatomy was not written, and gives the retry command and manual route.
+The already written connectome stays usable; anatomy is optional for the game.
+If it fails after writing the connectome, anatomy may still be absent or old;
+the loader refuses an old sidecar paired with different wiring.
+
+Manual route (Node only; `npm install` installs the packer's Arrow/LZ4 dev dependencies):
+
+```sh
+curl -fL https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather -o packages/brain/data/annotations.feather
+node packages/brain/scripts/anatomy.ts --annotations packages/brain/data/annotations.feather
+# Optional: --connectome <connectome.bin> --out <anatomy.bin>
+node packages/brain/scripts/anatomy-report.ts
+```
+
+This route also checks the pinned annotation hash. Repacking against a locally
+built connectome binds anatomy to those exact wiring bytes; all its root IDs
+must exist in the annotations. All 166,700 IDs in the shipped wiring are present.
+The packer joins by `bodyId`, rejects duplicates and missing IDs, validates each
+row and sorts the string tables, so input row order cannot affect output.
+The source, its version, hash and URL, and attribution "FlyEM male CNS connectome,
+Janelia Research Campus (CC-BY 4.0)" travel in the header.
+
+### Format and loading
+
+`src/anatomy.ts` is browser-safe, exported from `@fly/brain`; Arrow, LZ4 and Node
+code stay in `src/pack-anatomy.ts` and the scripts. Little-endian:
+`FANA` (4 bytes), version u32 (1), JSON byte length u32, UTF-8 JSON header,
+zero padding to 8 bytes, then these sections, each 8-byte aligned:
+
+| Section | Type | Meaning |
+|---|---|---|
+| position | u16[3N] | Interleaved dataset x/y/z, linearly quantised over header `bounds` |
+| positionKind | u8[N] | 0 absent (coordinates zero), 1 actual `somaLocation`, 2 `tosomaLocation` fallback |
+| neuromere | u8[N] | `somaNeuromere`, index into sorted string table |
+| entryNerve | u8[N] | Entry nerve, particularly for sensory axons whose somata are outside the CNS |
+| rootSide | u8[N] | Side of the axon root: L/R/M normalised to left/right/midline; `unknown` preserved |
+
+Blank categorical data is `""`, code 0. These supplement the connectome's columns;
+root side is **not** soma side, and entry nerve is **not** a soma position. Retaining
+the fibre fallback costs just the flag already needed for absent positions and
+places 976 extra cells without calling their fibre points cell bodies. No column
+hex coordinates are duplicated (`eye-columns.ts` already serves the eyes), no
+inferred positions for missing somata, and no neuropil/synapse data are added.
+Entry nerves/root sides are retained wherever present, even for the few
+non-sensory cells, without changing the packed wiring's nerve or side.
+
+For each axis, `p = min + code / 65535 * (max - min)` µm. Bounds are measured from
+all matched somata and fallback points, before quantisation, in the unwarped
+male CNS EM frame: x 19.744–749.344, y 38.064–551.968, z 81.232–1076.472 µm.
+Maximum rounding error is 0.00557/0.00393/0.00760 µm respectively, at most 7.6 nm.
+Degenerate axes encode as zero and decode to the bound; an all-absent file has
+zero bounds. The sidecar is **1,668,256 bytes** (936,365 bytes gzip at Node's default),
+SHA-256 `acd8f7a3d3ec2c631b762098cb6ff186b35cb8ee9803a3fb885e5697b643bbf9`
+for wiring hash `51c97031b39f93c04a683f16683d88f15d291f1e1062694fc0a215e23c3b895c`.
+
+```ts
+const anatomy = await loadAnatomy(anatomyBuffer, connectomeBuffer);
+const p = anatomy.position(i);         // µm in dataset frame, or null
+const kind = anatomy.positionKind[i];  // distinguish soma from fibre fallback
+const segment = anatomy.segment(i);   // "T1", "A3", "CG", ... or ""
+const unit = p && anatomy.unitBox(p);  // [0,1]^3 in dataset axes
+const oriented = p && anatomicalPosition(p); // left/dorsal/anterior µm
+```
+
+The loader hashes the **actual connectome buffer**, refuses a mismatched pair
+with a recovery message, validates the wiring, then exposes typed-array views
+into the anatomy buffer. It validates magic/version, UTF-8/JSON, provenance,
+frame, bounds, exact section layout/lengths, padding, sorted tables, category
+codes and flags. `position`, `unitBox` and `anatomicalPosition` accept an optional
+output tuple to reuse; retain it for allocation-free per-frame work. `unitBox`
+normalises each axis independently (so it changes aspect ratio), maps degenerate
+axes to zero, and doesn't clamp points outside the recorded bounds. Use a single
+physical scale with `anatomicalPosition` when preserving relative sizes matters.
+
+### Coverage, verified against the source
+
+Soma: **139,662 (83.78%)**. Fibre only: **976**; total positioned **140,638 (84.37%)**.
+There are 995 `tosomaLocation` annotations, but 19 overlap a soma and prefer it.
+Segments: **21,799**; entry nerves: **11,806**; root sides: **17,906** (includes 414
+`unknown` entries, which do not establish left/right). Coverage by the connectome's
+super class (the report script regenerates this table):
+
+| Super class | Neurons | Soma | Fibre only | Segment | Entry nerve | Root side |
+|---|---:|---:|---:|---:|---:|---:|
+| ENS | 50 | 1 | 0 | 0 | 0 | 0 |
+| ascending_neuron | 1846 | 1812 | 27 | 1846 | 0 | 0 |
+| cb_efferent | 4 | 4 | 0 | 4 | 0 | 0 |
+| cb_endocrine | 72 | 68 | 0 | 2 | 0 | 0 |
+| cb_intrinsic | 32164 | 31997 | 77 | 5082 | 0 | 0 |
+| cb_motor | 107 | 103 | 0 | 20 | 0 | 0 |
+| cb_sensory | 4868 | 0 | 0 | 0 | 4859 | 4868 |
+| cb_sensory_tbc | 14 | 0 | 0 | 0 | 8 | 7 |
+| descending_neuron | 1314 | 1308 | 0 | 755 | 0 | 0 |
+| descending_neuron_tbc | 2 | 0 | 0 | 0 | 0 | 0 |
+| efferent_ascending | 8 | 8 | 0 | 8 | 0 | 0 |
+| efferent_descending | 4 | 4 | 0 | 0 | 0 | 0 |
+| ol_intrinsic | 89403 | 81055 | 630 | 25 | 0 | 3 |
+| ol_sensory | 6098 | 28 | 0 | 0 | 0 | 6091 |
+| sensory_ascending | 537 | 0 | 0 | 0 | 536 | 536 |
+| sensory_ascending_tbc | 2 | 0 | 0 | 0 | 1 | 1 |
+| sensory_descending | 12 | 0 | 0 | 2 | 12 | 12 |
+| visual_centrifugal | 563 | 563 | 0 | 32 | 0 | 0 |
+| visual_projection | 9201 | 9162 | 17 | 46 | 0 | 0 |
+| visual_projection_tbc | 2 | 2 | 0 | 0 | 0 | 0 |
+| vnc_efferent | 94 | 90 | 1 | 93 | 1 | 1 |
+| vnc_endocrine | 22 | 22 | 0 | 22 | 3 | 4 |
+| vnc_intrinsic | 13161 | 12729 | 223 | 13152 | 8 | 2 |
+| vnc_motor | 708 | 703 | 1 | 707 | 0 | 0 |
+| vnc_sensory | 6370 | 2 | 0 | 0 | 6355 | 6357 |
+| vnc_sensory_tbc | 36 | 0 | 0 | 0 | 23 | 24 |
+| vnc_tbc | 38 | 1 | 0 | 3 | 0 | 0 |
+
+This verifies and refines PR #11's research: the 6,098 photoreceptors include 28
+positions (6,070 missing); 4,868 head sensory neurons have none; the 6,370 cord
+sensory neurons include 2 positions, with none among the 537 sensory ascending
+neurons. So "sensory neurons are missing" has exceptions. Of L1–L5, **7,436** lack
+either kind of position (L1 1,475; L2 1,538; L3 1,517; L4 1,485; L5 1,421).
+For `vnc_sensory`, entry nerve covers 6,355/6,370, root side 6,357/6,370 (6,356
+left/right, one unknown); for `sensory_ascending`, both cover 536/537.
+The source also confirms 23,720 neurons with both optic-column hex coordinates;
+they are deliberately left out. The position union reaches z=134,559 voxels
+(1,076.472 µm), correcting PR #11's upper bound of 134,531. Nerve names
+include ProLN/MesoLN/MetaLN (legs), ADMN/PDMN (wing), DMetaN (haltere) and AbN*
+(abdominal); these identify CNS entry, not locations on the legs or abdomen.
+
+The annotation schema has no per-neuron neuropil counts. Independently reading
+the public `body-stats` Feather schema also finds none (pre/post/downstream/
+synweight and labels). Reading the schema and object metadata of
+`v1.0/database/neuprint-inputs/Neuprint_Neurons.feather` confirms `roiInfo:string`
+and **4,648,794,426 bytes**; that export was not downloaded in full. Per-neuron
+neuropil counts remain out of scope, not inferred from soma segment.
+
+### Coordinate frame and seating in the fly
+
+The table's locations are **8 nm voxels** in male CNS v1.0 EM space, converted to
+µm before quantisation. From side annotations, larger dataset x is the fly's
+left. Smaller y is dorsal, smaller z anterior. The [male CNS paper, EM Volume
+Alignment](https://pmc.ncbi.nlm.nih.gov/articles/PMC12636603/) describes approximately
+axis-aligned brain/VNC volumes and the neck stitching. Our orientation is a
+proper rotation (two sign flips) plus translation, with no rescaling or warp:
+
+```
+left    =  0.008 * voxelX - 400
+ dorsal =  300 - 0.008 * voxelY
+anterior = -0.008 * voxelZ
+```
+
+`anatomicalPosition` takes **µm**, so omits the 0.008 factor. The 400/300 µm
+reference is a convenient origin, not a measured midline plane or a ground
+height; the specimen is asymmetric. The fly contract uses exactly these signs:
++x left, +y dorsal/up, +z anterior/forward, feet on y=0, one body length.
+Ground translation and the physical length scale belong to a later display.
+
+Tissue extents from the public
+[major-compartment meshes](https://storage.googleapis.com/flyem-male-cns/rois/malecns-major-compartments-v2/segment_properties/info)
+(convert nm to µm, then use the transform above):
+
+| Tissue mesh | Left x (µm) | Dorsal y (µm) | Anterior z (µm) |
+|---|---:|---:|---:|
+| CentralBrain.ngmesh | -238.0…221.4 | -130.6…263.1 | -415.2…-63.5 |
+| Optic(L).ngmesh | 88.5…351.1 | -109.6…210.3 | -349.2…-123.5 |
+| Optic(R).ngmesh | -382.1…-107.7 | -133.2…199.6 | -355.8…-157.9 |
+| CV.ngmesh | -44.3…65.8 | -147.5…-4.0 | -481.8…-348.7 |
+| VNC.ngmesh | -162.9…152.8 | -277.8…-7.3 | -1077.2…-481.8 |
+
+`node packages/brain/scripts/anatomy-mesh-bounds.ts` reproduces this table, fetching
+about 25 MB once and printing the source mesh SHA-256s. These are tissue shells;
+they differ from soma envelopes, and contain no per-neuron neuropil assignments.
+Neck CV is about 110 × 143 × 133 µm, descending from the back/ventral brain to
+the anterior cord. The VNC is about 316 × 270 × 595 µm; the central brain is
+459 × 394 × 352 µm, and the left/right optic lobes 263/274 × 320/333 × 226/198 µm.
+The full brain including both lobes spans about 733 µm laterally. Both remain in
+a common physical scale; do not normalise brain and cord separately to unit cubes.
+
+For the **somata/fibre points** the report gives these envelopes by annotations,
+including every recorded neuromere (no points for `unknown`):
+
+| Soma envelope | Positioned | Left x (µm) | Dorsal y (µm) | Anterior z (µm) |
+|---|---:|---:|---:|---:|
+| Central brain (cb_intrinsic) | 32074 | -240.1…210.3 | -94.9…261.9 | -348.9…-81.2 |
+| Brain incl. optic lobes (head-resident super classes) | 125014 | -380.3…349.3 | -128.2…261.9 | -353.3…-81.2 |
+| Optic lobe left (ol_intrinsic) | 40692 | -0.6…349.3 | -106.7…216.6 | -346.6…-106.4 |
+| Optic lobe right (ol_intrinsic) | 40993 | -380.3…-12.7 | -128.2…201.3 | -353.3…-120.0 |
+| Neck-projecting classes (somata, NOT neck tissue) | 3147 | -167.0…147.6 | -251.2…240.5 | -1072.7…-96.6 |
+| Cord (vnc_* and ascending_neuron) | 15611 | -133.7…127.2 | -252.0…23.8 | -1076.5…-194.4 |
+| A1 | 912 | -60.7…82.3 | -187.8…-28.1 | -1053.6…-799.5 |
+| A10 | 36 | -24.2…33.4 | -134.1…-21.0 | -1075.6…-941.5 |
+| A2 | 264 | -52.2…76.5 | -138.3…-21.5 | -1034.4…-894.9 |
+| A3 | 237 | -56.2…76.3 | -141.8…-19.8 | -1055.8…-931.3 |
+| A4 | 212 | -55.5…72.3 | -140.7…-19.2 | -1050.2…-967.9 |
+| A5 | 179 | -53.2…68.3 | -144.6…-19.4 | -1053.8…-982.6 |
+| A6 | 164 | -52.2…61.9 | -150.2…-17.7 | -1070.4…-983.5 |
+| A7 | 115 | -46.6…58.9 | -145.8…-18.4 | -1069.7…-941.5 |
+| A8 | 187 | -43.7…55.6 | -144.9…-17.8 | -1076.5…-1018.1 |
+| A9 | 135 | -43.9…42.1 | -146.0…-16.3 | -1076.2…-1029.5 |
+| CG | 2392 | -228.1…200.5 | -10.0…247.6 | -312.5…-95.5 |
+| DC | 566 | -154.3…121.1 | 12.8…164.6 | -296.2…-86.2 |
+| GNG | 89 | -135.6…117.4 | -92.8…-1.2 | -288.3…-120.5 |
+| LB | 1305 | -135.9…126.2 | -95.8…47.3 | -348.9…-201.5 |
+| MD | 372 | -136.3…122.6 | -61.9…3.8 | -197.9…-126.4 |
+| MX | 498 | -115.6…95.3 | -93.4…-8.0 | -238.0…-141.0 |
+| T1 | 4198 | -133.7…127.2 | -237.9…-54.8 | -696.1…-414.8 |
+| T2 | 5016 | -116.1…124.5 | -252.0…-39.0 | -949.3…-544.4 |
+| T3 | 3957 | -104.5…103.3 | -250.9…23.8 | -1054.1…-194.4 |
+| TC | 729 | -159.6…136.6 | -48.8…59.6 | -245.3…-113.7 |
+
+These are min/max soma envelopes, **not** segment tissue boundaries. Segment
+somata overlap; T3 even has an annotated outlier in the head. Segment labels
+should not be re-inferred by slicing z. Mean z of cord interneuron T1/T2/T3 is
+approximately -615/-758/-966 µm: their leg segments progress posteriorly. The
+abdominal neuromeres form the fused ganglion near the cord's back, not a string
+of ganglia extending through the fly's abdomen.
+
+The data is a dissected, aligned specimen: the authors rotated the brain back
+18° to align its axes; brain and cord were imaged separately, and their neck
+cut faces still differed by about 25° before a local nonrigid stitch. Those
+angles describe acquisition/alignment, **not** a known inverse transform into
+our live model. A display must fit brain and cord as separate rigid groups,
+rotate/translate about the neck attachment and bridge the neck for illustration;
+it cannot claim a measured live neck pose. No such fitting is baked into this file.
+
+For a concrete scale check, assuming a 2.5 mm body gives 0.0004 model units/µm:
+brain width 0.293 units, cord length 0.238, neck length 0.053. The current model's
+head centre is (0, 0.335, 0.392), radii (0.155, 0.13, 0.095); thorax centre
+(0, 0.335, 0.135), radii (0.15, 0.155, 0.2), and neck pivot (0, 0.335, 0.33)
+(`packages/fly/src/anatomy.ts`). These suggest a reasonable common scale but do
+not determine registration. One illustrative starting fit centres the brain
+around dataset (390, 230, 235) µm at the model head centre; centre the cord near
+(400, 443, 780) µm at (0, 0.27, 0.135), ventral within the thorax. Preserve the
+same 0.0004 scale, then fit rotations about +x and attachment offsets against
+the head/cord envelopes. At that scale the specimen's brain-to-cord offset is
+about (0.004, -0.085, -0.218) model units, whereas those proposed model centres
+differ by (0, -0.065, -0.257): one global translation alone cannot make both
+centres coincide. This is an illustrative seating recipe, not anatomical ground
+truth, and should be checked against the visible body before use.
+
+### Cord segment view, not applied to the catalog
+
+`cordSegments(connectome, anatomy)` returns disjoint groups of `vnc_intrinsic`
+neurons with the exact segment string (blank for unknown), side (left/right/
+midline/blank), and `Uint32Array` indices; `.neurons.length` is the count. It
+uses the connectome's soma side, normalising `center` to `midline`, **not** the
+axon root side. It includes all 13,161 interneurons exactly once, and no
+`vnc_tbc` or sensory/motor neurons. Fine segment counts:
+
+| Interneuron segment | Left | Right | Midline | No side |
+|---|---:|---:|---:|---:|
+| Unknown | 2 | 0 | 0 | 7 |
+| A1 | 375 | 374 | 8 | 0 |
+| A10 | 1 | 1 | 0 | 0 |
+| A2 | 88 | 88 | 4 | 0 |
+| A3 | 89 | 87 | 4 | 0 |
+| A4 | 73 | 73 | 4 | 0 |
+| A5 | 60 | 60 | 3 | 0 |
+| A6 | 62 | 63 | 2 | 0 |
+| A7 | 43 | 44 | 0 | 0 |
+| A8 | 74 | 78 | 0 | 0 |
+| A9 | 51 | 53 | 0 | 0 |
+| T1 | 1652 | 1643 | 85 | 0 |
+| T2 | 2197 | 2205 | 90 | 1 |
+| T3 | 1707 | 1679 | 31 | 0 |
+
+
+13,152 have a segment: T1 3,380; T2 4,493; T3 3,417; A1 757; A2–A10 1,105.
+The nine unknowns stay unknown (2 left, 7 no soma side). One more neuron has a
+T2 segment but no side. No fallback guesses a side or segment from position.
+
+A later catalog change could replace `cord-interneurons-left/right` with
+T1/T2/T3/abdominal × left/right, abdomen aggregating A1–A10. Counts would be
+1,652/1,643; 2,197/2,205; 1,707/1,679; 916/921. Keep two unknown-segment left
+cells in an explicit cord-interneurons-unknown group. Keep `cord-midline` as
+its current 277 cells (231 midline, 8 without side, 38 `vnc_tbc`); 63 regions
+would become 70. The catalog descriptions, native partition and rate names,
+native/TS parity tests and region `fullHz` measurements would need updating
+together, after the display lands. This PR does none of that.
+
+### Serving and future bundling
+
+Vite serves `/brain/anatomy.bin` in dev and preview and copies it beside
+`brain/connectome.bin` in production; no fetch or consumer is added to the game.
+The connectome URL and browser caching/loading code are unchanged. A later tvOS
+change would need to copy the matching sidecar into its app resources, expose
+its bytes to the display and use the same hash validation (or an equivalently
+validated native reader); updating this web Vite plugin does not bundle it into
+the Apple TV app. The native simulation itself needs no anatomy.
 
 ## Neuron model
 
@@ -273,7 +576,7 @@ Not reproduced:
 
 ### How neurons are placed
 
-The packed file has no positions and no neuropil per neuron (FlyEM's own annotation table has a soma position for 84% of them; it isn't packed), so each neuron is placed by its annotations: super class, class, sub class, cell type and soma side. Where a type's name says which neuropil it belongs to, that decides; where nothing places a neuron, it goes to its part of the body's catch-all rather than to a guess. A neuron of a left/right region whose soma is on the midline or has no side goes to the catch-all too. `regionOf(connectome)` gives each neuron's region; `scripts/regions.ts` prints what each region holds (below).
+The wiring file has no positions and no neuropil per neuron (the separate anatomy sidecar below now carries positions and segments), so each neuron is placed by its annotations: super class, class, sub class, cell type and soma side. Where a type's name says which neuropil it belongs to, that decides; where nothing places a neuron, it goes to its part of the body's catch-all rather than to a guess. A neuron of a left/right region whose soma is on the midline or has no side goes to the catch-all too. `regionOf(connectome)` gives each neuron's region; `scripts/regions.ts` prints what each region holds (below).
 
 - **Eyes and optic lobes**, each side. The photoreceptors (`ol_sensory`) are the retina; the visual projection and visual centrifugal neurons are regions of their own. The optic lobe's 89,403 intrinsic neurons go by type, after the naming of Fischbach and Dittrich (1989) and the male optic lobe's inventory (Nern et al. 2025):
   - **lamina**: its own cell types as Tuthill et al. (2013) list them, less the photoreceptors: L1-L5, the amacrine Lai, T1, the centrifugal C2 and C3 and the wide-field Lawf1 and Lawf2 (C2, C3 and the Lawfs take their input in the medulla and feed it back), and the lamina tangential Lat cells: 15,025.
@@ -287,7 +590,7 @@ The packed file has no positions and no neuropil per neuron (FlyEM's own annotat
 - **The neck**: descending neurons (with the 12 `sensory_descending`) and ascending neurons, by side.
 - **Ventral nerve cord motor neurons** by sub class: front, middle and hind leg (`fl`, `ml`, `hl`) by side; wings, halteres and the unassigned ones leaving through the dorsal nerves (`wm`, `hm`, `xm`) one region; neck (`nm`); abdomen (`ad`).
 - **Body sensory neurons** (`vnc_sensory`, `sensory_ascending`) by sub class, where it names a place: legs (`leg`, `leg_bristle`); wings, halteres and thorax (`wing`, `wing_bristle`, `haltere`, `notum`, `neck`); abdomen. Where it names only the organ: proprioceptors (`campaniform_sensilla`, `chordotonal_organ`, `hair_plate`) and body bristles (`mechanosensory_bristle`, `taste_bristle`). Most have no side recorded, so these are both sides together.
-- **Ventral nerve cord interneurons** (`vnc_intrinsic`) by side; those with their soma on the midline, and the cord neurons to be confirmed (`vnc_tbc`), on the midline. The packed file doesn't say which neuromere an interneuron is in (FlyEM's annotation table does, as `somaNeuromere`, for all but 9 of them; it isn't packed), so each side is one region along the whole cord. Efferent and neuroendocrine neurons of the cord (`vnc_efferent`, `vnc_endocrine`, `efferent_ascending`, `efferent_descending`) one region.
+- **Ventral nerve cord interneurons** (`vnc_intrinsic`) by side; those with their soma on the midline, and the cord neurons to be confirmed (`vnc_tbc`), on the midline. The wiring file doesn't say which neuromere an interneuron is in (the separate anatomy sidecar now does, as `somaNeuromere`, for all but 9 of them; the catalog does not consume it), so each side is one region along the whole cord. Efferent and neuroendocrine neurons of the cord (`vnc_efferent`, `vnc_endocrine`, `efferent_ascending`, `efferent_descending`) one region.
 - **Unplaced**: what nothing above places, 75 here: descending and ascending neurons with their soma on the midline or no side, and sensory neurons whose class or organ is to be confirmed.
 
 What each region holds, by what put them there (super class, class or sub class where the rule reads it, and the type's prefix, its letters before the first digit), largest first (`node packages/brain/scripts/regions.ts`):

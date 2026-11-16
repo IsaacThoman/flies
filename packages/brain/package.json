@@ -10,5 +10,9 @@
   "scripts": {
     "data:pack": "node scripts/pack.ts",
     "data:fetch": "node scripts/fetch.ts"
+  },
+  "devDependencies": {
+    "apache-arrow": "^21.2.0",
+    "lz4js": "^0.2.0"
   }
 }
