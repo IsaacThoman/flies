@@ -352,9 +352,9 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
   `apps/web/src/ui/text-entry.ts`). There is no share sheet or clipboard, so
   no Share the link: at a room, Online shows its QR code and its code (as it
   does everywhere) for a phone to scan or another TV to type. The simulator
-  check sits the app in a room of eight; eight on a real Apple TV still has
-  to be measured (`npm run tvos:soak -- --table`, `docs/apple-tv.md`,
-  "Playing together").
+  check sits the app in a room of eight, and on an Apple TV 4K a room of
+  eight holds 60 fps (`npm run tvos:soak -- --table`, `docs/apple-tv.md`,
+  "Eight flies on a TV").
 - **iPhone and iPad.** No bridge: the app is the web build in a web view,
   whose own WebSocket reaches `wss://flies.isaacthoman.com/rooms` (and a room
   server of your own at an address or a `.local` name, for development), and

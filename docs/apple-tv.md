@@ -532,6 +532,25 @@ Pull `performance.log` as for any soak. The `stats` lines from `drive: table pla
 is one there and living) and `state.calls` the game's draws a frame. Compare them with the
 single-player soak above.
 
+Measured 16 November 2026 on an Apple TV 4K (3rd generation), tvOS 27.2.1, release build, against
+a room server on a Mac over the local network (by address, with no ATS exception), `--minutes 20`.
+The TV was warm from an earlier soak and reported thermal state 2 (serious) throughout.
+
+| Phase | FPS in 10-second windows | Mean JavaScript a frame | Its p95, median window and worst | Draws a frame (host's mean) |
+| --- | --- | --- | --- | --- |
+| Playing at the table | 55–60, mean 59.9 | 7.5 ms | 13.1 ms, 26.6 ms | 48.7 |
+| Wallpaper at the table | 59.9–60 | 6.2 ms | 8.9 ms, 18.6 ms | 48.4 |
+
+All seven others were there throughout, with no reconnects; memory stayed at 183–187 MB. The
+host's draws are a mean over every frame: with the eyes at 20 Hz, two frames in three are the
+usual 34 and the third refreshes the eyes (about 83). `state.calls` is one frame sampled every
+200 ms, every twelfth frame at 60 fps, so it can lock onto the eyes' frames and read about 85
+for minutes on end; it never read more than 93. A frame that rebuilds the reflections (34 draws,
+while the light changes) leaves the eyes' refresh to the next frame (`apps/web/src/eyes/eyes.ts`),
+so the two never add up in one frame. Brought back from the background with Settings in front,
+the same run of the app was in its own seat 3 s later; a capture of the TV's screen at a room
+decodes to the room's link.
+
 ## Reading pixels back
 
 The game renders what the fly's eyes see into a small render target and reads it back every
@@ -759,15 +778,12 @@ No Apple TV was connected while this was built, so none of this has run on one:
   CoreText's font fallback should give it); refreshing across suspend and resume over a day;
   the calls a day it really makes.
 - The home-screen icon's parallax and the Top Shelf banner on the home screen.
-- **Playing together**: eight flies' frame on a TV (`tvos:soak --table`, [Eight flies on a
-  TV](#eight-flies-on-a-tv)); the keyboard with a real remote (that it comes up at once, that Back
-  from it answers null, that a code typed there joins); going to the background at a table and
-  back (the lines closed with 1001 before tvOS suspends the app, the fly resting there meanwhile,
-  the line open again at once on return); `wss://` to the real room server through a TV's
-  network; plain `ws://` to a room server on the local network, by address and (from a
-  `--local-rooms` build) by name;
-  and the QR code scanned off a TV across a room by a phone's camera (it decodes in Core Image
-  and Vision on a Mac).
+- **Playing together** (eight flies' frame, the QR code on screen, plain `ws://` by address and
+  going to the background and back were checked on a TV: [Eight flies on a
+  TV](#eight-flies-on-a-tv)): the keyboard with a real remote (that it comes up at once, that
+  Back from it answers null, that a code typed there joins); `wss://` to the real room server
+  through a TV's network; plain `ws://` to a room server on the local network by name (from a
+  `--local-rooms` build); and the QR code scanned off a TV across a room by a phone's camera.
 
 ## What came from aerodance
 
