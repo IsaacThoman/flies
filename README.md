@@ -472,7 +472,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
 | `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
 | `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
-| `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, another fly's body, or past the table's edge. |
+| `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, another fly's body, or past the table's edge. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
 | `grounded` | On its feet. |
@@ -502,8 +502,11 @@ lives (`packages/body/src/motion.ts` unless noted):
 - **Staying in the world.** It doesn't walk off the table's edge, and in the
   air it is drawn back inside 360 mm of the middle and below 320 mm.
 - **Turning from a wall.** Pressed against a wall it faces for 2 s, it turns
-  away (about 125°). The brain feels the wall on its antennae, but nothing in
-  the model turns it.
+  away (about 125°). The brain feels the wall on its antennae and grooms
+  them (Johnston's organ's displacement-sensitive neurons drive the
+  head-grooming neurons), but nothing in the model turns it or backs it
+  away, as a real fly's touched antenna does through MDN (see
+  `packages/brain/README.md`).
 - **Landing.** Coming down on something it can stand on puts it on its feet.
 - **Lining its mouth up with food.** Once the brain wants to feed and its feet
   or mouth are on something sweet, the body shuffles the last millimetre to put
@@ -691,7 +694,7 @@ wings and thorax's and abdomen's sensory neurons never fire in this model (the
 light enters one synapse in, at the lamina; there is no sense of smell; of
 the body's senses only touch and the legs' load are driven): they are drawn,
 and stay dark. The mushroom body, lateral horn, superior protocerebrum,
-antennal lobe and central complex fire under 1.1 Hz on a 5 Hz scale and stay
+antennal lobe and central complex fire under 2 Hz on a 5 Hz scale and stay
 nearly dark. A region glows with the mean of all its neurons, so a command
 carried by a few hardly shows: the giant fibre's escape is one neuron among
 660 descending ones, and what shows of an escape is the optic lobes, the

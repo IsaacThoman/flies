@@ -38,7 +38,9 @@ test("with the eyes shut the brain is what it was before it had eyes, wherever n
   // never make a columnar cell fire; looming on both sides at once, or
   // everything at full strength, can, and then the runs part (see the README).
   // Spikes per tick under a fixed sequence of senses, seed 1, hashed: measured
-  // on the commit before the eyes were added (b373345).
+  // on the commit before the eyes were added (b373345), and again, with the
+  // columnar synapses at 1 as they were then, when Johnston's organ's right
+  // half was made to count as much as its left (it changes wind and bump).
   const b = new FlyBrain(connectome!, { seed: 1 });
   const phases = [
     RESTING_SENSES,
@@ -56,7 +58,7 @@ test("with the eyes shut the brain is what it was before it had eyes, wherever n
       hash = (Math.imul(hash, 31) + spikes) >>> 0;
     }
   }
-  assert.deepEqual({ total, hash }, { total: 485164, hash: 1881340068 });
+  assert.deepEqual({ total, hash }, { total: 519209, hash: 409547121 });
 });
 
 test("a dark disc looming at an eye fires the giant fiber through the optic lobe; a passing dot or a receding disc doesn't", { skip }, () => {

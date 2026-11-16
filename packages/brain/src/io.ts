@@ -47,7 +47,13 @@ export type ReadoutSpec = {
 const sided = (query: NeuronQuery, side: "left" | "right"): NeuronQuery => ({ ...query, side });
 
 const LOOMING: NeuronQuery = { type: ["LPLC2", "LC4"] };
-const ANTENNA: NeuronQuery = { superClass: "cb_sensory", type: /^JO-/ };
+// Pushing the antenna deflects it and holds it there. The Johnston's organ neurons
+// that answer a sustained push or pull are zones C and E (Kamikouchi et al. 2009;
+// Yorozu et al. 2009; Hampel et al. 2020), and they drive antennal grooming
+// (Hampel et al. 2015, 2020). A and B answer sound and vibration; F drives
+// grooming too, but answers neither a push nor vibration (what it senses is
+// unknown, Hampel et al. 2020).
+const ANTENNA: NeuronQuery = { superClass: "cb_sensory", type: /^JO-[CE]/ };
 // Nothing in the data says which taste neurons are sweet-sensing. These were
 // chosen by what they do in this model: built greedily from the head's taste
 // neuron types, each added for raising the proboscis motor neuron MN9's rate
@@ -75,18 +81,16 @@ export const SENSES: readonly SenseSpec[] = [
   {
     sense: "bumpLeft",
     name: "bumpLeft",
-    description: "Johnston's organ neurons of the left antenna",
+    description: "Displacement-sensitive Johnston's organ neurons (zones C and E) of the left antenna",
     select: sided(ANTENNA, "left"),
     maxRate: 100,
-    balance: "bumpRight",
   },
   {
     sense: "bumpRight",
     name: "bumpRight",
-    description: "Johnston's organ neurons of the right antenna",
+    description: "Displacement-sensitive Johnston's organ neurons (zones C and E) of the right antenna",
     select: sided(ANTENNA, "right"),
     maxRate: 100,
-    balance: "bumpLeft",
   },
   {
     sense: "wind",

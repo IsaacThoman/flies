@@ -114,6 +114,35 @@ std::vector<uint8_t> columnar(const Connectome& c) {
   return out;
 }
 
+std::vector<double> completeness(const Connectome& c) {
+  std::vector<double> out(c.neurons(), 1);
+  for (const char* zone : {"JO-C", "JO-E", "JO-F"}) {
+    const auto side = [&](const char* name) {
+      NeuronQuery q;
+      q[kSuperClass] = [](std::string_view s) { return s == "cb_sensory"; };
+      q[kType] = [zone](std::string_view s) { return s.starts_with(zone); };
+      q[kSide] = [name](std::string_view s) { return s == name; };
+      return c.find(q);
+    };
+    const std::vector<uint32_t> left = side("left");
+    const std::vector<uint32_t> right = side("right");
+    const auto synapses = [&](const std::vector<uint32_t>& neurons) {
+      uint64_t total = 0;
+      for (uint32_t i : neurons) {
+        for (uint32_t e = c.ptr(i); e < c.ptr(i + 1); e++) total += c.count(e);
+      }
+      return static_cast<double>(total);
+    };
+    const double l = synapses(left);
+    const double r = synapses(right);
+    if (l == 0 || r == 0 || l == r) continue;
+    const std::vector<uint32_t>& weaker = l < r ? left : right;
+    const double factor = l < r ? r / l : l / r;
+    for (uint32_t i : weaker) out[i] = factor;
+  }
+  return out;
+}
+
 float transmitter_gain(const std::string& t) {
   if (t == "ACH") return static_cast<float>(kExcitatory);
   if (t == "GABA" || t == "GLUT" || t == "HIST") return static_cast<float>(-kInhibitory);
@@ -140,6 +169,12 @@ Simulation build(const Connectome& c, uint32_t seed) {
     const std::vector<uint8_t> graded = columnar(c);
     for (uint32_t i = 0; i < n; i++) {
       if (graded[i] != 0) gain[i] = static_cast<float>(static_cast<double>(gain[i]) * kGraded);
+    }
+  }
+  {
+    const std::vector<double> factor = completeness(c);
+    for (uint32_t i = 0; i < n; i++) {
+      if (factor[i] != 1) gain[i] = static_cast<float>(static_cast<double>(gain[i]) * factor[i]);
     }
   }
   const auto saturated = std::make_unique<std::array<uint16_t, 65536>>(saturated_counts());

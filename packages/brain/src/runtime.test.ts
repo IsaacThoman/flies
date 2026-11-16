@@ -6,10 +6,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
 import { BACKGROUND, READOUTS, SCALES, SENSES, backgroundRates, balanceFactor, decode, intensity, outputSynapses, senseRates, smooth, wire } from "./io.ts";
+import { OPERATING_POINT, buildWeights, completenessFactors } from "./params.ts";
 import { REGIONS, REGION_RATE_NAMES } from "./regions.ts";
 import { createBrain, FlyBrain, MAX_TICK_MS } from "./runtime.ts";
 import { InternalState, Wander, normals } from "./state.ts";
-import { bufferOf, syntheticConnectome, syntheticEyeColumns } from "./test-helpers.ts";
+import { bufferOf, packSynthetic, syntheticConnectome, syntheticEyeColumns } from "./test-helpers.ts";
 import { RESTING_SENSES } from "./types.ts";
 import type { BrainSenses } from "./types.ts";
 import { VISION_STAGES } from "./vision.ts";
@@ -86,6 +87,46 @@ test("balancing turns down the side whose neurons make more synapses", () => {
   assert.equal(balanceFactor(c, fewer, left), 1);
   assert.ok(close(balanceFactor(c, left, fewer), outputSynapses(c, fewer) / outputSynapses(c, left)));
   assert.equal(balanceFactor(c, left, synthetic.index["LC10a right"]), 1);
+});
+
+test("the less completely traced side of a Johnston's organ zone counts the other side's synapses", () => {
+  const jo = (type: string, side: string) => ({ type, superClass: "cb_sensory", side, nt: "ACH" });
+  const c = loadConnectome(
+    bufferOf(
+      packSynthetic(
+        [
+          jo("JO-EV1", "left"),
+          jo("JO-ED1", "left"),
+          jo("JO-EV1", "right"),
+          jo("JO-FV", "left"),
+          jo("JO-FV", "right"),
+          jo("JO-A1", "left"),
+          jo("JO-A1", "right"),
+          { type: "AMMC001", superClass: "cb_intrinsic", side: "left", nt: "ACH" },
+        ],
+        [
+          [0, 7, 30],
+          [1, 7, 30],
+          [2, 7, 20],
+          [3, 7, 10],
+          [4, 7, 15],
+          [5, 7, 40],
+          [6, 7, 4],
+        ],
+      ),
+    ),
+  );
+  // Zone E: 60 synapses on the left, 20 on the right. Zone F: 10 against 15. Zone A (sound) is left as it is.
+  const factors = completenessFactors(c, OPERATING_POINT.completeness);
+  assert.deepEqual([...factors].sort((a, b) => a[0] - b[0]), [
+    [2, 3],
+    [3, 1.5],
+  ]);
+  const { gain } = buildWeights(c);
+  assert.equal(gain[0], Math.fround(OPERATING_POINT.excitatory));
+  assert.equal(gain[2], Math.fround(Math.fround(OPERATING_POINT.excitatory) * 3));
+  assert.equal(gain[3], Math.fround(Math.fround(OPERATING_POINT.excitatory) * 1.5));
+  assert.equal(gain[6], Math.fround(OPERATING_POINT.excitatory));
 });
 
 test("no neuron is both driven and read, and wiring refuses connectomes where one would be", () => {
