@@ -231,7 +231,15 @@ export function buildShell(b: Builder) {
     b.shell(new THREE.PlaneGeometry(z0 - z1, ceiling).rotateY(-Math.PI / 2).translate(x1, ceiling / 2, (z0 + z1) / 2), tile, KIND.kitchen);
     b.shell(box(x0 + 200, 0, line.z - line.depth / 2, x1 - 200, line.top, z1), "#7a8080", KIND.kitchen);
     b.shell(box(x0 + 300, 1800, z1 + 0, x1 - 300, 2300, z1 + 900), "#8a9090", KIND.kitchen);
-    b.shell(box(PASS.x0 + 100, 0, -4300, PASS.x1 - 100, 880, -3600), "#8c9292", KIND.kitchen);
+    // The bench behind the pass, its steel top level with the pass's shelf (a world solid); where the shelf runs over it the shelf's top is the one drawn.
+    const bench = PASS.kitchen;
+    const shelf = PASS.shelf;
+    const sx0 = shelf.x - shelf.hx;
+    const sx1 = shelf.x + shelf.hx;
+    b.shell(box(bench.x0, 0, bench.z0, bench.x1, bench.top - 30, bench.z1), "#8c9292", KIND.kitchen);
+    b.shell(box(bench.x0, bench.top - 30, bench.z0, bench.x1, bench.top, shelf.z0), "#ffffff", KIND.steel);
+    b.shell(box(bench.x0, bench.top - 30, shelf.z0, sx0, bench.top, bench.z1), "#ffffff", KIND.steel);
+    b.shell(box(sx1, bench.top - 30, shelf.z0, bench.x1, bench.top, bench.z1), "#ffffff", KIND.steel);
     b.shell(box(x0 + 200, 1500, z1 + 40, x0 + 1600, 1530, z1 + 380), "#7a8080", KIND.kitchen);
     for (let i = 0; i < 4; i++) b.shell(new THREE.CylinderGeometry(110, 100, 120, 14).translate(x0 + 400 + i * 300, 1590, z1 + 210), "#5a5e5e", KIND.kitchen);
     // A strip light left on over the line.
