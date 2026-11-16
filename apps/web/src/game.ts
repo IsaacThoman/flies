@@ -169,7 +169,7 @@ export class Game implements Shell {
     const s = this.settings;
     this.stage.setPixels(s.pixels);
     this.audio.setVolumes(s.effects, s.ambience);
-    this.director.lively = s.wallpaperCamera === "lively";
+    this.director.wallpaperStyle = s.wallpaperCamera;
     this.eyes.detail = s.eyes;
     if (save) saveSettings(s);
   }
