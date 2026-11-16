@@ -17,5 +17,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["apps/web", "apps/tvos/runtime", "apps/tvos/tests", "apps/tvos/vite.config.ts", "packages/*/src", "packages/*/scripts", "packages/*/tests", "scripts", "vite.config.ts"]
+  "include": ["apps/web", "apps/tvos/runtime", "apps/tvos/tests", "apps/tvos/vite.config.ts", "apps/ios/tests", "packages/*/src", "packages/*/scripts", "packages/*/tests", "scripts", "vite.config.ts"]
 }

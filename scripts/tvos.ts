@@ -11,7 +11,7 @@ const appDir = path.join(root, 'apps/tvos');
 const www = path.join(appDir, 'www');
 const DEFAULT_TEAM_ID = 'PX72AL9366';
 const DEFAULT_BUNDLE_ID = 'com.isaacthoman.flies';
-const TEAM_ID = process.env.TVOS_TEAM_ID || DEFAULT_TEAM_ID;
+export const TEAM_ID = process.env.TVOS_TEAM_ID || DEFAULT_TEAM_ID;
 export const BUNDLE_ID = process.env.TVOS_BUNDLE_ID || DEFAULT_BUNDLE_ID;
 /** The weather outside from WeatherKit: off unless the App ID has the capability (docs/apple-tv.md). */
 const WEATHERKIT = /^(1|true|yes|on)$/i.test(process.env.TVOS_WEATHERKIT ?? '');
