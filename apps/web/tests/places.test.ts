@@ -9,6 +9,7 @@ import { FlyBody, createIntent } from "@fly/body";
 import { Pantry, World, createSurface } from "@fly/world";
 import { CameraDirector, WALLPAPER } from "../src/camera.ts";
 import { PLACES, nextPlace } from "../src/places/catalog.ts";
+import type { PlaceId } from "../src/places/catalog.ts";
 import { SCENES } from "../src/places/index.ts";
 import { TIMES } from "../src/scene/light.ts";
 
@@ -17,7 +18,7 @@ const STANDABLE = Math.cos((65 * Math.PI) / 180);
 
 test("every place in the catalog has a scene of the same id, and they take turns round all of them", () => {
   for (const info of PLACES) assert.equal(SCENES[info.id].id, info.id);
-  let id = PLACES[0].id;
+  let id: PlaceId = PLACES[0].id;
   const seen = new Set<string>();
   for (let i = 0; i < PLACES.length; i++) {
     seen.add(id);

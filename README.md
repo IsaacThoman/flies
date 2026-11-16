@@ -52,6 +52,28 @@ night, eased from one to the next; by day a cloud now and then passes over the
 sun and the light dims by a fifth for a few seconds. At dusk and at night
 fireflies drift round the table and blink.
 
+The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
+wiring was traced: a stereo microscope with a fly pad on its stage (its base and
+pillar are solid; a fly can land on it), a rack of plugged vials with pupae up
+their walls, a vial with its foam plug pulled half out and cornmeal food at the
+bottom, a foil-capped beaker, a wash bottle, a box of pipette tips, a lab timer
+and a desk lamp. The fly can eat from a dish of grape-juice agar poured to the
+brim (land on it, walk off over the rim) and from drips of food spilt when the
+vials were filled. At its own scale there are dried crumbs of food to climb,
+grains of cornmeal, forceps whose arms it can walk along, a fine paintbrush, a
+crumpled wipe to climb, and an open notebook, thin enough to step onto, written
+in squiggles with a cross, a tally of counts and a sketch of a fly; a drop of
+water on the page magnifies the writing under it. The epoxy's flecks, the
+foam's pores, the cornmeal's grains and the ink are worked out in the shaders,
+crisp however close the camera comes, and glossy things show the windows and
+the ceiling's panels in them. By day fluorescent panels light the room evenly
+and the sun comes in at the windows behind the bench, laying their shapes,
+frames and blinds across the bench and the floor, long and warm at golden hour;
+from dusk the panels are off, a desk lamp pools warm light on the bench, and
+the room is dark round it but for lit windows across the way. It sounds of the
+air handling, the lights' hum, a fridge's compressor starting and stopping, and
+a distant beep now and then. There are no bubbles or fireflies indoors.
+
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
 Back, space for Play/Pause) and dragging the mouse over the picture is the
 touch surface.
@@ -185,11 +207,12 @@ fast dark area grows, and at 20 Hz a throw set off the escape about one time in
 six against one in two at 60 Hz.
 
 The ball is dark in green and blue for the same reason: the eyes answer
-darkening, not brightening. It dives in low from the fly's front-right, where
-the connectome's looming pathway is strongest and where the fly is seen
-against the bright table, stops just short, hangs a moment and veers away. It
-casts a shadow. With all that, the fly takes off about half the time: that is
-the model's answer, not a dice roll in the game.
+darkening, not brightening. It dives in low from the fly's front-right (higher
+over anything standing in its way), where the connectome's looming pathway is
+strongest and where the fly is seen against the bright table, stops just short,
+hangs a moment and veers away on a side that is clear. It casts a shadow. With
+all that, the fly takes off about half the time: that is the model's answer,
+not a dice roll in the game.
 
 **View → Fly's eyes** shows the same picture to the player: one dot per facet
 (the brain's 1,772, or, for a brain without eyes, a stand-in layout labelled as

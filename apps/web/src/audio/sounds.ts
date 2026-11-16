@@ -112,6 +112,73 @@ function outdoorsLoop(ctx: BaseAudioContext) {
   });
 }
 
+/**
+ * A lab: the air handling's steady hush and the hum of the lights, the
+ * fridge's compressor starting with a thud, running for most of a minute and
+ * shuddering to a stop, and once a distant double beep. A minute and a half,
+ * so the compressor and the beep come round rarely; at a low rate, as
+ * nothing in it is high. Its end is blended into its start, so it loops
+ * without a seam.
+ */
+function labLoop(ctx: BaseAudioContext) {
+  const rate = 8000;
+  const seconds = 90;
+  const n = seconds * rate;
+  const overlap = rate * 2;
+  const data = new Float32Array(n + overlap);
+  const r = noise(31);
+  const on = 12;
+  const off = 54;
+  const beep = 74;
+  // Hums as turning phasors: a sine a sample costs a few multiplies.
+  const phasor = (hz: number) => ({ c: 1, s: 0, dc: Math.cos((TAU * hz) / rate), ds: Math.sin((TAU * hz) / rate) });
+  const turn = (p: ReturnType<typeof phasor>) => {
+    const c = p.c * p.dc - p.s * p.ds;
+    p.s = p.c * p.ds + p.s * p.dc;
+    p.c = c;
+    return p.s;
+  };
+  const lights = phasor(120);
+  const lights2 = phasor(240);
+  const motor = phasor(98);
+  const motor2 = phasor(196);
+  let air = 0;
+  let air2 = 0;
+  let rumble = 0;
+  for (let i = 0; i < data.length; i++) {
+    const t = i / rate;
+    air += (r() - air) * 0.09;
+    air2 += (air - air2) * 0.14;
+    // A slow breath in the air, whole cycles over the loop.
+    let s = air2 * 1.3 * (0.86 + 0.14 * Math.sin((TAU * 4 * i) / n));
+    s += turn(lights) * 0.01 + turn(lights2) * 0.004;
+    // The compressor: eased in and out, a low motor tone and a rumble.
+    const running = Math.min(1, Math.max(0, (t - on) / 1.5)) * Math.min(1, Math.max(0, (off - t) / 2.5));
+    rumble += (r() - rumble) * 0.03;
+    const m1 = turn(motor);
+    const m2 = turn(motor2);
+    if (running > 0) s += running * (m1 * 0.045 + m2 * 0.02 + rumble * 0.5) * (0.92 + 0.08 * Math.sin(TAU * 1.7 * t));
+    // Its thud as it starts, and its shudder as it stops.
+    const since = t - on;
+    if (since > 0 && since < 0.4) s += Math.exp(-since * 14) * Math.sin(TAU * 46 * since) * 0.16;
+    const after = t - off;
+    if (after > 0 && after < 1.2) s += Math.exp(-after * 4) * Math.sin(TAU * 31 * after) * Math.sin(TAU * 7 * after) * 0.09;
+    // A distant beep, twice, with the room's echo.
+    for (const [delay, gain] of [[0, 1], [0.07, 0.35], [0.16, 0.15]]) {
+      for (const at of [beep, beep + 0.2]) {
+        const u = t - at - delay;
+        if (u > 0 && u < 0.11) s += Math.min(1, u / 0.004, (0.11 - u) / 0.01) * Math.sin(TAU * 1760 * u) * 0.028 * gain;
+      }
+    }
+    data[i] = s;
+  }
+  for (let i = 0; i < overlap; i++) {
+    const k = i / overlap;
+    data[i] = data[i] * k + data[n + i] * (1 - k);
+  }
+  return render(ctx, seconds, (_t, i) => data[i], rate);
+}
+
 /** A bird's chirp: quick upward sweeps. */
 function chirp(ctx: BaseAudioContext, seed: number) {
   const r = noise(seed);
@@ -126,10 +193,11 @@ function chirp(ctx: BaseAudioContext, seed: number) {
 }
 
 /** The sound of a place, under everything else: its loop, and whether birds call now and then. */
-export type Ambience = "outdoors";
+export type Ambience = "outdoors" | "lab";
 
 const AMBIENCES: Record<Ambience, { loop: (ctx: BaseAudioContext) => AudioBuffer; birds: boolean }> = {
   outdoors: { loop: outdoorsLoop, birds: true },
+  lab: { loop: labLoop, birds: false },
 };
 
 type Loop = { source: AudioBufferSourceNode; gain: GainNode };
