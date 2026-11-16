@@ -30,7 +30,8 @@ export function soakConfig(minutes = 30) {
   phase("daylight transition", 10000);
   press("ArrowLeft", 3);
   throws();
-  press("ArrowRight", 4);
+  // Past Light and Weather to View.
+  press("ArrowRight", 5);
   press("ArrowDown", 5);
   wait({ view: "eyes" });
   phase("eye picture low", 15000);
@@ -62,7 +63,7 @@ export function soakConfig(minutes = 30) {
   phase("daylight wallpaper", minutes * 30000);
   press("Enter");
   wait({ wallpaper: "false" });
-  press("ArrowLeft");
+  press("ArrowLeft", 2);
   press("ArrowDown", 3);
   wait({ time: "night" });
   wait({ wallpaper: "true" });
