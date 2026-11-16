@@ -201,7 +201,8 @@ frame the eyes refresh, about 70 draws and 280,000 triangles (the most the
 end-to-end run sees is about 85 draws and 300,000), the eyes' own part about 45
 draws and 1.5 to 2.5 ms (mostly the read-back). JavaScript per frame about 1 to
 2.5 ms in the browser. The end-to-end test fails above 150
-draws or 500,000 triangles. Nothing here has been measured on an Apple TV yet.
+draws or 500,000 triangles. Physical Apple TV measurements and the unattended
+soak command are in [docs/apple-tv.md](docs/apple-tv.md).
 
 ## Remote and host
 

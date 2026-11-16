@@ -7,6 +7,8 @@
 
 export type Sound = "move" | "select" | "back" | "blocked" | "tick" | "tool" | "drop" | "land" | "swoop" | "pop" | "takeoff" | "eat" | "open";
 
+import { followParam } from "./follow.ts";
+
 const TAU = Math.PI * 2;
 const RATE = 22050;
 
@@ -214,9 +216,9 @@ export class Audio {
     const ctx = this.ctx;
     if (!ctx || !this.#wings || !this.#feet) return;
     const now = ctx.currentTime;
-    this.#wings.gain.gain.setTargetAtTime(Math.min(1, wings) * 0.35 * near, now, 0.03);
-    this.#wings.source.playbackRate.setTargetAtTime(0.85 + wings * 0.3, now, 0.05);
-    this.#feet.gain.gain.setTargetAtTime(Math.min(1, walking) * 0.25 * near, now, 0.05);
+    followParam(this.#wings.gain.gain, Math.min(1, wings) * 0.35 * near, now, 0.03);
+    followParam(this.#wings.source.playbackRate, 0.85 + wings * 0.3, now, 0.05);
+    followParam(this.#feet.gain.gain, Math.min(1, walking) * 0.25 * near, now, 0.05);
     // Now and then, a bird.
     this.#nextChirp -= dt;
     if (this.#nextChirp <= 0 && this.#outdoors && this.#chirps.length) {

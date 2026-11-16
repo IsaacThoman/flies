@@ -21,6 +21,7 @@
     "e2e": "node apps/web/e2e/play.e2e.ts",
     "tvos": "node scripts/tvos.ts",
     "tvos:check": "node apps/tvos/tests/simulator.tvos.ts",
+    "tvos:soak": "node scripts/tvosSoak.ts",
     "tvos:typecheck": "tsc -p apps/tvos",
     "tvos:art": "node scripts/art.ts",
     "brain:fetch": "node packages/brain/scripts/fetch.ts",

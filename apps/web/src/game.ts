@@ -553,6 +553,7 @@ export class Game implements Shell {
     d.triangles = String(this.stage.cost.triangles);
     d.frameMs = this.frameMsAverage.toFixed(2);
     d.eyesMs = this.eyes.costMs.toFixed(2);
+    d.eyesUpdates = String(this.eyes.updates);
     d.spikesPerSecond = String(Math.round(this.meter.spikesPerSecond));
     d.time = this.stage.light.time;
     d.view = this.hands.view;

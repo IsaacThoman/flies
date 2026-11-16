@@ -82,6 +82,15 @@ try {
   await press("Enter");
   await waitFor(page, "screen=play,stack=title>play,atRoot=false");
 
+  step("daylight: the dark ball needs a bright background for the fly to see it");
+  await press("ArrowRight", 4);
+  await waitFor(page, "tool=light");
+  await press("ArrowDown", 2);
+  await waitFor(page, "time=noon");
+  await page.waitForTimeout(2000);
+  await press("ArrowRight", 2);
+  await waitFor(page, "tool=feed");
+
   step("feeding: honey at its mouth, tasted, eaten");
   await press("ArrowDown");
   await waitFor(page, "tool=feed,variant=honey");

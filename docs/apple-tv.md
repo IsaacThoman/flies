@@ -57,6 +57,8 @@ npm run tvos -- build --sim              # ...for the tvOS simulator
 npm run tvos -- build --sim --test-scene --stand-in-brain
 npm run tvos -- run --sim <udid>         # install and launch, printing the console
 npm run tvos -- run --device <udid> --config '{"script":"game.js","stats":2}'
+npm run tvos -- run --device <udid> --detached --config '{"script":"game.js","stats":10,"logFile":true}'
+npm run tvos:soak -- --device <udid> --minutes 30
 npm run tvos:check                       # the simulator check (below)
 ```
 
@@ -94,6 +96,7 @@ JSON, from `--config` on the command line, else `www/config.json` (what the home
 | `mode` | `2` (default): GL runs on the render thread a frame behind. `1`: on the JavaScript thread at the end of each frame. `0`: as each call is made, for comparison |
 | `fps` | Caps the frame rate (default 60) |
 | `stats` | Logs frame timings every N seconds as `stats {json}`: fps, JavaScript and GL ms per frame, draws, memory |
+| `logFile` | Redirects stderr to `Library/Caches/performance.log` in the app container, replacing the previous run's log; defaults to `false` |
 | `profile` | With `stats`: time spent in each WebGL and 2D canvas method |
 | `gpuTiming` | `glFinish` after every frame, to time the GPU (slows it down) |
 | `glDebug` | Checks `glGetError` after every GL command |
@@ -102,6 +105,26 @@ JSON, from `--config` on the command line, else `www/config.json` (what the home
 `devicectl ... --console` (what `run --device` uses) attaches a debugger, which slows
 JavaScript down by about 1.5x (aerodance's measurement): don't trust frame timings taken that
 way.
+
+Use `--detached` with `logFile` for device measurements. `tvos:soak` installs and launches the
+last physical-device build without attaching, exercises feeding, ball throws, the eye picture
+at Low and High, and pause/settings, then watches the wallpaper at midday and at night for
+`--minutes` in total (plus about three minutes of interaction and idle transitions). It assumes
+the default tool variants and Low eyes, and restores Low before the wallpaper phases. It leaves
+the app running. Do not attach a console or enable `profile`, `gpuTiming` or `glDebug` for the
+final measurement. Pull its log while it runs or after `drive: soak complete`:
+
+```sh
+xcrun devicectl device copy from --device <udid> \
+  --domain-type appDataContainer --domain-identifier com.isaacthoman.appletvfly \
+  --source Library/Caches/performance.log --destination /tmp/fly-performance.log
+```
+
+Reports include the canvas state, elapsed `atMs`, and `thermalState` (0 nominal, 1 fair,
+2 serious, 3 critical). `intervalMs` measures animation-frame starts; `completedIntervalMs`
+measures render-thread frame completions. Neither is a hardware scanout measurement. Check
+their tails as well as average FPS, and compare early and late windows for slowdown and memory
+growth. The host retains about 68 seconds of frame history, so use a stats interval below that.
 
 ## The Web APIs that exist
 
@@ -259,8 +282,12 @@ starts, before the next frame (most of that is three's 4 ms polling interval). T
 path is correct and cheap on a Mac; they say nothing about the Apple TV, where the wait is for
 its render thread and GPU. On a device, run the test scene (`build --test-scene
 --stand-in-brain`, `run --device <udid>`) and read `readback` and `readbackAsync` in its
-`report` lines. Until then, prefer the async read: its cost is at worst one wait for the render
-thread, and it never waits for the GPU.
+`report` lines. The game uses the async path with at most one read in flight, retaining the last
+completed facet values while it waits. Resolution changes wait for the read before disposing
+its target, and keep the previous light until the new picture arrives. `data-eyes-updates`
+counts completed pictures; `data-eyes-ms` includes submission and resampling CPU time, excluding
+the asynchronous wait. A readback's final data copy can still wait for queued render-thread
+commands; this is not a fully asynchronous native transfer.
 
 ## Checking it
 

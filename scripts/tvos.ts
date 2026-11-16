@@ -26,9 +26,10 @@ const USAGE = `Usage: npm run tvos -- <command> [options]
         --sim, the tvOS simulator). --test-scene bundles apps/tvos/tests/scene.ts in place of
         the game; --stand-in-brain compiles apps/tvos/tests/brain-stand-in/ in place of
         packages/brain-native/src/
-  run (--sim <udid> | --device <udid>) [--config <json>]
+  run (--sim <udid> | --device <udid>) [--config <json>] [--detached]
         install the built app and launch it with a launch config (default: www/config.json,
-        as from the home screen), printing its console
+        as from the home screen), printing its console. --detached (device only) launches
+        without attaching; config.logFile saves logs to Library/Caches/performance.log
 
 Signing uses TVOS_TEAM_ID (default ${DEFAULT_TEAM_ID}) and TVOS_BUNDLE_ID (default ${DEFAULT_BUNDLE_ID}).`;
 
@@ -92,14 +93,15 @@ function build(options: BuildOptions) {
   console.log(`Built ${path.relative(root, appPath(options.sim))}${options.testScene ? ' with the test scene' : ''}${options.standInBrain ? ' and the stand-in brain' : ''}`);
 }
 
-function launch(target: { sim?: string; device?: string }, config: string) {
+function launch(target: { sim?: string; device?: string }, config: string, detached: boolean) {
+  if (target.sim && detached) throw Error('--detached is for physical devices');
   if (target.sim) {
     run('xcrun', ['simctl', 'install', target.sim, appPath(true)]);
     run('xcrun', ['simctl', 'launch', '--console-pty', '--terminate-running-process', target.sim, BUNDLE_ID, '--config', config]);
   } else {
     const device = target.device ?? '';
     run('xcrun', ['devicectl', 'device', 'install', 'app', '--device', device, '--quiet', appPath(false)]);
-    run('xcrun', ['devicectl', 'device', 'process', 'launch', '--device', device, '--terminate-existing', '--console', BUNDLE_ID, '--config', config]);
+    run('xcrun', ['devicectl', 'device', 'process', 'launch', '--device', device, '--terminate-existing', ...(detached ? [] : ['--console']), BUNDLE_ID, '--config', config]);
   }
 }
 
@@ -112,7 +114,7 @@ function main() {
   if (cmd === 'run') {
     const sim = flag('--sim'), device = flag('--device'), config = flag('--config') ?? readFileSync(path.join(www, 'config.json'), 'utf8');
     if (!sim && !device) throw Error('run needs --sim <udid> or --device <udid>');
-    return launch({ sim, device }, config);
+    return launch({ sim, device }, config, has('--detached'));
   }
   throw Error(`Unknown command ${cmd}\n\n${USAGE}`);
 }

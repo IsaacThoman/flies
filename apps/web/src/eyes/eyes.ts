@@ -65,7 +65,7 @@ void main() {
 export class Eyes {
   /** From the settings: how finely to render, or off. */
   detail: EyesDetail = "low";
-  /** CPU time of the last refresh, ms (render, read back and resample), and its draws. */
+  /** CPU time of the last refresh, ms (render submission and resampling), and its draws. */
   costMs = 0;
   costCalls = 0;
   /** Refreshes so far. */
@@ -80,7 +80,9 @@ export class Eyes {
   #cameras = FACES.map(() => new THREE.PerspectiveCamera(90, 1, 0.3, 4000));
   #faceQ = FACES.map((f) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(...f.right), new THREE.Vector3(...f.up), new THREE.Vector3(...f.forward).negate())));
   #light: { left: Float32Array; right: Float32Array } | null = null;
+  #hasLight = false;
   #since = 0;
+  #pending = false;
   #sky: THREE.Mesh;
   picture: { scene: THREE.Scene; camera: THREE.Camera; points: THREE.Points; light: THREE.BufferAttribute; map: EyeMap } | null = null;
   #head = new THREE.Vector3();
@@ -144,7 +146,7 @@ export class Eyes {
 
   /** Before the fly's frame: hands the brain the last picture, if it has eyes. */
   beforeStep() {
-    this.#life.light = this.inUse ? this.#light : null;
+    this.#life.light = this.inUse && this.#hasLight ? this.#light : null;
   }
 
   /** The facets in use: the brain's, or the stand-in for the picture. */
@@ -166,7 +168,8 @@ export class Eyes {
     const detail = DETAIL[this.detail === "high" ? "high" : "low"];
     this.#since += dt;
     const hz = urgent ? URGENT_HZ : detail.hz;
-    if (!paused && (this.#since >= 1 / hz - 1e-3 || !this.#light)) {
+    // One read in flight: a slow GPU must not accumulate pictures or sampling work.
+    if (!paused && !this.#pending && (this.#since >= 1 / hz - 1e-3 || !this.#light)) {
       this.#since = 0;
       this.#refresh(detail.resolution);
     }
@@ -176,12 +179,16 @@ export class Eyes {
   #prepare(resolution: number) {
     const map = this.map;
     if (this.#target && this.#map === map && this.#samplers?.left.resolution === resolution) return;
+    const sameMap = this.#map === map;
     this.#map = map;
     this.#target?.dispose();
     this.#target = new THREE.WebGLRenderTarget(resolution * FACES.length, resolution, { depthBuffer: true, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     this.#pixels = new Uint8Array(resolution * FACES.length * resolution * 4);
     this.#samplers = { left: createSampler(map.left.directions, resolution), right: createSampler(map.right.directions, resolution) };
-    this.#light = { left: new Float32Array(this.#samplers.left.count), right: new Float32Array(this.#samplers.right.count) };
+    if (!sameMap) {
+      this.#light = { left: new Float32Array(this.#samplers.left.count), right: new Float32Array(this.#samplers.right.count) };
+      this.#hasLight = false;
+    }
   }
 
   #refresh(resolution: number) {
@@ -218,15 +225,25 @@ export class Eyes {
       renderer.render(stage.scene, camera);
     }
     target.scissorTest = false;
-    renderer.readRenderTargetPixels(target, 0, 0, resolution * FACES.length, resolution, this.#pixels!);
+    const pixels = this.#pixels!;
+    const read = renderer.readRenderTargetPixelsAsync(target, 0, 0, resolution * FACES.length, resolution, pixels);
     renderer.setRenderTarget(null);
-    const light = this.#light!;
-    sample(this.#pixels!, this.#samplers!.left, light.left);
-    sample(this.#pixels!, this.#samplers!.right, light.right);
-    this.updates++;
+    this.#pending = true;
     this.costCalls = renderer.info.render.calls - callsBefore;
     this.costMs = performance.now() - started;
-    if (this.picture) this.#fillPicture();
+    // Keep the last completed light while the GPU works; the frame never waits for it.
+    void read.then(() => {
+      const sampled = performance.now();
+      const light = this.#light!;
+      sample(pixels, this.#samplers!.left, light.left);
+      sample(pixels, this.#samplers!.right, light.right);
+      this.#hasLight = true;
+      this.updates++;
+      if (this.picture) this.#fillPicture();
+      this.costMs += performance.now() - sampled;
+    }).catch((error: unknown) => {
+      console.warn("The fly's eye readback failed", error);
+    }).finally(() => { this.#pending = false; });
   }
 
   /** The picture of what the eyes take in: every facet a dot, both eyes laid out by where they look. */
