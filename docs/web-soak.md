@@ -17,7 +17,7 @@ visits, with assertions that textures return exactly
 to each place's warmed baseline. Geometry may vary by one and programs by two:
 the fireflies' first appearance uploads a persistent mesh and its program.
 The default full run uses 200 circuits, 30 minutes per interaction phase, and
-60 minutes of wallpaper **in each place**. Options:
+60 minutes of screensaver **in each place**. Options:
 
 | Option | Meaning |
 | --- | --- |
@@ -25,7 +25,7 @@ The default full run uses 200 circuits, 30 minutes per interaction phase, and
 | `--cycles 200` | Full four-place circuits in the places phase. |
 | `--minutes 30` | Minimum real minutes per other interaction phase. Climate finishes a complete matrix even if this takes longer. |
 | `--wallpaper-minutes 60` | Real minutes per place, in four parallel isolated contexts. |
-| `--places picnic,windowsill,lab,bar` | Places to run wallpaper in; interaction phases still visit every place. |
+| `--places picnic,windowsill,lab,bar` | Places to run screensaver in; interaction phases still visit every place. |
 | `--wallpaper-time clock` | Clock or a held daylight preset (morning/noon/golden/dusk/night). |
 | `--wallpaper-weather now` | Forecast or a held weather preset (clear/overcast/mist/rain). |
 | `--interval 10` | Sample interval in seconds. Overruns skip a tick; GCs never queue indefinitely. |
@@ -34,7 +34,7 @@ The default full run uses 200 circuits, 30 minutes per interaction phase, and
 | `--url http://localhost:5173/` | Use an existing server; otherwise start and stop Vite. |
 | `--quick` | Four circuits and strict resource assertions. Keep the places phase when selecting phases. |
 
-Interaction runs in a fifth context alongside wallpaper. Each wallpaper page
+Interaction runs in a fifth context alongside screensaver. Each screensaver page
 is pinned to its place and by default follows the real clock and forecast.
 The interaction page waits for `data-moving` to clear between places; climate visits every
 weather and all five daylight presets plus the clock, holding each combination
@@ -59,11 +59,11 @@ fly and X-ray, bubbles, hands, fireflies, footprints and remote models.
 The harness warms persistent tool meshes, icon textures, eye pictures, and every
 place's pixel-mode shader variants before sampling.
 Place changes reset adaptive quality so baseline counts use the same render
-target; uninterrupted wallpaper retains its normal adaptive behavior.
+target; uninterrupted screensaver retains its normal adaptive behavior.
 Checkpoints after place changes
 compare a fresh place with the same settings and view. Other phases repeat
 those same checkpoints between stress rounds each minute and when they finish; their in-flight counts are deliberately variable.
-Only checkpoints within the same phase/place, and continuous wallpaper, get
+Only checkpoints within the same phase/place, and continuous screensaver, get
 trend verdicts. At least four samples are required. Disjoint early/late
 quarters are averaged and their difference divided by elapsed hours. A small
 noise band (2% or 256 KiB for heaps, 10% for frame cost/brain speed) labels a
@@ -71,7 +71,7 @@ series flat; raw values and hourly rates remain visible. This is evidence for
 the duration tested, not proof of an infinite bound. A growing count needs
 investigation; changing camera draw counts or lazy uploads alone are not leaks.
 
-Wallpaper samples also verify that game time and completed eye readbacks keep advancing. Adaptive quality, FPS, pixel mode and eye detail are recorded so a cheaper picture cannot disguise a slowdown.
+Screensaver samples also verify that game time and completed eye readbacks keep advancing. Adaptive quality, FPS, pixel mode and eye detail are recorded so a cheaper picture cannot disguise a slowdown.
 
 Each fixed-interval sample forces `HeapProfiler.collectGarbage` in the page and
 brain worker, then records page `Performance.getMetrics` heap bytes, worker
@@ -86,7 +86,7 @@ The CSV includes screen/tab/brain engine/weather/time/view/eyes/inset/variant fo
 The browser cannot report per-page GPU allocation bytes or the TV's resident
 memory, thermal behavior or actual scanout pacing. Three's resource counts
 are not GPU bytes; JS heaps exclude most native allocations. Forced GC and
-concurrent pages perturb frame timings, so use a single wallpaper phase or the
+concurrent pages perturb frame timings, so use a single screensaver phase or the
 real device for precise performance comparisons.
 
 Room sockets bound both unread traffic and stalled sends. A reader that stops
@@ -96,6 +96,6 @@ checks a real hidden tab with seven peers and reconnection on wake.
 
 Run `npm run tvos:soak -- --device <udid> --minutes 60` on the Apple TV for that
 last evidence. It now visits every place, weather and daylight preset, pins each
-place against rotation, and divides its requested wallpaper minutes among all
+place against rotation, and divides its requested screensaver minutes among all
 four places, half midday and half night. Interaction time is additional. Keep
 raw CSVs, logs and charts out of git; retain a compact results table in the PR.

@@ -109,8 +109,8 @@ again through the same handler.
 | | The game | The screen |
 | --- | --- | --- |
 | Seen, playing | Runs | Sleeps as the phone's Auto-Lock says (touches keep it awake) |
-| Seen, the wallpaper, on a charger | Runs | Kept on |
-| Seen, the wallpaper, on battery | Runs | Kept on for 10 minutes after the last touch, then Auto-Lock |
+| Seen, the screensaver, on a charger | Runs | Kept on |
+| Seen, the screensaver, on battery | Runs | Kept on for 10 minutes after the last touch, then Auto-Lock |
 | Seen but not in focus: an iPad window beside another app's, Control Center or Notification Center over it, the app switcher | Runs | As above |
 | Low Power Mode | Runs (WebKit holds a page's animation frames to 30 a second then) | As the phone's Auto-Lock says |
 | Hot (`serious`) | Runs | As the phone's Auto-Lock says |
@@ -136,8 +136,8 @@ WebKit hides an app's page in the background by itself; the still is for the hea
 is still on screen (hiding the web view, `isHidden`, doesn't hide the page).
 
 The brain keeps one core busy and the world is drawn 60 times a second, so a phone that kept the
-wallpaper on for as long as it liked would go flat in a few hours and grow warm doing it. On a
-charger the wallpaper is the point; on battery it is a glance. The page's own wake lock
+screensaver on for as long as it liked would go flat in a few hours and grow warm doing it. On a
+charger the screensaver is the point; on battery it is a glance. The page's own wake lock
 (`navigator.wakeLock`, which a browser tab uses) is refused inside an app's web view, so the
 app's policy is the only one.
 
@@ -146,7 +146,7 @@ the game again. Its settings are kept; the fly's moment is not.
 
 ### Haptics
 
-While playing (never in the wallpaper, where nobody's finger is on the glass): a soft tap with the
+While playing (never in the screensaver, where nobody's finger is on the glass): a soft tap with the
 fly's own touch sense while the feather is on it (`data-touch` above 0.35 with `data-tool`
 `feather`: resting on it 0.4, stroking 1), and a knock when it takes off. Both follow the fly's published
 state, so they are what happened to the fly. They come up to 200 ms late (the canvas's state is
@@ -272,7 +272,7 @@ No iPhone or iPad was connected while this was built. Everything above ran in th
 - **The brain's speed and cost on a phone**: whether it keeps real time on the oldest phones iOS
   26 runs on (A13), and what share of the app's power it is. That decides whether the native
   brain over a message bridge (above) is worth building.
-- **Battery and heat**: how long a phone lasts showing the wallpaper on battery, how warm it gets
+- **Battery and heat**: how long a phone lasts showing the screensaver on battery, how warm it gets
   on a charger overnight, and whether the thermal states arrive and the policy follows them. The
   simulator reports no battery (so on battery throughout) and is never hot. The policy's table is
   unit-tested; its effect is not measured.
