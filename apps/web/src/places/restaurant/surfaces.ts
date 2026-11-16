@@ -559,10 +559,8 @@ if (rK == K_EXIT) {
 }
 if (rK == K_OPENING) rEmit += vec3(1.0) * uOpening;
 if (rK == K_MIRROR) {
-  // A mirror shows the room: the windows' light by day, and the lamp left on over the bar as a bright disc where the eye would see its image, a glow round it.
+  // A mirror shows the room (its reflections, light.ts rRoom), and the lamp left on over the bar as a bright disc where the eye would see its image, a glow round it.
   vec3 v = normalize(vWorld - cameraPosition);
-  vec3 r = reflect(v, rN);
-  rEmit += uWindow * 0.1 * smoothstep(0.1, 0.9, r.z) * (1.0 - smoothstep(0.4, 0.9, abs(r.y)));
   vec3 lamp = vec3(${f(PENDANT_LIGHT.x)}, ${f(PENDANT_LIGHT.y + 40)}, ${f(PENDANT_LIGHT.z)});
   vec3 image = lamp - 2.0 * dot(lamp - vWorld, rN) * rN;
   vec3 toImage = image - cameraPosition;
