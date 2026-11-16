@@ -5,10 +5,12 @@
 // felt.
 
 import type * as THREE from "three";
-import type { Place } from "@fly/world";
+import type { Looming } from "@fly/body";
+import type { Pantry, Place, Vec3, World } from "@fly/world";
 import type { Ambience } from "../audio/sounds.ts";
 import type { Shot } from "../camera.ts";
 import type { Daylight, Palettes } from "../scene/light.ts";
+import type { Weather } from "../scene/weather.ts";
 import type { PlaceId } from "./catalog.ts";
 
 /** The near pass: the table top and everything on it, in millimetres, with the table's top at y = 0. */
@@ -18,16 +20,54 @@ export type SceneSet = {
   materials: THREE.MeshStandardMaterial[];
   /** What the fly's eyes see of it: the big shapes, without the small details. */
   seen: THREE.Object3D[];
-  update(time: number, light: Daylight): void;
+  /** Moves it on. The weather is for a place that shows it (rain on a pane, wet things); one that doesn't can leave it. */
+  update(time: number, light: Daylight, weather: Weather): void;
   /** Sets a ring spreading on a pool (a FoodPatch with `pool`), from a point on it, 0 to 1 strong. */
   ripple(x: number, z: number, strength: number): void;
+  /**
+   * The place's own goings-on, each frame the fly lives (not while paused):
+   * wind, rain, visitors, things to find. Whatever reaches the fly does so
+   * only through `around.felt`, which goes to its senses with the player's
+   * tools; food goes into `around.pantry`, to be found by walking and
+   * tasting; anything it could see is in `seen`. Optional: a place without
+   * it is still.
+   */
+  live?(dt: number, around: Around): void;
+};
+
+/** What a place's goings-on are given each frame, and where they leave what the fly feels. */
+export type Around = {
+  /** Where the fly is (between its feet), mm. */
+  readonly fly: Readonly<Vec3>;
+  readonly airborne: boolean;
+  readonly world: World;
+  readonly pantry: Pantry;
+  readonly weather: Weather;
+  /**
+   * Nobody has touched the remote for a while (the wallpaper, or a minute of
+   * play without a press): comings and goings start only then, so that what
+   * the fly does while someone plays answers what they do.
+   */
+  readonly quiet: boolean;
+  /** Cleared by the game each frame, filled in by the place. */
+  readonly felt: Felt;
+};
+
+/** What the place does to the fly this frame, all through its senses. */
+export type Felt = {
+  /** The air's own velocity at the fly, mm/s (a gust): felt as wind, and it carries the fly in flight as a puff does. */
+  air: Vec3;
+  /** Something landing on it (a raindrop), 0 to 1, this frame: felt as touch. */
+  touch: number;
+  /** Things it could see coming, for a brain without eyes (with eyes, it sees whatever is in `seen`). */
+  looming: Looming[];
 };
 
 /** The far pass: everything beyond the table, from 200 mm out (stage.ts, FAR). */
 export type SceneBackdrop = {
   scene: THREE.Scene;
-  /** Keeps it round the camera and moves its light, water, clouds, whatever lives there. */
-  update(time: number, camera: THREE.Camera, light: Daylight): void;
+  /** Keeps it round the camera and moves its light, water, clouds, whatever lives there, and its weather if it shows it. */
+  update(time: number, camera: THREE.Camera, light: Daylight, weather: Weather): void;
 };
 
 /** The camera's view of the whole place (View → Whole table); the shots round the fly are every place's. */
@@ -44,6 +84,14 @@ export type Scene = {
   buildSet(): SceneSet;
   buildBackdrop(light: Daylight): SceneBackdrop;
   camera: SceneCamera;
+  /**
+   * How much of the weather reaches its light, 0 to 1 (1 if not said): out
+   * under the sky, all of it; in a room that sees the sky through windows,
+   * less, and after dark (lit by lamps) hardly any. Overcast greys the
+   * palettes' sky and takes the sun, mist whitens the distance
+   * (scene/light.ts), in that measure.
+   */
+  open?: number;
   ambience: Ambience;
   /** Soap bubbles drifting over on the breeze (scene/bubbles.ts), and fireflies at dusk (scene/fireflies.ts): both are built for the picnic's open air and size. */
   bubbles: boolean;

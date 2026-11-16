@@ -50,8 +50,13 @@ const intent = createIntent();
 
 /** Settles the scene into a shot: the light, the fly's place and pose, the camera. */
 function arrange(shot: ArtShot) {
+  // The art is a clear day.
+  stage.weather.choose("clear");
   stage.light.set(shot.time);
-  for (let i = 0; i < 40; i++) stage.light.update(0.1);
+  for (let i = 0; i < 40; i++) {
+    stage.weather.update(0.1);
+    stage.light.update(0.1, stage.weather);
+  }
   const c = shot.camera;
   const y = world.heightAt(shot.fly.x, shot.fly.z);
   // The fly side on to the camera, facing the picture's right, turned by `turn` toward it.

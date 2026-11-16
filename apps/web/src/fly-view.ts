@@ -1,6 +1,7 @@
 // The fly as it is drawn: the model (packages/fly, through the FlyModel
 // contract) placed where the body is, turned the way it faces and tilted to
-// the surface under it, posed from what it is doing, with a soft shadow.
+// the surface under it, posed from what it is doing, with a soft shadow. It
+// takes the shadow of anything passing over the place (scene/shade.ts).
 
 import * as THREE from "three";
 import { createFly } from "@fly/fly";
@@ -10,6 +11,7 @@ import { FLY_LENGTH } from "@fly/body";
 import type { FlyBody, Intent } from "@fly/body";
 import type { World } from "@fly/world";
 import { canvas2d, canvasTexture } from "./scene/build.ts";
+import { shaded } from "./scene/shade.ts";
 
 function shadowTexture() {
   const { canvas, g } = canvas2d(64, 64);
@@ -38,6 +40,12 @@ export class FlyView {
     this.#world = world;
     this.model = createFly();
     this.model.object.scale.setScalar(FLY_LENGTH);
+    const materials = new Set<THREE.MeshStandardMaterial>();
+    this.model.object.traverse((o) => {
+      const material = (o as THREE.Mesh).material;
+      if (material instanceof THREE.MeshStandardMaterial) materials.add(material);
+    });
+    for (const material of materials) shaded(material);
     this.root.add(this.model.object);
     parent.add(this.root);
     this.shadow = new THREE.Mesh(

@@ -11,8 +11,9 @@ import type { View } from "../camera.ts";
 import { PLACES } from "../places/catalog.ts";
 import type { PlaceId } from "../places/catalog.ts";
 import type { TimeOfDay } from "../scene/light.ts";
+import type { WeatherKind } from "../scene/weather.ts";
 
-export type ToolId = "feed" | "swoop" | "feather" | "blow" | "light" | "view" | "place";
+export type ToolId = "feed" | "swoop" | "feather" | "blow" | "light" | "weather" | "view" | "place";
 
 export type Variant = { id: string; label: string };
 export type Tool = { id: ToolId; name: string; verb: string; hold: boolean; variants: readonly Variant[]; /** The kind chosen at the start, if not the first. */ initial?: number };
@@ -24,6 +25,8 @@ export const TOOLS: readonly Tool[] = [
   { id: "blow", name: "Blow", verb: "Blow", hold: true, variants: [{ id: "gentle", label: "Gently" }, { id: "strong", label: "Hard" }] },
   // "Now" follows the clock, so the wallpaper's light changes with the day outside.
   { id: "light", name: "Light", verb: "", hold: false, variants: [{ id: "clock", label: "Now" }, { id: "morning", label: "Morning" }, { id: "noon", label: "Midday" }, { id: "golden", label: "Golden hour" }, { id: "dusk", label: "Dusk" }, { id: "night", label: "Night" }] },
+  // "Now" wanders as a forecast worked out from the clock would; the others hold.
+  { id: "weather", name: "Weather", verb: "", hold: false, variants: [{ id: "now", label: "Now" }, { id: "clear", label: "Clear" }, { id: "overcast", label: "Overcast" }, { id: "mist", label: "Mist" }, { id: "rain", label: "Rain" }] },
   // Nearest first, so Up brings the camera in and Down takes it out.
   { id: "view", name: "View", verb: "", hold: false, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }] },
   // Where it lives: Up and Down choose, Select carries it there. Only when there is somewhere else to go.
@@ -32,6 +35,9 @@ export const TOOLS: readonly Tool[] = [
 
 /** Where the Place tool is on the shelf, or -1 without one. */
 export const PLACE_TOOL = TOOLS.findIndex((t) => t.id === "place");
+const LIGHT_TOOL = TOOLS.findIndex((t) => t.id === "light");
+const WEATHER_TOOL = TOOLS.findIndex((t) => t.id === "weather");
+const VIEW_TOOL = TOOLS.findIndex((t) => t.id === "view");
 
 /** The beach ball: how big (mm), how fast it swoops (mm/s), and how long a swoop lasts (s). */
 export const BALL_RADIUS = 34;
@@ -142,7 +148,12 @@ export class Hands {
 
   /** The time of day chosen on the Light tool: one of the five, or the time outside by the clock. */
   get timeOfDay(): TimeOfDay | "clock" {
-    return TOOLS[4].variants[this.variants[4]].id as TimeOfDay | "clock";
+    return TOOLS[LIGHT_TOOL].variants[this.variants[LIGHT_TOOL]].id as TimeOfDay | "clock";
+  }
+
+  /** The weather chosen on the Weather tool: one of the four, or the forecast's ("now"). */
+  get weather(): WeatherKind | "now" {
+    return TOOLS[WEATHER_TOOL].variants[this.variants[WEATHER_TOOL]].id as WeatherKind | "now";
   }
 
   /** The kind's name as shown: the whole-place view is named for what the fly stands on there. */
@@ -163,7 +174,7 @@ export class Hands {
 
   /** The view chosen on the View tool ("eyes" is the fly's-eye picture). */
   get view(): View | "eyes" {
-    return TOOLS[5].variants[this.variants[5]].id as View | "eyes";
+    return TOOLS[VIEW_TOOL].variants[this.variants[VIEW_TOOL]].id as View | "eyes";
   }
 
   /** The player moved the pointer to a new place in the world. */

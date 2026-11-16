@@ -39,6 +39,8 @@ export const lab: Scene = {
     // The windows.
     vista: { x: 0, z: -1 },
   },
+  // It sees the weather through its windows: a grey day dims the daylight from them, and little else.
+  open: 0.4,
   ambience: "lab",
   bubbles: false,
   fireflies: false,

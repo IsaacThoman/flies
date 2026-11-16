@@ -1,6 +1,8 @@
 // The picnic's table and everything on it, built from the world's description
 // (packages/world/src/picnic.ts) so that what the fly stands on is exactly
-// what is drawn. Merged by material into a few meshes.
+// what is drawn. Merged by material into a few meshes. Everything on it gets
+// wet in the rain, and takes the shadow of a gull passing over; its comings
+// and goings are in life.ts.
 
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
@@ -8,8 +10,11 @@ import { DECOR, PATCHES, SOLIDS, TABLE_RADIUS, topHeight, topNormal } from "@fly
 import type { Solid } from "@fly/world";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { Batch, canvas2d, canvasTexture, freeze, mat4, paint, random } from "../../scene/build.ts";
+import { shaded } from "../../scene/shade.ts";
 import type { SceneSet } from "../types.ts";
 import { LAWN_Y } from "./backdrop.ts";
+import { Goings } from "./life.ts";
+import { outside } from "./outside.ts";
 
 /** How many rings can spread on the pool at once. */
 const RIPPLES = 4;
@@ -67,9 +72,20 @@ function tableTexture() {
  * pixels fade into their average, so it never shimmers; from across the table
  * it is plain gingham.
  */
-function clothShader(material: THREE.MeshStandardMaterial) {
+/**
+ * In the rain the napkin darkens as the cloth soaks it up, and the enamel
+ * takes a film of water, pooling here and there, that mirrors the sky, and
+ * is beaded with drops: each a lens in the shading (its slope bends the
+ * light, its rim darkens), as many as there are pixels for, so they cover
+ * the table without a vertex between them. In a gust ripples run across the
+ * cloth.
+ */
+type TableUniforms = { uWet: { value: number }; uGust: { value: THREE.Vector3 }; uTime: { value: number } };
+
+function clothShader(material: THREE.MeshStandardMaterial, uniforms: TableUniforms) {
   const { napkin } = DECOR;
   material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
     shader.uniforms.uNapkin = { value: new THREE.Vector4(napkin.x, napkin.z, napkin.size / 2, napkin.angle) };
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec2 vTable;")
@@ -79,6 +95,9 @@ function clothShader(material: THREE.MeshStandardMaterial) {
         "#include <common>",
         /* glsl */ `#include <common>
 uniform vec4 uNapkin;
+uniform float uWet;
+uniform vec3 uGust;
+uniform float uTime;
 varying vec2 vTable;
 const float CHECK = ${(napkin.size / 12).toFixed(3)};
 const float PITCH = 0.22;
@@ -88,6 +107,25 @@ float band(float x) {
   float tri = abs(fract(t) - 0.5) * 2.0;
   float w = fwidth(t) * 1.5 + 0.004;
   return smoothstep(0.5 - w, 0.5 + w, tri);
+}
+// Where the water lies thickest on the enamel: soft blobs a few centimetres across, spreading as it gets wetter.
+float puddles(vec2 p) {
+  float n = sin(p.x * 0.043 + sin(p.y * 0.031) * 2.1) + sin(p.y * 0.052 + sin(p.x * 0.027) * 2.4) + 0.5 * sin((p.x + p.y) * 0.091);
+  return smoothstep(1.9 - 2.4 * uWet, 2.15 - 2.4 * uWet, n);
+}
+// A bead of water in this cell of a grid (cells \`size\` mm across), if the table is wet enough for one: its slope, and how far in from its rim (0 to 1), or -1.
+vec3 bead(vec2 p, float size, float salt) {
+  vec2 cell = floor(p / size);
+  vec2 f = p / size - cell;
+  float h1 = fract(sin(dot(cell, vec2(127.1, 311.7)) + salt) * 43758.5453);
+  float h2 = fract(sin(dot(cell, vec2(269.5, 183.3)) + salt) * 43758.5453);
+  float h3 = fract(sin(dot(cell, vec2(419.2, 371.9)) + salt) * 43758.5453);
+  float r = mix(0.16, 0.4, h3 * h3);
+  vec2 d = (f - (vec2(h1, h2) * (1.0 - 2.0 * r) + r)) / r;
+  float dd = dot(d, d);
+  if (dd >= 1.0 || h1 * 0.6 + h3 * 0.4 > uWet * 0.95) return vec3(0.0, 0.0, -1.0);
+  // A cap of water: level in the middle, steep at its rim.
+  return vec3(d * 0.7 / sqrt(max(0.12, 1.0 - dd * 0.9)), 1.0 - dd);
 }
 vec3 napkinUV() {
   vec2 d = vTable - uNapkin.xy;
@@ -129,11 +167,25 @@ float stitchLine = 1.0 - smoothstep(0.07, 0.07 + fwidth(edge) + 0.03, abs(edge +
 float along = (abs(uv.x) > abs(uv.y) ? uv.y : uv.x) / 1.7;
 float dash = step(0.35, fract(along));
 cloth = mix(cloth, vec3(0.03, 0.16, 0.5), stitchLine * dash * 0.85);
+// Wet cotton goes darker and greyer, the table showing through it.
+cloth = mix(cloth, cloth * vec3(0.64, 0.68, 0.76), uWet * 0.85);
 diffuseColor.rgb *= mix(vec3(1.0), cloth, inside);
 // A hairline of shadow where the cloth's edge stands off the table.
-diffuseColor.rgb *= 1.0 - (1.0 - inside) * (1.0 - smoothstep(0.0, 0.6, edge)) * 0.25;`,
+diffuseColor.rgb *= 1.0 - (1.0 - inside) * (1.0 - smoothstep(0.0, 0.6, edge)) * 0.25;
+float puddle = puddles(vTable) * uWet;
+diffuseColor.rgb *= 1.0 - (1.0 - inside) * puddle * 0.05;
+// Beads, two sizes, faded out where they would be smaller than the pixels.
+vec3 drop = vec3(0.0, 0.0, -1.0);
+float beading = 0.0;
+if (uWet > 0.02 && inside < 0.5) {
+  drop = bead(vTable, 2.6, 0.0);
+  vec3 small = bead(vTable + 1.3, 1.15, 7.0);
+  if (small.z > drop.z) drop = small;
+  beading = (1.0 - smoothstep(0.12, 0.45, fwidth(vTable.x) / 1.15)) * step(0.0, drop.z);
+  diffuseColor.rgb *= 1.0 - beading * pow(1.0 - drop.z, 3.0) * 0.35;
+}`,
       )
-      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.92, inside);")
+      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.92, inside);\nroughnessFactor = mix(roughnessFactor, mix(mix(0.13, 0.025, puddle), 0.6, inside), uWet);\nroughnessFactor = mix(roughnessFactor, 0.02, beading);")
       .replace(
         "#include <normal_fragment_maps>",
         /* glsl */ `#include <normal_fragment_maps>
@@ -145,6 +197,9 @@ diffuseColor.rgb *= 1.0 - (1.0 - inside) * (1.0 - smoothstep(0.0, 0.6, edge)) * 
   vec3 tilted = normalize(vec3(-slope.x, 1.0, -slope.y));
   float c = cos(uNapkin.w), s = sin(uNapkin.w);
   tilted = vec3(tilted.x * c + tilted.z * s, tilted.y, -tilted.x * s + tilted.z * c);
+  // A gust sends ripples running across the cloth.
+  tilted = normalize(tilted - vec3(uGust.x, 0.0, uGust.y) * cos(dot(vTable, uGust.xy) * 0.35 - uTime * 7.0) * 0.06 * uGust.z * inside2);
+  tilted = normalize(mix(tilted, normalize(vec3(-drop.x, 1.0, -drop.y)), beading));
   normal = normalize((viewMatrix * vec4(tilted, 0.0)).xyz);
 }`,
       );
@@ -255,7 +310,8 @@ export function buildTable(): SceneSet {
   const juicy = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.16, metalness: 0, envMapIntensity: 0.55 });
   const matte = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, envMapIntensity: 0.5 });
   const tableMaterial = new THREE.MeshStandardMaterial({ map: tableTexture(), roughness: 0.3, metalness: 0, envMapIntensity: 0.5 });
-  clothShader(tableMaterial);
+  const tableUniforms: TableUniforms = { uWet: { value: 0 }, uGust: { value: new THREE.Vector3() }, uTime: { value: 0 } };
+  clothShader(tableMaterial, tableUniforms);
   const cloth = new THREE.MeshStandardMaterial({ map: ginghamTexture("#e8344e"), roughness: 0.85, side: THREE.DoubleSide });
   const glass = new THREE.MeshStandardMaterial({ color: "#e6f6ff", roughness: 0.04, metalness: 0, transparent: true, opacity: 0.14, depthWrite: false, envMapIntensity: 1.4 });
   const liquid = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.1, transparent: true, opacity: 0.72, depthWrite: false });
@@ -596,17 +652,6 @@ export function buildTable(): SceneSet {
   puddle(honey.x, honey.z, honey.r, "#f29200", 1, "#ffd25e");
   puddle(jamPatch.x, jamPatch.z, jamPatch.r, "#a3002a", 3, "#ff4a6a");
 
-  // A fallen leaf, thin enough to walk over.
-  {
-    const { leaf } = DECOR;
-    const shape = new THREE.Shape();
-    shape.moveTo(0, -leaf.length / 2);
-    shape.quadraticCurveTo(leaf.length * 0.32, 0, 0, leaf.length / 2);
-    shape.quadraticCurveTo(-leaf.length * 0.32, 0, 0, -leaf.length / 2);
-    const geometry = new THREE.ShapeGeometry(shape, 12).rotateX(-Math.PI / 2);
-    batch.add(matte, paint(geometry, (p) => (Math.abs(p.x) < 0.8 ? "#c6ef7a" : "#6fcb3c")), mat4({ x: leaf.x, y: 0.12, z: leaf.z }, new THREE.Euler(0, leaf.angle, 0)));
-  }
-
   // Dew: clear drops on the table and on the lemonade jar.
   const dew: THREE.Matrix4[] = [];
   for (const drop of byName("dew")) {
@@ -652,11 +697,35 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
   group.add(contactShadows(shadows));
 
   seen.push(...batch.build(group));
+  // A fallen leaf (thin enough to walk over), visitors, rain: life.ts.
+  const goings = new Goings(ripple);
+  group.add(goings.group);
+  seen.push(...goings.seen);
+  const all = [glossy, juicy, matte, tableMaterial, cloth, glass, liquid, dewMaterial, ...materials];
+  for (const material of all) shaded(material);
+  let wetNow = -1;
   return {
     group,
-    materials: [glossy, juicy, matte, tableMaterial, cloth, glass, liquid, dewMaterial, ...materials],
+    materials: all,
     seen,
-    update(time) {
+    update(time, light, weather) {
+      goings.update(time, light, weather);
+      // Wet, glazes and fruit shine more, crumbs and cloth darken.
+      const wet = weather.wet;
+      if (Math.abs(wet - wetNow) > 0.003) {
+        wetNow = wet;
+        glossy.roughness = 0.22 - 0.12 * wet;
+        juicy.roughness = 0.16 - 0.08 * wet;
+        matte.roughness = 0.7 - 0.32 * wet;
+        matte.color.setScalar(1 - 0.22 * wet);
+        cloth.roughness = 0.85 - 0.25 * wet;
+        cloth.color.setScalar(1 - 0.3 * wet);
+        tableUniforms.uWet.value = wet;
+      }
+      const g = outside.gust;
+      const speed = Math.hypot(g.x, g.z) || 1;
+      tableUniforms.uGust.value.set(g.x / speed, g.z / speed, g.strength);
+      tableUniforms.uTime.value = time;
       poolUniforms.uTime.value = time;
       // Now and then a drop of dew runs down the jar into the pool.
       if (time > nextDrip) {
@@ -667,5 +736,8 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
       }
     },
     ripple,
+    live(dt, around) {
+      goings.live(dt, around);
+    },
   };
 }

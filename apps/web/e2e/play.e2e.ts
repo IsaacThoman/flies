@@ -2,7 +2,8 @@
 // brain: boots it, waits for the brain, walks the menus with the keys, feeds
 // the fly and checks it tasted and ate, throws the ball until the fly takes
 // off, checks the wallpaper comes and goes with what it sees in a corner, and
-// holds the frame to its draw budget throughout.
+// holds the frame to its draw budget throughout. It holds the light at midday
+// and the weather clear, so that what the fly does answers what the test does.
 //
 //   npm run e2e            (starts its own Vite server)
 //   npm run e2e -- --url http://localhost:5173/
@@ -41,6 +42,16 @@ const press = async (key: string, times = 1) => {
     await page.keyboard.press(key);
     await page.waitForTimeout(150);
   }
+};
+/** Steps along the shelf to a tool, however many tools there are, one step at a time as the game shows each. */
+const toTool = async (id: string) => {
+  for (let i = 0; i < 12; i++) {
+    const at = (await readState(page)).tool;
+    if (at === id) return;
+    await page.keyboard.press("ArrowRight");
+    await waitFor(page, `tool~^(?!${at}$)`, 2000);
+  }
+  await waitFor(page, `tool=${id}`, 1000);
 };
 const step = (name: string) => console.log(`· ${name}`);
 let failed = false;
@@ -83,15 +94,18 @@ try {
   await press("Enter");
   await waitFor(page, "screen=play,stack=title>play,atRoot=false");
 
-  step("daylight: the dark ball needs a bright background for the fly to see it");
-  await press("ArrowRight", 4);
-  await waitFor(page, "tool=light");
+  step("clear weather and daylight: no rain must touch the fly, and the dark ball needs a bright background for it to see");
+  await toTool("weather");
+  await press("ArrowDown");
+  await waitFor(page, "variant=clear");
+  await waitFor(page, "weather=clear", 10_000);
+  await toTool("light");
   await press("ArrowDown", 2);
   await waitFor(page, "time=noon");
-  await page.waitForTimeout(2000);
-  // Past View and Place, round to the start of the shelf.
-  await press("ArrowRight", 3);
-  await waitFor(page, "tool=feed");
+  // The light changing so much can make it jump (its brain's answer): let it come down and settle before the honey drops at its mouth.
+  await page.waitForTimeout(3000);
+  await waitFor(page, "mode~standing|walking", 10_000);
+  await toTool("feed");
 
   step("feeding: honey at its mouth, tasted, eaten");
   await press("ArrowDown");
@@ -145,7 +159,7 @@ try {
     settings.eyesInset = "always";
   });
   await waitFor(page, "eyesInset=top-right", 5000);
-  await press("ArrowRight", 4);
+  await toTool("view");
   await waitFor(page, "tool=view,view=follow");
   await press("ArrowDown", 4);
   await waitFor(page, "view=eyes,eyesInset=hidden", 3000);

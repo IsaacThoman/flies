@@ -1,6 +1,7 @@
 // The rendered world: the place's backdrop and its table in their two passes,
-// the light of the day and the reflections that follow it, the veil drawn
-// while the fly is carried to another place, and the frame's cost.
+// the light of the day and the weather over it, the reflections that follow
+// them, the veil drawn while the fly is carried to another place, and the
+// frame's cost.
 
 import * as THREE from "three";
 import { PIXEL_SIZES, RENDER_HEIGHT, RENDER_WIDTH } from "./display.ts";
@@ -9,6 +10,7 @@ import type { Scene, SceneBackdrop, SceneSet } from "./places/types.ts";
 import { disposeAll } from "./scene/build.ts";
 import { Daylight } from "./scene/light.ts";
 import type { TimeOfDay } from "./scene/light.ts";
+import { WeatherNow } from "./scene/weather.ts";
 
 /** The near pass covers the table, from this close to this far (mm); the backdrop the rest. */
 export const NEAR = { near: 0.5, far: 4000 };
@@ -46,6 +48,7 @@ export type FrameCost = { calls: number; triangles: number; textures: number; ge
 export class Stage {
   readonly renderer: THREE.WebGLRenderer;
   readonly light: Daylight;
+  readonly weather = new WeatherNow();
   /** The place shown, its far pass and its table. */
   current: Scene;
   backdrop: SceneBackdrop;
@@ -58,6 +61,8 @@ export class Stage {
   #envScene: THREE.Scene;
   #env: THREE.WebGLRenderTarget | null = null;
   #envDirty = true;
+  /** The light the reflections were last built from, to tell when they are out of date. */
+  #envLight = { zenith: new THREE.Color(), horizon: new THREE.Color(), ground: new THREE.Color(), sun: new THREE.Color(), direction: new THREE.Vector3() };
   #lowRes: THREE.WebGLRenderTarget | null = null;
   #blit: { scene: THREE.Scene; camera: THREE.OrthographicCamera; material: THREE.MeshBasicMaterial } | null = null;
   #veil: { scene: THREE.Scene; material: THREE.MeshBasicMaterial };
@@ -77,7 +82,7 @@ export class Stage {
     renderer.toneMapping = THREE.NoToneMapping;
     this.renderer = renderer;
     this.current = scene;
-    this.light = new Daylight(time, scene.palettes);
+    this.light = new Daylight(time, scene.palettes, scene.open);
     const started = performance.now();
     this.backdrop = scene.buildBackdrop(this.light);
     this.set = scene.buildSet();
@@ -105,7 +110,7 @@ export class Stage {
     disposeAll(this.set.group);
     disposeAll(this.backdrop.scene);
     this.current = scene;
-    this.light.use(scene.palettes);
+    this.light.use(scene.palettes, scene.open);
     const started = performance.now();
     this.backdrop = scene.buildBackdrop(this.light);
     this.set = scene.buildSet();
@@ -119,15 +124,28 @@ export class Stage {
     this.light.set(time);
   }
 
-  /** Moves the light and the backdrop on; call before rendering. */
+  /** Moves the weather, the light and the place on; call before rendering. */
   update(time: number, dt: number, camera: THREE.PerspectiveCamera) {
-    if (this.light.update(dt)) {
+    this.weather.update(dt);
+    if (this.light.update(dt, this.weather)) {
       this.#applyLight();
-      // Reflections follow the sky, but rebuilding them costs a few ms: a few times a second while the light changes.
-      this.#envDirty = true;
+      this.#envDirty ||= this.#envStale();
     }
-    this.backdrop.update(time, camera, this.light);
-    this.set.update(time, this.light);
+    this.backdrop.update(time, camera, this.light, this.weather);
+    this.set.update(time, this.light, this.weather);
+  }
+
+  /**
+   * Reflections follow the sky, but rebuilding them costs a few ms: only once
+   * the light has moved far enough from what they were built from to be
+   * seen, so the clock's slow drift rebuilds them every few minutes, and a
+   * change of time or weather a few times a second while it lasts.
+   */
+  #envStale() {
+    const l = this.light;
+    const e = this.#envLight;
+    const far = (a: THREE.Color, b: THREE.Color) => Math.abs(a.r - b.r) + Math.abs(a.g - b.g) + Math.abs(a.b - b.b) > 0.03;
+    return far(l.zenith, e.zenith) || far(l.horizon, e.horizon) || far(l.groundColor, e.ground) || far(l.sunColor, e.sun) || l.sunDirection.distanceTo(e.direction) > 0.03;
   }
 
   #applyLight() {
@@ -149,6 +167,13 @@ export class Stage {
     if (!this.#envDirty || (this.#env && this.#envAge < 0.4)) return;
     this.#envDirty = false;
     this.#envAge = 0;
+    const l = this.light;
+    const e = this.#envLight;
+    e.zenith.copy(l.zenith);
+    e.horizon.copy(l.horizon);
+    e.ground.copy(l.groundColor);
+    e.sun.copy(l.sunColor);
+    e.direction.copy(l.sunDirection);
     const old = this.#env;
     this.#env = this.#pmrem.fromScene(this.#envScene, 0.02, 0.1, 100);
     this.scene.environment = this.#env.texture;

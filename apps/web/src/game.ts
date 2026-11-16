@@ -5,7 +5,7 @@ import * as THREE from "three";
 import type { BrainDriver, RemoteButton } from "@fly/contracts";
 import { AT_ROOT_PROPERTY } from "@fly/contracts";
 import { Navigator } from "@fly/ui";
-import { World } from "@fly/world";
+import { World, isDropped } from "@fly/world";
 import type { RayHit } from "@fly/world";
 import { Audio } from "./audio/sounds.ts";
 import type { Sound } from "./audio/sounds.ts";
@@ -21,9 +21,11 @@ import { Life } from "./life.ts";
 import { isPlaceId, nextPlace, placeInfo } from "./places/catalog.ts";
 import type { PlaceId } from "./places/catalog.ts";
 import { SCENES } from "./places/index.ts";
+import type { Around, Felt } from "./places/types.ts";
 import { Bubbles } from "./scene/bubbles.ts";
 import { Fireflies } from "./scene/fireflies.ts";
-import { timeFromClock } from "./scene/light.ts";
+import { clockHours, timeAt } from "./scene/light.ts";
+import { forecastHours } from "./scene/weather.ts";
 import { loadSettings, saveSettings } from "./settings.ts";
 import type { Settings } from "./settings.ts";
 import { Stage } from "./stage.ts";
@@ -50,6 +52,10 @@ const PLACE_TURN = 20 * 60;
 /** Seconds the world takes to fade out before the fly is carried somewhere else, and to fade in after. */
 const VEIL_OUT = 0.45;
 const VEIL_IN = 0.9;
+/** Seconds without a press before the place's comings and goings start, when the wallpaper hasn't already. */
+const QUIET_AFTER = 60;
+/** How often the clock and the forecast are looked at again, s: the light moves on that slowly. */
+const CLOCK_EVERY = 2;
 
 type MenuScreenId = Exclude<ScreenId, "play">;
 
@@ -95,6 +101,10 @@ export class Game implements Shell {
   #paddleIn = 0;
   #clockAt = 0;
   #air = new THREE.Vector3();
+  /** What the place's own goings-on did to the fly this frame, and what they are given. */
+  #felt: Felt = { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] };
+  #around: { -readonly [K in keyof Around]: Around[K] };
+  #puff = { x: 0, y: 0, z: 0 };
   #middle = new THREE.Vector3();
   #floorAt = (x: number, z: number) => this.life.world.heightAt(x, z);
   #ndc = new THREE.Vector3();
@@ -119,7 +129,10 @@ export class Game implements Shell {
     const place = this.settings.place;
     this.#here = place !== "turns" && isPlaceId(place) ? place : isPlaceId(this.settings.scene) ? this.settings.scene : "picnic";
     const scene = SCENES[this.#here];
-    this.stage = new Stage(canvas, timeFromClock(new Date()), scene);
+    const now = new Date();
+    this.stage = new Stage(canvas, timeAt(clockHours(now)), scene);
+    this.stage.light.follow(clockHours(now), true);
+    this.stage.weather.follow(forecastHours(now), true);
     this.fireflies = new Fireflies(this.stage.scene);
     const world = new World(scene.place);
     this.life = new Life(world, brain);
@@ -129,6 +142,7 @@ export class Game implements Shell {
     this.hands = new Hands(world);
     this.handsView = new HandsView(this.stage.scene);
     this.eyes = new Eyes(this.stage, this.life);
+    this.#around = { fly: this.life.body.position, airborne: false, world, pantry: this.life.pantry, weather: this.stage.weather, quiet: false, felt: this.#felt };
     this.eyes.see(this.bubbles.mesh);
     for (const object of this.handsView.seen) this.eyes.see(object);
     this.inset = new EyesInset(this.eyes);
@@ -313,6 +327,7 @@ export class Game implements Shell {
       const playing = this.nav.current === "play" && !this.wallpaper;
       this.#copyEye();
       this.hands.update(dt, { use: false, holding: playing && remote.held.has("select"), eye: this.#eye }, life.body, life.pantry);
+      this.#live(dt);
       this.#feel();
       this.eyes.beforeStep();
       life.step(dt, now);
@@ -334,8 +349,10 @@ export class Game implements Shell {
     if (this.time > this.#clockAt) this.#followLight();
     stage.update(this.time, dt, director.camera);
     this.#clouds();
-    this.fireflies.update(this.time, stage.light.stars, director.camera);
-    this.#air.set(this.hands.air.x, this.hands.air.y, this.hands.air.z);
+    // Fireflies shelter from the rain.
+    this.fireflies.update(this.time, stage.light.stars * (1 - stage.weather.rain), director.camera);
+    this.#air.set(this.hands.air.x + this.#felt.air.x, this.hands.air.y + this.#felt.air.y, this.hands.air.z + this.#felt.air.z);
+    this.bubbles.rain = stage.weather.rain;
     const middle = this.#middle.set(life.body.position.x, life.body.position.y + 0.75, life.body.position.z);
     this.bubbles.update(this.time, paused ? 0 : dt, director.camera, stage.light.sunDirection, this.#air, middle);
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
@@ -345,6 +362,7 @@ export class Game implements Shell {
     const near = Math.max(0, Math.min(1, 1 - (director.camera.position.distanceTo(this.fly.root.position) - 15) / 120));
     const wings = paused ? 0 : life.body.mode === "airborne" ? Math.max(0.15, life.intent.wings) : life.intent.wingPose * 0.6;
     this.audio.follow(wings, paused ? 0 : Math.abs(life.body.groundSpeed) / 12, near, dt);
+    this.audio.weather(stage.weather.rain, Math.hypot(this.#felt.air.x, this.#felt.air.z));
 
     this.#overlay(dt);
 
@@ -378,17 +396,40 @@ export class Game implements Shell {
     this.#eye.z = c.z;
   }
 
+  /** The place's own goings-on this frame (wind, rain, visitors): what they do to the fly is left in #felt. */
+  #live(dt: number) {
+    const felt = this.#felt;
+    felt.air.x = 0;
+    felt.air.y = 0;
+    felt.air.z = 0;
+    felt.touch = 0;
+    felt.looming.length = 0;
+    const live = this.stage.set.live;
+    if (!live || this.#moving) return;
+    const around = this.#around;
+    around.airborne = this.life.body.mode === "airborne";
+    around.quiet = this.wallpaper || (performance.now() - this.remote.lastInputAt) / 1000 > QUIET_AFTER;
+    live.call(this.stage.set, dt, around);
+  }
+
   /** What the hands and the world do to the fly this frame, for its senses. */
   #feel() {
     const { stimuli } = this.life;
     const hands = this.hands;
-    // The feather, or a bubble that burst on it last frame.
-    stimuli.stroke = Math.max(hands.stroke, this.bubbles.brushed);
-    stimuli.air = hands.air;
-    // Things that could loom: the ball and the bubbles.
+    const felt = this.#felt;
+    // The feather, a bubble that burst on it last frame, or something from the place itself (a raindrop).
+    stimuli.stroke = Math.max(hands.stroke, this.bubbles.brushed, felt.touch);
+    // A puff from the player and the place's own air (a gust) together.
+    const air = this.#puff;
+    air.x = hands.air.x + felt.air.x;
+    air.y = hands.air.y + felt.air.y;
+    air.z = hands.air.z + felt.air.z;
+    stimuli.air = air;
+    // Things that could loom: the ball, the bubbles, and whatever comes by.
     stimuli.looming.length = 0;
     stimuli.looming.push(hands.looming[0]);
     if (this.bubbles.enabled) for (const b of this.bubbles.looming) stimuli.looming.push(b);
+    for (const l of felt.looming) stimuli.looming.push(l);
     stimuli.threat = hands.ball.active ? hands.ball.position : null;
   }
 
@@ -405,11 +446,16 @@ export class Game implements Shell {
     if (he.swooped) this.audio.play("swoop");
   }
 
-  /** Sets the light to the Light tool's choice; on "Now", to the time outside, looked at again every half minute. */
+  /** Sets the light and the weather to the tools' choices; on "Now", to the clock's, looked at again every few seconds. */
   #followLight() {
-    const chosen = this.hands.timeOfDay;
-    this.stage.setTime(chosen === "clock" ? timeFromClock(new Date()) : chosen);
-    this.#clockAt = this.time + 30;
+    const now = new Date();
+    const time = this.hands.timeOfDay;
+    if (time === "clock") this.stage.light.follow(clockHours(now));
+    else this.stage.setTime(time);
+    const weather = this.hands.weather;
+    if (weather === "now") this.stage.weather.follow(forecastHours(now));
+    else this.stage.weather.choose(weather);
+    this.#clockAt = this.time + CLOCK_EVERY;
   }
 
   /**
@@ -509,8 +555,8 @@ export class Game implements Shell {
             }
             this.moveTo(hands.place);
           }
-        } else if (hands.current.id === "light" || hands.current.id === "view") {
-          // Select steps round the times of day or the views, for a remote held in one hand.
+        } else if (hands.current.id === "light" || hands.current.id === "weather" || hands.current.id === "view") {
+          // Select steps round the times of day, the weathers or the views, for a remote held in one hand.
           hands.variants[hands.tool] = (hands.variants[hands.tool] + 1) % hands.current.variants.length;
           this.#variantChanged();
         } else {
@@ -531,7 +577,7 @@ export class Game implements Shell {
   #variantChanged() {
     this.audio.play("tick");
     this.#changedAt = this.time;
-    if (this.hands.current.id === "light") this.#followLight();
+    if (this.hands.current.id === "light" || this.hands.current.id === "weather") this.#followLight();
     if (this.hands.current.id === "view") this.#syncCamera();
   }
 
@@ -638,7 +684,7 @@ export class Game implements Shell {
     d.sweet = s.sweet.toFixed(3);
     d.eaten = life.eaten.toFixed(3);
     d.meals = String(life.meals);
-    d.food = String(life.pantry.foods.filter((f) => f.kind !== "patch").length);
+    d.food = String(life.pantry.foods.filter(isDropped).length);
     d.takeoffs = String(life.takeOffs);
     d.escape = (life.brain.state?.command.escape ?? 0).toFixed(3);
     d.escapePeak = this.peaks.escape.toFixed(3);
@@ -654,6 +700,9 @@ export class Game implements Shell {
     d.eyesUpdates = String(this.eyes.updates);
     d.spikesPerSecond = String(Math.round(this.meter.spikesPerSecond));
     d.time = this.stage.light.time;
+    d.hours = this.stage.light.hours === null ? "" : this.stage.light.hours.toFixed(2);
+    d.weather = this.stage.weather.kind;
+    d.wet = this.stage.weather.wet.toFixed(2);
     d.view = this.hands.view;
     d.place = this.#here;
     d.placeMs = this.stage.buildMs.toFixed(0);
