@@ -24,7 +24,7 @@ test("every food in every place either leaves an ink or is dry, and water leaves
     for (const patch of SCENES[info.id].place.patches) assert.ok(INKS[patch.name] || DRY.has(patch.name), `${info.name}: what does ${patch.name} leave?`);
   }
   // What the picnic puts out to be found.
-  assert.ok(INKS["strawberry juice"] && DRY.has("biscuit crumb"));
+  assert.ok(INKS["grape juice"] && INKS["strawberry juice"] && DRY.has("biscuit crumb"));
   for (const kind of Object.keys(FOODS) as FoodKind[]) assert.ok(kind in DROPPED);
   assert.equal(DROPPED.sugar, null);
   assert.equal(DROPPED.water, WATER);

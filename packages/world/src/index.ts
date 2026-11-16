@@ -14,3 +14,4 @@ export * from "./pace.ts";
 export * from "./ventilation.ts";
 export * from "./swoop.ts";
 export * from "./places.ts";
+export * from "./kitchen.ts";

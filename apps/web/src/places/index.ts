@@ -1,3 +1,4 @@
+import { kitchen } from "./kitchen/index.ts";
 // Every place the fly can live, by id (catalog.ts lists them in order).
 
 import type { PlaceId } from "./catalog.ts";
@@ -8,4 +9,4 @@ import { restaurant } from "./restaurant/index.ts";
 import type { Scene } from "./types.ts";
 import { windowsill } from "./windowsill/index.ts";
 
-export const SCENES: Readonly<Record<PlaceId, Scene>> = { picnic, windowsill, lab, bar, restaurant };
+export const SCENES: Readonly<Record<PlaceId, Scene>> = { picnic, windowsill, lab, bar, restaurant, kitchen };
