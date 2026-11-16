@@ -1,5 +1,6 @@
 // The player's settings, kept in localStorage.
 
+import type { WallpaperStyle } from "./camera.ts";
 import type { PixelSize } from "./display.ts";
 
 export type EyesDetail = "off" | "low" | "high";
@@ -11,8 +12,8 @@ export type Settings = {
   pixels: PixelSize;
   /** Seconds without a press before the game becomes a wallpaper; 0 never. */
   wallpaperAfter: number;
-  /** How the camera moves in the wallpaper: "calm" holds long shots, "lively" changes them more often. */
-  wallpaperCamera: "calm" | "lively";
+  /** How the camera moves in the wallpaper: "follow" keeps one shot on the fly, "calm" holds long shots, "lively" changes them more often. */
+  wallpaperCamera: WallpaperStyle;
   /** How finely the fly's eyes are rendered. */
   eyes: EyesDetail;
   /** Show what the buttons do. */
@@ -26,7 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ambience: 5,
   pixels: "classic",
   wallpaperAfter: 60,
-  wallpaperCamera: "calm",
+  wallpaperCamera: "follow",
   eyes: "low",
   hints: true,
   stats: false,
