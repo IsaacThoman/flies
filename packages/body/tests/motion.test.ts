@@ -177,3 +177,36 @@ test("long frames keep flight stable and report a landing anywhere within the fr
   assert.equal(body.events.landed, true);
   assert.equal(body.position.y, 0);
 });
+
+test("a descending side collision cannot leave the fly below the floor", () => {
+  const world = new World({ floor: { kind: "rect", hx: 100, hz: 100 }, solids: [{ name: "wall", footprint: { kind: "box", x: 5, z: 0, hx: 5, hz: 20, angle: 0 }, top: { kind: "flat", y: 100 } }], patches: [], start: { x: -0.7, z: 0, yaw: Math.PI / 2 }, ceiling: 320 });
+  const body = new FlyBody(world, world.place.start);
+  body.position.y = 1;
+  body.mode = "airborne";
+  Object.assign(body.velocity, { x: 100, y: -100, z: 0 });
+  body.step(intent(), still, DT);
+  assert.ok(body.position.y >= world.heightAt(body.position.x, body.position.z), JSON.stringify(body.position));
+});
+
+test("flight hits a thin solid even when both frame endpoints are outside it", () => {
+  const world = new World({ floor: { kind: "rect", hx: 100, hz: 100 }, solids: [{ name: "pane", footprint: { kind: "box", x: 0, z: 0, hx: 0.5, hz: 20, angle: 0 }, top: { kind: "flat", y: 100 } }], patches: [], start: { x: -2, z: 0, yaw: Math.PI / 2 }, ceiling: 320 });
+  const body = new FlyBody(world, world.place.start);
+  body.position.y = 20;
+  body.mode = "airborne";
+  body.velocity.x = 600;
+  body.step(intent(), still, DT);
+  assert.ok(body.position.x < -0.5, `crossed pane to ${body.position.x}`);
+  assert.ok(body.events.hit > 0);
+  assert.ok(body.velocity.x < 0);
+});
+
+test("walls beyond the floor stop a falling fly before the edge height clamp", () => {
+  const world = new World({ floor: { kind: "rect", hx: 20, hz: 20 }, solids: [{ name: "reveal", footprint: { kind: "box", x: 30, z: -10, hx: 10, hz: 10, angle: 0 }, top: { kind: "flat", y: 100 } }], patches: [], start: { x: 25, z: 0.1, yaw: Math.PI }, ceiling: 100 });
+  const body = new FlyBody(world, world.place.start);
+  body.position.y = 1;
+  body.mode = "airborne";
+  Object.assign(body.velocity, { x: 0, y: 0, z: -30 });
+  body.step(intent(), still, DT);
+  assert.ok(body.position.z > 0, `inside reveal: ${JSON.stringify(body.position)}`);
+  assert.ok(body.position.y < 100, "did not teleport onto the wall");
+});

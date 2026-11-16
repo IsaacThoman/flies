@@ -58,6 +58,7 @@ export class World {
   solids: readonly Solid[] = [];
   floor!: Floor;
   #radii = new Float64Array(0);
+  #span: [number, number] = [0, 0];
 
   constructor(place: Place) {
     this.load(place);
@@ -170,15 +171,15 @@ export class World {
    * `dir` must be a unit vector. Null when it misses everything (into the sky,
    * or past the table's edge).
    */
-  raycast(origin: Vec3, dir: Vec3, out: RayHit): RayHit | null {
-    let bestT = Infinity;
+  raycast(origin: Vec3, dir: Vec3, out: RayHit, maxDistance = Infinity): RayHit | null {
+    let bestT = maxDistance;
     let found = false;
     // The table top.
     if (dir.y < -1e-9) {
       const t = -origin.y / dir.y;
       const x = origin.x + dir.x * t;
       const z = origin.z + dir.z * t;
-      if (t > 0 && this.onTable(x, z)) {
+      if (t > 0 && t <= bestT && this.onTable(x, z)) {
         bestT = t;
         found = true;
         setHit(out, x, 0, z, 0, 1, 0, -1, t);
@@ -186,7 +187,15 @@ export class World {
     }
     for (let i = 0; i < this.solids.length; i++) {
       const solid = this.solids[i];
-      const span = prismSpan(solid.footprint, origin.x, origin.z, dir.x, dir.z);
+      const f = solid.footprint;
+      const r = this.#radii[i];
+      if (Number.isFinite(bestT) && (
+        f.x + r < Math.min(origin.x, origin.x + dir.x * bestT) ||
+        f.x - r > Math.max(origin.x, origin.x + dir.x * bestT) ||
+        f.z + r < Math.min(origin.z, origin.z + dir.z * bestT) ||
+        f.z - r > Math.max(origin.z, origin.z + dir.z * bestT)
+      )) continue;
+      const span = prismSpan(f, origin.x, origin.z, dir.x, dir.z, this.#span);
       if (!span) continue;
       const t0 = Math.max(span[0], 0);
       const t1 = Math.min(span[1], bestT);
@@ -245,17 +254,16 @@ function topCrossing(solid: Solid, o: Vec3, d: Vec3, t0: number, t1: number): nu
     const t = (top.y - o.y) / d.y;
     return t >= t0 && t <= t1 ? t : null;
   }
-  const above = (t: number) => o.y + d.y * t - topHeight(solid, o.x + d.x * t, o.z + d.z * t);
   const steps = 16;
   let a = t0;
-  if (above(a) <= 0) return a;
+  if (aboveTop(solid, o, d, a) <= 0) return a;
   for (let k = 1; k <= steps; k++) {
     const end = t0 + ((t1 - t0) * k) / steps;
-    if (above(end) <= 0) {
+    if (aboveTop(solid, o, d, end) <= 0) {
       let b = end;
       for (let j = 0; j < 20; j++) {
         const m = (a + b) / 2;
-        if (above(m) > 0) a = m;
+        if (aboveTop(solid, o, d, m) > 0) a = m;
         else b = m;
       }
       return b;
@@ -263,4 +271,8 @@ function topCrossing(solid: Solid, o: Vec3, d: Vec3, t0: number, t1: number): nu
     a = end;
   }
   return null;
+}
+
+function aboveTop(solid: Solid, o: Vec3, d: Vec3, t: number) {
+  return o.y + d.y * t - topHeight(solid, o.x + d.x * t, o.z + d.z * t);
 }
