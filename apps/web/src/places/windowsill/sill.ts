@@ -4,7 +4,7 @@
 // into a few meshes; the small things are instanced.
 
 import * as THREE from "three";
-import { BANANA, WINE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_DECOR, SILL_PATCHES, SILL_SOLIDS, TEASPOON, WINDOW, bananaAt, inside, topHeight, topNormal } from "@fly/world";
+import { BANANA, WINE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_DECOR, SILL_PATCHES, SILL_SOLIDS, TEASPOON, WINDOW, bananaAt, inside, topHeight, topNormal, topPeak } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { Batch, freeze, mat4, paint, random } from "../../scene/build.ts";
 import type { Daylight } from "../../scene/light.ts";
@@ -32,6 +32,8 @@ const one = (name: string) => byName(name)[0];
 const patch = (name: string) => SILL_PATCHES.find((p) => p.name === name)!;
 
 const box = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number) => new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0).translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+
+const UP = new THREE.Vector3(0, 1, 0);
 
 /** A round thing's surface turned from a profile of [radius, height] points, at (x, z). */
 const lathe = (profile: readonly (readonly [number, number])[], segments: number, x: number, z: number) =>
@@ -267,7 +269,7 @@ export function buildSill(): SceneSet {
   const rnd = random(23);
   const { balls, columns } = casters();
   const sunlight = createSunlight(balls, columns);
-  const paintM = paintMaterial(sunlight, contacts(), SILL_DECOR.ring);
+  const paintM = paintMaterial(sunlight, contacts(), SILL_DECOR.ring, byName("crumb").map((c) => ({ x: c.footprint.x, z: c.footprint.z, r: (c.footprint as { rx: number }).rx, height: topPeak(c.top) })));
   const plaster = plasterMaterial(sunlight);
   const tiles = tileMaterial(sunlight);
   const clay = clayMaterial(sunlight);
@@ -568,8 +570,35 @@ export function buildSill(): SceneSet {
     fruity(blob(honey.x, honey.z, 4.6, well + 0.25, 1), "#e08a10", 0);
   }
 
-  // Crumbs of toast at the fly's scale.
-  for (const crumb of byName("crumb")) clayed(topGeometry(crumb, 6, 18), (p) => (p.y > 1 ? tone("#d29444") : tone("#a8682a")));
+  // Crumbs of toast at the fly's scale, and specks of it too small to feel underfoot (SILL_DECOR.crumbs), each a little different, resting on the sill: golden, toasted darker in patches, paler where the crumb is open.
+  {
+    const toastColor = (p: THREE.Vector3) => {
+      const speck = Math.sin(p.x * 13.1 + p.z * 7.7) * Math.sin(p.z * 11.3 - p.x * 5.1 + p.y * 9);
+      return speck > 0.5 ? tone("#9a5520") : speck < -0.65 ? tone("#f0d293") : p.y > 0.7 ? tone("#dcaa62") : tone("#c08440");
+    };
+    for (const crumb of byName("crumb")) fruity(topGeometry(crumb, 6, 18), toastColor, 6);
+    // The specks are written straight into one geometry, each a lumpy twenty-faced chip flat underneath.
+    const ico = new THREE.IcosahedronGeometry(1, 0).attributes.position;
+    const points: number[] = [];
+    const v = new THREE.Vector3();
+    const m = new THREE.Matrix4();
+    for (const cluster of SILL_DECOR.crumbs) {
+      for (let i = 0; i < cluster.count; i++) {
+        const a = rnd.range(0, Math.PI * 2);
+        const r = Math.sqrt(rnd.next()) * cluster.r;
+        const size = rnd.range(0.12, 0.42) * (r < cluster.r * 0.4 ? 1.25 : 1);
+        m.compose(v.set(cluster.x + Math.cos(a) * r, 0, cluster.z + Math.sin(a) * r), new THREE.Quaternion().setFromAxisAngle(UP, rnd.range(0, 6.3)), new THREE.Vector3(size, size, size * rnd.range(0.7, 1.3)));
+        for (let k = 0; k < ico.count; k++) {
+          const j = 0.75 + 0.5 * Math.abs(Math.sin(ico.getX(k) * 5.3 + ico.getZ(k) * 3.1 + i));
+          v.set(ico.getX(k) * j, Math.max(-0.1, ico.getY(k)) * j * 0.7, ico.getZ(k) * j).applyMatrix4(m).toArray(points, points.length);
+        }
+      }
+    }
+    const specks = new THREE.BufferGeometry();
+    specks.setAttribute("position", new THREE.Float32BufferAttribute(points, 3));
+    specks.computeVertexNormals();
+    fruity(specks, toastColor, 6);
+  }
 
   // The tea towel, folded on the sill, its end hanging over the front edge.
   {
@@ -710,18 +739,9 @@ export function buildSill(): SceneSet {
     group.add(dropMesh);
   }
 
-  // Bits too small to feel: specks of toast, grains of spilt sugar, perlite and crumbs of soil in the pot.
+  // Bits too small to feel: grains of spilt sugar, perlite and crumbs of soil in the pot.
   {
     const bits: { m: THREE.Matrix4; c: THREE.Color }[] = [];
-    const toast = [new THREE.Color("#b5722e"), new THREE.Color("#e2b06a"), new THREE.Color("#8a4f1e")];
-    for (const cluster of SILL_DECOR.crumbs) {
-      for (let i = 0; i < cluster.count; i++) {
-        const a = rnd.range(0, Math.PI * 2);
-        const r = Math.sqrt(rnd.next()) * cluster.r;
-        const size = rnd.range(0.12, 0.4);
-        bits.push({ m: mat4({ x: cluster.x + Math.cos(a) * r, y: size * 0.3, z: cluster.z + Math.sin(a) * r }, new THREE.Euler(rnd.range(0, 3), rnd.range(0, 3), 0), { x: size, y: size * 0.7, z: size * rnd.range(0.8, 1.4) }), c: toast[Math.floor(rnd.next() * 3)] });
-      }
-    }
     const sugar = patch("spilt sugar");
     for (let i = 0; i < 50; i++) {
       const a = rnd.range(0, Math.PI * 2);

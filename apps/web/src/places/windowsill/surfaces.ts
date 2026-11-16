@@ -82,6 +82,9 @@ const withVarying = (shader: Shader, attribute: string, varying: string) => {
 /** Where the bottoms of things stand on the sill, for the soft dark where they meet it: x, z, radius, how dark. */
 export type Contact = { x: number; z: number; r: number; dark: number };
 const MAX_CONTACTS = 24;
+/** Crumbs at the fly's scale, too small for the light's casters, which throw their own little shadows on the sill: where, how wide, how high. */
+export type Lump = { x: number; z: number; r: number; height: number };
+const MAX_LUMPS = 4;
 
 /**
  * Painted timber: the sill and the window's frame. Gloss paint over pine,
@@ -92,12 +95,14 @@ const MAX_CONTACTS = 24;
  * On the sill's top the things standing on it darken it where they meet it,
  * and a glass once left a ring.
  */
-export function paintMaterial(sunlight: Sunlight, contacts: readonly Contact[], ring: { x: number; z: number; r: number }) {
+export function paintMaterial(sunlight: Sunlight, contacts: readonly Contact[], ring: { x: number; z: number; r: number }, lumps: readonly Lump[]) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0, envMapIntensity: 0.55 });
   const spots = Array.from({ length: MAX_CONTACTS }, (_, i) => (contacts[i] ? new THREE.Vector4(contacts[i].x, contacts[i].z, contacts[i].r, contacts[i].dark) : new THREE.Vector4(1e5, 1e5, 0, 0)));
+  const shadows = Array.from({ length: MAX_LUMPS }, (_, i) => (lumps[i] ? new THREE.Vector4(lumps[i].x, lumps[i].z, lumps[i].r, lumps[i].height) : new THREE.Vector4(1e5, 1e5, 0, 0)));
   sunlit(material, sunlight, "paint", {
     extra: (shader) => {
       shader.uniforms.uContacts = { value: spots };
+      shader.uniforms.uLumps = { value: shadows };
       shader.uniforms.uRing = { value: new THREE.Vector3(ring.x, ring.z, ring.r) };
       withVarying(shader, "grain", "vGrain");
       shader.fragmentShader = shader.fragmentShader
@@ -106,6 +111,7 @@ export function paintMaterial(sunlight: Sunlight, contacts: readonly Contact[], 
           /* glsl */ `#include <common>
 ${NOISE}\n${BUMP}
 uniform vec4 uContacts[${MAX_CONTACTS}];
+uniform vec4 uLumps[${MAX_LUMPS}];
 uniform vec3 uRing;
 float paintRough;
 float paintHeight;
@@ -216,7 +222,19 @@ if (sillTop > 0.5) {
   }
   reflectedLight.indirectDiffuse *= open;
   reflectedLight.indirectSpecular *= open;
-  reflectedLight.directDiffuse *= mix(1.0, open, 0.35);
+  // The crumbs' shadows, each a ball half sunk in the sill, soft-edged.
+  vec3 toSun = normalize(uSun);
+  float lit = 1.0;
+  for (int i = 0; i < ${MAX_LUMPS}; i++) {
+    vec4 c = uLumps[i];
+    vec3 d = vec3(c.x, c.w * 0.3, c.y) - vWorld;
+    float along = dot(d, toSun);
+    if (along <= 0.0) continue;
+    float miss = length(d - toSun * along);
+    lit *= 1.0 - (1.0 - smoothstep(c.z * 0.55, c.z * 0.95 + along * 0.02, miss)) * 0.75;
+  }
+  reflectedLight.directDiffuse *= mix(1.0, open, 0.35) * lit;
+  reflectedLight.directSpecular *= lit;
 }`,
         );
     },
@@ -260,7 +278,8 @@ export function clayMaterial(sunlight: Sunlight) {
  * honey), 1 a banana (freckles, darker brown where it is bruised, ridged), 2 a
  * peach's fuzz (a soft sheen at its edges), 3 a plum's bloom (dusty pale over
  * deep purple), 4 a peach's cut flesh (fibres running out from the stone,
- * wet), 5 the peach's stone (deeply wrinkled).
+ * wet), 5 the peach's stone (deeply wrinkled), 6 toast (a dry, open crumb,
+ * its little holes dark).
  */
 export function fruitMaterial(sunlight: Sunlight, stone: THREE.Vector2) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0, envMapIntensity: 0.6 });
@@ -311,11 +330,18 @@ export function fruitMaterial(sunlight: Sunlight, stone: THREE.Vector2) {
     c *= 0.92 + 0.16 * fibres;
     skinRough = 0.1;
     skinHeight = fibres * 0.04;
-  } else {
+  } else if (kind == 5) {
     float wrinkle = abs(vnoise3(p * 0.9) - 0.5) * 2.0;
     c *= 0.65 + 0.5 * wrinkle;
     skinRough = 0.8;
     skinHeight = -wrinkle * 0.5 * resolved(0.4);
+  } else {
+    // Toast: the crumb's open cells, a tenth of a millimetre and more across, dark where they open; matte and dry.
+    float cells = vnoise3(p * 3.1) * 0.65 + vnoise3(p * 7.3) * 0.35;
+    float hole = smoothstep(0.6, 0.74, cells) * resolved(0.25);
+    c *= (0.88 + 0.2 * vnoise3(p * 1.1)) * (1.0 - hole * 0.5);
+    skinRough = 0.88;
+    skinHeight = (vnoise3(p * 2.0) * 0.05 - hole * 0.06) * resolved(0.3);
   }
   diffuseColor.rgb = c;
 }`,
