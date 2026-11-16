@@ -25,11 +25,11 @@ Five threads:
 | JavaScript | The JavaScriptCore context: runs `runtime.js`, then `game.js`, animation frames from a `CADisplayLink`, timers, events | `src/Host.mm`, `runtime/` |
 | Render | The OpenGL ES context: replays WebGL and 2D canvas commands a frame behind JavaScript, presents | `src/Renderer.mm`, `src/Executor.mm`, `src/Canvas2D.mm` |
 | Brain | The `fly_brain`: loads the connectome, steps the simulation whenever time is waiting | `src/BrainBridge.mm`, `packages/brain-native` |
+| Audio | AVAudioEngine's render callback: the Web Audio graph, mixed per sample | `src/Audio.mm` |
 
 Built with WeatherKit, the weather outside is found on the main thread (Core Location, timers)
 and in Swift's own tasks (the request), and read from the JavaScript thread
 ([The weather outside](#the-weather-outside)).
-| Audio | AVAudioEngine's render callback: the Web Audio graph, mixed per sample | `src/Audio.mm` |
 
 WebGL calls that return nothing are encoded into a 4 MB command buffer (about 0.2–0.3 µs a call
 on the device, per aerodance) and run later on the render thread. Object handles are numbered in
@@ -296,7 +296,8 @@ has no Swift and no `__native.weather`, and the game keeps its made-up forecast.
   expires, and at most an hour apart), and after a failure sooner, backing off from a minute to
   20. Timers don't fire while the app is suspended; when it becomes active again it asks if the
   answer is 20 minutes old. A relaunch within 20 minutes of the last answer uses the kept one
-  and doesn't ask. `stop()` stops it asking.
+  and doesn't ask. Apple Weather's attribution is asked for on its own once a run, as it starts,
+  so About has it for a kept answer too. `stop()` stops it asking.
 - Nothing waits: `start` and `stop` hand over to the main actor and return, and the rest copy.
   The game looks at `version()` every two seconds and reads `conditions()` only when it changes,
   so nothing is allocated per frame.

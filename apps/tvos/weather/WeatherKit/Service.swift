@@ -32,6 +32,8 @@ final class Service: NSObject, CLLocationManagerDelegate {
   private var placedAt = Date.distantPast
   /** A location fix or a WeatherKit request is out. */
   private var asking = false
+  /** Apple Weather's attribution is being asked for. */
+  private var attributing = false
   private var failures = 0
   private var timer: Timer?
 
@@ -48,6 +50,8 @@ final class Service: NSObject, CLLocationManagerDelegate {
       NotificationCenter.default.addObserver(self, selector: #selector(becameActive), name: UIApplication.didBecomeActiveNotification, object: nil)
     }
     refresh()
+    // Asked for on its own: an answer kept from the last run is shown before the next request.
+    attribute()
   }
 
   func stop(_ answer: Answer) {
@@ -134,7 +138,6 @@ final class Service: NSObject, CLLocationManagerDelegate {
     guard let answer else { return }
     asking = true
     answer.set(status: "fetching")
-    let wantsAttribution = answer.attribution == nil
     Task {
       do {
         let calendar = Calendar.current
@@ -158,15 +161,12 @@ final class Service: NSObject, CLLocationManagerDelegate {
           // Where the sun never comes up, its lowest is the one WeatherKit gives: its highest is twelve hours from it.
           "noon": localHours(sun?.solarNoon ?? sun?.solarMidnight.map { $0.addingTimeInterval(-12 * 3600) }, from: today),
         ])
-        if wantsAttribution {
-          let a = try await WeatherService.shared.attribution
-          answer.attributed(service: a.serviceName, legalText: a.legalAttributionText, legalPage: a.legalPageURL.absoluteString)
-        }
         asking = false
         failures = 0
         // Stopped while it was asked: the answer is kept, and it says it has stopped.
         guard running else { return answer.set(status: "idle") }
         wait(min(3600, max(Self.every, current.metadata.expirationDate.timeIntervalSinceNow)))
+        attribute()
       } catch {
         asking = false
         guard running else { return answer.set(status: "idle") }
@@ -174,6 +174,17 @@ final class Service: NSObject, CLLocationManagerDelegate {
         answer.set(status: status, error: description)
         retry()
       }
+    }
+  }
+
+  /** Apple Weather's attribution, once a run; if it isn't given, it is asked for again after the next answer. */
+  private func attribute() {
+    guard let answer, answer.attribution == nil, !attributing else { return }
+    attributing = true
+    Task {
+      defer { attributing = false }
+      guard let a = try? await WeatherService.shared.attribution else { return }
+      answer.attributed(service: a.serviceName, legalText: a.legalAttributionText, legalPage: a.legalPageURL.absoluteString)
     }
   }
 
