@@ -12,7 +12,9 @@ const f = (n: number) => n.toFixed(1);
  * reflection of the room, more at a glancing angle, and the dust and a
  * smear on it lit up when the sun is behind them. At night, with the dark
  * outside, it is a mirror of the warm room with the lamp in it. On cold
- * mornings and evenings it mists at its foot.
+ * mornings and evenings it mists at its foot. In the rain, drops bead on the
+ * outside of the pane and run down it, and when it has been raining it stays
+ * streaked where they ran.
  */
 export function windowGlass() {
   const uniforms = {
@@ -22,6 +24,13 @@ export function windowGlass() {
     uMist: { value: 0 },
     uRoom: { value: new THREE.Color("#e0c8a0") },
     uLampColor: { value: new THREE.Color("#ffd29a") },
+    uRain: { value: 0 },
+    uWet: { value: 0 },
+    uTime: { value: 0 },
+    /** The light outside, as a drop shows it (a drop is a lens: the sky in it is at its foot). */
+    uOutside: { value: new THREE.Color() },
+    /** The glint in each drop: the sky's by day, the lamp's at night. */
+    uGlint: { value: new THREE.Color() },
   };
   const material = new THREE.ShaderMaterial({
     uniforms,
@@ -41,8 +50,66 @@ uniform float uNight;
 uniform float uMist;
 uniform vec3 uRoom;
 uniform vec3 uLampColor;
+uniform float uRain;
+uniform float uWet;
+uniform float uTime;
+uniform vec3 uOutside;
+uniform vec3 uGlint;
 varying vec3 vWorld;
 ${NOISE}
+// A drop at d (its own coordinates, 1 at its edge, y up): how much of the pixel it covers, and its colour, a lens of the outside: dark round its rim, the sky bright in its lower part (upside down), a glint up on the side the light comes from.
+vec4 drop(vec2 d, float aa) {
+  float l = length(d);
+  aa += 0.02;
+  float inside = 1.0 - smoothstep(1.0 - aa, 1.0, l);
+  if (inside <= 0.0) return vec4(0.0);
+  float rim = smoothstep(0.45, 0.95, l);
+  vec3 c = uOutside * mix(0.55, 1.25, smoothstep(0.3, -0.7, d.y)) * (1.0 - rim * 0.65);
+  c += uGlint * (1.0 - smoothstep(0.0, 0.22, length(d - vec2(-0.32, 0.45)))) * 1.4;
+  // In the dark a drop is seen by its glint, its body hardly at all.
+  float body = (0.55 + 0.4 * rim) * (1.0 - 0.7 * uNight);
+  float glint = 1.0 - smoothstep(0.0, 0.22, length(d - vec2(-0.32, 0.45)));
+  return vec4(c, inside * max(body, glint * 0.9));
+}
+// Rain on the outside of the pane, at p (mm in its plane): beads that sit, more of them the wetter it is, and drops running down, as many as it rains, each leaving a wet trail.
+vec4 rain(vec2 p) {
+  vec4 out4 = vec4(0.0);
+  // A pixel's size here, mm: taken once, as derivatives inside branches are not to be trusted.
+  float px = length(fwidth(p));
+  // Beads, in cells 6 mm across: one in some cells, a millimetre or two across.
+  vec2 cell = floor(p / 6.0);
+  float h = hash21(cell);
+  if (h < uWet * 0.55) {
+    vec2 o = vec2(hash21(cell + 7.1), hash21(cell + 3.3)) * 2.4 + 1.8;
+    float r = 0.5 + 1.2 * hash21(cell + 1.9);
+    vec2 d = (p - cell * 6.0 - o) / vec2(r, r * 1.12);
+    out4 = drop(d, px / r);
+  }
+  // Running drops, one to a column 14 mm wide where it rains enough: each slides down, wavering, at its own pace, and starts again at the top.
+  float col = floor(p.x / 14.0);
+  float n = hash21(vec2(col, 9.0));
+  float x = (col + 0.5 + 0.22 * sin(p.y * 0.045 + n * 30.0)) * 14.0;
+  if (n < uRain * 0.7) {
+    float speed = 18.0 + 70.0 * hash21(vec2(col, 4.0));
+    float y = 560.0 - mod(uTime * speed + n * 900.0, 640.0);
+    float r = 1.6 + 1.4 * hash21(vec2(col, 2.0));
+    vec2 d = vec2(p.x - x, p.y - y) / vec2(r, r * 1.25);
+    // A little flattened underneath, drawn out above: a drop running.
+    d.x *= 1.0 + max(d.y, 0.0) * 0.35;
+    vec4 running = drop(d, px / r);
+    // Its trail: a thin film of water up behind it, thinning out.
+    float above = p.y - y;
+    float trail = step(0.0, above) * (1.0 - smoothstep(0.0, 140.0 + 200.0 * n, above));
+    float width = r * 0.35 * trail;
+    float onTrail = (1.0 - smoothstep(width * 0.6, width + px, abs(p.x - x))) * trail;
+    if (running.a <= 0.0) running = vec4(uOutside * 1.1, onTrail * 0.3);
+    if (running.a > out4.a) out4 = running;
+  }
+  // Where drops have run, once it has rained: faint streaks down the pane.
+  float streak = (1.0 - smoothstep(0.2, 0.9 + px, abs(p.x - x))) * step(n, 0.7) * uWet * 0.12;
+  if (streak > out4.a) out4 = vec4(uOutside * 1.1, streak);
+  return out4;
+}
 void main() {
   vec3 v = normalize(vWorld - cameraPosition);
   float facing = abs(v.z);
@@ -70,6 +137,12 @@ void main() {
   float mirror = fresnel * (0.3 + 0.7 * uNight) + uNight * 0.16;
   float a = clamp(mirror + haze * 0.05 + mist * 0.55 + dot(glow, vec3(0.3)) * 0.4, 0.0, 0.92);
   vec3 c = room * mirror + glow + vec3(0.9, 0.93, 0.95) * haze * 0.05 + fog * mist * 0.55;
+  // Rain outside the glass, the room's reflection over it as over the pane.
+  if (uWet + uRain > 0.0) {
+    vec4 wet = rain(vWorld.xy);
+    c = c * (1.0 - wet.a) + (wet.rgb + room * mirror) * wet.a;
+    a = a + wet.a * (1.0 - a);
+  }
   gl_FragColor = vec4(c / max(a, 1e-3), a);
 }`,
   });

@@ -30,6 +30,8 @@ export type Sunlight = {
   uColumns: { value: THREE.Vector4[] };
   /** 0 by day, 1 with the lamp on. */
   uLamp: { value: number };
+  /** 0 in sunshine, 1 under a grey sky: how soft the window's shadows are. */
+  uSoft: { value: number };
   /** By day, the sunlight thrown back from the room: it lights what faces into the room. */
   uBounce: { value: THREE.Color };
   /** The lit room, as glossy things reflect it. */
@@ -47,6 +49,7 @@ export function createSunlight(balls: readonly Ball[], columns: readonly Column[
     uDensity: { value: Array.from({ length: MAX_BALLS }, (_, i) => balls[i]?.density ?? 1) },
     uColumns: { value: c },
     uLamp: { value: 0 },
+    uSoft: { value: 0 },
     uBounce: { value: new THREE.Color() },
     uRoom: { value: new THREE.Color() },
     uLampColor: { value: new THREE.Color("#ffb867") },
@@ -63,6 +66,7 @@ uniform vec4 uBalls[${MAX_BALLS}];
 uniform float uDensity[${MAX_BALLS}];
 uniform vec4 uColumns[${MAX_COLUMNS}];
 uniform float uLamp;
+uniform float uSoft;
 uniform vec3 uBounce;
 uniform vec3 uRoom;
 uniform vec3 uLampColor;
@@ -80,8 +84,8 @@ float throughWindow(vec3 p, vec3 s) {
   float t = (${f(WINDOW.glass)} - p.z) / s.z;
   if (t > 0.0) {
     vec2 q = p.xy + s.xy * t;
-    // The sun is half a degree across, and light scatters: shadows soften with distance.
-    float b = 0.8 + t * 0.014;
+    // The sun is half a degree across, and light scatters: shadows soften with distance, and under a grey sky the light comes from all of it.
+    float b = (0.8 + t * 0.014) * (1.0 + uSoft * 14.0);
     v *= soft(${f(SILL.hx - WINDOW.jamb.width)} - abs(q.x), b);
     v *= soft(${f(FRAME_HEAD)} - q.y, b);
     v *= soft(abs(q.x) - ${f(WINDOW.mullion.half)}, b);
@@ -90,7 +94,7 @@ float throughWindow(vec3 p, vec3 s) {
   }
   // The bottom rail's front edge.
   t = (${f(WINDOW.glass + WINDOW.rail.depth)} - p.z) / s.z;
-  if (t > 0.0) v *= soft(p.y + s.y * t - ${f(WINDOW.rail.top)}, 0.8 + t * 0.014);
+  if (t > 0.0) v *= soft(p.y + s.y * t - ${f(WINDOW.rail.top)}, (0.8 + t * 0.014) * (1.0 + uSoft * 14.0));
   // Out in the room: in through the wall's opening, over the sill.
   t = (${f(WINDOW.wall)} - p.z) / s.z;
   if (t > 0.0) {
@@ -110,7 +114,7 @@ float pastThings(vec3 p, vec3 s) {
     float along = dot(d, s);
     if (along <= 0.0) continue;
     float miss = length(d - s * along);
-    float b = 0.4 + along * 0.025;
+    float b = (0.4 + along * 0.025) * (1.0 + uSoft * 6.0);
     v *= 1.0 - (1.0 - soft(miss - o.w, b)) * uDensity[i];
   }
   vec2 s2 = s.xz;
@@ -124,7 +128,7 @@ float pastThings(vec3 p, vec3 s) {
     if (along + chord <= 0.0) continue;
     // Stopped if it is still between the sill and the top where it goes in (or, from inside, where it comes out: a bowl's rim shades its floor).
     float at = along - chord > 0.0 ? along - chord : along + chord;
-    float b = 0.4 + abs(along) * 0.025;
+    float b = (0.4 + abs(along) * 0.025) * (1.0 + uSoft * 6.0);
     float y = p.y + s.y * at;
     v *= 1.0 - (1.0 - soft(miss - c.z, b)) * (1.0 - soft(y - c.w, b)) * soft(y + 0.5, 0.5);
   }

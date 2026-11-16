@@ -3,16 +3,22 @@
 // backs of a little street of houses, their chimneys and roofs against the
 // sky, with a church spire and hills far off. Through the day the light
 // changes on it, clouds drift, birds pass; at night its windows light up,
-// the stars come out and the moon is up. Drawn in the far pass, in five draws.
+// the stars come out and the moon is up. On a grey day the cloud closes over,
+// mist and rain bring the distance in, and the wind moves the tree and the
+// washing. Drawn in the far pass, in five draws, and a sixth for rain.
 
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { Batch, paint, random } from "../../scene/build.ts";
 import type { Daylight } from "../../scene/light.ts";
+import type { Weather } from "../../scene/weather.ts";
 import type { SceneBackdrop } from "../types.ts";
 import { NOISE, tone } from "./surfaces.ts";
 
 /** The garden's ground, mm below the sill. */
 export const GARDEN_Y = -1250;
+
+const WHITE = new THREE.Color(1, 1, 1);
 
 /** Where the moon is, when it is night. */
 const MOON = new THREE.Vector3(0.3, 0.5, -0.81).normalize();
@@ -30,7 +36,7 @@ void main() {
 const SKY_FS = /* glsl */ `
 uniform vec3 zenith; uniform vec3 middle; uniform vec3 horizon;
 uniform vec3 sunDir; uniform vec3 sunColor; uniform float glow; uniform float stars; uniform float time;
-uniform vec3 cloudLit; uniform vec3 cloudShade; uniform vec3 moonDir; uniform float day;
+uniform vec3 cloudLit; uniform vec3 cloudShade; uniform vec3 moonDir; uniform float day; uniform float cover; uniform float mist; uniform vec3 veil;
 varying vec3 vDir;
 varying vec3 vWorld;
 ${NOISE}
@@ -46,28 +52,31 @@ void main() {
   vec3 c = mix(horizon, middle, smoothstep(0.0, 0.25, h));
   c = mix(c, zenith, smoothstep(0.2, 0.9, h));
   float s = max(dot(d, sunDir), 0.0);
-  c += sunColor * (pow(s, 6.0) * glow + pow(s, 64.0) * 0.4) * day;
-  c = mix(c, vec3(1.0, 0.99, 0.94), smoothstep(0.9993, 0.9996, s) * day);
-  // Clouds: drifting fair-weather cumulus on a plane above, lit on the sun's side.
+  float sunny = day * (1.0 - cover * 0.9);
+  c += sunColor * (pow(s, 6.0) * glow + pow(s, 64.0) * 0.4) * sunny;
+  c = mix(c, vec3(1.0, 0.99, 0.94), smoothstep(0.9993, 0.9996, s) * sunny);
+  // Clouds: drifting fair-weather cumulus on a plane above, lit on the sun's side; on a grey day they close over into a lid, darker underneath.
   if (h > 0.0) {
     vec2 uv = d.xz / (h + 0.12) * 2.2 + vec2(time * 0.006, time * 0.002);
     float n = fbm(uv);
-    float cover = smoothstep(0.52, 0.78, n) * smoothstep(0.0, 0.12, h);
-    float lit = clamp(0.55 + (fbm(uv + sunDir.xz * 0.08) - n) * -4.0, 0.0, 1.0);
+    float amount = smoothstep(0.52 - 0.5 * cover, 0.78 - 0.3 * cover, n) * smoothstep(0.0, 0.12, h);
+    float lit = clamp(0.55 + (fbm(uv + sunDir.xz * 0.08) - n) * -4.0, 0.0, 1.0) * (1.0 - cover * 0.6);
     vec3 cloud = mix(cloudShade, cloudLit, lit);
-    c = mix(c, cloud, cover * 0.92);
+    c = mix(c, cloud, amount * 0.92);
   }
+  // Mist: the sky fades to white, most of all low down.
+  c = mix(c, veil, mist * (0.95 - 0.45 * smoothstep(0.0, 0.7, h)));
   // Night: stars, and the moon.
   if (stars > 0.0 && h > 0.0) {
     vec3 cell = floor(d * 300.0);
     float star = step(0.9972, hash31(cell)) * smoothstep(0.03, 0.3, h);
     float twinkle = 0.6 + 0.4 * sin(time * 2.6 + hash31(cell + 1.0) * 40.0);
-    c += vec3(star * twinkle * stars);
+    c += vec3(star * twinkle * stars * (1.0 - cover) * (1.0 - mist));
     float m = dot(d, moonDir);
     float disc = smoothstep(0.99955, 0.99968, m);
     vec3 face = vec3(0.92, 0.93, 0.88) * (0.82 + 0.18 * vnoise(d.xy * 900.0));
-    c = mix(c, face, disc * stars);
-    c += vec3(0.5, 0.55, 0.7) * pow(max(m, 0.0), 300.0) * 0.35 * stars;
+    c = mix(c, face, disc * stars * (1.0 - cover * 0.95) * (1.0 - mist * 0.6));
+    c += vec3(0.5, 0.55, 0.7) * (pow(max(m, 0.0), 300.0) * 0.35 + pow(max(m, 0.0), 40.0) * 0.25 * mist) * stars * (1.0 - cover * 0.8);
   }
   gl_FragColor = vec4(c, 1.0);
 }`;
@@ -94,6 +103,9 @@ export function buildBackdrop(light: Daylight): SceneBackdrop {
     cloudShade: { value: new THREE.Color() },
     moonDir: { value: MOON },
     day: { value: 1 },
+    cover: { value: 0 },
+    mist: { value: 0 },
+    veil: { value: new THREE.Color() },
   };
   const sky = new THREE.Mesh(new THREE.SphereGeometry(2_000_000, 32, 16), new THREE.ShaderMaterial({ uniforms: skyUniforms, vertexShader: SKY_VS, fragmentShader: SKY_FS, side: THREE.BackSide, depthWrite: false, fog: false }));
   sky.renderOrder = -10;
@@ -330,15 +342,17 @@ export function buildBackdrop(light: Daylight): SceneBackdrop {
 
   // The apple tree and the laundry move in the breeze.
   const sway = { value: 0 };
+  const breeze = { value: 1 };
   const swayMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
   swayMaterial.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = sway;
-    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nuniform float uTime;\nattribute float give;").replace(
+    shader.uniforms.uBreeze = breeze;
+    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nuniform float uTime;\nuniform float uBreeze;\nattribute float give;").replace(
       "#include <begin_vertex>",
       /* glsl */ `#include <begin_vertex>
 {
   float t = uTime;
-  float gust = 0.6 + 0.4 * sin(t * 0.31) * sin(t * 0.17 + 1.0);
+  float gust = (0.6 + 0.4 * sin(t * 0.31) * sin(t * 0.17 + 1.0)) * uBreeze;
   transformed.x += give * (sin(t * 1.3 + position.x * 0.0004 + position.y * 0.0003) * 0.6 + sin(t * 2.7 + position.z * 0.001) * 0.25) * gust;
   transformed.z += give * sin(t * 1.1 + position.x * 0.0005) * 0.5 * gust;
 }`,
@@ -492,36 +506,95 @@ void main() {
   smoke.renderOrder = -4;
   scene.add(smoke);
 
+  // Rain falling in the garden: streaks on two sheets across the view, near and far, in one draw, drawn only while it rains.
+  const rainUniforms = { uTime: { value: 0 }, uRain: { value: 0 }, uColor: { value: new THREE.Color() } };
+  const sheets = mergeGeometries([new THREE.PlaneGeometry(9000, 5200).translate(0, G + 2600, -1700), new THREE.PlaneGeometry(26_000, 9000).translate(0, G + 4500, -5200)]);
+  const rain = new THREE.Mesh(
+    sheets,
+    new THREE.ShaderMaterial({
+      uniforms: rainUniforms,
+      transparent: true,
+      depthWrite: false,
+      vertexShader: /* glsl */ `
+varying vec3 vWorld;
+void main() {
+  vec4 w = modelMatrix * vec4(position, 1.0);
+  vWorld = w.xyz;
+  gl_Position = projectionMatrix * viewMatrix * w;
+}`,
+      fragmentShader: /* glsl */ `
+uniform float uTime;
+uniform float uRain;
+uniform vec3 uColor;
+varying vec3 vWorld;
+${NOISE}
+void main() {
+  // Further sheets have bigger cells, so the streaks look the same size wherever they fall; they fall at 6 m/s, slanting a little.
+  float far = step(-3000.0, -vWorld.z);
+  float size = mix(36.0, 90.0, far);
+  vec2 p = vec2(vWorld.x + vWorld.y * 0.08, vWorld.y + uTime * 6000.0) / vec2(size, size * 30.0);
+  vec2 cell = floor(p);
+  vec2 f = fract(p);
+  float h = hash21(cell);
+  float x = 0.2 + 0.6 * hash21(cell + 4.1);
+  float y = hash21(cell + 9.3);
+  float wide = fwidth(p.x) * 1.2 + 0.03;
+  float streak = (1.0 - smoothstep(0.0, wide, abs(f.x - x))) * smoothstep(0.0, 0.05, f.y - y) * (1.0 - smoothstep(0.05, 0.12, f.y - y));
+  float a = streak * step(h, uRain * 0.8) * 0.35;
+  gl_FragColor = vec4(uColor, a);
+}`,
+    }),
+  );
+  rain.frustumCulled = false;
+  rain.renderOrder = 2;
+  rain.visible = false;
+  scene.add(rain);
+
   const moonColor = new THREE.Color("#9fb4e8");
     return {
     scene,
-    update(time: number, camera: THREE.Camera, daylight: Daylight) {
+    update(time: number, camera: THREE.Camera, daylight: Daylight, weather: Weather) {
       sky.position.copy(camera.position);
       sky.updateMatrixWorld();
-      // By day the sun outside is the light coming in; at night the "sun" is the kitchen's lamp, and outside it is the moon.
-      const night = Math.min(1, Math.max(0, daylight.sunDirection.z * 4 + 0.2));
+      // By day the light coming in is the sun's; from dusk the "sun" is the kitchen's lamp, and outside it is the moon.
+      const inRoom = Math.min(1, Math.max(0, daylight.sunDirection.z * 4 + 0.2));
       skyUniforms.glow.value = daylight.glow;
       skyUniforms.stars.value = daylight.stars;
       skyUniforms.time.value = time;
-      skyUniforms.day.value = 1 - night;
+      skyUniforms.day.value = 1 - inRoom;
+      // The light indoors takes only some of the weather (Scene.open); the garden is out in all of it.
+      skyUniforms.cover.value = weather.cloud;
+      skyUniforms.mist.value = weather.mist;
+      skyUniforms.veil.value.copy(daylight.horizon).lerp(daylight.haze, 0.5).lerp(WHITE, 0.35 * (1 - daylight.stars));
       skyUniforms.cloudLit.value.copy(daylight.cloud);
       skyUniforms.cloudShade.value.copy(daylight.cloud).lerp(daylight.middle, 0.5).multiplyScalar(0.92);
       hemi.color.copy(daylight.zenith).lerp(daylight.horizon, 0.5);
       hemi.groundColor.copy(daylight.groundColor);
-      hemi.intensity = 0.55 + 0.6 * (1 - night) * Math.min(1, daylight.sunIntensity);
-      sun.color.copy(daylight.sunColor).lerp(moonColor, night);
-      sun.intensity = daylight.sunIntensity * (1 - night) + 0.25 * night;
-      sun.position.copy(night > 0.5 ? MOON : daylight.sunDirection);
-      (scene.fog as THREE.Fog).color.copy(daylight.haze);
-      nightUniform.value = Math.max(night, daylight.stars * 0.8);
+      hemi.intensity = 0.55 + 0.6 * (1 - inRoom) * Math.min(1, daylight.sunIntensity);
+      sun.color.copy(daylight.sunColor).lerp(moonColor, inRoom);
+      sun.intensity = daylight.sunIntensity * (1 - inRoom) + 0.25 * inRoom * daylight.stars * (1 - weather.cloud);
+      sun.position.copy(inRoom > 0.5 ? MOON : daylight.sunDirection);
+      // Rain and mist close the distance in: in mist the houses are ghosts, and the hills gone.
+      const fog = scene.fog as THREE.Fog;
+      fog.color.copy(daylight.haze).lerp(skyUniforms.veil.value, weather.mist * 0.7);
+      fog.near = THREE.MathUtils.lerp(THREE.MathUtils.lerp(20_000, 8000, weather.rain), 2500, weather.mist);
+      fog.far = THREE.MathUtils.lerp(THREE.MathUtils.lerp(260_000, 90_000, weather.rain), 20_000, weather.mist);
+      // Lights come on as it gets dark, and on a grey day a few already.
+      nightUniform.value = Math.min(1, daylight.stars * 1.4 + weather.cloud * 0.3);
       sway.value = time;
+      breeze.value = 0.4 + 1.4 * weather.wind;
+      rain.visible = weather.rain > 0.01;
+      rainUniforms.uTime.value = time;
+      rainUniforms.uRain.value = weather.rain;
+      rainUniforms.uColor.value.copy(daylight.horizon).lerp(daylight.haze, 0.5);
       // Fires are lit on cool mornings and in the evening.
       const fires = daylight.time === "noon" || daylight.time === "golden" ? 0.25 : 1;
       smokeUniforms.uSmoke.value += (fires - smokeUniforms.uSmoke.value) * Math.min(1, Math.max(0, time - smokeUniforms.uTime.value) * 0.5);
       smokeUniforms.uTime.value = time;
       smokeUniforms.uColor.value.copy(daylight.cloud).lerp(daylight.haze, 0.4);
       birdUniforms.uTime.value = time;
-      birdUniforms.uDay.value = 1 - night;
+      // In the rain the birds keep to shelter.
+      birdUniforms.uDay.value = (1 - inRoom) * (1 - Math.min(1, weather.rain * 2));
     },
   };
 }

@@ -8,6 +8,7 @@ import { BANANA, WINE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_DEC
 import type { Solid } from "@fly/world";
 import { Batch, freeze, mat4, paint, random } from "../../scene/build.ts";
 import type { Daylight } from "../../scene/light.ts";
+import type { Weather } from "../../scene/weather.ts";
 import type { SceneSet } from "../types.ts";
 import { waterMaterial, windowGlass } from "./glass.ts";
 import { FRAME_HEAD, createSunlight, sunlit } from "./light.ts";
@@ -768,22 +769,30 @@ export function buildSill(): SceneSet {
     group,
     materials,
     seen: [eyes.mesh],
-    update(time: number, light: Daylight) {
+    update(time: number, light: Daylight, weather: Weather) {
       sunlight.uSun.value = light.sunDirection;
       sunlight.uTime.value = time;
-      // Lamplight: on once the light through the window is gone.
-      const night = Math.min(1, Math.max(0, light.sunDirection.z * 4 + 0.2));
-      // The lamp goes on as it gets dark: at dusk already, though the sun still comes in low.
-      const lamp = Math.max(night, Math.min(1, Math.max(0, (light.stars - 0.15) / 0.5)));
+      // The "sun" is the lamp once it comes from the room rather than through the window.
+      const inRoom = Math.min(1, Math.max(0, light.sunDirection.z * 4 + 0.2));
+      // The lamp goes on as it gets dark.
+      const lamp = Math.max(inRoom, Math.min(1, Math.max(0, (light.stars - 0.15) / 0.5)));
       sunlight.uLamp.value = lamp;
+      // Under cloud the window's light is the sky's, not the sun's: its shadows go soft.
+      sunlight.uSoft.value = weather.cloud * (1 - inRoom);
       sunlight.uRoom.value.copy(light.skyColor).multiplyScalar(light.hemiIntensity * 0.45).lerp(LAMPLIT, lamp * 0.5);
-      sunlight.uBounce.value.copy(light.sunColor).multiplyScalar(light.sunIntensity * 0.16 * (1 - night)).multiply(BOUNCE);
+      sunlight.uBounce.value.copy(light.sunColor).multiplyScalar(light.sunIntensity * 0.16 * (1 - inRoom)).multiply(BOUNCE);
       const u = glazing.uniforms;
       u.uSun.value = light.sunDirection;
       u.uSunColor.value.copy(light.sunColor);
-      u.uNight.value = night;
-      // Cold glass mists in the morning and at night.
-      const goal = light.time === "morning" ? 1 : light.time === "night" ? 0.4 : 0;
+      // The glass becomes a mirror of the lit room as it gets dark outside.
+      u.uNight.value = lamp * Math.min(1, light.stars * 1.2);
+      u.uRain.value = weather.rain;
+      u.uWet.value = weather.wet;
+      u.uTime.value = time;
+      u.uOutside.value.copy(light.horizon).lerp(light.middle, 0.4).multiplyScalar(1 - 0.85 * light.stars);
+      u.uGlint.value.setScalar(0.8).lerp(u.uLampColor.value, lamp).multiplyScalar(1 - 0.4 * light.stars);
+      // Cold glass mists in the morning and at night, and on a damp day.
+      const goal = Math.max(light.time === "morning" ? 1 : light.time === "night" ? 0.4 : 0, weather.mist * 0.7, weather.wet * 0.35);
       mist += (goal - mist) * Math.min(1, Math.max(0, time - lastTime) * 0.5);
       lastTime = time;
       u.uMist.value = mist;

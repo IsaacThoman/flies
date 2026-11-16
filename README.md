@@ -96,7 +96,7 @@ sage over pine, its old gloss crazed where the sun bakes it and chipped along
 its front edge. The light comes in through the panes of a casement window, so
 the frame, the mullion and the glazing bars lay their shadows across the sill
 and the kitchen and swing round with the day; by day the room throws some of it
-back, and at night the lamp over the kitchen table lights it and the glass
+back, and from dusk the lamp over the kitchen table lights it and the glass
 turns to a dark mirror with the lamp in it. On the sill: a spongeware bowl with
 a peach and two plums, whose side a fly can walk up, round its rim and down to
 where plum juice has run; an overripe, freckled banana it can climb from its
@@ -111,9 +111,13 @@ can the ball, which comes round from where it has room. Outside are a garden
 with a striped lawn, an apple tree and washing moving in the breeze, a picket
 fence with hollyhocks and foxgloves, and the backs of a little street of houses
 with smoke from their chimneys, a church spire, clouds and passing birds; at
-night their windows light up and the stars and the moon come out. It sounds of
-the kitchen's hush, the fridge, and birds muffled by the glass. There are no
-bubbles or fireflies indoors.
+night their windows light up and the stars and the moon come out. Under a grey
+sky the window's shadows go soft; on cold mornings and damp days the glass
+mists at its foot; in mist the houses fade to ghosts; in the rain it falls
+across the garden, drops bead on the pane and run down it, and it stays
+streaked as it dries. It sounds of the kitchen's hush, the fridge, birds
+muffled by the glass, and rain on the pane. There are no bubbles or fireflies
+indoors.
 
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
 wiring was traced: a stereo microscope with a fly pad on its stage (its base and
