@@ -1,8 +1,9 @@
 # Places
 
 The fly can live in more than one place, and the player can carry it between
-them (the Place tool, or Settings → Screensaver → Where it lives; "Each in turn" moves it on
-after 20 minutes of screensaver). It is the same fly with the same brain, running
+them (the Place tool, or Settings → Screensaver → Where it lives, which carries it
+once the choice rests a second or the row is left, not to each place stepped
+past; "Each in turn" moves it on after 20 minutes of screensaver). It is the same fly with the same brain, running
 on: the world fades to black, the new place is built behind the veil, and the
 fly is set down where that place starts it.
 

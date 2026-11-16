@@ -41,7 +41,8 @@ beside yours, up to eight, each marked with a dab of its player's colour
 
 The fly can live in more than one place (`docs/places.md`), and the player can
 carry it from one to another: the **Place** tool, or Settings → Screensaver →
-Where it lives. Living in each in turn (the default), it moves on after 20 minutes of
+Where it lives, once the choice rests there a second or the row is left (the
+places stepped past on the way aren't built). Living in each in turn (the default), it moves on after 20 minutes of
 screensaver. It is the same fly, its brain running on; the world fades out, the
 place is built behind the veil, and it is set down there.
 

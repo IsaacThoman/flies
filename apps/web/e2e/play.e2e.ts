@@ -1,5 +1,6 @@
 // Plays the game in a real (GPU-rendered, headless) Chromium with the real
-// brain: boots it, waits for the brain, walks the menus with the keys, feeds
+// brain: boots it, waits for the brain, walks the menus with the keys (stepping
+// through where the fly lives carries it only where the choice rests), feeds
 // the fly and checks its taste senses and feed command, throws the ball until the fly takes
 // off, checks the wallpaper comes and goes with what it sees and its nervous
 // system in a corner, that the X-ray comes where the fly is big enough,
@@ -128,6 +129,32 @@ try {
   await waitFor(page, "focus=wallpaperAfter");
   await press("ArrowDown", 2);
   await waitFor(page, "focus=place");
+  // Where it lives: stepped through, the fly is carried only to the place it rests on, then (leaving the row) at once back.
+  await page.evaluate(() => {
+    const game = (globalThis as unknown as { __fly: Game; __carried: string[] }).__fly;
+    const carried: string[] = ((globalThis as unknown as { __carried: string[] }).__carried = []);
+    const moveTo = game.moveTo.bind(game);
+    game.moveTo = (id, table) => {
+      carried.push(id);
+      moveTo(id, table);
+    };
+  });
+  const carried = () => page.evaluate(() => (globalThis as unknown as { __carried: string[] }).__carried);
+  // Each in turn, then the first three places, a step at a time, quicker than it settles.
+  await press("ArrowRight", 3);
+  assert.deepEqual(await carried(), [], "nowhere on the way");
+  await waitFor(page, `place=${PLACES[2].id},moving=`, 30_000);
+  assert.deepEqual(await carried(), [PLACES[2].id], "once, to where it rested");
+  await press("ArrowLeft", 2);
+  await press("ArrowUp");
+  await waitFor(page, `place=${PLACES[0].id},moving=`, 30_000);
+  assert.deepEqual(await carried(), [PLACES[2].id, PLACES[0].id], "leaving the row settles it");
+  // Back to living in each in turn, which carries it nowhere.
+  await press("ArrowDown");
+  await press("ArrowLeft");
+  await waitForGameTime(page, 1.5);
+  assert.deepEqual(await carried(), [PLACES[2].id, PLACES[0].id]);
+  assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.settings.place), "turns");
   await press("ArrowUp", 3);
   await waitFor(page, "focus=page");
   await press("ArrowRight");

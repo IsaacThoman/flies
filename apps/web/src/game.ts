@@ -69,6 +69,7 @@ import { hudLayout, loadingLayout, playRoom, titleLayout, touchSlop } from "./ui
 import type { HudLayout, LoadingLayout } from "./ui/layout.ts";
 import { LOADING_HITS, arriving, drawLoading } from "./ui/loading.ts";
 import { Overlay } from "./ui/overlay.ts";
+import { Settle } from "./ui/settle.ts";
 import { AboutScreen } from "./ui/screens/about.ts";
 import { settingsScreen, settingsTab, titleScreen } from "./ui/screens/menus.ts";
 import type { MenuScreen } from "./ui/screens/menu-screen.ts";
@@ -238,6 +239,11 @@ export class Game implements Shell {
   #moving: { to: PlaceId; t: number; arrived: boolean } | null = null;
   /** Seconds of wallpaper spent where it is now. */
   #stayed = 0;
+  /** A place stepped to in Settings, waiting for the player to settle on it. */
+  #placeChoice = new Settle(
+    () => this.#choosingPlace(),
+    () => this.#settlePlace(),
+  );
   /** The shelf's choices a launch comes back to, as saved. */
   #shelf: ShelfChoices;
   /** What the hints have taught, as saved; and how many times that has changed, for the HUD to redraw. */
@@ -637,8 +643,8 @@ export class Game implements Shell {
   applySettings(save = true) {
     const s = this.settings;
     this.haptics.enabled = s.rumble;
-    // At a table, the table's place is the starter's to choose, with the Place tool.
-    if (!this.online && s.place !== "turns" && isPlaceId(s.place) && s.place !== this.#here) this.moveTo(s.place);
+    // Stepped to in Settings, a place waits until the player settles on it: carried to each on the way, the fly would build every one.
+    this.#placeChoice.changed();
     // The player chose a picture: take it at its word until the device shows it can't keep up.
     if (save && this.quality && (s.pixels !== this.#chosen.pixels || s.eyes !== this.#chosen.eyes)) this.quality.reset();
     this.#chosen.pixels = s.pixels;
@@ -704,6 +710,17 @@ export class Game implements Shell {
     this.stage.contextRestored();
     this.eyes.contextRestored();
     this.overlay.dirty = true;
+  }
+
+  /** Whether the player is on Settings' "Where it lives". */
+  #choosingPlace() {
+    return this.nav.current === "settings" && this.screens.settings.menu.focused?.id === "place";
+  }
+
+  /** Carries the fly to the place it lives in, if it lives in one and isn't there. At a table, the table's place is the starter's to choose, with the Place tool. */
+  #settlePlace() {
+    const place = this.settings.place;
+    if (!this.online && place !== "turns" && isPlaceId(place) && place !== this.#here) this.moveTo(place);
   }
 
   /** Carries the fly to another place: the world fades out, the place is built behind the veil, and fades in. */
@@ -832,6 +849,7 @@ export class Game implements Shell {
     }
 
     this.#input(dt);
+    this.#placeChoice.update(dt);
     this.#move(dt);
     this.#table(dt);
     this.#browse(dt);
