@@ -11,7 +11,7 @@ import { Behavior, FLIGHT_FADE, FLIGHT_HOLD, FLIGHT_WINGS, FlyBody, LAND_WINGS, 
 import type { Forces } from "../src/index.ts";
 
 const DT = 1 / 60;
-const command = (c: Partial<BrainCommand> = {}): BrainCommand => ({ walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, ...c });
+const command = (c: Partial<BrainCommand> = {}): BrainCommand => ({ walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, ...c });
 const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
 const open = (ceiling = 320): Place => ({ floor: { kind: "rect", hx: 600, hz: 600 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling });
 
