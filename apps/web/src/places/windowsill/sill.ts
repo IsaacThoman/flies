@@ -325,13 +325,13 @@ export function buildSill(): SceneSet {
     // The profile is drawn in (z, y); turned a quarter the other way round y, its x becomes the world's z and it runs along -x.
     const nosing = new THREE.ExtrudeGeometry(nose, { depth: SILL.hx * 2, bevelEnabled: false, curveSegments: 1 }).rotateY(-Math.PI / 2).translate(SILL.hx, 0, 0);
     painted(nosing, PAINT, 0);
-    // A cove moulding where the board meets the wall below it.
+    // A cove moulding where the board meets the wall below it, ending in a fillet that stands just proud of the tiles rather than meeting them on the slant.
     const cove: [number, number][] = [[WINDOW.wall, -depth]];
     for (let i = 0; i <= 6; i++) {
-      const a = (i / 6) * (Math.PI / 2);
-      cove.push([WINDOW.wall + 14 - Math.sin(a) * 14, -depth - 14 + Math.cos(a) * 14]);
+      const a = (i / 6) * (Math.PI / 2) * 0.9;
+      cove.push([WINDOW.wall + 15.5 - Math.sin(a) * 14, -depth - 14 + Math.cos(a) * 14]);
     }
-    cove.push([WINDOW.wall, -depth - 16]);
+    cove.push([WINDOW.wall + 1.5, -depth - 19], [WINDOW.wall, -depth - 19]);
     const coveShape = new THREE.Shape(cove.map(([z, y]) => new THREE.Vector2(z, y)));
     painted(new THREE.ExtrudeGeometry(coveShape, { depth: SILL.hx * 2 - 10, bevelEnabled: false, curveSegments: 1 }).rotateY(-Math.PI / 2).translate(SILL.hx - 5, 0, 0), PAINT, 0);
   }
@@ -431,7 +431,7 @@ export function buildSill(): SceneSet {
       for (let k = 0; k < pairs; k++) {
         const t = 0.2 + (k / pairs) * 0.78;
         const at = curve.getPoint(t);
-        const size = (60 - k * 7.5) * brnd.range(0.82, 1.12);
+        const size = (58 - k * 5) * brnd.range(0.82, 1.12);
         for (const side of [-1, 1]) {
           const turn = a + (k % 2) * (Math.PI / 2) + (side < 0 ? Math.PI : 0) + brnd.range(-0.35, 0.35);
           const m = mat4(at, new THREE.Euler(brnd.range(-0.15, 0.15), -turn, 0.5 - k * 0.07 + brnd.range(-0.15, 0.15), "YXZ"));
@@ -442,8 +442,8 @@ export function buildSill(): SceneSet {
           }), m);
         }
       }
-      // The young leaves at the tip.
-      for (let k = 0; k < 4; k++) add(leaf, paint(leafShape(16, 0.1), "#79cc4c"), mat4(top, new THREE.Euler(0, (k / 4) * Math.PI * 2 + a, -0.5, "YXZ")));
+      // The young leaves at the tip, held up round the growing point.
+      for (let k = 0; k < 4; k++) add(leaf, paint(leafShape(k % 2 ? 22 : 17, 0.08), "#79cc4c"), mat4(top, new THREE.Euler(0, (k / 4) * Math.PI * 2 + a, k % 2 ? 0.75 : 1.05, "YXZ")));
     }
   }
 
