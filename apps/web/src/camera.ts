@@ -278,7 +278,9 @@ export class CameraDirector {
     let follow: number;
     let aimSettle: number;
     if (shot.around === "table") {
-      focus.set(p.x * 0.35, 60 + p.y * 0.3, p.z * 0.35);
+      const f = this.#scene.focus;
+      if (f) focus.set(f.x + p.x * f.follow, f.y + p.y * 0.3, f.z + p.z * f.follow);
+      else focus.set(p.x * 0.35, 60 + p.y * 0.3, p.z * 0.35);
       this.#goal = shot.side + this.#orbit;
       follow = settle;
       aimSettle = settle * 0.8;

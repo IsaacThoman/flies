@@ -15,6 +15,7 @@ import type { Sampler } from "@fly/body";
 import type { Frame } from "../display.ts";
 import type { Life } from "../life.ts";
 import type { EyesDetail } from "../settings.ts";
+import { NEAR } from "../stage.ts";
 import type { Stage } from "../stage.ts";
 import { pictureDots } from "../ui/layout.ts";
 import type { HudLayout } from "../ui/layout.ts";
@@ -270,8 +271,13 @@ export class Eyes {
     renderer.setRenderTarget(target);
     renderer.clear(true, true, false);
     target.scissorTest = true;
+    const far = stage.current.reach ?? NEAR.far;
     for (let i = 0; i < FACES.length; i++) {
       const camera = this.#cameras[i];
+      if (camera.far !== far) {
+        camera.far = far;
+        camera.updateProjectionMatrix();
+      }
       camera.position.copy(this.#head);
       camera.quaternion.copy(this.#q).multiply(this.#faceQ[i]);
       camera.updateMatrixWorld();
