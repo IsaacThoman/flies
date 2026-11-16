@@ -14,7 +14,7 @@ for any host name, on `HTTP_PORT` (8080 unless set, so it can share a host
 with a proxy on 80 and 443).
 
 ```sh
-git clone --branch dev https://github.com/IsaacThoman/flies.git
+git clone --branch main https://github.com/IsaacThoman/flies.git
 cd flies
 cp .env.example .env
 # Edit .env: FLY_SITE_URL=https://flies.isaacthoman.com/, and HTTP_PORT if 8080 is taken
@@ -129,7 +129,7 @@ docker image tag flies-rooms:rollback flies-rooms:local
 docker compose up -d --no-build --pull never --force-recreate --wait
 ```
 
-Keep the same `.env` and volumes. Use `git switch dev` before the next update.
+Keep the same `.env` and volumes. Use `git switch main` before the next update.
 Do not prune the rollback image until you no longer need it. Existing tabs
 keep their service worker until closed; close all Flies tabs and reopen to
 see a new or rolled-back version.
