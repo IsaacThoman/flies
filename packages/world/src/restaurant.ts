@@ -97,6 +97,9 @@ export const TABLE_TOPS = {
   four: { half: 400, bottom: 730, top: 760 },
 };
 
+/** The cast-iron spider under a marble top: its hub's radius, its arms' half-width, how far each reaches along its diagonal, and how deep it is. */
+export const SPIDER = { round: { hub: 48, arm: 11, reach: 149 }, square: { hub: 48, arm: 11, reach: 192 }, depth: 26 };
+
 /** The bentwood chair (in its own frame: `ahead` toward where it faces, `aside` across): seat, legs, the back's posts and rails. */
 export const CHAIR = {
   seat: { r: 200, bottom: 428, rim: 446, crown: 4 },
@@ -232,7 +235,7 @@ export const MENU = { x: -1860, z: 2240, hx: 110, hz: 160, angle: 0.5, thick: 0.
 export const BREAD = { x: 1180, z: 2390, rx: 130, rz: 85, angle: 0.4, well: 20, rim: 70, heel: { rx: 70, rz: 45, height: 45 } };
 
 /** An espresso cup on its saucer, sugar left in the bottom, on the banquette's middle table. */
-export const ESPRESSO = { x: 3400, z: -260, saucer: { r: 60, well: 4, rim: 12 }, cup: { r: 30, well: 12, rim: 60 } };
+export const ESPRESSO = { x: 3400, z: -260, saucer: { r: 60, well: 4, rim: 12 }, cup: { r: 30, well: 12, rim: 60 }, handle: { out: 44, half: 2, bottom: 16, top: 44 } };
 
 /** On the zinc: the fruit bowl near the front end, the cutting board with a cut lemon, the bar mat with a shaker tin drying on it, and a cake under a glass cloche at the back end. */
 export const ON_BAR = {
@@ -276,7 +279,7 @@ export const ON_HOST = {
 export const ON_STATION = {
   tray: { x: -2060, z: -2760, hx: 160, hz: 110, well: 4, rim: 55 },
   plates: { x: -1700, z: -2800, r: 135, height: 90 },
-  carafe: { x: -1420, z: -2700, r: 55, shoulder: 200, crown: 40, neck: 22, top: 280 },
+  carafe: { x: -1420, z: -2700, r: 55, shoulder: 200, crown: 40, neck: 22, top: 280, mouth: 60 },
   tumblers: Array.from({ length: 6 }, (_, i) => ({ x: -1330 + (i % 3) * 80, z: -2880 + Math.floor(i / 3) * 80 })) as readonly { x: number; z: number }[],
   tumbler: { r: 35, height: 95 },
 };
@@ -384,7 +387,7 @@ function chair(c: ChairPlace): Solid[] {
     out.push(solid("chair rail", box(back.x, back.z, mid.half, mid.depth, c.yaw), flat(mid.top), mid.bottom));
     return out;
   }
-  // Upside down: the seat face down on the table, its legs in the air, its back hanging over the edge.
+  // Upside down: the seat face down on the table, its four legs in the air, its back hanging over the edge.
   const on = c.upturned;
   const under = on + (seat.rim + seat.crown - seat.bottom);
   const flip = (y: number) => under - (y - seat.bottom);
@@ -393,7 +396,8 @@ function chair(c: ChairPlace): Solid[] {
     const front = chairPoint(c, leg.at, side * leg.at);
     const rear = chairPoint(c, -leg.at, side * leg.at);
     out.push(solid("chair leg", circle(front.x, front.z, leg.r), dome(flip(0) - leg.r * 0.5, leg.r * 0.5, 0.5), under));
-    out.push(solid("chair post", circle(rear.x, rear.z, leg.r), flat(under), flip(post.top)));
+    // The rear legs run on up through the seat to tips like the front legs', the back hanging below.
+    out.push(solid("chair post", circle(rear.x, rear.z, leg.r), dome(flip(0) - leg.r * 0.5, leg.r * 0.5, 0.5), flip(post.top)));
   }
   out.push(solid("chair rail", box(back.x, back.z, rail.half, rail.depth, c.yaw), flat(flip(rail.bottom)), flip(rail.top)));
   out.push(solid("chair rail", box(back.x, back.z, mid.half, mid.depth, c.yaw), flat(flip(mid.bottom)), flip(mid.top)));
@@ -417,9 +421,11 @@ function table(t: TablePlace): Solid[] {
     const spec = t.kind === "round" ? TABLE_TOPS.round : TABLE_TOPS.square;
     const footprint = t.kind === "round" ? circle(t.x, t.z, TABLE_TOPS.round.r) : box(t.x, t.z, TABLE_TOPS.square.half, TABLE_TOPS.square.half);
     out.push(solid("table", footprint, flat(spec.top), spec.bottom));
-    // The cast-iron spider under the top, the pedestal, and the foot.
-    out.push(solid("spider", t.kind === "round" ? circle(t.x, t.z, 150) : box(t.x, t.z, 140, 140), flat(spec.bottom), spec.bottom - 26));
-    out.push(solid("pedestal", circle(t.x, t.z, 32), flat(spec.bottom - 26)));
+    // The cast-iron spider under the top (a hub, and four arms out along the diagonals to the screws), the pedestal, and the foot.
+    const { hub, arm, reach } = SPIDER[t.kind];
+    out.push(solid("spider", circle(t.x, t.z, hub), flat(spec.bottom), spec.bottom - SPIDER.depth));
+    for (const a of [Math.PI / 4, -Math.PI / 4]) out.push(solid("spider", box(t.x, t.z, reach, arm, a), flat(spec.bottom), spec.bottom - SPIDER.depth));
+    out.push(solid("pedestal", circle(t.x, t.z, 32), flat(spec.bottom - SPIDER.depth)));
     if (t.kind === "round") out.push(solid("table foot", circle(t.x, t.z, 230), dome(8, 40, 1)));
     else for (const a of [Math.PI / 4, -Math.PI / 4]) out.push(solid("table foot", box(t.x, t.z, 260, 30, a), dome(12, 22, 1)));
   }
@@ -465,6 +471,8 @@ function tableThings(): Solid[] {
   out.push(
     solid("saucer", circle(e.x, e.z, e.saucer.r), { kind: "dish", well: on + e.saucer.well, rim: on + e.saucer.rim, inner: 0.55, lip: 0.85 }, on),
     solid("espresso cup", circle(e.x, e.z, e.cup.r), { kind: "dish", well: on + e.saucer.well + e.cup.well, rim: on + e.saucer.well + e.cup.rim, inner: 0.75, lip: 0.92 }, on + e.saucer.well),
+    // Its handle, toward the banquette: a loop felt as the slab it fills, from the cup's side out.
+    solid("cup handle", box(e.x + (e.cup.r + e.handle.out) / 2 - 1, e.z, (e.handle.out - e.cup.r) / 2 + 1, e.handle.half), flat(on + e.saucer.well + e.handle.top), on + e.saucer.well + e.handle.bottom),
   );
   return out;
 }
@@ -547,7 +555,8 @@ function standsAndWalls(): Solid[] {
     solid("cutlery tray", box(os.tray.x, os.tray.z, os.tray.hx, os.tray.hz), { kind: "dish", well: st.top + os.tray.well, rim: st.top + os.tray.rim, inner: 0.9, lip: 0.96 }, st.top),
     solid("plates", circle(os.plates.x, os.plates.z, os.plates.r), flat(st.top + os.plates.height), st.top),
     solid("carafe", circle(os.carafe.x, os.carafe.z, os.carafe.r), dome(st.top + os.carafe.shoulder, os.carafe.crown, 1), st.top),
-    solid("carafe neck", circle(os.carafe.x, os.carafe.z, os.carafe.neck), flat(st.top + os.carafe.top), st.top + os.carafe.shoulder),
+    // Its neck open at the top: a fly on the lip can look in, and down it.
+    solid("carafe neck", circle(os.carafe.x, os.carafe.z, os.carafe.neck), { kind: "dish", well: st.top + os.carafe.top - os.carafe.mouth, rim: st.top + os.carafe.top, inner: 0.72, lip: 0.92 }, st.top + os.carafe.shoulder),
     ...os.tumblers.map((t) => solid("tumbler", circle(t.x, t.z, os.tumbler.r), flat(st.top + os.tumbler.height), st.top)),
     solid("banquette", box((q.x0 + q.x1) / 2, (q.z0 + q.z1) / 2, (q.x1 - q.x0) / 2, (q.z1 - q.z0) / 2), vault(q.seat - 12, 12, 1)),
     solid("banquette back", box((q.back.x0 + q.x1) / 2, (q.z0 + q.z1) / 2, (q.x1 - q.back.x0) / 2, (q.z1 - q.z0) / 2), vault(q.back.top - 30, 30, 1)),

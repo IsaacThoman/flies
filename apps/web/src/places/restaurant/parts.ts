@@ -30,7 +30,7 @@ export type Part = {
 
 export const PARTS: Readonly<Record<PartName, Part>> = { tables, tabletop, counter, backbar, rest };
 
-const TABLE_THINGS = new Set(["sugar caddy", "bud vase", "flower stem", "flower", "votive", "sugar packet", "shaker", "glass foot", "glass stem", "wine glass", "ketchup", "ketchup neck", "ketchup cap", "menu", "bread basket", "bread", "saucer", "espresso cup"]);
+const TABLE_THINGS = new Set(["sugar caddy", "bud vase", "flower stem", "flower", "votive", "sugar packet", "shaker", "glass foot", "glass stem", "wine glass", "ketchup", "ketchup neck", "ketchup cap", "menu", "bread basket", "bread", "saucer", "espresso cup", "cup handle"]);
 const FURNITURE = new Set(["table", "spider", "pedestal", "table foot", "table leg", "apron", "chair seat", "chair leg", "chair post", "chair rail"]);
 const BAR = new Set(["zinc", "bar front", "underbar", "foot rail", "stool foot", "stool post", "stool", "pendant", "cord", "fruit bowl", "orange", "lemon", "peach", "board", "lemon slice", "knife", "knife handle", "bar mat", "shaker tin", "cake stand", "cake plate", "cloche", "cloche knob"]);
 const BACK = new Set(["back bar", "shelf", "bottle", "bottle neck"]);
