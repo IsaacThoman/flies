@@ -13,7 +13,7 @@ import * as THREE from "three";
 import { FlyBody, createIntent } from "@fly/body";
 import type { FlyPose } from "@fly/contracts";
 import { World } from "@fly/world";
-import { DESIGN_WIDTH } from "./display.ts";
+import { TV_DESIGN_WIDTH } from "./display.ts";
 import { FlyView } from "./fly-view.ts";
 import { picnic } from "./places/picnic/index.ts";
 import { Bubbles } from "./scene/bubbles.ts";
@@ -141,10 +141,10 @@ function render(shot: ArtShot): string {
   g.putImageData(image, 0, 0);
   if (shot.wordmark) {
     // The menus are laid out 854 wide: draw the wordmark at that scale.
-    const scale = width / DESIGN_WIDTH;
+    const scale = width / TV_DESIGN_WIDTH;
     g.save();
     g.scale(scale, scale);
-    drawWordmark(g, DESIGN_WIDTH / 2, (shot.wordmark.y * height) / scale, (shot.wordmark.size * height) / scale, 0.8);
+    drawWordmark(g, TV_DESIGN_WIDTH / 2, (shot.wordmark.y * height) / scale, (shot.wordmark.size * height) / scale, 0.8);
     g.restore();
   }
   return out.toDataURL("image/png");

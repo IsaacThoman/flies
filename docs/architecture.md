@@ -41,7 +41,11 @@ day where it can, and its own made-up forecast and summer day where it can't
 
 The remote reaches the game as DOM events (`packages/contracts/src/remote.ts`):
 key events for the buttons, a `remotetouch` event for the touch surface. A
-browser produces the same events from the keyboard and mouse.
+browser's keyboard and game pad are the same buttons; a mouse, a trackpad or
+a finger points at the screen itself (`apps/web/src/input.ts`), and what it
+presses is whatever was drawn there, or the fly's world under it. A host that
+wraps the web build says what its screen's notch covers through
+`packages/contracts/src/screen.ts`.
 
 ## Rules
 
@@ -53,8 +57,10 @@ browser produces the same events from the keyboard and mouse.
    documented in `packages/brain/README.md`.
 2. **Say what is real.** Anything shown to the player as "the brain doing X"
    has to be the brain doing X.
-3. **640×480.** The game renders at 640×480 and is stretched to the screen,
-   laid out for 16:9. It is a look, and it is what makes the TV fast.
+3. **640×480.** On the TV the game renders 640×480 and is stretched to the
+   screen, laid out for 16:9. Elsewhere it renders the same number of
+   pixels, square, in the screen's shape (`apps/web/src/display.ts`). It is
+   a look, and it is what makes the TV fast.
 4. **The TV is slow at JavaScript.** See `AGENTS.md`.
 5. **Everything is drawn in engine.** Menus too. No DOM.
 

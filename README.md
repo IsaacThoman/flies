@@ -195,18 +195,43 @@ is in them; at dusk and night the lamps, the flickering candle and the back
 bar light it, and lights out of focus glow behind the fly. It sounds like a
 quiet room: low voices, a glass or two touching, ice settling.
 
-In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
-Back, space for Play/Pause) and dragging the mouse over the picture is the
-touch surface.
+It plays as well with a finger, a mouse or trackpad, a keyboard or a game pad
+as with the remote. Your hand is a glowing ring on the table; until you move
+it, it waits just in front of the fly's mouth, and it drifts back there 15 s
+after you last did.
 
 | On the remote | Does |
 | --- | --- |
-| Swipe on the touch surface | Moves your hand (the glowing ring) across the table. Until you do, it waits just in front of the fly's mouth, and it drifts back there after 15 s. |
+| Swipe on the touch surface | Moves your hand across the table. |
 | Left / Right | Picks a tool from the shelf. |
 | Up / Down | Picks the tool's kind: which food, how hard to blow, the time of day, the weather, the camera. |
 | Select | Uses the tool: drops food, throws the ball. Hold it to tickle or blow. On Light, Weather and View it steps round the choices. |
 | Play/Pause, or Back | The pause menu. Play/Pause or Back again carries on. |
 | Back on the title | Leaves the app. |
+
+Pointing, the screen itself is what you press, and there are no button hints:
+
+| | With a finger | With a mouse or trackpad |
+| --- | --- | --- |
+| Your hand | Where you touch the table. Touching the fly is touching the fly, not the table behind it. | Under the cursor, on whatever it is over (the cursor is hidden there: the ring is the cursor). |
+| Feed, Swoop | Tap where you mean (drag to aim, lift to drop). | Click there. |
+| Tickle, Blow | Touch and hold, and drag: the feather strokes the fly while you hold it on it, and rests on it lightly while the hand is there; the puff follows the finger. | Hold the button, and drag. Hovering over the fly rests the feather on it. |
+| Light, Weather, View, Place | The arrows either side of the tool's label (or a tap on the label, or a swipe along it) step its kind; tapping the tool again does too. Place has a Go button for somewhere the fly isn't. | The same, or the wheel over the label. |
+| The camera | Pinch to bring it in or take it out: it follows the fingers and settles into the nearest view (close up, follow, wide, the whole table). Drag across the air off the table, or with two fingers, to look round the fly; let go, and it eases back to where the cameraman had it. | The wheel steps between the views; a trackpad's pinch follows the fingers and settles. Drag across the air, or with the right button anywhere, to look round. A trackpad's sideways scroll looks round too. |
+| Tools | Tap one on the shelf. | Click one; the wheel over the shelf steps along it. |
+| Menus | Tap a row; a choice's arrows step it, a slider follows the finger, a long list scrolls when dragged. The round button at the top left of a pane, or a tap outside it, goes back. | The same; rows light up under the cursor, and the wheel scrolls. |
+| The pause menu | The round button at the top left. | The same. |
+
+In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
+Back, space for Play/Pause), its hints drawn as keys; the number keys pick a
+tool and + and − bring the camera in and take it out. A standard game pad
+(the Gamepad API) is the remote too: A is Select, B Back, Start Play/Pause,
+the d-pad and the shoulder buttons the arrows, the left stick moves your hand
+(and steps through a menu), the right stick looks round, the triggers bring
+the camera in and take it out; its hints are drawn as its buttons. The hints
+always show the thing last used, and the screen hides the system's cursor,
+text selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
+and scrolling.
 
 The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
 beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
@@ -248,9 +273,12 @@ the menus.
 
 After a minute with no press (Settings → Wallpaper: 30 s to 5 min, or never)
 the hints, the shelf and the pointer fade, and the camera settles beside the
-fly and follows it: the wallpaper. Its camera can take long slow shots of the
+fly and follows it: the wallpaper. A mouse resting on the desk doesn't keep it
+away, and a nudge of the desk doesn't end it; a mouse moved as if meant does.
+Its camera can take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
-(Lively). Any press or touch brings the controls back and does nothing else.
+(Lively). Any press, touch, tap, click, key or deliberate move of the mouse
+brings the controls back and does nothing else.
 A small picture of what the fly's eyes see sits in a corner of the wallpaper
 (Settings → Wallpaper → What it sees: off, in the wallpaper, or always, which keeps it in
 the top right while you play too). Each time the wallpaper moves on to a new
@@ -370,10 +398,36 @@ title, over a menu, or while View → Fly's eyes is up.
 
 ## The frame
 
-The game renders 640×480, laid out for 16:9 (the picture is squeezed into the
-4:3 buffer and stretched back out), with no antialiasing and a pixel ratio of
-1; Settings → Picture → Pixels renders the world at 320×240 or 214×160 under crisp
-640×480 menus. The backdrop (sky, clouds, hills, lollipop trees, lawn, daisies,
+On the Apple TV the game renders 640×480, laid out for 16:9 (the picture is
+squeezed into the 4:3 buffer and stretched back out), with no antialiasing and
+a pixel ratio of 1. Elsewhere (`apps/web/src/display.ts`) the frame takes the
+screen's shape with square pixels and the same number of them, 640×480 =
+307,200: 739×416 in a 16:9 window, exactly 640×480 at 4:3, 376×815 on a phone
+held upright, 853×360 on an ultrawide. So the pixels are as chunky for the
+size of the screen as on the TV (each covers about the same area of it), the
+GPU fills as many, and nothing costs more for the shape. Settings → Picture →
+Pixels renders the world at a half or a third of the frame each way (on the
+TV 320×240 or 214×160) under crisp menus at the frame's own size. Resizing or
+turning the screen lays the frame and every layout out again at the start of
+the next frame; nothing in the world is built again.
+
+The shots are framed for 16:9. On a wider screen the camera keeps their
+height and sees more to the sides; on a narrower one it keeps seven tenths of
+the extra height as field of view (`camera.ts`, `fieldOfView`), so on a phone
+held upright the fly is about two fifths of the screen across in Follow (on
+the TV, a quarter of its width) rather than a quarter (keeping the TV's width,
+a small fly in a great deal of sky and table) or a half (keeping its pixels,
+too big to turn round in). The whole table keeps its width, so it always
+fits. Playing on a short screen, where the shelf and the label take more of
+the height, the fly is raised clear of them and drawn a little smaller
+(`ui/layout.ts`, `playRoom`). Every layout (the shelf, the hints, the
+caption, the fly's-eye picture and the corner one, the title, the menus,
+About and the brain's page) is worked out from the frame in design units (480
+to the shorter side, and at least 1.25 CSS pixels on a touch screen, so that
+a finger has room) inside the screen's safe area, and comes out exactly where
+it always was on the TV.
+
+The backdrop (sky, clouds, hills, lollipop trees, lawn, daisies,
 lake) and the table are two passes with their own depth ranges. Static things
 are merged by material into a handful of meshes with vertex colours and frozen
 matrices (the crumbs, pips and saucer go into those too, and the small things'
@@ -416,7 +470,10 @@ measurements. On the Apple TV it is drawn as it always was.
 
 The game reads the remote only as `packages/contracts/src/remote.ts` describes,
 and sets `window.__flyAtRoot` while on the title (or loading), where Back
-leaves the app. Arrow presses that arrive during a fast swipe are taken as the
+leaves the app. A host that wraps the web build (the iPhone and iPad app)
+shows it edge to edge and says what its notch and home indicator cover by
+assigning `window.__flySafeArea` (`packages/contracts/src/screen.ts`) and
+dispatching a `resize`; otherwise CSS `env(safe-area-inset-*)` says. Arrow presses that arrive during a fast swipe are taken as the
 swipe's and ignored. In a browser the brain is `packages/brain` in a Web Worker
 (`apps/web/src/brain/worker-driver.ts`), fed the connectome in its wire form
 (`apps/web/src/brain/wire.ts`: 14 MB gzipped where plain gzip makes 21),
@@ -487,6 +544,15 @@ windowsill the banana, the bowl and the basil's saucer, with the glass a wall
 and a ledge at its foot; that the ball comes over what is in its way, and
 round a window.
 
+`npm test` also checks the frame at every shape (the pixel count, the design
+units, the safe area), every layout at eleven shapes (inside the safe area,
+nothing overlapping, a finger's room for every target drawn, the TV's numbers
+unchanged), the menu kit's hit map and its pointer operations, the gestures
+(a tap, a drag, a pinch, the wheel, a mouse moved as if meant), which device
+is in hand, the keyboard's and the pad's buttons, what a pointer on the screen
+points at in the world, and the camera's framing at every aspect, held and let
+go.
+
 `npm run e2e` plays the game with the real brain: the title
 appears once the brain wakes, the menus are walked with the keys, honey is
 tasted and eaten, the ball is thrown until the fly takes off, Play/Pause
@@ -496,14 +562,18 @@ eyes or the pause menu), the fly is carried to every place, the weather
 outside, fed as the Apple TV would give it, is what "Now" shows until it is
 too old, Back reaches the root, a reload finds the settings, the view, the
 light and the weather as they were left, the shelf on Feed and the hints for
-what was used gone, and the frame stays within its draw budget. Then it
-builds the site and serves it from a folder of a static server
-(`apps/web/e2e/web.e2e.ts`): a first visit on a slow connection that breaks
-off partway counts the brain's bytes and carries on from the break, a second
-loads with the network off, a hidden tab sleeps and wakes without a jump, the
-wallpaper holds the screen awake, a lost graphics context comes back, losing
-the network on a first visit and a browser without WebGL 2 each say so, and
-nothing is asked of any other site. A browser has no weather outside: scripts
+what was used gone, and the frame stays within its draw budget. Then
+`apps/web/e2e/pointer.e2e.ts` plays it with fingers on a phone with a notch
+(the menus and the shelf tapped, honey dropped and eaten, the feather and the
+puff held on the fly, a pinch, a look round, the phone turned on its side,
+the wallpaper woken by a tap that does nothing else) and with a mouse and keys
+on a desktop. Then it builds the site and serves it from a folder of a static
+server (`apps/web/e2e/web.e2e.ts`): a first visit on a slow connection that
+breaks off partway counts the brain's bytes and carries on from the break, a
+second loads with the network off, a hidden tab sleeps and wakes without a
+jump, the wallpaper holds the screen awake, a lost graphics context comes
+back, losing the network on a first visit and a browser without WebGL 2 each
+say so, and nothing is asked of any other site. A browser has no weather outside: scripts
 feed it with `__fly.outside.feed({...})` (`OutsideConditions` without its
 `source`, or `null` to take it away; `node scripts/play.ts eval:...`), and the
 canvas's `data-weather-from` (`outside`, `forecast` or `chosen`),

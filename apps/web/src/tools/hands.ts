@@ -145,10 +145,19 @@ export class Hands {
     this.events.toolChanged = true;
   }
 
-  /** Steps through the current tool's kinds (up and down); false when it has only one or is at the end. */
-  stepVariant(dir: -1 | 1): boolean {
+  /** Picks a tool by its place on the shelf (a tap on it, a number key); false if it is already in hand or there is none. */
+  chooseTool(index: number): boolean {
+    if (index < 0 || index >= TOOLS.length || index === this.tool) return false;
+    this.tool = index;
+    this.events.toolChanged = true;
+    return true;
+  }
+
+  /** Steps through the current tool's kinds (up and down, or round and round with `wrap`); false when it has only one or is at the end. */
+  stepVariant(dir: -1 | 1, wrap = false): boolean {
     const n = this.current.variants.length;
-    const next = this.variants[this.tool] + dir;
+    let next = this.variants[this.tool] + dir;
+    if (wrap && n > 1) next = (next + n) % n;
     if (n <= 1 || next < 0 || next >= n) {
       this.events.blocked = true;
       return false;
@@ -190,10 +199,23 @@ export class Hands {
     return TOOLS[VIEW_TOOL].variants[this.variants[VIEW_TOOL]].id as View | "eyes";
   }
 
+  /** Chooses a view on the View tool (the camera brought in or taken out by hand). */
+  chooseView(view: View | "eyes") {
+    const i = TOOLS[VIEW_TOOL].variants.findIndex((v) => v.id === view);
+    if (i >= 0) this.variants[VIEW_TOOL] = i;
+  }
+
   /** The player moved the pointer to a new place in the world. */
   movePointer(point: Vec3, normal: Vec3) {
     this.following = false;
     this.#idle = 0;
+    copy(this.pointer, point);
+    copy(this.normal, normal);
+  }
+
+  /** The pointer kept under a cursor that hasn't moved while the camera has: not the player's doing, so it doesn't stop it drifting back. */
+  slidePointer(point: Vec3, normal: Vec3) {
+    if (this.following) return;
     copy(this.pointer, point);
     copy(this.normal, normal);
   }

@@ -10,6 +10,16 @@
 // out (critically damped springs, so nothing overshoots or pops). It aims a
 // little ahead of where the fly is going, so it follows a walk or a jump
 // without lagging off it. It never goes inside anything on the table.
+//
+// The shots are framed for the TV's 16:9. On a wider screen the camera sees
+// more to the sides; on a narrower one (a tablet, a phone held upright) it
+// sees more above and below, and comes in a little, so the fly is about as
+// big on the screen as it is on the TV without leaving the picture as it
+// turns (fieldOfView).
+//
+// The player can take hold of it too: look round the fly, or bring it in or
+// take it out (a drag, a pinch, the wheel). Let go, it eases back to where
+// the cameraman would have it.
 
 import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
@@ -17,6 +27,7 @@ import type { FlyBody } from "@fly/body";
 import { topPeak } from "@fly/world";
 import type { RayHit, World } from "@fly/world";
 import type { SceneCamera } from "./places/types.ts";
+import { TV_ASPECT } from "./display.ts";
 
 export type View = "close" | "follow" | "wide" | "table" | "above";
 export const VIEWS: readonly View[] = ["close", "follow", "wide", "table", "above"];
@@ -71,6 +82,35 @@ export const WALLPAPER: readonly Shot[] = [
   { around: "fly", distance: 4.5, height: 15, side: Math.PI, low: 0, fov: 34, settle: 3.5, orbit: 0.02 },
 ];
 
+/**
+ * How the shots round the fly follow a screen narrower than the TV's: the
+ * share of the extra height kept as field of view. 1 would keep the TV's
+ * width in the picture (the fly as small across as on the TV, with a great
+ * deal of sky and table); 0.5 would keep the fly as many pixels long (and on
+ * a phone held upright, too big to turn round in). Shots of the whole table
+ * keep its width: it must fit.
+ */
+export const NARROW_KEEP = 0.7;
+
+/** A shot's vertical field of view (degrees), framed for the TV's 16:9, on a screen of this shape. */
+export function fieldOfView(fov: number, aspect: number, keep = NARROW_KEEP): number {
+  if (aspect >= TV_ASPECT) return fov;
+  const t = Math.tan((fov * Math.PI) / 360) * Math.pow(TV_ASPECT / aspect, keep);
+  return (Math.atan(t) * 360) / Math.PI;
+}
+
+/** The views nearest first, for bringing the camera in and taking it out by hand. */
+export const NEAR_TO_FAR: readonly View[] = ["close", "follow", "wide", "table"];
+
+/** Seconds a look round by hand is held after it is let go, and how long it then takes to ease back. */
+const LOOK_HOLD = 0.8;
+const LOOK_SETTLE = 1.6;
+/** How far the camera can be swung up or down by hand (radians of elevation). */
+const LOOK_PITCH = [0.03, 1.45] as const;
+/** The nearest the hand can bring it to the fly (mm), and how far past the whole table's shot it can take it out. */
+const ZOOM_NEAREST = 4.5;
+const ZOOM_FARTHEST = 1.3;
+
 /** How far (mm) the camera keeps above whatever is under it. */
 const CLEARANCE = 1.1;
 /** The fly's middle, above its feet, mm. */
@@ -114,6 +154,20 @@ export class CameraDirector {
   prefer: number | null = null;
   /** Pins the camera (for screenshots and art): eye and target, or null to let it move. */
   pinned: { eye: THREE.Vector3Like; target: THREE.Vector3Like; fov?: number } | null = null;
+  /**
+   * The player's hand on the camera: radians round the fly from where the
+   * cameraman stands, radians up or down, and how much farther (over 1) or
+   * nearer. `held` while a finger or a button is on it; let go, the turn
+   * eases back and the zoom is left for `letGo` to settle.
+   */
+  readonly look = { yaw: 0, pitch: 0, zoom: 1, held: false };
+  /**
+   * Where the screens leave room for the fly, from their layout: in the
+   * title's shot, its place across and down the picture (as a Shot's
+   * `across` and `low`); playing, how much lower than the shot says, and how
+   * much wider its field of view (the tangent of half of it, over 1).
+   */
+  readonly room = { across: -0.56, low: 0.1, lower: 0, wider: 1 };
   #world: World;
   #scene!: SceneCamera;
   /** The camera's place: the point it circles (smoothed), its angle round it, distance, height, and where it aims. */
@@ -141,11 +195,23 @@ export class CameraDirector {
   #hit: RayHit = { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 1, z: 0 }, solid: -1, t: 0 };
   #dir = { x: 0, y: 0, z: 0 };
   #from = { x: 0, y: 0, z: 0 };
+  #title: Shot = { ...TITLE };
+  /** Seconds since the hand let go, and the springs easing the look back. */
+  #loose = 0;
+  #lookV = new Float64Array(2);
 
   constructor(world: World, aspect: number, scene: SceneCamera) {
     this.#world = world;
     this.camera = new THREE.PerspectiveCamera(30, aspect, 0.5, 4000);
     this.useScene(scene);
+  }
+
+  /** The screen changed shape. */
+  setAspect(aspect: number) {
+    if (aspect === this.camera.aspect) return;
+    this.camera.aspect = aspect;
+    // The field of view follows it on the next update.
+    this.camera.updateProjectionMatrix();
   }
 
   /** The place's own shots, for a place the fly has just been carried to: the camera starts afresh there. */
@@ -163,7 +229,11 @@ export class CameraDirector {
 
   /** The shot being taken now. */
   get shot(): Shot {
-    if (this.title) return TITLE;
+    if (this.title) {
+      this.#title.across = this.room.across;
+      this.#title.low = this.room.low;
+      return this.#title;
+    }
     if (!this.wallpaper) return this.view === "table" ? this.#scene.whole : SHOTS[this.view];
     return this.wallpaperStyle === "follow" ? FOLLOW : WALLPAPER[this.#shot];
   }
@@ -243,12 +313,26 @@ export class CameraDirector {
     this.#azimuth = wrap(damp(this.#azimuth, goal, s, 6, settle, dt));
     this.#distance = damp(this.#distance, distance, s, 7, settle * 0.8, dt);
     this.#height = damp(this.#height, height, s, 8, settle * 0.8, dt);
+    // Playing, the HUD's room: the wallpaper and the title have the screen to themselves.
+    const hud = !this.title && !this.wallpaper;
+    if (hud && this.room.wider !== 1) fov = (Math.atan(Math.tan((fov * Math.PI) / 360) * this.room.wider) * 360) / Math.PI;
     this.#fov = damp(this.#fov, fov, s, 9, fovSettle, dt);
-    this.#low = damp(this.#low, shot.low, s, 10, settle * 0.8, dt);
+    this.#low = damp(this.#low, shot.low + (hud ? this.room.lower : 0), s, 10, settle * 0.8, dt);
+    const look = this.#easeLook(dt);
+    const view = fieldOfView(this.#fov, cam.aspect, shot.around === "table" ? 1 : NARROW_KEEP);
 
     const eye = this.#eye;
-    const az = this.#azimuth;
-    eye.set(c.x + Math.sin(az) * this.#distance, c.y + this.#height, c.z + Math.cos(az) * this.#distance);
+    const az = this.#azimuth + look.yaw;
+    // The player's hand swings it up or down round the fly, and in or out.
+    let reach = this.#distance * look.zoom;
+    let rise = this.#height * look.zoom;
+    if (look.pitch !== 0) {
+      const r = Math.hypot(reach, rise);
+      const up = Math.min(LOOK_PITCH[1], Math.max(LOOK_PITCH[0], Math.atan2(rise, reach) + look.pitch));
+      reach = Math.cos(up) * r;
+      rise = Math.sin(up) * r;
+    }
+    eye.set(c.x + Math.sin(az) * reach, c.y + rise, c.z + Math.cos(az) * reach);
     // A breath of movement in the wallpaper's long shots, as if the camera were on a sandbag rather than a tripod.
     if (this.wallpaper) {
       eye.x += Math.sin(this.#time * 0.23) * this.#distance * 0.006;
@@ -260,7 +344,7 @@ export class CameraDirector {
       const dy = eye.y - focus.y;
       const dz = eye.z - focus.z;
       const near = Math.hypot(dx, dy, dz);
-      const least = Math.hypot(shot.distance, shot.height) * 0.75;
+      const least = Math.hypot(shot.distance, shot.height) * 0.75 * Math.min(1, look.zoom);
       if (near < least) {
         const k = least / Math.max(1e-6, near);
         eye.set(focus.x + dx * k, focus.y + dy * k, focus.z + dz * k);
@@ -271,13 +355,13 @@ export class CameraDirector {
 
     // Aim so the fly sits `low` below the middle of the picture.
     const ground = Math.hypot(eye.x - c.x, eye.z - c.z);
-    const drop = Math.atan2(eye.y - c.y, Math.max(1e-3, ground)) - Math.atan(this.#low * Math.tan((this.#fov * Math.PI) / 360));
+    const drop = Math.atan2(eye.y - c.y, Math.max(1e-3, ground)) - Math.atan(this.#low * Math.tan((view * Math.PI) / 360));
     const lift = eye.y - c.y - ground * Math.tan(drop);
     // Aimed ahead by about what the spring lags, so a jump stays in the picture; never more than a few body lengths.
     const speed = Math.hypot(v.x, v.y, v.z);
     const lead = shot.around === "fly" && speed > 0 ? Math.min(aimSettle, MAX_LEAD / speed) : 0;
     // To put the fly to one side, aim the other way along the camera's right.
-    const aside = -(shot.across ?? 0) * ground * Math.tan((this.#fov * Math.PI) / 360) * this.camera.aspect;
+    const aside = -(shot.across ?? 0) * ground * Math.tan((view * Math.PI) / 360) * this.camera.aspect;
     const a = this.#aim;
     a.x = damp(a.x, focus.x + v.x * lead + Math.cos(az) * aside, s, 3, aimSettle, dt);
     a.y = damp(a.y, focus.y + lift + v.y * lead, s, 4, aimSettle, dt);
@@ -286,11 +370,70 @@ export class CameraDirector {
 
     cam.position.copy(eye);
     cam.lookAt(a);
-    if (Math.abs(cam.fov - this.#fov) > 0.01) {
-      cam.fov = this.#fov;
+    if (Math.abs(cam.fov - view) > 0.01) {
+      cam.fov = view;
       cam.updateProjectionMatrix();
     }
     cam.updateMatrixWorld();
+  }
+
+  /** The look by hand, eased back to nothing once let go and left a moment. */
+  #easeLook(dt: number) {
+    const look = this.look;
+    if (look.held) {
+      this.#loose = 0;
+      this.#lookV.fill(0);
+      return look;
+    }
+    this.#loose += dt;
+    if (this.#loose > LOOK_HOLD) {
+      look.yaw = Math.abs(look.yaw) < 1e-4 ? 0 : damp(look.yaw, 0, this.#lookV, 0, LOOK_SETTLE, dt);
+      look.pitch = Math.abs(look.pitch) < 1e-4 ? 0 : damp(look.pitch, 0, this.#lookV, 1, LOOK_SETTLE, dt);
+    }
+    return look;
+  }
+
+  /** Turns the camera round the fly by hand (radians round, and up), no further up or down than it can go from where the shot has it, so that turning back takes effect at once. */
+  turnBy(yaw: number, pitch: number) {
+    const look = this.look;
+    look.yaw = wrap(look.yaw + yaw);
+    const up = Math.atan2(this.#height, this.#distance);
+    look.pitch = Math.max(LOOK_PITCH[0] - up, Math.min(LOOK_PITCH[1] - up, look.pitch + pitch));
+  }
+
+  /** Brings the camera in (under 1) or takes it out by hand, by this factor. */
+  zoomBy(factor: number) {
+    const reach = Math.hypot(this.#distance, this.#height);
+    const whole = this.#scene.whole;
+    const look = this.look;
+    look.zoom = Math.min((Math.hypot(whole.distance, whole.height) * ZOOM_FARTHEST) / reach, Math.max(ZOOM_NEAREST / reach, look.zoom * factor));
+  }
+
+  /**
+   * The hand has let go of the zoom: the view nearest to where it was left
+   * (null if it is still nearest the one it was in), with the camera left
+   * exactly where it is, to ease from there into that view.
+   */
+  letGo(): View | null {
+    const look = this.look;
+    look.held = false;
+    if (look.zoom === 1) return null;
+    this.#distance *= look.zoom;
+    this.#height *= look.zoom;
+    const reach = Math.hypot(this.#distance, this.#height);
+    look.zoom = 1;
+    let best: View | null = null;
+    let bestGap = Infinity;
+    for (const view of NEAR_TO_FAR) {
+      const shot = view === "table" ? this.#scene.whole : SHOTS[view];
+      // The whole table's shot circles the table, not the fly: as far from the fly as from its middle, near enough.
+      const gap = Math.abs(Math.log(reach / Math.hypot(shot.distance, shot.height)));
+      if (gap < bestGap) {
+        bestGap = gap;
+        best = view;
+      }
+    }
+    return best === this.view ? null : best;
   }
 
   /**

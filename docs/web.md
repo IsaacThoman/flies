@@ -131,11 +131,15 @@ time:
 | 0 | 60 a second | as chosen | as chosen |
 | 1 | 60 | as chosen | no finer than Low |
 | 2 | 30 | as chosen | Low |
-| 3 | 30 | no finer than Chunky (320×240) | Low |
+| 3 | 30 | no finer than Chunky (half the frame each way) | Low |
 | 4 | 30 | Chunky | Low, refreshing half as often |
-| 5 | 30 | Chunkier (214×160) | Low, half as often |
+| 5 | 30 | Chunkier (a third of it each way) | Low, half as often |
 
-Never more than Settings asks for, and the player choosing pixels or eyes in
+The frame takes the screen's shape (`display.ts`), so each step keeps it,
+square pixels and all, at a quarter and a ninth of the pixels: 370×208 and
+247×139 in a 16:9 window, 188×408 and 126×272 on a phone held upright. A step
+changes only the size the world is drawn at; nothing is built again. Never
+more than Settings asks for, and the player choosing pixels or eyes in
 Settings is taken at their word until the device shows again that it can't
 keep up. After 30 s of easy going it tries a step back up; if that goes badly
 it steps straight back and waits twice as long before trying again. When it

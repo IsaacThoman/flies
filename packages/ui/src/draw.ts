@@ -315,3 +315,27 @@ export function chevron(g: Ctx, x: number, y: number, dir: -1 | 1, enabled: bool
   g.stroke();
   g.restore();
 }
+
+/** A round glass button with a symbol on it, for a pointer to press: back (a chevron) or the menu (two bars, as for pause). */
+export function iconButton(g: Ctx, x: number, y: number, r: number, icon: "back" | "menu", hot = false) {
+  g.save();
+  softShadow(g, x - r, y - r, r * 2, r * 2, r, 5, 0.18);
+  orb(g, x, y, r, hot ? "aqua" : "glass");
+  g.fillStyle = hot ? "#ffffff" : INK;
+  g.strokeStyle = hot ? "#ffffff" : INK;
+  if (icon === "menu") {
+    const k = r * 0.36;
+    g.fillRect(x - k * 0.85, y - k, k * 0.6, k * 2);
+    g.fillRect(x + k * 0.25, y - k, k * 0.6, k * 2);
+  } else {
+    g.beginPath();
+    g.moveTo(x + r * 0.16, y - r * 0.36);
+    g.lineTo(x - r * 0.22, y);
+    g.lineTo(x + r * 0.16, y + r * 0.36);
+    g.lineWidth = r * 0.2;
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    g.stroke();
+  }
+  g.restore();
+}

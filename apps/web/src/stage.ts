@@ -4,8 +4,8 @@
 // frame's cost.
 
 import * as THREE from "three";
-import { PIXEL_SIZES, RENDER_HEIGHT, RENDER_WIDTH } from "./display.ts";
-import type { PixelSize } from "./display.ts";
+import { TV_FRAME, worldSize } from "./display.ts";
+import type { Frame, PixelSize } from "./display.ts";
 import type { Scene, SceneBackdrop, SceneSet } from "./places/types.ts";
 import { disposeAll } from "./scene/build.ts";
 import { Daylight } from "./scene/light.ts";
@@ -67,6 +67,8 @@ export class Stage {
   #blit: { scene: THREE.Scene; camera: THREE.OrthographicCamera; material: THREE.MeshBasicMaterial } | null = null;
   #veil: { scene: THREE.Scene; material: THREE.MeshBasicMaterial };
   pixels: PixelSize = "classic";
+  /** The frame rendered into. */
+  frame: Frame = TV_FRAME;
   /** 0 to 1: how far the world is faded to black (while the fly is carried somewhere else). One draw while above 0. */
   veil = 0;
   /** How long building the place shown took, ms: all JavaScript, so on the Apple TV many times this. */
@@ -75,7 +77,7 @@ export class Stage {
   constructor(canvas: HTMLCanvasElement, time: TimeOfDay, scene: Scene) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance", stencil: false });
     renderer.setPixelRatio(1);
-    renderer.setSize(RENDER_WIDTH, RENDER_HEIGHT, false);
+    renderer.setSize(TV_FRAME.width, TV_FRAME.height, false);
     renderer.autoClear = false;
     renderer.info.autoReset = false;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -186,12 +188,22 @@ export class Stage {
     this.#envAge = 1;
   }
 
+  /** The screen changed shape: the frame (and the chunkier world's, if it is) follows. Nothing in the world is built again. */
+  resize(frame: Frame) {
+    this.frame = frame;
+    this.renderer.setSize(frame.width, frame.height, false);
+    if (this.#lowRes) {
+      const { width, height } = worldSize(frame, this.pixels);
+      this.#lowRes.setSize(width, height);
+    }
+  }
+
   setPixels(pixels: PixelSize) {
     this.pixels = pixels;
     this.#lowRes?.dispose();
     this.#lowRes = null;
     if (pixels === "classic") return;
-    const { width, height } = PIXEL_SIZES[pixels];
+    const { width, height } = worldSize(this.frame, pixels);
     this.#lowRes = new THREE.WebGLRenderTarget(width, height, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: true, colorSpace: THREE.SRGBColorSpace });
     if (!this.#blit) {
       const material = new THREE.MeshBasicMaterial({ depthTest: false, depthWrite: false, toneMapped: false });

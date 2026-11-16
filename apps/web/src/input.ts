@@ -1,12 +1,46 @@
-// The remote, as the game reads it: button presses (with the host's key
-// repeat) and the finger on the touch surface, gathered between frames.
+// Everything the player plays with, gathered between frames: the Apple TV
+// remote (its buttons, with the host's key repeat, and the finger on its
+// touch surface), and in a browser the keyboard, the mouse or trackpad, the
+// fingers on the screen and a game pad. Each says which it was, so the game
+// can show hints for the thing in the player's hand.
 //
-// In a browser the keyboard and mouse stand in for it: keys map through
-// REMOTE_KEYS, and the mouse pressed over the canvas sends the same
-// `remotetouch` events the Apple TV host does.
+// The remote reaches the game as DOM events (packages/contracts/src/remote.ts),
+// and the keyboard sends the same keys. A pointer is not a stand-in for the
+// remote's touch surface: it points at the screen itself, and Pointers turns
+// what it does into a few gestures (a press, a drag, a tap, a pinch, the
+// wheel). A pad's buttons arrive as the remote's buttons.
 
 import { REMOTE_KEYS, REMOTE_TOUCH_EVENT } from "@fly/contracts";
 import type { RemoteButton, RemoteTouch } from "@fly/contracts";
+
+/** What the player is holding. */
+export type Device = "remote" | "keys" | "pad" | "mouse" | "touch";
+
+/** The device used last, and when. */
+export class Devices {
+  current: Device;
+  /** performance.now() of the last deliberate input from any of them. */
+  at = 0;
+
+  constructor(initial: Device) {
+    this.current = initial;
+  }
+
+  use(device: Device, now: number) {
+    this.current = device;
+    this.at = now;
+  }
+
+  /** Pointed at the screen itself: no buttons to explain, the screen is the affordance. */
+  get pointing() {
+    return this.current === "mouse" || this.current === "touch";
+  }
+}
+
+/** A device to start with before anything is used: the remote on the TV; in a browser a finger or a mouse, by its primary pointer. */
+export function initialDevice(tv: boolean, coarse: boolean): Device {
+  return tv ? "remote" : coarse ? "touch" : "mouse";
+}
 
 export type Press = { button: RemoteButton; repeat: boolean };
 
@@ -21,7 +55,7 @@ export class Remote {
   readonly held = new Set<RemoteButton>();
   /** Where the finger is, -1 to 1 with y up, and whether it's down. */
   readonly touch: RemoteTouch = { x: 0, y: 0, touching: false };
-  /** How far the finger moved since the last frame, in surface units. */
+  /** How far the finger moved since the last frame, in surface units (a pad's stick adds to it too). */
   dx = 0;
   dy = 0;
   /** performance.now() of the last press, release or touch. */
@@ -29,9 +63,14 @@ export class Remote {
   #last: { x: number; y: number; at: number } | null = null;
   #swipingUntil = 0;
   #now: () => number;
+  #devices: Devices | null;
+  /** What the keys are: the remote's buttons (the TV host sends them), or a keyboard's. */
+  #keys: Device;
 
-  constructor(target: Pick<Window, "addEventListener">, now: () => number = () => performance.now()) {
+  constructor(target: Pick<Window, "addEventListener">, now: () => number = () => performance.now(), devices: Devices | null = null, keys: Device = "remote") {
     this.#now = now;
+    this.#devices = devices;
+    this.#keys = keys;
     target.addEventListener("keydown", (event) => this.#key(event as KeyboardEvent, true));
     target.addEventListener("keyup", (event) => this.#key(event as KeyboardEvent, false));
     target.addEventListener(REMOTE_TOUCH_EVENT, (event) => this.receiveTouch((event as CustomEvent<RemoteTouch>).detail));
@@ -41,8 +80,14 @@ export class Remote {
     const button = REMOTE_KEYS[event.key];
     if (!button) return;
     event.preventDefault?.();
+    this.button(button, down, !!event.repeat, this.#keys);
+  }
+
+  /** A button going down or up: the remote's, a key's, or a pad's. Letting go is not doing something new: only a press says which device is in hand. */
+  button(button: RemoteButton, down: boolean, repeat: boolean, device: Device) {
     const now = this.#now();
     this.lastInputAt = now;
+    if (down) this.#devices?.use(device, now);
     if (!down) {
       this.held.delete(button);
       return;
@@ -50,13 +95,14 @@ export class Remote {
     const arrow = button === "up" || button === "down" || button === "left" || button === "right";
     if (arrow && now < this.#swipingUntil) return;
     this.held.add(button);
-    this.presses.push({ button, repeat: !!event.repeat });
+    this.presses.push({ button, repeat });
   }
 
   receiveTouch(detail: RemoteTouch) {
     if (!detail || !Number.isFinite(detail.x) || !Number.isFinite(detail.y)) return;
     const now = this.#now();
     this.lastInputAt = now;
+    if (detail.touching) this.#devices?.use("remote", now);
     if (detail.touching && this.touch.touching && this.#last) {
       const mx = detail.x - this.#last.x;
       const my = detail.y - this.#last.y;
@@ -79,30 +125,400 @@ export class Remote {
   }
 }
 
-/** In a browser: the mouse pressed over the canvas is the touch surface. */
-export function mouseAsTouch(canvas: HTMLCanvasElement) {
-  if (typeof canvas.addEventListener !== "function" || typeof canvas.getBoundingClientRect !== "function") return;
-  let down = false;
-  const send = (event: PointerEvent, touching: boolean) => {
-    const rect = canvas.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
-    const y = 1 - ((event.clientY - rect.top) / Math.max(1, rect.height)) * 2;
-    window.dispatchEvent(new CustomEvent(REMOTE_TOUCH_EVENT, { detail: { x: Math.max(-1, Math.min(1, x)), y: Math.max(-1, Math.min(1, y)), touching } }));
-  };
-  canvas.addEventListener("pointerdown", (event) => {
-    down = true;
-    canvas.setPointerCapture?.(event.pointerId);
-    send(event, true);
-  });
-  canvas.addEventListener("pointermove", (event) => {
-    if (down) send(event, true);
-  });
-  const up = (event: PointerEvent) => {
-    if (!down) return;
-    down = false;
-    send(event, false);
-  };
-  canvas.addEventListener("pointerup", up);
-  canvas.addEventListener("pointercancel", up);
-  canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+/** What a pointer did, in the canvas's own terms: x and y from 0 to 1 across and down it. */
+export type Gesture =
+  /** The first finger, or a mouse button, went down. */
+  | { type: "down"; x: number; y: number; touch: boolean; button: number }
+  /** It moved while down. */
+  | { type: "drag"; x: number; y: number }
+  /** It lifted; `tap` if it barely moved. */
+  | { type: "up"; x: number; y: number; tap: boolean }
+  /** What it was doing is off: a second finger came down, or the system took the pointer. */
+  | { type: "cancel" }
+  /** A mouse moved with no button down. */
+  | { type: "hover"; x: number; y: number }
+  /** The mouse left the screen. */
+  | { type: "leave" }
+  /** Two fingers: how much further apart since the last (over 1 is spreading), and how far their middle moved. */
+  | { type: "pinch"; scale: number; dx: number; dy: number }
+  | { type: "pinchEnd" }
+  /** The wheel or a trackpad's scroll, CSS pixels; `zoom` is a trackpad's pinch (or the wheel with Ctrl), `notch` a mouse wheel's click. */
+  | { type: "wheel"; x: number; y: number; dx: number; dy: number; zoom: boolean; notch: boolean };
+
+/** Fingers wander: one that moves less than this (CSS pixels) from where it went down is tapping. A mouse, less. */
+export const TAP_SLOP = { touch: 12, mouse: 5 } as const;
+/** A mouse moving this far (a share of the screen's diagonal) within MOVE_WINDOW ms means it, rather than a nudge of the desk. */
+export const DELIBERATE_MOVE = 0.04;
+const MOVE_WINDOW = 400;
+
+/** A raw pointer event, as Pointers needs it (the DOM's, or a test's). */
+export type RawPointer = { pointerId: number; pointerType: string; clientX: number; clientY: number; button: number; buttons: number };
+type Box = { left: number; top: number; width: number; height: number };
+
+/**
+ * Turns the canvas's pointer events into gestures. One finger or a mouse is
+ * a press that drags and lifts (a tap if it barely moved); a second finger
+ * turns it into a pinch, and nothing more happens until every finger has
+ * lifted. A mouse moving with no button down hovers. `deliberate` says
+ * something meant was done since the last frame: any press or wheel, or a
+ * mouse moved far enough, fast enough.
+ */
+export class Pointers {
+  readonly gestures: Gesture[] = [];
+  /** Something meant since the last frame, to wake the wallpaper with. */
+  deliberate = false;
+  /** performance.now() of the last deliberate input. */
+  lastAt = 0;
+  readonly #box: () => Box;
+  readonly #now: () => number;
+  readonly #devices: Devices | null;
+  #primary = -1;
+  #touch = false;
+  #start = { x: 0, y: 0 };
+  #moved = 0;
+  readonly #fingers = new Map<number, { x: number; y: number }>();
+  #pinch: { distance: number; x: number; y: number } | null = null;
+  /** A pinch ended, or the system cancelled: ignore what is left until every finger is up. */
+  #spent = false;
+  #travel = 0;
+  #travelAt = 0;
+  #hover = { x: 0, y: 0, known: false };
+
+  constructor(box: () => Box, now: () => number = () => performance.now(), devices: Devices | null = null) {
+    this.#box = box;
+    this.#now = now;
+    this.#devices = devices;
+  }
+
+  /** Listens to the canvas, and keeps the browser's own gestures (scrolling, zooming the page, its menus) off it. */
+  attach(canvas: HTMLCanvasElement) {
+    const opts = { passive: false } as const;
+    canvas.addEventListener("pointerdown", (e) => {
+      canvas.setPointerCapture?.(e.pointerId);
+      this.down(e);
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      // A fast mouse sends several moves a frame; the browser has them all.
+      const events = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
+      this.move(events.length ? events[events.length - 1] : e);
+    });
+    canvas.addEventListener("pointerup", (e) => this.up(e, false));
+    canvas.addEventListener("pointercancel", (e) => this.up(e, true));
+    // The system took the pointer (another window, a gesture of its own): its lift won't come.
+    canvas.addEventListener("lostpointercapture", (e) => this.up(e, true));
+    canvas.addEventListener("pointerleave", (e) => {
+      if (e.pointerType === "mouse" && this.#primary !== e.pointerId) this.gestures.push({ type: "leave" });
+    });
+    canvas.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      this.wheel(e);
+    }, opts);
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    // Safari's own pinch and double-tap zoom, and the page's rubber band.
+    for (const type of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(type, (e) => e.preventDefault(), opts);
+    document.addEventListener("touchmove", (e) => e.preventDefault(), opts);
+  }
+
+  #at(e: { clientX: number; clientY: number }) {
+    const box = this.#box();
+    return { x: (e.clientX - box.left) / Math.max(1, box.width), y: (e.clientY - box.top) / Math.max(1, box.height) };
+  }
+
+  #meant(touch: boolean) {
+    const now = this.#now();
+    this.deliberate = true;
+    this.lastAt = now;
+    this.#devices?.use(touch ? "touch" : "mouse", now);
+  }
+
+  down(e: RawPointer) {
+    const touch = e.pointerType === "touch";
+    const p = this.#at(e);
+    this.#meant(touch);
+    if (touch) {
+      this.#fingers.set(e.pointerId, p);
+      if (this.#fingers.size === 2 && !this.#spent) {
+        if (this.#primary >= 0) this.gestures.push({ type: "cancel" });
+        this.#primary = -1;
+        const [a, b] = [...this.#fingers.values()];
+        this.#pinch = { distance: this.#distance(a, b), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        return;
+      }
+      if (this.#fingers.size > 1 || this.#spent) return;
+    } else if (this.#primary >= 0) {
+      // Another button while one is down is the same press; the same pointer pressed again means its lift was lost (the window lost focus mid-drag): that press is over.
+      if (e.pointerId !== this.#primary) return;
+      this.gestures.push({ type: "cancel" });
+    }
+    this.#primary = e.pointerId;
+    this.#touch = touch;
+    this.#start = p;
+    this.#moved = 0;
+    this.gestures.push({ type: "down", x: p.x, y: p.y, touch, button: e.button });
+  }
+
+  move(e: RawPointer) {
+    const p = this.#at(e);
+    if (e.pointerType === "touch") {
+      if (!this.#fingers.has(e.pointerId)) return;
+      this.#fingers.set(e.pointerId, p);
+      const pinch = this.#pinch;
+      if (pinch) {
+        const [a, b] = [...this.#fingers.values()];
+        const distance = this.#distance(a, b);
+        const x = (a.x + b.x) / 2;
+        const y = (a.y + b.y) / 2;
+        this.gestures.push({ type: "pinch", scale: distance / Math.max(1e-6, pinch.distance), dx: x - pinch.x, dy: y - pinch.y });
+        this.#meant(true);
+        pinch.distance = distance;
+        pinch.x = x;
+        pinch.y = y;
+        return;
+      }
+    }
+    if (e.pointerId === this.#primary) {
+      const box = this.#box();
+      this.#moved = Math.max(this.#moved, Math.hypot((p.x - this.#start.x) * box.width, (p.y - this.#start.y) * box.height));
+      this.gestures.push({ type: "drag", x: p.x, y: p.y });
+      // Still playing: a held finger dragging keeps the wallpaper away.
+      this.#meant(this.#touch);
+      return;
+    }
+    if (e.pointerType === "touch" || e.buttons !== 0) return;
+    // A mouse hovering: only the latest matters.
+    const last = this.gestures[this.gestures.length - 1];
+    if (last?.type === "hover") {
+      last.x = p.x;
+      last.y = p.y;
+    } else this.gestures.push({ type: "hover", x: p.x, y: p.y });
+    this.#hovered(p);
+  }
+
+  /** A mouse moved: deliberate once it has gone far enough, quickly enough. */
+  #hovered(p: { x: number; y: number }) {
+    const box = this.#box();
+    const now = this.#now();
+    if (this.#hover.known) {
+      // What it travelled lately, forgetting what is older than the window.
+      const k = Math.max(0, 1 - (now - this.#travelAt) / MOVE_WINDOW);
+      this.#travel = this.#travel * k + Math.hypot((p.x - this.#hover.x) * box.width, (p.y - this.#hover.y) * box.height);
+      this.#travelAt = now;
+      if (this.#travel > DELIBERATE_MOVE * Math.hypot(box.width, box.height)) {
+        this.#travel = 0;
+        this.#meant(false);
+      }
+    }
+    this.#hover.x = p.x;
+    this.#hover.y = p.y;
+    this.#hover.known = true;
+  }
+
+  up(e: RawPointer, cancelled: boolean) {
+    if (e.pointerType === "touch") {
+      this.#fingers.delete(e.pointerId);
+      if (this.#pinch) {
+        this.#pinch = null;
+        this.#spent = this.#fingers.size > 0;
+        this.gestures.push({ type: "pinchEnd" });
+        return;
+      }
+      if (this.#fingers.size === 0) this.#spent = false;
+    }
+    if (e.pointerId !== this.#primary) return;
+    this.#primary = -1;
+    if (cancelled) {
+      this.gestures.push({ type: "cancel" });
+      return;
+    }
+    const p = this.#at(e);
+    this.gestures.push({ type: "up", x: p.x, y: p.y, tap: this.#moved < (this.#touch ? TAP_SLOP.touch : TAP_SLOP.mouse) });
+  }
+
+  wheel(e: { clientX: number; clientY: number; deltaX: number; deltaY: number; deltaMode: number; ctrlKey: boolean; metaKey?: boolean }) {
+    const box = this.#box();
+    // Lines and pages, as pixels.
+    const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? box.height : 1;
+    const p = this.#at(e);
+    const dx = e.deltaX * k;
+    const dy = e.deltaY * k;
+    // A mouse wheel's click comes in lines, or in steps of a hundred or so pixels; a trackpad's scroll in small ones.
+    const notch = e.deltaMode === 1 || (Math.abs(dy) >= 50 && Number.isInteger(e.deltaY) && e.deltaX === 0);
+    this.#meant(false);
+    this.gestures.push({ type: "wheel", x: p.x, y: p.y, dx, dy, zoom: e.ctrlKey || !!e.metaKey, notch });
+  }
+
+  #distance(a: { x: number; y: number }, b: { x: number; y: number }) {
+    const box = this.#box();
+    return Math.hypot((a.x - b.x) * box.width, (a.y - b.y) * box.height);
+  }
+
+  /** Called once a frame, after the frame has read the gestures. */
+  endFrame() {
+    this.gestures.length = 0;
+    this.deliberate = false;
+  }
 }
+
+/**
+ * The keys a keyboard has that the remote hasn't: the number keys pick a
+ * tool, and + and − bring the camera in and take it out.
+ */
+export type KeyAction = { kind: "tool"; index: number } | { kind: "zoom"; dir: -1 | 1 };
+
+export function keyAction(code: string, key: string): KeyAction | null {
+  const digit = /^(?:Digit|Numpad)([1-9])$/.exec(code);
+  if (digit) return { kind: "tool", index: Number(digit[1]) - 1 };
+  if (key === "+" || key === "=") return { kind: "zoom", dir: -1 };
+  if (key === "-" || key === "_") return { kind: "zoom", dir: 1 };
+  return null;
+}
+
+export class Keyboard {
+  readonly actions: KeyAction[] = [];
+
+  constructor(target: Pick<Window, "addEventListener">, remote: Remote, devices: Devices) {
+    target.addEventListener("keydown", (event) => {
+      const e = event as KeyboardEvent;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const action = keyAction(e.code, e.key);
+      if (!action) return;
+      e.preventDefault();
+      remote.lastInputAt = performance.now();
+      devices.use("keys", remote.lastInputAt);
+      if (!e.repeat) this.actions.push(action);
+    });
+  }
+
+  endFrame() {
+    this.actions.length = 0;
+  }
+}
+
+/** A stick inside this is resting. */
+export const STICK_DEAD = 0.22;
+/** A held direction repeats as the remote's buttons do: first after this long, then this often (ms). */
+const REPEAT_FIRST = 400;
+const REPEAT_EVERY = 100;
+
+/** The standard pad's buttons that are the remote's (the W3C standard mapping): A, B, Start, the d-pad. */
+const PAD_BUTTONS: readonly [number, RemoteButton][] = [
+  [0, "select"],
+  [1, "back"],
+  [9, "playPause"],
+  [12, "up"],
+  [13, "down"],
+  [14, "left"],
+  [15, "right"],
+];
+/** Its shoulder buttons step through the tools, as left and right do. */
+const PAD_SHOULDERS: readonly [number, RemoteButton][] = [
+  [4, "left"],
+  [5, "right"],
+];
+
+type PadLike = { connected: boolean; mapping: string; buttons: readonly { pressed: boolean; value: number }[]; axes: readonly number[] };
+
+/**
+ * A game pad, through the web's Gamepad API: polled once a frame, and only
+ * once one has been connected. Its buttons are the remote's (A is Select, B
+ * is Back, Start is Play/Pause, the d-pad the arrows, the shoulders the
+ * tools); the left stick moves the hand as a finger on the touch surface
+ * does, or, in a menu, steps as the arrows do; the right stick looks round
+ * the fly; the triggers bring the camera in and take it out.
+ */
+export class Gamepads {
+  /** The right stick, -1 to 1 each way (y up), for looking round. */
+  readonly look = { x: 0, y: 0 };
+  /** The triggers' steps since the last frame: -1 nearer, 1 farther. */
+  zoom = 0;
+  #active = false;
+  readonly #pressed = new Map<number, boolean>();
+  readonly #repeatAt = new Map<RemoteButton, number>();
+  #stickHeld: RemoteButton | null = null;
+  #triggers = [false, false];
+  readonly #remote: Remote;
+  readonly #devices: Devices;
+  readonly #pads: () => readonly (PadLike | null)[];
+
+  constructor(remote: Remote, devices: Devices, pads: () => readonly (PadLike | null)[], target?: Pick<Window, "addEventListener">) {
+    this.#remote = remote;
+    this.#devices = devices;
+    this.#pads = pads;
+    target?.addEventListener("gamepadconnected", () => {
+      this.#active = true;
+    });
+    if (!target) this.#active = true;
+  }
+
+  /** Once a frame: `menus` says whether the left stick steps (a menu) or moves the hand (play). */
+  poll(dt: number, now: number, menus: boolean) {
+    this.look.x = 0;
+    this.look.y = 0;
+    this.zoom = 0;
+    if (!this.#active) return;
+    const pad = this.#pads().find((p) => p?.connected && p.mapping === "standard");
+    if (!pad) return;
+    const remote = this.#remote;
+    const press = (index: number, button: RemoteButton) => {
+      const down = !!pad.buttons[index]?.pressed;
+      const was = this.#pressed.get(index) ?? false;
+      if (down !== was) {
+        this.#pressed.set(index, down);
+        remote.button(button, down, false, "pad");
+        if (down) this.#repeatAt.set(button, now + REPEAT_FIRST);
+      } else if (down && button !== "select" && button !== "back" && button !== "playPause" && now >= (this.#repeatAt.get(button) ?? Infinity)) {
+        remote.button(button, true, true, "pad");
+        this.#repeatAt.set(button, now + REPEAT_EVERY);
+      }
+    };
+    for (const [index, button] of PAD_BUTTONS) press(index, button);
+    for (const [index, button] of PAD_SHOULDERS) press(index, button);
+    for (let i = 0; i < 2; i++) {
+      const down = (pad.buttons[6 + i]?.value ?? 0) > 0.5;
+      if (down && !this.#triggers[i]) {
+        this.zoom += i === 0 ? 1 : -1;
+        this.#devices.use("pad", now);
+        remote.lastInputAt = now;
+      }
+      this.#triggers[i] = down;
+    }
+    const lx = deadzone(pad.axes[0] ?? 0);
+    const ly = -deadzone(pad.axes[1] ?? 0);
+    const rx = deadzone(pad.axes[2] ?? 0);
+    const ry = -deadzone(pad.axes[3] ?? 0);
+    if (menus) {
+      // The stick as the arrows, with their repeat.
+      const dir: RemoteButton | null = Math.abs(lx) > 0.5 || Math.abs(ly) > 0.5 ? (Math.abs(lx) > Math.abs(ly) ? (lx > 0 ? "right" : "left") : ly > 0 ? "up" : "down") : null;
+      if (dir !== this.#stickHeld) {
+        if (this.#stickHeld) remote.button(this.#stickHeld, false, false, "pad");
+        if (dir) {
+          remote.button(dir, true, false, "pad");
+          this.#repeatAt.set(dir, now + REPEAT_FIRST);
+        }
+        this.#stickHeld = dir;
+      } else if (dir && now >= (this.#repeatAt.get(dir) ?? Infinity)) {
+        remote.button(dir, true, true, "pad");
+        this.#repeatAt.set(dir, now + REPEAT_EVERY);
+      }
+    } else {
+      if (this.#stickHeld) remote.button(this.#stickHeld, false, false, "pad");
+      this.#stickHeld = null;
+      if (lx !== 0 || ly !== 0) {
+        // About a screen's width a second, at full tilt; gently, finely.
+        const speed = 1.1 * dt;
+        remote.dx += lx * Math.abs(lx) * speed;
+        remote.dy += ly * Math.abs(ly) * speed;
+        remote.lastInputAt = now;
+        this.#devices.use("pad", now);
+      }
+    }
+    if (rx !== 0 || ry !== 0) {
+      this.look.x = rx;
+      this.look.y = ry;
+      remote.lastInputAt = now;
+      this.#devices.use("pad", now);
+    }
+  }
+}
+
+const deadzone = (v: number) => (Math.abs(v) < STICK_DEAD ? 0 : (v - Math.sign(v) * STICK_DEAD) / (1 - STICK_DEAD));

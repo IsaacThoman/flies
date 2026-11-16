@@ -5,9 +5,10 @@
 //
 // One draw: an instanced quad whose first instance is the glass panel (a
 // small canvas drawn with the menu kit) and the rest a dot for each facet,
-// snapped to the frame's pixels so it stays crisp at 640×480. It is drawn
-// with the overlay, under the menus and hints, but fades by itself: the
-// wallpaper fades those out, and this is meant to stay.
+// snapped to the frame's pixels so it stays crisp in a chunky frame. It is
+// drawn with the overlay, under the menus and hints, but fades by itself:
+// the wallpaper fades those out, and this is meant to stay. On a narrow
+// screen it is smaller, and its top corners are under the caption.
 //
 // A panel left in one place for hours can burn into an OLED screen, so in the
 // wallpaper it moves to another corner each time the camera moves on to a new
@@ -17,8 +18,11 @@
 import * as THREE from "three";
 import type { EyeMap } from "@fly/brain";
 import { glassPanel, roundedRect, text } from "@fly/ui";
-import { DESIGN_HEIGHT, DESIGN_WIDTH, RENDER_HEIGHT, RENDER_WIDTH } from "../display.ts";
+import { TV_DESIGN_HEIGHT, TV_DESIGN_WIDTH, TV_FRAME, pixelsPerUnit } from "../display.ts";
+import type { Frame } from "../display.ts";
 import type { ShowWhen } from "../settings.ts";
+import { hudLayout, safeRect } from "../ui/layout.ts";
+import type { HudLayout } from "../ui/layout.ts";
 import { FACET_COLOR, PICTURE_LAYOUT } from "./eyes.ts";
 import type { Eyes } from "./eyes.ts";
 
@@ -29,7 +33,7 @@ export type Corner = "top-right" | "bottom-left" | "top-left" | "bottom-right";
  */
 export const CORNERS: readonly Corner[] = ["top-right", "bottom-left", "top-left", "bottom-right"];
 
-/** The panel, in design units (16:9, as the overlay): about a fifth of the screen's width. */
+/** The panel, in design units (as the overlay), at its full size: about a fifth of the TV's width. */
 export const INSET_PANEL = { width: 176, height: 92, radius: 14, margin: 16 };
 /** Where the dots go in the panel, and the label over them (design units). */
 export const INSET_PICTURE = { x: 10, y: 27, width: 156, height: 56 };
@@ -43,21 +47,48 @@ const FADE_OUT = 0.5;
 /** The longest it stays in one corner of the wallpaper, seconds. */
 export const CORNER_HOLD = 60;
 
-/** Frame pixels per design unit, across (the frame is squeezed into 4:3 and shown stretched to 16:9). */
-const ACROSS = RENDER_WIDTH / DESIGN_WIDTH;
-const DOWN = RENDER_HEIGHT / DESIGN_HEIGHT;
+/** Its size and corners on a screen: in design units, and in the frame's whole pixels (so the panel's texels and the dots land on pixels). */
+export type InsetLayout = {
+  /** Its size, as a share of the full size. */
+  scale: number;
+  rects: Record<Corner, { x: number; y: number; width: number; height: number }>;
+  origins: Record<Corner, { x: number; y: number }>;
+  panel: { width: number; height: number };
+  /** Frame pixels per design unit. */
+  ppu: { x: number; y: number };
+};
 
-/** The panel's place at a corner, in design units. */
-export function insetRect(corner: Corner) {
-  const { width, height, margin } = INSET_PANEL;
-  const x = corner.endsWith("left") ? margin : DESIGN_WIDTH - margin - width;
-  const y = corner.startsWith("top") ? margin : DESIGN_HEIGHT - margin - height;
-  return { x, y, width, height };
+/**
+ * Where its corners are: in from the safe area's edges, clear of the caption
+ * at the top (under it, on a screen too narrow to sit beside it) and of the
+ * shelf and the tool's label at the bottom (over them, where the shelf runs
+ * under the corner), so the one it keeps to while playing covers nothing.
+ */
+export function insetLayout(frame: Frame, hud: HudLayout = hudLayout(frame)): InsetLayout {
+  const a = safeRect(frame);
+  const { margin } = INSET_PANEL;
+  const scale = Math.min(1, (a.w * 0.42) / INSET_PANEL.width);
+  const width = INSET_PANEL.width * scale;
+  const height = INSET_PANEL.height * scale;
+  const beside = a.w / 2 - 120 - margin - 8 >= width;
+  const top = beside ? a.y + margin : hud.captionY + 23;
+  const under = hud.shelfLeft > a.x + margin + width;
+  const bottom = under ? a.y + a.h - margin - height : hud.labelY - 25 - height;
+  const ppu = pixelsPerUnit(frame);
+  const rects = {} as InsetLayout["rects"];
+  const origins = {} as InsetLayout["origins"];
+  for (const c of CORNERS) {
+    const r = { x: c.endsWith("left") ? a.x + margin : a.x + a.w - margin - width, y: c.startsWith("top") ? top : bottom, width, height };
+    rects[c] = r;
+    origins[c] = { x: Math.round(r.x * ppu.x), y: Math.round(r.y * ppu.y) };
+  }
+  return { scale, rects, origins, panel: { width: Math.round(width * ppu.x), height: Math.round(height * ppu.y) }, ppu };
 }
 
-/** Each corner's top left in whole frame pixels, so the panel's texels and the dots land on pixels. */
-const ORIGINS = Object.fromEntries(CORNERS.map((c) => [c, { x: Math.round(insetRect(c).x * ACROSS), y: Math.round(insetRect(c).y * DOWN) }])) as Record<Corner, { x: number; y: number }>;
-const PANEL_PX = { width: Math.round(INSET_PANEL.width * ACROSS), height: Math.round(INSET_PANEL.height * DOWN) };
+/** The panel's place at a corner, in design units. */
+export function insetRect(corner: Corner, frame: Frame = TV_FRAME) {
+  return insetLayout(frame).rects[corner];
+}
 
 /** "show"; "fade": not wanted now, though nothing covers it; "hide": gone at once. */
 export type InsetWanted = "show" | "fade" | "hide";
@@ -123,7 +154,7 @@ export class InsetPlacement {
  * dot is as wide as its facet's share of the view there, wider by
  * 1/cos(elevation).
  */
-export function layoutFacets(map: EyeMap): Float32Array {
+export function layoutFacets(map: EyeMap, layout: InsetLayout = insetLayout(TV_FRAME)): Float32Array {
   const eyes = [map.left.directions, map.right.directions];
   const n = (eyes[0].length + eyes[1].length) / 3;
   const angles = new Float32Array(n * 2);
@@ -144,26 +175,29 @@ export function layoutFacets(map: EyeMap): Float32Array {
       el1 = Math.max(el1, el);
     }
   }
-  // Design units per radian in the full picture, and the scale that fits this one.
-  const across = (PICTURE_LAYOUT.azimuth / Math.PI) * (DESIGN_WIDTH / 2);
-  const up = (PICTURE_LAYOUT.elevation / (Math.PI / 2)) * (DESIGN_HEIGHT / 2);
-  const p = INSET_PICTURE;
+  // Design units per radian in the TV's full picture, and the scale that fits this one.
+  const across = (PICTURE_LAYOUT.azimuth / Math.PI) * (TV_DESIGN_WIDTH / 2);
+  const up = (PICTURE_LAYOUT.elevation / (Math.PI / 2)) * (TV_DESIGN_HEIGHT / 2);
+  const size = layout.scale;
+  const p = { x: INSET_PICTURE.x * size, y: INSET_PICTURE.y * size, width: INSET_PICTURE.width * size, height: INSET_PICTURE.height * size };
+  const px = layout.ppu.x;
+  const py = layout.ppu.y;
   const scale = Math.min(p.width / Math.max(1e-6, (az1 - az0) * across), p.height / Math.max(1e-6, (el1 - el0) * up));
   const cx = p.x + p.width / 2 - ((az0 + az1) / 2) * across * scale;
   const cy = p.y + p.height / 2 + ((el0 + el1) / 2) * up * scale;
   // The picture's space in frame pixels: a widened dot at its edge stays inside it.
-  const x0 = Math.round(p.x * ACROSS);
-  const x1 = Math.round((p.x + p.width) * ACROSS);
-  const y0 = Math.round(p.y * DOWN);
-  const y1 = Math.round((p.y + p.height) * DOWN);
+  const x0 = Math.round(p.x * px);
+  const x1 = Math.round((p.x + p.width) * px);
+  const y0 = Math.round(p.y * py);
+  const y1 = Math.round((p.y + p.height) * py);
   const offsets = new Float32Array((n + 1) * 4);
   offsets[2] = 2;
   const left = eyes[0].length / 3;
   for (let i = 0; i < n; i++) {
     const el = angles[i * 2 + 1];
     const width = Math.min(DOT_WIDEST, Math.max(DOT, Math.round(DOT / Math.cos(el))));
-    const x = (cx + angles[i * 2] * across * scale) * ACROSS;
-    const y = (cy - el * up * scale) * DOWN;
+    const x = (cx + angles[i * 2] * across * scale) * px;
+    const y = (cy - el * up * scale) * py;
     const o = (i + 1) * 4;
     offsets[o] = Math.max(x0, Math.min(x1 - width, Math.round(x - width / 2)));
     offsets[o + 1] = Math.max(y0, Math.min(y1 - DOT, Math.round(y - DOT / 2)));
@@ -178,13 +212,14 @@ attribute vec4 offset;
 attribute float light;
 uniform vec2 origin;
 uniform vec2 panelSize;
+uniform vec2 frame;
 varying vec2 vUv;
 varying float vLight;
 varying float vKind;
 void main() {
   vec2 size = offset.z > 1.5 ? panelSize : vec2(offset.w, ${DOT.toFixed(1)});
   vec2 px = origin + offset.xy + position.xy * size;
-  gl_Position = vec4(px.x / ${(RENDER_WIDTH / 2).toFixed(1)} - 1.0, 1.0 - px.y / ${(RENDER_HEIGHT / 2).toFixed(1)}, 0.0, 1.0);
+  gl_Position = vec4(px.x / (frame.x * 0.5) - 1.0, 1.0 - px.y / (frame.y * 0.5), 0.0, 1.0);
   vUv = vec2(position.x, 1.0 - position.y);
   vLight = light;
   vKind = offset.z;
@@ -220,12 +255,13 @@ export class EyesInset {
   #seen = -1;
   /** What the label says now: true, what the brain is sent; false, a picture; null, not drawn yet. */
   #sent: boolean | null = null;
+  #layout: InsetLayout = insetLayout(TV_FRAME);
 
   constructor(eyes: Eyes) {
     this.#eyes = eyes;
     this.#canvas = document.createElement("canvas");
-    this.#canvas.width = PANEL_PX.width;
-    this.#canvas.height = PANEL_PX.height;
+    this.#canvas.width = this.#layout.panel.width;
+    this.#canvas.height = this.#layout.panel.height;
     const g = this.#canvas.getContext("2d");
     if (!g) throw new Error("No 2D canvas for the eyes' inset");
     this.#g = g;
@@ -237,7 +273,13 @@ export class EyesInset {
     this.#material = new THREE.ShaderMaterial({
       vertexShader: INSET_VS,
       fragmentShader: INSET_FS,
-      uniforms: { panel: { value: this.#texture }, alpha: { value: 0 }, origin: { value: new THREE.Vector2() }, panelSize: { value: new THREE.Vector2(PANEL_PX.width, PANEL_PX.height) } },
+      uniforms: {
+        panel: { value: this.#texture },
+        alpha: { value: 0 },
+        origin: { value: new THREE.Vector2() },
+        panelSize: { value: new THREE.Vector2(this.#layout.panel.width, this.#layout.panel.height) },
+        frame: { value: new THREE.Vector2(TV_FRAME.width, TV_FRAME.height) },
+      },
       transparent: true,
       depthTest: false,
       depthWrite: false,
@@ -248,6 +290,24 @@ export class EyesInset {
     this.mesh.visible = false;
     // Under the overlay's quad: both are in the transparent list, drawn in this order.
     this.mesh.renderOrder = -1;
+  }
+
+  /** The screen changed shape: its size and corners follow, its panel is drawn again and its dots laid out again. */
+  layout(frame: Frame, hud: HudLayout) {
+    const layout = insetLayout(frame, hud);
+    this.#layout = layout;
+    const { width, height } = layout.panel;
+    if (this.#canvas.width !== width || this.#canvas.height !== height) {
+      this.#canvas.width = width;
+      this.#canvas.height = height;
+      // A texture's storage is its first size: a new one for the new size.
+      this.#texture.dispose();
+    }
+    const uniforms = this.#material.uniforms;
+    (uniforms.panelSize.value as THREE.Vector2).set(width, height);
+    (uniforms.frame.value as THREE.Vector2).set(frame.width, frame.height);
+    this.#sent = null;
+    this.#map = null;
   }
 
   /** Where it is: its corner, or "hidden". */
@@ -276,12 +336,12 @@ export class EyesInset {
     }
     const uniforms = this.#material.uniforms;
     uniforms.alpha.value = this.placement.alpha;
-    const origin = ORIGINS[this.placement.corner];
+    const origin = this.#layout.origins[this.placement.corner];
     (uniforms.origin.value as THREE.Vector2).set(origin.x, origin.y);
   }
 
   #build(map: EyeMap) {
-    const offsets = layoutFacets(map);
+    const offsets = layoutFacets(map, this.#layout);
     const count = offsets.length / 4;
     const geometry = new THREE.InstancedBufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0]), 3));
@@ -302,8 +362,10 @@ export class EyesInset {
   #drawPanel(sent: boolean) {
     const g = this.#g;
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.clearRect(0, 0, PANEL_PX.width, PANEL_PX.height);
-    g.setTransform(ACROSS, 0, 0, DOWN, 0, 0);
+    const { panel, ppu, scale: k } = this.#layout;
+    g.clearRect(0, 0, panel.width, panel.height);
+    // In the panel's own design units, at its size.
+    g.setTransform(ppu.x * k, 0, 0, ppu.y * k, 0, 0);
     const { width, height, radius } = INSET_PANEL;
     glassPanel(g, 1, 1, width - 2, height - 2, radius, { tint: "night", shadow: false });
     const p = INSET_PICTURE;

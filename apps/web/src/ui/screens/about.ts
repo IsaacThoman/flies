@@ -3,10 +3,14 @@
 // attribution, which Apple requires of an app showing its data.
 
 import type { RemoteButton, WeatherAttribution } from "@fly/contracts";
-import { INK, INK_SOFT, Scroller, glassPanel, orb, roundedRect, text, wrap } from "@fly/ui";
-import { DESIGN_WIDTH } from "../../display.ts";
+import { INK, INK_SOFT, Scroller, glassPanel, iconButton, orb, roundedRect, text, wrap } from "@fly/ui";
+import type { HitMap } from "@fly/ui";
+import type { Frame } from "../../display.ts";
+import { backButton, fitPane } from "../layout.ts";
+import type { Rect } from "../layout.ts";
 import { drawMenuHints } from "./menu-screen.ts";
-import type { Screen, Shell } from "./types.ts";
+import { SCREEN_HITS } from "./types.ts";
+import type { Point, Screen, Shell } from "./types.ts";
 
 type Block = { heading?: string; body: string };
 
@@ -33,7 +37,6 @@ export function weatherBlock(a: WeatherAttribution): Block {
   };
 }
 
-const PANEL = { x: (DESIGN_WIDTH - 620) / 2, y: 30, w: 620, h: 404 };
 const BODY = 15;
 const LINE = 21;
 const HEADING = 19;
@@ -42,13 +45,17 @@ export class AboutScreen implements Screen {
   readonly id = "about" as const;
   readonly pauses = true;
   readonly #shell: Shell;
-  #lines: { text: string; heading: boolean }[] | null = null;
+  #lines: { text: string; heading: boolean; bullet?: boolean }[] | null = null;
   #attributed = false;
   #scroll = new Scroller(LINE * 3);
   #dirty = true;
+  #pane: Rect;
+  /** Where the page was when a finger went down on it, to drag it from. */
+  #from = -1;
 
   constructor(shell: Shell) {
     this.#shell = shell;
+    this.#pane = fitPane(shell.shape, 620, 404, 8);
   }
 
   enter() {
@@ -56,6 +63,13 @@ export class AboutScreen implements Screen {
     this.#dirty = true;
     // The attribution arrives with the host's first answer: lay the page out again with it.
     if (!this.#attributed && this.#shell.weatherAttribution()) this.#lines = null;
+  }
+
+  layout(frame: Frame) {
+    this.#pane = fitPane(frame, 620, 404, 8);
+    // Wrapped again to the new width.
+    this.#lines = null;
+    this.#dirty = true;
   }
 
   press(button: RemoteButton, repeat: boolean) {
@@ -69,28 +83,51 @@ export class AboutScreen implements Screen {
     this.#dirty = true;
   }
 
+  point(p: Point) {
+    const scroll = this.#scroll;
+    if (p.type === "down") this.#from = scroll.offset;
+    else if (p.type === "drag" && this.#from >= 0) scroll.offset = Math.max(0, Math.min(scroll.max, this.#from - p.dy));
+    else if (p.type === "wheel") scroll.offset = Math.max(0, Math.min(scroll.max, scroll.offset + p.dy));
+    else if (p.type === "up") {
+      this.#from = -1;
+      if (p.tap && (!p.hit || p.hit.kind === SCREEN_HITS.back)) {
+        this.#shell.sound("back");
+        this.#shell.back();
+      }
+    } else if (p.type === "cancel") this.#from = -1;
+    this.#dirty = true;
+  }
+
   update() {
     const d = this.#dirty;
     this.#dirty = false;
     return d || true;
   }
 
-  draw(g: CanvasRenderingContext2D, t: number) {
-    const { x, y, w, h } = PANEL;
+  draw(g: CanvasRenderingContext2D, t: number, hits: HitMap) {
+    const { x, y, w, h } = this.#pane;
+    // Narrower than the TV's, the text comes nearer the pane's edges.
+    const pad = w < 620 ? 24 : 40;
     if (!this.#lines) {
       this.#lines = [];
       const attribution = this.#shell.weatherAttribution();
       this.#attributed = !!attribution;
       for (const block of attribution ? [...ABOUT, weatherBlock(attribution)] : ABOUT) {
-        if (block.heading) this.#lines.push({ text: block.heading, heading: true });
-        for (const line of wrap(g, block.body, w - 80, BODY, 400)) this.#lines.push({ text: line, heading: false });
+        if (block.heading) wrap(g, block.heading, w - 2 * pad - 18, HEADING).forEach((line, i) => this.#lines!.push({ text: line, heading: true, bullet: i === 0 }));
+        for (const line of wrap(g, block.body, w - 2 * pad, BODY, 400)) this.#lines.push({ text: line, heading: false });
         this.#lines.push({ text: "", heading: false });
       }
       const content = this.#lines.reduce((sum, l) => sum + (l.heading ? LINE + 6 : LINE), 0);
       this.#scroll.setExtent(content, h - 110);
     }
+    hits.add(SCREEN_HITS.panel, x, y, w, h);
     glassPanel(g, x, y, w, h, 28);
     text(g, "About the fly", x + w / 2, y + 44, { size: 26, align: "center", color: INK });
+    if (this.#shell.glyphs === null) {
+      const b = backButton(this.#pane, y + 44);
+      iconButton(g, b.x, b.y, b.r, "back");
+      hits.add(SCREEN_HITS.back, b.x - 24, b.y - 24, 48, 48);
+    }
     // The page, clipped to its window.
     const top = y + 70;
     const bottom = y + h - 26;
@@ -99,9 +136,9 @@ export class AboutScreen implements Screen {
       // Whole lines only: the Apple TV's canvas has no clipping.
       if (ly - 16 > top && ly < bottom) {
         if (line.heading) {
-          orb(g, x + 44, ly - 6, 6, "green");
-          text(g, line.text, x + 58, ly, { size: HEADING, color: "#0a6fc0" });
-        } else text(g, line.text, x + 40, ly, { size: BODY, weight: 400, color: INK });
+          if (line.bullet) orb(g, x + pad + 4, ly - 6, 6, "green");
+          text(g, line.text, x + pad + 18, ly, { size: HEADING, color: "#0a6fc0" });
+        } else text(g, line.text, x + pad, ly, { size: BODY, weight: 400, color: INK });
       }
       ly += line.heading ? LINE + 6 : LINE;
     }
@@ -115,6 +152,6 @@ export class AboutScreen implements Screen {
       g.fill();
     }
     text(g, this.#scroll.offset < this.#scroll.max ? "▼ more" : "", x + w - 40, bottom + 16, { size: 12, color: INK_SOFT, align: "right" });
-    drawMenuHints(g, t);
+    drawMenuHints(g, t, this.#shell);
   }
 }

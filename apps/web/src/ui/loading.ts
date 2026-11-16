@@ -1,12 +1,13 @@
 // The loading screen while the brain wakes: the world is already there behind
 // it, and the brain's size counts up as its bytes arrive and it is wired
 // together. If it can't wake, it says why, in a word or two, and offers to try
-// again.
+// again: Select, or a tap or a click on the button (recorded in `hits`).
 
 import type { BrainDriver } from "@fly/contracts";
-import { INK, INK_SOFT, glassPanel, pill, roundedRect, text, wrap } from "@fly/ui";
+import { INK, INK_SOFT, font, glassPanel, pill, roundedRect, text, wrap } from "@fly/ui";
+import type { HitMap } from "@fly/ui";
 import type { BrainFailure, BrainSource } from "../brain/worker-driver.ts";
-import { DESIGN_HEIGHT, DESIGN_WIDTH } from "../display.ts";
+import type { LoadingLayout } from "./layout.ts";
 import { drawWordmark } from "./wordmark.ts";
 
 /** The connectome's size, known before it arrives (packages/brain/README.md). */
@@ -21,33 +22,34 @@ export const arriving = (brain: BrainDriver): brain is Arriving => "source" in b
 /** Why it can't run when the page can't even draw the world: the browser lacks WebGL 2. */
 export type PageFailure = "webgl";
 
+/** What "Try again" is, as recorded in the hit map. */
+export const LOADING_HITS = { retry: "retry" } as const;
+
 const format = (n: number) => Math.round(n).toLocaleString("en-US");
 const megabytes = (bytes: number) => (bytes / 1e6).toFixed(1);
 
-const PANEL = { w: 440, h: 132 };
-
-export function drawLoading(g: CanvasRenderingContext2D, t: number, brain: BrainDriver) {
+export function drawLoading(g: CanvasRenderingContext2D, t: number, brain: BrainDriver, layout: LoadingLayout, hits: HitMap) {
   const loading = arriving(brain) ? brain : null;
   const phase = loading?.phase ?? (brain.status === "running" ? "done" : "build");
   const progress = loading?.progress ?? 0;
-  drawWordmark(g, DESIGN_WIDTH / 2, 150, 64, t);
+  const { wordmark } = layout;
+  drawWordmark(g, wordmark.x, wordmark.y, wordmark.size, t);
   if (brain.status === "failed") {
-    drawFailure(g, loading?.failure ?? "brain", brain.error ?? "", loading?.source ?? null);
+    drawFailure(g, loading?.failure ?? "brain", brain.error ?? "", loading?.source ?? null, layout, hits);
     return;
   }
-  const { w, h } = PANEL;
-  const x = (DESIGN_WIDTH - w) / 2;
-  const y = DESIGN_HEIGHT - h - 56;
+  const { x, y, w, h } = layout.panel;
+  const cx = x + w / 2;
   glassPanel(g, x, y, w, h, 26);
   const running = brain.status === "running";
   const fill = running ? 1 : phase === "download" ? progress * 0.9 : 0.9 + 0.1 * (1 - Math.exp(-t * 0.5));
   const title = running ? (loading?.source.storageFull ? "Awake! (not kept: storage full)" : "Awake!") : phase === "download" ? "Waking the fly's brain" : "Wiring up its neurons";
-  text(g, title, DESIGN_WIDTH / 2, y + 36, { size: 19, align: "center", color: INK_SOFT });
-  text(g, `${format(running ? brain.neurons : NEURONS * fill)} neurons`, DESIGN_WIDTH / 2, y + 76, { size: 34, align: "center", color: INK });
+  text(g, title, cx, y + 36, { size: 19, align: "center", color: INK_SOFT });
+  text(g, `${format(running ? brain.neurons : NEURONS * fill)} neurons`, cx, y + 76, { size: 34, align: "center", color: INK });
   // The progress bar: a glossy tube filling with green, with the bytes under it while they come over the network.
-  const bx = x + 40;
+  const bx = x + Math.min(40, w / 11);
   const by = y + 92;
-  const bw = w - 80;
+  const bw = w - 2 * (bx - x);
   roundedRect(g, bx, by, bw, 14, 7);
   g.fillStyle = "rgba(10, 60, 120, 0.25)";
   g.fill();
@@ -62,7 +64,7 @@ export function drawLoading(g: CanvasRenderingContext2D, t: number, brain: Brain
   g.fillStyle = "rgba(255,255,255,0.6)";
   g.fill();
   if (loading && phase === "download" && loading.source.from === "network") {
-    text(g, `${megabytes(loading.source.received)} of ${megabytes(loading.source.total)} MB`, DESIGN_WIDTH / 2, by + 30, { size: 13, align: "center", color: INK_SOFT });
+    text(g, `${megabytes(loading.source.received)} of ${megabytes(loading.source.total)} MB`, cx, by + 30, { size: 13, align: "center", color: INK_SOFT });
   }
 }
 
@@ -88,20 +90,19 @@ function explain(failure: BrainFailure | PageFailure, error: string, source: Bra
   }
 }
 
-/** Where "Try again" is, in design units, for a click or a tap. */
-export const TRY_AGAIN = { x: (DESIGN_WIDTH - 180) / 2, y: DESIGN_HEIGHT - 56 - 46, w: 180, h: 34 };
-
 /** The failure panel, over the world or (without WebGL) over nothing at all. */
-export function drawFailure(g: CanvasRenderingContext2D, failure: BrainFailure | PageFailure, error: string, source: BrainSource | null) {
-  const w = 520;
-  const h = 150;
-  const x = (DESIGN_WIDTH - w) / 2;
-  const y = DESIGN_HEIGHT - h - 56;
+export function drawFailure(g: CanvasRenderingContext2D, failure: BrainFailure | PageFailure, error: string, source: BrainSource | null, layout: LoadingLayout, hits: HitMap) {
+  const { x, y, w } = layout.failure;
+  const cx = x + w / 2;
   const [heading, line] = explain(failure, error, source);
-  glassPanel(g, x, y, w, h, 26);
-  text(g, heading, DESIGN_WIDTH / 2, y + 40, { size: 22, align: "center", color: INK });
+  glassPanel(g, x, y, w, layout.failure.h, 26);
+  // Narrower than the TV's, the heading comes down a size to fit.
+  g.font = font(22);
+  const size = Math.min(22, Math.floor((22 * (w - 32)) / Math.max(1, g.measureText(heading).width)));
+  text(g, heading, cx, y + 40, { size, align: "center", color: INK });
   const lines = wrap(g, line, w - 60, 13);
-  for (let i = 0; i < Math.min(2, lines.length); i++) text(g, lines[i], DESIGN_WIDTH / 2, y + 66 + i * 18 - (lines.length > 1 ? 6 : 0), { size: 13, align: "center", color: INK_SOFT });
-  const b = TRY_AGAIN;
+  for (let i = 0; i < Math.min(2, lines.length); i++) text(g, lines[i], cx, y + 66 + i * 18 - (lines.length > 1 ? 6 : 0), { size: 13, align: "center", color: INK_SOFT });
+  const b = layout.retry;
   pill(g, b.x, b.y, b.w, b.h, "Try again", { focused: true });
+  hits.add(LOADING_HITS.retry, b.x, b.y, b.w, b.h);
 }

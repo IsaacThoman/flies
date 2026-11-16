@@ -12,21 +12,20 @@ import * as THREE from "three";
 import type { EyeMap } from "@fly/brain";
 import { FACES, HEAD_AHEAD, HEAD_UP, FLY_LENGTH, createSampler, sample, standInEyes } from "@fly/body";
 import type { Sampler } from "@fly/body";
+import type { Frame } from "../display.ts";
 import type { Life } from "../life.ts";
 import type { EyesDetail } from "../settings.ts";
 import type { Stage } from "../stage.ts";
+import { pictureDots } from "../ui/layout.ts";
+import type { HudLayout } from "../ui/layout.ts";
 
 /**
- * Where the picture's dark panel sits, in clip space (-1 to 1, y up): below
- * the caption and above the View label, with room inside for the HUD's
- * heading over the dots and the eyes' names under them (ui/hud.ts).
- */
-export const PICTURE_PANEL = { left: -0.84, right: 0.84, top: 0.78, bottom: -0.46 };
-/**
- * How the picture lays the facets out, in clip space: x from the azimuth
- * (all the way round is twice `azimuth`), y from the elevation (straight up
- * to straight down is twice `elevation`), raised by `lift`. The corner inset
- * (inset.ts) keeps these proportions.
+ * How the picture lays the facets out on the TV, in clip space: x from the
+ * azimuth (all the way round is twice `azimuth`), y from the elevation
+ * (straight up to straight down is twice `elevation`), raised by `lift`. On
+ * other screens the HUD's layout places the panel and scales the dots
+ * (ui/layout.ts, pictureDots), in the same proportions; so does the corner
+ * inset (inset.ts).
  */
 export const PICTURE_LAYOUT = { azimuth: 0.76, elevation: 0.45, lift: 0.09 };
 
@@ -54,12 +53,14 @@ const PICTURE_VS = /* glsl */ `
 attribute float light;
 attribute float side;
 uniform float size;
+uniform vec4 place;
 varying float vLight;
 varying float vSide;
 void main() {
   vLight = light;
   vSide = side;
-  gl_Position = vec4(position.xy, 0.0, 1.0);
+  // Azimuth and elevation (radians) to clip space: scaled, then moved.
+  gl_Position = vec4(position.xy * place.xy + place.zw, 0.0, 1.0);
   gl_PointSize = size;
 }`;
 
@@ -100,7 +101,12 @@ export class Eyes {
   #since = 0;
   #pending = false;
   #sky: THREE.Mesh;
-  picture: { scene: THREE.Scene; camera: THREE.Camera; points: THREE.Points; light: THREE.BufferAttribute; map: EyeMap } | null = null;
+  picture: { scene: THREE.Scene; camera: THREE.Camera; points: THREE.Points; backing: THREE.Mesh; light: THREE.BufferAttribute; map: EyeMap } | null = null;
+  /** Where the picture goes: clip space per radian and its middle, its panel, and how big its dots are for their count. */
+  readonly #place = new THREE.Vector4(PICTURE_LAYOUT.azimuth / Math.PI, PICTURE_LAYOUT.elevation / (Math.PI / 2), 0, PICTURE_LAYOUT.lift);
+  /** The panel's middle and size in clip space: the TV's until laid out. */
+  readonly #panel = { x: 0, y: 0.16, w: 1.68, h: 1.24 };
+  #dotScale = 1;
   #head = new THREE.Vector3();
   #q = new THREE.Quaternion();
   #yaw = new THREE.Quaternion();
@@ -134,6 +140,30 @@ export class Eyes {
     // Lights answer to layers too: the eyes' views need them.
     stage.hemi.layers.enable(EYE_LAYER);
     stage.sun.layers.enable(EYE_LAYER);
+  }
+
+  /** Places the picture where the HUD's layout has it (between the caption and the tool's label). */
+  layout(frame: Frame, hud: HudLayout) {
+    const { width, height } = frame.design;
+    const dots = pictureDots(hud);
+    this.#place.set((dots.azimuth * 2) / width, (dots.elevation * 2) / height, (dots.x * 2) / width - 1, 1 - (dots.y * 2) / height);
+    const p = hud.picture;
+    this.#panel.x = ((p.x + p.w / 2) * 2) / width - 1;
+    this.#panel.y = 1 - ((p.y + p.h / 2) * 2) / height;
+    this.#panel.w = (p.w * 2) / width;
+    this.#panel.h = (p.h * 2) / height;
+    // Dots as big for the picture's size, in the frame's pixels, as on the TV.
+    this.#dotScale = ((dots.azimuth * 2 * Math.PI) / 649.04) * (frame.height / height);
+    if (this.picture) this.#placePicture(this.picture);
+  }
+
+  #placePicture(picture: NonNullable<Eyes["picture"]>) {
+    const p = this.#panel;
+    picture.backing.position.set(p.x, p.y, 0);
+    picture.backing.scale.set(p.w, p.h, 1);
+    picture.backing.updateMatrixWorld();
+    const n = picture.light.count;
+    (picture.points.material as THREE.ShaderMaterial).uniforms.size.value = Math.max(2, Math.min(7, 200 / Math.sqrt(n)) * this.#dotScale);
   }
 
   /** Marks things the eyes should see (the ball, the bubbles, food). */
@@ -290,9 +320,9 @@ export class Eyes {
       for (let i = 0; i < d.length / 3; i++) {
         const azimuth = Math.atan2(d[i * 3], d[i * 3 + 1]);
         const elevation = Math.asin(Math.max(-1, Math.min(1, d[i * 3 + 2])));
-        // Equirectangular, in the panel between its heading and its labels (PICTURE_PANEL; the frame is shown stretched to 16:9).
-        positions[k * 3] = (azimuth / Math.PI) * PICTURE_LAYOUT.azimuth;
-        positions[k * 3 + 1] = (elevation / (Math.PI / 2)) * PICTURE_LAYOUT.elevation + PICTURE_LAYOUT.lift;
+        // Equirectangular: placed in the panel, between its heading and its labels, by the shader.
+        positions[k * 3] = azimuth;
+        positions[k * 3 + 1] = elevation;
         sides[k] = side;
         k++;
       }
@@ -303,21 +333,18 @@ export class Eyes {
     light.setUsage(THREE.DynamicDrawUsage);
     geometry.setAttribute("light", light);
     geometry.setAttribute("side", new THREE.BufferAttribute(sides, 1));
-    const size = Math.max(2, Math.min(7, 200 / Math.sqrt(n)));
-    const points = new THREE.Points(geometry, new THREE.ShaderMaterial({ vertexShader: PICTURE_VS, fragmentShader: PICTURE_FS, uniforms: { size: { value: size } }, depthTest: false, depthWrite: false, transparent: true }));
+    const points = new THREE.Points(geometry, new THREE.ShaderMaterial({ vertexShader: PICTURE_VS, fragmentShader: PICTURE_FS, uniforms: { size: { value: 2 }, place: { value: this.#place } }, depthTest: false, depthWrite: false, transparent: true }));
     points.frustumCulled = false;
     // Over the backing: both are in the transparent list, drawn in this order.
     points.renderOrder = 1;
     const scene = new THREE.Scene();
-    const p = PICTURE_PANEL;
-    const backing = new THREE.Mesh(new THREE.PlaneGeometry(p.right - p.left, p.top - p.bottom), new THREE.MeshBasicMaterial({ color: "#020a1c", transparent: true, opacity: 0.88, depthTest: false, depthWrite: false }));
-    backing.position.set((p.left + p.right) / 2, (p.top + p.bottom) / 2, 0);
+    const backing = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: "#020a1c", transparent: true, opacity: 0.88, depthTest: false, depthWrite: false }));
     scene.add(backing, points);
     scene.matrixWorldAutoUpdate = false;
-    backing.updateMatrixWorld();
     points.updateMatrixWorld();
     this.picture?.points.geometry.dispose();
-    this.picture = { scene, camera: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), points, light, map };
+    this.picture = { scene, camera: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), points, backing, light, map };
+    this.#placePicture(this.picture);
     this.#fillPicture();
   }
 

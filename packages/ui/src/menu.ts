@@ -1,7 +1,9 @@
 // Menu state: a vertical list of items with a focus that moves where the
 // player expects, values that change with left and right, and scrolling that
-// keeps the focus in view. No drawing here: the screens draw a Menu however
-// they like, and the logic is tested in Node.
+// keeps the focus in view. A pointer works it too: an item is focused, tapped,
+// stepped or slid by its index, and the list scrolled by rows. No drawing
+// here: the screens draw a Menu however they like, and the logic is tested in
+// Node.
 
 import type { RemoteButton } from "@fly/contracts";
 
@@ -35,11 +37,11 @@ export class Menu {
   /** Index of the first row shown. */
   scroll = 0;
   /** How many rows fit; the focus is kept inside them. */
-  readonly rows: number;
+  rows: number;
 
   constructor(items: MenuItem[], { rows = items.length, focus }: { rows?: number; focus?: string } = {}) {
     this.items = items;
-    this.rows = Math.max(1, rows);
+    this.rows = Math.min(items.length, Math.max(1, rows));
     const start = focus ? items.findIndex((item) => item.id === focus) : -1;
     this.focus = start >= 0 && !items[start].disabled ? start : this.#nextEnabled(-1, 1) ?? 0;
     this.#keepInView();
@@ -60,6 +62,61 @@ export class Menu {
       this.focus = i;
       this.#keepInView();
     }
+  }
+
+  /** Shows this many rows at once (the screen's shape changed), keeping the focus in view. */
+  setRows(rows: number) {
+    this.rows = Math.min(this.items.length, Math.max(1, Math.floor(rows)));
+    this.#keepInView();
+  }
+
+  /** Focuses the item at `index`, if it can take it; true if the focus moved. */
+  focusIndex(index: number): boolean {
+    const item = this.items[index];
+    if (!item || item.disabled || index === this.focus) return false;
+    this.focus = index;
+    this.#keepInView();
+    return true;
+  }
+
+  /** A tap on the item at `index`: focuses it and does what Select does there. */
+  tap(index: number): Outcome {
+    const item = this.items[index];
+    if (!item || item.disabled) return BLOCKED;
+    this.focusIndex(index);
+    return this.press("select");
+  }
+
+  /** A tap on one of a choice's or a slider's arrows: steps it that way, as left and right do. */
+  stepAt(index: number, dir: -1 | 1): Outcome {
+    const item = this.items[index];
+    if (!item || item.disabled) return BLOCKED;
+    this.focusIndex(index);
+    return this.#step(dir, false);
+  }
+
+  /** Sets the slider at `index` to `k` of the way along its track (0 to 1), to the nearest step. */
+  slideAt(index: number, k: number): Outcome {
+    const item = this.items[index];
+    if (!item || item.disabled || item.kind !== "slider") return NONE;
+    this.focusIndex(index);
+    const raw = item.min + Math.max(0, Math.min(1, k)) * (item.max - item.min);
+    const value = Math.min(item.max, Math.max(item.min, item.min + Math.round((raw - item.min) / item.step) * item.step));
+    if (value === item.value) return NONE;
+    item.value = value;
+    return { kind: "change", item };
+  }
+
+  /** Scrolls the list by `rows` (a drag, the wheel), bringing the focus along so it stays in view; false if it can't go that way. */
+  scrollBy(rows: number): boolean {
+    const maxScroll = Math.max(0, this.items.length - this.rows);
+    const next = Math.min(maxScroll, Math.max(0, this.scroll + Math.round(rows)));
+    if (next === this.scroll) return false;
+    this.scroll = next;
+    const last = this.scroll + this.rows - 1;
+    if (this.focus < this.scroll) this.focus = this.#nextEnabled(this.scroll - 1, 1) ?? this.focus;
+    else if (this.focus > last) this.focus = this.#nextEnabled(last + 1, -1) ?? this.focus;
+    return true;
   }
 
   press(button: RemoteButton, repeat = false): Outcome {

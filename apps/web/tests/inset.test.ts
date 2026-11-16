@@ -3,13 +3,19 @@ import { test } from "node:test";
 import { EYE_COLUMNS, facetDirection } from "@fly/brain";
 import type { EyeMap } from "@fly/brain";
 import { standInEyes } from "@fly/body";
-import { DESIGN_HEIGHT, DESIGN_WIDTH, RENDER_HEIGHT, RENDER_WIDTH } from "../src/display.ts";
-import { CORNERS, CORNER_HOLD, INSET_PICTURE, InsetPlacement, insetRect, insetWanted, layoutFacets } from "../src/eyes/inset.ts";
+import { TV_DESIGN_HEIGHT as DESIGN_HEIGHT, TV_DESIGN_WIDTH as DESIGN_WIDTH, TV_HEIGHT as RENDER_HEIGHT, TV_WIDTH as RENDER_WIDTH } from "../src/display.ts";
+import { TV_FRAME } from "../src/display.ts";
+import { CORNERS, CORNER_HOLD, INSET_PICTURE, InsetPlacement, insetLayout, insetRect, insetWanted, layoutFacets } from "../src/eyes/inset.ts";
+import { TOOLS } from "../src/tools/hands.ts";
+import { hudLayout, safeRect } from "../src/ui/layout.ts";
+import { frames } from "./shapes.ts";
 import type { InsetWanted } from "../src/eyes/inset.ts";
 import { DEFAULT_SETTINGS, loadSettings } from "../src/settings.ts";
-import { SHELF } from "../src/ui/hud.ts";
 
 type Rect = { x: number; y: number; width: number; height: number };
+const TV_HUD = hudLayout(TV_FRAME);
+/** The shelf's glass on the TV, both halves. */
+const SHELF = { x: TV_HUD.shelfLeft - 8, y: TV_HUD.shelfY - 26, width: TV_HUD.gap * TOOLS.length + TV_HUD.apart + 16, height: 52 };
 const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 /** Where the HUD draws (ui/hud.ts), in design units, generously: the widest caption, label and hints. */
@@ -144,4 +150,36 @@ test("the setting is kept with the others, in the wallpaper by default", () => {
   assert.equal(DEFAULT_SETTINGS.eyesInset, "wallpaper");
   const store = { getItem: () => JSON.stringify({ eyesInset: "always" }), setItem() {} };
   assert.equal(loadSettings(store).eyesInset, "always");
+});
+
+test("at every shape each corner is inside the safe area and clear of the caption, the menu's button, the shelf and the label", () => {
+  for (const [name, frame] of frames()) {
+    const hud = hudLayout(frame);
+    const layout = insetLayout(frame, hud);
+    const a = safeRect(frame);
+    const shelf = { x: hud.shelfLeft, y: hud.shelfY - 26, width: hud.gap * TOOLS.length + hud.apart, height: 52 };
+    const label = { x: hud.cx - 110, y: hud.labelY - 17, width: 220, height: 32 };
+    const caption = { x: hud.cx - 70, y: hud.captionY - 15, width: 140, height: 30 };
+    const menu = { x: hud.menuX, y: hud.menuY - 18, width: 36, height: 36 };
+    for (const corner of CORNERS) {
+      const r = layout.rects[corner];
+      assert.ok(r.x >= a.x && r.y >= a.y && r.x + r.width <= a.x + a.w + 1e-6 && r.y + r.height <= a.y + a.h + 1e-6, `${name}: ${corner} inside the safe area`);
+      for (const [zone, z] of Object.entries({ shelf, label, caption })) assert.ok(!overlaps(r, z), `${name}: ${corner} and the ${zone}`);
+    }
+    assert.ok(!overlaps(layout.rects["top-right"], menu), `${name}: the corner it keeps to while playing and the menu's button`);
+    assert.ok(layout.rects["top-right"].width <= a.w * 0.45, `${name}: no more than a little under half the width`);
+    const offsets = layoutFacets(brainEyes(), layout);
+    for (let i = 4; i < offsets.length; i += 4) {
+      assert.ok(Number.isInteger(offsets[i]) && Number.isInteger(offsets[i + 1]), `${name}: on whole pixels`);
+      assert.ok(offsets[i] >= 0 && offsets[i] + offsets[i + 3] <= layout.panel.width + 1 && offsets[i + 1] >= 0 && offsets[i + 1] + 3 <= layout.panel.height + 1, `${name}: facet ${i / 4} inside the panel`);
+    }
+  }
+});
+
+test("on the TV the corners are where they always were", () => {
+  const layout = insetLayout(TV_FRAME);
+  assert.deepEqual(layout.rects["top-right"], { x: 662, y: 16, width: 176, height: 92 });
+  assert.deepEqual(layout.rects["bottom-left"], { x: 16, y: 372, width: 176, height: 92 });
+  assert.deepEqual(layout.panel, { width: 132, height: 92 });
+  assert.deepEqual(layout.origins["top-right"], { x: 496, y: 16 });
 });

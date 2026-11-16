@@ -1,27 +1,39 @@
-// Boots the game: the canvas, the remote, the brain and the frame loop. In a
-// browser also the page's lifecycle (page.ts) and the frame rate this device
-// can afford (quality.ts); if it can't draw at all, it says so.
+// Boots the game: the screen, what the player holds, the brain and the frame
+// loop. In a browser also the page's lifecycle (page.ts) and the frame rate
+// this device can afford (quality.ts); if it can't draw at all, it says so.
 
 import { AT_ROOT_PROPERTY } from "@fly/contracts";
-import { DESIGN_HEIGHT, DESIGN_WIDTH, RENDER_HEIGHT, RENDER_WIDTH, fitCanvas } from "./display.ts";
+import { HitMap } from "@fly/ui";
+import { Display } from "./display.ts";
 import { createBrainDriver } from "./brain/create.ts";
 import { Game } from "./game.ts";
-import { Remote, mouseAsTouch } from "./input.ts";
+import type { Inputs } from "./game.ts";
+import { Devices, Gamepads, Keyboard, Pointers, Remote, initialDevice } from "./input.ts";
 import { Page } from "./page.ts";
 import { Quality } from "./quality.ts";
+import { loadingLayout } from "./ui/layout.ts";
 import { drawFailure } from "./ui/loading.ts";
 import { drawWordmark } from "./ui/wordmark.ts";
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
-fitCanvas(canvas);
+// The Apple TV host: the remote is all there is, and the screen never changes.
 const native = !!(globalThis as { __native?: unknown }).__native;
-if (!native) mouseAsTouch(canvas);
-const remote = new Remote(window);
+const display = new Display(native);
+const devices = new Devices(initialDevice(native, display.frame.coarse));
+const remote = new Remote(window, undefined, devices, native ? "remote" : "keys");
+const inputs: Inputs = { devices };
+if (!native) {
+  const pointers = new Pointers(() => canvas.getBoundingClientRect(), undefined, devices);
+  pointers.attach(canvas);
+  inputs.pointers = pointers;
+  inputs.keyboard = new Keyboard(window, remote, devices);
+  inputs.pads = new Gamepads(remote, devices, () => navigator.getGamepads?.() ?? [], window);
+}
 (window as unknown as Record<string, unknown>)[AT_ROOT_PROPERTY] = true;
 
 let game: Game | null = null;
 try {
-  game = new Game(canvas, remote, createBrainDriver());
+  game = new Game(canvas, remote, createBrainDriver(), display, inputs);
 } catch (error) {
   if (native) throw error;
   cannotDraw(error);
@@ -38,7 +50,7 @@ if (game) {
   }
   let last = performance.now();
   // How often the display offers a frame (ms, smoothed), and when the next one the game draws is due.
-  let display = 1000 / 60;
+  let offeredEvery = 1000 / 60;
   let offered = -1;
   let due = 0;
   const frame = (now: number) => {
@@ -48,13 +60,13 @@ if (game) {
       offered = -1;
       return;
     }
-    if (offered >= 0) display += (Math.min(100, now - offered) - display) * 0.1;
+    if (offered >= 0) offeredEvery += (Math.min(100, now - offered) - offeredEvery) * 0.1;
     offered = now;
     const every = game.quality ? 1000 / game.quality.current.fps : 0;
     // Only a display well over the game's rate is held back (120 Hz, or 60 Hz when the game wants 30): one just
     // over it would otherwise lose a frame every few seconds, a judder in every pan.
-    if (every > display * 1.33) {
-      if (now < due - display / 2) return;
+    if (every > offeredEvery * 1.33) {
+      if (now < due - offeredEvery / 2) return;
       due = Math.max(due + every, now);
     }
     page?.update();
@@ -73,7 +85,7 @@ function storage() {
   }
 }
 
-/** No WebGL 2 (or it couldn't start): the failure, drawn in 2D on the same canvas, and a reload to try again. */
+/** No WebGL 2 (or it couldn't start): the failure, drawn in 2D on the same canvas at the screen's shape, and a reload to try again. */
 function cannotDraw(error: unknown) {
   console.error(error);
   const g = canvas.getContext("2d");
@@ -84,20 +96,30 @@ function cannotDraw(error: unknown) {
   }
   if (!g) return;
   const start = performance.now();
+  const hits = new HitMap();
   const draw = () => {
+    display.update();
+    const frame = display.frame;
+    if (canvas.width !== frame.width || canvas.height !== frame.height) {
+      canvas.width = frame.width;
+      canvas.height = frame.height;
+    }
     const t = (performance.now() - start) / 1000;
     g.setTransform(1, 0, 0, 1, 0, 0);
-    const sky = g.createLinearGradient(0, 0, 0, RENDER_HEIGHT);
+    const sky = g.createLinearGradient(0, 0, 0, frame.height);
     sky.addColorStop(0, "#5aa9ec");
     sky.addColorStop(1, "#cfeaff");
     g.fillStyle = sky;
-    g.fillRect(0, 0, RENDER_WIDTH, RENDER_HEIGHT);
-    g.setTransform(RENDER_WIDTH / DESIGN_WIDTH, 0, 0, RENDER_HEIGHT / DESIGN_HEIGHT, 0, 0);
-    drawWordmark(g, DESIGN_WIDTH / 2, 150, 64, t);
-    drawFailure(g, "webgl", "", null);
+    g.fillRect(0, 0, frame.width, frame.height);
+    g.setTransform(frame.width / frame.design.width, 0, 0, frame.height / frame.design.height, 0, 0);
+    const layout = loadingLayout(frame);
+    drawWordmark(g, layout.wordmark.x, layout.wordmark.y, layout.wordmark.size, t);
+    hits.begin("loading");
+    drawFailure(g, "webgl", "", null, layout, hits);
     requestAnimationFrame(draw);
   };
   draw();
+  // Anything at all tries again: there is nothing else to do here.
   const retry = (event: Event) => {
     if (event instanceof KeyboardEvent && event.key !== "Enter") return;
     location.reload();

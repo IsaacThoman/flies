@@ -3,11 +3,11 @@
 import { Menu, choiceValue, indexOf } from "@fly/ui";
 import type { ChoiceItem, MenuItem, Option, SliderItem } from "@fly/ui";
 import { INK_SOFT, glassPanel, orb, text } from "@fly/ui";
-import { DESIGN_WIDTH } from "../../display.ts";
 import type { PixelSize } from "../../display.ts";
 import { PLACES } from "../../places/catalog.ts";
 import { WALLPAPER_DELAYS } from "../../settings.ts";
 import type { EyesDetail, Settings, ShowWhen } from "../../settings.ts";
+import { fitMenu, safeRect, titleLayout } from "../layout.ts";
 import { drawWordmark } from "../wordmark.ts";
 import { MenuScreen } from "./menu-screen.ts";
 import type { SettingsPage, Shell } from "./types.ts";
@@ -20,11 +20,14 @@ export function titleScreen(shell: Shell) {
     { kind: "action", id: "about", label: "About the fly" },
     { kind: "action", id: "settings", label: "Settings" },
   ]);
+  // Laid out with the menu, for the backdrop to draw from.
+  let title = titleLayout(shell.shape, menu.items.length);
   return new MenuScreen(shell, {
     id: "title",
     pauses: false,
     menu,
-    panel: { x: DESIGN_WIDTH - 360, y: 112, w: 320, h: 300 },
+    root: true,
+    place: (frame) => (title = titleLayout(frame, menu.items.length)).menu,
     onActivate(item) {
       if (item.id === "play") shell.play();
       else if (item.id === "watch") shell.watch();
@@ -32,14 +35,15 @@ export function titleScreen(shell: Shell) {
     },
     onBack: () => shell.back(),
     backdrop(g, t) {
-      drawWordmark(g, 250, 100, 60, t);
+      const { wordmark, status } = title;
+      drawWordmark(g, wordmark.x, wordmark.y, wordmark.size, t);
       // How the brain is doing, quietly, under the name.
       const brain = shell.brain;
       const awake = brain.status === "running";
       const label = awake ? `Brain awake · ${brain.neurons.toLocaleString("en-US")} neurons` : brain.status === "failed" ? "Its brain couldn't wake" : "Its brain is waking…";
-      glassPanel(g, 72, 128, 356, 34, 17, { alpha: 0.85, shadow: false });
-      orb(g, 92, 145, 8, awake ? "green" : brain.status === "failed" ? "pink" : "orange");
-      text(g, label, 108, 146, { size: 15, color: INK_SOFT, baseline: "middle" });
+      glassPanel(g, status.x, status.y, status.w, status.h, 17, { alpha: 0.85, shadow: false });
+      orb(g, status.x + 20, status.y + 17, 8, awake ? "green" : brain.status === "failed" ? "pink" : "orange");
+      text(g, label, status.x + 36, status.y + 18, { size: status.size, color: INK_SOFT, baseline: "middle" });
     },
   });
 }
@@ -57,7 +61,7 @@ export function pauseScreen(shell: Shell) {
     pauses: true,
     menu,
     heading: "Paused",
-    panel: { x: (DESIGN_WIDTH - 340) / 2, y: 52, w: 340, h: 352 },
+    place: (frame) => fitMenu(safeRect(frame), { items: menu.items.length, width: 340, row: 40, heading: true, foot: 34, values: false, raise: 12 }),
     onActivate(item) {
       if (item.id === "resume") shell.play();
       else if (item.id === "title") shell.title();
@@ -125,12 +129,6 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
   },
 };
 
-/** A pane for `rows` rows `row` tall under a heading, centred over the menu hints. */
-function pane(width: number, rows: number, row: number) {
-  const h = 70 + rows * (row + 12) - 12 + 28;
-  return { x: (DESIGN_WIDTH - width) / 2, y: Math.round(226 - h / 2), w: width, h };
-}
-
 /** The top of the settings: a button for each page. */
 export function settingsScreen(shell: Shell) {
   const items: MenuItem[] = (Object.keys(PAGES) as SettingsPage[]).map((id) => ({ kind: "action", id, label: PAGES[id].heading }));
@@ -139,7 +137,7 @@ export function settingsScreen(shell: Shell) {
     pauses: true,
     menu: new Menu(items),
     heading: "Settings",
-    panel: pane(340, items.length, 40),
+    place: (frame) => fitMenu(safeRect(frame), { items: items.length, width: 340, row: 40, heading: true, foot: 28, values: false, raise: 14 }),
     onActivate: (item) => shell.open(item.id as SettingsPage),
     onBack: () => shell.back(),
   });
@@ -156,8 +154,7 @@ export function settingsPages(shell: Shell) {
       pauses: true,
       menu: new Menu(items),
       heading: PAGES[id].heading,
-      row: 36,
-      panel: pane(540, items.length, 36),
+      place: (frame) => fitMenu(safeRect(frame), { items: items.length, width: 540, row: 36, heading: true, foot: 28, values: true, raise: 14 }),
       // As they are now: the Place tool, or a script, may have changed them since.
       onEnter() {
         for (const item of items) {
