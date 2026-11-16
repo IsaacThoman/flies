@@ -26,6 +26,6 @@ test("update is quick with a JIT", () => {
   const micros = median(samples.map((s) => s.micros));
   const rawMicros = median(samples.map((s) => s.rawMicros));
   console.log(`  update: ${micros.toFixed(2)} M5 Pro CPU µs (${rawMicros.toFixed(2)} here) in Node with its JIT; median of ${SAMPLES}`);
-  // 2.4 to 2.9 µs on an M5 Pro.
-  assert.ok(micros < 4.4, `${micros.toFixed(2)} M5 Pro CPU µs per update; budget 4.4`);
+  // 3.0 µs on an M5 Pro in Node 26, 3.6 in Node 24 (CI's).
+  assert.ok(micros < 5.6, `${micros.toFixed(2)} M5 Pro CPU µs per update; budget 5.6`);
 });
