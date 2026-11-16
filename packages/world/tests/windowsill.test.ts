@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BANANA, FRUIT_BOWL, BASIL_POT, Pantry, SILL, SILL_PATCHES, SILL_SOLIDS, WINDOW, WINDOWSILL, World, bananaAt, createSurface } from "../src/index.ts";
+import { ALARM_CLOCK, BANANA, FRUIT_BOWL, BASIL_POT, Pantry, SILL, SILL_PATCHES, SILL_SOLIDS, WINDOW, WINDOWSILL, World, bananaAt, createSurface } from "../src/index.ts";
 import type { RayHit } from "../src/index.ts";
 
 const world = new World(WINDOWSILL);
@@ -70,6 +70,42 @@ test("the basil's saucer holds water round the pot's foot, and the pot's rim and
   const lip = (solid("pot").top as { lip: number }).lip * BASIL_POT.r;
   assert.ok(world.surface(BASIL_POT.x + lip, BASIL_POT.z, s).normal.y > 0.99 && s.y === BASIL_POT.rim, "the rim's crest");
   assert.equal(world.heightAt(BASIL_POT.x + 20, BASIL_POT.z + 10), BASIL_POT.soil, "the soil");
+});
+
+test("the alarm clock stands on the sill: a fly can land on its case and walk across its top, round as the drum is, and on its bells", () => {
+  const { x, z, r, y, depth, bezel, bells, hammer } = ALARM_CLOCK;
+  const s = createSurface();
+  const curve = (u: number) => y + Math.sqrt(r * r - u * u);
+  // Across the top in front of the bells, from one side to the other where it isn't too steep: level underfoot, within a third of a millimetre of the drum, in steps a fly hardly notices.
+  const front = z + bells.r + 1;
+  const reach = r * Math.sin((Math.atan(Math.tan((65 * Math.PI) / 180)) * 0.98));
+  let last = -1;
+  for (let u = -reach; u <= reach; u += 0.05) {
+    world.surface(x + u, front, s);
+    assert.ok(s.normal.y >= STANDABLE, `level enough ${u.toFixed(2)} mm across`);
+    assert.ok(Math.abs(s.y - curve(u)) < 0.36, `on the drum ${u.toFixed(2)} mm across: ${s.y.toFixed(2)} for ${curve(u).toFixed(2)}`);
+    if (last >= 0) assert.ok(Math.abs(s.y - last) < 0.9, `a step ${u.toFixed(2)} mm across`);
+    last = s.y;
+  }
+  // Along its shoulder, past a bell, from the back to the bezel it is level: a drum, not a dome.
+  const shoulder = bells.x + bells.r + 3;
+  for (let w = -depth / 2 + 0.5; w < depth / 2 + bezel - 0.5; w += 0.5) assert.ok(Math.abs(world.heightAt(x + shoulder, z + w) - curve(shoulder)) < 0.36, `along its top ${w} mm`);
+  assert.equal(world.heightAt(x, z + depth / 2 + bezel + 0.5), 0, "the sill in front of the bezel");
+  assert.equal(world.heightAt(x, z - depth / 2 - 0.5), 0, "the sill behind it");
+  // Its sides go down to its widest, as wide as it is, and no wider.
+  for (const side of [-1, 1]) {
+    assert.ok(world.heightAt(x + side * (r - 0.2), z) > y - 1, "its side, to its widest");
+    assert.equal(world.heightAt(x + side * (r + 0.2), z), 0, "the sill beside it");
+    assert.equal(world.heightAt(x + side * bells.x, z), bells.base + bells.r, "a bell's crown");
+  }
+  assert.equal(world.heightAt(x, z), hammer.base + hammer.r, "the hammer's head");
+  assert.ok(bells.base + bells.r < WINDOWSILL.ceiling, "within a fly's reach");
+  // It stands on the sill, clear of the window's ledge and of the bowl and the bottle beside it.
+  assert.ok(z - depth / 2 > WINDOW.glass + WINDOW.rail.depth, "in front of the ledge");
+  for (const name of ["bowl", "bottle"]) {
+    const f = solid(name).footprint as { x: number; z: number; r: number };
+    assert.ok(Math.abs(f.x - x) > f.r + r, `clear of the ${name}`);
+  }
 });
 
 test("the wine is a pool on the sill, and everything to eat lies within reach of the sill", () => {

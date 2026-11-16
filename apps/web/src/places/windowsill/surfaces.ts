@@ -360,14 +360,19 @@ reflectedLight.indirectDiffuse += sheen * pow(1.0 - abs(dot(normal, normalize(vV
   return material;
 }
 
-/** Glazed things: speckled stoneware, the fridge, the plates on the dresser. */
-export function glazeMaterial(sunlight: Sunlight) {
+/**
+ * Glazed things: speckled stoneware, the fridge, the plates on the dresser,
+ * the clocks' enamel and their dials, on which `faces` draws the hands
+ * (clocks.ts) turned by `hands`.
+ */
+export function glazeMaterial(sunlight: Sunlight, faces: { hands: { value: THREE.Vector3 }; common: string; color: string }) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.24, metalness: 0, envMapIntensity: 0.45 });
   sunlit(material, sunlight, "glaze", {
     lamp: true,
     extra: (shader) => {
       withVarying(shader, "speckle", "vSpeckle");
-      shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${NOISE}\n${BUMP}`).replace(
+      shader.uniforms.uClockHands = faces.hands;
+      shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${NOISE}\n${BUMP}\n${faces.common}`).replace(
         "#include <color_fragment>",
         /* glsl */ `#include <color_fragment>
 {
@@ -389,7 +394,8 @@ export function glazeMaterial(sunlight: Sunlight) {
     float blue = inDab * mix(smoothstep(0.42 - laceAa, 0.42 + laceAa, lace), 1.0, smoothstep(0.58, 0.68, dab));
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.13, 0.27, 0.6), blue * 0.9);
   }
-}`,
+}
+${faces.color}`,
       );
     },
   });

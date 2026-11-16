@@ -4,12 +4,14 @@
 // into a few meshes; the small things are instanced.
 
 import * as THREE from "three";
-import { BANANA, WINE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_DECOR, SILL_PATCHES, SILL_SOLIDS, TEASPOON, WINDOW, bananaAt, inside, topHeight, topNormal, topPeak } from "@fly/world";
+import { ALARM_CLOCK, BANANA, WINE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_DECOR, SILL_PATCHES, SILL_SOLIDS, TEASPOON, WINDOW, bananaAt, inside, topHeight, topNormal, topPeak } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { Batch, freeze, mat4, paint, random } from "../../scene/build.ts";
+import { WallClock } from "../../scene/clock.ts";
 import type { Daylight } from "../../scene/light.ts";
 import type { Weather } from "../../scene/weather.ts";
 import type { SceneSet } from "../types.ts";
+import { ALARM_DIAL, CLOCK_FACES } from "./clocks.ts";
 import { waterMaterial, windowGlass } from "./glass.ts";
 import { FRAME_HEAD, createSunlight, sunlit } from "./light.ts";
 import type { Ball, Column } from "./light.ts";
@@ -24,6 +26,9 @@ const BOUNCE = new THREE.Color("#ffe2bc");
 /** The room under its lamp, as glossy things on the sill reflect it at night. */
 const LAMPLIT = new THREE.Color("#6a4a2c");
 
+/** How far either side of the alarm clock's middle its feet stand. */
+const CLOCK_FOOT = 25;
+
 /** How many rings can spread on the pools at once. */
 const RIPPLES = 4;
 
@@ -34,6 +39,14 @@ const patch = (name: string) => SILL_PATCHES.find((p) => p.name === name)!;
 const box = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number) => new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0).translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
 
 const UP = new THREE.Vector3(0, 1, 0);
+/** A rod from a to b. */
+const rod = (a: THREE.Vector3, b: THREE.Vector3, r: number, segments = 8) => {
+  const along = b.clone().sub(a);
+  return new THREE.CylinderGeometry(r, r, along.length(), segments, 1, true)
+    .applyQuaternion(new THREE.Quaternion().setFromUnitVectors(UP, along.normalize()))
+    .translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+};
+
 
 /** A round thing's surface turned from a profile of [radius, height] points, at (x, z). */
 const lathe = (profile: readonly (readonly [number, number])[], segments: number, x: number, z: number) =>
@@ -210,6 +223,8 @@ function casters(): { balls: Ball[]; columns: Column[] } {
     // The basil's leaves let some light through.
     { x: BASIL_POT.x + 4, y: 160, z: BASIL_POT.z - 2, r: 64, density: 0.72 },
     { x: BASIL_POT.x - 12, y: 222, z: BASIL_POT.z - 10, r: 38, density: 0.6 },
+    // The alarm clock's drum: seen from the window, a disc.
+    { x: ALARM_CLOCK.x, y: ALARM_CLOCK.y, z: ALARM_CLOCK.z, r: ALARM_CLOCK.r },
     { x: PEACH_PLATE.x - 5, y: -12, z: PEACH_PLATE.z - 3, r: 27 },
   ];
   for (const t of [0.22, 0.42, 0.6, 0.76]) {
@@ -236,6 +251,9 @@ function contacts(): Contact[] {
     { x: WINE_BOTTLE.x, z: WINE_BOTTLE.z, r: WINE_BOTTLE.r, dark: 0.55 },
     { x: PEACH_PLATE.x, z: PEACH_PLATE.z, r: PEACH_PLATE.r * 0.95, dark: 0.35 },
     { x: TEASPOON.x, z: TEASPOON.z, r: TEASPOON.rx, dark: 0.25 },
+    // Under the alarm clock's belly, and its feet.
+    { x: ALARM_CLOCK.x, z: ALARM_CLOCK.z, r: ALARM_CLOCK.r * 0.7, dark: 0.3 },
+    ...[-1, 1].map((side) => ({ x: ALARM_CLOCK.x + side * CLOCK_FOOT, z: ALARM_CLOCK.z, r: 4, dark: 0.45 })),
   ];
   const p = { x: 0, z: 0 };
   for (const t of [0.05, 0.18, 0.32, 0.46, 0.6, 0.74, 0.88, 0.97]) {
@@ -275,7 +293,8 @@ export function buildSill(): SceneSet {
   const clay = clayMaterial(sunlight);
   const stone = new THREE.Vector2(PEACH_PLATE.x - 5, PEACH_PLATE.z - 3);
   const fruit = fruitMaterial(sunlight, stone);
-  const glaze = glazeMaterial(sunlight);
+  const clock = new WallClock();
+  const glaze = glazeMaterial(sunlight, { hands: clock.hands, ...CLOCK_FACES });
   const leaf = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0, envMapIntensity: 0.22, side: THREE.DoubleSide });
   // Leaves let the sun through: lit from behind they glow green.
   sunlit(leaf, sunlight, "leaf", {
@@ -491,6 +510,37 @@ export function buildSill(): SceneSet {
     // Plum juice run into the bowl from a split.
     const juice = patch("plum juice");
     fruity(blob(juice.x, juice.z, juice.r, topHeight(bowl, juice.x, juice.z) + 0.12, 2), "#5a0e2e", 0);
+  }
+
+  // The alarm clock: a drum of red enamel on two chrome feet, its back domed, its front rolled in to a chrome bezel round the dial (clocks.ts draws the hands), two bells on top and the hammer between them.
+  {
+    const { x, y, z, r, depth, bells, hammer } = ALARM_CLOCK;
+    const RED = "#c63a2b";
+    const CHROME = "#e2e5ea";
+    const front = z + depth / 2;
+    const back = z - depth / 2;
+    const shell = (top: number) => y + Math.sqrt(Math.max(0, r * r - top * top));
+    // Turned about the clock's axis (z), from `at` along it: a lathe's profile is [radius, along].
+    const turned = (profile: [number, number][], at: number, segments = 44) => lathe(profile, segments, 0, 0).rotateX(Math.PI / 2).translate(x, y, at);
+    glazed(new THREE.CylinderGeometry(r, r, depth, 64, 1, true).rotateX(Math.PI / 2).translate(x, y, z), RED, 0);
+    glazed(turned([[r, 0], [r - 0.6, 1.4], [r - 2.2, 2.4], [r - 4.5, 2.6]], front), RED, 0);
+    glazed(lathe([[r - 0.6, 0], [r - 3, 1], [r * 0.55, 2.6], [0, 3.2]], 40, 0, 0).rotateX(-Math.PI / 2).translate(x, y, back), RED, 0);
+    add(metal, paint(new THREE.TorusGeometry(r - 0.2, 1.1, 3, 40).translate(x, y, back), CHROME));
+    add(metal, paint(turned([[r - 4.3, 2.4], [r - 4.6, 4], [r - 5.6, 4.9], [r - 7.2, 4.6], [r - 8.2, 3.5], [r - 8.6, 1.6]], front), CHROME));
+    glazed(new THREE.CircleGeometry(ALARM_DIAL.radius + 0.4, 48).translate(x, y, ALARM_DIAL.centre.z), "#f5eedb", 0);
+    for (const side of [-1, 1]) {
+      const sx = x + side * CLOCK_FOOT;
+      add(metal, paint(rod(new THREE.Vector3(x + side * 14, y - 33, z), new THREE.Vector3(sx, 3, z), 2.2), CHROME));
+      add(metal, paint(new THREE.SphereGeometry(1, 8, 5).scale(3.6, 2.6, 7).translate(sx, 2.3, z), CHROME));
+      const bell = byName("bell").find((b) => Math.sign(b.footprint.x - x) === side)!;
+      const bx = x + side * bells.x;
+      add(metal, paint(topGeometry(bell, 5, 24), CHROME));
+      add(metal, paint(new THREE.TorusGeometry(bells.r - 0.6, 0.8, 3, 24).rotateX(Math.PI / 2).translate(bx, bells.base + 0.4, z), CHROME));
+      add(metal, paint(new THREE.CircleGeometry(bells.r - 0.8, 24).rotateX(Math.PI / 2).translate(bx, bells.base + 1.2, z), "#5c6066"));
+      add(metal, paint(rod(new THREE.Vector3(bx, shell(bells.x) - 1, z), new THREE.Vector3(bx, bells.base + 2, z), 1.6), CHROME));
+    }
+    add(metal, paint(rod(new THREE.Vector3(x, shell(0) - 1, z), new THREE.Vector3(x, hammer.base, z), 1.1), CHROME));
+    add(metal, paint(new THREE.SphereGeometry(hammer.r, 8, 6).translate(x, hammer.base, z), CHROME));
   }
 
   // The banana: ripe past yellow, freckled, its tip black and its stalk green-brown.
@@ -817,6 +867,7 @@ export function buildSill(): SceneSet {
       lastTime = time;
       u.uMist.value = mist;
       room.update(lamp);
+      clock.update();
       // Now and then a drop runs down the bottle into the wine.
       if (time > nextDrip) {
         const a = rnd.range(0, Math.PI * 2);

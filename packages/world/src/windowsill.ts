@@ -98,6 +98,54 @@ function bananaSolids(): Solid[] {
 
 /** The terracotta pot of basil, in its saucer. */
 export const BASIL_POT = { x: -225, z: -36, r: 48, rim: 96, soil: 89, saucer: 66 };
+
+/**
+ * A wind-up alarm clock in red enamel, standing toward the back of the sill
+ * with its dial to the room: a drum on its side (`r`, its middle `y` high, as
+ * deep as `depth` with a bezel `bezel` deep in front) on two splayed feet,
+ * with two bells on top and the hammer between them.
+ */
+export const ALARM_CLOCK = { x: 128, z: -70, r: 38, y: 45, depth: 30, bezel: 5, bells: { x: 16, r: 12, base: 84 }, hammer: { r: 3, base: 88 } };
+
+/** The steepest a fly stands on, as rise over run. */
+const STANDABLE_SLOPE = Math.tan((65 * Math.PI) / 180);
+
+/**
+ * The clock as the fly feels it. The world can't hold a drum on its side,
+ * so its case is a row of thin boxes across it, each as deep as the case and
+ * its bezel, each flat top within a third of a millimetre of the drum's curve
+ * where a fly could stand on it (so it walks across the top in steps it
+ * hardly notices), and in coarser steps down its steep sides. Under its belly
+ * the column goes down to the sill, between its feet. The bells are domes,
+ * the hammer's head a little one.
+ */
+function clockSolids(): Solid[] {
+  const { x, z, r, y, depth, bezel, bells, hammer } = ALARM_CLOCK;
+  const zMid = z + bezel / 2;
+  const hz = (depth + bezel) / 2;
+  const curve = (u: number) => y + Math.sqrt(Math.max(0, r * r - u * u));
+  const box = (u0: number, u1: number): Solid => ({ name: "clock", footprint: { kind: "box", x: x + (u0 + u1) / 2, z: zMid, hx: (u1 - u0) / 2, hz, angle: 0 }, top: { kind: "flat", y: curve(Math.abs(u0 + u1) / 2) } });
+  const out: Solid[] = [box(-3, 3)];
+  for (let a = 3; a < r; ) {
+    const step = a / Math.sqrt(r * r - a * a) < STANDABLE_SLOPE ? 0.6 : 2;
+    let b = Math.min(r, a + 6);
+    if (curve(a) - curve(b) > step) {
+      let lo = a;
+      for (let i = 0; i < 40; i++) {
+        const m = (lo + b) / 2;
+        if (curve(a) - curve(m) > step) b = m;
+        else lo = m;
+      }
+      b = lo;
+    }
+    if (r - b < 0.3) b = r;
+    out.push(box(a, b), box(-b, -a));
+    a = b;
+  }
+  for (const side of [-1, 1]) out.push({ name: "bell", footprint: { kind: "circle", x: x + side * bells.x, z, r: bells.r }, top: { kind: "dome", base: bells.base, height: bells.r, power: 0.5 } });
+  out.push({ name: "hammer", footprint: { kind: "circle", x, z, r: hammer.r }, top: { kind: "dome", base: hammer.base, height: hammer.r, power: 0.5 } });
+  return out;
+}
 /** The fruit bowl: shallow stoneware with a rim a fly can walk round. */
 export const FRUIT_BOWL = { x: -40, z: -20, r: 80 };
 /** The bottle of red wine, corked, at the right of the sill. */
@@ -117,6 +165,7 @@ export const SILL_SOLIDS: readonly Solid[] = [
   { name: "pot", footprint: { kind: "circle", x: BASIL_POT.x, z: BASIL_POT.z, r: BASIL_POT.r }, top: { kind: "dish", well: BASIL_POT.soil, rim: BASIL_POT.rim, inner: 0.8, lip: 0.92 } },
   // The basil's stems, rising from the soil into its leaves (the leaves are above where the fly can reach from the soil).
   { name: "stems", footprint: { kind: "circle", x: BASIL_POT.x + 4, z: BASIL_POT.z - 3, r: 7 }, top: { kind: "flat", y: 190 } },
+  ...clockSolids(),
   // The fruit bowl: up its outside, round its rim and down into it, among a peach and two plums.
   { name: "bowl", footprint: { kind: "circle", x: FRUIT_BOWL.x, z: FRUIT_BOWL.z, r: FRUIT_BOWL.r }, top: { kind: "dish", well: 6, rim: 28, inner: 0.4, lip: 0.72 } },
   { name: "peach", footprint: { kind: "circle", x: FRUIT_BOWL.x - 8, z: FRUIT_BOWL.z - 6, r: 26 }, top: { kind: "dome", base: 32, height: 26, power: 0.5 } },
@@ -170,7 +219,7 @@ export const SILL_DECOR = {
   /** A linen tea towel folded on the sill, its end hanging over the front edge. */
   towel: { x: 245, z: 70, hx: 54, hz: 62 },
   /** A ring left by a glass, and a dried drip. */
-  ring: { x: 140, z: -60, r: 33 },
+  ring: { x: 165, z: -8, r: 30 },
   /** Specks of toast no taller than half a millimetre: where they lie, how far round, and how many. */
   crumbs: [
     { x: 42, z: 40, r: 16, count: 50 },

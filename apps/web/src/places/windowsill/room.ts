@@ -13,6 +13,9 @@ import { tag, tone } from "./surfaces.ts";
 /** The kitchen's floor and ceiling, its far wall and side walls, mm (the sill is 1.05 m from the floor). */
 export const ROOM = { floor: -1050, ceiling: WINDOW.ceiling, far: 2900, side: 1700, worktop: -180 };
 
+/** The clock on the far wall: a drum `depth` deep, its dial the cream middle of its face, inside a green rim (clocks.ts draws its hands). */
+export const WALL_CLOCK = { r: 150, dial: 132, depth: 30, face: { x: -150, y: 720, z: ROOM.far - 6 - 15 } };
+
 type Materials = { plaster: THREE.Material; tiles: THREE.Material; glaze: THREE.Material; paint: THREE.Material; metal: THREE.Material; leaf: THREE.Material };
 
 const box = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number) => new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0).translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
@@ -101,16 +104,10 @@ export function buildRoom(m: Materials) {
   }
   // A jug on the dresser's top.
   glaze(new THREE.LatheGeometry([[0, 0], [60, 0], [70, 60], [58, 140], [48, 190], [58, 215], [0, 215]].map(([r, y]) => new THREE.Vector2(r, y)), 20).translate(dresser.x1 - 160, -170, far - 220), "#e8b23a", 1);
-  // The clock.
+  // The clock, which tells the time (clocks.ts).
   {
-    const at = new THREE.Vector3(-150, 720, far - 6);
-    glaze(new THREE.CylinderGeometry(150, 150, 30, 40).rotateX(Math.PI / 2).translate(at.x, at.y, at.z), (p) => (Math.hypot(p.x - at.x, p.y - at.y) > 132 ? tone("#2f4f45") : tone("#fbf6ea")));
-    for (let h = 0; h < 12; h++) {
-      const a = (h / 12) * Math.PI * 2;
-      metal(box(-3, 3, 104, 122, 0, 3).rotateZ(a).translate(at.x, at.y, at.z - 18), "#2a2a2a");
-    }
-    metal(box(-4, 4, 0, 82, 0, 3).rotateZ(-2.1).translate(at.x, at.y, at.z - 22), "#2a2a2a");
-    metal(box(-3, 3, 0, 116, 0, 3).rotateZ(0.6).translate(at.x, at.y, at.z - 24), "#2a2a2a");
+    const { face, r, dial, depth } = WALL_CLOCK;
+    glaze(new THREE.CylinderGeometry(r, r, depth, 40).rotateX(Math.PI / 2).translate(face.x, face.y, face.z + depth / 2), (p) => (Math.hypot(p.x - face.x, p.y - face.y) > dial ? tone("#2f4f45") : tone("#fbf6ea")));
   }
 
   // The fridge, round-shouldered and cream, on the left.
