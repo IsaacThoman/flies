@@ -8,13 +8,18 @@ and the iPhone and iPad app (`apps/ios`) go together, as one app, "Flies", at on
 1. Pull requests are squash-merged into `dev` as usual, with plain-English titles.
 2. To release, open a pull request from `dev` into `main` and merge it with a **merge commit**,
    not a squash, so `main` keeps `dev`'s history and the two don't drift apart.
-3. CI (`.github/workflows/ci.yml`), which checks every pull request and every push to `dev`
-   and `main` (lint, both typechecks and the web build on Linux; the unit tests on a macOS arm64 runner,
-   where the brain's bit-for-bit tests hold; and `npm run e2e`, which reports without blocking;
-   the connectome is fetched and cached by `.github/actions/brain`), runs the checks on `main`. When they pass, the `release` job
-   runs [semantic-release](https://semantic-release.org) (`release.config.mjs`). It works out
-   the next version from the commits since the last `v*` tag, tags the release `v<version>` and
-   creates a GitHub Release whose notes are those commits' titles.
+3. CI (`.github/workflows/ci.yml`) runs the checks on `main`, as it does on every pull request
+   and push to `dev`:
+   - lint, both typechecks and the web build, on Linux;
+   - the unit tests, on a macOS arm64 runner, where the brain's bit-for-bit tests hold;
+   - `npm run e2e`, which reports without blocking.
+
+   The connectome is fetched once and cached (`.github/actions/brain`).
+
+   When the checks pass, the `release` job runs
+   [semantic-release](https://semantic-release.org) (`release.config.mjs`). It works out the next
+   version from the commits since the last `v*` tag, tags the release `v<version>`, and creates a
+   GitHub Release whose notes are those commits' titles.
 4. The `testflight` job then calls `.github/workflows/testflight.yml` with that version. On the
    `xcode-27` runner, it archives both apps from the tag with `npm run ios -- archive` and
    `npm run tvos -- archive` (`scripts/apple.ts`) and uploads them to App Store Connect. They
@@ -34,7 +39,7 @@ under "Merge pull request #n from ...":
 | --- | --- |
 | `dev to main`, or anything plain | patch: 0.1.0 → 0.1.1 |
 | `feat: rooms online` | minor: 0.1.1 → 0.2.0 |
-| `feat!: a new kind of save`, or `BREAKING CHANGE: ...` in the description | major: 0.2.0 → 1.0.0 |
+| `feat!: a new kind of save` | major: 0.2.0 → 1.0.0 |
 
 A commit on `dev` with a conventional title (`feat: ...`, `fix(tvos): ...`) is read the same
 way. The repository's merge-commit message must stay at GitHub's default, the pull request's
