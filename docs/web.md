@@ -279,17 +279,20 @@ places it is set.
 
 ## In an iPhone or iPad app
 
-An app can show the web build in a WKWebView, loading `index.html` from its
+`apps/ios` ([ios.md](ios.md)) shows the web build in a WKWebView, loading `index.html` from its
 own bundle through a custom URL scheme (`WKURLSchemeHandler`). That works
 as it is, with no network:
 
 - the scheme handler serves `dist/` as it is, the brain's parts included, at
   paths relative to the page; any `Content-Type` will do;
 - there is no service worker (it isn't offered there; registering fails
-  quietly) and maybe no Cache API, so the brain is read from the bundle on
-  every launch, which is quick from local storage;
-- without `crypto.subtle` the digest check is skipped, and gzip's own check
-  and the connectome's loader catch damage;
+  quietly), and the Cache API, though there, keeps only `http` and `https`
+  responses, so nothing is copied and the brain is read from the bundle on
+  every launch, which is quick from local storage (measured in the iPhone
+  and iPad app, [ios.md](ios.md));
+- the page is a secure context there, so `crypto.subtle` checks each part's
+  digest; where it is missing the check is skipped, and gzip's own check and
+  the connectome's loader catch damage;
 - or the app runs the C++ brain itself and exposes it as
   `globalThis.__native.brain` (`NativeBrainBridge` in
   `packages/contracts/src/brain.ts`), as the Apple TV app does: the game then

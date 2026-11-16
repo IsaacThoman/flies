@@ -27,8 +27,8 @@ back up, take off, beat the wings, groom, feed. The game moves the body
 accordingly and poses the model (`FlyPose`).
 
 In a browser, and so in the iPhone and iPad app, the brain is `packages/brain` in a Web Worker,
-fed a compressed form of the connectome that the page downloads once and keeps; the browser
-build is plain files for any static host (`docs/web.md`). On the Apple TV
+fed a compressed form of the connectome that the page downloads once and keeps (the app has it in
+its bundle); the browser build is plain files for any static host (`docs/web.md`). On the Apple TV
 JavaScript has no JIT and is far too slow for it, so the host runs
 `packages/brain-native` on its own thread and exposes it as
 `globalThis.__native.brain` (`NativeBrainBridge`). The game only ever sees a
