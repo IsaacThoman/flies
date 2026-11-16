@@ -9,10 +9,11 @@
 // measured work, and the work's time is scaled by what the reference takes here
 // against what it takes on an M5 Pro. The reference reads and writes a 4 MB table
 // at random, past the first-level cache, as the brain's sweep over its neurons
-// and synapses does: with it, every budget's work reads 1.0 to 1.4 times its M5
-// Pro cost on the CI runner (a reference of arithmetic alone left it at 1.2 to
-// 1.7). Each budget sits about 1.7 times above what the work costs on an M5 Pro,
-// so it holds on the CI runner, and doubling the work fails it on either.
+// and synapses does: with it, the brain's work reads 1.0 to 1.4 times its M5 Pro
+// cost on the CI runner and the fly's update, arithmetic in cache, up to 1.6 (a
+// reference of arithmetic alone left the brain at 1.2 to 1.5). Each budget sits
+// 1.5 to 1.8 times above what the work costs on an M5 Pro, so it holds on the CI
+// runner, and doubling the work fails it on either.
 //
 // The reference can't follow other processes thrashing the caches and memory the
 // work shares (four copies of the brain at once each cost a third more on an M5
