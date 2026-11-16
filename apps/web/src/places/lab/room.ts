@@ -25,6 +25,7 @@ import { BACK_Z, CEILING_Y, PANELS, SUNBEAM, WINDOWS, WINDOW_LIGHT, sunbeam } fr
 import type { Sunbeam } from "./materials.ts";
 
 const WHITE = new THREE.Color("#ffffff");
+const UP = new THREE.Vector3(0, 1, 0);
 const FRONT_Z = 2700;
 const LEFT_X = -2800;
 const RIGHT_X = 3000;
@@ -339,6 +340,25 @@ const box = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: num
 /** A picture on a wall facing +z (or turned to face another way). */
 const facing = (w: number, h: number, x: number, y: number, z: number, turn = 0) => new THREE.PlaneGeometry(w, h).rotateY(turn).translate(x, y, z);
 
+/** A strip along a line of points, from `from` to `to` of the way across it (-1 one edge, 1 the other) at each point's half-width, seen from both sides: a leaf, or a stripe of one. */
+function ribbon(points: readonly THREE.Vector3[], widths: readonly number[], from: number, to: number) {
+  const out: number[] = [];
+  const side = new THREE.Vector3();
+  const at = (i: number, k: number) => {
+    const j = Math.min(i, points.length - 2);
+    side.subVectors(points[j + 1], points[j]).cross(UP).normalize();
+    return points[i].clone().addScaledVector(side, widths[i] * k);
+  };
+  for (let i = 0; i < points.length - 1; i++) {
+    const [a0, a1, b0, b1] = [at(i, from), at(i, to), at(i + 1, from), at(i + 1, to)];
+    for (const v of [a0, b0, a1, a1, b0, b1, a0, a1, b0, a1, b1, b0]) out.push(v.x, v.y, v.z);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(out, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 /** The room's materials: their floor and ceiling tiled, and the sun through the windows laid across them; the one with the clock's dial in it, its hands. */
 function roomShader(material: THREE.Material, beam: Sunbeam, key: string, hands?: WallClock["hands"]) {
   material.onBeforeCompile = (shader) => {
@@ -522,7 +542,7 @@ export function buildRoom(light: Daylight): SceneBackdrop {
       add(box(x + 260, x + 340, -110, -95, z1 - 10, z1), trim);
     }
     add(box(-2560, 2360, -30, 0, z0, z1), "#2b2d30");
-    // A covered microscope, a few bottles, trays of vials, a plant on the sill.
+    // A covered microscope, a few bottles, trays of vials, a spider plant on the sill.
     const cover = new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2).scale(170, 380, 150).translate(-1500, 0, z0 + 400);
     add(cover, "#dfe6ea");
     for (let i = 0; i < 7; i++) {
@@ -538,11 +558,33 @@ export function buildRoom(light: Daylight): SceneBackdrop {
       pics.push(pictured(facing(280, 90, x, 45, z0 + 521), PICTURES.trays));
     }
     add(new THREE.CylinderGeometry(70, 55, 120, 16).translate(1550, WINDOWS.y0 + 60, BACK_Z + 10), "#b8643a");
-    for (let k = 0; k < 26; k++) {
-      const a = rnd.range(0, Math.PI * 2);
-      const r = rnd.range(30, 110);
-      const leaf = new THREE.SphereGeometry(rnd.range(26, 38), 8, 6).scale(1, 0.55, 1).translate(1550 + Math.cos(a) * r, WINDOWS.y0 + 150 + rnd.range(-20, 140) - (r > 80 ? rnd.range(60, 220) : 0), BACK_Z + 10 + Math.sin(a) * r * 0.6);
-      add(leaf, ["#3f7f3a", "#56994a", "#2f6a30"][k % 3]);
+    add(new THREE.CylinderGeometry(74, 72, 14, 16).translate(1550, WINDOWS.y0 + 113, BACK_Z + 10), "#a95a33");
+    // Its leaves arch up out of the pot and over, green with a pale stripe down the middle; runners hang down with little plants on their ends.
+    const crown = new THREE.Vector3(1550, WINDOWS.y0 + 116, BACK_Z + 10);
+    const arc = (a: number, length: number, rise: number, droop: number, steps: number, from = crown) => {
+      const points: THREE.Vector3[] = [];
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        // Kept off the glass behind the pot.
+        const z = Math.max(BACK_Z - 50, from.z + Math.sin(a) * length * t * 0.6);
+        points.push(new THREE.Vector3(from.x + Math.cos(a) * length * t, from.y + length * (rise * t - droop * t * t), z));
+      }
+      return points;
+    };
+    for (let k = 0; k < 40; k++) {
+      const a = k * 2.4 + rnd.range(-0.2, 0.2);
+      const inner = k % 3 === 0;
+      const points = arc(a, inner ? rnd.range(110, 170) : rnd.range(170, 270), inner ? rnd.range(1.4, 2) : rnd.range(0.8, 1.4), inner ? rnd.range(1.6, 2.2) : rnd.range(1.1, 1.6), 5);
+      const widths = points.map((_p, i) => 13 * (1 - Math.pow(i / 5, 1.6)) + 0.8);
+      add(ribbon(points, widths, -1, -0.3), "#4b8a3c");
+      add(ribbon(points, widths, -0.3, 0.3), "#e4ebc8");
+      add(ribbon(points, widths, 0.3, 1), "#4b8a3c");
+    }
+    for (const a of [0.9, 1.9, 2.7]) {
+      const runner = arc(a, 230, 0.45, 1.25, 6);
+      add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(runner), 8, 2, 3), "#c9d7a0");
+      const end = runner[runner.length - 1];
+      for (let k = 0; k < 5; k++) add(ribbon(arc((k / 5) * Math.PI * 2, 60, 0.6, 1.1, 3, end), [5, 4, 2.5, 0.5], -1, 1), "#5e9a46");
     }
     // The gas cylinder, chained to the wall at the end of the bench, with its regulator.
     add(new THREE.CylinderGeometry(115, 115, 1380, 24).translate(2620, FLOOR_Y + 690, BACK_Z + 200), "#5f6c74");
