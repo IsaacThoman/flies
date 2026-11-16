@@ -79,6 +79,8 @@ void main() {
 export class Eyes {
   /** From the settings: how finely to render, or off. */
   detail: EyesDetail = "low";
+  /** How often they refresh, as a share of their detail's rate: lowered on a device that can't keep up (quality.ts). */
+  rate = 1;
   /** CPU time of the last refresh, ms (render submission and resampling), and its draws. */
   costMs = 0;
   costCalls = 0;
@@ -186,13 +188,18 @@ export class Eyes {
     }
     const detail = DETAIL[this.detail === "high" ? "high" : "low"];
     this.#since += dt;
-    const hz = urgent ? URGENT_HZ : detail.hz;
+    const hz = urgent ? URGENT_HZ : detail.hz * this.rate;
     // One read in flight: a slow GPU must not accumulate pictures or sampling work.
     if (!paused && !this.#pending && (this.#since >= 1 / hz - 1e-3 || !this.#light)) {
       this.#since = 0;
       this.#refresh(detail.resolution);
     }
     if (showPicture) this.#drawPicture();
+  }
+
+  /** The graphics context was lost and given back: a read in flight then will never finish. */
+  contextRestored() {
+    this.#pending = false;
   }
 
   #prepare(resolution: number) {

@@ -78,8 +78,10 @@ export function disposeAll(root: THREE.Object3D) {
     const materials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
     for (const material of materials) {
       for (const value of Object.values(material)) if (value instanceof THREE.Texture) value.dispose();
-      const uniforms = (material as THREE.ShaderMaterial).uniforms;
-      if (uniforms) for (const u of Object.values(uniforms)) if (u.value instanceof THREE.Texture) u.value.dispose();
+      // A material extended as it compiles keeps its own uniforms in userData (places/bar/light.ts `patch`): their textures go too.
+      for (const uniforms of [(material as THREE.ShaderMaterial).uniforms, material.userData.uniforms as Record<string, THREE.IUniform> | undefined]) {
+        if (uniforms) for (const u of Object.values(uniforms)) if (u.value instanceof THREE.Texture) u.value.dispose();
+      }
       material.dispose();
     }
   });

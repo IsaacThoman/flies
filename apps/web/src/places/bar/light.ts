@@ -201,6 +201,8 @@ export type Patch = {
 
 /** Adds to a physical material's shader, keeping everything three.js does, with the `kind` of each vertex. */
 export function patch(material: THREE.MeshPhysicalMaterial, p: Patch) {
+  // Where the stage finds the textures among them to free when the fly leaves the bar (scene/build.ts disposeAll).
+  material.userData.uniforms = p.uniforms;
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, p.uniforms);
     shader.vertexShader = shader.vertexShader.replace("#include <common>", `#include <common>\n${VERTEX_HEAD}`).replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX_BODY}`);

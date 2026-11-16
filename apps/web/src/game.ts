@@ -27,6 +27,8 @@ import { Fireflies } from "./scene/fireflies.ts";
 import { clockHours, timeAt } from "./scene/light.ts";
 import { Outside, nativeWeather } from "./scene/outside.ts";
 import { forecastHours } from "./scene/weather.ts";
+import { cheaperEyes, cheaperPixels } from "./quality.ts";
+import type { Quality } from "./quality.ts";
 import { KEPT, loadLearned, loadSettings, loadShelf, saveLearned, saveSettings, saveShelf } from "./settings.ts";
 import type { Learned, Lesson, Settings, ShelfChoices } from "./settings.ts";
 import { Stage } from "./stage.ts";
@@ -34,7 +36,7 @@ import { BALL_RADIUS, Hands, SWOOP_BEARING } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
 import { drawHud } from "./ui/hud.ts";
 import type { HudState } from "./ui/hud.ts";
-import { drawLoading } from "./ui/loading.ts";
+import { arriving, drawLoading } from "./ui/loading.ts";
 import { Overlay } from "./ui/overlay.ts";
 import { AboutScreen } from "./ui/screens/about.ts";
 import { BrainScreen } from "./ui/screens/brain.ts";
@@ -42,8 +44,11 @@ import { pauseScreen, settingsPages, settingsScreen, titleScreen } from "./ui/sc
 import type { Screen, ScreenId, Shell } from "./ui/screens/types.ts";
 import { drawStats } from "./ui/stats.ts";
 
-/** Seconds the loading screen stays after the brain wakes, so "Awake!" is seen. */
+/** Seconds the loading screen stays after the brain wakes, so "Awake!" is seen; longer when it has more to say. */
 const AWAKE_HOLD = 1.2;
+const AWAKE_HOLD_NOTE = 4;
+/** Hidden longer than this (ms), the page wakes with the sky and the weather where the clock has them now, not easing there. */
+const AWAY_SETTLE_MS = 30_000;
 /** How sensitive the touch surface is: screen widths per full swipe. */
 const SWIPE_GAIN = 0.9;
 /** How often the HUD redraws for its shimmer alone, per second. */
@@ -92,6 +97,10 @@ export class Game implements Shell {
   wallpaper = false;
   /** 0 to 1: how much of the menus and hints show (they fade for the wallpaper). */
   uiAlpha = 1;
+  /** In a browser, what this device can afford to draw (quality.ts); null on the Apple TV, which is drawn as it is. */
+  quality: Quality | null = null;
+  /** The graphics context was lost, and nothing can be drawn until it is restored. */
+  glLost = false;
   /** Recent peaks of the giant fibre's escape command, the hand-wired loom, and the eyes' looming detectors (Hz). */
   readonly peaks = { escape: 0, loom: 0, looming: 0 };
   #loading = true;
@@ -119,6 +128,11 @@ export class Game implements Shell {
   #hit: RayHit = { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 1, z: 0 }, solid: -1, t: 0 };
   #eye = { x: 0, y: 0, z: 0 };
   #lastScreen: ScreenId | "loading" = "loading";
+  #lastNow = -1;
+  #qualitySeen = 0;
+  /** The pixels and eyes last chosen in Settings, to tell when the player changes them. */
+  #chosen: { pixels: string; eyes: string } = { pixels: "", eyes: "" };
+  #touchWas = false;
   #hud: HudState;
   #eyesInfo = { facets: 0, standIn: false, off: false };
   /** Where the fly is now. */
@@ -235,10 +249,13 @@ export class Game implements Shell {
   applySettings(save = true) {
     const s = this.settings;
     if (s.place !== "turns" && isPlaceId(s.place) && s.place !== this.#here) this.moveTo(s.place);
-    this.stage.setPixels(s.pixels);
+    // The player chose a picture: take it at its word until the device shows it can't keep up.
+    if (save && this.quality && (s.pixels !== this.#chosen.pixels || s.eyes !== this.#chosen.eyes)) this.quality.reset();
+    this.#chosen.pixels = s.pixels;
+    this.#chosen.eyes = s.eyes;
+    this.#applyPicture();
     this.audio.setVolumes(s.effects, s.ambience);
     this.director.wallpaperStyle = s.wallpaperCamera;
-    this.eyes.detail = s.eyes;
     if (s.hints && !this.#hints) this.#unlearn();
     this.#hints = s.hints;
     if (this.outside.enabled !== s.realWeather) {
@@ -246,6 +263,56 @@ export class Game implements Shell {
       this.#clockAt = 0;
     }
     if (save) saveSettings(s);
+  }
+
+  /** The pixels and eyes the player chose, or cheaper ones if this device can't afford them. */
+  #applyPicture() {
+    const s = this.settings;
+    const limit = this.quality?.current;
+    const pixels = limit ? cheaperPixels(s.pixels, limit.pixels) : s.pixels;
+    if (pixels !== this.stage.pixels) this.stage.setPixels(pixels);
+    this.eyes.detail = limit ? cheaperEyes(s.eyes, limit.eyes) : s.eyes;
+    this.eyes.rate = limit?.eyesRate ?? 1;
+    this.#qualitySeen = this.quality?.changes ?? 0;
+  }
+
+  /** Tries the brain again after it failed: on the player's say-so, or (`network`) when the network comes back. */
+  retryBrain(network = false) {
+    const brain = this.brain;
+    if (!arriving(brain) || brain.status !== "failed") return;
+    if (network && brain.failure !== "offline" && brain.failure !== "download") return;
+    brain.retry();
+    this.#awakeAt = -1;
+    this.overlay.dirty = true;
+  }
+
+  /** The page is hidden: the fly's life stops with the frames, and the sound with it. */
+  sleep() {
+    this.audio.sleep();
+  }
+
+  /** The page is back after `awayMs`: everything carries on from where it was, under the sky of the hour it is now. */
+  wake(awayMs: number) {
+    this.audio.wake();
+    this.#lastNow = -1;
+    if (awayMs > AWAY_SETTLE_MS) {
+      const now = new Date();
+      if (this.hands.timeOfDay === "clock") this.stage.light.follow(clockHours(now), true);
+      if (this.hands.weather === "now") this.stage.weather.follow(forecastHours(now), true);
+    }
+    this.overlay.dirty = true;
+  }
+
+  contextLost() {
+    this.glLost = true;
+  }
+
+  /** three.js rebuilds its own state; what was drawn into textures (the reflections) has to be drawn again. */
+  contextRestored() {
+    this.glLost = false;
+    this.stage.contextRestored();
+    this.eyes.contextRestored();
+    this.overlay.dirty = true;
   }
 
   sound(sound: Sound) {
@@ -342,10 +409,20 @@ export class Game implements Shell {
     this.time += dt;
     const { life, stage, director, remote } = this;
 
-    // The brain waking: the loading screen until it has, then the title.
+    // The brain waking: the loading screen until it has, then the title. A brain
+    // that can be tried again (in a browser) keeps its failure on screen until it is.
+    const brain = this.brain;
+    if (!this.#loading && brain.status === "failed" && arriving(brain)) {
+      this.#loading = true;
+      this.#awakeAt = -1;
+      // A finger already down isn't "Try again".
+      this.#touchWas = remote.touch.touching;
+      this.#syncCamera();
+    }
     if (this.#loading) {
-      if (this.brain.status !== "loading" && this.#awakeAt < 0) this.#awakeAt = this.time;
-      if (this.#awakeAt >= 0 && this.time - this.#awakeAt > (this.brain.status === "running" ? AWAKE_HOLD : 3)) {
+      if (brain.status !== "loading" && this.#awakeAt < 0) this.#awakeAt = this.time;
+      const hold = brain.status === "running" ? (arriving(brain) && brain.source.storageFull ? AWAKE_HOLD_NOTE : AWAKE_HOLD) : arriving(brain) ? Infinity : 3;
+      if (this.#awakeAt >= 0 && this.time - this.#awakeAt > hold) {
         this.#loading = false;
         this.#entered();
         // Asked once the title is up, not over the loading screen: the first time, the TV asks whether it may know where it is.
@@ -376,6 +453,13 @@ export class Game implements Shell {
       this.#paddle(dt);
     }
     this.meter.update(life.brain, now);
+    if (this.quality) {
+      // Loading, the pause menu and the building of a place aren't this device's everyday pace.
+      const steady = !this.#loading && !paused && !this.#moving && this.#lastNow >= 0;
+      this.quality.frame(steady ? now - this.#lastNow : 0, steady && life.brain.status === "running" ? this.meter.speed : -1);
+      if (this.quality.changes !== this.#qualitySeen) this.#applyPicture();
+    }
+    this.#lastNow = now;
     // Peaks of the brief things scripts wait for, held for a few seconds.
     const command = life.brain.state?.command;
     const rates = life.brain.state?.stats.rates;
@@ -407,18 +491,21 @@ export class Game implements Shell {
 
     this.#overlay(dt);
 
-    stage.beginFrame();
-    stage.render(director.camera, dt);
-    const showEyes = this.#showEyes();
-    this.inset.update(dt, insetWanted(this.settings.eyesInset, this.#loading ? "loading" : this.nav.current, this.wallpaper, showEyes, this.eyes.detail === "off"), this.wallpaper, director.shotChanges);
-    this.eyes.render(dt, showEyes, paused, this.hands.ball.active, this.inset.watching);
-    stage.renderer.render(this.overlay.scene, this.overlay.camera);
-    if (!this.#ready) {
-      // The TV's splash can give way once both the world and its loading panel are drawn.
-      this.canvas.dataset.ready = "true";
-      this.#ready = true;
+    // With the graphics context lost there is nothing to draw into: the fly lives on, unseen, until it is back.
+    if (!this.glLost) {
+      stage.beginFrame();
+      stage.render(director.camera, dt);
+      const showEyes = this.#showEyes();
+      this.inset.update(dt, insetWanted(this.settings.eyesInset, this.#loading ? "loading" : this.nav.current, this.wallpaper, showEyes, this.eyes.detail === "off"), this.wallpaper, director.shotChanges);
+      this.eyes.render(dt, showEyes, paused, this.hands.ball.active, this.inset.watching);
+      stage.renderer.render(this.overlay.scene, this.overlay.camera);
+      if (!this.#ready) {
+        // The TV's splash can give way once both the world and its loading panel are drawn.
+        this.canvas.dataset.ready = "true";
+        this.#ready = true;
+      }
+      stage.measure();
     }
-    stage.measure();
     remote.endFrame();
     this.hands.clearEvents();
     (window as unknown as Record<string, unknown>)[AT_ROOT_PROPERTY] = this.#loading || this.nav.atRoot;
@@ -558,6 +645,12 @@ export class Game implements Shell {
     this.uiAlpha += ((this.wallpaper ? 0 : 1) - this.uiAlpha) * Math.min(1, dt * (this.wallpaper ? 1.2 : 6));
 
     if (this.#loading) {
+      // Select, or a touch, is "Try again" on a failure.
+      const touched = remote.touch.touching && !this.#touchWas;
+      this.#touchWas = remote.touch.touching;
+      let select = touched;
+      for (const press of remote.presses) if (press.button === "select" && !press.repeat) select = true;
+      if (select && this.brain.status === "failed") this.retryBrain();
       remote.presses.length = 0;
       return;
     }
@@ -792,5 +885,23 @@ export class Game implements Shell {
     d.place = this.#here;
     d.placeMs = this.stage.buildMs.toFixed(0);
     d.moving = this.#moving ? this.#moving.to : "";
+    d.speed = this.meter.speed.toFixed(2);
+    d.gl = this.glLost ? "lost" : "ok";
+    d.pixels = this.stage.pixels;
+    d.eyesDetail = this.eyes.detail;
+    d.eyesRate = String(this.eyes.rate);
+    const brain = life.brain;
+    if (arriving(brain)) {
+      d.phase = brain.phase;
+      d.received = String(brain.source.received);
+      d.total = String(brain.source.total);
+      d.from = brain.source.from ?? "";
+      d.failure = brain.failure ?? "";
+    }
+    if (this.quality) {
+      d.quality = String(this.quality.level);
+      d.fps = String(this.quality.current.fps);
+      d.windowMs = this.quality.frameMs.toFixed(1);
+    }
   }
 }

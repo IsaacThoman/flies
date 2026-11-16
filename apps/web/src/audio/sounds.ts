@@ -429,6 +429,7 @@ export class Audio {
   #muffled: AudioBuffer[] = [];
   #nextChirp = 8;
   #started = false;
+  #asleep = false;
   #ambience: Ambience = "outdoors";
   #place: Loop | null = null;
   #loops = new Map<Ambience, AudioBuffer>();
@@ -454,7 +455,7 @@ export class Audio {
   /** Builds the sounds and starts the loops. Call from a key press, so browsers allow sound. */
   start(effects: number, ambience: number) {
     const ctx = this.ctx;
-    if (!ctx) return;
+    if (!ctx || this.#asleep) return;
     if (ctx.state === "suspended") void ctx.resume?.();
     if (this.#started) return;
     this.#started = true;
@@ -475,6 +476,29 @@ export class Audio {
     } catch {
       this.#buffers = null;
     }
+  }
+
+  /**
+   * Called from a press or tap's own event handler, the one moment some
+   * browsers (Safari) let a page's sound start; the sounds are built later,
+   * from the frame (`start`).
+   */
+  unlock() {
+    const ctx = this.ctx;
+    if (ctx && !this.#asleep && ctx.state !== "running" && ctx.state !== "closed") void ctx.resume?.().catch(() => {});
+  }
+
+  /** The page is hidden: silence, and nothing for the audio thread to do. */
+  sleep() {
+    this.#asleep = true;
+    if (this.ctx?.state === "running") void this.ctx.suspend().catch(() => {});
+  }
+
+  /** The page is back: the sound carries on where it was, if it had started. */
+  wake() {
+    this.#asleep = false;
+    const ctx = this.ctx;
+    if (this.#started && ctx && ctx.state !== "running" && ctx.state !== "closed") void ctx.resume?.().catch(() => {});
   }
 
   /** Changes to another place's sound, fading the old one out. */

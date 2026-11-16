@@ -1,11 +1,13 @@
 # Assets
 
-Images the Apple TV app is built from. `npm run tvos -- build` turns them into the app's asset
-catalog (`scripts/tvosAssets.ts`). They are rendered from the game itself by `npm run tvos:art`
-(`scripts/art.ts`, which drives `apps/web/art.html` in a headless Chromium): the same table, light
-and fly, at full size with 4× multisampling, so they change when the game's look does. Run it
-again after changing the scene; `--out <dir>` writes them somewhere else to look at first, and
-`--only <path>` renders just the files whose paths start with it.
+Images the Apple TV app and the web build are made with. `npm run tvos -- build` turns the TV's
+into the app's asset catalog (`scripts/tvosAssets.ts`); `npm run build` gives the web's (`web/`)
+hashed names and lists them in the web app manifest (`scripts/webBuild.ts`). They are rendered
+from the game itself by `npm run tvos:art` (`scripts/art.ts`, which drives `apps/web/art.html` in
+a headless Chromium): the same table, light and fly, at full size with 4× multisampling, so they
+change when the game's look does. Run it again after changing the scene; `--out <dir>` writes
+them somewhere else to look at first, and `--only <path>` renders just the files whose paths
+start with it (`--only web/` for the web's).
 
 - **Icon**: the fly close up on the napkin, the hills and trees beyond. Back to front: `1-sky`
   (the backdrop: sky, hills, lake; opaque), `2-table` (the table and the picnic, transparent
@@ -21,3 +23,8 @@ again after changing the scene; `--out <dir>` writes them somewhere else to look
 | `top-shelf/standard/` | The Top Shelf banner, shown above the top row when the app is in it: `top-shelf.png`, `top-shelf@2x.png`. tvOS may crop the edges. | 1920×720, 3840×1440 |
 | `top-shelf/wide/` | The wide Top Shelf banner, the same way. | 2320×720, 4640×1440 |
 | `splash/` | The launch image, which stays up until the game says it is ready. | `splash-1920x1080.png`, `splash-3840x2160.png` |
+| `web/icon-192.png`, `web/icon-512.png` | The web app's icon: the fly close up on the napkin, square, full bleed. | 192×192, 512×512 |
+| `web/icon-maskable-512.png` | The same framed looser, for launchers that cut icons to a circle or a squircle (the fly inside the middle 80%). | 512×512 |
+| `web/apple-touch-icon.png` | The icon an iPhone or iPad puts on its home screen. | 180×180 |
+| `web/favicon.png` | The browser tab's icon: the fly alone, from nearly above, transparent. | 64×64 |
+| `web/preview.png` | The picture a link to the site shows in chats and feeds: the launch image's shot, with the wordmark. | 1200×630 |

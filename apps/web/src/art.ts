@@ -1,6 +1,7 @@
-// The app's own art (the layered home-screen icon, the Top Shelf banners and
-// the launch image), rendered from the game: the same table, the same light
-// and the same fly, at the sizes tvOS wants. scripts/art.ts opens this page
+// The app's own art (the layered home-screen icon, the Top Shelf banners,
+// the launch image, and the web app's icons and link preview), rendered from
+// the game: the same table, the same light and the same fly, at the sizes
+// tvOS and browsers want. scripts/art.ts opens this page
 // (apps/web/art.html, not part of the build) and calls `__art.render`.
 //
 // Each picture is drawn into a 4× multisampled target and read back. A layer

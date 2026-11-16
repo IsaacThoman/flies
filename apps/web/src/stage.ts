@@ -180,6 +180,12 @@ export class Stage {
     old?.dispose();
   }
 
+  /** After the graphics context was lost and given back: the reflections were in it, and are drawn again. */
+  contextRestored() {
+    this.#envDirty = true;
+    this.#envAge = 1;
+  }
+
   setPixels(pixels: PixelSize) {
     this.pixels = pixels;
     this.#lowRes?.dispose();
