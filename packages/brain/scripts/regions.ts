@@ -12,7 +12,7 @@
 // after 2 s of rest; its peak, the highest it reaches under any stimulus, and
 // which; and its fullHz, then says whether every fullHz is the rule's. The
 // stimuli, each from a fresh brain: each sense alone at full strength for 1 s
-// after 2 s of rest, every sense at once the same way, the pet's looming pulse
+// after 2 s of rest, every sense at once the same way, the game's fallback looming pulse
 // in the left eye (report.ts, a), and every stimulus of the vision battery
 // with the eyes open, after 1 s of its steady scene (report.ts, e).
 //

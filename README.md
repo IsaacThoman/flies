@@ -241,7 +241,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | Sense | From |
 | --- | --- |
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
-| `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms, as in the desktop pet. |
+| `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
 | `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
 | `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, or past the table's edge. |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
@@ -251,7 +251,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 ## What the body adds
 
 The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
-with the desktop pet's thresholds, smoothing and hysteresis: walk above 0.3
+with thresholds, smoothing and hysteresis: walk above 0.3
 until below 0.15, back up when `back` beats `walk` by 0.15, take off as
 `escape` rises past 0.5, groom and wing poses above 0.2, feed above 0.15 until
 below 0.05, commands older than 500 ms ignored). Steering is continuous: `turn`
@@ -281,7 +281,7 @@ lives (`packages/body/src/motion.ts` unless noted):
   its mouth on it. Stopping is the brain's (sugar stops DNg100); the shuffle
   isn't.
 - **The pose.** Grooming is shown only while it stands, and a bout lingers
-  about 1.5 s after the command fades (as in the pet). The crouch follows the
+  about 1.5 s after the command fades. The crouch follows the
   raw escape command.
 
 The caption ("Walking", "Eating honey", "Grooming", "Flying") names what the

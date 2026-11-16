@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { test } from "node:test";
 import { DEFAULT_CONNECTOME_PATH, readConnectomeFile } from "./node.ts";
-import { PetObserver } from "./pet.ts";
+import { BehaviorObserver } from "./observer.ts";
 import { FlyBrain } from "./runtime.ts";
 import { RESTING_SENSES } from "./types.ts";
 import type { BrainCommand, BrainSenses } from "./types.ts";
@@ -86,7 +86,7 @@ test("no seizures: after each sense, and everything at once, at full strength fo
 
 test("a full-strength loom in either eye fires the giant fiber: escape passes 0.5 within 150 ms and falls below 0.3 within 300 ms of the loom ending", { skip }, () => {
   for (const eye of ["loomLeft", "loomRight"] as const) {
-    // The pet's pulse: held at its peak for 80 ms, fading to 0 over 200 ms.
+    // The fallback looming pulse: held at its peak for 80 ms, fading to 0 over 200 ms.
     const b = brain();
     run(b, 2000);
     let up = -1;
@@ -173,9 +173,9 @@ test("touch makes it back away, wind makes it groom, sweet makes it feed, and lo
 
 test("at rest it walks in bouts, turns both ways and never escapes (3 minutes of fly time)", { skip }, () => {
   const b = brain();
-  const pet = new PetObserver();
-  for (let t = 0; t < 180_000; t += TICK) pet.observe(b.tick(TICK, RESTING_SENSES).command, TICK / 1000);
-  const t = pet.tally;
+  const observer = new BehaviorObserver();
+  for (let t = 0; t < 180_000; t += TICK) observer.observe(b.tick(TICK, RESTING_SENSES).command, TICK / 1000);
+  const t = observer.tally;
   const share = t.walking / t.seconds;
   assert.ok(share > 0.2 && share < 0.7, `walking ${(share * 100).toFixed(0)}% of the time`);
   assert.ok(t.walkBouts >= 15, `${t.walkBouts} walking bouts`);

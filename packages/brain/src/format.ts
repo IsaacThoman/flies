@@ -1,5 +1,5 @@
 // The packed connectome, connectome.bin, and the code that reads and writes
-// it. No Node APIs here: the desktop pet loads it in a Web Worker.
+// it. No Node APIs here: the browser game loads it in a Web Worker.
 //
 // Layout, all little-endian:
 //

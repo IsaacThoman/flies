@@ -1,7 +1,5 @@
 // What the body makes of the brain's commands: thresholds, smoothing and
-// hysteresis, the same as the Computerbug desktop pet's
-// (apps/desktop/src/brain/behavior.ts in github.com/IsaacThoman/ladybug),
-// carried over into three dimensions. This decides nothing by itself: every
+// hysteresis. This decides nothing by itself: every
 // action starts with a command read from the fly's own neurons.
 
 import type { BrainCommand } from "@fly/brain";

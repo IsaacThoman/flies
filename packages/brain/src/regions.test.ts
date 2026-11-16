@@ -198,7 +198,7 @@ test("on the real connectome the rates respond where they should, and rest leave
   assert.equal(rest("mouthparts"), 0);
   assert.ok(rest("visual-projection-left") > 0.5, "the visual background");
 
-  // The pet's looming pulse, straight into the left eye's looming detectors.
+  // The game's fallback looming pulse, straight into the left eye's looming detectors.
   const pulse = measure(rested(), 300, (t) => ({ ...RESTING_SENSES, loomLeft: t < 80 ? 1 : Math.max(0, 1 - (t - 80) / 200) }));
   for (const side of ["left", "right"]) {
     assert.ok(pulse(`descending-${side}`) > 3 * rest(`descending-${side}`) && pulse(`descending-${side}`) > 2, `descending ${side} under the pulse ${pulse(`descending-${side}`)}`);

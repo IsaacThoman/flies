@@ -1,6 +1,6 @@
 // The running brain: the connectome at the operating point (params.ts), driven
 // by the senses and the internal state (io.ts, state.ts), read out as
-// commands. No Node APIs; it runs in the pet's Web Worker.
+// commands. No Node APIs; it runs in the browser game's Web Worker.
 
 import type { EyeColumn } from "./eye-columns.ts";
 import { buildEyes } from "./eyes.ts";

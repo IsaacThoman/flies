@@ -45,7 +45,7 @@ export type Food = {
   pool: boolean;
 };
 
-/** Amount eaten per second at `feed` 1. A dropped food lasts about 6 s with `feed` near 0.5, as the berry does in the desktop pet. */
+/** Amount eaten per second at `feed` 1. A dropped food lasts about 6 s with `feed` near 0.5. */
 export const EAT_RATE = 0.33;
 /** A patch eaten down comes back over about this long, s. */
 export const PATCH_RECOVERY = 90;

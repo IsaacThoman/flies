@@ -19,7 +19,7 @@ const SHA256 = "51c97031b39f93c04a683f16683d88f15d291f1e1062694fc0a215e23c3b895c
 
 const { values } = parseArgs({
   options: {
-    url: { type: "string", default: process.env.LADYBUG_BRAIN_URL ?? DEFAULT_URL },
+    url: { type: "string", default: process.env.FLY_BRAIN_URL ?? DEFAULT_URL },
     out: { type: "string", default: DEFAULT_CONNECTOME_PATH },
   },
 });
