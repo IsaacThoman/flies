@@ -10,7 +10,7 @@
 // pendant (light.ts).
 
 import * as THREE from "three";
-import { BANQUETTE, BOTTLES, CHAIR, DINING_ROOM, ESPRESSO, HOST_STAND, PASS, RESTAURANT_SOLIDS, STATION, STOOL, START_TABLE, TABLES, TABLE_TOPS, ZINC_BAR, topPeak } from "@fly/world";
+import { BANQUETTE, BOTTLES, CHAIR, DINING_ROOM, ESPRESSO, HOST_STAND, PASS, RESTAURANT_SOLIDS, STATION, STOOL, RESTAURANT_START, START_TABLE, TABLES, TABLE_TOPS, ZINC_BAR, topPeak } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { EYE_LAYER } from "../../eyes/eyes.ts";
 import { canvasTexture, freeze } from "../../scene/build.ts";
@@ -26,6 +26,7 @@ import { buildShell } from "./shell.ts";
 import { PARTS, owner } from "./parts.ts";
 import type { PartName } from "./parts.ts";
 import { buildShopGlass } from "./glass.ts";
+import { buildGlows } from "./glows.ts";
 import { updateStreetLight } from "./traffic.ts";
 
 /** How bright the pendant left on is, for a millimetre world (its light falls off as the distance squared). */
@@ -181,6 +182,8 @@ export function buildRestaurant(): SceneSet {
   // The shop front's glass, with the rain on it: the street's (glass.ts), between the frames.
   const glass = buildShopGlass();
   group.add(glass.mesh);
+  const glows = buildGlows(shared.uNight);
+  group.add(glows.mesh);
 
   type Shown = { spec: AreaSpec; group: THREE.Group; shown: boolean; lit: Lit | null };
   const areas: Shown[] = AREAS.map((spec, i) => {
@@ -209,6 +212,8 @@ export function buildRestaurant(): SceneSet {
   useLight(noLight);
 
   const eyeAt = new THREE.Vector3();
+  // Where the fly was last seen living, for the camera's focus.
+  const flyAt = new THREE.Vector3(RESTAURANT_START.x, RESTAURANT_START.y, RESTAURANT_START.z);
   const glow = new THREE.Color();
   let nextRipple = 0;
   const ripples = shared.uRipples.value;
@@ -224,19 +229,21 @@ export function buildRestaurant(): SceneSet {
       updateStreetLight(time, light, weather);
       glass.update(time, light, weather);
       // The one pendant left on for the night, lit as the evening comes.
-      shared.uPendant.value.w = PENDANT * THREE.MathUtils.smoothstep(night, 0.15, 0.6);
+      const lit = THREE.MathUtils.smoothstep(night, 0.15, 0.6);
+      shared.uPendant.value.w = PENDANT * lit;
       shared.uFridge.value.setRGB(0.55, 0.68, 0.85);
       shared.uExit.value.setRGB(0.02, 0.5, 0.18);
       shared.uKitchen.value.setRGB(0.05, 0.055, 0.06).multiplyScalar(0.6 + night);
       shared.uHeat.value.setRGB(0.5, 0.12, 0.03).multiplyScalar(0.4 + 0.6 * night);
       // The sky through the glass by day, and the street's glow after dark.
-      glow.copy(light.skyColor).lerp(light.horizon, 0.3).multiplyScalar(2.2 * (1 - night) + 0.05);
+      glow.copy(light.skyColor).lerp(light.horizon, 0.3).multiplyScalar(3.4 * (1 - night) + 0.05);
       shared.uWindow.value.copy(glow);
       shared.uSunSoft.value = 0.03 + 0.12 * Math.max(0, 1 - light.sunIntensity / 3) + 0.1 * night;
       shared.uOpening.value = 0.25 + 1.1 * (1 - night);
 
       if (!camera) return;
       eyeAt.setFromMatrixPosition(camera.matrixWorld);
+      glows.update(lit, eyeAt.distanceTo(flyAt));
       let bits = 0;
       let nearest: Shown | null = null;
       let nearestD = Infinity;
@@ -256,6 +263,9 @@ export function buildRestaurant(): SceneSet {
       }
       mask.value = bits;
       useLight(nearest && nearestD < DETAIL_REACH ? nearest.lit! : noLight);
+    },
+    live(_dt, around) {
+      flyAt.set(around.fly.x, around.fly.y, around.fly.z);
     },
     ripple(x: number, z: number, strength: number) {
       ripples.set([x, z, shared.uTime.value, strength], nextRipple * 4);

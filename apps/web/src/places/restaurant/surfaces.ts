@@ -176,9 +176,10 @@ if (rK == K_MARBLE) {
   float vein;
   float seed = rHash(floor(vWorld.xz / 1300.0 + 0.5));
   diffuseColor.rgb *= rMarble(vWorld.xz + vWorld.y * vec2(0.3, 0.7), seed, vein);
-  rRough = 0.22 + vein * 0.08;
-  rCoat = 0.75;
-  rCoatRough = 0.05;
+  // A faint polish, worn by years of plates and elbows.
+  rRough = 0.3 + vein * 0.08;
+  rCoat = 0.45;
+  rCoatRough = 0.12;
   // Rings where glasses and cups stood, a wine stain, a smear: each the rim of a ring, a little dull.
   for (int i = 0; i < 6; i++) {
     vec4 ring = uRings[i];
@@ -249,8 +250,9 @@ if (rK == K_ZINC) {
   // Elbows have polished the front edge bright.
   float edge = smoothstep(${f(-2570)} - 120.0, ${f(-2570)}, vWorld.x);
   diffuseColor.rgb *= c;
-  rMetal = 0.85;
-  rRough = mix(0.42, 0.24, edge) + marks * 0.12 + patina * 0.1;
+  // Old zinc is dull: grey, half metal, the hammering catching what light there is; only the front edge is bright.
+  rMetal = mix(0.45, 0.75, edge);
+  rRough = mix(0.46, 0.28, edge) + marks * 0.12 + patina * 0.1;
   rBump = vec3(dim.x, 0.0, dim.y) * d * (1.0 - edge * 0.6);
 }
 if (rK == K_BRASS) {

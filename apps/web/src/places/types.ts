@@ -74,12 +74,14 @@ export type SceneBackdrop = {
 export type SceneCamera = {
   whole: Shot;
   /**
-   * The point the whole-place view circles, and how much of the way it
-   * follows the fly from there (and half of the fly's height); left out, a
-   * point a third of the way from the table's middle to the fly. A room
-   * gives its own, so that the view stays inside it wherever the fly goes.
+   * The point the whole-place view circles, how much of the way it follows
+   * the fly from there (and a third of the fly's height), and how much of
+   * the way from it toward the fly the camera aims (0 if left out); left
+   * out, a point a third of the way from the table's middle to the fly. A
+   * room gives its own, so that the view stays inside it wherever the fly
+   * goes, and turns to keep the fly in the picture.
    */
-  focus?: { x: number; y: number; z: number; follow: number };
+  focus?: { x: number; y: number; z: number; follow: number; aim?: number };
   /** Which way the best of the view lies, on the ground (a unit vector): with nothing standing behind the fly, the camera likes to have it there. */
   vista: { x: number; z: number };
 };
