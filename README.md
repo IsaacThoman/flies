@@ -74,6 +74,27 @@ the room is dark round it but for lit windows across the way. It sounds of the
 air handling, the lights' hum, a fridge's compressor starting and stopping, and
 a distant beep now and then. There are no bubbles or fireflies indoors.
 
+The bar is the walnut counter of a small, warm bar in the evening: a cocktail
+on the rocks with a wedge of lime on its rim, a tall beer with its head of
+foam, salted peanuts heaped in a fluted ramekin (two have fallen out), two
+maraschino cherries, printed card coasters, a folded paper napkin, and a
+candle in a storm lantern whose cap is a perch and whose flame is out of
+reach. A sticky ring of syrup marks where a glass stood; the cherries' syrup,
+the lime, the beer's head and the cocktail itself are sweet too (a fly that
+lands in the drink can climb out up the meniscus onto the rim), and spilt
+beer takes its feet as rings, as does the cocktail when the ice settles. At
+the fly's scale the walnut's grain and open pores show under the varnish,
+with fine scratches and the milky rings of old glasses; salt crystals and
+bits of peanut lie about; the cold glasses are beaded with condensation and
+bubbles rise through the beer. Behind the bar, bottles glow on glass shelves
+before an old mirror, under brass pendant lamps; off the counter's end a
+window looks over a square to a row of houses. By day the room is unlit and
+the light is the window's, falling away from it; at golden hour the sun comes
+in low across the counter and the glasses throw long shadows coloured by what
+is in them; at dusk and night the lamps, the flickering candle and the back
+bar light it, and lights out of focus glow behind the fly. It sounds like a
+quiet room: low voices, a glass or two touching, ice settling.
+
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
 Back, space for Play/Pause) and dragging the mouse over the picture is the
 touch surface.
