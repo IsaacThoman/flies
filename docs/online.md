@@ -358,8 +358,10 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
 - **iPhone and iPad.** No bridge: the app is the web build in a web view,
   whose own WebSocket reaches `wss://flies.isaacthoman.com/rooms` (and a room
   server of your own at an address or a `.local` name, for development), and
-  whose `navigator.share` is the system share sheet. The links it shares are
-  the site's; with `APPLE_TEAM_ID` on the site and the app built with
-  `IOS_LINKS=1`, they open the app (universal links). iOS suspends a
+  whose `navigator.share` is the system share sheet. Names and passwords are
+  typed as in Safari, with the phone's keyboard and AutoFill. The links it
+  shares are the site's; with `APPLE_TEAM_ID` on the site and the app built
+  with `IOS_LINKS=1`, they open the app (universal links), and AutoFill
+  offers the site's passwords in it. iOS suspends a
   backgrounded app, so away is the normal state there; the 10 minutes and
   coming back are what make it work. `docs/ios.md`, "Tables with others".

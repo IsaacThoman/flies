@@ -263,29 +263,32 @@ server.
 
 ### Typing names and passwords
 
-A room's name and password are typed into fields the game draws, with the keys going to one hidden
-`<input>` (the room list's `apps/web/src/ui/text-entry.ts`, being built on `feat-online-rooms`).
-Tried in the web view with an input like that one (fixed at the top left, 1 px, transparent, a
-16 px font, focused with `preventScroll`):
+A room's name, its password and a code are typed into fields the game draws (Online, docs/online.md),
+with the keys going to one hidden `<input>` (`BrowserTextEntry`, `apps/web/src/ui/text-entry.ts`),
+focused as a tap on a field lifts (`Game.#typeOnTap`). Tried in the simulator, in the app's
+Online → New room, and with a page of its own for what the game doesn't do:
 
-- **Focused during the tap** (in its `pointerup`), the phone's keyboard comes up and what is typed
-  reaches the input (`keydown` and `input`, the value as typed). **Focused a frame later**, the
-  input has focus but no keyboard comes up: WebKit shows it only for focus that comes from the
-  player's own touch. So the field must be focused in the tap's handler, as the room list does
-  (`#typeOnTap`). A hardware keyboard types into it either way.
-- **A password field** (`type="password"`, `autocomplete="current-password"`) brings the keyboard
-  with AutoFill's Passwords button over it, in the app as in Safari. With the site's
-  `webcredentials` and the app's entitlement (above), AutoFill also suggests the passwords saved
-  for `flies.isaacthoman.com` and offers to save a new one (`new-password`, for a new room); without
-  them it offers only the list of all passwords. Seeing that needs a signed build on a device.
-- **The keyboard covers the bottom of the canvas.** On the iPhone 18 Pro Max it takes 415 of 956
-  points: `visualViewport.height` drops to 541 and `visualViewport` fires `resize`, while
-  `innerHeight` stays 956, no window `resize` comes, and the page isn't scrolled. WebKit's form bar
-  (up, down, Done) sits on the keyboard. The app tells the page nothing more, because this is what
-  Safari on a phone tells the same page, so one rule serves both: the room list must keep the field
-  being typed into, and its Join, above `visualViewport.height` while that is smaller than the
-  page, and lay out again when it grows back. Return (`enterkeyhint="done"`) and Done both end the
-  typing.
+- **The phone's keyboard comes up** for a field tapped, and what is typed reaches it: the name as
+  typed, the password as dots. It must be focused in the tap's own handler, as `#typeOnTap` does:
+  focused a frame later, the input has focus but no keyboard comes up, since WebKit shows it only for
+  focus that comes from the player's touch. A hardware keyboard types into it either way.
+- **Return** (the keyboard's blue key, `enterkeyhint="done"`) and **Done** on WebKit's form bar
+  (up, down, Done, over the keyboard) both end the typing and keep what was typed; the keyboard
+  goes and the panel lays out again.
+- **Passwords**: a password field (`current-password` at a locked room's door, `new-password` for
+  a new room) brings the keyboard with AutoFill's Passwords button over it, in the app as in
+  Safari. With the site's `webcredentials` and the app's entitlement (Universal links, above),
+  AutoFill also suggests the passwords saved for `flies.isaacthoman.com`, offers a strong one for a
+  new room and offers to save it; without them it offers only the list of all passwords. Seeing
+  that needs a signed build on a device.
+- **The keyboard covers the bottom of the screen**: on the iPhone 18 Pro Max 415 of 956 points.
+  WebKit leaves the window its size (`innerHeight` stays 956, no window `resize`, nothing
+  scrolled) and shrinks only the visual viewport, to 541, as Safari on a phone does. So New room's
+  Password and Create were under the keyboard, and the password was typed into a field nobody
+  could see. The game now takes what the visual viewport no longer shows of the window's bottom as
+  covered (`keyboardInset`, `apps/web/src/display.ts`), as it does the home indicator: while the
+  keyboard is up the menus lay themselves out above it, in the app and in Safari alike, and back
+  when it goes. The app tells the page nothing for it.
 - Nothing in the app stands in the way: the web view is the first responder, and the page's own
   focus decides the rest.
 
@@ -429,10 +432,11 @@ with its GPU. They say the app works, not how a phone runs it.
    4. Build with it: `IOS_LINKS=1 npm run ios -- build`, then `npm run ios -- run --device <udid>`.
       For TestFlight, set `IOS_LINKS=1` in the release workflow's environment
       (`.github/workflows/testflight.yml`, [release.md](release.md)) or archive by hand with it.
-   5. On the phone: send yourself a table's link (Start a table in a browser, Share the link) in
-      Messages or Notes and tap it: the app opens and sits down at that table. A link typed into
-      Safari's address bar opens the page in Safari, by design. A password typed into a room in the
-      app is offered for saving under flies.isaacthoman.com, and offered again in Safari and the app.
+   5. On the phone: send yourself a room's link (Online → New room in a browser, then Share the
+      link) in Messages or Notes and tap it: the app opens and sits down in that room. A link typed
+      into Safari's address bar opens the page in Safari, by design. A password given to a new room
+      in the app is offered for saving under flies.isaacthoman.com, and offered again at its door,
+      in Safari and in the app.
 
 ## What isn't verified
 

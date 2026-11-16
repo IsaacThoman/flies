@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PIXEL_BUDGET, TV_FRAME, frameFor, pixelsPerUnit, sameFrame, worldSize } from "../src/display.ts";
+import { PIXEL_BUDGET, TV_FRAME, frameFor, keyboardInset, pixelsPerUnit, sameFrame, worldSize } from "../src/display.ts";
 import { SHAPES } from "./shapes.ts";
 
 test("the Apple TV's frame is what it always was: 640×480, shown at 16:9, laid out 854×480", () => {
@@ -53,6 +53,15 @@ test("the safe area comes in design units", () => {
   assert.ok(Math.abs(frame.safe.top - 59 / 1.25) < 1e-9);
   assert.ok(Math.abs(frame.safe.bottom - 34 / 1.25) < 1e-9);
   assert.equal(frameFor(393, 852, { top: Number.NaN, right: -4, bottom: 0, left: 0 }).safe.top, 0, "nonsense is nothing");
+});
+
+test("a phone's keyboard covers what the visual viewport no longer shows of the window's bottom", () => {
+  // Measured in the iPhone app's web view, iPhone 18 Pro Max: the window stays 956 tall, the visual viewport 541.
+  assert.equal(keyboardInset(956, { offsetTop: 0, height: 541, scale: 1 }), 415);
+  assert.equal(keyboardInset(956, { offsetTop: 0, height: 956, scale: 1 }), 0, "no keyboard");
+  assert.equal(keyboardInset(956, { offsetTop: 0, height: 955.6, scale: 1 }), 0, "rounding is no keyboard");
+  assert.equal(keyboardInset(956, { offsetTop: 200, height: 478, scale: 2 }), 0, "zoomed in by a pinch, no keyboard");
+  assert.equal(keyboardInset(956, null), 0, "no visual viewport");
 });
 
 test("a screen of the same shape is the same frame; any change is a new one", () => {
