@@ -56,13 +56,13 @@ function prepare() {
 const configuration = (debug: boolean) => (debug ? 'Debug' : 'Release');
 export const derivedData = path.join(appDir, 'build');
 export const appPath = (sim: boolean, debug = false) =>
-  path.join(derivedData, `Build/Products/${configuration(debug)}-${sim ? 'iphonesimulator' : 'iphoneos'}/AppleTVFly.app`);
+  path.join(derivedData, `Build/Products/${configuration(debug)}-${sim ? 'iphonesimulator' : 'iphoneos'}/Flies.app`);
 
 export function build(options: BuildOptions) {
   const env = prepare();
   const debug = options.debug || options.forTesting;
   run('xcodebuild', [
-    '-project', 'AppleTVFlyiOS.xcodeproj', '-scheme', 'AppleTVFly', '-configuration', configuration(debug),
+    '-project', 'Flies.xcodeproj', '-scheme', 'Flies', '-configuration', configuration(debug),
     '-destination', options.sim ? 'generic/platform=iOS Simulator' : 'generic/platform=iOS', '-derivedDataPath', derivedData,
     // Signed to run locally in the simulator, as test runners must be.
     ...(options.sim ? ['CODE_SIGN_IDENTITY=-', 'CODE_SIGN_STYLE=Manual', 'DEVELOPMENT_TEAM=', 'ARCHS=arm64'] : ['-allowProvisioningUpdates', '-allowProvisioningDeviceRegistration']),

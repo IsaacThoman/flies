@@ -171,19 +171,18 @@ npm run tvos:art -- --only ios/           # render the icon and launch image aga
 `build` writes the asset catalog from `assets/ios` (`scripts/iosAssets.ts`), builds the web app
 with the root Vite config into `apps/ios/www/` (17 MB, the brain's parts included; the same files
 `npm run build` makes for a web host), generates
-`AppleTVFlyiOS.xcodeproj` from `apps/ios/project.yml` and builds it. Release by default; `--debug`
+`Flies.xcodeproj` from `apps/ios/project.yml` and builds it. Release by default; `--debug`
 makes the page inspectable in Safari's Web Inspector.
 
 ### The app's identity
 
 - **Bundle ID and team**: `IOS_BUNDLE_ID` and `IOS_TEAM_ID`, which default to the Apple TV app's
-  (`TVOS_BUNDLE_ID`, `com.isaacthoman.appletvfly`; `TVOS_TEAM_ID`, `PX72AL9366`). One bundle ID
+  (`TVOS_BUNDLE_ID`, `com.isaacthoman.flies`; `TVOS_TEAM_ID`, `PX72AL9366`). One bundle ID
   for both makes them one app in the App Store, bought once for both (universal purchase): App
   Store Connect adds iOS as a platform to the Apple TV app's record.
 - **Version**: `apps/version.yml`, included by both XcodeGen specs, so the iPhone, iPad and Apple
   TV apps are numbered together.
-- **Name**: "Apple TV Fly", the game's own. App Review's guidelines (5.2.5) are wary of Apple's
-  trademarks in an app's name; that goes for the Apple TV app too.
+- **Name**: "Flies", the game's own, as on the Apple TV and the web.
 - **Icon and launch image**: rendered from the game by the art pipeline (`scripts/art.ts`,
   `apps/web/src/art.ts`) into `assets/ios` ([assets/README.md](../assets/README.md)): the web
   app's icon (the fly close up on the napkin) at full size, with a night version for the dark
@@ -251,16 +250,17 @@ with its GPU. They say the app works, not how a phone runs it.
 
 ## On a device, and in TestFlight
 
-1. In the [developer account](https://developer.apple.com/account), the app ID
-   `com.isaacthoman.appletvfly` already exists for the Apple TV app; nothing to add (no
-   capabilities). With a different `IOS_BUNDLE_ID`, register it.
+1. The app ID is the Apple TV app's, `com.isaacthoman.flies`: Xcode's automatic signing registers
+   it with the first signed build if it isn't in the
+   [developer account](https://developer.apple.com/account) yet. The iPhone and iPad app needs no
+   capabilities of its own. With a different `IOS_BUNDLE_ID`, the same goes for that one.
 2. For a device: enable Developer Mode on it (Settings, Privacy & Security), connect it, then
    `npm run ios -- build` (Xcode's automatic signing makes the profile; `-allowProvisioningUpdates`
    is passed) and `npm run ios -- run --device <udid>` (`xcrun devicectl list devices` gives the
    UDID). Without `--report` it runs as from the home screen.
-3. For TestFlight: in App Store Connect, open the Apple TV Fly record and add iOS as a platform
+3. For TestFlight: in App Store Connect, open the Flies record and add iOS as a platform
    (Add Platform). Raise `CURRENT_PROJECT_VERSION` in `apps/version.yml` for each upload. Then
-   `npm run ios -- build`, open `apps/ios/AppleTVFlyiOS.xcodeproj` in Xcode, Product → Archive,
+   `npm run ios -- build`, open `apps/ios/Flies.xcodeproj` in Xcode, Product → Archive,
    and Distribute App → App Store Connect. Add the iPhone and iPad screenshots, the privacy
    answers (no data collected) and a TestFlight group.
 

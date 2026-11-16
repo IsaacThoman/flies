@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import AppleTVFly
+@testable import Flies
 
 /// When the screen is held on and when the game runs (PowerPolicy).
 final class PowerPolicyTests: XCTestCase {

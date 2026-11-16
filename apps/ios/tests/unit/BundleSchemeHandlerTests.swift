@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import AppleTVFly
+@testable import Flies
 
 /// The scheme handler serves the bundled site and nothing else.
 @MainActor

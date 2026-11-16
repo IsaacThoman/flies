@@ -37,7 +37,7 @@ function sampleMemory(udid: string) {
   if (!launchd) return;
   for (const line of ps) {
     const [pid, ppid] = line.trim().split(/\s+/);
-    const name = /\/(AppleTVFly|com\.apple\.WebKit\.\w+)(\s|$)/.exec(line)?.[1];
+    const name = /\/(Flies|com\.apple\.WebKit\.\w+)(\s|$)/.exec(line)?.[1];
     if (ppid !== launchd || !name) continue;
     const out = spawnSync('footprint', ['-p', pid], { encoding: 'utf8' }).stdout ?? '';
     const m = /phys_footprint:\s*([\d.]+)\s*(KB|MB|GB)/.exec(out);
@@ -53,9 +53,9 @@ if (!args.includes('--no-build')) {
 }
 
 const started = Date.now();
-const udid = xcrun('simctl', 'create', 'apple-tv-fly-ios-check', `com.apple.CoreSimulator.SimDeviceType.${device}`, `com.apple.CoreSimulator.SimRuntime.${runtime}`);
+const udid = xcrun('simctl', 'create', 'flies-ios-check', `com.apple.CoreSimulator.SimDeviceType.${device}`, `com.apple.CoreSimulator.SimRuntime.${runtime}`);
 console.log(`simulator ${udid} (${device}, ${runtime})`);
-const evidence = mkdtempSync(path.join(tmpdir(), 'apple-tv-fly-ios-'));
+const evidence = mkdtempSync(path.join(tmpdir(), 'flies-ios-'));
 const screenshot = path.join(evidence, 'simulator.png');
 const output: string[] = [];
 let sampler: ReturnType<typeof setInterval> | null = null;
@@ -64,7 +64,7 @@ try {
   xcrun('simctl', 'bootstatus', udid, '-b');
   sampler = setInterval(() => sampleMemory(udid), 3000);
   const test = spawn('xcodebuild', [
-    'test-without-building', '-project', 'apps/ios/AppleTVFlyiOS.xcodeproj', '-scheme', 'AppleTVFly', '-configuration', 'Debug',
+    'test-without-building', '-project', 'apps/ios/Flies.xcodeproj', '-scheme', 'Flies', '-configuration', 'Debug',
     '-destination', `id=${udid}`, '-derivedDataPath', derivedData, '-resultBundlePath', path.join(evidence, 'result.xcresult'),
   ], { cwd: root, env: { ...process.env, TEST_RUNNER_FLY_SCREENSHOT: screenshot }, stdio: ['ignore', 'pipe', 'pipe'] });
   const read = (chunk: Buffer) => {

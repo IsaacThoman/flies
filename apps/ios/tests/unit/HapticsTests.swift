@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import AppleTVFly
+@testable import Flies
 
 /// What the player feels for each change of the game's state (Haptics.feel).
 @MainActor
