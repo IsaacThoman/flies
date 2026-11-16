@@ -113,7 +113,7 @@ vec3 rDimples(vec2 p) {
     float d = dot(r, r);
     if (d < f1) { f1 = d; to = r; }
   }
-  return vec3(-to * 0.12, sqrt(f1));
+  return vec3(-to * 0.3, sqrt(f1));
 }
 
 // Grains packed together (a stone's crystals, a glaze's crazing): the offset to the nearest grain's middle, its own number, and how near the wall to the next (0 on it).
@@ -335,7 +335,7 @@ if (rK == K_ZINC) {
   diffuseColor.rgb *= c;
   // Old zinc is dull: grey, half metal, the hammering catching what light there is; only the front edge is bright.
   rMetal = mix(0.45, 0.75, edge);
-  rRough = mix(0.46, 0.28, edge) + marks * 0.12 + patina * 0.1 + bloom * 0.2 - scratch * 0.12;
+  rRough = mix(0.36, 0.24, edge) + marks * 0.12 + patina * 0.1 + bloom * 0.2 - scratch * 0.12;
   // The dimples tilt the surface across its own two ways.
   vec3 bu = abs(rN.y) > 0.6 ? vec3(1.0, 0.0, 0.0) : abs(rN.x) > abs(rN.z) ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
   vec3 bv = abs(rN.y) > 0.6 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
