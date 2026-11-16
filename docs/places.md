@@ -67,9 +67,11 @@ surface within a step of them, with room over it for its body; an underside
 lower than that, there or under its head, is a wall it walks into, and one
 higher is nothing to it. In the air its feet sweep the way it goes with its
 body over them: an underside stops it with its body just under it and
-bounces it back down; it lands on what it comes down onto from above (the
-top within a step under its feet, or of what its feet went into), never on
-something it is under; beside a slab it falls past it.
+bounces it back down, and it goes on along under it; it lands on what it
+comes down onto from above (the top within a step under its feet, or of
+what its feet went into), never on something it is under; beside a slab it
+falls past it. Under something less than 2 mm higher than its body, it can
+only walk out.
 
 The world files every solid in a grid of flat arrays, its cells 32 mm or,
 in a bigger place, doubled until there are no more than 16,384 of them (the
