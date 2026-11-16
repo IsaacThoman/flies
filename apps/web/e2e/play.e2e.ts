@@ -254,20 +254,29 @@ try {
   assert.equal(back.tool, "swoop", "the press that woke it did nothing else");
   assert.equal(back.screen, "play");
 
-  step("what it sees: only in the wallpaper by default; on Always while playing too, but never over the full picture or a menu");
-  await waitFor(page, "eyesInset=hidden");
+  step("what it sees: while playing by default, but never over the full picture or a menu; on Wallpaper it hides while playing");
   await page.evaluate(() => {
-    const settings = (globalThis as unknown as { __fly: { settings: { wallpaperAfter: number; eyesInset: string } } }).__fly.settings;
-    settings.wallpaperAfter = 60;
-    settings.eyesInset = "always";
+    (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 60;
   });
-  await waitFor(page, "eyesInset=top-right");
+  await waitFor(page, "screen=play,wallpaper=false,eyesInset=top-right");
+  await press("Escape");
+  await waitFor(page, "screen=title,eyesInset=hidden");
+  await press("Enter");
+  await waitFor(page, "screen=play,eyesInset=top-right");
   await toTool("view");
   await waitFor(page, "tool=view,view=follow");
   await press("ArrowDown", 4);
   await waitFor(page, "view=eyes,eyesInset=hidden");
   await press("ArrowUp", 4);
   await waitFor(page, "view=follow,eyesInset=top-right");
+  await page.evaluate(() => {
+    (globalThis as unknown as { __fly: Game }).__fly.settings.eyesInset = "wallpaper";
+  });
+  await waitFor(page, "wallpaper=false,eyesInset=hidden");
+  await page.evaluate(() => {
+    (globalThis as unknown as { __fly: Game }).__fly.settings.eyesInset = "always";
+  });
+  await waitFor(page, "eyesInset=top-right");
 
   step("its nervous system: in the corner with what it sees, the fly as glass where it is big enough to see inside, never over the full picture");
   await page.evaluate(() => {

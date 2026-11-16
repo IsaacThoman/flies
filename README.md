@@ -413,7 +413,7 @@ fly from one angle after another instead (Calm), or change them more often
 (Lively). Any press, touch, tap, click, key or deliberate move of the mouse
 brings the controls back and does nothing else.
 A small picture of what the fly's eyes see sits in a corner of the screensaver
-(Settings → On screen → Fly POV: off, in the screensaver, or always, which keeps it in
+(Settings → On screen → Fly POV: off, in the screensaver, or always, the default, which keeps it in
 the top right while you play too), and under it a picture of its nervous
 system at work (Nervous system, the same choices). Each time the screensaver
 moves on to a new shot, and at least once a minute, they fade out and come
