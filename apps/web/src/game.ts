@@ -26,8 +26,8 @@ import { Bubbles } from "./scene/bubbles.ts";
 import { Fireflies } from "./scene/fireflies.ts";
 import { clockHours, timeAt } from "./scene/light.ts";
 import { forecastHours } from "./scene/weather.ts";
-import { loadSettings, saveSettings } from "./settings.ts";
-import type { Settings } from "./settings.ts";
+import { KEPT, loadSettings, loadShelf, saveSettings, saveShelf } from "./settings.ts";
+import type { Settings, ShelfChoices } from "./settings.ts";
 import { Stage } from "./stage.ts";
 import { BALL_RADIUS, Hands, SWOOP_BEARING } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
@@ -37,7 +37,7 @@ import { drawLoading } from "./ui/loading.ts";
 import { Overlay } from "./ui/overlay.ts";
 import { AboutScreen } from "./ui/screens/about.ts";
 import { BrainScreen } from "./ui/screens/brain.ts";
-import { pauseScreen, settingsScreen, titleScreen } from "./ui/screens/menus.ts";
+import { pauseScreen, settingsPages, settingsScreen, titleScreen } from "./ui/screens/menus.ts";
 import type { Screen, ScreenId, Shell } from "./ui/screens/types.ts";
 import { drawStats } from "./ui/stats.ts";
 
@@ -114,13 +114,15 @@ export class Game implements Shell {
   #eye = { x: 0, y: 0, z: 0 };
   #lastScreen: ScreenId | "loading" = "loading";
   #hud: HudState;
-  #eyesInfo = { facets: 0, standIn: false, sent: false, ms: 0, calls: 0 };
+  #eyesInfo = { facets: 0, standIn: false, sent: false };
   /** Where the fly is now. */
   #here: PlaceId;
   /** Being carried to another place: where, and seconds since the veil began to fall. */
   #moving: { to: PlaceId; t: number; arrived: boolean } | null = null;
   /** Seconds of wallpaper spent where it is now. */
   #stayed = 0;
+  /** The shelf's choices a launch comes back to, as saved. */
+  #shelf: ShelfChoices;
 
   constructor(canvas: HTMLCanvasElement, remote: Remote, brain: BrainDriver) {
     this.canvas = canvas;
@@ -129,17 +131,18 @@ export class Game implements Shell {
     const place = this.settings.place;
     this.#here = place !== "turns" && isPlaceId(place) ? place : isPlaceId(this.settings.scene) ? this.settings.scene : "picnic";
     const scene = SCENES[this.#here];
-    const now = new Date();
-    this.stage = new Stage(canvas, timeAt(clockHours(now)), scene);
-    this.stage.light.follow(clockHours(now), true);
-    this.stage.weather.follow(forecastHours(now), true);
-    this.fireflies = new Fireflies(this.stage.scene);
     const world = new World(scene.place);
+    this.#shelf = loadShelf(Date.now());
+    this.hands = new Hands(world, this.#shelf);
+    // The light and the weather are already as chosen, or as the clock has them, when the game appears.
+    const time = this.hands.timeOfDay;
+    this.stage = new Stage(canvas, time === "clock" ? timeAt(clockHours(new Date())) : time, scene);
+    this.#followLight(true);
+    this.fireflies = new Fireflies(this.stage.scene);
     this.life = new Life(world, brain);
     this.fly = new FlyView(this.stage.scene, world);
     this.director = new CameraDirector(world, DISPLAY_ASPECT, scene.camera);
     this.bubbles = new Bubbles(this.stage.scene, world);
-    this.hands = new Hands(world);
     this.handsView = new HandsView(this.stage.scene);
     this.eyes = new Eyes(this.stage, this.life);
     this.#around = { fly: this.life.body.position, airborne: false, world, pantry: this.life.pantry, weather: this.stage.weather, quiet: false, felt: this.#felt };
@@ -152,6 +155,7 @@ export class Game implements Shell {
       title: titleScreen(this),
       pause: pauseScreen(this),
       settings: settingsScreen(this),
+      ...settingsPages(this),
       about: new AboutScreen(this),
       brain: new BrainScreen(this),
     };
@@ -446,15 +450,15 @@ export class Game implements Shell {
     if (he.swooped) this.audio.play("swoop");
   }
 
-  /** Sets the light and the weather to the tools' choices; on "Now", to the clock's, looked at again every few seconds. */
-  #followLight() {
+  /** Sets the light and the weather to the tools' choices; on "Now", to the clock's, looked at again every few seconds. With `settle`, there at once. */
+  #followLight(settle = false) {
     const now = new Date();
     const time = this.hands.timeOfDay;
-    if (time === "clock") this.stage.light.follow(clockHours(now));
+    if (time === "clock") this.stage.light.follow(clockHours(now), settle);
     else this.stage.setTime(time);
     const weather = this.hands.weather;
-    if (weather === "now") this.stage.weather.follow(forecastHours(now));
-    else this.stage.weather.choose(weather);
+    if (weather === "now") this.stage.weather.follow(forecastHours(now), settle);
+    else this.stage.weather.choose(weather, settle);
     this.#clockAt = this.time + CLOCK_EVERY;
   }
 
@@ -579,6 +583,15 @@ export class Game implements Shell {
     this.#changedAt = this.time;
     if (this.hands.current.id === "light" || this.hands.current.id === "weather") this.#followLight();
     if (this.hands.current.id === "view") this.#syncCamera();
+    this.#remember();
+  }
+
+  /** Keeps the kind just chosen, if it is one a launch comes back to. */
+  #remember() {
+    const tool = this.hands.current.id;
+    if (!KEPT[tool]) return;
+    this.#shelf[tool] = { kind: this.hands.variant.id, at: Date.now() };
+    saveShelf(this.#shelf);
   }
 
   /** The finger moved on the touch surface: the pointer moves the same way across the screen, staying on the world. */
@@ -625,8 +638,6 @@ export class Game implements Shell {
         e.facets = this.eyes.facets;
         e.standIn = this.eyes.standIn;
         e.sent = this.eyes.inUse;
-        e.ms = this.eyes.costMs;
-        e.calls = this.eyes.costCalls;
         hud.eyes = e;
       } else hud.eyes = null;
       const k = this.#hudKey;

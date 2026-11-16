@@ -24,8 +24,8 @@ to add one.
 ## Playing
 
 The fly can live in more than one place (`docs/places.md`), and the player can
-carry it from one to another: the **Place** tool, or Settings → Where it
-lives. Living in each in turn (the default), it moves on after 20 minutes of
+carry it from one to another: the **Place** tool, or Settings → Wallpaper →
+Where it lives. Living in each in turn (the default), it moves on after 20 minutes of
 wallpaper. It is the same fly, its brain running on; the world fades out, the
 place is built behind the veil, and it is set down there.
 
@@ -154,9 +154,17 @@ from where you sit toward the spot), **Light** (now, which follows the clock,
 or morning, midday, golden hour, dusk, night), **Weather** (now, which
 follows the forecast, or clear, overcast, mist, rain), **View** (close up, follow, wide, the whole table, from above,
 and through the fly's eyes; Up brings the camera in, Down takes it out) and
-**Place** (where it lives; Up and Down choose, Select carries it there). The
-screen always shows what each button does now, and a caption at the top says
-what the fly is doing.
+**Place** (where it lives; Up and Down choose, Select carries it there). On
+the shelf the four that act on the fly stand apart from the four about its
+world and the camera; Left and Right go along all of them. The screen always
+shows what each button does now, and a caption at the top says what the fly
+is doing.
+
+A launch starts on Feed with sugar, so that one press of Select gives the fly
+something to find. It comes back to the view last chosen (but never through
+the fly's eyes, which would open on no fly at all), and to a time of day or a
+weather chosen in the last six hours; after that it is back on Now, so the
+wallpaper follows the clock again.
 
 The camera (`apps/web/src/camera.ts`) works like a patient nature cameraman.
 In Follow the fly is about 170 pixels long, seen from low down and a little
@@ -173,13 +181,13 @@ fly from where the ball will come, so the dive is seen past the fly. Behind the
 loading screen and the title it keeps the fly small and to the left, clear of
 the menus.
 
-After a minute with no press (Settings: 30 s to 5 min, or never) the hints,
-the shelf and the pointer fade, and the camera settles beside the fly and
-follows it: the wallpaper. Settings can have it take long slow shots of the
+After a minute with no press (Settings → Wallpaper: 30 s to 5 min, or never)
+the hints, the shelf and the pointer fade, and the camera settles beside the
+fly and follows it: the wallpaper. Its camera can take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
 (Lively). Any press or touch brings the controls back and does nothing else.
 A small picture of what the fly's eyes see sits in a corner of the wallpaper
-(Settings, What it sees: off, in the wallpaper, or always, which keeps it in
+(Settings → Wallpaper → What it sees: off, in the wallpaper, or always, which keeps it in
 the top right while you play too). Each time the wallpaper moves on to a new
 shot, and at least once a minute, it fades out and comes back in the next
 corner, so it is never left in one place long enough to mark an OLED screen.
@@ -187,9 +195,11 @@ corner, so it is never left in one place long enough to mark an OLED screen.
 The title also offers **Just watch** (the wallpaper straight away), **Inside
 its brain** (live: every sense going in, every command coming out with the
 neurons it is read from and their firing rates, spikes a second, active
-neurons), **About the fly**, and **Settings** (where it lives, sound and surroundings volume, pixel
-size, wallpaper timing and camera, the eyes' detail, what it sees in a corner,
-button hints, frame stats).
+neurons), **About the fly**, and **Settings**, a page for each part of the
+game, every setting a step from the top: **Wallpaper** (when it starts, how
+its camera films, where the fly lives, what it sees in a corner), **Sound**
+(effects, surroundings) and **Picture** (pixel size, the eyes' detail, button
+hints, frame stats).
 
 ## The fly's senses
 
@@ -257,7 +267,7 @@ comes down, steered by `turn`, sometimes onto the sugar or the fruit.
 ## The eyes
 
 `apps/web/src/eyes/eyes.ts` and `packages/body/src/vision.ts`. Every 50 ms
-(Settings, The fly's eyes: Low is 16×16 views at 20 Hz, High 32×32 at 30 Hz,
+(Settings → Picture → The fly's eyes: Low is 16×16 views at 20 Hz, High 32×32 at 30 Hz,
 Off sends no light) the world is rendered round the fly's head as six 90° views
 of a low-detail layer of the scene (sky, table, fruit and jars, ball, bubbles,
 food, feather; never the menus or the pointer), read back once, and resampled
@@ -294,7 +304,7 @@ title, over a menu, or while View → Fly's eyes is up.
 
 The game renders 640×480, laid out for 16:9 (the picture is squeezed into the
 4:3 buffer and stretched back out), with no antialiasing and a pixel ratio of
-1; Settings → Pixels renders the world at 320×240 or 214×160 under crisp
+1; Settings → Picture → Pixels renders the world at 320×240 or 214×160 under crisp
 640×480 menus. The backdrop (sky, clouds, hills, lollipop trees, lawn, daisies,
 lake) and the table are two passes with their own depth ranges. Static things
 are merged by material into a handful of meshes with vertex colours and frozen
@@ -311,7 +321,7 @@ Menus and hints are one 2D canvas drawn over the frame,
 uploaded only when something on it changes (at most 30 times a second; the
 in-game shimmer at 10).
 
-Measured in Chromium on an M-series Mac (Settings → Frame stats shows it live,
+Measured in Chromium on an M-series Mac (Settings → Picture → Frame stats shows it live,
 and the canvas's `data-calls`, `data-triangles`, `data-frame-ms` and
 `data-eyes-ms`): playing, 23 draws and about 105,000 triangles a frame (in
 rain 26 and 118,000, and about 0.07 ms more JavaScript; with a butterfly, a
@@ -341,8 +351,9 @@ Sound is synthesised into buffers at start-up (no oscillators or filters):
 wing buzz following the wings, patter while it walks, each place's own
 surroundings (the picnic's breeze, lake and birds, quieter in the rain), rain
 and the rush of a gust, and small sounds for the
-tools and menus. Settings are kept in
-`localStorage`.
+tools and menus. The settings and the shelf's kept choices are in
+`localStorage` (`apps/web/src/settings.ts`); from a save made by another
+build, or a broken one, only what this build can use is kept.
 
 ## Tests
 
@@ -361,7 +372,11 @@ queries, round and rectangular tops, and becoming another place; every place
 day, every shot keeps the camera out of everything with the fly in view); the body's thresholds, motion, collisions, falls, flight, landing,
 wall turning and mouth alignment; every sense; the facet layout, cube mapping
 and resampling; both brain drivers against fakes and the worker's host; the
-brain meter; the menu kit's focus, values, scrolling and navigation; the
+brain meter; the menu kit's focus, values, scrolling and navigation; what is
+kept between launches (the settings and the shelf's choices come back as
+saved, old and broken saves fall back to the defaults, the light and the
+weather only for six hours, never the fly's eyes) and the settings' pages
+(every setting on one page, a step from the top, none scrolling); the
 camera (the fly's size on screen in each view, kept in the picture through a
 long wandering walk and a jump, never inside anything, never jumping); the
 corner picture of what it sees (when it shows, its way round the corners, clear
@@ -375,8 +390,9 @@ appears once the brain wakes, the menus are walked with the keys, honey is
 tasted and eaten, the ball is thrown until the fly takes off, Play/Pause
 pauses and resumes, the wallpaper comes and goes with what it sees in a
 corner (and, set to always, it stays while playing but not over View → Fly's
-eyes or the pause menu), Back reaches the root, and the frame stays within its
-draw budget. `node scripts/play.ts` drives and
+eyes or the pause menu), Back reaches the root, a reload finds the settings,
+the view, the light and the weather as they were left and the shelf on Feed,
+and the frame stays within its draw budget. `node scripts/play.ts` drives and
 screenshots the game step by step (see the comment at its top).
 
 ## Credits

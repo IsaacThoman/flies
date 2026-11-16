@@ -22,14 +22,16 @@ export function soakConfig(minutes = 30) {
   press("ArrowRight");
   wait({ tool: "swoop" });
   throws();
+  // From Now, whatever time of day a launch came back to.
   press("ArrowRight", 3);
+  press("ArrowUp", 5);
   press("ArrowDown", 2);
   wait({ time: "noon" });
   phase("daylight transition", 10000);
   press("ArrowLeft", 3);
   throws();
   press("ArrowRight", 4);
-  press("ArrowDown", 4);
+  press("ArrowDown", 5);
   wait({ view: "eyes" });
   phase("eye picture low", 15000);
   press("MediaPlayPause");
@@ -37,19 +39,22 @@ export function soakConfig(minutes = 30) {
   press("ArrowDown", 3);
   press("Enter");
   wait({ screen: "settings" });
-  press("ArrowDown", 5);
+  press("ArrowDown", 2);
+  wait({ focus: "picture" });
+  press("Enter");
+  wait({ screen: "picture" });
+  press("ArrowDown");
   wait({ focus: "eyes" });
   press("ArrowRight");
-  press("Escape");
   press("MediaPlayPause");
   wait({ screen: "play" });
   phase("eye picture high", 15000);
   // Restore Low so an unattended run leaves the user's usual eye detail in place.
   press("MediaPlayPause");
   press("Enter");
-  wait({ screen: "settings", focus: "eyes" });
+  press("Enter");
+  wait({ screen: "picture", focus: "eyes" });
   press("ArrowLeft");
-  press("Escape");
   press("MediaPlayPause");
   press("ArrowUp", 4);
   wait({ view: "follow" });

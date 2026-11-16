@@ -1,9 +1,10 @@
 // Plays the game in a real (GPU-rendered, headless) Chromium with the real
 // brain: boots it, waits for the brain, walks the menus with the keys, feeds
 // the fly and checks it tasted and ate, throws the ball until the fly takes
-// off, checks the wallpaper comes and goes with what it sees in a corner, and
-// holds the frame to its draw budget throughout. It holds the light at midday
-// and the weather clear, so that what the fly does answers what the test does.
+// off, checks the wallpaper comes and goes with what it sees in a corner,
+// reloads and finds the settings and the shelf as it left them, and holds the
+// frame to its draw budget throughout. It holds the light at midday and the
+// weather clear, so that what the fly does answers what the test does.
 //
 //   npm run e2e            (starts its own Vite server)
 //   npm run e2e -- --url http://localhost:5173/
@@ -12,7 +13,7 @@
 
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
-import { openGame, readState, startServer, waitFor } from "../../../scripts/play.ts";
+import { gameUp, openGame, readState, startServer, waitFor } from "../../../scripts/play.ts";
 
 /** The frame's budget on the Apple TV. */
 const MAX_CALLS = 150;
@@ -64,15 +65,32 @@ try {
   assert.equal(awake.focus, "play");
   assert.equal(awake.eyesInset, "hidden", "not over the title");
 
-  step("the menus: settings, about, inside its brain, and back each time");
+  step("the menus: settings and each of its pages, about, inside its brain, and back each time");
   await press("ArrowDown", 4);
   await waitFor(page, "focus=settings");
   await press("ArrowDown");
   await waitFor(page, "focus=settings");
   await press("Enter");
-  await waitFor(page, "screen=settings,focus=place,atRoot=false");
+  await waitFor(page, "screen=settings,focus=wallpaper,atRoot=false");
+  await press("Enter");
+  await waitFor(page, "screen=wallpaper,stack=title>settings>wallpaper,focus=wallpaperAfter");
   await press("ArrowDown", 3);
-  await waitFor(page, "focus=pixels");
+  await waitFor(page, "focus=eyesInset");
+  await press("Escape");
+  await waitFor(page, "screen=settings,focus=wallpaper");
+  await press("ArrowDown");
+  await press("Enter");
+  await waitFor(page, "screen=sound,focus=effects");
+  // Kept for the reload at the end.
+  await press("ArrowLeft");
+  await press("Escape");
+  await waitFor(page, "screen=settings,focus=sound");
+  await press("ArrowDown");
+  await press("Enter");
+  await waitFor(page, "screen=picture,focus=pixels");
+  await press("ArrowDown", 3);
+  await waitFor(page, "focus=stats");
+  await press("Escape");
   await press("Escape");
   await waitFor(page, "screen=title,focus=settings");
   await press("ArrowUp");
@@ -165,6 +183,9 @@ try {
   await waitFor(page, "view=eyes,eyesInset=hidden", 3000);
   await press("ArrowUp", 4);
   await waitFor(page, "view=follow,eyesInset=top-right", 5000);
+  // Kept for the reload at the end.
+  await press("ArrowDown");
+  await waitFor(page, "view=wide");
 
   step("back to the title through the pause menu, where Back leaves the app");
   await press("Escape");
@@ -173,6 +194,16 @@ try {
   await waitFor(page, "focus=title");
   await press("Enter");
   await waitFor(page, "screen=title,atRoot=true");
+
+  step("a reload: the settings, the view, the light and the weather as they were left, and the shelf on Feed");
+  await page.reload();
+  await gameUp(page);
+  await waitFor(page, "brain=running,screen=title", 90_000);
+  await press("Enter");
+  const again = await waitFor(page, "screen=play");
+  assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["feed", "sugar", "wide", "noon", "clear"]);
+  const effects = await page.evaluate(() => (globalThis as unknown as { __fly: { settings: { effects: number } } }).__fly.settings.effects);
+  assert.equal(effects, 6, "the sounds turned down");
 
   step(`the frame's budget: at most ${maxCalls} draws and ${maxTriangles.toLocaleString("en-US")} triangles`);
   assert.ok(maxCalls > 0 && maxCalls < MAX_CALLS, `${maxCalls} draws`);

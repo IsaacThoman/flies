@@ -1,7 +1,7 @@
 # Places
 
 The fly can live in more than one place, and the player can carry it between
-them (the Place tool, or Settings → Where it lives; "Each in turn" moves it on
+them (the Place tool, or Settings → Wallpaper → Where it lives; "Each in turn" moves it on
 after 20 minutes of wallpaper). It is the same fly with the same brain, running
 on: the world fades to black, the new place is built behind the veil, and the
 fly is set down where that place starts it.
@@ -127,7 +127,7 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   repeated ones, freeze their matrices, put detail in shaders and textures
   rather than meshes, allocate nothing per frame, and keep `update` small.
   The picnic draws in about 23 calls and 105,000 triangles while playing
-  (Settings → Frame stats, or the canvas's `data-calls` and `data-triangles`);
+  (Settings → Picture → Frame stats, or the canvas's `data-calls` and `data-triangles`);
   a new place should stay close to that.
 - **Building is a pause behind the veil.** `data-place-ms` on the canvas says
   how long the place took to build: the picnic 36 ms in desktop Chromium, so

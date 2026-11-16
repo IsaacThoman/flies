@@ -33,6 +33,8 @@ export const TOOLS: readonly Tool[] = [
   ...(PLACES.length > 1 ? [{ id: "place", name: "Place", verb: "Go", hold: false, variants: PLACES.map((p) => ({ id: p.id, label: p.name })) } satisfies Tool] : []),
 ];
 
+/** The tools before this one act on the fly; from it on, they are about its world and the camera. */
+export const WORLD_TOOLS = TOOLS.findIndex((t) => t.id === "light");
 /** Where the Place tool is on the shelf, or -1 without one. */
 export const PLACE_TOOL = TOOLS.findIndex((t) => t.id === "place");
 const LIGHT_TOOL = TOOLS.findIndex((t) => t.id === "light");
@@ -111,11 +113,12 @@ export class Hands {
   #idle = 0;
   #world: World;
 
-  constructor(world: World, saved?: { tool?: number; variants?: number[] }) {
+  /** `start`: a kind to start on for some tools, by id; any the shelf doesn't have are passed over. */
+  constructor(world: World, start: { readonly [T in ToolId]?: { readonly kind: string } } = {}) {
     this.#world = world;
-    if (saved?.tool !== undefined && saved.tool >= 0 && saved.tool < TOOLS.length) this.tool = saved.tool;
-    saved?.variants?.forEach((v, i) => {
-      if (i < TOOLS.length && v >= 0 && v < TOOLS[i].variants.length) this.variants[i] = v;
+    TOOLS.forEach((tool, i) => {
+      const kind = tool.variants.findIndex((v) => v.id === start[tool.id]?.kind);
+      if (kind >= 0) this.variants[i] = kind;
     });
   }
 

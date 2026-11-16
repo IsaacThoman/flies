@@ -7,7 +7,9 @@ import type { Life } from "../../life.ts";
 import type { Settings } from "../../settings.ts";
 import type { Sound } from "../../audio/sounds.ts";
 
-export type ScreenId = "title" | "play" | "pause" | "settings" | "about" | "brain";
+/** The settings' pages, each opened from the top of the settings. */
+export type SettingsPage = "wallpaper" | "sound" | "picture";
+export type ScreenId = "title" | "play" | "pause" | "settings" | SettingsPage | "about" | "brain";
 
 /** The game, as the screens see it. */
 export interface Shell {

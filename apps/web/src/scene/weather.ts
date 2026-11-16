@@ -187,10 +187,11 @@ export class WeatherNow implements Weather {
     this.#jump();
   }
 
-  /** Holds a chosen weather, eased in over a few seconds. What it wets dries in its own time. */
-  choose(kind: WeatherKind) {
+  /** Holds a chosen weather, eased in over a few seconds, or there at once with `settle`. What it wets dries in its own time. */
+  choose(kind: WeatherKind, settle = false) {
     this.chosen = kind;
     Object.assign(this.#target, KINDS[kind]);
+    if (settle) this.#jump();
   }
 
   #jump() {
