@@ -108,10 +108,14 @@ shelf's end falls down the wall's kitchen side and hangs there against it,
 with nothing beyond the floor to land on: put there, it fails the recovery
 probe. The body runs have not reached it from the room yet. Its first find was a fly
 falling onto the steep outside of the bar's fruit bowl, through it into the
-zinc under it, which hung there rather than sliding off. The diner's first
-was a take-off from under its high rail that went nowhere: a fly that rose
-into an underside stopped dead there, rather than going on along under it.
-Both are regressions in `packages/body/tests/slabs.test.ts`.
+zinc under it, which hung there rather than sliding off; then, with high
+starts, a fly drawn back over the floor across the pass's shelf, inside the
+wall's thickness, held for good against the plates stacked there, since
+the pull back is square to the floor's edge and the stack's side is round:
+it now slides round what stands in its way back. The diner's first was a
+take-off from under its high rail that went nowhere: a fly that rose into
+an underside stopped dead there, rather than going on along under it. All
+three are regressions in `packages/body/tests/slabs.test.ts`.
 
 
 ## Ordinary-frame cost
