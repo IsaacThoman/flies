@@ -140,7 +140,8 @@ vec3 rCast(vec3 p, vec3 l, float size, bool sun) {
   float len = sqrt(dd + d.y * d.y);
   for (int i = 0; i < ${CASTERS}; i++) {
     vec4 o = uCast[i];
-    if (o.z <= 0.0 || p.y > o.w) continue;
+    // Nothing on or above a caster's top is in its shadow (a flat thing's top is wider than its disc).
+    if (o.z <= 0.0 || p.y > o.w - 0.5) continue;
     vec2 c = o.xy - p.xz;
     if (dot(c, c) < (o.z + 0.4) * (o.z + 0.4)) continue;
     float along = dot(c, dxz) / dd;

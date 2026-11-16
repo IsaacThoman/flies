@@ -322,23 +322,15 @@ if (rK == K_TIN) {
   rAO *= 0.85 + 0.15 * h0;
 }
 if (rK == K_LEATHER) {
-  // Buttoned: the leather pulled into diamonds between the buttons, pillowed in between, creased toward each button.
-  vec2 lp = vec2(vWorld.z, vWorld.y + vWorld.x * (abs(rN.y) > 0.6 ? 1.0 : 0.0)) / vec2(150.0, 130.0);
-  vec2 cell = vec2(lp.x + lp.y, lp.x - lp.y);
-  vec2 fr = fract(cell) - 0.5;
-  float r = length(fr);
-  bool back = abs(rN.x) > 0.6 && vWorld.y > ${f(470)};
-  float pillow = back ? 1.0 - r * 1.4 : 0.0;
-  diffuseColor.rgb *= (0.8 + 0.25 * pillow) * (0.9 + 0.15 * rFbm(vWorld.yz * 0.05));
-  if (back) {
-    rBump = vec3(0.0, -fr.y, fr.x) * 0.45;
-    float button = 1.0 - smoothstep(0.035, 0.06, r);
-    diffuseColor.rgb *= 1.0 - button * 0.6;
-    rAO *= 1.0 - (1.0 - smoothstep(0.0, 0.18, r)) * 0.4;
-  }
-  rRough = 0.45;
-  rCoat = 0.35;
-  rCoatRough = 0.3;
+  // Oxblood hide: its grain, and the shine rubbed into it where people sat; the buttons and pleats are in the geometry, darker in their hollows.
+  vec2 lp = (abs(rN.y) > 0.6 ? vWorld.xz : abs(rN.x) > 0.5 ? vWorld.zy : vWorld.xy) * 0.6;
+  float d = rDetail(lp);
+  diffuseColor.rgb *= 0.88 + 0.16 * rFbm(vWorld.yz * 0.012 + vWorld.x * 0.01) + (rNoise(lp) - 0.5) * 0.08 * d;
+  float rubbed = smoothstep(0.55, 0.85, rN.y) * (0.5 + 0.5 * rFbm(vWorld.xz * 0.004));
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.25 + vec3(0.02, 0.006, 0.0), rubbed * 0.4);
+  rRough = 0.42 - rubbed * 0.12;
+  rCoat = 0.3 + rubbed * 0.25;
+  rCoatRough = 0.28;
 }
 if (rK == K_CHALK) {
   // A slate, wiped over and over, with lines of illegible chalk: short strokes along rows, and a smudged haze.
