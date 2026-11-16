@@ -35,3 +35,18 @@ test("walking, it climbs the fruit bowl's side, over its rim and down inside", (
   assert.ok(peak > 25, "over the rim");
   assert.ok(body.position.y < 10, `inside, at ${body.position.y.toFixed(1)} mm`);
 });
+
+
+test("a fly at the highest allowed excursion cannot cross the window", () => {
+  const world = new World(WINDOWSILL);
+  const body = new FlyBody(world, { x: -80, z: -90, yaw: Math.PI });
+  body.mode = "airborne";
+  body.position.y = WINDOWSILL.ceiling + 399;
+  body.velocity.z = -600;
+  for (let i = 0; i < 1200 && !body.onFeet; i++) {
+    body.step(createIntent(), still, DT);
+    assert.ok(body.position.z > -125, "never gets behind the glass");
+    assert.ok(body.position.y >= world.heightAt(body.position.x, body.position.z));
+  }
+  assert.ok(body.onFeet && world.onTable(body.position.x, body.position.z));
+});

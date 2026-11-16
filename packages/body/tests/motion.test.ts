@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { SOLIDS, World, createPicnic } from "@fly/world";
+import { LAB, SOLIDS, WINDOWSILL, World, createPicnic } from "@fly/world";
 import type { Food } from "@fly/world";
 import { FlyBody, MOUTH_AHEAD, WALL_PATIENCE, createIntent } from "../src/index.ts";
 import type { Forces, Intent } from "../src/index.ts";
@@ -158,4 +158,94 @@ test("walking, it climbs the whole strawberry to the top", () => {
     peak = Math.max(peak, body.position.y);
   }
   assert.ok(peak > 20, `reached ${peak.toFixed(1)} mm`);
+});
+
+test("a long frame cannot walk through a thin wall", () => {
+  const world = new World({ floor: { kind: "rect", hx: 100, hz: 100 }, solids: [{ name: "pane", footprint: { kind: "box", x: 0, z: 0, hx: 0.5, hz: 20, angle: 0 }, top: { kind: "flat", y: 100 } }], patches: [], start: { x: -10, z: 0, yaw: Math.PI / 2 }, ceiling: 320 });
+  const body = new FlyBody(world, world.place.start);
+  body.step(intent({ speed: 16, walking: true }), still, 2);
+  assert.ok(body.position.x < -0.5, `crossed pane to ${body.position.x}`);
+});
+
+test("long frames keep flight stable and report a landing anywhere within the frame", () => {
+  const body = new FlyBody(openTable(300), { x: 0, z: 0, yaw: 0 });
+  body.step(intent({ takeOff: 1, wings: 1 }), still, 1);
+  assert.ok(body.position.y < 700, `climbed to ${body.position.y}`);
+  assert.ok(Math.hypot(body.position.x, body.position.z) < 500);
+  body.step(intent(), still, 2);
+  assert.equal(body.mode, "standing");
+  assert.equal(body.events.landed, true);
+  assert.equal(body.position.y, 0);
+});
+
+test("a descending side collision cannot leave the fly below the floor", () => {
+  const world = new World({ floor: { kind: "rect", hx: 100, hz: 100 }, solids: [{ name: "wall", footprint: { kind: "box", x: 5, z: 0, hx: 5, hz: 20, angle: 0 }, top: { kind: "flat", y: 100 } }], patches: [], start: { x: -0.7, z: 0, yaw: Math.PI / 2 }, ceiling: 320 });
+  const body = new FlyBody(world, world.place.start);
+  body.position.y = 1;
+  body.mode = "airborne";
+  Object.assign(body.velocity, { x: 100, y: -100, z: 0 });
+  body.step(intent(), still, DT);
+  assert.ok(body.position.y >= world.heightAt(body.position.x, body.position.z), JSON.stringify(body.position));
+});
+
+test("flight hits a thin solid even when both frame endpoints are outside it", () => {
+  const world = new World({ floor: { kind: "rect", hx: 100, hz: 100 }, solids: [{ name: "pane", footprint: { kind: "box", x: 0, z: 0, hx: 0.5, hz: 20, angle: 0 }, top: { kind: "flat", y: 100 } }], patches: [], start: { x: -2, z: 0, yaw: Math.PI / 2 }, ceiling: 320 });
+  const body = new FlyBody(world, world.place.start);
+  body.position.y = 20;
+  body.mode = "airborne";
+  body.velocity.x = 600;
+  body.step(intent(), still, DT);
+  assert.ok(body.position.x < -0.5, `crossed pane to ${body.position.x}`);
+  assert.ok(body.events.hit > 0);
+  assert.ok(body.velocity.x < 0);
+});
+
+test("walls beyond the floor stop a falling fly before the edge height clamp", () => {
+  const world = new World({ floor: { kind: "rect", hx: 20, hz: 20 }, solids: [{ name: "reveal", footprint: { kind: "box", x: 30, z: -10, hx: 10, hz: 10, angle: 0 }, top: { kind: "flat", y: 100 } }], patches: [], start: { x: 25, z: 0.1, yaw: Math.PI }, ceiling: 100 });
+  const body = new FlyBody(world, world.place.start);
+  body.position.y = 1;
+  body.mode = "airborne";
+  Object.assign(body.velocity, { x: 0, y: 0, z: -30 });
+  body.step(intent(), still, DT);
+  assert.ok(body.position.z > 0, `inside reveal: ${JSON.stringify(body.position)}`);
+  assert.ok(body.position.y < 100, "did not teleport onto the wall");
+});
+
+test("walking cannot cut through the corner of the lab's tip box", () => {
+  const body = new FlyBody(new World(LAB), { x: -265.9581632354974, z: 161.12309437589366, yaw: -2.821201696394096 });
+  const before = { ...body.position };
+  body.step(intent({ speed: 16.29026827067137 }), still, 0.016399991242681648);
+  const dx = body.position.x - before.x;
+  const dz = body.position.z - before.z;
+  assert.ok(Math.abs(dx) < 1e-9 || Math.abs(dz - dx / Math.tan(body.yaw)) > 1e-6, "blocked or slid, never crossed the corner");
+});
+
+test("being placed elsewhere clears the old wall turn, motion and contact", () => {
+  const world = createPicnic();
+  const jam = SOLIDS.find(s => s.name === "jam")!.footprint as { x: number; z: number; r: number };
+  const body = new FlyBody(world, { x: jam.x - jam.r - 2, z: jam.z, yaw: Math.PI / 2 });
+  run(body, intent({ speed: 10 }), WALL_PATIENCE + 0.4);
+  body.events.hit = 300;
+  body.place(0, -150, 0);
+  assert.equal(body.blocked, false);
+  assert.deepEqual(body.events, { tookOff: false, jumped: false, landed: false, hit: 0 });
+  assert.equal(body.groundSpeed, 0);
+  assert.equal(body.turnRate, 0);
+  assert.deepEqual(body.up, { x: 0, y: 1, z: 0 });
+  body.step(intent({ speed: 10 }), still, DT);
+  assert.equal(body.yaw, 0, "no turn carried over from the old wall");
+  assert.ok(body.position.z > -150, "walks immediately on the new floor");
+});
+
+test("the top of an outside wall cannot strand a landed fly", () => {
+  const world = new World({ ...WINDOWSILL, solids: [{ name: "wall", footprint: { kind: "box", x: 0, z: -150, hx: 340, hz: 25, angle: 0 }, top: { kind: "flat", y: 560 } }] });
+  const body = new FlyBody(world, { x: 319.64246689820015, z: -127.12441457700562, yaw: 1.6266740085034517 });
+  body.position.y = 561.7095573431452;
+  body.mode = "airborne";
+  Object.assign(body.velocity, { x: 190.55379881361213, y: -166.33772141858546, z: -103.20124930930517 });
+  body.step(intent(), still, 0.015151695601475305);
+  assert.equal(body.onFeet, false, "outside walls are barriers, not off-floor perches");
+  run(body, intent(), 20);
+  assert.equal(body.onFeet, true);
+  assert.equal(world.onTable(body.position.x, body.position.z), true);
 });

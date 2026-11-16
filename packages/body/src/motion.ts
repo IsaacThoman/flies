@@ -18,7 +18,7 @@
 // - Lining its mouth up with food the brain has already decided to eat
 //   (FEED_ALIGN): stopping is the brain's doing, the last shuffle isn't.
 
-import type { Food, Surface, Vec3, World } from "@fly/world";
+import type { Food, RayHit, Surface, Vec3, World } from "@fly/world";
 import { createSurface } from "@fly/world";
 import type { Intent } from "./behavior.ts";
 import { ease } from "./behavior.ts";
@@ -106,6 +106,9 @@ export class FlyBody {
   #probe = createSurface();
   #wall = v3();
   #inward = v3();
+  #flightOrigin = v3();
+  #flightDir = v3();
+  #flightHit: RayHit = { point: v3(), normal: v3(), solid: -1, t: 0 };
 
   constructor(world: World, start: { x: number; z: number; yaw: number }) {
     this.#world = world;
@@ -145,6 +148,12 @@ export class FlyBody {
     this.velocity.x = this.velocity.y = this.velocity.z = 0;
     this.mode = "standing";
     this.#world.surface(x, z, this.surface);
+    this.blocked = false;
+    this.groundSpeed = this.turnRate = 0;
+    this.#pressed = this.#awayLeft = 0;
+    this.events.tookOff = this.events.jumped = this.events.landed = false;
+    this.events.hit = 0;
+    this.#easeUp(this.surface.normal, 1);
   }
 
   step(intent: Intent, forces: Forces, dt: number) {
@@ -153,10 +162,21 @@ export class FlyBody {
     ev.jumped = false;
     ev.landed = false;
     ev.hit = 0;
-    if (!(dt > 0)) return;
+    if (!(dt > 0) || !Number.isFinite(dt)) return;
     if (this.mode !== "airborne" && intent.takeOff !== null) this.#takeOff(intent.takeOff, forces.threat);
-    if (this.mode === "airborne") this.#fly(intent, forces, dt);
-    else this.#walk(intent, forces, dt);
+    // Ordinary frames need no subdivision bookkeeping.
+    if (dt <= 1 / 60) {
+      if (this.mode === "airborne") this.#fly(intent, forces, dt);
+      else this.#walk(intent, forces, dt);
+      return;
+    }
+    // Long frames must not destabilize drag or skip a wall between samples.
+    const steps = Math.ceil(dt / (1 / 60));
+    const h = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      if (this.mode === "airborne") this.#fly(intent, forces, h);
+      else this.#walk(intent, forces, h);
+    }
   }
 
   #takeOff(strength: number, threat: Vec3 | null) {
@@ -280,6 +300,17 @@ export class FlyBody {
     // slope it can walk up is not one.
     const length = Math.hypot(mx, mz);
     if (length > 0) {
+      // A grazing path can enter and leave a corner between even tiny steps.
+      const origin = this.#flightOrigin;
+      origin.x = p.x;
+      origin.y = p.y + STEP_UP + 1e-6;
+      origin.z = p.z;
+      const dir = this.#flightDir;
+      dir.x = mx / length;
+      dir.y = 0;
+      dir.z = mz / length;
+      const hit = world.raycast(origin, dir, this.#flightHit, length);
+      if (hit && hit.normal.y === 0) return "blocked";
       const sign = mx * Math.sin(this.yaw) + mz * Math.cos(this.yaw) >= 0 ? 1 : -1;
       const reach = HEAD_AHEAD * FLY_LENGTH * sign;
       const allowed = STEP_UP + (Math.abs(reach) / 3) * MAX_SLOPE_TAN;
@@ -343,19 +374,63 @@ export class FlyBody {
     p.z += v.z * dt;
     this.blocked = false;
 
-    const under = world.surface(p.x, p.z, this.#probe);
-    if (!under.onTable) {
-      // Past the table's edge, there's nothing to land on: kept above the table's height until drawn back.
-      if (p.y < 1) {
-        p.y = 1;
-        if (v.y < 0) v.y = 0;
+    // Outside the floor it cannot fall below the edge while returning. Clamp
+    // before sweeping, or that correction could lift it into an outside wall.
+    if (!world.onTable(p.x, p.z) && p.y < 1) {
+      p.y = 1;
+      if (v.y < 0) v.y = 0;
+    }
+
+    // A fast fly can cross a pane between endpoints, even at normal frame times.
+    const distance = Math.hypot(p.x - px, p.y - py, p.z - pz);
+    if (distance > 1e-9) {
+      const origin = this.#flightOrigin;
+      origin.x = px;
+      origin.y = py + 1e-6;
+      origin.z = pz;
+      const dir = this.#flightDir;
+      dir.x = (p.x - px) / distance;
+      dir.y = (p.y - py) / distance;
+      dir.z = (p.z - pz) / distance;
+      const hit = world.raycast(origin, dir, this.#flightHit, distance);
+      if (hit && hit.t <= distance) {
+        if (hit.normal.y === 0) {
+          p.x = px;
+          p.z = pz;
+          // Rolling back sideways must not leave its feet below the old surface.
+          p.y = Math.max(p.y, world.heightAt(px, pz));
+          const into = v.x * hit.normal.x + v.z * hit.normal.z;
+          if (into < 0) {
+            v.x -= into * hit.normal.x * 1.4;
+            v.z -= into * hit.normal.z * 1.4;
+            this.events.hit = Math.max(this.events.hit, -into);
+            this.blocked = fx * hit.normal.x + fz * hit.normal.z < -0.3;
+          }
+        } else if (hit.normal.y >= MAX_SLOPE_COS && !world.onTable(hit.point.x, hit.point.z)) {
+          // Keep sliding back across an outside wall's top, without perching on it.
+          p.y = Math.max(p.y, hit.point.y);
+        } else if (hit.normal.y >= MAX_SLOPE_COS) {
+          p.x = hit.point.x;
+          p.z = hit.point.z;
+          p.y = world.heightAt(p.x, p.z);
+        }
       }
-    } else if (p.y <= under.y) {
+    }
+
+    const under = world.surface(p.x, p.z, this.#probe);
+    if ((under.onTable || under.solid >= 0) && p.y <= under.y) {
       const before = world.heightAt(px, pz);
       if (py >= under.y - STEP_UP || before >= under.y - 1e-6) {
         // Came down onto it from above.
+        if (!under.onTable && under.normal.y >= MAX_SLOPE_COS) {
+          p.y = under.y;
+          if (v.y < 0) v.y = 0;
+          this.groundSpeed = 0;
+          this.#easeUp(levelUp, dt);
+          return;
+        }
         if (under.normal.y >= MAX_SLOPE_COS) {
-          this.events.hit = Math.max(0, -v.y);
+          this.events.hit = Math.max(this.events.hit, -v.y);
           p.y = under.y;
           v.x = v.y = v.z = 0;
           this.mode = "standing";
@@ -378,6 +453,7 @@ export class FlyBody {
         // Flew into its side: back out, bounced off.
         p.x = px;
         p.z = pz;
+        p.y = Math.max(p.y, world.heightAt(px, pz));
         if (world.wallNormal(p.x + v.x * dt, p.z + v.z * dt, p.y, this.#wall)) {
           const into = v.x * this.#wall.x + v.z * this.#wall.z;
           if (into < 0) {

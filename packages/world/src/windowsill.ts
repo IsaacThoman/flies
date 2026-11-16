@@ -22,6 +22,8 @@ export const SILL = { hx: 320, hz: 125 };
 export const WINDOW = {
   glass: -SILL.hz,
   head: 560,
+  /** The wall continues above the opening to the kitchen ceiling. */
+  ceiling: 1350,
   rail: { top: 34, depth: 22 },
   jamb: { width: 26, depth: 24 },
   mullion: { half: 16, depth: 16 },
@@ -31,20 +33,20 @@ export const WINDOW = {
   wall: SILL.hz - 20,
 };
 
-const { glass, head, rail, jamb, mullion, bar } = WINDOW;
+const { glass, ceiling, rail, jamb, mullion, bar } = WINDOW;
 
 /** The window's sashes and the wall it is set in, as the fly (and the camera) meets them. */
 const WINDOW_SOLIDS: Solid[] = [
   // The glass, and the wall either side of the opening (its reveals), stand off the sill's edges: walls to the fly, and nowhere for the camera to stand.
-  { name: "glass", footprint: { kind: "box", x: 0, z: glass - 25, hx: SILL.hx + 20, hz: 25, angle: 0 }, top: { kind: "flat", y: head } },
-  { name: "wall", footprint: { kind: "box", x: SILL.hx + 690, z: (WINDOW.wall - 420) / 2, hx: 690, hz: (WINDOW.wall + 420) / 2, angle: 0 }, top: { kind: "flat", y: 1500 } },
-  { name: "wall", footprint: { kind: "box", x: -SILL.hx - 690, z: (WINDOW.wall - 420) / 2, hx: 690, hz: (WINDOW.wall + 420) / 2, angle: 0 }, top: { kind: "flat", y: 1500 } },
+  { name: "glass", footprint: { kind: "box", x: 0, z: glass - 25, hx: SILL.hx + 20, hz: 25, angle: 0 }, top: { kind: "flat", y: ceiling } },
+  { name: "wall", footprint: { kind: "box", x: SILL.hx + 690, z: (WINDOW.wall - 420) / 2, hx: 690, hz: (WINDOW.wall + 420) / 2, angle: 0 }, top: { kind: "flat", y: ceiling } },
+  { name: "wall", footprint: { kind: "box", x: -SILL.hx - 690, z: (WINDOW.wall - 420) / 2, hx: 690, hz: (WINDOW.wall + 420) / 2, angle: 0 }, top: { kind: "flat", y: ceiling } },
   // The bottom rail: a ledge at the foot of the glass, too tall to step up onto, for a fly that flies there.
   { name: "rail", footprint: { kind: "box", x: 0, z: glass + rail.depth / 2, hx: SILL.hx, hz: rail.depth / 2, angle: 0 }, top: { kind: "flat", y: rail.top } },
-  { name: "jamb", footprint: { kind: "box", x: -SILL.hx + jamb.width / 2, z: glass + jamb.depth / 2, hx: jamb.width / 2, hz: jamb.depth / 2, angle: 0 }, top: { kind: "flat", y: head } },
-  { name: "jamb", footprint: { kind: "box", x: SILL.hx - jamb.width / 2, z: glass + jamb.depth / 2, hx: jamb.width / 2, hz: jamb.depth / 2, angle: 0 }, top: { kind: "flat", y: head } },
-  { name: "mullion", footprint: { kind: "box", x: 0, z: glass + mullion.depth / 2, hx: mullion.half, hz: mullion.depth / 2, angle: 0 }, top: { kind: "flat", y: head } },
-  ...bar.at.map((x): Solid => ({ name: "bar", footprint: { kind: "box", x, z: glass + bar.depth / 2, hx: bar.half, hz: bar.depth / 2, angle: 0 }, top: { kind: "flat", y: head } })),
+  { name: "jamb", footprint: { kind: "box", x: -SILL.hx + jamb.width / 2, z: glass + jamb.depth / 2, hx: jamb.width / 2, hz: jamb.depth / 2, angle: 0 }, top: { kind: "flat", y: ceiling } },
+  { name: "jamb", footprint: { kind: "box", x: SILL.hx - jamb.width / 2, z: glass + jamb.depth / 2, hx: jamb.width / 2, hz: jamb.depth / 2, angle: 0 }, top: { kind: "flat", y: ceiling } },
+  { name: "mullion", footprint: { kind: "box", x: 0, z: glass + mullion.depth / 2, hx: mullion.half, hz: mullion.depth / 2, angle: 0 }, top: { kind: "flat", y: ceiling } },
+  ...bar.at.map((x): Solid => ({ name: "bar", footprint: { kind: "box", x, z: glass + bar.depth / 2, hx: bar.half, hz: bar.depth / 2, angle: 0 }, top: { kind: "flat", y: ceiling } })),
 ];
 
 const BANANA_STALK = 0.88;

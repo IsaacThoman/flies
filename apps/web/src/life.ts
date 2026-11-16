@@ -63,6 +63,7 @@ export class Life {
     this.pantry.reset(place.patches);
     this.body.place(place.start.x, place.start.z, place.start.yaw);
     this.eating = false;
+    this.#wasEating = false;
   }
 
   get intent(): Intent {

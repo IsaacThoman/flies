@@ -206,7 +206,7 @@ export function sideNormal(f: Footprint, x: number, z: number, out: Vec3): Vec3 
  * distances along it: [t0, t1], or null when it misses. Only x and z of the
  * ray matter.
  */
-export function prismSpan(f: Footprint, ox: number, oz: number, dx: number, dz: number): [number, number] | null {
+export function prismSpan(f: Footprint, ox: number, oz: number, dx: number, dz: number, out: [number, number] = [0, 0]): [number, number] | null {
   let u0: number;
   let v0: number;
   let du: number;
@@ -235,7 +235,9 @@ export function prismSpan(f: Footprint, ox: number, oz: number, dx: number, dz: 
     // Slabs |u| < 1 and |v| < 1.
     let t0 = -Infinity;
     let t1 = Infinity;
-    for (const [p, d] of [[u0, du], [v0, dv]] as const) {
+    for (let axis = 0; axis < 2; axis++) {
+      const p = axis === 0 ? u0 : v0;
+      const d = axis === 0 ? du : dv;
       if (Math.abs(d) < 1e-12) {
         if (Math.abs(p) >= 1) return null;
         continue;
@@ -245,17 +247,27 @@ export function prismSpan(f: Footprint, ox: number, oz: number, dx: number, dz: 
       t0 = Math.max(t0, Math.min(a, b));
       t1 = Math.min(t1, Math.max(a, b));
     }
-    return t0 < t1 ? [t0, t1] : null;
+    if (t0 >= t1) return null;
+    out[0] = t0;
+    out[1] = t1;
+    return out;
   }
   // Unit circle: |p + t d|² = 1.
   const a = du * du + dv * dv;
-  if (a < 1e-12) return u0 * u0 + v0 * v0 < 1 ? [-Infinity, Infinity] : null;
+  if (a < 1e-12) {
+    if (u0 * u0 + v0 * v0 >= 1) return null;
+    out[0] = -Infinity;
+    out[1] = Infinity;
+    return out;
+  }
   const b = 2 * (u0 * du + v0 * dv);
   const c = u0 * u0 + v0 * v0 - 1;
   const disc = b * b - 4 * a * c;
   if (disc <= 0) return null;
   const root = Math.sqrt(disc);
-  return [(-b - root) / (2 * a), (-b + root) / (2 * a)];
+  out[0] = (-b - root) / (2 * a);
+  out[1] = (-b + root) / (2 * a);
+  return out;
 }
 
 /** The footprint's bounding radius around its centre. */

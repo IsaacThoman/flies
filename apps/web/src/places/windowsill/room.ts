@@ -11,7 +11,7 @@ import { LAMP } from "./light.ts";
 import { tag, tone } from "./surfaces.ts";
 
 /** The kitchen's floor and ceiling, its far wall and side walls, mm (the sill is 1.05 m from the floor). */
-export const ROOM = { floor: -1050, ceiling: 1350, far: 2900, side: 1700, worktop: -180 };
+export const ROOM = { floor: -1050, ceiling: WINDOW.ceiling, far: 2900, side: 1700, worktop: -180 };
 
 type Materials = { plaster: THREE.Material; tiles: THREE.Material; glaze: THREE.Material; paint: THREE.Material; metal: THREE.Material; leaf: THREE.Material };
 
