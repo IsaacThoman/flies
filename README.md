@@ -442,7 +442,7 @@ cells two to a row on a narrow screen, and its brain beside its day on a
 short one. In and out, also headed by what the fly is doing, is a bar for
 each sense going into the brain as the body sends it (a loom at either eye,
 touch, either antenna, wind, sweet, weight on its legs, a male's taste on
-its front legs, and the light, the mean over every facet) and for each
+its front legs, and the light, the mean over every facet), and its hunger, and for each
 command coming out (walk, steer, back up, escape, wings, groom, feed, sing),
 with the firing rate of the neurons each is read from (DNg100, the two DNa02s,
 MDN, DNp01, the flight motor neurons, DNg12, MN9, pIP10) in Hz: the senses beside the commands, under them on a narrow
