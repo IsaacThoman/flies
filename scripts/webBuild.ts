@@ -9,6 +9,7 @@ import { gzipSync } from "node:zlib";
 import type { Connect, Plugin } from "vite";
 import type { BrainFile } from "../apps/web/src/brain/download.ts";
 import { encodeWire } from "../apps/web/src/brain/wire.ts";
+import { CODE_LENGTH } from "../packages/net/src/protocol.ts";
 
 const root = path.join(import.meta.dirname, "..");
 const CONNECTOME = path.join(root, "packages/brain/data/connectome.bin");
@@ -137,12 +138,48 @@ const SERVICE_WORKER = path.join(root, "apps/web/src/offline/sw.ts");
 const ICONS = path.join(root, "assets/web");
 
 /**
+ * Where the apps (the Apple TV's, the iPhone and iPad's) find the room server and which site their
+ * invitations open, read by apps/web/src/online/invite.ts: `ROOMS_URL` (a room server for
+ * development, such as ws://192.168.1.20:8787/rooms) and `FLY_SITE_URL`, else Flies' own site.
+ * A browser at a site uses that site's.
+ */
+export function appSite(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  return { __FLY_ROOMS__: JSON.stringify(env.ROOMS_URL ?? ""), __FLY_SITE__: JSON.stringify(env.FLY_SITE_URL ?? "") };
+}
+
+/** Where Apple's devices look for the apps a site vouches for: always at the site's root, whatever folder the game is in. */
+export const SITE_ASSOCIATION = ".well-known/apple-app-site-association";
+/** The iPhone and iPad app's bundle ID (scripts/ios.ts), which is the Apple TV app's. */
+const APP_BUNDLE_ID = "com.isaacthoman.flies";
+
+/**
+ * The site's side of the iPhone and iPad app's Associated Domains (docs/ios.md, "Universal links"):
+ * a table's link (the site's page with ?table= and a code) opens the app where it is installed, and
+ * password AutoFill offers the site's passwords in it. It names the app by its team, which only the
+ * owner can give (APPLE_TEAM_ID), so without one there is no file: the host answers 404, and phones
+ * open the links in Safari. A team that can't be one stops the build, rather than publish an
+ * association that names nobody.
+ */
+export function siteAssociation(teamId = process.env.APPLE_TEAM_ID): string | null {
+  if (!teamId) return null;
+  if (!/^[A-Z0-9]{10}$/.test(teamId)) throw new Error(`APPLE_TEAM_ID must be a Team ID, ten capital letters and digits, not ${JSON.stringify(teamId)}`);
+  const app = `${teamId}.${APP_BUNDLE_ID}`;
+  const association = {
+    applinks: { details: [{ appIDs: [app], components: [{ "/": "/", "?": { table: "?".repeat(CODE_LENGTH) }, comment: "A table's link" }] }] },
+    webcredentials: { apps: [app] },
+  };
+  return `${JSON.stringify(association, null, 2)}\n`;
+}
+
+/**
  * The parts that make the page an app: the manifest with its icons, the
  * service worker that keeps the page for opening offline (it leaves the brain
- * to the page, download.ts), and, given FLY_SITE_URL, absolute links for
- * link previews. Build only: the dev server has neither.
+ * to the page, download.ts), given FLY_SITE_URL, absolute links for link
+ * previews, and given APPLE_TEAM_ID, the site's association with the iPhone
+ * and iPad app. Build only: the dev server has none of them.
  */
-export function webApp({ siteUrl = process.env.FLY_SITE_URL }: { siteUrl?: string } = {}): Plugin {
+export function webApp({ siteUrl = process.env.FLY_SITE_URL, teamId = process.env.APPLE_TEAM_ID }: { siteUrl?: string; teamId?: string } = {}): Plugin {
+  const association = siteAssociation(teamId);
   return {
     name: "fly-web-app",
     apply: "build",
@@ -190,11 +227,12 @@ export function webApp({ siteUrl = process.env.FLY_SITE_URL }: { siteUrl?: strin
       };
       this.emitFile({ type: "asset", fileName: "manifest.webmanifest", source: `${JSON.stringify(manifest, null, 2)}\n` });
       emitted.push("manifest.webmanifest");
+      if (association) this.emitFile({ type: "asset", fileName: SITE_ASSOCIATION, source: association });
       // Everything the page needs to open, kept by the service worker: not the brain, which the page keeps
-      // itself, nor the link preview's picture, which only other sites look at.
+      // itself, nor the link preview's picture or the site's association, which only other sites look at.
       const page = bundle["index.html"];
       if (page?.type !== "asset") throw new Error("The page must be written before the service worker's list");
-      const files = ["./", ...[...Object.keys(bundle), ...emitted].filter((name) => name !== "sw.js" && name !== "index.html" && !/\.map$|\/preview-/.test(name))];
+      const files = ["./", ...[...Object.keys(bundle), ...emitted].filter((name) => name !== "sw.js" && name !== "index.html" && name !== SITE_ASSOCIATION && !/\.map$|\/preview-/.test(name))];
       const unique = [...new Set(files)].sort();
       const version = sha256(unique.join("\n") + String(page.source)).slice(0, 16);
       const sw = bundle["sw.js"];

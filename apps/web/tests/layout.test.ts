@@ -8,11 +8,12 @@ import type { Learned } from "../src/settings.ts";
 import { TOOLS, Hands } from "../src/tools/hands.ts";
 import { HUD_HITS, drawHud } from "../src/ui/hud.ts";
 import type { HudState } from "../src/ui/hud.ts";
-import { hudLayout, loadingLayout, safeRect, titleLayout } from "../src/ui/layout.ts";
+import { hudLayout, loadingLayout, roomLayout, safeRect, titleLayout } from "../src/ui/layout.ts";
 import { LOADING_HITS, drawLoading } from "../src/ui/loading.ts";
 import type { Rect } from "../src/ui/layout.ts";
 import { AboutScreen } from "../src/ui/screens/about.ts";
 import { settingsScreen, titleScreen } from "../src/ui/screens/menus.ts";
+import { OnlineScreen } from "../src/ui/screens/online.ts";
 import type { Shell } from "../src/ui/screens/types.ts";
 import { createPicnic } from "@fly/world";
 import { blankCanvas, writtenOn } from "./canvas.ts";
@@ -48,6 +49,7 @@ function shell(frame: Frame, glyphs: Shell["glyphs"] = null, online = true): She
     here: "picnic",
     rooms: null,
     typing: null,
+    canShare: true,
     startRoom() {},
     joinRoom() {},
     shareTable: async () => "failed",
@@ -233,6 +235,32 @@ test("the title leaves room for the fly, clear of the name, the brain's state an
     const fly = { x: fx - 20, y: fy - 12, w: 40, h: 24 };
     assert.ok(!overlaps(fly, t.menu.panel) && !overlaps(fly, t.status), `${name}: the fly at ${fx.toFixed(0)}, ${fy.toFixed(0)} is in the clear`);
   }
+});
+
+test("at a room, its QR code and code are beside the menu or over it, inside the safe area, clear of the hints, and big enough to scan across a room", () => {
+  // The starter of a full room: Remove for each of the other seven, and Share and Leave.
+  const others = Array.from({ length: 7 }, (_, i) => ({ id: i + 2, colour: "#e53" }));
+  const table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://flies.isaacthoman.com/?table=abcdefghjk", starting: true, joined: true, others };
+  const spec = { items: 9, maxRows: 7, width: 460, row: 40, heading: true, foot: 34, values: false, raise: 12 };
+  for (const [name, frame] of [...frames(), ["the TV", TV_FRAME] as const]) {
+    const a = safeRect(frame);
+    const layout = roomLayout(frame, spec);
+    const card = layout.card;
+    assert.ok(inside(card, a) && inside(layout.menu.panel, a), `${name}: inside the safe area`);
+    assert.ok(!overlaps(card, layout.menu.panel), `${name}: the card clear of the menu`);
+    assert.ok(card.y + card.h <= a.y + a.h - 38, `${name}: clear of the hints`);
+    assert.ok(inside(layout.qr, card) && layout.qr.w >= 120, `${name}: a QR code ${layout.qr.w.toFixed(0)} across`);
+    // Drawn, the code is under its QR code, inside its card.
+    const screen = new OnlineScreen({ ...shell(frame, frame === TV_FRAME ? "remote" : null), table });
+    screen.enter();
+    const g = blankCanvas();
+    screen.draw(g, 0, new HitMap());
+    const halves = writtenOn(g).filter((w) => w.text === "abcde" || w.text === "fghjk");
+    assert.equal(halves.length, 2, `${name}: the code`);
+    for (const w of halves) assert.ok(w.y > layout.qr.y + layout.qr.h && w.y < card.y + card.h, `${name}: the code under the QR code`);
+    assert.ok(halves[0].x - halves[0].width > card.x && halves[1].x + halves[1].width < card.x + card.w, `${name}: the code inside its card`);
+  }
+  assert.equal(roomLayout(TV_FRAME, spec).qr.w, 210, "as big as the TV has room for");
 });
 
 test("the About page is inside the safe area at every shape, and scroll what doesn't fit", () => {

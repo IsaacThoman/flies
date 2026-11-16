@@ -37,7 +37,9 @@ Coolify v4 with its default Traefik proxy.
    (`FLY_SITE_URL` overrides it; don't set it, or every preview gets
    production's). Behind Cloudflare (proxied DNS or a tunnel) set
    `CLIENT_IP_HEADERS=CF-Connecting-IP X-Forwarded-For` (see
-   [visitors' addresses](#visitors-addresses)).
+   [visitors' addresses](#visitors-addresses)). Once the Team ID is known,
+   set `APPLE_TEAM_ID` as a build variable ([the iPhone and iPad app's
+   links](#the-iphone-and-ipad-apps-links)).
 5. **Deploy**, and check `https://flies.isaacthoman.com/`. Coolify shows a
    service healthy when its Docker health check passes: `web` serves its
    entry file to itself on `127.0.0.1:8080/healthz`, and `rooms` answers
@@ -77,7 +79,8 @@ with a proxy on 80 and 443), which `compose.override.yaml` publishes.
 git clone --branch main https://github.com/IsaacThoman/flies.git
 cd flies
 cp .env.example .env
-# Edit .env: FLY_SITE_URL=https://flies.isaacthoman.com/, and HTTP_PORT if 8080 is taken
+# Edit .env: FLY_SITE_URL=https://flies.isaacthoman.com/, HTTP_PORT if 8080 is taken,
+# and, once known, APPLE_TEAM_ID (see The iPhone and iPad app's links)
 docker compose up -d --build --wait
 ```
 
@@ -278,3 +281,37 @@ service both read. Browsing the list of rooms uses the same `/rooms`
 WebSocket, so nothing about the proxy changes for it. Memory and CPU are
 small: it relays about 1 KB/s up and 7 KB/s down per player at a table of
 eight. Rolling back works as for the site: tag `flies-rooms:local` as `flies-rooms:rollback` before an update.
+The iPhone and iPad app reaches the same `wss://flies.isaacthoman.com/rooms`
+(docs/ios.md, "Tables with others").
+
+## The iPhone and iPad app's links
+
+With `APPLE_TEAM_ID` set (a build variable in Coolify, or in `.env`), the build writes
+`/.well-known/apple-app-site-association`: the site's side of the app's
+Associated Domains. It says that a table's link (`/?table=<code>`, and nothing
+else on the site) opens the Flies app where it is installed, and that the
+site's passwords are the app's too, for AutoFill. It names the app as
+`<APPLE_TEAM_ID>.com.isaacthoman.flies`. The Team ID is on
+[the developer account](https://developer.apple.com/account) under
+Membership details: ten capital letters and digits. It is the owner's to give;
+nothing here guesses it.
+
+```sh
+# Coolify: add APPLE_TEAM_ID=<the Team ID> to the environment variables, and redeploy.
+# By hand: put it in .env, then
+docker compose up -d --build --wait
+curl -i https://flies.isaacthoman.com/.well-known/apple-app-site-association
+```
+
+That must answer 200 with `Content-Type: application/json` and no redirect,
+as Apple requires; Caddy serves it so (the file has no extension), and never
+answers that path with the game's page. Left blank, the build writes no file
+and the path is a 404: phones then open table links in Safari, which plays
+them as well. A value that isn't a Team ID stops the build rather than
+publish an association that names nobody. Apple's devices fetch the file
+through Apple's CDN, which can take hours to see a change. The app's own side
+is a build flag and a capability in the developer account (docs/ios.md,
+"On a device, and in TestFlight").
+
+`scripts/checkDeploy.ts` checks the file's type when the build has one, and
+that the path is a 404 when it doesn't.

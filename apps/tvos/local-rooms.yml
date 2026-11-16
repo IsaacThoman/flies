@@ -1,0 +1,10 @@
+# Plain ws:// to a room server on the local network or this Mac, merged into project.yml only when
+# scripts/tvos.ts builds for one (--local-rooms, the simulator check, or ROOMS_URL=ws://...).
+# App Transport Security otherwise allows only wss://, which is all the real room server needs:
+# a build for the App Store never has this.
+targets:
+  Flies:
+    info:
+      properties:
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true

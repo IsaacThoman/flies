@@ -25,13 +25,15 @@ const TEST_SCENE = path.join(appDir, 'tests/scene.ts');
 
 const USAGE = `Usage: npm run tvos -- <command> [options]
 
-  build [--sim] [--test-scene] [--stand-in-brain] [--stand-in-weather]
+  build [--sim] [--test-scene] [--stand-in-brain] [--stand-in-weather] [--local-rooms]
         bundle the runtime and the game (apps/web/src/main.ts) into apps/tvos/www/ with the
         connectome, generate the Xcode project and build the app for an Apple TV (or, with
         --sim, the tvOS simulator). --test-scene bundles apps/tvos/tests/scene.ts in place of
         the game; --stand-in-brain compiles apps/tvos/tests/brain-stand-in/ in place of
         packages/brain-native/src/; --stand-in-weather compiles the weather service's stand-in,
-        apps/tvos/tests/weather-stand-in/, with no WeatherKit or location
+        apps/tvos/tests/weather-stand-in/, with no WeatherKit or location; --local-rooms lets
+        the app reach a room server over plain ws:// on this Mac or the local network (always so
+        when ROOMS_URL is a ws:// URL)
   run (--sim <udid> | --device <udid>) [--config <json>] [--detached]
         install the built app and launch it with a launch config (default: www/config.json,
         as from the home screen), printing its console. --detached (device only) launches
@@ -43,6 +45,8 @@ const USAGE = `Usage: npm run tvos -- <command> [options]
 Signing uses TVOS_TEAM_ID (default ${DEFAULT_TEAM_ID}) and TVOS_BUNDLE_ID (default ${DEFAULT_BUNDLE_ID}).
 TVOS_WEATHERKIT=1 builds in the weather outside (WeatherKit and Core Location), which signing for
 a device needs an explicit App ID with the WeatherKit capability for: see docs/apple-tv.md.
+ROOMS_URL (ws:// or wss://) builds in another room server in place of the site's, and FLY_SITE_URL
+the site its invitations open.
 
 ${ARCHIVE_USAGE}`;
 
@@ -67,10 +71,10 @@ function sourcesIn(dir: string): string[] {
   return readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(c|cc|cpp|cxx|m|mm)$/.test(f));
 }
 
-type BuildOptions = { sim: boolean; testScene: boolean; standInBrain: boolean; standInWeather: boolean };
+type BuildOptions = { sim: boolean; testScene: boolean; standInBrain: boolean; standInWeather: boolean; localRooms: boolean };
 
 /** Bundles www/ and generates the Xcode project; returns xcodebuild's environment. */
-function prepare({ testScene, standInBrain, standInWeather }: BuildOptions) {
+function prepare({ testScene, standInBrain, standInWeather, localRooms }: BuildOptions) {
   if (!existsSync(CONNECTOME)) throw Error(`The connectome isn't there (${path.relative(root, CONNECTOME)}): npm run brain:fetch`);
   const brain = standInBrain ? STAND_IN_BRAIN : BRAIN_SOURCES;
   if (!sourcesIn(brain).length) {
@@ -99,6 +103,8 @@ function prepare({ testScene, standInBrain, standInWeather }: BuildOptions) {
     TVOS_BRAIN_SOURCES: path.relative(appDir, brain),
     TVOS_WEATHER: String(weather), TVOS_WEATHERKIT_ENTITLED: String(weather && !standInWeather),
     TVOS_WEATHER_SOURCES: path.relative(appDir, standInWeather ? STAND_IN_WEATHER : WEATHER_SOURCES),
+    // App Transport Security allows only wss:// unless the build is for a room server without TLS.
+    TVOS_LOCAL_ROOMS: String(localRooms || /^ws:/i.test(process.env.ROOMS_URL ?? '')),
   };
   run('xcodegen', ['generate', '--quiet'], appDir, env);
   return env;
@@ -113,7 +119,7 @@ function build(options: BuildOptions) {
     '-destination', options.sim ? 'generic/platform=tvOS Simulator' : 'generic/platform=tvOS', '-derivedDataPath', 'build',
     ...(options.sim ? ['CODE_SIGNING_ALLOWED=NO', 'ARCHS=arm64'] : ['-allowProvisioningUpdates', '-allowProvisioningDeviceRegistration']), '-quiet', 'build',
   ], appDir, env);
-  const parts = [options.testScene && 'the test scene', options.standInBrain && 'the stand-in brain', options.standInWeather ? 'the stand-in weather' : WEATHERKIT && 'WeatherKit'].filter(Boolean);
+  const parts = [options.testScene && 'the test scene', options.standInBrain && 'the stand-in brain', options.standInWeather ? 'the stand-in weather' : WEATHERKIT && 'WeatherKit', env.TVOS_LOCAL_ROOMS === 'true' && 'plain ws:// to local room servers'].filter(Boolean);
   const all = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
   console.log(`Built ${path.relative(root, appPath(options.sim))}${all ? ` with ${all}` : ''}`);
 }
@@ -135,10 +141,12 @@ function main() {
   const flag = (name: string) => { const i = args.indexOf(name); return i < 0 ? undefined : args.splice(i, 2)[1] ?? ''; };
   const has = (name: string) => { const i = args.indexOf(name); if (i >= 0) args.splice(i, 1); return i >= 0; };
   if (!cmd || cmd === 'help' || cmd === '--help') return console.log(USAGE);
-  if (cmd === 'build') return build({ sim: has('--sim'), testScene: has('--test-scene'), standInBrain: has('--stand-in-brain'), standInWeather: has('--stand-in-weather') });
+  if (cmd === 'build') return build({ sim: has('--sim'), testScene: has('--test-scene'), standInBrain: has('--stand-in-brain'), standInWeather: has('--stand-in-weather'), localRooms: has('--local-rooms') });
   if (cmd === 'archive') {
+    // A release reaches the site's room server; ROOMS_URL is for development builds (and a ws:// one adds an ATS exception).
+    if (process.env.ROOMS_URL) throw Error('An archive is a release: unset ROOMS_URL, which points a development build at another room server.');
     const options = archiveOptions(flag('--version'), flag('--build-number'), has('--upload'));
-    const env = prepare({ sim: false, testScene: false, standInBrain: false, standInWeather: false });
+    const env = prepare({ sim: false, testScene: false, standInBrain: false, standInWeather: false, localRooms: false });
     return archive({ appDir, platform: 'tvOS', teamId: TEAM_ID, env }, options);
   }
   if (cmd === 'run') {

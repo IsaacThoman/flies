@@ -10,6 +10,9 @@ import WebKit
 /// no frames, so the fly's life and the brain stop with them. Shown again it carries
 /// on from where it was. WebKit hides the page of an app in the background by itself; only the heat
 /// needs this, but one way for both keeps them the same.
+///
+/// At a table with others the page keeps its own line to the room, a WebSocket (docs/ios.md,
+/// "Tables with others"); the app only says which table a link opened it for.
 final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, UIScrollViewDelegate {
   private let webView: WKWebView
   private let schemeHandler: BundleSchemeHandler
@@ -19,8 +22,17 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
   private var report: Report?
   private var still: UIView?
   private var shown = false
+  /// A room server for development and checks (`-FlyRooms <url>`) instead of the site's.
+  private let rooms = ProcessInfo.processInfo.argument(after: "-FlyRooms")
+  /// The game's page as it is first loaded: at the table a link opened the app for, if one did.
+  private let page: URL
+  /// The game in the page has started (`data-ready`), so it hears invitations.
+  private var started = false
+  /// A table the game is to sit down at once it has started.
+  private var invited: String?
 
-  init() {
+  init(table: String?) {
+    page = Links.page(rooms: rooms, table: table)
     let www = Bundle.main.resourceURL!.appendingPathComponent("www", isDirectory: true)
     schemeHandler = BundleSchemeHandler(root: www)
     let configuration = WKWebViewConfiguration()
@@ -72,7 +84,7 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    webView.load(URLRequest(url: BundleSchemeHandler.home))
+    webView.load(URLRequest(url: page))
     // A page that never draws (a script error while loading) isn't hidden for good.
     DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in self?.reveal() }
   }
@@ -90,7 +102,14 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
   func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
     guard let body = message.body as? [String: Any] else { return }
     report?.received(body)
-    if body["ready"] as? Bool == true { reveal() }
+    if body["ready"] as? Bool == true {
+      reveal()
+      started = true
+      if let table = invited {
+        invited = nil
+        invite(to: table)
+      }
+    }
     guard let screen = body["screen"] as? String else { return }
     let wallpaper = body["wallpaper"] as? Bool ?? false
     power.wallpaper = wallpaper
@@ -105,10 +124,19 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { webView.becomeFirstResponder() }
 
   /// iOS may end the page's process to reclaim memory, mostly while the app is in the background:
-  /// start the game again (its settings are kept; the fly's moment is not).
+  /// start the game again (its settings are kept, and the table it was at; the fly's moment is not).
   func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
     report?.log("web content process ended; reloading")
-    webView.load(URLRequest(url: BundleSchemeHandler.home))
+    started = false
+    webView.load(URLRequest(url: Links.page(rooms: rooms, table: nil)))
+  }
+
+  /// A table's link opened while the app runs: the game leaves the table it is at, if any, and
+  /// sits down there; one opened before the game has started waits till it has.
+  func invite(to table: String) {
+    report?.log("invited to a table")
+    guard started else { return invited = table }
+    webView.evaluateJavaScript(Links.invite(to: table))
   }
 
   func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {

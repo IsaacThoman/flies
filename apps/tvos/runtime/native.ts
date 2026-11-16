@@ -1,5 +1,5 @@
 // What the native host (src/Host.mm) puts on globalThis.__native before the runtime runs.
-import type { NativeBrainBridge } from '@fly/contracts';
+import type { NativeBrainBridge, NativeKeyboardBridge, NativeSocketBridge } from '@fly/contracts';
 
 /** Sync queries: they run after every command sent so far (see Native.query). */
 export const Q = {
@@ -59,6 +59,10 @@ export interface Native {
   readonly config: string;
   /** The fly's brain on its own thread (src/Brain.mm). */
   readonly brain: NativeBrainBridge;
+  /** A table's line to its room (src/SocketBridge.mm). */
+  readonly socket: NativeSocketBridge;
+  /** tvOS's keyboard, over the game (src/KeyboardBridge.mm). */
+  readonly keyboard: NativeKeyboardBridge;
 }
 
 export const native = (globalThis as unknown as { __native: Native }).__native;

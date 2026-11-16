@@ -47,6 +47,20 @@ if (game) {
     game.applySettings(false);
     page = new Page(game, canvas);
     Page.keepForOffline();
+  } else {
+    // The host stops frames in the background and says so: a room hears at once that the fly is
+    // away, and coming back the line to it is opened again at once.
+    let hiddenAt = 0;
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        hiddenAt ||= Date.now();
+        game.sleep();
+      } else if (hiddenAt) {
+        const away = Date.now() - hiddenAt;
+        hiddenAt = 0;
+        game.wake(away);
+      }
+    });
   }
   let last = performance.now();
   // How often the display offers a frame (ms, smoothed), and when the next one the game draws is due.
@@ -95,7 +109,6 @@ function cannotDraw(error: unknown) {
     canvas.dataset.failure = "webgl";
   }
   if (!g) return;
-  const start = performance.now();
   const hits = new HitMap();
   const draw = () => {
     display.update();
@@ -104,7 +117,6 @@ function cannotDraw(error: unknown) {
       canvas.width = frame.width;
       canvas.height = frame.height;
     }
-    const t = (performance.now() - start) / 1000;
     g.setTransform(1, 0, 0, 1, 0, 0);
     const sky = g.createLinearGradient(0, 0, 0, frame.height);
     sky.addColorStop(0, "#5aa9ec");
@@ -113,7 +125,7 @@ function cannotDraw(error: unknown) {
     g.fillRect(0, 0, frame.width, frame.height);
     g.setTransform(frame.width / frame.design.width, 0, 0, frame.height / frame.design.height, 0, 0);
     const layout = loadingLayout(frame);
-    drawWordmark(g, layout.wordmark.x, layout.wordmark.y, layout.wordmark.size, t);
+    drawWordmark(g, layout.wordmark.x, layout.wordmark.y, layout.wordmark.size);
     hits.begin("loading");
     drawFailure(g, "webgl", "", null, layout, hits);
     requestAnimationFrame(draw);

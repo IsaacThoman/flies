@@ -109,10 +109,25 @@ export function sameFrame(a: Frame, b: Frame) {
 }
 
 /**
+ * With a keyboard: what of the window's bottom a phone's on-screen keyboard
+ * covers, CSS pixels. Safari on a phone, and the iPhone and iPad app's web
+ * view, leave the window its size when the keyboard comes up and shrink only
+ * the visual viewport, so a field being typed into low on the screen would
+ * be under the keyboard unless the menus are laid out above it. A page
+ * zoomed in by a pinch has a smaller visual viewport too, with no keyboard.
+ */
+export function keyboardInset(windowHeight: number, view: { offsetTop: number; height: number; scale: number } | null | undefined): number {
+  if (!view || view.scale > 1.01) return 0;
+  const covered = windowHeight - view.offsetTop - view.height;
+  return covered >= 1 ? covered : 0;
+}
+
+/**
  * The screen the game is shown on. On the Apple TV it never changes. In a
  * browser the canvas fills the window (its CSS does that) and the frame
  * follows the window's shape; the safe area comes from the native host, if it
- * says (`SAFE_AREA_PROPERTY`), else from CSS `env(safe-area-inset-*)`.
+ * says (`SAFE_AREA_PROPERTY`), else from CSS `env(safe-area-inset-*)`, and
+ * reaches up over a phone's keyboard while it is up (`keyboardInset`).
  * Resizing is noticed at once but applied at the start of the next frame, so
  * a window being dragged is laid out once a frame, and never half-drawn.
  */
@@ -144,6 +159,12 @@ export class Display {
   }
 
   #insets(): Insets {
+    const safe = this.#safeArea();
+    const keyboard = keyboardInset(window.innerHeight, window.visualViewport);
+    return keyboard > safe.bottom ? { ...safe, bottom: keyboard } : safe;
+  }
+
+  #safeArea(): Insets {
     const host = (window as unknown as Record<string, unknown>)[SAFE_AREA_PROPERTY] as Partial<SafeArea> | undefined;
     if (host && typeof host === "object") return { top: host.top ?? 0, right: host.right ?? 0, bottom: host.bottom ?? 0, left: host.left ?? 0 };
     const style = this.#probe ? getComputedStyle(this.#probe) : null;

@@ -28,7 +28,8 @@ Four threads:
 
 Built with WeatherKit, the weather outside is found on the main thread (Core Location, timers)
 and in Swift's own tasks (the request), and read from the JavaScript thread
-([The weather outside](#the-weather-outside)).
+([The weather outside](#the-weather-outside)). A table's line to its room is handled on a queue of
+its own, and the system keyboard on the main thread ([Playing together](#playing-together)).
 
 WebGL calls that return nothing are encoded into a 4 MB command buffer (about 0.2–0.3 µs a call
 on the device, per aerodance) and run later on the render thread. Object handles are numbered in
@@ -68,6 +69,9 @@ npm run tvos -- run --sim <udid>         # install and launch, printing the cons
 npm run tvos -- run --device <udid> --config '{"script":"game.js","stats":2}'
 npm run tvos -- run --device <udid> --detached --config '{"script":"game.js","stats":10,"logFile":true}'
 npm run tvos:soak -- --device <udid> --minutes 30
+npm run tvos:soak -- --device <udid> --minutes 20 --table   # ...in a room of eight
+npm run tvos -- build --local-rooms      # ...that can reach a room server over plain ws://
+ROOMS_URL=ws://192.168.1.20:8787/rooms npm run tvos -- build   # with that room server built in
 npm run tvos:check                       # the simulator check (below)
 npm run tvos:check -- --weatherkit       # ...with the real weather service
 npm run tvos -- archive --version 0.1.1   # archive for the App Store (docs/release.md)
@@ -84,7 +88,8 @@ npm run tvos -- archive --version 0.1.1   # archive for the App Store (docs/rele
 4. copies `packages/brain/data/connectome.bin` to `www/brain/` (and stops, saying how to get
    it, if it isn't there);
 5. generates `Flies.xcodeproj` (XcodeGen, `project.yml`, with `weather.yml` and
-   `weatherkit.yml` merged in when the weather is wanted) and builds it with xcodebuild.
+   `weatherkit.yml` merged in when the weather is wanted, and `local-rooms.yml` for a room server
+   without TLS: [Playing together](#playing-together)) and builds it with xcodebuild.
 
 The Xcode project compiles every source under `packages/brain-native/src/` with that
 package's release flags (`-O2 -DNDEBUG -ffp-contract=off`). `--stand-in-brain` compiles
@@ -112,6 +117,7 @@ JSON, from `--config` on the command line, else `www/config.json` (what the home
 | `profile` | With `stats`: time spent in each WebGL and 2D canvas method |
 | `gpuTiming` | `glFinish` after every frame, to time the GPU (slows it down) |
 | `glDebug` | Checks `glGetError` after every GL command |
+| `typed` | Answers for the keyboard in unattended runs: each keyboard shown is answered with the next after 1.5 s, as if typed and confirmed (`null`: as if the player went back). The check uses it; nothing else should |
 | `drive` | Scripted remote input for unattended runs, waiting on the canvas's `data-*` state: `[["wait", {"ready": "true"}], ["press", "ArrowRight", 650], ["swipe", "ArrowUp"], ["touch", 0.5, -0.2, true], ["sleep", 500], ["log", "mark"]]`. Presses, swipes and touches go through the same native code as the remote's (`runtime/report.ts`) |
 
 `devicectl ... --console` (what `run --device` uses) attaches a debugger, which slows
@@ -194,7 +200,9 @@ desktop browser.
   `http://fly.local/`), `blob:` and `data:` URLs. `Response` (`arrayBuffer`, `json`, `text`,
   `blob`, `bytes`; `body` gives the whole file as one chunk), `Request`, `Headers`, `Blob`,
   `File`, `URL`, `URLSearchParams`, `URL.createObjectURL`. The page has no network: anything
-  else rejects. (The weather service's requests are native: [The weather outside](#the-weather-outside).) No `XMLHttpRequest`, `WebSocket`, `EventSource`.
+  else rejects. (The weather service's requests are native: [The weather outside](#the-weather-outside);
+  so is a table's line to its room, `__native.socket`: [Playing together](#playing-together).) No
+  `XMLHttpRequest`, `WebSocket`, `EventSource`.
 - **Storage**: `localStorage`, kept in `NSUserDefaults` (keep it small: settings, not data).
   `sessionStorage` lasts as long as the app runs. No IndexedDB, no cookies, no Cache API.
 - **Timers and frames**: `setTimeout`, `setInterval`, `requestAnimationFrame` (the display
@@ -207,7 +215,8 @@ desktop browser.
   `IntersectionObserver` and `MutationObserver` (inert).
 - **Not there**: `Worker` (it is `undefined`: the brain is `__native.brain`), modules and
   `import()` at run time (Vite inlines them; `import.meta.url` is `http://fly.local/game.js`),
-  WebGPU, WebXR, video, the Gamepad API, pointer and touch events, `alert`/`confirm` (logged).
+  WebGPU, WebXR, video, the Gamepad API, pointer and touch events, `alert`/`confirm` (logged),
+  `navigator.clipboard` and `navigator.share` (a phone scans a table's code instead).
 
 ## The remote
 
@@ -404,6 +413,144 @@ with the capability.
 In a browser there is no service: scripts feed the game conditions (`__fly.outside.feed`, in the
 README's Tests).
 
+## Playing together
+
+The Apple TV plays online, in rooms with others, as a browser does (`docs/online.md`). Its runtime has no
+`WebSocket`, so the host gives it one, and tvOS's own keyboard for typing a table's code.
+
+### The line to the room
+
+`globalThis.__native.socket` is `NativeSocketBridge` (`packages/contracts/src/socket.ts`), made
+by `src/SocketBridge.mm`. Each line is an `NSURLSessionWebSocketTask` in an ephemeral session
+whose delegate runs on a queue of the bridge's own, never the JavaScript or main thread.
+
+- What arrives waits in the line's inbox until the game takes it, once a frame
+  (`apps/web/src/online/native-socket.ts`): `next` copies a binary message straight into the
+  game's one 64 KB `ArrayBuffer` (`JSObjectGetArrayBufferBytesPtr`), so taking one makes nothing
+  in JavaScript; the room's rare JSON comes back as a string. A frame with nothing new is two
+  native calls, each a lookup under a lock (the check times them: about a microsecond a frame in
+  the simulator).
+- It keeps what a browser's line keeps (`apps/web/src/online/socket.ts`): at most 256 messages
+  or 256 KB waiting to be taken, and as much waiting to go. A line that falls further behind is
+  closed with 1000, "line fell behind", its backlog dropped; the game opens it again and the
+  room gives it the table as it is now. A binary message bigger than the game's buffer closes the
+  line with 1009 (the room sends nothing over 4 KB).
+- A line that can't open, fails or drops is closed with 1006 and no reason, as a browser's is;
+  the room's own close keeps its code and reason. The line reports closed only once everything
+  that came before the close has been taken, as a browser hands on its messages before its close
+  event.
+- When the app goes to the background (`sceneDidEnterBackground`, in `src/main.mm`) the game
+  hears it first (`visibilitychange`: at a table, the room is told at once that the fly is
+  away), then every line is closed with 1001, both on the JavaScript thread
+  and in a short background task, before tvOS suspends the app. The fly rests at the table, and
+  after 10 minutes away it leaves (the room's rule). Coming back, the game wakes as a shown tab
+  does and opens its line again at once, rather than waiting out its retry.
+
+### Where the room is
+
+The app's room server is the site's, `wss://flies.isaacthoman.com/rooms` (`APP_ROOMS` in
+`apps/web/src/online/invite.ts`), and the links it hands on are the site's
+(`https://flies.isaacthoman.com/?table=<code>`), which open in a browser, or in the iPhone app
+where it is installed. For development:
+
+- `ROOMS_URL=ws://192.168.1.20:8787/rooms npm run tvos -- build` builds another room server in
+  (and `FLY_SITE_URL` another site for the links); `scripts/webBuild.ts`, `appSite()`.
+- The launch config's `url` can name one for a single run, as a page's address does:
+  `{"script":"game.js","url":"http://fly.local/?rooms=ws://192.168.1.20:8787/rooms"}`, with
+  `&table=<code>` to sit at a table straight away.
+
+App Transport Security wants `wss://` to a site with a valid certificate, which is all the real
+room server needs: a release build has no exception. A room server on the Mac or the local
+network (`npm run rooms`) is plain `ws://`. Reached by its IP address (`ws://192.168.1.20:8787/rooms`)
+it needs nothing: ATS leaves addresses alone (checked in the simulator: the check passes with and
+without the exception). Reached by a name (`ws://my-mac.local:8787/rooms`), it needs
+`NSAllowsLocalNetworking`, which a build for a local room server adds
+(`apps/tvos/local-rooms.yml`, merged into `project.yml` by XcodeGen only when it is wanted):
+`npm run tvos -- build --local-rooms`, any build whose `ROOMS_URL` is `ws://`, and the simulator
+check. Never ship one of those.
+
+### Typing
+
+`globalThis.__native.keyboard` is `NativeKeyboardBridge` (`packages/contracts/src/text-entry.ts`),
+made by `src/KeyboardBridge.mm`. `ask(title, value, kind, done)` returns at once; on the main
+thread the host presents an alert titled with the field's label, holding what the field holds,
+brings up tvOS's full-screen keyboard for it, and calls `done` on the JavaScript thread with what
+was typed (OK), or null (Cancel, or Back). The kind sets the keyboard: `code` (ASCII, no
+autocorrection or capitals), `name` (words capitalised), `password` and `new-password` (hidden,
+marked as one or the other for the system). One question at a time: asking while one is up
+answers the first with null, and the new one comes up once the first is down; `close` takes it
+down the same way. The game's frames go on under it, but the remote is the keyboard's: while it is
+up `Remote` sends the game nothing, and what the game was holding (the Select that asked) is let
+go as it comes up.
+
+The game types through a `TextEntry`, polled each frame, as it does a browser's hidden input:
+`NativeTextEntry` (`apps/web/src/ui/text-entry.ts`) asks the bridge when a field is begun, and
+when the keyboard answers the field takes the whole of what was typed at once (to its length),
+ending as Return (`done`) or Escape (`cancel`) would. So every field in Online works on the TV
+with no change to the screen: a new room's name and password, a locked room's password, and a
+room's code, which joins it.
+
+### In a room, with the remote
+
+Online (the menu's last row) lists the rooms, makes one, and joins one by its code, typed into
+Code. In a room there is no share sheet or clipboard on tvOS, so no Share the link; beside the
+menu, as everywhere, is a card with the room's QR code for a phone to scan and its code (two
+groups of five, typed as one) for another TV (`apps/web/src/ui/room-card.ts`). The QR code
+(`packages/ui/src/qr.ts`, level M, versions 1 to 10) is drawn once per room into a small canvas, a
+module a pixel, and scaled up on whole pixels each time the menu is drawn: one `drawImage`, not a
+path of hundreds of squares.
+
+### Eight flies on a TV
+
+The simulator check (below) sits the app in a room of eight and holds a frame to the budget, but
+the simulator draws in software and has a Mac's CPU, so whether eight flies hold 60 fps on an
+Apple TV has to be measured there before it is promised. `tvos:soak --table` does it: seven fake
+flies from this Mac (`fakeFly`, `scripts/tables.ts`: no brain, each walking a small circle round
+the TV's fly and sending its state 20 times a second, as a device does) start an unlisted room at
+midday in clear weather, and the TV, launched detached with `stats` and `logFile` and the room's
+code in its URL, sits down in it and plays: feeding, the ball every 20 s, then watching them as the screensaver, half the minutes each.
+The fakes keep walking until the soak is done; the process waits for them.
+
+Against the real room server, with a release build as it is:
+
+```sh
+npm run tvos -- build
+npm run tvos:soak -- --device <udid> --minutes 20 --table
+```
+
+Or against a room server on the Mac, which the TV reaches over the local network (find the Mac's
+address with `ipconfig getifaddr en0`):
+
+```sh
+npm run rooms                                  # in one terminal: ws://0.0.0.0:8787/rooms
+npm run tvos -- build --local-rooms
+npm run tvos:soak -- --device <udid> --minutes 20 --table --rooms ws://192.168.1.20:8787/rooms
+```
+
+Pull `performance.log` as for any soak. The `stats` lines from `drive: table play` and
+`drive: table wallpaper` on are eight flies; `state.others` lists the seven others (`id:1:0:…`
+is one there and living) and `state.calls` the game's draws a frame. Compare them with the
+single-player soak above.
+
+Measured 16 November 2026 on an Apple TV 4K (3rd generation), tvOS 27.2.1, release build, against
+a room server on a Mac over the local network (by address, with no ATS exception), `--minutes 20`.
+The TV was warm from an earlier soak and reported thermal state 2 (serious) throughout.
+
+| Phase | FPS in 10-second windows | Mean JavaScript a frame | Its p95, median window and worst | Draws a frame (host's mean) |
+| --- | --- | --- | --- | --- |
+| Playing at the table | 55–60, mean 59.9 | 7.5 ms | 13.1 ms, 26.6 ms | 48.7 |
+| Screensaver at the table | 59.9–60 | 6.2 ms | 8.9 ms, 18.6 ms | 48.4 |
+
+All seven others were there throughout, with no reconnects; memory stayed at 183–187 MB. The
+host's draws are a mean over every frame: with the eyes at 20 Hz, two frames in three are the
+usual 34 and the third refreshes the eyes (about 83). `state.calls` is one frame sampled every
+200 ms, every twelfth frame at 60 fps, so it can lock onto the eyes' frames and read about 85
+for minutes on end; it never read more than 93. A frame that rebuilds the reflections (34 draws,
+while the light changes) leaves the eyes' refresh to the next frame (`apps/web/src/eyes/eyes.ts`),
+so the two never add up in one frame. Brought back from the background with Settings in front,
+the same run of the app was in its own seat 3 s later; a capture of the TV's screen at a room
+decodes to the room's link.
+
 ## Reading pixels back
 
 The game renders what the fly's eyes see into a small render target and reads it back every
@@ -522,8 +669,8 @@ git; this table is the retained summary.
 ### Simulator correctness check
 
 `npm run tvos:check` (`apps/tvos/tests/simulator.tvos.ts`; `--no-build` to reuse the last
-build, `--runtime tvOS-26-0` for the older system) builds the app with the test scene and the
-stand-in brain, creates and boots a fresh Apple TV 4K simulator, installs and launches the app
+build, `--runtime tvOS-26-0` for the older system) builds the app with the test scene, the
+stand-in brain and plain `ws://` to room servers on the Mac (`--local-rooms`), creates and boots a fresh Apple TV 4K simulator, installs and launches the app
 with a `drive`, and checks what the scene reports:
 
 - a held Right repeats (three times in 650 ms), Select, a swipe, Back and Play/Pause arrive as
@@ -546,14 +693,40 @@ with a `drive`, and checks what the scene reports:
 - the weather bridge, against the stand-in weather service: its conditions and attribution
   arrive as sent and with nothing else in them, and its status goes `fetching`, `ok`, and
   `idle` once stopped (with `--weatherkit`, the real service: above);
+- the socket bridge, against an echo server the check runs: a text and the bytes of a view both
+  ways, the bytes copied into the scene's buffer; a URL that is no WebSocket's, and a port nobody
+  listens on, give lines closed with 1006 and no reason; a message bigger than the buffer closes
+  its line with 1009; a line sent more messages than it keeps closes with 1000, "line fell
+  behind", with nothing left to take; the server's close (4321 and a reason) comes after the
+  message it sent before it; a line the game closed is forgotten; and what a frame with nothing
+  new costs;
+- the keyboard bridge, answered by the launch config's `typed`: asked twice at once, the first
+  is answered with null and the second as typed; a press while it is up goes to it and not the
+  scene, and the press that asked is let go as it comes up; frames go on meanwhile;
 - the host's frame stats.
 
-It then launches the bundled real game with the same stand-in brain and waits for its own
-`data-ready="true"`. The test scene's readiness signal cannot stand in for the game's.
+It then launches the bundled real game with the same stand-in brain, in a room of eight in a
+room server it runs (keeping its rooms in a temporary folder): seven fake flies
+(`scripts/tables.ts`) start an unlisted room and walk round the game's fly, and the game, given
+the room server by its launch config's URL, goes to Online, Code, and is answered the room's code
+(in capitals) by `typed`. It checks the game publishes its own readiness (the test scene's can't
+stand in for it) and joins; photographs Online in the room, its QR code and code; in play, sees
+all seven others there whenever it is in the room for ten seconds, holds the frame under the
+budget the browser checks hold it to (150 draws, by the game's count and the host's), and prints
+what JavaScript cost a frame; then stops the room server, sees the game lose the room, starts it
+again on the same port and sees the game come back to the same seat.
 
-It saves a screenshot in a temporary folder outside the repo and prints its path, then shuts the
-simulator down and deletes it. It takes about 15 seconds after the build. The simulator draws
-OpenGL ES in software, so it says nothing about speed.
+The simulator's renderer is slow with the real game: a few frames a second at best, and now and
+then none for seconds. After such a stall the others read as resting for a moment (what arrived
+meanwhile is taken as heard at the frame before it), and after one of more than about 12 s the
+line has more waiting than it keeps and is opened again, as a browser's would be. The check prints
+both, and asks only that the others are there; a TV holding its frame rate does neither.
+
+It saves screenshots in a temporary folder outside the repo and prints their paths, then shuts
+the simulator down and deletes it. It takes a few minutes after the build, most of it the real
+game starting on the simulator's software renderer. The simulator draws OpenGL ES in software,
+so it says nothing about the GPU's speed; its JavaScript times are a Mac's, without the TV's slower
+CPU, and its draw counts are what the TV would draw.
 
 ### The simulator's renderer loses clipped triangles
 
@@ -605,6 +778,12 @@ No Apple TV was connected while this was built, so none of this has run on one:
   CoreText's font fallback should give it); refreshing across suspend and resume over a day;
   the calls a day it really makes.
 - The home-screen icon's parallax and the Top Shelf banner on the home screen.
+- **Playing together** (eight flies' frame, the QR code on screen, plain `ws://` by address and
+  going to the background and back were checked on a TV: [Eight flies on a
+  TV](#eight-flies-on-a-tv)): the keyboard with a real remote (that it comes up at once, that
+  Back from it answers null, that a code typed there joins); `wss://` to the real room server
+  through a TV's network; plain `ws://` to a room server on the local network by name (from a
+  `--local-rooms` build); and the QR code scanned off a TV across a room by a phone's camera.
 
 ## What came from aerodance
 
@@ -615,7 +794,7 @@ the runtime (`dom.ts`, `web.ts`, `webgl.ts`, `canvas2d.ts`, `color.ts`, `glConst
 spec, the privacy manifest, the build script, the asset-catalog pipeline and App Store archiving
 (`scripts/apple.ts`, [release.md](release.md)).
 
-Left out: phone pairing and the relay, WebSocket and EventSource, HTTP `fetch` and the
+Left out: phone pairing and the relay, its WebSocket and EventSource, HTTP `fetch` and the
 log/report uploads, the page's file store, `crypto.subtle`, React-specific mount points, songs,
 the benchmarks and their natives, Now Playing.
 
@@ -624,4 +803,6 @@ the touch surface through GameController; the root flag pushed from JavaScript i
 from the game's state), the brain bridge and its stand-in, real WebGL fences, `FontFace` in
 place of fonts bundled by file name, `sessionStorage` in memory instead of sharing
 `localStorage`'s store, readiness from `data-ready`, nearest-neighbour
-stretch by default, the test scene and the simulator check, and placeholder art drawn by script.
+stretch by default, the test scene and the simulator check, placeholder art drawn by script, and
+a WebSocket bridge of its own (polled, with nothing made per message) and the system keyboard, for
+tables with others.

@@ -7,10 +7,11 @@
 // - a new room: its name (one is suggested), its place, whether it is listed
 //   or only reached by its link, and a password if it is to have one;
 // - a locked room's door: its password;
-// - at a room: its name, a button to hand its link on, one to leave, and for
-//   whoever started it each other fly by its player's colour, to take it
-//   off. Who is there shows in the world itself, a dab of each player's
-//   colour on their fly.
+// - at a room: its name, a button to hand its link on (where there is a way
+//   to: not on the Apple TV), one to leave, and for whoever started it each
+//   other fly by its player's colour, to take it off; beside them, the room's
+//   QR code for a phone to scan and its code to type. Who is there shows in
+//   the world itself, a dab of each player's colour on their fly.
 //
 // What goes wrong is said in the heading's place, briefly, in pink.
 
@@ -23,7 +24,9 @@ import type { Ended } from "../../online/online.ts";
 import { suggestName } from "../../online/invite.ts";
 import { PLACES, isPlaceId, placeInfo } from "../../places/catalog.ts";
 import type { PlaceId } from "../../places/catalog.ts";
-import { fitMenu, safeRect } from "../layout.ts";
+import { fitMenu, roomLayout, safeRect } from "../layout.ts";
+import type { MenuPanelSpec, RoomLayout } from "../layout.ts";
+import { RoomCard } from "../room-card.ts";
 import { MenuScreen } from "./menu-screen.ts";
 import type { NewRoom, Point, Screen, Shell } from "./types.ts";
 
@@ -74,6 +77,9 @@ export class OnlineScreen implements Screen {
   #knocked = -1;
   #copied = -1;
   #time = 0;
+  /** At a room: where its card is, and the card. */
+  #room: RoomLayout | null = null;
+  readonly #card = new RoomCard();
 
   constructor(shell: Shell) {
     this.#shell = shell;
@@ -151,7 +157,7 @@ export class OnlineScreen implements Screen {
         const table = shell.table;
         if (!table) return [];
         const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
-        const rows: MenuItem[] = [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", disabled: !table.joined }];
+        const rows: MenuItem[] = shell.canShare ? [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", disabled: !table.joined }] : [];
         if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: `remove:${o.id}`, label: "Remove", swatch: o.colour });
         rows.push({ kind: "action", id: "leave", label: "Leave the room" });
         return rows;
@@ -184,12 +190,22 @@ export class OnlineScreen implements Screen {
     const menu = new Menu(items, { focus });
     const note = !!this.#note;
     const values = this.view === "new" || this.view === "door" || this.view === "rooms";
+    const spec: MenuPanelSpec = { items: items.length, maxRows: MOST_ROWS, width: 460, row: 40, heading: true, foot: 34, values, raise: 12 };
+    // Its card once the room has let this device in.
+    const card = this.view === "room" && !!shell.table?.joined;
     return new MenuScreen(shell, {
       id: "online",
       menu,
       heading: this.#heading(),
       headingColor: note ? NOTE_COLOUR : undefined,
-      place: (frame) => fitMenu(safeRect(frame), { items: items.length, maxRows: MOST_ROWS, width: 460, row: 40, heading: true, foot: 34, values, raise: 12 }),
+      place: (frame) => {
+        this.#room = card ? roomLayout(frame, spec) : null;
+        return this.#room?.menu ?? fitMenu(safeRect(frame), spec);
+      },
+      backdrop: (g) => {
+        const table = shell.table;
+        if (this.#room && table) this.#card.draw(g, shell.shape, this.#room, table);
+      },
       onActivate: (item) => this.#activate(item.id),
       onChange: (item) => {
         this.#note = null;
@@ -254,7 +270,7 @@ export class OnlineScreen implements Screen {
     this.#note = null;
     const max = item.id === "code" ? CODE_LENGTH : item.id === "name" ? ROOM_NAME_MAX : PASSWORD_MAX;
     const kind = item.id === "code" ? "code" : item.id === "name" ? "name" : this.view === "new" ? "new-password" : "password";
-    typing.begin({ id: item.id, kind, value: item.value, max });
+    typing.begin({ id: item.id, kind, value: item.value, max, label: item.label });
   }
 
   typeNow(index: number) {

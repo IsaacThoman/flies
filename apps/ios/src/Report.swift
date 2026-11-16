@@ -4,7 +4,8 @@ import WebKit
 /// For checks and measurements (`-FlyReport <seconds>` on the command line, as `npm run ios:check`
 /// launches it; off from the home screen). That often it reports the canvas's state, how fast the
 /// brain runs against real time and what that costs it, frames, taps and keys the page saw, what
-/// the browser's cache holds of the brain, where the menu's first row is, and the app's own
+/// the browser's cache holds of the brain, where the menu's first row is, the table the game is
+/// at (the canvas says how its line to the room is, and who else is there), and the app's own
 /// memory, power and thermal state, as `report {json}` on the console and in
 /// `Library/Caches/report.log`, and as the value of an accessibility element, `fly-report`, where
 /// a UI test can read it. The page's errors and console warnings are passed on as they happen.
@@ -28,10 +29,7 @@ final class Report {
   private init(webView: WKWebView, configuration: WKWebViewConfiguration, every: TimeInterval) {
     self.webView = webView
     configuration.userContentController.addUserScript(WKUserScript(source: Self.counters, injectionTime: .atDocumentStart, forMainFrameOnly: true))
-    // From the arguments as they are: the defaults would read JSON as an old-style property list.
-    let arguments = ProcessInfo.processInfo.arguments
-    if let at = arguments.firstIndex(of: "-FlySettings"), at + 1 < arguments.count {
-      let settings = arguments[at + 1]
+    if let settings = ProcessInfo.processInfo.argument(after: "-FlySettings") {
       configuration.userContentController.addUserScript(WKUserScript(source: Self.change(settings), injectionTime: .atDocumentStart, forMainFrameOnly: true))
     }
     // Accessibility leaves out hidden and fully transparent views; this one is neither, and too faint and small to see.
@@ -186,7 +184,18 @@ final class Report {
       visibility: document.visibilityState,
       safeArea: globalThis.\(PageScripts.safeAreaProperty) ?? null,
       size: [innerWidth, innerHeight, devicePixelRatio],
+      // The table the game is at, which it keeps in the page's address (apps/web/src/online/invite.ts).
+      table: new URL(location.href).searchParams.get("table"),
     });
   })()
   """
+}
+
+extension ProcessInfo {
+  /// What follows `name` on the command line (`-FlyRooms ws://…`), as it is: the defaults would read
+  /// it as an old-style property list, which JSON and URLs aren't.
+  func argument(after name: String) -> String? {
+    guard let at = arguments.firstIndex(of: name), at + 1 < arguments.count else { return nil }
+    return arguments[at + 1]
+  }
 }
