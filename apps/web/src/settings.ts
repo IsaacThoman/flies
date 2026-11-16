@@ -1,5 +1,6 @@
 // What the game keeps between launches, in localStorage: the player's
-// settings, and the few choices on the shelf worth coming back to. A save from
+// settings, the few choices on the shelf worth coming back to, and what the
+// button hints have already taught. A save from
 // another build, or a broken one, never stops the game: anything that isn't
 // one of today's values is left at its default.
 
@@ -70,6 +71,7 @@ const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean 
 
 const SETTINGS_KEY = "apple-tv-fly.settings";
 const SHELF_KEY = "apple-tv-fly.shelf";
+const LEARNED_KEY = "apple-tv-fly.learned";
 
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 
@@ -155,4 +157,25 @@ export function loadShelf(now: number, store: Storage | null = storage()): Shelf
 
 export function saveShelf(shelf: ShelfChoices, store: Storage | null = storage()) {
   write(store, SHELF_KEY, shelf);
+}
+
+/**
+ * What a hint teaches: going along the shelf ("tools"), or what Select does
+ * with a tool (by its id). Once the player has done it, its hint goes, and a
+ * later launch doesn't teach it again.
+ */
+export type Lesson = "tools" | ToolId;
+export type Learned = { [L in Lesson]?: true };
+
+/** What the hints have taught, of the lessons this build has. */
+export function loadLearned(store: Storage | null = storage()): Learned {
+  const learned: Learned = {};
+  const saved = read(store, LEARNED_KEY);
+  if (!saved) return learned;
+  for (const lesson of ["tools", ...TOOLS.map((t) => t.id)] as Lesson[]) if (saved[lesson] === true) learned[lesson] = true;
+  return learned;
+}
+
+export function saveLearned(learned: Learned, store: Storage | null = storage()) {
+  write(store, LEARNED_KEY, learned);
 }

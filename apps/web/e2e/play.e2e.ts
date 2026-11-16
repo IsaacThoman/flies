@@ -2,9 +2,10 @@
 // brain: boots it, waits for the brain, walks the menus with the keys, feeds
 // the fly and checks it tasted and ate, throws the ball until the fly takes
 // off, checks the wallpaper comes and goes with what it sees in a corner,
-// reloads and finds the settings and the shelf as it left them, and holds the
-// frame to its draw budget throughout. It holds the light at midday and the
-// weather clear, so that what the fly does answers what the test does.
+// reloads and finds the settings, the shelf and what the hints taught as it
+// left them, and holds the frame to its draw budget throughout. It holds the
+// light at midday and the weather clear, so that what the fly does answers
+// what the test does.
 //
 //   npm run e2e            (starts its own Vite server)
 //   npm run e2e -- --url http://localhost:5173/
@@ -195,7 +196,7 @@ try {
   await press("Enter");
   await waitFor(page, "screen=title,atRoot=true");
 
-  step("a reload: the settings, the view, the light and the weather as they were left, and the shelf on Feed");
+  step("a reload: the settings, the view, the light and the weather as they were left, the shelf on Feed, and the hints for what was used gone");
   await page.reload();
   await gameUp(page);
   await waitFor(page, "brain=running,screen=title", 90_000);
@@ -204,6 +205,8 @@ try {
   assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["feed", "sugar", "wide", "noon", "clear"]);
   const effects = await page.evaluate(() => (globalThis as unknown as { __fly: { settings: { effects: number } } }).__fly.settings.effects);
   assert.equal(effects, 6, "the sounds turned down");
+  const learned = await page.evaluate(() => JSON.parse(localStorage.getItem("apple-tv-fly.learned") ?? "{}") as Record<string, true>);
+  assert.deepEqual(Object.keys(learned).sort(), ["feed", "swoop", "tools"], "the hints for what was used aren't taught again");
 
   step(`the frame's budget: at most ${maxCalls} draws and ${maxTriangles.toLocaleString("en-US")} triangles`);
   assert.ok(maxCalls > 0 && maxCalls < MAX_CALLS, `${maxCalls} draws`);

@@ -9,7 +9,7 @@ import type { RemoteButton } from "@fly/contracts";
 import { World } from "@fly/world";
 import type { Place } from "@fly/world";
 import { DESIGN_HEIGHT } from "../src/display.ts";
-import { DEFAULT_SETTINGS, KEPT, loadSettings, loadShelf, saveSettings, saveShelf } from "../src/settings.ts";
+import { DEFAULT_SETTINGS, KEPT, loadLearned, loadSettings, loadShelf, saveLearned, saveSettings, saveShelf } from "../src/settings.ts";
 import type { Settings } from "../src/settings.ts";
 import { Hands, TOOLS } from "../src/tools/hands.ts";
 import type { MenuScreen } from "../src/ui/screens/menu-screen.ts";
@@ -118,6 +118,17 @@ test("a kind or a tool the shelf no longer has is passed over, as is anything ma
   assert.deepEqual(loaded, {});
   for (const raw of ["", "}", "null", "[]", "7"]) assert.deepEqual(loadShelf(NOW, shelfSaved(raw)), {}, raw);
   assert.deepEqual(loadShelf(NOW, shelfSaved({ light: null, weather: { kind: 4, at: NOW }, view: { kind: "wide", at: "yesterday" } })), {});
+});
+
+test("what the hints have taught comes back, of the lessons this build has", () => {
+  const store = memory();
+  saveLearned({ tools: true, feed: true, feather: true }, store);
+  assert.deepEqual(loadLearned(store), { tools: true, feed: true, feather: true });
+  // A tool since dropped, or a value that isn't a plain yes, is passed over.
+  const old = memory({ "apple-tv-fly.learned": JSON.stringify({ tools: true, lamp: true, swoop: 1, blow: "yes", place: true }) });
+  assert.deepEqual(loadLearned(old), { tools: true, place: true });
+  for (const raw of ["", "{", "null", '["tools"]', "true"]) assert.deepEqual(loadLearned(memory({ "apple-tv-fly.learned": raw })), {}, raw);
+  assert.deepEqual(loadLearned(null), {});
 });
 
 const bare: Place = { floor: { kind: "rect", hx: 500, hz: 500 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 300 };

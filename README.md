@@ -156,9 +156,13 @@ follows the forecast, or clear, overcast, mist, rain), **View** (close up, follo
 and through the fly's eyes; Up brings the camera in, Down takes it out) and
 **Place** (where it lives; Up and Down choose, Select carries it there). On
 the shelf the four that act on the fly stand apart from the four about its
-world and the camera; Left and Right go along all of them. The screen always
-shows what each button does now, and a caption at the top says what the fly
-is doing.
+world and the camera; Left and Right go along all of them. Hints in the
+corners show what the buttons do, until they have been used: the shelf's goes
+once you have gone along it, and what Select does with a tool once you have
+used it (held it, for Tickle and Blow), on later launches too. The way to the
+menu, and how to move your hand while it waits by the fly, always show.
+Turning Settings → Picture → Button hints off and on again brings them all
+back. A caption at the top says what the fly is doing.
 
 A launch starts on Feed with sugar, so that one press of Select gives the fly
 something to find. It comes back to the view last chosen (but never through
@@ -353,7 +357,8 @@ Sound is synthesised into buffers at start-up (no oscillators or filters):
 wing buzz following the wings, patter while it walks, each place's own
 surroundings (the picnic's breeze, lake and birds, quieter in the rain), rain
 and the rush of a gust, and small sounds for the
-tools and menus. The settings and the shelf's kept choices are in
+tools and menus. The settings, the shelf's kept choices and what the hints
+have taught are in
 `localStorage` (`apps/web/src/settings.ts`); from a save made by another
 build, or a broken one, only what this build can use is kept.
 
@@ -375,9 +380,10 @@ day, every shot keeps the camera out of everything with the fly in view); the bo
 wall turning and mouth alignment; every sense; the facet layout, cube mapping
 and resampling; both brain drivers against fakes and the worker's host; the
 brain meter; the menu kit's focus, values, scrolling and navigation; what is
-kept between launches (the settings and the shelf's choices come back as
-saved, old and broken saves fall back to the defaults, the light and the
-weather only for six hours, never the fly's eyes) and the settings' pages
+kept between launches (the settings, the shelf's choices and what the hints
+have taught come back as saved, old and broken saves fall back to the
+defaults, the light and the weather only for six hours, never the fly's eyes),
+which hints show once something has been used, and the settings' pages
 (every setting on one page, a step from the top, none scrolling); the
 camera (the fly's size on screen in each view, kept in the picture through a
 long wandering walk and a jump, never inside anything, never jumping); the
@@ -393,7 +399,8 @@ tasted and eaten, the ball is thrown until the fly takes off, Play/Pause
 pauses and resumes, the wallpaper comes and goes with what it sees in a
 corner (and, set to always, it stays while playing but not over View → Fly's
 eyes or the pause menu), Back reaches the root, a reload finds the settings,
-the view, the light and the weather as they were left and the shelf on Feed,
+the view, the light and the weather as they were left, the shelf on Feed and
+the hints for what was used gone,
 and the frame stays within its draw budget. `node scripts/play.ts` drives and
 screenshots the game step by step (see the comment at its top).
 

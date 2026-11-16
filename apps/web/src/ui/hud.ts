@@ -8,6 +8,7 @@ import { DESIGN_HEIGHT, DESIGN_WIDTH } from "../display.ts";
 import type { Activity } from "../life.ts";
 import { placeInfo } from "../places/catalog.ts";
 import type { PlaceId } from "../places/catalog.ts";
+import type { Learned } from "../settings.ts";
 import { TOOLS, WORLD_TOOLS } from "../tools/hands.ts";
 import type { Hands } from "../tools/hands.ts";
 import { PICTURE_PANEL } from "../eyes/eyes.ts";
@@ -21,6 +22,8 @@ export type HudState = {
   /** What it is tasting or eating, if anything. */
   food: string | null;
   hints: boolean;
+  /** What the hints have taught: those hints aren't shown. */
+  learned: Learned;
   /** The player hasn't moved the pointer yet: show how. */
   teachSwipe: boolean;
   /** Seconds since the tool or its kind last changed, for the label's little pop. */
@@ -114,11 +117,11 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState) {
   }
 
   if (s.hints) {
-    // Up and down need no hint: the arrows on the tool's name say it.
+    // Up and down need no hint: the arrows on the tool's name say it. The shelf's and each tool's go once they've been used.
     const hy = DESIGN_HEIGHT - 34;
-    hintChip(g, 16, hy, "leftRight", "Tools", t, 13);
-    const action = actionLabel(hands, s.here);
-    if (action) hintChip(g, 16, hy - 34, action.glyph, action.label, t, 13);
+    if (!s.learned.tools) hintChip(g, 16, hy, "leftRight", "Tools", t, 13);
+    const action = s.learned[tool.id] ? null : actionLabel(hands, s.here);
+    if (action) hintChip(g, 16, s.learned.tools ? hy : hy - 34, action.glyph, action.label, t, 13);
     if (s.teachSwipe || hands.following) hintChip(g, DESIGN_WIDTH - 16 - hintWidth(g, SWIPE, 13), hy, "swipe", SWIPE, t, 13);
     hintChip(g, 16, 24, "playPause", "Menu", t, 12);
   }
