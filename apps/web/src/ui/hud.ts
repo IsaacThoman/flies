@@ -8,7 +8,8 @@ import { DESIGN_HEIGHT, DESIGN_WIDTH } from "../display.ts";
 import type { Activity } from "../life.ts";
 import { placeInfo } from "../places/catalog.ts";
 import type { PlaceId } from "../places/catalog.ts";
-import { TOOLS } from "../tools/hands.ts";
+import type { Learned } from "../settings.ts";
+import { TOOLS, WORLD_TOOLS } from "../tools/hands.ts";
 import type { Hands } from "../tools/hands.ts";
 import { PICTURE_PANEL } from "../eyes/eyes.ts";
 import { drawToolIcon } from "../tools/view.ts";
@@ -21,6 +22,8 @@ export type HudState = {
   /** What it is tasting or eating, if anything. */
   food: string | null;
   hints: boolean;
+  /** What the hints have taught: those hints aren't shown. */
+  learned: Learned;
   /** The player hasn't moved the pointer yet: show how. */
   teachSwipe: boolean;
   /** Seconds since the tool or its kind last changed, for the label's little pop. */
@@ -28,9 +31,17 @@ export type HudState = {
   /** Spikes per second, for the brain's pulse. */
   spikes: number;
   brainRunning: boolean;
-  /** Looking through the fly's eyes: how many facets, whether they're a stand-in, and what they cost. */
-  eyes: { facets: number; standIn: boolean; sent: boolean; ms: number; calls: number } | null;
+  /** Looking through the fly's eyes: how many facets, whether they're a stand-in, and whether they're off in Settings. */
+  eyes: { facets: number; standIn: boolean; off: boolean } | null;
 };
+
+/** How far apart the tools are on the shelf. */
+const PITCH = 52;
+/** The tools that act on the fly, then, farther apart by APART, those about its world and the camera: two shelves to the eye, one row to the remote. */
+const SPLIT = WORLD_TOOLS > 0 ? WORLD_TOOLS : TOOLS.length;
+const APART = SPLIT < TOOLS.length ? 32 : 0;
+/** The shelf's glass, both halves, in design units. */
+export const SHELF = { x: DESIGN_WIDTH / 2 - (TOOLS.length * PITCH + APART) / 2 - 8, y: DESIGN_HEIGHT - 60, width: TOOLS.length * PITCH + APART + 16, height: 52 };
 
 const CAPTIONS: Record<Activity, string> = {
   resting: "Resting",
@@ -44,6 +55,9 @@ const CAPTIONS: Record<Activity, string> = {
   falling: "Falling",
   waiting: "Waiting for its brain",
 };
+
+/** What the touch surface does while the hand waits by the fly. */
+const SWIPE = "Move your hand";
 
 export function caption(activity: Activity, food: string | null) {
   if ((activity === "feeding" || activity === "tasting") && food) return `${CAPTIONS[activity]} ${food.toLowerCase()}`;
@@ -74,12 +88,12 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState) {
   const { hands } = s;
   // The shelf.
   const n = TOOLS.length;
-  const gap = 58;
   const cx = DESIGN_WIDTH / 2;
-  const sy = DESIGN_HEIGHT - 34;
-  glassPanel(g, cx - (gap * n) / 2 - 8, sy - 26, gap * n + 16, 52, 26, { alpha: 0.75, shadow: false });
+  const sy = SHELF.y + SHELF.height / 2;
+  glassPanel(g, SHELF.x, SHELF.y, SPLIT * PITCH + 16, SHELF.height, 26, { alpha: 0.75, shadow: false });
+  if (APART) glassPanel(g, SHELF.x + SPLIT * PITCH + APART, SHELF.y, (n - SPLIT) * PITCH + 16, SHELF.height, 26, { alpha: 0.75, shadow: false });
   for (let i = 0; i < n; i++) {
-    const x = cx + (i - (n - 1) / 2) * gap;
+    const x = SHELF.x + 8 + (i + 0.5) * PITCH + (i < SPLIT ? 0 : APART);
     const on = i === hands.tool;
     const r = on ? 22 : 17;
     const y = on ? sy - 6 : sy;
@@ -103,16 +117,12 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState) {
   }
 
   if (s.hints) {
+    // Up and down need no hint: the arrows on the tool's name say it. The shelf's and each tool's go once they've been used.
     const hy = DESIGN_HEIGHT - 34;
-    hintChip(g, 16, hy, "leftRight", "Tools", t, 13);
-    if (many) hintChip(g, 16, hy - 34, "upDown", tool.id === "light" ? "Time of day" : tool.id === "weather" ? "Weather" : tool.id === "view" ? "Camera" : tool.id === "place" ? "Where" : "Kind", t, 13);
-    const action = actionLabel(hands, s.here);
-    if (action) hintChip(g, 16, many ? hy - 68 : hy - 34, action.glyph, action.label, t, 13);
-    const right = DESIGN_WIDTH - 16;
-    if (s.teachSwipe || hands.following) {
-      const label = s.teachSwipe ? "Swipe to move your hand" : "Swipe to aim";
-      hintChip(g, right - hintWidth(g, label, 13), hy, "swipe", label, t, 13);
-    }
+    if (!s.learned.tools) hintChip(g, 16, hy, "leftRight", "Tools", t, 13);
+    const action = s.learned[tool.id] ? null : actionLabel(hands, s.here);
+    if (action) hintChip(g, 16, s.learned.tools ? hy : hy - 34, action.glyph, action.label, t, 13);
+    if (s.teachSwipe || hands.following) hintChip(g, DESIGN_WIDTH - 16 - hintWidth(g, SWIPE, 13), hy, "swipe", SWIPE, t, 13);
     hintChip(g, 16, 24, "playPause", "Menu", t, 12);
   }
 
@@ -120,19 +130,18 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState) {
     // The picture of what its eyes take in is drawn under this layer, in its panel; label it for what it is, inside the panel.
     const top = ((1 - PICTURE_PANEL.top) / 2) * DESIGN_HEIGHT;
     const bottom = ((1 - PICTURE_PANEL.bottom) / 2) * DESIGN_HEIGHT;
-    const right = ((PICTURE_PANEL.right + 1) / 2) * DESIGN_WIDTH;
     text(g, "Through the fly's eyes", cx, top + 22, { size: 18, align: "center", color: "#eaf6ff" });
-    const facets = s.eyes.facets.toLocaleString("en-US");
-    const sub = s.eyes.standIn
-      ? `A picture of the light on ${facets} facets, laid out as its eyes look. Its brain doesn't see this yet.`
-      : s.eyes.sent
-        ? `The light on each of its ${facets} facets, as its brain receives it now.`
+    // The heading is the truth when its brain is sent this; only when it isn't does the picture need a word more.
+    if (s.eyes.standIn || s.eyes.off) {
+      const facets = s.eyes.facets.toLocaleString("en-US");
+      const sub = s.eyes.standIn
+        ? `A picture of the light on ${facets} facets, laid out as its eyes look. Its brain doesn't see this yet.`
         : `The light on each of its ${facets} facets. Its eyes are off in Settings, so its brain isn't sent this.`;
-    text(g, sub, cx, top + 42, { size: 12, align: "center", color: "#cfe8ff" });
+      text(g, sub, cx, top + 42, { size: 12, align: "center", color: "#cfe8ff" });
+    }
     text(g, "left eye", cx - 190, bottom - 12, { size: 12, align: "center", color: "#9fdcff" });
     text(g, "ahead", cx, bottom - 12, { size: 12, align: "center", color: "#9fdcff" });
     text(g, "right eye", cx + 190, bottom - 12, { size: 12, align: "center", color: "#9fdcff" });
-    text(g, `${s.eyes.calls} draws · ${s.eyes.ms.toFixed(1)} ms a refresh`, right - 10, top + 16, { size: 10, align: "right", color: "#7fa8cc" });
   }
 
   // What the fly is doing, from its brain, at the top.

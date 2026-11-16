@@ -13,6 +13,7 @@
 //   shot:<file.png>           screenshot the game as shown (16:9)
 //   state                     print the data-* state
 //   eval:<js>                 evaluate in the page and print the result
+//   reload                    reload the page (what the game saved stays), and wait for the game
 // Paths are relative to the current directory.
 
 import { spawn } from "node:child_process";
@@ -101,6 +102,9 @@ export async function drag(page: Page, from: [number, number], to: [number, numb
   await page.mouse.up();
 }
 
+/** Until the game is drawing and has published its state. */
+export const gameUp = (page: Page) => page.waitForFunction(() => !!(document.getElementById("game") as HTMLCanvasElement | null)?.dataset.screen, null, { timeout: 30_000 });
+
 export async function openGame({ url, width = 1280, height = 720, headed = false }: { url: string; width?: number; height?: number; headed?: boolean }) {
   const browser = await chromium.launch({ headless: !headed, executablePath: chromiumPath(), args: gpuFlags() });
   const page = await browser.newPage({ viewport: { width, height } });
@@ -110,7 +114,7 @@ export async function openGame({ url, width = 1280, height = 720, headed = false
     if (message.type() === "error") errors.push(message.text());
   });
   await page.goto(url);
-  await page.waitForFunction(() => !!(document.getElementById("game") as HTMLCanvasElement | null)?.dataset.screen, null, { timeout: 30_000 });
+  await gameUp(page);
   return { browser, page, errors };
 }
 
@@ -159,6 +163,10 @@ async function main() {
         console.log("shot", path.resolve(arg));
       } else if (kind === "state") console.log(JSON.stringify(await readState(page), null, 1));
       else if (kind === "eval") console.log(JSON.stringify(await page.evaluate(arg)));
+      else if (kind === "reload") {
+        await page.reload();
+        await gameUp(page);
+      }
       else throw new Error(`Unknown step: ${step}`);
     }
   } finally {

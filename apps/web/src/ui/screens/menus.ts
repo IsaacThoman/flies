@@ -6,10 +6,10 @@ import { INK_SOFT, glassPanel, orb, text } from "@fly/ui";
 import { DESIGN_WIDTH } from "../../display.ts";
 import type { PixelSize } from "../../display.ts";
 import { PLACES } from "../../places/catalog.ts";
-import type { EyesDetail, EyesInsetMode, Settings } from "../../settings.ts";
+import type { EyesDetail, Settings, ShowWhen } from "../../settings.ts";
 import { drawWordmark } from "../wordmark.ts";
 import { MenuScreen } from "./menu-screen.ts";
-import type { Shell } from "./types.ts";
+import type { SettingsPage, Shell } from "./types.ts";
 
 export function titleScreen(shell: Shell) {
   const menu = new Menu([
@@ -71,7 +71,7 @@ const PIXELS: Option<PixelSize>[] = [
   { value: "chunky", label: "Chunky" },
   { value: "chunkier", label: "Chunkier" },
 ];
-const WALLPAPER: Option<number>[] = [
+const STARTS_AFTER: Option<number>[] = [
   { value: 30, label: "30 s" },
   { value: 60, label: "1 min" },
   { value: 120, label: "2 min" },
@@ -88,7 +88,8 @@ const EYES: Option<EyesDetail>[] = [
   { value: "low", label: "Low" },
   { value: "high", label: "High" },
 ];
-const INSET: Option<EyesInsetMode>[] = [
+/** For each picture that can show over the world in a corner. */
+const SHOWN: Option<ShowWhen>[] = [
   { value: "off", label: "Off" },
   { value: "wallpaper", label: "In the wallpaper" },
   { value: "always", label: "Always" },
@@ -99,39 +100,81 @@ const ON_OFF: Option<boolean>[] = [
   { value: true, label: "On" },
 ];
 
+const choice = <K extends keyof Settings>(id: K, label: string, options: Option<Settings[K]>[]): ChoiceItem<Settings[K]> => ({ kind: "choice", id, label, options, index: 0 });
+const volume = (id: "effects" | "ambience", label: string): SliderItem => ({ kind: "slider", id, label, min: 0, max: 10, step: 1, value: 0 });
+
+/**
+ * The settings, a page for each part of the game, every one a step from the
+ * top and short enough not to scroll. Each row is a setting, by its key.
+ */
+const PAGES: Record<SettingsPage, { heading: string; rows: () => MenuItem[] }> = {
+  wallpaper: {
+    heading: "Wallpaper",
+    rows: () => [
+      choice("wallpaperAfter", "Starts after", STARTS_AFTER),
+      choice("wallpaperCamera", "Camera", CAMERA),
+      // Only when there is somewhere else to live.
+      ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE)] : []),
+      // Then the pictures that can show in a corner, each off, in the wallpaper, or always.
+      choice("eyesInset", "What it sees", SHOWN),
+    ],
+  },
+  sound: {
+    heading: "Sound",
+    rows: () => [volume("effects", "Effects"), volume("ambience", "Surroundings")],
+  },
+  picture: {
+    heading: "Picture",
+    rows: () => [choice("pixels", "Pixels", PIXELS), choice("eyes", "The fly's eyes", EYES), choice("hints", "Button hints", ON_OFF), choice("stats", "Frame stats", ON_OFF)],
+  },
+};
+
+/** A pane for `rows` rows `row` tall under a heading, centred over the menu hints. */
+function pane(width: number, rows: number, row: number) {
+  const h = 70 + rows * (row + 12) - 12 + 28;
+  return { x: (DESIGN_WIDTH - width) / 2, y: Math.round(226 - h / 2), w: width, h };
+}
+
+/** The top of the settings: a button for each page. */
 export function settingsScreen(shell: Shell) {
-  const s = shell.settings;
-  const choice = <V>(id: string, label: string, options: Option<V>[], value: V): ChoiceItem<V> => ({ kind: "choice", id, label, options, index: indexOf(options, value) });
-  const items: MenuItem[] = [
-    // Only when there is somewhere else to live.
-    ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE, s.place) as ChoiceItem] : []),
-    { kind: "slider", id: "effects", label: "Sounds", min: 0, max: 10, step: 1, value: s.effects },
-    { kind: "slider", id: "ambience", label: "Surroundings", min: 0, max: 10, step: 1, value: s.ambience },
-    choice("pixels", "Pixels", PIXELS, s.pixels) as ChoiceItem,
-    choice("wallpaperAfter", "Wallpaper after", WALLPAPER, s.wallpaperAfter) as ChoiceItem,
-    choice("wallpaperCamera", "Wallpaper camera", CAMERA, s.wallpaperCamera) as ChoiceItem,
-    choice("eyes", "The fly's eyes", EYES, s.eyes) as ChoiceItem,
-    choice("eyesInset", "What it sees", INSET, s.eyesInset) as ChoiceItem,
-    choice("hints", "Button hints", ON_OFF, s.hints) as ChoiceItem,
-    choice("stats", "Frame stats", ON_OFF, s.stats) as ChoiceItem,
-    { kind: "action", id: "done", label: "Done" },
-  ];
-  const menu = new Menu(items, { rows: 6 });
+  const items: MenuItem[] = (Object.keys(PAGES) as SettingsPage[]).map((id) => ({ kind: "action", id, label: PAGES[id].heading }));
   return new MenuScreen(shell, {
     id: "settings",
     pauses: true,
-    menu,
+    menu: new Menu(items),
     heading: "Settings",
-    row: 36,
-    panel: { x: (DESIGN_WIDTH - 540) / 2, y: 40, w: 540, h: 372 },
-    onActivate(item) {
-      if (item.id === "done") shell.back();
-    },
-    onChange(item) {
-      const settings = shell.settings as Record<string, unknown>;
-      settings[item.id] = item.kind === "slider" ? (item as SliderItem).value : choiceValue(item as ChoiceItem);
-      shell.applySettings();
-    },
+    panel: pane(340, items.length, 40),
+    onActivate: (item) => shell.open(item.id as SettingsPage),
     onBack: () => shell.back(),
   });
+}
+
+/** Every page of the settings, by id. */
+export function settingsPages(shell: Shell) {
+  const settings = shell.settings as Record<string, unknown>;
+  const pages = {} as Record<SettingsPage, MenuScreen>;
+  for (const id of Object.keys(PAGES) as SettingsPage[]) {
+    const items = PAGES[id].rows();
+    pages[id] = new MenuScreen(shell, {
+      id,
+      pauses: true,
+      menu: new Menu(items),
+      heading: PAGES[id].heading,
+      row: 36,
+      panel: pane(540, items.length, 36),
+      // As they are now: the Place tool, or a script, may have changed them since.
+      onEnter() {
+        for (const item of items) {
+          if (item.kind === "choice") item.index = indexOf(item.options, settings[item.id]);
+          else if (item.kind === "slider") item.value = settings[item.id] as number;
+        }
+      },
+      onChange(item) {
+        settings[item.id] = item.kind === "slider" ? item.value : choiceValue(item);
+        shell.applySettings();
+      },
+      onBack: () => shell.back(),
+    });
+  }
+  return pages;
 }

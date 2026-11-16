@@ -18,7 +18,7 @@ import * as THREE from "three";
 import type { EyeMap } from "@fly/brain";
 import { glassPanel, roundedRect, text } from "@fly/ui";
 import { DESIGN_HEIGHT, DESIGN_WIDTH, RENDER_HEIGHT, RENDER_WIDTH } from "../display.ts";
-import type { EyesInsetMode } from "../settings.ts";
+import type { ShowWhen } from "../settings.ts";
 import { FACET_COLOR, PICTURE_LAYOUT } from "./eyes.ts";
 import type { Eyes } from "./eyes.ts";
 
@@ -75,7 +75,7 @@ export type InsetWanted = "show" | "fade" | "hide";
  * without eyes still gets the picture: its eyes are rendered for it alone,
  * and it is labelled as a picture.)
  */
-export function insetWanted(setting: EyesInsetMode, screen: string, wallpaper: boolean, fullPicture: boolean, eyesOff: boolean): InsetWanted {
+export function insetWanted(setting: ShowWhen, screen: string, wallpaper: boolean, fullPicture: boolean, eyesOff: boolean): InsetWanted {
   if (setting === "off" || screen !== "play" || fullPicture || eyesOff) return "hide";
   return setting === "always" || wallpaper ? "show" : "fade";
 }

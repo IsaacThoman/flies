@@ -17,7 +17,9 @@ export type MenuScreenOptions = {
   /** The pane's place and size, and the rows inside it. */
   panel: { x: number; y: number; w: number; h: number };
   row?: number;
-  onActivate(item: MenuItem): void;
+  /** Each time it comes to the top. */
+  onEnter?(): void;
+  onActivate?(item: MenuItem): void;
   onChange?(item: ChoiceItem | SliderItem): void;
   onBack(): void;
   /** Drawn first, under the pane. */
@@ -48,6 +50,7 @@ export class MenuScreen implements Screen {
   }
 
   enter() {
+    this.#options.onEnter?.();
     this.#dirty = true;
   }
 
@@ -64,7 +67,7 @@ export class MenuScreen implements Screen {
       case "activate":
         this.view.pressed();
         shell.sound("select");
-        this.#options.onActivate(outcome.item);
+        this.#options.onActivate?.(outcome.item);
         break;
       case "change":
         shell.sound("tick");

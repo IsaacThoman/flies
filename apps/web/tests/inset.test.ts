@@ -7,6 +7,7 @@ import { DESIGN_HEIGHT, DESIGN_WIDTH, RENDER_HEIGHT, RENDER_WIDTH } from "../src
 import { CORNERS, CORNER_HOLD, INSET_PICTURE, InsetPlacement, insetRect, insetWanted, layoutFacets } from "../src/eyes/inset.ts";
 import type { InsetWanted } from "../src/eyes/inset.ts";
 import { DEFAULT_SETTINGS, loadSettings } from "../src/settings.ts";
+import { SHELF } from "../src/ui/hud.ts";
 
 type Rect = { x: number; y: number; width: number; height: number };
 const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
@@ -15,7 +16,8 @@ const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.width && b.x < a.x + a.widt
 const HUD = {
   caption: { x: DESIGN_WIDTH / 2 - 120, y: 8, width: 240, height: 36 },
   menuHint: { x: 12, y: 10, width: 100, height: 30 },
-  shelf: { x: DESIGN_WIDTH / 2 - 190, y: 414, width: 380, height: 66 },
+  // With the tool chosen standing up out of it.
+  shelf: { x: SHELF.x, y: SHELF.y - 8, width: SHELF.width, height: SHELF.height + 8 },
   toolLabel: { x: DESIGN_WIDTH / 2 - 140, y: 360, width: 280, height: 44 },
   leftHints: { x: 12, y: 362, width: 210, height: 100 },
   swipeHint: { x: DESIGN_WIDTH - 230, y: 430, width: 230, height: 30 },

@@ -26,8 +26,8 @@ import { Bubbles } from "./scene/bubbles.ts";
 import { Fireflies } from "./scene/fireflies.ts";
 import { clockHours, timeAt } from "./scene/light.ts";
 import { forecastHours } from "./scene/weather.ts";
-import { loadSettings, saveSettings } from "./settings.ts";
-import type { Settings } from "./settings.ts";
+import { KEPT, loadLearned, loadSettings, loadShelf, saveLearned, saveSettings, saveShelf } from "./settings.ts";
+import type { Learned, Lesson, Settings, ShelfChoices } from "./settings.ts";
 import { Stage } from "./stage.ts";
 import { BALL_RADIUS, Hands, SWOOP_BEARING } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
@@ -37,7 +37,7 @@ import { drawLoading } from "./ui/loading.ts";
 import { Overlay } from "./ui/overlay.ts";
 import { AboutScreen } from "./ui/screens/about.ts";
 import { BrainScreen } from "./ui/screens/brain.ts";
-import { pauseScreen, settingsScreen, titleScreen } from "./ui/screens/menus.ts";
+import { pauseScreen, settingsPages, settingsScreen, titleScreen } from "./ui/screens/menus.ts";
 import type { Screen, ScreenId, Shell } from "./ui/screens/types.ts";
 import { drawStats } from "./ui/stats.ts";
 
@@ -56,6 +56,8 @@ const VEIL_IN = 0.9;
 const QUIET_AFTER = 60;
 /** How often the clock and the forecast are looked at again, s: the light moves on that slowly. */
 const CLOCK_EVERY = 2;
+/** Seconds of tickling or blowing that teach holding Select, longer than a press. */
+const HOLD_TAUGHT = 0.5;
 
 type MenuScreenId = Exclude<ScreenId, "play">;
 
@@ -93,7 +95,7 @@ export class Game implements Shell {
   #awakeAt = -1;
   #datasetAt = 0;
   /** What the HUD last drew, to tell when it needs drawing again. */
-  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false };
+  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1 };
   #hudAt = 0;
   #changedAt = -10;
   #touched = false;
@@ -114,13 +116,22 @@ export class Game implements Shell {
   #eye = { x: 0, y: 0, z: 0 };
   #lastScreen: ScreenId | "loading" = "loading";
   #hud: HudState;
-  #eyesInfo = { facets: 0, standIn: false, sent: false, ms: 0, calls: 0 };
+  #eyesInfo = { facets: 0, standIn: false, off: false };
   /** Where the fly is now. */
   #here: PlaceId;
   /** Being carried to another place: where, and seconds since the veil began to fall. */
   #moving: { to: PlaceId; t: number; arrived: boolean } | null = null;
   /** Seconds of wallpaper spent where it is now. */
   #stayed = 0;
+  /** The shelf's choices a launch comes back to, as saved. */
+  #shelf: ShelfChoices;
+  /** What the hints have taught, as saved; and how many times that has changed, for the HUD to redraw. */
+  #learned: Learned = loadLearned();
+  #taught = 0;
+  /** Seconds Select has been tickling or blowing. */
+  #held = 0;
+  /** Button hints as last applied: turned on again, they teach everything again. */
+  #hints = true;
 
   constructor(canvas: HTMLCanvasElement, remote: Remote, brain: BrainDriver) {
     this.canvas = canvas;
@@ -129,17 +140,18 @@ export class Game implements Shell {
     const place = this.settings.place;
     this.#here = place !== "turns" && isPlaceId(place) ? place : isPlaceId(this.settings.scene) ? this.settings.scene : "picnic";
     const scene = SCENES[this.#here];
-    const now = new Date();
-    this.stage = new Stage(canvas, timeAt(clockHours(now)), scene);
-    this.stage.light.follow(clockHours(now), true);
-    this.stage.weather.follow(forecastHours(now), true);
-    this.fireflies = new Fireflies(this.stage.scene);
     const world = new World(scene.place);
+    this.#shelf = loadShelf(Date.now());
+    this.hands = new Hands(world, this.#shelf);
+    // The light and the weather are already as chosen, or as the clock has them, when the game appears.
+    const time = this.hands.timeOfDay;
+    this.stage = new Stage(canvas, time === "clock" ? timeAt(clockHours(new Date())) : time, scene);
+    this.#followLight(true);
+    this.fireflies = new Fireflies(this.stage.scene);
     this.life = new Life(world, brain);
     this.fly = new FlyView(this.stage.scene, world);
     this.director = new CameraDirector(world, DISPLAY_ASPECT, scene.camera);
     this.bubbles = new Bubbles(this.stage.scene, world);
-    this.hands = new Hands(world);
     this.handsView = new HandsView(this.stage.scene);
     this.eyes = new Eyes(this.stage, this.life);
     this.#around = { fly: this.life.body.position, airborne: false, world, pantry: this.life.pantry, weather: this.stage.weather, quiet: false, felt: this.#felt };
@@ -152,10 +164,12 @@ export class Game implements Shell {
       title: titleScreen(this),
       pause: pauseScreen(this),
       settings: settingsScreen(this),
+      ...settingsPages(this),
       about: new AboutScreen(this),
       brain: new BrainScreen(this),
     };
-    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, teachSwipe: true, changed: 10, spikes: 0, brainRunning: false, eyes: null };
+    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, learned: this.#learned, teachSwipe: true, changed: 10, spikes: 0, brainRunning: false, eyes: null };
+    this.#hints = this.settings.hints;
     this.applySettings(false);
     this.director.startWallpaper();
     this.director.title = true;
@@ -208,6 +222,8 @@ export class Game implements Shell {
     this.audio.setVolumes(s.effects, s.ambience);
     this.director.wallpaperStyle = s.wallpaperCamera;
     this.eyes.detail = s.eyes;
+    if (s.hints && !this.#hints) this.#unlearn();
+    this.#hints = s.hints;
     if (save) saveSettings(s);
   }
 
@@ -327,6 +343,8 @@ export class Game implements Shell {
       const playing = this.nav.current === "play" && !this.wallpaper;
       this.#copyEye();
       this.hands.update(dt, { use: false, holding: playing && remote.held.has("select"), eye: this.#eye }, life.body, life.pantry);
+      this.#held = this.hands.stroking || this.hands.blowing ? this.#held + dt : 0;
+      if (this.#held > HOLD_TAUGHT) this.#learn(this.hands.current.id);
       this.#live(dt);
       this.#feel();
       this.eyes.beforeStep();
@@ -446,15 +464,15 @@ export class Game implements Shell {
     if (he.swooped) this.audio.play("swoop");
   }
 
-  /** Sets the light and the weather to the tools' choices; on "Now", to the clock's, looked at again every few seconds. */
-  #followLight() {
+  /** Sets the light and the weather to the tools' choices; on "Now", to the clock's, looked at again every few seconds. With `settle`, there at once. */
+  #followLight(settle = false) {
     const now = new Date();
     const time = this.hands.timeOfDay;
-    if (time === "clock") this.stage.light.follow(clockHours(now));
+    if (time === "clock") this.stage.light.follow(clockHours(now), settle);
     else this.stage.setTime(time);
     const weather = this.hands.weather;
-    if (weather === "now") this.stage.weather.follow(forecastHours(now));
-    else this.stage.weather.choose(weather);
+    if (weather === "now") this.stage.weather.follow(forecastHours(now), settle);
+    else this.stage.weather.choose(weather, settle);
     this.#clockAt = this.time + CLOCK_EVERY;
   }
 
@@ -535,6 +553,7 @@ export class Game implements Shell {
         hands.stepTool(button === "left" ? -1 : 1);
         this.audio.play("tool");
         this.#changedAt = this.time;
+        this.#learn("tools");
         break;
       case "up":
       case "down":
@@ -554,6 +573,7 @@ export class Game implements Shell {
               saveSettings(this.settings);
             }
             this.moveTo(hands.place);
+            this.#learn("place");
           }
         } else if (hands.current.id === "light" || hands.current.id === "weather" || hands.current.id === "view") {
           // Select steps round the times of day, the weathers or the views, for a remote held in one hand.
@@ -563,6 +583,7 @@ export class Game implements Shell {
           this.#copyEye();
           hands.update(0, { use: true, holding: true, eye: this.#eye }, this.life.body, this.life.pantry);
           if (hands.events.blocked) this.audio.play("blocked");
+          if (hands.events.dropped || hands.events.swooped) this.#learn(hands.current.id);
         }
         break;
       case "back":
@@ -579,6 +600,29 @@ export class Game implements Shell {
     this.#changedAt = this.time;
     if (this.hands.current.id === "light" || this.hands.current.id === "weather") this.#followLight();
     if (this.hands.current.id === "view") this.#syncCamera();
+    this.#remember();
+  }
+
+  /** Keeps the kind just chosen, if it is one a launch comes back to. */
+  #remember() {
+    const tool = this.hands.current.id;
+    if (!KEPT[tool]) return;
+    this.#shelf[tool] = { kind: this.hands.variant.id, at: Date.now() };
+    saveShelf(this.#shelf);
+  }
+
+  /** The player has done what a hint shows: it goes, now and on later launches. */
+  #learn(lesson: Lesson) {
+    if (this.#learned[lesson]) return;
+    this.#learned[lesson] = true;
+    this.#taught++;
+    saveLearned(this.#learned);
+  }
+
+  #unlearn() {
+    for (const lesson of Object.keys(this.#learned) as Lesson[]) delete this.#learned[lesson];
+    this.#taught++;
+    saveLearned(this.#learned);
   }
 
   /** The finger moved on the touch surface: the pointer moves the same way across the screen, staying on the world. */
@@ -624,13 +668,11 @@ export class Game implements Shell {
         const e = this.#eyesInfo;
         e.facets = this.eyes.facets;
         e.standIn = this.eyes.standIn;
-        e.sent = this.eyes.inUse;
-        e.ms = this.eyes.costMs;
-        e.calls = this.eyes.costCalls;
+        e.off = this.eyes.detail === "off";
         hud.eyes = e;
       } else hud.eyes = null;
       const k = this.#hudKey;
-      const changed = k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes;
+      const changed = k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught;
       if (changed || hud.changed < 0.3 || this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS) {
         k.tool = this.hands.tool;
         k.variant = this.hands.variants[this.hands.tool];
@@ -640,6 +682,7 @@ export class Game implements Shell {
         k.touched = this.#touched;
         k.hints = hud.hints;
         k.eyes = !!hud.eyes;
+        k.taught = this.#taught;
         this.#hudAt = this.time;
         overlay.dirty = true;
       }

@@ -1,4 +1,4 @@
-// The frame-cost corner (Settings → Frame stats): draws, triangles, JavaScript
+// The frame-cost corner (Settings → Picture → Frame stats): draws, triangles, JavaScript
 // time per frame and the eyes' cost, for tuning on the TV.
 
 import { text } from "@fly/ui";
