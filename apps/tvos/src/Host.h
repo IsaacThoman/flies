@@ -62,6 +62,7 @@ struct FrameRecord {
   double gpuMs = -1;    // glFinish after the frame, when GPU timing is on
   double copyMs = 0;    // CPU time in framebuffer-to-texture copies (may wait for the GPU)
   double presentMs = 0; // CPU time presenting the drawable (may wait for the display/GPU)
+  double completedAt = 0; // ms, when the render thread finished the frame
   int commands = 0;     // command words executed
 };
 class FrameStats {

@@ -78,6 +78,7 @@ void FrameStats::executed(uint64_t frame, double ms, double gpuMs, int words, do
   FrameRecord &r = records_[frame % kFrameRing];
   r.execMs += ms; r.commands += words;
   r.copyMs += copyMs; r.presentMs += presentMs;
+  r.completedAt = NowMs();
   if (gpuMs >= 0) r.gpuMs = gpuMs;
 }
 /** The process's memory as jetsam counts it (phys_footprint), in MB. */
@@ -99,8 +100,8 @@ static NSDictionary *Stat(std::vector<double> v) {
 }
 NSString *FrameStats::summary(double fromMs, double toMs) {
   std::lock_guard<std::mutex> g(lock_);
-  std::vector<double> js, submit, exec, gpu, words, interval, copy, present;
-  double last = -1;
+  std::vector<double> js, submit, exec, gpu, words, interval, copy, present, completedInterval;
+  double last = -1, lastCompleted = -1;
   for (uint64_t f = frame_ > kFrameRing ? frame_ - kFrameRing + 1 : 1; f <= frame_; f++) {
     const FrameRecord &r = records_[f % kFrameRing];
     if (r.start < fromMs || r.start > toMs) continue;
@@ -109,9 +110,14 @@ NSString *FrameStats::summary(double fromMs, double toMs) {
     if (r.gpuMs >= 0) gpu.push_back(r.gpuMs);
     if (last >= 0) interval.push_back(r.start - last);
     last = r.start;
+    if (r.completedAt > 0) {
+      if (lastCompleted >= 0) completedInterval.push_back(r.completedAt - lastCompleted);
+      lastCompleted = r.completedAt;
+    }
   }
   NSDictionary *d = @{ @"memMB": @(std::round(PhysFootprintMB() * 10) / 10), @"frames": @(js.size()), @"jsMs": Stat(js), @"submitMs": Stat(submit), @"execMs": Stat(exec),
-                       @"gpuFinishMs": gpu.empty() ? [NSNull null] : Stat(gpu), @"copyMs": Stat(copy), @"presentMs": Stat(present), @"wordsPerFrame": Stat(words), @"intervalMs": Stat(interval) };
+                       @"gpuFinishMs": gpu.empty() ? [NSNull null] : Stat(gpu), @"copyMs": Stat(copy), @"presentMs": Stat(present), @"wordsPerFrame": Stat(words), @"intervalMs": Stat(interval),
+                       @"completedIntervalMs": Stat(completedInterval), @"thermalState": @(NSProcessInfo.processInfo.thermalState) };
   NSData *data = [NSJSONSerialization dataWithJSONObject:d options:0 error:nil];
   return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 }

@@ -32,6 +32,12 @@ static NSDictionary *LaunchConfig() {
   [super viewDidLoad];
   self.view.backgroundColor = UIColor.blackColor;
   NSDictionary *config = LaunchConfig();
+  // Keep unattended measurements free of the console debugger's overhead.
+  if ([config[@"logFile"] boolValue]) {
+    NSString *dir = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *file = [dir stringByAppendingPathComponent:@"performance.log"];
+    if (freopen(file.fileSystemRepresentation, "w", stderr)) setvbuf(stderr, nullptr, _IOLBF, 0);
+  }
   CAEAGLLayer *layer = [CAEAGLLayer layer];
   layer.opaque = YES;
   layer.drawableProperties = @{ kEAGLDrawablePropertyRetainedBacking: @NO, kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8 };

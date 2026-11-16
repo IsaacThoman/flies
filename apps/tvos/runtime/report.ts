@@ -61,7 +61,8 @@ function logStats(every: number, withProfile: boolean) {
     const frames = Math.max(1, stats.frames);
     const draws = commands();
     console.log(`stats ${JSON.stringify({
-      ...stats, fps: stats.intervalMs.mean ? round(1000 / stats.intervalMs.mean, 1) : 0,
+      ...stats, atMs: Math.round(native.now()), state: dataset(),
+      fps: stats.intervalMs.mean ? round(1000 / stats.intervalMs.mean, 1) : 0,
       drawsPerFrame: Math.round((draws - lastDraws) / frames),
       perFrame: Object.fromEntries(Object.entries(counters).map(([k, v]) => [k, round((v - last[k as keyof typeof counters]) / frames, 1)])),
       ...(withProfile ? { profile: takeProfile(frames) } : {}),
