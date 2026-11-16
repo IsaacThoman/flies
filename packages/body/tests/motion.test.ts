@@ -237,8 +237,8 @@ test("being placed elsewhere clears the old wall turn, motion and contact", () =
   assert.ok(body.position.z > -150, "walks immediately on the new floor");
 });
 
-test("the top of a wall beyond the sill cannot strand a landed fly", () => {
-  const world = new World(WINDOWSILL);
+test("the top of an outside wall cannot strand a landed fly", () => {
+  const world = new World({ ...WINDOWSILL, solids: [{ name: "wall", footprint: { kind: "box", x: 0, z: -150, hx: 340, hz: 25, angle: 0 }, top: { kind: "flat", y: 560 } }] });
   const body = new FlyBody(world, { x: 319.64246689820015, z: -127.12441457700562, yaw: 1.6266740085034517 });
   body.position.y = 561.7095573431452;
   body.mode = "airborne";

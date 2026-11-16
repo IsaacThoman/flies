@@ -7,6 +7,7 @@ import type { Vec3 } from "@fly/world";
 
 export const places = { picnic: PICNIC, windowsill: WINDOWSILL, lab: LAB, bar: BAR };
 export type PlaceId = keyof typeof places;
+export const CEILING_EXCURSION = 400;
 export const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
 const surface = createSurface();
 const inward = { x: 0, y: 0, z: 0 };
@@ -28,7 +29,7 @@ export function checkBody(body: FlyBody, world: World) {
   }
   // The spring can overshoot the boundary under sustained thrust or a gust.
   assert.ok(world.beyond(p.x, p.z, inward) < 250, "escaped the floor's restoring force");
-  assert.ok(p.y < world.place.ceiling + 400, "escaped the ceiling's restoring force");
+  assert.ok(p.y < world.place.ceiling + CEILING_EXCURSION, "escaped the ceiling's restoring force");
   if (body.events.landed && !body.events.tookOff) assert.ok(body.onFeet, "landing did not put it on its feet");
 }
 
@@ -99,7 +100,7 @@ export function randomStart(world: World, random: () => number, highStarts = fal
     const x = (random() * 2 - 1) * (f.kind === "circle" ? f.r : f.hx);
     const z = (random() * 2 - 1) * (f.kind === "circle" ? f.r : f.hz);
     const s = world.surface(x, z, createSurface());
-    if (s.onTable && s.normal.y >= MAX_SLOPE_COS && (highStarts || s.y <= world.place.ceiling)) return { x, z, yaw: random() * Math.PI * 2 };
+    if (s.onTable && s.normal.y >= MAX_SLOPE_COS && s.y <= world.place.ceiling + (highStarts ? CEILING_EXCURSION : 0)) return { x, z, yaw: random() * Math.PI * 2 };
   }
   throw new Error("could not sample a standable start");
 }

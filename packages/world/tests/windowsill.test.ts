@@ -78,3 +78,15 @@ test("the wine is a pool on the sill, and everything to eat lies within reach of
   assert.equal(world.heightAt(wine.x, wine.z), 0);
   for (const f of SILL_PATCHES) assert.ok(Math.abs(f.x) < SILL.hx && Math.abs(f.z) < SILL.hz, f.name);
 });
+
+test("the window and surrounding wall close every allowed ceiling excursion", () => {
+  const highestFlight = WINDOWSILL.ceiling + 400;
+  for (const s of SILL_SOLIDS.filter(s => ["glass", "wall", "jamb", "mullion", "bar"].includes(s.name))) {
+    assert.ok(s.top.kind === "flat" && s.top.y > highestFlight, `${s.name} can be flown over`);
+  }
+  for (const x of [-319, -160, -80, 0, 160, 319]) {
+    const ray = world.raycast({ x, y: highestFlight, z: 0 }, { x: 0, y: 0, z: -1 }, hit());
+    assert.ok(ray && ray.normal.z > 0.99, `a high flight at x=${x} hits the room wall`);
+  }
+  assert.ok(world.heightAt(319.64246689820015, -127.12441457700562) > highestFlight, "the old 560 mm starting perch is no longer reachable");
+});
