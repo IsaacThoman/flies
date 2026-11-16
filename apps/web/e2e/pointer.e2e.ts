@@ -23,6 +23,8 @@ import type { ChildProcess } from "node:child_process";
 import type { Page } from "playwright";
 import { Fingers, canvasPoint, openGame, readState, screenOf, startServer, targetOf, waitFor } from "../../../scripts/play.ts";
 
+/** How long a camera turned by hand may take to ease back, ms: it holds 0.8 s, then its spring takes about 5 s of the game's time, which a loaded machine (frames over 100 ms are cut short) stretches. */
+const EASE_BACK = 20_000;
 /** The frame's budget on the Apple TV, as play.e2e.ts holds it to. */
 const MAX_CALLS = 150;
 const MAX_TRIANGLES = 500_000;
@@ -144,7 +146,7 @@ async function fingers() {
     assert.ok(sky, "some air to drag across");
     await touch.drag(sky, [sky[0] + 0.25, sky[1] + 0.04], 500);
     await waitFor(page, "looking=true", 1000);
-    await waitFor(page, "looking=false", 6000);
+    await waitFor(page, "looking=false", EASE_BACK);
 
     step("fingers: the menu's button, its back button, and Settings changed by tapping");
     await tapOn("menu");
@@ -254,7 +256,7 @@ async function mouse() {
     await page.waitForTimeout(1500);
     assert.equal(await game<number>(page, "g.director.look.yaw"), turned, "held, the camera doesn't ease back");
     await page.mouse.up({ button: "right" });
-    await waitFor(page, "looking=false", 6000);
+    await waitFor(page, "looking=false", EASE_BACK);
 
     step("keys: a number picks a tool, and the hints are a keyboard's");
     await page.keyboard.press("2");
