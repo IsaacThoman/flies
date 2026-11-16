@@ -271,7 +271,7 @@ export class Eyes {
     renderer.setRenderTarget(target);
     renderer.clear(true, true, false);
     target.scissorTest = true;
-    const far = stage.current.reach ?? NEAR.far;
+    const far = stage.current.camera.reach ?? NEAR.far;
     for (let i = 0; i < FACES.length; i++) {
       const camera = this.#cameras[i];
       if (camera.far !== far) {

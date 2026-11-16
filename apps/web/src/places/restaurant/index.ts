@@ -53,9 +53,9 @@ export const restaurant: Scene = {
     focus: { x: -500, y: 500, z: 700, follow: 0.12, aim: 0.75 },
     // The street, through the shop front.
     vista: { x: 0, z: 1 },
+    // The room is ten metres corner to corner: the camera sees across it.
+    reach: 12_000,
   },
-  // The room is ten metres corner to corner: its near pass reaches across it.
-  reach: 12_000,
   // Big windows: a grey day greys it, and after dark the street's lamps and the room's own light it.
   open: 0.5,
   ambience: "restaurant",

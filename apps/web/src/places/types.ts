@@ -82,6 +82,8 @@ export type SceneCamera = {
    * goes, and turns to keep the fly in the picture.
    */
   focus?: { x: number; y: number; z: number; follow: number; aim?: number };
+  /** How far the camera sees, mm (4,000 if not said): the near pass's reach and the fly's eyes'. A room bigger than that says so. */
+  reach?: number;
   /** Which way the best of the view lies, on the ground (a unit vector): with nothing standing behind the fly, the camera likes to have it there. */
   vista: { x: number; z: number };
 };
@@ -102,8 +104,6 @@ export type Scene = {
    */
   open?: number;
   ambience: Ambience;
-  /** How far the near pass reaches, mm (4,000 if not said): a room bigger than that says so, and the camera and the fly's eyes see as far. */
-  reach?: number;
   /** Soap bubbles drifting over on the breeze (scene/bubbles.ts), and fireflies at dusk (scene/fireflies.ts): both are built for the picnic's open air and size. */
   bubbles: boolean;
   fireflies: boolean;

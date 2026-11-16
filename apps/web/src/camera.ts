@@ -231,6 +231,8 @@ export class CameraDirector {
   useScene(scene: SceneCamera) {
     this.#scene = scene;
     this.#started = false;
+    this.camera.far = scene.reach ?? 4000;
+    this.camera.updateProjectionMatrix();
   }
 
   setView(view: View) {

@@ -245,7 +245,7 @@ export class Stage {
     r.render(this.backdrop.scene, camera);
     r.clearDepth();
     camera.near = NEAR.near;
-    camera.far = this.current.reach ?? NEAR.far;
+    camera.far = this.current.camera.reach ?? NEAR.far;
     camera.updateProjectionMatrix();
     r.render(scene, camera);
     camera.near = near;
