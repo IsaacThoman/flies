@@ -481,7 +481,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
 with thresholds, smoothing and hysteresis: walk above 0.3
 until below 0.15, back up when `back` beats `walk` by 0.15, take off as
-`escape` rises past 0.5, groom and wing poses above 0.2, feed above 0.15 until
+`escape` rises past 0.4 (the giant fiber at 80 Hz: why there, in `behavior.ts`), groom and wing poses above 0.2, feed above 0.15 until
 below 0.05, commands older than 500 ms ignored). Steering is continuous: `turn`
 sets the yaw rate (3 rad/s at full turn walking, a third of that standing, 5
 in the air).
@@ -529,6 +529,16 @@ little in wind, and losing ground contact doesn't start flight (see
 `packages/brain/README.md`). So in practice a take-off is a short powered jump that comes down wherever it
 comes down, steered by `turn`, sometimes onto the sugar or the fruit.
 
+How much flight there is depends on how hard the loom drives the looming
+detectors. The hand-wired loom (eyes off) drives every one of them at once and
+the flight motor neurons reach `wings` 0.8 to 0.9, but mostly after the jump
+is over: of 8 throws at midday, one flew, rising 158 mm, and the rest were in
+the air for 0.08 to 0.17 s. Seen through the eyes, a loom fires the
+giant fiber but brings the flight motor neurons only to 0.3 to 0.4, below the
+0.6 that holds the fly up, so the escape is a jump of a few millimetres, over
+in a tenth of a second. That is the connectome as modelled; the body adds no
+flight of its own.
+
 ## The eyes
 
 `apps/web/src/eyes/eyes.ts` and `packages/body/src/vision.ts`. Every 50 ms
@@ -549,8 +559,12 @@ over anything standing in its way, and round what it can't come in over, such
 as a window), where the connectome's looming pathway is strongest and where the
 fly is seen against the bright table, stops just short, hangs a moment and
 veers away on a side that is clear. It casts a shadow. With
-all that, the fly takes off about half the time: that is the model's answer,
-not a dice roll in the game.
+all that, measured with the eyes on (`apps/web/tests/swoop-escape.test.ts`
+checks the chain in Node): the fly takes off from almost every throw at
+midday (10 of 10), less often as the light goes (2 of 10 at dusk, 4 of 10 at
+night), when the ball is dark on a dark table. Escape peaks at 0.42 to 0.73 at
+midday and 0.13 to 0.48 at dusk. That is the model's answer, not a dice roll
+in the game.
 
 **View → Fly's eyes** shows the same picture to the player: one dot per facet
 (the brain's 1,772, or, for a brain without eyes, a stand-in layout labelled as

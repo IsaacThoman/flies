@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { BrainCommand } from "@fly/brain";
-import { BACK_SPEED, Behavior, COMMAND_STALE_MS, ESCAPE_REFRACTORY, STANDING_TURN, TURN_RATE, WALK_SPEED } from "../src/index.ts";
+import { BACK_SPEED, Behavior, COMMAND_STALE_MS, ESCAPE_ON, ESCAPE_REFRACTORY, STANDING_TURN, TURN_RATE, WALK_SPEED } from "../src/index.ts";
 
 const command = (c: Partial<BrainCommand> = {}): BrainCommand => ({ walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, ...c });
 const DT = 1 / 60;
@@ -49,9 +49,10 @@ test("turn toward the fly's right is clockwise from above: negative yaw", () => 
   assert.ok(Math.abs(standing.yawRate - TURN_RATE * STANDING_TURN) < 0.01);
 });
 
-test("escape takes off once as it passes 0.5, then must fall back and wait", () => {
+test("escape takes off once as it passes ESCAPE_ON, then must fall back and wait", () => {
   const b = new Behavior();
   hold(b, command(), 0.2);
+  assert.equal(b.update(command({ escape: ESCAPE_ON - 0.01 }), 0, true, DT).takeOff, null, "just under");
   const first = b.update(command({ escape: 0.9 }), 0, true, DT);
   assert.ok(first.takeOff !== null && first.takeOff > 0.5);
   assert.equal(b.update(command({ escape: 0.9 }), 0, true, DT).takeOff, null, "held high: once");
