@@ -686,16 +686,17 @@ export function buildBench(): SceneSet {
   {
     const wipe = one("wipe");
     // Its folds are a little below the world's dome (never above it), and its faces flat, so the creases catch the light.
-    const geometry = solidTop(wipe, 12, 36);
+    const geometry = solidTop(wipe, 22, 64);
     const pos = geometry.attributes.position;
-    const crease = (x: number, z: number) => Math.abs(Math.sin(x * 0.29 + Math.sin(z * 0.23) * 2.2) + Math.sin(z * 0.37 - x * 0.15) * 0.8 + Math.sin((x + z) * 0.61) * 0.35);
+    // Sharp ridges where the folds meet, a little deeper up on the heap than at its foot, never more than a millimetre or two under where the fly stands.
+    const crease = (x: number, z: number) => Math.abs(Math.sin(x * 0.21 + Math.sin(z * 0.17) * 2.2) + Math.sin(z * 0.3 - x * 0.13) * 0.8 + Math.sin((x + z) * 0.5) * 0.35) + Math.abs(Math.sin(x * 0.9 - z * 0.7 + Math.sin(z * 0.5) * 1.5)) * 0.3;
     for (let i = 0; i < pos.count; i++) {
       const y = pos.getY(i);
-      if (y > 0.3) pos.setY(i, Math.max(0.2, y - crease(pos.getX(i), pos.getZ(i)) * 0.7));
+      if (y > 0.3) pos.setY(i, Math.max(0.2, y - crease(pos.getX(i), pos.getZ(i)) * (0.55 + 0.45 * THREE.MathUtils.smoothstep(y, 3, 12))));
     }
     geometry.deleteAttribute("normal");
     geometry.computeVertexNormals();
-    big.add(surface, piece(geometry, "#f2f3f5", { rough: 0.95, texture: 0.25 }));
+    big.add(surface, piece(geometry, "#f2f3f5", { rough: 0.95, texture: 0.12 }));
   }
 
   // Fly food spilt when the vials were filled: flat drips, and dried crumbs to climb.
