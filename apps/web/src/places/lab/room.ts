@@ -5,7 +5,9 @@
 // a background. The day comes in at the windows: by day the sun lays their
 // shapes across the floor and the far wall; at night only the lamp on the
 // bench is on, and its light spills a little way into the dark room. A wall
-// clock between the windows tells the real time.
+// clock between the windows tells the real time. Outside, a grey day closes
+// the sky over and flattens the garden, mist turns it to a pale veil, and
+// rain falls past the windows.
 // Five draws: the room, its pictures, what glows, the view outside, and the
 // glass.
 
@@ -21,6 +23,7 @@ import { FLOOR_Y, SHADE } from "./bench.ts";
 import { BACK_Z, CEILING_Y, PANELS, SUNBEAM, WINDOWS, WINDOW_LIGHT, sunbeam } from "./materials.ts";
 import type { Sunbeam } from "./materials.ts";
 
+const WHITE = new THREE.Color("#ffffff");
 const FRONT_Z = 2700;
 const LEFT_X = -2800;
 const RIGHT_X = 3000;
@@ -380,6 +383,7 @@ const OUTSIDE_FS = /* glsl */ `
 uniform sampler2D map;
 uniform vec3 high; uniform vec3 low; uniform vec3 sunDir; uniform vec3 sunColor;
 uniform float glow; uniform float stars; uniform float time;
+uniform float cover; uniform float mist; uniform float rain; uniform vec3 veil;
 uniform vec4 scenery; uniform vec4 mask; uniform vec4 band;
 varying vec3 vWorld;
 varying vec2 vUv;
@@ -392,13 +396,15 @@ void main() {
   vec3 d = normalize(vWorld - cameraPosition);
   float h = d.y;
   float day = 1.0 - stars;
-  // The sky: pale low down, deeper higher up, with the sun's glow and soft clouds drifting.
-  vec3 sky = mix(low, high, smoothstep(-0.05, 0.55, h));
+  // The sky: pale low down, deeper higher up, with the sun's glow and soft clouds drifting; on a grey day the cloud closes over it, darker underneath.
+  vec3 sky = mix(low, high, smoothstep(-0.05, 0.55, h) * (1.0 - cover * 0.85));
   float s = max(dot(d, normalize(sunDir)), 0.0);
-  sky += sunColor * (pow(s, 5.0) * glow * 0.6 + pow(s, 60.0) * 0.4) * day;
+  sky += sunColor * (pow(s, 5.0) * glow * 0.6 + pow(s, 60.0) * 0.4) * day * (1.0 - cover * 0.9);
   vec2 cp = d.xz / max(h + 0.25, 0.05) * 2.2 + vec2(time * 0.004, 0.0);
-  float cloud = smoothstep(0.5, 0.85, noise(cp) * 0.6 + noise(cp * 2.3) * 0.3 + noise(cp * 5.1) * 0.1);
-  sky = mix(sky, mix(low, vec3(1.0), 0.6 * day + 0.1), cloud * 0.55 * smoothstep(0.0, 0.12, h));
+  float n = noise(cp) * 0.6 + noise(cp * 2.3) * 0.3 + noise(cp * 5.1) * 0.1;
+  float cloud = smoothstep(0.5 - cover * 0.45, 0.85 - cover * 0.3, n);
+  vec3 cloudColor = mix(low, vec3(1.0), (0.6 * day + 0.1) * (1.0 - cover * 0.7)) * (1.0 - cover * 0.18 * smoothstep(0.4, 0.9, n)) * (1.0 - rain * 0.15);
+  sky = mix(sky, cloudColor, cloud * mix(0.55, 0.9, cover) * smoothstep(0.0, 0.12, h));
   // Stars, faintly, at night.
   vec2 cell = floor(d.xy / max(d.z * -1.0, 0.2) * 260.0);
   sky += vec3(step(0.997, hash(cell)) * stars * 0.8 * smoothstep(0.05, 0.3, h));
@@ -411,10 +417,24 @@ void main() {
     vec3 m = texture2D(map, mask.xy + q * mask.zw).rgb;
     vec3 tint = mix(vec3(0.06, 0.08, 0.15), mix(vec3(1.0), low * 1.15, 0.3), day);
     vec3 lit = there * tint + vec3(1.0, 0.8, 0.5) * m.r * stars * 0.9;
-    // Haze toward the far things, more by day.
-    lit = mix(lit, low, 0.22 * day);
+    // Haze toward the far things, more by day; under cloud the colours flatten and darken.
+    lit = mix(lit, low, 0.22 * day + 0.15 * cover);
+    lit = mix(lit, vec3(dot(lit, vec3(0.3, 0.55, 0.15))), cover * 0.35) * (1.0 - cover * 0.2);
     c = mix(lit, sky, m.g * step(0.0, p.y));
   } else if (p.y < 0.0) c = mix(vec3(0.3, 0.42, 0.22), vec3(0.04, 0.05, 0.08), stars) * mix(vec3(1.0), low, 0.3);
+  // Mist: the building across the way a ghost, the trees grey shapes, the sky gone white; the lawn, nearest, keeps a little colour.
+  c = mix(c, veil, mist * mix(0.8, 0.55, smoothstep(0.08, -0.02, h)));
+  // Rain falling past the window: thin streaks, slanting a little, as many as it rains.
+  if (rain > 0.0) {
+    vec2 r = vec2(d.x + d.y * 0.06, d.y) / max(-d.z, 0.3) * vec2(90.0, 3.0) + vec2(0.0, time * 9.0);
+    vec2 cell = floor(r);
+    vec2 f = fract(r);
+    float x = 0.2 + 0.6 * hash(cell + 4.1);
+    float y = hash(cell + 9.3);
+    float wide = fwidth(r.x) * 1.2 + 0.04;
+    float streak = (1.0 - smoothstep(0.0, wide, abs(f.x - x))) * smoothstep(0.0, 0.06, f.y - y * 0.7) * (1.0 - smoothstep(0.1, 0.3, f.y - y * 0.7));
+    c = mix(c, mix(veil, vec3(1.0), 0.4), streak * step(hash(cell), rain * 0.8) * 0.4);
+  }
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
 }`;
@@ -667,6 +687,10 @@ export function buildRoom(light: Daylight): SceneBackdrop {
     glow: { value: light.glow },
     stars: { value: light.stars },
     time: { value: 0 },
+    cover: { value: 0 },
+    mist: { value: 0 },
+    rain: { value: 0 },
+    veil: { value: new THREE.Color() },
     scenery: { value: uv(PICTURES.scenery) },
     mask: { value: uv(PICTURES.mask) },
     band: { value: new THREE.Vector4(band.x, band.y, band.w, band.h) },
@@ -685,7 +709,7 @@ export function buildRoom(light: Daylight): SceneBackdrop {
 
   return {
     scene,
-    update(time, _camera, daylight) {
+    update(time, _camera, daylight, weather) {
       clock.update();
       const dark = Math.min(1, Math.max(0, (daylight.stars - 0.25) / 0.6));
       const night = dark * dark * (3 - 2 * dark);
@@ -704,6 +728,10 @@ export function buildRoom(light: Daylight): SceneBackdrop {
       outsideUniforms.glow.value = daylight.glow;
       outsideUniforms.stars.value = daylight.stars;
       outsideUniforms.time.value = time;
+      outsideUniforms.cover.value = weather.cloud;
+      outsideUniforms.mist.value = weather.mist;
+      outsideUniforms.rain.value = weather.rain;
+      outsideUniforms.veil.value.copy(daylight.cloud).lerp(daylight.haze, 0.5).lerp(WHITE, 0.3 * (1 - daylight.stars));
     },
   };
 }
