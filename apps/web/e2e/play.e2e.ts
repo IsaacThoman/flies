@@ -126,9 +126,17 @@ try {
   await waitFor(page, "screen=settings,stack=title>settings,focus=page,tab=wallpaper,atRoot=false");
   await press("ArrowDown");
   await waitFor(page, "focus=wallpaperAfter");
-  await press("ArrowDown", 3);
+  await press("ArrowDown", 2);
+  await waitFor(page, "focus=place");
+  await press("ArrowUp", 3);
+  await waitFor(page, "focus=page");
+  await press("ArrowRight");
+  await waitFor(page, "tab=screen");
+  await press("ArrowDown");
   await waitFor(page, "focus=eyesInset");
-  await press("ArrowUp", 4);
+  await press("ArrowDown", 2);
+  await waitFor(page, "focus=statsPanel");
+  await press("ArrowUp", 3);
   await waitFor(page, "focus=page");
   await press("ArrowRight");
   await waitFor(page, "tab=sound");
@@ -223,6 +231,7 @@ try {
   const corner = await waitFor(page, "wallpaper=true,eyesInset~^(top|bottom)-(left|right)$,nerves~^(top|bottom)-(left|right)$");
   assert.equal(corner.nerves, corner.eyesInset, "its nervous system shares the corner with what it sees");
   assert.equal(corner.xray, "0.00", "no X-ray unless asked for");
+  assert.equal(corner.statsPanel, "hidden", "no stats unless asked for");
   console.log(`  what it sees and its nervous system, in the ${corner.eyesInset} corner`);
   await waitForGameTime(page, 1.5);
   await press("ArrowRight");
@@ -271,6 +280,34 @@ try {
   // Kept for the reload at the end.
   await press("ArrowDown");
   await waitFor(page, "view=wide");
+
+  step("its stats: on Always, across the screen from the others while playing, counting its day; in the wallpaper, moving round with them");
+  await page.evaluate(() => {
+    (globalThis as unknown as { __fly: { settings: { statsPanel: string } } }).__fly.settings.statsPanel = "always";
+  });
+  const stats = await waitFor(page, "statsPanel=top-left,eyesInset=top-right,nerves=top-right", 5000);
+  const counted = /walked ([\d.]+) meals (\d+) takeoffs (\d+) flown ([\d.]+) groomed ([\d.]+)/.exec(stats.day);
+  assert.ok(counted, `its day: ${stats.day}`);
+  // A fresh browser: today is this run, counted once.
+  assert.equal(counted[3], stats.takeoffs, "take-offs today, as the fly's life counted them");
+  assert.equal(counted[2], stats.meals, "meals today, as the fly's life counted them");
+  console.log(`  its day: ${stats.day}`);
+  await page.evaluate(() => {
+    const settings = (globalThis as unknown as { __fly: { settings: { statsPanel: string; wallpaperAfter: number } } }).__fly.settings;
+    settings.statsPanel = "wallpaper";
+    settings.wallpaperAfter = 2;
+  });
+  await waitFor(page, "statsPanel=hidden", 3000);
+  const together = await waitFor(page, "wallpaper=true,statsPanel~^(top|bottom)-(left|right)$,eyesInset~^(top|bottom)-(left|right)$", 10_000);
+  assert.equal(together.statsPanel.split("-")[0], together.eyesInset.split("-")[0], "at the same edge as the others");
+  assert.notEqual(together.statsPanel, together.eyesInset, "across the screen from them");
+  await page.evaluate(() => {
+    const settings = (globalThis as unknown as { __fly: { settings: { statsPanel: string; wallpaperAfter: number } } }).__fly.settings;
+    settings.statsPanel = "off";
+    settings.wallpaperAfter = 60;
+  });
+  await press("ArrowLeft");
+  await waitFor(page, "wallpaper=false,statsPanel=hidden,tool=view", 3000);
 
   step("carried to each place in turn with the Place tool, it lives there, and the frame keeps to its budget");
   await toTool("place");

@@ -18,6 +18,31 @@ test("focus starts on the first enabled item, or the one asked for", () => {
   assert.equal(new Menu(items(), { focus: "soon" }).focused?.id, "play");
 });
 
+test("in two columns, left and right go across between actions, and up and down along the list as ever", () => {
+  const six = ["play", "watch", "together", "brain", "about", "settings"].map((id): MenuItem => ({ kind: "action", id, label: id }));
+  const menu = new Menu(six);
+  menu.columns = 2;
+  assert.deepEqual(menu.press("right"), { kind: "moved" });
+  assert.equal(menu.focused?.id, "brain", "across from Play");
+  assert.deepEqual(menu.press("right"), { kind: "blocked" }, "no third column");
+  menu.press("down");
+  menu.press("down");
+  assert.equal(menu.focused?.id, "settings");
+  assert.deepEqual(menu.press("down"), { kind: "blocked" });
+  menu.press("left");
+  assert.equal(menu.focused?.id, "together");
+  assert.deepEqual(menu.press("left"), { kind: "blocked" });
+  menu.press("down");
+  assert.equal(menu.focused?.id, "brain", "down from the foot of a column is the top of the next");
+  // Five in two columns: three, then two; nothing across from the third.
+  const five = new Menu(six.slice(0, 5));
+  five.columns = 2;
+  five.focusOn("together");
+  assert.deepEqual(five.press("right"), { kind: "blocked" });
+  // One column: left and right do nothing to an action.
+  assert.deepEqual(new Menu(six).press("right"), { kind: "none" });
+});
+
 test("up and down skip disabled items and stop at the ends", () => {
   const menu = new Menu(items());
   assert.equal(menu.press("up").kind, "blocked");

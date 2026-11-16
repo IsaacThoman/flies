@@ -132,7 +132,7 @@ export type MenuPanel = {
   panel: Rect;
   /** The heading's baseline and size, or none where there isn't room. */
   heading: { y: number; size: number } | null;
-  list: { x: number; y: number; width: number; row: number; gap: number; compact: boolean };
+  list: { x: number; y: number; width: number; row: number; gap: number; compact: boolean; columns: number };
   rows: number;
 };
 
@@ -150,6 +150,8 @@ export type MenuPanelSpec = {
   values: boolean;
   /** Where it goes in the space it is given: centred, raised this much (the TV's panes sit a little above the middle). */
   raise: number;
+  /** Two columns rather than scrolling, where one doesn't fit: for a list of actions short enough to show whole. */
+  columns?: 2;
 };
 
 /** Fits a menu's pane into a space: the TV's size if it fits, else narrower and with tighter rows, scrolling what doesn't fit. */
@@ -169,17 +171,24 @@ export function fitMenu(space: Rect, spec: MenuPanelSpec): MenuPanel {
     { row: compact ? 50 : Math.max(34, spec.row - 4), gap: 6, top: 14, foot: 14, heading: null },
   ];
   const fits = (t: (typeof tiers)[number]) => Math.floor((room - t.top - t.foot + t.gap) / (t.row + t.gap));
-  // A list short enough to show whole: the roomiest spacing that shows it all. One that scrolls anyway: the roomiest that shows a few rows, keeping its heading.
+  // A list short enough to show whole: the roomiest spacing that shows it all, in two columns if it may and one won't do. One that scrolls anyway: the roomiest that shows a few rows, keeping its heading.
   const few = Math.min(want, 4);
-  const tier = (want === spec.items ? tiers.find((t) => fits(t) >= want) : undefined) ?? tiers.find((t) => fits(t) >= few) ?? tiers[tiers.length - 1];
-  const rows = Math.max(1, Math.min(want, fits(tier)));
-  const h = tier.top + rows * (tier.row + tier.gap) - tier.gap + tier.foot;
+  const whole = want === spec.items;
+  let columns = 1;
+  let tier = whole ? tiers.find((t) => fits(t) >= want) : undefined;
+  if (!tier && whole && spec.columns) {
+    tier = tiers.find((t) => fits(t) >= Math.ceil(want / spec.columns!));
+    if (tier) columns = spec.columns;
+  }
+  tier ??= tiers.find((t) => fits(t) >= few) ?? tiers[tiers.length - 1];
+  const rows = columns > 1 ? want : Math.max(1, Math.min(want, fits(tier)));
+  const h = tier.top + Math.ceil(rows / columns) * (tier.row + tier.gap) - tier.gap + tier.foot;
   const x = space.x + (space.w - width) / 2;
   const y = space.y + Math.max(margin, Math.min(space.h - h - margin, (space.h - h) / 2 - spec.raise));
   return {
     panel: { x, y, w: width, h },
     heading: tier.heading ? { y: y + tier.heading.dy, size: tier.heading.size } : null,
-    list: { x: x + pad, y: y + tier.top, width: listWidth, row: tier.row, gap: tier.gap, compact },
+    list: { x: x + pad, y: y + tier.top, width: listWidth, row: tier.row, gap: tier.gap, compact, columns },
     rows,
   };
 }
@@ -210,6 +219,9 @@ function spot(frame: Frame, x: number, y: number) {
   return { across: x / (width / 2) - 1, low: y / (height / 2) - 1 };
 }
 
+/** What the menus' hints take along the foot of the safe area (drawMenuHints). */
+const HINTS_ROOM = 38;
+
 /** The wordmark's size for a width: a 6.5th of it, in proportion to the brain's state under it. */
 const wordmarkFor = (width: number, most: number) => Math.max(24, Math.min(most, (width - 32) / 6.5));
 
@@ -229,18 +241,25 @@ export type TitleLayout = {
  */
 export function titleLayout(frame: Frame, items: number): TitleLayout {
   const a = safeRect(frame);
-  const spec: MenuPanelSpec = { items, width: 320, row: 40, heading: false, foot: 26, values: false, raise: -22 };
+  const spec: MenuPanelSpec = { items, width: 320, row: 40, heading: false, foot: 26, values: false, raise: -22, columns: 2 };
   if (a.w >= a.h * 1.2) {
-    const width = Math.min(320, a.w * 0.44);
     const right = Math.min(40, a.w * 0.047);
+    const fit = (width: number) => fitMenu({ x: a.x + a.w - right - width - 12, y: a.y, w: width + 24, h: a.h }, { ...spec, width });
+    let width = Math.min(320, a.w * 0.44);
+    let menu = fit(width);
+    // In two columns, wider, so that each button's word is as big as it can be.
+    if (menu.list.columns > 1) menu = fit((width = Math.min(360, a.w * 0.52)));
+    // Clear of the hints along the foot of the screen, where it can go up.
+    const over = menu.panel.y + menu.panel.h - (a.y + a.h - HINTS_ROOM);
+    if (over > 0) menu = shiftMenu(menu, -Math.max(0, Math.min(over, menu.panel.y - a.y - 12)));
     const menuX = a.x + a.w - right - width;
-    const menu = fitMenu({ x: menuX - 12, y: a.y, w: width + 24, h: a.h }, { ...spec, width });
     const left = menuX - a.x;
     const size = wordmarkFor(left, 60);
     const x = a.x + left * (250 / 494);
     const y = Math.max(a.y + size * 0.9, menu.panel.y - 12);
     const w = Math.min(356, left - 24);
-    const status = { x: Math.max(a.x + 12, x - w / 2), y: y + 28, w, h: 34, size: w < 300 ? 13 : 15 };
+    // Under the name, and clear of the menu where the name is pushed against it.
+    const status = { x: Math.max(a.x + 12, Math.min(x - w / 2, menuX - 12 - w)), y: y + 28, w, h: 34, size: w < 300 ? 13 : 15 };
     return { menu, wordmark: { x, y, size }, status, fly: { across: spot(frame, a.x + left * (187.88 / 494), 0).across, low: 0.1 } };
   }
   const size = wordmarkFor(a.w, 60);

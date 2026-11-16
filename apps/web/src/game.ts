@@ -50,14 +50,18 @@ import { Outside, nativeWeather } from "./scene/outside.ts";
 import { Footprints } from "./scene/prints.ts";
 import { cheaperEyes, cheaperPixels } from "./quality.ts";
 import type { Quality } from "./quality.ts";
-import { KEPT, loadLearned, loadSettings, loadShelf, loadTableSeat, saveLearned, saveSettings, saveShelf, saveTableSeat } from "./settings.ts";
+import { KEPT, OVERLAY_OPACITIES, OVERLAY_SIZES, loadLearned, loadSettings, loadShelf, loadTableSeat, saveLearned, saveSettings, saveShelf, saveTableSeat } from "./settings.ts";
 import type { Learned, Lesson, Settings, ShelfChoices, TableSeat } from "./settings.ts";
 import { Stage } from "./stage.ts";
 import { aimAt } from "./tools/aim.ts";
 import { Hands, SWOOP_BEARING, TOOLS } from "./tools/hands.ts";
 import type { ToolId } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
+import { StatsPanel, statsSlot, statsWanted } from "./stats/panel.ts";
+import type { StatsState } from "./stats/panel.ts";
+import { Tally } from "./stats/tally.ts";
 import { CornerDeck, waitFor } from "./ui/corners.ts";
+import type { CornerPicture } from "./ui/corners.ts";
 import { HUD_HITS, drawHud } from "./ui/hud.ts";
 import type { HudState } from "./ui/hud.ts";
 import { hudLayout, loadingLayout, playRoom, titleLayout, touchSlop } from "./ui/layout.ts";
@@ -154,6 +158,9 @@ export class Game implements Shell {
   /** Its nervous system in a corner, and the corner it shares with what it sees. */
   readonly nerves: NervesPanel;
   readonly corners = new CornerDeck();
+  /** Its stats in a corner, and the day they count. */
+  readonly statsPanel = new StatsPanel();
+  readonly tally: Tally;
   /** How brightly each part of its nervous system glows, from the brain's region rates. */
   readonly glow: NerveGlow;
   readonly xray = new Xray();
@@ -213,6 +220,10 @@ export class Game implements Shell {
   #touchWas = false;
   #hud: HudState;
   #eyesInfo = { facets: 0, standIn: false, off: false };
+  /** The pictures that share the corners, and the size and stats they were last laid out for. */
+  #pictures: CornerPicture[] = [];
+  #laidOut = { size: "", kind: "" };
+  #statsState: StatsState;
   /** Where the fly is now. */
   #here: PlaceId;
   /** Being carried to another place: where, and seconds since the veil began to fall. */
@@ -295,6 +306,10 @@ export class Game implements Shell {
     this.overlay.scene.add(this.inset.mesh);
     this.nerves = new NervesPanel(this.fly.model.nerves);
     this.overlay.scene.add(this.nerves.mesh);
+    this.overlay.scene.add(this.statsPanel.mesh);
+    this.#pictures = [this.inset, this.nerves, this.statsPanel];
+    this.tally = new Tally(this.life, Date.now());
+    this.#statsState = { activity: "waiting", spikes: 0, active: 0, speed: 0, history: this.meter.history, head: 0, day: this.tally.day };
     this.glow = new NerveGlow(this.fly.model.nerves.glow);
     this.#settle();
     const title = titleScreen(this);
@@ -469,11 +484,24 @@ export class Game implements Shell {
     this.#hud.layout = this.#hudLayout;
     this.#loadingLayout = loadingLayout(frame);
     this.eyes.layout(frame, this.#hudLayout);
-    this.inset.layout(frame, this.#hudLayout);
-    this.nerves.layout(frame, this.#hudLayout);
+    this.#layCorners(true);
     if (!first) for (const screen of Object.values(this.screens)) screen.layout(frame);
     this.#frameRoom();
     this.overlay.dirty = true;
+  }
+
+  /** Lays out the pictures in the corners for the screen and the size and stats chosen, if any has changed (or `now`). */
+  #layCorners(now = false) {
+    const { overlaySize, statsKind } = this.settings;
+    const laid = this.#laidOut;
+    if (!now && laid.size === overlaySize && laid.kind === statsKind) return;
+    laid.size = overlaySize;
+    laid.kind = statsKind;
+    const frame = this.display.frame;
+    const size = OVERLAY_SIZES[overlaySize];
+    this.inset.layout(frame, this.#hudLayout, size);
+    this.nerves.layout(frame, this.#hudLayout, size);
+    this.statsPanel.layout(frame, this.#hudLayout, size, statsKind);
   }
 
   /** Where the camera leaves the fly on the title and the loading screen, clear of what is drawn there. */
@@ -583,6 +611,7 @@ export class Game implements Shell {
   sleep() {
     this.audio.sleep();
     this.online?.away(this.#playerNow());
+    this.tally.save();
   }
 
   /** The page is back after `awayMs`: everything carries on from where it was, under the sky of the hour it is now. */
@@ -760,6 +789,7 @@ export class Game implements Shell {
     this.#feel();
     this.eyes.beforeStep();
     life.step(dt, now);
+    this.tally.update(life, Date.now(), dt);
     this.#reactions();
     this.#paddle(dt);
     const hands = this.hands;
@@ -814,13 +844,27 @@ export class Game implements Shell {
       stage.render(director.camera, dt);
       const showEyes = this.#showEyes();
       const screen = this.#loading ? "loading" : this.nav.current;
-      const eyesWanted = insetWanted(this.settings.eyesInset, screen, this.wallpaper, showEyes, this.eyes.detail === "off");
-      const nervesNow = nervesWanted(this.settings.nerves, screen, this.wallpaper, showEyes);
-      this.corners.update(dt, eyesWanted === "show" || nervesNow === "show", this.wallpaper, director.shotChanges);
-      // What it sees takes the corner itself; its nervous system is next to it, or there when it isn't. Neither comes in where the other still shows.
+      const settings = this.settings;
+      const eyesWanted = insetWanted(settings.eyesInset, screen, this.wallpaper, showEyes, this.eyes.detail === "off");
+      const nervesNow = nervesWanted(settings.nerves, screen, this.wallpaper, showEyes);
+      const statsNow = statsWanted(settings.statsPanel, screen, this.wallpaper, showEyes);
+      this.#layCorners();
+      this.corners.update(dt, eyesWanted === "show" || nervesNow === "show" || statsNow === "show", this.wallpaper, director.shotChanges);
+      // What it sees takes the corner itself; its nervous system is next to it, or there when it isn't; the stats across from them, or under them. None comes in where another still shows.
+      const opacity = OVERLAY_OPACITIES[settings.overlayOpacity];
+      const pictures = this.#pictures;
       const slot = nervesSlot(eyesWanted);
-      this.inset.update(dt, waitFor(eyesWanted, this.corners, 0, this.nerves.placement), this.corners);
-      this.nerves.update(dt, waitFor(nervesNow, this.corners, slot, this.inset.placement), this.corners, slot);
+      const statsAt = statsSlot(this.statsPanel.layoutNow, eyesWanted, nervesNow);
+      this.inset.update(dt, waitFor(eyesWanted, this.corners, 0, this.inset, pictures), this.corners, opacity);
+      this.nerves.update(dt, waitFor(nervesNow, this.corners, slot, this.nerves, pictures), this.corners, slot, opacity);
+      const stats = this.#statsState;
+      stats.activity = life.activity;
+      stats.spikes = this.meter.spikesPerSecond;
+      stats.active = this.meter.active;
+      stats.speed = this.meter.speed;
+      stats.head = this.meter.head;
+      stats.day = this.tally.day;
+      this.statsPanel.update(dt, waitFor(statsNow, this.corners, statsAt, this.statsPanel, pictures), this.corners, statsAt, opacity, stats);
       this.eyes.render(dt, showEyes, this.hands.ball.active, this.inset.watching);
       stage.renderer.render(this.overlay.scene, this.overlay.camera);
       if (!this.#ready) {
@@ -1567,6 +1611,9 @@ export class Game implements Shell {
     d.eyes = this.eyes.inUse ? "brain" : this.eyes.active ? "picture" : "off";
     d.eyesInset = this.inset.state;
     d.nerves = this.nerves.state;
+    d.statsPanel = this.statsPanel.state;
+    const day = this.tally.day;
+    d.day = `walked ${day.walked.toFixed(1)} meals ${day.meals} takeoffs ${day.takeOffs} flown ${day.flown.toFixed(1)} groomed ${day.groomed.toFixed(1)}`;
     d.xray = this.xray.amount.toFixed(2);
     d.glow = this.#glowSummary();
     d.calls = String(this.stage.cost.calls);

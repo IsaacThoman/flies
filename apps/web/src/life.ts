@@ -39,6 +39,10 @@ export class Life {
   eaten = 0;
   meals = 0;
   takeOffs = 0;
+  /** How far its legs have carried it, mm, and seconds spent flying and grooming: all only ever counted up, as they happen. */
+  walked = 0;
+  flown = 0;
+  groomed = 0;
   /** Seconds of fly time lived. */
   time = 0;
   activity: Activity = "waiting";
@@ -124,9 +128,13 @@ export class Life {
     forces.air = stimuli.air;
     forces.threat = stimuli.threat;
     forces.meal = intent.feeding && food && food.sweet > 0 ? food : null;
+    const { x, y, z } = body.position;
+    const wasOnFeet = body.onFeet;
     body.step(intent, forces, dt);
     this.crowd.resolve(body, dt);
     if (body.events.jumped) this.takeOffs++;
+    // On its feet before and after: a take-off's leap and a landing aren't walking.
+    if (wasOnFeet && body.onFeet) this.walked += Math.hypot(body.position.x - x, body.position.y - y, body.position.z - z);
 
     // Eating: the brain wants to feed, and its mouthparts are on something sweet.
     this.eating = false;
@@ -139,6 +147,8 @@ export class Life {
     this.#proboscis += ((intent.feeding ? 1 : 0) - this.#proboscis) * Math.min(1, dt * 6);
     this.pantry.update(dt);
     this.activity = this.#describe(intent, felt.sweet);
+    if (this.activity === "flying") this.flown += dt;
+    else if (this.activity === "grooming") this.groomed += dt;
   }
 
   #describe(intent: Intent, sweet: number): Activity {

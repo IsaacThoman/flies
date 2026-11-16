@@ -10,7 +10,7 @@ import type { Settings } from "../../settings.ts";
 import type { Sound } from "../../audio/sounds.ts";
 
 /** The settings' tabs. */
-export type SettingsPage = "wallpaper" | "sound" | "picture";
+export type SettingsPage = "wallpaper" | "screen" | "sound" | "picture";
 /** The menu (the title, at launch and from play alike), play, and what the menu opens. */
 export type ScreenId = "title" | "play" | "settings" | "about" | "brain" | "together";
 

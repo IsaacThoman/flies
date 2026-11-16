@@ -58,6 +58,7 @@ export class MenuScreen implements Screen {
     this.id = options.id;
     this.#pane = options.place(shell.shape);
     options.menu.setRows(this.#pane.rows);
+    options.menu.columns = this.#pane.list.columns;
     this.view = new MenuView(options.menu, this.#pane.list);
   }
 
@@ -78,6 +79,7 @@ export class MenuScreen implements Screen {
   layout(frame: Frame) {
     this.#pane = this.#options.place(frame);
     this.menu.setRows(this.#pane.rows);
+    this.menu.columns = this.#pane.list.columns;
     this.view.place(this.#pane.list);
     this.#dirty = true;
   }
