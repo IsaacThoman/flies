@@ -48,8 +48,8 @@ if (game) {
     page = new Page(game, canvas);
     Page.keepForOffline();
   } else {
-    // The host stops frames in the background and says so: the sound stops with them, a room
-    // hears at once that the fly is away, and coming back the line to it is opened again at once.
+    // The host stops frames in the background and says so: a room hears at once that the fly is
+    // away, and coming back the line to it is opened again at once.
     let hiddenAt = 0;
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {

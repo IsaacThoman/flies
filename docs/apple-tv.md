@@ -440,8 +440,8 @@ whose delegate runs on a queue of the bridge's own, never the JavaScript or main
   that came before the close has been taken, as a browser hands on its messages before its close
   event.
 - When the app goes to the background (`sceneDidEnterBackground`, in `src/main.mm`) the game
-  hears it first (`visibilitychange`: the sound is suspended and, at a table, the room is told at
-  once that the fly is away), then every line is closed with 1001, both on the JavaScript thread
+  hears it first (`visibilitychange`: at a table, the room is told at once that the fly is
+  away), then every line is closed with 1001, both on the JavaScript thread
   and in a short background task, before tvOS suspends the app. The fly rests at the table, and
   after 10 minutes away it leaves (the room's rule). Coming back, the game wakes as a shown tab
   does and opens its line again at once, rather than waiting out its retry.
@@ -508,7 +508,7 @@ Apple TV has to be measured there before it is promised. `tvos:soak --table` doe
 flies from this Mac (`fakeFly`, `scripts/tables.ts`: no brain, each walking a small circle round
 the TV's fly and sending its state 20 times a second, as a device does) start an unlisted room at
 midday in clear weather, and the TV, launched detached with `stats` and `logFile` and the room's
-code in its URL, sits down in it and plays: feeding, the ball every 20 s, then watching them as the wallpaper, half the minutes each.
+code in its URL, sits down in it and plays: feeding, the ball every 20 s, then watching them as the screensaver, half the minutes each.
 The fakes keep walking until the soak is done; the process waits for them.
 
 Against the real room server, with a release build as it is:
@@ -539,7 +539,7 @@ The TV was warm from an earlier soak and reported thermal state 2 (serious) thro
 | Phase | FPS in 10-second windows | Mean JavaScript a frame | Its p95, median window and worst | Draws a frame (host's mean) |
 | --- | --- | --- | --- | --- |
 | Playing at the table | 55–60, mean 59.9 | 7.5 ms | 13.1 ms, 26.6 ms | 48.7 |
-| Wallpaper at the table | 59.9–60 | 6.2 ms | 8.9 ms, 18.6 ms | 48.4 |
+| Screensaver at the table | 59.9–60 | 6.2 ms | 8.9 ms, 18.6 ms | 48.4 |
 
 All seven others were there throughout, with no reconnects; memory stayed at 183–187 MB. The
 host's draws are a mean over every frame: with the eyes at 20 Hz, two frames in three are the
