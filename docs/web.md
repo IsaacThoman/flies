@@ -435,3 +435,6 @@ lifetimes in the table above, a `_headers` file in `dist/`:
 GitHub Pages works too, if the repository is public or on a paid plan, but
 nothing about its responses can be set. Netlify's free traffic would run out
 after about a thousand first visits a month.
+
+<!-- docs-check: generated sw.js -->
+<!-- docs-check: generated ./dist -->
