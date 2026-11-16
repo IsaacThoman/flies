@@ -30,7 +30,7 @@ class FakeSocket implements TableSocket {
     this.closeCode ||= code;
   }
   /** The room says something. */
-  say(m: ServerMessage) {
+  say(m: ServerMessage | null) {
     this.#inbox.push(JSON.stringify(m));
   }
   drop(code: number) {
@@ -171,4 +171,18 @@ test("the table knows every place, light and weather the game does, by the same 
   assert.deepEqual(Object.keys(WORLDS).sort(), PLACES.map((p) => p.id).sort());
   assert.deepEqual([...TABLE_LIGHTS], TOOLS.find((t) => t.id === "light")!.variants.map((v) => v.id));
   assert.deepEqual([...TABLE_WEATHERS], TOOLS.find((t) => t.id === "weather")!.variants.map((v) => v.id));
+});
+
+
+test("a non-message JSON value is ignored while the line can still be welcomed", () => {
+  const { line: l, sockets } = line();
+  sockets[0].status = "open";
+  l.update(0);
+  sockets[0].say(null);
+  assert.doesNotThrow(() => l.update(0));
+  assert.equal(l.status, "connecting");
+  sockets[0].say(welcome(5000));
+  l.update(0);
+  assert.equal(l.status, "joined");
+  l.leave();
 });
