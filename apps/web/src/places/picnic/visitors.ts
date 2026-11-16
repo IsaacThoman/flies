@@ -465,7 +465,7 @@ function rimPath(k: number) {
 // Leaves.
 
 /** A leaf as a fine grid, so it can bend: along x from stem (0) to tip (1), across z; darker at the middle of each half, lighter toward its edge (the veins are drawn in its shader). */
-function leafGeometry(length: number, dark: string, edge: string) {
+export function leafGeometry(length: number, dark: string, edge: string) {
   const ALONG = 16;
   const ACROSS = 4;
   const positions: number[] = [];
@@ -514,7 +514,7 @@ rise += aAcross * aAcross * (0.25 + uLift * 0.8);
 transformed.y += rise;`;
 
 /** Its midrib and the veins running out from it toward the tip, lighter than the blade, as fine as the pixels allow. */
-const LEAF_FRAGMENT = /* glsl */ `
+export const LEAF_FRAGMENT = /* glsl */ `
 float midrib = 1.0 - smoothstep(0.0, 0.05 + fwidth(vLeaf.y) * 1.5, abs(vLeaf.y));
 float rib = vLeaf.x * 9.0 - abs(vLeaf.y) * 1.6;
 float lateral = 1.0 - smoothstep(0.0, 0.07 + fwidth(rib) * 1.5, abs(fract(rib) - 0.5) - 0.42);
