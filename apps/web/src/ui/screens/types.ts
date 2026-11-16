@@ -12,7 +12,7 @@ import type { Sound } from "../../audio/sounds.ts";
 /** The settings' tabs. */
 export type SettingsPage = "wallpaper" | "screen" | "sound" | "picture";
 /** The menu (the title, at launch and from play alike), play, and what the menu opens. */
-export type ScreenId = "title" | "play" | "settings" | "about" | "brain" | "together";
+export type ScreenId = "title" | "play" | "settings" | "about" | "together";
 
 /** The table this device is at, as the screens show it: whether this player started it, and the others there. */
 export type TableNow = { readonly starting: boolean; readonly joined: boolean; readonly others: readonly { readonly id: number; readonly colour: string }[] };

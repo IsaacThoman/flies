@@ -69,7 +69,6 @@ import type { HudLayout, LoadingLayout } from "./ui/layout.ts";
 import { LOADING_HITS, arriving, drawLoading } from "./ui/loading.ts";
 import { Overlay } from "./ui/overlay.ts";
 import { AboutScreen } from "./ui/screens/about.ts";
-import { BrainScreen } from "./ui/screens/brain.ts";
 import { settingsScreen, settingsTab, titleScreen } from "./ui/screens/menus.ts";
 import type { MenuScreen } from "./ui/screens/menu-screen.ts";
 import type { Point, Screen, ScreenId, Shell, TableNow } from "./ui/screens/types.ts";
@@ -168,7 +167,7 @@ export class Game implements Shell {
   /** The real weather outside, where the Apple TV can tell it; scripts feed it in a browser (`outside.feed`). */
   readonly outside = new Outside(nativeWeather());
   readonly nav = new Navigator<ScreenId>("title");
-  readonly screens: { title: MenuScreen; settings: MenuScreen; about: Screen; brain: Screen; together: Screen };
+  readonly screens: { title: MenuScreen; settings: MenuScreen; about: Screen; together: Screen };
   /** At a table with others (docs/online.md), its line to the table and the others there; null alone. */
   online: Online | null = null;
   /** How the table this device was last at ended: it left, or was turned away (removed, the table gone). */
@@ -309,7 +308,7 @@ export class Game implements Shell {
     this.overlay.scene.add(this.statsPanel.mesh);
     this.#pictures = [this.inset, this.nerves, this.statsPanel];
     this.tally = new Tally(this.life, Date.now());
-    this.#statsState = { activity: "waiting", spikes: 0, active: 0, speed: 0, history: this.meter.history, head: 0, day: this.tally.day };
+    this.#statsState = { activity: "waiting", spikes: 0, active: 0, speed: 0, history: this.meter.history, head: 0, day: this.tally.day, sensed: this.life.sensed, brain: null };
     this.glow = new NerveGlow(this.fly.model.nerves.glow);
     this.#settle();
     const title = titleScreen(this);
@@ -318,7 +317,6 @@ export class Game implements Shell {
       title,
       settings: settingsScreen(this),
       about: new AboutScreen(this),
-      brain: new BrainScreen(this),
       together: new TogetherScreen(this),
     };
     this.#hudLayout = hudLayout(display.frame);
@@ -864,6 +862,7 @@ export class Game implements Shell {
       stats.speed = this.meter.speed;
       stats.head = this.meter.head;
       stats.day = this.tally.day;
+      stats.brain = life.brain.state;
       this.statsPanel.update(dt, waitFor(statsNow, this.corners, statsAt, this.statsPanel, pictures), this.corners, statsAt, opacity, stats);
       this.eyes.render(dt, showEyes, this.hands.ball.active, this.inset.watching);
       stage.renderer.render(this.overlay.scene, this.overlay.camera);
@@ -1303,7 +1302,7 @@ export class Game implements Shell {
     }
   }
 
-  /** A pointer on a menu, the About page or the brain's: told in design units, with what was drawn under it. A right click is Back, anywhere. */
+  /** A pointer on a menu or the About page: told in design units, with what was drawn under it. A right click is Back, anywhere. */
   #screenGesture(g: Gesture) {
     const screen = this.screens[this.nav.current as MenuScreenId];
     const { width, height } = this.shape.design;

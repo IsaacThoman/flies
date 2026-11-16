@@ -111,12 +111,12 @@ try {
   assert.equal(awake.focus, "play");
   assert.equal(awake.eyesInset, "hidden", "not over the title");
 
-  step("the menus: the first arrow shows the focus, then Settings and its tabs, About, the brain, and back each time");
+  step("the menus: the first arrow shows the focus, then Settings and its tabs, About, and back each time");
   // The page starts as a mouse's, with no focus showing: the first arrow only shows where it is.
   assert.equal(awake.ring, "false");
   await press("ArrowDown");
   await waitFor(page, "ring=true,focus=play");
-  await press("ArrowDown", 4);
+  await press("ArrowDown", 3);
   await waitFor(page, "focus=settings");
   await press("ArrowDown", 2);
   await waitFor(page, "focus=together");
@@ -158,13 +158,7 @@ try {
   await waitFor(page, "screen=about");
   await press("ArrowDown", 3);
   await press("Escape");
-  await waitFor(page, "screen=title");
-  await press("ArrowUp");
-  await press("Enter");
-  await waitFor(page, "screen=brain");
-  await waitForGameTime(page, 0.5);
-  await press("Escape");
-  await waitFor(page, "screen=title,focus=brain");
+  await waitFor(page, "screen=title,focus=about");
   await press("ArrowUp", 2);
   await waitFor(page, "focus=play");
 

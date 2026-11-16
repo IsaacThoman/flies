@@ -17,8 +17,8 @@ import type { ToolId } from "./tools/hands.ts";
 export type EyesDetail = "off" | "low" | "high";
 /** When something shows over the picture: never, in the wallpaper, or while playing too. */
 export type ShowWhen = "off" | "wallpaper" | "always";
-/** What the stats in a corner are of: its brain at work, its day so far, or both. */
-export type StatsKind = "brain" | "day" | "both";
+/** What the stats in a corner are of: its brain at work, its day so far, both, or what goes in and out of its brain. */
+export type StatsKind = "brain" | "day" | "both" | "signals";
 /** How big the pictures in the corners are, and how much of the world shows through them. */
 export type OverlaySize = "small" | "medium" | "large";
 export type OverlayOpacity = "full" | "soft" | "faint";
@@ -106,7 +106,7 @@ const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean 
   nerves: showWhen,
   xray: showWhen,
   statsPanel: showWhen,
-  statsKind: (v) => ["brain", "day", "both"].includes(v),
+  statsKind: (v) => ["brain", "day", "both", "signals"].includes(v),
   overlaySize: (v) => Object.hasOwn(OVERLAY_SIZES, v),
   overlayOpacity: (v) => Object.hasOwn(OVERLAY_OPACITIES, v),
   place: (v) => v === "turns" || isPlaceId(v),

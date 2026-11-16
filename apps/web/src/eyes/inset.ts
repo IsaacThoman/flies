@@ -337,7 +337,7 @@ export class EyesInset {
     const { width, height, radius } = INSET_PANEL;
     glassPanel(g, 1, 1, width - 2, height - 2, radius, { tint: "night", shadow: false });
     const p = INSET_PICTURE;
-    // A dark well for the dots, as the brain screen sets its trace in one.
+    // A dark well for the dots, as the stats set the brain's trace in one.
     roundedRect(g, p.x - 2, p.y - 2, p.width + 4, p.height + 4, 6);
     g.fillStyle = "rgba(0, 16, 50, 0.5)";
     g.fill();
