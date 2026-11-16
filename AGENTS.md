@@ -29,6 +29,14 @@ the rules the whole thing is built on.
 - Tests wait on game time or canvas state, not wall-clock sleeps; speed budgets use CPU time.
   The brain chooses: observe its inputs and commands, and bound retries for its choices.
 - Comments say why, not what. No dead code, no leftover experiments.
+- Shut down what you start as soon as you no longer need it: dev and
+  preview servers, room servers, headless browsers, probes, Docker
+  containers and Compose projects (with their scratch volumes), and
+  simulators you booted (`xcrun simctl shutdown <udid>`; leave ones you
+  didn't boot). Start long-running things so they can be stopped (note the
+  PID), check with `lsof -nP -iTCP -sTCP:LISTEN` and `xcrun simctl list
+  devices booted` before you finish, and never leave a background process
+  orphaned. The machine is shared with many other agents.
 
 ## Commits and pull requests
 
