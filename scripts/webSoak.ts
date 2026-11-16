@@ -12,6 +12,7 @@ import { startServer as startRooms } from "../apps/server/src/server.ts";
 import { fakeFly } from "./tables.ts";
 import { HANDS, HOLDING, PLAYING } from "@fly/net";
 import type { CDPSession, Page } from "playwright";
+import type { Object3D } from "three";
 import type { Game } from "../apps/web/src/game.ts";
 import { PLACES } from "../apps/web/src/places/catalog.ts";
 import type { PlaceId } from "../apps/web/src/places/catalog.ts";
@@ -137,6 +138,55 @@ async function canonical(page: Page) {
   await choose(page, "weather", "clear");
   await choose(page, "view", "follow");
   await page.waitForTimeout(2500);
+}
+
+async function checkArrivalActors(page: Page, to: PlaceId) {
+  const inventory = await page.evaluate(async (to) => {
+    const g = globalThis.__fly;
+    const stage = g.stage, parent = stage.scene, rendered = stage.renderScene;
+    const oldPlace = stage.set.group;
+    const actors = parent.children.filter((o) => o !== oldPlace);
+    const labels = new Map<Object3D | undefined, string>([
+      [g.fly.root, "fly"], [g.fly.shadow ?? undefined, "fly shadow"],
+      [g.fly.model.object.getObjectByName("fly-nerves"), "X-ray nerves"],
+      [g.bubbles.mesh, "bubbles"], [g.handsView.group, "hands view"],
+      [g.fireflies.mesh, "fireflies"], [g.prints.prints.mesh, "footprints"],
+      [parent.children.find((o) => o.renderOrder === -10), "eyes sky sphere"],
+      ...g.online!.others.list.map((o) => [o.view.root, `remote fly ${o.id}`] as const),
+    ]);
+    const retained: Object3D[] = [];
+    for (const actor of actors) actor.traverse((o) => retained.push(o));
+    const listed = retained.filter((o) => labels.has(o) || actors.includes(o));
+    const list = () => {
+      const found: { name: string; id: number }[] = [];
+      parent.traverse((o) => { if (listed.includes(o)) found.push({ name: labels.get(o) ?? o.type, id: o.id }); });
+      return found;
+    };
+    const before = list();
+    const fail = (why: string) => { throw Error(`arrival actors: ${why}`); };
+    for (const [object, label] of labels) if (!object || !retained.includes(object)) fail(`missing ${label} before arrival`);
+    g.moveTo(to, true);
+    const started = performance.now();
+    await new Promise<void>((resolve, reject) => {
+      const frame = () => {
+        if (stage.current.id === to && stage.veil === 0) resolve();
+        else if (performance.now() - started > 60_000) reject(Error("arrival actors: move timed out"));
+        else requestAnimationFrame(frame);
+      };
+      frame();
+    });
+    if (stage.scene !== parent || stage.renderScene === rendered || rendered.children.length) fail("scene container was not replaced around the same parent");
+    if (stage.set.group === oldPlace || oldPlace.parent) fail("old place was not replaced");
+    for (const object of retained) {
+      let root = object;
+      while (root.parent) root = root.parent;
+      if (root !== stage.renderScene) fail(`lost ${labels.get(object) ?? object.type} ${object.id}`);
+    }
+    return { before, after: list(), retained: retained.length };
+  }, to);
+  assert.deepEqual(inventory.after, inventory.before, "arrival preserves every listed actor by identity");
+  console.log(`arrival actors (${inventory.retained} retained objects): ${JSON.stringify(inventory)}`);
+  await waitFor(page, `place=${to},moving=`);
 }
 
 export async function run(args = process.argv.slice(2)) {
@@ -284,6 +334,7 @@ export async function run(args = process.argv.slice(2)) {
   }
 
   async function interaction(page: Page, sample: (checkpoint?: boolean, force?: boolean) => Promise<void>, phase: (p: string) => void) {
+    let actorsChecked = false;
     for (const p of phases.filter((p) => p !== "wallpaper")) {
       phase(p);
       if (p === "places") {
@@ -373,6 +424,13 @@ export async function run(args = process.argv.slice(2)) {
               for (let p = o.view.root.parent; p; p = p.parent) if (p === globalThis.__fly.stage.scene) return true;
               return false;
             })), "joined fly is attached to the visible place");
+            if (quick && !actorsChecked) {
+              const from = (await readState(page)).place as PlaceId;
+              await checkArrivalActors(page, PLACES.find((p) => p.id !== from)!.id);
+              await page.evaluate((id) => globalThis.__fly.moveTo(id, true), from);
+              await waitFor(page, `place=${from},moving=`);
+              actorsChecked = true;
+            }
             await page.waitForTimeout(1500);
             await sample(false, true);
           } finally {
