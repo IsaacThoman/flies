@@ -291,6 +291,49 @@ commands; this is not a fully asynchronous native transfer.
 
 ## Checking it
 
+### Sustained performance on Rufus
+
+Measured 15 November 2026 on Rufus, Apple TV 4K (3rd generation, AppleTV14,1), tvOS 27.2.1
+(24K157): signed Release, 640×480, mode 2, real 166,700-neuron connectome, Low eyes except for
+the High-eye interaction phase, sound enabled. Both runs were detached, with 10-second stats
+written to the app's cache; no console, GPU timing or GL debug was attached.
+
+The previous code initially averaged about 60 FPS, with JavaScript p95 around 21–22 ms on
+eye-refresh frames. After the first remote press started sound, its three per-frame audio
+targets accumulated without limit. The native mixer evaluated their entire history for each
+sample while holding the graph lock, so JavaScript's audio calls progressively waited longer.
+The seven-minute baseline fell below 1 FPS by about four minutes, with individual JavaScript
+frames taking seconds. Memory stayed around 136–137 MB: this was growing work, not a large
+memory spike. That baseline stayed on the night title/wallpaper; it is not a matched scene
+benchmark against every phase below.
+
+`audio/follow.ts` now rebases only the three parameters owned by the frame loop, retaining an
+anchor and a target while preserving exponential smoothing. The one-hour synthetic regression
+test checks both the smoothed values and the bounded JavaScript/native command timeline. Eye
+readback is asynchronous as described above; neither fix changes the neural model.
+
+The fixed build completed `tvos:soak --minutes 20` in 23 minutes 3 seconds: interaction phases
+followed by ten minutes each of midday and night wallpaper. It was left running on Rufus.
+
+| Phase | FPS in steady 10-second windows | Mean JavaScript per frame | Highest window's JavaScript p95 | Memory |
+| --- | --- | --- | --- | --- |
+| Midday wallpaper | 59.9–60.0 | 4.22 ms | 10.40 ms | 140.4–142.5 MB |
+| Night wallpaper | 59.9–60.0 | 4.60 ms | 11.84 ms | 142.5–143.5 MB |
+
+Feeding, sixteen ball throws, the Low/High eye picture, pause/settings, and waking the
+wallpaper all completed. There were no runtime errors or drive timeouts, and every thermal
+sample was nominal. The last six complete 10-second windows all reported 60 FPS. Memory
+increased about 3 MB after interaction warmup; this run does not establish an overnight bound.
+
+This meets the sustained average 60 FPS target on this device, not an every-frame guarantee.
+Startup and lighting changes had 10-second averages as low as 58.6 FPS. In steady wallpaper,
+the worst window's frame-start interval p95 was 19.71 ms and render-completion interval p95
+was 20.83 ms, so some pacing variation remains even when average FPS is 60. These intervals
+are CPU-side measurements, not display scanout. Raw logs, CSVs and test evidence are outside
+git; this table is the retained summary.
+
+### Simulator correctness check
+
 `npm run tvos:check` (`apps/tvos/tests/simulator.tvos.ts`; `--no-build` to reuse the last
 build, `--runtime tvOS-26-0` for the older system) builds the app with the test scene and the
 stand-in brain, creates and boots a fresh Apple TV 4K simulator, installs and launches the app
