@@ -33,7 +33,8 @@ const TEXT = /\.(html|js|css|webmanifest|json)$/;
  * one of its shaders. Anything else is a request to somebody else's server
  * until shown otherwise.
  */
-const NOT_REQUESTS = new Set(["http://www.w3.org/1999/xhtml", "https://jcgt.org/published/0007/04/01/"]);
+// The site is named for the apps' invitations and room server (online/invite.ts); a page at a site uses its own.
+const NOT_REQUESTS = new Set(["http://www.w3.org/1999/xhtml", "https://jcgt.org/published/0007/04/01/", "https://flies.isaacthoman.com/"]);
 
 test("nothing in the build asks another site for anything: no fonts, scripts, analytics or CDNs", () => {
   const html = read("index.html");
