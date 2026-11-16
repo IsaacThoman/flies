@@ -144,7 +144,7 @@ function render(shot: ArtShot): string {
     const scale = width / TV_DESIGN_WIDTH;
     g.save();
     g.scale(scale, scale);
-    drawWordmark(g, TV_DESIGN_WIDTH / 2, (shot.wordmark.y * height) / scale, (shot.wordmark.size * height) / scale, 0.8);
+    drawWordmark(g, TV_DESIGN_WIDTH / 2, (shot.wordmark.y * height) / scale, (shot.wordmark.size * height) / scale, 0.8, true);
     g.restore();
   }
   return out.toDataURL("image/png");
