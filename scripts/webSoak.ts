@@ -24,7 +24,7 @@ type Phase = typeof PHASES[number];
 type Sample = { seconds: number; phase: string; place: string; checkpoint: boolean; [metric: string]: number | string | boolean };
 const STATE = ["screen", "tab", "brainEngine", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden", "xray", "nerves"];
 const CLOCKS = ["gameSeconds", "audioSeconds", "eyesUpdates"];
-const METRICS = ["geometries", "textures", "programs", "calls", "triangles", "heap", "backing", "workerHeap", "workerBacking", "nodes", "listeners", "audioNodes", "frameMs", "brainSpeed", "storage"];
+const METRICS = ["geometries", "textures", "programs", "calls", "triangles", "heap", "backing", "workerHeap", "workerBacking", "workerWasm", "nodes", "listeners", "audioNodes", "frameMs", "brainSpeed", "storage"];
 
 /** Disjoint early/late quarters avoid calling a warmup spike a sustained slope. */
 export function trend(rows: { seconds: number; value: number }[], tolerance: number) {
@@ -41,7 +41,7 @@ export function trend(rows: { seconds: number; value: number }[], tolerance: num
 class WorkerHeap {
   #cdp: CDPSession;
   #sessions = new Set<string>();
-  #pending = new Map<number, { resolve: (v: Record<string, number>) => void; reject: (e: Error) => void }>();
+  #pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   #id = 0;
   constructor(cdp: CDPSession) {
     this.#cdp = cdp;
@@ -57,23 +57,33 @@ class WorkerHeap {
     });
   }
   async start() { await this.#cdp.send("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: false, flatten: false }); }
-  async #send(sessionId: string, method: string) {
+  async #send<T = Record<string, number>>(sessionId: string, method: string, params: Record<string, unknown> = {}) {
     const id = ++this.#id;
-    return new Promise<Record<string, number>>((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       const timeout = setTimeout(() => { this.#pending.delete(id); reject(new Error(`Worker CDP timed out: ${method}`)); }, 30_000);
-      this.#pending.set(id, { resolve: (v) => { clearTimeout(timeout); resolve(v); }, reject: (e) => { clearTimeout(timeout); reject(e); } });
-      void this.#cdp.send("Target.sendMessageToTarget", { sessionId, message: JSON.stringify({ id, method }) }).catch((e) => { clearTimeout(timeout); this.#pending.delete(id); reject(e); });
+      this.#pending.set(id, { resolve: (v) => { clearTimeout(timeout); resolve(v as T); }, reject: (e) => { clearTimeout(timeout); reject(e); } });
+      void this.#cdp.send("Target.sendMessageToTarget", { sessionId, message: JSON.stringify({ id, method, params }) }).catch((e) => { clearTimeout(timeout); this.#pending.delete(id); reject(e); });
     });
   }
   async sample() {
-    let heap = 0, backing = 0;
+    let heap = 0, backing = 0, wasm = 0;
     for (const session of this.#sessions) {
       await this.#send(session, "HeapProfiler.collectGarbage");
       const m = await this.#send(session, "Runtime.getHeapUsage");
       heap += m.usedSize;
       backing += m.backingStorageSize ?? 0;
+      // V8's backing-store metric omits Wasm linear memory. Release inspector handles after every query.
+      try {
+        const proto = await this.#send<{ result: { objectId?: string } }>(session, "Runtime.evaluate", { expression: "typeof WebAssembly === 'object' ? WebAssembly.Memory.prototype : null", objectGroup: "soak-wasm" });
+        if (proto.result.objectId) {
+          const objects = await this.#send<{ objects: { objectId: string } }>(session, "Runtime.queryObjects", { prototypeObjectId: proto.result.objectId, objectGroup: "soak-wasm" });
+          const size = await this.#send<{ result: { value: number } }>(session, "Runtime.callFunctionOn", { objectId: objects.objects.objectId, functionDeclaration: "function() { return this.reduce((n, m) => n + m.buffer.byteLength, 0); }", returnByValue: true });
+          assert.ok(Number.isFinite(size.result.value), "worker Wasm memory unavailable");
+          wasm += size.result.value;
+        }
+      } finally { await this.#send(session, "Runtime.releaseObjectGroup", { objectGroup: "soak-wasm" }); }
     }
-    return { workerHeap: this.#sessions.size ? heap : NaN, workerBacking: this.#sessions.size ? backing : NaN };
+    return { workerHeap: this.#sessions.size ? heap : NaN, workerBacking: this.#sessions.size ? backing : NaN, workerWasm: this.#sessions.size ? wasm : NaN };
   }
 }
 

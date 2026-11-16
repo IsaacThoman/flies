@@ -64,6 +64,8 @@ brain worker, then records page `Performance.getMetrics` heap bytes, worker
 `Memory.getDOMCounters` nodes/listeners, CDP WebAudio live nodes, localStorage
 characters, and the canvas's renderer geometries/textures/programs, calls,
 triangles, CPU frame milliseconds and brain speed (simulated/real time).
+The worker's live `WebAssembly.Memory` buffers are counted separately: V8's
+backing-store metric omits them. Inspector handles are released after each query.
 The CSV includes screen/tab/brain engine/weather/time/view/eyes/inset/variant for context.
 
 The browser cannot report per-page GPU allocation bytes or the TV's resident
