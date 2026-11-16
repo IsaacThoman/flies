@@ -29,8 +29,11 @@ const smooth = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 const wrap24 = (h: number) => ((h % 24) + 24) % 24;
-/** From one hour of the day to another the short way round, k of the way. */
-export const mixHours = (a: number, b: number, k: number) => wrap24(a + ((((b - a) % 24) + 36) % 24 - 12) * k);
+/** The hours from one hour of the day on to another (negative for back), the way round nearest `near`: 0 for the short way. */
+export const turn = (a: number, b: number, near = 0) => {
+  const d = b - a - near;
+  return near + d - 24 * Math.round(d / 24);
+};
 
 // WeatherKit's conditions (WeatherCondition's raw values) by what the game can show of them.
 const RAINY = new Set(["drizzle", "rain", "heavyRain", "sunShowers", "sleet", "wintryMix", "freezingDrizzle", "freezingRain", "hail"]);
@@ -144,6 +147,14 @@ export class Outside {
   #wantWeather = false;
   #wantSun = false;
   #at = -1;
+  /**
+   * The way round (hours) each ease of the light's hour went last, null while
+   * it isn't easing: the short way round flips sides when the two hours come
+   * twelve apart (a polar day turning to night, say), so an ease keeps to the
+   * way it went, and the light never jumps across the day.
+   */
+  #sunTurn: number | null = null;
+  #switchTurn: number | null = null;
 
   constructor(bridge: NativeWeatherBridge | null) {
     this.#bridge = bridge;
@@ -275,10 +286,22 @@ export class Outside {
   lightHours(hours: number): number {
     const sun = this.#sun;
     const k = smooth(0, 1, this.sunWeight);
-    if (!sun || k <= 0) return hours;
+    if (!sun || k <= 0) {
+      this.#sunTurn = this.#switchTurn = null;
+      return hours;
+    }
     let real = dayHours(hours, sun);
-    if (this.#sunFrom && this.#sunBlend < 1) real = mixHours(dayHours(hours, this.#sunFrom), real, smooth(0, 1, this.#sunBlend));
-    return mixHours(hours, real, k);
+    if (this.#sunFrom && this.#sunBlend < 1) {
+      const from = dayHours(hours, this.#sunFrom);
+      this.#sunTurn = turn(from, real, this.#sunTurn ?? 0);
+      real = wrap24(from + this.#sunTurn * smooth(0, 1, this.#sunBlend));
+    } else this.#sunTurn = null;
+    if (k >= 1) {
+      this.#switchTurn = null;
+      return real;
+    }
+    this.#switchTurn = turn(hours, real, this.#switchTurn ?? 0);
+    return wrap24(hours + this.#switchTurn * k);
   }
 }
 

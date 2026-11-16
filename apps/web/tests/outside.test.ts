@@ -10,7 +10,7 @@ import type { NativeWeatherBridge, OutsideConditions, OutsideStatus } from "@fly
 import { SCENES } from "../src/places/index.ts";
 import { CLOCK_SUNRISE, CLOCK_SUNSET, TIMES, blankLight, clockLight } from "../src/scene/light.ts";
 import type { Light, TimeOfDay } from "../src/scene/light.ts";
-import { BLEND, Outside, STALE, SUN_STALE, SWITCH, dayHours, mixHours, outsideMix } from "../src/scene/outside.ts";
+import { BLEND, Outside, STALE, SUN_STALE, SWITCH, dayHours, outsideMix, turn } from "../src/scene/outside.ts";
 import type { SunTimes } from "../src/scene/outside.ts";
 import { KINDS, WeatherNow, forecast, kindOf } from "../src/scene/weather.ts";
 import type { Mix } from "../src/scene/weather.ts";
@@ -133,8 +133,7 @@ test("the day moves on without jumping, through every day length from a short wi
     let last = dayHours(0, sun);
     for (let m = 1; m <= 24 * 60; m++) {
       const g = dayHours(m / 60, sun);
-      const step = mixHours(last, g, 1) - last;
-      const short = ((step % 24) + 36) % 24 - 12;
+      const short = turn(last, g);
       if (!polar) assert.ok(short >= 0, `day ${rise}–${set}: backwards at ${(m / 60).toFixed(2)}`);
       // Never more than about ten minutes of the clock's day in a real minute.
       assert.ok(Math.abs(short) < 11 / 60, `day ${rise}–${set}: ${short.toFixed(3)} h at ${(m / 60).toFixed(2)}`);
@@ -321,7 +320,7 @@ test("the light moves to the real sunrise and sunset without jumping, however it
   let last = o.lightHours(15);
   run(o, NOW, SWITCH + 2, (x) => {
     const h = x.lightHours(15);
-    assert.ok(Math.abs(mixHours(last, h, 1) - last) < 0.5, `${last.toFixed(2)} to ${h.toFixed(2)}`);
+    assert.ok(Math.abs(turn(last, h)) < 0.5, `${last.toFixed(2)} to ${h.toFixed(2)}`);
     last = h;
   });
   assert.ok(Math.abs(o.lightHours(16) - CLOCK_SUNSET) < 1e-9);
@@ -330,7 +329,7 @@ test("the light moves to the real sunrise and sunset without jumping, however it
   last = o.lightHours(16);
   run(o, NOW + 70_000, BLEND, (x) => {
     const h = x.lightHours(16);
-    assert.ok(Math.abs(mixHours(last, h, 1) - last) < 0.1);
+    assert.ok(Math.abs(turn(last, h)) < 0.1);
     last = h;
   });
 });
@@ -358,4 +357,42 @@ test("opened with a fresh answer kept from the last run, it is the weather from 
   w.follow(500_000, true, o);
   assert.equal(w.kind, "rain");
   assert.ok(w.wet > 0.8, `wet ${w.wet.toFixed(2)}`);
+});
+
+test("a polar day turning to night between observations eases across without the light jumping", () => {
+  for (let h0 = 0; h0 < 24; h0 += 0.25) {
+    const bridge = new FakeBridge();
+    const o = new Outside(bridge);
+    bridge.answer(outside({ observedAt: NOW, sunrise: null, sunset: null, noon: 12, daylight: true }));
+    o.update(NOW, true);
+    bridge.answer(outside({ observedAt: NOW, sunrise: null, sunset: null, noon: 12, daylight: false }));
+    let last = o.lightHours(h0);
+    run(o, NOW, BLEND + 4, (x, t) => {
+      const h = x.lightHours(h0 + (t - NOW) / 3_600_000);
+      assert.ok(Math.abs(turn(last, h)) < 0.1, `from ${h0}: ${last.toFixed(2)} to ${h.toFixed(2)}`);
+      last = h;
+    });
+  }
+});
+
+test("day after day of observations, the light only ever moves on, and never far at once", () => {
+  const bridge = new FakeBridge();
+  const o = new Outside(bridge);
+  const midnight = NOW - 12 * 3_600_000;
+  // A winter week, the days drawing in by three minutes each: an observation every 20 minutes, as the TV asks.
+  const sunOn = (t: number) => {
+    const day = Math.floor((t - midnight) / 86_400_000);
+    return { sunrise: 7.9 + day * 0.03, sunset: 16.2 - day * 0.03, noon: 12.05 };
+  };
+  bridge.answer(outside({ observedAt: midnight, ...sunOn(midnight) }));
+  o.update(midnight, true);
+  let last = o.lightHours(0);
+  for (let t = midnight + 2000; t < midnight + 7 * 86_400_000; t += 2000) {
+    if ((t - midnight) % (20 * 60_000) === 0) bridge.answer(outside({ observedAt: t, ...sunOn(t) }));
+    o.update(t);
+    const h = o.lightHours((((t - midnight) / 3_600_000) % 24));
+    const step = turn(last, h);
+    assert.ok(step >= -1e-9 && step < 0.05, `${((t - midnight) / 3_600_000).toFixed(3)} h in: ${last.toFixed(3)} to ${h.toFixed(3)}`);
+    last = h;
+  }
 });
