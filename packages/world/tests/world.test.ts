@@ -3,6 +3,9 @@ import { test } from "node:test";
 import { FOODS, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TABLE_RADIUS, World, createPicnic, createSurface } from "../src/index.ts";
 import type { RayHit } from "../src/index.ts";
 
+/** A bare round table this wide, with nothing on it. */
+const openTable = (r: number) => new World({ floor: { kind: "circle", r }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320 });
+
 const world = createPicnic();
 const solid = (name: string) => SOLIDS.find((s) => s.name === name)!;
 const hit = (): RayHit => ({ point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 0 }, solid: -2, t: 0 });
@@ -91,7 +94,7 @@ test("the pantry knows what is tasted where", () => {
 });
 
 test("eating takes food down, dropped food is gone when eaten, patches come back", () => {
-  const pantry = new Pantry(new World([], 300), [{ name: "honey", x: 0, z: 0, r: 5, sweet: 1 }]);
+  const pantry = new Pantry(openTable(300), [{ name: "honey", x: 0, z: 0, r: 5, sweet: 1 }]);
   const patch = pantry.foods[0];
   pantry.eat(patch, 1, 1);
   assert.ok(patch.amount < 1 && patch.amount > 0.5);
@@ -108,7 +111,7 @@ test("eating takes food down, dropped food is gone when eaten, patches come back
 });
 
 test("at most a few dropped foods at once: the oldest makes way", () => {
-  const pantry = new Pantry(new World([], 300));
+  const pantry = new Pantry(openTable(300));
   const first = pantry.drop("berry", 0, 0);
   for (let i = 0; i < MAX_DROPPED; i++) pantry.drop("sugar", i * 10, 0);
   assert.equal(pantry.foods.length, MAX_DROPPED);
@@ -173,4 +176,46 @@ test("the lemonade stands in a saucer with a rim to walk along and lemonade pool
   // A ray from above lands in the moat.
   const down = world.raycast({ x: pool.x, y: 50, z: pool.z }, { x: 0, y: -1, z: 0 }, hit());
   assert.ok(down && Math.abs(down.point.y - floor) < 1e-4);
+});
+
+test("a rectangular top: over it inside its edges, and the way back from beyond them", () => {
+  const sill = new World({ floor: { kind: "rect", hx: 200, hz: 40 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 200 });
+  assert.equal(sill.onTable(199, 39), true);
+  assert.equal(sill.onTable(0, 41), false);
+  assert.equal(sill.onTable(201, 0), false);
+  const inward = { x: 0, y: 0, z: 0 };
+  // Beyond the long edge, straight back across it.
+  assert.equal(sill.beyond(0, 50, inward), 10);
+  assert.ok(inward.x === 0 && inward.z === -1);
+  // Beyond a corner, diagonally back toward it.
+  assert.ok(Math.abs(sill.beyond(203, -44, inward) - 5) < 1e-9);
+  assert.ok(Math.abs(inward.x + 0.6) < 1e-9 && Math.abs(inward.z - 0.8) < 1e-9);
+  // Inside, negative: how far in from the nearest edge.
+  assert.equal(sill.beyond(0, 30, inward), -10);
+  // Walls: off the top, back over it.
+  const n = { x: 0, y: 0, z: 0 };
+  assert.equal(sill.wallNormal(0, 45, 1, n), true);
+  assert.ok(n.x === 0 && n.z === -1);
+  // Rays land on the top only inside its edges.
+  assert.ok(sill.raycast({ x: 150, y: 50, z: 30 }, { x: 0, y: -1, z: 0 }, hit()));
+  assert.equal(sill.raycast({ x: 150, y: 50, z: 45 }, { x: 0, y: -1, z: 0 }, hit()), null);
+});
+
+test("a circle's way back from beyond its edge points to the middle", () => {
+  const inward = { x: 0, y: 0, z: 0 };
+  assert.ok(Math.abs(world.beyond(TABLE_RADIUS + 30, 0, inward) - 30) < 1e-9);
+  assert.ok(inward.x === -1 && inward.z === 0);
+});
+
+test("the world can become another place, and the pantry sets out that place's food", () => {
+  const w = createPicnic();
+  const pantry = new Pantry(w, PATCHES);
+  pantry.drop("sugar", 10, 10);
+  const shelf = { floor: { kind: "rect", hx: 100, hz: 30 }, solids: [{ name: "pot", footprint: { kind: "circle", x: 50, z: 0, r: 10 }, top: { kind: "flat", y: 40 } }], patches: [{ name: "jam", x: -20, z: 0, r: 4, sweet: 1 }], start: { x: 0, z: 0, yaw: 0 }, ceiling: 150 } as const;
+  w.load(shelf);
+  pantry.reset(shelf.patches);
+  assert.equal(w.heightAt(50, 0), 40);
+  assert.equal(w.heightAt(SOLIDS[1].footprint.x, SOLIDS[1].footprint.z), 0);
+  assert.equal(w.onTable(0, 31), false);
+  assert.deepEqual(pantry.foods.map((f) => f.name), ["jam"]);
 });

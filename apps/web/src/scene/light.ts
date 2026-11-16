@@ -1,6 +1,7 @@
 // The light of the day: five times of day the player can choose between, and
 // everything that follows from one (the sky, the sun, the lights, the haze,
-// the water), eased from one to the next.
+// the water), eased from one to the next. Each place has its own palettes
+// (apps/web/src/places).
 
 import * as THREE from "three";
 
@@ -18,7 +19,8 @@ export function timeFromClock(date: Date): TimeOfDay {
   return "night";
 }
 
-type Palette = {
+/** The light of one time of day in one place. Indoors the "sun" is what comes in at the window, and the sky what is seen through it. */
+export type Palette = {
   zenith: string;
   middle: string;
   horizon: string;
@@ -40,13 +42,7 @@ type Palette = {
   env: number;
 };
 
-const PALETTES: Record<TimeOfDay, Palette> = {
-  morning: { zenith: "#2f7fe0", middle: "#7cc0f4", horizon: "#e8f4ff", sunUp: 0.42, sunAround: 2.2, sun: "#fff1d6", sunIntensity: 1.43, sky: "#d8ecff", ground: "#8cc46a", hemiIntensity: 0.96, haze: "#cfe6fb", water: "#2d8fd6", cloud: "#ffffff", stars: 0, glow: 0.25, env: 1 },
-  noon: { zenith: "#0f5fd8", middle: "#45a3f2", horizon: "#d9f0ff", sunUp: 1.05, sunAround: 2.6, sun: "#fffaf0", sunIntensity: 1.65, sky: "#dff0ff", ground: "#7dbf55", hemiIntensity: 1.08, haze: "#c4e3fb", water: "#1679cc", cloud: "#ffffff", stars: 0, glow: 0.18, env: 1.1 },
-  golden: { zenith: "#3d6fd0", middle: "#9fb8e8", horizon: "#ffd9a0", sunUp: 0.2, sunAround: 0.8, sun: "#ffc27a", sunIntensity: 1.32, sky: "#ffe2bf", ground: "#a3b85a", hemiIntensity: 0.78, haze: "#f6d6b0", water: "#3a7cc0", cloud: "#ffe6c8", stars: 0, glow: 0.55, env: 0.95 },
-  dusk: { zenith: "#24306e", middle: "#7a5aa8", horizon: "#ff9a7a", sunUp: 0.03, sunAround: 0.3, sun: "#ff8a5c", sunIntensity: 0.66, sky: "#b9a3d8", ground: "#5a6e58", hemiIntensity: 0.60, haze: "#c49ab8", water: "#43508e", cloud: "#ffb6a8", stars: 0.3, glow: 0.7, env: 0.7 },
-  night: { zenith: "#050b2a", middle: "#10245a", horizon: "#2f4f8c", sunUp: 0.7, sunAround: -0.5, sun: "#b8ccff", sunIntensity: 0.30, sky: "#3c5590", ground: "#1d2c3c", hemiIntensity: 0.45, haze: "#1c2f5c", water: "#0e2050", cloud: "#5c6c9c", stars: 1, glow: 0.1, env: 0.45 },
-};
+export type Palettes = Readonly<Record<TimeOfDay, Palette>>;
 
 /** The light as it is now, eased toward the chosen time of day. */
 export class Daylight {
@@ -68,15 +64,26 @@ export class Daylight {
   time: TimeOfDay;
   /** 0 to 1 through a change of time; 1 when settled. */
   #blend = 1;
+  #palettes: Palettes;
   #from: Palette;
   #to: Palette;
   #up = 0;
   #around = 0;
 
-  constructor(time: TimeOfDay) {
+  constructor(time: TimeOfDay, palettes: Palettes) {
     this.time = time;
-    this.#from = PALETTES[time];
-    this.#to = PALETTES[time];
+    this.#palettes = palettes;
+    this.#from = palettes[time];
+    this.#to = palettes[time];
+    this.#apply(1);
+  }
+
+  /** Changes to another place's palettes at once, settled: behind the veil while the fly is carried there. */
+  use(palettes: Palettes) {
+    this.#palettes = palettes;
+    this.#from = palettes[this.time];
+    this.#to = palettes[this.time];
+    this.#blend = 1;
     this.#apply(1);
   }
 
@@ -87,7 +94,7 @@ export class Daylight {
   set(time: TimeOfDay) {
     if (time === this.time) return;
     this.#from = this.#snapshot();
-    this.#to = PALETTES[time];
+    this.#to = this.#palettes[time];
     this.time = time;
     this.#blend = 0;
   }

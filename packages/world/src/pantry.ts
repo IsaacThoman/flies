@@ -1,9 +1,21 @@
-// The food in the world and how much of it is left: the table's own (honey,
+// The food in the world and how much of it is left: the place's own (honey,
 // jam, fruit, sugar), which is eaten down and slowly comes back, and what the
 // player drops, which is eaten up and gone.
 
-import type { FoodPatch } from "./picnic.ts";
 import type { World } from "./world.ts";
+
+/** A patch of food built into a place: it can be eaten down and slowly comes back. */
+export type FoodPatch = {
+  name: string;
+  x: number;
+  z: number;
+  /** How far from (x, z) it tastes, mm. */
+  r: number;
+  /** 0 to 1. */
+  sweet: number;
+  /** A pool of liquid: a fly walking or drinking in it sets rings spreading. */
+  pool?: boolean;
+};
 
 export type FoodKind = "sugar" | "honey" | "berry" | "water";
 
@@ -28,6 +40,8 @@ export type Food = {
   sweet: number;
   /** 1 when whole, 0 when eaten up. */
   amount: number;
+  /** A pool of liquid (see FoodPatch). */
+  pool: boolean;
 };
 
 /** Amount eaten per second at `feed` 1. A dropped food lasts about 6 s with `feed` near 0.5, as the berry does in the desktop pet. */
@@ -46,8 +60,14 @@ export class Pantry {
 
   constructor(world: World, patches: readonly FoodPatch[] = []) {
     this.#world = world;
+    this.reset(patches);
+  }
+
+  /** Clears away everything, dropped food too, and sets out these patches, whole: the fly has been carried somewhere else. */
+  reset(patches: readonly FoodPatch[]) {
+    this.foods.length = 0;
     for (const p of patches) {
-      this.foods.push({ id: this.#next++, kind: "patch", name: p.name, x: p.x, y: world.heightAt(p.x, p.z), z: p.z, r: p.r, sweet: p.sweet, amount: 1 });
+      this.foods.push({ id: this.#next++, kind: "patch", name: p.name, x: p.x, y: this.#world.heightAt(p.x, p.z), z: p.z, r: p.r, sweet: p.sweet, amount: 1, pool: p.pool ?? false });
     }
   }
 
@@ -56,7 +76,7 @@ export class Pantry {
     const dropped = this.foods.filter((f) => f.kind !== "patch");
     if (dropped.length >= MAX_DROPPED) this.remove(dropped[0]);
     const spec = FOODS[kind];
-    const food: Food = { id: this.#next++, kind, name: spec.name, x, y: this.#world.heightAt(x, z), z, r: spec.r, sweet: spec.sweet, amount: 1 };
+    const food: Food = { id: this.#next++, kind, name: spec.name, x, y: this.#world.heightAt(x, z), z, r: spec.r, sweet: spec.sweet, amount: 1, pool: false };
     this.foods.push(food);
     return food;
   }

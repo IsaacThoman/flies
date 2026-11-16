@@ -18,11 +18,18 @@ npm run e2e           # plays the game in headless Chromium with the real brain
 the game (`apps/web`) and its packages: `packages/world` (where the fly can
 stand, what it bumps into and eats), `packages/body` (its senses, what it makes
 of the brain's commands, how it moves, what its eyes see) and `packages/ui`
-(the menu kit).
+(the menu kit). `docs/places.md` is about the places the fly can live and how
+to add one.
 
 ## Playing
 
-The fly lives on a round café table by a lake: lemonade, a jam jar, a
+The fly can live in more than one place (`docs/places.md`), and the player can
+carry it from one to another: the **Place** tool, or Settings → Where it
+lives. Living in each in turn (the default), it moves on after 20 minutes of
+wallpaper. It is the same fly, its brain running on; the world fades out, the
+place is built behind the veil, and it is set down there.
+
+The first place is the picnic: a round café table by a lake: lemonade, a jam jar, a
 strawberry and a half, cherries, a slice of orange, a green apple, sugar cubes,
 a drip of honey, a smear of jam, dew. The lemonade jar stands in a saucer:
 up a gentle slope, a rounded rim to walk along, and down into a moat where
@@ -62,14 +69,15 @@ The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
 beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot), **Light** (now, which follows the clock,
-or morning, midday, golden hour, dusk, night) and **View** (close up, follow, wide, whole table, from above,
-and through the fly's eyes; Up brings the camera in, Down takes it out). The
+or morning, midday, golden hour, dusk, night), **View** (close up, follow, wide, the whole table, from above,
+and through the fly's eyes; Up brings the camera in, Down takes it out) and
+**Place** (where it lives; Up and Down choose, Select carries it there). The
 screen always shows what each button does now, and a caption at the top says
 what the fly is doing.
 
 The camera (`apps/web/src/camera.ts`) works like a patient nature cameraman.
 In Follow the fly is about 170 pixels long, seen from low down and a little
-behind its side, with the table, the fruit or the lake behind it; Close up is
+behind its side, with the table, the fruit or the place's view (the picnic's lake) behind it; Close up is
 about twice that, Wide about a third. It keeps its place round the fly and
 moves only when it has to (the fly has turned its back for more than a
 second, something is in the way, or there is fruit or a jar to have behind
@@ -91,7 +99,7 @@ fly from one angle after another instead (Calm), or change them more often
 The title also offers **Just watch** (the wallpaper straight away), **Inside
 its brain** (live: every sense going in, every command coming out with the
 neurons it is read from and their firing rates, spikes a second, active
-neurons), **About the fly**, and **Settings** (sound and outdoor volume, pixel
+neurons), **About the fly**, and **Settings** (where it lives, sound and surroundings volume, pixel
 size, wallpaper timing and camera, the eyes' detail, button hints, frame
 stats).
 
@@ -217,14 +225,17 @@ dev and preview servers serve and the production build copies in
 (`vite.config.ts`). On the Apple TV it is `globalThis.__native.brain`
 (`apps/web/src/brain/native-driver.ts`), which allocates nothing per frame.
 Sound is synthesised into buffers at start-up (no oscillators or filters):
-wing buzz following the wings, patter while it walks, the outdoors (breeze,
-lake, birds), and small sounds for the tools and menus. Settings are kept in
+wing buzz following the wings, patter while it walks, each place's own
+surroundings (the picnic's breeze, lake and birds), and small sounds for the
+tools and menus. Settings are kept in
 `localStorage`.
 
 ## Tests
 
 `npm test` runs, without a browser: the world's standing, bumping, ray and food
-queries; the body's thresholds, motion, collisions, falls, flight, landing,
+queries, round and rectangular tops, and becoming another place; every place
+(the fly starts standing, its food can be tasted where it lies, every time of
+day, every shot keeps the camera out of everything with the fly in view); the body's thresholds, motion, collisions, falls, flight, landing,
 wall turning and mouth alignment; every sense; the facet layout, cube mapping
 and resampling; both brain drivers against fakes and the worker's host; the
 brain meter; the menu kit's focus, values, scrolling and navigation; the

@@ -8,9 +8,11 @@ import type { Looming } from "@fly/body";
 import { FLY_LENGTH, MOUTH_AHEAD } from "@fly/body";
 import type { FoodKind, Pantry, Vec3, World } from "@fly/world";
 import type { View } from "../camera.ts";
+import { PLACES } from "../places/catalog.ts";
+import type { PlaceId } from "../places/catalog.ts";
 import type { TimeOfDay } from "../scene/light.ts";
 
-export type ToolId = "feed" | "swoop" | "feather" | "blow" | "light" | "view";
+export type ToolId = "feed" | "swoop" | "feather" | "blow" | "light" | "view" | "place";
 
 export type Variant = { id: string; label: string };
 export type Tool = { id: ToolId; name: string; verb: string; hold: boolean; variants: readonly Variant[]; /** The kind chosen at the start, if not the first. */ initial?: number };
@@ -24,7 +26,12 @@ export const TOOLS: readonly Tool[] = [
   { id: "light", name: "Light", verb: "", hold: false, variants: [{ id: "clock", label: "Now" }, { id: "morning", label: "Morning" }, { id: "noon", label: "Midday" }, { id: "golden", label: "Golden hour" }, { id: "dusk", label: "Dusk" }, { id: "night", label: "Night" }] },
   // Nearest first, so Up brings the camera in and Down takes it out.
   { id: "view", name: "View", verb: "", hold: false, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }] },
+  // Where it lives: Up and Down choose, Select carries it there. Only when there is somewhere else to go.
+  ...(PLACES.length > 1 ? [{ id: "place", name: "Place", verb: "Go", hold: false, variants: PLACES.map((p) => ({ id: p.id, label: p.name })) } satisfies Tool] : []),
 ];
+
+/** Where the Place tool is on the shelf, or -1 without one. */
+export const PLACE_TOOL = TOOLS.findIndex((t) => t.id === "place");
 
 /** The beach ball: how big (mm), how fast it swoops (mm/s), and how long a swoop lasts (s). */
 export const BALL_RADIUS = 34;
@@ -93,6 +100,8 @@ export class Hands {
   stroking = false;
   readonly looming: Looming[] = [{ id: 1, position: this.ball.position, r: BALL_RADIUS }];
   readonly events: HandsEvents = { dropped: null, landed: null, swooped: false, toolChanged: false, variantChanged: false, blocked: false };
+  /** What the fly stands on where it is now ("table", "sill"), for the name of the whole-place view. */
+  surface = "table";
   #idle = 0;
   #world: World;
 
@@ -136,6 +145,22 @@ export class Hands {
     return TOOLS[4].variants[this.variants[4]].id as TimeOfDay | "clock";
   }
 
+  /** The kind's name as shown: the whole-place view is named for what the fly stands on there. */
+  get label(): string {
+    const v = this.variant;
+    return this.current.id === "view" && v.id === "table" ? `Whole ${this.surface}` : v.label;
+  }
+
+  /** The place chosen on the Place tool. */
+  get place(): PlaceId {
+    return (PLACE_TOOL < 0 ? PLACES[0].id : TOOLS[PLACE_TOOL].variants[this.variants[PLACE_TOOL]].id) as PlaceId;
+  }
+
+  /** Shows a place as chosen on the Place tool (where the fly is now). */
+  choosePlace(id: PlaceId) {
+    if (PLACE_TOOL >= 0) this.variants[PLACE_TOOL] = Math.max(0, PLACES.findIndex((p) => p.id === id));
+  }
+
   /** The view chosen on the View tool ("eyes" is the fly's-eye picture). */
   get view(): View | "eyes" {
     return TOOLS[5].variants[this.variants[5]].id as View | "eyes";
@@ -152,6 +177,17 @@ export class Hands {
   /** Back to following the fly. */
   release() {
     this.following = true;
+  }
+
+  /** Lets go of everything: the fly has been carried somewhere else, and what was falling or flying there is gone. */
+  clear() {
+    this.release();
+    this.falling.length = 0;
+    this.ball.active = false;
+    this.ball.position.y = -1e4;
+    this.stroke = 0;
+    this.blowing = false;
+    this.stroking = false;
   }
 
   update(dt: number, input: HandsInput, fly: { position: Vec3; yaw: number; onFeet: boolean }, pantry: Pantry) {

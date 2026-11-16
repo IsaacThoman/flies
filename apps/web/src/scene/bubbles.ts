@@ -73,6 +73,8 @@ export class Bubbles {
   #surface = { y: 0, normal: { x: 0, y: 1, z: 0 }, solid: -1, onTable: true };
   /** A bubble burst on the fly this frame: how hard it felt it (0 if none). */
   brushed = 0;
+  /** Bubbles drift over this place (Scene.bubbles). Without them there is nothing to see, feel or hear of them. */
+  enabled = true;
 
   constructor(parent: THREE.Object3D, world: World) {
     this.#world = world;
@@ -118,6 +120,7 @@ export class Bubbles {
 
   /** Pops the bubble nearest a point, if one is within `reach` of its skin (a puff, a tool). */
   popNear(point: THREE.Vector3Like, reach: number) {
+    if (!this.enabled) return;
     for (const b of this.#bubbles) {
       if (b.popping > 0) continue;
       if (Math.hypot(b.x - point.x, b.y - point.y, b.z - point.z) < b.r + reach) b.popping = 0.001;
@@ -130,6 +133,8 @@ export class Bubbles {
     this.#uniforms.light.value.copy(sun).transformDirection(camera.matrixWorldInverse);
     this.popped.length = 0;
     this.brushed = 0;
+    this.mesh.visible = this.enabled;
+    if (!this.enabled) return;
     const world = this.#world;
     for (let i = 0; i < this.#bubbles.length; i++) {
       const b = this.#bubbles[i];
