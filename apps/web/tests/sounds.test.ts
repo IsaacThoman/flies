@@ -8,7 +8,8 @@ class FakeContext {
   state = "running";
   currentTime = 0;
   destination = {};
-  started: { buffer: { data: Float32Array }; loop: boolean; gain: number }[] = [];
+  started: { buffer: { data: Float32Array }; loop: boolean; gain: number; rate: number }[] = [];
+  stopped = 0;
   createGain() {
     const node = { gain: param(1), out: null as unknown, connect: (to: unknown) => void (node.out = to) };
     return node;
@@ -25,8 +26,8 @@ class FakeContext {
       playbackRate: param(1),
       out: null as { gain: { value: number } } | null,
       connect: (to: { gain: { value: number } }) => void (source.out = to),
-      start: () => started.push({ buffer: source.buffer!, loop: source.loop, gain: source.out?.gain.value ?? 1 }),
-      stop: () => {},
+      start: () => started.push({ buffer: source.buffer!, loop: source.loop, gain: source.out?.gain.value ?? 1, rate: source.playbackRate.value }),
+      stop: () => void this.stopped++,
     };
     return source;
   }
@@ -102,4 +103,29 @@ test("at the windowsill the birds are the garden's, muffled by the glass, and ke
 test("indoors without a window the birds aren't heard", () => {
   assert.equal(anHour("lab", 0, 0).chirps.length, 0);
   assert.equal(anHour("bar", 0, 0).chirps.length, 0);
+});
+
+test("a held tool is heard from when it starts to when it stops, and nothing is made in between", () => {
+  const ctx = new FakeContext();
+  (globalThis as { AudioContext?: unknown }).AudioContext = function () {
+    return ctx;
+  };
+  const audio = new Audio();
+  audio.start(10, 10);
+  const loops = ctx.started.length;
+  audio.held(0, 0);
+  assert.equal(ctx.started.length, loops, "nothing while nothing is held");
+  for (let frame = 0; frame < 120; frame++) audio.held(1, 0);
+  assert.equal(ctx.started.length, loops + 1, "the feather's rustle, once");
+  assert.ok(ctx.started.at(-1)!.loop);
+  for (let frame = 0; frame < 60; frame++) audio.held(0, 0);
+  assert.equal(ctx.stopped, 1, "let go when it stops");
+  audio.held(0, 0.55);
+  audio.held(0, 0.55);
+  audio.held(0, 0);
+  audio.held(0, 1);
+  const [gentle, hard] = ctx.started.slice(-2);
+  assert.equal(ctx.started.length, loops + 3);
+  assert.ok(hard.rate > gentle.rate, "blowing hard is higher and brighter than blowing gently");
+  assert.ok(energy(gentle.buffer.data) > 0 && edge(ctx.started[loops].buffer.data) > edge(gentle.buffer.data), "the feather hisses higher than the breath");
 });

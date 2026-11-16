@@ -625,6 +625,7 @@ export class Game implements Shell {
     const wings = paused ? 0 : life.body.mode === "airborne" ? Math.max(0.15, life.intent.wings) : life.intent.wingPose * 0.6;
     this.audio.follow(wings, paused ? 0 : Math.abs(life.body.groundSpeed) / 12, near, dt);
     this.audio.weather(stage.weather.rain, Math.hypot(this.#felt.air.x, this.#felt.air.z), stage.light.stars);
+    this.audio.held(this.hands.stroking && !paused ? 1 : 0, this.hands.blowing && !paused ? (this.hands.variant.id === "strong" ? 1 : 0.55) : 0);
 
     this.#overlay(dt);
 

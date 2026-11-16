@@ -625,7 +625,11 @@ wing buzz following the wings, patter while it walks, each place's own
 surroundings (the picnic's breeze and lake; birds by day, quieter in the
 rain and gone to roost at night, muffled behind the windowsill's glass), rain
 and the rush of a gust, and small sounds for the
-tools and menus. The settings, the shelf's kept choices and what the hints
+tools and menus. The held tools are heard while they work: the feather
+rustles, swelling with each brush, while it strokes the fly, and a breath of
+air blows while you hold Blow, deeper and softer gently, higher and louder
+hard. Each starts when the tool begins and is let go when it stops, so
+nothing plays, or costs anything, in between. The settings, the shelf's kept choices and what the hints
 have taught are in
 `localStorage` (`apps/web/src/settings.ts`); from a save made by another
 build, or a broken one, only what this build can use is kept.
