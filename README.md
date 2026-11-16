@@ -197,6 +197,39 @@ is in them; at dusk and night the lamps, the flickering candle and the back
 bar light it, and lights out of focus glow behind the fly. It sounds like a
 quiet room: low voices, a glass or two touching, ice settling.
 
+The restaurant is a whole room, not a tabletop: a small city bistro, closed
+for the night. The fly starts on a round marble table in the window, between
+a glass caddy of sugar packets and a glass with red wine left in it, a rose
+in a bud vase and an unlit votive beside them, a torn sugar packet spilt
+across the marble and the ring a glass left; from there it can walk under
+the table, fly to the next, to the floor's black and white penny rounds, to
+the zinc bar or the kitchen's pass. Chairs are pushed in, or upturned on two
+of the oak four-tops; the tables are cleared but not spotless (ketchup and a
+menu on one, the bread basket on another, an espresso cup with sugar in the
+bottom on the banquette's). Along the bar are leather stools under three
+enamel pendants, the middle one left on; on the hammered zinc a bowl of
+fruit with a bruised peach, a board with a cut lemon, a mat with syrup
+spilt on it, two glasses of wine and a cake under a glass cloche. Behind
+it, bottles on shelves before an old mirror over the drinks fridge's glowing
+doors; at the back, a plate sent back to the pass with crumbs of tart and
+raspberry coulis, under the heat lamps' faint red; by the door the host's
+stand with a sticky menu and a bowl of mints, the exit sign's green over it.
+The marble's veins, the cane's weave, the zinc's hammering, the oak's grain,
+the floor's glaze and grout and the pressed-tin ceiling are worked out in the
+shaders, crisp however close the camera comes. Outside the shop front is a
+street with a corner bar's neon across it; by day the daylight comes in at
+the glass, its frames laying their shadows across the tables and the floor,
+long and gold at golden hour; after dark the street lamp throws the window's
+shape in and the tables' shadows back, passing cars sweep their headlamps
+across the ceiling, the pendant pools warm light on the zinc, and in the rain
+water runs down the glass. Now and then, while nobody plays, the ventilation
+comes on and a slow draught falls from its diffusers. The room is drawn in
+areas, each in detail only while the camera is near it (`docs/places.md`, "A
+large place"). It sounds of a bistro after closing: the ventilation's hush, the
+fridge's compressor knocking on and off, the ice machine dropping a batch,
+the building ticking as it cools, and the city through the glass. There are
+no bubbles or fireflies indoors.
+
 It plays as well with a finger, a mouse or trackpad, a keyboard or a game pad
 as with the remote. Your hand is a glowing ring on the table; until you move
 it, it waits just in front of the fly's mouth, and it drifts back there 15 s
