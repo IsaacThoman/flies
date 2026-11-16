@@ -288,6 +288,17 @@ export class FlyBody {
     // slope it can walk up is not one.
     const length = Math.hypot(mx, mz);
     if (length > 0) {
+      // A grazing path can enter and leave a corner between even tiny steps.
+      const origin = this.#flightOrigin;
+      origin.x = p.x;
+      origin.y = p.y + STEP_UP + 1e-6;
+      origin.z = p.z;
+      const dir = this.#flightDir;
+      dir.x = mx / length;
+      dir.y = 0;
+      dir.z = mz / length;
+      const hit = world.raycast(origin, dir, this.#flightHit, length);
+      if (hit && hit.normal.y === 0) return "blocked";
       const sign = mx * Math.sin(this.yaw) + mz * Math.cos(this.yaw) >= 0 ? 1 : -1;
       const reach = HEAD_AHEAD * FLY_LENGTH * sign;
       const allowed = STEP_UP + (Math.abs(reach) / 3) * MAX_SLOPE_TAN;

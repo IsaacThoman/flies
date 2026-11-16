@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { SOLIDS, World, createPicnic } from "@fly/world";
+import { LAB, SOLIDS, World, createPicnic } from "@fly/world";
 import type { Food } from "@fly/world";
 import { FlyBody, MOUTH_AHEAD, WALL_PATIENCE, createIntent } from "../src/index.ts";
 import type { Forces, Intent } from "../src/index.ts";
@@ -209,4 +209,13 @@ test("walls beyond the floor stop a falling fly before the edge height clamp", (
   body.step(intent(), still, DT);
   assert.ok(body.position.z > 0, `inside reveal: ${JSON.stringify(body.position)}`);
   assert.ok(body.position.y < 100, "did not teleport onto the wall");
+});
+
+test("walking cannot cut through the corner of the lab's tip box", () => {
+  const body = new FlyBody(new World(LAB), { x: -265.9581632354974, z: 161.12309437589366, yaw: -2.821201696394096 });
+  const before = { ...body.position };
+  body.step(intent({ speed: 16.29026827067137 }), still, 0.016399991242681648);
+  const dx = body.position.x - before.x;
+  const dz = body.position.z - before.z;
+  assert.ok(Math.abs(dx) < 1e-9 || Math.abs(dz - dx / Math.tan(body.yaw)) > 1e-6, "blocked or slid, never crossed the corner");
 });
