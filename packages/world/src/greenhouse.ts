@@ -44,5 +44,5 @@ export const GREENHOUSE_PATCHES: readonly FoodPatch[] = [
 ];
 export const GREENHOUSE: Place = {
   floor: { kind: "rect", ...GREENHOUSE_BENCH }, solids: GREENHOUSE_SOLIDS, patches: GREENHOUSE_PATCHES,
-  start: { x: -8, z: 8, yaw: -0.65 }, ceiling: 280,
+  start: { x: -8, z: 8, yaw: 0.6 }, ceiling: 280,
 };

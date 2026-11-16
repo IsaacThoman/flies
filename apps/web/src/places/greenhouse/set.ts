@@ -5,6 +5,7 @@ import { Batch, freeze, paint, random } from "../../scene/build.ts";
 import type { SceneSet } from "../types.ts";
 import { tag } from "../windowsill/surfaces.ts";
 import { K, surfaces } from "./surfaces.ts";
+import { sunShafts } from "./shafts.ts";
 import { glazing } from "./glass.ts";
 
 const box = (x: number, y: number, z: number, w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
@@ -142,6 +143,7 @@ export function buildBench(): SceneSet {
   batch.build(group);
   const seen = eyes.build(new THREE.Group());
 
+  const shafts = sunShafts(group);
   const ripples = Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, -100, 0));
   const time = { value: 0 };
   const water = new THREE.MeshStandardMaterial({ color: "#7eaaa0", roughness: 0.12, metalness: 0.3, transparent: true, opacity: 0.7, envMapIntensity: 1.5, depthWrite: false });
@@ -167,6 +169,10 @@ outgoingLight += wave * 0.22;
   return {
     group, materials: [opaque.material, water], seen,
     update(t, light, weather) {
+      shafts.uniforms.uSun.value.copy(light.sunDirection);
+      shafts.uniforms.uColor.value.copy(light.sunColor);
+      shafts.uniforms.uStrength.value = light.sunIntensity * (1 - weather.cloud) * (1 - weather.mist * 0.8) * (1 - light.stars);
+      shafts.mesh.visible = shafts.uniforms.uStrength.value > 0.1;
       time.value = t; opaque.uniforms.uWet.value = weather.wet * 0.6;
       opaque.uniforms.uSun.value.copy(light.sunDirection);
       opaque.uniforms.uDirect.value = (1 - weather.cloud * 0.9) * (1 - light.stars * 0.8);
