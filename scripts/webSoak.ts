@@ -384,7 +384,7 @@ export async function run(args = process.argv.slice(2)) {
         } else if (p === "menus") {
           await page.keyboard.press(" ");
           await waitFor(page, "screen=title");
-          for (const screen of ["brain", "about", "settings", "together"] as const) {
+          for (const screen of ["about", "settings", "together"] as const) {
             await page.evaluate((screen) => globalThis.__fly.open(screen), screen);
             await waitFor(page, `screen=${screen}`);
             if (screen === "settings") {
@@ -452,7 +452,7 @@ export async function run(args = process.argv.slice(2)) {
               await sample();
             }
           }
-          for (const shown of ["off", "always", "wallpaper"] as const) for (const kind of ["brain", "day", "both"] as const) for (const size of ["small", "medium", "large"] as const) for (const opacity of ["full", "soft", "faint"] as const) {
+          for (const shown of ["off", "always", "wallpaper"] as const) for (const kind of ["brain", "day", "both", "signals"] as const) for (const size of ["small", "medium", "large"] as const) for (const opacity of ["full", "soft", "faint"] as const) {
             await page.evaluate(({ shown, kind, size, opacity }) => {
               const g = globalThis.__fly;
               if (shown === "wallpaper") g.watch();

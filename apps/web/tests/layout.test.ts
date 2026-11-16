@@ -12,7 +12,6 @@ import { hudLayout, loadingLayout, safeRect, titleLayout } from "../src/ui/layou
 import { LOADING_HITS, drawLoading } from "../src/ui/loading.ts";
 import type { Rect } from "../src/ui/layout.ts";
 import { AboutScreen } from "../src/ui/screens/about.ts";
-import { BrainScreen } from "../src/ui/screens/brain.ts";
 import { settingsScreen, titleScreen } from "../src/ui/screens/menus.ts";
 import type { Shell } from "../src/ui/screens/types.ts";
 import { createPicnic } from "@fly/world";
@@ -230,10 +229,10 @@ test("the title leaves room for the fly, clear of the name, the brain's state an
   }
 });
 
-test("the About page and the brain's are inside the safe area at every shape, and scroll what doesn't fit", () => {
+test("the About page is inside the safe area at every shape, and scroll what doesn't fit", () => {
   for (const [name, frame] of frames()) {
     const s = shell(frame);
-    for (const screen of [new AboutScreen(s), new BrainScreen(s)]) {
+    for (const screen of [new AboutScreen(s)]) {
       const hits = new HitMap();
       hits.begin(screen.id);
       screen.draw(blankCanvas(), 0, hits);

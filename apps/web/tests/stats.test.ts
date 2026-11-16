@@ -11,8 +11,9 @@ import { World } from "@fly/world";
 import { HISTORY_SAMPLES } from "../src/brain/meter.ts";
 import { Life } from "../src/life.ts";
 import { freshDay } from "../src/settings.ts";
-import type { Day } from "../src/settings.ts";
-import { distance, drawStatsPanel, duration, figures, statsShape } from "../src/stats/panel.ts";
+import type { Day, StatsKind } from "../src/settings.ts";
+import { SIGNALS, distance, drawStatsPanel, duration, figures, readSignals, statsShape } from "../src/stats/panel.ts";
+import type { StatsState } from "../src/stats/panel.ts";
 import { SAVE_EVERY, Tally, dayOf } from "../src/stats/tally.ts";
 import { places } from "../../../scripts/fuzz/body.ts";
 import { blankCanvas, writtenOn } from "./canvas.ts";
@@ -161,25 +162,46 @@ test("figures in three digits, distances and times as a watcher reads them", () 
 test("the panel shows what it is doing over its day, and its brain's numbers, each with a word, nothing else", () => {
   const history = new Float32Array(HISTORY_SAMPLES).fill(250_000);
   const day: Day = { date: "2026-11-16", walked: 1420, meals: 3, takeOffs: 7, flown: 42, groomed: 130 };
-  const state = { activity: "grooming" as const, spikes: 1_240_000, active: 41_234, speed: 0.98, history, head: 3, day };
-  const written = (kind: "brain" | "day" | "both", cols = 3, side = false) => {
+  const sensed = { loomLeft: 0.4, loomRight: 0, touch: 1, bumpLeft: 0, bumpRight: 0.2, wind: 0, sweet: 0, grounded: true };
+  const state: StatsState = { activity: "grooming", spikes: 1_240_000, active: 41_234, speed: 0.98, history, head: 3, day, sensed, brain: null };
+  const written = (kind: StatsKind, cols = 3, side = false) => {
     const g = blankCanvas();
     drawStatsPanel(g, statsShape(kind, cols, side), state);
     return writtenOn(g).map((w) => w.text);
   };
   assert.deepEqual(written("brain"), ["Its brain", "1.24M", "spikes/s", "41.2k", "active", "0.98×", "real time"]);
+  assert.deepEqual(written("signals", 2, true), ["Grooming", "In", "Loom L", "Loom R", "Touch", "Antenna L", "Antenna R", "Wind", "Sweet", "On legs", "Light", "Out", "Hz", "Walk", "0", "Steer", "0·0", "Back up", "0", "Escape", "0", "Wings", "0", "Groom", "0", "Feed", "0"]);
   assert.deepEqual(written("day"), ["Grooming", "1.42", "m", "walked", "3", "meals", "7", "take-offs", "42", "s", "flying", "2", "min", "grooming"]);
   for (const [cols, side] of [[3, false], [2, false], [3, true]] as const) assert.equal(written("both", cols, side).length, 1 + 2 * 8 + 3, `${cols} across${side ? ", side by side" : ""}`);
   // Every cell inside the panel, in every arrangement.
-  for (const kind of ["brain", "day", "both"] as const) {
-    for (const [cols, side] of [[3, false], [2, false], ...(kind === "both" ? [[3, true] as const] : [])] as const) {
+  for (const kind of ["brain", "day", "both", "signals"] as const) {
+    const arrangements = kind === "signals" ? ([[2, true], [1, false], [3, true]] as const) : ([[3, false], [2, false], ...(kind === "both" ? [[3, true] as const] : [])] as const);
+    for (const [cols, side] of arrangements) {
       const shape = statsShape(kind, cols, side);
       const g = blankCanvas();
       drawStatsPanel(g, shape, state);
-      const all = writtenOn(g);
+      // Where each starts, whichever way it is aligned.
+      const all = writtenOn(g).map((w) => (w.align === "right" ? { ...w, x: w.x - w.width } : w));
       // Nothing written over anything else on its line.
       for (const a of all) for (const b of all) if (a !== b && a.y === b.y) assert.ok(a.x + a.width <= b.x || b.x + b.width <= a.x, `${kind}, ${cols} across: "${a.text}" and "${b.text}"`);
       for (const w of all) assert.ok(w.x >= 0 && w.x + w.width <= shape.width - 4 && w.y > 0 && w.y <= shape.height - 4, `${kind}, ${cols} across${side ? ", side by side" : ""}: "${w.text}" at ${w.x.toFixed(0)},${w.y.toFixed(0)} in ${shape.width}×${shape.height}`);
     }
   }
+});
+
+test("in and out are the senses as sent and the commands as answered, each to the step it is drawn in, with the rates of the neurons each is read from", () => {
+  const sensed = { loomLeft: 0.5, loomRight: 0.004, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0.25, sweet: 1, grounded: false, light: { left: [0.2, 0.4], right: [0.6, 0.8] } };
+  const brain: BrainState = {
+    command: { walk: 0.8, turn: -0.5, back: 0, escape: 0, wings: 1, groom: 0, feed: 0.25 },
+    stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: { DNg100: 41.6, "DNa02 left": 30.2, "DNa02 right": 12.7, flight: 180, MN9: 3.4 } },
+  };
+  const state: StatsState = { activity: "walking", spikes: 0, active: 0, speed: 1, history: new Float32Array(HISTORY_SAMPLES), head: 0, day: freshDay("2026-11-16"), sensed, brain };
+  const v = Array.from(readSignals(state, new Float32Array(SIGNALS)), (x) => Number(x.toFixed(2)));
+  assert.deepEqual(v.slice(0, 9), [0.5, 0, 0, 0, 0, 0.25, 1, 0, 0.5], "the senses: the light is the mean over every facet, a sense too small to show is none");
+  assert.deepEqual(v.slice(9, 16), [0.8, -0.5, 0, 0, 1, 0, 0.25], "the commands, steering signed");
+  assert.deepEqual(v.slice(16), [42, 30, 13, 0, 0, 180, 0, 3], "each command's neurons, in whole Hz; a rate the brain doesn't report is none");
+  const g = blankCanvas();
+  drawStatsPanel(g, statsShape("signals", 1, false), state);
+  const words = writtenOn(g).map((w) => w.text);
+  assert.ok(words.includes("Walking") && words.includes("42") && words.includes("30·13") && words.includes("180"), words.join(" "));
 });

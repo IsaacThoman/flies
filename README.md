@@ -426,9 +426,9 @@ faint, which also dims them for the screen) set how much of the wallpaper
 they take.
 
 **Stats** (`apps/web/src/stats/`; On screen → Stats, off by default, then
-Stats of: its brain, its day, or both) is a small panel of numbers, each a
+Stats of: its brain, its day, both, or in and out) is a small panel of numbers, each a
 figure and a word: the brain's spikes a second, neurons active and speed
-against real time (from the brain's meter, as on "Inside its brain"), under
+against real time (from the brain's meter), under
 a trace of its last twenty seconds; and, headed by what the fly is doing now
 (the HUD's caption, so it can be read in the wallpaper too), its day: how far
 it has walked, its meals, its take-offs, and its time flying and grooming.
@@ -439,14 +439,19 @@ second it was flying or grooming), once each, kept across launches as
 from the other pictures, at the same edge (at the top left while you play),
 and moves round with them; on a screen too narrow for that, under them; its
 cells two to a row on a narrow screen, and its brain beside its day on a
-short one. It is drawn again only when a figure it shows changes, at most
-four times a second.
+short one. In and out, also headed by what the fly is doing, is a bar for
+each sense going into the brain as the body sends it (a loom at either eye,
+touch, either antenna, wind, sweet, weight on its legs, and the light, the
+mean over every facet) and for each command coming out (walk, steer, back
+up, escape, wings, groom, feed), with the firing rate of the neurons each is
+read from (DNg100, the two DNa02s, MDN, DNp01, the flight motor neurons,
+DNg12, MN9) in Hz: the senses beside the commands, under them on a narrow
+screen, or split in two on a short one. It is drawn again only when a figure
+or a bar it shows changes, at most four times a second.
 
 There is one menu: the title at launch, and the same menu from play (Back,
 Play/Pause, or the button at the top left), with the fly living on behind it.
-It has **Play**, **Watch** (the wallpaper straight away), **Brain** (live:
-every sense going in, every command coming out with the neurons it is read
-from and their firing rates, spikes a second, active neurons), **About**, and
+It has **Play**, **Watch** (the wallpaper straight away), **About**, and
 **Settings**: a row of tabs over each part of the game, every setting two
 steps from the menu and none scrolling: **Wallpaper** (when it starts, how
 its camera films, where the fly lives, and, on an Apple TV that can tell,
@@ -518,8 +523,8 @@ lives (`packages/body/src/motion.ts` unless noted):
   raw escape command.
 
 The caption ("Walking", "Eating honey", "Grooming", "Flying") names what the
-body is doing on the brain's commands; "Inside its brain" shows the commands
-and the neurons themselves.
+body is doing on the brain's commands; the stats' In and out shows the
+commands and the neurons themselves.
 
 ## Flight
 
@@ -727,7 +732,7 @@ fits. Playing on a short screen, where the shelf and the label take more of
 the height, the fly is raised clear of them and drawn a little smaller
 (`ui/layout.ts`, `playRoom`). Every layout (the shelf, the hints, the
 caption, the fly's-eye picture and the corner one, the title, the menus,
-About and the brain's page) is worked out from the frame in design units (480
+About) is worked out from the frame in design units (480
 to the shorter side, and at least 1.25 CSS pixels on a touch screen, so that
 a finger has room) inside the screen's safe area, and comes out exactly where
 it always was on the TV.

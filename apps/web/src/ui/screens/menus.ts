@@ -2,7 +2,6 @@
 //
 //   menu ─┬─ Play
 //         ├─ Watch
-//         ├─ Brain
 //         ├─ About
 //         ├─ Settings: Wallpaper | On screen | Sound | Picture, as tabs
 //         └─ Together (in a browser): a table with others (together.ts)
@@ -28,7 +27,6 @@ export function titleScreen(shell: Shell) {
   const menu = new Menu([
     { kind: "action", id: "play", label: "Play" },
     { kind: "action", id: "watch", label: "Watch" },
-    { kind: "action", id: "brain", label: "Brain" },
     { kind: "action", id: "about", label: "About" },
     { kind: "action", id: "settings", label: "Settings" },
     // With others, where there is a way to reach them.
@@ -44,7 +42,7 @@ export function titleScreen(shell: Shell) {
     onActivate(item) {
       if (item.id === "play") shell.play();
       else if (item.id === "watch") shell.watch();
-      else shell.open(item.id as "brain" | "about" | "settings" | "together");
+      else shell.open(item.id as "about" | "settings" | "together");
     },
     onBack: () => shell.back(),
     backdrop(g, t) {
@@ -89,6 +87,7 @@ const STATS: Option<StatsKind>[] = [
   { value: "brain", label: "Its brain" },
   { value: "day", label: "Its day" },
   { value: "both", label: "Both" },
+  { value: "signals", label: "In and out" },
 ];
 const SIZE: Option<OverlaySize>[] = [
   { value: "small", label: "Small" },

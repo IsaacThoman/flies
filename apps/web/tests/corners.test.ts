@@ -185,7 +185,7 @@ test("whatever happens, at every shape, size and choice of stats, they never ove
   const settings: ShowWhen[] = ["off", "wallpaper", "always"];
   for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
     for (const size of Object.values(OVERLAY_SIZES)) {
-      for (const kind of ["brain", "day", "both"] as const) {
+      for (const kind of ["brain", "day", "both", "signals"] as const) {
         const all = new All(frame, size, kind);
         let seed = 7;
         const chance = (p: number) => (seed = (seed * 16807) % 2147483647) / 2147483647 < p;
@@ -228,7 +228,7 @@ test("at every shape, size and choice of stats, at every corner, they are inside
       const size = OVERLAY_SIZES[sizeName];
       const eyes = insetLayout(frame, hud, size);
       const nerves = nervesLayout(frame, hud, size);
-      for (const kind of ["brain", "day", "both"] as const) {
+      for (const kind of ["brain", "day", "both", "signals"] as const) {
         const stats = statsLayout(frame, hud, size, kind);
         const where = `${name}, ${sizeName}, ${kind}`;
         for (const corner of CORNERS) {
@@ -261,7 +261,7 @@ test("at every shape, size and choice of stats, at every corner, they are inside
 });
 
 test("at the TV's medium size the stats are at their full size, across the screen from the others", () => {
-  for (const kind of ["brain", "day", "both"] as const) {
+  for (const kind of ["brain", "day", "both", "signals"] as const) {
     const stats = statsLayout(TV_FRAME, hudLayout(TV_FRAME), 1, kind);
     assert.equal(stats.scale, 1, kind);
     assert.equal(stats.across, true, kind);
@@ -287,7 +287,7 @@ test("on the TV it is at full size under what it sees", () => {
 });
 
 test("the nervous system shows only in play, never over the loading screen, the title, a menu or the full picture", () => {
-  for (const screen of ["loading", "title", "settings", "about", "brain"]) {
+  for (const screen of ["loading", "title", "settings", "about"]) {
     assert.equal(nervesWanted("always", screen, false, false), "hide", screen);
     assert.equal(nervesWanted("always", screen, true, false), "hide", `${screen} in the wallpaper`);
   }

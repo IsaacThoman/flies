@@ -138,7 +138,7 @@ What a slower device does with it is in the measurements below.
 The TypeScript brain costs about 0.12 s of one core per simulated second at
 rest and up to 0.4 s with the eyes busy (`packages/brain/README.md`). A slow
 brain runs the fly slower than real time rather than falling behind
-(`BrainDriver.tick`), and "Inside its brain" shows by how much.
+(`BrainDriver.tick`), and the stats' real-time figure shows by how much.
 
 In a browser the game watches its own pace (`apps/web/src/quality.ts`): the
 time between frames, and how fast the brain runs against real time, judged

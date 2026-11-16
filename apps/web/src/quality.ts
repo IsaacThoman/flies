@@ -12,7 +12,7 @@
 // picture will help, and if stepping all the way down didn't, the picture goes
 // back to where it was. The brain is never slowed or simplified to make the
 // picture smoother; one that runs slower than real time is left so, and
-// "Inside its brain" says by how much.
+// the stats' real-time figure says by how much.
 //
 // Allocates nothing per frame.
 

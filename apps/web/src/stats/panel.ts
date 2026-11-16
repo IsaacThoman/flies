@@ -1,9 +1,12 @@
 // The fly's stats, small in a corner: its brain at work (spikes a second,
 // neurons active, how fast it runs against real time, and a trace of the
 // last twenty seconds), what it is doing now, and its day so far (stats/
-// tally.ts). Every number is read from what is running or what happened: the
-// brain's meter, the body's activity as Life describes it, and the tally.
-// The words are only units; the numbers are what the player asked for.
+// tally.ts); or what goes in and out of its brain: each sense as the body
+// sends it and each command as the brain answers, with how fast the neurons
+// it is read from fire. Every number is read from what is running or what
+// happened: the brain's meter and state, the senses and activity as Life
+// has them, and the tally. The words are only units and names; the numbers
+// and bars are what the player asked for.
 //
 // One draw: a quad with a small canvas, drawn with the menu kit and uploaded
 // only when what it shows has changed, at most REDRAWS times a second. It is
@@ -12,6 +15,7 @@
 // moving round with them (ui/corners.ts); or, on a screen too narrow for
 // that, under them, where there is more room.
 
+import type { BrainSenses, BrainState } from "@fly/brain";
 import * as THREE from "three";
 import { font, glassPanel, roundedRect, text } from "@fly/ui";
 import { HISTORY_SAMPLES } from "../brain/meter.ts";
@@ -44,12 +48,81 @@ export const REDRAWS = 4;
 const VALUE = { size: 13, color: "#ffffff" };
 const UNIT = { size: 9, color: "rgba(220, 240, 255, 0.72)" };
 
+/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0. */
+const SENSES = [
+  ["loomLeft", "Loom L"],
+  ["loomRight", "Loom R"],
+  ["touch", "Touch"],
+  ["bumpLeft", "Antenna L"],
+  ["bumpRight", "Antenna R"],
+  ["wind", "Wind"],
+  ["sweet", "Sweet"],
+  ["grounded", "On legs"],
+  ["light", "Light"],
+] as const;
+/** What comes out, and the neurons each is read from, by their rates' names in stats.rates. */
+const COMMANDS = [
+  { key: "walk", label: "Walk", rates: ["DNg100"] },
+  { key: "turn", label: "Steer", rates: ["DNa02 left", "DNa02 right"] },
+  { key: "back", label: "Back up", rates: ["MDN"] },
+  { key: "escape", label: "Escape", rates: ["DNp01"] },
+  { key: "wings", label: "Wings", rates: ["flight"] },
+  { key: "groom", label: "Groom", rates: ["DNg12"] },
+  { key: "feed", label: "Feed", rates: ["MN9"] },
+] as const;
+const RATES = COMMANDS.reduce((n, c) => n + c.rates.length, 0);
+/** How many numbers in and out it shows: the senses, the commands, then each command's rates. */
+export const SIGNALS = SENSES.length + COMMANDS.length + RATES;
+
+/** In and out, design units: a heading over each column, then a row each, a name, a bar and, for a command, its neurons' rates. */
+const SUB = 13;
+const ROW = 12;
+const NAME = { in: 50, out: 42 };
+const BAR = { width: 44, height: 5 };
+const HZ = 36;
+const IN_WIDTH = NAME.in + BAR.width;
+const OUT_WIDTH = NAME.out + BAR.width + HZ;
+const IN_COLOR = "#9fffd8";
+const OUT_COLOR = "#ffd59a";
+const IN_HEADING = { size: 10, color: IN_COLOR };
+const OUT_HEADING = { size: 10, color: OUT_COLOR };
+const RATE = { size: 9, color: "#ffffff", align: "right" as const };
+const HZ_UNIT = { ...UNIT, align: "right" as const };
+/** Between its columns. */
+const APART = 14;
+
+/** A column of in or out: whether it is the commands, its first row, how many, and where it is from the panel's corner. */
+type SignalColumn = { out: boolean; from: number; rows: number; x: number; y: number };
+
+/**
+ * In and out, in one column (the commands under the senses), two (side by
+ * side) or three (the senses split in two, for a short screen): each column,
+ * and the panel's size.
+ */
+function signalColumns(cols: number) {
+  const half = Math.ceil(SENSES.length / 2);
+  const split = (out: boolean) => (out ? [[0, COMMANDS.length]] : cols === 3 ? [[0, half], [half, SENSES.length - half]] : [[0, SENSES.length]]);
+  const columns: SignalColumn[] = [];
+  let x = 10, y = TOP, bottom = 0;
+  for (const out of [false, true]) {
+    for (const [from, rows] of split(out)) {
+      columns.push({ out, from, rows, x, y });
+      bottom = Math.max(bottom, y + SUB + rows * ROW);
+      if (cols === 1) y = bottom + 4;
+      else x += (out ? OUT_WIDTH : IN_WIDTH) + APART;
+    }
+  }
+  const width = cols === 1 ? 20 + OUT_WIDTH : x - APART + 10;
+  return { columns, width, height: bottom + FOOT };
+}
+const SIGNAL_COLUMNS = [1, 2, 3].map(signalColumns);
+
 /**
  * How its cells are arranged: three or two to a row, and, for both its brain
  * and its day, one above the other or side by side. The layout takes
  * whichever is largest on the screen: three to a row, as wide as what it
  * sees, where there is room; two on a narrow screen; side by side on a short
- * one.
+ * one. What goes in and out is in `cols` columns instead (signalColumns).
  */
 export type StatsShape = { kind: StatsKind; cols: number; side: boolean; width: number; height: number };
 
@@ -57,14 +130,22 @@ const rows = (cells: number, cols: number) => Math.ceil(cells / cols);
 const brainHeight = (cols: number) => TRACE + 4 + rows(BRAIN_CELLS, cols) * CELL.height;
 const dayHeight = (cols: number) => rows(DAY_CELLS, cols) * CELL.height;
 
+/** In and out are `cols` columns: one, two or three (signalColumns). */
+const signalsOf = (cols: number) => SIGNAL_COLUMNS[Math.min(3, Math.max(1, cols)) - 1];
+
 export function statsShape(kind: StatsKind, cols: number, side: boolean): StatsShape {
+  if (kind === "signals") {
+    const { width, height } = signalsOf(cols);
+    return { kind, cols, side: cols > 1, width, height };
+  }
   const inner = cols * CELL.width;
   if (side) return { kind, cols, side, width: 20 + inner + 10 + inner, height: TOP + Math.max(brainHeight(cols), dayHeight(cols)) + FOOT };
   const height = TOP + (kind !== "day" ? brainHeight(cols) : 0) + (kind === "both" ? 4 : 0) + (kind !== "brain" ? dayHeight(cols) : 0) + FOOT;
   return { kind, cols, side, width: 20 + inner, height };
 }
 
-const shapesOf = (kind: StatsKind) => [statsShape(kind, 3, false), statsShape(kind, 2, false), ...(kind === "both" ? [statsShape(kind, 3, true)] : [])];
+const shapesOf = (kind: StatsKind) =>
+  kind === "signals" ? [statsShape(kind, 2, true), statsShape(kind, 1, false), statsShape(kind, 3, true)] : [statsShape(kind, 3, false), statsShape(kind, 2, false), ...(kind === "both" ? [statsShape(kind, 3, true)] : [])];
 
 export type StatsLayout = {
   scale: number;
@@ -168,6 +249,9 @@ export type StatsState = {
   history: Float32Array;
   head: number;
   day: Day;
+  /** What went to the brain last, and its latest answer: read only when the panel shows them. */
+  sensed: BrainSenses;
+  brain: BrainState | null;
 };
 
 /** A count in three figures: 412, 41.2k, 1.24M. */
@@ -193,6 +277,71 @@ export function duration(seconds: number) {
   return `${(seconds / 3600).toFixed(1)} h`;
 }
 
+/** How bright the world is to its eyes: the mean over every facet, 0 with them shut. */
+function meanLight(light: BrainSenses["light"]) {
+  if (!light) return 0;
+  let sum = 0;
+  for (let i = 0; i < light.left.length; i++) sum += light.left[i];
+  for (let i = 0; i < light.right.length; i++) sum += light.right[i];
+  const n = light.left.length + light.right.length;
+  return n > 0 ? sum / n : 0;
+}
+
+/** A bar's length in whole design units of its width: the steps it is drawn in, so only a change that shows counts. */
+const step = (v: number) => Math.round(Math.max(-1, Math.min(1, Number.isFinite(v) ? v : 0)) * BAR.width) / BAR.width;
+
+/** What it shows of what goes in and out, in `out` (SIGNALS long), each to the step it is drawn in: the senses, the commands, then each command's rates in whole Hz. */
+export function readSignals(s: StatsState, out: Float32Array) {
+  const sensed = s.sensed;
+  let i = 0;
+  for (let k = 0; k < SENSES.length; k++) {
+    const key = SENSES[k][0];
+    out[i++] = step(key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : sensed[key]);
+  }
+  const command = s.brain?.command;
+  for (let k = 0; k < COMMANDS.length; k++) out[i++] = command ? step(command[COMMANDS[k].key]) : 0;
+  const rates = s.brain?.stats.rates;
+  for (let k = 0; k < COMMANDS.length; k++) for (let j = 0; j < COMMANDS[k].rates.length; j++) out[i++] = Math.round(rates?.[COMMANDS[k].rates[j]] ?? 0);
+  return out;
+}
+
+/** A bar in a dark well, `v` of it lit; a signed one from its middle. */
+function bar(g: CanvasRenderingContext2D, x: number, y: number, v: number, color: string, signed: boolean) {
+  const { width: w, height: h } = BAR;
+  roundedRect(g, x, y, w, h, h / 2);
+  g.fillStyle = "rgba(0, 16, 50, 0.5)";
+  g.fill();
+  if (Math.abs(v) < 0.01) return;
+  const len = signed ? (Math.abs(v) * w) / 2 : v * w;
+  const from = signed ? (v < 0 ? x + w / 2 - len : x + w / 2) : x;
+  roundedRect(g, from, y, Math.max(h, len), h, h / 2);
+  g.fillStyle = color;
+  g.fill();
+}
+
+/** A column of in or out: a heading at the top of each (and the commands' unit over each of theirs), then a row each, a name and a bar, and for a command its neurons' rates. Steering is signed, from the middle. */
+function signalColumn(g: CanvasRenderingContext2D, c: SignalColumn, v: Float32Array) {
+  const { out, x, y } = c;
+  if (c.from === 0) text(g, out ? "Out" : "In", x, y + 9, out ? OUT_HEADING : IN_HEADING);
+  if (out) text(g, "Hz", x + OUT_WIDTH, y + 9, HZ_UNIT);
+  // Each command's rates follow the commands, in order: to this column's first.
+  let r = SENSES.length + COMMANDS.length;
+  for (let i = 0; out && i < c.from; i++) r += COMMANDS[i].rates.length;
+  for (let i = c.from; i < c.from + c.rows; i++) {
+    const ry = y + SUB + (i - c.from) * ROW;
+    if (!out) {
+      text(g, SENSES[i][1], x, ry + 8, UNIT);
+      bar(g, x + NAME.in, ry + 3, v[i], IN_COLOR, false);
+      continue;
+    }
+    const command = COMMANDS[i];
+    text(g, command.label, x, ry + 8, UNIT);
+    bar(g, x + NAME.out, ry + 3, v[SENSES.length + i], OUT_COLOR, command.key === "turn");
+    text(g, command.rates.length === 2 ? `${v[r]}·${v[r + 1]}` : String(v[r]), x + OUT_WIDTH, ry + 8, RATE);
+    r += command.rates.length;
+  }
+}
+
 /** The `i`th cell of a grid `cols` across from (x, y): a number over what it counts. A unit after the number ("142 mm") is in the small type, to fit. */
 function cell(g: CanvasRenderingContext2D, x: number, y: number, cols: number, i: number, value: string, what: string) {
   const cx = x + 2 + (i % cols) * CELL.width;
@@ -208,18 +357,23 @@ function cell(g: CanvasRenderingContext2D, x: number, y: number, cols: number, i
 }
 
 /** The panel in its own design units at full size: the glass, then what it shows, as the game has it now. */
-export function drawStatsPanel(g: CanvasRenderingContext2D, shape: StatsShape, s: StatsState) {
+export function drawStatsPanel(g: CanvasRenderingContext2D, shape: StatsShape, s: StatsState, signalsNow?: Float32Array) {
   const { kind, cols, side, width, height } = shape;
   glassPanel(g, 1, 1, width - 2, height - 2, RADIUS, { tint: "night", shadow: false });
-  // What it is doing heads its day; the brain alone is only the brain. Smaller, if it must be, to fit.
+  // What it is doing heads its day, and what goes in and out; the brain alone is only the brain. Smaller, if it must be, to fit.
   const heading = kind === "brain" ? "Its brain" : caption(s.activity, null);
   g.font = font(HEADING.size);
   const size = Math.min(HEADING.size, Math.floor((HEADING.size * (width - 2 * HEADING.x)) / g.measureText(heading).width));
   text(g, heading, HEADING.x, HEADING.y, { size, color: HEADING.color });
+  if (kind === "signals") {
+    const v = signalsNow ?? readSignals(s, new Float32Array(SIGNALS));
+    for (const c of signalsOf(cols).columns) signalColumn(g, c, v);
+    return;
+  }
   const inner = cols * CELL.width;
   let y = TOP;
   if (kind !== "day") {
-    // The trace of spikes a second, as on the brain's own screen, in a dark well.
+    // The trace of spikes a second, in a dark well.
     const w = inner, h = TRACE;
     roundedRect(g, 10, y, w, h, 6);
     g.fillStyle = "rgba(0, 16, 50, 0.5)";
@@ -282,8 +436,10 @@ export class StatsPanel {
   #layout: StatsLayout = statsLayout(TV_FRAME);
   #kind: StatsKind = "both";
   #since = 1;
-  /** What it last drew, to tell when it has changed. */
+  /** What it last drew, to tell when it has changed; what goes in and out as last drawn, and as it is now. */
   readonly #drawn = { kind: "", activity: "", head: -1, walked: -1, meals: -1, takeOffs: -1, flown: -1, groomed: -1, date: "" };
+  #signalsDrawn = new Float32Array(SIGNALS);
+  #signalsNow = new Float32Array(SIGNALS);
 
   constructor() {
     this.#canvas = document.createElement("canvas");
@@ -358,7 +514,11 @@ export class StatsPanel {
     this.#since += dt;
     this.mesh.visible = this.placement.alpha > 0;
     if (!this.mesh.visible) return;
-    if (this.#since >= 1 / REDRAWS && this.#changed(s)) this.#draw(s);
+    // Looked at, and drawn if anything has changed, at most REDRAWS times a second: what goes in and out moves all the time.
+    if (this.#since >= 1 / REDRAWS) {
+      if (this.#changed(s)) this.#draw(s);
+      else this.#since = 0;
+    }
     const uniforms = this.#material.uniforms;
     uniforms.alpha.value = this.placement.alpha * opacity;
     const slots = this.#layout.origins[this.placement.corner];
@@ -369,7 +529,15 @@ export class StatsPanel {
   /** Whether anything it shows has changed since it was drawn, to the figure it is shown to. */
   #changed(s: StatsState) {
     const d = this.#drawn, day = s.day, kind = this.#kind;
-    if (d.kind !== kind) return true;
+    if (d.kind !== kind) {
+      if (kind === "signals") readSignals(s, this.#signalsNow);
+      return true;
+    }
+    if (kind === "signals") {
+      const now = readSignals(s, this.#signalsNow), drawn = this.#signalsDrawn;
+      for (let i = 0; i < SIGNALS; i++) if (now[i] !== drawn[i]) return true;
+      return d.activity !== s.activity;
+    }
     if (kind !== "brain" && (d.activity !== s.activity || d.date !== day.date || d.meals !== day.meals || d.takeOffs !== day.takeOffs || d.walked !== Math.round(day.walked) || d.flown !== Math.floor(day.flown) || d.groomed !== Math.floor(day.groomed))) return true;
     // The trace moves on with each sample the meter takes, and the figures with it.
     return kind !== "day" && d.head !== s.head;
@@ -392,7 +560,11 @@ export class StatsPanel {
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, panel.width, panel.height);
     g.setTransform(ppu.x * k, 0, 0, ppu.y * k, 0, 0);
-    drawStatsPanel(g, this.#layout.shape, s);
+    // What goes in and out as it was read to tell it had changed, and kept as drawn.
+    const now = this.#signalsNow;
+    this.#signalsNow = this.#signalsDrawn;
+    this.#signalsDrawn = now;
+    drawStatsPanel(g, this.#layout.shape, s, now);
     this.#texture.needsUpdate = true;
   }
 
