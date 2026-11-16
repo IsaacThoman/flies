@@ -10,7 +10,7 @@ const root = path.join(import.meta.dirname, '..');
 const appDir = path.join(root, 'apps/tvos');
 const www = path.join(appDir, 'www');
 const DEFAULT_TEAM_ID = 'PX72AL9366';
-const DEFAULT_BUNDLE_ID = 'com.isaacthoman.appletvfly';
+const DEFAULT_BUNDLE_ID = 'com.isaacthoman.flies';
 const TEAM_ID = process.env.TVOS_TEAM_ID || DEFAULT_TEAM_ID;
 export const BUNDLE_ID = process.env.TVOS_BUNDLE_ID || DEFAULT_BUNDLE_ID;
 /** The weather outside from WeatherKit: off unless the App ID has the capability (docs/apple-tv.md). */
@@ -98,12 +98,12 @@ function prepare({ testScene, standInBrain, standInWeather }: BuildOptions) {
   return env;
 }
 
-export const appPath = (sim: boolean) => path.join(appDir, `build/Build/Products/Release-${sim ? 'appletvsimulator' : 'appletvos'}/AppleTVFly.app`);
+export const appPath = (sim: boolean) => path.join(appDir, `build/Build/Products/Release-${sim ? 'appletvsimulator' : 'appletvos'}/Flies.app`);
 
 function build(options: BuildOptions) {
   const env = prepare(options);
   run('xcodebuild', [
-    '-project', 'AppleTVFly.xcodeproj', '-scheme', 'AppleTVFly', '-configuration', 'Release',
+    '-project', 'Flies.xcodeproj', '-scheme', 'Flies', '-configuration', 'Release',
     '-destination', options.sim ? 'generic/platform=tvOS Simulator' : 'generic/platform=tvOS', '-derivedDataPath', 'build',
     ...(options.sim ? ['CODE_SIGNING_ALLOWED=NO', 'ARCHS=arm64'] : ['-allowProvisioningUpdates', '-allowProvisioningDeviceRegistration']), '-quiet', 'build',
   ], appDir, env);

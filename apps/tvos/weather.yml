@@ -4,7 +4,7 @@
 # TVOS_WEATHER_SOURCES: WeatherKit and Core Location (weather/WeatherKit), or the simulator
 # check's stand-in (tests/weather-stand-in).
 targets:
-  AppleTVFly:
+  Flies:
     sources:
       - path: weather/Shared
       - path: ${TVOS_WEATHER_SOURCES}

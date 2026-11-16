@@ -14,4 +14,4 @@ apps/tvos/dist/
 apps/tvos/src/generated/
 apps/tvos/*.xcodeproj
 apps/tvos/Info.plist
-apps/tvos/AppleTVFly.entitlements
+apps/tvos/Flies.entitlements

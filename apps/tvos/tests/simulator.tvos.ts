@@ -81,7 +81,7 @@ if (!args.includes('--no-build')) {
 }
 
 const started = Date.now();
-const udid = xcrun('simctl', 'create', 'apple-tv-fly-check', 'com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-1080p', `com.apple.CoreSimulator.SimRuntime.${runtime}`);
+const udid = xcrun('simctl', 'create', 'flies-check', 'com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-1080p', `com.apple.CoreSimulator.SimRuntime.${runtime}`);
 console.log(`simulator ${udid} (${runtime})`);
 const output: string[] = [];
 let app: ReturnType<typeof spawn> | null = null;
@@ -128,7 +128,7 @@ try {
     }, 500);
   });
   await waitUntil(() => !!(done && latest && complete(latest)));
-  const shot = path.join(mkdtempSync(path.join(tmpdir(), 'apple-tv-fly-')), 'simulator.png');
+  const shot = path.join(mkdtempSync(path.join(tmpdir(), 'flies-')), 'simulator.png');
   xcrun('simctl', 'io', udid, 'screenshot', shot);
   const r = latest as unknown as Report;
   console.log(`\nreport ${JSON.stringify(r, null, 2)}\n`);

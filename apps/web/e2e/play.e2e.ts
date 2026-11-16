@@ -278,7 +278,7 @@ try {
   assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["feed", "sugar", "wide", "noon", "clear"]);
   const effects = await page.evaluate(() => (globalThis as unknown as { __fly: { settings: { effects: number } } }).__fly.settings.effects);
   assert.equal(effects, 6, "the sounds turned down");
-  const learned = await page.evaluate(() => JSON.parse(localStorage.getItem("apple-tv-fly.learned") ?? "{}") as Record<string, true>);
+  const learned = await page.evaluate(() => JSON.parse(localStorage.getItem("flies.learned") ?? "{}") as Record<string, true>);
   assert.deepEqual(Object.keys(learned).sort(), ["feed", "place", "swoop", "tools"], "the hints for what was used aren't taught again");
 
   step(`the frame's budget: at most ${maxCalls} draws and ${maxTriangles.toLocaleString("en-US")} triangles`);

@@ -6,7 +6,7 @@ Renderer::Renderer(int mode, DisplayTarget *display, bool gpuTiming, bool checkE
   for (auto &b : buffers_) b = (uint8_t *)calloc(kBufferBytes, 1);
   if (mode_ == 2) {
     thread_ = std::thread([this] {
-      pthread_setname_np("appletvfly.render");
+      pthread_setname_np("flies.render");
       pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
       executor_.makeCurrent();
       loop();

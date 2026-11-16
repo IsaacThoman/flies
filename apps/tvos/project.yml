@@ -1,7 +1,7 @@
 # XcodeGen spec for the Apple TV app; scripts/tvos.ts generates the project and builds it. The
 # team and bundle ID come from TVOS_TEAM_ID and TVOS_BUNDLE_ID, and the brain's sources from
 # TVOS_BRAIN_SOURCES (packages/brain-native/src, or the stand-in under tests/).
-name: AppleTVFly
+name: Flies
 # The weather outside, off unless scripts/tvos.ts turns it on: the service (weather.yml), and
 # WeatherKit's entitlement and location usage string (weatherkit.yml).
 include:
@@ -13,7 +13,7 @@ options:
   deploymentTarget:
     tvOS: "26.0"
 targets:
-  AppleTVFly:
+  Flies:
     type: application
     platform: tvOS
     sources:
@@ -43,7 +43,7 @@ targets:
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: Apple TV Fly
+        CFBundleDisplayName: Flies
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # The launch image, generated into src/generated/Assets.xcassets by scripts/tvos.ts.
@@ -56,7 +56,7 @@ targets:
           - ProfileName: MicroGamepad
         ITSAppUsesNonExemptEncryption: false
     settings:
-      PRODUCT_NAME: AppleTVFly
+      PRODUCT_NAME: Flies
       PRODUCT_BUNDLE_IDENTIFIER: ${TVOS_BUNDLE_ID}
       DEVELOPMENT_TEAM: ${TVOS_TEAM_ID}
       MARKETING_VERSION: "0.1"

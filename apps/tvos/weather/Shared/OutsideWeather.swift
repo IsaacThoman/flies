@@ -40,7 +40,7 @@ final class Answer: @unchecked Sendable {
   private var _attribution: String?
   private var _fetchedAt: Date?
   /** Conditions and when they were fetched; never where. */
-  private static let key = "appletvfly.outsideWeather"
+  private static let key = "flies.outsideWeather"
 
   init() {
     if let kept = UserDefaults.standard.dictionary(forKey: Self.key), let c = kept["conditions"] as? String, let at = kept["fetchedAt"] as? Double {

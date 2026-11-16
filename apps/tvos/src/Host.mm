@@ -291,7 +291,7 @@ NATIVE(N_readFile) {
 NATIVE(N_wake) { [gHost wakeAfter:Num(ctx, argc, argv, 0)]; return JSValueMakeUndefined(ctx); }
 NATIVE(N_now) { return JSValueMakeNumber(ctx, NowMs()); }
 NATIVE(N_log) { HostLog((int)Num(ctx, argc, argv, 0), ToNS(ctx, argv[1])); return JSValueMakeUndefined(ctx); }
-static NSString *const kStorageKey = @"appletvfly.localStorage";
+static NSString *const kStorageKey = @"flies.localStorage";
 NATIVE(N_storageGet) {
   NSString *v = [NSUserDefaults.standardUserDefaults dictionaryForKey:kStorageKey][ToNS(ctx, argv[0])];
   return v ? MakeString(ctx, v) : JSValueMakeNull(ctx);
@@ -386,7 +386,7 @@ NATIVE(N_input) {
 
 - (void)start {
   NSThread *t = [[NSThread alloc] initWithTarget:self selector:@selector(threadMain) object:nil];
-  t.name = @"appletvfly.js";
+  t.name = @"flies.js";
   t.qualityOfService = NSQualityOfServiceUserInteractive;
   t.stackSize = 16 << 20;
   [t start];

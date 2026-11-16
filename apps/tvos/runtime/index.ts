@@ -59,7 +59,7 @@ replace('location', {
 });
 replace('history', { length: 1, state: null, pushState() {}, replaceState() {}, back() {}, forward() {}, go() {} });
 replace('navigator', {
-  userAgent: 'Mozilla/5.0 (AppleTV; CPU OS 27_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) appletvfly-jsc',
+  userAgent: 'Mozilla/5.0 (AppleTV; CPU OS 27_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) flies-jsc',
   platform: 'AppleTV', vendor: 'Apple Computer, Inc.', language: 'en-US', languages: ['en-US', 'en'], onLine: true,
   hardwareConcurrency: 6, maxTouchPoints: 0, cookieEnabled: false, webdriver: false, deviceMemory: 4,
   userActivation: { hasBeenActive: true, isActive: true }, getGamepads: () => [], vibrate: () => false,

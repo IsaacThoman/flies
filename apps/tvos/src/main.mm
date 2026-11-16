@@ -1,4 +1,4 @@
-// apple-tv-fly for Apple TV on JavaScriptCore and OpenGL ES: public APIs only. See
+// Flies for Apple TV on JavaScriptCore and OpenGL ES: public APIs only. See
 // docs/apple-tv.md.
 //
 // The game's own JavaScript runs in JavaScriptCore (JSHost) with a small browser runtime

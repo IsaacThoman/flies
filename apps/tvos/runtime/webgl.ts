@@ -289,7 +289,7 @@ export class WebGL2RenderingContext {
   getParameter(pname: number): unknown {
     const i = info();
     switch (pname) {
-      case C.VERSION: return 'WebGL 2.0 (OpenGL ES 3.0 appletvfly-jsc)';
+      case C.VERSION: return 'WebGL 2.0 (OpenGL ES 3.0 flies-jsc)';
       case C.SHADING_LANGUAGE_VERSION: return 'WebGL GLSL ES 3.00';
       case C.VENDOR: return 'WebKit';
       case C.RENDERER: return 'WebKit WebGL';

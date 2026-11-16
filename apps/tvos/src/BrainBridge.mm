@@ -84,7 +84,7 @@ fly_brain *Load() {
 }
 
 void *Run(void *) {
-  pthread_setname_np("appletvfly.brain");
+  pthread_setname_np("flies.brain");
   fly_brain *brain = Load();
   if (!brain) return nullptr;
   gBrain.status.store(kRunning, std::memory_order_release);
