@@ -398,6 +398,12 @@ check still passed, the brain still at real time, but at 33 fps with 18 ms of Ja
 and 56 s to the first title; and a busy Mac makes the web build's adaptive picture (web.md,
 Running on what people have) step down to bigger pixels, as a slow phone would.
 
+At a table (four runs, the same day): seated 10.6 to 11.7 s after a cold launch by the link, most
+of it the brain loading; resting at the table, as the room saw it, for 12.1 to 13.1 s of the 10 s
+away (counting the moments the other app takes to slide in and out); with its line dropped, back at the table in the same seat 1.3 to 2.0 s after the app was in
+front again, one reconnect (0.2 s in an earlier run where the line had stayed open); the second
+table's link seating it there in 0.7 to 0.8 s.
+
 These are the Mac's speeds: the simulator runs the page's JavaScript on the Mac's cores and draws
 with its GPU. They say the app works, not how a phone runs it.
 
