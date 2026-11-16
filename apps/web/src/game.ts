@@ -19,6 +19,7 @@ import type { GlyphSet, Hit } from "@fly/ui";
 import { World, isDropped } from "@fly/world";
 import type { RayHit } from "@fly/world";
 import { Audio } from "./audio/sounds.ts";
+import { Haptics } from "./haptics.ts";
 import type { Sound } from "./audio/sounds.ts";
 import { BrainMeter } from "./brain/meter.ts";
 import { CameraDirector, NEAR_TO_FAR } from "./camera.ts";
@@ -126,6 +127,7 @@ export class Game implements Shell {
   readonly hands: Hands;
   readonly handsView: HandsView;
   readonly audio = new Audio();
+  readonly haptics: Haptics;
   readonly eyes: Eyes;
   readonly inset: EyesInset;
   /** Its nervous system in a corner, and the corner it shares with what it sees. */
@@ -230,6 +232,7 @@ export class Game implements Shell {
     this.display = display;
     this.devices = inputs.devices;
     this.#inputs = inputs;
+    this.haptics = new Haptics(this.devices, () => navigator.getGamepads?.() ?? [], typeof navigator.vibrate === "function" ? navigator.vibrate.bind(navigator) : null);
     this.settings = loadSettings();
     const place = this.settings.place;
     this.#here = place !== "turns" && isPlaceId(place) ? place : isPlaceId(this.settings.scene) ? this.settings.scene : "picnic";
@@ -384,6 +387,7 @@ export class Game implements Shell {
     this.#chosen.eyes = s.eyes;
     this.#applyPicture();
     this.audio.setVolumes(s.effects, s.ambience);
+    this.haptics.setVolume(s.effects);
     this.director.wallpaperStyle = s.wallpaperCamera;
     if (s.hints && !this.#hints) this.#unlearn();
     this.#hints = s.hints;
@@ -586,6 +590,8 @@ export class Game implements Shell {
       life.step(dt, now);
       this.#reactions();
       this.#paddle(dt);
+      const hands = this.hands;
+      this.haptics.held(playing && hands.current.id === "feather" ? hands.stroke : 0, hands.blowing ? (hands.variant.id === "strong" ? 1 : 0.55) : 0, dt);
     }
     this.meter.update(life.brain, now);
     if (this.quality) {
@@ -726,11 +732,24 @@ export class Game implements Shell {
   #reactions() {
     const { life } = this;
     const ev = life.body.events;
-    if (ev.jumped) this.audio.play("takeoff", this.#nearness(life.body.position));
+    if (ev.jumped) {
+      this.audio.play("takeoff", this.#nearness(life.body.position));
+      if (this.nav.current === "play" && !this.wallpaper) this.haptics.feel("takeoff");
+    }
     if (ev.landed) this.audio.play("land", this.#nearness(life.body.position) * 0.5);
     if (life.meals > this.#lastMeals) this.audio.play("eat", this.#nearness(life.body.position));
     this.#lastMeals = life.meals;
     this.audio.tools(this.hands.events);
+    const tools = this.hands.events;
+    if (tools.dropped) this.haptics.feel("drop");
+    if (tools.landed && !this.wallpaper) this.haptics.feel("land");
+    if (tools.swooped) this.haptics.feel("swoop");
+  }
+
+  /** A press that can't do anything: heard, and felt in a pad or a phone. */
+  #refuse() {
+    this.audio.play("blocked");
+    this.haptics.feel("blocked");
   }
 
   /** Sets the light and the weather to the tools' choices; on "Now", to the clock's and the weather outside's (or the forecast's), looked at again every few seconds. With `settle`, there at once. */
@@ -878,7 +897,7 @@ export class Game implements Shell {
     const from = at < 0 ? NEAR_TO_FAR.indexOf("follow") : at;
     const to = Math.max(0, Math.min(NEAR_TO_FAR.length - 1, from + dir));
     if (to === at) {
-      this.audio.play("blocked");
+      this.#refuse();
       return;
     }
     this.hands.chooseView(NEAR_TO_FAR[to]);
@@ -890,7 +909,7 @@ export class Game implements Shell {
   /** The tool's kind, stepped by a pointer: round and round. */
   #stepKind(dir: -1 | 1) {
     if (this.hands.stepVariant(dir, true)) this.#variantChanged();
-    else this.audio.play("blocked");
+    else this.#refuse();
   }
 
   /** Uses the tool in hand where the pointer is, as Select does. */
@@ -898,14 +917,14 @@ export class Game implements Shell {
     const hands = this.hands;
     this.#copyEye();
     hands.update(0, { use: true, holding: true, eye: this.#eye }, this.life.body, this.life.pantry);
-    if (hands.events.blocked) this.audio.play("blocked");
+    if (hands.events.blocked) this.#refuse();
   }
 
   /** Carries the fly to the place chosen on the Place tool, if it isn't there; whether it went. */
   #goToPlace(): boolean {
     const hands = this.hands;
     if (hands.place === this.#here) {
-      this.audio.play("blocked");
+      this.#refuse();
       return false;
     }
     this.audio.play("select");
@@ -1217,7 +1236,7 @@ export class Game implements Shell {
       case "down":
         // Up goes to the earlier kind in the list, as a list reads top to bottom.
         if (hands.stepVariant(button === "up" ? -1 : 1)) this.#variantChanged();
-        else if (!repeat) this.audio.play("blocked");
+        else if (!repeat) this.#refuse();
         break;
       case "select":
         if (repeat) break;

@@ -236,7 +236,14 @@ tool and + and − bring the camera in and take it out. A standard game pad
 (the Gamepad API) is the remote too: A is Select, B Back, Start Play/Pause,
 the d-pad and the shoulder buttons the arrows, the left stick moves your hand
 (and steps through a menu), the right stick looks round, the triggers bring
-the camera in and take it out; its hints are drawn as its buttons. The hints
+the camera in and take it out; its hints are drawn as its buttons. A pad that can
+rumble (`apps/web/src/haptics.ts`) is felt in the hand: a tick when food is
+dropped and a softer one when it lands, a swell as the ball dives, two quick
+knocks when a press can't do anything, light pulses while the feather is on
+the fly, a low one while you blow, and a knock when the fly takes off. A
+phone that can vibrate (Android) buzzes for the same; the iPhone and iPad app
+plays its own haptics. It is as strong as the effects are loud, and off with
+them; it is never felt in the wallpaper. The hints
 always show the thing last used, and the screen hides the system's cursor,
 text selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
