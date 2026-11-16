@@ -117,7 +117,8 @@ export const TRANSMITTER_FIXES: readonly TransmitterFix[] = [
 // traced less completely. Zones A and B (sound) are left as they are: their right
 // halves are mostly fragments of 18 synapses a neuron (26 and 31 times fewer
 // than the left's), which no factor could stand for, and only a few of them are
-// driven at all (by wind). Zone D has no right half.
+// driven at all (by wind). Zone D has no right half. The README (Johnston's
+// organ, completeness) gives the evidence zone by zone.
 const jo = (zone: string): CompletenessFix => ({
   reason: `Johnston's organ zone ${zone}: the same partners on both sides, but one side traced less completely`,
   select: { superClass: "cb_sensory", type: new RegExp(`^JO-${zone}`) },
