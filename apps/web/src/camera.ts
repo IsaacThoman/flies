@@ -136,6 +136,8 @@ const PATIENCE = 1.2;
 /** Placings tried each side of the preferred one, and how far apart (rad). */
 const TRIES = 2;
 const TRY_STEP = 0.32;
+/** How much the place's view is worth behind the fly: as much as something tall standing on the table some 280 mm behind it. */
+const VISTA = 0.35;
 
 /** A critically damped spring on one number: no overshoot, continuous speed. Returns the new value and leaves the speed in `v[i]`. */
 function damp(current: number, target: number, v: Float64Array, i: number, settle: number, dt: number) {
@@ -644,9 +646,10 @@ export class CameraDirector {
     from.x = f.x + d.x * 3;
     from.y = f.y + 0.5;
     from.z = f.z + d.z * 3;
-    let score = Math.max(0, d.x * this.#scene.vista.x + d.z * this.#scene.vista.z) * 0.15;
+    let score = Math.max(0, d.x * this.#scene.vista.x + d.z * this.#scene.vista.z) * VISTA;
     const hit = world.raycast(from, d, this.#hit);
-    if (hit && hit.solid >= 0 && hit.t < 400) {
+    // A wall or a window standing past the table's edge is no better a background than the view beyond it.
+    if (hit && hit.solid >= 0 && hit.t < 400 && world.onTable(hit.point.x - hit.normal.x * 0.5, hit.point.z - hit.normal.z * 0.5)) {
       const solid = world.solids[hit.solid];
       score += Math.min(1, topPeak(solid.top) / 30) * (1 - hit.t / 500) * 0.8;
     }
