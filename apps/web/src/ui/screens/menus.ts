@@ -101,16 +101,18 @@ const volume = (id: "effects" | "ambience", label: string): SliderItem => ({ kin
  * The settings, a page for each part of the game, every one a step from the
  * top and short enough not to scroll. Each row is a setting, by its key.
  */
-const PAGES: Record<SettingsPage, { heading: string; rows: () => MenuItem[] }> = {
+const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => MenuItem[] }> = {
   wallpaper: {
     heading: "Wallpaper",
-    rows: () => [
+    rows: (shell) => [
       choice("wallpaperAfter", "Starts after", WALLPAPER_DELAYS),
       choice("wallpaperCamera", "Camera", CAMERA),
       // Only when there is somewhere else to live.
       ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE)] : []),
       // Then the pictures that can show in a corner, each off, in the wallpaper, or always.
       choice("eyesInset", "What it sees", SHOWN),
+      // Whether the sky follows the weather outside, only where the Apple TV can tell it.
+      ...(shell.weatherOutside ? [choice("realWeather", "Real weather", ON_OFF)] : []),
     ],
   },
   sound: {
@@ -148,7 +150,7 @@ export function settingsPages(shell: Shell) {
   const settings = shell.settings as Record<string, unknown>;
   const pages = {} as Record<SettingsPage, MenuScreen>;
   for (const id of Object.keys(PAGES) as SettingsPage[]) {
-    const items = PAGES[id].rows();
+    const items = PAGES[id].rows(shell);
     pages[id] = new MenuScreen(shell, {
       id,
       pauses: true,

@@ -1,9 +1,15 @@
-// Checks the Apple TV app in a tvOS simulator with its test scene (tests/scene.ts) and the
-// stand-in brain: builds it (unless --no-build), boots a fresh simulator, launches the app with
-// scripted remote input (the launch config's "drive"), and checks what the scene saw. Saves a
-// screenshot outside the repo, then shuts the simulator down and deletes it.
+// Checks the Apple TV app in a tvOS simulator with its test scene (tests/scene.ts), the
+// stand-in brain and the stand-in weather service: builds it (unless --no-build), boots a fresh
+// simulator, launches the app with scripted remote input (the launch config's "drive"), and
+// checks what the scene saw. Saves a screenshot outside the repo, then shuts the simulator down
+// and deletes it.
 //
-//   node apps/tvos/tests/simulator.tvos.ts [--no-build] [--runtime tvOS-26-0]
+// With --weatherkit it builds the real weather service instead (TVOS_WEATHERKIT=1), grants the
+// app location and sets the simulator's, and checks the service locates, asks WeatherKit, and
+// either answers or says plainly why not: unsigned, as simulator builds are, it can't have the
+// entitlement, so "unauthorised" is the expected answer until a signed build has the capability.
+//
+//   node apps/tvos/tests/simulator.tvos.ts [--no-build] [--runtime tvOS-26-0] [--weatherkit]
 //
 // The simulator draws OpenGL ES in software, so this checks correctness, not speed.
 import assert from 'node:assert/strict';
@@ -11,12 +17,14 @@ import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, openSync, readSync, closeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import type { OutsideConditions, WeatherAttribution } from '@fly/contracts';
 import { BUNDLE_ID, appPath } from '../../../scripts/tvos.ts';
 
 const root = path.join(import.meta.dirname, '../../..');
 const args = process.argv.slice(2);
 const runtime = args.includes('--runtime') ? args[args.indexOf('--runtime') + 1] : 'tvOS-27-0';
 const TIMEOUT_MS = 10 * 60_000;
+const weatherkit = args.includes('--weatherkit');
 
 const drive = [
   ['wait', { ready: 'true' }, 180_000],
@@ -62,12 +70,13 @@ type Report = {
   audio: { beeps: number; ended: number; decoded: { length: number; sampleRate: number } | null };
   storage: boolean | null; fetched: string | null;
   brain: { neurons?: number; connections?: number; facets?: number[]; rates?: string[]; states?: number; command?: Record<string, number>; maxSimMsAfterBurst?: number; rateCount?: number; lastRate?: number; error?: string } | null;
+  weather: { error?: string; statuses: string[]; version: number; conditions: OutsideConditions | null; attribution: WeatherAttribution | null; failure: { status: string; error: string } | null; stopped: string | null } | null;
 };
 type Stats = { fps: number; jsMs: { mean: number }; execMs: { mean: number }; drawsPerFrame: number };
-const complete = (r: Report) => !!(r.readbackAsync && r.audio.decoded && r.audio.ended && r.fetched && (r.brain?.states ?? 0) > 2);
+const complete = (r: Report) => !!(r.readbackAsync && r.audio.decoded && r.audio.ended && r.fetched && (r.brain?.states ?? 0) > 2 && (r.weather?.stopped || r.weather?.error));
 
 if (!args.includes('--no-build')) {
-  const r = spawnSync('node', ['scripts/tvos.ts', 'build', '--sim', '--test-scene', '--stand-in-brain'], { cwd: root, stdio: 'inherit' });
+  const r = spawnSync('node', ['scripts/tvos.ts', 'build', '--sim', '--test-scene', '--stand-in-brain', ...(weatherkit ? [] : ['--stand-in-weather'])], { cwd: root, stdio: 'inherit', env: { ...process.env, TVOS_WEATHERKIT: weatherkit ? '1' : '' } });
   assert.equal(r.status, 0, 'build the app');
 }
 
@@ -80,6 +89,11 @@ try {
   xcrun('simctl', 'boot', udid);
   xcrun('simctl', 'bootstatus', udid, '-b');
   xcrun('simctl', 'install', udid, appPath(true));
+  if (weatherkit) {
+    // As if the owner had allowed it, somewhere with weather: tvOS would otherwise ask, and nobody is there to answer.
+    xcrun('simctl', 'privacy', udid, 'grant', 'location', BUNDLE_ID);
+    xcrun('simctl', 'location', udid, 'set', '51.5072,-0.1276');
+  }
   const config = { script: 'game.js', url: 'http://fly.local/', fit: 'fill', pixelated: true, stats: 2, drive };
   app = spawn('xcrun', ['simctl', 'launch', '--console-pty', udid, BUNDLE_ID, '--config', JSON.stringify(config)], { stdio: ['ignore', 'pipe', 'pipe'] });
   let latest: Report | null = null, lastStats: Stats | null = null, done = false;
@@ -160,6 +174,35 @@ try {
   assert.equal(b.command?.feed, 0.5, 'feed follows sweet');
   assert.equal(b.command?.escape, 0, 'grounded');
   assert.ok((b.maxSimMsAfterBurst ?? 0) > 0 && (b.maxSimMsAfterBurst ?? 0) <= 100, `a step simulates at most 100 ms: ${b.maxSimMsAfterBurst}`);
+  // The weather bridge: only what the game needs crosses into JavaScript, and never where.
+  const wx = r.weather;
+  assert.ok(wx && !wx.error, `weather: ${wx?.error}`);
+  assert.equal(wx.stopped, 'idle', 'stopped, it says so');
+  const keys = ['cloudCover', 'condition', 'daylight', 'noon', 'observedAt', 'precipitation', 'source', 'sunrise', 'sunset', 'visibility', 'wind'];
+  const outside = wx.conditions;
+  if (weatherkit) {
+    // The real service, unsigned: it must locate (a fix can come between two looks, but WeatherKit is only asked after one), ask WeatherKit, and answer or say why not.
+    assert.ok(wx.statuses.includes('fetching'), `weather statuses ${wx.statuses.join(' > ')}`);
+    if (outside) {
+      assert.deepEqual(Object.keys(outside).sort(), keys, 'what crosses into JavaScript');
+      assert.equal(outside.source, 'weatherkit');
+      console.log(`WeatherKit answered: ${JSON.stringify(outside)}; attribution ${JSON.stringify(wx.attribution)}`);
+    } else {
+      assert.ok(wx.failure, 'an answer or a reason');
+      console.log(`WeatherKit didn't answer: ${wx.failure.status} (${wx.failure.error}) after ${wx.statuses.join(' > ')}`);
+      assert.equal(wx.failure.status, 'unauthorised', 'an unsigned build is refused for want of the capability, and says so');
+    }
+  } else {
+    // Against the stand-in (tests/weather-stand-in/Service.swift).
+    assert.ok(wx.statuses.includes('fetching') && wx.statuses.includes('ok'), `weather statuses ${wx.statuses.join(' > ')}`);
+    assert.equal(wx.version, 1, 'one answer');
+    assert.ok(outside, 'conditions');
+    assert.deepEqual(Object.keys(outside).sort(), keys, 'what crosses into JavaScript');
+    assert.deepEqual({ ...outside, observedAt: 0 }, { source: 'stand-in', observedAt: 0, cloudCover: 0.62, precipitation: 0.4, visibility: 2400, wind: 5.5, condition: 'drizzle', daylight: true, sunrise: 7.25, sunset: 16.75, noon: 12 }, 'the stand-in\'s conditions arrived as sent');
+    const minutesOld = (Date.now() - outside.observedAt) / 60_000;
+    assert.ok(minutesOld > 4 && minutesOld < 15, `observed ${minutesOld.toFixed(1)} min before`);
+    assert.equal(wx.attribution?.service, 'Stand-in weather', 'the attribution');
+  }
 
   if (softwareClipping) console.log(`Clipping: ${c.wrong} of ${c.pixels} table pixels wrong, as expected of ${c.renderer} (docs/apple-tv.md, "The simulator's renderer"); not checked here`);
   console.log(`All checks passed in ${Math.round((Date.now() - started) / 1000)} s (${r.frames} frames).`);

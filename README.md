@@ -57,7 +57,8 @@ it comes on and stays), so dawn and dusk come over half an hour or more. A
 room sees less of the weather than the open air (`docs/places.md`). By day a
 cloud now and then passes over the sun and the light dims by a
 fifth for a few seconds. The hours are a fixed summer day's (sunrise about
-5:40, sunset about 20:10): the TV doesn't know where it is.
+5:40, sunset about 20:10), unless the Apple TV can tell the real sunrise and
+sunset (the weather outside, below).
 
 So does the weather, unless you choose one (the **Weather** tool): clear,
 overcast, mist or light rain. On "Now" it follows a forecast worked out from
@@ -73,6 +74,36 @@ the lake, keeps the birds quiet and is heard; the table dries over the next
 half hour or so, and if the sun comes out while it's wet a rainbow stands
 opposite it. Rain bursts the bubbles, and the fireflies shelter from it. A
 drop landing on the fly is felt (`touch`).
+
+**The weather outside.** An Apple TV app built with WeatherKit
+([docs/apple-tv.md](docs/apple-tv.md#the-weather-outside)) follows the real
+weather instead (`apps/web/src/scene/outside.ts`). The first time, once the
+title is up, the TV asks whether the app may know where it is; from then on,
+while the app is open, Apple Weather is asked every 20 minutes for the
+conditions about where the TV is and the day's sunrise and sunset. The Weather
+tool's "Now" then says "Outside" and is the real weather, as near as the
+game's four kinds go: the cloud cover is the cloud; fog, or seeing less than a
+kilometre, is mist, fading out by eight, and a haze is some; precipitation is
+rain, light rain at the heaviest, since that is all the game has. There is no
+snow or thunder in the game yet, so each is the nearest it has: snow is a
+white mist under a grey sky, with nothing falling (rain would be wrong),
+flurries a grey sky; sleet, freezing rain and hail are rain; a thunderstorm is
+heavy rain, with no lightning. The real wind speed is how windy the day is, a
+fresh breeze (10 m/s) the windiest, so the picnic's gusts come more often and
+harder on a windy day and the trees and the lake move more. The Light tool's
+"Now" stretches or squeezes the clock's day so that its sun comes up at the
+real sunrise and goes down at the real sunset, each colour of the day keeping
+its place between: on a winter afternoon it is dark at five. Where the sun
+doesn't set that day, the light swings slowly between high noon and a low
+golden sun, highest at the real noon; where it doesn't rise, between before
+dawn and deep night. A new observation comes in over ten minutes, and the
+switch between the real weather and the made-up one over a minute. With no
+answer (no permission, no network, WeatherKit refusing the app) or one more
+than two hours old (two days for sunrise and sunset, which move by minutes a
+day), it is the forecast and the summer day as before, and the tool says
+"Now". Settings → Wallpaper → Real weather turns it off. Apple Weather's attribution is in
+About the fly. None of it reaches the fly but as everything else does: what
+it sees and the wind it feels.
 
 While nobody is using the remote (the wallpaper, or a minute of play without
 a press), the picnic has its own goings-on, about ten an hour, never two
@@ -229,9 +260,9 @@ its brain** (live: every sense going in, every command coming out with the
 neurons it is read from and their firing rates, spikes a second, active
 neurons), **About the fly**, and **Settings**, a page for each part of the
 game, every setting a step from the top: **Wallpaper** (when it starts, how
-its camera films, where the fly lives, what it sees in a corner), **Sound**
-(effects, surroundings) and **Picture** (pixel size, the eyes' detail, button
-hints, frame stats).
+its camera films, where the fly lives, what it sees in a corner, and, on an
+Apple TV that can tell, the real weather), **Sound** (effects, surroundings)
+and **Picture** (pixel size, the eyes' detail, button hints, frame stats).
 
 ## The fly's senses
 
@@ -401,7 +432,12 @@ every place's palettes and an indoor-like set; a room sees less of the
 weather); the
 weather (the same forecast for the same hour, changing slowly over a month,
 every kind over two months with clear the commonest, mist only in the morning
-and rain only under cloud, wetting and drying); the pacing of the picnic's
+and rain only under cloud, wetting and drying); the weather outside
+(WeatherKit's conditions to the game's weathers, snow and thunder to the
+nearest; the real sunrise and sunset on the clock's day for long and short
+days, a sunset before the clock's, polar day and night, never jumping; easing
+in and out, too old an answer, turning it off, one kept from the last run, and
+feeding it in a browser); the pacing of the picnic's
 goings-on (none while the remote is in use, never two close together, each
 about as often as it should be); the world's standing, bumping, ray and food
 queries, round and rectangular tops, and becoming another place; every place
@@ -431,10 +467,20 @@ appears once the brain wakes, the menus are walked with the keys, honey is
 tasted and eaten, the ball is thrown until the fly takes off, Play/Pause
 pauses and resumes, the wallpaper comes and goes with what it sees in a
 corner (and, set to always, it stays while playing but not over View → Fly's
-eyes or the pause menu), the fly is carried to every place, Back reaches the
-root, a reload finds the settings, the view, the light and the weather as
-they were left, the shelf on Feed and the hints for what was used gone,
-and the frame stays within its draw budget. `node scripts/play.ts` drives and
+eyes or the pause menu), the fly is carried to every place, the weather
+outside, fed as the Apple TV would give it, is what "Now" shows until it is
+too old, Back reaches the root, a reload finds the settings, the view, the
+light and the weather as they were left, the shelf on Feed and the hints for
+what was used gone, and the frame stays within its draw budget. A browser has
+no weather outside: scripts
+feed it with `__fly.outside.feed({...})` (`OutsideConditions` without its
+`source`, or `null` to take it away; `node scripts/play.ts eval:...`), and the
+canvas's `data-weather-from` (`outside`, `forecast` or `chosen`),
+`data-sun-from` (`outside`, `clock` or `chosen`), `data-outside` (the
+service's state: `none` without one, `off`, `fed`, `locating`, `fetching`,
+`ok`, `denied`, `no-location`, `offline`, `unauthorised`, `failed`) and
+`data-outside-age` (seconds) say where the weather comes from and how old it
+is. `node scripts/play.ts` drives and
 screenshots the game step by step (see the comment at its top).
 
 Longer headless body and real-brain soaks run with `npm run fuzz`. See

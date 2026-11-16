@@ -6,6 +6,7 @@
 #import "Audio.h"
 #import "BrainBridge.h"
 #import "Remote.h"
+#import "WeatherBridge.h"
 #import <JavaScriptCore/JavaScriptCore.h>
 #import <ImageIO/ImageIO.h>
 #include <mach/mach.h>
@@ -498,6 +499,8 @@ static void Define(JSContextRef ctx, JSObjectRef obj, const char *name, JSValueR
   // The newest GL fence the executor has seen signal, so clientWaitSync never has to wait for it.
   Define(ctx, native, "fences", JSObjectMakeArrayBufferWithBytesNoCopy(ctx, _renderer->fences(), sizeof(int32_t), nullptr, nullptr, nullptr));
   Define(ctx, native, "brain", MakeBrainBridge(ctx, [self.wwwRoot stringByAppendingPathComponent:@"brain/connectome.bin"]));
+  // Only in a build with the weather service (TVOS_WEATHERKIT, or the simulator check's stand-in).
+  if (JSObjectRef weather = MakeWeatherBridge(ctx)) Define(ctx, native, "weather", weather);
   NSData *json = [NSJSONSerialization dataWithJSONObject:self.config options:0 error:nil];
   Define(ctx, native, "config", MakeString(ctx, [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding]));
   Define(ctx, JSContextGetGlobalObject(ctx), "__native", native);

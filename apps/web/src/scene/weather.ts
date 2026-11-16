@@ -1,9 +1,10 @@
 // The weather: clear, overcast, mist or light rain. On "Now" (the Weather
-// tool) it follows a forecast worked out from the clock, so it wanders slowly
-// over hours and is the same whenever the app is opened at the same hour;
-// chosen, it holds. Changes come gradually: clouds gather before rain and
-// clear after it, mist forms in the early morning and burns off before noon,
-// and what the rain wetted dries over the next half hour or so.
+// tool) it follows the real weather outside where the Apple TV can tell it
+// (scene/outside.ts), else a forecast worked out from the clock, so it
+// wanders slowly over hours and is the same whenever the app is opened at the
+// same hour; chosen, it holds. Changes come gradually: clouds gather before
+// rain and clear after it, mist forms in the early morning and burns off
+// before noon, and what the rain wetted dries over the next half hour or so.
 //
 // Every place's light follows it (scene/light.ts). How rain, mist and wind
 // look and sound in a place is the place's own (places/types.ts).
@@ -27,7 +28,8 @@ export type Weather = {
   readonly kind: WeatherKind;
 };
 
-type Mix = { cloud: number; mist: number; rain: number; wind: number };
+/** The weather's parts that are set (the wet follows from them). */
+export type Mix = { cloud: number; mist: number; rain: number; wind: number };
 
 /** Each kind of weather, settled. */
 export const KINDS: Readonly<Record<WeatherKind, Readonly<Mix>>> = {
@@ -175,14 +177,23 @@ export class WeatherNow implements Weather {
   chosen: WeatherKind | null = null;
   #target: Mix = { ...KINDS.clear };
 
-  /** Follows the forecast at a local hour since the epoch. With `settle` it is there at once, as wet as the last hours' rain left it. */
-  follow(hours: number, settle = false) {
+  /**
+   * Follows the forecast at a local hour since the epoch, with as much of the
+   * real weather mixed in as `outside` says counts. With `settle` it is there
+   * at once, as wet as the last hours' rain left it (outside, as if it had
+   * been as it is now).
+   */
+  follow(hours: number, settle = false, outside?: { blend(forecast: Mix): Mix }) {
     this.chosen = null;
     forecast(hours, this.#target);
+    outside?.blend(this.#target);
     if (!settle) return;
     let wet = 0;
     const step = 0.05;
-    for (let h = hours - 3; h < hours; h += step) wet = wetten(wet, forecast(h, scratchA), step * 3600);
+    for (let h = hours - 3; h < hours; h += step) {
+      forecast(h, scratchA);
+      wet = wetten(wet, outside ? outside.blend(scratchA) : scratchA, step * 3600);
+    }
     this.wet = wet;
     this.#jump();
   }

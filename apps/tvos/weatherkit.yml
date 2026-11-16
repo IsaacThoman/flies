@@ -1,0 +1,12 @@
+# What WeatherKit itself needs, merged into project.yml only with TVOS_WEATHERKIT=1: its
+# entitlement (which signing for a device then needs an explicit App ID with the WeatherKit
+# capability for, docs/apple-tv.md) and the reason shown when tvOS asks for the TV's location.
+targets:
+  AppleTVFly:
+    entitlements:
+      path: AppleTVFly.entitlements
+      properties:
+        com.apple.developer.weatherkit: true
+    info:
+      properties:
+        NSLocationWhenInUseUsageDescription: "The fly's sky can follow the weather outside. Apple Weather is asked for the weather and today's sunrise and sunset about where your Apple TV is (to within a kilometre or so). The location isn't saved or used for anything else."

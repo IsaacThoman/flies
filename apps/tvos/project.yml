@@ -2,6 +2,13 @@
 # team and bundle ID come from TVOS_TEAM_ID and TVOS_BUNDLE_ID, and the brain's sources from
 # TVOS_BRAIN_SOURCES (packages/brain-native/src, or the stand-in under tests/).
 name: AppleTVFly
+# The weather outside, off unless scripts/tvos.ts turns it on: the service (weather.yml), and
+# WeatherKit's entitlement and location usage string (weatherkit.yml).
+include:
+  - path: weather.yml
+    enable: ${TVOS_WEATHER}
+  - path: weatherkit.yml
+    enable: ${TVOS_WEATHERKIT_ENTITLED}
 options:
   deploymentTarget:
     tvOS: "26.0"

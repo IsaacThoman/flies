@@ -13,25 +13,32 @@ const DEFAULT_TEAM_ID = 'PX72AL9366';
 const DEFAULT_BUNDLE_ID = 'com.isaacthoman.appletvfly';
 const TEAM_ID = process.env.TVOS_TEAM_ID || DEFAULT_TEAM_ID;
 export const BUNDLE_ID = process.env.TVOS_BUNDLE_ID || DEFAULT_BUNDLE_ID;
+/** The weather outside from WeatherKit: off unless the App ID has the capability (docs/apple-tv.md). */
+const WEATHERKIT = /^(1|true|yes|on)$/i.test(process.env.TVOS_WEATHERKIT ?? '');
 const CONNECTOME = path.join(root, 'packages/brain/data/connectome.bin');
 const BRAIN_SOURCES = path.join(root, 'packages/brain-native/src');
 const STAND_IN_BRAIN = path.join(appDir, 'tests/brain-stand-in');
+const WEATHER_SOURCES = path.join(appDir, 'weather/WeatherKit');
+const STAND_IN_WEATHER = path.join(appDir, 'tests/weather-stand-in');
 const TEST_SCENE = path.join(appDir, 'tests/scene.ts');
 
 const USAGE = `Usage: npm run tvos -- <command> [options]
 
-  build [--sim] [--test-scene] [--stand-in-brain]
+  build [--sim] [--test-scene] [--stand-in-brain] [--stand-in-weather]
         bundle the runtime and the game (apps/web/src/main.ts) into apps/tvos/www/ with the
         connectome, generate the Xcode project and build the app for an Apple TV (or, with
         --sim, the tvOS simulator). --test-scene bundles apps/tvos/tests/scene.ts in place of
         the game; --stand-in-brain compiles apps/tvos/tests/brain-stand-in/ in place of
-        packages/brain-native/src/
+        packages/brain-native/src/; --stand-in-weather compiles the weather service's stand-in,
+        apps/tvos/tests/weather-stand-in/, with no WeatherKit or location
   run (--sim <udid> | --device <udid>) [--config <json>] [--detached]
         install the built app and launch it with a launch config (default: www/config.json,
         as from the home screen), printing its console. --detached (device only) launches
         without attaching; config.logFile saves logs to Library/Caches/performance.log
 
-Signing uses TVOS_TEAM_ID (default ${DEFAULT_TEAM_ID}) and TVOS_BUNDLE_ID (default ${DEFAULT_BUNDLE_ID}).`;
+Signing uses TVOS_TEAM_ID (default ${DEFAULT_TEAM_ID}) and TVOS_BUNDLE_ID (default ${DEFAULT_BUNDLE_ID}).
+TVOS_WEATHERKIT=1 builds in the weather outside (WeatherKit and Core Location), which signing for
+a device needs an explicit App ID with the WeatherKit capability for: see docs/apple-tv.md.`;
 
 function run(command: string, args: string[], cwd = root, env: NodeJS.ProcessEnv = process.env) {
   const result = spawnSync(command, args, { cwd, env, stdio: 'inherit' });
@@ -54,10 +61,10 @@ function sourcesIn(dir: string): string[] {
   return readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(c|cc|cpp|cxx|m|mm)$/.test(f));
 }
 
-type BuildOptions = { sim: boolean; testScene: boolean; standInBrain: boolean };
+type BuildOptions = { sim: boolean; testScene: boolean; standInBrain: boolean; standInWeather: boolean };
 
 /** Bundles www/ and generates the Xcode project; returns xcodebuild's environment. */
-function prepare({ testScene, standInBrain }: BuildOptions) {
+function prepare({ testScene, standInBrain, standInWeather }: BuildOptions) {
   if (!existsSync(CONNECTOME)) throw Error(`The connectome isn't there (${path.relative(root, CONNECTOME)}): npm run brain:fetch`);
   const brain = standInBrain ? STAND_IN_BRAIN : BRAIN_SOURCES;
   if (!sourcesIn(brain).length) {
@@ -73,9 +80,13 @@ function prepare({ testScene, standInBrain }: BuildOptions) {
   cpSync(path.join(appDir, 'dist'), www, { recursive: true });
   cpSync(CONNECTOME, path.join(www, 'brain/connectome.bin'));
   writeFileSync(path.join(www, 'config.json'), JSON.stringify({ script: 'game.js', url: 'http://fly.local/', fit: 'fill', pixelated: true }));
+  // The weather service is in only with WeatherKit or its stand-in; WeatherKit's entitlement only with WeatherKit.
+  const weather = standInWeather || WEATHERKIT;
   const env = {
     ...process.env, TVOS_TEAM_ID: TEAM_ID, TVOS_BUNDLE_ID: BUNDLE_ID,
     TVOS_BRAIN_SOURCES: path.relative(appDir, brain),
+    TVOS_WEATHER: String(weather), TVOS_WEATHERKIT_ENTITLED: String(weather && !standInWeather),
+    TVOS_WEATHER_SOURCES: path.relative(appDir, standInWeather ? STAND_IN_WEATHER : WEATHER_SOURCES),
   };
   run('xcodegen', ['generate', '--quiet'], appDir, env);
   return env;
@@ -90,7 +101,9 @@ function build(options: BuildOptions) {
     '-destination', options.sim ? 'generic/platform=tvOS Simulator' : 'generic/platform=tvOS', '-derivedDataPath', 'build',
     ...(options.sim ? ['CODE_SIGNING_ALLOWED=NO', 'ARCHS=arm64'] : ['-allowProvisioningUpdates', '-allowProvisioningDeviceRegistration']), '-quiet', 'build',
   ], appDir, env);
-  console.log(`Built ${path.relative(root, appPath(options.sim))}${options.testScene ? ' with the test scene' : ''}${options.standInBrain ? ' and the stand-in brain' : ''}`);
+  const parts = [options.testScene && 'the test scene', options.standInBrain && 'the stand-in brain', options.standInWeather ? 'the stand-in weather' : WEATHERKIT && 'WeatherKit'].filter(Boolean);
+  const all = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
+  console.log(`Built ${path.relative(root, appPath(options.sim))}${all ? ` with ${all}` : ''}`);
 }
 
 function launch(target: { sim?: string; device?: string }, config: string, detached: boolean) {
@@ -110,7 +123,7 @@ function main() {
   const flag = (name: string) => { const i = args.indexOf(name); return i < 0 ? undefined : args.splice(i, 2)[1] ?? ''; };
   const has = (name: string) => { const i = args.indexOf(name); if (i >= 0) args.splice(i, 1); return i >= 0; };
   if (!cmd || cmd === 'help' || cmd === '--help') return console.log(USAGE);
-  if (cmd === 'build') return build({ sim: has('--sim'), testScene: has('--test-scene'), standInBrain: has('--stand-in-brain') });
+  if (cmd === 'build') return build({ sim: has('--sim'), testScene: has('--test-scene'), standInBrain: has('--stand-in-brain'), standInWeather: has('--stand-in-weather') });
   if (cmd === 'run') {
     const sim = flag('--sim'), device = flag('--device'), config = flag('--config') ?? readFileSync(path.join(www, 'config.json'), 'utf8');
     if (!sim && !device) throw Error('run needs --sim <udid> or --device <udid>');

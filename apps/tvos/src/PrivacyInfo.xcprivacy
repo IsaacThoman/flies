@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  The app's privacy manifest. No tracking and no data collected: the app has no network. Two
-  required-reason APIs: NSUserDefaults, the runtime's localStorage for the game's own settings,
-  read and written by the app alone (CA92.1); and mach_absolute_time, the clock behind
-  performance.now and the audio's timing, which only measures time between the app's own events
-  (35F9.1).
+  The app's privacy manifest. No tracking and no data collected. The only network use is the
+  weather outside, in a build with WeatherKit (docs/apple-tv.md): the TV's location, rounded to
+  two decimal places, goes to Apple's WeatherKit to answer each request, and the app keeps none
+  of it off the device; data collected by Apple isn't the app's to declare. Two required-reason
+  APIs: NSUserDefaults, the runtime's localStorage for the game's own settings and the weather
+  service's last answer (no location), read and written by the app alone (CA92.1); and
+  mach_absolute_time, the clock behind performance.now and the audio's timing, which only
+  measures time between the app's own events (35F9.1).
 -->
 <plist version="1.0">
 <dict>

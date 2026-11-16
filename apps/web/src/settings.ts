@@ -42,6 +42,8 @@ export type Settings = {
   hints: boolean;
   /** Small frame-cost counters in a corner. */
   stats: boolean;
+  /** On the Weather and Light tools' "Now", the real weather and sunrise and sunset outside, where the Apple TV can tell them. */
+  realWeather: boolean;
   /** Where the fly lives: one place, or each in turn (it moves on during a long wallpaper). */
   place: PlaceId | "turns";
   /** Where it was last, to come back to. */
@@ -58,6 +60,7 @@ export const DEFAULT_SETTINGS: Settings = {
   eyesInset: "wallpaper",
   hints: true,
   stats: false,
+  realWeather: true,
   place: "turns",
   scene: "picnic",
 };

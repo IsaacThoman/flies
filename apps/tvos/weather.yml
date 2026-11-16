@@ -1,0 +1,12 @@
+# The weather service behind globalThis.__native.weather, merged into project.yml when
+# scripts/tvos.ts builds with it (TVOS_WEATHER): the Swift that the JavaScript thread reads
+# (weather/Shared; src/WeatherBridge.mm finds it by name) and the service itself from
+# TVOS_WEATHER_SOURCES: WeatherKit and Core Location (weather/WeatherKit), or the simulator
+# check's stand-in (tests/weather-stand-in).
+targets:
+  AppleTVFly:
+    sources:
+      - path: weather/Shared
+      - path: ${TVOS_WEATHER_SOURCES}
+    settings:
+      SWIFT_VERSION: "6.0"

@@ -12,7 +12,7 @@ does, from what it sees, tastes and feels in the world.
 | `packages/brain` | The nervous system: 166,700 spiking neurons wired from the FlyEM male CNS connectome (CC-BY 4.0). TypeScript. Its README is the reference for the model and its limits. |
 | `packages/brain-native` | The same simulation in C++, behind the C interface in `include/fly_brain.h`, for the Apple TV. |
 | `packages/fly` | The fly's body: a 3D model that knows how a fly moves its legs, wings and mouthparts. |
-| `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver. |
+| `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver, the weather outside. |
 | `apps/web` | The game: the world, the fly's life in it, its senses, the remote's tools, menus, sound. Runs in a browser as it is. |
 | `apps/tvos` | The Apple TV app: a native host that runs the web build's JavaScript in JavaScriptCore and draws it through OpenGL ES. |
 
@@ -30,6 +30,12 @@ JavaScript has no JIT and is far too slow for it, so the host runs
 `packages/brain-native` on its own thread and exposes it as
 `globalThis.__native.brain` (`NativeBrainBridge`). The game only ever sees a
 `BrainDriver`.
+
+Built with WeatherKit, the Apple TV app also tells the game the weather
+outside and today's sunrise and sunset, as `globalThis.__native.weather`
+(`NativeWeatherBridge`); the game takes them for its weather and its clock's
+day where it can, and its own made-up forecast and summer day where it can't
+(`docs/apple-tv.md`, "The weather outside").
 
 The remote reaches the game as DOM events (`packages/contracts/src/remote.ts`):
 key events for the buttons, a `remotetouch` event for the touch surface. A

@@ -2,10 +2,12 @@
 // brain: boots it, waits for the brain, walks the menus with the keys, feeds
 // the fly and checks it tasted and ate, throws the ball until the fly takes
 // off, checks the wallpaper comes and goes with what it sees in a corner,
-// carries the fly to every place, reloads and finds the settings, the shelf
-// and what the hints taught as it left them, and holds the frame to its draw
-// budget throughout. It holds the light at midday and the weather clear, so
-// that what the fly does answers what the test does.
+// carries the fly to every place, feeds it the weather outside as the Apple TV
+// would, reloads and finds the settings, the shelf and what the hints taught
+// as it left them, and holds the frame to its draw budget throughout. It holds
+// the light at midday and the weather clear, so that what the fly does answers
+// what the test does; a browser has no weather outside but what the test feeds
+// it.
 //
 //   npm run e2e            (starts its own Vite server)
 //   npm run e2e -- --url http://localhost:5173/
@@ -201,6 +203,24 @@ try {
   await press("ArrowUp", PLACES.length - 1);
   await press("Enter");
   await waitFor(page, `place=${PLACES[0].id},moving=`, 30_000);
+
+  step("the weather outside: on Now it is what the Apple TV says, called Outside, and too old an answer goes back to the forecast");
+  const before = await readState(page);
+  assert.equal(before.outside, "none", "a browser can't tell the weather outside");
+  await toTool("weather");
+  await press("ArrowUp");
+  await waitFor(page, "variant=now,weatherFrom=forecast", 3000);
+  const fog = { cloudCover: 0.8, precipitation: 0, visibility: 300, wind: 1, condition: "foggy", daylight: true, sunrise: 7, sunset: 17, noon: 12 };
+  await page.evaluate((c) => (globalThis as unknown as { __fly: { outside: { feed(c: unknown): void } } }).__fly.outside.feed({ ...c, observedAt: Date.now() - 60_000 }), fog);
+  const foggy = await waitFor(page, "outside=fed,weatherFrom=outside,weather=mist,outsideAge<120", 10_000);
+  console.log(`  fog outside, ${foggy.outsideAge} s old: ${foggy.weather}`);
+  await page.evaluate((c) => (globalThis as unknown as { __fly: { outside: { feed(c: unknown): void } } }).__fly.outside.feed({ ...c, observedAt: Date.now() - 3 * 3_600_000 }), fog);
+  await waitFor(page, "weatherFrom=forecast", 3000);
+  await page.evaluate(() => (globalThis as unknown as { __fly: { outside: { feed(c: null): void } } }).__fly.outside.feed(null));
+  await waitFor(page, "outside=none,outsideAge=", 3000);
+  // Clear again, kept for the reload at the end.
+  await press("ArrowDown");
+  await waitFor(page, "variant=clear,weatherFrom=chosen,weather=clear", 10_000);
 
   step("back to the title through the pause menu, where Back leaves the app");
   await press("Escape");
