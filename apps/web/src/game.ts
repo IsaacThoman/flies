@@ -1612,6 +1612,10 @@ export class Game implements Shell {
     d.glow = this.#glowSummary();
     d.calls = String(this.stage.cost.calls);
     d.triangles = String(this.stage.cost.triangles);
+    d.textures = String(this.stage.cost.textures);
+    d.geometries = String(this.stage.cost.geometries);
+    d.programs = String(this.stage.cost.programs);
+    d.brainSpeed = this.meter.speed.toFixed(3);
     d.frameMs = this.frameMsAverage.toFixed(2);
     d.eyesMs = this.eyes.costMs.toFixed(2);
     d.eyesUpdates = String(this.eyes.updates);

@@ -43,7 +43,7 @@ function buildEnvironment(light: Daylight) {
 
 const VEIL_CAMERA = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-export type FrameCost = { calls: number; triangles: number; textures: number; geometries: number };
+export type FrameCost = { calls: number; triangles: number; textures: number; geometries: number; programs: number };
 
 export class Stage {
   readonly renderer: THREE.WebGLRenderer;
@@ -56,7 +56,7 @@ export class Stage {
   readonly scene = new THREE.Scene();
   readonly hemi: THREE.HemisphereLight;
   readonly sun: THREE.DirectionalLight;
-  readonly cost: FrameCost = { calls: 0, triangles: 0, textures: 0, geometries: 0 };
+  readonly cost: FrameCost = { calls: 0, triangles: 0, textures: 0, geometries: 0, programs: 0 };
   #pmrem: THREE.PMREMGenerator;
   #envScene: THREE.Scene;
   #env: THREE.WebGLRenderTarget | null = null;
@@ -264,6 +264,7 @@ export class Stage {
     this.cost.triangles = info.render.triangles;
     this.cost.textures = info.memory.textures;
     this.cost.geometries = info.memory.geometries;
+    this.cost.programs = info.programs?.length ?? 0;
     return this.cost;
   }
 }
