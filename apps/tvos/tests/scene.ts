@@ -10,10 +10,15 @@
 //     half-float target;
 //   - localStorage and fetch of the app's own files;
 //   - the brain bridge, end to end, against the stand-in brain (tests/brain-stand-in);
-//   - the weather bridge, against the stand-in weather service (tests/weather-stand-in).
+//   - the weather bridge, against the stand-in weather service (tests/weather-stand-in);
+//   - the socket bridge, against an echo server the check runs (?echo= in the page's URL): texts
+//     and bytes both ways, a message too big for the game's buffer, a line that falls behind, the
+//     server's close and what came before it, and lines that can't open;
+//   - the keyboard bridge, answered by the launch config's "typed": a second question answers the
+//     first with null, the remote's presses go to the keyboard while it is up, frames carry on.
 import * as THREE from 'three';
-import { AT_ROOT_PROPERTY, COMMAND_ORDER, REMOTE_TOUCH_EVENT, STATE_STATS } from '@fly/contracts';
-import type { NativeBrainBridge, NativeWeatherBridge, OutsideConditions, RemoteTouch, WeatherAttribution } from '@fly/contracts';
+import { AT_ROOT_PROPERTY, COMMAND_ORDER, NATIVE_SOCKET_CLOSED, NATIVE_SOCKET_OPEN, REMOTE_TOUCH_EVENT, STATE_STATS } from '@fly/contracts';
+import type { NativeBrainBridge, NativeKeyboardBridge, NativeSocketBridge, NativeWeatherBridge, OutsideConditions, RemoteTouch, WeatherAttribution } from '@fly/contracts';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
@@ -44,6 +49,8 @@ const report = {
   fetched: null as null | string,
   brain: null as null | Record<string, unknown>,
   weather: null as null | { error?: string; statuses: string[]; version: number; conditions: OutsideConditions | null; attribution: WeatherAttribution | null; failure: { status: string; error: string } | null; stopped: string | null },
+  socket: null as null | Record<string, unknown>,
+  keyboard: null as null | { answers: (string | null)[]; framesWhileUp: number },
 };
 
 // A label on a 2D canvas, used as a texture: the game draws all its text this way.
@@ -236,6 +243,7 @@ window.addEventListener('keydown', (e) => {
   drawLabel(e.key);
   // Play/Pause takes the scene to its "root": Back then belongs to tvOS.
   if (e.key === 'MediaPlayPause') atRoot[AT_ROOT_PROPERTY] = true;
+  if (e.key === 'ArrowLeft') askTwice();
 });
 window.addEventListener('keyup', (e) => { report.keys.push(`${e.key}^`); });
 window.addEventListener(REMOTE_TOUCH_EVENT, (event) => {
@@ -307,6 +315,89 @@ function checkWeather() {
 }
 weather?.start();
 setInterval(checkWeather, 50);
+
+// The keyboard: asked twice at once, the first is answered with null and the second as typed.
+const keyboard = (globalThis as unknown as { __native?: { keyboard?: NativeKeyboardBridge } }).__native?.keyboard;
+function askTwice() {
+  if (!keyboard || report.keyboard) return;
+  const asked = report.frames;
+  const k = (report.keyboard = { answers: [] as (string | null)[], framesWhileUp: 0 });
+  keyboard.ask('First', '', 'code', (text) => k.answers.push(text));
+  keyboard.ask('Join a table', '', 'code', (text) => {
+    k.answers.push(text);
+    k.framesWhileUp = report.frames - asked;
+    canvas.dataset.keyboard = 'answered';
+  });
+}
+
+// The socket, against the check's echo server: it echoes, and on "big" sends more than the game's
+// buffer holds, on "flood" more messages than wait to be taken, on "bye" some last words and
+// closes with 4321.
+const socket = (globalThis as unknown as { __native?: { socket?: NativeSocketBridge } }).__native?.socket;
+const echo = new URL(location.href).searchParams.get('echo');
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function until(what: string, check: () => boolean, ms = 5000) {
+  for (const start = performance.now(); !check(); await wait(10)) if (performance.now() - start > ms) throw new Error(`timed out: ${what}`);
+}
+async function checkSocket(bridge: NativeSocketBridge, url: string) {
+  const r: Record<string, unknown> = (report.socket = {});
+  const buffer = new ArrayBuffer(64 * 1024);
+  const closed = (id: number) => bridge.status(id) === NATIVE_SOCKET_CLOSED;
+  const ended = (id: number) => [bridge.closeCode(id), bridge.closeReason(id)];
+  const opened = async (what: string) => {
+    const id = bridge.open(url);
+    await until(`${what} opens`, () => bridge.status(id) === NATIVE_SOCKET_OPEN);
+    return id;
+  };
+  let next: number | string = 0;
+  const arrives = (id: number) => (next = bridge.next(id, buffer)) !== 0;
+
+  const bad = bridge.open('http://fly.local/rooms');
+  r.notASocket = [bridge.status(bad), ...ended(bad)];
+  bridge.close(bad, 1000, '');
+  const nowhere = bridge.open('ws://127.0.0.1:9/rooms');
+  await until('a line to nowhere fails', () => closed(nowhere), 10_000);
+  r.nowhere = ended(nowhere);
+  bridge.close(nowhere, 1000, '');
+
+  const id = await opened('the echo');
+  bridge.send(id, 'hello');
+  await until('the text echoed', () => arrives(id));
+  r.text = next;
+  bridge.send(id, new Uint8Array([9, 1, 2, 3, 250, 9]).subarray(1, 5));
+  await until('the bytes echoed', () => arrives(id));
+  r.bytes = [next, ...new Uint8Array(buffer, 0, 4)];
+  // Nothing waiting: two calls a frame, each a lookup. Timed over many, in microseconds a frame.
+  const t = performance.now();
+  for (let i = 0; i < 1000; i++) {
+    bridge.next(id, buffer);
+    bridge.status(id);
+  }
+  r.idleFrameUs = Math.round((performance.now() - t) * 100) / 100;
+  bridge.send(id, 'big');
+  await until('too big for the buffer', () => (bridge.next(id, buffer), closed(id)));
+  r.tooBig = ended(id);
+  bridge.close(id, 1000, '');
+  r.forgotten = closed(id) && bridge.next(id, buffer) === 0;
+
+  const flooded = await opened('the flooded line');
+  bridge.send(flooded, 'flood');
+  await until('the flooded line falls behind', () => closed(flooded));
+  r.fellBehind = [...ended(flooded), bridge.next(flooded, buffer)];
+  bridge.close(flooded, 1000, '');
+
+  const leaving = await opened('the line the server closes');
+  bridge.send(leaving, 'bye');
+  const last: (number | string)[] = [];
+  await until('the server closes', () => {
+    while (arrives(leaving)) last.push(next);
+    return closed(leaving);
+  });
+  r.serverClosed = [...last, ...ended(leaving)];
+  bridge.close(leaving, 1000, '');
+}
+if (socket && echo) checkSocket(socket, echo).catch((e: unknown) => { report.socket = { error: String(e) }; });
+else report.socket = { error: socket ? 'no ?echo= in the URL' : 'no __native.socket' };
 
 let last = performance.now();
 const frame = (now: number) => {

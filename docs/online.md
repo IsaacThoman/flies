@@ -9,8 +9,8 @@ place, the food, thrown balls, the light and the weather, and the seed and
 clock the bubbles and visitors come from. Each fly sees the others with its
 own eyes and meets them with its own body. Nothing else passes between flies.
 
-This is the web's, for now. The Apple TV and the iPhone app join later
-through a native WebSocket bridge (below).
+This is the web's and the Apple TV's, whose host bridges a native WebSocket
+(below). The iPhone app joins later.
 
 ## Playing
 
@@ -334,16 +334,26 @@ The game reaches the room only through `TableSocket`
 (`packages/contracts/src/socket.ts`): send, and once a frame drain what has
 arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
 
-- **Apple TV (stage 2).** Its runtime has no `WebSocket`. Its host bridges
-  one as `globalThis.__native.socket`, backed by `URLSessionWebSocketTask`
-  on its own queue. JavaScript polls it each frame, copying each binary
-  message into a preallocated buffer, so nothing is allocated per message.
-  It needs `wss` (App Transport Security), an absolute room URL
-  (`wss://flies.isaacthoman.com/rooms`), sharing a room (its code, or a QR
-  code on the TV), a `TextEntry` bridged to tvOS's own keyboard as
-  `globalThis.__native.keyboard` for names, codes and passwords, and
-  measuring on the device with eight fake flies before promising eight.
-  Online's screens already work with the remote alone.
+- **Apple TV.** Its runtime has no `WebSocket`, so its host bridges one as
+  `globalThis.__native.socket` (`apps/tvos/src/SocketBridge.mm`), an
+  `NSURLSessionWebSocketTask` on a queue of its own; the room's line and
+  the Lobby's both go through it. The game polls it each frame
+  (`apps/web/src/online/native-socket.ts`): each binary message is copied
+  into one buffer kept in JavaScript, so nothing is made per message, and a
+  frame with nothing new is two native calls. The host keeps as much waiting
+  as a browser does, and closes every line (1001) when the app goes to the
+  background; the fly rests in the room meanwhile, and coming back the line
+  opens again at once. Its room server is `wss://flies.isaacthoman.com/rooms`
+  (`ROOMS_URL` at build, or `?rooms=` in the launch config's URL, for
+  another), which App Transport Security allows as it is. Typing (a room's
+  name, a password, a code) is tvOS's own keyboard, as
+  `globalThis.__native.keyboard`, made a `TextEntry` (`NativeTextEntry`,
+  `apps/web/src/ui/text-entry.ts`). There is no share sheet or clipboard, so
+  no Share the link: at a room, Online shows its QR code and its code (as it
+  does everywhere) for a phone to scan or another TV to type. The simulator
+  check sits the app in a room of eight; eight on a real Apple TV still has
+  to be measured (`npm run tvos:soak -- --table`, `docs/apple-tv.md`,
+  "Playing together").
 - **iPhone and iPad (stage 3).** The same bridge, and the system share
   sheet. iOS suspends a backgrounded app, so away is the normal state there;
   the 10 minutes and coming back are what make it work.

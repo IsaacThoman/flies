@@ -164,3 +164,21 @@ test("a host that can't open the URL gives a closed line, and the table tries ag
   for (let i = 0; i < 10; i++) line.update(0.1);
   assert.equal(host.lines.size, 2);
 });
+
+test("shown again before the frame that sees the host's close: the line opens again at once, not after its retry", () => {
+  const host = new FakeHost();
+  const line = new TableLine(nativeSockets(host), "wss://flies.example/rooms", () => ({ type: "hello", v: 2, table: "abcdefghjk", key: "k" }));
+  host.line(0).status = NATIVE_SOCKET_OPEN;
+  line.update(0.016);
+  // Closed in the background, with no frame since; the page is shown, then its first frame comes.
+  Object.assign(host.line(0), { status: NATIVE_SOCKET_CLOSED, code: 1001, reason: "" });
+  line.hurry();
+  line.update(0.016);
+  line.update(0.016);
+  assert.equal(host.lines.size, 2, "a new line on the next frame");
+  // Hurried once only: the next drop waits its turn.
+  Object.assign(host.line(1), { status: NATIVE_SOCKET_CLOSED, code: 1006, reason: "" });
+  line.update(0.016);
+  line.update(0.016);
+  assert.equal(host.lines.size, 2);
+});

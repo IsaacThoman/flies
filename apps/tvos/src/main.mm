@@ -8,6 +8,7 @@
 #import <UIKit/UIKit.h>
 #import "JSHost.h"
 #import "Remote.h"
+#import "SocketBridge.h"
 
 // The launch config: --config <json> on the command line, else www/config.json (written by
 // scripts/tvos.ts build), which is what runs from the home screen.
@@ -134,7 +135,23 @@ static NSDictionary *LaunchConfig() {
   [((GameViewController *)self.window.rootViewController).host setActive:YES];
 }
 - (void)sceneDidEnterBackground:(UIScene *)scene {
-  [((GameViewController *)self.window.rootViewController).host setHidden:YES];
+  // The game hears it is hidden (at a table, it says its fly is away), then every line to a room
+  // closes, in that order on the JavaScript thread, before tvOS suspends the app; coming back,
+  // the game opens its line again.
+  JSHost *host = ((GameViewController *)self.window.rootViewController).host;
+  UIApplication *app = UIApplication.sharedApplication;
+  __block UIBackgroundTaskIdentifier task = [app beginBackgroundTaskWithExpirationHandler:^{
+    [app endBackgroundTask:task];
+    task = UIBackgroundTaskInvalid;
+  }];
+  [host setHidden:YES];
+  [host perform:^(JSGlobalContextRef) {
+    CloseSocketsGoingAway();
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (task != UIBackgroundTaskInvalid) [app endBackgroundTask:task];
+      task = UIBackgroundTaskInvalid;
+    });
+  }];
 }
 - (void)sceneWillEnterForeground:(UIScene *)scene {
   [((GameViewController *)self.window.rootViewController).host setHidden:NO];

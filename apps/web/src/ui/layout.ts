@@ -273,6 +273,53 @@ export function titleLayout(frame: Frame, items: number): TitleLayout {
   return { menu, wordmark: { x: cx, y, size }, status, fly: spot(frame, cx, middle) };
 }
 
+export type RoomLayout = {
+  menu: MenuPanel;
+  /** The card with the room's QR code and, under it, its code. */
+  card: Rect;
+  qr: Rect;
+  code: { x: number; y: number; size: number };
+};
+
+/** Round the QR code inside its card, and the room under it for the code. */
+const CARD_PAD = 14;
+const CODE_ROOM = 40;
+/** The QR code's side: as big as the TV has room for, for a phone across the room; never so small a phone has to come close. */
+const QR_MOST = 210;
+const QR_LEAST = 120;
+
+/**
+ * At a room: the menu (`spec`), and the card a phone scans to join it, its
+ * code readable under it. Side by side where the screen is wide, the card on
+ * the left; on a tall one the card over the menu. Either way clear of the
+ * hints along the foot.
+ */
+export function roomLayout(frame: Frame, spec: MenuPanelSpec): RoomLayout {
+  const a = safeRect(frame);
+  const margin = 12;
+  const gap = 16;
+  const sized = (qr: number) => ({ w: qr + 2 * CARD_PAD, h: qr + 2 * CARD_PAD + CODE_ROOM });
+  const place = (x: number, y: number, qr: number) => {
+    const { w, h } = sized(qr);
+    return { card: { x, y, w, h }, qr: { x: x + CARD_PAD, y: y + CARD_PAD, w: qr, h: qr }, code: { x: x + w / 2, y: y + CARD_PAD + qr + CODE_ROOM * 0.66, size: Math.min(26, qr / 7) } };
+  };
+  if (a.w >= a.h) {
+    const qr = Math.max(QR_LEAST, Math.min(QR_MOST, a.h - 2 * HINTS_ROOM - 2 * CARD_PAD - CODE_ROOM, a.w * 0.36));
+    const { w, h } = sized(qr);
+    const menuWidth = Math.min(spec.width, a.w - 2 * margin - gap - w);
+    const left = a.x + (a.w - w - gap - menuWidth) / 2;
+    const menu = fitMenu({ x: left + w + gap - margin, y: a.y, w: menuWidth + 2 * margin, h: a.h }, { ...spec, width: menuWidth });
+    return { menu, ...place(left, a.y + Math.max(margin, (a.h - h) / 2 - spec.raise), qr) };
+  }
+  const qr = Math.max(QR_LEAST, Math.min(QR_MOST, a.w - 2 * margin - 2 * CARD_PAD, a.h * 0.4));
+  const { w, h } = sized(qr);
+  const fitted = fitMenu({ x: a.x, y: a.y + h + gap, w: a.w, h: a.h - h - gap - HINTS_ROOM }, { ...spec, raise: 0 });
+  // The two together in the middle of the height.
+  const top = a.y + Math.max(margin, (a.h - HINTS_ROOM - (h + gap + fitted.panel.h)) / 2);
+  const menu = shiftMenu(fitted, top + h + gap - fitted.panel.y);
+  return { menu, ...place(a.x + (a.w - w) / 2, top, qr) };
+}
+
 export type LoadingLayout = {
   wordmark: { x: number; y: number; size: number };
   /** The brain waking; or, if it can't, why, with "Try again" in it. */

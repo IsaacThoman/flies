@@ -17,6 +17,8 @@ export type TextRequest = {
   value: string;
   /** At most this many characters. */
   max: number;
+  /** What the field is called, for a keyboard that says so over what is typed (the Apple TV's). */
+  label?: string;
 };
 
 export interface TextEntry {
@@ -31,4 +33,18 @@ export interface TextEntry {
   begin(request: TextRequest): void;
   /** Stops, keeping what was typed. */
   end(): void;
+}
+
+/**
+ * `globalThis.__native.keyboard` in the Apple TV app: tvOS's own keyboard
+ * screen, over the game. `ask` returns at once; the host shows the keyboard
+ * (the game's frames go on under it, but the remote is the keyboard's) and
+ * calls `done` on the JavaScript thread with what was typed, or null when the
+ * player went back without it. One question at a time: asking while one is up
+ * answers the first with null, and `close` takes it down the same way. The
+ * game makes a TextEntry of it (apps/web/src/ui/text-entry.ts).
+ */
+export interface NativeKeyboardBridge {
+  ask(title: string, value: string, kind: TextKind, done: (text: string | null) => void): void;
+  close(): void;
 }

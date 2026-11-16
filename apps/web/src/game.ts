@@ -11,7 +11,7 @@
 import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
 import { REGIONS } from "@fly/brain";
-import type { BrainDriver, OpenTableSocket, RemoteButton, WeatherAttribution } from "@fly/contracts";
+import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttribution } from "@fly/contracts";
 import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
 import { Navigator } from "@fly/ui";
 import type { GlyphSet, Hit } from "@fly/ui";
@@ -78,7 +78,7 @@ import type { Knock, NewRoom, Point, Screen, ScreenId, Shell, TableNow } from ".
 import { drawStats } from "./ui/stats.ts";
 import { MENU_HITS } from "./ui/menu-view.ts";
 import { OnlineScreen } from "./ui/screens/online.ts";
-import { BrowserTextEntry } from "./ui/text-entry.ts";
+import { BrowserTextEntry, NativeTextEntry, nativeKeyboard } from "./ui/text-entry.ts";
 
 /** Seconds the loading screen stays after the brain wakes, so "Awake!" is seen; longer when it has more to say. */
 const AWAKE_HOLD = 1.2;
@@ -179,7 +179,7 @@ export class Game implements Shell {
   /** A locked room's door, waiting for its password. */
   knock: Knock | null = null;
   /** Typing into the fields the game draws (a room's name, its password), where there is a way to. */
-  readonly typing: BrowserTextEntry | null;
+  readonly typing: TextEntry | null;
   /** The line that lists the rooms, while Online shows them. */
   #lobby: Lobby | null = null;
   /** The fly's own food, kept while it tries a room, to have back if the room never lets it in. */
@@ -365,7 +365,9 @@ export class Game implements Shell {
     this.#seat = loadTableSeat(newDeviceKey);
     [this.#openSocket, this.#app] = tableLines();
     // The Apple TV's host types with its own keyboard screen, not a page's <input>.
-    this.typing = this.canPlayOnline && typeof document !== "undefined" && !(globalThis as { __native?: unknown }).__native ? new BrowserTextEntry() : null;
+    const keyboard = nativeKeyboard();
+    const native = !!(globalThis as { __native?: unknown }).__native;
+    this.typing = !this.canPlayOnline ? null : keyboard ? new NativeTextEntry(keyboard) : typeof document !== "undefined" && !native ? new BrowserTextEntry() : null;
     // Invited to a room, or still at the one it was at when it last closed: it sits down there.
     if (this.canPlayOnline) {
       const code = invitedTo(location.href) ?? this.#seat.table;
@@ -451,6 +453,11 @@ export class Game implements Shell {
     return this.online && typeof location !== "undefined" ? inviteLink(location.href, this.online.code, this.#app) : null;
   }
 
+  /** A share sheet or a clipboard to hand the link on with: not on the Apple TV, where a phone scans the room's QR code instead. */
+  get canShare() {
+    return typeof navigator !== "undefined" && (typeof navigator.share === "function" || !!navigator.clipboard);
+  }
+
   /** Hands the table's link on: the share sheet, or the clipboard. Called from a press. */
   shareTable(): Promise<Shared> {
     const link = this.tableLink;
@@ -460,7 +467,8 @@ export class Game implements Shell {
   /** The room as the screens show it. */
   get table(): TableNow | null {
     const online = this.online;
-    return online ? { name: online.room?.name ?? null, starting: online.starting, joined: online.joined, others: online.others.list } : null;
+    const link = this.tableLink;
+    return online && link ? { name: online.room?.name ?? null, code: online.code, link, starting: online.starting, joined: online.joined, others: online.others.list } : null;
   }
 
   /** The starter takes another's fly off the table. */

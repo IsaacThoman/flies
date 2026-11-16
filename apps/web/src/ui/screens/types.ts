@@ -16,8 +16,15 @@ export type SettingsPage = "wallpaper" | "screen" | "picture";
 /** The menu (the title, at launch and from play alike), play, and what the menu opens. */
 export type ScreenId = "title" | "play" | "settings" | "about" | "online";
 
-/** The room this device is at, as the screens show it: what it is called (once it has said), whether this player started it, and the others there. */
-export type TableNow = { readonly name: string | null; readonly starting: boolean; readonly joined: boolean; readonly others: readonly { readonly id: number; readonly colour: string }[] };
+/** The room this device is at, as the screens show it: what it is called (once it has said), its code and link, whether this player started it, and the others there. */
+export type TableNow = {
+  readonly name: string | null;
+  readonly code: string;
+  readonly link: string;
+  readonly starting: boolean;
+  readonly joined: boolean;
+  readonly others: readonly { readonly id: number; readonly colour: string }[];
+};
 
 /**
  * A locked room's door: the room chosen from the list, or one this device
@@ -68,6 +75,8 @@ export interface Shell {
   readonly rooms: readonly RoomWire[] | null;
   /** Typing into a field the game draws, or null where there is no way to type. */
   readonly typing: TextEntry | null;
+  /** Whether a link can be handed on here: a share sheet or a clipboard (the Apple TV has neither, and shows the room's QR code for a phone instead). */
+  readonly canShare: boolean;
   /** Makes a room and sits at it; sits at one by its code (with its password, if it is locked); hands its link on (from a press: the share sheet or the clipboard); takes another's fly off it (the starter); leaves it. */
   startRoom(room: NewRoom): void;
   joinRoom(code: string, password?: string): void;

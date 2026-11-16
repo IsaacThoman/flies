@@ -1,4 +1,6 @@
-// Typing in a browser: one <input>, never seen, focused while a field the
+// Typing in a browser, and on the Apple TV (NativeTextEntry, below).
+//
+// In a browser: one <input>, never seen, focused while a field the
 // game draws is being typed into, so that whatever the player types with
 // works as it does anywhere on the web: a physical keyboard, a phone's or a
 // tablet's own keyboard, an input method composing a word, paste, a password
@@ -11,7 +13,7 @@
 // (the field goes back to what it was); leaving the field (a tap elsewhere,
 // the phone's keyboard closed) finishes too.
 
-import type { TextEntry, TextKind, TextRequest } from "@fly/contracts";
+import type { NativeKeyboardBridge, TextEntry, TextKind, TextRequest } from "@fly/contracts";
 
 const TYPE: Record<TextKind, string> = { name: "text", password: "password", "new-password": "password", code: "text" };
 /** What a password manager is to make of it: nothing to fill or keep, a password to fill, or one to keep. */
@@ -106,4 +108,56 @@ export class BrowserTextEntry implements TextEntry {
     this.#ended = null;
     return ended;
   }
+}
+
+/**
+ * Typing on the Apple TV: tvOS's own keyboard screen (`__native.keyboard`),
+ * which takes the whole field at once and gives back what was typed when the
+ * player is done. Until then the field shows what it held.
+ */
+export class NativeTextEntry implements TextEntry {
+  active: string | null = null;
+  value = "";
+  caret = 0;
+  readonly #bridge: NativeKeyboardBridge;
+  #ended: "done" | "cancel" | null = null;
+  /** Each question's number: an answer to one since given up (another field, or `end`) is no one's. */
+  #asked = 0;
+
+  constructor(bridge: NativeKeyboardBridge) {
+    this.#bridge = bridge;
+  }
+
+  begin(request: TextRequest) {
+    const asked = ++this.#asked;
+    this.active = request.id;
+    this.value = request.value;
+    this.caret = request.value.length;
+    this.#ended = null;
+    this.#bridge.ask(request.label ?? request.id, request.value, request.kind, (text) => {
+      if (asked !== this.#asked) return;
+      if (text !== null) this.value = text.slice(0, request.max);
+      this.caret = this.value.length;
+      this.active = null;
+      this.#ended = text === null ? "cancel" : "done";
+    });
+  }
+
+  end() {
+    if (!this.active) return;
+    this.#asked++;
+    this.active = null;
+    this.#bridge.close();
+  }
+
+  take() {
+    const ended = this.#ended;
+    this.#ended = null;
+    return ended;
+  }
+}
+
+/** The Apple TV host's keyboard, where there is one. */
+export function nativeKeyboard(): NativeKeyboardBridge | null {
+  return (globalThis as { __native?: { keyboard?: NativeKeyboardBridge } }).__native?.keyboard ?? null;
 }

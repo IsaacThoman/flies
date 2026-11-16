@@ -4,7 +4,9 @@
 #import "JSHost.h"
 #import "Renderer.h"
 #import "BrainBridge.h"
+#import "KeyboardBridge.h"
 #import "Remote.h"
+#import "SocketBridge.h"
 #import "WeatherBridge.h"
 #import <JavaScriptCore/JavaScriptCore.h>
 #import <ImageIO/ImageIO.h>
@@ -498,6 +500,9 @@ static void Define(JSContextRef ctx, JSObjectRef obj, const char *name, JSValueR
   Define(ctx, native, "brain", MakeBrainBridge(ctx, [self.wwwRoot stringByAppendingPathComponent:@"brain/connectome.bin"]));
   // Only in a build with the weather service (TVOS_WEATHERKIT, or the simulator check's stand-in).
   if (JSObjectRef weather = MakeWeatherBridge(ctx)) Define(ctx, native, "weather", weather);
+  // A table's line to its room, and tvOS's keyboard for typing its code.
+  Define(ctx, native, "socket", MakeSocketBridge(ctx));
+  Define(ctx, native, "keyboard", MakeKeyboardBridge(ctx, self.config[@"typed"]));
   NSData *json = [NSJSONSerialization dataWithJSONObject:self.config options:0 error:nil];
   Define(ctx, native, "config", MakeString(ctx, [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding]));
   Define(ctx, JSContextGetGlobalObject(ctx), "__native", native);
