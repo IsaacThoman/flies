@@ -81,16 +81,16 @@ export function soakConfig(minutes = 30) {
     wait({ place: place.id, moving: "" });
     // Pin the place: a long wallpaper phase must not trigger the normal 20-minute rotation.
     press("MediaPlayPause");
-    wait({ screen: "pause" });
+    wait({ screen: "title", focus: "play" });
     press("ArrowUp", 4);
-    press("ArrowDown", 3);
+    press("ArrowDown", 4);
     press("Enter");
     wait({ screen: "settings" });
-    press("ArrowUp", 2);
-    press("Enter");
-    wait({ screen: "wallpaper" });
-    press("ArrowUp", 4);
-    press("ArrowDown", 2);
+    press("ArrowUp", 8);
+    wait({ focus: "page" });
+    press("ArrowLeft", 2);
+    wait({ tab: "wallpaper" });
+    press("ArrowDown", 3);
     wait({ focus: "place" });
     press("ArrowLeft", PLACES.length);
     press("ArrowRight", index + 1);

@@ -17,5 +17,9 @@ test("the device soak visits every place, weather and daylight and divides wallp
     }
   });
   assert.equal(wallpaperMs, 60 * 60000);
+  const waits = config.drive.filter((s) => s[0] === "wait").map((s) => s[1] as Record<string, string>);
+  assert.ok(waits.some((s) => s.screen === "settings" && s.tab === "picture"));
+  assert.ok(waits.some((s) => s.tab === "wallpaper"));
+  assert.ok(waits.every((s) => !["pause", "wallpaper", "sound", "picture"].includes(s.screen)));
   assert.throws(() => soakConfig(1));
 });

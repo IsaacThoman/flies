@@ -62,6 +62,14 @@ test("hundreds of place changes and one-shots leave only the live audio graph co
     audioEnded(starts[before]);
     assert.equal(reachable(ctx.destination), baseline, "the chirp's gain disconnects too");
   }
+  for (let i = 0; i < 400; i++) {
+    audio.held(1, 1);
+    assert.equal(reachable(ctx.destination), baseline + 4, "both held tools are audible");
+    audio.held(0, 0);
+    now += 1;
+    for (const id of stops.splice(0)) audioEnded(id);
+    assert.equal(reachable(ctx.destination), baseline, `held tools ${i}`);
+  }
 });
 
 test("an hour of repeated volume settings keeps the TV automation bounded", () => {

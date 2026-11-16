@@ -22,7 +22,7 @@ declare global { var __fly: Game; }
 const PHASES = ["places", "climate", "tools", "menus", "eyes", "wallpaper"] as const;
 type Phase = typeof PHASES[number];
 type Sample = { seconds: number; phase: string; place: string; checkpoint: boolean; [metric: string]: number | string | boolean };
-const STATE = ["screen", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden", "xray", "nerves"];
+const STATE = ["screen", "tab", "brainEngine", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden", "xray", "nerves"];
 const CLOCKS = ["gameSeconds", "audioSeconds", "eyesUpdates"];
 const METRICS = ["geometries", "textures", "programs", "calls", "triangles", "heap", "backing", "workerHeap", "workerBacking", "nodes", "listeners", "audioNodes", "frameMs", "brainSpeed", "storage"];
 
@@ -295,24 +295,33 @@ export async function run(args = process.argv.slice(2)) {
           }
         } else if (p === "menus") {
           await page.keyboard.press(" ");
-          await waitFor(page, "screen=pause");
-          for (const screen of ["brain", "about", "settings", "wallpaper", "sound", "picture"] as const) {
+          await waitFor(page, "screen=title");
+          for (const screen of ["brain", "about", "settings"] as const) {
             await page.evaluate((screen) => globalThis.__fly.open(screen), screen);
             await waitFor(page, `screen=${screen}`);
-            await page.keyboard.press("ArrowDown");
-            if (["wallpaper", "sound", "picture"].includes(screen)) {
-              await page.keyboard.press("ArrowRight");
-              await page.keyboard.press("ArrowLeft");
+            if (screen === "settings") {
+              for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowUp");
+              for (let i = 0; i < 2; i++) await page.keyboard.press("ArrowLeft");
+              for (const tab of ["wallpaper", "sound", "picture"]) {
+                await waitFor(page, `tab=${tab},focus=page`);
+                await page.keyboard.press("ArrowDown");
+                await page.keyboard.press("ArrowRight");
+                await page.keyboard.press("ArrowLeft");
+                await sample(false, true);
+                await page.keyboard.press("ArrowUp");
+                if (tab !== "picture") await page.keyboard.press("ArrowRight");
+              }
             }
-            await sample();
+            await sample(false, true);
             await page.keyboard.press("Escape");
-            await waitFor(page, "screen=pause");
+            await waitFor(page, "screen=title");
           }
           await page.keyboard.press(" ");
           await waitFor(page, "screen=play");
-          await page.evaluate(() => { globalThis.__fly.title(); });
+          await page.keyboard.press("Escape");
           await waitFor(page, "screen=title");
-          await page.evaluate(() => globalThis.__fly.play());
+          await page.keyboard.press("Escape");
+          await waitFor(page, "screen=play");
         } else if (p === "eyes") {
           for (const eyes of ["off", "high", "low"] as const) for (const inset of ["off", "always", "wallpaper"] as const) {
             await page.evaluate(({ eyes, inset }) => {

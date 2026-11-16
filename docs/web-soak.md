@@ -34,12 +34,14 @@ The default full run uses 200 circuits, 30 minutes per interaction phase, and
 | `--quick` | Four circuits and strict resource assertions. Keep the places phase when selecting phases. |
 
 Interaction runs in a fifth context alongside wallpaper. Each wallpaper page
-is pinned to its place and by default follows the real clock and forecast. The interaction
-page waits for `data-moving` to clear between places; climate visits every
+is pinned to its place and by default follows the real clock and forecast.
+The interaction page waits for `data-moving` to clear between places; climate visits every
 weather and all five daylight presets plus the clock, holding each combination
-for 12 seconds, waiting for each weather to arrive, recording every combination, and taking a fresh-place checkpoint after every weather. Tools use every variant and hold continuous tools; menus visit
-title, pause, brain, about, settings and all settings pages; eyes alternate
-Off/Low/High, all eye/nervous-system inset and X-ray settings, the full eye picture, and Inside it. Input and lifecycle behavior
+for 12 seconds, waiting for each weather to arrive, recording every combination,
+and taking a fresh-place checkpoint after every weather. Tools use every variant
+and hold continuous tools; menus visit the menu, brain, about and all three
+settings tabs, repeatedly pausing and resuming. Eyes alternate Off/Low/High,
+all eye/nervous-system inset and X-ray settings, the full eye picture, and Inside it. Input and lifecycle behavior
 remain covered by the ordinary e2e test and the web-release work.
 
 The harness warms persistent tool meshes, icon textures, eye pictures, pixel
@@ -62,7 +64,7 @@ brain worker, then records page `Performance.getMetrics` heap bytes, worker
 `Memory.getDOMCounters` nodes/listeners, CDP WebAudio live nodes, localStorage
 characters, and the canvas's renderer geometries/textures/programs, calls,
 triangles, CPU frame milliseconds and brain speed (simulated/real time).
-The CSV includes screen/weather/time/view/eyes/inset/variant for context.
+The CSV includes screen/tab/brain engine/weather/time/view/eyes/inset/variant for context.
 
 The browser cannot report per-page GPU allocation bytes or the TV's resident
 memory, thermal behavior, native audio graph cost, native automation timeline,
