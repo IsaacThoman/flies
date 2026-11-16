@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as THREE from "three";
 import type { FlyAnchor, FlyPose } from "@fly/contracts";
-import { BODY_JOINTS, FOOT_CLEARANCE, J, LEG_COUNT, LEG_SEGMENTS, LEGS, WING_JOINTS, legPair } from "../src/anatomy.ts";
+import { BODY_JOINTS, FOOT_CLEARANCE, J, LEG_COUNT, LEG_SEGMENTS, LEGS, WING, WING_COPIES, WING_JOINTS, legPair } from "../src/anatomy.ts";
 import { createFly } from "../src/index.ts";
 import { Walker, pose } from "./helpers.ts";
 
@@ -190,7 +190,7 @@ test("every pose value across its range, extremes and rapid changes, stays finit
     // Hold a pose for a while, or change everything every frame.
     const p: FlyPose = {
       speed: pick(-5, 15), turn: pick(-10, 10), airborne: rand() < 0.3, wings: pick(0, 1), groom: pick(0, 1),
-      feed: pick(0, 1), crouch: pick(0, 1), pitch: pick(-2, 2), roll: pick(-2, 2),
+      feed: pick(0, 1), crouch: pick(0, 1), pitch: pick(-2, 2), roll: pick(-2, 2), sing: pick(-1, 1),
     };
     const hold = rand() < 0.5 ? 1 : 1 + Math.floor(rand() * 40);
     const dt = rand() < 0.05 ? wild[Math.floor(rand() * wild.length)] : rand() * 0.05;
@@ -261,4 +261,26 @@ test("update is quick with a JIT", () => {
   }));
   console.log(`  update: ${micros.toFixed(1)} CPU µs in Node with its JIT (best of three)`);
   assert.ok(micros < 50, `${micros.toFixed(1)} CPU µs per update; budget 50`);
+});
+
+test("singing holds one wing out to its side, the other folded", () => {
+  // Where a wing copy's tip is, from its hinge, in the model's space (+x the fly's left, +z ahead).
+  const tip = (fly: ReturnType<typeof createFly>, copy: number) => {
+    const f = fly.rig.wings, o = copy * 12, l = WING.length;
+    return { x: f[o] * l, z: f[o + 8] * l };
+  };
+  const out = (fly: ReturnType<typeof createFly>, side: 0 | 1) => (side === 0 ? 1 : -1) * tip(fly, side * WING_COPIES).x;
+  const rest = createFly();
+  run(rest, pose(), 2);
+  for (const side of [0, 1] as const) assert.ok(out(rest, side) < 0.3 * WING.length && tip(rest, side * WING_COPIES).z < 0, `folded back at rest (${side})`);
+  for (const [sing, singing] of [[1, 0], [-1, 1]] as const) {
+    const fly = createFly();
+    run(fly, pose({ sing }), 2);
+    assert.ok(out(fly, singing) > 0.85 * WING.length, `sing ${sing}: the singing wing is out (${out(fly, singing).toFixed(2)})`);
+    assert.ok(out(fly, (1 - singing) as 0 | 1) < 0.3 * WING.length, `sing ${sing}: the other stays folded`);
+  }
+  // Not in the air: there both wings beat alike.
+  const flying = createFly();
+  run(flying, pose({ sing: 1, airborne: true, wings: 1 }), 2);
+  assert.ok(Math.abs(out(flying, 0) - out(flying, 1)) < 1e-6);
 });

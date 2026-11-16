@@ -50,6 +50,47 @@ export const ESCAPE_ON = 0.4;
 export const ESCAPE_REARM = 0.3;
 /** Seconds after a take-off before another. */
 export const ESCAPE_REFRACTORY = 1.5;
+/**
+ * The tarsal reflex: flight once the feet lose the ground. A body reflex
+ * standing in for circuitry the model doesn't have, not the brain's choice.
+ *
+ * In a fly, losing contact with the ground under the feet starts the wings
+ * beating and keeps them going until the feet touch something again (Fraenkel
+ * 1932; a fly held by its back in the air flies for as long as its feet find
+ * nothing to hold). In this connectome it works the other way round: the leg
+ * mechanosensors that fire while it stands excite the flight power motor
+ * neurons, so leaving the ground takes drive away, and after an escape seen
+ * through the eyes `wings` stays at 0.3 to 0.4, below the 0.6 that holds the
+ * fly up (packages/brain/README.md). So the body keeps a floor under the
+ * wings' drive while it is off its feet:
+ *
+ * - A take-off goes straight into it: the giant fiber drives the jump muscle
+ *   (TTM) and, through the PSI, the wings' power muscles, so the first
+ *   downstroke comes with the jump (von Reyn et al. 2014). Off its feet any
+ *   other way (walking off a ledge), it starts TARSAL_ONSET after the feet
+ *   leave, a stand-in for the time the flight motor takes to come up to
+ *   power: a step down of a few millimetres is over before then.
+ * - For FLIGHT_HOLD it holds FLIGHT_WINGS, a little over what holds the fly
+ *   up, so it flies on, level or climbing a little, at about 0.28 m/s: a
+ *   fruit fly cruises at about 0.3 m/s and can reach about 1 m/s (David 1978).
+ * - Then it eases over FLIGHT_FADE to LAND_WINGS, short of holding it up, and
+ *   the fly glides down at about 0.14 m/s until its feet touch: touching
+ *   down ends the reflex, as tarsal contact does in the fly.
+ *
+ * What a real fly does with an escape flight, how long it stays up and where
+ * it chooses to land, is decided in circuits the model doesn't reproduce
+ * well enough to read (no landing command is read from it), so how long the
+ * floor holds is the stand-in's: a short escape flight of a couple of
+ * seconds, a few hundred millimetres. The brain still has the rest: whether
+ * it takes off at all (the giant fiber), its own wing drive, which raises the
+ * floor whenever it is higher (a fly kept looming at keeps flying hard), and
+ * its steering in the air (`turn`).
+ */
+export const TARSAL_ONSET = 0.05;
+export const FLIGHT_WINGS = 0.62;
+export const FLIGHT_HOLD = 0.7;
+export const FLIGHT_FADE = 0.4;
+export const LAND_WINGS = 0.54;
 /** Wings and grooming below this are the brain idling, not an action: the pose gets nothing, and what's above is stretched back over 0 to 1. */
 export const POSE_FLOOR = 0.2;
 /**
@@ -62,6 +103,17 @@ export const GROOM_LINGER = 1.5;
 /** Feeds when `feed` passes FEED_ON with food in reach, until it falls below FEED_OFF. */
 export const FEED_ON = 0.15;
 export const FEED_OFF = 0.05;
+/**
+ * Sings, on its feet, when `sing` passes SING_ON, until it falls below SING_OFF.
+ *
+ * `sing` is pIP10, the song command neuron (read at 40 Hz). Measured at rest
+ * (10 minutes, seeds 1 to 3, packages/brain/README.md) it peaks at 0.16: two
+ * spikes of the pair within its smoothing, and nothing a fly alone does
+ * drives it further. SING_ON is two and a half times that, so a lone fly
+ * never sings; P1, the courtship neurons that drive pIP10, take it to 1.
+ */
+export const SING_ON = 0.4;
+export const SING_OFF = 0.2;
 
 const posed = (value: number) => Math.max(0, (value - POSE_FLOOR) / (1 - POSE_FLOOR));
 const clamp = (value: number, min: number, max: number) => (Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : 0);
@@ -81,8 +133,10 @@ export type Intent = {
   airYawRate: number;
   /** A take-off this frame, with its strength 0 to 1; null otherwise. */
   takeOff: number | null;
-  /** The flight muscles' drive, 0 to 1, for the wings' force in the air. */
+  /** The flight muscles' drive, 0 to 1, for the wings' force in the air: the brain's, or the tarsal reflex's floor where that is higher. */
   wings: number;
+  /** The floor the tarsal reflex (TARSAL_ONSET) keeps under `wings` now: 0 on its feet. */
+  reflex: number;
   /** For the pose: how far the wings open and beat. */
   wingPose: number;
   /** For the pose: grooming, 0 to 1, shown only while it stands. */
@@ -93,6 +147,10 @@ export type Intent = {
   feed: number;
   /** The raw latest `escape`, for display. */
   escape: number;
+  /** Singing its courtship song: one wing out and vibrating. */
+  singing: boolean;
+  /** The smoothed `sing`: how hard. */
+  sing: number;
 };
 
 export const createIntent = (): Intent => ({
@@ -104,24 +162,28 @@ export const createIntent = (): Intent => ({
   airYawRate: 0,
   takeOff: null,
   wings: 0,
+  reflex: 0,
   wingPose: 0,
   groom: 0,
   feeding: false,
   feed: 0,
   escape: 0,
+  singing: false,
+  sing: 0,
 });
 
-type Channel = "walk" | "turn" | "back" | "wings" | "groom" | "feed";
-const CHANNELS: readonly Channel[] = ["walk", "turn", "back", "wings", "groom", "feed"];
+type Channel = "walk" | "turn" | "back" | "wings" | "groom" | "feed" | "sing";
+const CHANNELS: readonly Channel[] = ["walk", "turn", "back", "wings", "groom", "feed", "sing"];
 
 /** Turns the brain's latest command into what the body is asked to do. Allocates nothing per frame. */
 export class Behavior {
   readonly intent = createIntent();
-  #smoothed: Record<Channel, number> = { walk: 0, turn: 0, back: 0, wings: 0, groom: 0, feed: 0 };
+  #smoothed: Record<Channel, number> = { walk: 0, turn: 0, back: 0, wings: 0, groom: 0, feed: 0, sing: 0 };
   #fresh = false;
   #grooming = 0;
   #armed = false;
   #refractory = 0;
+  #aloft = 0;
 
   /**
    * `command` is the latest from the brain (null if none), `ageMs` how old it
@@ -131,6 +193,7 @@ export class Behavior {
     const step = Number.isFinite(dt) ? Math.max(0, dt) : 0;
     const out = this.intent;
     this.#refractory = Math.max(0, this.#refractory - step);
+    this.#aloft = onFeet ? 0 : this.#aloft + step;
     out.takeOff = null;
     if (!command || !(ageMs <= COMMAND_STALE_MS)) {
       this.#fresh = false;
@@ -149,12 +212,16 @@ export class Behavior {
     s.wings += (clamp(command.wings, 0, 1) - s.wings) * k;
     s.groom += (clamp(command.groom, 0, 1) - s.groom) * k;
     s.feed += (clamp(command.feed, 0, 1) - s.feed) * k;
+    s.sing += (clamp(command.sing, 0, 1) - s.sing) * k;
 
     out.live = true;
     out.walking = out.walking ? s.walk >= WALK_OFF : s.walk > WALK_ON;
     out.backing = out.backing ? s.back >= BACK_OFF && s.back >= s.walk : s.back > BACK_ON && s.back > s.walk + BACK_MARGIN;
     out.feeding = out.feeding ? s.feed >= FEED_OFF : s.feed > FEED_ON;
     out.feed = s.feed;
+    // Males sing standing or walking, not in the air.
+    out.singing = onFeet && (out.singing ? s.sing >= SING_OFF : s.sing > SING_ON);
+    out.sing = s.sing;
     out.speed = out.backing
       ? -WALK_SPEED * BACK_SPEED
       : out.walking
@@ -163,8 +230,12 @@ export class Behavior {
     // turn is positive toward the fly's right; yaw is positive toward its left.
     out.yawRate = -s.turn * TURN_RATE * (out.walking || out.backing ? 1 : STANDING_TURN);
     out.airYawRate = -s.turn * AIR_TURN_RATE;
-    out.wings = s.wings;
-    out.wingPose = posed(s.wings);
+    // The tarsal reflex: a floor under the wings' drive while its feet are off the ground (see TARSAL_ONSET).
+    const flying = this.#aloft - TARSAL_ONSET;
+    const held = flying <= FLIGHT_HOLD ? 1 : Math.max(0, 1 - (flying - FLIGHT_HOLD) / FLIGHT_FADE);
+    out.reflex = onFeet || flying < 0 ? 0 : LAND_WINGS + (FLIGHT_WINGS - LAND_WINGS) * held;
+    out.wings = Math.max(s.wings, out.reflex);
+    out.wingPose = posed(out.wings);
 
     const asked = posed(s.groom);
     if (asked >= this.#grooming) this.#grooming = asked;
@@ -180,6 +251,8 @@ export class Behavior {
       this.#armed = false;
       this.#refractory = ESCAPE_REFRACTORY;
       out.takeOff = clamp((escape - ESCAPE_ON) / (1 - ESCAPE_ON), 0, 1);
+      // Into flight with the jump (see TARSAL_ONSET).
+      this.#aloft = TARSAL_ONSET;
     }
     return out;
   }

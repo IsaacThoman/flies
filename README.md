@@ -73,7 +73,11 @@ code.
 Soap bubbles drift over the table on the breeze, and a few small ones bob
 low past the fly; one that touches the table or anything standing on it
 pops. A bubble that reaches the fly, or that it walks into,
-bursts on it, and it feels the film break (`touch`, below). At dusk and at
+bursts on it, and it feels the film break (`touch`, below). A bubble has no
+light of its own: its film shows the sky's light and its glints the sun's or
+the moon's, so at night it is faint, to the player and to the fly's eyes alike
+(drawn as bright as by day, each one drifting past set the fly off now and
+then with nothing thrown at it). At dusk and at
 night fireflies drift round the table and blink.
 
 The sky follows the clock unless you choose a time (the **Light** tool):
@@ -438,11 +442,11 @@ and moves round with them; on a screen too narrow for that, under them; its
 cells two to a row on a narrow screen, and its brain beside its day on a
 short one. In and out, also headed by what the fly is doing, is a bar for
 each sense going into the brain as the body sends it (a loom at either eye,
-touch, either antenna, wind, sweet, weight on its legs, and the light, the
-mean over every facet) and for each command coming out (walk, steer, back
-up, escape, wings, groom, feed), with the firing rate of the neurons each is
-read from (DNg100, the two DNa02s, MDN, DNp01, the flight motor neurons,
-DNg12, MN9) in Hz: the senses beside the commands, under them on a narrow
+touch, either antenna, wind, sweet, weight on its legs, a male's taste on
+its front legs, and the light, the mean over every facet) and for each
+command coming out (walk, steer, back up, escape, wings, groom, feed, sing),
+with the firing rate of the neurons each is read from (DNg100, the two DNa02s,
+MDN, DNp01, the flight motor neurons, DNg12, MN9, pIP10) in Hz: the senses beside the commands, under them on a narrow
 screen, or split in two on a short one. It is drawn again only when a figure
 or a bar it shows changes, at most four times a second.
 
@@ -473,10 +477,11 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
 | `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
 | `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
-| `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, another fly's body, or past the table's edge. |
+| `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, another fly's body, or past the table's edge. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
 | `grounded` | On its feet. |
+| `maleTaste` | A front leg's tarsus on another fly's body, while it stands (at a table with others; every fly there is a male): the taste of a male's cuticle, 1 while touching, easing out over 0.3 s. |
 
 ## What the body adds
 
@@ -484,7 +489,8 @@ The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
 with thresholds, smoothing and hysteresis: walk above 0.3
 until below 0.15, back up when `back` beats `walk` by 0.15, take off as
 `escape` rises past 0.4 (the giant fiber at 80 Hz: why there, in `behavior.ts`), groom and wing poses above 0.2, feed above 0.15 until
-below 0.05, commands older than 500 ms ignored). Steering is continuous: `turn`
+below 0.05, sing above 0.4 until below 0.2 and only on its feet (pIP10, the
+song command neuron: why there, in `behavior.ts`), commands older than 500 ms ignored). Steering is continuous: `turn`
 sets the yaw rate (3 rad/s at full turn walking, a third of that standing, 5
 in the air).
 
@@ -498,13 +504,22 @@ lives (`packages/body/src/motion.ts` unless noted):
   the push of its wings: lift in proportion to the `wings` command (0.6 holds
   its weight) and thrust along its heading.
 - **The take-off's direction.** The escape command launches it (380 to 620 mm/s
-  up and 160 to 340 away, by how far past 0.5 it went); the direction is the
+  up and 160 to 340 away, by how far past 0.4 it went); the direction is the
   body's: away from the ball if the ball is in the air, else straight ahead.
+- **Flying on: the tarsal reflex** (`behavior.ts`, see Flight). Off its feet,
+  the body keeps a floor under the wings' drive until it lands.
+- **Facing its course.** In the air it turns to face the way it is going (at
+  up to 8/s of the angle between), and the brain's `turn` steers on top:
+  thrust is along its body, so a jump away from the ball would otherwise
+  have its wings carry it straight back.
 - **Staying in the world.** It doesn't walk off the table's edge, and in the
   air it is drawn back inside 360 mm of the middle and below 320 mm.
 - **Turning from a wall.** Pressed against a wall it faces for 2 s, it turns
-  away (about 125°). The brain feels the wall on its antennae, but nothing in
-  the model turns it.
+  away (about 125°). The brain feels the wall on its antennae and grooms
+  them (Johnston's organ's displacement-sensitive neurons drive the
+  head-grooming neurons), but nothing in the model turns it or backs it
+  away, as a real fly's touched antenna does through MDN (see
+  `packages/brain/README.md`).
 - **Landing.** Coming down on something it can stand on puts it on its feet.
 - **Lining its mouth up with food.** Once the brain wants to feed and its feet
   or mouth are on something sweet, the body shuffles the last millimetre to put
@@ -515,6 +530,14 @@ lives (`packages/body/src/motion.ts` unless noted):
   another fly's body it is pushed back out, so it stops against it or slides
   past, and flying into one it bounces off. Each device moves only its own
   fly, out of where it sees the others.
+- **The song's wing.** Singing, it holds out the wing on the side
+  of the nearest other fly (else the one it last sang with; a male extends the
+  wing nearer the one he courts), vibrating too fast to see as strokes. The
+  song is shown, not heard. In
+  practice it never does: nothing it meets reaches the courtship neurons (P1)
+  that make pIP10 sing, a male's taste and the sight of one included
+  (`packages/brain/README.md`, Courtship). Another player's fly is not shown
+  singing (the table doesn't carry it).
 - **The pose.** Grooming is shown only while it stands, and a bout lingers
   about 1.5 s after the command fades. The crouch follows the
   raw escape command.
@@ -525,21 +548,58 @@ commands and the neurons themselves.
 
 ## Flight
 
-Flight is simple physics driven by the brain's flight motor neurons. With this
-connectome the wings beat hard only while something looms (the escape) and a
-little in wind, and losing ground contact doesn't start flight (see
-`packages/brain/README.md`). So in practice a take-off is a short powered jump that comes down wherever it
-comes down, steered by `turn`, sometimes onto the sugar or the fruit.
+A swoop that fires the giant fiber makes the fly jump and fly: up for a second
+and a half to two and a half, a few hundred millimetres away from the ball,
+then a glide down onto whatever is under it. Flight is simple physics (lift in
+proportion to the wings' drive, 0.6 holding its weight, and thrust along its
+body), driven by the brain's flight motor neurons and, while its feet are off
+the ground, by a body reflex standing in for circuitry the model lacks.
 
-How much flight there is depends on how hard the loom drives the looming
-detectors. The hand-wired loom (eyes off) drives every one of them at once and
-the flight motor neurons reach `wings` 0.8 to 0.9, but mostly after the jump
-is over: of 8 throws at midday, one flew, rising 158 mm, and the rest were in
-the air for 0.08 to 0.17 s. Seen through the eyes, a loom fires the
-giant fiber but brings the flight motor neurons only to 0.3 to 0.4, below the
-0.6 that holds the fly up, so the escape is a jump of a few millimetres, over
-in a tenth of a second. That is the connectome as modelled; the body adds no
-flight of its own.
+**What the brain does.** It decides whether to go: the body takes off only when
+the giant fiber (DNp01) fires, and nothing else starts a take-off. It steers in
+the air (`turn`, 5 rad/s at full). Its own wing drive counts whenever it is
+higher than the reflex's: the hand-wired loom (eyes off) drives the flight motor
+neurons to `wings` 0.8 to 0.9, and the fly then climbs and flies longer.
+
+**What the body adds: the tarsal reflex** (`packages/body/src/behavior.ts`,
+`TARSAL_ONSET`). In a fly, losing contact with the ground under its feet starts
+the wings beating and keeps them going until its feet touch something again
+(Fraenkel 1932): a fly held in the air flies for as long as its feet find
+nothing. This connectome does the opposite. The legs' load sensors that fire
+while it stands excite the flight motor neurons, so leaving the ground takes
+drive away, and after an escape seen through the eyes `wings` is 0.3 to 0.4,
+short of the 0.6 that holds it up: on its own a take-off was a hop of a few
+millimetres, over in a tenth of a second (`packages/brain/README.md`). So while
+its feet are off the ground the body keeps a floor under the wings' drive:
+
+- a take-off goes straight into it (the giant fiber drives the jump muscle and,
+  through the PSI, the wings' power muscles, so the first downstroke comes
+  with the jump); off its feet any other way, walking off a ledge, it starts
+  0.05 s later, so a step down of a few millimetres is over first;
+- for 0.7 s it holds 0.62, a little over its weight, so it flies on at about
+  0.28 m/s (a fruit fly cruises at about 0.3 m/s);
+- then over 0.4 s it eases to 0.54, short of its weight, and the fly glides
+  down at about 0.14 m/s until its feet touch, which ends the reflex, as tarsal
+  contact does in the fly.
+
+How long that is, and so where it comes down, is the stand-in's: what a real fly
+does with an escape flight and where it chooses to land is decided in circuits
+the model doesn't reproduce well enough to read, and no landing command is read
+from it. Without a brain (its commands stale) there is no reflex either.
+
+Measured in Node on the real connectome, eyes open
+(`apps/web/tests/swoop-escape.test.ts`, seeds 1 to 4): every take-off is a
+flight of 1.5 to 2.4 s, 290 to 560 mm along its way, rising 30 to 70 mm, and
+lands on its feet; with the eyes shut (the hand-wired loom), 2.2 to 2.8 s and
+590 to 690 mm. Before the reflex they were in the air for 0.07 to 0.12 s. The
+fly often crosses the edge of the picnic table and is drawn back over it to land
+(Staying in the world). The camera keeps a flying fly in the picture: pulled
+back while it is in the air, and led ahead of it by up to 120 mm once it has
+been up for a quarter of a second (a hop is over by then), as it is led a
+little ahead of a walking fly. The caption says "Flying" and the
+stats count the time; the X-ray and the stats' In and out show the brain's own
+flight motor neurons, which the reflex doesn't touch, so they stay as dim as
+the brain leaves them.
 
 ## The eyes
 
@@ -550,7 +610,19 @@ of a low-detail layer of the scene (sky, table, fruit and jars, ball, bubbles,
 food, feather; never the menus or the pointer), read back once, and resampled
 to each facet (bilinear, by the facet's direction in the head frame).
 Brightness is weighted as a fly's outer photoreceptors (Rh1, mostly blue-green)
-see it, 0.1 R + 0.45 G + 0.45 B, so a blue sky is bright to it. While the ball
+see it, 0.1 R + 0.45 G + 0.45 B, so a blue sky is bright to it. The picture is
+then adapted to the light, as a fly's photoreceptors adapt their gain to it
+(`Adaptation` in `vision.ts`): where the scene renders dim, it is scaled up
+toward the level midday has (a mean of 0.5), by up to 2 times, following the
+picture's mean over 4 s. The screen's dusk is 0.15 and its night 0.07 to 0.09
+against midday's 0.6, but real dusk is far above the light at which a fly's
+photoreceptors stop coding contrast, and the brain's input stage measures
+contrast against the ambient level plus a floor of 0.05 for black, which at the
+screen's dusk cut a dark ball's contrast from 0.89 to 0.70, and at night to
+0.63; adapted, they are 0.86 and 0.76. Midday is left as it is (the gain never
+goes below 1). What is left of a fly's poorer sight in dim light is the cap: at
+4, night came up to midday's level and a quiet night set the fly off more often
+with nothing thrown at it. While the ball
 is in the air the eyes refresh every frame: the looming detectors answer how
 fast dark area grows, and at 20 Hz a throw set off the escape about one time in
 six against one in two at 60 Hz.
@@ -561,12 +633,19 @@ over anything standing in its way, and round what it can't come in over, such
 as a window), where the connectome's looming pathway is strongest and where the
 fly is seen against the bright table, stops just short, hangs a moment and
 veers away on a side that is clear. It casts a shadow. With
-all that, measured with the eyes on (`apps/web/tests/swoop-escape.test.ts`
-checks the chain in Node): the fly takes off from almost every throw at
-midday (10 of 10), less often as the light goes (2 of 10 at dusk, 4 of 10 at
-night), when the ball is dark on a dark table. Escape peaks at 0.42 to 0.73 at
-midday and 0.13 to 0.48 at dusk. That is the model's answer, not a dice roll
-in the game.
+all that, measured in the game in a browser with the eyes on, two runs of 8
+throws at each time of day: the fly takes off from 11 of 16 at midday, 12 at
+golden hour, 11 at dusk and 9 at night; before the light adaptation, one run,
+5 of 8, 5, 4 and 0. It varies from run to run as much as from one time of day
+to the next (golden hour gave 8 of 8 in one run and 4 in the other): whether
+it goes is the brain's answer to what it sees, not a dice roll in the game.
+At night the ball is dark against a dark table and a dark sky, and the looming
+detectors reach about two thirds of their midday rate. With nothing thrown at
+it (4-minute runs of ordinary life on the picnic table), it never took off at
+midday (8 minutes, escape at most 0.35) or at dusk (12 minutes, at most 0.37),
+and at night 0.3 times a minute (16 minutes). Before, the night gave 0.5 to 0.7
+a minute, mostly from soap bubbles drawn as bright as by day drifting past it.
+`apps/web/tests/swoop-escape.test.ts` checks the chain in Node.
 
 **View → Fly's eyes** shows the same picture to the player: one dot per facet
 (the brain's 1,772, or, for a brain without eyes, a stand-in layout labelled as
@@ -692,7 +771,7 @@ wings and thorax's and abdomen's sensory neurons never fire in this model (the
 light enters one synapse in, at the lamina; there is no sense of smell; of
 the body's senses only touch and the legs' load are driven): they are drawn,
 and stay dark. The mushroom body, lateral horn, superior protocerebrum,
-antennal lobe and central complex fire under 1.1 Hz on a 5 Hz scale and stay
+antennal lobe and central complex fire under 2 Hz on a 5 Hz scale and stay
 nearly dark. A region glows with the mean of all its neurons, so a command
 carried by a few hardly shows: the giant fibre's escape is one neuron among
 660 descending ones, and what shows of an escape is the optic lobes, the

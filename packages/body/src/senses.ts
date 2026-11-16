@@ -61,6 +61,14 @@ export const MOUTH_REACH = 0.3;
 export const PROBOSCIS_REACH = 0.4;
 /** Where its feet are: around its middle, within this radius (mm). */
 export const FOOT_SPREAD = 0.9;
+/**
+ * Where the front legs' tarsi rest, in body lengths ahead of its middle and to
+ * each side (packages/fly's anatomy: LEGS' front foot), and how close (mm) to
+ * another fly's body one has to come to touch it.
+ */
+export const FORELEG_AHEAD = 0.66;
+export const FORELEG_SIDE = 0.27;
+export const FORELEG_REACH = 0.1;
 
 const clamp01 = (value: number) => (Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0);
 
@@ -77,7 +85,7 @@ type EyeState = { value: number; hold: number };
 export type Tasting = { food: Food | null; byMouth: boolean };
 
 export class SenseTracker {
-  readonly senses: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true };
+  readonly senses: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0 };
   readonly tasting: Tasting = { food: null, byMouth: false };
   /** How large each looming thing was in the eye last frame (rad), by id. */
   #sizes = new Map<number, number>();
@@ -86,6 +94,7 @@ export class SenseTracker {
   #bumpLeft = 0;
   #bumpRight = 0;
   #wind = 0;
+  #maleTaste = 0;
   #head: Vec3 = { x: 0, y: 0, z: 0 };
   #probe: Vec3 = { x: 0, y: 0, z: 0 };
 
@@ -142,6 +151,11 @@ export class SenseTracker {
     this.#wind += (clamp01(airspeed / WIND_FULL_SPEED) - this.#wind) * ease(WIND_SMOOTHING, dt);
     if (this.#wind < 0.005) this.#wind = 0;
 
+    // A male's taste: another fly's body under a front leg's tarsus, where a
+    // male's pheromone-sensing taste bristles are. Every other fly is a male.
+    const foreleg = body.onFeet && (this.#foreleg(body, 1, input.bodies) || this.#foreleg(body, -1, input.bodies));
+    this.#maleTaste = release(this.#maleTaste, foreleg ? 1 : 0, RELEASE, dt);
+
     // Taste: with the feet and the mouthparts, while it stands.
     const tasting = this.tasting;
     tasting.food = null;
@@ -168,7 +182,14 @@ export class SenseTracker {
     out.wind = clamp01(this.#wind);
     out.sweet = clamp01(sweet);
     out.grounded = body.onFeet;
+    out.maleTaste = clamp01(this.#maleTaste);
     return out;
+  }
+
+  #foreleg(body: FlyBody, side: 1 | -1, bodies: Bodies | undefined) {
+    if (!bodies) return false;
+    const tarsus = body.point(FORELEG_AHEAD, 0, side * FORELEG_SIDE, this.#probe);
+    return bodies.inside(tarsus.x, tarsus.y, tarsus.z, FORELEG_REACH);
   }
 
   /** On its feet, a wall it would walk into (something between a step and its height over its feet); in the air, the tip inside something. */

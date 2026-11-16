@@ -90,7 +90,7 @@ export type Tick = { dt: number; senses: BrainSenses; what: string };
 /** Columns for the eyes in place of eye-columns.ts's (runtime.ts's eyeColumns option). */
 export type Columns = { readonly right: readonly EyeColumn[]; readonly left: readonly EyeColumn[] };
 
-const SCALAR = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet"] as const;
+const SCALAR = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet", "maleTaste"] as const;
 type Scalar = (typeof SCALAR)[number];
 
 /**
@@ -133,7 +133,7 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     hold(2000, frame, () => ({ touch: 0.4, wind: 0.5, grounded: false }), "held and dragged");
     hold(1500, 16, () => ({ sweet: 1, touch: 0.4 }), "sweet while touched");
     hold(1000, 16, () => ({ loomLeft: 1, loomRight: 1 }), "looming on both sides");
-    hold(2000, 16, () => ({ loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1 }), "everything at once");
+    hold(2000, 16, () => ({ loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, maleTaste: 1 }), "everything at once");
     hold(4000, 16, (t) => ({ loomRight: t % 1000 < 100 ? 1 : 0 }), "a looming pulse every second");
     hold(3000, () => Math.floor(random() * 50 * 4) / 4, () => Object.fromEntries(SCALAR.map((s) => [s, random() < 0.3 ? random() : 0])), "random ticks and senses");
     for (const dt of [0.4, 0.6, 0.25, 0, 0, 0.75, 1, 1.5, 2.5]) add(dt, { touch: 0.3 }, "short ticks");
@@ -332,7 +332,7 @@ export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick
   for (const { dt, senses } of ticks) {
     try {
       const { command, stats } = brain.tick(dt, senses);
-      const c = [command.walk, command.turn, command.back, command.escape, command.wings, command.groom, command.feed];
+      const c = [command.walk, command.turn, command.back, command.escape, command.wings, command.groom, command.feed, command.sing];
       const rates = names.map((name) => stats.rates[name]);
       lines.push(
         [

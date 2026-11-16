@@ -141,6 +141,34 @@ test("a jump stays mostly in the picture, the fly is framed again soon after it 
   assert.ok(inPicture / frames > 0.6, `in the picture ${inPicture} of ${frames} frames in the air`);
 });
 
+test("a flight of a couple of seconds stays near the middle of the picture, and the fly stays big enough to see", () => {
+  const director = new CameraDirector(world, 16 / 9, picnic.camera);
+  const body = fakeBody(-100, -60, 0.6);
+  settle(director, body, 3);
+  body.mode = "airborne";
+  // The tarsal reflex's flight: about 0.28 m/s along its heading, a little up.
+  body.velocity.x = Math.sin(body.yaw) * 270;
+  body.velocity.z = Math.cos(body.yaw) * 270;
+  body.velocity.y = 20;
+  let worst = 0;
+  let smallest = Infinity;
+  for (let i = 0; i < 60 * 2; i++) {
+    const dt = 1 / 60;
+    body.position.x += body.velocity.x * dt;
+    body.position.y += body.velocity.y * dt;
+    body.position.z += body.velocity.z * dt;
+    director.update(body, dt);
+    // Once it has been up long enough to be a flight, not a hop.
+    if (i < 45) continue;
+    const at = project(director.camera, { x: body.position.x, y: body.position.y + 0.75, z: body.position.z });
+    worst = Math.max(worst, Math.abs(at.x), Math.abs(at.y));
+    smallest = Math.min(smallest, lengthOnScreen(director.camera, body));
+  }
+  assert.ok(worst < 0.5, `as far as ${worst.toFixed(2)} from the middle`);
+  // Trailing behind it on springs alone, the camera lets it shrink to a speck of 2 px.
+  assert.ok(smallest > 8, `${smallest.toFixed(0)} px long`);
+});
+
 test("the following wallpaper keeps the fly the same size for minutes on end", () => {
   const director = new CameraDirector(world, 16 / 9, picnic.camera);
   director.startWallpaper();

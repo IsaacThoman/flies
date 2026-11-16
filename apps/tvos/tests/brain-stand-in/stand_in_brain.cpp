@@ -6,7 +6,7 @@
 //     file's header, so a test can tell the bundled file arrived whole;
 //   - each eye has kFacets facets; turn is mean(right light) - mean(left light), so a test can
 //     tell the light arrays arrived, and on the right sides;
-//   - walk is always 0.8; feed follows `sweet`; escape is 1 while grounded is 0;
+//   - walk is always 0.8; feed follows `sweet`; sing follows `male_taste`; escape is 1 while grounded is 0;
 //   - the stats count ticks (spikes) and the simulated time of each (sim_ms); the rates are the
 //     ticks so far and the total simulated time, then numbered ones (each its own index) up to as
 //     many as the real brain reports with its eyes and regions, so a test can tell they all arrive.
@@ -24,8 +24,8 @@
 namespace {
 constexpr uint32_t kFacets = 8;
 constexpr int kTickMs = 20;
-// The real brain's: 8 command readouts, 63 regions, 12 vision stages.
-constexpr uint32_t kRates = 83;
+// The real brain's: 9 command readouts, 63 regions, 12 vision stages.
+constexpr uint32_t kRates = 84;
 
 const std::vector<std::string> &RateNames() {
   static const std::vector<std::string> names = [] {
@@ -101,7 +101,7 @@ int fly_brain_tick(fly_brain *brain, double dt_ms, const fly_senses *senses, fly
   }
   brain->ticks++;
   brain->simulated += dt_ms;
-  *command = { 0.8f, (float)turn, 0, senses->grounded ? 0.f : 1.f, 0, 0, senses->sweet };
+  *command = { 0.8f, (float)turn, 0, senses->grounded ? 0.f : 1.f, 0, 0, senses->sweet, senses->male_taste };
   stats->sim_ms = dt_ms;
   stats->wall_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
   stats->spikes = (uint32_t)brain->ticks;

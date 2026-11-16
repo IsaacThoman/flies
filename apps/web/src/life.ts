@@ -10,7 +10,7 @@ import { Pantry } from "@fly/world";
 import type { Food, Place, Vec3, World } from "@fly/world";
 
 /** What the fly is doing, in a word, for the screen and for tests. */
-export type Activity = "resting" | "walking" | "backing" | "turning" | "grooming" | "feeding" | "tasting" | "flying" | "falling" | "waiting";
+export type Activity = "resting" | "walking" | "backing" | "turning" | "grooming" | "feeding" | "tasting" | "singing" | "flying" | "falling" | "waiting";
 
 export type Stimuli = {
   looming: Looming[];
@@ -35,6 +35,8 @@ export class Life {
   readonly stimuli: Stimuli = { looming: [], stroke: 0, air: { x: 0, y: 0, z: 0 }, threat: null };
   /** The eyes' picture for this frame, when the brain has eyes and they're open. Set by the eyes before `step`. */
   light: { left: Float32Array; right: Float32Array } | null = null;
+  /** The wing it sings with: 1 its left, -1 its right, toward the nearest other fly where there is one. */
+  songSide: 1 | -1 = 1;
   /** What it last ate, and how much in total (for the screen and tests). */
   eaten = 0;
   meals = 0;
@@ -51,7 +53,7 @@ export class Life {
   #forces: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
   #wasEating = false;
   #proboscis = 0;
-  readonly #sent: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true };
+  readonly #sent: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0 };
 
   constructor(world: World, brain: BrainDriver) {
     this.world = world;
@@ -118,6 +120,7 @@ export class Life {
     sent.wind = felt.wind;
     sent.sweet = felt.sweet;
     sent.grounded = felt.grounded;
+    sent.maleTaste = felt.maleTaste;
     if (this.light) sent.light = this.light;
     else delete sent.light;
     brain.tick(dt * 1000, sent);
@@ -133,6 +136,8 @@ export class Life {
     body.step(intent, forces, dt);
     this.crowd.resolve(body, dt);
     if (body.events.jumped) this.takeOffs++;
+    // A courting male extends the wing nearer the one he courts.
+    if (intent.singing) this.songSide = this.crowd.sideOf(body) || this.songSide;
     // On its feet before and after: a take-off's leap and a landing aren't walking.
     if (wasOnFeet && body.onFeet) this.walked += Math.hypot(body.position.x - x, body.position.y - y, body.position.z - z);
 
@@ -157,6 +162,7 @@ export class Life {
     if (body.mode === "airborne") return intent.wings > 0.15 ? "flying" : "falling";
     if (this.eating) return "feeding";
     if (intent.backing) return "backing";
+    if (intent.singing) return "singing";
     if (intent.walking) return "walking";
     if (intent.groom > 0.05) return "grooming";
     if (sweet > 0) return "tasting";

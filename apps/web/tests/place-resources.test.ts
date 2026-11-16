@@ -11,7 +11,7 @@ import { SHADE } from "../src/scene/shade.ts";
 const gradient = { addColorStop() {} };
 const context = new Proxy({}, { get: () => () => gradient });
 (globalThis as { document?: unknown }).document = { createElement: () => ({ getContext: () => context }) };
-(globalThis as { Path2D?: unknown }).Path2D = class { addPath() {} };
+(globalThis as { Path2D?: unknown }).Path2D = class { addPath() {} moveTo() {} bezierCurveTo() {} quadraticCurveTo() {} closePath() {} };
 
 test("the picnic reuses its injected shadow map across place rebuilds", () => {
   const first = new Goings(() => {});

@@ -141,6 +141,9 @@ const BY_THE_FLY = 2 * FLY_LENGTH;
 const MIDDLE = 0.3 * FLY_LENGTH;
 /** The furthest (mm) the camera aims ahead of a moving fly. */
 const MAX_LEAD = 12;
+/** How far ahead of a flying fly (mm) the camera's middle may be led, coming in between these times (s) in the air. */
+const FLIGHT_LEAD = 120;
+const FLIGHT_LEAD_AFTER = [0.25, 0.6] as const;
 /** How often (s) the camera reconsiders where to stand, and how long a better place must stay better before it moves there. */
 const SCOUT_EVERY = 0.35;
 const PATIENCE = 1.2;
@@ -242,6 +245,8 @@ export class CameraDirector {
   #zooming = 0;
   #tableTurn = 0;
   #tableDrift = 0;
+  /** Seconds the fly has been in the air, 0 on its feet. */
+  #aloft = 0;
   /** Handed back: take the best place at once, and ease the tilt back quickly. */
   #rechoose = false;
   #tiltSettle = TILT_SETTLE;
@@ -433,9 +438,14 @@ export class CameraDirector {
 
     const s = this.#v;
     const c = this.#center;
-    // Walking, it keeps pace a little ahead, as the spring would otherwise trail by the fly's speed times its settling time.
+    // It keeps pace a little ahead, as the spring would otherwise trail by the fly's speed times its settling time: walking,
+    // by no more than half MAX_LEAD; flying on (not a hop, over in a quarter of a second), by up to FLIGHT_LEAD, or a
+    // flight of a second or two at a quarter of a metre a second would leave the fly a speck far from the picture's middle.
+    this.#aloft = airborne ? this.#aloft + dt : 0;
     const pace = Math.hypot(v.x, v.z);
-    const ahead = !airborne && pace > 0 ? Math.min(follow, (MAX_LEAD * 0.5) / pace) * (1 - table) : 0;
+    const flying = Math.min(1, Math.max(0, (this.#aloft - FLIGHT_LEAD_AFTER[0]) / (FLIGHT_LEAD_AFTER[1] - FLIGHT_LEAD_AFTER[0])));
+    const most = airborne ? FLIGHT_LEAD * flying : MAX_LEAD * 0.5;
+    const ahead = pace > 0 ? Math.min(follow, most / pace) * (1 - table) : 0;
     c.x = damp(c.x, tx + v.x * ahead, s, 0, follow, dt);
     c.y = damp(c.y, ty, s, 1, follow, dt);
     c.z = damp(c.z, tz + v.z * ahead, s, 2, follow, dt);

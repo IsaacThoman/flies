@@ -21,9 +21,14 @@ export type FlyPose = {
   /** In the air: nose-up pitch and roll toward its right, in radians. */
   pitch: number;
   roll: number;
+  /**
+   * -1 to 1: singing its courtship song, one wing held out to the side and
+   * vibrating; its left wing when positive, its right when negative.
+   */
+  sing: number;
 };
 
-export const RESTING_POSE: FlyPose = { speed: 0, turn: 0, airborne: false, wings: 0, groom: 0, feed: 0, crouch: 0, pitch: 0, roll: 0 };
+export const RESTING_POSE: FlyPose = { speed: 0, turn: 0, airborne: false, wings: 0, groom: 0, feed: 0, crouch: 0, pitch: 0, roll: 0, sing: 0 };
 
 /** Points on the fly the game needs: for food, cameras, effects and the eyes' view. */
 export type FlyAnchor = "mouth" | "head" | "leftEye" | "rightEye" | "back";

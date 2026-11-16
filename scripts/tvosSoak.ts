@@ -5,16 +5,18 @@ import { PLACES } from "../apps/web/src/places/catalog.ts";
 import { TIMES } from "../apps/web/src/scene/light.ts";
 import { WEATHERS } from "@fly/world";
 
-type Step = ["wait", Record<string, string>] | ["press", string] | ["sleep", number] | ["log", string];
+type Step = ["wait", Record<string, string>, number?] | ["press", string] | ["sleep", number] | ["log", string];
 
 export function soakConfig(minutes = 30) {
   if (!Number.isFinite(minutes) || minutes < 2) throw Error("--minutes must be at least 2");
   const drive: Step[] = [];
-  const wait = (state: Record<string, string>) => drive.push(["wait", state]);
+  const wait = (state: Record<string, string>, timeout?: number) => drive.push(timeout ? ["wait", state, timeout] : ["wait", state]);
   const press = (key: string, times = 1) => { for (let i = 0; i < times; i++) drive.push(["press", key]); };
   const phase = (name: string, ms: number) => { drive.push(["log", name], ["sleep", ms]); };
   const throws = () => { for (let i = 0; i < 8; i++) { press("Enter"); drive.push(["sleep", 2500]); } };
 
+  // The splash lifts at ready: the log line's [js ms] is the time from launch.
+  wait({ ready: "true" });
   wait({ screen: "title", brain: "running" });
   phase("title", 15000);
   press("Enter");
@@ -79,23 +81,27 @@ export function soakConfig(minutes = 30) {
     choose("place", index);
     press("Enter");
     wait({ place: place.id, moving: "" });
-    // Pin the place: a long wallpaper phase must not trigger the normal 20-minute rotation.
-    press("MediaPlayPause");
-    wait({ screen: "title", focus: "play" });
-    press("ArrowUp", 4);
-    press("ArrowDown", 4);
-    press("Enter");
-    wait({ screen: "settings" });
-    press("ArrowUp", 8);
-    wait({ focus: "page" });
-    press("ArrowLeft", 3);
-    wait({ tab: "wallpaper" });
-    press("ArrowDown", 3);
-    wait({ focus: "place" });
-    press("ArrowLeft", PLACES.length);
-    press("ArrowRight", index + 1);
-    press("MediaPlayPause");
-    wait({ screen: "play" });
+    // Pin the place once, at the first: a long wallpaper phase must not trigger the normal 20-minute rotation.
+    // Each step of Settings' choice carries the fly there at once, so only step from Each in turn to here;
+    // once pinned, the Place tool moves the pin with the fly.
+    if (index === 0) {
+      press("MediaPlayPause");
+      wait({ screen: "title", focus: "play" });
+      press("ArrowUp", 4);
+      press("ArrowDown", 4);
+      press("Enter");
+      wait({ screen: "settings" });
+      press("ArrowUp", 8);
+      wait({ focus: "page" });
+      press("ArrowLeft", 3);
+      wait({ tab: "wallpaper" });
+      press("ArrowDown", 3);
+      wait({ focus: "place" });
+      press("ArrowLeft", PLACES.length);
+      press("ArrowRight");
+      press("MediaPlayPause");
+      wait({ screen: "play", place: place.id });
+    }
     for (const [weatherIndex, weather] of WEATHERS.entries()) {
       choose("weather", weatherIndex + 1);
       wait({ variant: weather });
@@ -110,7 +116,8 @@ export function soakConfig(minutes = 30) {
     for (const [variant, time] of [[2, "noon"], [5, "night"]] as const) {
       choose("light", variant);
       wait({ time });
-      wait({ wallpaper: "true" });
+      // The wallpaper comes after a minute without a press (the default), as long as a wait's default timeout: leave room.
+      wait({ wallpaper: "true" }, 150000);
       phase(`${place.id} ${time} wallpaper`, minutes * 60000 / (PLACES.length * 2));
       press("Enter");
       wait({ wallpaper: "false" });

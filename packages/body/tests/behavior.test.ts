@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { BrainCommand } from "@fly/brain";
-import { BACK_SPEED, Behavior, COMMAND_STALE_MS, ESCAPE_ON, ESCAPE_REFRACTORY, STANDING_TURN, TURN_RATE, WALK_SPEED } from "../src/index.ts";
+import { BACK_SPEED, Behavior, COMMAND_STALE_MS, ESCAPE_ON, ESCAPE_REFRACTORY, SING_OFF, SING_ON, STANDING_TURN, TURN_RATE, WALK_SPEED } from "../src/index.ts";
 
-const command = (c: Partial<BrainCommand> = {}): BrainCommand => ({ walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, ...c });
+const command = (c: Partial<BrainCommand> = {}): BrainCommand => ({ walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, ...c });
 const DT = 1 / 60;
 
 /** Holds a command for `seconds`. */
@@ -86,4 +86,13 @@ test("feeding switches on above 0.15 and off below 0.05", () => {
   assert.equal(hold(b, command({ feed: 0.3 }), 1).feeding, true);
   assert.equal(hold(b, command({ feed: 0.08 }), 1).feeding, true);
   assert.equal(hold(b, command({ feed: 0.02 }), 1).feeding, false);
+});
+
+test("singing switches on past SING_ON and off below SING_OFF, only on its feet", () => {
+  const b = new Behavior();
+  assert.equal(hold(b, command({ sing: SING_ON - 0.05 }), 1).singing, false);
+  assert.equal(hold(b, command({ sing: SING_ON + 0.05 }), 1).singing, true);
+  assert.equal(hold(b, command({ sing: SING_OFF + 0.05 }), 1).singing, true, "hysteresis keeps it singing");
+  assert.equal(hold(b, command({ sing: SING_OFF - 0.05 }), 1).singing, false);
+  assert.equal(hold(new Behavior(), command({ sing: 1 }), 1, false).singing, false, "not in the air");
 });

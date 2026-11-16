@@ -119,12 +119,17 @@ JavaScript down by about 1.5x (aerodance's measurement): don't trust frame timin
 way.
 
 Use `--detached` with `logFile` for device measurements. `tvos:soak` installs and launches the
-last physical-device build without attaching, exercises feeding, ball throws, the eye picture
-at Low and High, and pause/settings, then watches the screensaver at midday and at night for
-`--minutes` in total (plus about three minutes of interaction and idle transitions). It assumes
-the default tool variants and Low eyes, and restores Low before the screensaver phases. It leaves
-the app running. Do not attach a console or enable `profile`, `gpuTiming` or `glDebug` for the
-final measurement. Pull its log while it runs or after `drive: soak complete`:
+last physical-device build without attaching. It logs when the splash lifts (`drive:
+{"ready":"true"}`; the line's `[js ms]` is the time since the host started), exercises feeding,
+ball throws, the eye picture at Low and High, and pause/settings, then carries the fly to each
+place in turn. It pins the first through Settings, so the screensaver doesn't move it on (each
+step of that choice carries the fly at once, so it is set only once; the Place tool moves the
+pin after that), shows each place in every weather and light for 5 seconds, and watches its
+screensaver at midday and at night, `--minutes` in total split among them. Each screensaver phase
+starts after a minute without a press. A 30-minute soak takes about 55 minutes. It assumes the
+default tool variants and Low eyes, and restores Low before the screensaver phases. It leaves the
+app running, pinned to the last place. Do not attach a console or enable `profile`,
+`gpuTiming` or `glDebug` for the final measurement. Pull its log while it runs or after `drive: soak complete`:
 
 ```sh
 xcrun devicectl device copy from --device <udid> \
@@ -431,6 +436,61 @@ the asynchronous wait. A readback's final data copy can still wait for queued re
 commands; this is not a fully asynchronous native transfer.
 
 ## Checking it
+
+### Measured on peev
+
+Measured 16 November 2026 on peev, Apple TV 4K (3rd generation, A15), tvOS 27.2.1: signed
+Release of `dev` at `8e50250` (sound removed), 640×480, mode 2, real 166,700-neuron connectome,
+Low eyes except for the High phase, no WeatherKit. `tvos:soak --minutes 30` ran detached, with
+10-second stats written to the app's cache. It finished (`soak complete`) in 54 minutes 23
+seconds, with no drive timeouts or runtime errors. A TV whose display is asleep launches the
+app but draws nothing (`frames: 0`, a 300×150 framebuffer): wake it first.
+
+The splash lifted 1.65 seconds after the host started (1.54 in an earlier run): `game.js`
+evaluated in 1.36 s, and the connectome loaded in 0.12 s. Feeding, sixteen ball throws, the
+daylight change, the eye picture at Low and High, and the menu and Settings ran at 59.3–60 FPS.
+Mean JavaScript was 3.8 ms a frame, the highest window's p95 7.35 ms and the longest frame
+31.6 ms. Memory was 169–173 MB. The one longer frame after the splash was 265 ms, in the first
+10 seconds.
+
+Steady screensaver by place. The windows at the start and end of each 3-minute phase are left out.
+"Built" is the place's `data-place-ms`, the JavaScript that builds it behind the veil, and
+"Select to arrival" runs from the Place tool's press until the veil has lifted.
+
+| Place | Built | Select to arrival | FPS, midday / night | Mean JavaScript per frame | Highest window's JavaScript p95 | Mean GL replay per frame | Draws per frame | Memory |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Picnic | 568 ms (at launch) | n/a | 59.9–60 / 59.9–60 | 3.53 / 3.64 ms | 8.85 ms | 13.8 ms | 37–45 | 175 MB |
+| Windowsill | 998 ms | 4.2 s | 59.9–60 / 59.9–60 | 3.27 / 3.31 ms | 6.69 ms | 14.1 ms | 26–27 | 162 MB |
+| Lab | 1,072 ms | 4.2 s | 59.9–60 / 59.9–60 | 3.75 / 3.53 ms | 8.08 ms | 13.7 ms | 27–29 | 206 MB |
+| Bar | 1,082 ms | 4.7 s | 40–57.9 / 40.7–56.5 (about 50) | 3.47 / 3.79 ms | 10.29 ms | 17.0 ms | 27–31 | 172 MB |
+| Restaurant | 1,736 ms in steps (longest 350 ms) | 11.1 s | 39.9–40.1 / 39.9–40.1 | 3.83 / 3.00 ms | 9.92 ms | 22.0 ms | 23–24 | 225 MB |
+
+- **The restaurant runs at 40 FPS, and the bar at 40–58 depending on the shot. Neither is
+  JavaScript's cost.** JavaScript stays under 4 ms and the draw count is lower than at the
+  picnic. It is the render thread's GL replay (`execMs`), 22 ms a frame with a 35 ms p95 in
+  the restaurant, 17 ms in the bar, and about 14 ms in the other three. That is GPU or driver
+  time, not the number of objects: per-pixel cost (materials, lights, transparent layers
+  covering the screen) or what three.js asks of the driver each frame. `gpuTiming` and
+  `profile` runs in those two places are the next step. Frame-start p95 is 36–37 ms there,
+  against 19–20 ms elsewhere.
+- **The restaurant takes 11 seconds behind the veil, against about 4 for the others.** Its
+  JavaScript is 1.7 s in steps of at most 350 ms (the first 701 ms). But one render-thread frame
+  took 2.57 s while it was uploaded: its buffers and new programs going to the GPU. The others
+  each block one frame for 1.8–2.2 s (the build, then the first draw).
+- During the restaurant's weather and light sweep, the TV's thermal state was serious (2) for
+  about two minutes. It was nominal again for both screensaver phases, which were at 40 FPS all
+  the same.
+- Memory goes down again when the fly leaves a place (206 MB at the lab, 172 MB at the bar
+  next). The restaurant is the largest, at 225–238 MB.
+- Against Rufus on 15 November (below; code from before PR #2, so only the picnic, and with
+  sound), the picnic's screensaver is as smooth: JavaScript is down from 4.22/4.60 to 3.53/3.64 ms
+  and the p95 from 10.40/11.84 to 8.85/7.49 ms. Memory is up from 140–143 to 175 MB, and nothing
+  in this run says which of the changes since added it.
+- This run found the picnic butterfly drawn with no wings on the Apple TV, since its wing
+  texture used SVG path strings, which the runtime's `Path2D` doesn't read: fixed.
+
+Online can't be opened on the Apple TV yet (the host has no `WebSocket`, so the title has no
+Online), so it isn't measured.
 
 ### Sustained performance on Rufus
 

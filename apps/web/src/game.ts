@@ -891,7 +891,7 @@ export class Game implements Shell {
     this.peaks.loom = Math.max(this.peaks.loom * fade, life.sensed.loomLeft, life.sensed.loomRight);
     this.peaks.looming = Math.max(this.peaks.looming * fade, rates?.["vision.looming left"] ?? 0, rates?.["vision.looming right"] ?? 0);
     this.glow.update(life.brain.regionRates, dt);
-    this.fly.update(life.body, life.intent, life.eating, dt);
+    this.fly.update(life.body, life.intent, life.eating, dt, life.songSide);
     this.prints.update(this.fly.model, life.body.onFeet, this.fly.pose.groom > 0.02, life.world, life.pantry, this.time);
     this.online?.send(this.#playerNow());
     // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
@@ -906,6 +906,7 @@ export class Game implements Shell {
     this.#air.set(this.hands.air.x + this.#felt.air.x, this.hands.air.y + this.#felt.air.y, this.hands.air.z + this.#felt.air.z);
     this.bubbles.rain = stage.weather.rain;
     const middle = this.#middle.set(life.body.position.x, life.body.position.y + 0.75, life.body.position.z);
+    this.bubbles.lightBy(stage.light);
     this.bubbles.update(this.time, dt, director.camera, stage.light.sunDirection, this.#air, middle);
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
     this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
@@ -1652,7 +1653,7 @@ export class Game implements Shell {
     d.tool = this.hands.current.id;
     d.variant = this.hands.variant.id;
     d.pointer = this.hands.following ? "following" : "free";
-    d.senses = `loom ${s.loomLeft.toFixed(2)}/${s.loomRight.toFixed(2)} touch ${s.touch.toFixed(2)} bump ${s.bumpLeft.toFixed(2)}/${s.bumpRight.toFixed(2)} wind ${s.wind.toFixed(2)} sweet ${s.sweet.toFixed(2)} grounded ${s.grounded ? 1 : 0}`;
+    d.senses = `loom ${s.loomLeft.toFixed(2)}/${s.loomRight.toFixed(2)} touch ${s.touch.toFixed(2)} bump ${s.bumpLeft.toFixed(2)}/${s.bumpRight.toFixed(2)} wind ${s.wind.toFixed(2)} sweet ${s.sweet.toFixed(2)} grounded ${s.grounded ? 1 : 0} male ${s.maleTaste.toFixed(2)}`;
     d.loom = Math.max(s.loomLeft, s.loomRight).toFixed(3);
     d.touch = s.touch.toFixed(3);
     d.wind = s.wind.toFixed(3);
@@ -1667,6 +1668,8 @@ export class Game implements Shell {
     d.loomPeak = this.peaks.loom.toFixed(3);
     d.loomingHz = this.peaks.looming.toFixed(1);
     d.feed = (life.brain.state?.command.feed ?? 0).toFixed(3);
+    d.sing = (life.brain.state?.command.sing ?? 0).toFixed(3);
+    d.maleTaste = s.maleTaste.toFixed(3);
     d.eyes = this.eyes.inUse ? "brain" : this.eyes.active ? "picture" : "off";
     d.eyesInset = this.inset.state;
     d.nerves = this.nerves.state;
@@ -1684,6 +1687,7 @@ export class Game implements Shell {
     d.frameMs = this.frameMsAverage.toFixed(2);
     d.eyesMs = this.eyes.costMs.toFixed(2);
     d.eyesUpdates = String(this.eyes.updates);
+    d.eyesGain = this.eyes.gain.toFixed(2);
     d.spikesPerSecond = String(Math.round(this.meter.spikesPerSecond));
     d.time = this.stage.light.time;
     d.hours = this.stage.light.hours === null ? "" : this.stage.light.hours.toFixed(2);

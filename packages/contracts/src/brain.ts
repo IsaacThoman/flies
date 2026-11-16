@@ -40,9 +40,9 @@ export interface BrainDriver {
 }
 
 /** The order the scalar senses are packed in for the native brain. `grounded` is 0 or 1. */
-export const SENSE_ORDER = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet", "grounded"] as const;
+export const SENSE_ORDER = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet", "grounded", "maleTaste"] as const;
 /** The order commands come back in from the native brain. */
-export const COMMAND_ORDER = ["walk", "turn", "back", "escape", "wings", "groom", "feed"] as const;
+export const COMMAND_ORDER = ["walk", "turn", "back", "escape", "wings", "groom", "feed", "sing"] as const;
 /** After the commands in a native state: simulated ms, wall ms, spikes and active neurons of the last step, then one rate per `rateNames()` entry. */
 export const STATE_STATS = ["simMs", "wallMs", "spikes", "active"] as const;
 

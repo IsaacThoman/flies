@@ -3,7 +3,7 @@
 // constants. Every departure from "synapse count × transmitter sign" is here;
 // the README explains each.
 
-import type { Connectome } from "./format.ts";
+import type { Connectome, NeuronQuery } from "./format.ts";
 
 export type TransmitterFix = {
   /** What the fix is and why. */
@@ -12,6 +12,17 @@ export type TransmitterFix = {
   applies(connectome: Connectome, i: number): boolean;
   /** The transmitter they get instead. */
   nt: string;
+};
+
+/**
+ * A group of neurons whose two sides were reconstructed unequally: the same
+ * cells, wired to the same partners, but one side's with far fewer synapses.
+ */
+export type CompletenessFix = {
+  /** What the group is, and the evidence that its sides differ only in how completely they were traced. */
+  reason: string;
+  /** The group, both sides; each side is its neurons with that soma (or root) side. */
+  select: NeuronQuery;
 };
 
 export type OperatingPoint = {
@@ -38,6 +49,13 @@ export type OperatingPoint = {
   saturation: number;
   /** Corrections to the predicted transmitter, applied in order. */
   fixes: readonly TransmitterFix[];
+  /**
+   * Groups reconstructed less completely on one side: that side's synapses
+   * count as many times more as the other side has output synapses (see
+   * `completenessFactors`), so that at the same firing rate both sides
+   * deliver the same drive.
+   */
+  completeness: readonly CompletenessFix[];
   /** Neuron model constants, passed to Simulation. */
   neuron: {
     dt: number;
@@ -84,6 +102,30 @@ export const TRANSMITTER_FIXES: readonly TransmitterFix[] = [
   },
 ];
 
+// Johnston's organ's neurons are grouped by the zone of the antennal mechanosensory
+// and motor centre their axons end in (Kamikouchi et al. 2006, 2009; zone F,
+// Hampel et al. 2020); the dataset's types are named for them. Zones C and E
+// sense the antenna's sustained deflection, and they and F drive antennal
+// grooming (Kamikouchi et al. 2009; Yorozu et al. 2009; Hampel et al. 2015,
+// 2020). C and E are what `bump` drives, and with F most of what `wind` does.
+// On each side each zone's neurons send their synapses to the same partner
+// types in much the same proportions (by synapse counts partner type by partner type, the cosine
+// similarity of a zone's left and right halves is 0.75 for C, 0.95 for E and
+// 0.78 for F, against at most 0.39 between different zones), but the right
+// antenna's C and E neurons have 7.9 and 2.5 times fewer output synapses than
+// the left's, and the left's F 1.2 times fewer than the right's: one side was
+// traced less completely. Zones A and B (sound) are left as they are: their right
+// halves are mostly fragments of 18 synapses a neuron (26 and 31 times fewer
+// than the left's), which no factor could stand for, and only a few of them are
+// driven at all (by wind). Zone D has no right half. The README (Johnston's
+// organ, completeness) gives the evidence zone by zone.
+const jo = (zone: string): CompletenessFix => ({
+  reason: `Johnston's organ zone ${zone}: the same partners on both sides, but one side traced less completely`,
+  select: { superClass: "cb_sensory", type: new RegExp(`^JO-${zone}`) },
+});
+
+export const COMPLETENESS_FIXES: readonly CompletenessFix[] = [jo("C"), jo("E"), jo("F")];
+
 export const OPERATING_POINT: OperatingPoint = {
   // Shiu et al. 2024's w_syn, for both signs.
   excitatory: 0.275,
@@ -98,6 +140,7 @@ export const OPERATING_POINT: OperatingPoint = {
   graded: 2.3,
   saturation: 75,
   fixes: TRANSMITTER_FIXES,
+  completeness: COMPLETENESS_FIXES,
   neuron: {
     // Shiu et al. 2024: rest -52 mV, threshold -45 mV, tauMem 20 ms, tauSyn 5 ms,
     // refractory 2.2 ms, delay 1.8 ms, and a spike resets g as well as v. They
@@ -188,6 +231,35 @@ export function saturatedCounts(count: Uint16Array, saturation: number): Uint16A
   return out;
 }
 
+/**
+ * The factor on each neuron's gain from the completeness fixes (1 for most):
+ * for each group, the side with fewer output synapses gets the ratio of the
+ * other side's to its own, so that the two sides' synapses carry the same
+ * total. Derived from the wiring, not fitted. Synaptic saturation is left as it
+ * is: scaling the weaker side's saturated connections this way brings their
+ * total within 3% of the stronger side's (for every zone of Johnston's organ),
+ * where adding the missing synapses to each connection before saturating would
+ * fall short by up to 35%.
+ */
+export function completenessFactors(connectome: Connectome, fixes: readonly CompletenessFix[]): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const fix of fixes) {
+    const left = connectome.find({ ...fix.select, side: "left" });
+    const right = connectome.find({ ...fix.select, side: "right" });
+    const synapses = (neurons: Uint32Array) => {
+      let total = 0;
+      for (const i of neurons) for (let e = connectome.ptr[i]; e < connectome.ptr[i + 1]; e++) total += connectome.count[e];
+      return total;
+    };
+    const l = synapses(left);
+    const r = synapses(right);
+    if (l === 0 || r === 0 || l === r) continue;
+    const [weaker, factor] = l < r ? [left, r / l] : [right, l / r];
+    for (const i of weaker) out.set(i, factor);
+  }
+  return out;
+}
+
 export type Weights = {
   /** Simulation's `gain`: mV per synapse of each presynaptic neuron. */
   gain: Float32Array;
@@ -206,6 +278,7 @@ export function buildWeights(connectome: Connectome, point: OperatingPoint = OPE
     const graded = columnar(connectome);
     for (let i = 0; i < connectome.neurons; i++) if (graded[i]) gain[i] *= point.graded;
   }
+  for (const [i, factor] of completenessFactors(connectome, point.completeness)) gain[i] *= factor;
   const network = { ptr: connectome.ptr, post: connectome.post, count: saturatedCounts(connectome.count, point.saturation) };
   return { gain, network, nt, changed };
 }

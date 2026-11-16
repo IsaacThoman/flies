@@ -43,7 +43,8 @@ targets:
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: Flies
+        CFBundleDisplayName: flies
+        CFBundleName: flies
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # The launch image, generated into src/generated/Assets.xcassets by scripts/tvos.ts.
