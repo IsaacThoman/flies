@@ -146,7 +146,7 @@ vec2 uv = nap.xy;
 float edge = nap.z;
 float aa = fwidth(edge) + 0.02;
 float inside = 1.0 - smoothstep(-aa, aa, edge);
-vec3 cloth = gingham(uv, CHECK, vec3(0.13, 0.40, 0.86));
+vec3 cloth = gingham(uv, CHECK, vec3(0.16, 0.34, 0.62));
 // The hem: folded under (a touch darker) and stitched in blue.
 float hem = smoothstep(-2.6, -2.4, edge);
 cloth *= 1.0 - hem * 0.06;
@@ -447,10 +447,14 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
   jar.renderOrder = 3;
   freeze(jar);
   group.add(jar);
+  for (const [r, y, tube] of [[lf.r - 1, 2.0, 0.8], [lf.r - 0.2, lidTop - 10, 0.65]]) {
+    batch.add(glossy, paint(new THREE.TorusGeometry(r, tube, 6, 48).rotateX(Math.PI / 2).translate(lf.x, y, lf.z), "#dce9df"));
+  }
   const drink = new THREE.Mesh(paint(new THREE.CylinderGeometry(lf.r - 1.5, lf.r - 1.5, lidTop - 26, 40).translate(lf.x, (lidTop - 26) / 2 + 1, lf.z), (p) => (p.y > lidTop - 30 ? "#fff6b8" : "#ffe14f")), liquid);
   drink.renderOrder = 2;
   freeze(drink);
   group.add(drink);
+  batch.add(glossy, paint(new THREE.TorusGeometry(lf.r - 1.7, 0.38, 5, 48).rotateX(Math.PI / 2).translate(lf.x, lidTop - 25, lf.z), "#fff0a1"));
   seen.push(drink);
   // The lid: knurled round its side, and pressed on top (LID_PRESS).
   {
@@ -601,12 +605,12 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
 
   // Strawberries: a whole one with seeds and leaves, and a half one, cut face up.
   const berry = one("strawberry");
-  fruit(SKIN.plain, paint(domeGeometry(berry, 14, 40), (p) => {
+  fruit(SKIN.strawberry, paint(domeGeometry(berry, 14, 40), (p) => {
     const k = Math.min(1, p.y / 20);
     return new THREE.Color("#c3001f").lerp(new THREE.Color("#ff3048"), k);
   }));
   const half = one("strawberry half");
-  fruit(SKIN.plain, paint(domeGeometry(half, 10, 40), (p) => {
+  fruit(SKIN.cutBerry, paint(domeGeometry(half, 16, 64), (p) => {
     const hf = half.footprint as { x: number; z: number; rx: number; rz: number; angle: number };
     const s = Math.min(1, Math.hypot((p.x - hf.x) / hf.rx, (p.z - hf.z) / hf.rz));
     return s > 0.86 ? "#e0102c" : s > 0.7 ? "#ff6b7c" : s > 0.25 ? "#ffb3bd" : "#fff0f0";
@@ -728,6 +732,12 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
   grainMesh.computeBoundingSphere();
   freeze(grainMesh);
   group.add(grainMesh);
+
+  // Loose cotton fibres lie below a tenth of a millimetre: scale cues, not obstacles.
+  for (const [x, z, angle, length] of [[-12, -10, 0.7, 2.8], [-4, -12, -0.3, 3.4], [-17, -4, 2.1, 2.1], [-6, 1, 0.2, 2.5], [2, -19, 1.1, 3.2]]) {
+    const fibre = new THREE.QuadraticBezierCurve3(new THREE.Vector3(x, 0.065, z), new THREE.Vector3(x + Math.cos(angle + 0.8) * length * 0.5, 0.09, z + Math.sin(angle + 0.8) * length * 0.5), new THREE.Vector3(x + Math.cos(angle) * length, 0.055, z + Math.sin(angle) * length));
+    dry(paint(new THREE.TubeGeometry(fibre, 8, 0.035, 3, false), "#e4e7df"));
+  }
 
   // Crumbs and pips at the fly's own scale, with soft shadows under them (one merged draw, see contactShadows).
   const shadows: Spot[] = [];

@@ -62,7 +62,7 @@ vec3 gingham(vec2 uv, float check, vec3 dye) {
     float along = warpOnTop ? f.x : f.y;
     float bulge = pow(sin(3.14159 * across), 0.55) * (0.88 + 0.12 * sin(3.14159 * along));
     // A thread's own colour shows a little through the one over it, as in real cloth seen close.
-    vec3 thread = mix(warpOnTop ? warp : weft, (warp + weft) * 0.5, 0.55) * (0.8 + 0.2 * bulge);
+    vec3 thread = mix(warpOnTop ? warp : weft, (warp + weft) * 0.5, 0.82) * (0.9 + 0.1 * bulge);
     cloth = mix(cloth, thread, detail);
   }
   return cloth;
@@ -151,7 +151,7 @@ vec3 bumped(vec3 n, float h) {
 `;
 
 /** Which skin a piece merged into the fruit's material has: its `skin` attribute. */
-export const SKIN = { plain: 0, apple: 1, orange: 2, jam: 3, cherry: 4 } as const;
+export const SKIN = { plain: 0, apple: 1, orange: 2, jam: 3, cherry: 4, strawberry: 5, cutBerry: 6 } as const;
 
 /** Says which skin a piece has: every piece merged into one material needs the same attributes. */
 export function skin(geometry: THREE.BufferGeometry, kind: number) {
@@ -169,6 +169,8 @@ const at = (name: string) => {
 const apple = at("apple");
 const LENTICELS = Math.round((2 * Math.PI * apple.r) / 1.3);
 const orange = at("orange slice");
+const cutBerry = SOLIDS.find((s) => s.name === "strawberry half")!.footprint;
+if (cutBerry.kind !== "ellipse") throw new Error("The cut strawberry needs an elliptical footprint");
 
 /**
  * The fruit's skins, by `skin`: plain and glossy (the saucer, the lemon, the
@@ -194,6 +196,7 @@ ${NOISE}
 ${BUMP}
 const vec4 APPLE = vec4(${apple.x.toFixed(1)}, ${apple.top.base!.toFixed(1)}, ${apple.z.toFixed(1)}, ${apple.r.toFixed(1)});
 const vec3 ORANGE = vec3(${orange.x.toFixed(1)}, ${orange.z.toFixed(1)}, ${orange.r.toFixed(1)});
+const vec4 BERRY = vec4(${cutBerry.x.toFixed(1)}, ${cutBerry.z.toFixed(1)}, ${cutBerry.rx.toFixed(1)}, ${cutBerry.rz.toFixed(1)});
 const float LENTICELS = ${LENTICELS.toFixed(1)};
 float skinRough;
 float skinHeight;`,
@@ -280,6 +283,27 @@ skinHeight = 0.0;
     vec3 sq = (fract(p / 1.1) - 0.5 - (vec3(hash31(sc), hash31(sc + 3.0), hash31(sc + 5.0)) - 0.5) * 0.4) * 1.1;
     float seed = step(hash31(sc + 9.0), 0.6) * (1.0 - smoothstep(0.13, 0.13 + px, length(sq * vec3(1.0, 0.7, 1.0)))) * resolved(px, 0.15);
     c = mix(c, vec3(0.75, 0.45, 0.08), seed * 0.8);
+  } else if (kind == 5) {
+    float pores = vnoise3(p * 2.1);
+    c *= 0.89 + 0.16 * vnoise3(p * 0.22) + 0.06 * pores;
+    skinRough = 0.14 + 0.08 * pores;
+    skinHeight = pores * 0.018 * resolved(px, 0.5);
+  } else if (kind == 6) {
+    vec2 d = p.xz - BERRY.xy;
+    float ca = cos(${cutBerry.angle.toFixed(4)}), sa = sin(${cutBerry.angle.toFixed(4)});
+    vec2 uv = vec2(d.x * ca - d.y * sa, d.x * sa + d.y * ca) / BERRY.zw;
+    float rho = length(uv);
+    float a = atan(uv.y, uv.x);
+    float fibres = sin(a * 43.0 + rho * 18.0 + vnoise(uv * 12.0) * 3.0);
+    float grain = vnoise(p.xz * 3.0);
+    float core = 1.0 - smoothstep(0.12, 0.56, rho + sin(a * 5.0) * 0.035);
+    vec3 flesh = mix(vec3(0.74, 0.055, 0.10), vec3(1.0, 0.34, 0.38), core);
+    flesh = mix(flesh, vec3(1.0, 0.78, 0.67), core * 0.78);
+    flesh *= 0.91 + 0.12 * grain + 0.06 * fibres * resolved(px, 0.6);
+    float rind = smoothstep(0.88, 0.96, rho);
+    c = mix(flesh, vec3(0.52, 0.012, 0.025), rind);
+    skinRough = mix(0.12, 0.2, rind);
+    skinHeight = (grain + fibres * 0.25) * 0.025 * resolved(px, 0.5);
   } else if (kind == 4) {
     c *= 0.88 + 0.2 * vnoise3(p * 0.35);
     skinRough = -0.05;
