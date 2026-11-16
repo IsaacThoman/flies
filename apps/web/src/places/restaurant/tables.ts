@@ -63,7 +63,8 @@ export const tables: Part = {
       } else {
         const pedestal = one(named("pedestal"), "pedestal");
         marbleTop(m, top);
-        spider(m, one(named("spider").filter((s) => s.footprint.kind === "circle"), "spider's hub"), kind === "round");
+        const spiders = named("spider");
+        spider(m, one(spiders.filter((s) => s.footprint.kind === "circle"), "spider's hub"), spiders.filter((s) => s.footprint.kind === "box"));
         // The round foot buries the column's plinth; the crossed one stands it on the floor between its bars.
         column(m, pedestal, kind === "round" ? 40 : 0);
         if (kind === "round") roundFoot(m, one(named("table foot"), "table foot"));
@@ -74,13 +75,13 @@ export const tables: Part = {
       far.set(kind, s);
     }
 
-    const upright = chairSolids(solids, false);
+    const standing = chairSolids(solids, false);
     const turned = chairSolids(solids, true);
     // Upturned, the seat's crown rests on the table, a tenth of a millimetre in.
-    const flip = (turned.seat.bottom ?? 0) - 0.1 + topHeight(upright.seat, 0, 0);
-    const parts: ChairSolids = { ...upright, tip: turned.leg };
-    const { back, rear } = chair(parts, flip);
-    const over = back.flipped(flip);
+    const flip = (turned.seat.bottom ?? 0) - 0.1 + topHeight(standing.seat, 0, 0);
+    const parts: ChairSolids = { ...standing, tip: turned.leg };
+    const upright = chair(parts, flip);
+    const over = upright.flipped(flip);
     const farChairs = farChair(parts, flip);
 
     const lots = new Map<number, { near: Lot; far: Lot }>();
@@ -92,8 +93,7 @@ export const tables: Part = {
       lot.far.add(far.get(t.kind)!, t);
       for (const c of t.chairs) {
         if (c.upturned === undefined) {
-          lot.near.add(back, c);
-          lot.near.add(rear, c);
+          lot.near.add(upright, c);
           lot.far.add(farChairs.upright, c);
         } else {
           lot.near.add(over, c);

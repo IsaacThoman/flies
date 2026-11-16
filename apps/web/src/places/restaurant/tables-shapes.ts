@@ -74,23 +74,40 @@ export function marbleTop(m: Mesh, top: Solid) {
   m.kind(KIND.marble).sweep(hx, hz, 3, edge.slice(4), 4).plate(-hx + 3, -hz + 3, hx - 3, hz - 3, y, true);
 }
 
-/** The cast-iron spider under a marble top: a hub and four arms out to screw bosses, open between them. */
-export function spider(m: Mesh, s: Solid, round: boolean) {
-  const bottom = s.bottom ?? 0;
+/**
+ * The cast-iron spider under a marble top: a hub, and four arms along the
+ * world's two crossed boxes, each a flat bar screwed to the slab over a web
+ * that arches up toward a boss at the box's end.
+ */
+export function spider(m: Mesh, hub: Solid, arms: readonly Solid[]) {
+  const bottom = hub.bottom ?? 0;
   // Into the slab above by a tenth, so no seam shows.
-  const top = topHeight(s, s.footprint.x, s.footprint.z) + 0.1;
-  // The bosses reach the felt edge: the disc's for a round top, the square's corners along the diagonals.
-  const reach = round ? radius(s) - 12 : (half(s).hx - 12) * Math.SQRT2;
+  const top = topHeight(hub, hub.footprint.x, hub.footprint.z) + 0.1;
+  const r = radius(hub) - 0.05;
   m.kind(TBL.iron).plain();
-  m.revolve([[0, bottom, 0, -1], [45, bottom, 0, -1], [45, bottom, 0.7, -0.7], [48, bottom + 3, 0.7, -0.7], [48, bottom + 3, 1, 0], [48, top, 1, 0]], 48);
-  for (let k = 0; k < 4; k++) {
-    const a = Math.PI / 4 + (k * Math.PI) / 2;
-    const dx = Math.cos(a);
-    const dz = Math.sin(a);
-    const section = (d: number, w: number): P3[] =>
-      [[-w, top], [w, top], [w, bottom + 3], [w - 3, bottom], [3 - w, bottom], [-w, bottom + 3]].map(([q, y]) => [dx * d - dz * q, y, dz * d + dx * q] as const);
-    m.loft(section(40, 14), section(reach, 9));
-    m.revolve([[0, bottom, 0, -1], [9.5, bottom, 0, -1], ...arc(9.5, bottom + 1.5, 1.5, -Math.PI / 2, 0, 3), [11, top, 1, 0]], 20, dx * reach, dz * reach);
+  m.revolve([[0, bottom, 0, -1], [r - 3, bottom, 0, -1], [r - 3, bottom, 0.7, -0.7], [r, bottom + 3, 0.7, -0.7], [r, bottom + 3, 1, 0], [r, top, 1, 0]], 48);
+  for (const arm of arms) {
+    const { hx, hz, angle } = half(arm);
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    const w = hz - 0.5;
+    const boss = hx - w - 0.1;
+    for (const end of [-1, 1]) {
+      const dx = end * c;
+      const dz = -end * s;
+      const at = (d: number, q: number, y: number): P3 => [dx * d - dz * q, y, dz * d + dx * q];
+      const box = (d: number, half: number, y0: number, y1: number): P3[] => [at(d, -half, y1), at(d, half, y1), at(d, half, y0), at(d, -half, y0)];
+      // The bar under the slab, 6 deep, from inside the hub to the boss.
+      m.loft(box(30, w, top - 6, top), box(boss, w, top - 6, top));
+      // The web, deep at the hub, rising to the boss.
+      const web = (d: number) => bottom + 4 + (top - 16 - bottom - 4) * smooth(r - 4, boss, d);
+      for (let k = 0; k < 5; k++) {
+        const d0 = r - 4 + ((boss - r + 4) * k) / 5;
+        const d1 = r - 4 + ((boss - r + 4) * (k + 1)) / 5;
+        m.loft(box(d0, 3.5, web(d0), top - 5.9), box(d1, 3.5, web(d1), top - 5.9));
+      }
+      m.revolve([[0, top - 18, 0, -1], [w - 1.5, top - 18, 0, -1], ...arc(w - 1.5, top - 16.5, 1.5, -Math.PI / 2, 0, 3), [w, top, 1, 0]], 20, dx * boss, dz * boss);
+    }
   }
 }
 
@@ -254,15 +271,12 @@ export function apron(m: Mesh, board: Solid, into: number) {
 export type ChairSolids = { seat: Solid; leg: Solid; post: Solid; rail: Solid; mid: Solid; tip: Solid };
 
 /**
- * The bentwood chair, upright, in two pieces: everything but the back legs
- * below the seat (`back`), and those (`rear`): the world's upturned chair
- * has no back legs in the air, so it is `back` turned over. `flip` is the
- * height the upturned chair mirrors about (y to flip − y), its cane just
- * touching the table.
+ * The bentwood chair, upright. Turned over about `flip` (y to flip − y) it
+ * is the upturned chair too, its cane just touching the table, its rear
+ * legs' feet the world's rounded tips like the front legs'.
  */
-export function chair(c: ChairSolids, flip: number): { back: Mesh; rear: Mesh } {
-  const back = new Mesh();
-  const rear = new Mesh();
+export function chair(c: ChairSolids, flip: number): Mesh {
+  const m = new Mesh();
   const seatY = (r: number) => topHeight(c.seat, r, 0);
   const R = radius(c.seat);
   const under = c.seat.bottom ?? 0;
@@ -280,20 +294,19 @@ export function chair(c: ChairSolids, flip: number): { back: Mesh; rear: Mesh } 
   };
   const scuffed = (_a: number, y: number) => [0, 0, y < 30 ? 0.7 : 0] as const;
   const lowLeg = [...sole, ...side(foot, ankle[1], foot + 0.2, 30), ...side(foot + 0.2, 30, legR, under + 1).slice(1)];
-  back.kind(TBL.bent);
-  rear.kind(TBL.bent);
+  m.kind(TBL.bent);
   for (const s of [-1, 1]) {
-    back.revolve(lowLeg, 16, s * Math.abs(c.leg.footprint.x), c.leg.footprint.z, scuffed);
-    rear.revolve(lowLeg, 16, s * Math.abs(c.post.footprint.x), c.post.footprint.z, scuffed);
+    m.revolve(lowLeg, 16, s * Math.abs(c.leg.footprint.x), c.leg.footprint.z, scuffed);
+    m.revolve(lowLeg, 16, s * Math.abs(c.post.footprint.x), c.post.footprint.z, scuffed);
   }
-  // The back's posts: on up from inside the seat (where, turned over, the cane hides their ends), a little slimmer, to the world's caps.
+  // The back's posts: on up from the rear legs through the seat, a little slimmer, to the world's caps.
   const postY = (r: number) => topHeight(c.post, c.post.footprint.x + r, c.post.footprint.z);
   const neck = legR - 0.8;
   const cap: Turn[] = [neck, 10.5, 7, 3.5, 0].map((r) => onTop(postY, r));
   // Worn only round the caps, where hands take the chair: a ring of the profile just below them keeps the rest unworn.
   const shoulder = cap[0][1] - 25;
   const upper = [...side(legR, under + 1, neck + 0.05, shoulder), ...side(neck + 0.05, shoulder, neck, cap[0][1]).slice(1), ...cap];
-  for (const s of [-1, 1]) back.revolve(upper, 16, s * Math.abs(c.post.footprint.x), c.post.footprint.z, (_a, y) => [0, 0, y > shoulder + 1 ? 0.5 : 0]);
+  for (const s of [-1, 1]) m.revolve(upper, 16, s * Math.abs(c.post.footprint.x), c.post.footprint.z, (_a, y) => [0, 0, y > shoulder + 1 ? 0.5 : 0]);
 
   // The seat: cane in a bent rim, both at the world's dome, the rim rounded over and under, the cane's underside a hair above the rim's.
   const rimTop: Turn[] = [cane, (cane + R) / 2, R - 1.5].map((r) => onTop(seatY, r));
@@ -309,22 +322,17 @@ export function chair(c: ChairSolids, flip: number): { back: Mesh; rear: Mesh } 
     [cane, under, -1, 0],
     [cane, under + 0.4, -1, 0],
   ];
-  back.revolve(rim, 64, 0, 0, (a, y) => [-Math.sin(a), Math.cos(a), Math.max(0, Math.sin(a)) ** 3 * (y > under + 12 ? 0.9 : 0.25)]);
+  m.revolve(rim, 64, 0, 0, (a, y) => [-Math.sin(a), Math.cos(a), Math.max(0, Math.sin(a)) ** 3 * (y > under + 12 ? 0.9 : 0.25)]);
   const top: Turn[] = [0, 70, 120, 158, cane].map((r) => onTop(seatY, r));
-  back.kind(KIND.cane).plain().revolve(top, 64).revolve([[cane, under + 0.4, 0, -1], [0, under + 0.4, 0, -1]], 64);
+  m.kind(KIND.cane).plain().revolve(top, 64).revolve([[cane, under + 0.4, 0, -1], [0, under + 0.4, 0, -1]], 64);
 
-  // The top rail: a bent band straight across between the posts, its crown the world's exactly, its lower edges eased.
-  back.kind(TBL.bent);
+  // The top rail: a bent band straight across between the posts, its crown the world's vault exactly (round across, level along), its lower edges eased.
+  m.kind(TBL.bent);
   const rail = c.rail;
   const rz = rail.footprint.z;
   const { hx: rx, hz: rd } = half(rail);
   const rb = rail.bottom ?? 0;
   const crown = (u: number, v: number) => topHeight(rail, u, rz + v);
-  const ridge = (u: number) => {
-    const d = (crown(Math.min(rx - 0.6, u + 0.05), rz) - crown(Math.max(-rx + 0.6, u - 0.05), rz)) / 0.1;
-    const l = Math.hypot(d, 1);
-    return [-d / l, 1 / l, 0] as const;
-  };
   const V = rd - 0.05;
   const railAt = (u: number) => {
     const pts: [number, number, number, number, number, number][] = [];
@@ -335,15 +343,14 @@ export function chair(c: ChairSolids, flip: number): { back: Mesh; rear: Mesh } 
     for (let k = 0; k <= 10; k++) {
       const th = Math.PI / 2 - (k * Math.PI) / 10;
       const v = V * Math.sin(th);
-      // Where the band's round governs the world's dome its normal is the round's; toward the ends, the ridge's slope along it.
-      const n = Math.abs(v) / rd >= Math.abs(u) / rx ? ([0, Math.cos(th), Math.sin(th)] as const) : ridge(u);
-      push(v, crown(u, v), n, Math.abs(th) < 0.9 ? 0.4 * (1 - (u / rx) ** 2) : 0);
+      push(v, crown(u, v), [0, Math.cos(th), Math.sin(th)], Math.abs(th) < 0.9 ? 0.4 * (1 - (u / rx) ** 2) : 0);
     }
     for (const [v, y, nv, ny] of arc(1.5 - V, rb + 1.5, 1.5, Math.PI, (3 * Math.PI) / 2, 3)) push(v, y, [0, ny, nv]);
     push(-V + 1.5, rb, [0, -1, 0]);
     return pts;
   };
-  bar(back, -rx, rx, 18, rz, railAt);
+  // Level along, it needs few steps: enough for the wear to fade toward the posts.
+  bar(m, -rx, rx, 6, rz, railAt);
 
   // The mid rail: a plain band with its edges rounded, a little into the posts at either end.
   const mid = c.mid;
@@ -356,8 +363,8 @@ export function chair(c: ChairSolids, flip: number): { back: Mesh; rear: Mesh } 
     for (const [v, y, nv, ny] of arc(cv, cy, 1.5, a0, a0 + Math.PI / 2, 3)) midSection.push([v, y, 0, ny, nv, 0]);
   }
   midSection.push(midSection[0]);
-  bar(back, -Math.abs(c.post.footprint.x) + 8, Math.abs(c.post.footprint.x) - 8, 1, mid.footprint.z, () => midSection);
-  return { back, rear };
+  bar(m, -Math.abs(c.post.footprint.x) + 8, Math.abs(c.post.footprint.x) - 8, 1, mid.footprint.z, () => midSection);
+  return m;
 }
 
 /** A band along x at z = zc: its section (v across, y up, the normal's x, y, z, and the finish's wear) at each u. */
@@ -370,91 +377,150 @@ function bar(m: Mesh, u0: number, u1: number, steps: number, zc: number, section
   });
 }
 
-/** A ring of `n` points round (x, z) at height y. */
-const ring = (x: number, z: number, r: number, n: number, y: number, turn = 0): P3[] =>
-  Array.from({ length: n }, (_, k) => {
-    const a = turn + (k / n) * Math.PI * 2;
-    return [x + r * Math.cos(a), y, z + r * Math.sin(a)] as const;
-  });
+/*
+ * The far stand-ins: what is drawn from beyond an area's reach, and what the
+ * fly's eyes see six times a frame, so a few dozen triangles each. They are
+ * the near shapes' silhouettes, inside the world's solids, with the near
+ * kinds and the same grain and wear, and normals that round them, so the
+ * switch between the two is a change of a few millimetres at the edges.
+ */
 
-/** A fan over a ring, facing up or down. */
-function fan(m: Mesh, points: readonly P3[], up: boolean) {
-  const n = up ? 1 : -1;
-  const c = points.reduce((s, p) => [s[0] + p[0] / points.length, s[1] + p[1] / points.length, s[2] + p[2] / points.length], [0, 0, 0]);
-  for (let i = 0; i < points.length; i++) {
-    const a = points[i];
-    const b = points[(i + 1) % points.length];
-    m.tri([c[0], c[1], c[2], 0, n, 0], [a[0], a[1], a[2], 0, n, 0], [b[0], b[1], b[2], 0, n, 0]);
-  }
-}
+/** A turned point of a far stand-in, its normal tilted `t` from up toward out (radians). */
+const tilt = (r: number, y: number, t: number): Turn => [r, y, Math.sin(t), Math.cos(t)];
 
-/** The far stand-ins: a pedestal table (round or square) in a few dozen triangles. */
+/** A pedestal table: the slab and its rounded edge, the column flaring to the top, and the foot. */
 export function farPedestal(m: Mesh, top: Solid, foot: readonly Solid[], pedestal: Solid) {
   const bottom = top.bottom ?? 0;
   const y = topHeight(top, 0, 0);
-  m.kind(KIND.marble).plain();
-  if (top.footprint.kind === "circle") m.loft(ring(0, 0, radius(top), 12, bottom), ring(0, 0, radius(top), 12, y), true, true);
-  else m.loft(eased(-half(top).hx, -half(top).hz, half(top).hx, half(top).hz, bottom, 0).filter((_, i) => i % 2 === 0), eased(-half(top).hx, -half(top).hz, half(top).hx, half(top).hz, y, 0).filter((_, i) => i % 2 === 0), true, true);
-  m.kind(TBL.iron);
-  m.loft(ring(0, 0, radius(pedestal) * 0.8, 4, 0), ring(0, 0, radius(pedestal) * 0.8, 4, topHeight(pedestal, 0, 0)));
+  if (top.footprint.kind === "circle") {
+    const R = radius(top) - 0.05;
+    m.kind(KIND.marble).plain().revolve([tilt(0, y, 0), tilt(R - 1.5, y, 0.2), tilt(R, bottom + 3.5, 1.9)], 20);
+    m.kind(TBL.stone).revolve([tilt(R, bottom + 3.5, 2.2), tilt(0, bottom, Math.PI)], 20);
+  } else {
+    const { hx, hz } = half(top);
+    const box = (yy: number, inset: number): P3[] => [[-hx + inset, -hz + inset], [hx - inset, -hz + inset], [hx - inset, hz - inset], [-hx + inset, hz - inset]].map(([x, z]) => [x, yy, z] as const);
+    m.kind(KIND.marble).plain().loft(box(bottom + 2, 0.05), box(y, 0.05), false, true);
+    m.kind(TBL.stone).loft(box(bottom, 2.95), box(bottom + 2, 0.05), true, false);
+  }
+  // The column, in six sides: its foot's cove, the shaft, the trumpet to the spider.
+  const r0 = radius(pedestal) - 0.2;
+  const py = topHeight(pedestal, 0, 0);
+  m.kind(TBL.iron).plain().revolve([tilt(r0 - 3.8, 20, Math.PI / 2), tilt(20, 640, Math.PI / 2), tilt(r0, py, 1.2)], 6);
   for (const f of foot) {
     if (f.footprint.kind === "circle") {
-      const rim = ring(0, 0, radius(f), 8, topHeight(f, radius(f), 0));
-      const apex = topHeight(f, 0, 0);
-      for (let i = 0; i < 8; i++) m.tri([0, apex, 0, 0, 1, 0], [...rim[i], 0, 1, 0], [...rim[(i + 1) % 8], 0, 1, 0]);
+      const fy = (r: number) => topHeight(f, r, 0);
+      const R = radius(f) - 1.5;
+      m.revolve([tilt(0, fy(0), 0), tilt(R * 0.55, fy(R * 0.55), 0.3), tilt(R + 1.4, -0.1, 1.2)], 12);
       continue;
     }
+    // A crossed bar as a low pyramid under its dome: the dome's level lines are rectangles, and so are a pyramid's.
     const { hx, hz, angle } = half(f);
     const c = Math.cos(angle);
     const s = Math.sin(angle);
-    const box = (yy: number): P3[] => [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]].map(([u, v]) => [u * c + v * s, yy, -u * s + v * c] as const);
-    m.loft(box(0), box(topHeight(f, 0, 0) * 0.7), false, true);
+    const at = (u: number, v: number, yy: number): P3 => [u * c + v * s, yy, -u * s + v * c];
+    const eave = topHeight(f, hx, 0) - 0.1;
+    const U = hx - 0.1;
+    const V = hz - 0.1;
+    const base = [at(-U, -V, eave), at(U, -V, eave), at(U, V, eave), at(-U, V, eave)];
+    m.loft(base.map((p): P3 => [p[0], -0.1, p[2]]), base);
+    const apex = at(0, 0, topHeight(f, 0, 0) - 0.1);
+    for (let k = 0; k < 4; k++) {
+      const p = base[k];
+      const q = base[(k + 1) % 4];
+      const n = cross([q[0] - p[0], q[1] - p[1], q[2] - p[2]], [apex[0] - p[0], apex[1] - p[1], apex[2] - p[2]]);
+      m.tri([...p, ...n], [...q, ...n], [...apex, ...n]);
+    }
   }
 }
 
-/** The far stand-in of a four-top: its top, legs and aprons as boxes. */
+/** The unit normal of two edges, turned to face up. */
+function cross(a: readonly number[], b: readonly number[]) {
+  const n = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const l = Math.hypot(n[0], n[1], n[2]) * Math.sign(n[1]);
+  return n.map((x) => x / l);
+}
+
+/** A four-top: the top and its eased edge, the tapered legs, the aprons. */
 export function farFour(m: Mesh, top: Solid, legs: readonly Solid[], aprons: readonly Solid[]) {
   const { hx, hz } = half(top);
   const bottom = top.bottom ?? 0;
   const y = topHeight(top, 0, 0);
-  const box = (x0: number, z0: number, x1: number, z1: number, yy: number) => eased(x0, z0, x1, z1, yy, 0).filter((_, i) => i % 2 === 0);
-  m.kind(TBL.oak);
-  m.loft(box(-hx, -hz, hx, hz, bottom), box(-hx, -hz, hx, hz, y), true, true);
-  for (const s of [...legs, ...aprons]) {
-    const f = s.footprint;
-    const h = half(s);
-    m.loft(box(f.x - h.hx, f.z - h.hz, f.x + h.hx, f.z + h.hz, s.bottom ?? 0), box(f.x - h.hx, f.z - h.hz, f.x + h.hx, f.z + h.hz, bottom));
+  const box = (x0: number, z0: number, x1: number, z1: number, yy: number): P3[] => [[x0, z0], [x1, z0], [x1, z1], [x0, z1]].map(([x, z]) => [x, yy, z] as const);
+  m.kind(TBL.oak).grain(1, 0);
+  m.loft(box(-hx + 0.05, -hz + 0.05, hx - 0.05, hz - 0.05, bottom), box(-hx + 0.05, -hz + 0.05, hx - 0.05, hz - 0.05, y), true, true);
+  m.grain(0, 0);
+  for (const leg of legs) {
+    const f = leg.footprint;
+    const { hx: lx, hz: lz } = half(leg);
+    const sx = Math.sign(f.x);
+    const sz = Math.sign(f.z);
+    const ring = (yy: number, taper: number) => {
+      const xs = [f.x + sx * lx, f.x - sx * (lx - taper)];
+      const zs = [f.z + sz * lz, f.z - sz * (lz - taper)];
+      return box(Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), yy);
+    };
+    m.loft(ring(-0.1, 8), ring(bottom + 0.1, 0));
+  }
+  // The aprons' two faces and their lower edges: their ends are in the legs, their tops under the slab.
+  for (const a of aprons) {
+    const f = a.footprint;
+    const h = half(a);
+    const alongX = h.hx > h.hz;
+    const len = alongX ? h.hx : h.hz;
+    const t = alongX ? h.hz : h.hx;
+    const y0 = a.bottom ?? 0;
+    const at = (d: number, q: number, yy: number, nq: number, ny: number) => (alongX ? [f.x + d, yy, f.z + q, 0, ny, nq] : [f.x + q, yy, f.z + d, nq, ny, 0]);
+    m.grain(alongX ? 1 : 0, alongX ? 0 : 1);
+    for (const side of [-1, 1]) m.quad(at(-len, side * t, y0, side, 0), at(len, side * t, y0, side, 0), at(len, side * t, bottom + 0.1, side, 0), at(-len, side * t, bottom + 0.1, side, 0));
+    m.quad(at(-len, -t, y0, 0, -1), at(len, -t, y0, 0, -1), at(len, t, y0, 0, -1), at(-len, t, y0, 0, -1));
   }
 }
 
-/** The far stand-in of the chair, upright and upturned: seat, legs, posts and rails as a few prisms. */
+/**
+ * The chair, upright and upturned: a round seat, its cane inside the bent
+ * rim; five-sided legs; the back's two posts to their caps, the top rail
+ * straight across and the mid rail. Upturned, its cane is down on the table
+ * and left out.
+ */
 export function farChair(c: ChairSolids, flip: number): { upright: Mesh; upturned: Mesh } {
-  const build = (whole: boolean) => {
+  const R = radius(c.seat) - 0.05;
+  const under = c.seat.bottom ?? 0;
+  const cane = R - 17;
+  const seatY = (r: number) => topHeight(c.seat, r, 0);
+  const legR = radius(c.leg) - 0.4;
+  const postTop = topHeight(c.post, c.post.footprint.x, c.post.footprint.z);
+  const lx = Math.abs(c.leg.footprint.x);
+  // The near chair's wear: the rim's front, the caps.
+  const rimWear = (a: number) => [-Math.sin(a), Math.cos(a), Math.max(0, Math.sin(a)) ** 3 * 0.6] as const;
+  const build = (cane0: boolean) => {
     const m = new Mesh();
-    const R = radius(c.seat);
-    const under = c.seat.bottom ?? 0;
-    const crown = topHeight(c.seat, R * 0.5, 0);
-    m.kind(KIND.bentwood).plain();
-    const low = ring(0, 0, R, 8, under, Math.PI / 8);
-    const high = ring(0, 0, R, 8, crown, Math.PI / 8);
-    m.loft(low, high, true, false);
-    m.kind(KIND.cane);
-    fan(m, high, true);
-    m.kind(KIND.bentwood);
-    const r = radius(c.leg) - 1;
-    const lx = Math.abs(c.leg.footprint.x);
+    if (cane0) m.kind(KIND.cane).plain().revolve([tilt(0, seatY(0), 0), tilt(cane, seatY(cane), 0)], 16);
+    // The rim's top and side as one band, rounding from the cane's edge down to the seat's underside.
+    m.kind(TBL.bent).revolve([tilt(cane, seatY(cane), 0.2), tilt(R, under + 4, 1.9), tilt(0, under, Math.PI)], 16, 0, 0, rimWear);
+    m.plain();
     for (const s of [-1, 1]) {
-      m.loft(ring(s * lx, c.leg.footprint.z, r, 3, 0), ring(s * lx, c.leg.footprint.z, r, 3, under));
-      m.loft(ring(s * lx, c.post.footprint.z, r, 3, whole ? 0 : under), ring(s * lx, c.post.footprint.z, r, 3, topHeight(c.post, c.post.footprint.x, c.post.footprint.z) - 2), false, true);
+      m.revolve([tilt(legR - 2.6, 0, Math.PI / 2), tilt(legR, under + 1, Math.PI / 2)], 5, s * lx, c.leg.footprint.z);
+      m.revolve([tilt(legR - 2.6, 0, Math.PI / 2), tilt(legR - 0.8, postTop - 3, 1.2)], 5, s * lx, c.post.footprint.z);
+      // The cap flat, a little under the world's dome.
+      const cap = Array.from({ length: 5 }, (_, k) => [s * lx + (legR - 0.8) * Math.cos((k * 2 * Math.PI) / 5), postTop - 3, c.post.footprint.z + (legR - 0.8) * Math.sin((k * 2 * Math.PI) / 5), 0, 1, 0]);
+      m.grain(0, 0, 0.5);
+      for (let k = 1; k < 4; k++) m.tri(cap[0], cap[k], cap[k + 1]);
+      m.plain();
     }
-    for (const s of [c.rail, c.mid]) {
-      const h = half(s);
-      const f = s.footprint;
-      const yb = s.bottom ?? 0;
-      const yt = topHeight(s, f.x, f.z) - (s === c.rail ? 4 : 0);
-      const box = (yy: number): P3[] => [[-h.hx, f.z - h.hz], [h.hx, f.z - h.hz], [h.hx, f.z + h.hz], [-h.hx, f.z + h.hz]].map(([x, z]) => [x, yy, z] as const);
-      m.loft(box(yb), box(yt));
-    }
+    // The rails as prisms between the posts' middles, the top one's gable under the world's vault.
+    const rail = (s: Solid, reach: number, section: readonly (readonly [number, number])[], wear: number) => {
+      const z = s.footprint.z;
+      const end = (x: number) => section.map(([v, yy]) => [x, yy, z + v] as const);
+      m.grain(1, 0, wear).loft(end(-reach), end(reach));
+    };
+    const rd = half(c.rail).hz - 0.05;
+    const rb = c.rail.bottom ?? 0;
+    const rTop = topHeight(c.rail, 0, c.rail.footprint.z);
+    rail(c.rail, lx, [[-rd, rb], [rd, rb], [rd, rTop - 11], [0, rTop - 0.2], [-rd, rTop - 11]], 0.2);
+    const md = half(c.mid).hz - 0.05;
+    const m0 = c.mid.bottom ?? 0;
+    const m1 = topHeight(c.mid, 0, c.mid.footprint.z);
+    rail(c.mid, lx - 8, [[-md, m0], [md, m0], [md, m1], [-md, m1]], 0);
     return m;
   };
   return { upright: build(true), upturned: build(false).flipped(flip) };
