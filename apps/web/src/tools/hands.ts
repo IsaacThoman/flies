@@ -335,9 +335,10 @@ export class Hands {
   }
 
   #drop(kind: FoodKind) {
-    // On the surface the pointer is on: under a table, the floor there, not the table top.
-    const floor = this.#world.heightAt(this.pointer.x, this.pointer.z, this.pointer.y);
-    this.falling.push({ kind, x: this.pointer.x, z: this.pointer.z, y: floor + DROP_HEIGHT, floor, vy: 0 });
+    // Onto the surface the pointer is on (under a table, the floor there, not the table top), from under whatever is over it.
+    const s = this.#world.surface(this.pointer.x, this.pointer.z, surface, this.pointer.y);
+    const floor = s.y;
+    this.falling.push({ kind, x: this.pointer.x, z: this.pointer.z, y: Math.max(floor, Math.min(floor + DROP_HEIGHT, s.underside - 1)), floor, vy: 0 });
     this.events.dropped = kind;
   }
 

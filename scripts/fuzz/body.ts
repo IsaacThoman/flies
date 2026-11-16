@@ -21,7 +21,7 @@ export function checkBody(body: FlyBody, world: World) {
   const p = body.position;
   // Its feet out of everything, and room for its body over them.
   const room = world.underside(p.x, p.z, p.y) - p.y;
-  assert.ok(room >= FLY_HEIGHT - 1e-6, `inside ${world.solids[world.solidAt(p.x, p.y + Math.max(0, room) + 1e-3, p.z)]?.name ?? "a solid"}: y=${p.y}, room=${room}`);
+  if (!(room >= FLY_HEIGHT - 1e-6)) assert.fail(`inside ${world.solids[world.solidAt(p.x, p.y + Math.max(0, room) + 1e-3, p.z)]?.name ?? "a solid"}: y=${p.y}, room=${room}`);
   // On its feet, it stands on the surface under them.
   const under = world.surface(p.x, p.z, surface, p.y);
   if (body.onFeet) {
