@@ -4,7 +4,7 @@
 
 import type { BrainSenses } from "@fly/brain";
 import type { BrainDriver } from "@fly/contracts";
-import { Behavior, Crowd, FlyBody, SenseTracker } from "@fly/body";
+import { Behavior, Crowd, FlyBody, Hunger, SenseTracker } from "@fly/body";
 import type { Forces, Intent, Looming } from "@fly/body";
 import { Pantry } from "@fly/world";
 import type { Food, Place, Vec3, World } from "@fly/world";
@@ -29,6 +29,8 @@ export class Life {
   readonly body: FlyBody;
   readonly behavior = new Behavior();
   readonly senses = new SenseTracker();
+  /** How hungry it is and how full its crop, from what it has eaten: the brain is sent the hunger. */
+  readonly hunger = new Hunger();
   readonly brain: BrainDriver;
   /** Other flies at a table with others (none alone): bodies it can't walk through, which its antennae and its body feel. */
   readonly crowd: Crowd;
@@ -121,6 +123,7 @@ export class Life {
     sent.sweet = felt.sweet;
     sent.grounded = felt.grounded;
     sent.maleTaste = felt.maleTaste;
+    sent.hunger = this.hunger.level;
     if (this.light) sent.light = this.light;
     else delete sent.light;
     brain.tick(dt * 1000, sent);
@@ -143,10 +146,14 @@ export class Life {
 
     // Eating: the brain wants to feed, and its mouthparts are on something sweet.
     this.eating = false;
+    let sugar = 0;
     if (intent.feeding && food && food.sweet > 0 && body.onFeet && this.senses.tasting.byMouth) {
-      this.eaten += this.pantry.eat(food, intent.feed, dt);
+      const bite = this.pantry.eat(food, intent.feed, dt);
+      this.eaten += bite;
+      sugar = bite * food.sweet;
       this.eating = true;
     }
+    this.hunger.step(dt, sugar);
     if (this.eating && !this.#wasEating) this.meals++;
     this.#wasEating = this.eating;
     this.#proboscis += ((intent.feeding ? 1 : 0) - this.#proboscis) * Math.min(1, dt * 6);

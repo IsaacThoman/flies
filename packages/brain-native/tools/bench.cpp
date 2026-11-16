@@ -152,8 +152,8 @@ int main(int argc, char** argv) {
   std::printf("memory: %.1f MB with the file read, %.1f MB with the brain built (the brain and building it: %.1f MB)\n", megabytes(before), megabytes(built),
               megabytes(built - before));
 
-  const fly_senses rest{0, 0, 0, 0, 0, 0, 0, 1, nullptr, nullptr, 0};
-  const fly_senses everything{1, 1, 1, 1, 1, 1, 1, 1, nullptr, nullptr, 1};
+  const fly_senses rest{0, 0, 0, 0, 0, 0, 0, 1, nullptr, nullptr, 0, 1};
+  const fly_senses everything{1, 1, 1, 1, 1, 1, 1, 1, nullptr, nullptr, 1, 1};
   regime(brain, "at rest (standing)", rest, seconds);
   regime(brain, "every sense at full strength", everything, seconds);
   if (argc > 4) {

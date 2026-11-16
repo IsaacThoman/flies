@@ -155,6 +155,24 @@ test("left and right mirror each other: either eye's loom escapes alike, and a s
   assert.ok(ratio > 1 / 1.6 && ratio < 1.6, `left ${turns[0]} against right ${turns[1]}`);
 });
 
+test("a fed fly leaves alone sugar that a starved one feeds on", { skip }, () => {
+  // Sugar at 0.6 for 3 s after 2 s of rest, seeds 1 to 3 (hunger.ts section a): the body feeds above 0.15.
+  const feed = (hunger: number) => {
+    let sum = 0;
+    for (const seed of [1, 2, 3]) {
+      const b = new FlyBrain(connectome!, { seed });
+      run(b, 2000, { ...RESTING_SENSES, hunger });
+      sum += mean(b, 3000, { ...RESTING_SENSES, sweet: 0.6, hunger }).feed;
+    }
+    return sum / 3;
+  };
+  const fed = feed(0);
+  const starved = feed(1);
+  assert.ok(starved > 0.2, `starved ${starved}`);
+  assert.ok(fed < 0.15, `fed ${fed}`);
+  assert.ok(fed < 0.6 * starved, `fed ${fed} against starved ${starved}`);
+});
+
 test("touch makes it back away, wind or a push on either antenna makes it groom, sweet makes it feed, and looming opens the wings", { skip }, () => {
   const restB = brain();
   run(restB, 1000);

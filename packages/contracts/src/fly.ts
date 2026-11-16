@@ -26,9 +26,11 @@ export type FlyPose = {
    * vibrating; its left wing when positive, its right when negative.
    */
   sing: number;
+  /** 0 to 1: how full its crop is, 0 empty to 1 a full meal; the abdomen swells with it. Left out, 0. */
+  fullness?: number;
 };
 
-export const RESTING_POSE: FlyPose = { speed: 0, turn: 0, airborne: false, wings: 0, groom: 0, feed: 0, crouch: 0, pitch: 0, roll: 0, sing: 0 };
+export const RESTING_POSE: FlyPose = { speed: 0, turn: 0, airborne: false, wings: 0, groom: 0, feed: 0, crouch: 0, pitch: 0, roll: 0, sing: 0, fullness: 0 };
 
 /** Points on the fly the game needs: for food, cameras, effects and the eyes' view. */
 export type FlyAnchor = "mouth" | "head" | "leftEye" | "rightEye" | "back";

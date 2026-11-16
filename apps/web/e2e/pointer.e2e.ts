@@ -28,7 +28,7 @@ import type { Page } from "playwright";
 import { Fingers, canvasPoint, openGame, readState, screenOf, startServer, targetOf, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 
 import type { Game } from "../src/game.ts";
-import { feedHoney } from "./feeding.ts";
+import { dropFood, feedHoney } from "./feeding.ts";
 
 /** The frame's budget on the Apple TV, as play.e2e.ts holds it to. */
 const MAX_CALLS = 150;
@@ -130,11 +130,7 @@ async function fingers() {
     await tool("feed");
     await tapOn("kind", 1);
     await waitFor(page, "variant=honey");
-    await feedHoney(page, async () => {
-      const before = Number((await readState(page)).food);
-      await touch.tap(await screenOf(page, "hand"));
-      await waitFor(page, `food>${before}`);
-    });
+    await feedHoney(page, () => dropFood(page, async () => touch.tap(await screenOf(page, "hand"))));
 
     step("fingers: a finger held on the fly strokes it with the feather");
     await tool("feather");
@@ -275,10 +271,10 @@ async function mouse() {
     }, spot, { timeout: 60_000 });
 
     step("mouse: a click drops food where it points");
-    const food = Number((await readState(page)).food);
-    await page.mouse.down();
-    await page.mouse.up();
-    await waitFor(page, `food>${food}`);
+    await dropFood(page, async () => {
+      await page.mouse.down();
+      await page.mouse.up();
+    });
 
     step("mouse: each click of the wheel brings the camera a little nearer, smoothly, and back out; it stays where it is left");
     const start = Number((await waitFor(page, "view=follow")).reach);
@@ -331,17 +327,23 @@ async function mouse() {
       await page.keyboard.press("r");
       await waitFor(page, "looking=false");
     }
-    // Turned low and round with the right button until there is some air over the table to double-click.
-    let sky: [number, number] | null = null;
-    for (let i = 0; i < 6 && !sky; i++) {
+    // Turned low and round with the right button until there is some air over the table to double-click, as
+    // the game sees it under the pointer (a grab, not the hand): the camera glides on and follows the fly after
+    // a drag, so air found a moment before can have the table under it by the time the mouse gets there.
+    let at: { x: number; y: number } | null = null;
+    for (let i = 0; i < 6 && !at; i++) {
       await rightDrag(page, [0.5, 0.6], [0.65, 0.3]);
       // The game takes the drag a frame or more later, longer on a loaded machine: look for air once it has.
       await waitForGameTime(page, 0.6);
-      sky = await airOf(page);
+      const sky = await airOf(page);
+      if (!sky) continue;
+      const point = await canvasPoint(page, sky);
+      await page.mouse.move(point.x, point.y);
+      await waitForGameTime(page, 0.1);
+      if ((await page.evaluate(() => (document.getElementById("game") as HTMLCanvasElement).style.cursor)) === "grab") at = point;
     }
-    assert.ok(sky, "some air to double-click");
+    assert.ok(at, "some air to double-click");
     await waitFor(page, "looking=true");
-    const at = await canvasPoint(page, sky);
     await page.mouse.dblclick(at.x, at.y);
     // At once: left alone it would stay where the mouse put it.
     await waitFor(page, "looking=false");
