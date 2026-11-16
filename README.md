@@ -395,8 +395,12 @@ turns from the fly to the table's middle); the named views are points on it,
 and the View tool names the one it is nearest. It stays wherever you leave it.
 Turned round the fly, it stays where you put it for five seconds after you let
 go; then the cameraman carries on from there, moving only when it would have
-anyway. Handed back (R, a double click or tap in the air, the pad's right
-stick pressed in), the cameraman takes it at once, at the named view nearest your zoom.
+anyway. A mouse or a trackpad orbits it freely instead: turned round the fly,
+up or down, or brought in or out, it stays just where you put it, however the
+fly turns, until you give it back; each click of a mouse wheel eases in, so a
+turn of the wheel is one smooth move. Handed back (R, a double click or tap in
+the air, the pad's right stick pressed in), or a view chosen on the View tool,
+the cameraman takes it at once, at the named view nearest your zoom or the one chosen.
 The wallpaper takes it too, and gives your zoom back after.
 
 After a minute with no press (Settings → Wallpaper: 30 s to 5 min, or never)
@@ -884,7 +888,7 @@ puff held on the fly, a pinch, a look round that stays a while, the phone
 turned on its side, the wallpaper woken by a tap that does nothing else) and
 with a mouse and keys on a desktop (hovering moves no focus, the wheel zooms
 smoothly and stays, drags with each button turn the camera without dropping
-food, R and a double click give it back, a trackpad's pinch and + zoom too). Then it builds the site and serves it from a folder of a static
+food and it stays where it was put, R and a double click give it back, a trackpad's pinch and + zoom too). Then it builds the site and serves it from a folder of a static
 server (`apps/web/e2e/web.e2e.ts`): a first visit on a slow connection that
 breaks off partway counts the brain's bytes and carries on from the break, a
 second loads with the network off, a hidden tab sleeps and wakes without a

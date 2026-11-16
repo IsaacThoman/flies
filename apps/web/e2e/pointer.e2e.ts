@@ -15,8 +15,8 @@
 // With a mouse, in a desktop window: hovering over the menu moves no focus
 // and shows no ring, and the first arrow shows it; the hand is under the
 // cursor, a click drops food there, the wheel brings the camera smoothly in
-// and out, a drag from the table, a right-drag and a middle-drag turn it, a
-// double click in the air or R gives it back, a trackpad's pinch zooms, the
+// and out, a drag from the table, a right-drag and a middle-drag turn it and
+// it stays where it was put, a double click in the air or R gives it back, a trackpad's pinch zooms, the
 // number keys pick tools and + held zooms, and a nudge of the desk doesn't
 // wake the wallpaper while a mouse moved as if meant does.
 //
@@ -291,6 +291,9 @@ async function mouse() {
       last = now;
     }
     await waitFor(page, "view=close");
+    // Each click eases in over a moment; once in, left there, it stays there.
+    await waitForGameTime(page, 0.5);
+    last = Number((await readState(page)).reach);
     await waitForGameTime(page, 1.5);
     assert.equal(Number((await readState(page)).reach), last, "left there, it stays there");
     for (let i = 0; i < 4; i++) await page.mouse.wheel(0, 100);
@@ -320,6 +323,11 @@ async function mouse() {
       await page.mouse.up({ button });
       await waitForGameTime(page, 0.3);
       assert.equal((await readState(page)).food, food, `${button}: no food dropped`);
+      if (button === "left") {
+        // A mouse orbits freely: long after a finger's turn would have gone back to the cameraman, it is still where it was put.
+        await waitForGameTime(page, 7);
+        assert.equal((await readState(page)).looking, "true", "it stays where the mouse put it");
+      }
       await page.keyboard.press("r");
       await waitFor(page, "looking=false");
     }
@@ -335,7 +343,7 @@ async function mouse() {
     await waitFor(page, "looking=true");
     const at = await canvasPoint(page, sky);
     await page.mouse.dblclick(at.x, at.y);
-    // At once: left alone it would stay turned for five seconds.
+    // At once: left alone it would stay where the mouse put it.
     await waitFor(page, "looking=false");
 
     step("keys: a number picks a tool, and the hints are a keyboard's");
