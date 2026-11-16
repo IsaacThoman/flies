@@ -84,6 +84,10 @@ export class Stage {
   buildMs = 0;
   /** The longest of the frames it was built in (SceneSet.more), ms: what one frame behind the veil cost. */
   buildStepMs = 0;
+  /** A set built in steps: its hidden parts still to be drawn once behind the veil (null while it is still being built), the one drawn this frame, and its meshes the camera's view would have culled. */
+  #unseen: THREE.Object3D[] | null = null;
+  #seen: THREE.Object3D | null = null;
+  #uncull: THREE.Object3D[] = [];
 
   constructor(canvas: HTMLCanvasElement, time: TimeOfDay, scene: Scene) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance", stencil: false });
@@ -134,20 +138,46 @@ export class Stage {
     this.set = scene.buildSet();
     this.buildMs = performance.now() - started;
     this.buildStepMs = this.buildMs;
+    this.#unseen = null;
+    this.#seen = null;
     this.scene.add(this.set.group);
     this.#applyLight();
     this.#envDirty = true;
   }
 
-  /** Builds the next part of the place shown, if it is built in steps (SceneSet.more): true while there is more. */
+  /**
+   * Builds the next part of the place shown, if it is built in steps
+   * (SceneSet.more): true while there is more. Then, a frame each, it shows
+   * each part of it that is hidden (a large place's detail away from the
+   * camera) to that frame's render behind the veil, so its buffers are on
+   * the GPU before the veil lifts: the camera coming near it later has
+   * nothing to upload, and what the place holds on the GPU doesn't depend
+   * on where the camera has been.
+   */
   buildMore(): boolean {
     if (!this.set.more) return false;
     const started = performance.now();
-    const more = this.set.more();
+    if (this.#seen) {
+      this.#seen.visible = false;
+      for (const o of this.#uncull) o.frustumCulled = true;
+      this.#seen = null;
+    }
+    if (this.#unseen === null) {
+      if (!this.set.more()) this.#unseen = this.set.group.children.filter((o) => !o.visible);
+    } else if (this.#unseen.length) {
+      const part = (this.#seen = this.#unseen.pop()!);
+      part.visible = true;
+      this.#uncull.length = 0;
+      part.traverse((o) => {
+        if (!o.frustumCulled) return;
+        o.frustumCulled = false;
+        this.#uncull.push(o);
+      });
+    }
     const ms = performance.now() - started;
     this.buildMs += ms;
     this.buildStepMs = Math.max(this.buildStepMs, ms);
-    return more;
+    return this.#unseen === null || this.#unseen.length > 0 || this.#seen !== null;
   }
 
   get renderScene(): THREE.Scene { return this.#renderScene; }

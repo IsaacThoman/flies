@@ -244,7 +244,11 @@ TV has (`places/restaurant/`):
 - **Built in steps.** The whole room is several times the picnic's work to
   build, so it is built a part a frame behind the veil (`SceneSet.more`): the
   game holds the veil until it is done, and no one frame is longer than the
-  picnic's whole build.
+  picnic's whole build. Then each part of it that is hidden (an area's
+  detail) is drawn once behind the veil, a frame each, so its buffers are on
+  the GPU before the veil lifts: nothing is uploaded when the camera first
+  comes near it, and what the place holds on the GPU is the same however the
+  camera has gone (the browser soak checks it, `docs/web-soak.md`).
 
 ## Rules
 
