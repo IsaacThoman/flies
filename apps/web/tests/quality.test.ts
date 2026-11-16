@@ -71,7 +71,7 @@ test("a slow brain steps the picture down only while that helps it", () => {
   const bound = new Quality(saved);
   run(bound, 60, 16, 0.6);
   assert.equal(bound.level, 0, "a brain no cheaper picture helps is left as it is, and the picture with it");
-  assert.equal(saved.items.get("apple-tv-fly.quality") ?? "0", "0", "the way down isn't remembered");
+  assert.equal(saved.items.get("flies.quality") ?? "0", "0", "the way down isn't remembered");
   run(bound, 120, 16, 0.6);
   assert.equal(bound.level, 0, "and it doesn't try again");
 
@@ -103,11 +103,11 @@ test("the player's own choice starts afresh: no trial or half-judged window left
 });
 
 test("it starts a step better than where it settled last time, and the player's own choice resets it", () => {
-  const saved = store({ "apple-tv-fly.quality": "4" });
+  const saved = store({ "flies.quality": "4" });
   const q = new Quality(saved);
   assert.equal(q.level, 3);
   run(q, 120, 60);
-  assert.equal(saved.items.get("apple-tv-fly.quality"), String(LEVELS.length - 1));
+  assert.equal(saved.items.get("flies.quality"), String(LEVELS.length - 1));
   q.reset();
   assert.equal(q.level, 0);
 });

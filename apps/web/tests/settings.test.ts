@@ -26,8 +26,8 @@ function memory(saved: Record<string, string> = {}) {
     },
   };
 }
-const settingsSaved = (value: unknown) => memory({ "apple-tv-fly.settings": typeof value === "string" ? value : JSON.stringify(value) });
-const shelfSaved = (value: unknown) => memory({ "apple-tv-fly.shelf": typeof value === "string" ? value : JSON.stringify(value) });
+const settingsSaved = (value: unknown) => memory({ "flies.settings": typeof value === "string" ? value : JSON.stringify(value) });
+const shelfSaved = (value: unknown) => memory({ "flies.shelf": typeof value === "string" ? value : JSON.stringify(value) });
 
 const HOUR = 3_600_000;
 const NOW = Date.UTC(2026, 10, 16, 20);
@@ -139,9 +139,9 @@ test("what the hints have taught comes back, of the lessons this build has", () 
   saveLearned({ tools: true, feed: true, feather: true }, store);
   assert.deepEqual(loadLearned(store), { tools: true, feed: true, feather: true });
   // A tool since dropped, or a value that isn't a plain yes, is passed over.
-  const old = memory({ "apple-tv-fly.learned": JSON.stringify({ tools: true, lamp: true, swoop: 1, blow: "yes", place: true }) });
+  const old = memory({ "flies.learned": JSON.stringify({ tools: true, lamp: true, swoop: 1, blow: "yes", place: true }) });
   assert.deepEqual(loadLearned(old), { tools: true, place: true });
-  for (const raw of ["", "{", "null", '["tools"]', "true"]) assert.deepEqual(loadLearned(memory({ "apple-tv-fly.learned": raw })), {}, raw);
+  for (const raw of ["", "{", "null", '["tools"]', "true"]) assert.deepEqual(loadLearned(memory({ "flies.learned": raw })), {}, raw);
   assert.deepEqual(loadLearned(null), {});
 });
 

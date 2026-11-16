@@ -57,7 +57,7 @@ const BRAIN_BEHIND = 0.95;
  */
 const HITCH_MS = 1000;
 /** Where the level it settled at is kept, to start from next time. */
-const KEY = "apple-tv-fly.quality";
+const KEY = "flies.quality";
 
 const PIXEL_ORDER: readonly PixelSize[] = ["classic", "chunky", "chunkier"];
 const EYES_ORDER: readonly EyesDetail[] = ["off", "low", "high"];

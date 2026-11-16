@@ -210,7 +210,7 @@ function spot(frame: Frame, x: number, y: number) {
   return { across: x / (width / 2) - 1, low: y / (height / 2) - 1 };
 }
 
-/** The wordmark's size to fit a width: about 6.5 of it across "apple tv fly". */
+/** The wordmark's size for a width: a 6.5th of it, in proportion to the brain's state under it. */
 const wordmarkFor = (width: number, most: number) => Math.max(24, Math.min(most, (width - 32) / 6.5));
 
 export type TitleLayout = {

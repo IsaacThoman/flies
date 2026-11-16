@@ -1,4 +1,4 @@
-# apple-tv-fly
+# flies
 
 A simulated fruit fly that lives on an Apple TV. Read `docs/architecture.md`
 before changing anything: it says what each part is, who talks to whom, and

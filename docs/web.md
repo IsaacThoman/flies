@@ -273,8 +273,7 @@ copy asks the browser to keep its storage (`navigator.storage.persist()`), so
 the brain isn't cleared when space runs short; a plain tab doesn't ask,
 since Firefox would show a prompt.
 
-It is named "Apple TV Fly", what the title screen's wordmark says. Whether
-that suits a web page (and the trademark in it) is the owner's to decide;
+It is named "Flies", what the title screen's wordmark says:
 `APP_NAME` in `scripts/webBuild.ts` and the page's `<title>` are the two
 places it is set.
 

@@ -81,9 +81,9 @@ const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean 
   scene: isPlaceId,
 };
 
-const SETTINGS_KEY = "apple-tv-fly.settings";
-const SHELF_KEY = "apple-tv-fly.shelf";
-const LEARNED_KEY = "apple-tv-fly.learned";
+const SETTINGS_KEY = "flies.settings";
+const SHELF_KEY = "flies.shelf";
+const LEARNED_KEY = "flies.learned";
 
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 

@@ -53,7 +53,9 @@ Needs a Mac with Xcode 27 and XcodeGen (`brew install xcodegen`), and the connec
 (`npm run brain:fetch`). For a device: an Apple TV 4K on tvOS 26 or later, paired with the Mac
 (Settings → Remotes and Devices → Remote App and Devices on the TV, then Xcode's Devices window or
 `xcrun devicectl manage pair`), and a paid developer team signed in to Xcode. Builds sign with
-`TVOS_TEAM_ID` (default `PX72AL9366`) and `TVOS_BUNDLE_ID` (default `com.isaacthoman.appletvfly`).
+`TVOS_TEAM_ID` (default `PX72AL9366`) and `TVOS_BUNDLE_ID` (default `com.isaacthoman.flies`).
+The app used to be `com.isaacthoman.appletvfly`: a TV with that one installed gets this as a
+separate app, with its settings starting fresh, and the old one can be deleted.
 `TVOS_WEATHERKIT=1` builds in the weather outside, which needs the App ID set up first: see
 [Turning it on](#turning-it-on-for-the-owner). Without it the app is built as it always was, with
 no Swift, no WeatherKit, no location and no entitlements.
@@ -81,7 +83,7 @@ npm run tvos:check -- --weatherkit       # ...with the real weather service
    module loader, so everything is inlined; `apps/web/public` is copied beside it;
 4. copies `packages/brain/data/connectome.bin` to `www/brain/` (and stops, saying how to get
    it, if it isn't there);
-5. generates `AppleTVFly.xcodeproj` (XcodeGen, `project.yml`, with `weather.yml` and
+5. generates `Flies.xcodeproj` (XcodeGen, `project.yml`, with `weather.yml` and
    `weatherkit.yml` merged in when the weather is wanted) and builds it with xcodebuild.
 
 The Xcode project compiles every source under `packages/brain-native/src/` with that
@@ -126,7 +128,7 @@ final measurement. Pull its log while it runs or after `drive: soak complete`:
 
 ```sh
 xcrun devicectl device copy from --device <udid> \
-  --domain-type appDataContainer --domain-identifier com.isaacthoman.appletvfly \
+  --domain-type appDataContainer --domain-identifier com.isaacthoman.flies \
   --source Library/Caches/performance.log --destination /tmp/fly-performance.log
 ```
 
@@ -372,8 +374,9 @@ The team's wildcard profile can't carry WeatherKit, so until this is done builds
 are, without it, and the game uses its made-up forecast.
 
 1. In [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list)
-   for team `PX72AL9366`, open the App ID `com.isaacthoman.appletvfly` (or whatever
+   for team `PX72AL9366`, open the App ID `com.isaacthoman.flies` (or whatever
    `TVOS_BUNDLE_ID` is), or register it: Identifiers → + → App IDs → App, Explicit Bundle ID.
+   WeatherKit set up on the old `com.isaacthoman.appletvfly` doesn't carry over: this is a new App ID.
 2. On its **Capabilities** tab tick **WeatherKit**, and on its **App Services** tab tick
    **WeatherKit** too (the usual missing step when WeatherKit refuses an app). Save.
 3. Build and install with the switch on: `TVOS_WEATHERKIT=1 npm run tvos -- build`, then

@@ -1,4 +1,4 @@
-# apple-tv-fly
+# flies
 
 A fruit fly that lives on your Apple TV, or in a browser tab. It isn't
 scripted: a simulation of the fly's whole nervous system, 166,700 neurons

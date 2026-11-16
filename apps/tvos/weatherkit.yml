@@ -2,9 +2,9 @@
 # entitlement (which signing for a device then needs an explicit App ID with the WeatherKit
 # capability for, docs/apple-tv.md) and the reason shown when tvOS asks for the TV's location.
 targets:
-  AppleTVFly:
+  Flies:
     entitlements:
-      path: AppleTVFly.entitlements
+      path: Flies.entitlements
       properties:
         com.apple.developer.weatherkit: true
     info:

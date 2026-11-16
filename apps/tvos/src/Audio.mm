@@ -231,7 +231,7 @@ void Restart(NSString *why) {
 
 void Start() {
   if (gEngine) return;
-  gEvents = dispatch_queue_create("appletvfly.audio.events", DISPATCH_QUEUE_SERIAL);
+  gEvents = dispatch_queue_create("flies.audio.events", DISPATCH_QUEUE_SERIAL);
   AVAudioSession *session = AVAudioSession.sharedInstance;
   SetCategory();
   [session setActive:YES error:nil];

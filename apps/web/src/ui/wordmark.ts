@@ -1,10 +1,10 @@
-// The game's name as a glossy wordmark: "apple tv fly" in round white letters
-// with a candy outline, and a little fly for the dot of the i.
+// The game's name as a glossy wordmark: "flies" in round white letters with
+// a candy outline, and a little fly circling it.
 
 import { FONT, TAU } from "@fly/ui";
 
 export function drawWordmark(g: CanvasRenderingContext2D, x: number, y: number, size: number, t: number) {
-  const word = "apple tv fly";
+  const word = "flies";
   g.save();
   g.font = `700 ${size}px ${FONT}`;
   g.textAlign = "center";
