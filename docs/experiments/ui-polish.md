@@ -1,0 +1,26 @@
+# UI hill climb
+
+Scope: title, Settings, About, Online, HUD, tool shelf and corner layout. No sound, gameplay changes, camera edits or Online default-room changes.
+
+## Rubric
+
+Each criterion is scored independently from 0 to 10 by three fresh blind reviewers. A 10 means:
+
+| Criterion | A 10 looks like |
+| --- | --- |
+| Clarity | The next action and current value are immediately apparent, with only necessary text. |
+| Polish | Consistent glass, spacing, alignment and readable type hierarchy throughout. |
+| Remote navigation | Predictable directional focus, short paths, no traps or unnecessary steps. |
+| Pointer and touch | Every target is at least 44 CSS pixels on touch, visibly actionable, and hover never shows keyboard focus. |
+| Fit | Every screen fits TV 1920×1080, desktop 1440×900, phone 390×844 / 844×390 and iPad 1024×1366 without clipping or crowding. |
+| Legibility | Labels, values and selected states are easy to read from a TV couch and a phone. |
+| No redundancy | Each screen and action has a distinct purpose; repeated labels add no navigation burden. |
+| Accessibility | Adequate contrast, explicit selection and state cues independent of colour. |
+
+## Method
+
+Screenshots are driven by `scripts/play.ts` against a local room server, with the real brain and renderer. Evidence sets have neutral names; each review receives only the rubric and evidence. Version order is randomized separately for each reviewer. Navigation counts start on the title with Play focused and Settings' first tab selected. Each directional press, activation, click or tap counts once; counts stop when the setting has focus (remote) or can be changed (pointer/touch). Screenshots and raw traces live outside the feature branch. Images are published only on `pr-assets-ui-polish`.
+
+## Rounds
+
+Baseline capture and independent review pending.
