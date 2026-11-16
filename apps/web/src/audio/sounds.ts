@@ -293,7 +293,15 @@ function barLoop(ctx: BaseAudioContext) {
   return buffer;
 }
 
-/** A bistro after closing: the machinery and the street, softened by the empty room. */
+/**
+ * A bistro after closing: the ventilation's hush and a ballast's faint hum;
+ * the drinks fridge's compressor starting with a knock, droning with a
+ * little rattle for most of half the minute and clicking off; the ice machine
+ * under the counter dropping a batch and refilling; the building ticking as
+ * it cools; and the city through the shop windows, a low wash with now and
+ * then a car going by outside. A minute that loops, rendered at a low rate
+ * (it is all below 4 kHz), its tail cross-faded into its head.
+ */
 function restaurantLoop(ctx: BaseAudioContext) {
   const rate = 8000;
   const seconds = 64;
