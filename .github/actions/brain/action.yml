@@ -1,0 +1,15 @@
+name: Brain data
+description: Restore or download the packed connectome and anatomy.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      id: brain
+      with:
+        path: packages/brain/data
+        # Match the Dockerfile's brain inputs so game edits keep the download cached.
+        key: brain-${{ hashFiles('packages/brain/scripts/fetch.ts', 'packages/brain/src/**') }}
+    - if: steps.brain.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm run brain:fetch
