@@ -25,7 +25,7 @@ declare global { var __fly: Game; }
 const PHASES = ["places", "climate", "tools", "menus", "eyes", "tables", "wallpaper"] as const;
 type Phase = typeof PHASES[number];
 type Sample = { seconds: number; phase: string; place: string; checkpoint: boolean; [metric: string]: number | string | boolean };
-const STATE = ["screen", "tab", "brainEngine", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden", "xray", "nerves", "prints"];
+const STATE = ["screen", "tab", "brainEngine", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden", "xray", "nerves", "prints", "statsPanel", "statsKind", "overlaySize", "overlayOpacity"];
 const CLOCKS = ["gameSeconds", "audioSeconds", "eyesUpdates"];
 const METRICS = ["geometries", "textures", "programs", "calls", "triangles", "heap", "backing", "workerHeap", "workerBacking", "workerWasm", "nodes", "listeners", "audioNodes", "frameMs", "brainSpeed", "storage"];
 
@@ -115,6 +115,10 @@ async function canonical(page: Page) {
     g.settings.eyes = "low";
     g.settings.eyesInset = "always";
     g.settings.nerves = "always";
+    g.settings.statsPanel = "always";
+    g.settings.statsKind = "both";
+    g.settings.overlaySize = "medium";
+    g.settings.overlayOpacity = "full";
     g.settings.xray = "off";
     g.settings.pixels = "classic";
     g.applySettings();
@@ -192,6 +196,9 @@ export async function run(args = process.argv.slice(2)) {
         gameSeconds: globalThis.__fly.time,
         audioSeconds: globalThis.__fly.audio.ctx?.currentTime ?? NaN,
         eyesUpdates: globalThis.__fly.eyes.updates,
+        statsKind: globalThis.__fly.settings.statsKind,
+        overlaySize: globalThis.__fly.settings.overlaySize,
+        overlayOpacity: globalThis.__fly.settings.overlayOpacity,
       }));
       if (current === "wallpaper" && lastLive && Date.now() - lastLive.at >= 2000) {
         assert.ok(live.gameSeconds > lastLive.gameSeconds, `${name}: frames stopped`);
@@ -315,8 +322,8 @@ export async function run(args = process.argv.slice(2)) {
             await waitFor(page, `screen=${screen}`);
             if (screen === "settings") {
               for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowUp");
-              for (let i = 0; i < 2; i++) await page.keyboard.press("ArrowLeft");
-              for (const tab of ["wallpaper", "sound", "picture"]) {
+              for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowLeft");
+              for (const tab of ["wallpaper", "screen", "sound", "picture"]) {
                 await waitFor(page, `tab=${tab},focus=page`);
                 await page.keyboard.press("ArrowDown");
                 await page.keyboard.press("ArrowRight");
@@ -370,6 +377,16 @@ export async function run(args = process.argv.slice(2)) {
               await page.waitForTimeout(view === "inside" ? 1500 : 500);
               await sample();
             }
+          }
+          for (const shown of ["off", "always", "wallpaper"] as const) for (const kind of ["brain", "day", "both"] as const) for (const size of ["small", "medium", "large"] as const) for (const opacity of ["full", "soft", "faint"] as const) {
+            await page.evaluate(({ shown, kind, size, opacity }) => {
+              const g = globalThis.__fly;
+              g.settings.statsPanel = shown; g.settings.statsKind = kind;
+              g.settings.overlaySize = size; g.settings.overlayOpacity = opacity;
+              g.applySettings();
+            }, { shown, kind, size, opacity });
+            await page.waitForTimeout(500);
+            await sample(false, true);
           }
         }
         await sample();

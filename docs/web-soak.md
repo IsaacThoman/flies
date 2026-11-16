@@ -40,9 +40,11 @@ The interaction page waits for `data-moving` to clear between places; climate vi
 weather and all five daylight presets plus the clock, holding each combination
 for 12 seconds, waiting for each weather to arrive, recording every combination,
 and taking a fresh-place checkpoint after every weather. Tools use every variant
-and hold continuous tools; menus visit the menu, brain, about and all three
+and hold continuous tools; menus visit the menu, brain, about and all four
 settings tabs, repeatedly pausing and resuming. Eyes alternate Off/Low/High,
-all eye/nervous-system inset and X-ray settings, the full eye picture, and Inside it. Input and lifecycle behavior
+all eye/nervous-system inset and X-ray settings, the full eye picture, and Inside it.
+They also cycle every stats kind, corner size, opacity and visibility; canonical
+checkpoints keep all three corner pictures on at Medium/Solid. Input and lifecycle behavior
 remain covered by the ordinary e2e test and the web-release work.
 
 Tables starts an in-process room server and repeatedly joins a synthetic peer,

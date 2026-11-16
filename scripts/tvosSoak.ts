@@ -88,7 +88,7 @@ export function soakConfig(minutes = 30) {
     wait({ screen: "settings" });
     press("ArrowUp", 8);
     wait({ focus: "page" });
-    press("ArrowLeft", 2);
+    press("ArrowLeft", 3);
     wait({ tab: "wallpaper" });
     press("ArrowDown", 3);
     wait({ focus: "place" });
