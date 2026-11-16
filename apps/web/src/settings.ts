@@ -5,6 +5,8 @@ import type { PixelSize } from "./display.ts";
 import type { PlaceId } from "./places/catalog.ts";
 
 export type EyesDetail = "off" | "low" | "high";
+/** When the small picture of what its eyes see shows in a corner. */
+export type EyesInsetMode = "off" | "wallpaper" | "always";
 
 export type Settings = {
   /** 0 to 10. */
@@ -17,6 +19,8 @@ export type Settings = {
   wallpaperCamera: WallpaperStyle;
   /** How finely the fly's eyes are rendered. */
   eyes: EyesDetail;
+  /** What its eyes see, small in a corner: never, in the wallpaper, or while playing too. */
+  eyesInset: EyesInsetMode;
   /** Show what the buttons do. */
   hints: boolean;
   /** Small frame-cost counters in a corner. */
@@ -34,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   wallpaperAfter: 60,
   wallpaperCamera: "follow",
   eyes: "low",
+  eyesInset: "wallpaper",
   hints: true,
   stats: false,
   place: "turns",

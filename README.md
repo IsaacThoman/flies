@@ -95,13 +95,18 @@ the shelf and the pointer fade, and the camera settles beside the fly and
 follows it: the wallpaper. Settings can have it take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
 (Lively). Any press or touch brings the controls back and does nothing else.
+A small picture of what the fly's eyes see sits in a corner of the wallpaper
+(Settings, What it sees: off, in the wallpaper, or always, which keeps it in
+the top right while you play too). Each time the wallpaper moves on to a new
+shot, and at least once a minute, it fades out and comes back in the next
+corner, so it is never left in one place long enough to mark an OLED screen.
 
 The title also offers **Just watch** (the wallpaper straight away), **Inside
 its brain** (live: every sense going in, every command coming out with the
 neurons it is read from and their firing rates, spikes a second, active
 neurons), **About the fly**, and **Settings** (where it lives, sound and surroundings volume, pixel
-size, wallpaper timing and camera, the eyes' detail, button hints, frame
-stats).
+size, wallpaper timing and camera, the eyes' detail, what it sees in a corner,
+button hints, frame stats).
 
 ## The fly's senses
 
@@ -190,6 +195,16 @@ the model's answer, not a dice roll in the game.
 (the brain's 1,772, or, for a brain without eyes, a stand-in layout labelled as
 such), laid out by where each looks, left eye on the left.
 
+**What it sees** (`apps/web/src/eyes/inset.ts`) is that picture small, in a
+corner over the camera's: the same layout and colours, the dots snapped to the
+frame's pixels and widened toward the top and bottom, where the layout spreads
+the facets apart. It says "What it sees" when it is what the brain is being
+sent, and "A picture it doesn't see" for a brain without eyes, whose eyes are
+then rendered for the picture alone. With the eyes off in Settings it doesn't
+show: rendering them for the picture would bring back the cost that setting
+saves, and it would no longer be what the brain is sent. It never shows on the
+title, over a menu, or while View → Fly's eyes is up.
+
 ## The frame
 
 The game renders 640×480, laid out for 16:9 (the picture is squeezed into the
@@ -210,7 +225,10 @@ and the canvas's `data-calls`, `data-triangles`, `data-frame-ms` and
 frame the eyes refresh, about 70 draws and 280,000 triangles (the most the
 end-to-end run sees is about 85 draws and 300,000), the eyes' own part about 45
 draws and 1.5 to 2.5 ms (mostly the read-back). JavaScript per frame about 1 to
-2.5 ms in the browser. The end-to-end test fails above 150
+2.5 ms in the browser. The corner picture of what it sees (in the wallpaper,
+or always) is one more draw (its panel and every facet are instances of one
+quad, drawn with the menus) and about 3,500 triangles, with no measurable
+JavaScript. The end-to-end test fails above 150
 draws or 500,000 triangles. Physical Apple TV measurements and the unattended
 soak command are in [docs/apple-tv.md](docs/apple-tv.md).
 
@@ -241,14 +259,18 @@ and resampling; both brain drivers against fakes and the worker's host; the
 brain meter; the menu kit's focus, values, scrolling and navigation; the
 camera (the fly's size on screen in each view, kept in the picture through a
 long wandering walk and a jump, never inside anything, never jumping); the
+corner picture of what it sees (when it shows, its way round the corners, clear
+of the hints, every facet a dot inside it); the
 bubbles (low ones pass the fly, settle as domes, burst on it and are felt);
 that the crumbs, pips, strawberry and saucer can be walked over.
 
 `npm run e2e` plays the game with the real brain: the title
 appears once the brain wakes, the menus are walked with the keys, honey is
 tasted and eaten, the ball is thrown until the fly takes off, Play/Pause
-pauses and resumes, the wallpaper comes and goes, Back reaches the root, and
-the frame stays within its draw budget. `node scripts/play.ts` drives and
+pauses and resumes, the wallpaper comes and goes with what it sees in a
+corner (and, set to always, it stays while playing but not over View → Fly's
+eyes or the pause menu), Back reaches the root, and the frame stays within its
+draw budget. `node scripts/play.ts` drives and
 screenshots the game step by step (see the comment at its top).
 
 ## Credits

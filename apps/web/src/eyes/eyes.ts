@@ -22,6 +22,21 @@ import type { Stage } from "../stage.ts";
  * heading over the dots and the eyes' names under them (ui/hud.ts).
  */
 export const PICTURE_PANEL = { left: -0.84, right: 0.84, top: 0.78, bottom: -0.46 };
+/**
+ * How the picture lays the facets out, in clip space: x from the azimuth
+ * (all the way round is twice `azimuth`), y from the elevation (straight up
+ * to straight down is twice `elevation`), raised by `lift`. The corner inset
+ * (inset.ts) keeps these proportions.
+ */
+export const PICTURE_LAYOUT = { azimuth: 0.76, elevation: 0.45, lift: 0.09 };
+
+/** A facet's colour from its light (0 to 1) and its eye (0 left, 1 right), in both pictures. */
+export const FACET_COLOR = /* glsl */ `
+vec3 facetColor(float light, float side) {
+  vec3 dark = mix(vec3(0.03, 0.07, 0.16), vec3(0.06, 0.04, 0.14), side);
+  vec3 lit = mix(vec3(0.85, 1.0, 0.92), vec3(1.0, 0.95, 0.85), side);
+  return mix(dark, lit, pow(light, 0.8));
+}`;
 
 /** The layer the eyes see. */
 export const EYE_LAYER = 1;
@@ -51,15 +66,14 @@ void main() {
 const PICTURE_FS = /* glsl */ `
 varying float vLight;
 varying float vSide;
+${FACET_COLOR}
 void main() {
   vec2 p = gl_PointCoord * 2.0 - 1.0;
   float r = dot(p, p);
   if (r > 1.0) discard;
   // Each facet a little lens: brightest in the middle.
   float lens = 1.0 - r * 0.35;
-  vec3 dark = mix(vec3(0.03, 0.07, 0.16), vec3(0.06, 0.04, 0.14), vSide);
-  vec3 lit = mix(vec3(0.85, 1.0, 0.92), vec3(1.0, 0.95, 0.85), vSide);
-  gl_FragColor = vec4(mix(dark, lit, pow(vLight, 0.8)) * lens, 1.0);
+  gl_FragColor = vec4(facetColor(vLight, vSide) * lens, 1.0);
 }`;
 
 export class Eyes {
@@ -153,12 +167,18 @@ export class Eyes {
     return this.#life.brain.eyes ?? this.#standIn;
   }
 
+  /** The last complete picture of the facets in use (`map`), one value per facet, or null until there is one. */
+  get light(): { readonly left: Float32Array; readonly right: Float32Array } | null {
+    return this.#hasLight && this.#map === this.map ? this.#light : null;
+  }
+
   /**
    * Refreshes the eyes when due, and draws the picture over the frame when
-   * asked. Call after the world has been rendered.
+   * asked. Call after the world has been rendered. `forInset`: the corner
+   * picture (inset.ts) is up, so they render even when not for the brain.
    */
-  render(dt: number, showPicture: boolean, paused: boolean, urgent = false) {
-    this.active = this.inUse || showPicture;
+  render(dt: number, showPicture: boolean, paused: boolean, urgent = false, forInset = false) {
+    this.active = this.inUse || showPicture || forInset;
     if (!this.active) {
       this.costMs = 0;
       this.costCalls = 0;
@@ -264,8 +284,8 @@ export class Eyes {
         const azimuth = Math.atan2(d[i * 3], d[i * 3 + 1]);
         const elevation = Math.asin(Math.max(-1, Math.min(1, d[i * 3 + 2])));
         // Equirectangular, in the panel between its heading and its labels (PICTURE_PANEL; the frame is shown stretched to 16:9).
-        positions[k * 3] = (azimuth / Math.PI) * 0.76;
-        positions[k * 3 + 1] = (elevation / (Math.PI / 2)) * 0.45 + 0.09;
+        positions[k * 3] = (azimuth / Math.PI) * PICTURE_LAYOUT.azimuth;
+        positions[k * 3 + 1] = (elevation / (Math.PI / 2)) * PICTURE_LAYOUT.elevation + PICTURE_LAYOUT.lift;
         sides[k] = side;
         k++;
       }

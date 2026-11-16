@@ -6,7 +6,7 @@ import { INK_SOFT, glassPanel, orb, text } from "@fly/ui";
 import { DESIGN_WIDTH } from "../../display.ts";
 import type { PixelSize } from "../../display.ts";
 import { PLACES } from "../../places/catalog.ts";
-import type { EyesDetail, Settings } from "../../settings.ts";
+import type { EyesDetail, EyesInsetMode, Settings } from "../../settings.ts";
 import { drawWordmark } from "../wordmark.ts";
 import { MenuScreen } from "./menu-screen.ts";
 import type { Shell } from "./types.ts";
@@ -88,6 +88,11 @@ const EYES: Option<EyesDetail>[] = [
   { value: "low", label: "Low" },
   { value: "high", label: "High" },
 ];
+const INSET: Option<EyesInsetMode>[] = [
+  { value: "off", label: "Off" },
+  { value: "wallpaper", label: "In the wallpaper" },
+  { value: "always", label: "Always" },
+];
 const PLACE: Option<Settings["place"]>[] = [{ value: "turns", label: "Each in turn" }, ...PLACES.map((p) => ({ value: p.id, label: p.name }))];
 const ON_OFF: Option<boolean>[] = [
   { value: false, label: "Off" },
@@ -106,6 +111,7 @@ export function settingsScreen(shell: Shell) {
     choice("wallpaperAfter", "Wallpaper after", WALLPAPER, s.wallpaperAfter) as ChoiceItem,
     choice("wallpaperCamera", "Wallpaper camera", CAMERA, s.wallpaperCamera) as ChoiceItem,
     choice("eyes", "The fly's eyes", EYES, s.eyes) as ChoiceItem,
+    choice("eyesInset", "What it sees", INSET, s.eyesInset) as ChoiceItem,
     choice("hints", "Button hints", ON_OFF, s.hints) as ChoiceItem,
     choice("stats", "Frame stats", ON_OFF, s.stats) as ChoiceItem,
     { kind: "action", id: "done", label: "Done" },

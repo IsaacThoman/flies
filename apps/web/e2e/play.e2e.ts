@@ -1,8 +1,8 @@
 // Plays the game in a real (GPU-rendered, headless) Chromium with the real
 // brain: boots it, waits for the brain, walks the menus with the keys, feeds
 // the fly and checks it tasted and ate, throws the ball until the fly takes
-// off, checks the wallpaper comes and goes, and holds the frame to its draw
-// budget throughout.
+// off, checks the wallpaper comes and goes with what it sees in a corner, and
+// holds the frame to its draw budget throughout.
 //
 //   npm run e2e            (starts its own Vite server)
 //   npm run e2e -- --url http://localhost:5173/
@@ -51,6 +51,7 @@ try {
   assert.equal(awake.neurons, "166700");
   assert.equal(awake.atRoot, "true");
   assert.equal(awake.focus, "play");
+  assert.equal(awake.eyesInset, "hidden", "not over the title");
 
   step("the menus: settings, about, inside its brain, and back each time");
   await press("ArrowDown", 4);
@@ -127,15 +128,32 @@ try {
     (globalThis as unknown as { __fly: { settings: { wallpaperAfter: number } } }).__fly.settings.wallpaperAfter = 2;
   });
   await waitFor(page, "wallpaper=true", 10_000);
+  const corner = await waitFor(page, "wallpaper=true,eyesInset~^(top|bottom)-(left|right)$", 5000);
+  console.log(`  what it sees, in the ${corner.eyesInset} corner`);
   await page.waitForTimeout(1500);
   await press("ArrowRight");
   const back = await waitFor(page, "wallpaper=false", 3000);
   assert.equal(back.tool, "swoop", "the press that woke it did nothing else");
   assert.equal(back.screen, "play");
 
+  step("what it sees: only in the wallpaper by default; on Always while playing too, but never over the full picture or a menu");
+  await waitFor(page, "eyesInset=hidden", 3000);
+  await page.evaluate(() => {
+    const settings = (globalThis as unknown as { __fly: { settings: { wallpaperAfter: number; eyesInset: string } } }).__fly.settings;
+    settings.wallpaperAfter = 60;
+    settings.eyesInset = "always";
+  });
+  await waitFor(page, "eyesInset=top-right", 5000);
+  await press("ArrowRight", 4);
+  await waitFor(page, "tool=view,view=follow");
+  await press("ArrowDown", 4);
+  await waitFor(page, "view=eyes,eyesInset=hidden", 3000);
+  await press("ArrowUp", 4);
+  await waitFor(page, "view=follow,eyesInset=top-right", 5000);
+
   step("back to the title through the pause menu, where Back leaves the app");
   await press("Escape");
-  await waitFor(page, "screen=pause");
+  await waitFor(page, "screen=pause,eyesInset=hidden");
   await press("ArrowDown", 4);
   await waitFor(page, "focus=title");
   await press("Enter");
