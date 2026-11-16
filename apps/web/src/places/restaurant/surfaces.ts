@@ -264,12 +264,14 @@ if (rK == K_CANE) {
   rBump = vec3(tilt.x, 0.0, tilt.y) * 0.5 * d * on;
 }
 if (rK == K_ZINC) {
-  vec3 dim = rDimples(vWorld.xz);
-  float d = rDetail(vWorld.xz / 7.0);
-  float patina = rFbm(vWorld.xz * 0.006) * 0.7 + rNoise(vWorld.xz * 0.05) * 0.3;
+  // Hammered all over, the rolled nose too: the pattern laid on whichever way the surface faces.
+  vec2 zp = abs(rN.y) > 0.6 ? vWorld.xz : abs(rN.x) > abs(rN.z) ? vWorld.zy : vWorld.xy;
+  vec3 dim = rDimples(zp);
+  float d = rDetail(zp / 7.0);
+  float patina = rFbm(zp * 0.006) * 0.7 + rNoise(zp * 0.05) * 0.3;
   vec3 c = mix(vec3(0.6, 0.62, 0.63), vec3(0.4, 0.42, 0.43), smoothstep(0.35, 0.75, patina));
   // Water marks: pale rings and runs left by wet glasses and cloths.
-  vec2 wq = vWorld.xz * 0.012;
+  vec2 wq = zp * 0.012;
   float marks = (1.0 - smoothstep(0.0, 0.04 + fwidth(wq.x) * 4.0, abs(rFbm(wq) - 0.5))) * smoothstep(0.4, 0.7, rNoise(wq * 0.5 + 3.0));
   c = mix(c, vec3(0.78, 0.79, 0.78), marks * 0.45);
   // Elbows have polished the front edge bright.
@@ -278,7 +280,10 @@ if (rK == K_ZINC) {
   // Old zinc is dull: grey, half metal, the hammering catching what light there is; only the front edge is bright.
   rMetal = mix(0.45, 0.75, edge);
   rRough = mix(0.46, 0.28, edge) + marks * 0.12 + patina * 0.1;
-  rBump = vec3(dim.x, 0.0, dim.y) * d * (1.0 - edge * 0.6);
+  // The dimples tilt the surface across its own two ways.
+  vec3 bu = abs(rN.y) > 0.6 ? vec3(1.0, 0.0, 0.0) : abs(rN.x) > abs(rN.z) ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+  vec3 bv = abs(rN.y) > 0.6 ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
+  rBump = (bu * dim.x + bv * dim.y) * d * (1.0 - edge * 0.6);
 }
 if (rK == K_BRASS) {
   float tarnish = rFbm(vWorld.xz * 0.02 + vWorld.y * 0.01);
