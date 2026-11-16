@@ -91,7 +91,13 @@ class WorkerHeap {
 }
 
 async function move(page: Page, place: PlaceId) {
-  await page.evaluate((id) => globalThis.__fly.moveTo(id), place);
+  await page.evaluate((id) => {
+    const g = globalThis.__fly;
+    // Other pages' GPU load must not change the render target used for a place's baseline.
+    g.quality?.reset();
+    g.applySettings(false);
+    g.moveTo(id);
+  }, place);
   await waitFor(page, `place=${place},moving=`, 60_000);
 }
 
@@ -255,7 +261,13 @@ export async function run(args = process.argv.slice(2)) {
       }
       await canonical(page);
       // Touch every place before measuring: audio buffers and shader variants are lazy.
-      for (const place of PLACES) { await move(page, place.id); await page.waitForTimeout(500); }
+      for (const place of PLACES) {
+        await move(page, place.id);
+        for (const pixels of ["chunky", "chunkier", "classic"] as const) {
+          await page.evaluate((pixels) => { const g = globalThis.__fly; g.settings.pixels = pixels; g.applySettings(); }, pixels);
+          await page.waitForTimeout(250);
+        }
+      }
       timer = setInterval(() => {
         // Skip an overrun rather than queue GCs that could themselves slow the game indefinitely.
         if (sampling || sampleError) return;

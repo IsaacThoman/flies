@@ -53,8 +53,11 @@ still runs in real time. Cleanup checkpoints and the fast check catch resources
 retained by remote hands or pooled fly models. The joined model must also remain
 attached to the visible scene after place changes. Menus include Together.
 
-The harness warms persistent tool meshes, icon textures, eye pictures, pixel
-modes and ambience buffers before sampling. Checkpoints after place changes
+The harness warms persistent tool meshes, icon textures, eye pictures, every
+place's pixel-mode shader variants and ambience buffers before sampling.
+Place changes reset adaptive quality so baseline counts use the same render
+target; uninterrupted wallpaper retains its normal adaptive behavior.
+Checkpoints after place changes
 compare a fresh place with the same settings and view. Other phases repeat
 those same checkpoints between stress rounds each minute and when they finish; their in-flight counts are deliberately variable.
 Only checkpoints within the same phase/place, and continuous wallpaper, get
@@ -86,6 +89,11 @@ regressions therefore exercise the actual TV shim with a recording native
 bridge as well as the browser soak. Forced GC and concurrent pages perturb
 frame timings, so use a single wallpaper phase or the real device for precise
 performance comparisons.
+
+Room sockets bound both unread traffic and stalled sends. A reader that stops
+draining reconnects for a fresh snapshot instead of retaining and replaying old
+frames. The one-hour transport regression is synthetic; the browser case also
+checks a real hidden tab with seven peers and reconnection on wake.
 
 Run `npm run tvos:soak -- --device <udid> --minutes 60` on the Apple TV for that
 last evidence. It now visits every place, weather and daylight preset, pins each
