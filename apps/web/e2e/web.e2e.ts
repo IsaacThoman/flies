@@ -23,7 +23,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
 import { build } from "vite";
-import { fullChromiumPath, gpuFlags, readState, waitFor, waitForGameTime } from "../../../scripts/play.ts";
+import { chromiumPath, gpuFlags, readState, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import { serveSite } from "../../../scripts/serve.ts";
 
 const root = path.join(import.meta.dirname, "../../..");
@@ -38,7 +38,7 @@ const out = mkdtempSync(path.join(tmpdir(), "fly-web-e2e-"));
 await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "warn", build: { outDir: out, emptyOutDir: true } });
 let cuts = 0;
 const site = await serveSite({ dir: out, base: "/some/folder/fly/", cut: (file) => (file.startsWith("brain/connectome.") && cuts++ === 0 ? CUT_AT : null) });
-const browser = await chromium.launch({ executablePath: fullChromiumPath(), args: gpuFlags() });
+const browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
 const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
 const page = await context.newPage();
 const errors: string[] = [];
@@ -68,6 +68,13 @@ let failed = false;
 try {
   step("first visit, on a slow connection: the brain's bytes are counted as they arrive");
   const cdp = await context.newCDPSession(page);
+  // The headless shell defaults to "prompt", which wake locks treat as denied.
+  // Without the page's context ID, CDP grants only the default browser context.
+  const { targetInfo } = await cdp.send("Target.getTargetInfo");
+  await cdp.send("Browser.setPermission", {
+    permission: { name: "screen-wake-lock" }, setting: "granted",
+    origin: new URL(site.url).origin, browserContextId: targetInfo.browserContextId,
+  });
   await cdp.send("Network.enable");
   await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: 80, downloadThroughput: 2_500_000, uploadThroughput: 500_000 });
   const started = Date.now();
