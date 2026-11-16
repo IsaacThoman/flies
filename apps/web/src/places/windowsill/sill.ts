@@ -71,19 +71,27 @@ function topGeometry(solid: Solid, rings: number, segments: number, from = 0, to
   const angle = f.kind === "circle" ? 0 : f.angle;
   const c = Math.cos(angle);
   const s = Math.sin(angle);
+  // Each point of the grid worked out once, then laid into its triangles.
+  const grid = new Float32Array((rings + 1) * (segments + 1) * 6);
+  const n = { x: 0, y: 1, z: 0 };
+  for (let si = 0; si <= rings; si++) {
+    const sv = Math.min(0.9999, from + ((to - from) * si) / rings);
+    for (let ti = 0; ti <= segments; ti++) {
+      const th = (ti / segments) * Math.PI * 2;
+      const u = Math.cos(th) * rx * sv;
+      const v = Math.sin(th) * rz * sv;
+      const x = f.x + u * c + v * s;
+      const z = f.z - u * s + v * c;
+      topNormal(solid, x, z, n);
+      grid.set([x, topHeight(solid, x, z), z, n.x, n.y, n.z], (si * (segments + 1) + ti) * 6);
+    }
+  }
   const positions: number[] = [];
   const normals: number[] = [];
-  const n = { x: 0, y: 1, z: 0 };
   const point = (si: number, ti: number) => {
-    const sv = Math.min(0.9999, from + ((to - from) * si) / rings);
-    const th = (ti / segments) * Math.PI * 2;
-    const u = Math.cos(th) * rx * sv;
-    const v = Math.sin(th) * rz * sv;
-    const x = f.x + u * c + v * s;
-    const z = f.z - u * s + v * c;
-    positions.push(x, topHeight(solid, x, z), z);
-    topNormal(solid, x, z, n);
-    normals.push(n.x, n.y, n.z);
+    const k = (si * (segments + 1) + ti) * 6;
+    positions.push(grid[k], grid[k + 1], grid[k + 2]);
+    normals.push(grid[k + 3], grid[k + 4], grid[k + 5]);
   };
   for (let i = 0; i < rings; i++) {
     for (let j = 0; j < segments; j++) {
@@ -115,9 +123,11 @@ function bananaGeometry() {
   const across = 22;
   const p = { x: 0, z: 0 };
   const q = { x: 0, z: 0 };
-  const height = (x: number, z: number) => {
+  // Only the rounds near t along it can be under a point: the rest are too far along it.
+  const height = (x: number, z: number, t: number) => {
     let y = 0;
-    for (const ring of rings) if (inside(ring.footprint, x, z)) y = Math.max(y, topHeight(ring, x, z));
+    const k = Math.round(t * (rings.length - 1));
+    for (let i = Math.max(0, k - 6); i <= Math.min(rings.length - 1, k + 6); i++) if (inside(rings[i].footprint, x, z)) y = Math.max(y, topHeight(rings[i], x, z));
     return y;
   };
   // Past each end it rounds off over the end ring's radius.
@@ -171,7 +181,7 @@ function bananaGeometry() {
       const s = Math.sin(((j / across) * 2 - 1) * (Math.PI / 2));
       const x = cx - dirZ * w * s;
       const z = cz + dirX * w * s;
-      const y = height(x, z);
+      const y = height(x, z, at);
       row.push(new THREE.Vector3(x, y, z));
       tint.push(bananaColor(at, Math.abs(s), y));
     }
