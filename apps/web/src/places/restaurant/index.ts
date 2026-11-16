@@ -37,8 +37,8 @@ const PALETTES: Palettes = {
   morning: { zenith: "#8a8478", middle: "#9cc2e6", horizon: "#b8b0a0", sunUp: 0.42, sunAround: Math.PI + 0.1, sun: "#fff0dc", sunIntensity: 1.0, sky: "#c4c8cc", ground: "#6a5a4c", hemiIntensity: 0.42, haze: "#d8e2ea", water: "#f0e2cc", cloud: "#ffe0b0", stars: 0, glow: 0, env: 0.55 },
   noon: { zenith: "#928c80", middle: "#6aa2e2", horizon: "#c0b8a8", sunUp: 0.7, sunAround: Math.PI - 0.15, sun: "#fff8ee", sunIntensity: 1.1, sky: "#d0d6dc", ground: "#76604e", hemiIntensity: 0.46, haze: "#d2e2ee", water: "#ece6da", cloud: "#ffe0b0", stars: 0, glow: 0, env: 0.6 },
   golden: { zenith: "#7a5e48", middle: "#7e94c8", horizon: "#dca474", sunUp: 0.13, sunAround: Math.PI + 0.5, sun: "#ffb26a", sunIntensity: 4.2, sky: "#d6b496", ground: "#4a3022", hemiIntensity: 0.2, haze: "#ffb47a", water: "#7a5a58", cloud: "#ffb060", stars: 0, glow: 0.2, env: 0.55 },
-  dusk: { zenith: "#2c2420", middle: "#2c3a78", horizon: "#6a4232", sunUp: LAMP.up, sunAround: LAMP.around, sun: "#c8b8d8", sunIntensity: 0.14, sky: "#4a4e6a", ground: "#22160e", hemiIntensity: 0.16, haze: "#c8806a", water: "#363c58", cloud: "#ffb060", stars: 0.55, glow: 0.8, env: 0.4 },
-  night: { zenith: "#16100c", middle: "#0a1030", horizon: "#3a2414", sunUp: LAMP.up, sunAround: LAMP.around, sun: "#ffc890", sunIntensity: 0.12, sky: "#2a2622", ground: "#120c08", hemiIntensity: 0.12, haze: "#2a2848", water: "#1c1e2c", cloud: "#ffb060", stars: 1, glow: 1, env: 0.3 },
+  dusk: { zenith: "#2c2420", middle: "#2c3a78", horizon: "#6a4232", sunUp: LAMP.up, sunAround: LAMP.around, sun: "#d8c0c8", sunIntensity: 0.22, sky: "#4a4e6a", ground: "#22160e", hemiIntensity: 0.11, haze: "#c8806a", water: "#363c58", cloud: "#ffb060", stars: 0.55, glow: 0.8, env: 0.4 },
+  night: { zenith: "#16100c", middle: "#0a1030", horizon: "#3a2414", sunUp: LAMP.up, sunAround: LAMP.around, sun: "#ffc890", sunIntensity: 0.3, sky: "#2a2622", ground: "#120c08", hemiIntensity: 0.07, haze: "#2a2848", water: "#1c1e2c", cloud: "#ffb060", stars: 1, glow: 1, env: 0.3 },
 };
 
 export const restaurant: Scene = {
