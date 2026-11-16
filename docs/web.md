@@ -385,8 +385,8 @@ iPad's home-screen app 18.4+.
 
 For the owner's Docker server at `flies.isaacthoman.com`, use the
 [self-hosting instructions](deploy.md): a multi-stage web image, Caddy with
-automatic HTTPS and the headers above, and a Compose stack with a slot for
-the future multiplayer room server. The options below are managed static
+the headers above behind the owner's own HTTPS reverse proxy, and a Compose
+stack with the room server. The options below are managed static
 hosts for anyone who prefers those.
 
 Checked against each host's own documentation on 16 November 2026. Each

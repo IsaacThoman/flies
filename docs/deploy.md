@@ -7,27 +7,81 @@ tables with others is a second, small Node service (below). Both `linux/amd64` a
 
 ## First start
 
-Use a Linux server with Docker Engine, the Compose v2 plugin and Git installed.
-Allow inbound TCP 80 and 443, and UDP 443 for HTTP/3. Point the DNS A record
-for `flies.isaacthoman.com` at the server; add an AAAA record only if its IPv6
-address is reachable too. These ports must be free on the server.
+Flies sits behind your own reverse proxy, which terminates HTTPS for
+`flies.isaacthoman.com`. Use a Linux server with Docker Engine, the Compose
+v2 plugin and Git installed. Caddy in the web container answers plain HTTP,
+for any host name, on `HTTP_PORT` (8080 unless set, so it can share a host
+with a proxy on 80 and 443).
 
 ```sh
 git clone --branch dev https://github.com/IsaacThoman/flies.git
 cd flies
 cp .env.example .env
-# Edit .env: FLIES_DOMAIN=flies.isaacthoman.com, ACME_EMAIL=your email,
-# FLY_SITE_URL=https://flies.isaacthoman.com/
+# Edit .env: FLY_SITE_URL=https://flies.isaacthoman.com/, and HTTP_PORT if 8080 is taken
 docker compose up -d --build --wait
 ```
 
 Private repository access uses your own Git credentials. `.env` is ignored
-by Git and excluded from the image. `FLIES_DOMAIN` is the site address, with
-no path; `FLY_SITE_URL` is optional and supplies absolute social-preview URLs
-at build time. Caddy obtains and renews a Let's Encrypt certificate, redirects
-HTTP to HTTPS, and offers HTTP/2 and HTTP/3. Keep `caddy_data` and
-`caddy_config`: they hold certificates, keys and Caddy state. Do not run
-`docker compose down -v` on the server unless you intend to erase them.
+by Git and excluded from the image. `FLY_SITE_URL` is optional and supplies
+absolute social-preview URLs at build time. `HTTP_PORT` may name an address
+too: `127.0.0.1:8080` keeps the port to a proxy on the same host.
+
+### Your reverse proxy
+
+Point it at `http://<server>:8080/` (or your `HTTP_PORT`). It must:
+
+- forward every path to that port, with the original `Host`;
+- pass WebSocket upgrades on `/rooms` and `/rooms/*`, without a short idle
+  timeout (a table's connection stays open for as long as people play);
+- set `X-Forwarded-For` and `X-Forwarded-Proto`.
+
+The site must reach visitors over `https://`: the service worker and the
+Cache API, which keep the game and its 14 MB brain for later visits, work
+only in a secure context. Plain HTTP is enough on `localhost` alone.
+
+The room server limits password guesses and new rooms by address, so it
+must see each visitor's own. Caddy believes `X-Forwarded-For` only from
+`TRUSTED_PROXIES` (Caddy's [`trusted_proxies`](https://caddyserver.com/docs/caddyfile/options#trusted-proxies)
+ranges: `private_ranges` unless set, which covers a proxy on the same host,
+reaching the container through Docker's bridge, or on the LAN). It reads the
+header from the right, so a visitor cannot claim another address, and hands
+the rooms service just the visitor's. If your proxy reaches the server from
+a public address, set it, for example `TRUSTED_PROXIES=203.0.113.7/32`, with
+spaces between several. Without that, every visitor counts as the
+proxy, and one person's guesses lock everyone out.
+
+Caddy as the proxy, which upgrades WebSockets and sets both headers itself:
+
+```caddyfile
+flies.isaacthoman.com {
+	reverse_proxy 127.0.0.1:8080
+}
+```
+
+nginx:
+
+```nginx
+# In the http block:
+map $http_upgrade $connection_upgrade { default upgrade; "" close; }
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name flies.isaacthoman.com;
+    # ssl_certificate and ssl_certificate_key as for your other sites
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_read_timeout 1h;
+    }
+}
+```
 
 ```sh
 docker compose ps                 # web and rooms should be healthy
@@ -36,9 +90,12 @@ curl -I https://flies.isaacthoman.com/
 ```
 
 The health check reads the built entry file over a container-only loopback
-listener. Check the public URL too: container health does not prove DNS,
-firewall rules or certificate issuance. Caddy logs requests and TLS errors
-to the container log, rotated at 3 × 10 MB.
+listener. Check the public URL too: container health does not prove DNS or
+your proxy. Caddy logs requests, with each visitor's address, to the
+container log, rotated at 3 × 10 MB. It keeps no certificates or state, so
+the web container has no volumes. A server that ran an older stack, with
+its own certificates, can remove them after the update:
+`docker volume rm flies_caddy_data flies_caddy_config`.
 
 Plan for 2 GiB RAM and 4 GiB free disk for Node, npm and Docker's build
 cache, plus room for a rollback image. Serving needs far less: the site is
@@ -79,16 +136,11 @@ see a new or rolled-back version.
 
 ## Local check
 
-In `.env`, set `FLIES_DOMAIN=http://localhost`, `FLY_SITE_URL=http://localhost/`
-and leave `ACME_EMAIL` empty. Then run `docker compose up -d --build --wait`
-and open `http://localhost/`. Plain HTTP on localhost is a secure context
-for the browser cache and service worker. Alternatively, `FLIES_DOMAIN=localhost`
-uses Caddy's internal HTTPS certificate; the browser needs to trust its local
-CA. No public certificate is requested for either local address.
-
-`HTTP_PORT` and `HTTPS_PORT` can change the published ports for local tests.
-For example, with `HTTP_PORT=18080`, use `http://localhost:18080/` and set
-`FLY_SITE_URL` accordingly. Use the default 80/443 in production.
+With `FLY_SITE_URL=http://localhost:8080/` in `.env`, run
+`docker compose up -d --build --wait` and open `http://localhost:8080/`.
+Plain HTTP on localhost is a secure context for the browser cache and
+service worker, so no proxy is needed to try it. Another `HTTP_PORT`, such as
+18080, changes the address; set `FLY_SITE_URL` to match.
 
 After `npm install` and installing Playwright Chromium
 (`npx playwright install chromium`), copy the running image's files to a
@@ -98,7 +150,7 @@ Node/zlib versions can produce different compressed brain hashes:
 ```sh
 deploy_dist=$(mktemp -d)
 docker compose cp web:/srv/. "$deploy_dist"
-node scripts/checkDeploy.ts --url http://localhost/ --dir "$deploy_dist"
+node scripts/checkDeploy.ts --url http://localhost:8080/ --dir "$deploy_dist"
 ```
 
 This checks every built file's cache and MIME headers, uncompressed brain
@@ -119,7 +171,9 @@ process, built from the same `Dockerfile` (its `rooms` stage), that the
 first start and every update bring up with the site. It needs nothing beyond
 `docker compose up -d --build --wait`, and no settings: Caddy proxies `/rooms`
 and `/rooms/*` on the site's own origin, WebSocket upgrades included, to
-`rooms:3000`, and browsers connect to `wss://flies.isaacthoman.com/rooms`. It
+`rooms:3000`, and browsers connect to `wss://flies.isaacthoman.com/rooms`
+through your proxy. It counts visitors by the address Caddy passes on in
+`X-Forwarded-For` (`TRUST_PROXY=1`; see [your reverse proxy](#your-reverse-proxy)). It
 has no public port, and no `depends_on`: the site works while it is down
 (only `/rooms` answers 502 then).
 
@@ -138,8 +192,8 @@ for rooms) reaches open tabs as a refusal they answer by reloading into the
 new site, once. Rolling the rooms back past it forgets nothing, but an older
 server would let anyone with a locked room's link in. An update restarts it with SIGTERM: it writes
 the tables, tells every connected device it is restarting, and the devices
-reconnect to their tables within a couple of seconds. Keep `rooms_data` like
-the Caddy volumes. Deleting it forgets every table and every invitation. The
+reconnect to their tables within a couple of seconds. Keep `rooms_data`, and
+do not run `docker compose down -v` on the server: deleting it forgets every table and every invitation. The
 only optional setting is `ROOMS_PORT`, the internal port, which Caddy and the
 service both read. Browsing the list of rooms uses the same `/rooms`
 WebSocket, so nothing about the proxy changes for it. Memory and CPU are

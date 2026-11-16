@@ -1,15 +1,27 @@
+# Plain HTTP for any host: your own HTTPS reverse proxy sits in front
+# (docs/deploy.md). Nothing here is kept, so the container needs no volumes.
 {
-	email "{$ACME_EMAIL:}"
-	acme_ca https://acme-v02.api.letsencrypt.org/directory
+	auto_https off
+	persist_config off
+	servers {
+		# Only addresses these proxies forward for are believed: the room server
+		# counts password guesses and new rooms by address. Strict reads
+		# X-Forwarded-For from the right, so a client cannot claim another address.
+		trusted_proxies static {$TRUSTED_PROXIES:private_ranges}
+		trusted_proxies_strict
+	}
 }
 
-{$FLIES_DOMAIN:localhost} {
+:80 {
 	log
 
 	# DNS is resolved on requests, so the site starts before rooms exists.
 	@rooms path /rooms /rooms/*
 	handle @rooms {
-		reverse_proxy {$ROOMS_HOST:rooms}:{$ROOMS_PORT:3000}
+		reverse_proxy {$ROOMS_HOST:rooms}:{$ROOMS_PORT:3000} {
+			# The room server reads the first entry: give it only the client.
+			header_up X-Forwarded-For {client_ip}
+		}
 	}
 
 	handle {
@@ -49,8 +61,8 @@
 	}
 }
 
-# Probe the actual entry file without depending on DNS, TLS or the room server.
-http://:8080 {
+# Probe the actual entry file without depending on the proxy or the room server.
+:8080 {
 	bind 127.0.0.1
 	root * /srv
 	rewrite * /index.html

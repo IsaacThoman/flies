@@ -27,7 +27,7 @@ to add one, and `docs/web.md` about the web build: getting the brain to a
 browser, running well on what people have, being a good tab, and hosting.
 `docs/online.md` is about tables with others: up to eight people's flies at
 one table, joined by a link, and the room server between them. For a Docker
-Compose stack with automatic HTTPS on your own server, see
+Compose stack on your own server, behind your own HTTPS reverse proxy, see
 [Self-hosting Flies](docs/deploy.md).
 
 ## Playing
