@@ -22,7 +22,10 @@ RUN npm run brain:fetch
 FROM brain AS build
 COPY . .
 ARG FLY_SITE_URL
-RUN --mount=type=cache,target=/app/node_modules/.cache npm run build
+# Coolify's address for the web service, a preview's own in a preview.
+ARG SERVICE_URL_WEB
+RUN --mount=type=cache,target=/app/node_modules/.cache \
+  FLY_SITE_URL="${FLY_SITE_URL:-$SERVICE_URL_WEB}" npm run build
 
 FROM caddy:2.11-alpine AS web
 COPY Caddyfile /etc/caddy/Caddyfile
