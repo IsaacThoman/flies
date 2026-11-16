@@ -36,7 +36,7 @@ Interaction runs in a fifth context alongside wallpaper. Each wallpaper page
 is pinned to its place and by default follows the real clock and forecast. The interaction
 page waits for `data-moving` to clear between places; climate visits every
 weather and all five daylight presets plus the clock, holding each combination
-for 12 seconds. Tools use every variant and hold continuous tools; menus visit
+for 12 seconds and taking a fresh-place checkpoint after every weather. Tools use every variant and hold continuous tools; menus visit
 title, pause, brain, about, settings and all settings pages; eyes alternate
 Off/Low/High, all inset modes, and the full picture. Input and lifecycle behavior
 remain covered by the ordinary e2e test and the web-release work.

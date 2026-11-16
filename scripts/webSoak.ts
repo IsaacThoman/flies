@@ -236,11 +236,19 @@ export async function run(args = process.argv.slice(2)) {
         if (p === "climate") {
           for (const place of PLACES) {
             await move(page, place.id);
-            for (const weather of WEATHERS) for (const time of [...TIMES, "clock"]) {
-              await choose(page, "weather", weather);
-              await choose(page, "light", time);
-              // Let the eased sky/rain and its PMREM rebuilds run, without advancing the clock.
-              for (let i = 0; i < 12; i++) { await page.waitForTimeout(1000); await sample(); }
+            for (const weather of WEATHERS) {
+              for (const time of [...TIMES, "clock"]) {
+                await choose(page, "weather", weather);
+                await choose(page, "light", time);
+                // Let the eased sky/rain and its PMREM rebuilds run, without advancing the clock.
+                for (let i = 0; i < 12; i++) { await page.waitForTimeout(1000); await sample(); }
+              }
+              // A fresh copy after each weather gives comparable early/late climate samples.
+              await canonical(page);
+              await move(page, PLACES.find((p) => p.id !== place.id)!.id);
+              await move(page, place.id);
+              await page.waitForTimeout(2500);
+              await sample(true);
             }
           }
         } else if (p === "tools") {
