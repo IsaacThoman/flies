@@ -165,7 +165,7 @@ test("every menu fits inside the safe area at every shape, its rows big enough f
       for (let i = 0; i < hits.count; i++) if (hits.get(i)!.kind === "row") shown++;
       assert.equal(shown, screen.menu.rows, `${name}: ${screen.id}`);
     }
-    // The menu's six rows (with Online) all show: in two columns where one is too short for them.
+    // The menu's five rows (with Online) all show: in two columns where one is too short for them.
     const title = titleScreen(s);
     assert.equal(title.menu.rows, title.menu.items.length, `${name}: the menu doesn't scroll`);
     // Each row where it is drawn, inside the pane and clear of the others.
