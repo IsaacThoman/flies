@@ -13,10 +13,12 @@ npm run dev           # the game in a browser
 npm test              # unit tests (Node)
 npm run e2e           # plays the game in headless Chromium with the real brain, then the built site
 npm run build         # the web build, plain files for any static host (docs/web.md)
+npm run ios           # the iPhone and iPad app in a simulator (docs/ios.md)
 ```
 
 `docs/architecture.md` describes the parts and the rules. This file is about
-the game (`apps/web`) and its packages: `packages/world` (where the fly can
+the game (`apps/web`), which is also the iPhone and iPad app
+([docs/ios.md](docs/ios.md)), and its packages: `packages/world` (where the fly can
 stand, what it bumps into and eats), `packages/body` (its senses, what it makes
 of the brain's commands, how it moves, what its eyes see) and `packages/ui`
 (the menu kit). `docs/places.md` is about the places the fly can live and how
