@@ -667,7 +667,7 @@ it (4-minute runs of ordinary life on the picnic table), it never took off at
 midday (8 minutes, escape at most 0.35) or at dusk (12 minutes, at most 0.37),
 and at night 0.3 times a minute (16 minutes). Before, the night gave 0.5 to 0.7
 a minute, mostly from soap bubbles drawn as bright as by day drifting past it.
-`apps/web/tests/swoop-escape.test.ts` checks the chain in Node.
+`apps/web/tests/swoop-escape.budget.ts` checks the chain in Node.
 
 **View → Fly's eyes** shows the same picture to the player: one dot per facet
 (the brain's 1,772, or, for a brain without eyes, a stand-in layout labelled as

@@ -3,7 +3,9 @@
 // the fly's senses make of it, the brain's giant fiber, the body's take-off,
 // and the flight the tarsal reflex makes of it (packages/body/src/behavior.ts).
 // Whether the fly goes is the brain's choice, so each test throws a bounded
-// number of times and counts.
+// number of times and counts. It also holds the fly's life with its eyes open
+// to a budget, in M5 Pro CPU time, so npm test runs it alone
+// (scripts/cpuBudget.ts says why).
 
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
@@ -11,6 +13,7 @@ import { test } from "node:test";
 import { ESCAPE_ON, ESCAPE_REARM, HEAD_AHEAD, HEAD_UP } from "@fly/body";
 import { BALL_RADIUS, World } from "@fly/world";
 import type { Place, Vec3 } from "@fly/world";
+import { CpuMeter } from "../../../scripts/cpuBudget.ts";
 import { Hands, TOOLS } from "../src/tools/hands.ts";
 import { Life } from "../src/life.ts";
 import { DEFAULT_CONNECTOME_PATH } from "../../../packages/brain/src/node.ts";
@@ -34,8 +37,8 @@ const BALL = 0.04;
 /** A throw: whether it took off and how hard the giant fiber fired; and if it flew, how long, how far along its way and how high, and whether it came down on its feet. */
 type Throw = { tookOff: boolean; escape: number; air: number; distance: number; top: number; landed: boolean; lowest: number };
 
-/** Throws the ball at the fly until `throws` have flown, the eyes open (seeing it) or shut (the hand-wired loom). */
-function swoops(eyes: "open" | "shut", seed: number, throws = THROWS) {
+/** Throws the ball at the fly until `throws` have flown, the eyes open (seeing it) or shut (the hand-wired loom), with a lap of `meter` every simulated second. */
+function swoops(eyes: "open" | "shut", seed: number, throws = THROWS, meter?: CpuMeter) {
   const brain = new InProcessBrain(data!, seed);
   const world = new World(bare);
   const life = new Life(world, brain);
@@ -46,6 +49,7 @@ function swoops(eyes: "open" | "shut", seed: number, throws = THROWS) {
   const eye: Vec3 = { x: 0, y: 5, z: -10 };
   const fly = { position: life.body.position, yaw: 0, onFeet: true };
   let time = 0;
+  let frames = 0;
 
   const frame = (use: boolean) => {
     fly.yaw = life.body.yaw;
@@ -60,6 +64,7 @@ function swoops(eyes: "open" | "shut", seed: number, throws = THROWS) {
     }
     life.step(DT, performance.now());
     time += DT;
+    if (meter && ++frames % 60 === 0) meter.lap();
   };
 
   const results: Throw[] = [];
@@ -138,12 +143,12 @@ const scratch: Vec3 = { x: 0, y: 0, z: 0 };
 const summary = (results: Throw[]) => results.map((r) => `${r.escape.toFixed(2)}${r.tookOff ? ` flew ${r.air.toFixed(1)} s ${r.distance.toFixed(0)} mm` : ""}`).join(", ");
 
 test("the swoop seen through the brain's own eyes fires the giant fiber and the fly takes off and flies, in at least 6 of 8 throws", { skip }, () => {
-  const started = process.cpuUsage();
-  const { results, time } = swoops("open", 1);
-  const used = process.cpuUsage(started);
-  const cpu = (used.user + used.system) / 1e6;
+  const meter = new CpuMeter();
+  const { results, time } = swoops("open", 1, THROWS, meter);
+  meter.lap();
+  const cpu = meter.ms / 1000;
   const off = results.filter((r) => r.tookOff).length;
-  console.log(`  eyes open: ${off} of ${results.length} took off (escape peaks: ${summary(results)}); ${time.toFixed(0)} s of its life in ${cpu.toFixed(1)} CPU s`);
+  console.log(`  eyes open: ${off} of ${results.length} took off (escape peaks: ${summary(results)}); ${time.toFixed(0)} s of its life in ${cpu.toFixed(1)} M5 Pro CPU s (${(meter.rawMs / 1000).toFixed(1)} here)`);
   // Seed 1 takes off from all 8 (escape 0.45 to 0.70), each a flight of 1.5 to 1.6 s and 386 to 407 mm along its way.
   assert.ok(off >= 6, `${off} of ${results.length} took off: ${summary(results)}`);
   // Every throw that crossed the line took off: the body did what the giant fiber said.
@@ -156,8 +161,8 @@ test("the swoop seen through the brain's own eyes fires the giant fiber and the 
     assert.ok(r.landed, `didn't land: ${summary(results)}`);
     assert.ok(r.lowest >= 0, "never below the floor");
   }
-  // The brain takes about a fifth of a CPU second per simulated second with the eyes open (packages/brain/README.md); five times that is a fault.
-  assert.ok(cpu < time, `${cpu.toFixed(1)} CPU s for ${time.toFixed(0)} s`);
+  // The fly's life with its eyes open to the swoop takes a fifth of an M5 Pro CPU second per simulated second.
+  assert.ok(cpu < 0.34 * time, `${cpu.toFixed(1)} M5 Pro CPU s for ${time.toFixed(0)} s; budget ${(0.34 * time).toFixed(1)}`);
 });
 
 test("with the eyes shut, the hand-wired loom of the swoop drives the giant fiber past take-off almost every throw", { skip }, () => {

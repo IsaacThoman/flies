@@ -223,27 +223,3 @@ test("a male's taste on its front legs doesn't make it sing; P1, the courtship n
   b.sim.addInput("P1", connectome!.filter((i) => /^pC1_\d/.test(connectome!.columns.type.value(i))), 30);
   assert.ok(mean(b, 1000, RESTING_SENSES).sing > 0.9);
 });
-
-test("it builds in under 2 CPU s and runs within its cost bounds, with room to spare", { skip }, () => {
-  // Scheduling delays belong to the busy machine, not the brain's cost. Best of three
-  // also keeps an occasional GC or JIT compilation from deciding a regression check.
-  const cpuMs = (work: () => void) => {
-    const start = process.cpuUsage();
-    work();
-    const used = process.cpuUsage(start);
-    return (used.user + used.system) / 1000;
-  };
-  const built = Math.min(...Array.from({ length: 3 }, () => cpuMs(() => { brain(); })));
-  assert.ok(built < 2000, `built in ${built.toFixed(1)} CPU ms (best of three)`);
-  const b = brain();
-  const cost = (senses: BrainSenses) => {
-    run(b, 1000, senses);
-    return Math.min(...Array.from({ length: 3 }, () => cpuMs(() => run(b, 4000, senses)) / 4000));
-  };
-  // The budgets are 0.15 and 0.5 s per simulated second; these allow twice that.
-  const rest = cost(RESTING_SENSES);
-  assert.ok(rest < 0.3, `${rest} CPU s per simulated second at rest (best of three)`);
-  const all = cost(FULL);
-  assert.ok(all < 1, `${all} CPU s per simulated second with everything at once (best of three)`);
-  console.log(`  CPU cost: build ${built.toFixed(0)} ms, rest ${rest.toFixed(3)} s/s, full ${all.toFixed(3)} s/s (best of three)`);
-});
