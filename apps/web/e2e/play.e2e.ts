@@ -18,10 +18,11 @@
 
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
-import { gameUp, openGame, readState, startServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
+import { openGame, readState, startServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import { dropFood, feedHoney } from "./feeding.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import type { Game } from "../src/game.ts";
+import { disableScreensaver } from "./settings.ts";
 
 /** The frame's budget on the Apple TV. */
 const MAX_CALLS = 150;
@@ -37,6 +38,7 @@ if (!url) {
 }
 
 const { browser, page, errors } = await openGame({ url });
+await disableScreensaver(page);
 let maxCalls = 0;
 let maxTriangles = 0;
 const watch = setInterval(() => {
@@ -79,6 +81,7 @@ try {
   await startup.waitForFunction(() => !!(globalThis as unknown as { __fly?: unknown }).__fly, null, { polling: 100 });
   const firstFrame = await startup.evaluate(async () => {
     const { __fly: game, __drawFrame: draw } = globalThis as unknown as { __fly: Game; __drawFrame: () => void };
+    game.settings.wallpaperAfter = 0;
     const canvas = document.getElementById("game") as HTMLCanvasElement;
     const before = canvas.dataset.ready;
     let writes = 0, renders = 0, early = false;
@@ -256,7 +259,7 @@ try {
 
   step("what it sees: while playing by default, but never over the full picture or a menu; on Wallpaper it hides while playing");
   await page.evaluate(() => {
-    (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 60;
+    (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 0;
   });
   await waitFor(page, "screen=play,wallpaper=false,eyesInset=top-right");
   await press("Escape");
@@ -328,7 +331,7 @@ try {
   await page.evaluate(() => {
     const settings = (globalThis as unknown as { __fly: { settings: { statsPanel: string; wallpaperAfter: number } } }).__fly.settings;
     settings.statsPanel = "off";
-    settings.wallpaperAfter = 60;
+    settings.wallpaperAfter = 0;
   });
   await press("ArrowLeft");
   await waitFor(page, "wallpaper=false,statsPanel=hidden,tool=view", 3000);
@@ -371,7 +374,7 @@ try {
 
   step("a reload: the settings, the view, the light and the weather as they were left, the shelf on Feed, and the hints for what was used gone");
   await page.reload();
-  await gameUp(page);
+  await disableScreensaver(page);
   await waitFor(page, "brain=running,screen=title", 90_000);
   assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.haptics.enabled), false, "rumble stays off after reloading");
   await press("Enter");
