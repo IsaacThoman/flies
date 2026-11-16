@@ -208,7 +208,11 @@ vec3 rRoomLight(vec3 p, vec3 n) {
     e += uKitchen * rRect(p, n, vec3(${f(PASS.x0)}, ${f(PASS.shelf.top + 20)}, -3000.0), vec3(${f(PASS.x1)}, ${f(PASS.shelf.top + 20)}, -3000.0), vec3(${f(PASS.x1)}, ${f(PASS.head)}, -3000.0), vec3(${f(PASS.x0)}, ${f(PASS.head)}, -3000.0));
   }
   if (p.y < ${f(HEAT.y)} && p.z < -1500.0 && p.x > 0.0) {
-    e += uHeat * rRect(p, n, vec3(${f(HEAT.x0)}, ${f(HEAT.y)}, ${f(HEAT.z0)}), vec3(${f(HEAT.x1)}, ${f(HEAT.y)}, ${f(HEAT.z0)}), vec3(${f(HEAT.x1)}, ${f(HEAT.y)}, ${f(HEAT.z1)}), vec3(${f(HEAT.x0)}, ${f(HEAT.y)}, ${f(HEAT.z1)}));
+    // In the room, the heat lamps are seen only through the pass.
+    vec3 h = vec3(${f((HEAT.x0 + HEAT.x1) / 2)}, ${f(HEAT.y)}, ${f((HEAT.z0 + HEAT.z1) / 2)}) - p;
+    vec2 through = p.xy + h.xy * clamp((-3000.0 - p.z) / min(h.z, -1.0), 0.0, 1.0);
+    float seen = p.z < -3000.0 ? 1.0 : rBand(through.x, ${f(PASS.x0)}, ${f(PASS.x1)}, 40.0) * rBand(through.y, ${f(PASS.sill)}, ${f(PASS.head)}, 40.0);
+    if (seen > 0.0) e += seen * uHeat * rRect(p, n, vec3(${f(HEAT.x0)}, ${f(HEAT.y)}, ${f(HEAT.z0)}), vec3(${f(HEAT.x1)}, ${f(HEAT.y)}, ${f(HEAT.z0)}), vec3(${f(HEAT.x1)}, ${f(HEAT.y)}, ${f(HEAT.z1)}), vec3(${f(HEAT.x0)}, ${f(HEAT.y)}, ${f(HEAT.z1)}));
   }
   return e;
 }

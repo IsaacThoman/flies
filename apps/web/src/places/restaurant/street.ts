@@ -520,7 +520,8 @@ void main() {
   float wide = fwidth(q.x) * 1.2 + 0.04;
   // Each drop a streak, as the eye sees one falling: long, thin, faint at its ends.
   float streak = (1.0 - smoothstep(0.0, wide, abs(fq.x - x))) * smoothstep(0.0, 0.1, fq.y - y) * (1.0 - smoothstep(0.1, 0.3, fq.y - y));
-  float a = streak * step(hash21(cell), uRain * 0.3);
+  // The game's rain is light rain: few drops, and fine.
+  float a = streak * step(hash21(cell), uRain * 0.14);
   vec3 lit = uAir;
   for (int i = 0; i < ${LAMPS.length}; i++) {
     vec3 d = p - uLamps[i];
@@ -534,7 +535,7 @@ void main() {
     lit += vec3(1.0, 0.95, 0.86) * car.w * 0.02 * pow(ahead, 6.0) / (1.0 + dot(d, d) * 1e-7);
   }
   // Rain is seen where it is lit: in front of the lamps and the headlamps, hardly at all in the dark between.
-  gl_FragColor = vec4(lit, a * clamp(dot(lit, vec3(1.0)), 0.02, 0.4));
+  gl_FragColor = vec4(lit, a * clamp(dot(lit, vec3(1.0)), 0.02, 0.24));
   #include <colorspace_fragment>
 }`;
 
