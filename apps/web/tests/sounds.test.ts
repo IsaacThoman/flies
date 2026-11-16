@@ -28,6 +28,7 @@ class FakeContext {
       connect: (to: { gain: { value: number } }) => void (source.out = to),
       start: () => started.push({ buffer: source.buffer!, loop: source.loop, gain: source.out?.gain.value ?? 1, rate: source.playbackRate.value }),
       stop: () => void this.stopped++,
+      addEventListener: () => {},
     };
     return source;
   }

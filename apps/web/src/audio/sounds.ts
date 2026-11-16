@@ -575,8 +575,17 @@ export class Audio {
     gain.gain.value = 0;
     source.connect(gain);
     gain.connect(out);
+    this.#disconnectWhenEnded(source, gain);
     source.start();
     return { source, gain };
+  }
+
+  #disconnectWhenEnded(source: AudioBufferSourceNode, gain?: GainNode) {
+    // The TV retains every node connected to a bus, even after its input ends.
+    source.addEventListener("ended", () => {
+      source.disconnect();
+      gain?.disconnect();
+    }, { once: true });
   }
 
   setVolumes(effects: number, ambience: number) {
@@ -626,12 +635,14 @@ export class Audio {
     const source = ctx.createBufferSource();
     source.buffer = this.#buffers[sound];
     source.playbackRate.value = rate;
+    let gain: GainNode | undefined;
     if (volume !== 1) {
-      const gain = ctx.createGain();
+      gain = ctx.createGain();
       gain.gain.value = volume;
       source.connect(gain);
       gain.connect(this.#effects);
     } else source.connect(this.#effects);
+    this.#disconnectWhenEnded(source, gain);
     source.start();
   }
 
@@ -658,12 +669,14 @@ export class Audio {
       const chirps = birds < 1 ? this.#muffled : this.#chirps;
       source.buffer = chirps[Math.floor(Math.random() * chirps.length)];
       source.playbackRate.value = 0.9 + Math.random() * 0.25;
+      let gain: GainNode | undefined;
       if (birds < 1) {
-        const gain = ctx.createGain();
+        gain = ctx.createGain();
         gain.gain.value = birds;
         source.connect(gain);
         gain.connect(this.#ambient);
       } else source.connect(this.#ambient);
+      this.#disconnectWhenEnded(source, gain);
       source.start();
     }
   }
