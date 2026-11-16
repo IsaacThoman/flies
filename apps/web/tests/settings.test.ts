@@ -131,7 +131,7 @@ test("a saved wallpaper delay outside the menu's choices falls back to the defau
     const after = screen.menu.item("wallpaperAfter");
     assert.ok(after?.kind === "choice");
     assert.equal(after.options[after.index].value, settings.wallpaperAfter);
-    assert.equal(after.options[after.index].label, "1 min");
+    assert.equal(after.options[after.index].label, "30 s");
   }
 });
 
