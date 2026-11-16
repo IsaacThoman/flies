@@ -97,7 +97,28 @@ function bananaSolids(): Solid[] {
 }
 
 /** The terracotta pot of basil, in its saucer. */
-export const BASIL_POT = { x: -225, z: -36, r: 48, rim: 96, soil: 89, saucer: 66 };
+export const BASIL_POT = { x: -225, z: -30, r: 54, rim: 96, soil: 89, saucer: 72 };
+
+/**
+ * The basil: a dense mound of leaves no wider than the pot, so that it can be
+ * a solid a fly lands on with nothing but the pot under it: the hull its
+ * outermost leaves reach, none standing out of it, and a clump of shoots
+ * standing up out of it. Domes (their middles from the pot's, mm, and
+ * the height each rises from): one from the rim over all of it, and the
+ * clump's, rising from inside the mound so that it swells smoothly out of it.
+ * There is one clump only: where two met the mound together they would leave
+ * a hollow a falling fly could be caught in.
+ */
+export const BASIL_CROWN: readonly { x: number; z: number; r: number; base: number; top: number; power: number }[] = [
+  { x: 0, z: 0, r: 53, base: BASIL_POT.rim, top: 158, power: 0.6 },
+  { x: -8, z: -6, r: 24, base: 135, top: 174, power: 0.7 },
+];
+
+/** The basil's flowering tips: where each stands, and how high its top is. */
+export const BASIL_TIPS: readonly { x: number; z: number; top: number }[] = [
+  { x: BASIL_POT.x - 30, z: BASIL_POT.z + 14, top: 200 },
+  { x: BASIL_POT.x + 24, z: BASIL_POT.z - 20, top: 192 },
+];
 
 /**
  * A wind-up alarm clock in red enamel, standing toward the back of the sill
@@ -160,11 +181,12 @@ const spoonAxis = { x: Math.sin(TEASPOON.angle), z: Math.cos(TEASPOON.angle) };
 /** What each solid is, for the scene builder to draw it: the names below. */
 export const SILL_SOLIDS: readonly Solid[] = [
   ...WINDOW_SOLIDS,
-  // A saucer a fly can walk up into, with water standing round the pot's foot; the pot's rolled rim to walk round, and the soil inside.
-  { name: "saucer", footprint: { kind: "circle", x: BASIL_POT.x, z: BASIL_POT.z, r: BASIL_POT.saucer }, top: { kind: "dish", well: 1.4, rim: 6, inner: 0.82, lip: 0.9 } },
+  // A saucer a fly can walk up into, with water standing round the pot's foot, and the pot.
+  { name: "saucer", footprint: { kind: "circle", x: BASIL_POT.x, z: BASIL_POT.z, r: BASIL_POT.saucer }, top: { kind: "dish", well: 1.4, rim: 6, inner: 0.84, lip: 0.92 } },
   { name: "pot", footprint: { kind: "circle", x: BASIL_POT.x, z: BASIL_POT.z, r: BASIL_POT.r }, top: { kind: "dish", well: BASIL_POT.soil, rim: BASIL_POT.rim, inner: 0.8, lip: 0.92 } },
-  // The basil's stems, rising from the soil into its leaves (the leaves are above where the fly can reach from the soil).
-  { name: "stems", footprint: { kind: "circle", x: BASIL_POT.x + 4, z: BASIL_POT.z - 3, r: 7 }, top: { kind: "flat", y: 190 } },
+  // The basil: a mound of leaves from the pot's rim, hiding the stems and the soil, and its flowering tips standing up out of it.
+  ...BASIL_CROWN.map((c): Solid => ({ name: "basil", footprint: { kind: "circle", x: BASIL_POT.x + c.x, z: BASIL_POT.z + c.z, r: c.r }, top: { kind: "dome", base: c.base, height: c.top - c.base, power: c.power } })),
+  ...BASIL_TIPS.map((t): Solid => ({ name: "basil tip", footprint: { kind: "circle", x: t.x, z: t.z, r: 6 }, top: { kind: "dome", base: t.top - 4, height: 4, power: 0.5 } })),
   ...clockSolids(),
   // The fruit bowl: up its outside, round its rim and down into it, among a peach and two plums.
   { name: "bowl", footprint: { kind: "circle", x: FRUIT_BOWL.x, z: FRUIT_BOWL.z, r: FRUIT_BOWL.r }, top: { kind: "dish", well: 6, rim: 28, inner: 0.4, lip: 0.72 } },
@@ -207,7 +229,7 @@ export const SILL_PATCHES: readonly FoodPatch[] = [
   // A drip of wine run down the bottle and pooled on the sill.
   { name: "wine", x: WINE_BOTTLE.x - 47, z: WINE_BOTTLE.z + 32, r: 9, sweet: 0.6, pool: true },
   // Water standing in the basil's saucer, round the pot's foot on the side toward the bowl.
-  { name: "water", x: BASIL_POT.x + 52.5, z: BASIL_POT.z + 6, r: 2.6, sweet: 0, pool: true },
+  { name: "water", x: BASIL_POT.x + 57, z: BASIL_POT.z + 6, r: 2.6, sweet: 0, pool: true },
   { name: "spilt sugar", x: 38, z: 66, r: 4, sweet: 1 },
 ];
 

@@ -243,6 +243,67 @@ if (sillTop > 0.5) {
 }
 
 /**
+ * Leaves: the basil's, glossy and quilted between their veins, and the
+ * tulips' in the kitchen. `vein` (a two-float attribute) is where a point is
+ * on its leaf: along it from stalk to tip (0 to 1) and across it from the
+ * midrib (-1 to 1); below -1 along, it isn't a leaf's blade (a stem, a
+ * flower). Lit from behind, a leaf glows green with the sun through it; its
+ * underside is paler.
+ */
+export function leafMaterial(sunlight: Sunlight) {
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.36, metalness: 0, envMapIntensity: 0.3, side: THREE.DoubleSide });
+  sunlit(material, sunlight, "leaf", {
+    extra: (shader) => {
+      shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nattribute vec2 vein;\nvarying vec2 vVein;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvVein = vein;");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", `#include <common>\n${NOISE}\n${BUMP}\nvarying vec2 vVein;\nfloat leafHeight;\nfloat leafRough;`)
+        .replace(
+          "#include <color_fragment>",
+          /* glsl */ `#include <color_fragment>
+leafHeight = 0.0;
+leafRough = 0.36;
+if (vVein.x > -1.0) {
+  float u = vVein.x;
+  float w = abs(vVein.y);
+  float aa = fwidth(w) + 0.004;
+  // The midrib, pale and raised; side veins running from it toward the tip, five or six a side; the blade puckered between them.
+  float rib = 1.0 - smoothstep(0.035, 0.035 + aa * 1.5, w);
+  float along = (u - 0.42 * pow(w, 1.15)) * 6.0;
+  float va = fwidth(along) + 0.02;
+  float side = (1.0 - smoothstep(0.05, 0.05 + va, abs(fract(along) - 0.5) * 2.0 - 0.9)) * smoothstep(0.04, 0.1, w) * (1.0 - smoothstep(0.82, 0.95, w)) * smoothstep(0.06, 0.16, u);
+  float pucker = sin(3.14159 * fract(along)) * sin(3.14159 * min(w * 1.15, 1.0));
+  vec3 c = diffuseColor.rgb * (0.9 + 0.16 * pucker);
+  c = mix(c, c * vec3(1.25, 1.3, 1.05) + vec3(0.05, 0.06, 0.0), max(rib, side * 0.55));
+  if (!gl_FrontFacing) c = mix(c, vec3(dot(c, vec3(0.3, 0.55, 0.15))) * vec3(0.95, 1.08, 0.85), 0.3) * 1.12;
+  diffuseColor.rgb = c;
+  leafHeight = (pucker * 0.25 + rib * 0.2 - side * 0.12) * resolved(0.6);
+  leafRough = 0.24 + 0.12 * (1.0 - pucker);
+}`,
+        )
+        .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = leafRough;")
+        .replace("#include <normal_fragment_maps>", "#include <normal_fragment_maps>\nnormal = bumped(normal, leafHeight);")
+        .replace(
+          "#include <lights_fragment_end>",
+          /* glsl */ `#include <lights_fragment_end>
+{
+  vec3 wn = inverseTransformDirection(normal, viewMatrix);
+  vec3 sunDirView = normalize((viewMatrix * vec4(uSun, 0.0)).xyz);
+  float behind = max(dot(-normal, sunDirView), 0.0) * max(dot(normalize(-vViewPosition), -sunDirView), 0.0);
+  reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.9, 1.1, 0.5) * behind * 0.6 * sunReach(vWorld, -wn) * directionalLights[0].color;
+}`,
+        );
+    },
+  });
+  return material;
+}
+
+/** Marks a geometry's points as not on a leaf's blade, for the leaf material. */
+export const notLeaf = (geometry: THREE.BufferGeometry) => {
+  geometry.setAttribute("vein", new THREE.BufferAttribute(new Float32Array(geometry.attributes.position.count * 2).fill(-9), 2));
+  return geometry;
+};
+
+/**
  * Terracotta, and the soil in the pot: unglazed clay with fine pores and a
  * mottle from the kiln, and the white bloom of salts that soak through it.
  */

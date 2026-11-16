@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ALARM_CLOCK, BANANA, FRUIT_BOWL, BASIL_POT, Pantry, SILL, SILL_PATCHES, SILL_SOLIDS, WINDOW, WINDOWSILL, World, bananaAt, createSurface } from "../src/index.ts";
+import { ALARM_CLOCK, BANANA, BASIL_CROWN, BASIL_POT, BASIL_TIPS, FRUIT_BOWL, Pantry, SILL, SILL_PATCHES, SILL_SOLIDS, WINDOW, WINDOWSILL, World, bananaAt, createSurface, inside, topHeight } from "../src/index.ts";
 import type { RayHit } from "../src/index.ts";
 
 const world = new World(WINDOWSILL);
@@ -61,15 +61,35 @@ test("the fruit bowl: up its side, round its rim, down inside among the fruit to
   assert.ok(world.heightAt(juice.x, juice.z) < 8, "down in the bowl");
 });
 
-test("the basil's saucer holds water round the pot's foot, and the pot's rim and soil are level enough to stand on", () => {
+test("the basil's saucer holds water round the pot's foot, walkable from the sill", () => {
   const s = createSurface();
   for (let r = BASIL_POT.saucer + 1; r > BASIL_POT.r + 0.5; r -= 0.25) assert.ok(world.surface(BASIL_POT.x + r, BASIL_POT.z, s).normal.y >= STANDABLE, `saucer too steep ${r} mm out`);
   const water = SILL_PATCHES.find((f) => f.name === "water")!;
   assert.ok(water.pool);
   assert.equal(new Pantry(world, SILL_PATCHES).touching(water.x, world.heightAt(water.x, water.z), water.z, 0.3)?.name, "water");
-  const lip = (solid("pot").top as { lip: number }).lip * BASIL_POT.r;
-  assert.ok(world.surface(BASIL_POT.x + lip, BASIL_POT.z, s).normal.y > 0.99 && s.y === BASIL_POT.rim, "the rim's crest");
-  assert.equal(world.heightAt(BASIL_POT.x + 20, BASIL_POT.z + 10), BASIL_POT.soil, "the soil");
+});
+
+test("the basil is a mound of leaves a fly lands on, from the pot's rim up, with its flowering tips standing out of it", () => {
+  const { x, z, rim } = BASIL_POT;
+  const s = createSurface();
+  const crown = SILL_SOLIDS.filter((c) => c.name === "basil");
+  const leaves = (px: number, pz: number) => Math.max(rim, ...crown.filter((c) => inside(c.footprint, px, pz)).map((c) => topHeight(c, px, pz)));
+  const highest = BASIL_CROWN.reduce((a, b) => (b.top > a.top ? b : a));
+  assert.ok(highest.top < WINDOWSILL.ceiling, "within a fly's reach");
+  // Its top is a perch: level enough to stand on round the highest clump's crest, and smooth.
+  let last = world.heightAt(x + highest.x, z + highest.z);
+  assert.equal(last, highest.top);
+  for (let r = 0; r < highest.r * 0.45; r += 0.25) {
+    world.surface(x + highest.x + r * 0.6, z + highest.z - r * 0.8, s);
+    assert.ok(s.normal.y >= STANDABLE, `too steep ${r} mm out`);
+    assert.ok(Math.abs(s.y - last) < 0.9, `a step ${r} mm out`);
+    last = s.y;
+  }
+  // It fills the pot, hiding the soil, and comes down to the rim at its edge; no wider than the pot, so the saucer round it stays open to the sky.
+  assert.ok(world.heightAt(x + 20, z + 10) > rim + 50, "over the soil");
+  assert.ok(Math.abs(leaves(x + BASIL_CROWN[0].r * 0.9999, z) - rim) < 2, "at the rim");
+  for (const c of BASIL_CROWN) assert.ok(Math.hypot(c.x, c.z) + c.r <= BASIL_POT.r, "within the pot");
+  for (const tip of BASIL_TIPS) assert.ok(world.heightAt(tip.x, tip.z) > leaves(tip.x, tip.z) + 10, "a flowering tip stands out of the leaves");
 });
 
 test("the alarm clock stands on the sill: a fly can land on its case and walk across its top, round as the drum is, and on its bells", () => {

@@ -4,7 +4,7 @@
 // into a few meshes; the small things are instanced.
 
 import * as THREE from "three";
-import { ALARM_CLOCK, BANANA, WINE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_DECOR, SILL_PATCHES, SILL_SOLIDS, TEASPOON, WINDOW, bananaAt, inside, topHeight, topNormal, topPeak } from "@fly/world";
+import { ALARM_CLOCK, BANANA, BASIL_CROWN, WINE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_DECOR, SILL_PATCHES, SILL_SOLIDS, TEASPOON, WINDOW, bananaAt, inside, topHeight, topNormal, topPeak } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { Batch, freeze, mat4, paint, random } from "../../scene/build.ts";
 import { WallClock } from "../../scene/clock.ts";
@@ -17,7 +17,7 @@ import { FRAME_HEAD, createSunlight, sunlit } from "./light.ts";
 import type { Ball, Column } from "./light.ts";
 import { buildRoom } from "./room.ts";
 import { buildSeen } from "./seen.ts";
-import { blend, clayMaterial, fruitMaterial, glazeMaterial, paintMaterial, plasterMaterial, tag, tileMaterial, tone, towelMaterial } from "./surfaces.ts";
+import { blend, clayMaterial, fruitMaterial, glazeMaterial, leafMaterial, notLeaf, paintMaterial, plasterMaterial, tag, tileMaterial, tone, towelMaterial } from "./surfaces.ts";
 import type { Contact } from "./surfaces.ts";
 
 /** The room's warm walls and floor tint the sunlight they throw back at the window. */
@@ -221,8 +221,8 @@ function casters(): { balls: Ball[]; columns: Column[] } {
     { x: FRUIT_BOWL.x + 32, y: 28, z: FRUIT_BOWL.z - 24, r: 17 },
     { x: FRUIT_BOWL.x + 20, y: 24.5, z: FRUIT_BOWL.z + 30, r: 17 },
     // The basil's leaves let some light through.
-    { x: BASIL_POT.x + 4, y: 160, z: BASIL_POT.z - 2, r: 64, density: 0.72 },
-    { x: BASIL_POT.x - 12, y: 222, z: BASIL_POT.z - 10, r: 38, density: 0.6 },
+    { x: BASIL_POT.x, y: BASIL_POT.rim + 30, z: BASIL_POT.z, r: BASIL_CROWN[0].r, density: 0.85 },
+    { x: BASIL_POT.x, y: BASIL_CROWN[1].top - 40, z: BASIL_POT.z, r: 40, density: 0.8 },
     // The alarm clock's drum: seen from the window, a disc.
     { x: ALARM_CLOCK.x, y: ALARM_CLOCK.y, z: ALARM_CLOCK.z, r: ALARM_CLOCK.r },
     { x: PEACH_PLATE.x - 5, y: -12, z: PEACH_PLATE.z - 3, r: 27 },
@@ -295,22 +295,7 @@ export function buildSill(): SceneSet {
   const fruit = fruitMaterial(sunlight, stone);
   const clock = new WallClock();
   const glaze = glazeMaterial(sunlight, { hands: clock.hands, ...CLOCK_FACES });
-  const leaf = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0, envMapIntensity: 0.22, side: THREE.DoubleSide });
-  // Leaves let the sun through: lit from behind they glow green.
-  sunlit(leaf, sunlight, "leaf", {
-    extra: (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "#include <lights_fragment_end>",
-        /* glsl */ `#include <lights_fragment_end>
-{
-  vec3 wn = inverseTransformDirection(normal, viewMatrix);
-  vec3 sunDirView = normalize((viewMatrix * vec4(uSun, 0.0)).xyz);
-  float behind = max(dot(-normal, sunDirView), 0.0) * max(dot(normalize(-vViewPosition), -sunDirView), 0.0);
-  reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.9, 1.1, 0.5) * behind * 0.6 * sunReach(vWorld, -wn) * directionalLights[0].color;
-}`,
-      );
-    },
-  });
+  const leaf = leafMaterial(sunlight);
   const metal = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.16, metalness: 1, envMapIntensity: 1.1 });
   sunlit(metal, sunlight, "metal");
   const towel = towelMaterial(sunlight, SILL_DECOR.towel.hx * 2);
@@ -395,7 +380,7 @@ export function buildSill(): SceneSet {
   add(plaster, paint(box(-SILL.hx - 20, SILL.hx + 20, -70, -40, -440, back), "#cfc7b8"));
 
   const room = buildRoom({ plaster, tiles, glaze, paint: paintM, metal, leaf });
-  for (const [m, g] of room.pieces) add(m, g);
+  for (const [m, g] of room.pieces) add(m, m === leaf ? notLeaf(g) : g);
   for (const object of room.objects) {
     freeze(object);
     group.add(object);
@@ -415,57 +400,198 @@ export function buildSill(): SceneSet {
     const outside: [number, number][] = [[BASIL_POT.r - 2.4, 95.6], [BASIL_POT.r - 0.6, 94.2], [BASIL_POT.r + 0.8, 92.2], [BASIL_POT.r + 1.4, 89.5], [BASIL_POT.r + 1.4, 81.5], [BASIL_POT.r + 0.6, 80], [BASIL_POT.r - 0.2, 79.6], [BASIL_POT.r - 0.2, 4], [BASIL_POT.r - 0.5, 1.2]];
     const wall = [...rim, ...outside].reverse();
     clayed(lathe(wall, 72, BASIL_POT.x, BASIL_POT.z), (p) => (p.y > 79.5 ? tone("#cf7a52") : TERRACOTTA), 1);
-    // The soil, dark and crumbly.
-    const soil = new THREE.CircleGeometry(top.inner * BASIL_POT.r + 0.2, 48).rotateX(-Math.PI / 2).translate(BASIL_POT.x, BASIL_POT.soil, BASIL_POT.z);
-    clayed(soil, "#3a2a1f", 0);
   }
 
-  // The basil: a bush of stems from the soil, with pairs of big glossy leaves, cupped and drooping at the tip, each pair turned a quarter from the last.
+  // The basil: a mound of shoots filling the pot, each tipped with opposite pairs of broad, cupped, glossy leaves, every pair turned a quarter from the last, round a tight bud; two shoots have run up to flower. Its outermost leaves reach the crown the fly lands on (packages/world/src/windowsill.ts) and none stands out of it; inside them the crown is dark foliage, hiding the stems and the soil.
   {
-    const stems = one("stems").footprint as { x: number; z: number; r: number };
+    const crowns = byName("basil");
+    const { x: px, z: pz, rim } = BASIL_POT;
+    const reach = (crowns[0].footprint as { r: number }).r;
     const brnd = random(5);
-    const leafShape = (size: number, curl: number) => {
-      const g = new THREE.PlaneGeometry(1, 1, 8, 4);
-      const pos = g.attributes.position;
-      for (let v = 0; v < pos.count; v++) {
-        const u = pos.getX(v) + 0.5;
-        const w = pos.getY(v) * 2;
-        // Broadly ovate, widest a third of the way along, to a short point.
-        const halfWidth = Math.pow(Math.sin(Math.PI * Math.pow(u, 0.7)), 0.8) * 0.42 * (1 - u * 0.2);
-        const across = w * halfWidth;
-        // Domed over its midrib, edges turned down; the tip drooping.
-        const y = -Math.pow(u, 1.8) * size * curl - across * across * size * 0.9 + u * size * 0.15;
-        pos.setXYZ(v, u * size, y, across * size);
-      }
-      g.computeVertexNormals();
-      return g;
-    };
-    for (let i = 0; i < 7; i++) {
-      const a = (i / 7) * Math.PI * 2 + brnd.range(-0.3, 0.3);
-      const base = new THREE.Vector3(stems.x + Math.cos(a) * 4, BASIL_POT.soil, stems.z + Math.sin(a) * 4);
-      const height = 105 + brnd.range(0, 70) - (i % 3) * 12;
-      const spread = brnd.range(14, 34);
-      const top = base.clone().add(new THREE.Vector3(Math.cos(a) * spread, height, Math.sin(a) * spread));
-      const curve = new THREE.QuadraticBezierCurve3(base, base.clone().add(new THREE.Vector3(Math.cos(a) * spread * 0.2, height * 0.55, Math.sin(a) * spread * 0.2)), top);
-      add(leaf, paint(new THREE.TubeGeometry(curve, 8, 1.7 - (i % 3) * 0.2, 5), (p) => (p.y < BASIL_POT.soil + 25 ? tone("#7a8a44") : tone("#62a83e"))));
-      const pairs = 5 + (i % 2);
-      for (let k = 0; k < pairs; k++) {
-        const t = 0.2 + (k / pairs) * 0.78;
-        const at = curve.getPoint(t);
-        const size = (58 - k * 5) * brnd.range(0.82, 1.12);
-        for (const side of [-1, 1]) {
-          const turn = a + (k % 2) * (Math.PI / 2) + (side < 0 ? Math.PI : 0) + brnd.range(-0.35, 0.35);
-          const m = mat4(at, new THREE.Euler(brnd.range(-0.15, 0.15), -turn, 0.5 - k * 0.07 + brnd.range(-0.15, 0.15), "YXZ"));
-          const light = brnd.next() < 0.3;
-          add(leaf, paint(leafShape(size, 0.16 + brnd.range(0, 0.1)), (p) => {
-            if (Math.abs(p.z) < size * 0.025) return tone("#8fd05a");
-            return light ? tone("#46ad2c") : tone("#358f22");
-          }), m);
+    const n = { x: 0, y: 1, z: 0 };
+    for (const c of crowns) {
+      const f = c.footprint as { x: number; z: number };
+      // Deep among the leaves, so that between them the bush looks deep.
+      const inner = (c === crowns[0] ? topGeometry(c, 6, 32) : topGeometry(c, 3, 12)).translate(-f.x, -rim, -f.z).scale(0.84, 0.8, 0.84).translate(f.x, rim, f.z);
+      add(leaf, notLeaf(paint(inner, (p) => blend("#10260b", "#1f4515", Math.min(1, (p.y - rim) / 60)))));
+    }
+    /** The crown's top over a point, and the solid it is (for its slope), or the rim's height off it. */
+    let under = crowns[0];
+    const height = (x: number, z: number) => {
+      let y = rim;
+      for (const c of crowns) {
+        if (!inside(c.footprint, x, z)) continue;
+        const h = topHeight(c, x, z);
+        if (h > y) {
+          y = h;
+          under = c;
         }
       }
-      // The young leaves at the tip, held up round the growing point.
-      for (let k = 0; k < 4; k++) add(leaf, paint(leafShape(k % 2 ? 22 : 17, 0.08), "#79cc4c"), mat4(top, new THREE.Euler(0, (k / 4) * Math.PI * 2 + a, k % 2 ? 0.75 : 1.05, "YXZ")));
+      return y;
+    };
+    /** Draws a point back onto the crown (a little proud of it) if it stands out of it, along the line from inside the pot. */
+    const hold = (v: THREE.Vector3) => {
+      const cy = rim - 10;
+      const out = (k: number) => {
+        const x = px + (v.x - px) * k;
+        const z = pz + (v.z - pz) * k;
+        const y = cy + (v.y - cy) * k;
+        return Math.hypot(x - px, z - pz) > reach + 1 || y > height(x, z) + 1;
+      };
+      if (!out(1)) return;
+      let lo = 0;
+      let hi = 1;
+      // To within a hundredth of the way, always on the inside.
+      for (let i = 0; i < 7; i++) {
+        const m = (lo + hi) / 2;
+        if (out(m)) hi = m;
+        else lo = m;
+      }
+      v.set(px + (v.x - px) * lo, cy + (v.y - cy) * lo, pz + (v.z - pz) * lo);
+    };
+    // Every leaf goes into one geometry, written point by point: made as a geometry each, they took longer to build than all the rest of the sill.
+    const leafPoints: number[] = [];
+    const leafNormals: number[] = [];
+    const leafColors: number[] = [];
+    const leafVeins: number[] = [];
+    const grid: THREE.Vector3[] = Array.from({ length: 40 }, () => new THREE.Vector3());
+    const gridNormals: THREE.Vector3[] = Array.from({ length: 40 }, () => new THREE.Vector3());
+    const top = new THREE.Vector3();
+    const e1 = new THREE.Vector3();
+    const e2 = new THREE.Vector3();
+    /** A basil leaf `length` long, placed by `matrix`: broad, ovate to a point, domed over its midrib with its edges curled under, its tip dipping by `droop`; `vein` says where each point is on it. Held to the crown unless it is a flowering tip's bract, within the tip's own column. */
+    const basilLeaf = (length: number, droop: number, matrix: THREE.Matrix4, color: THREE.Color, held: boolean) => {
+      // Small leaves need fewer points to be as smooth.
+      const nu = length > 12 ? 8 : 4;
+      const nw = length > 12 ? 5 : 3;
+      const at = (i: number, j: number) => grid[i * nw + j];
+      for (let i = 0; i < nu; i++) {
+        const u = i / (nu - 1);
+        const half = length * 0.36 * Math.pow(Math.sin(Math.PI * Math.pow(u, 0.72)), 0.85) * (1 - 0.15 * u) + length * 0.015;
+        for (let j = 0; j < nw; j++) {
+          const w = (j / (nw - 1)) * 2 - 1;
+          const y = -droop * u * u - Math.pow(Math.abs(w), 2.2) * half * 0.45 + Math.sin(Math.PI * u) * length * 0.05;
+          const v = at(i, j).set(u * length, y, w * half).applyMatrix4(matrix);
+          if (held) hold(v);
+        }
+      }
+      // Each point's normal from its neighbours along and across, turned to the leaf's upper side.
+      top.set(0, 1, 0).transformDirection(matrix);
+      for (let i = 0; i < nu; i++) {
+        for (let j = 0; j < nw; j++) {
+          e1.subVectors(at(Math.min(i + 1, nu - 1), j), at(Math.max(i - 1, 0), j));
+          e2.subVectors(at(i, Math.min(j + 1, nw - 1)), at(i, Math.max(j - 1, 0)));
+          const n = gridNormals[i * nw + j].crossVectors(e1, e2).normalize();
+          if (n.dot(top) < 0) n.negate();
+        }
+      }
+      // Wound so that its front faces the way its normals do.
+      e1.subVectors(at(1, 0), at(0, 0));
+      e2.subVectors(at(1, 1), at(0, 0));
+      const flip = e1.cross(e2).dot(gridNormals[nw]) < 0;
+      const corner = (i: number, j: number) => {
+        at(i, j).toArray(leafPoints, leafPoints.length);
+        gridNormals[i * nw + j].toArray(leafNormals, leafNormals.length);
+        leafColors.push(color.r, color.g, color.b);
+        leafVeins.push(i / (nu - 1), (j / (nw - 1)) * 2 - 1);
+      };
+      for (let i = 0; i < nu - 1; i++) {
+        for (let j = 0; j < nw - 1; j++) {
+          for (const [a, b] of flip ? [[i, j], [i + 1, j + 1], [i + 1, j], [i, j], [i, j + 1], [i + 1, j + 1]] : [[i, j], [i + 1, j], [i + 1, j + 1], [i, j], [i + 1, j + 1], [i, j + 1]]) corner(a, b);
+        }
+      }
+    };
+    const X = new THREE.Vector3();
+    const Y = new THREE.Vector3();
+    const Z = new THREE.Vector3();
+    /** A leaf from `node`, out along `dir` in the plane square to `normal`, raised `rise` toward it. */
+    const leafAt = (node: THREE.Vector3, normal: THREE.Vector3, dir: THREE.Vector3, rise: number, length: number, droop: number, color: THREE.Color, held = true) => {
+      X.copy(dir).multiplyScalar(Math.cos(rise)).addScaledVector(normal, Math.sin(rise)).normalize();
+      Y.copy(normal).addScaledVector(X, -X.dot(normal)).normalize();
+      Z.crossVectors(X, Y);
+      basilLeaf(length, droop, new THREE.Matrix4().makeBasis(X, Y, Z).setPosition(node), color, held);
+    };
+    const stem = (a: THREE.Vector3, b: THREE.Vector3, r: number) => add(leaf, notLeaf(paint(rod(a, b, r, 4), "#5e9a34")));
+    // Older leaves low on each shoot, big, held out level with their tips drooping; the next pair a quarter round, smaller and held up; the bud.
+    const PAIRS = [
+      { depth: 20, length: 46, rise: 0.12, droop: 9, color: "#2c8422" },
+      { depth: 11, length: 36, rise: 0.22, droop: 6, color: "#389a2a" },
+      { depth: 4, length: 21, rise: 0.5, droop: 2.5, color: "#56b43a" },
+      { depth: 0.5, length: 10, rise: 1.0, droop: 0.4, color: "#7fcf52" },
+    ];
+    // A shoot on the crest of each clump, where a fly lands, and the rest spread evenly over the crown from its top down its sides to the rim.
+    const SHOOTS = 18;
+    const shoots = crowns.slice(1).map((c) => ({ x: c.footprint.x + 1, z: c.footprint.z + 1 }));
+    for (let i = 0; i < SHOOTS; i++) {
+      const polar = Math.acos(1 - ((i + 0.5) / SHOOTS) * 0.86);
+      const a = i * 2.39996 + brnd.range(-0.2, 0.2);
+      const s = Math.min(0.95, Math.sin(polar));
+      shoots.push({ x: px + Math.cos(a) * s * reach, z: pz + Math.sin(a) * s * reach });
     }
+    for (const at of shoots) {
+      const a = Math.atan2(at.z - pz, at.x - px);
+      const tip = new THREE.Vector3(at.x, height(at.x, at.z), at.z);
+      topNormal(under, tip.x, tip.z, n);
+      // Shoots grow up, leaning out a little as the crown does.
+      const normal = new THREE.Vector3(n.x, n.y, n.z).lerp(new THREE.Vector3(0, 1, 0), 0.7).normalize();
+      const radial = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+      const outward = radial.addScaledVector(normal, -radial.dot(normal)).normalize();
+      const across = new THREE.Vector3().crossVectors(normal, outward);
+      const turn = brnd.range(0, Math.PI);
+      const size = brnd.range(0.88, 1.1);
+      stem(tip.clone().addScaledVector(normal, -22), tip.clone().addScaledVector(normal, -1), 1.4);
+      PAIRS.forEach((pair, k) => {
+        const node = tip.clone().addScaledVector(normal, -pair.depth);
+        const angle = turn + (k % 2) * (Math.PI / 2);
+        const tint = tone(k < 2 && brnd.next() < 0.3 ? "#45a630" : pair.color).clone().multiplyScalar(brnd.range(0.9, 1.06));
+        for (const side of [-1, 1]) {
+          const dir = outward.clone().multiplyScalar(Math.cos(angle) * side).addScaledVector(across, Math.sin(angle) * side);
+          leafAt(node, normal, dir, pair.rise + brnd.range(-0.12, 0.12), pair.length * size, pair.droop * size, tint);
+        }
+      });
+    }
+    // The flowering tips: a square stem up out of the leaves, and up it whorls of little white flowers over pairs of small bracts, closer and smaller to the green buds at the top.
+    const up = new THREE.Vector3(0, 1, 0);
+    const petal = new THREE.OctahedronGeometry(1, 0).attributes.position;
+    const flowers: number[] = [];
+    const flowerColors: number[] = [];
+    const fm = new THREE.Matrix4();
+    const fp = new THREE.Vector3();
+    for (const tipSolid of byName("basil tip")) {
+      const f = tipSolid.footprint as { x: number; z: number; r: number };
+      const crest = topPeak(tipSolid.top);
+      const base = height(f.x, f.z);
+      stem(new THREE.Vector3(f.x, base - 16, f.z), new THREE.Vector3(f.x, crest - 2.5, f.z), 1.3);
+      const tiers = 4;
+      for (let t = 0; t < tiers; t++) {
+        const k = t / (tiers - 1);
+        const y = base + 4 + (crest - 6 - base) * Math.pow(k, 0.8);
+        const spread = (f.r - 1.2) * (1 - k * 0.45);
+        const bract = new THREE.Vector3(Math.cos(t * 1.57), 0, Math.sin(t * 1.57));
+        for (const side of [-1, 1]) leafAt(new THREE.Vector3(f.x, y - 1, f.z), up, bract.clone().multiplyScalar(side), 0.35, spread + 1, 0.5, tone("#4c9a30"), false);
+        const bud = t === tiers - 1;
+        const color = tone(bud ? "#a8d47c" : "#f7f4ef");
+        for (let j = 0; j < 5; j++) {
+          const fa = (j / 5) * Math.PI * 2 + t * 0.7;
+          fm.makeRotationY(-fa).multiply(new THREE.Matrix4().makeRotationZ(0.6)).scale(fp.set(0.9, bud ? 1.1 : 1.7, 0.9)).setPosition(f.x + Math.cos(fa) * spread * 0.62, y + 1, f.z + Math.sin(fa) * spread * 0.62);
+          for (let q = 0; q < petal.count; q++) {
+            fp.fromBufferAttribute(petal, q).applyMatrix4(fm).toArray(flowers, flowers.length);
+            flowerColors.push(color.r, color.g, color.b);
+          }
+        }
+      }
+    }
+    const blossom = new THREE.BufferGeometry();
+    blossom.setAttribute("position", new THREE.Float32BufferAttribute(flowers, 3));
+    blossom.computeVertexNormals();
+    blossom.setAttribute("color", new THREE.Float32BufferAttribute(flowerColors, 3));
+    add(leaf, notLeaf(blossom));
+    const leaves = new THREE.BufferGeometry();
+    leaves.setAttribute("position", new THREE.Float32BufferAttribute(leafPoints, 3));
+    leaves.setAttribute("normal", new THREE.Float32BufferAttribute(leafNormals, 3));
+    leaves.setAttribute("color", new THREE.Float32BufferAttribute(leafColors, 3));
+    leaves.setAttribute("vein", new THREE.Float32BufferAttribute(leafVeins, 2));
+    add(leaf, leaves);
   }
 
   // The fruit bowl: speckled stoneware, its glaze teal inside and oatmeal outside, thin and toasted brown at the rim.
@@ -704,7 +830,16 @@ export function buildSill(): SceneSet {
     shape.moveTo(0, -dry.length / 2);
     shape.quadraticCurveTo(dry.length * 0.36, 0, 0, dry.length / 2);
     shape.quadraticCurveTo(-dry.length * 0.36, 0, 0, -dry.length / 2);
-    add(leaf, paint(new THREE.ShapeGeometry(shape, 10).rotateX(-Math.PI / 2), (p) => (Math.abs(p.x) < 0.5 ? tone("#8a8a4a") : tone("#6e7a36"))), mat4({ x: dry.x, y: 0.1, z: dry.z }, new THREE.Euler(0, dry.angle, 0)));
+    const g = paint(new THREE.ShapeGeometry(shape, 10), "#7a7a3e");
+    const pos = g.attributes.position;
+    const vein = new Float32Array(pos.count * 2);
+    for (let i = 0; i < pos.count; i++) {
+      const u = pos.getY(i) / dry.length + 0.5;
+      vein[i * 2] = u;
+      vein[i * 2 + 1] = pos.getX(i) / Math.max(1e-3, 0.72 * dry.length * u * (1 - u));
+    }
+    g.setAttribute("vein", new THREE.BufferAttribute(vein, 2));
+    add(leaf, g.rotateX(-Math.PI / 2), mat4({ x: dry.x, y: 0.1, z: dry.z }, new THREE.Euler(0, dry.angle, 0)));
   }
 
   // The pools: wine run down the bottle onto the sill, and water standing in the basil's saucer. Rings spread on them from drips and the fly's feet.
@@ -789,7 +924,7 @@ export function buildSill(): SceneSet {
     group.add(dropMesh);
   }
 
-  // Bits too small to feel: grains of spilt sugar, perlite and crumbs of soil in the pot.
+  // Grains of spilt sugar, too small to feel.
   {
     const bits: { m: THREE.Matrix4; c: THREE.Color }[] = [];
     const sugar = patch("spilt sugar");
@@ -798,14 +933,6 @@ export function buildSill(): SceneSet {
       const r = Math.sqrt(rnd.next()) * sugar.r * 1.3;
       const size = rnd.range(0.18, 0.28);
       bits.push({ m: mat4({ x: sugar.x + Math.cos(a) * r, y: size * 0.7, z: sugar.z + Math.sin(a) * r }, new THREE.Euler(rnd.range(0, 3), rnd.range(0, 3), rnd.range(0, 3)), { x: size, y: size, z: size }), c: new THREE.Color("#ffffff") });
-    }
-    const soilR = (pot.top as { inner: number }).inner * BASIL_POT.r - 1;
-    for (let i = 0; i < 120; i++) {
-      const a = rnd.range(0, Math.PI * 2);
-      const r = Math.sqrt(rnd.next()) * soilR;
-      const perlite = rnd.next() < 0.18;
-      const size = perlite ? rnd.range(0.5, 1.1) : rnd.range(0.4, 1.3);
-      bits.push({ m: mat4({ x: BASIL_POT.x + Math.cos(a) * r, y: BASIL_POT.soil + size * 0.15, z: BASIL_POT.z + Math.sin(a) * r }, new THREE.Euler(rnd.range(0, 3), rnd.range(0, 3), 0), { x: size, y: size * 0.5, z: size }), c: perlite ? new THREE.Color("#f0ede4") : new THREE.Color(rnd.next() < 0.5 ? "#2a1d14" : "#4a3524") });
     }
     const bitMaterial = new THREE.MeshStandardMaterial({ roughness: 0.75, metalness: 0, envMapIntensity: 0.4 });
     sunlit(bitMaterial, sunlight, "bits");
