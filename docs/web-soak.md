@@ -29,6 +29,7 @@ The default full run uses 200 circuits, 30 minutes per interaction phase, and
 | `--wallpaper-weather now` | Forecast or a held weather preset (clear/overcast/mist/rain). |
 | `--interval 10` | Sample interval in seconds. Overruns skip a tick; GCs never queue indefinitely. |
 | `--csv /tmp/soak.csv` | Incremental samples; default a unique file in the OS temporary directory. |
+| `--built` | Build once into a temporary directory and serve from `/fly/`, including service-worker behavior. |
 | `--url http://localhost:5173/` | Use an existing server; otherwise start and stop Vite. |
 | `--quick` | Four circuits and strict resource assertions. Keep the places phase when selecting phases. |
 
@@ -36,7 +37,7 @@ Interaction runs in a fifth context alongside wallpaper. Each wallpaper page
 is pinned to its place and by default follows the real clock and forecast. The interaction
 page waits for `data-moving` to clear between places; climate visits every
 weather and all five daylight presets plus the clock, holding each combination
-for 12 seconds and taking a fresh-place checkpoint after every weather. Tools use every variant and hold continuous tools; menus visit
+for 12 seconds, waiting for each weather to arrive, recording every combination, and taking a fresh-place checkpoint after every weather. Tools use every variant and hold continuous tools; menus visit
 title, pause, brain, about, settings and all settings pages; eyes alternate
 Off/Low/High, all inset modes, and the full picture. Input and lifecycle behavior
 remain covered by the ordinary e2e test and the web-release work.
@@ -52,6 +53,8 @@ noise band (2% or 256 KiB for heaps, 10% for frame cost/brain speed) labels a
 series flat; raw values and hourly rates remain visible. This is evidence for
 the duration tested, not proof of an infinite bound. A growing count needs
 investigation; changing camera draw counts or lazy uploads alone are not leaks.
+
+Wallpaper samples also verify that game time, completed eye readbacks and running audio time keep advancing. Adaptive quality, FPS, pixel mode and eye detail are recorded so a cheaper picture cannot disguise a slowdown.
 
 Each fixed-interval sample forces `HeapProfiler.collectGarbage` in the page and
 brain worker, then records page `Performance.getMetrics` heap bytes, worker

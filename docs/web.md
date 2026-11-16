@@ -313,15 +313,15 @@ what more speed would cost.
   rebuilds its state and the game draws its reflections again.
 - **The back-forward cache**: leaving and coming back either restores the
   page as it was, asleep since it left, or loads it afresh from the caches.
-- **Days open**: `node scripts/webSoak.ts` leaves the built game as a
-  wallpaper, carrying the fly between places every few seconds, and prints the
-  JavaScript heap after a garbage collection and three.js's geometries,
-  textures and programs each lap. Over 80 moves (`--minutes 9 --every 5`)
-  the textures stay at 18, the programs at 39 and the geometries at 44, and
-  the heap settles at about 21 MB after the first few laps. It found the
-  picnic and the bar each leaving a texture behind on every visit (the gull's
-  shadow, and the counter's contact shadows, which only uniforms added as the
-  shader compiles held); both are fixed.
+- **Days open**: `npm run soak:web -- --built` leaves the built game running
+  from a subfolder, with its service worker. It samples page and brain-worker
+  heaps after collection, three.js resources, audio and DOM counts, frame cost
+  and brain speed. Place circuits, weather/daylight, tools, menus, eyes and
+  uninterrupted wallpaper are separate phases; `npm run e2e:soak` is the fast
+  resource regression. See [the soak guide](web-soak.md) for durations,
+  comparable checkpoints and what still needs an Apple TV. Hidden-tab sleep,
+  context loss, caching and offline recovery remain in `npm run e2e`.
+
 
 The service worker (`apps/web/src/offline/sw.ts`) keeps the page and every
 file it loads, so it opens with no network; it asks the network for the page

@@ -1,11 +1,13 @@
 // Real-time browser soak. Raw samples belong outside the repository.
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
+import { build } from "vite";
+import { serveSite } from "./serve.ts";
 import type { CDPSession, Page } from "playwright";
 import type { Game } from "../apps/web/src/game.ts";
 import { PLACES } from "../apps/web/src/places/catalog.ts";
@@ -13,14 +15,15 @@ import type { PlaceId } from "../apps/web/src/places/catalog.ts";
 import { TIMES } from "../apps/web/src/scene/light.ts";
 import { WEATHERS } from "../apps/web/src/scene/weather.ts";
 import { TOOLS } from "../apps/web/src/tools/hands.ts";
-import { chromiumPath, gameUp, gpuFlags, readState, startServer, waitFor } from "./play.ts";
+import { chromiumPath, fullChromiumPath, gameUp, gpuFlags, readState, startServer, waitFor } from "./play.ts";
 
 declare global { var __fly: Game; }
 
 const PHASES = ["places", "climate", "tools", "menus", "eyes", "wallpaper"] as const;
 type Phase = typeof PHASES[number];
 type Sample = { seconds: number; phase: string; place: string; checkpoint: boolean; [metric: string]: number | string | boolean };
-const STATE = ["screen", "weather", "time", "view", "eyes", "eyesInset", "variant"];
+const STATE = ["screen", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "page"];
+const CLOCKS = ["gameSeconds", "audioSeconds", "eyesUpdates"];
 const METRICS = ["geometries", "textures", "programs", "calls", "triangles", "heap", "backing", "workerHeap", "workerBacking", "nodes", "listeners", "audioNodes", "frameMs", "brainSpeed", "storage"];
 
 /** Disjoint early/late quarters avoid calling a warmup spike a sustained slope. */
@@ -123,18 +126,25 @@ export async function run(args = process.argv.slice(2)) {
   assert.ok(phases.length && phases.every((p) => PHASES.includes(p)), `--phases: ${PHASES.join(",")}`);
   assert.ok([minutes, wallpaperMinutes, cycles, interval].every((n) => Number.isFinite(n) && n > 0), "durations, cycles and interval must be positive");
   const csv = path.resolve(flag("--csv", path.join(os.tmpdir(), `web-soak-${Date.now()}.csv`)));
-  writeFileSync(csv, ["seconds", "phase", "place", "checkpoint", ...STATE, ...METRICS].join(",") + "\n");
+  writeFileSync(csv, ["seconds", "phase", "place", "checkpoint", ...STATE, ...CLOCKS, ...METRICS].join(",") + "\n");
   let server: ChildProcess | undefined;
+  let site: Awaited<ReturnType<typeof serveSite>> | undefined;
+  let built: string | undefined;
   let url = flag("--url", "");
-  if (!url) ({ url, server } = await startServer());
-  const browser = await chromium.launch({ executablePath: chromiumPath(), args: [...gpuFlags(), "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows"] });
+  if (!url && args.includes("--built")) {
+    built = mkdtempSync(path.join(os.tmpdir(), "fly-soak-"));
+    await build({ configFile: path.join(import.meta.dirname, "../vite.config.ts"), logLevel: "warn", build: { outDir: built, emptyOutDir: true } });
+    site = await serveSite({ dir: built, base: "/fly/" });
+    url = site.url;
+  } else if (!url) ({ url, server } = await startServer());
+  const browser = await chromium.launch({ executablePath: args.includes("--built") ? fullChromiumPath() : chromiumPath(), args: [...gpuFlags(), "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows"] });
   const samples: Sample[] = [];
   const errors: string[] = [];
   const started = Date.now();
   console.log(`CSV ${csv}; real time, ${cycles} circuits; ${minutes} min/interaction phase, ${wallpaperMinutes} min/place wallpaper`);
   console.log("GPU bytes and native mixer memory unavailable in CDP; frameMs is CPU submission, not GPU/display time.");
 
-  async function lane(name: string, work: (page: Page, sample: (checkpoint?: boolean) => Promise<void>, phase: (p: string) => void) => Promise<void>) {
+  async function lane(name: string, work: (page: Page, sample: (checkpoint?: boolean, force?: boolean) => Promise<void>, phase: (p: string) => void) => Promise<void>) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
     page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
@@ -149,6 +159,7 @@ export async function run(args = process.argv.slice(2)) {
     await cdp.send("WebAudio.enable");
     await worker.start();
     let current = "warmup";
+    let lastLive: { gameSeconds: number; audioSeconds: number; eyesUpdates: number; at: number } | undefined;
     const sample = async (checkpoint = false) => {
       await cdp.send("HeapProfiler.collectGarbage");
       const wm = await worker.sample();
@@ -158,13 +169,24 @@ export async function run(args = process.argv.slice(2)) {
       const dom = await cdp.send("Memory.getDOMCounters");
       const state = await readState(page);
       assert.equal(state.brain, "running", `${name}: brain stopped`);
-      const storage = await page.evaluate(() => Object.entries(localStorage).reduce((n, [k, v]) => n + k.length + v.length, 0));
+      const live = await page.evaluate(() => ({
+        storage: Object.entries(localStorage).reduce((n, [k, v]) => n + k.length + v.length, 0),
+        gameSeconds: globalThis.__fly.time,
+        audioSeconds: globalThis.__fly.audio.ctx?.currentTime ?? NaN,
+        eyesUpdates: globalThis.__fly.eyes.updates,
+      }));
+      if (current === "wallpaper" && lastLive && Date.now() - lastLive.at >= 2000) {
+        assert.ok(live.gameSeconds > lastLive.gameSeconds, `${name}: frames stopped`);
+        if (state.eyes === "brain") assert.ok(live.eyesUpdates > lastLive.eyesUpdates, `${name}: eye readbacks stopped`);
+        if (state.audio === "running") assert.ok(live.audioSeconds > lastLive.audioSeconds, `${name}: audio stopped`);
+      }
+      lastLive = { ...live, at: Date.now() };
       const row: Sample = { seconds: (Date.now() - started) / 1000, phase: `${name}:${current}`, place: state.place, checkpoint,
         ...Object.fromEntries(STATE.map((k) => [k, state[k]])),
         ...Object.fromEntries(["geometries", "textures", "programs", "calls", "triangles", "frameMs", "brainSpeed"].map((k) => [k, Number(state[k])])),
-        heap: metrics.JSHeapUsedSize, backing: heap.backingStorageSize ?? NaN, ...wm, nodes: dom.nodes, listeners: dom.jsEventListeners, audioNodes: audioNodes.size, storage };
+        heap: metrics.JSHeapUsedSize, backing: heap.backingStorageSize ?? NaN, ...wm, nodes: dom.nodes, listeners: dom.jsEventListeners, audioNodes: audioNodes.size, ...live };
       samples.push(row);
-      appendFileSync(csv, [row.seconds, row.phase, row.place, row.checkpoint, ...STATE.map((k) => row[k]), ...METRICS.map((m) => Number.isFinite(row[m]) ? row[m] : "")].join(",") + "\n");
+      appendFileSync(csv, [row.seconds, row.phase, row.place, row.checkpoint, ...STATE.map((k) => row[k]), ...CLOCKS.map((k) => Number.isFinite(row[k]) ? row[k] : ""), ...METRICS.map((m) => Number.isFinite(row[m]) ? row[m] : "")].join(",") + "\n");
     };
     let inSample: Promise<void> = Promise.resolve();
     let sampling = false;
@@ -175,9 +197,9 @@ export async function run(args = process.argv.slice(2)) {
       inSample = next.catch((e) => { sampleError = e; });
       return next;
     };
-    const due = async (checkpoint = false) => {
+    const due = async (checkpoint = false, force = false) => {
       if (sampleError) throw sampleError;
-      if (checkpoint) await enqueue(true);
+      if (checkpoint || force) await enqueue(checkpoint);
     };
     try {
       await page.goto(url);
@@ -214,7 +236,7 @@ export async function run(args = process.argv.slice(2)) {
     }
   }
 
-  async function interaction(page: Page, sample: (checkpoint?: boolean) => Promise<void>, phase: (p: string) => void) {
+  async function interaction(page: Page, sample: (checkpoint?: boolean, force?: boolean) => Promise<void>, phase: (p: string) => void) {
     for (const p of phases.filter((p) => p !== "wallpaper")) {
       phase(p);
       if (p === "places") {
@@ -237,11 +259,13 @@ export async function run(args = process.argv.slice(2)) {
           for (const place of PLACES) {
             await move(page, place.id);
             for (const weather of WEATHERS) {
+              await choose(page, "weather", weather);
+              await waitFor(page, `weather=${weather}`);
               for (const time of [...TIMES, "clock"]) {
-                await choose(page, "weather", weather);
                 await choose(page, "light", time);
                 // Let the eased sky/rain and its PMREM rebuilds run, without advancing the clock.
                 for (let i = 0; i < 12; i++) { await page.waitForTimeout(1000); await sample(); }
+                await sample(false, true);
               }
               // A fresh copy after each weather gives comparable early/late climate samples.
               await canonical(page);
@@ -327,6 +351,8 @@ export async function run(args = process.argv.slice(2)) {
     }
   } finally {
     await browser.close(); server?.kill();
+    await site?.close();
+    if (built) rmSync(built, { recursive: true, force: true });
     const groups = new Map<string, Sample[]>();
     for (const s of samples) {
       // Climate/tool/menu counts are intentionally variable. Only matched checkpoints or steady wallpaper have meaningful slopes.
