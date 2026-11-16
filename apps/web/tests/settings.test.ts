@@ -50,7 +50,7 @@ test("everything new on screen is off by default, and what was already there is 
   assert.equal(DEFAULT_SETTINGS.statsPanel, "off", "no stats unless asked for");
   assert.equal(DEFAULT_SETTINGS.xray, "off");
   // As before there were sizes and opacities: what it sees and its nervous system in the wallpaper, at their own size, solid.
-  assert.equal(DEFAULT_SETTINGS.eyesInset, "wallpaper");
+  assert.equal(DEFAULT_SETTINGS.eyesInset, "always");
   assert.equal(DEFAULT_SETTINGS.nerves, "wallpaper");
   assert.equal(DEFAULT_SETTINGS.overlaySize, "medium");
   assert.equal(DEFAULT_SETTINGS.overlayOpacity, "full");

@@ -74,7 +74,7 @@ export const DEFAULT_SETTINGS: Settings = {
   wallpaperAfter: 60,
   wallpaperCamera: "follow",
   eyes: "low",
-  eyesInset: "wallpaper",
+  eyesInset: "always",
   nerves: "wallpaper",
   xray: "off",
   statsPanel: "off",

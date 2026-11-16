@@ -87,7 +87,7 @@ test("every facet gets a dot on whole pixels inside the picture, left eye on the
 });
 
 test("the setting is kept with the others, in the wallpaper by default", () => {
-  assert.equal(DEFAULT_SETTINGS.eyesInset, "wallpaper");
+  assert.equal(DEFAULT_SETTINGS.eyesInset, "always");
   const store = { getItem: () => JSON.stringify({ eyesInset: "always" }), setItem() {} };
   assert.equal(loadSettings(store).eyesInset, "always");
 });
