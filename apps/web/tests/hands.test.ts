@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Pantry, World } from "@fly/world";
 import type { Place } from "@fly/world";
+import { DINER } from "../../../packages/world/tests/diner.ts";
 import { Audio } from "../src/audio/sounds.ts";
 import type { Sound } from "../src/audio/sounds.ts";
 import { Hands, TOOLS } from "../src/tools/hands.ts";
@@ -83,4 +84,20 @@ test("frame end clears every hands event even when a pause skips the regular upd
   assert.deepEqual(hands.events, { dropped: "sugar", landed: "sugar", swooped: true, toolChanged: true, variantChanged: true, blocked: true });
   hands.clearEvents();
   assert.deepEqual(hands.events, { dropped: null, landed: null, swooped: false, toolChanged: false, variantChanged: false, blocked: false });
+});
+
+test("food dropped where the pointer is under a table falls from under its top onto the floor there", () => {
+  const world = new World(DINER);
+  const hands = new Hands(world);
+  const pantry = new Pantry(world);
+  const fly = { position: { x: -50, y: 0, z: 20 }, yaw: 0, onFeet: true };
+  const eye = { x: -50, y: 3, z: 0 };
+  hands.tool = TOOLS.findIndex((t) => t.id === "feed");
+  hands.movePointer({ x: -50, y: 0, z: 0 }, { x: 0, y: 1, z: 0 });
+  hands.update(0, { use: true, holding: true, eye }, fly, pantry);
+  const falling = hands.falling[0];
+  assert.ok(falling.y < 72 && falling.floor === 0, `falls from ${falling.y} to ${falling.floor}`);
+  for (let i = 0; i < 60; i++) hands.update(1 / 60, { use: false, holding: false, eye }, fly, pantry);
+  assert.equal(pantry.foods.length, 1);
+  assert.equal(pantry.foods[0].y, 0);
 });

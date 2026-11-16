@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { mulberry32 } from "@fly/brain";
-import { FlyBody, MAX_SLOPE_COS, createIntent } from "@fly/body";
+import { FLY_HEIGHT, FlyBody, MAX_SLOPE_COS, createIntent } from "@fly/body";
 import type { Forces } from "@fly/body";
-import { BAR, LAB, PICNIC, WINDOWSILL, World, createSurface } from "@fly/world";
-import type { Vec3 } from "@fly/world";
+import { BAR, LAB, PICNIC, RESTAURANT, WINDOWSILL, World, createSurface } from "@fly/world";
+import type { Place, Vec3 } from "@fly/world";
 
-export const places = { picnic: PICNIC, windowsill: WINDOWSILL, lab: LAB, bar: BAR };
+export const places = { picnic: PICNIC, windowsill: WINDOWSILL, lab: LAB, bar: BAR, restaurant: RESTAURANT };
 export type PlaceId = keyof typeof places;
 export const CEILING_EXCURSION = 400;
 export const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
@@ -19,8 +19,11 @@ export function checkBody(body: FlyBody, world: World) {
   }
   for (const n of [body.yaw, body.groundSpeed, body.turnRate, body.events.hit, body.surface.y]) assert.ok(Number.isFinite(n), "body scalar is not finite");
   const p = body.position;
-  const under = world.surface(p.x, p.z, surface);
-  assert.ok(p.y >= under.y - 1e-6, `inside solid ${under.solid}: y=${p.y}, surface=${under.y}`);
+  // Its feet out of everything, and room for its body over them.
+  const room = world.underside(p.x, p.z, p.y) - p.y;
+  if (!(room >= FLY_HEIGHT - 1e-6)) assert.fail(`inside ${world.solids[world.solidAt(p.x, p.y + Math.max(0, room) + 1e-3, p.z)]?.name ?? "a solid"}: y=${p.y}, room=${room}`);
+  // On its feet, it stands on the surface under them.
+  const under = world.surface(p.x, p.z, surface, p.y);
   if (body.onFeet) {
     assert.ok(under.onTable, "standing beyond the floor");
     assert.ok(under.normal.y >= MAX_SLOPE_COS - 1e-9, "standing on a steep slope");
@@ -77,7 +80,8 @@ export function checkRecovery(body: FlyBody, world: World) {
     }
     if (canWalk) break;
   }
-  let canJump = false;
+  // Under something lower than a jump over its body, it can only walk out.
+  let canJump = world.underside(landed.position.x, landed.position.z, landed.position.y) < landed.position.y + FLY_HEIGHT + 2;
   for (let direction = 0; direction < 8 && !canJump; direction++) {
     const jump = clone(landed, world);
     jump.yaw = direction * Math.PI / 4;
@@ -94,20 +98,29 @@ export function checkRecovery(body: FlyBody, world: World) {
   assert.ok(canWalk, "no walking escape in eight directions within 3s");
 }
 
+/**
+ * A standable surface inside the floor, below the flight ceiling (or the
+ * high-start limit), with room over it for the fly. Where surfaces lie one
+ * above another (a place with slabs), a height is drawn too, and the start is
+ * the surface at or below it; elsewhere the draws are as they always were.
+ */
 export function randomStart(world: World, random: () => number, highStarts = false) {
   const f = world.floor;
+  const limit = world.place.ceiling + (highStarts ? CEILING_EXCURSION : 0);
+  const layered = world.solids.some(s => (s.bottom ?? 0) > 0);
   for (let i = 0; i < 10000; i++) {
     const x = (random() * 2 - 1) * (f.kind === "circle" ? f.r : f.hx);
     const z = (random() * 2 - 1) * (f.kind === "circle" ? f.r : f.hz);
-    const s = world.surface(x, z, createSurface());
-    if (s.onTable && s.normal.y >= MAX_SLOPE_COS && s.y <= world.place.ceiling + (highStarts ? CEILING_EXCURSION : 0)) return { x, z, yaw: random() * Math.PI * 2 };
+    const s = world.surface(x, z, createSurface(), layered ? random() * limit : Infinity);
+    if (s.onTable && s.normal.y >= MAX_SLOPE_COS && s.y <= limit && s.underside >= s.y + FLY_HEIGHT) return { x, z, yaw: random() * Math.PI * 2, y: s.y };
   }
   throw new Error("could not sample a standable start");
 }
 
-export function fuzzBody(id: PlaceId, seed: number, duration: number, highStarts = false) {
+/** Fuzzes the body in one of the places, or in `place` (a test's own) under that name. */
+export function fuzzBody(id: string, seed: number, duration: number, highStarts = false, place: Place = places[id as PlaceId]) {
   const random = mulberry32(seed);
-  const world = new World(places[id]);
+  const world = new World(place);
   const body = new FlyBody(world, randomStart(world, random, highStarts));
   let intent = createIntent();
   const forces: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
@@ -120,7 +133,7 @@ export function fuzzBody(id: PlaceId, seed: number, duration: number, highStarts
   for (let time = 0; time < duration; ) {
     if (time >= nextStart) {
       const start = starts++ === 0 ? world.place.start : randomStart(world, random, highStarts);
-      body.place(start.x, start.z, start.yaw);
+      body.place(start.x, start.z, start.yaw, start.y);
       nextStart = time + 60;
     }
     if (time >= nextIntent) {

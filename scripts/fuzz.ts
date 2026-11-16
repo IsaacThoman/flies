@@ -13,7 +13,7 @@ const { values } = parseArgs({ options: {
   help: { type: "boolean", default: false },
 } });
 if (values.help) {
-  console.log("npm run fuzz -- [--kind body|life|both] [--place all|picnic|windowsill|lab|bar] [--seeds 1,2,3] [--duration 3600] [--high-starts]\nDuration is simulated seconds per seed per place. Reports are JSON lines; failures stop at the first violation with a replay command and checkpoint. Life progress goes to stderr every simulated minute.");
+  console.log("npm run fuzz -- [--kind body|life|both] [--place all|picnic|windowsill|lab|bar|restaurant] [--seeds 1,2,3] [--duration 3600] [--high-starts]\nDuration is simulated seconds per seed per place. Reports are JSON lines; failures stop at the first violation with a replay command and checkpoint. Life progress goes to stderr every simulated minute.");
 } else {
   const ids = values.place === "all" ? Object.keys(places) as PlaceId[] : [values.place as PlaceId];
   const seeds = values.seeds.split(",").map(Number);

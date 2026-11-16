@@ -596,7 +596,7 @@ export const RESTAURANT_PATCHES: readonly FoodPatch[] = [
   { name: "mints", x: ON_HOST.mints.x, z: ON_HOST.mints.z, y: HOST_STAND.top + ON_HOST.mints.well, r: 12, sweet: 0.6 },
   // On the floor: a soda spilt at the end of the bar, and a grape that rolled under the window's left table.
   { name: "soda", x: -2250, z: 1420, y: 0, r: 34, sweet: 0.9, pool: true },
-  { name: "grape", x: -1700, z: 2180, y: 0, r: 8, sweet: 0.85 },
+  { name: "grape", x: -1660, z: 2120, y: 0, r: 8, sweet: 0.85 },
 ];
 
 /** Where the fly first stands: on the window table, between the sugar and the glass, facing the sugar, with the street behind. */

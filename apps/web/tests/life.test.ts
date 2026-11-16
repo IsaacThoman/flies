@@ -32,7 +32,7 @@ for (const id of Object.keys(places) as PlaceId[]) {
       const life = new Life(new World(places.picnic), brain);
       const command: Partial<BrainCommand> = mode === "walking" ? { walk: 1 } : mode === "feeding" ? { feed: 1 } : {};
       Object.assign(brain.state.command, command);
-      if (mode === "feeding") life.pantry.drop("honey", life.body.position.x, life.body.position.z);
+      if (mode === "feeding") life.pantry.drop("honey", life.body.position.x, life.body.position.z, life.body.position.y);
       life.step(1 / 60, performance.now());
       if (mode === "airborne") { brain.state.command.escape = 1; life.step(1 / 60, performance.now()); }
       if (mode === "feeding") assert.ok(life.eating);
@@ -51,7 +51,7 @@ for (const id of Object.keys(places) as PlaceId[]) {
     const brain = realBrain!;
     fuzzLife(id, 1, 2, data!, undefined, brain);
     const life = new Life(new World(places[id]), brain);
-    life.pantry.drop("honey", life.body.position.x, life.body.position.z);
+    life.pantry.drop("honey", life.body.position.x, life.body.position.z, life.body.position.y);
     for (let i = 0; i < 45; i++) {
       life.step(1 / 30, performance.now());
       checkBody(life.body, life.world);
@@ -66,11 +66,11 @@ test("eating in the new place starts a new meal even when carried mid-meal", () 
   const brain = new Commands();
   brain.state.command.feed = 1;
   const life = new Life(new World(places.picnic), brain);
-  life.pantry.drop("honey", life.body.position.x, life.body.position.z);
+  life.pantry.drop("honey", life.body.position.x, life.body.position.z, life.body.position.y);
   life.step(1 / 60, performance.now());
   assert.equal(life.meals, 1);
   life.move(places.lab);
-  life.pantry.drop("honey", life.body.position.x, life.body.position.z);
+  life.pantry.drop("honey", life.body.position.x, life.body.position.z, life.body.position.y);
   life.step(1 / 60, performance.now());
   assert.equal(life.meals, 2);
 });

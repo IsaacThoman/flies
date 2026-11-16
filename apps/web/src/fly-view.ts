@@ -10,6 +10,7 @@ import type { FlyPose } from "@fly/contracts";
 import { RESTING_POSE } from "@fly/contracts";
 import { FLY_LENGTH } from "@fly/body";
 import type { FlyBody, Intent } from "@fly/body";
+import { createSurface } from "@fly/world";
 import type { World } from "@fly/world";
 import { canvas2d, canvasTexture } from "./scene/build.ts";
 import { shaded } from "./scene/shade.ts";
@@ -86,7 +87,7 @@ export class FlyView {
     this.root.quaternion.copy(this.#q);
 
     // The shadow lies on whatever is under the fly, softer and wider the higher it is.
-    const surface = this.#world.surface(p.x, p.z, scratchSurface);
+    const surface = this.#world.surface(p.x, p.z, scratchSurface, p.y);
     const height = Math.max(0, p.y - surface.y);
     const size = FLY_LENGTH * (1.1 + height * 0.02);
     const fade = Math.max(0, 1 - height / 120);
@@ -100,4 +101,4 @@ export class FlyView {
 }
 
 const AXIS_Y = new THREE.Vector3(0, 1, 0);
-const scratchSurface = { y: 0, normal: { x: 0, y: 1, z: 0 }, solid: -1, onTable: true };
+const scratchSurface = createSurface();
