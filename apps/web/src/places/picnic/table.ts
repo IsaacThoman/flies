@@ -15,9 +15,12 @@ import type { SceneSet } from "../types.ts";
 import { LAWN_Y } from "./backdrop.ts";
 import { Goings } from "./life.ts";
 import { outside } from "./outside.ts";
+import { ENAMEL, NOISE } from "./surfaces.ts";
 
 /** How many rings can spread on the pool at once. */
 const RIPPLES = 4;
+/** Where a wet jar of lemonade once stood, out toward the lake, and left a ring. */
+export const JAR_RING = { x: -40, z: -150, r: 34 };
 
 const byName = (name: string) => SOLIDS.filter((s) => s.name === name);
 const one = (name: string) => byName(name)[0];
@@ -52,13 +55,6 @@ function tableTexture() {
     if (solid.name === "straw" || solid.name === "dew" || solid.name === "crumb" || solid.name === "pip") continue;
     shadow(f.x, f.z, r, solid.name === "lemonade" || solid.name === "jam" ? 0.32 : 0.26);
   }
-  // A wet ring left by the lemonade jar.
-  const ring = tableUV(-60, -110, S);
-  g.beginPath();
-  g.arc(ring.px, ring.py, (30 / (TABLE_RADIUS * 2)) * S, 0, Math.PI * 1.7);
-  g.strokeStyle = "rgba(150, 200, 235, 0.35)";
-  g.lineWidth = 3;
-  g.stroke();
   const texture = canvasTexture(canvas);
   return texture;
 }
@@ -70,7 +66,8 @@ function tableTexture() {
  * white it is light), with a stitched hem, the creases where it was folded in
  * four, and a hairline of shadow round its edge. Threads too fine for the
  * pixels fade into their average, so it never shimmers; from across the table
- * it is plain gingham.
+ * it is plain gingham. Round it is the enamel, worn by use (ENAMEL,
+ * surfaces.ts).
  */
 /**
  * In the rain the napkin darkens as the cloth soaks it up, and the enamel
@@ -99,6 +96,10 @@ uniform float uWet;
 uniform vec3 uGust;
 uniform float uTime;
 varying vec2 vTable;
+${NOISE}
+${ENAMEL(TABLE_RADIUS, JAR_RING)}
+float enamelRough;
+vec2 enamelPeel;
 const float CHECK = ${(napkin.size / 12).toFixed(3)};
 const float PITCH = 0.22;
 // 1 in the blue half of each check, softened by how many checks a pixel covers.
@@ -172,6 +173,12 @@ cloth = mix(cloth, cloth * vec3(0.64, 0.68, 0.76), uWet * 0.85);
 diffuseColor.rgb *= mix(vec3(1.0), cloth, inside);
 // A hairline of shadow where the cloth's edge stands off the table.
 diffuseColor.rgb *= 1.0 - (1.0 - inside) * (1.0 - smoothstep(0.0, 0.6, edge)) * 0.25;
+// The enamel round it, worn by use.
+float tablePx = length(fwidth(vTable));
+vec4 worn = enamel(vTable, tablePx);
+diffuseColor.rgb *= mix(worn.rgb, vec3(1.0), inside);
+enamelRough = worn.a * (1.0 - inside);
+enamelPeel = peel(vTable, tablePx) * (1.0 - inside);
 float puddle = puddles(vTable) * uWet;
 diffuseColor.rgb *= 1.0 - (1.0 - inside) * puddle * 0.05;
 // Beads, two sizes, faded out where they would be smaller than the pixels.
@@ -185,7 +192,7 @@ if (uWet > 0.02 && inside < 0.5) {
   diffuseColor.rgb *= 1.0 - beading * pow(1.0 - drop.z, 3.0) * 0.35;
 }`,
       )
-      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.92, inside);\nroughnessFactor = mix(roughnessFactor, mix(mix(0.13, 0.025, puddle), 0.6, inside), uWet);\nroughnessFactor = mix(roughnessFactor, 0.02, beading);")
+      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor + enamelRough, 0.92, inside);\nroughnessFactor = mix(roughnessFactor, mix(mix(0.13, 0.025, puddle), 0.6, inside), uWet);\nroughnessFactor = mix(roughnessFactor, 0.02, beading);")
       .replace(
         "#include <normal_fragment_maps>",
         /* glsl */ `#include <normal_fragment_maps>
@@ -197,6 +204,7 @@ if (uWet > 0.02 && inside < 0.5) {
   vec3 tilted = normalize(vec3(-slope.x, 1.0, -slope.y));
   float c = cos(uNapkin.w), s = sin(uNapkin.w);
   tilted = vec3(tilted.x * c + tilted.z * s, tilted.y, -tilted.x * s + tilted.z * c);
+  tilted = normalize(tilted - vec3(enamelPeel.x, 0.0, enamelPeel.y));
   // A gust sends ripples running across the cloth.
   tilted = normalize(tilted - vec3(uGust.x, 0.0, uGust.y) * cos(dot(vTable, uGust.xy) * 0.35 - uTime * 7.0) * 0.06 * uGust.z * inside2);
   tilted = normalize(mix(tilted, normalize(vec3(-drop.x, 1.0, -drop.y)), beading));
@@ -309,7 +317,7 @@ export function buildTable(): SceneSet {
   const glossy = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.22, metalness: 0, envMapIntensity: 0.6 });
   const juicy = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.16, metalness: 0, envMapIntensity: 0.55 });
   const matte = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, envMapIntensity: 0.5 });
-  const tableMaterial = new THREE.MeshStandardMaterial({ map: tableTexture(), roughness: 0.3, metalness: 0, envMapIntensity: 0.5 });
+  const tableMaterial = new THREE.MeshStandardMaterial({ map: tableTexture(), roughness: 0.24, metalness: 0, envMapIntensity: 0.5 });
   const tableUniforms: TableUniforms = { uWet: { value: 0 }, uGust: { value: new THREE.Vector3() }, uTime: { value: 0 } };
   clothShader(tableMaterial, tableUniforms);
   const cloth = new THREE.MeshStandardMaterial({ map: ginghamTexture("#e8344e"), roughness: 0.85, side: THREE.DoubleSide });
