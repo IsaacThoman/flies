@@ -18,7 +18,7 @@ typedef struct fly_brain fly_brain;
 /** What the body feels. Intensities run 0 to 1; see BrainSenses in packages/brain/src/types.ts. */
 typedef struct fly_senses {
   float loom_left, loom_right, touch, bump_left, bump_right, wind, sweet;
-  /** 1 standing on its feet, 0 held or in the air. */
+  /** 1 standing on its feet (the weight on its legs), 0 held or in the air. */
   int grounded;
   /** Luminance per facet, 0 to 1, fly_brain_facets() values each; both NULL with the eyes shut. */
   const float* light_left;
@@ -31,6 +31,8 @@ typedef struct fly_senses {
    * hunger: the brain as it was before it had one. Not 0: that is a fed fly.
    */
   float hunger;
+  /** How hard its own wings beat, 0 (folded) to 1 (full flight power), as their strain sensors feel it. */
+  float wingbeat;
 } fly_senses;
 
 /** What the brain wants done. All 0 to 1 except turn, which runs -1 (hard left) to 1 (hard right). */

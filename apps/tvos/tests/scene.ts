@@ -261,7 +261,7 @@ void fetch('config.json').then((r) => r.json()).then((c: { script?: string }) =>
 
 // The brain: senses with the left eye dark and the right bright, sweet on the mouthparts, a male tasted.
 const brain = (globalThis as unknown as { __native?: { brain?: NativeBrainBridge } }).__native?.brain;
-const scalars = new Float32Array([0, 0, 0, 0, 0, 0, 0.5, 1, 0.25]);
+const scalars = new Float32Array([0, 0, 0, 0, 0, 0, 0.5, 1, 0.25, 1, 0]);
 let light: [Float32Array, Float32Array] | null = null;
 let state = new Float32Array(0);
 let brainFrames = 0, burst = false, maxSimMs = 0, lastCount = 0;

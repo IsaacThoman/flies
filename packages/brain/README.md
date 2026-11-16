@@ -435,17 +435,26 @@ With these, from rest, any sense or pair of senses or everything at once, held a
 | `bumpLeft`, `bumpRight` | Johnston's organ neurons of zones C and E (`JO-C*`, `JO-E*`) of that antenna, the ones that answer a sustained push or pull (Kamikouchi et al. 2009; Yorozu et al. 2009; Hampel et al. 2020) | 203 left, 132 right | 100 Hz |
 | `wind` | Wind- and gravity-sensitive Johnston's organ neurons (subclass wind_gravity) of both antennae | 475 | 100 Hz |
 | `sweet` | Head taste neurons dorsal_tpGRN, LB3d, PhG9, LB3c, LB2a, LB4a, LB3b, PhG1c, PhG3 | 88 | 100 Hz |
-| `grounded` | Campaniform sensilla (load sensors) of the legs, firing tonically while it stands | 426 | 20 Hz |
+| `grounded` | Campaniform sensilla (load sensors) of the legs (`SNpp53`), firing tonically while it stands | 13 | 20 Hz |
 | `light` | L1, L2 and L3 of every column of each eye, through the input stage (see The eyes) | 2,599 left, 2,660 right | 200 Hz at full darkening |
 | `maleTaste` | The front legs' taste neurons for a male's pheromones: LgLG1a (ppk23 M cells) and LgAG1 (Gr32a/Gr33a), see Courtship | 34 + 10 | 50 Hz |
+| `wingbeat` | Campaniform sensilla (strain sensors) of the wings and halteres: every other campaniform sensillum | 413 | 100 Hz |
 
 `bump` leaves out Johnston's organ's other zones: A and B answer sound and vibration, and F, though its neurons drive antennal grooming too, answers neither a push nor vibration (what it senses is unknown; Hampel et al. 2020). Driven alone at 100 Hz, F does nothing to any readout. The right antenna's C and E count for what the left's do (Operating point).
 
-Sides: the looming detectors, Johnston's organ and head bristle neurons all have a side. Most VNC sensory neurons don't (5,297 of 6,370 are blank, and the `nerve` column is blank for every sensory neuron), so the body senses, touch and grounded, are whole-body and ignore side. Touch's two groups have different rates because there are more than twice as many body bristle neurons, and touching the fly's body excites only some of them.
+Sides: the looming detectors, Johnston's organ and head bristle neurons all have a side. Most VNC sensory neurons don't (5,297 of 6,370 are blank, and the `nerve` column is blank for every sensory neuron), so the body senses, touch, grounded and wingbeat, are whole-body and ignore side. Touch's two groups have different rates because there are more than twice as many body bristle neurons, and touching the fly's body excites only some of them.
 
 Nothing in the data says which taste neurons sense sugar. `sweet`'s were chosen by what they do in the model: starting from none of the head's taste neuron types (cb_sensory, class gustatory), the type that raised the proboscis motor neuron MN9's rate most when driven at 100 Hz for 500 ms together with those already chosen was added, until no type added 1 Hz. Driven alone, no type raises MN9 by more than 8 Hz; together the nine reach 48 Hz. `node packages/brain/scripts/probe.ts --superClass cb_sensory --class gustatory --each type --target MN9 --greedy` repeats it. Some of them may well be bitter or water neurons in the real fly.
 
 `maleTaste` is the one sense picked by root ID as well as type: the packed wiring doesn't say which leg a sensory neuron comes from, so the front legs' LgLG1a and LgAG1 are listed in `io.ts` (`FORELEG_MALE_TASTE`), from FlyEM's annotations (entry nerve ProLN), and `scripts/song.ts` checks the list against them. Its input is added after the eyes', so every other input draws the same random stream as before it existed (the fingerprint test holds it). 50 Hz is a round number of the order of what contact chemoreceptors fire for their ligand; at 100 Hz the answer is the same (Courtship).
+
+**The campaniform sensilla**, strain sensors in the cuticle, are of three places, which FlyEM's annotations tell apart by the nerve each enters the cord by (the packed wiring doesn't carry it; `scripts/wingbeat.ts` checks the split against the anatomy file). Of the 426 annotated as campaniform sensilla, 218 come in by the anterior dorsal mesothoracic nerve, the wing's (Lesser, Moussa & Tuthill 2025 reconstructed it: about 36 proximal and 17 distal campaniform sensilla a wing, and the tegula's), 195 by the dorsal metathoracic nerve, the haltere's, and 12 by the leg nerves, four by each; one more has no nerve recorded. The 13 are one type, `SNpp53`, and no other type enters by a leg nerve. Only the legs' bear the body's weight, so `grounded` drives the 13. The legs' other proprioceptors aren't sorted by organ in the data (180 of the leg nerves' proprioceptive neurons have none named), and the chordotonal organs and hair plates aren't load sensors (What it does and doesn't reproduce).
+
+Until this was found, `grounded` drove all 426: the wings' and halteres' sensors fired tonically while the fly stood. They were where the resting activity of the flight motor neurons (8.9 Hz) and of the proprioceptors (8.7 Hz) came from (Regions), and they were why leaving the ground took drive away from the flight motor neurons, which was taken for the connectome working against the tarsal reflex. The legs' 13 at 20 Hz do next to nothing: at rest, standing or in the air, the fly walks, opens its wings and fires the same (`scripts/wingbeat.ts` (a), 60 s, seeds 1 to 3: walking 66%, 47% and 14% of the time either way, `wings` 0.038, 0.024 and 0.005 on average, 34,000, 25,000 and 10,000 spikes a second; with all 426 driven as they were, 62%, 41% and 8%, `wings` 0.059, 0.049 and 0.038, and 47,000, 39,000 and 24,000: the wings' and halteres' sensors held the wings a little open and kept the network busier, and walked the fly a little less).
+
+The wings' and halteres' sensors are `wingbeat`. Every stroke strains them and they fire with it, phase-locked, in flight: the wing's set the timing of the steering motor neuron b1 (Fayyazuddin & Dickinson 1999), and the haltere's fire with every stroke too (Dhawan, Huang & Dickerson 2025, bioRxiv). The body sends how hard its own wings beat, so this is reafference through real sensory neurons: in the air, the drive it flies with; on its feet only as far as the pose opens them, so 0 with the wings folded, and 0 from the step it lands in (root README, The fly's senses). In flight each fires a spike a stroke, about 200 a second, locked to the stroke; a Poisson input carries only a rate, at random. Under the refractory period, 250 Hz of it fires these neurons 200 times a second, 200 Hz 167 times, 100 Hz 91 times. 100 Hz is the round rate the model drives its other hard-driven sensory neurons at (the looming detectors, Johnston's organ, sweet taste), and anywhere from 100 to 250 Hz the loop it closes with the body dies away the same (What it does and doesn't reproduce). Its input, like `maleTaste`'s, is added after the eyes'.
+
+`wingbeat` at full strength drives the flight power motor neurons to `wings` 0.30 to 0.32 on average over 3 s in the air (peaks 0.42 to 0.45), 0.15 to 0.16 at half (seeds 1 to 3), and nothing else much; 2 s after it stops, `wings` is back where it rests (`scripts/wingbeat.ts` (b)). At 150 Hz that would be 0.42 to 0.46, at 200 Hz 0.57 to 0.58, at 250 Hz 0.68 to 0.69.
 
 ## The eyes
 
@@ -531,7 +540,7 @@ Read across, stage by stage:
 - **Looming.** LC4 and LPLC2 respond to looming, and the giant fiber (DNp01) and the other looming-sensitive descending neurons (DNp02, DNp04, DNp11) follow. A disc looming at the right eye passes the body's take-off threshold (escape 0.4, where the giant fiber counts as having fired: `packages/body/src/behavior.ts`) at 10 and 40 ms (0.76 to 0.84 over seeds 1 to 3) and above the horizon (0.81 to 0.83); slowly (160 ms) it reaches 0.53 to 0.67; receding, 0.29 to 0.33. Small dots don't reach the lobula at all (escape 0.11 to 0.15, as at rest).
 - **Not selective enough.** Anything that darkens much of the field drives LC4 too: whole-field dimming reaches escape 0.64 to 0.75 (flies do jump when the lights go off, so this is not wrong in itself), a 4 Hz flicker 0.76 to 0.78, a high-contrast grating covering one eye 0.38 to 0.53 and a wide dark bar 0.27 to 0.52, at or past the body's threshold. Scenes in the game don't come near that: with the eyes open at midday, walking and resting, escape peaked at 0.34 in 5 minutes. LC4 here answers dark area, not expansion: T4 and T5, which give LPLC2 its preference for expansion, are too weak to shape it, and LC4 takes most of its drive from T2, TmY3, Tm4 and Tm2, columnar cells of the OFF side that answer any darkening.
 - **Left and right differ.** The same loom at the left eye drives the left LC4 a third as hard as the right one is driven, and LPLC2 a seventh, and reaches escape 0.30 to 0.52; at the front, 0.41 to 0.61. The eye map is mirror-symmetric and both eyes' lamina are driven alike, so the difference is in the wiring beyond: the left optic lobe has fewer synapses in this dataset. Its intrinsic neurons make 12.8 million against the right's 16.0 million, and along the looming pathway each step is thinner (L2 to Tm4, 74 synapses per cell against 113; Tm4 to LC4, 172 against 246; T2 to LC4, 255 against 372), which compounds from stage to stage. With both eyes dimmed alike, L2 fires the same on both sides (28 Hz) and Tm4 already differs (11 against 16 Hz). That is most likely the left lobe being less completely reconstructed rather than a real difference between the fly's eyes.
-- **Steering.** A rotation turns the fly with it: seen from above, a clockwise rotation (front to back in the right eye) gives turn +0.11, +0.10, +0.19 (seeds 1 to 3) against −0.05, −0.08, +0.08 anticlockwise, the direction of the optomotor response. In the game, `packages/body` turns continuously at a yaw rate proportional to `turn`. In one eye, any grating turns the fly toward that eye, front to back most.
+- **Steering.** A rotation turns the fly with it, weakly: seen from above, a clockwise rotation (front to back in the right eye) gives turn +0.01, +0.03, +0.17 (seeds 1 to 3) against −0.03, −0.04, +0.06 anticlockwise, the direction of the optomotor response in each. While `grounded` drove the wings' and halteres' sensors too (Senses) it was +0.11, +0.10, +0.19 against −0.05, −0.08, +0.08: their tonic drive raised the steering neurons' rates under the grating (seed 1, clockwise: the right DNa02 at 5.4 Hz with it, 2.5 without). In the game, `packages/body` turns continuously at a yaw rate proportional to `turn`. In one eye, any grating turns the fly toward that eye, front to back most.
 - **Walking.** Dimming makes it walk (walk 0.19 to 0.30 against 0.03 to 0.08), and gratings stop it (0.00 to 0.04 against 0.04 to 0.17).
 - **A steady scene** drives nothing once adapted to: 3 s after a checkerboard appears only L3's sustained response remains (and Mi9, Mi1 from it), and nothing beyond the medulla.
 
@@ -567,14 +576,14 @@ No neuron is both driven and read (`wire()` refuses a connectome where one would
 
 ## Spontaneous behaviour
 
-With no input the network is silent. Two things keep it going at rest, and neither touches a neuron that is read:
+With no input the network is silent. Two things keep it going at rest, and neither touches a neuron that is read, though the first barely counts:
 
-- **The legs' load sensors** fire tonically while it stands (`grounded`).
+- **The legs' load sensors** fire tonically while it stands (`grounded`): 13 neurons at 20 Hz, which do next to nothing on their own (Senses).
 - **A visual background.** A fly at rest still sees a world. Every visual projection neuron except the looming detectors (nothing is looming) fires at a low rate, up to 6 Hz (5 Hz for the right eye, balanced: its neurons have 19% more output synapses). Each eye's rate is set by `src/state.ts`, a stand-in for internal state the connectome doesn't contain: a slowly wandering arousal shared by both eyes (time constant 10 s) and a slowly wandering scene for each eye (4 s), combined through a logistic into a level from 0 to 1. These are made-up processes, not neurons, and they act only by setting those background rates. The background stays on when the eyes are open (see Seeing for why). Hunger adds a term of its own, a stand-in for starvation's restlessness (Hunger); at hunger 1, or left out, it is 0, and everything below is measured there.
 
 The behaviour then comes out of the network. The visual projection neurons drive the forward-walking DNg100 (LC9, LC12, LPC1 and LLPC types among them), so walking rises and falls with arousal, in bouts. Each eye's background drives only that side's DNa02, through the LC10 types, so the fly turns toward the busier eye; driven alone at matched strength, the left eye gives DNa02 21 Hz and the right 16.5 Hz. That central asymmetry, which the balancing doesn't touch, makes spontaneous turns lean toward the fly's left. Any other sense stops walking: it drives GNG inhibitory neurons onto DNg100.
 
-Over 10 minutes at rest (seed 1, through the diagnostic observer; `report.ts` section c): walking forwards 43% of the time in 104 bouts (2.5 s on average), backwards once for 0.2 s, 56 diagnostic turn events toward the fly's left and 37 toward its right, no escapes; escape peaked at 0.23. Other seeds walk 41–47% of the time in 104–126 bouts, and turn toward the left 1.5 to 3.5 times as often as toward the right. No spontaneous grooming or feeding.
+Over 10 minutes at rest (seed 1, through the diagnostic observer; `report.ts` section c): walking forwards 49% of the time in 93 bouts (3.1 s on average), never backwards, 67 diagnostic turn events toward the fly's left and 36 toward its right, no escapes; escape peaked at 0.25. Seeds 2 and 3 walk 46% and 53% of the time in 100 and 127 bouts, and the three turn toward the left 1.9 to 3.6 times as often as toward the right. No spontaneous grooming or feeding. While `grounded` drove the wings' and halteres' sensors too (Senses), seed 1 walked 43% of the time in 104 bouts and the others 41–47%: those sensors held the wings a little open and the network busier, and the fly walked a little less.
 
 `src/observer.ts` keeps these diagnostics reproducible without running the body or world. It smooths walking, backing and steering commands, applies fixed walking, backing and escape thresholds (escape the body's, 0.4), and counts left/right turn events using a leaky integral (threshold 0.5, leak 0.5/s). Those turn counts measure sustained steering commands, not the game's actual turns: `packages/body` steers continuously. The observer is used only by the brain tests and report, not by the game. The live body's behaviour and the remote's tools are described in the root README.
 
@@ -607,7 +616,7 @@ This connectome is a male's, and every fly it meets in the game, at a table with
 - **The song pathway itself works.** Driving P1 drives pIP10 to 64 Hz, and the song circuit in the cord with it (dPR1 56 Hz, TN1a 10 Hz, vPR9 36 Hz); `sing` reaches 1. LC10a driven far above anything vision gives it reaches pIP10 too (sing 0.69 at 30 Hz).
 - **Not even a female would be courted.** The female-pheromone neurons (the F-cell candidates LgLG1b, LgLG5, LgLG8) reach PPN1 weakly and P1 not at all. In the fly the forelegs' pheromone signals reach P1 along excitatory ascending relays (vAB3, PPN1) and, in parallel, through the inhibitory mAL neurons, which M cells drive too (Clowney et al. 2015; Kallman et al. 2015); here, as wired and at this operating point, the inhibition wins or the excitation dies on the way. So the honest answer is no song, and not because the model knows the other fly is a male.
 
-**Alone, it never sings.** Over 10 minutes at rest (eyes shut, and eyes open on a steady scene, which is spike for spike the same) pIP10 is silent but for single spikes: its smoothed rate peaks at 6.45 Hz (seeds 1 and 2) and 3.2 Hz (seed 3), sing 0.16 and 0.08, and its mean is 0.001 to 0.004 Hz. The body sings past 0.4 (`packages/body/src/behavior.ts`), two and a half times that peak and 1.6 times the closest a seen fly comes.
+**Alone, it never sings.** Over 10 minutes at rest (eyes shut, and eyes open on a steady scene, which is spike for spike the same) pIP10 is silent but for single spikes: sing peaks at 0.08 (seed 1) and stays at 0 (seeds 2 and 3); while `grounded` drove the wings' sensors too (Senses), at 0.16 (seeds 1 and 2) and 0.08 (seed 3), with a mean rate of 0.001 to 0.004 Hz. The body sings past 0.4 (`packages/body/src/behavior.ts`), five times that peak and 1.6 times the closest a seen fly comes.
 
 Stand-ins and what is left out: the body decides which wing (toward the nearest other fly, else the side it last sang on; a male extends the wing nearer the female), which is not read from the brain; the song is shown, not heard. Neuropeptides and the dopamine that gates P1 in the fly (not modelled: dopamine is muted, Operating point) are left out, and so is the internal state that makes a male court more after a time without mating.
 
@@ -621,24 +630,24 @@ It acts in two places, each a stand-in for something the connectome lacks, and n
 
 **On the sweet taste neurons' output** (`io.ts`, `HUNGER`). Starvation does not make sugar-sensing taste neurons fire faster: their spiking to sucrose is the same in fed and starved flies. It raises the calcium that enters their terminals for each spike, and so what they release, through dopamine acting on their DopEcR receptors (Inagaki et al. 2012, Cell 148: 583, Figure 6 and S5). The dopamine comes from TH-VUM, a neuron in the subesophageal zone that fires at about 1 Hz just after a meal and 25 Hz after 24 hours without food; silencing it lowers the probability of extending the proboscis to sucrose, exciting it raises it (Marella et al. 2012, Neuron 73: 941). Dopamine's output is muted in this model (The operating point) and neuropeptides aren't in the connectome at all, so the brain scales the sweet neurons' outgoing synapses directly: each of their spikes reaches its targets with `sweetOutputGain(hunger)` times its usual weight (the engine's `addOutputGain` and `setOutputGain`, which touch only those 2,591 connections and leave their firing as it was). The gain is 1/1.4 just fed and 1 starved, linear between (a round assumption). The 1.4 is the measured effect of dopamine on those terminals: a bath of it raised the calcium sucrose brings in 1.3 to 1.4 fold (ibid., Figure 6G), taken here as release one for one. Release rises more steeply than calcium at most synapses, so if anything that understates it.
 
-**On the made-up arousal** (`state.ts`). Starved flies walk more: about 60% more than fed ones in a day's starvation (Yu et al. 2016, eLife 5: e15693, Figure 1d; Lee & Park 2004, Genetics 167: 311; Yang et al. 2015, PNAS 112: 5219), through the adipokinetic hormone acting on octopaminergic neurons, none of which the model has. Hunger adds `hunger.weight × (hunger − 1)` to the logistic that sets the visual background's level (Spontaneous behaviour): 0 at hunger 1, lower as the fly is fed. Its weight, 0.8, is the one number here fitted to a measurement, so that a just-fed fly walks 1/1.6 as much as a starved one at rest.
+**On the made-up arousal** (`state.ts`). Starved flies walk more: about 60% more than fed ones in a day's starvation (Yu et al. 2016, eLife 5: e15693, Figure 1d; Lee & Park 2004, Genetics 167: 311; Yang et al. 2015, PNAS 112: 5219), through the adipokinetic hormone acting on octopaminergic neurons, none of which the model has. Hunger adds `hunger.weight × (hunger − 1)` to the logistic that sets the visual background's level (Spontaneous behaviour): 0 at hunger 1, lower as the fly is fed. Its weight, 0.8, is the one number here fitted to a measurement, so that a just-fed fly walks 1/1.6 as much as a starved one at rest. It was fitted while `grounded` drove the wings' and halteres' sensors too (Senses); since, a just-fed fly walks 1/1.46 to 1/1.49 as much (the table below).
 
 Everything after that is the network. `node packages/brain/scripts/hunger.ts` measures it (about five minutes). Sugar held for 3 s after 2 s of rest, MN9's mean rate and `feed`'s, over seeds 1 to 3:
 
 | Sugar | Hunger 0 (just fed) | Hunger 0.5 | Hunger 1 (starved, as before) |
 |---|---|---|---|
-| 0.25 | 0.0 Hz, feed 0.00 | 0.4 Hz, feed 0.01 | 0.9 Hz, feed 0.02 |
-| 0.4 | 1.6 Hz, feed 0.04 | 3.6 Hz, feed 0.09 | 5.6 Hz, feed 0.14 |
-| 0.6 | 5.3 Hz, feed 0.13 | 9.7 Hz, feed 0.24 | 11.8 Hz, feed 0.29 |
-| 0.8 | 10.9 Hz, feed 0.27 | 14.7 Hz, feed 0.37 | 19.3 Hz, feed 0.48 |
-| 1 | 15.4 Hz, feed 0.38 | 20.6 Hz, feed 0.52 | 24.6 Hz, feed 0.61 |
+| 0.25 | 0.1 Hz, feed 0.00 | 0.7 Hz, feed 0.02 | 1.4 Hz, feed 0.03 |
+| 0.4 | 2.2 Hz, feed 0.05 | 3.8 Hz, feed 0.10 | 6.3 Hz, feed 0.16 |
+| 0.6 | 6.1 Hz, feed 0.15 | 9.6 Hz, feed 0.24 | 13.4 Hz, feed 0.34 |
+| 0.8 | 11.3 Hz, feed 0.28 | 15.1 Hz, feed 0.38 | 19.5 Hz, feed 0.49 |
+| 1 | 15.8 Hz, feed 0.39 | 20.9 Hz, feed 0.52 | 25.2 Hz, feed 0.62 |
 
 As a proboscis extension test: of 20 flies (seeds 1 to 20), how many the body starts feeding within 1 s of the sugar touching (`Behavior`, feed past 0.15):
 
 | Sugar | Hunger 0 | Hunger 0.5 | Hunger 1 |
 |---|---|---|---|
-| 0.25 | 0/20 | 0/20 | 0/20 |
-| 0.4 | 4/20 | 14/20 | 19/20 |
+| 0.25 | 0/20 | 0/20 | 1/20 |
+| 0.4 | 3/20 | 17/20 | 20/20 |
 | 0.6 | 20/20 | 20/20 | 20/20 |
 | 1 | 20/20 | 20/20 | 20/20 |
 
@@ -648,21 +657,21 @@ Does a fed fly stop sooner? A meal on one dropped lump of sugar, eaten as the ga
 
 | Hunger at the start | Held: feeding, eaten | Falling as it eats: feeding, eaten |
 |---|---|---|
-| 0 | 9.0, 7.6, 9.3 s; 86, 82, 89% | 9.4, 8.4, 7.4 s; 87, 85, 84% |
-| 0.5 | 6.8, 7.1, 6.5 s; 87, 89, 89% | 7.8, 9.0, 8.5 s; 85, 90, 88% |
-| 1 | 5.5, 6.8, 5.5 s; 88, 92, 89% | 7.3, 7.2, 7.5 s; 88, 89, 90% |
+| 0 | 8.0, 8.8, 8.0 s; 86, 88, 87% | 8.7, 9.3, 8.1 s; 86, 87, 87% |
+| 0.5 | 7.4, 6.8, 7.1 s; 90, 89, 91% | 8.2, 8.7, 7.5 s; 86, 89, 87% |
+| 1 | 6.2, 6.2, 5.6 s; 91, 91, 90% | 6.3, 6.6, 6.7 s; 85, 85, 88% |
 
-A little: a fed fly feeds more slowly, so its meal takes longer, and it gives up while more is left (11 to 18% of the lump against 8 to 12%), because the taste of what is left falls below what its weaker sweet neurons pass on sooner. A real fly's meal ends mostly from inside, which this one doesn't have (below).
+A little: a fed fly feeds more slowly, so its meal takes longer, and it gives up while more is left (12 to 14% of the lump against 9 to 10%, hunger held), because the taste of what is left falls below what its weaker sweet neurons pass on sooner. A real fly's meal ends mostly from inside, which this one doesn't have (below).
 
-At rest (`report.ts --hunger <h>`, section c, 10 minutes, seeds 1 to 3):
+At rest (`report.ts --hunger <h>`, section c, 10 minutes, seeds 1 to 3; these tables measured again when `grounded` was narrowed to the legs' load sensors, Senses):
 
 | Hunger | Walking forwards | Bouts |
 |---|---|---|
-| 0 (just fed) | 28.2%, 25.9%, 30.6% | 96, 106, 120 |
-| 0.5 | 36.2%, 32.8%, 37.1% | 98, 112, 116 |
-| 1 (starved, as before) | 43.3%, 40.9%, 46.6% | 104, 115, 126 |
+| 0 (just fed) | 33.4%, 30.8%, 35.7% | 91, 98, 105 |
+| 0.5 | 40.4%, 38.0%, 43.4% | 91, 108, 115 |
+| 1 (starved, as before) | 48.6%, 45.9%, 52.9% | 93, 100, 127 |
 
-Cost: a tick resets the sweet neurons' output gain whenever hunger has changed, which in the game is every frame: 2,591 weights rewritten, 8 to 11 µs a time in the TypeScript on an M5 Pro (`hunger.ts` section d), under 1% of a 16 ms tick's 2 ms at rest; the C++ does the same writes. The hunger term in the arousal is one multiply-add per chunk. Left out, hunger costs nothing: the gain stays at 1 and is never reset.
+Cost: a tick resets the sweet neurons' output gain whenever hunger has changed, which in the game is every frame: 2,591 weights rewritten, 3 to 11 µs a time in the TypeScript on an M5 Pro (`hunger.ts` section d), under 1% of a 16 ms tick's 2 ms at rest; the C++ does the same writes. The hunger term in the arousal is one multiply-add per chunk. Left out, hunger costs nothing: the gain stays at 1 and is never reset.
 
 What it leaves out:
 
@@ -674,13 +683,14 @@ What it leaves out:
 
 From the response matrix (`report.ts` section a):
 
-- **Looming → escape.** LPLC2 and LC4 drive the giant fiber to 190–230 Hz and the flight power motor neurons to ~100 Hz: a take-off. The game's fallback looming pulse at full strength passes escape 0.5 in 32 ms and falls below 0.3 within 40 ms of fading; at half strength it still passes 0.5, in 48 ms. Other looming-sensitive descending neurons (DNp02, DNp04, DNp11) respond too. Escape stays below 0.3 at rest and under every other sense.
-- **Sweet → feed.** The chosen taste neurons drive MN9 to ~31 Hz (feed 0.76). They were chosen for this (see Senses), so it is a demonstration that the pathway carries through the network, not evidence of which neurons are sweet. Held on, feed settles at 0.48–0.50 (seeds 1–3, seconds 2 to 10), and at 0.32–0.33 with touch at 0.4 and 0.16 with full touch. Walking stops too: over 20 s of sugar `walk` averaged 0.001–0.010. The taste neurons were chosen for MN9 alone, not for that.
-- **A push on an antenna → groom.** Either antenna's zone C and E neurons at full strength drive the head-grooming DNg12 neurons to 27–31 Hz from the left and 26–29 Hz from the right (groom 0.41–0.45 and 0.40–0.44, seeds 1–3), with walking stopped and the wings a little open (0.11–0.18): in flies JO-C/E activation drives antennal grooming, with some wing flapping (Hampel et al. 2015, 2020). Both together, 0.52. Before the right antenna's completeness fix (Operating point) it was 0.00–0.06 from the left and 0 from the right. The game sends it when an antenna presses into something, and the body shows grooming within 130–160 ms. What is read is head grooming, of which antennal grooming is part: DNg12 is the descending neuron type for head grooming, and the descending neurons Hampel et al. (2015) found for antennal grooming itself, aDN1 and aDN2 (DNg62 and DNge078 in this dataset's annotations), fire too, at 35–95 and 52–62 Hz, but are not read.
-- **Wind → groom.** Wind-sensitive Johnston's organ neurons drive DNg12 to ~35 Hz (groom 0.51–0.54, seeds 1–3; 0.49–0.50 before the completeness fix) and open the wings a little (0.29–0.32; 0.21–0.25 before).
-- **Touch → back.** Full touch drives MDN to ~25 Hz (back 0.63), mostly through the head bristles: touched, it backs away. Touch at the resting feather's level (0.4) does very little.
+- **Looming → escape.** LPLC2 and LC4 drive the giant fiber to 190–230 Hz and the flight power motor neurons to ~100 Hz: a take-off. The game's fallback looming pulse at full strength passes escape 0.5 in 32 ms and falls below 0.3 within 40 ms of fading; at half strength it still passes 0.5, in 32 ms too (seeds 1–3). Other looming-sensitive descending neurons (DNp02, DNp04, DNp11) respond too. Escape stays below 0.3 at rest and under every other sense.
+- **Sweet → feed.** The chosen taste neurons drive MN9 to 30–34 Hz (feed 0.74–0.81, seeds 1–3). They were chosen for this (see Senses), so it is a demonstration that the pathway carries through the network, not evidence of which neurons are sweet. Held on, feed settles at 0.48–0.50 (seeds 1–3, seconds 2 to 10), and at 0.32–0.33 with touch at 0.4 and 0.16 with full touch. Walking stops too: over 20 s of sugar `walk` averaged 0.001–0.010. The taste neurons were chosen for MN9 alone, not for that.
+- **A push on an antenna → groom.** Either antenna's zone C and E neurons at full strength drive the head-grooming DNg12 neurons to 26–28 Hz from the left and 23–25 Hz from the right (groom 0.43–0.47 and 0.39–0.41, seeds 1–3), with walking stopped and the wings a little open (0.12–0.21): in flies JO-C/E activation drives antennal grooming, with some wing flapping (Hampel et al. 2015, 2020). Both together, 0.52. Before the right antenna's completeness fix (Operating point) it was 0.00–0.06 from the left and 0 from the right. The game sends it when an antenna presses into something, and the body shows grooming within 130–160 ms. What is read is head grooming, of which antennal grooming is part: DNg12 is the descending neuron type for head grooming, and the descending neurons Hampel et al. (2015) found for antennal grooming itself, aDN1 and aDN2 (DNg62 and DNge078 in this dataset's annotations), fire too, at 35–95 and 52–62 Hz, but are not read.
+- **Wind → groom.** Wind-sensitive Johnston's organ neurons drive DNg12 to 31–33 Hz (groom 0.52–0.55, seeds 1–3; 0.49–0.50 before the completeness fix) and open the wings a little (0.24–0.27; 0.29–0.32 while `grounded` drove the wings' sensors too, Senses).
+- **Touch → back.** Full touch drives MDN to 27–28 Hz (back 0.69–0.70, seeds 1–3), mostly through the head bristles: touched, it backs away. Touch at the resting feather's level (0.4) does very little.
 - **Spontaneous walking and steering** as above.
 - **Hunger** (Hunger): a fed fly needs stronger sugar before MN9 extends its proboscis and feeds less eagerly, because its sweet neurons pass on less, as dopamine makes them do in the fly; and it walks less at rest, through a labelled stand-in for the hormones that make a starved fly restless.
+- **Its own wingbeat → the flight motor neurons.** The wings' and halteres' strain sensors at full strength drive the flight power motor neurons to 36–42 Hz (`wings` 0.30–0.35, seeds 1–3), and little else: a weak loop through the body's own wings (Not reproduced, below).
 - **Seeing** (The eyes): a dark disc looming at the right eye fires the giant fiber through the optic lobe, from the lamina on; the lobula plate's tangential cells prefer the directions they do in the fly; a rotation turns the fly with it, weakly.
 - **P1 → pIP10 → song** (Courtship): driving P1 drives pIP10 and the cord's song circuit, and `sing` reaches 1. A male's taste on the front legs drives the male-male inhibition relay AN05B023, not P1: the fly doesn't court other males.
 
@@ -688,8 +698,8 @@ Not reproduced:
 
 - **A push on an antenna → backing away.** Touching a real fly's antenna drives MDN and walks it backward (Dahlhoff et al. 2025, bioRxiv 10.1101/2025.07.22.666129), and Johnston's organ's zone F drives backing (Hampel et al. 2020). Here no Johnston's organ neuron synapses onto MDN, and the routes through one other neuron are thin (pIP1 makes 15 and 18 synapses onto MDN and takes 3–5% of its input from zones C, E and F); a push brings MDN to a few Hz (back 0.01–0.13). The fly's body (`packages/body/src/motion.ts`) keeps it from walking off an edge and turns it away after pressing against a wall for 2 s; the brain doesn't.
 - **Touch → grooming of the body, wings or legs.** The body bristles mostly drive unnamed GNG descending neurons (DNge104, DNge122) and wing and haltere steering motor neurons, none of them a readout, and there is nothing honest to read: DNp29 stays silent under touch, and grooming of the thorax by the hind legs is commanded inside the ventral nerve cord, by the MGT neurons (Yoshikawa, Tang & Simpson 2024, Curr Biol 34:2066), not by a descending neuron.
-- **The legs' proprioceptors**, other than the load sensors (`grounded`), aren't driven. The chordotonal organs and hair plates encode each joint's angle and movement through the step (Mamiya, Gurung & Tuthill 2018, Neuron 100:636), which a flat rate wouldn't stand for.
-- **Losing ground contact → flight.** Airborne is the same as standing, except the load sensors' slight drive to the flight motor neurons goes away; real flies start flying when their legs lose contact (the tarsal reflex). So nothing in the model keeps a fly in the air once something stops looming. And a loom seen through the eyes, though it fires the giant fiber, drives the flight motor neurons to `wings` 0.3 to 0.4 (the Swoop tool's ball at midday), no more than they wander to at rest and short of the 0.6 that holds the body up: on the model alone an escape seen through the eyes is a jump, not a flight. The hand-wired pulse drives them to 0.8 to 0.9. The body stands in for the reflex (`packages/body/src/behavior.ts`, `TARSAL_ONSET`, and the root README's Flight): off its feet, it keeps a floor under the wings' drive, outside the brain, until it lands. The brain's `wings` command is unchanged by it, and no neuron is driven.
+- **The legs' proprioceptors**, other than the load sensors (`grounded`), aren't driven. The chordotonal organs and hair plates encode each joint's angle and movement through the step (Mamiya, Gurung & Tuthill 2018, Neuron 100:636), which a flat rate wouldn't stand for. Only 13 of the legs' sensors are annotated as campaniform sensilla (Senses); a fly's legs have many more, which this dataset doesn't name.
+- **Losing ground contact → flight.** Real flies start flying when their legs lose contact and keep flying until their feet touch something (the tarsal reflex; Fraenkel 1932). Here nothing says the feet are free but the legs' 13 load sensors falling silent, which changes nothing measurable (Senses). The wings' own sensors (`wingbeat`) close a loop through the flight motor neurons, but a weak one: beating at full power they bring `wings` to 0.30 to 0.32, short of the 0.6 that holds the body up, so at every strength the brain answers with less than it is given. Flying on its own drive alone, as the body would without a stand-in, from a take-off's 0.62, its `wings` is down to 0 to 0.02 within half a second and wanders under 0.1 after, as at rest (`scripts/wingbeat.ts` (c), seeds 1 to 3); at 150, 200 and 250 Hz it is down within one to two seconds (at 250 Hz full strength drives `wings` to 0.69, but 0.62 to only 0.43). A loom seen through the eyes, though it fires the giant fiber, takes `wings` to 0.3 to 0.5 at its peak (the Swoop tool's ball at midday), short of 0.6 too: on the model alone an escape seen through the eyes is a jump, not a flight. The hand-wired pulse drives them to 0.8 to 0.9. The body stands in for the reflex (`packages/body/src/behavior.ts`, `TARSAL_ONSET`, and the root README's Flight): off its feet, it keeps a floor under the wings' drive, outside the brain, until it lands. The brain's `wings` command is unchanged by it, and no neuron is driven but the wings' own sensors, which feel the strokes the floor makes as they would any others: in a flight from a swoop they raise the brain's own `wings` from 0.07–0.14 to 0.19–0.23 on average, never as high as the floor (Flight in the root README).
 - **A meal ending from inside**: crop and gut stretch, and the feeding restraint of fed flies, aren't driven (Hunger). A fed fly stops eating only when the food runs low, a little sooner than a hungry one.
 - **DNp09 (forward walking toward objects) and DNa01** barely fire at rest and aren't read.
 - **Seeing, in part**: brightening and everything that needs the ON pathway (T4); small objects; looming as distinct from any large darkening (dimming, flicker and high-contrast gratings take the fly near or past take-off); and the left eye's looming pathway is weaker than the right's. See Seeing.
@@ -796,79 +806,79 @@ A display shows a region at `rate / fullHz`, clamped to 1. `fullHz` is measured 
 | Region | Neurons | Rest (Hz) | Peak (Hz) | Under | fullHz |
 |---|---|---|---|---|---|
 | `retina-left` | 2,349 | 0 | 0.03 | grating, anticlockwise | 5 |
-| `retina-right` | 3,749 | 0 | 0.02 | grating right, front to back | 5 |
+| `retina-right` | 3,749 | 0 | 0.02 | grating right, upward | 5 |
 | `lamina-left` | 7,474 | 0 | 38.9 | loom left | 41 |
-| `lamina-right` | 7,551 | 0 | 40.2 | loom right fast | 41 |
+| `lamina-right` | 7,551 | 0 | 40.3 | loom right fast | 41 |
 | `medulla-left` | 28,185 | 0 | 11.8 | loom left | 15 |
 | `medulla-right` | 28,284 | 0 | 14.5 | loom right fast | 15 |
-| `lobula-left` | 827 | 0.02 | 9.71 | loom left | 16 |
+| `lobula-left` | 827 | 0.02 | 9.82 | loom left | 16 |
 | `lobula-right` | 842 | 0.03 | 15.8 | loom right fast | 16 |
 | `lobula-plate-left` | 7,365 | 0 | 0.31 | grating, anticlockwise | 5 |
-| `lobula-plate-right` | 7,361 | 0 | 0.70 | grating right, upward | 5 |
+| `lobula-plate-right` | 7,361 | 0 | 0.69 | grating right, upward | 5 |
 | `optic-other-left` | 758 | 0.02 | 0.79 | grating, anticlockwise | 5 |
-| `optic-other-right` | 758 | 0.06 | 0.96 | grating, clockwise | 5 |
-| `visual-projection-left` | 4,589 | 1.94 | 6.32 | everything at once | 12 |
-| `visual-projection-right` | 4,612 | 2.90 | 3.63 | everything at once | 12 |
-| `visual-centrifugal-left` | 283 | 1.34 | 10.5 | everything at once | 12 |
-| `visual-centrifugal-right` | 280 | 1.77 | 11.1 | everything at once | 12 |
+| `optic-other-right` | 758 | 0.06 | 1.00 | grating, clockwise | 5 |
+| `visual-projection-left` | 4,589 | 1.94 | 6.36 | everything at once | 12 |
+| `visual-projection-right` | 4,612 | 2.90 | 3.64 | everything at once | 12 |
+| `visual-centrifugal-left` | 283 | 1.28 | 10.5 | everything at once | 11 |
+| `visual-centrifugal-right` | 280 | 1.71 | 10.8 | everything at once | 11 |
 | `antenna-smell` | 2,730 | 0 | 0 | - | 5 |
 | `johnston-left` | 348 | 0 | 101.7 | everything at once | 110 |
 | `johnston-right` | 324 | 0 | 98.5 | everything at once | 110 |
-| `head-bristles` | 932 | 0 | 47.9 | touch | 48 |
-| `mouthparts` | 374 | 0 | 21.5 | everything at once | 22 |
-| `head-sensory-other` | 174 | 0 | 1.08 | sweet | 5 |
-| `antennal-lobe-left` | 572 | 0 | 0.90 | everything at once | 5 |
-| `antennal-lobe-right` | 570 | 0 | 1.25 | everything at once | 5 |
-| `mushroom-body-left` | 2,241 | 0 | 0.14 | everything at once | 5 |
-| `mushroom-body-right` | 2,269 | 0.01 | 0.13 | everything at once | 5 |
-| `central-complex` | 2,979 | 0 | 1.80 | everything at once | 5 |
-| `superior-protocerebrum-left` | 1,969 | 0 | 0.70 | everything at once | 5 |
-| `superior-protocerebrum-right` | 1,961 | 0.01 | 0.91 | everything at once | 5 |
-| `lateral-horn-left` | 1,016 | 0 | 0.81 | everything at once | 5 |
-| `lateral-horn-right` | 1,010 | 0 | 0.86 | everything at once | 5 |
-| `ventrolateral-protocerebrum-left` | 2,336 | 0.99 | 8.34 | everything at once | 8.6 |
-| `ventrolateral-protocerebrum-right` | 2,345 | 1.82 | 8.54 | everything at once | 8.6 |
-| `inferior-ventromedial-left` | 1,919 | 0.13 | 4.38 | everything at once | 5 |
-| `inferior-ventromedial-right` | 1,933 | 0.20 | 4.71 | everything at once | 5 |
-| `subesophageal-left` | 1,193 | 0.21 | 19.4 | everything at once | 21 |
-| `subesophageal-right` | 1,207 | 0.28 | 21.0 | everything at once | 21 |
-| `central-brain-other` | 6,644 | 0.12 | 4.34 | everything at once | 5 |
-| `head-motor` | 107 | 3.00 | 27.4 | everything at once | 28 |
-| `brain-endocrine` | 126 | 0 | 0.61 | wind | 5 |
-| `descending-left` | 662 | 0.38 | 18.3 | everything at once | 19 |
-| `descending-right` | 654 | 0.53 | 18.1 | everything at once | 19 |
-| `ascending-left` | 930 | 0.39 | 8.78 | everything at once | 8.8 |
-| `ascending-right` | 907 | 0.36 | 8.52 | everything at once | 8.8 |
-| `front-leg-motor-left` | 68 | 0.13 | 10.4 | wind | 11 |
-| `front-leg-motor-right` | 67 | 0.10 | 10.7 | wind | 11 |
-| `middle-leg-motor-left` | 58 | 0.30 | 9.66 | loomRight | 9.7 |
-| `middle-leg-motor-right` | 58 | 0.31 | 8.47 | everything at once | 9.7 |
-| `hind-leg-motor-left` | 66 | 0.76 | 5.76 | everything at once | 8.8 |
-| `hind-leg-motor-right` | 64 | 0.66 | 8.74 | everything at once | 8.8 |
-| `flight-motor` | 89 | 8.90 | 68.8 | everything at once | 69 |
-| `neck-motor` | 24 | 5.36 | 12.7 | sweet | 22 |
-| `abdomen-motor` | 214 | 0.55 | 31.7 | everything at once | 32 |
-| `leg-sensory` | 1,640 | 0 | 0 | - | 5 |
-| `thorax-sensory` | 868 | 0 | 0 | - | 5 |
+| `head-bristles` | 932 | 0 | 48.0 | everything at once | 48 |
+| `mouthparts` | 374 | 0 | 21.5 | sweet | 22 |
+| `head-sensory-other` | 174 | 0 | 1.06 | sweet | 5 |
+| `antennal-lobe-left` | 572 | 0 | 0.89 | everything at once | 5 |
+| `antennal-lobe-right` | 570 | 0 | 1.09 | everything at once | 5 |
+| `mushroom-body-left` | 2,241 | 0 | 0.21 | everything at once | 5 |
+| `mushroom-body-right` | 2,269 | 0 | 0.21 | everything at once | 5 |
+| `central-complex` | 2,979 | 0 | 1.21 | everything at once | 5 |
+| `superior-protocerebrum-left` | 1,969 | 0 | 0.90 | everything at once | 5 |
+| `superior-protocerebrum-right` | 1,961 | 0.01 | 1.05 | everything at once | 5 |
+| `lateral-horn-left` | 1,016 | 0 | 0.73 | everything at once | 5 |
+| `lateral-horn-right` | 1,010 | 0 | 0.85 | everything at once | 5 |
+| `ventrolateral-protocerebrum-left` | 2,336 | 0.98 | 7.81 | everything at once | 8 |
+| `ventrolateral-protocerebrum-right` | 2,345 | 1.80 | 7.97 | everything at once | 8 |
+| `inferior-ventromedial-left` | 1,919 | 0.12 | 4.39 | everything at once | 5 |
+| `inferior-ventromedial-right` | 1,933 | 0.19 | 4.79 | everything at once | 5 |
+| `subesophageal-left` | 1,193 | 0.06 | 20.0 | everything at once | 22 |
+| `subesophageal-right` | 1,207 | 0.12 | 21.5 | everything at once | 22 |
+| `central-brain-other` | 6,644 | 0.10 | 4.02 | everything at once | 5 |
+| `head-motor` | 107 | 0.49 | 37.4 | everything at once | 38 |
+| `brain-endocrine` | 126 | 0 | 0.67 | wingbeat | 5 |
+| `descending-left` | 662 | 0.41 | 18.0 | everything at once | 18 |
+| `descending-right` | 654 | 0.60 | 18.0 | everything at once | 18 |
+| `ascending-left` | 930 | 0.08 | 9.49 | everything at once | 9.5 |
+| `ascending-right` | 907 | 0.07 | 8.95 | everything at once | 9.5 |
+| `front-leg-motor-left` | 68 | 0.14 | 10.7 | wind | 11 |
+| `front-leg-motor-right` | 67 | 0.11 | 10.2 | wind | 11 |
+| `middle-leg-motor-left` | 58 | 0.33 | 9.05 | loomRight | 9.1 |
+| `middle-leg-motor-right` | 58 | 0.32 | 7.64 | everything at once | 9.1 |
+| `hind-leg-motor-left` | 66 | 0.46 | 12.2 | wingbeat | 13 |
+| `hind-leg-motor-right` | 64 | 0.45 | 10.2 | wingbeat | 13 |
+| `flight-motor` | 89 | 2.69 | 75.6 | everything at once | 76 |
+| `neck-motor` | 24 | 0.49 | 28.3 | wingbeat | 29 |
+| `abdomen-motor` | 214 | 0.11 | 28.5 | everything at once | 29 |
+| `leg-sensory` | 1,640 | 0 | 1.57 | everything at once | 5 |
+| `thorax-sensory` | 868 | 0 | 0.02 | wingbeat | 5 |
 | `abdomen-sensory` | 1,143 | 0 | 0 | - | 5 |
-| `proprioceptors` | 964 | 8.67 | 9.37 | loom right slow | 35 |
+| `proprioceptors` | 964 | 0.27 | 39.8 | wingbeat | 40 |
 | `bristles` | 2,276 | 0 | 9.77 | touch | 9.8 |
-| `cord-interneurons-left` | 6,474 | 0.33 | 5.49 | everything at once | 5.5 |
-| `cord-interneurons-right` | 6,448 | 0.26 | 5.44 | everything at once | 5.5 |
-| `cord-midline` | 277 | 0.52 | 34.8 | everything at once | 35 |
-| `cord-efferent` | 128 | 0.15 | 9.71 | everything at once | 9.8 |
-| `unplaced` | 75 | 0.06 | 7.75 | everything at once | 7.8 |
+| `cord-interneurons-left` | 6,474 | 0.08 | 6.89 | everything at once | 6.9 |
+| `cord-interneurons-right` | 6,448 | 0.07 | 6.41 | everything at once | 6.9 |
+| `cord-midline` | 277 | 0.02 | 32.5 | everything at once | 33 |
+| `cord-efferent` | 128 | 0.03 | 9.75 | everything at once | 9.8 |
+| `unplaced` | 75 | 0.01 | 11.6 | everything at once | 12 |
 
 What it shows:
 
-- **At rest** the busy regions are the ones the made-up visual background drives (the visual projection neurons, at 2-3 Hz, wandering with it, and the ventrolateral protocerebrum they end in, and the visual centrifugal neurons), the legs' load sensors (proprioceptors, 8.7 Hz, of which `grounded` drives 426 at 20 Hz) and what they drive (the wing and haltere motor neurons, 8.9 Hz; the neck motor neurons, 5.4 Hz), and the head motor neurons (3 Hz). On the display's scale these show at 11 to 25% of full; the descending and ascending neurons, the cord's interneurons and the leg motor neurons, at 0.1 to 0.8 Hz, at 1 to 10%.
-- **Never fire**: the retina, smell, and the legs', the wings, halteres and thorax's and the abdomen's sensory neurons. No sense drives them: the light enters one synapse in, at the lamina (The eyes), the model has no sense of smell, and among the body's sensory neurons only the bristles and the proprioceptors are driven. What reaches them in the wiring doesn't fire them either. The photoreceptors' input is 96% inhibitory (Dm9 and the other photoreceptors' histamine; the retina's peak, 0.03 Hz under a grating, is a handful of them); the others get synapses onto their axon terminals, more of them inhibitory than excitatory, and the excitatory ones mostly from other sensory neurons like themselves, which nothing drives. They stay dark, as they should.
-- **Barely fire**, under 2 Hz at their peak, and stay faint: the mushroom body (0.14 Hz), lateral horn and superior protocerebrum (0.7 to 0.9 Hz), antennal lobe (0.9 to 1.3) and central complex (1.8, with every sense at once), the lobula plate (0.7: T4 never fires because the ON pathway is silent, and T5 fires at about 1 Hz, Seeing), the optic lobe's other cells, the neuroendocrine neurons and the head's other sensory neurons. With no smell nothing reaches the olfactory centres, and the other senses reach the higher centres of the brain only weakly in this model.
+- **At rest** the busy regions are the ones the made-up visual background drives: the visual projection neurons, at 2-3 Hz, wandering with it, the ventrolateral protocerebrum they end in, at 1-2 Hz, and the visual centrifugal neurons. On the display's scale they show at 12 to 24% of full. The wing and haltere motor neurons fire at 2.7 Hz (4% of full), the head and neck motor neurons at 0.5 Hz, and the proprioceptors at 0.3 Hz: the legs' 13 load sensors that `grounded` drives at 20 Hz, among 964. Until `grounded` was narrowed to those 13 it drove the wings' and halteres' sensors too (Senses), and at rest the flight motor neurons fired at 8.9 Hz, the proprioceptors at 8.7 and the neck motor neurons at 5.4. The descending and ascending neurons, the cord's interneurons and the leg motor neurons, at 0.1 to 0.6 Hz, show at 1 to 4%.
+- **Never fire**: the retina, smell, and the wings', halteres', thorax's and abdomen's sensory neurons other than the proprioceptors; the legs' fire only with every sense at once, and then at 1.6 Hz. No sense drives them: the light enters one synapse in, at the lamina (The eyes), the model has no sense of smell, and among the body's sensory neurons only the bristles and the proprioceptors are driven. What reaches them in the wiring doesn't fire them either. The photoreceptors' input is 96% inhibitory (Dm9 and the other photoreceptors' histamine; the retina's peak, 0.03 Hz under a grating, is a handful of them); the others get synapses onto their axon terminals, more of them inhibitory than excitatory, and the excitatory ones mostly from other sensory neurons like themselves, which nothing drives. They stay dark, as they should.
+- **Barely fire**, under 2 Hz at their peak, and stay faint: the mushroom body (0.21 Hz), lateral horn and superior protocerebrum (0.7 to 1.1 Hz), antennal lobe (0.9 to 1.1) and central complex (1.2, with every sense at once), the lobula plate (0.7: T4 never fires because the ON pathway is silent, and T5 fires at about 1 Hz, Seeing), the optic lobe's other cells, the neuroendocrine neurons and the head's other sensory neurons. With no smell nothing reaches the olfactory centres, and the other senses reach the higher centres of the brain only weakly in this model.
 - **Fire, but drive nothing**: every motor region (their output is muted: no predicted transmitter, Operating point), and the dopaminergic neurons in the mushroom body region (their output is muted as modulatory). Their rates are their own; what they would do downstream isn't modelled.
 
 ### Cost
 
-What the readout adds: one increment a spike, whichever neuron fires (49,000 a second at rest, 970,000 under the grating across both eyes), and every 10 ms chunk 63 smoothings; a byte a neuron for the partition; and, when the brain is built, classifying every neuron, 12 to 20 ms of string checks here and a few ms natively (in the native bench's runs the TypeScript brain built in 149 to 163 ms after against 155 to 159 before, the native one in 51 to 52 ms against 46 to 49). Measured on an M5 Pro against the commit before, runs alternating between the two, it is within the runs' own spread everywhere:
+What the readout adds: one increment a spike, whichever neuron fires (23,000 a second at rest, 970,000 under the grating across both eyes), and every 10 ms chunk 63 smoothings; a byte a neuron for the partition; and, when the brain is built, classifying every neuron, 12 to 20 ms of string checks here and a few ms natively (in the native bench's runs the TypeScript brain built in 149 to 163 ms after against 155 to 159 before, the native one in 51 to 52 ms against 46 to 49). Measured on an M5 Pro against the commit before, runs alternating between the two, it is within the runs' own spread everywhere:
 
 | Wall time per simulated second | Before | After |
 |---|---|---|
@@ -901,13 +911,15 @@ The game's X-ray and nervous-system panel are such a display (`apps/web/src/nerv
 
 ## Cost
 
-On an M5 Pro, one thread (`report.ts` section d), wall time per simulated second: 0.12 s at rest, 0.14 s with the feather resting on the fly (touch 0.4), 0.13 s with a full looming pulse every second, 0.16 s with touch and wind while airborne (touch 1, wind 0.5: just over the 0.15 s aimed for), 0.21 s with every sense at full strength at once. Building the brain takes about 0.3 s. Almost all of it is the sweep over active neurons: at rest about 65,000 of them, nearly all genuinely depolarised by the background. The regions' readout costs nothing that can be measured (Regions).
+On an M5 Pro, one thread (`report.ts` section d), wall time per simulated second: 0.09 s at rest (`node packages/brain-native/scripts/bench.ts`, measured again when `grounded` was narrowed: about 23,000 spikes a second and 40,000 active neurons, against 49,000 and 58,000 while it drove the wings' and halteres' sensors too; the figures after it are from before), 0.14 s with the feather resting on the fly (touch 0.4), 0.13 s with a full looming pulse every second, 0.16 s with touch and wind while airborne (touch 1, wind 0.5: just over the 0.15 s aimed for), 0.21 s with every sense at full strength at once. Building the brain takes about 0.3 s. Almost all of it is the sweep over active neurons: at rest about 40,000 of them, nearly all genuinely depolarised by the background. The regions' readout costs nothing that can be measured (Regions).
 
 With the eyes open (`report.ts` section e): a steady scene costs what shut eyes do (0.122 to 0.125 s against 0.123 in interleaved runs: the input stage only checks whether the light has changed), a disc looming at one eye over and over 0.21 to 0.23 s, a 4 Hz whole-field flicker 0.33 to 0.38 s, and the worst case of the battery, a high-contrast grating drifting across both eyes, 0.39 to 0.42 s (three runs), under the 0.5 s aimed for. The eyes' input itself is cheap (one random draw per candidate spike, and nothing at all once adapted); what costs is the optic lobe answering, with the active set growing to about 120,000 neurons. Real screens move less of the field at lower contrast than that grating. If it ever needs cutting, halving the lamina's scale (`RETINA.maxRate` 100) halves the spikes the rotating grating causes (529,000 a second against 1,016,000), at the price of most of the motion pathway (Seeing).
 
 ## Tools
 
 `node packages/brain/scripts/probe.ts --type LPLC2,LC4 --side left` drives any group (by `--type`, `--superClass`, `--class`, `--subClass`, `--side`, `--nt`: comma-separated values or a `/regex/`) at `--rate` Hz for `--ms` and lists what responds, by super class and type, at the operating point. `--only <regex>` limits the list to some super classes, `--after <ms>` keeps running with the drive off to show what keeps going (driven neurons included), and `--set excitatory=0.2`, `--set saturation=0` and so on try another operating point. `--each type --target MN9` ranks each type in the selection by what it does to a target, and `--greedy` builds a set as `sweet`'s was built. The comment at the top of the file lists every option.
+
+`node packages/brain/scripts/wingbeat.ts` checks which campaniform sensilla are the legs' against FlyEM's nerves, and measures `grounded` and `wingbeat`: rest standing and in the air, `wingbeat` held, and the loop it closes with the body, with and without the body's floor (Senses; What it does and doesn't reproduce). `--rate` tries another rate for `wingbeat`.
 
 `node packages/brain/scripts/report.ts` measures everything above on the real connectome: (a) the response matrix, each sense alone at full strength and rest, with each command's mean, peak and latency to peak, and the looming pulse; (b) the seizure checks, every sense, pair and all at once; (c) 10 minutes of resting behaviour (`--minutes` to change it); (d) wall time per simulated second at rest, under typical stimulation and with everything at once; (e) for the eyes, recovery after every stimulus of the vision battery, alone and with every other sense at full strength, and wall time with the eyes open. It takes about three minutes. `--seed` changes the seed.
 
@@ -925,4 +937,4 @@ With the eyes open (`report.ts` section e): a steady scene costs what shut eyes 
 
 ## Tests
 
-`node --test 'packages/brain/src/*.test.ts'` from the repository root (or `npm test` for all packages). Without the real data: the format, the packer, the engine against a dense reference, and the runtime on a small synthetic connectome (`src/test-helpers.ts`): decoding, the sense-to-rate mapping, left/right balancing, a male's taste picked by root ID (a mid leg's LgLG1a left out), Johnston's organ's completeness fix (on each zone's less complete side only, by the ratio of synapses), that no neuron is both driven and read, `createBrain` end to end and its errors, determinism, hunger (left out, 1 and NaN the same brain spike for spike; 0 passes on less sugar and quietens the background; the engine's output gain scaling only its group and exact at 1), and a four-column eye on it (shut, the brain is spike for spike the one without eyes; open, darkness reaches the lamina, the looming detectors and the giant fiber). Also without the data: the regions' catalog (unique ids, every field filled in, pairs alike but for their side), their rules on examples of every kind of neuron and every catch-all, and on the synthetic brain that every region is reported after the readouts, an empty one at 0, and that no command reads them; the engine's partition (every spike counted by its neuron's part, the run unchanged); the column table, the viewing directions (unit vectors, none alike, mirrored, the frontal overlap, the dorsal rim looking up), and the input stage (adaptation, contrast, transient and sustained cells, steady scenes costing nothing, skipping steps exactly). With `data/connectome.bin` (skipped without it), `src/behaviour.test.ts` checks the requirements: the real groups and their disjointness, no seizure after each sense and all at once, loom → escape timing, escape below 0.3 otherwise, mirrored looms and steering, touch → back, wind and a push on either antenna → groom, sweet → feed, a fed fly ignoring sugar a starved one feeds on, loom → wings, P1 → sing and no sense, a male's taste among them, near singing, three minutes of resting behaviour (walking 20–70% of the time in at least 15 bouts, turns both ways, no escapes, sing under 0.25; 10 minutes is in `report.ts`); `src/cost.budget.ts`, which `npm test` runs on its own after the rest, construction time and cost in M5 Pro CPU time, 1.7 to 1.8 times what they take (`scripts/cpuBudget.ts`); `src/eyes.test.ts` that every column's cells are the right type and side; `src/regions.test.ts` the partition (every neuron in one region, as many in each as the catalog says, none empty), that the senses' and the readouts' neurons are in the regions the catalog says, and that the region rates respond where they should (at rest the descending neurons stay under 1.5 Hz; the looming pulse raises them more than threefold and the wing and haltere motor neurons with them; a disc looming at the left eye drives the left lamina, medulla and lobula more than twice as hard as the right ones; sweet drives the mouthparts, the head motor neurons and the subesophageal zone); and `src/seeing.test.ts` the eyes: shut, the same spikes as the commit before the eyes (a fingerprint); a loom at the right eye passing escape 0.5 and dots and a receding disc not; a steady scene sending the lamina nothing; HS preferring front-to-back and H2 back-to-front motion and a rotation turning the fly with it; and no seizure after a loom, a grating or a flicker, alone and with every other sense. It takes about a minute and a half.
+`node --test 'packages/brain/src/*.test.ts'` from the repository root (or `npm test` for all packages). Without the real data: the format, the packer, the engine against a dense reference, and the runtime on a small synthetic connectome (`src/test-helpers.ts`): decoding, the sense-to-rate mapping, left/right balancing, a male's taste picked by root ID (a mid leg's LgLG1a left out), the legs' campaniform sensilla for `grounded` and every other for `wingbeat`, Johnston's organ's completeness fix (on each zone's less complete side only, by the ratio of synapses), that no neuron is both driven and read, `createBrain` end to end and its errors, determinism, hunger (left out, 1 and NaN the same brain spike for spike; 0 passes on less sugar and quietens the background; the engine's output gain scaling only its group and exact at 1), and a four-column eye on it (shut, the brain is spike for spike the one without eyes; open, darkness reaches the lamina, the looming detectors and the giant fiber). Also without the data: the regions' catalog (unique ids, every field filled in, pairs alike but for their side), their rules on examples of every kind of neuron and every catch-all, and on the synthetic brain that every region is reported after the readouts, an empty one at 0, and that no command reads them; the engine's partition (every spike counted by its neuron's part, the run unchanged); the column table, the viewing directions (unit vectors, none alike, mirrored, the frontal overlap, the dorsal rim looking up), and the input stage (adaptation, contrast, transient and sustained cells, steady scenes costing nothing, skipping steps exactly). With `data/connectome.bin` (skipped without it), `src/behaviour.test.ts` checks the requirements: the real groups and their disjointness, no seizure after each sense and all at once, loom → escape timing, escape below 0.3 otherwise, mirrored looms and steering, touch → back, wind and a push on either antenna → groom, sweet → feed, a fed fly ignoring sugar a starved one feeds on, loom → wings, P1 → sing and no sense, a male's taste among them, near singing, the wings' own sensors driving the flight motor neurons short of holding the fly up and the loop they close with the body dying away, three minutes of resting behaviour (walking 20–70% of the time in at least 15 bouts, turns both ways, no escapes, sing under 0.25; 10 minutes is in `report.ts`); `src/cost.budget.ts`, which `npm test` runs on its own after the rest, construction time and cost in M5 Pro CPU time, 1.7 to 1.8 times what they take (`scripts/cpuBudget.ts`); `src/eyes.test.ts` that every column's cells are the right type and side; `src/regions.test.ts` the partition (every neuron in one region, as many in each as the catalog says, none empty), that the senses' and the readouts' neurons are in the regions the catalog says, and that the region rates respond where they should (at rest the descending neurons stay under 1.5 Hz; the looming pulse raises them more than threefold and the wing and haltere motor neurons with them; a disc looming at the left eye drives the left lamina, medulla and lobula more than twice as hard as the right ones; sweet drives the mouthparts, the head motor neurons and the subesophageal zone); and `src/seeing.test.ts` the eyes: shut, the same spikes as the commit before the eyes (a fingerprint); a loom at the right eye passing escape 0.5 and dots and a receding disc not; a steady scene sending the lamina nothing; HS preferring front-to-back and H2 back-to-front motion and a rotation turning the fly with it; and no seizure after a loom, a grating or a flicker, alone and with every other sense. It takes about a minute and a half.

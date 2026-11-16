@@ -480,9 +480,10 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, another fly's body, or past the table's edge. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
-| `grounded` | On its feet. |
+| `grounded` | On its feet: its legs' load sensors bear its weight. |
 | `maleTaste` | A front leg's tarsus on another fly's body, while it stands (at a table with others; every fly there is a male): the taste of a male's cuticle, 1 while touching, easing out over 0.3 s. |
 | `hunger` | Not a sense: how hungry it is (below). |
+| `wingbeat` | How hard its own wings beat, felt by their and the halteres' strain sensors: in the air, the drive it flies with (the brain's `wings`, or the tarsal reflex's floor where that is higher, see Flight); on its feet, only as far as the pose opens them, so 0 with the wings folded, and 0 from the step it lands in (tarsal contact stops a fly's wings). |
 
 **Hunger** (`packages/body/src/hunger.ts`). The body keeps account of how
 hungry the fly is, from 0 just fed to 1 starved, and of how full its crop is.
@@ -496,8 +497,8 @@ what takes a real fly an hour takes this one a minute. Nothing else does. A
 fly starts at 0.7, hungry enough to go and look for food.
 
 What changes, all through the brain: a just-fed fly leaves weak sugar alone
-that a hungry one stops to eat (sweetness 0.4, as the bar's beer foam: 4 flies
-in 20 start to feed, against 19 in 20 starved), takes strong sugar less
+that a hungry one stops to eat (sweetness 0.4, as the bar's beer foam: 3 flies
+in 20 start to feed, against 20 in 20 starved), takes strong sugar less
 eagerly and leaves a little more of it, and walks about a third less.
 
 The crop fills with what it eats and empties by half every minute (an hour,
@@ -571,7 +572,7 @@ commands and the neurons themselves.
 ## Flight
 
 A swoop that fires the giant fiber makes the fly jump and fly: up for a second
-and a half to two and a half, a few hundred millimetres away from the ball,
+and a half to three, a few hundred millimetres away from the ball,
 then a glide down onto whatever is under it. Flight is simple physics (lift in
 proportion to the wings' drive, 0.6 holding its weight, and thrust along its
 body), driven by the brain's flight motor neurons and, while its feet are off
@@ -587,11 +588,14 @@ neurons to `wings` 0.8 to 0.9, and the fly then climbs and flies longer.
 `TARSAL_ONSET`). In a fly, losing contact with the ground under its feet starts
 the wings beating and keeps them going until its feet touch something again
 (Fraenkel 1932): a fly held in the air flies for as long as its feet find
-nothing. This connectome does the opposite. The legs' load sensors that fire
-while it stands excite the flight motor neurons, so leaving the ground takes
-drive away, and after an escape seen through the eyes `wings` is 0.3 to 0.4,
-short of the 0.6 that holds it up: on its own a take-off was a hop of a few
-millimetres, over in a tenth of a second (`packages/brain/README.md`). So while
+nothing. The model has nothing that does it. Leaving the ground silences only
+the legs' 13 load sensors, which changes nothing measurable, and the wings' own
+sensors (`wingbeat`) feed each stroke back to the flight motor neurons too
+weakly to keep them going: beating at full power they bring `wings` to about
+0.3. After an escape seen through the eyes `wings` peaks at 0.3 to 0.5, short of
+the 0.6 that holds the fly up, and falls away: on its own a take-off is a hop of
+a few millimetres, over in a tenth of a second (`packages/brain/README.md`,
+What it does and doesn't reproduce). So while
 its feet are off the ground the body keeps a floor under the wings' drive:
 
 - a take-off goes straight into it (the giant fiber drives the jump muscle and,
@@ -609,19 +613,40 @@ does with an escape flight and where it chooses to land is decided in circuits
 the model doesn't reproduce well enough to read, and no landing command is read
 from it. Without a brain (its commands stale) there is no reflex either.
 
-Measured in Node on the real connectome, eyes open
-(`apps/web/tests/swoop-escape.test.ts`, seeds 1 to 4): every take-off is a
-flight of 1.5 to 2.4 s, 290 to 560 mm along its way, rising 30 to 70 mm, and
-lands on its feet; with the eyes shut (the hand-wired loom), 2.2 to 2.8 s and
-590 to 690 mm. Before the reflex they were in the air for 0.07 to 0.12 s. The
+**The wings' own sensors** (`wingbeat`, The fly's senses) feel the strokes the
+floor makes as they would any others, so the reflex reaches the brain only
+through them, as a fly's own strokes would: no neuron is driven for it. They
+raise the brain's own wing drive in the air, but never to the floor, so they
+change no flight; and without the floor every take-off is the same hop with
+them as without. They don't make the reflex any less needed, and its floor
+stays as it was. Measured in Node on the real connectome, the swoop thrown as
+`apps/web/tests/swoop-escape.test.ts` throws it (eyes open, seeds 1 to 4, 8
+throws each):
+
+| | With the floor | Without it |
+| --- | --- | --- |
+| With the wings' sensors | 31 of 32 flew: 1.5 to 1.6 s, 375 to 407 mm; the brain's `wings` 0.19 to 0.23 on average in the air, peaks 0.32 to 0.49 | 32 of 32 hopped: 0.05 to 0.10 s, 5 to 13 mm |
+| Without them | 29 of 32 flew: 1.5 to 1.6 s, 380 to 415 mm; the brain's `wings` 0.07 to 0.14, peaks 0.26 to 0.48 | 32 of 32 hopped: 0.05 to 0.10 s, 6 to 13 mm |
+
+With the floor each flight spends 0.78 s at power and the rest gliding, and
+lands on its feet. Nothing runs away: the wings fold the step it lands, and a
+second later the brain's `wings` is 0 to 0.12 with the floor or without it
+(as at rest). The brain alone, flying on its own drive as the body would
+without the floor, lets its wings down within half a second
+(`packages/brain/README.md`, What it does and doesn't reproduce).
+
+Every take-off with the eyes open is a flight of 1.5 to 1.6 s, 375 to 407 mm
+along its way, rising 59 to 72 mm, and lands on its feet; with the eyes shut
+(the hand-wired loom, 6 throws a seed), 2.0 to 3.2 s and 507 to 781 mm.
+Before the reflex they were in the air for 0.07 to 0.12 s. The
 fly often crosses the edge of the picnic table and is drawn back over it to land
 (Staying in the world). The camera keeps a flying fly in the picture: pulled
 back while it is in the air, and led ahead of it by up to 120 mm once it has
 been up for a quarter of a second (a hop is over by then), as it is led a
 little ahead of a walking fly. The caption says "Flying" and the
 stats count the time; the X-ray and the stats' In and out show the brain's own
-flight motor neurons, which the reflex doesn't touch, so they stay as dim as
-the brain leaves them.
+flight motor neurons, which the reflex reaches only through the wings' own
+sensors, so they glow only as much as the brain answers the strokes.
 
 ## The eyes
 

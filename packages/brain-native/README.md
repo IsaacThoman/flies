@@ -113,14 +113,14 @@ Wall time per simulated second on an Apple M5 Pro, one thread, the real connecto
 
 | Regime | Active neurons | Spikes per second | TypeScript (Node 26) | Native | |
 |---|---|---|---|---|---|
-| At rest, standing, eyes shut | ~58,000 | ~49,000 | 0.11–0.14 s | 0.063–0.068 s | 1.8× |
-| Every sense at full strength, eyes shut | ~88,000 | ~434,000 | 0.22–0.28 s | 0.122–0.134 s | 1.8× |
-| A steady uniform scene | ~63,000 | ~51,000 | 0.12–0.14 s | 0.067–0.074 s | 1.8× |
+| At rest, standing, eyes shut | ~40,000 | ~23,000 | 0.09 s | 0.052 s | 1.8× |
+| Every sense at full strength, eyes shut | ~92,000 | ~512,000 | 0.30 s | 0.153 s | 1.9× |
+| A steady uniform scene | ~58,000 | ~37,000 | 0.12–0.14 s | 0.067–0.074 s | 1.8× |
 | A disc looming at the right eye, over and over | ~86,000 | ~286,000 | 0.20–0.24 s | 0.109–0.120 s | 1.9× |
 | A grating drifting across both eyes (the worst case) | ~124,000 | ~970,000 | 0.37–0.46 s | 0.205–0.225 s | 1.8–2.0× |
 | The whole field flickering at 4 Hz | ~125,000 | ~744,000 | 0.32–0.39 s | 0.19–0.24 s | 1.7× |
 
-The ranges are repeated runs on a machine others were using. The regions' readout changes none of these beyond that spread (packages/brain/README.md, Regions, Cost). Both builds report the same active neurons and spikes in each regime, as they should (a spike rate ending in .5 is printed rounded up by the TypeScript and to even here). Building the brain takes about 45 ms (the TypeScript's, 120 to 140 ms).
+The ranges are repeated runs on a machine others were using. The first two rows and the counts were measured again when `grounded` was narrowed to the legs' load sensors and `wingbeat` added (packages/brain/README.md, Senses), one run on a busy machine: at rest the brain had been firing ~49,000 spikes a second with ~58,000 neurons active, the wings' and halteres' sensors driven while it stood; every sense now includes `wingbeat`. The regions' readout changes none of these beyond that spread (packages/brain/README.md, Regions, Cost). Both builds report the same active neurons and spikes in each regime, as they should (a spike rate ending in .5 is printed rounded up by the TypeScript and to even here). Building the brain takes about 45 ms (the TypeScript's, 120 to 140 ms).
 
 Memory: the brain takes 58 MB (with what building it uses; the file the host read is another 40 MB and need not be kept), and the most the process ever holds is that and the file, 98 MB, measured as the system's own peak footprint. 50 MB of it is the connections, a target and a weight each; per-neuron state, the CSR pointers, the spike ring and the readouts make the rest. The eyes add next to nothing (the column table, two retinas of about 2,600 cells, and the vision readouts' entries in the neuron-to-readout lists), and the regions a byte a neuron (167 kB). The TypeScript brain's process is about 180 MB (the bench's 197 to 201 MB, less the 19 MB of frames it keeps for the native run).
 

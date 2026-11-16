@@ -88,6 +88,28 @@ test("an escape becomes a flight: up for over a second, a few hundred millimetre
   assert.ok(flight.lowest >= 0, "never below the table");
 });
 
+test("the wings' own sensors feel the drive it flies with, and nothing from the step it lands in, its wings folded", () => {
+  const world = new World(open());
+  const body = new FlyBody(world, { x: 0, z: 0, yaw: 0 });
+  const behavior = new Behavior();
+  body.step(behavior.update(command(), 0, true, DT), still, DT);
+  assert.equal(body.wingbeat, 0, "standing, wings folded");
+  body.step(behavior.update(command({ escape: 0.5 }), 0, true, DT), still, DT);
+  let beat = 0;
+  for (let t = 0; t < 10 && !body.onFeet; t += DT) {
+    const intent = behavior.update(command({ wings: 0.3 }), 0, body.onFeet, DT);
+    body.step(intent, still, DT);
+    if (!body.onFeet) assert.equal(body.wingbeat, intent.wings);
+    beat = Math.max(beat, body.wingbeat);
+  }
+  assert.ok(body.onFeet, "it landed");
+  assert.ok(Math.abs(beat - FLIGHT_WINGS) < 1e-9, `beat as hard as the reflex holds them: ${beat}`);
+  assert.equal(body.wingbeat, 0, "folded on landing (0.3 is under the pose's floor)");
+  // On its feet they beat only as far as the pose opens them.
+  body.step(behavior.update(command({ wings: 0.6 }), 0, true, 1), still, DT);
+  assert.ok(Math.abs(body.wingbeat - 0.5) < 1e-4, `${body.wingbeat}`);
+});
+
 test("it flies away from the threat, not back past it", () => {
   const world = new World(open());
   const body = new FlyBody(world, { x: 0, z: 0, yaw: 0 });
