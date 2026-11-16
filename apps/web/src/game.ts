@@ -2,7 +2,7 @@
 // tools and the menus, put together frame by frame.
 
 import * as THREE from "three";
-import type { BrainDriver, RemoteButton } from "@fly/contracts";
+import type { BrainDriver, RemoteButton, WeatherAttribution } from "@fly/contracts";
 import { AT_ROOT_PROPERTY } from "@fly/contracts";
 import { Navigator } from "@fly/ui";
 import { World, isDropped } from "@fly/world";
@@ -25,6 +25,7 @@ import type { Around, Felt } from "./places/types.ts";
 import { Bubbles } from "./scene/bubbles.ts";
 import { Fireflies } from "./scene/fireflies.ts";
 import { clockHours, timeAt } from "./scene/light.ts";
+import { Outside, nativeWeather } from "./scene/outside.ts";
 import { forecastHours } from "./scene/weather.ts";
 import { KEPT, loadLearned, loadSettings, loadShelf, saveLearned, saveSettings, saveShelf } from "./settings.ts";
 import type { Learned, Lesson, Settings, ShelfChoices } from "./settings.ts";
@@ -54,7 +55,7 @@ const VEIL_OUT = 0.45;
 const VEIL_IN = 0.9;
 /** Seconds without a press before the place's comings and goings start, when the wallpaper hasn't already. */
 const QUIET_AFTER = 60;
-/** How often the clock and the forecast are looked at again, s: the light moves on that slowly. */
+/** How often the clock, the forecast and the weather outside are looked at again, s: the light moves on that slowly. */
 const CLOCK_EVERY = 2;
 /** Seconds of tickling or blowing that teach holding Select, longer than a press. */
 const HOLD_TAUGHT = 0.5;
@@ -78,6 +79,8 @@ export class Game implements Shell {
   readonly eyes: Eyes;
   readonly inset: EyesInset;
   readonly fireflies: Fireflies;
+  /** The real weather outside, where the Apple TV can tell it; scripts feed it in a browser (`outside.feed`). */
+  readonly outside = new Outside(nativeWeather());
   readonly nav = new Navigator<ScreenId>("title");
   readonly screens: Record<MenuScreenId, Screen>;
   /** Seconds since the game started. */
@@ -132,6 +135,8 @@ export class Game implements Shell {
   #held = 0;
   /** Button hints as last applied: turned on again, they teach everything again. */
   #hints = true;
+  /** The weather outside's state when last logged. */
+  #outsideState = "";
 
   constructor(canvas: HTMLCanvasElement, remote: Remote, brain: BrainDriver) {
     this.canvas = canvas;
@@ -143,9 +148,12 @@ export class Game implements Shell {
     const world = new World(scene.place);
     this.#shelf = loadShelf(Date.now());
     this.hands = new Hands(world, this.#shelf);
-    // The light and the weather are already as chosen, or as the clock has them, when the game appears.
+    // The light and the weather are already as chosen, or as the clock (and an answer kept from the
+    // last run, if it is still fresh) has them, when the game appears.
+    this.outside.enabled = this.settings.realWeather;
+    this.outside.update(Date.now(), true);
     const time = this.hands.timeOfDay;
-    this.stage = new Stage(canvas, time === "clock" ? timeAt(clockHours(new Date())) : time, scene);
+    this.stage = new Stage(canvas, time === "clock" ? timeAt(this.outside.lightHours(clockHours(new Date()))) : time, scene);
     this.#followLight(true);
     this.fireflies = new Fireflies(this.stage.scene);
     this.life = new Life(world, brain);
@@ -177,6 +185,14 @@ export class Game implements Shell {
 
   get brain(): BrainDriver {
     return this.life.brain;
+  }
+
+  get weatherOutside() {
+    return this.outside.available;
+  }
+
+  weatherAttribution(): WeatherAttribution | null {
+    return this.outside.attribution();
   }
 
   get screen(): ScreenId {
@@ -224,6 +240,10 @@ export class Game implements Shell {
     this.eyes.detail = s.eyes;
     if (s.hints && !this.#hints) this.#unlearn();
     this.#hints = s.hints;
+    if (this.outside.enabled !== s.realWeather) {
+      this.outside.enabled = s.realWeather;
+      this.#clockAt = 0;
+    }
     if (save) saveSettings(s);
   }
 
@@ -327,6 +347,8 @@ export class Game implements Shell {
       if (this.#awakeAt >= 0 && this.time - this.#awakeAt > (this.brain.status === "running" ? AWAKE_HOLD : 3)) {
         this.#loading = false;
         this.#entered();
+        // Asked once the title is up, not over the loading screen: the first time, the TV asks whether it may know where it is.
+        this.outside.begin();
       }
     }
 
@@ -461,14 +483,17 @@ export class Game implements Shell {
     this.audio.tools(this.hands.events);
   }
 
-  /** Sets the light and the weather to the tools' choices; on "Now", to the clock's, looked at again every few seconds. With `settle`, there at once. */
+  /** Sets the light and the weather to the tools' choices; on "Now", to the clock's and the weather outside's (or the forecast's), looked at again every few seconds. With `settle`, there at once. */
   #followLight(settle = false) {
     const now = new Date();
+    const outside = this.outside;
+    outside.update(now.getTime(), settle);
+    this.hands.outside = outside.following;
     const time = this.hands.timeOfDay;
-    if (time === "clock") this.stage.light.follow(clockHours(now), settle);
+    if (time === "clock") this.stage.light.follow(outside.lightHours(clockHours(now)), settle);
     else this.stage.setTime(time);
     const weather = this.hands.weather;
-    if (weather === "now") this.stage.weather.follow(forecastHours(now), settle);
+    if (weather === "now") this.stage.weather.follow(forecastHours(now), settle, outside);
     else this.stage.weather.choose(weather, settle);
     this.#clockAt = this.time + CLOCK_EVERY;
   }
@@ -744,6 +769,19 @@ export class Game implements Shell {
     d.hours = this.stage.light.hours === null ? "" : this.stage.light.hours.toFixed(2);
     d.weather = this.stage.weather.kind;
     d.wet = this.stage.weather.wet.toFixed(2);
+    // Where the weather and the daylight come from, and how old the weather outside is (s).
+    const outside = this.outside;
+    d.weatherFrom = this.hands.weather !== "now" ? "chosen" : outside.following ? "outside" : "forecast";
+    d.sunFrom = this.hands.timeOfDay !== "clock" ? "chosen" : outside.sunFollowing ? "outside" : "clock";
+    d.outside = outside.state;
+    const age = outside.age(Date.now());
+    d.outsideAge = age === null ? "" : age.toFixed(0);
+    // On the TV's console, why it has nothing (no permission, WeatherKit refusing the app), once each time it changes.
+    if (outside.state !== this.#outsideState) {
+      this.#outsideState = outside.state;
+      const why = outside.error;
+      console.log(`weather outside: ${outside.state}${why ? ` (${why})` : ""}`);
+    }
     d.view = this.hands.view;
     d.place = this.#here;
     d.placeMs = this.stage.buildMs.toFixed(0);

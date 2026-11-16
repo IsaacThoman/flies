@@ -6,8 +6,8 @@ public JavaScriptCore framework, with a small browser in TypeScript (`apps/tvos/
 fakes enough of the DOM and Web APIs for three.js and the game. three's ordinary
 `WebGLRenderer` draws through a home-made WebGL 2 that records calls into shared command
 buffers, which native code replays on OpenGL ES 3.0. 2D canvases are CoreGraphics, Web Audio is
-AVAudioEngine, and the fly's brain is C++ on a thread of its own. Public APIs only, so it can go
-through App Review.
+AVAudioEngine, and the fly's brain is C++ on a thread of its own. Built with WeatherKit, a Swift
+service tells the game the weather outside. Public APIs only, so it can go through App Review.
 
 The host is the one built for aerodance (github.com/IsaacThoman/aerodance, `apps/tvos`), which
 holds 60 fps there on an Apple TV 4K; its `docs/apple-tv.md` records the measurements and the
@@ -26,6 +26,10 @@ Five threads:
 | Render | The OpenGL ES context: replays WebGL and 2D canvas commands a frame behind JavaScript, presents | `src/Renderer.mm`, `src/Executor.mm`, `src/Canvas2D.mm` |
 | Brain | The `fly_brain`: loads the connectome, steps the simulation whenever time is waiting | `src/BrainBridge.mm`, `packages/brain-native` |
 | Audio | AVAudioEngine's render callback: the Web Audio graph, mixed per sample | `src/Audio.mm` |
+
+Built with WeatherKit, the weather outside is found on the main thread (Core Location, timers)
+and in Swift's own tasks (the request), and read from the JavaScript thread
+([The weather outside](#the-weather-outside)).
 
 WebGL calls that return nothing are encoded into a 4 MB command buffer (about 0.2–0.3 µs a call
 on the device, per aerodance) and run later on the render thread. Object handles are numbered in
@@ -50,16 +54,21 @@ Needs a Mac with Xcode 27 and XcodeGen (`brew install xcodegen`), and the connec
 (Settings → Remotes and Devices → Remote App and Devices on the TV, then Xcode's Devices window or
 `xcrun devicectl manage pair`), and a paid developer team signed in to Xcode. Builds sign with
 `TVOS_TEAM_ID` (default `PX72AL9366`) and `TVOS_BUNDLE_ID` (default `com.isaacthoman.appletvfly`).
+`TVOS_WEATHERKIT=1` builds in the weather outside, which needs the App ID set up first: see
+[Turning it on](#turning-it-on-for-the-owner). Without it the app is built as it always was, with
+no Swift, no WeatherKit, no location and no entitlements.
 
 ```sh
 npm run tvos -- build                    # the game, for an Apple TV
 npm run tvos -- build --sim              # ...for the tvOS simulator
 npm run tvos -- build --sim --test-scene --stand-in-brain
+TVOS_WEATHERKIT=1 npm run tvos -- build  # with the weather outside (WeatherKit)
 npm run tvos -- run --sim <udid>         # install and launch, printing the console
 npm run tvos -- run --device <udid> --config '{"script":"game.js","stats":2}'
 npm run tvos -- run --device <udid> --detached --config '{"script":"game.js","stats":10,"logFile":true}'
 npm run tvos:soak -- --device <udid> --minutes 30
 npm run tvos:check                       # the simulator check (below)
+npm run tvos:check -- --weatherkit       # ...with the real weather service
 ```
 
 `build`:
@@ -72,7 +81,8 @@ npm run tvos:check                       # the simulator check (below)
    module loader, so everything is inlined; `apps/web/public` is copied beside it;
 4. copies `packages/brain/data/connectome.bin` to `www/brain/` (and stops, saying how to get
    it, if it isn't there);
-5. generates `AppleTVFly.xcodeproj` (XcodeGen, `project.yml`) and builds it with xcodebuild.
+5. generates `AppleTVFly.xcodeproj` (XcodeGen, `project.yml`, with `weather.yml` and
+   `weatherkit.yml` merged in when the weather is wanted) and builds it with xcodebuild.
 
 The Xcode project compiles every source under `packages/brain-native/src/` with that
 package's release flags (`-O2 -DNDEBUG -ffp-contract=off`). `--stand-in-brain` compiles
@@ -176,8 +186,8 @@ desktop browser.
 - **Files**: `fetch` of the app's own files (GET only; relative URLs resolve against
   `http://fly.local/`), `blob:` and `data:` URLs. `Response` (`arrayBuffer`, `json`, `text`,
   `blob`, `bytes`; `body` gives the whole file as one chunk), `Request`, `Headers`, `Blob`,
-  `File`, `URL`, `URLSearchParams`, `URL.createObjectURL`. The app has no network: anything
-  else rejects. No `XMLHttpRequest`, `WebSocket`, `EventSource`.
+  `File`, `URL`, `URLSearchParams`, `URL.createObjectURL`. The page has no network: anything
+  else rejects. (The weather service's requests are native: [The weather outside](#the-weather-outside).) No `XMLHttpRequest`, `WebSocket`, `EventSource`.
 - **Storage**: `localStorage`, kept in `NSUserDefaults` (keep it small: settings, not data).
   `sessionStorage` lasts as long as the app runs. No IndexedDB, no cookies, no Cache API.
 - **Timers and frames**: `setTimeout`, `setInterval`, `requestAnimationFrame` (the display
@@ -262,6 +272,139 @@ implemented in `src/BrainBridge.mm` over `packages/brain-native/include/fly_brai
 In the simulator the real brain (`packages/brain-native` as of 15 November) loads in about 150 ms
 and keeps up with real time at 60 submits a second, on an M5 Pro. How fast it runs on an Apple TV
 is not measured yet.
+
+## The weather outside
+
+Built with `TVOS_WEATHERKIT=1`, the app tells the game the real weather where the TV is, and
+today's sunrise and sunset (what the game makes of them is in [the README](../README.md), "The
+weather outside", and `apps/web/src/scene/outside.ts`). `globalThis.__native.weather` is
+`NativeWeatherBridge` (`packages/contracts/src/weather.ts`), made by `src/WeatherBridge.mm` over a
+Swift service it finds by its Objective-C name (`FlyOutsideWeather`). A build without the service
+has no Swift and no `__native.weather`, and the game keeps its made-up forecast.
+
+- `weather/Shared/OutsideWeather.swift` holds what the JavaScript thread reads (status, error,
+  the last answer as JSON, Apple Weather's attribution, a version that counts answers) under a
+  lock it holds only to copy, and keeps the last answer in `NSUserDefaults` (the conditions and
+  when they were fetched, never where) for the next run.
+- `weather/WeatherKit/Service.swift` finds the answer, on the main actor. `start()` (the game
+  calls it once the title is up, and when Settings → Wallpaper → Real weather is turned on) asks for When
+  In Use location permission the first time; after that it takes one location fix at a time
+  (`requestLocation`) and uses it for six hours, a TV not being one to move. It rounds the
+  coordinates to two decimal places (about a kilometre) and asks WeatherKit for the current
+  conditions and today's daily forecast (for its sunrise, sunset and solar noon) in one
+  request. It asks again every 20 minutes while the app is open (not before WeatherKit's answer
+  expires, and at most an hour apart), and after a failure sooner, backing off from a minute to
+  20. Timers don't fire while the app is suspended; when it becomes active again it asks if the
+  answer is 20 minutes old. A relaunch within 20 minutes of the last answer uses the kept one
+  and doesn't ask. Apple Weather's attribution is asked for on its own once a run, as it starts,
+  so About has it for a kept answer too. `stop()` stops it asking.
+- Nothing waits: `start` and `stop` hand over to the main actor and return, and the rest copy.
+  The game looks at `version()` every two seconds and reads `conditions()` only when it changes,
+  so nothing is allocated per frame.
+- What JavaScript gets (`OutsideConditions`): cloud cover, precipitation (mm an hour), visibility
+  (m), wind speed (m/s), WeatherKit's condition (`foggy`, `snow`...), whether it is day, the
+  observation's time, and sunrise, sunset and solar noon as local hours (null where the sun
+  doesn't rise or set). Not the location. `status()` says what it has: `locating`, `fetching`,
+  `ok`, or why it has nothing: `denied` (location permission refused or restricted),
+  `no-location`, `offline`, `unauthorised` (WeatherKit refused the app: the capability isn't on
+  its App ID), `failed`; `error()` says more. The game logs `weather outside: <status>
+  (<error>)` on the console each time it changes, and puts it on the canvas as `data-outside`,
+  with `data-outside-age` (seconds), `data-weather-from` and `data-sun-from`.
+
+### What Apple's documentation says it needs
+
+Checked against Apple's documentation in November 2026:
+
+- [WeatherKit](https://developer.apple.com/documentation/weatherkit) is on tvOS from 16 (this
+  app targets 26), and so is
+  [`WeatherService.weather(for:including:_:)`](https://developer.apple.com/documentation/weatherkit/weatherservice/weather(for:including:_:)).
+  Each call is one request against the quota however many data sets it includes ([Apple, on the
+  developer forums](https://developer.apple.com/forums/thread/750791)).
+- Core Location is on tvOS with
+  [When In Use authorisation only](https://developer.apple.com/documentation/corelocation/requesting-authorization-to-use-location-services)
+  (Always is for "All platforms except tvOS and visionOS"),
+  [`requestWhenInUseAuthorization()`](https://developer.apple.com/documentation/corelocation/cllocationmanager/requestwheninuseauthorization())
+  and the one-shot
+  [`requestLocation()`](https://developer.apple.com/documentation/corelocation/cllocationmanager/requestlocation())
+  (tvOS 9); `startUpdatingLocation()` isn't on tvOS. The prompt shows
+  `NSLocationWhenInUseUsageDescription`, which Info.plist must have ("Authorization requests
+  fail immediately if the required keys aren't present"), and only while the app is in the
+  foreground.
+- The [WeatherKit entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.weatherkit)
+  (`com.apple.developer.weatherkit`), on an App ID registered with
+  [WeatherKit ticked under App Services and under Capabilities](https://developer.apple.com/help/account/configure-app-services/weatherkit/).
+  A wildcard App ID can't have it, so a device build signs with an explicit one.
+- [Attribution](https://developer.apple.com/weatherkit/get-started/): an app that shows weather
+  data from Apple must "clearly display the Apple Weather trademark ( Weather), as well as
+  the legal link to other data sources", and one that shows it changed ("value-added") must
+  attribute it to " Weather" "along with a notice that the data provided by Apple has been
+  modified". tvOS can't open the link, and
+  [`legalAttributionText`](https://developer.apple.com/documentation/weatherkit/weatherattribution/legalattributiontext)
+  (tvOS 16.4) is the "text that should be made available to users for apps that cannot display
+  the attributionURL contents in a Safari view". About the fly shows the mark, that the game
+  has modified the data, the legal text and the legal page's address, all from
+  `WeatherService.attribution`; the wallpaper shows none of it. The game shows no weather
+  alerts, which have rules of their own.
+- [Quotas](https://developer.apple.com/weatherkit/): 500,000 calls a month come with the
+  developer membership; more is a subscription (a million a month for US$49.99, up to 200
+  million). Unused calls don't roll over.
+- Privacy. The [privacy manifest](../apps/tvos/src/PrivacyInfo.xcprivacy) still declares no
+  collected data: Apple's ["collect"](https://developer.apple.com/app-store/app-privacy-details/)
+  is "transmitting data off the device in a way that allows you and/or your third-party partners
+  to access it for a period longer than what is necessary to service the transmitted request in
+  real time", and "you are not responsible for disclosing data collected by Apple". The rounded
+  location goes only to Apple's WeatherKit, to answer that request; nothing is sent anywhere
+  else, kept off the device, or linked to anyone. Two decimal places is what Apple calls coarse
+  location ("lower resolution than a latitude and longitude with three or more decimal
+  places"). The service's one required-reason API is `NSUserDefaults`, for its own last answer,
+  already declared (CA92.1); Core Location isn't one.
+
+### Cost
+
+One request every 20 minutes while the app is open and Real weather is on: 72 a day for a TV
+that shows the fly around the clock, about 2,200 a month, so the membership's 500,000 cover
+about 230 TVs doing that, and none while a TV sleeps (tvOS suspends the app). The attribution is
+asked for once a run; Apple doesn't say whether that counts.
+
+### Turning it on (for the owner)
+
+The team's wildcard profile can't carry WeatherKit, so until this is done builds stay as they
+are, without it, and the game uses its made-up forecast.
+
+1. In [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list)
+   for team `PX72AL9366`, open the App ID `com.isaacthoman.appletvfly` (or whatever
+   `TVOS_BUNDLE_ID` is), or register it: Identifiers → + → App IDs → App, Explicit Bundle ID.
+2. On its **Capabilities** tab tick **WeatherKit**, and on its **App Services** tab tick
+   **WeatherKit** too (the usual missing step when WeatherKit refuses an app). Save.
+3. Build and install with the switch on: `TVOS_WEATHERKIT=1 npm run tvos -- build`, then
+   `npm run tvos -- run --device <udid>`. Xcode's automatic signing (`-allowProvisioningUpdates`)
+   makes an explicit development profile for the App ID with the entitlement, in place of the
+   wildcard one.
+4. On the TV, the first time the title comes up, allow the app to use your location while it is
+   in use. Settings → Wallpaper now has Real weather (on); on the Weather tool "Now" becomes "Outside" within
+   a few seconds; About the fly ends with Apple Weather's attribution.
+5. If it stays "Now", read the console (`run --device` prints it) for `weather outside: …`:
+   `unauthorised` with a `WDSJWTAuthenticator` error means WeatherKit doesn't accept the App ID
+   yet (check both tabs; Apple's side can take a while), `denied` that location was refused
+   (Settings → Privacy → Location Services on the TV).
+
+Keep building with `TVOS_WEATHERKIT=1` from then on: a build without it has no weather service,
+and the game goes back to the made-up forecast.
+
+### Checking it
+
+The simulator check (below) builds the stand-in service (`tests/weather-stand-in/Service.swift`,
+`--stand-in-weather`): with no WeatherKit and no location, it answers with the same conditions
+every time, and the check makes sure they reach the test scene as sent and with nothing else in
+them, that it reports `fetching` then `ok`, and that stopped it says `idle`.
+`npm run tvos:check -- --weatherkit` builds the real service instead, grants the app location
+(`simctl privacy`) and sets the simulator's, and checks that it locates, asks WeatherKit and,
+unsigned as simulator builds are, is refused and says so: `unauthorised`, with WeatherKit's
+`WDSJWTAuthenticatorServiceProxy.Errors` error. A real answer needs a signed build on an App ID
+with the capability.
+
+In a browser there is no service: scripts feed the game conditions (`__fly.outside.feed`, in the
+README's Tests).
 
 ## Reading pixels back
 
@@ -362,6 +505,9 @@ with a `drive`, and checks what the scene reports:
   arrive, as many as the real brain reports; the commands it answers prove the senses and both
   light arrays arrived on the right sides; a 600 ms burst of submits is simulated in steps of at
   most 100 ms;
+- the weather bridge, against the stand-in weather service: its conditions and attribution
+  arrive as sent and with nothing else in them, and its status goes `fetching`, `ok`, and
+  `idle` once stopped (with `--weatherkit`, the real service: above);
 - the host's frame stats.
 
 It saves a screenshot in a temporary folder outside the repo and prints its path, then shuts the
@@ -411,6 +557,13 @@ No Apple TV was connected while this was built, so none of this has run on one:
 - **Clipping**: that the device's GPU draws the triangles the simulator loses (above). Run the
   test scene on it and read `clipping` in its `report` lines.
 - **Audio** on a TV's speakers, and with other apps' music playing.
+- **The weather outside**: no build with the WeatherKit capability has been signed or run, so
+  WeatherKit has never answered this app. Unchecked: the location prompt on a TV and the
+  location a TV gives; signing with the explicit profile; real conditions, sunrise and sunset
+  reaching the game, and how the mapping looks under them; the attribution WeatherKit returns
+  and how it lays out in About (and that the Apple logo in " Weather" draws there, which
+  CoreText's font fallback should give it); refreshing across suspend and resume over a day;
+  the calls a day it really makes.
 - The home-screen icon's parallax and the Top Shelf banner on the home screen.
 
 ## What came from aerodance

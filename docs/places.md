@@ -61,12 +61,15 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   is), the light's direction and strength ease between the palettes with
   their colours, so the lamp stays lit and still through the night. Either
   way a palette's `sunUp` and `sunAround` are where its light is at that
-  hour. Indoors the "sun" is the light coming in at the window and the sky
-  what is seen through it; a lamp at night can be a warm "sun". `stars` (0 to
-  1) is how dark it is. `env` scales the reflections in the set's
-  `materials`.
+  hour. Where the Apple TV knows the real sunrise and sunset, the hour is
+  moved first so that the clock's day comes up and goes down with the real
+  one (`scene/outside.ts`): a place's palettes don't change for it. Indoors
+  the "sun" is the light coming in at the window and the sky what is seen
+  through it; a lamp at night can be a warm "sun". `stars` (0 to 1) is how
+  dark it is. `env` scales the reflections in the set's `materials`.
 - **Weather** (`scene/weather.ts`): clear, overcast, mist or light rain, from
-  the Weather tool or, on "Now", a forecast worked out from the clock. Every
+  the Weather tool or, on "Now", the weather outside where the Apple TV can
+  tell it (`scene/outside.ts`), else a forecast worked out from the clock. Every
   place gets its light from it without doing anything, as much as its
   optional `open` lets in (1 if not said; the lab's is 0.4 and the bar's
   0.35, as they see the sky only through windows, and after dark, lit by

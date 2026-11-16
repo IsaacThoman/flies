@@ -2,8 +2,11 @@
 // one for each time of day the player can choose. On "Now" the light follows
 // the clock between them: the colours ease from each palette to the next,
 // the sun rises, crosses through each palette's place and sets, and the moon
-// rises after it. Over all of it lies the weather (scene/weather.ts): cloud
-// greys the sky and hides the sun, mist whitens the distance.
+// rises after it. The clock's day is a fixed summer one; where the Apple TV
+// knows the real sunrise and sunset, the hour is moved to match them before
+// it gets here (scene/outside.ts). Over all of it lies the weather
+// (scene/weather.ts): cloud greys the sky and hides the sun, mist whitens the
+// distance.
 
 import * as THREE from "three";
 import type { Weather } from "./weather.ts";
@@ -103,6 +106,15 @@ export const COLOUR_HOURS: readonly (readonly [number, TimeOfDay])[] = [
   [20, "dusk"],
   [21.5, "night"],
 ];
+
+/**
+ * Where the sun crosses the horizon on the clock's day (the picnic's
+ * palettes; other places' within a few minutes): a summer day's. The real
+ * sunrise and sunset, where the Apple TV knows them, are moved onto these
+ * (scene/outside.ts).
+ */
+export const CLOCK_SUNRISE = 5 + 40 / 60;
+export const CLOCK_SUNSET = 20 + 10 / 60;
 
 /** How far below the horizon (radians) the sun and moon are when down: far enough that neither disc nor light shows. */
 export const BELOW = -0.15;

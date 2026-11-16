@@ -1,7 +1,7 @@
 // What every screen is, and what it can ask of the game.
 
 import type { RemoteButton } from "@fly/contracts";
-import type { BrainDriver } from "@fly/contracts";
+import type { BrainDriver, WeatherAttribution } from "@fly/contracts";
 import type { BrainMeter } from "../../brain/meter.ts";
 import type { Life } from "../../life.ts";
 import type { Settings } from "../../settings.ts";
@@ -17,6 +17,10 @@ export interface Shell {
   readonly brain: BrainDriver;
   readonly meter: BrainMeter;
   readonly life: Life;
+  /** The Apple TV can tell the game the weather outside (it is built with WeatherKit). */
+  readonly weatherOutside: boolean;
+  /** Apple Weather's attribution, for About, once the host has it. */
+  weatherAttribution(): WeatherAttribution | null;
   /** Opens a screen over the current one. */
   open(screen: ScreenId): void;
   /** Back one screen (leaving the app at the root). */

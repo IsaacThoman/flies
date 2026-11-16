@@ -34,7 +34,7 @@ const NOW = Date.UTC(2026, 10, 16, 20);
 
 test("settings come back as they were saved", () => {
   const store = memory();
-  const settings: Settings = { effects: 3, ambience: 0, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "lively", eyes: "high", eyesInset: "always", hints: false, stats: true, place: "lab", scene: "bar" };
+  const settings: Settings = { effects: 3, ambience: 0, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "lively", eyes: "high", eyesInset: "always", hints: false, stats: true, realWeather: false, place: "lab", scene: "bar" };
   saveSettings(settings, store);
   assert.deepEqual(loadSettings(store), settings);
 });
@@ -77,6 +77,7 @@ test("each setting keeps only a value the game can use", () => {
     eyesInset: ["sometimes", "corner"],
     hints: ["yes", 1],
     stats: [0, "on"],
+    realWeather: ["off", 0],
     place: ["moon", 3, null],
     scene: ["turns", "moon", {}],
   };
@@ -165,12 +166,25 @@ test("the hands start on Feed with what was kept, by id, and on each tool's firs
   assert.equal(odd.timeOfDay, "clock");
 });
 
+test("the weather kept is Now by its id, whether Now was the real weather outside or the forecast", () => {
+  // Kept while it said "Outside": a launch comes back to Now, real again if the Apple TV can tell it.
+  const hands = new Hands(new World(bare), { weather: { kind: "now" }, light: { kind: "clock" } });
+  assert.equal(hands.weather, "now");
+  assert.equal(hands.timeOfDay, "clock");
+  hands.tool = TOOLS.findIndex((t) => t.id === "weather");
+  assert.equal(hands.label, "Now");
+  hands.outside = true;
+  assert.equal(hands.label, "Outside");
+  assert.equal(hands.variant.id, "now", "what is kept is the kind, not what it is called");
+});
+
 /** A game for the screens to ask things of: it keeps the settings and remembers what it was asked. */
-function fakeShell(settings: Settings = { ...DEFAULT_SETTINGS }) {
+function fakeShell(settings: Settings = { ...DEFAULT_SETTINGS }, weatherOutside = false) {
   const asked: string[] = [];
   const shell = {
     settings,
     asked,
+    weatherOutside,
     open: (screen: ScreenId) => asked.push(`open ${screen}`),
     back: () => asked.push("back"),
     applySettings: () => asked.push("apply"),
@@ -197,19 +211,23 @@ test("the top of the settings opens each page, and Back from it goes back", () =
 });
 
 test("every setting the player chooses is on exactly one page, each a step from the top and short enough not to scroll", () => {
-  const pages = settingsPages(fakeShell());
-  const ids = Object.values(pages).flatMap((page) => page.menu.items.map((item) => item.id));
-  assert.deepEqual(
-    [...ids].sort(),
-    Object.keys(DEFAULT_SETTINGS)
-      .filter((key) => key !== "scene")
-      .sort(),
-  );
-  for (const [id, page] of Object.entries(pages)) {
-    assert.equal(page.menu.rows, page.menu.items.length, `${id} shows all its rows`);
-    assert.ok(page.menu.items.every((item) => item.kind !== "action"), `${id} is all settings`);
-    const { y } = page.view.layout;
-    assert.ok(y > 0 && y + page.view.height < DESIGN_HEIGHT - 50, `${id} clear of the menu hints`);
+  // Real weather only where the Apple TV can tell the weather outside.
+  for (const weatherOutside of [false, true]) {
+    const pages = settingsPages(fakeShell(undefined, weatherOutside));
+    const ids = Object.values(pages).flatMap((page) => page.menu.items.map((item) => item.id));
+    assert.deepEqual(
+      [...ids].sort(),
+      Object.keys(DEFAULT_SETTINGS)
+        .filter((key) => key !== "scene" && (weatherOutside || key !== "realWeather"))
+        .sort(),
+    );
+    assert.equal(pages.wallpaper.menu.items.some((item) => item.id === "realWeather"), weatherOutside);
+    for (const [id, page] of Object.entries(pages)) {
+      assert.equal(page.menu.rows, page.menu.items.length, `${id} shows all its rows`);
+      assert.ok(page.menu.items.every((item) => item.kind !== "action"), `${id} is all settings`);
+      const { y } = page.view.layout;
+      assert.ok(y > 0 && y + page.view.height < DESIGN_HEIGHT - 50, `${id} clear of the menu hints`);
+    }
   }
 });
 

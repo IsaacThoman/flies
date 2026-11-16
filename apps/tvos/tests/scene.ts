@@ -10,10 +10,11 @@
 //     half-float target;
 //   - Web Audio: a beep from generated samples with a gain ramp, and decodeAudioData;
 //   - localStorage and fetch of the app's own files;
-//   - the brain bridge, end to end, against the stand-in brain (tests/brain-stand-in).
+//   - the brain bridge, end to end, against the stand-in brain (tests/brain-stand-in);
+//   - the weather bridge, against the stand-in weather service (tests/weather-stand-in).
 import * as THREE from 'three';
 import { AT_ROOT_PROPERTY, COMMAND_ORDER, REMOTE_TOUCH_EVENT, STATE_STATS } from '@fly/contracts';
-import type { NativeBrainBridge, RemoteTouch } from '@fly/contracts';
+import type { NativeBrainBridge, NativeWeatherBridge, OutsideConditions, RemoteTouch, WeatherAttribution } from '@fly/contracts';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
@@ -44,6 +45,7 @@ const report = {
   storage: null as null | boolean,
   fetched: null as null | string,
   brain: null as null | Record<string, unknown>,
+  weather: null as null | { error?: string; statuses: string[]; version: number; conditions: OutsideConditions | null; attribution: WeatherAttribution | null; failure: { status: string; error: string } | null; stopped: string | null },
 };
 
 // A label on a 2D canvas, used as a texture: the game draws all its text this way.
@@ -314,6 +316,29 @@ function tickBrain(dtMs: number) {
   }
 }
 brain?.start(7);
+
+// The weather: started, it answers (the stand-in, or WeatherKit) or says why not; then it is
+// stopped and must say so.
+const weather = (globalThis as unknown as { __native?: { weather?: NativeWeatherBridge } }).__native?.weather;
+const FAILURES = ['denied', 'no-location', 'offline', 'unauthorised', 'failed'];
+function checkWeather() {
+  if (!weather) { report.weather = { error: 'no __native.weather', statuses: [], version: 0, conditions: null, attribution: null, failure: null, stopped: null }; return; }
+  const w = report.weather ??= { statuses: [], version: 0, conditions: null, attribution: null, failure: null, stopped: null };
+  const status = weather.status();
+  if (w.statuses[w.statuses.length - 1] !== status) w.statuses.push(status);
+  const done = w.conditions || w.failure;
+  if (!done && weather.version() > 0 && weather.attribution()) {
+    w.version = weather.version();
+    w.conditions = weather.conditions();
+    w.attribution = weather.attribution();
+    weather.stop();
+  } else if (!done && FAILURES.includes(status)) {
+    w.failure = { status, error: weather.error() };
+    weather.stop();
+  } else if (done && !w.stopped && status === 'idle') w.stopped = status;
+}
+weather?.start();
+setInterval(checkWeather, 50);
 
 let last = performance.now();
 const frame = (now: number) => {

@@ -25,7 +25,7 @@ export const TOOLS: readonly Tool[] = [
   { id: "blow", name: "Blow", verb: "Blow", hold: true, variants: [{ id: "gentle", label: "Gently" }, { id: "strong", label: "Hard" }] },
   // "Now" follows the clock, so the wallpaper's light changes with the day outside.
   { id: "light", name: "Light", verb: "", hold: false, variants: [{ id: "clock", label: "Now" }, { id: "morning", label: "Morning" }, { id: "noon", label: "Midday" }, { id: "golden", label: "Golden hour" }, { id: "dusk", label: "Dusk" }, { id: "night", label: "Night" }] },
-  // "Now" wanders as a forecast worked out from the clock would; the others hold.
+  // "Now" is the weather outside where the Apple TV can tell it ("Outside"), else wanders as a forecast worked out from the clock would; the others hold.
   { id: "weather", name: "Weather", verb: "", hold: false, variants: [{ id: "now", label: "Now" }, { id: "clear", label: "Clear" }, { id: "overcast", label: "Overcast" }, { id: "mist", label: "Mist" }, { id: "rain", label: "Rain" }] },
   // Nearest first, so Up brings the camera in and Down takes it out.
   { id: "view", name: "View", verb: "", hold: false, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }] },
@@ -117,6 +117,8 @@ export class Hands {
   readonly events: HandsEvents = { dropped: null, landed: null, swooped: false, toolChanged: false, variantChanged: false, blocked: false };
   /** What the fly stands on where it is now ("table", "sill"), for the name of the whole-place view. */
   surface = "table";
+  /** The Weather tool's "Now" is the real weather outside: it is called "Outside". */
+  outside = false;
   #idle = 0;
   #world: World;
 
@@ -166,10 +168,11 @@ export class Hands {
     return TOOLS[WEATHER_TOOL].variants[this.variants[WEATHER_TOOL]].id as WeatherKind | "now";
   }
 
-  /** The kind's name as shown: the whole-place view is named for what the fly stands on there. */
+  /** The kind's name as shown: the whole-place view is named for what the fly stands on there, and "Now" for where the weather comes from. */
   get label(): string {
     const v = this.variant;
-    return this.current.id === "view" && v.id === "table" ? `Whole ${this.surface}` : v.label;
+    if (this.current.id === "view" && v.id === "table") return `Whole ${this.surface}`;
+    return this.current.id === "weather" && v.id === "now" && this.outside ? "Outside" : v.label;
   }
 
   /** The place chosen on the Place tool. */
