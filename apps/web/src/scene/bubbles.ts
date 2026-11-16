@@ -9,6 +9,7 @@
 import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
 import type { Looming } from "@fly/body";
+import { createSurface } from "@fly/world";
 import type { World } from "@fly/world";
 import { random } from "./build.ts";
 
@@ -70,7 +71,7 @@ export class Bubbles {
   #distance = new Float64Array(BUBBLES);
   #world: World;
   #pool = Array.from({ length: BUBBLES }, () => new THREE.Vector3());
-  #surface = { y: 0, normal: { x: 0, y: 1, z: 0 }, solid: -1, onTable: true };
+  #surface = createSurface();
   /** A bubble burst on the fly this frame: how hard it felt it (0 if none). */
   brushed = 0;
   /** Bubbles drift over this place (Scene.bubbles). Without them there is nothing to see, feel or hear of them. */
@@ -105,7 +106,7 @@ export class Bubbles {
       b.x = near.x - rnd.range(50, 160);
       b.z = near.z + rnd.range(-14, 14);
       b.r = rnd.range(2.2, 6);
-      b.y = this.#world.heightAt(b.x, b.z) + b.r + rnd.range(1.8, 4);
+      b.y = this.#world.heightAt(b.x, b.z, near.y) + b.r + rnd.range(1.8, 4);
     } else {
       b.x = -520 + rnd.range(-80, 0);
       b.z = rnd.range(-260, 260);
@@ -161,7 +162,7 @@ export class Bubbles {
       b.z += (BREEZE.z * b.speed + gust.z * 0.4 + Math.sin(time * 0.3 + b.phase) * 10) * dt;
       // Low ones bob without sinking, so most pass the fly before touching the table.
       b.y += ((b.low ? Math.sin(time * 0.5 + b.phase) * 0.6 : Math.sin(time * 0.5 + b.phase) * 6 - 2) + gust.y * 0.4) * dt;
-      const s = world.surface(b.x, b.z, this.#surface);
+      const s = world.surface(b.x, b.z, this.#surface, b.y);
       let burst = b.y - b.r < s.y + 0.5 || b.y < b.r;
       // Raindrops hitting it.
       if (!burst && this.rain > 0 && this.#rnd.next() < this.rain * dt * 0.5) burst = true;

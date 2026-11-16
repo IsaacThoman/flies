@@ -172,7 +172,7 @@ export class Game implements Shell {
   #around: { -readonly [K in keyof Around]: Around[K] };
   #puff = { x: 0, y: 0, z: 0 };
   #middle = new THREE.Vector3();
-  #floorAt = (x: number, z: number) => this.life.world.heightAt(x, z);
+  #floorAt = (x: number, z: number, below: number) => this.life.world.heightAt(x, z, below);
   #ndc = new THREE.Vector3();
   #ndc2 = new THREE.Vector2();
   #ray = new THREE.Raycaster();
