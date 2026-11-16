@@ -4,7 +4,7 @@
 //         ├─ Watch
 //         ├─ Brain
 //         ├─ About
-//         ├─ Settings: Wallpaper | Sound | Picture, as tabs
+//         ├─ Settings: Wallpaper | On screen | Sound | Picture, as tabs
 //         └─ Together (in a browser): a table with others (together.ts)
 //
 // The menu is the title, at launch and from play alike (Back, Play/Pause or
@@ -18,7 +18,7 @@ import { INK_SOFT, glassPanel, orb, text } from "@fly/ui";
 import type { PixelSize } from "../../display.ts";
 import { PLACES } from "../../places/catalog.ts";
 import { WALLPAPER_DELAYS } from "../../settings.ts";
-import type { EyesDetail, Settings, ShowWhen } from "../../settings.ts";
+import type { EyesDetail, OverlayOpacity, OverlaySize, Settings, ShowWhen, StatsKind } from "../../settings.ts";
 import { fitMenu, safeRect, titleLayout } from "../layout.ts";
 import { drawWordmark } from "../wordmark.ts";
 import { MenuScreen } from "./menu-screen.ts";
@@ -82,6 +82,21 @@ const SHOWN: Option<ShowWhen>[] = [
   { value: "wallpaper", label: "In the wallpaper" },
   { value: "always", label: "Always" },
 ];
+const STATS: Option<StatsKind>[] = [
+  { value: "brain", label: "Its brain" },
+  { value: "day", label: "Its day" },
+  { value: "both", label: "Both" },
+];
+const SIZE: Option<OverlaySize>[] = [
+  { value: "small", label: "Small" },
+  { value: "medium", label: "Medium" },
+  { value: "large", label: "Large" },
+];
+const OPACITY: Option<OverlayOpacity>[] = [
+  { value: "full", label: "Solid" },
+  { value: "soft", label: "Soft" },
+  { value: "faint", label: "Faint" },
+];
 const PLACE: Option<Settings["place"]>[] = [{ value: "turns", label: "Each in turn" }, ...PLACES.map((p) => ({ value: p.id, label: p.name }))];
 const ON_OFF: Option<boolean>[] = [
   { value: false, label: "Off" },
@@ -103,12 +118,21 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       choice("wallpaperCamera", "Camera", CAMERA),
       // Only when there is somewhere else to live.
       ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE)] : []),
-      // Then the pictures that can show in a corner, and the fly seen through, each off, in the wallpaper, or always.
-      choice("eyesInset", "What it sees", SHOWN),
-      choice("nerves", "Nervous system", SHOWN),
-      choice("xray", "X-ray", SHOWN),
       // Whether the sky follows the weather outside, only where the Apple TV can tell it.
       ...(shell.weatherOutside ? [choice("realWeather", "Real weather", ON_OFF)] : []),
+    ],
+  },
+  // Everything that can show over the world: each picture in a corner, the stats and the fly seen through, each off, in the wallpaper, or always; then how the corners' pictures look.
+  screen: {
+    heading: "On screen",
+    rows: () => [
+      choice("eyesInset", "What it sees", SHOWN),
+      choice("nerves", "Nervous system", SHOWN),
+      choice("statsPanel", "Stats", SHOWN),
+      choice("statsKind", "Stats of", STATS),
+      choice("overlaySize", "Size", SIZE),
+      choice("overlayOpacity", "Opacity", OPACITY),
+      choice("xray", "X-ray", SHOWN),
     ],
   },
   sound: {

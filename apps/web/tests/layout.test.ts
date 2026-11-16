@@ -75,9 +75,9 @@ test("on the TV everything is where it always was", () => {
   // The Apple TV has no way to a table yet.
   const s = shell(TV_FRAME, "remote", false);
   const settings = settingsScreen(s);
-  // Sized for its longest tab (Wallpaper: the tabs and six rows), so it keeps its size from tab to tab.
-  assert.deepEqual(settings.pane.panel, { x: 157, y: 37, w: 540, h: 378 });
-  assert.deepEqual(settings.pane.list, { x: 185, y: 63, width: 484, row: 36, gap: 12, compact: false });
+  // Sized for its longest tab (On screen: the tabs and seven rows, as Wallpaper was on an Apple TV that can tell the weather), so it keeps its size from tab to tab.
+  assert.deepEqual(settings.pane.panel, { x: 157, y: 13, w: 540, h: 426 });
+  assert.deepEqual(settings.pane.list, { x: 185, y: 39, width: 484, row: 36, gap: 12, compact: false });
   assert.equal(settings.menu.rows, settings.menu.items.length);
 
   const loading = loadingLayout(TV_FRAME);
@@ -147,7 +147,8 @@ test("every menu fits inside the safe area at every shape, its rows big enough f
       assert.ok(inside(panel, a), `${name}: ${screen.id} inside the safe area: ${JSON.stringify(panel)}`);
       assert.ok(list.y + rows * (list.row + list.gap) - list.gap <= panel.y + panel.h + 1e-6, `${name}: ${screen.id}'s rows inside its pane`);
       assert.ok(list.row >= 34, `${name}: ${screen.id}'s rows ${list.row} tall`);
-      assert.equal(screen.menu.rows, rows);
+      // A tab shorter than the longest leaves room spare.
+      assert.equal(screen.menu.rows, Math.min(rows, screen.menu.items.length));
       if (frame.coarse) assert.ok(list.row * frame.unit >= 42, `${name}: ${screen.id}'s rows ${(list.row * frame.unit).toFixed(0)} px tall`);
       // Drawn, its targets are the rows shown.
       const hits = new HitMap();
@@ -155,13 +156,41 @@ test("every menu fits inside the safe area at every shape, its rows big enough f
       screen.draw(blankCanvas(), 0, hits);
       let shown = 0;
       for (let i = 0; i < hits.count; i++) if (hits.get(i)!.kind === "row") shown++;
-      assert.equal(shown, rows, `${name}: ${screen.id}`);
+      assert.equal(shown, screen.menu.rows, `${name}: ${screen.id}`);
     }
     // The menu's six rows (with Together) all show, but on a phone on its side, too short for them: there it scrolls by a row or two.
     const menu = titleScreen(s).menu;
     if (name === "a phone on its side") assert.ok(menu.rows >= 4, `${name}: ${menu.rows} of the menu's rows show`);
     else assert.equal(menu.rows, menu.items.length, `${name}: the menu doesn't scroll`);
   }
+});
+
+test("the settings' tabs can be read at every shape: every one, or, where they are too narrow for that, the one chosen with arrows to step along them", () => {
+  const labels = ["Wallpaper", "On screen", "Sound", "Picture"];
+  for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
+    for (const glyphs of [null, "remote"] as const) {
+      const screen = settingsScreen(shell(frame, glyphs));
+      const g = blankCanvas();
+      const hits = new HitMap();
+      hits.begin(screen.id);
+      screen.draw(g, 0, hits);
+      const tabs = writtenOn(g).filter((w) => labels.includes(w.text));
+      const where = `${name}, ${glyphs ?? "pointing"}`;
+      if (tabs.length === labels.length) {
+        assert.ok(tabs.every((w) => w.size === tabs[0].size && w.size >= 7), `${where}: tabs at ${tabs.map((w) => w.size).join(", ")}`);
+      } else {
+        assert.deepEqual(tabs.map((w) => w.text), ["Wallpaper"], `${where}: the tab chosen`);
+        assert.ok(tabs[0].size >= 12, `${where}: at ${tabs[0].size}`);
+        let steps = 0;
+        for (let i = 0; i < hits.count; i++) if (hits.get(i)!.kind === "step" && hits.get(i)!.index === 0) steps++;
+        assert.equal(steps, 2, `${where}: arrows either side`);
+      }
+    }
+  }
+  // The TV's four tabs are as big as a row's words.
+  const g = blankCanvas();
+  settingsScreen(shell(TV_FRAME, "remote")).draw(g, 0, new HitMap());
+  assert.ok(writtenOn(g).filter((w) => labels.includes(w.text)).every((w) => w.size === 17), "on the TV");
 });
 
 test("the title leaves room for the fly, clear of the name, the brain's state and the menu", () => {

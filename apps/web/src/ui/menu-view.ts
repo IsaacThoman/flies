@@ -107,6 +107,9 @@ export class MenuView {
   }
 }
 
+/** The smallest a tab's label is drawn (design units); narrower, the tabs become one choice. */
+const SMALLEST_TAB = 7;
+
 /** A choice as tabs: its options side by side, the chosen one lit. */
 function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: number, w: number, h: number, hits: HitMap, index: number) {
   const n = item.options.length;
@@ -114,9 +117,21 @@ function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: n
   const tw = (w - gap * (n - 1)) / n;
   // No taller than a TV's row, and every label the same size, small enough for the widest to fit.
   const th = Math.min(h, 40);
-  let size = Math.round(th * 0.46);
-  g.font = font(size);
-  for (const option of item.options) size = Math.min(size, Math.floor((size * (tw - 14)) / g.measureText(option.label).width));
+  const most = Math.round(th * 0.46);
+  g.font = font(most);
+  let size = most;
+  // Each label measured at the largest size: the smallest it needs is the one for all.
+  for (const option of item.options) size = Math.min(size, Math.floor((most * (tw - 14)) / g.measureText(option.label).width));
+  if (size < SMALLEST_TAB) {
+    // Too narrow for every tab to be read: the one chosen, between arrows that step along them, as a choice is.
+    const y0 = y + (h - th) / 2, mid = y0 + th / 2;
+    pill(g, x, y0, w, th, item.options[item.index].label, { color: "aqua", disabled: item.disabled, size: Math.min(most, 16) });
+    chevron(g, x + 20, mid, -1, item.index > 0);
+    chevron(g, x + w - 20, mid, 1, item.index < n - 1);
+    hits.add(MENU_HITS.step, x, y, 44, h, index, -1);
+    hits.add(MENU_HITS.step, x + w - 44, y, 44, h, index, 1);
+    return;
+  }
   for (let k = 0; k < n; k++) {
     const tx = x + k * (tw + gap);
     pill(g, tx, y + (h - th) / 2, tw, th, item.options[k].label, { color: k === item.index ? "aqua" : "glass", disabled: item.disabled, size });

@@ -17,6 +17,15 @@ import type { ToolId } from "./tools/hands.ts";
 export type EyesDetail = "off" | "low" | "high";
 /** When something shows over the picture: never, in the wallpaper, or while playing too. */
 export type ShowWhen = "off" | "wallpaper" | "always";
+/** What the stats in a corner are of: its brain at work, its day so far, or both. */
+export type StatsKind = "brain" | "day" | "both";
+/** How big the pictures in the corners are, and how much of the world shows through them. */
+export type OverlaySize = "small" | "medium" | "large";
+export type OverlayOpacity = "full" | "soft" | "faint";
+
+/** Each size as a share of the corners' own size, which is "medium". */
+export const OVERLAY_SIZES: Record<OverlaySize, number> = { small: 0.75, medium: 1, large: 1.3 };
+export const OVERLAY_OPACITIES: Record<OverlayOpacity, number> = { full: 1, soft: 0.7, faint: 0.45 };
 
 export const WALLPAPER_DELAYS: Option<number>[] = [
   { value: 30, label: "30 s" },
@@ -43,6 +52,12 @@ export type Settings = {
   nerves: ShowWhen;
   /** The fly drawn as glass with its nervous system glowing inside. */
   xray: ShowWhen;
+  /** Numbers about the fly in a corner, and which. */
+  statsPanel: ShowWhen;
+  statsKind: StatsKind;
+  /** The pictures in the corners: their size, and how solid they are. */
+  overlaySize: OverlaySize;
+  overlayOpacity: OverlayOpacity;
   /** Show what the buttons do. */
   hints: boolean;
   /** Small frame-cost counters in a corner. */
@@ -65,6 +80,10 @@ export const DEFAULT_SETTINGS: Settings = {
   eyesInset: "wallpaper",
   nerves: "wallpaper",
   xray: "off",
+  statsPanel: "off",
+  statsKind: "both",
+  overlaySize: "medium",
+  overlayOpacity: "full",
   hints: true,
   stats: false,
   realWeather: true,
@@ -86,6 +105,10 @@ const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean 
   eyesInset: showWhen,
   nerves: showWhen,
   xray: showWhen,
+  statsPanel: showWhen,
+  statsKind: (v) => ["brain", "day", "both"].includes(v),
+  overlaySize: (v) => Object.hasOwn(OVERLAY_SIZES, v),
+  overlayOpacity: (v) => Object.hasOwn(OVERLAY_OPACITIES, v),
   place: (v) => v === "turns" || isPlaceId(v),
   scene: isPlaceId,
 };
@@ -215,4 +238,28 @@ export function loadTableSeat(make: () => string, store: Storage | null = storag
 
 export function saveTableSeat(seat: TableSeat, store: Storage | null = storage()) {
   write(store, TABLE_KEY, seat);
+}
+
+/** What the fly has done on `date` (the local day, as YYYY-MM-DD): mm walked, meals begun, take-offs, and seconds flying and grooming. */
+export type Day = { date: string; walked: number; meals: number; takeOffs: number; flown: number; groomed: number };
+export const DAY_COUNTS = ["walked", "meals", "takeOffs", "flown", "groomed"] as const;
+const DAY_KEY = "flies.day";
+
+/** A day with nothing done in it yet. */
+export const freshDay = (date: string): Day => ({ date, walked: 0, meals: 0, takeOffs: 0, flown: 0, groomed: 0 });
+
+/** Today's tally as saved, or a fresh one if the save is of another day; a count that isn't one starts again from nothing. */
+export function loadDay(date: string, store: Storage | null = storage()): Day {
+  const day = freshDay(date);
+  const saved = read(store, DAY_KEY);
+  if (!saved || saved.date !== date) return day;
+  for (const key of DAY_COUNTS) {
+    const value = saved[key];
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) day[key] = value;
+  }
+  return day;
+}
+
+export function saveDay(day: Day, store: Storage | null = storage()) {
+  write(store, DAY_KEY, day);
 }

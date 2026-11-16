@@ -1,16 +1,20 @@
-// The pictures in a corner (what it sees, its nervous system): where they go
+// The pictures in a corner (what it sees, its nervous system, its stats): where they go
 // on every shape of screen, how they keep moving so that neither burns into a
 // screen, and that they never cover each other or what the HUD draws.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { TV_FRAME } from "../src/display.ts";
+import type { Frame } from "../src/display.ts";
 import { insetLayout, insetWanted } from "../src/eyes/inset.ts";
 import { NERVES_PANEL, nervesLayout, nervesSlot, nervesWanted } from "../src/nerves/panel.ts";
+import { OVERLAY_SIZES } from "../src/settings.ts";
+import type { OverlaySize, ShowWhen, StatsKind } from "../src/settings.ts";
+import { statsLayout, statsSlot, statsWanted } from "../src/stats/panel.ts";
+import type { StatsLayout } from "../src/stats/panel.ts";
 import { TOOLS } from "../src/tools/hands.ts";
 import { CORNERS, CORNER_HOLD, CornerDeck, CornerPlacement, waitFor } from "../src/ui/corners.ts";
-import type { CornerWanted } from "../src/ui/corners.ts";
-import type { ShowWhen } from "../src/settings.ts";
+import type { CornerPicture, CornerWanted } from "../src/ui/corners.ts";
 import { hudLayout, safeRect } from "../src/ui/layout.ts";
 import { frames } from "./shapes.ts";
 
@@ -118,31 +122,58 @@ test("both pictures share a corner and move on together, its nervous system next
   assert.equal(nerves.alpha, 1);
 });
 
-/** Both pictures, placed as the game places them each frame (game.ts). */
-class Both {
+/** The pictures, laid out for a screen and placed as the game places them each frame (game.ts). */
+class All {
   readonly deck = new CornerDeck();
-  readonly eyes = new CornerPlacement();
-  readonly nerves = new CornerPlacement();
-  update(dt: number, eyesWanted: CornerWanted, nervesWanted: CornerWanted, wallpaper: boolean, shotChanges: number) {
-    this.deck.update(dt, eyesWanted === "show" || nervesWanted === "show", wallpaper, shotChanges);
+  readonly eyes: CornerPicture;
+  readonly nerves: CornerPicture;
+  readonly stats: CornerPicture;
+  readonly layout: StatsLayout;
+  readonly #all: CornerPicture[];
+  constructor(frame: Frame = TV_FRAME, size = 1, kind: StatsKind = "both") {
+    const hud = hudLayout(frame);
+    const eyes = insetLayout(frame, hud, size), nerves = nervesLayout(frame, hud, size), stats = statsLayout(frame, hud, size, kind);
+    this.layout = stats;
+    this.eyes = { placement: new CornerPlacement(), at: (c) => eyes.rects[c] };
+    this.nerves = { placement: new CornerPlacement(), at: (c, slot) => nerves.rects[c][slot] };
+    this.stats = { placement: new CornerPlacement(), at: (c, slot) => stats.rects[c][Math.min(slot, stats.rects[c].length - 1)] };
+    this.#all = [this.eyes, this.nerves, this.stats];
+  }
+  update(dt: number, eyesWanted: CornerWanted, nervesWanted: CornerWanted, statsWanted: CornerWanted, wallpaper: boolean, shotChanges: number) {
+    const deck = this.deck, all = this.#all;
+    deck.update(dt, eyesWanted === "show" || nervesWanted === "show" || statsWanted === "show", wallpaper, shotChanges);
     const slot = nervesSlot(eyesWanted);
-    this.eyes.update(dt, waitFor(eyesWanted, this.deck, 0, this.nerves), this.deck.goal, 0);
-    this.nerves.update(dt, waitFor(nervesWanted, this.deck, slot, this.eyes), this.deck.goal, slot);
+    const statsAt = statsSlot(this.layout, eyesWanted, nervesWanted);
+    this.eyes.placement.update(dt, waitFor(eyesWanted, deck, 0, this.eyes, all), deck.goal, 0);
+    this.nerves.placement.update(dt, waitFor(nervesWanted, deck, slot, this.nerves, all), deck.goal, slot);
+    this.stats.placement.update(dt, waitFor(statsWanted, deck, statsAt, this.stats, all), deck.goal, statsAt);
+  }
+  /** Where each is on screen now, if it shows at all. */
+  shown(): Rect[] {
+    return this.#all.filter((p) => p.placement.alpha > 0).map((p) => p.at(p.placement.corner, p.placement.slot));
   }
 }
 
-test("in the Follow wallpaper, which never changes shot, they move on together at least once a minute, and so does its nervous system alone", () => {
-  for (const eyesOn of [true, false]) {
-    const both = new Both();
+test("in the Follow wallpaper, which never changes shot, they move on together at least once a minute, and so does any of them alone", () => {
+  const cases: [boolean, boolean, boolean][] = [
+    [true, true, false],
+    [false, true, false],
+    [false, false, true],
+    [true, true, true],
+  ];
+  for (const [eyesOn, nervesOn, statsOn] of cases) {
+    const all = new All();
     const moves: number[] = [];
-    let last = both.nerves.corner;
+    const one = statsOn ? all.stats : all.nerves;
+    let last = one.placement.corner;
     for (let f = 0; f < 60 * 300; f++) {
-      both.update(1 / 60, eyesOn ? "show" : "hide", "show", true, 0);
-      if (both.nerves.corner !== last) {
+      all.update(1 / 60, eyesOn ? "show" : "hide", nervesOn ? "show" : "hide", statsOn ? "show" : "hide", true, 0);
+      if (one.placement.corner !== last) {
         moves.push(f / 60);
-        last = both.nerves.corner;
+        last = one.placement.corner;
       }
-      if (eyesOn && both.eyes.alpha === 1 && both.nerves.alpha === 1) assert.equal(both.eyes.corner, both.nerves.corner, "in the same corner whenever both show");
+      const up = [all.eyes, all.nerves, all.stats].filter((p) => p.placement.alpha === 1);
+      for (const p of up) assert.equal(p.placement.corner, up[0].placement.corner, "with the deck, whenever they show");
     }
     assert.ok(moves.length >= 4, `${moves.length} moves in five minutes`);
     for (let k = 1; k < moves.length; k++) assert.ok(moves[k] - moves[k - 1] <= CORNER_HOLD + 2, `moved after ${(moves[k] - moves[k - 1]).toFixed(1)} s`);
@@ -150,57 +181,101 @@ test("in the Follow wallpaper, which never changes shot, they move on together a
   }
 });
 
-test("whatever happens, at every shape, the two never overlap on screen, not even while one comes in and the other goes", () => {
+test("whatever happens, at every shape, size and choice of stats, they never overlap on screen, not even while one comes in and another goes, and keep moving", () => {
   const settings: ShowWhen[] = ["off", "wallpaper", "always"];
   for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
-    const hud = hudLayout(frame);
-    const eyesLayout = insetLayout(frame, hud), nervesAt = nervesLayout(frame, hud);
-    const both = new Both();
-    let seed = 7;
-    const chance = (p: number) => (seed = (seed * 16807) % 2147483647) / 2147483647 < p;
-    let eyesSetting: ShowWhen = "wallpaper", nervesSetting: ShowWhen = "wallpaper", wallpaper = true, full = false, shots = 0, overlapsSeen = 0, together = 0, moves = 0;
-    for (let f = 0; f < 60 * 600; f++) {
-      if (chance(0.004)) wallpaper = !wallpaper;
-      if (chance(0.002)) eyesSetting = settings[f % 3];
-      if (chance(0.002)) nervesSetting = settings[(f >> 3) % 3];
-      if (chance(0.002)) full = !full;
-      if (chance(0.003)) shots++;
-      both.update(1 / 60, insetWanted(eyesSetting, "play", wallpaper, full, false), nervesWanted(nervesSetting, "play", wallpaper, full), wallpaper, shots);
-      const { eyes, nerves } = both;
-      if (eyes.alpha > 0 && nerves.alpha > 0) together++;
-      if (eyes.alpha > 0 && nerves.alpha > 0 && overlaps(eyesLayout.rects[eyes.corner], nervesAt.rects[nerves.corner][nerves.slot])) overlapsSeen++;
-      if (both.deck.goal !== CORNERS[0] && f % 60 === 0) moves++;
+    for (const size of Object.values(OVERLAY_SIZES)) {
+      for (const kind of ["brain", "day", "both"] as const) {
+        const all = new All(frame, size, kind);
+        let seed = 7;
+        const chance = (p: number) => (seed = (seed * 16807) % 2147483647) / 2147483647 < p;
+        let eyesSetting: ShowWhen = "wallpaper", nervesSetting: ShowWhen = "wallpaper", statsSetting: ShowWhen = "wallpaper";
+        let wallpaper = true, full = false, shots = 0, overlapsSeen = 0, together = 0, moves = 0;
+        for (let f = 0; f < 60 * 300; f++) {
+          if (chance(0.004)) wallpaper = !wallpaper;
+          if (chance(0.002)) eyesSetting = settings[f % 3];
+          if (chance(0.002)) nervesSetting = settings[(f >> 3) % 3];
+          if (chance(0.002)) statsSetting = settings[(f >> 5) % 3];
+          if (chance(0.002)) full = !full;
+          if (chance(0.003)) shots++;
+          all.update(1 / 60, insetWanted(eyesSetting, "play", wallpaper, full, false), nervesWanted(nervesSetting, "play", wallpaper, full), statsWanted(statsSetting, "play", wallpaper, full), wallpaper, shots);
+          const shown = all.shown();
+          if (shown.length === 3) together++;
+          for (let i = 0; i < shown.length; i++) for (let j = i + 1; j < shown.length; j++) if (overlaps(shown[i], shown[j])) overlapsSeen++;
+          if (all.deck.goal !== CORNERS[0] && f % 60 === 0) moves++;
+        }
+        const where = `${name}, size ${size}, ${kind}`;
+        assert.equal(overlapsSeen, 0, `${where}: frames where they overlapped`);
+        assert.ok(together > 60 * 10 && moves > 15, `${where}: all three up together for ${(together / 60).toFixed(0)} s, away from the first corner ${moves} s`);
+      }
     }
-    assert.equal(overlapsSeen, 0, `${name}: frames where they overlapped`);
-    assert.ok(together > 60 * 60 && moves > 30, `${name}: both up together for ${(together / 60).toFixed(0)} s, away from the first corner ${moves} s`);
   }
 });
 
-test("at every shape, at every corner, the two together are inside the safe area, clear of each other and of the caption, the menu's button, the shelf and the label", () => {
-  for (const [name, frame] of frames()) {
+test("at every shape, size and choice of stats, at every corner, they are inside the safe area, clear of each other and of the caption, the menu's button, the shelf, the label and the hints", () => {
+  for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
     const hud = hudLayout(frame);
-    const eyes = insetLayout(frame, hud);
-    const nerves = nervesLayout(frame, hud);
     const a = safeRect(frame);
+    const inside = (r: Rect) => r.x >= a.x - 1e-6 && r.y >= a.y - 1e-6 && r.x + r.width <= a.x + a.w + 1e-6 && r.y + r.height <= a.y + a.h + 1e-6;
     const shelf = { x: hud.shelfLeft, y: hud.shelfY - 26, width: hud.gap * TOOLS.length + hud.apart, height: 52 };
     const label = { x: hud.cx - 110, y: hud.labelY - 17, width: 220, height: 32 };
     const caption = { x: hud.cx - 70, y: hud.captionY - 15, width: 140, height: 30 };
-    const menu = { x: hud.menuX, y: hud.menuY - 18, width: 36, height: 36 };
+    // The remote's chip for the menu is wider than the pointer's button.
+    const menu = { x: hud.menuX, y: hud.menuY - 18, width: 90, height: 36 };
     const rightHint = { x: hud.rightX - 200, y: hud.rightY - 15, width: 200, height: 30 };
-    for (const corner of CORNERS) {
-      const [alone, next] = nerves.rects[corner];
-      for (const [where, r] of [["alone", alone], ["next to what it sees", next]] as const) {
-        assert.ok(r.x >= a.x - 1e-6 && r.y >= a.y - 1e-6 && r.x + r.width <= a.x + a.w + 1e-6 && r.y + r.height <= a.y + a.h + 1e-6, `${name}: ${corner}, ${where}, inside the safe area`);
-        for (const [zone, z] of Object.entries({ shelf, label, caption })) assert.ok(!overlaps(r, z), `${name}: ${corner}, ${where}, and the ${zone}`);
+    const leftHints = { x: hud.hintsX, y: hud.hintsY - 34 - 12, width: 200, height: 34 + 24 };
+    for (const sizeName of Object.keys(OVERLAY_SIZES) as OverlaySize[]) {
+      const size = OVERLAY_SIZES[sizeName];
+      const eyes = insetLayout(frame, hud, size);
+      const nerves = nervesLayout(frame, hud, size);
+      for (const kind of ["brain", "day", "both"] as const) {
+        const stats = statsLayout(frame, hud, size, kind);
+        const where = `${name}, ${sizeName}, ${kind}`;
+        for (const corner of CORNERS) {
+          const [alone, next] = nerves.rects[corner];
+          for (const [what, r] of [["what it sees", eyes.rects[corner]], ["its nervous system alone", alone], ["its nervous system next to what it sees", next], ...stats.rects[corner].map((r, i) => [`the stats at slot ${i}`, r] as const)] as const) {
+            assert.ok(inside(r), `${where}: ${corner}, ${what}, inside the safe area`);
+            for (const [zone, z] of Object.entries({ shelf, label, caption })) assert.ok(!overlaps(r, z), `${where}: ${corner}, ${what}, and the ${zone}`);
+          }
+          assert.ok(!overlaps(eyes.rects[corner], next), `${where}: ${corner}, the two`);
+          // The stats, at the place they take for whichever of the others show.
+          for (const eyesShow of [false, true]) {
+            for (const nervesShow of [false, true]) {
+              const r = stats.rects[corner][statsSlot(stats, eyesShow ? "show" : "hide", nervesShow ? "show" : "hide")];
+              if (eyesShow) assert.ok(!overlaps(r, eyes.rects[corner]), `${where}: ${corner}, the stats and what it sees`);
+              if (nervesShow) assert.ok(!overlaps(r, nerves.rects[corner][eyesShow ? 1 : 0]), `${where}: ${corner}, the stats and its nervous system`);
+            }
+          }
+        }
+        // While playing they keep to the top right (the stats across from them, or under them), clear of the menu's button and the hints.
+        for (const r of [eyes.rects["top-right"], ...nerves.rects["top-right"], ...stats.rects["top-right"]]) {
+          for (const [zone, z] of Object.entries({ menu, rightHint })) assert.ok(!overlaps(r, z), `${where}: while playing, and the ${zone}`);
+        }
+        // The stats may be across at the top left, over the hints at the bottom left.
+        for (const r of stats.rects["top-right"]) assert.ok(!overlaps(r, leftHints), `${where}: while playing, the stats and the hints at the bottom left`);
+        assert.ok(nerves.scale > 0.3, `${where}: its nervous system big enough to read (${nerves.scale.toFixed(2)}, ${nerves.across ? "beside" : "under"} what it sees)`);
+        assert.ok(stats.scale > 0.5, `${where}: the stats big enough to read (${stats.scale.toFixed(2)}, ${stats.across ? "across from" : "under"} the others)`);
       }
-      assert.ok(!overlaps(eyes.rects[corner], next), `${name}: ${corner}, the two`);
     }
-    // While playing they keep to the top right, clear of the menu's button and the hint under them.
-    for (const r of [eyes.rects["top-right"], ...nerves.rects["top-right"]]) {
-      assert.ok(!overlaps(r, menu), `${name}: the menu's button`);
-      assert.ok(!overlaps(r, rightHint), `${name}: the hint at the bottom right`);
-    }
-    assert.ok(nerves.scale > 0.3, `${name}: big enough to read (${nerves.scale.toFixed(2)}, ${nerves.across ? "beside" : "under"} what it sees)`);
+  }
+});
+
+test("at the TV's medium size the stats are at their full size, across the screen from the others", () => {
+  for (const kind of ["brain", "day", "both"] as const) {
+    const stats = statsLayout(TV_FRAME, hudLayout(TV_FRAME), 1, kind);
+    assert.equal(stats.scale, 1, kind);
+    assert.equal(stats.across, true, kind);
+    assert.equal(stats.rects["top-right"][0].x, 16, "with the others at the top right, at the top left");
+  }
+});
+
+test("the pictures' own size is the corners' medium: what it sees and its nervous system are where they always were", () => {
+  for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
+    const hud = hudLayout(frame);
+    assert.deepEqual(insetLayout(frame, hud, OVERLAY_SIZES.medium), insetLayout(frame, hud), name);
+    assert.deepEqual(nervesLayout(frame, hud, OVERLAY_SIZES.medium), nervesLayout(frame, hud), name);
+    const small = insetLayout(frame, hud, OVERLAY_SIZES.small).scale, medium = insetLayout(frame, hud).scale, large = insetLayout(frame, hud, OVERLAY_SIZES.large).scale;
+    assert.ok(small < medium && medium <= large, `${name}: ${small.toFixed(2)} < ${medium.toFixed(2)} <= ${large.toFixed(2)}`);
   }
 });
 
