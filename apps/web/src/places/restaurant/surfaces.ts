@@ -386,7 +386,9 @@ if (rK == K_SUGAR) {
   rCoat = 0.5;
 }
 if (rK == K_FRUIT) {
-  vec2 gp = vWorld.xz * 1.6 + vWorld.yy * 1.1;
+  // Dimpled peel, the pattern laid on whichever way the surface faces so it doesn't streak down a fruit's sides.
+  vec3 an = abs(rN);
+  vec2 gp = (an.y > max(an.x, an.z) ? vWorld.xz : an.x > an.z ? vWorld.zy : vWorld.xy) * 1.6;
   float d = rDetail(gp);
   rBump = (vec3(rNoise(gp), 0.0, rNoise(gp + 5.0)) - 0.5) * 0.3 * d;
   diffuseColor.rgb *= 0.9 + rNoise(gp * 0.2) * 0.2;
@@ -455,7 +457,8 @@ if (vWorld.y < 3.0 && rN.y > 0.5 && abs(vWorld.x) < ${f(DINING_ROOM.hx)} && abs(
   rAO *= 1.0 - 0.35 * (1.0 - smoothstep(0.0, 260.0, wall)) * (1.0 - smoothstep(0.0, 220.0, min(low, high)) * 0.6);
   rAO *= 1.0 - 0.25 * (1.0 - smoothstep(0.0, 380.0, high));
 }
-if (rCasting) rAO *= rCastAO(vWorld);
+// Round the casters' feet, on what they stand on (not on their own sides).
+if (rCasting && rN.y > 0.6) rAO *= rCastAO(vWorld);
 `;
 
 /** What glows of itself. */

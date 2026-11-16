@@ -169,7 +169,7 @@ float rCastAO(vec3 p) {
     float above = p.y - uCastBottom[i];
     if (above < -1.0 || above > o.z) continue;
     float e = length(p.xz - o.xy) - o.z;
-    if (e < -0.5) continue;
+    if (e < 0.0) continue;
     ao *= 1.0 - 0.55 * exp(-max(e, 0.0) / (1.0 + o.z * 0.18)) * (1.0 - smoothstep(0.0, o.z, above)) * (1.0 - uCastTint[i].x * 0.5);
   }
   return ao;

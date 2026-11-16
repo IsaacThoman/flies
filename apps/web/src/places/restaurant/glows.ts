@@ -35,6 +35,8 @@ void main() {
     vRing = smoothstep(0.004, 0.02, blur);
   }
   mv.xy += position.xy * size;
+  // A glow is light in the air round its lamp: brought forward of the lamp itself, so the lamp doesn't cut it in two.
+  if (aInfo.y > 0.5) mv.z = min(mv.z + size * 0.6, -1.0);
   gl_Position = projectionMatrix * mv;
   vColor = aColor * on;
 }`;

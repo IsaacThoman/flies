@@ -115,7 +115,7 @@ function lighting(area: AreaSpec, surface: number): Lit {
   const things = RESTAURANT_SOLIDS.filter((s) => {
     const f = s.footprint;
     const bottom = s.bottom ?? 0;
-    return f.x > area.x0 && f.x < area.x1 && f.z > area.z0 && f.z < area.z1 && bottom >= surface - 1 && bottom < surface + 400 && !s.name.startsWith("chair") && topPeak(s.top) - bottom > 2.5;
+    return f.x > area.x0 && f.x < area.x1 && f.z > area.z0 && f.z < area.z1 && bottom >= surface - 1 && bottom < surface + 400 && !s.name.startsWith("chair") && topPeak(s.top) - bottom > 25;
   }).sort((a, b) => topPeak(b.top) - topPeak(a.top)).slice(0, CASTERS);
   const lit: Lit = { cast: new Float32Array(CASTERS * 4), tint: new Float32Array(CASTERS * 4), bottom: new Float32Array(CASTERS), box: new THREE.Vector4(area.x0, area.x1, area.z0, area.z1), y: new THREE.Vector2(surface - 6, surface + 420), rings: new Float32Array(24) };
   things.forEach((s: Solid, i) => {
