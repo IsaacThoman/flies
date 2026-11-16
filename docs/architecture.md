@@ -15,6 +15,7 @@ does, from what it sees, tastes and feels in the world.
 | `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver. |
 | `apps/web` | The game: the world, the fly's life in it, its senses, the remote's tools, menus, sound. Runs in a browser as it is. |
 | `apps/tvos` | The Apple TV app: a native host that runs the web build's JavaScript in JavaScriptCore and draws it through OpenGL ES. |
+| `packages/net`, `apps/room` | A spike: several people's flies at one table (`docs/online.md`). The wire format, the room's clock, other flies interpolated, the shared food and bubbles; and the room server that passes each fly's state on and owns the table. |
 
 ## How it fits together
 
