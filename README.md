@@ -641,7 +641,7 @@ in-game shimmer at 10).
 
 Measured in Chromium on an M-series Mac (Settings → Picture → Frame stats shows it live,
 and the canvas's `data-calls`, `data-triangles`, `data-frame-ms` and
-`data-eyes-ms`): playing, 23 draws and about 105,000 triangles a frame (in
+`data-eyes-ms`): playing, 23 draws and about 106,000 triangles a frame (in
 rain 26 and 118,000, and about 0.07 ms more JavaScript; with a butterfly, a
 ladybird, a falling leaf, the gull, the boat and a drop of juice all about at
 once, a draw for each in view and 0.04 ms); on a

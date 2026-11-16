@@ -149,7 +149,7 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   things by material (`Batch` in `apps/web/src/scene/build.ts`), instance
   repeated ones, freeze their matrices, put detail in shaders and textures
   rather than meshes, allocate nothing per frame, and keep `update` small.
-  The picnic draws in about 23 calls and 105,000 triangles while playing
+  The picnic draws in about 23 calls and 106,000 triangles while playing
   (Settings → Picture → Frame stats, or the canvas's `data-calls` and `data-triangles`);
   a new place should stay close to that.
 - **Building is a pause behind the veil.** `data-place-ms` on the canvas says
