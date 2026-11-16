@@ -40,6 +40,24 @@ export function chromiumPath(): string | undefined {
   return undefined;
 }
 
+/**
+ * The whole browser rather than the headless shell, for what the shell
+ * leaves out (the Screen Wake Lock API): Playwright's, or the newest in its
+ * cache; the shell if there is none.
+ */
+export function fullChromiumPath(): string | undefined {
+  const cache = process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(os.homedir(), process.platform === "darwin" ? "Library/Caches/ms-playwright" : ".cache/ms-playwright");
+  const builds = existsSync(cache) ? readdirSync(cache).filter((d) => /^chromium-\d+$/.test(d)).sort((a, b) => Number(b.split("-")[1]) - Number(a.split("-")[1])) : [];
+  for (const d of builds) {
+    const binary =
+      process.platform === "darwin"
+        ? path.join(cache, d, `chrome-mac-${process.arch}`, "Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing")
+        : path.join(cache, d, "chrome-linux64", "chrome");
+    if (existsSync(binary)) return binary;
+  }
+  return chromiumPath();
+}
+
 /** Headless Chromium falls back to software WebGL unless told to use the GPU. */
 export const gpuFlags = () => (process.platform === "darwin" ? ["--use-angle=metal"] : ["--ignore-gpu-blocklist", "--enable-gpu"]);
 

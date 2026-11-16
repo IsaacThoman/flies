@@ -1,17 +1,18 @@
 # apple-tv-fly
 
-A fruit fly that lives on your Apple TV. It isn't scripted: a simulation of
-the fly's whole nervous system, 166,700 neurons wired as they are in the real
-animal, decides what it does from what it sees, tastes and feels. Feed it,
-startle it, tickle it and watch it with the remote; leave it alone and it is a
-living wallpaper.
+A fruit fly that lives on your Apple TV, or in a browser tab. It isn't
+scripted: a simulation of the fly's whole nervous system, 166,700 neurons
+wired as they are in the real animal, decides what it does from what it sees,
+tastes and feels. Feed it, startle it, tickle it and watch it with the
+remote; leave it alone and it is a living wallpaper.
 
 ```sh
 npm install
 npm run brain:fetch   # the packed connectome, 38 MB, once
 npm run dev           # the game in a browser
 npm test              # unit tests (Node)
-npm run e2e           # plays the game in headless Chromium with the real brain
+npm run e2e           # plays the game in headless Chromium with the real brain, then the built site
+npm run build         # the web build, plain files for any static host (docs/web.md)
 ```
 
 `docs/architecture.md` describes the parts and the rules. This file is about
@@ -19,7 +20,8 @@ the game (`apps/web`) and its packages: `packages/world` (where the fly can
 stand, what it bumps into and eats), `packages/body` (its senses, what it makes
 of the brain's commands, how it moves, what its eyes see) and `packages/ui`
 (the menu kit). `docs/places.md` is about the places the fly can live and how
-to add one.
+to add one, and `docs/web.md` about the web build: getting the brain to a
+browser, running well on what people have, being a good tab, and hosting.
 
 ## Playing
 
@@ -403,15 +405,27 @@ JavaScript. The end-to-end test fails above 150
 draws or 500,000 triangles. Physical Apple TV measurements and the unattended
 soak command are in [docs/apple-tv.md](docs/apple-tv.md).
 
+In a browser the game watches its own pace (`apps/web/src/quality.ts`): frames
+falling behind, or the brain running slower than real time, and it draws less
+(the eyes' finer detail, then 30 frames a second, then bigger pixels, then the
+eyes refreshing half as often, then bigger pixels still), never more than
+Settings asks for, and never at the brain's expense. `docs/web.md` has the
+measurements. On the Apple TV it is drawn as it always was.
+
 ## Remote and host
 
 The game reads the remote only as `packages/contracts/src/remote.ts` describes,
 and sets `window.__flyAtRoot` while on the title (or loading), where Back
 leaves the app. Arrow presses that arrive during a fast swipe are taken as the
 swipe's and ignored. In a browser the brain is `packages/brain` in a Web Worker
-(`apps/web/src/brain/worker-driver.ts`), fed `brain/connectome.bin`, which the
-dev and preview servers serve and the production build copies in
-(`vite.config.ts`). On the Apple TV it is `globalThis.__native.brain`
+(`apps/web/src/brain/worker-driver.ts`), fed the connectome in its wire form
+(`apps/web/src/brain/wire.ts`: 14 MB gzipped where plain gzip makes 21),
+which `apps/web/src/brain/download.ts` fetches with its bytes counted, keeps
+in the browser's cache and checks against the digest the build recorded
+(`scripts/webBuild.ts`; the dev server serves the same file). The page sleeps
+while hidden, holds the screen awake while it is the wallpaper, and recovers
+from a lost graphics context (`apps/web/src/page.ts`); `docs/web.md` has the
+rest. On the Apple TV it is `globalThis.__native.brain`
 (`apps/web/src/brain/native-driver.ts`), which allocates nothing per frame.
 Sound is synthesised into buffers at start-up (no oscillators or filters):
 wing buzz following the wings, patter while it walks, each place's own
@@ -444,7 +458,18 @@ queries, round and rectangular tops, and becoming another place; every place
 (the fly starts standing, its food can be tasted where it lies, every time of
 day, every shot keeps the camera out of everything with the fly in view); the body's thresholds, motion, collisions, falls, flight, landing,
 wall turning and mouth alignment; every sense; the facet layout, cube mapping
-and resampling; both brain drivers against fakes and the worker's host; the
+and resampling; both brain drivers against fakes and the worker's host (a
+stalled brain fails, a page asleep for an hour doesn't count, each failure
+says what it is, trying again carries on); the connectome's wire form (byte
+for byte back however it arrives, and damaged, cut-short or foreign data
+refused); the brain's download (bytes counted, each part kept and taken from
+the cache next time, a broken part resumed, a host that ignores ranges, a page
+closed halfway, missing, offline, damaged, a full storage, no Cache API); how
+much picture the device can afford (stepping down and back up with growing
+patience, a slow brain given cheaper pictures only if they let it keep up,
+noise not mistaken for help, hidden time and a reset not counted); the web build itself
+(nothing fetched from another site, relative paths, hashed names, the
+manifest, the service worker's list, the brain in parts of a few MB); the
 brain meter; the menu kit's focus, values, scrolling and navigation; what is
 kept between launches (the settings, the shelf's choices and what the hints
 have taught come back as saved, old and broken saves fall back to the
@@ -471,8 +496,14 @@ eyes or the pause menu), the fly is carried to every place, the weather
 outside, fed as the Apple TV would give it, is what "Now" shows until it is
 too old, Back reaches the root, a reload finds the settings, the view, the
 light and the weather as they were left, the shelf on Feed and the hints for
-what was used gone, and the frame stays within its draw budget. A browser has
-no weather outside: scripts
+what was used gone, and the frame stays within its draw budget. Then it
+builds the site and serves it from a folder of a static server
+(`apps/web/e2e/web.e2e.ts`): a first visit on a slow connection that breaks
+off partway counts the brain's bytes and carries on from the break, a second
+loads with the network off, a hidden tab sleeps and wakes without a jump, the
+wallpaper holds the screen awake, a lost graphics context comes back, losing
+the network on a first visit and a browser without WebGL 2 each say so, and
+nothing is asked of any other site. A browser has no weather outside: scripts
 feed it with `__fly.outside.feed({...})` (`OutsideConditions` without its
 `source`, or `null` to take it away; `node scripts/play.ts eval:...`), and the
 canvas's `data-weather-from` (`outside`, `forecast` or `chosen`),
@@ -480,8 +511,10 @@ canvas's `data-weather-from` (`outside`, `forecast` or `chosen`),
 service's state: `none` without one, `off`, `fed`, `locating`, `fetching`,
 `ok`, `denied`, `no-location`, `offline`, `unauthorised`, `failed`) and
 `data-outside-age` (seconds) say where the weather comes from and how old it
-is. `node scripts/play.ts` drives and
-screenshots the game step by step (see the comment at its top).
+is. `node scripts/play.ts` drives and screenshots the game step by step (see
+the comment at its top); `node scripts/measure.ts` measures it on a throttled
+CPU and in other browsers, and `node scripts/webSoak.ts` leaves it running
+for a long time, moving between places, watching what it holds on to.
 
 Longer headless body and real-brain soaks run with `npm run fuzz`. See
 [the fuzzing guide](docs/fuzzing.md) for seeds, duration, place selection,

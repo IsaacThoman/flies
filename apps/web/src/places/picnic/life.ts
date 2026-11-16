@@ -44,8 +44,12 @@ const CRUMB_LASTS = [900, 1500] as const;
 
 type Found = { food: Food | null; mesh: THREE.Mesh; age: number; lasts: number; from: THREE.Vector3; to: THREE.Vector3; arrive: number; kind: "juice" | "crumb" };
 
+/** The gull's shadow, drawn the first time the picnic is built and kept: every visit casts the same one. */
+let gull: THREE.CanvasTexture | null = null;
+
 /** The gull's shadow from above, wings spread, its length along x: white where it shades, soft at the edge as a shadow from high up is. */
 function gullShadow() {
+  if (gull) return gull;
   const S = 128;
   const canvas = document.createElement("canvas");
   canvas.width = S;
@@ -78,6 +82,7 @@ function gullShadow() {
   texture.generateMipmaps = false;
   texture.minFilter = THREE.LinearFilter;
   texture.needsUpdate = true;
+  gull = texture;
   return texture;
 }
 

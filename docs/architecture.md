@@ -25,7 +25,9 @@ commands read from the fly's own descending and motor neurons: walk, turn,
 back up, take off, beat the wings, groom, feed. The game moves the body
 accordingly and poses the model (`FlyPose`).
 
-In a browser the brain is `packages/brain` in a Web Worker. On the Apple TV
+In a browser the brain is `packages/brain` in a Web Worker, fed a compressed
+form of the connectome that the page downloads once and keeps; the browser
+build is plain files for any static host (`docs/web.md`). On the Apple TV
 JavaScript has no JIT and is far too slow for it, so the host runs
 `packages/brain-native` on its own thread and exposes it as
 `globalThis.__native.brain` (`NativeBrainBridge`). The game only ever sees a
