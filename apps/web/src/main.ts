@@ -95,7 +95,6 @@ function cannotDraw(error: unknown) {
     canvas.dataset.failure = "webgl";
   }
   if (!g) return;
-  const start = performance.now();
   const hits = new HitMap();
   const draw = () => {
     display.update();
@@ -104,7 +103,6 @@ function cannotDraw(error: unknown) {
       canvas.width = frame.width;
       canvas.height = frame.height;
     }
-    const t = (performance.now() - start) / 1000;
     g.setTransform(1, 0, 0, 1, 0, 0);
     const sky = g.createLinearGradient(0, 0, 0, frame.height);
     sky.addColorStop(0, "#5aa9ec");
@@ -113,7 +111,7 @@ function cannotDraw(error: unknown) {
     g.fillRect(0, 0, frame.width, frame.height);
     g.setTransform(frame.width / frame.design.width, 0, 0, frame.height / frame.design.height, 0, 0);
     const layout = loadingLayout(frame);
-    drawWordmark(g, layout.wordmark.x, layout.wordmark.y, layout.wordmark.size, t);
+    drawWordmark(g, layout.wordmark.x, layout.wordmark.y, layout.wordmark.size);
     hits.begin("loading");
     drawFailure(g, "webgl", "", null, layout, hits);
     requestAnimationFrame(draw);

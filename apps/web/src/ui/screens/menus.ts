@@ -45,9 +45,9 @@ export function titleScreen(shell: Shell) {
       else shell.open(item.id as "about" | "settings" | "online");
     },
     onBack: () => shell.back(),
-    backdrop(g, t) {
+    backdrop(g) {
       const { wordmark, status } = title;
-      drawWordmark(g, wordmark.x, wordmark.y, wordmark.size, t);
+      drawWordmark(g, wordmark.x, wordmark.y, wordmark.size);
       // How the brain is doing, quietly, under the name.
       const brain = shell.brain;
       const awake = brain.status === "running";
