@@ -208,8 +208,7 @@ export class Bubbles {
       m[o + 10] = r * wobble;
       m[o + 15] = 1;
       m[o + 12] = b.x;
-      // Keep the burst flash to its contact frame so it cannot linger inside a surface.
-      m[o + 13] = b.popping > 0.001 ? -1e6 : b.y;
+      m[o + 13] = b.popping > 0 ? -1e6 * (b.popping > 0.04 ? 1 : 0) + b.y : b.y;
       m[o + 14] = b.z;
     }
     this.mesh.instanceMatrix.needsUpdate = true;
