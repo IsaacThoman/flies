@@ -2,21 +2,59 @@ import * as THREE from "three";
 import type { Daylight } from "../../scene/light.ts";
 import type { Weather } from "../../scene/weather.ts";
 
-export const KIND = { stone: 0, wood: 1, glaze: 2, banana: 3, peach: 4, grape: 5, compost: 6, wall: 7, metal: 8, honey: 9, wine: 10 };
+export const KIND = {
+  stone: 0,
+  wood: 1,
+  glaze: 2,
+  banana: 3,
+  peach: 4,
+  grape: 5,
+  compost: 6,
+  wall: 7,
+  metal: 8,
+  honey: 9,
+  wine: 10,
+};
 
 export function surfaceMaterial() {
+  const rings = {
+    value: Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, -100, 0)),
+  };
+  const time = { value: 0 };
+  let ring = 0;
   const night = { value: 0 };
   const rain = { value: 0 };
-  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.02 });
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.45,
+    metalness: 0.02,
+  });
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uNight = night;
+    shader.uniforms.uRings = rings;
+    shader.uniforms.uTime = time;
     shader.uniforms.uRain = rain;
-    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nattribute float kind; varying float vKind; varying vec3 vPlace;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvKind = kind; vPlace = position;");
-    shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>
-      varying float vKind; varying vec3 vPlace; uniform float uNight; uniform float uRain;
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nattribute float kind; varying float vKind; varying vec3 vPlace;",
+      )
+      .replace(
+        "#include <begin_vertex>",
+        "#include <begin_vertex>\nvKind = kind; vPlace = position;",
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+      varying float vKind; varying vec3 vPlace; uniform float uNight; uniform float uRain; uniform vec4 uRings[4]; uniform float uTime;
       float hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
       float noise(vec2 p) { vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
-    `).replace("#include <color_fragment>", `#include <color_fragment>
+    `,
+      )
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
       vec3 p = vPlace; float k = vKind; float micro = noise(p.xz*6.0);
       if(k<0.5) {
         float vein = pow(0.5+0.5*sin(p.x*.026+p.z*.018+noise(p.xz*.009)*10.0),18.0);
@@ -64,18 +102,50 @@ export function surfaceMaterial() {
           diffuseColor.rgb=mix(view*(1.0-uNight*.92)+streak,vec3(.78,.74,.64),min(frame,1.0));
         }
       }
-    `).replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+      if(k>8.5) for(int i=0;i<4;i++) {
+        float age=uTime-uRings[i].z;
+        float d=length(p.xz-uRings[i].xy);
+        float wave=exp(-pow((d-age*9.0)*3.0,2.0))*max(0.0,1.0-age/2.0)*uRings[i].w;
+        diffuseColor.rgb+=wave*.14;
+      }
+    `,
+      )
+      .replace(
+        "#include <roughnessmap_fragment>",
+        `#include <roughnessmap_fragment>
       if(vKind>1.5 && vKind<2.5) roughnessFactor=.21;
       if(vKind>4.5 && vKind<5.5) roughnessFactor=.32;
       if(vKind>7.5 && vKind<8.5) roughnessFactor=.24;
       if(vKind>8.5) roughnessFactor=.10;
-    `).replace("#include <metalnessmap_fragment>", "#include <metalnessmap_fragment>\nif(vKind>7.5 && vKind<8.5) metalnessFactor=.7;");
+    `,
+      )
+      .replace(
+        "#include <metalnessmap_fragment>",
+        "#include <metalnessmap_fragment>\nif(vKind>7.5 && vKind<8.5) metalnessFactor=.7;",
+      );
   };
   material.customProgramCacheKey = () => "kitchen-surfaces-1";
-  return { material, update(light: Daylight, weather: Weather) { night.value = light.stars; rain.value = weather.rain; } };
+  return {
+    material,
+    update(t: number, light: Daylight, weather: Weather) {
+      time.value = t;
+      night.value = light.stars;
+      rain.value = weather.rain;
+    },
+    ripple(x: number, z: number, strength: number) {
+      rings.value[ring].set(x, z, time.value, strength);
+      ring = (ring + 1) % 4;
+    },
+  };
 }
 
 export function tag(g: THREE.BufferGeometry, kind: number) {
-  g.setAttribute("kind", new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count).fill(kind), 1));
+  g.setAttribute(
+    "kind",
+    new THREE.Float32BufferAttribute(
+      new Float32Array(g.attributes.position.count).fill(kind),
+      1,
+    ),
+  );
   return g;
 }

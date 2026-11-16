@@ -13,7 +13,7 @@ npm run fuzz -- --kind body --place restaurant --seeds 1,2,3 --duration 21600 --
 
 - `--kind body|life|both` (default `both`). Body runs need no connectome;
   life runs need `npm run brain:fetch`.
-- `--place all|picnic|windowsill|lab|bar|restaurant` (default `all`).
+- `--place all|picnic|windowsill|lab|bar|restaurant|kitchen` (default `all`).
 - `--seeds 1,2,3` lists actual unsigned 32-bit seeds, not a seed count.
 - `--duration 3600` is simulated **seconds per seed per place**, default one
   hour. Thus three seeds at 21600 seconds give 18 hours per place.

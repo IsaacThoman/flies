@@ -160,6 +160,16 @@ leaf are in the fly's world only as things it sees (and, for a brain without
 eyes, things that can loom); they keep clear of it, and none of it is aimed
 or timed at the fly: what it does about any of it is its brain's.
 
+The kitchen counter is a metre-wide stone worktop with a glazed ceramic
+fruit bowl, spotty bananas and purple grapes, a cut peach on a scarred wooden
+chopping board, toast crumbs, a stemmed glass with red wine left in it, a
+honey jar and a spill, and a compost caddy with its lid ajar. The fly begins
+on the board beside the crumbs. Split fruit, peach flesh, grape juice,
+honey and wine are food; feet disturb the liquid pools. A tiled splashback
+and a window frame the worktop, with cabinets and the kitchen beyond; warm
+pendant light takes over from window daylight at dusk. The garden in the
+window is a stylised shader backdrop, not a simulated outdoor place.
+
 The windowsill is the deep sill of a cottage kitchen window, painted cream
 over sage over pine, its old gloss crazed where the sun bakes it and chipped
 along its front edge, its bottom rail flaking and tide-marked where

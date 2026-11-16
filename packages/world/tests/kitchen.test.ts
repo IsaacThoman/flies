@@ -1,0 +1,30 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  KITCHEN,
+  KITCHEN_GLASS,
+  KITCHEN_PATCHES,
+  Pantry,
+  World,
+} from "../src/index.ts";
+
+test("the kitchen's wine is inside the cup, with air under its bowl", () => {
+  const world = new World(KITCHEN);
+  const { x, z, wine, rim } = KITCHEN_GLASS;
+  assert.equal(world.heightAt(x + 35, z, 80), 0);
+  assert.equal(world.underside(x + 35, z, 0), 100);
+  assert.equal(world.heightAt(x, z), wine);
+  assert.ok(world.heightAt(x + 41.7, z) > rim - 1);
+  const patch = KITCHEN_PATCHES.find((p) => p.name === "red wine")!;
+  const pantry = new Pantry(world, KITCHEN_PATCHES);
+  assert.equal(pantry.touching(x, wine, z, 0)?.name, patch.name);
+  assert.equal(pantry.touching(x, 3, z, 0), null);
+});
+
+test("the kitchen's board and ajar caddy have surfaces at their drawn heights", () => {
+  const world = new World(KITCHEN);
+  assert.equal(world.heightAt(KITCHEN.start.x, KITCHEN.start.z), 14);
+  assert.equal(world.heightAt(-369, -170, 151), 150);
+  assert.ok(world.underside(-369, -170, 150) > 175);
+  assert.ok(world.heightAt(-369, -170) > 179);
+});
