@@ -204,16 +204,15 @@ export function buildRoom(around: Batch, solid: THREE.Material, clear: THREE.Mat
   const add = (geometry: THREE.BufferGeometry, color: THREE.ColorRepresentation | ((p: THREE.Vector3, n: THREE.Vector3) => THREE.ColorRepresentation | THREE.Color), kind: number, matrix?: THREE.Matrix4) =>
     around.add(kind >= KIND.glass ? clear : solid, part(geometry, color, kind), matrix);
   const green = "#2a4a3c";
-  const plaster = KIND.matte;
 
   // The floor: oak boards. The ceiling: dark boards between beams.
   add(new THREE.PlaneGeometry(right - left, front - back).rotateX(-Math.PI / 2).translate((left + right) / 2, floor, (back + front) / 2), "#b49a88", KIND.wood);
-  add(new THREE.PlaneGeometry(right - left, front - back).rotateX(Math.PI / 2).translate((left + right) / 2, ceiling, (back + front) / 2), "#3a2a20", plaster);
+  add(new THREE.PlaneGeometry(right - left, front - back).rotateX(Math.PI / 2).translate((left + right) / 2, ceiling, (back + front) / 2), "#3a2a20", KIND.matte);
   for (const x of [-480, 320, 1120, 1920]) add(box(x - 70, ceiling - 170, back, x + 70, ceiling, front), "#6a4a38", KIND.wood);
 
-  // The walls: dark green plaster over walnut panelling.
+  // The walls: dark green flocked paper over walnut panelling.
   const rail = floor + 950;
-  const wall = (geometry: THREE.BufferGeometry) => add(geometry, green, plaster);
+  const wall = (geometry: THREE.BufferGeometry) => add(geometry, green, KIND.paper);
   wall(new THREE.PlaneGeometry(right - left, ceiling - rail).translate((left + right) / 2, (rail + ceiling) / 2, back));
   wall(new THREE.PlaneGeometry(right - left, ceiling - rail).rotateY(Math.PI).translate((left + right) / 2, (rail + ceiling) / 2, front));
   wall(new THREE.PlaneGeometry(front - back, ceiling - rail).rotateY(-Math.PI / 2).translate(right, (rail + ceiling) / 2, (back + front) / 2));
@@ -423,19 +422,22 @@ export function buildRoom(around: Batch, solid: THREE.Material, clear: THREE.Mat
       add(box(-200, 480, 170, 200, 900, 200), "#ffffff", KIND.wood, m);
     }
   }
+  // Hung at the height pictures are, their middles about 1.45 m from the floor, where the band of wall seen past the fly reaches them.
   const picture = (x: number, y: number, z: number, w: number, h: number, facing: number, colors: readonly string[]) => {
     const m = mat4({ x, y, z }, new THREE.Euler(0, facing, 0));
     add(box(-w / 2 - 40, -h / 2 - 40, 0, w / 2 + 40, h / 2 + 40, 30), "#b8904a", KIND.metal, m);
-    add(new THREE.PlaneGeometry(w, h, 6, 4).translate(0, 0, 32), (p) => {
+    add(new THREE.PlaneGeometry(w, h, 12, 8).translate(0, 0, 32), (p) => {
       const u = (p.x + w / 2) / w;
       const v = (p.y + h / 2) / h;
-      return colors[Math.min(colors.length - 1, Math.floor((v * 0.7 + u * 0.3 + Math.sin(u * 5) * 0.08) * colors.length))];
-    }, KIND.plain, m);
+      const k = Math.min(0.999, Math.max(0, v * 0.7 + u * 0.3 + Math.sin(u * 5) * 0.08)) * (colors.length - 1);
+      return new THREE.Color(colors[Math.floor(k)]).lerp(new THREE.Color(colors[Math.floor(k) + 1]), k - Math.floor(k));
+    }, KIND.canvas, m);
   };
-  picture(950, 600, front - 6, 620, 440, Math.PI, ["#2a3a5a", "#c86a2a", "#e8c070", "#8aa8c0"]);
-  picture(1900, 560, front - 6, 380, 500, Math.PI, ["#3a1a14", "#a03020", "#e0a050"]);
-  picture(right - 6, 600, 1000, 520, 380, -Math.PI / 2, ["#1a2a1a", "#4a6a3a", "#c8c088", "#e8e0c0"]);
-  picture(left + 6, 600, 1650, 360, 460, Math.PI / 2, ["#5a2a3a", "#c87a6a", "#f0d0b0"]);
+  picture(950, 360, front - 6, 620, 440, Math.PI, ["#2a3a5a", "#c86a2a", "#e8c070", "#8aa8c0"]);
+  picture(1900, 360, front - 6, 380, 500, Math.PI, ["#3a1a14", "#a03020", "#e0a050"]);
+  // Clear of the door.
+  picture(right - 6, 340, 930, 520, 380, -Math.PI / 2, ["#1a2a1a", "#4a6a3a", "#c8c088", "#e8e0c0"]);
+  picture(left + 6, 360, 1650, 360, 460, Math.PI / 2, ["#5a2a3a", "#c87a6a", "#f0d0b0"]);
   // A door in the right wall, panelled, with a brass handle.
   add(box(right - 50, floor, 1250, right, floor + 2150, 2000), "#7a5a48", KIND.wood);
   add(box(right - 60, floor + 1050, 1880, right - 50, floor + 1080, 1950), "#c89648", KIND.metal);

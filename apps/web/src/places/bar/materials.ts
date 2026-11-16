@@ -38,6 +38,10 @@ export const KIND = {
   cherry: 14,
   /** The clock's face: its enamel, its markings and its hands, drawn in the shader. */
   dial: 15,
+  /** The walls above the panelling: flocked paper, its damask drawn in the shader. */
+  paper: 16,
+  /** The paintings: brushwork and old varnish over the colours they are painted in. */
+  canvas: 17,
   glass: 20,
   beer: 21,
   cocktail: 22,
@@ -284,6 +288,30 @@ if (barK == K_GLOSSY) {
   barVarnish = 0.8;
 }
 if (barK == K_MATTE) barRough = 0.88;
+if (barK == K_PAPER || barK == K_CANVAS) {
+  vec3 an = abs(vWorldNormal);
+  vec2 wp = vec2(an.z > an.x ? vWorld.x : vWorld.z, vWorld.y);
+  if (barK == K_PAPER) {
+    // Flocked paper: ogees in a half drop, a quatrefoil in each, in velvet a shade darker than the satin ground.
+    vec2 t = wp / vec2(170.0, 240.0);
+    float col = floor(t.x + 0.5);
+    float x = t.x - col;
+    float y = fract(t.y + 0.5 * mod(col, 2.0));
+    float aa = fwidth(t.x) * 1.5;
+    float lattice = 1.0 - smoothstep(0.03, 0.045 + aa, abs(abs(x) - 0.47 * sin(3.14159 * y)));
+    vec2 c = vec2(x, (y - 0.5) * 1.41);
+    float petals = 1.0 - smoothstep(-aa, aa, length(c) - 0.15 * (0.78 + 0.22 * cos(atan(c.y, c.x) * 4.0)));
+    float flock = mix(0.25, max(lattice, petals), barDetail(t * 14.0));
+    diffuseColor.rgb *= mix(1.08, 0.74, flock);
+    barRough = mix(0.5, 0.95, flock);
+  } else {
+    // Oil paint: strokes laid across, a little raised, under varnish gone amber, darkest toward the frame.
+    vec2 sp = wp * vec2(0.05, 0.2);
+    diffuseColor.rgb *= (0.8 + barNoise(sp) * 0.3 + (barNoise(sp * 3.1 + 7.0) - 0.5) * 0.25 * barDetail(sp * 3.1)) * vec3(1.0, 0.94, 0.8);
+    barRough = 0.35;
+    barVarnish = 0.4;
+  }
+}
 if (barK == K_MIRROR) {
   // An old mirror: the silvering gone smoky and spotted, most at its edges and corners, where the damp got in.
   vec2 mp = vWorld.xy * 0.012;
