@@ -13,6 +13,7 @@ import { BANQUETTE, DINING_ROOM, PASS, SHOPFRONT } from "@fly/world";
 import type { Builder } from "./builder.ts";
 import { box, lathe } from "./geometry.ts";
 import { KIND } from "./kinds.ts";
+import { DIFFUSERS } from "./live.ts";
 import { FANS, FRONT, KITCHEN, OUT_OF_REACH, WAINSCOT } from "./plan.ts";
 import { mat4 } from "../../scene/build.ts";
 
@@ -281,11 +282,22 @@ export function buildShell(b: Builder) {
     for (const x of [d.x0 + 110, d.x1 - 110]) b.shell(new THREE.CylinderGeometry(8, 8, 40, 8).rotateX(Math.PI / 2).translate(x, 1050, d.z0 + 15), "#ffffff", KIND.brass);
   }
 
+  // The ventilation's diffusers, square louvres in the tin (live.ts).
+  for (const d of DIFFUSERS) {
+    for (const [half, depth] of [[230, 14], [170, 24], [110, 34], [50, 44]]) {
+      for (const s of [-1, 1]) {
+        b.shell(box(d.x - half, height - depth, d.z + s * half - 6, d.x + half, height, d.z + s * half + 6), "#d8dad8", KIND.steel);
+        b.shell(box(d.x + s * half - 6, height - depth, d.z - half, d.x + s * half + 6, height, d.z + half), "#d8dad8", KIND.steel);
+      }
+    }
+    b.shell(box(d.x - 45, height - 3, d.z - 45, d.x + 45, height - 1, d.z + 45), "#1a1c1c", KIND.matte);
+  }
+
   // The ceiling fans, still: a brass motor on a downrod, five dark blades.
   for (const fan of FANS) {
-    b.shell(lathe([[0, 0], [70, 0], [95, 40], [100, 90], [70, 130], [20, 140], [0, 142]], 20, fan.x, fan.z).translate(0, fan.y - 70, 0), "#ffffff", KIND.brass);
-    b.shell(new THREE.CylinderGeometry(14, 14, height - fan.y - 60, 8).translate(fan.x, (height + fan.y + 60) / 2, fan.z), "#ffffff", KIND.brass);
-    b.shell(lathe([[0, 0], [60, 0], [70, 40], [0, 60]], 16, fan.x, fan.z).translate(0, height - 60, 0), "#ffffff", KIND.brass);
+    b.shell(lathe([[0, 0], [70, 0], [95, 40], [100, 90], [70, 130], [20, 140], [0, 142]], 10, fan.x, fan.z).translate(0, fan.y - 70, 0), "#ffffff", KIND.brass);
+    b.shell(new THREE.CylinderGeometry(14, 14, height - fan.y - 60, 6, 1, true).translate(fan.x, (height + fan.y + 60) / 2, fan.z), "#ffffff", KIND.brass);
+    b.shell(lathe([[0, 0], [60, 0], [70, 40], [0, 60]], 10, fan.x, fan.z).translate(0, height - 60, 0), "#ffffff", KIND.brass);
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2 + fan.x * 0.001;
       b.shell(new THREE.BoxGeometry(fan.r - 90, 6, 120).translate((fan.r + 90) / 2, 0, 0), "#ffffff", KIND.mahogany, mat4({ x: fan.x, y: fan.y - 10, z: fan.z }, new THREE.Euler(0.08, a, 0)));

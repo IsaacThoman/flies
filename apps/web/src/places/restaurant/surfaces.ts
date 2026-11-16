@@ -6,7 +6,7 @@
 // chooses by the vertex's kind (kinds.ts), and leaves its findings in a few
 // variables the material then uses (materials.ts).
 
-import { DINING_ROOM } from "@fly/world";
+import { DINING_ROOM, ZINC_BAR } from "@fly/world";
 import { EXIT, ROOM } from "./plan.ts";
 
 const f = (n: number) => n.toFixed(1);
@@ -171,6 +171,17 @@ if (rK == K_TILE) {
   rCoat = inside * d * 0.5 * (1.0 - worn * 0.5);
   rBump = vec3(g.x, 0.0, g.y) / PENNY * 0.18 * inside * d * smoothstep(PENNY * 0.4, PENNY, r);
   rAO *= mix(1.0, 0.7, (1.0 - inside) * d);
+  // Behind the bar, where the bartender stands, the floor is under rubber matting.
+  float mat = rBand(vWorld.x, ${f(ZINC_BAR.back.x1 + 15)}, ${f(ZINC_BAR.underbar.x - ZINC_BAR.underbar.hx - 15)}, 1.0) * rBand(vWorld.z, ${f(ZINC_BAR.underbar.z0 + 20)}, ${f(ZINC_BAR.underbar.z1 - 20)}, 1.0);
+  if (mat > 0.0) {
+    vec2 mp = vWorld.xz / 16.0;
+    vec2 holes = fract(mp) - 0.5;
+    float hole = (1.0 - smoothstep(0.2, 0.26, max(abs(holes.x), abs(holes.y)))) * rDetail(mp);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.03, 0.03) * (1.0 - hole * 0.5), mat);
+    rRough = mix(rRough, 0.8, mat);
+    rCoat *= 1.0 - mat;
+    rBump *= 1.0 - mat;
+  }
 }
 if (rK == K_MARBLE) {
   float vein;

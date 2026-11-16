@@ -27,6 +27,7 @@ import { PARTS, owner } from "./parts.ts";
 import type { PartName } from "./parts.ts";
 import { buildShopGlass } from "./glass.ts";
 import { buildGlows } from "./glows.ts";
+import { Ventilation } from "./live.ts";
 import { updateStreetLight } from "./traffic.ts";
 
 /** How bright the pendant left on is, for a millimetre world (its light falls off as the distance squared). */
@@ -214,6 +215,7 @@ export function buildRestaurant(): SceneSet {
   const eyeAt = new THREE.Vector3();
   // Where the fly was last seen living, for the camera's focus.
   const flyAt = new THREE.Vector3(RESTAURANT_START.x, RESTAURANT_START.y, RESTAURANT_START.z);
+  const ventilation = new Ventilation();
   const glow = new THREE.Color();
   let nextRipple = 0;
   const ripples = shared.uRipples.value;
@@ -264,8 +266,9 @@ export function buildRestaurant(): SceneSet {
       mask.value = bits;
       useLight(nearest && nearestD < DETAIL_REACH ? nearest.lit! : noLight);
     },
-    live(_dt, around) {
+    live(dt, around) {
       flyAt.set(around.fly.x, around.fly.y, around.fly.z);
+      ventilation.step(dt, around);
     },
     ripple(x: number, z: number, strength: number) {
       ripples.set([x, z, shared.uTime.value, strength], nextRipple * 4);
