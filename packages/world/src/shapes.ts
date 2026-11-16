@@ -63,6 +63,8 @@ export type Solid = {
   name: string;
   footprint: Footprint;
   top: Top;
+  /** The underside, mm: a solid with air beneath it (a table top, a shelf, a lamp, a plate on a table top), occupying only from here up to its top. Left out, it stands on the floor (y = 0). */
+  bottom?: number;
 };
 
 export type Vec3 = { x: number; y: number; z: number };
