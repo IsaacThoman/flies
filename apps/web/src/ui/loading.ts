@@ -33,7 +33,7 @@ export function drawLoading(g: CanvasRenderingContext2D, t: number, brain: Brain
   const phase = loading?.phase ?? (brain.status === "running" ? "done" : "build");
   const progress = loading?.progress ?? 0;
   const { wordmark } = layout;
-  drawWordmark(g, wordmark.x, wordmark.y, wordmark.size, t);
+  drawWordmark(g, wordmark.x, wordmark.y, wordmark.size);
   if (brain.status === "failed") {
     drawFailure(g, loading?.failure ?? "brain", brain.error ?? "", loading?.source ?? null, layout, hits);
     return;
