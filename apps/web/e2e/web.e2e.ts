@@ -23,13 +23,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
 import { build } from "vite";
-import { fullChromiumPath, gpuFlags, readState, waitFor } from "../../../scripts/play.ts";
+import { fullChromiumPath, gpuFlags, readState, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import { serveSite } from "../../../scripts/serve.ts";
 
 const root = path.join(import.meta.dirname, "../../..");
 const args = process.argv.slice(2);
 const shots = args.includes("--shots") ? path.resolve(args[args.indexOf("--shots") + 1]) : null;
-const step = (name: string) => console.log(`· ${name}`);
+let currentStep = "startup";
+const step = (name: string) => { currentStep = name; console.log(`· ${name}`); };
 /** Where the first part of the brain is cut off the first time, bytes. */
 const CUT_AT = 3_000_000;
 
@@ -70,20 +71,21 @@ try {
   await cdp.send("Network.enable");
   await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: 80, downloadThroughput: 2_500_000, uploadThroughput: 500_000 });
   const started = Date.now();
+  await page.addInitScript(() => {
+    const progress = new Set<number>();
+    (globalThis as unknown as { __downloadProgress: Set<number> }).__downloadProgress = progress;
+    // Observe publications rather than sampling wall time: a busy driver can miss many updates.
+    new MutationObserver(() => {
+      const data = document.getElementById("game")?.dataset;
+      if (data?.phase === "download" && Number(data.received) > 0) progress.add(Number(data.received));
+    }).observe(document, { subtree: true, attributes: true, attributeFilter: ["data-received"] });
+  });
   await page.goto(site.url);
-  await waitFor(page, "screen=loading,phase=download,received>0", 30_000);
-  const seen = new Set<number>();
-  let total = 0;
-  for (let i = 0; i < 80; i++) {
-    const s = await readState(page);
-    if (s.phase !== "download") break;
-    seen.add(Number(s.received));
-    total = Number(s.total);
-    if (i === 6) await shot("1-downloading");
-    await page.waitForTimeout(100);
-  }
-  assert.ok(seen.size >= 5, `the bytes counted up (${[...seen].join(", ")})`);
+  await shot("1-downloading");
   const awake = await waitFor(page, "brain=running,screen=title", 120_000);
+  const seen = await page.evaluate(() => [...(globalThis as unknown as { __downloadProgress: Set<number> }).__downloadProgress]);
+  assert.ok(seen.length >= 5, `the bytes counted up (${seen.join(", ")})`);
+  const total = Number(awake.total);
   console.log(`  ${(total / 1e6).toFixed(1)} MB, awake after ${((Date.now() - started) / 1000).toFixed(1)} s`);
   assert.equal(awake.from, "network");
   assert.equal(awake.neurons, "166700");
@@ -134,7 +136,7 @@ try {
   await page.keyboard.press("ArrowDown");
   await waitFor(page, "focus=watch");
   await page.keyboard.press("Enter");
-  await waitFor(page, "wallpaper=true,wakeLock=held", 10_000);
+  await waitFor(page, "wallpaper=true,wakeLock=held");
 
   step("hidden for a while: it sleeps, lets the screen go, and wakes without a jump");
   const hide = (hidden: boolean) =>
@@ -145,15 +147,21 @@ try {
     }, hidden);
   const lived = () => page.evaluate(() => (globalThis as unknown as { __fly: { time: number; life: { time: number } } }).__fly.life.time);
   await hide(true);
-  await waitFor(page, "hidden=true,wakeLock=none,audio~^(?!running)", 3000);
+  await waitFor(page, "hidden=true,wakeLock=none,audio~^(?!running)");
   const livedBefore = await lived();
   await page.waitForTimeout(6000);
-  await hide(false);
-  const back = await waitFor(page, "hidden=false,wallpaper=true,wakeLock=held,audio=running", 5000);
+  const jumped = await page.evaluate(async (before) => {
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => false });
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    // Read in the first resumed frame, before protocol/driver delays can add normal awake time.
+    await new Promise(requestAnimationFrame);
+    return (globalThis as unknown as { __fly: { life: { time: number } } }).__fly.life.time - before;
+  }, livedBefore);
+  const back = await waitFor(page, "hidden=false,wallpaper=true,wakeLock=held,audio=running");
   assert.equal(back.brain, "running", "a frozen page is not a stalled brain");
-  const jumped = (await lived()) - livedBefore;
   assert.ok(jumped < 1.5, `the fly lived ${jumped.toFixed(2)} s across six seconds asleep`);
-  await page.waitForTimeout(2500);
+  await waitForGameTime(page, 2.5);
   assert.equal((await readState(page)).brain, "running");
 
   step("the graphics context is lost and comes back");
@@ -163,12 +171,10 @@ try {
     (globalThis as unknown as { __lose: WEBGL_lose_context }).__lose = lose;
     lose.loseContext();
   });
-  await waitFor(page, "gl=lost", 5000);
-  await page.waitForTimeout(500);
+  await waitFor(page, "gl=lost");
   await page.evaluate(() => (globalThis as unknown as { __lose: WEBGL_lose_context }).__lose.restoreContext());
-  await waitFor(page, "gl=ok,brain=running", 5000);
-  await page.waitForTimeout(1500);
-  const drawn = await readState(page);
+  await waitFor(page, "gl=ok,brain=running");
+  const drawn = await waitFor(page, "gl=ok,brain=running,calls>5");
   assert.ok(Number(drawn.calls) > 5, `drawing again (${drawn.calls} draws)`);
   // Read in a frame callback after the game's, while what it drew is still in the canvas.
   const colours = await page.evaluate(async () => {
@@ -233,7 +239,7 @@ try {
   console.log("passed");
 } catch (error) {
   failed = true;
-  console.error("failed:", error instanceof Error ? error.message : error);
+  console.error(`failed (${currentStep}):`, error instanceof Error ? error.message : error);
   console.error("state:", JSON.stringify(await readState(page).catch(() => ({}))));
   if (errors.length) console.error("page errors:\n" + errors.join("\n"));
 } finally {
