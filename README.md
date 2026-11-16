@@ -408,7 +408,7 @@ fly from one angle after another instead (Calm), or change them more often
 (Lively). Any press, touch, tap, click, key or deliberate move of the mouse
 brings the controls back and does nothing else.
 A small picture of what the fly's eyes see sits in a corner of the screensaver
-(Settings → On screen → What it sees: off, in the screensaver, or always, which keeps it in
+(Settings → On screen → Fly POV: off, in the screensaver, or always, which keeps it in
 the top right while you play too), and under it a picture of its nervous
 system at work (Nervous system, the same choices). Each time the screensaver
 moves on to a new shot, and at least once a minute, they fade out and come
@@ -573,10 +573,10 @@ such), laid out by where each looks, left eye on the left. It is titled and
 nothing more while it is what the brain is sent; a line under the title says
 so when it isn't (a stand-in, or the eyes off in Settings).
 
-**What it sees** (`apps/web/src/eyes/inset.ts`) is that picture small, in a
+**Fly POV** (`apps/web/src/eyes/inset.ts`) is that picture small, in a
 corner over the camera's: the same layout and colours, the dots snapped to the
 frame's pixels and widened toward the top and bottom, where the layout spreads
-the facets apart. It says "What it sees" when it is what the brain is being
+the facets apart. It says "Fly POV" when it is what the brain is being
 sent, and "A picture it doesn't see" for a brain without eyes, whose eyes are
 then rendered for the picture alone. With the eyes off in Settings it doesn't
 show: rendering them for the picture would bring back the cost that setting
@@ -602,7 +602,7 @@ that draw the same model with the same glow, so they never disagree:
 - **The panel** (Settings → On screen → Nervous system: off, in the
   screensaver, the default, or always): the same model from above, head up,
   the fly's left on the left, standing at rest so that it holds still,
-  cropped to the brain and the cord, labelled "Its nervous system". It shares
+  cropped to the brain and the cord, labelled "Nervous system". It shares
   its corner with what it sees, under it (over it at the bottom; beside it,
   smaller, where the screen is too short, as a phone on its side), at the
   corner itself when that isn't shown, and moves round the corners with it;
