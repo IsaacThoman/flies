@@ -85,6 +85,19 @@ test("each setting keeps only a value the game can use", () => {
   }
 });
 
+test("a saved wallpaper delay outside the menu's choices falls back to the default and shows that value", () => {
+  for (const wallpaperAfter of [2, 45, 90, 600]) {
+    const settings = loadSettings(settingsSaved({ wallpaperAfter }));
+    assert.equal(settings.wallpaperAfter, DEFAULT_SETTINGS.wallpaperAfter);
+    const { wallpaper } = settingsPages(fakeShell(settings));
+    wallpaper.enter();
+    const after = wallpaper.menu.item("wallpaperAfter");
+    assert.ok(after?.kind === "choice");
+    assert.equal(after.options[after.index].value, settings.wallpaperAfter);
+    assert.equal(after.options[after.index].label, "1 min");
+  }
+});
+
 test("the shelf keeps the view, the light and the weather, and nothing else", () => {
   assert.deepEqual(Object.keys(KEPT).sort(), ["light", "view", "weather"]);
   const store = memory();

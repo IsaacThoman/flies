@@ -6,6 +6,7 @@ import { INK_SOFT, glassPanel, orb, text } from "@fly/ui";
 import { DESIGN_WIDTH } from "../../display.ts";
 import type { PixelSize } from "../../display.ts";
 import { PLACES } from "../../places/catalog.ts";
+import { WALLPAPER_DELAYS } from "../../settings.ts";
 import type { EyesDetail, Settings, ShowWhen } from "../../settings.ts";
 import { drawWordmark } from "../wordmark.ts";
 import { MenuScreen } from "./menu-screen.ts";
@@ -71,13 +72,6 @@ const PIXELS: Option<PixelSize>[] = [
   { value: "chunky", label: "Chunky" },
   { value: "chunkier", label: "Chunkier" },
 ];
-const STARTS_AFTER: Option<number>[] = [
-  { value: 30, label: "30 s" },
-  { value: 60, label: "1 min" },
-  { value: 120, label: "2 min" },
-  { value: 300, label: "5 min" },
-  { value: 0, label: "Never" },
-];
 const CAMERA: Option<Settings["wallpaperCamera"]>[] = [
   { value: "follow", label: "Follow" },
   { value: "calm", label: "Calm" },
@@ -111,7 +105,7 @@ const PAGES: Record<SettingsPage, { heading: string; rows: () => MenuItem[] }> =
   wallpaper: {
     heading: "Wallpaper",
     rows: () => [
-      choice("wallpaperAfter", "Starts after", STARTS_AFTER),
+      choice("wallpaperAfter", "Starts after", WALLPAPER_DELAYS),
       choice("wallpaperCamera", "Camera", CAMERA),
       // Only when there is somewhere else to live.
       ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE)] : []),
