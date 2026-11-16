@@ -1,28 +1,28 @@
 // What is left on the tables, and the food about the place: the bread basket
 // with its napkin and heel, the espresso cup on its saucer, the menu with
 // ketchup smeared on it, the torn sugar packet and its spilt sugar, crumbs,
-// drops of wine dried on the marble, the soda spilt by the bar and the grape
-// trodden flat under a window table. Whatever the world doesn't have is
-// under half a millimetre tall, lying on what it does.
+// the soda spilt by the bar and the grape trodden flat under a window table.
+// Whatever the world doesn't have is under half a millimetre tall, lying on
+// what it does.
 
 import * as THREE from "three";
 import type { Solid } from "@fly/world";
 import { mat4 } from "../../scene/build.ts";
 import type { Builder } from "./builder.ts";
-import { scatter } from "./geometry.ts";
 import { KIND } from "./kinds.ts";
 import { far, put } from "./tabletop-glass.ts";
 import { TOP } from "./tabletop-glsl.ts";
-import { dishEdge, dishProfile, domeRun, feltAt, feltRun, raw, roundOf } from "./tabletop-shapes.ts";
+import { crumbColor, crumbs, sugar, sugarRound, sugarTrail } from "./tabletop-litter.ts";
+import type { Placement } from "./tabletop-litter.ts";
+import { dishEdge, dishProfile, domeRun, feltAt, feltRun, raw, roundOf, tube } from "./tabletop-shapes.ts";
 
 type Rnd = { next(): number; range(lo: number, hi: number): number };
-type Placement = { matrix: THREE.Matrix4; color: THREE.Color };
 
 /** What small things are scattered on: a surface's height at a point. */
 type Ground = (x: number, z: number) => number;
 
 /** Grains (or crumbs) round a point, thickest in the middle: each at most `tall` high, resting on `ground`. */
-export function strew(out: Placement[], rnd: Rnd, x: number, z: number, r: number, count: number, ground: Ground, size: readonly [number, number], tall: number, color: (i: number) => THREE.Color, flat = 1) {
+function strew(out: Placement[], rnd: Rnd, x: number, z: number, r: number, count: number, ground: Ground, size: readonly [number, number], tall: number, color: (i: number) => THREE.Color, flat = 1) {
   for (let i = 0; i < count; i++) {
     const a = rnd.range(0, Math.PI * 2);
     const d = r * Math.sqrt(rnd.next()) * (0.4 + 0.6 * rnd.next());
@@ -35,24 +35,6 @@ export function strew(out: Placement[], rnd: Rnd, x: number, z: number, r: numbe
       color: color(i),
     });
   }
-}
-
-const GRAIN = new THREE.BoxGeometry(1, 1, 1);
-/** A crumb: a broken lump, half its height above its middle. */
-const CRUMB = new THREE.OctahedronGeometry(0.5, 0);
-/** A grain of sugar, as the shaker's kind reads it (tabletop-glsl.ts). */
-const sugarGrain = new THREE.Color().setRGB(0.5, 0.5, 1, THREE.LinearSRGBColorSpace);
-const crust = new THREE.Color("#8a4a1c");
-const crumbIn = new THREE.Color("#e8d6a8");
-export const crumbColor = (rnd: Rnd) => () => (rnd.next() < 0.45 ? crust.clone().lerp(new THREE.Color("#5a2c10"), rnd.next() * 0.5) : crumbIn.clone().lerp(new THREE.Color("#c8a870"), rnd.next() * 0.5));
-
-/** Sugar grains, cubes a third of a millimetre across. */
-export function grains(b: Builder, area: number, placed: readonly Placement[]) {
-  if (placed.length) b.detailPainted(area, scatter(GRAIN, placed, TOP.shaker), TOP.shaker);
-}
-/** Crumbs, flattened lumps. */
-export function crumbs(b: Builder, area: number, placed: readonly Placement[]) {
-  if (placed.length) b.detailPainted(area, scatter(CRUMB, placed, KIND.crumb), KIND.crumb);
 }
 
 /** A flat thing on a table, lying in its footprint: a sheet of `shape` (local x, z), extruded up `thick`, coloured by where on it. */
@@ -120,37 +102,13 @@ export function tornPacket(b: Builder, area: number, solid: Solid, spill: { x: n
   sheet(b, area, shape, top - ground - 0.06, { x: f.x, y: ground - 0.02, z: f.z, angle: f.angle }, (u, v) => raw(color, (u + f.hx) / (2 * f.hx), (v + f.hz) / (2 * f.hz), 4 / 8), TOP.print);
   b.standIn(area, new THREE.PlaneGeometry(f.hx * 2, f.hz * 2).rotateX(-Math.PI / 2), "#ece6da", KIND.paper, mat4({ x: f.x, y: top - 0.05, z: f.z }, new THREE.Euler(0, f.angle, 0)));
   const placed: Placement[] = [];
-  const white = () => sugarGrain;
-  const table: Ground = () => ground;
-  strew(placed, rnd, spill.x, spill.z, spill.r, 300, table, [0.16, 0.36], 0.3, white, 0.55);
-  strew(placed, rnd, onPacket.x, onPacket.z, onPacket.r, 70, () => top - 0.06, [0.16, 0.34], 0.3, white, 0.55);
+  sugarRound(placed, rnd, spill.x, spill.z, spill.r, 340, ground);
+  sugarRound(placed, rnd, onPacket.x, onPacket.z, onPacket.r, 60, top - 0.06);
   // From the torn end (its corner toward the heap) to the heap.
   const c = Math.cos(f.angle);
   const s = Math.sin(f.angle);
-  const ex = f.x + tear * c + f.hz * 0.4 * s;
-  const ez = f.z - tear * s + f.hz * 0.4 * c;
-  for (let i = 0; i < 50; i++) {
-    const t = rnd.next() ** 1.4;
-    const x = ex + (spill.x - ex) * t + rnd.range(-3, 3) * (1 - t * 0.5);
-    const z = ez + (spill.z - ez) * t + rnd.range(-3, 3) * (1 - t * 0.5);
-    strew(placed, rnd, x, z, 0.5, 1, table, [0.16, 0.34], 0.3, white, 0.55);
-  }
+  sugarTrail(placed, rnd, { x: f.x + tear * c + f.hz * 0.4 * s, z: f.z - tear * s + f.hz * 0.4 * c }, spill, 50, ground);
   return placed;
-}
-
-/** Wine dried in drops on the marble, where the world's food is: dark, glossy, a little sticky-looking at their edges. */
-export function wineDrops(b: Builder, area: number, at: readonly { x: number; z: number; r: number }[], y: number, rnd: Rnd) {
-  const dark = new THREE.Color("#3a0418");
-  const mid = new THREE.Color("#7a0c2a");
-  for (const d of at) {
-    const drops = [{ x: d.x, z: d.z, r: d.r * 0.8 }, ...Array.from({ length: 3 }, () => ({ x: d.x + rnd.range(-d.r, d.r) * 1.6, z: d.z + rnd.range(-d.r, d.r) * 1.6, r: rnd.range(0.5, 1.4) }))];
-    for (const p of drops) {
-      const l = rnd.range(0, 6.3);
-      put(b, area, TOP.dregs, [[p.r, y - 0.02], [p.r * 0.85, y + 0.09], [p.r * 0.6, y + 0.13], [0, y + 0.14]], p.r > 2 ? 28 : 12, { x: p.x, z: p.z }, (out, x, _y, z) => {
-        out.copy(mid).lerp(dark, THREE.MathUtils.smoothstep(Math.hypot(x - p.x, z - p.z), p.r * 0.4, p.r));
-      }, { shape: (th) => 1 + 0.12 * Math.sin(th * 3 + l) + 0.07 * Math.sin(th * 5 + l * 2) });
-    }
-  }
 }
 
 /**
@@ -235,21 +193,45 @@ export function breadBasket(b: Builder, area: number, basket: Solid, bread: Soli
   far(b, area, KIND.bread, "#b06a2c", [[1, top.well], [0.6, feltAt(bread, 0.6)], [0, feltAt(bread, 0)]], 6, { x: h.x, z: h.z, sx: h.rx, sz: h.rz, angle: h.angle });
 }
 
-/** The espresso cup on its saucer: glazed white china, the coffee's dregs in it (tabletop-glsl.ts) and sugar in them. */
-export function espresso(b: Builder, area: number, saucer: Solid, cup: Solid, rnd: Rnd) {
+/** The espresso cup on its saucer: glazed white china, the coffee's dregs in it (tabletop-glsl.ts) and sugar in them, its handle an ear filling the world's slab. */
+export function espresso(b: Builder, area: number, saucer: Solid, cup: Solid, handle: Solid, rnd: Rnd) {
   const sf = roundOf(saucer);
   const cf = roundOf(cup);
   const china = (out: THREE.Color, x: number, y: number, z: number) => raw(out, (x - sf.x) / 120 + 0.5, (z - sf.z) / 120 + 0.5, (y - 760) / 70);
   const st = saucer.top as { well: number; inner: number };
-  const ct = cup.top as { well: number; rim: number; inner: number };
+  const ct = cup.top as { well: number; rim: number; inner: number; lip: number };
   const under = dishEdge(cup) * cf.rx;
   put(b, area, TOP.china, [...dishProfile(saucer, st.inner), [(under + 0.2) / sf.rx, st.well]], 72, { x: sf.x, z: sf.z, sx: sf.rx, sz: sf.rz }, china);
   put(b, area, TOP.china, [...dishProfile(cup, ct.inner), [0.5, ct.well], [0.25, ct.well], [0, ct.well]], 64, { x: cf.x, z: cf.z, sx: cf.rx, sz: cf.rz }, china);
+  // The handle: a round bar from the cup's side out and back, the loop as wide and as tall as the slab allows.
+  const hf = handle.footprint as { x: number; z: number; hx: number; hz: number };
+  const r = hf.hz * 0.9;
+  const low = (handle.bottom ?? 0) + r + 1.2;
+  const high = (handle.top as { y: number }).y - r - 0.6;
+  const wall = (y: number) => {
+    let lo = ct.lip;
+    let hi = dishEdge(cup);
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (feltAt(cup, mid) > y) lo = mid;
+      else hi = mid;
+    }
+    return lo * cf.rx - 0.4;
+  };
+  const out = hf.x + hf.hx - r - 0.3 - cf.x;
+  const cx = wall((low + high) / 2) + 4;
+  const ear: THREE.Vector3[] = [new THREE.Vector3(wall(high), high + 0.4, 0)];
+  for (let i = 0; i <= 12; i++) {
+    const a = Math.PI / 2 - (i / 12) * Math.PI;
+    ear.push(new THREE.Vector3(cx + (out - cx) * Math.max(0, Math.cos(a)) ** 0.8, (low + high) / 2 + ((high - low) / 2) * Math.sin(a), 0));
+  }
+  ear.push(new THREE.Vector3(wall(low), low - 0.4, 0));
+  for (const p of ear) p.set(cf.x + p.x, p.y, hf.z);
+  b.detail(area, tube(ear, r, 10), (p) => china(new THREE.Color(), p.x, p.y, p.z), TOP.china);
   const placed: Placement[] = [];
-  const white = () => sugarGrain;
-  strew(placed, rnd, cf.x + 1, cf.z - 1, 9, 40, () => ct.well, [0.16, 0.32], 0.3, white);
-  strew(placed, rnd, sf.x - 34, sf.z + 18, 5, 8, () => st.well, [0.16, 0.3], 0.28, white);
-  grains(b, area, placed);
+  sugarRound(placed, rnd, cf.x + 1, cf.z - 1, 9, 40, ct.well);
+  sugarRound(placed, rnd, sf.x - 34, sf.z + 18, 5, 8, st.well);
+  sugar(b, area, placed);
   far(b, area, KIND.ceramic, "#f4f2ec", [[dishEdge(saucer), saucer.bottom ?? 0], [dishEdge(saucer), (saucer.top as { rim: number }).rim], [under / sf.rx, st.well]], 6, { x: sf.x, z: sf.z, sx: sf.rx, sz: sf.rz });
   far(b, area, KIND.ceramic, "#f4f2ec", [[dishEdge(cup), cup.bottom ?? 0], [dishEdge(cup), ct.rim], [0, ct.well + 2]], 6, { x: cf.x, z: cf.z, sx: cf.rx, sz: cf.rz });
 }

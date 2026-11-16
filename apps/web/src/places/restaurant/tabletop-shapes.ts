@@ -100,7 +100,7 @@ export function revolve(profile: Profile, segments: number, at: Place, paint: Pa
         let nx = ay * bz - az * by;
         let ny = az * bx - ax * bz;
         let nz = ax * by - ay * bx;
-        const len = Math.hypot(nx, ny, nz) || 1;
+        const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
         nx /= len;
         ny /= len;
         nz /= len;
@@ -255,38 +255,62 @@ export function domeRun(solid: Solid, steps: number): [number, number][] {
   return out;
 }
 
+/** Where one copy goes, and its colour: its own, or the template's with its own blue (a design). */
+export type Copy = { matrix: THREE.Matrix4; color: THREE.Color } | { matrix: THREE.Matrix4; blue: number };
+
+const normalOf = new THREE.Matrix3();
+
 /**
- * Copies of one coded template (its colour's red and green where on it a
- * vertex is), each placed by a matrix with its own blue: many small things
- * that each carry a design, baked into one geometry.
+ * Copies of one template baked into one geometry: many small things (grains,
+ * specks, packets) each placed by its own matrix. A coded template (its
+ * colour's red and green where on it a vertex is) keeps them, each copy
+ * setting its blue. The arithmetic is written out, since a table's litter is
+ * tens of thousands of vertices.
  */
-export function stamp(template: THREE.BufferGeometry, items: readonly { matrix: THREE.Matrix4; blue: number }[], kind: number) {
-  const tp = template.attributes.position.array;
-  const tn = template.attributes.normal.array;
-  const tc = template.attributes.color.array;
-  const count = tp.length / 3;
-  const pos = new Float32Array(count * 3 * items.length);
-  const nor = new Float32Array(count * 3 * items.length);
-  const rgb = new Float32Array(count * 3 * items.length);
-  const normal = new THREE.Matrix3();
-  const v = new THREE.Vector3();
-  items.forEach(({ matrix, blue }, k) => {
-    normal.getNormalMatrix(matrix);
-    const o = k * count * 3;
-    for (let i = 0; i < count * 3; i += 3) {
-      v.set(tp[i], tp[i + 1], tp[i + 2]).applyMatrix4(matrix);
-      pos[o + i] = v.x;
-      pos[o + i + 1] = v.y;
-      pos[o + i + 2] = v.z;
-      v.set(tn[i], tn[i + 1], tn[i + 2]).applyMatrix3(normal).normalize();
-      nor[o + i] = v.x;
-      nor[o + i + 1] = v.y;
-      nor[o + i + 2] = v.z;
-      rgb[o + i] = tc[i];
-      rgb[o + i + 1] = tc[i + 1];
-      rgb[o + i + 2] = blue;
+export function copies(template: THREE.BufferGeometry, items: readonly Copy[], kind: number) {
+  const base = template.index ? template.toNonIndexed() : template;
+  const tp = base.attributes.position.array;
+  const tn = base.attributes.normal.array;
+  const tc = base.attributes.color?.array;
+  const count = tp.length;
+  const pos = new Float32Array(count * items.length);
+  const nor = new Float32Array(count * items.length);
+  const rgb = new Float32Array(count * items.length);
+  let o = 0;
+  for (const item of items) {
+    const m = item.matrix.elements;
+    const n = normalOf.getNormalMatrix(item.matrix).elements;
+    const own = "color" in item ? item.color : null;
+    const blue = "blue" in item ? item.blue : 0;
+    for (let i = 0; i < count; i += 3, o += 3) {
+      const x = tp[i];
+      const y = tp[i + 1];
+      const z = tp[i + 2];
+      pos[o] = m[0] * x + m[4] * y + m[8] * z + m[12];
+      pos[o + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+      pos[o + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+      const a = tn[i];
+      const b = tn[i + 1];
+      const c = tn[i + 2];
+      const nx = n[0] * a + n[3] * b + n[6] * c;
+      const ny = n[1] * a + n[4] * b + n[7] * c;
+      const nz = n[2] * a + n[5] * b + n[8] * c;
+      const l = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1);
+      nor[o] = nx * l;
+      nor[o + 1] = ny * l;
+      nor[o + 2] = nz * l;
+      if (own) {
+        rgb[o] = own.r;
+        rgb[o + 1] = own.g;
+        rgb[o + 2] = own.b;
+      } else if (tc) {
+        rgb[o] = tc[i];
+        rgb[o + 1] = tc[i + 1];
+        rgb[o + 2] = blue;
+      }
     }
-  });
+  }
+  if (base !== template) base.dispose();
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
   geometry.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
@@ -296,3 +320,54 @@ export function stamp(template: THREE.BufferGeometry, items: readonly { matrix: 
 
 /** A colour set straight from three numbers, for the kinds that read their vertex colour as coordinates. */
 export const raw = (out: THREE.Color, r: number, g: number, b: number) => out.setRGB(r, g, b, THREE.LinearSRGBColorSpace);
+
+/**
+ * A round tube of radius r along a line of points (a wire, a fibre), its
+ * cross-section carried along without twisting; a closed loop joins its ends.
+ */
+export function tube(points: readonly THREE.Vector3[], r: number, sides: number, closed = false) {
+  const n = points.length;
+  const ring: THREE.Vector3[][] = [];
+  const along = new THREE.Vector3();
+  const side = new THREE.Vector3();
+  const up = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    const prev = points[closed ? (i - 1 + n) % n : Math.max(0, i - 1)];
+    const next = points[closed ? (i + 1) % n : Math.min(n - 1, i + 1)];
+    along.subVectors(next, prev).normalize();
+    // The first frame from any line across the tube, then each turned only as far as the line turns.
+    if (i === 0) side.set(Math.abs(along.y) < 0.9 ? 0 : 1, Math.abs(along.y) < 0.9 ? 1 : 0, 0).cross(along).normalize();
+    else side.sub(along.clone().multiplyScalar(side.dot(along))).normalize();
+    up.crossVectors(along, side);
+    const row: THREE.Vector3[] = [];
+    for (let k = 0; k < sides; k++) {
+      const a = (k / sides) * Math.PI * 2;
+      row.push(new THREE.Vector3().copy(side).multiplyScalar(Math.cos(a)).addScaledVector(up, Math.sin(a)));
+    }
+    ring.push(row);
+  }
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const emit = (i: number, k: number) => {
+    const d = ring[i][k % sides];
+    const p = points[i];
+    pos.push(p.x + d.x * r, p.y + d.y * r, p.z + d.z * r);
+    nor.push(d.x, d.y, d.z);
+  };
+  const segs = closed ? n : n - 1;
+  for (let i = 0; i < segs; i++) {
+    const j = (i + 1) % n;
+    for (let k = 0; k < sides; k++) {
+      emit(i, k);
+      emit(i, k + 1);
+      emit(j, k);
+      emit(j, k);
+      emit(i, k + 1);
+      emit(j, k + 1);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+  return geometry;
+}

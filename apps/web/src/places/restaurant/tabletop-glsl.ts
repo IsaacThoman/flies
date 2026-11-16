@@ -13,11 +13,11 @@ const [C0] = PART_KINDS.tabletop.clear;
 
 /** The tabletop's own kinds. */
 export const TOP = {
-  /** Printed paper: the laminated menu (design 0) and the sugar packets (designs 1-4). Colour: across, along, design / 8. */
+  /** Printed paper: the laminated menu (design 0), the sugar packets standing in the caddy (white 1, brown 2, pink 3, blue-banded white 5) and the torn one (4). Colour: across, along, design / 8. */
   print: S0,
   /** The bud vase's bloom. Colour: its offset from the middle (1 at the edge), height up it. */
   rose: S0 + 1,
-  /** A shaker's steel cap (b 0 salt, 1/3 pepper), its ground pepper (b 2/3), and a grain of sugar (b 1). Colour: offset from the middle / 40 mm. */
+  /** A shaker's steel cap (b 0 salt, 0.2 pepper), ground pepper (b 0.4), salt (b 0.6), and a crystal of sugar (b 1). Colour: offset from the middle / 40 mm. */
   shaker: S0 + 2,
   /** The heel of bread: crust, and crumb where it was cut. Colour: across it, along it. */
   bread: S0 + 3,
@@ -39,6 +39,9 @@ export const TOP = {
 
 /** Where the wine glass's bowl starts, for the stain up its inside. */
 export const BOWL_BASE = 855;
+
+/** A sugar packet standing in the caddy: across, up, and how deep its crimped seals are (mm). */
+export const PACKET = { across: 55, up: 60, seal: 4.5 };
 
 const k = (name: string, value: number) => `const int K_TOP_${name} = ${value};`;
 
@@ -91,29 +94,46 @@ if (rK >= K_TOP_PRINT && rK <= K_TOP_CHINA) {
       rCoat = 0.9;
       rCoatRough = 0.05;
     } else {
-      // A sugar packet: paper, a band of colour with a round mark on it, crimped where it was sealed.
-      bool lying = design > 3.5;
-      vec2 size = lying ? vec2(50.0, 36.0) : vec2(41.6, 55.0);
+      // A sugar packet: paper, a band of colour across it with a round mark and pinstripes either side, crimped where it was sealed.
+      bool lying = abs(design - 4.0) < 0.5;
+      vec2 size = lying ? vec2(50.0, 36.0) : vec2(${PACKET.across.toFixed(1)}, ${PACKET.up.toFixed(1)});
       vec2 mm = tc.rg * size;
       float along = lying ? mm.x : mm.y;
-      float across = lying ? size.x : size.y;
-      vec3 paper = design > 2.5 && !lying ? vec3(0.9, 0.6, 0.64) : design > 1.5 && !lying ? vec3(0.6, 0.42, 0.25) : vec3(0.93, 0.92, 0.88);
-      vec3 ink = design > 2.5 && !lying ? vec3(0.95, 0.94, 0.92) : design > 1.5 && !lying ? vec3(0.24, 0.12, 0.06) : vec3(0.62, 0.08, 0.06);
-      vec3 c = paper * (0.95 + 0.07 * rFbm(mm * 1.3) * rDetail(mm * 1.3));
-      float stripe = rBand(along, across * 0.36, across * 0.64, 0.2);
-      float mark = 1.0 - smoothstep(4.0, 4.4, length(mm - size * 0.5));
-      c = mix(c, ink, stripe);
-      c = mix(c, paper, mark * stripe);
+      float span = lying ? size.x : size.y;
+      vec3 paper = vec3(0.93, 0.92, 0.88);
+      vec3 ink = vec3(0.62, 0.08, 0.06);
+      vec3 mark = paper;
+      if (abs(design - 2.0) < 0.5) {
+        paper = vec3(0.58, 0.4, 0.23);
+        ink = vec3(0.2, 0.1, 0.05);
+        mark = vec3(0.86, 0.72, 0.46);
+      } else if (abs(design - 3.0) < 0.5) {
+        paper = vec3(0.93, 0.6, 0.66);
+        ink = vec3(0.97, 0.95, 0.94);
+        mark = vec3(0.8, 0.22, 0.38);
+      } else if (design > 4.5) {
+        ink = vec3(0.1, 0.22, 0.5);
+      }
+      float d = rDetail(mm * 1.3);
+      vec3 c = paper * (0.95 + 0.07 * rFbm(mm * 1.3) * d);
+      float band = rBand(along, span * 0.36, span * 0.64, 0.2);
+      float pin = max(rBand(along, span * 0.3, span * 0.315, 0.08), rBand(along, span * 0.685, span * 0.7, 0.08));
+      c = mix(c, ink, max(band, pin * 0.85));
+      float r = length(mm - size * 0.5);
+      c = mix(c, mark, (1.0 - smoothstep(4.6, 5.0, r)) * band);
+      c = mix(c, ink, rBand(r, 2.4, 3.2, 0.15) * band);
       // The seals, crimped across: the far end and both long sides of the one lying flat, the top and bottom of those standing.
       vec2 to = min(mm, size - mm);
       bool end = lying && mm.x > size.x - 4.0;
-      float seal = end || to.y < (lying ? 2.5 : 3.5) ? 1.0 : 0.0;
+      float seal = end || to.y < (lying ? 2.5 : ${PACKET.seal.toFixed(1)}) ? 1.0 : 0.0;
       float crimp = 0.5 + 0.5 * sin((end ? mm.y : mm.x) * 9.0);
-      c *= 1.0 - seal * (0.12 + 0.12 * crimp) * rDetail(mm * 1.5);
+      c *= 1.0 - seal * (0.12 + 0.16 * crimp) * rDetail(mm * 1.5);
+      // A standing packet's sides are folds, shadowed in their crease.
+      if (!lying) c *= 1.0 - (1.0 - smoothstep(0.0, 0.03, min(tc.r, 1.0 - tc.r))) * 0.3;
       // The torn end: paper fibres, whiter.
       if (lying) c = mix(c, vec3(0.97, 0.96, 0.93), (1.0 - smoothstep(4.0, 6.5, mm.x)) * (0.5 + 0.5 * rNoise(mm * 6.0)));
       diffuseColor.rgb = c;
-      rRough = 0.82;
+      rRough = 0.82 - seal * 0.2;
     }
   }
   if (rK == K_TOP_ROSE) {
@@ -133,9 +153,12 @@ if (rK >= K_TOP_PRINT && rK <= K_TOP_CHINA) {
       c = mix(c, vec3(0.2, 0.32, 0.1), 1.0 - smoothstep(0.08, 0.12, rho));
     } else if (rN.y < 0.55 && h < 0.5) {
       float f = fract(th / 6.2832 * 5.0 + 0.15);
+      float which = floor(th / 6.2832 * 5.0 + 0.15);
       float edge = 0.38 + 0.08 * sin(f * 3.14159);
       fold = (1.0 - smoothstep(0.0, 0.1, f)) + smoothstep(edge - 0.02, edge, h) * 0.6;
-      c = mix(deep, petal, smoothstep(0.0, 0.35, h));
+      vec3 own = mix(vec3(0.78, 0.1, 0.14), vec3(0.44, 0.02, 0.12), rHash1(which + 3.0)) * (0.8 + 0.4 * rHash1(which + 9.0));
+      c = mix(deep, own, smoothstep(0.0, 0.35, h));
+      c *= 1.0 - 0.1 * rBand(fract(f * 7.0), 0.45, 0.55, 0.06) * smoothstep(0.1, 0.3, h);
       c = mix(c, lip, smoothstep(edge - 0.1, edge, h) * 0.5);
     } else {
       // Petals laid round in a spiral, each a broad rounded blade a little smaller than the last and lying over it:
@@ -159,8 +182,14 @@ if (rK >= K_TOP_PRINT && rK <= K_TOP_CHINA) {
       }
       float under = 1.0 - smoothstep(0.0, 0.09, over);
       fold = under * 0.85;
-      c = mix(petal, deep, which / 15.0 * 0.6 + (1.0 - smoothstep(0.0, 0.18, rho)) * 0.5);
+      // Each petal its own red: some toward crimson, some toward a cooler wine, the outer ones paler and a few bruised at the edge.
+      float hue = rHash1(which + 11.0);
+      vec3 own = mix(vec3(0.8, 0.1, 0.13), vec3(0.46, 0.02, 0.14), hue) * (0.8 + 0.4 * rHash1(which + 5.0));
+      c = mix(own, deep, which / 15.0 * 0.6 + (1.0 - smoothstep(0.0, 0.18, rho)) * 0.5);
       c = mix(c, lip, (1.0 - smoothstep(0.0, 0.035, edgeD)) * 0.55);
+      c = mix(c, vec3(0.28, 0.08, 0.06), (1.0 - smoothstep(0.0, 0.02, edgeD)) * step(0.75, rHash1(which + 23.0)) * 0.7);
+      // Veins fanning from each petal's base.
+      c *= 1.0 - 0.12 * rBand(fract(th * 9.0 + which * 0.37), 0.45, 0.55, 0.05) * smoothstep(0.1, 0.6, rho);
     }
     float d = rDetail(vec2(th * 40.0, rho * 30.0));
     c *= 1.0 - fold * 0.6;
@@ -170,11 +199,11 @@ if (rK >= K_TOP_PRINT && rK <= K_TOP_CHINA) {
     rRough = 0.62;
   }
   if (rK == K_TOP_SHAKER) {
-    if (tc.b < 0.5) {
+    if (tc.b < 0.3) {
       // A steel cap: brushed round, holes in its crown (six small for salt, three for pepper), salt caked at them.
       vec2 o = (tc.rg - 0.5) * 40.0;
       float r = length(o);
-      bool pepper = tc.b > 0.2;
+      bool pepper = tc.b > 0.1;
       float n = pepper ? 3.0 : 6.0;
       float hr = pepper ? 0.85 : 0.6;
       float a = atan(o.y, o.x);
@@ -190,19 +219,40 @@ if (rK >= K_TOP_PRINT && rK <= K_TOP_CHINA) {
       rMetal = (1.0 - hole) * (1.0 - caked);
       rRough = 0.26 + 0.12 * brush + caked * 0.5;
     } else if (tc.b > 0.8) {
-      // A grain of sugar: clear crystal, so the room's light comes out of every face of it, its facets flashing.
-      diffuseColor.rgb = vec3(0.93, 0.92, 0.9);
-      rEmit += diffuseColor.rgb * rRoomLight(vWorld, vec3(0.0, 1.0, 0.0)) * 0.22;
+      // A crystal of sugar: clear, so the room's light comes through it and out of every face, brightest at its edges; now and then a facet flashes.
+      diffuseColor.rgb = vec3(0.97, 0.96, 0.94);
+      float flash = step(0.86, rHash(floor(vWorld.xz * 2.5) + rN.xz * 3.0));
+      rEmit += diffuseColor.rgb * rRoomLight(vWorld, vec3(0.0, 1.0, 0.0)) * (0.6 + flash * 0.6);
       rRough = 0.1;
       rCoat = 1.0;
       rCoatRough = 0.03;
     } else {
-      // Ground pepper: dark, flecked with grey and brown husk.
-      vec2 pp = vec2(vWorld.x + vWorld.z, vWorld.y) * 4.0;
-      float d = rDetail(pp);
-      float fleck = rNoise(pp) * 0.6 + rNoise(pp * 2.7 + 1.3) * 0.4;
-      diffuseColor.rgb = mix(vec3(0.07, 0.065, 0.06), mix(vec3(0.35, 0.33, 0.3), vec3(0.32, 0.2, 0.12), rNoise(pp * 0.7)), smoothstep(0.55, 0.8, fleck) * d + (1.0 - d) * 0.25);
-      rRough = 0.85;
+      // Salt or ground pepper packed in a shaker: grains a third of a millimetre across, crowded against the glass and heaped on top,
+      // each its own shade, dark in the gaps between. Laid out round the side by the way round and up, on top by where.
+      bool salt = tc.b > 0.5;
+      vec2 o = (tc.rg - 0.5) * 40.0;
+      vec2 uv = (rN.y > 0.6 ? o : vec2(atan(o.y, o.x) * length(o), vWorld.y)) / (salt ? 0.3 : 0.38);
+      uv.x += rHash1(floor(uv.y)) * 0.8;
+      uv.y += rHash1(floor(uv.x) + 3.0) * 0.6;
+      vec2 cell = floor(uv);
+      vec2 fq = min(fract(uv), 1.0 - fract(uv));
+      float e = min(fq.x, fq.y);
+      float h = rHash(cell + (rN.y > 0.6 ? 31.0 : 0.0));
+      float d = rDetail(uv * 1.4);
+      float gap = (1.0 - smoothstep(0.02, 0.12, e)) * d;
+      vec3 c;
+      if (salt) {
+        c = vec3(0.92, 0.92, 0.9) * mix(0.86, 0.62 + 0.38 * h, d) * (1.0 - gap * 0.6);
+        rEmit += c * rRoomLight(vWorld, rN) * 0.12 * step(0.85, h) * d;
+        rRough = 0.3 + gap * 0.4;
+        rCoat = 0.5;
+      } else {
+        vec3 grain = h < 0.55 ? vec3(0.05, 0.045, 0.04) : h < 0.75 ? vec3(0.3, 0.29, 0.27) : h < 0.9 ? vec3(0.3, 0.19, 0.1) : vec3(0.52, 0.44, 0.32);
+        c = mix(vec3(0.14, 0.12, 0.1), grain, d) * (1.0 - gap * 0.6);
+        rRough = 0.85;
+      }
+      diffuseColor.rgb = c;
+      rAO *= 1.0 - gap * 0.4;
     }
   }
   if (rK == K_TOP_BREAD) {
@@ -267,7 +317,7 @@ if (rK >= K_TOP_PRINT && rK <= K_TOP_CHINA) {
     float coffee = 0.0;
     float gloss = 0.0;
     if (y > 775.5) {
-      bool inside = rN.y > 0.5 || dot(rN.xz, o) < 0.0;
+      bool inside = (rN.y > 0.5 || dot(rN.xz, o) < 0.0) && rho < 28.5;
       if (inside) {
         float onFloor = 1.0 - smoothstep(776.3, 777.5, y);
         float edge = 13.0 + 1.6 * sin(a * 3.0 + 1.0) + 0.8 * sin(a * 7.0 + 2.0);
@@ -320,7 +370,8 @@ float topStain;
 
 const CLEAR_COLOR = /* glsl */ `
 topStain = 0.0;
-if (rK == K_TOP_DREGS) { rAlpha = 0.78; rRough = 0.1; }
+// Dried wine: as opaque as it is dark, a pale film where it lay thin.
+if (rK == K_TOP_DREGS) { rAlpha = mix(0.92, 0.4, smoothstep(0.03, 0.35, diffuseColor.r)); rRough = 0.1; }
 if (rK == K_TOP_BOWL) {
   // Wine left a film inside the glass above where it stands, and its tears run back down in streaks.
   vec2 o = (diffuseColor.rg - 0.5) * 84.0;

@@ -1,18 +1,16 @@
 // The glass on the tables, and what is in it: the wine glass left with red in
 // its bowl, the bud vase with its rose, the votive with its tealight, the
-// sugar caddy full of packets, the salt and pepper, the ketchup bottle. Each
-// drawn to the world's felt shape (its outside where the world has it, its
-// rim and inside the world's top), what is inside it within that, and a
-// stand-in of a few faces for far off.
+// salt and pepper, the ketchup bottle. Each drawn to the world's felt shape
+// (its outside where the world has it, its rim and inside the world's top),
+// what is inside it within that, and a stand-in of a few faces for far off.
 
 import * as THREE from "three";
 import type { Solid } from "@fly/world";
-import { mat4, paint, random } from "../../scene/build.ts";
+import { mat4, random } from "../../scene/build.ts";
 import type { Builder } from "./builder.ts";
-import { box, sweepRect } from "./geometry.ts";
 import { KIND } from "./kinds.ts";
 import { BOWL_BASE, TOP } from "./tabletop-glsl.ts";
-import { dishEdge, dishProfile, domeRun, feltAt, feltRun, raw, revolve, roundOf, stamp, turned } from "./tabletop-shapes.ts";
+import { dishEdge, dishProfile, domeRun, feltAt, feltRun, raw, revolve, roundOf, turned } from "./tabletop-shapes.ts";
 import type { Paint, Place, Profile, RevolveOptions } from "./tabletop-shapes.ts";
 
 const WHITE = new THREE.Color("#ffffff");
@@ -201,53 +199,6 @@ export function votive(b: Builder, area: number, solid: Solid) {
 }
 
 /**
- * The sugar caddy: a box of thick glass, its corners rounded, full of
- * packets standing on end, their tops level with its rim, where the fly
- * walks on them; most white, a run of brown and of pink.
- */
-export function sugarCaddy(b: Builder, area: number, solid: Solid) {
-  const f = solid.footprint as { x: number; z: number; hx: number; hz: number; angle: number };
-  const top = (solid.top as { y: number }).y;
-  const ground = solid.bottom ?? 0;
-  const place = mat4({ x: f.x, y: 0, z: f.z }, new THREE.Euler(0, f.angle, 0));
-  const corner = 3.5;
-  const wall = 2.5;
-  const floor = ground + 6;
-  const rim: [number, number][] = [
-    [corner - wall, floor],
-    [corner - wall, top - 0.8],
-    [corner - wall + 0.25, top - 0.2],
-    [corner - wall + 0.7, top],
-    [corner - 0.7, top],
-    [corner - 0.25, top - 0.25],
-    [corner, top - 0.8],
-    [corner, ground - 0.1],
-  ];
-  b.detail(area, sweepRect(f.hx - corner, f.hz - corner, rim, 5), WHITE, KIND.glass, place);
-  const ix = f.hx - wall;
-  const iz = f.hz - wall;
-  b.detail(area, box(-ix, floor - 0.6, -iz, ix, floor, iz), WHITE, KIND.glass, place);
-  const rnd = random(64);
-  const rows = 21;
-  // Runs of white, brown and pink, as they were pushed in.
-  const DESIGNS = [1, 1, 1, 2, 2, 1, 1, 3, 3, 3, 1, 2, 1, 1, 1, 2, 2, 2, 1, 3, 1, 1, 2, 1, 1, 1, 3, 3];
-  const pitch = (iz * 2) / rows;
-  const width = ix - 0.35;
-  // One packet, a unit box coded across and up it, stamped out for each.
-  const unit = paint(new THREE.BoxGeometry(1, 1, 1), (p) => raw(new THREE.Color(), p.x + 0.5, p.y + 0.5, 0));
-  const packets: { matrix: THREE.Matrix4; blue: number }[] = [];
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < rows; i++) {
-      const height = top - 0.15 - rnd.range(0, 0.35) - (floor + 0.2);
-      const local = mat4({ x: (side * (ix + 0.1)) / 2, y: floor + 0.2 + height / 2, z: -iz + pitch * (i + 0.5) }, new THREE.Euler(rnd.range(-0.012, 0.012), rnd.range(-0.01, 0.01), 0), { x: width, y: height, z: pitch - 0.12 });
-      packets.push({ matrix: place.clone().multiply(local), blue: DESIGNS[(i + (side > 0 ? 9 : 0)) % DESIGNS.length] / 8 });
-    }
-  }
-  b.detailPainted(area, stamp(unit, packets, TOP.print), TOP.print);
-  b.standIn(area, box(-f.hx, ground, -f.hz, f.hx, top, f.hz), "#e8e2d4", KIND.paper, place);
-}
-
-/**
  * The salt and pepper shakers, in pairs: fluted glass with a thick foot,
  * salt or pepper two thirds up it, and a steel cap whose crown is the
  * world's dome, holes in it. Each is the same shaker, so one of each is
@@ -283,8 +234,8 @@ export function shakers(b: Builder, solids: readonly Solid[], areaOf: (s: Solid)
     const heap = (th: number, row: number) => (row >= 2 ? 0.6 * Math.sin(th * 2 + (pepper ? 2 : 0)) * Math.min(1, (5 - row) / 2) : 0);
     const near: [THREE.BufferGeometry, number][] = [
       [turned(KIND.glass, glass, 36, at, WHITE, { shape: flute }), KIND.glass],
-      pepper ? [turned(TOP.shaker, grains, 24, at, (out) => raw(out, 0.5, 0.5, 2 / 3), { lift: heap }), TOP.shaker] : [turned(KIND.sugar, grains, 24, at, new THREE.Color("#f2f0ea"), { lift: heap }), KIND.sugar],
-      [turned(TOP.shaker, cap, 28, at, (out, x, _y, z) => raw(out, x / 40 + 0.5, z / 40 + 0.5, pepper ? 1 / 3 : 0)), TOP.shaker],
+      [turned(TOP.shaker, grains, 36, at, (out, x, _y, z) => raw(out, x / 40 + 0.5, z / 40 + 0.5, pepper ? 0.4 : 0.6), { lift: heap }), TOP.shaker],
+      [turned(TOP.shaker, cap, 28, at, (out, x, _y, z) => raw(out, x / 40 + 0.5, z / 40 + 0.5, pepper ? 0.2 : 0)), TOP.shaker],
     ];
     const salt = pepper ? "#2a2826" : "#ecebe6";
     const color = (p: THREE.Vector3) => (p.y > capFoot + 0.5 ? "#b8babc" : salt);
