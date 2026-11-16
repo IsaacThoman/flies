@@ -9,9 +9,10 @@
 // over the fly to the other side unless it must, and every move eases in and
 // out (critically damped springs, so nothing overshoots or pops). It aims a
 // little ahead of where the fly is going, so it follows a walk or a jump
-// without lagging off it. It never goes inside anything, and nothing comes
-// between it and the fly: a table top over the fly, a wall behind it, brings
-// the camera in front of it (at once), and it eases back out once clear.
+// without lagging off it. It never goes inside anything, and nothing big
+// stands between it and the fly: a table top over the fly or a wall behind
+// it brings the camera in front of it (at once), and it eases back out once
+// clear.
 //
 // The shots are framed for the TV's 16:9. On a wider screen the camera sees
 // more to the sides; on a narrower one (a tablet, a phone held upright) it

@@ -125,10 +125,13 @@ export class World {
     const n = place.solids.length;
     const bounds = (this.#bounds = new Float64Array(n * B));
     const f = place.floor;
-    let minX = f.kind === "circle" ? -f.r : -f.hx;
-    let maxX = -minX;
-    let minZ = f.kind === "circle" ? -f.r : -f.hz;
-    let maxZ = -minZ;
+    const fx = f.kind === "circle" ? f.r : f.hx;
+    const fz = f.kind === "circle" ? f.r : f.hz;
+    // Everything's extent sizes the cells.
+    let minX = -fx;
+    let maxX = fx;
+    let minZ = -fz;
+    let maxZ = fz;
     for (let i = 0; i < n; i++) {
       const solid = place.solids[i];
       const p = solid.footprint;
@@ -162,12 +165,10 @@ export class World {
     const span = (lo: number, hi: number) => Math.floor(hi * inv) - Math.floor(lo * inv) + 1;
     const big: number[] = [];
     // The grid covers the floor and everything but the big solids.
-    const f0 = f.kind === "circle" ? f.r : f.hx;
-    const f1 = f.kind === "circle" ? f.r : f.hz;
-    minX = -f0;
-    maxX = f0;
-    minZ = -f1;
-    maxZ = f1;
+    minX = -fx;
+    maxX = fx;
+    minZ = -fz;
+    maxZ = fz;
     for (let i = 0; i < n; i++) {
       const b = i * B;
       if (span(bounds[b], bounds[b + 1]) * span(bounds[b + 2], bounds[b + 3]) > BIG_CELLS) {
