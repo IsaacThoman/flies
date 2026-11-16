@@ -134,7 +134,7 @@ export class Stage {
       this.#envDirty ||= this.#envStale();
     }
     this.backdrop.update(time, camera, this.light, this.weather);
-    this.set.update(time, this.light, this.weather);
+    this.set.update(time, this.light, this.weather, camera);
   }
 
   /**
@@ -245,7 +245,7 @@ export class Stage {
     r.render(this.backdrop.scene, camera);
     r.clearDepth();
     camera.near = NEAR.near;
-    camera.far = NEAR.far;
+    camera.far = this.current.reach ?? NEAR.far;
     camera.updateProjectionMatrix();
     r.render(scene, camera);
     camera.near = near;

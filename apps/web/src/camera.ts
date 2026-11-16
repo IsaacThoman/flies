@@ -199,6 +199,7 @@ export class CameraDirector {
   #started = false;
   #time = 0;
   #focus = new THREE.Vector3();
+  #target = new THREE.Vector3();
   #eye = new THREE.Vector3();
   #hit: RayHit = { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 1, z: 0 }, solid: -1, t: 0 };
   #dir = { x: 0, y: 0, z: 0 };
@@ -290,7 +291,9 @@ export class CameraDirector {
     let follow: number;
     let aimSettle: number;
     if (shot.around === "table") {
-      focus.set(p.x * 0.35, 60 + p.y * 0.3, p.z * 0.35);
+      const f = this.#scene.focus;
+      if (f) focus.set(f.x + p.x * f.follow, f.y + p.y * 0.3, f.z + p.z * f.follow);
+      else focus.set(p.x * 0.35, 60 + p.y * 0.3, p.z * 0.35);
       this.#goal = shot.side + this.#orbit;
       follow = settle;
       aimSettle = settle * 0.8;
@@ -312,6 +315,9 @@ export class CameraDirector {
       this.#chooseSide(body, shot, distance, height, dt);
     }
     if (!this.#started) this.#jump(focus, shot, distance, height);
+    // A room's whole view may turn toward the fly from the point it circles.
+    const lean = shot.around === "table" ? (this.#scene.focus?.aim ?? 0) : 0;
+    const target = this.#target.set(focus.x + (p.x - focus.x) * lean, focus.y + (p.y - focus.y) * lean, focus.z + (p.z - focus.z) * lean);
 
     const s = this.#v;
     const c = this.#center;
@@ -374,9 +380,9 @@ export class CameraDirector {
     // To put the fly to one side, aim the other way along the camera's right.
     const aside = -(shot.across ?? 0) * ground * Math.tan((view * Math.PI) / 360) * this.camera.aspect;
     const a = this.#aim;
-    a.x = damp(a.x, focus.x + v.x * lead + Math.cos(az) * aside, s, 3, aimSettle, dt);
-    a.y = damp(a.y, focus.y + lift + v.y * lead, s, 4, aimSettle, dt);
-    a.z = damp(a.z, focus.z + v.z * lead - Math.sin(az) * aside, s, 5, aimSettle, dt);
+    a.x = damp(a.x, target.x + v.x * lead + Math.cos(az) * aside, s, 3, aimSettle, dt);
+    a.y = damp(a.y, target.y + lift + v.y * lead, s, 4, aimSettle, dt);
+    a.z = damp(a.z, target.z + v.z * lead - Math.sin(az) * aside, s, 5, aimSettle, dt);
     this.#started = true;
 
     cam.position.copy(eye);

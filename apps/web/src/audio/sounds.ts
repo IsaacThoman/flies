@@ -293,6 +293,101 @@ function barLoop(ctx: BaseAudioContext) {
   return buffer;
 }
 
+/**
+ * A bistro after closing: the ventilation's hush and a ballast's faint hum;
+ * the drinks fridge's compressor starting with a knock, droning with a
+ * little rattle for most of half the minute and clicking off; the ice machine
+ * under the counter dropping a batch and refilling; the building ticking as
+ * it cools; and the city through the shop windows, a low wash with now and
+ * then a car going by outside. A minute that loops, rendered at a low rate
+ * (it is all below 4 kHz), its tail cross-faded into its head.
+ */
+function restaurantLoop(ctx: BaseAudioContext) {
+  const rate = 8000;
+  const seconds = 64;
+  const length = seconds * rate;
+  const join = rate;
+  const out = new Float32Array(length + join);
+  const r = noise(53);
+  // Whole cycles can be reused: these quiet motors don't need a sine per sample on the TV.
+  const mains = new Float32Array(rate / 50);
+  const motor = new Float32Array(rate);
+  for (let i = 0; i < mains.length; i++) mains[i] = Math.sin(TAU * 100 * i / rate) * 0.003 + Math.sin(TAU * 200 * i / rate) * 0.001;
+  for (let i = 0; i < motor.length; i++) motor[i] = Math.sin(TAU * 47 * i / rate) * 0.019 + Math.sin(TAU * 94 * i / rate) * 0.007 + Math.sin(TAU * 141 * i / rate) * 0.002;
+  let air = 0;
+  let air2 = 0;
+  let street = 0;
+  let street2 = 0;
+  let rumble = 0;
+  let rattle = 0;
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate;
+    const white = r();
+    air += (white - air) * 0.07;
+    air2 += (air - air2) * 0.1;
+    street += (white - street) * 0.008;
+    street2 += (street - street2) * 0.05;
+    rumble += (white - rumble) * 0.025;
+    rattle += (white - rattle) * 0.28;
+    // A complete compressor cycle leaves most of the minute noticeably quieter.
+    const running = Math.max(0, Math.min(1, (t - 9) / 1.8, (35 - t) / 0.12));
+    out[i] = air2 * 0.075 + street2 * 0.045 + mains[i % mains.length]
+      + running * (motor[i % motor.length] + rumble * 0.065 + (rattle - rumble) * 0.008);
+  }
+  const at = (time: number, len: number, synth: (t: number) => number) => {
+    const i0 = Math.round(time * rate);
+    for (let i = 0; i < len * rate; i++) out[i0 + i] += synth(i / rate);
+  };
+  const knock = (f: number, t: number, decay: number) => attack(t, 0.0015) * Math.exp(-t * decay) * (Math.sin(TAU * f * t) + Math.sin(TAU * f * 1.73 * t) * 0.3);
+  at(9, 0.3, (t) => knock(64, t, 22) * 0.016);
+  at(35, 0.15, (t) => knock(460, t, 65) * 0.014);
+  for (const [time, f] of [[6.3, 720], [38.6, 560], [57.1, 830]]) at(time, 0.2, (t) => knock(f, t, 60) * 0.012);
+
+  // The bin is under the counter: take the sharp edge off the whole cascade before mixing it in.
+  const ice = new Float32Array(rate * 3);
+  for (let t = 0; t < 1.8; t += 0.035 + (r() + 1) * 0.055) {
+    const f = 430 + (r() + 1) * 340;
+    const gain = 0.014 + (r() + 1) * 0.012;
+    const start = Math.round(t * rate);
+    for (let i = 0; i < rate * 0.2; i++) ice[start + i] += knock(f, i / rate, 35) * gain;
+  }
+  let muffled = 0;
+  for (let i = 0; i < ice.length; i++) {
+    muffled += (ice[i] - muffled) * 0.22;
+    out[Math.round(43.8 * rate) + i] += muffled;
+  }
+  let water = 0;
+  let water2 = 0;
+  at(46, 3.6, (t) => {
+    water += (r() - water) * 0.24;
+    water2 += (water - water2) * 0.12;
+    return (water - water2) * Math.min(1, t / 0.3, (3.6 - t) / 0.6) * 0.045;
+  });
+
+  // Glass keeps the tyre hiss low; the engine falls in pitch as each car goes by, without panning.
+  for (const [time, duration, gain] of [[18.4, 6.4, 0.075], [51.5, 5.2, 0.06]]) {
+    let tyre = 0;
+    let tyre2 = 0;
+    let phase = 0;
+    at(time, duration, (t) => {
+      const u = t / duration;
+      const envelope = 16 * u * u * (1 - u) * (1 - u);
+      tyre += (r() - tyre) * 0.32;
+      tyre2 += (tyre - tyre2) * 0.15;
+      phase += TAU * (92 - 24 * u) / rate;
+      return (tyre2 + Math.sin(phase) * 0.07) * envelope * gain;
+    });
+  }
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  data.set(out.subarray(0, length));
+  for (let i = 0; i < join; i++) {
+    const k = i / join;
+    data[i] = out[i] * k + out[length + i] * (1 - k);
+  }
+  return buffer;
+}
+
 /** Renders `seconds` that loop without a seam: the tail is cross-faded into the head. */
 function renderLoop(ctx: BaseAudioContext, seconds: number, synth: Synth) {
   const length = Math.round(seconds * RATE);
@@ -397,7 +492,7 @@ function kitchenLoop(ctx: BaseAudioContext) {
 }
 
 /** The sound of a place, under everything else: its loop, and how the birds outside and the rain are heard there. */
-export type Ambience = "outdoors" | "kitchen" | "lab" | "bar";
+export type Ambience = "outdoors" | "kitchen" | "lab" | "bar" | "restaurant";
 
 const AMBIENCES: Record<
   Ambience,
@@ -414,6 +509,7 @@ const AMBIENCES: Record<
   kitchen: { loop: kitchenLoop, birds: 0.25, rain: 0.5 },
   lab: { loop: labLoop },
   bar: { loop: barLoop },
+  restaurant: { loop: restaurantLoop, birds: 0.12, rain: 0.45 },
 };
 
 type Loop = { source: AudioBufferSourceNode; gain: GainNode };

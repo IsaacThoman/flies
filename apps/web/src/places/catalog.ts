@@ -8,6 +8,7 @@ export const PLACES = [
   { id: "windowsill", name: "Windowsill", to: "the windowsill", surface: "sill" },
   { id: "lab", name: "Lab bench", to: "the lab bench", surface: "bench" },
   { id: "bar", name: "Bar", to: "the bar", surface: "bar" },
+  { id: "restaurant", name: "Restaurant", to: "the restaurant", surface: "room" },
 ] as const;
 
 export type PlaceId = (typeof PLACES)[number]["id"];
