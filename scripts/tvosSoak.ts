@@ -35,6 +35,7 @@ export function soakConfig(minutes = 30) {
   throws();
   // Past Light and Weather to View.
   press("ArrowRight", 5);
+  press("ArrowUp", 6);
   press("ArrowDown", 5);
   wait({ view: "eyes" });
   phase("eye picture low", 15000);

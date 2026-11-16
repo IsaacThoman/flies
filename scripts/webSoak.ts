@@ -22,7 +22,7 @@ declare global { var __fly: Game; }
 const PHASES = ["places", "climate", "tools", "menus", "eyes", "wallpaper"] as const;
 type Phase = typeof PHASES[number];
 type Sample = { seconds: number; phase: string; place: string; checkpoint: boolean; [metric: string]: number | string | boolean };
-const STATE = ["screen", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden"];
+const STATE = ["screen", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden", "xray", "nervesInset"];
 const CLOCKS = ["gameSeconds", "audioSeconds", "eyesUpdates"];
 const METRICS = ["geometries", "textures", "programs", "calls", "triangles", "heap", "backing", "workerHeap", "workerBacking", "nodes", "listeners", "audioNodes", "frameMs", "brainSpeed", "storage"];
 
@@ -100,6 +100,8 @@ async function canonical(page: Page) {
     g.settings.place = "turns";
     g.settings.eyes = "low";
     g.settings.eyesInset = "always";
+    g.settings.nerves = "always";
+    g.settings.xray = "off";
     g.settings.pixels = "classic";
     g.applySettings();
   });
@@ -313,9 +315,10 @@ export async function run(args = process.argv.slice(2)) {
           for (const eyes of ["off", "high", "low"] as const) for (const inset of ["off", "always", "wallpaper"] as const) {
             await page.evaluate(({ eyes, inset }) => {
               const g = globalThis.__fly;
-              g.settings.eyes = eyes; g.settings.eyesInset = inset; g.applySettings();
+              g.settings.eyes = eyes; g.settings.eyesInset = inset;
+              g.settings.nerves = inset; g.settings.xray = inset; g.applySettings();
             }, { eyes, inset });
-            for (const view of ["eyes", "follow"]) {
+            for (const view of ["eyes", "inside", "follow"]) {
               await choose(page, "view", view);
               await page.waitForTimeout(500);
               await sample();

@@ -39,7 +39,7 @@ page waits for `data-moving` to clear between places; climate visits every
 weather and all five daylight presets plus the clock, holding each combination
 for 12 seconds, waiting for each weather to arrive, recording every combination, and taking a fresh-place checkpoint after every weather. Tools use every variant and hold continuous tools; menus visit
 title, pause, brain, about, settings and all settings pages; eyes alternate
-Off/Low/High, all inset modes, and the full picture. Input and lifecycle behavior
+Off/Low/High, all eye/nervous-system inset and X-ray settings, the full eye picture, and Inside it. Input and lifecycle behavior
 remain covered by the ordinary e2e test and the web-release work.
 
 The harness warms persistent tool meshes, icon textures, eye pictures, pixel
