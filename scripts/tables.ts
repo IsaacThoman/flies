@@ -29,7 +29,7 @@ import { chromium } from "playwright";
 import type { Browser, Page } from "playwright";
 import { FLY_LENGTH } from "@fly/body";
 import { FLY_MAX, MAX_PLAYERS, PROTOCOL, createFlyState, decodeFlies, encodeFly } from "@fly/net";
-import type { ServerMessage, Spot, TableStart } from "@fly/net";
+import type { FlyState, ServerMessage, Spot, TableStart } from "@fly/net";
 import { World, WORLDS } from "@fly/world";
 import { startServer as startRooms } from "../apps/server/src/server.ts";
 import { chromiumPath, gpuFlags, readState, startServer, waitFor } from "./play.ts";
