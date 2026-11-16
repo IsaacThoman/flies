@@ -139,17 +139,15 @@ try {
   await press("ArrowUp", 3);
   await waitFor(page, "focus=page");
   await press("ArrowRight");
-  await waitFor(page, "tab=sound");
-  await press("ArrowDown");
-  await waitFor(page, "focus=effects");
-  // Kept for the reload at the end.
-  await press("ArrowLeft");
-  await press("ArrowUp");
-  await press("ArrowRight");
   await waitFor(page, "tab=picture,focus=page");
   await press("ArrowDown");
   await waitFor(page, "focus=pixels");
   await press("ArrowDown", 3);
+  await waitFor(page, "focus=rumble");
+  await press("ArrowLeft");
+  assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.haptics.enabled), false);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("flies.settings")!).rumble), false);
+  await press("ArrowDown");
   await waitFor(page, "focus=stats");
   await press("Escape");
   await waitFor(page, "screen=title,focus=settings");
@@ -343,11 +341,10 @@ try {
   await page.reload();
   await gameUp(page);
   await waitFor(page, "brain=running,screen=title", 90_000);
+  assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.haptics.enabled), false, "rumble stays off after reloading");
   await press("Enter");
   const again = await waitFor(page, "screen=play");
   assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["feed", "sugar", "wide", "noon", "clear"]);
-  const effects = await page.evaluate(() => (globalThis as unknown as { __fly: { settings: { effects: number } } }).__fly.settings.effects);
-  assert.equal(effects, 6, "the sounds turned down");
   const learned = await page.evaluate(() => JSON.parse(localStorage.getItem("flies.learned") ?? "{}") as Record<string, true>);
   assert.deepEqual(Object.keys(learned).sort(), ["feed", "place", "swoop", "tools"], "the hints for what was used aren't taught again");
 

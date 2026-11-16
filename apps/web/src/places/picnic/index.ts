@@ -27,7 +27,6 @@ export const picnic: Scene = {
     // The lake.
     vista: { x: 0, z: -1 },
   },
-  ambience: "outdoors",
   bubbles: true,
   fireflies: true,
 };

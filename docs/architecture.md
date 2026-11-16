@@ -1,9 +1,11 @@
 # Architecture
 
-Flies is a toy and a wallpaper: a fruit fly in a small bright world on
+Flies is a toy and a screensaver: a fruit fly in a small bright world on
 your TV, which you can feed, startle and watch. The fly is not scripted. A
 simulation of the fruit fly's whole central nervous system decides what it
 does, from what it sees, tastes and feels in the world.
+
+The game currently has no sound, by design, pending a new sound design.
 
 ## The parts
 
@@ -14,7 +16,7 @@ does, from what it sees, tastes and feels in the world.
 | `packages/fly` | The fly's body: a 3D model that knows how a fly moves its legs, wings and mouthparts, with its nervous system drawn inside it. |
 | `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver, the weather outside, a table's line to its room, typing into a field the game draws. |
 | `packages/net` | How flies share a table: the wire format, the room's clock, other flies as they are heard of, the shared food, balls and bubbles, and what a player may do. Runs in a browser and in Node. |
-| `apps/web` | The game: the world, the fly's life in it, its senses, the remote's tools, menus, sound. Runs in a browser as it is. |
+| `apps/web` | The game: the world, the fly's life in it, its senses, the remote's tools and menus. Runs in a browser as it is. |
 | `apps/server` | The room server for rooms of up to eight people's flies (`docs/online.md`), and the list of those open to anyone: one Node process over WebSockets. It runs no brains and draws nothing. |
 | `apps/tvos` | The Apple TV app: a native host that runs the web build's JavaScript in JavaScriptCore and draws it through OpenGL ES. |
 | `apps/ios` | The iPhone and iPad app: the web build in a `WKWebView`, served from the app's bundle, in a small Swift shell ([ios.md](ios.md)). |

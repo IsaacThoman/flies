@@ -7,7 +7,7 @@
 // before noon, and what the rain wetted dries over the next half hour or so.
 //
 // Every place's light follows it (scene/light.ts). How rain, mist and wind
-// look and sound in a place is the place's own (places/types.ts).
+// look in a place is the place's own (places/types.ts).
 
 import { KINDS, forecast } from "@fly/world";
 import type { Mix, WeatherKind } from "@fly/world";

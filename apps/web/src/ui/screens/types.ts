@@ -10,10 +10,9 @@ import type { Life } from "../../life.ts";
 import type { Ended } from "../../online/online.ts";
 import type { PlaceId } from "../../places/catalog.ts";
 import type { Settings } from "../../settings.ts";
-import type { Sound } from "../../audio/sounds.ts";
 
 /** The settings' tabs. */
-export type SettingsPage = "wallpaper" | "screen" | "sound" | "picture";
+export type SettingsPage = "wallpaper" | "screen" | "picture";
 /** The menu (the title, at launch and from play alike), play, and what the menu opens. */
 export type ScreenId = "title" | "play" | "settings" | "about" | "online";
 
@@ -55,7 +54,6 @@ export interface Shell {
   watch(): void;
   /** The settings changed: apply and save them. */
   applySettings(): void;
-  sound(sound: Sound): void;
   /** Playing with others online: whether this device can at all, and the room it is at (null alone). */
   readonly canPlayOnline: boolean;
   readonly table: TableNow | null;

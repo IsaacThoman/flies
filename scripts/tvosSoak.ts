@@ -1,4 +1,4 @@
-// Unattended physical-device run with the real brain, sound, eyes and remote input.
+// Unattended physical-device run with the real brain, eyes and remote input.
 // Logs stay on the TV: copy Library/Caches/performance.log from the app container.
 import { spawnSync } from "node:child_process";
 import { PLACES } from "../apps/web/src/places/catalog.ts";

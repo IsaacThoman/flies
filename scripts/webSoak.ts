@@ -26,9 +26,9 @@ declare global { var __fly: Game; }
 const PHASES = ["places", "climate", "tools", "menus", "eyes", "tables", "wallpaper"] as const;
 type Phase = typeof PHASES[number];
 type Sample = { seconds: number; phase: string; place: string; checkpoint: boolean; [metric: string]: number | string | boolean };
-const STATE = ["screen", "tab", "brainEngine", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden", "xray", "nerves", "prints", "statsPanel", "statsKind", "overlaySize", "overlayOpacity"];
-const CLOCKS = ["gameSeconds", "audioSeconds", "eyesUpdates"];
-const METRICS = ["geometries", "textures", "programs", "calls", "triangles", "heap", "backing", "workerHeap", "workerBacking", "workerWasm", "nodes", "listeners", "audioNodes", "frameMs", "brainSpeed", "storage"];
+const STATE = ["screen", "tab", "brainEngine", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "hidden", "xray", "nerves", "prints", "statsPanel", "statsKind", "overlaySize", "overlayOpacity"];
+const CLOCKS = ["gameSeconds", "eyesUpdates"];
+const METRICS = ["geometries", "textures", "programs", "calls", "triangles", "heap", "backing", "workerHeap", "workerBacking", "workerWasm", "nodes", "listeners", "frameMs", "brainSpeed", "storage"];
 
 /** Disjoint early/late quarters avoid calling a warmup spike a sustained slope. */
 export function trend(rows: { seconds: number; value: number }[], tolerance: number) {
@@ -224,7 +224,7 @@ export async function run(args = process.argv.slice(2)) {
   const errors: string[] = [];
   const started = Date.now();
   console.log(`CSV ${csv}; real time, ${cycles} circuits; ${minutes} min/interaction phase, ${wallpaperMinutes} min/place wallpaper`);
-  console.log("GPU bytes and native mixer memory unavailable in CDP; frameMs is CPU submission, not GPU/display time.");
+  console.log("GPU bytes unavailable in CDP; frameMs is CPU submission, not GPU/display time.");
 
   async function lane(name: string, work: (page: Page, sample: (checkpoint?: boolean, force?: boolean) => Promise<void>, phase: (p: string) => void) => Promise<void>) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
@@ -233,15 +233,11 @@ export async function run(args = process.argv.slice(2)) {
     page.on("console", (m) => { if (m.type() === "error") errors.push(`${name}: ${m.text()}`); });
     const cdp = await context.newCDPSession(page);
     const worker = new WorkerHeap(cdp);
-    const audioNodes = new Set<string>();
-    cdp.on("WebAudio.audioNodeCreated", ({ node }) => audioNodes.add(node.nodeId));
-    cdp.on("WebAudio.audioNodeWillBeDestroyed", ({ nodeId }) => audioNodes.delete(nodeId));
     await cdp.send("Performance.enable");
     await cdp.send("HeapProfiler.enable");
-    await cdp.send("WebAudio.enable");
     await worker.start();
     let current = "warmup";
-    let lastLive: { gameSeconds: number; audioSeconds: number; eyesUpdates: number; at: number } | undefined;
+    let lastLive: { gameSeconds: number; eyesUpdates: number; at: number } | undefined;
     const sample = async (checkpoint = false) => {
       await cdp.send("HeapProfiler.collectGarbage");
       const wm = await worker.sample();
@@ -254,7 +250,6 @@ export async function run(args = process.argv.slice(2)) {
       const live = await page.evaluate(() => ({
         storage: Object.entries(localStorage).reduce((n, [k, v]) => n + k.length + v.length, 0),
         gameSeconds: globalThis.__fly.time,
-        audioSeconds: globalThis.__fly.audio.ctx?.currentTime ?? NaN,
         eyesUpdates: globalThis.__fly.eyes.updates,
         statsKind: globalThis.__fly.settings.statsKind,
         overlaySize: globalThis.__fly.settings.overlaySize,
@@ -263,13 +258,12 @@ export async function run(args = process.argv.slice(2)) {
       if (current === "wallpaper" && lastLive && Date.now() - lastLive.at >= 2000) {
         assert.ok(live.gameSeconds > lastLive.gameSeconds, `${name}: frames stopped`);
         if (state.eyes === "brain") assert.ok(live.eyesUpdates > lastLive.eyesUpdates, `${name}: eye readbacks stopped`);
-        if (state.audio === "running") assert.ok(live.audioSeconds > lastLive.audioSeconds, `${name}: audio stopped`);
       }
       lastLive = { ...live, at: Date.now() };
       const row: Sample = { seconds: (Date.now() - started) / 1000, phase: `${name}:${current}`, place: state.place, checkpoint,
         ...Object.fromEntries(STATE.map((k) => [k, state[k]])),
         ...Object.fromEntries(["geometries", "textures", "programs", "calls", "triangles", "frameMs", "brainSpeed"].map((k) => [k, Number(state[k])])),
-        heap: metrics.JSHeapUsedSize, backing: heap.backingStorageSize ?? NaN, ...wm, nodes: dom.nodes, listeners: dom.jsEventListeners, audioNodes: audioNodes.size, ...live };
+        heap: metrics.JSHeapUsedSize, backing: heap.backingStorageSize ?? NaN, ...wm, nodes: dom.nodes, listeners: dom.jsEventListeners, ...live };
       samples.push(row);
       appendFileSync(csv, [row.seconds, row.phase, row.place, row.checkpoint, ...STATE.map((k) => row[k]), ...CLOCKS.map((k) => Number.isFinite(row[k]) ? row[k] : ""), ...METRICS.map((m) => Number.isFinite(row[m]) ? row[m] : "")].join(",") + "\n");
     };
@@ -310,7 +304,7 @@ export async function run(args = process.argv.slice(2)) {
         await page.waitForTimeout(250);
       }
       await canonical(page);
-      // Touch every place before measuring: audio buffers and shader variants are lazy.
+      // Touch every place before measuring: shader variants are lazy.
       for (const place of PLACES) {
         await move(page, place.id);
         for (const pixels of ["chunky", "chunkier", "classic"] as const) {
@@ -390,7 +384,7 @@ export async function run(args = process.argv.slice(2)) {
             if (screen === "settings") {
               for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowUp");
               for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowLeft");
-              for (const tab of ["wallpaper", "screen", "sound", "picture"]) {
+              for (const tab of ["wallpaper", "screen", "picture"]) {
                 await waitFor(page, `tab=${tab},focus=page`);
                 await page.keyboard.press("ArrowDown");
                 await page.keyboard.press("ArrowRight");

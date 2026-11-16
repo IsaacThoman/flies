@@ -67,13 +67,12 @@ type Report = {
   layers: { target: boolean; screen: boolean } | null;
   clipping: { renderer: string; wrong: number; pixels: number } | null;
   halfFloat: boolean | null;
-  audio: { beeps: number; ended: number; decoded: { length: number; sampleRate: number } | null };
   storage: boolean | null; fetched: string | null;
   brain: { neurons?: number; connections?: number; facets?: number[]; rates?: string[]; states?: number; command?: Record<string, number>; maxSimMsAfterBurst?: number; rateCount?: number; lastRate?: number; error?: string } | null;
   weather: { error?: string; statuses: string[]; version: number; conditions: OutsideConditions | null; attribution: WeatherAttribution | null; failure: { status: string; error: string } | null; stopped: string | null } | null;
 };
 type Stats = { fps: number; jsMs: { mean: number }; execMs: { mean: number }; drawsPerFrame: number };
-const complete = (r: Report) => !!(r.readbackAsync && r.audio.decoded && r.audio.ended && r.fetched && (r.brain?.states ?? 0) > 2 && (r.weather?.stopped || r.weather?.error));
+const complete = (r: Report) => !!(r.readbackAsync && r.fetched && (r.brain?.states ?? 0) > 2 && (r.weather?.stopped || r.weather?.error));
 
 if (!args.includes('--no-build')) {
   const r = spawnSync('node', ['scripts/tvos.ts', 'build', '--sim', '--test-scene', '--stand-in-brain', ...(weatherkit ? [] : ['--stand-in-weather'])], { cwd: root, stdio: 'inherit', env: { ...process.env, TVOS_WEATHERKIT: weatherkit ? '1' : '' } });
@@ -157,10 +156,7 @@ try {
   assert.ok(c && c.pixels > 0, 'the clipping check ran');
   const softwareClipping = /Apple Software Renderer/.test(c.renderer);
   if (!softwareClipping) assert.equal(c.wrong, 0, `clipping on ${c.renderer}: ${c.wrong} of ${c.pixels} table pixels wrong`);
-  // Audio, storage, files.
-  assert.equal(r.audio.beeps, 1, 'one beep');
-  assert.equal(r.audio.ended, 1, 'the beep ended');
-  assert.ok(r.audio.decoded && r.audio.decoded.length > 0, 'decodeAudioData');
+  // Storage and files.
   assert.equal(r.storage, true, 'localStorage');
   assert.equal(r.fetched, 'game.js', 'fetch of a bundled file');
   // The brain bridge, against the stand-in (tests/brain-stand-in/stand_in_brain.cpp).

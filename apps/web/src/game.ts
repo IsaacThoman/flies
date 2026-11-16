@@ -17,9 +17,7 @@ import { Navigator } from "@fly/ui";
 import type { GlyphSet, Hit } from "@fly/ui";
 import { BALL_RADIUS, Pantry, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
 import type { RayHit } from "@fly/world";
-import { Audio } from "./audio/sounds.ts";
 import { Haptics } from "./haptics.ts";
-import type { Sound } from "./audio/sounds.ts";
 import { BrainMeter } from "./brain/meter.ts";
 import { CameraDirector, VIEWS } from "./camera.ts";
 import { TV_FRAME, worldSize } from "./display.ts";
@@ -155,7 +153,6 @@ export class Game implements Shell {
   readonly bubbles: Bubbles;
   readonly hands: Hands;
   readonly handsView: HandsView;
-  readonly audio = new Audio();
   readonly haptics: Haptics;
   readonly eyes: Eyes;
   readonly inset: EyesInset;
@@ -209,7 +206,6 @@ export class Game implements Shell {
   #hudAt = 0;
   #changedAt = -10;
   #touched = false;
-  #lastMeals = 0;
   #paddleIn = 0;
   #clockAt = 0;
   #air = new THREE.Vector3();
@@ -633,7 +629,6 @@ export class Game implements Shell {
 
   /** The menu, from play, with Play to carry on under the focus. */
   #toMenu() {
-    this.audio.play("open");
     this.nav.reset("title");
     this.screens.title.menu.focusOn("play");
     this.#entered();
@@ -641,6 +636,7 @@ export class Game implements Shell {
 
   applySettings(save = true) {
     const s = this.settings;
+    this.haptics.enabled = s.rumble;
     // At a table, the table's place is the starter's to choose, with the Place tool.
     if (!this.online && s.place !== "turns" && isPlaceId(s.place) && s.place !== this.#here) this.moveTo(s.place);
     // The player chose a picture: take it at its word until the device shows it can't keep up.
@@ -648,8 +644,6 @@ export class Game implements Shell {
     this.#chosen.pixels = s.pixels;
     this.#chosen.eyes = s.eyes;
     this.#applyPicture();
-    this.audio.setVolumes(s.effects, s.ambience);
-    this.haptics.setVolume(s.effects);
     this.director.wallpaperStyle = s.wallpaperCamera;
     if (s.hints && !this.#hints) this.#unlearn();
     this.#hints = s.hints;
@@ -681,16 +675,14 @@ export class Game implements Shell {
     this.overlay.dirty = true;
   }
 
-  /** The page is hidden: the fly's life stops with the frames, and the sound with it; at a table, its fly rests there. */
+  /** The page is hidden: the fly's life stops with the frames; at a table, its fly rests there. */
   sleep() {
-    this.audio.sleep();
     this.online?.away(this.#playerNow());
     this.tally.save();
   }
 
   /** The page is back after `awayMs`: everything carries on from where it was, under the sky of the hour it is now. */
   wake(awayMs: number) {
-    this.audio.wake();
     this.#lastNow = -1;
     this.online?.wake();
     if (this.online) this.#followLight(awayMs > AWAY_SETTLE_MS);
@@ -712,10 +704,6 @@ export class Game implements Shell {
     this.stage.contextRestored();
     this.eyes.contextRestored();
     this.overlay.dirty = true;
-  }
-
-  sound(sound: Sound) {
-    this.audio.play(sound);
   }
 
   /** Carries the fly to another place: the world fades out, the place is built behind the veil, and fades in. */
@@ -773,7 +761,6 @@ export class Game implements Shell {
     for (const object of this.stage.set.seen) this.eyes.see(object);
     this.bubbles.enabled = scene.bubbles;
     this.fireflies.enabled = scene.fireflies;
-    this.audio.setAmbience(scene.ambience);
     this.hands.surface = placeInfo(scene.id).surface;
     this.hands.choosePlace(scene.id);
     this.overlay.dirty = true;
@@ -903,14 +890,8 @@ export class Game implements Shell {
     const middle = this.#middle.set(life.body.position.x, life.body.position.y + 0.75, life.body.position.z);
     this.bubbles.update(this.time, dt, director.camera, stage.light.sunDirection, this.#air, middle);
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
-    for (let i = 0; i < this.bubbles.popped.length; i++) this.audio.play("pop", this.#nearness(this.bubbles.popped[i]) * 0.7, 0.9 + Math.random() * 0.3);
     this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
     this.handsView.update(this.hands, life.pantry, director.camera, this.time, dt, this.#floorAt, life.body.position);
-    const near = Math.max(0, Math.min(1, 1 - (director.camera.position.distanceTo(this.fly.root.position) - 15) / 120));
-    const wings = life.body.mode === "airborne" ? Math.max(0.15, life.intent.wings) : life.intent.wingPose * 0.6;
-    this.audio.follow(wings, Math.abs(life.body.groundSpeed) / 12, near, dt);
-    this.audio.weather(stage.weather.rain, Math.hypot(this.#felt.air.x, this.#felt.air.z), stage.light.stars);
-    this.audio.held(this.hands.stroking ? 1 : 0, this.hands.blowing ? (this.hands.variant.id === "strong" ? 1 : 0.55) : 0);
 
     this.#overlay(dt);
 
@@ -1030,23 +1011,15 @@ export class Game implements Shell {
   #reactions() {
     const { life } = this;
     const ev = life.body.events;
-    if (ev.jumped) {
-      this.audio.play("takeoff", this.#nearness(life.body.position));
-      if (this.nav.current === "play" && !this.wallpaper) this.haptics.feel("takeoff");
-    }
-    if (ev.landed) this.audio.play("land", this.#nearness(life.body.position) * 0.5);
-    if (life.meals > this.#lastMeals) this.audio.play("eat", this.#nearness(life.body.position));
-    this.#lastMeals = life.meals;
-    this.audio.tools(this.hands.events);
+    if (ev.jumped && this.nav.current === "play" && !this.wallpaper) this.haptics.feel("takeoff");
     const tools = this.hands.events;
     if (tools.dropped) this.haptics.feel("drop");
     if (tools.landed && !this.wallpaper) this.haptics.feel("land");
     if (tools.swooped) this.haptics.feel("swoop");
   }
 
-  /** A press that can't do anything: heard, and felt in a pad or a phone. */
+  /** A press that can't do anything: felt in a pad or a phone. */
   #refuse() {
-    this.audio.play("blocked");
     this.haptics.feel("blocked");
   }
 
@@ -1103,13 +1076,6 @@ export class Game implements Shell {
     this.#paddleIn = moving ? 0.45 : 1.4;
   }
 
-  /** 1 close to the camera, falling off with distance. */
-  #nearness(p: { x: number; y: number; z: number }) {
-    const c = this.director.camera.position;
-    const d = Math.hypot(p.x - c.x, p.y - c.y, p.z - c.z);
-    return Math.max(0.05, Math.min(1, 40 / Math.max(1, d)));
-  }
-
   #input(dt: number) {
     const { remote, devices } = this;
     const { pointers, keyboard, pads } = this.#inputs;
@@ -1118,7 +1084,6 @@ export class Game implements Shell {
     // A press, a finger on the remote, a tap or a click, a key, a pad, a mouse moved as if meant: not a nudge of the desk.
     const pressed = remote.presses.length > 0 || remote.touch.touching || devices.at > this.#seenInput;
     this.#seenInput = devices.at;
-    if (pressed) this.audio.start(this.settings.effects, this.settings.ambience);
     const idle = (nowMs - Math.max(remote.lastInputAt, devices.at)) / 1000;
     const after = this.settings.wallpaperAfter;
     const current = this.nav.current;
@@ -1164,10 +1129,8 @@ export class Game implements Shell {
       else if (isArrow(press.button) && !this.#ringShown) {
         // After a mouse or a finger the menus show no focus: the first arrow shows where it is, on what was last pressed.
         this.#ringShown = true;
-        this.audio.play("move");
       } else if (press.button === "playPause" && !press.repeat) {
         // Play/Pause plays, or carries on, from anywhere in the menus, as on any TV.
-        this.audio.play("select");
         this.play();
       } else this.screens[screen].press(press.button, press.repeat);
     }
@@ -1245,14 +1208,12 @@ export class Game implements Shell {
   #handBack() {
     if (this.hands.view === "eyes") return;
     this.director.handBack();
-    this.audio.play("tick");
   }
 
   /** Picks a tool from the shelf by its place (a tap on it, a number key); picking the one in hand steps its kind instead. */
   #chooseTool(index: number) {
     const hands = this.hands;
     if (hands.chooseTool(index)) {
-      this.audio.play("tool");
       this.#changedAt = this.time;
     } else if (index === hands.tool && hands.stepVariant(1, true)) this.#variantChanged();
   }
@@ -1280,7 +1241,6 @@ export class Game implements Shell {
       this.#refuse();
       return false;
     }
-    this.audio.play("select");
     // At a table the whole table goes, when the table says so.
     if (online) {
       online.choosePlace(hands.place);
@@ -1402,7 +1362,6 @@ export class Game implements Shell {
       case "down":
         if (g.button === 2) {
           this.#grip = { kind: "spent" };
-          this.audio.play("back");
           this.back();
           return;
         }
@@ -1496,7 +1455,6 @@ export class Game implements Shell {
       case "left":
       case "right":
         hands.stepTool(button === "left" ? -1 : 1);
-        this.audio.play("tool");
         this.#changedAt = this.time;
         this.#learn("tools");
         break;
@@ -1528,7 +1486,6 @@ export class Game implements Shell {
   }
 
   #variantChanged() {
-    this.audio.play("tick");
     this.#changedAt = this.time;
     const id = this.hands.current.id;
     if (id === "light" || id === "weather") {

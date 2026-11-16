@@ -1,8 +1,8 @@
 # Browser soak
 
 Run `npm install` and `npm run brain:fetch` first. The harness uses Playwright's
-headless Chromium with the GPU enabled, a real brain worker in every page, and
-sound started by a remote press. There is no simulated or accelerated time.
+headless Chromium with the GPU enabled and a real brain worker in every page.
+There is no simulated or accelerated time.
 
 ```
 npm run e2e:soak
@@ -17,7 +17,7 @@ visits, with assertions that textures return exactly
 to each place's warmed baseline. Geometry may vary by one and programs by two:
 the fireflies' first appearance uploads a persistent mesh and its program.
 The default full run uses 200 circuits, 30 minutes per interaction phase, and
-60 minutes of wallpaper **in each place**. Options:
+60 minutes of screensaver **in each place**. Options:
 
 | Option | Meaning |
 | --- | --- |
@@ -25,7 +25,7 @@ The default full run uses 200 circuits, 30 minutes per interaction phase, and
 | `--cycles 200` | Full four-place circuits in the places phase. |
 | `--minutes 30` | Minimum real minutes per other interaction phase. Climate finishes a complete matrix even if this takes longer. |
 | `--wallpaper-minutes 60` | Real minutes per place, in four parallel isolated contexts. |
-| `--places picnic,windowsill,lab,bar` | Places to run wallpaper in; interaction phases still visit every place. |
+| `--places picnic,windowsill,lab,bar` | Places to run screensaver in; interaction phases still visit every place. |
 | `--wallpaper-time clock` | Clock or a held daylight preset (morning/noon/golden/dusk/night). |
 | `--wallpaper-weather now` | Forecast or a held weather preset (clear/overcast/mist/rain). |
 | `--interval 10` | Sample interval in seconds. Overruns skip a tick; GCs never queue indefinitely. |
@@ -34,13 +34,13 @@ The default full run uses 200 circuits, 30 minutes per interaction phase, and
 | `--url http://localhost:5173/` | Use an existing server; otherwise start and stop Vite. |
 | `--quick` | Four circuits and strict resource assertions. Keep the places phase when selecting phases. |
 
-Interaction runs in a fifth context alongside wallpaper. Each wallpaper page
+Interaction runs in a fifth context alongside screensaver. Each screensaver page
 is pinned to its place and by default follows the real clock and forecast.
 The interaction page waits for `data-moving` to clear between places; climate visits every
 weather and all five daylight presets plus the clock, holding each combination
 for 12 seconds, waiting for each weather to arrive, recording every combination,
 and taking a fresh-place checkpoint after every weather. Tools use every variant
-and hold continuous tools; menus visit the menu, about and all four
+and hold continuous tools; menus visit the menu, about and all three
 settings tabs, repeatedly pausing and resuming. Eyes alternate Off/Low/High,
 all eye/nervous-system inset and X-ray settings, the full eye picture, and Inside it.
 They also cycle every stats kind, corner size, opacity and visibility; canonical
@@ -56,14 +56,14 @@ The fast check lists the real scene actors before and after an arrival with a
 peer present, verifying every retained descendant by identity: the eyes' sky,
 fly and X-ray, bubbles, hands, fireflies, footprints and remote models.
 
-The harness warms persistent tool meshes, icon textures, eye pictures, every
-place's pixel-mode shader variants and ambience buffers before sampling.
+The harness warms persistent tool meshes, icon textures, eye pictures, and every
+place's pixel-mode shader variants before sampling.
 Place changes reset adaptive quality so baseline counts use the same render
-target; uninterrupted wallpaper retains its normal adaptive behavior.
+target; uninterrupted screensaver retains its normal adaptive behavior.
 Checkpoints after place changes
 compare a fresh place with the same settings and view. Other phases repeat
 those same checkpoints between stress rounds each minute and when they finish; their in-flight counts are deliberately variable.
-Only checkpoints within the same phase/place, and continuous wallpaper, get
+Only checkpoints within the same phase/place, and continuous screensaver, get
 trend verdicts. At least four samples are required. Disjoint early/late
 quarters are averaged and their difference divided by elapsed hours. A small
 noise band (2% or 256 KiB for heaps, 10% for frame cost/brain speed) labels a
@@ -71,12 +71,12 @@ series flat; raw values and hourly rates remain visible. This is evidence for
 the duration tested, not proof of an infinite bound. A growing count needs
 investigation; changing camera draw counts or lazy uploads alone are not leaks.
 
-Wallpaper samples also verify that game time, completed eye readbacks and running audio time keep advancing. Adaptive quality, FPS, pixel mode and eye detail are recorded so a cheaper picture cannot disguise a slowdown.
+Screensaver samples also verify that game time and completed eye readbacks keep advancing. Adaptive quality, FPS, pixel mode and eye detail are recorded so a cheaper picture cannot disguise a slowdown.
 
 Each fixed-interval sample forces `HeapProfiler.collectGarbage` in the page and
 brain worker, then records page `Performance.getMetrics` heap bytes, worker
 `Runtime.getHeapUsage`, ArrayBuffer backing storage in both isolates,
-`Memory.getDOMCounters` nodes/listeners, CDP WebAudio live nodes, localStorage
+`Memory.getDOMCounters` nodes/listeners, localStorage
 characters, and the canvas's renderer geometries/textures/programs, calls,
 triangles, CPU frame milliseconds and brain speed (simulated/real time).
 The worker's live `WebAssembly.Memory` buffers are counted separately: V8's
@@ -84,14 +84,10 @@ backing-store metric omits them. Inspector handles are released after each query
 The CSV includes screen/tab/brain engine/weather/time/view/eyes/inset/variant for context.
 
 The browser cannot report per-page GPU allocation bytes or the TV's resident
-memory, thermal behavior, native audio graph cost, native automation timeline,
-or actual scanout pacing. Three's resource counts are not GPU bytes; JS heaps
-exclude most native allocations. Chromium automatically collects some finished
-audio graphs that the TV's shim retains. The audio lifetime and automation
-regressions therefore exercise the actual TV shim with a recording native
-bridge as well as the browser soak. Forced GC and concurrent pages perturb
-frame timings, so use a single wallpaper phase or the real device for precise
-performance comparisons.
+memory, thermal behavior or actual scanout pacing. Three's resource counts
+are not GPU bytes; JS heaps exclude most native allocations. Forced GC and
+concurrent pages perturb frame timings, so use a single screensaver phase or the
+real device for precise performance comparisons.
 
 Room sockets bound both unread traffic and stalled sends. A reader that stops
 draining reconnects for a fresh snapshot instead of retaining and replaying old
@@ -100,6 +96,6 @@ checks a real hidden tab with seven peers and reconnection on wake.
 
 Run `npm run tvos:soak -- --device <udid> --minutes 60` on the Apple TV for that
 last evidence. It now visits every place, weather and daylight preset, pins each
-place against rotation, and divides its requested wallpaper minutes among all
+place against rotation, and divides its requested screensaver minutes among all
 four places, half midday and half night. Interaction time is additional. Keep
 raw CSVs, logs and charts out of git; retain a compact results table in the PR.

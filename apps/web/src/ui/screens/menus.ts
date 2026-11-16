@@ -3,7 +3,7 @@
 //   menu ─┬─ Play
 //         ├─ Watch
 //         ├─ About
-//         ├─ Settings: Wallpaper | On screen | Sound | Picture, as tabs
+//         ├─ Settings: Screensaver | On screen | Picture, as tabs
 //         └─ Online (in a browser): rooms with others (online.ts)
 //
 // The menu is the title, at launch and from play alike (Back, Play/Pause or
@@ -12,7 +12,7 @@
 // Every setting is two steps from it.
 
 import { Menu, choiceValue, indexOf } from "@fly/ui";
-import type { ChoiceItem, MenuItem, Option, SliderItem } from "@fly/ui";
+import type { ChoiceItem, MenuItem, Option } from "@fly/ui";
 import { INK_SOFT, font, glassPanel, orb, text } from "@fly/ui";
 import type { PixelSize } from "../../display.ts";
 import { PLACES } from "../../places/catalog.ts";
@@ -80,7 +80,7 @@ const EYES: Option<EyesDetail>[] = [
 /** For each picture that can show over the world in a corner. */
 const SHOWN: Option<ShowWhen>[] = [
   { value: "off", label: "Off" },
-  { value: "wallpaper", label: "In the wallpaper" },
+  { value: "wallpaper", label: "In the screensaver" },
   { value: "always", label: "Always" },
 ];
 const STATS: Option<StatsKind>[] = [
@@ -106,7 +106,6 @@ const ON_OFF: Option<boolean>[] = [
 ];
 
 const choice = <K extends keyof Settings>(id: K, label: string, options: Option<Settings[K]>[]): ChoiceItem<Settings[K]> => ({ kind: "choice", id, label, options, index: 0 });
-const volume = (id: "effects" | "ambience", label: string): SliderItem => ({ kind: "slider", id, label, min: 0, max: 10, step: 1, value: 0 });
 
 /**
  * The settings, a page for each part of the game, every one a step from the
@@ -114,7 +113,7 @@ const volume = (id: "effects" | "ambience", label: string): SliderItem => ({ kin
  */
 const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => MenuItem[] }> = {
   wallpaper: {
-    heading: "Wallpaper",
+    heading: "Screensaver",
     rows: (shell) => [
       choice("wallpaperAfter", "Starts after", WALLPAPER_DELAYS),
       choice("wallpaperCamera", "Camera", CAMERA),
@@ -124,7 +123,7 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       ...(shell.weatherOutside ? [choice("realWeather", "Real weather", ON_OFF)] : []),
     ],
   },
-  // Everything that can show over the world: each picture in a corner, the stats and the fly seen through, each off, in the wallpaper, or always; then how the corners' pictures look.
+  // Everything that can show over the world: each picture in a corner, the stats and the fly seen through, each off, in the screensaver, or always; then how the corners' pictures look.
   screen: {
     heading: "On screen",
     rows: () => [
@@ -137,13 +136,9 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       choice("xray", "X-ray", SHOWN),
     ],
   },
-  sound: {
-    heading: "Sound",
-    rows: () => [volume("effects", "Effects"), volume("ambience", "Surroundings")],
-  },
   picture: {
     heading: "Picture",
-    rows: () => [choice("pixels", "Pixels", PIXELS), choice("eyes", "The fly's eyes", EYES), choice("hints", "Button hints", ON_OFF), choice("stats", "Frame stats", ON_OFF)],
+    rows: () => [choice("pixels", "Pixels", PIXELS), choice("eyes", "The fly's eyes", EYES), choice("hints", "Button hints", ON_OFF), choice("rumble", "Rumble", ON_OFF), choice("stats", "Frame stats", ON_OFF)],
   },
 };
 

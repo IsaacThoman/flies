@@ -1,0 +1,12 @@
+# A plain `docker compose up` on your own host merges this file; Coolify reads
+# only compose.yaml. It publishes the site for your own HTTPS reverse proxy
+# (docs/deploy.md), off 80 so it can share a host with one, and names the
+# images for rollback.
+services:
+  web:
+    image: flies-web:local
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+
+  rooms:
+    image: flies-rooms:local

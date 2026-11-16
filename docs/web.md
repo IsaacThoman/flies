@@ -2,7 +2,7 @@
 
 The game is a web page underneath, and the web build is a real way to have
 the fly: a link anyone can open on a laptop, a phone or a tablet and leave
-open as a wallpaper, or install as an app. It is plain files that work from
+open as a screensaver, or install as an app. It is plain files that work from
 any static host and from any folder on it; nothing needs a server.
 
 ## Building it
@@ -182,7 +182,7 @@ from the page.)
 
 `node scripts/measure.ts`, on an M5 Pro shared the whole time with many
 other jobs (load averages of 7 to 180 on 18 cores), so the times are on the
-slow side; each run is a minute of the wallpaper ("watch") or of play with
+slow side; each run is a minute of the screensaver ("watch") or of play with
 the ball thrown every 3 s ("play"). Chromium can slow a page's own thread by
 a factor, but refuses to slow a worker that way, so the frame figures are a
 slow device's main thread with this machine's brain; the brain is measured
@@ -293,9 +293,9 @@ what more speed would cost.
 `apps/web/src/page.ts`, in a browser only:
 
 - **Hidden**, the fly's life and its brain stop with the frames (the game
-  skips them even where a browser keeps frames coming for a hidden page) and
-  the sound is suspended. Shown again, it carries on from where it was, the
-  first frame no longer than any other; after more than half a minute away,
+  skips them even where a browser keeps frames coming for a hidden page).
+  Shown again, it carries on from where it was, the first frame no longer
+  than any other; after more than half a minute away,
   the sky and the weather are put where the clock and the forecast have them
   now, before that frame is drawn, not eased there from where they were.
 - **A frozen or sleeping page** (a laptop lid closed with the tab showing, a
@@ -303,11 +303,9 @@ what more speed would cost.
   game notices the wall clock has jumped between two frames, since no event
   says so. Nor is it taken for a stalled brain: only time while frames are
   coming counts toward the brain's 2 s stall limit.
-- **The screen stays awake** (the Screen Wake Lock API) while the wallpaper
+- **The screen stays awake** (the Screen Wake Lock API) while the screensaver
   shows in a visible tab, and is let go otherwise. Browsers without it, or that
   refuse it, let the screen sleep as usual.
-- **Sound** starts on the first press, tap or click, from inside that event,
-  as Safari requires.
 - **A lost graphics context** (a GPU reset, a phone reclaiming memory) is
   waited out with the fly living on unseen, and when it is given back three.js
   rebuilds its state and the game draws its reflections again.
@@ -315,9 +313,9 @@ what more speed would cost.
   page as it was, asleep since it left, or loads it afresh from the caches.
 - **Days open**: `npm run soak:web -- --built` leaves the built game running
   from a subfolder, with its service worker. It samples page and brain-worker
-  heaps after collection, three.js resources, audio and DOM counts, frame cost
+  heaps after collection, three.js resources, DOM counts, frame cost
   and brain speed. Place circuits, weather/daylight, tools, menus, eyes and
-  uninterrupted wallpaper are separate phases; `npm run e2e:soak` is the fast
+  uninterrupted screensaver are separate phases; `npm run e2e:soak` is the fast
   resource regression. See [the soak guide](web-soak.md) for durations,
   comparable checkpoints and what still needs an Apple TV. Hidden-tab sleep,
   context loss, caching and offline recovery remain in `npm run e2e`.
@@ -327,7 +325,7 @@ The service worker (`apps/web/src/offline/sw.ts`) keeps the page and every
 file it loads, so it opens with no network; it asks the network for the page
 first, so a new version shows as soon as there is one. A new version's
 service worker waits until every tab of the old one has closed, so a page
-left open as a wallpaper keeps the files it started with. The brain is not the
+left open as a screensaver keeps the files it started with. The brain is not the
 service worker's: the page keeps it, with its own progress and checks.
 
 ## Installing it

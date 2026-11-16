@@ -5,9 +5,9 @@ WebView: tvOS's WebKit is private API. Instead an Objective-C++ host runs the sc
 public JavaScriptCore framework, with a small browser in TypeScript (`apps/tvos/runtime`) that
 fakes enough of the DOM and Web APIs for three.js and the game. three's ordinary
 `WebGLRenderer` draws through a home-made WebGL 2 that records calls into shared command
-buffers, which native code replays on OpenGL ES 3.0. 2D canvases are CoreGraphics, Web Audio is
-AVAudioEngine, and the fly's brain is C++ on a thread of its own. Built with WeatherKit, a Swift
-service tells the game the weather outside. Public APIs only, so it can go through App Review.
+buffers, which native code replays on OpenGL ES 3.0. 2D canvases are CoreGraphics, and the fly's
+brain is C++ on a thread of its own. Built with WeatherKit, a Swift service tells the game the
+weather outside. Public APIs only, so it can go through App Review.
 
 The host is the one built for aerodance (github.com/IsaacThoman/aerodance, `apps/tvos`), which
 holds 60 fps there on an Apple TV 4K; its `docs/apple-tv.md` records the measurements and the
@@ -17,7 +17,7 @@ benchmarks). See [What came from aerodance](#what-came-from-aerodance).
 
 ## How it works
 
-Five threads:
+Four threads:
 
 | Thread | Owns | Code |
 | --- | --- | --- |
@@ -25,7 +25,6 @@ Five threads:
 | JavaScript | The JavaScriptCore context: runs `runtime.js`, then `game.js`, animation frames from a `CADisplayLink`, timers, events | `src/Host.mm`, `runtime/` |
 | Render | The OpenGL ES context: replays WebGL and 2D canvas commands a frame behind JavaScript, presents | `src/Renderer.mm`, `src/Executor.mm`, `src/Canvas2D.mm` |
 | Brain | The `fly_brain`: loads the connectome, steps the simulation whenever time is waiting | `src/BrainBridge.mm`, `packages/brain-native` |
-| Audio | AVAudioEngine's render callback: the Web Audio graph, mixed per sample | `src/Audio.mm` |
 
 Built with WeatherKit, the weather outside is found on the main thread (Core Location, timers)
 and in Swift's own tasks (the request), and read from the JavaScript thread
@@ -71,6 +70,7 @@ npm run tvos -- run --device <udid> --detached --config '{"script":"game.js","st
 npm run tvos:soak -- --device <udid> --minutes 30
 npm run tvos:check                       # the simulator check (below)
 npm run tvos:check -- --weatherkit       # ...with the real weather service
+npm run tvos -- archive --version 0.1.1   # archive for the App Store (docs/release.md)
 ```
 
 `build`:
@@ -120,9 +120,9 @@ way.
 
 Use `--detached` with `logFile` for device measurements. `tvos:soak` installs and launches the
 last physical-device build without attaching, exercises feeding, ball throws, the eye picture
-at Low and High, and pause/settings, then watches the wallpaper at midday and at night for
+at Low and High, and pause/settings, then watches the screensaver at midday and at night for
 `--minutes` in total (plus about three minutes of interaction and idle transitions). It assumes
-the default tool variants and Low eyes, and restores Low before the wallpaper phases. It leaves
+the default tool variants and Low eyes, and restores Low before the screensaver phases. It leaves
 the app running. Do not attach a console or enable `profile`, `gpuTiming` or `glDebug` for the
 final measurement. Pull its log while it runs or after `drive: soak complete`:
 
@@ -196,16 +196,6 @@ desktop browser.
   link, 60 Hz; a frame isn't started while two are still on their way to the screen),
   `requestIdleCallback`, `queueMicrotask`, `performance.now()` (no marks or measures),
   `console` (to the device console), `reportError`.
-- **Web Audio**: `AudioContext` (`currentTime`, `resume`/`suspend`, `getOutputTimestamp`,
-  `outputLatency`), `GainNode`, `AudioBufferSourceNode` (`start` with offset and duration,
-  `stop`, `loop`, `playbackRate`, `ended`), `AudioBuffer` (`getChannelData`,
-  `copyTo/FromChannel`), `createBuffer` for generated sounds, `decodeAudioData` (what
-  AVAudioFile reads, such as WAV, AIFF, CAF, MP3 and AAC/M4A; not Ogg), `AudioParam` automation
-  (`setValueAtTime`, linear and exponential ramps, `setTargetAtTime`, `setValueCurveAtTime`,
-  `cancelScheduledValues`), and `DynamicsCompressorNode` as a pass-through (the output is hard
-  clipped at full scale). Nothing else: no oscillators, filters, panners, analysers,
-  convolvers, `AudioWorklet` or media elements; build sounds as buffers. The context needs no
-  user gesture. The session is ambient: other apps' music keeps playing under the fly's sounds.
 - **Misc**: `crypto.getRandomValues`, `crypto.randomUUID` (no `crypto.subtle`),
   `structuredClone`, `atob`/`btoa`, `TextEncoder`/`TextDecoder` (UTF-8, UTF-16LE, Latin-1),
   `AbortController`, `DOMException`, `ResizeObserver` (fires once, at the screen's size),
@@ -289,7 +279,7 @@ has no Swift and no `__native.weather`, and the game keeps its made-up forecast.
   lock it holds only to copy, and keeps the last answer in `NSUserDefaults` (the conditions and
   when they were fetched, never where) for the next run.
 - `weather/WeatherKit/Service.swift` finds the answer, on the main actor. `start()` (the game
-  calls it once the title is up, and when Settings → Wallpaper → Real weather is turned on) asks for When
+  calls it once the title is up, and when Settings → Screensaver → Real weather is turned on) asks for When
   In Use location permission the first time; after that it takes one location fix at a time
   (`requestLocation`) and uses it for six hours, a TV not being one to move. It rounds the
   coordinates to two decimal places (about a kilometre) and asks WeatherKit for the current
@@ -345,7 +335,7 @@ Checked against Apple's documentation in November 2026:
   (tvOS 16.4) is the "text that should be made available to users for apps that cannot display
   the attributionURL contents in a Safari view". About the fly shows the mark, that the game
   has modified the data, the legal text and the legal page's address, all from
-  `WeatherService.attribution`; the wallpaper shows none of it. The game shows no weather
+  `WeatherService.attribution`; the screensaver shows none of it. The game shows no weather
   alerts, which have rules of their own.
 - [Quotas](https://developer.apple.com/weatherkit/): 500,000 calls a month come with the
   developer membership; more is a subscription (a million a month for US$49.99, up to 200
@@ -384,7 +374,7 @@ are, without it, and the game uses its made-up forecast.
    makes an explicit development profile for the App ID with the entitlement, in place of the
    wildcard one.
 4. On the TV, the first time the title comes up, allow the app to use your location while it is
-   in use. Settings → Wallpaper now has Real weather (on); on the Weather tool "Now" becomes "Outside" within
+   in use. Settings → Screensaver now has Real weather (on); on the Weather tool "Now" becomes "Outside" within
    a few seconds; About the fly ends with Apple Weather's attribution.
 5. If it stays "Now", read the console (`run --device` prints it) for `weather outside: …`:
    `unauthorised` with a `WDSJWTAuthenticator` error means WeatherKit doesn't accept the App ID
@@ -446,38 +436,24 @@ commands; this is not a fully asynchronous native transfer.
 
 Measured 15 November 2026 on Rufus, Apple TV 4K (3rd generation, AppleTV14,1), tvOS 27.2.1
 (24K157): signed Release, 640×480, mode 2, real 166,700-neuron connectome, Low eyes except for
-the High-eye interaction phase, sound enabled. Both runs were detached, with 10-second stats
-written to the app's cache; no console, GPU timing or GL debug was attached.
+the High-eye interaction phase. The runs were detached, with 10-second stats written to the
+app's cache; no console, GPU timing or GL debug was attached.
 
-The previous code initially averaged about 60 FPS, with JavaScript p95 around 21–22 ms on
-eye-refresh frames. After the first remote press started sound, its three per-frame audio
-targets accumulated without limit. The native mixer evaluated their entire history for each
-sample while holding the graph lock, so JavaScript's audio calls progressively waited longer.
-The seven-minute baseline fell below 1 FPS by about four minutes, with individual JavaScript
-frames taking seconds. Memory stayed around 136–137 MB: this was growing work, not a large
-memory spike. That baseline stayed on the night title/wallpaper; it is not a matched scene
-benchmark against every phase below.
-
-`audio/follow.ts` now rebases only the three parameters owned by the frame loop, retaining an
-anchor and a target while preserving exponential smoothing. The one-hour synthetic regression
-test checks both the smoothed values and the bounded JavaScript/native command timeline. Eye
-readback is asynchronous as described above; neither fix changes the neural model.
-
-The fixed build completed `tvos:soak --minutes 20` in 23 minutes 3 seconds: interaction phases
-followed by ten minutes each of midday and night wallpaper. It was left running on Rufus.
+The measured build completed `tvos:soak --minutes 20` in 23 minutes 3 seconds: interaction phases
+followed by ten minutes each of midday and night screensaver. It was left running on Rufus.
 
 | Phase | FPS in steady 10-second windows | Mean JavaScript per frame | Highest window's JavaScript p95 | Memory |
 | --- | --- | --- | --- | --- |
-| Midday wallpaper | 59.9–60.0 | 4.22 ms | 10.40 ms | 140.4–142.5 MB |
-| Night wallpaper | 59.9–60.0 | 4.60 ms | 11.84 ms | 142.5–143.5 MB |
+| Midday screensaver | 59.9–60.0 | 4.22 ms | 10.40 ms | 140.4–142.5 MB |
+| Night screensaver | 59.9–60.0 | 4.60 ms | 11.84 ms | 142.5–143.5 MB |
 
 Feeding, sixteen ball throws, the Low/High eye picture, pause/settings, and waking the
-wallpaper all completed. There were no runtime errors or drive timeouts, and every thermal
+screensaver all completed. There were no runtime errors or drive timeouts, and every thermal
 sample was nominal. The last six complete 10-second windows all reported 60 FPS. Memory
 increased about 3 MB after interaction warmup; this run does not establish an overnight bound.
 
 This meets the sustained average 60 FPS target on this device, not an every-frame guarantee.
-Startup and lighting changes had 10-second averages as low as 58.6 FPS. In steady wallpaper,
+Startup and lighting changes had 10-second averages as low as 58.6 FPS. In steady screensaver,
 the worst window's frame-start interval p95 was 19.71 ms and render-completion interval p95
 was 20.83 ms, so some pacing variation remains even when average FPS is 60. These intervals
 are CPU-side measurements, not display scanout. Raw logs, CSVs and test evidence are outside
@@ -501,8 +477,7 @@ with a `drive`, and checks what the scene reports:
   and keeps values over 1; and the game's lawn and table top seen from a fly's height, which
   must be clipped, are all table at the bottom of the picture. The last is asserted on any
   renderer but the simulator's, which gets it wrong (see below); the check prints how wrong;
-- a generated beep plays and ends; a WAV decodes; `localStorage` keeps a value; `fetch` reads
-  a bundled file;
+- `localStorage` keeps a value; `fetch` reads a bundled file;
 - the brain bridge: the stand-in loads the bundled connectome and reports its neuron and
   connection counts (so the file arrived whole), its eyes, its rate names; all 83 of its rates
   arrive, as many as the real brain reports; the commands it answers prove the senses and both
@@ -562,7 +537,6 @@ No Apple TV was connected while this was built, so none of this has run on one:
   as a press (it isn't the Now Playing app); and that Back at the root really leaves the app.
 - **Clipping**: that the device's GPU draws the triangles the simulator loses (above). Run the
   test scene on it and read `clipping` in its `report` lines.
-- **Audio** on a TV's speakers, and with other apps' music playing.
 - **The weather outside**: no build with the WeatherKit capability has been signed or run, so
   WeatherKit has never answered this app. Unchecked: the location prompt on a TV and the
   location a TV gives; signing with the explicit profile; real conditions, sunrise and sunset
@@ -575,18 +549,19 @@ No Apple TV was connected while this was built, so none of this has run on one:
 ## What came from aerodance
 
 Copied and adapted: the host (`Host.mm`, `JSHost.h`, `Host.h`), the command executor
-(`Renderer`, `Executor`, `Canvas2D`, `Fonts.mm`), Web Audio (`Audio.mm`, `runtime/audio.ts`),
+(`Renderer`, `Executor`, `Canvas2D`, `Fonts.mm`),
 the runtime (`dom.ts`, `web.ts`, `webgl.ts`, `canvas2d.ts`, `color.ts`, `glConstants.ts`,
 `ops.ts`, `native.ts`), the frame-stats and `drive` hooks (`runtime/report.ts`), the XcodeGen
-spec, the privacy manifest, the build script and the asset-catalog pipeline.
+spec, the privacy manifest, the build script, the asset-catalog pipeline and App Store archiving
+(`scripts/apple.ts`, [release.md](release.md)).
 
 Left out: phone pairing and the relay, WebSocket and EventSource, HTTP `fetch` and the
 log/report uploads, the page's file store, `crypto.subtle`, React-specific mount points, songs,
-the benchmarks and their natives, Now Playing, App Store archiving.
+the benchmarks and their natives, Now Playing.
 
 Changed or added: the remote (its own `Remote` class; Play/Pause is its own key; key repeat;
 the touch surface through GameController; the root flag pushed from JavaScript instead of polled
 from the game's state), the brain bridge and its stand-in, real WebGL fences, `FontFace` in
 place of fonts bundled by file name, `sessionStorage` in memory instead of sharing
-`localStorage`'s store, an ambient audio session, readiness from `data-ready`, nearest-neighbour
+`localStorage`'s store, readiness from `data-ready`, nearest-neighbour
 stretch by default, the test scene and the simulator check, and placeholder art drawn by script.

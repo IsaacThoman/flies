@@ -36,9 +36,6 @@ export const WALLPAPER_DELAYS: Option<number>[] = [
 ];
 
 export type Settings = {
-  /** 0 to 10. */
-  effects: number;
-  ambience: number;
   pixels: PixelSize;
   /** Seconds without a press before the game becomes a wallpaper; 0 never. */
   wallpaperAfter: number;
@@ -60,6 +57,8 @@ export type Settings = {
   overlayOpacity: OverlayOpacity;
   /** Show what the buttons do. */
   hints: boolean;
+  /** Feel the tools and the fly through a game pad or a phone that can vibrate. */
+  rumble: boolean;
   /** Small frame-cost counters in a corner. */
   stats: boolean;
   /** On the Weather and Light tools' "Now", the real weather and sunrise and sunset outside, where the Apple TV can tell them. */
@@ -71,8 +70,6 @@ export type Settings = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  effects: 7,
-  ambience: 5,
   pixels: "classic",
   wallpaperAfter: 60,
   wallpaperCamera: "follow",
@@ -85,19 +82,17 @@ export const DEFAULT_SETTINGS: Settings = {
   overlaySize: "medium",
   overlayOpacity: "full",
   hints: true,
+  rumble: true,
   stats: false,
   realWeather: true,
   place: "turns",
   scene: "picnic",
 };
 
-const volume = (v: number) => v >= 0 && v <= 10;
 const showWhen = (v: ShowWhen) => ["off", "wallpaper", "always"].includes(v);
 
 /** What a saved setting may be, where not every value of its type will do. */
 const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean } = {
-  effects: volume,
-  ambience: volume,
   pixels: (v) => Object.hasOwn(PIXEL_SIZES, v),
   wallpaperAfter: (v) => WALLPAPER_DELAYS.some((delay) => delay.value === v),
   wallpaperCamera: (v) => ["follow", "calm", "lively"].includes(v),

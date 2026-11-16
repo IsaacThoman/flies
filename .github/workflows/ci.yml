@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # A newer push to main waits for the release in progress instead of cancelling it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          # Matches the Dockerfile's node:24-alpine image.
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Coolify reads only compose.yaml, so check it separately from plain hosting.
+      - run: node scripts/checkCompose.ts
+      # The web build carries the brain.
+      - uses: ./.github/actions/brain
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run tvos:typecheck
+      - run: npm run build
+
+  test:
+    # On Apple silicon, as the brain's bit-for-bit tests need: the native brain and the committed
+    # WebAssembly reproduce Node's Math there, where V8 is built with clang and fuses
+    # multiply-adds (packages/brain-native/wasm.sh, README.md). Node on x86-64 or on Linux arm64
+    # rounds some of them differently in the last bit, and those tests fail there.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: ./.github/actions/brain
+      - run: npm test
+
+  e2e:
+    # The game in headless Chromium with the real brain, then the built site (npm run e2e). It
+    # reports without blocking: with no GPU, the game's adaptive quality draws in bigger pixels
+    # here, and the fly is then too few of them for the X-ray step's view inside it
+    # (apps/web/src/nerves/xray.ts). Run it locally before merging.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: ./.github/actions/brain
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+
+  release:
+    # A push to main with something new since the last v* tag (release.config.mjs) tags it and
+    # creates a GitHub Release, once the checks pass. A run whose commit main has moved past
+    # releases nothing; the run for the newer commit does.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [checks, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - id: release
+        run: npm run release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  testflight:
+    needs: release
+    if: needs.release.outputs.version != ''
+    uses: ./.github/workflows/testflight.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+    # A called workflow sees no secrets, its environment's included, unless the caller passes them.
+    secrets: inherit

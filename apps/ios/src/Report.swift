@@ -184,8 +184,6 @@ final class Report {
       digest: !!globalThis.crypto?.subtle,
       firstRow: firstRow(fly),
       visibility: document.visibilityState,
-      audio: fly?.audio?.ctx?.state ?? null,
-      audioSession: navigator.audioSession?.type ?? null,
       safeArea: globalThis.\(PageScripts.safeAreaProperty) ?? null,
       size: [innerWidth, innerHeight, devicePixelRatio],
     });

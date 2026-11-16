@@ -13,7 +13,7 @@ test("bubbles keep drifting at the picnic without settling, and few low ones end
   const bubbles = new Bubbles(new THREE.Group(), world);
   const fly = new THREE.Vector3(-8, 0.75, -8);
   const surface = createSurface();
-  const previousX = new Float64Array(4).fill(Infinity);
+  const previous = Array.from({ length: 4 }, () => new THREE.Vector3(Infinity, 0, 0));
   const visible = new Array<boolean>(4).fill(false);
   const tracking = new Array<boolean>(4).fill(false);
   const passedFly = new Array<boolean>(4).fill(false);
@@ -35,21 +35,26 @@ test("bubbles keep drifting at the picnic without settling, and few low ones end
         assert.ok(p.y - l.r >= surface.y, `bubble ${l.id} intersects a surface at ${i / 60}s`);
       }
       if (k >= 4) continue;
-      const pop = bubbles.popped.find((pop) => pop.x === p.x && pop.z === p.z);
-      const renewed = i > 0 && inAir && (!visible[k] || p.x < previousX[k]);
+      const burst = visible[k] && !inAir;
+      const renewed = i > 0 && inAir && (!visible[k] || p.x < previous[k].x);
       // Count complete lives only, excluding the initial bubbles already partway along their path.
-      if (tracking[k] && (pop || renewed)) {
+      if (tracking[k] && (burst || renewed)) {
         completed++;
         if (passedFly[k]) passed++;
-        if (pop && surface.onTable && surface.solid === -1 && pop.y - l.r < surface.y + 0.5) tablePops++;
+        if (burst) {
+          const last = previous[k];
+          world.surface(last.x, last.z, surface);
+          // The last in-air position is at most one frame's vertical bob above the burst.
+          if (surface.onTable && surface.solid === -1 && last.y - l.r < surface.y + 0.5 + 0.6 / 60) tablePops++;
+        }
         tracking[k] = false;
       }
       if (renewed) {
         tracking[k] = true;
         passedFly[k] = false;
       }
-      if (inAir && previousX[k] <= fly.x && p.x > fly.x) passedFly[k] = true;
-      previousX[k] = p.x;
+      if (inAir && previous[k].x <= fly.x && p.x > fly.x) passedFly[k] = true;
+      if (inAir) previous[k].copy(p);
       visible[k] = inAir;
     }
     assert.ok(airborne > 0, "there are always bubbles in the air");
@@ -71,8 +76,7 @@ test("a bubble bursting on the fly is felt for that frame only", () => {
   const bubble = bubbles.looming.find((l) => l.position.y > 0)!;
   fly.copy(bubble.position);
   bubbles.update(0, 0, camera, sun, still, fly);
-  assert.equal(bubbles.brushed, BUBBLE_TOUCH);
-  assert.ok(bubbles.popped.some((p) => p.equals(fly)), "the bubble burst where it touched the fly");
+  assert.equal(bubbles.brushed, BUBBLE_TOUCH, "the bubble burst where it touched the fly");
   assert.ok(bubble.position.y < -1000, "a popped bubble cannot loom at the fly");
   fly.set(5000, 0, 5000);
   bubbles.update(1 / 60, 1 / 60, camera, sun, still, fly);

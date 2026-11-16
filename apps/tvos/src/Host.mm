@@ -3,7 +3,6 @@
 // CADisplayLink. Natives are plain JSC C API callbacks on globalThis.__native.
 #import "JSHost.h"
 #import "Renderer.h"
-#import "Audio.h"
 #import "BrainBridge.h"
 #import "Remote.h"
 #import "WeatherBridge.h"
@@ -167,7 +166,6 @@ static uint8_t *BytesOf(JSContextRef ctx, JSValueRef v, size_t *length) {
   uint8_t *base = (uint8_t *)JSObjectGetTypedArrayBytesPtr(ctx, o, nullptr);
   return base ? base + (gTypedArrayPointerIncludesOffset ? 0 : JSObjectGetTypedArrayByteOffset(ctx, o, nullptr)) : nullptr;
 }
-JSHost *CurrentHost() { return gHost; }
 uint8_t *JSBytesOf(JSContextRef ctx, JSValueRef v, size_t *length) { return BytesOf(ctx, v, length); }
 JSValueRef JSStringValue(JSContextRef ctx, NSString *s) { return MakeString(ctx, s); }
 
@@ -327,7 +325,6 @@ NATIVE(N_ready) {
   });
   return JSValueMakeUndefined(ctx);
 }
-NATIVE(N_audio) { return AudioNative(ctx, argc, argv); }
 // registerFont(bytes, family, weight, italic): a FontFace the page loaded from its bundled files.
 NATIVE(N_registerFont) {
   size_t len = 0;
@@ -479,7 +476,7 @@ static void Define(JSContextRef ctx, JSObjectRef obj, const char *name, JSValueR
     { "measureText", N_measureText }, { "decodeImage", N_decodeImage }, { "releaseImage", N_releaseImage },
     { "readFile", N_readFile }, { "wake", N_wake }, { "now", N_now }, { "log", N_log },
     { "storageGet", N_storageGet }, { "storageSet", N_storageSet }, { "storageKeys", N_storageKeys },
-    { "randomBytes", N_randomBytes }, { "setAtRoot", N_setAtRoot }, { "ready", N_ready }, { "audio", N_audio },
+    { "randomBytes", N_randomBytes }, { "setAtRoot", N_setAtRoot }, { "ready", N_ready },
     { "registerFont", N_registerFont }, { "input", N_input },
   };
   for (auto &f : fns) {

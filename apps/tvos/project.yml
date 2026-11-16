@@ -39,8 +39,6 @@ targets:
       - sdk: CoreText.framework
       - sdk: ImageIO.framework
       - sdk: Accelerate.framework
-      - sdk: AVFAudio.framework
-      - sdk: AudioToolbox.framework
       - sdk: GameController.framework
     info:
       path: Info.plist

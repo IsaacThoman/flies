@@ -71,7 +71,6 @@ function world() {
     play() {},
     watch() {},
     applySettings() {},
-    sound() {},
     canPlayOnline: true,
     get table() {
       return state.table;

@@ -1,5 +1,6 @@
-# Plain HTTP for any host: your own HTTPS reverse proxy sits in front
-# (docs/deploy.md). Nothing here is kept, so the container needs no volumes.
+# Plain HTTP for any host: Coolify's Traefik or your own HTTPS reverse proxy
+# sits in front (docs/deploy.md). Nothing here is kept, so the container needs
+# no volumes.
 {
 	auto_https off
 	persist_config off
@@ -9,16 +10,27 @@
 		# X-Forwarded-For from the right, so a client cannot claim another address.
 		trusted_proxies static {$TRUSTED_PROXIES:private_ranges}
 		trusted_proxies_strict
+		# Behind Cloudflare, Traefik replaces X-Forwarded-For with Cloudflare's
+		# own address; CF-Connecting-IP still names the visitor.
+		client_ip_headers {$CLIENT_IP_HEADERS:X-Forwarded-For}
 	}
 }
 
 :80 {
 	log
 
+	# A Coolify pull request preview (COOLIFY_BRANCH "pull/<n>/head", quotes
+	# and all) reaches its own room server as rooms-pr-<n>, the one name every
+	# Coolify version gives it, never production's.
+	map {env.COOLIFY_BRANCH} {rooms_upstream} {
+		~^"?pull/([0-9]+)/head"?$ {$ROOMS_HOST:rooms}-pr-${1}:{$ROOMS_PORT:3000}
+		default {$ROOMS_HOST:rooms}:{$ROOMS_PORT:3000}
+	}
+
 	# DNS is resolved on requests, so the site starts before rooms exists.
 	@rooms path /rooms /rooms/*
 	handle @rooms {
-		reverse_proxy {$ROOMS_HOST:rooms}:{$ROOMS_PORT:3000} {
+		reverse_proxy {rooms_upstream} {
 			# The room server reads the first entry: give it only the client.
 			header_up X-Forwarded-For {client_ip}
 		}

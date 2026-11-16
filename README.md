@@ -4,7 +4,7 @@ A fruit fly that lives on your Apple TV, or in a browser tab. It isn't
 scripted: a simulation of the fly's whole nervous system, 166,700 neurons
 wired as they are in the real animal, decides what it does from what it sees,
 tastes and feels. Feed it, startle it, tickle it and watch it with the
-remote; leave it alone and it is a living wallpaper.
+remote; leave it alone and it is a living screensaver.
 
 ```sh
 npm install
@@ -29,6 +29,7 @@ browser, running well on what people have, being a good tab, and hosting.
 one table, joined by a link, and the room server between them. For a Docker
 Compose stack on your own server, behind your own HTTPS reverse proxy, see
 [Self-hosting Flies](docs/deploy.md).
+Releases to TestFlight, and setting them up, are in [docs/release.md](docs/release.md).
 
 ## Playing
 
@@ -39,9 +40,9 @@ beside yours, up to eight, each marked with a dab of its player's colour
 (`docs/online.md`).
 
 The fly can live in more than one place (`docs/places.md`), and the player can
-carry it from one to another: the **Place** tool, or Settings → Wallpaper →
+carry it from one to another: the **Place** tool, or Settings → Screensaver →
 Where it lives. Living in each in turn (the default), it moves on after 20 minutes of
-wallpaper. It is the same fly, its brain running on; the world fades out, the
+screensaver. It is the same fly, its brain running on; the world fades out, the
 place is built behind the veil, and it is set down there.
 
 The first place is the picnic: a round café table by a lake: lemonade, a jam
@@ -103,9 +104,8 @@ Overcast greys every place's sky and takes the sun's light away, and mist
 whitens the distance. At the picnic rain falls past the camera, splashes on
 the table, the fruit and the lemonade's pool (crowns of droplets, rings in
 the wet), beads the table and the fruit, soaks the napkin darker, speckles
-the lake, keeps the birds quiet and is heard; the table dries over the next
-half hour or so, and if the sun comes out while it's wet a rainbow stands
-opposite it. Rain bursts the bubbles, and the fireflies shelter from it. A
+the lake; the table dries over the next half hour or so, and if the sun
+comes out while it's wet a rainbow stands opposite it. Rain bursts the bubbles, and the fireflies shelter from it. A
 drop landing on the fly is felt (`touch`).
 
 **The weather outside.** An Apple TV app built with WeatherKit
@@ -134,16 +134,16 @@ switch between the real weather and the made-up one over a minute. With no
 answer (no permission, no network, WeatherKit refusing the app) or one more
 than two hours old (two days for sunrise and sunset, which move by minutes a
 day), it is the forecast and the summer day as before, and the tool says
-"Now". Settings → Wallpaper → Real weather turns it off. Apple Weather's attribution is in
+"Now". Settings → Screensaver → Real weather turns it off. Apple Weather's attribution is in
 About the fly. None of it reaches the fly but as everything else does: what
 it sees and the wind it feels.
 
-While nobody is using the remote (the wallpaper, or a minute of play without
+While nobody is using the remote (the screensaver, or a minute of play without
 a press), the picnic has its own goings-on, about ten an hour, never two
 starting within 45 s of each other, each only when the time of day and the
 weather allow it: a gust (the fly feels it as `wind`; the bubbles are blown
 on, the table's leaf lifts, ripples run over the napkin, the trees sway and it
-runs across the grass and the lake, and it is heard), a gull gliding high over
+runs across the grass and the lake), a gull gliding high over
 whose shadow sweeps the table (the fly's eyes see it darken), a leaf coming
 down on a gust to lie where it lands until another blows it off the table, a
 butterfly that flutters over and may settle on the fruit a while, a ladybird
@@ -188,9 +188,8 @@ chimneys, a church spire, clouds and passing birds; at night their windows
 light up and the stars and the moon come out. Under a grey sky the window's
 shadows go soft; on cold mornings and damp days the glass mists at its foot;
 in mist the houses fade to ghosts; in the rain it falls across the garden,
-drops bead on the pane and run down it, and it stays streaked as it dries. It
-sounds of the kitchen's hush, the fridge, birds in the garden muffled by the
-glass by day, and rain on the pane. There are no bubbles or fireflies indoors.
+drops bead on the pane and run down it, and it stays streaked as it dries.
+There are no bubbles or fireflies indoors.
 
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
 wiring was traced: a stereo microscope with a fly pad on its stage (its base
@@ -217,9 +216,7 @@ and blinds across the bench and the floor, long and warm at golden hour; from
 dusk the panels are off, a desk lamp pools warm light on the bench, and the
 room is dark round it but for lit windows across the way. Under a grey sky the
 view outside goes flat and grey, in mist it fades to a pale veil, and in the
-rain it falls past the windows. It sounds of the air handling, the lights'
-hum, a fridge's compressor starting and stopping, and a distant beep now and
-then. There are no bubbles or fireflies indoors.
+rain it falls past the windows. There are no bubbles or fireflies indoors.
 
 The bar is the walnut counter of a small, warm bar in the evening: a cocktail
 on the rocks with a wedge of lime on its rim, a tall beer with its head of
@@ -245,8 +242,7 @@ the light is the window's, falling away from it, and the varnish mirrors the
 dark room and the bright window; at golden hour the sun comes in low across
 the counter and the glasses throw long shadows coloured by what is in them; at
 dusk and night the lamps, the flickering candle and the back bar light it, and
-lights out of focus glow behind the fly. It sounds like a quiet room: low
-voices, a glass or two touching, ice settling.
+lights out of focus glow behind the fly.
 
 Wherever it lives, a fly that has stood in something sticky or wet leaves
 footprints (`apps/web/src/scene/prints.ts`): faint prints of the two pads of
@@ -292,10 +288,7 @@ across the ceiling, the pendant pools warm light on the zinc, and in the rain
 water runs down the glass. Now and then, while nobody plays, the ventilation
 comes on and a slow draught falls from its diffusers. The room is drawn in
 areas, each in detail only while the camera is near it (`docs/places.md`, "A
-large place"). It sounds of a bistro after closing: the ventilation's hush, the
-fridge's compressor knocking on and off, the ice machine dropping a batch,
-the building ticking as it cools, and the city through the glass. There are
-no bubbles or fireflies indoors.
+large place"). There are no bubbles or fireflies indoors.
 
 It plays as well with a finger, a mouse or trackpad, a keyboard or a game pad
 as with the remote. Your hand is a glowing ring on the table; until you move
@@ -346,10 +339,11 @@ dropped and a softer one when it lands, a swell as the ball dives, two quick
 knocks when a press can't do anything, light pulses while the feather is on
 the fly, a low one while you blow, and a knock when the fly takes off. A
 phone that can vibrate (Android) buzzes for the same; the iPhone and iPad app
-plays its own haptics. It is as strong as the effects are loud, and off with
-them; it is never felt in the wallpaper. The hints
-always show the thing last used, and the screen hides the system's cursor,
-text selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
+plays its own haptics. Settings → Picture → Rumble turns the pad and Android
+rumble off; it starts on and is kept between launches. It is never felt in
+the screensaver. The hints always
+show the thing last used, and the screen hides the system's cursor, text
+selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
 
 The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
@@ -374,7 +368,7 @@ A launch starts on Feed with sugar, so that one press of Select gives the fly
 something to find. It comes back to the view last chosen (but never through
 the fly's eyes, which would open on no fly at all), and to a time of day or a
 weather chosen in the last six hours; after that it is back on Now, so the
-wallpaper follows the clock again.
+screensaver follows the clock again.
 
 The camera (`apps/web/src/camera.ts`) works like a patient nature cameraman.
 In Follow the fly is about 170 pixels long, seen from low down and a little
@@ -403,28 +397,28 @@ fly turns, until you give it back; each click of a mouse wheel eases in, so a
 turn of the wheel is one smooth move. Handed back (R, a double click or tap in
 the air, the pad's right stick pressed in), or a view chosen on the View tool,
 the cameraman takes it at once, at the named view nearest your zoom or the one chosen.
-The wallpaper takes it too, and gives your zoom back after.
+The screensaver takes it too, and gives your zoom back after.
 
-After a minute with no press (Settings → Wallpaper: 30 s to 5 min, or never)
+After a minute with no press (Settings → Screensaver: 30 s to 5 min, or never)
 the hints, the shelf and the pointer fade, and the camera settles beside the
-fly and follows it: the wallpaper. A mouse resting on the desk doesn't keep it
+fly and follows it: the screensaver. A mouse resting on the desk doesn't keep it
 away, and a nudge of the desk doesn't end it; a mouse moved as if meant does.
 Its camera can take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
 (Lively). Any press, touch, tap, click, key or deliberate move of the mouse
 brings the controls back and does nothing else.
-A small picture of what the fly's eyes see sits in a corner of the wallpaper
-(Settings → On screen → What it sees: off, in the wallpaper, or always, which keeps it in
+A small picture of what the fly's eyes see sits in a corner of the screensaver
+(Settings → On screen → What it sees: off, in the screensaver, or always, which keeps it in
 the top right while you play too), and under it a picture of its nervous
-system at work (Nervous system, the same choices). Each time the wallpaper
+system at work (Nervous system, the same choices). Each time the screensaver
 moves on to a new shot, and at least once a minute, they fade out and come
 back together in the next corner, so none is left in one place long
 enough to mark an OLED screen. The corners aren't chosen: a picture pinned
-to one would sit there for hours in a wallpaper, its glass edge and its
+to one would sit there for hours in a screensaver, its glass edge and its
 words the sharpest, brightest things on screen, which is how an OLED screen
 is marked, and keeping them moving costs nothing. Instead Size (small,
 medium, the default, or large) and Opacity (solid, the default, soft or
-faint, which also dims them for the screen) set how much of the wallpaper
+faint, which also dims them for the screen) set how much of the screensaver
 they take.
 
 **Stats** (`apps/web/src/stats/`; On screen → Stats, off by default, then
@@ -432,7 +426,7 @@ Stats of: its brain, its day, both, or in and out) is a small panel of numbers, 
 figure and a word: the brain's spikes a second, neurons active and speed
 against real time (from the brain's meter), under
 a trace of its last twenty seconds; and, headed by what the fly is doing now
-(the HUD's caption, so it can be read in the wallpaper too), its day: how far
+(the HUD's caption, so it can be read in the screensaver too), its day: how far
 it has walked, its meals, its take-offs, and its time flying and grooming.
 The day is counted from what the fly's life did (`life.ts`: its legs' steps
 on its feet, a meal from its first taste, each leap into the air, each
@@ -453,18 +447,18 @@ or a bar it shows changes, at most four times a second.
 
 There is one menu: the title at launch, and the same menu from play (Back,
 Play/Pause, or the button at the top left), with the fly living on behind it.
-It has **Play**, **Watch** (the wallpaper straight away), **About**, and
+It has **Play**, **Watch** (the screensaver straight away), **About**, and
 **Settings**: a row of tabs over each part of the game, every setting two
-steps from the menu and none scrolling: **Wallpaper** (when it starts, how
+steps from the menu and none scrolling: **Screensaver** (when it starts, how
 its camera films, where the fly lives, and, on an Apple TV that can tell,
 the real weather), **On screen** (everything that can show over the world:
 what it sees, its nervous system and its stats in the corners, what the
-stats are of, the corners' size and opacity, and the X-ray), **Sound**
-(effects, surroundings) and **Picture** (pixel size, the eyes' detail,
-button hints, frame stats). In a browser it also has **Online**, rooms
-shared with others. The menu never scrolls either: on a screen too short for
-its rows (a phone on its side) they are in two columns, Left and Right going
-across, Up and Down along the list as ever. Where the settings' tabs are too
+stats are of, the corners' size and opacity, and the X-ray), and **Picture**
+(pixel size, the eyes' detail, button hints, rumble, frame stats). In a browser it
+also has **Online**, rooms shared with others. The menu never scrolls
+either: on a screen too short for its rows (a phone on its side) they are
+in two columns, Left and Right going across, Up and Down along the list as
+ever. Where the settings' tabs are too
 narrow to read (the smallest phones), they are one choice, the tab shown
 between arrows.
 
@@ -594,7 +588,7 @@ title, over a menu, or while View → Fly's eyes is up.
 The fly's brain, nerve cord and nerves can be watched at work, in two ways
 that draw the same model with the same glow, so they never disagree:
 
-- **The X-ray** (Settings → On screen → X-ray: off, in the wallpaper, or
+- **The X-ray** (Settings → On screen → X-ray: off, in the screensaver, or
   always; or View → Inside it while playing, which also brings the camera in
   close). The fly's cuticle turns to smoky glass, faint across its face and
   stronger at its edges, still glossy, and its nervous system shows through
@@ -606,7 +600,7 @@ that draw the same model with the same glow, so they never disagree:
   places' glass jars by distance, so a jar in front of the fly is in front of
   it.
 - **The panel** (Settings → On screen → Nervous system: off, in the
-  wallpaper, the default, or always): the same model from above, head up,
+  screensaver, the default, or always): the same model from above, head up,
   the fly's left on the left, standing at rest so that it holds still,
   cropped to the brain and the cord, labelled "Its nervous system". It shares
   its corner with what it sees, under it (over it at the bottom; beside it,
@@ -770,7 +764,7 @@ interpreter); on a
 frame the eyes refresh, about 70 draws and 280,000 triangles (the most the
 end-to-end run sees is about 85 draws and 300,000), the eyes' own part about 45
 draws and 1.5 to 2.5 ms (mostly the read-back). JavaScript per frame about 1 to
-2.5 ms in the browser. The corner picture of what it sees (in the wallpaper,
+2.5 ms in the browser. The corner picture of what it sees (in the screensaver,
 or always) is one more draw (its panel and every facet are instances of one
 quad, drawn with the menus) and about 3,500 triangles, with no measurable
 JavaScript. The X-ray is one more draw (the nervous system: one mesh, posed by
@@ -803,21 +797,11 @@ swipe's and ignored. In a browser the brain is `packages/brain` in a Web Worker
 which `apps/web/src/brain/download.ts` fetches with its bytes counted, keeps
 in the browser's cache and checks against the digest the build recorded
 (`scripts/webBuild.ts`; the dev server serves the same file). The page sleeps
-while hidden, holds the screen awake while it is the wallpaper, and recovers
+while hidden, holds the screen awake while it is the screensaver, and recovers
 from a lost graphics context (`apps/web/src/page.ts`); `docs/web.md` has the
 rest. On the Apple TV it is `globalThis.__native.brain`
 (`apps/web/src/brain/native-driver.ts`), which allocates nothing per frame.
-Sound is synthesised into buffers at start-up (no oscillators or filters):
-wing buzz following the wings, patter while it walks, each place's own
-surroundings (the picnic's breeze and lake; birds by day, quieter in the
-rain and gone to roost at night, muffled behind the windowsill's glass), rain
-and the rush of a gust, and small sounds for the
-tools and menus. The held tools are heard while they work: the feather
-rustles, swelling with each brush, while it strokes the fly, and a breath of
-air blows while you hold Blow, deeper and softer gently, higher and louder
-hard. Each starts when the tool begins and is let go when it stops, so
-nothing plays, or costs anything, in between. The settings, the shelf's kept choices and what the hints
-have taught are in
+The settings, the shelf's kept choices and what the hints have taught are in
 `localStorage` (`apps/web/src/settings.ts`); from a save made by another
 build, or a broken one, only what this build can use is kept.
 
@@ -895,7 +879,7 @@ go.
 appears once the brain wakes, the menus and the settings' tabs are walked with
 the keys (the first arrow only showing the focus), honey is tasted and eaten,
 the ball is thrown until the fly takes off, Play/Pause and Back open the menu
-and carry on, the wallpaper comes and goes with what it sees in a
+and carry on, the screensaver comes and goes with what it sees in a
 corner, with its nervous system under it (and, set to always, they stay while
 playing but not over View → Fly's eyes or the menu), the X-ray comes in
 the follow shot, goes in the wide one and comes with View → Inside it, the fly is carried to every place, the weather
@@ -906,14 +890,14 @@ what was used gone, and the frame stays within its draw budget. Then
 `apps/web/e2e/pointer.e2e.ts` plays it with fingers on a phone with a notch
 (the menus and the shelf tapped, honey dropped and eaten, the feather and the
 puff held on the fly, a pinch, a look round that stays a while, the phone
-turned on its side, the wallpaper woken by a tap that does nothing else) and
+turned on its side, the screensaver woken by a tap that does nothing else) and
 with a mouse and keys on a desktop (hovering moves no focus, the wheel zooms
 smoothly and stays, drags with each button turn the camera without dropping
 food and it stays where it was put, R and a double click give it back, a trackpad's pinch and + zoom too). Then it builds the site and serves it from a folder of a static
 server (`apps/web/e2e/web.e2e.ts`): a first visit on a slow connection that
 breaks off partway counts the brain's bytes and carries on from the break, a
 second loads with the network off, a hidden tab sleeps and wakes without a
-jump, the wallpaper holds the screen awake, a lost graphics context comes
+jump, the screensaver holds the screen awake, a lost graphics context comes
 back, losing the network on a first visit and a browser without WebGL 2 each
 say so, and nothing is asked of any other site. A browser has no weather outside: scripts
 feed it with `__fly.outside.feed({...})` (`OutsideConditions` without its

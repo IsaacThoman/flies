@@ -1,7 +1,6 @@
 // The game as a browser tab, which it may be for days as someone's
 // wallpaper: it sleeps while hidden and wakes where the clock is, keeps the
-// screen on only while it is the wallpaper, starts its sound on the first
-// press or tap (browsers allow no sooner), comes back from a lost graphics
+// screen on only while it is the wallpaper, comes back from a lost graphics
 // context and from the back-forward cache, tries the brain again when the
 // network returns, and registers the service worker that keeps the page for
 // opening offline. None of it applies on the Apple TV, whose host does these
@@ -42,12 +41,9 @@ export class Page {
     window.addEventListener("pageshow", (event) => {
       if (event.persisted) this.#wake();
     });
-    const unlock = () => game.audio.unlock();
-    for (const type of ["pointerdown", "pointerup", "keydown", "touchend"]) window.addEventListener(type, unlock, { capture: true, passive: true });
     canvas.addEventListener("webglcontextlost", () => game.contextLost());
     canvas.addEventListener("webglcontextrestored", () => game.contextRestored());
     window.addEventListener("online", () => game.retryBrain(true));
-    game.audio.ctx?.addEventListener?.("statechange", () => this.#publish());
     // Opened in a background tab: asleep until it is first seen.
     if (document.hidden) this.#sleep();
     this.#publish();
@@ -141,6 +137,5 @@ export class Page {
     if (!d) return;
     d.hidden = String(!!this.#hiddenAt);
     d.wakeLock = this.#lock ? "held" : "none";
-    d.audio = this.#game.audio.ctx?.state ?? "none";
   }
 }
