@@ -3,12 +3,12 @@
 // the fly and checks it tasted and ate, throws the ball until the fly takes
 // off, checks the wallpaper comes and goes with what it sees and its nervous
 // system in a corner, that the X-ray comes where the fly is big enough,
-// carries the fly to every place, feeds it the weather outside as the Apple TV
-// would, reloads and finds the settings, the shelf and what the hints taught
-// as it left them, and holds the frame to its draw budget throughout. It holds
-// the light at midday and the weather clear, so that what the fly does answers
-// what the test does; a browser has no weather outside but what the test feeds
-// it.
+// carries the fly to every place, leaving its footprints behind each time,
+// feeds it the weather outside as the Apple TV would, reloads and finds the
+// settings, the shelf and what the hints taught as it left them, and holds
+// the frame to its draw budget throughout. It holds the light at midday and
+// the weather clear, so that what the fly does answers what the test does; a
+// browser has no weather outside but what the test feeds it.
 //
 //   npm run e2e            (starts its own Vite server)
 //   npm run e2e -- --url http://localhost:5173/
@@ -184,6 +184,9 @@ try {
   await waitFor(page, "eaten>0.05", 20_000);
   const fed = await readState(page);
   console.log(`  tasted (sweet ${fed.sweet}), feed command ${fed.feed}, ate ${fed.eaten}`);
+  // Walking off, its feet leave honey prints; whether it walks off now is its brain's.
+  const printed = await waitFor(page, "prints>0", 10_000).then((s) => s.prints, () => "");
+  console.log(printed ? `  walked off the honey, its feet printing (${printed} so far)` : "  stayed by the honey: no prints yet");
 
   step("startle: the ball dives at it until it takes off (its brain decides; it doesn't every time)");
   await press("ArrowRight");
@@ -272,7 +275,8 @@ try {
   for (const place of PLACES.slice(1)) {
     await press("ArrowDown");
     await press("Enter");
-    await waitFor(page, `place=${place.id},moving=`, 30_000);
+    const arrived = await waitFor(page, `place=${place.id},moving=`, 30_000);
+    assert.equal(arrived.prints, "0", "its prints are left behind where it was");
     await waitFor(page, "mode~standing|walking", 10_000);
     await page.waitForTimeout(3000);
   }

@@ -47,6 +47,7 @@ import { Bubbles } from "./scene/bubbles.ts";
 import { Fireflies } from "./scene/fireflies.ts";
 import { clockHours, timeAt } from "./scene/light.ts";
 import { Outside, nativeWeather } from "./scene/outside.ts";
+import { Footprints } from "./scene/prints.ts";
 import { cheaperEyes, cheaperPixels } from "./quality.ts";
 import type { Quality } from "./quality.ts";
 import { KEPT, loadLearned, loadSettings, loadShelf, loadTableSeat, saveLearned, saveSettings, saveShelf, saveTableSeat } from "./settings.ts";
@@ -139,6 +140,8 @@ export class Game implements Shell {
   readonly director: CameraDirector;
   readonly life: Life;
   readonly fly: FlyView;
+  /** What its feet leave after it has stood in something sticky or wet: only drawn, never felt. */
+  readonly prints: Footprints;
   readonly meter = new BrainMeter();
   readonly overlay = new Overlay();
   readonly bubbles: Bubbles;
@@ -280,6 +283,7 @@ export class Game implements Shell {
     this.fireflies = new Fireflies(this.stage.scene);
     this.life = new Life(world, brain);
     this.fly = new FlyView(this.stage.scene, world);
+    this.prints = new Footprints(this.stage.scene);
     this.director = new CameraDirector(world, display.frame.aspect, scene.camera);
     this.bubbles = new Bubbles(this.stage.scene, world);
     this.handsView = new HandsView(this.stage.scene);
@@ -646,6 +650,7 @@ export class Game implements Shell {
     this.#stayed = 0;
     this.stage.load(scene);
     this.life.move(scene.place);
+    this.prints.clear();
     this.hands.clear();
     this.director.useScene(scene.camera);
     this.#settle();
@@ -771,6 +776,7 @@ export class Game implements Shell {
     this.peaks.looming = Math.max(this.peaks.looming * fade, rates?.["vision.looming left"] ?? 0, rates?.["vision.looming right"] ?? 0);
     this.glow.update(life.brain.regionRates, dt);
     this.fly.update(life.body, life.intent, life.eating, dt);
+    this.prints.update(this.fly.model, life.body.onFeet, this.fly.pose.groom > 0.02, life.world, life.pantry, this.time);
     this.online?.send(this.#playerNow());
     // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
     director.prefer = this.hands.current.id === "swoop" && this.nav.current === "play" && !this.wallpaper ? Math.PI - SWOOP_BEARING : null;
@@ -1545,6 +1551,7 @@ export class Game implements Shell {
     d.eaten = life.eaten.toFixed(3);
     d.meals = String(life.meals);
     d.food = String(life.pantry.foods.filter(isDropped).length);
+    d.prints = String(this.prints.prints.count(this.time));
     d.takeoffs = String(life.takeOffs);
     d.escape = (life.brain.state?.command.escape ?? 0).toFixed(3);
     d.escapePeak = this.peaks.escape.toFixed(3);

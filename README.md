@@ -246,6 +246,22 @@ dusk and night the lamps, the flickering candle and the back bar light it, and
 lights out of focus glow behind the fly. It sounds like a quiet room: low
 voices, a glass or two touching, ice settling.
 
+Wherever it lives, a fly that has stood in something sticky or wet leaves
+footprints (`apps/web/src/scene/prints.ts`): faint prints of the two pads of
+its feet, each where its gait set that foot down, lying on whatever it walks
+on (the table, a fruit, a jar's rim, the sill). Honey leaves them amber; jam,
+raspberry, wine and syrup red; the juices, lemonade, beer, the agar and the
+lab's fly food their own colours. Water (dropped, the basil's saucer, a drop
+or dew) leaves darker wet prints that dry in about half a minute; sticky ones
+fade over a minute and a half. A foot carries only a little: the first steps
+off the food print clearly, the next fainter and then only now and then, and
+after ten or so it is clean, until it walks back into food. Sugar and crumbs
+are dry and leave nothing. There are none on a drink, a head of foam or
+anything drawn rougher than the fly feels it, and they stay behind when the
+fly is carried somewhere else. They are only drawn: the fly doesn't taste or
+feel its own prints, they aren't food, and nothing about them reaches its
+brain.
+
 It plays as well with a finger, a mouse or trackpad, a keyboard or a game pad
 as with the remote. Your hand is a glowing ring on the table; until you move
 it, it waits just in front of the fly's mouth, and it drifts back there 15 s
@@ -647,6 +663,9 @@ the table's own beads and puddles are in its shader, as many as there are
 pixels for. The ripple round food that has just landed is one draw for under
 a second. Each visitor is one draw while it is about, the gull's shadow is
 in the table's and the fly's own shading, and nothing is allocated per frame.
+The footprints are one instanced draw while any are left (at most 128, two
+triangles each), multiplied into what they lie on, so they need no light; a
+print is written only when a foot is set down, and fades in the shader.
 Menus and hints are one 2D canvas drawn over the frame,
 uploaded only when something on it changes (at most 30 times a second; the
 in-game shimmer at 10).
@@ -656,7 +675,9 @@ and the canvas's `data-calls`, `data-triangles`, `data-frame-ms` and
 `data-eyes-ms`): playing, 23 draws and about 106,000 triangles a frame (in
 rain 26 and 118,000, and about 0.07 ms more JavaScript; with a butterfly, a
 ladybird, a falling leaf, the gull, the boat and a drop of juice all about at
-once, a draw for each in view and 0.04 ms); on a
+once, a draw for each in view and 0.04 ms; with footprints, one more draw
+and at most 256 triangles, and about 7 µs of JavaScript a frame in V8's
+interpreter); on a
 frame the eyes refresh, about 70 draws and 280,000 triangles (the most the
 end-to-end run sees is about 85 draws and 300,000), the eyes' own part about 45
 draws and 1.5 to 2.5 ms (mostly the read-back). JavaScript per frame about 1 to
