@@ -43,6 +43,14 @@ function buildEnvironment(light: Daylight) {
 
 const VEIL_CAMERA = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
+/** Three keeps light uniforms by light ID for a scene's lifetime, even after those lights leave. */
+export function renewScene(scene: THREE.Scene): THREE.Scene {
+  const next = new THREE.Scene();
+  next.environment = scene.environment;
+  while (scene.children.length) next.add(scene.children[0]);
+  return next;
+}
+
 export type FrameCost = { calls: number; triangles: number; textures: number; geometries: number; programs: number };
 
 export class Stage {
@@ -53,7 +61,7 @@ export class Stage {
   current: Scene;
   backdrop: SceneBackdrop;
   set: SceneSet;
-  readonly scene = new THREE.Scene();
+  scene = new THREE.Scene();
   readonly hemi: THREE.HemisphereLight;
   readonly sun: THREE.DirectionalLight;
   readonly cost: FrameCost = { calls: 0, triangles: 0, textures: 0, geometries: 0, programs: 0 };
@@ -111,6 +119,7 @@ export class Stage {
     this.scene.remove(this.set.group);
     disposeAll(this.set.group);
     disposeAll(this.backdrop.scene);
+    this.scene = renewScene(this.scene);
     this.current = scene;
     this.light.use(scene.palettes, scene.open);
     const started = performance.now();
