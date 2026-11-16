@@ -132,12 +132,13 @@ async function toTool(page: Page, id: string) {
   await waitFor(page, `tool=${id}`, 1000);
 }
 
-/** Moves the focus with `key` until it is on `id`. */
+/** Moves the focus with `key` until it is on `id`, one step at a time as the game shows each (a first arrow may only show where the focus is). */
 async function keyTo(page: Page, id: string, key: "ArrowUp" | "ArrowDown") {
-  for (let i = 0; i < 12; i++) {
-    if ((await readState(page)).focus === id) return;
+  for (let i = 0; i < 16; i++) {
+    const at = (await readState(page)).focus;
+    if (at === id) return;
     await page.keyboard.press(key);
-    await page.waitForTimeout(50);
+    await waitFor(page, `focus~^(?!${at.replace(/[^\w]/g, ".")}$)`, 1000).catch(() => {});
   }
   await waitFor(page, `focus=${id}`, 1000);
 }
