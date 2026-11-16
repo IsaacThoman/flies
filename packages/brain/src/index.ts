@@ -27,3 +27,5 @@ export { RETINA, Retina, VISION_STAGES, stageName } from "./vision.ts";
 export type { RetinaParameters } from "./vision.ts";
 export { PoissonInput, RatedPoissonInput, Simulation, gainByTransmitter, inputSeed, mulberry32 } from "./sim.ts";
 export type { Network, SimulationOptions, SimulationStats } from "./sim.ts";
+export { ANATOMY_CATEGORIES, AnatomyFormatError, anatomicalPosition, cordSegments, loadAnatomy, writeAnatomy } from "./anatomy.ts";
+export type { Anatomy, AnatomyCategory, AnatomyData, AnatomyHeader, Bounds, CordSegment, Position } from "./anatomy.ts";
