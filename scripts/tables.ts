@@ -253,7 +253,10 @@ async function main() {
     const first = tabs[0].page;
     await first.goto(`${url}?rooms=${roomsUrl}`);
     await waitFor(first, "brain=running", 120_000);
-    await first.evaluate(() => (globalThis as unknown as { __fly: { startTable(): void } }).__fly.startTable());
+    await first.evaluate(() => {
+      const g = (globalThis as unknown as { __fly: { here: string; startRoom(room: { name: string; listed: boolean; password: string; place: string }): void } }).__fly;
+      g.startRoom({ name: "Tables", listed: false, password: "", place: g.here });
+    });
     await waitFor(first, "online=joined", 20_000);
     const link = await first.evaluate(() => (globalThis as unknown as { __fly: { tableLink: string } }).__fly.tableLink);
     const code = new URL(link).searchParams.get("table")!;

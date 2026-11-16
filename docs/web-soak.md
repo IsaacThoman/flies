@@ -51,7 +51,7 @@ Tables starts an in-process room server and repeatedly joins a synthetic peer,
 drives its held Blow tool through the real wire, and leaves. The browser's brain
 still runs in real time. Cleanup checkpoints and the fast check catch resources
 retained by remote hands or pooled fly models. The joined model must also remain
-attached to the visible scene after place changes. Menus include Together.
+attached to the visible scene after place changes. Menus include Online.
 The fast check lists the real scene actors before and after an arrival with a
 peer present, verifying every retained descendant by identity: the eyes' sky,
 fly and X-ray, bubbles, hands, fireflies, footprints and remote models.

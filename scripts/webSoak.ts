@@ -384,7 +384,7 @@ export async function run(args = process.argv.slice(2)) {
         } else if (p === "menus") {
           await page.keyboard.press(" ");
           await waitFor(page, "screen=title");
-          for (const screen of ["about", "settings", "together"] as const) {
+          for (const screen of ["about", "settings", "online"] as const) {
             await page.evaluate((screen) => globalThis.__fly.open(screen), screen);
             await waitFor(page, `screen=${screen}`);
             if (screen === "settings") {
@@ -411,7 +411,7 @@ export async function run(args = process.argv.slice(2)) {
           await page.keyboard.press("Escape");
           await waitFor(page, "screen=play");
         } else if (p === "tables") {
-          await page.evaluate(() => globalThis.__fly.startTable());
+          await page.evaluate(() => globalThis.__fly.startRoom({ name: "Soak", listed: false, password: "", place: globalThis.__fly.here }));
           await waitFor(page, "online=joined", 30_000);
           const code = await page.evaluate(() => globalThis.__fly.online!.code);
           const peer = await fakeFly(`ws://127.0.0.1:${rooms!.port}/rooms`, code, 0, new Set());

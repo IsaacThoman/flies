@@ -1,6 +1,8 @@
 // Draws a Menu (packages/ui) as a column of glossy rows: actions as jelly
-// buttons, choices with their value between chevrons (or, as tabs, all their
-// options side by side), sliders as glossy tracks. The soap-bubble ring
+// buttons (with, for a room, its place's colour, its flies as pips and a
+// padlock), choices with their value between chevrons (or, as tabs, all their
+// options side by side), sliders as glossy tracks, fields as what is typed
+// in them, with a caret while it is. The soap-bubble ring
 // glides to the focused row, for the remote, a keyboard and a pad; for a
 // mouse or a finger there is no ring, and what the mouse is over only
 // brightens a little. On a narrow screen a choice or a slider puts its value
@@ -9,7 +11,7 @@
 // track and "more" is recorded where it is drawn, for a pointer.
 
 import { Eased, INK, INK_SOFT, bubbleRing, chevron, font, pill, slider, text } from "@fly/ui";
-import type { ChoiceItem, HitMap, Menu, MenuItem } from "@fly/ui";
+import type { ActionItem, ChoiceItem, FieldItem, HitMap, Menu, MenuItem } from "@fly/ui";
 
 /** `columns`: how many columns the rows are in (1 unless they don't fit in one). */
 export type MenuLayout = { x: number; y: number; width: number; row: number; gap: number; compact?: boolean; columns?: number };
@@ -23,6 +25,9 @@ export const MENU_HITS = { row: "row", step: "step", track: "track", more: "more
 /** The slider's track, from the row's right edge: where it starts and how long it is. */
 const TRACK = { from: 170, length: 140 };
 
+/** The field being typed into, by its item's index (-1: none), and where its caret is (characters into its value). */
+export type Typing = { index: number; caret: number };
+
 export class MenuView {
   readonly menu: Menu;
   layout: MenuLayout;
@@ -30,6 +35,7 @@ export class MenuView {
   readonly track = { x: 0, w: 0 };
   /** Room (design units) kept clear at the left of a row of tabs, for the back button beside them. */
   tabInset = 0;
+  readonly typing: Typing = { index: -1, caret: 0 };
   #ring = new Eased(0, 18);
   #ringX = new Eased(0, 18);
   /** Where a visible row goes: its left edge, top and width. */
@@ -132,7 +138,9 @@ export class MenuView {
       const focused = ring && i === menu.focus;
       const press = i === menu.focus ? this.#press.value : 0;
       hits.add(MENU_HITS.row, x, y, width, row, i);
+      const caret = i === this.typing.index ? this.typing.caret : -1;
       if (item.kind === "choice" && item.tabs) drawTabs(g, item, x + this.tabInset, y, width - this.tabInset, row, hits, i);
+      else if (item.kind === "field") drawField(g, item, x, y, width, row, focused, i === hover, caret, t, !!this.layout.compact);
       else if (this.layout.compact) drawStacked(g, item, x, y, width, row, focused, i === hover, press, hits, i, this.track);
       else drawItem(g, item, x, y, width, row, focused, i === hover, press, hits, i, this.track, size);
     }
@@ -184,13 +192,127 @@ function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: n
   }
 }
 
+/** An action's jelly button, with whatever marks it: its swatch at the left, its pips and padlock at the right, its words between them. */
+function drawAction(g: CanvasRenderingContext2D, item: ActionItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, press: number, size?: number) {
+  const mid = y + h / 2 - (focused ? 2 : 0) + press * 2;
+  const marks = item.count || item.locked;
+  // Clear of the marks on both sides, the words centred, smaller if they must be.
+  let words = size;
+  if (marks) {
+    const room = w - 2 * (h * 0.4 + PIPS.width + (item.locked ? h * 0.5 : 0));
+    const most = size ?? Math.round(h * 0.46);
+    g.font = font(most);
+    words = Math.max(8, Math.min(most, Math.floor((most * room) / Math.max(1, g.measureText(item.label).width))));
+  }
+  pill(g, x, y, w, h, item.label, { focused, hover, disabled: item.disabled, press, size: words });
+  if (item.swatch) swatch(g, x + h * 0.62, mid, h * 0.22, item.swatch);
+  if (!marks) return;
+  const ink = focused ? "#ffffff" : INK;
+  let right = x + w - h * 0.4;
+  if (item.count) {
+    pips(g, right - PIPS.width, mid, item.count[0], item.count[1], ink, item.disabled);
+    right -= PIPS.width + h * 0.18;
+  }
+  if (item.locked) padlock(g, right - h * 0.16, mid, h * 0.3, ink, item.disabled);
+}
+
+/** How many of how many, as two rows of small dots: those there filled. */
+const PIPS = { width: 34, r: 2.6, step: 8.5 };
+function pips(g: CanvasRenderingContext2D, x: number, y: number, n: number, of: number, ink: string, disabled = false) {
+  const across = Math.ceil(of / 2);
+  g.save();
+  if (disabled) g.globalAlpha *= 0.45;
+  g.lineWidth = 1.2;
+  for (let i = 0; i < of; i++) {
+    const px = x + PIPS.r + (i % across) * PIPS.step;
+    const py = y + (i < across ? -1 : 1) * (PIPS.step / 2);
+    g.beginPath();
+    g.arc(px, py, PIPS.r, 0, Math.PI * 2);
+    if (i < n) {
+      g.fillStyle = ink;
+      g.fill();
+    } else {
+      g.strokeStyle = ink;
+      g.globalAlpha *= 0.5;
+      g.stroke();
+      g.globalAlpha /= 0.5;
+    }
+  }
+  g.restore();
+}
+
+/** A padlock `s` tall, centred on (x, y). */
+function padlock(g: CanvasRenderingContext2D, x: number, y: number, s: number, ink: string, disabled = false) {
+  g.save();
+  if (disabled) g.globalAlpha *= 0.45;
+  const bw = s * 0.8, bh = s * 0.55;
+  g.strokeStyle = ink;
+  g.fillStyle = ink;
+  g.lineWidth = Math.max(1.4, s * 0.13);
+  g.beginPath();
+  g.arc(x, y - bh / 2 + s * 0.02, bw * 0.3, Math.PI, 0);
+  g.lineTo(x + bw * 0.3, y - bh / 2 + s * 0.08);
+  g.moveTo(x - bw * 0.3, y - bh / 2 + s * 0.08);
+  g.lineTo(x - bw * 0.3, y - bh / 2 + s * 0.02);
+  g.stroke();
+  g.beginPath();
+  g.rect(x - bw / 2, y - bh / 2 + s * 0.08, bw, bh);
+  g.fill();
+  g.restore();
+}
+
+/**
+ * A field: its label at the left, what is typed in it at the right (dots, for
+ * a secret), or its placeholder, softly, when it is empty and not being
+ * typed into; a blinking caret while it is. Narrow, the label is over the
+ * value, as a choice's is.
+ */
+function drawField(g: CanvasRenderingContext2D, item: FieldItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, caret: number, t: number, compact: boolean) {
+  const typing = caret >= 0;
+  pill(g, x, y, w, h, "", { focused: false, hover: hover || typing, color: "glass", disabled: item.disabled });
+  const mid = compact ? y + h * 0.66 : y + h / 2 + 1;
+  const labelSize = Math.round(h * (compact ? 0.27 : 0.4));
+  text(g, item.label, x + 22, compact ? y + h * 0.3 : mid, { size: labelSize, color: compact ? INK_SOFT : INK, baseline: "middle" });
+  g.font = font(labelSize);
+  const left = compact ? x + 22 : x + 22 + g.measureText(item.label).width + 18;
+  const right = x + w - 22;
+  const room = right - left;
+  const shown = item.secret ? "•".repeat([...item.value].length) : item.value;
+  const before = item.secret ? "•".repeat([...item.value.slice(0, Math.max(0, caret))].length) : item.value.slice(0, Math.max(0, caret));
+  const most = Math.round(h * (compact ? 0.3 : 0.38));
+  if (!shown && !typing) {
+    if (item.placeholder) text(g, item.placeholder, right, mid, { size: most, color: INK_SOFT, align: "right", baseline: "middle" });
+    return;
+  }
+  // As large as fits, down to a little smaller; past that, its start is left off, so the caret's end shows.
+  g.font = font(most);
+  const size = Math.max(Math.round(most * 0.7), Math.min(most, Math.floor((most * room) / Math.max(1, g.measureText(shown).width))));
+  g.font = font(size);
+  let value = shown;
+  let lead = before;
+  while (value.length > 1 && g.measureText(`…${value}`).width > room && lead.length > 0) {
+    value = value.slice(1);
+    lead = lead.slice(1);
+  }
+  if (value !== shown) {
+    value = `…${value}`;
+    lead = `…${lead}`;
+  }
+  const color = focused || typing ? "#0a6fc0" : INK;
+  text(g, value, right, mid, { size, color, align: "right", baseline: "middle" });
+  if (!typing || Math.floor(t * 2) % 2 === 1) return;
+  const cx = right - g.measureText(value).width + g.measureText(lead).width + 1;
+  g.fillStyle = "#0a6fc0";
+  g.fillRect(Math.round(cx), mid - size * 0.6, 2, size * 1.2);
+}
+
 /** `size`: an action's words, where not the pill's own. */
 function drawItem(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, press: number, hits: HitMap, index: number, track: { x: number; w: number }, size?: number) {
   if (item.kind === "action") {
-    pill(g, x, y, w, h, item.label, { focused, hover, disabled: item.disabled, press, size });
-    if (item.swatch) swatch(g, x + h * 0.62, y + h / 2 - (focused ? 2 : 0) + press * 2, h * 0.22, item.swatch);
+    drawAction(g, item, x, y, w, h, focused, hover, press, size);
     return;
   }
+  if (item.kind === "field") return;
   // A row of glass with the label on the left and the value on the right.
   pill(g, x, y, w, h, "", { focused: false, hover, color: "glass", disabled: item.disabled });
   const mid = y + h / 2 + 1;
@@ -229,10 +351,10 @@ function swatch(g: CanvasRenderingContext2D, x: number, y: number, r: number, co
 function drawStacked(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, press: number, hits: HitMap, index: number, track: { x: number; w: number }) {
   if (item.kind === "action") {
     const ph = Math.min(h, 42);
-    pill(g, x, y + (h - ph) / 2, w, ph, item.label, { focused, hover, disabled: item.disabled, press });
-    if (item.swatch) swatch(g, x + ph * 0.62, y + h / 2 - (focused ? 2 : 0) + press * 2, ph * 0.22, item.swatch);
+    drawAction(g, item, x, y + (h - ph) / 2, w, ph, focused, hover, press);
     return;
   }
+  if (item.kind === "field") return;
   pill(g, x, y, w, h, "", { focused: false, hover, color: "glass", disabled: item.disabled });
   text(g, item.label, x + 22, y + h * 0.3, { size: Math.round(h * 0.27), color: INK_SOFT, baseline: "middle" });
   const low = y + h * 0.66;

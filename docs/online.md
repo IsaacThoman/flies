@@ -1,6 +1,7 @@
-# Flies together
+# Flies online
 
-Up to eight people's flies can share a table. Each fly's brain and body run
+Up to eight people's flies can share a room (a table, in the code: the
+place the flies share). Each fly's brain and body run
 on its owner's device, exactly as they do alone. A small room server
 (`apps/server`) runs no brains and draws nothing: it passes each fly's state
 on to the others, and it owns the rest of the world there. That means the
@@ -13,13 +14,27 @@ through a native WebSocket bridge (below).
 
 ## Playing
 
-- **Starting a table.** The menu → Together → Start a table. The
-  table is made in the place, light and weather the fly has now, and Share
-  the link opens the system's share sheet, or copies the link where there is
-  none. The link is `https://<site>/?table=<code>`. Ten letters and digits
-  (about 50 bits) are the only permission there is: anyone with the link can
-  sit down.
-- **Joining.** Opening the link sits this device's fly at the table, set
+- **The rooms.** The menu → Online lists every public room with someone in
+  it, fullest first: its name, its place's colour, its flies as eight pips
+  and a padlock if it has a password. The list follows the room server as
+  rooms open, fill and empty. A full one can't be chosen. Above the list are
+  New room, and Code, for an unlisted room's code (the ten letters of its
+  link).
+- **A new room.** New room → its name (two words are suggested, to keep or
+  type over), its place (the fly's own to start with), Public or Unlisted
+  and a password (none, unless one is typed). Create sits this device's
+  fly there, under its light and weather. Share the link opens the system's
+  share sheet, or copies the link where there is none. The link is
+  `https://<site>/?table=<code>`. Ten letters and digits (about 50 bits):
+  for an unlisted room without a password, they are the only permission
+  there is.
+- **A locked room.** Choosing one from the list, or opening its link or
+  code, comes to its door: its password, then Join. With a remote or the
+  keys in hand the password is typed at once; with a finger, a tap on it.
+  A wrong one says so where the room's name was, in pink, and the password
+  is typed again. A device that has once sat at the room comes back to it
+  (a dropped line, a reload) without it; its starter never needs it.
+- **Joining.** Choosing an open room, typing its code, or opening its link sits this device's fly at the room, set
   down near the others, at the height of the place's start (in the
   restaurant, on the window table, not the floor under it). The device remembers its table: a reload, or opening
   the site again, comes back to it until it leaves.
@@ -30,7 +45,7 @@ through a native WebSocket bridge (below).
 - **The starter** chooses the place (the Place tool carries the whole table
   there together), the light and the weather (their tools). Everyone else's
   Light, Weather and Place tools show the table's choice and refuse to change
-  it. The starter can also take a fly off the table: Together lists the
+  it. The starter can also take a fly off the table: Online lists the
   others by colour, each with Remove. A removed device can't sit at that
   table again.
 - **The table's clock** is the starter's. Their time zone goes with the
@@ -47,8 +62,29 @@ through a native WebSocket bridge (below).
   fly at the table, resting: wings folded, still, its body dimmed. After 10
   minutes away it leaves; when its device comes back, it sits down again where
   it was, in its colour.
-- **Leaving.** Together → Leave the table. The fly stays where it is, alone,
+- **Leaving.** Online → Leave the room. The fly stays where it is, alone,
   with the place's own food, and the light and weather its shelf had.
+- **What goes wrong** is said in the heading's place, in a few words: a
+  wrong password, too many tries, a full room, one that has closed, being
+  taken off one.
+
+### Typing
+
+Names, passwords and codes are typed into fields the game draws. In a
+browser the keys go to one `<input>` that is never seen
+(`apps/web/src/ui/text-entry.ts`), focused while a field is being typed
+into, so a physical keyboard, a phone's or a tablet's own keyboard, input
+methods, paste and password managers all work: a password field is a
+password to them (`current-password` at a door, `new-password` for a new
+room). A phone shows its keyboard only for a field focused during a tap, so
+the tap on a field focuses it as it lifts, not a frame later
+(`Game.#typeOnTap`). The game draws the field from the input's value and
+caret, a password as dots. Return finishes (at a door, it is Join; in Code,
+it is going in), Escape puts the field back as it was. A game pad has no
+keys to type with: a new room's suggested name lets it make one, and it can
+join any open room; a password needs a keyboard. The game reaches typing only
+through `TextEntry` (`packages/contracts/src/text-entry.ts`), polled each
+frame, so the Apple TV can bring its own keyboard through the bridge.
 
 When not at a table nothing here runs: no connection, no other bodies, and
 the single-player game as it was.
@@ -73,9 +109,11 @@ nobody else sees yours.
 ## The wire
 
 One WebSocket per device, at `wss://<site>/rooms`. The first message is the
-device's `hello`, carrying the protocol version (now 2); the room refuses any
+device's `hello`, carrying the protocol version (now 3); the room refuses any
 other, and a page it refuses for its version reloads itself once, into the
-site's current game. The fast traffic is binary and little-endian, with a type byte
+site's current game. A connection that only lists the rooms says `browse`
+instead, and is told `rooms` at once and again whenever the list changes
+(checked every 2 s); nothing else it says is listened to. The fast traffic is binary and little-endian, with a type byte
 first; everything rare is JSON (`packages/net/src/protocol.ts`,
 `ClientMessage` and `ServerMessage`).
 
@@ -103,6 +141,10 @@ carried to, during a move), and drops theirs from any other epoch. Another
 fly is drawn half a step up from where the wire puts it, so rounding never
 sinks one on its feet into what it stands on.
 
+Protocol 3 is protocol 2 with rooms: names, the list, and passwords. A
+device speaking 2 doesn't know a room can be locked, and would knock at a
+locked door forever, so it is turned away and reloads into 3.
+
 Protocol 2 is protocol 1 with each place's own scale. A tabletop's states
 are the same bytes as before, but the room is a place protocol 1 can't
 read: a device that doesn't know the restaurant would read its states at a
@@ -127,7 +169,8 @@ JSON, from the device:
 
 | Message | |
 | --- | --- |
-| `hello {v, table, key, start?, at?, epoch?}` | the table's code; this device's key; `start` (place, light, weather, time zone and offset) to start the table if it doesn't exist; `at`, where its fly is, coming back after a moment away, and the `epoch` of the place it is in |
+| `hello {v, table, key, start?, password?, at?, epoch?}` | the table's code; this device's key; `start` (place, light, weather, time zone and offset, and the room's `name` and whether it is `listed`) to start the table if it doesn't exist; `password`, the lock a new room is to have, or the key to a locked one, sent only until welcomed; `at`, where its fly is, coming back after a moment away, and the `epoch` of the place it is in |
+| `browse {v}` | instead of a hello: this connection only lists the rooms |
 | `ping {t}` | answered `pong {t, now}` with the room's time |
 | `drop {id, kind, x, z, y, at}` | food dropped onto the surface at or below `y` (the floor under a table, or the table), named by the device (player id × 1,000,000 + its count) so its fly can eat it before the room has heard |
 | `ball {at, from, via, to}` | a throw, starting at room time `at` |
@@ -140,8 +183,9 @@ From the room:
 
 | Message | |
 | --- | --- |
-| `welcome {v, id, colour, starter, seed, now, wall, offset, place, epoch, world, players, foods, balls, happenings, bubbles, at}` | the table as it is, and where this fly stands; then a `FLIES` batch of every other fly where it is now |
-| `refused {reason}` | then the connection closes with the matching code: version 4001, full 4002, removed 4003, unknown table 4004, busy 4005, malformed 4006, the same key sat down elsewhere 4007; 4010 after `bye` |
+| `welcome {v, id, colour, starter, seed, now, wall, offset, place, epoch, world, players, foods, balls, happenings, bubbles, at, room}` | the table as it is, where this fly stands, and the room's `{name, listed, locked}`; then a `FLIES` batch of every other fly where it is now |
+| `refused {reason, name?}` | then the connection closes with the matching code: version 4001, full 4002, removed 4003, unknown table 4004, busy 4005 (too many rooms started, or passwords tried), malformed 4006, the same key sat down elsewhere 4007, locked 4008 (no password, or the wrong one: with the room's `name`, for its door); 4010 after `bye` |
+| `rooms {rooms}` | to a browsing connection: each listed room with a fly there, fullest first, at most 50, as `{code, name, place, flies, locked}` |
 | `joined {id, colour, away}`, `away {id, away}`, `left {id}` | who is at the table, and whose device has stopped |
 | `drop`, `ball`, `found`, `pop` | as above, to everyone else (`by` the player); a drop's `y` is the surface it lands on |
 | `world {light, weather, offset}`, `place {place, epoch, foods, spots}` | the starter's choices, to everyone; `spots` is where each fly is set down |
@@ -162,9 +206,13 @@ Its fly carries on where it is if that is in the place the table is in (the
 hello's epoch) and within a walk of where the room last had it (20 mm/s for
 up to 10 s, on the same table or floor); otherwise it is put back where the
 room had it. The room keeps every table in a file (`DATA_DIR/tables.json`)
-every 30 s and as it stops, and reads it back as it starts. Room time is
+every 30 s and as it stops, and reads it back as it starts, with each
+room's name, whether it is listed, and its lock (tables kept before rooms
+had them come back unlisted, unlocked, named "Flies"). Room time is
 each server process's own, so a device takes up the restarted room's clock
-from its welcome. A table nobody has sat at for 30 days is forgotten.
+from its welcome. A table nobody has sat at for 30 days is forgotten; a
+listed one after a day (it has long since dropped out of the list, which
+shows only rooms with a fly there).
 
 ## The limits
 
@@ -194,9 +242,37 @@ can't spoil the others' screens or their food (`packages/net/src/limits.ts`):
   foods, 120 bubbles burst, and 30 of the starter's changes.
 - **Messages.** At most 60 a second from a device (120 at once); more are
   dropped. A message is at most 4 KB, and a device has 10 s to say hello.
-  At most 24 connections from one address, and 30 tables started from one an
-  hour. At most 8 flies a table; a seat gone more than 10 minutes is given
-  up to a newcomer, never the starter's.
+  At most 24 connections from one address, and 30 rooms started from one an
+  hour (5 at once). At most 8 flies a table; a seat gone more than 10 minutes is given
+  up to a newcomer, never the starter's. What an address has done is kept
+  for an hour after its last connection closes, so closing and opening
+  again doesn't start its counts afresh.
+
+### Rooms, names and passwords
+
+A room's name is shown to strangers, so it is kept plain
+(`roomName`, `packages/net/src/limits.ts`): up to 24 characters, made
+canonical (NFC), every run of spaces one space, trimmed; only letters (any
+script), their marks, digits, spaces and a little punctuation (`' ’ ! ? . ,
+& : # ( ) + - _`). No control or invisible characters, which could reorder
+or hide text, no symbols, no emoji. It is drawn as plain text on the
+canvas, never as markup. Names aren't filtered for what they say: anything
+more (a word list, reporting a room, the server's owner hiding one) is a
+follow-up.
+
+A password is up to 64 characters, none of them control characters. The
+room keeps only a salted scrypt hash of it (`apps/server/src/lock.ts`:
+16 random bytes of salt, N = 2^14, r = 8, p = 1), compared in constant time
+and worked out off the event loop. It is never written to the file of
+tables or the log, and it goes only over the room's socket (`wss` on the
+site), in the hello, until the room has welcomed the device. A room's code
+doesn't get round its lock: only the password does, or a key that has sat
+there before (128 random bits each device keeps). Tries at a password are
+counted where they come from and where they go: 5 at once then 3 a minute
+from an address, and 10 at once then 6 a minute at a room, whoever tries;
+a try past either is refused as busy, right or not. The list carries only
+listed rooms: an unlisted one is never in it, nor told to anyone but by its
+code.
 
 The device's key is 128 random bits kept in its storage. The room keeps only
 a hash of it. Table codes are invitations, so the log writes only a short
@@ -221,8 +297,9 @@ npm run rooms        # the room server on ws://localhost:8787/rooms
 npm run dev          # the game; Vite proxies /rooms to it
 ```
 
-Open the game, Together → Start a table, and open the copied link in another
-browser (or a private window: a device is its storage). `?rooms=ws://host:port/rooms`
+Open the game, Online → New room → Create, and open the copied link in
+another browser (or a private window: a device is its storage), or choose
+the room from that browser's own list. `?rooms=ws://host:port/rooms`
 points a page at another room server. `npm run rooms` keeps its tables only
 in memory; set `DATA_DIR` to keep them across restarts.
 
@@ -233,15 +310,20 @@ in memory; set `DATA_DIR` to keep them across restarts.
 | `DATA_DIR` | where the tables are kept (none: in memory; `/data` in Docker) |
 | `TRUST_PROXY` | 1 behind a proxy that sets `X-Forwarded-For`, for counting connections by address (set in Docker) |
 
-`GET /health` answers `{ok, protocol, tables, devices, flies, uptime}`. The
+`GET /health` answers `{ok, protocol, tables, devices, flies, browsing, uptime}`. The
 log is one JSON object a line on stdout. In production the room server is
 the `rooms` service of the Docker stack (`docs/deploy.md`).
 
-Checks: `npm test` covers the protocol, the limits, interpolation, the
-shared food, the table (presence, the away rule, removal, the starter's
-choices, keeping tables across restarts) and the server over real sockets.
-`npm run e2e` runs two headless tabs at a table: they see each other, share
-food, rest while hidden, survive a server restart and a removal. It also
+Checks: `npm test` covers the protocol, the limits (names, passwords),
+interpolation, the shared food, the table (presence, the away rule,
+removal, the starter's choices, keeping tables across restarts), rooms
+(the list, locks, guessing slowed, starting slowed, a listed room
+forgotten) and the server over real sockets, and Online's screen and its
+list's line. `npm run e2e` runs two headless tabs at a table: they see each other, share
+food, rest while hidden, survive a server restart and a removal; then a
+named, locked room is made from the menus with the keys and joined from
+another tab's list, a wrong password first, and its link alone opens only
+its door. It also
 holds eight flies to the frame's budget on every screen shape, and checks
 that single-player opens no connection. `npm run tables -- --clients 4 --seconds 120`
 is a longer run with several tabs and fake flies, summing up what each saw.
@@ -257,9 +339,11 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
   on its own queue. JavaScript polls it each frame, copying each binary
   message into a preallocated buffer, so nothing is allocated per message.
   It needs `wss` (App Transport Security), an absolute room URL
-  (`wss://flies.isaacthoman.com/rooms`), a way to start, share (a code or a
-  QR code on the TV) and leave a table with the remote, and measuring on the
-  device with eight fake flies before promising eight.
+  (`wss://flies.isaacthoman.com/rooms`), sharing a room (its code, or a QR
+  code on the TV), a `TextEntry` bridged to tvOS's own keyboard as
+  `globalThis.__native.keyboard` for names, codes and passwords, and
+  measuring on the device with eight fake flies before promising eight.
+  Online's screens already work with the remote alone.
 - **iPhone and iPad (stage 3).** The same bridge, and the system share
   sheet. iOS suspends a backgrounded app, so away is the normal state there;
   the 10 minutes and coming back are what make it work.

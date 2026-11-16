@@ -6,19 +6,26 @@
 // is the rest of the world there: the place, the food and who ate how much,
 // the balls thrown, the light and the weather by the clock of whoever
 // started it, the seed and the clock every device blows the same bubbles
-// from, and when a visitor comes. No brains, no drawing and no sockets here
-// (server.ts), so a whole table can run in a test.
+// from, and when a visitor comes. It is a room too: it has a name, may be
+// listed for anyone browsing to find, and may be locked with a password
+// (lock.ts). No brains, no drawing and no sockets here (server.ts), so a
+// whole table can run in a test.
 
 import { BALL_RADIUS, Pace, VentilationClock, World, WORLDS, forecast, hourOfDay } from "@fly/world";
 import type { Happening } from "@fly/world";
 import {
-  AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_PLAYERS, PLAYING, PROTOCOL, Rate, TABLE_LIGHTS, TABLE_WEATHERS,
-  TableBubbles, TableFood, ballProgress, createFlyState, decodeBites, encodeFlies, mayReturnTo, mix, readState, spawnSpot,
+  AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_PLAYERS, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
+  TABLE_WEATHERS, TableBubbles, TableFood, ballProgress, createFlyState, decodeBites, encodeFlies, mayReturnTo, mix, readState, roomName, spawnSpot,
   stream, tableHours, toWire, wireScale,
 } from "@fly/net";
 import type {
-  BallWire, ClientMessage, FlyState, FoodWire, HappeningWire, PlayerWire, Refusal, ServerMessage, Spot, TableStart, V3, WireScale, WorldWire,
+  BallWire, ClientMessage, FlyState, FoodWire, HappeningWire, PlayerWire, Refusal, RoomInfo, RoomWire, ServerMessage, Spot, TableStart, V3, WireScale,
+  WorldWire,
 } from "@fly/net";
+import type { Lock } from "./lock.ts";
+
+/** A room started without a name (by a page from before rooms had them) is called this. */
+export const UNNAMED = "Flies";
 
 /** A fly whose device has stopped (or gone) is kept at the table, resting, this long (ms); then it leaves. */
 export const AWAY_LIMIT = 10 * 60_000;
@@ -84,6 +91,10 @@ export type TableRecord = {
   foods: FoodWire[];
   /** How much each player has eaten by the table's account, by id (older files have none). */
   eaten?: [id: number, amount: number][];
+  /** The room's name, whether it is listed, and its lock (older files have none: unnamed, unlisted, open to its link). */
+  name?: string;
+  listed?: boolean;
+  lock?: Lock | null;
 };
 
 export type TableOptions = {
@@ -131,6 +142,12 @@ export class Table {
   bubbles: TableBubbles | null = null;
   /** Keys that were removed from the table, hashed: they can't sit down again. */
   readonly removed: Set<string>;
+  /** What it is called; whether anyone browsing sees it; its password, hashed, if it has one. */
+  readonly name: string;
+  readonly listed: boolean;
+  readonly lock: Lock | null;
+  /** Tries at its password, from anyone: a lock that can be tried only so often. */
+  readonly knocks = new Rate(...ROOM_LIMITS.knocksAtRoom);
   readonly #starter: string;
   readonly #zone: string;
   #offset: number;
@@ -148,8 +165,11 @@ export class Table {
   #offsetAt = 0;
   readonly #mix = { cloud: 0, mist: 0, rain: 0, wind: 0 };
 
-  constructor(code: string, start: TableStart, starterKey: string, seed: number, options: TableOptions, record?: TableRecord) {
+  constructor(code: string, start: TableStart, starterKey: string, seed: number, options: TableOptions, record?: TableRecord, lock: Lock | null = record?.lock ?? null) {
     this.code = code;
+    this.name = roomName(start.name) ?? UNNAMED;
+    this.listed = start.listed === true;
+    this.lock = lock;
     this.#options = options;
     this.seed = seed >>> 0;
     this.created = record?.created ?? options.wall();
@@ -188,7 +208,7 @@ export class Table {
 
   /** Restores a table as it was kept. */
   static restore(record: TableRecord, options: TableOptions): Table {
-    const start: TableStart = { place: record.place, light: record.world.light, weather: record.world.weather, zone: record.zone, offset: record.offset };
+    const start: TableStart = { place: record.place, light: record.world.light, weather: record.world.weather, zone: record.zone, offset: record.offset, name: record.name, listed: record.listed };
     return new Table(record.code, start, record.starter, record.seed, options, record);
   }
 
@@ -208,7 +228,26 @@ export class Table {
       seats: [...this.seats.values()].map((s) => ({ id: s.id, key: s.key, at: [s.state.x, s.state.y, s.state.z, s.state.yaw], airborne: !!(s.state.flags & AIRBORNE), lastSeen: s.lastSeen, gone: !s.present })),
       foods: this.food.foods.map(toWire),
       eaten: [...this.food.eaten],
+      name: this.name,
+      listed: this.listed,
+      lock: this.lock,
     };
+  }
+
+  /** What it says of itself: in its welcome, and in the list of rooms. */
+  get info(): RoomInfo {
+    return { name: this.name, listed: this.listed, locked: !!this.lock };
+  }
+
+  room(): RoomWire {
+    return { code: this.code, name: this.name, place: this.place, flies: this.present, locked: !!this.lock };
+  }
+
+  /** Whether a device with this key (hashed) may sit down without the password: it has sat here before, or started the table. */
+  knows(key: string) {
+    if (key === this.#starter) return true;
+    for (const s of this.seats.values()) if (s.key === key) return true;
+    return false;
   }
 
   get now() {
@@ -351,6 +390,7 @@ export class Table {
       happenings: this.happenings.filter((h) => now - h.at < HAPPENING_KEPT),
       bubbles: this.bubbles?.snapshot() ?? [],
       at,
+      room: this.info,
     });
     // And everyone else's fly where it is now, resting ones too, so the newcomer sees them before they next move.
     const others = this.#others;

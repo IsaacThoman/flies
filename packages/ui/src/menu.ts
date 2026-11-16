@@ -17,13 +17,18 @@ export type ActionItem = {
   label: string;
   disabled?: boolean;
   hint?: string;
-  /** A dot of colour at its left: what it is about, where words would be too many (a fly at a table, by its player's colour). */
+  /** A dot of colour at its left: what it is about, where words would be too many (a fly at a table, by its player's colour; a room's place). */
   swatch?: string;
+  /** How many of how many, as pips at its right (the flies in a room), and a padlock, for what needs a password. */
+  count?: readonly [number, number];
+  locked?: boolean;
 };
 /** A choice; `tabs` draws its options side by side, every one to be pressed, as the tabs across the top of a page. */
 export type ChoiceItem<V = unknown> = { kind: "choice"; id: string; label: string; options: readonly Option<V>[]; index: number; disabled?: boolean; hint?: string; tabs?: boolean };
 export type SliderItem = { kind: "slider"; id: string; label: string; min: number; max: number; step: number; value: number; disabled?: boolean; hint?: string };
-export type MenuItem = ActionItem | ChoiceItem | SliderItem;
+/** Words to type: a name, a password (`secret`: shown masked), a code. Select starts typing into it; `placeholder` shows while it is empty. */
+export type FieldItem = { kind: "field"; id: string; label: string; value: string; placeholder?: string; secret?: boolean; disabled?: boolean; hint?: string };
+export type MenuItem = ActionItem | ChoiceItem | SliderItem | FieldItem;
 
 /** What a press did. */
 export type Outcome =
@@ -33,6 +38,8 @@ export type Outcome =
   /** Pressed against the end of the list or of a value's range. */
   | { kind: "blocked" }
   | { kind: "activate"; item: ActionItem }
+  /** Select on a field: type into it. */
+  | { kind: "edit"; item: FieldItem }
   | { kind: "change"; item: ChoiceItem | SliderItem }
   | { kind: "back" };
 
@@ -184,6 +191,7 @@ export class Menu {
         const item = this.focused;
         if (!item || item.disabled) return BLOCKED;
         if (item.kind === "action") return { kind: "activate", item };
+        if (item.kind === "field") return { kind: "edit", item };
         if (item.kind === "choice") {
           // Select steps through a choice, round to the start: enough to set it without the arrows.
           item.index = (item.index + 1) % item.options.length;
@@ -200,7 +208,7 @@ export class Menu {
 
   #step(dir: -1 | 1, repeat: boolean, wrap = false): Outcome {
     const item = this.focused;
-    if (!item || item.disabled || item.kind === "action") return NONE;
+    if (!item || item.disabled || item.kind === "action" || item.kind === "field") return NONE;
     if (item.kind === "choice") {
       const next = item.index + dir;
       if (next < 0 || next >= item.options.length) return repeat ? NONE : BLOCKED;

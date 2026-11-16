@@ -30,6 +30,8 @@ export class TableLine {
   status: LineStatus = "connecting";
   /** Why the room turned this device away, once it has. */
   refusal: Refusal | "left" | null = null;
+  /** A locked room's name, as it said turning this device away for want of its password. */
+  lockedName: string | null = null;
   /** Times the line has been opened again. */
   reconnects = 0;
   /** What has gone each way, bytes. */
@@ -95,6 +97,7 @@ export class TableLine {
     } else if (message.type === "refused") {
       this.status = "refused";
       this.refusal = message.reason;
+      if (message.reason === "locked" && typeof message.name === "string") this.lockedName = message.name;
     }
     this.onMessage(message);
   }

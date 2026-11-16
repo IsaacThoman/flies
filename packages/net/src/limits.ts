@@ -210,3 +210,46 @@ export const LIMITS = {
   changes: [30, 6],
   messages: [60 * 60, 120],
 } as const satisfies Record<string, readonly [perMinute: number, burst: number]>;
+
+/**
+ * What each address may do with rooms, as [per minute, at once] where it is
+ * a rate: connections open at once; rooms started (an hour's worth: 30);
+ * tries at a locked room's password, from one address and at one room, so
+ * that guessing one is hopeless (a few dozen tries an hour at most).
+ */
+export const ROOM_LIMITS = {
+  connections: 24,
+  starts: [0.5, 5],
+  knocks: [3, 5],
+  knocksAtRoom: [6, 10],
+} as const;
+
+/** A room's name: up to this many characters, after it is tidied (`roomName`). */
+export const ROOM_NAME_MAX = 24;
+/** A room's password: up to this many characters, none of them a control character. */
+export const PASSWORD_MAX = 64;
+/** At most this many rooms in the list a device browses: the fullest. */
+export const LISTED_MAX = 50;
+
+/**
+ * Anything that isn't a letter, a mark on one, a digit, a space or a little
+ * common punctuation: what a room's name may not hold. A name is shown to
+ * strangers, so it is plain words: no control or invisible characters (which
+ * could reorder the text around it, or hide in it), and no symbols or emoji.
+ */
+const NOT_IN_A_NAME = /[^\p{L}\p{M}\p{N} '’!?.,&:#()+\-_]/u;
+
+/**
+ * A room's name as it is kept and shown: spaces of any kind made one,
+ * trimmed, at most ROOM_NAME_MAX characters. Null if nothing is left or it
+ * holds a character a name may not.
+ */
+export function roomName(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.length > ROOM_NAME_MAX * 4) return null;
+  const name = raw.normalize("NFC").replace(/\s+/gu, " ").trim();
+  if (!name || [...name].length > ROOM_NAME_MAX || NOT_IN_A_NAME.test(name)) return null;
+  return name;
+}
+
+/** Whether a password can be one: not empty, not too long, and nothing a keyboard doesn't type. */
+export const isPassword = (raw: unknown): raw is string => typeof raw === "string" && raw.length > 0 && [...raw].length <= PASSWORD_MAX && !/\p{C}/u.test(raw);

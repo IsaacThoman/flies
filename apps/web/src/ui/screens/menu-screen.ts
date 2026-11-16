@@ -9,8 +9,8 @@
 // back button, is Back.
 
 import type { RemoteButton } from "@fly/contracts";
-import { INK, glassPanel, hintChip, hintWidth, iconButton, text } from "@fly/ui";
-import type { ChoiceItem, GlyphSet, HitMap, Menu, MenuItem, Outcome, SliderItem } from "@fly/ui";
+import { INK, font, glassPanel, hintChip, hintWidth, iconButton, text } from "@fly/ui";
+import type { ChoiceItem, FieldItem, GlyphSet, HitMap, Menu, MenuItem, Outcome, SliderItem } from "@fly/ui";
 import type { Frame } from "../../display.ts";
 import { backButton } from "../layout.ts";
 import type { MenuPanel } from "../layout.ts";
@@ -21,8 +21,9 @@ import type { Point, Screen, ScreenId, Shell } from "./types.ts";
 export type MenuScreenOptions = {
   id: ScreenId;
   menu: Menu;
-  /** The pane's title, or none (the title screen draws its own wordmark). */
+  /** The pane's title, or none (the title screen draws its own wordmark), and its colour, if not the ink's. */
   heading?: string;
+  headingColor?: string;
   /** Where the pane and its rows go on a screen of this shape. */
   place(frame: Frame): MenuPanel;
   /** The root of the game, which a pointer can't go back from. */
@@ -31,6 +32,8 @@ export type MenuScreenOptions = {
   onEnter?(): void;
   onActivate?(item: MenuItem): void;
   onChange?(item: ChoiceItem | SliderItem): void;
+  /** Select on a field: start typing into it. */
+  onEdit?(item: FieldItem): void;
   onBack(): void;
   /** Drawn first, under the pane. */
   backdrop?(g: CanvasRenderingContext2D, t: number): void;
@@ -105,6 +108,10 @@ export class MenuScreen implements Screen {
       case "change":
         shell.sound("tick");
         this.#options.onChange?.(outcome.item);
+        break;
+      case "edit":
+        shell.sound("select");
+        this.#options.onEdit?.(outcome.item);
         break;
       case "back":
         shell.sound("back");
@@ -196,7 +203,12 @@ export class MenuScreen implements Screen {
     hits.add(SCREEN_HITS.panel, panel.x, panel.y, panel.w, panel.h);
     glassPanel(g, panel.x, panel.y, panel.w, panel.h, 28);
     const head = this.#pane.heading;
-    if (heading && head) text(g, heading, panel.x + panel.w / 2, head.y, { size: head.size, align: "center", color: INK });
+    if (heading && head) {
+      // Smaller, if it must be, to stay clear of the back button.
+      g.font = font(head.size);
+      const size = Math.min(head.size, Math.floor((head.size * (panel.w - 150)) / Math.max(1, g.measureText(heading).width)));
+      text(g, heading, panel.x + panel.w / 2, head.y, { size, align: "center", color: this.#options.headingColor ?? INK });
+    }
     // For a pointer, a way back: by the heading, or, with none, beside the first row (a row of tabs leaves room for it).
     const pointing = this.#shell.glyphs === null;
     const backed = pointing && !this.#options.root;

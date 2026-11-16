@@ -29,10 +29,13 @@ import { EyesInset, insetWanted } from "./eyes/inset.ts";
 import { FlyView } from "./fly-view.ts";
 import { PlayControls } from "./controls.ts";
 import type { PlayTarget, ToolUse } from "./controls.ts";
+import type { TableStart } from "@fly/net";
+import { TAP_SLOP } from "./input.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
 import { Life } from "./life.ts";
 import { inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart } from "./online/invite.ts";
 import type { Shared } from "./online/invite.ts";
+import { Lobby } from "./online/lobby.ts";
 import { Online } from "./online/online.ts";
 import type { Ended, PlayerNow, TableHost } from "./online/online.ts";
 import { BrowserSocket } from "./online/socket.ts";
@@ -71,9 +74,11 @@ import { Overlay } from "./ui/overlay.ts";
 import { AboutScreen } from "./ui/screens/about.ts";
 import { settingsScreen, settingsTab, titleScreen } from "./ui/screens/menus.ts";
 import type { MenuScreen } from "./ui/screens/menu-screen.ts";
-import type { Point, Screen, ScreenId, Shell, TableNow } from "./ui/screens/types.ts";
+import type { Knock, NewRoom, Point, Screen, ScreenId, Shell, TableNow } from "./ui/screens/types.ts";
 import { drawStats } from "./ui/stats.ts";
-import { TogetherScreen } from "./ui/screens/together.ts";
+import { MENU_HITS } from "./ui/menu-view.ts";
+import { OnlineScreen } from "./ui/screens/online.ts";
+import { BrowserTextEntry } from "./ui/text-entry.ts";
 
 /** Seconds the loading screen stays after the brain wakes, so "Awake!" is seen; longer when it has more to say. */
 const AWAKE_HOLD = 1.2;
@@ -167,11 +172,19 @@ export class Game implements Shell {
   /** The real weather outside, where the Apple TV can tell it; scripts feed it in a browser (`outside.feed`). */
   readonly outside = new Outside(nativeWeather());
   readonly nav = new Navigator<ScreenId>("title");
-  readonly screens: { title: MenuScreen; settings: MenuScreen; about: Screen; together: Screen };
-  /** At a table with others (docs/online.md), its line to the table and the others there; null alone. */
+  readonly screens: { title: MenuScreen; settings: MenuScreen; about: Screen; online: OnlineScreen };
+  /** At a room with others (docs/online.md), its line to the room and the others there; null alone. */
   online: Online | null = null;
-  /** How the table this device was last at ended: it left, or was turned away (removed, the table gone). */
+  /** How the room this device was last at, or tried to sit at, ended: it left, or was turned away (removed, the room gone, locked). */
   tableEnded: Ended | null = null;
+  /** A locked room's door, waiting for its password. */
+  knock: Knock | null = null;
+  /** Typing into the fields the game draws (a room's name, its password), where there is a way to. */
+  readonly typing: BrowserTextEntry | null;
+  /** The line that lists the rooms, while Online shows them. */
+  #lobby: Lobby | null = null;
+  /** The fly's own food, kept while it tries a room, to have back if the room never lets it in. */
+  #alone: Pantry | null = null;
   /** Seconds since the game started. */
   time = 0;
   /** JavaScript time of the last frame (ms), smoothed. */
@@ -317,7 +330,7 @@ export class Game implements Shell {
       title,
       settings: settingsScreen(this),
       about: new AboutScreen(this),
-      together: new TogetherScreen(this),
+      online: new OnlineScreen(this),
     };
     this.#hudLayout = hudLayout(display.frame);
     this.#loadingLayout = loadingLayout(display.frame);
@@ -344,22 +357,78 @@ export class Game implements Shell {
       onWorld: (settle) => this.#followLight(settle),
     };
     this.#seat = loadTableSeat(newDeviceKey);
-    // Invited to a table, or still at the one it was at when it last closed: it sits down there.
-    if (this.canPlayTogether) {
+    this.typing = this.canPlayOnline && typeof document !== "undefined" ? new BrowserTextEntry() : null;
+    // Invited to a room, or still at the one it was at when it last closed: it sits down there.
+    if (this.canPlayOnline) {
       const code = invitedTo(location.href) ?? this.#seat.table;
       if (code) this.#sit(code, null);
+      // A phone's keyboard comes up only for a field focused during the tap itself: the frame that handles the tap is too late.
+      if (inputs.pointers) this.#typeOnTap(canvas);
     }
   }
 
-  /** Tables with others need a WebSocket: a browser's (the Apple TV and iPhone hosts will bridge theirs). */
-  get canPlayTogether() {
+  /** Rooms with others need a WebSocket: a browser's (the Apple TV and iPhone hosts will bridge theirs). */
+  get canPlayOnline() {
     return typeof WebSocket !== "undefined" && typeof location !== "undefined" && /^https?:$/.test(location.protocol);
   }
 
-  /** Starts a table here, in this place, under this light and weather: its link can be shared at once. */
-  startTable() {
-    if (this.online || !this.canPlayTogether) return;
-    this.#sit(newTableCode(), tableStart(this.#here, this.hands.timeOfDay, this.hands.weather));
+  /** Makes a room and sits at it, under this light and weather: its link can be shared at once. */
+  startRoom(room: NewRoom) {
+    if (this.online || !this.canPlayOnline) return;
+    const start = { ...tableStart(room.place, this.hands.timeOfDay, this.hands.weather), name: room.name, listed: room.listed };
+    this.#sit(newTableCode(), start, room.password || null);
+  }
+
+  /** Sits at a room by its code, with its password if it is locked. */
+  joinRoom(code: string, password?: string) {
+    if (this.online || !this.canPlayOnline) return;
+    this.#sit(code, null, password || null);
+  }
+
+  /** Comes to a locked room's door from the list (or goes away from it). */
+  door(room: { code: string; name: string } | null) {
+    this.knock = room && { code: room.code, name: room.name, wrong: false, seq: (this.knock?.seq ?? 0) + 1 };
+  }
+
+  /** Where the fly is now. */
+  get here(): PlaceId {
+    return this.#here;
+  }
+
+  /** The listed rooms, while Online is showing them. */
+  get rooms() {
+    return this.#lobby?.rooms ?? null;
+  }
+
+  /** The list of rooms is open while Online is up and this device is at none (on its other faces too, so that coming back to the list finds it as it is). */
+  #browse(dt: number) {
+    const wanted = this.nav.current === "online" && !this.online && this.canPlayOnline;
+    if (wanted && !this.#lobby) this.#lobby = new Lobby((url) => new BrowserSocket(url), roomsUrl(location.href));
+    else if (!wanted && this.#lobby) {
+      this.#lobby.close();
+      this.#lobby = null;
+    }
+    this.#lobby?.update(dt);
+    // A room server newer than this page: the newer page speaks its protocol.
+    if (this.#lobby?.status === "version") reloadOnce();
+  }
+
+  /** Starts typing into a field as a tap on it lifts, while the browser still counts it as the player's doing. */
+  #typeOnTap(canvas: HTMLCanvasElement) {
+    let from = { x: 0, y: 0 };
+    const at = (e: PointerEvent) => {
+      const box = canvas.getBoundingClientRect();
+      return { x: (e.clientX - box.left) / Math.max(1, box.width), y: (e.clientY - box.top) / Math.max(1, box.height) };
+    };
+    canvas.addEventListener("pointerdown", (e) => (from = at(e)));
+    canvas.addEventListener("pointerup", (e) => {
+      const p = at(e);
+      const { width, height } = this.shape.design;
+      if (Math.hypot((p.x - from.x) * width, (p.y - from.y) * height) > TAP_SLOP.touch) return;
+      const hit = this.#hitAt(p.x, p.y);
+      const current = this.nav.current;
+      if (hit?.kind === MENU_HITS.row && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index);
+    });
   }
 
   /** The link to the table this device is at. */
@@ -373,10 +442,10 @@ export class Game implements Shell {
     return link ? share(link) : Promise.resolve("failed");
   }
 
-  /** The table as the screens show it. */
+  /** The room as the screens show it. */
   get table(): TableNow | null {
     const online = this.online;
-    return online ? { starting: online.starting, joined: online.joined, others: online.others.list } : null;
+    return online ? { name: online.room?.name ?? null, starting: online.starting, joined: online.joined, others: online.others.list } : null;
   }
 
   /** The starter takes another's fly off the table. */
@@ -391,9 +460,10 @@ export class Game implements Shell {
     this.#stand("left");
   }
 
-  #sit(code: string, start: ReturnType<typeof tableStart> | null) {
+  #sit(code: string, start: TableStart | null, password: string | null = null) {
     this.tableEnded = null;
-    this.online = new Online(this.#tableHost, (url) => new BrowserSocket(url), roomsUrl(location.href), code, this.#seat.key, start);
+    this.#alone = this.life.pantry;
+    this.online = new Online(this.#tableHost, (url) => new BrowserSocket(url), roomsUrl(location.href), code, this.#seat.key, start, password);
     this.#seat.table = code;
     saveTableSeat(this.#seat);
     showInAddress(code);
@@ -408,8 +478,14 @@ export class Game implements Shell {
     this.online = null;
     this.tableEnded = why;
     if (this.canvas.dataset) Online.unpublish(this.canvas.dataset);
-    // Its own food again, and its own light and weather, as its shelf had them.
-    this.life.share(new Pantry(this.life.world, this.life.world.place.patches));
+    // A locked room: its door, to try its password (again).
+    if (why === "locked") {
+      this.knock = { code: online.code, name: online.line.lockedName ?? this.knock?.name ?? "", wrong: online.triedPassword, seq: (this.knock?.seq ?? 0) + 1 };
+      if (this.nav.current !== "online") this.open("online");
+    } else if (why !== "busy") this.knock = null;
+    // Its own food again (as it was, if the room never let it in), and its own light and weather, as its shelf had them.
+    this.life.share(!online.welcomed && this.#alone ? this.#alone : new Pantry(this.life.world, this.life.world.place.patches));
+    this.#alone = null;
     for (const id of ["light", "weather"] as const) {
       const i = TOOLS.findIndex((t) => t.id === id);
       const kind = TOOLS[i].variants.findIndex((v) => v.id === this.#shelf[id]?.kind);
@@ -705,6 +781,7 @@ export class Game implements Shell {
 
   #entered() {
     const current = this.nav.current;
+    if (current !== "online") this.typing?.end();
     if (current !== "play") this.screens[current].enter();
     this.#frameRoom();
     this.#syncCamera();
@@ -770,6 +847,7 @@ export class Game implements Shell {
     this.#input(dt);
     this.#move(dt);
     this.#table(dt);
+    this.#browse(dt);
     // Living in each place in turn, it moves on during a long wallpaper (alone: a table's place is the table's).
     if (this.wallpaper && !this.#moving && !this.online) {
       this.#stayed += dt;
@@ -1588,6 +1666,7 @@ export class Game implements Shell {
     // Whether the menus show their focus (the remote's, the keys', a pad's): hidden while a pointer is in use.
     d.ring = String(shown !== "play" && this.#ringShown);
     d.tab = shown === "settings" ? settingsTab(this.screens.settings) : "";
+    if (shown === "online") this.screens.online.publish(d);
     d.atRoot = String((window as unknown as Record<string, unknown>)[AT_ROOT_PROPERTY]);
     d.wallpaper = String(this.wallpaper);
     d.brain = life.brain.status;
@@ -1654,6 +1733,7 @@ export class Game implements Shell {
     d.placeStepMs = this.stage.buildStepMs.toFixed(0);
     d.moving = this.#moving ? this.#moving.to : "";
     d.table = this.online ? "yes" : "";
+    d.roomName = this.online?.room?.name ?? "";
     this.online?.publish(d);
     d.speed = this.meter.speed.toFixed(2);
     d.gl = this.glLost ? "lost" : "ok";

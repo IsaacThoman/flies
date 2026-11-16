@@ -32,9 +32,11 @@ Compose stack with automatic HTTPS on your own server, see
 
 ## Playing
 
-In a browser, Together (on the menu) starts a table and
-shares its link: whoever opens it sits their fly down beside yours, up to
-eight, each marked with a dab of its player's colour (`docs/online.md`).
+In a browser, **Online** (on the menu) lists the rooms open to anyone and
+makes new ones: named, public or unlisted, with a password if you like.
+Whoever joins, by the list, a code or the room's link, sits their fly down
+beside yours, up to eight, each marked with a dab of its player's colour
+(`docs/online.md`).
 
 The fly can live in more than one place (`docs/places.md`), and the player can
 carry it from one to another: the **Place** tool, or Settings → Wallpaper →
@@ -459,7 +461,7 @@ the real weather), **On screen** (everything that can show over the world:
 what it sees, its nervous system and its stats in the corners, what the
 stats are of, the corners' size and opacity, and the X-ray), **Sound**
 (effects, surroundings) and **Picture** (pixel size, the eyes' detail,
-button hints, frame stats). In a browser it also has **Together**, a table
+button hints, frame stats). In a browser it also has **Online**, rooms
 shared with others. The menu never scrolls either: on a screen too short for
 its rows (a phone on its side) they are in two columns, Left and Right going
 across, Up and Down along the list as ever. Where the settings' tabs are too

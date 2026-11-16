@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { RESTAURANT, RESTAURANT_START, TABLE_TOPS, World, WORLDS, createPicnic } from "@fly/world";
-import { AIRBORNE, Leash, MAX_FLIGHT, MAX_PLAYERS, MAX_WALK, Rate, couldBe, createFlyState, mayReturnTo, spawnSpot } from "../src/index.ts";
+import { AIRBORNE, Leash, MAX_FLIGHT, MAX_PLAYERS, MAX_WALK, PASSWORD_MAX, ROOM_NAME_MAX, Rate, couldBe, createFlyState, isPassword, mayReturnTo, roomName, spawnSpot } from "../src/index.ts";
 
 const world = createPicnic();
 const start = world.place.start;
@@ -128,4 +128,23 @@ test("a rate allows a few at once, then so many a minute", () => {
   assert.ok(!rate.take(0));
   assert.ok(!rate.take(5_000));
   assert.ok(rate.take(10_000));
+});
+
+test("a room's name is tidied to plain words, short, or refused", () => {
+  assert.equal(roomName("  Sunny   crumbs "), "Sunny crumbs");
+  assert.equal(roomName("Café 9 & co."), "Café 9 & co.");
+  assert.equal(roomName("Café"), "Café", "composed, so it counts and compares as it shows");
+  assert.equal(roomName("いえ のハエ"), "いえ のハエ");
+  assert.equal(roomName("x".repeat(ROOM_NAME_MAX)), "x".repeat(ROOM_NAME_MAX));
+  for (const bad of ["", "   ", "x".repeat(ROOM_NAME_MAX + 1), "a\u0000b", "tab\u0007", "evil‮txt", "zero​width", "<b>hi</b>", "fly 🪰", "a\nb\nc".repeat(40), 42, null])
+    assert.equal(roomName(bad), bad === "a\nb\nc".repeat(40) ? null : null, String(bad));
+  // A new line is a space, like any other.
+  assert.equal(roomName("two\nlines"), "two lines");
+});
+
+test("a password is anything typed, up to its length, and nothing invisible", () => {
+  assert.ok(isPassword("correct horse"));
+  assert.ok(isPassword("пароль ✓"));
+  assert.ok(isPassword("x".repeat(PASSWORD_MAX)));
+  for (const bad of ["", "x".repeat(PASSWORD_MAX + 1), "a\u0000", "line\nbreak", "zero​width", 7, undefined]) assert.ok(!isPassword(bad), String(bad));
 });

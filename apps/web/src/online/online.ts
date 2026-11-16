@@ -17,7 +17,7 @@ import {
   AIRBORNE, AWAY, EATING, HANDS, HOLDING, LEAD, MAX_BITES, PLAYING, PROTOCOL, SEND_EVERY, TABLETOP_SCALE, TABLE_BUBBLES, TableBubbles, ballProgress, createFlyState,
   decodeFlies, fromWire, mix, stream, tableHours, toV3, wireScale,
 } from "@fly/net";
-import type { BallWire, Bite, BubbleSnapshot, FlyState, FoodWire, HappeningWire, Refusal, ServerMessage, Spot, TableStart, WireScale } from "@fly/net";
+import type { BallWire, Bite, BubbleSnapshot, FlyState, FoodWire, HappeningWire, Refusal, RoomInfo, ServerMessage, Spot, TableStart, WireScale } from "@fly/net";
 import { BALL_RADIUS, SWOOP_SECONDS, WORLDS } from "@fly/world";
 import type { FoodKind, Vec3, World } from "@fly/world";
 import type { Eyes } from "../eyes/eyes.ts";
@@ -88,6 +88,10 @@ export class Online {
   starter = 0;
   epoch = 0;
   place: PlaceId | null = null;
+  /** The room's name, whether it is listed and whether it is locked, once welcomed. */
+  room: RoomInfo | null = null;
+  /** A password was given to get in: if the room turns this device away as locked, it was the wrong one. */
+  readonly triedPassword: boolean;
   /** Room time now, ms. */
   now = 0;
   /** The nearest any other fly's body came to this one's, as drawn here (mm; below 0 they overlapped), since last published. */
@@ -133,7 +137,8 @@ export class Online {
   #seed = 0;
   readonly #burst = (slot: number, cycle: number, at: number) => this.line.send({ type: "pop", slot, cycle, at: at * 1000 });
 
-  constructor(host: TableHost, open: OpenTableSocket, url: string, code: string, key: string, start: TableStart | null) {
+  /** `password`: a locked room's, said in the hello until the room has welcomed this device (it knows the device after that). */
+  constructor(host: TableHost, open: OpenTableSocket, url: string, code: string, key: string, start: TableStart | null, password: string | null = null) {
     this.#host = host;
     this.code = code;
     this.#world = host.life.world;
@@ -142,15 +147,20 @@ export class Online {
     host.life.share(this.pantry);
     this.pantry.onFound = (food) => this.line.send({ type: "found", id: food.id, name: food.name, x: food.x, z: food.z, y: food.y, r: food.r, sweet: food.sweet });
     this.shared = { others: this.#othersAt, anchor: this.#anchor };
+    this.triedPassword = !!password;
     let starting = start;
+    let opening = password;
     this.line = new TableLine(open, url, () => {
       const p = host.life.body.position;
       // Coming back after a moment away, the fly carries on where it is (in the place of the table's epoch it is in); the first time, the table says where it stands.
       const back = this.#welcomed ? { at: [p.x, p.z, host.life.body.yaw, p.y] as Spot, epoch: this.epoch } : {};
-      return { type: "hello" as const, v: PROTOCOL, table: code, key, ...back, ...(starting ? { start: starting } : {}) };
+      return { type: "hello" as const, v: PROTOCOL, table: code, key, ...back, ...(starting ? { start: starting } : {}), ...(opening ? { password: opening } : {}) };
     });
     this.line.onMessage = (m) => {
-      if (m.type === "welcome") starting = null;
+      if (m.type === "welcome") {
+        starting = null;
+        opening = null;
+      }
       this.#message(m);
     };
     this.line.onFlies = (view) => decodeFlies(view, this.#heardScale, this.#scratch, this.#heard);
@@ -158,6 +168,11 @@ export class Online {
 
   get joined() {
     return this.line.joined && this.id > 0;
+  }
+
+  /** The room has welcomed this device, at least once: it has been at the table, not only on its way. */
+  get welcomed() {
+    return this.#welcomed;
   }
 
   /** This player started the table: theirs are the place, the light and the weather. */
@@ -185,6 +200,7 @@ export class Online {
       case "welcome": {
         const back = this.#welcomed;
         this.#welcomed = true;
+        this.room = m.room;
         this.id = m.id;
         this.colour = m.colour;
         this.starter = m.starter;

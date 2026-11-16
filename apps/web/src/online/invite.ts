@@ -1,7 +1,8 @@
 // Invitations to a table: a link with the table's code (?table=), which is
-// all the permission there is; this device's own key, kept on it; where the
-// room server is; and handing the link on (the system's share sheet where
-// there is one, else the clipboard).
+// all the permission there is, but for a locked room's password; this
+// device's own key, kept on it; where the room server is; handing the link
+// on (the system's share sheet where there is one, else the clipboard); and
+// a name for a new room.
 
 import { ROOMS_PATH, isTableCode, tableCode } from "@fly/net";
 import type { TableStart } from "@fly/net";
@@ -86,4 +87,12 @@ export async function share(url: string): Promise<Shared> {
   } catch {
     return "failed";
   }
+}
+
+const KINDS = ["Sunny", "Sticky", "Quiet", "Buzzy", "Sweet", "Lazy", "Golden", "Breezy", "Tiny", "Merry", "Sleepy", "Shiny"];
+const THINGS = ["Crumbs", "Sugar", "Picnic", "Window", "Honey", "Berries", "Teacup", "Corner", "Buzz", "Wings", "Saucer", "Puddle"];
+
+/** A name for a new room, ready to keep or change: two words, so that rooms in the list are told apart without anyone typing. */
+export function suggestName(pick: (n: number) => number = (n) => Math.floor(Math.random() * n)): string {
+  return `${KINDS[pick(KINDS.length)]} ${THINGS[pick(THINGS.length)]}`;
 }

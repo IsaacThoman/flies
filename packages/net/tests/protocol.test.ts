@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DINING_ROOM, PASS, RESTAURANT, TABLE_TOPS, WORLDS } from "@fly/world";
 import {
-  AIRBORNE, BITES, EATING, FLIES, FLY, FLY_MAX, HANDS, HOLDING, PROTOCOL, createFlyState, decodeBites, decodeFlies, dropOwner,
+  AIRBORNE, BITES, CLOSE, EATING, FLIES, FLY, FLY_MAX, HANDS, HOLDING, PROTOCOL, createFlyState, decodeBites, decodeFlies, dropOwner,
   AIR_BEYOND, ROOM_SCALE, TABLETOP_SCALE, encodeBites, encodeFlies, encodeFly, foundId, isTableCode, readState, seqAtOrAfter, stateLength, tableCode, wireScale,
 } from "../src/index.ts";
 import type { FlyState } from "../src/index.ts";
@@ -151,8 +151,9 @@ test("sequence numbers compare across their wrap", () => {
   assert.ok(seqAtOrAfter(7, 7));
 });
 
-test("the protocol is 2: a device that would read the restaurant at a tabletop's scale is turned away", () => {
-  assert.equal(PROTOCOL, 2);
+test("the protocol is 3: a device that doesn't know rooms can be locked is turned away (and reloads into one that does)", () => {
+  assert.equal(PROTOCOL, 3);
+  assert.equal(CLOSE.locked, 4008);
 });
 
 test("dropped food is named for its player, found food for where it is", () => {
