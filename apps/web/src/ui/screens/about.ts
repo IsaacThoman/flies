@@ -74,10 +74,8 @@ export class AboutScreen implements Screen {
 
   press(button: RemoteButton, repeat: boolean) {
     if (button === "up" || button === "down") {
-      if (this.#scroll.step(button === "up" ? -1 : 1)) this.#shell.sound("move");
-      else if (!repeat) this.#shell.sound("blocked");
+      this.#scroll.step(button === "up" ? -1 : 1);
     } else if ((button === "back" || button === "select") && !repeat) {
-      this.#shell.sound("back");
       this.#shell.back();
     }
     this.#dirty = true;
@@ -91,7 +89,6 @@ export class AboutScreen implements Screen {
     else if (p.type === "up") {
       this.#from = -1;
       if (p.tap && (!p.hit || p.hit.kind === SCREEN_HITS.back)) {
-        this.#shell.sound("back");
         this.#shell.back();
       }
     } else if (p.type === "cancel") this.#from = -1;

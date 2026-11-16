@@ -7,7 +7,7 @@
 // TypeScript one from the same kept connectome; the second loads with the network off,
 // from the service worker and the brain's cache; a tab hidden for a while
 // (headless Chromium can't hide one, so the page is told it is) stops the
-// fly's life and its sound and wakes without a jump; a lost graphics context
+// fly's life and wakes without a jump; a lost graphics context
 // comes back; the wallpaper holds the screen
 // awake and lets go when hidden; and nothing is fetched from anywhere but the
 // site itself.
@@ -147,7 +147,7 @@ try {
     }, hidden);
   const lived = () => page.evaluate(() => (globalThis as unknown as { __fly: { time: number; life: { time: number } } }).__fly.life.time);
   await hide(true);
-  await waitFor(page, "hidden=true,wakeLock=none,audio~^(?!running)");
+  await waitFor(page, "hidden=true,wakeLock=none");
   const livedBefore = await lived();
   await page.waitForTimeout(6000);
   const jumped = await page.evaluate(async (before) => {
@@ -158,7 +158,7 @@ try {
     await new Promise(requestAnimationFrame);
     return (globalThis as unknown as { __fly: { life: { time: number } } }).__fly.life.time - before;
   }, livedBefore);
-  const back = await waitFor(page, "hidden=false,wallpaper=true,wakeLock=held,audio=running");
+  const back = await waitFor(page, "hidden=false,wallpaper=true,wakeLock=held");
   assert.equal(back.brain, "running", "a frozen page is not a stalled brain");
   assert.ok(jumped < 1.5, `the fly lived ${jumped.toFixed(2)} s across six seconds asleep`);
   await waitForGameTime(page, 2.5);

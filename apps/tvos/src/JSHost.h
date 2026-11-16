@@ -32,8 +32,6 @@ class Renderer;
 - (void)setActive:(BOOL)active;
 @end
 
-/** The running host, for natives outside Host.mm. */
-JSHost *CurrentHost(void);
 /** A typed array's or ArrayBuffer's bytes (nullptr if v is neither). */
 uint8_t *JSBytesOf(JSContextRef ctx, JSValueRef v, size_t *length);
 JSValueRef JSStringValue(JSContextRef ctx, NSString *s);

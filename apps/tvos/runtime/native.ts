@@ -57,8 +57,6 @@ export interface Native {
   input(kind: 'touch', x: number, y: number, touching: boolean): void;
   /** Launch configuration as JSON. */
   readonly config: string;
-  /** Web Audio (src/Audio.mm). */
-  audio(command: number, ...args: unknown[]): unknown;
   /** The fly's brain on its own thread (src/Brain.mm). */
   readonly brain: NativeBrainBridge;
 }

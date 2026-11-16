@@ -1,13 +1,11 @@
 // What a place has to provide for the game to show it and the fly to live in
 // it. The world (what the fly stands on, bumps into and eats) is exact and
-// shared with the body (packages/world); everything here is how it looks and
-// sounds, built from that same description so that what is drawn is what is
-// felt.
+// shared with the body (packages/world); everything here is how it looks,
+// built from that same description so that what is drawn is what is felt.
 
 import type * as THREE from "three";
 import type { Looming } from "@fly/body";
 import type { Pantry, Place, Vec3, World } from "@fly/world";
-import type { Ambience } from "../audio/sounds.ts";
 import type { Shot } from "../camera.ts";
 import type { Daylight, Palettes } from "../scene/light.ts";
 import type { Weather } from "../scene/weather.ts";
@@ -121,7 +119,6 @@ export type Scene = {
    * (scene/light.ts), in that measure.
    */
   open?: number;
-  ambience: Ambience;
   /** Soap bubbles drifting over on the breeze (scene/bubbles.ts), and fireflies at dusk (scene/fireflies.ts): both are built for the picnic's open air and size. */
   bubbles: boolean;
   fireflies: boolean;

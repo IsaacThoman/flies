@@ -6,8 +6,7 @@
 // blow, and a knock when the fly takes off. It is the player's: nothing here
 // reaches the fly. Where there is nothing to rumble (the Apple TV's remote, a
 // mouse, a keyboard, a phone without vibrate, whose own app plays haptics of
-// its own) it does nothing, and it is as strong as the sound effects are loud:
-// at none, none.
+// its own) it does nothing.
 
 import type { Device } from "./input.ts";
 
@@ -28,12 +27,8 @@ export const FEELS: Readonly<Record<Feel, { strong: number; weak: number; ms: nu
 
 /** A held tool is felt as short pulses this often (ms), each a little longer, so they run together on a pad and brush on a phone. */
 export const HOLD_EVERY = 140;
-/** Designed at the Effects volume's default, 7 of 10; louder doesn't rumble harder. */
-const DESIGNED_AT = 7;
 
 export class Haptics {
-  /** 0 (off) to 1, from the Effects volume. */
-  #level = 1;
   #holdIn = 0;
   readonly #devices: { readonly current: Device };
   readonly #pads: () => readonly (PadLike | null)[];
@@ -48,11 +43,6 @@ export class Haptics {
     this.#devices = devices;
     this.#pads = pads;
     this.#vibrate = vibrate;
-  }
-
-  /** The Effects volume, 0 to 10. */
-  setVolume(effects: number) {
-    this.#level = Math.min(1, Math.max(0, effects) / DESIGNED_AT);
   }
 
   feel(kind: Feel) {
@@ -79,7 +69,6 @@ export class Haptics {
   }
 
   #play(strong: number, weak: number, ms: number, again?: number) {
-    if (this.#level <= 0) return;
     const device = this.#devices.current;
     if (device === "pad") {
       const pads = this.#pads();
@@ -88,8 +77,8 @@ export class Haptics {
         if (!actuator?.playEffect) continue;
         const e = this.#effect;
         e.duration = ms;
-        e.strongMagnitude = strong * this.#level;
-        e.weakMagnitude = weak * this.#level;
+        e.strongMagnitude = strong;
+        e.weakMagnitude = weak;
         void actuator.playEffect("dual-rumble", e).catch(() => {});
         // A new effect cuts the one playing short, so the second knock waits for its turn.
         if (again !== undefined) {
@@ -100,7 +89,7 @@ export class Haptics {
       }
     } else if (device === "touch" && this.#vibrate) {
       // A phone's motor has one strength: a weak feel is a shorter buzz.
-      const buzz = Math.max(8, Math.round(ms * Math.min(1, 0.4 + Math.max(strong, weak)) * this.#level));
+      const buzz = Math.max(8, Math.round(ms * Math.min(1, 0.4 + Math.max(strong, weak))));
       if (again === undefined) this.#vibrate(buzz);
       else {
         this.#twice[0] = buzz;

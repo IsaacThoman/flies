@@ -57,8 +57,6 @@ export class TableBubbles {
   readonly #surface = createSurface();
   /** How hard it is raining (0 to 1): the table's weather. */
   rain = 0;
-  /** Bubbles burst this update, by slot (for a sound): cleared each update. */
-  readonly popped: number[] = [];
 
   constructor(seed: number, world: World, count: number) {
     this.#seed = seed;
@@ -120,7 +118,6 @@ export class TableBubbles {
 
   /** Moves every slot on to room time t (s): finds where bubbles ended, and blows the next ones. */
   update(t: number) {
-    this.popped.length = 0;
     for (let i = 0; i < this.slots.length; i++) this.#advance(i, t);
   }
 
@@ -139,7 +136,6 @@ export class TableBubbles {
         const to = Math.min(t, from + STEP);
         if (this.#ends(b, to)) {
           b.poppedAt = bisect(from, to, (x) => this.#ends(b, x));
-          this.popped.push(slot);
           break;
         }
         if (this.#off(b, to)) {
@@ -161,7 +157,6 @@ export class TableBubbles {
     const b = this.slots[slot];
     if (!b || b.cycle !== cycle || !this.alive(b, at)) return false;
     b.poppedAt = at;
-    this.popped.push(slot);
     return true;
   }
 

@@ -7,7 +7,7 @@ import WebKit
 /// While the game shouldn't run (nothing of the app can be seen, or the phone is critically hot),
 /// the web view leaves the window and a still of its last frame takes its place. Out of a window
 /// the page is hidden, and the game sleeps as it does in a hidden browser tab (apps/web/src/page.ts):
-/// no frames, so the fly's life and the brain stop with them, and no sound. Shown again it carries
+/// no frames, so the fly's life and the brain stop with them. Shown again it carries
 /// on from where it was. WebKit hides the page of an app in the background by itself; only the heat
 /// needs this, but one way for both keeps them the same.
 final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, UIScrollViewDelegate {
@@ -25,10 +25,6 @@ final class GameViewController: UIViewController, WKScriptMessageHandler, WKNavi
     schemeHandler = BundleSchemeHandler(root: www)
     let configuration = WKWebViewConfiguration()
     configuration.setURLSchemeHandler(schemeHandler, forURLScheme: BundleSchemeHandler.scheme)
-    // Sound starts when the page's own code says (the player's first press or touch, or the game
-    // waking), without WebKit asking for a gesture of its own.
-    configuration.mediaTypesRequiringUserActionForPlayback = []
-    configuration.allowsInlineMediaPlayback = true
     configuration.userContentController.addUserScript(WKUserScript(source: PageScripts.host, injectionTime: .atDocumentStart, forMainFrameOnly: true))
     webView = WKWebView(frame: .zero, configuration: configuration)
     super.init(nibName: nil, bundle: nil)

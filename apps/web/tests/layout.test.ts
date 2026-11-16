@@ -39,7 +39,6 @@ function shell(frame: Frame, glyphs: Shell["glyphs"] = null, online = true): She
     play() {},
     watch() {},
     applySettings() {},
-    sound() {},
     // With "Online" on the title and the pause menu, as in a browser: the longest they are.
     canPlayOnline: online,
     table: null,
@@ -193,7 +192,7 @@ test("every menu fits inside the safe area at every shape, its rows big enough f
 });
 
 test("the settings' tabs can be read at every shape: every one, or, where they are too narrow for that, the one chosen with arrows to step along them", () => {
-  const labels = ["Wallpaper", "On screen", "Sound", "Picture"];
+  const labels = ["Wallpaper", "On screen", "Picture"];
   for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
     for (const glyphs of [null, "remote"] as const) {
       const screen = settingsScreen(shell(frame, glyphs));

@@ -92,29 +92,18 @@ export class MenuScreen implements Screen {
   }
 
   #outcome(outcome: Outcome) {
-    const shell = this.#shell;
     switch (outcome.kind) {
-      case "moved":
-        shell.sound("move");
-        break;
-      case "blocked":
-        shell.sound("blocked");
-        break;
       case "activate":
         this.view.pressed();
-        shell.sound("select");
         this.#options.onActivate?.(outcome.item);
         break;
       case "change":
-        shell.sound("tick");
         this.#options.onChange?.(outcome.item);
         break;
       case "edit":
-        shell.sound("select");
         this.#options.onEdit?.(outcome.item);
         break;
       case "back":
-        shell.sound("back");
         this.#options.onBack();
         break;
     }

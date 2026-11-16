@@ -62,19 +62,16 @@ export class Bubbles {
   readonly mesh: THREE.InstancedMesh;
   /** As things the fly could see looming, refreshed each frame. */
   readonly looming: Looming[] = [];
-  /** Bubbles that popped this frame, for a sound and a sparkle: their positions. */
-  readonly popped: THREE.Vector3[] = [];
   #bubbles: Bubble[] = [];
   #rnd = random(23);
   #uniforms = { light: { value: new THREE.Vector3() }, time: { value: 0 } };
   #order: number[] = [];
   #distance = new Float64Array(BUBBLES);
   #world: World;
-  #pool = Array.from({ length: BUBBLES }, () => new THREE.Vector3());
   #surface = createSurface();
   /** A bubble burst on the fly this frame: how hard it felt it (0 if none). */
   brushed = 0;
-  /** Bubbles drift over this place (Scene.bubbles). Without them there is nothing to see, feel or hear of them. */
+  /** Bubbles drift over this place (Scene.bubbles). Without them there is nothing to see or feel of them. */
   enabled = true;
   /** How hard it is raining (the weather's rain, 0 to 1). */
   rain = 0;
@@ -85,8 +82,6 @@ export class Bubbles {
    * past the fly stay each device's own.
    */
   table: { bubbles: TableBubbles; time: number; burst: (slot: number, cycle: number, at: number) => void } | null = null;
-  /** When each high bubble's burst was last sounded, so each sounds once. */
-  #announced = new Float64Array(BUBBLES).fill(-1);
 
   constructor(parent: THREE.Object3D, world: World) {
     this.#world = world;
@@ -170,10 +165,6 @@ export class Bubbles {
     if (s.poppedAt >= 0 && t - s.poppedAt < POP_SECONDS) {
       table.bubbles.position(s, s.poppedAt, b);
       b.popping = t - s.poppedAt + 0.001;
-      if (this.#announced[i] !== s.poppedAt) {
-        this.#announced[i] = s.poppedAt;
-        this.popped.push(this.#pool[i].set(b.x, b.y, b.z));
-      }
     } else b.popping = 1;
   }
 
@@ -181,7 +172,6 @@ export class Bubbles {
   update(time: number, dt: number, camera: THREE.Camera, sun: THREE.Vector3, gust: THREE.Vector3Like, fly: THREE.Vector3Like) {
     this.#uniforms.time.value = time;
     this.#uniforms.light.value.copy(sun).transformDirection(camera.matrixWorldInverse);
-    this.popped.length = 0;
     this.brushed = 0;
     this.mesh.visible = this.enabled;
     if (!this.enabled) return;
@@ -215,7 +205,6 @@ export class Bubbles {
       }
       if (burst) {
         b.popping = 0.001;
-        this.popped.push(this.#pool[i].set(b.x, b.y, b.z));
         continue;
       }
       if (b.x > 640 || Math.abs(b.z) > 700) this.#renew(b, fly);

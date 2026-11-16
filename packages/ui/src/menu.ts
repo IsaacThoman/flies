@@ -33,7 +33,7 @@ export type MenuItem = ActionItem | ChoiceItem | SliderItem | FieldItem;
 /** What a press did. */
 export type Outcome =
   | { kind: "none" }
-  /** The focus moved (for a sound and a redraw). */
+  /** The focus moved (for a redraw). */
   | { kind: "moved" }
   /** Pressed against the end of the list or of a value's range. */
   | { kind: "blocked" }

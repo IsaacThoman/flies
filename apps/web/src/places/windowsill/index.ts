@@ -38,7 +38,6 @@ export const windowsill: Scene = {
   },
   // It sees the sky through a big window: a grey day dims the sun coming in, and after dark, lit by its lamp, it hardly feels the weather.
   open: 0.5,
-  ambience: "kitchen",
   bubbles: false,
   fireflies: false,
 };

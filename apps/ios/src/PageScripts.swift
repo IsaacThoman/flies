@@ -10,12 +10,10 @@ enum PageScripts {
   /// The page's own background (apps/web/index.html), behind the web view while it loads.
   static let background = UIColor(red: 0x04 / 255, green: 0x12 / 255, blue: 0x2b / 255, alpha: 1)
 
-  /// Ambient sound, as the Apple TV app's: it obeys the silent switch and plays under other apps'
-  /// music instead of stopping it. Then, whenever what the app follows changes (the game having drawn
-  /// its first screen, the screen, the wallpaper, and for haptics the tool, the fly's touch and its
-  /// take-offs), tells the app: the canvas's state is set every 200 ms, and only changes are sent.
+  /// Whenever what the app follows changes (the game having drawn its first screen, the screen, the
+  /// wallpaper, and for haptics the tool, the fly's touch and its take-offs), tells the app: the
+  /// canvas's state is set every 200 ms, and only changes are sent.
   static let host = """
-  if (navigator.audioSession) navigator.audioSession.type = "ambient";
   addEventListener("DOMContentLoaded", () => {
     const canvas = document.getElementById("game");
     if (!canvas) return;

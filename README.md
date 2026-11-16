@@ -104,9 +104,8 @@ Overcast greys every place's sky and takes the sun's light away, and mist
 whitens the distance. At the picnic rain falls past the camera, splashes on
 the table, the fruit and the lemonade's pool (crowns of droplets, rings in
 the wet), beads the table and the fruit, soaks the napkin darker, speckles
-the lake, keeps the birds quiet and is heard; the table dries over the next
-half hour or so, and if the sun comes out while it's wet a rainbow stands
-opposite it. Rain bursts the bubbles, and the fireflies shelter from it. A
+the lake; the table dries over the next half hour or so, and if the sun
+comes out while it's wet a rainbow stands opposite it. Rain bursts the bubbles, and the fireflies shelter from it. A
 drop landing on the fly is felt (`touch`).
 
 **The weather outside.** An Apple TV app built with WeatherKit
@@ -144,7 +143,7 @@ a press), the picnic has its own goings-on, about ten an hour, never two
 starting within 45 s of each other, each only when the time of day and the
 weather allow it: a gust (the fly feels it as `wind`; the bubbles are blown
 on, the table's leaf lifts, ripples run over the napkin, the trees sway and it
-runs across the grass and the lake, and it is heard), a gull gliding high over
+runs across the grass and the lake), a gull gliding high over
 whose shadow sweeps the table (the fly's eyes see it darken), a leaf coming
 down on a gust to lie where it lands until another blows it off the table, a
 butterfly that flutters over and may settle on the fruit a while, a ladybird
@@ -189,9 +188,8 @@ chimneys, a church spire, clouds and passing birds; at night their windows
 light up and the stars and the moon come out. Under a grey sky the window's
 shadows go soft; on cold mornings and damp days the glass mists at its foot;
 in mist the houses fade to ghosts; in the rain it falls across the garden,
-drops bead on the pane and run down it, and it stays streaked as it dries. It
-sounds of the kitchen's hush, the fridge, birds in the garden muffled by the
-glass by day, and rain on the pane. There are no bubbles or fireflies indoors.
+drops bead on the pane and run down it, and it stays streaked as it dries.
+There are no bubbles or fireflies indoors.
 
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
 wiring was traced: a stereo microscope with a fly pad on its stage (its base
@@ -218,9 +216,7 @@ and blinds across the bench and the floor, long and warm at golden hour; from
 dusk the panels are off, a desk lamp pools warm light on the bench, and the
 room is dark round it but for lit windows across the way. Under a grey sky the
 view outside goes flat and grey, in mist it fades to a pale veil, and in the
-rain it falls past the windows. It sounds of the air handling, the lights'
-hum, a fridge's compressor starting and stopping, and a distant beep now and
-then. There are no bubbles or fireflies indoors.
+rain it falls past the windows. There are no bubbles or fireflies indoors.
 
 The bar is the walnut counter of a small, warm bar in the evening: a cocktail
 on the rocks with a wedge of lime on its rim, a tall beer with its head of
@@ -246,8 +242,7 @@ the light is the window's, falling away from it, and the varnish mirrors the
 dark room and the bright window; at golden hour the sun comes in low across
 the counter and the glasses throw long shadows coloured by what is in them; at
 dusk and night the lamps, the flickering candle and the back bar light it, and
-lights out of focus glow behind the fly. It sounds like a quiet room: low
-voices, a glass or two touching, ice settling.
+lights out of focus glow behind the fly.
 
 Wherever it lives, a fly that has stood in something sticky or wet leaves
 footprints (`apps/web/src/scene/prints.ts`): faint prints of the two pads of
@@ -293,10 +288,7 @@ across the ceiling, the pendant pools warm light on the zinc, and in the rain
 water runs down the glass. Now and then, while nobody plays, the ventilation
 comes on and a slow draught falls from its diffusers. The room is drawn in
 areas, each in detail only while the camera is near it (`docs/places.md`, "A
-large place"). It sounds of a bistro after closing: the ventilation's hush, the
-fridge's compressor knocking on and off, the ice machine dropping a batch,
-the building ticking as it cools, and the city through the glass. There are
-no bubbles or fireflies indoors.
+large place"). There are no bubbles or fireflies indoors.
 
 It plays as well with a finger, a mouse or trackpad, a keyboard or a game pad
 as with the remote. Your hand is a glowing ring on the table; until you move
@@ -347,10 +339,9 @@ dropped and a softer one when it lands, a swell as the ball dives, two quick
 knocks when a press can't do anything, light pulses while the feather is on
 the fly, a low one while you blow, and a knock when the fly takes off. A
 phone that can vibrate (Android) buzzes for the same; the iPhone and iPad app
-plays its own haptics. It is as strong as the effects are loud, and off with
-them; it is never felt in the wallpaper. The hints
-always show the thing last used, and the screen hides the system's cursor,
-text selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
+plays its own haptics. It is never felt in the wallpaper. The hints always
+show the thing last used, and the screen hides the system's cursor, text
+selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
 
 The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
@@ -460,12 +451,12 @@ steps from the menu and none scrolling: **Wallpaper** (when it starts, how
 its camera films, where the fly lives, and, on an Apple TV that can tell,
 the real weather), **On screen** (everything that can show over the world:
 what it sees, its nervous system and its stats in the corners, what the
-stats are of, the corners' size and opacity, and the X-ray), **Sound**
-(effects, surroundings) and **Picture** (pixel size, the eyes' detail,
-button hints, frame stats). In a browser it also has **Online**, rooms
-shared with others. The menu never scrolls either: on a screen too short for
-its rows (a phone on its side) they are in two columns, Left and Right going
-across, Up and Down along the list as ever. Where the settings' tabs are too
+stats are of, the corners' size and opacity, and the X-ray), and **Picture**
+(pixel size, the eyes' detail, button hints, frame stats). In a browser it
+also has **Online**, rooms shared with others. The menu never scrolls
+either: on a screen too short for its rows (a phone on its side) they are
+in two columns, Left and Right going across, Up and Down along the list as
+ever. Where the settings' tabs are too
 narrow to read (the smallest phones), they are one choice, the tab shown
 between arrows.
 
@@ -808,17 +799,7 @@ while hidden, holds the screen awake while it is the wallpaper, and recovers
 from a lost graphics context (`apps/web/src/page.ts`); `docs/web.md` has the
 rest. On the Apple TV it is `globalThis.__native.brain`
 (`apps/web/src/brain/native-driver.ts`), which allocates nothing per frame.
-Sound is synthesised into buffers at start-up (no oscillators or filters):
-wing buzz following the wings, patter while it walks, each place's own
-surroundings (the picnic's breeze and lake; birds by day, quieter in the
-rain and gone to roost at night, muffled behind the windowsill's glass), rain
-and the rush of a gust, and small sounds for the
-tools and menus. The held tools are heard while they work: the feather
-rustles, swelling with each brush, while it strokes the fly, and a breath of
-air blows while you hold Blow, deeper and softer gently, higher and louder
-hard. Each starts when the tool begins and is let go when it stops, so
-nothing plays, or costs anything, in between. The settings, the shelf's kept choices and what the hints
-have taught are in
+The settings, the shelf's kept choices and what the hints have taught are in
 `localStorage` (`apps/web/src/settings.ts`); from a save made by another
 build, or a broken one, only what this build can use is kept.
 
