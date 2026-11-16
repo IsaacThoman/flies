@@ -284,7 +284,9 @@ async function mouse() {
       await page.mouse.wheel(0, -100);
       const now = Number((await waitFor(page, `reach<${last - 0.1}`)).reach);
       assert.ok(now > last / 1.3, `a step, not a jump: ${last} → ${now} mm`);
-      last = now;
+      // Let this click finish before measuring the next: unfinished glides add together.
+      await waitForGameTime(page, 0.6);
+      last = Number((await readState(page)).reach);
     }
     await waitFor(page, "view=close");
     // Each click eases in over a moment; once in, left there, it stays there.
