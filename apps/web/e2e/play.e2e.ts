@@ -18,7 +18,7 @@
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
 import { gameUp, openGame, readState, startServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
-import { feedHoney } from "./feeding.ts";
+import { dropFood, feedHoney } from "./feeding.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import type { Game } from "../src/game.ts";
 
@@ -180,11 +180,7 @@ try {
   step("feeding: honey at its mouth reaches taste senses and the brain produces a feed command");
   await press("ArrowDown");
   await waitFor(page, "tool=feed,variant=honey");
-  await feedHoney(page, async () => {
-    const before = Number((await readState(page)).food);
-    await press("Enter");
-    await waitFor(page, `food>${before}`);
-  });
+  await feedHoney(page, () => dropFood(page, () => press("Enter")));
   // Whether it walks off the honey is the brain's choice; footprint generation is also checked with a deterministic walker.
   await waitForGameTime(page, 2);
   const printed = Number((await readState(page)).prints);
