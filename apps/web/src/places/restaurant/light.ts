@@ -295,7 +295,7 @@ vec3 rRoom(vec3 p, vec3 r, float rough) {
     vec3 n = vec3(${f(CORNER_BAR.neon.x)}, ${f(CORNER_BAR.neon.y)}, ${f(CORNER_BAR.neon.z)}) - p;
     float nd = length(n);
     float na = acos(clamp(dot(r, n / nd), -1.0, 1.0));
-    c += uStreetFar * 0.04 * (1.0 - smoothstep(600.0 / nd, 600.0 / nd + blur * 0.4 + 0.003, na)) * open;
+    c += uStreetFar * 0.012 * (1.0 - smoothstep(450.0 / nd, 450.0 / nd + blur * 0.25 + 0.002, na)) * open;
   }
   // The lit pendant's diffuser overhead, and the glow round it.
   if (uPendant.w > 0.0 && r.y > 0.02 && p.y < ${f(PENDANT_LIGHT.y)}) {

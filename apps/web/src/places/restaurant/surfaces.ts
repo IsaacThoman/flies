@@ -481,8 +481,13 @@ if (rK == K_LABEL) {
   rRough = 0.7;
 }
 if (rK == K_CRUMB || rK == K_CAKE) {
-  vec2 cp = vWorld.xz * 2.5 + vWorld.y * 2.0;
-  diffuseColor.rgb *= 0.8 + rFbm(cp) * 0.35;
+  // Baked: the crust's colour mottled and the crumb's open pores, as small dimples in a lump's rounded surface.
+  vec3 cq = vWorld * 9.0;
+  vec2 cp = cq.xz + cq.y * vec2(0.7, 0.3);
+  float cd = rDetail(cp);
+  float pore = smoothstep(0.62, 0.8, rNoise(cp * 1.7)) * cd;
+  diffuseColor.rgb *= (0.82 + rFbm(cp * 0.6) * 0.3) * (1.0 - pore * 0.35);
+  rBump = (vec3(rNoise(cp), rNoise(cp + 3.1), rNoise(cp + 7.3)) - 0.5) * 0.6 * cd;
   rRough = 0.85;
 }
 if (rK == K_FLOWER) rRough = 0.5;

@@ -39,22 +39,29 @@ const CRYSTAL = (() => {
 })();
 /** A speck of dust. */
 const SPECK = new THREE.TetrahedronGeometry(0.5);
-/** A crumb: a broken lump round its middle, a ring of five uneven points between a low and a high one. */
+/**
+ * A crumb: an uneven lump, a ring of eight points between a low and a high
+ * one, shaded as the rounded thing it is (each corner's normal points out
+ * from its middle, its pores are in the shader), not as flat facets.
+ */
 const CRUMB = (() => {
-  const ring = [0.5, 0.36, 0.46, 0.3, 0.42].map((r, i) => {
-    const a = (i / 5) * Math.PI * 2 + (i % 2) * 0.3;
-    return new THREE.Vector3(Math.cos(a) * r, (i % 3) * 0.08 - 0.08, Math.sin(a) * r);
+  const radii = [0.5, 0.42, 0.47, 0.34, 0.44, 0.4, 0.49, 0.37];
+  const ring = radii.map((r, i) => {
+    const a = ((i + 0.3 * Math.sin(i * 2.1)) / radii.length) * Math.PI * 2;
+    return new THREE.Vector3(Math.cos(a) * r, (i % 3) * 0.06 - 0.06, Math.sin(a) * r);
   });
   const high = new THREE.Vector3(0.08, 0.5, -0.05);
   const low = new THREE.Vector3(-0.05, -0.5, 0.06);
   const points: THREE.Vector3[] = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < ring.length; i++) {
     const a = ring[i];
-    const b = ring[(i + 1) % 5];
+    const b = ring[(i + 1) % ring.length];
     points.push(a, high, b, b, low, a);
   }
   const g = new THREE.BufferGeometry().setFromPoints(points);
-  g.computeVertexNormals();
+  // Squashed as it lies, so its normals out from the middle lean up a little more.
+  const normals = points.flatMap((p) => new THREE.Vector3(p.x, p.y * 1.6, p.z).normalize().toArray());
+  g.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
   return g;
 })();
 const crust = new THREE.Color("#8a4a1c");
@@ -206,7 +213,8 @@ export function wineRing(b: Builder, area: number, centre: Spot, R: number, pool
   };
   // Rows across the ring and how high each stands.
   // From its outer edge in, so it faces up.
-  const rows: [number, number][] = [[0.95, -0.03], [0.88, 0.06], [0.75, 0.11], [0.6, 0.1], [0.3, 0.07], [-0.2, 0.05], [-0.7, 0.03], [-0.9, -0.03]];
+  // Flat: a stain, a hair higher at its outer edge where the wine drew as it dried.
+  const rows: [number, number][] = [[0.95, -0.02], [0.88, 0.045], [0.75, 0.032], [0.6, 0.03], [0.3, 0.03], [-0.2, 0.03], [-0.7, 0.028], [-0.9, -0.02]];
   const pale = new THREE.Color("#a03048");
   const dark = new THREE.Color("#2a0410");
   const mid = new THREE.Color("#5a0a20");
@@ -221,6 +229,6 @@ export function wineRing(b: Builder, area: number, centre: Spot, R: number, pool
     const a = rnd.range(0, Math.PI * 2);
     const d = R + rnd.range(3, 14);
     const r = rnd.range(0.3, 0.9);
-    put(b, area, TOP.dregs, [[r, y - 0.02], [r * 0.8, y + 0.07], [r * 0.4, y + 0.1], [0, y + 0.11]], 10, { x: centre.x + Math.cos(a) * d, z: centre.z + Math.sin(a) * d }, dark);
+    put(b, area, TOP.dregs, [[r, y - 0.02], [r * 0.8, y + 0.04], [r * 0.4, y + 0.04], [0, y + 0.04]], 10, { x: centre.x + Math.cos(a) * d, z: centre.z + Math.sin(a) * d }, dark);
   }
 }

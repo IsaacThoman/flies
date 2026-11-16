@@ -243,7 +243,7 @@ if (rK >= K_TOP_PRINT && rK <= K_TOP_CHINA) {
       vec3 c;
       if (salt) {
         c = vec3(0.92, 0.92, 0.9) * mix(0.86, 0.62 + 0.38 * h, d) * (1.0 - gap * 0.6);
-        rEmit += c * rRoomLight(vWorld, rN) * 0.12 * step(0.85, h) * d;
+        rEmit += c * (rRoomLight(vWorld, rN) * 0.12 * step(0.85, h) * d + rKeyLight(vWorld) * (0.07 + 0.2 * step(0.85, h) * d));
         rRough = 0.3 + gap * 0.4;
         rCoat = 0.5;
       } else {
@@ -371,7 +371,11 @@ float topStain;
 const CLEAR_COLOR = /* glsl */ `
 topStain = 0.0;
 // Dried wine: as opaque as it is dark, a pale film where it lay thin.
-if (rK == K_TOP_DREGS) { rAlpha = mix(0.92, 0.4, smoothstep(0.03, 0.35, diffuseColor.r)); rRough = 0.1; }
+if (rK == K_TOP_DREGS) {
+  // Dried wine: a stain the marble shows through, densest at the edge it dried to; satin, not wet.
+  rAlpha = mix(0.72, 0.22, smoothstep(0.03, 0.35, diffuseColor.r));
+  rRough = 0.38;
+}
 if (rK == K_TOP_BOWL) {
   // Wine left a film inside the glass above where it stands, and its tears run back down in streaks.
   vec2 o = (diffuseColor.rg - 0.5) * 84.0;
@@ -387,7 +391,7 @@ if (rK == K_TOP_TINT) diffuseColor.rgb *= 0.35;
 `;
 
 const CLEAR_FINAL = /* glsl */ `
-if (rK == K_TOP_DREGS) rAlpha = min(1.0, rAlpha + edge * 0.2);
+if (rK == K_TOP_DREGS) rAlpha = min(1.0, rAlpha + edge * 0.08);
 if (rK == K_TOP_BOWL) rAlpha = 0.04 + edge * 0.7 + min(dot(outgoingLight, vec3(0.1)), 0.15) + topStain * 0.45;
 if (rK == K_TOP_TINT) rAlpha = 0.14 + edge * 0.6 + min(dot(outgoingLight, vec3(0.1)), 0.15);
 `;

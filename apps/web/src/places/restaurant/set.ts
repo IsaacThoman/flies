@@ -230,6 +230,7 @@ export function buildRestaurant(): SceneSet {
   const flyAt = new THREE.Vector3(RESTAURANT_START.x, RESTAURANT_START.y, RESTAURANT_START.z);
   const ventilation = new Ventilation();
   const glow = new THREE.Color();
+  const street = new THREE.Color();
   let nextRipple = 0;
   const ripples = shared.uRipples.value;
 
@@ -262,7 +263,8 @@ export function buildRestaurant(): SceneSet {
       shared.uSunSoft.value = 0.03 + 0.12 * Math.max(0, 1 - light.sunIntensity / 3) + 0.1 * night;
       shared.uOpening.value = 0.25 + 1.1 * (1 - night);
       shared.uRoomTone.value.copy(light.zenith).lerp(light.horizon, 0.5).multiplyScalar(0.5);
-      shared.uWindowSeen.value.copy(light.middle).lerp(light.haze, 0.6).multiplyScalar(1.4 * (1 - night) + 0.1);
+      // By day the sky; after dark the street's lit fronts and lamps, warm and dim.
+      shared.uWindowSeen.value.copy(light.middle).lerp(light.haze, 0.6).multiplyScalar(1.4 * (1 - night) + 0.1).add(street.setRGB(0.3, 0.24, 0.18).multiplyScalar(night));
 
       if (!camera) return;
       eyeAt.setFromMatrixPosition(camera.matrixWorld);

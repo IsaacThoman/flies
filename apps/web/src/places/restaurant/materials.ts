@@ -244,7 +244,7 @@ const CLEAR_FINAL = /* glsl */ `
   if (rK == K_GLASS) {
     rAlpha = 0.05 + edge * 0.85 + min(dot(outgoingLight, vec3(0.12)), 0.25);
     // Its edges catch the room's light and the lights' glints.
-    outgoingLight += (rRoomLight(vWorld, -normalize(vWorldNormal)) * 0.15 + rKeyLight(vWorld) * 0.04) * pow(edge, 1.5);
+    outgoingLight += (uRoomTone * 0.5 + uWindowSeen * 0.3 + rRoomLight(vWorld, -normalize(vWorldNormal)) * 0.15 + rKeyLight(vWorld) * 0.12) * pow(edge, 1.5);
   }
   if (rK == K_FRIDGE_GLASS) rAlpha = 0.08 + edge * 0.5;
   if (rK == K_WINE || rK == K_WHITE_WINE || rK == K_BOTTLE) rAlpha = min(1.0, rAlpha + edge * 0.3);
