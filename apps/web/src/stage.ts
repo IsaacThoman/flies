@@ -61,7 +61,8 @@ export class Stage {
   current: Scene;
   backdrop: SceneBackdrop;
   set: SceneSet;
-  scene = new THREE.Scene();
+  readonly scene = new THREE.Scene();
+  #renderScene = new THREE.Scene().add(this.scene);
   readonly hemi: THREE.HemisphereLight;
   readonly sun: THREE.DirectionalLight;
   readonly cost: FrameCost = { calls: 0, triangles: 0, textures: 0, geometries: 0, programs: 0 };
@@ -119,7 +120,8 @@ export class Stage {
     this.scene.remove(this.set.group);
     disposeAll(this.set.group);
     disposeAll(this.backdrop.scene);
-    this.scene = renewScene(this.scene);
+    // Actors that spawn later retain their parent, while only the renderer's light cache must expire.
+    this.#renderScene = renewScene(this.#renderScene);
     this.current = scene;
     this.light.use(scene.palettes, scene.open);
     const started = performance.now();
@@ -130,6 +132,8 @@ export class Stage {
     this.#applyLight();
     this.#envDirty = true;
   }
+
+  get renderScene(): THREE.Scene { return this.#renderScene; }
 
   setTime(time: TimeOfDay) {
     this.light.set(time);
@@ -188,6 +192,7 @@ export class Stage {
     const old = this.#env;
     this.#env = this.#pmrem.fromScene(this.#envScene, 0.02, 0.1, 100);
     this.scene.environment = this.#env.texture;
+    this.#renderScene.environment = this.#env.texture;
     old?.dispose();
   }
 
@@ -245,7 +250,7 @@ export class Stage {
   }
 
   /** The two passes, into whatever target is set: the backdrop, then the table over it. */
-  renderPasses(camera: THREE.PerspectiveCamera, scene: THREE.Scene = this.scene) {
+  renderPasses(camera: THREE.PerspectiveCamera, scene: THREE.Scene = this.#renderScene) {
     const r = this.renderer;
     const { near, far } = camera;
     camera.near = FAR.near;

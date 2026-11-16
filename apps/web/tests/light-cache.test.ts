@@ -50,3 +50,16 @@ test("a thousand replacement lights leave only the current scene's uniform color
   assert.ok(queryObjects(Color, { format: "count" }) - baseline <= 2, "old per-scene uniform caches were collected");
   assert.equal(states.get(scene), states.get(scene), "keep the renderer cache alive during the count");
 });
+
+test("renewing the rendered container preserves a parent's identity for actors joining later", () => {
+  const parent = new THREE.Scene();
+  const first = new THREE.Group();
+  parent.add(first);
+  const scene = new THREE.Scene().add(parent);
+  const next = renewScene(scene);
+  const later = new THREE.Group();
+  parent.add(later);
+  assert.equal(next.children[0], parent);
+  assert.deepEqual(parent.children, [first, later]);
+  assert.equal(later.parent?.parent, next);
+});

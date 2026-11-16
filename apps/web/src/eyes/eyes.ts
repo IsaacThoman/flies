@@ -278,7 +278,7 @@ export class Eyes {
       target.viewport.set(i * resolution, 0, resolution, resolution);
       target.scissor.set(i * resolution, 0, resolution, resolution);
       renderer.setRenderTarget(target);
-      renderer.render(stage.scene, camera);
+      renderer.render(stage.renderScene, camera);
     }
     target.scissorTest = false;
     const pixels = this.#pixels!;
