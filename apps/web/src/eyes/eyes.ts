@@ -10,7 +10,7 @@
 
 import * as THREE from "three";
 import type { EyeMap } from "@fly/brain";
-import { FACES, HEAD_AHEAD, HEAD_UP, FLY_LENGTH, createSampler, sample, standInEyes } from "@fly/body";
+import { Adaptation, FACES, HEAD_AHEAD, HEAD_UP, FLY_LENGTH, createSampler, sample, standInEyes } from "@fly/body";
 import type { Sampler } from "@fly/body";
 import type { Frame } from "../display.ts";
 import type { Life } from "../life.ts";
@@ -100,6 +100,9 @@ export class Eyes {
   #light: { left: Float32Array; right: Float32Array } | null = null;
   #hasLight = false;
   #since = 0;
+  /** Seconds since the last picture was sampled, for its light adaptation. */
+  #sinceSampled = 0;
+  readonly #adaptation = new Adaptation();
   #pending = false;
   #sky: THREE.Mesh;
   picture: { scene: THREE.Scene; camera: THREE.Camera; points: THREE.Points; backing: THREE.Mesh; light: THREE.BufferAttribute; map: EyeMap } | null = null;
@@ -185,6 +188,11 @@ export class Eyes {
     return (this.map.left.directions.length + this.map.right.directions.length) / 3;
   }
 
+  /** How far its light adaptation brightens the picture now (1 at midday). */
+  get gain() {
+    return this.#adaptation.gain;
+  }
+
   /** Whether the facets are the brain's own or the stand-in. */
   get standIn() {
     return !this.#life.brain.eyes;
@@ -219,6 +227,7 @@ export class Eyes {
     }
     const detail = DETAIL[this.detail === "high" ? "high" : "low"];
     this.#since += dt;
+    this.#sinceSampled += dt;
     const hz = urgent ? URGENT_HZ : detail.hz * this.rate;
     // One read in flight: a slow GPU must not accumulate pictures or sampling work.
     if (!this.#pending && (this.#since >= 1 / hz - 1e-3 || !this.#light)) {
@@ -299,6 +308,8 @@ export class Eyes {
       const light = this.#light!;
       sample(pixels, this.#samplers!.left, light.left);
       sample(pixels, this.#samplers!.right, light.right);
+      this.#adaptation.apply(light, this.#sinceSampled);
+      this.#sinceSampled = 0;
       this.#hasLight = true;
       this.updates++;
       if (this.picture) this.#fillPicture();

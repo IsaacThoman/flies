@@ -104,10 +104,15 @@ const fly = <T>(page: Page, js: string) => page.evaluate(`(() => { const g = glo
 /** How near `seer` draws player `id`'s fly to where its own tab (`own`) has it, mm: each is drawn a moment in the past, so the nearest of a few looks. */
 async function drawnApart(seer: Page, own: Page, id: number) {
   let apart = Infinity;
-  for (let i = 0; i < 6; i++) {
-    const [seen, at] = await Promise.all([readState(seer), fly<{ x: number; z: number }>(own, "({ x: g.life.body.position.x, z: g.life.body.position.z })")]);
+  // On its feet: a fly in flight (a second or two at a quarter of a metre a second, if something startled it) is drawn
+  // the network's delay behind, tens of millimetres. Six looks at it standing or walking, over at most 20 s.
+  for (let looked = 0, i = 0; looked < 6 && i < 80; i++) {
+    const [seen, at] = await Promise.all([readState(seer), fly<{ x: number; z: number; flying: boolean }>(own, "({ x: g.life.body.position.x, z: g.life.body.position.z, flying: !g.life.body.onFeet })")]);
     const o = othersOf(seen).find((o) => o.id === id)!;
-    apart = Math.min(apart, Math.hypot(o.x - at.x, o.z - at.z));
+    if (!at.flying) {
+      apart = Math.min(apart, Math.hypot(o.x - at.x, o.z - at.z));
+      looked++;
+    }
     await seer.waitForTimeout(250);
   }
   return apart;

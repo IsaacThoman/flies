@@ -30,6 +30,8 @@ void main() {
 const FS = /* glsl */ `
 uniform vec3 light;
 uniform float time;
+uniform float sky;
+uniform float glint;
 varying vec3 vNormal;
 varying vec3 vView;
 varying vec3 vLocal;
@@ -46,7 +48,7 @@ void main() {
   vec3 h2 = normalize(vec3(-light.x, -light.y * 0.3, light.z) + v);
   float spec2 = pow(max(dot(n, h2), 0.0), 50.0) * 0.4;
   float alpha = clamp(rim * 0.8 + 0.04 + spec + spec2, 0.0, 1.0);
-  gl_FragColor = vec4(c * (0.6 + rim * 0.6) + vec3(spec + spec2), alpha);
+  gl_FragColor = vec4(c * (0.6 + rim * 0.6) * sky + vec3(spec + spec2) * glint, alpha);
 }`;
 
 type Bubble = { x: number; y: number; z: number; r: number; phase: number; speed: number; age: number; popping: number; low: boolean; wait: number };
@@ -55,6 +57,9 @@ type Bubble = { x: number; y: number; z: number; r: number; phase: number; speed
 export const BUBBLES = 12;
 /** How many of them drift low, near the fly. */
 const LOW = 4;
+/** The sky's light (its luminance times the hemisphere light's intensity) and the sun's intensity at which bubbles are lit fully. */
+const SKY_FULL = 0.75;
+const GLINT_FULL = 1.2;
 /** How hard a bubble bursting on the fly touches it (the feather resting is 0.4). */
 export const BUBBLE_TOUCH = 0.3;
 
@@ -64,7 +69,7 @@ export class Bubbles {
   readonly looming: Looming[] = [];
   #bubbles: Bubble[] = [];
   #rnd = random(23);
-  #uniforms = { light: { value: new THREE.Vector3() }, time: { value: 0 } };
+  #uniforms = { light: { value: new THREE.Vector3() }, time: { value: 0 }, sky: { value: 1 }, glint: { value: 1 } };
   #order: number[] = [];
   #distance = new Float64Array(BUBBLES);
   #world: World;
@@ -166,6 +171,23 @@ export class Bubbles {
       table.bubbles.position(s, s.poppedAt, b);
       b.popping = t - s.poppedAt + 0.001;
     } else b.popping = 1;
+  }
+
+  /**
+   * Lights them by the day as it is now. A soap film has no light of its own:
+   * its colours are the sky's light reflected, its glints the sun's or the
+   * moon's. Drawn as bright at night as at midday, they were the brightest
+   * things in a dark scene, and the fly's eyes saw each one drift by as a
+   * flash that dimmed as it went, enough to set off its escape about once a
+   * minute or two with nothing thrown at it (none with the bubbles out of its
+   * sight). Full at midday's sky (luminance 0.75 and over, through the
+   * hemisphere light) and sun (1.2 and over), as they always were by day.
+   */
+  lightBy(daylight: { skyColor: THREE.Color; hemiIntensity: number; sunIntensity: number }) {
+    const c = daylight.skyColor;
+    const luminance = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+    this.#uniforms.sky.value = Math.min(1, (luminance * daylight.hemiIntensity) / SKY_FULL);
+    this.#uniforms.glint.value = Math.min(1, daylight.sunIntensity / GLINT_FULL);
   }
 
   /** Moves the bubbles on. `fly` is the fly's middle: a bubble that reaches it bursts on it. */

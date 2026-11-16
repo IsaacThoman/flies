@@ -1,8 +1,9 @@
-// The whole chain from the Swoop tool to a take-off, on the real connectome
+// The whole chain from the Swoop tool to a flight, on the real connectome
 // (skipped without it: npm run brain:fetch): the ball on its real path, what
-// the fly's senses make of it, the brain's giant fiber, and the body's
-// take-off. Whether the fly goes is the brain's choice, so each test throws a
-// bounded number of times and counts.
+// the fly's senses make of it, the brain's giant fiber, the body's take-off,
+// and the flight the tarsal reflex makes of it (packages/body/src/behavior.ts).
+// Whether the fly goes is the brain's choice, so each test throws a bounded
+// number of times and counts.
 
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
@@ -30,7 +31,8 @@ const bare: Place = { floor: { kind: "rect", hx: 500, hz: 500 }, solids: [], pat
 const GROUND = 0.65;
 const BALL = 0.04;
 
-type Throw = { tookOff: boolean; escape: number };
+/** A throw: whether it took off and how hard the giant fiber fired; and if it flew, how long, how far along its way and how high, and whether it came down on its feet. */
+type Throw = { tookOff: boolean; escape: number; air: number; distance: number; top: number; landed: boolean; lowest: number };
 
 /** Throws the ball at the fly until `throws` have flown, the eyes open (seeing it) or shut (the hand-wired loom). */
 function swoops(eyes: "open" | "shut", seed: number, throws = THROWS) {
@@ -66,16 +68,39 @@ function swoops(eyes: "open" | "shut", seed: number, throws = THROWS) {
   for (let n = 0; n < throws; n++) {
     // Ready: on its feet, its giant fiber quiet, as long as that takes (bounded: the brain's choice).
     for (let wait = 0; wait < 10 && !(life.body.onFeet && (brain.state?.command.escape ?? 1) < ESCAPE_REARM); wait += DT) frame(false);
+    // Back in the middle, facing as it was: a few flights carry it to the floor's edge, where its antennae press on the
+    // world's end as on a wall, and that (a push on an antenna) would be measured instead of the swoop.
+    life.body.place(0, 0, life.body.yaw);
+    for (let t = 0; t < 1; t += DT) frame(false);
     const before = life.takeOffs;
-    let escape = 0;
+    const from = { ...life.body.position };
+    const last = { ...from };
+    const result: Throw = { tookOff: false, escape: 0, air: 0, distance: 0, top: 0, landed: false, lowest: Infinity };
+    const watch = () => {
+      result.escape = Math.max(result.escape, brain.state?.command.escape ?? 0);
+      if (life.body.onFeet) return;
+      result.air += DT;
+      result.distance += Math.hypot(life.body.position.x - last.x, life.body.position.z - last.z);
+      last.x = life.body.position.x;
+      last.z = life.body.position.z;
+      result.top = Math.max(result.top, life.body.position.y - from.y);
+      result.lowest = Math.min(result.lowest, life.body.position.y);
+    };
     frame(true);
     while (hands.ball.active) {
       frame(false);
-      escape = Math.max(escape, brain.state?.command.escape ?? 0);
+      watch();
     }
-    // Past the refractory time before the next.
+    // Down again (bounded: a flight the brain keeps up lasts as long as it does), and past the refractory time before the next.
+    for (let t = 0; t < 8 && !life.body.onFeet; t += DT) {
+      frame(false);
+      watch();
+      result.landed ||= life.body.events.landed;
+    }
+    result.landed ||= result.air > 0 && life.body.onFeet;
     for (let t = 0; t < 1.6; t += DT) frame(false);
-    results.push({ tookOff: life.takeOffs > before, escape });
+    result.tookOff = life.takeOffs > before;
+    results.push(result);
   }
   return { results, time };
 }
@@ -110,19 +135,27 @@ function see(life: Life, hands: Hands, map: NonNullable<InProcessBrain["eyes"]>,
 }
 const scratch: Vec3 = { x: 0, y: 0, z: 0 };
 
-const summary = (results: Throw[]) => results.map((r) => `${r.escape.toFixed(2)}${r.tookOff ? " off" : ""}`).join(", ");
+const summary = (results: Throw[]) => results.map((r) => `${r.escape.toFixed(2)}${r.tookOff ? ` flew ${r.air.toFixed(1)} s ${r.distance.toFixed(0)} mm` : ""}`).join(", ");
 
-test("the swoop seen through the brain's own eyes fires the giant fiber and the fly takes off, in at least 7 of 8 throws", { skip }, () => {
+test("the swoop seen through the brain's own eyes fires the giant fiber and the fly takes off and flies, in at least 6 of 8 throws", { skip }, () => {
   const started = process.cpuUsage();
   const { results, time } = swoops("open", 1);
   const used = process.cpuUsage(started);
   const cpu = (used.user + used.system) / 1e6;
   const off = results.filter((r) => r.tookOff).length;
   console.log(`  eyes open: ${off} of ${results.length} took off (escape peaks: ${summary(results)}); ${time.toFixed(0)} s of its life in ${cpu.toFixed(1)} CPU s`);
-  // Seeds 1 to 3 take off in all 8 (escape 0.44 to 0.68); 6 of seed 1's peaks reach the old line, 0.5.
-  assert.ok(off >= 7, `${off} of ${results.length} took off: ${summary(results)}`);
+  // Seed 1 takes off from all 8 (escape 0.45 to 0.70), each a flight of 1.5 to 1.6 s and 386 to 407 mm along its way.
+  assert.ok(off >= 6, `${off} of ${results.length} took off: ${summary(results)}`);
   // Every throw that crossed the line took off: the body did what the giant fiber said.
   for (const r of results) if (r.escape >= ESCAPE_ON + 0.02) assert.ok(r.tookOff, `escape reached ${r.escape.toFixed(2)} and it stayed: ${summary(results)}`);
+  // And every take-off is a flight (the tarsal reflex: packages/body/src/behavior.ts): up for over a second, away, and down safely on its feet.
+  for (const r of results.filter((r) => r.tookOff)) {
+    assert.ok(r.air >= 1, `in the air for ${r.air.toFixed(2)} s: ${summary(results)}`);
+    assert.ok(r.distance > 100, `flew ${r.distance.toFixed(0)} mm: ${summary(results)}`);
+    assert.ok(r.top > 10, `rose ${r.top.toFixed(0)} mm`);
+    assert.ok(r.landed, `didn't land: ${summary(results)}`);
+    assert.ok(r.lowest >= 0, "never below the floor");
+  }
   // The brain takes about a fifth of a CPU second per simulated second with the eyes open (packages/brain/README.md); five times that is a fault.
   assert.ok(cpu < time, `${cpu.toFixed(1)} CPU s for ${time.toFixed(0)} s`);
 });

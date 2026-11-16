@@ -888,6 +888,7 @@ export class Game implements Shell {
     this.#air.set(this.hands.air.x + this.#felt.air.x, this.hands.air.y + this.#felt.air.y, this.hands.air.z + this.#felt.air.z);
     this.bubbles.rain = stage.weather.rain;
     const middle = this.#middle.set(life.body.position.x, life.body.position.y + 0.75, life.body.position.z);
+    this.bubbles.lightBy(stage.light);
     this.bubbles.update(this.time, dt, director.camera, stage.light.sunDirection, this.#air, middle);
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
     this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
@@ -1666,6 +1667,7 @@ export class Game implements Shell {
     d.frameMs = this.frameMsAverage.toFixed(2);
     d.eyesMs = this.eyes.costMs.toFixed(2);
     d.eyesUpdates = String(this.eyes.updates);
+    d.eyesGain = this.eyes.gain.toFixed(2);
     d.spikesPerSecond = String(Math.round(this.meter.spikesPerSecond));
     d.time = this.stage.light.time;
     d.hours = this.stage.light.hours === null ? "" : this.stage.light.hours.toFixed(2);
