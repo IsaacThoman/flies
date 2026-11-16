@@ -20,6 +20,7 @@ declare global { var __fly: Game; }
 const PHASES = ["places", "climate", "tools", "menus", "eyes", "wallpaper"] as const;
 type Phase = typeof PHASES[number];
 type Sample = { seconds: number; phase: string; place: string; checkpoint: boolean; [metric: string]: number | string | boolean };
+const STATE = ["screen", "weather", "time", "view", "eyes", "eyesInset", "variant"];
 const METRICS = ["geometries", "textures", "programs", "calls", "triangles", "heap", "backing", "workerHeap", "workerBacking", "nodes", "listeners", "audioNodes", "frameMs", "brainSpeed", "storage"];
 
 /** Disjoint early/late quarters avoid calling a warmup spike a sustained slope. */
@@ -110,13 +111,13 @@ export async function run(args = process.argv.slice(2)) {
   const quick = args.includes("--quick");
   const minutes = Number(flag("--minutes", quick ? "0.25" : "30"));
   const wallpaperMinutes = Number(flag("--wallpaper-minutes", "60"));
-  const cycles = Number(flag("--cycles", quick ? "3" : "200"));
+  const cycles = Number(flag("--cycles", quick ? "4" : "200"));
   const interval = Number(flag("--interval", quick ? "5" : "10")) * 1000;
-  const phases = flag("--phases", quick ? "places,tools,menus,eyes" : PHASES.join(",")).split(",") as Phase[];
+  const phases = flag("--phases", quick ? "places" : PHASES.join(",")).split(",") as Phase[];
   assert.ok(phases.length && phases.every((p) => PHASES.includes(p)), `--phases: ${PHASES.join(",")}`);
   assert.ok([minutes, wallpaperMinutes, cycles, interval].every((n) => Number.isFinite(n) && n > 0), "durations, cycles and interval must be positive");
   const csv = path.resolve(flag("--csv", path.join(os.tmpdir(), `web-soak-${Date.now()}.csv`)));
-  writeFileSync(csv, ["seconds", "phase", "place", "checkpoint", ...METRICS].join(",") + "\n");
+  writeFileSync(csv, ["seconds", "phase", "place", "checkpoint", ...STATE, ...METRICS].join(",") + "\n");
   let server: ChildProcess | undefined;
   let url = flag("--url", "");
   if (!url) ({ url, server } = await startServer());
@@ -153,10 +154,11 @@ export async function run(args = process.argv.slice(2)) {
       assert.equal(state.brain, "running", `${name}: brain stopped`);
       const storage = await page.evaluate(() => Object.entries(localStorage).reduce((n, [k, v]) => n + k.length + v.length, 0));
       const row: Sample = { seconds: (Date.now() - started) / 1000, phase: `${name}:${current}`, place: state.place, checkpoint,
+        ...Object.fromEntries(STATE.map((k) => [k, state[k]])),
         ...Object.fromEntries(["geometries", "textures", "programs", "calls", "triangles", "frameMs", "brainSpeed"].map((k) => [k, Number(state[k])])),
         heap: metrics.JSHeapUsedSize, backing: heap.backingStorageSize ?? NaN, ...wm, nodes: dom.nodes, listeners: dom.jsEventListeners, audioNodes: audioNodes.size, storage };
       samples.push(row);
-      appendFileSync(csv, [row.seconds, row.phase, row.place, row.checkpoint, ...METRICS.map((m) => Number.isFinite(row[m]) ? row[m] : "")].join(",") + "\n");
+      appendFileSync(csv, [row.seconds, row.phase, row.place, row.checkpoint, ...STATE.map((k) => row[k]), ...METRICS.map((m) => Number.isFinite(row[m]) ? row[m] : "")].join(",") + "\n");
     };
     let inSample: Promise<void> = Promise.resolve();
     let sampling = false;
@@ -295,10 +297,10 @@ export async function run(args = process.argv.slice(2)) {
     assert.deepEqual(errors, [], "browser errors");
     if (quick) {
       for (const place of PLACES) for (const metric of ["geometries", "textures", "programs"]) {
-        const rows = samples.filter((s) => s.checkpoint && s.place === place.id);
+        const rows = samples.filter((s) => s.checkpoint && s.phase === "interaction:places" && s.place === place.id);
         const baseline = Number(rows[0]?.[metric]);
         assert.ok(rows.length >= 3, `${place.id}: need three matched checkpoints`);
-        for (const row of rows) assert.ok(Number(row[metric]) <= baseline + (metric === "programs" ? 2 : 0), `${place.id}: ${metric} ${baseline} → ${row[metric]}`);
+        for (const row of rows) assert.ok(Number(row[metric]) <= baseline + (metric === "programs" ? 2 : metric === "geometries" ? 1 : 0), `${place.id}: ${metric} ${baseline} → ${row[metric]}`);
       }
     }
   } finally {
@@ -307,7 +309,7 @@ export async function run(args = process.argv.slice(2)) {
     for (const s of samples) {
       // Climate/tool/menu counts are intentionally variable. Only matched checkpoints or steady wallpaper have meaningful slopes.
       if (!s.checkpoint && !s.phase.endsWith(":wallpaper")) continue;
-      const key = `${s.checkpoint ? "checkpoints" : s.phase}/${s.place}`;
+      const key = `${s.phase}/${s.place}`;
       const rows = groups.get(key) ?? []; rows.push(s); groups.set(key, rows);
     }
     for (const [key, rows] of groups) for (const metric of METRICS) {

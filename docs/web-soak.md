@@ -1,0 +1,74 @@
+# Browser soak
+
+Run `npm install` and `npm run brain:fetch` first. The harness uses Playwright's
+headless Chromium with the GPU enabled, a real brain worker in every page, and
+sound started by a remote press. There is no simulated or accelerated time.
+
+```
+npm run e2e:soak
+npm run soak:web -- --cycles 200 --minutes 5 --wallpaper-minutes 100 --csv /tmp/web-soak.csv
+npm run soak:web -- --phases climate,eyes --minutes 10 --interval 10
+```
+
+`e2e:soak` is the separate, roughly two-minute CI check beside `npm run e2e`:
+four circuits (16 place visits), with assertions that textures return exactly
+to each place's warmed baseline. Geometry may vary by one and programs by two:
+the fireflies' first appearance uploads a persistent mesh and its program.
+The default full run uses 200 circuits, 30 minutes per interaction phase, and
+60 minutes of wallpaper **in each place**. Options:
+
+| Option | Meaning |
+| --- | --- |
+| `--phases places,climate,tools,menus,eyes,wallpaper` | Select phases; default all, or only places with `--quick`. |
+| `--cycles 200` | Full four-place circuits in the places phase. |
+| `--minutes 30` | Minimum real minutes per other interaction phase. Climate finishes a complete matrix even if this takes longer. |
+| `--wallpaper-minutes 60` | Real minutes per place, in four parallel isolated contexts. |
+| `--interval 10` | Sample interval in seconds. Overruns skip a tick; GCs never queue indefinitely. |
+| `--csv /tmp/soak.csv` | Incremental samples; default a unique file in the OS temporary directory. |
+| `--url http://localhost:5173/` | Use an existing server; otherwise start and stop Vite. |
+| `--quick` | Four circuits and strict resource assertions. Keep the places phase when selecting phases. |
+
+Interaction runs in a fifth context alongside wallpaper. Each wallpaper page
+is pinned to its place and follows the real clock and forecast. The interaction
+page waits for `data-moving` to clear between places; climate visits every
+weather and all five daylight presets plus the clock, holding each combination
+for 12 seconds. Tools use every variant and hold continuous tools; menus visit
+title, pause, brain, about, settings and all settings pages; eyes alternate
+Off/Low/High, all inset modes, and the full picture. Input and lifecycle behavior
+remain covered by the ordinary e2e test and the web-release work.
+
+The harness warms persistent tool meshes, icon textures, eye pictures, pixel
+modes and ambience buffers before sampling. Checkpoints after place changes
+compare a fresh place with the same settings and view. Other phases end with
+those same checkpoints; their in-flight counts are deliberately variable.
+Only checkpoints within the same phase/place, and continuous wallpaper, get
+trend verdicts. At least four samples are required. Disjoint early/late
+quarters are averaged and their difference divided by elapsed hours. A small
+noise band (2% or 256 KiB for heaps, 10% for frame cost/brain speed) labels a
+series flat; raw values and hourly rates remain visible. This is evidence for
+the duration tested, not proof of an infinite bound. A growing count needs
+investigation; changing camera draw counts or lazy uploads alone are not leaks.
+
+Each fixed-interval sample forces `HeapProfiler.collectGarbage` in the page and
+brain worker, then records page `Performance.getMetrics` heap bytes, worker
+`Runtime.getHeapUsage`, ArrayBuffer backing storage in both isolates,
+`Memory.getDOMCounters` nodes/listeners, CDP WebAudio live nodes, localStorage
+characters, and the canvas's renderer geometries/textures/programs, calls,
+triangles, CPU frame milliseconds and brain speed (simulated/real time).
+The CSV includes screen/weather/time/view/eyes/inset/variant for context.
+
+The browser cannot report per-page GPU allocation bytes or the TV's resident
+memory, thermal behavior, native audio graph cost, native automation timeline,
+or actual scanout pacing. Three's resource counts are not GPU bytes; JS heaps
+exclude most native allocations. Chromium automatically collects some finished
+audio graphs that the TV's shim retains. The audio lifetime and automation
+regressions therefore exercise the actual TV shim with a recording native
+bridge as well as the browser soak. Forced GC and concurrent pages perturb
+frame timings, so use a single wallpaper phase or the real device for precise
+performance comparisons.
+
+Run `npm run tvos:soak -- --device <udid> --minutes 60` on the Apple TV for that
+last evidence. It now visits every place, weather and daylight preset, pins each
+place against rotation, and divides its requested wallpaper minutes among all
+four places, half midday and half night. Interaction time is additional. Keep
+raw CSVs, logs and charts out of git; retain a compact results table in the PR.
