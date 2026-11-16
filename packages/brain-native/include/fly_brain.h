@@ -33,6 +33,11 @@ typedef struct fly_senses {
   float hunger;
   /** How hard its own wings beat, 0 (folded) to 1 (full flight power), as their strain sensors feel it. */
   float wingbeat;
+  /**
+   * Internal state, 0 to 1 each (types.ts's BrainSenses says what each is); 0, as a
+   * struct initialised without them leaves them, is a rested fly with no clock.
+   */
+  float clock_morning, clock_evening, clock_sleep, sleep_pressure, sleep_depth;
 } fly_senses;
 
 /** What the brain wants done. All 0 to 1 except turn, which runs -1 (hard left) to 1 (hard right). */

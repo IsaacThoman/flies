@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { test } from "node:test";
 import { REGIONS } from "@fly/brain";
-import type { BrainCommand, BrainState } from "@fly/brain";
+import type { BrainCommand, BrainSenses, BrainState } from "@fly/brain";
 import type { BrainDriver } from "@fly/contracts";
+import { RHYTHM, Rhythm, SUMMER } from "@fly/body";
 import { World } from "@fly/world";
 import { Life } from "../src/life.ts";
 import { DEFAULT_CONNECTOME_PATH } from "../../../packages/brain/src/node.ts";
@@ -91,4 +92,26 @@ test("what it eats feeds its hunger, which goes to the brain, and fills its crop
   assert.ok(life.hunger.level < before - 0.1, `${life.hunger.level} after eating, ${before} before`);
   assert.ok(life.hunger.fullness > 0.1);
   assert.ok(life.sensed.hunger! < before - 0.1, "and the brain is sent the lower hunger");
+});
+
+test("with a rhythm it tells the brain the clock and its sleep, and is asleep after five minutes still", () => {
+  const brain = new Commands();
+  const life = new Life(new World(places.picnic), brain);
+  life.step(1 / 30, performance.now());
+  assert.equal(life.sensed.clockSleep, undefined, "no rhythm, no internal state: the brain as it was");
+  life.rhythm = new Rhythm(1, SUMMER, 0.4);
+  for (let t = 0; t < RHYTHM.still - 1; t += 0.5) life.step(0.5, performance.now());
+  assert.equal(life.activity, "resting");
+  const last: BrainSenses = life.sensed;
+  assert.equal(last.clockSleep, 1);
+  assert.ok(Math.abs(last.sleepPressure! - 0.4) < 0.01, "awake so far, building slowly");
+  assert.ok(last.sleepDepth! > 0.5);
+  for (let t = 0; t < 2; t += 0.5) life.step(0.5, performance.now());
+  assert.equal(life.activity, "sleeping");
+  // The brain's walking ends it: the body only watches.
+  brain.state.command.walk = 1;
+  for (let k = 0; k < 10; k++) life.step(1 / 30, performance.now());
+  assert.equal(life.activity, "walking");
+  assert.equal(life.rhythm.depth, 0);
+  assert.equal(life.rhythm.bouts, 1);
 });

@@ -19,6 +19,9 @@ namespace fly::io {
 /** The senses that are one intensity each (types.ts's BrainSenses less light). */
 enum Sense : uint8_t { kLoomLeft, kLoomRight, kTouch, kBumpLeft, kBumpRight, kWind, kSweet, kGrounded, kMaleTaste, kWingbeat, kSenseCount };
 
+/** The internal state that comes with the senses (types.ts's STATE_KEYS), 0 to 1 each. */
+enum StateKey : uint8_t { kClockMorning, kClockEvening, kClockSleep, kSleepPressure, kSleepDepth, kStateCount };
+
 struct Senses {
   double loom_left = 0, loom_right = 0, touch = 0, bump_left = 0, bump_right = 0, wind = 0, sweet = 0;
   bool grounded = false;
@@ -26,6 +29,8 @@ struct Senses {
   /** Internal state, not a sense (types.ts's BrainSenses.hunger): 0 just fed to 1 starved; anything not a number counts as 1. */
   double hunger = 1;
   double wingbeat = 0;
+  /** In StateKey's order; 0, left out. */
+  double state[kStateCount] = {};
 };
 
 struct Command {
@@ -54,6 +59,23 @@ struct InputSpec {
   std::vector<uint32_t> root_ids = {};
   /** Added to the simulation after the eyes (io.ts's InputSpec.afterEyes). */
   bool after_eyes = false;
+  /** Mechanosensory: reaches the brain at less than its strength while the fly sleeps (kSleepGate). */
+  bool gated = false;
+};
+
+/** io.ts's SLEEP_GATE: how much of a mechanosensory sense's strength is lost at full sleep depth. */
+constexpr double kSleepGate = 0.4;
+
+/** io.ts's SLEEP_EYES: how much of the eyes' input is lost at full sleepiness. */
+constexpr double kSleepEyes = 0.3;
+
+/** An input that stands for internal state the connectome can't supply (io.ts's StateSpec). */
+struct StateSpec {
+  std::string name;
+  std::string description;
+  NeuronQuery select;
+  double max_rate;
+  StateKey state;
 };
 
 struct ReadoutSpec {
@@ -68,6 +90,7 @@ struct ReadoutSpec {
 /** io.ts's SENSES, BACKGROUND and READOUTS, in their order. */
 std::vector<InputSpec> senses();
 std::vector<InputSpec> background();
+std::vector<StateSpec> state_inputs();
 std::vector<ReadoutSpec> readouts();
 
 /** decode() reads the readouts by these positions in readouts(). */
@@ -79,6 +102,11 @@ struct Group {
   double max_rate;
 };
 
+struct StateGroup {
+  StateSpec spec;
+  std::vector<uint32_t> neurons;
+};
+
 struct ReadoutGroup {
   ReadoutSpec spec;
   std::vector<uint32_t> neurons;
@@ -87,6 +115,8 @@ struct ReadoutGroup {
 struct Wiring {
   std::vector<Group> senses;
   std::vector<Group> background;
+  /** The internal-state inputs this connectome has neurons for. */
+  std::vector<StateGroup> state;
   std::vector<ReadoutGroup> readouts;
 };
 
@@ -101,6 +131,12 @@ double hunger_of(const Senses& senses);
 
 /** The sweet taste neurons' output gain at this hunger (io.ts's sweetOutputGain and HUNGER, which say why). */
 double sweet_output_gain(double hunger);
+
+/** An internal state's value, 0..1. */
+double state_of(const Senses& senses, StateKey key);
+
+/** What a mechanosensory sense keeps of its strength at this sleep depth. */
+double sleep_gate(const Senses& senses);
 
 /** Commands from the smoothed readout rates, Hz. */
 Command decode(const std::vector<double>& rates);

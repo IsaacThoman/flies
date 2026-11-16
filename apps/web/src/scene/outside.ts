@@ -206,6 +206,18 @@ export class Outside {
     return this.#wantSun;
   }
 
+  /**
+   * Today's real sunrise and sunset (hours, local time) where the host has
+   * told them and the sun both rises and sets; null otherwise. For the fly's
+   * own clock, which keeps to the real day whatever light is chosen.
+   */
+  get sunTimes(): { sunrise: number; sunset: number } | null {
+    const sun = this.#enabled ? this.#sun : null;
+    if (!sun || sun.sunrise === null || sun.sunset === null) return null;
+    const length = wrap24(sun.sunset - sun.sunrise);
+    return length < SHORTEST || length > 24 - SHORTEST ? null : { sunrise: sun.sunrise, sunset: sun.sunset };
+  }
+
   /** How old the latest observation is (s) at `now` (ms since the epoch), or null with none. */
   age(now: number): number | null {
     return this.#conditions ? Math.max(0, now - this.#conditions.observedAt) / 1000 : null;

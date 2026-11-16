@@ -5,12 +5,12 @@
 import type { BrainSenses } from "@fly/brain";
 import type { BrainDriver } from "@fly/contracts";
 import { Behavior, Crowd, FlyBody, Hunger, SenseTracker } from "@fly/body";
-import type { Forces, Intent, Looming } from "@fly/body";
+import type { Forces, Intent, Looming, Rhythm } from "@fly/body";
 import { Pantry } from "@fly/world";
 import type { Food, Place, Vec3, World } from "@fly/world";
 
 /** What the fly is doing, in a word, for the screen and for tests. */
-export type Activity = "resting" | "walking" | "backing" | "turning" | "grooming" | "feeding" | "tasting" | "singing" | "flying" | "falling" | "waiting";
+export type Activity = "resting" | "sleeping" | "walking" | "backing" | "turning" | "grooming" | "feeding" | "tasting" | "singing" | "flying" | "falling" | "waiting";
 
 export type Stimuli = {
   looming: Looming[];
@@ -35,6 +35,12 @@ export class Life {
   /** Other flies at a table with others (none alone): bodies it can't walk through, which its antennae and its body feel. */
   readonly crowd: Crowd;
   readonly stimuli: Stimuli = { looming: [], stroke: 0, air: { x: 0, y: 0, z: 0 }, threat: null };
+  /**
+   * Its daily clock and need for sleep, told to the brain with the senses, or
+   * null for a fly with neither (the brain as it was before them; tests, unless
+   * they give it one). The game gives it one set to the real time of day.
+   */
+  rhythm: Rhythm | null = null;
   /** The eyes' picture for this frame, when the brain has eyes and they're open. Set by the eyes before `step`. */
   light: { left: Float32Array; right: Float32Array } | null = null;
   /** The wing it sings with: 1 its left, -1 its right, toward the nearest other fly where there is one. */
@@ -127,6 +133,20 @@ export class Life {
     sent.wingbeat = felt.wingbeat;
     if (this.light) sent.light = this.light;
     else delete sent.light;
+    const rhythm = this.rhythm;
+    if (rhythm) {
+      sent.clockMorning = rhythm.clock.morning;
+      sent.clockEvening = rhythm.clock.evening;
+      sent.clockSleep = rhythm.clock.sleep;
+      sent.sleepPressure = rhythm.pressure;
+      sent.sleepDepth = rhythm.depth;
+    } else {
+      delete sent.clockMorning;
+      delete sent.clockEvening;
+      delete sent.clockSleep;
+      delete sent.sleepPressure;
+      delete sent.sleepDepth;
+    }
     brain.tick(dt * 1000, sent);
 
     const intent = this.behavior.update(brain.state?.command ?? null, now - brain.stateAt, body.onFeet, dt);
@@ -160,6 +180,11 @@ export class Life {
     this.#proboscis += ((intent.feeding ? 1 : 0) - this.#proboscis) * Math.min(1, dt * 6);
     this.pantry.update(dt);
     this.activity = this.#describe(intent, felt.sweet);
+    // Still is resting, or standing on food without eating it; anything else is moving. What it does is the brain's: this only watches.
+    if (rhythm) {
+      rhythm.step(dt, this.activity !== "resting" && this.activity !== "tasting");
+      if (rhythm.asleep && this.activity === "resting") this.activity = "sleeping";
+    }
     if (this.activity === "flying") this.flown += dt;
     else if (this.activity === "grooming") this.groomed += dt;
   }
