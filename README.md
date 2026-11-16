@@ -214,29 +214,35 @@ fly's world.
 | Left / Right | Picks a tool from the shelf. |
 | Up / Down | Picks the tool's kind: which food, how hard to blow, the time of day, the weather, the camera. |
 | Select | Uses the tool: drops food, throws the ball. Hold it to tickle or blow. On Light, Weather and View it steps round the choices. |
-| Play/Pause, or Back | The pause menu. Play/Pause or Back again carries on. |
-| Back on the title | Leaves the app. |
+| Play/Pause, or Back | The menu. Play/Pause, or Play on it, carries on. |
+| Back on the menu | Leaves the app. |
 
 Pointing, the screen itself is what you press, and there are no button hints:
 
 | | With a finger | With a mouse or trackpad |
 | --- | --- | --- |
 | Your hand | Where you touch the table. Touching the fly is touching the fly, not the table behind it. | Under the cursor, on whatever it is over (the cursor is hidden there: the ring is the cursor). |
-| Feed, Swoop | Tap where you mean (drag to aim, lift to drop). | Click there. |
+| Feed, Swoop | Tap where you mean. | Click there. |
 | Tickle, Blow | Touch and hold, and drag: the feather strokes the fly while you hold it on it, and rests on it lightly while the hand is there; the puff follows the finger. | Hold the button, and drag. Hovering over the fly rests the feather on it. |
 | Light, Weather, View, Place | The arrows either side of the tool's label (or a tap on the label, or a swipe along it) step its kind; tapping the tool again does too. Place has a Go button for somewhere the fly isn't. | The same, or the wheel over the label. |
-| The camera | Pinch to bring it in or take it out: it follows the fingers and settles into the nearest view (close up, follow, wide, the whole table). Drag across the air off the table, or with two fingers, to look round the fly; let go, and it eases back to where the cameraman had it. | The wheel steps between the views; a trackpad's pinch follows the fingers and settles. Drag across the air, or with the right button anywhere, to look round. A trackpad's sideways scroll looks round too. |
+| Closer and farther | Pinch. | The wheel, a trackpad's scroll up and down, or its pinch. |
+| Round the fly | Drag anywhere but with the feather or the air in hand on the table (they go where the finger goes); or drag with two fingers. | Drag (the same), or drag with the right or middle button anywhere. A trackpad's sideways scroll. |
+| The camera back | Double-tap the air. | Double-click the air. |
 | Tools | Tap one on the shelf. | Click one; the wheel over the shelf steps along it. |
-| Menus | Tap a row; a choice's arrows step it, a slider follows the finger, a long list scrolls when dragged. The round button at the top left of a pane, or a tap outside it, goes back. | The same; rows light up under the cursor, and the wheel scrolls. |
-| The pause menu | The round button at the top left. | The same. |
+| Menus | Tap a row, a tab, a choice's arrows; a slider follows the finger. The round button at the top left, or a tap outside the pane, goes back. | The same, and a right click goes back. Hovering only brightens what is under the cursor: the focus ring is the remote's and the keys'. |
+| The menu | The round button at the top left. | The same. |
 
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
 Back, space for Play/Pause), its hints drawn as keys; the number keys pick a
-tool and + and − bring the camera in and take it out. A standard game pad
-(the Gamepad API) is the remote too: A is Select, B Back, Start Play/Pause,
-the d-pad and the shoulder buttons the arrows, the left stick moves your hand
-(and steps through a menu), the right stick looks round, the triggers bring
-the camera in and take it out; its hints are drawn as its buttons. A pad that can
+tool, + and − held bring the camera in and take it out, Q and E held turn it
+round the fly, and R (or Home) gives it back to the cameraman. After a mouse
+or a finger the menus show no focus; the first arrow shows it, on what was
+last pressed. A standard game pad (the Gamepad API) is the remote too: A is
+Select, B Back, Start Play/Pause, the d-pad and the shoulder buttons the
+arrows, the left stick moves your hand (and steps through a menu), the right
+stick turns the camera round (pressed in, gives it back), the triggers bring
+it in and take it out as far as they are pressed; its hints are drawn as its
+buttons. A pad that can
 rumble (`apps/web/src/haptics.ts`) is felt in the hand: a tick when food is
 dropped and a softer one when it lands, a swell as the ball dives, two quick
 knocks when a press can't do anything, light pulses while the feather is on
@@ -284,8 +290,18 @@ pace a little ahead, and in a jump it pulls back, widens and whips round
 after the fly. It is never inside anything, nor closer to the fly than most of
 the shot's distance. With the ball in hand it goes round to the side across the
 fly from where the ball will come, so the dive is seen past the fly. Behind the
-loading screen and the title it keeps the fly small and to the left, clear of
-the menus.
+loading screen and the menu it keeps the fly small and to the left, clear of
+them.
+
+You can take the camera from the cameraman. Closer and farther is one smooth
+range, from the facets of the fly's eyes out to the whole table (where it
+turns from the fly to the table's middle); the named views are points on it,
+and the View tool names the one it is nearest. It stays wherever you leave it.
+Turned round the fly, it stays where you put it for five seconds after you let
+go; then the cameraman carries on from there, moving only when it would have
+anyway. Handed back (R, a double click or tap in the air, the pad's right
+stick pressed in), the cameraman takes it at once, at the named view nearest your zoom.
+The wallpaper takes it too, and gives your zoom back after.
 
 After a minute with no press (Settings → Wallpaper: 30 s to 5 min, or never)
 the hints, the shelf and the pointer fade, and the camera settles beside the
@@ -303,11 +319,13 @@ moves on to a new shot, and at least once a minute, they fade out and come
 back together in the next corner, so neither is left in one place long
 enough to mark an OLED screen.
 
-The title also offers **Just watch** (the wallpaper straight away), **Inside
-its brain** (live: every sense going in, every command coming out with the
-neurons it is read from and their firing rates, spikes a second, active
-neurons), **About the fly**, and **Settings**, a page for each part of the
-game, every setting a step from the top: **Wallpaper** (when it starts, how
+There is one menu: the title at launch, and the same menu from play (Back,
+Play/Pause, or the button at the top left), with the fly living on behind it.
+It has **Play**, **Watch** (the wallpaper straight away), **Brain** (live:
+every sense going in, every command coming out with the neurons it is read
+from and their firing rates, spikes a second, active neurons), **About**, and
+**Settings**: a row of tabs over each part of the game, every setting two
+steps from the menu and none scrolling: **Wallpaper** (when it starts, how
 its camera films, where the fly lives, what it sees and its nervous system
 in a corner, the X-ray, and, on an Apple TV that can tell, the real weather), **Sound** (effects, surroundings)
 and **Picture** (pixel size, the eyes' detail, button hints, frame stats).
@@ -707,11 +725,12 @@ points at in the world, and the camera's framing at every aspect, held and let
 go.
 
 `npm run e2e` plays the game with the real brain: the title
-appears once the brain wakes, the menus are walked with the keys, honey is
-tasted and eaten, the ball is thrown until the fly takes off, Play/Pause
-pauses and resumes, the wallpaper comes and goes with what it sees in a
+appears once the brain wakes, the menus and the settings' tabs are walked with
+the keys (the first arrow only showing the focus), honey is tasted and eaten,
+the ball is thrown until the fly takes off, Play/Pause and Back open the menu
+and carry on, the wallpaper comes and goes with what it sees in a
 corner, with its nervous system under it (and, set to always, they stay while
-playing but not over View → Fly's eyes or the pause menu), the X-ray comes in
+playing but not over View → Fly's eyes or the menu), the X-ray comes in
 the follow shot, goes in the wide one and comes with View → Inside it, the fly is carried to every place, the weather
 outside, fed as the Apple TV would give it, is what "Now" shows until it is
 too old, Back reaches the root, a reload finds the settings, the view, the
@@ -719,9 +738,11 @@ light and the weather as they were left, the shelf on Feed and the hints for
 what was used gone, and the frame stays within its draw budget. Then
 `apps/web/e2e/pointer.e2e.ts` plays it with fingers on a phone with a notch
 (the menus and the shelf tapped, honey dropped and eaten, the feather and the
-puff held on the fly, a pinch, a look round, the phone turned on its side,
-the wallpaper woken by a tap that does nothing else) and with a mouse and keys
-on a desktop. Then it builds the site and serves it from a folder of a static
+puff held on the fly, a pinch, a look round that stays a while, the phone
+turned on its side, the wallpaper woken by a tap that does nothing else) and
+with a mouse and keys on a desktop (hovering moves no focus, the wheel zooms
+smoothly and stays, drags with each button turn the camera without dropping
+food, R and a double click give it back, a trackpad's pinch and + zoom too). Then it builds the site and serves it from a folder of a static
 server (`apps/web/e2e/web.e2e.ts`): a first visit on a slow connection that
 breaks off partway counts the brain's bytes and carries on from the break, a
 second loads with the network off, a hidden tab sleeps and wakes without a

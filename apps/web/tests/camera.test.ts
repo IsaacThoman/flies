@@ -5,7 +5,7 @@ import { FLY_LENGTH } from "@fly/body";
 import type { FlyBody } from "@fly/body";
 import { createPicnic } from "@fly/world";
 import { picnic } from "../src/places/picnic/index.ts";
-import { CameraDirector, NARROW_KEEP, SHOTS, fieldOfView } from "../src/camera.ts";
+import { CameraDirector, HAND_HOLD, NARROW_KEEP, NEAREST, SHOTS, fieldOfView } from "../src/camera.ts";
 import type { View } from "../src/camera.ts";
 
 const RENDER_WIDTH = 640;
@@ -254,57 +254,126 @@ test("the title's room for the fly comes from its layout: on a tall screen, betw
   assert.ok(Math.abs(at.x) < 0.1 && Math.abs(at.y - 0.35) < 0.12, `${at.x.toFixed(2)}, ${at.y.toFixed(2)}`);
 });
 
-test("turned by hand the camera goes round the fly and, let go, eases back to where the cameraman had it", () => {
+const middleOf = (body: FlyBody) => ({ x: body.position.x, y: body.position.y + 0.75, z: body.position.z });
+
+/** Runs the camera on, watching that it never jumps (mm in a frame at most) and keeps the fly in the picture. */
+function watch(director: CameraDirector, body: FlyBody, seconds: number) {
+  let worst = 0;
+  const last = director.camera.position.clone();
+  for (let t = 0; t < seconds; t += 1 / 60) {
+    director.update(body, 1 / 60);
+    worst = Math.max(worst, director.camera.position.distanceTo(last));
+    last.copy(director.camera.position);
+    const at = project(director.camera, middleOf(body));
+    assert.ok(Math.abs(at.x) < 0.9 && Math.abs(at.y) < 0.9 && at.z < 1, `the fly in the picture: ${at.x.toFixed(2)}, ${at.y.toFixed(2)}`);
+  }
+  return worst;
+}
+
+test("turned by hand the camera goes round the fly at once, stays where it was put for a while after, then the cameraman takes it on from there, smoothly", () => {
   const director = new CameraDirector(world, 16 / 9, picnic.camera);
   const body = fakeBody(-8, -8, 0.6);
   settle(director, body, 6);
   const before = director.camera.position.clone();
-  director.look.held = true;
+  director.hand.held = true;
   director.turnBy(1.2, 0.3);
-  settle(director, body, 0.2);
+  director.update(body, 1 / 60);
   const turned = director.camera.position.clone();
-  assert.ok(turned.distanceTo(before) > 4, `it went round: ${turned.distanceTo(before).toFixed(1)} mm`);
-  let at = project(director.camera, { x: body.position.x, y: body.position.y + 0.75, z: body.position.z });
-  assert.ok(Math.abs(at.x) < 0.5 && Math.abs(at.y) < 0.5, "still looking at the fly");
-  director.look.held = false;
-  let worst = 0;
-  const last = director.camera.position.clone();
-  for (let t = 0; t < 6; t += 1 / 60) {
-    director.update(body, 1 / 60);
-    worst = Math.max(worst, director.camera.position.distanceTo(last));
-    last.copy(director.camera.position);
-  }
-  assert.ok(director.camera.position.distanceTo(before) < 0.6, `back where it was: ${director.camera.position.distanceTo(before).toFixed(2)} mm off`);
+  assert.ok(turned.distanceTo(before) > 4, `it went round at once: ${turned.distanceTo(before).toFixed(1)} mm`);
+  watch(director, body, 2);
+  assert.ok(director.camera.position.distanceTo(turned) < 0.3, "held, it stays put");
+  director.hand.held = false;
+  watch(director, body, HAND_HOLD - 0.5);
+  assert.ok(director.camera.position.distanceTo(turned) < 0.3, "let go, it stays a while");
+  assert.ok(director.handled);
+  const worst = watch(director, body, 10);
+  assert.ok(!director.handled, "and then it is the cameraman's again");
+  // Where it likes to be, give or take one of the placings it tries.
+  assert.ok(director.camera.position.distanceTo(before) < 0.32 * director.reach, `back where it likes to be: ${director.camera.position.distanceTo(before).toFixed(2)} mm off`);
   assert.ok(worst < 0.5, `smoothly: ${worst.toFixed(2)} mm in a frame at most`);
-  at = project(director.camera, { x: body.position.x, y: body.position.y + 0.75, z: body.position.z });
-  assert.ok(Math.abs(at.x) < 0.5 && Math.abs(at.y) < 0.5);
 });
 
-test("brought in or taken out by hand, let go it settles into the nearest view, from exactly where it was", () => {
+test("brought in or taken out by hand it goes smoothly along one range, from the eyes' facets to the whole table, and stays where it is left", () => {
+  const director = new CameraDirector(world, 16 / 9, picnic.camera);
+  // Well away from the table's middle, so the fly is in the picture only if the camera keeps it there.
+  const body = fakeBody(150, -60, 3);
+  settle(director, body, 6);
+  const follow = director.reach;
+  let size = lengthOnScreen(director.camera, body);
+  // In, a wheel's click at a time: the fly grows each time, and the View tool's name follows.
+  const names = new Set<string>();
+  for (let i = 0; i < 12; i++) {
+    director.zoomBy(1 / 1.2);
+    assert.ok(watch(director, body, 0.4) < 1, "no jumps");
+    const now = lengthOnScreen(director.camera, body);
+    if (director.reach > NEAREST) assert.ok(now > size, `bigger: ${size.toFixed(0)} → ${now.toFixed(0)} px`);
+    size = now;
+    names.add(director.view);
+  }
+  assert.equal(director.reach, NEAREST, "no nearer than the nearest");
+  assert.ok(size > 640, `close enough for the facets, the fly longer than the picture is wide: the fly ${size.toFixed(0)} px long`);
+  assert.deepEqual([...names], ["follow", "close"]);
+  // Left there, it stays there.
+  watch(director, body, 8);
+  assert.equal(director.reach, NEAREST);
+  // Out, all the way, the fly in the picture throughout (watch says so): the whole table, where the View tool's Whole table puts it.
+  for (let i = 0; i < 40; i++) {
+    director.zoomBy(1.2);
+    watch(director, body, 0.25);
+  }
+  watch(director, body, 3);
+  assert.equal(director.view, "table");
+  const chosen = new CameraDirector(world, 16 / 9, picnic.camera);
+  chosen.setView("table");
+  settle(chosen, body, 12);
+  settle(director, body, 6);
+  // The same shot round the table's middle (it drifts slowly round, so not from the same angle).
+  const round = (c: THREE.PerspectiveCamera) => [Math.hypot(c.position.x - body.position.x * 0.35, c.position.z - body.position.z * 0.35), c.position.y, c.fov];
+  const [a, b] = [round(director.camera), round(chosen.camera)];
+  assert.ok(a.every((v, i) => Math.abs(v - b[i]) < Math.abs(b[i]) * 0.03), `the whole table's own shot: ${a.map((v) => v.toFixed(1))} against ${b.map((v) => v.toFixed(1))}`);
+  // And Follow, chosen on the View tool, is where it was.
+  director.setView("follow");
+  assert.equal(director.reach, follow);
+});
+
+test("handed back, the cameraman takes the camera at once: its own place round the fly, and the named view nearest the zoom", () => {
   const director = new CameraDirector(world, 16 / 9, picnic.camera);
   const body = fakeBody(-8, -8, 0.6);
   settle(director, body, 6);
-  director.look.held = true;
-  director.zoomBy(0.2);
-  assert.ok(director.look.zoom > 0.2, "never nearer than a few millimetres");
-  director.update(body, 1 / 60);
-  const held = director.camera.position.clone();
-  assert.equal(director.letGo(), "close");
-  director.setView("close");
-  director.update(body, 1 / 60);
-  assert.ok(director.camera.position.distanceTo(held) < 0.2, "no jump when it lets go");
-  director.look.held = true;
-  director.zoomBy(1.1);
-  assert.equal(director.letGo(), null, "still nearest close up");
-  director.zoomBy(60);
-  assert.equal(director.letGo(), "table");
+  const before = director.camera.position.clone();
+  director.hand.held = true;
+  director.turnBy(1.4, 0.5);
+  director.zoomBy(1.15);
+  director.hand.held = false;
+  settle(director, body, 0.5);
+  assert.equal(director.view, "follow");
+  director.handBack();
+  assert.equal(director.reach, Math.hypot(SHOTS.follow.distance, SHOTS.follow.height));
+  const worst = watch(director, body, 4);
+  assert.ok(director.camera.position.distanceTo(before) < 1, `back: ${director.camera.position.distanceTo(before).toFixed(2)} mm off`);
+  assert.ok(worst < 0.6, `smoothly: ${worst.toFixed(2)} mm in a frame`);
+});
+
+test("the wallpaper takes the camera from the hand, and gives the zoom back when it ends", () => {
+  const director = new CameraDirector(world, 16 / 9, picnic.camera);
+  const body = fakeBody(-8, -8, 0.6);
+  settle(director, body, 3);
+  director.hand.held = true;
+  director.turnBy(1, 0.4);
+  director.zoomBy(0.7);
+  const reach = director.reach;
+  director.startWallpaper();
+  assert.ok(!director.hand.held, "let go");
+  settle(director, body, 3);
+  director.stopWallpaper();
+  assert.equal(director.reach, reach);
 });
 
 test("swung up by hand past where it can go, it comes back down the moment it is swung back", () => {
   const director = new CameraDirector(world, 16 / 9, picnic.camera);
   const body = fakeBody(-8, -8, 0.6);
   settle(director, body, 6);
-  director.look.held = true;
+  director.hand.held = true;
   director.turnBy(0, 5);
   settle(director, body, 0.1);
   const top = director.camera.position.y;

@@ -45,7 +45,9 @@ The remote reaches the game as DOM events (`packages/contracts/src/remote.ts`):
 key events for the buttons, a `remotetouch` event for the touch surface. A
 browser's keyboard and game pad are the same buttons; a mouse, a trackpad or
 a finger points at the screen itself (`apps/web/src/input.ts`), and what it
-presses is whatever was drawn there, or the fly's world under it. A host that
+presses is whatever was drawn there, or the fly's world under it; in play,
+`apps/web/src/controls.ts` says what each gesture means for the tools and the
+camera. A host that
 wraps the web build says what its screen's notch covers through
 `packages/contracts/src/screen.ts`.
 

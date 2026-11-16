@@ -212,7 +212,7 @@ test("on the TV it is at full size under what it sees", () => {
 });
 
 test("the nervous system shows only in play, never over the loading screen, the title, a menu or the full picture", () => {
-  for (const screen of ["loading", "title", "pause", "settings", "about", "brain"]) {
+  for (const screen of ["loading", "title", "settings", "about", "brain"]) {
     assert.equal(nervesWanted("always", screen, false, false), "hide", screen);
     assert.equal(nervesWanted("always", screen, true, false), "hide", `${screen} in the wallpaper`);
   }

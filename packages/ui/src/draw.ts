@@ -82,7 +82,8 @@ export function glassPanel(g: Ctx, x: number, y: number, w: number, h: number, r
   g.restore();
 }
 
-export type PillStyle = { focused?: boolean; color?: "aqua" | "green" | "orange" | "pink" | "glass"; disabled?: boolean; press?: number };
+/** `focused`: the remote's focus is on it; `hover`: a pointer is over it, which only brightens it a little. */
+export type PillStyle = { focused?: boolean; hover?: boolean; color?: "aqua" | "green" | "orange" | "pink" | "glass"; disabled?: boolean; press?: number; /** The label's size, if not the pill's own. */ size?: number };
 
 const PILL_COLORS = {
   aqua: ["#9ff0ff", "#29b6ec", "#0a7cc7"],
@@ -109,6 +110,10 @@ export function pill(g: Ctx, x: number, y: number, w: number, h: number, label: 
   roundedRect(g, x, yy, w, h, r);
   g.fillStyle = body;
   g.fill();
+  if (style.hover && !style.focused) {
+    g.fillStyle = "rgba(80, 185, 255, 0.2)";
+    g.fill();
+  }
   const gloss = g.createLinearGradient(0, yy, 0, yy + h * 0.55);
   gloss.addColorStop(0, "rgba(255,255,255,0.9)");
   gloss.addColorStop(1, "rgba(255,255,255,0.12)");
@@ -120,7 +125,7 @@ export function pill(g: Ctx, x: number, y: number, w: number, h: number, label: 
   g.strokeStyle = style.focused ? "rgba(0, 80, 150, 0.6)" : "rgba(40, 110, 180, 0.4)";
   g.stroke();
   if (label) {
-    const size = Math.round(h * 0.46);
+    const size = style.size ?? Math.round(h * 0.46);
     g.font = font(size);
     g.textAlign = "center";
     g.textBaseline = "middle";
@@ -324,9 +329,10 @@ export function iconButton(g: Ctx, x: number, y: number, r: number, icon: "back"
   g.fillStyle = hot ? "#ffffff" : INK;
   g.strokeStyle = hot ? "#ffffff" : INK;
   if (icon === "menu") {
-    const k = r * 0.36;
-    g.fillRect(x - k * 0.85, y - k, k * 0.6, k * 2);
-    g.fillRect(x + k * 0.25, y - k, k * 0.6, k * 2);
+    // Three bars: the menu, which doesn't stop the fly.
+    const w = r * 0.9;
+    const h = r * 0.16;
+    for (let i = -1; i <= 1; i++) g.fillRect(x - w / 2, y + i * r * 0.3 - h / 2, w, h);
   } else {
     g.beginPath();
     g.moveTo(x + r * 0.16, y - r * 0.36);

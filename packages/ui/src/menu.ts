@@ -1,7 +1,9 @@
 // Menu state: a vertical list of items with a focus that moves where the
 // player expects, values that change with left and right, and scrolling that
-// keeps the focus in view. A pointer works it too: an item is focused, tapped,
-// stepped or slid by its index, and the list scrolled by rows. No drawing
+// keeps the focus in view. A pointer works it too: an item is tapped, stepped,
+// slid or (a choice drawn as tabs) chosen by its index, and the list scrolled
+// by rows; what it touches takes the focus, so the arrows carry on from
+// there, but merely hovering over an item does not. No drawing
 // here: the screens draw a Menu however they like, and the logic is tested in
 // Node.
 
@@ -10,7 +12,8 @@ import type { RemoteButton } from "@fly/contracts";
 export type Option<V> = { value: V; label: string };
 
 export type ActionItem = { kind: "action"; id: string; label: string; disabled?: boolean; hint?: string };
-export type ChoiceItem<V = unknown> = { kind: "choice"; id: string; label: string; options: readonly Option<V>[]; index: number; disabled?: boolean; hint?: string };
+/** A choice; `tabs` draws its options side by side, every one to be pressed, as the tabs across the top of a page. */
+export type ChoiceItem<V = unknown> = { kind: "choice"; id: string; label: string; options: readonly Option<V>[]; index: number; disabled?: boolean; hint?: string; tabs?: boolean };
 export type SliderItem = { kind: "slider"; id: string; label: string; min: number; max: number; step: number; value: number; disabled?: boolean; hint?: string };
 export type MenuItem = ActionItem | ChoiceItem | SliderItem;
 
@@ -38,9 +41,12 @@ export class Menu {
   scroll = 0;
   /** How many rows fit; the focus is kept inside them. */
   rows: number;
+  /** How many rows there is room for, however many items there are now. */
+  #room: number;
 
   constructor(items: MenuItem[], { rows = items.length, focus }: { rows?: number; focus?: string } = {}) {
     this.items = items;
+    this.#room = rows;
     this.rows = Math.min(items.length, Math.max(1, rows));
     const start = focus ? items.findIndex((item) => item.id === focus) : -1;
     this.focus = start >= 0 && !items[start].disabled ? start : this.#nextEnabled(-1, 1) ?? 0;
@@ -66,6 +72,7 @@ export class Menu {
 
   /** Shows this many rows at once (the screen's shape changed), keeping the focus in view. */
   setRows(rows: number) {
+    this.#room = rows;
     this.rows = Math.min(this.items.length, Math.max(1, Math.floor(rows)));
     this.#keepInView();
   }
@@ -93,6 +100,24 @@ export class Menu {
     if (!item || item.disabled) return BLOCKED;
     this.focusIndex(index);
     return this.#step(dir, false);
+  }
+
+  /** A tap on one of a choice's options (a tab): chooses it. */
+  chooseAt(index: number, option: number): Outcome {
+    const item = this.items[index];
+    if (!item || item.disabled || item.kind !== "choice" || !item.options[option]) return BLOCKED;
+    this.focusIndex(index);
+    if (item.index === option) return NONE;
+    item.index = option;
+    return { kind: "change", item };
+  }
+
+  /** Puts these items in place of the ones after the first `keep` (the page under a row of tabs), keeping the focus where it was if it still can be. */
+  replaceFrom(keep: number, items: readonly MenuItem[]) {
+    this.items.length = keep;
+    this.items.push(...items);
+    if (this.focus >= this.items.length || this.items[this.focus]?.disabled) this.focus = this.#nextEnabled(-1, 1) ?? 0;
+    this.setRows(this.#room);
   }
 
   /** Sets the slider at `index` to `k` of the way along its track (0 to 1), to the nearest step. */

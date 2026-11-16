@@ -209,7 +209,7 @@ export class Eyes {
    * asked. Call after the world has been rendered. `forInset`: the corner
    * picture (inset.ts) is up, so they render even when not for the brain.
    */
-  render(dt: number, showPicture: boolean, paused: boolean, urgent = false, forInset = false) {
+  render(dt: number, showPicture: boolean, urgent = false, forInset = false) {
     this.active = this.inUse || showPicture || forInset;
     if (!this.active) {
       this.costMs = 0;
@@ -220,7 +220,7 @@ export class Eyes {
     this.#since += dt;
     const hz = urgent ? URGENT_HZ : detail.hz * this.rate;
     // One read in flight: a slow GPU must not accumulate pictures or sampling work.
-    if (!paused && !this.#pending && (this.#since >= 1 / hz - 1e-3 || !this.#light)) {
+    if (!this.#pending && (this.#since >= 1 / hz - 1e-3 || !this.#light)) {
       this.#since = 0;
       this.#refresh(detail.resolution);
     }

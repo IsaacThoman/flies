@@ -128,6 +128,9 @@ try {
   await waitFor(page, "brain=running,screen=title,brainEngine=wasm", 60_000);
 
   step("the wallpaper keeps the screen awake");
+  // The first arrow after a mouse shows the focus; the next moves it.
+  await page.keyboard.press("ArrowDown");
+  await waitFor(page, "ring=true");
   await page.keyboard.press("ArrowDown");
   await waitFor(page, "focus=watch");
   await page.keyboard.press("Enter");

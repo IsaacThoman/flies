@@ -1,4 +1,15 @@
-// The title, the pause menu and the settings.
+// The menu and the settings: the whole of it.
+//
+//   menu ─┬─ Play
+//         ├─ Watch
+//         ├─ Brain
+//         ├─ About
+//         └─ Settings: Wallpaper | Sound | Picture, as tabs
+//
+// The menu is the title, at launch and from play alike (Back, Play/Pause or
+// the menu button), with the fly living on behind it; Back there carries on
+// playing (on the Apple TV it leaves the app, as the root of an app must).
+// Every setting is two steps from it.
 
 import { Menu, choiceValue, indexOf } from "@fly/ui";
 import type { ChoiceItem, MenuItem, Option, SliderItem } from "@fly/ui";
@@ -14,17 +25,16 @@ import type { SettingsPage, Shell } from "./types.ts";
 
 export function titleScreen(shell: Shell) {
   const menu = new Menu([
-    { kind: "action", id: "play", label: "Visit the fly" },
-    { kind: "action", id: "watch", label: "Just watch" },
-    { kind: "action", id: "brain", label: "Inside its brain" },
-    { kind: "action", id: "about", label: "About the fly" },
+    { kind: "action", id: "play", label: "Play" },
+    { kind: "action", id: "watch", label: "Watch" },
+    { kind: "action", id: "brain", label: "Brain" },
+    { kind: "action", id: "about", label: "About" },
     { kind: "action", id: "settings", label: "Settings" },
   ]);
   // Laid out with the menu, for the backdrop to draw from.
   let title = titleLayout(shell.shape, menu.items.length);
   return new MenuScreen(shell, {
     id: "title",
-    pauses: false,
     menu,
     root: true,
     place: (frame) => (title = titleLayout(frame, menu.items.length)).menu,
@@ -45,29 +55,6 @@ export function titleScreen(shell: Shell) {
       orb(g, status.x + 20, status.y + 17, 8, awake ? "green" : brain.status === "failed" ? "pink" : "orange");
       text(g, label, status.x + 36, status.y + 18, { size: status.size, color: INK_SOFT, baseline: "middle" });
     },
-  });
-}
-
-export function pauseScreen(shell: Shell) {
-  const menu = new Menu([
-    { kind: "action", id: "resume", label: "Carry on" },
-    { kind: "action", id: "brain", label: "Inside its brain" },
-    { kind: "action", id: "about", label: "About the fly" },
-    { kind: "action", id: "settings", label: "Settings" },
-    { kind: "action", id: "title", label: "Back to the title" },
-  ]);
-  return new MenuScreen(shell, {
-    id: "pause",
-    pauses: true,
-    menu,
-    heading: "Paused",
-    place: (frame) => fitMenu(safeRect(frame), { items: menu.items.length, width: 340, row: 40, heading: true, foot: 34, values: false, raise: 12 }),
-    onActivate(item) {
-      if (item.id === "resume") shell.play();
-      else if (item.id === "title") shell.title();
-      else shell.open(item.id as "brain" | "about" | "settings");
-    },
-    onBack: () => shell.back(),
   });
 }
 
@@ -131,45 +118,44 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
   },
 };
 
-/** The top of the settings: a button for each page. */
+/** The settings: a row of tabs, one for each part of the game, over that part's settings, each a setting by its key. */
 export function settingsScreen(shell: Shell) {
-  const items: MenuItem[] = (Object.keys(PAGES) as SettingsPage[]).map((id) => ({ kind: "action", id, label: PAGES[id].heading }));
+  const settings = shell.settings as Record<string, unknown>;
+  const ids = Object.keys(PAGES) as SettingsPage[];
+  const pages = {} as Record<SettingsPage, MenuItem[]>;
+  for (const id of ids) pages[id] = PAGES[id].rows(shell);
+  const tabs: ChoiceItem<SettingsPage> = { kind: "choice", id: "page", label: "", options: ids.map((id) => ({ value: id, label: PAGES[id].heading })), index: 0, tabs: true };
+  const menu = new Menu([tabs, ...pages[ids[0]]]);
+  // Room for the longest page, so the pane keeps its size from tab to tab.
+  const most = 1 + Math.max(...ids.map((id) => pages[id].length));
+  // As they are now: the Place tool, or a script, may have changed them since.
+  const show = () => {
+    for (const item of menu.items) {
+      if (item === tabs) continue;
+      if (item.kind === "choice") item.index = indexOf(item.options, settings[item.id]);
+      else if (item.kind === "slider") item.value = settings[item.id] as number;
+    }
+  };
   return new MenuScreen(shell, {
     id: "settings",
-    pauses: true,
-    menu: new Menu(items),
-    heading: "Settings",
-    place: (frame) => fitMenu(safeRect(frame), { items: items.length, width: 340, row: 40, heading: true, foot: 28, values: false, raise: 14 }),
-    onActivate: (item) => shell.open(item.id as SettingsPage),
+    menu,
+    place: (frame) => fitMenu(safeRect(frame), { items: most, width: 540, row: 36, heading: false, foot: 28, values: true, raise: 14 }),
+    onEnter: show,
+    onChange(item) {
+      if (item === tabs) {
+        menu.replaceFrom(1, pages[choiceValue(tabs)]);
+        show();
+        return;
+      }
+      settings[item.id] = item.kind === "slider" ? item.value : choiceValue(item);
+      shell.applySettings();
+    },
     onBack: () => shell.back(),
   });
 }
 
-/** Every page of the settings, by id. */
-export function settingsPages(shell: Shell) {
-  const settings = shell.settings as Record<string, unknown>;
-  const pages = {} as Record<SettingsPage, MenuScreen>;
-  for (const id of Object.keys(PAGES) as SettingsPage[]) {
-    const items = PAGES[id].rows(shell);
-    pages[id] = new MenuScreen(shell, {
-      id,
-      pauses: true,
-      menu: new Menu(items),
-      heading: PAGES[id].heading,
-      place: (frame) => fitMenu(safeRect(frame), { items: items.length, width: 540, row: 36, heading: true, foot: 28, values: true, raise: 14 }),
-      // As they are now: the Place tool, or a script, may have changed them since.
-      onEnter() {
-        for (const item of items) {
-          if (item.kind === "choice") item.index = indexOf(item.options, settings[item.id]);
-          else if (item.kind === "slider") item.value = settings[item.id] as number;
-        }
-      },
-      onChange(item) {
-        settings[item.id] = item.kind === "slider" ? item.value : choiceValue(item);
-        shell.applySettings();
-      },
-      onBack: () => shell.back(),
-    });
-  }
-  return pages;
-}
+/** The settings tab shown. */
+export const settingsTab = (screen: MenuScreen) => {
+  const tabs = screen.menu.items[0];
+  return tabs.kind === "choice" ? String(choiceValue(tabs)) : "";
+};

@@ -35,26 +35,27 @@ export function soakConfig(minutes = 30) {
   press("ArrowDown", 5);
   wait({ view: "eyes" });
   phase("eye picture low", 15000);
+  // The menu (Play/Pause), Settings, the Picture tab, the fly's eyes up a step, and back to play.
   press("MediaPlayPause");
-  wait({ screen: "pause" });
-  press("ArrowDown", 3);
+  wait({ screen: "title", focus: "play" });
+  press("ArrowDown", 4);
+  wait({ focus: "settings" });
   press("Enter");
-  wait({ screen: "settings" });
+  wait({ screen: "settings", focus: "page" });
+  press("ArrowRight", 2);
+  wait({ tab: "picture" });
   press("ArrowDown", 2);
-  wait({ focus: "picture" });
-  press("Enter");
-  wait({ screen: "picture" });
-  press("ArrowDown");
   wait({ focus: "eyes" });
   press("ArrowRight");
   press("MediaPlayPause");
   wait({ screen: "play" });
   phase("eye picture high", 15000);
-  // Restore Low so an unattended run leaves the user's usual eye detail in place.
+  // Restore Low so an unattended run leaves the user's usual eye detail in place: the menu and Settings remember where they were.
   press("MediaPlayPause");
+  wait({ screen: "title" });
+  press("ArrowDown", 4);
   press("Enter");
-  press("Enter");
-  wait({ screen: "picture", focus: "eyes" });
+  wait({ screen: "settings", tab: "picture", focus: "eyes" });
   press("ArrowLeft");
   press("MediaPlayPause");
   press("ArrowUp", 4);
