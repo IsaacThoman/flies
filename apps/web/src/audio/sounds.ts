@@ -4,7 +4,8 @@
 //
 // The wing buzz follows the wings, the feet patter while it walks, and the
 // place's own sound (at the picnic a breeze, the lake and birds now and then)
-// plays quietly underneath.
+// plays quietly underneath, with the rain when it rains and the rush of a
+// gust when one blows.
 
 export type Sound = "move" | "select" | "back" | "blocked" | "tick" | "tool" | "drop" | "land" | "swoop" | "pop" | "takeoff" | "eat" | "open";
 
@@ -291,6 +292,60 @@ function barLoop(ctx: BaseAudioContext) {
   return buffer;
 }
 
+/** Renders `seconds` that loop without a seam: the tail is cross-faded into the head. */
+function renderLoop(ctx: BaseAudioContext, seconds: number, synth: Synth) {
+  const length = Math.round(seconds * RATE);
+  const fade = Math.round(RATE * 0.5);
+  const raw = new Float32Array(length + fade);
+  for (let i = 0; i < raw.length; i++) raw[i] = synth(i / RATE, i);
+  const buffer = ctx.createBuffer(1, length, RATE);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = i < fade ? raw[i] * (i / fade) + raw[length + i] * (1 - i / fade) : raw[i];
+  return buffer;
+}
+
+/**
+ * Light rain: a soft hiss of drops on grass and water far off, and close by a
+ * patter of small drops on the table, now and then a bigger one.
+ */
+function rainLoop(ctx: BaseAudioContext) {
+  const r = noise(31);
+  const drops: { at: number; f: number; a: number; d: number }[] = [];
+  const seconds = 5;
+  for (let t = 0; t < seconds + 0.5; t += 0.004 + ((r() + 1) / 2) * 0.012) {
+    const big = (r() + 1) / 2 > 0.97;
+    drops.push({ at: t, f: big ? 900 + r() * 400 : 2600 + r() * 1800, a: big ? 0.22 : 0.03 + ((r() + 1) / 2) ** 3 * 0.12, d: big ? 70 : 500 + r() * 200 });
+  }
+  let low = 0;
+  let k = 0;
+  return renderLoop(ctx, seconds, (t) => {
+    const white = r();
+    low += (white - low) * 0.12;
+    let s = (white - low) * 0.09;
+    while (k < drops.length && drops[k].at < t - 0.05) k++;
+    for (let j = k; j < drops.length && drops[j].at <= t; j++) {
+      const d = t - drops[j].at;
+      s += Math.exp(-d * drops[j].d) * Math.sin(TAU * drops[j].f * d) * drops[j].a;
+    }
+    return s;
+  });
+}
+
+/** The rush of a gust: air, low and rising and falling. */
+function windLoop(ctx: BaseAudioContext) {
+  const r = noise(41);
+  let a = 0;
+  let b = 0;
+  const seconds = 6;
+  return renderLoop(ctx, seconds, (t) => {
+    const swell = 0.6 + 0.25 * Math.sin((TAU * 2 * t) / seconds) + 0.15 * Math.sin((TAU * 5 * t) / seconds + 2);
+    const open = 0.015 + 0.03 * swell;
+    a += (r() - a) * open;
+    b += (a - b) * open;
+    return b * 9 * swell;
+  });
+}
+
 /** A bird's chirp: quick upward sweeps. */
 function chirp(ctx: BaseAudioContext, seed: number) {
   const r = noise(seed);
@@ -307,8 +362,8 @@ function chirp(ctx: BaseAudioContext, seed: number) {
 /** The sound of a place, under everything else: its loop, and whether birds call now and then. */
 export type Ambience = "outdoors" | "lab" | "bar";
 
-const AMBIENCES: Record<Ambience, { loop: (ctx: BaseAudioContext) => AudioBuffer; birds: boolean }> = {
-  outdoors: { loop: outdoorsLoop, birds: true },
+const AMBIENCES: Record<Ambience, { loop: (ctx: BaseAudioContext) => AudioBuffer; birds: boolean; /** How loud rain is there, 0 to 1: outdoors in it, or muffled by walls and glass (0.3 if not said). */ rain?: number }> = {
+  outdoors: { loop: outdoorsLoop, birds: true, rain: 1 },
   lab: { loop: labLoop, birds: false },
   bar: { loop: barLoop, birds: false },
 };
@@ -328,6 +383,12 @@ export class Audio {
   #ambience: Ambience = "outdoors";
   #place: Loop | null = null;
   #loops = new Map<Ambience, AudioBuffer>();
+  #rain: Loop | null = null;
+  #wind: Loop | null = null;
+  /** What the rain and wind loops were last set to, so they are touched only when they change. */
+  #rainAt = 0;
+  #windAt = 0;
+  #raining = 0;
 
   constructor() {
     let ctx: AudioContext | null;
@@ -357,6 +418,8 @@ export class Audio {
       this.#wings = this.#loop(wingLoop(ctx), this.#effects);
       this.#feet = this.#loop(feetLoop(ctx), this.#effects);
       this.#chirps = [chirp(ctx, 21), chirp(ctx, 22), chirp(ctx, 23)];
+      this.#rain = this.#loop(rainLoop(ctx), this.#ambient);
+      this.#wind = this.#loop(windLoop(ctx), this.#ambient);
       this.#playAmbience();
     } catch {
       this.#buffers = null;
@@ -433,15 +496,35 @@ export class Audio {
     followParam(this.#wings.gain.gain, Math.min(1, wings) * 0.35 * near, now, 0.03);
     followParam(this.#wings.source.playbackRate, 0.85 + wings * 0.3, now, 0.05);
     followParam(this.#feet.gain.gain, Math.min(1, walking) * 0.25 * near, now, 0.05);
-    // Now and then, a bird.
+    // Now and then, a bird; in the rain they mostly keep quiet.
     this.#nextChirp -= dt;
     if (this.#nextChirp <= 0 && this.#ambient && this.#chirps.length && AMBIENCES[this.#ambience].birds) {
       this.#nextChirp = 6 + Math.random() * 14;
+      if (Math.random() < this.#raining * 0.85) return;
       const source = ctx.createBufferSource();
       source.buffer = this.#chirps[Math.floor(Math.random() * this.#chirps.length)];
       source.playbackRate.value = 0.9 + Math.random() * 0.25;
       source.connect(this.#ambient);
       source.start();
+    }
+  }
+
+  /** The weather as heard: how hard it rains (0 to 1), and the speed of a gust blowing here (mm/s). */
+  weather(rain: number, gust: number) {
+    const ctx = this.ctx;
+    this.#raining = rain;
+    if (!ctx || !this.#rain || !this.#wind) return;
+    const now = ctx.currentTime;
+    const heard = rain * (AMBIENCES[this.#ambience].rain ?? 0.3);
+    if (Math.abs(heard - this.#rainAt) > 0.004) {
+      this.#rainAt = heard;
+      followParam(this.#rain.gain.gain, heard * 0.7, now, 0.5);
+    }
+    const blowing = Math.min(1, gust / 700);
+    if (Math.abs(blowing - this.#windAt) > 0.004) {
+      this.#windAt = blowing;
+      followParam(this.#wind.gain.gain, blowing * 0.8, now, 0.3);
+      followParam(this.#wind.source.playbackRate, 0.8 + blowing * 0.4, now, 0.3);
     }
   }
 }

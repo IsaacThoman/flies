@@ -4,7 +4,8 @@
 // touches something pops. A few small ones drift low past the fly; one that
 // comes down on something level settles there as a dome, as a soap bubble
 // does on a wet table, until it bursts. Walking or flying into a bubble
-// bursts it, and the fly feels the film break as a light touch.
+// bursts it, and the fly feels the film break as a light touch. In the rain
+// the drops burst them, and few new ones come.
 
 import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
@@ -46,7 +47,7 @@ void main() {
   gl_FragColor = vec4(c * (0.6 + rim * 0.6) + vec3(spec + spec2), alpha);
 }`;
 
-type Bubble = { x: number; y: number; z: number; r: number; phase: number; speed: number; age: number; popping: number; low: boolean; landed: number };
+type Bubble = { x: number; y: number; z: number; r: number; phase: number; speed: number; age: number; popping: number; low: boolean; landed: number; wait: number };
 
 /** How many bubbles drift at once. */
 export const BUBBLES = 12;
@@ -75,6 +76,8 @@ export class Bubbles {
   brushed = 0;
   /** Bubbles drift over this place (Scene.bubbles). Without them there is nothing to see, feel or hear of them. */
   enabled = true;
+  /** How hard it is raining (the weather's rain, 0 to 1). */
+  rain = 0;
 
   constructor(parent: THREE.Object3D, world: World) {
     this.#world = world;
@@ -97,7 +100,7 @@ export class Bubbles {
   /** A new bubble upwind: high over the table, or, with `near`, small and low a little upwind of that point. */
   #spawn(into?: Bubble, near: { x: number; y: number; z: number } | null = null): Bubble {
     const rnd = this.#rnd;
-    const b = into ?? { x: 0, y: 0, z: 0, r: 0, phase: 0, speed: 0, age: 0, popping: 0, low: false, landed: 0 };
+    const b = into ?? { x: 0, y: 0, z: 0, r: 0, phase: 0, speed: 0, age: 0, popping: 0, low: false, landed: 0, wait: 0 };
     b.low = near !== null;
     b.landed = 0;
     if (near) {
@@ -115,7 +118,18 @@ export class Bubbles {
     b.speed = rnd.range(0.7, 1.3);
     b.age = 0;
     b.popping = 0;
+    b.wait = 0;
     return b;
+  }
+
+  /** A bubble that has burst or drifted away comes round again, unless it is raining: then often not for a while. */
+  #renew(b: Bubble, fly: THREE.Vector3Like) {
+    if (this.#rnd.next() < this.rain) {
+      b.popping = Math.max(b.popping, 0.2);
+      b.wait = this.#rnd.range(6, 20);
+      return;
+    }
+    this.#spawn(b, b.low ? fly : null);
   }
 
   /** Pops the bubble nearest a point, if one is within `reach` of its skin (a puff, a tool). */
@@ -141,7 +155,8 @@ export class Bubbles {
       b.age += dt;
       if (b.popping > 0) {
         b.popping += dt;
-        if (b.popping > 0.12) this.#spawn(b, b.low ? fly : null);
+        b.wait -= dt;
+        if (b.popping > 0.12 && b.wait <= 0) this.#renew(b, fly);
         continue;
       }
       let burst = false;
@@ -167,8 +182,10 @@ export class Bubbles {
           } else burst = true;
         }
       }
+      // Raindrops hitting it.
+      if (!burst && this.rain > 0 && this.#rnd.next() < this.rain * dt * 0.5) burst = true;
       // Into the fly, or the fly into it (the fly about as round as half its length).
-      if (!burst && Math.hypot(b.x - fly.x, b.y - fly.y, b.z - fly.z) < b.r + FLY_LENGTH / 2) {
+      else if (!burst && Math.hypot(b.x - fly.x, b.y - fly.y, b.z - fly.z) < b.r + FLY_LENGTH / 2) {
         burst = true;
         this.brushed = BUBBLE_TOUCH;
       }
@@ -177,9 +194,9 @@ export class Bubbles {
         this.popped.push(this.#pool[i].set(b.x, b.y, b.z));
         continue;
       }
-      if (b.x > 640 || Math.abs(b.z) > 700) this.#spawn(b, b.low ? fly : null);
+      if (b.x > 640 || Math.abs(b.z) > 700) this.#renew(b, fly);
       // A low one that has drifted well past the fly comes round again.
-      else if (b.low && b.landed <= 0 && b.x - fly.x > 120) this.#spawn(b, fly);
+      else if (b.low && b.landed <= 0 && b.x - fly.x > 120) this.#renew(b, fly);
     }
     // Far to near, for the transparency.
     const cx = camera.position.x;

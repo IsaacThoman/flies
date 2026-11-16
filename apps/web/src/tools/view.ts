@@ -4,7 +4,7 @@
 // draw, and nothing is drawn that isn't there.
 
 import * as THREE from "three";
-import { FOODS } from "@fly/world";
+import { FOODS, isDropped } from "@fly/world";
 import type { FoodKind, Pantry, Vec3 } from "@fly/world";
 import { canvas2d, canvasTexture, paint, random } from "../scene/build.ts";
 import { BALL_RADIUS, TOOLS } from "./hands.ts";
@@ -134,6 +134,36 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolId, x: numbe
       g.arc(0, 0, r * 0.4, 0, Math.PI * 2);
       g.fill();
       g.stroke();
+      break;
+    }
+    case "weather": {
+      // A cloud over the sun, raining.
+      g.fillStyle = "#ffcf2e";
+      g.strokeStyle = "#e88a00";
+      g.lineWidth = r * 0.07;
+      g.beginPath();
+      g.arc(r * 0.3, -r * 0.35, r * 0.34, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      g.fillStyle = "#ffffff";
+      g.strokeStyle = "#5a7ea8";
+      g.lineWidth = r * 0.08;
+      g.beginPath();
+      g.moveTo(-r * 0.62, r * 0.28);
+      g.arc(-r * 0.42, r * 0.08, r * 0.24, Math.PI * 0.6, Math.PI * 1.45);
+      g.arc(-r * 0.08, -r * 0.1, r * 0.34, Math.PI * 1.1, Math.PI * 1.9);
+      g.arc(r * 0.4, r * 0.08, r * 0.26, Math.PI * 1.45, Math.PI * 0.45);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      g.strokeStyle = "#2a8fe0";
+      g.lineWidth = r * 0.1;
+      for (let i = -1; i <= 1; i++) {
+        g.beginPath();
+        g.moveTo(i * r * 0.32 + r * 0.06, r * 0.5);
+        g.lineTo(i * r * 0.32 - r * 0.04, r * 0.78);
+        g.stroke();
+      }
       break;
     }
     case "view": {
@@ -379,7 +409,7 @@ export class HandsView {
     const counts = this.#counts;
     for (const kind of KINDS) counts[kind] = 0;
     for (const f of hands.falling) this.#place(f.kind, f.x, f.y, f.z, 1, f.y * 0.3);
-    for (const food of pantry.foods) if (food.kind !== "patch") this.#place(food.kind, food.x, food.y, food.z, 0.35 + 0.65 * Math.cbrt(food.amount), food.id * 1.7);
+    for (const food of pantry.foods) if (isDropped(food)) this.#place(food.kind, food.x, food.y, food.z, 0.35 + 0.65 * Math.cbrt(food.amount), food.id * 1.7);
     for (const [kind, mesh] of this.#foods) {
       const n = counts[kind];
       mesh.count = n;

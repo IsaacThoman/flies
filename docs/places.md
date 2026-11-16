@@ -48,10 +48,38 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   4 m from the camera) is drawn over the backdrop (`buildBackdrop`, from
   200 mm to 3,000 km). Indoors, a room's far walls, a window's view, a bar's
   lights can all be backdrop.
-- **Light** (`palettes`): the five times of day, eased between. Indoors the
-  "sun" is the light coming in at the window and the sky what is seen through
-  it; a lamp at night can be a warm low "sun". `stars` (0 to 1) is how dark it
-  is. `env` scales the reflections in the set's `materials`.
+- **Light** (`palettes`): the five times of day. Chosen on the Light tool, the
+  light eases to one and holds it; on "Now" it follows the clock between them
+  (`scene/light.ts`, `clockLight`): each palette's colours are full at its
+  hour (morning 7:30, midday 10:30 to 15:15, golden 17:45, dusk 20:00, night
+  21:30 to 4:30, and dawn borrows dusk's colours at 5:55). Where the dusk
+  palette's sun is low (`sunUp` under 0.25: it is setting), the sun rises from
+  under the horizon on the morning's bearing, passes through each day
+  palette's place at its hour and sets past dusk's, and the night palette's
+  light (the moon) rises after it and sets before dawn, its light fading as it
+  goes down. Where it is high (the evening's light is a lamp, as the lab's
+  is), the light's direction and strength ease between the palettes with
+  their colours, so the lamp stays lit and still through the night. Either
+  way a palette's `sunUp` and `sunAround` are where its light is at that
+  hour. Indoors the "sun" is the light coming in at the window and the sky
+  what is seen through it; a lamp at night can be a warm "sun". `stars` (0 to
+  1) is how dark it is. `env` scales the reflections in the set's
+  `materials`.
+- **Weather** (`scene/weather.ts`): clear, overcast, mist or light rain, from
+  the Weather tool or, on "Now", a forecast worked out from the clock. Every
+  place gets its light from it without doing anything, as much as its
+  optional `open` lets in (1 if not said; the lab's is 0.4 and the bar's
+  0.35, as they see the sky only through windows, and after dark, lit by
+  their lamps, they hardly feel it): overcast greys the `Daylight`'s sky colours
+  and takes most of the sun's light (much less of the night's), mist whitens the
+  horizon and the haze. Showing it in the place itself is up to the place,
+  and optional: `SceneSet.update` and `SceneBackdrop.update` are handed the
+  `Weather` (`cloud`, `mist`, `rain`, `wet`, `wind`, each 0 to 1, and its
+  `kind`) as their last argument, which a place that ignores it can leave off.
+  A windowsill can run rain down its pane by `rain` and leave it streaked by
+  `wet`; the picnic's rain, wet table, overcast deck, mist and rainbow are
+  worked examples (`places/picnic/rain.ts`, `table.ts`, `backdrop.ts`). Rain
+  bursts the bubbles and sends the fireflies to shelter wherever they are.
 - **What the fly's eyes see** (`SceneSet.seen`): the big shapes only. They are
   rendered six times at 16 or 32 pixels for the brain's eyes, so the small
   details stay out.
@@ -63,7 +91,24 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   place.
 - **Sound** (`ambience`): an `Ambience` in `apps/web/src/audio/sounds.ts`, a loop
   synthesised sample by sample (the Apple TV's audio has no oscillators or
-  filters), built the first time it is needed.
+  filters), built the first time it is needed. Its optional `rain` (0 to 1,
+  0.3 if left out) is how loud rain is heard there: 1 out in it, less through
+  walls and glass. A gust blowing at the fly (`Felt.air`, below) is heard as
+  a rush of air wherever it blows.
+- **Goings-on** (`SceneSet.live`, optional): the place's own life, called each
+  frame the fly lives with an `Around`: where the fly is, the world, the
+  pantry, the weather, and `quiet` (nobody has touched the remote for a
+  while). It leaves what reaches the fly in `around.felt`: `air` (a gust, mm/s:
+  felt as wind, and it carries the fly in flight as a puff does), `touch` (a
+  raindrop landing on it, 0 to 1) and `looming` (things it could see coming,
+  for a brain without eyes). Food goes into the pantry with `pantry.add`, to
+  be found by walking and tasting. Start comings and goings only while
+  `quiet`, so what the fly does while someone plays answers what they do. The
+  picnic's (`places/picnic/life.ts`, paced in `pace.ts`) are the worked
+  example.
+- **A shadow passing over** (`scene/shade.ts`, optional): `shaded(material)`
+  teaches a lit material to take a shadow cast from high up (the picnic's
+  gull), set in `SHADE`; the fly takes it already.
 - **Bubbles and fireflies** are built for the picnic's open air and size; a
   place says whether it has them.
 - **The Place tool's name** for it, what it is carried "to", and what the fly
@@ -73,7 +118,9 @@ reach (beyond the floor's edge, above it, or in the backdrop).
 
 - **Through the senses, never around them** (`docs/architecture.md`). Anything
   in a place that moves (a gust, a drip, a shadow) reaches the fly only through
-  what it can see, feel or taste, and the brain decides what to do about it.
+  what it can see, feel or taste (`Felt`, the pantry, its eyes), and the brain
+  decides what to do about it. Nothing is aimed or timed at the fly: things
+  that move may keep clear of it, but not seek it.
 - **The Apple TV's budget.** JavaScript costs about 16 times what it does in a
   desktop browser, and the cost follows objects and draw calls. Merge static
   things by material (`Batch` in `apps/web/src/scene/build.ts`), instance

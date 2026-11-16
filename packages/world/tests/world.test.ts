@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FOODS, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TABLE_RADIUS, World, createPicnic, createSurface } from "../src/index.ts";
+import { FOODS, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TABLE_RADIUS, World, createPicnic, createSurface, isDropped } from "../src/index.ts";
 import type { RayHit } from "../src/index.ts";
 
 /** A bare round table this wide, with nothing on it. */
@@ -136,6 +136,20 @@ function climbable(name: string) {
     return true;
   });
 }
+
+test("something the place puts out to be found is tasted where it lies, eaten up and gone, and isn't the player's", () => {
+  const pantry = new Pantry(world, []);
+  for (let i = 0; i < MAX_DROPPED; i++) pantry.drop("sugar", -100 + i * 5, 150);
+  const juice = pantry.add("strawberry juice", 40, -200, 1.1, 0.8);
+  assert.equal(juice.kind, "found");
+  assert.equal(pantry.touching(40, 0, -200, 0.3), juice);
+  pantry.drop("honey", 100, 150);
+  assert.ok(pantry.foods.includes(juice), "dropping more food doesn't push it out");
+  assert.equal(pantry.foods.filter(isDropped).length, MAX_DROPPED);
+  let eaten = 0;
+  while (pantry.foods.includes(juice) && eaten < 100) eaten += pantry.eat(juice, 1, 1);
+  assert.ok(!pantry.foods.includes(juice) && Math.abs(eaten - 1) < 1e-9, "eaten up, and gone");
+});
 
 test("the biscuit crumbs and the lemon pips are low and round enough to walk up and over", () => {
   assert.ok(SOLIDS.some((s) => s.name === "crumb") && SOLIDS.some((s) => s.name === "pip"));

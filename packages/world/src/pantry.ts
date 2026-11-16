@@ -1,6 +1,7 @@
 // The food in the world and how much of it is left: the place's own (honey,
-// jam, fruit, sugar), which is eaten down and slowly comes back, and what the
-// player drops, which is eaten up and gone.
+// jam, fruit, sugar), which is eaten down and slowly comes back; what the
+// player drops; and now and then something new the place puts out to be
+// found (a drop of juice, a crumb). Those last two are eaten up and gone.
 
 import type { World } from "./world.ts";
 
@@ -29,8 +30,8 @@ export const FOODS: Readonly<Record<FoodKind, { name: string; sweet: number; r: 
 
 export type Food = {
   id: number;
-  /** The table's own food is a patch; dropped food has a kind. */
-  kind: FoodKind | "patch";
+  /** The table's own food is a patch; dropped food has a kind; what the place puts out to be found is "found". */
+  kind: FoodKind | "patch" | "found";
   name: string;
   x: number;
   y: number;
@@ -53,6 +54,9 @@ export const TASTE_HEIGHT = 1.5;
 /** At most this much dropped food at once; dropping more replaces the oldest. */
 export const MAX_DROPPED = 6;
 
+/** Food the player dropped. */
+export const isDropped = (food: Food): food is Food & { kind: FoodKind } => food.kind !== "patch" && food.kind !== "found";
+
 export class Pantry {
   readonly foods: Food[] = [];
   #next = 1;
@@ -73,10 +77,17 @@ export class Pantry {
 
   /** Drops food at a point on the world's surface. Returns it. */
   drop(kind: FoodKind, x: number, z: number): Food {
-    const dropped = this.foods.filter((f) => f.kind !== "patch");
+    const dropped = this.foods.filter(isDropped);
     if (dropped.length >= MAX_DROPPED) this.remove(dropped[0]);
     const spec = FOODS[kind];
     const food: Food = { id: this.#next++, kind, name: spec.name, x, y: this.#world.heightAt(x, z), z, r: spec.r, sweet: spec.sweet, amount: 1, pool: false };
+    this.foods.push(food);
+    return food;
+  }
+
+  /** Puts out something new to be found at a point on the world's surface (it is the place's, not the player's). Returns it. */
+  add(name: string, x: number, z: number, r: number, sweet: number): Food {
+    const food: Food = { id: this.#next++, kind: "found", name, x, y: this.#world.heightAt(x, z), z, r, sweet, amount: 1, pool: false };
     this.foods.push(food);
     return food;
   }

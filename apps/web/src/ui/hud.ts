@@ -105,7 +105,7 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState) {
   if (s.hints) {
     const hy = DESIGN_HEIGHT - 34;
     hintChip(g, 16, hy, "leftRight", "Tools", t, 13);
-    if (many) hintChip(g, 16, hy - 34, "upDown", tool.id === "light" ? "Time of day" : tool.id === "view" ? "Camera" : tool.id === "place" ? "Where" : "Kind", t, 13);
+    if (many) hintChip(g, 16, hy - 34, "upDown", tool.id === "light" ? "Time of day" : tool.id === "weather" ? "Weather" : tool.id === "view" ? "Camera" : tool.id === "place" ? "Where" : "Kind", t, 13);
     const action = actionLabel(hands, s.here);
     if (action) hintChip(g, 16, many ? hy - 68 : hy - 34, action.glyph, action.label, t, 13);
     const right = DESIGN_WIDTH - 16;

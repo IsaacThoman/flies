@@ -38,6 +38,8 @@ export const bar: Scene = {
     // The back bar's bottles, and the window.
     vista: { x: -0.45, z: -Math.sqrt(1 - 0.45 * 0.45) },
   },
+  // It sees the weather through its street window.
+  open: 0.35,
   ambience: "bar",
   bubbles: false,
   fireflies: false,
