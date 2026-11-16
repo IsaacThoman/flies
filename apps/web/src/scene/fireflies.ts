@@ -59,9 +59,12 @@ export class Fireflies {
     }
   }
 
+  /** Fireflies live in this place (Scene.fireflies). */
+  enabled = true;
+
   /** `dark` is 0 by day to 1 at night (the light's stars). */
   update(time: number, dark: number, camera: THREE.Camera) {
-    const show = Math.max(0, Math.min(1, (dark - 0.15) / 0.6));
+    const show = this.enabled ? Math.max(0, Math.min(1, (dark - 0.15) / 0.6)) : 0;
     this.mesh.visible = show > 0.01;
     if (!this.mesh.visible) return;
     this.#material.opacity = show;

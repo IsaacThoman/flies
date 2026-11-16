@@ -69,6 +69,22 @@ export class Batch {
   }
 }
 
+/** Frees everything under `root` on the GPU, textures too: a place the fly has been carried away from. */
+export function disposeAll(root: THREE.Object3D) {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
+    mesh.geometry?.dispose();
+    const materials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+    for (const material of materials) {
+      for (const value of Object.values(material)) if (value instanceof THREE.Texture) value.dispose();
+      const uniforms = (material as THREE.ShaderMaterial).uniforms;
+      if (uniforms) for (const u of Object.values(uniforms)) if (u.value instanceof THREE.Texture) u.value.dispose();
+      material.dispose();
+    }
+  });
+}
+
 /** Stops three.js recomputing a static object's matrices every frame. */
 export function freeze(object: THREE.Object3D) {
   object.updateMatrix();

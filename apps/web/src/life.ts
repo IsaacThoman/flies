@@ -6,8 +6,8 @@ import type { BrainSenses } from "@fly/brain";
 import type { BrainDriver } from "@fly/contracts";
 import { Behavior, FlyBody, SenseTracker } from "@fly/body";
 import type { Forces, Intent, Looming } from "@fly/body";
-import { PATCHES, Pantry, START } from "@fly/world";
-import type { Food, Vec3, World } from "@fly/world";
+import { Pantry } from "@fly/world";
+import type { Food, Place, Vec3, World } from "@fly/world";
 
 /** What the fly is doing, in a word, for the screen and for tests. */
 export type Activity = "resting" | "walking" | "backing" | "turning" | "grooming" | "feeding" | "tasting" | "flying" | "falling" | "waiting";
@@ -49,8 +49,20 @@ export class Life {
   constructor(world: World, brain: BrainDriver) {
     this.world = world;
     this.brain = brain;
-    this.pantry = new Pantry(world, PATCHES);
-    this.body = new FlyBody(world, { x: START.x, z: START.z, yaw: START.heading });
+    this.pantry = new Pantry(world, world.place.patches);
+    this.body = new FlyBody(world, world.place.start);
+  }
+
+  /**
+   * Carries the fly to another place: the world becomes that place, its food
+   * is set out, and the fly stands where the place starts it. The brain is
+   * the same brain, running on.
+   */
+  move(place: Place) {
+    this.world.load(place);
+    this.pantry.reset(place.patches);
+    this.body.place(place.start.x, place.start.z, place.start.yaw);
+    this.eating = false;
   }
 
   get intent(): Intent {

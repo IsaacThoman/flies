@@ -11,9 +11,10 @@
 import * as THREE from "three";
 import { FlyBody, createIntent } from "@fly/body";
 import type { FlyPose } from "@fly/contracts";
-import { createPicnic } from "@fly/world";
+import { World } from "@fly/world";
 import { DESIGN_WIDTH } from "./display.ts";
 import { FlyView } from "./fly-view.ts";
+import { picnic } from "./places/picnic/index.ts";
 import { Bubbles } from "./scene/bubbles.ts";
 import type { TimeOfDay } from "./scene/light.ts";
 import { FAR, NEAR, Stage } from "./stage.ts";
@@ -38,8 +39,9 @@ export type ArtShot = {
 };
 
 const canvas = document.getElementById("art") as HTMLCanvasElement;
-const world = createPicnic();
-const stage = new Stage(canvas, "noon");
+// The app's art is the picnic, where the fly first lives.
+const world = new World(picnic.place);
+const stage = new Stage(canvas, "noon", picnic);
 const fly = new FlyView(stage.scene, world);
 const bubbles = new Bubbles(stage.scene, world);
 const camera = new THREE.PerspectiveCamera(30, 16 / 9, NEAR.near, NEAR.far);
@@ -95,7 +97,7 @@ function renderTo(target: THREE.WebGLRenderTarget, shot: ArtShot) {
   camera.near = NEAR.near;
   camera.far = NEAR.far;
   camera.updateProjectionMatrix();
-  stage.table.group.visible = showTable;
+  stage.set.group.visible = showTable;
   bubbles.mesh.visible = showTable;
   fly.root.visible = showFly;
   fly.shadow.visible = showTable;

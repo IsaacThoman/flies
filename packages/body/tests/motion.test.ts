@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { SOLIDS, World, createPicnic } from "@fly/world";
 import type { Food } from "@fly/world";
-import { AIR_RADIUS, FlyBody, MOUTH_AHEAD, WALL_PATIENCE, createIntent } from "../src/index.ts";
+import { FlyBody, MOUTH_AHEAD, WALL_PATIENCE, createIntent } from "../src/index.ts";
 import type { Forces, Intent } from "../src/index.ts";
+
+/** A bare round table this wide, with nothing on it. */
+const openTable = (r: number) => new World({ floor: { kind: "circle", r }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320 });
 
 const DT = 1 / 60;
 const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
@@ -94,7 +97,7 @@ test("a take-off with the wings beating climbs well clear of the table", () => {
 });
 
 test("its wings hold it up in proportion to their drive", () => {
-  const world = new World([], 300);
+  const world = openTable(300);
   const flap = (wings: number) => {
     const body = new FlyBody(world, { x: 0, z: 0, yaw: 0 });
     body.step(intent({ takeOff: 0 }), still, DT);
@@ -106,10 +109,10 @@ test("its wings hold it up in proportion to their drive", () => {
 });
 
 test("in the air it is drawn back toward the table", () => {
-  const body = new FlyBody(new World([], 300), { x: 0, z: 0, yaw: Math.PI / 2 });
+  const body = new FlyBody(openTable(300), { x: 0, z: 0, yaw: Math.PI / 2 });
   body.step(intent({ takeOff: 1 }), still, DT);
   run(body, intent({ wings: 0.62, airYawRate: 0 }), 8);
-  assert.ok(Math.hypot(body.position.x, body.position.z) < AIR_RADIUS + 20);
+  assert.ok(Math.hypot(body.position.x, body.position.z) < 300 + 60);
 });
 
 test("it lands on top of a perch it comes down on", () => {
@@ -123,8 +126,8 @@ test("it lands on top of a perch it comes down on", () => {
 });
 
 test("with food to eat, the body brings its mouth to it", () => {
-  const body = new FlyBody(new World([], 300), { x: 0, z: 0, yaw: 0 });
-  const meal: Food = { id: 1, kind: "sugar", name: "Sugar", x: 1.5, y: 0, z: 2.5, r: 1.6, sweet: 1, amount: 1 };
+  const body = new FlyBody(openTable(300), { x: 0, z: 0, yaw: 0 });
+  const meal: Food = { id: 1, kind: "sugar", name: "Sugar", x: 1.5, y: 0, z: 2.5, r: 1.6, sweet: 1, amount: 1, pool: false };
   run(body, intent({ feeding: true, feed: 0.5 }), 2, { ...still, meal });
   const mouth = body.point(MOUTH_AHEAD, 0, 0, { x: 0, y: 0, z: 0 });
   assert.ok(Math.hypot(mouth.x - meal.x, mouth.z - meal.z) < meal.r, `mouth ${JSON.stringify(mouth)}`);

@@ -3,7 +3,8 @@
 // so the waveforms and the filtering are worked out here, sample by sample.
 //
 // The wing buzz follows the wings, the feet patter while it walks, and the
-// outdoors (a breeze, the lake, birds now and then) plays quietly underneath.
+// place's own sound (at the picnic a breeze, the lake and birds now and then)
+// plays quietly underneath.
 
 export type Sound = "move" | "select" | "back" | "blocked" | "tick" | "tool" | "drop" | "land" | "swoop" | "pop" | "takeoff" | "eat" | "open";
 
@@ -124,18 +125,28 @@ function chirp(ctx: BaseAudioContext, seed: number) {
   });
 }
 
+/** The sound of a place, under everything else: its loop, and whether birds call now and then. */
+export type Ambience = "outdoors";
+
+const AMBIENCES: Record<Ambience, { loop: (ctx: BaseAudioContext) => AudioBuffer; birds: boolean }> = {
+  outdoors: { loop: outdoorsLoop, birds: true },
+};
+
 type Loop = { source: AudioBufferSourceNode; gain: GainNode };
 
 export class Audio {
   readonly ctx: AudioContext | null;
   #effects: GainNode | null = null;
-  #outdoors: GainNode | null = null;
+  #ambient: GainNode | null = null;
   #buffers: Record<Sound, AudioBuffer> | null = null;
   #wings: Loop | null = null;
   #feet: Loop | null = null;
   #chirps: AudioBuffer[] = [];
   #nextChirp = 8;
   #started = false;
+  #ambience: Ambience = "outdoors";
+  #place: Loop | null = null;
+  #loops = new Map<Ambience, AudioBuffer>();
 
   constructor() {
     let ctx: AudioContext | null;
@@ -158,17 +169,39 @@ export class Audio {
     try {
       this.#effects = ctx.createGain();
       this.#effects.connect(ctx.destination);
-      this.#outdoors = ctx.createGain();
-      this.#outdoors.connect(ctx.destination);
+      this.#ambient = ctx.createGain();
+      this.#ambient.connect(ctx.destination);
       this.setVolumes(effects, ambience);
       this.#buffers = synthesise(ctx);
       this.#wings = this.#loop(wingLoop(ctx), this.#effects);
       this.#feet = this.#loop(feetLoop(ctx), this.#effects);
-      this.#loop(outdoorsLoop(ctx), this.#outdoors).gain.gain.value = 1;
       this.#chirps = [chirp(ctx, 21), chirp(ctx, 22), chirp(ctx, 23)];
+      this.#playAmbience();
     } catch {
       this.#buffers = null;
     }
+  }
+
+  /** Changes to another place's sound, fading the old one out. */
+  setAmbience(ambience: Ambience) {
+    if (ambience === this.#ambience) return;
+    this.#ambience = ambience;
+    if (this.#started) this.#playAmbience();
+  }
+
+  #playAmbience() {
+    const ctx = this.ctx;
+    if (!ctx || !this.#ambient) return;
+    const old = this.#place;
+    if (old) {
+      old.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.3);
+      old.source.stop(ctx.currentTime + 2);
+    }
+    // Each place's loop is synthesised the first time it is needed, and kept.
+    let buffer = this.#loops.get(this.#ambience);
+    if (!buffer) this.#loops.set(this.#ambience, (buffer = AMBIENCES[this.#ambience].loop(ctx)));
+    this.#place = this.#loop(buffer, this.#ambient);
+    this.#place.gain.gain.setTargetAtTime(1, ctx.currentTime, 0.4);
   }
 
   #loop(buffer: AudioBuffer, out: GainNode): Loop {
@@ -186,10 +219,10 @@ export class Audio {
 
   setVolumes(effects: number, ambience: number) {
     const ctx = this.ctx;
-    if (!ctx || !this.#effects || !this.#outdoors) return;
+    if (!ctx || !this.#effects || !this.#ambient) return;
     // Volumes 0 to 10, on a gentle curve.
     this.#effects.gain.setTargetAtTime((effects / 10) ** 2 * 0.8, ctx.currentTime, 0.05);
-    this.#outdoors.gain.setTargetAtTime((ambience / 10) ** 2 * 0.5, ctx.currentTime, 0.2);
+    this.#ambient.gain.setTargetAtTime((ambience / 10) ** 2 * 0.5, ctx.currentTime, 0.2);
   }
 
   play(sound: Sound, volume = 1, rate = 1) {
@@ -221,12 +254,12 @@ export class Audio {
     followParam(this.#feet.gain.gain, Math.min(1, walking) * 0.25 * near, now, 0.05);
     // Now and then, a bird.
     this.#nextChirp -= dt;
-    if (this.#nextChirp <= 0 && this.#outdoors && this.#chirps.length) {
+    if (this.#nextChirp <= 0 && this.#ambient && this.#chirps.length && AMBIENCES[this.#ambience].birds) {
       this.#nextChirp = 6 + Math.random() * 14;
       const source = ctx.createBufferSource();
       source.buffer = this.#chirps[Math.floor(Math.random() * this.#chirps.length)];
       source.playbackRate.value = 0.9 + Math.random() * 0.25;
-      source.connect(this.#outdoors);
+      source.connect(this.#ambient);
       source.start();
     }
   }

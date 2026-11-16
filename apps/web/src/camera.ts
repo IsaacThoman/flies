@@ -16,6 +16,7 @@ import { FLY_LENGTH } from "@fly/body";
 import type { FlyBody } from "@fly/body";
 import { topPeak } from "@fly/world";
 import type { RayHit, World } from "@fly/world";
+import type { SceneCamera } from "./places/types.ts";
 
 export type View = "close" | "follow" | "wide" | "table" | "above";
 export const VIEWS: readonly View[] = ["close", "follow", "wide", "table", "above"];
@@ -44,28 +45,31 @@ export type Shot = {
   across?: number;
 };
 
-/** The player's views. In ordinary play (Follow) the fly is 120 to 200 pixels long; Close up and Wide are the choices either side. */
-export const SHOTS: Record<View, Shot> = {
+/** The player's views round the fly. In ordinary play (Follow) the fly is 120 to 200 pixels long; Close up and Wide are the choices either side. Whole table is the place's own (SceneCamera.whole). */
+export const SHOTS: Record<Exclude<View, "table">, Shot> = {
   close: { around: "fly", distance: 6.2, height: 0.9, side: 1.25, low: -0.12, fov: 30, settle: 1.6, scout: true },
   follow: { around: "fly", distance: 11, height: 1.6, side: 1.85, low: 0.12, fov: 30, settle: 1.8, scout: true },
   wide: { around: "fly", distance: 30, height: 6, side: 2.1, low: 0.18, fov: 34, settle: 2.2, scout: true },
-  table: { around: "table", distance: 560, height: 170, side: 0.25, low: 0, fov: 40, settle: 1.6, orbit: 0.03 },
   above: { around: "fly", distance: 3.2, height: 13, side: Math.PI, low: 0, fov: 34, settle: 1.4 },
 };
 
 /** Behind the loading screen and the title: the fly small and to the left, clear of the wordmark and the menu on the right. */
 const TITLE: Shot = { around: "fly", distance: 18, height: 2.2, side: 1.75, low: 0.1, fov: 30, settle: 3, orbit: 0.01, scout: true, across: -0.56 };
 
-/** The wallpaper's shots, in turn: medium, portrait, wide among the fruit, the whole table, low across the cloth, from above. */
-const WALLPAPER: readonly Shot[] = [
+/** The wallpaper's shots of the fly: medium, portrait, wide among the things on the table, low across it, from above. The place's two wide shots go between them (`wallpaperShots`). */
+const WALLPAPER_FLY: readonly Shot[] = [
   { around: "fly", distance: 11, height: 1.6, side: 1.7, low: 0.1, fov: 28, settle: 3.5, orbit: 0.012, scout: true },
   { around: "fly", distance: 5.5, height: 0.8, side: 1.1, low: 0.05, fov: 28, settle: 3.5, orbit: -0.01, scout: true },
   { around: "fly", distance: 42, height: 7, side: 2.3, low: 0.22, fov: 32, settle: 4, orbit: 0.008, scout: true },
-  { around: "table", distance: 470, height: 110, side: -0.4, low: 0, fov: 38, settle: 4.5, orbit: 0.02 },
   { around: "fly", distance: 18, height: 1.1, side: 2.0, low: 0.16, fov: 24, settle: 4, orbit: 0.01, scout: true },
   { around: "fly", distance: 4.5, height: 15, side: Math.PI, low: 0, fov: 34, settle: 3.5, orbit: 0.02 },
-  { around: "table", distance: 600, height: 220, side: 0.9, low: 0, fov: 36, settle: 4.5, orbit: -0.015 },
 ];
+
+/** The wallpaper's shots in turn, for a place: three of the fly, the whole place, two of the fly, the whole place again. */
+export function wallpaperShots(scene: SceneCamera): Shot[] {
+  const [a, b, c, d, e] = WALLPAPER_FLY;
+  return [a, b, c, scene.wide[0], d, e, scene.wide[1]];
+}
 
 /** How far (mm) the camera keeps above whatever is under it. */
 const CLEARANCE = 1.1;
@@ -110,6 +114,8 @@ export class CameraDirector {
   /** Pins the camera (for screenshots and art): eye and target, or null to let it move. */
   pinned: { eye: THREE.Vector3Like; target: THREE.Vector3Like; fov?: number } | null = null;
   #world: World;
+  #scene!: SceneCamera;
+  #wallpaperShots: Shot[] = [];
   /** The camera's place: the point it circles (smoothed), its angle round it, distance, height, and where it aims. */
   #center = new THREE.Vector3();
   #aim = new THREE.Vector3();
@@ -136,9 +142,18 @@ export class CameraDirector {
   #dir = { x: 0, y: 0, z: 0 };
   #from = { x: 0, y: 0, z: 0 };
 
-  constructor(world: World, aspect: number) {
+  constructor(world: World, aspect: number, scene: SceneCamera) {
     this.#world = world;
     this.camera = new THREE.PerspectiveCamera(30, aspect, 0.5, 4000);
+    this.useScene(scene);
+  }
+
+  /** The place's own shots, for a place the fly has just been carried to: the camera starts afresh there. */
+  useScene(scene: SceneCamera) {
+    this.#scene = scene;
+    this.#wallpaperShots = wallpaperShots(scene);
+    this.#shot %= this.#wallpaperShots.length;
+    this.#started = false;
   }
 
   setView(view: View) {
@@ -150,7 +165,9 @@ export class CameraDirector {
 
   /** The shot being taken now. */
   get shot(): Shot {
-    return this.title ? TITLE : this.wallpaper ? WALLPAPER[this.#shot] : SHOTS[this.view];
+    if (this.title) return TITLE;
+    if (this.wallpaper) return this.#wallpaperShots[this.#shot];
+    return this.view === "table" ? this.#scene.whole : SHOTS[this.view];
   }
 
   /** Moves the camera on by `dt` seconds, framing the fly. */
@@ -171,7 +188,7 @@ export class CameraDirector {
       this.#shotTime += dt;
       if (this.#shotTime > (this.lively ? 14 : 24)) {
         this.#shotTime = 0;
-        this.#shot = (this.#shot + 1) % WALLPAPER.length;
+        this.#shot = (this.#shot + 1) % this.#wallpaperShots.length;
         this.#orbit = 0;
         this.#scoutIn = 0;
       }
@@ -366,7 +383,7 @@ export class CameraDirector {
     from.z = f.z + d.z * 0.5;
     if (world.raycast(from, d, this.#hit) && this.#hit.t < length - 0.5) return -Infinity;
     if (!shot.scout) return 0;
-    // What's behind the fly from there: something standing on the table, the nearer and taller the better; else the lake.
+    // What's behind the fly from there: something standing on the table, the nearer and taller the better; else the place's view.
     const gx = -d.x;
     const gz = -d.z;
     const gl = Math.hypot(gx, gz) || 1;
@@ -376,7 +393,7 @@ export class CameraDirector {
     from.x = f.x + d.x * 3;
     from.y = f.y + 0.5;
     from.z = f.z + d.z * 3;
-    let score = Math.max(0, -d.z) * 0.15;
+    let score = Math.max(0, d.x * this.#scene.vista.x + d.z * this.#scene.vista.z) * 0.15;
     const hit = world.raycast(from, d, this.#hit);
     if (hit && hit.solid >= 0 && hit.t < 400) {
       const solid = world.solids[hit.solid];
@@ -401,7 +418,7 @@ export class CameraDirector {
   startWallpaper() {
     this.wallpaper = true;
     this.#shotTime = 0;
-    this.#shot = (this.#shot + 1) % WALLPAPER.length;
+    this.#shot = (this.#shot + 1) % this.#wallpaperShots.length;
     this.#scoutIn = 0;
   }
 

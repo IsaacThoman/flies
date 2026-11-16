@@ -115,7 +115,6 @@ export class Eyes {
     this.#sky.layers.set(EYE_LAYER);
     this.#sky.frustumCulled = false;
     stage.scene.add(this.#sky);
-    for (const object of stage.table.seen) object.layers.enable(EYE_LAYER);
     // Lights answer to layers too: the eyes' views need them.
     stage.hemi.layers.enable(EYE_LAYER);
     stage.sun.layers.enable(EYE_LAYER);

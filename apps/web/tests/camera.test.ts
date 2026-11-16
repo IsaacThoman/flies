@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
 import type { FlyBody } from "@fly/body";
 import { createPicnic } from "@fly/world";
+import { picnic } from "../src/places/picnic/index.ts";
 import { CameraDirector, SHOTS } from "../src/camera.ts";
 import type { View } from "../src/camera.ts";
 
@@ -36,7 +37,7 @@ function settle(director: CameraDirector, body: FlyBody, seconds: number) {
 
 test("in ordinary play the fly is 120 to 200 pixels long, wherever it stands and whichever way it faces", () => {
   for (const [x, z, yaw] of [[-8, -8, 0.6], [40, 20, 2.5], [-60, 40, -1.2], [150, -60, 3], [0, 120, 1.5]]) {
-    const director = new CameraDirector(world, 16 / 9);
+    const director = new CameraDirector(world, 16 / 9, picnic.camera);
     const body = fakeBody(x, z, yaw);
     settle(director, body, 8);
     const length = lengthOnScreen(director.camera, body);
@@ -50,7 +51,7 @@ test("in ordinary play the fly is 120 to 200 pixels long, wherever it stands and
 test("close up is bigger than follow, and wide smaller", () => {
   const sizes: Partial<Record<View, number>> = {};
   for (const view of ["close", "follow", "wide"] as const) {
-    const director = new CameraDirector(world, 16 / 9);
+    const director = new CameraDirector(world, 16 / 9, picnic.camera);
     director.setView(view);
     const body = fakeBody(-8, -8, 0.6);
     settle(director, body, 8);
@@ -62,7 +63,7 @@ test("close up is bigger than follow, and wide smaller", () => {
 
 test("the camera keeps a walking, turning fly in the picture, never jumps, and is never inside anything", () => {
   for (const view of ["close", "follow", "wide", "above"] as const) {
-    const director = new CameraDirector(world, 16 / 9);
+    const director = new CameraDirector(world, 16 / 9, picnic.camera);
     director.setView(view);
     const body = fakeBody(-8, -8, 0.6);
     settle(director, body, 3);
@@ -97,7 +98,7 @@ test("the camera keeps a walking, turning fly in the picture, never jumps, and i
 });
 
 test("a jump stays mostly in the picture, the fly is framed again soon after it lands, and the camera never ends up on top of the fly after landing", () => {
-  const director = new CameraDirector(world, 16 / 9);
+  const director = new CameraDirector(world, 16 / 9, picnic.camera);
   const body = fakeBody(-8, -8, 0.6);
   settle(director, body, 3);
   body.mode = "airborne";

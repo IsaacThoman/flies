@@ -1,10 +1,28 @@
-// The world as the fly's body meets it: a round table with things standing on
-// it. It answers where the fly can stand, what it bumps into, and where a ray
-// from the camera lands. How the world looks is built from the same
-// description elsewhere (apps/web/src/scene), but nothing here depends on it.
+// The world as the fly's body meets it: a table top (round, or a rectangle:
+// a sill, a bench, a bar) with things standing on it. It answers where the
+// fly can stand, what it bumps into, and where a ray from the camera lands.
+// How the world looks is built from the same description elsewhere
+// (apps/web/src/scenes), but nothing here depends on it.
 
+import type { FoodPatch } from "./pantry.ts";
 import { footprintRadius, inside, prismSpan, sideNormal, topHeight, topNormal } from "./shapes.ts";
 import type { Solid, Vec3 } from "./shapes.ts";
+
+/** The top the fly lives on, centred on the origin at y = 0: a disc, or a rectangle with half-sizes hx and hz. */
+export type Floor = { kind: "circle"; r: number } | { kind: "rect"; hx: number; hz: number };
+
+/** A place the fly can live: everything its body meets there. */
+export type Place = {
+  floor: Floor;
+  /** What stands on it, as the fly feels it (and as it is drawn). Solids may stand beyond the floor's edge: walls, a window. */
+  solids: readonly Solid[];
+  /** The place's own food, eaten down and slowly coming back. */
+  patches: readonly FoodPatch[];
+  /** Where the fly first stands, and its yaw (radians; 0 faces +z). */
+  start: { x: number; z: number; yaw: number };
+  /** In the air it is drawn back below this height, mm. */
+  ceiling: number;
+};
 
 /** What is under a point: the height of the surface and which way it faces. */
 export type Surface = {
@@ -30,20 +48,61 @@ export type RayHit = {
 
 export const createSurface = (): Surface => ({ y: 0, normal: { x: 0, y: 1, z: 0 }, solid: -1, onTable: true });
 
+/**
+ * One world object for the whole game, whose place can change (`load`): the
+ * fly, the camera and everything else that asks it questions keep asking the
+ * same object when the fly is carried somewhere else.
+ */
 export class World {
-  readonly solids: readonly Solid[];
-  /** The table top is a disc of this radius (mm) around the origin, at y = 0. */
-  readonly tableRadius: number;
-  #radii: Float64Array;
+  place!: Place;
+  solids: readonly Solid[] = [];
+  floor!: Floor;
+  #radii = new Float64Array(0);
 
-  constructor(solids: readonly Solid[], tableRadius: number) {
-    this.solids = solids;
-    this.tableRadius = tableRadius;
-    this.#radii = Float64Array.from(solids, (s) => footprintRadius(s.footprint));
+  constructor(place: Place) {
+    this.load(place);
   }
 
+  load(place: Place) {
+    this.place = place;
+    this.solids = place.solids;
+    this.floor = place.floor;
+    this.#radii = Float64Array.from(place.solids, (s) => footprintRadius(s.footprint));
+  }
+
+  /** Over the table top (inside the floor's edge). */
   onTable(x: number, z: number) {
-    return x * x + z * z < this.tableRadius * this.tableRadius;
+    const f = this.floor;
+    return f.kind === "circle" ? x * x + z * z < f.r * f.r : Math.abs(x) < f.hx && Math.abs(z) < f.hz;
+  }
+
+  /**
+   * How far a point is past the floor's edge, mm (0 or less over the table),
+   * and the horizontal way back over it, written to `inward`.
+   */
+  beyond(x: number, z: number, inward: Vec3): number {
+    const f = this.floor;
+    inward.y = 0;
+    if (f.kind === "circle") {
+      const d = Math.hypot(x, z);
+      inward.x = d > 0 ? -x / d : 0;
+      inward.z = d > 0 ? -z / d : 0;
+      return d - f.r;
+    }
+    const ox = Math.abs(x) - f.hx;
+    const oz = Math.abs(z) - f.hz;
+    if (ox <= 0 && oz <= 0) {
+      // Inside: toward the middle, across the nearer edge.
+      inward.x = ox > oz ? -Math.sign(x) : 0;
+      inward.z = ox > oz ? 0 : -Math.sign(z);
+      return Math.max(ox, oz);
+    }
+    const px = Math.max(0, ox);
+    const pz = Math.max(0, oz);
+    const d = Math.hypot(px, pz);
+    inward.x = (-Math.sign(x) * px) / d;
+    inward.z = (-Math.sign(z) * pz) / d;
+    return d;
   }
 
   /** The highest surface over a point (the table top if nothing stands there). Writes `out`. */
@@ -80,15 +139,12 @@ export class World {
 
   /**
    * The way out of whatever rises above `y` at a point: the horizontal outward
-   * normal of the tallest column there, or toward the table's middle beyond
-   * its edge. Writes `out`; returns false when nothing there is above `y`.
+   * normal of the tallest column there, or back over the table beyond its
+   * edge. Writes `out`; returns false when nothing there is above `y`.
    */
   wallNormal(x: number, z: number, y: number, out: Vec3): boolean {
     if (!this.onTable(x, z)) {
-      const d = Math.hypot(x, z) || 1;
-      out.x = -x / d;
-      out.y = 0;
-      out.z = -z / d;
+      this.beyond(x, z, out);
       return true;
     }
     let best = -1;

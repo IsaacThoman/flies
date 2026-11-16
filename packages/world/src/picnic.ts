@@ -3,8 +3,10 @@
 // here, in millimetres; a fruit fly is about 2.5 mm long. The table's centre
 // is the origin, its top is y = 0, and the lake lies toward -z.
 
+import type { FoodPatch } from "./pantry.ts";
 import type { Solid } from "./shapes.ts";
 import { World } from "./world.ts";
+import type { Place } from "./world.ts";
 
 export const TABLE_RADIUS = 320;
 
@@ -48,17 +50,6 @@ export const SOLIDS: readonly Solid[] = [
   { name: "pip", footprint: { kind: "ellipse", x: -40, z: -21, rx: 0.95, rz: 1.7, angle: -0.5 }, top: { kind: "dome", base: 0, height: 0.9, power: 1 } },
 ];
 
-/** A patch of food built into the table: it can be eaten down and slowly comes back. */
-export type FoodPatch = {
-  name: string;
-  x: number;
-  z: number;
-  /** How far from (x, z) it tastes, mm. */
-  r: number;
-  /** 0 to 1. */
-  sweet: number;
-};
-
 /** The table's own food. Heights come from the surface under each. */
 export const PATCHES: readonly FoodPatch[] = [
   { name: "honey", x: 30, z: -64, r: 7, sweet: 1 },
@@ -67,7 +58,7 @@ export const PATCHES: readonly FoodPatch[] = [
   // A bruise on top of the whole strawberry, for a fly that climbs it.
   { name: "strawberry juice", x: 18, z: 52, r: 4, sweet: 0.7 },
   // Lemonade dripped down the jar and pooled in the saucer's moat, on the side toward the middle of the table.
-  { name: "lemonade", x: -77.7, z: -45.7, r: 6, sweet: 0.7 },
+  { name: "lemonade", x: -77.7, z: -45.7, r: 6, sweet: 0.7, pool: true },
   { name: "orange", x: -128, z: 54, r: 18, sweet: 0.6 },
   { name: "sugar", x: 126, z: 61, r: 8, sweet: 1 },
   { name: "sugar", x: 112, z: 56, r: 5, sweet: 1 },
@@ -77,8 +68,8 @@ export const PATCHES: readonly FoodPatch[] = [
   { name: "spilt sugar", x: -36, z: -24, r: 4, sweet: 1 },
 ];
 
-/** Where the fly first stands, and which way it faces (radians from +x toward -z). */
-export const START = { x: -8, z: -8, heading: 0.6 };
+/** Where the fly first stands, and which way it faces. */
+export const START = { x: -8, z: -8, yaw: 0.6 };
 
 /** Flat things lying on the table that change nothing for the fly: they are drawn, not felt. */
 export const DECOR = {
@@ -92,6 +83,8 @@ export const DECOR = {
   ],
 };
 
+export const PICNIC: Place = { floor: { kind: "circle", r: TABLE_RADIUS }, solids: SOLIDS, patches: PATCHES, start: START, ceiling: 320 };
+
 export function createPicnic(): World {
-  return new World(SOLIDS, TABLE_RADIUS);
+  return new World(PICNIC);
 }

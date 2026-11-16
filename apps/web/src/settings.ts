@@ -1,6 +1,7 @@
 // The player's settings, kept in localStorage.
 
 import type { PixelSize } from "./display.ts";
+import type { PlaceId } from "./places/catalog.ts";
 
 export type EyesDetail = "off" | "low" | "high";
 
@@ -19,6 +20,10 @@ export type Settings = {
   hints: boolean;
   /** Small frame-cost counters in a corner. */
   stats: boolean;
+  /** Where the fly lives: one place, or each in turn (it moves on during a long wallpaper). */
+  place: PlaceId | "turns";
+  /** Where it was last, to come back to. */
+  scene: PlaceId;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -30,6 +35,8 @@ export const DEFAULT_SETTINGS: Settings = {
   eyes: "low",
   hints: true,
   stats: false,
+  place: "turns",
+  scene: "picnic",
 };
 
 const KEY = "apple-tv-fly.settings";

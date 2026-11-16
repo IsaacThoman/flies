@@ -1,15 +1,14 @@
-// The rendered world: the backdrop and the table in their two passes, the
-// light of the day and the reflections that follow it, and the frame's cost.
+// The rendered world: the place's backdrop and its table in their two passes,
+// the light of the day and the reflections that follow it, the veil drawn
+// while the fly is carried to another place, and the frame's cost.
 
 import * as THREE from "three";
 import { PIXEL_SIZES, RENDER_HEIGHT, RENDER_WIDTH } from "./display.ts";
 import type { PixelSize } from "./display.ts";
-import { buildBackdrop } from "./scene/backdrop.ts";
-import type { Backdrop } from "./scene/backdrop.ts";
+import type { Scene, SceneBackdrop, SceneSet } from "./places/types.ts";
+import { disposeAll } from "./scene/build.ts";
 import { Daylight } from "./scene/light.ts";
 import type { TimeOfDay } from "./scene/light.ts";
-import { buildTable } from "./scene/table.ts";
-import type { Table } from "./scene/table.ts";
 
 /** The near pass covers the table, from this close to this far (mm); the backdrop the rest. */
 export const NEAR = { near: 0.5, far: 4000 };
@@ -40,14 +39,18 @@ function buildEnvironment(light: Daylight) {
   return scene;
 }
 
+const VEIL_CAMERA = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
 export type FrameCost = { calls: number; triangles: number; textures: number; geometries: number };
 
 export class Stage {
   readonly renderer: THREE.WebGLRenderer;
   readonly light: Daylight;
-  readonly backdrop: Backdrop;
+  /** The place shown, its far pass and its table. */
+  current: Scene;
+  backdrop: SceneBackdrop;
+  set: SceneSet;
   readonly scene = new THREE.Scene();
-  readonly table: Table;
   readonly hemi: THREE.HemisphereLight;
   readonly sun: THREE.DirectionalLight;
   readonly cost: FrameCost = { calls: 0, triangles: 0, textures: 0, geometries: 0 };
@@ -57,9 +60,14 @@ export class Stage {
   #envDirty = true;
   #lowRes: THREE.WebGLRenderTarget | null = null;
   #blit: { scene: THREE.Scene; camera: THREE.OrthographicCamera; material: THREE.MeshBasicMaterial } | null = null;
+  #veil: { scene: THREE.Scene; material: THREE.MeshBasicMaterial };
   pixels: PixelSize = "classic";
+  /** 0 to 1: how far the world is faded to black (while the fly is carried somewhere else). One draw while above 0. */
+  veil = 0;
+  /** How long building the place shown took, ms: all JavaScript, so on the Apple TV many times this. */
+  buildMs = 0;
 
-  constructor(canvas: HTMLCanvasElement, time: TimeOfDay) {
+  constructor(canvas: HTMLCanvasElement, time: TimeOfDay, scene: Scene) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance", stencil: false });
     renderer.setPixelRatio(1);
     renderer.setSize(RENDER_WIDTH, RENDER_HEIGHT, false);
@@ -68,16 +76,43 @@ export class Stage {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NoToneMapping;
     this.renderer = renderer;
-    this.light = new Daylight(time);
-    this.backdrop = buildBackdrop(this.light);
-    this.table = buildTable();
-    this.scene.add(this.table.group);
+    this.current = scene;
+    this.light = new Daylight(time, scene.palettes);
+    const started = performance.now();
+    this.backdrop = scene.buildBackdrop(this.light);
+    this.set = scene.buildSet();
+    this.buildMs = performance.now() - started;
+    this.scene.add(this.set.group);
     this.hemi = new THREE.HemisphereLight(this.light.skyColor, this.light.groundColor, this.light.hemiIntensity);
     this.sun = new THREE.DirectionalLight(this.light.sunColor, this.light.sunIntensity);
     this.scene.add(this.hemi, this.sun);
     this.#pmrem = new THREE.PMREMGenerator(renderer);
     this.#envScene = buildEnvironment(this.light);
+    const veil = new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, depthTest: false, depthWrite: false, toneMapped: false });
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), veil);
+    quad.frustumCulled = false;
+    this.#veil = { scene: new THREE.Scene().add(quad), material: veil };
     this.#applyLight();
+  }
+
+  /**
+   * Shows another place: builds its backdrop and table, frees the old ones,
+   * and settles its light at once. Building takes a while (all of it is
+   * JavaScript, and on the Apple TV slow), so do it behind the veil.
+   */
+  load(scene: Scene) {
+    this.scene.remove(this.set.group);
+    disposeAll(this.set.group);
+    disposeAll(this.backdrop.scene);
+    this.current = scene;
+    this.light.use(scene.palettes);
+    const started = performance.now();
+    this.backdrop = scene.buildBackdrop(this.light);
+    this.set = scene.buildSet();
+    this.buildMs = performance.now() - started;
+    this.scene.add(this.set.group);
+    this.#applyLight();
+    this.#envDirty = true;
   }
 
   setTime(time: TimeOfDay) {
@@ -92,7 +127,7 @@ export class Stage {
       this.#envDirty = true;
     }
     this.backdrop.update(time, camera, this.light);
-    this.table.update(time);
+    this.set.update(time, this.light);
   }
 
   #applyLight() {
@@ -103,7 +138,7 @@ export class Stage {
     this.sun.color.copy(l.sunColor);
     this.sun.intensity = l.sunIntensity;
     this.sun.position.copy(l.sunDirection);
-    for (const m of this.table.materials) m.envMapIntensity = (m.userData.envBase ??= m.envMapIntensity) * l.env;
+    for (const m of this.set.materials) m.envMapIntensity = (m.userData.envBase ??= m.envMapIntensity) * l.env;
   }
 
   #envAge = 1;
@@ -150,6 +185,10 @@ export class Stage {
       r.setRenderTarget(null);
       r.clear(true, true, false);
       r.render(this.#blit.scene, this.#blit.camera);
+    }
+    if (this.veil > 0.002) {
+      this.#veil.material.opacity = Math.min(1, this.veil);
+      r.render(this.#veil.scene, VEIL_CAMERA);
     }
   }
 

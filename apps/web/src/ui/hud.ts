@@ -6,6 +6,8 @@ import { INK, INK_SOFT, bubbleRing, glassPanel, hintChip, hintWidth, orb, pill, 
 import type { Glyph } from "@fly/ui";
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from "../display.ts";
 import type { Activity } from "../life.ts";
+import { placeInfo } from "../places/catalog.ts";
+import type { PlaceId } from "../places/catalog.ts";
 import { TOOLS } from "../tools/hands.ts";
 import type { Hands } from "../tools/hands.ts";
 import { PICTURE_PANEL } from "../eyes/eyes.ts";
@@ -13,6 +15,8 @@ import { drawToolIcon } from "../tools/view.ts";
 
 export type HudState = {
   hands: Hands;
+  /** Where the fly is now, for the Place tool. */
+  here: PlaceId;
   activity: Activity;
   /** What it is tasting or eating, if anything. */
   food: string | null;
@@ -47,9 +51,9 @@ export function caption(activity: Activity, food: string | null) {
 }
 
 /** What Select does with the current tool, in a few words. */
-export function actionLabel(hands: Hands): { glyph: Glyph; label: string } | null {
+export function actionLabel(hands: Hands, here: PlaceId): { glyph: Glyph; label: string } | null {
   const tool = hands.current;
-  const variant = hands.variant.label.toLowerCase();
+  const variant = hands.label.toLowerCase();
   switch (tool.id) {
     case "feed":
       return { glyph: "select", label: `Drop ${variant}` };
@@ -59,6 +63,8 @@ export function actionLabel(hands: Hands): { glyph: Glyph; label: string } | nul
       return { glyph: "hold", label: "Hold to tickle" };
     case "blow":
       return { glyph: "hold", label: `Hold to blow ${hands.variant.id === "strong" ? "hard" : "gently"}` };
+    case "place":
+      return hands.place === here ? null : { glyph: "select", label: `Go to ${placeInfo(hands.place).to}` };
     default:
       return null;
   }
@@ -84,7 +90,7 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState) {
   // The tool's name and kind, over the shelf.
   const tool = hands.current;
   const many = tool.variants.length > 1;
-  const label = many ? `${tool.name} · ${hands.variant.label}` : tool.name;
+  const label = many ? `${tool.name} · ${hands.label}` : tool.name;
   g.font = `700 17px sans-serif`;
   const lw = Math.max(150, hintWidth(g, label, 17) + (many ? 40 : 0));
   const pop = Math.max(0, 1 - s.changed * 4) * 3;
@@ -99,8 +105,8 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState) {
   if (s.hints) {
     const hy = DESIGN_HEIGHT - 34;
     hintChip(g, 16, hy, "leftRight", "Tools", t, 13);
-    if (many) hintChip(g, 16, hy - 34, "upDown", tool.id === "light" ? "Time of day" : tool.id === "view" ? "Camera" : "Kind", t, 13);
-    const action = actionLabel(hands);
+    if (many) hintChip(g, 16, hy - 34, "upDown", tool.id === "light" ? "Time of day" : tool.id === "view" ? "Camera" : tool.id === "place" ? "Where" : "Kind", t, 13);
+    const action = actionLabel(hands, s.here);
     if (action) hintChip(g, 16, many ? hy - 68 : hy - 34, action.glyph, action.label, t, 13);
     const right = DESIGN_WIDTH - 16;
     if (s.teachSwipe || hands.following) {
