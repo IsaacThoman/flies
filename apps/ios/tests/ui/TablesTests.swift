@@ -46,9 +46,10 @@ final class TablesTests: XCTestCase {
     // Away (another app over the whole screen), as a phone is whenever its owner does something
     // else: iOS suspends the app, and the fly rests at the table until it is back.
     XCUIApplication(bundleIdentifier: "com.apple.Preferences").activate()
+    // Settings can take a while to come up on a busy Mac: away is counted from when the app has gone.
+    XCTAssertTrue(app.wait(for: .runningBackgroundSuspended, timeout: 60) || app.state == .runningBackground, "in the background")
     print("check-tables: away")
     sleep(10)
-    XCTAssertNotEqual(app.state, .runningForeground, "in the background")
     let returned = Date()
     print("check-tables: back")
     app.activate()
