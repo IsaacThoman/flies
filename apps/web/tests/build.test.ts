@@ -13,12 +13,11 @@ import { siteAssociation } from "../../../scripts/webBuild.ts";
 
 const root = path.join(import.meta.dirname, "../../..");
 const out = mkdtempSync(path.join(tmpdir(), "fly-web-build-"));
-/** A team for the build to name in the site's association, as the owner's would be (docs/deploy.md). */
-const TEAM = "ABCDE12345";
+const TEAM = "PX72AL9366";
 
 before(async () => {
   const team = process.env.APPLE_TEAM_ID;
-  process.env.APPLE_TEAM_ID = TEAM;
+  delete process.env.APPLE_TEAM_ID;
   try {
     await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "silent", build: { outDir: out, emptyOutDir: true } });
   } finally {
@@ -98,7 +97,7 @@ test("the page is an installable app, credits the connectome, and its service wo
   assert.ok(kept.includes("./"));
 });
 
-test("given the owner's team, the site vouches for the app: table links open it, and its passwords are the site's", () => {
+test("by default the site vouches for the app: table links open it, and its passwords are the site's", () => {
   const app = `${TEAM}.com.isaacthoman.flies`;
   assert.deepEqual(JSON.parse(read(".well-known/apple-app-site-association")), {
     applinks: { details: [{ appIDs: [app], components: [{ "/": "/", "?": { table: "??????????" }, comment: "A table's link" }] }] },
@@ -106,9 +105,13 @@ test("given the owner's team, the site vouches for the app: table links open it,
   });
 });
 
-test("without a team there is no association, and a team that can't be one stops the build", () => {
-  assert.equal(siteAssociation(undefined), null);
-  assert.equal(siteAssociation(""), null);
+test("an empty team uses the default, another team overrides it, and 0 disables the association", () => {
+  assert.equal(siteAssociation(""), read(".well-known/apple-app-site-association"));
+  const app = "ABCDE12345.com.isaacthoman.flies";
+  const other = JSON.parse(siteAssociation("ABCDE12345")!);
+  assert.deepEqual(other.applinks.details[0].appIDs, [app]);
+  assert.deepEqual(other.webcredentials.apps, [app]);
+  assert.equal(siteAssociation("0"), null);
   for (const team of ["TEAMID", "abcde12345", "ABCDE12345 ", "<TEAMID>"]) assert.throws(() => siteAssociation(team), /APPLE_TEAM_ID/, team);
 });
 

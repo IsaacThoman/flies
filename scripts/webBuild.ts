@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
 import type { Connect, Plugin } from "vite";
+import { DEFAULT_TEAM_ID } from "./appleConfig.ts";
 import type { BrainFile } from "../apps/web/src/brain/download.ts";
 import { encodeWire } from "../apps/web/src/brain/wire.ts";
 import { CODE_LENGTH } from "../packages/net/src/protocol.ts";
@@ -155,13 +156,13 @@ const APP_BUNDLE_ID = "com.isaacthoman.flies";
 /**
  * The site's side of the iPhone and iPad app's Associated Domains (docs/ios.md, "Universal links"):
  * a table's link (the site's page with ?table= and a code) opens the app where it is installed, and
- * password AutoFill offers the site's passwords in it. It names the app by its team, which only the
- * owner can give (APPLE_TEAM_ID), so without one there is no file: the host answers 404, and phones
- * open the links in Safari. A team that can't be one stops the build, rather than publish an
- * association that names nobody.
+ * password AutoFill offers the site's passwords in it. APPLE_TEAM_ID overrides the Apple apps'
+ * default team; 0 leaves out the file, so the host answers 404 and phones open links in Safari.
+ * A team that can't be one stops the build rather than publish an association that names nobody.
  */
 export function siteAssociation(teamId = process.env.APPLE_TEAM_ID): string | null {
-  if (!teamId) return null;
+  if (teamId === "0") return null;
+  teamId ||= DEFAULT_TEAM_ID;
   if (!/^[A-Z0-9]{10}$/.test(teamId)) throw new Error(`APPLE_TEAM_ID must be a Team ID, ten capital letters and digits, not ${JSON.stringify(teamId)}`);
   const app = `${teamId}.${APP_BUNDLE_ID}`;
   const association = {
@@ -175,7 +176,7 @@ export function siteAssociation(teamId = process.env.APPLE_TEAM_ID): string | nu
  * The parts that make the page an app: the manifest with its icons, the
  * service worker that keeps the page for opening offline (it leaves the brain
  * to the page, download.ts), given FLY_SITE_URL, absolute links for link
- * previews, and given APPLE_TEAM_ID, the site's association with the iPhone
+ * previews, and the site's association with the iPhone
  * and iPad app. Build only: the dev server has none of them.
  */
 export function webApp({ siteUrl = process.env.FLY_SITE_URL, teamId = process.env.APPLE_TEAM_ID }: { siteUrl?: string; teamId?: string } = {}): Plugin {

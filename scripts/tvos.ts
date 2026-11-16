@@ -5,12 +5,12 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, r
 import path from 'node:path';
 import { CANVAS_OPS, GL_OPS, OP } from '../apps/tvos/runtime/ops.ts';
 import { archive, ARCHIVE_USAGE, archiveOptions } from './apple.ts';
+import { DEFAULT_TEAM_ID } from './appleConfig.ts';
 import { writeAssetCatalog } from './tvosAssets.ts';
 
 const root = path.join(import.meta.dirname, '..');
 const appDir = path.join(root, 'apps/tvos');
 const www = path.join(appDir, 'www');
-const DEFAULT_TEAM_ID = 'PX72AL9366';
 const DEFAULT_BUNDLE_ID = 'com.isaacthoman.flies';
 export const TEAM_ID = process.env.TVOS_TEAM_ID || DEFAULT_TEAM_ID;
 export const BUNDLE_ID = process.env.TVOS_BUNDLE_ID || DEFAULT_BUNDLE_ID;

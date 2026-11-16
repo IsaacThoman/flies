@@ -40,7 +40,7 @@
 		root * /srv
 		route {
 			# Missing data or scripts must be 404s, never the SPA entry; so must the
-			# app site association when the build has none (no APPLE_TEAM_ID).
+			# app site association when disabled (APPLE_TEAM_ID=0).
 			@spa {
 				not path /assets/* /brain/* /sw.js /manifest.webmanifest *.wasm /.well-known/*
 				not file {path}

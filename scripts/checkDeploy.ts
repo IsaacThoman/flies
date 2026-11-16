@@ -37,7 +37,15 @@ const spa = await fetch(new URL("a-page-that-does-not-exist", base));
 assert.equal(spa.status, 200);
 assert.equal(spa.headers.get("cache-control"), "no-cache");
 assert.match(spa.headers.get("content-type") ?? "", /^text\/html/);
-// Without APPLE_TEAM_ID the build has no association, and Apple's devices must be told so, not handed the page.
+if (files.includes(SITE_ASSOCIATION)) {
+  console.log("· App links: JSON at the well-known path, no redirect, matching the built association");
+  const response = await fetch(new URL(`/${SITE_ASSOCIATION}`, base), { redirect: "manual" });
+  assert.equal(response.status, 200, SITE_ASSOCIATION);
+  assert.equal(response.headers.get("location"), null, "the association must not redirect");
+  assert.equal(response.headers.get("content-type")?.split(";")[0], "application/json");
+  assert.deepEqual(await response.json(), JSON.parse(readFileSync(path.join(values.dir, SITE_ASSOCIATION), "utf8")));
+}
+// With APPLE_TEAM_ID=0 the build has no association, and Apple's devices must be told so, not handed the page.
 for (const file of ["brain/missing.bin", "assets/missing.js", ...(files.includes(SITE_ASSOCIATION) ? [] : [SITE_ASSOCIATION])]) {
   assert.equal((await fetch(new URL(file, base))).status, 404, file);
 }

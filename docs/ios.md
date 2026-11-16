@@ -231,17 +231,19 @@ tap. So the app adds nothing for it. Both seen in the simulators.
 A table's link opens the app where it is installed, instead of Safari, when both sides say so:
 
 - **The site** serves `/.well-known/apple-app-site-association`, naming the app by its team and
-  bundle ID, `<TEAMID>.com.isaacthoman.flies`: `applinks` for its own page with a `table` of ten
+  bundle ID, `PX72AL9366.com.isaacthoman.flies`: `applinks` for its own page with a `table` of ten
   characters (in the components form, so nothing else on the site opens the app), and
-  `webcredentials` for password AutoFill. The web build writes it only when `APPLE_TEAM_ID` is set
-  ([deploy.md](deploy.md#the-iphone-and-ipad-apps-links)); without it there is no file, and links
-  open in Safari, which plays them as well.
+  `webcredentials` for password AutoFill. The web build writes it by default, using the Apple
+  apps' team (`scripts/appleConfig.ts`). `APPLE_TEAM_ID` overrides the team; unset or blank uses
+  the default. Set `APPLE_TEAM_ID=0` and rebuild to omit the file: links then open in Safari,
+  which plays them as well ([deploy.md](deploy.md#the-iphone-and-ipad-apps-links)).
 - **The app** has the Associated Domains entitlement (`applinks:flies.isaacthoman.com` and
   `webcredentials:flies.isaacthoman.com`) only when it is built with `IOS_LINKS=1`
   (`apps/ios/links.yml`, merged into `project.yml` as `apps/tvos/weatherkit.yml` is for the Apple
-  TV). It is off by default because signing a device build with it needs the App ID to have the
-  capability, which is the owner's to turn on in the developer account. Nothing here changes
-  signing, the team or the App ID.
+  TV). TestFlight releases turn it on by default; set the repository variable `IOS_LINKS` to `0`
+  to turn it off. Local builds and archives still require `IOS_LINKS=1` to opt in (omit it or
+  use `IOS_LINKS=0` to leave it out). Associated Domains is already enabled on the owner's App ID;
+  another App ID needs the capability before signing a build with links.
 
 The app takes a link (`src/Links.swift`, unit-tested) only if it is https, to
 `flies.isaacthoman.com`, its own page, with a `table` that could be a table's code; anything else
@@ -424,20 +426,24 @@ with its GPU. They say the app works, not how a phone runs it.
    in App Store Connect.
 4. For table links that open the app, and the site's passwords in it (universal links, above), in
    this order:
-   1. Find the Team ID: [developer account](https://developer.apple.com/account), Membership
-      details (ten capital letters and digits).
-   2. On the server, set `APPLE_TEAM_ID=<that ID>` in `.env` and redeploy the site
+   1. The default team is `PX72AL9366`, shared by the Apple apps and the site's association.
+      For another team, find its ID in [developer account](https://developer.apple.com/account),
+      Membership details (ten capital letters and digits), and override the app's team too.
+   2. Deploy the site; it publishes the association by default. For another team, set
+      `APPLE_TEAM_ID=<that ID>` in `.env` (a build variable in Coolify) and rebuild
       ([deploy.md](deploy.md#the-iphone-and-ipad-apps-links)). Check it:
       `curl -i https://flies.isaacthoman.com/.well-known/apple-app-site-association` answers 200,
-      `application/json`, no redirect, naming `<TEAMID>.com.isaacthoman.flies`. Apple's CDN
+      `application/json`, no redirect, naming `PX72AL9366.com.isaacthoman.flies` by default. Apple's CDN
       fetches it from there (`https://app-site-association.cdn-apple.com/a/v1/flies.isaacthoman.com`
       shows what it has), and can take a while to see a change.
    3. In the developer account, Certificates, Identifiers & Profiles → Identifiers →
-      `com.isaacthoman.flies`, turn on Associated Domains and save. (Xcode may say the profile
+      `com.isaacthoman.flies`, Associated Domains is already on. For another App ID, turn it on
+      and save. (Xcode may say the profile
       must be made again; automatic signing does that on the next build.)
    4. Build with it: `IOS_LINKS=1 npm run ios -- build`, then `npm run ios -- run --device <udid>`.
-      For TestFlight, set `IOS_LINKS=1` in the release workflow's environment
-      (`.github/workflows/testflight.yml`, [release.md](release.md)) or archive by hand with it.
+      TestFlight releases already use `IOS_LINKS=1` (`.github/workflows/testflight.yml`,
+      [release.md](release.md)); set the repository variable `IOS_LINKS=0` to disable it.
+      Archives by hand need `IOS_LINKS=1` explicitly.
    5. On the phone: send yourself a room's link (Online → New room in a browser, then Share the
       link) in Messages or Notes and tap it: the app opens and sits down in that room. A link typed
       into Safari's address bar opens the page in Safari, by design. A password given to a new room

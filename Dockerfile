@@ -24,7 +24,8 @@ COPY . .
 ARG FLY_SITE_URL
 # Coolify's address for the web service, a preview's own in a preview.
 ARG SERVICE_URL_WEB
-# The owner's Apple Team ID: with it the site vouches for the iPhone and iPad app (docs/deploy.md).
+# Optional team override (0 disables app links). The default lives in scripts/appleConfig.ts,
+# not Compose: Coolify passes --build-arg KEY for variables it knows (see #52).
 ARG APPLE_TEAM_ID
 RUN --mount=type=cache,target=/app/node_modules/.cache \
   FLY_SITE_URL="${FLY_SITE_URL:-$SERVICE_URL_WEB}" npm run build

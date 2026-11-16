@@ -13,6 +13,7 @@ services:
         # Coolify's https:// address for this service, production's or a
         # preview's own; the build uses it when FLY_SITE_URL is unset.
         SERVICE_URL_WEB: ${SERVICE_URL_WEB:-}
+        # Empty uses the build script's team; 0 disables app links.
         APPLE_TEAM_ID: ${APPLE_TEAM_ID:-}
     environment:
       ROOMS_HOST: ${ROOMS_HOST:-rooms}

@@ -45,10 +45,12 @@ jobs:
     env:
       UPLOAD: ${{ inputs.upload }}
       VERSION: ${{ inputs.version }}
-      # Empty falls back to scripts/tvos.ts's team, which the iPhone and iPad app shares.
+      # Empty falls back to scripts/appleConfig.ts's team, shared by both apps and the site.
       TVOS_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
       # The weather outside on the Apple TV, once the App ID has the WeatherKit capability.
       TVOS_WEATHERKIT: ${{ vars.TVOS_WEATHERKIT }}
+      # Associated Domains is enabled on the App ID; set the repository variable to 0 to opt out.
+      IOS_LINKS: ${{ vars.IOS_LINKS || '1' }}
     steps:
       - uses: actions/checkout@v5
         with:

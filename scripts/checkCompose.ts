@@ -23,7 +23,7 @@ interface Compose {
 }
 
 // Shell variables beat env files, and COMPOSE_FILE can bypass default discovery.
-const variables = ["SERVICE_URL_WEB", "FLY_SITE_URL", "TRUSTED_PROXIES", "CLIENT_IP_HEADERS", "ROOMS_PORT", "ROOMS_HOST", "HTTP_PORT"];
+const variables = ["SERVICE_URL_WEB", "FLY_SITE_URL", "APPLE_TEAM_ID", "TRUSTED_PROXIES", "CLIENT_IP_HEADERS", "ROOMS_PORT", "ROOMS_HOST", "HTTP_PORT"];
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !variables.includes(key) && !key.startsWith("COMPOSE_")));
 const temp = mkdtempSync(join(tmpdir(), "fly-check-compose-"));
 function config(coolify: boolean, values: Record<string, string> = {}): Compose {
@@ -63,6 +63,12 @@ try {
   }
 
   const trusted = "203.0.113.7/32 10.0.0.0/8";
+  for (const team of ["", "ABCDE12345", "0"]) {
+    for (const coolify of [true, false]) {
+      assert.equal(config(coolify, { APPLE_TEAM_ID: team }).services.web.build?.args?.APPLE_TEAM_ID, team,
+        "the team override or opt-out must reach the build, with the default left to the script");
+    }
+  }
   const runtime = config(true, { TRUSTED_PROXIES: trusted, ROOMS_PORT: "3100" }).services;
   assert.equal(runtime.web.environment?.TRUSTED_PROXIES, trusted, "web must honor TRUSTED_PROXIES from the env file");
   assert.equal(runtime.web.environment?.ROOMS_PORT, "3100", "web must honor ROOMS_PORT from the env file");
