@@ -148,6 +148,12 @@ export class FlyBody {
     this.velocity.x = this.velocity.y = this.velocity.z = 0;
     this.mode = "standing";
     this.#world.surface(x, z, this.surface);
+    this.blocked = false;
+    this.groundSpeed = this.turnRate = 0;
+    this.#pressed = this.#awayLeft = 0;
+    this.events.tookOff = this.events.jumped = this.events.landed = false;
+    this.events.hit = 0;
+    this.#easeUp(this.surface.normal, 1);
   }
 
   step(intent: Intent, forces: Forces, dt: number) {

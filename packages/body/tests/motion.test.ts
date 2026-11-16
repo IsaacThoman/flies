@@ -219,3 +219,20 @@ test("walking cannot cut through the corner of the lab's tip box", () => {
   const dz = body.position.z - before.z;
   assert.ok(Math.abs(dx) < 1e-9 || Math.abs(dz - dx / Math.tan(body.yaw)) > 1e-6, "blocked or slid, never crossed the corner");
 });
+
+test("being placed elsewhere clears the old wall turn, motion and contact", () => {
+  const world = createPicnic();
+  const jam = SOLIDS.find(s => s.name === "jam")!.footprint as { x: number; z: number; r: number };
+  const body = new FlyBody(world, { x: jam.x - jam.r - 2, z: jam.z, yaw: Math.PI / 2 });
+  run(body, intent({ speed: 10 }), WALL_PATIENCE + 0.4);
+  body.events.hit = 300;
+  body.place(0, -150, 0);
+  assert.equal(body.blocked, false);
+  assert.deepEqual(body.events, { tookOff: false, jumped: false, landed: false, hit: 0 });
+  assert.equal(body.groundSpeed, 0);
+  assert.equal(body.turnRate, 0);
+  assert.deepEqual(body.up, { x: 0, y: 1, z: 0 });
+  body.step(intent({ speed: 10 }), still, DT);
+  assert.equal(body.yaw, 0, "no turn carried over from the old wall");
+  assert.ok(body.position.z > -150, "walks immediately on the new floor");
+});
