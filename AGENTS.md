@@ -34,4 +34,11 @@ the rules the whole thing is built on.
 
 - Never add AI attribution: no co-author trailers, no "generated with" lines.
 - Branches are named in conventional-commit style (`feat-...`, `fix-...`).
-- Don't commit screenshots, recordings or other test evidence.
+- Don't commit screenshots, recordings or other test evidence to `dev` or a
+  feature branch. To show them in a pull request, push them alone to an
+  orphan branch named `pr-assets-<topic>` (a commit with no parent, holding
+  only the images: "PR assets: ...") and put them inline in the PR's
+  description as Markdown images, before and after side by side in a table
+  where that helps. The repository is private, so link them as
+  `https://github.com/IsaacThoman/flies/blob/pr-assets-<topic>/<file>?raw=true`
+  (a raw.githubusercontent.com link doesn't load). Not in gists.
