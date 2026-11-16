@@ -153,6 +153,24 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolId, x: numbe
       g.fill();
       break;
     }
+    case "place": {
+      // A map pin.
+      g.fillStyle = "#ff5a6e";
+      g.strokeStyle = "#b0183a";
+      g.lineWidth = r * 0.08;
+      g.beginPath();
+      g.moveTo(0, r * 0.9);
+      g.bezierCurveTo(-r * 0.25, r * 0.35, -r * 0.62, r * 0.05, -r * 0.62, -r * 0.3);
+      g.arc(0, -r * 0.3, r * 0.62, Math.PI, 0);
+      g.bezierCurveTo(r * 0.62, r * 0.05, r * 0.25, r * 0.35, 0, r * 0.9);
+      g.fill();
+      g.stroke();
+      g.fillStyle = "#ffffff";
+      g.beginPath();
+      g.arc(0, -r * 0.3, r * 0.24, 0, Math.PI * 2);
+      g.fill();
+      break;
+    }
   }
   g.restore();
 }

@@ -47,9 +47,8 @@ export const DRAG = 7;
 /** A take-off's speed, mm/s, upward and away, from the weakest to the strongest. */
 export const TAKEOFF_UP = [380, 620] as const;
 export const TAKEOFF_AWAY = [160, 340] as const;
-/** In the air it's drawn back inside this radius around the table's middle, and below this height (mm). */
-export const AIR_RADIUS = 360;
-export const AIR_CEILING = 320;
+/** In the air, past the table's edge (or above the place's ceiling), it's drawn back this hard per mm, mm/s². */
+export const AIR_PULL = 40;
 /** Seconds pressed against a wall it faces before the body turns it away. */
 export const WALL_PATIENCE = 2;
 /** Turning away from a wall, rad/s, and how far it turns (rad). */
@@ -106,6 +105,7 @@ export class FlyBody {
   #awayDir = 1;
   #probe = createSurface();
   #wall = v3();
+  #inward = v3();
 
   constructor(world: World, start: { x: number; z: number; yaw: number }) {
     this.#world = world;
@@ -325,13 +325,13 @@ export class FlyBody {
     let ay = LIFT * w - GRAVITY - DRAG * (v.y - forces.air.y);
     let az = fz * THRUST * w - DRAG * (v.z - forces.air.z);
     // Drawn back into the world near its edges: the body's, see the top of the file.
-    const r = Math.hypot(p.x, p.z);
-    if (r > AIR_RADIUS - 40) {
-      const k = (r - (AIR_RADIUS - 40)) * 40;
-      ax -= (p.x / r) * k;
-      az -= (p.z / r) * k;
+    const out = world.beyond(p.x, p.z, this.#inward);
+    if (out > 0) {
+      ax += this.#inward.x * out * AIR_PULL;
+      az += this.#inward.z * out * AIR_PULL;
     }
-    if (p.y > AIR_CEILING) ay -= (p.y - AIR_CEILING) * 40;
+    const ceiling = world.place.ceiling;
+    if (p.y > ceiling) ay -= (p.y - ceiling) * AIR_PULL;
     v.x += ax * dt;
     v.y += ay * dt;
     v.z += az * dt;

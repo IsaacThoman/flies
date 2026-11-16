@@ -1,4 +1,4 @@
-// The table and the picnic on it, built from the world's description
+// The picnic's table and everything on it, built from the world's description
 // (packages/world/src/picnic.ts) so that what the fly stands on is exactly
 // what is drawn. Merged by material into a few meshes.
 
@@ -7,19 +7,9 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { DECOR, PATCHES, SOLIDS, TABLE_RADIUS, topHeight, topNormal } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { Batch, canvas2d, canvasTexture, freeze, mat4, paint, random } from "./build.ts";
+import { Batch, canvas2d, canvasTexture, freeze, mat4, paint, random } from "../../scene/build.ts";
+import type { SceneSet } from "../types.ts";
 import { LAWN_Y } from "./backdrop.ts";
-
-export type Table = {
-  group: THREE.Group;
-  /** Materials whose look follows the time of day. */
-  materials: THREE.MeshStandardMaterial[];
-  /** What the fly's eyes see of the table: the big shapes, without the small details. */
-  seen: THREE.Object3D[];
-  update(time: number): void;
-  /** Sets a ring spreading on the pool of lemonade in the saucer, from a point on it (a drip, a fly's foot), 0 to 1 strong. */
-  ripple(x: number, z: number, strength: number): void;
-};
 
 /** How many rings can spread on the pool at once. */
 const RIPPLES = 4;
@@ -258,7 +248,7 @@ function domeGeometry(solid: Solid, rings: number, segments: number) {
   return geometry;
 }
 
-export function buildTable(): Table {
+export function buildTable(): SceneSet {
   const group = new THREE.Group();
   const rnd = random(11);
   const glossy = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.22, metalness: 0, envMapIntensity: 0.6 });
@@ -666,7 +656,7 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
     group,
     materials: [glossy, juicy, matte, tableMaterial, cloth, glass, liquid, dewMaterial, ...materials],
     seen,
-    update(time: number) {
+    update(time) {
       poolUniforms.uTime.value = time;
       // Now and then a drop of dew runs down the jar into the pool.
       if (time > nextDrip) {

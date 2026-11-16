@@ -5,7 +5,7 @@ import * as THREE from "three";
 import type { BrainDriver, RemoteButton } from "@fly/contracts";
 import { AT_ROOT_PROPERTY } from "@fly/contracts";
 import { Navigator } from "@fly/ui";
-import { createPicnic } from "@fly/world";
+import { World } from "@fly/world";
 import type { RayHit } from "@fly/world";
 import { Audio } from "./audio/sounds.ts";
 import type { Sound } from "./audio/sounds.ts";
@@ -18,6 +18,9 @@ import { EyesInset, insetWanted } from "./eyes/inset.ts";
 import { FlyView } from "./fly-view.ts";
 import type { Remote } from "./input.ts";
 import { Life } from "./life.ts";
+import { isPlaceId, nextPlace, placeInfo } from "./places/catalog.ts";
+import type { PlaceId } from "./places/catalog.ts";
+import { SCENES } from "./places/index.ts";
 import { Bubbles } from "./scene/bubbles.ts";
 import { Fireflies } from "./scene/fireflies.ts";
 import { timeFromClock } from "./scene/light.ts";
@@ -42,6 +45,11 @@ const AWAKE_HOLD = 1.2;
 const SWIPE_GAIN = 0.9;
 /** How often the HUD redraws for its shimmer alone, per second. */
 const HUD_SHIMMER_FPS = 10;
+/** Seconds of wallpaper in one place before the fly moves on, when it lives in each in turn. */
+const PLACE_TURN = 20 * 60;
+/** Seconds the world takes to fade out before the fly is carried somewhere else, and to fade in after. */
+const VEIL_OUT = 0.45;
+const VEIL_IN = 0.9;
 
 type MenuScreenId = Exclude<ScreenId, "play">;
 
@@ -97,17 +105,26 @@ export class Game implements Shell {
   #lastScreen: ScreenId | "loading" = "loading";
   #hud: HudState;
   #eyesInfo = { facets: 0, standIn: false, sent: false, ms: 0, calls: 0 };
+  /** Where the fly is now. */
+  #here: PlaceId;
+  /** Being carried to another place: where, and seconds since the veil began to fall. */
+  #moving: { to: PlaceId; t: number; arrived: boolean } | null = null;
+  /** Seconds of wallpaper spent where it is now. */
+  #stayed = 0;
 
   constructor(canvas: HTMLCanvasElement, remote: Remote, brain: BrainDriver) {
     this.canvas = canvas;
     this.remote = remote;
     this.settings = loadSettings();
-    this.stage = new Stage(canvas, timeFromClock(new Date()));
+    const place = this.settings.place;
+    this.#here = place !== "turns" && isPlaceId(place) ? place : isPlaceId(this.settings.scene) ? this.settings.scene : "picnic";
+    const scene = SCENES[this.#here];
+    this.stage = new Stage(canvas, timeFromClock(new Date()), scene);
     this.fireflies = new Fireflies(this.stage.scene);
-    const world = createPicnic();
+    const world = new World(scene.place);
     this.life = new Life(world, brain);
     this.fly = new FlyView(this.stage.scene, world);
-    this.director = new CameraDirector(world, DISPLAY_ASPECT);
+    this.director = new CameraDirector(world, DISPLAY_ASPECT, scene.camera);
     this.bubbles = new Bubbles(this.stage.scene, world);
     this.hands = new Hands(world);
     this.handsView = new HandsView(this.stage.scene);
@@ -116,6 +133,7 @@ export class Game implements Shell {
     for (const object of this.handsView.seen) this.eyes.see(object);
     this.inset = new EyesInset(this.eyes);
     this.overlay.scene.add(this.inset.mesh);
+    this.#settle();
     this.screens = {
       title: titleScreen(this),
       pause: pauseScreen(this),
@@ -123,7 +141,7 @@ export class Game implements Shell {
       about: new AboutScreen(this),
       brain: new BrainScreen(this),
     };
-    this.#hud = { hands: this.hands, activity: "waiting", food: null, hints: true, teachSwipe: true, changed: 10, spikes: 0, brainRunning: false, eyes: null };
+    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, teachSwipe: true, changed: 10, spikes: 0, brainRunning: false, eyes: null };
     this.applySettings(false);
     this.director.startWallpaper();
     this.director.title = true;
@@ -171,6 +189,7 @@ export class Game implements Shell {
 
   applySettings(save = true) {
     const s = this.settings;
+    if (s.place !== "turns" && isPlaceId(s.place) && s.place !== this.#here) this.moveTo(s.place);
     this.stage.setPixels(s.pixels);
     this.audio.setVolumes(s.effects, s.ambience);
     this.director.wallpaperStyle = s.wallpaperCamera;
@@ -180,6 +199,59 @@ export class Game implements Shell {
 
   sound(sound: Sound) {
     this.audio.play(sound);
+  }
+
+  /** Carries the fly to another place: the world fades out, the place is built behind the veil, and fades in. */
+  moveTo(id: PlaceId) {
+    if (id === this.#here || this.#moving?.to === id) return;
+    // From however dark the veil already is.
+    this.#moving = { to: id, t: this.stage.veil * VEIL_OUT, arrived: false };
+  }
+
+  /** The veil over the world while the fly is carried somewhere else, and the moment it arrives. */
+  #move(dt: number) {
+    const moving = this.#moving;
+    if (!moving) return;
+    moving.t += dt;
+    if (!moving.arrived && moving.t >= VEIL_OUT) {
+      // Black now: build the place. This frame is long (it is all JavaScript), and nobody sees it.
+      this.stage.veil = 1;
+      this.#arrive(moving.to);
+      moving.arrived = true;
+      moving.t = VEIL_OUT;
+      return;
+    }
+    const k = moving.arrived ? 1 - (moving.t - VEIL_OUT) / VEIL_IN : moving.t / VEIL_OUT;
+    this.stage.veil = Math.max(0, Math.min(1, k * k * (3 - 2 * k)));
+    if (moving.arrived && moving.t >= VEIL_OUT + VEIL_IN) {
+      this.stage.veil = 0;
+      this.#moving = null;
+    }
+  }
+
+  #arrive(id: PlaceId) {
+    const scene = SCENES[id];
+    this.#here = id;
+    this.#stayed = 0;
+    this.stage.load(scene);
+    this.life.move(scene.place);
+    this.hands.clear();
+    this.director.useScene(scene.camera);
+    this.#settle();
+    this.settings.scene = id;
+    saveSettings(this.settings);
+  }
+
+  /** Everything that follows the place the fly is in, besides the world and the stage. */
+  #settle() {
+    const scene = this.stage.current;
+    for (const object of this.stage.set.seen) this.eyes.see(object);
+    this.bubbles.enabled = scene.bubbles;
+    this.fireflies.enabled = scene.fireflies;
+    this.audio.setAmbience(scene.ambience);
+    this.hands.surface = placeInfo(scene.id).surface;
+    this.hands.choosePlace(scene.id);
+    this.overlay.dirty = true;
   }
 
   #entered() {
@@ -229,6 +301,12 @@ export class Game implements Shell {
     }
 
     this.#input(dt);
+    this.#move(dt);
+    // Living in each place in turn, it moves on during a long wallpaper.
+    if (this.wallpaper && !this.#moving) {
+      this.#stayed += dt;
+      if (this.settings.place === "turns" && this.#stayed > PLACE_TURN && nextPlace(this.#here) !== this.#here) this.moveTo(nextPlace(this.#here));
+    }
 
     const paused = this.paused;
     if (!paused) {
@@ -310,7 +388,7 @@ export class Game implements Shell {
     // Things that could loom: the ball and the bubbles.
     stimuli.looming.length = 0;
     stimuli.looming.push(hands.looming[0]);
-    for (const b of this.bubbles.looming) stimuli.looming.push(b);
+    if (this.bubbles.enabled) for (const b of this.bubbles.looming) stimuli.looming.push(b);
     stimuli.threat = hands.ball.active ? hands.ball.position : null;
   }
 
@@ -347,15 +425,15 @@ export class Game implements Shell {
     this.stage.sun.intensity = this.stage.light.sunIntensity * (1 - cover * cover * 0.2 * day);
   }
 
-  /** A fly walking, landing or drinking in the pool of lemonade sets rings spreading on it. */
+  /** A fly walking, landing or drinking in a pool (the picnic's lemonade) sets rings spreading on it. */
   #paddle(dt: number) {
     this.#paddleIn -= dt;
     const food = this.life.senses.tasting.food;
-    if (food?.name !== "lemonade" || this.#paddleIn > 0) return;
+    if (!food?.pool || this.#paddleIn > 0) return;
     const body = this.life.body;
     const moving = Math.abs(body.groundSpeed) > 0.5 || Math.abs(body.turnRate) > 0.3;
     if (!moving && !this.life.eating && !body.events.landed) return;
-    this.stage.table.ripple(body.position.x, body.position.z, body.events.landed ? 1 : moving ? 0.45 : 0.2);
+    this.stage.set.ripple(body.position.x, body.position.z, body.events.landed ? 1 : moving ? 0.45 : 0.2);
     this.#paddleIn = moving ? 0.45 : 1.4;
   }
 
@@ -420,7 +498,18 @@ export class Game implements Shell {
         break;
       case "select":
         if (repeat) break;
-        if (hands.current.id === "light" || hands.current.id === "view") {
+        if (hands.current.id === "place") {
+          if (hands.place === this.#here) this.audio.play("blocked");
+          else {
+            this.audio.play("select");
+            // Chosen by hand: if it lives in one place, this is now that place.
+            if (this.settings.place !== "turns") {
+              this.settings.place = hands.place;
+              saveSettings(this.settings);
+            }
+            this.moveTo(hands.place);
+          }
+        } else if (hands.current.id === "light" || hands.current.id === "view") {
           // Select steps round the times of day or the views, for a remote held in one hand.
           hands.variants[hands.tool] = (hands.variants[hands.tool] + 1) % hands.current.variants.length;
           this.#variantChanged();
@@ -478,6 +567,7 @@ export class Game implements Shell {
       const life = this.life;
       const hud = this.#hud;
       hud.activity = life.activity;
+      hud.here = this.#here;
       hud.food = life.senses.tasting.food?.name ?? null;
       hud.hints = this.settings.hints;
       hud.teachSwipe = !this.#touched;
@@ -565,5 +655,8 @@ export class Game implements Shell {
     d.spikesPerSecond = String(Math.round(this.meter.spikesPerSecond));
     d.time = this.stage.light.time;
     d.view = this.hands.view;
+    d.place = this.#here;
+    d.placeMs = this.stage.buildMs.toFixed(0);
+    d.moving = this.#moving ? this.#moving.to : "";
   }
 }

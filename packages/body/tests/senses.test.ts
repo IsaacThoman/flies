@@ -4,6 +4,9 @@ import { PATCHES, Pantry, SOLIDS, World, createPicnic } from "@fly/world";
 import { FlyBody, LOOM_DECAY, LOOM_HOLD, SenseTracker, WIND_FULL_SPEED } from "../src/index.ts";
 import type { Looming, SenseInput } from "../src/index.ts";
 
+/** A bare round table this wide, with nothing on it. */
+const openTable = (r: number) => new World({ floor: { kind: "circle", r }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320 });
+
 const DT = 1 / 60;
 const world = createPicnic();
 const pantry = new Pantry(world, PATCHES);
@@ -87,7 +90,7 @@ test("it tastes sugar with its feet and its mouth, only while on its feet", () =
 });
 
 test("wind is its own speed through the air; touch follows a stroke and eases out", () => {
-  const body = new FlyBody(new World([], 300), { x: 0, z: 0, yaw: 0 });
+  const body = new FlyBody(openTable(300), { x: 0, z: 0, yaw: 0 });
   const tracker = new SenseTracker();
   body.mode = "airborne";
   body.velocity.x = WIND_FULL_SPEED;

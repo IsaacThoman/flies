@@ -4,8 +4,9 @@
 // hills hundreds of metres), in six draws.
 
 import * as THREE from "three";
-import { Batch, canvas2d, canvasTexture, freeze, paint, random } from "./build.ts";
-import type { Daylight } from "./light.ts";
+import { Batch, canvas2d, canvasTexture, freeze, paint, random } from "../../scene/build.ts";
+import type { Daylight } from "../../scene/light.ts";
+import type { SceneBackdrop } from "../types.ts";
 
 /** The lawn is this far below the table top, mm (a café table is 75 cm tall). */
 export const LAWN_Y = -760;
@@ -199,13 +200,7 @@ export function hillHeight(x: number, z: number): number {
   return lakeward > 0 && z < 0 ? shore * lakeward + (LAWN_Y + hills * (1 - lakeward * (1 - beyond))) * (1 - lakeward) + hills * beyond * lakeward : LAWN_Y + hills;
 }
 
-export type Backdrop = {
-  scene: THREE.Scene;
-  /** Keeps the sky round the camera and moves the light, water and clouds. */
-  update(time: number, camera: THREE.Camera, light: Daylight): void;
-};
-
-export function buildBackdrop(light: Daylight): Backdrop {
+export function buildBackdrop(light: Daylight): SceneBackdrop {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(light.haze.getHex(), 120_000, 1_400_000);
   scene.matrixWorldAutoUpdate = true;
