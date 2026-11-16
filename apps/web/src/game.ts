@@ -818,9 +818,9 @@ export class Game implements Shell {
   }
 
   #syncCamera() {
-    // The menu and what it opens keep the title's shot.
+    // The menu and what it opens keep the title's shot; once the menu has faded for the wallpaper, the fly is filmed as it is in play's.
     const playing = !this.#loading && this.nav.current === "play";
-    this.director.title = !playing;
+    this.director.title = !playing && !this.wallpaper;
     if (!playing || this.wallpaper) {
       if (!this.director.wallpaper) this.director.startWallpaper();
     } else {
@@ -836,6 +836,7 @@ export class Game implements Shell {
     this.hands.release();
     this.#controls.reset();
     this.director.startWallpaper();
+    this.director.title = false;
   }
 
   #stopWallpaper() {

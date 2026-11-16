@@ -211,8 +211,10 @@ export class CameraDirector {
   #height = 2;
   #fov = 30;
   #low = 0;
-  /** Spring speeds: center xyz, aim xyz, azimuth, distance, height, fov, low. */
-  #v = new Float64Array(11);
+  /** Where the fly sits across the picture, eased: the title's menu fading into the wallpaper brings it from the side to the middle, and back. */
+  #across = 0;
+  /** Spring speeds: center xyz, aim xyz, azimuth, distance, height, fov, low, across. */
+  #v = new Float64Array(12);
   /** The angle round the fly the camera is making for, and one it is considering. */
   #goal = 0;
   #pending = 0;
@@ -456,6 +458,7 @@ export class CameraDirector {
     if (own && this.room.wider !== 1) fov = (Math.atan(Math.tan((fov * Math.PI) / 360) * this.room.wider) * 360) / Math.PI;
     this.#fov = damp(this.#fov, fov, s, 9, fovSettle, dt);
     this.#low = damp(this.#low, shot.low + (own ? this.room.lower : 0), s, 10, settle * 0.8, dt);
+    this.#across = damp(this.#across, shot.across ?? 0, s, 11, settle * 0.8, dt);
     const view = fieldOfView(this.#fov, cam.aspect, mix(NARROW_KEEP, 1, table));
 
     const eye = this.#eye;
@@ -499,7 +502,7 @@ export class CameraDirector {
     const speed = Math.hypot(v.x, v.y, v.z);
     const lead = speed > 0 ? Math.min(aimSettle, MAX_LEAD / speed) * (1 - table) : 0;
     // To put the fly to one side, aim the other way along the camera's right.
-    const aside = -(shot.across ?? 0) * ground * Math.tan((view * Math.PI) / 360) * this.camera.aspect;
+    const aside = -this.#across * ground * Math.tan((view * Math.PI) / 360) * this.camera.aspect;
     const a = this.#aim;
     a.x = damp(a.x, target.x + v.x * lead + Math.cos(az) * aside, s, 3, aimSettle, dt);
     a.y = damp(a.y, target.y + lift + v.y * lead, s, 4, aimSettle, dt);
@@ -764,6 +767,7 @@ export class CameraDirector {
     this.#height = height;
     this.#fov = shot.fov;
     this.#low = shot.low;
+    this.#across = shot.across ?? 0;
     this.#v.fill(0);
   }
 
