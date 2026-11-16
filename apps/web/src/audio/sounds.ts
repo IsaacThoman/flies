@@ -592,8 +592,8 @@ export class Audio {
     const ctx = this.ctx;
     if (!ctx || !this.#effects || !this.#ambient) return;
     // Volumes 0 to 10, on a gentle curve.
-    this.#effects.gain.setTargetAtTime((effects / 10) ** 2 * 0.8, ctx.currentTime, 0.05);
-    this.#ambient.gain.setTargetAtTime((ambience / 10) ** 2 * 0.5, ctx.currentTime, 0.2);
+    followParam(this.#effects.gain, (effects / 10) ** 2 * 0.8, ctx.currentTime, 0.05);
+    followParam(this.#ambient.gain, (ambience / 10) ** 2 * 0.5, ctx.currentTime, 0.2);
   }
 
   tools(events: HandsEvents) {

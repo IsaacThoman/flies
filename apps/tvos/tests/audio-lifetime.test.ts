@@ -64,3 +64,13 @@ test("hundreds of place changes and one-shots leave only the live audio graph co
   }
 });
 
+test("an hour of repeated volume settings keeps the TV automation bounded", () => {
+  const audio = new Audio();
+  audio.start(7, 5);
+  const ctx = audio.ctx as unknown as InstanceType<typeof AudioContextShim>;
+  for (let i = 0; i < 3600; i++) { now += 1; audio.setVolumes(i % 11, (i + 3) % 11); }
+  for (const node of ctx.destination._inputs) {
+    const gain = node as InstanceType<typeof AudioContextShim>["destination"] & { gain: { _events: unknown[] } };
+    assert.equal(gain.gain._events.length, 2);
+  }
+});
