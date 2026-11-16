@@ -22,7 +22,7 @@ declare global { var __fly: Game; }
 const PHASES = ["places", "climate", "tools", "menus", "eyes", "wallpaper"] as const;
 type Phase = typeof PHASES[number];
 type Sample = { seconds: number; phase: string; place: string; checkpoint: boolean; [metric: string]: number | string | boolean };
-const STATE = ["screen", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "page"];
+const STATE = ["screen", "weather", "time", "view", "eyes", "eyesInset", "variant", "quality", "fps", "pixels", "eyesDetail", "eyesRate", "frame", "audio", "hidden"];
 const CLOCKS = ["gameSeconds", "audioSeconds", "eyesUpdates"];
 const METRICS = ["geometries", "textures", "programs", "calls", "triangles", "heap", "backing", "workerHeap", "workerBacking", "nodes", "listeners", "audioNodes", "frameMs", "brainSpeed", "storage"];
 
@@ -138,6 +138,7 @@ export async function run(args = process.argv.slice(2)) {
     url = site.url;
   } else if (!url) ({ url, server } = await startServer());
   const browser = await chromium.launch({ executablePath: args.includes("--built") ? fullChromiumPath() : chromiumPath(), args: [...gpuFlags(), "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows"] });
+  console.log(`Chromium ${browser.version()}; ${os.cpus()[0]?.model ?? process.arch}; ${os.release()}`);
   const samples: Sample[] = [];
   const errors: string[] = [];
   const started = Date.now();
@@ -208,6 +209,11 @@ export async function run(args = process.argv.slice(2)) {
       await page.keyboard.press("Enter");
       await waitFor(page, "screen=play");
       await canonical(page);
+      console.log(`${name}: GPU ${await page.evaluate(() => {
+        const gl = globalThis.__fly.stage.renderer.getContext();
+        const debug = gl.getExtension("WEBGL_debug_renderer_info");
+        return debug ? String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)) : "unavailable";
+      })}`);
       // Upload the persistent, initially hidden tool/eye/blit resources before taking baselines.
       for (const tool of TOOLS) for (const variant of tool.variants) {
         if (tool.id === "place") continue;
