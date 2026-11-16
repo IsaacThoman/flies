@@ -45,9 +45,9 @@ reach (beyond the floor's edge, above it, or in the backdrop).
 ## The scene
 
 - **Two passes** (`apps/web/src/stage.ts`): the set (`buildSet`, from 0.5 mm to
-  4 m from the camera) is drawn over the backdrop (`buildBackdrop`, from
-  200 mm to 3,000 km). Indoors, a room's far walls, a window's view, a bar's
-  lights can all be backdrop.
+  4 m from the camera, or its camera's `reach`) is drawn over the backdrop
+  (`buildBackdrop`, from 200 mm to 3,000 km). Indoors, a room's far walls, a
+  window's view, a bar's lights can all be backdrop.
 - **Light** (`palettes`): the five times of day. Chosen on the Light tool, the
   light eases to one and holds it; on "Now" it follows the clock between them
   (`scene/light.ts`, `clockLight`): each palette's colours are full at its
@@ -85,10 +85,12 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   bursts the bubbles and sends the fireflies to shelter wherever they are.
 - **What the fly's eyes see** (`SceneSet.seen`): the big shapes only. They are
   rendered six times at 16 or 32 pixels for the brain's eyes, so the small
-  details stay out.
+  details stay out, and what is in `seen` costs six times its triangles.
 - **The camera** (`SceneCamera`): `whole` is View → Whole table
   (`around: "table"` circles the table's middle; keep it on the room side of
-  any wall). `vista` is the way the best of the view lies: with nothing
+  any wall). A room gives `focus`: the point the view circles, how much it
+  follows the fly from there, and how far toward the fly it aims, so that it
+  stays inside the room and keeps the fly in the picture wherever it goes. `vista` is the way the best of the view lies: with nothing
   standing behind the fly, the camera likes to have that there. Every other
   shot, the wallpaper's included, stays on the fly and is shared by every
   place.
@@ -119,6 +121,55 @@ reach (beyond the floor's edge, above it, or in the backdrop).
 - **The Place tool's name** for it, what it is carried "to", and what the fly
   stands on there ("Whole sill"), are in `apps/web/src/places/catalog.ts`.
 
+## A large place
+
+The restaurant is a whole room, not a tabletop: 8.4 by 6 metres, where the
+fly can live at any table, at the bar or on the floor, and the camera can be
+anywhere in it. Drawn as one, its detail would cost far more than the Apple
+TV has (`places/restaurant/`):
+
+- **Areas.** The room is split into areas (`areas.ts`): each table with its
+  chairs and what is on it, the bar in three lengths, the back bar in two,
+  the pass, the host's stand, the service station, the banquette in two, the
+  window's ledge. Each area's detail is merged by material into a mesh or two
+  of its own, drawn only while the camera is within 650 mm of it.
+- **Two levels of detail.** Every area also has a stand-in: its things at
+  their felt shapes, few-sided (a few hundred triangles a table), merged with
+  the room's shell (floor, walls, ceiling, the shop front) into one room-wide
+  mesh, always drawn. Each stand-in vertex carries its area in its `kind`
+  (kind + 128 × area), and a uniform mask of the areas in detail folds their
+  stand-ins away in the vertex shader. Each frame is a loop over the areas'
+  distances from the camera, a few `visible` flags and the mask: no rebuilding
+  and no draws for what is far away (`set.ts`). `SceneSet.update` is handed the
+  camera for this.
+- **One material, kinds in the shader.** Everything solid in the room is one
+  physical material and everything clear another; what each vertex is made of
+  (marble, oak, zinc, the floor's penny rounds, the tin ceiling...) is its
+  `kind`, shaded in the fragment shader from where it is in the room, so a
+  whole area is one or two draws and the detail is in the shader, crisp close
+  up and faded where a pixel can't show it (`kinds.ts`, `surfaces.ts`). The
+  room is built in parts, each owning the world's solids it draws and a range
+  of kinds of its own (`parts.ts`).
+- **The eyes' stand-in.** The fly's eyes see the room-wide mesh again, with
+  nothing folded away and the shop front's openings bright: the big shapes,
+  six times a refresh, so it is kept lean.
+- **Reach.** `SceneCamera.reach` (mm, 4,000 if not said) is how far the
+  camera sees: the near pass's far plane, the camera's, and the fly's eyes'. The restaurant's
+  is 12 m. The near plane stays at 0.5 mm, so a distant depth is coarse:
+  nothing is drawn coplanar, stains and print are in the shaders, and what
+  rests on a surface sinks into it a hair.
+- **Light.** Still a hemisphere and one "sun" from the stage, the sun coming
+  in only through the glass (the frames cast their shadows, worked out in
+  the shader). The room's own lights are uniforms in the materials, with no
+  three.js lights and no shadow maps: the sky or the lit street seen through
+  the shop front as a rectangle of light (Lambert's formula), the fridge's
+  glass doors, the exit sign, the heat lamps and the kitchen through the pass
+  as more rectangles, the one pendant left on over the bar as a lamp with its
+  highlights. The tables, chairs, stools and the zinc shadow the sun, the
+  street lamp and the pendant as blocks; the things of the area the camera is
+  in shadow them exactly, as upright columns (`light.ts`); soft shadows on
+  the floor under everything are painted once from the layout.
+
 ## Rules
 
 - **Through the senses, never around them** (`docs/architecture.md`). Anything
@@ -133,7 +184,7 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   rather than meshes, allocate nothing per frame, and keep `update` small.
   The picnic draws in about 23 calls and 105,000 triangles while playing
   (Settings → Picture → Frame stats, or the canvas's `data-calls` and `data-triangles`);
-  a new place should stay close to that.
+  a new place should stay close to that, near the fly and in its whole view.
 - **Building is a pause behind the veil.** `data-place-ms` on the canvas says
   how long the place took to build: the picnic 36 ms in desktop Chromium, so
   about half a second on the TV. Keep it there.
