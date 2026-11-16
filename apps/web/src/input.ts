@@ -129,10 +129,10 @@ export class Remote {
 export type Gesture =
   /** The first finger, or a mouse button, went down. */
   | { type: "down"; x: number; y: number; touch: boolean; button: number }
-  /** It moved while down. */
-  | { type: "drag"; x: number; y: number }
-  /** It lifted; `tap` if it barely moved. */
-  | { type: "up"; x: number; y: number; tap: boolean }
+  /** It moved while down; `far` once it has gone further than a tap may wander. */
+  | { type: "drag"; x: number; y: number; far: boolean }
+  /** It lifted; `tap` if it barely moved, `double` if that tap was the second of two in quick succession in one place. */
+  | { type: "up"; x: number; y: number; tap: boolean; double: boolean }
   /** What it was doing is off: a second finger came down, or the system took the pointer. */
   | { type: "cancel" }
   /** A mouse moved with no button down. */
@@ -150,6 +150,9 @@ export const TAP_SLOP = { touch: 12, mouse: 5 } as const;
 /** A mouse moving this far (a share of the screen's diagonal) within MOVE_WINDOW ms means it, rather than a nudge of the desk. */
 export const DELIBERATE_MOVE = 0.04;
 const MOVE_WINDOW = 400;
+/** A second tap this soon (ms) after the first, and this near it (CSS pixels), makes a double click or tap. */
+const DOUBLE_WITHIN = 350;
+const DOUBLE_NEAR = 24;
 
 /** A raw pointer event, as Pointers needs it (the DOM's, or a test's). */
 export type RawPointer = { pointerId: number; pointerType: string; clientX: number; clientY: number; button: number; buttons: number };
@@ -183,6 +186,8 @@ export class Pointers {
   #travel = 0;
   #travelAt = 0;
   #hover = { x: 0, y: 0, known: false };
+  /** The last tap's lift, for telling a double one. */
+  #lastTap = { x: 0, y: 0, at: -Infinity };
 
   constructor(box: () => Box, now: () => number = () => performance.now(), devices: Devices | null = null) {
     this.#box = box;
@@ -279,7 +284,7 @@ export class Pointers {
     if (e.pointerId === this.#primary) {
       const box = this.#box();
       this.#moved = Math.max(this.#moved, Math.hypot((p.x - this.#start.x) * box.width, (p.y - this.#start.y) * box.height));
-      this.gestures.push({ type: "drag", x: p.x, y: p.y });
+      this.gestures.push({ type: "drag", x: p.x, y: p.y, far: this.#moved >= (this.#touch ? TAP_SLOP.touch : TAP_SLOP.mouse) });
       // Still playing: a held finger dragging keeps the wallpaper away.
       this.#meant(this.#touch);
       return;
@@ -331,7 +336,16 @@ export class Pointers {
       return;
     }
     const p = this.#at(e);
-    this.gestures.push({ type: "up", x: p.x, y: p.y, tap: this.#moved < (this.#touch ? TAP_SLOP.touch : TAP_SLOP.mouse) });
+    const tap = this.#moved < (this.#touch ? TAP_SLOP.touch : TAP_SLOP.mouse);
+    const now = this.#now();
+    const last = this.#lastTap;
+    const box = this.#box();
+    const double = tap && now - last.at < DOUBLE_WITHIN && Math.hypot((p.x - last.x) * box.width, (p.y - last.y) * box.height) < DOUBLE_NEAR;
+    // A third tap starts again rather than making a second double.
+    last.at = tap && !double ? now : -Infinity;
+    last.x = p.x;
+    last.y = p.y;
+    this.gestures.push({ type: "up", x: p.x, y: p.y, tap, double });
   }
 
   wheel(e: { clientX: number; clientY: number; deltaX: number; deltaY: number; deltaMode: number; ctrlKey: boolean; metaKey?: boolean }) {
@@ -360,33 +374,75 @@ export class Pointers {
 }
 
 /**
- * The keys a keyboard has that the remote hasn't: the number keys pick a
- * tool, and + and − bring the camera in and take it out.
+ * The keys a keyboard has that the remote hasn't (the arrows, Enter, Escape
+ * and the space bar are the remote's): the number keys pick a tool, R or
+ * Home gives the camera back to the cameraman; held, Q and E turn the camera
+ * round the fly and + and − bring it in and take it out.
  */
-export type KeyAction = { kind: "tool"; index: number } | { kind: "zoom"; dir: -1 | 1 };
+export type KeyAction = { kind: "tool"; index: number } | { kind: "handBack" };
 
 export function keyAction(code: string, key: string): KeyAction | null {
   const digit = /^(?:Digit|Numpad)([1-9])$/.exec(code);
   if (digit) return { kind: "tool", index: Number(digit[1]) - 1 };
-  if (key === "+" || key === "=") return { kind: "zoom", dir: -1 };
-  if (key === "-" || key === "_") return { kind: "zoom", dir: 1 };
+  if (code === "KeyR" || key === "Home") return { kind: "handBack" };
+  return null;
+}
+
+/** Which way a held key moves the camera: round (−1 left, 1 right) or in and out (−1 nearer, 1 farther). */
+export function keyAxis(code: string, key: string): { axis: "turn" | "zoom"; dir: -1 | 1 } | null {
+  if (code === "KeyQ") return { axis: "turn", dir: -1 };
+  if (code === "KeyE") return { axis: "turn", dir: 1 };
+  if (key === "+" || key === "=" || code === "NumpadAdd") return { axis: "zoom", dir: -1 };
+  if (key === "-" || key === "_" || code === "NumpadSubtract") return { axis: "zoom", dir: 1 };
   return null;
 }
 
 export class Keyboard {
   readonly actions: KeyAction[] = [];
+  /** The keys held now, by code, and the way each moves the camera. */
+  readonly #held = new Map<string, { axis: "turn" | "zoom"; dir: -1 | 1 }>();
+  /** Where the held keys push the camera: -1 to 1 round, and in (−) or out (+). */
+  turn = 0;
+  zoom = 0;
 
-  constructor(target: Pick<Window, "addEventListener">, remote: Remote, devices: Devices) {
+  constructor(target: Pick<Window, "addEventListener">, remote: Remote, devices: Devices, now: () => number = () => performance.now()) {
     target.addEventListener("keydown", (event) => {
       const e = event as KeyboardEvent;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const action = keyAction(e.code, e.key);
-      if (!action) return;
-      e.preventDefault();
-      remote.lastInputAt = performance.now();
+      const axis = action ? null : keyAxis(e.code, e.key);
+      if (!action && !axis) return;
+      e.preventDefault?.();
+      remote.lastInputAt = now();
       devices.use("keys", remote.lastInputAt);
-      if (!e.repeat) this.actions.push(action);
+      if (axis) this.#held.set(e.code, axis);
+      else if (action && !e.repeat) this.actions.push(action);
+      this.#sum();
     });
+    target.addEventListener("keyup", (event) => {
+      if (this.#held.delete((event as KeyboardEvent).code)) this.#sum();
+    });
+    // A key let go in another window never comes up here.
+    target.addEventListener("blur", () => {
+      this.#held.clear();
+      this.#sum();
+    });
+  }
+
+  #sum() {
+    this.turn = 0;
+    this.zoom = 0;
+    for (const { axis, dir } of this.#held.values()) {
+      if (axis === "turn") this.turn += dir;
+      else this.zoom += dir;
+    }
+    this.turn = Math.max(-1, Math.min(1, this.turn));
+    this.zoom = Math.max(-1, Math.min(1, this.zoom));
+  }
+
+  /** Held keys keep the player at it: the wallpaper stays away. */
+  get holding() {
+    return this.#held.size > 0;
   }
 
   endFrame() {
@@ -423,19 +479,23 @@ type PadLike = { connected: boolean; mapping: string; buttons: readonly { presse
  * once one has been connected. Its buttons are the remote's (A is Select, B
  * is Back, Start is Play/Pause, the d-pad the arrows, the shoulders the
  * tools); the left stick moves the hand as a finger on the touch surface
- * does, or, in a menu, steps as the arrows do; the right stick looks round
- * the fly; the triggers bring the camera in and take it out.
+ * does, or, in a menu, steps as the arrows do; the right stick turns the
+ * camera round the fly, and pressed in gives it back to the cameraman; the
+ * triggers bring it in (right) and take it out (left), as far as they are
+ * pressed.
  */
 export class Gamepads {
   /** The right stick, -1 to 1 each way (y up), for looking round. */
   readonly look = { x: 0, y: 0 };
-  /** The triggers' steps since the last frame: -1 nearer, 1 farther. */
+  /** The triggers: -1 (right, all the way: nearer) to 1 (left: farther). */
   zoom = 0;
+  /** The right stick was pressed in since the last frame. */
+  handBack = false;
   #active = false;
   readonly #pressed = new Map<number, boolean>();
   readonly #repeatAt = new Map<RemoteButton, number>();
   #stickHeld: RemoteButton | null = null;
-  #triggers = [false, false];
+  #stickIn = false;
   readonly #remote: Remote;
   readonly #devices: Devices;
   readonly #pads: () => readonly (PadLike | null)[];
@@ -455,6 +515,7 @@ export class Gamepads {
     this.look.x = 0;
     this.look.y = 0;
     this.zoom = 0;
+    this.handBack = false;
     if (!this.#active) return;
     const pad = this.#pads().find((p) => p?.connected && p.mapping === "standard");
     if (!pad) return;
@@ -473,14 +534,14 @@ export class Gamepads {
     };
     for (const [index, button] of PAD_BUTTONS) press(index, button);
     for (const [index, button] of PAD_SHOULDERS) press(index, button);
-    for (let i = 0; i < 2; i++) {
-      const down = (pad.buttons[6 + i]?.value ?? 0) > 0.5;
-      if (down && !this.#triggers[i]) {
-        this.zoom += i === 0 ? 1 : -1;
-        this.#devices.use("pad", now);
-        remote.lastInputAt = now;
-      }
-      this.#triggers[i] = down;
+    const triggers = trigger(pad.buttons[6]?.value ?? 0) - trigger(pad.buttons[7]?.value ?? 0);
+    const stickIn = !!pad.buttons[11]?.pressed;
+    if (stickIn && !this.#stickIn) this.handBack = true;
+    this.#stickIn = stickIn;
+    if (triggers !== 0 || this.handBack) {
+      this.zoom = triggers;
+      this.#devices.use("pad", now);
+      remote.lastInputAt = now;
     }
     const lx = deadzone(pad.axes[0] ?? 0);
     const ly = -deadzone(pad.axes[1] ?? 0);
@@ -521,4 +582,6 @@ export class Gamepads {
   }
 }
 
+/** A trigger resting lightly is nothing. */
+const trigger = (v: number) => (v < 0.08 ? 0 : (v - 0.08) / 0.92);
 const deadzone = (v: number) => (Math.abs(v) < STICK_DEAD ? 0 : (v - Math.sign(v) * STICK_DEAD) / (1 - STICK_DEAD));

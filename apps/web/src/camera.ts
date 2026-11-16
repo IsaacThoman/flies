@@ -17,9 +17,13 @@
 // big on the screen as it is on the TV without leaving the picture as it
 // turns (fieldOfView).
 //
-// The player can take hold of it too: look round the fly, or bring it in or
-// take it out (a drag, a pinch, the wheel). Let go, it eases back to where
-// the cameraman would have it.
+// The player can take hold of it too. Turned round the fly by hand, it stays
+// where it was put for a few seconds after the hand lets go; then the
+// cameraman carries on from there, moving only when it would have anyway.
+// Brought in or taken out (the wheel, a pinch, the View tool), it goes
+// smoothly along one range, from the facets of the fly's eyes out to the whole
+// place, and stays there: the named views are points along it. Wherever the
+// hand has taken it, `handBack` gives it back to the cameraman at once.
 
 import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
@@ -99,17 +103,26 @@ export function fieldOfView(fov: number, aspect: number, keep = NARROW_KEEP): nu
   return (Math.atan(t) * 360) / Math.PI;
 }
 
-/** The views nearest first, for bringing the camera in and taking it out by hand. */
-export const NEAR_TO_FAR: readonly View[] = ["close", "follow", "wide", "table"];
+/**
+ * The level shots round the fly that the hand zooms between, nearest first:
+ * near enough for the facets of its eyes, Close up, Follow and Wide. Past
+ * Wide the range goes on out to the place's whole-table shot, turning from
+ * the fly to the table's middle as it goes.
+ */
+const LEVEL: readonly Shot[] = [{ around: "fly", distance: 2.4, height: 0.4, side: 1.15, low: -0.15, fov: 30, settle: 1.4, scout: true }, SHOTS.close, SHOTS.follow, SHOTS.wide];
+/** The nearest the camera comes to the fly's middle, mm. */
+export const NEAREST = Math.hypot(LEVEL[0].distance, LEVEL[0].height);
+const reachOf = (shot: Shot) => Math.hypot(shot.distance, shot.height);
+const elevationOf = (shot: Shot) => Math.atan2(shot.height, shot.distance);
 
-/** Seconds a look round by hand is held after it is let go, and how long it then takes to ease back. */
-const LOOK_HOLD = 0.8;
-const LOOK_SETTLE = 1.6;
+/** Seconds the camera stays where the hand left it before the cameraman takes it again, and how long the tilt then takes to ease back (or, handed back at once, takes). */
+export const HAND_HOLD = 5;
+const TILT_SETTLE = 2;
+const TILT_SETTLE_NOW = 0.7;
+/** While the hand zooms, the camera follows it this quickly (s), rather than at the shots' unhurried pace. */
+const ZOOM_SETTLE = 0.18;
 /** How far the camera can be swung up or down by hand (radians of elevation). */
 const LOOK_PITCH = [0.03, 1.45] as const;
-/** The nearest the hand can bring it to the fly (mm), and how far past the whole table's shot it can take it out. */
-const ZOOM_NEAREST = 4.5;
-const ZOOM_FARTHEST = 1.3;
 
 /** How far (mm) the camera keeps above whatever is under it. */
 const CLEARANCE = 1.1;
@@ -136,9 +149,11 @@ function damp(current: number, target: number, v: Float64Array, i: number, settl
 }
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+const mix = (a: number, b: number, k: number) => a + (b - a) * k;
 
 export class CameraDirector {
   readonly camera: THREE.PerspectiveCamera;
+  /** The named view the camera is at, or nearest to (the View tool shows it). */
   view: View = "follow";
   wallpaper = false;
   wallpaperStyle: WallpaperStyle = "follow";
@@ -155,12 +170,11 @@ export class CameraDirector {
   /** Pins the camera (for screenshots and art): eye and target, or null to let it move. */
   pinned: { eye: THREE.Vector3Like; target: THREE.Vector3Like; fov?: number } | null = null;
   /**
-   * The player's hand on the camera: radians round the fly from where the
-   * cameraman stands, radians up or down, and how much farther (over 1) or
-   * nearer. `held` while a finger or a button is on it; let go, the turn
-   * eases back and the zoom is left for `letGo` to settle.
+   * The player's hand on the camera: `held` while a finger, a button, a key
+   * or a stick is turning it; `pitch`, how far (radians) it has been swung up
+   * or down from the shot's height.
    */
-  readonly look = { yaw: 0, pitch: 0, zoom: 1, held: false };
+  readonly hand = { held: false, pitch: 0 };
   /**
    * Where the screens leave room for the fly, from their layout: in the
    * title's shot, its place across and down the picture (as a Shot's
@@ -170,6 +184,8 @@ export class CameraDirector {
   readonly room = { across: -0.56, low: 0.1, lower: 0, wider: 1 };
   #world: World;
   #scene!: SceneCamera;
+  /** How far out the range goes in this place: the whole-table shot's reach. */
+  #farthest = 600;
   /** The camera's place: the point it circles (smoothed), its angle round it, distance, height, and where it aims. */
   #center = new THREE.Vector3();
   #aim = new THREE.Vector3();
@@ -196,9 +212,20 @@ export class CameraDirector {
   #dir = { x: 0, y: 0, z: 0 };
   #from = { x: 0, y: 0, z: 0 };
   #title: Shot = { ...TITLE };
-  /** Seconds since the hand let go, and the springs easing the look back. */
-  #loose = 0;
-  #lookV = new Float64Array(2);
+  /** Where the player has the camera along the range (mm from the focus), and whether it looks straight down (From above) or across. */
+  #reach = reachOf(SHOTS.follow);
+  #above = false;
+  /** The shot at that reach, worked out each frame. */
+  #made: Shot = { ...SHOTS.follow };
+  /** Seconds the camera stays where the hand left it; seconds it follows a zoom quickly; the hand's turn of the whole-table shot. */
+  #handFor = 0;
+  #zooming = 0;
+  #tableTurn = 0;
+  #tableDrift = 0;
+  /** Handed back: take the best place at once, and ease the tilt back quickly. */
+  #rechoose = false;
+  #tiltSettle = TILT_SETTLE;
+  #handV = new Float64Array(2);
 
   constructor(world: World, aspect: number, scene: SceneCamera) {
     this.#world = world;
@@ -217,14 +244,28 @@ export class CameraDirector {
   /** The place's own shots, for a place the fly has just been carried to: the camera starts afresh there. */
   useScene(scene: SceneCamera) {
     this.#scene = scene;
+    this.#farthest = reachOf(scene.whole);
+    this.#reach = this.view === "table" ? this.#farthest : Math.min(this.#reach, this.#farthest);
     this.#started = false;
   }
 
+  /** Takes the camera to one of the named views, at the shots' own unhurried pace. */
   setView(view: View) {
     if (view === this.view) return;
     this.view = view;
+    this.#above = view === "above";
+    this.#reach = this.#reachOfView(view);
     this.#orbit = 0;
     this.#scoutIn = 0;
+  }
+
+  #reachOfView(view: View) {
+    return view === "table" ? this.#farthest : reachOf(SHOTS[view]);
+  }
+
+  /** How far the camera is along the range, mm from what it circles: what the hand zooms. */
+  get reach() {
+    return this.#reach;
   }
 
   /** The shot being taken now. */
@@ -234,8 +275,59 @@ export class CameraDirector {
       this.#title.low = this.room.low;
       return this.#title;
     }
-    if (!this.wallpaper) return this.view === "table" ? this.#scene.whole : SHOTS[this.view];
+    if (!this.wallpaper) return this.#made;
     return this.wallpaperStyle === "follow" ? FOLLOW : WALLPAPER[this.#shot];
+  }
+
+  /** The player has the camera, or had it a moment ago: the cameraman leaves it where it is. */
+  get handled() {
+    return this.hand.held || this.#handFor > 0 || Math.abs(this.hand.pitch) > 0.01;
+  }
+
+  /**
+   * The shot the player has along the range: between the level shots (or
+   * from above, at that reach); past Wide, toward the whole place's. Leaves it
+   * in #made, and returns how far toward the whole place it is, 0 to 1.
+   */
+  #shape(reach: number): number {
+    const out = this.#made;
+    const wide = LEVEL[LEVEL.length - 1];
+    const whole = this.#scene.whole;
+    let elevation: number;
+    if (this.#above) {
+      const above = SHOTS.above;
+      elevation = elevationOf(above);
+      out.side = above.side;
+      out.low = above.low;
+      out.fov = above.fov;
+      out.settle = above.settle;
+      out.scout = false;
+    } else {
+      // The two level shots either side, by how far between them it is on a log scale (as a zoom feels).
+      let i = 0;
+      while (i < LEVEL.length - 2 && reach > reachOf(LEVEL[i + 1])) i++;
+      const a = LEVEL[i];
+      const b = LEVEL[i + 1];
+      const k = Math.max(0, Math.min(1, Math.log(reach / reachOf(a)) / Math.log(reachOf(b) / reachOf(a))));
+      elevation = mix(elevationOf(a), elevationOf(b), k);
+      out.side = mix(a.side, b.side, k);
+      out.low = mix(a.low, b.low, k);
+      out.fov = mix(a.fov, b.fov, k);
+      out.settle = mix(a.settle, b.settle, k);
+      out.scout = true;
+    }
+    const start = reachOf(wide);
+    const raw = reach <= start ? 0 : Math.min(1, Math.log(reach / start) / Math.log(this.#farthest / start));
+    const t = raw * raw * (3 - 2 * raw);
+    if (t > 0) {
+      elevation = mix(elevation, elevationOf(whole), t);
+      out.low = mix(out.low, whole.low, t);
+      out.fov = mix(out.fov, whole.fov, t);
+      out.settle = mix(out.settle, whole.settle, t);
+    }
+    out.distance = reach * Math.cos(elevation);
+    out.height = reach * Math.sin(elevation);
+    return t;
   }
 
   /** Moves the camera on by `dt` seconds, framing the fly. */
@@ -262,73 +354,80 @@ export class CameraDirector {
         this.shotChanges++;
       }
     }
+    // The player's own shot, along the range; the title's and the wallpaper's are their own.
+    const own = !this.title && !this.wallpaper;
+    const table = own ? this.#shape(this.#reach) : 0;
     const shot = this.shot;
     this.#orbit += (shot.orbit ?? 0) * dt;
+    this.#tableDrift += table > 0 ? (this.#scene.whole.orbit ?? 0) * dt : 0;
+    this.#easeHand(dt);
     const airborne = body.mode === "airborne";
     const p = body.position;
     const v = body.velocity;
 
     // What the camera circles, and how quickly it keeps up: a fly in the air moves a hundred times faster than one walking.
-    const focus = this.#focus;
+    const focus = this.#focus.set(p.x, p.y + MIDDLE, p.z);
     let distance = shot.distance;
     let height = shot.height;
     let settle = shot.settle;
     let fov = shot.fov;
     let fovSettle = settle * 0.8;
-    let follow: number;
-    let aimSettle: number;
-    if (shot.around === "table") {
-      focus.set(p.x * 0.35, 60 + p.y * 0.3, p.z * 0.35);
-      this.#goal = shot.side + this.#orbit;
-      follow = settle;
-      aimSettle = settle * 0.8;
-    } else {
-      focus.set(p.x, p.y + MIDDLE, p.z);
-      if (airborne) {
-        // Pulled back to keep a jump in the picture, and quick to follow it; aimed ahead by what the springs would lag.
-        distance = Math.max(distance * 2.8, 22);
-        height = Math.max(height * 2, 4);
-        follow = 0.35;
-        aimSettle = 0.06;
-        settle = 1.2;
-        fov = Math.max(fov, 52);
-        fovSettle = 0.25;
-      } else {
-        follow = 0.9;
-        aimSettle = 0.35;
-      }
-      this.#chooseSide(body, shot, distance, height, dt);
+    let follow = 0.9;
+    let aimSettle = 0.35;
+    if (airborne) {
+      // Pulled back to keep a jump in the picture, and quick to follow it; aimed ahead by what the springs would lag. Not from the whole table, which has it all in the picture already.
+      const k = 1 - table;
+      distance = mix(distance, Math.max(distance * 2.8, 22), k);
+      height = mix(height, Math.max(height * 2, 4), k);
+      follow = 0.35;
+      aimSettle = 0.06;
+      settle = mix(1.2, settle, table);
+      fov = mix(Math.max(fov, 52), fov, table);
+      fovSettle = mix(0.25, fovSettle, table);
     }
-    if (!this.#started) this.#jump(focus, shot, distance, height);
+    if (table < 1) this.#chooseSide(body, shot, distance, height, dt);
+    // Toward the whole table: circling its middle, from its own angle, at its own pace. What it circles moves over last, so the fly stays in the picture all the way out.
+    const whole = this.#scene.whole;
+    const middle = table * table * table;
+    const tx = mix(focus.x, p.x * 0.35, middle);
+    const ty = mix(focus.y, 60 + p.y * 0.3, middle);
+    const tz = mix(focus.z, p.z * 0.35, middle);
+    follow = mix(follow, whole.settle, table);
+    aimSettle = mix(aimSettle, whole.settle * 0.8, table);
+    const goal = this.#goal + wrap(whole.side + this.#tableDrift + this.#tableTurn - this.#goal) * table;
+    if (this.#zooming > 0) {
+      this.#zooming -= dt;
+      settle = Math.min(settle, ZOOM_SETTLE / 0.8);
+      fovSettle = Math.min(fovSettle, ZOOM_SETTLE);
+    }
+    if (!this.#started) this.#jump(tx, ty, tz, goal, shot, distance, height);
 
     const s = this.#v;
     const c = this.#center;
     // Walking, it keeps pace a little ahead, as the spring would otherwise trail by the fly's speed times its settling time.
     const pace = Math.hypot(v.x, v.z);
-    const ahead = shot.around === "fly" && !airborne && pace > 0 ? Math.min(follow, (MAX_LEAD * 0.5) / pace) : 0;
-    c.x = damp(c.x, focus.x + v.x * ahead, s, 0, follow, dt);
-    c.y = damp(c.y, focus.y, s, 1, follow, dt);
-    c.z = damp(c.z, focus.z + v.z * ahead, s, 2, follow, dt);
-    const goal = this.#azimuth + wrap(this.#goal - this.#azimuth);
-    this.#azimuth = wrap(damp(this.#azimuth, goal, s, 6, settle, dt));
+    const ahead = !airborne && pace > 0 ? Math.min(follow, (MAX_LEAD * 0.5) / pace) * (1 - table) : 0;
+    c.x = damp(c.x, tx + v.x * ahead, s, 0, follow, dt);
+    c.y = damp(c.y, ty, s, 1, follow, dt);
+    c.z = damp(c.z, tz + v.z * ahead, s, 2, follow, dt);
+    this.#azimuth = wrap(damp(this.#azimuth, this.#azimuth + wrap(goal - this.#azimuth), s, 6, settle, dt));
     this.#distance = damp(this.#distance, distance, s, 7, settle * 0.8, dt);
     this.#height = damp(this.#height, height, s, 8, settle * 0.8, dt);
     // Playing, the HUD's room: the wallpaper and the title have the screen to themselves.
-    const hud = !this.title && !this.wallpaper;
-    if (hud && this.room.wider !== 1) fov = (Math.atan(Math.tan((fov * Math.PI) / 360) * this.room.wider) * 360) / Math.PI;
+    if (own && this.room.wider !== 1) fov = (Math.atan(Math.tan((fov * Math.PI) / 360) * this.room.wider) * 360) / Math.PI;
     this.#fov = damp(this.#fov, fov, s, 9, fovSettle, dt);
-    this.#low = damp(this.#low, shot.low + (hud ? this.room.lower : 0), s, 10, settle * 0.8, dt);
-    const look = this.#easeLook(dt);
-    const view = fieldOfView(this.#fov, cam.aspect, shot.around === "table" ? 1 : NARROW_KEEP);
+    this.#low = damp(this.#low, shot.low + (own ? this.room.lower : 0), s, 10, settle * 0.8, dt);
+    const view = fieldOfView(this.#fov, cam.aspect, mix(NARROW_KEEP, 1, table));
 
     const eye = this.#eye;
-    const az = this.#azimuth + look.yaw;
-    // The player's hand swings it up or down round the fly, and in or out.
-    let reach = this.#distance * look.zoom;
-    let rise = this.#height * look.zoom;
-    if (look.pitch !== 0) {
+    const az = this.#azimuth;
+    // The player's hand swings it up or down round what it circles.
+    let reach = this.#distance;
+    let rise = this.#height;
+    const pitch = own ? this.hand.pitch : 0;
+    if (pitch !== 0) {
       const r = Math.hypot(reach, rise);
-      const up = Math.min(LOOK_PITCH[1], Math.max(LOOK_PITCH[0], Math.atan2(rise, reach) + look.pitch));
+      const up = Math.min(LOOK_PITCH[1], Math.max(LOOK_PITCH[0], Math.atan2(rise, reach) + pitch));
       reach = Math.cos(up) * r;
       rise = Math.sin(up) * r;
     }
@@ -338,13 +437,13 @@ export class CameraDirector {
       eye.x += Math.sin(this.#time * 0.23) * this.#distance * 0.006;
       eye.y += Math.sin(this.#time * 0.31) * this.#distance * 0.004;
     }
-    // However the springs lag (a landing, a sudden turn), never closer to the fly than most of the shot's distance.
-    if (shot.around === "fly") {
+    // However the springs lag (a landing, a sudden turn), never closer to the fly than most of where the camera is meant to be.
+    if (table < 0.5) {
       const dx = eye.x - focus.x;
       const dy = eye.y - focus.y;
       const dz = eye.z - focus.z;
       const near = Math.hypot(dx, dy, dz);
-      const least = Math.hypot(shot.distance, shot.height) * 0.75 * Math.min(1, look.zoom);
+      const least = Math.min(Math.hypot(shot.distance, shot.height), Math.hypot(this.#distance, this.#height)) * 0.75;
       if (near < least) {
         const k = least / Math.max(1e-6, near);
         eye.set(focus.x + dx * k, focus.y + dy * k, focus.z + dz * k);
@@ -359,13 +458,13 @@ export class CameraDirector {
     const lift = eye.y - c.y - ground * Math.tan(drop);
     // Aimed ahead by about what the spring lags, so a jump stays in the picture; never more than a few body lengths.
     const speed = Math.hypot(v.x, v.y, v.z);
-    const lead = shot.around === "fly" && speed > 0 ? Math.min(aimSettle, MAX_LEAD / speed) : 0;
+    const lead = speed > 0 ? Math.min(aimSettle, MAX_LEAD / speed) * (1 - table) : 0;
     // To put the fly to one side, aim the other way along the camera's right.
     const aside = -(shot.across ?? 0) * ground * Math.tan((view * Math.PI) / 360) * this.camera.aspect;
     const a = this.#aim;
-    a.x = damp(a.x, focus.x + v.x * lead + Math.cos(az) * aside, s, 3, aimSettle, dt);
-    a.y = damp(a.y, focus.y + lift + v.y * lead, s, 4, aimSettle, dt);
-    a.z = damp(a.z, focus.z + v.z * lead - Math.sin(az) * aside, s, 5, aimSettle, dt);
+    a.x = damp(a.x, tx + v.x * lead + Math.cos(az) * aside, s, 3, aimSettle, dt);
+    a.y = damp(a.y, ty + lift + v.y * lead, s, 4, aimSettle, dt);
+    a.z = damp(a.z, tz + v.z * lead - Math.sin(az) * aside, s, 5, aimSettle, dt);
     this.#started = true;
 
     cam.position.copy(eye);
@@ -377,63 +476,70 @@ export class CameraDirector {
     cam.updateMatrixWorld();
   }
 
-  /** The look by hand, eased back to nothing once let go and left a moment. */
-  #easeLook(dt: number) {
-    const look = this.look;
-    if (look.held) {
-      this.#loose = 0;
-      this.#lookV.fill(0);
-      return look;
+  /** While the hand is on the camera it stays put; let go a while, the tilt and the turn of the whole table ease back. */
+  #easeHand(dt: number) {
+    const hand = this.hand;
+    if (hand.held) {
+      this.#handFor = HAND_HOLD;
+      this.#handV.fill(0);
+      return;
     }
-    this.#loose += dt;
-    if (this.#loose > LOOK_HOLD) {
-      look.yaw = Math.abs(look.yaw) < 1e-4 ? 0 : damp(look.yaw, 0, this.#lookV, 0, LOOK_SETTLE, dt);
-      look.pitch = Math.abs(look.pitch) < 1e-4 ? 0 : damp(look.pitch, 0, this.#lookV, 1, LOOK_SETTLE, dt);
+    if (this.#handFor > 0) {
+      this.#handFor -= dt;
+      return;
     }
-    return look;
+    hand.pitch = Math.abs(hand.pitch) < 1e-4 ? 0 : damp(hand.pitch, 0, this.#handV, 0, this.#tiltSettle, dt);
+    this.#tableTurn = Math.abs(this.#tableTurn) < 1e-4 ? 0 : damp(this.#tableTurn, 0, this.#handV, 1, this.#tiltSettle, dt);
   }
 
-  /** Turns the camera round the fly by hand (radians round, and up), no further up or down than it can go from where the shot has it, so that turning back takes effect at once. */
+  /** Turns the camera round by hand, at once (radians round, and up), no further up or down than it can go from where the shot has it, so that turning back takes effect at once. It stays there until the hand has been off it a while. */
   turnBy(yaw: number, pitch: number) {
-    const look = this.look;
-    look.yaw = wrap(look.yaw + yaw);
+    this.#azimuth = wrap(this.#azimuth + yaw);
+    this.#goal = wrap(this.#goal + yaw);
+    this.#tableTurn += yaw;
+    this.#v[6] = 0;
+    const hand = this.hand;
     const up = Math.atan2(this.#height, this.#distance);
-    look.pitch = Math.max(LOOK_PITCH[0] - up, Math.min(LOOK_PITCH[1] - up, look.pitch + pitch));
+    hand.pitch = Math.max(LOOK_PITCH[0] - up, Math.min(LOOK_PITCH[1] - up, hand.pitch + pitch));
+    this.#handFor = HAND_HOLD;
+    this.#tiltSettle = TILT_SETTLE;
   }
 
-  /** Brings the camera in (under 1) or takes it out by hand, by this factor. */
+  /** Brings the camera in (under 1) or takes it out by hand, by this factor, along the range; the View tool's name follows it. */
   zoomBy(factor: number) {
-    const reach = Math.hypot(this.#distance, this.#height);
-    const whole = this.#scene.whole;
-    const look = this.look;
-    look.zoom = Math.min((Math.hypot(whole.distance, whole.height) * ZOOM_FARTHEST) / reach, Math.max(ZOOM_NEAREST / reach, look.zoom * factor));
+    const reach = Math.min(this.#farthest, Math.max(NEAREST, this.#reach * factor));
+    if (reach === this.#reach) return;
+    this.#reach = reach;
+    this.#zooming = 0.4;
+    this.view = this.#nearest(reach);
+    if (this.view === "table") this.#above = false;
   }
 
-  /**
-   * The hand has let go of the zoom: the view nearest to where it was left
-   * (null if it is still nearest the one it was in), with the camera left
-   * exactly where it is, to ease from there into that view.
-   */
-  letGo(): View | null {
-    const look = this.look;
-    look.held = false;
-    if (look.zoom === 1) return null;
-    this.#distance *= look.zoom;
-    this.#height *= look.zoom;
-    const reach = Math.hypot(this.#distance, this.#height);
-    look.zoom = 1;
-    let best: View | null = null;
-    let bestGap = Infinity;
-    for (const view of NEAR_TO_FAR) {
-      const shot = view === "table" ? this.#scene.whole : SHOTS[view];
-      // The whole table's shot circles the table, not the fly: as far from the fly as from its middle, near enough.
-      const gap = Math.abs(Math.log(reach / Math.hypot(shot.distance, shot.height)));
-      if (gap < bestGap) {
-        bestGap = gap;
+  /** The named view nearest a reach: Whole table once it is more the table's shot than the fly's. */
+  #nearest(reach: number): View {
+    const start = reachOf(SHOTS.wide);
+    if (reach > start && Math.log(reach / start) / Math.log(this.#farthest / start) >= 0.7) return "table";
+    if (this.#above) return "above";
+    let best: View = "follow";
+    let gap = Infinity;
+    for (const view of ["close", "follow", "wide"] as const) {
+      const g = Math.abs(Math.log(reach / reachOf(SHOTS[view])));
+      if (g < gap) {
+        gap = g;
         best = view;
       }
     }
-    return best === this.view ? null : best;
+    return best;
+  }
+
+  /** Gives the camera back to the cameraman now: it takes the best place round the fly at once, the tilt eases back, and (unless `keepZoom`) the zoom goes to the named view it is nearest. */
+  handBack(keepZoom = false) {
+    this.hand.held = false;
+    this.#handFor = 0;
+    this.#rechoose = true;
+    this.#scoutIn = 0;
+    this.#tiltSettle = TILT_SETTLE_NOW;
+    if (!keepZoom) this.#reach = this.#reachOfView(this.view);
   }
 
   /**
@@ -443,7 +549,8 @@ export class CameraDirector {
    * preferred angle, near where the camera is, with something behind the fly.
    */
   #chooseSide(body: FlyBody, shot: Shot, distance: number, height: number, dt: number) {
-    if (body.mode === "airborne") return;
+    // Left where the hand put it, for now.
+    if (body.mode === "airborne" || (this.handled && !this.#rechoose)) return;
     this.#scoutIn -= dt;
     if (this.#scoutIn > 0 && this.#started) return;
     const elapsed = SCOUT_EVERY - this.#scoutIn;
@@ -473,8 +580,10 @@ export class CameraDirector {
         }
       }
     }
-    if (!this.#started) {
+    if (!this.#started || this.#rechoose) {
       this.#goal = bestAngle;
+      this.#rechoose = false;
+      this.#pendingFor = 0;
       return;
     }
     // Stay put while where it is making for still works and nothing is much better.
@@ -545,10 +654,10 @@ export class CameraDirector {
   }
 
   /** Puts the camera straight into the shot's place. */
-  #jump(focus: THREE.Vector3, shot: Shot, distance: number, height: number) {
-    this.#center.copy(focus);
-    this.#aim.copy(focus);
-    this.#azimuth = this.#goal;
+  #jump(x: number, y: number, z: number, azimuth: number, shot: Shot, distance: number, height: number) {
+    this.#center.set(x, y, z);
+    this.#aim.set(x, y, z);
+    this.#azimuth = azimuth;
     this.#distance = distance;
     this.#height = height;
     this.#fov = shot.fov;
@@ -558,6 +667,7 @@ export class CameraDirector {
 
   /** Starts the wallpaper on the next of its shots. */
   startWallpaper() {
+    this.handBack(true);
     this.wallpaper = true;
     this.#shotTime = 0;
     this.#shot = (this.#shot + 1) % WALLPAPER.length;

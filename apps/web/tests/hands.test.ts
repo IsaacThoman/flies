@@ -32,14 +32,6 @@ for (const [tool, sound] of [["feed", "drop"], ["swoop", "swoop"]] as const) {
     update(1 / 60);
     audio.tools(hands.events);
     assert.deepEqual(sounds, [{ sound, volume: 1 }]);
-    hands.clearEvents();
-
-    // The pause menu skips updates; it must not leave an event to replay on resume.
-    hands.clearEvents();
-    audio.tools(hands.events);
-    update(1 / 60);
-    audio.tools(hands.events);
-    assert.deepEqual(sounds, [{ sound, volume: 1 }]);
   });
 }
 

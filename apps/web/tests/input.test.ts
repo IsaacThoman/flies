@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DELIBERATE_MOVE, Devices, Gamepads, Pointers, Remote, TAP_SLOP, initialDevice, keyAction } from "../src/input.ts";
+import { DELIBERATE_MOVE, Devices, Gamepads, Keyboard, Pointers, Remote, TAP_SLOP, initialDevice, keyAction, keyAxis } from "../src/input.ts";
 import type { Gesture, RawPointer } from "../src/input.ts";
 
 /** A 1000×500 canvas at the page's top left, and a clock the test moves. */
@@ -120,13 +120,56 @@ test("on the TV the remote's keys are the remote's, as they always were", () => 
   assert.equal(remote.held.size, 0);
 });
 
-test("a keyboard's own keys: the numbers pick tools, plus and minus bring the camera in and take it out", () => {
+test("a keyboard's own keys: the numbers pick tools, R or Home hands the camera back; held, Q and E turn it and + and − zoom it", () => {
   assert.deepEqual(keyAction("Digit1", "1"), { kind: "tool", index: 0 });
   assert.deepEqual(keyAction("Numpad8", "8"), { kind: "tool", index: 7 });
-  assert.deepEqual(keyAction("Equal", "+"), { kind: "zoom", dir: -1 });
-  assert.deepEqual(keyAction("Minus", "-"), { kind: "zoom", dir: 1 });
+  assert.deepEqual(keyAction("KeyR", "r"), { kind: "handBack" });
+  assert.deepEqual(keyAction("Home", "Home"), { kind: "handBack" });
   assert.equal(keyAction("KeyA", "a"), null);
   assert.equal(keyAction("Digit0", "0"), null);
+  assert.deepEqual(keyAxis("Equal", "+"), { axis: "zoom", dir: -1 });
+  assert.deepEqual(keyAxis("Minus", "-"), { axis: "zoom", dir: 1 });
+  assert.deepEqual(keyAxis("KeyQ", "q"), { axis: "turn", dir: -1 });
+  assert.equal(keyAxis("ArrowLeft", "ArrowLeft"), null, "the arrows are the remote's");
+
+  const devices = new Devices("mouse");
+  const target = new EventTarget();
+  const remote = new Remote(target as unknown as Window, () => 1, devices, "keys");
+  const keyboard = new Keyboard(target as unknown as Window, remote, devices, () => 7);
+  const key = (type: string, code: string, k: string, extra = {}) => target.dispatchEvent(Object.assign(new Event(type), { code, key: k, repeat: false, ...extra }));
+  key("keydown", "KeyE", "e");
+  key("keydown", "Equal", "=");
+  assert.deepEqual([keyboard.turn, keyboard.zoom, keyboard.holding, devices.current], [1, -1, true, "keys"]);
+  key("keydown", "Equal", "=", { repeat: true });
+  assert.equal(keyboard.zoom, -1, "a key's repeats are the same key held");
+  key("keyup", "KeyE", "e");
+  assert.equal(keyboard.turn, 0);
+  target.dispatchEvent(new Event("blur"));
+  assert.deepEqual([keyboard.zoom, keyboard.holding], [0, false], "keys held when the window lost focus are let go");
+  key("keydown", "KeyR", "r");
+  key("keydown", "KeyR", "r", { repeat: true });
+  key("keydown", "KeyR", "r", { ctrlKey: true });
+  assert.deepEqual(keyboard.actions, [{ kind: "handBack" }], "once, and never with the browser's own shortcuts");
+});
+
+test("a second tap or click soon after the first, in the same place, is a double one; a third starts again", () => {
+  const { pointers, raw, tick } = rig();
+  const tapAt = (x: number) => {
+    pointers.down(raw(1, "mouse", x, 100));
+    pointers.up(raw(1, "mouse", x, 100, 0), false);
+    const up = pointers.gestures[pointers.gestures.length - 1] as Extract<Gesture, { type: "up" }>;
+    pointers.endFrame();
+    return up.double;
+  };
+  assert.equal(tapAt(100), false);
+  tick(200);
+  assert.equal(tapAt(104), true);
+  tick(200);
+  assert.equal(tapAt(104), false, "a third starts again");
+  tick(600);
+  assert.equal(tapAt(104), false, "too late");
+  tick(100);
+  assert.equal(tapAt(300), false, "somewhere else");
 });
 
 test("a pad's buttons are the remote's, held directions repeat as the remote's do, and its sticks move the hand and look round", () => {
@@ -172,7 +215,17 @@ test("a pad's buttons are the remote's, held directions repeat as the remote's d
   assert.deepEqual(remote.presses.map((p) => p.button), ["down"], "in a menu the stick steps");
   buttons[7].value = 1;
   pads.poll(1 / 60, 820, false);
-  assert.equal(pads.zoom, -1, "the right trigger brings the camera in");
+  assert.equal(pads.zoom, -1, "the right trigger, all the way, brings the camera in");
+  buttons[7].value = 0;
+  buttons[6].value = 0.54;
+  pads.poll(1 / 60, 840, false);
+  assert.ok(pads.zoom > 0.45 && pads.zoom < 0.55, `the left, halfway, takes it out half as fast: ${pads.zoom}`);
+  buttons[6].value = 0;
+  buttons[11].pressed = true;
+  pads.poll(1 / 60, 860, false);
+  assert.equal(pads.handBack, true, "the right stick pressed in hands the camera back");
+  pads.poll(1 / 60, 880, false);
+  assert.equal(pads.handBack, false, "once");
 });
 
 test("a mouse whose lift was lost (the window lost focus mid-drag) can press again: the old press is cancelled", () => {

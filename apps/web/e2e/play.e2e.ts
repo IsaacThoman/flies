@@ -109,32 +109,36 @@ try {
   assert.equal(awake.focus, "play");
   assert.equal(awake.eyesInset, "hidden", "not over the title");
 
-  step("the menus: settings and each of its pages, about, inside its brain, and back each time");
+  step("the menus: the first arrow shows the focus, then Settings and its tabs, About, the brain, and back each time");
+  // The page starts as a mouse's, with no focus showing: the first arrow only shows where it is.
+  assert.equal(awake.ring, "false");
+  await press("ArrowDown");
+  await waitFor(page, "ring=true,focus=play");
   await press("ArrowDown", 4);
   await waitFor(page, "focus=settings");
   await press("ArrowDown");
   await waitFor(page, "focus=settings");
   await press("Enter");
-  await waitFor(page, "screen=settings,focus=wallpaper,atRoot=false");
-  await press("Enter");
-  await waitFor(page, "screen=wallpaper,stack=title>settings>wallpaper,focus=wallpaperAfter");
+  await waitFor(page, "screen=settings,stack=title>settings,focus=page,tab=wallpaper,atRoot=false");
+  await press("ArrowDown");
+  await waitFor(page, "focus=wallpaperAfter");
   await press("ArrowDown", 3);
   await waitFor(page, "focus=eyesInset");
-  await press("Escape");
-  await waitFor(page, "screen=settings,focus=wallpaper");
+  await press("ArrowUp", 4);
+  await waitFor(page, "focus=page");
+  await press("ArrowRight");
+  await waitFor(page, "tab=sound");
   await press("ArrowDown");
-  await press("Enter");
-  await waitFor(page, "screen=sound,focus=effects");
+  await waitFor(page, "focus=effects");
   // Kept for the reload at the end.
   await press("ArrowLeft");
-  await press("Escape");
-  await waitFor(page, "screen=settings,focus=sound");
+  await press("ArrowUp");
+  await press("ArrowRight");
+  await waitFor(page, "tab=picture,focus=page");
   await press("ArrowDown");
-  await press("Enter");
-  await waitFor(page, "screen=picture,focus=pixels");
+  await waitFor(page, "focus=pixels");
   await press("ArrowDown", 3);
   await waitFor(page, "focus=stats");
-  await press("Escape");
   await press("Escape");
   await waitFor(page, "screen=title,focus=settings");
   await press("ArrowUp");
@@ -194,10 +198,14 @@ try {
   assert.ok(tookOff, "the fly never took off");
   await waitFor(page, "mode~standing|walking", 10_000);
 
-  step("pause with Play/Pause, carry on with Play/Pause");
+  step("the menu with Play/Pause, and Play/Pause carries on; the same with Back");
   await press(" ");
-  await waitFor(page, "screen=pause,focus=resume");
+  await waitFor(page, "screen=title,stack=title,focus=play,ring=true");
   await press(" ");
+  await waitFor(page, "screen=play,stack=title>play");
+  await press("Escape");
+  await waitFor(page, "screen=title,focus=play");
+  await press("Escape");
   await waitFor(page, "screen=play");
 
   step("the wallpaper comes when nobody touches the remote, and any press brings the controls back");
@@ -288,13 +296,9 @@ try {
   await press("ArrowDown");
   await waitFor(page, "variant=clear,weatherFrom=chosen,weather=clear", 10_000);
 
-  step("back to the title through the pause menu, where Back leaves the app");
+  step("Back to the menu, where (on the Apple TV) Back leaves the app");
   await press("Escape");
-  await waitFor(page, "screen=pause,eyesInset=hidden,nerves=hidden");
-  await press("ArrowDown", 4);
-  await waitFor(page, "focus=title");
-  await press("Enter");
-  await waitFor(page, "screen=title,atRoot=true");
+  await waitFor(page, "screen=title,atRoot=true,eyesInset=hidden,nerves=hidden");
 
   step("a reload: the settings, the view, the light and the weather as they were left, the shelf on Feed, and the hints for what was used gone");
   await page.reload();

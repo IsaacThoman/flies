@@ -74,6 +74,15 @@ for (const info of PLACES) {
     };
     director.setView("table");
     check("whole place");
+    // Brought in by hand all the way, and out again, a wheel's click at a time.
+    director.setView("follow");
+    for (let i = 0; i < 60; i++) {
+      director.zoomBy(i < 20 ? 1 / 1.2 : 1.2);
+      for (let t = 0; t < 0.3; t += 1 / 30) director.update(body, 1 / 30);
+      const cam = director.camera.position;
+      assert.ok(cam.y >= world.heightAt(cam.x, cam.z) + 0.5, `zoomed to ${director.reach.toFixed(1)} mm: the camera is inside something`);
+    }
+    check("zoomed all the way out");
     director.startWallpaper();
     director.wallpaperStyle = "follow";
     check("wallpaper, following");

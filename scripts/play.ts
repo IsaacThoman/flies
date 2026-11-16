@@ -16,12 +16,13 @@
 //   swipe:<x0>,<y0>:<x1>,<y1> a finger across the remote's touch surface, in its -1..1 units (y up)
 //   move:<x>,<y>              move the mouse there
 //   click:<x>,<y>[:<ms>]      click the mouse there (held for ms)
-//   mousedrag:<x0>,<y0>:<x1>,<y1>[:<button>]  drag the mouse (button: left, right)
-//   wheel:<x>,<y>:<dy>[:ctrl] the wheel there (ctrl: a trackpad's pinch)
+//   mousedrag:<x0>,<y0>:<x1>,<y1>[:<button>]  drag the mouse (button: left, right, middle)
+//   dblclick:<x>,<y>          double-click the mouse there
+//   wheel:<x>,<y>:<dy>[:ctrl|:<dx>] the wheel there (ctrl: a trackpad's pinch; a number: scrolled across too)
 //   tap:<x>,<y>[:<ms>]        a finger taps there (held for ms)
 //   touchdrag:<x0>,<y0>:<x1>,<y1>[:<ms>]  a finger drags between points
 //   pinch:<x>,<y>:<from>:<to> two fingers about a point, from one spread to another (shares of the width)
-//   tapon:<kind>[:<index>]    a finger taps the middle of a target drawn on screen (from the game's hit map: tool, kind, label, go, menu, row, step, back...)
+//   tapon:<kind>[:<index>]    a finger taps the middle of a target drawn on screen (from the game's hit map: tool, kind, label, go, menu, row, step, tab, back...)
 //   clickon:<kind>[:<index>]  the mouse clicks one
 //   resize:<w>x<h>            the window (or the device's screen) changes shape
 //   sleep:<ms>                wait
@@ -143,7 +144,7 @@ export async function canvasPoint(page: Page, [x, y]: Pt) {
 }
 
 /** Drags the mouse between points on the canvas. */
-export async function mouseDrag(page: Page, from: Pt, to: Pt, button: "left" | "right" = "left", steps = 12) {
+export async function mouseDrag(page: Page, from: Pt, to: Pt, button: "left" | "right" | "middle" = "left", steps = 12) {
   const a = await canvasPoint(page, from);
   await page.mouse.move(a.x, a.y);
   await page.mouse.down({ button });
@@ -209,20 +210,28 @@ export class Fingers {
 
 /** The middle of a target drawn on screen (0 to 1 across and down the canvas), found in the game's hit map by its kind and index. */
 export async function targetOf(page: Page, kind: string, index?: number): Promise<Pt> {
-  const found = await page.evaluate(
+  // A screen just opened may not have been drawn yet: give it a moment.
+  for (let tries = 0; ; tries++) {
+    const found = await findTarget(page, kind, index);
+    if (found) return found;
+    if (tries === 20) throw new Error(`Nothing drawn on screen is a ${kind}${index === undefined ? "" : ` ${index}`}`);
+    await page.waitForTimeout(100);
+  }
+}
+
+function findTarget(page: Page, kind: string, index?: number): Promise<Pt | null> {
+  return page.evaluate(
     ([kind, index]) => {
       const game = (globalThis as unknown as { __fly: { overlay: { hits: { count: number; get(i: number): { kind: string; index: number; value: number; x: number; y: number; w: number; h: number } } }; shape: { design: { width: number; height: number } } } }).__fly;
       const hits = game.overlay.hits;
       for (let i = hits.count - 1; i >= 0; i--) {
         const h = hits.get(i);
-        if (h.kind === kind && (index === null || h.index === index || (kind === "kind" && h.value === index))) return [(h.x + h.w / 2) / game.shape.design.width, (h.y + h.h / 2) / game.shape.design.height];
+        if (h.kind === kind && (index === null || ((kind === "kind" || kind === "tab") ? h.value === index : h.index === index))) return [(h.x + h.w / 2) / game.shape.design.width, (h.y + h.h / 2) / game.shape.design.height];
       }
       return null;
     },
     [kind, index ?? null] as const,
-  );
-  if (!found) throw new Error(`Nothing drawn on screen is a ${kind}${index === undefined ? "" : ` ${index}`}`);
-  return found as Pt;
+  ) as Promise<Pt | null>;
 }
 
 /** Where something in the fly's world is on the screen (0 to 1 across and down the canvas): the fly's middle, or the hand. */
@@ -319,12 +328,16 @@ async function main() {
         await page.mouse.down();
         await page.waitForTimeout(Number(rest[1] ?? 40));
         await page.mouse.up();
-      } else if (kind === "mousedrag") await mouseDrag(page, pt(rest[0]), pt(rest[1]), rest[2] === "right" ? "right" : "left");
+      } else if (kind === "mousedrag") await mouseDrag(page, pt(rest[0]), pt(rest[1]), rest[2] === "right" || rest[2] === "middle" ? rest[2] : "left");
+      else if (kind === "dblclick") {
+        const p = await canvasPoint(page, pt(rest[0]));
+        await page.mouse.dblclick(p.x, p.y);
+      }
       else if (kind === "wheel") {
         const p = await canvasPoint(page, pt(rest[0]));
         await page.mouse.move(p.x, p.y);
         if (rest[2] === "ctrl") await page.keyboard.down("Control");
-        await page.mouse.wheel(0, Number(rest[1]));
+        await page.mouse.wheel(rest[2] && rest[2] !== "ctrl" ? Number(rest[2]) : 0, Number(rest[1]));
         if (rest[2] === "ctrl") await page.keyboard.up("Control");
       } else if (kind === "tap") await fingers.tap(pt(rest[0]), Number(rest[1] ?? 60));
       else if (kind === "tapon") await fingers.tap(await targetOf(page, rest[0], rest[1] === undefined ? undefined : Number(rest[1])));

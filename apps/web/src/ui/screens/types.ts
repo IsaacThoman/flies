@@ -9,9 +9,10 @@ import type { Life } from "../../life.ts";
 import type { Settings } from "../../settings.ts";
 import type { Sound } from "../../audio/sounds.ts";
 
-/** The settings' pages, each opened from the top of the settings. */
+/** The settings' tabs. */
 export type SettingsPage = "wallpaper" | "sound" | "picture";
-export type ScreenId = "title" | "play" | "pause" | "settings" | SettingsPage | "about" | "brain";
+/** The menu (the title, at launch and from play alike), play, and what the menu opens. */
+export type ScreenId = "title" | "play" | "settings" | "about" | "brain";
 
 /** The game, as the screens see it. */
 export interface Shell {
@@ -31,12 +32,10 @@ export interface Shell {
   open(screen: ScreenId): void;
   /** Back one screen (leaving the app at the root). */
   back(): void;
-  /** Starts playing (from the title), or carries on (from the pause menu). */
+  /** Starts playing, or carries on. */
   play(): void;
   /** Goes straight to the wallpaper. */
   watch(): void;
-  /** Back to the title. */
-  title(): void;
   /** The settings changed: apply and save them. */
   applySettings(): void;
   sound(sound: Sound): void;
@@ -61,8 +60,6 @@ export type Point = {
 
 export interface Screen {
   readonly id: ScreenId;
-  /** The fly's life stops while this screen is open. */
-  readonly pauses: boolean;
   /** Called when the screen comes to the top. */
   enter(): void;
   /** The screen changed shape: lay out again. */

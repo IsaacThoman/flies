@@ -1,16 +1,19 @@
 // Draws a Menu (packages/ui) as a column of glossy rows: actions as jelly
-// buttons, choices with their value between chevrons, sliders as glossy
-// tracks. The soap-bubble ring glides to the focused row. On a narrow screen
-// a choice or a slider puts its value under its label. Every row, chevron,
-// track and "more" is recorded where it is drawn, for a pointer.
+// buttons, choices with their value between chevrons (or, as tabs, all their
+// options side by side), sliders as glossy tracks. The soap-bubble ring
+// glides to the focused row, for the remote, a keyboard and a pad; for a
+// mouse or a finger there is no ring, and what the mouse is over only
+// brightens a little. On a narrow screen a choice or a slider puts its value
+// under its label. Every row, chevron, tab, track and "more" is recorded
+// where it is drawn, for a pointer.
 
-import { Eased, INK, INK_SOFT, bubbleRing, chevron, pill, slider, text } from "@fly/ui";
-import type { HitMap, Menu, MenuItem } from "@fly/ui";
+import { Eased, INK, INK_SOFT, bubbleRing, chevron, font, pill, slider, text } from "@fly/ui";
+import type { ChoiceItem, HitMap, Menu, MenuItem } from "@fly/ui";
 
 export type MenuLayout = { x: number; y: number; width: number; row: number; gap: number; compact?: boolean };
 
 /** What a menu's targets are, as recorded in the hit map: `index` is the item's, `value` a chevron's or a "more"'s direction. */
-export const MENU_HITS = { row: "row", step: "step", track: "track", more: "more" } as const;
+export const MENU_HITS = { row: "row", step: "step", track: "track", more: "more", tab: "tab" } as const;
 
 /** The slider's track, from the row's right edge: where it starts and how long it is. */
 const TRACK = { from: 170, length: 140 };
@@ -20,6 +23,8 @@ export class MenuView {
   layout: MenuLayout;
   /** Where a slider's track runs across its row, for turning a point on it into a value: worked out with the layout. */
   readonly track = { x: 0, w: 0 };
+  /** Room (design units) kept clear at the left of a row of tabs, for the back button beside them. */
+  tabInset = 0;
   #ring = new Eased(0, 18);
   #press = new Eased(0, 12);
 
@@ -72,17 +77,20 @@ export class MenuView {
     this.track.w = compact ? width - 56 : TRACK.length;
   }
 
-  draw(g: CanvasRenderingContext2D, t: number, hits: HitMap) {
+  /** `ring`: show the focus (the remote's, the keys', a pad's); `hover`: the item a mouse is over, or -1. */
+  draw(g: CanvasRenderingContext2D, t: number, hits: HitMap, ring = true, hover = -1) {
     const { x, width, row } = this.layout;
     const menu = this.menu;
     const end = Math.min(menu.items.length, menu.scroll + menu.rows);
     for (let i = menu.scroll; i < end; i++) {
       const item = menu.items[i];
       const y = this.#rowY(this.#visibleIndex(i));
-      const focused = i === menu.focus;
+      const focused = ring && i === menu.focus;
+      const press = i === menu.focus ? this.#press.value : 0;
       hits.add(MENU_HITS.row, x, y, width, row, i);
-      if (this.layout.compact) drawStacked(g, item, x, y, width, row, focused, focused ? this.#press.value : 0, hits, i, this.track);
-      else drawItem(g, item, x, y, width, row, focused, focused ? this.#press.value : 0, hits, i, this.track);
+      if (item.kind === "choice" && item.tabs) drawTabs(g, item, x + this.tabInset, y, width - this.tabInset, row, hits, i);
+      else if (this.layout.compact) drawStacked(g, item, x, y, width, row, focused, i === hover, press, hits, i, this.track);
+      else drawItem(g, item, x, y, width, row, focused, i === hover, press, hits, i, this.track);
     }
     // At the list's right edge, clear of a heading centred over it.
     if (menu.scroll > 0) {
@@ -94,17 +102,35 @@ export class MenuView {
       hits.add(MENU_HITS.more, x + width - 60, this.#rowY(menu.rows) - 8, 60, 18, 0, 1);
     }
     const focused = menu.focused;
-    if (focused) bubbleRing(g, x, this.#ring.value - (focused.kind === "action" ? 2 : 0), width, row, row / 2, t);
+    const inset = focused?.kind === "choice" && focused.tabs ? this.tabInset : 0;
+    if (focused && ring) bubbleRing(g, x + inset, this.#ring.value - (focused.kind === "action" ? 2 : 0), width - inset, row, row / 2, t);
   }
 }
 
-function drawItem(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: number, w: number, h: number, focused: boolean, press: number, hits: HitMap, index: number, track: { x: number; w: number }) {
+/** A choice as tabs: its options side by side, the chosen one lit. */
+function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: number, w: number, h: number, hits: HitMap, index: number) {
+  const n = item.options.length;
+  const gap = 6;
+  const tw = (w - gap * (n - 1)) / n;
+  // No taller than a TV's row, and every label the same size, small enough for the widest to fit.
+  const th = Math.min(h, 40);
+  let size = Math.round(th * 0.46);
+  g.font = font(size);
+  for (const option of item.options) size = Math.min(size, Math.floor((size * (tw - 14)) / g.measureText(option.label).width));
+  for (let k = 0; k < n; k++) {
+    const tx = x + k * (tw + gap);
+    pill(g, tx, y + (h - th) / 2, tw, th, item.options[k].label, { color: k === item.index ? "aqua" : "glass", disabled: item.disabled, size });
+    hits.add(MENU_HITS.tab, tx, y, tw, h, index, k);
+  }
+}
+
+function drawItem(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, press: number, hits: HitMap, index: number, track: { x: number; w: number }) {
   if (item.kind === "action") {
-    pill(g, x, y, w, h, item.label, { focused, disabled: item.disabled, press });
+    pill(g, x, y, w, h, item.label, { focused, hover, disabled: item.disabled, press });
     return;
   }
   // A row of glass with the label on the left and the value on the right.
-  pill(g, x, y, w, h, "", { focused: false, color: "glass", disabled: item.disabled });
+  pill(g, x, y, w, h, "", { focused: false, hover, color: "glass", disabled: item.disabled });
   const mid = y + h / 2 + 1;
   text(g, item.label, x + 22, mid, { size: Math.round(h * 0.4), color: INK, baseline: "middle" });
   const right = x + w - 22;
@@ -125,13 +151,13 @@ function drawItem(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: num
 }
 
 /** A narrow row: an action as ever; a choice's or slider's label small on top, its value under it, the width of the row. */
-function drawStacked(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: number, w: number, h: number, focused: boolean, press: number, hits: HitMap, index: number, track: { x: number; w: number }) {
+function drawStacked(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, press: number, hits: HitMap, index: number, track: { x: number; w: number }) {
   if (item.kind === "action") {
     const ph = Math.min(h, 42);
-    pill(g, x, y + (h - ph) / 2, w, ph, item.label, { focused, disabled: item.disabled, press });
+    pill(g, x, y + (h - ph) / 2, w, ph, item.label, { focused, hover, disabled: item.disabled, press });
     return;
   }
-  pill(g, x, y, w, h, "", { focused: false, color: "glass", disabled: item.disabled });
+  pill(g, x, y, w, h, "", { focused: false, hover, color: "glass", disabled: item.disabled });
   text(g, item.label, x + 22, y + h * 0.3, { size: Math.round(h * 0.27), color: INK_SOFT, baseline: "middle" });
   const low = y + h * 0.66;
   if (item.kind === "choice") {
