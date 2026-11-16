@@ -39,7 +39,7 @@ class FakeSocket implements TableSocket {
   }
 }
 
-const welcome = (now: number): ServerMessage => ({ type: "welcome", v: PROTOCOL, id: 2, colour: "#2fb8ff", starter: 1, seed: 1, now, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0] });
+const welcome = (now: number): ServerMessage => ({ type: "welcome", v: PROTOCOL, id: 2, colour: "#2fb8ff", starter: 1, seed: 1, now, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0], room: { name: "Flies", listed: false, locked: false } });
 
 function line() {
   const sockets: FakeSocket[] = [];

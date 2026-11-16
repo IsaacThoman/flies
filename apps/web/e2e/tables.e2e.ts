@@ -6,7 +6,9 @@
 // when shown; the room server restarts and both come back to it as they
 // were; the starter carries the table to the restaurant, where both are set
 // down on the window table and see each other at a room's scale; the
-// starter takes the other's fly off and it is alone again; alone,
+// starter takes the other's fly off and it is alone again; a named, locked
+// room is made from the menus and joined from Online's list with its
+// password, and its link alone leads only to its door; alone,
 // nothing of tables happens at all; and a full table (one tab, seven fake
 // flies from Node walking round its fly) keeps the frame to the Apple TV's
 // budget on every screen shape, followed and close up.
@@ -130,6 +132,26 @@ async function toTool(page: Page, id: string) {
   await waitFor(page, `tool=${id}`, 1000);
 }
 
+/** Moves the focus with `key` until it is on `id`. */
+async function keyTo(page: Page, id: string, key: "ArrowUp" | "ArrowDown") {
+  for (let i = 0; i < 12; i++) {
+    if ((await readState(page)).focus === id) return;
+    await page.keyboard.press(key);
+    await page.waitForTimeout(50);
+  }
+  await waitFor(page, `focus=${id}`, 1000);
+}
+
+/** Types into the focused field as a player would: Select, the words (after rubbing out what was there), Return. */
+async function typeInto(page: Page, id: string, words: string, clear = false) {
+  if ((await readState(page)).typing !== id) await page.keyboard.press("Enter");
+  await waitFor(page, `typing=${id}`, 2000);
+  if (clear) for (let i = 0; i < 30; i++) await page.keyboard.press("Backspace");
+  await page.keyboard.type(words);
+  await page.keyboard.press("Enter");
+  await waitFor(page, "typing=", 2000);
+}
+
 type Cost = { frames: number; calls: number; triangles: number; usual: number; eyeFrames: number; eyeCalls: number; eyesOwn: number };
 /**
  * The cost of every frame drawn for `ms`, as the game counts it once it has
@@ -181,7 +203,7 @@ try {
   const [a, b] = [await open(), await open()];
   await a.page.goto(`${url}?rooms=${roomsAt}`);
   await waitFor(a.page, "brain=running,screen=title", 120_000);
-  await fly(a.page, "g.startTable()");
+  await fly(a.page, "g.startRoom({ name: 'Two tabs', listed: false, password: '', place: g.here })");
   const first = await waitFor(a.page, "online=joined,table=yes", 20_000);
   assert.equal(first.player, "1");
   assert.equal(first.starter, "1", "who starts the table is its starter");
@@ -263,6 +285,50 @@ try {
   await waitUntil(a.page, "fly 2 gone from tab 0", (s) => !othersOf(s).some((o) => o.id === 2), 5000);
   await a.page.context().close();
   await b.page.context().close();
+
+  step("a named, locked room made from the menus with the keys; another tab finds it in Online's list, is told a wrong password is wrong, and gets in with the right one; its link alone opens only its door");
+  const maker = await open();
+  await maker.page.goto(`${url}?rooms=${roomsAt}`);
+  await waitFor(maker.page, "brain=running,screen=title", 120_000);
+  await fly(maker.page, "g.open('online')");
+  await waitFor(maker.page, "screen=online,onlineView=rooms,focus=new");
+  await maker.page.keyboard.press("Enter");
+  await waitFor(maker.page, "onlineView=new,focus=create");
+  await keyTo(maker.page, "name", "ArrowUp");
+  await typeInto(maker.page, "name", "Locked Lab", true);
+  await keyTo(maker.page, "password", "ArrowDown");
+  await typeInto(maker.page, "password", "fly paper");
+  await keyTo(maker.page, "create", "ArrowDown");
+  await maker.page.keyboard.press("Enter");
+  const made = await waitFor(maker.page, "online=joined,onlineView=room,roomName=Locked Lab", 20_000);
+  assert.equal(made.player, "1");
+  const lockedCode = await fly<string>(maker.page, "g.online.code");
+
+  const guest = await open();
+  await guest.page.goto(`${url}?rooms=${roomsAt}`);
+  await waitFor(guest.page, "brain=running,screen=title", 120_000);
+  await fly(guest.page, "g.open('online')");
+  const listed = await waitFor(guest.page, `screen=online,rooms~${lockedCode}:Locked Lab:picnic:1:1`, 10_000);
+  const unlisted = new URL(link).searchParams.get("table")!;
+  assert.ok(listed.rooms.split(";").every((r) => !r.startsWith(unlisted)), "the first two tabs' unlisted table isn't listed");
+  await keyTo(guest.page, `room:${lockedCode}`, "ArrowDown");
+  await guest.page.keyboard.press("Enter");
+  // With the keys in hand, the door's password is typed at once.
+  await waitFor(guest.page, "onlineView=door,typing=password");
+  await guest.page.keyboard.type("fly trap");
+  await guest.page.keyboard.press("Enter");
+  await waitFor(guest.page, "onlineView=door,note=wrong,table=", 10_000);
+  await typeInto(guest.page, "password", "fly paper");
+  const inside = await waitFor(guest.page, "online=joined,onlineView=room,roomName=Locked Lab", 20_000);
+  assert.equal(inside.player, "2");
+  await seesFly(maker.page, 2);
+  await seesFly(guest.page, 1);
+
+  const linked = await open();
+  await linked.page.goto(`${url}?table=${lockedCode}&rooms=${roomsAt}`);
+  const door = await waitFor(linked.page, "screen=online,onlineView=door,table=", 60_000);
+  assert.ok(!("online" in door), "not at the room");
+  for (const tab of [maker, guest, linked]) await tab.page.context().close();
 
   step("alone, nothing changes: no table, no line to a room, and the frame in its budget");
   const solo = await open();

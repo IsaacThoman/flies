@@ -130,11 +130,18 @@ docker compose exec rooms wget -qO- http://127.0.0.1:3000/health
 ```
 
 It keeps its tables in the `rooms_data` volume (`/data/tables.json`), written
-every 30 s and when it stops. An update restarts it with SIGTERM: it writes
+every 30 s and when it stops: each room with its name, whether it is listed,
+and, for a locked one, a salted scrypt hash of its password (never the
+password; nor does the log ever have one). Tables kept by an older server
+are read as they are, unlisted and without a password. A new protocol (3,
+for rooms) reaches open tabs as a refusal they answer by reloading into the
+new site, once. Rolling the rooms back past it forgets nothing, but an older
+server would let anyone with a locked room's link in. An update restarts it with SIGTERM: it writes
 the tables, tells every connected device it is restarting, and the devices
 reconnect to their tables within a couple of seconds. Keep `rooms_data` like
 the Caddy volumes. Deleting it forgets every table and every invitation. The
 only optional setting is `ROOMS_PORT`, the internal port, which Caddy and the
-service both read. Memory and CPU are small: it relays about 1 KB/s up and
-7 KB/s down per player at a table of eight. Rolling back works as for the
-site: tag `flies-rooms:local` as `flies-rooms:rollback` before an update.
+service both read. Browsing the list of rooms uses the same `/rooms`
+WebSocket, so nothing about the proxy changes for it. Memory and CPU are
+small: it relays about 1 KB/s up and 7 KB/s down per player at a table of
+eight. Rolling back works as for the site: tag `flies-rooms:local` as `flies-rooms:rollback` before an update.

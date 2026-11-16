@@ -119,7 +119,7 @@ try {
   await press("ArrowDown", 3);
   await waitFor(page, "focus=settings");
   await press("ArrowDown", 2);
-  await waitFor(page, "focus=together");
+  await waitFor(page, "focus=online");
   await press("ArrowUp");
   await waitFor(page, "focus=settings");
   await press("Enter");

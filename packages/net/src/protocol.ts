@@ -17,9 +17,11 @@ import type { BubbleSnapshot } from "./bubbles.ts";
 /**
  * Bumped whenever a layout or a message changes meaning. 2: a fly's state
  * is read at its place's scale (`wireScale`), which a device that doesn't
- * know the restaurant would read at a tabletop's.
+ * know the restaurant would read at a tabletop's. 3: rooms have names, may
+ * be listed and locked, and a device may browse them; a device speaking 2
+ * would sit at a locked room's door forever, not knowing why it was refused.
  */
-export const PROTOCOL = 2;
+export const PROTOCOL = 3;
 
 /** Where the room server answers WebSockets, on the site's own host. */
 export const ROOMS_PATH = "/rooms";
@@ -397,7 +399,16 @@ export type TableStart = {
   /** Their time zone (an IANA name, if the device knows it) and its offset from UTC now, minutes east: the table's clock is theirs. */
   zone: string;
   offset: number;
+  /** What the room is called (`roomName`), and whether it is in the list of rooms anyone can browse; unlisted, only its link or code leads there. */
+  name?: string;
+  listed?: boolean;
 };
+
+/** A room as the list shows it: its code (to join it), name, place, how many flies are there now, and whether it needs a password. */
+export type RoomWire = { code: string; name: string; place: string; flies: number; locked: boolean };
+
+/** What a table says of itself in its welcome: its name, whether it is listed, and whether it is locked. */
+export type RoomInfo = { name: string; listed: boolean; locked: boolean };
 
 export type ClientMessage =
   | {
@@ -409,10 +420,18 @@ export type ClientMessage =
       key: string;
       /** Starting the table, if it doesn't exist yet. */
       start?: TableStart;
+      /**
+       * The room's password: starting it, the lock it is to have; joining a
+       * locked room this device has no seat at, the key to it. Sent only
+       * over this socket, and only until welcomed.
+       */
+      password?: string;
       /** Where this device's fly is, coming back to the table after a moment away (a reconnection), and the epoch of the place it is in: from before a move, it isn't anywhere at the table. */
       at?: Spot;
       epoch?: number;
     }
+  /** Instead of a hello: this connection only browses the listed rooms (answered with `rooms`, and again as they change). */
+  | { type: "browse"; v: number }
   | { type: "ping"; t: number }
   /** `y`: the surface it falls to, at or below this height (the floor under a table, or the table). */
   | { type: "drop"; id: number; kind: string; x: number; z: number; y: number; at: number }
@@ -425,7 +444,7 @@ export type ClientMessage =
   | { type: "bye" };
 
 /** Why the room turned a device away (and closed its connection with the matching code). */
-export type Refusal = "version" | "full" | "removed" | "unknown" | "busy" | "malformed" | "elsewhere";
+export type Refusal = "version" | "full" | "removed" | "unknown" | "busy" | "malformed" | "elsewhere" | "locked";
 
 /** WebSocket close codes for each refusal, and for a deploy restarting the server (try again shortly). */
 export const CLOSE: Readonly<Record<Refusal | "restart" | "left", number>> = {
@@ -436,6 +455,7 @@ export const CLOSE: Readonly<Record<Refusal | "restart" | "left", number>> = {
   busy: 4005,
   malformed: 4006,
   elsewhere: 4007,
+  locked: 4008,
   left: 4010,
   restart: 1012,
 };
@@ -468,8 +488,12 @@ export type ServerMessage =
       bubbles: BubbleSnapshot;
       /** Where this player's fly is to stand: where it was, coming back; where the table finds room for it, new. */
       at: Spot;
+      room: RoomInfo;
     }
-  | { type: "refused"; reason: Refusal }
+  /** `name`: a locked room's, to ask for its password by (whoever has its code may know what it is called). */
+  | { type: "refused"; reason: Refusal; name?: string }
+  /** The listed rooms, fullest first, to a browsing connection. */
+  | { type: "rooms"; rooms: RoomWire[] }
   | { type: "pong"; t: number; now: number }
   | ({ type: "joined" } & PlayerWire)
   | { type: "away"; id: number; away: boolean }

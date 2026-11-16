@@ -24,7 +24,7 @@ const FINGER = 40;
 const inside = (r: Rect, a: Rect, slack = 0.5) => r.x >= a.x - slack && r.y >= a.y - slack && r.x + r.w <= a.x + a.w + slack && r.y + r.h <= a.y + a.h + slack;
 const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-function shell(frame: Frame, glyphs: Shell["glyphs"] = null, together = true): Shell {
+function shell(frame: Frame, glyphs: Shell["glyphs"] = null, online = true): Shell {
   return {
     settings: { ...DEFAULT_SETTINGS },
     brain: { status: "running", neurons: 166700, connections: 6242118, state: null } as unknown as Shell["brain"],
@@ -40,10 +40,17 @@ function shell(frame: Frame, glyphs: Shell["glyphs"] = null, together = true): S
     watch() {},
     applySettings() {},
     sound() {},
-    // With "Together" on the title and the pause menu, as in a browser: the longest they are.
-    canPlayTogether: together,
+    // With "Online" on the title and the pause menu, as in a browser: the longest they are.
+    canPlayOnline: online,
     table: null,
-    startTable() {},
+    tableEnded: null,
+    knock: null,
+    door() {},
+    here: "picnic",
+    rooms: null,
+    typing: null,
+    startRoom() {},
+    joinRoom() {},
     shareTable: async () => "failed",
     removeFly() {},
     leaveTable() {},
@@ -158,7 +165,7 @@ test("every menu fits inside the safe area at every shape, its rows big enough f
       for (let i = 0; i < hits.count; i++) if (hits.get(i)!.kind === "row") shown++;
       assert.equal(shown, screen.menu.rows, `${name}: ${screen.id}`);
     }
-    // The menu's six rows (with Together) all show: in two columns where one is too short for them.
+    // The menu's six rows (with Online) all show: in two columns where one is too short for them.
     const title = titleScreen(s);
     assert.equal(title.menu.rows, title.menu.items.length, `${name}: the menu doesn't scroll`);
     // Each row where it is drawn, inside the pane and clear of the others.

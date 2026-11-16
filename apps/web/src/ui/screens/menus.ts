@@ -4,7 +4,7 @@
 //         ├─ Watch
 //         ├─ About
 //         ├─ Settings: Wallpaper | On screen | Sound | Picture, as tabs
-//         └─ Together (in a browser): a table with others (together.ts)
+//         └─ Online (in a browser): rooms with others (online.ts)
 //
 // The menu is the title, at launch and from play alike (Back, Play/Pause or
 // the menu button), with the fly living on behind it; Back there carries on
@@ -30,7 +30,7 @@ export function titleScreen(shell: Shell) {
     { kind: "action", id: "about", label: "About" },
     { kind: "action", id: "settings", label: "Settings" },
     // With others, where there is a way to reach them.
-    ...(shell.canPlayTogether ? [{ kind: "action" as const, id: "together", label: "Together" }] : []),
+    ...(shell.canPlayOnline ? [{ kind: "action" as const, id: "online", label: "Online" }] : []),
   ]);
   // Laid out with the menu, for the backdrop to draw from.
   let title = titleLayout(shell.shape, menu.items.length);
@@ -42,7 +42,7 @@ export function titleScreen(shell: Shell) {
     onActivate(item) {
       if (item.id === "play") shell.play();
       else if (item.id === "watch") shell.watch();
-      else shell.open(item.id as "about" | "settings" | "together");
+      else shell.open(item.id as "about" | "settings" | "online");
     },
     onBack: () => shell.back(),
     backdrop(g, t) {

@@ -6,9 +6,9 @@ import {
   spawnSpot, toWire,
 } from "@fly/net";
 import type { ClientMessage, ServerMessage, Spot, TableStart, WireScale } from "@fly/net";
-import { AWAY_LIMIT, SILENT_AFTER, Table } from "../src/table.ts";
-import type { Link, Seat } from "../src/table.ts";
-import { Tables } from "../src/tables.ts";
+import { AWAY_LIMIT, SILENT_AFTER, Table, UNNAMED } from "../src/table.ts";
+import type { Link, Seat, TableRecord } from "../src/table.ts";
+import { LISTED_IDLE, TABLE_IDLE, Tables } from "../src/tables.ts";
 
 const CODE = "23456789ab";
 const START: TableStart = { place: "picnic", light: "noon", weather: "clear", zone: "", offset: 0 };
@@ -645,3 +645,43 @@ test("in the restaurant food is dropped onto the surface it falls to, and eaten 
   assert.equal(table.food.refused.far, 1);
 });
 
+
+test("rooms: only listed ones with someone there are listed, fullest first; a listed room nobody has come to for a day is forgotten, an unlisted one kept as its invitations are", () => {
+  const clock = { now: 0, wall: Date.UTC(2026, 5, 1) };
+  const tables = new Tables({ now: () => clock.now, wall: () => clock.wall });
+  const open = (code: string, key: string, start: TableStart) => tables.open(key, { type: "hello", v: PROTOCOL, table: code, key, start }, 1) as Table;
+  const sit = (table: Table, key: string) => table.hello(fakeLink(), key, { type: "hello", v: PROTOCOL, table: table.code, key }) as Seat;
+  const quiet = open("aaaaaaaaaa", "k1", { ...START, name: "Quiet", listed: true });
+  const busy = open("bbbbbbbbbb", "k2", { ...START, place: "bar", name: "Busy", listed: true });
+  const hidden = open("cccccccccc", "k3", { ...START, name: "Hidden" });
+  const empty = open("dddddddddd", "k4", { ...START, name: "Empty", listed: true });
+  sit(quiet, "k1");
+  for (const key of ["k2", "k5", "k6"]) sit(busy, key);
+  sit(hidden, "k3");
+  assert.deepEqual(tables.listed(), [
+    { code: "bbbbbbbbbb", name: "Busy", place: "bar", flies: 3, locked: false },
+    { code: "aaaaaaaaaa", name: "Quiet", place: "picnic", flies: 1, locked: false },
+  ]);
+  assert.equal(empty.name, "Empty");
+  // A table from before rooms had names is still one, unlisted, under a name of its own.
+  assert.equal(open("eeeeeeeeee", "k7", START).name, UNNAMED);
+
+  for (const table of [quiet, busy, hidden]) for (const seat of table.seats.values()) table.disconnected(seat, seat.link!);
+  clock.wall += LISTED_IDLE + 60_000;
+  tables.tick();
+  assert.deepEqual([...tables.values()].map((t) => t.code).sort(), ["cccccccccc", "eeeeeeeeee"]);
+  clock.wall += TABLE_IDLE;
+  tables.tick();
+  assert.equal(tables.size, 0);
+});
+
+test("a room's name, whether it is listed, and its lock are kept across a restart", () => {
+  const { table, options } = room({ ...START, name: "Kept", listed: true });
+  const locked = new Table("ffffffffff", { ...START, name: "Locked" }, "key-1", 3, options, undefined, { salt: "c2FsdA", hash: "aGFzaA" });
+  for (const t of [table, locked]) {
+    const back = Table.restore(JSON.parse(JSON.stringify(t.record())) as TableRecord, options);
+    assert.deepEqual(back.info, t.info);
+    assert.deepEqual(back.lock, t.lock);
+  }
+  assert.deepEqual(locked.info, { name: "Locked", listed: false, locked: true });
+});
