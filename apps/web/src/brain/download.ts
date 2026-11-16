@@ -15,6 +15,8 @@
 // served over plain http, or from an app's own URL scheme) it just fetches,
 // and without crypto.subtle it relies on gzip's own check when unpacking.
 
+import type { BrainSource } from "./worker-driver.ts";
+
 export type BrainPart = { url: string; bytes: number; sha256: string };
 
 /** The brain as the build wrote it (scripts/webBuild.ts): the gzipped wire form, in parts, in order. */
@@ -37,6 +39,8 @@ export class BrainLoadError extends Error {
  * isn't its current parts.
  */
 export const BRAIN_CACHE = "fly-brain";
+/** The cache the WebAssembly brain (fly-brain.wasm) is kept in. */
+export const BRAIN_MODULE_CACHE = "fly-brain-module";
 /** No bytes for this long, ms, and the connection is given up and tried again. */
 export const STALL_TIMEOUT_MS = 20_000;
 /** Attempts in a row that bring nothing before the download is reported as failed. */
@@ -310,5 +314,49 @@ export class BrainDownload {
     }
     partial.bytes.set(chunk, partial.at);
     partial.at += chunk.length;
+  }
+}
+
+/**
+ * The brain's files as one download, as the loading screen counts it: the
+ * WebAssembly brain, when the page runs that one (small, so first: a broken
+ * download never leaves the big file waiting on it), then the connectome.
+ * Each keeps its own cache.
+ */
+export class BrainFiles implements BrainSource {
+  readonly connectome: BrainDownload;
+  readonly module: BrainDownload | null;
+  readonly #downloads: BrainDownload[];
+
+  constructor(connectome: BrainDownload, module: BrainDownload | null) {
+    this.connectome = connectome;
+    this.module = module;
+    this.#downloads = module ? [module, connectome] : [connectome];
+  }
+
+  get received() {
+    return this.#downloads.reduce((n, d) => n + d.received, 0);
+  }
+
+  get total() {
+    return this.#downloads.reduce((n, d) => n + d.total, 0);
+  }
+
+  get from() {
+    if (this.#downloads.some((d) => d.from === "network")) return "network";
+    return this.#downloads.every((d) => d.from === "cache") ? "cache" : null;
+  }
+
+  get storageFull() {
+    return this.#downloads.some((d) => d.storageFull);
+  }
+
+  async load(onProgress: () => void = () => {}) {
+    const module = this.module ? await this.module.load(onProgress) : null;
+    return { data: await this.connectome.load(onProgress), module };
+  }
+
+  async discard() {
+    for (const d of this.#downloads) await d.discard();
   }
 }

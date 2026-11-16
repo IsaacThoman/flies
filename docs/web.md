@@ -28,9 +28,10 @@ All of `dist/`, as it is, to any folder of the host. About 17 MB:
 | `sw.js` (the service worker) | 1 KB | `no-cache` | `text/javascript` |
 | `manifest.webmanifest` | 1 KB | `no-cache` | `application/manifest+json` |
 | `assets/index-<hash>.js` | 1 MB, 295 KB gzipped | `public, max-age=31536000, immutable` | `text/javascript` |
-| `assets/brain.worker-<hash>.js` | 84 KB | the same | `text/javascript` |
+| `assets/brain.worker-<hash>.js` | 108 KB | the same | `text/javascript` |
 | `assets/*-<hash>.png` | icons and the link preview, 1.3 MB | the same | `image/png` |
 | `brain/connectome.<n>.<hash>.bin` | the brain, in four parts of at most 4 MiB, 14.2 MB in all | the same | `application/octet-stream` (any will do) |
+| `brain/fly-brain.0.<hash>.wasm` | the brain's simulation as WebAssembly, 268 KB (106 KB gzipped) | the same | `application/wasm` (what hosts send for `.wasm`; any will do) |
 | `brain/anatomy.<n>.<hash>.bin` | where each neuron is (`packages/brain/src/anatomy.ts`), 0.9 MB, if `npm run brain:fetch` built it; nothing loads it yet | the same | the same |
 
 Every file whose contents can change has its contents in its name, so it can
@@ -44,7 +45,7 @@ What matters, and why:
 - **No file over 4 MiB.** Hosts cap a single file at 25 MiB (Cloudflare) or
   warn about anything over 10 MB (Netlify); the brain's parts are well under
   both.
-- **The brain arrives as it is.** Its parts are already gzipped (below) but
+- **The brain arrives as it is.** The connectome's parts are already gzipped (below) but
   are plain binary files to a host: none ends in `.gz`, so no host takes one
   for something to serve with `Content-Encoding: gzip`. A host that
   compresses them again on the way does no harm; the browser undoes it.
@@ -53,7 +54,7 @@ What matters, and why:
   (Cloudflare's static assets answer a range with the whole file) that part
   starts again, which is at most 4 MiB; the parts already in hand are kept.
 - **https.** The service worker (opening offline), the browser's cache for the
-  brain, the digest check and the wake lock all need a secure page. Over plain
+  brain and its module, the digest check and the wake lock all need a secure page. Over plain
   http the game still runs, but downloads its brain every time.
 - **Nothing else.** No headers beyond these, no rewrites, no server code, no
   cross-origin isolation.
@@ -64,6 +65,24 @@ the end-to-end run (`apps/web/e2e/web.e2e.ts`) records every request the
 browser makes and fails on one that isn't to the site.
 
 ## Getting the brain to the browser
+
+Two files: the connectome, below, and the simulation that runs on it. That is
+the brain's C++ (`packages/brain-native`) built as WebAssembly, where the
+browser can run it (Chrome and Edge 137+, Firefox 131+, Safari 18.4+), and
+otherwise `packages/brain`'s TypeScript, which comes with the page's own
+script. Both are the same simulation, to the bit (the C++'s README says how);
+the WebAssembly one is faster in Chromium and needs half the memory
+(measured below). `?brain=typescript` or `?brain=wasm` on the page's address
+picks one, for tests and for comparing them; nothing shows it to players.
+
+The module, `brain/fly-brain.0.<hash>.wasm`, is fetched first (it is small)
+and kept the same way as the connectome's parts, in a cache of its own
+(`fly-brain-module`), counted with them on the loading screen ("3.2 of 14.5
+MB"). It isn't gzipped by the build, so a host serves it as it serves any
+`.wasm` and may compress it on the way; the worker compiles it from its bytes,
+so the type it is served with doesn't matter. The worker then unzips the
+connectome straight into the module's memory and builds the brain there:
+the 40 MB are never held twice.
 
 The packed connectome (`packages/brain`) is 40 MB, 21 MB gzipped. The build
 rearranges it before gzipping (`apps/web/src/brain/wire.ts`): the sorted
@@ -212,11 +231,62 @@ same loaded machine):
 | The whole field flickering | 0.90 | 0.35 | 2.5× |
 
 So a phone four to six times slower than this machine draws the game at 60
-frames with room to spare, but its brain, with the eyes open, lives at about
-half to three quarters of real time, and no cheaper picture changes that.
-That is the case for a WebAssembly build of the C++ brain: WebAssembly
-usually costs 1.2 to 2 times native, which would put such a phone's brain at
-about real time. It isn't built here.
+frames with room to spare, but its TypeScript brain, with the eyes open,
+lives at about half to three quarters of real time, and no cheaper picture
+changes that. That was the case for running the C++ brain as WebAssembly,
+which is what browsers that can now do.
+
+### The two brains
+
+The same runs (`node scripts/measure.ts --brain typescript|wasm`), one of
+each brain back to back so both meet the same load, on the same shared
+machine; the brain's cost as above (median / slowest tenth), the speed that
+implies on a CPU four and six times slower (Chromium slows the page but not
+the worker, so the worker's cost is multiplied, as above), how long the
+worker took from the connectome's arrival to a running brain (unzipping,
+compiling the module, building), the page's process's memory in Chromium,
+the worker included, and the load average (TypeScript run, then
+WebAssembly run). The eyes are open throughout; every run kept 60 frames.
+
+| Browser | Scenario | Page CPU | TypeScript | WebAssembly | Faster | TypeScript on 4×, 6× slower | WebAssembly on 4×, 6× slower | Start, ms | Memory, MB | Load |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Chromium | watch | 1× | 0.29 / 0.34 | 0.20 / 0.23 | 1.4× | 0.86×, 0.57× | real time, 0.83× | 250 / 208 | 446 / 390 | 9, 8 |
+| Chromium | watch | 4× | 0.26 / 0.43 | 0.21 / 0.26 | 1.2× | 0.97×, 0.65× | real time, 0.80× | 262 / 206 | 307 / 382 | 8, 6 |
+| Chromium | watch | 6× | 0.60 / 0.69 | 0.30 / 0.41 | 2.0× | 0.41×, 0.28× | 0.83×, 0.56× | 377 / 316 | 444 / 303 | 187, 90 |
+| Chromium | play | 1× | 0.30 / 0.35 | 0.19 / 0.22 | 1.6× | 0.83×, 0.55× | real time, 0.87× | 234 / 214 | 458 / 389 | 46, 110 |
+| Chromium | play | 4× | 0.28 / 0.42 | 0.19 / 0.24 | 1.5× | 0.90×, 0.60× | real time, 0.88× | 261 / 229 | 501 / 437 | 13, 21 |
+| Chromium | play | 6× | 0.31 / 0.37 | 0.21 / 0.26 | 1.5× | 0.81×, 0.54× | real time, 0.78× | 285 / 238 | 476 / 432 | 11, 13 |
+| WebKit 26 | watch | 1× | 0.35 / 0.39 | 0.31 / 0.36 | 1.1× | 0.71×, 0.47× | 0.81×, 0.54× | 499 / 354 | | 154, 112 |
+| WebKit 26 | play | 1× | 0.22 / 0.26 | 0.19 / 0.22 | 1.2× | real time, 0.77× | real time, 0.88× | 332 / 201 | | 10, 9 |
+
+- **Chromium** (Chrome and Edge, and most Android browsers): the
+  WebAssembly brain costs 0.19 to 0.21 s a second, against 0.26 to 0.31 for
+  the TypeScript, 1.2 to 1.6 times less at an ordinary load. On a phone four
+  times slower it lives in real time, with room, where the TypeScript lives
+  at 0.8 to 0.97; on one six times slower neither does: 0.8 to 0.88 against
+  0.55 to 0.65.
+- **WebKit** (Safari, and every browser on an iPhone or iPad): 1.1 to 1.2
+  times less. JavaScriptCore compiles the TypeScript's typed-array loops
+  nearly as well as the C++, so the gain is small, but it is there, and an
+  iPhone's brain is no slower for it.
+- **Memory**: the module holds 95 MB once the brain is built, the
+  TypeScript brain about 180 MB (`node packages/brain-native/scripts/bench.ts`);
+  the page's process was 45 to 70 MB smaller with it in four runs of six,
+  and in the other two it went either way by more, as garbage collection
+  fell.
+- **Starting**: compiling the 268 KB module takes 2 or 3 ms; the brain is
+  running 200 to 240 ms after the connectome arrives, against 230 to 290
+  for the TypeScript.
+- Measured again, a second time each with the load average at 60 to 110,
+  Chromium's play at 1× cost 0.33 and 0.42: the order holds, the size of the
+  gap moves with the load.
+
+The packages/brain-native README has the same comparison brain alone, in
+Node (where the TypeScript runs as fast as the WebAssembly, probably because
+Node's V8, unlike Chrome's, has no sandbox around its typed arrays), Chromium and WebKit, and why it is no
+more: the C++ runs 1.4 to 1.7 times slower as WebAssembly than natively.
+What would take a six-times-slower phone to real time is in its list of
+what more speed would cost.
 
 ## Being a good tab
 
@@ -279,17 +349,23 @@ places it is set.
 
 ## In an iPhone or iPad app
 
-An app can show the web build in a WKWebView, loading `index.html` from its
+`apps/ios` ([ios.md](ios.md)) shows the web build in a WKWebView, loading `index.html` from its
 own bundle through a custom URL scheme (`WKURLSchemeHandler`). That works
 as it is, with no network:
 
-- the scheme handler serves `dist/` as it is, the brain's parts included, at
-  paths relative to the page; any `Content-Type` will do;
+- the scheme handler serves `dist/` as it is, the brain's parts and its
+  WebAssembly module included, at paths relative to the page; any
+  `Content-Type` will do (the module is compiled from its bytes, not
+  streamed). WKWebView runs WebAssembly, and on iOS and iPadOS 18.4+ this
+  module; before that the page runs the TypeScript brain;
 - there is no service worker (it isn't offered there; registering fails
-  quietly) and maybe no Cache API, so the brain is read from the bundle on
-  every launch, which is quick from local storage;
-- without `crypto.subtle` the digest check is skipped, and gzip's own check
-  and the connectome's loader catch damage;
+  quietly), and the Cache API, though there, keeps only `http` and `https`
+  responses, so nothing is copied and the brain is read from the bundle on
+  every launch, which is quick from local storage (measured in the iPhone
+  and iPad app, [ios.md](ios.md));
+- the page is a secure context there, so `crypto.subtle` checks each part's
+  digest; where it is missing the check is skipped, and gzip's own check and
+  the connectome's loader catch damage;
 - or the app runs the C++ brain itself and exposes it as
   `globalThis.__native.brain` (`NativeBrainBridge` in
   `packages/contracts/src/brain.ts`), as the Apple TV app does: the game then
@@ -298,7 +374,10 @@ as it is, with no network:
 ## Browsers
 
 It needs WebGL 2, module Web Workers and `DecompressionStream`: Chrome and
-Edge 80+, Firefox 114+, Safari 16.4+ (iOS and iPadOS 16.4+). The wake lock
+Edge 80+, Firefox 114+, Safari 16.4+ (iOS and iPadOS 16.4+). The brain runs as
+WebAssembly where the browser has WebAssembly's exceptions in their final
+form (exnref): Chrome and Edge 137+, Firefox 131+, Safari 18.4+ (iOS and
+iPadOS 18.4+); before those, as TypeScript. The wake lock
 is Chrome and Edge 84+, Firefox 126+ and Safari 16.4+, and in an iPhone's or
 iPad's home-screen app 18.4+.
 

@@ -1,7 +1,8 @@
 # Self-hosting Flies
 
-The image builds the web game and serves only `dist/` with Caddy. Node runs
-during the build, never in the web container. Both `linux/amd64` and
+The web image builds the web game and serves only `dist/` with Caddy. Node
+runs during its build, never in the web container; the room server for
+tables with others is a second, small Node service (below). Both `linux/amd64` and
 `linux/arm64` are supported. Nothing is deployed by the repository itself.
 
 ## First start
@@ -29,7 +30,7 @@ HTTP to HTTPS, and offers HTTP/2 and HTTP/3. Keep `caddy_data` and
 `docker compose down -v` on the server unless you intend to erase them.
 
 ```sh
-docker compose ps                 # web should be healthy
+docker compose ps                 # web and rooms should be healthy
 docker compose logs --tail=100 web
 curl -I https://flies.isaacthoman.com/
 ```
@@ -51,6 +52,7 @@ Before an update, note `git rev-parse HEAD` and save the current image:
 
 ```sh
 docker image tag flies-web:local flies-web:rollback
+docker image tag flies-rooms:local flies-rooms:rollback
 git pull --ff-only && docker compose up -d --build --wait
 ```
 
@@ -66,6 +68,7 @@ To roll back, restore the saved revision's Compose settings and image:
 ```sh
 git switch --detach <previous-sha>
 docker image tag flies-web:rollback flies-web:local
+docker image tag flies-rooms:rollback flies-rooms:local
 docker compose up -d --no-build --pull never --force-recreate --wait
 ```
 
@@ -104,18 +107,34 @@ missing assets, then loads the real brain with progress and reloads fully
 offline from the service worker and brain cache. To inspect headers by hand,
 use `curl -I` on `/`, `/index.html`, `/sw.js`, `/manifest.webmanifest` and the
 actual hashed paths under `dist/assets/` and `dist/brain/` (see
-[the web build](web.md#what-to-upload)). `.wasm` files, if added, are served
-as `application/wasm`; brain parts never get a `Content-Encoding` header.
+[the web build](web.md#what-to-upload)). The brain's WebAssembly module
+(`brain/fly-brain.0.<hash>.wasm`, committed, so the image needs no toolchain
+for it) is served as `application/wasm` and may be compressed; the
+connectome's parts never get a `Content-Encoding` header.
 
-## The room server slot
+## The room server
 
-Caddy already proxies `/rooms` and `/rooms/*`, preserving the path and
-query, including WebSocket upgrades. Add a Compose service named `rooms`
-that listens on `0.0.0.0:3000`; it needs no public port. The browser connects
-to `wss://flies.isaacthoman.com/rooms` on the site's origin. Set `ROOMS_HOST`
-and `ROOMS_PORT` in `.env` to use a different service name or internal port.
-No Caddy edit or web rebuild is needed for the default slot.
+Tables of people's flies (`docs/online.md`) are the `rooms` service: one Node
+process, built from the same `Dockerfile` (its `rooms` stage), that the
+first start and every update bring up with the site. It needs nothing beyond
+`docker compose up -d --build --wait`, and no settings: Caddy proxies `/rooms`
+and `/rooms/*` on the site's own origin, WebSocket upgrades included, to
+`rooms:3000`, and browsers connect to `wss://flies.isaacthoman.com/rooms`. It
+has no public port, and no `depends_on`: the site works while it is down
+(only `/rooms` answers 502 then).
 
-There is deliberately no `depends_on`: Caddy starts and the game works
-without the service. Until it exists, only `/rooms` returns 502. There is
-no room server in this change.
+```sh
+docker compose ps                    # rooms should be healthy too
+docker compose logs --tail=100 rooms # one JSON line an event
+docker compose exec rooms wget -qO- http://127.0.0.1:3000/health
+```
+
+It keeps its tables in the `rooms_data` volume (`/data/tables.json`), written
+every 30 s and when it stops. An update restarts it with SIGTERM: it writes
+the tables, tells every connected device it is restarting, and the devices
+reconnect to their tables within a couple of seconds. Keep `rooms_data` like
+the Caddy volumes. Deleting it forgets every table and every invitation. The
+only optional setting is `ROOMS_PORT`, the internal port, which Caddy and the
+service both read. Memory and CPU are small: it relays about 1 KB/s up and
+7 KB/s down per player at a table of eight. Rolling back works as for the
+site: tag `flies-rooms:local` as `flies-rooms:rollback` before an update.

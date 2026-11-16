@@ -45,11 +45,11 @@ const settled = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 test("eyes keep the last complete light and allow only one asynchronous read in flight", async () => {
   const { eyes, life, reads } = setup();
-  eyes.render(1 / 20, false, false);
+  eyes.render(1 / 20, false);
   eyes.beforeStep();
   assert.equal(life.light, null, "unread pixels must not be sent as a dark picture");
   assert.equal(eyes.updates, 0);
-  for (let i = 0; i < 120; i++) eyes.render(1 / 60, false, false, true);
+  for (let i = 0; i < 120; i++) eyes.render(1 / 60, false, true);
   assert.equal(reads.length, 1, "a stalled GPU cannot queue more reads");
   reads[0].finish();
   await settled();
@@ -57,7 +57,7 @@ test("eyes keep the last complete light and allow only one asynchronous read in 
   assert.equal(life.light!.left[0], 1);
   assert.equal(life.light!.right[0], 1);
   assert.equal(eyes.updates, 1);
-  eyes.render(1 / 60, false, false, true);
+  eyes.render(1 / 60, false, true);
   assert.equal(reads.length, 2);
   assert.equal(life.light!.left[0], 1, "the brain keeps completed light during the next read");
   reads[1].finish();
@@ -66,15 +66,15 @@ test("eyes keep the last complete light and allow only one asynchronous read in 
 
 test("an eye detail change waits for readback before disposing its render target", async () => {
   const { eyes, reads, life } = setup();
-  eyes.render(1, false, false);
+  eyes.render(1, false);
   let disposed = false;
   reads[0].target.addEventListener("dispose", () => { disposed = true; });
   eyes.detail = "high";
-  eyes.render(1, false, false);
+  eyes.render(1, false);
   assert.equal(disposed, false);
   reads[0].finish();
   await settled();
-  eyes.render(1, false, false);
+  eyes.render(1, false);
   assert.equal(disposed, true);
   assert.equal(reads[1].target.height, 32);
   eyes.beforeStep();
@@ -89,14 +89,12 @@ test("an eye detail change waits for readback before disposing its render target
 test("a rejected eye read can recover on the next refresh", async (t) => {
   const warning = t.mock.method(console, "warn", () => {});
   const { eyes, reads } = setup();
-  eyes.render(1, false, false);
+  eyes.render(1, false);
   reads[0].fail();
   await settled();
   assert.equal(warning.mock.calls.length, 1);
   assert.equal(eyes.updates, 0);
-  eyes.render(1, false, true);
-  assert.equal(reads.length, 1, "paused eyes do not start reads");
-  eyes.render(1, false, false);
+  eyes.render(1, false);
   reads[1].finish();
   await settled();
   assert.equal(eyes.updates, 1);

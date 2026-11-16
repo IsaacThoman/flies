@@ -2,9 +2,11 @@
 # team and bundle ID come from TVOS_TEAM_ID and TVOS_BUNDLE_ID, and the brain's sources from
 # TVOS_BRAIN_SOURCES (packages/brain-native/src, or the stand-in under tests/).
 name: Flies
-# The weather outside, off unless scripts/tvos.ts turns it on: the service (weather.yml), and
-# WeatherKit's entitlement and location usage string (weatherkit.yml).
+# The version, shared with the iPhone and iPad app (version.yml); the weather outside, off unless
+# scripts/tvos.ts turns it on: the service (weather.yml), and WeatherKit's entitlement and location
+# usage string (weatherkit.yml).
 include:
+  - ../version.yml
   - path: weather.yml
     enable: ${TVOS_WEATHER}
   - path: weatherkit.yml
@@ -59,8 +61,6 @@ targets:
       PRODUCT_NAME: Flies
       PRODUCT_BUNDLE_IDENTIFIER: ${TVOS_BUNDLE_ID}
       DEVELOPMENT_TEAM: ${TVOS_TEAM_ID}
-      MARKETING_VERSION: "0.1"
-      CURRENT_PROJECT_VERSION: "1"
       CODE_SIGN_STYLE: Automatic
       GENERATE_INFOPLIST_FILE: NO
       CLANG_ENABLE_OBJC_ARC: YES

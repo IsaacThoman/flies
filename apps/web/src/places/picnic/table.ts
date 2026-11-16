@@ -6,8 +6,8 @@
 
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { DECOR, PATCHES, SOLIDS, TABLE_RADIUS, topHeight, topNormal } from "@fly/world";
-import type { Solid } from "@fly/world";
+import { DECOR, HAPPENINGS, PATCHES, SOLIDS, TABLE_RADIUS, topHeight, topNormal } from "@fly/world";
+import type { Happening, Solid } from "@fly/world";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { Batch, canvas2d, canvasTexture, freeze, mat4, paint, random } from "../../scene/build.ts";
 import { shaded } from "../../scene/shade.ts";
@@ -15,12 +15,29 @@ import type { SceneSet } from "../types.ts";
 import { LAWN_Y } from "./backdrop.ts";
 import { Goings } from "./life.ts";
 import { outside } from "./outside.ts";
-
-/** How many rings can spread on the pool at once. */
-const RIPPLES = 4;
+import { LEAF_FRAGMENT, leafGeometry } from "./visitors.ts";
+import { BUMP, ENAMEL, GINGHAM, NOISE, SKIN, fruitSkins, skin } from "./surfaces.ts";
 
 const byName = (name: string) => SOLIDS.filter((s) => s.name === name);
 const one = (name: string) => byName(name)[0];
+
+/** How many rings can spread on the pool at once. */
+const RIPPLES = 4;
+/** Where a wet jar of lemonade once stood, out toward the lake, and left a ring. */
+export const JAR_RING = { x: -40, z: -150, r: 34 };
+
+/**
+ * The lemonade's lid as pressed: its radius (mm) and how far above or below
+ * the lid's top in the world, from the rolled rim (over the jar's edge) in to
+ * the button in the middle, by way of a channel and a raised ring. All within
+ * half a millimetre of flat, for the fly walking on it.
+ */
+export const LID_PRESS = (() => {
+  const R = (one("lemonade").footprint as { r: number }).r + 1.5;
+  return [[R, -0.6], [R - 0.4, 0], [R - 1.2, 0.25], [R - 2, 0], [R - 2.8, -0.3], [R - 4, -0.3], [R - 4.8, 0], [24, 0], [23, 0.28], [21.5, 0.28], [20.5, 0], [6, 0], [5, 0.18], [0, 0.22]] as const;
+})();
+/** The grommet round the straw where it goes through the lid: its tube's radius and how high its middle sits, mm. */
+export const GROMMET = { tube: 0.38, lift: 0.08 };
 
 /** The uv of a table point, for painting the table's texture. */
 const tableUV = (x: number, z: number, size: number) => ({ px: (0.5 + x / (TABLE_RADIUS * 2)) * size, py: (0.5 + z / (TABLE_RADIUS * 2)) * size });
@@ -52,25 +69,15 @@ function tableTexture() {
     if (solid.name === "straw" || solid.name === "dew" || solid.name === "crumb" || solid.name === "pip") continue;
     shadow(f.x, f.z, r, solid.name === "lemonade" || solid.name === "jam" ? 0.32 : 0.26);
   }
-  // A wet ring left by the lemonade jar.
-  const ring = tableUV(-60, -110, S);
-  g.beginPath();
-  g.arc(ring.px, ring.py, (30 / (TABLE_RADIUS * 2)) * S, 0, Math.PI * 1.7);
-  g.strokeStyle = "rgba(150, 200, 235, 0.35)";
-  g.lineWidth = 3;
-  g.stroke();
   const texture = canvasTexture(canvas);
   return texture;
 }
 
 /**
- * The blue gingham napkin, drawn thread by thread on the table's material: a
- * plain weave of white and blue threads (a thread is blue where it crosses a
- * blue band, so where blue meets blue the square is dark and where blue meets
- * white it is light), with a stitched hem, the creases where it was folded in
- * four, and a hairline of shadow round its edge. Threads too fine for the
- * pixels fade into their average, so it never shimmers; from across the table
- * it is plain gingham.
+ * The blue gingham napkin, woven thread by thread on the table's material
+ * (GINGHAM, surfaces.ts), with a stitched hem, the creases where it was
+ * folded in four, and a hairline of shadow round its edge; and round it the
+ * enamel, worn by use (ENAMEL).
  */
 /**
  * In the rain the napkin darkens as the cloth soaks it up, and the enamel
@@ -99,15 +106,12 @@ uniform float uWet;
 uniform vec3 uGust;
 uniform float uTime;
 varying vec2 vTable;
+${NOISE}
+${ENAMEL(TABLE_RADIUS, JAR_RING)}
+float enamelRough;
+vec2 enamelPeel;
+${GINGHAM}
 const float CHECK = ${(napkin.size / 12).toFixed(3)};
-const float PITCH = 0.22;
-// 1 in the blue half of each check, softened by how many checks a pixel covers.
-float band(float x) {
-  float t = x / CHECK;
-  float tri = abs(fract(t) - 0.5) * 2.0;
-  float w = fwidth(t) * 1.5 + 0.004;
-  return smoothstep(0.5 - w, 0.5 + w, tri);
-}
 // Where the water lies thickest on the enamel: soft blobs a few centimetres across, spreading as it gets wetter.
 float puddles(vec2 p) {
   float n = sin(p.x * 0.043 + sin(p.y * 0.031) * 2.1) + sin(p.y * 0.052 + sin(p.x * 0.027) * 2.4) + 0.5 * sin((p.x + p.y) * 0.091);
@@ -142,24 +146,7 @@ vec2 uv = nap.xy;
 float edge = nap.z;
 float aa = fwidth(edge) + 0.02;
 float inside = 1.0 - smoothstep(-aa, aa, edge);
-vec2 th = uv / PITCH;
-float detail = 1.0 - smoothstep(0.18, 0.42, max(fwidth(th.x), fwidth(th.y)));
-const vec3 WHITE = vec3(0.96);
-const vec3 BLUE = vec3(0.13, 0.40, 0.86);
-vec3 warp = mix(WHITE, BLUE, band(uv.y));
-vec3 weft = mix(WHITE, BLUE, band(uv.x));
-vec3 cloth = (warp + weft) * 0.5 * 0.95;
-if (detail > 0.0) {
-  // Plain weave: warp and weft take turns on top at each crossing; each thread is round, with a dark gap beside it.
-  vec2 f = fract(th);
-  bool warpOnTop = mod(floor(th.x) + floor(th.y), 2.0) < 1.0;
-  float across = warpOnTop ? f.y : f.x;
-  float along = warpOnTop ? f.x : f.y;
-  float bulge = pow(sin(3.14159 * across), 0.55) * (0.88 + 0.12 * sin(3.14159 * along));
-  // A thread's own colour shows a little through the one over it, as in real cloth seen close.
-  vec3 thread = mix(warpOnTop ? warp : weft, (warp + weft) * 0.5, 0.55) * (0.8 + 0.2 * bulge);
-  cloth = mix(cloth, thread, detail);
-}
+vec3 cloth = gingham(uv, CHECK, vec3(0.13, 0.40, 0.86));
 // The hem: folded under (a touch darker) and stitched in blue.
 float hem = smoothstep(-2.6, -2.4, edge);
 cloth *= 1.0 - hem * 0.06;
@@ -172,6 +159,12 @@ cloth = mix(cloth, cloth * vec3(0.64, 0.68, 0.76), uWet * 0.85);
 diffuseColor.rgb *= mix(vec3(1.0), cloth, inside);
 // A hairline of shadow where the cloth's edge stands off the table.
 diffuseColor.rgb *= 1.0 - (1.0 - inside) * (1.0 - smoothstep(0.0, 0.6, edge)) * 0.25;
+// The enamel round it, worn by use.
+float tablePx = length(fwidth(vTable));
+vec4 worn = enamel(vTable, tablePx);
+diffuseColor.rgb *= mix(worn.rgb, vec3(1.0), inside);
+enamelRough = worn.a * (1.0 - inside);
+enamelPeel = peel(vTable, tablePx) * (1.0 - inside);
 float puddle = puddles(vTable) * uWet;
 diffuseColor.rgb *= 1.0 - (1.0 - inside) * puddle * 0.05;
 // Beads, two sizes, faded out where they would be smaller than the pixels.
@@ -185,7 +178,7 @@ if (uWet > 0.02 && inside < 0.5) {
   diffuseColor.rgb *= 1.0 - beading * pow(1.0 - drop.z, 3.0) * 0.35;
 }`,
       )
-      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.92, inside);\nroughnessFactor = mix(roughnessFactor, mix(mix(0.13, 0.025, puddle), 0.6, inside), uWet);\nroughnessFactor = mix(roughnessFactor, 0.02, beading);")
+      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor + enamelRough, 0.92, inside);\nroughnessFactor = mix(roughnessFactor, mix(mix(0.13, 0.025, puddle), 0.6, inside), uWet);\nroughnessFactor = mix(roughnessFactor, 0.02, beading);")
       .replace(
         "#include <normal_fragment_maps>",
         /* glsl */ `#include <normal_fragment_maps>
@@ -197,6 +190,7 @@ if (uWet > 0.02 && inside < 0.5) {
   vec3 tilted = normalize(vec3(-slope.x, 1.0, -slope.y));
   float c = cos(uNapkin.w), s = sin(uNapkin.w);
   tilted = vec3(tilted.x * c + tilted.z * s, tilted.y, -tilted.x * s + tilted.z * c);
+  tilted = normalize(tilted - vec3(enamelPeel.x, 0.0, enamelPeel.y));
   // A gust sends ripples running across the cloth.
   tilted = normalize(tilted - vec3(uGust.x, 0.0, uGust.y) * cos(dot(vTable, uGust.xy) * 0.35 - uTime * 7.0) * 0.06 * uGust.z * inside2);
   tilted = normalize(mix(tilted, normalize(vec3(-drop.x, 1.0, -drop.y)), beading));
@@ -207,20 +201,21 @@ if (uWet > 0.02 && inside < 0.5) {
   material.customProgramCacheKey = () => "napkin";
 }
 
-function ginghamTexture(color: string) {
-  const { canvas, g } = canvas2d(128, 128);
-  g.fillStyle = "#ffffff";
-  g.fillRect(0, 0, 128, 128);
-  g.fillStyle = color;
-  for (let i = 0; i < 8; i++) {
-    g.globalAlpha = 0.55;
-    g.fillRect(i * 16, 0, 8, 128);
-    g.fillRect(0, i * 16, 128, 8);
-  }
-  g.globalAlpha = 1;
-  const texture = canvasTexture(canvas, { repeat: true });
-  texture.repeat.set(1.6, 1.6);
-  return texture;
+/** How many sides the jam jar's cloth cover is drawn with, and how far round its skirt is, mm, at its middle. */
+const COVER_AROUND = 48;
+const COVER_ROUND = 2 * Math.PI * ((one("jam").footprint as { r: number }).r + 6);
+
+/** The jam jar's cover: red gingham, woven like the napkin, its checks fitting round the skirt a whole number of times. */
+function coverShader(material: THREE.MeshStandardMaterial) {
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nattribute vec2 weave;\nvarying vec2 vWeave;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWeave = weave;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>\nvarying vec2 vWeave;\n${GINGHAM}`)
+      .replace("#include <map_fragment>", `#include <map_fragment>\ndiffuseColor.rgb *= gingham(vWeave, ${(COVER_ROUND / Math.round(COVER_ROUND / 5.3)).toFixed(4)}, vec3(0.8, 0.04, 0.08));`);
+  };
+  material.customProgramCacheKey = () => "cover";
 }
 
 /** A soft ellipse on the table: a shadow, or with `light` the bright spot a drop of water focuses the sun into. */
@@ -303,19 +298,131 @@ function domeGeometry(solid: Solid, rings: number, segments: number) {
   return geometry;
 }
 
+/** A stalk along a curve, round and tapering from one radius to the other. */
+function stalk(curve: THREE.Curve<THREE.Vector3>, segments: number, from: number, to: number) {
+  const radial = 8;
+  const geometry = new THREE.TubeGeometry(curve, segments, 1, radial);
+  const pos = geometry.attributes.position;
+  const centre = new THREE.Vector3();
+  const v = new THREE.Vector3();
+  for (let i = 0; i <= segments; i++) {
+    curve.getPointAt(i / segments, centre);
+    const r = from + (to - from) * (i / segments);
+    for (let j = 0; j <= radial; j++) {
+      const k = i * (radial + 1) + j;
+      v.fromBufferAttribute(pos, k).sub(centre).multiplyScalar(r).add(centre);
+      pos.setXYZ(k, v.x, v.y, v.z);
+    }
+  }
+  return geometry;
+}
+
+/**
+ * The matte things: the leaves among them have their veins drawn in, as the
+ * fallen ones' are (visitors.ts); the sugar cubes are pressed from crystals,
+ * each catching the light its own way, a few glinting. Anything not a leaf
+ * has `aAlong` -1, and sugar has `aAcross` 1 (notLeaf).
+ */
+function veined(material: THREE.MeshStandardMaterial) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uVein = { value: new THREE.Color("#c6ef7a") };
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nattribute float aAlong;\nattribute float aAcross;\nvarying vec2 vLeaf;\nvarying vec3 vWorld;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLeaf = vec2(aAlong, aAcross);\nvWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>\nuniform vec3 uVein;\nvarying vec2 vLeaf;\nvarying vec3 vWorld;\nfloat grainRough;\nfloat grainHeight;\n${NOISE}\n${BUMP}`)
+      .replace(
+        "#include <color_fragment>",
+        /* glsl */ `#include <color_fragment>
+grainRough = 0.0;
+grainHeight = 0.0;
+if (vLeaf.x >= 0.0) {${LEAF_FRAGMENT}
+} else if (vLeaf.y > 0.5) {
+  float sharp = resolved(length(fwidth(vWorld)), 0.3);
+  // Crystals packed every which way: a turned grid, warped, so no two faces line up.
+  vec3 q = mat3(0.8, 0.36, -0.48, -0.6, 0.48, -0.64, 0.0, 0.8, 0.6) * vWorld / 0.3;
+  q += vec3(vnoise3(vWorld * 3.0), vnoise3(vWorld * 3.0 + 7.0), vnoise3(vWorld * 3.0 + 13.0)) * 0.8;
+  float grain = hash31(floor(q));
+  float glint = step(0.93, grain);
+  diffuseColor.rgb *= 1.0 + (grain * 0.2 - 0.12 + glint * 0.12) * sharp;
+  grainRough = (glint * -0.55 + grain * 0.15 - 0.1) * sharp;
+  grainHeight = grain * 0.03 * sharp;
+}`,
+      )
+      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor + grainRough, 0.04, 1.0);")
+      .replace("#include <normal_fragment_maps>", "#include <normal_fragment_maps>\nnormal = bumped(normal, grainHeight);");
+  };
+  material.customProgramCacheKey = () => "veined";
+  return material;
+}
+
+function notLeaf(geometry: THREE.BufferGeometry, sugar = false) {
+  const count = geometry.attributes.position.count;
+  geometry.setAttribute("aAlong", new THREE.BufferAttribute(new Float32Array(count).fill(-1), 1));
+  geometry.setAttribute("aAcross", new THREE.BufferAttribute(new Float32Array(count).fill(sugar ? 1 : 0), 1));
+  return geometry;
+}
+
+/** A leaf still on its fruit, along z: cupped, its tip drooping, seen from either side. */
+function growingLeaf(length: number, dark: string, edge: string) {
+  const top = leafGeometry(length, dark, edge).rotateY(Math.PI / 2);
+  const pos = top.attributes.position;
+  const along = top.attributes.aAlong;
+  const across = top.attributes.aAcross;
+  for (let i = 0; i < pos.count; i++) {
+    const droop = Math.max(0, along.getX(i) - 0.45);
+    pos.setY(i, across.getX(i) ** 2 * length * 0.04 - droop * droop * length * 0.15);
+  }
+  top.computeVertexNormals();
+  const upper = top.toNonIndexed();
+  top.dispose();
+  // The underside: the same faces turned over.
+  const under = upper.clone();
+  for (const name of Object.keys(under.attributes)) {
+    const attr = under.attributes[name];
+    for (let t = 0; t < attr.count; t += 3) {
+      for (let k = 0; k < attr.itemSize; k++) {
+        const a = attr.array[(t + 1) * attr.itemSize + k];
+        attr.array[(t + 1) * attr.itemSize + k] = attr.array[(t + 2) * attr.itemSize + k];
+        attr.array[(t + 2) * attr.itemSize + k] = a;
+      }
+    }
+  }
+  const normals = under.attributes.normal;
+  for (let i = 0; i < normals.count; i++) normals.setXYZ(i, -normals.getX(i), -normals.getY(i), -normals.getZ(i));
+  const leaf = mergeGeometries([upper, under]);
+  upper.dispose();
+  under.dispose();
+  return leaf;
+}
+
 export function buildTable(): SceneSet {
   const group = new THREE.Group();
   const rnd = random(11);
   const glossy = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.22, metalness: 0, envMapIntensity: 0.6 });
-  const juicy = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.16, metalness: 0, envMapIntensity: 0.55 });
-  const matte = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, envMapIntensity: 0.5 });
-  const tableMaterial = new THREE.MeshStandardMaterial({ map: tableTexture(), roughness: 0.3, metalness: 0, envMapIntensity: 0.5 });
+  const juicy = fruitSkins(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.16, metalness: 0, envMapIntensity: 0.55 }));
+  const matte = veined(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, envMapIntensity: 0.5 }));
+  const tableMaterial = new THREE.MeshStandardMaterial({ map: tableTexture(), roughness: 0.24, metalness: 0, envMapIntensity: 0.5 });
   const tableUniforms: TableUniforms = { uWet: { value: 0 }, uGust: { value: new THREE.Vector3() }, uTime: { value: 0 } };
   clothShader(tableMaterial, tableUniforms);
-  const cloth = new THREE.MeshStandardMaterial({ map: ginghamTexture("#e8344e"), roughness: 0.85, side: THREE.DoubleSide });
+  const cloth = new THREE.MeshStandardMaterial({ roughness: 0.85, side: THREE.DoubleSide });
+  coverShader(cloth);
   const glass = new THREE.MeshStandardMaterial({ color: "#e6f6ff", roughness: 0.04, metalness: 0, transparent: true, opacity: 0.14, depthWrite: false, envMapIntensity: 1.4 });
+  // Glass: clear where you look straight through it, thickening to a bright edge where you look along it.
+  glass.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <opaque_fragment>",
+      /* glsl */ `float along = 1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
+diffuseColor.a = clamp(diffuseColor.a + pow(along, 3.0) * 0.6, 0.0, 1.0);
+outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
+#include <opaque_fragment>`,
+    );
+  };
+  glass.customProgramCacheKey = () => "glass";
   const liquid = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.1, transparent: true, opacity: 0.72, depthWrite: false });
   const batch = new Batch();
+  const dry = (geometry: THREE.BufferGeometry, matrix?: THREE.Matrix4) => batch.add(matte, notLeaf(geometry), matrix);
+  const fruit = (kind: number, geometry: THREE.BufferGeometry, matrix?: THREE.Matrix4) => batch.add(juicy, skin(geometry, kind), matrix);
   const seen: THREE.Object3D[] = [];
   const materials: THREE.MeshStandardMaterial[] = [];
 
@@ -345,9 +452,17 @@ export function buildTable(): SceneSet {
   freeze(drink);
   group.add(drink);
   seen.push(drink);
-  batch.add(glossy, paint(new THREE.CylinderGeometry(lf.r + 1.5, lf.r + 1.5, 9, 48).translate(lf.x, lidTop - 4.5, lf.z), (p, n) => (n.y > 0.5 ? "#7fd4ff" : Math.sin(p.y * 2.2) > 0 ? "#43aef0" : "#9fe0ff")));
+  // The lid: knurled round its side, and pressed on top (LID_PRESS).
+  {
+    const R = LID_PRESS[0][0];
+    const knurls = 96;
+    const side = new THREE.CylinderGeometry(R, R, 8.4, knurls, 1, true).translate(lf.x, lidTop - 4.8, lf.z);
+    batch.add(glossy, paint(side, (p) => (Math.round(((Math.atan2(p.z - lf.z, p.x - lf.x) / (Math.PI * 2)) * knurls) % 2) === 0 ? "#4fb6f2" : "#a6e3ff")));
+    const tone = (r: number) => (r > R - 2.1 ? "#9fe0ff" : r > R - 4.4 ? "#3ea6e6" : r < 24.2 && r > 20.3 ? "#a8e6ff" : r < 5.5 ? "#92dbff" : "#7fd4ff");
+    batch.add(glossy, paint(new THREE.LatheGeometry(LID_PRESS.map(([r, y]) => new THREE.Vector2(r, lidTop + y)), 64).translate(lf.x, 0, lf.z), (p) => tone(Math.hypot(p.x - lf.x, p.z - lf.z))));
+  }
   // A lemon slice standing in the drink, against the glass.
-  batch.add(juicy, paint(new THREE.CylinderGeometry(20, 20, 3, 32).rotateX(Math.PI / 2).rotateY(0.6).translate(lf.x + 12, 44, lf.z + 22), (p) => {
+  fruit(SKIN.plain, paint(new THREE.CylinderGeometry(20, 20, 3, 32).rotateX(Math.PI / 2).rotateY(0.6).translate(lf.x + 12, 44, lf.z + 22), (p) => {
     const d = Math.hypot(p.x - (lf.x + 12), p.y - 44);
     return d > 18 ? "#f5d000" : d > 16.5 ? "#fffbe0" : Math.sin(Math.atan2(p.y - 44, p.x - lf.x - 12) * 5) > 0.85 ? "#fffbe0" : "#ffe66b";
   }));
@@ -355,6 +470,8 @@ export function buildTable(): SceneSet {
   const sf = straw.footprint as { x: number; z: number; r: number };
   const strawTop = (straw.top as { y: number }).y;
   batch.add(glossy, paint(new THREE.CylinderGeometry(sf.r, sf.r, strawTop - 50, 12, 24).translate(sf.x, (strawTop + 50) / 2, sf.z), (p) => (Math.floor((p.y - 50) / 7) % 2 === 0 ? "#ff5f9e" : "#ffffff")));
+  // The grommet the straw goes through the lid by.
+  batch.add(glossy, paint(new THREE.TorusGeometry(sf.r + 0.5, GROMMET.tube, 6, 20).rotateX(Math.PI / 2).translate(sf.x, lidTop + GROMMET.lift, sf.z), "#eef3f6"));
 
   // The saucer under the jar, its glaze following its shape in the world exactly, and the lemonade pooled in its moat.
   const saucer = one("saucer");
@@ -371,7 +488,7 @@ export function buildTable(): SceneSet {
     }
     // Outside in, so its faces point up.
     profile.reverse();
-    batch.add(juicy, paint(new THREE.LatheGeometry(profile, 56).translate(f.x, 0, f.z), (p) => {
+    fruit(SKIN.plain, paint(new THREE.LatheGeometry(profile, 56).translate(f.x, 0, f.z), (p) => {
       const s = Math.hypot(p.x - f.x, p.z - f.z) / f.r;
       if (Math.abs(s - top.lip) < 0.025) return "#ffffff";
       if (Math.abs(s - (top.lip + 0.065)) < 0.01) return "#1f8fd0";
@@ -450,40 +567,50 @@ export function buildTable(): SceneSet {
   jamGlass.renderOrder = 3;
   freeze(jamGlass);
   group.add(jamGlass);
-  batch.add(juicy, paint(new THREE.CylinderGeometry(jf.r - 1.2, jf.r - 1.2, jamTop - 16, 40).translate(jf.x, (jamTop - 16) / 2 + 1, jf.z), "#d4123e"));
-  const cover = new THREE.CylinderGeometry(jf.r + 3, jf.r + 9, 13, 48, 3, true);
+  fruit(SKIN.jam, paint(new THREE.CylinderGeometry(jf.r - 1.2, jf.r - 1.2, jamTop - 16, 40).translate(jf.x, (jamTop - 16) / 2 + 1, jf.z), "#d4123e"));
+  // Its cloth, laid out flat in millimetres for the weave: across the top, and round and down the skirt.
+  const skirt = new THREE.CylinderGeometry(jf.r + 3, jf.r + 9, 13, COVER_AROUND, 3, true);
   {
-    const pos = cover.attributes.position;
+    const pos = skirt.attributes.position;
+    const weave = new Float32Array(pos.count * 2);
     for (let i = 0; i < pos.count; i++) {
       const y = pos.getY(i);
+      weave[i * 2] = ((i % (COVER_AROUND + 1)) / COVER_AROUND) * COVER_ROUND;
+      weave[i * 2 + 1] = -y;
       if (y < -6) {
         const a = Math.atan2(pos.getZ(i), pos.getX(i));
         pos.setY(i, y + Math.sin(a * 9) * 2.2);
       }
     }
+    skirt.setAttribute("weave", new THREE.BufferAttribute(weave, 2));
   }
-  const coverSkirt = new THREE.Mesh(cover.translate(jf.x, jamTop - 7.5, jf.z), cloth);
-  const coverTop = new THREE.Mesh(new THREE.CircleGeometry(jf.r + 3, 48).rotateX(-Math.PI / 2).translate(jf.x, jamTop, jf.z), cloth);
-  for (const m of [coverSkirt, coverTop]) {
-    freeze(m);
-    group.add(m);
-    seen.push(m);
+  const lid = new THREE.CircleGeometry(jf.r + 3, COVER_AROUND).rotateX(-Math.PI / 2);
+  {
+    const pos = lid.attributes.position;
+    const weave = new Float32Array(pos.count * 2);
+    for (let i = 0; i < pos.count; i++) weave.set([pos.getX(i), pos.getZ(i)], i * 2);
+    lid.setAttribute("weave", new THREE.BufferAttribute(weave, 2));
   }
+  const cover = new THREE.Mesh(mergeGeometries([skirt.translate(jf.x, jamTop - 7.5, jf.z), lid.translate(jf.x, jamTop, jf.z)]), cloth);
+  skirt.dispose();
+  lid.dispose();
+  freeze(cover);
+  group.add(cover);
+  seen.push(cover);
   batch.add(glossy, paint(new THREE.TorusGeometry(jf.r + 3.6, 1.6, 6, 48).rotateX(Math.PI / 2).translate(jf.x, jamTop - 6, jf.z), "#ff7eb6"));
 
   // Strawberries: a whole one with seeds and leaves, and a half one, cut face up.
   const berry = one("strawberry");
-  batch.add(juicy, paint(domeGeometry(berry, 14, 40), (p) => {
+  fruit(SKIN.plain, paint(domeGeometry(berry, 14, 40), (p) => {
     const k = Math.min(1, p.y / 20);
     return new THREE.Color("#c3001f").lerp(new THREE.Color("#ff3048"), k);
   }));
   const half = one("strawberry half");
-  batch.add(juicy, paint(domeGeometry(half, 10, 40), (p) => {
+  fruit(SKIN.plain, paint(domeGeometry(half, 10, 40), (p) => {
     const hf = half.footprint as { x: number; z: number; rx: number; rz: number; angle: number };
     const s = Math.min(1, Math.hypot((p.x - hf.x) / hf.rx, (p.z - hf.z) / hf.rz));
     return s > 0.86 ? "#e0102c" : s > 0.7 ? "#ff6b7c" : s > 0.25 ? "#ffb3bd" : "#fff0f0";
   }));
-  const leafColor = (p: THREE.Vector3) => (p.y > 0 ? "#3fbf3a" : "#2c8f2a");
   {
     const bf = berry.footprint as { x: number; z: number; rx: number; rz: number; angle: number };
     // The green sepals, a star lying over one end of its long axis.
@@ -498,9 +625,9 @@ export function buildTable(): SceneSet {
     for (let i = 0; i < 7; i++) {
       const leaf = new THREE.ShapeGeometry(sepal, 4).rotateX(-Math.PI / 2);
       const m = mat4({ x: ex, y: ey + 0.6, z: ez }, new THREE.Euler(0.25 * Math.sin(i * 1.7), (i / 7) * Math.PI * 2 + bf.angle, -0.35, "YXZ"));
-      batch.add(matte, paint(leaf, (p) => (p.y > ey + 1 ? "#62d84a" : "#2fa83a")), m);
+      dry(paint(leaf, (p) => (p.y > ey + 1 ? "#62d84a" : "#2fa83a")), m);
     }
-    batch.add(matte, paint(new THREE.CylinderGeometry(0.9, 1.2, 7, 6).rotateZ(0.5).translate(ex + 1, ey + 3, ez), "#3c9a2e"));
+    dry(paint(new THREE.CylinderGeometry(0.9, 1.2, 7, 6).rotateZ(0.5).translate(ex + 1, ey + 3, ez), "#3c9a2e"));
   }
   // Seeds on the whole strawberry, following its surface.
   const seeds: THREE.Matrix4[] = [];
@@ -516,11 +643,16 @@ export function buildTable(): SceneSet {
       const z = bf.z - u * Math.sin(bf.angle) + v * Math.cos(bf.angle);
       const y = topHeight(berry, x, z);
       topNormal(berry, x, z, n);
-      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(n.x, n.y, n.z));
-      seeds.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y + 0.1, z), q, new THREE.Vector3(1, 0.5, 1)));
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(n.x, n.y, n.z)).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 2.4));
+      seeds.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y + 0.1, z), q, new THREE.Vector3(1, 1, 1)));
     }
   }
-  const seedMesh = new THREE.InstancedMesh(paint(new THREE.SphereGeometry(0.7, 6, 4), "#ffe27a"), glossy, seeds.length);
+  // Each seed sits in a dark pit of its own.
+  const seed = mergeGeometries([
+    paint(new THREE.CircleGeometry(0.85, 12).rotateX(-Math.PI / 2).translate(0, -0.08, 0), (p) => new THREE.Color("#5e0012").lerp(new THREE.Color("#a8001e"), Math.hypot(p.x, p.z) / 0.85)),
+    paint(new THREE.SphereGeometry(1, 8, 5).scale(0.4, 0.24, 0.6), (p) => (p.z > 0.2 ? "#ffe680" : p.z < -0.3 ? "#d8b44a" : "#f4d462")),
+  ]);
+  const seedMesh = new THREE.InstancedMesh(seed, glossy, seeds.length);
   seeds.forEach((m, i) => seedMesh.setMatrixAt(i, m));
   seedMesh.computeBoundingSphere();
   freeze(seedMesh);
@@ -528,38 +660,30 @@ export function buildTable(): SceneSet {
 
   // Cherries on their stems.
   const cherries = byName("cherry");
+  const cherryDark = new THREE.Color("#4a000e");
+  const cherryRed = new THREE.Color("#a3001f");
+  const cherryLit = new THREE.Color("#ff2d50");
+  const cherryColor = new THREE.Color();
   for (const cherry of cherries) {
     const f = cherry.footprint as { x: number; z: number; r: number };
-    batch.add(juicy, paint(new THREE.SphereGeometry(f.r, 28, 18).translate(f.x, f.r, f.z), (_p, n) => (n.y > 0.85 ? "#ff3d5c" : "#a3001f")));
+    fruit(SKIN.cherry, paint(new THREE.SphereGeometry(f.r, 28, 18).translate(f.x, f.r, f.z), (_p, n) => (n.y < 0 ? cherryColor.copy(cherryDark).lerp(cherryRed, 1 + n.y) : cherryColor.copy(cherryRed).lerp(cherryLit, n.y ** 3))));
   }
   {
     const [a, b] = cherries.map((c) => c.footprint as { x: number; z: number; r: number });
     const join = new THREE.Vector3((a.x + b.x) / 2 + 8, 42, (a.z + b.z) / 2 - 10);
     for (const c of [a, b]) {
       const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(c.x, c.r * 2 - 1, c.z), new THREE.Vector3(c.x + 2, c.r * 2 + 18, c.z - 4), join);
-      batch.add(matte, paint(new THREE.TubeGeometry(curve, 10, 0.9, 5), "#5d8a2b"));
+      dry(paint(stalk(curve, 10, 0.9, 0.7), (p) => (p.y > 38 ? "#4f7524" : "#5d8a2b")));
     }
-    const cherryLeaf = new THREE.SphereGeometry(1, 12, 6).scale(6, 0.6, 15);
-    batch.add(matte, paint(cherryLeaf, leafColor), mat4(join.clone().add(new THREE.Vector3(4, 1, -10)), new THREE.Euler(0.4, 0.5, 0.3)));
+    batch.add(matte, growingLeaf(30, "#4aa832", "#6cc444"), mat4(join.clone().add(new THREE.Vector3(4, 1, -10)), new THREE.Euler(0.4, 0.5, 0.3)));
   }
 
-  // A slice of orange.
+  // A slice of orange: its segments, pith and peel are drawn in its skin (surfaces.ts).
   {
     const orange = one("orange slice");
     const f = orange.footprint as { x: number; z: number; r: number };
     const h = (orange.top as { y: number }).y;
-    batch.add(juicy, paint(new THREE.CylinderGeometry(f.r, f.r, h, 64, 1, false).translate(f.x, h / 2, f.z), (p, n) => {
-      if (n.y < 0.5) return "#ff9a1a";
-      const dx = p.x - f.x;
-      const dz = p.z - f.z;
-      const d = Math.hypot(dx, dz) / f.r;
-      if (d > 0.94) return "#ff8a00";
-      if (d > 0.86) return "#fff3d6";
-      const a = Math.atan2(dz, dx);
-      const segment = Math.abs(Math.sin(a * 5));
-      if (segment < 0.08 || d < 0.1) return "#fff3d6";
-      return new THREE.Color("#ffb21e").lerp(new THREE.Color("#ffd65c"), d * 0.7);
-    }));
+    fruit(SKIN.orange, paint(new THREE.CylinderGeometry(f.r, f.r, h, 64, 1, false).translate(f.x, h / 2, f.z), "#ff9a1a"));
   }
 
   // A green apple.
@@ -567,13 +691,21 @@ export function buildTable(): SceneSet {
     const apple = one("apple");
     const f = apple.footprint as { x: number; z: number; r: number };
     const base = (apple.top as { base: number }).base;
-    batch.add(juicy, paint(new THREE.SphereGeometry(f.r, 40, 26).translate(f.x, base, f.z), (p) => {
-      const blush = Math.max(0, Math.sin((p.x - f.x) * 0.05 + 1) * Math.cos((p.z - f.z) * 0.04)) * Math.max(0, (p.y - base) / f.r);
-      return new THREE.Color("#79d33f").lerp(new THREE.Color("#ffd23a"), Math.max(0, (p.y - base) / f.r) * 0.25).lerp(new THREE.Color("#ff6b3a"), blush * 0.5);
+    const green = new THREE.Color("#79d33f");
+    const yellow = new THREE.Color("#ffd23a");
+    const red = new THREE.Color("#ff6b3a");
+    const skinColor = new THREE.Color();
+    fruit(SKIN.apple, paint(new THREE.SphereGeometry(f.r, 40, 26).translate(f.x, base, f.z), (p) => {
+      const up = Math.max(0, (p.y - base) / f.r);
+      const blush = Math.max(0, Math.sin((p.x - f.x) * 0.05 + 1) * Math.cos((p.z - f.z) * 0.04)) * up;
+      return skinColor.copy(green).lerp(yellow, up * 0.25).lerp(red, blush * 0.5);
     }));
+    // The stalk, thinning to a cut end paler than the rest.
     const stem = new THREE.QuadraticBezierCurve3(new THREE.Vector3(f.x, base + f.r - 2, f.z), new THREE.Vector3(f.x + 1, base + f.r + 6, f.z), new THREE.Vector3(f.x + 4, base + f.r + 10, f.z + 1));
-    batch.add(matte, paint(new THREE.TubeGeometry(stem, 6, 1.2, 5), "#7a4a24"));
-    batch.add(matte, paint(new THREE.SphereGeometry(1, 12, 6).scale(7, 0.6, 16), leafColor), mat4({ x: f.x + 9, y: base + f.r + 8, z: f.z + 5 }, new THREE.Euler(0.5, 0.9, -0.4)));
+    const tip = stem.getPoint(1);
+    dry(paint(stalk(stem, 8, 1.3, 0.85), (p) => (p.distanceTo(tip) < 0.3 ? "#b98e5a" : p.y < base + f.r + 1 ? "#5c4a1c" : "#6e4421")));
+    dry(paint(new THREE.CircleGeometry(0.85, 8), "#c9a46c"), new THREE.Matrix4().lookAt(tip.clone().add(stem.getTangent(1)), tip, new THREE.Vector3(0, 1, 0)).setPosition(tip));
+    batch.add(matte, growingLeaf(32, "#4fae32", "#74cc46"), mat4({ x: f.x + 9, y: base + f.r + 8, z: f.z + 5 }, new THREE.Euler(0.5, 0.9, -0.4)));
   }
 
   // Sugar cubes, and grains of sugar spilt beside them.
@@ -581,7 +713,7 @@ export function buildTable(): SceneSet {
     const f = cube.footprint as { x: number; z: number; hx: number; hz: number; angle: number };
     const y = (cube.top as { y: number }).y;
     const geometry = new RoundedBoxGeometry(f.hx * 2, 16, f.hz * 2, 2, 1.2);
-    batch.add(matte, paint(geometry, (p) => (Math.sin(p.x * 3.1) * Math.cos(p.z * 2.7 + p.y) > 0.92 ? "#e8f6ff" : "#fcfeff")), mat4({ x: f.x, y: y - 8, z: f.z }, new THREE.Euler(0, f.angle, 0)));
+    batch.add(matte, notLeaf(paint(geometry, (p) => (Math.sin(p.x * 3.1) * Math.cos(p.z * 2.7 + p.y) > 0.92 ? "#e8f6ff" : "#fcfeff")), true), mat4({ x: f.x, y: y - 8, z: f.z }, new THREE.Euler(0, f.angle, 0)));
   }
   const grains: THREE.Matrix4[] = [];
   for (const p of PATCHES.filter((p) => p.name === "spilt sugar")) {
@@ -605,12 +737,12 @@ export function buildTable(): SceneSet {
   };
   for (const crumb of byName("crumb")) {
     const f = crumb.footprint as { x: number; z: number; rx: number; rz: number; angle: number };
-    batch.add(matte, paint(domeGeometry(crumb, 6, 18), crumbColor));
+    dry(paint(domeGeometry(crumb, 6, 18), crumbColor));
     shadows.push({ x: f.x, z: f.z, rx: f.rx * 1.25, rz: f.rz * 1.25, angle: f.angle, strength: 0.5 });
   }
   for (const pip of byName("pip")) {
     const f = pip.footprint as { x: number; z: number; rx: number; rz: number; angle: number };
-    batch.add(juicy, paint(domeGeometry(pip, 5, 16), (p) => (p.y > 0.7 ? "#fff8dc" : "#f1e2a8")));
+    fruit(SKIN.plain, paint(domeGeometry(pip, 5, 16), (p) => (p.y > 0.7 ? "#fff8dc" : "#f1e2a8")));
     shadows.push({ x: f.x, z: f.z, rx: f.rx * 1.3, rz: f.rz * 1.25, angle: f.angle, strength: 0.4 });
   }
   // Specks of biscuit, too small to feel underfoot (picnic.ts, DECOR.crumbs).
@@ -627,7 +759,7 @@ export function buildTable(): SceneSet {
       }
       const x = cluster.x + Math.cos(a) * r;
       const z = cluster.z + Math.sin(a) * r;
-      batch.add(matte, paint(speck, crumbColor), mat4({ x, y: 0, z }, new THREE.Euler(0, rnd.range(0, 6.3), 0), { x: size, y: size, z: size * rnd.range(0.7, 1.3) }));
+      dry(paint(speck, crumbColor), mat4({ x, y: 0, z }, new THREE.Euler(0, rnd.range(0, 6.3), 0), { x: size, y: size, z: size * rnd.range(0.7, 1.3) }));
       if (size > 0.3) shadows.push({ x, z, rx: size * 1.6, rz: size * 1.6, angle: 0, strength: 0.3 });
     }
   }
@@ -645,7 +777,7 @@ export function buildTable(): SceneSet {
     const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.15, bevelEnabled: true, bevelThickness: 0.4, bevelSize: 0.7, bevelSegments: 4, curveSegments: 1 });
     const deep = new THREE.Color(color);
     const thin = new THREE.Color(rim);
-    batch.add(juicy, paint(geometry.rotateX(-Math.PI / 2).translate(x, 0.05, z), (p) => thin.clone().lerp(deep, Math.min(1, Math.max(0, (p.y - 0.1) / 0.45)))));
+    fruit(SKIN.plain, paint(geometry.rotateX(-Math.PI / 2).translate(x, 0.05, z), (p) => thin.clone().lerp(deep, Math.min(1, Math.max(0, (p.y - 0.1) / 0.45)))));
   };
   const honey = PATCHES.find((p) => p.name === "honey")!;
   const jamPatch = PATCHES.find((p) => p.name === "jam")!;
@@ -736,6 +868,9 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
       }
     },
     ripple,
+    happen(kind, random) {
+      if ((HAPPENINGS as readonly string[]).includes(kind)) goings.happen(kind as Happening, random);
+    },
     live(dt, around) {
       goings.live(dt, around);
     },

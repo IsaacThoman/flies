@@ -4,7 +4,7 @@
 
 import type { BrainSenses } from "@fly/brain";
 import type { BrainDriver } from "@fly/contracts";
-import { Behavior, FlyBody, SenseTracker } from "@fly/body";
+import { Behavior, Crowd, FlyBody, SenseTracker } from "@fly/body";
 import type { Forces, Intent, Looming } from "@fly/body";
 import { Pantry } from "@fly/world";
 import type { Food, Place, Vec3, World } from "@fly/world";
@@ -24,11 +24,14 @@ export type Stimuli = {
 
 export class Life {
   readonly world: World;
-  readonly pantry: Pantry;
+  /** The food it can find: its own place's, or a table's shared with others (`share`). */
+  pantry: Pantry;
   readonly body: FlyBody;
   readonly behavior = new Behavior();
   readonly senses = new SenseTracker();
   readonly brain: BrainDriver;
+  /** Other flies at a table with others (none alone): bodies it can't walk through, which its antennae and its body feel. */
+  readonly crowd: Crowd;
   readonly stimuli: Stimuli = { looming: [], stroke: 0, air: { x: 0, y: 0, z: 0 }, threat: null };
   /** The eyes' picture for this frame, when the brain has eyes and they're open. Set by the eyes before `step`. */
   light: { left: Float32Array; right: Float32Array } | null = null;
@@ -51,6 +54,14 @@ export class Life {
     this.brain = brain;
     this.pantry = new Pantry(world, world.place.patches);
     this.body = new FlyBody(world, world.place.start);
+    this.crowd = new Crowd(world);
+  }
+
+  /** It eats from another pantry from now on: a table's, shared with others, or its own again. */
+  share(pantry: Pantry) {
+    this.pantry = pantry;
+    this.eating = false;
+    this.#wasEating = false;
   }
 
   /**
@@ -87,10 +98,12 @@ export class Life {
       world: this.world,
       pantry: this.pantry,
       looming: stimuli.looming,
-      stroke: stimuli.stroke,
+      // Another fly pushing against it is felt as anything touching it is.
+      stroke: Math.max(stimuli.stroke, this.crowd.touch),
       air: stimuli.air,
       eyesOpen,
       proboscis: this.#proboscis,
+      bodies: this.crowd,
     });
     const sent = this.#sent;
     sent.loomLeft = felt.loomLeft;
@@ -112,6 +125,7 @@ export class Life {
     forces.threat = stimuli.threat;
     forces.meal = intent.feeding && food && food.sweet > 0 ? food : null;
     body.step(intent, forces, dt);
+    this.crowd.resolve(body, dt);
     if (body.events.jumped) this.takeOffs++;
 
     // Eating: the brain wants to feed, and its mouthparts are on something sweet.

@@ -9,6 +9,7 @@ import type { Food, Pantry, Vec3, World } from "@fly/world";
 import { ease } from "./behavior.ts";
 import { FLY_HEIGHT, HEAD_AHEAD, HEAD_UP, MOUTH_AHEAD, MOUTH_UP, STEP_UP } from "./motion.ts";
 import type { FlyBody } from "./motion.ts";
+import type { Bodies } from "./crowd.ts";
 
 /**
  * Something the fly could see coming: a ball of radius `r` at `position`. Its
@@ -31,6 +32,8 @@ export type SenseInput = {
   eyesOpen: boolean;
   /** How far the proboscis reaches now (0 to 1, the feeding pose), adding to what the mouth can taste. */
   proboscis: number;
+  /** Other flies' bodies, which the antennae press on as on a wall (at a table with others). */
+  bodies?: Bodies;
 };
 
 /** Angular expansion (rad/s) below which nothing looms, and at which it looms fully. */
@@ -130,8 +133,8 @@ export class SenseTracker {
     this.#touch = release(this.#touch, Math.max(clamp01(input.stroke), hit), RELEASE, dt);
 
     // Antennae: just ahead of the head, one each side. Each feels a wall it presses into.
-    this.#bumpLeft = release(this.#bumpLeft, this.#pressing(body, world, 1) ? 1 : 0, RELEASE, dt);
-    this.#bumpRight = release(this.#bumpRight, this.#pressing(body, world, -1) ? 1 : 0, RELEASE, dt);
+    this.#bumpLeft = release(this.#bumpLeft, this.#pressing(body, world, 1, input.bodies) ? 1 : 0, RELEASE, dt);
+    this.#bumpRight = release(this.#bumpRight, this.#pressing(body, world, -1, input.bodies) ? 1 : 0, RELEASE, dt);
 
     // Wind: its own speed through the air.
     const v = body.velocity;
@@ -169,8 +172,9 @@ export class SenseTracker {
   }
 
   /** On its feet, a wall it would walk into (something between a step and its height over its feet); in the air, the tip inside something. */
-  #pressing(body: FlyBody, world: World, side: 1 | -1) {
+  #pressing(body: FlyBody, world: World, side: 1 | -1, bodies: Bodies | undefined) {
     const tip = body.point(HEAD_AHEAD + ANTENNA_AHEAD, HEAD_UP, side * ANTENNA_SIDE, this.#probe);
+    if (bodies?.inside(tip.x, tip.y, tip.z, 0)) return true;
     if (!world.onTable(tip.x, tip.z)) return body.onFeet;
     const feet = body.position.y;
     return body.onFeet ? world.underside(tip.x, tip.z, feet + STEP_UP) < feet + FLY_HEIGHT : world.solidAt(tip.x, tip.y, tip.z) >= 0;

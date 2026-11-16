@@ -37,7 +37,14 @@ export type FlyNervesModel = FlyNerves & {
 };
 
 /** A FlyModel with its rig exposed, for the viewer and the tests. */
-export type FlyModelWithRig = FlyModel & { readonly rig: FlyRig; readonly nerves: FlyNervesModel };
+export type FlyModelWithRig = FlyModel & {
+  readonly rig: FlyRig;
+  readonly nerves: FlyNervesModel;
+  /** Paints a dab of colour on its thorax, as researchers mark flies to tell them apart (at a table with others); null for none. */
+  mark(colour: THREE.ColorRepresentation | null): void;
+  /** Dims the body, 0 to 1. */
+  dim(k: number): void;
+};
 
 /**
  * Where the X-ray is sorted among the world's other see-through things: with
@@ -58,6 +65,8 @@ export function createFly(): FlyModelWithRig {
     uSky: { value: 0.55 },
     uXray: { value: 0 },
     uGlow: { value: glow },
+    uMark: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uDim: { value: 0 },
   };
 
   const object = new THREE.Group();
@@ -137,6 +146,13 @@ export function createFly(): FlyModelWithRig {
         wings.renderOrder = xrayOn ? XRAY_ORDER : 1;
         nervesMesh.visible = xrayOn;
       }
+    },
+    mark(colour: THREE.ColorRepresentation | null) {
+      const c = new THREE.Color(colour ?? 0);
+      uniforms.uMark.value.set(c.r, c.g, c.b, colour === null ? 0 : 1);
+    },
+    dim(k: number) {
+      uniforms.uDim.value = k;
     },
     anchor(name: FlyAnchor, out: THREE.Vector3) {
       rig.anchorLocal(name, point);

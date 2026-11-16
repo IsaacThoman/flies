@@ -89,15 +89,25 @@ export function encodeWire(connectome: Uint8Array): Uint8Array {
   return out;
 }
 
+/** Where the decoded connectome goes: given its size, the bytes to write it into. */
+export type Allocate = (bytes: number) => Uint8Array<ArrayBuffer>;
+
 /**
  * Puts a wire connectome back together as its bytes arrive, writing each
- * straight to its place, so nothing but the result is held in memory.
+ * straight to its place, so nothing but the result is held in memory. The
+ * place is a buffer of its own, or what `allocate` gives (the WebAssembly
+ * brain's memory, so the connectome never exists twice).
  */
 export class WireDecoder {
   #head: Uint8Array = new Uint8Array(0);
   #layout: Layout | null = null;
   #out: Uint8Array<ArrayBuffer> | null = null;
   #at = 0;
+  readonly #allocate: Allocate;
+
+  constructor(allocate: Allocate = (bytes) => new Uint8Array(bytes)) {
+    this.#allocate = allocate;
+  }
 
   /** Bytes taken so far. */
   get received() {
@@ -113,7 +123,7 @@ export class WireDecoder {
       if (head.length >= 4 && magicOf(head) !== WIRE_MAGIC) throw new Error("This isn't the fly's brain.");
       this.#layout = layoutOf(head);
       if (!this.#layout) return;
-      this.#out = new Uint8Array(this.#layout.size);
+      this.#out = this.#allocate(this.#layout.size);
       this.#head = new Uint8Array(0);
       chunk = head;
     }
@@ -142,11 +152,11 @@ export class WireDecoder {
   }
 
   /** The packed connectome, once every byte has arrived. */
-  finish(): ArrayBuffer {
+  finish(): Uint8Array<ArrayBuffer> {
     const layout = this.#layout;
     const out = this.#out;
     if (!layout || !out || this.#at !== out.length) throw new Error("The fly's brain arrived incomplete.");
-    const words = (s: Section) => new Uint32Array(out.buffer, s.start, s.length);
+    const words = (s: Section) => new Uint32Array(out.buffer, out.byteOffset + s.start, s.length);
     const ptr = layout.sections.find((s) => s.name === "ptr");
     for (const name of ["rootId", "ptr", "post"]) {
       const s = layout.sections.find((x) => x.name === name);
@@ -164,7 +174,7 @@ export class WireDecoder {
     }
     writeMagic(out, CONNECTOME_MAGIC);
     this.#out = null;
-    return out.buffer;
+    return out;
   }
 
   #sectionAt(at: number): Section | null {
@@ -178,12 +188,12 @@ export class WireDecoder {
   }
 }
 
-/** The packed connectome from the gzipped wire form, decoded as it is unzipped. */
-export async function unpackConnectome(data: ArrayBuffer): Promise<ArrayBuffer> {
+/** The packed connectome from the gzipped wire form, decoded as it is unzipped (into `allocate`'s bytes, if given). */
+export async function unpackConnectome(data: ArrayBuffer, allocate?: Allocate): Promise<Uint8Array<ArrayBuffer>> {
   const bytes = new Uint8Array(data);
   if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) throw new Error("This isn't the fly's brain.");
   if (typeof DecompressionStream === "undefined") throw new Error("This browser can't unpack the fly's brain (it has no DecompressionStream).");
-  const decoder = new WireDecoder();
+  const decoder = new WireDecoder(allocate);
   // Fed a megabyte at a time, views not copies, so no browser hands back all 40 MB in one piece.
   let fed = 0;
   const input = new ReadableStream<Uint8Array<ArrayBuffer>>({

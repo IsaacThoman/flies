@@ -1,7 +1,7 @@
 // What the game keeps between launches: the settings and the shelf's choices
 // come back as they were left, a save from another build or a broken one never
-// stops the game, and the settings' pages reach every setting a step from the
-// top without scrolling.
+// stops the game, and the settings' tabs reach every setting without
+// scrolling.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -13,7 +13,7 @@ import { DEFAULT_SETTINGS, KEPT, loadLearned, loadSettings, loadShelf, saveLearn
 import type { Settings } from "../src/settings.ts";
 import { Hands, TOOLS } from "../src/tools/hands.ts";
 import type { MenuScreen } from "../src/ui/screens/menu-screen.ts";
-import { settingsPages, settingsScreen } from "../src/ui/screens/menus.ts";
+import { settingsScreen, settingsTab } from "../src/ui/screens/menus.ts";
 import type { ScreenId, Shell } from "../src/ui/screens/types.ts";
 
 /** localStorage, in memory. */
@@ -92,9 +92,9 @@ test("a saved wallpaper delay outside the menu's choices falls back to the defau
   for (const wallpaperAfter of [2, 45, 90, 600]) {
     const settings = loadSettings(settingsSaved({ wallpaperAfter }));
     assert.equal(settings.wallpaperAfter, DEFAULT_SETTINGS.wallpaperAfter);
-    const { wallpaper } = settingsPages(fakeShell(settings));
-    wallpaper.enter();
-    const after = wallpaper.menu.item("wallpaperAfter");
+    const screen = settingsScreen(fakeShell(settings));
+    screen.enter();
+    const after = screen.menu.item("wallpaperAfter");
     assert.ok(after?.kind === "choice");
     assert.equal(after.options[after.index].value, settings.wallpaperAfter);
     assert.equal(after.options[after.index].label, "1 min");
@@ -198,67 +198,83 @@ function fakeShell(settings: Settings = { ...DEFAULT_SETTINGS }, weatherOutside 
 }
 const press = (screen: MenuScreen, ...buttons: RemoteButton[]) => buttons.forEach((b) => screen.press(b, false));
 
-test("the top of the settings opens each page, and Back from it goes back", () => {
+/** Every tab of the settings in turn, from the first: Right along the row of tabs. */
+function eachTab(screen: MenuScreen, visit: (tab: string) => void) {
+  screen.enter();
+  screen.menu.focusOn("page");
+  for (let i = 0; i < 3; i++) {
+    visit(settingsTab(screen));
+    press(screen, "right");
+  }
+}
+
+test("the settings are a row of tabs over each part's settings: Left and Right on the tabs, Down into a tab, Back goes back", () => {
   const shell = fakeShell();
-  const top = settingsScreen(shell);
-  const pages = settingsPages(shell);
-  assert.deepEqual(
-    top.menu.items.map((item) => item.id),
-    Object.keys(pages),
-  );
-  assert.equal(top.menu.focused?.id, "wallpaper");
-  press(top, "select", "down", "select", "down", "select", "back");
-  assert.deepEqual(shell.asked, ["open wallpaper", "open sound", "open picture", "back"]);
-  shell.asked.length = 0;
-  press(pages.sound, "back");
-  assert.deepEqual(shell.asked, ["back"]);
+  const screen = settingsScreen(shell);
+  screen.enter();
+  assert.equal(screen.menu.focused?.id, "page", "it opens on the tabs");
+  assert.equal(settingsTab(screen), "wallpaper");
+  press(screen, "right");
+  assert.equal(settingsTab(screen), "sound");
+  assert.deepEqual(screen.menu.items.slice(1).map((item) => item.id), ["effects", "ambience"]);
+  press(screen, "down");
+  assert.equal(screen.menu.focused?.id, "effects");
+  press(screen, "up", "right");
+  assert.equal(settingsTab(screen), "picture");
+  press(screen, "right");
+  assert.equal(settingsTab(screen), "picture", "the last tab is the last");
+  press(screen, "select");
+  assert.equal(settingsTab(screen), "wallpaper", "Select steps round the tabs, for a remote held in one hand");
+  press(screen, "back");
+  assert.deepEqual(shell.asked, ["back"], "changing tabs changes no setting");
 });
 
-test("every setting the player chooses is on exactly one page, each a step from the top and short enough not to scroll", () => {
+test("every setting the player chooses is on exactly one tab, and every tab fits without scrolling", () => {
   // Real weather only where the Apple TV can tell the weather outside.
   for (const weatherOutside of [false, true]) {
-    const pages = settingsPages(fakeShell(undefined, weatherOutside));
-    const ids = Object.values(pages).flatMap((page) => page.menu.items.map((item) => item.id));
+    const screen = settingsScreen(fakeShell(undefined, weatherOutside));
+    const ids: string[] = [];
+    eachTab(screen, (tab) => {
+      const rows = screen.menu.items.slice(1);
+      ids.push(...rows.map((item) => item.id));
+      assert.equal(screen.menu.rows, screen.menu.items.length, `${tab} shows all its rows`);
+      assert.ok(rows.every((item) => item.kind !== "action"), `${tab} is all settings`);
+      const { y } = screen.view.layout;
+      assert.ok(y > 0 && y + screen.view.height < DESIGN_HEIGHT - 50, `${tab} clear of the menu hints`);
+    });
     assert.deepEqual(
       [...ids].sort(),
       Object.keys(DEFAULT_SETTINGS)
         .filter((key) => key !== "scene" && (weatherOutside || key !== "realWeather"))
         .sort(),
     );
-    assert.equal(pages.wallpaper.menu.items.some((item) => item.id === "realWeather"), weatherOutside);
-    for (const [id, page] of Object.entries(pages)) {
-      assert.equal(page.menu.rows, page.menu.items.length, `${id} shows all its rows`);
-      assert.ok(page.menu.items.every((item) => item.kind !== "action"), `${id} is all settings`);
-      const { y } = page.view.layout;
-      assert.ok(y > 0 && y + page.view.height < DESIGN_HEIGHT - 50, `${id} clear of the menu hints`);
-    }
   }
 });
 
-test("a page shows the settings as they are when it opens, and a change is kept and applied", () => {
+test("a tab shows the settings as they are when it opens, and a change is kept and applied", () => {
   const shell = fakeShell();
-  const { wallpaper, sound } = settingsPages(shell);
-  // Changed elsewhere since the page was made: by the Place tool, say.
+  const screen = settingsScreen(shell);
+  // Changed elsewhere since the screen was made: by the Place tool, say.
   shell.settings.place = "bar";
   shell.settings.effects = 2;
-  wallpaper.enter();
-  sound.enter();
-  const place = wallpaper.menu.item("place");
+  screen.enter();
+  const place = screen.menu.item("place");
   assert.ok(place?.kind === "choice" && place.options[place.index].value === "bar");
-  const effects = sound.menu.item("effects");
-  assert.ok(effects?.kind === "slider" && effects.value === 2);
   // Camera: Follow, then Calm.
-  press(wallpaper, "down", "right");
+  press(screen, "down", "down", "right");
   assert.equal(shell.settings.wallpaperCamera, "calm");
-  press(sound, "left");
+  press(screen, "up", "up", "right");
+  const effects = screen.menu.item("effects");
+  assert.ok(effects?.kind === "slider" && effects.value === 2);
+  press(screen, "down", "left");
   assert.equal(shell.settings.effects, 1);
   assert.deepEqual(shell.asked, ["apply", "apply"]);
 });
 
-test("every value a page offers is one a save keeps", () => {
-  const pages = settingsPages(fakeShell());
-  for (const page of Object.values(pages)) {
-    for (const item of page.menu.items) {
+test("every value a tab offers is one a save keeps", () => {
+  const screen = settingsScreen(fakeShell());
+  eachTab(screen, () => {
+    for (const item of screen.menu.items.slice(1)) {
       const values = item.kind === "choice" ? item.options.map((o) => o.value) : item.kind === "slider" ? [item.min, item.max] : [];
       for (const value of values) {
         const store = memory();
@@ -266,5 +282,5 @@ test("every value a page offers is one a save keeps", () => {
         assert.equal(loadSettings(store)[item.id as keyof Settings], value, `${item.id}: ${JSON.stringify(value)}`);
       }
     }
-  }
+  });
 });

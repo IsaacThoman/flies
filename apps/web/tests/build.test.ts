@@ -87,7 +87,7 @@ test("the page is an installable app, credits the connectome, and its service wo
 });
 
 test("the brain is beside the page in its wire form, in parts named for their contents, each a few MB (and the neurons' positions, if built, the same way)", { skip: !existsSync(path.join(root, "packages/brain/data/connectome.bin")) && "no connectome (npm run brain:fetch)" }, () => {
-  for (const part of files().filter((f) => f.startsWith("brain/"))) assert.match(part, /^brain\/(connectome|anatomy)\.\d+\.[0-9a-f]{16}\.bin$/);
+  for (const part of files().filter((f) => f.startsWith("brain/") && !f.endsWith(".wasm"))) assert.match(part, /^brain\/(connectome|anatomy)\.\d+\.[0-9a-f]{16}\.bin$/);
   const parts = files()
     .filter((f) => f.startsWith("brain/connectome."))
     .sort((a, b) => Number(a.split(".")[1]) - Number(b.split(".")[1]));
@@ -102,4 +102,16 @@ test("the brain is beside the page in its wire form, in parts named for their co
   assert.equal(gunzipSync(whole).subarray(0, 4).toString(), "FLYW", "of the wire form");
   const js = files().filter((f) => f.startsWith("assets/index-") && f.endsWith(".js")).map(read).join("");
   for (const part of parts) assert.ok(js.includes(part), `the page knows ${part}`);
+});
+
+test("the brain built as WebAssembly is beside the page as it is, one file named for its contents", () => {
+  const modules = files().filter((f) => f.endsWith(".wasm"));
+  assert.equal(modules.length, 1);
+  const [module] = modules;
+  assert.match(module, /^brain\/fly-brain\.0\.[0-9a-f]{16}\.wasm$/);
+  const bytes = readFileSync(path.join(out, module));
+  assert.deepEqual(bytes, readFileSync(path.join(root, "packages/brain-native/wasm/fly-brain.wasm")), "the committed module, not gzipped");
+  assert.equal(createHash("sha256").update(bytes).digest("hex").slice(0, 16), module.split(".")[2]);
+  const js = files().filter((f) => f.startsWith("assets/index-") && f.endsWith(".js")).map(read).join("");
+  assert.ok(js.includes(module), "the page knows it");
 });

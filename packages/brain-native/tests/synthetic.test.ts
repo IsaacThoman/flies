@@ -1,10 +1,10 @@
-// The native brain against the TypeScript one on the small synthetic
-// connectome the TypeScript tests use (packages/brain/src/test-helpers.ts), so
-// these run without the real data: every tick of the scripted senses bit for
-// bit, with its four-column eyes open and without eyes, the same refusals with
-// the same messages for broken files and broken eye columns, and the same
-// outcome on randomly corrupted ones. The fuzzing and the eyes also run under
-// the sanitizers.
+// The native brain and the WebAssembly one against the TypeScript one on the
+// small synthetic connectome the TypeScript tests use
+// (packages/brain/src/test-helpers.ts), so these run without the real data:
+// every tick of the scripted senses bit for bit, with its four-column eyes
+// open and without eyes, the same refusals with the same messages for broken
+// files and broken eye columns, and the same outcome on randomly corrupted
+// ones. The fuzzing and the eyes also run under the sanitizers (native).
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -12,7 +12,7 @@ import { loadConnectome } from "../../brain/src/format.ts";
 import { mulberry32 } from "../../brain/src/sim.ts";
 import { syntheticConnectome, syntheticEyeColumns } from "../../brain/src/test-helpers.ts";
 import type { EyeMap } from "../../brain/src/types.ts";
-import { build, eyeMap, firstDifference, native, noCompiler, scenario, tempFile, typescript } from "./compare.ts";
+import { BUILDS, build, eyeMap, firstDifference, native, noCompiler, scenario, tempFile, typescript } from "./compare.ts";
 import type { Columns, Tick } from "./compare.ts";
 
 const synthetic = syntheticConnectome();
@@ -37,33 +37,37 @@ const retinaDigests = (lines: readonly string[]) => new Set(lines.slice(1).filte
 // Light for an eyeless brain, which it must ignore whatever it is: four facets an eye, looking anywhere.
 const NOWHERE: EyeMap = { left: { directions: new Float32Array(12).fill(0.5) }, right: { directions: new Float32Array(12).fill(-0.5) }, acceptance: 0.05 };
 
-test("every tick of 70 simulated seconds is the TypeScript's, bit for bit, for several seeds", { skip: noCompiler }, () => {
-  const dir = build();
-  for (const seed of [1, 3, 0xdeadbeef]) {
-    // Without eyes (eye-columns.ts's body IDs are not in this connectome), light given and ignored.
-    const ticks = scenario(70, seed, NOWHERE);
-    const { expected, difference } = compare(dir, synthetic.bytes, seed, ticks);
-    assert.equal(difference, null, `seed ${seed}: ${difference}`);
-    // The comparison means something: the fly did things, and some ticks were refused.
-    assert.ok(spikesOf(expected) > 50_000, `${spikesOf(expected)} spikes`);
-    assert.ok(expected.some((line) => line.startsWith("error tick takes 0 to 1000 ms")));
-    assert.ok(!expected.some((line) => line.includes("facets")));
-  }
-});
+for (const target of BUILDS) {
+  test(`every tick of 70 simulated seconds is the TypeScript's, bit for bit, for several seeds (${target.name})`, { skip: target.skip }, () => {
+    const dir = target.dir();
+    for (const seed of [1, 3, 0xdeadbeef]) {
+      // Without eyes (eye-columns.ts's body IDs are not in this connectome), light given and ignored.
+      const ticks = scenario(70, seed, NOWHERE);
+      const { expected, difference } = compare(dir, synthetic.bytes, seed, ticks);
+      assert.equal(difference, null, `seed ${seed}: ${difference}`);
+      // The comparison means something: the fly did things, and some ticks were refused.
+      assert.ok(spikesOf(expected) > 50_000, `${spikesOf(expected)} spikes`);
+      assert.ok(expected.some((line) => line.startsWith("error tick takes 0 to 1000 ms")));
+      assert.ok(!expected.some((line) => line.includes("facets")));
+    }
+  });
+}
 
-test("with its eyes open every tick is the TypeScript's, bit for bit, for several seeds", { skip: noCompiler }, () => {
-  const dir = build();
-  for (const seed of [1, 3, 0xdeadbeef]) {
-    const ticks = scenario(70, seed, eyes);
-    const { expected, difference } = compare(dir, synthetic.bytes, seed, ticks, columns);
-    assert.equal(difference, null, `seed ${seed}: ${difference}`);
-    assert.match(expected[0], /\|vision\.lamina left\|.*\|vision\.looming right$/);
-    // The eyes did something: their rates changed many times, and light that doesn't fit was refused.
-    assert.ok(retinaDigests(expected).size > 100, `${retinaDigests(expected).size} different retina states`);
-    assert.ok(expected.includes("error The left eye has 4 facets, but the light gives 3"));
-    assert.ok(expected.includes("error The left eye has 4 facets, but the light gives undefined"));
-  }
-});
+for (const target of BUILDS) {
+  test(`with its eyes open every tick is the TypeScript's, bit for bit, for several seeds (${target.name})`, { skip: target.skip }, () => {
+    const dir = target.dir();
+    for (const seed of [1, 3, 0xdeadbeef]) {
+      const ticks = scenario(70, seed, eyes);
+      const { expected, difference } = compare(dir, synthetic.bytes, seed, ticks, columns);
+      assert.equal(difference, null, `seed ${seed}: ${difference}`);
+      assert.match(expected[0], /\|vision\.lamina left\|.*\|vision\.looming right$/);
+      // The eyes did something: their rates changed many times, and light that doesn't fit was refused.
+      assert.ok(retinaDigests(expected).size > 100, `${retinaDigests(expected).size} different retina states`);
+      assert.ok(expected.includes("error The left eye has 4 facets, but the light gives 3"));
+      assert.ok(expected.includes("error The left eye has 4 facets, but the light gives undefined"));
+    }
+  });
+}
 
 /** The synthetic eye's columns with one changed. */
 function withColumn(side: "left" | "right", k: number, change: (row: number[]) => void): Columns {
@@ -87,16 +91,18 @@ const BROKEN_EYES: [string, Columns][] = [
   ["a column far from the centre", withColumn("right", 1, (row) => ((row[0] = 255), (row[1] = 0)))],
 ];
 
-test("broken or odd eye columns come out as in TypeScript", { skip: noCompiler }, () => {
-  const dir = build();
-  const problems: string[] = [];
-  for (const [what, eyeColumns] of BROKEN_EYES) {
-    const map = eyeMap(bufferOf(synthetic.bytes), eyeColumns);
-    const { difference } = compare(dir, synthetic.bytes, 1, scenario(1, 1, map ?? NOWHERE), eyeColumns);
-    if (difference) problems.push(`${what}: ${difference}`);
-  }
-  assert.deepEqual(problems, []);
-});
+for (const target of BUILDS) {
+  test(`broken or odd eye columns come out as in TypeScript (${target.name})`, { skip: target.skip }, () => {
+    const dir = target.dir();
+    const problems: string[] = [];
+    for (const [what, eyeColumns] of BROKEN_EYES) {
+      const map = eyeMap(bufferOf(synthetic.bytes), eyeColumns);
+      const { difference } = compare(dir, synthetic.bytes, 1, scenario(1, 1, map ?? NOWHERE), eyeColumns);
+      if (difference) problems.push(`${what}: ${difference}`);
+    }
+    assert.deepEqual(problems, []);
+  });
+}
 
 /** The bytes with the header's text changed, the sections moved to follow it. */
 function withHeaderText(bytes: Uint8Array, change: (text: string) => string): Uint8Array {
@@ -213,21 +219,23 @@ const sameOutcome = (expected: string, actual: string) =>
 
 const FEW: Tick[] = scenario(0.2).slice(0, 12);
 
-test("a broken connectome is refused with the TypeScript's message", { skip: noCompiler }, () => {
-  const dir = build();
-  const problems: string[] = [];
-  for (const [what, bytes] of BROKEN) {
-    const { expected, actual } = compare(dir, bytes, 1, FEW);
-    if (ACCEPTED.has(what) === expected[0].startsWith("error")) problems.push(`${what}: the TypeScript says ${expected[0]}`);
-    for (let k = 0; k < Math.max(expected.length, actual.length); k++) {
-      if (!sameOutcome(expected[k] ?? "", actual[k] ?? "")) {
-        problems.push(`${what}, line ${k}:\n  typescript ${expected[k]}\n  native     ${actual[k]}`);
-        break;
+for (const target of BUILDS) {
+  test(`a broken connectome is refused with the TypeScript's message (${target.name})`, { skip: target.skip }, () => {
+    const dir = target.dir();
+    const problems: string[] = [];
+    for (const [what, bytes] of BROKEN) {
+      const { expected, actual } = compare(dir, bytes, 1, FEW);
+      if (ACCEPTED.has(what) === expected[0].startsWith("error")) problems.push(`${what}: the TypeScript says ${expected[0]}`);
+      for (let k = 0; k < Math.max(expected.length, actual.length); k++) {
+        if (!sameOutcome(expected[k] ?? "", actual[k] ?? "")) {
+          problems.push(`${what}, line ${k}:\n  typescript ${expected[k]}\n  C++        ${actual[k]}`);
+          break;
+        }
       }
     }
-  }
-  assert.deepEqual(problems, []);
-});
+    assert.deepEqual(problems, []);
+  });
+}
 
 /** Randomly corrupted copies of the synthetic file: bytes flipped in the header or the sections, or the end cut off. */
 function corruptions(count: number): [string, Uint8Array][] {
@@ -247,16 +255,17 @@ function corruptions(count: number): [string, Uint8Array][] {
   return out;
 }
 
-for (const mode of ["release", "sanitize"] as const) {
-  test(`randomly corrupted connectomes come out as in TypeScript (${mode} build)`, { skip: noCompiler }, () => {
-    const dir = build(mode);
+const corrupting = [...BUILDS.map((b) => ({ ...b, count: 400 })), { name: "native, sanitizers", skip: noCompiler, dir: () => build("sanitize"), count: 120 }];
+for (const target of corrupting) {
+  test(`randomly corrupted connectomes come out as in TypeScript (${target.name})`, { skip: target.skip }, () => {
+    const dir = target.dir();
     let refused = 0;
-    for (const [k, [what, bytes]] of corruptions(mode === "release" ? 400 : 120).entries()) {
+    for (const [k, [what, bytes]] of corruptions(target.count).entries()) {
       // Every other one with the synthetic eye, whose body IDs the corruption may move or retype.
       const { expected, actual } = compare(dir, bytes, 1, FEW, k % 2 === 1 ? columns : undefined);
       if (expected[0].startsWith("error")) refused++;
       for (let k = 0; k < Math.max(expected.length, actual.length); k++) {
-        assert.ok(sameOutcome(expected[k] ?? "", actual[k] ?? ""), `${what}, line ${k}:\n  typescript ${expected[k]}\n  native     ${actual[k]}`);
+        assert.ok(sameOutcome(expected[k] ?? "", actual[k] ?? ""), `${what}, line ${k}:\n  typescript ${expected[k]}\n  C++        ${actual[k]}`);
       }
     }
     assert.ok(refused > 20, `only ${refused} were refused`);

@@ -121,7 +121,6 @@ function brainLayout(frame: Frame): BrainLayout {
 
 export class BrainScreen implements Screen {
   readonly id = "brain" as const;
-  readonly pauses = false;
   readonly #shell: Shell;
   #since = 0;
   #layout: BrainLayout;

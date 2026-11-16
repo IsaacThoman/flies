@@ -12,8 +12,9 @@ import { CLOCK_SUNRISE, CLOCK_SUNSET, TIMES, blankLight, clockLight } from "../s
 import type { Light, TimeOfDay } from "../src/scene/light.ts";
 import { BLEND, Outside, STALE, SUN_STALE, SWITCH, dayHours, outsideMix, turn } from "../src/scene/outside.ts";
 import type { SunTimes } from "../src/scene/outside.ts";
-import { KINDS, WeatherNow, forecast, kindOf } from "../src/scene/weather.ts";
-import type { Mix } from "../src/scene/weather.ts";
+import { KINDS, forecast } from "@fly/world";
+import type { Mix } from "@fly/world";
+import { WeatherNow, kindOf } from "../src/scene/weather.ts";
 
 const NOW = Date.UTC(2026, 10, 16, 12);
 const mix = (): Mix => ({ cloud: 0, mist: 0, rain: 0, wind: 0 });

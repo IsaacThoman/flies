@@ -31,7 +31,7 @@ const HUD = {
 };
 
 test("it shows only in play, never over the loading screen, the title, a menu or the full picture, nor with the eyes off", () => {
-  for (const screen of ["loading", "title", "pause", "settings", "about", "brain"]) {
+  for (const screen of ["loading", "title", "settings", "about", "brain"]) {
     assert.equal(insetWanted("always", screen, false, false, false), "hide", screen);
     assert.equal(insetWanted("always", screen, true, false, false), "hide", `${screen} in the wallpaper`);
   }

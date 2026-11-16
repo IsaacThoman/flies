@@ -35,11 +35,12 @@ export const lab: Scene = {
   buildSet: buildBench,
   buildBackdrop: buildRoom,
   camera: {
-    whole: { around: "table", distance: 640, height: 200, side: 0.3, low: 0, fov: 40, settle: 1.6, orbit: 0.03 },
-    // The windows.
-    vista: { x: 0, z: -1 },
+    // Raised a little above the bench, so the windows and the clock between two of them are seen over it.
+    whole: { around: "table", distance: 640, height: 200, side: 0.3, low: 0.08, fov: 42, settle: 1.6, orbit: 0.03 },
+    // The windows, and the clock between two of them.
+    vista: { x: -0.3, z: -Math.sqrt(0.91) },
   },
-  // It sees the weather through its windows: a grey day dims the daylight from them, and little else.
+  // It sees the weather through its windows: a grey day dims the daylight from them and greys the view, mist veils it, rain falls past them.
   open: 0.4,
   ambience: "lab",
   bubbles: false,

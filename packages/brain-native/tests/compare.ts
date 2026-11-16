@@ -1,13 +1,17 @@
 // Shared by the tests: building the native brain, the scripted senses both
 // builds are run through, and the lines both write per tick (the native ones
 // by tools/harness.cpp). Every number is written as the hex of its bits, so
-// equal lines mean bit-identical results.
+// equal lines mean bit-identical results. The same harness built as
+// WebAssembly (wasm/fly-brain-harness.wasm, committed) runs in this process
+// under WASI wherever a native build does, so each comparison holds both
+// builds to the TypeScript.
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { WASI } from "node:wasi";
 import type { EyeColumn } from "../../brain/src/eye-columns.ts";
 import { buildEyes } from "../../brain/src/eyes.ts";
 import { loadConnectome } from "../../brain/src/format.ts";
@@ -27,6 +31,15 @@ const CXX = process.env.CXX ?? "clang++";
 /** Why the native tests can't run here, or false when they can. */
 export const noCompiler: string | false = spawnSync(CXX, ["--version"]).status === 0 ? false : `no C++ compiler (${CXX})`;
 
+/** The WebAssembly build (wasm.sh): `harness` runs this directory's fly-brain-harness.wasm. */
+export const WASM = join(PACKAGE, "wasm");
+
+/** The builds each comparison runs: the native one where there is a compiler, and always the WebAssembly one. */
+export const BUILDS: readonly { name: string; skip: string | false; dir: () => string }[] = [
+  { name: "native", skip: noCompiler, dir: () => build() },
+  { name: "WebAssembly", skip: false, dir: () => WASM },
+];
+
 /** Builds the library and tools (a no-op when up to date); returns the directory holding them. */
 export function build(mode: "release" | "sanitize" = "release"): string {
   const result = spawnSync(join(PACKAGE, "build.sh"), [mode], { encoding: "utf8" });
@@ -34,11 +47,32 @@ export function build(mode: "release" | "sanitize" = "release"): string {
   return join(PACKAGE, "build", mode);
 }
 
-/** Runs the harness; returns its output lines. */
+/** Runs the harness of a build (`build()`'s directory, or WASM); returns its output lines. */
 export function harness(dir: string, args: string[], input: string): string[] {
-  const result = spawnSync(join(dir, "fly-brain-harness"), args, { input, encoding: "utf8", maxBuffer: 1 << 30 });
+  const result = dir === WASM ? wasmHarness(args, input) : spawnSync(join(dir, "fly-brain-harness"), args, { input, encoding: "utf8", maxBuffer: 1 << 30 });
   if (result.status !== 0) throw new Error(`fly-brain-harness ${args.join(" ")} exited with ${result.status ?? result.signal}:\n${result.stderr}`);
   return result.stdout.split("\n").filter((line) => line.length > 0);
+}
+
+let harnessModule: WebAssembly.Module | null = null;
+
+/** fly-brain-harness.wasm on its own WASI, in this process: its files are the machine's, its standard streams files of their own. */
+function wasmHarness(args: string[], input: string): { status: number; signal: null; stdout: string; stderr: string } {
+  harnessModule ??= new WebAssembly.Module(readFileSync(join(WASM, "fly-brain-harness.wasm")));
+  const temp = mkdtempSync(join(tmpdir(), "fly-brain-wasm-"));
+  const [stdin, stdout, stderr] = ["stdin", "stdout", "stderr"].map((name) => join(temp, name));
+  writeFileSync(stdin, input);
+  const fds = [openSync(stdin, "r"), openSync(stdout, "w"), openSync(stderr, "w")];
+  try {
+    const wasi = new WASI({ version: "preview1", args: ["fly-brain-harness", ...args], preopens: { "/": "/" }, stdin: fds[0], stdout: fds[1], stderr: fds[2], returnOnExit: true });
+    const status = wasi.start(new WebAssembly.Instance(harnessModule, wasi.getImportObject() as WebAssembly.Imports));
+    for (const fd of fds) closeSync(fd);
+    fds.length = 0;
+    return { status, signal: null, stdout: readFileSync(stdout, "utf8"), stderr: readFileSync(stderr, "utf8") };
+  } finally {
+    for (const fd of fds) closeSync(fd);
+    rmSync(temp, { recursive: true, force: true });
+  }
 }
 
 const view = new DataView(new ArrayBuffer(8));
@@ -319,7 +353,7 @@ export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick
   return lines;
 }
 
-/** The same from the native brain. */
+/** The same from the C++ brain, the native build or the WebAssembly one (`build()`'s directory, or WASM). */
 export function native(dir: string, path: string, seed: number, ticks: readonly Tick[], columns?: Columns): string[] {
   const { input, frames } = script(ticks);
   const temp = mkdtempSync(join(tmpdir(), "fly-brain-native-"));
@@ -342,7 +376,7 @@ export function firstDifference(expected: readonly string[], actual: readonly st
   for (let k = 0; k < n; k++) {
     if (expected[k] === actual[k]) continue;
     const tick = k === 0 ? "construction" : `tick ${k - 1} (${ticks[k - 1]?.what}, dt ${ticks[k - 1]?.dt})`;
-    return `first difference at ${tick}:\n  typescript ${expected[k]}\n  native     ${actual[k]}`;
+    return `first difference at ${tick}:\n  typescript ${expected[k]}\n  C++        ${actual[k]}`;
   }
   return null;
 }

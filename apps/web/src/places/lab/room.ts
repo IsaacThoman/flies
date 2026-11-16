@@ -1,10 +1,14 @@
 // The lab round the bench, in the far pass: a row of windows behind it with a
-// black-topped bench under them, shelves of fly stocks and an incubator to the
-// left, a sink, a whiteboard and the door to the right, a desk with a dark
-// monitor and a fridge behind, fluorescent panels overhead. Soft and calm:
+// black-topped bench under them, shelves of fly stocks, gloves and an
+// incubator to the left, a centrifuge, a water bath, a sink, a whiteboard and
+// the door to the right, a desk with a dark monitor and a fridge behind,
+// fluorescent panels overhead. Soft and calm:
 // a background. The day comes in at the windows: by day the sun lays their
 // shapes across the floor and the far wall; at night only the lamp on the
-// bench is on, and its light spills a little way into the dark room.
+// bench is on, and its light spills a little way into the dark room. A wall
+// clock between the windows tells the real time. Outside, a grey day closes
+// the sky over and flattens the garden, mist turns it to a pale veil, and
+// rain falls past the windows.
 // Five draws: the room, its pictures, what glows, the view outside, and the
 // glass.
 
@@ -12,15 +16,53 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { canvas2d, canvasTexture, freeze, paint, random } from "../../scene/build.ts";
 import type { ColorFn } from "../../scene/build.ts";
+import { CLOCK_GLSL, WallClock, onDial } from "../../scene/clock.ts";
+import type { Dial } from "../../scene/clock.ts";
 import type { Daylight } from "../../scene/light.ts";
 import type { SceneBackdrop } from "../types.ts";
 import { FLOOR_Y, SHADE } from "./bench.ts";
 import { BACK_Z, CEILING_Y, PANELS, SUNBEAM, WINDOWS, WINDOW_LIGHT, sunbeam } from "./materials.ts";
 import type { Sunbeam } from "./materials.ts";
 
+const WHITE = new THREE.Color("#ffffff");
+const UP = new THREE.Vector3(0, 1, 0);
 const FRONT_Z = 2700;
 const LEFT_X = -2800;
 const RIGHT_X = 3000;
+
+/**
+ * The wall clock's dial (mm), facing the room: on the pier between the left
+ * and the middle windows, hung low over the bench under them, where it can be
+ * read from a stool and is seen past the fly and from across the bench.
+ */
+const CLOCK: Dial = { centre: { x: -WINDOWS.xs[2] / 2, y: 290, z: BACK_Z + 28.5 }, up: { x: 0, y: 1, z: 0 }, right: { x: 1, y: 0, z: 0 }, radius: 104 };
+
+/** The clock's face, drawn on its dial in the room's material: a black minute track and hour batons, black hands, a thin red second hand. */
+const CLOCK_FACE = /* glsl */ `
+{
+  vec3 d = ${onDial(CLOCK)};
+  vec2 q = d.xy;
+  float px = length(fwidth(q));
+  if (abs(d.z) < 0.5 && length(q) < 1.0) {
+    vec3 h = uClockHands;
+    float marks = max(clockTicks(q, 60.0, 0.83, 0.9, 0.016, px), clockTicks(q, 12.0, 0.64, 0.9, 0.06, px));
+    float black = max(marks, max(max(clockHand(q, h.x, 0.5, 0.12, 0.085, 0.07, px), clockHand(q, h.y, 0.8, 0.14, 0.065, 0.05, px)), clockSpot(q, vec2(0.0), 0.07, px)));
+    float red = max(clockHand(q, h.z, 0.86, 0.26, 0.022, 0.016, px), clockSpot(q, vec2(0.0), 0.04, px));
+    // The hands stand off the dial: their soft shadow falls a little down and to the side, and the bezel's round the edge.
+    vec2 s = q - vec2(0.025, -0.035);
+    float soft = px + 0.04;
+    float shadow = max(max(clockHand(s, h.x, 0.5, 0.12, 0.085, 0.07, soft), clockHand(s, h.y, 0.8, 0.14, 0.065, 0.05, soft)), clockHand(s, h.z, 0.86, 0.26, 0.022, 0.016, soft) * 0.5);
+    float rim = smoothstep(0.86, 1.0, length(q));
+    diffuseColor.rgb *= 1.0 - shadow * 0.28 - rim * 0.2;
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.025), black);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.72, 0.05, 0.04), red);
+    #if NUM_HEMI_LIGHTS > 0
+    // The glass over it shows the lit room, brightest across its upper half: by day a sheen, after dark next to nothing.
+    float sheen = 0.03 + 0.07 * smoothstep(-0.3, 0.7, q.y - q.x * 0.35) * (1.0 - smoothstep(0.55, 0.95, abs(q.y - 0.25 + q.x * 0.35)));
+    totalEmissiveRadiance += hemisphereLights[0].skyColor * sheen * (1.0 - rim);
+    #endif
+  }
+}`;
 
 /** Where each picture is on the room's atlas (px of a 2048 × 1024 canvas). */
 const ATLAS = { w: 2048, h: 1024 };
@@ -298,15 +340,36 @@ const box = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: num
 /** A picture on a wall facing +z (or turned to face another way). */
 const facing = (w: number, h: number, x: number, y: number, z: number, turn = 0) => new THREE.PlaneGeometry(w, h).rotateY(turn).translate(x, y, z);
 
-/** The room's materials: their floor and ceiling tiled, and the sun through the windows laid across them. */
-function roomShader(material: THREE.Material, beam: Sunbeam, key: string) {
+/** A strip along a line of points, from `from` to `to` of the way across it (-1 one edge, 1 the other) at each point's half-width, seen from both sides: a leaf, or a stripe of one. */
+function ribbon(points: readonly THREE.Vector3[], widths: readonly number[], from: number, to: number) {
+  const out: number[] = [];
+  const side = new THREE.Vector3();
+  const at = (i: number, k: number) => {
+    const j = Math.min(i, points.length - 2);
+    side.subVectors(points[j + 1], points[j]).cross(UP).normalize();
+    return points[i].clone().addScaledVector(side, widths[i] * k);
+  };
+  for (let i = 0; i < points.length - 1; i++) {
+    const [a0, a1, b0, b1] = [at(i, from), at(i, to), at(i + 1, from), at(i + 1, to)];
+    for (const v of [a0, b0, a1, a1, b0, b1, a0, a1, b0, a1, b1, b0]) out.push(v.x, v.y, v.z);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(out, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** The room's materials: their floor and ceiling tiled, and the sun through the windows laid across them; the one with the clock's dial in it, its hands. */
+function roomShader(material: THREE.Material, beam: Sunbeam, key: string, hands?: WallClock["hands"]) {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, beam);
+    if (hands) shader.uniforms.uClockHands = hands;
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vWorld;")
       .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;");
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>\nvarying vec3 vWorld;\n${WINDOW_LIGHT}`)
+      .replace("#include <common>", `#include <common>\nvarying vec3 vWorld;\n${WINDOW_LIGHT}\n${hands ? CLOCK_GLSL : ""}`)
+      .replace("#include <color_fragment>", `#include <color_fragment>\n${hands ? CLOCK_FACE : ""}`)
       .replace(
         "#include <map_fragment>",
         /* glsl */ `#include <map_fragment>
@@ -341,6 +404,7 @@ const OUTSIDE_FS = /* glsl */ `
 uniform sampler2D map;
 uniform vec3 high; uniform vec3 low; uniform vec3 sunDir; uniform vec3 sunColor;
 uniform float glow; uniform float stars; uniform float time;
+uniform float cover; uniform float mist; uniform float rain; uniform vec3 veil;
 uniform vec4 scenery; uniform vec4 mask; uniform vec4 band;
 varying vec3 vWorld;
 varying vec2 vUv;
@@ -353,13 +417,15 @@ void main() {
   vec3 d = normalize(vWorld - cameraPosition);
   float h = d.y;
   float day = 1.0 - stars;
-  // The sky: pale low down, deeper higher up, with the sun's glow and soft clouds drifting.
-  vec3 sky = mix(low, high, smoothstep(-0.05, 0.55, h));
+  // The sky: pale low down, deeper higher up, with the sun's glow and soft clouds drifting; on a grey day the cloud closes over it, darker underneath.
+  vec3 sky = mix(low, high, smoothstep(-0.05, 0.55, h) * (1.0 - cover * 0.85));
   float s = max(dot(d, normalize(sunDir)), 0.0);
-  sky += sunColor * (pow(s, 5.0) * glow * 0.6 + pow(s, 60.0) * 0.4) * day;
+  sky += sunColor * (pow(s, 5.0) * glow * 0.6 + pow(s, 60.0) * 0.4) * day * (1.0 - cover * 0.9);
   vec2 cp = d.xz / max(h + 0.25, 0.05) * 2.2 + vec2(time * 0.004, 0.0);
-  float cloud = smoothstep(0.5, 0.85, noise(cp) * 0.6 + noise(cp * 2.3) * 0.3 + noise(cp * 5.1) * 0.1);
-  sky = mix(sky, mix(low, vec3(1.0), 0.6 * day + 0.1), cloud * 0.55 * smoothstep(0.0, 0.12, h));
+  float n = noise(cp) * 0.6 + noise(cp * 2.3) * 0.3 + noise(cp * 5.1) * 0.1;
+  float cloud = smoothstep(0.5 - cover * 0.45, 0.85 - cover * 0.3, n);
+  vec3 cloudColor = mix(low, vec3(1.0), (0.6 * day + 0.1) * (1.0 - cover * 0.7)) * (1.0 - cover * 0.18 * smoothstep(0.4, 0.9, n)) * (1.0 - rain * 0.15);
+  sky = mix(sky, cloudColor, cloud * mix(0.55, 0.9, cover) * smoothstep(0.0, 0.12, h));
   // Stars, faintly, at night.
   vec2 cell = floor(d.xy / max(d.z * -1.0, 0.2) * 260.0);
   sky += vec3(step(0.997, hash(cell)) * stars * 0.8 * smoothstep(0.05, 0.3, h));
@@ -372,10 +438,24 @@ void main() {
     vec3 m = texture2D(map, mask.xy + q * mask.zw).rgb;
     vec3 tint = mix(vec3(0.06, 0.08, 0.15), mix(vec3(1.0), low * 1.15, 0.3), day);
     vec3 lit = there * tint + vec3(1.0, 0.8, 0.5) * m.r * stars * 0.9;
-    // Haze toward the far things, more by day.
-    lit = mix(lit, low, 0.22 * day);
+    // Haze toward the far things, more by day; under cloud the colours flatten and darken.
+    lit = mix(lit, low, 0.22 * day + 0.15 * cover);
+    lit = mix(lit, vec3(dot(lit, vec3(0.3, 0.55, 0.15))), cover * 0.35) * (1.0 - cover * 0.2);
     c = mix(lit, sky, m.g * step(0.0, p.y));
   } else if (p.y < 0.0) c = mix(vec3(0.3, 0.42, 0.22), vec3(0.04, 0.05, 0.08), stars) * mix(vec3(1.0), low, 0.3);
+  // Mist: the building across the way a ghost, the trees grey shapes, the sky gone white; the lawn, nearest, keeps a little colour.
+  c = mix(c, veil, mist * mix(0.8, 0.55, smoothstep(0.08, -0.02, h)));
+  // Rain falling past the window: thin streaks, slanting a little, as many as it rains.
+  if (rain > 0.0) {
+    vec2 r = vec2(d.x + d.y * 0.06, d.y) / max(-d.z, 0.3) * vec2(90.0, 3.0) + vec2(0.0, time * 9.0);
+    vec2 cell = floor(r);
+    vec2 f = fract(r);
+    float x = 0.2 + 0.6 * hash(cell + 4.1);
+    float y = hash(cell + 9.3);
+    float wide = fwidth(r.x) * 1.2 + 0.04;
+    float streak = (1.0 - smoothstep(0.0, wide, abs(f.x - x))) * smoothstep(0.0, 0.06, f.y - y * 0.7) * (1.0 - smoothstep(0.1, 0.3, f.y - y * 0.7));
+    c = mix(c, mix(veil, vec3(1.0), 0.4), streak * step(hash(cell), rain * 0.8) * 0.4);
+  }
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
 }`;
@@ -391,8 +471,9 @@ export function buildRoom(light: Daylight): SceneBackdrop {
   beam.uSunDir.value = light.sunDirection;
   beam.uSunColor.value = light.sunColor;
 
+  const clock = new WallClock();
   const room = new THREE.MeshLambertMaterial({ vertexColors: true });
-  roomShader(room, beam, "lab-room");
+  roomShader(room, beam, "lab-room", clock.hands);
   const pictures = new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true });
   roomShader(pictures, beam, "lab-pictures");
   // What gives light: the panels overhead by day, the incubator's light by day, little lights always.
@@ -461,7 +542,7 @@ export function buildRoom(light: Daylight): SceneBackdrop {
       add(box(x + 260, x + 340, -110, -95, z1 - 10, z1), trim);
     }
     add(box(-2560, 2360, -30, 0, z0, z1), "#2b2d30");
-    // A covered microscope, a few bottles, trays of vials, a plant on the sill.
+    // A covered microscope, a few bottles, trays of vials, a spider plant on the sill.
     const cover = new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2).scale(170, 380, 150).translate(-1500, 0, z0 + 400);
     add(cover, "#dfe6ea");
     for (let i = 0; i < 7; i++) {
@@ -477,11 +558,33 @@ export function buildRoom(light: Daylight): SceneBackdrop {
       pics.push(pictured(facing(280, 90, x, 45, z0 + 521), PICTURES.trays));
     }
     add(new THREE.CylinderGeometry(70, 55, 120, 16).translate(1550, WINDOWS.y0 + 60, BACK_Z + 10), "#b8643a");
-    for (let k = 0; k < 26; k++) {
-      const a = rnd.range(0, Math.PI * 2);
-      const r = rnd.range(30, 110);
-      const leaf = new THREE.SphereGeometry(rnd.range(26, 38), 8, 6).scale(1, 0.55, 1).translate(1550 + Math.cos(a) * r, WINDOWS.y0 + 150 + rnd.range(-20, 140) - (r > 80 ? rnd.range(60, 220) : 0), BACK_Z + 10 + Math.sin(a) * r * 0.6);
-      add(leaf, ["#3f7f3a", "#56994a", "#2f6a30"][k % 3]);
+    add(new THREE.CylinderGeometry(74, 72, 14, 16).translate(1550, WINDOWS.y0 + 113, BACK_Z + 10), "#a95a33");
+    // Its leaves arch up out of the pot and over, green with a pale stripe down the middle; runners hang down with little plants on their ends.
+    const crown = new THREE.Vector3(1550, WINDOWS.y0 + 116, BACK_Z + 10);
+    const arc = (a: number, length: number, rise: number, droop: number, steps: number, from = crown) => {
+      const points: THREE.Vector3[] = [];
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        // Kept off the glass behind the pot.
+        const z = Math.max(BACK_Z - 50, from.z + Math.sin(a) * length * t * 0.6);
+        points.push(new THREE.Vector3(from.x + Math.cos(a) * length * t, from.y + length * (rise * t - droop * t * t), z));
+      }
+      return points;
+    };
+    for (let k = 0; k < 40; k++) {
+      const a = k * 2.4 + rnd.range(-0.2, 0.2);
+      const inner = k % 3 === 0;
+      const points = arc(a, inner ? rnd.range(110, 170) : rnd.range(170, 270), inner ? rnd.range(1.4, 2) : rnd.range(0.8, 1.4), inner ? rnd.range(1.6, 2.2) : rnd.range(1.1, 1.6), 5);
+      const widths = points.map((_p, i) => 13 * (1 - Math.pow(i / 5, 1.6)) + 0.8);
+      add(ribbon(points, widths, -1, -0.3), "#4b8a3c");
+      add(ribbon(points, widths, -0.3, 0.3), "#e4ebc8");
+      add(ribbon(points, widths, 0.3, 1), "#4b8a3c");
+    }
+    for (const a of [0.9, 1.9, 2.7]) {
+      const runner = arc(a, 230, 0.45, 1.25, 6);
+      add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(runner), 8, 2, 3), "#c9d7a0");
+      const end = runner[runner.length - 1];
+      for (let k = 0; k < 5; k++) add(ribbon(arc((k / 5) * Math.PI * 2, 60, 0.6, 1.1, 3, end), [5, 4, 2.5, 0.5], -1, 1), "#5e9a46");
     }
     // The gas cylinder, chained to the wall at the end of the bench, with its regulator.
     add(new THREE.CylinderGeometry(115, 115, 1380, 24).translate(2620, FLOOR_Y + 690, BACK_Z + 200), "#5f6c74");
@@ -489,7 +592,15 @@ export function buildRoom(light: Daylight): SceneBackdrop {
     add(box(2580, 2660, FLOOR_Y + 1480, FLOOR_Y + 1560, BACK_Z + 160, BACK_Z + 240), "#b9bcbf");
     add(new THREE.TorusGeometry(120, 6, 6, 24, Math.PI).rotateX(Math.PI / 2).translate(2620, FLOOR_Y + 1100, BACK_Z + 200), "#9a9da1");
   }
-  // The left wall: shelves of fly stocks, a poster, and the incubator.
+  // The wall clock: a white dial in a dark case with a rounded bezel. Its face is drawn on the dial by the room's material.
+  {
+    const { x, y, z } = CLOCK.centre;
+    const r = CLOCK.radius;
+    add(new THREE.CylinderGeometry(r + 9, r + 11, z - BACK_Z - 1, 48).rotateX(Math.PI / 2).translate(x, y, (z + BACK_Z - 1) / 2), "#25272a");
+    add(new THREE.TorusGeometry(r + 5, 6, 8, 48).translate(x, y, z + 0.5), "#2e3033");
+    add(new THREE.CircleGeometry(r + 4, 48).translate(x, y, z), "#f6f5f0");
+  }
+  // The left wall: shelves of fly stocks, a poster, the incubator, and gloves.
   {
     const x0 = LEFT_X;
     for (const z of [-1500, -600]) {
@@ -513,8 +624,17 @@ export function buildRoom(light: Daylight): SceneBackdrop {
     add(box(x0 + 761, x0 + 772, 950, 1020, z - 200, z + 200), "#2a2c30");
     glow(facing(90, 34, x0 + 773, 985, z + 120, Math.PI / 2), "#ff6a4a", true);
     glow(facing(16, 16, x0 + 773, 985, z - 140, Math.PI / 2), "#7dffa0", true);
+    // Between the shelves and the incubator, boxes of gloves in a rack on the wall, a glove pulled half out of each.
+    const gz = 165;
+    add(box(x0, x0 + 10, 160, 450, gz - 215, gz + 215), "#e4e5e2");
+    [["#3f6fd0", "#8fb4f0"], ["#7a5cc4", "#c3b0ee"], ["#e9eef2", "#9fd0e6"]].forEach(([carton, glove], i) => {
+      const z0 = gz + (i - 1) * 135;
+      add(box(x0 + 10, x0 + 80, 175, 425, z0 - 62, z0 + 62), carton);
+      add(new THREE.CylinderGeometry(26, 26, 2, 16).scale(1, 1, 1.5).rotateZ(Math.PI / 2).translate(x0 + 80.5, 330, z0), "#2a2c33");
+      add(new THREE.SphereGeometry(22, 10, 6).scale(0.8, 1.3, 1).translate(x0 + 86, 345, z0 + 6), glove);
+    });
   }
-  // The right wall: the sink, a towel dispenser, the whiteboard, the door and a lab coat.
+  // The right wall: a centrifuge, a water bath and pipettes, the sink, a towel dispenser, the whiteboard, the door and a lab coat.
   {
     const x1 = RIGHT_X;
     add(box(x1 - 700, x1, FLOOR_Y, -30, -900, 700), "#c4c7ca");
@@ -523,6 +643,29 @@ export function buildRoom(light: Daylight): SceneBackdrop {
       add(box(x1 - 722, x1 - 712, -150, -60, z + 240, z + 270), trim);
     }
     add(box(x1 - 710, x1, -30, 0, -910, 710), "#2b2d30");
+    // Further along, toward the windows, a short bench with a centrifuge, a water bath and a stand of pipettes.
+    add(box(x1 - 600, x1, FLOOR_Y, -30, -1880, -930), "#c4c7ca");
+    for (const z of [-1870, -1400]) add(box(x1 - 612, x1 - 600, FLOOR_Y + 110, -60, z, z + 460), "#7fa3a6");
+    add(box(x1 - 610, x1, -30, 0, -1890, -925), "#2b2d30");
+    add(box(x1 - 450, x1 - 120, 0, 230, -1830, -1480), "#dfe2e3");
+    add(new THREE.SphereGeometry(150, 20, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.3, 1).translate(x1 - 285, 230, -1655), "#56616c");
+    add(box(x1 - 456, x1 - 450, 120, 200, -1790, -1520), "#2f3338");
+    glow(facing(70, 26, x1 - 457, 175, -1700, -Math.PI / 2), "#7dffa0", true);
+    add(box(x1 - 470, x1 - 110, 0, 190, -1310, -980), "#b9bec3");
+    add(box(x1 - 465, x1 - 115, 190, 205, -1305, -985), "#c9ced2");
+    add(box(x1 - 476, x1 - 470, 40, 150, -1250, -1040), "#2f3338");
+    glow(facing(60, 24, x1 - 477, 120, -1150, -Math.PI / 2), "#ff6a4a", true);
+    add(new THREE.CylinderGeometry(70, 75, 16, 20).translate(x1 - 560, 8, -1395), "#3b4048");
+    add(new THREE.CylinderGeometry(6, 6, 330, 8).translate(x1 - 560, 165, -1395), "#c9ccd0");
+    add(new THREE.CylinderGeometry(80, 80, 10, 20).translate(x1 - 560, 330, -1395), "#3b4048");
+    ["#d24e3a", "#e6c34a", "#3a7fd2", "#2e9e6a"].forEach((top, i) => {
+      const a = i * (Math.PI / 2) + 0.4;
+      const px = x1 - 560 + Math.cos(a) * 62;
+      const pz = -1395 + Math.sin(a) * 62;
+      add(new THREE.CylinderGeometry(13, 9, 190, 8).translate(px, 225, pz), "#ecebe6");
+      add(new THREE.CylinderGeometry(4, 2, 70, 6).translate(px, 95, pz), "#e2e2de");
+      add(new THREE.CylinderGeometry(9, 9, 22, 8).translate(px, 330, pz), top);
+    });
     add(box(x1 - 560, x1 - 140, -6, 1, -380, 220), "#8f969c");
     add(box(x1 - 540, x1 - 160, -4, 2, -360, 200), "#5d6368");
     const tap = new THREE.CatmullRomCurve3([new THREE.Vector3(x1 - 90, 0, -80), new THREE.Vector3(x1 - 90, 330, -80), new THREE.Vector3(x1 - 160, 400, -80), new THREE.Vector3(x1 - 260, 330, -80)]);
@@ -619,6 +762,10 @@ export function buildRoom(light: Daylight): SceneBackdrop {
     glow: { value: light.glow },
     stars: { value: light.stars },
     time: { value: 0 },
+    cover: { value: 0 },
+    mist: { value: 0 },
+    rain: { value: 0 },
+    veil: { value: new THREE.Color() },
     scenery: { value: uv(PICTURES.scenery) },
     mask: { value: uv(PICTURES.mask) },
     band: { value: new THREE.Vector4(band.x, band.y, band.w, band.h) },
@@ -637,7 +784,8 @@ export function buildRoom(light: Daylight): SceneBackdrop {
 
   return {
     scene,
-    update(time, _camera, daylight) {
+    update(time, _camera, daylight, weather) {
+      clock.update();
       const dark = Math.min(1, Math.max(0, (daylight.stars - 0.25) / 0.6));
       const night = dark * dark * (3 - 2 * dark);
       day.value = 1 - night;
@@ -655,6 +803,10 @@ export function buildRoom(light: Daylight): SceneBackdrop {
       outsideUniforms.glow.value = daylight.glow;
       outsideUniforms.stars.value = daylight.stars;
       outsideUniforms.time.value = time;
+      outsideUniforms.cover.value = weather.cloud;
+      outsideUniforms.mist.value = weather.mist;
+      outsideUniforms.rain.value = weather.rain;
+      outsideUniforms.veil.value.copy(daylight.cloud).lerp(daylight.haze, 0.5).lerp(WHITE, 0.3 * (1 - daylight.stars));
     },
   };
 }

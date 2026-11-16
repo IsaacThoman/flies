@@ -9,9 +9,13 @@ import type { Life } from "../../life.ts";
 import type { Settings } from "../../settings.ts";
 import type { Sound } from "../../audio/sounds.ts";
 
-/** The settings' pages, each opened from the top of the settings. */
+/** The settings' tabs. */
 export type SettingsPage = "wallpaper" | "sound" | "picture";
-export type ScreenId = "title" | "play" | "pause" | "settings" | SettingsPage | "about" | "brain";
+/** The menu (the title, at launch and from play alike), play, and what the menu opens. */
+export type ScreenId = "title" | "play" | "settings" | "about" | "brain" | "together";
+
+/** The table this device is at, as the screens show it: whether this player started it, and the others there. */
+export type TableNow = { readonly starting: boolean; readonly joined: boolean; readonly others: readonly { readonly id: number; readonly colour: string }[] };
 
 /** The game, as the screens see it. */
 export interface Shell {
@@ -31,15 +35,21 @@ export interface Shell {
   open(screen: ScreenId): void;
   /** Back one screen (leaving the app at the root). */
   back(): void;
-  /** Starts playing (from the title), or carries on (from the pause menu). */
+  /** Starts playing, or carries on. */
   play(): void;
   /** Goes straight to the wallpaper. */
   watch(): void;
-  /** Back to the title. */
-  title(): void;
   /** The settings changed: apply and save them. */
   applySettings(): void;
   sound(sound: Sound): void;
+  /** Playing with others: whether this device can at all, and the table it is at (null alone). */
+  readonly canPlayTogether: boolean;
+  readonly table: TableNow | null;
+  /** Starts a table, here; hands its link on (from a press: the share sheet or the clipboard); takes another's fly off it (the starter); leaves it. */
+  startTable(): void;
+  shareTable(): Promise<"shared" | "copied" | "failed">;
+  removeFly(id: number): void;
+  leaveTable(): void;
 }
 
 /**
@@ -61,8 +71,6 @@ export type Point = {
 
 export interface Screen {
   readonly id: ScreenId;
-  /** The fly's life stops while this screen is open. */
-  readonly pauses: boolean;
   /** Called when the screen comes to the top. */
   enter(): void;
   /** The screen changed shape: lay out again. */

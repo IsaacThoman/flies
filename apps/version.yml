@@ -1,0 +1,5 @@
+# The version the Apple TV app (apps/tvos) and the iPhone and iPad app (apps/ios) ship as: they are
+# one app in the App Store, so they are numbered together. Included by both XcodeGen specs.
+settings:
+  MARKETING_VERSION: "0.1"
+  CURRENT_PROJECT_VERSION: "1"

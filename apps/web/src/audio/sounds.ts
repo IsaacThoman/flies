@@ -2,7 +2,8 @@
 // audio has gain automation and buffer sources but no oscillators or filters,
 // so the waveforms and the filtering are worked out here, sample by sample.
 //
-// The wing buzz follows the wings, the feet patter while it walks, and the
+// The wing buzz follows the wings, the feet patter while it walks, the feather
+// rustles while it strokes and a breath of air is heard while you blow, and the
 // place's own sound (at the picnic a breeze, the lake and birds now and then)
 // plays quietly underneath, with the rain when it rains and the rush of a
 // gust when one blows.
@@ -442,6 +443,40 @@ function windLoop(ctx: BaseAudioContext) {
   });
 }
 
+/**
+ * The feather brushing to and fro: a soft, high hiss of barbs, swelling twice
+ * each way the feather goes (it sways at 14 rad/s in tools/view.ts).
+ */
+function rustleLoop(ctx: BaseAudioContext) {
+  const r = noise(51);
+  let low = 0;
+  let soft = 0;
+  const sway = 14 / TAU;
+  const seconds = 8 / sway;
+  return renderLoop(ctx, seconds, (t) => {
+    const white = r();
+    low += (white - low) * 0.35;
+    const hiss = white - low;
+    soft += (hiss - soft) * 0.5;
+    const brush = Math.abs(Math.sin(TAU * sway * t));
+    return soft * (0.25 + 0.75 * brush * brush) * 0.5;
+  });
+}
+
+/** A breath of air: blown through pursed lips, low and steady with a slight waver. */
+function breathLoop(ctx: BaseAudioContext) {
+  const r = noise(61);
+  let a = 0;
+  let b = 0;
+  const seconds = 3;
+  return renderLoop(ctx, seconds, (t) => {
+    const waver = 0.85 + 0.1 * Math.sin((TAU * 3 * t) / seconds) + 0.05 * Math.sin((TAU * 7 * t) / seconds + 1);
+    a += (r() - a) * 0.09;
+    b += (a - b) * 0.09;
+    return (b * 4 + (a - b) * 1.2) * waver;
+  });
+}
+
 /** A bird's chirp: quick upward sweeps. Heard through glass, the glass takes the top off it. */
 function chirp(ctx: BaseAudioContext, seed: number, glass = false) {
   const r = noise(seed);
@@ -531,6 +566,11 @@ export class Audio {
   #loops = new Map<Ambience, AudioBuffer>();
   #rain: Loop | null = null;
   #wind: Loop | null = null;
+  /** The held tools, heard only while they are at work: started when they begin, let go when they stop. */
+  #rustleBuffer: AudioBuffer | null = null;
+  #breathBuffer: AudioBuffer | null = null;
+  #rustle: Loop | null = null;
+  #breath: Loop | null = null;
   /** What the rain and wind loops were last set to, so they are touched only when they change. */
   #rainAt = 0;
   #windAt = 0;
@@ -568,6 +608,8 @@ export class Audio {
       this.#muffled = [chirp(ctx, 21, true), chirp(ctx, 22, true), chirp(ctx, 23, true)];
       this.#rain = this.#loop(rainLoop(ctx), this.#ambient);
       this.#wind = this.#loop(windLoop(ctx), this.#ambient);
+      this.#rustleBuffer = rustleLoop(ctx);
+      this.#breathBuffer = breathLoop(ctx);
       this.#playAmbience();
     } catch {
       this.#buffers = null;
@@ -619,11 +661,12 @@ export class Audio {
     this.#place.gain.gain.setTargetAtTime(1, ctx.currentTime, 0.4);
   }
 
-  #loop(buffer: AudioBuffer, out: GainNode): Loop {
+  #loop(buffer: AudioBuffer, out: GainNode, rate = 1): Loop {
     const ctx = this.ctx!;
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.loop = true;
+    source.playbackRate.value = rate;
     const gain = ctx.createGain();
     gain.gain.value = 0;
     source.connect(gain);
@@ -644,6 +687,33 @@ export class Audio {
     if (events.dropped) this.play("drop");
     if (events.landed) this.play("land", 0.6);
     if (events.swooped) this.play("swoop");
+  }
+
+  /**
+   * The tools held down: the feather stroking the fly (0 or 1) and a puff of
+   * air (0, or how hard, up to 1). Each is heard from when it starts to when it
+   * stops; nothing is touched in between.
+   */
+  held(stroke: number, blow: number) {
+    this.#rustle = this.#hold(this.#rustle, this.#rustleBuffer, stroke * 0.5, 1);
+    this.#breath = this.#hold(this.#breath, this.#breathBuffer, blow * 0.45, 0.75 + blow * 0.45);
+  }
+
+  #hold(loop: Loop | null, buffer: AudioBuffer | null, level: number, rate: number): Loop | null {
+    const ctx = this.ctx;
+    if (!ctx || !buffer || !this.#effects) return loop;
+    const now = ctx.currentTime;
+    if (level > 0 && !loop) {
+      loop = this.#loop(buffer, this.#effects, rate);
+      loop.gain.gain.setTargetAtTime(level, now, 0.04);
+      return loop;
+    }
+    if (level <= 0 && loop) {
+      loop.gain.gain.setTargetAtTime(0, now, 0.08);
+      loop.source.stop(now + 0.6);
+      return null;
+    }
+    return loop;
   }
 
   play(sound: Sound, volume = 1, rate = 1) {

@@ -9,3 +9,7 @@ export * from "./lab.ts";
 export * from "./bar.ts";
 export * from "./restaurant.ts";
 export * from "./pantry.ts";
+export * from "./forecast.ts";
+export * from "./pace.ts";
+export * from "./swoop.ts";
+export * from "./places.ts";
