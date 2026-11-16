@@ -49,6 +49,16 @@ export const INKS: Readonly<Record<string, Ink>> = {
   lime: sticky(0xc8d892),
   beer: sticky(0xd8a446),
   "beer foam": sticky(0xe6d6aa),
+  "red wine": sticky(0x7e1a32),
+  "white wine": sticky(0xe0d08a),
+  "wine ring": sticky(0x8e3a4a),
+  ketchup: sticky(0xb02418),
+  espresso: sticky(0x6a4426),
+  peach: sticky(0xf0a264),
+  lemon: sticky(0xe6d870),
+  coulis: sticky(0xb41e3c),
+  soda: sticky(0x8a5a2e),
+  grape: sticky(0xb4b86a),
   water: WATER,
 };
 
@@ -60,11 +70,12 @@ export const inkOf = (food: Food): Ink | null => (isDropped(food) ? DROPPED[food
 /** Things standing in the world that are water (dew, a drop): a foot set on one comes away wet. */
 export const WET_SOLIDS: ReadonlySet<string> = new Set(["dew", "drop", "ice"]);
 /**
- * Where a print would not lie on what is drawn: a drink's surface, a head of
+ * Where a print would not lie on what is drawn: a drink's surface (the
+ * restaurant's wine in its glass, the espresso's dregs in its cup), a head of
  * foam, water, and things drawn rougher than the world's smooth shape of them
  * (a heap of peanuts, a crumpled wipe, a brush's bristles, a bush of basil).
  */
-export const NO_PRINTS: ReadonlySet<string> = new Set(["cocktail", "beer", "ice", "dew", "drop", "peanuts", "wipe", "bristles", "stems"]);
+export const NO_PRINTS: ReadonlySet<string> = new Set(["cocktail", "beer", "wine glass", "espresso cup", "ice", "dew", "drop", "peanuts", "wipe", "bristles", "stems"]);
 
 /** How many prints there can be at once; a new one takes the oldest's place. */
 export const PRINTS = 128;
@@ -293,7 +304,8 @@ export class Footprints {
     const feet = model.rig.gait.feet;
     const matrix = model.object.matrixWorld;
     const p = this.#foot.set(feet[leg * 3], 0, feet[leg * 3 + 2]).applyMatrix4(matrix);
-    const surface = world.surface(p.x, p.z, this.#surface);
+    // The surface under the foot, not one over it (a table top over the floor).
+    const surface = world.surface(p.x, p.z, this.#surface, p.y + TOUCHING);
     if (!surface.onTable) return;
     const solid = surface.solid >= 0 ? world.solids[surface.solid].name : "";
     const food = pantry.touching(p.x, surface.y, p.z, 0);

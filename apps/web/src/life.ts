@@ -76,7 +76,7 @@ export class Life {
   move(place: Place) {
     this.world.load(place);
     this.pantry.reset(place.patches);
-    this.body.place(place.start.x, place.start.z, place.start.yaw);
+    this.body.place(place.start.x, place.start.z, place.start.yaw, place.start.y);
     this.eating = false;
     this.#wasEating = false;
   }

@@ -14,11 +14,11 @@ import type { OpenTableSocket } from "@fly/contracts";
 import { BODY_HALF, BODY_RADIUS, segmentToSegment } from "@fly/body";
 import type { Looming } from "@fly/body";
 import {
-  AIRBORNE, AWAY, EATING, HANDS, HOLDING, LEAD, MAX_BITES, PLAYING, PROTOCOL, SEND_EVERY, TABLE_BUBBLES, TableBubbles, ballProgress, createFlyState, decodeFlies,
-  fromWire, mix, stream, tableHours, toV3,
+  AIRBORNE, AWAY, EATING, HANDS, HOLDING, LEAD, MAX_BITES, PLAYING, PROTOCOL, SEND_EVERY, TABLETOP_SCALE, TABLE_BUBBLES, TableBubbles, ballProgress, createFlyState,
+  decodeFlies, fromWire, mix, stream, tableHours, toV3, wireScale,
 } from "@fly/net";
-import type { BallWire, Bite, BubbleSnapshot, FlyState, FoodWire, HappeningWire, Refusal, ServerMessage, Spot, TableStart } from "@fly/net";
-import { BALL_RADIUS, SWOOP_SECONDS } from "@fly/world";
+import type { BallWire, Bite, BubbleSnapshot, FlyState, FoodWire, HappeningWire, Refusal, ServerMessage, Spot, TableStart, WireScale } from "@fly/net";
+import { BALL_RADIUS, SWOOP_SECONDS, WORLDS } from "@fly/world";
 import type { FoodKind, Vec3, World } from "@fly/world";
 import type { Eyes } from "../eyes/eyes.ts";
 import type { FlyView } from "../fly-view.ts";
@@ -106,9 +106,16 @@ export class Online {
   readonly #visits: HappeningWire[] = [];
   readonly #bites: Bite[] = Array.from({ length: MAX_BITES }, () => ({ food: 0, amount: 0 }));
   readonly #scratch = createFlyState();
-  /** Another fly's state, kept if it is from the place the table is in (the one it is being carried to, during a move). */
+  /** How this fly's state goes on the wire: the scale of the place it is in (`epoch`'s). */
+  #scale: WireScale = TABLETOP_SCALE;
+  /** How the others' are read: the scale of the place the table is in (the one this fly is being carried to, during a move). */
+  #heardScale: WireScale = TABLETOP_SCALE;
+  /** Another fly's state, kept if it is from the place the table is in: read at another place's scale, any other is wrong. */
   readonly #heard = (s: FlyState) => {
-    if (s.epoch === (this.#arrival?.epoch ?? this.epoch)) this.others.heard(s, this.now);
+    if (s.epoch !== (this.#arrival?.epoch ?? this.epoch)) return;
+    // Rounded on the wire, a fly on its feet could come out a hair inside what it stands on, and be drawn on the floor under it.
+    s.y += 0.5 / this.#heardScale.position;
+    this.others.heard(s, this.now);
   };
   #sentAt = -Infinity;
   #bitesAt = -Infinity;
@@ -120,7 +127,7 @@ export class Online {
   /** Welcomed at least once: a later welcome is coming back after the line dropped. */
   #welcomed = false;
   /** Carried to the table's place, and what to do on arrival: where to stand, and the food there. */
-  #arrival: { spot: Spot | null; foods: FoodWire[]; epoch: number; bubbles: BubbleSnapshot | null } | null = null;
+  #arrival: { spot: Spot | null; foods: FoodWire[]; epoch: number; scale: WireScale; bubbles: BubbleSnapshot | null } | null = null;
   #table: TableBubbles | null = null;
   /** The table's seed, for its bubbles. */
   #seed = 0;
@@ -133,20 +140,20 @@ export class Online {
     this.others = new OtherFlies(host.scene, this.#world);
     this.pantry = new TablePantry(this.#world);
     host.life.share(this.pantry);
-    this.pantry.onFound = (food) => this.line.send({ type: "found", id: food.id, name: food.name, x: food.x, z: food.z, r: food.r, sweet: food.sweet });
+    this.pantry.onFound = (food) => this.line.send({ type: "found", id: food.id, name: food.name, x: food.x, z: food.z, y: food.y, r: food.r, sweet: food.sweet });
     this.shared = { others: this.#othersAt, anchor: this.#anchor };
     let starting = start;
     this.line = new TableLine(open, url, () => {
-      const body = host.life.body;
-      // Coming back after a moment away, the fly carries on where it is; the first time, the table says where it stands.
-      const at: Spot | undefined = this.#welcomed ? [body.position.x, body.position.z, body.yaw] : undefined;
-      return { type: "hello" as const, v: PROTOCOL, table: code, key, at, ...(starting ? { start: starting } : {}) };
+      const p = host.life.body.position;
+      // Coming back after a moment away, the fly carries on where it is (in the place of the table's epoch it is in); the first time, the table says where it stands.
+      const back = this.#welcomed ? { at: [p.x, p.z, host.life.body.yaw, p.y] as Spot, epoch: this.epoch } : {};
+      return { type: "hello" as const, v: PROTOCOL, table: code, key, ...back, ...(starting ? { start: starting } : {}) };
     });
     this.line.onMessage = (m) => {
       if (m.type === "welcome") starting = null;
       this.#message(m);
     };
-    this.line.onFlies = (view) => decodeFlies(view, this.#scratch, this.#heard);
+    this.line.onFlies = (view) => decodeFlies(view, this.#heardScale, this.#scratch, this.#heard);
   }
 
   get joined() {
@@ -185,6 +192,9 @@ export class Online {
         host.fly.model.mark(m.colour);
         this.#clock = { at: m.now, wall: m.wall, offset: m.offset };
         this.now = this.#roomNow();
+        // The room's clock may be a restarted room's, behind the last sends: they are due now, not once it has caught up.
+        this.#sentAt = -Infinity;
+        this.#bitesAt = -Infinity;
         // Whoever is here now; anyone heard of before is from before the line dropped.
         this.others.forget();
         for (const o of [...this.others.list]) if (!m.players.some((p) => p.id === o.id)) this.#leave(o.id);
@@ -195,7 +205,7 @@ export class Online {
         for (const h of m.happenings) this.#visits.push(h);
         this.#takeWorld(m.world.light, m.world.weather, true);
         this.#seed = m.seed;
-        this.#arrive(m.place, m.epoch, m.foods, back && Math.hypot(m.at[0] - host.life.body.position.x, m.at[1] - host.life.body.position.z) <= PUT_BACK ? null : m.at, m.bubbles);
+        this.#arrive(m.place, m.epoch, m.foods, back && m.epoch === this.epoch && this.#standsAt(m.at) ? null : m.at, m.bubbles);
         return;
       }
       case "joined":
@@ -210,7 +220,7 @@ export class Online {
         this.#leave(m.id);
         return;
       case "drop":
-        if (m.by !== this.id && isFood(m.kind)) this.#hands.get(m.by)?.drop(m.id, m.kind, m.x, m.z, (this.now - m.at) / 1000);
+        if (m.by !== this.id && isFood(m.kind)) this.#hands.get(m.by)?.drop(m.id, m.kind, m.x, m.z, m.y, (this.now - m.at) / 1000);
         return;
       case "found":
         this.pantry.mirror.add(fromWire(this.#world, m.food));
@@ -241,11 +251,20 @@ export class Online {
     }
   }
 
+  /** Whether this fly is where the table has it already: there, on the same surface (not the floor under the table it is on). */
+  #standsAt(spot: Spot) {
+    const p = this.#host.life.body.position;
+    if (Math.hypot(spot[0] - p.x, spot[1] - p.z) > PUT_BACK) return false;
+    return spot[3] === undefined || Math.abs(this.#world.heightAt(p.x, p.z, p.y) - spot[3]) <= PUT_BACK;
+  }
+
   /** The table is in `place` (in its `epoch`'th): there already, the food and the spot are taken now; elsewhere, once carried there. */
   #arrive(place: string, epoch: number, foods: FoodWire[], spot: Spot | null, bubbles: BubbleSnapshot | null) {
     if (!isPlaceId(place)) return;
     this.place = place;
-    this.#arrival = { spot, foods, epoch, bubbles };
+    const scale = wireScale(WORLDS[place]);
+    this.#heardScale = scale;
+    this.#arrival = { spot, foods, epoch, scale, bubbles };
     if (this.#host.here() === place && !this.#host.moving()) this.arrived();
     else this.#host.moveTo(place);
   }
@@ -256,8 +275,9 @@ export class Online {
     if (!arrival) return;
     this.#arrival = null;
     this.epoch = arrival.epoch;
+    this.#scale = arrival.scale;
     this.pantry.mirror.welcome(arrival.foods);
-    if (arrival.spot) this.#host.life.body.place(arrival.spot[0], arrival.spot[1], arrival.spot[2]);
+    if (arrival.spot) this.#host.life.body.place(arrival.spot[0], arrival.spot[1], arrival.spot[2], arrival.spot[3]);
     // Only the picnic has bubbles: the table's, from its seed and the place's count.
     const bubbles = this.#host.bubbles;
     this.#table = this.place === "picnic" ? new TableBubbles(mix(this.#seed, this.epoch), this.#world, TABLE_BUBBLES) : null;
@@ -310,7 +330,7 @@ export class Online {
   }
 
   /** Before this fly lives its frame: the line, the others where they were a moment ago, and what their hands do to it. */
-  update(dt: number, camera: THREE.PerspectiveCamera, pictureHeight: number, time: number, floorAt: (x: number, z: number) => number) {
+  update(dt: number, camera: THREE.PerspectiveCamera, pictureHeight: number, time: number, floorAt: (x: number, z: number, below: number) => number) {
     this.line.update(dt);
     const roomNow = this.#roomNow();
     const prev = this.#lastRoomNow || roomNow;
@@ -415,7 +435,7 @@ export class Online {
     }
     if (ev.dropped) {
       const f = hands.falling[hands.falling.length - 1];
-      if (f) this.line.send({ type: "drop", id: this.pantry.name(f.kind), kind: f.kind, x: f.x, z: f.z, at: roomNow });
+      if (f) this.line.send({ type: "drop", id: this.pantry.name(f.kind), kind: f.kind, x: f.x, z: f.z, y: f.floor, at: roomNow });
     }
   }
 
@@ -425,7 +445,7 @@ export class Online {
     const now = this.now;
     if (now - this.#sentAt >= SEND_EVERY - 4) {
       this.#sentAt = now;
-      this.line.sendFly(this.#state(player, now));
+      this.line.sendFly(this.#scale, this.#state(player, now));
     }
     if (now - this.#bitesAt >= BITES_EVERY) {
       this.#bitesAt = now;
@@ -449,7 +469,7 @@ export class Online {
   away(player: PlayerNow) {
     if (!this.joined) return;
     player.away = true;
-    this.line.sendFly(this.#state(player, this.#roomNow()));
+    this.line.sendFly(this.#scale, this.#state(player, this.#roomNow()));
   }
 
   /** The page is back: the line comes back now if it dropped meanwhile. */

@@ -15,7 +15,7 @@ import { DROPPED, EVERY, FAINTEST, Footprints, INKS, InkedFeet, KEEP, PRINTS, Pr
 import { walker } from "./walker.ts";
 
 /** The foods that are dry, and leave nothing on a fly's feet. */
-const DRY = new Set(["sugar", "spilt sugar", "biscuit crumb"]);
+const DRY = new Set(["sugar", "spilt sugar", "biscuit crumb", "crumbs", "cake crumbs", "tart crumbs", "mints"]);
 const HONEY = PICNIC.patches.find((p) => p.name === "honey")!;
 const rgb = (tint: number) => [(tint >> 16) & 255, (tint >> 8) & 255, tint & 255];
 

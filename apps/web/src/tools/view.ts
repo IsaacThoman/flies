@@ -424,7 +424,7 @@ export class HandsView {
     this.#foods.get(kind)!.setMatrixAt(i, this.#m.compose(this.#p.set(x, y, z), this.#q, this.#s.setScalar(scale)));
   }
 
-  update(hands: Hands, pantry: Pantry, camera: THREE.Camera, time: number, dt: number, floorAt: (x: number, z: number) => number, fly: Vec3) {
+  update(hands: Hands, pantry: Pantry, camera: THREE.Camera, time: number, dt: number, floorAt: (x: number, z: number, below: number) => number, fly: Vec3) {
     const showPointer = this.opacity > 0.01;
     const p = hands.pointer;
     const ring = this.#ring;
@@ -506,7 +506,7 @@ export class HandsView {
       this.#ball.position.set(ball.position.x, ball.position.y, ball.position.z);
       this.#ball.rotation.set(ball.spin, ball.spin * 0.6, 0);
       // Cast straight down: the sun is high, and a soft blob is what a fly would notice.
-      const floor = floorAt(ball.position.x, ball.position.z);
+      const floor = floorAt(ball.position.x, ball.position.z, ball.position.y);
       const height = Math.max(0, ball.position.y - BALL_RADIUS - floor);
       const size = BALL_RADIUS * 2 * (1.1 + height / 120);
       this.#ballShadow.position.set(ball.position.x, floor + 0.05, ball.position.z);

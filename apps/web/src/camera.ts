@@ -9,7 +9,10 @@
 // over the fly to the other side unless it must, and every move eases in and
 // out (critically damped springs, so nothing overshoots or pops). It aims a
 // little ahead of where the fly is going, so it follows a walk or a jump
-// without lagging off it. It never goes inside anything on the table.
+// without lagging off it. It never goes inside anything, and nothing big
+// stands between it and the fly: a table top over the fly or a wall behind
+// it brings the camera in front of it (at once), and it eases back out once
+// clear.
 //
 // The shots are framed for the TV's 16:9. On a wider screen the camera sees
 // more to the sides; on a narrower one (a tablet, a phone held upright) it
@@ -28,7 +31,7 @@
 import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
 import type { FlyBody } from "@fly/body";
-import { topPeak } from "@fly/world";
+import { createSurface, solidBottom, topPeak } from "@fly/world";
 import type { RayHit, World } from "@fly/world";
 import type { SceneCamera } from "./places/types.ts";
 import { TV_ASPECT } from "./display.ts";
@@ -124,8 +127,13 @@ const ZOOM_SETTLE = 0.18;
 /** How far the camera can be swung up or down by hand (radians of elevation). */
 const LOOK_PITCH = [0.03, 1.45] as const;
 
-/** How far (mm) the camera keeps above whatever is under it. */
+/** How far (mm) the camera keeps above whatever is under it, and from anything in the way. */
 const CLEARANCE = 1.1;
+/** What stands in the line of sight but not in it from this much higher (of the eye's distance, up to a few body lengths) is a bump it grazes, not in the way. */
+const RAISE = 0.15;
+const RAISE_MOST = 4 * FLY_LENGTH;
+/** Something this near the fly's middle (mm) is right by it: the camera goes round it rather than in to it. */
+const BY_THE_FLY = 2 * FLY_LENGTH;
 /** The fly's middle, above its feet, mm. */
 const MIDDLE = 0.3 * FLY_LENGTH;
 /** The furthest (mm) the camera aims ahead of a moving fly. */
@@ -209,10 +217,16 @@ export class CameraDirector {
   #started = false;
   #time = 0;
   #focus = new THREE.Vector3();
+  #target = new THREE.Vector3();
+  #sight = new THREE.Vector3();
   #eye = new THREE.Vector3();
   #hit: RayHit = { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 1, z: 0 }, solid: -1, t: 0 };
   #dir = { x: 0, y: 0, z: 0 };
   #from = { x: 0, y: 0, z: 0 };
+  #under = createSurface();
+  /** How far from what it films the eye may be, for what is in the way (Infinity: nothing is), and that reach's spring speed. */
+  #arm = Infinity;
+  #armV = new Float64Array(1);
   #title: Shot = { ...TITLE };
   /** Where the player has the camera along the range (mm from the focus), and whether it looks straight down (From above) or across. */
   #reach = reachOf(SHOTS.follow);
@@ -249,6 +263,8 @@ export class CameraDirector {
     this.#farthest = reachOf(scene.whole);
     this.#reach = this.view === "table" ? this.#farthest : Math.min(this.#reach, this.#farthest);
     this.#started = false;
+    this.camera.far = scene.reach ?? 4000;
+    this.camera.updateProjectionMatrix();
   }
 
   /** Takes the camera to one of the named views, at the shots' own unhurried pace. */
@@ -388,12 +404,19 @@ export class CameraDirector {
       fovSettle = mix(0.25, fovSettle, table);
     }
     if (table < 1) this.#chooseSide(body, shot, distance, height, dt);
-    // Toward the whole table: circling its middle, from its own angle, at its own pace. What it circles moves over last, so the fly stays in the picture all the way out.
+    // Toward the whole table: circling its middle (a room's own point), from its own angle, at its own pace. What it circles moves over last, so the fly stays in the picture all the way out.
     const whole = this.#scene.whole;
+    const room = this.#scene.focus;
     const middle = table * table * table;
-    const tx = mix(focus.x, p.x * 0.35, middle);
-    const ty = mix(focus.y, 60 + p.y * 0.3, middle);
-    const tz = mix(focus.z, p.z * 0.35, middle);
+    const wx = room ? room.x + p.x * room.follow : p.x * 0.35;
+    const wy = (room ? room.y : 60) + p.y * 0.3;
+    const wz = room ? room.z + p.z * room.follow : p.z * 0.35;
+    const tx = mix(focus.x, wx, middle);
+    const ty = mix(focus.y, wy, middle);
+    const tz = mix(focus.z, wz, middle);
+    // A room's whole view turns toward the fly from the point it circles.
+    const lean = room?.aim ?? 0;
+    const target = this.#target.set(mix(focus.x, mix(wx, p.x, lean), middle), mix(focus.y, mix(wy, p.y, lean), middle), mix(focus.z, mix(wz, p.z, lean), middle));
     follow = mix(follow, whole.settle, table);
     aimSettle = mix(aimSettle, whole.settle * 0.8, table);
     const goal = this.#goal + wrap(whole.side + this.#tableDrift + this.#tableTurn - this.#goal) * table;
@@ -451,8 +474,8 @@ export class CameraDirector {
         eye.set(focus.x + dx * k, focus.y + dy * k, focus.z + dz * k);
       }
     }
-    const floor = this.#world.heightAt(eye.x, eye.z);
-    if (eye.y < floor + CLEARANCE) eye.y = floor + CLEARANCE;
+    // What it keeps in sight is what it circles: the fly, or on the way out to the whole place the point that turns into.
+    this.#keepInSight(this.#sight.set(tx, ty, tz), eye, settle, dt);
 
     // Aim so the fly sits `low` below the middle of the picture.
     const ground = Math.hypot(eye.x - c.x, eye.z - c.z);
@@ -464,9 +487,9 @@ export class CameraDirector {
     // To put the fly to one side, aim the other way along the camera's right.
     const aside = -(shot.across ?? 0) * ground * Math.tan((view * Math.PI) / 360) * this.camera.aspect;
     const a = this.#aim;
-    a.x = damp(a.x, tx + v.x * lead + Math.cos(az) * aside, s, 3, aimSettle, dt);
-    a.y = damp(a.y, ty + lift + v.y * lead, s, 4, aimSettle, dt);
-    a.z = damp(a.z, tz + v.z * lead - Math.sin(az) * aside, s, 5, aimSettle, dt);
+    a.x = damp(a.x, target.x + v.x * lead + Math.cos(az) * aside, s, 3, aimSettle, dt);
+    a.y = damp(a.y, target.y + lift + v.y * lead, s, 4, aimSettle, dt);
+    a.z = damp(a.z, target.z + v.z * lead - Math.sin(az) * aside, s, 5, aimSettle, dt);
     this.#started = true;
 
     cam.position.copy(eye);
@@ -476,6 +499,64 @@ export class CameraDirector {
       cam.updateProjectionMatrix();
     }
     cam.updateMatrixWorld();
+  }
+
+  /**
+   * Keeps the eye out of everything, with nothing between it and the focus.
+   * Inside something, it rides up over it if the fly is in sight from there
+   * (a strawberry under a wide shot), as it always has. Anything else in the
+   * way (a wall behind it, a table top over the fly) brings it in front of
+   * that, at once, and it eases back out once clear. But a bump the line of
+   * sight only grazes (one it would clear from a little higher), and
+   * something right by the fly, are left for the cameraman to go round
+   * (#chooseSide) rather than coming in to the fly's side. Last, it keeps
+   * clear of the surface under it and of anything over it.
+   */
+  #keepInSight(focus: THREE.Vector3, eye: THREE.Vector3, settle: number, dt: number) {
+    const world = this.#world;
+    const over = world.topAbove(eye.x, eye.y, eye.z) + CLEARANCE;
+    if (over > eye.y + CLEARANCE && this.#inSight(focus, eye.x, over, eye.z) === Infinity) eye.y = over;
+    const wanted = eye.distanceTo(focus);
+    if (wanted > 1e-6) {
+      const clear = this.#inSight(focus, eye.x, eye.y, eye.z);
+      if (clear < this.#arm) {
+        this.#arm = clear;
+        this.#armV[0] = 0;
+      } else if (this.#arm !== Infinity) {
+        this.#arm = damp(this.#arm, Math.min(clear, wanted + 1), this.#armV, 0, settle * 0.5, dt);
+        if (this.#arm >= Math.min(clear, wanted)) this.#arm = clear;
+      }
+      if (this.#arm < wanted) {
+        const k = this.#arm / wanted;
+        eye.set(focus.x + (eye.x - focus.x) * k, focus.y + (eye.y - focus.y) * k, focus.z + (eye.z - focus.z) * k);
+      }
+    }
+    const s = world.surface(eye.x, eye.z, this.#under, eye.y);
+    eye.y = s.underside - s.y < 2 * CLEARANCE ? (s.y + s.underside) / 2 : Math.min(s.underside - CLEARANCE, Math.max(s.y + CLEARANCE, eye.y));
+  }
+
+  /** How far toward an eye at (x, y, z) the camera can be with nothing in the way between it and the focus (see #keepInSight), or Infinity when nothing is. */
+  #inSight(focus: THREE.Vector3, x: number, y: number, z: number): number {
+    const world = this.#world;
+    const d = this.#dir;
+    const wanted = Math.hypot(x - focus.x, y - focus.y, z - focus.z);
+    if (wanted < 1e-6) return Infinity;
+    d.x = (x - focus.x) / wanted;
+    d.y = (y - focus.y) / wanted;
+    d.z = (z - focus.z) / wanted;
+    const hit = world.raycast(focus, d, this.#hit, wanted + CLEARANCE);
+    if (!hit) return Infinity;
+    // Short of it by the clearance, measured square to it (but not without end, grazing it).
+    const clear = Math.max(hit.t * 0.5, hit.t - CLEARANCE / Math.max(0.25, -(d.x * hit.normal.x + d.y * hit.normal.y + d.z * hit.normal.z)));
+    if (world.solidAt(x, y, z) >= 0) return clear;
+    if (hit.t < BY_THE_FLY) return Infinity;
+    const graze = Math.max(CLEARANCE, Math.min(RAISE_MOST, wanted * RAISE));
+    const r = this.#from;
+    const length = Math.hypot(x - focus.x, y + graze - focus.y, z - focus.z);
+    r.x = (x - focus.x) / length;
+    r.y = (y + graze - focus.y) / length;
+    r.z = (z - focus.z) / length;
+    return world.raycast(focus, r, this.#hit, length) ? clear : Infinity;
   }
 
   /** While the hand is on the camera it stays put; let go a while, the tilt and the turn of the whole table ease back. */
@@ -623,7 +704,9 @@ export class CameraDirector {
     const ex = f.x + Math.sin(angle) * distance;
     const ez = f.z + Math.cos(angle) * distance;
     const ey = f.y + height;
-    if (world.heightAt(ex, ez) + CLEARANCE > ey) return -Infinity;
+    // Clear of the surface under it and of anything over it (not inside anything).
+    const under = world.surface(ex, ez, this.#under, ey);
+    if (ey < under.y + CLEARANCE || ey > under.underside - CLEARANCE) return -Infinity;
     // Can it see the fly?
     const d = this.#dir;
     const from = this.#from;
@@ -636,7 +719,7 @@ export class CameraDirector {
     from.z = f.z + d.z * 0.5;
     if (world.raycast(from, d, this.#hit) && this.#hit.t < length - 0.5) return -Infinity;
     if (!shot.scout) return 0;
-    // What's behind the fly from there: something standing on the table, the nearer and taller the better; else the place's view.
+    // What's behind the fly from there: something standing on the table, the nearer and taller (bottom to top) the better; else the place's view.
     const gx = -d.x;
     const gz = -d.z;
     const gl = Math.hypot(gx, gz) || 1;
@@ -651,13 +734,14 @@ export class CameraDirector {
     // A wall or a window standing past the table's edge is no better a background than the view beyond it.
     if (hit && hit.solid >= 0 && hit.t < 400 && world.onTable(hit.point.x - hit.normal.x * 0.5, hit.point.z - hit.normal.z * 0.5)) {
       const solid = world.solids[hit.solid];
-      score += Math.min(1, topPeak(solid.top) / 30) * (1 - hit.t / 500) * 0.8;
+      score += Math.min(1, (topPeak(solid.top) - solidBottom(solid)) / 30) * (1 - hit.t / 500) * 0.8;
     }
     return score;
   }
 
   /** Puts the camera straight into the shot's place. */
   #jump(x: number, y: number, z: number, azimuth: number, shot: Shot, distance: number, height: number) {
+    this.#arm = Infinity;
     this.#center.set(x, y, z);
     this.#aim.set(x, y, z);
     this.#azimuth = azimuth;

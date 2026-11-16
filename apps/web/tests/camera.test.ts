@@ -3,8 +3,10 @@ import { test } from "node:test";
 import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
 import type { FlyBody } from "@fly/body";
-import { createPicnic } from "@fly/world";
+import { DINING_ROOM, RESTAURANT, TABLES, TABLE_TOPS, World, ZINC_BAR, createPicnic } from "@fly/world";
 import { picnic } from "../src/places/picnic/index.ts";
+import { SCENES } from "../src/places/index.ts";
+import type { SceneCamera } from "../src/places/types.ts";
 import { CameraDirector, HAND_HOLD, NARROW_KEEP, NEAREST, SHOTS, fieldOfView } from "../src/camera.ts";
 import type { View } from "../src/camera.ts";
 
@@ -380,4 +382,127 @@ test("swung up by hand past where it can go, it comes back down the moment it is
   director.turnBy(0, -0.3);
   settle(director, body, 0.1);
   assert.ok(director.camera.position.y < top - 0.5, `${top.toFixed(2)} → ${director.camera.position.y.toFixed(2)} mm`);
+});
+
+/** The restaurant, filmed as a room: the whole of it from about a corner. */
+const room = new World(RESTAURANT);
+const ROOM_CAMERA: SceneCamera = { whole: { around: "table", distance: 3000, height: 1300, side: 0.6, low: 0, fov: 50, settle: 1.6 }, vista: { x: 0, z: 1 } };
+/** A fly standing in the restaurant on the surface at or below `y`. */
+const roomBody = (x: number, z: number, yaw: number, y: number) => ({ position: { x, y: room.heightAt(x, z, y), z }, velocity: { x: 0, y: 0, z: 0 }, yaw, mode: "standing" }) as unknown as FlyBody & { mode: string };
+
+/** The camera is out of everything, in the room, and nothing stands between it and the fly. */
+function inRoomAndInSight(director: CameraDirector, body: FlyBody, what: string) {
+  const eye = director.camera.position;
+  assert.equal(room.solidAt(eye.x, eye.y, eye.z), -1, `${what}: inside ${room.solids[room.solidAt(eye.x, eye.y, eye.z)]?.name}`);
+  assert.ok(Math.abs(eye.x) < DINING_ROOM.hx && Math.abs(eye.z) < DINING_ROOM.hz && eye.y > 0 && eye.y < DINING_ROOM.height, `${what}: out of the room at ${eye.x.toFixed(0)}, ${eye.y.toFixed(0)}, ${eye.z.toFixed(0)}`);
+  const p = body.position;
+  const middle = { x: p.x, y: p.y + 0.75, z: p.z };
+  const length = Math.hypot(eye.x - middle.x, eye.y - middle.y, eye.z - middle.z);
+  const dir = { x: (eye.x - middle.x) / length, y: (eye.y - middle.y) / length, z: (eye.z - middle.z) / length };
+  const hit = room.raycast(middle, dir, { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 0 }, solid: -1, t: 0 }, length);
+  assert.equal(hit, null, `${what}: ${room.solids[hit?.solid ?? -1]?.name} between the camera and the fly`);
+}
+
+test("under a table, the camera stays under it, out of everything, with the fly in sight, even swung up by hand", () => {
+  const table = TABLES.find((t) => t.id === "middle-left")!;
+  for (const view of ["close", "follow", "wide"] as const) {
+    const director = new CameraDirector(room, 16 / 9, ROOM_CAMERA);
+    director.setView(view);
+    const body = roomBody(table.x, table.z, 0.4, 0);
+    settle(director, body, 6);
+    inRoomAndInSight(director, body, view);
+    director.hand.held = true;
+    director.turnBy(0.3, 1.4);
+    director.zoomBy(40);
+    settle(director, body, 3);
+    inRoomAndInSight(director, body, `${view}, swung up and out`);
+    const eye = director.camera.position;
+    assert.ok(eye.y < TABLE_TOPS.four.bottom, `${view}: up through the table top to ${eye.y.toFixed(0)}`);
+  }
+});
+
+test("zoomed out by hand by a wall, the camera stops in front of it, whichever way round the fly it is turned", () => {
+  for (let k = 0; k < 8; k++) {
+    const director = new CameraDirector(room, 16 / 9, ROOM_CAMERA);
+    const body = roomBody(-500, -2960, Math.PI, 0);
+    settle(director, body, 4);
+    director.hand.held = true;
+    director.turnBy((k * Math.PI) / 4, 0);
+    // Out past Wide, where the range is still the fly's (beyond, it turns to the whole room).
+    director.zoomBy(150 / director.reach);
+    settle(director, body, 3);
+    inRoomAndInSight(director, body, `turned ${k} eighths round`);
+  }
+});
+
+/** What the camera must never pass through between one frame and the next (it goes past a chair leg or a bottle as the cameraman would, and is never inside one). */
+const BIG = new Set(["wall", "glass", "ceiling", "table"]);
+
+test("zoomed by hand from the fly out to the whole room and back, a wheel's click at a time, the camera never goes into anything, nor through a wall or a table", () => {
+  const scene = SCENES.restaurant.camera;
+  const under = TABLES.find((t) => t.id === "middle-left")!;
+  const { zinc } = ZINC_BAR;
+  const flies: [string, number, number, number, number][] = [
+    ["on its table", RESTAURANT.start.x, RESTAURANT.start.z, RESTAURANT.start.yaw, RESTAURANT.start.y!],
+    ["under a table", under.x, under.z, 0.4, 0],
+    ["by a wall", -500, -2960, Math.PI, 0],
+    ["on the bar", zinc.x, zinc.z, 1.2, zinc.top],
+  ];
+  const last = new THREE.Vector3();
+  const way = { x: 0, y: 0, z: 0 };
+  const hit = { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 0 }, solid: -1, t: 0 };
+  for (const [what, x, z, yaw, y] of flies) {
+    const director = new CameraDirector(room, 16 / 9, scene);
+    const body = roomBody(x, z, yaw, y);
+    settle(director, body, 4);
+    last.copy(director.camera.position);
+    for (let i = 0; i < 80; i++) {
+      director.zoomBy(i < 40 ? 1.2 : 1 / 1.2);
+      for (let t = 0; t < 0.3; t += 1 / 30) {
+        director.update(body, 1 / 30);
+        const eye = director.camera.position;
+        const at = `${what}, zoomed to ${director.reach.toFixed(0)} mm, at ${eye.x.toFixed(0)}, ${eye.y.toFixed(0)}, ${eye.z.toFixed(0)}`;
+        assert.ok(Math.abs(eye.x) < DINING_ROOM.hx && Math.abs(eye.z) < DINING_ROOM.hz && eye.y < DINING_ROOM.height, `${at}: out of the room`);
+        assert.ok(room.solidAt(eye.x, eye.y, eye.z) < 0 && eye.y >= room.heightAt(eye.x, eye.z, eye.y) + 0.5, `${at}: inside ${room.solids[room.solidAt(eye.x, eye.y, eye.z)]?.name ?? "the floor"}`);
+        let moved = last.distanceTo(eye);
+        if (moved > 1e-6) {
+          way.x = (eye.x - last.x) / moved;
+          way.y = (eye.y - last.y) / moved;
+          way.z = (eye.z - last.z) / moved;
+          for (let k = 0; k < 8 && room.raycast(last, way, hit, moved); k++) {
+            const name = room.solids[hit.solid]?.name ?? "the floor";
+            assert.ok(!BIG.has(name) && hit.solid >= 0, `${at}: through ${name}`);
+            last.addScaledVector(way, hit.t + 0.01);
+            moved -= hit.t + 0.01;
+          }
+        }
+        last.copy(eye);
+      }
+      if (i === 39) assert.equal(director.view, "table", `${what}: all the way out is the whole room`);
+    }
+    inRoomAndInSight(director, body, `${what}, back in`);
+  }
+});
+
+test("in the restaurant every view and wallpaper shot keeps the camera out of everything, with the fly in the picture", () => {
+  const { x, z, yaw, y } = RESTAURANT.start;
+  const body = roomBody(x, z, yaw, y!);
+  const director = new CameraDirector(room, 16 / 9, ROOM_CAMERA);
+  const check = (what: string) => {
+    settle(director, body, 6);
+    const eye = director.camera.position;
+    assert.ok(room.solidAt(eye.x, eye.y, eye.z) < 0 && eye.y >= room.heightAt(eye.x, eye.z, eye.y) + 0.5, `${what}: inside something`);
+    const at = project(director.camera, { x, y: body.position.y + 0.75, z });
+    assert.ok(Math.abs(at.x) < 1 && Math.abs(at.y) < 1 && at.z < 1, `${what}: the fly is out of the picture`);
+  };
+  for (const view of ["close", "follow", "wide", "above", "table"] as const) {
+    director.setView(view);
+    check(view);
+  }
+  director.startWallpaper();
+  director.wallpaperStyle = "calm";
+  for (let i = 0; i < 5; i++) {
+    check(`wallpaper shot ${i}`);
+    director.startWallpaper();
+  }
 });

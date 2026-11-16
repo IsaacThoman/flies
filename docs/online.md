@@ -20,7 +20,8 @@ through a native WebSocket bridge (below).
   (about 50 bits) are the only permission there is: anyone with the link can
   sit down.
 - **Joining.** Opening the link sits this device's fly at the table, set
-  down near the others. The device remembers its table: a reload, or opening
+  down near the others, at the height of the place's start (in the
+  restaurant, on the window table, not the floor under it). The device remembers its table: a reload, or opening
   the site again, comes back to it until it leaves.
 - **Who is who.** No names and no chat. Each fly wears a dab of enamel on its
   thorax in its player's colour, as researchers mark flies. Other players'
@@ -64,6 +65,7 @@ the single-player game as it was.
 | The light, the weather, the clock | The room, chosen by the starter | `world` and the welcome's clock; "Now" follows the starter's time zone |
 | The high bubbles | The room's seed and clock | Each device works them out (`bubbles.ts`); a device whose fly bursts one says so |
 | Visitors (gust, gull, leaf, butterfly, ladybird, juice, boat) | The room says when, with a seed (the picnic's pace, `@fly/world`) | Each device starts the visit from that seed (`SceneSet.happen`); visitors keep clear of whichever fly is nearest |
+| The restaurant's ventilation | The room says when it comes on, by the same clock as alone (`VentilationClock`, `@fly/world`), with a seed | Each device draws how long it runs from the seed (`SceneSet.happen`), so every fly feels the same draught at the same time |
 
 The four low bubbles that bob past each fly stay each device's own, so
 nobody else sees yours.
@@ -71,8 +73,9 @@ nobody else sees yours.
 ## The wire
 
 One WebSocket per device, at `wss://<site>/rooms`. The first message is the
-device's `hello`, carrying the protocol version (now 1); the room refuses any
-other. The fast traffic is binary and little-endian, with a type byte
+device's `hello`, carrying the protocol version (now 2); the room refuses any
+other, and a page it refuses for its version reloads itself once, into the
+site's current game. The fast traffic is binary and little-endian, with a type byte
 first; everything rare is JSON (`packages/net/src/protocol.ts`,
 `ClientMessage` and `ServerMessage`).
 
@@ -82,7 +85,30 @@ first; everything rare is JSON (`packages/net/src/protocol.ts`,
 | 2 `FLIES` | room to device, every 50 ms when anything is new | type, count, then each fly's player id and state | 2 + 33 or 47 a fly |
 | 3 `BITES` | device to room, at most every 100 ms | type, sequence (u16), count, then each food's id (u32) and amount (f32) | 4 + 8 a bite |
 
-A fly's state (32 bytes, 46 with the hand):
+A fly's state (32 bytes, 46 with the hand). Its lengths are at its place's
+scale (`wireScale`), the finest that holds the place's floor and ceiling
+with room for a fly in the air past the edge:
+
+| Scale | Places | Position | Pointer | Camera |
+| --- | --- | --- | --- | --- |
+| A tabletop's | picnic, windowsill, lab, bar (floors within 500 mm of their middle) | 1/50 mm (±655 mm) | 1/20 mm (±1.6 m) | 1/10 mm (±3.3 m) |
+| A room's | restaurant (within 5 m: its floor is 4.2 by 3 m from its middle) | 1/5 mm (±6.5 m) | 1/4 mm (±8.2 m) | 1/2 mm (±16 m) |
+
+A length out of its scale's range is held at its end, never wrapped. Both
+ends always know which place a state is from: the table's place, in the
+epoch the state carries. The room reads every state at its place's scale
+and drops one from another epoch before using it; a device reads the
+others' at the scale of the place the table is in (the one it is being
+carried to, during a move), and drops theirs from any other epoch. Another
+fly is drawn half a step up from where the wire puts it, so rounding never
+sinks one on its feet into what it stands on.
+
+Protocol 2 is protocol 1 with each place's own scale. A tabletop's states
+are the same bytes as before, but the room is a place protocol 1 can't
+read: a device that doesn't know the restaurant would read its states at a
+tabletop's scale, clamped and wrong, and can't be carried there. So the
+version changed, and a device speaking 1 is turned away (and reloads into 2)
+rather than sitting at a table that may move to the restaurant.
 
 | Field | Encoding |
 | --- | --- |
@@ -90,24 +116,24 @@ A fly's state (32 bytes, 46 with the hand):
 | epoch | u8, the room's count of moves to another place: a state from before a move is dropped |
 | sequence | u16, wrapping |
 | time | u32, room ms when the fly was there |
-| position | 3 × i16, 1/50 mm (±655 mm) |
+| position | 3 × i16, at the place's scale |
 | heading | u16, a turn in 65,536 |
 | the ground's normal | 2 × i8, x and z (y follows) |
 | velocity | 3 × i16, mm/s |
 | pose | i8 speed (¼ body length/s), i8 turn (1/16 rad/s), u8 wings, groom, feed, crouch (1/255), i8 pitch (1/150 rad), i8 roll (1/200 rad) |
-| the hand, if out | 3 × i16 pointer (1/20 mm), 3 × i16 camera (1/10 mm, for the way a puff blows), u8 tool, u8 kind |
+| the hand, if out | 3 × i16 pointer, 3 × i16 camera (for the way a puff blows), each at the place's scale, u8 tool, u8 kind |
 
 JSON, from the device:
 
 | Message | |
 | --- | --- |
-| `hello {v, table, key, start?, at?}` | the table's code; this device's key; `start` (place, light, weather, time zone and offset) to start the table if it doesn't exist; `at`, where its fly is, coming back after a moment away |
+| `hello {v, table, key, start?, at?, epoch?}` | the table's code; this device's key; `start` (place, light, weather, time zone and offset) to start the table if it doesn't exist; `at`, where its fly is, coming back after a moment away, and the `epoch` of the place it is in |
 | `ping {t}` | answered `pong {t, now}` with the room's time |
-| `drop {id, kind, x, z, at}` | food dropped, named by the device (player id × 1,000,000 + its count) so its fly can eat it before the room has heard |
+| `drop {id, kind, x, z, y, at}` | food dropped onto the surface at or below `y` (the floor under a table, or the table), named by the device (player id × 1,000,000 + its count) so its fly can eat it before the room has heard |
 | `ball {at, from, via, to}` | a throw, starting at room time `at` |
 | `world {light, weather}`, `place {place}`, `remove {id}` | the starter's choices |
 | `pop {slot, cycle, at}` | its fly burst a bubble |
-| `found {id, name, x, z, r, sweet}` | the place put food out on this device, named from where it lies |
+| `found {id, name, x, z, y, r, sweet}` | the place put food out on this device, named from where it lies |
 | `bye` | leaving for good |
 
 From the room:
@@ -117,8 +143,12 @@ From the room:
 | `welcome {v, id, colour, starter, seed, now, wall, offset, place, epoch, world, players, foods, balls, happenings, bubbles, at}` | the table as it is, and where this fly stands; then a `FLIES` batch of every other fly where it is now |
 | `refused {reason}` | then the connection closes with the matching code: version 4001, full 4002, removed 4003, unknown table 4004, busy 4005, malformed 4006, the same key sat down elsewhere 4007; 4010 after `bye` |
 | `joined {id, colour, away}`, `away {id, away}`, `left {id}` | who is at the table, and whose device has stopped |
-| `drop`, `ball`, `found`, `pop` | as above, to everyone else (`by` the player) |
+| `drop`, `ball`, `found`, `pop` | as above, to everyone else (`by` the player); a drop's `y` is the surface it lands on |
 | `world {light, weather, offset}`, `place {place, epoch, foods, spots}` | the starter's choices, to everyone; `spots` is where each fly is set down |
+
+A spot (`at`, `spots`) is x, z, yaw and the height of the surface the fly
+stands on, and each of `foods` carries the height it lies at: in the
+restaurant one point can be the floor, a chair seat or the table over them.
 | `happening {kind, seed, at}` | a visitor comes |
 | `food {ack, amounts, gone, eaten}` | at most ten times a second while food changes: what is left, what is gone, this player's total by the room's account, and the last of its bites counted |
 
@@ -128,8 +158,9 @@ A dropped line is opened again after 0.5, 1, 2, 4, 8, then 15 s, and at once
 when the page is shown again. A deploy closes every connection with 1012;
 devices come back within 0.3 to 1.5 s, spread out. The hello names the
 device's key, and the room gives it back its seat: the same id and colour.
-Its fly carries on where it is if that is within a walk of where the room
-last had it (20 mm/s for up to 10 s); otherwise it is put back where the
+Its fly carries on where it is if that is in the place the table is in (the
+hello's epoch) and within a walk of where the room last had it (20 mm/s for
+up to 10 s, on the same table or floor); otherwise it is put back where the
 room had it. The room keeps every table in a file (`DATA_DIR/tables.json`)
 every 30 s and as it stops, and reads it back as it starts. Room time is
 each server process's own, so a device takes up the restarted room's clock
@@ -148,11 +179,14 @@ can't spoil the others' screens or their food (`packages/net/src/limits.ts`):
   others see the fly come only as far as it could have, and never jump. (The
   spike took a fly where it said after ten refusals in a row, which let a
   stalled or lying device's fly leap across everyone's screen; that is gone.)
-  A state from somewhere a fly can't be (inside what stands on the table,
-  under it, standing on nothing) leaves the fly where it was. A state from
+  A state from somewhere a fly can't be (inside anything, under the floor,
+  standing on nothing) leaves the fly where it was. Over each point it
+  stands on whatever is under it there, the floor beneath a table or the
+  table. A state from
   the future or older than the last is dropped.
 - **Food.** Only under your own name, only on the table. A bite counts only
-  within 4 mm of the food's edge of where the room has the fly, and no faster
+  within 4 mm of the food's edge of where the room has the fly, at the
+  food's height (not from the floor under its table), and no faster
   than a fly eats (with a second's appetite saved up). Two flies at one sugar
   never eat more than there was.
 - **Hands.** One ball in the air at a time per player (a new one replaces

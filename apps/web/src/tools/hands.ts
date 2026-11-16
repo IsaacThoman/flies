@@ -5,8 +5,8 @@
 // coming, a feather it can feel, air it can feel moving.
 
 import type { Looming } from "@fly/body";
-import { FLY_LENGTH, MOUTH_AHEAD } from "@fly/body";
-import { BALL_RADIUS, SWOOP_SECONDS, swoopAt } from "@fly/world";
+import { FLY_LENGTH, MOUTH_AHEAD, STEP_UP } from "@fly/body";
+import { BALL_RADIUS, SWOOP_SECONDS, createSurface, swoopAt } from "@fly/world";
 import type { FoodKind, Pantry, Vec3, World } from "@fly/world";
 import type { View } from "../camera.ts";
 import { PLACES } from "../places/catalog.ts";
@@ -247,14 +247,14 @@ export class Hands {
     this.#idle += dt;
     if (!this.following && this.#idle > POINTER_RETURN) this.following = true;
     if (this.following) {
-      // Just in front of its mouth, on whatever is there.
+      // Just in front of its mouth, on whatever is there at its feet (within a step) or below them.
       const reach = (MOUTH_AHEAD + 0.55) * FLY_LENGTH;
       const x = fly.position.x + Math.sin(fly.yaw) * reach;
       const z = fly.position.z + Math.cos(fly.yaw) * reach;
       const k = Math.min(1, dt * 4);
       this.pointer.x += (x - this.pointer.x) * k;
       this.pointer.z += (z - this.pointer.z) * k;
-      const s = world.surface(this.pointer.x, this.pointer.z, surface);
+      const s = world.surface(this.pointer.x, this.pointer.z, surface, fly.position.y + STEP_UP);
       this.pointer.y = s.y;
       copy(this.normal, s.normal);
     }
@@ -272,9 +272,9 @@ export class Hands {
       f.y += f.vy * dt;
       if (f.y <= f.floor) {
         this.falling.splice(i, 1);
-        pantry.drop(f.kind, f.x, f.z);
+        pantry.drop(f.kind, f.x, f.z, f.floor);
         ev.landed = f.kind;
-        const s = world.surface(f.x, f.z, surface);
+        const s = world.surface(f.x, f.z, surface, f.floor);
         this.landedAt.x = f.x;
         this.landedAt.y = s.y;
         this.landedAt.z = f.z;
@@ -336,8 +336,10 @@ export class Hands {
   }
 
   #drop(kind: FoodKind) {
-    const floor = this.#world.heightAt(this.pointer.x, this.pointer.z);
-    this.falling.push({ kind, x: this.pointer.x, z: this.pointer.z, y: floor + DROP_HEIGHT, floor, vy: 0 });
+    // Onto the surface the pointer is on (under a table, the floor there, not the table top), from under whatever is over it.
+    const s = this.#world.surface(this.pointer.x, this.pointer.z, surface, this.pointer.y);
+    const floor = s.y;
+    this.falling.push({ kind, x: this.pointer.x, z: this.pointer.z, y: Math.max(floor, Math.min(floor + DROP_HEIGHT, s.underside - 1)), floor, vy: 0 });
     this.events.dropped = kind;
   }
 
@@ -418,7 +420,7 @@ export class Hands {
     return !this.#through(far, partway);
   }
 
-  /** Whether the ball, going straight from `a` to `b`, would pass through anything standing on the table that is taller than its middle. */
+  /** Whether the ball, going straight from `a` to `b`, would pass through anything at the height of its middle, there or most of its radius round it. */
   #through(a: Vec3, b: Vec3) {
     const steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / 8);
     const r = BALL_RADIUS * 0.8;
@@ -427,13 +429,13 @@ export class Hands {
       const x = a.x + (b.x - a.x) * k;
       const y = a.y + (b.y - a.y) * k;
       const z = a.z + (b.z - a.z) * k;
-      for (let j = 0; j < RING.length; j += 2) if (this.#world.heightAt(x + RING[j] * r, z + RING[j + 1] * r) > y) return true;
+      for (let j = 0; j < RING.length; j += 2) if (this.#world.solidAt(x + RING[j] * r, y, z + RING[j + 1] * r) >= 0) return true;
     }
     return false;
   }
 }
 
-const surface = { y: 0, normal: { x: 0, y: 1, z: 0 }, solid: -1, onTable: true };
+const surface = createSurface();
 const partway = v3();
 /** The ball's middle and eight points round it, as x, z pairs of unit length or less. */
 const RING = [0, 0, ...Array.from({ length: 8 }, (_, i) => [Math.cos((i * Math.PI) / 4), Math.sin((i * Math.PI) / 4)]).flat()];

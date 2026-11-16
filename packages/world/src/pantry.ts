@@ -10,6 +10,8 @@ export type FoodPatch = {
   name: string;
   x: number;
   z: number;
+  /** The height it lies at, where there is more than one surface over (x, z) (a table, the floor under it): the surface there at or below this. Left out, the highest. */
+  y?: number;
   /** How far from (x, z) it tastes, mm. */
   r: number;
   /** 0 to 1. */
@@ -71,23 +73,23 @@ export class Pantry {
   reset(patches: readonly FoodPatch[]) {
     this.foods.length = 0;
     for (const p of patches) {
-      this.foods.push({ id: this.#next++, kind: "patch", name: p.name, x: p.x, y: this.#world.heightAt(p.x, p.z), z: p.z, r: p.r, sweet: p.sweet, amount: 1, pool: p.pool ?? false });
+      this.foods.push({ id: this.#next++, kind: "patch", name: p.name, x: p.x, y: this.#world.heightAt(p.x, p.z, p.y), z: p.z, r: p.r, sweet: p.sweet, amount: 1, pool: p.pool ?? false });
     }
   }
 
-  /** Drops food at a point on the world's surface. Returns it. */
-  drop(kind: FoodKind, x: number, z: number): Food {
+  /** Drops food at a point on the world's surface: the one at or below `y` (the highest, if left out). Returns it. */
+  drop(kind: FoodKind, x: number, z: number, y?: number): Food {
     const dropped = this.foods.filter(isDropped);
     if (dropped.length >= MAX_DROPPED) this.remove(dropped[0]);
     const spec = FOODS[kind];
-    const food: Food = { id: this.#next++, kind, name: spec.name, x, y: this.#world.heightAt(x, z), z, r: spec.r, sweet: spec.sweet, amount: 1, pool: false };
+    const food: Food = { id: this.#next++, kind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, amount: 1, pool: false };
     this.foods.push(food);
     return food;
   }
 
-  /** Puts out something new to be found at a point on the world's surface (it is the place's, not the player's). Returns it. */
-  add(name: string, x: number, z: number, r: number, sweet: number): Food {
-    const food: Food = { id: this.#next++, kind: "found", name, x, y: this.#world.heightAt(x, z), z, r, sweet, amount: 1, pool: false };
+  /** Puts out something new to be found at a point on the world's surface, the one at or below `y` (it is the place's, not the player's). Returns it. */
+  add(name: string, x: number, z: number, r: number, sweet: number, y?: number): Food {
+    const food: Food = { id: this.#next++, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, amount: 1, pool: false };
     this.foods.push(food);
     return food;
   }

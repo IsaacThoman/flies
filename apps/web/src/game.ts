@@ -15,7 +15,7 @@ import type { BrainDriver, RemoteButton, WeatherAttribution } from "@fly/contrac
 import { AT_ROOT_PROPERTY } from "@fly/contracts";
 import { Navigator } from "@fly/ui";
 import type { GlyphSet, Hit } from "@fly/ui";
-import { BALL_RADIUS, Pantry, World, forecastHours, hourOfDay, isDropped } from "@fly/world";
+import { BALL_RADIUS, Pantry, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
 import type { RayHit } from "@fly/world";
 import { Audio } from "./audio/sounds.ts";
 import { Haptics } from "./haptics.ts";
@@ -206,7 +206,7 @@ export class Game implements Shell {
   #around: { -readonly [K in keyof Around]: Around[K] };
   #puff = { x: 0, y: 0, z: 0 };
   #middle = new THREE.Vector3();
-  #floorAt = (x: number, z: number) => this.life.world.heightAt(x, z);
+  #floorAt = (x: number, z: number, below: number) => this.life.world.heightAt(x, z, below);
   #ndc = new THREE.Vector3();
   #ndc2 = new THREE.Vector2();
   #ray = new THREE.Raycaster();
@@ -662,6 +662,11 @@ export class Game implements Shell {
       this.stage.veil = 1;
       this.#arrive(moving.to);
       moving.arrived = true;
+      moving.t = VEIL_OUT;
+      return;
+    }
+    // A place built in steps is finished a step a frame before the veil lifts.
+    if (moving.arrived && this.stage.buildMore()) {
       moving.t = VEIL_OUT;
       return;
     }
@@ -1190,7 +1195,8 @@ export class Game implements Shell {
   #goToPlace(): boolean {
     const hands = this.hands;
     const online = this.online;
-    if (hands.place === this.#here || (online && !online.starting)) {
+    // At a table only its starter carries it, and only to a place a table can be in.
+    if (hands.place === this.#here || (online && (!online.starting || !Object.hasOwn(WORLDS, hands.place)))) {
       this.#refuse();
       return false;
     }
@@ -1640,6 +1646,7 @@ export class Game implements Shell {
     d.view = this.hands.view;
     d.place = this.#here;
     d.placeMs = this.stage.buildMs.toFixed(0);
+    d.placeStepMs = this.stage.buildStepMs.toFixed(0);
     d.moving = this.#moving ? this.#moving.to : "";
     d.table = this.online ? "yes" : "";
     this.online?.publish(d);

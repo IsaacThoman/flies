@@ -51,7 +51,7 @@ try {
           for (let i = 0; i < bodies.length; i++) {
             const body = bodies[i];
             const start = starts[i];
-            body.place(start.x, start.z, start.yaw);
+            body.place(start.x, start.z, start.yaw, start.y);
             body.blocked = false;
             if (mode === "flying") {
               body.position.y += start.lift;

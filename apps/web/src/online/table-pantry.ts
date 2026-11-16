@@ -37,25 +37,25 @@ export class TablePantry extends Pantry {
     return this.player * DROP_ID + (++this.#dropped % DROP_ID);
   }
 
-  /** It landed. */
-  drop(kind: FoodKind, x: number, z: number): Food {
+  /** It landed, on the surface at or below `y` (the highest, if left out). */
+  drop(kind: FoodKind, x: number, z: number, y?: number): Food {
     const i = this.#named.findIndex((n) => n.kind === kind);
     const id = i >= 0 ? this.#named.splice(i, 1)[0].id : this.#next();
-    this.landed(id, kind, x, z);
+    this.landed(id, kind, x, z, y);
     return this.foods.find((f) => f.id === id) ?? this.foods[this.foods.length - 1];
   }
 
-  /** Food landed: this player's, or another's under the name they gave it. */
-  landed(id: number, kind: FoodKind, x: number, z: number) {
+  /** Food landed, on the surface at or below `y`: this player's, or another's under the name they gave it. */
+  landed(id: number, kind: FoodKind, x: number, z: number, y?: number) {
     const spec = FOODS[kind];
-    this.mirror.add({ id, kind, name: spec.name, x, y: this.#world.heightAt(x, z), z, r: spec.r, sweet: spec.sweet, amount: 1, pool: false });
+    this.mirror.add({ id, kind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, amount: 1, pool: false });
   }
 
-  add(name: string, x: number, z: number, r: number, sweet: number): Food {
+  add(name: string, x: number, z: number, r: number, sweet: number, y?: number): Food {
     const id = foundId(name, x, z);
     const known = this.foods.find((f) => f.id === id);
     if (known) return known;
-    const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z), z, r, sweet, amount: 1, pool: false };
+    const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, amount: 1, pool: false };
     this.foods.push(food);
     this.onFound(food);
     return food;

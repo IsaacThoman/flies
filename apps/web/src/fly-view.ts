@@ -10,6 +10,7 @@ import type { FlyPose } from "@fly/contracts";
 import { RESTING_POSE } from "@fly/contracts";
 import { FLY_LENGTH } from "@fly/body";
 import type { FlyBody, Intent } from "@fly/body";
+import { createSurface } from "@fly/world";
 import type { Vec3, World } from "@fly/world";
 import { canvas2d, canvasTexture } from "./scene/build.ts";
 import { shaded } from "./scene/shade.ts";
@@ -103,12 +104,13 @@ export function flyShadowMaterial() {
 let shadowMap: THREE.Texture | null = null;
 
 /**
- * Sets an object to be a fly's shadow on whatever is under it, softer and
- * wider the higher it is, turned with its heading (`yaw`). Returns how strong
- * it is (0 to 1; 0 where there is nothing under it).
+ * Sets an object to be a fly's shadow on whatever is under it (not on what
+ * is over it), softer and wider the higher it is, turned with its heading
+ * (`yaw`). Returns how strong it is (0 to 1; 0 where there is nothing under
+ * it).
  */
 export function flyShadow(world: World, p: Vec3, yaw: THREE.Quaternion, shadow: THREE.Object3D): number {
-  const surface = world.surface(p.x, p.z, scratchSurface);
+  const surface = world.surface(p.x, p.z, scratchSurface, p.y);
   const height = Math.max(0, p.y - surface.y);
   const size = FLY_LENGTH * (1.1 + height * 0.02);
   shadow.position.set(p.x, surface.y + 0.02, p.z);
@@ -119,5 +121,5 @@ export function flyShadow(world: World, p: Vec3, yaw: THREE.Quaternion, shadow: 
 }
 
 const AXIS_Y = new THREE.Vector3(0, 1, 0);
-const scratchSurface = { y: 0, normal: { x: 0, y: 1, z: 0 }, solid: -1, onTable: true };
+const scratchSurface = createSurface();
 const scratchNormal = new THREE.Vector3();

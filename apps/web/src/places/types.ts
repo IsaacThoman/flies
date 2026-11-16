@@ -20,8 +20,16 @@ export type SceneSet = {
   materials: THREE.MeshStandardMaterial[];
   /** What the fly's eyes see of it: the big shapes, without the small details. */
   seen: THREE.Object3D[];
-  /** Moves it on. The weather is for a place that shows it (rain on a pane, wet things); one that doesn't can leave it. */
-  update(time: number, light: Daylight, weather: Weather): void;
+  /** Moves it on. The weather is for a place that shows it (rain on a pane, wet things), the camera for one that draws what is near it in more detail; one that doesn't can leave them. */
+  update(time: number, light: Daylight, weather: Weather, camera: THREE.Camera): void;
+  /**
+   * Builds the next part of a place too big to build in one frame: true
+   * while there is more. The game calls it once a frame behind the veil and
+   * lifts the veil once it is done, so no one frame is long (stage.ts builds
+   * all of it at once when there is no veil, at start). Optional: a place
+   * left without it is built whole by `buildSet`.
+   */
+  more?(): boolean;
   /** Sets a ring spreading on a pool (a FoodPatch with `pool`), from a point on it, 0 to 1 strong. */
   ripple(x: number, z: number, strength: number): void;
   /**
@@ -83,6 +91,17 @@ export type SceneBackdrop = {
 /** The camera's view of the whole place (View → Whole table); the shots round the fly are every place's. */
 export type SceneCamera = {
   whole: Shot;
+  /**
+   * The point the whole-place view circles, how much of the way it follows
+   * the fly from there (and a third of the fly's height), and how much of
+   * the way from it toward the fly the camera aims (0 if left out); left
+   * out, a point a third of the way from the table's middle to the fly. A
+   * room gives its own, so that the view stays inside it wherever the fly
+   * goes, and turns to keep the fly in the picture.
+   */
+  focus?: { x: number; y: number; z: number; follow: number; aim?: number };
+  /** How far the camera sees, mm (4,000 if not said): the near pass's reach and the fly's eyes'. A room bigger than that says so. */
+  reach?: number;
   /** Which way the best of the view lies, on the ground (a unit vector): with nothing standing behind the fly, the camera likes to have it there. */
   vista: { x: number; z: number };
 };

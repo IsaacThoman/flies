@@ -15,6 +15,9 @@ import { DROP_HEIGHT, FALL, Hands, TOOLS, WORLD_TOOLS } from "../tools/hands.ts"
 import { HandsView } from "../tools/view.ts";
 import type { TablePantry } from "./table-pantry.ts";
 
+/** How far below what it is on a pointer may come out, rounded on the wire, mm: more than any place's rounding. */
+const POINTER_ROUNDING = 1;
+
 export class OtherHand {
   readonly player: number;
   readonly hands: Hands;
@@ -49,9 +52,9 @@ export class OtherHand {
     this.#nothing = new Pantry(world);
     const falling = this.#falling;
     this.#landing = new (class extends Pantry {
-      drop(kind: FoodKind, x: number, z: number) {
+      drop(kind: FoodKind, x: number, z: number, y?: number) {
         const i = falling.findIndex((f) => f.kind === kind);
-        if (i >= 0) table.landed(falling.splice(i, 1)[0].id, kind, x, z);
+        if (i >= 0) table.landed(falling.splice(i, 1)[0].id, kind, x, z, y);
         return table.foods[table.foods.length - 1];
       }
     })(world);
@@ -77,7 +80,8 @@ export class OtherHand {
     this.#eye.x = h.eyeX;
     this.#eye.y = h.eyeY;
     this.#eye.z = h.eyeZ;
-    this.#world.surface(h.x, h.z, this.#surface);
+    // What it is on, not what is over it (the floor under a table): rounded on the wire, it may come out a hair below.
+    this.#world.surface(h.x, h.z, this.#surface, h.y + POINTER_ROUNDING);
     this.#normal.x = this.#surface.normal.x;
     this.#normal.y = this.#surface.normal.y;
     this.#normal.z = this.#surface.normal.z;
@@ -94,9 +98,9 @@ export class OtherHand {
     b.active = true;
   }
 
-  /** They dropped food: it falls from where it was dropped, as long ago as it was (s). */
-  drop(id: number, kind: FoodKind, x: number, z: number, age: number) {
-    const floor = this.#world.heightAt(x, z);
+  /** They dropped food: it falls from where it was dropped, as long ago as it was (s), to the surface at or below `y`. */
+  drop(id: number, kind: FoodKind, x: number, z: number, y: number, age: number) {
+    const floor = this.#world.heightAt(x, z, y);
     const t = Math.max(0, age);
     this.#falling.push({ id, kind });
     this.hands.falling.push({ kind, x, z, y: Math.max(floor, floor + DROP_HEIGHT - 0.5 * FALL * t * t), floor, vy: -FALL * t });
@@ -113,7 +117,7 @@ export class OtherHand {
    * Moves it on to room time `now` (ms). `fly` is this player's fly, which
    * their feather and their puffs reach as this player's own would.
    */
-  update(dt: number, now: number, fly: { position: Vec3; yaw: number; onFeet: boolean }, camera: THREE.Camera, time: number, floorAt: (x: number, z: number) => number) {
+  update(dt: number, now: number, fly: { position: Vec3; yaw: number; onFeet: boolean }, camera: THREE.Camera, time: number, floorAt: (x: number, z: number, below: number) => number) {
     const ball = this.hands.ball;
     // The ball where the room's clock has it, the same on every device.
     if (this.#ball) {

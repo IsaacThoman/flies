@@ -6,7 +6,7 @@ import { performance } from "node:perf_hooks";
 import { after, test } from "node:test";
 import { WebSocket } from "ws";
 import { createPicnic } from "@fly/world";
-import { CLOSE, COLOURS, FLY_MAX, PROTOCOL, ROOMS_PATH, createFlyState, decodeFlies, encodeFly, tableCode } from "@fly/net";
+import { CLOSE, COLOURS, FLY_MAX, PROTOCOL, ROOMS_PATH, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, tableCode } from "@fly/net";
 import type { ClientMessage, FlyState, ServerMessage, TableStart } from "@fly/net";
 import { startServer } from "../src/server.ts";
 import type { RoomServer } from "../src/server.ts";
@@ -47,7 +47,7 @@ async function device(port: number) {
     if (binary) {
       const flies: FlyState[] = [];
       const scratch = createFlyState();
-      decodeFlies(new DataView(data.buffer, data.byteOffset, data.byteLength), scratch, (s) => flies.push({ ...s, pose: { ...s.pose }, hand: { ...s.hand } }));
+      decodeFlies(new DataView(data.buffer, data.byteOffset, data.byteLength), TABLETOP_SCALE, scratch, (s) => flies.push({ ...s, pose: { ...s.pose }, hand: { ...s.hand } }));
       heard.push({ flies });
     } else heard.push({ json: JSON.parse(data.toString("utf8")) as ServerMessage });
     for (const w of waiting) w();
@@ -111,7 +111,7 @@ async function device(port: number) {
       s.y = picnic.heightAt(x, z);
       s.z = z;
       const view = new DataView(new ArrayBuffer(FLY_MAX));
-      ws.send(new Uint8Array(view.buffer, 0, encodeFly(view, s)));
+      ws.send(new Uint8Array(view.buffer, 0, encodeFly(view, TABLETOP_SCALE, s)));
     },
   };
 }

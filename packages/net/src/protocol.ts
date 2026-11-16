@@ -11,10 +11,15 @@
 // The first message on a connection is the client's `hello` with PROTOCOL;
 // the room refuses a version it doesn't speak.
 
+import type { Place } from "@fly/world";
 import type { BubbleSnapshot } from "./bubbles.ts";
 
-/** Bumped whenever a layout or a message changes meaning. */
-export const PROTOCOL = 1;
+/**
+ * Bumped whenever a layout or a message changes meaning. 2: a fly's state
+ * is read at its place's scale (`wireScale`), which a device that doesn't
+ * know the restaurant would read at a tabletop's.
+ */
+export const PROTOCOL = 2;
 
 /** Where the room server answers WebSockets, on the site's own host. */
 export const ROOMS_PATH = "/rooms";
@@ -42,10 +47,40 @@ export const HOLDING = 16;
 /** Someone is at the remote (not the wallpaper, a press within the last minute): the room's visitors wait. */
 export const PLAYING = 32;
 
-/** Position in 1/50 mm (±655 mm), the hand's pointer in 1/20 mm (±1.6 m), the camera in 1/10 mm (±3.3 m). */
-const POS = 50;
-const POINTER = 20;
-const EYE = 10;
+/**
+ * How finely lengths go in a fly's state, in steps a millimetre (each an
+ * i16): where the fly is, its player's pointer, and their camera. Each place
+ * has its own (`wireScale`), and both ends always know which place a state is
+ * from: the table's, in the epoch it carries (a state from another is dropped).
+ */
+export type WireScale = { readonly position: number; readonly pointer: number; readonly eye: number };
+
+/** A tabletop's: the fly to 1/50 mm (±655 mm), the pointer to 1/20 mm (±1.6 m), the camera to 1/10 mm (±3.3 m). */
+export const TABLETOP_SCALE: WireScale = { position: 50, pointer: 20, eye: 10 };
+
+/**
+ * A room's, for a floor up to 5 m from its middle: the fly to 1/5 mm
+ * (±6.5 m: the restaurant's 4.2 m, and the air past its edge), the pointer
+ * to 1/4 mm (±8.2 m: wherever it lands, the kitchen beyond the back wall
+ * included), the camera to 1/2 mm (±16 m). A fly is 2.5 mm long and seen
+ * from across the room, and a puff only needs the camera's direction.
+ */
+export const ROOM_SCALE: WireScale = { position: 5, pointer: 4, eye: 2 };
+
+/** The scales, finest first, each with how far from the middle a place's floor and ceiling may reach in it, mm: the rest of its range is for a fly in the air past the floor's edge. */
+const SCALES: readonly (readonly [WireScale, number])[] = [
+  [TABLETOP_SCALE, 500],
+  [ROOM_SCALE, 5000],
+];
+
+/** The finest scale that holds a place: its floor's size, and its ceiling. */
+export function wireScale(place: Place): WireScale {
+  const f = place.floor;
+  const reach = Math.max(f.kind === "circle" ? f.r : Math.max(f.hx, f.hz), place.ceiling);
+  for (const [scale, holds] of SCALES) if (reach <= holds) return scale;
+  return SCALES[SCALES.length - 1][0];
+}
+
 const YAW = 65536 / (Math.PI * 2);
 
 /** Bytes of a fly's state after the type (or, in a batch, the id) byte, without and with the hand. */
@@ -158,15 +193,16 @@ const u8 = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
 /** Bytes a fly's state takes after the type (and, in a batch, the id) byte. */
 export const stateLength = (flags: number) => STATE_BYTES + (flags & HANDS ? HANDS_BYTES : 0);
 
-/** Writes a fly's state at `at` (after its type or id byte). Returns where it ends. */
-export function writeState(view: DataView, at: number, s: FlyState): number {
+/** Writes a fly's state at `at` (after its type or id byte), at its place's scale; a length out of range is clamped. Returns where it ends. */
+export function writeState(view: DataView, at: number, scale: WireScale, s: FlyState): number {
+  const pos = scale.position;
   view.setUint8(at, s.flags & 0xff);
   view.setUint8(at + 1, s.epoch & 0xff);
   view.setUint16(at + 2, s.seq & 0xffff, true);
   view.setUint32(at + 4, Math.max(0, Math.round(s.t)) >>> 0, true);
-  view.setInt16(at + 8, i16(s.x * POS), true);
-  view.setInt16(at + 10, i16(s.y * POS), true);
-  view.setInt16(at + 12, i16(s.z * POS), true);
+  view.setInt16(at + 8, i16(s.x * pos), true);
+  view.setInt16(at + 10, i16(s.y * pos), true);
+  view.setInt16(at + 12, i16(s.z * pos), true);
   const yaw = ((s.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
   view.setUint16(at + 14, Math.round(yaw * YAW) & 0xffff, true);
   view.setInt8(at + 16, i8(s.upX * 127));
@@ -186,12 +222,14 @@ export function writeState(view: DataView, at: number, s: FlyState): number {
   let end = at + STATE_BYTES;
   if (s.flags & HANDS) {
     const h = s.hand;
-    view.setInt16(end, i16(h.x * POINTER), true);
-    view.setInt16(end + 2, i16(h.y * POINTER), true);
-    view.setInt16(end + 4, i16(h.z * POINTER), true);
-    view.setInt16(end + 6, i16(h.eyeX * EYE), true);
-    view.setInt16(end + 8, i16(h.eyeY * EYE), true);
-    view.setInt16(end + 10, i16(h.eyeZ * EYE), true);
+    const pointer = scale.pointer;
+    const eye = scale.eye;
+    view.setInt16(end, i16(h.x * pointer), true);
+    view.setInt16(end + 2, i16(h.y * pointer), true);
+    view.setInt16(end + 4, i16(h.z * pointer), true);
+    view.setInt16(end + 6, i16(h.eyeX * eye), true);
+    view.setInt16(end + 8, i16(h.eyeY * eye), true);
+    view.setInt16(end + 10, i16(h.eyeZ * eye), true);
     view.setUint8(end + 12, u8(h.tool));
     view.setUint8(end + 13, u8(h.variant));
     end += HANDS_BYTES;
@@ -199,8 +237,13 @@ export function writeState(view: DataView, at: number, s: FlyState): number {
   return end;
 }
 
-/** Reads a fly's state at `at` into `s`. Returns where it ends, or -1 if the message is too short. */
-export function readState(view: DataView, at: number, s: FlyState): number {
+/**
+ * Reads a fly's state at `at` into `s`, at the scale of the place it is
+ * from. Returns where it ends, or -1 if the message is too short. A state
+ * from another place (its epoch isn't the one expected) comes out wrong and
+ * must be dropped unused.
+ */
+export function readState(view: DataView, at: number, scale: WireScale, s: FlyState): number {
   if (at + STATE_BYTES > view.byteLength) return -1;
   const flags = view.getUint8(at);
   if (at + stateLength(flags) > view.byteLength) return -1;
@@ -208,9 +251,10 @@ export function readState(view: DataView, at: number, s: FlyState): number {
   s.epoch = view.getUint8(at + 1);
   s.seq = view.getUint16(at + 2, true);
   s.t = view.getUint32(at + 4, true);
-  s.x = view.getInt16(at + 8, true) / POS;
-  s.y = view.getInt16(at + 10, true) / POS;
-  s.z = view.getInt16(at + 12, true) / POS;
+  const pos = scale.position;
+  s.x = view.getInt16(at + 8, true) / pos;
+  s.y = view.getInt16(at + 10, true) / pos;
+  s.z = view.getInt16(at + 12, true) / pos;
   s.yaw = view.getUint16(at + 14, true) / YAW;
   s.upX = view.getInt8(at + 16) / 127;
   s.upZ = view.getInt8(at + 17) / 127;
@@ -229,12 +273,14 @@ export function readState(view: DataView, at: number, s: FlyState): number {
   let end = at + STATE_BYTES;
   if (flags & HANDS) {
     const h = s.hand;
-    h.x = view.getInt16(end, true) / POINTER;
-    h.y = view.getInt16(end + 2, true) / POINTER;
-    h.z = view.getInt16(end + 4, true) / POINTER;
-    h.eyeX = view.getInt16(end + 6, true) / EYE;
-    h.eyeY = view.getInt16(end + 8, true) / EYE;
-    h.eyeZ = view.getInt16(end + 10, true) / EYE;
+    const pointer = scale.pointer;
+    const eye = scale.eye;
+    h.x = view.getInt16(end, true) / pointer;
+    h.y = view.getInt16(end + 2, true) / pointer;
+    h.z = view.getInt16(end + 4, true) / pointer;
+    h.eyeX = view.getInt16(end + 6, true) / eye;
+    h.eyeY = view.getInt16(end + 8, true) / eye;
+    h.eyeZ = view.getInt16(end + 10, true) / eye;
     h.tool = view.getUint8(end + 12);
     h.variant = view.getUint8(end + 13);
     end += HANDS_BYTES;
@@ -246,9 +292,9 @@ export function readState(view: DataView, at: number, s: FlyState): number {
 export const FLY_MAX = 1 + STATE_BYTES + HANDS_BYTES;
 
 /** Encodes the device's own fly into `out` (at least FLY_MAX bytes). Returns its length. */
-export function encodeFly(out: DataView, s: FlyState): number {
+export function encodeFly(out: DataView, scale: WireScale, s: FlyState): number {
   out.setUint8(0, FLY);
-  return writeState(out, 1, s);
+  return writeState(out, 1, scale, s);
 }
 
 /** A batch: type, count, then each fly's id and state. */
@@ -261,30 +307,31 @@ export function batchLength(states: readonly FlyState[], count = states.length) 
 /** The biggest batch: every other fly at the table, each with its hand. */
 export const FLIES_MAX = 2 + MAX_PLAYERS * (1 + STATE_BYTES + HANDS_BYTES);
 
-export function encodeFlies(out: DataView, states: readonly FlyState[], count = states.length): number {
+export function encodeFlies(out: DataView, scale: WireScale, states: readonly FlyState[], count = states.length): number {
   out.setUint8(0, FLIES);
   out.setUint8(1, count);
   let at = 2;
   for (let i = 0; i < count; i++) {
     out.setUint8(at, states[i].id);
-    at = writeState(out, at + 1, states[i]);
+    at = writeState(out, at + 1, scale, states[i]);
   }
   return at;
 }
 
 /**
- * Reads a batch, handing every fly's state in turn to `each` (the same
- * `scratch` object each time: copy what you keep). Returns how many, or -1
- * if the batch is broken.
+ * Reads a batch at the scale of the place expected, handing every fly's
+ * state in turn to `each` (the same `scratch` object each time: copy what you
+ * keep, and drop one from another epoch). Returns how many, or -1 if the
+ * batch is broken.
  */
-export function decodeFlies(view: DataView, scratch: FlyState, each: (s: FlyState) => void): number {
+export function decodeFlies(view: DataView, scale: WireScale, scratch: FlyState, each: (s: FlyState) => void): number {
   if (view.byteLength < 2 || view.getUint8(0) !== FLIES) return -1;
   const count = view.getUint8(1);
   let at = 2;
   for (let i = 0; i < count; i++) {
     if (at >= view.byteLength) return -1;
     scratch.id = view.getUint8(at);
-    at = readState(view, at + 1, scratch);
+    at = readState(view, at + 1, scale, scratch);
     if (at < 0) return -1;
     each(scratch);
   }
@@ -320,11 +367,11 @@ export function decodeBites(view: DataView, each: (food: number, amount: number)
 // The JSON messages.
 
 export type V3 = [number, number, number];
-/** Where a fly stands: x, z and its yaw. */
-export type Spot = [x: number, z: number, yaw: number];
+/** Where a fly stands: x, z, its yaw, and on the surface at or below which height (one table over another's floor; the highest, if left out). */
+export type Spot = [x: number, z: number, yaw: number, y?: number];
 
-/** A food as it travels: id, kind ("patch", a dropped kind, or "found"), name, x, z, reach, sweetness, how much is left, a pool. */
-export type FoodWire = [id: number, kind: string, name: string, x: number, z: number, r: number, sweet: number, amount: number, pool: 0 | 1];
+/** A food as it travels: id, kind ("patch", a dropped kind, or "found"), name, x, z, reach, sweetness, how much is left, a pool, and the height it lies at (the highest surface there, if left out: a table kept before there were heights). */
+export type FoodWire = [id: number, kind: string, name: string, x: number, z: number, r: number, sweet: number, amount: number, pool: 0 | 1, y?: number];
 
 /** A ball in flight: who threw it, when (room ms) the swoop starts, and its path. */
 export type BallWire = { by: number; at: number; from: V3; via: V3; to: V3 };
@@ -362,17 +409,19 @@ export type ClientMessage =
       key: string;
       /** Starting the table, if it doesn't exist yet. */
       start?: TableStart;
-      /** Where this device's fly is, coming back to the table after a moment away (a reconnection). */
+      /** Where this device's fly is, coming back to the table after a moment away (a reconnection), and the epoch of the place it is in: from before a move, it isn't anywhere at the table. */
       at?: Spot;
+      epoch?: number;
     }
   | { type: "ping"; t: number }
-  | { type: "drop"; id: number; kind: string; x: number; z: number; at: number }
+  /** `y`: the surface it falls to, at or below this height (the floor under a table, or the table). */
+  | { type: "drop"; id: number; kind: string; x: number; z: number; y: number; at: number }
   | ({ type: "ball" } & Omit<BallWire, "by">)
   | { type: "world"; light?: string; weather?: string }
   | { type: "place"; place: string }
   | { type: "remove"; id: number }
   | { type: "pop"; slot: number; cycle: number; at: number }
-  | { type: "found"; id: number; name: string; x: number; z: number; r: number; sweet: number }
+  | { type: "found"; id: number; name: string; x: number; z: number; y: number; r: number; sweet: number }
   | { type: "bye" };
 
 /** Why the room turned a device away (and closed its connection with the matching code). */
@@ -425,7 +474,7 @@ export type ServerMessage =
   | ({ type: "joined" } & PlayerWire)
   | { type: "away"; id: number; away: boolean }
   | { type: "left"; id: number }
-  | { type: "drop"; by: number; id: number; kind: string; x: number; z: number; at: number }
+  | { type: "drop"; by: number; id: number; kind: string; x: number; z: number; y: number; at: number }
   | ({ type: "ball" } & BallWire)
   | ({ type: "world"; offset: number } & WorldWire)
   /** The table is carried to another place: everyone's fly is set down there, where `spots` says. */

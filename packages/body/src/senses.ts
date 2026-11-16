@@ -7,7 +7,7 @@
 import type { BrainSenses } from "@fly/brain";
 import type { Food, Pantry, Vec3, World } from "@fly/world";
 import { ease } from "./behavior.ts";
-import { HEAD_AHEAD, HEAD_UP, MOUTH_AHEAD, MOUTH_UP, STEP_UP } from "./motion.ts";
+import { FLY_HEIGHT, HEAD_AHEAD, HEAD_UP, MOUTH_AHEAD, MOUTH_UP, STEP_UP } from "./motion.ts";
 import type { FlyBody } from "./motion.ts";
 import type { Bodies } from "./crowd.ts";
 
@@ -171,12 +171,13 @@ export class SenseTracker {
     return out;
   }
 
+  /** On its feet, a wall it would walk into (something between a step and its height over its feet); in the air, the tip inside something. */
   #pressing(body: FlyBody, world: World, side: 1 | -1, bodies: Bodies | undefined) {
     const tip = body.point(HEAD_AHEAD + ANTENNA_AHEAD, HEAD_UP, side * ANTENNA_SIDE, this.#probe);
     if (bodies?.inside(tip.x, tip.y, tip.z, 0)) return true;
     if (!world.onTable(tip.x, tip.z)) return body.onFeet;
-    const floor = body.onFeet ? body.position.y + STEP_UP : tip.y;
-    return world.heightAt(tip.x, tip.z) > floor;
+    const feet = body.position.y;
+    return body.onFeet ? world.underside(tip.x, tip.z, feet + STEP_UP) < feet + FLY_HEIGHT : world.solidAt(tip.x, tip.y, tip.z) >= 0;
   }
 
   #eye(state: EyeState, seen: number, dt: number) {

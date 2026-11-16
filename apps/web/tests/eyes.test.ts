@@ -36,6 +36,7 @@ function setup() {
     hemi: new THREE.HemisphereLight(),
     sun: new THREE.DirectionalLight(),
     light: {},
+    current: { camera: {} },
   } as unknown as Stage;
   return { eyes: new Eyes(stage, life), life, reads };
 }

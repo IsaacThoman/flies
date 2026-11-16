@@ -2,9 +2,9 @@
 // point is over it, how high its top is there, which way its top and its
 // sides face, and where a ray meets it.
 //
-// The world is a height field. Every solid is a column standing on the table:
-// a footprint (seen from above) extruded up to its top, which is flat or
-// domed. Units are millimetres, y is up.
+// Every solid is a footprint (seen from above) extruded from its bottom up to
+// its top, which is flat, domed or dished: a column standing on the floor, or
+// a slab with air beneath it. Units are millimetres, y is up.
 
 export type Footprint =
   | { kind: "circle"; x: number; z: number; r: number }
@@ -24,23 +24,31 @@ export type Top =
    */
   | { kind: "dome"; base: number; height: number; power: number }
   /**
+   * A box's top rounded across its narrower side and level along its length
+   * (a rail, a tube, a cushion): y = base + height × (1 − s²)^power, s from 0
+   * along its middle line to 1 at its long edges. A dome over a long box would
+   * sag along its length; this doesn't. Only on a box.
+   */
+  | { kind: "vault"; base: number; height: number; power: number }
+  /**
    * A dish, round its footprint's middle: a flat well (`well` high) out to
    * `inner` of the way to the edge, rising to a rounded rim (`rim` high) at
-   * `lip`, then down a gentle outside to the table at the edge. Each slope is
+   * `lip`, then down a gentle outside to its bottom at the edge (the floor,
+   * for a dish without one). Each slope is
    * a smoothstep, so the rim's crest and both feet are level.
    */
   | { kind: "dish"; well: number; rim: number; inner: number; lip: number };
 
 /** The highest point of a top. */
 export function topPeak(top: Top): number {
-  return top.kind === "flat" ? top.y : top.kind === "dome" ? top.base + top.height : top.rim;
+  return top.kind === "flat" ? top.y : top.kind === "dish" ? top.rim : top.base + top.height;
 }
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
 const smoothSlope = (t: number) => 6 * t * (1 - t);
 
-/** A dish's height at normalised distance s from its middle, and its slope dy/ds. */
-function dishProfile(top: Extract<Top, { kind: "dish" }>, s: number, out: { y: number; dy: number }) {
+/** A dish's height at normalised distance s from its middle, and its slope dy/ds; its outside falls to `foot`. */
+function dishProfile(top: Extract<Top, { kind: "dish" }>, foot: number, s: number, out: { y: number; dy: number }) {
   if (s <= top.inner) {
     out.y = top.well;
     out.dy = 0;
@@ -52,8 +60,8 @@ function dishProfile(top: Extract<Top, { kind: "dish" }>, s: number, out: { y: n
   } else {
     const w = 1 - top.lip;
     const t = Math.min(1, (s - top.lip) / w);
-    out.y = top.rim * (1 - smooth(t));
-    out.dy = (-top.rim * smoothSlope(t)) / w;
+    out.y = foot + (top.rim - foot) * (1 - smooth(t));
+    out.dy = (-(top.rim - foot) * smoothSlope(t)) / w;
   }
   return out;
 }
@@ -63,7 +71,12 @@ export type Solid = {
   name: string;
   footprint: Footprint;
   top: Top;
+  /** The underside, mm: a solid with air beneath it (a table top, a shelf, a lamp, a plate on a table top), occupying only from here up to its top. Left out, it stands on the floor (y = 0). */
+  bottom?: number;
 };
+
+/** Where a solid's underside is: the floor (0) for one standing on it. */
+export const solidBottom = (solid: Solid) => solid.bottom ?? 0;
 
 export type Vec3 = { x: number; y: number; z: number };
 
@@ -118,12 +131,20 @@ export function footprintS2(f: Footprint, x: number, z: number): number {
 
 export const inside = (f: Footprint, x: number, z: number) => footprintS2(f, x, z) < 1;
 
+/** A vault's s² at a point: across the box's narrower side only. */
+function vaultS2(f: Footprint, x: number, z: number): number {
+  if (f.kind !== "box") throw new Error("A vault's top needs a box");
+  const { u, v } = local(f, x, z, scratch);
+  return Math.min(1, f.hx <= f.hz ? (u / f.hx) ** 2 : (v / f.hz) ** 2);
+}
+
 /** The top's height at a point inside the footprint. */
 export function topHeight(solid: Solid, x: number, z: number): number {
   const { top } = solid;
   if (top.kind === "flat") return top.y;
+  if (top.kind === "vault") return top.base + top.height * Math.pow(1 - vaultS2(solid.footprint, x, z), top.power);
   const s2 = Math.min(1, footprintS2(solid.footprint, x, z));
-  if (top.kind === "dish") return dishProfile(top, Math.sqrt(s2), scratchProfile).y;
+  if (top.kind === "dish") return dishProfile(top, solidBottom(solid), Math.sqrt(s2), scratchProfile).y;
   return top.base + top.height * Math.pow(1 - s2, top.power);
 }
 
@@ -134,7 +155,19 @@ export function topHeight(solid: Solid, x: number, z: number): number {
  */
 export function topNormal(solid: Solid, x: number, z: number, out: Vec3): Vec3 {
   const { top, footprint: f } = solid;
-  if (top.kind === "flat" || f.kind === "box") {
+  if (top.kind === "vault" && f.kind === "box") {
+    const s2 = Math.min(0.999999, vaultS2(f, x, z));
+    const k = -top.height * top.power * Math.pow(1 - s2, top.power - 1);
+    const { u, v } = local(f, x, z, scratch);
+    const across = f.hx <= f.hz;
+    const back = world(f, across ? (k * 2 * u) / (f.hx * f.hx) : 0, across ? 0 : (k * 2 * v) / (f.hz * f.hz), scratchXZ);
+    const length = Math.hypot(back.x, 1, back.z);
+    out.x = -back.x / length;
+    out.y = 1 / length;
+    out.z = -back.z / length;
+    return out;
+  }
+  if (top.kind === "flat" || top.kind === "vault" || f.kind === "box") {
     out.x = 0;
     out.y = 1;
     out.z = 0;
@@ -145,7 +178,7 @@ export function topNormal(solid: Solid, x: number, z: number, out: Vec3): Vec3 {
   let k: number;
   if (top.kind === "dish") {
     const s = Math.sqrt(s2);
-    k = s > 1e-9 ? dishProfile(top, s, scratchProfile).dy / (2 * s) : 0;
+    k = s > 1e-9 ? dishProfile(top, solidBottom(solid), s, scratchProfile).dy / (2 * s) : 0;
   } else k = -top.height * top.power * Math.pow(1 - s2, top.power - 1);
   let gx: number;
   let gz: number;

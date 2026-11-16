@@ -10,7 +10,7 @@ export function checkMove(life: Life, id: PlaceId) {
   const oldFoods = new Set(life.pantry.foods);
   life.move(places[id]);
   const start = places[id].start;
-  assert.deepEqual(life.body.position, { x: start.x, y: life.world.heightAt(start.x, start.z), z: start.z });
+  assert.deepEqual(life.body.position, { x: start.x, y: life.world.heightAt(start.x, start.z, start.y), z: start.z });
   assert.deepEqual(life.body.velocity, { x: 0, y: 0, z: 0 });
   assert.equal(life.body.mode, "standing");
   assert.equal(life.body.yaw, start.yaw);
@@ -45,7 +45,8 @@ export function fuzzLife(id: PlaceId, seed: number, duration: number, data: Arra
       const dt = Math.min(duration - time, random() < 0.01 ? 0.2 : 1 / 30);
       if (time >= nextMove) {
         moveModes.add(life.eating ? "feeding" : life.body.mode);
-        const destination = (Object.keys(places) as PlaceId[]).filter(p => p !== id)[Math.floor(random() * 3)];
+        const others = (Object.keys(places) as PlaceId[]).filter(p => p !== id);
+        const destination = others[Math.floor(random() * others.length)];
         checkMove(life, destination);
         // Excursions exercise the carry; return so this run's hours belong to its named place.
         checkMove(life, id);
@@ -59,7 +60,7 @@ export function fuzzLife(id: PlaceId, seed: number, duration: number, data: Arra
         nextEvent = eventUntil + 2 + random() * 15;
         if (event === 0 || event === 1) {
           const p = event === 0 ? life.body.position : randomStart(life.world, random);
-          life.pantry.drop(random() < 0.5 ? "honey" : "sugar", p.x, p.z);
+          life.pantry.drop(random() < 0.5 ? "honey" : "sugar", p.x, p.z, p.y);
           if (event === 0) counts.nearFood++; else counts.farFood++;
         }
         if (event === 2) counts.strokes++;

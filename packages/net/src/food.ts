@@ -6,7 +6,7 @@
 // room last heard from it. So two flies at the same sugar eat it down
 // together, and between them never eat more than there was.
 
-import { EAT_RATE, FOODS, MAX_DROPPED, PATCH_RECOVERY } from "@fly/world";
+import { EAT_RATE, FOODS, MAX_DROPPED, PATCH_RECOVERY, TASTE_HEIGHT } from "@fly/world";
 import type { Food, FoodKind, FoodPatch, Pantry, World } from "@fly/world";
 import type { FoodWire } from "./protocol.ts";
 import { FOUND_ID, dropOwner, seqAtOrAfter } from "./protocol.ts";
@@ -18,11 +18,12 @@ const APPETITE_SLACK = 1.5;
 /** Seconds of appetite a player may save up. */
 const APPETITE_STORE = 1;
 
-export const toWire = (f: Food): FoodWire => [f.id, f.kind, f.name, f.x, f.z, f.r, f.sweet, f.amount, f.pool ? 1 : 0];
+export const toWire = (f: Food): FoodWire => [f.id, f.kind, f.name, f.x, f.z, f.r, f.sweet, f.amount, f.pool ? 1 : 0, f.y];
 
+/** A food as the room has it, at the height it lies at (the highest surface there, kept before foods had one). */
 export function fromWire(world: World, w: FoodWire): Food {
-  const [id, kind, name, x, z, r, sweet, amount, pool] = w;
-  return { id, kind: kind as Food["kind"], name, x, y: world.heightAt(x, z), z, r, sweet, amount, pool: pool === 1 };
+  const [id, kind, name, x, z, r, sweet, amount, pool, y] = w;
+  return { id, kind: kind as Food["kind"], name, x, y: typeof y === "number" && Number.isFinite(y) ? y : world.heightAt(x, z), z, r, sweet, amount, pool: pool === 1 };
 }
 
 /** What a bite came to. */
@@ -54,7 +55,7 @@ export class TableFood {
     this.foods.length = 0;
     this.#changed.clear();
     // Numbered 1 upward, in order: the place's patches are always the same food.
-    patches.forEach((p, i) => this.foods.push({ id: i + 1, kind: "patch", name: p.name, x: p.x, y: this.#world.heightAt(p.x, p.z), z: p.z, r: p.r, sweet: p.sweet, amount: 1, pool: p.pool ?? false }));
+    patches.forEach((p, i) => this.foods.push({ id: i + 1, kind: "patch", name: p.name, x: p.x, y: this.#world.heightAt(p.x, p.z, p.y), z: p.z, r: p.r, sweet: p.sweet, amount: 1, pool: p.pool ?? false }));
   }
 
   /** The food as it was kept (a restarted room). */
@@ -67,34 +68,38 @@ export class TableFood {
     return this.foods.find((f) => f.id === id) ?? null;
   }
 
-  /** A player dropped food; returns it, or null if it isn't theirs to name or isn't on the table. The oldest dropped goes past MAX_DROPPED. */
-  drop(by: number, id: number, kind: string, x: number, z: number): Food | null {
+  /**
+   * A player dropped food, onto the surface at or below `y` (the highest, if
+   * left out); returns it, or null if it isn't theirs to name or isn't on the
+   * table. The oldest dropped goes past MAX_DROPPED.
+   */
+  drop(by: number, id: number, kind: string, x: number, z: number, y?: number): Food | null {
     if (dropOwner(id) !== by || !Object.hasOwn(FOODS, kind) || this.find(id) || !this.#world.onTable(x, z)) return null;
     const dropped = this.foods.filter((f) => f.kind !== "patch" && f.kind !== "found");
     if (dropped.length >= MAX_DROPPED) this.#remove(dropped[0]);
     const spec = FOODS[kind as FoodKind];
-    const food: Food = { id, kind: kind as FoodKind, name: spec.name, x, y: this.#world.heightAt(x, z), z, r: spec.r, sweet: spec.sweet, amount: 1, pool: false };
+    const food: Food = { id, kind: kind as FoodKind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, amount: 1, pool: false };
     this.foods.push(food);
     return food;
   }
 
-  /** Something the place put out, as a device saw it; the first to say so names it. */
-  found(id: number, name: string, x: number, z: number, r: number, sweet: number): Food | null {
+  /** Something the place put out, on the surface at or below `y`, as a device saw it; the first to say so names it. */
+  found(id: number, name: string, x: number, z: number, r: number, sweet: number, y?: number): Food | null {
     if (!(id >= FOUND_ID) || typeof name !== "string" || name.length > 40 || this.find(id) || !this.#world.onTable(x, z) || !(r > 0 && r < 5) || !(sweet >= 0 && sweet <= 1)) return null;
-    const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z), z, r, sweet, amount: 1, pool: false };
+    const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, amount: 1, pool: false };
     this.foods.push(food);
     return food;
   }
 
   /**
    * A player's fly took `amount` of a food at room time `now` (ms), standing
-   * at (x, z). It gets what is there, if it could reach it and isn't eating
-   * faster than a fly can.
+   * at (x, y, z). It gets what is there, if it could reach it (not from the
+   * floor under the table it is on) and isn't eating faster than a fly can.
    */
-  bite(by: number, id: number, amount: number, x: number, z: number, now: number): Granted {
+  bite(by: number, id: number, amount: number, x: number, y: number, z: number, now: number): Granted {
     const food = this.find(id);
     if (!food || !(amount > 0)) return this.#refuse("unknown");
-    if (Math.hypot(food.x - x, food.z - z) > food.r + BITE_REACH) return this.#refuse("far");
+    if (Math.hypot(food.x - x, food.z - z) > food.r + BITE_REACH || Math.abs(food.y - y) > TASTE_HEIGHT + BITE_REACH) return this.#refuse("far");
     const appetite = this.#appetite.get(by) ?? { stored: EAT_RATE * APPETITE_STORE * APPETITE_SLACK, at: now };
     appetite.stored = Math.min(EAT_RATE * APPETITE_STORE * APPETITE_SLACK, appetite.stored + ((now - appetite.at) / 1000) * EAT_RATE * APPETITE_SLACK);
     appetite.at = now;
