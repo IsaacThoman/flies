@@ -26,6 +26,8 @@ the rules the whole thing is built on.
   draw calls, not what they draw. Merge and instance geometry, keep draw calls
   low, allocate nothing per frame, and keep per-frame JavaScript small. The
   brain does not run in JavaScript on the TV.
+- Tests wait on game time or canvas state, not wall-clock sleeps; speed budgets use CPU time.
+  The brain chooses: observe its inputs and commands, and bound retries for its choices.
 - Comments say why, not what. No dead code, no leftover experiments.
 
 ## Commits and pull requests

@@ -121,6 +121,12 @@ export async function waitFor(page: Page, spec: string, timeout = 60_000) {
   }
 }
 
+/** Waits for frames to advance the game's clock, even when long wall-clock frames are capped. */
+export async function waitForGameTime(page: Page, seconds: number, timeout = 120_000) {
+  const until = await page.evaluate((seconds) => (globalThis as unknown as { __fly: { time: number } }).__fly.time + seconds, seconds);
+  await page.waitForFunction((until) => (globalThis as unknown as { __fly: { time: number } }).__fly.time >= until, until, { timeout });
+}
+
 type Pt = [number, number];
 
 /** A finger across the remote's touch surface (x, y in -1..1, y up), as the Apple TV host sends it. */
@@ -181,9 +187,17 @@ export class Fingers {
   }
 
   async tap(at: Pt, ms = 60) {
+    await this.hold(at, () => this.#page.waitForTimeout(ms));
+  }
+
+  /** Keeps a tool pressed until its effect is observed, and releases it on failure too. */
+  async hold<T>(at: Pt, until: () => Promise<T>): Promise<T> {
     await this.#send("touchStart", [at]);
-    await this.#page.waitForTimeout(ms);
-    await this.#send("touchEnd", []);
+    try {
+      return await until();
+    } finally {
+      await this.#send("touchEnd", []);
+    }
   }
 
   async drag(from: Pt, to: Pt, ms = 400, steps = 14) {
@@ -211,10 +225,11 @@ export class Fingers {
 /** The middle of a target drawn on screen (0 to 1 across and down the canvas), found in the game's hit map by its kind and index. */
 export async function targetOf(page: Page, kind: string, index?: number): Promise<Pt> {
   // A screen just opened may not have been drawn yet: give it a moment.
-  for (let tries = 0; ; tries++) {
+  const until = Date.now() + 60_000;
+  for (;;) {
     const found = await findTarget(page, kind, index);
     if (found) return found;
-    if (tries === 20) throw new Error(`Nothing drawn on screen is a ${kind}${index === undefined ? "" : ` ${index}`}`);
+    if (Date.now() > until) throw new Error(`Nothing drawn on screen is a ${kind}${index === undefined ? "" : ` ${index}`}`);
     await page.waitForTimeout(100);
   }
 }
