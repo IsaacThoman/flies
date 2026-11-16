@@ -2,10 +2,10 @@
 // brain: boots it, waits for the brain, walks the menus with the keys, feeds
 // the fly and checks it tasted and ate, throws the ball until the fly takes
 // off, checks the wallpaper comes and goes with what it sees in a corner,
-// reloads and finds the settings, the shelf and what the hints taught as it
-// left them, and holds the frame to its draw budget throughout. It holds the
-// light at midday and the weather clear, so that what the fly does answers
-// what the test does.
+// carries the fly to every place, reloads and finds the settings, the shelf
+// and what the hints taught as it left them, and holds the frame to its draw
+// budget throughout. It holds the light at midday and the weather clear, so
+// that what the fly does answers what the test does.
 //
 //   npm run e2e            (starts its own Vite server)
 //   npm run e2e -- --url http://localhost:5173/
@@ -15,6 +15,7 @@
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
 import { gameUp, openGame, readState, startServer, waitFor } from "../../../scripts/play.ts";
+import { PLACES } from "../src/places/catalog.ts";
 
 /** The frame's budget on the Apple TV. */
 const MAX_CALLS = 150;
@@ -188,6 +189,19 @@ try {
   await press("ArrowDown");
   await waitFor(page, "view=wide");
 
+  step("carried to each place in turn with the Place tool, it lives there, and the frame keeps to its budget");
+  await toTool("place");
+  for (const place of PLACES.slice(1)) {
+    await press("ArrowDown");
+    await press("Enter");
+    await waitFor(page, `place=${place.id},moving=`, 30_000);
+    await waitFor(page, "mode~standing|walking", 10_000);
+    await page.waitForTimeout(3000);
+  }
+  await press("ArrowUp", PLACES.length - 1);
+  await press("Enter");
+  await waitFor(page, `place=${PLACES[0].id},moving=`, 30_000);
+
   step("back to the title through the pause menu, where Back leaves the app");
   await press("Escape");
   await waitFor(page, "screen=pause,eyesInset=hidden");
@@ -206,7 +220,7 @@ try {
   const effects = await page.evaluate(() => (globalThis as unknown as { __fly: { settings: { effects: number } } }).__fly.settings.effects);
   assert.equal(effects, 6, "the sounds turned down");
   const learned = await page.evaluate(() => JSON.parse(localStorage.getItem("apple-tv-fly.learned") ?? "{}") as Record<string, true>);
-  assert.deepEqual(Object.keys(learned).sort(), ["feed", "swoop", "tools"], "the hints for what was used aren't taught again");
+  assert.deepEqual(Object.keys(learned).sort(), ["feed", "place", "swoop", "tools"], "the hints for what was used aren't taught again");
 
   step(`the frame's budget: at most ${maxCalls} draws and ${maxTriangles.toLocaleString("en-US")} triangles`);
   assert.ok(maxCalls > 0 && maxCalls < MAX_CALLS, `${maxCalls} draws`);

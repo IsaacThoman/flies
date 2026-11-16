@@ -380,7 +380,7 @@ export class Game implements Shell {
     const near = Math.max(0, Math.min(1, 1 - (director.camera.position.distanceTo(this.fly.root.position) - 15) / 120));
     const wings = paused ? 0 : life.body.mode === "airborne" ? Math.max(0.15, life.intent.wings) : life.intent.wingPose * 0.6;
     this.audio.follow(wings, paused ? 0 : Math.abs(life.body.groundSpeed) / 12, near, dt);
-    this.audio.weather(stage.weather.rain, Math.hypot(this.#felt.air.x, this.#felt.air.z));
+    this.audio.weather(stage.weather.rain, Math.hypot(this.#felt.air.x, this.#felt.air.z), stage.light.stars);
 
     this.#overlay(dt);
 

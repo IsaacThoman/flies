@@ -346,26 +346,73 @@ function windLoop(ctx: BaseAudioContext) {
   });
 }
 
-/** A bird's chirp: quick upward sweeps. */
-function chirp(ctx: BaseAudioContext, seed: number) {
+/** A bird's chirp: quick upward sweeps. Heard through glass, the glass takes the top off it. */
+function chirp(ctx: BaseAudioContext, seed: number, glass = false) {
   const r = noise(seed);
   const notes = 2 + Math.floor((r() + 1) * 2);
   const base = 2600 + r() * 600;
+  let low = 0;
   return render(ctx, notes * 0.11, (t) => {
     const k = Math.floor(t / 0.11);
     const u = t - k * 0.11;
     const f = base + u * 9000 + k * 120;
-    return attack(u, 0.005) * Math.exp(-u * 30) * Math.sin(TAU * f * u) * 0.25;
+    const s = attack(u, 0.005) * Math.exp(-u * 30) * Math.sin(TAU * f * u) * 0.25;
+    low += (s - low) * 0.22;
+    return glass ? low : s;
   });
 }
 
-/** The sound of a place, under everything else: its loop, and whether birds call now and then. */
-export type Ambience = "outdoors" | "lab" | "bar";
+/**
+ * A kitchen: the hush of the room and the fridge humming. Twelve seconds that
+ * loop without a seam: the hum is whole cycles of mains, and the room's noise
+ * is cross-faded into itself. The birds outside are `Audio`'s, so they keep
+ * the hours and the weather.
+ */
+function kitchenLoop(ctx: BaseAudioContext) {
+  const r = noise(13);
+  const seconds = 12;
+  const length = seconds * RATE;
+  // The hum repeats every cycle of the mains (50 Hz), harmonics and all: worked out once.
+  const cycle = new Float32Array(RATE / 50);
+  for (let i = 0; i < cycle.length; i++) {
+    const a = (TAU * i) / cycle.length;
+    cycle[i] = Math.sin(a) * 0.4 + Math.sin(2 * a) * 0.5 + Math.sin(3 * a + 1) * 0.3 + Math.sin(4 * a + 2) * 0.18 + Math.sin(6 * a) * 0.08;
+  }
+  const fade = 3000;
+  const hush = new Float32Array(length + fade);
+  let a = 0;
+  let b = 0;
+  for (let i = 0; i < hush.length; i++) {
+    a += (r() - a) * 0.012;
+    b += (a - b) * 0.04;
+    hush[i] = b;
+  }
+  return render(ctx, seconds, (_t, i) => {
+    const room = i < fade ? hush[i] * (i / fade) + hush[length + i] * (1 - i / fade) : hush[i];
+    // The compressor's hum swells and settles: whole cycles of it over the loop.
+    const breathe = 0.7 + 0.3 * Math.sin((TAU * 2 * i) / length) * Math.sin((TAU * 3 * i) / length + 1);
+    return room * 1.2 + cycle[i % cycle.length] * breathe * 0.035;
+  });
+}
 
-const AMBIENCES: Record<Ambience, { loop: (ctx: BaseAudioContext) => AudioBuffer; birds: boolean; /** How loud rain is there, 0 to 1: outdoors in it, or muffled by walls and glass (0.3 if not said). */ rain?: number }> = {
-  outdoors: { loop: outdoorsLoop, birds: true, rain: 1 },
-  lab: { loop: labLoop, birds: false },
-  bar: { loop: barLoop, birds: false },
+/** The sound of a place, under everything else: its loop, and how the birds outside and the rain are heard there. */
+export type Ambience = "outdoors" | "kitchen" | "lab" | "bar";
+
+const AMBIENCES: Record<
+  Ambience,
+  {
+    loop: (ctx: BaseAudioContext) => AudioBuffer;
+    /** How loud the birds outside are, 0 to 1: out among them, or less and muffled through glass (none heard if not said). */
+    birds?: number;
+    /** How loud rain is there, 0 to 1: outdoors in it, or muffled by walls and glass (0.3 if not said). */
+    rain?: number;
+  }
+> = {
+  outdoors: { loop: outdoorsLoop, birds: 1, rain: 1 },
+  // Birds in the garden and rain on the window pane, close by: louder than through a wall.
+  kitchen: { loop: kitchenLoop, birds: 0.25, rain: 0.5 },
+  lab: { loop: labLoop },
+  bar: { loop: barLoop },
 };
 
 type Loop = { source: AudioBufferSourceNode; gain: GainNode };
@@ -378,6 +425,7 @@ export class Audio {
   #wings: Loop | null = null;
   #feet: Loop | null = null;
   #chirps: AudioBuffer[] = [];
+  #muffled: AudioBuffer[] = [];
   #nextChirp = 8;
   #started = false;
   #ambience: Ambience = "outdoors";
@@ -389,6 +437,7 @@ export class Audio {
   #rainAt = 0;
   #windAt = 0;
   #raining = 0;
+  #dark = 0;
 
   constructor() {
     let ctx: AudioContext | null;
@@ -418,6 +467,7 @@ export class Audio {
       this.#wings = this.#loop(wingLoop(ctx), this.#effects);
       this.#feet = this.#loop(feetLoop(ctx), this.#effects);
       this.#chirps = [chirp(ctx, 21), chirp(ctx, 22), chirp(ctx, 23)];
+      this.#muffled = [chirp(ctx, 21, true), chirp(ctx, 22, true), chirp(ctx, 23, true)];
       this.#rain = this.#loop(rainLoop(ctx), this.#ambient);
       this.#wind = this.#loop(windLoop(ctx), this.#ambient);
       this.#playAmbience();
@@ -496,23 +546,32 @@ export class Audio {
     followParam(this.#wings.gain.gain, Math.min(1, wings) * 0.35 * near, now, 0.03);
     followParam(this.#wings.source.playbackRate, 0.85 + wings * 0.3, now, 0.05);
     followParam(this.#feet.gain.gain, Math.min(1, walking) * 0.25 * near, now, 0.05);
-    // Now and then, a bird; in the rain they mostly keep quiet.
+    // Now and then by day, a bird; in the rain they mostly keep quiet, and from dusk they go to roost.
     this.#nextChirp -= dt;
-    if (this.#nextChirp <= 0 && this.#ambient && this.#chirps.length && AMBIENCES[this.#ambience].birds) {
+    const birds = AMBIENCES[this.#ambience].birds ?? 0;
+    if (this.#nextChirp <= 0 && this.#ambient && this.#chirps.length && birds > 0) {
       this.#nextChirp = 6 + Math.random() * 14;
-      if (Math.random() < this.#raining * 0.85) return;
+      const day = 1 - Math.min(1, this.#dark * 2);
+      if (Math.random() >= day * (1 - this.#raining * 0.85)) return;
       const source = ctx.createBufferSource();
-      source.buffer = this.#chirps[Math.floor(Math.random() * this.#chirps.length)];
+      const chirps = birds < 1 ? this.#muffled : this.#chirps;
+      source.buffer = chirps[Math.floor(Math.random() * chirps.length)];
       source.playbackRate.value = 0.9 + Math.random() * 0.25;
-      source.connect(this.#ambient);
+      if (birds < 1) {
+        const gain = ctx.createGain();
+        gain.gain.value = birds;
+        source.connect(gain);
+        gain.connect(this.#ambient);
+      } else source.connect(this.#ambient);
       source.start();
     }
   }
 
-  /** The weather as heard: how hard it rains (0 to 1), and the speed of a gust blowing here (mm/s). */
-  weather(rain: number, gust: number) {
+  /** The weather and the hour as heard: how hard it rains (0 to 1), the speed of a gust blowing here (mm/s), and how dark it is (the light's `stars`, 0 by day to 1 at night). */
+  weather(rain: number, gust: number, dark: number) {
     const ctx = this.ctx;
     this.#raining = rain;
+    this.#dark = dark;
     if (!ctx || !this.#rain || !this.#wind) return;
     const now = ctx.currentTime;
     const heard = rain * (AMBIENCES[this.#ambience].rain ?? 0.3);

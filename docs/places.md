@@ -93,7 +93,9 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   synthesised sample by sample (the Apple TV's audio has no oscillators or
   filters), built the first time it is needed. Its optional `rain` (0 to 1,
   0.3 if left out) is how loud rain is heard there: 1 out in it, less through
-  walls and glass. A gust blowing at the fly (`Felt.air`, below) is heard as
+  walls and glass. Its optional `birds` is how loud the birds outside are (1
+  out among them, less and muffled through glass; none if left out): they
+  call by day, mostly keep quiet in the rain, and go to roost from dusk. A gust blowing at the fly (`Felt.air`, below) is heard as
   a rush of air wherever it blows.
 - **Goings-on** (`SceneSet.live`, optional): the place's own life, called each
   frame the fly lives with an `Around`: where the fly is, the world, the

@@ -5,5 +5,6 @@ import { bar } from "./bar/index.ts";
 import { lab } from "./lab/index.ts";
 import { picnic } from "./picnic/index.ts";
 import type { Scene } from "./types.ts";
+import { windowsill } from "./windowsill/index.ts";
 
-export const SCENES: Readonly<Record<PlaceId, Scene>> = { picnic, lab, bar };
+export const SCENES: Readonly<Record<PlaceId, Scene>> = { picnic, windowsill, lab, bar };

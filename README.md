@@ -91,6 +91,34 @@ leaf are in the fly's world only as things it sees (and, for a brain without
 eyes, things that can loom); they keep clear of it, and none of it is aimed
 or timed at the fly: what it does about any of it is its brain's.
 
+The windowsill is the deep sill of a cottage kitchen window, painted cream over
+sage over pine, its old gloss crazed where the sun bakes it and chipped along
+its front edge. The light comes in through the panes of a casement window, so
+the frame, the mullion and the glazing bars lay their shadows across the sill
+and the kitchen and swing round with the day; by day the room throws some of it
+back, and from dusk the lamp over the kitchen table lights it and the glass
+turns to a dark mirror with the lamp in it. On the sill: a spongeware bowl with
+a peach and two plums, whose side a fly can walk up, round its rim and down to
+where plum juice has run; an overripe, freckled banana it can climb from its
+tip, split near the stalk; half a peach on a plate with its stone; a pot of
+basil in a saucer with water round the pot's foot, its rim and soil a perch; a
+bottle of red wine that has dripped a pool on the sill, where drips and the
+fly's feet set rings spreading, as they do on the saucer's water; a teaspoon
+with honey in it, crumbs of toast and spilt sugar, drops from watering the
+basil, and a linen tea towel woven thread by thread in its shader. A fly can
+stand on the rail at the foot of the glass but never get through it, and nor
+can the ball, which comes round from where it has room. Outside are a garden
+with a striped lawn, an apple tree and washing moving in the breeze, a picket
+fence with hollyhocks and foxgloves, and the backs of a little street of houses
+with smoke from their chimneys, a church spire, clouds and passing birds; at
+night their windows light up and the stars and the moon come out. Under a grey
+sky the window's shadows go soft; on cold mornings and damp days the glass
+mists at its foot; in mist the houses fade to ghosts; in the rain it falls
+across the garden, drops bead on the pane and run down it, and it stays
+streaked as it dries. It sounds of the kitchen's hush, the fridge, birds in
+the garden muffled by the glass by day, and rain on the pane. There are no bubbles or fireflies
+indoors.
+
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
 wiring was traced: a stereo microscope with a fly pad on its stage (its base and
 pillar are solid; a fly can land on it), a rack of plugged vials with pupae up
@@ -284,9 +312,10 @@ six against one in two at 60 Hz.
 
 The ball is dark in green and blue for the same reason: the eyes answer
 darkening, not brightening. It dives in low from the fly's front-right (higher
-over anything standing in its way), where the connectome's looming pathway is
-strongest and where the fly is seen against the bright table, stops just short,
-hangs a moment and veers away on a side that is clear. It casts a shadow. With
+over anything standing in its way, and round what it can't come in over, such
+as a window), where the connectome's looming pathway is strongest and where the
+fly is seen against the bright table, stops just short, hangs a moment and
+veers away on a side that is clear. It casts a shadow. With
 all that, the fly takes off about half the time: that is the model's answer,
 not a dice roll in the game.
 
@@ -355,7 +384,8 @@ dev and preview servers serve and the production build copies in
 (`apps/web/src/brain/native-driver.ts`), which allocates nothing per frame.
 Sound is synthesised into buffers at start-up (no oscillators or filters):
 wing buzz following the wings, patter while it walks, each place's own
-surroundings (the picnic's breeze, lake and birds, quieter in the rain), rain
+surroundings (the picnic's breeze and lake; birds by day, quieter in the
+rain and gone to roost at night, muffled behind the windowsill's glass), rain
 and the rush of a gust, and small sounds for the
 tools and menus. The settings, the shelf's kept choices and what the hints
 have taught are in
@@ -391,16 +421,19 @@ corner picture of what it sees (when it shows, its way round the corners, clear
 of the hints, every facet a dot inside it); the
 bubbles (low ones mostly pass the fly, pop on surfaces without settling,
 keep coming, and burst on the fly and are felt);
-that the crumbs, pips, strawberry and saucer can be walked over.
+that the crumbs, pips, strawberry and saucer can be walked over, and at the
+windowsill the banana, the bowl and the basil's saucer, with the glass a wall
+and a ledge at its foot; that the ball comes over what is in its way, and
+round a window.
 
 `npm run e2e` plays the game with the real brain: the title
 appears once the brain wakes, the menus are walked with the keys, honey is
 tasted and eaten, the ball is thrown until the fly takes off, Play/Pause
 pauses and resumes, the wallpaper comes and goes with what it sees in a
 corner (and, set to always, it stays while playing but not over View → Fly's
-eyes or the pause menu), Back reaches the root, a reload finds the settings,
-the view, the light and the weather as they were left, the shelf on Feed and
-the hints for what was used gone,
+eyes or the pause menu), the fly is carried to every place, Back reaches the
+root, a reload finds the settings, the view, the light and the weather as
+they were left, the shelf on Feed and the hints for what was used gone,
 and the frame stays within its draw budget. `node scripts/play.ts` drives and
 screenshots the game step by step (see the comment at its top).
 

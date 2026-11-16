@@ -46,6 +46,13 @@ export const BALL_RADIUS = 34;
 export const SWOOP_SECONDS = 1.6;
 /** Where the ball comes from, radians round from straight ahead toward the fly's right. */
 export const SWOOP_BEARING = 0.9;
+/**
+ * When the ball can't come in over what stands in its way, or get away past
+ * it (a window, a wall), it comes from further round the fly's right instead,
+ * as far as behind it, then from round its left: these turns (radians) from
+ * SWOOP_BEARING, in order, until both are clear.
+ */
+export const SWOOP_TURNS = [0, 0.4, 0.8, 1.2, 1.6, 2, 2.4, 2.8, -0.4, -0.8, -1.2, -1.6, -2, -2.4];
 /** The shares of a swoop spent diving in and hanging there at the end of the dive; the rest is veering away. */
 export const SWOOP_DIVE = 0.2;
 export const SWOOP_HOLD = 0.15;
@@ -317,14 +324,36 @@ export class Hands {
     // of it, then away up past it. Low, it is seen against the bright table and horizon
     // (a fly's eyes answer darkening); the fly's looming pathway is strongest on its right
     // (packages/brain/README.md, The eyes); and a fly sees little behind it.
+    const clear = SWOOP_TURNS.some((turn) => {
+      const a = yaw - SWOOP_BEARING - turn;
+      return this.#dive(a) && this.#away(a);
+    });
+    // Nowhere clear all the way (the fly among fruit by a window): the first way whose far reaches are clear, grazing only what is right by the fly; failing that, the usual way.
+    if (!clear) {
+      const open = SWOOP_TURNS.some((turn) => {
+        const a = yaw - SWOOP_BEARING - turn;
+        this.#dive(a);
+        this.#away(a);
+        return this.#farClear(ball.from, ball.via) && this.#farClear(ball.to, ball.via);
+      });
+      if (!open) {
+        this.#dive(yaw - SWOOP_BEARING);
+        this.#away(yaw - SWOOP_BEARING);
+      }
+    }
+    ball.t = 0;
+    ball.active = true;
+    copy(ball.position, ball.from);
+    this.events.swooped = true;
+  }
+
+  /** Sets the ball's dive in along this heading (radians, as the fly's yaw), coming in higher over anything standing in its way, rather than through it. Whether it found a way in. */
+  #dive(a: number): boolean {
+    const ball = this.ball;
     const p = this.pointer;
-    const a = yaw - SWOOP_BEARING;
-    const ux = Math.sin(a);
-    const uz = Math.cos(a);
-    ball.from.x = p.x + ux * 330;
+    ball.from.x = p.x + Math.sin(a) * 330;
     ball.from.y = p.y + 70;
-    ball.from.z = p.z + uz * 330;
-    // Coming in higher over anything standing in its way, rather than through it.
+    ball.from.z = p.z + Math.cos(a) * 330;
     for (let tries = 0; ; tries++) {
       // Where the dive ends: its surface SWOOP_CLEARANCE short of the spot, along the way it came.
       const fx = ball.from.x - p.x;
@@ -335,20 +364,31 @@ export class Hands {
       ball.via.x = p.x + (fx / fl) * stop;
       ball.via.y = p.y + 2 + (fy / fl) * stop;
       ball.via.z = p.z + (fz / fl) * stop;
-      if (tries === 8 || !this.#through(ball.from, ball.via)) break;
+      if (!this.#through(ball.from, ball.via)) return true;
+      if (tries === 8) return false;
       ball.from.y += 40;
     }
-    // Away up and over to the side it came from; or the other side, or back the way it came, if that is clear.
+  }
+
+  /** Sets the ball's getaway from the end of a dive that came in along this heading: away up and over to the side it came from; or the other side, or back the way it came, if that is clear. Whether one was. */
+  #away(a: number): boolean {
+    const ball = this.ball;
+    const p = this.pointer;
+    const ux = Math.sin(a);
+    const uz = Math.cos(a);
     for (const side of [1, -1, 0]) {
       ball.to.x = p.x + ux * 200 + uz * 160 * side;
       ball.to.y = p.y + 400;
       ball.to.z = p.z + uz * 200 - ux * 160 * side;
-      if (!this.#through(ball.via, ball.to)) break;
+      if (!this.#through(ball.via, ball.to)) return true;
     }
-    ball.t = 0;
-    ball.active = true;
-    copy(ball.position, ball.from);
-    this.events.swooped = true;
+    return false;
+  }
+
+  /** Whether the ball's path between `far` and the end of its dive is clear but for its last fifth, by the fly. */
+  #farClear(far: Vec3, near: Vec3): boolean {
+    lerp(partway, far, near, 0.8);
+    return !this.#through(far, partway);
   }
 
   /** Whether the ball, going straight from `a` to `b`, would pass through anything standing on the table that is taller than its middle. */
@@ -367,6 +407,7 @@ export class Hands {
 }
 
 const surface = { y: 0, normal: { x: 0, y: 1, z: 0 }, solid: -1, onTable: true };
+const partway = v3();
 /** The ball's middle and eight points round it, as x, z pairs of unit length or less. */
 const RING = [0, 0, ...Array.from({ length: 8 }, (_, i) => [Math.cos((i * Math.PI) / 4), Math.sin((i * Math.PI) / 4)]).flat()];
 
