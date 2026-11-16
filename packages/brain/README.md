@@ -62,7 +62,9 @@ No new binary needs hosting. The annotation download is 14,483,314 bytes,
 211,577 bodies, version `v1.0-minconf-0.5`, SHA-256
 `2177e246113e4cfbf1e7772ec37c6da1955ff22e8063d0b1f833101f99a9a3b2`.
 The packer refuses changed/incomplete bytes before decoding them. An unreachable
-source produces an error with its URL and the manual route; retry the command.
+source or a changed annotation hash fails the fetch command, explicitly reports
+that anatomy was not written, and gives the retry command and manual route.
+The already written connectome stays usable; anatomy is optional for the game.
 If it fails after writing the connectome, anatomy may still be absent or old;
 the loader refuses an old sidecar paired with different wiring.
 

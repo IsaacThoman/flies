@@ -6,7 +6,7 @@
 // 4.0) as packed by `npm run brain:pack`, gzipped.
 
 import { createHash } from "node:crypto";
-import { mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { gunzipSync } from "node:zlib";
@@ -53,19 +53,27 @@ try {
   console.log(`wrote ${out}`);
 
   // Pack locally from the public annotations; no second hosted binary to maintain.
-  let annotationResponse: Response;
   try {
-    annotationResponse = await fetch(ANNOTATION_URL);
+    const response = await fetch(ANNOTATION_URL);
+    if (!response.ok) throw new Error(`${ANNOTATION_URL}: ${response.status} ${response.statusText}`);
+    const anatomy = await packAnatomy(await response.arrayBuffer(), Uint8Array.from(bytes).buffer);
+    const anatomyOut = join(dirname(out), "anatomy.bin");
+    writeFileSync(`${anatomyOut}.part`, anatomy);
+    renameSync(`${anatomyOut}.part`, anatomyOut);
+    console.log(`wrote ${anatomyOut} (${anatomy.length.toLocaleString("en-US")} bytes)`);
   } catch (error) {
-    throw new Error(`Couldn't download anatomy annotations from ${ANNOTATION_URL}: ${(error as Error).message}. Retry npm run brain:fetch or use the manual route in packages/brain/README.md.`, { cause: error });
+    console.error(`anatomy.bin was not written from ${ANNOTATION_URL}: ${(error as Error).message}. The usable connectome.bin is at ${out}. Retry npm run brain:fetch or use the manual annotation route in packages/brain/README.md.`);
+    process.exitCode = 1;
   }
-  if (!annotationResponse.ok) throw new Error(`Couldn't download anatomy annotations: ${annotationResponse.status} ${annotationResponse.statusText} (${ANNOTATION_URL}). Retry npm run brain:fetch or use the manual route in packages/brain/README.md.`);
-  const anatomy = await packAnatomy(await annotationResponse.arrayBuffer(), Uint8Array.from(bytes).buffer);
-  const anatomyOut = join(dirname(out), "anatomy.bin");
-  writeFileSync(`${anatomyOut}.part`, anatomy);
-  renameSync(`${anatomyOut}.part`, anatomyOut);
-  console.log(`wrote ${anatomyOut} (${anatomy.length.toLocaleString("en-US")} bytes)`);
 } catch (error) {
-  console.error(`Brain fetch failed: ${(error as Error).message}`);
+  let usable: boolean;
+  try {
+    loadConnectome(Uint8Array.from(readFileSync(values.out)).buffer);
+    usable = true;
+  } catch {
+    usable = false;
+  }
+  const retained = usable ? `The existing connectome.bin is still usable at ${resolve(values.out)}; anatomy.bin was not refreshed.` : "No usable connectome.bin was found at the output path.";
+  console.error(`Brain fetch failed: ${(error as Error).message}. ${retained} Retry npm run brain:fetch or use the manual route in packages/brain/README.md.`);
   process.exitCode = 1;
 }
