@@ -9,6 +9,7 @@
 
 export type Sound = "move" | "select" | "back" | "blocked" | "tick" | "tool" | "drop" | "land" | "swoop" | "pop" | "takeoff" | "eat" | "open";
 
+import type { HandsEvents } from "../tools/hands.ts";
 import { followParam } from "./follow.ts";
 
 const TAU = Math.PI * 2;
@@ -517,6 +518,12 @@ export class Audio {
     // Volumes 0 to 10, on a gentle curve.
     this.#effects.gain.setTargetAtTime((effects / 10) ** 2 * 0.8, ctx.currentTime, 0.05);
     this.#ambient.gain.setTargetAtTime((ambience / 10) ** 2 * 0.5, ctx.currentTime, 0.2);
+  }
+
+  tools(events: HandsEvents) {
+    if (events.dropped) this.play("drop");
+    if (events.landed) this.play("land", 0.6);
+    if (events.swooped) this.play("swoop");
   }
 
   play(sound: Sound, volume = 1, rate = 1) {
