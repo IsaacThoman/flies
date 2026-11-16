@@ -4,7 +4,8 @@
 // monitor and a fridge behind, fluorescent panels overhead. Soft and calm:
 // a background. The day comes in at the windows: by day the sun lays their
 // shapes across the floor and the far wall; at night only the lamp on the
-// bench is on, and its light spills a little way into the dark room.
+// bench is on, and its light spills a little way into the dark room. A wall
+// clock between the windows tells the real time.
 // Five draws: the room, its pictures, what glows, the view outside, and the
 // glass.
 
@@ -12,6 +13,8 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { canvas2d, canvasTexture, freeze, paint, random } from "../../scene/build.ts";
 import type { ColorFn } from "../../scene/build.ts";
+import { CLOCK_GLSL, WallClock, onDial } from "../../scene/clock.ts";
+import type { Dial } from "../../scene/clock.ts";
 import type { Daylight } from "../../scene/light.ts";
 import type { SceneBackdrop } from "../types.ts";
 import { FLOOR_Y, SHADE } from "./bench.ts";
@@ -21,6 +24,40 @@ import type { Sunbeam } from "./materials.ts";
 const FRONT_Z = 2700;
 const LEFT_X = -2800;
 const RIGHT_X = 3000;
+
+/**
+ * The wall clock's dial (mm), facing the room: on the pier between the left
+ * and the middle windows, hung low over the bench under them, where it can be
+ * read from a stool and is seen past the fly and from across the bench.
+ */
+const CLOCK: Dial = { centre: { x: -WINDOWS.xs[2] / 2, y: 290, z: BACK_Z + 28.5 }, up: { x: 0, y: 1, z: 0 }, right: { x: 1, y: 0, z: 0 }, radius: 104 };
+
+/** The clock's face, drawn on its dial in the room's material: a black minute track and hour batons, black hands, a thin red second hand. */
+const CLOCK_FACE = /* glsl */ `
+{
+  vec3 d = ${onDial(CLOCK)};
+  vec2 q = d.xy;
+  float px = length(fwidth(q));
+  if (abs(d.z) < 0.5 && length(q) < 1.0) {
+    vec3 h = uClockHands;
+    float marks = max(clockTicks(q, 60.0, 0.83, 0.9, 0.016, px), clockTicks(q, 12.0, 0.64, 0.9, 0.06, px));
+    float black = max(marks, max(max(clockHand(q, h.x, 0.5, 0.12, 0.085, 0.07, px), clockHand(q, h.y, 0.8, 0.14, 0.065, 0.05, px)), clockSpot(q, vec2(0.0), 0.07, px)));
+    float red = max(clockHand(q, h.z, 0.86, 0.26, 0.022, 0.016, px), clockSpot(q, vec2(0.0), 0.04, px));
+    // The hands stand off the dial: their soft shadow falls a little down and to the side, and the bezel's round the edge.
+    vec2 s = q - vec2(0.025, -0.035);
+    float soft = px + 0.04;
+    float shadow = max(max(clockHand(s, h.x, 0.5, 0.12, 0.085, 0.07, soft), clockHand(s, h.y, 0.8, 0.14, 0.065, 0.05, soft)), clockHand(s, h.z, 0.86, 0.26, 0.022, 0.016, soft) * 0.5);
+    float rim = smoothstep(0.86, 1.0, length(q));
+    diffuseColor.rgb *= 1.0 - shadow * 0.28 - rim * 0.2;
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.025), black);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.72, 0.05, 0.04), red);
+    #if NUM_HEMI_LIGHTS > 0
+    // The glass over it shows the lit room, brightest across its upper half: by day a sheen, after dark next to nothing.
+    float sheen = 0.03 + 0.07 * smoothstep(-0.3, 0.7, q.y - q.x * 0.35) * (1.0 - smoothstep(0.55, 0.95, abs(q.y - 0.25 + q.x * 0.35)));
+    totalEmissiveRadiance += hemisphereLights[0].skyColor * sheen * (1.0 - rim);
+    #endif
+  }
+}`;
 
 /** Where each picture is on the room's atlas (px of a 2048 × 1024 canvas). */
 const ATLAS = { w: 2048, h: 1024 };
@@ -298,15 +335,17 @@ const box = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: num
 /** A picture on a wall facing +z (or turned to face another way). */
 const facing = (w: number, h: number, x: number, y: number, z: number, turn = 0) => new THREE.PlaneGeometry(w, h).rotateY(turn).translate(x, y, z);
 
-/** The room's materials: their floor and ceiling tiled, and the sun through the windows laid across them. */
-function roomShader(material: THREE.Material, beam: Sunbeam, key: string) {
+/** The room's materials: their floor and ceiling tiled, and the sun through the windows laid across them; the one with the clock's dial in it, its hands. */
+function roomShader(material: THREE.Material, beam: Sunbeam, key: string, hands?: WallClock["hands"]) {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, beam);
+    if (hands) shader.uniforms.uClockHands = hands;
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vWorld;")
       .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;");
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>\nvarying vec3 vWorld;\n${WINDOW_LIGHT}`)
+      .replace("#include <common>", `#include <common>\nvarying vec3 vWorld;\n${WINDOW_LIGHT}\n${hands ? CLOCK_GLSL : ""}`)
+      .replace("#include <color_fragment>", `#include <color_fragment>\n${hands ? CLOCK_FACE : ""}`)
       .replace(
         "#include <map_fragment>",
         /* glsl */ `#include <map_fragment>
@@ -391,8 +430,9 @@ export function buildRoom(light: Daylight): SceneBackdrop {
   beam.uSunDir.value = light.sunDirection;
   beam.uSunColor.value = light.sunColor;
 
+  const clock = new WallClock();
   const room = new THREE.MeshLambertMaterial({ vertexColors: true });
-  roomShader(room, beam, "lab-room");
+  roomShader(room, beam, "lab-room", clock.hands);
   const pictures = new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true });
   roomShader(pictures, beam, "lab-pictures");
   // What gives light: the panels overhead by day, the incubator's light by day, little lights always.
@@ -488,6 +528,14 @@ export function buildRoom(light: Daylight): SceneBackdrop {
     add(new THREE.SphereGeometry(115, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2).translate(2620, FLOOR_Y + 1380, BACK_Z + 200), "#5f6c74");
     add(box(2580, 2660, FLOOR_Y + 1480, FLOOR_Y + 1560, BACK_Z + 160, BACK_Z + 240), "#b9bcbf");
     add(new THREE.TorusGeometry(120, 6, 6, 24, Math.PI).rotateX(Math.PI / 2).translate(2620, FLOOR_Y + 1100, BACK_Z + 200), "#9a9da1");
+  }
+  // The wall clock: a white dial in a dark case with a rounded bezel. Its face is drawn on the dial by the room's material.
+  {
+    const { x, y, z } = CLOCK.centre;
+    const r = CLOCK.radius;
+    add(new THREE.CylinderGeometry(r + 9, r + 11, z - BACK_Z - 1, 48).rotateX(Math.PI / 2).translate(x, y, (z + BACK_Z - 1) / 2), "#25272a");
+    add(new THREE.TorusGeometry(r + 5, 6, 8, 48).translate(x, y, z + 0.5), "#2e3033");
+    add(new THREE.CircleGeometry(r + 4, 48).translate(x, y, z), "#f6f5f0");
   }
   // The left wall: shelves of fly stocks, a poster, and the incubator.
   {
@@ -638,6 +686,7 @@ export function buildRoom(light: Daylight): SceneBackdrop {
   return {
     scene,
     update(time, _camera, daylight) {
+      clock.update();
       const dark = Math.min(1, Math.max(0, (daylight.stars - 0.25) / 0.6));
       const night = dark * dark * (3 - 2 * dark);
       day.value = 1 - night;
