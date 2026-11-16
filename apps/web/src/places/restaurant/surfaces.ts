@@ -7,7 +7,7 @@
 // variables the material then uses (materials.ts).
 
 import { DINING_ROOM, ZINC_BAR } from "@fly/world";
-import { EXIT, ROOM } from "./plan.ts";
+import { EXIT, PENDANT_LIGHT, ROOM } from "./plan.ts";
 
 const f = (n: number) => n.toFixed(1);
 
@@ -490,5 +490,19 @@ if (rK == K_EXIT) {
   rEmit += face * uExit.g * 0.6;
 }
 if (rK == K_OPENING) rEmit += vec3(1.0) * uOpening;
+if (rK == K_MIRROR) {
+  // A mirror shows the room: the windows' light by day, and the lamp left on over the bar as a bright disc where the eye would see its image, a glow round it.
+  vec3 v = normalize(vWorld - cameraPosition);
+  vec3 r = reflect(v, rN);
+  rEmit += uWindow * 0.1 * smoothstep(0.1, 0.9, r.z) * (1.0 - smoothstep(0.4, 0.9, abs(r.y)));
+  vec3 lamp = vec3(${f(PENDANT_LIGHT.x)}, ${f(PENDANT_LIGHT.y + 40)}, ${f(PENDANT_LIGHT.z)});
+  vec3 image = lamp - 2.0 * dot(lamp - vWorld, rN) * rN;
+  vec3 toImage = image - cameraPosition;
+  float off = length(cross(v, toImage)) * step(0.0, dot(v, toImage));
+  float lit = uPendant.w * ${(1 / 620_000).toExponential(3)};
+  rEmit += uPendantColor * lit * (smoothstep(${f(PENDANT_LIGHT.r + 10)}, ${f(PENDANT_LIGHT.r - 30)}, off) * 1.6 + exp(-off * off / 320000.0) * 0.25);
+  // And the room's own dim warmth, darker where the silvering has gone.
+  rEmit += vec3(0.05, 0.035, 0.022) * (0.3 + 0.7 * lit) * (1.0 - smoothstep(0.0, 0.8, rRough));
+}
 if (rK == K_KITCHEN) rEmit += diffuseColor.rgb * (uKitchen * 0.6 + uHeat * 0.15 * smoothstep(1500.0, 1100.0, abs(vWorld.y - 1100.0)) * step(${f(-3400)}, vWorld.z));
 `;

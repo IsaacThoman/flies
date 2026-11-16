@@ -13,6 +13,7 @@ import { BANQUETTE, DINING_ROOM, PASS, SHOPFRONT } from "@fly/world";
 import type { Builder } from "./builder.ts";
 import { box, lathe } from "./geometry.ts";
 import { KIND } from "./kinds.ts";
+import { BACK_MIRROR } from "./backbar.ts";
 import { DIFFUSERS } from "./live.ts";
 import { FANS, FRONT, KITCHEN, OUT_OF_REACH, WAINSCOT } from "./plan.ts";
 import { mat4 } from "../../scene/build.ts";
@@ -128,7 +129,11 @@ export function buildShell(b: Builder) {
   b.shell(face("back", px0, px1, 0, sill), "#ffffff", KIND.steel);
   // The left wall behind the bar, and the right behind the banquette (which hides its foot).
   wainscot(b, "left", -hz, hz);
-  plaster("left", -hz, hz, rail, height);
+  // Round the back bar's mirror, sunk into the wall over the shelves (backbar.ts).
+  const m = BACK_MIRROR;
+  plaster("left", -hz, m.z0, rail, height);
+  plaster("left", m.z1, hz, rail, height);
+  plaster("left", m.z0, m.z1, m.y1, height);
   wainscot(b, "right", -hz, BANQUETTE.z0);
   wainscot(b, "right", BANQUETTE.z1, hz - 0.5);
   b.shell(face("right", BANQUETTE.z0, BANQUETTE.z1, 0, BANQUETTE.back.top), "#3a2a20", KIND.mahogany);
