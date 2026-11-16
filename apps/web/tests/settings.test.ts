@@ -34,7 +34,7 @@ const NOW = Date.UTC(2026, 10, 16, 20);
 
 test("settings come back as they were saved", () => {
   const store = memory();
-  const settings: Settings = { effects: 3, ambience: 0, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "lively", eyes: "high", eyesInset: "always", hints: false, stats: true, realWeather: false, place: "lab", scene: "bar" };
+  const settings: Settings = { effects: 3, ambience: 0, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "lively", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", hints: false, stats: true, realWeather: false, place: "lab", scene: "bar" };
   saveSettings(settings, store);
   assert.deepEqual(loadSettings(store), settings);
 });
@@ -75,6 +75,8 @@ test("each setting keeps only a value the game can use", () => {
     wallpaperCamera: ["drone", 0],
     eyes: ["medium", false],
     eyesInset: ["sometimes", "corner"],
+    nerves: ["glowing", 1],
+    xray: ["on", true],
     hints: ["yes", 1],
     stats: [0, "on"],
     realWeather: ["off", 0],

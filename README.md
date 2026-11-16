@@ -241,7 +241,8 @@ the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot), **Light** (now, which follows the clock,
 or morning, midday, golden hour, dusk, night), **Weather** (now, which
 follows the forecast, or clear, overcast, mist, rain), **View** (close up, follow, wide, the whole table, from above,
-and through the fly's eyes; Up brings the camera in, Down takes it out) and
+through the fly's eyes, and inside it, close up with the fly as glass; Up
+brings the camera in, Down takes it out) and
 **Place** (where it lives; Up and Down choose, Select carries it there). On
 the shelf the four that act on the fly stand apart from the four about its
 world and the camera; Left and Right go along all of them. Hints in the
@@ -283,17 +284,19 @@ fly from one angle after another instead (Calm), or change them more often
 brings the controls back and does nothing else.
 A small picture of what the fly's eyes see sits in a corner of the wallpaper
 (Settings → Wallpaper → What it sees: off, in the wallpaper, or always, which keeps it in
-the top right while you play too). Each time the wallpaper moves on to a new
-shot, and at least once a minute, it fades out and comes back in the next
-corner, so it is never left in one place long enough to mark an OLED screen.
+the top right while you play too), and under it a picture of its nervous
+system at work (Nervous system, the same choices). Each time the wallpaper
+moves on to a new shot, and at least once a minute, they fade out and come
+back together in the next corner, so neither is left in one place long
+enough to mark an OLED screen.
 
 The title also offers **Just watch** (the wallpaper straight away), **Inside
 its brain** (live: every sense going in, every command coming out with the
 neurons it is read from and their firing rates, spikes a second, active
 neurons), **About the fly**, and **Settings**, a page for each part of the
 game, every setting a step from the top: **Wallpaper** (when it starts, how
-its camera films, where the fly lives, what it sees in a corner, and, on an
-Apple TV that can tell, the real weather), **Sound** (effects, surroundings)
+its camera films, where the fly lives, what it sees and its nervous system
+in a corner, the X-ray, and, on an Apple TV that can tell, the real weather), **Sound** (effects, surroundings)
 and **Picture** (pixel size, the eyes' detail, button hints, frame stats).
 
 ## The fly's senses
@@ -398,6 +401,125 @@ show: rendering them for the picture would bring back the cost that setting
 saves, and it would no longer be what the brain is sent. It never shows on the
 title, over a menu, or while View → Fly's eyes is up.
 
+## Its nervous system
+
+The fly's brain, nerve cord and nerves can be watched at work, in two ways
+that draw the same model with the same glow, so they never disagree:
+
+- **The X-ray** (Settings → Wallpaper → X-ray: off, in the wallpaper, or
+  always; or View → Inside it while playing, which also brings the camera in
+  close). The fly's cuticle turns to smoky glass, faint across its face and
+  stronger at its edges, still glossy, and its nervous system shows through
+  inside it, posed by the same rig as the body: the head turns the brain, the
+  legs carry their nerves as they walk, the proboscis its labial nerves as it
+  feeds. When the fly is under about 110 pixels long on screen (a wide shot,
+  the whole table) the X-ray eases back, and below 60 the fly is its ordinary
+  self: its brain would be a smudge of a few pixels. It is sorted with the
+  places' glass jars by distance, so a jar in front of the fly is in front of
+  it.
+- **The panel** (Settings → Wallpaper → Nervous system: off, in the
+  wallpaper, the default, or always): the same model from above, head up,
+  the fly's left on the left, standing at rest so that it holds still,
+  cropped to the brain and the cord, labelled "Its nervous system". It shares
+  its corner with what it sees, under it (over it at the bottom; beside it,
+  smaller, where the screen is too short, as a phone on its side), at the
+  corner itself when that isn't shown, and moves round the corners with it;
+  while playing it keeps to the top right. It never shows over a menu or
+  View → Fly's eyes.
+
+**The anatomy** (`packages/fly/src/nerves/`). The neuropils are measured from
+the FlyEM male CNS v1.0's own neuropil meshes (one male's brain, neck and
+cord in one EM volume, CC-BY 4.0) by `packages/fly/scripts/nerves.ts`, which
+writes `measured.ts`: each neuropil's surface as its radius in each direction
+round its centre, the farthest of its mesh's vertices within 15° of each
+direction (left side only, mirrored, so the drawing is symmetric); the
+lamina as a curved plate round the centre of the sphere that fits it; the
+mushroom body's peduncle and lobes and the protocerebral bridge as rods
+through slices of their meshes; the ellipsoid body as the torus that fits it;
+and where each of the cord's nerves leaves it. The brain is drawn at 0.88 of
+true size (the model's head is a little narrower than a real male's, its
+eyes true to size) and tipped 7° nose-down so the subesophageal zone sits over
+the proboscis; the cord at true size, tipped up 6° to lie along the thorax's
+floor, its leg neuropils over the coxae and their nerves leaving where the
+dataset's do (the hind leg's straight back off T3, as in the fly). The
+dataset is a CNS dissected out of the fly, so its brain–cord posture isn't
+the fly's: the two are placed separately and joined by a connective through
+the neck. The retina isn't in the dataset; it is drawn as a cup bent to the
+model's eye, 80–100 µm of photoreceptors under the lens. Nerves follow the
+literature and the dataset's nerve stubs: each leg's motor axons go as far as
+the tibia (there are no muscles in the tarsus), its sensory axons from the
+tip of the tarsus; the flight motor axons up the posterior dorsal
+mesothoracic nerve to the indirect flight muscles and the wing's steering
+muscles; the wing nerve, the haltere nerve, the cervical nerve to the neck
+muscles, the labial nerves down the proboscis, the antennal nerve's smell
+and Johnston's-organ strands, the abdominal nerve trunk with a branch to
+each segment. Sense organs are small clusters: the bristles' sockets where
+the model's bristles are, the femoral chordotonal organs, the campaniform
+sensilla on the legs and at the bases of the wings and halteres.
+
+**Where each region is drawn** (`apps/web/src/nerves/regions.ts`). All 63 of
+the brain's regions have a place and every part of the drawing belongs to
+exactly one region (a test holds it). Where several regions share a place in
+the fly, each is drawn as what is its own there: motor neurons as their
+cell bodies at the cord's edge and the nerves their axons leave by, sensory
+neurons as the organs and nerves they come in from, descending and ascending
+neurons as the tracts they run in, and the neuropils go to the neurons that
+fill them.
+
+| Regions | Drawn as |
+| --- | --- |
+| retina, lamina, medulla, lobula, lobula plate (each side) | their neuropils |
+| optic lobe, other · visual projection · visual centrifugal | the inner chiasm's fibres · the optic tracts into the central brain · fibres back out |
+| antennal lobe, mushroom body, superior protocerebrum, lateral horn, ventrolateral (with the optic tubercle), inferior and ventromedial, subesophageal (each side); central complex | their neuropils; the mushroom body as calyx, peduncle and lobes; the central complex as bridge, fan-shaped body, ellipsoid body, noduli |
+| central brain, other | the rind of cell bodies round the central brain, drawn as an edge (that is where those neurons' cell bodies are) |
+| smell · Johnston's organ · head bristles · mouthparts · head sensory, other | the third antennal segment and its strand of the antennal nerve · the second segment's organ and its strand to the AMMC · the head's bristle sockets · the labellum, the pharynx's taste organs and the labial nerves' sensory axons · the pharyngeal nerves |
+| head motor · neuroendocrine | the labial nerves' motor axons · the pars intercerebralis, its nerve to the corpora cardiaca, the frontal ganglion |
+| descending · ascending (each side) · unplaced | tracts from the brain down the neck and along the cord's top · from the cord's floor up into the brain · a thread down the connective's midline |
+| front, middle, hind leg motor (each side) · wing and haltere motor · neck motor · abdomen motor | cell bodies at the leg neuropil's edge and the leg nerve's motor strand · cell bodies over the wing tectulum and the dorsal nerves · the cervical nerve · the abdominal trunk's motor strand |
+| leg sensory · wing, haltere and thorax sensory · abdomen sensory · proprioceptors · body bristles | the leg nerves' sensory strands · the wing and haltere nerves · the abdominal trunk's sensory strand · the chordotonal organs and campaniform sensilla · the body's bristle sockets |
+| cord interneurons (each side) · cord, midline · cord, efferent | the leg neuropils T1, T2, T3, the abdominal neuromeres and the neck, wing and haltere tectulum of its side · the cord's ventral midline · its dorsal median fibres and median nerves |
+
+The cord is drawn segment by segment, so when the brain reports its
+interneurons by segment (the dataset has each one's neuromere) only this
+table changes.
+
+**How a rate becomes a glow** (`apps/web/src/nerves/glow.ts`). A region's
+glow heads for min(1, rate / fullHz): its mean firing rate over all its
+neurons (a 100 ms average in the brain) on the scale the brain package
+measured for it, where strong stimulation comes near 1 and busy rest shows
+at under a quarter. It rises toward that with a 50 ms time constant and falls
+with 400 ms, so a burst of tens of milliseconds is seen for half a second and
+nothing flickers between brain states. **How a glow is drawn**
+(`packages/fly/src/nerves/materials.ts`, one function for both views): a
+part's colour goes from its tissue's toward its role's, blue for sensory
+neurons, amber for the neurons between, red for motor and neurosecretory
+ones, by (glow / 0.4)², all the way at 0.4, covering more of what is behind
+it as it does, and it gives off light in that colour in proportion to
+glow². The square keeps the low hum of background activity near the tissue's
+colour and lets a burst stand out: in a ball's dive the optic lobes go from
+about 0.07 to 0.35. Nothing else lights a part. Its tissue is drawn
+unlit by activity: in the world lit by the scene's lights like the rest of the
+fly, with a faint constant cool tone strongest at its edge so the shape
+reads in a dark room (the same at all times for every part, as an X-ray
+shows bone); in the panel a faint constant stain on the dark glass, as a
+neuropil stain shows anatomy in a micrograph.
+
+**What stays dark, and what it can't show.** The retina, smell and the legs',
+wings and thorax's and abdomen's sensory neurons never fire in this model (the
+light enters one synapse in, at the lamina; there is no sense of smell; of
+the body's senses only touch and the legs' load are driven): they are drawn,
+and stay dark. The mushroom body, lateral horn, superior protocerebrum,
+antennal lobe and central complex fire under 1.1 Hz on a 5 Hz scale and stay
+nearly dark. A region glows with the mean of all its neurons, so a command
+carried by a few hardly shows: the giant fibre's escape is one neuron among
+660 descending ones, and what shows of an escape is the optic lobes, the
+visual projection neurons and the motor neurons it sets going (the jump's
+are among the middle leg's). The cord's interneurons light their side's
+whole cord together, for now. The shapes are an anatomical drawing, not where
+each neuron is. The canvas's `data-xray` (how far the fly is glass),
+`data-nerves` (the panel's corner, or `hidden`) and `data-glow` (each region
+glowing at 0.05 or more, brightest first) say what is shown.
+
 ## The frame
 
 On the Apple TV the game renders 640×480, laid out for 16:9 (the picture is
@@ -457,7 +579,12 @@ draws and 1.5 to 2.5 ms (mostly the read-back). JavaScript per frame about 1 to
 2.5 ms in the browser. The corner picture of what it sees (in the wallpaper,
 or always) is one more draw (its panel and every facet are instances of one
 quad, drawn with the menus) and about 3,500 triangles, with no measurable
-JavaScript. The end-to-end test fails above 150
+JavaScript. The X-ray is one more draw (the nervous system: one mesh, posed by
+the body's joint uniforms, its glow a uniform array of 24 vec4s, a float for each of its 93 parts) and about
+16,000 triangles; the panel one more draw (the same geometry, its backdrop the
+first two triangles) and the same triangles; JavaScript per frame within the
+noise of none (the glow, the X-ray's easing and the corners together are
+about 12 µs a frame in V8's interpreter alone). The end-to-end test fails above 150
 draws or 500,000 triangles. Physical Apple TV measurements and the unattended
 soak command are in [docs/apple-tv.md](docs/apple-tv.md).
 
@@ -537,8 +664,14 @@ which hints show once something has been used, and the settings' pages
 (every setting on one page, a step from the top, none scrolling); the
 camera (the fly's size on screen in each view, kept in the picture through a
 long wandering walk and a jump, never inside anything, never jumping); the
-corner picture of what it sees (when it shows, its way round the corners, clear
-of the hints, every facet a dot inside it); the
+corner pictures (when what it sees and its nervous system show, their way
+round the corners together, stacked and never overlapping, clear of the
+hints, every facet a dot inside its picture); the nervous system (every
+region drawn and every part lit by exactly one, on its own side and in its
+role's colour; a glow is its rate on its region's scale and rises and falls
+as it should; the X-ray only where it's asked for and the fly is big enough;
+the brain inside the head and the cord on the thorax's floor, the nerves
+inside the legs in every pose; nothing allocated per frame); the
 bubbles (low ones mostly pass the fly, pop on surfaces without settling,
 keep coming, and burst on the fly and are felt);
 that the crumbs, pips, strawberry and saucer can be walked over, and at the
@@ -559,8 +692,9 @@ go.
 appears once the brain wakes, the menus are walked with the keys, honey is
 tasted and eaten, the ball is thrown until the fly takes off, Play/Pause
 pauses and resumes, the wallpaper comes and goes with what it sees in a
-corner (and, set to always, it stays while playing but not over View → Fly's
-eyes or the pause menu), the fly is carried to every place, the weather
+corner, with its nervous system under it (and, set to always, they stay while
+playing but not over View → Fly's eyes or the pause menu), the X-ray comes in
+the follow shot, goes in the wide one and comes with View → Inside it, the fly is carried to every place, the weather
 outside, fed as the Apple TV would give it, is what "Now" shows until it is
 too old, Back reaches the root, a reload finds the settings, the view, the
 light and the weather as they were left, the shelf on Feed and the hints for
@@ -594,7 +728,8 @@ invariants, failure replay and open design cases.
 
 ## Credits
 
-The wiring is the [FlyEM male CNS connectome](https://male-cns.janelia.org/)
-(Janelia Research Campus, CC-BY 4.0). The neuron model follows Shiu et al.,
+The wiring, and the shapes its nervous system is drawn with, are the
+[FlyEM male CNS connectome](https://male-cns.janelia.org/)'s (Janelia
+Research Campus, CC-BY 4.0). The neuron model follows Shiu et al.,
 "A Drosophila computational brain model reveals sensorimotor processing",
 Nature 634 (2024).

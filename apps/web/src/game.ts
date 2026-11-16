@@ -10,6 +10,8 @@
 // round it, which turns the camera.
 
 import * as THREE from "three";
+import { FLY_LENGTH } from "@fly/body";
+import { REGIONS } from "@fly/brain";
 import type { BrainDriver, RemoteButton, WeatherAttribution } from "@fly/contracts";
 import { AT_ROOT_PROPERTY } from "@fly/contracts";
 import { Navigator } from "@fly/ui";
@@ -21,7 +23,7 @@ import type { Sound } from "./audio/sounds.ts";
 import { BrainMeter } from "./brain/meter.ts";
 import { CameraDirector, NEAR_TO_FAR } from "./camera.ts";
 import type { View } from "./camera.ts";
-import { TV_FRAME } from "./display.ts";
+import { TV_FRAME, worldSize } from "./display.ts";
 import type { Display, Frame } from "./display.ts";
 import { Eyes } from "./eyes/eyes.ts";
 import { EyesInset, insetWanted } from "./eyes/inset.ts";
@@ -30,6 +32,9 @@ import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./i
 import { Life } from "./life.ts";
 import { isPlaceId, nextPlace, placeInfo } from "./places/catalog.ts";
 import type { PlaceId } from "./places/catalog.ts";
+import { NerveGlow } from "./nerves/glow.ts";
+import { NervesPanel, nervesSlot, nervesWanted } from "./nerves/panel.ts";
+import { Xray, pixelsLong, xrayWanted } from "./nerves/xray.ts";
 import { SCENES } from "./places/index.ts";
 import type { Around, Felt } from "./places/types.ts";
 import { Bubbles } from "./scene/bubbles.ts";
@@ -45,6 +50,7 @@ import { Stage } from "./stage.ts";
 import { aimAt } from "./tools/aim.ts";
 import { BALL_RADIUS, Hands, SWOOP_BEARING, TOOLS } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
+import { CornerDeck, waitFor } from "./ui/corners.ts";
 import { HUD_HITS, drawHud } from "./ui/hud.ts";
 import type { HudState } from "./ui/hud.ts";
 import { hudLayout, loadingLayout, playRoom, titleLayout, touchSlop } from "./ui/layout.ts";
@@ -122,6 +128,12 @@ export class Game implements Shell {
   readonly audio = new Audio();
   readonly eyes: Eyes;
   readonly inset: EyesInset;
+  /** Its nervous system in a corner, and the corner it shares with what it sees. */
+  readonly nerves: NervesPanel;
+  readonly corners = new CornerDeck();
+  /** How brightly each part of its nervous system glows, from the brain's region rates. */
+  readonly glow: NerveGlow;
+  readonly xray = new Xray();
   readonly fireflies: Fireflies;
   /** The real weather outside, where the Apple TV can tell it; scripts feed it in a browser (`outside.feed`). */
   readonly outside = new Outside(nativeWeather());
@@ -244,6 +256,9 @@ export class Game implements Shell {
     for (const object of this.handsView.seen) this.eyes.see(object);
     this.inset = new EyesInset(this.eyes);
     this.overlay.scene.add(this.inset.mesh);
+    this.nerves = new NervesPanel(this.fly.model.nerves);
+    this.overlay.scene.add(this.nerves.mesh);
+    this.glow = new NerveGlow(this.fly.model.nerves.glow);
     this.#settle();
     const title = titleScreen(this);
     this.#titleItems = title.menu.items.length;
@@ -295,6 +310,7 @@ export class Game implements Shell {
     this.#loadingLayout = loadingLayout(frame);
     this.eyes.layout(frame, this.#hudLayout);
     this.inset.layout(frame, this.#hudLayout);
+    this.nerves.layout(frame, this.#hudLayout);
     if (!first) for (const screen of Object.values(this.screens)) screen.layout(frame);
     this.#frameRoom();
     this.overlay.dirty = true;
@@ -503,7 +519,7 @@ export class Game implements Shell {
     } else if (!this.paused) {
       this.director.stopWallpaper();
       const view = this.hands.view;
-      this.director.setView(view === "eyes" ? "follow" : (view as View));
+      this.director.setView(view === "eyes" ? "follow" : view === "inside" ? "close" : view);
     }
   }
 
@@ -586,10 +602,12 @@ export class Game implements Shell {
     this.peaks.escape = Math.max(this.peaks.escape * fade, command?.escape ?? 0);
     this.peaks.loom = Math.max(this.peaks.loom * fade, life.sensed.loomLeft, life.sensed.loomRight);
     this.peaks.looming = Math.max(this.peaks.looming * fade, rates?.["vision.looming left"] ?? 0, rates?.["vision.looming right"] ?? 0);
+    this.glow.update(life.brain.regionRates, dt);
     this.fly.update(life.body, life.intent, life.eating, paused ? 0 : dt);
     // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
     director.prefer = this.hands.current.id === "swoop" && this.nav.current === "play" && !this.wallpaper ? Math.PI - SWOOP_BEARING : null;
     director.update(life.body, dt);
+    this.#xray(dt);
     if (this.time > this.#clockAt) this.#followLight();
     stage.update(this.time, dt, director.camera);
     this.#clouds();
@@ -615,7 +633,14 @@ export class Game implements Shell {
       stage.beginFrame();
       stage.render(director.camera, dt);
       const showEyes = this.#showEyes();
-      this.inset.update(dt, insetWanted(this.settings.eyesInset, this.#loading ? "loading" : this.nav.current, this.wallpaper, showEyes, this.eyes.detail === "off"), this.wallpaper, director.shotChanges);
+      const screen = this.#loading ? "loading" : this.nav.current;
+      const eyesWanted = insetWanted(this.settings.eyesInset, screen, this.wallpaper, showEyes, this.eyes.detail === "off");
+      const nervesNow = nervesWanted(this.settings.nerves, screen, this.wallpaper, showEyes);
+      this.corners.update(dt, eyesWanted === "show" || nervesNow === "show", this.wallpaper, director.shotChanges);
+      // What it sees takes the corner itself; its nervous system is next to it, or there when it isn't. Neither comes in where the other still shows.
+      const slot = nervesSlot(eyesWanted);
+      this.inset.update(dt, waitFor(eyesWanted, this.corners, 0, this.nerves.placement), this.corners);
+      this.nerves.update(dt, waitFor(nervesNow, this.corners, slot, this.inset.placement), this.corners, slot);
       this.eyes.render(dt, showEyes, paused, this.hands.ball.active, this.inset.watching);
       stage.renderer.render(this.overlay.scene, this.overlay.camera);
       if (!this.#ready) {
@@ -636,6 +661,16 @@ export class Game implements Shell {
       this.#datasetAt = now;
       this.#publish();
     }
+  }
+
+  /** How far the fly is drawn as glass with its nervous system showing, for the next frame. */
+  #xray(dt: number) {
+    const screen = this.#loading ? "loading" : this.nav.current;
+    const inside = this.hands.view === "inside";
+    const rows = worldSize(this.display.frame, this.stage.pixels).height;
+    const pixels = pixelsLong(this.director.camera, this.fly.root.position, FLY_LENGTH, rows);
+    this.xray.update(dt, xrayWanted(this.settings.xray, screen, this.wallpaper, inside), pixels);
+    this.fly.model.nerves.xray = this.xray.amount;
   }
 
   /** The player is looking through the fly's eyes. */
@@ -1318,6 +1353,14 @@ export class Game implements Shell {
     });
   }
 
+  /** The regions glowing now, brightest first, as id:glow, for scripts to read the nervous system's state. */
+  #glowSummary() {
+    const g = this.glow.regions;
+    const lit: string[] = [];
+    for (let r = 0; r < g.length; r++) if (g[r] >= 0.05) lit.push(`${REGIONS[r].id}:${g[r].toFixed(2)}`);
+    return lit.sort((a, b) => Number(b.split(":")[1]) - Number(a.split(":")[1])).join(" ");
+  }
+
   /** The game's state on the canvas, for scripts and tests to wait on. */
   #publish() {
     const d = this.canvas.dataset;
@@ -1354,6 +1397,9 @@ export class Game implements Shell {
     d.feed = (life.brain.state?.command.feed ?? 0).toFixed(3);
     d.eyes = this.eyes.inUse ? "brain" : this.eyes.active ? "picture" : "off";
     d.eyesInset = this.inset.state;
+    d.nerves = this.nerves.state;
+    d.xray = this.xray.amount.toFixed(2);
+    d.glow = this.#glowSummary();
     d.calls = String(this.stage.cost.calls);
     d.triangles = String(this.stage.cost.triangles);
     d.frameMs = this.frameMsAverage.toFixed(2);

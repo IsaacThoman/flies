@@ -24,13 +24,14 @@ function meshes(object: THREE.Object3D): THREE.Mesh[] {
   return found;
 }
 
-/** Every vertex of the posed fly, in the model's space, as the vertex shaders place it. */
+/** Every vertex of the posed fly, in the model's space, as the vertex shaders place it (not the nervous system's panel backdrop, which the X-ray drops). */
 function posedVertices(fly: ReturnType<typeof createFly>): number[][] {
   const out: number[][] = [];
   for (const mesh of meshes(fly.object)) {
     const frames = mesh.name === "fly-wings" ? fly.rig.wings : fly.rig.joints;
-    const position = mesh.geometry.getAttribute("position"), joint = mesh.geometry.getAttribute("aJoint");
+    const position = mesh.geometry.getAttribute("position"), joint = mesh.geometry.getAttribute("aJoint"), info = mesh.geometry.getAttribute("aInfo");
     for (let i = 0; i < position.count; i++) {
+      if (info && info.getX(i) < 0) continue;
       const o = Math.round(joint.getX(i)) * 12, x = position.getX(i), y = position.getY(i), z = position.getZ(i);
       out.push([0, 4, 8].map((r) => frames[o + r] * x + frames[o + r + 1] * y + frames[o + r + 2] * z + frames[o + r + 3]));
     }
@@ -51,8 +52,12 @@ test("a handful of draw calls and a modest triangle count", () => {
     assert.ok(!(m.transparent && m.side === THREE.DoubleSide) || m.forceSinglePass, `${mesh.name} draws once`);
   }
   assert.ok(all.length <= 4, `${all.length} meshes`);
-  const triangles = all.reduce((n, m) => n + m.geometry.index!.count / 3, 0);
+  // The ordinary fly, and the nervous system the X-ray adds as one more draw.
+  const nerves = all.filter((m) => m.name === "fly-nerves");
+  const triangles = all.filter((m) => !nerves.includes(m)).reduce((n, m) => n + m.geometry.index!.count / 3, 0);
+  const nerveTriangles = nerves.reduce((n, m) => n + m.geometry.index!.count / 3, 0);
   assert.ok(triangles < 30000, `${triangles} triangles`);
+  assert.ok(nerveTriangles < 18000, `${nerveTriangles} triangles in the nervous system`);
   // Every vertex names a joint the shaders have.
   for (const mesh of all) {
     const limit = mesh.name === "fly-wings" ? WING_JOINTS : BODY_JOINTS;
@@ -65,7 +70,7 @@ test("a handful of draw calls and a modest triangle count", () => {
   }
   assert.equal(fly.rig.joints.length, BODY_JOINTS * 12);
   assert.equal(fly.rig.wings.length, WING_JOINTS * 12);
-  console.log(`  ${all.length} draw calls, ${triangles} triangles, ${BODY_JOINTS} body joints + ${WING_JOINTS} wing copies`);
+  console.log(`  ${all.length - nerves.length} draw calls, ${triangles} triangles, ${BODY_JOINTS} body joints + ${WING_JOINTS} wing copies; the X-ray one more and ${nerveTriangles}`);
   fly.dispose();
 });
 

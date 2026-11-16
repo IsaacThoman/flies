@@ -10,10 +10,8 @@
 // the wallpaper fades those out, and this is meant to stay. On a narrow
 // screen it is smaller, and its top corners are under the caption.
 //
-// A panel left in one place for hours can burn into an OLED screen, so in the
-// wallpaper it moves to another corner each time the camera moves on to a new
-// shot, and at least every CORNER_HOLD seconds (the wallpaper that follows the
-// fly never changes shot).
+// It is the first picture in its corner; where the corner is, and how it
+// keeps moving so that it never burns into a screen, is ui/corners.ts.
 
 import * as THREE from "three";
 import type { EyeMap } from "@fly/brain";
@@ -21,17 +19,12 @@ import { glassPanel, roundedRect, text } from "@fly/ui";
 import { TV_DESIGN_HEIGHT, TV_DESIGN_WIDTH, TV_FRAME, pixelsPerUnit } from "../display.ts";
 import type { Frame } from "../display.ts";
 import type { ShowWhen } from "../settings.ts";
+import { CORNERS, CornerPlacement } from "../ui/corners.ts";
+import type { Corner, CornerDeck, CornerWanted } from "../ui/corners.ts";
 import { hudLayout, safeRect } from "../ui/layout.ts";
 import type { HudLayout } from "../ui/layout.ts";
 import { FACET_COLOR, PICTURE_LAYOUT } from "./eyes.ts";
 import type { Eyes } from "./eyes.ts";
-
-export type Corner = "top-right" | "bottom-left" | "top-left" | "bottom-right";
-/**
- * The corners in the order it visits them, across the screen each time.
- * Playing, it keeps to the first: the hints take the others.
- */
-export const CORNERS: readonly Corner[] = ["top-right", "bottom-left", "top-left", "bottom-right"];
 
 /** The panel, in design units (as the overlay), at its full size: about a fifth of the TV's width. */
 export const INSET_PANEL = { width: 176, height: 92, radius: 14, margin: 16 };
@@ -41,11 +34,6 @@ const LABEL = { x: 12, y: 19, size: 12, color: "#eaf6ff" };
 /** A facet's dot, in frame pixels, and the widest it gets toward the poles. */
 const DOT = 3;
 const DOT_WIDEST = 8;
-/** Seconds to fade in, and out (out sooner: the controls are coming back, or it is moving on). */
-const FADE_IN = 1;
-const FADE_OUT = 0.5;
-/** The longest it stays in one corner of the wallpaper, seconds. */
-export const CORNER_HOLD = 60;
 
 /** Its size and corners on a screen: in design units, and in the frame's whole pixels (so the panel's texels and the dots land on pixels). */
 export type InsetLayout = {
@@ -90,9 +78,6 @@ export function insetRect(corner: Corner, frame: Frame = TV_FRAME) {
   return insetLayout(frame).rects[corner];
 }
 
-/** "show"; "fade": not wanted now, though nothing covers it; "hide": gone at once. */
-export type InsetWanted = "show" | "fade" | "hide";
-
 /**
  * Whether it should be up. Never on the loading screen, the title or a menu,
  * nor while the full picture is up (the same picture, large). Those go at
@@ -106,42 +91,9 @@ export type InsetWanted = "show" | "fade" | "hide";
  * without eyes still gets the picture: its eyes are rendered for it alone,
  * and it is labelled as a picture.)
  */
-export function insetWanted(setting: ShowWhen, screen: string, wallpaper: boolean, fullPicture: boolean, eyesOff: boolean): InsetWanted {
+export function insetWanted(setting: ShowWhen, screen: string, wallpaper: boolean, fullPicture: boolean, eyesOff: boolean): CornerWanted {
   if (setting === "off" || screen !== "play" || fullPicture || eyesOff) return "hide";
   return setting === "always" || wallpaper ? "show" : "fade";
-}
-
-/** Where it is and how much it shows: it fades out before it moves to another corner, and back in there. */
-export class InsetPlacement {
-  corner: Corner = CORNERS[0];
-  /** 0 to 1. */
-  alpha = 0;
-  #goal = 0;
-  #shotChanges = -1;
-  /** Seconds shown in this corner of the wallpaper. */
-  #held = 0;
-
-  update(dt: number, wanted: InsetWanted, wallpaper: boolean, shotChanges: number) {
-    if (!wallpaper) {
-      this.#goal = 0;
-      this.#held = 0;
-    } else if (wanted === "show" && this.#shotChanges >= 0 && (shotChanges !== this.#shotChanges || this.#held > CORNER_HOLD)) {
-      this.#goal = (this.#goal + 1) % CORNERS.length;
-      this.#held = 0;
-    }
-    this.#shotChanges = shotChanges;
-    const goal = CORNERS[this.#goal];
-    if (wanted === "hide") {
-      this.alpha = 0;
-      this.corner = goal;
-      return;
-    }
-    if (wanted === "show" && this.corner === goal) {
-      this.alpha = Math.min(1, this.alpha + dt / FADE_IN);
-      if (wallpaper) this.#held += dt;
-    } else this.alpha = Math.max(0, this.alpha - dt / FADE_OUT);
-    if (this.alpha === 0) this.corner = goal;
-  }
 }
 
 /**
@@ -240,7 +192,7 @@ void main() {
 }`;
 
 export class EyesInset {
-  readonly placement = new InsetPlacement();
+  readonly placement = new CornerPlacement();
   /** Drawn with the overlay (the game adds it to the overlay's scene), before the menus and hints. */
   readonly mesh: THREE.Mesh;
   /** It is, or is about to be, on screen: the eyes must render, even for a brain that has none of its own. */
@@ -315,13 +267,13 @@ export class EyesInset {
     return this.mesh.visible ? this.placement.corner : "hidden";
   }
 
-  /** Once a frame, before the eyes render and the overlay is drawn. */
-  update(dt: number, wanted: InsetWanted, wallpaper: boolean, shotChanges: number) {
+  /** Once a frame, after the corner deck and before the eyes render and the overlay is drawn. */
+  update(dt: number, wanted: CornerWanted, deck: CornerDeck) {
     const eyes = this.#eyes;
     const light = eyes.light;
     this.watching = wanted === "show";
-    // It fades in once there is a picture to show.
-    this.placement.update(dt, wanted === "show" && !light ? "fade" : wanted, wallpaper, shotChanges);
+    // It fades in once there is a picture to show. It is first in the corner.
+    this.placement.update(dt, wanted === "show" && !light ? "fade" : wanted, deck.goal, 0);
     this.mesh.visible = this.placement.alpha > 0 && light !== null;
     if (!light || !this.mesh.visible) return;
     if (eyes.map !== this.#map) this.#build(eyes.map);

@@ -12,8 +12,13 @@ const poses: FlyPose[] = [
   { speed: 3, turn: 1 }, { groom: 1 }, { feed: 1, wings: 0.5 }, { airborne: true, wings: 1, pitch: 0.4, roll: 0.3 }, { crouch: 1, speed: -1 }, {},
 ].map((p) => ({ ...RESTING_POSE, ...p }));
 const fly = createFly();
+// The X-ray on, off and on again on the way: turning it changes the body's material, which mustn't allocate either.
+const xrays = [0, 0.4, 1, 1, 0];
 const run = (n: number) => {
-  for (let i = 0; i < n; i++) fly.update(poses[Math.floor(i / 40) % poses.length], 1 / 60);
+  for (let i = 0; i < n; i++) {
+    fly.nerves.xray = xrays[Math.floor(i / 70) % xrays.length];
+    fly.update(poses[Math.floor(i / 40) % poses.length], 1 / 60);
+  }
 };
 
 run(1500);

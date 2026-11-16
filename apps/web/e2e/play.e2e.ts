@@ -1,7 +1,8 @@
 // Plays the game in a real (GPU-rendered, headless) Chromium with the real
 // brain: boots it, waits for the brain, walks the menus with the keys, feeds
 // the fly and checks it tasted and ate, throws the ball until the fly takes
-// off, checks the wallpaper comes and goes with what it sees in a corner,
+// off, checks the wallpaper comes and goes with what it sees and its nervous
+// system in a corner, that the X-ray comes where the fly is big enough,
 // carries the fly to every place, feeds it the weather outside as the Apple TV
 // would, reloads and finds the settings, the shelf and what the hints taught
 // as it left them, and holds the frame to its draw budget throughout. It holds
@@ -204,8 +205,10 @@ try {
     (globalThis as unknown as { __fly: { settings: { wallpaperAfter: number } } }).__fly.settings.wallpaperAfter = 2;
   });
   await waitFor(page, "wallpaper=true", 10_000);
-  const corner = await waitFor(page, "wallpaper=true,eyesInset~^(top|bottom)-(left|right)$", 5000);
-  console.log(`  what it sees, in the ${corner.eyesInset} corner`);
+  const corner = await waitFor(page, "wallpaper=true,eyesInset~^(top|bottom)-(left|right)$,nerves~^(top|bottom)-(left|right)$", 5000);
+  assert.equal(corner.nerves, corner.eyesInset, "its nervous system shares the corner with what it sees");
+  assert.equal(corner.xray, "0.00", "no X-ray unless asked for");
+  console.log(`  what it sees and its nervous system, in the ${corner.eyesInset} corner`);
   await page.waitForTimeout(1500);
   await press("ArrowRight");
   const back = await waitFor(page, "wallpaper=false", 3000);
@@ -226,6 +229,30 @@ try {
   await waitFor(page, "view=eyes,eyesInset=hidden", 3000);
   await press("ArrowUp", 4);
   await waitFor(page, "view=follow,eyesInset=top-right", 5000);
+
+  step("its nervous system: in the corner with what it sees, the fly as glass where it is big enough to see inside, never over the full picture");
+  await page.evaluate(() => {
+    const settings = (globalThis as unknown as { __fly: { settings: { nerves: string; xray: string } } }).__fly.settings;
+    settings.nerves = "always";
+    settings.xray = "always";
+  });
+  const inside = await waitFor(page, "view=follow,eyesInset=top-right,nerves=top-right,xray>0.9", 5000);
+  assert.ok(inside.glow.length > 0, "its brain's regions glow at rest");
+  console.log(`  glowing: ${inside.glow.split(" ").slice(0, 4).join(" ")}`);
+  await press("ArrowDown");
+  await waitFor(page, "view=wide,xray<0.05", 8000);
+  await press("ArrowUp");
+  await waitFor(page, "view=follow,xray>0.9", 8000);
+  await press("ArrowDown", 4);
+  await waitFor(page, "view=eyes,nerves=hidden", 3000);
+  // View → Inside it shows it however the setting is.
+  await page.evaluate(() => {
+    (globalThis as unknown as { __fly: { settings: { xray: string } } }).__fly.settings.xray = "off";
+  });
+  await press("ArrowDown");
+  await waitFor(page, "view=inside,nerves=top-right,xray>0.9", 8000);
+  await press("ArrowUp", 5);
+  await waitFor(page, "view=follow,xray<0.05", 5000);
   // Kept for the reload at the end.
   await press("ArrowDown");
   await waitFor(page, "view=wide");
@@ -263,7 +290,7 @@ try {
 
   step("back to the title through the pause menu, where Back leaves the app");
   await press("Escape");
-  await waitFor(page, "screen=pause,eyesInset=hidden");
+  await waitFor(page, "screen=pause,eyesInset=hidden,nerves=hidden");
   await press("ArrowDown", 4);
   await waitFor(page, "focus=title");
   await press("Enter");

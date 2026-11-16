@@ -32,6 +32,42 @@ measurements are in `src/anatomy.ts`; the shapes and colours in `src/body.ts`.
 | Halteres | Pale knobs on short stalks behind the wings, which buzz with them. |
 | Bristles | Thin black cones curving back over the body. When a bristle gets thinner than about a third of a pixel it shrinks back to its root rather than being drawn as a broken line, so a small fly is not furred with flickering hairs. |
 
+## The nervous system
+
+`src/nerves/` builds the fly's brain, optic lobes, neck connective, ventral
+nerve cord and nerves, inside the body, for the game's X-ray and its corner
+panel (the game's README, Its nervous system, says how they are shown and
+lit). `createFly()` returns it as `nerves`: its 93 parts (`parts.ts`: each
+with a role, sensory, central or motor, and a kind), a `glow` array the game
+fills (a float a part), and `xray`, 0 to 1.
+
+- **Measured.** The neuropils' shapes are fitted to the FlyEM male CNS v1.0's
+  neuropil meshes by `scripts/nerves.ts` (`node packages/fly/scripts/nerves.ts`,
+  which downloads about 150 MB of meshes once and rewrites
+  `src/nerves/measured.ts`): each as its radius in a grid of directions round
+  its centre, the lamina as a curved plate round the sphere that fits it, the
+  mushroom body's lobes and the protocerebral bridge as rods, the ellipsoid
+  body as a torus, and where the cord's nerves leave it. `anatomy.ts` places
+  the brain in the head (0.88 of true size, its optic lobes under the eyes)
+  and the cord on the thorax's floor (true size), and says what the dataset
+  doesn't hold (the retina, the neck's path, the pars intercerebralis).
+- **Posed by the rig.** Like the body, every vertex belongs to one joint and is
+  stored in its space (the shapes are laid out on a rest pose and carried
+  into each joint's frame); a tube can run through several joints, a ring to
+  a joint, so the connective bends at the neck and each leg nerve at every
+  leg joint. The X-ray's vertex shader reads the body's own joint uniform.
+- **Drawn.** One mesh, one draw, with the body's joints and a uniform array of
+  glows, shaded from three's Lambert material (so its tissue takes the scene's
+  lights), blended premultiplied so its tissue covers what is behind it and
+  its light adds on top. While `xray` is above 0 the body is drawn with a glass
+  variant of its material (smoky across its face, stronger at its edges, its
+  reflections kept) and sorted with the world's glass; at 0 it is exactly the
+  opaque body again and the nervous system isn't drawn. Thin tubes and small
+  organs are kept at least a pixel wide, as the legs are.
+- **The panel's view.** `createNervesPanelMaterial` draws the same geometry
+  and glow from above into a rectangle of the frame, posed at rest; the first
+  two triangles of the geometry are its backdrop.
+
 ## How it moves
 
 `src/rig.ts` turns the pose into a frame for every rigid piece. Inputs are
@@ -122,11 +158,12 @@ follows the number of objects and draw calls. So:
 
 | | |
 | --- | --- |
-| Draw calls | 2 (plus 1 each in any shadow pass) |
-| Triangles | about 14,900 (body 14,400, wings 530) |
+| Draw calls | 2 (plus 1 each in any shadow pass); the X-ray 1 more |
+| Triangles | about 14,900 (body 14,400, wings 530); the nervous system about 16,100 |
 | Joints | 41 body joints (thorax, head, 2 antennae, 3 proboscis, 2 abdomen, 2 halteres, 30 leg segments) and 16 wing copies |
 | `update` | about 2.4 µs in Node with its JIT, about 78 µs in V8's interpreter alone (the nearest Node gets to the TV) |
 | Textures | one 256×128 RGBA `DataTexture` (wing venation) |
+| Uniforms | the body's 41 joints (123 vec4), the nervous system's glow (24 vec4) |
 
 ## The viewer
 
@@ -136,8 +173,13 @@ value, presets for each behaviour, a turntable, slow motion, a fixed 30 or
 off, and the **in-game view**: a 640×480 buffer with no antialiasing,
 stretched to 16:9 like the TV, with the fly a chosen number of pixels long.
 With "walk over the ground" on, the fly moves over a grid as the pose says,
-so a sliding foot shows. `?shot` starts it paused with the panel hidden, and
-`window.viewer` lets a script pose, step and frame it.
+so a sliding foot shows. Under Nervous system: the X-ray's amount and test
+patterns to light the parts (all of them, one role, one part, a ramp of
+levels, or a wave through them in order), which only the viewer makes; the
+game lights them from the brain. `?shot` starts it paused with the panel
+hidden, and `window.viewer` lets a script pose, step and frame it, light the
+nervous system (`xray`), draw the corner panel's view of it large (`panel`),
+and show only some meshes on a plain background (`only`, `background`).
 
 ## Accuracy
 

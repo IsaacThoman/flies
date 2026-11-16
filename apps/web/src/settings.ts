@@ -38,6 +38,10 @@ export type Settings = {
   eyes: EyesDetail;
   /** What its eyes see, small in a corner. */
   eyesInset: ShowWhen;
+  /** Its nervous system at work, small in a corner. */
+  nerves: ShowWhen;
+  /** The fly drawn as glass with its nervous system glowing inside. */
+  xray: ShowWhen;
   /** Show what the buttons do. */
   hints: boolean;
   /** Small frame-cost counters in a corner. */
@@ -58,6 +62,8 @@ export const DEFAULT_SETTINGS: Settings = {
   wallpaperCamera: "follow",
   eyes: "low",
   eyesInset: "wallpaper",
+  nerves: "wallpaper",
+  xray: "off",
   hints: true,
   stats: false,
   realWeather: true,
@@ -77,6 +83,8 @@ const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean 
   wallpaperCamera: (v) => ["follow", "calm", "lively"].includes(v),
   eyes: (v) => ["off", "low", "high"].includes(v),
   eyesInset: showWhen,
+  nerves: showWhen,
+  xray: showWhen,
   place: (v) => v === "turns" || isPlaceId(v),
   scene: isPlaceId,
 };

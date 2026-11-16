@@ -24,9 +24,14 @@ export type FlyUniforms = {
   uPixels: { value: number };
   /** Strength of the painted sky reflection used when there is no environment map. */
   uSky: { value: number };
+  /** 0 to 1: how far the cuticle has turned to a glassy shell to show the nervous system inside (the X-ray). */
+  uXray: { value: number };
+  /** How brightly each part of the nervous system glows, 0 to 1, a float a part (nerves/parts.ts). */
+  uGlow: { value: Float32Array };
 };
 
-const JOINT_PARS = (uniform: string, count: number) => /* glsl */ `
+/** The rig's joint frames as a uniform array of three vec4 rows a joint, and the two ways to apply one. */
+export const JOINT_PARS = (uniform: string, count: number) => /* glsl */ `
 attribute float aJoint;
 uniform vec4 ${uniform}[${count * 3}];
 vec3 flyApply(int j, vec3 p) {
@@ -148,17 +153,42 @@ function bodyVertex(shader: THREE.WebGLProgramParametersWithUniforms, withNormal
   if (withNormal) shader.vertexShader = shader.vertexShader.replace("#include <beginnormal_vertex>", BODY_BEGIN_NORMAL);
 }
 
-/** The opaque body: everything but the wings. */
-export function createBodyMaterial(uniforms: FlyUniforms): THREE.MeshPhysicalMaterial {
+// The X-ray: the cuticle fades to a smoky glass shell, faint and dark across
+// its face and stronger at its edge as glass is, so the fly keeps its outline
+// and colours while what is inside shows through, a little darker than the
+// world behind it so that it stands out in daylight. Its reflections stay at full strength
+// (added to the blend, as the wings do), so it still reads as a hard, glossy
+// surface. The eyes stay a little more tinted than the rest. At uXray 0 it is
+// the opaque body exactly.
+const GLASS = /* glsl */ `
+{
+  float flyEdge = 1.0 - abs(dot(normal, normalize(vViewPosition)));
+  float flyClear = (vFlyMat.w > 0.5 && vFlyMat.w < 1.5 ? 0.18 : 0.16) + 0.55 * flyEdge * flyEdge * flyEdge;
+  float flyA0 = mix(1.0, flyClear, uXray);
+  vec3 flyShine = max(outgoingLight - totalDiffuse, vec3(0.0));
+  float flyA1 = min(1.0, flyA0 + dot(flyShine, vec3(0.2126, 0.7152, 0.0722)) * uXray);
+  // Smoky across its face, so what is inside sits a little darker than the world behind.
+  vec3 flyGlass = totalDiffuse * mix(0.35, 1.0, flyEdge);
+  outgoingLight = mix(outgoingLight, (flyGlass * flyA0 + flyShine) / max(flyA1, 1e-4), uXray);
+  diffuseColor.a = flyA1;
+}
+`;
+
+/**
+ * The body: everything but the wings. Opaque; or, with `glass`, the same
+ * body as the X-ray's clear shell, drawn with the transparent things.
+ */
+export function createBodyMaterial(uniforms: FlyUniforms, glass = false): THREE.MeshPhysicalMaterial {
   const material = new THREE.MeshPhysicalMaterial({
     vertexColors: true, roughness: 0.5, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.22,
-    sheen: 1, sheenRoughness: 0.55, sheenColor: 0xffffff, ior: 1.5,
+    sheen: 1, sheenRoughness: 0.55, sheenColor: 0xffffff, ior: 1.5, transparent: glass,
   });
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, { uJoints: uniforms.uJoints, uPixels: uniforms.uPixels, uSky: uniforms.uSky });
+    Object.assign(shader.uniforms, { uJoints: uniforms.uJoints, uPixels: uniforms.uPixels, uSky: uniforms.uSky, uXray: uniforms.uXray });
     bodyVertex(shader, true);
+    if (glass) shader.fragmentShader = shader.fragmentShader.replace("#include <opaque_fragment>", `${GLASS}\n#include <opaque_fragment>`);
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>\nvarying vec4 vFlyMat;\nvarying vec2 vFlyEye;\n${SKY}`)
+      .replace("#include <common>", `#include <common>\nvarying vec4 vFlyMat;\nvarying vec2 vFlyEye;\nuniform float uXray;\n${SKY}`)
       .replace("#include <roughnessmap_fragment>", "float roughnessFactor = vFlyMat.x;")
       .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>\n${EYE}\n${HAIRS}`)
       .replace(
@@ -173,7 +203,7 @@ export function createBodyMaterial(uniforms: FlyUniforms): THREE.MeshPhysicalMat
       )
       .replace("#include <lights_fragment_maps>", `#include <lights_fragment_maps>\n${SKY_REFLECTION}`);
   };
-  material.customProgramCacheKey = () => "fly-body";
+  material.customProgramCacheKey = () => (glass ? "fly-body-glass" : "fly-body");
   return material;
 }
 
