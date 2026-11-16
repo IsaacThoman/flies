@@ -166,6 +166,18 @@ test("the hands start on Feed with what was kept, by id, and on each tool's firs
   assert.equal(odd.timeOfDay, "clock");
 });
 
+test("the weather kept is Now by its id, whether Now was the real weather outside or the forecast", () => {
+  // Kept while it said "Outside": a launch comes back to Now, real again if the Apple TV can tell it.
+  const hands = new Hands(new World(bare), { weather: { kind: "now" }, light: { kind: "clock" } });
+  assert.equal(hands.weather, "now");
+  assert.equal(hands.timeOfDay, "clock");
+  hands.tool = TOOLS.findIndex((t) => t.id === "weather");
+  assert.equal(hands.label, "Now");
+  hands.outside = true;
+  assert.equal(hands.label, "Outside");
+  assert.equal(hands.variant.id, "now", "what is kept is the kind, not what it is called");
+});
+
 /** A game for the screens to ask things of: it keeps the settings and remembers what it was asked. */
 function fakeShell(settings: Settings = { ...DEFAULT_SETTINGS }, weatherOutside = false) {
   const asked: string[] = [];
