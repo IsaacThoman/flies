@@ -8,7 +8,7 @@ import { test } from "node:test";
 import type { RemoteButton } from "@fly/contracts";
 import { World } from "@fly/world";
 import type { Place } from "@fly/world";
-import { DESIGN_HEIGHT } from "../src/display.ts";
+import { TV_DESIGN_HEIGHT as DESIGN_HEIGHT, TV_FRAME } from "../src/display.ts";
 import { DEFAULT_SETTINGS, KEPT, loadLearned, loadSettings, loadShelf, saveLearned, saveSettings, saveShelf } from "../src/settings.ts";
 import type { Settings } from "../src/settings.ts";
 import { Hands, TOOLS } from "../src/tools/hands.ts";
@@ -185,6 +185,8 @@ function fakeShell(settings: Settings = { ...DEFAULT_SETTINGS }, weatherOutside 
     settings,
     asked,
     weatherOutside,
+    shape: TV_FRAME,
+    glyphs: "remote" as const,
     open: (screen: ScreenId) => asked.push(`open ${screen}`),
     back: () => asked.push("back"),
     applySettings: () => asked.push("apply"),

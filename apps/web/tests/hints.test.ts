@@ -9,8 +9,11 @@ import type { Place } from "@fly/world";
 import type { Learned } from "../src/settings.ts";
 import { Hands, TOOLS } from "../src/tools/hands.ts";
 import type { ToolId } from "../src/tools/hands.ts";
+import { HitMap } from "@fly/ui";
+import { TV_FRAME } from "../src/display.ts";
 import { drawHud } from "../src/ui/hud.ts";
 import type { HudState } from "../src/ui/hud.ts";
+import { hudLayout } from "../src/ui/layout.ts";
 
 /** A 2D context that draws nothing and keeps the words written on it. */
 function recorder() {
@@ -38,9 +41,9 @@ const bare: Place = { floor: { kind: "rect", hx: 500, hz: 500 }, solids: [], pat
 function shown(tool: ToolId, learned: Learned, hints = true) {
   const hands = new Hands(new World(bare));
   hands.tool = TOOLS.findIndex((t) => t.id === tool);
-  const state: HudState = { hands, here: "picnic", activity: "resting", food: null, hints, learned, teachSwipe: true, changed: 10, spikes: 0, brainRunning: true, eyes: null };
+  const state: HudState = { hands, here: "picnic", activity: "resting", food: null, hints, glyphs: "remote", learned, teachSwipe: true, changed: 10, spikes: 0, brainRunning: true, eyes: null, layout: hudLayout(TV_FRAME) };
   const { g, words } = recorder();
-  drawHud(g, 0, state);
+  drawHud(g, 0, state, new HitMap());
   return words;
 }
 
