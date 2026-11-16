@@ -1,8 +1,8 @@
 # Places
 
 The fly can live in more than one place, and the player can carry it between
-them (the Place tool, or Settings → Wallpaper → Where it lives; "Each in turn" moves it on
-after 20 minutes of wallpaper). It is the same fly with the same brain, running
+them (the Place tool, or Settings → Screensaver → Where it lives; "Each in turn" moves it on
+after 20 minutes of screensaver). It is the same fly with the same brain, running
 on: the world fades to black, the new place is built behind the veil, and the
 fly is set down where that place starts it.
 
@@ -153,7 +153,7 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   past the table's edge counts for nothing behind the fly; the view counts
   for about as much as something tall standing some 280 mm behind it. Every
   other
-  shot, the wallpaper's included, stays on the fly and is shared by every
+  shot, the screensaver's included, stays on the fly and is shared by every
   place. Wherever it is, the camera keeps out of everything and clear of the
   surface under it and of what is over it, and anything standing between it
   and the fly (a wall behind it, a table top over the fly) brings it in front

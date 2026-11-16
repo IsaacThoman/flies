@@ -192,7 +192,7 @@ test("every menu fits inside the safe area at every shape, its rows big enough f
 });
 
 test("the settings' tabs can be read at every shape: every one, or, where they are too narrow for that, the one chosen with arrows to step along them", () => {
-  const labels = ["Wallpaper", "On screen", "Picture"];
+  const labels = ["Screensaver", "On screen", "Picture"];
   for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
     for (const glyphs of [null, "remote"] as const) {
       const screen = settingsScreen(shell(frame, glyphs));
@@ -205,7 +205,7 @@ test("the settings' tabs can be read at every shape: every one, or, where they a
       if (tabs.length === labels.length) {
         assert.ok(tabs.every((w) => w.size === tabs[0].size && w.size >= 7), `${where}: tabs at ${tabs.map((w) => w.size).join(", ")}`);
       } else {
-        assert.deepEqual(tabs.map((w) => w.text), ["Wallpaper"], `${where}: the tab chosen`);
+        assert.deepEqual(tabs.map((w) => w.text), ["Screensaver"], `${where}: the tab chosen`);
         assert.ok(tabs[0].size >= 12, `${where}: at ${tabs[0].size}`);
         let steps = 0;
         for (let i = 0; i < hits.count; i++) if (hits.get(i)!.kind === "step" && hits.get(i)!.index === 0) steps++;

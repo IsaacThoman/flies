@@ -120,9 +120,9 @@ way.
 
 Use `--detached` with `logFile` for device measurements. `tvos:soak` installs and launches the
 last physical-device build without attaching, exercises feeding, ball throws, the eye picture
-at Low and High, and pause/settings, then watches the wallpaper at midday and at night for
+at Low and High, and pause/settings, then watches the screensaver at midday and at night for
 `--minutes` in total (plus about three minutes of interaction and idle transitions). It assumes
-the default tool variants and Low eyes, and restores Low before the wallpaper phases. It leaves
+the default tool variants and Low eyes, and restores Low before the screensaver phases. It leaves
 the app running. Do not attach a console or enable `profile`, `gpuTiming` or `glDebug` for the
 final measurement. Pull its log while it runs or after `drive: soak complete`:
 
@@ -279,7 +279,7 @@ has no Swift and no `__native.weather`, and the game keeps its made-up forecast.
   lock it holds only to copy, and keeps the last answer in `NSUserDefaults` (the conditions and
   when they were fetched, never where) for the next run.
 - `weather/WeatherKit/Service.swift` finds the answer, on the main actor. `start()` (the game
-  calls it once the title is up, and when Settings → Wallpaper → Real weather is turned on) asks for When
+  calls it once the title is up, and when Settings → Screensaver → Real weather is turned on) asks for When
   In Use location permission the first time; after that it takes one location fix at a time
   (`requestLocation`) and uses it for six hours, a TV not being one to move. It rounds the
   coordinates to two decimal places (about a kilometre) and asks WeatherKit for the current
@@ -335,7 +335,7 @@ Checked against Apple's documentation in November 2026:
   (tvOS 16.4) is the "text that should be made available to users for apps that cannot display
   the attributionURL contents in a Safari view". About the fly shows the mark, that the game
   has modified the data, the legal text and the legal page's address, all from
-  `WeatherService.attribution`; the wallpaper shows none of it. The game shows no weather
+  `WeatherService.attribution`; the screensaver shows none of it. The game shows no weather
   alerts, which have rules of their own.
 - [Quotas](https://developer.apple.com/weatherkit/): 500,000 calls a month come with the
   developer membership; more is a subscription (a million a month for US$49.99, up to 200
@@ -374,7 +374,7 @@ are, without it, and the game uses its made-up forecast.
    makes an explicit development profile for the App ID with the entitlement, in place of the
    wildcard one.
 4. On the TV, the first time the title comes up, allow the app to use your location while it is
-   in use. Settings → Wallpaper now has Real weather (on); on the Weather tool "Now" becomes "Outside" within
+   in use. Settings → Screensaver now has Real weather (on); on the Weather tool "Now" becomes "Outside" within
    a few seconds; About the fly ends with Apple Weather's attribution.
 5. If it stays "Now", read the console (`run --device` prints it) for `weather outside: …`:
    `unauthorised` with a `WDSJWTAuthenticator` error means WeatherKit doesn't accept the App ID
@@ -440,20 +440,20 @@ the High-eye interaction phase. The runs were detached, with 10-second stats wri
 app's cache; no console, GPU timing or GL debug was attached.
 
 The measured build completed `tvos:soak --minutes 20` in 23 minutes 3 seconds: interaction phases
-followed by ten minutes each of midday and night wallpaper. It was left running on Rufus.
+followed by ten minutes each of midday and night screensaver. It was left running on Rufus.
 
 | Phase | FPS in steady 10-second windows | Mean JavaScript per frame | Highest window's JavaScript p95 | Memory |
 | --- | --- | --- | --- | --- |
-| Midday wallpaper | 59.9–60.0 | 4.22 ms | 10.40 ms | 140.4–142.5 MB |
-| Night wallpaper | 59.9–60.0 | 4.60 ms | 11.84 ms | 142.5–143.5 MB |
+| Midday screensaver | 59.9–60.0 | 4.22 ms | 10.40 ms | 140.4–142.5 MB |
+| Night screensaver | 59.9–60.0 | 4.60 ms | 11.84 ms | 142.5–143.5 MB |
 
 Feeding, sixteen ball throws, the Low/High eye picture, pause/settings, and waking the
-wallpaper all completed. There were no runtime errors or drive timeouts, and every thermal
+screensaver all completed. There were no runtime errors or drive timeouts, and every thermal
 sample was nominal. The last six complete 10-second windows all reported 60 FPS. Memory
 increased about 3 MB after interaction warmup; this run does not establish an overnight bound.
 
 This meets the sustained average 60 FPS target on this device, not an every-frame guarantee.
-Startup and lighting changes had 10-second averages as low as 58.6 FPS. In steady wallpaper,
+Startup and lighting changes had 10-second averages as low as 58.6 FPS. In steady screensaver,
 the worst window's frame-start interval p95 was 19.71 ms and render-completion interval p95
 was 20.83 ms, so some pacing variation remains even when average FPS is 60. These intervals
 are CPU-side measurements, not display scanout. Raw logs, CSVs and test evidence are outside

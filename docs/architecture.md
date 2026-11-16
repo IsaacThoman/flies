@@ -1,6 +1,6 @@
 # Architecture
 
-Flies is a toy and a wallpaper: a fruit fly in a small bright world on
+Flies is a toy and a screensaver: a fruit fly in a small bright world on
 your TV, which you can feed, startle and watch. The fly is not scripted. A
 simulation of the fruit fly's whole central nervous system decides what it
 does, from what it sees, tastes and feels in the world.
