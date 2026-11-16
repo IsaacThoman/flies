@@ -67,8 +67,8 @@ vec3 rMarble(vec2 p, float seed, out float vein) {
   float fv = rFbm(fq);
   float fine = (1.0 - smoothstep(0.0, 0.018 + fwidth(fv) * 1.5, abs(fv - 0.52))) * rDetail(fq * 6.0);
   vec3 c = mix(vec3(0.86, 0.86, 0.84), vec3(0.95, 0.945, 0.93), rFbm(q * 2.0 + 9.0));
-  c = mix(c, vec3(0.6, 0.62, 0.64), strong * (0.45 + 0.35 * rNoise(q * 5.0)));
-  c = mix(c, vec3(0.7, 0.71, 0.72), fine * 0.4);
+  c = mix(c, vec3(0.48, 0.5, 0.53), strong * (0.55 + 0.35 * rNoise(q * 5.0)));
+  c = mix(c, vec3(0.62, 0.63, 0.65), fine * 0.55);
   vein = strong;
   return c;
 }
@@ -188,9 +188,9 @@ if (rK == K_MARBLE) {
   float seed = rHash(floor(vWorld.xz / 1300.0 + 0.5));
   diffuseColor.rgb *= rMarble(vWorld.xz + vWorld.y * vec2(0.3, 0.7), seed, vein);
   // A faint polish, worn by years of plates and elbows.
-  rRough = 0.3 + vein * 0.08;
-  rCoat = 0.45;
-  rCoatRough = 0.12;
+  rRough = 0.38 + vein * 0.08;
+  rCoat = 0.3;
+  rCoatRough = 0.22;
   // Rings where glasses and cups stood, a wine stain, a smear: each the rim of a ring, a little dull.
   for (int i = 0; i < 6; i++) {
     vec4 ring = uRings[i];
