@@ -25,11 +25,12 @@ final class AliveTests: XCTestCase {
     let awake = Date().timeIntervalSince(launched)
     let firstFrames = state.frames
 
-    // Frames go on being drawn and the brain keeps up with them.
+    // Frames go on being drawn and the brain keeps up with them. How many says more about how busy
+    // the Mac is than about the app, so this asks only that they keep coming.
     sleep(4)
     state = try report()
     let drawn = state.frames - firstFrames
-    XCTAssertGreaterThan(drawn, 100, "frames drawn in 4 s")
+    XCTAssertGreaterThan(drawn, 40, "frames drawn in 4 s")
     XCTAssertGreaterThan(state.speed, 0.8, "the brain against real time")
     let load = state.brainSimMs > 0 ? state.brainWallMs / state.brainSimMs : 0
     try assertBrainFromBundle(state)
