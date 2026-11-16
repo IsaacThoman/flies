@@ -21,7 +21,7 @@ export type BrainSenses = {
   wind: number;
   /** Something sweet on the mouthparts. */
   sweet: number;
-  /** Standing on its feet, rather than held or in the air. */
+  /** Standing on its feet, rather than held or in the air: the weight on its legs. */
   grounded: boolean;
   /**
    * What the eyes see: how bright each facet's patch of the world is, from 0
@@ -44,6 +44,11 @@ export type BrainSenses = {
    * before it had a hunger: a hungry fly's, at 1.
    */
   hunger?: number;
+  /**
+   * How hard its own wings beat, from folded (0) to full flight power (1):
+   * what the wings' and halteres' strain sensors feel of each stroke.
+   */
+  wingbeat: number;
 };
 
 /**
@@ -138,4 +143,5 @@ export const RESTING_SENSES: BrainSenses = {
   sweet: 0,
   grounded: true,
   maleTaste: 0,
+  wingbeat: 0,
 };

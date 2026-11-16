@@ -51,7 +51,7 @@ class InternalState {
   static constexpr double kArousalTau = 10, kArousalWeight = 1.6;
   static constexpr double kSceneTau = 4, kSceneWeight = 1.5;
   static constexpr double kBias = -1;
-  static constexpr double kHungerWeight = 0.8;
+  static constexpr double kHungerWeight = 0.9;
 
   explicit InternalState(uint32_t seed) : normal_(seed) {}
 

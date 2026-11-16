@@ -90,6 +90,24 @@ export const FORELEG_MALE_TASTE = {
   LgAG1: [91673, 92777, 94281, 94719, 94995, 95900, 105964, 108436, 111872, 816710],
 } as const;
 
+// The campaniform sensilla (strain sensors in the cuticle) are of three
+// places, which FlyEM's entry nerves tell apart (the packed wiring doesn't carry
+// them; `scripts/wingbeat.ts` checks the types against the anatomy file):
+// the legs' (SNpp53: 12 by the leg nerves, and one with no nerve recorded), the wings' (the anterior
+// dorsal mesothoracic nerve, ADMN: 218) and the halteres' (the dorsal
+// metathoracic nerve, DMetaN: 195). Only the legs' bear the body's weight.
+// The wings' and halteres' are strained by every stroke and fire phase-locked
+// with it in flight (Fayyazuddin & Dickinson 1999; Dhawan, Huang & Dickerson
+// 2025; Lesser, Moussa & Tuthill 2025 reconstructed the ADMN).
+export const LEG_CAMPANIFORM = "SNpp53";
+// In flight the wings' and halteres' sensors fire a spike a stroke, about 200
+// a second, each locked to the stroke. A Poisson input carries only a rate, at
+// random: under the refractory period, 250 Hz of it fires them 200 times a
+// second and 100 Hz 91 times. WINGBEAT_RATE is the round rate the model drives
+// its other hard-driven sensory neurons at; anywhere from 100 to 250 Hz the
+// loop it closes with the body dies away the same (README, Senses).
+export const WINGBEAT_RATE = 100;
+
 export const SENSES: readonly SenseSpec[] = [
   { sense: "loomLeft", name: "loomLeft", description: "Looming detectors (LPLC2, LC4) of the left eye", select: sided(LOOMING, "left"), maxRate: 100 },
   { sense: "loomRight", name: "loomRight", description: "Looming detectors (LPLC2, LC4) of the right eye", select: sided(LOOMING, "right"), maxRate: 100 },
@@ -138,8 +156,8 @@ export const SENSES: readonly SenseSpec[] = [
   {
     sense: "grounded",
     name: "grounded",
-    description: "Campaniform sensilla (load sensors) of the legs, firing tonically while standing",
-    select: { superClass: ["vnc_sensory", "sensory_ascending"], subClass: "campaniform_sensilla" },
+    description: "Campaniform sensilla (load sensors) of the legs (SNpp53), firing tonically while standing",
+    select: { subClass: "campaniform_sensilla", type: LEG_CAMPANIFORM },
     maxRate: 20,
   },
   {
@@ -150,6 +168,14 @@ export const SENSES: readonly SenseSpec[] = [
     // A round number, of the order of what a contact chemoreceptor fires for
     // its ligand (tens of spikes a second); at 100 the answer is the same (README).
     maxRate: 50,
+    afterEyes: true,
+  },
+  {
+    sense: "wingbeat",
+    name: "wingbeat",
+    description: "Campaniform sensilla (strain sensors) of the wings and halteres, firing with each stroke",
+    select: { superClass: ["vnc_sensory", "sensory_ascending"], subClass: "campaniform_sensilla", type: (t: string) => t !== LEG_CAMPANIFORM },
+    maxRate: WINGBEAT_RATE,
     afterEyes: true,
   },
 ];

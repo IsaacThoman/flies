@@ -44,7 +44,8 @@ export type Synthetic = { bytes: Uint8Array; index: Record<string, number[]>; ne
  * Every group the brain needs, a few neurons each, with:
  * looming detectors -> giant fiber -> flight motor neurons; head bristles ->
  * MDN; wind JO -> DNg12; sweet taste -> MN9; a male's taste on the front
- * legs -> pIP10; each eye's LC10a -> that side's
+ * legs -> pIP10; the wings' campaniform sensilla -> the flight motor neurons;
+ * each eye's LC10a -> that side's
  * DNa02 and DNg100. Each eye also has four columns of L1, L2 and L3 (see
  * syntheticEyeColumns), whose L2s drive that eye's LPLC2. Leave groups out
  * with `without`, or change their annotations with `change`, to get broken
@@ -76,7 +77,8 @@ export function syntheticConnectome({ without = [], change = {} }: { without?: r
   add("bristle", 6, { type: "SNta02", superClass: "vnc_sensory", class: "mechanosensory_tactile", subClass: "mechanosensory_bristle", nt: "ACH" });
   add("sweet", 4, { type: "dorsal_tpGRN", superClass: "cb_sensory", class: "gustatory", side: "left", nt: "ACH" });
   add("bitter", 4, { type: "LB1a", superClass: "cb_sensory", class: "gustatory", side: "left", nt: "ACH" });
-  add("campaniform", 4, { type: "SNpp01", superClass: "vnc_sensory", class: "mechanosensory_proprioceptive", subClass: "campaniform_sensilla", nt: "ACH" });
+  add("campaniform", 4, { type: "SNpp53", superClass: "vnc_sensory", class: "mechanosensory_proprioceptive", subClass: "campaniform_sensilla", nt: "ACH" });
+  add("wing campaniform", 3, { type: "SApp10", superClass: "sensory_ascending", class: "mechanosensory_proprioceptive", subClass: "campaniform_sensilla", nt: "ACH" });
   add("DNg100", 2, { type: "DNg100", superClass: "descending_neuron", side: "left", nt: "ACH" });
   add("MDN", 2, { type: "MDN", superClass: "descending_neuron", side: "left", nt: "ACH" });
   add("DLM", 2, { type: "DLM1-4", superClass: "vnc_motor", side: "left" });
@@ -109,6 +111,7 @@ export function syntheticConnectome({ without = [], change = {} }: { without?: r
   wire("bitter", "interneuron", 60);
   wire("interneuron", "MN9", 60);
   wire("campaniform", "interneuron", 5);
+  wire("wing campaniform", "DLM", 40);
   wire("bristle", "MDN", 20);
   wire("LgLG1a", "pIP10", 120);
   wire("LgAG1", "pIP10", 120);

@@ -34,8 +34,11 @@ const bare: Place = { floor: { kind: "rect", hx: 500, hz: 500 }, solids: [], pat
 const GROUND = 0.65;
 const BALL = 0.04;
 
-/** A throw: whether it took off and how hard the giant fiber fired; and if it flew, how long, how far along its way and how high, and whether it came down on its feet. */
-type Throw = { tookOff: boolean; escape: number; air: number; distance: number; top: number; landed: boolean; lowest: number };
+/**
+ * A throw: whether it took off and how hard the giant fiber fired; and if it flew, how long, how far along its way and how
+ * high, whether it came down on its feet, and how hard its wings beat on its feet after (the brain's `wingbeat`, on average).
+ */
+type Throw = { tookOff: boolean; escape: number; air: number; distance: number; top: number; landed: boolean; lowest: number; beatAfter: number };
 
 /** Throws the ball at the fly until `throws` have flown, the eyes open (seeing it) or shut (the hand-wired loom), with a lap of `meter` every simulated second. */
 function swoops(eyes: "open" | "shut", seed: number, throws = THROWS, meter?: CpuMeter) {
@@ -80,7 +83,7 @@ function swoops(eyes: "open" | "shut", seed: number, throws = THROWS, meter?: Cp
     const before = life.takeOffs;
     const from = { ...life.body.position };
     const last = { ...from };
-    const result: Throw = { tookOff: false, escape: 0, air: 0, distance: 0, top: 0, landed: false, lowest: Infinity };
+    const result: Throw = { tookOff: false, escape: 0, air: 0, distance: 0, top: 0, landed: false, lowest: Infinity, beatAfter: 0 };
     const watch = () => {
       result.escape = Math.max(result.escape, brain.state?.command.escape ?? 0);
       if (life.body.onFeet) return;
@@ -103,7 +106,12 @@ function swoops(eyes: "open" | "shut", seed: number, throws = THROWS, meter?: Cp
       result.landed ||= life.body.events.landed;
     }
     result.landed ||= result.air > 0 && life.body.onFeet;
-    for (let t = 0; t < 1.6; t += DT) frame(false);
+    let frames = 0;
+    for (let t = 0; t < 1.6; t += DT, frames++) {
+      frame(false);
+      result.beatAfter += life.senses.senses.wingbeat;
+    }
+    result.beatAfter /= frames;
     result.tookOff = life.takeOffs > before;
     results.push(result);
   }
@@ -149,7 +157,7 @@ test("the swoop seen through the brain's own eyes fires the giant fiber and the 
   const cpu = meter.ms / 1000;
   const off = results.filter((r) => r.tookOff).length;
   console.log(`  eyes open: ${off} of ${results.length} took off (escape peaks: ${summary(results)}); ${time.toFixed(0)} s of its life in ${cpu.toFixed(1)} M5 Pro CPU s (${(meter.rawMs / 1000).toFixed(1)} here)`);
-  // Seed 1 takes off from all 8 (escape 0.45 to 0.70), each a flight of 1.5 to 1.6 s and 386 to 407 mm along its way.
+  // Seed 1 takes off from 7 of 8 (escape 0.51 to 0.70; the eighth peaks at 0.32), each a flight of 1.5 to 1.6 s and 382 to 396 mm along its way.
   assert.ok(off >= 6, `${off} of ${results.length} took off: ${summary(results)}`);
   // Every throw that crossed the line took off: the body did what the giant fiber said.
   for (const r of results) if (r.escape >= ESCAPE_ON + 0.02) assert.ok(r.tookOff, `escape reached ${r.escape.toFixed(2)} and it stayed: ${summary(results)}`);
@@ -160,6 +168,8 @@ test("the swoop seen through the brain's own eyes fires the giant fiber and the 
     assert.ok(r.top > 10, `rose ${r.top.toFixed(0)} mm`);
     assert.ok(r.landed, `didn't land: ${summary(results)}`);
     assert.ok(r.lowest >= 0, "never below the floor");
+    // The wings' own sensors don't keep them going once it is down (measured, seeds 1 to 4: at most 0.03 at any moment).
+    assert.ok(r.beatAfter < 0.05, `its wings beat at ${r.beatAfter.toFixed(2)} after it landed`);
   }
   // The fly's life with its eyes open to the swoop takes a fifth of an M5 Pro CPU second per simulated second.
   assert.ok(cpu < 0.34 * time, `${cpu.toFixed(1)} M5 Pro CPU s for ${time.toFixed(0)} s; budget ${(0.34 * time).toFixed(1)}`);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FOODS, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TABLE_RADIUS, World, createPicnic, createSurface, isDropped } from "../src/index.ts";
-import type { RayHit } from "../src/index.ts";
+import type { RayHit, Solid } from "../src/index.ts";
 
 /** A bare round table this wide, with nothing on it. */
 const openTable = (r: number) => new World({ floor: { kind: "circle", r }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320 });
@@ -243,13 +243,13 @@ test("a bounded ray stops at its segment end, for both the floor and a solid", (
 });
 
 test("a level ray meets a dome or a dish where it first stands as high as the ray, as a fine walk along it finds", () => {
-  const solids = [
+  const solids: Solid[] = [
     { name: "dome", footprint: { kind: "circle", x: 0, z: 0, r: 10 }, top: { kind: "dome", base: 2, height: 6, power: 0.6 } },
     { name: "egg", footprint: { kind: "ellipse", x: 30, z: 0, rx: 8, rz: 5, angle: 0.4 }, top: { kind: "dome", base: 0, height: 5, power: 1 } },
     { name: "cushion", footprint: { kind: "box", x: -30, z: 0, hx: 6, hz: 9, angle: 0.3 }, top: { kind: "dome", base: 1, height: 3, power: 1.15 } },
     { name: "dish", footprint: { kind: "circle", x: 0, z: 30, r: 12 }, top: { kind: "dish", well: 3, rim: 6, inner: 0.6, lip: 0.85 } },
     { name: "plate", footprint: { kind: "circle", x: 0, z: -30, r: 12 }, top: { kind: "dish", well: 9, rim: 10, inner: 0.7, lip: 0.9 }, bottom: 8 },
-  ] as const;
+  ];
   const place = new World({ floor: { kind: "rect", hx: 60, hz: 60 }, solids, patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 100 });
   let seed = 9;
   const random = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32);

@@ -85,7 +85,7 @@ type EyeState = { value: number; hold: number };
 export type Tasting = { food: Food | null; byMouth: boolean };
 
 export class SenseTracker {
-  readonly senses: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0 };
+  readonly senses: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0, wingbeat: 0 };
   readonly tasting: Tasting = { food: null, byMouth: false };
   /** How large each looming thing was in the eye last frame (rad), by id. */
   #sizes = new Map<number, number>();
@@ -183,6 +183,8 @@ export class SenseTracker {
     out.sweet = clamp01(sweet);
     out.grounded = body.onFeet;
     out.maleTaste = clamp01(this.#maleTaste);
+    // Its own wings, as they beat in its last step: their strain sensors feel each stroke.
+    out.wingbeat = clamp01(body.wingbeat);
     return out;
   }
 
