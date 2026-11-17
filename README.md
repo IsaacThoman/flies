@@ -92,7 +92,7 @@ with `npm run brain:wasm` as well.
 
 The sleep measurements are being remeasured separately. The account below
 describes the intended clock rhythm and retained observations, not a
-guarantee for every bout; no numeric sleep result or table is changed here.
+guarantee for every bout.
 
 The fly keeps the real time of day, whatever light is chosen: its clock follows the
 device's clock and, on an Apple TV that knows them, the available real sunrise and sunset

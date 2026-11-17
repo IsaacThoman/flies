@@ -10,8 +10,9 @@ and the iPhone and iPad app (`apps/ios`) go together, as one app, "Flies", at on
    commit titles are supported by the release analyzer.
 2. To release, open a pull request from `dev` into `main` and merge it with a **merge commit**,
    not a squash, so `main` keeps `dev`'s history and the two don't drift apart.
-3. CI (`.github/workflows/ci.yml`) runs the checks on `main`, as it does on every pull request
-   and push to `dev`:
+3. CI (`.github/workflows/ci.yml`) runs the checks on `main` and pushes to `dev`.
+   Pull requests run the same jobs when ready; drafts skip the macOS tests
+   and browser e2e job:
    - lint, both typechecks and the web build, on Linux;
    - the unit tests, on a macOS arm64 runner, where the brain's bit-for-bit tests hold;
    - `npm run e2e`, which reports without blocking.

@@ -102,7 +102,8 @@ about twice that, Wide about a third. It keeps its place round the fly and
 moves only when it has to (the fly has turned its back for more than a
 second, something is in the way, or there is fruit or a jar to have behind
 it), never crossing over the fly when it can help it. Ordinary tracking uses critically damped springs; cuts, manual yaw and
-collision shortening can be immediate. walking it keeps
+emergency collision correction can be immediate. Obstacle feelers usually bring
+it in over several frames and let it out more slowly once the way stays clear. Walking, it keeps
 pace a little ahead, and in a jump it pulls back, widens and whips round
 after the fly. Collision checks try to keep it outside solids, taking precedence over
 the desired shot distance; in tight spaces it can come much closer. With the ball in hand it goes round to the side across the
@@ -134,8 +135,9 @@ Its camera can take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
 (Lively). A bound press, tap, touch or deliberate mouse move brings the controls
 back. One-shot presses and pointer taps are consumed; held Select or camera
-axes can act immediately on waking. On an idle title screen the title
-framing remains, and play-only corner pictures stay hidden.
+axes can act immediately on waking. When the title menu fades into the
+screensaver, the fly eases into the middle of the picture; play-only corner
+pictures stay hidden.
 A small picture of what the fly's eyes see sits in a corner of the screensaver
 (Settings → On screen → Fly POV: off, in the screensaver, or always, the default, which keeps it in
 the top right while you play too), and under it a picture of its nervous

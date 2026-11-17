@@ -15,6 +15,8 @@ npm run tvos:typecheck
 Tests run TypeScript directly in Node. The normal tests run first; calibrated
 CPU budgets in `*.budget.ts` then run serially (`scripts/cpuBudget.ts`).
 For a small change, run the relevant file with `node --test <path>` first.
+CI skips macOS tests and browser e2e for draft pull requests, then runs them
+when the request is marked ready. Local checks still apply.
 
 Browser checks need the connectome and Playwright Chromium:
 
