@@ -49,11 +49,10 @@ if (values.wiring) {
       for (let e = c.ptr[i]; e < c.ptr[i + 1]; e++) group.output += c.count[e];
     }
     console.log(JSON.stringify({ population: name, n: members.length, types }));
-      // For each exact hop length, dynamic programming retains the strongest
-      // bottleneck path per neuron. Counts remain individual edges, never a
-      // product of group totals that may involve different relay neurons.
-      const walksBySign = [];
-      for (const excitatoryOnly of [false, true]) {
+    // Group totals may combine unrelated relays; retain individual contiguous
+    // edges so every reported count belongs to a real anatomical walk.
+    const walksBySign = [];
+    for (const excitatoryOnly of [false, true]) {
       let paths = new Map<number, { nodes: number[]; counts: number[]; bottleneck: number }>();
       for (const i of members) paths.set(i, { nodes: [i], counts: [], bottleneck: Infinity });
       const walks = [];
@@ -71,7 +70,7 @@ if (values.wiring) {
         paths = next;
       }
       walksBySign.push({ excitatoryOnly, walks });
-      }
+    }
     for (const type of targets) {
       const ends = new Set(c.find({ type }));
       let directSynapses = 0;
@@ -97,7 +96,7 @@ if (values.simulate) {
   for (const population of values.populations.split(",")) {
     const members = populations.get(population);
     if (!members) throw new Error(`Unknown population ${population}`);
-    for (const rate of population === "rest" ? [0] : rates) for (const duration of durations) {
+    for (const rate of (population === "rest" ? [0] : rates)) for (const duration of durations) {
       const trials = [];
       for (let seed = 1; seed <= seeds; seed++) {
         // Fresh brain per trial preserves the real background state and each

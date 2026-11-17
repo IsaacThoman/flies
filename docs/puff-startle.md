@@ -1,6 +1,6 @@
 # Air puffs and take-off: investigation
 
-Status: circuit investigation. No gameplay change is proposed yet.
+Status: completed circuit investigation; no gameplay change proposed. The full check has a CPU-budget failure, detailed below.
 
 ## Review rubric
 
@@ -32,7 +32,7 @@ contact with a perch, and the animal's state matter. These are adult
 | Same paper, Fig. 1i–l, 2d–o and 4 | Wind-selective cells are tonic; sound-selective cells are phasic, with occasional onset/offset spikes during wind. A/B and C/E are distinct sensory channels. | A sharp mechanical onset is not represented adequately by tonic C/E drive alone. |
 | [Mu, Bacon, Ito & Strausfeld 2014, J Exp Biol 217:2121–2129](https://doi.org/10.1242/jeb.099135), Fig. 4A–D ([full text](https://jfly.uni-koeln.de/temp/reprints/2014_Mu_JExpBiol_giant_fiber.pdf)) | Air puffs depolarized 28/29 recorded giant descending neurons; onset evoked a large EPSP, later responses varied. A roughly 6 Hz puff train adapted. Combined light-off and puff responses exceeded either alone but were sublinear relative to their sum. | 28/29 is a membrane response count, **not** a jump or flight probability. Sensory depolarization often stayed below spike threshold. |
 | [Banerjee et al. 2004, J Neurosci 24:7869–7878](https://pmc.ncbi.nlm.nih.gov/articles/PMC1289272/), Fig. 3A and associated Results | Wild-type CS air-puff-evoked DLM flight patterns were reported in five of five animals; each of two itpr mutant combinations failed in four of four. | 5/5 is a small-sample tethered muscle-pattern result, **not** a free-standing take-off dose-response. |
-| [Iyengar & Wu 2014, J Neurogenet 28:316–328](https://pmc.ncbi.nlm.nih.gov/articles/PMC5555410/), Fig. 3 and Methods | A 500 ms puff reliably initiated tethered WT flight. Non-fliers failed five puffs separated by 5 s. Onset DLM firing was 19.65±2.9 Hz versus 4.25±0.9 Hz in sustained flight. | Flight initiation is well established; these are muscle rates, not GF rates or single-puff jump percentages. |
+| [Iyengar & Wu 2014, J Neurogenet 28:316–328](https://pmc.ncbi.nlm.nih.gov/articles/PMC5555410/), Fig. 3 and Methods | A 500 ms puff reliably initiated tethered WT male flight (Fig. 3: 37 initiations from 14 flies). Non-fliers failed five puffs separated by 5 s. Onset DLM firing was 19.65±2.9 Hz versus 4.25±0.9 Hz in sustained flight. | Flight initiation is well established; these are muscle rates, not GF rates or single-puff jump percentages. |
 | [Ache et al. 2019, Nat Neurosci 22:1132–1139](https://pmc.ncbi.nlm.nih.gov/articles/PMC7444277/), Fig. 3d–f and Mechanosensory stimulation | Strong one-second posterior-lateral puffs moved antennae, legs and wings but did **not** initiate flight in this preparation. DNp10 was excited and DNp07 inhibited. | Direction and preparation matter; a non-GF mechanosensory response does not imply take-off. |
 | [Lebestky et al. 2009, Neuron 64:522–536](https://pmc.ncbi.nlm.nih.gov/articles/PMC2908595/), Fig. 1A–J, S2, S7 ([full text](https://www.bennington.edu/sites/default/files/sources/docs/Sherman_Two%20Different%20Forms%20of%20Arousal.pdf)) | Six 200 ms puffs, 5 s apart, 35 psi at the apparatus produced 7–10 min of hyperlocomotion. Peak velocity/distance saturated near four puffs. Sensitization persisted at 10 min but was absent at 30 min. | A persistent locomotor state (ReSH), not sustained GF spiking or a take-off count. The puffs physically displaced flies against mesh. Regulator psi is not air velocity at the antenna. |
 
@@ -117,7 +117,7 @@ with deterministic ties from dataset index order. It permits repeated neurons;
 it is not an enumeration of every simple path. Transmitters and root IDs are
 printed on every node, so inhibitory or muted relays are visible. A strongest
 bottleneck is a descriptive graph statistic, not a model of effective drive.
-The simulator, rather than this ranking, determines whether activity passes.
+The simulator, rather than this ranking, determines whether activity passes. Both unrestricted and model-excitatory-only rankings are supplied, so a large inhibitory walk cannot hide the smaller excitatory candidate.
 
 Each simulated trial starts a fresh brain and its normal spontaneous state,
 rests for 2 s, applies independent Poisson drive to the stated population, and
@@ -157,6 +157,7 @@ At 100 Hz, for a 100 ms transient (range across seeds):
 
 | Population | DNp01 peak, Hz | Flight MN peak, Hz | DNg12 peak, Hz | Escape peak | Threshold events |
 | --- | ---: | ---: | ---: | ---: | ---: |
+| Sham / rest | 0.00–23.81 | 0.00–5.75 | 0.00–0.00 | 0.00–0.12 | 0/3 |
 | wind | 0.00–30.86 | 23.89–25.08 | 23.46–27.91 | 0.00–0.15 | 0/3 |
 | A | 0.00–24.19 | 0.00–8.01 | 0.00–0.00 | 0.00–0.12 | 0/3 |
 | B | 67.60–73.67 | 2.79–10.54 | 0.00–0.25 | 0.34–0.37 | 0/3 |
@@ -261,10 +262,103 @@ This is a bounded model result, not proof that the real animal lacks puff
 escape, nor proof that missing electrical coupling alone caused the negative
 result. Other limitations include incomplete JO reconstruction, model gains,
 lack of receptor potentials and synchrony, no antennal mechanics, and the
-rate-based escape decoder. ReSH's dopamine/receptor-mediated persistent
+rate-based escape decoder. A physical puff can also move body bristles, wings and legs (the Ache preparation demonstrates this); JO-only stimulation does not test all of those mechanosensory routes. ReSH's dopamine/receptor-mediated persistent
 state is absent too; it is not reproduced by simply holding wind on.
 
 The next useful work is a separately validated GF decoder and electrical
 sensory transmission model with physiological constraints, plus a calibrated
 antennal puff waveform. A physical airspeed-to-neural-rate/timing measurement
 would be needed before comparing a game probability curve to real take-offs.
+
+## Expanded transient check
+
+A/B, 100 ms onset drive, seeds 1–20; a fresh brain uses the same seed at each strength. The explicit sham sweep used seeds 1–3:
+
+| Requested neural rate | Realized population rate during pulse | Escape peak range | Threshold-event fraction |
+| --- | ---: | ---: | ---: |
+| 25 Hz | 22.4–27.8 Hz | 0.083–0.200 | 0/20 |
+| 50 Hz | 44.1–51.4 Hz | 0.118–0.207 | 0/20 |
+| 100 Hz | 87.2–96.7 Hz | 0.147–0.315 | 0/20 |
+| 200 Hz | 159.5–173.2 Hz | 0.243–0.395 | 0/20 |
+
+Every strength had 0/20 observed threshold events. This does **not** estimate a
+zero biological probability: the two-sided 95% exact binomial interval for
+0/20 is 0–16.8%, and seeds sample model stochasticity, not animal-to-animal
+variation. The 200 Hz condition approaches threshold in some seeds. The
+realized rate is below the requested Poisson rate because driven neurons
+retain their refractory period. No conversion to airflow strength is known.
+This neural dose-response is therefore not quantitatively comparable with
+the 5/5 tethered DLM observation or a free-standing fly's take-off probability.
+
+Reproduce the expansion:
+
+```sh
+node packages/brain/scripts/puff.ts --simulate --populations AB --rates 25,50,100,200 --durations 100 --seeds 20
+```
+
+The script also records cumulative spike snapshots at 20 ms, stimulus end,
+1,000 ms and 1,500 ms, and realized input firing, allowing onset, held and
+recovery intervals to be recovered by subtraction. It counts the body's
+inclusive threshold (`>= 0.4`); no measured result here lies exactly on it.
+
+## Timing control
+
+Onset A/B plus tonic C/E was tested separately (seeds 1–10). A/B received a
+20 or 100 ms pulse; disjoint C/E received the same requested rate for 1 s.
+This is a temporal-recruitment experiment, not a measured antenna waveform.
+The C/E completeness corrections remained in place.
+
+| Requested rate | A/B pulse | Largest escape peak across 10 seeds | Threshold events |
+| --- | ---: | ---: | ---: |
+| 50 Hz | 20 ms | 0.141 | 0/10 |
+| 50 Hz | 100 ms | 0.209 | 0/10 |
+| 100 Hz | 20 ms | 0.185 | 0/10 |
+| 100 Hz | 100 ms | 0.129 | 0/10 |
+| 200 Hz | 20 ms | 0.184 | 0/10 |
+| 200 Hz | 100 ms | 0.214 | 0/10 |
+
+No threshold event occurred in this timing control. Its 0/10 condition counts
+have wide uncertainty (two-sided exact 95% upper limit 30.8%); pooling different
+strengths would not estimate a single puff probability. The result rules out
+neither other timing/recruitment patterns nor an electrical pathway absent
+from the model. It supports withholding this particular sensory mapping.
+
+```sh
+node packages/brain/scripts/puff.ts --simulate --populations AB+CE --rates 50,100,200 --durations 20,100 --seeds 10
+```
+
+## Validation
+
+Against base `bd88a01` (the origin/dev tip when this branch was created), the
+production brain, native brain, body and tool sources are unchanged. The diff
+adds this report, two numerical summaries, the Node-only research probe and a
+README link. New commits on dev are not treated as part of this experiment.
+
+- Full `npm test`: main suite **717 passed, 0 failed, 4 skipped** (721 tests).
+  This includes the real-connectome behaviour/fingerprint tests and native and
+  committed-WASM parity. Skips: three optional anatomy/Feather checks (sidecar
+  absent) and rebuilding WASM byte-for-byte (wasi-sdk absent). No native source
+  or WASM output changed.
+- The four subsequent CPU-budget tests: **3 passed, 1 failed**. Swoop/flight
+  integration and fly-update budgets passed. Brain build **225 ms < 250**;
+  rest **0.100 s/s < 0.16**; everything-at-once **0.597 s/s > 0.5** failed.
+- Isolated rerun of `node --test packages/brain/src/cost.budget.ts` also failed:
+  build **213 ms**, rest **0.097 s/s**, everything-at-once **0.566 s/s**.
+  These are normalized thread CPU measurements (median of five), not wall time.
+- `npm run lint` and `npm run typecheck`: passed.
+- No browser e2e flow is changed; no UI or browser render was needed to verify
+  the documentation/probe-only change.
+
+Thus **the full npm test command is not green**. No budget was relaxed and no
+model parameter was adjusted. The failed budget and all its imported runtime
+sources are byte-identical to the base. `scripts/cpuBudget.ts` explicitly warns
+that its reference cannot normalize other processes thrashing shared caches
+and memory; the observed failure is consistent with that limitation, but its
+cause has not been experimentally isolated. A quiet-machine budget check is
+still needed. The report does not claim an all-green regression run.
+
+Heavy runs used the shared slots. Following the fairness update, the full test
+process group was paused and its slot released near nine minutes, then resumed
+after a two-minute cooldown in another owned slot. Only CPU/game-time checks
+remained active; no test or assertion was skipped to fit a slot. No server,
+browser or simulator was started for this investigation.
