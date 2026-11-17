@@ -42,7 +42,7 @@
 			# Missing data or scripts must be 404s, never the SPA entry; so must the
 			# app site association when disabled (APPLE_TEAM_ID=0).
 			@spa {
-				not path /assets/* /brain/* /sw.js /manifest.webmanifest *.wasm /.well-known/*
+				not path /privacy /privacy/* /assets/* /brain/* /sw.js /manifest.webmanifest *.wasm /.well-known/*
 				not file {path}
 			}
 			rewrite @spa /index.html
@@ -52,6 +52,8 @@
 			header @immutable Cache-Control "public, max-age=31536000, immutable"
 			@js path *.js
 			header @js Content-Type "text/javascript; charset=utf-8"
+			@notices path /THIRD_PARTY_NOTICES
+			header @notices Content-Type "text/plain; charset=utf-8"
 			@manifest path *.webmanifest
 			header @manifest Content-Type application/manifest+json
 			@binary path *.bin
