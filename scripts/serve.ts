@@ -39,9 +39,11 @@ export type SiteOptions = {
   port?: number;
   /** For trying a broken download: drop the connection after this many bytes of the response for `file`. */
   cut?: (file: string, hit: Hit) => number | null;
+  /** Completed response bodies, including service-worker requests, for transfer measurements. */
+  transferred?: (file: string, bytes: number) => void;
 };
 
-export async function serveSite({ dir, base = "/", port = 0, cut }: SiteOptions) {
+export async function serveSite({ dir, base = "/", port = 0, cut, transferred }: SiteOptions) {
   dir = path.resolve(dir);
   const requests: Hit[] = [];
   const server = http.createServer((req, res) => {
@@ -97,6 +99,7 @@ export async function serveSite({ dir, base = "/", port = 0, cut }: SiteOptions)
       res.end();
       return;
     }
+    res.on("finish", () => transferred?.(file, end - start + 1));
     const stop = cut?.(file, request);
     const stream = fs.createReadStream(full, { start, end: stop != null ? Math.min(end, start + stop - 1) : end });
     stream.on("error", () => res.destroy());
