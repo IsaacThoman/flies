@@ -201,26 +201,33 @@ export class Rate {
   }
 }
 
-/** Per player: balls thrown, food dropped, food the place put out reported, bubbles burst, and (the starter) changes to the table; and messages of any kind. */
+/**
+ * Per player: balls thrown, food dropped, food the place put out reported, bubbles burst, (the starter) changes to the table, and changes
+ * to how many flies it brings; and messages of any kind. A device's fly count has its own allowance, so a starter busy with the light
+ * and the weather never has a recount dropped.
+ */
 export const LIMITS = {
   throws: [12, 3],
   drops: [30, 6],
   found: [10, 4],
   pops: [120, 10],
   changes: [30, 6],
+  recounts: [20, 6],
   messages: [60 * 60, 120],
 } as const satisfies Record<string, readonly [perMinute: number, burst: number]>;
 
 /**
  * What each address may do with rooms, as [per minute, at once] where it is
- * a rate: connections open at once; connections opened (a device opens one
+ * a rate: connections open at once (enough for a house, a school or a phone
+ * network behind one address, now that every device sits in a room open to
+ * everyone unless told not to); connections opened (a device opens one
  * again only after it drops, later each time, so this is many devices'
  * worth; and it keeps guessing tables' codes hopeless); rooms started (an hour's worth: 30);
  * tries at a locked room's password, from one address and at one room, so
  * that guessing one is hopeless (a few dozen tries an hour at most).
  */
 export const ROOM_LIMITS = {
-  connections: 24,
+  connections: 64,
   opens: [60, 30],
   starts: [0.5, 5],
   knocks: [3, 5],

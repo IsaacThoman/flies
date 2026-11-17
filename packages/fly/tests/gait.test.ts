@@ -58,8 +58,8 @@ function walk(speed: number, turn: number, seconds: number, dt = DT) {
 
 test("legs lift in two alternating tripods", () => {
   // A fine time step, so the frame rate does not blur the phases.
-  const { lifts } = walk(2, 0, 3, 1 / 1200);
-  const period = strideLength(2) / 2;
+  const { lifts } = walk(6, 0, 3, 1 / 1200);
+  const period = strideLength(6) / 6;
   // Within a tripod the legs lift within a tenth of a cycle of each other...
   const nearest = (leg: number, t: number) => lifts[leg].reduce((best, x) => (Math.abs(x - t) < Math.abs(best - t) ? x : best));
   for (const tripod of [TRIPOD_A, TRIPOD_B]) {
@@ -142,5 +142,63 @@ test("a fly that stops settles onto all six feet at home and stops stepping", ()
     assert.equal(gait.swinging[leg], 0);
     const d = Math.hypot(gait.feet[leg * 3] - home[leg * 3], gait.feet[leg * 3 + 2] - home[leg * 3 + 2]);
     assert.ok(d < 0.013, `leg ${leg} is ${d.toFixed(4)} from home`);
+  }
+});
+
+test('contact durations follow published stance scaling and maintain fast support', () => {
+  // DeAngelis 2019 Methods Eq. 1: stance_ms = 932.8 * speed_mm^-1.025.
+  // Compare extracted contacts; no timing helper from the implementation.
+  for (const speed of [0.5, 3, 6, 10, 14]) {
+    const home = homes(), gait = new Gait(home), dt = 0.001;
+    const landed = new Float64Array(6), stances: number[] = [];
+    let supported = 0, samples = 0, five = 0;
+    for (let f = 0; f < 10000; f++) {
+      const prev = gait.swinging.slice();
+      gait.update(speed, 0, dt, home);
+      const t = f * dt;
+      let feet = 0;
+      for (let l = 0; l < 6; l++) {
+        if (prev[l] && !gait.swinging[l]) landed[l] = t;
+        if (!prev[l] && gait.swinging[l] && t > 3) stances.push(t - landed[l]);
+        if (!gait.swinging[l]) feet++;
+      }
+      if (t > 3) { supported += feet >= 3 ? 1 : 0; five += feet >= 5 ? 1 : 0; samples++; }
+    }
+    const stance = stances.reduce((a,b)=>a+b,0) / stances.length;
+    const reference = 0.9328 * (speed * 2.5) ** -1.025;
+    assert.ok(Math.abs(stance/reference-1)<0.2, `${speed}: stance ${stance}, reference ${reference}`);
+    assert.ok(supported/samples>0.98, `${speed}: support ${supported/samples}`);
+    if(speed===0.5) assert.ok(five/samples>0.95, 'slow metachronal steps retain five-foot support');
+  }
+});
+
+test('recovery is visible at the 30 Hz display rate', () => {
+  const home=homes(), gait=new Gait(home);
+  let lifted=0;
+  for(let i=0;i<120;i++) {
+    gait.update(10,0,1/30,home);
+    if(i>30) for(const height of gait.lifted) if(height>0.3)lifted++;
+  }
+  assert.ok(lifted>50, `visible recovery frames ${lifted}`);
+});
+
+test("contact events retain their timing at 30, 60 and 120 Hz", () => {
+  for (const fps of [30, 60, 120]) for (const speed of [0.5, 3, 6, 10, 14]) {
+    const gait = new Gait(homes()), home = homes(), dt = 1 / fps;
+    let stance = 0, count = 0, lifted = 0;
+    for (let f = 0; f < fps * 6; f++) {
+      const prevLift = gait.lastLift.slice(), prevLand = gait.lastLand.slice();
+      gait.update(speed, 0, dt, home);
+      if (f < fps * 3) continue;
+      for (let l = 0; l < 6; l++) {
+        if (gait.lastLift[l] !== prevLift[l]) {
+          stance += gait.lastLift[l] - (gait.lastLand[l] < gait.lastLift[l] ? gait.lastLand[l] : prevLand[l]); count++;
+        }
+        if (gait.lifted[l] > 0.2) lifted++;
+      }
+    }
+    const reference = 0.9328 * (speed * 2.5) ** -1.025;
+    assert.ok(Math.abs(stance / count / reference - 1) < 0.2, `${fps} Hz, ${speed} BL/s: ${stance / count}, fit ${reference}`);
+    assert.ok(lifted > fps / 2, `${fps} Hz, ${speed} BL/s: visible recovery ${lifted}`);
   }
 });

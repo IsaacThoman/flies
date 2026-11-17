@@ -12,7 +12,7 @@ import type { Daylight } from "../../scene/light.ts";
 import type { Weather } from "../../scene/weather.ts";
 import type { SceneSet } from "../types.ts";
 import { ALARM_DIAL, CLOCK_FACES } from "./clocks.ts";
-import { waterMaterial, windowGlass } from "./glass.ts";
+import { bottleMaterial, waterMaterial, windowGlass } from "./glass.ts";
 import { FRAME_HEAD, createSunlight, sunlit } from "./light.ts";
 import type { Ball, Column } from "./light.ts";
 import { TILE_TOP, buildRoom } from "./room.ts";
@@ -309,7 +309,7 @@ export function buildSill(): SceneSet {
   const metal = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.16, metalness: 1, envMapIntensity: 1.1 });
   sunlit(metal, sunlight, "metal");
   const towel = towelMaterial(sunlight, SILL_DECOR.towel.hx * 2);
-  const bottleGlass = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.55, depthWrite: false, envMapIntensity: 1.6 });
+  const bottleGlass = bottleMaterial(sunlight);
   const water = waterMaterial();
   const batch = new Batch();
   const add = (m: THREE.Material, g: THREE.BufferGeometry, matrix?: THREE.Matrix4) => batch.add(m, g, matrix);
@@ -1042,6 +1042,7 @@ export function buildSill(): SceneSet {
       // The glass becomes a mirror of the lit room as it gets dark outside.
       u.uNight.value = lamp * Math.min(1, light.stars * 1.2);
       u.uRain.value = weather.rain;
+      u.uFrost.value = weather.snowCover;
       u.uWet.value = weather.wet;
       u.uTime.value = time;
       u.uOutside.value.copy(light.horizon).lerp(light.middle, 0.4).multiplyScalar(1 - 0.85 * light.stars);

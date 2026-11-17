@@ -15,3 +15,4 @@ export * from "./bubbles.ts";
 export * from "./random.ts";
 export * from "./limits.ts";
 export * from "./wire.ts";
+export * from "./weather.ts";

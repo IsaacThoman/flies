@@ -10,6 +10,7 @@ import { BELOW, Daylight, SETTING, TIMES, aboveHorizon, blankLight, clockLight, 
 import type { Light, Palette, Palettes, TimeOfDay } from "../src/scene/light.ts";
 import { KINDS } from "@fly/world";
 import type { Weather } from "../src/scene/weather.ts";
+import { WeatherNow } from "../src/scene/weather.ts";
 
 /** Palettes unlike the picnic's: a room whose "sun" is a window, high all day, and a lamp at night. */
 const ROOM: Palettes = Object.fromEntries(
@@ -107,7 +108,7 @@ test("the time of day a clock hour is called", () => {
   assert.equal(timeAt(3), "night");
 });
 
-const clear: Weather = { ...KINDS.clear, wet: 0, kind: "clear" };
+const clear: Weather = { ...KINDS.clear, wet: 0, heavy: 0, storm: 0, snow: 0, snowCover: 0, lightning: 0, kind: "clear" };
 
 test("a chosen time eases in over a couple of seconds and then is exactly its palette", () => {
   const palettes = SCENES.picnic.palettes;
@@ -140,7 +141,7 @@ test("following the clock eases there from a chosen time, then moves with it; se
 test("a room open to the weather only through its windows feels it less", () => {
   const out = new Daylight("noon", ROOM);
   const room = new Daylight("noon", ROOM, 0.4);
-  const grey: Weather = { ...KINDS.overcast, wet: 0, kind: "overcast" };
+  const grey: Weather = { ...KINDS.overcast, wet: 0, heavy: 0, storm: 0, snow: 0, snowCover: 0, lightning: 0, kind: "overcast" };
   out.update(0, grey);
   room.update(0, grey);
   assert.ok(room.sunIntensity > out.sunIntensity * 2, "more of its daylight left");
@@ -165,4 +166,59 @@ test("overcast greys the sky and takes the sun away; mist whitens the horizon; c
   const misty = look({ ...clear, ...KINDS.mist, kind: "mist" });
   assert.ok(saturation(misty.horizon) < saturation(sunny.horizon) && misty.haze.getHSL({ h: 0, s: 0, l: 0 }).l >= sunny.haze.getHSL({ h: 0, s: 0, l: 0 }).l * 0.95, "the distance whitens");
   for (const l of [grey, misty]) for (const c of [l.zenith, l.middle, l.horizon, l.haze, l.skyColor]) assert.ok(c.r <= 1.0001 && c.g <= 1.0001 && c.b <= 1.0001 && c.r >= 0 && c.g >= 0 && c.b >= 0);
+});
+
+test("the clock's light repeats across positive and negative days, including midnight", () => {
+  const p = resolved(ROOM);
+  for (const hour of [0, 4, 6, 12, 20, 23.5]) {
+    const expected = clockLight(p, hour, blankLight());
+    for (const offset of [-48, -24, 24, 48]) {
+      const actual = clockLight(p, hour + offset, blankLight());
+      for (const c of COLOURS) assert.ok(colourGap(actual[c], expected[c]) < 1e-9, `${c} at ${hour + offset}`);
+      for (const n of NUMBERS) assert.ok(Math.abs(actual[n] - expected[n]) < 1e-9, `${n} at ${hour + offset}`);
+    }
+  }
+});
+
+test("time-of-day names include the first instant of each part of the day", () => {
+  for (const [hour, name] of [[5.5, "morning"], [9, "noon"], [16.5, "golden"], [19, "dusk"], [21, "night"]] as const) {
+    assert.equal(timeAt(hour), name);
+    assert.equal(timeAt(hour - 24), name);
+  }
+});
+
+test("a light crossing the azimuth seam takes the short way instead of swinging across the room", () => {
+  const palettes: Palettes = { ...ROOM, morning: { ...ROOM.morning, sunAround: 3.1 }, noon: { ...ROOM.noon, sunAround: -3.1 } };
+  const light = new Daylight("morning", palettes);
+  light.follow(9, true);
+  light.update(0, { ...new WeatherNow(), ...KINDS.clear, wet: 0, kind: "clear" });
+  assert.ok(light.sunDirection.z > 0.8, "halfway between the bearings still faces the same wall");
+});
+
+test("a dusk light at the lamp threshold stays on through the night", () => {
+  const p = resolved({ ...ROOM, dusk: { ...ROOM.dusk, sunUp: SETTING } });
+  const light = clockLight(p, 22, blankLight());
+  assert.equal(light.sunUp, ROOM.night.sunUp);
+  assert.equal(light.sunIntensity, ROOM.night.sunIntensity);
+});
+
+test("rain changing by itself updates the light and darkens an overcast room", () => {
+  const light = new Daylight("noon", ROOM);
+  const weather: Weather = { ...new WeatherNow(), cloud: 0.6, mist: 0, rain: 0, wet: 0, wind: 0, kind: "overcast" };
+  light.update(0, weather);
+  const middle = light.middle.clone();
+  const ambient = light.hemiIntensity;
+  assert.equal(light.update(0, { ...weather, rain: 0.8 }), true);
+  assert.ok(light.middle.r < middle.r && light.hemiIntensity < ambient);
+  assert.equal(light.update(0, { ...weather, rain: 0.8 }), false);
+});
+
+test("mist changing by itself updates the haze, then holds until the weather changes again", () => {
+  const light = new Daylight("noon", ROOM);
+  const weather: Weather = { ...new WeatherNow(), ...KINDS.clear, kind: "clear", wet: 0 };
+  light.update(0, weather);
+  const haze = light.haze.clone();
+  assert.equal(light.update(0, { ...weather, mist: 0.8 }), true);
+  assert.ok(colourGap(light.haze, haze) > 0.01, "mist reaches the distance even when cloud and rain hold");
+  assert.equal(light.update(0, { ...weather, mist: 0.8 }), false);
 });

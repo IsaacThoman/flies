@@ -48,7 +48,7 @@ export const INTERNAL_STATE = {
   bias: -1,
   hunger: { weight: 0.9 },
   // How far the clock's oscillators raise arousal, and its push toward sleep, sleep pressure and sleep depth lower it, at 1.
-  sleep: { wake: 1, clock: 3.5, pressure: 4, depth: 5 },
+  sleep: { wake: 1, clock: 3.5, pressure: 4, depth: 4 },
 } as const;
 
 export type InternalStateParameters = {

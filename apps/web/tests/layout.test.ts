@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HitMap } from "@fly/ui";
+import { COLOURS } from "@fly/net";
 import { TV_FRAME, frameFor } from "../src/display.ts";
 import type { Frame } from "../src/display.ts";
 import { DEFAULT_SETTINGS } from "../src/settings.ts";
@@ -29,6 +30,7 @@ const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y
 function shell(frame: Frame, glyphs: Shell["glyphs"] = null, online = true): Shell {
   return {
     settings: { ...DEFAULT_SETTINGS },
+    maxFlies: 4,
     brain: { status: "running", neurons: 166700, connections: 6242118, state: null } as unknown as Shell["brain"],
     meter: { history: new Float32Array(120), head: 0, spikesPerSecond: 0, active: 0, speed: 1 } as unknown as Shell["meter"],
     life: { sensed: { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, light: null }, activity: "resting" } as unknown as Shell["life"],
@@ -121,7 +123,7 @@ test("the HUD's targets are where it draws them, inside the safe area, and big e
     hands.stepVariant(1);
     const hits = new HitMap();
     hits.begin("play");
-    const state: HudState = { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, spikes: 0, brainRunning: true, eyes: null, layout: hudLayout(frame) };
+    const state: HudState = { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, brainRunning: true, eyes: null, layout: hudLayout(frame) };
     drawHud(blankCanvas(), 0, state, hits);
     const kinds = new Set<string>();
     for (let i = 0; i < hits.count; i++) {
@@ -142,7 +144,7 @@ test("with the remote in hand the HUD records no targets of its own but the menu
   const hands = new Hands(createPicnic());
   const hits = new HitMap();
   hits.enabled = false;
-  drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: "remote", learned: {}, teachSwipe: true, changed: 10, spikes: 0, brainRunning: true, eyes: null, layout: hudLayout(TV_FRAME) }, hits);
+  drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: "remote", learned: {}, teachSwipe: true, changed: 10, brainRunning: true, eyes: null, layout: hudLayout(TV_FRAME) }, hits);
   assert.equal(hits.count, 0);
 });
 
@@ -240,8 +242,8 @@ test("the title leaves room for the fly, clear of the name, the brain's state an
 
 test("at a room, its QR code and code are beside the menu or over it, inside the safe area, clear of the hints, and big enough to scan across a room", () => {
   // The starter of a full room: Remove for each of the other seven, and Share and Leave.
-  const others = Array.from({ length: 7 }, (_, i) => ({ id: i + 2, colour: "#e53" }));
-  const table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://flies.isaacthoman.com/?table=abcdefghjk", starting: true, joined: true, others };
+  const others = Array.from({ length: 7 }, (_, i) => ({ id: i + 2, colours: ["#e53"] }));
+  const table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://flies.isaacthoman.com/?table=abcdefghjk", starting: true, joined: true, everyone: false, others };
   const spec = { items: 9, maxRows: 7, width: 460, row: 40, heading: true, foot: 34, values: false, raise: 12 };
   for (const [name, frame] of [...frames(), ["the TV", TV_FRAME] as const]) {
     const a = safeRect(frame);
@@ -291,7 +293,7 @@ test("with a remote, a keyboard or a pad in hand, the hints keep clear of the sh
         hands.chooseTool(TOOLS.findIndex((t) => t.id === tool));
         for (const learned of [{}, { tools: true }] as Learned[]) {
           const g = blankCanvas();
-          drawHud(g, 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs, learned, teachSwipe: true, changed: 10, spikes: 0, brainRunning: true, eyes: null, layout: hud }, new HitMap());
+          drawHud(g, 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs, learned, teachSwipe: true, changed: 10, brainRunning: true, eyes: null, layout: hud }, new HitMap());
           for (const chip of writtenOn(g).filter((w) => w.size === 13)) {
             // A chip: from the hints' edge on the left; on the right, its glyph before its words (a chip 13 high starts 0.95 of its 22.75 height before them), and a little after them.
             const left = chip.x < hud.cx ? hud.hintsX : chip.x - 0.95 * 22.75;
@@ -324,6 +326,89 @@ test("the loading screen and its failure panel: where they always were on the TV
   }
 });
 
+test("phone and Split View touch targets stay distinct, with Menu in portrait thumb reach", () => {
+  const world = createPicnic();
+  for (const [w, h] of [[390, 844], [430, 932], [375, 820], [507, 820], [844, 390], [932, 430], [820, 1180], [1180, 820]]) {
+    const frame = frameFor(w, h, { top: 59, bottom: 34, left: 0, right: 0 }, true);
+    const hands = new Hands(world);
+    hands.chooseTool(TOOLS.findIndex(t => t.id === "place"));
+    hands.stepVariant(1);
+    const hits = new HitMap();
+    const layout = hudLayout(frame);
+    drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 0, brainRunning: true, eyes: null, layout }, hits);
+    const all = Array.from({ length: hits.count }, (_, i) => hits.get(i)!);
+    for (const hit of all) {
+      assert.ok(hit.w * frame.unit >= 44 - 1e-6 && hit.h * frame.unit >= 44 - 1e-6, `${w}×${h}: ${hit.kind} ${hit.w * frame.unit}×${hit.h * frame.unit}`);
+      for (const other of all) if (other !== hit) assert.ok(Math.min(hit.x + hit.w, other.x + other.w) - Math.max(hit.x, other.x) < 1e-6 || Math.min(hit.y + hit.h, other.y + other.h) - Math.max(hit.y, other.y) < 1e-6, `${w}×${h}: ${hit.kind} overlaps ${other.kind}`);
+    }
+    const menu = all.find(hit => hit.kind === HUD_HITS.menu)!;
+    assert.ok(h - (menu.y + menu.h / 2) * frame.unit <= 200);
+  }
+});
+
+test("the room form keeps its focused field above a phone or Split View keyboard", () => {
+  for (const [w, h, covered] of [[390, 844, 360], [844, 390, 200], [507, 820, 360], [375, 820, 360]]) {
+    const frame = frameFor(w, h, { top: h > w ? 59 : 0, bottom: covered, left: 0, right: 0 }, true);
+    const s = { ...shell(frame), typing: { active: null, end() {} } as Shell["typing"] };
+    const screen = new OnlineScreen(s);
+    screen.enter();
+    screen.press("select", false);
+    assert.equal(screen.view, "new");
+    screen.layout(frame);
+    // Password is just above Create, which the form initially focuses.
+    screen.press("up", false);
+    assert.equal(screen.menu.focused?.id, "password");
+    const hits = new HitMap();
+    screen.draw(blankCanvas(), 0, hits);
+    const rows = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).filter(hit => hit.kind === "row");
+    assert.ok(rows.length > 0);
+    for (const hit of rows) assert.ok(inside(hit, safeRect(frame), 1), `${w}×${h}: a form row is covered`);
+  }
+});
+
+
+test("selector arrows stay put across kinds, including Place's Go appearing", () => {
+  for (const [, frame] of frames()) for (const id of ["feed", "light", "weather", "view", "place"]) {
+    const hands = new Hands(createPicnic());
+    const i = TOOLS.findIndex((t) => t.id === id);
+    hands.chooseTool(i);
+    let first: number[] | null = null;
+    for (let kind = 0; kind < TOOLS[i].variants.length; kind++) {
+      hands.variants[i] = kind;
+      const hits = new HitMap();
+      drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "resting", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, brainRunning: true, eyes: null, layout: hudLayout(frame) }, hits);
+      const arrows: number[] = [];
+      for (let j = 0; j < hits.count; j++) if (hits.get(j)!.kind === "kind") arrows.push(hits.get(j)!.x);
+      if (!first) first = arrows;
+      else assert.deepEqual(arrows, first, `${id}: the same place selects each next kind`);
+    }
+  }
+});
+
+test("the Flies row draws one enamel dot per fly on wide and compact screens, with chevrons to choose", () => {
+  for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
+    for (let count = 1; count <= 4; count++) {
+      const host = shell(frame);
+      host.settings.flies = count;
+      const screen = settingsScreen(host);
+      screen.enter();
+      const row = screen.menu.items.findIndex((i) => i.id === "flies");
+      screen.menu.focusOn("flies");
+      const g = blankCanvas();
+      const colours: string[] = [];
+      g.fill = () => {
+        if (COLOURS.some((colour) => colour === String(g.fillStyle))) colours.push(String(g.fillStyle));
+      };
+      const hits = new HitMap();
+      hits.begin(screen.id);
+      screen.draw(g, 0, hits);
+      assert.deepEqual(colours, COLOURS.slice(0, count), `${name}: ${count} enamel dots`);
+      assert.ok(!writtenOn(g).some((w) => w.text === String(count)), "count shown as dots");
+      const steps = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).filter((h) => h.kind === "step" && h.index === row);
+      assert.equal(steps.length, 2, `${name}: both chevrons target this row`);
+    }
+  }
+});
 
 test("Acknowledgements pages fit every screen and every document is reachable with a remote", () => {
   for (const [name, frame] of frames()) {
@@ -375,5 +460,38 @@ test("notice navigation clears the button hints on tall and short screens", () =
       const hit = hits.get(i)!;
       if (hit.kind === "notice") assert.ok(hit.y + hit.h < frame.design.height - frame.safe.bottom - 43, name);
     }
+  }
+});
+
+
+test("a pending tool is shown as an icon clear of the shelf without changing its committed tool or hit targets", () => {
+  for (const [w, h] of [[390, 844], [844, 390], [430, 932], [932, 430], [820, 1180], [1180, 820], [507, 820], [375, 820]]) {
+    const hands = new Hands(createPicnic());
+    const frame = frameFor(w, h, { top: h > w ? 59 : 0, bottom: 34, left: 0, right: 0 }, true);
+    const layout = hudLayout(frame);
+    const s: HudState = { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 1, brainRunning: true, eyes: null, layout };
+    const hits = new HitMap();
+    const committed = blankCanvas();
+    drawHud(committed, 0, s, hits);
+    const label = writtenOn(committed).find(word => word.text.includes("Sugar"))!;
+    const original = Array.from({ length: hits.count }, (_, i) => ({ ...hits.get(i)! }));
+    for (let i = 0; i < TOOLS.length; i++) {
+      const pressed = original.find(hit => hit.kind === HUD_HITS.tool && hit.index === i)!;
+      s.pressed = pressed;
+      const g = blankCanvas();
+      const iconOrigins: { x: number; y: number }[] = [];
+      g.translate = (x, y) => { iconOrigins.push({ x, y }); };
+      const previewHits = new HitMap();
+      drawHud(g, 0, s, previewHits);
+      assert.ok(iconOrigins.some(p => near(p.x, label.x) && near(p.y, label.y)), `${w}×${h}: pending ${TOOLS[i].name} has an icon outside the shelf`);
+      assert.ok(!writtenOn(g).some(word => near(word.x, label.x) && near(word.y, label.y)), "the pending tool adds no caption text");
+      assert.ok(Math.hypot(label.x - pressed.x - pressed.w / 2, label.y - pressed.y - pressed.h / 2) * frame.unit > 44, "the icon clears the fingertip");
+      assert.equal(hands.tool, 0, "preview does not select a tool");
+      assert.deepEqual(Array.from({ length: previewHits.count }, (_, i) => ({ ...previewHits.get(i)! })), original, "press feedback cannot move hit targets");
+    }
+    s.pressed = null;
+    const g = blankCanvas();
+    drawHud(g, 0, s, new HitMap());
+    assert.ok(writtenOn(g).some(word => word.text.includes("Sugar")), "cancellation restores the committed label");
   }
 });

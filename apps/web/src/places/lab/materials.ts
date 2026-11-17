@@ -6,6 +6,7 @@
 // however close the camera comes.
 
 import * as THREE from "three";
+import { LAB_START } from "@fly/world";
 
 /** The lab's back wall, mm from the bench's middle, and its windows: their middles across, their open part, and where the blinds begin. */
 export const BACK_Z = -2300;
@@ -29,10 +30,15 @@ float labWindowLight(vec3 p, vec3 n) {
   if (uSunBeam <= 0.0 || uSunDir.z > -0.05) return 0.0;
   float t = (${BACK_Z.toFixed(1)} - p.z) / uSunDir.z;
   vec3 at = p + uSunDir * t;
+  // A finite sun and the distance from the pane soften every frame edge; subpixel slats merge into their average.
+  vec2 edge = max(fwidth(at.xy), vec2(4.0 + max(t, 0.0) * 0.006));
   float glass = 0.0;
-  ${WINDOWS.xs.map((x) => `glass += step(abs(at.x - (${x.toFixed(1)})), ${(WINDOWS.hw - WINDOWS.frame).toFixed(1)}) * step(${WINDOWS.frame.toFixed(1)}, abs(at.x - (${x.toFixed(1)})));`).join("\n  ")}
-  float open = step(${(WINDOWS.y0 + WINDOWS.frame).toFixed(1)}, at.y) * step(at.y, ${(WINDOWS.y1 - WINDOWS.frame).toFixed(1)});
-  float slats = at.y > ${WINDOWS.blinds.toFixed(1)} ? step(0.55, fract(at.y / 24.0)) * 0.8 : 1.0;
+  ${WINDOWS.xs.map((x) => `glass += (1.0 - smoothstep(${(WINDOWS.hw - WINDOWS.frame).toFixed(1)} - edge.x, ${(WINDOWS.hw - WINDOWS.frame).toFixed(1)} + edge.x, abs(at.x - (${x.toFixed(1)})))) * smoothstep(${WINDOWS.frame.toFixed(1)} - edge.x, ${WINDOWS.frame.toFixed(1)} + edge.x, abs(at.x - (${x.toFixed(1)})));`).join("\n  ")}
+  float open = smoothstep(${(WINDOWS.y0 + WINDOWS.frame).toFixed(1)} - edge.y, ${(WINDOWS.y0 + WINDOWS.frame).toFixed(1)} + edge.y, at.y) * (1.0 - smoothstep(${(WINDOWS.y1 - WINDOWS.frame).toFixed(1)} - edge.y, ${(WINDOWS.y1 - WINDOWS.frame).toFixed(1)} + edge.y, at.y));
+  float stripe = abs(fract(at.y / 24.0) - 0.775);
+  float slat = 1.0 - smoothstep(0.225 - edge.y / 24.0, 0.225 + edge.y / 24.0, stripe);
+  slat = mix(slat, 0.45, smoothstep(0.2, 0.6, edge.y / 24.0));
+  float slats = mix(1.0, slat * 0.8, smoothstep(${WINDOWS.blinds.toFixed(1)} - edge.y, ${WINDOWS.blinds.toFixed(1)} + edge.y, at.y));
   return min(glass, 1.0) * open * slats * step(0.0, t) * max(dot(n, uSunDir), 0.0);
 }`;
 
@@ -170,6 +176,12 @@ vec3 q = vWorld / 0.34;
 float size = max(max(length(dFdx(q)), length(dFdy(q))), 1e-4);
 float labDetail = 1.0 - smoothstep(0.35, 0.9, size);
 float labBump = 0.0;
+float labFinish = 0.0;
+if (vSurface.y > 0.5) {
+  // The brushed finish breaks broad steel highlights without introducing a repeating line pattern.
+  labFinish = (labNoise(vec3(vWorld.x * 0.06, vWorld.y * 8.0, vWorld.z * 0.06)) - 0.5) * labDetail;
+  diffuseColor.rgb *= 0.97 + labFinish * 0.04;
+}
 if (vSurface.z != 0.0) {
   // Two octaves of smooth noise, cut into blobs: pores in foam, grains in cornmeal, irregular as both are.
   float n = labNoise(q) * 0.65 + labNoise(q * 2.3 + 7.1) * 0.35;
@@ -197,7 +209,7 @@ if (vSurface.z != 0.0) {
   }
 }`,
       )
-      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = vSurface.x;")
+      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = clamp(vSurface.x + labFinish * 0.12, 0.04, 1.0);")
       .replace("#include <metalnessmap_fragment>", "#include <metalnessmap_fragment>\nmetalnessFactor = vSurface.y;")
       .replace(
         "#include <normal_fragment_maps>",
@@ -220,10 +232,10 @@ if (vSurface.z != 0.0) {
         /* glsl */ `#include <lights_fragment_end>
 ${BEAM_FRAGMENT}
 // Glossy things (the agar, wet food, the lacquer, chrome) show the room's bright things in them.
-if (vSurface.x < 0.25) {
+if (vSurface.x < 0.35) {
   float f = pow(1.0 - max(dot(normal, normalize(vViewPosition)), 0.0), 3.0);
   vec3 spec = mix(vec3(0.04), diffuseColor.rgb, vSurface.y);
-  reflectedLight.indirectSpecular += labGlints(labReflect(normal), vSurface.x * 0.25) * (spec + (1.0 - spec) * f) * (1.0 - vSurface.x * 3.0);
+  reflectedLight.indirectSpecular += labGlints(labReflect(normal), vSurface.x * 0.25) * (spec + (1.0 - spec) * f) * (1.0 - vSurface.x * 2.2) * mix(0.55, 1.0, vSurface.y);
 }`,
       )
   };
@@ -244,12 +256,28 @@ export function clearMaterial(shine: Glints): THREE.MeshStandardMaterial {
       /* glsl */ `float facing = abs(dot(normal, normalize(vViewPosition)));
 float edge = pow(1.0 - facing, 2.5);
 // The windows and the panels, bright in the glass.
-outgoingLight += labGlints(labReflect(normal), 0.01) * (0.05 + edge * 0.9);
-diffuseColor.a = clamp(0.1 + edge * 0.8 + dot(outgoingLight, vec3(0.33)) * 0.1, 0.0, 0.9);
+outgoingLight += labGlints(labReflect(normal), 0.01) * (0.04 + edge * 0.65);
+diffuseColor.a = clamp(0.055 + edge * 0.6 + dot(outgoingLight, vec3(0.33)) * 0.07, 0.0, 0.85);
 #include <opaque_fragment>`,
     );
   };
   material.customProgramCacheKey = () => "lab-clear";
+  return material;
+}
+
+/** A separate liquid surface sorts beneath the vessel wall, so its meniscus stays distinct from glass rims. */
+export function liquidMaterial(shine: Glints): THREE.MeshStandardMaterial {
+  const material = clearMaterial(shine);
+  material.side = THREE.FrontSide;
+  const compile = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, renderer) => {
+    compile.call(material, shader, renderer);
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "clamp(0.055 + edge * 0.6 + dot(outgoingLight, vec3(0.33)) * 0.07, 0.0, 0.85)",
+      "clamp(0.08 + edge * 0.55 + dot(outgoingLight, vec3(0.33)) * 0.06, 0.0, 0.8)",
+    );
+  };
+  material.customProgramCacheKey = () => "lab-liquid";
   return material;
 }
 
@@ -299,6 +327,20 @@ reflectedLight.indirectSpecular += labGlints(labReflect(normal), 0.06) * (0.02 +
   // A soft mottle, a few millimetres across, as poured resin has.
   float mottle = labNoise(vWorld * 0.09) * 0.6 + labNoise(vWorld * 0.31) * 0.4;
   diffuseColor.rgb *= mix(0.982, tone, detail) * (1.0 - grain * 0.1) * (0.975 + mottle * 0.05);
+  // A flat strip of calibration tape gives the nearby fly a familiar millimetre scale.
+  vec2 tape = vWorld.xz - vec2(${LAB_START.x.toFixed(1)}, ${(LAB_START.z - 5).toFixed(1)});
+  vec2 pixel = max(fwidth(tape), vec2(0.01));
+  vec2 edge = 1.0 - smoothstep(vec2(7.5, 1.5) - pixel, vec2(7.5, 1.5) + pixel, abs(tape));
+  float label = edge.x * edge.y;
+  float at = tape.x + 7.0;
+  float nearest = floor(at + 0.5);
+  float major = 1.0 - step(0.1, mod(nearest, 5.0));
+  float tick = (1.0 - smoothstep(0.04, 0.04 + pixel.x, abs(at - nearest))) * min(1.0, 0.08 / pixel.x);
+  tick *= smoothstep(-1.05 - pixel.y, -1.05 + pixel.y, tape.y) * (1.0 - smoothstep(-0.4 + major * 0.55, -0.4 + major * 0.55 + pixel.y, tape.y));
+  float line = (1.0 - smoothstep(0.04, 0.04 + pixel.y, abs(tape.y + 1.0))) * min(1.0, 0.08 / pixel.y);
+  float ends = 1.0 - smoothstep(7.0, 7.0 + pixel.x, abs(tape.x));
+  vec3 paper = mix(vec3(0.82, 0.80, 0.70), vec3(0.13, 0.16, 0.18), max(tick, line) * ends * 0.85);
+  diffuseColor.rgb = mix(diffuseColor.rgb, paper, label * 0.94);
 }`,
       )
       .replace(
