@@ -19,6 +19,8 @@ export const MAX_FOUND = 16;
 const APPETITE_SLACK = 1.5;
 /** Seconds of appetite a player may save up. */
 const APPETITE_STORE = 1;
+/** Longest picnic crumb lifetime, including its fade; also bounds older devices and saved rooms. */
+export const FOUND_LASTS = 1520;
 
 export const toWire = (f: Food): FoodWire => [f.id, f.kind, f.name, f.x, f.z, f.r, f.sweet, f.amount, f.pool ? 1 : 0, f.y];
 
@@ -45,11 +47,14 @@ export class TableFood {
   readonly #meals = new Map<number, [number, number]>();
   readonly #appetite = new Map<number, Appetite>();
   readonly #world: World;
+  readonly #wall: () => number;
+  readonly #expires = new Map<number, number>();
   /** Bites refused, by reason. */
   readonly refused = { unknown: 0, far: 0, greedy: 0 };
 
-  constructor(world: World, patches: readonly FoodPatch[]) {
+  constructor(world: World, patches: readonly FoodPatch[], wall: () => number = Date.now) {
     this.#world = world;
+    this.#wall = wall;
     this.reset(patches);
   }
 
@@ -57,15 +62,27 @@ export class TableFood {
   reset(patches: readonly FoodPatch[]) {
     for (const f of this.foods) this.#gone.push(f.id);
     this.foods.length = 0;
+    this.#expires.clear();
     this.#changed.clear();
     // Numbered 1 upward, in order: the place's patches are always the same food.
     patches.forEach((p, i) => this.foods.push({ id: i + 1, kind: "patch", name: p.name, x: p.x, y: this.#world.heightAt(p.x, p.z, p.y), z: p.z, r: p.r, sweet: p.sweet, amount: 1, pool: p.pool ?? false }));
   }
 
   /** The food as it was kept (a restarted room). */
-  restore(foods: readonly FoodWire[]) {
+  restore(foods: readonly FoodWire[], expires: readonly [number, number][] = []) {
     this.foods.length = 0;
-    for (const w of foods) this.foods.push(fromWire(this.#world, w));
+    this.#expires.clear();
+    const now = this.#wall();
+    for (const w of foods) {
+      if (w[1] === "found") this.#expires.set(w[0], Math.min(expires.find(([id]) => id === w[0])?.[1] ?? Infinity, now + FOUND_LASTS * 1000));
+      this.foods.push(fromWire(this.#world, w));
+    }
+    this.update(0);
+  }
+
+  /** Wall-clock deadlines survive room-clock resets and time with nobody at the table. */
+  expiries(): [number, number][] {
+    return [...this.#expires];
   }
 
   find(id: number) {
@@ -97,12 +114,14 @@ export class TableFood {
   }
 
   /** Something the place put out, on the surface at or below `y`, as a device saw it; the first to say so names it. The oldest found goes past MAX_FOUND. */
-  found(id: number, name: string, x: number, z: number, r: number, sweet: number, y?: number): Food | null {
+  found(id: number, name: string, x: number, z: number, r: number, sweet: number, y?: number, lasts = FOUND_LASTS): Food | null {
     if (!(id >= FOUND_ID) || typeof name !== "string" || name.length > 40 || this.find(id) || !this.#world.onTable(x, z) || !(r > 0 && r < 5) || !(sweet >= 0 && sweet <= 1)) return null;
+    if (!Number.isFinite(lasts) || !(lasts > 0 && lasts <= FOUND_LASTS)) return null;
     const found = this.foods.filter((f) => f.kind === "found");
     if (found.length >= MAX_FOUND) this.#remove(found[0]);
     const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, amount: 1, pool: false };
     this.foods.push(food);
+    this.#expires.set(id, this.#wall() + lasts * 1000);
     return food;
   }
 
@@ -155,12 +174,18 @@ export class TableFood {
     const i = this.foods.indexOf(food);
     if (i < 0) return;
     this.foods.splice(i, 1);
+    this.#expires.delete(food.id);
     this.#changed.delete(food.id);
     this.#gone.push(food.id);
   }
 
   /** Patches come back, as on every device. */
   update(dt: number) {
+    const now = this.#wall();
+    for (let i = this.foods.length - 1; i >= 0; i--) {
+      const f = this.foods[i];
+      if (f.kind === "found" && now >= (this.#expires.get(f.id) ?? Infinity)) this.#remove(f);
+    }
     for (const f of this.foods) {
       if (f.kind !== "patch" || f.amount >= 1) continue;
       f.amount = Math.min(1, f.amount + dt / PATCH_RECOVERY);

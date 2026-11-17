@@ -159,6 +159,42 @@ test("clearing dropped food is owned by the room, preserves patches and finds, a
   assert.equal(table.flush(), null, "a repeated clear makes no changes");
 });
 
+test("found food expires from snapshots, including across a restart and while nobody ticks the table", () => {
+  let now = 1000;
+  const table = new TableFood(world, [], () => now);
+  const food = table.found(900000001, "strawberry juice", 20, 20, 1, 0.8, 0, 10)!;
+  const foods = table.foods.map(toWire);
+  now += 10001;
+  table.update(0);
+  assert.equal(table.find(food.id), null, "expiry removes food from the room snapshot");
+  now = 1000;
+  table.found(food.id, "strawberry juice", 20, 20, 1, 0.8, 0, 10);
+  const expires = table.expiries();
+  now += 9000;
+  const restored = new TableFood(world, [], () => now);
+  restored.restore(foods, expires);
+  assert.ok(restored.find(food.id));
+  now += 1001;
+  restored.update(0);
+  assert.equal(restored.find(food.id), null);
+  assert.deepEqual(restored.flush()?.gone, [food.id]);
+  const late = new TableFood(world, [], () => now);
+  late.restore(foods, expires);
+  assert.equal(late.find(food.id), null, "expired food is not restored");
+});
+
+test("legacy found food receives a bounded lifetime", () => {
+  let now = 0;
+  const table = new TableFood(world, [], () => now);
+  const food = table.found(900000001, "crumb", 20, 20, 1, 0.5)!;
+  const legacy = table.foods.map(toWire);
+  now = 1000;
+  table.restore(legacy);
+  now += 1520001;
+  table.update(0);
+  assert.equal(table.find(food.id), null);
+});
+
 test("refused and trimmed bites reconcile quantities and drain predictions", () => {
   for (const reason of ["far", "greedy", "unknown", "trimmed"] as const) {
     const table = new TableFood(world, []);

@@ -191,7 +191,7 @@ export class Game implements Shell {
   /** The real weather outside, where the Apple TV can tell it; scripts feed it in a browser (`outside.feed`). */
   readonly outside = new Outside(nativeWeather());
   readonly nav = new Navigator<ScreenId>("title");
-  readonly screens: { title: MenuScreen; settings: MenuScreen; about: Screen; online: OnlineScreen };
+  readonly screens: { title: MenuScreen; settings: MenuScreen; about: AboutScreen; online: OnlineScreen };
   /** At a room with others (docs/online.md), its line to the room and the others there; null alone. */
   online: Online | null = null;
   /** How the room this device was last at, or tried to sit at, ended: it left, or was turned away (removed, the room gone, locked). */
@@ -1889,6 +1889,7 @@ export class Game implements Shell {
     d.ring = String(shown !== "play" && this.#ringShown);
     d.tab = shown === "settings" ? settingsTab(this.screens.settings) : "";
     if (shown === "online") this.screens.online.publish(d);
+    if (shown === "about") this.screens.about.publish(d);
     d.atRoot = String((window as unknown as Record<string, unknown>)[AT_ROOT_PROPERTY]);
     d.wallpaper = String(this.wallpaper);
     d.brain = life.brain.status;

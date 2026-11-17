@@ -513,7 +513,7 @@ export type ClientMessage =
   /** How many flies this device now wants at the table: answered with `seated`, as many as there are seats for. */
   | { type: "flies"; count: number }
   | { type: "pop"; slot: number; cycle: number; at: number; epoch?: number }
-  | { type: "found"; id: number; name: string; x: number; z: number; y: number; r: number; sweet: number; epoch?: number }
+  | { type: "found"; id: number; name: string; x: number; z: number; y: number; r: number; sweet: number; lasts?: number; epoch?: number }
   | { type: "bye" };
 
 /** Why the room turned a device away (and closed its connection with the matching code). */

@@ -199,7 +199,7 @@ desktop browser.
 - **Files**: `fetch` of the app's own files (GET only; relative URLs resolve against
   `http://fly.local/`), `blob:` and `data:` URLs. `Response` (`arrayBuffer`, `json`, `text`,
   `blob`, `bytes`; `body` gives the whole file as one chunk), `Request`, `Headers`, `Blob`,
-  `File`, `URL`, `URLSearchParams`, `URL.createObjectURL`. The page has no network: anything
+  `File`, `URL`, `URLSearchParams`, `URL.createObjectURL`. This fetch shim serves local files only: anything
   else rejects. (The weather service's requests are native: [The weather outside](#the-weather-outside);
   so is a table's line to its room, `__native.socket`: [Playing together](#playing-together).) No
   `XMLHttpRequest`, `WebSocket`, `EventSource`.
@@ -375,16 +375,16 @@ Checked against Apple's documentation in November 2026:
 - [Quotas](https://developer.apple.com/weatherkit/): 500,000 calls a month come with the
   developer membership; more is a subscription (a million a month for US$49.99, up to 200
   million). Unused calls don't roll over.
-- Privacy. The [privacy manifest](../apps/tvos/src/PrivacyInfo.xcprivacy) still declares no
-  collected data: Apple's ["collect"](https://developer.apple.com/app-store/app-privacy-details/)
-  is "transmitting data off the device in a way that allows you and/or your third-party partners
-  to access it for a period longer than what is necessary to service the transmitted request in
-  real time", and "you are not responsible for disclosing data collected by Apple". The rounded
-  location goes only to Apple's WeatherKit, to answer that request; nothing is sent anywhere
-  else, kept off the device, or linked to anyone. Two decimal places is what Apple calls coarse
-  location ("lower resolution than a latitude and longitude with three or more decimal
-  places"). The service's one required-reason API is `NSUserDefaults`, for its own last answer,
-  already declared (CA92.1); Core Location isn't one.
+- Privacy. The [privacy manifest](../apps/tvos/src/PrivacyInfo.xcprivacy) declares Online's retained
+  identifiers, user content, gameplay and operational data, including time-zone settings.
+  See the [policy](privacy.md) and [App Privacy draft](app-store-answers.md) for the full audit.
+  WeatherKit's rounded location goes directly to Apple to answer the request; the app never
+  sends coordinates, returned conditions or sun times to the room server. Online instead uses
+  its shared simulated forecast. Apple excludes responsibility for data collected by Apple in its
+  [App Privacy guidance](https://developer.apple.com/app-store/app-privacy-details/).
+  This WeatherKit distinction does not exempt Online's separate persistent collection.
+  The weather service's required-reason API is `NSUserDefaults` for its last answer (CA92.1);
+  Core Location is not a required-reason API.
 
 ### Cost
 

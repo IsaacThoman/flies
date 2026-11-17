@@ -181,7 +181,7 @@ export class Online {
     this.pantry.onClear = () => {
       if (this.joined && !this.#arrival && !this.#host.moving()) this.line.send({ type: "clearFood", epoch: this.epoch });
     };
-    this.pantry.onFound = (food) => this.line.send({ type: "found", id: food.id, name: food.name, x: food.x, z: food.z, y: food.y, r: food.r, sweet: food.sweet, epoch: this.epoch });
+    this.pantry.onFound = (food, lasts) => this.line.send({ type: "found", id: food.id, name: food.name, x: food.x, z: food.z, y: food.y, r: food.r, sweet: food.sweet, lasts, epoch: this.epoch });
     this.shared = { others: this.#othersAt, anchor: this.#anchor };
     this.triedPassword = !!password;
     let starting = start;
@@ -415,7 +415,7 @@ export class Online {
     this.#arrival = null;
     this.epoch = arrival.epoch;
     this.#scale = arrival.scale;
-    this.pantry.mirror.welcome(arrival.foods);
+    this.pantry.welcome(arrival.foods);
     const lives = this.#lives();
     for (const [i, f] of this.mine.entries()) {
       const spot = arrival.spots.get(f.id);

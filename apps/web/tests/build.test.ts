@@ -8,24 +8,35 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
 import { gunzipSync } from "node:zlib";
-import { build } from "vite";
+import { build, createServer, preview } from "vite";
+import { noticeText, privacyHtml } from "../../../scripts/notices.ts";
 import { siteAssociation } from "../../../scripts/webBuild.ts";
+import { PUBLIC_OWNER } from "./privacy-fixture.ts";
 
 const root = path.join(import.meta.dirname, "../../..");
 const out = mkdtempSync(path.join(tmpdir(), "fly-web-build-"));
+const unpublished = mkdtempSync(path.join(tmpdir(), "fly-web-unpublished-"));
 const TEAM = "PX72AL9366";
 
 before(async () => {
   const team = process.env.APPLE_TEAM_ID;
+  const savedOwner = Object.fromEntries(Object.keys(PUBLIC_OWNER).map((field) => [field, process.env[field]]));
   delete process.env.APPLE_TEAM_ID;
   try {
+    Object.assign(process.env, PUBLIC_OWNER);
     await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "silent", build: { outDir: out, emptyOutDir: true } });
+    for (const field of Object.keys(PUBLIC_OWNER)) delete process.env[field];
+    await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "silent", build: { outDir: unpublished, emptyOutDir: true } });
   } finally {
     if (team === undefined) delete process.env.APPLE_TEAM_ID;
     else process.env.APPLE_TEAM_ID = team;
+    for (const [field, value] of Object.entries(savedOwner)) {
+      if (value === undefined) delete process.env[field];
+      else process.env[field] = value;
+    }
   }
 });
-after(() => rmSync(out, { recursive: true, force: true }));
+after(() => { rmSync(out, { recursive: true, force: true }); rmSync(unpublished, { recursive: true, force: true }); });
 
 function files(dir = out): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -44,7 +55,8 @@ const TEXT = /\.(html|js|css|webmanifest|json)$/;
  * they hand on (apps/web/src/online/invite.ts). Anything else is a request to
  * somebody else's server until shown otherwise.
  */
-const NOT_REQUESTS = new Set(["http://www.w3.org/1999/xhtml", "https://jcgt.org/published/0007/04/01/", "https://flies.isaacthoman.com/"]);
+const CREDIT_URLS = [...(noticeText() + privacyHtml(PUBLIC_OWNER)).matchAll(/https?:\/\/[^\s"'`)<>\\]+/g)].map((m) => m[0]);
+const NOT_REQUESTS = new Set([...CREDIT_URLS, "http://www.w3.org/1999/xhtml", "https://jcgt.org/published/0007/04/01/", "https://flies.isaacthoman.com/"]);
 
 test("nothing in the build asks another site for anything: no fonts, scripts, analytics or CDNs", () => {
   const html = read("index.html");
@@ -76,8 +88,8 @@ test("every path is relative, so the site works from any folder", () => {
 
 test("what may be kept forever has its contents in its name; the few that may not are small", () => {
   const unhashed = files().filter((f) => !/[.-][A-Za-z0-9_-]{8,}\.[a-z]+$/.test(f));
-  assert.deepEqual(unhashed.sort(), [".well-known/apple-app-site-association", "index.html", "manifest.webmanifest", "sw.js"]);
-  for (const file of unhashed) assert.ok(statSync(path.join(out, file)).size < 8_000, `${file} is small`);
+  assert.deepEqual(unhashed.sort(), [".well-known/apple-app-site-association", "THIRD_PARTY_NOTICES", "index.html", "manifest.webmanifest", "privacy/index.html", "sw.js"]);
+  for (const file of unhashed.filter((f) => f !== "THIRD_PARTY_NOTICES" && f !== "privacy/index.html")) assert.ok(statSync(path.join(out, file)).size < 8_000, `${file} is small`);
 });
 
 test("the page is an installable app, credits the connectome, and its service worker keeps every file but the brain", () => {
@@ -143,4 +155,47 @@ test("the brain built as WebAssembly is beside the page as it is, one file named
   assert.equal(createHash("sha256").update(bytes).digest("hex").slice(0, 16), module.split(".")[2]);
   const js = files().filter((f) => f.startsWith("assets/index-") && f.endsWith(".js")).map(read).join("");
   assert.ok(js.includes(module), "the page knows it");
+});
+
+test("the web build ships the exact notices and a readable static privacy policy", () => {
+  assert.equal(read("THIRD_PARTY_NOTICES"), noticeText());
+  assert.equal(read("privacy/index.html"), privacyHtml(PUBLIC_OWNER));
+  assert.equal(existsSync(path.join(unpublished, "privacy/index.html")), false);
+  const worker = readFileSync(path.join(unpublished, "sw.js"), "utf8");
+  const precache = JSON.parse(/addAll\((\[[^\]]*\])\)/.exec(worker)![1]) as string[];
+  assert.ok(!precache.includes("privacy/index.html"), "an unpublished policy cannot break offline installation");
+  assert.doesNotMatch(worker, /__FLY_PRECACHE__|__FLY_VERSION__/);
+  for (const dir of [out, unpublished]) {
+    const source = readFileSync(path.join(dir, "index.html"), "utf8") + readdirSync(path.join(dir, "assets")).filter((f) => f.endsWith(".js")).map((f) => readFileSync(path.join(dir, "assets", f), "utf8")).join("");
+    assert.doesNotMatch(source, /<operator name>|<contact email>|&lt;(operator name|contact email)&gt;/);
+  }
+});
+
+test("Vite preview follows the built policy, including 404 instead of its SPA fallback", async () => {
+  for (const [dir, status] of [[out, 200], [unpublished, 404]] as const) {
+    const server = await preview({ configFile: path.join(root, "vite.config.ts"), logLevel: "silent", build: { outDir: dir }, preview: { host: "127.0.0.1", port: 0, open: false } });
+    try {
+      for (const route of ["privacy", "privacy/", "privacy/index.html"]) {
+        const response = await fetch(new URL(route, server.resolvedUrls!.local[0]));
+        assert.equal(response.status, status, route);
+        if (status === 200) assert.equal(await response.text(), privacyHtml(PUBLIC_OWNER));
+      }
+    } finally { await new Promise<void>((resolve, reject) => server.httpServer.close((error) => error ? reject(error) : resolve())); }
+  }
+});
+
+test("the unconfigured dev server answers 404 at /privacy", async () => {
+  const saved = Object.fromEntries(Object.keys(PUBLIC_OWNER).map((field) => [field, process.env[field]]));
+  for (const field of Object.keys(PUBLIC_OWNER)) delete process.env[field];
+  const server = await createServer({ configFile: path.join(root, "vite.config.ts"), logLevel: "silent", server: { host: "127.0.0.1", port: 0, open: false } });
+  try {
+    await server.listen();
+    assert.equal((await fetch(new URL("privacy", server.resolvedUrls!.local[0]))).status, 404);
+  } finally {
+    await server.close();
+    for (const [field, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[field];
+      else process.env[field] = value;
+    }
+  }
 });
