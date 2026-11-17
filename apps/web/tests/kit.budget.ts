@@ -22,7 +22,7 @@ import { WeatherNow } from "../src/scene/weather.ts";
 import { Builder } from "../src/tools/build.ts";
 
 const DT = 1 / 60;
-const FRAMES = 600;
+const FRAMES = 1800;
 const SAMPLES = 5;
 
 /** A brain that walks the fly round in a slow circle, so that it meets what is built: its command always fresh at the frames' own clock. */
@@ -86,12 +86,17 @@ function frames(full: boolean) {
   const meter = new CpuMeter();
   for (let i = 0; i < FRAMES; i++) {
     frame((300 + i) * 16);
-    if (i % 60 === 59) meter.lap();
+    // Few laps, each long: a frame with nothing built is a few microseconds, so laps of 60 held under a millisecond
+    // of work beside each reference, and one collection of the garbage the samples leave spread five samples past 1.35x.
+    if (i % 300 === 299) meter.lap();
   }
   return { ms: meter.ms / FRAMES, raw: meter.rawMs / FRAMES, references: meter.references, pieces: builder.pieces.length, met };
 }
 
 test(`with the most a place keeps built (${MAX_PIECES} pieces), a frame costs little more JavaScript than with none`, async (t) => {
+  // The first samples in a process would include the JIT tiering the frame up: one of each runs unmeasured first.
+  frames(false);
+  frames(true);
   const measured = await measureBudget(t, () => {
     const bare = Array.from({ length: SAMPLES }, () => frames(false));
     const full = Array.from({ length: SAMPLES }, () => frames(true));
