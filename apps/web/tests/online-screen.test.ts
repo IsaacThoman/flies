@@ -456,7 +456,7 @@ test("room refreshes never turn a drawn room or removal into a different action"
           const rooms = [ROOMS[0], { ...ROOMS[1], locked: false }];
           const others = [{ id: 2, colour: "red" }, { id: 3, colour: "blue" }];
           if (action === "join") state.rooms = rooms;
-          else state.table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, others };
+          else state.table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, everyone: false, others };
           step();
           const index = screen.menu.items.findIndex((item) => action === "join" ? item.id === `room:${ROOMS[0].code}` : item.id.startsWith("remove:2:"));
           const hits = new HitMap();
@@ -503,7 +503,7 @@ test("a room tap must release on its pressed action, while an unchanged drawn ro
 test("a departed player's reused seat cannot inherit its drawn removal target", () => {
   for (const held of [false, true]) {
     const { screen, state, step, did } = world();
-    const table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, others: [{ id: 2, colour: "red" }] };
+    const table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, everyone: false, others: [{ id: 2, colour: "red" }] };
     state.table = table;
     step();
     const hits = new HitMap();
