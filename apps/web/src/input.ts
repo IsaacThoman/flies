@@ -193,8 +193,12 @@ const MOVE_WINDOW = 400;
 const DOUBLE_WITHIN = 350;
 const DOUBLE_NEAR = 24;
 
-/** A raw pointer event, as Pointers needs it (the DOM's, or a test's). */
-export type RawPointer = { pointerId: number; pointerType: string; clientX: number; clientY: number; button: number; buttons: number };
+/**
+ * A raw pointer event, as Pointers needs it (the DOM's, or a test's). `timeStamp` is when it
+ * happened, on performance.now()'s clock: a busy frame hands events over late, and how far apart
+ * two clicks were, or how quickly a mouse moved, is told from when they happened.
+ */
+export type RawPointer = { pointerId: number; pointerType: string; clientX: number; clientY: number; button: number; buttons: number; timeStamp?: number };
 type Box = { left: number; top: number; width: number; height: number };
 
 /**
@@ -261,6 +265,11 @@ export class Pointers {
     // Safari's own pinch and double-tap zoom, and the page's rubber band.
     for (const type of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(type, (e) => e.preventDefault(), opts);
     document.addEventListener("touchmove", (e) => e.preventDefault(), opts);
+  }
+
+  /** When an event happened: its own time if it has one, else now. */
+  #when(e: RawPointer) {
+    return e.timeStamp !== undefined && e.timeStamp > 0 ? e.timeStamp : this.#now();
   }
 
   #at(e: { clientX: number; clientY: number }) {
@@ -335,13 +344,12 @@ export class Pointers {
       last.x = p.x;
       last.y = p.y;
     } else this.gestures.push({ type: "hover", x: p.x, y: p.y });
-    this.#hovered(p);
+    this.#hovered(p, this.#when(e));
   }
 
   /** A mouse moved: deliberate once it has gone far enough, quickly enough. */
-  #hovered(p: { x: number; y: number }) {
+  #hovered(p: { x: number; y: number }, now: number) {
     const box = this.#box();
-    const now = this.#now();
     if (this.#hover.known) {
       // What it travelled lately, forgetting what is older than the window.
       const k = Math.max(0, 1 - (now - this.#travelAt) / MOVE_WINDOW);
@@ -376,7 +384,7 @@ export class Pointers {
     }
     const p = this.#at(e);
     const tap = this.#moved < (this.#touch ? TAP_SLOP.touch : TAP_SLOP.mouse);
-    const now = this.#now();
+    const now = this.#when(e);
     const last = this.#lastTap;
     const box = this.#box();
     const double = tap && now - last.at < DOUBLE_WITHIN && Math.hypot((p.x - last.x) * box.width, (p.y - last.y) * box.height) < DOUBLE_NEAR;

@@ -64,3 +64,10 @@ test("a list of rooms keeps the rooms that are rooms, named as a room may be", (
   const m = read({ type: "rooms", rooms: [good, { ...good, name: "ㅤ" }, { ...good, code: "nope" }, { ...good, flies: 99 }, { ...good, name: "‮evil" }, null] });
   assert.deepEqual(m, { type: "rooms", rooms: [good] });
 });
+
+test("nutrition receipts are optional and must be finite, nonnegative meals", () => {
+  const food = { type: "food", ack: 1, amounts: [], gone: [], eaten: 0 };
+  assert.deepEqual(read(food), food);
+  assert.deepEqual(read({ ...food, meal: [0.1, 0.08] }), { ...food, meal: [0.1, 0.08] });
+  for (const meal of [null, [1], [1, -1], [-1, 0], [0.1, 0.2], [1, Infinity]]) assert.equal(read({ ...food, meal }), null);
+});

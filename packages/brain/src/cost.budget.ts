@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { test } from "node:test";
-import { CpuMeter, median } from "../../../scripts/cpuBudget.ts";
+import { CpuMeter, measureBudget, median } from "../../../scripts/cpuBudget.ts";
 import { DEFAULT_CONNECTOME_PATH, readConnectomeFile } from "./node.ts";
 import { FlyBrain } from "./runtime.ts";
 import { RESTING_SENSES } from "./types.ts";
@@ -30,18 +30,22 @@ const cost = (b: FlyBrain, senses: BrainSenses) => {
   run(b, 1000, senses);
   const meter = new CpuMeter();
   run(b, 2048, senses, meter);
-  return { ms: meter.ms / 2048, rawMs: meter.rawMs / 2048 };
+  return { ms: meter.ms / 2048, rawMs: meter.rawMs / 2048, references: meter.references };
 };
 
-test("it builds and runs within its cost bounds", { skip }, () => {
+test("it builds and runs within its cost bounds", { skip }, async (t) => {
   // Each sample is a new brain with the same seed through the same senses, so
   // they all do the same work and differ only in the machine's noise.
-  const samples = Array.from({ length: SAMPLES }, () => {
-    const meter = new CpuMeter();
-    const b = new FlyBrain(connectome!, { seed: 1 });
-    meter.lap();
-    return { build: { ms: meter.ms, rawMs: meter.rawMs }, rest: cost(b, RESTING_SENSES), full: cost(b, FULL) };
+  const samples = await measureBudget(t, () => {
+    const measured = Array.from({ length: SAMPLES }, () => {
+      const meter = new CpuMeter();
+      const b = new FlyBrain(connectome!, { seed: 1 });
+      meter.lap();
+      return { build: { ms: meter.ms, rawMs: meter.rawMs, references: meter.references }, rest: cost(b, RESTING_SENSES), full: cost(b, FULL) };
+    });
+    return { value: measured, references: measured.flatMap((s) => [...s.build.references, ...s.rest.references, ...s.full.references]), samples: (["build", "rest", "full"] as const).map((key) => measured.map((s) => s[key].ms)) };
   });
+  if (!samples) return;
   const of = (key: "build" | "rest" | "full") => ({ ms: median(samples.map((s) => s[key].ms)), rawMs: median(samples.map((s) => s[key].rawMs)) });
   const built = of("build");
   const rest = of("rest");
