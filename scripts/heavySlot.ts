@@ -12,23 +12,15 @@ const cooldown = `${lock}.released`;
 const COOLDOWN_MS = 120_000;
 type Holder = { pid: number; token: string };
 
-/** Only a proven-dead holder's own slots may be reclaimed; never another agent's lease. */
-export function recoverOwnLease(file: string, slots = "/tmp/flies-heavy"): boolean {
+/** A stale lease needs explicit cleanup: read-then-delete recovery races concurrent claimants. */
+export function assertLiveLease(file: string): void {
   let holder: Holder;
-  try { holder = JSON.parse(readlinkSync(file)); } catch { return false; }
-  if (!Number.isSafeInteger(holder.pid) || holder.pid <= 0 || !holder.token) return false;
-  try { process.kill(holder.pid, 0); return false; }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") return false; }
-  for (let n = 1; n <= 8; n++) {
-    const slot = `${slots}/slot-${n}`;
-    try {
-      const lease: Holder = JSON.parse(readFileSync(`${slot}/holder.json`, "utf8"));
-      if (lease.pid === holder.pid && lease.token === holder.token) rmSync(slot, { recursive: true, force: true });
-    } catch { /* An absent or differently owned slot is not ours to remove. */ }
+  try { holder = JSON.parse(readlinkSync(file)); } catch { return; }
+  if (!Number.isSafeInteger(holder.pid) || holder.pid <= 0) return;
+  try { process.kill(holder.pid, 0); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") throw Error(`Abandoned measurement lease ${file}: PID ${holder.pid}, token ${holder.token}. Verify ownership before manually removing its slot and lease.`);
   }
-  rmSync(file, { force: true });
-  writeFileSync(`${file}.released`, String(Date.now()));
-  return true;
 }
 
 export async function withHeavySlot<T>(work: () => Promise<T>): Promise<T> {
@@ -42,16 +34,16 @@ export async function withHeavySlot<T>(work: () => Promise<T>): Promise<T> {
   for (;;) {
     try { symlinkSync(JSON.stringify(holder), lock); break; }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
-    recoverOwnLease(lock);
+    assertLiveLease(lock);
     await wait();
   }
-  let slot = "", released = false;
+  let slot = "", released = false, metadataWritten = false;
   const release = () => {
     if (released) return;
     released = true;
     if (slot) {
       try {
-        if (JSON.parse(readFileSync(`${slot}/holder.json`, "utf8")).token === holder.token) rmSync(slot, { recursive: true, force: true });
+        if (!metadataWritten || JSON.parse(readFileSync(`${slot}/holder.json`, "utf8")).token === holder.token) rmSync(slot, { recursive: true, force: true });
       } catch { /* Do not remove a slot whose ownership changed. */ }
       writeFileSync(cooldown, String(Date.now()));
     }
@@ -72,6 +64,7 @@ export async function withHeavySlot<T>(work: () => Promise<T>): Promise<T> {
       if (!slot) await wait();
     }
     writeFileSync(`${slot}/holder.json`, JSON.stringify(holder));
+    metadataWritten = true;
     writeFileSync(`${slot}/owner`, branch + "\n");
     // Leave thirty seconds for a browser's termination handler to close its owned children.
     deadline = globalThis.setTimeout(() => { console.error("Heavy batch exceeded 9m30s; split it into smaller batches."); process.kill(process.pid, "SIGTERM"); }, 570_000);

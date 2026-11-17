@@ -10,8 +10,9 @@ CHROMIUM_PATH=... node scripts/webPerf.ts --build --out /tmp/fly-perf-A
 Each build and measurement acquires an atomic `/tmp/flies-heavy/slot-1` through
 `slot-8`, writing the branch into `owner` and removing the slot when complete.
 Batches stop at 9m30s; the worktree waits two minutes between batches, even across branch changes.
-Repetitions and long frame samples (2–120 seconds) are split across leases.
-A dead process’s lease is recovered only after checking its PID and ownership token.
+Each repetition has its own lease; frame samples are bounded to 2–12 seconds
+to retain the same complete sequence of places in each browser session.
+A dead owner produces a diagnostic; automatic reclamation could race another claimant.
 No slot is held during reviews.
 `--phases loads,frames,memory,brain` selects work; `--dir` reuses a built site.
 Loads and frame scenarios run three times by default (`--runs`, minimum 3).
