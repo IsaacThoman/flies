@@ -26,10 +26,10 @@ import { Eyes } from "./eyes/eyes.ts";
 import { EyesInset, insetWanted } from "./eyes/inset.ts";
 import { FlyView } from "./fly-view.ts";
 import { PlayControls } from "./controls.ts";
+import { TouchLoupe } from "./ui/touch-loupe.ts";
 import type { PlayTarget, ToolUse } from "./controls.ts";
 import { everyoneIndex } from "@fly/net";
 import type { TableStart } from "@fly/net";
-import { TAP_SLOP } from "./input.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
 import { Life } from "./life.ts";
 import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart, tryProtocolReload } from "./online/invite.ts";
@@ -185,6 +185,8 @@ export class Game implements Shell {
   knock: Knock | null = null;
   /** Typing into the fields the game draws (a room's name, its password), where there is a way to. */
   readonly typing: TextEntry | null;
+  #typingHit: Hit | null = null;
+  readonly touchLoupe: TouchLoupe | null;
   /** The line that lists the rooms, while Online shows them. */
   #lobby: Lobby | null = null;
   /** The fly's own food, kept while it tries a room, to have back if the room never lets it in. */
@@ -209,7 +211,7 @@ export class Game implements Shell {
   #awakeAt = -1;
   #datasetAt = 0;
   /** What the HUD last drew, to tell when it needs drawing again. */
-  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1 };
+  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1, pressed: null as Readonly<Hit> | null };
   #hudAt = 0;
   #changedAt = -10;
   #touched = false;
@@ -339,6 +341,8 @@ export class Game implements Shell {
     this.nerves = new NervesPanel(this.fly.model.nerves);
     this.overlay.scene.add(this.nerves.mesh);
     this.overlay.scene.add(this.statsPanel.mesh);
+    this.touchLoupe = inputs.pointers ? new TouchLoupe() : null;
+    if (this.touchLoupe) this.overlay.scene.add(this.touchLoupe.mesh);
     this.#pictures = [this.inset, this.nerves, this.statsPanel];
     this.tally = new Tally(this.life, Date.now());
     this.#statsState = { spikes: 0, active: 0, speed: 0, history: this.meter.history, head: 0, day: this.tally.day, sensed: this.life.sensed, brain: null };
@@ -392,7 +396,13 @@ export class Game implements Shell {
       const code = invited ?? (kept && everyoneIndex(kept) < 0 ? kept : null);
       if (code) this.#sit(code, null);
       // A phone's keyboard comes up only for a field focused during the tap itself: the frame that handles the tap is too late.
-      if (inputs.pointers) this.#typeOnTap(canvas);
+      if (inputs.pointers) {
+        inputs.pointers.onDown = (x, y) => {
+          const hit = this.#hitAt(x, y);
+          this.#typingHit = hit && { ...hit };
+        };
+        inputs.pointers.onTap = (x, y) => this.#typeOnTap(x, y);
+      }
       // A link opened while the app runs (a universal link on a phone): this room, leaving any other.
       window.addEventListener?.(INVITE_EVENT, (event) => {
         const code = invitedTo(String((event as CustomEvent<unknown>).detail));
@@ -480,26 +490,10 @@ export class Game implements Shell {
   }
 
   /** Starts typing into a field as a tap on it lifts, while the browser still counts it as the player's doing. */
-  #typeOnTap(canvas: HTMLCanvasElement) {
-    let from = { x: 0, y: 0 };
-    let pressed: Hit | null = null;
-    const at = (e: PointerEvent) => {
-      const box = canvas.getBoundingClientRect();
-      return { x: (e.clientX - box.left) / Math.max(1, box.width), y: (e.clientY - box.top) / Math.max(1, box.height) };
-    };
-    canvas.addEventListener("pointerdown", (e) => {
-      from = at(e);
-      const hit = this.#hitAt(from.x, from.y);
-      pressed = hit && { ...hit };
-    });
-    canvas.addEventListener("pointerup", (e) => {
-      const p = at(e);
-      const { width, height } = this.shape.design;
-      if (Math.hypot((p.x - from.x) * width, (p.y - from.y) * height) > TAP_SLOP.touch) return;
-      const hit = this.#hitAt(p.x, p.y);
-      const current = this.nav.current;
-      if (hit?.kind === MENU_HITS.row && sameTarget(pressed, hit) && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index, hit.id ?? "");
-    });
+  #typeOnTap(x: number, y: number) {
+    const hit = this.#hitAt(x, y);
+    const current = this.nav.current;
+    if (hit?.kind === MENU_HITS.row && sameTarget(this.#typingHit, hit) && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index, hit.id ?? "");
   }
 
   /** The link to the table this device is at. */
@@ -643,7 +637,7 @@ export class Game implements Shell {
     p.away = typeof document !== "undefined" && document.hidden;
     p.handsOut = playing;
     p.playing = playing && (performance.now() - Math.max(this.remote.lastInputAt, this.devices.at)) / 1000 < QUIET_AFTER;
-    p.holding = playing && (this.remote.held.has("select") || this.#controls.holding);
+    p.holding = playing && (this.remote.held.has("select") || (this.#controls.holding && this.#aim.onWorld));
     this.#copyEye();
     p.eye = this.#eye;
     return p;
@@ -666,6 +660,10 @@ export class Game implements Shell {
     const first = this.#frameVersion < 0;
     this.#frameVersion = this.display.version;
     const frame = this.display.frame;
+    if (!first) {
+      this.#inputs.pointers?.cancel();
+      this.#letGo();
+    }
     // The Apple TV's frame is the one everything starts in: nothing to resize there.
     if (frame !== TV_FRAME) {
       this.stage.resize(frame);
@@ -987,7 +985,7 @@ export class Game implements Shell {
 
     const playing = this.nav.current === "play" && !this.wallpaper;
     this.#copyEye();
-    const holding = remote.held.has("select") || this.#controls.holding;
+    const holding = remote.held.has("select") || (this.#controls.holding && this.#aim.onWorld);
     this.hands.update(dt, { use: false, holding: playing && holding, eye: this.#eye }, life.body, life.pantry);
     // Holding Select is taught by holding it: a finger or a mouse button held teaches the remote nothing.
     this.#held = (this.hands.stroking || this.hands.blowing) && remote.held.has("select") ? this.#held + dt : 0;
@@ -1044,6 +1042,7 @@ export class Game implements Shell {
     if (!this.glLost) {
       stage.beginFrame();
       stage.render(director.camera, dt);
+      this.touchLoupe?.update(stage.renderer, this.shape, this.#aim.x, this.#aim.y, this.devices.current === "touch" && this.#controls.holding && this.#aim.onWorld && playing);
       const showEyes = this.#showEyes();
       const screen = this.#loading ? "loading" : this.nav.current;
       const settings = this.settings;
@@ -1406,7 +1405,8 @@ export class Game implements Shell {
     const hits = this.overlay.hits;
     if (hits.owner !== (this.#loading ? "loading" : this.nav.current)) return null;
     const { width, height } = this.shape.design;
-    const hit = hits.at(x * width, y * height, touchSlop(this.shape));
+    // Play targets already take a finger; padding them steals taps on the nearby world.
+    const hit = hits.at(x * width, y * height, this.nav.current === "play" ? 0 : touchSlop(this.shape));
     return hit?.kind === "panel" && this.nav.current === "play" ? null : hit;
   }
 
@@ -1523,7 +1523,7 @@ export class Game implements Shell {
         p.dy = (g.y - grip.y) * height;
         if (g.type === "up") {
           p.hit = this.#hitAt(g.x, g.y);
-          p.tap = g.tap;
+          p.tap = g.tap && sameTarget(grip.hit, p.hit);
           this.#grip = null;
         }
         break;
@@ -1712,6 +1712,7 @@ export class Game implements Shell {
       hud.changed = this.time - this.#changedAt;
       hud.spikes = this.meter.spikesPerSecond;
       hud.brainRunning = this.brain.status === "running";
+      hud.pressed = this.#controls.preview;
       if (this.#showEyes()) {
         const e = this.#eyesInfo;
         e.facets = this.eyes.facets;
@@ -1720,7 +1721,8 @@ export class Game implements Shell {
         hud.eyes = e;
       } else hud.eyes = null;
       const k = this.#hudKey;
-      const changed = k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught;
+      const pressedChanged = k.pressed !== hud.pressed;
+      const changed = pressedChanged || k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught;
       if (changed || hud.changed < 0.3 || this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS) {
         k.tool = this.hands.tool;
         k.variant = this.hands.variants[this.hands.tool];
@@ -1731,13 +1733,14 @@ export class Game implements Shell {
         k.hints = hud.hints;
         k.eyes = !!hud.eyes;
         k.taught = this.#taught;
+        k.pressed = hud.pressed ?? null;
         this.#hudAt = this.time;
         overlay.dirty = true;
       }
       overlay.redraw(dt, current, (g, hits) => {
         drawHud(g, this.time, hud, hits);
         if (stats) drawStats(g, this, hud.layout.statsX, hud.layout.statsY);
-      });
+      }, pressedChanged);
       return;
     }
     const screen = this.screens[current];
