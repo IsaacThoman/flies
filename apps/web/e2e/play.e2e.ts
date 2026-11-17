@@ -123,7 +123,8 @@ try {
     let now = performance.now();
     const clock = Object.getOwnPropertyDescriptor(performance, "now");
     Object.defineProperty(performance, "now", { configurable: true, value: () => now });
-    const draw = (ms: number) => { now += ms; game.frame(0.1, now); return canvas.dataset.wallpaper; };
+    // Canvas diagnostics publish every 200 ms; inspect the frame itself at the deadline.
+    const draw = (ms: number) => { now += ms; game.frame(0.1, now); return String(game.wallpaper); };
     const key = () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
       window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight" }));
