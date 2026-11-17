@@ -13,7 +13,7 @@ import { FLY_LENGTH, Rhythm, SUMMER } from "@fly/body";
 import { REGIONS } from "@fly/brain";
 import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttribution } from "@fly/contracts";
 import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
-import { Navigator } from "@fly/ui";
+import { Navigator, sameTarget } from "@fly/ui";
 import type { GlyphSet, Hit } from "@fly/ui";
 import { BALL_RADIUS, Pantry, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
 import type { RayHit, Vec3 } from "@fly/world";
@@ -29,7 +29,7 @@ import { EyesInset, insetWanted } from "./eyes/inset.ts";
 import { FlyView } from "./fly-view.ts";
 import { PlayControls } from "./controls.ts";
 import type { PlayTarget, ToolUse } from "./controls.ts";
-import { COLOURS, MAX_OWN } from "@fly/net";
+import { COLOURS, MAX_OWN, PROTOCOL } from "@fly/net";
 import type { SeatedFly, TableStart } from "@fly/net";
 import { TAP_SLOP } from "./input.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
@@ -40,7 +40,9 @@ import { Lobby } from "./online/lobby.ts";
 import { Online } from "./online/online.ts";
 import type { Ended, PlayerNow, TableHost } from "./online/online.ts";
 import { nativeSocketBridge, nativeSockets } from "./online/native-socket.ts";
-import { OtherFlies } from "./online/others.ts";
+import { NEWER_KEY, reloadForNewer } from "./online/newer.ts";
+import { OtherFlies, devicesOf } from "./online/others.ts";
+import type { Device, Other } from "./online/others.ts";
 import { BrowserSocket } from "./online/socket.ts";
 import { isPlaceId, nextPlace, placeInfo } from "./places/catalog.ts";
 import type { PlaceId } from "./places/catalog.ts";
@@ -117,17 +119,19 @@ type MenuScreenId = Exclude<ScreenId, "play">;
 const FIXED_AT_TABLE: ReadonlySet<ToolId> = new Set(["light", "weather", "place"]);
 const NOTHING_FIXED: ReadonlySet<ToolId> = new Set();
 
-/** Reloads the page, once a session: whether it did. */
 /** Adds each of `from` to `to`, without the iterator a for…of would make: it runs every frame for every fly. */
 function pushAll<T>(to: T[], from: readonly T[]) {
   for (let i = 0; i < from.length; i++) to.push(from[i]);
 }
 
-function reloadOnce(): boolean {
+/** Reloads the page into the build that speaks the room's newer protocol, when it may (online/newer.ts): whether it did. */
+function reloadForNewerProtocol(): boolean {
   try {
-    if (sessionStorage.getItem("flies.reloaded")) return false;
-    sessionStorage.setItem("flies.reloaded", "1");
+    const next = reloadForNewer(sessionStorage.getItem(NEWER_KEY), PROTOCOL, Date.now());
+    if (!next) return false;
+    sessionStorage.setItem(NEWER_KEY, next);
   } catch {
+    // Without the session's memory a reload that brought this page back would reload again every frame.
     return false;
   }
   location.reload();
@@ -310,6 +314,8 @@ export class Game implements Shell {
   readonly #app: boolean;
   readonly #player: PlayerNow = { away: false, playing: false, handsOut: false, holding: false, eye: { x: 0, y: 0, z: 0 } };
   readonly #tableHost: TableHost;
+  /** The other devices at the table as the screens have them, by the first of their flies heard of. */
+  readonly #devices = new WeakMap<Other, Device>();
   readonly #titleItems: number;
 
   constructor(canvas: HTMLCanvasElement, remote: Remote, brains: Brains, display: Display, inputs: Inputs) {
@@ -465,24 +471,29 @@ export class Game implements Shell {
     }
     this.#lobby?.update(dt);
     // A room server newer than this page: the newer page speaks its protocol.
-    if (this.#lobby?.status === "version") reloadOnce();
+    if (this.#lobby?.status === "version") reloadForNewerProtocol();
   }
 
   /** Starts typing into a field as a tap on it lifts, while the browser still counts it as the player's doing. */
   #typeOnTap(canvas: HTMLCanvasElement) {
     let from = { x: 0, y: 0 };
+    let pressed: Hit | null = null;
     const at = (e: PointerEvent) => {
       const box = canvas.getBoundingClientRect();
       return { x: (e.clientX - box.left) / Math.max(1, box.width), y: (e.clientY - box.top) / Math.max(1, box.height) };
     };
-    canvas.addEventListener("pointerdown", (e) => (from = at(e)));
+    canvas.addEventListener("pointerdown", (e) => {
+      from = at(e);
+      const hit = this.#hitAt(from.x, from.y);
+      pressed = hit && { ...hit };
+    });
     canvas.addEventListener("pointerup", (e) => {
       const p = at(e);
       const { width, height } = this.shape.design;
       if (Math.hypot((p.x - from.x) * width, (p.y - from.y) * height) > TAP_SLOP.touch) return;
       const hit = this.#hitAt(p.x, p.y);
       const current = this.nav.current;
-      if (hit?.kind === MENU_HITS.row && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index);
+      if (hit?.kind === MENU_HITS.row && sameTarget(pressed, hit) && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index, hit.id ?? "");
     });
   }
 
@@ -507,13 +518,7 @@ export class Game implements Shell {
     const online = this.online;
     const link = this.tableLink;
     if (!online || !link) return null;
-    const others: { id: number; colours: string[] }[] = [];
-    for (const o of online.others.list) {
-      const of = others.find((p) => p.id === o.of);
-      if (of) of.colours.push(o.colour);
-      else others.push({ id: o.of, colours: [o.colour] });
-    }
-    return { name: online.room?.name ?? null, code: online.code, link, starting: online.starting, joined: online.joined, others };
+    return { name: online.room?.name ?? null, code: online.code, link, starting: online.starting, joined: online.joined, others: devicesOf(online.others.list, this.#devices) };
   }
 
   /** A fly's clock, as every fly's here keeps it: the real time of day, and the sun's times where the TV can tell them. */
@@ -676,7 +681,7 @@ export class Game implements Shell {
     const ended = online.ended;
     if (!ended) return;
     // A page from before the server's last deploy: the newer page speaks its protocol.
-    if (ended === "version" && reloadOnce()) return;
+    if (ended === "version" && reloadForNewerProtocol()) return;
     this.#stand(ended);
   }
 
@@ -1630,6 +1635,7 @@ export class Game implements Shell {
         p.dx = (g.x - grip.x) * width;
         p.dy = (g.y - grip.y) * height;
         if (g.type === "up") {
+          p.hit = this.#hitAt(g.x, g.y);
           p.tap = g.tap;
           this.#grip = null;
         }

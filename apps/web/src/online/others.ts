@@ -85,6 +85,31 @@ function instanced(geometry: THREE.BufferGeometry, material: THREE.Material, par
   return mesh;
 }
 
+/** Another device at the table as the screens show it: its player's id, and its flies' colours. */
+export type Device = { readonly id: number; colours: string[] };
+
+/**
+ * The other devices at the table, from their flies heard of. Each is the
+ * same object for as long as the first of its flies heard of is the same
+ * one (`known` keeps them), so the screens can tell it from a device that
+ * later sits in its seats: that one's flies are heard of anew.
+ */
+export function devicesOf(list: readonly Other[], known: WeakMap<Other, Device>): Device[] {
+  const devices: Device[] = [];
+  for (const o of list) {
+    const of = devices.find((d) => d.id === o.of);
+    if (of) {
+      of.colours.push(o.colour);
+      continue;
+    }
+    let device = known.get(o);
+    if (!device) known.set(o, (device = { id: o.of, colours: [] }));
+    device.colours = [o.colour];
+    devices.push(device);
+  }
+  return devices;
+}
+
 export class OtherFlies {
   /** The other players' flies at the table. */
   readonly list: Other[] = [];

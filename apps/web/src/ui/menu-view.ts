@@ -137,7 +137,7 @@ export class MenuView {
       const { x, y, width } = this.#at(this.#visibleIndex(i));
       const focused = ring && i === menu.focus;
       const press = i === menu.focus ? this.#press.value : 0;
-      hits.add(MENU_HITS.row, x, y, width, row, i);
+      hits.add(MENU_HITS.row, x, y, width, row, i, 0, item.id);
       const caret = i === this.typing.index ? this.typing.caret : -1;
       if (item.kind === "choice" && item.tabs) drawTabs(g, item, x + this.tabInset, y, width - this.tabInset, row, hits, i);
       else if (item.kind === "field") drawField(g, item, x, y, width, row, focused, i === hover, caret, t, !!this.layout.compact);
@@ -181,14 +181,14 @@ function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: n
     pill(g, x, y0, w, th, item.options[item.index].label, { color: "aqua", disabled: item.disabled, size: Math.min(most, 16) });
     chevron(g, x + 20, mid, -1, item.index > 0);
     chevron(g, x + w - 20, mid, 1, item.index < n - 1);
-    hits.add(MENU_HITS.step, x, y, 44, h, index, -1);
-    hits.add(MENU_HITS.step, x + w - 44, y, 44, h, index, 1);
+    hits.add(MENU_HITS.step, x, y, 44, h, index, -1, item.id);
+    hits.add(MENU_HITS.step, x + w - 44, y, 44, h, index, 1, item.id);
     return;
   }
   for (let k = 0; k < n; k++) {
     const tx = x + k * (tw + gap);
     pill(g, tx, y + (h - th) / 2, tw, th, item.options[k].label, { color: k === item.index ? "aqua" : "glass", disabled: item.disabled, size });
-    hits.add(MENU_HITS.tab, tx, y, tw, h, index, k);
+    hits.add(MENU_HITS.tab, tx, y, tw, h, index, k, item.id);
   }
 }
 
@@ -326,13 +326,13 @@ function drawItem(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: num
     chevron(g, right - 10, mid, 1, item.index < item.options.length - 1);
     if (item.dots) dots(g, item, (vx - 64 + right - 10) / 2, mid, h);
     else text(g, label, (vx - 64 + right - 10) / 2, mid, { size: Math.round(h * 0.38), color: focused ? "#0a6fc0" : INK, align: "center", baseline: "middle" });
-    hits.add(MENU_HITS.step, vx - 64 - 20, y, 40, h, index, -1);
-    hits.add(MENU_HITS.step, right - 30, y, 40, h, index, 1);
+    hits.add(MENU_HITS.step, vx - 64 - 20, y, 40, h, index, -1, item.id);
+    hits.add(MENU_HITS.step, right - 30, y, 40, h, index, 1, item.id);
   } else {
     const k = (item.value - item.min) / (item.max - item.min);
     slider(g, track.x, mid, track.w, k, focused);
     text(g, String(Math.round(item.value)), right, mid, { size: Math.round(h * 0.36), color: INK, align: "right", baseline: "middle" });
-    hits.add(MENU_HITS.track, track.x - 14, y, track.w + 28, h, index);
+    hits.add(MENU_HITS.track, track.x - 14, y, track.w + 28, h, index, 0, item.id);
   }
 }
 
@@ -374,12 +374,12 @@ function drawStacked(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: 
     chevron(g, x + w - 26, low, 1, item.index < item.options.length - 1);
     if (item.dots) dots(g, item, x + w / 2, low, h * 0.8);
     else text(g, item.options[item.index].label, x + w / 2, low, { size: Math.round(h * 0.3), color: focused ? "#0a6fc0" : INK, align: "center", baseline: "middle" });
-    hits.add(MENU_HITS.step, x, y, 56, h, index, -1);
-    hits.add(MENU_HITS.step, x + w - 56, y, 56, h, index, 1);
+    hits.add(MENU_HITS.step, x, y, 56, h, index, -1, item.id);
+    hits.add(MENU_HITS.step, x + w - 56, y, 56, h, index, 1, item.id);
   } else {
     const k = (item.value - item.min) / (item.max - item.min);
     text(g, String(Math.round(item.value)), x + w - 22, y + h * 0.3, { size: Math.round(h * 0.27), color: INK, align: "right", baseline: "middle" });
     slider(g, track.x, low, track.w, k, focused);
-    hits.add(MENU_HITS.track, track.x - 14, y + h * 0.4, track.w + 28, h * 0.6, index);
+    hits.add(MENU_HITS.track, track.x - 14, y + h * 0.4, track.w + 28, h * 0.6, index, 0, item.id);
   }
 }

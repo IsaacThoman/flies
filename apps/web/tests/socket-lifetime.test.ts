@@ -3,6 +3,9 @@ import { test } from "node:test";
 import { BrowserSocket, BUFFERED_BYTES, INBOX_MESSAGES } from "../src/online/socket.ts";
 import { TableLine } from "../src/online/connection.ts";
 import { PROTOCOL } from "@fly/net";
+import type { ServerMessage } from "@fly/net";
+
+const WELCOME = JSON.stringify({ type: "welcome", v: PROTOCOL, id: 1, colour: "#ffd21f", flies: [{ id: 1, colour: "#ffd21f", at: [0, 0, 0, 0] }], starter: 1, seed: 1, now: 0, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0, 0], room: { name: "Flies", listed: false, locked: false } } satisfies ServerMessage);
 
 class Wire {
   static OPEN = 1;
@@ -85,7 +88,7 @@ test("a room's refusal queued before closing still reaches its reader", () => {
 test("overflow is a recoverable dropped line and a new welcome restores the table", () => {
   const line = new TableLine(() => new BrowserSocket("ws://local/rooms"), "ws://local/rooms", () => ({ type: "hello", v: PROTOCOL, table: "abcde23456", key: "device" }));
   const first = Wire.all.at(-1)!; first.open(); line.update(0);
-  first.message('{"type":"welcome","now":0}'); line.update(0);
+  first.message(WELCOME); line.update(0);
   assert.equal(line.status, "joined");
   for (let i = 0; i <= INBOX_MESSAGES; i++) first.message(new ArrayBuffer(340));
   line.update(0);
@@ -94,7 +97,7 @@ test("overflow is a recoverable dropped line and a new welcome restores the tabl
   const second = Wire.all.at(-1)!;
   assert.notEqual(second, first);
   second.open(); line.update(0);
-  second.message('{"type":"welcome","now":0}'); line.update(0);
+  second.message(WELCOME); line.update(0);
   assert.equal(line.status, "joined");
   assert.equal(line.reconnects, 1);
   line.leave();

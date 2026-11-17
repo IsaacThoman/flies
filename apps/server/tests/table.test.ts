@@ -1003,3 +1003,119 @@ test("bites are credited to the device when a trailing fly reaches food, at the 
   step(100);
   assert.equal(saidOf(a, "food").at(-1)?.ack, 1);
 });
+
+test("a clear request removes only the sender's offerings and broadcasts gone ids; stale epochs do nothing", () => {
+  const { table, join, send, step, clock } = room();
+  const a = join("key-1"), b = join("key-2");
+  const mine = DROP_ID + 1, theirs = 2 * DROP_ID + 1;
+  send(a, { type: "drop", id: mine, kind: "honey", x: 0, z: 0, y: 0, at: clock.now });
+  send(b, { type: "drop", id: theirs, kind: "water", x: 0, z: 0, y: 0, at: clock.now });
+  const patches = table.food.foods.filter((f) => f.kind === "patch").map((f) => f.id);
+  send(a, { type: "clearFood", epoch: table.epoch + 1 });
+  assert.ok(table.food.find(mine), "a delayed request for another place is ignored");
+  send(b, { type: "clearFood", epoch: table.epoch });
+  assert.ok(table.food.find(mine), "the starter's offering is not the guest's to clear");
+  assert.equal(table.food.find(theirs), null);
+  step(150);
+  for (const player of [a, b]) assert.ok(saidOf(player, "food").some((m) => m.gone.includes(theirs)), "both devices hear the room's removal");
+  send(a, { type: "clearFood", epoch: table.epoch });
+  assert.equal(table.food.find(mine), null);
+  assert.deepEqual(table.food.foods.map((f) => f.id), patches);
+});
+
+test("a multi-fly device's FLY batch is read whole before any of it is used: cut short, a fly twice, or more than a device brings, none of it is taken", () => {
+  const { table, clock, join, own, step } = room();
+  const a = join("key-1", { flies: 3 });
+  const b = join("key-2");
+  step();
+  clear(a, b);
+  const before = a.seat.flies.map((f) => ({ ...f.state }));
+  const send = (bytes: Uint8Array) => table.receive(a.seat, bytes);
+  const encode = (states: readonly FlyState[]) => {
+    const view = new DataView(new ArrayBuffer(2 + 8 * 64));
+    return new Uint8Array(view.buffer, 0, encodeOwn(view, table.scale, states));
+  };
+  const moved = () => {
+    const states = nextStates(a, clock.now + 10);
+    for (const s of states) s.x += 0.5;
+    return states;
+  };
+  // Cut short in its last fly: the first two, whole, aren't taken either.
+  const whole = encode(moved());
+  send(whole.slice(0, whole.length - 5));
+  // A fly twice: one could take two steps for it in one message.
+  const twice = moved();
+  send(encode([twice[0], { ...twice[0], seq: twice[0].seq + 1, t: twice[0].t + 1, x: twice[0].x + 0.5 }]));
+  // More than any device brings, every one its own.
+  send(encode([...moved(), ...moved().map((s) => ({ ...s, seq: s.seq + 1, t: s.t + 1 }))].slice(0, MAX_OWN + 1)));
+  // Ids no fly at a table has.
+  send(encode(moved().map((s, i) => ({ ...s, id: i === 0 ? 0 : 200 }))));
+  assert.deepEqual(a.seat.flies.map((f) => f.state), before);
+  step();
+  assert.deepEqual(batches(b), [], "nothing of them reached anyone");
+  // The same states, whole and once each, are taken.
+  own(a, moved());
+  step();
+  assert.deepEqual(batches(b).map((batch) => batch.map((s) => s.id)), [[1, 2, 3]]);
+});
+
+test("each of a device's flies is read at the room time nearest it past the u32 wrap, and by its own epoch", () => {
+  const { table, clock, join, own } = room();
+  clock.now = 2 ** 32 - 1000;
+  const a = join("key-1", { flies: 2 });
+  for (let i = 0; i < 40; i++) {
+    clock.now += 50;
+    const states = nextStates(a, clock.now);
+    // A whole number of the wire's 1/50 mm, so nothing is lost to rounding.
+    for (const s of states) s.x += 0.1;
+    // The second fly's state names a place the table has left: only the first moves.
+    states[1].epoch = (table.epoch + 1) & 0xff;
+    own(a, states);
+  }
+  assert.ok(clock.now > 2 ** 32);
+  const [first, second] = a.seat.flies.map((f) => f.state);
+  assert.ok(Math.abs(first.t - clock.now) < 1, "its time is the room's, past 2^32");
+  assert.ok(Math.abs(first.x - (spawnSpot(table.world, 1)[0] + 40 * 0.1)) < 0.05, `not stuck at the wrap: ${first.x - spawnSpot(table.world, 1)[0]}`);
+  assert.deepEqual([second.x, second.z], spawnSpot(table.world, 2).slice(0, 2), "a state from another place moves nothing");
+});
+
+test("hostile counts and spots in a hello or a recount from a multi-fly device seat 1 to MAX_OWN flies, each where the table has it", () => {
+  const { table, join, send, hello } = room();
+  const a = join("key-1", { flies: 3 });
+  const spots = a.seat.flies.map((f) => [f.state.x, f.state.z, f.state.yaw, f.state.y]);
+  for (const count of ["4", null, -3, 1e9, Infinity, { length: 4 }, [4]] as unknown[]) {
+    send(a, { type: "flies", count } as ClientMessage);
+    const n = typeof count === "number" && Number.isFinite(count) ? Math.max(1, Math.min(MAX_OWN, count)) : 1;
+    assert.equal(a.seat.flies.length, n, `count ${JSON.stringify(count)}`);
+    assert.equal(saidOf(a, "seated").at(-1)?.asked, n);
+  }
+  send(a, { type: "flies", count: 3 });
+  // Back with nonsense for where its flies are: a spot far off, the wrong shape, one spot as a device with one fly once said, too many, none of them numbers.
+  for (const at of [[[1e6, 0, 0, 0], [0, 0], "x"], [0, 0, 0, 0], Array.from({ length: 1000 }, () => [NaN, 0, 0]), "here", { 0: [0, 0, 0] }] as unknown[]) {
+    const link = fakeLink();
+    const seat = table.hello(link, "key-1", { ...hello("key-1", { flies: 3, epoch: table.epoch }), at } as Hello) as Seat;
+    assert.deepEqual(seat.flies.map((f) => [f.state.x, f.state.z, f.state.yaw, f.state.y]), spots, `at ${JSON.stringify(at).slice(0, 40)}`);
+    assert.deepEqual(saidOf(link, "welcome")[0].flies.map((f) => f.at), spots);
+  }
+});
+
+test("clearing dropped food from a multi-fly device clears that device's drops only, named by its player id, and only in the place it names", () => {
+  const { table, join, send, step, clock } = room();
+  const a = join("key-1", { flies: 3 });
+  const b = join("key-2", { flies: 2 });
+  assert.equal(b.seat.id, 4);
+  const mine = b.seat.id * DROP_ID + 1;
+  const theirs = a.seat.id * DROP_ID + 1;
+  // Under another of its own flies' ids is not its name: only its player's.
+  send(b, { type: "drop", id: 5 * DROP_ID + 1, kind: "honey", x: 0, z: 0, y: 0, at: clock.now, epoch: table.epoch });
+  assert.equal(table.food.find(5 * DROP_ID + 1), null);
+  send(b, { type: "drop", id: mine, kind: "honey", x: 0, z: 0, y: 0, at: clock.now, epoch: table.epoch });
+  send(a, { type: "drop", id: theirs, kind: "water", x: 0, z: 0, y: 0, at: clock.now, epoch: table.epoch });
+  send(b, { type: "clearFood", epoch: (table.epoch + 1) & 0xff });
+  assert.ok(table.food.find(mine), "a clear from a place the table has left does nothing");
+  send(b, { type: "clearFood", epoch: table.epoch });
+  assert.equal(table.food.find(mine), null);
+  assert.ok(table.food.find(theirs));
+  step(150);
+  for (const p of [a, b]) assert.ok(saidOf(p, "food").some((m) => m.gone.includes(mine)));
+});

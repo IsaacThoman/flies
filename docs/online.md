@@ -123,8 +123,12 @@ nobody else sees yours.
 
 One WebSocket per device, at `wss://<site>/rooms`. The first message is the
 device's `hello`, carrying the protocol version (now 4); the room refuses any
-other, and a page it refuses for its version reloads itself once, into the
-site's current game. A connection that only lists the rooms says `browse`
+other, and a page it refuses for its version reloads itself into the
+site's current game: at once, the first time for each protocol it speaks
+(so a tab left open reloads at every deploy that changes it), and if the
+reload brought the same page back (the network too slow, and the service
+worker's kept page shown), again after 30 s, doubling to 30 minutes, so
+it never stays behind nor reloads every frame (`apps/web/src/online/newer.ts`). A connection that only lists the rooms says `browse`
 instead, and is told `rooms` at once and again whenever the list changes
 (checked every 2 s); nothing else it says is listened to. The fast traffic is binary and little-endian, with a type byte
 first; everything rare is JSON (`packages/net/src/protocol.ts`,
@@ -134,7 +138,7 @@ first; everything rare is JSON (`packages/net/src/protocol.ts`,
 | --- | --- | --- | --- |
 | 1 `FLY` | device to room, every 50 ms | type, count, then each fly's id and state; only the first carries the hand | 2 + 33 a fly, + 14 with the hand |
 | 2 `FLIES` | room to device, every 50 ms when anything is new | type, count, then each fly's id and state | 2 + 33 a fly, + 14 for each hand |
-| 3 `BITES` | device to room, at most every 100 ms | type, sequence (u16), count, then each food's id (u32) and amount (f32) | 4 + 8 a bite |
+| 3 `BITES` | device to room, at most every 100 ms | type, sequence (u16), count, then each food's id (u32) and amount (f32), then the epoch (u8) of the place they were taken in | 5 + 8 a bite |
 
 A fly's state (32 bytes, 46 with the hand). Its lengths are at its place's
 scale (`wireScale`), the finest that holds the place's floor and ceiling
@@ -156,7 +160,9 @@ sinks one on its feet into what it stands on.
 
 Protocol 4 is protocol 3 with several flies from one device: the seats
 count flies, each with its own id and colour, and `FLY` is a batch like
-`FLIES`. A device speaking 3 sends one state without its id, so it is
+`FLIES`. It also carries what came to 3 without a new number, which a
+device speaking 4 always sends: the epoch on a drop, a ball, a burst
+bubble, found food and bites, and `clearFood`. A device speaking 3 sends one state without its id, so it is
 turned away and reloads into 4.
 
 Protocol 3 is protocol 2 with rooms: names, the list, and passwords. A
@@ -175,7 +181,7 @@ rather than sitting at a table that may move to the restaurant.
 | flags | u8: airborne 1, away (its device has stopped) 2, eating 4, hand out 8, holding Select 16, at the remote 32 |
 | epoch | u8, the room's count of moves to another place: a state from before a move is dropped |
 | sequence | u16, wrapping |
-| time | u32, room ms when the fly was there |
+| time | u32, room ms when the fly was there, modulo 2^32 (it wraps after about 49.7 days of a room server's uptime): each end reads it as the room time nearest its own (`roomTime`) |
 | position | 3 × i16, at the place's scale |
 | heading | u16, a turn in 65,536 |
 | the ground's normal | 2 × i8, x and z (y follows) |
@@ -190,13 +196,22 @@ JSON, from the device:
 | `hello {v, table, key, start?, password?, flies?, at?, epoch?}` | the table's code; this device's key; `start` (place, light, weather, time zone and offset, and the room's `name` and whether it is `listed`) to start the table if it doesn't exist; `password`, the lock a new room is to have, or the key to a locked one, sent only until welcomed; `flies`, how many it asks for (1 to 4, 1 if left out); `at`, an array of each fly's spot in seated order, coming back after a moment away, and the `epoch` of their place |
 | `browse {v}` | instead of a hello: this connection only lists the rooms |
 | `ping {t}` | answered `pong {t, now}` with the room's time |
-| `drop {id, kind, x, z, y, at}` | food dropped onto the surface at or below `y` (the floor under a table, or the table), named by the device (player id × 1,000,000 + its count) so its flies can eat it before the room has heard |
-| `ball {at, from, via, to}` | a throw, starting at room time `at` |
+| `drop {id, kind, x, z, y, at, epoch}` | food dropped onto the surface at or below `y` (the floor under a table, or the table), named by the device (player id × 1,000,000 + its count) so its flies can eat it before the room has heard |
+| `clearFood {epoch}` | clears only this player’s dropped offerings in the current place; the room sends their ids in `food.gone` |
+| `ball {at, from, via, to, epoch}` | a throw, starting at room time `at` |
 | `world {light, weather}`, `place {place}`, `remove {id}` | the starter's choices; `remove` takes any fly's id and removes its whole device |
 | `flies {count}` | how many flies this device now asks for, answered by `seated`; one at a time, and one unanswered (dropped for coming too often) is asked again after 1, 2, 4 and 8 s, then left until the count changes or the line comes back |
-| `pop {slot, cycle, at}` | one of its flies burst a bubble |
-| `found {id, name, x, z, y, r, sweet}` | the place put food out on this device, named from where it lies |
+| `pop {slot, cycle, at, epoch}` | one of its flies burst a bubble |
+| `found {id, name, x, z, y, r, sweet, epoch}` | the place put food out on this device, named from where it lies |
 | `bye` | leaving for good |
+
+What a device does in its place (bites, a drop, a throw, a burst bubble,
+found food) names the epoch of the place it was done in, as its fly's
+states do: one in flight as the starter moves the table is dropped, not
+done in the place the table has gone to, where the same food ids and
+coordinates are something else. The epoch is an addition: a room from
+before reads the bites before it and ignores the field, and a device from
+before sends none, which the room takes wherever the table is.
 
 From the room:
 
@@ -208,7 +223,7 @@ From the room:
 | `joined {id, colour, away, of}`, `away {id, away}`, `left {id}` | one message per fly coming, resting or leaving; `of` is whose it is, the id of its device's first fly |
 | `seated {flies, asked}` | this device's flies after a count change, each as `{id, colour, at}`, and the count it answers |
 | `drop`, `ball`, `found`, `pop` | as above, to everyone else (`by` the player); a drop's `y` is the surface it lands on |
-| `world {light, weather, offset}`, `place {place, epoch, foods, spots}` | the starter's choices, to everyone; `spots` is where each fly is set down |
+| `world {light, weather, offset}`, `place {place, epoch, foods, spots, bubbles?}` | the starter's choices, to everyone; `spots` is where each fly is set down, and `bubbles` the picnic's bubbles as they stand (a room server from before them says none, and a device starts them at 0) |
 | `happening {kind, seed, at}` | a visitor comes |
 | `food {ack, amounts, gone, eaten}` | at most ten times a second while food changes: what is left, what is gone, this device's flies' total by the room's account, and the last of its bites counted |
 
@@ -254,21 +269,26 @@ can't spoil the others' screens or their food (`packages/net/src/limits.ts`):
   stands on whatever is under it there, the floor beneath a table or the
   table. A state from
   the future or older than the last is dropped.
-- **Food.** One account per device. A bite counts only within 4 mm of the
+- **Food.** Dropped offerings can be cleared only by their owner; patches and finds stay. Clear requests share the drop rate limit and must name the current place’s epoch. Only under your own name, only on the table. One account per device. A bite counts only within 4 mm of the
   food's edge of where the room has any of its flies, at the food's height
   (not from the floor under its table), and no faster than that many flies
   eat (with a second's appetite saved up). Two flies at one sugar never eat
   more than there was (`TableFood.bite`, `packages/net/src/food.ts`).
 - **Hands.** One ball in the air at a time per player (a new one replaces
   it), at most 12 throws a minute (3 at once), 30 drops (6 at once), 10 found
-  foods, 120 bubbles burst, 30 changes (the starter's choices), and 20
-  changes to a device's fly count (6 at once), an allowance of its own so
-  that a starter busy with the light never has a recount dropped. One past
-  it goes unanswered, and the device asks again.
+  foods, 120 bubbles burst, 30 of the starter's changes, removals among
+  them, and 20 changes to a device's fly count (6 at once), an allowance of
+  its own so that a starter busy with the light never has a recount
+  dropped. One past it goes unanswered, and the device asks again. At most
+  6 dropped foods and 16 found ones lie at a table at once; past either,
+  the oldest goes.
 - **Messages.** At most 60 a second from a device (120 at once); more are
   dropped. A message is at most 4 KB, and a device has 10 s to say hello.
-  At most 24 connections from one address, and 30 rooms started from one an
-  hour (5 at once). At most 8 flies a table (`MAX_FLIES`), 4 per device
+  A device's `FLY` is read whole before any of it is used: one cut short,
+  with more than 4 flies, or with a fly twice is dropped; a state in it for
+  a fly that isn't the device's is left out.
+  At most 24 connections open from one address, 60 opened a minute (30 at
+  once), and 30 rooms started from one an hour (5 at once). At most 8 flies a table (`MAX_FLIES`), 4 per device
   (`MAX_OWN`). A new device gets as many as it asks for or there are free seats,
   whichever is fewer; with none free it is refused as full. Reducing the
   count takes the last flies off first. A device gone more than 10 minutes
@@ -290,7 +310,11 @@ script), their marks, digits, spaces and a little punctuation (`' ’ ! ? . ,
 or hide text, no symbols, no emoji. It is drawn as plain text on the
 canvas, never as markup. Names aren't filtered for what they say: anything
 more (a word list, reporting a room, the server's owner hiding one) is a
-follow-up.
+follow-up. Nor may a name hold a letter that draws nothing (the Hangul
+fillers, and every other default-ignorable character), so none looks empty
+or hides inside another, or more than three marks on one letter, which
+would pile up over the rows round it. The game checks the names in the
+list the same way, so one the room server let through is left out.
 
 A password is up to 64 characters, none of them control characters. The
 room keeps only a salted scrypt hash of it (`apps/server/src/lock.ts`:
@@ -309,6 +333,85 @@ code.
 The device's key is 128 random bits kept in its storage. The room keeps only
 a hash of it. Table codes are invitations, so the log writes only a short
 hash of each.
+
+## Security
+
+The room server is on the open internet, and anyone can write their own
+client. This is what it holds to, whatever a device sends, and where.
+
+- **Who may do what.** Every message is checked by the room, never trusted
+  from the device that sent it (`apps/server/src/table.ts`). A device acts
+  only as the seat its key sat it in: its own fly, its own drops (food
+  named under its own id), its own bites, its own ball, its own goodbye.
+  Only the starter's key moves the table, changes its light and weather,
+  or removes a player, and never its own seat. A bubble bursts only if it
+  was there then; found food only on the table and in bounds. Keys are 128
+  random bits a device keeps, never sent to anyone else, and stored only
+  hashed: no one can sit as someone else without their device's storage.
+- **Locked and unlisted rooms.** Only the password opens a locked room, or a
+  key that has sat there before (above). An unlisted room is never in the
+  list or told to anyone but by its code, and the server answers no
+  question that would tell whether a code is a room without trying to sit
+  at it: 50 bits of code, at 60 connections a minute from an address, can't
+  be guessed.
+- **Addresses.** The per-address limits count the visitor, not the proxy:
+  with `TRUST_PROXY=1`, `X-Forwarded-For` is believed only when the
+  connection itself comes from a loopback or private address (the proxy in
+  front, `docs/deploy.md`), and then only its last entry, the one that
+  proxy added; anyone reaching the server directly is counted by their own
+  address, whatever they write. An IPv4 address seen as IPv6 is the IPv4
+  address, and IPv6 ones count by their /64, since one machine has a whole
+  /64 to pick from.
+- **Bounds.** Nothing a client does grows the server without bound
+  (`apps/server/src/server.ts`): 4 KB a message, uncompressed; 60 messages
+  a second from a device; 10 s to say hello; a ping every 15 s, a
+  connection that didn't answer the last one dropped; a request's headers
+  within 10 s and 8 KB; 4096 sockets at once in all and 24 from an
+  address; a device that has 256 KB it hasn't taken is dropped rather than
+  its backlog kept; 8 passwords worked out at once (about 16 MB each, off
+  the event loop), a try past that refused as busy; 10,000 tables, and
+  when they are full, the one nobody has been at for longest is forgotten
+  to make room; 50,000 addresses remembered. A table holds at most 8
+  flies (4 a device), 8 balls, 16 happenings, 6 dropped and 16 found foods besides the
+  place's own, and 256 removed keys. A table with nobody at it does no
+  work each beat, and its bubbles start afresh when someone comes (as on
+  a table started, or carried to the picnic), never replaying all the
+  time the server has been up. A message the table can't take costs its
+  sender the line (4006), never the server.
+- **The file of tables.** Written whole to a new file, flushed to the disk,
+  then renamed over the old one, so the last good copy survives a crash or
+  a power cut halfway. Read back, each table is checked field by field
+  against what the server writes (`isTableRecord`: each seat's flies, 1 to
+  4, under ids no other fly there has, or a single fly kept before devices
+  had several); one that doesn't fit is
+  left out and logged, and a file that can't be read at all is moved aside
+  as `tables.json.unreadable-<time>` and the server starts empty, rather
+  than not starting.
+- **Logs and secrets.** Passwords are kept only as salted scrypt hashes,
+  keys only as hashes, and neither is ever logged; a table's code, which is
+  its invitation, is logged only as a short hash of it.
+- **The game's side.** A device reads nothing from the room until it has
+  the shape the protocol gives it (`readServerMessage`,
+  `packages/net/src/wire.ts`): every field there and of its type, every
+  number finite, every id a fly's, every list no longer than a table can
+  hold, and this device's own flies (`welcome`, `seated`) 1 to 4, each
+  once. A message that doesn't is dropped whole, so a wrong or hostile
+  server, or a player through it, can't make the game throw or make
+  something for each of a million ids. A browser's line drops itself
+  rather than queue more than 256 messages or 256 KB; the Apple TV's host
+  line takes nothing longer than the largest batch.
+- **Fuzzing.** `npm test` fuzzes the protocol for a moment from a fresh
+  seed each run (`apps/server/tests/fuzz.test.ts`): a table in the process
+  fed what a device might send, mostly in shape and often not, checked
+  after each step against these bounds and against the game's reading of
+  everything it sent; and a server on the loopback, over sockets, that
+  must stay up, log no error and still seat a device afterwards.
+  `npm run fuzz:rooms -- --seconds 600` runs it for longer, seed after
+  seed; `--seed` replays one.
+
+Not covered: what names say (above), and a botnet's worth of addresses,
+which no per-address limit stops; that is the proxy's and the host's to
+meet (Cloudflare's, `docs/deploy.md`).
 
 ## Cost
 
@@ -363,7 +466,7 @@ in memory; set `DATA_DIR` to keep them across restarts.
 | `PORT` | where it listens (8787; 3000 in Docker) |
 | `HOST` | the address it listens on (0.0.0.0) |
 | `DATA_DIR` | where the tables are kept (none: in memory; `/data` in Docker) |
-| `TRUST_PROXY` | 1 behind a proxy that sets `X-Forwarded-For`, for counting connections by address (set in Docker) |
+| `TRUST_PROXY` | 1 behind a proxy that sets `X-Forwarded-For`, for counting connections by address (set in Docker); believed only from a loopback or private address |
 
 `GET /health` answers `{ok, protocol, tables, devices, flies, browsing, uptime}`. The
 log is one JSON object a line on stdout. In production the room server is
@@ -373,10 +476,11 @@ Checks: `npm test` covers the protocol, the limits (names, passwords),
 interpolation, the shared food, the table (presence, the away rule,
 removal, the starter's choices, keeping tables across restarts), rooms
 (the list, locks, guessing slowed, starting slowed, a listed room
-forgotten) and the server over real sockets, Online's screen and its
-list's line, and `Online` itself: the flies the table seats it, recounts
-asked until answered, where its flies stand coming back, and never taking
-its own flies for another player's. `npm run e2e` runs two headless tabs at a table: they see each other, share
+forgotten) and the server over real sockets, what hostile devices send
+(`apps/server/tests/hardening.test.ts`, and the fuzzing above), Online's
+screen and its list's line, and `Online` itself: the flies the table seats
+it, recounts asked until answered, where its flies stand coming back, and
+never taking its own flies for another player's. `npm run e2e` runs two headless tabs at a table: they see each other, share
 food, rest while hidden, survive a server restart and a removal; then a
 named, locked room is made from the menus with the keys and joined from
 another tab's list, a wrong password first, and its link alone opens only

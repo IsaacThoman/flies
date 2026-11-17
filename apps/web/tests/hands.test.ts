@@ -158,3 +158,26 @@ for (const [variant, speed] of Object.entries(PUFF_SPEED)) {
     assert.deepEqual(far, { x: 2, y: 3, z: 4 }, "releasing stops the puff");
   });
 }
+
+test("Feed's Clear dropped kind removes offerings and falling food, leaving patches and finds", () => {
+  const world = new World(bare);
+  const hands = new Hands(world);
+  const pantry = new Pantry(world, [{ name: "jam", x: 0, z: 0, r: 3, sweet: 1 }]);
+  const patch = pantry.foods[0];
+  const found = pantry.add("crumb", 0, 0, 1, 0.8);
+  pantry.drop("honey", 0, 0);
+  pantry.drop("water", 10, 0);
+  hands.falling.push({ kind: "sugar", x: 0, z: 0, y: 10, floor: 0, vy: 0 });
+  hands.variants[0] = TOOLS[0].variants.findIndex((v) => v.id === "clear");
+  assert.ok(hands.variants[0] >= 0, "clear is selectable through the usual kind controls");
+  const fly = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true };
+  const eye = { x: 0, y: 5, z: 10 };
+  hands.update(0, { use: true, holding: true, eye }, fly, pantry);
+  hands.update(1, { use: false, holding: false, eye }, fly, pantry);
+  assert.deepEqual(pantry.foods, [patch, found]);
+  assert.equal(hands.falling.length, 0);
+  assert.equal(hands.events.dropped, null, "clear never tries to drop a food kind");
+  assert.equal(hands.events.landed, null);
+  hands.update(0, { use: true, holding: true, eye }, fly, pantry);
+  assert.deepEqual(pantry.foods, [patch, found], "clearing an empty table is harmless");
+});

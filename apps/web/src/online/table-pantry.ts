@@ -7,6 +7,7 @@
 
 import { FOODS, Pantry } from "@fly/world";
 import type { Food, FoodKind, World } from "@fly/world";
+import type { Falling } from "../tools/hands.ts";
 import { DROP_ID, FoodMirror, foundId } from "@fly/net";
 
 export class TablePantry extends Pantry {
@@ -15,10 +16,12 @@ export class TablePantry extends Pantry {
   player = 0;
   /** Food the place put out here, for the room to hear of. */
   onFound: (food: Food) => void = () => {};
+  /** Requests a clear from the room, which decides what this player owns. */
+  onClear: () => void = () => {};
   readonly #world: World;
   #dropped = 0;
   /** Names given at the moment of dropping, waiting for the food to land: by kind, oldest first. */
-  readonly #named: { kind: FoodKind; id: number }[] = [];
+  readonly #named: { kind: FoodKind; id: number; falling?: Falling }[] = [];
 
   constructor(world: World) {
     super(world, world.place.patches);
@@ -27,9 +30,9 @@ export class TablePantry extends Pantry {
   }
 
   /** Names the next food this player drops (as it leaves the hand, so the room can tell everyone while it falls). */
-  name(kind: FoodKind): number {
+  name(kind: FoodKind, falling?: Falling): number {
     const id = this.#next();
-    this.#named.push({ kind, id });
+    this.#named.push({ kind, id, falling });
     return id;
   }
 
@@ -37,9 +40,20 @@ export class TablePantry extends Pantry {
     return this.player * DROP_ID + (++this.#dropped % DROP_ID);
   }
 
+  clearDropped() {
+    this.onClear();
+    return false;
+  }
+
+  /** The room removed an offering before it landed: cancel that exact fall. */
+  forgetFood(id: number): Falling | undefined {
+    const i = this.#named.findIndex((n) => n.id === id);
+    return i < 0 ? undefined : this.#named.splice(i, 1)[0].falling;
+  }
+
   /** It landed, on the surface at or below `y` (the highest, if left out). */
   drop(kind: FoodKind, x: number, z: number, y?: number): Food {
-    const i = this.#named.findIndex((n) => n.kind === kind);
+    const i = this.#named.findIndex((n) => n.kind === kind && (!n.falling || (n.falling.x === x && n.falling.z === z && n.falling.floor === y)));
     const id = i >= 0 ? this.#named.splice(i, 1)[0].id : this.#next();
     this.landed(id, kind, x, z, y);
     return this.foods.find((f) => f.id === id) ?? this.foods[this.foods.length - 1];

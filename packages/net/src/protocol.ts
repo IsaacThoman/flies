@@ -125,7 +125,7 @@ export type FlyState = {
   epoch: number;
   /** The sender's count, wrapping at 65536. */
   seq: number;
-  /** Room time when the fly was here, ms. */
+  /** Room time when the fly was here, ms; on the wire a u32 that wraps, read back with `roomTime`. */
   t: number;
   x: number;
   y: number;
@@ -362,12 +362,22 @@ export function decodeFlies(view: DataView, scale: WireScale, scratch: FlyState,
   return count;
 }
 
-/** Bites a fly took: the sender's count (for the room's acknowledgement), then each food's id and how much. */
+/**
+ * Bites a fly took: the sender's count (for the room's acknowledgement),
+ * then each food's id and how much, then the epoch of the place they were
+ * taken in. The epoch is one byte after the bites, so a room that reads
+ * only the bites takes them as before; without it (a device from before),
+ * the bites are taken wherever the table is.
+ */
 export type Bite = { food: number; amount: number };
 
+/** Bytes of `count` bites, without the epoch after them. */
 export const bitesLength = (count: number) => 4 + count * BITE_BYTES;
+/** The biggest bites message: as many as there may be, and the epoch. */
+export const BITES_MAX = bitesLength(MAX_BITES) + 1;
 
-export function encodeBites(out: DataView, seq: number, bites: readonly Bite[], count = bites.length): number {
+/** Encodes bites into `out` (at least BITES_MAX bytes), with the epoch of the place they were taken in, if given. Returns the length. */
+export function encodeBites(out: DataView, seq: number, bites: readonly Bite[], count = bites.length, epoch?: number): number {
   const n = Math.min(count, MAX_BITES);
   out.setUint8(0, BITES);
   out.setUint16(1, seq & 0xffff, true);
@@ -376,7 +386,9 @@ export function encodeBites(out: DataView, seq: number, bites: readonly Bite[], 
     out.setUint32(4 + i * BITE_BYTES, bites[i].food >>> 0, true);
     out.setFloat32(8 + i * BITE_BYTES, bites[i].amount, true);
   }
-  return bitesLength(n);
+  if (epoch === undefined) return bitesLength(n);
+  out.setUint8(bitesLength(n), epoch & 0xff);
+  return bitesLength(n) + 1;
 }
 
 /** Reads bites; `each` is called with each (food id, amount). Returns the sequence number, or -1 if broken. */
@@ -386,6 +398,24 @@ export function decodeBites(view: DataView, each: (food: number, amount: number)
   if (n > MAX_BITES || view.byteLength < bitesLength(n)) return -1;
   for (let i = 0; i < n; i++) each(view.getUint32(4 + i * BITE_BYTES, true), view.getFloat32(8 + i * BITE_BYTES, true));
   return view.getUint16(1, true);
+}
+
+/** The epoch of the place bites were taken in, or null if the message doesn't say (or isn't bites). */
+export function bitesEpoch(view: DataView): number | null {
+  if (view.byteLength < 4 || view.getUint8(0) !== BITES) return null;
+  const end = bitesLength(view.getUint8(3));
+  return view.byteLength === end + 1 ? view.getUint8(end) : null;
+}
+
+/**
+ * A time from the wire (a u32 of room ms, so it wraps every 2^32 ms, about
+ * 49.7 days of a room server's uptime) as room time: the time it can be
+ * that is nearest `now`, the reader's own room time, ms. Sent times are
+ * never more than a few seconds from it, so this is always the one meant.
+ */
+export function roomTime(wire: number, now: number): number {
+  const ahead = (((wire - now) % 2 ** 32) + 2 ** 32) % 2 ** 32;
+  return now + (ahead >= 2 ** 31 ? ahead - 2 ** 32 : ahead);
 }
 
 // The JSON messages.
@@ -467,17 +497,23 @@ export type ClientMessage =
   /** Instead of a hello: this connection only browses the listed rooms (answered with `rooms`, and again as they change). */
   | { type: "browse"; v: number }
   | { type: "ping"; t: number }
-  /** `y`: the surface it falls to, at or below this height (the floor under a table, or the table). */
-  | { type: "drop"; id: number; kind: string; x: number; z: number; y: number; at: number }
-  | ({ type: "ball" } & Omit<BallWire, "by">)
+  | { type: "clearFood"; epoch: number }
+  /**
+   * `y`: the surface it falls to, at or below this height (the floor under a table, or the table).
+   * `epoch`, on this and the others of a place's own (a ball, a burst bubble, found food): the
+   * place it was done in; the room drops one from a place it has since left. Left out (by a
+   * device from before), it is taken wherever the table is.
+   */
+  | { type: "drop"; id: number; kind: string; x: number; z: number; y: number; at: number; epoch?: number }
+  | ({ type: "ball"; epoch?: number } & Omit<BallWire, "by">)
   | { type: "world"; light?: string; weather?: string }
   | { type: "place"; place: string }
   /** The starter takes a device off the table, by any of its flies: all of them go. */
   | { type: "remove"; id: number }
   /** How many flies this device now wants at the table: answered with `seated`, as many as there are seats for. */
   | { type: "flies"; count: number }
-  | { type: "pop"; slot: number; cycle: number; at: number }
-  | { type: "found"; id: number; name: string; x: number; z: number; y: number; r: number; sweet: number }
+  | { type: "pop"; slot: number; cycle: number; at: number; epoch?: number }
+  | { type: "found"; id: number; name: string; x: number; z: number; y: number; r: number; sweet: number; epoch?: number }
   | { type: "bye" };
 
 /** Why the room turned a device away (and closed its connection with the matching code). */
@@ -545,8 +581,8 @@ export type ServerMessage =
   | { type: "drop"; by: number; id: number; kind: string; x: number; z: number; y: number; at: number }
   | ({ type: "ball" } & BallWire)
   | ({ type: "world"; offset: number } & WorldWire)
-  /** The table is carried to another place: everyone's fly is set down there, where `spots` says. */
-  | { type: "place"; place: string; epoch: number; foods: FoodWire[]; spots: Record<number, Spot> }
+  /** The table is carried to another place: everyone's fly is set down there, where `spots` says, and its bubbles are as `bubbles` says (the picnic's; a room from before it said starts them at 0). */
+  | { type: "place"; place: string; epoch: number; foods: FoodWire[]; spots: Record<number, Spot>; bubbles?: BubbleSnapshot }
   | ({ type: "happening" } & HappeningWire)
   | { type: "pop"; slot: number; cycle: number; at: number }
   | { type: "found"; food: FoodWire }

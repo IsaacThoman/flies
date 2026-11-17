@@ -142,6 +142,13 @@ test("a room's name is tidied to plain words, short, or refused", () => {
   assert.equal(roomName("two\nlines"), "two lines");
 });
 
+test("a room's name can't look empty, hide letters that draw nothing, or pile marks over the rows round it; every script's words still can", () => {
+  // Hangul fillers are letters that draw nothing; the others are invisible.
+  for (const bad of ["\u3164", "\u3164\u3164 \u3164", "Fly\u3164s", "\uFFA0room", "\u115F\u1160", "soft\u00ADhyphen", "a\u034Fb", "word\u2060joiner", "Z\u0351\u0352\u0353\u0354algo", "e\u0301\u0302\u0303\u0304\u0305"])
+    assert.equal(roomName(bad), null, JSON.stringify(bad));
+  for (const good of ["नमस्ते दुनिया", "Phở ngon", "สวัสดี", "안녕 파리", "مرحبا", "Ελληνικά", "ກິ່ງ", "བཀྲ ཤིས"]) assert.equal(roomName(good), good.normalize("NFC"), good);
+});
+
 test("a password is anything typed, up to its length, and nothing invisible", () => {
   assert.ok(isPassword("correct horse"));
   assert.ok(isPassword("пароль ✓"));

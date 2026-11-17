@@ -41,7 +41,7 @@ export type Settings = {
   pixels: PixelSize;
   /** Seconds without a press before the game becomes a wallpaper; 0 never. */
   wallpaperAfter: number;
-  /** How the camera moves in the wallpaper: "follow" keeps one shot on the fly, "calm" holds long shots, "lively" changes them more often. */
+  /** How the camera moves in the wallpaper: "follow" keeps one shot on the fly, "calm" holds long shots, "lively" changes them more often, "whole" keeps the whole place in view. */
   wallpaperCamera: WallpaperStyle;
   /** How finely the fly's eyes are rendered. */
   eyes: EyesDetail;
@@ -100,7 +100,7 @@ const showWhen = (v: ShowWhen) => ["off", "wallpaper", "always"].includes(v);
 const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean } = {
   pixels: (v) => Object.hasOwn(PIXEL_SIZES, v),
   wallpaperAfter: (v) => WALLPAPER_DELAYS.some((delay) => delay.value === v),
-  wallpaperCamera: (v) => ["follow", "calm", "lively"].includes(v),
+  wallpaperCamera: (v) => ["follow", "calm", "lively", "whole"].includes(v),
   eyes: (v) => ["off", "low", "high"].includes(v),
   eyesInset: showWhen,
   nerves: showWhen,

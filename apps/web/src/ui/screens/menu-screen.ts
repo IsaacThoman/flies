@@ -9,8 +9,8 @@
 // back button, is Back.
 
 import type { RemoteButton } from "@fly/contracts";
-import { INK, font, glassPanel, hintChip, hintWidth, iconButton, text } from "@fly/ui";
-import type { ChoiceItem, FieldItem, GlyphSet, HitMap, Menu, MenuItem, Outcome, SliderItem } from "@fly/ui";
+import { INK, font, glassPanel, hintChip, hintWidth, iconButton, sameTarget, text } from "@fly/ui";
+import type { ChoiceItem, FieldItem, GlyphSet, Hit, HitMap, Menu, MenuItem, Outcome, SliderItem } from "@fly/ui";
 import type { Frame } from "../../display.ts";
 import { backButton } from "../layout.ts";
 import type { MenuPanel } from "../layout.ts";
@@ -50,7 +50,7 @@ export class MenuScreen implements Screen {
   #dirty = true;
   #pane: MenuPanel;
   /** What a pointer went down on: a slider it is sliding, or the list it may drag. */
-  #held: { slider: number; scroll: number; dragging: boolean } | null = null;
+  #held: { slider: number; hit: Hit | null; scroll: number; dragging: boolean } | null = null;
   #wheel = 0;
   /** The row a mouse is over, or -1. */
   #hover = -1;
@@ -113,6 +113,12 @@ export class MenuScreen implements Screen {
   point(p: Point) {
     const menu = this.menu;
     const hit = p.hit;
+    const row = hit && (hit.kind === MENU_HITS.row || hit.kind === MENU_HITS.step || hit.kind === MENU_HITS.tab || hit.kind === MENU_HITS.track);
+    // The list may have refreshed since these pixels were drawn.
+    if (row && (!hit.id || menu.items[hit.index]?.id !== hit.id)) {
+      if (p.type !== "hover") this.#held = null;
+      return;
+    }
     switch (p.type) {
       case "hover": {
         const over = hit && hit.kind !== SCREEN_HITS.panel && hit.kind !== SCREEN_HITS.back && hit.kind !== MENU_HITS.more && !menu.items[hit.index]?.disabled ? hit.index : -1;
@@ -123,7 +129,7 @@ export class MenuScreen implements Screen {
         break;
       }
       case "down":
-        this.#held = { slider: -1, scroll: menu.scroll, dragging: false };
+        this.#held = { slider: -1, hit: hit && { ...hit }, scroll: menu.scroll, dragging: false };
         if (hit?.kind === MENU_HITS.track) {
           this.#held.slider = hit.index;
           this.#slide(hit.index, p.x);
@@ -132,7 +138,7 @@ export class MenuScreen implements Screen {
       case "drag": {
         const held = this.#held;
         if (!held) break;
-        if (held.slider >= 0) this.#slide(held.slider, p.x);
+        if (held.slider >= 0 && menu.items[held.slider]?.id === held.hit?.id) this.#slide(held.slider, p.x);
         else if (menu.items.length > menu.rows && (held.dragging || Math.abs(p.dy) > SCROLL_SLOP)) {
           held.dragging = true;
           const { row, gap } = this.view.layout;
@@ -144,7 +150,7 @@ export class MenuScreen implements Screen {
       case "up": {
         const held = this.#held;
         this.#held = null;
-        if (!p.tap || !held || held.dragging || held.slider >= 0) break;
+        if (!p.tap || !held || !sameTarget(held.hit, hit) || held.dragging || held.slider >= 0) break;
         if (!hit) {
           if (!this.#options.root) this.#outcome({ kind: "back" });
         } else if (hit.kind === SCREEN_HITS.back) this.#outcome({ kind: "back" });

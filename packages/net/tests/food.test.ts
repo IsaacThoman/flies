@@ -134,3 +134,27 @@ test("a device's stored appetite and its refill scale with its fly count, and re
   assert.equal(table.bite(1, sugar, EAT_RATE * 2, [food], 0).refused, "greedy");
   assert.equal(table.bite(1, sugar, EAT_RATE, [food], 0).refused, null);
 });
+
+test("clearing dropped food is owned by the room, preserves patches and finds, and reaches every mirror", () => {
+  const table = new TableFood(world, PATCHES);
+  const patchIds = table.foods.map((f) => f.id);
+  const found = table.found(900_000_001, "crumb", 0, 0, 1, 0.5)!;
+  const mine = table.drop(1, DROP_ID + 1, "honey", 0, 0)!;
+  const theirs = table.drop(2, 2 * DROP_ID + 1, "water", 0, 0)!;
+  const pantry = new Pantry(world);
+  const mirror = new FoodMirror(world, pantry);
+  mirror.welcome(table.foods.map(toWire));
+  table.clearDropped(0);
+  assert.ok(table.find(mine.id) && table.find(theirs.id), "invalid owner clears nothing");
+  table.clearDropped(1);
+  assert.equal(table.find(mine.id), null);
+  assert.ok(table.find(theirs.id));
+  assert.ok(table.find(found.id));
+  for (const id of patchIds) assert.ok(table.find(id));
+  const change = table.flush()!;
+  assert.deepEqual(change.gone, [mine.id]);
+  mirror.apply(0, change.amounts, change.gone, undefined);
+  assert.deepEqual(pantry.foods.map((f) => f.id), table.foods.map((f) => f.id));
+  table.clearDropped(1);
+  assert.equal(table.flush(), null, "a repeated clear makes no changes");
+});

@@ -77,3 +77,91 @@ test("leaving a table frees pooled fly models and the instanced stand-ins withou
   assert.equal([...shadow.values()][0], 0);
   assert.deepEqual(scene.children, []);
 });
+
+test("a room removal cancels a remote offering still falling so it cannot reappear", async () => {
+  const { OtherHand } = await import("../src/online/other-hands.ts");
+  const { TablePantry } = await import("../src/online/table-pantry.ts");
+  const world = new World(WORLDS.picnic);
+  const pantry = new TablePantry(world);
+  const scene = new THREE.Scene();
+  const hand = new OtherHand(scene, world, 2, "#ff3355", pantry);
+  hand.drop(2_000_001, "honey", 0, 0, 0, 0);
+  hand.drop(2_000_002, "water", 10, 0, 0, 0);
+  hand.forgetFood(2_000_001);
+  assert.equal(hand.hands.falling.length, 1);
+  const camera = new THREE.PerspectiveCamera();
+  const fly = { position: { x: 100, y: 0, z: 0 }, yaw: 0, onFeet: true };
+  hand.update(1, 1000, fly, camera, 1, () => 0);
+  assert.ok(!pantry.foods.some((f) => f.id === 2_000_001));
+  assert.ok(pantry.foods.some((f) => f.id === 2_000_002), "an offering not removed lands normally");
+  hand.dispose();
+});
+
+test("online clears wait for the room: rejected falling food still lands; accepted falling food never returns", async () => {
+  const { Online } = await import("../src/online/online.ts");
+  const { Hands } = await import("../src/tools/hands.ts");
+  const { Life } = await import("../src/life.ts");
+  const { Company } = await import("../src/company.ts");
+  const { Table } = await import("../../server/src/table.ts");
+  const world = new World(WORLDS.picnic);
+  const brain = (): import("@fly/contracts").BrainDriver => ({ status: "running", error: null, neurons: 0, connections: 0, eyes: null, regionRates: new Float32Array(), state: null, stateAt: 0, tick() {}, dispose() {} });
+  const life = new Life(world, brain());
+  const company = new Company(world, brain);
+  const body = life.body;
+  const hands = new Hands(world);
+  const clock = { now: 1000 };
+  const table = new Table("23456789ab", { place: "picnic", light: "noon", weather: "clear", zone: "", offset: 0 }, "player-key", 7, { now: () => clock.now, wall: () => clock.now });
+  const inbox: string[] = [];
+  let seat: import("../../server/src/table.ts").Seat;
+  const socket: import("@fly/contracts").TableSocket = {
+    status: "open", closeCode: 0, closeReason: "",
+    send(data) {
+      if (typeof data === "string" && JSON.parse(data).type === "hello") {
+        seat = table.hello({ send: (m) => { if (typeof m === "string") inbox.push(m); }, close() {} }, "player-key", JSON.parse(data)) as typeof seat;
+      } else table.receive(seat, data);
+    },
+    drain(text) { for (const m of inbox.splice(0)) text(m); },
+    close() {},
+  };
+  const scene = new THREE.Scene();
+  const host = {
+    scene, life, company, others: new OtherFlies(scene, world), hands, felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] },
+    stage: { weather: { rain: 0 }, set: {} }, fly: { model: { mark() {} } }, eyes: { see() {} }, bubbles: {},
+    flies: () => 1, seat() {}, share: (p: import("@fly/world").Pantry) => life.share(p),
+    here: () => "picnic", moving: () => false, onWorld() {}, moveTo() {},
+  } as unknown as import("../src/online/online.ts").TableHost;
+  const online = new Online(host, () => socket, "ws://test", "23456789ab", "player-key", null);
+  const camera = new THREE.PerspectiveCamera();
+  const update = () => online.update(0, camera, 0, () => 0);
+  update();
+  update();
+  assert.ok(online.joined);
+  const use = (kind: number) => {
+    hands.variants[0] = kind;
+    hands.update(0, { use: true, holding: true, eye: camera.position }, body, online.pantry);
+    update();
+    hands.clearEvents();
+  };
+  for (let i = 0; i < 6; i++) use(0);
+  assert.equal(hands.falling.length, 6);
+  use(4);
+  assert.equal(hands.falling.length, 6, "rate-limited clear preserves the pending offerings");
+  hands.update(0.3, { use: false, holding: false, eye: camera.position }, body, online.pantry);
+  assert.equal(online.pantry.foods.filter((f) => f.kind === "sugar").length, 6, "rejected clear still lands locally");
+  clock.now += 4000;
+  use(4);
+  table.tick();
+  update();
+  assert.ok(!online.pantry.foods.some((f) => f.kind === "sugar"), "accepted removal arrives through food.gone");
+  clock.now += 4000;
+  use(0);
+  assert.equal(hands.falling.length, 1);
+  use(4);
+  table.tick();
+  update();
+  assert.equal(hands.falling.length, 0, "accepted clear cancels the exact pending fall");
+  hands.update(1, { use: false, holding: false, eye: camera.position }, body, online.pantry);
+  assert.ok(!online.pantry.foods.some((f) => f.kind === "sugar"));
+  assert.ok(online.pantry.foods.some((f) => f.kind === "patch"));
+  online.dispose();
+});

@@ -4,19 +4,13 @@
 // a TableSocket, polled once a frame, and opens again when it drops.
 
 import type { OpenTableSocket, TableSocket } from "@fly/contracts";
-import { CLOSE, PROTOCOL, isTableCode } from "@fly/net";
-import type { RoomWire, ServerMessage } from "@fly/net";
+import { CLOSE, PROTOCOL, readServerMessage } from "@fly/net";
+import type { RoomWire } from "@fly/net";
 
 /** Seconds before opening the line again after it dropped: longer each time, up to the last. */
 const RETRY = [0.5, 1, 2, 4, 8];
 
 export type LobbyStatus = "connecting" | "open" | "lost" | "version";
-
-/** Whether something heard is a room as the list carries it. */
-const isRoom = (r: unknown): r is RoomWire => {
-  const room = r as RoomWire;
-  return !!room && isTableCode(room.code) && typeof room.name === "string" && typeof room.place === "string" && typeof room.flies === "number" && typeof room.locked === "boolean";
-};
 
 export class Lobby {
   status: LobbyStatus = "connecting";
@@ -32,14 +26,10 @@ export class Lobby {
   #retryAt = 0;
   #tries = 0;
   readonly #text = (text: string) => {
-    let m: ServerMessage;
-    try {
-      m = JSON.parse(text) as ServerMessage;
-    } catch {
-      return;
-    }
-    if (m.type === "rooms" && Array.isArray(m.rooms)) {
-      this.rooms = m.rooms.filter(isRoom);
+    // Only rooms that are rooms, each named as a room may be.
+    const m = readServerMessage(text);
+    if (m?.type === "rooms") {
+      this.rooms = m.rooms;
       this.heard++;
       this.status = "open";
       this.#tries = 0;

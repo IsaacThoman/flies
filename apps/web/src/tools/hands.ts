@@ -20,7 +20,7 @@ export type Variant = { id: string; label: string };
 export type Tool = { id: ToolId; name: string; verb: string; hold: boolean; variants: readonly Variant[]; /** The kind chosen at the start, if not the first. */ initial?: number };
 
 export const TOOLS: readonly Tool[] = [
-  { id: "feed", name: "Feed", verb: "Drop", hold: false, variants: [{ id: "sugar", label: "Sugar" }, { id: "honey", label: "Honey" }, { id: "berry", label: "Raspberry" }, { id: "water", label: "Water" }] },
+  { id: "feed", name: "Feed", verb: "Drop", hold: false, variants: [{ id: "sugar", label: "Sugar" }, { id: "honey", label: "Honey" }, { id: "berry", label: "Raspberry" }, { id: "water", label: "Water" }, { id: "clear", label: "Clear dropped" }] },
   { id: "swoop", name: "Swoop", verb: "Throw the ball", hold: false, variants: [{ id: "ball", label: "Beach ball" }] },
   { id: "feather", name: "Tickle", verb: "Tickle", hold: true, variants: [{ id: "feather", label: "Feather" }] },
   { id: "blow", name: "Blow", verb: "Blow", hold: true, variants: [{ id: "gentle", label: "Gently" }, { id: "strong", label: "Hard" }] },
@@ -264,7 +264,11 @@ export class Hands {
 
     const tool = this.current.id;
     if (input.use) {
-      if (tool === "feed") this.#drop(this.variant.id as FoodKind);
+      if (tool === "feed") {
+        if (this.variant.id === "clear") {
+          if (pantry.clearDropped()) this.falling.length = 0;
+        } else this.#drop(this.variant.id as FoodKind);
+      }
       else if (tool === "swoop") this.#swoop(fly.yaw);
     }
 

@@ -108,7 +108,7 @@ function table() {
   /** A frame of the line: what has come is read, and the hello said if the line has just opened. */
   const frame = (dt = 0.016) => online.line.update(dt);
   const welcome = (mine: SeatedFly[], players: PlayerWire[] = [], epoch = 0): ServerMessage => ({
-    type: "welcome", v: PROTOCOL, id: mine[0].id, colour: mine[0].colour, flies: mine, starter: 9, seed: 1, now: 5000, wall: 0, offset: 0, place: "picnic", epoch,
+    type: "welcome", v: PROTOCOL, id: mine[0].id, colour: mine[0].colour, flies: mine, starter: 0, seed: 1, now: 5000, wall: 0, offset: 0, place: "picnic", epoch,
     world: { light: "clock", weather: "now" }, players, foods: [], balls: [], happenings: [], bubbles: [], at: mine[0].at, room: { name: "Flies", listed: false, locked: false },
   });
   return { online, life, company, others, sockets, socket, frame, welcome, seatedWith, setFlies: (n: number) => (flies = n) };
@@ -241,4 +241,37 @@ test("this device's own flies are never taken for another player's, from the wel
   t.online.remove(6);
   t.online.remove(3);
   assert.deepEqual(t.socket().of("remove"), [], "not its own, nor is it the starter");
+});
+
+test("a fly heard of as another device's than before (its seats given up and taken while the line was down) is that device's, not the one before's", () => {
+  const t = table();
+  t.frame();
+  t.socket().say(t.welcome([fly(1, [0, 0, 0])], [player(2, 2), player(3, 2)]));
+  t.frame();
+  t.socket().close(1006);
+  t.frame();
+  for (let i = 0; i < 200 && t.sockets.length < 2; i++) t.frame(0.1);
+  t.frame();
+  t.socket().say(t.welcome([fly(1, [0, 0, 0])], [player(2, 5), player(5, 5)]));
+  t.frame();
+  assert.deepEqual(t.others.list.map((o) => [o.id, o.of]), [[2, 5], [5, 5]]);
+});
+
+test("the other devices, as the screens have them, are the same while their flies are and another once their seats are someone else's", async () => {
+  const { devicesOf } = await import("../src/online/others.ts");
+  const known = new WeakMap();
+  const other = (id: number, of: number) => ({ id, of, colour: `c${id}` }) as unknown as import("../src/online/others.ts").Other;
+  const [a1, a2, b2] = [other(2, 2), other(3, 2), other(4, 4)];
+  const first = devicesOf([a1, a2, b2], known);
+  assert.deepEqual(first.map((d) => [d.id, d.colours]), [[2, ["c2", "c3"]], [4, ["c4"]]]);
+  // A recount: the same device, with a fly more, and the same object.
+  const again = devicesOf([a1, a2, b2, other(5, 2)], known);
+  assert.equal(again[0], first[0]);
+  assert.deepEqual(again[0].colours, ["c2", "c3", "c5"]);
+  assert.equal(again[1], first[1]);
+  // The first device left and another sat down in its seats: heard of anew, it is another device.
+  const reclaimed = devicesOf([b2, other(2, 2), other(3, 2)], known);
+  assert.equal(reclaimed[0], first[1]);
+  assert.notEqual(reclaimed[1], first[0]);
+  assert.deepEqual(reclaimed[1].id, 2);
 });

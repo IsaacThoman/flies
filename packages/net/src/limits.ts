@@ -218,12 +218,15 @@ export const LIMITS = {
 
 /**
  * What each address may do with rooms, as [per minute, at once] where it is
- * a rate: connections open at once; rooms started (an hour's worth: 30);
+ * a rate: connections open at once; connections opened (a device opens one
+ * again only after it drops, later each time, so this is many devices'
+ * worth; and it keeps guessing tables' codes hopeless); rooms started (an hour's worth: 30);
  * tries at a locked room's password, from one address and at one room, so
  * that guessing one is hopeless (a few dozen tries an hour at most).
  */
 export const ROOM_LIMITS = {
   connections: 24,
+  opens: [60, 30],
   starts: [0.5, 5],
   knocks: [3, 5],
   knocksAtRoom: [6, 10],
@@ -245,14 +248,24 @@ export const LISTED_MAX = 50;
 const NOT_IN_A_NAME = /[^\p{L}\p{M}\p{N} '’!?.,&:#()+\-_]/u;
 
 /**
+ * Letters that draw nothing (the Hangul fillers are letters; so are other
+ * default-ignorable characters): a name of them would look empty, or hide
+ * in another.
+ */
+const DRAWS_NOTHING = /\p{Default_Ignorable_Code_Point}/u;
+/** More marks on one letter than any script's writing stacks: piled up, they spill over the rows above and below. */
+const STACKED = /\p{M}{4}/u;
+
+/**
  * A room's name as it is kept and shown: spaces of any kind made one,
  * trimmed, at most ROOM_NAME_MAX characters. Null if nothing is left or it
- * holds a character a name may not.
+ * holds a character a name may not, a letter that draws nothing, or more
+ * than three marks on a letter.
  */
 export function roomName(raw: unknown): string | null {
   if (typeof raw !== "string" || raw.length > ROOM_NAME_MAX * 4) return null;
   const name = raw.normalize("NFC").replace(/\s+/gu, " ").trim();
-  if (!name || [...name].length > ROOM_NAME_MAX || NOT_IN_A_NAME.test(name)) return null;
+  if (!name || [...name].length > ROOM_NAME_MAX || NOT_IN_A_NAME.test(name) || DRAWS_NOTHING.test(name) || STACKED.test(name)) return null;
   return name;
 }
 
