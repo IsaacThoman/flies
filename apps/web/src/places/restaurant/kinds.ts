@@ -81,11 +81,11 @@ export const KIND = {
   grape: 39,
   /** The clock's face: an enamel dial with its marks and hands, telling the real time. */
   dial: 40,
-  /** Clear glass: wine glasses, shakers, the vase, the cloche, the caddy. */
+  /** Clear glass: the tumblers, shakers, the vase, the cloche, the caddy. */
   glass: 96,
-  /** Red wine and white, left in the glasses. */
-  wine: 97,
-  whiteWine: 98,
+  /** Orange juice and lemonade, left in the glasses. */
+  juice: 97,
+  lemonade: 98,
   /** Water in the vase and the carafe. */
   water: 99,
   /** A thin spilt film: soda, coulis, syrup. */

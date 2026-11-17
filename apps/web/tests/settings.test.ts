@@ -34,7 +34,7 @@ const NOW = Date.UTC(2026, 10, 16, 20);
 
 test("settings come back as they were saved", () => {
   const store = memory();
-  const settings: Settings = { flies: 3, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "whole", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, rumble: false, stats: true, realWeather: false, place: "lab", scene: "bar", joinOthers: false };
+  const settings: Settings = { flies: 3, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "whole", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, rumble: false, stats: true, realWeather: false, place: "lab", scene: "greenhouse", joinOthers: false };
   saveSettings(settings, store);
   assert.deepEqual(loadSettings(store), settings);
 });
@@ -87,8 +87,8 @@ test("a save from an older build keeps what it has and takes today's defaults fo
   const loaded = loadSettings(settingsSaved({ effects: 2, ambience: 9, pixels: "chunky", wallpaperAfter: 120, eyes: "off", hints: false, stats: false, fov: 60 }));
   assert.deepEqual(loaded, { ...DEFAULT_SETTINGS, pixels: "chunky", wallpaperAfter: 120, eyes: "off", hints: false });
   for (const key of ["effects", "ambience", "fov"]) assert.ok(!(key in loaded), `${key} is ignored`);
-  // A place that has gone, where it was or where it lived.
-  assert.deepEqual(loadSettings(settingsSaved({ place: "garden", scene: "garden" })), DEFAULT_SETTINGS);
+  // A place that has gone, where it was or where it lived: each falls back alone, and the rest is kept.
+  for (const gone of ["garden", "bar"]) assert.deepEqual(loadSettings(settingsSaved({ place: gone, scene: gone, hints: false })), { ...DEFAULT_SETTINGS, hints: false }, gone);
 });
 
 test("a broken save, or none, is the defaults; nothing throws", () => {
@@ -311,11 +311,11 @@ test("a tab shows the settings as they are when it opens, and a change is kept a
   const shell = fakeShell();
   const screen = settingsScreen(shell);
   // Changed elsewhere since the screen was made: by the Place tool, say.
-  shell.settings.place = "bar";
+  shell.settings.place = "greenhouse";
   shell.settings.pixels = "chunky";
   screen.enter();
   const place = screen.menu.item("place");
-  assert.ok(place?.kind === "choice" && place.options[place.index].value === "bar");
+  assert.ok(place?.kind === "choice" && place.options[place.index].value === "greenhouse");
   // Camera: Follow, then Calm.
   press(screen, "down", "down", "right");
   assert.equal(shell.settings.wallpaperCamera, "calm");

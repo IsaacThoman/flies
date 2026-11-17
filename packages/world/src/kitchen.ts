@@ -6,7 +6,8 @@ import type { Place } from "./world.ts";
 export const COUNTER = { hx: 500, hz: 300 };
 export const KITCHEN_BOWL = { x: -155, z: -35, r: 124 };
 export const KITCHEN_BOARD = { x: 80, z: 170, hx: 132, hz: 76, top: 14 };
-export const KITCHEN_GLASS = { x: 186, z: -65, r: 43, wine: 112, rim: 187 };
+/** A tumbler of orange juice: its juice's surface and its rim, mm above the worktop. */
+export const KITCHEN_GLASS = { x: 186, z: -65, r: 40, juice: 78, rim: 118 };
 export const KITCHEN_JAR = { x: 354, z: 110, r: 38, top: 112 };
 export const KITCHEN_CADDY = {
   x: -369,
@@ -155,35 +156,19 @@ export const KITCHEN_SOLIDS: readonly Solid[] = [
     [140, 145, 2],
   ].map(([x, z, r]) => dome("kitchen crumb", x, z, r, 14, r * 0.65, 1)),
   {
-    name: "kitchen glass foot",
-    footprint: {
-      kind: "circle",
-      x: KITCHEN_GLASS.x,
-      z: KITCHEN_GLASS.z,
-      r: 32,
-    },
-    top: { kind: "dome", base: 0, height: 3, power: 0.45 },
-  },
-  {
-    name: "kitchen glass stem",
-    footprint: { kind: "circle", x: KITCHEN_GLASS.x, z: KITCHEN_GLASS.z, r: 3 },
-    top: { kind: "flat", y: 103 },
-  },
-  {
-    name: "kitchen wine",
+    name: "kitchen glass",
     footprint: {
       kind: "circle",
       x: KITCHEN_GLASS.x,
       z: KITCHEN_GLASS.z,
       r: KITCHEN_GLASS.r,
     },
-    bottom: 100,
     top: {
       kind: "dish",
-      well: KITCHEN_GLASS.wine,
+      well: KITCHEN_GLASS.juice,
       rim: KITCHEN_GLASS.rim,
-      inner: 0.43,
-      lip: 0.97,
+      inner: 0.88,
+      lip: 0.96,
     },
   },
   {
@@ -234,16 +219,17 @@ export const KITCHEN_PATCHES: readonly FoodPatch[] = [
   { name: "peach juice", x: 68, z: 176, y: 14, r: 9, sweet: 0.9, pool: true },
   { name: "grape juice", x: -151, z: 0, r: 4, sweet: 0.8 },
   {
-    name: "red wine",
+    name: "orange juice",
     x: KITCHEN_GLASS.x,
     z: KITCHEN_GLASS.z,
-    y: KITCHEN_GLASS.wine,
-    r: 16,
+    y: KITCHEN_GLASS.juice,
+    r: 30,
     sweet: 0.65,
     pool: true,
   },
   { name: "honey", x: 305, z: 160, r: 10, sweet: 1, pool: true },
-  { name: "wine", x: 225, z: -20, r: 8, sweet: 0.65, pool: true },
+  // A splash spilt pouring it.
+  { name: "orange juice", x: 225, z: -20, r: 8, sweet: 0.65, pool: true },
   { name: "crumbs", x: 98, z: 183, r: 12, sweet: 0.25 },
 ];
 export const KITCHEN: Place = {

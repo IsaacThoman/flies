@@ -7,7 +7,7 @@
 // in a wooden piece, and how worn its finish is (tables-look.ts reads it).
 
 import * as THREE from "three";
-import { tag } from "../bar/materials.ts";
+import { tag } from "./geometry.ts";
 
 /** A vertex: where it is, which way it faces, and its own grain's colour (`grainColour`) if it has one. */
 export type Vertex = readonly number[];

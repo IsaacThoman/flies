@@ -8,16 +8,17 @@ import {
   World,
 } from "../src/index.ts";
 
-test("the kitchen's wine is inside the cup, with air under its bowl", () => {
+test("the kitchen's orange juice is inside the tumbler, below its rim", () => {
   const world = new World(KITCHEN);
-  const { x, z, wine, rim } = KITCHEN_GLASS;
-  assert.equal(world.heightAt(x + 35, z, 80), 0);
-  assert.equal(world.underside(x + 35, z, 0), 100);
-  assert.equal(world.heightAt(x, z), wine);
-  assert.ok(world.heightAt(x + 41.7, z) > rim - 1);
-  const patch = KITCHEN_PATCHES.find((p) => p.name === "red wine")!;
+  const { x, z, r, juice, rim } = KITCHEN_GLASS;
+  assert.equal(world.heightAt(x, z), juice);
+  assert.equal(world.heightAt(x + r * 0.8, z), juice);
+  assert.ok(world.heightAt(x + r * 0.96, z) > rim - 1);
+  assert.equal(world.heightAt(x + r + 1, z), 0);
+  const patch = KITCHEN_PATCHES.find((p) => p.y === juice)!;
+  assert.equal(patch.name, "orange juice");
   const pantry = new Pantry(world, KITCHEN_PATCHES);
-  assert.equal(pantry.touching(x, wine, z, 0)?.name, patch.name);
+  assert.equal(pantry.touching(x, juice, z, 0)?.name, patch.name);
   assert.equal(pantry.touching(x, 3, z, 0), null);
 });
 

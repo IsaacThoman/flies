@@ -1,5 +1,5 @@
 // The windowsill: a deep painted sill in a cottage kitchen, a bowl of fruit, a
-// pot of basil and a bottle of wine on it, and through the window a garden and
+// pot of basil and a bottle of orange juice on it, and through the window a garden and
 // the backs of a little street of houses.
 
 import { WINDOWSILL } from "@fly/world";

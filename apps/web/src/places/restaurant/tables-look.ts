@@ -164,19 +164,19 @@ if (rK == K_TBL_OAK) {
   float used = top * smoothstep(0.35, 0.75, rFbm(vWorld.xz * 0.005));
   // Fine scratches every way, at three scales; pale where they break the finish.
   float scratch = top * clamp(tblScratch(vWorld.xz, 28.0, 0.55, 0.25) + tblScratch(vWorld.xz + 3.7, 8.0, 0.45, 0.07) * 0.7 + tblScratch(vWorld.xz + 9.1, 2.6, 0.62, 0.025) * 0.5, 0.0, 1.0);
-  // A ring or two where glasses stood, out toward the sides an upturned chair's seat leaves bare: a water ring's white blush in the finish, a wine ring's dark rim.
+  // A ring or two where glasses stood, out toward the sides an upturned chair's seat leaves bare: a water ring's white blush in the finish, a coffee ring's dark rim.
   float th = rHash(pc.xy * 0.01 + 0.5);
   float toward = th < 0.5 ? -1.0 : 1.0;
   vec2 w0 = pc.xy + vec2(toward * (200.0 + 120.0 * th), (th - 0.5) * 160.0);
   vec2 w1 = pc.xy + vec2(-toward * (230.0 + 90.0 * rHash(pc.xy * 0.01 + 3.0)), (0.5 - th) * 120.0);
   float blush = top * (tblRing(vWorld.xz, w0, 37.0, th * 40.0) + (1.0 - smoothstep(31.0, 37.0, length(vWorld.xz - w0))) * 0.3 * rFbm(vWorld.xz * 0.15));
-  float wine = top * step(0.4, th) * tblRing(vWorld.xz, w1, 33.0, th * 70.0);
+  float coffee = top * step(0.4, th) * tblRing(vWorld.xz, w1, 33.0, th * 70.0);
   // Low on the legs, scuffs from feet and the mop.
   float scuff = (1.0 - slab) * (1.0 - smoothstep(30.0, 140.0, vWorld.y)) * smoothstep(0.5, 0.8, rNoise(tblPlane(vWorld, rN) * 0.08));
   c = mix(c, c * 1.18 + vec3(0.05, 0.04, 0.02), worn * 0.7 + scratch * 0.45);
   c = mix(c, c * 0.92 + vec3(0.02, 0.015, 0.01), used * 0.4);
   c = mix(c, vec3(0.76, 0.72, 0.64), blush * 0.45);
-  c = mix(c, c * vec3(0.55, 0.36, 0.33), wine * 0.6);
+  c = mix(c, c * vec3(0.55, 0.42, 0.32), coffee * 0.6);
   c *= 1.0 - scuff * 0.35;
   // A little dust on the top: grains a tenth of a millimetre, grey and pale.
   vec2 dp = vWorld.xz / 0.3;

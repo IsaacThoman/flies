@@ -58,7 +58,7 @@ Only WeatherKit-enabled Apple TV builds offer real outside weather. Allow locati
 
 About → Acknowledgements contains the offline third-party notices. Left/right moves between notices, up/down scrolls, Back returns to About. Touch has previous/next and back controls. Privacy is served as a static web page at the privacy URL above.
 
-The connectome drives a simplified neuron simulation; body physics, the sustained-flight reflex and visual background are explicit stand-ins, not a claim to reproduce all fly biology. There is deliberately no audio. The bar environment depicts beer, cocktails and bottles; answer the age questionnaire accordingly. Do not submit as a Kids Category app.
+The connectome drives a simplified neuron simulation; body physics, the sustained-flight reflex and visual background are explicit stand-ins, not a claim to reproduce all fly biology. There is deliberately no audio. No place depicts alcohol. Do not submit as a Kids Category app.
 
 ## Submission checks
 

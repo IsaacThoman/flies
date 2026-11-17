@@ -1,8 +1,9 @@
-// The back bar's bottles. Each of the world's kinds (wine, spirit, square,
-// tall) is turned once at exactly its felt shape (the body's column, the
-// shoulder's dome, the neck and its rounded top), cut into what it is made
-// of (glass empty and full, label, capsule or stopper) and copied wherever
-// a bottle of it stands, each copy its own drink. Far off, a bottle is the
+// The back bar's bottles: a café's water, juices, oil and coffee syrups.
+// Each of the world's kinds (water, juice, square, syrup) is turned once at
+// exactly its felt shape (the body's column, the shoulder's dome, the neck
+// and its rounded top), cut into what it is made of (glass empty and full,
+// label, cap) and copied wherever a bottle of it stands, each copy its own
+// drink. Far off, a bottle is the
 // same in a few dozen triangles and the same looks, so it hardly changes
 // as its detail comes and goes. The fridge's bottles behind its glass are
 // smaller, plainer and opaque: dark shapes against its light.
@@ -22,7 +23,6 @@ const INSET = 0.2;
 /** What each part of a bottle is: below 10 glass (clear), from 10 opaque. */
 const EMPTY = 0;
 const FULL = 1;
-const CORK = 2;
 const LABEL = 10;
 const BAND = 11;
 const CAP = 12;
@@ -128,15 +128,15 @@ function turn(rows: readonly Row[], segments: number, role: (y: number, angle: n
 }
 
 /** Where on each kind its label, band, collar and top are, by height above what it stands on, and how far round the label goes. */
-const DRESS: Readonly<Record<BottleKind, { label: [number, number, number]; band?: [number, number]; collar?: [number, number]; cap: number; cork?: number; stopper?: boolean }>> = {
-  // A claret: a broad label, a foil capsule over the neck.
-  wine: { label: [55, 150, 1.26], cap: 245 },
-  // A whisky's: a squat label with a band above it, a cork stopper with a wooden head.
-  spirit: { label: [42, 122, 0.95], band: [130, 144], cap: 247, cork: 226, stopper: true },
-  // A gin's square bottle: the label on its face, a collar on the neck, a screw cap.
+const DRESS: Readonly<Record<BottleKind, { label: [number, number, number]; band?: [number, number]; collar?: [number, number]; cap: number }>> = {
+  // Mineral water: a broad label with a band of colour over it, a screw cap.
+  water: { label: [60, 150, 1.26], band: [150, 162], cap: 258 },
+  // Juice: a label nearly all the way round, a wide screw cap.
+  juice: { label: [30, 110, 1.5], cap: 234 },
+  // Oil or a syrup in a square bottle: the label on its face, a collar on the neck, a screw cap.
   square: { label: [58, 150, 0.53], collar: [222, 234], cap: 244 },
-  // A tall liqueur: a narrow label, a collar, the top sealed in wax.
-  tall: { label: [80, 172, 0.95], collar: [282, 294], cap: 300 },
+  // A coffee syrup's: a narrow label, a collar, a screw cap.
+  syrup: { label: [80, 172, 0.95], collar: [268, 278], cap: 290 },
 };
 
 /** The rows of a kind's profile at its felt shape, with rows where it is filled to and where its dress changes. */
@@ -150,7 +150,6 @@ function profile(kind: BottleKind, fill: number): Row[] {
   const h = s.r * 0.6;
   const yb = s.body - h;
   const n = s.neck - INSET;
-  const thin = dress.stopper ? n - 2.5 : n;
   const rows: Row[] = [
     { a: R - 3, y: -0.1, square },
     { a: R - 0.8, y: 1.2, square },
@@ -168,12 +167,8 @@ function profile(kind: BottleKind, fill: number): Row[] {
   const neck0 = rows[rows.length - 1].y;
   if (square) rows.push({ a: n, y: neck0 + 0.01, square: false });
   const yc = s.top - s.neck * 0.5;
-  const neckMarks = [fill, ...(dress.collar ?? []), dress.cork ?? 0, dress.cap, yc].filter((y) => y > neck0 + 0.5 && y <= yc).sort((a, b) => a - b);
-  for (const y of new Set(neckMarks)) {
-    // A stopper's head sits on a thinner neck: a step out under it.
-    if (dress.stopper && y === dress.cap) rows.push({ a: thin, y, square: false }, { a: n, y: y + 0.01, square: false });
-    else rows.push({ a: y > dress.cap ? n : thin, y, square: false });
-  }
+  const neckMarks = [fill, ...(dress.collar ?? []), dress.cap, yc].filter((y) => y > neck0 + 0.5 && y <= yc).sort((a, b) => a - b);
+  for (const y of new Set(neckMarks)) rows.push({ a: n, y, square: false });
   for (const t of [0.45, 0.75, 0.93, 1]) rows.push({ a: t < 1 ? n * Math.sqrt(1 - t * t) : 0, y: yc + (s.neck * 0.5 - INSET) * t, square: false });
   return rows;
 }
@@ -192,46 +187,50 @@ function template(kind: BottleKind, fill: number) {
     if (dress.collar && y > dress.collar[0] && y < dress.collar[1]) return COLLAR;
     if (y > dress.label[0] && y < dress.label[1] && Math.abs(angle) < dress.label[2]) return LABEL;
     if (dress.band && y > dress.band[0] && y < dress.band[1] && Math.abs(angle) < dress.label[2]) return BAND;
-    if (dress.cork && y > dress.cork) return CORK;
     return y < fill ? FULL : EMPTY;
   });
   templates.set(key, t);
   return t;
 }
 
-/** A drink: its glass and what is in it, its label, and how it is closed. */
-type Drink = { glass: Look; full: Look; cork: Look; label: Look; band: Look; cap: Look };
+/** A drink: its glass and what is in it, its label, and its cap. */
+type Drink = { glass: Look; full: Look; label: Look; band: Look; cap: Look };
 
-/** Kinds of the back bar's own: clear flint glass empty, with a clear spirit in it, and dark with red wine or rum; the fridge's lit lining and what stands in it. */
-export const BB_KINDS = { flint: 116, gin: 117, dark: 118, inside: 80, cold: 81 } as const;
+/** Kinds of the back bar's own: clear flint glass, empty; the fridge's lit lining and what stands in it. */
+export const BB_KINDS = { flint: 116, inside: 80, cold: 81 } as const;
 
 const tinted = (c: THREE.ColorRepresentation) => look(KIND.bottle, c);
 const flint = look(BB_KINDS.flint, "#e6f0ec");
-const drink = (glass: Look, full: Look, label: THREE.ColorRepresentation, band: THREE.ColorRepresentation, cap: Look): Drink => ({ glass, full, cork: look(KIND.bottle, "#8a6a44"), label: look(KIND.label, label), band: look(KIND.label, band), cap });
+// Clear water in clear glass would show only the dark mirror behind it: the water is in pale blue glass.
+const blue = tinted("#a8d4ec");
+const water = tinted("#c8e6f6");
+const cap = (c: THREE.ColorRepresentation) => look(KIND.glossy, c);
+const drink = (glass: Look, full: Look, label: THREE.ColorRepresentation, band: THREE.ColorRepresentation, top: Look): Drink => ({ glass, full, label: look(KIND.label, label), band: look(KIND.label, band), cap: top });
 
-/** What each kind of bottle may hold. */
+/** What each kind of bottle may hold: bright, so that none could be taken for anything stronger. */
 const DRINKS: Readonly<Record<BottleKind, readonly Drink[]>> = {
-  wine: [
-    drink(tinted("#10301a"), look(BB_KINDS.dark, "#1a0608"), "#ece2c8", "#6a1418", look(KIND.glossy, "#5c0e18")),
-    drink(tinted("#5a6a26"), tinted("#9c8a3a"), "#f2eee2", "#2a3a5a", look(KIND.brass, "#d8b060")),
-    drink(tinted("#14261a"), look(BB_KINDS.dark, "#140a06"), "#d8c49a", "#1a1a1a", look(KIND.glossy, "#121212")),
+  water: [
+    drink(blue, water, "#f4f8fa", "#2a6ac8", cap("#2a6ac8")),
+    drink(blue, water, "#eef6f2", "#3aa8d8", cap("#e8eef2")),
+    drink(blue, water, "#f6f4ee", "#e23a3a", cap("#e23a3a")),
   ],
-  spirit: [
-    drink(flint, tinted("#b05e18"), "#1a1612", "#b08a3a", look(KIND.oak, "#ffffff")),
-    drink(flint, tinted("#7a300e"), "#efe4cc", "#6a1010", look(KIND.glossy, "#1a1210")),
-    drink(tinted("#3a2a1a"), look(BB_KINDS.dark, "#2e1206"), "#e2c88a", "#1a1a1a", look(KIND.oak, "#c8a888")),
-    drink(flint, tinted("#b8121c"), "#f4f0e6", "#b8121c", look(KIND.glossy, "#e8e4dc")),
+  juice: [
+    drink(flint, tinted("#f5901a"), "#f8f2dc", "#38a040", cap("#38a040")),
+    drink(flint, tinted("#f2dc6a"), "#fbf8ea", "#7ac83a", cap("#7ac83a")),
+    drink(flint, tinted("#f6a83c"), "#fff6e4", "#e8501e", cap("#f0f0ec")),
+    drink(flint, tinted("#f4c84a"), "#f6f8ff", "#2a7ad8", cap("#2a7ad8")),
   ],
   square: [
-    drink(flint, look(BB_KINDS.gin, "#e8f4f2"), "#f2f0ea", "#24467e", look(KIND.steel, "#ffffff")),
-    drink(flint, tinted("#4e8c1c"), "#e8dcb8", "#2e5a1a", look(KIND.glossy, "#1e3a14")),
-    drink(flint, tinted("#9a5012"), "#121212", "#d8d0c0", look(KIND.glossy, "#121212")),
+    drink(flint, tinted("#c4b830"), "#f2ead2", "#4a7a2a", look(KIND.steel, "#ffffff")),
+    drink(flint, tinted("#2ec85a"), "#f6f8f2", "#1e9a44", cap("#1e9a44")),
+    drink(flint, tinted("#e8204a"), "#fbf2f2", "#e8204a", cap("#e8204a")),
   ],
-  tall: [
-    drink(flint, look(BB_KINDS.gin, "#f2f2ea"), "#ece6d6", "#7a1414", look(KIND.wax, "#8a1212")),
-    drink(flint, tinted("#9a3612"), "#e2c890", "#5a1a0a", look(KIND.glossy, "#3a1a0e")),
-    drink(flint, tinted("#e2c21c"), "#f4f0e0", "#3a6a1a", look(KIND.brass, "#e0c070")),
-    drink(tinted("#1a3a20"), tinted("#2a6a1a"), "#1a1a1a", "#c8a050", look(KIND.wax, "#1a3a14")),
+  syrup: [
+    drink(flint, tinted("#e01c40"), "#fbf6ee", "#e01c40", cap("#e01c40")),
+    drink(flint, tinted("#2cc455"), "#f6faf4", "#2cc455", cap("#2cc455")),
+    drink(flint, tinted("#f88a14"), "#fffaf0", "#f88a14", cap("#f88a14")),
+    drink(flint, tinted("#f4e8c2"), "#fbf6ea", "#8ac0e0", cap("#8ac0e0")),
+    drink(flint, tinted("#f4d82a"), "#fbfbf0", "#e8c40a", cap("#f4d82a")),
   ],
 };
 
@@ -246,10 +245,11 @@ export function stock(list: readonly Bottle[], seed: number): Stocked[] {
     const shape = BOTTLE_SHAPES[b.kind];
     const choices = DRINKS[b.kind];
     const drink = choices[Math.floor(rand() * choices.length) % choices.length];
-    // Wine is full to the neck; what is poured by the glass has gone down.
-    const yb = shape.body - shape.r * 0.6;
+    // Water is full to the neck, unopened; the juices and syrups poured from are down to their shoulders or a little below (empty glass shows only the dark mirror behind).
+    const h = shape.r * 0.6;
+    const yb = shape.body - h;
     const level = rand();
-    const fill = b.kind === "wine" ? yb + 12 : Math.round((yb * (0.3 + 0.6 * level)) / 20) * 20;
+    const fill = b.kind === "water" ? yb + 12 : Math.round((yb + h * (1.2 * level - 0.2)) / 10) * 10;
     // A square bottle stays square to its felt box.
     const facing = b.yaw + (b.kind === "square" ? 0 : (rand() - 0.5) * 0.7);
     return { ...b, drink, fill, facing };
@@ -264,7 +264,6 @@ export function bottles(s: Sheets, list: readonly Stocked[]) {
     const d = b.drink;
     looks[EMPTY] = d.glass;
     looks[FULL] = d.full;
-    looks[CORK] = d.cork;
     looks[LABEL] = d.label;
     looks[BAND] = d.band;
     looks[CAP] = d.cap;
@@ -306,7 +305,7 @@ type Role = "glass" | "full" | "label" | "band" | "cap";
  * Far off, a bottle in forty to fifty triangles (`fine`: seventy), in the
  * looks its detail has: the body to its shoulder, full to where it is
  * filled, its label on the faces toward the room; the shoulder narrowing to
- * the neck; the capsule, or the stopper's head, closing it. They go to the
+ * the neck; the cap closing it. They go to the
  * far mesh painted and tagged as they are made, each area's in a piece.
  */
 export function farBottles(b: Builder, list: readonly Stocked[], fine: (bottle: Stocked) => boolean) {
@@ -389,7 +388,7 @@ export function farBottles(b: Builder, list: readonly Stocked[], fine: (bottle: 
       }
     }
 
-    // The shoulder, from the body's top to the neck (by way of its middle, when fine); the neck to the capsule; the capsule, tapering to a flat top.
+    // The shoulder, from the body's top to the neck (by way of its middle, when fine); the neck to the cap; the cap, tapering to a flat top.
     const rn = n;
     const top = s.top - n * 0.2;
     const zip = (role: Role, lo: Ring, hi: Ring) => {
@@ -439,12 +438,12 @@ export function farBottles(b: Builder, list: readonly Stocked[], fine: (bottle: 
   for (const [key, sheet] of sheets) b.standInPainted(key >> 1, sheet.geometry(), key & 1 ? CLEAR : 0);
 }
 
-/** The fridge's bottles: beer, white wine, water, soda; (radius, height) up the outside. */
+/** The fridge's bottles: orange juice, lemonade, water, milk; (radius, height) up the outside. */
 const COLD: readonly { rows: readonly [number, number][]; glass: string; label: [number, number]; labelColor: string; cap: string }[] = [
-  { rows: [[29, 0], [30, 3], [30, 135], [24, 160], [13, 182], [12, 222], [13, 224], [13, 232], [0, 233]], glass: "#3a1c06", label: [55, 120], labelColor: "#c8b070", cap: "#b8a060" },
-  { rows: [[36, 0], [37, 3], [37, 195], [30, 215], [14, 238], [14, 290], [0, 291]], glass: "#5a6424", label: [60, 150], labelColor: "#e8e2d0", cap: "#c8b47a" },
+  { rows: [[30, 0], [31, 3], [31, 130], [27, 146], [19, 158], [19, 180], [0, 181]], glass: "#ffb437", label: [45, 110], labelColor: "#f4f4ec", cap: "#4ad050" },
+  { rows: [[33, 0], [34, 3], [34, 185], [28, 205], [17, 224], [17, 256], [0, 257]], glass: "#f4e480", label: [60, 150], labelColor: "#2a8ad8", cap: "#f4f4ee" },
   { rows: [[34, 0], [35, 4], [35, 170], [26, 205], [14, 228], [14, 250], [0, 251]], glass: "#9ab8c0", label: [70, 140], labelColor: "#2a5a9a", cap: "#2a5a9a" },
-  { rows: [[29, 0], [30, 3], [30, 120], [22, 150], [12, 172], [12, 196], [0, 197]], glass: "#2a5a20", label: [50, 105], labelColor: "#c82a1a", cap: "#c8c8c0" },
+  { rows: [[30, 0], [31, 3], [31, 118], [26, 136], [20, 150], [20, 168], [0, 169]], glass: "#f8f6ee", label: [40, 100], labelColor: "#2a5ab8", cap: "#2a5ab8" },
 ];
 const coldTemplates = new Map<number, { t: Template; looks: Look[] }>();
 

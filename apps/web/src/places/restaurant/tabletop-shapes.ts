@@ -10,7 +10,7 @@
 import * as THREE from "three";
 import { topHeight } from "@fly/world";
 import type { Solid } from "@fly/world";
-import { tag } from "../bar/materials.ts";
+import { tag } from "./geometry.ts";
 
 export type Profile = readonly (readonly [number, number])[];
 

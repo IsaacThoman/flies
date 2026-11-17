@@ -160,7 +160,7 @@ for (const { id, name } of PLACES) {
   }
 }
 
-for (const [id, x, z, yaw] of [["picnic", 180, -170, 0.4], ["bar", -425, 0, 0]] as const) {
+for (const [id, x, z, yaw] of [["picnic", 180, -170, 0.4], ["lab", 215, -175, 0]] as const) {
   test(`${id}: entering whole-place screensaver away from spawn keeps the fly in frame and camera outside scenery`, () => {
     const scene = SCENES[id];
     const world = new World(scene.place);

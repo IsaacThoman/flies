@@ -43,17 +43,17 @@ function game() {
 
 test("stepping through the places carries the fly nowhere until it rests on one, then once, there", () => {
   const { settings, carried, press, wait } = game();
-  // Each in turn, the picnic, the windowsill, the lab bench, the bar: a step a third of a second.
+  // Each in turn, the picnic, the windowsill, the lab bench, the greenhouse: a step a third of a second.
   for (let i = 0; i < 4; i++) {
     press("right");
     wait(0.3);
   }
-  assert.equal(settings.place, "bar", "the row and the setting show each step");
+  assert.equal(settings.place, "greenhouse", "the row and the setting show each step");
   assert.deepEqual(carried, [], "nowhere on the way");
   wait(SETTLE);
-  assert.deepEqual(carried, ["bar"], "once, to where it rested");
+  assert.deepEqual(carried, ["greenhouse"], "once, to where it rested");
   wait(5);
-  assert.deepEqual(carried, ["bar"]);
+  assert.deepEqual(carried, ["greenhouse"]);
 });
 
 test("leaving the row, or the screen, settles it at once", () => {
@@ -63,7 +63,7 @@ test("leaving the row, or the screen, settles it at once", () => {
   assert.deepEqual(carried, ["lab"], "up off the row");
   press("down", "right", "back");
   wait(1 / 60);
-  assert.deepEqual(carried, ["lab", "bar"], "back out of Settings");
+  assert.deepEqual(carried, ["lab", "greenhouse"], "back out of Settings");
 });
 
 test("resting on Each in turn, or on where it is, carries it nowhere", () => {

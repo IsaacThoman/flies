@@ -1,7 +1,7 @@
 // What is on the tables: the start table's sugar caddy, bud vase, votive,
-// torn packet and the glass of wine left there; salt and pepper on most
-// tables; the ketchup and a menu, the bread basket, an espresso cup; the
-// crumbs, sugar and the wine's ring the world has as food, and the grains,
+// torn packet and the glass of orange juice left there; salt and pepper on
+// most tables; the ketchup and a menu, the bread basket, an espresso cup; the
+// crumbs, sugar and the juice's ring the world has as food, and the grains,
 // dust and lint round them at a fly's scale; and the food on the floor (the
 // soda by the bar, a grape under a window table). Shapes are in
 // tabletop-caddy.ts, tabletop-glass.ts, tabletop-food.ts and
@@ -14,8 +14,8 @@ import { AREAS, areaAt, areaOf, distanceTo } from "./areas.ts";
 import type { Part } from "./parts.ts";
 import { sugarCaddy } from "./tabletop-caddy.ts";
 import { breadBasket, espresso, grape, leftCrumbs, menu, soda, tornPacket } from "./tabletop-food.ts";
-import { budVase, ketchup, shakers, votive, wineGlass } from "./tabletop-glass.ts";
-import { litter, sugar, sugarTrail, wineRing } from "./tabletop-litter.ts";
+import { ORANGE_JUICE, budVase, juiceGlass, ketchup, shakers, votive } from "./tabletop-glass.ts";
+import { juiceRing, litter, sugar, sugarTrail } from "./tabletop-litter.ts";
 import { TABLETOP_CLEAR, TABLETOP_SOLID } from "./tabletop-glsl.ts";
 
 /** The world's food by name, in order. */
@@ -56,8 +56,8 @@ export const tabletop: Part = {
     sugarTrail(crystals, rnd, spill, RESTAURANT_START, 90, table.y);
     litter(b, start, table, RESTAURANT_START, solids.filter((s) => areaOf(s) === start), rnd, { grains: 380, dust: 1400, lint: 22, crumbs: 22 }, crystals);
     sugar(b, start, crystals);
-    wineGlass(b, start, one("glass foot"), one("glass stem"), one("wine glass"));
-    wineRing(b, start, START_TABLE.ring, START_TABLE.ring.r, food("wine ring"), table.y, rnd);
+    juiceGlass(b, start, one("juice glass"), ORANGE_JUICE);
+    juiceRing(b, start, START_TABLE.ring, START_TABLE.ring.r, food("juice ring"), table.y, rnd);
 
     // Salt and pepper, in pairs; a few crumbs left by each pair.
     const pairs = named("shaker");

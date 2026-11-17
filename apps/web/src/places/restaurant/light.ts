@@ -15,7 +15,7 @@
 import * as THREE from "three";
 import { CHAIR, PASS, STOOL, TABLES, TABLE_TOPS, ZINC_BAR } from "@fly/world";
 import { EXIT, FRIDGE, FRONT, HEAT, PENDANT_LIGHT } from "./plan.ts";
-import { CORNER_BAR, NEAR_LAMP } from "./street/layout.ts";
+import { NEAR_LAMP, PARLOUR } from "./street/layout.ts";
 import { STREET_LIGHT_GLSL } from "./traffic.ts";
 import { litOnly } from "../../scene/lit.ts";
 import { noiseGlsl } from "../../scene/noise.ts";
@@ -329,7 +329,7 @@ vec3 rRoom(vec3 p, vec3 r, float rough) {
     float ld = length(l);
     float a = acos(clamp(dot(r, l / ld), -1.0, 1.0));
     c += uStreetLamp * 6.0 * (1.0 - smoothstep(180.0 / ld, 180.0 / ld + blur * 0.6 + 0.004, a)) * open;
-    vec3 n = vec3(${f(CORNER_BAR.neon.x)}, ${f(CORNER_BAR.neon.y)}, ${f(CORNER_BAR.neon.z)}) - p;
+    vec3 n = vec3(${f(PARLOUR.neon.x)}, ${f(PARLOUR.neon.y)}, ${f(PARLOUR.neon.z)}) - p;
     float nd = length(n);
     float na = acos(clamp(dot(r, n / nd), -1.0, 1.0));
     c += uStreetFar * 0.012 * (1.0 - smoothstep(450.0 / nd, 450.0 / nd + blur * 0.25 + 0.002, na)) * open;

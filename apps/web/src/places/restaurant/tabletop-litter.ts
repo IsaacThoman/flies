@@ -194,12 +194,12 @@ export function sugarTrail(out: Placement[], rnd: Rnd, from: Spot, to: Spot, cou
 }
 
 /**
- * The ring a glass of red left, dried: a thin film a millimetre or two wide,
- * the wine drawn to its outer edge as it dried, so darkest there; broken
- * where the glass's foot was lifted, and run wider where the world has its
+ * The ring a glass of orange juice left, dried: a thin film a millimetre or
+ * two wide, the juice drawn to its outer edge as it dried, so darkest there;
+ * broken where the glass was lifted, and run wider where the world has its
  * food (`pools`).
  */
-export function wineRing(b: Builder, area: number, centre: Spot, R: number, pools: readonly Spot[], y: number, rnd: Rnd) {
+export function juiceRing(b: Builder, area: number, centre: Spot, R: number, pools: readonly Spot[], y: number, rnd: Rnd) {
   const at = pools.map((p) => Math.atan2(p.z - centre.z, p.x - centre.x));
   const phase = rnd.range(0, 6.3);
   const near = (th: number, a: number) => {
@@ -213,15 +213,15 @@ export function wineRing(b: Builder, area: number, centre: Spot, R: number, pool
   };
   // Rows across the ring and how high each stands.
   // From its outer edge in, so it faces up.
-  // Flat: a stain, a hair higher at its outer edge where the wine drew as it dried.
+  // Flat: a stain, a hair higher at its outer edge where the juice drew as it dried.
   const rows: [number, number][] = [[0.95, -0.02], [0.88, 0.045], [0.75, 0.032], [0.6, 0.03], [0.3, 0.03], [-0.2, 0.03], [-0.7, 0.028], [-0.9, -0.02]];
-  const pale = new THREE.Color("#a03048");
-  const dark = new THREE.Color("#2a0410");
-  const mid = new THREE.Color("#5a0a20");
+  const pale = new THREE.Color("#f0b860");
+  const dark = new THREE.Color("#9a4a08");
+  const mid = new THREE.Color("#d8801c");
   put(b, area, TOP.dregs, rows.map(([o, h]) => [R + o * 1.1, y + h]), 120, { x: centre.x, z: centre.z }, (out, _x, _y, _z, th, row) => {
     const t = rows[row][0];
     out.copy(pale).lerp(mid, THREE.MathUtils.smoothstep(t, -0.6, 0.4)).lerp(dark, THREE.MathUtils.smoothstep(t, 0.45, 0.8));
-    // At the pools the wine lay deep and dried darker all through.
+    // At the pools the juice lay deep and dried darker all through.
     out.lerp(dark, at.reduce((m, a) => Math.max(m, near(th, a)), 0) * 0.6);
   }, { shape: (th, row) => (R + rows[row][0] * 1.1 * width(th)) / (R + rows[row][0] * 1.1) });
   // A few drops flicked off it.

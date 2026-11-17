@@ -688,7 +688,7 @@ game holds itself to what the TV can sustain (`Warmth` in `apps/web/src/quality.
   it took), up to two hours. A step up that warms the TV within 10 minutes comes straight back
   down.
 - Each place starts where it was last held, with the wait it had earned there, kept in
-  `localStorage` (`flies.warmth`): the bar and the restaurant warm the TV very differently. peev
+  `localStorage` (`flies.warmth`): the lab and the restaurant warm the TV very differently. peev
   goes from nominal straight to serious, never through fair, so a place that has once made it hot
   starts where it stayed cool.
 - Only the frame rate and the pixels change. The brain is handed the same time whatever the frame

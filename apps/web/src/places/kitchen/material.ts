@@ -14,7 +14,7 @@ export const KIND = {
   wall: 7,
   metal: 8,
   honey: 9,
-  wine: 10,
+  juice: 10,
   bulb: 11,
   skin: 12,
   cloth: 13,

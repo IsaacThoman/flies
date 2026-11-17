@@ -6,6 +6,7 @@
 // what a pixel can't show. Things that are just a colour (the ketchup, the
 // wax) use their vertex colour as it is.
 
+import { JUICE_GLASS } from "@fly/world";
 import { PART_KINDS } from "./kinds.ts";
 
 const [S0] = PART_KINDS.tabletop.solid;
@@ -29,16 +30,13 @@ export const TOP = {
   china: S0 + 6,
   /** Ketchup: in the bottle, smeared, and dried to a crust (painted darker). */
   ketchup: S0 + 7,
-  /** Wine dried in drops on the marble. */
+  /** Juice dried in a ring on the marble. */
   dregs: C0,
-  /** The wine glass's inside, filmed with wine above its level. Colour: offset from its middle / 84 mm, height / 120 mm. */
-  bowl: C0 + 1,
+  /** The tumbler's inside, filmed with juice above its level. Colour: blue, the height above the glass's foot / 120 mm. */
+  inside: C0 + 1,
   /** Tinted glass, its colour showing: the votive. */
   tint: C0 + 2,
 } as const;
-
-/** Where the wine glass's bowl starts, for the stain up its inside. */
-export const BOWL_BASE = 855;
 
 /** A sugar packet standing in the caddy: across, up, and how deep its crimped seals are (mm). */
 export const PACKET = { across: 55, up: 60, seal: 4.5 };
@@ -182,7 +180,7 @@ if (rK >= K_TOP_PRINT && rK <= K_TOP_CHINA) {
       }
       float under = 1.0 - smoothstep(0.0, 0.09, over);
       fold = under * 0.85;
-      // Each petal its own red: some toward crimson, some toward a cooler wine, the outer ones paler and a few bruised at the edge.
+      // Each petal its own red: some toward crimson, some toward a cooler plum, the outer ones paler and a few bruised at the edge.
       float hue = rHash1(which + 11.0);
       vec3 own = mix(vec3(0.8, 0.1, 0.13), vec3(0.46, 0.02, 0.14), hue) * (0.8 + 0.4 * rHash1(which + 5.0));
       c = mix(own, deep, which / 15.0 * 0.6 + (1.0 - smoothstep(0.0, 0.18, rho)) * 0.5);
@@ -363,36 +361,30 @@ if (rK == K_TOP_KETCHUP) {
 
 const CLEAR_HEAD = /* glsl */ `
 const int K_TOP_DREGS = ${TOP.dregs};
-const int K_TOP_BOWL = ${TOP.bowl};
+const int K_TOP_INSIDE = ${TOP.inside};
 const int K_TOP_TINT = ${TOP.tint};
 float topStain;
 `;
 
 const CLEAR_COLOR = /* glsl */ `
 topStain = 0.0;
-// Dried wine: as opaque as it is dark, a pale film where it lay thin.
 if (rK == K_TOP_DREGS) {
-  // Dried wine: a stain the marble shows through, densest at the edge it dried to; satin, not wet.
-  rAlpha = mix(0.72, 0.22, smoothstep(0.03, 0.35, diffuseColor.r));
+  // Dried juice: a stain the marble shows through, as opaque as it is dark, densest at the edge it dried to; satin, not wet.
+  rAlpha = mix(0.72, 0.22, smoothstep(0.08, 0.45, diffuseColor.g));
   rRough = 0.38;
 }
-if (rK == K_TOP_BOWL) {
-  // Wine left a film inside the glass above where it stands, and its tears run back down in streaks.
-  vec2 o = (diffuseColor.rg - 0.5) * 84.0;
-  float y = ${BOWL_BASE.toFixed(1)} + diffuseColor.b * 120.0;
-  float a = atan(o.y, o.x) / 6.2832 * 17.0;
-  float tear = floor(a + 0.13 * sin(a * 1.9));
-  float leg = rBand(fract(a + 0.13 * sin(a * 1.9)), 0.42, 0.58, 0.06);
-  float reach = 882.0 + 18.0 * rHash1(mod(tear, 17.0));
-  topStain = (1.0 - smoothstep(870.5, 876.0, y)) * 0.3 + leg * (1.0 - smoothstep(reach - 4.0, reach, y)) * smoothstep(870.0, 873.0, y) * 0.3 * (0.4 + 0.6 * rHash1(mod(tear, 17.0) + 5.0));
-  diffuseColor.rgb = mix(vec3(0.03), vec3(0.16, 0.005, 0.02), topStain);
+if (rK == K_TOP_INSIDE) {
+  // Juice left a film on the glass above where it stands, thinning upward, and a line of pulp at its level.
+  float y = diffuseColor.b * 120.0;
+  topStain = (1.0 - smoothstep(${(JUICE_GLASS.well + 0.5).toFixed(1)}, ${(JUICE_GLASS.well + 16).toFixed(1)}, y)) * 0.35 + rBand(y, ${(JUICE_GLASS.well + 0.3).toFixed(1)}, ${(JUICE_GLASS.well + 1.8).toFixed(1)}, 0.3) * 0.35;
+  diffuseColor.rgb = mix(vec3(0.03), vec3(0.5, 0.2, 0.02), topStain);
 }
 if (rK == K_TOP_TINT) diffuseColor.rgb *= 0.35;
 `;
 
 const CLEAR_FINAL = /* glsl */ `
 if (rK == K_TOP_DREGS) rAlpha = min(1.0, rAlpha + edge * 0.08);
-if (rK == K_TOP_BOWL) rAlpha = 0.04 + edge * 0.7 + min(dot(outgoingLight, vec3(0.1)), 0.15) + topStain * 0.45;
+if (rK == K_TOP_INSIDE) rAlpha = 0.04 + edge * 0.7 + min(dot(outgoingLight, vec3(0.1)), 0.15) + topStain * 0.45;
 if (rK == K_TOP_TINT) rAlpha = 0.14 + edge * 0.6 + min(dot(outgoingLight, vec3(0.1)), 0.15);
 `;
 

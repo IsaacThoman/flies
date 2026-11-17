@@ -4,7 +4,7 @@
 // neon and the lit shops, the lit windows that come and go through the
 // night, and the haze of distance, mist and rain.
 
-import { CORNER_BAR, HEADLAMPS, LAMPS, LATE_SHOP, STREET } from "./layout.ts";
+import { HEADLAMPS, LAMPS, LATE_SHOP, PARLOUR, STREET } from "./layout.ts";
 import type { Building } from "./buildings.ts";
 
 export const f = (n: number) => n.toFixed(1);
@@ -52,7 +52,7 @@ uniform vec3 uLamps[${LAMPS.length}];
 uniform vec3 uLampLight;
 uniform vec4 uCars[2];
 uniform vec3 uNeon;
-uniform vec3 uBarLight;
+uniform vec3 uParlourLight;
 uniform vec3 uShopLight;
 uniform vec3 uHomeLight;
 uniform float uDark;
@@ -131,11 +131,11 @@ vec3 outsideLight(vec3 p, vec3 n, vec3 v, vec3 albedo, float sharp, float shine)
     beam *= beam;
     pointLight(p, n, v, l, vec3(1.0, 0.95, 0.86) * (60.0 * beam * car.w), sharp, d, sp);
   }
-  if (uNeon.r + uBarLight.r > 0.0) {
-    pointLight(p, n, v, vec3(${f(CORNER_BAR.neon.x)}, ${f(CORNER_BAR.neon.y)}, ${f(STREET.facades - 300)}), uNeon, sharp, d, sp);
+  if (uNeon.r + uParlourLight.r > 0.0) {
+    pointLight(p, n, v, vec3(${f(PARLOUR.neon.x)}, ${f(PARLOUR.neon.y)}, ${f(STREET.facades - 300)}), uNeon, sharp, d, sp);
     // The shops lit inside light the pavement in front of them through their windows.
     if (p.z < ${f(STREET.facades)}) {
-      pointLight(p, n, v, vec3(clamp(p.x, ${f(CORNER_BAR.x0)}, ${f(CORNER_BAR.x1)}), ${f(STREET.pavement + 1700)}, ${f(STREET.facades + 900)}), uBarLight, sharp, d, sp);
+      pointLight(p, n, v, vec3(clamp(p.x, ${f(PARLOUR.x0)}, ${f(PARLOUR.x1)}), ${f(STREET.pavement + 1700)}, ${f(STREET.facades + 900)}), uParlourLight, sharp, d, sp);
       pointLight(p, n, v, vec3(clamp(p.x, ${f(LATE_SHOP.x0)}, ${f(LATE_SHOP.x1)}), ${f(STREET.pavement + 1700)}, ${f(STREET.facades + 900)}), uShopLight, sharp, d, sp);
     }
     // The restaurant's own windows, its one lamp left on.

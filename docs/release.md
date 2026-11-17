@@ -64,10 +64,9 @@ legal texts and confirm live WeatherKit attribution in a signed build.
 
 Listed rooms expose user-chosen names, with no chat channel. Decide whether
 to keep that public feature and answer the user-generated-content and
-public-posting questions accordingly. The bar/restaurant contain persistent
-alcohol imagery: review the frequency answers and accept Apple's resulting
-regional age rating; do not submit as a Kids Category app. The rationale is
-in [App Store answers](app-store-answers.md).
+public-posting questions accordingly. The answers aim at 4+, which needs no
+alcohol and no cartoon violence anywhere in the game; do not submit as a Kids
+Category app. The rationale is in [App Store answers](app-store-answers.md).
 
 The large notice files are committed generated output. `npm run notices`
 regenerates `THIRD_PARTY_NOTICES` and `apps/web/src/ui/notices.json`; tests

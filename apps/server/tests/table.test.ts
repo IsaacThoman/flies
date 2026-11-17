@@ -517,6 +517,28 @@ test("a table kept and restored has its place, its epoch, its seats with their c
   assert.equal(restored.hello(fakeLink(), "key-3", hello("key-3")), "removed");
 });
 
+test("a table kept at a place that has since gone comes back at the picnic, its flies set down there and the old place's food gone", () => {
+  const { table, clock, options, join, send, bite, step } = room({ ...START, place: "lab" });
+  const a = join("key-1", { flies: 2 });
+  const id = DROP_ID + 1;
+  const [x, z] = spawnSpot(table.world, 1);
+  send(a, { type: "drop", id, kind: "honey", x, z, y: 0, at: clock.now });
+  bite(a, id, 0.1);
+  step();
+  assert.ok(table.food.find(id));
+  table.disconnected(a.seat, a.link);
+  // Kept by a build that still had the bar.
+  const kept = { ...JSON.parse(JSON.stringify(table.record())), place: "bar" } as TableRecord;
+  clock.wall += 30_000;
+  const restored = Table.restore(kept, options);
+  assert.equal(restored.place, "picnic");
+  assert.equal(restored.epoch, (kept.epoch + 1) & 0xff, "a device still there knows it has moved");
+  assert.deepEqual(restored.seats.get(1)!.flies.map((f) => [f.state.x, f.state.z]), [1, 2].map((fly) => spawnSpot(restored.world, fly).slice(0, 2)));
+  assert.equal(restored.food.find(id), null);
+  assert.deepEqual([...restored.food.eaten], []);
+  assert.equal(restored.record().place, "picnic");
+});
+
 /** Runs a table for `minutes` with its only player keeping its device alive; returns the happenings it was told of. */
 function quietFor(start: TableStart, minutes: number, flags: number) {
   const { clock, join, fly, send, step, table } = room(start);
@@ -710,14 +732,14 @@ test("rooms: only listed ones with someone there are listed, fullest first; a li
   const open = (code: string, key: string, start: TableStart) => tables.open(key, { type: "hello", v: PROTOCOL, table: code, key, start }, 1) as Table;
   const sit = (table: Table, key: string) => table.hello(fakeLink(), key, { type: "hello", v: PROTOCOL, table: table.code, key }) as Seat;
   const quiet = open("aaaaaaaaaa", "k1", { ...START, name: "Quiet", listed: true });
-  const busy = open("bbbbbbbbbb", "k2", { ...START, place: "bar", name: "Busy", listed: true });
+  const busy = open("bbbbbbbbbb", "k2", { ...START, place: "greenhouse", name: "Busy", listed: true });
   const hidden = open("cccccccccc", "k3", { ...START, name: "Hidden" });
   const empty = open("dddddddddd", "k4", { ...START, name: "Empty", listed: true });
   sit(quiet, "k1");
   for (const key of ["k2", "k5", "k6"]) sit(busy, key);
   sit(hidden, "k3");
   assert.deepEqual(tables.listed().filter((room) => !room.everyone), [
-    { code: "bbbbbbbbbb", name: "Busy", place: "bar", flies: 3, locked: false },
+    { code: "bbbbbbbbbb", name: "Busy", place: "greenhouse", flies: 3, locked: false },
     { code: "aaaaaaaaaa", name: "Quiet", place: "picnic", flies: 1, locked: false },
   ]);
   assert.equal(empty.name, "Empty");
