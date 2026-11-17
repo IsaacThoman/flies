@@ -208,8 +208,15 @@ export class Pointers {
       this.down(e);
     });
     canvas.addEventListener("pointermove", (e) => {
-      // A fast mouse sends several moves a frame; the browser has them all.
       const events = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
+      // A batch can leave tap slop and return. Preserve that travel without queuing every sample.
+      if (events.length > 1 && e.pointerId === this.#primary) {
+        const box = this.#box();
+        for (let i = 0; i < events.length - 1; i++) {
+          const p = events[i];
+          this.#moved = Math.max(this.#moved, Math.hypot(p.clientX - box.left - this.#start.x * box.width, p.clientY - box.top - this.#start.y * box.height));
+        }
+      }
       this.move(events.length ? events[events.length - 1] : e);
     });
     canvas.addEventListener("pointerup", (e) => this.up(e, false));

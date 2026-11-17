@@ -373,3 +373,33 @@ test("a resize invalidates synchronous field focus before another game frame run
     else Reflect.deleteProperty(globalThis, "document");
   }
 });
+
+test("coalesced out-and-back travel cancels a tap while queuing only the latest drag", () => {
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  Object.defineProperty(globalThis, "window", { value: new EventTarget(), configurable: true });
+  Object.defineProperty(globalThis, "document", { value: new EventTarget(), configurable: true });
+  try {
+    for (const type of ["touch", "mouse"]) {
+      const { pointers, raw } = rig();
+      const canvas = new EventTarget();
+      let taps = 0;
+      pointers.onTap = () => { taps++; };
+      pointers.attach(canvas as HTMLCanvasElement);
+      canvas.dispatchEvent(Object.assign(new Event("pointerdown"), raw(1, type, 100, 100)));
+      canvas.dispatchEvent(Object.assign(new Event("pointermove"), raw(1, type, 100, 100), {
+        getCoalescedEvents: () => [raw(1, type, 150, 100), raw(1, type, 100, 100)],
+      }));
+      canvas.dispatchEvent(Object.assign(new Event("pointerup"), raw(1, type, 100, 100, 0)));
+      assert.equal(taps, 0);
+      assert.deepEqual(types(pointers.gestures), ["down", "drag", "up"]);
+      assert.equal((pointers.gestures[1] as Extract<Gesture, { type: "drag" }>).far, true);
+      assert.equal((pointers.gestures[2] as Extract<Gesture, { type: "up" }>).tap, false);
+    }
+  } finally {
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+    if (previousDocument) Object.defineProperty(globalThis, "document", previousDocument);
+    else Reflect.deleteProperty(globalThis, "document");
+  }
+});

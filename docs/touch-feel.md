@@ -154,8 +154,27 @@ pass, including synchronous focus cancellation and safe lens placement.
 
 ## Reach and edge-alignment pass
 
-Key: set-R6 is this pass; set-V2 is the preceding precision/focus pass. Scores
-pending. This pass also rebases onto `b6bd5548` from dev: camera, sleep,
+Key: set-R6 is this pass; set-V2 is the preceding precision/focus pass.
+Orders: R6/V2, V2/R6, R6/V2; regression review V2/R6.
+
+| Reviewer | Set | Intent | Reach | Visibility | Conventions | Response | Resize | Other | Mean |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| M2 | V2 | 8 | 7 | 7.5 | 8.5 | 9 | 8.5 | 8 | 8.07 |
+| M2 | R6 | 9 | 9 | 8.5 | 8.5 | 9 | 8.5 | 8 | 8.64 |
+| P7 | V2 | 9 | 7.5 | 8 | 9 | 10 | 9 | 8 | 8.64 |
+| P7 | R6 | 9.5 | 9 | 9 | 9 | 10 | 9 | 8.5 | 9.14 |
+| T4 | V2 | 8 | 7.5 | 7.5 | 9 | 10 | 8.5 | 8 | 8.36 |
+| T4 | R6 | 9 | 9 | 9 | 9 | 10 | 9 | 8.5 | 9.07 |
+
+Mean: **8.95**, versus **8.36** for V2 in this comparison. All three rank
+R6 first. Accepted. The regression reviewer confirms the edge alignment and
+field-identity gains, and notes a grip-dependent tradeoff: tablet controls
+near the edges require more reach from a central grip. Kept for two-handed
+edge use, with OS-edge behavior explicitly left for a device to verify.
+
+A scorer found that coalesced pointer batches could hide an out-and-back drag.
+The next pass preserves the farthest excursion while forwarding only the last
+sample to the game. This pass also rebases onto `b6bd5548` from dev: camera, sleep,
 food-contact, whole-place views, menu target identity and text-entry changes
 come from their owners and are not attributed to the touch experiment.
 
@@ -175,4 +194,13 @@ nervous-system/X-ray region-glow assertion documented in the shared rules
 (#63). The full ordinary suite before rebase passed 735 tests (731 passed,
 4 skipped). Its separate TypeScript-brain cost budget failed at 0.592 CPU s/s
 against 0.5; the budget rerun after rebase failed at 0.570. No brain or budget
-code was changed. Final full run and iPad shell check pending.
+code was changed. The iPad shell also passed all 17 tests (231 s); its simulator was shut down and deleted. A final full run follows the coalesced-input pass.
+
+## Coalesced-input pass
+
+Key: set-C9 is this pass; set-R6 is the preceding reach/edge pass. Scores and
+randomized order pending. The DOM pointer handler keeps maximum travel across
+all coalesced samples but queues only the final drag. Both mouse and touch
+out-and-back batches now cancel the tap and synchronous field focus, with a
+focused test confirming that no extra drag gestures are allocated. 58 focused
+tests pass. No further visual/menu changes in this pass.
