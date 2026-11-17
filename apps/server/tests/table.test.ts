@@ -704,3 +704,20 @@ test("a clear request removes only the sender's offerings and broadcasts gone id
   assert.equal(table.food.find(mine), null);
   assert.deepEqual(table.food.foods.map((f) => f.id), patches);
 });
+
+test("found food deadlines survive a saved idle room and are gone on welcome", () => {
+  const { table, clock, join, send, options } = room();
+  const a = join("key-1");
+  send(a, { type: "found", id: 900000001, name: "strawberry juice", x: 20, z: 20, y: 0, r: 1, sweet: 0.8, lasts: 10, epoch: table.epoch });
+  const saved = table.record();
+  assert.equal(saved.foodExpires?.length, 1);
+  clock.wall += 10001;
+  const restored = new Table(CODE, START, "key-1", 7, options, saved);
+  const link = fakeLink();
+  restored.hello(link, "key-1", { type: "hello", v: PROTOCOL, table: CODE, key: "key-1" });
+  assert.ok(!saidOf(link, "welcome")[0].foods.some((f) => f[0] === 900000001));
+  assert.ok(!restored.record().foods.some((f) => f[0] === 900000001));
+  assert.deepEqual(restored.record().foodExpires, []);
+  clock.wall += 1000;
+  assert.ok(!table.record().foods.some((f) => f[0] === 900000001), "a room that never ticked expires before its next save");
+});

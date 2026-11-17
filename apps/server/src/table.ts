@@ -14,7 +14,7 @@
 import { BALL_RADIUS, Pace, VentilationClock, World, WORLDS, forecast, hourOfDay } from "@fly/world";
 import type { Happening } from "@fly/world";
 import {
-  AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_PLAYERS, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
+  MAX_FOUND, AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_PLAYERS, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
   TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, encodeFlies, isTableCode, mayReturnTo, mix, readState,
   roomName, roomTime, spawnSpot, stream, tableHours, toWire, wireScale,
 } from "@fly/net";
@@ -93,6 +93,7 @@ export type TableRecord = {
   /** `gone`: it had left (said goodbye, or was away too long), so a restart doesn't bring its fly back. */
   seats: { id: number; key: string; at: [x: number, y: number, z: number, yaw: number]; airborne: boolean; lastSeen: number; gone?: boolean }[];
   foods: FoodWire[];
+  foodExpires?: [id: number, at: number][];
   /** How much each player has eaten by the table's account, by id (older files have none). */
   eaten?: [id: number, amount: number][];
   /** The room's name, whether it is listed, and its lock (older files have none: unnamed, unlisted, open to its link). */
@@ -135,6 +136,7 @@ export function isTableRecord(v: unknown): v is TableRecord {
   if (!Array.isArray(r.removed) || r.removed.length > REMOVED_MAX || !r.removed.every((k) => text(k, 64))) return false;
   const ids = new Set<number>();
   if (!Array.isArray(r.seats) || r.seats.length > MAX_PLAYERS || !r.seats.every((seat) => isSeatRecord(seat, ids))) return false;
+  if (r.foodExpires !== undefined && (!Array.isArray(r.foodExpires) || r.foodExpires.length > MAX_FOUND || !r.foodExpires.every((e) => Array.isArray(e) && e.length === 2 && finite(e[0]) && finite(e[1])))) return false;
   if (!Array.isArray(r.foods) || r.foods.length > WIRE_FOODS_MAX || !r.foods.every(isFoodRecord)) return false;
   if (r.eaten !== undefined && (!Array.isArray(r.eaten) || r.eaten.length > MAX_PLAYERS || !r.eaten.every((e) => Array.isArray(e) && e.length === 2 && finite(e[0], e[1])))) return false;
   return (r.name === undefined || roomName(r.name) === r.name) && (r.listed === undefined || typeof r.listed === "boolean") && (r.lock === undefined || r.lock === null || isLock(r.lock));
@@ -208,7 +210,7 @@ export class Table {
     this.epoch = record?.epoch ?? 0;
     this.world = new World(WORLDS[this.place]);
     this.scale = wireScale(this.world.place);
-    this.food = new TableFood(this.world, this.world.place.patches);
+    this.food = new TableFood(this.world, this.world.place.patches, options.wall);
     this.worldWire = { light: TABLE_LIGHTS.includes(start.light as never) ? start.light : "clock", weather: TABLE_WEATHERS.includes(start.weather as never) ? start.weather : "now" };
     this.#starter = starterKey;
     this.#zone = typeof start.zone === "string" ? start.zone.slice(0, 64) : "";
@@ -218,7 +220,7 @@ export class Table {
     this.#lastTick = options.now();
     this.#settle();
     if (record) {
-      this.food.restore(record.foods);
+      this.food.restore(record.foods, record.foodExpires);
       for (const [id, amount] of record.eaten ?? []) this.food.eaten.set(id, amount);
       const now = options.now();
       for (const r of record.seats) {
@@ -245,6 +247,7 @@ export class Table {
 
   /** The table as it is to be kept. */
   record(): TableRecord {
+    this.food.update(0);
     return {
       code: this.code,
       created: this.created,
@@ -258,6 +261,7 @@ export class Table {
       removed: [...this.removed],
       seats: [...this.seats.values()].map((s) => ({ id: s.id, key: s.key, at: [s.state.x, s.state.y, s.state.z, s.state.yaw], airborne: !!(s.state.flags & AIRBORNE), lastSeen: s.lastSeen, gone: !s.present })),
       foods: this.food.foods.map(toWire),
+      foodExpires: this.food.expiries(),
       eaten: [...this.food.eaten],
       name: this.name,
       listed: this.listed,
@@ -409,6 +413,7 @@ export class Table {
     const shown = returning && seat.present;
     seat.present = true;
     seat.away = false;
+    this.food.update(0);
     this.#send(seat, {
       type: "welcome",
       v: PROTOCOL,
@@ -542,7 +547,7 @@ export class Table {
         return;
       case "found": {
         if (!finite(m.id, m.x, m.z, m.r, m.sweet) || !seat.rates.found.take(now)) return;
-        const food = this.food.found(m.id, m.name, m.x, m.z, m.r, m.sweet, finite(m.y) ? m.y : undefined);
+        const food = this.food.found(m.id, m.name, m.x, m.z, m.r, m.sweet, finite(m.y) ? m.y : undefined, m.lasts);
         if (food) this.#broadcast({ type: "found", food: toWire(food) }, seat);
         return;
       }

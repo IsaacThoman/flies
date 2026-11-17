@@ -15,9 +15,9 @@ export class TablePantry extends Pantry {
   /** This player at the table: the first part of what it names its food. */
   player = 0;
   /** Food the place put out here, for the room to hear of. */
-  onFound: (food: Food) => void = () => {};
   /** Requests a clear from the room, which decides what this player owns. */
   onClear: () => void = () => {};
+  onFound: (food: Food, lasts?: number) => void = () => {};
   readonly #world: World;
   #dropped = 0;
   /** Names given at the moment of dropping, waiting for the food to land: by kind, oldest first. */
@@ -65,13 +65,13 @@ export class TablePantry extends Pantry {
     this.mirror.add({ id, kind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, amount: 1, pool: false });
   }
 
-  add(name: string, x: number, z: number, r: number, sweet: number, y?: number): Food {
+  add(name: string, x: number, z: number, r: number, sweet: number, y?: number, lasts?: number): Food {
     const id = foundId(name, x, z);
     const known = this.foods.find((f) => f.id === id);
     if (known) return known;
     const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, amount: 1, pool: false };
     this.foods.push(food);
-    this.onFound(food);
+    this.onFound(food, lasts);
     return food;
   }
 
