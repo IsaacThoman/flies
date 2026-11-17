@@ -15,15 +15,19 @@
 // 1.5 to 1.8 times above what the work costs on an M5 Pro, so it holds on the CI
 // runner, and doubling the work fails it on either.
 //
-// The reference can't follow other processes thrashing the caches and memory the
-// work shares (four copies of the brain at once each cost a third more on an M5
-// Pro, and with the machine buried under ten times its cores in other work, the
-// brain with everything at once comes close to its budget), so the budgets live
-// in *.budget.ts files, which npm test runs one at a time after everything else.
-// Only this thread's CPU counts: the JIT's and GC's helper threads aren't the work.
+// Cache and memory contention can affect the work and the reference differently.
+// Budgets run alone after the other tests and accept measurements only when the
+// reference's median is at most 2x the M5 Pro baseline locally (4x on CI's slower
+// virtual Macs), its 90th/10th percentile ratio is at most 1.5, and each set of
+// five work samples spans at most 1.35x. A stable 2x work regression still fails.
+// Three contended attempts, separated by one-second pauses, skip locally with an
+// explicit rerun message; in CI they fail with that reason. Functional assertions
+// and measurement errors always fail. Only this thread's CPU counts, not helpers.
 //
 // After a change of Node that moves the reference, `node scripts/cpuBudget.ts`
 // on an M5 Pro, with nothing else busy, prints the new REFERENCE_MS.
+
+import { setTimeout as pause } from "node:timers/promises";
 
 /** CPU milliseconds this thread has used. */
 const threadMs = () => {
@@ -66,12 +70,15 @@ export class CpuMeter {
   #work = 0;
   #reference = timeReference();
   #references = 1;
+  #referenceSamples = [this.#reference];
   #since = threadMs();
 
   /** Ends a lap of the work here. */
   lap() {
     this.#work += threadMs() - this.#since;
-    this.#reference += timeReference();
+    const sample = timeReference();
+    this.#reference += sample;
+    this.#referenceSamples.push(sample);
     this.#references++;
     this.#since = threadMs();
   }
@@ -80,6 +87,9 @@ export class CpuMeter {
   get ms() {
     return (this.#work * REFERENCE_MS) / (this.#reference / this.#references);
   }
+
+  /** The reference CPU times beside this work, for detecting contention. */
+  get references(): readonly number[] { return this.#referenceSamples; }
 
   /** The work's CPU milliseconds so far, as measured here. */
   get rawMs() {
@@ -93,6 +103,53 @@ export const median = (samples: number[]) => {
   const middle = sorted.length >> 1;
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 };
+
+
+type Measurement<T> = {
+  value: T;
+  references: readonly number[];
+  /** One series per cost metric; deterministic repetitions of the same work. */
+  samples?: readonly (readonly number[])[];
+};
+type BudgetContext = { skip(message: string): void; diagnostic(message: string): void };
+type Conditions = { ci?: boolean; pause?: (ms: number) => Promise<unknown> };
+
+function contention<T>({ references, samples = [] }: Measurement<T>, ci: boolean): string | null {
+  for (const series of [references, ...samples]) {
+    if (!series.length || series.some((sample) => !Number.isFinite(sample) || sample <= 0)) throw Error("Invalid CPU measurement: samples must be finite and positive");
+  }
+  const sorted = references.toSorted((a, b) => a - b);
+  const middle = median(sorted);
+  const limit = REFERENCE_MS * (ci ? 4 : 2);
+  if (middle > limit) return `reference median ${middle.toFixed(2)} ms exceeds ${limit} ms`;
+  const low = sorted[Math.floor((sorted.length - 1) * 0.1)];
+  const high = sorted[Math.ceil((sorted.length - 1) * 0.9)];
+  if (high / low > 1.5) return `reference p90/p10 ${(high / low).toFixed(2)} exceeds 1.5`;
+  for (const series of samples) {
+    const spread = Math.max(...series) / Math.min(...series);
+    if (spread > 1.35) return `work sample max/min ${spread.toFixed(2)} exceeds 1.35`;
+  }
+  return null;
+}
+
+/** Returns reliable measurements before any speed assertion; only contention is retried. */
+export async function measureBudget<T>(t: BudgetContext, measure: () => Measurement<T>, conditions: Conditions = {}): Promise<T | undefined> {
+  const ci = conditions.ci ?? Boolean(process.env.CI);
+  const wait = conditions.pause ?? pause;
+  let reason = "";
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const measured = measure();
+    const busy = contention(measured, ci);
+    if (!busy) return measured.value;
+    reason = busy;
+    t.diagnostic(`CPU measurement ${attempt}/3 contended: ${reason}`);
+    if (attempt < 3) await wait(1_000);
+  }
+  const message = `machine too busy to measure; rerun when idle (${reason}; 3 attempts)`;
+  if (ci) throw Error(message);
+  t.skip(message);
+  return undefined;
+}
 
 if (import.meta.main) {
   const samples = Array.from({ length: 200 }, timeReference);
