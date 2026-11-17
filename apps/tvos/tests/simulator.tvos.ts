@@ -22,7 +22,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import type { OutsideConditions, WeatherAttribution } from '@fly/contracts';
-import { MAX_PLAYERS, tableCode } from '@fly/net';
+import { MAX_FLIES, tableCode } from '@fly/net';
 import { startServer as startRooms } from '../../server/src/server.ts';
 import type { RoomServer } from '../../server/src/server.ts';
 import { BUNDLE_ID, appPath } from '../../../scripts/tvos.ts';
@@ -302,7 +302,7 @@ try {
   const code = tableCode((bytes) => crypto.getRandomValues(bytes));
   const start = { place: 'picnic', light: 'noon', weather: 'clear', zone: 'UTC', offset: 0, name: 'Check', listed: false };
   const fakes = new Set<number>();
-  for (let k = 0; k < MAX_PLAYERS - 1; k++) fakeFlies.push(await fakeFly(roomsUrl, code, k, fakes, k === 0 ? start : undefined));
+  for (let k = 0; k < MAX_FLIES - 1; k++) fakeFlies.push(await fakeFly(roomsUrl, code, k, fakes, k === 0 ? start : undefined));
   const press = (key: string) => ['press', key, 100];
   const gameDrive = [
     ['wait', { ready: 'true', brain: 'running', screen: 'title' }, 180_000],
@@ -310,7 +310,19 @@ try {
     // that the title is already the wallpaper, and that presses close together share a frame.
     press('ArrowUp'),
     ['wait', { wallpaper: 'false', focus: 'play' }, 60_000],
-    ...['watch', 'about', 'settings', 'online'].flatMap((focus) => [press('ArrowDown'), ['wait', { focus }, 60_000]]),
+    ...['watch', 'about', 'settings'].flatMap((focus) => [press('ArrowDown'), ['wait', { focus }, 60_000]]),
+    // Two flies, the second a brain of its own from the host's spawn(), on a thread of its own.
+    press('Enter'),
+    ['wait', { screen: 'settings' }, 60_000],
+    ...['wallpaperAfter', 'wallpaperCamera', 'place', 'flies'].flatMap((focus) => [press('ArrowDown'), ['wait', { focus }, 60_000]]),
+    press('ArrowRight'),
+    ['wait', { flies: '2' }, 180_000],
+    ['sleep', 6000],
+    ['log', 'two flies'],
+    press('Escape'),
+    ['wait', { screen: 'title', focus: 'settings' }, 60_000],
+    press('ArrowDown'),
+    ['wait', { focus: 'online' }, 60_000],
     press('Enter'),
     ['wait', { screen: 'online', focus: 'new' }, 60_000],
     press('ArrowDown'),
@@ -340,8 +352,15 @@ try {
   xcrun('simctl', 'io', udid, 'screenshot', room);
   console.log(`Joined the room by its code; its QR code and code: ${room}`);
 
+  // Alone it lived two flies, the other's brain native and running; the room had one seat left, so it brought one.
+  const two = allStats.find((w) => w.state.flies === '2' && /:running:/.test(w.state.company ?? ''));
+  assert.ok(two, `a second fly with a running brain of its own: ${JSON.stringify(allStats.map((w) => w.state.company))}`);
+  console.log(`Two flies alone, the second's brain native: ${two.state.company}`);
+
   // Ten seconds in play with the seven others walking round the game's fly: the frame's cost.
-  await waitUntil(() => output.some((l) => l.includes('drive: playing in the room')) && there(state()) === MAX_PLAYERS - 1);
+  await waitUntil(() => output.some((l) => l.includes('drive: playing in the room')) && there(state()) === MAX_FLIES - 1);
+  assert.equal(state().flies, '1', 'one seat left at the table: it brings one of its two flies');
+  assert.equal((state().mine ?? '').split(';').filter(Boolean).length, 1);
   const player = state().player;
   const from = allStats.length;
   await waitUntil(() => allStats.length >= from + 5);
@@ -350,7 +369,7 @@ try {
   // opens again, as a browser's does: in the room, every other fly is there.
   const joined = windows.filter((w) => w.state.online === 'joined');
   assert.ok(joined.length > 0, 'in the room');
-  for (const w of joined) assert.equal(there(w.state), MAX_PLAYERS - 1, `all ${MAX_PLAYERS - 1} others there: ${w.state.others}`);
+  for (const w of joined) assert.equal(there(w.state), MAX_FLIES - 1, `all ${MAX_FLIES - 1} others there: ${w.state.others}`);
   await waitUntil(() => state().online === 'joined');
   const drawn = windows.filter((w) => w.frames > 0);
   const calls = Math.max(...windows.map((w) => Number(w.state.calls)));
@@ -362,7 +381,7 @@ try {
   assert.ok(calls > 0 && calls < MAX_CALLS && draws < MAX_CALLS, `a frame in a room of eight: ${calls} draws by the game's count, ${draws} by the host's`);
   const playing = path.join(shots, 'playing.png');
   xcrun('simctl', 'io', udid, 'screenshot', playing);
-  console.log(`In a room of ${MAX_PLAYERS} (simulator, software GL): at most ${calls} draws a frame by the game's count (${draws} by the host's, budget ${MAX_CALLS}); ` +
+  console.log(`In a room of ${MAX_FLIES} (simulator, software GL): at most ${calls} draws a frame by the game's count (${draws} by the host's, budget ${MAX_CALLS}); ` +
     `JavaScript ${jsMean.toFixed(2)} ms a frame on average over ${frames} frames in 10 s, ${jsP95} ms p95 at worst; at most ${restingAtWorst} of the others read as resting after a stall; in the room ${joined.length} of ${windows.length} windows; ` +
     `${windows[windows.length - 1].memMB} MB. Screenshot: ${playing}`);
 
