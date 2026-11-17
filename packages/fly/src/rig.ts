@@ -9,7 +9,7 @@
 // shifting now and then), is animation, not behaviour: it never moves the
 // fly, and it stops whenever the pose asks for anything else.
 
-import { copy, identity, multiply, rotateX, rotateY, rotateZ, scale, scaleX, setFrame, transformPoint, translate } from "./affine.ts";
+import { copy, identity, multiply, rotateX, rotateY, rotateZ, scale, setFrame, transformPoint, translate } from "./affine.ts";
 import {
   BODY_JOINTS, EYE, FOOT_CLEARANCE, HEAD, J, LEG_COUNT, LEG_SEGMENTS, LEGS, PIVOT, PROBOSCIS, THORAX,
   WING_COPIES, WING_JOINTS, legPair, legSide,
@@ -92,6 +92,8 @@ export class FlyRig {
   private dip = 0;
   private dipVelocity = 0;
   private speed = 0;
+  private travelSpeed = 0;
+  private travelTurn = 0;
   private turn = 0;
   private sing = 0;
   /** The singing wing: 1 the left, -1 the right; it fades out on the side it sang with. */
@@ -147,13 +149,17 @@ export class FlyRig {
 
     const speed = Math.max(-20, Math.min(20, finite(pose.speed)));
     const turn = Math.max(-30, Math.min(30, finite(pose.turn)));
+    // Ground compensation follows measured body travel exactly. Only the
+    // posture is filtered; delaying foot transport makes planted feet slide.
+    this.travelSpeed = speed;
+    this.travelTurn = turn;
     this.speed += (speed - this.speed) * lag(dt, 0.08);
     this.turn += (turn - this.turn) * lag(dt, 0.08);
     this.crouch += (clamp01(pose.crouch) - this.crouch) * lag(dt, 0.07);
     // It settles into sleep over a few seconds and is up at once when it wakes.
     const sleep = clamp01(pose.sleep ?? 0);
     this.sleep += (sleep - this.sleep) * lag(dt, sleep > this.sleep ? 2.5 : 0.15);
-    this.feed += (clamp01(pose.feed) - this.feed) * lag(dt, 0.16);
+    this.feed += (smooth(0.05, 0.3, clamp01(pose.feed)) - this.feed) * lag(dt, 0.16);
     this.groom += (clamp01(pose.groom) - this.groom) * lag(dt, 0.12);
     this.beat += (clamp01(pose.wings) - this.beat) * lag(dt, 0.05);
     const airborne = pose.airborne === true;
@@ -221,7 +227,7 @@ export class FlyRig {
     const sway = walking * 0.025 * Math.sin(TAU * gaitPhase);
     const breathe = Math.sin(TAU * 0.45 * t);
     // Asleep it sits lower, body nearer the ground, head a little bowed: drawn to read as rest, its stillness is what is real.
-    const height = PIVOT.thorax[1] - 0.075 * this.crouch - 0.04 * this.sleep - 0.032 * this.feed - 0.012 * groomOn + bob + this.dip + 0.002 * breathe * (1 - walking);
+    const height = PIVOT.thorax[1] - 0.075 * this.crouch - 0.04 * this.sleep - 0.075 * this.feed - 0.012 * groomOn + bob + this.dip + 0.002 * breathe * (1 - walking);
     const noseDown = 0.07 * this.feed - 0.045 * groomOn + 0.03 * this.crouch + 0.02 * this.sleep;
     const jt = this.joints;
     identity(jt, 0);
@@ -275,7 +281,7 @@ export class FlyRig {
     const s = this.scratch;
     let x = 0, y = 0, z = 0;
     switch (name) {
-      case "mouth": x = PROBOSCIS.labellum * 0.75; break;
+      case "mouth": x = PROBOSCIS.labellum * 0.75; y = PROBOSCIS.padDepth * smooth(0.4, 0.85, this.feed); break;
       case "head": x = HEAD.centre[0]; y = HEAD.centre[1] - PIVOT.neck[1]; z = HEAD.centre[2] - PIVOT.neck[2]; break;
       case "leftEye":
       case "rightEye": {
@@ -351,37 +357,47 @@ export class FlyRig {
     const e = smooth(0.2, 0.7, this.feed);
     const l = smooth(0.4, 0.85, this.feed);
     const pad = smooth(0.65, 0.95, this.feed);
-    const pump = pad * 0.5 * (1 + Math.sin(TAU * 1.7 * t));
 
-    // The rostrum hinges down and forward out of the head.
+    const forwardLength = Math.hypot(jt[head + 2], jt[head + 10]) || 1;
+    const forwardX = jt[head + 2] / forwardLength, forwardZ = jt[head + 10] / forwardLength;
     transformPoint(jt, head, 0, PIVOT.proboscis[1] - PIVOT.neck[1], PIVOT.proboscis[2] - PIVOT.neck[2], s, 0);
-    this.sagittal(head, -1.25 + 1.75 * r, s, 9);
+    const targetX = s[0] + forwardX * 0.06, targetZ = s[2] + forwardZ * 0.06;
+    this.sagittal(head, -1.25, s, 9);
+    if (r > 0) {
+      // A fixed-length two-link reach keeps the pads seated as the head
+      // breathes. The cuticular stem must not telescope to imitate pumping.
+      const drop = s[1] - PROBOSCIS.padDepth;
+      const distance = Math.hypot(drop, 0.06), lr = PROBOSCIS.rostrum, lh = PROBOSCIS.haustellum;
+      const cosine = Math.max(-1, Math.min(1, (lr * lr + distance * distance - lh * lh) / (2 * lr * distance)));
+      const angle = Math.atan2(0.06, drop) - Math.acos(cosine);
+      const horizontal = Math.sin(angle);
+      s[9] += (forwardX * horizontal - s[9]) * r;
+      s[10] += (-Math.cos(angle) - s[10]) * r;
+      s[11] += (forwardZ * horizontal - s[11]) * r;
+      const length = Math.hypot(s[9], s[10], s[11]) || 1;
+      s[9] /= length; s[10] /= length; s[11] /= length;
+    }
     this.alongLateral(J.rostrum * 12, head, s[0], s[1], s[2], s[9], s[10], s[11]);
     transformPoint(jt, J.rostrum * 12, PROBOSCIS.rostrum, 0, 0, s, 3);
-
-    // The haustellum folds forward at rest; feeding, it reaches for the surface
-    // just ahead of the mouth, telescoping as far as it needs to.
-    const lift = PROBOSCIS.labellum * 0.55;
-    const dy = lift - s[4], dz = 0.035, reach = Math.sqrt(dy * dy + dz * dz);
+    const dx = targetX - s[3], dy = PROBOSCIS.padDepth - s[4], dz = targetZ - s[5];
+    const reach = Math.hypot(dx, dy, dz) || 1;
     this.sagittal(head, 1.4, s, 12);
-    let ax = s[12] * (1 - e), ay = s[13] + (dy / reach - s[13]) * e, az = s[14] + (dz / reach - s[14]) * e;
-    const al = Math.sqrt(ax * ax + ay * ay + az * az);
+    let ax = s[12] + (dx / reach - s[12]) * e, ay = s[13] + (dy / reach - s[13]) * e, az = s[14] + (dz / reach - s[14]) * e;
+    const al = Math.hypot(ax, ay, az) || 1;
     ax /= al; ay /= al; az /= al;
     const length = PROBOSCIS.haustellum;
-    const wanted = Math.min(length * 1.5, Math.max(length * 0.6, reach));
     this.alongLateral(J.haustellum * 12, head, s[3], s[4], s[5], ax, ay, az);
-    scaleX(jt, J.haustellum * 12, (1 + (wanted / length - 1) * e) * (1 - 0.06 * pump));
     transformPoint(jt, J.haustellum * 12, length, 0, 0, s, 6);
 
     // The labellum: folded up against the face at rest, its pad pressed flat to the surface when feeding.
     this.sagittal(head, 2.4, s, 15);
-    let lx = s[15] * (1 - l), ly = s[16] + (-1 - s[16]) * l, lz = s[17] + (0.08 - s[17]) * l;
+    let lx = s[15] * (1 - l) + forwardX * l, ly = s[16] * (1 - l), lz = s[17] * (1 - l) + forwardZ * l;
     const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
     lx /= ll; ly /= ll; lz /= ll;
     const lab = J.labellum * 12;
     this.alongLateral(lab, head, s[6], s[7], s[8], lx, ly, lz);
     // Its two lobes spread open on the food and work in quick pulses.
-    const spread = 1 + pad * (0.3 + 0.12 * Math.sin(TAU * 5.3 * t));
+    const spread = 1 + pad * (0.3 + 0.025 * Math.sin(TAU * 5.3 * t));
     jt[lab + 2] *= spread; jt[lab + 6] *= spread; jt[lab + 10] *= spread;
   }
 
@@ -414,8 +430,8 @@ export class FlyRig {
       this.home[i] = this.restHome[i] * inward + this.fidget[i];
       this.home[i + 2] = this.restHome[i + 2] + this.fidget[i + 2] + (pair === 1 ? 0.05 * groomOn : 0) + (pair === 2 ? 0.03 * groomOn : 0);
     }
-    if (this.flight > 0.5 || this.tuck > 0.5) this.gait.reset(this.home);
-    else this.gait.update(this.speed * ground, this.turn * ground, dt, this.home);
+    if (this.airborne && (this.flight > 0.5 || this.tuck > 0.5)) this.gait.reset(this.home);
+    else this.gait.update(this.travelSpeed, this.travelTurn, dt, this.home);
 
     const thorax = 0;
     for (let leg = 0; leg < LEG_COUNT; leg++) {

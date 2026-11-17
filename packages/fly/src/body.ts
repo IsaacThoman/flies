@@ -392,7 +392,7 @@ function proboscis(b: MeshBuilder) {
       point: (u, v, out) => {
         const [sx, sy, sz] = sphere(u, v);
         const l = PROBOSCIS.labellum / 2;
-        out[0] = l + l * sz; out[1] = 0.015 * sy; out[2] = side * 0.013 + 0.015 * sx;
+        out[0] = l + l * sz; out[1] = PROBOSCIS.padDepth * sy; out[2] = side * 0.013 + 0.015 * sx;
       },
     });
   }

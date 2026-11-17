@@ -74,3 +74,30 @@ the physical surface, outside this model/animation experiment's allowed scope.
 It is retained as a limitation, not corrected through animation or collisions.
 The game-scale output is a 640×480 buffer displayed at 16:9; subsequent evidence
 will include its unscaled buffer as well as the displayed view.
+
+### Round 2
+
+Key: R6 = candidate from round 1, rebased on the shared dev updates;
+L3 = `be8ab2f6`. Orders: R6,L3 for reviewers 1–3; L3,R6 for the tradeoff
+reviewer (independent coin flips). Every reviewer ranked L3 first.
+
+| Reviewer | R6 scores | L3 scores | R6 mean | L3 mean | Ranking |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 8,4,7,5.5,6,5.5,6,7 | 8,7.5,7,6.5,6.5,7,6,8 | 6.125 | 7.063 | L3 > R6 |
+| 2 | 8,4,6.5,6,6.5,5,5,7 | 8,7.5,6.5,7,7,6.5,6,8 | 6.000 | 7.063 | L3 > R6 |
+| 3 | 8,4,6.5,5.5,6.5,5.5,5.5,7 | 8,7.5,6.5,7,7,7,5.5,8 | 6.063 | 7.063 | L3 > R6 |
+| Tradeoff assessment | 8,4,6.5,6,7,5.5,5.5,7 | 8,8,6.5,7,7,7.5,6,8 | 6.188 | 7.250 | L3 > R6 |
+
+Primary-review mean: **6.063 → 7.063**. Accepted: sub-frame contact-event
+integration and timestamps, staged mouthparts, landing load independent of
+remaining tuck, and reuse of imperceptible wing-copy frames. Paired interpreter
+CPU medians: 163.124 → 143.305 µs (12.1% lower). No model proposal rejected.
+The terrain-aware landing query was replaced with the body's remembered support
+plane to honour the body-state-only animation constraint. The tradeoff reviewer
+correctly identified late/early extension at different terrain heights; it is a
+remaining limitation, rather than additional sensing or a physical landing reflex.
+
+All reviewers found remaining weak labellar contact and small-scale wing/action
+readability. Two identified an 80 ms ground-motion filter causing foot sliding
+through acceleration and changing turns. A targeted transport test measured
+0.264 body lengths of drift, motivating the next candidate.

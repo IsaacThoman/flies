@@ -24,7 +24,7 @@ measurements are in `src/anatomy.ts`; the shapes and colours in `src/body.ts`.
 | Compound eyes | Ellipsoid caps sunk into the sides of the head, deep brick red. The fragment shader draws a hexagonal lattice of about 900 facets, each a small dome that catches the light, and the **pseudopupil**: the dark spot where you look straight down the ommatidia, which follows the viewer across the eye. Both fade out by their screen-space derivatives once facets are smaller than a pixel, so the eye never shimmers. |
 | Ocelli | Three glossy amber domes in a triangle on a dark ocellar triangle on the vertex. |
 | Antennae | Scape, pedicel and the oval third segment hanging in front of the face, and the **arista**: a fine plumose bristle from the top of the third segment with branches above and below. Each antenna is a joint that twitches. |
-| Proboscis | Rostrum, haustellum and the two-lobed labellum with its food channels, each a joint. Folded up under the head at rest; extended it reaches the surface just in front of the head (the haustellum telescopes as far as it needs to), the lobes spread flat on the food and pulse. |
+| Proboscis | Rostrum, haustellum and the two-lobed labellum with its food channels, each a joint. Folded up under the head at rest; extended it reaches the surface just in front of the head through a fixed-length two-link reach, and the lobes spread flat on the food. |
 | Thorax | A deformed ellipsoid: broad blunt shoulders, the scutum arching up behind the neck, flatter sternum. Tan, darker above, paler pleura, faint dorsocentral stripes. The **microchaetae** (the rows of tiny hairs) are a procedural pattern that fades out when small; the **macrochaetae** are real geometry: humerals, notopleurals, supra- and post-alars, dorsocentrals, katepisternals. |
 | Scutellum | A flattened lobe over the base of the abdomen with its basal bristles and the long crossing apical scutellars. |
 | Abdomen | Six visible segments (a male), each tergite ridged where it overlaps the next and dark along its back edge, A5 and A6 dark all over; pale pleural membrane and sternites underneath. Two joints, so it breathes, lifts in flight and bows when feeding. |
@@ -115,8 +115,9 @@ jumpy, gives continuous motion.
 - **Feeding**: the body lowers and the head bows. Rostrum lift, haustellum
   extension, labellar extension and spreading use overlapping windows, in
   that order (Schwarz et al. 2017), reversing on withdrawal. It unfolds to
-  the surface and its labellum spreads and pulses; the mouth anchor is on
-  the surface.
+  the surface using a fixed-length two-link reach. Flat labellar pads remain
+  seated as the head breathes; internal intake pumping does not stretch the
+  stem. The mouth anchor sits on the pads' ventral surface.
 - **Wings**: opening sweeps them out from the folded position; beating
   spreads eight copies of each wing across the stroke (cosine-spaced, so
   denser at the stroke reversals where a real wing lingers) with a
@@ -206,7 +207,7 @@ and show only some meshes on a plain background (`only`, `background`).
 
 Right, or close: the three tagmata and their proportions, the big red eyes
 with facets and a pseudopupil, three ocelli, antennae with a plumose arista,
-the proboscis and its extension, coxae arranged as in the fly, five-part legs
+the proboscis and its staged fixed-length extension, coxae arranged as in the fly, five-part legs
 with claws and pulvilli, the wing outline and its vein pattern, folded flat
 one over the other, halteres, the main thoracic and head macrochaetae, the
 male's banded abdomen with a dark tip and his sex combs, the speed-dependent coordination with
@@ -238,7 +239,6 @@ groom path is a stylised sweep.
 - Seeds et al. (2014), [A suppression hierarchy among competing motor programs](https://doi.org/10.7554/eLife.02951).
 - van Breugel & Dickinson (2012), [The visual control of landing](https://doi.org/10.1242/jeb.066498).
 - Kopp (2011), [Drosophila sex combs as a model of evolutionary innovations](https://doi.org/10.1111/j.1525-142X.2011.00507.x).
-
 - Schwarz et al. (2017), [Motor control of Drosophila feeding behavior](https://doi.org/10.7554/eLife.19892).
 
 See `docs/fly-realism.md` for the experiment rubric, measurements and blind review log.

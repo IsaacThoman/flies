@@ -306,3 +306,52 @@ test("singing holds one wing out to its side, the other folded", () => {
   run(flying, pose({ sing: 1, airborne: true, wings: 1 }), 2);
   assert.ok(Math.abs(out(flying, 0) - out(flying, 1)) < 1e-6);
 });
+
+test("planted claws follow actual body travel through acceleration, braking and changing turns", () => {
+  const fly = createFly(), walker = new Walker(), dt = 1 / 60;
+  const anchors: ([number, number] | null)[] = Array(LEG_COUNT).fill(null);
+  const steps = new Uint32Array(LEG_COUNT);
+  let worst = 0;
+  for (let f = 0; f < 420; f++) {
+    const speed = f < 60 ? 0 : f < 150 ? (f - 60) / 15 : f < 180 ? 6 : f < 240 ? 6 - (f - 180) / 7.5 : -2;
+    const turn = f < 120 ? 0 : f < 210 ? (f - 120) / 45 : f < 270 ? 2 - (f - 210) / 15 : -2;
+    walker.advance(speed, turn, dt);
+    fly.update(pose({ speed, turn }), dt);
+    for (let leg = 0; leg < LEG_COUNT; leg++) {
+      if (fly.rig.gait.swinging[leg] || fly.rig.gait.steps[leg] !== steps[leg]) anchors[leg] = null;
+      steps[leg] = fly.rig.gait.steps[leg];
+      if (fly.rig.gait.swinging[leg]) continue;
+      const o = (J.leg + leg * LEG_SEGMENTS + 4) * 12, length = LEGS[legPair(leg)].tarsus, j = fly.rig.joints;
+      const claw = walker.toWorld(j[o] * length + j[o + 3], j[o + 8] * length + j[o + 11]);
+      if (anchors[leg]) worst = Math.max(worst, Math.hypot(claw[0] - anchors[leg]![0], claw[1] - anchors[leg]![1]));
+      else anchors[leg] = claw;
+    }
+  }
+  fly.dispose();
+  assert.ok(worst < 1e-6, `world-space planted-claw drift ${worst} body lengths`);
+});
+
+test("feeding seats both labellar pads through breathing without stretching the stem", () => {
+  const fly = createFly();
+  run(fly, pose({ feed: 1 }), 2);
+  const body = meshes(fly.object).find(m => m.name === "fly-body")!;
+  const joints = body.geometry.getAttribute("aJoint"), positions = body.geometry.getAttribute("position");
+  const mouth = new Float64Array(3);
+  let lowest = Infinity, highest = -Infinity;
+  for (let f = 0; f < 150; f++) {
+    fly.update(pose({ feed: 1 }), DT);
+    const matrix = fly.rig.joints, o = J.labellum * 12, stem = J.haustellum * 12;
+    const minY = [Infinity, Infinity];
+    for (let v = 0; v < positions.count; v++) {
+      if (Math.round(joints.getX(v)) !== J.labellum) continue;
+      const side = positions.getZ(v) >= 0 ? 0 : 1;
+      minY[side] = Math.min(minY[side], matrix[o + 4] * positions.getX(v) + matrix[o + 5] * positions.getY(v) + matrix[o + 6] * positions.getZ(v) + matrix[o + 7]);
+    }
+    for (const y of minY) { lowest = Math.min(lowest, y); highest = Math.max(highest, y); }
+    fly.rig.anchorLocal("mouth", mouth);
+    assert.ok(Math.abs(mouth[1]) < 1e-5, `mouth contact height ${mouth[1]}`);
+    assert.ok(Math.abs(Math.hypot(matrix[stem], matrix[stem + 4], matrix[stem + 8]) - 1) < 1e-5, "haustellum keeps its length");
+  }
+  fly.dispose();
+  assert.ok(lowest >= -0.0005 && highest < 0.002, `pad surface range ${lowest}..${highest}`);
+});

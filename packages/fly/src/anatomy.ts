@@ -29,7 +29,7 @@ export const ABDOMEN = { centre: [0, 0.295, -0.25] as Vec3, radii: [0.128, 0.11,
 /** Where each abdominal segment (A1 to A6) ends, as a fraction of the abdomen from front to tip. */
 export const ABDOMINAL_SEGMENTS = [0.12, 0.3, 0.47, 0.63, 0.8, 1];
 
-export const PROBOSCIS = { rostrum: 0.05, haustellum: 0.062, labellum: 0.04 };
+export const PROBOSCIS = { rostrum: 0.05, haustellum: 0.085, labellum: 0.04, padDepth: 0.015 };
 export const HALTERE = { stalk: 0.045, knob: 0.0125 };
 export const WING = { length: 0.8 };
 
