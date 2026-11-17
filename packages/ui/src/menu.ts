@@ -17,16 +17,20 @@ export type ActionItem = {
   label: string;
   disabled?: boolean;
   hint?: string;
-  /** A dot of colour at its left: what it is about, where words would be too many (a fly at a table, by its player's colour; a room's place). */
-  swatch?: string;
-  /** How many of how many, as pips at its right (the flies in a room), and a padlock, for what needs a password. */
+  /** A dot of colour at its left, or a few in a row: what it is about, where words would be too many (a player's flies at a table, by their colours; a room's place). */
+  swatch?: string | readonly string[];
+  /** How many of how many, as pips at its right (the flies in a room); a padlock, for what needs a password; a globe, for a room open to everyone. */
   count?: readonly [number, number];
   /** A cached counter for lists where the capacity must be explicit. */
   countLabel?: string;
   locked?: boolean;
+  everyone?: boolean;
 };
-/** A choice; `tabs` draws its options side by side, every one to be pressed, as the tabs across the top of a page. */
-export type ChoiceItem<V = unknown> = { kind: "choice"; id: string; label: string; options: readonly Option<V>[]; index: number; disabled?: boolean; hint?: string; tabs?: boolean };
+/**
+ * A choice; `tabs` draws its options side by side, every one to be pressed, as the tabs across the top of a page.
+ * `dots`: its value is a count, drawn as that many dots of these colours in turn (how many flies) in place of its label.
+ */
+export type ChoiceItem<V = unknown> = { kind: "choice"; id: string; label: string; options: readonly Option<V>[]; index: number; disabled?: boolean; hint?: string; tabs?: boolean; dots?: readonly string[] };
 export type SliderItem = { kind: "slider"; id: string; label: string; min: number; max: number; step: number; value: number; disabled?: boolean; hint?: string };
 /** Words to type: a name, a password (`secret`: shown masked), a code. Select starts typing into it; `placeholder` shows while it is empty. */
 export type FieldItem = { kind: "field"; id: string; label: string; value: string; placeholder?: string; secret?: boolean; disabled?: boolean; hint?: string; submit?: { label: string; disabled: boolean } };

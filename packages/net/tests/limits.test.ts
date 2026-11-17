@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { RESTAURANT, RESTAURANT_START, TABLE_TOPS, World, WORLDS, createPicnic } from "@fly/world";
-import { AIRBORNE, Leash, MAX_FLIGHT, MAX_PLAYERS, MAX_WALK, PASSWORD_MAX, ROOM_NAME_MAX, Rate, couldBe, createFlyState, isPassword, mayReturnTo, roomName, spawnSpot } from "../src/index.ts";
+import { AIRBORNE, COLOURS, Leash, MAX_FLIGHT, MAX_FLIES, MAX_OWN, MAX_WALK, PASSWORD_MAX, ROOM_NAME_MAX, Rate, couldBe, createFlyState, isPassword, mayReturnTo, roomName, spawnSpot } from "../src/index.ts";
 
 const world = createPicnic();
 const start = world.place.start;
@@ -73,7 +73,7 @@ test("coming back, a fly may be where it walked to meanwhile, but not across the
 test("every player's fly is set down on somewhere level near the place's start, apart from the others, in every place", () => {
   for (const [id, place] of Object.entries(WORLDS)) {
     const w = new World(place);
-    const spots = Array.from({ length: MAX_PLAYERS }, (_, i) => spawnSpot(w, i + 1));
+    const spots = Array.from({ length: MAX_FLIES }, (_, i) => spawnSpot(w, i + 1));
     const height = w.heightAt(place.start.x, place.start.z, place.start.y);
     assert.deepEqual(spots[0], [place.start.x, place.start.z, place.start.yaw, height], id);
     for (const [x, z, , y] of spots) {
@@ -89,7 +89,7 @@ test("every player's fly is set down on somewhere level near the place's start, 
 
 test("in the restaurant the flies are set down on the window table, not on the ceiling over it or the floor under it", () => {
   const room = new World(RESTAURANT);
-  for (let id = 1; id <= MAX_PLAYERS; id++) assert.equal(spawnSpot(room, id)[3], TABLE_TOPS.round.top);
+  for (let id = 1; id <= MAX_FLIES; id++) assert.equal(spawnSpot(room, id)[3], TABLE_TOPS.round.top);
 });
 
 test("in a room the leash knows the table from the floor under it: a fly may stand on either, never inside the table", () => {
@@ -154,6 +154,12 @@ test("a password is anything typed, up to its length, and nothing invisible", ()
   assert.ok(isPassword("пароль ✓"));
   assert.ok(isPassword("x".repeat(PASSWORD_MAX)));
   for (const bad of ["", "x".repeat(PASSWORD_MAX + 1), "a\u0000", "line\nbreak", "zero​width", 7, undefined]) assert.ok(!isPassword(bad), String(bad));
+});
+
+test("a table holds eight flies with distinct colours and a device can bring at most four", () => {
+  assert.equal(MAX_FLIES, 8);
+  assert.equal(MAX_OWN, 4);
+  assert.equal(new Set(COLOURS.slice(0, MAX_FLIES)).size, MAX_FLIES);
 });
 
 test("a rate refills only at its stated pace and never banks more than a burst", () => {

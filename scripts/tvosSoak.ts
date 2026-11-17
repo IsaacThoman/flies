@@ -6,7 +6,7 @@
 // default) and walk round the TV's fly for as long as the soak lasts, while the TV plays, throws
 // the ball among them and watches them as the wallpaper (docs/apple-tv.md, "Eight flies on a TV").
 import { spawnSync } from "node:child_process";
-import { MAX_PLAYERS, tableCode } from "@fly/net";
+import { MAX_FLIES, tableCode } from "@fly/net";
 import { WEATHERS } from "@fly/world";
 import { PLACES } from "../apps/web/src/places/catalog.ts";
 import { TIMES } from "../apps/web/src/scene/light.ts";
@@ -183,7 +183,7 @@ async function tableSoak(device: string, minutes: number, rooms: string) {
   const start = { place: "picnic", light: "noon", weather: "clear", zone: "UTC", offset: 0, name: "Soak", listed: false };
   const fakes = new Set<number>();
   const flies: FakeFly[] = [];
-  for (let k = 0; k < MAX_PLAYERS - 1; k++) flies.push(await fakeFly(rooms, code, k, fakes, k === 0 ? start : undefined));
+  for (let k = 0; k < MAX_FLIES - 1; k++) flies.push(await fakeFly(rooms, code, k, fakes, k === 0 ? start : undefined));
   console.log(`${flies.length} fake flies at table ${code} in ${rooms}`);
   const config = tableSoakConfig(minutes, code, rooms);
   const result = spawnSync(process.execPath, ["scripts/tvos.ts", "run", "--device", device, "--detached", "--config", JSON.stringify(config)], { stdio: "inherit", cwd: new URL("..", import.meta.url) });

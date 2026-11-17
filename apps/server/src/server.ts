@@ -27,7 +27,7 @@ import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { WebSocketServer } from "ws";
 import type { WebSocket } from "ws";
-import { CLOSE, PROTOCOL, ROOMS_PATH, ROOM_LIMITS, Rate, SEND_EVERY, isPassword, isTableCode, roomName } from "@fly/net";
+import { CLOSE, PROTOCOL, ROOMS_PATH, ROOM_LIMITS, Rate, SEND_EVERY, everyoneIndex, isPassword, isTableCode, roomName } from "@fly/net";
 import type { ClientMessage, Refusal, ServerMessage, TableStart } from "@fly/net";
 import { lock, opens } from "./lock.ts";
 import type { Lock } from "./lock.ts";
@@ -312,7 +312,8 @@ export async function startServer(options: ServerOptions): Promise<RoomServer> {
       const key = hashKey(hello.key);
       const known = tables.get(hello.table);
       let made: Lock | null = null;
-      if (!known && hello.start) {
+      // The rooms open to everyone are the server's: nobody starts one (tables.open seats the device wherever there is room), and none is locked.
+      if (!known && hello.start && everyoneIndex(hello.table) < 0) {
         if (!from.starts.take(Date.now())) return refuse("busy");
         if (hello.password) {
           made = await hashed(() => lock(hello.password!));

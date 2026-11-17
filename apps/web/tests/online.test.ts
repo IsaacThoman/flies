@@ -3,14 +3,21 @@
 
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
+import type { TestContext } from "node:test";
+import * as THREE from "three";
 import type { TableSocket, TableSocketStatus } from "@fly/contracts";
-import { CLOSE, PROTOCOL, TABLETOP_SCALE, TABLE_LIGHTS, TABLE_WEATHERS, bitesEpoch, createFlyState, decodeBites, readState } from "@fly/net";
+import { CLOSE, EVERYONE, PROTOCOL, TABLETOP_SCALE, TABLE_LIGHTS, TABLE_WEATHERS, bitesEpoch, createFlyState, decodeBites, everyoneCode, readState } from "@fly/net";
 import type { ClientMessage, ServerMessage } from "@fly/net";
-import { WORLDS } from "@fly/world";
+import { World, WORLDS } from "@fly/world";
+import type { Pantry } from "@fly/world";
 import { TableLine } from "../src/online/connection.ts";
 import { APP_ROOMS, APP_SITE, inApp, invitedTo, inviteLink, roomsUrl } from "../src/online/invite.ts";
+import { Online } from "../src/online/online.ts";
+import { OtherFlies } from "../src/online/others.ts";
+import type { TableHost } from "../src/online/online.ts";
 import { PLACES } from "../src/places/catalog.ts";
-import { TOOLS } from "../src/tools/hands.ts";
+import { Hands, TOOLS } from "../src/tools/hands.ts";
+import { blankCanvas } from "./canvas.ts";
 
 beforeEach(() => {
   mock.method(performance, "now", () => 1000);
@@ -50,7 +57,7 @@ class FakeSocket implements TableSocket {
   }
 }
 
-const welcome = (now: number): ServerMessage => ({ type: "welcome", v: PROTOCOL, id: 2, colour: "#2fb8ff", starter: 1, seed: 1, now, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0], room: { name: "Flies", listed: false, locked: false } });
+const welcome = (now: number): Extract<ServerMessage, { type: "welcome" }> => ({ type: "welcome", v: PROTOCOL, id: 2, colour: "#2fb8ff", flies: [{ id: 2, colour: "#2fb8ff", at: [0, 0, 0] }], starter: 1, seed: 1, now, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0], room: { name: "Flies", listed: false, locked: false } });
 
 function line() {
   const sockets: FakeSocket[] = [];
@@ -59,9 +66,122 @@ function line() {
     const s = new FakeSocket();
     sockets.push(s);
     return s;
-  }, "ws://test/rooms", () => ({ type: "hello", v: PROTOCOL, table: "abcdefghjk", key: "0123456789abcdef", at }));
+  }, "ws://test/rooms", () => ({ type: "hello", v: PROTOCOL, table: "abcdefghjk", key: "0123456789abcdef", at: at && [at] }));
   return { line: l, sockets, setAt: (spot: [number, number, number]) => (at = spot) };
 }
+
+function atTable(t: TestContext, code = EVERYONE) {
+  // The stand-ins need a shadow texture, but no renderer or browser is involved.
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "document");
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { createElement: () => ({ getContext: () => blankCanvas() }) } });
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, "document", previous);
+    else Reflect.deleteProperty(globalThis, "document");
+  });
+  const world = new World(WORLDS.picnic);
+  const hands = new Hands(world, { light: { kind: "golden" }, weather: { kind: "mist" } });
+  const shares: Pantry[] = [];
+  const worldChanges: boolean[] = [];
+  const scene = new THREE.Scene();
+  const host: TableHost = {
+    scene,
+    company: { list: [] } as unknown as TableHost["company"],
+    others: new OtherFlies(scene, world),
+    flies: () => 1,
+    seat() {},
+    share: (pantry) => shares.push(pantry),
+    life: {
+      world,
+      body: { position: { x: 0, y: 0, z: 0 }, yaw: 0, place() {} },
+      setDown() {},
+      share() {},
+      crowd: { clear() {} },
+    } as unknown as TableHost["life"],
+    hands,
+    fly: { model: { mark() {} } } as unknown as TableHost["fly"],
+    bubbles: { table: null } as TableHost["bubbles"],
+    stage: {} as TableHost["stage"],
+    eyes: {} as TableHost["eyes"],
+    felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] },
+    here: () => "picnic",
+    moving: () => false,
+    moveTo() { assert.fail("the fixture is already in the welcome's place"); },
+    onWorld: (settle) => worldChanges.push(settle),
+  };
+  const sockets: FakeSocket[] = [];
+  const online = new Online(host, () => {
+    const socket = new FakeSocket();
+    sockets.push(socket);
+    return socket;
+  }, "ws://test/rooms", code, "0123456789abcdef", null);
+  t.after(() => { online.leave(); online.dispose(); });
+  sockets[0].status = "open";
+  online.line.update(0);
+  return { online, sockets, hands, shares, worldChanges };
+}
+
+test("a welcome into another everyone room keeps its assigned code for the next hello and shares the pantry only on the first welcome", (t) => {
+  const { online, sockets, shares } = atTable(t);
+  const assigned = everyoneCode(3);
+  assert.equal(online.code, EVERYONE);
+  assert.equal(online.everyone, true, "known from the code before a welcome");
+  assert.deepEqual(shares, [], "an unanswered hello leaves the fly eating its own food");
+  assert.equal((JSON.parse(sockets[0].sent[0]) as Extract<ClientMessage, { type: "hello" }>).table, EVERYONE);
+  const message = { ...welcome(5000), room: { name: "Everyone 4", listed: true, locked: false, code: assigned, everyone: true } };
+  sockets[0].say(message);
+  online.line.update(0);
+  assert.equal(online.joined, true);
+  assert.equal(online.code, assigned);
+  assert.equal(online.everyone, true);
+  assert.equal(online.shared.ownSky, true);
+  assert.deepEqual(shares, [online.pantry]);
+  sockets[0].drop(1006);
+  online.line.update(0);
+  online.line.hurry();
+  online.line.update(0);
+  assert.equal(sockets.length, 2);
+  sockets[1].status = "open";
+  online.line.update(0);
+  assert.equal((JSON.parse(sockets[1].sent[0]) as Extract<ClientMessage, { type: "hello" }>).table, assigned);
+  sockets[1].say(message);
+  online.line.update(0);
+  assert.equal(online.joined, true);
+  assert.deepEqual(shares, [online.pantry], "reconnecting keeps the shared pantry already in use");
+});
+
+test("everyone's welcome and later world messages preserve this device's light, weather and clock", (t) => {
+  const { online, sockets, hands, worldChanges } = atTable(t);
+  const variants = [...hands.variants];
+  assert.equal(online.hours(), null);
+  sockets[0].say({ ...welcome(5000), world: { light: "night", weather: "rain" }, room: { name: "Everyone", listed: true, locked: false, code: EVERYONE, everyone: true } });
+  online.line.update(0);
+  assert.equal(online.welcomed, true);
+  assert.equal(online.everyone, true);
+  assert.equal(online.hours(), null, "the device follows its own clock");
+  assert.equal(hands.timeOfDay, "golden");
+  assert.equal(hands.weather, "mist");
+  assert.deepEqual(hands.variants, variants);
+  assert.deepEqual(worldChanges, []);
+  sockets[0].say({ type: "world", light: "noon", weather: "clear", offset: 60 });
+  online.line.update(1);
+  assert.equal(online.hours(), null);
+  assert.deepEqual(hands.variants, variants);
+  assert.deepEqual(worldChanges, []);
+});
+
+test("an ordinary room still supplies its light, weather and clock", (t) => {
+  const { online, sockets, hands, worldChanges } = atTable(t, "abcdefghjk");
+  assert.equal(online.everyone, false);
+  sockets[0].say({ ...welcome(5000), world: { light: "night", weather: "rain" } });
+  online.line.update(0);
+  assert.equal(online.joined, true);
+  assert.equal(online.everyone, false);
+  assert.equal(online.shared.ownSky, false);
+  assert.ok(Number.isFinite(online.hours()));
+  assert.equal(hands.timeOfDay, "night");
+  assert.equal(hands.weather, "rain");
+  assert.deepEqual(worldChanges, [true]);
+});
 
 test("the line says hello when it opens and is at the table once welcomed", () => {
   const { line: l, sockets } = line();
@@ -93,7 +213,7 @@ test("a dropped line is opened again, later each time, and the hello says where 
   assert.equal(sockets.length, 2, "opened again");
   sockets[1].status = "open";
   l.update(0.016);
-  assert.deepEqual((JSON.parse(sockets[1].sent[0]) as Extract<ClientMessage, { type: "hello" }>).at, [12, -3, 1]);
+  assert.deepEqual((JSON.parse(sockets[1].sent[0]) as Extract<ClientMessage, { type: "hello" }>).at, [[12, -3, 1]]);
   // Failing again, it waits longer.
   sockets[1].drop(1006);
   l.update(0.016);
@@ -201,7 +321,7 @@ test("only a joined line sends tools and binary state; an empty bite report send
   fly.x = 12;
   const send = () => {
     l.send({ type: "world", light: "night" });
-    l.sendFly(TABLETOP_SCALE, fly);
+    l.sendFlies(TABLETOP_SCALE, [fly], 1);
     l.sendBites(42, [{ food: 7, amount: 0.25 }], 1, 7);
   };
   send();
@@ -220,7 +340,8 @@ test("only a joined line sends tools and binary state; an empty bite report send
   assert.equal(socket.binary.length, 2);
   const back = createFlyState();
   const view = (data: Uint8Array) => new DataView(data.buffer, data.byteOffset, data.byteLength);
-  assert.equal(readState(view(socket.binary[0]), 1, TABLETOP_SCALE, back), 33);
+  // After the batch's type, count and the fly's id.
+  assert.equal(readState(view(socket.binary[0]), 3, TABLETOP_SCALE, back), 35);
   assert.equal(back.x, 12);
   const bites: [number, number][] = [];
   assert.equal(decodeBites(view(socket.binary[1]), (id, amount) => bites.push([id, amount])), 42);

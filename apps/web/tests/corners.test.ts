@@ -216,7 +216,7 @@ test("whatever happens, at every shape, size and choice of stats, they never ove
 });
 
 test("at every shape, size and choice of stats, at every corner, they are inside the safe area, clear of each other and of the caption, the menu's button, the shelf, the label and the hints", () => {
-  const sample: StatsState = { activity: "resting", spikes: 0, active: 0, speed: 1, history: new Float32Array(HISTORY_SAMPLES), head: 0, day: freshDay("2026-11-16"), sensed: RESTING_SENSES, brain: null };
+  const sample: StatsState = { spikes: 0, active: 0, speed: 1, history: new Float32Array(HISTORY_SAMPLES), head: 0, day: freshDay("2026-11-16"), sensed: RESTING_SENSES, brain: null };
   for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) for (const reserveHints of [true, false]) {
     const hud = hudLayout(frame, reserveHints);
     const a = safeRect(frame);

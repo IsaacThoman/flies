@@ -1,6 +1,7 @@
-// One table shared by up to eight people's flies: who is at it, and what
-// everyone there must agree on. Each fly's brain and body run on its owner's
-// device, which is the authority on that fly; the table only keeps what it
+// One table shared by up to eight flies, from as many devices as bring them:
+// who is at it, and what everyone there must agree on. Each fly's brain and
+// body run on its owner's device, which is the authority on its flies (one
+// device may bring several); the table only keeps what it
 // hears within what a fly could do (@fly/net, limits.ts) and passes it on to
 // everyone else, about 20 times a second in one batch. What the table owns
 // is the rest of the world there: the place, the food and who ate how much,
@@ -8,19 +9,21 @@
 // started it, the seed and the clock every device blows the same bubbles
 // from, and when a visitor comes. It is a room too: it has a name, may be
 // listed for anyone browsing to find, and may be locked with a password
-// (lock.ts). No brains, no drawing and no sockets here (server.ts), so a
+// (lock.ts). Or it is one of the rooms open to everyone, which nobody starts:
+// the server's clock takes it from place to place, and each device keeps its
+// own light and weather there. No brains, no drawing and no sockets here (server.ts), so a
 // whole table can run in a test.
 
 import { BALL_RADIUS, Pace, VentilationClock, World, WORLDS, forecast, hourOfDay } from "@fly/world";
 import type { Happening } from "@fly/world";
 import {
-  MAX_FOUND, AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_PLAYERS, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
-  TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, encodeFlies, isTableCode, mayReturnTo, mix, readState,
-  roomName, roomTime, spawnSpot, stream, tableHours, toWire, wireScale,
+  MAX_FOUND, AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_FLIES, MAX_OWN, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
+  TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, decodeFlies, encodeFlies, everyoneIndex, everyoneName,
+  isTableCode, mayReturnTo, mix, roomName, roomTime, spawnSpot, stream, tableHours, toWire, wireScale,
 } from "@fly/net";
 import type {
-  BallWire, ClientMessage, FlyState, FoodWire, HappeningWire, PlayerWire, Refusal, RoomInfo, RoomWire, ServerMessage, Spot, TableStart, V3, WireScale,
-  WorldWire,
+  BallWire, ClientMessage, FlyState, FoodWire, HappeningWire, PlayerWire, Refusal, RoomInfo, RoomWire, SeatedFly, ServerMessage, Spot, TableStart, V3,
+  WireScale, WorldWire,
 } from "@fly/net";
 import { isLock } from "./lock.ts";
 import type { Lock } from "./lock.ts";
@@ -44,21 +47,39 @@ export type Going = Happening | "ventilation";
 /** Seconds each visitor keeps the table busy, roughly, so the table doesn't send another of it meanwhile (the ventilation keeps its own clock). */
 const BUSY: Readonly<Record<Going, number>> = { gust: 10, gull: 80, leaf: 40, butterfly: 100, ladybird: 120, juice: 0, boat: 240, ventilation: 0 };
 
+/** A room open to everyone stays in each place this long (ms), then moves on to the next, by the wall clock: every server agrees where it is. */
+export const EVERYONE_TURN = 20 * 60_000;
+const TURNS = Object.keys(WORLDS);
+
+/** Where the rooms open to everyone are at this moment (ms since 1970). */
+export const everyonePlace = (wall: number) => TURNS[Math.floor(wall / EVERYONE_TURN) % TURNS.length];
+
+/** The weather a room open to everyone has for its own goings-on: none of note, since each device there has its own sky. */
+const CALM = Object.freeze({ cloud: 0, mist: 0, rain: 0, wind: 0.4 });
+
 /** A device's line to the table. */
 export type Link = {
   send(data: string | Uint8Array): void;
   close(code: number, reason: string): void;
 };
 
-/** A place at the table, kept for whoever has the key that took it: its id and colour come back with them. */
-export type Seat = {
-  id: number;
-  colour: string;
-  /** The device's key, hashed: nothing that could be used to sit here oneself is kept. */
-  key: string;
-  /** Its fly as the table has it, and whether it has been set down. */
+/** One of a device's flies at the table: its id and colour, where the table has it, and whether a state came for it since the last batch. */
+export type SeatFly = {
+  readonly id: number;
+  readonly colour: string;
   readonly state: FlyState;
   readonly leash: Leash;
+  fresh: boolean;
+};
+
+/** A device's place at the table, kept for whoever has the key that took it: its flies' ids and colours come back with them. */
+export type Seat = {
+  /** The player's id: its first fly's, which it keeps while it is seated (it always has one). */
+  readonly id: number;
+  /** The device's key, hashed: nothing that could be used to sit here oneself is kept. */
+  key: string;
+  /** Its flies, the first first: as many as it asked for and there were seats for. */
+  readonly flies: SeatFly[];
   link: Link | null;
   /** Shown at the table (not yet gone after a long time away). */
   present: boolean;
@@ -68,8 +89,6 @@ export type Seat = {
   /** When the table last heard from it (room ms) and when it was last seen (wall clock, ms). */
   heardAt: number;
   lastSeen: number;
-  /** A state came since the last batch. */
-  fresh: boolean;
   /** The last of its bites counted. */
   ack: number;
   readonly rates: { [K in keyof typeof LIMITS]: Rate };
@@ -90,8 +109,11 @@ export type TableRecord = {
   offset: number;
   starter: string;
   removed: string[];
-  /** `gone`: it had left (said goodbye, or was away too long), so a restart doesn't bring its fly back. */
-  seats: { id: number; key: string; at: [x: number, y: number, z: number, yaw: number]; airborne: boolean; lastSeen: number; gone?: boolean }[];
+  /**
+   * `gone`: it had left (said goodbye, or was away too long), so a restart doesn't bring its flies back. A table kept
+   * before devices had several flies has its one fly's `at` and `airborne` beside the seat's id, and no `flies`.
+   */
+  seats: { id: number; key: string; flies?: KeptFly[]; at?: KeptFly["at"]; airborne?: boolean; lastSeen: number; gone?: boolean }[];
   foods: FoodWire[];
   foodExpires?: [id: number, at: number][];
   /** How much each player has eaten by the table's account, by id (older files have none). */
@@ -101,6 +123,9 @@ export type TableRecord = {
   listed?: boolean;
   lock?: Lock | null;
 };
+
+/** A fly as a table is kept. */
+type KeptFly = { id: number; at: [x: number, y: number, z: number, yaw: number]; airborne: boolean };
 
 export type TableOptions = {
   /** Room time, ms: the server's monotonic clock. */
@@ -115,11 +140,21 @@ const isV3 = (v: unknown): v is V3 => Array.isArray(v) && v.length === 3 && v.ev
 const isSpot = (v: unknown): v is Spot => Array.isArray(v) && (v.length === 3 || v.length === 4) && v.every((x) => typeof x === "number" && Number.isFinite(x) && Math.abs(x) < 10_000);
 const finite = (...xs: unknown[]) => xs.every((x) => typeof x === "number" && Number.isFinite(x));
 const text = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
+const flyId = (id: unknown, ids: Set<number>) => {
+  if (!Number.isInteger(id) || (id as number) < 1 || (id as number) > MAX_FLIES || ids.has(id as number)) return false;
+  ids.add(id as number);
+  return true;
+};
+const isKept = (at: unknown, airborne: unknown) => Array.isArray(at) && at.length === 4 && at.every((x) => finite(x) && Math.abs(x) < 10_000) && typeof airborne === "boolean";
+/** A seat as kept: its flies (the first under the seat's own id, every id the table's only one of it), or, kept before devices had several, its one fly. */
 const isSeatRecord = (v: unknown, ids: Set<number>) => {
   const r = v as TableRecord["seats"][number];
-  if (!r || typeof r !== "object" || !Number.isInteger(r.id) || r.id < 1 || r.id > MAX_PLAYERS || ids.has(r.id)) return false;
-  ids.add(r.id);
-  return text(r.key, 64) && Array.isArray(r.at) && r.at.length === 4 && r.at.every((x) => finite(x) && Math.abs(x) < 10_000) && typeof r.airborne === "boolean" && finite(r.lastSeen) && (r.gone === undefined || typeof r.gone === "boolean");
+  if (!r || typeof r !== "object" || !text(r.key, 64) || !finite(r.lastSeen) || (r.gone !== undefined && typeof r.gone !== "boolean")) return false;
+  if (r.flies === undefined) return flyId(r.id, ids) && isKept(r.at, r.airborne);
+  return (
+    Array.isArray(r.flies) && r.flies.length >= 1 && r.flies.length <= MAX_OWN && r.flies[0]?.id === r.id &&
+    r.flies.every((f) => !!f && typeof f === "object" && flyId(f.id, ids) && isKept(f.at, f.airborne))
+  );
 };
 const isFoodRecord = (v: unknown) =>
   Array.isArray(v) && (v.length === 9 || v.length === 10) && finite(v[0], v[3], v[4], v[5], v[6], v[7]) && text(v[1], 16) && text(v[2], 40) && (v[8] === 0 || v[8] === 1) && (v[9] === undefined || finite(v[9]));
@@ -135,12 +170,15 @@ export function isTableRecord(v: unknown): v is TableRecord {
   if (!r.world || !text(r.world.light, 16) || !text(r.world.weather, 16) || !text(r.zone, 64) || !text(r.starter, 64)) return false;
   if (!Array.isArray(r.removed) || r.removed.length > REMOVED_MAX || !r.removed.every((k) => text(k, 64))) return false;
   const ids = new Set<number>();
-  if (!Array.isArray(r.seats) || r.seats.length > MAX_PLAYERS || !r.seats.every((seat) => isSeatRecord(seat, ids))) return false;
+  if (!Array.isArray(r.seats) || r.seats.length > MAX_FLIES || !r.seats.every((seat) => isSeatRecord(seat, ids))) return false;
   if (r.foodExpires !== undefined && (!Array.isArray(r.foodExpires) || r.foodExpires.length > MAX_FOUND || !r.foodExpires.every((e) => Array.isArray(e) && e.length === 2 && finite(e[0]) && finite(e[1])))) return false;
   if (!Array.isArray(r.foods) || r.foods.length > WIRE_FOODS_MAX || !r.foods.every(isFoodRecord)) return false;
-  if (r.eaten !== undefined && (!Array.isArray(r.eaten) || r.eaten.length > MAX_PLAYERS || !r.eaten.every((e) => Array.isArray(e) && e.length === 2 && finite(e[0], e[1])))) return false;
+  if (r.eaten !== undefined && (!Array.isArray(r.eaten) || r.eaten.length > MAX_FLIES || !r.eaten.every((e) => Array.isArray(e) && e.length === 2 && finite(e[0], e[1])))) return false;
   return (r.name === undefined || roomName(r.name) === r.name) && (r.listed === undefined || typeof r.listed === "boolean") && (r.lock === undefined || r.lock === null || isLock(r.lock));
 }
+
+/** How many flies a device asks for (a hello's `flies`, a recount's `count`), as far as one may bring: 1 if it says nothing that is a number. */
+export const wantedFlies = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? Math.max(1, Math.min(MAX_OWN, Math.floor(n))) : 1);
 
 const clampTime = (t: unknown, now: number) => (typeof t === "number" && Number.isFinite(t) ? Math.max(now - 2000, Math.min(now + 1000, t)) : now);
 
@@ -175,6 +213,8 @@ export class Table {
   bubbles: TableBubbles | null = null;
   /** Keys that were removed from the table, hashed: they can't sit down again. */
   readonly removed: Set<string>;
+  /** One of the rooms open to everyone: nobody started it, and nobody chooses its place, light or weather. */
+  readonly everyone: boolean;
   /** What it is called; whether anyone browsing sees it; its password, hashed, if it has one. */
   readonly name: string;
   readonly listed: boolean;
@@ -188,7 +228,11 @@ export class Table {
   readonly #scratch = createFlyState();
   readonly #batch = new DataView(new ArrayBuffer(FLIES_MAX));
   readonly #fresh: FlyState[] = [];
+  /** Whose each fresh state is, for leaving a device's own out of what it is sent. */
+  readonly #freshOf: Seat[] = [];
   readonly #others: FlyState[] = [];
+  /** A device's flies' states, for its bites. */
+  readonly #where: FlyState[] = [];
   #pace: Pace;
   readonly #busy = new Map<Going, number>();
   #ventilation: VentilationClock | null = null;
@@ -200,36 +244,52 @@ export class Table {
 
   constructor(code: string, start: TableStart, starterKey: string, seed: number, options: TableOptions, record?: TableRecord, lock: Lock | null = record?.lock ?? null) {
     this.code = code;
-    this.name = roomName(start.name) ?? UNNAMED;
-    this.listed = start.listed === true;
-    this.lock = lock;
+    const everyone = everyoneIndex(code);
+    this.everyone = everyone >= 0;
+    this.name = this.everyone ? everyoneName(everyone) : (roomName(start.name) ?? UNNAMED);
+    this.listed = this.everyone || start.listed === true;
+    this.lock = this.everyone ? null : lock;
     this.#options = options;
     this.seed = seed >>> 0;
     this.created = record?.created ?? options.wall();
-    this.place = Object.hasOwn(WORLDS, start.place) ? start.place : "picnic";
-    this.epoch = record?.epoch ?? 0;
+    // A room open to everyone is wherever the clock has it, whatever was kept.
+    this.place = this.everyone ? everyonePlace(options.wall()) : Object.hasOwn(WORLDS, start.place) ? start.place : "picnic";
+    // Moved on while the server was down: what was kept is of another place, and a device still there must know it isn't.
+    const moved = !!record && record.place !== this.place;
+    this.epoch = ((record?.epoch ?? 0) + (moved ? 1 : 0)) & 0xff;
     this.world = new World(WORLDS[this.place]);
     this.scale = wireScale(this.world.place);
     this.food = new TableFood(this.world, this.world.place.patches, options.wall);
-    this.worldWire = { light: TABLE_LIGHTS.includes(start.light as never) ? start.light : "clock", weather: TABLE_WEATHERS.includes(start.weather as never) ? start.weather : "now" };
-    this.#starter = starterKey;
+    const light = !this.everyone && TABLE_LIGHTS.includes(start.light as never) ? start.light : "clock";
+    this.worldWire = { light, weather: !this.everyone && TABLE_WEATHERS.includes(start.weather as never) ? start.weather : "now" };
+    // Nobody's key is empty: nobody started a room open to everyone.
+    this.#starter = this.everyone ? "" : starterKey;
     this.#zone = typeof start.zone === "string" ? start.zone.slice(0, 64) : "";
     this.#offset = finite(start.offset) ? Math.max(-14 * 60, Math.min(14 * 60, Math.round(start.offset))) : 0;
     this.removed = new Set(record?.removed ?? []);
     this.#pace = this.#newPace();
     this.#lastTick = options.now();
     this.#settle();
-    if (record) {
+    if (record && !moved) {
       this.food.restore(record.foods, record.foodExpires);
       for (const [id, amount] of record.eaten ?? []) this.food.eaten.set(id, amount);
+    }
+    if (record) {
       const now = options.now();
       for (const r of record.seats) {
-        const seat = this.#seat(r.id, r.key);
-        const s = seat.state;
-        [s.x, s.y, s.z, s.yaw] = r.at;
-        s.flags = (r.airborne ? AIRBORNE : 0) | AWAY;
-        s.t = now;
-        s.epoch = this.epoch;
+        const kept = r.flies ?? (r.at ? [{ id: r.id, at: r.at, airborne: !!r.airborne }] : []);
+        if (kept.length === 0) continue;
+        const seat = this.#seat(kept[0].id, r.key);
+        for (const [i, k] of kept.entries()) {
+          const fly = i === 0 ? seat.flies[0] : this.#addFly(seat, k.id);
+          const s = fly.state;
+          // Moved on while the server was down: each fly is set down where the table sets that fly down in the place it is in now.
+          if (moved) this.#setDown(fly, spawnSpot(this.world, k.id));
+          else [s.x, s.y, s.z, s.yaw] = k.at;
+          s.flags = (k.airborne && !moved ? AIRBORNE : 0) | AWAY;
+          s.t = now;
+          s.epoch = this.epoch;
+        }
         seat.lastSeen = r.lastSeen;
         // Away since it was last seen: the ten minutes run on across a restart.
         seat.away = true;
@@ -259,7 +319,13 @@ export class Table {
       offset: this.#offset,
       starter: this.#starter,
       removed: [...this.removed],
-      seats: [...this.seats.values()].map((s) => ({ id: s.id, key: s.key, at: [s.state.x, s.state.y, s.state.z, s.state.yaw], airborne: !!(s.state.flags & AIRBORNE), lastSeen: s.lastSeen, gone: !s.present })),
+      seats: [...this.seats.values()].map((s) => ({
+        id: s.id,
+        key: s.key,
+        flies: s.flies.map((f) => ({ id: f.id, at: [f.state.x, f.state.y, f.state.z, f.state.yaw], airborne: !!(f.state.flags & AIRBORNE) })),
+        lastSeen: s.lastSeen,
+        gone: !s.present,
+      })),
       foods: this.food.foods.map(toWire),
       foodExpires: this.food.expiries(),
       eaten: [...this.food.eaten],
@@ -271,11 +337,13 @@ export class Table {
 
   /** What it says of itself: in its welcome, and in the list of rooms. */
   get info(): RoomInfo {
-    return { name: this.name, listed: this.listed, locked: !!this.lock };
+    return { name: this.name, listed: this.listed, locked: !!this.lock, code: this.code, everyone: this.everyone };
   }
 
+  /** A room open to everyone nobody is in keeps no beat, so not its place either: the list says where the clock has it, where whoever comes is sat (Tables.everyone). */
   room(): RoomWire {
-    return { code: this.code, name: this.name, place: this.place, flies: this.present, locked: !!this.lock };
+    const place = this.everyone ? everyonePlace(this.#options.wall()) : this.place;
+    return { code: this.code, name: this.name, place, flies: this.taken, locked: !!this.lock, ...(this.everyone ? { everyone: true } : {}) };
   }
 
   /** Whether a device with this key (hashed) may sit down without the password: it has sat here before, or started the table. */
@@ -303,8 +371,25 @@ export class Table {
 
   get present() {
     let n = 0;
-    for (const s of this.seats.values()) if (s.present) n++;
+    for (const s of this.seats.values()) if (s.present) n += s.flies.length;
     return n;
+  }
+
+  /**
+   * How many seats a newcomer can't have: every fly shown, every fly of a
+   * device still on the line, and the one place a starter who has gone keeps.
+   * The rest are free, or theirs who have gone (`#freeIds` gives those up).
+   */
+  get taken() {
+    let n = 0;
+    for (const s of this.seats.values()) n += s.present || s.link ? s.flies.length : s.key === this.#starter ? 1 : 0;
+    return n;
+  }
+
+  /** The seat whose fly this is. */
+  seatOf(fly: number): Seat | null {
+    for (const s of this.seats.values()) for (const f of s.flies) if (f.id === fly) return s;
+    return null;
   }
 
   /** The seat whose key started the table. */
@@ -332,29 +417,105 @@ export class Table {
     this.bubbles = this.place === "picnic" ? new TableBubbles(mix(this.seed, this.epoch), this.world, TABLE_BUBBLES, this.now / 1000) : null;
   }
 
+  /** A seat for a device whose first fly is `id`. */
   #seat(id: number, key: string): Seat {
     const seat: Seat = {
       id,
-      colour: COLOURS[(id - 1) % COLOURS.length],
       key,
-      state: createFlyState(),
-      leash: new Leash(),
+      flies: [],
       link: null,
       present: true,
       away: false,
       awaySince: 0,
       heardAt: this.now,
       lastSeen: this.#options.wall(),
-      fresh: false,
       ack: 0,
-      rates: { throws: rate("throws"), drops: rate("drops"), found: rate("found"), pops: rate("pops"), changes: rate("changes"), messages: rate("messages") },
+      rates: { throws: rate("throws"), drops: rate("drops"), found: rate("found"), pops: rate("pops"), changes: rate("changes"), recounts: rate("recounts"), messages: rate("messages") },
       shortened: 0,
       dropped: 0,
     };
-    seat.state.id = id;
-    seat.state.epoch = this.epoch;
+    this.#addFly(seat, id);
     this.seats.set(id, seat);
     return seat;
+  }
+
+  /** Another fly for a seat, under `id`, in that id's colour, where the table first sets a fly with that id down. */
+  #addFly(seat: Seat, id: number): SeatFly {
+    const fly: SeatFly = { id, colour: COLOURS[(id - 1) % COLOURS.length], state: createFlyState(), leash: new Leash(), fresh: false };
+    fly.state.id = id;
+    this.#setDown(fly, spawnSpot(this.world, id));
+    seat.flies.push(fly);
+    return fly;
+  }
+
+  /** Puts a fly at a spot (on the surface at or below its height), as it is now; returns the spot as it stands. */
+  #setDown(fly: SeatFly, at: Spot): Spot {
+    const s = fly.state;
+    s.x = at[0];
+    s.z = at[1];
+    s.yaw = at[2];
+    s.y = this.world.heightAt(s.x, s.z, at[3]);
+    s.flags &= ~AIRBORNE;
+    s.t = this.now;
+    s.epoch = this.epoch;
+    fly.leash.reset();
+    fly.fresh = true;
+    return [s.x, s.z, s.yaw, s.y];
+  }
+
+  /**
+   * Up to `n` fly ids no seat has, lowest first, for `seat` (or a newcomer, if
+   * null). If there aren't enough, the seats of whoever has gone (not `seat`
+   * itself) are given up for them, whole, the longest gone first; then, if
+   * the starter has gone, all their seats but their first fly's, so the
+   * table keeps their place (and its colour) for when they come back.
+   */
+  #freeIds(n: number, seat: Seat | null): number[] {
+    const free = () => {
+      const ids: number[] = [];
+      for (let id = 1; id <= MAX_FLIES && ids.length < n; id++) if (!this.seatOf(id)) ids.push(id);
+      return ids;
+    };
+    let ids = free();
+    while (ids.length < n) {
+      let oldest: Seat | null = null;
+      for (const s of this.seats.values()) if (s !== seat && !s.present && !s.link && s.key !== this.#starter && (!oldest || s.lastSeen < oldest.lastSeen)) oldest = s;
+      if (oldest) this.seats.delete(oldest.id);
+      else {
+        const starter = this.starter;
+        if (!starter || starter === seat || starter.present || starter.link || starter.flies.length === 1) break;
+        starter.flies.length = 1;
+      }
+      ids = free();
+    }
+    return ids;
+  }
+
+  /**
+   * Gives a seat `wanted` flies, as many as there are seats for: those past it
+   * leave (the last first), and new ones are set down where the table finds
+   * room for them. Everyone else is told, if its flies are shown.
+   */
+  #recount(seat: Seat, wanted: number) {
+    const shown = seat.present;
+    while (seat.flies.length > Math.max(1, wanted)) {
+      const fly = seat.flies.pop()!;
+      if (shown) this.#broadcast({ type: "left", id: fly.id }, seat);
+    }
+    if (seat.flies.length >= wanted) return;
+    for (const id of this.#freeIds(wanted - seat.flies.length, seat)) {
+      const fly = this.#addFly(seat, id);
+      if (shown) this.#broadcast({ type: "joined", ...this.#player(seat, fly) }, seat);
+    }
+  }
+
+  /** How many flies a device asks for, as far as one may bring. */
+  #wanted(n: unknown) {
+    return wantedFlies(n);
+  }
+
+  #seated(seat: Seat): SeatedFly[] {
+    return seat.flies.map((f) => ({ id: f.id, colour: f.colour, at: [f.state.x, f.state.z, f.state.yaw, f.state.y] }));
   }
 
   /**
@@ -370,57 +531,45 @@ export class Table {
     const wall = this.#options.wall();
     let seat: Seat | null = null;
     for (const s of this.seats.values()) if (s.key === key) seat = s;
-    let at: Spot;
+    const wanted = this.#wanted(message.flies);
     const returning = !!seat;
     if (seat) {
-      // Back: on this or another device with the same key. The fly that was here stays here.
+      // Back: on this or another device with the same key. The flies that were here stay here.
       if (seat.link) seat.link.close(CLOSE.elsewhere, "elsewhere");
-      const s = seat.state;
       const away = (wall - seat.lastSeen) / 1000;
-      // Where it is counts only in the place the table is in: a device away while the table moved has its fly somewhere else.
-      const here = message.epoch === this.epoch && isSpot(message.at);
-      at = here && mayReturnTo(this.world, message.at!, s.x, s.y, s.z, away) ? message.at! : [s.x, s.z, s.yaw, s.y];
-    } else {
-      let id = 1;
-      while (this.seats.has(id) && id <= MAX_PLAYERS) id++;
-      if (id > MAX_PLAYERS) {
-        // Full: the seat of whoever has been gone longest is given up, if anyone has.
-        let oldest: Seat | null = null;
-        // Never the starter's: theirs is the table.
-        for (const s of this.seats.values()) if (!s.present && !s.link && s.key !== this.#starter && (!oldest || s.lastSeen < oldest.lastSeen)) oldest = s;
-        if (!oldest) return "full";
-        this.seats.delete(oldest.id);
-        id = oldest.id;
+      // Where they are counts only in the place the table is in: a device away while the table moved has its flies somewhere else.
+      const at = message.epoch === this.epoch && Array.isArray(message.at) ? message.at : [];
+      for (const [i, fly] of seat.flies.entries()) {
+        const s = fly.state;
+        const there = at[i];
+        this.#setDown(fly, isSpot(there) && mayReturnTo(this.world, there, s.x, s.y, s.z, away) ? there : [s.x, s.z, s.yaw, s.y]);
       }
-      seat = this.#seat(id, key);
-      at = spawnSpot(this.world, id);
+    } else {
+      const ids = this.#freeIds(wanted, null);
+      if (ids.length === 0) return "full";
+      seat = this.#seat(ids[0], key);
+      for (const id of ids.slice(1)) this.#addFly(seat, id);
     }
-    const s = seat.state;
-    s.x = at[0];
-    s.z = at[1];
-    s.yaw = at[2];
-    s.y = this.world.heightAt(s.x, s.z, at[3]);
-    at = [s.x, s.z, s.yaw, s.y];
-    s.flags = 0;
-    s.t = now;
-    s.epoch = this.epoch;
-    seat.leash.reset();
+    const shown = returning && seat.present;
+    // Coming back with another count: as many as it asks for now, as many as there are seats for.
+    if (returning) this.#recount(seat, wanted);
+    for (const fly of seat.flies) fly.state.flags = 0;
     seat.link = link;
     seat.heardAt = now;
     seat.lastSeen = wall;
-    seat.fresh = true;
     seat.ack = 0;
     this.food.takeMeal(seat.id);
-    const shown = returning && seat.present;
     seat.present = true;
     seat.away = false;
     this.food.update(0);
+    const flies = this.#seated(seat);
     this.#send(seat, {
       type: "welcome",
       meals: true,
       v: PROTOCOL,
       id: seat.id,
-      colour: seat.colour,
+      colour: flies[0].colour,
+      flies,
       starter: this.starter?.id ?? 0,
       seed: this.seed,
       now,
@@ -429,27 +578,52 @@ export class Table {
       place: this.place,
       epoch: this.epoch,
       world: { ...this.worldWire },
-      players: [...this.seats.values()].filter((p) => p !== seat && p.present).map((p) => this.#player(p)),
+      players: [...this.seats.values()].filter((p) => p !== seat && p.present).flatMap((p) => p.flies.map((f) => this.#player(p, f))),
       foods: this.food.foods.map(toWire),
       balls: this.balls.filter((b) => ballProgress(b, now) < 1),
       happenings: this.happenings.filter((h) => now - h.at < HAPPENING_KEPT),
       bubbles: this.bubbles?.snapshot() ?? [],
-      at,
+      at: flies[0].at,
       room: this.info,
     });
     // And everyone else's fly where it is now, resting ones too, so the newcomer sees them before they next move.
     const others = this.#others;
     others.length = 0;
-    for (const p of this.seats.values()) if (p !== seat && p.present) others.push(p.state);
+    for (const p of this.seats.values()) if (p !== seat && p.present) for (const f of p.flies) others.push(f.state);
     if (others.length) link.send(new Uint8Array(this.#batch.buffer, 0, encodeFlies(this.#batch, this.scale, others)));
-    // Everyone else sees it come, or wake if they were already seeing it rest.
-    this.#broadcast(shown ? { type: "away", id: seat.id, away: false } : { type: "joined", ...this.#player(seat) }, seat);
-    this.#options.log?.("joined", { table: this.code, player: seat.id, returning });
+    // Everyone else sees its flies come, or wake if they were already seeing them rest (and any it brings now, come).
+    for (const fly of seat.flies) this.#broadcast(shown ? { type: "away", id: fly.id, away: false } : { type: "joined", ...this.#player(seat, fly) }, seat);
+    this.#options.log?.("joined", { table: this.code, player: seat.id, flies: seat.flies.length, asked: wanted, returning });
     return seat;
   }
 
-  #player(seat: Seat): PlayerWire {
-    return { id: seat.id, colour: seat.colour, away: seat.away };
+  /** A room open to everyone moves on when the clock says, everyone there together. Returns the table. */
+  keepTurn(): this {
+    if (!this.everyone) return this;
+    const turn = everyonePlace(this.#options.wall());
+    if (turn !== this.place) this.moveTo(turn);
+    return this;
+  }
+
+  /** Whether a device with this key (hashed) is still at the table: its flies there, perhaps resting, not yet gone. */
+  seated(key: string) {
+    for (const s of this.seats.values()) if (s.key === key) return s.present;
+    return false;
+  }
+
+  /**
+   * How many flies a device with this key (hashed) could have here: as many as
+   * it brings, if it has a seat here already; otherwise the seats a newcomer
+   * can have (`taken`, which those gone give up). 0 if it was removed.
+   */
+  roomFor(key: string): number {
+    if (this.removed.has(key)) return 0;
+    for (const s of this.seats.values()) if (s.key === key) return MAX_OWN;
+    return MAX_FLIES - this.taken;
+  }
+
+  #player(seat: Seat, fly: SeatFly): PlayerWire {
+    return { id: fly.id, colour: fly.colour, away: seat.away, of: seat.id };
   }
 
   /** The device's line closed. Its fly stays, resting, until it comes back or AWAY_LIMIT passes. */
@@ -460,14 +634,14 @@ export class Table {
     this.#update(seat);
   }
 
-  /** The player left the table for good: its fly goes now. Its seat (and colour) stays theirs. */
+  /** The player left the table for good: its flies go now. Its seat (and their colours) stays theirs. */
   #bye(seat: Seat) {
     seat.link?.close(CLOSE.left, "left");
     seat.link = null;
     seat.present = false;
     seat.away = true;
     seat.awaySince = this.#options.wall();
-    this.#broadcast({ type: "left", id: seat.id }, seat);
+    for (const fly of seat.flies) this.#broadcast({ type: "left", id: fly.id }, seat);
     this.#options.log?.("left", { table: this.code, player: seat.id });
   }
 
@@ -537,9 +711,17 @@ export class Table {
         this.moveTo(m.place);
         return;
       case "remove": {
-        const other = this.seats.get(m.id);
+        const other = this.seatOf(m.id);
         if (seat.key !== this.#starter || !other || other === seat || !seat.rates.changes.take(now)) return;
         this.remove(other);
+        return;
+      }
+      case "flies": {
+        // One dropped for coming too often goes unanswered: the device asks again until it is answered.
+        if (!seat.rates.recounts.take(now)) return;
+        const asked = this.#wanted(m.count);
+        this.#recount(seat, asked);
+        this.#send(seat, { type: "seated", flies: this.#seated(seat), asked });
         return;
       }
       case "pop":
@@ -582,25 +764,13 @@ export class Table {
     this.#pace = this.#newPace();
     this.#settle();
     const spots: Record<number, Spot> = {};
-    const now = this.now;
-    for (const seat of this.seats.values()) {
-      const spot = spawnSpot(this.world, seat.id);
-      spots[seat.id] = spot;
-      const s = seat.state;
-      [s.x, s.z, s.yaw] = spot;
-      s.y = this.world.heightAt(s.x, s.z, spot[3]);
-      s.flags &= ~AIRBORNE;
-      s.t = now;
-      s.epoch = this.epoch;
-      seat.leash.reset();
-      // Everyone is told where everyone was set down.
-      seat.fresh = true;
-    }
+    // Everyone is told where every fly was set down.
+    for (const seat of this.seats.values()) for (const fly of seat.flies) spots[fly.id] = this.#setDown(fly, spawnSpot(this.world, fly.id));
     this.#broadcast({ type: "place", place, epoch: this.epoch, foods: this.food.foods.map(toWire), spots, ...(this.bubbles ? { bubbles: this.bubbles.snapshot() } : {}) });
     this.#options.log?.("moved", { table: this.code, place });
   }
 
-  /** The starter took a fly off the table: it goes, and its device can't sit down here again. */
+  /** The starter took a device off the table: all its flies go, and it can't sit down here again. */
   remove(seat: Seat) {
     this.removed.add(seat.key);
     // A Set keeps the order keys were added in: the first is the longest removed.
@@ -611,7 +781,7 @@ export class Table {
       seat.link.close(CLOSE.removed, "removed");
     }
     seat.link = null;
-    if (seat.present) this.#broadcast({ type: "left", id: seat.id });
+    if (seat.present) for (const fly of seat.flies) this.#broadcast({ type: "left", id: fly.id });
     this.#options.log?.("removed", { table: this.code, player: seat.id });
   }
 
@@ -619,58 +789,82 @@ export class Table {
     if (view.byteLength < 1) return;
     const type = view.getUint8(0);
     if (type === FLY) {
-      const s = this.#scratch;
-      // Read at this place's scale: one from before a move comes out wrong, and is dropped by its epoch before anything uses it.
-      if (readState(view, 1, this.scale, s) < 0 || s.epoch !== this.epoch) return;
-      s.t = roomTime(s.t, this.now);
-      const result = seat.leash.admit(this.world, seat.state, s, this.now);
-      if (result === "refused") return;
-      if (result !== "taken") seat.shortened++;
-      seat.fresh = true;
-      this.#update(seat);
+      const now = this.now;
+      // The whole batch is read before any of it is used: one cut short, with more flies than a device brings, or with a fly twice, is
+      // dropped whole rather than half taken.
+      let ids = 0;
+      let whole = true;
+      const count = decodeFlies(view, this.scale, this.#scratch, (s) => {
+        const bit = 1 << s.id;
+        if (s.id < 1 || s.id > MAX_FLIES || ids & bit) whole = false;
+        ids |= bit;
+      }, FLY);
+      if (count < 0 || count > MAX_OWN || !whole) return;
+      let heard = false;
+      // Read at this place's scale: one from before a move comes out wrong, and is dropped by its epoch before anything uses it; one for a fly
+      // that isn't this device's (in flight as it was taken off) is no state of its.
+      decodeFlies(view, this.scale, this.#scratch, (s) => {
+        const fly = s.epoch === this.epoch ? seat.flies.find((f) => f.id === s.id) : undefined;
+        if (!fly) return;
+        s.t = roomTime(s.t, now);
+        const result = fly.leash.admit(this.world, fly.state, s, now);
+        if (result === "refused") return;
+        if (result !== "taken") seat.shortened++;
+        fly.fresh = true;
+        heard = true;
+      }, FLY);
+      if (heard) this.#update(seat);
     } else if (type === BITES) {
       // Taken in a place the table has since left: not counted, nor acknowledged (the device has the new place's food from the move).
       const epoch = bitesEpoch(view);
       if (epoch !== null && epoch !== this.epoch) return;
-      const st = seat.state;
       const now = this.now;
-      const seq = decodeBites(view, (food, amount) => this.food.bite(seat.id, food, amount, st.x, st.y, st.z, now));
+      const where = this.#where;
+      where.length = 0;
+      for (const f of seat.flies) where.push(f.state);
+      const seq = decodeBites(view, (food, amount) => this.food.bite(seat.id, food, amount, where, now));
       if (seq >= 0) seat.ack = seq;
     }
   }
 
   /** Whether a seat's device has stopped, and if that changed, everyone is told; back from gone, it joins again. */
   #update(seat: Seat) {
-    const away = !seat.link || !!(seat.state.flags & AWAY) || this.now - seat.heardAt > SILENT_AFTER;
+    const away = !seat.link || !!(seat.flies[0].state.flags & AWAY) || this.now - seat.heardAt > SILENT_AFTER;
     if (!seat.present) {
-      // Gone after a long time away (or said goodbye): only its device living again brings it back.
+      // Gone after a long time away (or said goodbye): only its device living again brings its flies back.
       if (away) return;
       seat.present = true;
       seat.away = false;
-      this.#broadcast({ type: "joined", ...this.#player(seat) }, seat);
+      for (const fly of seat.flies) this.#broadcast({ type: "joined", ...this.#player(seat, fly) }, seat);
       return;
     }
     if (away === seat.away) return;
     seat.away = away;
     if (away) seat.awaySince = this.#options.wall();
-    this.#broadcast({ type: "away", id: seat.id, away }, seat);
+    for (const fly of seat.flies) this.#broadcast({ type: "away", id: fly.id, away }, seat);
   }
 
   /** Sends each device the others' fly states that came in since the last time. */
   #relay() {
     const fresh = this.#fresh;
+    const of = this.#freshOf;
     fresh.length = 0;
+    of.length = 0;
     for (const s of this.seats.values()) {
-      if (!s.fresh) continue;
-      s.fresh = false;
-      if (s.present) fresh.push(s.state);
+      for (const f of s.flies) {
+        if (!f.fresh) continue;
+        f.fresh = false;
+        if (!s.present) continue;
+        fresh.push(f.state);
+        of.push(s);
+      }
     }
     if (fresh.length === 0) return;
     const others = this.#others;
     for (const p of this.seats.values()) {
       if (!p.link) continue;
       others.length = 0;
-      for (const s of fresh) if (s.id !== p.id) others.push(s);
+      for (let i = 0; i < fresh.length; i++) if (of[i] !== p) others.push(fresh[i]);
       if (others.length === 0) continue;
       const bytes = encodeFlies(this.#batch, this.scale, others);
       p.link.send(new Uint8Array(this.#batch.buffer, 0, bytes));
@@ -694,10 +888,11 @@ export class Table {
       this.#update(seat);
       if (seat.present && seat.away && wall - seat.awaySince > AWAY_LIMIT) {
         seat.present = false;
-        this.#broadcast({ type: "left", id: seat.id }, seat);
+        for (const fly of seat.flies) this.#broadcast({ type: "left", id: fly.id }, seat);
         this.#options.log?.("gone", { table: this.code, player: seat.id });
       }
     }
+    this.keepTurn();
     // The table's clock's offset changes twice a year where the starter is.
     if (wall - this.#offsetAt > 60_000 && this.#zone) {
       this.#offsetAt = wall;
@@ -734,7 +929,7 @@ export class Table {
     for (const s of this.seats.values()) {
       if (!s.present || s.away) continue;
       quiet = true;
-      if (s.state.flags & PLAYING) {
+      if (s.flies[0].state.flags & PLAYING) {
         quiet = false;
         break;
       }
@@ -762,6 +957,8 @@ export class Table {
 
   #can(h: Happening, now: number) {
     if ((this.#busy.get(h) ?? 0) > now) return false;
+    // Each device's own sky says whether a visitor suits it there (SharedTable.ownSky).
+    if (this.everyone) return true;
     const hour = hourOfDay(this.hours);
     const light = this.worldWire.light;
     const day = light === "clock" ? hour > 7 && hour < 19.5 : light !== "night" && light !== "dusk";
@@ -781,6 +978,7 @@ export class Table {
 
   /** The table's weather: chosen, or the forecast by its clock. */
   #weather() {
+    if (this.everyone) return CALM;
     const w = this.worldWire.weather;
     const m = this.#mix;
     if (w === "now") return forecast(this.hours, m);

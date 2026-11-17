@@ -79,7 +79,7 @@ function watch(rooms: Awaited<ReturnType<typeof startRooms>>, table: string, fak
       seen.dropped = true;
       seat.link.close(1001, 'dropped by the check');
     }
-    for (const [key, on] of [['connected', !!seat.link], ['resting', seat.away || !!(seat.state.flags & AWAY)]] as const) {
+    for (const [key, on] of [['connected', !!seat.link], ['resting', seat.away || !!(seat.flies[0].state.flags & AWAY)]] as const) {
       if (on && open[key] < 0) open[key] = now;
       if (!on && open[key] >= 0) {
         seen[key].push([open[key], now]);

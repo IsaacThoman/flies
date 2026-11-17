@@ -1,10 +1,10 @@
 // The fly's stats, small in a corner: its brain at work (spikes a second,
 // neurons active, how fast it runs against real time, and a trace of the
-// last twenty seconds), what it is doing now, and its day so far (stats/
+// last twenty seconds), and its day so far (stats/
 // tally.ts); or what goes in and out of its brain: each sense as the body
 // sends it and each command as the brain answers, with how fast the neurons
 // it is read from fire. Every number is read from what is running or what
-// happened: the brain's meter and state, the senses and activity as Life
+// happened: the brain's meter and state, the senses as Life
 // has them, and the tally. The words are only units and names; the numbers
 // and bars are what the player asked for.
 //
@@ -22,20 +22,17 @@ import { HISTORY_SAMPLES } from "../brain/meter.ts";
 import { TV_FRAME, pixelsPerUnit } from "../display.ts";
 import type { Frame } from "../display.ts";
 import { INSET_PANEL, cornerScale, insetLayout } from "../eyes/inset.ts";
-import type { Activity } from "../life.ts";
 import { nervesLayout } from "../nerves/panel.ts";
 import type { Day, ShowWhen, StatsKind } from "../settings.ts";
 import { CORNERS, CornerPlacement, across } from "../ui/corners.ts";
 import type { Corner, CornerDeck, CornerRect, CornerWanted } from "../ui/corners.ts";
-import { caption } from "../ui/hud.ts";
 import { hudLayout, safeRect } from "../ui/layout.ts";
 import type { HudLayout } from "../ui/layout.ts";
 
-/** The panel, design units at full size: a heading, then a grid of cells (a number over its unit), with a trace over the brain's. */
+/** The panel, design units at full size: a grid of figures over units, with a trace over the brain's. */
 const RADIUS = 14;
-const HEADING = { x: 12, y: 21, size: 14, color: "#eaf6ff" };
-const TOP = 31;
-const FOOT = 7;
+const TOP = 12;
+const FOOT = 5;
 const TRACE = 26;
 const CELL = { width: 72, height: 38 };
 const BRAIN_CELLS = 3;
@@ -78,7 +75,7 @@ const RATES = COMMANDS.reduce((n, c) => n + c.rates.length, 0);
 /** How many numbers in and out it shows: the senses, the commands, then each command's rates. */
 export const SIGNALS = SENSES.length + COMMANDS.length + RATES;
 
-/** In and out, design units: a heading over each column, then a row each, a name, a bar and, for a command, its neurons' rates. */
+/** In and out: a heading per column, then sense/command names, bars and actual readout rates. */
 const SUB = 13;
 // 11, so that the eight commands still show big enough to read on a small phone on its side.
 const ROW = 11;
@@ -249,9 +246,7 @@ export const statsSlot = (layout: StatsLayout, eyes: CornerWanted, nerves: Corne
 
 /** What it shows, as the game has it now. */
 export type StatsState = {
-  activity: Activity;
-  /** Keep activity visible when the HUD caption is hidden. */
-  activityHeading?: boolean;
+
   spikes: number;
   active: number;
   speed: number;
@@ -370,10 +365,7 @@ function cell(g: CanvasRenderingContext2D, x: number, y: number, cols: number, i
 export function drawStatsPanel(g: CanvasRenderingContext2D, shape: StatsShape, s: StatsState, signalsNow?: Float32Array) {
   const { kind, cols, side, width, height } = shape;
   glassPanel(g, 1, 1, width - 2, height - 2, RADIUS, { tint: "night", shadow: false });
-  const heading = kind === "brain" ? "Its brain" : s.activityHeading !== false ? caption(s.activity, null) : kind === "day" ? "Its day" : kind === "signals" ? "In and out" : "Brain + day";
-  g.font = font(HEADING.size);
-  const size = Math.min(HEADING.size, Math.floor((HEADING.size * (width - 2 * HEADING.x)) / g.measureText(heading).width));
-  text(g, heading, HEADING.x, HEADING.y, { size, color: HEADING.color });
+
   if (kind === "signals") {
     const v = signalsNow ?? readSignals(s, new Float32Array(SIGNALS));
     for (const c of signalsOf(cols).columns) signalColumn(g, c, v);
@@ -446,7 +438,7 @@ export class StatsPanel {
   #kind: StatsKind = "both";
   #since = 1;
   /** What it last drew, to tell when it has changed; what goes in and out as last drawn, and as it is now. */
-  readonly #drawn = { kind: "", activity: "", activityHeading: true, head: -1, walked: -1, meals: -1, takeOffs: -1, flown: -1, groomed: -1, date: "" };
+  readonly #drawn = { kind: "", head: -1, walked: -1, meals: -1, takeOffs: -1, flown: -1, groomed: -1, date: "" };
   #signalsDrawn = new Float32Array(SIGNALS);
   #signalsNow = new Float32Array(SIGNALS);
 
@@ -538,16 +530,16 @@ export class StatsPanel {
   /** Whether anything it shows has changed since it was drawn, to the figure it is shown to. */
   #changed(s: StatsState) {
     const d = this.#drawn, day = s.day, kind = this.#kind;
-    if (d.kind !== kind || d.activityHeading !== (s.activityHeading !== false)) {
+    if (d.kind !== kind) {
       if (kind === "signals") readSignals(s, this.#signalsNow);
       return true;
     }
     if (kind === "signals") {
       const now = readSignals(s, this.#signalsNow), drawn = this.#signalsDrawn;
       for (let i = 0; i < SIGNALS; i++) if (now[i] !== drawn[i]) return true;
-      return d.activity !== s.activity;
+      return false;
     }
-    if (kind !== "brain" && (d.activity !== s.activity || d.date !== day.date || d.meals !== day.meals || d.takeOffs !== day.takeOffs || d.walked !== Math.round(day.walked) || d.flown !== Math.floor(day.flown) || d.groomed !== Math.floor(day.groomed))) return true;
+    if (kind !== "brain" && (d.date !== day.date || d.meals !== day.meals || d.takeOffs !== day.takeOffs || d.walked !== Math.round(day.walked) || d.flown !== Math.floor(day.flown) || d.groomed !== Math.floor(day.groomed))) return true;
     // The trace moves on with each sample the meter takes, and the figures with it.
     return kind !== "day" && d.head !== s.head;
   }
@@ -555,8 +547,7 @@ export class StatsPanel {
   #draw(s: StatsState) {
     const d = this.#drawn, day = s.day;
     d.kind = this.#kind;
-    d.activity = s.activity;
-    d.activityHeading = s.activityHeading !== false;
+
     d.head = s.head;
     d.date = day.date;
     d.walked = Math.round(day.walked);

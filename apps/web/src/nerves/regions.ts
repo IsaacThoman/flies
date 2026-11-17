@@ -1,7 +1,7 @@
 // Where each of the brain's regions is drawn on the fly's nervous system
-// (packages/fly/src/nerves): the parts its firing rate lights. Every region
-// has a place and every part belongs to exactly one region, so nothing is lit
-// by two things and nothing the brain reports goes undrawn.
+// (packages/fly/src/nerves): the parts its firing rate lights. A part belongs
+// to at most one region. The mixed unplaced group has no defensible location,
+// so it lights nothing; the connective's midline remains anatomical context.
 //
 // The drawing has its own parts for things the regions don't yet tell apart:
 // the cord is drawn segment by segment (T1, T2, T3, the abdominal neuromeres
@@ -20,6 +20,9 @@ import { LEG_NAMES, NERVE_PARTS, SIDES } from "@fly/fly";
 const each = <T>(f: (side: (typeof SIDES)[number]) => [string, T][]): [string, T][] => SIDES.flatMap(f);
 const same = (...ids: string[]) => each((side) => ids.map((id) => [`${id}-${side}`, [`${id}-${side}`]]));
 const legs = (part: string, side: string) => LEG_NAMES.map((leg) => `${part}-${leg}-${side}`);
+
+/** Anatomy retained for context, with no measured rate assignable to it. */
+export const UNLIT_PARTS = ["connective-midline"] as const;
 
 export const REGION_PARTS: Readonly<Record<string, readonly string[]>> = Object.fromEntries([
   ...same("retina", "lamina", "medulla", "lobula", "lobula-plate"),
@@ -56,7 +59,7 @@ export const REGION_PARTS: Readonly<Record<string, readonly string[]>> = Object.
   ["bristles", ["body-bristle-sockets"]],
   ["cord-midline", ["cord-midline"]],
   ["cord-efferent", ["cord-efferent"]],
-  ["unplaced", ["connective-midline"]],
+  ["unplaced", []],
 ]);
 
 /** For each part, in NERVE_PARTS order, the index in REGIONS of the region that lights it (-1 if none). */
