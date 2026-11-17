@@ -67,7 +67,7 @@ export function insetLayout(frame: Frame, hud: HudLayout = hudLayout(frame), siz
   let scale = cornerScale(a, INSET_PANEL.width, size);
   // Larger, on a short screen it would reach the hint at the bottom right while playing.
   const beside = (width: number) => a.w / 2 - 120 - margin - 8 >= width;
-  scale = Math.min(scale, (hud.rightY - 15 - (beside(INSET_PANEL.width * scale) ? a.y + margin : hud.captionY + 23)) / INSET_PANEL.height);
+  scale = Math.min(scale, ((hud.reserveHints ? hud.rightY - 15 : hud.labelY - 25) - (beside(INSET_PANEL.width * scale) ? a.y + margin : hud.captionY + 23)) / INSET_PANEL.height);
   const width = INSET_PANEL.width * scale;
   const height = INSET_PANEL.height * scale;
   const top = beside(width) ? a.y + margin : hud.captionY + 23;

@@ -34,6 +34,7 @@ export type MenuScreenOptions = {
   onChange?(item: ChoiceItem | SliderItem): void;
   /** Select on a field: start typing into it. */
   onEdit?(item: FieldItem): void;
+  onSubmit?(item: FieldItem): void;
   onBack(): void;
   /** Drawn first, under the pane. */
   backdrop?(g: CanvasRenderingContext2D, t: number): void;
@@ -134,7 +135,7 @@ export class MenuScreen implements Screen {
     if (p.type === "down" || p.type === "hover") this.semanticFocus = false;
     const menu = this.menu;
     const hit = p.hit;
-    const row = hit && (hit.kind === MENU_HITS.row || hit.kind === MENU_HITS.step || hit.kind === MENU_HITS.tab || hit.kind === MENU_HITS.track);
+    const row = hit && (hit.kind === MENU_HITS.row || hit.kind === MENU_HITS.step || hit.kind === MENU_HITS.tab || hit.kind === MENU_HITS.track || hit.kind === MENU_HITS.submit);
     // The list may have refreshed since these pixels were drawn.
     if (row && (!hit.id || menu.items[hit.index]?.id !== hit.id)) {
       if (p.type !== "hover") this.#held = null;
@@ -175,6 +176,10 @@ export class MenuScreen implements Screen {
         if (!hit) {
           if (!this.#options.root) this.#outcome({ kind: "back" });
         } else if (hit.kind === SCREEN_HITS.back) this.#outcome({ kind: "back" });
+        else if (hit.kind === MENU_HITS.submit) {
+          const item = menu.items[hit.index];
+          if (item?.kind === "field" && !item.disabled && item.submit && !item.submit.disabled) this.#options.onSubmit?.(item);
+        }
         else if (hit.kind === MENU_HITS.step) this.#outcome(menu.stepAt(hit.index, hit.value < 0 ? -1 : 1));
         else if (hit.kind === MENU_HITS.tab) this.#outcome(menu.chooseAt(hit.index, hit.value));
         else if (hit.kind === MENU_HITS.more) {

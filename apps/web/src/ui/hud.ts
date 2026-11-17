@@ -91,7 +91,7 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
     const x = L.shelfLeft + (i + 0.5) * gap + (i < split ? 0 : L.apart);
     const on = i === hands.tool;
     const pressed = s.pressed?.kind === HUD_HITS.tool && s.pressed.index === i;
-    const r = (on ? 22 : pressed ? 20 : 17) * L.orb;
+    const r = on ? 22 * L.orb : Math.min(pressed ? 20 : 17, gap / 2 - 1);
     const y = pressed ? sy - 1 : on ? sy - 6 : sy;
     orb(g, x, y, r, on || pressed ? "aqua" : "glass");
     drawToolIcon(g, TOOLS[i].id, x, y + 1, r * 0.62);
@@ -117,7 +117,7 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   const pending = pointing && s.pressed?.kind === HUD_HITS.tool ? TOOLS[s.pressed.index] : undefined;
   const pop = Math.max(0, 1 - s.changed * 4) * 3;
   const ly = labelY - 17 - pop;
-  const hitHeight = touch?.targetHeight ?? 32;
+  const hitHeight = Math.max(36, touch?.targetHeight ?? 32);
   const hitY = labelY - 17 - (hitHeight - 32) / 2;
   const labelPressed = s.pressed?.kind === HUD_HITS.kind || s.pressed?.kind === HUD_HITS.label;
   pill(g, lx, ly, lw, 32, "", { color: labelPressed || pending ? "aqua" : "glass", press: labelPressed ? 1 : 0 });
