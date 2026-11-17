@@ -14,12 +14,32 @@ export function requireNotices(names: Iterable<string>, registry = NPM_NOTICES) 
 /** Installed production dependencies, including transitive dependencies. Workspaces are our own code. */
 export function runtimeDependencies(root = ROOT): string[] {
   const names = new Set<string>();
+  const visited = new Set<string>();
+  const workspaces = new Map<string, string>();
+  for (const group of ["apps", "packages"]) {
+    const dir = path.join(root, group);
+    if (!fs.existsSync(dir)) continue;
+    for (const entry of fs.readdirSync(dir)) {
+      const file = path.join(dir, entry, "package.json");
+      if (fs.existsSync(file)) {
+        const pkg = JSON.parse(fs.readFileSync(file, "utf8")) as { name?: string };
+        if (pkg.name) workspaces.set(pkg.name, file);
+      }
+    }
+  }
   const visit = (file: string) => {
+    if (visited.has(file)) return;
+    visited.add(file);
     const pkg = JSON.parse(fs.readFileSync(file, "utf8")) as { dependencies?: Record<string, string> };
     for (const name of Object.keys(pkg.dependencies ?? {})) {
-      if (name.startsWith("@fly/") || names.has(name)) continue;
+      const own = workspaces.get(name);
+      if (own) { visit(own); continue; }
       names.add(name);
-      visit(path.join(root, "node_modules", name, "package.json"));
+      const installed = path.join(root, "node_modules", name, "package.json");
+      // Nested versions need a deliberate multi-version notice audit rather than the wrong root licence.
+      const nested = path.join(path.dirname(file), "node_modules", name, "package.json");
+      if (nested !== installed && fs.existsSync(nested)) throw new Error(`Nested shipped dependency needs a notice audit: ${name}`);
+      visit(installed);
     }
   };
   visit(path.join(root, "package.json"));

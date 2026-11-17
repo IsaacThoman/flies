@@ -28,6 +28,12 @@ test("missing direct, transitive and bundled-development dependency notices fail
     put("node_modules/hidden/package.json", {});
     assert.deepEqual(runtimeDependencies(dir), ["hidden", "three"]);
     assert.throws(() => requireNotices(runtimeDependencies(dir)), /no notice: hidden/);
+    put("apps/server/package.json", { dependencies: { "@fly/support": "*" } });
+    put("packages/support/package.json", { name: "@fly/support", dependencies: { more: "1" } });
+    put("node_modules/more/package.json", {});
+    assert.deepEqual(runtimeDependencies(dir), ["hidden", "more", "three"]);
+    put("node_modules/three/node_modules/hidden/package.json", {});
+    assert.throws(() => runtimeDependencies(dir), /Nested shipped dependency/);
     assert.throws(() => requireNotices(["playwright"]), /no notice: playwright/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

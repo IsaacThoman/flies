@@ -198,6 +198,12 @@ async function fingers() {
     await waitFor(page, "screen=title");
     await tapOn("row", 2);
     await waitFor(page, "screen=about");
+    await tapOn("notice", 0);
+    await waitFor(page, "acknowledgement=0");
+    await tapOn("notice", 1);
+    await waitFor(page, "acknowledgement=1");
+    await tapOn("back");
+    await waitFor(page, "screen=about,acknowledgement=");
     await tapOn("back");
     await waitFor(page, "screen=title");
     await tapOn("row", 0);

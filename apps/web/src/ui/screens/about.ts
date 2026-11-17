@@ -120,6 +120,11 @@ export class AboutScreen implements Screen {
     this.#dirty = true;
   }
 
+  publish(data: DOMStringMap) {
+    data.acknowledgement = this.#notice < 0 ? "" : String(this.#notice);
+    data.aboutScroll = String(this.#scroll.offset);
+  }
+
   update() {
     const d = this.#dirty;
     this.#dirty = false;

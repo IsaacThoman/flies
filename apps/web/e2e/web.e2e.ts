@@ -247,6 +247,15 @@ try {
   if (shots) await blind.locator("#game").screenshot({ path: path.join(shots, "5-no-webgl.png") });
   await flat.close();
 
+  step("the privacy policy remains a policy when opened offline");
+  await page.goto(new URL("privacy", site.url).href);
+  assert.match(await page.locator("main").innerText(), /Privacy policy/);
+  await context.setOffline(true);
+  await page.reload();
+  assert.match(await page.locator("main").innerText(), /Privacy policy/);
+  assert.equal(await page.locator("canvas").count(), 0);
+  await context.setOffline(false);
+
   step("nothing was asked of any other site");
   assert.deepEqual(elsewhere, []);
   assert.deepEqual(errors, [], "page errors");
