@@ -35,8 +35,10 @@ Baseline mean: **7.04/10**.
 
 The recurring problems were Back overlapping the landscape New room form, touch targets under 44 CSS pixels, disappearing Settings tabs during scrolling, ambiguous overlay labels, and small low-contrast diagnostic captions.
 
-### Candidate under review
+### Round 1 · blind comparison pending
+
+Key: `set-K7` = baseline, `set-R8` = candidate. The order is randomized independently for each of three scorers and a separate regression-only reviewer. A preparatory tab design was rejected without scoring because it added phone taps; the submitted candidate retains direct tab targets.
 
 Reserved the Online heading at every layout tier; pinned the Settings tab strip while its rows scroll; replaced tiny more links with separated arrow buttons; enlarged HUD targets and narrowed the shelf divider to meet 44 CSS pixels at the requested phone sizes; kept small tab labels from shrinking below 12 design units; added a selection underline independent of colour; clarified overlay/vision labels; increased About's reading size and corner-stat caption contrast.
 
-New tests cover the measured defects. Navigation and setting meanings are unchanged. No simulation, camera, sound or default-room logic changes. A live overlay preview was deferred: it would add another representation to an already crowded small screen; labels and the existing actual overlays are the first experiment.
+New tests cover the measured defects. Settings now cycles vertically, so X-ray takes six remote inputs to reach rather than twelve; tab widths follow their labels so all three remain directly tappable on the requested phone sizes. Tab measurements are cached outside steady redraws. Setting values and meanings are unchanged. No simulation, camera, sound or default-room logic changes. A live overlay preview was deferred: it would add another representation to an already crowded small screen; labels and the existing actual overlays are the first experiment.

@@ -150,7 +150,7 @@ export function settingsScreen(shell: Shell) {
   const pages = {} as Record<SettingsPage, MenuItem[]>;
   for (const id of ids) pages[id] = PAGES[id].rows(shell);
   const tabs: ChoiceItem<SettingsPage> = { kind: "choice", id: "page", label: "", options: ids.map((id) => ({ value: id, label: PAGES[id].heading })), index: 0, tabs: true };
-  const menu = new Menu([tabs, ...pages[ids[0]]]);
+  const menu = new Menu([tabs, ...pages[ids[0]]], { wrap: true });
   // Room for the longest page, so the pane keeps its size from tab to tab.
   const most = 1 + Math.max(...ids.map((id) => pages[id].length));
   // As they are now: the Place tool, or a script, may have changed them since.
@@ -163,8 +163,9 @@ export function settingsScreen(shell: Shell) {
   };
   return new MenuScreen(shell, {
     id: "settings",
+    heading: "Settings",
     menu,
-    place: (frame) => fitMenu(safeRect(frame), { items: most, width: 540, row: 36, heading: false, foot: 28, values: true, raise: 14 }),
+    place: (frame) => fitMenu(safeRect(frame), { items: most, width: 540, row: 36, heading: true, foot: 28, values: true, raise: 14 }),
     onEnter: show,
     onChange(item) {
       if (item === tabs) {

@@ -163,3 +163,14 @@ test("scrolling a tabbed menu keeps the tab strip separate from visible settings
   assert.equal(menu.focus, 1);
   assert.equal(menu.scroll, 0);
 });
+
+test("an optionally cyclic menu reaches the last setting from its tab strip in one press", () => {
+  const menu = new Menu(items(), { rows: 3, wrap: true });
+  menu.press("up");
+  assert.equal(menu.focused?.id, "back");
+  assert.equal(menu.scroll, 2);
+  menu.press("down");
+  assert.equal(menu.focused?.id, "play");
+  assert.equal(menu.scroll, 0);
+  assert.equal(new Menu(items()).press("up").kind, "blocked");
+});

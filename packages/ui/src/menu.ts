@@ -64,9 +64,11 @@ export class Menu {
   columns = 1;
   /** How many rows there is room for, however many items there are now. */
   #room: number;
+  readonly #wrap: boolean;
 
-  constructor(items: MenuItem[], { rows = items.length, focus }: { rows?: number; focus?: string } = {}) {
+  constructor(items: MenuItem[], { rows = items.length, focus, wrap = false }: { rows?: number; focus?: string; wrap?: boolean } = {}) {
     this.items = items;
+    this.#wrap = wrap;
     this.#room = rows;
     this.rows = Math.min(items.length, Math.max(1, rows));
     const start = focus ? items.findIndex((item) => item.id === focus) : -1;
@@ -175,7 +177,8 @@ export class Menu {
     switch (button) {
       case "up":
       case "down": {
-        const next = this.#nextEnabled(this.focus, button === "up" ? -1 : 1);
+        const dir = button === "up" ? -1 : 1;
+        const next = this.#nextEnabled(this.focus, dir) ?? (this.#wrap ? this.#nextEnabled(dir < 0 ? this.items.length : -1, dir) : null);
         if (next === null) return repeat ? NONE : BLOCKED;
         this.focus = next;
         this.#keepInView();

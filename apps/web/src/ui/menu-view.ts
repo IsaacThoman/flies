@@ -29,6 +29,7 @@ const TRACK = { from: 170, length: 140 };
 
 /** The field being typed into, by its item's index (-1: none), and where its caret is (characters into its value). */
 export type Typing = { index: number; caret: number };
+type TabLayout = { width: number; height: number; options: ChoiceItem["options"] | null; size: number; widths: Float64Array };
 
 export class MenuView {
   readonly menu: Menu;
@@ -43,6 +44,7 @@ export class MenuView {
   /** Where a visible row goes: its left edge, top and width. */
   readonly #cell = { x: 0, y: 0, width: 0 };
   #press = new Eased(0, 12);
+  readonly #tabs: TabLayout = { width: -1, height: -1, options: null, size: 0, widths: new Float64Array(0) };
 
   constructor(menu: Menu, layout: MenuLayout) {
     this.menu = menu;
@@ -142,7 +144,7 @@ export class MenuView {
       const press = i === menu.focus ? this.#press.value : 0;
       hits.add(MENU_HITS.row, x, y, width, row, i, 0, item.id);
       const caret = i === this.typing.index ? this.typing.caret : -1;
-      if (item.kind === "choice" && item.tabs) drawTabs(g, item, x + this.tabInset, y, width - this.tabInset, row, hits, i);
+      if (item.kind === "choice" && item.tabs) drawTabs(g, item, x + this.tabInset, y, width - this.tabInset, row, hits, i, this.#tabs);
       else if (item.kind === "field") drawField(g, item, x, y, width, row, focused, i === hover, caret, t, !!this.layout.compact);
       else if (this.layout.compact) drawStacked(g, item, x, y, width, row, focused, i === hover, press, hits, i, this.track);
       else drawItem(g, item, x, y, width, row, focused, i === hover, press, hits, i, this.track, size);
@@ -168,17 +170,29 @@ export class MenuView {
 const SMALLEST_TAB = 12;
 
 /** A choice as tabs: its options side by side, the chosen one lit. */
-function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: number, w: number, h: number, hits: HitMap, index: number) {
+function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: number, w: number, h: number, hits: HitMap, index: number, layout: TabLayout) {
   const n = item.options.length;
   const gap = 6;
-  const tw = (w - gap * (n - 1)) / n;
-  // No taller than a TV's row, and every label the same size, small enough for the widest to fit.
+  const padding = 16;
   const th = Math.min(h, 40);
   const most = Math.round(th * 0.46);
-  g.font = font(most);
-  let size = most;
-  // Each label measured at the largest size: the smallest it needs is the one for all.
-  for (const option of item.options) size = Math.min(size, Math.floor((most * (tw - 14)) / g.measureText(option.label).width));
+  if (layout.width !== w || layout.height !== h || layout.options !== item.options) {
+    layout.width = w;
+    layout.height = h;
+    layout.options = item.options;
+    if (layout.widths.length !== n) layout.widths = new Float64Array(n);
+    g.font = font(most);
+    let words = 0;
+    for (let k = 0; k < n; k++) {
+      const width = g.measureText(item.options[k].label).width;
+      layout.widths[k] = width;
+      words += width;
+    }
+    layout.size = Math.min(most, Math.floor((most * (w - gap * (n - 1) - padding * n)) / Math.max(1, words)));
+    const extra = (w - gap * (n - 1) - words * layout.size / most - padding * n) / n;
+    for (let k = 0; k < n; k++) layout.widths[k] = layout.widths[k] * layout.size / most + padding + extra;
+  }
+  const size = layout.size;
   if (size < SMALLEST_TAB) {
     // Too narrow for every tab to be read: the one chosen, between arrows that step along them, as a choice is.
     const y0 = y + (h - th) / 2, mid = y0 + th / 2;
@@ -189,14 +203,16 @@ function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: n
     hits.add(MENU_HITS.step, x + w - 44, y, 44, h, index, 1, item.id);
     return;
   }
+  let tx = x;
   for (let k = 0; k < n; k++) {
-    const tx = x + k * (tw + gap);
+    const tw = layout.widths[k];
     pill(g, tx, y + (h - th) / 2, tw, th, item.options[k].label, { color: k === item.index ? "aqua" : "glass", disabled: item.disabled, size });
     if (k === item.index) {
       g.fillStyle = "#ffffff";
       g.fillRect(tx + tw * 0.3, y + (h + th) / 2 - 5, tw * 0.4, 2);
     }
     hits.add(MENU_HITS.tab, tx, y, tw, h, index, k, item.id);
+    tx += tw + gap;
   }
 }
 

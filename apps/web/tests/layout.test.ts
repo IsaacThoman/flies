@@ -58,7 +58,7 @@ function shell(frame: Frame, glyphs: Shell["glyphs"] = null, online = true): She
   };
 }
 
-test("on the TV everything is where it always was", () => {
+test("the TV keeps its HUD and title layout, with Settings below a separate heading", () => {
   const hud = hudLayout(TV_FRAME);
   assert.equal(hud.cx, 427);
   assert.equal(hud.captionY, 25);
@@ -83,8 +83,8 @@ test("on the TV everything is where it always was", () => {
   const s = shell(TV_FRAME, "remote", false);
   const settings = settingsScreen(s);
   // Sized for its longest tab (On screen: the tabs and seven rows, as Wallpaper was on an Apple TV that can tell the weather), so it keeps its size from tab to tab.
-  assert.deepEqual(settings.pane.panel, { x: 157, y: 13, w: 540, h: 426 });
-  assert.deepEqual(settings.pane.list, { x: 185, y: 39, width: 484, row: 36, gap: 12, compact: false, columns: 1 });
+  assert.deepEqual(settings.pane.panel, { x: 157, y: 17, w: 540, h: 418 });
+  assert.deepEqual(settings.pane.list, { x: 185, y: 73, width: 484, row: 36, gap: 8, compact: false, columns: 1 });
   assert.equal(settings.menu.rows, settings.menu.items.length);
 
   const loading = loadingLayout(TV_FRAME);
@@ -205,7 +205,7 @@ test("the settings' tabs can be read at every shape: every one, or, where they a
       const tabs = writtenOn(g).filter((w) => labels.includes(w.text));
       const where = `${name}, ${glyphs ?? "pointing"}`;
       if (tabs.length === labels.length) {
-        assert.ok(tabs.every((w) => w.size === tabs[0].size && w.size >= 7), `${where}: tabs at ${tabs.map((w) => w.size).join(", ")}`);
+        assert.ok(tabs.every((w) => w.size === tabs[0].size && w.size >= 12), `${where}: tabs at ${tabs.map((w) => w.size).join(", ")}`);
       } else {
         assert.deepEqual(tabs.map((w) => w.text), ["Screensaver"], `${where}: the tab chosen`);
         assert.ok(tabs[0].size >= 12, `${where}: at ${tabs[0].size}`);
@@ -215,7 +215,7 @@ test("the settings' tabs can be read at every shape: every one, or, where they a
       }
     }
   }
-  // The TV's four tabs are as big as a row's words.
+  // The TV's three tabs are as big as a row's words.
   const g = blankCanvas();
   settingsScreen(shell(TV_FRAME, "remote")).draw(g, 0, new HitMap());
   assert.ok(writtenOn(g).filter((w) => labels.includes(w.text)).every((w) => w.size === 17), "on the TV");
