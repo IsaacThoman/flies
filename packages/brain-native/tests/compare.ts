@@ -16,6 +16,7 @@ import type { EyeColumn } from "../../brain/src/eye-columns.ts";
 import { buildEyes } from "../../brain/src/eyes.ts";
 import { loadConnectome } from "../../brain/src/format.ts";
 import { FlyBrain, createBrain } from "../../brain/src/runtime.ts";
+import { TOUCH_SENSES } from "../../brain/src/io.ts";
 import { mulberry32 } from "../../brain/src/sim.ts";
 import type { Simulation } from "../../brain/src/sim.ts";
 import { BATTERY, facetAngles, render } from "../../brain/src/stimuli.ts";
@@ -118,6 +119,7 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     if (each.thirst !== undefined) each.thirst = Math.fround(each.thirst);
     for (const key of STATE) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
     for (const key of TEMPERATURE) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
+    for (const key of TOUCH_SENSES) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
     ticks.push({ dt, senses: each, what });
     if (dt >= 0 && dt <= 1000) total += dt;
   };
@@ -147,6 +149,15 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     hold(1500, 16, () => ({ sweet: 1, bitter: 0.5 }), "sugar laced with something bitter");
     hold(2000, 16, (t) => ({ sweet: 1, water: 1, thirst: 1 - t / 2000 }), "sugary water as thirst is quenched");
     hold(500, 16, (t) => ({ water: 1, thirst: [Number.NaN, -1, 7, Number.NEGATIVE_INFINITY][Math.floor(t / 125)] }), "out-of-range thirst");
+    for (const part of TOUCH_SENSES) {
+      hold(600, cycle % 2 === 0 ? 16 : 33, () => ({ [part]: 1 }), `${part} at full strength`);
+      hold(300, 16, () => ({}), `rest after ${part}`);
+    }
+    hold(2000, 16, () => ({ touchNotum: 0.29, touchWings: 0.16 }), "the feather resting on its back");
+    hold(1500, 16, (t) => ({ touchFrontLeft: 1, touchEyeLeft: t / 1500, touch: 0.3 }), "stroked at the face, touched all over a little");
+    hold(1000, 16, () => ({ clockSleep: 1, sleepPressure: 0.6, sleepDepth: 1, touchFrontRight: 1, touchOcciputRight: 0.4 }), "asleep, its face stroked");
+    hold(500, 16, (t) => ({ touchLegs: [Number.NaN, -1, 7, Number.POSITIVE_INFINITY][Math.floor(t / 125)], touchAbdomen: 0.5 }), "out-of-range touch parts");
+    hold(1000, 16, () => Object.fromEntries(TOUCH_SENSES.map((s) => [s, random() < 0.3 ? random() : 0])), "random touch parts");
     hold(2000, 16, () => ({ loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1 }), "everything at once");
     hold(4000, 16, (t) => ({ loomRight: t % 1000 < 100 ? 1 : 0 }), "a looming pulse every second");
     hold(3000, () => Math.floor(random() * 50 * 4) / 4, () => Object.fromEntries(SCALAR.map((s) => [s, random() < 0.3 ? random() : 0])), "random ticks and senses");
@@ -304,6 +315,7 @@ export function script(ticks: readonly Tick[]): { input: string; frames: Uint8Ar
       hex32(senses.hunger ?? 1),
       hex32(senses.thirst ?? 1),
       ...TEMPERATURE.map((s) => hex32(senses[s] ?? Number.NaN)),
+      TOUCH_SENSES.map((s) => hex32(senses[s] ?? 0)).join(","),
     ].join(" ");
   });
   const frames = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));

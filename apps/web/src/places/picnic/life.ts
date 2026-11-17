@@ -12,6 +12,7 @@
 // among them, and a falling leaf brushes any of this device's flies.
 
 import * as THREE from "three";
+import { FLY_HEIGHT, FLY_LENGTH, POINT_REACH } from "@fly/body";
 import type { Food, Vec3, World } from "@fly/world";
 import { BREEZE, PATCHES, Pace, SOLIDS, TABLE_RADIUS, createSurface } from "@fly/world";
 import type { Happening } from "@fly/world";
@@ -36,6 +37,8 @@ export const BREEZE_ANGLE = Math.atan2(BREEZE.z, BREEZE.x);
 /** How hard a raindrop landing on the fly touches it (a bubble bursting on it is 0.3), and on average how many seconds pass between one and the next in light rain. */
 export const RAIN_TOUCH = 0.25;
 export const RAIN_HIT_EVERY = 40;
+/** A raindrop's radius, mm: light rain's drops are mostly about 1 mm across (Marshall & Palmer 1948, J Meteorol 5:165). */
+export const RAIN_DROP = 0.5;
 /** Splashes a second in light rain: round the fly (within 70 mm, where the camera mostly looks, and more within 18 mm, where it looks close up), over the rest of the table, and into the lemonade's pool. */
 const SPLASH_RATE = { near: 24, close: 5, far: 10, pool: 1.6 };
 /** The gull's shadow, half its length and half its span, mm: a small gull, 80 cm across the wings. */
@@ -222,7 +225,7 @@ export class Goings {
     felt.air.x += outside.gust.x;
     felt.air.z += outside.gust.z;
     const brushed = this.#leaves.step(dt, this.#time, world, fly, outside.gust);
-    if (brushed > 0) felt.touch = Math.max(felt.touch, brushed);
+    if (brushed > 0) felt.contacts.add(this.#leaves.at.x, this.#leaves.at.y, this.#leaves.at.z, POINT_REACH, brushed);
     this.#butterfly.step(dt, this.#time, world, this.#nearest(this.#butterfly.looming.position, around));
     this.#ladybird.step(dt, this.#time, world, this.#nearest(this.#ladybird.looming.position, around));
     if (weather.rain > 0.3) this.#ladybird.hurryOff();
@@ -240,12 +243,9 @@ export class Goings {
     felt.air.x += outside.gust.x;
     felt.air.z += outside.gust.z;
     const brushed = this.#leaves.brush(at);
-    if (brushed > 0) felt.touch = Math.max(felt.touch, brushed);
+    if (brushed > 0) felt.contacts.add(this.#leaves.at.x, this.#leaves.at.y, this.#leaves.at.z, POINT_REACH, brushed);
     const rain = this.#around?.weather.rain ?? 0;
-    if (rain >= 0.01 && Math.random() < (dt * rain) / RAIN_HIT_EVERY) {
-      felt.touch = Math.max(felt.touch, RAIN_TOUCH);
-      this.rain.splash(at.x, at.y + 0.9, at.z, 0.9);
-    }
+    if (rain >= 0.01 && Math.random() < (dt * rain) / RAIN_HIT_EVERY) this.#dropOn(at, felt, true);
     if (this.#butterfly.active) felt.looming.push(this.#butterfly.looming);
     if (this.#ladybird.active) felt.looming.push(this.#ladybird.looming);
     if (this.#leaves.state === "falling") felt.looming.push(this.#leaves.looming);
@@ -514,10 +514,17 @@ export class Goings {
       this.#ripple(POOL.x + Math.cos(a) * r, POOL.z + Math.sin(a) * r, range(0.5, 1));
       this.rain.splash(POOL.x + Math.cos(a) * r, world.heightAt(POOL.x, POOL.z) + 0.1, POOL.z + Math.sin(a) * r, 0.55);
     }
-    if (Math.random() < (dt * rain) / RAIN_HIT_EVERY) {
-      felt.touch = Math.max(felt.touch, RAIN_TOUCH);
-      this.rain.splash(fly.x, fly.y + 0.9, fly.z, 0.9, false);
-    }
+    if (Math.random() < (dt * rain) / RAIN_HIT_EVERY) this.#dropOn(fly, felt, false);
+  }
+
+  /** A raindrop lands on the fly whose feet are at `at`, where it lands: anywhere within half its length round its middle, from above. */
+  #dropOn(at: Readonly<Vec3>, felt: Felt, ring: boolean) {
+    const a = Math.random() * TAU;
+    const r = (Math.sqrt(Math.random()) * FLY_LENGTH) / 2;
+    const x = at.x + Math.cos(a) * r;
+    const z = at.z + Math.sin(a) * r;
+    felt.contacts.add(x, at.y + FLY_HEIGHT, z, RAIN_DROP, RAIN_TOUCH);
+    this.rain.splash(x, at.y + 0.9, z, 0.9, ring);
   }
 
   #land(world: Around["world"], x: number, z: number) {

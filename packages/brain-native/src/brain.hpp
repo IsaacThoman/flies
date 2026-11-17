@@ -97,6 +97,14 @@ class Brain {
   InternalState state_;
   Modulation modulation_;
   std::vector<uint32_t> sense_inputs_;
+  // For each group of touch regions (by its place in wiring_.senses): each neuron's rate, and each region's last set.
+  struct Regional {
+    size_t group;
+    std::vector<double> rates;
+    std::vector<double> felt;
+  };
+  std::vector<Regional> regional_;
+  void touch(Regional& regional, const io::Senses& senses);
   std::vector<uint32_t> background_inputs_;
   // The water neurons' output gain, which thirst sets (io::water_output_gain).
   uint32_t water_gain_ = 0;

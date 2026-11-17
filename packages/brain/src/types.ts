@@ -12,7 +12,12 @@ export type BrainSenses = {
   /** Something growing fast in the left or right eye: an approaching threat. */
   loomLeft: number;
   loomRight: number;
-  /** Something touching the body: stroked, poked or held. */
+  /**
+   * Something touching the whole body at once, every region's bristles alike
+   * (dust all over). A body that knows where it is touched leaves this at 0
+   * and sends the region it touches instead (the `touch…` senses below); a
+   * region feels the stronger of the two.
+   */
   touch: number;
   /** The left or right antenna pressed against something. */
   bumpLeft: number;
@@ -90,6 +95,30 @@ export type BrainSenses = {
    */
   temperatureLeft?: number;
   temperatureRight?: number;
+  /*
+   * Touch where it lands: each region's mechanosensory bristles, 0 to 1, as
+   * far as something deflects them (README, Senses). Left out, 0.
+   */
+  /** The compound eye's interommatidial bristles, that side's. */
+  touchEyeLeft?: number;
+  touchEyeRight?: number;
+  /** The bristles that enter by the antennal nerve: the antenna's and the front and top of the head's between the eyes (frons, orbits, ocelli). */
+  touchFrontLeft?: number;
+  touchFrontRight?: number;
+  /** The back of the head's: the occiput and behind the eye. */
+  touchOcciputLeft?: number;
+  touchOcciputRight?: number;
+  /** Under the head: the proboscis, maxillary palps and vibrissae. */
+  touchMouthpartsLeft?: number;
+  touchMouthpartsRight?: number;
+  /** The thorax's back, both sides: the notum's microchaetae and macrochaetae. */
+  touchNotum?: number;
+  /** The wings' margins and the halteres, both sides. */
+  touchWings?: number;
+  /** The abdomen, both sides. */
+  touchAbdomen?: number;
+  /** The six legs. */
+  touchLegs?: number;
 };
 
 /**

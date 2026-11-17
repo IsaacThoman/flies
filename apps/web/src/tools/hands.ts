@@ -4,8 +4,8 @@
 // reaches the fly through its senses: food it can taste, a ball it can see
 // coming, a feather it can feel, air it can feel moving.
 
-import type { Looming } from "@fly/body";
-import { FLY_LENGTH, MOUTH_AHEAD, STEP_UP } from "@fly/body";
+import type { Contacts, Looming } from "@fly/body";
+import { FLY_HEIGHT, FLY_LENGTH, MOUTH_AHEAD, STEP_UP } from "@fly/body";
 import { BALL_RADIUS, SWOOP_SECONDS, createSurface, swoopAt } from "@fly/world";
 import type { FoodKind, Pantry, PieceKind, Vec3, World } from "@fly/world";
 import type { View } from "../camera.ts";
@@ -106,6 +106,14 @@ export const SWOOP_CLEARANCE = 2;
 /** The feather touches the fly within this distance of its middle (mm). Resting there is a light touch, stroking a full one. */
 export const FEATHER_REACH = 3.2;
 export const FEATHER_REST = 0.4;
+/**
+ * The feather touches with its tip, from above, where the pointer is: the
+ * part of the fly nearest that and whatever lies within this of it (mm), its
+ * tip's barbs, chosen: a sixth of the drawn feather's width; stroking, it
+ * brushes this far to either side too (view.ts draws it so).
+ */
+export const FEATHER_TIP = 0.5;
+export const FEATHER_BRUSH = 0.5;
 /** Air speed of a puff at the pointer (mm/s), and how far round it the puff is felt (mm). */
 export const PUFF_SPEED = { gentle: 450, strong: 1300 } as const;
 export const PUFF_RADIUS = 30;
@@ -419,6 +427,14 @@ export class Hands {
     if (this.current.id !== "feather" || !fly.onFeet) return 0;
     const d = Math.hypot(this.pointer.x - p.x, this.pointer.y - p.y, this.pointer.z - p.z);
     return d < FEATHER_REACH ? (this.#holding ? 1 : FEATHER_REST) : 0;
+  }
+
+  /** The feather on a fly, after `update`, where it touches it: added to `contacts` as `reach` says how hard. */
+  touch(fly: { readonly position: Vec3; readonly onFeet: boolean }, contacts: Contacts) {
+    if (this.current.id !== "feather" || !fly.onFeet) return;
+    const p = fly.position;
+    if (Math.hypot(this.pointer.x - p.x, this.pointer.y - p.y, this.pointer.z - p.z) >= FEATHER_REACH) return;
+    contacts.add(this.pointer.x, p.y + FLY_HEIGHT, this.pointer.z, FEATHER_TIP + (this.#holding ? FEATHER_BRUSH : 0), this.#holding ? 1 : FEATHER_REST);
   }
 
   /** Clears the per-frame events the screen has read. */

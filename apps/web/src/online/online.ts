@@ -15,7 +15,7 @@
 import * as THREE from "three";
 import type { OpenTableSocket } from "@fly/contracts";
 import { BODY_HALF, BODY_RADIUS, segmentToSegment } from "@fly/body";
-import type { Looming } from "@fly/body";
+import type { Contacts, Looming } from "@fly/body";
 import {
   AIRBORNE, AWAY, EATING, HANDS, HOLDING, LEAD, MAX_BITES, MAX_OWN, PLAYING, PROTOCOL, SEND_EVERY, TABLETOP_SCALE, TABLE_BUBBLES, TableBubbles, ballProgress,
   createFlyState, decodeFlies, everyoneIndex, fromWire, mix, roomTime, stream, tableHours, toV3, wireScale,
@@ -96,8 +96,7 @@ export class Online {
   readonly line: TableLine;
   readonly others: OtherFlies;
   readonly pantry: TablePantry;
-  /** What the others' hands do to this fly this frame: a feather's touch, their puffs, their balls coming. */
-  stroke = 0;
+  /** What the others' hands do to this fly this frame: their puffs, their balls coming (their feathers' touch is `touch`). */
   readonly air: Vec3 = { x: 0, y: 0, z: 0 };
   readonly looming: Looming[] = [];
   threat: Vec3 | null = null;
@@ -528,8 +527,7 @@ export class Online {
       if (Math.abs(o.position.y - mine.y) < BODY_RADIUS * 2) this.closest = Math.min(this.closest, bodyGap(mine, life.body.yaw, o.position, o.state.yaw));
     }
 
-    // Their hands on this fly: a feather resting on it or stroking it, a puff, a ball coming.
-    this.stroke = 0;
+    // Their hands on this fly: a puff, a ball coming.
     this.air.x = this.air.y = this.air.z = 0;
     this.looming.length = 0;
     this.threat = null;
@@ -541,7 +539,6 @@ export class Online {
       hand.heard(newest && !other?.resting && !(newest.flags & AWAY) ? newest : null);
       hand.update(dt, roomNow, life.body, camera, time, floorAt);
       const h = hand.hands;
-      this.stroke = Math.max(this.stroke, h.stroke);
       this.air.x += h.air.x;
       this.air.y += h.air.y;
       this.air.z += h.air.z;
@@ -580,15 +577,14 @@ export class Online {
     }
   }
 
-  /**
-   * What the other players' hands do this frame to one of this device's
-   * other flies: their feather on it (returned) and their puffs' air at it,
-   * added to `air`.
-   */
-  reach(fly: { readonly position: Vec3; readonly onFeet: boolean }, air: Vec3): number {
-    let stroke = 0;
-    for (let i = 0; i < this.#handList.length; i++) stroke = Math.max(stroke, this.#handList[i].hands.reach(fly, air));
-    return stroke;
+  /** The other players' puffs this frame at one of this device's other flies: their air at it, added to `air`. */
+  reach(fly: { readonly position: Vec3; readonly onFeet: boolean }, air: Vec3) {
+    for (let i = 0; i < this.#handList.length; i++) this.#handList[i].hands.reach(fly, air);
+  }
+
+  /** The other players' feathers on a fly this device lives, after `update`, where they touch it: added to `contacts`. */
+  touch(fly: { readonly position: Vec3; readonly onFeet: boolean }, contacts: Contacts) {
+    for (let i = 0; i < this.#handList.length; i++) this.#handList[i].hands.touch(fly, contacts);
   }
 
   /** This player threw the ball or dropped food just now: the table hears of it, and the throw waits for its moment. */

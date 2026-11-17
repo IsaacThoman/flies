@@ -385,10 +385,16 @@ try {
   // At rest its brain can be all but silent: the fly keeps the real time of day,
   // and in its siesta or at night it lies still with no region glowing. So it is
   // stroked with the feather, which its brain answers at any hour (a sleeping fly
-  // included), and the glow is read while the stroke goes on.
+  // included) when it strokes its face, where it rests following the fly, and
+  // the glow is read while the stroke goes on.
   await toTool("feather");
+  // Back to following the fly, at its face, wherever the steps before left the pointer.
+  await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.hands.release());
+  await waitFor(page, "pointer=following");
+  await waitForGameTime(page, 2);
   await page.keyboard.down("Enter");
-  await waitFor(page, "touch>0.9");
+  const stroked = await waitFor(page, "touch>0.9");
+  assert.ok(/FrontLeft 1\.00/.test(stroked.touched) && /FrontRight 1\.00/.test(stroked.touched), `the feather strokes its face: ${stroked.touched}`);
   const inside = await waitWithin(page, "glow~head-bristles|bristles", 10);
   await page.keyboard.up("Enter");
   console.log(`  glowing while stroked: ${inside.glow.split(" ").slice(0, 4).join(" ")}`);

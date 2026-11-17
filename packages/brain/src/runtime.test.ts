@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
-import { BACKGROUND, READOUTS, SCALES, SENSES, THIRST, WINGBEAT_RATE, backgroundRates, balanceFactor, decode, hungerOf, intensity, outputSynapses, senseRates, smooth, thirstOf, waterOutputGain, wire } from "./io.ts";
+import { BACKGROUND, BRISTLE_RATE, READOUTS, SCALES, SENSES, SLEEP_GATE, THIRST, WINGBEAT_RATE, backgroundRates, balanceFactor, decode, hungerOf, intensity, outputSynapses, regionRate, senseRates, smooth, thirstOf, waterOutputGain, wire } from "./io.ts";
 import { RECEPTORS, STAND_INS } from "./modulation.ts";
 import { OPERATING_POINT, buildWeights, completenessFactors } from "./params.ts";
 import { REGIONS, REGION_RATE_NAMES } from "./regions.ts";
@@ -53,6 +53,30 @@ test("smoothing follows a step with its time constant, however the time is split
   assert.equal(smooth(2, 9, 0, 40), 2);
 });
 
+test("touch drives each region at the stronger of its own and the whole body's, gated in sleep as the other mechanosensory senses", () => {
+  const wiring = wire(load());
+  const head = wiring.senses.find((g) => g.spec.name === "touch head")!;
+  const body = wiring.senses.find((g) => g.spec.name === "touch body")!;
+  const region = (group: typeof head, sense: string) => group.spec.regions!.find((r) => r.sense === sense)!;
+  const rate = (group: typeof head, sense: string, senses: Partial<BrainSenses>) => regionRate(group, region(group, sense), { ...RESTING_SENSES, ...senses });
+  assert.equal(head.maxRate, BRISTLE_RATE);
+  assert.equal(body.maxRate, BRISTLE_RATE);
+  assert.equal(rate(body, "touchNotum", { touchNotum: 0.5 }), 25);
+  assert.equal(rate(body, "touchWings", { touchNotum: 0.5 }), 0, "a part feels only its own touch");
+  assert.equal(rate(head, "touchEyeLeft", { touchNotum: 0.5 }), 0);
+  assert.equal(rate(head, "touchEyeRight", { touchEyeRight: 0.2, touch: 0.6 }), 30, "the stronger of its own and touch everywhere");
+  assert.equal(rate(head, "touchEyeLeft", { touch: 1 }), BRISTLE_RATE);
+  assert.equal(rate(body, "touchLegs", { touchLegs: 7 }), BRISTLE_RATE);
+  assert.equal(rate(body, "touchLegs", { touchLegs: Number.NaN }), 0);
+  assert.equal(rate(body, "touchNotum", { touchNotum: 1, sleepDepth: 1 }), BRISTLE_RATE * (1 - SLEEP_GATE));
+  // Every region is its own neurons: the group's, region after region, with none in two.
+  for (const group of [head, body]) {
+    assert.equal(group.ends!.length, group.spec.regions!.length);
+    assert.equal(group.ends!.at(-1), group.neurons.length);
+    assert.equal(new Set(group.neurons).size, group.neurons.length);
+  }
+});
+
 test("each sense drives its groups at its intensity times the stated maximum", () => {
   const wiring = wire(load());
   const at = (senses: Partial<BrainSenses>) => senseRates(wiring, { ...RESTING_SENSES, grounded: false, ...senses });
@@ -64,10 +88,8 @@ test("each sense drives its groups at its intensity times the stated maximum", (
   assert.equal(at({ loomLeft: 0.25 }).get("loomLeft"), 25);
   assert.equal(at({ loomLeft: 1 }).get("loomRight"), 0);
   assert.equal(at({ sweet: 0.5 }).get("sweet"), 50);
-  // Touch drives both of its groups.
-  const touch = at({ touch: 1 });
-  assert.equal(touch.get("touch head"), max.get("touch head"));
-  assert.equal(touch.get("touch body"), max.get("touch body"));
+  // Touch's groups have a rate a region (regionRate), not one for the group.
+  assert.equal(at({ touch: 1 }).has("touch head"), false);
   // Out of range and nonsense are clamped.
   assert.equal(at({ wind: 7 }).get("wind"), max.get("wind"));
   assert.equal(at({ wind: -1 }).get("wind"), 0);

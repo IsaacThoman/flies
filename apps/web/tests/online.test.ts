@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import type { TestContext } from "node:test";
 import * as THREE from "three";
+import { Contacts } from "@fly/body";
 import type { TableSocket, TableSocketStatus } from "@fly/contracts";
 import { CLOSE, EVERYONE, PROTOCOL, TABLETOP_SCALE, TABLE_LIGHTS, TABLE_WEATHERS, bitesEpoch, createFlyState, decodeBites, everyoneCode, readState } from "@fly/net";
 import type { ClientMessage, ServerMessage } from "@fly/net";
@@ -102,7 +103,7 @@ function atTable(t: TestContext, code = EVERYONE) {
     bubbles: { table: null } as TableHost["bubbles"],
     stage: {} as TableHost["stage"],
     eyes: {} as TableHost["eyes"],
-    felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] },
+    felt: { air: { x: 0, y: 0, z: 0 }, contacts: new Contacts(), looming: [] },
     here: () => "picnic",
     moving: () => false,
     moveTo() { assert.fail("the fixture is already in the welcome's place"); },

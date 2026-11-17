@@ -14,11 +14,40 @@
 #include <vector>
 
 #include "connectome.hpp"
+#include "fly_brain.h"
 
 namespace fly::io {
 
-/** The senses that are one intensity each (types.ts's BrainSenses less light). */
-enum Sense : uint8_t { kLoomLeft, kLoomRight, kTouch, kBumpLeft, kBumpRight, kWind, kSweet, kGrounded, kMaleTaste, kWingbeat, kBitter, kWater, kSenseCount };
+/** The senses that are one intensity each (types.ts's BrainSenses less light), the touch senses that say where it lands last (io.ts's TOUCH_SENSES). */
+enum Sense : uint8_t {
+  kLoomLeft,
+  kLoomRight,
+  kTouch,
+  kBumpLeft,
+  kBumpRight,
+  kWind,
+  kSweet,
+  kGrounded,
+  kMaleTaste,
+  kWingbeat,
+  kBitter,
+  kWater,
+  kTouchEyeLeft,
+  kTouchEyeRight,
+  kTouchFrontLeft,
+  kTouchFrontRight,
+  kTouchOcciputLeft,
+  kTouchOcciputRight,
+  kTouchMouthpartsLeft,
+  kTouchMouthpartsRight,
+  kTouchNotum,
+  kTouchWings,
+  kTouchAbdomen,
+  kTouchLegs,
+  kSenseCount
+};
+constexpr int kTouchParts = kSenseCount - kTouchEyeLeft;
+static_assert(kTouchParts == FLY_TOUCH_PARTS, "fly_brain.h's touch_parts are the touch senses");
 
 /** The internal state that comes with the senses (types.ts's STATE_KEYS), 0 to 1 each. */
 enum StateKey : uint8_t { kClockMorning, kClockEvening, kClockSleep, kSleepPressure, kSleepDepth, kStateCount };
@@ -37,6 +66,8 @@ struct Senses {
   double thirst = 1;
   /** The air's temperature at each antenna's arista, °C (types.ts's BrainSenses.temperatureLeft and Right); NaN, left out: no input. */
   double temperature_left = std::numeric_limits<double>::quiet_NaN(), temperature_right = std::numeric_limits<double>::quiet_NaN();
+  /** Touch where it lands, from kTouchEyeLeft on in Sense's order; 0, left out. */
+  double touch_parts[kTouchParts] = {};
 };
 
 struct Command {
@@ -44,6 +75,15 @@ struct Command {
 };
 
 enum Side : uint8_t { kLeft, kRight };
+
+/** One part of the body's mechanosensory bristles, touched as its sense says (io.ts's TouchRegion). */
+struct TouchRegion {
+  Sense sense;
+  /** Its sense's name in types.ts's BrainSenses. */
+  std::string name;
+  std::string description;
+  NeuronQuery select;
+};
 
 struct InputSpec {
   /** Name of the Poisson input in the simulation. */
@@ -67,6 +107,8 @@ struct InputSpec {
   bool after_eyes = false;
   /** Mechanosensory: reaches the brain at less than its strength while the fly sleeps (kSleepGate). */
   bool gated = false;
+  /** When not empty, the group is these regions' neurons, region after region, each its own sense (io.ts's SenseSpec.regions). */
+  std::vector<TouchRegion> regions = {};
 };
 
 /** io.ts's SLEEP_GATE: how much of a mechanosensory sense's strength is lost at full sleep depth. */
@@ -120,6 +162,8 @@ struct Group {
   InputSpec spec;
   std::vector<uint32_t> neurons;
   double max_rate;
+  /** With regions, where each region's neurons end in `neurons` (they start where the one before ends). */
+  std::vector<uint32_t> ends = {};
 };
 
 struct StateGroup {
@@ -153,6 +197,9 @@ Wiring wire(const Connectome& connectome);
 
 /** Each sense's intensity, 0..1 (grounded as 0 or 1). */
 double intensity(const Senses& senses, Sense sense);
+
+/** Region r of a group of regions: its rate, Hz per neuron (io.ts's regionRate). */
+double region_rate(const Group& group, size_t r, const Senses& senses);
 
 /** How hungry the senses say it is, 0..1: 1 (as it was before hunger) when not a number (io.ts's hungerOf). */
 double hunger_of(const Senses& senses);

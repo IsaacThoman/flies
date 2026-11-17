@@ -23,7 +23,7 @@
 namespace {
 constexpr double kMaxStepMs = 100;
 // SENSE_ORDER, COMMAND_ORDER and STATE_STATS in packages/contracts/src/brain.ts.
-constexpr int kScalars = 21, kCommands = 8, kStats = 4;
+constexpr int kScalars = 33, kCommands = 8, kStats = 4;
 // Where hunger is among the scalars; a game that sends fewer keeps no account of it, which is 1.
 constexpr int kHunger = 9;
 // And thirst, which is 1 the same way.
@@ -32,6 +32,9 @@ constexpr int kThirst = 18;
 constexpr int kWingbeat = 10;
 // Where the temperature at each antenna is; a game that sends fewer feels none, NaN.
 constexpr int kTemperatureLeft = 19, kTemperatureRight = 20;
+// Where touch where it lands starts, FLY_TOUCH_PARTS of it; a game that sends fewer is touched nowhere but by `touch`, 0.
+constexpr int kTouchParts = 21;
+static_assert(kTouchParts + FLY_TOUCH_PARTS == kScalars, "the touch parts are the last scalars");
 enum Status { kLoading, kRunning, kFailed };
 
 struct BrainHost {
@@ -137,8 +140,9 @@ void *Run(void *arg) {
     fly_senses senses = {
       scalars[0], scalars[1], scalars[2], scalars[3], scalars[4], scalars[5], scalars[6], scalars[7] > 0.5f,
       eyes ? light[0].data() : nullptr, eyes ? light[1].data() : nullptr, scalars[8], scalars[kHunger], scalars[kWingbeat],
-      scalars[11], scalars[12], scalars[13], scalars[14], scalars[15], scalars[16], scalars[17], scalars[kThirst], scalars[kTemperatureLeft], scalars[kTemperatureRight],
+      scalars[11], scalars[12], scalars[13], scalars[14], scalars[15], scalars[16], scalars[17], scalars[kThirst], scalars[kTemperatureLeft], scalars[kTemperatureRight], {},
     };
+    std::copy(scalars + kTouchParts, scalars + kTouchParts + FLY_TOUCH_PARTS, senses.touch_parts);
     fly_command c = {};
     fly_stats stats = {};
     char message[512] = "";
