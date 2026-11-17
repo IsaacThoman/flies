@@ -16,7 +16,7 @@
 // What goes wrong is said in the heading's place, briefly, in pink.
 
 import type { RemoteButton } from "@fly/contracts";
-import { CODE_LENGTH, MAX_PLAYERS, PASSWORD_MAX, ROOM_NAME_MAX, isTableCode, roomName } from "@fly/net";
+import { CODE_LENGTH, MAX_FLIES, PASSWORD_MAX, ROOM_NAME_MAX, isTableCode, roomName } from "@fly/net";
 import { Menu, choiceValue, indexOf } from "@fly/ui";
 import type { ChoiceItem, FieldItem, HitMap, MenuItem, Option } from "@fly/ui";
 import type { Frame } from "../../display.ts";
@@ -130,7 +130,7 @@ export class OnlineScreen implements Screen {
         if (!rooms) rows.push({ kind: "action", id: "looking", label: "Looking for rooms…", disabled: true });
         else if (!rooms.length) rows.push({ kind: "action", id: "none", label: "No rooms open", disabled: true });
         for (const r of rooms ?? []) {
-          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), count: [r.flies, MAX_PLAYERS], locked: r.locked, disabled: r.flies >= MAX_PLAYERS });
+          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), count: [r.flies, MAX_FLIES], locked: r.locked, disabled: r.flies >= MAX_FLIES });
         }
         return rows;
       }
@@ -158,7 +158,7 @@ export class OnlineScreen implements Screen {
         if (!table) return [];
         const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
         const rows: MenuItem[] = shell.canShare ? [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", disabled: !table.joined }] : [];
-        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: `remove:${o.id}`, label: "Remove", swatch: o.colour });
+        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: `remove:${o.id}`, label: "Remove", swatch: o.colours });
         rows.push({ kind: "action", id: "leave", label: "Leave the room" });
         return rows;
       }
@@ -179,7 +179,7 @@ export class OnlineScreen implements Screen {
     const table = shell.table;
     const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
     const rooms = shell.rooms ? shell.rooms.map((r) => `${r.code}:${r.name}:${r.place}:${r.flies}:${r.locked}`).join(",") : "?";
-    const at = table ? `${table.name}|${table.joined}|${table.starting}|${copied}|${table.others.map((o) => o.id).join(",")}` : "alone";
+    const at = table ? `${table.name}|${table.joined}|${table.starting}|${copied}|${table.others.map((o) => `${o.id}/${o.colours.length}`).join(",")}` : "alone";
     return `${this.view}|${this.#note}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}`;
   }
 

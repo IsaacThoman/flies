@@ -3,7 +3,7 @@
 //   menu ─┬─ Play
 //         ├─ Watch
 //         ├─ About
-//         ├─ Settings: Screensaver | On screen | Picture, as tabs
+//         ├─ Settings: Screensaver (and how many flies) | On screen | Picture, as tabs
 //         └─ Online (in a browser): rooms with others (online.ts)
 //
 // The menu is the title, at launch and from play alike (Back, Play/Pause or
@@ -11,6 +11,7 @@
 // playing (on the Apple TV it leaves the app, as the root of an app must).
 // Every setting is two steps from it.
 
+import { COLOURS } from "@fly/net";
 import { Menu, choiceValue, indexOf } from "@fly/ui";
 import type { ChoiceItem, MenuItem, Option } from "@fly/ui";
 import { INK_SOFT, font, glassPanel, orb, text } from "@fly/ui";
@@ -100,6 +101,7 @@ const OPACITY: Option<OverlayOpacity>[] = [
   { value: "faint", label: "Faint" },
 ];
 const PLACE: Option<Settings["place"]>[] = [{ value: "turns", label: "Each in turn" }, ...PLACES.map((p) => ({ value: p.id, label: p.name }))];
+const flyCounts = (most: number): Option<number>[] => Array.from({ length: most }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
 const ON_OFF: Option<boolean>[] = [
   { value: false, label: "Off" },
   { value: true, label: "On" },
@@ -119,6 +121,8 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       choice("wallpaperCamera", "Camera", CAMERA),
       // Only when there is somewhere else to live.
       ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE)] : []),
+      // How many flies live here, each in its enamel; only where this device can run more than one brain.
+      ...(shell.maxFlies > 1 ? [{ ...choice("flies", "Flies", flyCounts(shell.maxFlies)), dots: COLOURS }] : []),
       // Whether the sky follows the weather outside, only where the Apple TV can tell it.
       ...(shell.weatherOutside ? [choice("realWeather", "Real weather", ON_OFF)] : []),
     ],

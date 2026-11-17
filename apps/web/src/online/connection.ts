@@ -3,11 +3,11 @@
 // and then, and coming back when the line drops. A deploy restarting the
 // server, a phone going through a tunnel, a laptop waking: the line is
 // opened again, a little later each time it fails, and the hello says where
-// the fly is so that it carries on where it was. Only the room turning it
+// its flies are so that they carry on where they were. Only the room turning it
 // away (removed from the table, the table gone, the protocol changed) ends it.
 
 import type { OpenTableSocket, TableSocket } from "@fly/contracts";
-import { CLOSE, FLIES, FLY_MAX, MAX_BITES, RoomClock, bitesLength, encodeBites, encodeFly } from "@fly/net";
+import { CLOSE, FLIES, MAX_BITES, OWN_MAX, RoomClock, bitesLength, encodeBites, encodeOwn } from "@fly/net";
 import type { Bite, ClientMessage, FlyState, Refusal, ServerMessage, WireScale } from "@fly/net";
 
 /** The clock is asked often at first, to settle quickly, then once a second. */
@@ -43,8 +43,8 @@ export class TableLine {
   readonly #url: string;
   readonly #hello: () => Extract<ClientMessage, { type: "hello" }>;
   #socket: TableSocket | null = null;
-  readonly #fly = new DataView<ArrayBuffer>(new ArrayBuffer(FLY_MAX));
-  /** One view per length a fly's state can be, so sending one makes nothing new. */
+  readonly #fly = new DataView<ArrayBuffer>(new ArrayBuffer(OWN_MAX));
+  /** One view per length its flies' states can come to, so sending them makes nothing new. */
   readonly #flyViews = new Map<number, Uint8Array<ArrayBuffer>>();
   readonly #bites = new DataView<ArrayBuffer>(new ArrayBuffer(bitesLength(MAX_BITES)));
   #pings = 0;
@@ -116,10 +116,10 @@ export class TableLine {
     this.#socket?.send(text);
   }
 
-  /** Sends this device's fly, at the scale of the place it is in. */
-  sendFly(scale: WireScale, state: FlyState) {
+  /** Sends this device's flies, the first `count` of `states`, at the scale of the place they are in. */
+  sendFlies(scale: WireScale, states: readonly FlyState[], count: number) {
     if (this.status !== "joined" || !this.#socket) return;
-    const n = encodeFly(this.#fly, scale, state);
+    const n = encodeOwn(this.#fly, scale, states, count);
     let view = this.#flyViews.get(n);
     if (!view) this.#flyViews.set(n, (view = new Uint8Array(this.#fly.buffer, 0, n)));
     this.bytesOut += n;

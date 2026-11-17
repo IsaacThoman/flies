@@ -40,6 +40,13 @@ export type SceneSet = {
    */
   live?(dt: number, around: Around): void;
   /**
+   * What the place's goings-on do this frame to another fly this device
+   * lives, at `at` (after `live`): left in `felt`, as `live` leaves in
+   * `around.felt` what reaches the one the player follows. Optional: a place
+   * without it does nothing to them.
+   */
+  feel?(dt: number, at: Readonly<Vec3>, felt: Felt): void;
+  /**
    * At a table with others the table says when a goings-on happens, and each
    * device starts it from the same random stream (`random`), so all see the
    * same visit; the place's own pace is off (`Around.shared`). Optional.

@@ -18,7 +18,7 @@ import { paint } from "../../scene/build.ts";
 import type { Daylight } from "../../scene/light.ts";
 import { SHADE, shaded } from "../../scene/shade.ts";
 import type { Weather } from "../../scene/weather.ts";
-import type { Around } from "../types.ts";
+import type { Around, Felt } from "../types.ts";
 import { outside } from "./outside.ts";
 import { Rain } from "./rain.ts";
 import { Butterfly, Ladybird, Leaves } from "./visitors.ts";
@@ -213,6 +213,20 @@ export class Goings {
     this.#stepBoat(dt, weather);
     this.#stepFound(dt, around);
     this.#rainOn(dt, around);
+    if (this.#butterfly.active) felt.looming.push(this.#butterfly.looming);
+    if (this.#ladybird.active) felt.looming.push(this.#ladybird.looming);
+    if (this.#leaves.state === "falling") felt.looming.push(this.#leaves.looming);
+  }
+
+  /** What this frame's goings-on do to another fly, at `at`: the gust, a raindrop now and then, and what it could see coming. */
+  feel(dt: number, at: Readonly<Vec3>, felt: Felt) {
+    felt.air.x += outside.gust.x;
+    felt.air.z += outside.gust.z;
+    const rain = this.#around?.weather.rain ?? 0;
+    if (rain >= 0.01 && Math.random() < (dt * rain) / RAIN_HIT_EVERY) {
+      felt.touch = Math.max(felt.touch, RAIN_TOUCH);
+      this.rain.splash(at.x, at.y + 0.9, at.z, 0.9);
+    }
     if (this.#butterfly.active) felt.looming.push(this.#butterfly.looming);
     if (this.#ladybird.active) felt.looming.push(this.#ladybird.looming);
     if (this.#leaves.state === "falling") felt.looming.push(this.#leaves.looming);

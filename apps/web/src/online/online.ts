@@ -1,9 +1,10 @@
 // Living at a table with others (docs/online.md). This device is the
-// authority on its own fly: its brain and body run here, and about 20 times
-// a second the table hears where it is and how it is posed. Everyone else's
-// fly is a body posed from what their device sends (others.ts), which this
-// fly sees with its eyes and meets with its body; their hands act on the
-// world as this player's do (other-hands.ts). The rest of the world there is
+// authority on its own flies (one, or as many as the player keeps and the
+// table has seats for): their brains and bodies run here, and about 20 times
+// a second the table hears where they are and how they are posed. Everyone
+// else's fly is a body posed from what their device sends (others.ts), which
+// these flies see with their eyes and meet with their bodies; their hands act
+// on the world as this player's do (other-hands.ts). The rest of the world there is
 // the table's: the place, the food (table-pantry.ts), the light and the
 // weather by the starter's clock, the bubbles from its seed and clock, and
 // when a visitor comes. Nothing passes between the flies but what their
@@ -14,10 +15,14 @@ import type { OpenTableSocket } from "@fly/contracts";
 import { BODY_HALF, BODY_RADIUS, segmentToSegment } from "@fly/body";
 import type { Looming } from "@fly/body";
 import {
-  AIRBORNE, AWAY, EATING, HANDS, HOLDING, LEAD, MAX_BITES, PLAYING, PROTOCOL, SEND_EVERY, TABLETOP_SCALE, TABLE_BUBBLES, TableBubbles, ballProgress, createFlyState,
-  decodeFlies, fromWire, mix, stream, tableHours, toV3, wireScale,
+  AIRBORNE, AWAY, EATING, HANDS, HOLDING, LEAD, MAX_BITES, MAX_OWN, PLAYING, PROTOCOL, SEND_EVERY, TABLETOP_SCALE, TABLE_BUBBLES, TableBubbles, ballProgress,
+  createFlyState, decodeFlies, fromWire, mix, stream, tableHours, toV3, wireScale,
 } from "@fly/net";
-import type { BallWire, Bite, BubbleSnapshot, FlyState, FoodWire, HappeningWire, Refusal, RoomInfo, ServerMessage, Spot, TableStart, WireScale } from "@fly/net";
+import type {
+  BallWire, Bite, BubbleSnapshot, FlyState, FoodWire, HappeningWire, Refusal, RoomInfo, SeatedFly, ServerMessage, Spot, TableStart, WireScale,
+} from "@fly/net";
+import type { FlyPose } from "@fly/contracts";
+import type { Company } from "../company.ts";
 import { BALL_RADIUS, SWOOP_SECONDS, WORLDS } from "@fly/world";
 import type { FoodKind, Vec3, World } from "@fly/world";
 import type { Eyes } from "../eyes/eyes.ts";
@@ -32,7 +37,7 @@ import { TOOLS } from "../tools/hands.ts";
 import type { Hands } from "../tools/hands.ts";
 import { TableLine } from "./connection.ts";
 import { OtherHand } from "./other-hands.ts";
-import { OtherFlies } from "./others.ts";
+import type { OtherFlies } from "./others.ts";
 import { TablePantry } from "./table-pantry.ts";
 
 /** Bites go to the room this often, ms. */
@@ -49,11 +54,22 @@ const WEATHER_TOOL = TOOLS.findIndex((t) => t.id === "weather");
 export type TableHost = {
   readonly scene: THREE.Scene;
   readonly stage: Stage;
+  /** The fly the player follows: this device's first at the table. */
   readonly life: Life;
+  /** The others this device lives, after it in line. */
+  readonly company: Company;
+  /** Every other fly, as drawn: the table's other players' are kept here. */
+  readonly others: OtherFlies;
   readonly hands: Hands;
   readonly fly: FlyView;
   readonly eyes: Eyes;
   readonly bubbles: Bubbles;
+  /** How many flies the player keeps (Settings), as many as this device may: how many it asks the table to seat. */
+  flies(): number;
+  /** The table seats these of this device's flies, in line: the company becomes as many, and each wears its colour. */
+  seat(flies: readonly SeatedFly[]): void;
+  /** All its flies eat from this pantry from now on. */
+  share(pantry: TablePantry): void;
   /** What the place's goings-on left for the fly this frame. */
   readonly felt: Felt;
   /** Where the fly is now. */
@@ -82,9 +98,13 @@ export class Online {
   readonly air: Vec3 = { x: 0, y: 0, z: 0 };
   readonly looming: Looming[] = [];
   threat: Vec3 | null = null;
-  /** This player at the table, its colour, and who started it (they choose the place, the light and the weather, and can take a fly off). */
+  /** This player at the table (its first fly's id), that fly's colour, and who started it (they choose the place, the light and the weather, and can take a device's flies off). */
   id = 0;
   colour = "";
+  /** This device's flies at the table, in line, as the table last seated them. */
+  mine: readonly SeatedFly[] = [];
+  /** How many flies this device last asked the table for. */
+  asked = 0;
   starter = 0;
   epoch = 0;
   place: PlaceId | null = null;
@@ -94,7 +114,7 @@ export class Online {
   readonly triedPassword: boolean;
   /** Room time now, ms. */
   now = 0;
-  /** The nearest any other fly's body came to this one's, as drawn here (mm; below 0 they overlapped), since last published. */
+  /** The nearest any other player's fly's body came to the followed one's, as drawn here (mm; below 0 they overlapped), since last published. */
   closest = Infinity;
   readonly shared: SharedTable;
   readonly #host: TableHost;
@@ -102,8 +122,9 @@ export class Online {
   readonly #hands = new Map<number, OtherHand>();
   /** The same hands in a list, for going through each frame without making anything. */
   readonly #handList: OtherHand[] = [];
-  readonly #me: FlyState = createFlyState();
-  readonly #mine: BallWire = { by: 0, at: 0, from: [0, 0, 0], via: [0, 0, 0], to: [0, 0, 0] };
+  /** This device's flies' states as they go to the table, in line. */
+  readonly #mine: FlyState[] = Array.from({ length: MAX_OWN }, createFlyState);
+  readonly #thrown: BallWire = { by: 0, at: 0, from: [0, 0, 0], via: [0, 0, 0], to: [0, 0, 0] };
   #mineFlying = false;
   readonly #othersAt: Vec3[] = [];
   readonly #anchor: Vec3 = { x: 0, y: 0, z: 0 };
@@ -130,8 +151,8 @@ export class Online {
   #clock = { at: 0, wall: 0, offset: 0 };
   /** Welcomed at least once: a later welcome is coming back after the line dropped. */
   #welcomed = false;
-  /** Carried to the table's place, and what to do on arrival: where to stand, and the food there. */
-  #arrival: { spot: Spot | null; foods: FoodWire[]; epoch: number; scale: WireScale; bubbles: BubbleSnapshot | null } | null = null;
+  /** Carried to the table's place, and what to do on arrival: where each of this device's flies is to stand (by id; none, where it stands already), and the food there. */
+  #arrival: { spots: Map<number, Spot>; foods: FoodWire[]; epoch: number; scale: WireScale; bubbles: BubbleSnapshot | null } | null = null;
   #table: TableBubbles | null = null;
   /** The table's seed, for its bubbles. */
   #seed = 0;
@@ -142,19 +163,19 @@ export class Online {
     this.#host = host;
     this.code = code;
     this.#world = host.life.world;
-    this.others = new OtherFlies(host.scene, this.#world);
+    this.others = host.others;
     this.pantry = new TablePantry(this.#world);
-    host.life.share(this.pantry);
+    host.share(this.pantry);
     this.pantry.onFound = (food) => this.line.send({ type: "found", id: food.id, name: food.name, x: food.x, z: food.z, y: food.y, r: food.r, sweet: food.sweet });
     this.shared = { others: this.#othersAt, anchor: this.#anchor };
     this.triedPassword = !!password;
     let starting = start;
     let opening = password;
     this.line = new TableLine(open, url, () => {
-      const p = host.life.body.position;
-      // Coming back after a moment away, the fly carries on where it is (in the place of the table's epoch it is in); the first time, the table says where it stands.
-      const back = this.#welcomed ? { at: [p.x, p.z, host.life.body.yaw, p.y] as Spot, epoch: this.epoch } : {};
-      return { type: "hello" as const, v: PROTOCOL, table: code, key, ...back, ...(starting ? { start: starting } : {}), ...(opening ? { password: opening } : {}) };
+      // Coming back after a moment away, its flies carry on where they are (in the place of the table's epoch they are in); the first time, the table says where they stand.
+      const back = this.#welcomed ? { at: this.#lives().map((l) => [l.body.position.x, l.body.position.z, l.body.yaw, l.body.position.y] as Spot), epoch: this.epoch } : {};
+      this.asked = host.flies();
+      return { type: "hello" as const, v: PROTOCOL, table: code, key, flies: this.asked, ...back, ...(starting ? { start: starting } : {}), ...(opening ? { password: opening } : {}) };
     });
     this.line.onMessage = (m) => {
       if (m.type === "welcome") {
@@ -168,6 +189,18 @@ export class Online {
 
   get joined() {
     return this.line.joined && this.id > 0;
+  }
+
+  /** This device's flies' lives, in line: the followed one, then its company. */
+  #lives(): Life[] {
+    return [this.#host.life, ...this.#host.company.list.map((c) => c.life)];
+  }
+
+  /** The player wants another number of flies at the table: it asks, and is seated as many as there are seats for. */
+  recount(n: number) {
+    if (!this.joined || n === this.asked) return;
+    this.asked = n;
+    this.line.send({ type: "flies", count: n });
   }
 
   /** The room has welcomed this device, at least once: it has been at the table, not only on its way. */
@@ -195,7 +228,6 @@ export class Online {
   }
 
   #message(m: ServerMessage) {
-    const host = this.#host;
     switch (m.type) {
       case "welcome": {
         const back = this.#welcomed;
@@ -205,7 +237,7 @@ export class Online {
         this.colour = m.colour;
         this.starter = m.starter;
         this.pantry.player = m.id;
-        host.fly.model.mark(m.colour);
+        this.#seat(m.flies);
         this.#clock = { at: m.now, wall: m.wall, offset: m.offset };
         this.now = this.#roomNow();
         // The room's clock may be a restarted room's, behind the last sends: they are due now, not once it has caught up.
@@ -214,18 +246,34 @@ export class Online {
         // Whoever is here now; anyone heard of before is from before the line dropped.
         this.others.forget();
         for (const o of [...this.others.list]) if (!m.players.some((p) => p.id === o.id)) this.#leave(o.id);
-        for (const p of m.players) this.#join(p.id, p.colour, p.away);
+        for (const p of m.players) this.#join(p.id, p.colour, p.away, p.of);
         this.#mineFlying = false;
         for (const b of m.balls) this.#hands.get(b.by)?.throw(b);
         this.#visits.length = 0;
         for (const h of m.happenings) this.#visits.push(h);
         this.#takeWorld(m.world.light, m.world.weather, true);
         this.#seed = m.seed;
-        this.#arrive(m.place, m.epoch, m.foods, back && m.epoch === this.epoch && this.#standsAt(m.at) ? null : m.at, m.bubbles);
+        // Coming back to the place they are in, each carries on where it stands, if the table has it there.
+        const spots = new Map<number, Spot>();
+        const lives = this.#lives();
+        for (const [i, f] of m.flies.entries()) if (!(back && m.epoch === this.epoch && lives[i] && this.#standsAt(lives[i], f.at))) spots.set(f.id, f.at);
+        this.#arrive(m.place, m.epoch, m.foods, spots, m.bubbles);
+        return;
+      }
+      case "seated": {
+        const known = new Set(this.mine.map((f) => f.id));
+        this.#seat(m.flies);
+        // The new ones stand where the table set them down: now, or once carried to its place.
+        const lives = this.#lives();
+        for (const [i, f] of m.flies.entries()) {
+          if (known.has(f.id)) continue;
+          if (this.#arrival) this.#arrival.spots.set(f.id, f.at);
+          else lives[i]?.setDown(f.at[0], f.at[1], f.at[2], f.at[3]);
+        }
         return;
       }
       case "joined":
-        this.#join(m.id, m.colour, m.away);
+        this.#join(m.id, m.colour, m.away, m.of);
         return;
       case "away": {
         const other = this.others.get(m.id);
@@ -253,7 +301,7 @@ export class Online {
         for (const hand of this.#handList) hand.clear();
         this.#mineFlying = false;
         this.#visits.length = 0;
-        this.#arrive(m.place, m.epoch, m.foods, m.spots[this.id] ?? null, null);
+        this.#arrive(m.place, m.epoch, m.foods, new Map(this.mine.filter((f) => m.spots[f.id]).map((f) => [f.id, m.spots[f.id]])), null);
         return;
       case "happening":
         this.#visits.push(m);
@@ -267,25 +315,32 @@ export class Online {
     }
   }
 
-  /** Whether this fly is where the table has it already: there, on the same surface (not the floor under the table it is on). */
-  #standsAt(spot: Spot) {
-    const p = this.#host.life.body.position;
+  /** This device's flies are these at the table, in line: the company follows, each in its colour. */
+  #seat(flies: readonly SeatedFly[]) {
+    if (flies.length === 0) return;
+    this.mine = flies;
+    this.#host.seat(flies);
+  }
+
+  /** Whether a fly is where the table has it already: there, on the same surface (not the floor under the table it is on). */
+  #standsAt(life: Life, spot: Spot) {
+    const p = life.body.position;
     if (Math.hypot(spot[0] - p.x, spot[1] - p.z) > PUT_BACK) return false;
     return spot[3] === undefined || Math.abs(this.#world.heightAt(p.x, p.z, p.y) - spot[3]) <= PUT_BACK;
   }
 
   /** The table is in `place` (in its `epoch`'th): there already, the food and the spot are taken now; elsewhere, once carried there. */
-  #arrive(place: string, epoch: number, foods: FoodWire[], spot: Spot | null, bubbles: BubbleSnapshot | null) {
+  #arrive(place: string, epoch: number, foods: FoodWire[], spots: Map<number, Spot>, bubbles: BubbleSnapshot | null) {
     if (!isPlaceId(place)) return;
     this.place = place;
     const scale = wireScale(WORLDS[place]);
     this.#heardScale = scale;
-    this.#arrival = { spot, foods, epoch, scale, bubbles };
+    this.#arrival = { spots, foods, epoch, scale, bubbles };
     if (this.#host.here() === place && !this.#host.moving()) this.arrived();
     else this.#host.moveTo(place);
   }
 
-  /** The fly is in the table's place: it stands where the table says, among the table's food. */
+  /** The flies are in the table's place: each stands where the table says, among the table's food. */
   arrived() {
     const arrival = this.#arrival;
     if (!arrival) return;
@@ -293,7 +348,11 @@ export class Online {
     this.epoch = arrival.epoch;
     this.#scale = arrival.scale;
     this.pantry.mirror.welcome(arrival.foods);
-    if (arrival.spot) this.#host.life.body.place(arrival.spot[0], arrival.spot[1], arrival.spot[2], arrival.spot[3]);
+    const lives = this.#lives();
+    for (const [i, f] of this.mine.entries()) {
+      const spot = arrival.spots.get(f.id);
+      if (spot && lives[i]) lives[i].setDown(spot[0], spot[1], spot[2], spot[3]);
+    }
     // Only the picnic has bubbles: the table's, from its seed and the place's count.
     const bubbles = this.#host.bubbles;
     this.#table = this.place === "picnic" ? new TableBubbles(mix(this.#seed, this.epoch), this.#world, TABLE_BUBBLES) : null;
@@ -301,10 +360,11 @@ export class Online {
     bubbles.table = this.#table ? { bubbles: this.#table, time: this.now / 1000, burst: this.#burst } : null;
   }
 
-  #join(id: number, colour: string, away: boolean) {
-    if (id === this.id) return;
-    this.others.join(id, colour, away);
-    if (this.#hands.has(id)) return;
+  /** Another player's fly is at the table (`of`: whose, by their first fly, whose state carries their hand). */
+  #join(id: number, colour: string, away: boolean, of: number) {
+    if (of === this.id || this.mine.some((f) => f.id === id)) return;
+    this.others.join(id, colour, away, of);
+    if (id !== of || this.#hands.has(id)) return;
     const hand = new OtherHand(this.#host.scene, this.#world, id, colour, this.pantry);
     for (const object of hand.view.seen) this.#host.eyes.see(object);
     this.#hands.set(id, hand);
@@ -313,6 +373,7 @@ export class Online {
 
   #leave(id: number) {
     this.others.leave(id);
+    // Their first fly leaves only with their device: so does their hand.
     const hand = this.#hands.get(id);
     if (!hand) return;
     hand.dispose();
@@ -340,31 +401,39 @@ export class Online {
     if (this.starting) this.line.send({ type: "place", place });
   }
 
-  /** The starter takes another player's fly off the table. */
+  /** The starter takes another player's device off the table, by any of its flies: all of them go. */
   remove(id: number) {
-    if (this.starting && id !== this.id) this.line.send({ type: "remove", id });
+    if (this.starting && !this.mine.some((f) => f.id === id)) this.line.send({ type: "remove", id });
   }
 
   /** Before this fly lives its frame: the line, the others where they were a moment ago, and what their hands do to it. */
-  update(dt: number, camera: THREE.PerspectiveCamera, pictureHeight: number, time: number, floorAt: (x: number, z: number, below: number) => number) {
+  update(dt: number, camera: THREE.PerspectiveCamera, time: number, floorAt: (x: number, z: number, below: number) => number) {
     this.line.update(dt);
     const roomNow = this.#roomNow();
     const prev = this.#lastRoomNow || roomNow;
     this.#lastRoomNow = roomNow;
     this.now = roomNow;
-    const { life } = this.#host;
+    const { life, company } = this.#host;
     this.#localTools(roomNow);
-    const pixels = pictureHeight / (2 * Math.tan((camera.fov * Math.PI) / 360));
-    this.others.update(roomNow, dt, life.crowd, camera.position, pixels);
 
-    // The others where this fly can meet them, and the one visits are planned round (the lowest id, the same on every device).
+    // The other flies where this one can meet them, and the one visits are planned round (the lowest id, the same on every device).
     this.#othersAt.length = 0;
-    let anchorId = this.id || 255;
+    let anchorId = this.mine[0]?.id || 255;
     const a = this.#anchor;
     const mine = life.body.position;
     a.x = mine.x;
     a.y = mine.y;
     a.z = mine.z;
+    for (const c of company.list) {
+      const p = c.life.body.position;
+      this.#othersAt.push(p);
+      if (c.id > 0 && c.id < anchorId) {
+        anchorId = c.id;
+        a.x = p.x;
+        a.y = p.y;
+        a.z = p.z;
+      }
+    }
     const list = this.others.list;
     for (let i = 0; i < list.length; i++) {
       const o = list[i];
@@ -413,8 +482,8 @@ export class Online {
     if (table) {
       table.rain = this.#host.stage.weather.rain;
       if (this.#mineFlying) {
-        if (ballProgress(this.#mine, roomNow) >= 1) this.#mineFlying = false;
-        else if (ballProgress(this.#mine, roomNow) > 0) table.hitBy(Math.max(this.#mine.at, prev) / 1000, roomNow / 1000, BALL_RADIUS, this.#mine);
+        if (ballProgress(this.#thrown, roomNow) >= 1) this.#mineFlying = false;
+        else if (ballProgress(this.#thrown, roomNow) > 0) table.hitBy(Math.max(this.#thrown.at, prev) / 1000, roomNow / 1000, BALL_RADIUS, this.#thrown);
       }
       table.update(roomNow / 1000);
       if (this.#host.bubbles.table) this.#host.bubbles.table.time = roomNow / 1000;
@@ -430,6 +499,17 @@ export class Online {
     }
   }
 
+  /**
+   * What the other players' hands do this frame to one of this device's
+   * other flies: their feather on it (returned) and their puffs' air at it,
+   * added to `air`.
+   */
+  reach(fly: { readonly position: Vec3; readonly onFeet: boolean }, air: Vec3): number {
+    let stroke = 0;
+    for (let i = 0; i < this.#handList.length; i++) stroke = Math.max(stroke, this.#handList[i].hands.reach(fly, air));
+    return stroke;
+  }
+
   /** This player threw the ball or dropped food just now: the table hears of it, and the throw waits for its moment. */
   #localTools(roomNow: number) {
     const hands = this.#host.hands;
@@ -440,7 +520,7 @@ export class Online {
       const lead = Math.min(600, Math.max(LEAD, this.line.clock.rtt * 1.5));
       const ball = hands.ball;
       ball.t = -lead / (SWOOP_SECONDS * 1000);
-      const mine = this.#mine;
+      const mine = this.#thrown;
       mine.by = this.id;
       mine.at = roomNow + lead;
       toV3(mine.from, ball.from);
@@ -455,13 +535,13 @@ export class Online {
     }
   }
 
-  /** After this fly has lived its frame and been posed: tells the table, when due. */
+  /** After its flies have lived their frame and been posed: tells the table, when due. */
   send(player: PlayerNow) {
     if (!this.joined || this.#arrival || this.#host.moving()) return;
     const now = this.now;
     if (now - this.#sentAt >= SEND_EVERY - 4) {
       this.#sentAt = now;
-      this.line.sendFly(this.#scale, this.#state(player, now));
+      this.line.sendFlies(this.#scale, this.#mine, this.#states(player, now));
     }
     if (now - this.#bitesAt >= BITES_EVERY) {
       this.#bitesAt = now;
@@ -485,7 +565,7 @@ export class Online {
   away(player: PlayerNow) {
     if (!this.joined) return;
     player.away = true;
-    this.line.sendFly(this.#scale, this.#state(player, this.#roomNow()));
+    this.line.sendFlies(this.#scale, this.#mine, this.#states(player, this.#roomNow()));
   }
 
   /** The page is back: the line comes back now if it dropped meanwhile. */
@@ -493,43 +573,32 @@ export class Online {
     this.line.hurry();
   }
 
-  #state(player: PlayerNow, now: number): FlyState {
-    const { life, fly, hands } = this.#host;
-    const s = this.#me;
-    const body = life.body;
-    s.seq = ++this.#seq & 0xffff;
-    s.t = now;
-    s.epoch = this.epoch;
-    s.flags = (body.mode === "airborne" ? AIRBORNE : 0) | (life.eating ? EATING : 0) | (player.away ? AWAY : 0) | (player.playing ? PLAYING : 0) | (player.handsOut ? HANDS : 0) | (player.holding ? HOLDING : 0);
-    s.x = body.position.x;
-    s.y = body.position.y;
-    s.z = body.position.z;
-    s.yaw = body.yaw;
-    s.upX = body.up.x;
-    s.upZ = body.up.z;
-    s.vx = body.velocity.x;
-    s.vy = body.velocity.y;
-    s.vz = body.velocity.z;
-    const p = fly.pose;
-    const q = s.pose;
-    q.speed = p.speed;
-    q.turn = p.turn;
-    q.wings = p.wings;
-    q.groom = p.groom;
-    q.feed = p.feed;
-    q.crouch = p.crouch;
-    q.pitch = p.pitch;
-    q.roll = p.roll;
-    const h = s.hand;
-    h.x = hands.pointer.x;
-    h.y = hands.pointer.y;
-    h.z = hands.pointer.z;
-    h.eyeX = player.eye.x;
-    h.eyeY = player.eye.y;
-    h.eyeZ = player.eye.z;
-    h.tool = hands.tool;
-    h.variant = hands.variants[hands.tool];
-    return s;
+  /** Each of this device's flies the table has seated, as it is now, into `#mine`: how many. The first carries the player's hand. */
+  #states(player: PlayerNow, now: number): number {
+    const { life, fly, company, hands } = this.#host;
+    const seq = ++this.#seq & 0xffff;
+    const playing = (player.away ? AWAY : 0) | (player.playing ? PLAYING : 0);
+    let n = 0;
+    for (const f of this.mine) {
+      const c = n === 0 ? null : company.list[n - 1];
+      if (n > 0 && (!c || c.id !== f.id)) break;
+      const s = this.#mine[n];
+      writeState(s, f.id, c?.life ?? life, c?.pose ?? fly.pose, seq, now, this.epoch, playing);
+      if (n === 0) {
+        s.flags |= (player.handsOut ? HANDS : 0) | (player.holding ? HOLDING : 0);
+        const h = s.hand;
+        h.x = hands.pointer.x;
+        h.y = hands.pointer.y;
+        h.z = hands.pointer.z;
+        h.eyeX = player.eye.x;
+        h.eyeY = player.eye.y;
+        h.eyeZ = player.eye.z;
+        h.tool = hands.tool;
+        h.variant = hands.variants[hands.tool];
+      }
+      if (++n >= MAX_OWN) break;
+    }
+    return n;
   }
 
   /** Leaves the table for good. */
@@ -542,10 +611,8 @@ export class Online {
     for (const hand of this.#handList) hand.dispose();
     this.#hands.clear();
     this.#handList.length = 0;
-    this.others.dispose();
+    this.others.clear();
     this.#host.bubbles.table = null;
-    this.#host.fly.model.mark(null);
-    this.#host.life.crowd.clear();
   }
 
   /** The table as this device has it, on the canvas for scripts to compare between devices. */
@@ -555,6 +622,8 @@ export class Online {
     d.player = String(this.id);
     d.starter = String(this.starter);
     d.colour = this.colour;
+    d.mine = this.mine.map((f) => `${f.id}:${f.colour}`).join(";");
+    d.asked = String(this.asked);
     d.epoch = String(this.epoch);
     d.roomTime = this.now.toFixed(0);
     d.rtt = line.clock.rtt.toFixed(1);
@@ -562,7 +631,7 @@ export class Online {
     d.netIn = String(line.bytesIn);
     d.netOut = String(line.bytesOut);
     d.others = this.others.list
-      .map((o) => `${o.id}:${o.present ? 1 : 0}:${o.resting ? 1 : 0}:${o.near ? 1 : 0}:${o.position.x.toFixed(2)},${o.position.z.toFixed(2)}:${o.track.delay.toFixed(0)}`)
+      .map((o) => `${o.id}:${o.present ? 1 : 0}:${o.resting ? 1 : 0}:${o.near ? 1 : 0}:${o.position.x.toFixed(2)},${o.position.z.toFixed(2)}:${o.track.delay.toFixed(0)}:${o.of}`)
       .join(";");
     d.closest = Number.isFinite(this.closest) ? this.closest.toFixed(2) : "";
     this.closest = Infinity;
@@ -574,8 +643,36 @@ export class Online {
 
   /** Takes what publish() wrote off the canvas: alone again, nothing of the table may still be read there. */
   static unpublish(d: DOMStringMap) {
-    for (const key of ["online", "player", "starter", "colour", "epoch", "roomTime", "rtt", "reconnects", "netIn", "netOut", "others", "closest", "predicted", "granted", "tableFoods"]) delete d[key];
+    for (const key of ["online", "player", "starter", "colour", "mine", "asked", "epoch", "roomTime", "rtt", "reconnects", "netIn", "netOut", "others", "closest", "predicted", "granted", "tableFoods"]) delete d[key];
   }
+}
+
+/** One fly's state as it goes to the table: where it is and how it is posed, with the player's flags (away, playing); no hand. */
+function writeState(s: FlyState, id: number, life: Life, p: FlyPose, seq: number, now: number, epoch: number, player: number) {
+  const body = life.body;
+  s.id = id;
+  s.seq = seq;
+  s.t = now;
+  s.epoch = epoch;
+  s.flags = (body.mode === "airborne" ? AIRBORNE : 0) | (life.eating ? EATING : 0) | player;
+  s.x = body.position.x;
+  s.y = body.position.y;
+  s.z = body.position.z;
+  s.yaw = body.yaw;
+  s.upX = body.up.x;
+  s.upZ = body.up.z;
+  s.vx = body.velocity.x;
+  s.vy = body.velocity.y;
+  s.vz = body.velocity.z;
+  const q = s.pose;
+  q.speed = p.speed;
+  q.turn = p.turn;
+  q.wings = p.wings;
+  q.groom = p.groom;
+  q.feed = p.feed;
+  q.crouch = p.crouch;
+  q.pitch = p.pitch;
+  q.roll = p.roll;
 }
 
 const isFood = (kind: string): kind is FoodKind => kind === "sugar" || kind === "honey" || kind === "berry" || kind === "water";
