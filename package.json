@@ -40,6 +40,7 @@
     "soak:web": "node scripts/webSoak.ts",
     "e2e:soak": "node scripts/webSoak.ts --quick",
     "release": "semantic-release",
+    "e2e:accessibility": "node apps/web/e2e/accessibility.e2e.ts",
     "notices": "node scripts/notices.ts",
     "notices:check": "node scripts/notices.ts --check"
   },
@@ -51,6 +52,7 @@
     "@semantic-release/exec": "^7.1.0",
     "@types/node": "^26.6.6",
     "@types/three": "^0.186.0",
+    "axe-core": "^4.14.1",
     "entities": "6.0.1",
     "eslint": "^10.15.0",
     "github-slugger": "2.0.0",

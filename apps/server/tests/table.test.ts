@@ -354,7 +354,7 @@ test("only the starter chooses the light, the weather and the place; a new place
   assert.equal(table.place, "picnic");
 
   send(a, { type: "world", light: "night", weather: "rain" });
-  send(a, { type: "world", light: "purple", weather: "snow" });
+  send(a, { type: "world", light: "purple", weather: "ash" });
   for (const p of [a, b]) {
     assert.deepEqual(saidOf(p.link, "world"), [
       { type: "world", light: "night", weather: "rain", offset: 0 },

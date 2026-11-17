@@ -58,6 +58,8 @@ export class BrowserTextEntry implements TextEntry {
     input.setAttribute("autocorrect", "off");
     input.setAttribute("enterkeyhint", "done");
     input.setAttribute("aria-label", "Text");
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
     const own = (e: Event) => e.stopPropagation();
     input.addEventListener("keydown", (e) => {
       own(e);
@@ -96,6 +98,8 @@ export class BrowserTextEntry implements TextEntry {
     input.autocomplete = AUTOCOMPLETE[request.kind] as AutoFill;
     input.autocapitalize = request.kind === "name" ? "sentences" : "none";
     input.name = request.id;
+    input.setAttribute("aria-label", request.label ?? request.id);
+    input.removeAttribute("aria-hidden");
     // maxlength counts UTF-16 units and can reject a valid password before the server would.
     input.removeAttribute("maxlength");
     this.#max = request.max;
@@ -116,6 +120,7 @@ export class BrowserTextEntry implements TextEntry {
     this.#sync();
     this.active = null;
     this.#input?.blur();
+    this.#input?.setAttribute("aria-hidden", "true");
   }
 
   #finish(how: "done" | "cancel") {
@@ -126,6 +131,7 @@ export class BrowserTextEntry implements TextEntry {
     this.active = null;
     this.#ended = how;
     this.#input?.blur();
+    this.#input?.setAttribute("aria-hidden", "true");
   }
 
   take() {
