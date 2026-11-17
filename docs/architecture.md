@@ -23,7 +23,7 @@ The game currently has no sound, by design, pending a new sound design.
 
 ## How it fits together
 
-Settings → Screensaver → Flies chooses one to four flies, shown as enamel
+Settings → Screensaver → Flies chooses one to four flies (three on an Apple TV, as measured there), shown as enamel
 dots, saved as `flies` with the other settings. Each is a whole fly: its own
 brain, body, senses, crowd and eyes, all eating from one pantry. Each frame
 the game works out what each body feels (what each facet of

@@ -82,7 +82,7 @@ and the iPhone and iPad app's, whose web view has a WebSocket of its own
   down near the others, at the height of the place's start (in the
   restaurant, on the window table, not the floor under it). The device remembers its table: a reload, or opening
   the site again, comes back to it until it leaves. Settings → Screensaver →
-  Flies chooses how many, shown as one to four enamel dots. The table seats
+  Flies chooses how many, shown as one to four enamel dots (three on an Apple TV). The table seats
   as many as there is room for, at least one, or refuses it as full. Changing
   the setting while seated asks again, until the table answers; a seat freed
   later doesn't add a fly by itself. Coming back asks again too.
@@ -499,8 +499,8 @@ each takes about 58 MB, and an estimated 13 to 45% of an A15 performance
 core; a WebAssembly worker takes about 95 MB (`packages/brain-native/README.md`).
 The workers load one after another from the same kept connectome
 (`InTurn`, `apps/web/src/brain/create.ts`), so nothing downloads twice at once.
-An older Apple TV host without `brain.spawn` runs only one fly and has no
-Flies setting.
+An Apple TV lives at most three; an older Apple TV host without `brain.spawn`
+runs only one fly and has no Flies setting.
 
 Their eyes take turns, normally one fly's refresh a frame, whichever is most overdue;
 with four at 60 fps each looks round about 15 times a second rather than
@@ -509,9 +509,10 @@ wait, so no frame refreshes two. The TV's
 eyes frame is about 83 draws against 34 without: with four flies it comes
 every frame rather than one in three. Four flies' meeting, senses, bodies,
 poses and nearby models took 19 M5 Pro CPU µs a frame, held below 34 by
-`apps/web/tests/company.budget.ts`: about 0.3 ms on the TV by its 16×
-JavaScript cost. These are estimates for several local flies, not
-measurements on an Apple TV device; that still needs doing.
+`apps/web/tests/company.budget.ts`. On an Apple TV 4K, measured, JavaScript
+a frame went from 3.8 ms with one fly to 7.9–9.3 ms with four, 13.6 ms at a
+full table, and four kept the screensaver below 60 fps where one and three
+hold it, so a TV lives three (`docs/apple-tv.md`, "Several flies on peev").
 
 ## Running it locally
 
