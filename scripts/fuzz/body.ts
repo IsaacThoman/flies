@@ -90,21 +90,61 @@ export function checkReach(body: FlyBody, world: World) {
     body.point(reach[j], 0, reach[j + 1], point);
     const length = Math.hypot(point.x - p.x, point.z - p.z);
     // A little past it, for what it is up against.
-    const ray = world.raycast(offset, { x: (point.x - p.x) / length, y: 0, z: (point.z - p.z) / length }, hit, length + 0.05);
-    if (!ray || ray.normal.y >= MAX_SLOPE_COS) continue;
-    const level = Math.hypot(ray.normal.x, ray.normal.z);
-    sides.push(ray.normal.x / level, ray.normal.z / level);
-    if (length - ray.t <= REACH_SLOP) continue;
-    const what = `${feet ? "foot" : "body"} ${j / 2} into ${world.solids[ray.solid]?.name} by ${(length - ray.t).toFixed(3)} mm`;
+    const into = wallAlong(world, p, (point.x - p.x) / length, (point.z - p.z) / length, length + 0.05, !feet);
+    if (rising) sides.push(rising.x, rising.z);
+    if (into < 0 || length - into <= REACH_SLOP) continue;
+    const what = `${feet ? "foot" : "body"} ${j / 2} into ${world.solids[hit.solid]?.name} by ${(length - into).toFixed(3)} mm`;
     if (!feet) assert.fail(what);
     foot ||= what;
   }
-  // Its legs only where it stands between things facing each other, against both, closer than its legs reach: it can't stand clear of them.
+  // Its legs only where it stands between things facing each other, closer than its legs reach, against a wall
+  // one way and the other way against anything rising (a wall, or a slope too steep where it would step onto it):
+  // it can't stand clear of both.
   if (!foot) return;
   for (let a = 0; a < sides.length; a += 2) for (let b = a + 2; b < sides.length; b += 2) if (sides[a] * sides[b] + sides[a + 1] * sides[b + 1] < -0.5) return;
   assert.fail(foot);
 }
 const sides: number[] = [];
+const stair = { x: 0, y: 0, z: 0 };
+const level = { x: 0, y: 0, z: 0 };
+/** The level way out of the first thing `wallAlong` met, wall or not, if it met one. */
+let rising: Vec3 | null = null;
+const up = { x: 0, y: 0, z: 0 };
+
+/**
+ * How far along the level way (dx, dz) from feet at `p` the first wall is, within `length`, or -1: a side
+ * rising more than a step over what is before it, or a slope too steep to stand on, past a step over the
+ * feet or over the top of each stair before it (and for its `body`, an underside lower than its body).
+ * Leaves it in `hit`, and the way out of whatever it met first in `rising`.
+ */
+function wallAlong(world: World, p: Vec3, dx: number, dz: number, length: number, body: boolean) {
+  rising = null;
+  stair.x = p.x;
+  stair.y = p.y + STEP_UP + 1e-6;
+  stair.z = p.z;
+  level.x = dx;
+  level.z = dz;
+  let from = 0;
+  for (let k = 0; k < 8; k++) {
+    if (!world.raycast(stair, level, hit, length - from, body ? Math.max(0, p.y + FLY_HEIGHT - 1e-4 - stair.y) : 0)) return -1;
+    const across = Math.hypot(hit.normal.x, hit.normal.z);
+    if (!rising && across > 1e-9) {
+      rising = up;
+      up.x = hit.normal.x / across;
+      up.z = hit.normal.z / across;
+    }
+    if (hit.normal.y >= MAX_SLOPE_COS) return -1;
+    if (hit.normal.y !== 0) return from + hit.t;
+    const ground = world.heightAt(hit.point.x - dx * 1e-3, hit.point.z - dz * 1e-3, stair.y);
+    const top = world.heightAt(hit.point.x + dx * 1e-3, hit.point.z + dz * 1e-3);
+    if (top - ground > STEP_UP) return from + hit.t;
+    from += hit.t + 1e-3;
+    stair.x = hit.point.x + dx * 1e-3;
+    stair.y = top + STEP_UP + 1e-6;
+    stair.z = hit.point.z + dz * 1e-3;
+  }
+  return from;
+}
 
 export function checkWalkSweep(before: Vec3, body: FlyBody, world: World, wasOnFeet: boolean) {
   if (!wasOnFeet || !body.onFeet) return;
