@@ -118,7 +118,10 @@ the supplied speed and turn directly; wing blur also jitters each update.
   Seeds et al. (2014) motivates anterior-to-posterior ordering and interleaved
   leg rubbing. The command has no dirt level or cleaning-site selection:
   the clock and site targets are explicitly an animation stand-in, not a
-  simulated suppression hierarchy. Feeding suppresses visible grooming
+  simulated suppression hierarchy. The brain can't supply one yet: dust on
+  the body's bristles doesn't reach the neurons that command its cleaning,
+  and the head's grooming neurons all rise together under what makes the fly
+  groom (packages/brain/README.md, Touch → grooming of the body). Feeding suppresses visible grooming
   without pausing its clock. Walking and leg tucking reduce the visible
   blend and slow the clock, stopping it at full walking or full tuck.
 - **Feeding**: the body lowers and the head bows. Rostrum lift, haustellum
