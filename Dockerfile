@@ -27,6 +27,11 @@ ARG SERVICE_URL_WEB
 # Optional team override (0 disables app links). The default lives in scripts/appleConfig.ts,
 # not Compose: Coolify passes --build-arg KEY for variables it knows (see #52).
 ARG APPLE_TEAM_ID
+# Public owner details: missing values leave /privacy unpublished.
+ARG FLIES_OPERATOR_NAME
+ARG FLIES_CONTACT_EMAIL
+ARG FLIES_SUPPORT_URL
+ARG FLIES_MARKETING_URL
 RUN --mount=type=cache,target=/app/node_modules/.cache \
   FLY_SITE_URL="${FLY_SITE_URL:-$SERVICE_URL_WEB}" npm run build
 
