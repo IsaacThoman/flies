@@ -257,3 +257,53 @@ test("a finger dragging or pinching is input still, to keep the wallpaper away; 
   assert.equal(devices.at, 0);
   assert.equal(remote.lastInputAt, 9, "though it was input");
 });
+
+test("lost focus, suspension and text focus release buttons and pending input", () => {
+  const document = Object.assign(new EventTarget(), { hidden: false });
+  const target = Object.assign(new EventTarget(), { document });
+  const remote = new Remote(target as unknown as Window);
+  const lose = [
+    () => target.dispatchEvent(new Event("blur")),
+    () => target.dispatchEvent(new Event("pagehide")),
+    () => { document.hidden = true; document.dispatchEvent(new Event("visibilitychange")); },
+    () => target.dispatchEvent(Object.assign(new Event("focusin"), { composedPath: () => [{ tagName: "INPUT" }] })),
+  ];
+  for (const loss of lose) {
+    document.hidden = false;
+    target.dispatchEvent(Object.assign(new Event("keydown"), { key: "Enter" }));
+    remote.receiveTouch({ x: 0, y: 0, touching: true });
+    loss();
+    assert.equal(remote.held.size, 0);
+    assert.equal(remote.presses.length, 0);
+    assert.equal(remote.touch.touching, false);
+  }
+});
+
+test("keyboard aliases and a pad release only their own holds, including disconnect and reconnect", () => {
+  const target = new EventTarget();
+  const devices = new Devices("keys");
+  const remote = new Remote(target as unknown as Window, () => 0, devices, "keys");
+  const buttons = Array.from({ length: 16 }, () => ({ pressed: false, value: 0 }));
+  const pad = { connected: true, mapping: "standard", buttons, axes: [0, 0, 0, 0] };
+  const pads = new Gamepads(remote, devices, () => pad.connected ? [pad] : []);
+  const key = (type: string, code: string) => target.dispatchEvent(Object.assign(new Event(type), { key: "Enter", code }));
+  buttons[0].pressed = true;
+  pads.poll(1 / 60, 0, false);
+  key("keydown", "Enter");
+  key("keydown", "NumpadEnter");
+  key("keyup", "Enter");
+  assert.equal(remote.held.has("select"), true);
+  pad.connected = false;
+  pads.poll(1 / 60, 1, false);
+  assert.equal(remote.held.has("select"), true, "the keypad Enter is still held");
+  key("keyup", "NumpadEnter");
+  assert.equal(remote.held.has("select"), false);
+  remote.endFrame();
+  pad.connected = true;
+  pads.poll(1 / 60, 2, false);
+  assert.equal(remote.held.has("select"), true, "a held button on reconnection is observed again");
+  assert.deepEqual(remote.presses, [{ button: "select", repeat: false }]);
+  pad.connected = false;
+  pads.poll(1 / 60, 3, false);
+  assert.equal(remote.held.has("select"), false, "the disconnected pad's missing button-up is released");
+});
