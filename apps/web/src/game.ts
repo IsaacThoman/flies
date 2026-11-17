@@ -13,7 +13,7 @@ import { FLY_LENGTH, Rhythm, SUMMER } from "@fly/body";
 import { REGIONS } from "@fly/brain";
 import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttribution } from "@fly/contracts";
 import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
-import { Navigator } from "@fly/ui";
+import { Navigator, sameTarget } from "@fly/ui";
 import type { GlyphSet, Hit } from "@fly/ui";
 import { BALL_RADIUS, Pantry, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
 import type { RayHit } from "@fly/world";
@@ -435,18 +435,23 @@ export class Game implements Shell {
   /** Starts typing into a field as a tap on it lifts, while the browser still counts it as the player's doing. */
   #typeOnTap(canvas: HTMLCanvasElement) {
     let from = { x: 0, y: 0 };
+    let pressed: Hit | null = null;
     const at = (e: PointerEvent) => {
       const box = canvas.getBoundingClientRect();
       return { x: (e.clientX - box.left) / Math.max(1, box.width), y: (e.clientY - box.top) / Math.max(1, box.height) };
     };
-    canvas.addEventListener("pointerdown", (e) => (from = at(e)));
+    canvas.addEventListener("pointerdown", (e) => {
+      from = at(e);
+      const hit = this.#hitAt(from.x, from.y);
+      pressed = hit && { ...hit };
+    });
     canvas.addEventListener("pointerup", (e) => {
       const p = at(e);
       const { width, height } = this.shape.design;
       if (Math.hypot((p.x - from.x) * width, (p.y - from.y) * height) > TAP_SLOP.touch) return;
       const hit = this.#hitAt(p.x, p.y);
       const current = this.nav.current;
-      if (hit?.kind === MENU_HITS.row && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index);
+      if (hit?.kind === MENU_HITS.row && sameTarget(pressed, hit) && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index, hit.id ?? "");
     });
   }
 
@@ -1422,7 +1427,7 @@ export class Game implements Shell {
         p.dx = (g.x - grip.x) * width;
         p.dy = (g.y - grip.y) * height;
         if (g.type === "up") {
-          p.tap = g.tap;
+          p.tap = g.tap && sameTarget(grip.hit, this.#hitAt(g.x, g.y));
           this.#grip = null;
         }
         break;

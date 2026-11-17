@@ -360,3 +360,56 @@ test("the lobby asks to browse once open, takes each list it is told (only well-
   lobby.update(0.016);
   assert.equal(lobby.status, "version", "a newer room server: the page reloads");
 });
+
+test("room refreshes never turn a drawn room or removal into a different action", () => {
+  for (const action of ["join", "remove"] as const) {
+    for (const change of ["insert", "remove", "reorder"] as const) {
+      for (const timing of ["before down", "while held"] as const) {
+        for (const redraw of [false, true]) {
+          const { screen, state, step, did } = world();
+          const rooms = [ROOMS[0], { ...ROOMS[1], locked: false }];
+          const others = [{ id: 2, colour: "red" }, { id: 3, colour: "blue" }];
+          if (action === "join") state.rooms = rooms;
+          else state.table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, others };
+          step();
+          const index = screen.menu.items.findIndex((item) => item.id === (action === "join" ? `room:${ROOMS[0].code}` : "remove:2"));
+          const hits = new HitMap();
+          const draw = () => { hits.begin("online"); screen.draw(blankCanvas(), 0, hits); };
+          draw();
+          const drawn = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).find((hit) => hit.kind === "row" && hit.index === index)!;
+          assert.ok(drawn);
+          const hit = { ...drawn };
+          const point = (type: "down" | "up") => screen.point({ type, x: hit.x + hit.w / 2, y: hit.y + hit.h / 2, dx: 0, dy: 0, tap: true, hit });
+          if (timing === "while held") point("down");
+          if (action === "join") {
+            state.rooms = change === "insert" ? [ROOMS[2], ...rooms] : change === "remove" ? rooms.slice(1) : [...rooms].reverse();
+          } else {
+            state.table = { ...state.table!, others: change === "insert" ? [{ id: 4, colour: "green" }, ...others] : change === "remove" ? others.slice(1) : [...others].reverse() };
+          }
+          step();
+          if (redraw) draw();
+          if (timing === "before down") point("down");
+          point("up");
+          assert.deepEqual(did, [], `${action}: ${change}, ${timing}, redraw ${redraw}`);
+        }
+      }
+    }
+  }
+});
+
+test("a room tap must release on its pressed action, while an unchanged drawn room still joins", () => {
+  const { screen, state, step, did } = world();
+  state.rooms = [ROOMS[0], { ...ROOMS[1], locked: false }];
+  step();
+  const hits = new HitMap();
+  hits.begin("online");
+  screen.draw(blankCanvas(), 0, hits);
+  const rows = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).filter((hit) => hit.kind === "row" && screen.menu.items[hit.index].id.startsWith("room:"));
+  const point = (type: "down" | "up", hit: (typeof rows)[number]) => screen.point({ type, hit, x: hit.x + hit.w / 2, y: hit.y + hit.h / 2, dx: 0, dy: 0, tap: true });
+  point("down", rows[0]);
+  point("up", rows[1]);
+  assert.deepEqual(did, []);
+  point("down", rows[0]);
+  point("up", rows[0]);
+  assert.deepEqual(did, [`join ${ROOMS[0].code}`]);
+});

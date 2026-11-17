@@ -273,9 +273,9 @@ export class OnlineScreen implements Screen {
     typing.begin({ id: item.id, kind, value: item.value, max, label: item.label });
   }
 
-  typeNow(index: number) {
+  typeNow(index: number, id: string) {
     const item = this.menu.items[index];
-    if (item?.kind === "field") this.#type(item);
+    if (item?.kind === "field" && item.id === id) this.#type(item);
   }
 
   #back() {
