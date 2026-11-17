@@ -12,7 +12,7 @@
 
 import * as THREE from "three";
 import type { Food, Vec3, World } from "@fly/world";
-import { BREEZE, PATCHES, Pace, SOLIDS, TABLE_RADIUS } from "@fly/world";
+import { BREEZE, PATCHES, Pace, SOLIDS, TABLE_RADIUS, createSurface } from "@fly/world";
 import type { Happening } from "@fly/world";
 import { paint } from "../../scene/build.ts";
 import type { Daylight } from "../../scene/light.ts";
@@ -106,6 +106,7 @@ export class Goings {
   #world: World | null = null;
   #fly: Readonly<Vec3> = { x: 0, y: 0, z: 0 };
   #wind = { x: 0, z: 0 };
+  #rainSurface = createSurface();
   #splashes = { near: 0, close: 0, far: 0, pool: 0 };
   #time = 0;
   #last = -1;
@@ -483,13 +484,14 @@ export class Goings {
     }
     if (Math.random() < (dt * rain) / RAIN_HIT_EVERY) {
       felt.touch = Math.max(felt.touch, RAIN_TOUCH);
-      this.rain.splash(fly.x, fly.y + 0.9, fly.z, 0.9);
+      this.rain.splash(fly.x, fly.y + 0.9, fly.z, 0.9, false);
     }
   }
 
   #land(world: Around["world"], x: number, z: number) {
     if (!world.onTable(x, z)) return;
-    this.rain.splash(x, world.heightAt(x, z), z, range(0.9, 1.5));
+    const surface = world.surface(x, z, this.#rainSurface);
+    this.rain.splash(x, surface.y, z, range(0.9, 1.5), surface.solid < 0);
   }
 }
 
