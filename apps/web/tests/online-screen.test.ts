@@ -480,7 +480,8 @@ test("room discovery failures replace searching, stale choices are disabled, and
   assert.ok(screen.menu.items.slice(3).every((item) => item.disabled));
   state.lobbyStatus = "version";
   step();
-  assert.equal(screen.menu.items[2].label, "Update needed");
+  const g = blankCanvas(); screen.draw(g, 0, new HitMap());
+  assert.equal(writtenOn(g).filter((w) => w.text === "Update needed").length, 1);
   assert.ok(screen.menu.items.every((item) => item.disabled));
   state.lobbyStatus = "open";
   step();

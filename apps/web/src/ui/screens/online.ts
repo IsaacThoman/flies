@@ -138,7 +138,9 @@ export class OnlineScreen implements Screen {
         const rooms = shell.rooms;
         const status = shell.lobbyStatus;
         const unavailable = status === "lost" || status === "stale" || this.#incompatible();
-        if (unavailable) rows.push({ kind: "action", id: "unavailable", label: this.#incompatible() ? "Update needed" : status === "stale" ? "Reconnecting…" : "Can't reach rooms", disabled: true });
+        if (unavailable) {
+          if (!this.#incompatible()) rows.push({ kind: "action", id: "unavailable", label: status === "stale" ? "Reconnecting…" : "Can't reach rooms", disabled: true });
+        }
         else if (!rooms) rows.push({ kind: "action", id: "looking", label: "Looking for rooms…", disabled: true });
         else if (!rooms.length) rows.push({ kind: "action", id: "none", label: "No rooms open", disabled: true });
         for (const r of rooms ?? []) {
