@@ -279,8 +279,7 @@ try {
   console.log(printed > 0 ? `  walked off the honey, its feet printing (${printed} so far)` : "  no honey prints yet: walking is the brain's choice");
 
   step("startle: the ball dives at it until it takes off (its brain decides; it doesn't every time)");
-  await press("ArrowRight");
-  await waitFor(page, "tool=swoop");
+  await toTool("swoop");
   let tookOff = false;
   // Its looming detectors answer how quickly the ball's darkness grows in its eyes (eyes.ts). A software
   // GPU drawing the whole picture finely hands the eyes their pictures late and few, and it took off

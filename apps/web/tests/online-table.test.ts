@@ -81,7 +81,7 @@ function table() {
     life,
     company,
     others,
-    hands: { variants: [] as number[] },
+    hands: { variants: [] as number[], setKind: () => true },
     fly: {},
     eyes: { see() {} },
     bubbles: { table: null },

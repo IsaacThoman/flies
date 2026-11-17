@@ -453,7 +453,7 @@ async function mouse() {
 
     step("keys: a number picks a tool, and the hints are a keyboard's");
     await page.keyboard.press("2");
-    await waitFor(page, "tool=swoop,device=keys");
+    await waitFor(page, "tool=feather,device=keys");
     await page.keyboard.press("1");
     await waitFor(page, "tool=feed");
 
