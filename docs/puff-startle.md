@@ -404,7 +404,7 @@ node packages/brain/scripts/puff.ts --simulate --populations rest,loom,AB+CE,AB 
 
 ## Regenerating the summaries
 
-[`summarize-puff.ts`](../packages/brain/scripts/summarize-puff.ts) consumes
+[`packages/brain/scripts/summarize-puff.ts`](../packages/brain/scripts/summarize-puff.ts) consumes
 JSONL captures without loading or simulating the connectome. It regenerates
 the two CSV summaries and the paired differences/intervals. Give captures in
 the desired row order; identical condition summaries are emitted once, while
