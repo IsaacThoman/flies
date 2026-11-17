@@ -8,7 +8,7 @@ export function foliage(crown: Solid) {
   if (f.kind === "box") throw new Error("A crown is round");
   const rx = f.kind === "circle" ? f.r : f.rx, rz = f.kind === "circle" ? f.r : f.rz;
   const angle = f.kind === "circle" ? 0 : f.angle;
-  const positions: number[] = [], colors: number[] = [];
+  const positions: number[] = [], colors: number[] = [], indices: number[] = [];
   const tint = new THREE.Color();
   for (let ring = 0; ring < 3; ring++) {
     const count = 5 + ring * 3;
@@ -27,15 +27,20 @@ export function foliage(crown: Solid) {
         positions.push(px, topHeight(crown, px, pz) + 0.1 - Math.abs(w) * 0.15, pz);
         colors.push(tint.r, tint.g, tint.b);
       };
+      const base = positions.length / 3;
+      for (let i = 0; i <= 8; i++) for (let j = 0; j <= 4; j++) vertex(i,j);
       for (let i = 0; i < 8; i++) for (let j = 0; j < 4; j++) {
-        vertex(i,j); vertex(i,j+1); vertex(i+1,j+1);
-        vertex(i,j); vertex(i+1,j+1); vertex(i+1,j);
+        const a = base+i*5+j, b=a+5;
+        indices.push(a,a+1,b+1,a,b+1,b);
       }
     }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(positions,3));
   g.setAttribute("color", new THREE.Float32BufferAttribute(colors,3));
+  g.setIndex(indices);
   g.computeVertexNormals();
-  return g;
+  const plain = g.toNonIndexed();
+  g.dispose();
+  return plain;
 }

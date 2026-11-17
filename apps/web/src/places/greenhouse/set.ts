@@ -126,13 +126,8 @@ export function buildBench(): SceneSet {
         add(g, "#4b6230", K.leaf);
       }
     }
-    const spill = new THREE.Shape();
-    for (let i = 0; i <= 48; i++) {
-      const a = i / 48 * Math.PI * 2, r = 6 * (0.9 + Math.sin(a * 3) * 0.07 + Math.sin(a * 7 + 1) * 0.05);
-      if (i === 0) spill.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-      else spill.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-    }
-    add(new THREE.ShapeGeometry(spill).rotateX(-Math.PI / 2).translate(-14, 0.08, 8), "#a94422", K.juice);
+    // Clear liquid reaches the whole taste patch; pulp leaves its irregular dark rim inside it.
+    add(new THREE.CircleGeometry(6,64).rotateX(-Math.PI/2).translate(-14,0.08,8),"#a94422",K.juice);
     for (const patch of GREENHOUSE_PATCHES) if (patch.name === "tomato juice" && patch.r < 2) add(new THREE.CircleGeometry(patch.r,24).rotateX(-Math.PI/2).translate(patch.x,0.08,patch.z),"#a94422",K.juice);
 
     yield;

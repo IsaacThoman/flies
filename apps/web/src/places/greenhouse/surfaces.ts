@@ -68,16 +68,17 @@ vec3 surface(vec3 c) {
  float fine = vnoise3(p * 7.0) * resolved(0.35);
  if (vKind < 0.5) {
    float knot = exp(-length((p.xz - vec2(-52.0, 74.0)) * vec2(0.035, 0.17)));
-   float grain = sin(p.z * 1.8 + vnoise(p.xz * vec2(0.025, 0.14)) * 7.0 + knot * 9.0);
+   float grain = vnoise(vec2(p.x*0.025,p.z*1.8+knot*3.0));
+   float fibre = vnoise(vec2(p.x*0.14,p.z*7.0+grain*2.0));
    float stripe = fract((p.z + 200.0) / 66.6667);
    float seam = 1.0 - smoothstep(0.002, 0.012, min(stripe, 1.0 - stripe));
    float wear = vnoise(p.xz * vec2(0.016, 0.06));
-   c *= 0.76 + 0.30 * wear + 0.045 * grain * resolved(3.0);
+   c *= 0.76 + 0.30 * wear + 0.10 * (grain-0.5) * resolved(2.0);
    c = mix(c, vec3(0.19, 0.24, 0.17), smoothstep(0.65, 0.9, wear) * 0.35);
    c *= 1.0 - seam * 0.8;
    float wet = uWet * (0.3 + 0.5 * vnoise(p.xz * 0.035));
    c *= 1.0 - wet * 0.32; rough = 0.85 - wet * 0.55;
-   relief = grain * 0.009 * resolved(3.0) - seam * 0.1;
+   relief = (fibre-0.5) * 0.025 * resolved(0.7) - seam * 0.1;
    // Rusted nail heads and their dark halos at the ends of each plank.
    vec2 nail = vec2(abs(p.x) - 300.0, mod(p.z + 200.0, 66.6667) - 9.0);
    float n = 1.0 - smoothstep(1.1, 1.65, length(nail));
@@ -85,7 +86,7 @@ vec3 surface(vec3 c) {
  } else if (vKind < 1.5) {
    float salt = smoothstep(0.56, 0.85, vnoise(p.xz * 0.11 + p.y * 0.025));
    c *= 0.87 + fine * 0.35;
-   c = mix(c, vec3(0.65, 0.59, 0.44), salt * 0.3);
+   c = mix(c, vec3(0.65, 0.59, 0.44), salt * (0.06 + 0.24 * exp(-pow((p.y - (p.x < -130.0 ? 63.0 : p.x < 0.0 ? 41.0 : 1.0)) * 0.35,2.0))));
    c *= 1.0 - uWet * 0.2;
    relief = fine * 0.055; rough = 0.94 - uWet * 0.12;
  } else if (vKind < 2.5) {
@@ -117,12 +118,13 @@ vec3 surface(vec3 c) {
    float bruise = smoothstep(0.57, 0.8, vnoise(p.xz * 0.17 + 7.0));
    c = mix(c, vec3(0.2, 0.037, 0.012), bruise * 0.7);
    c *= 0.9 + fine * 0.22; rough = 0.3 + bruise * 0.2; relief = fine * 0.018;
-   vec2 centre = p.x < -55.0 ? vec2(-82.0,51.0) : vec2(-50.0,-12.0);
-   float radius = p.x < -55.0 ? 4.0 : 7.0;
+   vec2 centre = p.z > 25.0 ? vec2(-82.0,51.0) : vec2(-50.0,-12.0);
+   float radius = p.z > 25.0 ? 4.0 : 7.0;
    float split = 1.0-smoothstep(radius*0.72,radius,length(p.xz-centre)+vnoise(p.xz*1.4)*0.7);
    c = mix(c,vec3(0.39,0.055,0.018),split*0.65); rough = mix(rough,0.16,split);
  } else if (vKind < 5.5) {
-   vec2 q = (p.xz - vec2(20.0, 56.0)) / vec2(19.0, 25.0);
+   vec2 d = p.xz-vec2(20.0,56.0);
+   vec2 q = vec2(0.939373*d.x+0.342898*d.y,-0.342898*d.x+0.939373*d.y) / vec2(19.0,25.0);
    float flesh = 1.0 - smoothstep(0.62, 0.78, length(q));
    float fibres = pow(abs(sin(atan(q.y, q.x) * 34.0 + length(q) * 18.0)), 9.0) * resolved(0.6);
    vec3 inside = mix(vec3(0.45, 0.055, 0.09), vec3(0.83, 0.29, 0.26), fibres * 0.7 + 0.2);
@@ -133,13 +135,24 @@ vec3 surface(vec3 c) {
  } else if (vKind < 6.5) {
    rough = 0.27 + fine * 0.2; shine = 0.72; relief = fine * 0.012;
  } else if (vKind < 7.5) {
-   float chip = smoothstep(0.65, 0.78, vnoise3(p * 0.3));
-   c = mix(c, vec3(0.14, 0.085, 0.028), chip * 0.7 * resolved(3.0)); rough = 0.45; shine = 0.35;
+   float chip = smoothstep(0.72, 0.85, vnoise3(p * 0.3));
+   c = mix(c, vec3(0.14, 0.085, 0.028), chip * 0.45 * resolved(3.0)); rough = 0.45; shine = 0.35;
  } else if (vKind < 8.5) {
    float line = step(0.7, sin(p.z * 6.0 + sin(p.x * 2.7))) * step(0.45, vnoise(p.xz * 0.5));
    c *= 1.0 - line * 0.6 * resolved(0.7); rough = 1.0;
  } else if (vKind < 9.5) { relief = sin(p.x * 14.0 + p.z * 7.0) * 0.035 * resolved(0.5); }
- else if (vKind < 10.5) { rough = 0.16; c *= 0.92 + 0.08 * vnoise(p.xz * 0.6); }
+ else if (vKind < 10.5) {
+   vec2 q = (p.xz-vec2(-14.0,8.0))/6.0;
+   float r = length(q), a = atan(q.y,q.x);
+   float edge = 0.9+sin(a*3.0)*0.07+sin(a*7.0+1.0)*0.03;
+   float body = r<1.01 ? 1.0-smoothstep(edge-0.06,edge,r) : 1.0;
+   float rim = r<1.01 ? exp(-pow((r-edge)*28.0,2.0)) : 0.0;
+   c = mix(vec3(0.287,0.191,0.076)*vec3(1.15,0.85,0.7),c,0.18+body*0.82);
+   c *= 1.0-rim*0.28;
+   float pulp = step(0.965,hash21(floor(p.xz*3.0)))*resolved(0.35)*body;
+   c = mix(c,vec3(0.6,0.28,0.055),pulp*0.4);
+   rough = mix(0.2,0.1,body);
+ }
  else {
    float u = (p.x + 6.0) / 15.0;
    float mid = p.z - 15.0 - sin(u * 3.14159) * 1.2;

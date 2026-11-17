@@ -10,7 +10,7 @@ export const greenhouse: Scene = {
   buildSet: buildBench,
   buildBackdrop,
   camera: {
-    whole: { around: "table", distance: 540, height: 150, side: 0.15, low: 0, fov: 48, settle: 1.6 },
+    whole: { around: "table", distance: 610, height: 180, side: 0.15, low: 0, fov: 52, settle: 1.6 },
     vista: { x: -0.6, z: -0.8 },
   },
   open: 0.7, bubbles: false, fireflies: true,
