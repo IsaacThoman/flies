@@ -465,7 +465,8 @@ export class Pointers {
  * The keys a keyboard has that the remote hasn't (the arrows, Enter, Escape
  * and the space bar are the remote's): the number keys pick a tool, R or
  * Home takes the camera back to Follow's distance and height; held, Q and E
- * turn the camera round the fly and + and − bring it in and take it out.
+ * turn the camera round the fly, W and S up and down, and + and − bring it in
+ * and take it out.
  */
 export type KeyAction = { kind: "tool"; index: number } | { kind: "home" };
 
@@ -476,10 +477,14 @@ export function keyAction(code: string, key: string): KeyAction | null {
   return null;
 }
 
-/** Which way a held key moves the camera: round (−1 left, 1 right) or in and out (−1 nearer, 1 farther). */
-export function keyAxis(code: string, key: string): { axis: "turn" | "zoom"; dir: -1 | 1 } | null {
+/** Which way a held key moves the camera: round (−1 left, 1 right), up (−1 lower, 1 higher) or in and out (−1 nearer, 1 farther). */
+export type KeyAxis = { axis: "turn" | "tilt" | "zoom"; dir: -1 | 1 };
+
+export function keyAxis(code: string, key: string): KeyAxis | null {
   if (code === "KeyQ") return { axis: "turn", dir: -1 };
   if (code === "KeyE") return { axis: "turn", dir: 1 };
+  if (code === "KeyW") return { axis: "tilt", dir: 1 };
+  if (code === "KeyS") return { axis: "tilt", dir: -1 };
   if (key === "+" || key === "=" || code === "NumpadAdd") return { axis: "zoom", dir: -1 };
   if (key === "-" || key === "_" || code === "NumpadSubtract") return { axis: "zoom", dir: 1 };
   return null;
@@ -488,9 +493,10 @@ export function keyAxis(code: string, key: string): { axis: "turn" | "zoom"; dir
 export class Keyboard {
   readonly actions: KeyAction[] = [];
   /** The keys held now, by code, and the way each moves the camera. */
-  readonly #held = new Map<string, { axis: "turn" | "zoom"; dir: -1 | 1 }>();
-  /** Where the held keys push the camera: -1 to 1 round, and in (−) or out (+). */
+  readonly #held = new Map<string, KeyAxis>();
+  /** Where the held keys push the camera: -1 to 1 round, up, and in (−) or out (+). */
   turn = 0;
+  tilt = 0;
   zoom = 0;
 
   constructor(target: InputTarget, remote: Remote, devices: Devices, now: () => number = () => performance.now()) {
@@ -520,12 +526,11 @@ export class Keyboard {
 
   #sum() {
     this.turn = 0;
+    this.tilt = 0;
     this.zoom = 0;
-    for (const { axis, dir } of this.#held.values()) {
-      if (axis === "turn") this.turn += dir;
-      else this.zoom += dir;
-    }
+    for (const { axis, dir } of this.#held.values()) this[axis] += dir;
     this.turn = Math.max(-1, Math.min(1, this.turn));
+    this.tilt = Math.max(-1, Math.min(1, this.tilt));
     this.zoom = Math.max(-1, Math.min(1, this.zoom));
   }
 
