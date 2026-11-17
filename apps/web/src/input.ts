@@ -49,10 +49,26 @@ const SWIPE_SPEED = 1.5;
 /** How long after a swipe arrow presses are still taken for it, ms. */
 const SWIPE_GRACE = 160;
 
+type InputTarget = Pick<Window, "addEventListener"> & { document?: Pick<Document, "addEventListener" | "hidden"> };
+
+/** Lost releases cannot be recovered from key events: discard them when the system takes input. */
+function onInputLost(target: InputTarget, reset: () => void) {
+  target.addEventListener("blur", reset);
+  target.addEventListener("pagehide", reset);
+  target.document?.addEventListener("visibilitychange", () => {
+    if (target.document?.hidden) reset();
+  });
+  target.addEventListener("focusin", (event) => {
+    const element = (event.composedPath?.()[0] ?? event.target) as HTMLElement | null;
+    if (element?.tagName === "INPUT" || element?.tagName === "TEXTAREA" || element?.isContentEditable) reset();
+  });
+}
+
 export class Remote {
   /** Presses since the last frame, oldest first. */
   readonly presses: Press[] = [];
   readonly held = new Set<RemoteButton>();
+  readonly #sources = new Map<RemoteButton, Map<string, Device>>();
   /** Where the finger is, -1 to 1 with y up, and whether it's down. */
   readonly touch: RemoteTouch = { x: 0, y: 0, touching: false };
   /** How far the finger moved since the last frame, in surface units (a pad's stick adds to it too). */
@@ -67,35 +83,58 @@ export class Remote {
   /** What the keys are: the remote's buttons (the TV host sends them), or a keyboard's. */
   #keys: Device;
 
-  constructor(target: Pick<Window, "addEventListener">, now: () => number = () => performance.now(), devices: Devices | null = null, keys: Device = "remote") {
+  constructor(target: InputTarget, now: () => number = () => performance.now(), devices: Devices | null = null, keys: Device = "remote") {
     this.#now = now;
     this.#devices = devices;
     this.#keys = keys;
     target.addEventListener("keydown", (event) => this.#key(event as KeyboardEvent, true));
     target.addEventListener("keyup", (event) => this.#key(event as KeyboardEvent, false));
     target.addEventListener(REMOTE_TOUCH_EVENT, (event) => this.receiveTouch((event as CustomEvent<RemoteTouch>).detail));
+    onInputLost(target, () => {
+      this.release();
+      this.presses.length = 0;
+      this.touch.touching = false;
+      this.#last = null;
+      this.#swipingUntil = 0;
+      this.dx = this.dy = 0;
+    });
   }
 
   #key(event: KeyboardEvent, down: boolean) {
     const button = REMOTE_KEYS[event.key];
     if (!button) return;
     event.preventDefault?.();
-    this.button(button, down, !!event.repeat, this.#keys);
+    const source = `key:${event.code || event.key}`;
+    if (down && event.repeat && !this.#sources.get(button)?.has(source)) return;
+    this.button(button, down, !!event.repeat, this.#keys, source);
   }
 
   /** A button going down or up: the remote's, a key's, or a pad's. Letting go is not doing something new: only a press says which device is in hand. */
-  button(button: RemoteButton, down: boolean, repeat: boolean, device: Device) {
+  button(button: RemoteButton, down: boolean, repeat: boolean, device: Device, source: string = device) {
     const now = this.#now();
     this.lastInputAt = now;
     if (down) this.#devices?.use(device, now);
     if (!down) {
-      this.held.delete(button);
+      const sources = this.#sources.get(button);
+      sources?.delete(source);
+      if (!sources?.size) this.held.delete(button);
       return;
     }
     const arrow = button === "up" || button === "down" || button === "left" || button === "right";
     if (arrow && now < this.#swipingUntil) return;
+    let sources = this.#sources.get(button);
+    if (!sources) this.#sources.set(button, sources = new Map());
+    sources.set(source, device);
     this.held.add(button);
     this.presses.push({ button, repeat });
+  }
+
+  /** Losing one device must not release another device's copy of the same button. */
+  release(device?: Device) {
+    for (const [button, sources] of this.#sources) {
+      for (const [source, owner] of sources) if (!device || device === owner) sources.delete(source);
+      if (!sources.size) this.held.delete(button);
+    }
   }
 
   receiveTouch(detail: RemoteTouch) {
@@ -405,10 +444,10 @@ export class Keyboard {
   turn = 0;
   zoom = 0;
 
-  constructor(target: Pick<Window, "addEventListener">, remote: Remote, devices: Devices, now: () => number = () => performance.now()) {
+  constructor(target: InputTarget, remote: Remote, devices: Devices, now: () => number = () => performance.now()) {
     target.addEventListener("keydown", (event) => {
       const e = event as KeyboardEvent;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || (e.repeat && !this.#held.has(e.code))) return;
       const action = keyAction(e.code, e.key);
       const axis = action ? null : keyAxis(e.code, e.key);
       if (!action && !axis) return;
@@ -423,7 +462,8 @@ export class Keyboard {
       if (this.#held.delete((event as KeyboardEvent).code)) this.#sum();
     });
     // A key let go in another window never comes up here.
-    target.addEventListener("blur", () => {
+    onInputLost(target, () => {
+      this.actions.length = 0;
       this.#held.clear();
       this.#sum();
     });
@@ -492,6 +532,8 @@ export class Gamepads {
   /** The right stick was pressed in since the last frame. */
   handBack = false;
   #active = false;
+  #padIndex = -1;
+  #awaitingNeutral = false;
   readonly #pressed = new Map<number, boolean>();
   readonly #repeatAt = new Map<RemoteButton, number>();
   #stickHeld: RemoteButton | null = null;
@@ -500,14 +542,32 @@ export class Gamepads {
   readonly #devices: Devices;
   readonly #pads: () => readonly (PadLike | null)[];
 
-  constructor(remote: Remote, devices: Devices, pads: () => readonly (PadLike | null)[], target?: Pick<Window, "addEventListener">) {
+  constructor(remote: Remote, devices: Devices, pads: () => readonly (PadLike | null)[], target?: InputTarget) {
     this.#remote = remote;
     this.#devices = devices;
     this.#pads = pads;
     target?.addEventListener("gamepadconnected", () => {
       this.#active = true;
     });
+    target?.addEventListener("gamepaddisconnected", (event) => {
+      if ((event as GamepadEvent).gamepad?.index === this.#padIndex) this.#reset();
+    });
+    if (target) onInputLost(target, () => {
+      this.#reset();
+      this.#awaitingNeutral = true;
+    });
     if (!target) this.#active = true;
+  }
+
+  #reset() {
+    this.#remote.release("pad");
+    this.#padIndex = -1;
+    this.#pressed.clear();
+    this.#repeatAt.clear();
+    this.#stickHeld = null;
+    this.#stickIn = false;
+    this.look.x = this.look.y = this.zoom = 0;
+    this.handBack = false;
   }
 
   /** Once a frame: `menus` says whether the left stick steps (a menu) or moves the hand (play). */
@@ -517,18 +577,34 @@ export class Gamepads {
     this.zoom = 0;
     this.handBack = false;
     if (!this.#active) return;
-    const pad = this.#pads().find((p) => p?.connected && p.mapping === "standard");
-    if (!pad) return;
+    const available = this.#pads();
+    const index = available.findIndex((p) => p?.connected && p.mapping === "standard");
+    const pad = available[index];
+    if (!pad) {
+      if (this.#padIndex >= 0) this.#reset();
+      return;
+    }
+    if (index !== this.#padIndex) {
+      this.#reset();
+      this.#padIndex = index;
+    }
+    // A stale pressed snapshot after blur or keyboard takeover is not a fresh press.
+    if (this.#awaitingNeutral) {
+      for (let i = 0; i < pad.buttons.length; i++) if (pad.buttons[i].pressed || pad.buttons[i].value > 0.08) return;
+      for (let i = 0; i < pad.axes.length; i++) if (Math.abs(pad.axes[i]) >= STICK_DEAD) return;
+      this.#awaitingNeutral = false;
+      return;
+    }
     const remote = this.#remote;
     const press = (index: number, button: RemoteButton) => {
       const down = !!pad.buttons[index]?.pressed;
       const was = this.#pressed.get(index) ?? false;
       if (down !== was) {
         this.#pressed.set(index, down);
-        remote.button(button, down, false, "pad");
+        remote.button(button, down, false, "pad", `pad:${index}`);
         if (down) this.#repeatAt.set(button, now + REPEAT_FIRST);
       } else if (down && button !== "select" && button !== "back" && button !== "playPause" && now >= (this.#repeatAt.get(button) ?? Infinity)) {
-        remote.button(button, true, true, "pad");
+        remote.button(button, true, true, "pad", `pad:${index}`);
         this.#repeatAt.set(button, now + REPEAT_EVERY);
       }
     };
@@ -551,18 +627,18 @@ export class Gamepads {
       // The stick as the arrows, with their repeat.
       const dir: RemoteButton | null = Math.abs(lx) > 0.5 || Math.abs(ly) > 0.5 ? (Math.abs(lx) > Math.abs(ly) ? (lx > 0 ? "right" : "left") : ly > 0 ? "up" : "down") : null;
       if (dir !== this.#stickHeld) {
-        if (this.#stickHeld) remote.button(this.#stickHeld, false, false, "pad");
+        if (this.#stickHeld) remote.button(this.#stickHeld, false, false, "pad", "pad:stick");
         if (dir) {
-          remote.button(dir, true, false, "pad");
+          remote.button(dir, true, false, "pad", "pad:stick");
           this.#repeatAt.set(dir, now + REPEAT_FIRST);
         }
         this.#stickHeld = dir;
       } else if (dir && now >= (this.#repeatAt.get(dir) ?? Infinity)) {
-        remote.button(dir, true, true, "pad");
+        remote.button(dir, true, true, "pad", "pad:stick");
         this.#repeatAt.set(dir, now + REPEAT_EVERY);
       }
     } else {
-      if (this.#stickHeld) remote.button(this.#stickHeld, false, false, "pad");
+      if (this.#stickHeld) remote.button(this.#stickHeld, false, false, "pad", "pad:stick");
       this.#stickHeld = null;
       if (lx !== 0 || ly !== 0) {
         // About a screen's width a second, at full tilt; gently, finely.
