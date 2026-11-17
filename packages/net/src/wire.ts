@@ -82,7 +82,8 @@ function valid(m: Obj): boolean {
     case "found":
       return isFood(m.food);
     case "food":
-      return int(m.ack, 0, 0xffff) && list(m.amounts, WIRE_FOODS_MAX, isAmount) && list(m.gone, WIRE_FOODS_MAX, num) && num(m.eaten);
+      return int(m.ack, 0, 0xffff) && list(m.amounts, WIRE_FOODS_MAX, isAmount) && list(m.gone, WIRE_FOODS_MAX, num) && num(m.eaten) &&
+        (m.meal === undefined || (isAmount(m.meal) && (m.meal as number[])[0]! >= 0 && (m.meal as number[])[1]! >= 0 && (m.meal as number[])[1]! <= (m.meal as number[])[0]!));
     default:
       return false;
   }

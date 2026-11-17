@@ -204,7 +204,7 @@ A spot (`at`, `spots`) is x, z, yaw and the height of the surface the fly
 stands on, and each of `foods` carries the height it lies at: in the
 restaurant one point can be the floor, a chair seat or the table over them.
 | `happening {kind, seed, at}` | a visitor comes |
-| `food {ack, amounts, gone, eaten}` | at most ten times a second while food changes: what is left, what is gone, this player's total by the room's account, and the last of its bites counted |
+| `food {ack, amounts, gone, eaten, meal?}` | at most ten times a second while food changes: what is left, what is gone, this player's total by the room's account, and the last of its bites counted |
 
 ### Coming back
 
@@ -457,3 +457,15 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
   offers the site's passwords in it. iOS suspends a
   backgrounded app, so away is the normal state there; the 10 minutes and
   coming back are what make it work. `docs/ios.md`, "Tables with others".
+
+### Bite acknowledgements
+
+Every processed bite, including a refusal, produces a food acknowledgement:
+known food carries its authoritative amount and missing food is gone.
+Devices predict the food being eaten but feed hunger and the crop only after
+acknowledgement. The optional `meal: [amount, sugar]` receipt counts exactly
+what that player was granted since its previous acknowledgement, including
+the sweetness of partial bites. Rejoining discards undelivered receipts.
+This is additive within protocol 3: older devices ignore the receipt; a
+new device with an older room bounds its cumulative eaten delta by the
+acknowledged bites and uses their average sweetness.
