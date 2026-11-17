@@ -70,7 +70,7 @@ test("coming back, a fly may be where it walked to meanwhile, but not across the
   assert.ok(!mayReturnTo(world, [5000, 0, 0], start.x, 0, start.z, 2));
 });
 
-test("every player's fly is set down on somewhere level near the place's start, apart from the others, in every place", () => {
+test("every player's fly at a full table is set down on somewhere level near the place's start, apart from the others, in every place", () => {
   for (const [id, place] of Object.entries(WORLDS)) {
     const w = new World(place);
     const spots = Array.from({ length: MAX_FLIES }, (_, i) => spawnSpot(w, i + 1));
@@ -78,7 +78,7 @@ test("every player's fly is set down on somewhere level near the place's start, 
     assert.deepEqual(spots[0], [place.start.x, place.start.z, place.start.yaw, height], id);
     for (const [x, z, , y] of spots) {
       assert.ok(w.onTable(x, z) && couldBe(w, x, y!, z, false), `${id}: somewhere it could stand`);
-      assert.ok(Math.abs(y! - height) < 0.5, `${id}: at the start's height`);
+      assert.ok(y! < height + 0.5 && y! > height - 50.5, `${id}: at the start's height, or a hop below it`);
       assert.ok(w.solidAt(x, y! + 1, z) < 0, `${id}: with air over it`);
     }
     for (let i = 0; i < spots.length; i++) {
@@ -156,10 +156,11 @@ test("a password is anything typed, up to its length, and nothing invisible", ()
   for (const bad of ["", "x".repeat(PASSWORD_MAX + 1), "a\u0000", "line\nbreak", "zero​width", 7, undefined]) assert.ok(!isPassword(bad), String(bad));
 });
 
-test("a table holds eight flies with distinct colours and a device can bring at most four", () => {
-  assert.equal(MAX_FLIES, 8);
+test("a table holds 128 flies, a device can bring at most four, and any eight in a row have distinct colours", () => {
+  assert.equal(MAX_FLIES, 128);
   assert.equal(MAX_OWN, 4);
-  assert.equal(new Set(COLOURS.slice(0, MAX_FLIES)).size, MAX_FLIES);
+  assert.equal(new Set(COLOURS).size, 8);
+  assert.ok(MAX_FLIES < 256, "a fly's id is one byte on the wire");
 });
 
 test("a rate refills only at its stated pace and never banks more than a burst", () => {

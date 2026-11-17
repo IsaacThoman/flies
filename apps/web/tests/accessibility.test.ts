@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { MenuAccess, projectItem } from "../src/accessibility/model.ts";
 import type { Game } from "../src/game.ts";
+import { MAX_FLIES } from "@fly/net";
 import { Menu } from "@fly/ui";
 import { accessibilityEnabled } from "../src/accessibility/browser.ts";
 
@@ -51,5 +52,5 @@ test("everyone rooms and multi-fly devices retain meaningful semantics", () => {
     table: { joined: true, name: "Garden", code: "abcdefghjk", others: [{ id: 2, colours: ["red", "blue", "green"] }] },
     online: { place: "picnic", room: { locked: false }, mine: [{}, {}], others: { list: [{}, {}, {}] } },
   } as unknown as Game;
-  assert.equal(new MenuAccess(game).read().body, "Picnic table, 5 of 8 flies, No password");
+  assert.equal(new MenuAccess(game).read().body, `Picnic table, 5 of ${MAX_FLIES} flies, No password`);
 });

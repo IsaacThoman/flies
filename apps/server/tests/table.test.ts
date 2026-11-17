@@ -59,9 +59,12 @@ function batches(to: FakeLink | Player, scale: WireScale = TABLETOP_SCALE) {
 }
 
 /** A table with clocks the test moves on: room time and the wall clock, ms. */
-function room(start: TableStart = START, seed = 7, code = CODE) {
+/** A table small enough to fill by hand, for what happens when there is no seat left. */
+const SMALL = 8;
+
+function room(start: TableStart = START, seed = 7, code = CODE, seats?: number) {
   const clock = { now: 1000, wall: Date.UTC(2026, 5, 1, 12) };
-  const options = { now: () => clock.now, wall: () => clock.wall };
+  const options = { now: () => clock.now, wall: () => clock.wall, seats };
   const table = new Table(code, start, "key-1", seed, options);
   const hello = (key: string, extra: Partial<Hello> = {}): Hello => ({ type: "hello", v: PROTOCOL, table: code, key, ...extra });
   /** A device sitting down; fails the test if it is refused. */
@@ -107,9 +110,9 @@ const clear = (...players: Player[]) => {
   for (const p of players) p.link.sent.length = 0;
 };
 
-function pool(wall = Date.UTC(2026, 5, 1, 12)) {
+function pool(wall = Date.UTC(2026, 5, 1, 12), seats?: number) {
   const clock = { now: 1000, wall };
-  const options = { now: () => clock.now, wall: () => clock.wall };
+  const options = { now: () => clock.now, wall: () => clock.wall, seats };
   const tables = new Tables(options);
   const join = (key: string, extra: Partial<Hello> = {}) => {
     const hello: Hello = { type: "hello", v: PROTOCOL, table: EVERYONE, key, ...extra };
@@ -290,7 +293,7 @@ test("a fly away for AWAY_LIMIT leaves; coming back with the same key it has its
   assert.deepEqual(saidOf(a, "joined"), [{ type: "joined", id: 2, colour: COLOURS[1], away: false, of: 2 }]);
 });
 
-test("a returning player keeps its colour after others have joined; the table is full at eight, but the seat of someone long gone goes to a newcomer", () => {
+test("a returning player keeps its colour after others have joined; the table is full at MAX_FLIES, but the seat of someone long gone goes to a newcomer", () => {
   const { table, clock, join, send, step, hello } = room();
   const players = [join("key-1"), join("key-2"), join("key-3")];
   send(players[1], { type: "bye" });
@@ -305,15 +308,16 @@ test("a returning player keeps its colour after others have joined; the table is
   assert.equal(back.seat.flies[0].colour, COLOURS[1]);
 
   for (let i = 5; i <= MAX_FLIES; i++) players.push(join(`key-${i}`));
+  const newest = `key-${MAX_FLIES + 1}`;
   assert.equal(table.present, MAX_FLIES);
-  assert.equal(table.hello(fakeLink(), "key-9", hello("key-9")), "full");
+  assert.equal(table.hello(fakeLink(), newest, hello(newest)), "full");
   // Away a moment: still at the table.
   table.disconnected(players[2].seat, players[2].link);
-  assert.equal(table.hello(fakeLink(), "key-9", hello("key-9")), "full");
+  assert.equal(table.hello(fakeLink(), newest, hello(newest)), "full");
   // Gone: its seat is given up.
   clock.wall += AWAY_LIMIT + 1000;
   step();
-  const newcomer = join("key-9");
+  const newcomer = join(newest);
   assert.equal(newcomer.seat.id, 3);
   assert.equal(newcomer.seat.flies[0].colour, COLOURS[2]);
   assert.equal(table.present, MAX_FLIES);
@@ -789,13 +793,13 @@ test("a fresh pool lists Everyone even empty, keeps it listed after the last fly
   assert.deepEqual(tables.listed(), [empty, ordinary.table.room()]);
 });
 
-test("a ninth and tenth device overflow into Everyone 2, a newcomer takes a freed seat in Everyone first, and a returning fly stays in Everyone 2", () => {
+test("the two devices past a full Everyone overflow into Everyone 2, a newcomer takes a freed seat in Everyone first, and a returning fly stays in Everyone 2", () => {
   const { tables, clock, join } = pool();
   const first = Array.from({ length: MAX_FLIES }, (_, i) => join(`key-${i + 1}`));
   assert.ok(first.every((p) => p.table.code === EVERYONE));
   assert.equal(tables.size, 1, "the next room opens only when needed");
-  const ninth = join("key-9");
-  const tenth = join("key-10");
+  const ninth = join(`key-${MAX_FLIES + 1}`);
+  const tenth = join(`key-${MAX_FLIES + 2}`);
   assert.equal(ninth.table.code, everyoneCode(1));
   assert.equal(tenth.table, ninth.table);
   assert.equal(ninth.table.name, "Everyone 2");
@@ -1064,21 +1068,21 @@ test("a device cannot send a state for another device's fly, even alongside vali
   assert.equal(table.seatOf(foreign.id), b.seat);
 });
 
-test("eight fly ids fill the table regardless of device count; newcomers get as many flies as fit", () => {
-  const { table, join, hello } = room();
+test("a small table's fly ids fill it regardless of device count; newcomers get as many flies as fit", () => {
+  const { table, join, hello } = room(START, 7, CODE, SMALL);
   join("key-1", { flies: MAX_OWN });
   const b = join("key-2", { flies: MAX_OWN });
   assert.deepEqual(b.seat.flies.map((f) => f.id), [5, 6, 7, 8]);
-  assert.equal(table.present, MAX_FLIES);
+  assert.equal(table.present, SMALL);
   assert.equal(table.hello(fakeLink(), "key-3", hello("key-3")), "full");
 
-  const partial = room();
+  const partial = room(START, 7, CODE, SMALL);
   partial.join("key-1", { flies: 4 });
   partial.join("key-2");
   const last = partial.join("key-3", { flies: 4 });
   assert.deepEqual(last.seat.flies.map((f) => f.id), [6, 7, 8]);
   assert.equal(saidOf(last, "welcome")[0].flies.length, 3);
-  assert.equal(partial.table.present, MAX_FLIES);
+  assert.equal(partial.table.present, SMALL);
 });
 
 test("hello fly counts default to one, clamp to MAX_OWN and use whole flies", () => {
@@ -1092,7 +1096,7 @@ test("hello fly counts default to one, clamp to MAX_OWN and use whole flies", ()
 });
 
 test("a seated device recounts up and down: seated lists its flies and others hear only new joins and trailing departures, capped by free ids", () => {
-  const { table, join, send } = room();
+  const { table, join, send } = room(START, 7, CODE, SMALL);
   const a = join("key-1", { flies: 2 });
   const b = join("key-2", { flies: 4 });
   const c = join("key-3");
@@ -1141,7 +1145,7 @@ test("fly recounts have an allowance of their own: the starter's changes never u
 
 test("a starter who leaves keeps one seat, not four: their others are given up when needed, the list counts the seat kept, and they come back to what is free", () => {
   const clock = { now: 0, wall: Date.UTC(2026, 5, 1) };
-  const tables = new Tables({ now: () => clock.now, wall: () => clock.wall });
+  const tables = new Tables({ now: () => clock.now, wall: () => clock.wall, seats: SMALL });
   const table = tables.open("key-s", { type: "hello", v: PROTOCOL, table: CODE, key: "key-s", start: { ...START, name: "Ours", listed: true } }, 1) as Table;
   const sit = (key: string, flies = 1) => table.hello(fakeLink(), key, { type: "hello", v: PROTOCOL, table: CODE, key, flies });
   const starter = sit("key-s", 4) as Seat;
@@ -1165,7 +1169,7 @@ test("a starter who leaves keeps one seat, not four: their others are given up w
 });
 
 test("a starter gone after a long time away keeps one seat too, and a seat still on the line is never given up", () => {
-  const { table, clock, join, hello, step } = room();
+  const { table, clock, join, hello, step } = room(START, 7, CODE, SMALL);
   const s = join("key-1", { flies: 4 });
   const others = ["key-2", "key-3", "key-4", "key-5"].map((key) => join(key));
   table.disconnected(s.seat, s.link);
@@ -1255,7 +1259,7 @@ test("stopping, silence and disconnecting put each of a device's flies to rest; 
 });
 
 test("a gone device's multiple flies are reclaimed together, oldest first, while the starter's ids stay reserved", () => {
-  const { table, clock, join, send } = room();
+  const { table, clock, join, send } = room(START, 7, CODE, SMALL);
   const a = join("key-1", { flies: 2 });
   const b = join("key-2", { flies: 3 });
   const c = join("key-3", { flies: 2 });
@@ -1648,7 +1652,7 @@ test("expiry replacement flushes pending bite receipts exactly once", () => {
 });
 
 test("a device's flies sit together in a room open to everyone: rooms fill by flies, and one that can't seat them all sends the device on to the next", () => {
-  const { tables, join } = pool();
+  const { tables, join } = pool(undefined, SMALL);
   const a = join("key-1", { flies: 4 });
   const b = join("key-2", { flies: 3 });
   assert.equal(a.table.code, EVERYONE);
@@ -1662,8 +1666,8 @@ test("a device's flies sit together in a room open to everyone: rooms fill by fl
   assert.deepEqual(saidOf(c, "welcome")[0].flies.map((f) => f.id), [1, 2, 3, 4]);
   const d = join("key-4");
   assert.equal(d.table, a.table);
-  assert.equal(a.table.taken, MAX_FLIES);
-  assert.deepEqual(tables.listed().filter((r) => r.everyone).map((r) => [r.code, r.flies]), [[EVERYONE, MAX_FLIES], [everyoneCode(1), 4]]);
+  assert.equal(a.table.taken, SMALL);
+  assert.deepEqual(tables.listed().filter((r) => r.everyone).map((r) => [r.code, r.flies]), [[EVERYONE, SMALL], [everyoneCode(1), 4]]);
   // Coming back, a device's flies are in the room they were in, as many as before.
   c.table.disconnected(c.seat, c.link);
   const back = join("key-3", { flies: 4, table: everyoneCode(1) });
@@ -1672,7 +1676,7 @@ test("a device's flies sit together in a room open to everyone: rooms fill by fl
 });
 
 test("nobody started a room open to everyone, so nobody's seats are kept there once they have gone", () => {
-  const { tables, clock, join } = pool();
+  const { tables, clock, join } = pool(undefined, SMALL);
   const a = join("key-1", { flies: 4 });
   const b = join("key-2", { flies: 4 });
   assert.equal(a.table.starter, null);
@@ -1693,11 +1697,11 @@ test("nobody started a room open to everyone, so nobody's seats are kept there o
   assert.equal(join("key-4", { flies: 4 }).table, a.table);
 });
 
-test("the rooms open to everyone hold at most 512 flies: past that a device is turned away as full, and short of it one gets the seats there are", () => {
+test("the rooms open to everyone hold at most EVERYONE_ROOMS × MAX_FLIES flies: past that a device is turned away as full, and short of it one gets the seats there are", () => {
   const { tables, join } = pool();
   for (let i = 0; i < EVERYONE_ROOMS; i++) {
-    join(`full-${i}-a`, { flies: 4 });
-    join(`full-${i}-b`, { flies: 3 });
+    for (let k = 1; k < MAX_FLIES / MAX_OWN; k++) join(`full-${i}-${k}`, { flies: MAX_OWN });
+    join(`full-${i}-last`, { flies: MAX_OWN - 1 });
   }
   assert.equal([...tables.values()].filter((t) => t.everyone).length, EVERYONE_ROOMS);
   // Every room has one seat: four flies asked for, one given, in the first.
@@ -1708,7 +1712,7 @@ test("the rooms open to everyone hold at most 512 flies: past that a device is t
   let flies = 0;
   for (const t of tables.values()) if (t.everyone) flies += t.taken;
   assert.equal(flies, EVERYONE_ROOMS * MAX_FLIES);
-  assert.equal(flies, 512);
+  assert.equal(flies, 8192);
   const hello: Hello = { type: "hello", v: PROTOCOL, table: EVERYONE, key: "too-many", flies: 1 };
   assert.equal(tables.open("too-many", hello, 7), "full");
 });

@@ -1,4 +1,4 @@
-// Playing with others online: rooms of up to eight people's flies
+// Playing with others online: rooms of up to 128 flies
 // (docs/online.md). Few words, one pane, four faces:
 //
 // - the rooms: a new one, a code to type, and every listed room with someone

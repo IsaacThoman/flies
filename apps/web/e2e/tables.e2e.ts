@@ -12,7 +12,7 @@
 // that open the game find each other in the room open to everyone, one
 // leaves it from Online and stays alone, and one whose room server can't be
 // reached plays alone without a word; with "Join others" off, nothing of
-// tables happens at all; and a full table (one tab, seven fake
+// tables happens at all; and a full table (one tab, MAX_FLIES - 1 fake
 // flies from Node walking round its fly) keeps the frame to the Apple TV's
 // budget on every screen shape, followed and close up.
 //
@@ -57,7 +57,8 @@ if (!url) {
 }
 const dataDir = mkdtempSync(path.join(os.tmpdir(), "flies-tables-"));
 const quiet = () => {};
-let rooms: RoomServer = await startRooms({ port: 0, dataDir, log: quiet });
+// Trusting a proxy, so that each fake fly is at an address of its own (scripts/tables.ts) and a full table of them is let in.
+let rooms: RoomServer = await startRooms({ port: 0, dataDir, trustProxy: true, log: quiet });
 const port = rooms.port;
 const roomsAt = `ws://127.0.0.1:${port}/rooms`;
 const browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
@@ -212,7 +213,7 @@ const frameCost = (page: Page, ms: number) =>
 async function restartRooms(): Promise<RoomServer> {
   for (let tries = 0; ; tries++) {
     try {
-      return await startRooms({ port, dataDir, log: quiet });
+      return await startRooms({ port, dataDir, trustProxy: true, log: quiet });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE" || tries >= 40) throw error;
       await new Promise((resolve) => setTimeout(resolve, 250));
@@ -370,10 +371,10 @@ try {
     const others = othersOf(s);
     return others.length === 1 && others[0].id === ownMany[0].id;
   });
-  // Three more devices leave only two additional seats for the starter's request of four.
+  // More devices fill all but two seats, all the starter's request of four can have.
   const fillers: FakeFly[] = [];
   const multiFakes = new Set<number>();
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < MAX_FLIES - 5; i++) {
     const filler = await fakeFly(roomsAt, multiCode, i, multiFakes);
     fillers.push(filler);
     fakeFlies.push(filler);
@@ -384,7 +385,7 @@ try {
   assert.equal(mineOf(capped)[0].id, ownMany[0].id, "the followed fly keeps its seat");
   await companyAwake(many.page, 3);
   await seesDevice(pair.page, mineOf(capped));
-  await waitUntil(pair.page, "six other flies fill the table", (s) => othersOf(s).length === 6);
+  await waitUntil(pair.page, `${MAX_FLIES - 2} other flies fill the table`, (s) => othersOf(s).length === MAX_FLIES - 2);
 
   step("reloading the two-fly device preserves every fly id and colour; removing either fly removes the whole device");
   await pair.page.reload();
@@ -400,7 +401,7 @@ try {
   for (const filler of fillers) filler.close();
   for (const tab of [many, pair]) await tab.page.context().close();
 
-  step("six fake flies leave two seats: a new device asking for four lives only the two it is seated");
+  step(`${MAX_FLIES - 2} fake flies leave two seats: a new device asking for four lives only the two it is seated`);
   const limitedCode = tableCode((bytes) => crypto.getRandomValues(bytes));
   const limitedFakes: FakeFly[] = [];
   const limitedIds = new Set<number>();
@@ -416,7 +417,7 @@ try {
   const twoSeats = await waitFor(limited.page, "online=joined,brain=running,flies=2,asked=4", 120_000);
   assert.equal(mineOf(twoSeats).length, 2);
   await companyAwake(limited.page, 2);
-  await waitUntil(limited.page, "six other flies present", (s) => othersOf(s).length === 6 && othersOf(s).every((o) => o.present));
+  await waitUntil(limited.page, `${MAX_FLIES - 2} other flies present`, (s) => othersOf(s).length === MAX_FLIES - 2 && othersOf(s).every((o) => o.present));
   await limited.page.context().close();
   for (const filler of limitedFakes) filler.close();
 

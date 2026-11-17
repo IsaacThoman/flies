@@ -9,7 +9,7 @@ import { NATIVE_SOCKET_CLOSED, NATIVE_SOCKET_OPEN } from "@fly/contracts";
 import type { NativeSocketBridge, OpenTableSocket, TableSocket, TableSocketStatus } from "@fly/contracts";
 import { FLIES_MAX } from "@fly/net";
 
-/** The largest binary message taken: the room's are a few hundred bytes (eight flies' states), and it sends nothing over 4 KB. */
+/** The largest binary message taken: the room's are at most FLIES_MAX (about 6 KB, a full table's states), and its others are smaller. */
 export const NATIVE_MESSAGE_BYTES = 64 * 1024;
 
 export class NativeSocket implements TableSocket {

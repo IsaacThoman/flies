@@ -7,7 +7,7 @@ import { performance } from "node:perf_hooks";
 import { after, test } from "node:test";
 import { WebSocket } from "ws";
 import { createPicnic } from "@fly/world";
-import { CLOSE, COLOURS, EVERYONE, FLY_MAX, OWN_MAX, PROTOCOL, ROOMS_PATH, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, encodeOwn, everyoneCode, tableCode } from "@fly/net";
+import { CLOSE, COLOURS, EVERYONE, FLY_MAX, MAX_FLIES, MAX_OWN, OWN_MAX, PROTOCOL, ROOMS_PATH, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, encodeOwn, everyoneCode, tableCode } from "@fly/net";
 import type { ClientMessage, FlyState, RoomWire, ServerMessage, Spot, TableStart } from "@fly/net";
 import { startServer } from "../src/server.ts";
 import type { RoomServer } from "../src/server.ts";
@@ -25,10 +25,10 @@ after(async () => {
   await Promise.all(dirs.map((d) => rm(d, { recursive: true, force: true })));
 });
 
-async function serve(dataDir?: string) {
+async function serve(dataDir?: string, trustProxy = false) {
   const dir = dataDir ?? (await mkdtemp(path.join(os.tmpdir(), "fly-rooms-")));
   if (!dataDir) dirs.push(dir);
-  const server = await startServer({ port: 0, host: "127.0.0.1", dataDir: dir, log: () => {}, listEvery: 50 });
+  const server = await startServer({ port: 0, host: "127.0.0.1", dataDir: dir, trustProxy, log: () => {}, listEvery: 50 });
   servers.push(server);
   return { server, dir };
 }
@@ -38,9 +38,9 @@ const newKey = () => `test-key-${crypto.randomUUID()}`;
 
 type Received = { json: ServerMessage } | { flies: FlyState[] };
 
-/** A device at the other end of a real socket: everything it hears is kept, and a test waits for the message it expects. */
-async function device(port: number) {
-  const ws = new WebSocket(`ws://127.0.0.1:${port}${ROOMS_PATH}`);
+/** A device at the other end of a real socket (`from`: the address a trusted proxy says it is at): everything it hears is kept, and a test waits for the message it expects. */
+async function device(port: number, from?: string) {
+  const ws = new WebSocket(`ws://127.0.0.1:${port}${ROOMS_PATH}`, from ? { headers: { "x-forwarded-for": from } } : undefined);
   ws.binaryType = "nodebuffer";
   const heard: Received[] = [];
   const waiting = new Set<() => void>();
@@ -407,8 +407,9 @@ test("guessing a room's password is slowed to a few tries a minute; starting roo
   }
 });
 
-test("real sockets welcome several flies per device, relay every id without echo and enforce the eight-fly capacity", async () => {
-  const { server } = await serve();
+test("real sockets welcome several flies per device, relay every id without echo and enforce the table's capacity", async () => {
+  // A full table is more devices than one address may open: each of those filling it is somewhere else.
+  const { server } = await serve(undefined, true);
   const code = newCode();
   const a = await device(server.port);
   const b = await device(server.port);
@@ -427,14 +428,16 @@ test("real sockets welcome several flies per device, relay every id without echo
     a.until((r) => "flies" in r && r.flies.length === 4 && r.flies.every((s) => s.seq === 1) ? r.flies : undefined),
   ]);
   for (const [d, w] of [[a, wa], [b, wb]] as const) assert.ok(d.heard.every((r) => !("flies" in r) || r.flies.every((s) => !w.flies.some((f) => f.id === s.id))));
-  const c = await device(server.port);
+  const filling = await Promise.all(Array.from({ length: MAX_FLIES / MAX_OWN - 2 }, (_, i) => device(server.port, `198.51.100.${i + 1}`)));
+  const welcomes = await Promise.all(filling.map((d) => d.hello(code, newKey(), { flies: MAX_OWN })));
+  assert.deepEqual(welcomes.flatMap((w) => (w.type === "welcome" ? w.flies.map((f) => f.id) : [])).sort((x, y) => x - y), Array.from({ length: MAX_FLIES - 8 }, (_, i) => i + 9));
+  const c = await device(server.port, "198.51.100.200");
   assert.deepEqual(await c.hello(code, newKey()), { type: "refused", reason: "full" });
   assert.equal((await c.closed).code, CLOSE.full);
   const health = await fetch(`http://127.0.0.1:${server.port}/health`);
   const body = await health.json() as { devices: number; flies: number };
-  assert.equal(body.devices, 2);
-  assert.equal(body.flies, 8);
-  a.ws.close();
-  b.ws.close();
-  await Promise.all([a.closed, b.closed]);
+  assert.equal(body.devices, MAX_FLIES / MAX_OWN);
+  assert.equal(body.flies, MAX_FLIES);
+  for (const d of [a, b, ...filling]) d.ws.close();
+  await Promise.all([a, b, ...filling].map((d) => d.closed));
 });

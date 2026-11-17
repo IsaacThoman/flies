@@ -14,7 +14,7 @@
 //   --size WxH    each tab's window
 //   --url         a running game to open instead of starting Vite
 //
-// At most eight flies sit at a table (MAX_FLIES), the tabs and the fakes together.
+// At most MAX_FLIES (128) flies sit at a table, the tabs and the fakes together.
 //
 // The summary, for each tab: every other fly it saw (how often it was there,
 // resting, and drawn as the real model, and how far in the past it was drawn),
@@ -26,6 +26,7 @@ import { randomBytes } from "node:crypto";
 import type { ChildProcess } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import { chromium } from "playwright";
+import { WebSocket } from "ws";
 import type { Browser, Page } from "playwright";
 import { FLY_LENGTH } from "@fly/body";
 import { FLY_MAX, MAX_FLIES, PROTOCOL, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, wireScale } from "@fly/net";
@@ -49,11 +50,14 @@ export type FakeFly = {
  * it with `start`) with a key of its own. It walks a circle round the fly
  * with the lowest id that isn't in `fakes` (the ids of all the fakes, which
  * it adds its own to), sending its state as a device would; until it has
- * heard of one, round where the table set it down. `k` sets its circle.
+ * heard of one, round where the table set it down. `k` sets its circle,
+ * and the address a proxy says it is at: a room server that trusts one
+ * (`trustProxy`) counts each fake as somewhere else, so a full table of them
+ * is within what one address may open.
  */
 export function fakeFly(rooms: string, table: string, k: number, fakes: Set<number>, start?: TableStart): Promise<FakeFly> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(rooms);
+    const ws = new WebSocket(rooms, { headers: { "x-forwarded-for": `198.18.${(k >> 8) & 255}.${k & 255}` } });
     ws.binaryType = "arraybuffer";
     const state = createFlyState();
     const heard = createFlyState();
@@ -225,7 +229,7 @@ async function main() {
   const [width, height] = option("size", "960x540").split("x").map(Number);
   if (clients + fakeCount > MAX_FLIES) throw new Error(`At most ${MAX_FLIES} flies sit at a table`);
 
-  const rooms = await startRooms({ port: 0, dataDir: null, log: () => {} });
+  const rooms = await startRooms({ port: 0, dataDir: null, trustProxy: true, log: () => {} });
   const roomsUrl = `ws://127.0.0.1:${rooms.port}/rooms`;
   let vite: ChildProcess | null = null;
   let url = option("url", "");

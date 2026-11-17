@@ -9,7 +9,7 @@
 
 import { createSurface } from "@fly/world";
 import type { World } from "@fly/world";
-import { AIRBORNE } from "./protocol.ts";
+import { AIRBORNE, MAX_FLIES } from "./protocol.ts";
 import type { FlyState, Spot } from "./protocol.ts";
 
 /** A fly on its feet moves no faster than this, mm/s (it walks at 5 to 16), and in the air no faster than MAX_FLIGHT (a take-off is about 700). */
@@ -144,8 +144,12 @@ export function mayReturnTo(world: World, at: Spot, x: number, y: number, z: num
   return Math.hypot(ax - x, standing.y - y, az - z) <= RETURN_PACE * Math.min(RETURN_SECONDS, Math.max(0, seconds)) + 3;
 }
 
-/** How far apart flies are set down round the place's start, mm: a few body lengths, so they find each other. */
-const SPREAD = 9;
+/** How far apart flies are set down round the place's start, mm: two body lengths, so they find each other. */
+const SPREAD = 5;
+/** How many points on the spiral a fly tries before it is set down on the start itself. */
+const TRIES = 12;
+/** How far below the start a fly may be set down when there is no room at its height, mm: a hop off a stone, not the floor under a table. */
+const DROP = 50;
 /** The steepest a fly is set down on (the cosine of its slope). */
 const LEVEL = 0.95;
 
@@ -153,24 +157,30 @@ const LEVEL = 0.95;
  * Where player `id`'s fly is set down in a place: the first on the place's
  * start, the others round it facing it, each on somewhere level at the
  * start's height (on the start's table, not the floor under it) with air
- * over it. The same on every device and in the room.
+ * over it; once there is no room at that height, on something level a hop
+ * below it (DROP). The same on every device and in the room.
+ *
+ * They are set down on a sunflower's spiral, point n at SPREAD × √n out and n
+ * golden angles round, which keeps any number of them about SPREAD apart.
+ * One whose point isn't level tries further out on the spiral, at points no
+ * other id has (n + MAX_FLIES, n + 2 × MAX_FLIES, …), so it never lands on another.
  */
 export function spawnSpot(world: World, id: number): Spot {
   const start = world.place.start;
   const y = world.heightAt(start.x, start.z, start.y);
   if (id <= 1) return [start.x, start.z, start.yaw, y];
-  const level = (x: number, z: number) => {
+  const level = (x: number, z: number, drop: number) => {
     if (!world.onTable(x, z)) return false;
     const s = world.surface(x, z, surface, y + 0.5);
-    return s.normal.y >= LEVEL && Math.abs(s.y - y) < 0.5 && s.underside >= s.y + CLEAR;
+    return s.normal.y >= LEVEL && s.y > y - drop - 0.5 && s.y < y + 0.5 && s.underside >= s.y + CLEAR;
   };
-  for (let ring = 1; ring <= 6; ring++) {
-    for (let turn = 0; turn < 12; turn++) {
-      // The golden angle spreads them round; each try further round, then further out.
-      const a = id * 2.39996 + turn * 0.52;
-      const x = start.x + Math.cos(a) * SPREAD * ring;
-      const z = start.z + Math.sin(a) * SPREAD * ring;
-      if (level(x, z)) return [x, z, Math.atan2(start.x - x, start.z - z), surface.y];
+  for (const drop of [0, DROP]) {
+    for (let n = id - 1; n < id - 1 + TRIES * MAX_FLIES; n += MAX_FLIES) {
+      const a = n * 2.39996;
+      const r = SPREAD * Math.sqrt(n);
+      const x = start.x + Math.cos(a) * r;
+      const z = start.z + Math.sin(a) * r;
+      if (level(x, z, drop)) return [x, z, Math.atan2(start.x - x, start.z - z), surface.y];
     }
   }
   return [start.x, start.z, start.yaw, y];

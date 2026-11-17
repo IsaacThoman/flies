@@ -228,8 +228,9 @@ function drawAction(g: CanvasRenderingContext2D, item: ActionItem, x: number, y:
   const marks = item.count || item.locked || item.everyone;
   // Clear of the marks on both sides, the words centred, smaller if they must be.
   let words = size;
+  const counted = item.count ? countWidth(g, item) : 0;
   if (marks) {
-    const room = w - 2 * (h * 0.4 + PIPS.width + (item.locked || item.everyone ? h * 0.5 : 0));
+    const room = w - 2 * (h * 0.4 + counted + (item.locked || item.everyone ? h * 0.5 : 0));
     const most = size ?? Math.round(h * 0.46);
     g.font = font(most);
     words = Math.max(8, Math.min(most, Math.floor((most * room) / Math.max(1, g.measureText(item.label).width))));
@@ -249,10 +250,10 @@ function drawAction(g: CanvasRenderingContext2D, item: ActionItem, x: number, y:
   if (item.count) {
     if (item.countLabel) {
       if (item.disabled) g.globalAlpha *= 0.45;
-      text(g, item.countLabel, right - PIPS.width / 2, mid, focused ? COUNT_FOCUSED : COUNT);
+      text(g, item.countLabel, right - counted / 2, mid, focused ? COUNT_FOCUSED : COUNT);
       if (item.disabled) g.globalAlpha /= 0.45;
     } else pips(g, right - PIPS.width, mid, item.count[0], item.count[1], ink, item.disabled);
-    right -= PIPS.width + h * 0.18;
+    right -= counted + h * 0.18;
   }
   if (item.locked) padlock(g, right - h * 0.16, mid, h * 0.3, ink, item.disabled);
   else if (item.everyone) globe(g, right - h * 0.16, mid, h * 0.3, ink, item.disabled);
@@ -277,6 +278,12 @@ function globe(g: CanvasRenderingContext2D, x: number, y: number, s: number, ink
 
 /** How many of how many, as two rows of small dots: those there filled. */
 const PIPS = { width: 34, r: 2.6, step: 8.5 };
+/** How wide an item's count is drawn: its pips, or its words ("128/128" is wider than the pips), whichever is wider. */
+function countWidth(g: CanvasRenderingContext2D, item: ActionItem) {
+  if (!item.countLabel) return PIPS.width;
+  g.font = font(COUNT.size);
+  return Math.max(PIPS.width, Math.ceil(g.measureText(item.countLabel).width));
+}
 function pips(g: CanvasRenderingContext2D, x: number, y: number, n: number, of: number, ink: string, disabled = false) {
   const across = Math.ceil(of / 2);
   g.save();

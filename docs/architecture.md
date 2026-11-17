@@ -21,7 +21,7 @@ The game has no sound, by design.
 | `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver, the weather outside, a table's line to its room, typing into a field the game draws. |
 | `packages/net` | How flies share a table: the wire format, the room's clock, other flies as they are heard of, the shared food, balls and bubbles, and what a player may do. Runs in a browser and in Node. |
 | `apps/web` | The game: the world, each fly's life and senses, the remote's tools and menus. `apps/web/src/company.ts` keeps this device's companion flies. Runs in a browser as it is. |
-| `apps/server` | The room server for rooms of up to eight flies, with one to four per device (`docs/online.md`): the rooms open to everyone, which clients try to join by default, the rooms people make, and the public directory: one Node process over WebSockets. It runs no brains and draws nothing. |
+| `apps/server` | The room server for rooms of up to 128 flies, with one to four per device (`docs/online.md`): the rooms open to everyone, which clients try to join by default, the rooms people make, and the public directory: one Node process over WebSockets. It runs no brains and draws nothing. |
 | `apps/tvos` | The Apple TV app: a native host that runs the web build's JavaScript in JavaScriptCore and draws it through OpenGL ES. |
 | `apps/ios` | The iPhone and iPad app: the web build in a `WKWebView`, served from the app's bundle, in a small Swift shell ([ios.md](ios.md)). |
 
@@ -82,7 +82,7 @@ camera. A host that wraps the web build says what its screen's notch covers thro
 
 At a table with others (`docs/online.md`) each fly still lives entirely on
 its owner's device. Each device carries its flies in one connection;
-only the first carries its hand. The table seats at most eight flies, giving
+only the first carries its hand. The table seats at most 128 flies, giving
 a device as many of its chosen flies as there is room for. The server relays
 each fly's state and keeps shared state for the place, food, balls and visitors. Player-created
 tables also share light and weather; rooms open to everyone keep those local

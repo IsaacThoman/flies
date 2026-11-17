@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Pantry, World } from "@fly/world";
-import { BODY_RADIUS, CONTACT_TOUCH, Crowd, FlyBody, SenseTracker, createIntent, segmentToSegment } from "../src/index.ts";
+import { BODY_RADIUS, CONTACT_TOUCH, Crowd, FlyBody, MAX_NEIGHBOURS, SenseTracker, createIntent, segmentToSegment } from "../src/index.ts";
 import type { Forces, Intent } from "../src/index.ts";
 
 const openTable = (r: number) => new World({ floor: { kind: "circle", r }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320 });
@@ -118,4 +118,19 @@ test("a front leg on another fly tastes him, on its feet; the nearest other fly'
   crowd.neighbours[0].z = 2.4;
   body.mode = "airborne";
   assert.equal(feel().maleTaste, 0);
+});
+
+test("a crowd holds only so many: at a full table it keeps the flies nearest, whatever order they come in", () => {
+  const crowd = new Crowd(openTable(200));
+  // Every other fly at a table of 128, the farthest first and the nearest last, then some in between.
+  const order = [...Array.from({ length: 127 }, (_, i) => 127 - i), 40, 0.5];
+  for (const d of order) {
+    const n = crowd.add(d * d);
+    if (n) Object.assign(n, { x: d, y: 0, z: 0, yaw: 0 });
+  }
+  assert.equal(crowd.count, MAX_NEIGHBOURS);
+  assert.deepEqual(crowd.neighbours.map((n) => n.x).sort((a, b) => a - b), [0.5, ...Array.from({ length: MAX_NEIGHBOURS - 1 }, (_, i) => i + 1)]);
+  assert.equal(crowd.add(200 * 200), null);
+  crowd.clear();
+  assert.ok(crowd.add(200 * 200), "an empty crowd takes any");
 });

@@ -24,7 +24,7 @@ export const BODY_UP = 0.3 * FLY_LENGTH;
 export const CONTACT_TOUCH = 0.3;
 /** How much of its speed into another fly it bounces back with in the air, as off a wall (motion.ts). The hit is felt as touch, as hitting anything is. */
 const BOUNCE = 1.3;
-/** At most this many others. */
+/** At most this many others: the nearest, when more are at the table. */
 export const MAX_NEIGHBOURS = 32;
 
 /** Another fly, as this one meets it. */
@@ -46,18 +46,36 @@ export class Crowd implements Bodies {
   overlap = 0;
   readonly #world: World;
   readonly #surface = createSurface();
+  /** How far each neighbour is, squared, and which is the farthest: a full crowd gives that one's place to a nearer fly. */
+  readonly #distance = new Float64Array(MAX_NEIGHBOURS);
+  #farthest = 0;
 
   constructor(world: World) {
     this.#world = world;
   }
 
-  /** Sets the next neighbour; returns it to fill in. */
-  add(): Neighbour | null {
-    return this.count < MAX_NEIGHBOURS ? this.neighbours[this.count++] : null;
+  /**
+   * Sets the next neighbour, `distance2` (mm², squared) from this fly;
+   * returns it to fill in. A full crowd keeps the nearest: this one takes
+   * the farthest's place, or is left out (null) if it is farther still.
+   */
+  add(distance2 = 0): Neighbour | null {
+    const d = this.#distance;
+    if (this.count < MAX_NEIGHBOURS) {
+      d[this.count] = distance2;
+      if (distance2 > d[this.#farthest]) this.#farthest = this.count;
+      return this.neighbours[this.count++];
+    }
+    const at = this.#farthest;
+    if (distance2 >= d[at]) return null;
+    d[at] = distance2;
+    for (let i = 0; i < MAX_NEIGHBOURS; i++) if (d[i] > d[this.#farthest]) this.#farthest = i;
+    return this.neighbours[at];
   }
 
   clear() {
     this.count = 0;
+    this.#farthest = 0;
   }
 
   inside(x: number, y: number, z: number, margin: number) {

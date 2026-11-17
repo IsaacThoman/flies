@@ -152,7 +152,7 @@ async function checkArrivalActors(page: Page, to: PlaceId) {
       [g.bubbles.mesh, "bubbles"], [g.handsView.group, "hands view"],
       [g.fireflies.mesh, "fireflies"], [g.prints.prints.mesh, "footprints"],
       [parent.children.find((o) => o.renderOrder === -10), "eyes sky sphere"],
-      ...g.online!.others.list.map((o) => [o.view.root, `remote fly ${o.id}`] as const),
+      ...g.online!.others.list.flatMap((o) => (o.view ? [[o.view.root, `remote fly ${o.id}`] as const] : [])),
     ]);
     const retained: Object3D[] = [];
     for (const actor of actors) actor.traverse((o) => retained.push(o));
@@ -414,7 +414,9 @@ export async function run(args = process.argv.slice(2)) {
             peer.state.flags = HANDS | HOLDING | PLAYING;
             Object.assign(peer.state.hand, { x: at.x, y: at.y, z: at.z, eyeX: at.x, eyeY: at.y + 10, eyeZ: at.z + 10, tool: TOOLS.findIndex((t) => t.id === "blow"), variant: 1 });
             await waitFor(page, `others~${peer.id}:1`, 30_000);
+            // A posed fly's model; one far off is a stand-in, with none.
             assert.ok(await page.evaluate(() => globalThis.__fly.online!.others.list.every((o) => {
+              if (!o.view) return true;
               for (let p = o.view.root.parent; p; p = p.parent) if (p === globalThis.__fly.stage.scene) return true;
               return false;
             })), "joined fly is attached to the visible place");
