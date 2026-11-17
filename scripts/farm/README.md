@@ -11,7 +11,7 @@ ssh ubuntu-thinkpad flies-check <branch> --with-dev
 `--with-dev` merges the fetched `origin/dev` before checking and lists conflicts.
 Branches, `origin/<branch>`, and pushed SHAs work. The checkout's SHA is printed.
 Use `--only lint|types|unit|e2e|all` (default `all`); `types` includes tvOS.
-For targeted runs, use `--files path/to/a.test.ts path/to/b.test.ts` (or `.e2e.ts`
+For targeted runs, use `--files path/to/a.test.ts path/to/b.test.ts` (or .e2e.ts
 paths). With default `all`, this retains lint, typechecks and build but runs only
 the selected test files; a test stage with no selected files is explicitly skipped.
 You can also combine it with `--only unit` or `--only e2e`. All runs exit nonzero on
@@ -71,11 +71,11 @@ only these exact names are excluded with Node's `--test-skip-pattern`:
 
 | File in `packages/brain-native/tests/` | Test |
 | --- | --- |
-| `math.test.ts` | exp, log, log1p, expm1, sin and cos are V8's to the bit (WebAssembly) |
-| `connectome.test.ts` | on the real connectome every tick is the TypeScript's, bit for bit, the eyes shut and open (WebAssembly) |
-| `synthetic.test.ts` | every tick of 70 simulated seconds is the TypeScript's, bit for bit, for several seeds (WebAssembly) |
-| `synthetic.test.ts` | with its eyes open every tick is the TypeScript's, bit for bit, for several seeds (WebAssembly) |
-| `synthetic.test.ts` | broken or odd eye columns come out as in TypeScript (WebAssembly) |
+| `packages/brain-native/tests/math.test.ts` | exp, log, log1p, expm1, sin and cos are V8's to the bit (WebAssembly) |
+| `packages/brain-native/tests/connectome.test.ts` | on the real connectome every tick is the TypeScript's, bit for bit, the eyes shut and open (WebAssembly) |
+| `packages/brain-native/tests/synthetic.test.ts` | every tick of 70 simulated seconds is the TypeScript's, bit for bit, for several seeds (WebAssembly) |
+| `packages/brain-native/tests/synthetic.test.ts` | with its eyes open every tick is the TypeScript's, bit for bit, for several seeds (WebAssembly) |
+| `packages/brain-native/tests/synthetic.test.ts` | broken or odd eye columns come out as in TypeScript (WebAssembly) |
 
 The committed WASM implements Apple silicon's fused math, while x86 Node's
 Math rounds differently. Native x86 comparisons, WASM engine/eyes/refusal tests,
