@@ -94,17 +94,17 @@ vec3 surface(vec3 c) {
    relief = fine * 0.16; rough = 1.0;
  } else if (vKind < 3.5) {
    vec2 q = p.xz;
-   float reach = 20.0;
+   float reach = 20.0, height = 40.0;
    float best = 1e6;
    for (int i=0; i<14; i++) {
      vec4 crown = uCrowns[i];
      float d = length(p.xz - crown.xy) / crown.z;
-     if (d < best) { best = d; q = p.xz - crown.xy; reach = crown.z; }
+     if (d < best) { best = d; q = p.xz - crown.xy; reach = crown.z; height=crown.w; }
    }
    // A rosette of overlapping pointed leaves, with paired side veins.
    float r = length(q);
-   float ring = floor(r / (reach * 0.3));
-   float count = 5.0 + ring * 3.0;
+   float ring = height<20.0 ? 0.0 : floor(r / (reach * 0.3));
+   float count = height<20.0 ? 4.0 : 5.0 + ring * 3.0;
    float around = atan(q.y,q.x) / 6.28318 * count + ring * 0.37;
    float w = (fract(around) - 0.5) * 2.0;
    float along = fract(r / (reach * 0.3));

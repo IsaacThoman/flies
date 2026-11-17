@@ -13,7 +13,7 @@ ${NOISE}
 void main() {
  vec3 view = normalize(cameraPosition - vWorld);
  vec2 p = abs(vNormal.z) > 0.5 ? vWorld.xy : vWorld.zy;
- if (abs(vNormal.y) > 0.5) p = vWorld.xz;
+ if (abs(vNormal.y) > 0.5) p = vec2(vWorld.z,-abs(vWorld.x));
  float px = max(0.15, length(fwidth(p)));
  float fresnel = pow(1.0 - abs(dot(view, normalize(vNormal))), 4.0);
  float fog = uMist * (1.0 - smoothstep(0.0, 400.0 + vnoise(vec2(p.x * 0.018, 0.0)) * 90.0, vWorld.y));
