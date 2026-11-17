@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { TableSocket, TableSocketStatus } from "@fly/contracts";
+import { tryProtocolReload } from "../src/online/invite.ts";
 import { Lobby } from "../src/online/lobby.ts";
 
 class Socket implements TableSocket {
@@ -54,4 +55,27 @@ test("a version refusal is surfaced even before the close arrives", () => {
   lobby.update(0.01);
   assert.equal(lobby.status, "version");
   assert.equal(s.status, "closed");
+});
+
+test("installed apps never try a protocol reload; browsers can", () => {
+  let reloads = 0;
+  const reload = () => { reloads++; return true; };
+  assert.equal(tryProtocolReload(true, reload), false);
+  assert.equal(reloads, 0);
+  assert.equal(tryProtocolReload(false, reload), true);
+  assert.equal(reloads, 1);
+});
+
+test("version failures clear if a compatible room server returns", () => {
+  const sockets: Socket[] = [];
+  const lobby = new Lobby(() => { const s = new Socket(); sockets.push(s); return s; }, "ws://test");
+  sockets[0].inbox.push(JSON.stringify({ type: "refused", reason: "version" }));
+  lobby.update(0.01);
+  assert.equal(lobby.status, "version");
+  lobby.update(8.1);
+  sockets[1].status = "open";
+  sockets[1].inbox.push(JSON.stringify({ type: "rooms", rooms: [] }));
+  lobby.update(0.01);
+  assert.equal(lobby.status, "open");
+  lobby.close();
 });

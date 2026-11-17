@@ -489,3 +489,16 @@ test("room discovery failures replace searching, stale choices are disabled, and
   press("back");
   assert.deepEqual(did, ["back"], "solo remains reachable");
 });
+
+test("a version mismatch disables forms already open and says an update is needed", () => {
+  const { screen, state, step, press, focus, did } = world();
+  focus("new"); press("select");
+  state.lobbyStatus = "version"; step();
+  assert.equal(screen.menu.items.find((i) => i.id === "create")?.disabled, true);
+  const g = blankCanvas(); screen.draw(g, 0, new HitMap());
+  assert.ok(writtenOn(g).some((w) => w.text === "Update needed"));
+  press("select"); assert.deepEqual(did, []);
+  press("back"); press("back"); assert.deepEqual(did, ["back"]);
+  state.knock = { code: "bbbbbbbbbb", name: "Secret Sugar", wrong: false, seq: 1 }; step();
+  assert.equal(screen.menu.items.find((i) => i.id === "join")?.disabled, true);
+});

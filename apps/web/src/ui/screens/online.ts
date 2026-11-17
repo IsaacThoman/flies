@@ -149,14 +149,14 @@ export class OnlineScreen implements Screen {
           place,
           listed,
           { kind: "field", id: "password", label: "Password", value: d.password, placeholder: "None", secret: true, disabled: !shell.typing },
-          { kind: "action", id: "create", label: "Create" },
+          { kind: "action", id: "create", label: "Create", disabled: shell.lobbyStatus === "version" },
         ];
       }
       case "door": {
         const joining = !!shell.table;
         return [
           { kind: "field", id: "password", label: "Password", value: this.#password, secret: true, disabled: !shell.typing || joining },
-          { kind: "action", id: "join", label: joining ? "Joining…" : "Join", disabled: joining || !this.#password },
+          { kind: "action", id: "join", label: joining ? "Joining…" : "Join", disabled: joining || !this.#password || shell.lobbyStatus === "version" },
         ];
       }
       case "room": {
@@ -173,6 +173,7 @@ export class OnlineScreen implements Screen {
 
   #heading() {
     const shell = this.#shell;
+    if (shell.lobbyStatus === "version") return "Update needed";
     if (this.#note) return NOTES[this.#note] ?? "";
     if (this.view === "new") return "New room";
     if (this.view === "door") return shell.knock?.name ?? "Online";

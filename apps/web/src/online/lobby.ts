@@ -42,6 +42,7 @@ export class Lobby {
       this.status = "version";
       this.#socket?.close();
       this.#socket = null;
+      this.#retryAt = this.#time + 8;
     }
   };
   readonly #binary = () => {};
@@ -55,7 +56,6 @@ export class Lobby {
   /** Once a frame while the list is shown: what has arrived, and opening the line again when it has dropped. `dt` in seconds. */
   update(dt: number) {
     this.#time += dt;
-    if (this.status === "version") return;
     const socket = this.#socket;
     if (!socket) {
       if (this.#time >= this.#retryAt) {
@@ -86,6 +86,7 @@ export class Lobby {
     // A room server newer than this page: the game reloads into its own.
     if (socket.closeCode === CLOSE.version) {
       this.status = "version";
+      this.#retryAt = this.#time + 8;
       return;
     }
     this.status = this.rooms ? "stale" : "lost";
