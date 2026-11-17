@@ -417,3 +417,32 @@ test("notice navigation clears the button hints on tall and short screens", () =
     }
   }
 });
+
+
+test("a pending tool is named clear of the shelf without changing its committed tool or hit targets", () => {
+  for (const [w, h] of [[390, 844], [844, 390], [430, 932], [932, 430], [820, 1180], [1180, 820], [507, 820], [375, 820]]) {
+    const hands = new Hands(createPicnic());
+    const frame = frameFor(w, h, { top: h > w ? 59 : 0, bottom: 34, left: 0, right: 0 }, true);
+    const layout = hudLayout(frame);
+    const s: HudState = { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 1, spikes: 0, brainRunning: true, eyes: null, layout };
+    const hits = new HitMap();
+    drawHud(blankCanvas(), 0, s, hits);
+    const original = Array.from({ length: hits.count }, (_, i) => ({ ...hits.get(i)! }));
+    for (let i = 0; i < TOOLS.length; i++) {
+      const pressed = original.find(hit => hit.kind === HUD_HITS.tool && hit.index === i)!;
+      s.pressed = pressed;
+      const g = blankCanvas();
+      const previewHits = new HitMap();
+      drawHud(g, 0, s, previewHits);
+      const caption = writtenOn(g).find(word => word.text === TOOLS[i].name);
+      assert.ok(caption, `${w}×${h}: pending ${TOOLS[i].name} is readable`);
+      assert.ok(Math.hypot(caption.x - pressed.x - pressed.w / 2, caption.y - pressed.y - pressed.h / 2) * frame.unit > 44, "caption clears the fingertip");
+      assert.equal(hands.tool, 0, "preview does not select a tool");
+      assert.deepEqual(Array.from({ length: previewHits.count }, (_, i) => ({ ...previewHits.get(i)! })), original, "press feedback cannot move hit targets");
+    }
+    s.pressed = null;
+    const g = blankCanvas();
+    drawHud(g, 0, s, new HitMap());
+    assert.ok(writtenOn(g).some(word => word.text.includes("Sugar")), "cancellation restores the committed label");
+  }
+});
