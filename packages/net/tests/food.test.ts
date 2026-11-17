@@ -22,7 +22,7 @@ test("two flies eating the same food at once never eat more than there was betwe
   // Each eats at full appetite every 50 ms until it is gone.
   for (let i = 0; i < 200 && table.find(id); i++) {
     now += 50;
-    for (const by of [1, 2]) granted += table.bite(by, id, EAT_RATE * 0.05, 20.5, food.y, 20, now).granted;
+    for (const by of [1, 2]) granted += table.bite(by, id, EAT_RATE * 0.05, [{ x: 20.5, y: food.y, z: 20 }], now).granted;
   }
   assert.equal(table.find(id), null, "eaten up and gone");
   assert.ok(Math.abs(granted - 1) < 1e-9, `granted ${granted}`);
@@ -36,11 +36,11 @@ test("two flies eating the same food at once never eat more than there was betwe
 test("a bite from too far away, of food that isn't there, or faster than a fly can eat is refused", () => {
   const table = new TableFood(world, PATCHES);
   const p = table.find(sugar)!;
-  assert.equal(table.bite(1, sugar, 0.01, p.x + 50, p.y, p.z, 0).refused, "far");
-  assert.equal(table.bite(1, 999, 0.01, p.x, p.y, p.z, 0).refused, "unknown");
-  assert.equal(table.bite(1, sugar, 0.9, p.x, p.y, p.z, 100).refused, "greedy");
+  assert.equal(table.bite(1, sugar, 0.01, [{ x: p.x + 50, y: p.y, z: p.z }], 0).refused, "far");
+  assert.equal(table.bite(1, 999, 0.01, [{ x: p.x, y: p.y, z: p.z }], 0).refused, "unknown");
+  assert.equal(table.bite(1, sugar, 0.9, [{ x: p.x, y: p.y, z: p.z }], 100).refused, "greedy");
   // Eating steadily at the fly's rate is fine for as long as it likes.
-  for (let t = 1000; t < 4000; t += 50) assert.equal(table.bite(1, sugar, EAT_RATE * 0.05, p.x, p.y, p.z, t).refused, null);
+  for (let t = 1000; t < 4000; t += 50) assert.equal(table.bite(1, sugar, EAT_RATE * 0.05, [{ x: p.x, y: p.y, z: p.z }], t).refused, null);
 });
 
 test("a player names only its own food, and past MAX_DROPPED the oldest goes", () => {
@@ -63,12 +63,12 @@ test("a device's pantry is the room's food less what its own fly ate that the ro
   mine.amount -= 0.1;
   mirror.ate(mine, 0.1);
   mirror.sent(1);
-  table.bite(2, sugar, 0.2, mine.x, mine.y, mine.z, 1000);
+  table.bite(2, sugar, 0.2, [{ x: mine.x, y: mine.y, z: mine.z }], 1000);
   let flushed = table.flush()!;
   mirror.apply(0, flushed.amounts, flushed.gone, undefined);
   assert.ok(Math.abs(mine.amount - 0.7) < 1e-9, `with its own bite still pending: ${mine.amount}`);
   // Now the room counts it.
-  table.bite(1, sugar, 0.1, mine.x, mine.y, mine.z, 2000);
+  table.bite(1, sugar, 0.1, [{ x: mine.x, y: mine.y, z: mine.z }], 2000);
   flushed = table.flush()!;
   mirror.apply(1, flushed.amounts, flushed.gone, table.eaten.get(1));
   assert.ok(Math.abs(mine.amount - 0.7) < 1e-9);
@@ -83,8 +83,8 @@ test("in the restaurant the room's food lies at its heights, and is eaten only f
   assert.deepEqual(table.foods.map((f) => f.y), pantry.foods.map((f) => f.y), "as every device has them");
   assert.ok(table.foods.some((f) => f.y === 0) && table.foods.some((f) => f.y >= TABLE_TOPS.round.top), "on the floor and on the tables");
   const sugar = table.foods.find((f) => f.name === "sugar" && f.y === TABLE_TOPS.round.top)!;
-  assert.equal(table.bite(1, sugar.id, 0.01, sugar.x, 0, sugar.z, 0).refused, "far", "from the floor under it");
-  assert.equal(table.bite(1, sugar.id, 0.01, sugar.x, sugar.y, sugar.z, 0).refused, null);
+  assert.equal(table.bite(1, sugar.id, 0.01, [{ x: sugar.x, y: 0, z: sugar.z }], 0).refused, "far", "from the floor under it");
+  assert.equal(table.bite(1, sugar.id, 0.01, [{ x: sugar.x, y: sugar.y, z: sugar.z }], 0).refused, null);
 
   // Dropped under the window table, it lands on the floor; on it, on the table.
   const x = RESTAURANT_START.x + 200;
@@ -97,4 +97,40 @@ test("in the restaurant the room's food lies at its heights, and is eaten only f
   assert.deepEqual(table.foods.map((f) => f.y), table.foods.map((f) => fromWire(room, toWire(f)).y));
   const [id, kind, name, fx, fz, r, sweet, amount, pool] = toWire(sugar);
   assert.equal(fromWire(room, [id, kind, name, fx, fz, r, sweet, amount, pool]).y, room.heightAt(fx, fz));
+});
+
+test("any one of a device's flies can reach a bite, but none means no bite and height still counts", () => {
+  const table = new TableFood(world, PATCHES);
+  const food = table.find(sugar)!;
+  const far = { x: food.x + 100, y: food.y, z: food.z };
+  const under = { x: food.x, y: food.y - 100, z: food.z };
+  assert.equal(table.bite(1, sugar, 0.01, [], 0).refused, "unknown");
+  assert.equal(table.bite(1, sugar, 0.01, [far, under], 0).refused, "far");
+  assert.equal(food.amount, 1);
+  const got = table.bite(1, sugar, 0.01, [far, under, food], 0);
+  assert.equal(got.refused, null);
+  assert.equal(got.granted, 0.01);
+  assert.equal(table.eaten.get(1), 0.01);
+});
+
+test("a device's stored appetite and its refill scale with its fly count, and recounting down caps the store", () => {
+  const foods = [new TableFood(world, PATCHES), new TableFood(world, PATCHES)];
+  const count = [1, 4];
+  for (const [i, table] of foods.entries()) {
+    const food = table.find(sugar)!;
+    const flies = Array.from({ length: count[i] }, () => ({ x: food.x, y: food.y, z: food.z }));
+    food.amount = 10;
+    const stored = EAT_RATE * 1.5 * count[i];
+    assert.equal(table.bite(1, sugar, stored + 0.01, flies, 0).refused, "greedy");
+    assert.equal(table.bite(1, sugar, stored, flies, 0).refused, null);
+    assert.equal(table.bite(1, sugar, 0.001, flies, 0).refused, "greedy");
+    assert.equal(table.bite(1, sugar, stored * 0.5, flies, 500).refused, null);
+    assert.ok(Math.abs(table.eaten.get(1)! - stored * 1.5) < 1e-9);
+  }
+  assert.ok(Math.abs(foods[1].eaten.get(1)! - foods[0].eaten.get(1)! * 4) < 1e-9);
+  const table = new TableFood(world, PATCHES);
+  const food = table.find(sugar)!;
+  assert.equal(table.bite(1, sugar, 0.01, [food, food, food, food], 0).refused, null);
+  assert.equal(table.bite(1, sugar, EAT_RATE * 2, [food], 0).refused, "greedy");
+  assert.equal(table.bite(1, sugar, EAT_RATE, [food], 0).refused, null);
 });
