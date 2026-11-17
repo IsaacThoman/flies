@@ -64,6 +64,13 @@ npm run tvos -- archive --version 0.1.1             # signs into apps/tvos/build
 npm run ios -- archive --version 0.1.1 --upload     # and uploads to TestFlight
 ```
 
+Ready pull requests and pushes to `dev` or `main` that change `packages/brain-native/**`
+(the build script and its pinned SDK version and digests included) or
+`.github/workflows/wasm-repro.yml` run that workflow on macOS. Draft pull requests skip it.
+It caches the pinned, digest-verified wasi-sdk and runs `wasm.sh --check` unconditionally,
+rebuilding both WebAssembly modules and their manifest and comparing them byte for byte
+with the committed files. This check cannot skip when the SDK is missing.
+
 ## The weather outside
 
 The Apple TV app has WeatherKit only when built with `TVOS_WEATHERKIT=1`
