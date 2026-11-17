@@ -64,7 +64,7 @@ npm run tvos -- archive --version 0.1.1             # signs into apps/tvos/build
 npm run ios -- archive --version 0.1.1 --upload     # and uploads to TestFlight
 ```
 
-Every PR and push to `dev` or `main` also runs `.github/workflows/wasm-repro.yml` on Linux.
+Every PR and push to `dev` or `main` also runs `.github/workflows/wasm-repro.yml` on macOS.
 It caches the pinned, digest-verified wasi-sdk and runs `wasm.sh --check` unconditionally,
 rebuilding both WebAssembly modules and their manifest and comparing them byte for byte
 with the committed files. This check cannot skip when the SDK is missing.
