@@ -61,7 +61,7 @@ state; they do not establish every operating system's real suspension behavior.
 
 ## Feed weather in a browser
 
-A browser has no native weather service. Scripts can provide conditions
+A browser has no native weather service. In solo play, scripts can provide conditions
 through `__fly.outside.feed`, taking `OutsideConditions` without `source`
 (`packages/contracts/src/weather.ts`). For example:
 
@@ -70,8 +70,9 @@ node scripts/play.ts 'eval:__fly.outside.feed({observedAt:Date.now(),cloudCover:
 ```
 
 The fields use milliseconds since the epoch, cloud fraction, mm/hour, metres,
-m/s and local civil clock hours from midnight. `feed` settles the change immediately by default;
-its optional second argument `false` eases the transition. In that page,
+m/s and local civil clock hours from midnight. `feed` settles the supplied observation's internal blend immediately by default;
+its optional second argument `false` eases that blend. Game polling and sky
+easing can still delay the rendered result. In that page,
 `__fly.outside.feed(null)` removes the supplied observation and returns to
 any host service, or the forecast without one. Use Weather → Now and Light →
 Now to follow it. If outside conditions were disabled in saved settings,
@@ -82,7 +83,11 @@ The canvas reports `data-weather-from` (`outside`, `forecast`, `chosen`),
 `data-sun-from` (`outside`, `clock`, `chosen`), `data-outside` (`fed`, `none`,
 `off`, or the host status including `idle`) and `data-outside-age` (seconds,
 empty with no observation). These show which source is in use and how old
-the observation is; the feed does not contact a weather provider.
+the observation is in solo play; the feed does not contact a weather provider.
+At an online table the room owns weather and clock, so the feed is not used
+for them. The source attributes can still reflect the local Outside flags
+in that case, a suspected reporting bug; do not use them as evidence that
+room weather came from the feed.
 
 ## Documentation checks
 
