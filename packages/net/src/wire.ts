@@ -5,8 +5,8 @@
 // every number finite. A message that doesn't is dropped, never half-used,
 // so the game can't throw on it or make something for each of a million ids.
 
-import { MAX_PLAYERS, isTableCode } from "./protocol.ts";
-import type { BallWire, FoodWire, HappeningWire, PlayerWire, Refusal, RoomWire, ServerMessage, Spot, V3 } from "./protocol.ts";
+import { MAX_FLIES, MAX_OWN, isTableCode } from "./protocol.ts";
+import type { BallWire, FoodWire, HappeningWire, PlayerWire, Refusal, RoomWire, SeatedFly, ServerMessage, Spot, V3 } from "./protocol.ts";
 import { LISTED_MAX, roomName } from "./limits.ts";
 
 /** The most food a table has at once: the restaurant's 25 patches, 6 dropped and 16 found, with room to spare. */
@@ -28,12 +28,15 @@ const int = (v: unknown, lo: number, hi: number): v is number => Number.isIntege
 const text = (v: unknown): v is string => typeof v === "string" && v.length <= TEXT_MAX;
 const bool = (v: unknown): v is boolean => typeof v === "boolean";
 const near = (v: unknown): v is number => num(v) && Math.abs(v) < REACH;
-const player = (v: unknown): v is number => int(v, 1, MAX_PLAYERS);
+const player = (v: unknown): v is number => int(v, 1, MAX_FLIES);
 const list = (v: unknown, max: number, each: (x: unknown) => boolean) => Array.isArray(v) && v.length <= max && v.every((x) => each(x));
 
 const isV3 = (v: unknown): v is V3 => Array.isArray(v) && v.length === 3 && v.every(near);
 const isSpot = (v: unknown): v is Spot => Array.isArray(v) && (v.length === 3 || v.length === 4) && v.every(near);
-const isPlayer = (v: unknown): v is PlayerWire => obj(v) && player(v.id) && text(v.colour) && bool(v.away);
+const isPlayer = (v: unknown): v is PlayerWire => obj(v) && player(v.id) && text(v.colour) && bool(v.away) && player(v.of);
+/** This device's own flies: one at least, no more than a device brings, each id once. */
+const isSeated = (v: unknown): v is SeatedFly[] =>
+  list(v, MAX_OWN, (f) => obj(f) && player(f.id) && text(f.colour) && isSpot(f.at)) && (v as SeatedFly[]).length > 0 && new Set((v as SeatedFly[]).map((f) => f.id)).size === (v as SeatedFly[]).length;
 const isBall = (v: unknown): v is BallWire => obj(v) && player(v.by) && num(v.at) && isV3(v.from) && isV3(v.via) && isV3(v.to);
 const isHappening = (v: unknown): v is HappeningWire => obj(v) && text(v.kind) && num(v.seed) && num(v.at);
 const isFood = (v: unknown): v is FoodWire =>
@@ -41,9 +44,9 @@ const isFood = (v: unknown): v is FoodWire =>
   (v[8] === 0 || v[8] === 1) && (v[9] === undefined || near(v[9]));
 const isBubble = (v: unknown) => obj(v) && int(v.slot, 0, LIST_MAX) && int(v.cycle, 0, 2 ** 31) && num(v.t0) && num(v.poppedAt) && num(v.goneAt);
 const isRoom = (v: unknown): v is RoomWire =>
-  obj(v) && isTableCode(v.code) && roomName(v.name) === v.name && text(v.place) && int(v.flies, 0, MAX_PLAYERS) && bool(v.locked) && (v.everyone === undefined || bool(v.everyone));
+  obj(v) && isTableCode(v.code) && roomName(v.name) === v.name && text(v.place) && int(v.flies, 0, MAX_FLIES) && bool(v.locked) && (v.everyone === undefined || bool(v.everyone));
 const isAmount = (v: unknown) => Array.isArray(v) && v.length === 2 && num(v[0]) && num(v[1]);
-const isSpots = (v: unknown) => obj(v) && Object.keys(v).length <= MAX_PLAYERS && Object.entries(v).every(([id, spot]) => player(Number(id)) && isSpot(spot));
+const isSpots = (v: unknown) => obj(v) && Object.keys(v).length <= MAX_FLIES && Object.entries(v).every(([id, spot]) => player(Number(id)) && isSpot(spot));
 const isWorld = (m: Obj) => text(m.light) && text(m.weather);
 
 /** Whether `m` is the message its type says, whole: each field there and in bounds. */
@@ -51,9 +54,9 @@ function valid(m: Obj): boolean {
   switch (m.type) {
     case "welcome":
       return (
-        (m.meals === undefined || bool(m.meals)) && num(m.v) && player(m.id) && text(m.colour) && int(m.starter, 0, MAX_PLAYERS) && num(m.seed) && num(m.now) && num(m.wall) && num(m.offset) && text(m.place) &&
-        int(m.epoch, 0, 255) && obj(m.world) && isWorld(m.world) && list(m.players, MAX_PLAYERS, isPlayer) && list(m.foods, WIRE_FOODS_MAX, isFood) &&
-        list(m.balls, MAX_PLAYERS, isBall) && list(m.happenings, LIST_MAX, isHappening) && list(m.bubbles, LIST_MAX, isBubble) && isSpot(m.at) && obj(m.room) &&
+        (m.meals === undefined || bool(m.meals)) && num(m.v) && player(m.id) && text(m.colour) && isSeated(m.flies) && (m.flies as SeatedFly[])[0].id === m.id && int(m.starter, 0, MAX_FLIES) && num(m.seed) && num(m.now) && num(m.wall) && num(m.offset) && text(m.place) &&
+        int(m.epoch, 0, 255) && obj(m.world) && isWorld(m.world) && list(m.players, MAX_FLIES, isPlayer) && list(m.foods, WIRE_FOODS_MAX, isFood) &&
+        list(m.balls, MAX_FLIES, isBall) && list(m.happenings, LIST_MAX, isHappening) && list(m.bubbles, LIST_MAX, isBubble) && isSpot(m.at) && obj(m.room) &&
         text(m.room.name) && bool(m.room.listed) && bool(m.room.locked) && (m.room.code === undefined || isTableCode(m.room.code)) &&
         (m.room.everyone === undefined || bool(m.room.everyone))
       );
@@ -65,6 +68,8 @@ function valid(m: Obj): boolean {
       return num(m.t) && num(m.now);
     case "joined":
       return isPlayer(m);
+    case "seated":
+      return isSeated(m.flies) && int(m.asked, 1, MAX_OWN);
     case "away":
       return player(m.id) && bool(m.away);
     case "left":

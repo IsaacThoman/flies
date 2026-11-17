@@ -7,8 +7,8 @@ import { performance } from "node:perf_hooks";
 import { after, test } from "node:test";
 import { WebSocket } from "ws";
 import { createPicnic } from "@fly/world";
-import { CLOSE, COLOURS, EVERYONE, FLY_MAX, PROTOCOL, ROOMS_PATH, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, everyoneCode, tableCode } from "@fly/net";
-import type { ClientMessage, FlyState, RoomWire, ServerMessage, TableStart } from "@fly/net";
+import { CLOSE, COLOURS, EVERYONE, FLY_MAX, OWN_MAX, PROTOCOL, ROOMS_PATH, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, encodeOwn, everyoneCode, tableCode } from "@fly/net";
+import type { ClientMessage, FlyState, RoomWire, ServerMessage, Spot, TableStart } from "@fly/net";
 import { startServer } from "../src/server.ts";
 import type { RoomServer } from "../src/server.ts";
 
@@ -87,6 +87,7 @@ async function device(port: number) {
 
   let clock = { now: 0, at: 0 };
   let seq = 0;
+  let id = 0;
   return {
     ws,
     heard,
@@ -99,12 +100,30 @@ async function device(port: number) {
       const from = heard.length;
       ws.send(JSON.stringify({ type: "hello", v: PROTOCOL, table, key, ...extra } satisfies ClientMessage));
       const answer = await until((r) => ("json" in r && (r.json.type === "welcome" || r.json.type === "refused") ? r.json : undefined), from);
-      if (answer.type === "welcome") clock = { now: answer.now, at: performance.now() };
+      if (answer.type === "welcome") {
+        clock = { now: answer.now, at: performance.now() };
+        id = answer.id;
+      }
       return answer;
+    },
+    own(flies: readonly { id: number; at: Spot }[]) {
+      const states = flies.map(({ id, at }) => {
+        const s = createFlyState();
+        s.id = id;
+        s.seq = seq + 1;
+        s.t = clock.now + (performance.now() - clock.at) + 1;
+        [s.x, s.z, s.yaw] = at;
+        s.y = picnic.heightAt(s.x, s.z, at[3]);
+        return s;
+      });
+      seq++;
+      const view = new DataView(new ArrayBuffer(OWN_MAX));
+      ws.send(new Uint8Array(view.buffer, 0, encodeOwn(view, TABLETOP_SCALE, states)));
     },
     /** Sends where its fly is at the picnic, stamped with the room's time as the welcome gave it. */
     fly(x: number, z: number, epoch = 0) {
       const s = createFlyState();
+      s.id = id;
       s.epoch = epoch;
       s.seq = ++seq;
       s.t = clock.now + (performance.now() - clock.at) + 1;
@@ -213,12 +232,13 @@ test("a restart sends everyone away to come back, and coming back they find the 
   const a = await device(server.port);
   const b = await device(server.port);
   await a.hello(code, newKey(), { start: START });
-  const welcome = await b.hello(code, keyB);
-  assert.equal(welcome.type, "welcome");
-  const [bx, bz] = welcome.type === "welcome" ? welcome.at : [0, 0];
+  const welcome = await b.hello(code, keyB, { flies: 3 });
+  assert.ok(welcome.type === "welcome");
+  const [bx, bz] = welcome.at;
   const from = a.heard.length;
-  b.fly(bx + 1, bz + 0.5);
-  const seen = await a.until((r) => ("flies" in r ? r.flies.find((s) => s.id === 2 && s.seq === 1) : undefined), from);
+  b.own(welcome.flies.map((f) => ({ id: f.id, at: [f.at[0] + 1, f.at[1] + 0.5, f.at[2], f.at[3]] })));
+  const seenFlies = await a.until((r) => ("flies" in r && r.flies.length === 3 && r.flies.every((s) => s.seq === 1) ? r.flies : undefined), from);
+  const seen = seenFlies[0];
 
   await server.stop();
   assert.equal((await a.closed).code, CLOSE.restart);
@@ -227,16 +247,21 @@ test("a restart sends everyone away to come back, and coming back they find the 
   const { server: again } = await serve(dir);
   assert.ok(again.tables.get(code), "the table was kept");
   const back = await device(again.port);
-  const returned = await back.hello(code, keyB);
+  const returned = await back.hello(code, keyB, { flies: 3 });
   assert.equal(returned.type, "welcome");
   if (returned.type !== "welcome") return;
   assert.equal(returned.id, 2);
   assert.equal(returned.colour, COLOURS[1]);
+  assert.deepEqual(returned.flies.map((f) => [f.id, f.colour]), welcome.flies.map((f) => [f.id, f.colour]));
+  for (const f of returned.flies) {
+    const last = seenFlies.find((s) => s.id === f.id)!;
+    assert.ok(Math.hypot(f.at[0] - last.x, f.at[1] - last.z) < 0.02);
+  }
   // Where the others last saw it, to the wire's 1/50 mm.
   assert.ok(Math.hypot(returned.at[0] - seen.x, returned.at[1] - seen.z) < 0.02, `back at ${returned.at}, seen at ${seen.x}, ${seen.z}`);
   assert.ok(Math.hypot(returned.at[0] - bx, returned.at[1] - bz) > 0.3, "where it had walked to, not where it was first set down");
   // The starter isn't back yet: it is shown resting.
-  assert.deepEqual(returned.players, [{ id: 1, colour: COLOURS[0], away: true }]);
+  assert.deepEqual(returned.players, [{ id: 1, colour: COLOURS[0], away: true, of: 1 }]);
   back.ws.close();
 });
 
@@ -378,4 +403,36 @@ test("guessing a room's password is slowed to a few tries a minute; starting roo
     const d = await device(server.port);
     assert.deepEqual(await d.hello(newCode(), newKey(), { start: { ...START, name } }), { type: "refused", reason: "malformed" }, name);
   }
+});
+
+test("real sockets welcome several flies per device, relay every id without echo and enforce the eight-fly capacity", async () => {
+  const { server } = await serve();
+  const code = newCode();
+  const a = await device(server.port);
+  const b = await device(server.port);
+  const wa = await a.hello(code, newKey(), { start: START, flies: 4 });
+  const wb = await b.hello(code, newKey(), { flies: 99 });
+  assert.ok(wa.type === "welcome" && wb.type === "welcome");
+  assert.deepEqual(wa.flies.map((f) => [f.id, f.colour]), [1, 2, 3, 4].map((id) => [id, COLOURS[id - 1]]));
+  assert.deepEqual(wb.flies.map((f) => f.id), [5, 6, 7, 8]);
+  assert.deepEqual(wb.players, wa.flies.map((f) => ({ id: f.id, colour: f.colour, away: false, of: wa.id })));
+  await a.until((r) => "json" in r && r.json.type === "joined" && r.json.id === 8 ? r.json : undefined);
+  assert.deepEqual(a.heard.flatMap((r) => "json" in r && r.json.type === "joined" ? [r.json] : []), wb.flies.map((f) => ({ type: "joined", id: f.id, colour: f.colour, away: false, of: wb.id })));
+  a.own(wa.flies);
+  b.own(wb.flies);
+  await Promise.all([
+    b.until((r) => "flies" in r && r.flies.length === 4 && r.flies.every((s) => s.seq === 1) ? r.flies : undefined),
+    a.until((r) => "flies" in r && r.flies.length === 4 && r.flies.every((s) => s.seq === 1) ? r.flies : undefined),
+  ]);
+  for (const [d, w] of [[a, wa], [b, wb]] as const) assert.ok(d.heard.every((r) => !("flies" in r) || r.flies.every((s) => !w.flies.some((f) => f.id === s.id))));
+  const c = await device(server.port);
+  assert.deepEqual(await c.hello(code, newKey()), { type: "refused", reason: "full" });
+  assert.equal((await c.closed).code, CLOSE.full);
+  const health = await fetch(`http://127.0.0.1:${server.port}/health`);
+  const body = await health.json() as { devices: number; flies: number };
+  assert.equal(body.devices, 2);
+  assert.equal(body.flies, 8);
+  a.ws.close();
+  b.ws.close();
+  await Promise.all([a.closed, b.closed]);
 });

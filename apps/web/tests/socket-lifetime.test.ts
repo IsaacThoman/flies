@@ -5,7 +5,7 @@ import { TableLine } from "../src/online/connection.ts";
 import { PROTOCOL } from "@fly/net";
 import type { ServerMessage } from "@fly/net";
 
-const WELCOME = JSON.stringify({ type: "welcome", v: PROTOCOL, id: 1, colour: "#ffd21f", starter: 1, seed: 1, now: 0, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0, 0], room: { name: "Flies", listed: false, locked: false } } satisfies ServerMessage);
+const WELCOME = JSON.stringify({ type: "welcome", v: PROTOCOL, id: 1, colour: "#ffd21f", flies: [{ id: 1, colour: "#ffd21f", at: [0, 0, 0, 0] }], starter: 1, seed: 1, now: 0, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0, 0], room: { name: "Flies", listed: false, locked: false } } satisfies ServerMessage);
 
 class Wire {
   static OPEN = 1;
