@@ -6,6 +6,7 @@
 
 import type { BrainSenses } from "@fly/brain";
 import type { Food, Pantry, Vec3, World } from "@fly/world";
+import { tasteIntensity } from "@fly/world";
 import { ease } from "./behavior.ts";
 import { FLY_HEIGHT, HEAD_AHEAD, HEAD_UP, MOUTH_AHEAD, MOUTH_UP, STEP_UP } from "./motion.ts";
 import type { FlyBody } from "./motion.ts";
@@ -81,7 +82,7 @@ function release(value: number, target: number, seconds: number, dt: number) {
 
 type EyeState = { value: number; hold: number };
 
-/** The food it is touching: under its feet, or at its mouth. */
+/** The food at its mouth, or under its feet when its mouth touches nothing. */
 export type Tasting = { food: Food | null; byMouth: boolean };
 
 export class SenseTracker {
@@ -166,12 +167,10 @@ export class SenseTracker {
       const reach = MOUTH_REACH + PROBOSCIS_REACH * clamp01(input.proboscis);
       const atMouth = pantry.touching(mouth.x, body.position.y, mouth.z, reach);
       const underfoot = pantry.touching(body.position.x, body.position.y, body.position.z, FOOT_SPREAD);
-      const best = !atMouth ? underfoot : !underfoot ? atMouth : atMouth.sweet * atMouth.amount >= underfoot.sweet * underfoot.amount ? atMouth : underfoot;
-      if (best) {
-        tasting.food = best;
-        tasting.byMouth = best === atMouth;
-        sweet = best.sweet * Math.min(1, best.amount * 4);
-      }
+      // Stronger foot taste must not prevent eating a food already at the mouth.
+      tasting.food = atMouth ?? underfoot;
+      tasting.byMouth = atMouth !== null;
+      sweet = Math.max(atMouth ? tasteIntensity(atMouth) : 0, underfoot ? tasteIntensity(underfoot) : 0);
     }
 
     out.loomLeft = clamp01(this.#eyes.left.value);

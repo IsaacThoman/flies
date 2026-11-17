@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PATCHES, Pantry, SOLIDS, World, createPicnic } from "@fly/world";
-import { FlyBody, LOOM_DECAY, LOOM_HOLD, SenseTracker, WIND_FULL_SPEED } from "../src/index.ts";
+import { FlyBody, LOOM_DECAY, LOOM_HOLD, MOUTH_AHEAD, SenseTracker, WIND_FULL_SPEED } from "../src/index.ts";
 import type { Looming, SenseInput } from "../src/index.ts";
 
 /** A bare round table this wide, with nothing on it. */
@@ -115,4 +115,55 @@ test("bumping into something in flight is felt as touch", () => {
   const tracker = new SenseTracker();
   body.events.hit = 400;
   assert.equal(tracker.update(input(body)).touch, 1);
+});
+
+test("the strongest contacted intensity wins regardless of food order or taste site", () => {
+  const world = openTable(30);
+  const body = new FlyBody(world, { x: 0, z: 0, yaw: 0 });
+  const mouth = body.point(MOUTH_AHEAD, 0, 0, { x: 0, y: 0, z: 0 });
+  const pairs = [
+    [{ sweet: 1, amount: 0.25 }, { sweet: 0.5, amount: 1 }],
+    [{ sweet: 1, amount: 0.25 }, { sweet: 0.5, amount: 0.5 }],
+    [{ sweet: 1, amount: 0.1 }, { sweet: 0.5, amount: 0.25 }],
+    [{ sweet: 1, amount: 0.05 }, { sweet: 0.5, amount: 0.15 }],
+  ];
+  // Both foods at either site, then one at each site in both arrangements.
+  for (const positions of [[-0.6, -0.6], [mouth.z, mouth.z], [-0.6, mouth.z], [mouth.z, -0.6]]) {
+    for (const pair of pairs) {
+      for (const order of [[0, 1], [1, 0]]) {
+        const pantry = new Pantry(world);
+        for (const i of order) {
+          const food = pantry.add(`food ${i}`, 0, positions[i], 0.05, pair[i].sweet);
+          food.amount = pair[i].amount;
+        }
+        const tracker = new SenseTracker();
+        const felt = tracker.update(input(body, { world, pantry }));
+        const expected = Math.max(...pair.map(f => f.sweet * Math.min(1, 4 * f.amount)));
+        assert.equal(felt.sweet, expected, JSON.stringify({ positions, pair, order }));
+      }
+    }
+  }
+});
+
+test("mouth food remains eligible when the feet taste something stronger", () => {
+  const world = openTable(30);
+  const body = new FlyBody(world, { x: 0, z: 0, yaw: 0 });
+  const mouth = body.point(MOUTH_AHEAD, 0, 0, { x: 0, y: 0, z: 0 });
+  const pantry = new Pantry(world);
+  const feetFood = pantry.add("sugar", 0, -0.6, 0.05, 1);
+  const tracker = new SenseTracker();
+  assert.equal(tracker.update(input(body, { world, pantry })).sweet, 1);
+  assert.equal(tracker.tasting.food, feetFood);
+  assert.equal(tracker.tasting.byMouth, false);
+  for (const sweet of [0.4, 0]) {
+    const mouthFood = pantry.add("mouth food", mouth.x, mouth.z, 0.05, sweet);
+    assert.equal(tracker.update(input(body, { world, pantry })).sweet, 1);
+    assert.equal(tracker.tasting.food, mouthFood);
+    assert.equal(tracker.tasting.byMouth, true);
+    pantry.remove(mouthFood);
+  }
+  body.mode = "airborne";
+  assert.equal(tracker.update(input(body, { world, pantry })).sweet, 0);
+  assert.equal(tracker.tasting.food, null);
+  assert.equal(tracker.tasting.byMouth, false);
 });
