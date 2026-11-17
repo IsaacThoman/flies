@@ -23,7 +23,7 @@ test("the kitchen's wine is inside the cup, with air under its bowl", () => {
 
 test("the kitchen's board and ajar caddy have surfaces at their drawn heights", () => {
   const world = new World(KITCHEN);
-  assert.equal(world.heightAt(KITCHEN.start.x, KITCHEN.start.z), 14);
+  assert.equal(world.heightAt(81, 180), 14);
   assert.equal(world.heightAt(-369, -170, 151), 150);
   assert.ok(world.underside(-369, -170, 150) > 175);
   assert.ok(world.heightAt(-369, -170) > 179);
@@ -34,4 +34,11 @@ test("grape juice is on exposed fruit in the bowl's flat well", () => {
   const patch = KITCHEN_PATCHES.find((p) => p.name === "grape juice")!;
   assert.equal(world.heightAt(patch.x, patch.z), 31);
   assert.equal(world.heightAt(patch.x, patch.z, 9), 9);
+});
+
+test("the peach has a flat feeding face and real air beneath its curved edge", () => {
+  const world = new World(KITCHEN);
+  assert.equal(world.heightAt(KITCHEN.start.x, KITCHEN.start.z), 40);
+  assert.equal(world.heightAt(60, 158, 14), 14);
+  assert.ok(world.underside(60, 158, 14) > 25);
 });

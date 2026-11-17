@@ -3,6 +3,8 @@ import {
   KITCHEN_SOLIDS,
   KITCHEN_BANANAS,
   KITCHEN_PATCHES,
+  KITCHEN_PEACH,
+  KITCHEN_PEACH_BANDS,
   inside,
   topHeight,
 } from "@fly/world";
@@ -24,6 +26,45 @@ export function buildSet(): SceneSet {
     side: THREE.DoubleSide,
     envMapIntensity: 1.5,
   });
+  const glassTime = { value: 0 },
+    glassRain = { value: 0 },
+    glassWet = { value: 0 };
+  glass.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, {
+      uKTime: glassTime,
+      uKRain: glassRain,
+      uKWet: glassWet,
+    });
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vGlass;")
+      .replace(
+        "#include <begin_vertex>",
+        "#include <begin_vertex>\nvGlass=position;",
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nvarying vec3 vGlass;uniform float uKTime;uniform float uKRain;uniform float uKWet;",
+      )
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+      if(abs(vGlass.z+300.0)<.1) {
+        vec2 q=vec2(vGlass.x*.32,vGlass.y*.003+uKTime*.12);
+        float cell=floor(q.x);
+        float seed=fract(sin(cell*127.1)*43758.5453);
+        float dx=abs(fract(q.x)-(.15+seed*.7));
+        float trace=(1.0-smoothstep(.025,.025+fwidth(q.x),dx));
+        float along=fract(q.y+seed*7.0);
+        trace*=smoothstep(.0,.07,along)*(1.0-smoothstep(.25,.55,along));
+        trace*=step(seed,uKRain*.8+uKWet*.15)*max(uKRain,uKWet*.25);
+        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.78,.86,.9),trace*.7);
+        diffuseColor.a+=trace*.32;
+      }
+    `,
+      );
+  };
+  glass.customProgramCacheKey = () => "kitchen-glass-rain-1";
   const glassBatch = new Batch();
   const addGlass = (g: THREE.BufferGeometry) =>
     glassBatch.add(glass, paint(g, "#ffffff"));
@@ -33,6 +74,8 @@ export function buildSet(): SceneSet {
     k = KIND.glaze,
   ) => batch.add(surfaces.material, tag(paint(g, c), k));
   const rnd = random(812);
+  for (const x of [-240.5, 80.5])
+    addGlass(new THREE.PlaneGeometry(309, 707).translate(x, 633.5, -300));
   add(box(0, -20, 0, 1000, 40, 600), "#c7c1ae", KIND.stone);
   // Drawer fronts below the reachable worktop give its edge a household scale.
   for (const x of [-375, -125, 125, 375]) {
@@ -42,6 +85,7 @@ export function buildSet(): SceneSet {
   for (const s of KITCHEN_SOLIDS) {
     const f = s.footprint;
     if (
+      s.name === "kitchen peach" ||
       s.name === "kitchen banana" ||
       s.name === "kitchen lid" ||
       s.name === "kitchen wall" ||
@@ -208,6 +252,31 @@ export function buildSet(): SceneSet {
         );
     }
   }
+  const p = KITCHEN_PEACH;
+  const profile: number[][] = [[0, p.base]];
+  for (let i = 0; i < KITCHEN_PEACH_BANDS.length; i++) {
+    const b = KITCHEN_PEACH_BANDS[i];
+    profile.push([b.radius, b.bottom]);
+    profile.push([b.radius, KITCHEN_PEACH_BANDS[i + 1]?.bottom ?? p.cut]);
+  }
+  const outer = KITCHEN_PEACH_BANDS.at(-1)!.radius;
+  add(
+    lathe(profile, 0, 0, 72)
+      .scale(p.rx, 1, p.rz)
+      .rotateY(p.angle)
+      .translate(p.x, 0, p.z),
+    "#cc5630",
+    KIND.skin,
+  );
+  add(
+    new THREE.CircleGeometry(outer, 96)
+      .rotateX(-Math.PI / 2)
+      .scale(p.rx, 1, p.rz)
+      .rotateY(p.angle)
+      .translate(p.x, p.cut, p.z),
+    "#ffc86b",
+    KIND.peach,
+  );
   // A glazed window occupies the wall's opening; in the world the pane is still a barrier.
   for (const g of [
     box(0, -342.5, -325, 3600, 1215, 50),
@@ -224,7 +293,7 @@ export function buildSet(): SceneSet {
     box(-80, 633, -305, 12, 735, 10),
   ])
     add(g, "#e0d7bc");
-  addGlass(new THREE.PlaneGeometry(650, 735).translate(-80, 632.5, -310));
+
   // Continuous banana skins sample the envelope, never drawing the hidden seams between rounds.
   for (const rounds of KITCHEN_BANANAS) {
     const positions: number[] = [],
@@ -305,13 +374,17 @@ export function buildSet(): SceneSet {
       KIND.compost,
     );
   for (const p of KITCHEN_PATCHES) {
-    if (p.name !== "honey" && p.name !== "wine") continue;
+    if (!p.pool || p.name === "red wine") continue;
     add(
       new THREE.CircleGeometry(p.r, 48)
         .rotateX(-Math.PI / 2)
-        .translate(p.x, 0.025, p.z),
-      p.name === "honey" ? "#be791f" : "#6a2436",
-      p.name === "honey" ? KIND.honey : KIND.wine,
+        .translate(p.x, (p.y ?? 0) + 0.025, p.z),
+      p.name === "honey"
+        ? "#be791f"
+        : p.name === "peach juice"
+          ? "#da9b45"
+          : "#6a2436",
+      p.name === "wine" ? KIND.wine : KIND.honey,
     );
   }
   add(
@@ -346,8 +419,10 @@ export function buildSet(): SceneSet {
   const seenGroup = new THREE.Group(),
     seenBatch = new Batch();
   const seenM = new THREE.MeshBasicMaterial({ vertexColors: true });
+  const peachTop = KITCHEN_SOLIDS.findLast((s) => s.name === "kitchen peach");
   for (const s of KITCHEN_SOLIDS) {
     if (
+      (s.name === "kitchen peach" && s !== peachTop) ||
       s.name === "kitchen lid" ||
       s.name.includes("crumb") ||
       s.name === "kitchen stone"
@@ -369,6 +444,21 @@ export function buildSet(): SceneSet {
         ),
       );
   }
+  seenBatch.add(
+    seenM,
+    paint(
+      lathe(
+        profile.filter((_, i) => i % 12 < 2),
+        0,
+        0,
+        24,
+      )
+        .scale(p.rx, 1, p.rz)
+        .rotateY(p.angle)
+        .translate(p.x, 0, p.z),
+      "#c88945",
+    ),
+  );
   seenBatch.build(seenGroup);
   return {
     group,
@@ -376,6 +466,9 @@ export function buildSet(): SceneSet {
     seen: seenGroup.children,
     update(time, light, weather) {
       surfaces.update(time, light, weather);
+      glassTime.value = time;
+      glassRain.value = weather.rain;
+      glassWet.value = weather.wet;
     },
     ripple: surfaces.ripple,
   };

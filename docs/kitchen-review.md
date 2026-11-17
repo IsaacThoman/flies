@@ -1,0 +1,169 @@
+# Kitchen counter review log
+
+The set is a metre-wide kitchen counter. Household dimensions are in millimetres;
+the fly is about 2.5 mm long. No sound or scripted fly behaviour was added.
+
+## Rubric
+
+Eight equally weighted criteria, scored 0–10. A ten means:
+
+| Criterion | Definition |
+|---|---|
+| H — habitat | An inhabited, believable fruit-fly feeding habitat. |
+| C — composition | Readable foreground, subject and context across the shared and whole-place views. |
+| L — lighting/weather | Coherent window daylight and warm pendant light in all five times and four weathers. |
+| M — materials | Distinct fruit skin, flesh, glazed ceramic, glass, wood and liquids. |
+| S — scale | Plausible household dimensions and detail beside a 2.5 mm fly. |
+| W — world/drawing | Feet, overhead clearance and food agree with the rendered surfaces. |
+| TV — budget | About 30 draws or less, comparable construction cost, coarse eyes, no routine frame allocation. |
+| A — artefacts | No cracks, clipping, unsupported forms, transparency errors or visible construction shortcuts. |
+
+Reviewers received the rubric, neutral evidence directories and source snapshots.
+Each invocation had a fresh context. The first comparison includes an identical-set
+decoy; every reviewer identified it and gave it identical scores. Brief order was
+rotated between reviewers. Subsequent orders are shuffled. No prior scores or
+implementation rationale was supplied.
+
+Each evidence set contains the five player views (whole, follow, close, wide,
+above), five fixed framings from the shared wallpaper shot parameters, at morning,
+noon, golden hour, dusk and night. Additional whole-place captures cover overcast,
+mist and rain at all five times. The fly is held at its normal start for repeatable
+pictures; the shipping brain and movement code are unchanged. Measurements are
+browser frame totals, including occasional eye/environment refresh work, not a
+measurement from an Apple TV.
+
+## Capture preflight (excluded from hill-climb decisions)
+
+Key: K7 = initial kitchen; D4 = windowsill reference. All three preferred D4.
+K7 means: 5.5625, 5.8750, 5.5000. D4 means: 6.6875, 7.2500, 7.3125.
+The capture driver advanced the palette without consistently applying stage lights,
+so these lighting scores are invalid. Both sets were recaptured through Stage.update
+and assessed by fresh reviewers. No improvement is claimed from this preflight.
+Construction also caught mixed glass vertex attributes and, during preparation of a
+candidate, a fragment-vector dimension mismatch; both were corrected before their
+scored evidence was captured.
+
+## Round 1
+
+Key: V6 = initial kitchen (109b2a0); T8 = identical V6 decoy;
+M3 = window, pendant, restrained grain and exposed grape food candidate;
+B2 = windowsill reference. All four ranked B2 > M3 > V6/T8.
+The duplicate ordering was an administrative tie-break only.
+
+| Reviewer | V6 / T8 | M3 | B2 | Decision |
+|---|---:|---:|---:|---|
+| R1 | 5.8750 | 6.1250 | 7.6250 | M3 over V6 |
+| R2 | 5.7500 | 6.2500 | 8.0000 | M3 over V6 |
+| R3 | 5.8750 | 6.1875 | 7.2500 | M3 over V6 |
+| R4, comparisons | 6.5000 | 6.6875 | 7.6250 | M3 over V6 |
+| Mean | 6.0000 | 6.3125 | 7.6250 | Retain M3 direction |
+
+The main gains were an actual window opening/exterior, quieter wood, a peach skin
+boundary and a visible grape split aligned with its food patch. The largest
+regression was exterior ground visible beneath the wall beside the counter.
+Reviewers also found unsupported grape caps, weak fruit identity, faint glass and
+little weather differentiation. These remain explicit work for the next candidate.
+No suggestion to change the shared camera, brain or body was adopted: those are
+outside this task's scope.
+
+| Reviewer | Set | H | C | L | M | S | W | TV | A | Mean |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| R1 | T8 | 6 | 5 | 5 | 5 | 7 | 5 | 8.5 | 5.5 | 5.8750 |
+| R1 | M3 | 6.5 | 5.5 | 5.5 | 5.5 | 7 | 6.5 | 7.5 | 5 | 6.1250 |
+| R1 | B2 | 8.5 | 7.5 | 8 | 7.5 | 8.5 | 7.5 | 6 | 7.5 | 7.6250 |
+| R1 | V6 | 6 | 5 | 5 | 5 | 7 | 5 | 8.5 | 5.5 | 5.8750 |
+| R2 | M3 | 6.5 | 5.5 | 6 | 5.5 | 7 | 6.5 | 7.5 | 5.5 | 6.2500 |
+| R2 | B2 | 9 | 8 | 8 | 8 | 8.5 | 8 | 7 | 7.5 | 8.0000 |
+| R2 | V6 | 5.5 | 5 | 5 | 4.5 | 7 | 6.5 | 8 | 4.5 | 5.7500 |
+| R2 | T8 | 5.5 | 5 | 5 | 4.5 | 7 | 6.5 | 8 | 4.5 | 5.7500 |
+| R3 | B2 | 8.5 | 7.5 | 7.5 | 7 | 8 | 6.5 | 6.5 | 6.5 | 7.2500 |
+| R3 | V6 | 5.5 | 4.5 | 4.5 | 4.5 | 7 | 6.5 | 9 | 5.5 | 5.8750 |
+| R3 | T8 | 5.5 | 4.5 | 4.5 | 4.5 | 7 | 6.5 | 9 | 5.5 | 5.8750 |
+| R3 | M3 | 6 | 5 | 5 | 5.5 | 7 | 7.5 | 8 | 5.5 | 6.1875 |
+| R4 | V6 | 6.5 | 5.5 | 5.5 | 5.5 | 7 | 7.5 | 8.5 | 6 | 6.5000 |
+| R4 | T8 | 6.5 | 5.5 | 5.5 | 5.5 | 7 | 7.5 | 8.5 | 6 | 6.5000 |
+| R4 | M3 | 7 | 6 | 5.5 | 6.5 | 7.5 | 8 | 7 | 6 | 6.6875 |
+| R4 | B2 | 8.5 | 8 | 8 | 8 | 8.5 | 7.5 | 5.5 | 7 | 7.6250 |
+
+## Round 2
+
+Key: C9 = enclosed room, grounded grapes, window shadows and reduced tessellation;
+M3 = preceding kitchen; V6 = initial kitchen; B2 = windowsill reference.
+All four ranked B2 > C9 > M3 > V6. Retain C9 (670af78).
+
+| Reviewer | V6 | M3 | C9 | B2 | Ranking |
+|---|---:|---:|---:|---:|---|
+| R1 | 5.2500 | 5.5000 | 6.5625 | 7.1250 | B2 > C9 > M3 > V6 |
+| R2 | 5.5000 | 5.6875 | 6.7500 | 7.0000 | B2 > C9 > M3 > V6 |
+| R3 | 5.5625 | 5.8125 | 6.6250 | 7.3750 | B2 > C9 > M3 > V6 |
+| R4, comparisons | 5.4375 | 5.8125 | 6.9375 | 7.4375 | B2 > C9 > M3 > V6 |
+| Mean | 5.4375 | 5.7031 | 6.7188 | 7.2344 | Retain C9 |
+
+The enclosing wall, grape support, subdued board highlights and lower triangle
+count all gained. The reference still won on household specificity, materials and
+weather. The largest remaining problems were the peach's pastry-like form, empty
+macro backgrounds, faint wine and a night key that did not originate at the pendant.
+The next experiment changes the peach geometry and starting surface, wet glass and
+pendant lighting. Changes to the shared camera were again rejected as out of scope.
+
+| Reviewer | Set | H | C | L | M | S | W | TV | A | Mean |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| R1 | C9 | 6.5 | 5.5 | 5.5 | 5 | 7 | 7.5 | 9 | 6.5 | 6.5625 |
+| R1 | B2 | 8.5 | 6 | 8 | 7.5 | 8.5 | 7 | 6 | 5.5 | 7.1250 |
+| R1 | V6 | 5 | 4.5 | 4 | 4 | 6.5 | 5 | 8.5 | 4.5 | 5.2500 |
+| R1 | M3 | 6 | 5 | 4.5 | 4.5 | 6.5 | 5.5 | 7.5 | 4.5 | 5.5000 |
+| R2 | B2 | 8.5 | 5 | 8 | 7 | 8.5 | 8 | 5.5 | 5.5 | 7.0000 |
+| R2 | V6 | 5.5 | 5 | 4.5 | 4 | 6.5 | 5.5 | 8.5 | 4.5 | 5.5000 |
+| R2 | M3 | 6 | 5.5 | 5 | 4.5 | 6.5 | 6 | 7 | 5 | 5.6875 |
+| R2 | C9 | 6.5 | 6 | 6 | 5.5 | 7 | 7.5 | 9 | 6.5 | 6.7500 |
+| R3 | V6 | 5.5 | 4.5 | 4.5 | 4.5 | 6.5 | 5.5 | 8.5 | 5 | 5.5625 |
+| R3 | M3 | 6 | 5 | 5 | 5 | 6.5 | 6 | 7.5 | 5.5 | 5.8125 |
+| R3 | C9 | 6.5 | 5.5 | 6 | 5.5 | 7 | 7 | 9 | 6.5 | 6.6250 |
+| R3 | B2 | 8.5 | 8 | 8 | 7 | 8 | 6.5 | 6 | 7 | 7.3750 |
+| R4 | M3 | 6.5 | 5.5 | 5 | 5 | 7 | 6 | 6.5 | 5 | 5.8125 |
+| R4 | C9 | 7 | 6 | 6.5 | 6 | 7 | 7.5 | 8.5 | 7 | 6.9375 |
+| R4 | B2 | 8.5 | 7.5 | 8 | 7.5 | 8 | 8 | 5.5 | 6.5 | 7.4375 |
+| R4 | V6 | 5.5 | 5 | 4.5 | 4.5 | 6.5 | 5.5 | 7.5 | 4.5 | 5.4375 |
+
+## Round 3
+
+Key: J4 = flat-cut peach with a rounded slab underside, peach start, pane rain,
+exterior mist and pendant-directed lighting; C9 = preceding kitchen;
+B2 = windowsill reference. Every reviewer preferred J4 to C9; three ranked B2
+first and one ranked J4 first. Retain J4. Brief orders were shuffled independently.
+
+| Reviewer | C9 | J4 | B2 | Ranking |
+|---|---:|---:|---:|---|
+| R1 | 6.3125 | 6.6250 | 7.4375 | B2 > J4 > C9 |
+| R2 | 6.4375 | 7.0625 | 7.6250 | B2 > J4 > C9 |
+| R3 | 6.5625 | 7.0625 | 7.1250 | B2 > J4 > C9 |
+| R4 | 6.5625 | 7.3125 | 6.8125 | J4 > B2 > C9 |
+| Mean | 6.4688 | 7.0156 | 7.2500 | Retain J4 |
+
+The new starting surface provided feeding context and the underside represented
+real air beneath the fruit. Reviewers credited the visible wet pane and the
+pendant's lighting. The main defects were morning glare on the flesh, regular
+stone grooves, stepped fruit edges and a still-sparse household set. The next
+experiment targets those material and domestic-context weaknesses.
+
+Capture protocol note: earlier sets waited 0.15 simulated seconds after changing
+stage lighting. Environment reflections rebuild on a 0.4-second throttle, so some
+weather captures retain a stale environment or include its rebuild cost. The next
+comparison recaptures both models and the reference with 0.7 seconds of game time
+and records the environment-refresh flag. Earlier scores are retained as reported;
+they are not directly comparable to the settled capture measurements.
+
+| Reviewer | Set | H | C | L | M | S | W | TV | A | Mean |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| R1 | C9 | 6 | 5.5 | 5 | 5 | 7 | 7 | 9 | 6 | 6.3125 |
+| R1 | B2 | 8.5 | 7.5 | 8 | 7.5 | 8.5 | 7 | 5.5 | 7 | 7.4375 |
+| R1 | J4 | 6.5 | 6 | 6.5 | 5.5 | 7.5 | 7.5 | 7.5 | 6 | 6.6250 |
+| R2 | C9 | 6.5 | 5.5 | 4.5 | 5 | 7 | 7.5 | 9 | 6.5 | 6.4375 |
+| R2 | B2 | 8.5 | 8 | 8 | 8 | 8.5 | 7 | 5.5 | 7.5 | 7.6250 |
+| R2 | J4 | 7 | 6.5 | 6.5 | 6 | 8 | 8 | 7.5 | 7 | 7.0625 |
+| R3 | J4 | 7.5 | 6.5 | 7 | 6 | 8 | 8 | 7 | 6.5 | 7.0625 |
+| R3 | C9 | 7 | 5 | 5.5 | 5.5 | 8 | 7 | 9 | 5.5 | 6.5625 |
+| R3 | B2 | 9 | 6 | 8 | 7.5 | 8.5 | 7 | 4.5 | 6.5 | 7.1250 |
+| R4 | C9 | 7 | 5.5 | 5.5 | 5.5 | 7 | 7 | 9 | 6 | 6.5625 |
+| R4 | J4 | 7 | 7 | 7 | 6.5 | 8 | 8 | 8 | 7 | 7.3125 |
+| R4 | B2 | 9 | 6 | 7.5 | 7.5 | 8 | 6.5 | 5 | 5 | 6.8125 |

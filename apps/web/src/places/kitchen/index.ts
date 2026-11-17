@@ -11,11 +11,11 @@ export const kitchen: Scene = {
   buildSet,
   buildBackdrop,
   camera: {
-    focus: { x: 0, y: 70, z: 0, follow: 0 },
+    focus: { x: 0, y: 170, z: 0, follow: 0 },
     whole: {
       around: "table",
       distance: 860,
-      height: 400,
+      height: 460,
       side: 0.08,
       low: 0,
       fov: 48,

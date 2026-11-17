@@ -64,6 +64,26 @@ export const KITCHEN_GRAPES = [
   [-160, -5, 23],
 ].map(([x, z, height]) => dome("kitchen grape", x, z, 11, 9, height));
 
+export const KITCHEN_PEACH = {
+  x: 30,
+  z: 158,
+  rx: 35,
+  rz: 30,
+  angle: 0.25,
+  base: 14,
+  cut: 40,
+};
+/** Flat cut face above a rounded underside: slabs keep the air beneath its skin real. */
+export const KITCHEN_PEACH_BANDS = Array.from({ length: 48 }, (_, i) => {
+  const p = KITCHEN_PEACH;
+  const bottom = p.base + ((p.cut - p.base) * i) / 48;
+  const radius = Math.max(
+    0.6 / p.rx,
+    Math.sqrt(1 - Math.pow((p.cut - bottom) / (p.cut - p.base), 2)),
+  );
+  return { bottom, radius };
+});
+
 const c = KITCHEN_CADDY;
 export const KITCHEN_SOLIDS: readonly Solid[] = [
   {
@@ -94,8 +114,24 @@ export const KITCHEN_SOLIDS: readonly Solid[] = [
     KITCHEN_BOARD.hz,
     KITCHEN_BOARD.top,
   ),
-  dome("kitchen peach", 30, 158, 35, 14, 23, 0.18),
-  dome("kitchen stone", 30, 158, 10, 36, 4, 0.7),
+  ...KITCHEN_PEACH_BANDS.map(({ bottom, radius }): Solid => ({
+    name: "kitchen peach",
+    footprint: {
+      kind: "ellipse",
+      x: KITCHEN_PEACH.x,
+      z: KITCHEN_PEACH.z,
+      rx: KITCHEN_PEACH.rx * radius,
+      rz: KITCHEN_PEACH.rz * radius,
+      angle: KITCHEN_PEACH.angle,
+    },
+    bottom,
+    top: { kind: "flat", y: KITCHEN_PEACH.cut },
+  })),
+  {
+    name: "kitchen stone",
+    footprint: { kind: "ellipse", x: 25, z: 155, rx: 8, rz: 13, angle: -0.35 },
+    top: { kind: "dome", base: 40, height: 6.5, power: 0.6 },
+  },
   ...[
     [97, 178, 2.8],
     [105, 185, 1.7],
@@ -166,6 +202,7 @@ export const KITCHEN_SOLIDS: readonly Solid[] = [
 export const KITCHEN_PATCHES: readonly FoodPatch[] = [
   { name: "banana", x: -158, z: -96, r: 5, sweet: 0.95 },
   { name: "peach juice", x: 46, z: 165, r: 7, sweet: 0.9 },
+  { name: "peach juice", x: 68, z: 176, y: 14, r: 9, sweet: 0.9, pool: true },
   { name: "grape juice", x: -151, z: 0, r: 4, sweet: 0.8 },
   {
     name: "red wine",
@@ -184,6 +221,6 @@ export const KITCHEN: Place = {
   floor: { kind: "rect", ...COUNTER },
   solids: KITCHEN_SOLIDS,
   patches: KITCHEN_PATCHES,
-  start: { x: 81, z: 180, y: 14, yaw: Math.PI - 0.5 },
+  start: { x: 46, z: 165, y: 40, yaw: -Math.PI / 2 },
   ceiling: 300,
 };

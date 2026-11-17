@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import type { Browser } from "playwright";
-import { openGame, readState, startServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
+import {
+  openGame,
+  readState,
+  startServer,
+  waitFor,
+  waitForGameTime,
+} from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
 import { PLACES } from "../src/places/catalog.ts";
 
@@ -14,7 +20,8 @@ try {
   await page.keyboard.press("Enter");
   await waitFor(page, "screen=play");
   await page.evaluate(() => {
-    (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 0;
+    (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter =
+      0;
   });
   const press = async (key: string, count = 1) => {
     for (let i = 0; i < count; i++) {
@@ -22,12 +29,17 @@ try {
       await waitForGameTime(page, 0.12);
     }
   };
-  const tool = async (id: string) => {
-    for (let i = 0; i < 10 && (await readState(page)).tool !== id; i++) await press("ArrowRight");
-    await waitFor(page, `tool=${id}`);
+  const tool = async (id:string)=>{
+    for(let i=0;i<12;i++) {
+      const at=(await readState(page)).tool;
+      if(at===id)return;
+      await page.keyboard.press("ArrowRight");
+      await waitFor(page,`tool~^(?!${at}$)`);
+    }
+    await waitFor(page,`tool=${id}`);
   };
   await tool("place");
-  const kitchen = PLACES.findIndex(p => p.id === "kitchen");
+  const kitchen = PLACES.findIndex((p) => p.id === "kitchen");
   await press("ArrowDown", kitchen);
   await press("Enter");
   const arrived = await waitFor(page, "place=kitchen,moving=");
@@ -35,10 +47,20 @@ try {
   assert.equal(arrived.gl, "ok");
   const food = await page.evaluate(() => {
     const { life } = (globalThis as unknown as { __fly: Game }).__fly;
-    return life.world.place.patches.map(p => ({ name: p.name, pool: !!p.pool, tasted: life.pantry.touching(p.x, life.world.heightAt(p.x, p.z, p.y), p.z, 0)?.name }));
+    return life.world.place.patches.map((p) => ({
+      name: p.name,
+      pool: !!p.pool,
+      tasted: life.pantry.touching(
+        p.x,
+        life.world.heightAt(p.x, p.z, p.y),
+        p.z,
+        0,
+      )?.name,
+    }));
   });
-  assert.ok(food.every(p => p.name === p.tasted));
-  assert.equal(food.filter(p => p.pool).length, 3);
+  assert.ok(food.every((p) => p.name === p.tasted));
+  for (const name of ["red wine", "honey", "wine"])
+    assert.ok(food.find((p) => p.name === name)?.pool);
   await tool("view");
   await press("ArrowDown", 2);
   await waitFor(page, "view=table");
@@ -46,7 +68,10 @@ try {
   for (const time of ["morning", "noon", "golden", "dusk", "night"]) {
     await tool("light");
     await press("ArrowUp", 6);
-    await press("ArrowDown", ["morning", "noon", "golden", "dusk", "night"].indexOf(time) + 1);
+    await press(
+      "ArrowDown",
+      ["morning", "noon", "golden", "dusk", "night"].indexOf(time) + 1,
+    );
     await waitFor(page, `time=${time}`);
     await tool("weather");
     await press("ArrowUp", 5);
@@ -64,7 +89,9 @@ try {
   calls.sort((a, b) => a - b);
   assert.ok(calls[Math.floor(calls.length / 2)] <= 35, JSON.stringify(calls));
   assert.deepEqual(errors, []);
-  console.log(`kitchen: carried with remote, all food tastable, 20 light/weather combinations, median ${calls[10]} draws`);
+  console.log(
+    `kitchen: carried with remote, all food tastable, 20 light/weather combinations, median ${calls[10]} draws`,
+  );
   await tool("place");
   await press("ArrowUp", kitchen);
   await press("Enter");

@@ -9,6 +9,7 @@ export function buildBackdrop(): SceneBackdrop {
   const m = new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: 0.8,
+    fog: false,
   });
   const add = (g: THREE.BufferGeometry, c: string) => batch.add(m, paint(g, c));
   scene.background = new THREE.Color("#d4c8b2");
@@ -83,6 +84,7 @@ export function buildBackdrop(): SceneBackdrop {
         plant(box(x + dx, y, -4940, 190, 250, 10), "#586a66");
   }
   garden.build(scene);
+  scene.fog = new THREE.Fog("#cbd2cc", 8000, 80000);
   const day = new THREE.Color(1, 1, 1),
     dark = new THREE.Color("#172437"),
     sky = new THREE.Color();
@@ -93,6 +95,10 @@ export function buildBackdrop(): SceneBackdrop {
   return {
     scene,
     update(_time, _camera, l, weather) {
+      const fog = scene.fog as THREE.Fog;
+      fog.color.copy(l.haze);
+      fog.near = 8000 - weather.mist * 6500 - weather.rain * 3500;
+      fog.far = 80000 - weather.mist * 68000 - weather.rain * 18000;
       outdoor.color
         .copy(day)
         .lerp(dark, l.stars * 0.9)

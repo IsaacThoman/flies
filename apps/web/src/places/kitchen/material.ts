@@ -15,6 +15,7 @@ export const KIND = {
   honey: 9,
   wine: 10,
   bulb: 11,
+  skin: 12,
 };
 
 export function surfaceMaterial() {
@@ -26,6 +27,16 @@ export function surfaceMaterial() {
   const night = { value: 0 };
   const sun = { value: new THREE.Vector3() };
   const soft = { value: 0 };
+  const lamp = { value: 0 };
+  const lighting = THREE.ShaderChunk.lights_fragment_begin.replace(
+    "getDirectionalLightInfo( directionalLight, directLight );",
+    `getDirectionalLightInfo( directionalLight, directLight );
+    vec3 lampDelta=vec3(260.0,430.0,-160.0)-vPlace;
+    vec3 lampDirection=(viewMatrix*vec4(normalize(lampDelta),0.0)).xyz;
+    directLight.direction=normalize(mix(directLight.direction,lampDirection,uLamp));
+    directLight.color*=mix(1.0,1.5/(1.0+dot(lampDelta,lampDelta)/360000.0),uLamp);
+  `,
+  );
   const material = new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: 0.45,
@@ -37,6 +48,7 @@ export function surfaceMaterial() {
     shader.uniforms.uTime = time;
     shader.uniforms.uSun = sun;
     shader.uniforms.uSoft = soft;
+    shader.uniforms.uLamp = lamp;
     shader.vertexShader = shader.vertexShader
       .replace(
         "#include <common>",
@@ -50,7 +62,7 @@ export function surfaceMaterial() {
       .replace(
         "#include <common>",
         `#include <common>
-      varying float vKind; varying vec3 vPlace; uniform float uNight; uniform vec3 uSun; uniform float uSoft; uniform vec4 uRings[4]; uniform float uTime;
+      varying float vKind; varying vec3 vPlace; uniform float uNight; uniform vec3 uSun; uniform float uSoft; uniform float uLamp; uniform vec4 uRings[4]; uniform float uTime;
       float hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
       float noise(vec2 p) { vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
     `,
@@ -78,16 +90,21 @@ export function surfaceMaterial() {
         float spot=(1.0-smoothstep(.08,.24,length(f)))*step(.70,hash(cell));
         float bruise = smoothstep(.59,.79,noise(p.xz*.055));
         diffuseColor.rgb = mix(diffuseColor.rgb,vec3(.12,.054,.014),max(spot*.9,bruise*.45));
-        diffuseColor.rgb *= .88+.12*sin(p.z*1.4+p.x*.05);
+        float t=clamp((p.x+246.0)/185.0,0.0,1.0);
+        float middle=-68.0-29.0*sin(t*3.14159265);
+        middle+=abs(p.z-(middle+33.0))<abs(p.z-middle)?33.0:0.0;
+        diffuseColor.rgb *= .96+.04*cos((p.z-middle)*.28);
         // Split skin reveals pale fermenting flesh at the feeding site.
         float split=1.0-smoothstep(.8,2.0,length((p.xz-vec2(-158,-96))/vec2(3.8,1)));
         diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.92,.75,.39),split);
       } else if(k<4.5) {
-        float d=length(p.xz-vec2(30,158));
+        vec2 a=p.xz-vec2(30,158);
+        vec2 q=vec2(a.x*.968912-a.y*.247404,a.x*.247404+a.y*.968912)/vec2(35,30);
+        float d=length(p.xz-vec2(25,155));
         float fibres=pow(abs(sin(atan(p.z-158.0,p.x-30.0)*63.0+noise(p.xz*.6)*2.0)),12.0);
         diffuseColor.rgb *= .90+.10*micro-fibres*.06;
         diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.55,.11,.052), (1.0-smoothstep(10.0,20.0,d))*.75);
-        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.70,.17,.07),smoothstep(30.0,35.0,d));
+        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.70,.17,.07),smoothstep(.975,.998,length(q)));
       } else if(k<5.5) {
         diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.38,.38,.51),.24+micro*.12);
         float split=1.0-smoothstep(2.0,4.2,length(p.xz-vec2(-151,0)));
@@ -96,13 +113,19 @@ export function surfaceMaterial() {
         diffuseColor.rgb *= .65+.35*noise(p.xz*1.7);
         if(p.y>149.0 && p.x < -300.0) diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.38,.35,.10),smoothstep(.45,.65,noise(p.xz*.15)));
         if(p.y<18.0 && p.y>14.0) diffuseColor.rgb*=.65+.35*smoothstep(.1,.5,noise(p.xz*12.0));
+        if(p.y>39.9 && p.y<48.0) diffuseColor.rgb*=.65+.35*pow(abs(sin(p.x*3.5+noise(p.xz*.3)*4.0)),.5);
       } else if(k<7.5) {
         vec2 tile=vec2(p.x/110.0,p.y/57.0); tile.x+=mod(floor(tile.y),2.0)*.5;
         vec2 f=fract(tile); float grout=step(.026,f.x)*step(.045,f.y);
         diffuseColor.rgb=mix(vec3(.38,.36,.30),diffuseColor.rgb*(.94+.06*hash(floor(tile))),grout);
         if(p.y>260.0) diffuseColor.rgb=vColor.rgb*(.97+.03*noise(p.xy*.3));
       }
-      if(k>8.5) for(int i=0;i<4;i++) {
+      if(k>11.5) {
+        float blush=noise(p.xz*.05)*.35+noise(p.xy*.2)*.15;
+        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.83,.44,.10),blush);
+        diffuseColor.rgb*=.92+micro*.08;
+      }
+      if(k>8.5 && k<10.5) for(int i=0;i<4;i++) {
         float age=uTime-uRings[i].z;
         float d=length(p.xz-uRings[i].xy);
         float wave=exp(-pow((d-age*9.0)*3.0,2.0))*max(0.0,1.0-age/2.0)*uRings[i].w;
@@ -110,6 +133,7 @@ export function surfaceMaterial() {
       }
     `,
       )
+      .replace("#include <lights_fragment_begin>", lighting)
       .replace(
         "#include <lights_fragment_end>",
         `#include <lights_fragment_end>
@@ -121,6 +145,7 @@ export function surfaceMaterial() {
           reach=smoothstep(-b,b,q.x+405.0)*smoothstep(-b,b,245.0-q.x)*smoothstep(-b,b,q.y-265.0)*smoothstep(-b,b,1000.0-q.y);
           reach*=smoothstep(4.0-b,8.0+b,abs(q.x+80.0));
         }
+        reach=mix(reach,1.0,uLamp);
         reflectedLight.directDiffuse*=reach;
         reflectedLight.directSpecular*=reach;
       `,
@@ -133,18 +158,19 @@ export function surfaceMaterial() {
       if(vKind>4.5 && vKind<5.5) roughnessFactor=.32;
       if(vKind>7.5 && vKind<8.5) roughnessFactor=.24;
       if(vKind>8.5) roughnessFactor=.10;
+      if(vKind>11.5) roughnessFactor=.78;
     `,
       )
       .replace(
         "#include <emissivemap_fragment>",
-        "#include <emissivemap_fragment>\nif(vKind>10.5) totalEmissiveRadiance += vec3(1.0,.50,.14)*(0.3+uNight*2.0);",
+        "#include <emissivemap_fragment>\nif(vKind>10.5 && vKind<11.5) totalEmissiveRadiance += vec3(1.0,.50,.14)*(0.3+uNight*2.0);",
       )
       .replace(
         "#include <metalnessmap_fragment>",
         "#include <metalnessmap_fragment>\nif(vKind>7.5 && vKind<8.5) metalnessFactor=.7;",
       );
   };
-  material.customProgramCacheKey = () => "kitchen-surfaces-1";
+  material.customProgramCacheKey = () => "kitchen-surfaces-3";
   return {
     material,
     update(t: number, light: Daylight, weather: Weather) {
@@ -152,6 +178,7 @@ export function surfaceMaterial() {
       night.value = light.stars;
       sun.value.copy(light.sunDirection);
       soft.value = weather.cloud;
+      lamp.value = Math.min(1, Math.max(0, (light.stars - 0.05) / 0.45));
     },
     ripple(x: number, z: number, strength: number) {
       rings.value[ring].set(x, z, time.value, strength);
