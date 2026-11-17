@@ -448,8 +448,11 @@ the camera, or the camera would be in it or so near it that the edge of the
 picture cuts into it, the camera comes in along its line of sight until it
 isn't, quickly but smoothly, looking a moment ahead of where your turn and the
 fly are taking it, so it is in front of a bottle before the bottle is in the
-way. Once the way has been clear for a moment it goes back out, gently. It
-never turns or tilts to get round anything, and never jumps.
+way. Once the way has been clear for a moment it goes back out, gently. Where
+coming in would bring it nearer than you can zoom, down in a bowl or on a
+slope, it looks from a little higher instead, as little as opens the way, and
+comes back down to where you had it once it can. It never turns round
+anything, and never jumps.
 
 The View tool's views are places on the same orbit, reached over a moment.
 Follow is 11 mm out, low over the table, the fly about 170 pixels long;
