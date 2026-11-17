@@ -47,11 +47,8 @@ await withHeavySlot(async () => {
     const {game:g,frame}=globalThis.__fixture;
     let seed=42;Math.random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32);
     g.play();g.settings.place=id;g.settings.wallpaperAfter=0;g.settings.realWeather=false;g.applySettings(false);g.moveTo(id);
-    for(const [tool,variant] of [["light","noon"],["weather","clear"],["view","table"],["feed","sugar"]]){
-     for(let i=0;i<12&&g.hands.current.id!==tool;i++) g.hands.stepTool(1);
-     while(g.hands.stepVariant(-1)){ /* Reset the saved variant. */ }
-     for(let i=0;i<12&&g.hands.variant.id!==variant;i++)g.hands.stepVariant(1);
-    }
+    g.hands.setKind("light","noon");g.hands.setKind("weather","clear");g.hands.setKind("view","table");
+    g.hands.chooseTool(0);g.hands.variants[0]=0;
     for(let i=0;i<300;i++)frame(1/60,(g.time+1/60)*1000);
    },place.id);
    await waitFor(page,`place=${place.id},moving=`);

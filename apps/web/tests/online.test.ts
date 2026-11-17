@@ -308,8 +308,9 @@ test("the apps aren't at a site: their room server and the links they hand on ar
 
 test("the table knows every place, light and weather the game does, by the same names", () => {
   assert.deepEqual(Object.keys(WORLDS).sort(), PLACES.map((p) => p.id).sort());
-  assert.deepEqual([...TABLE_LIGHTS], TOOLS.find((t) => t.id === "light")!.variants.map((v) => v.id));
-  assert.deepEqual([...TABLE_WEATHERS], TOOLS.find((t) => t.id === "weather")!.variants.map((v) => v.id));
+  const sky = TOOLS.find((t) => t.id === "sky")!;
+  assert.deepEqual([...TABLE_LIGHTS], sky.variants.map((v) => v.id));
+  assert.deepEqual([...TABLE_WEATHERS], sky.second!.map((v) => v.id));
 });
 
 test("only a joined line sends tools and binary state; an empty bite report sends nothing", (t) => {

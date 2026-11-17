@@ -53,35 +53,63 @@ try {
   } finally { await recovery.close(); }
   const roomData = await mkdtemp(path.join(tmpdir(), "flies-first-minute-"));
   const rooms = await startRooms({ port: 0, dataDir: roomData, log: () => {} });
-  const arriving = await browser.newContext();
-  let letBrainArrive!: () => void;
-  const brainGate = new Promise<void>((resolve) => { letBrainArrive = resolve; });
+  const roomsAt = `ws://127.0.0.1:${rooms.port}/rooms`;
   try {
-    await arriving.route("**/brain/connectome.*", async (route) => { await brainGate; await route.continue(); });
-    const page = await arriving.newPage();
-    const sockets: string[] = [];
-    page.on("websocket", (socket) => {
-      if (new URL(socket.url()).pathname === "/rooms") sockets.push(socket.url());
-    });
-    const launch = new URL(url);
-    launch.searchParams.set("rooms", `ws://127.0.0.1:${rooms.port}/rooms`);
-    await page.goto(launch.href);
-    await gameUp(page);
-    await waitFor(page, "screen=loading,brain=loading,autoJoin=waiting");
-    await waitForGameTime(page, 0.5);
-    assert.deepEqual(sockets, [], "the loading screen never joins before the real brain arrives");
-    await page.keyboard.press("Enter");
-    await waitFor(page, "screen=play,brain=loading,autoJoin=waiting");
-    await waitForGameTime(page, 0.5);
-    assert.deepEqual(sockets, [], "Explore keeps the brain gate on automatic joining");
-    letBrainArrive();
-    await waitFor(page, "screen=play,brain=running,online=joined,everyone=yes");
-    assert.equal(sockets.length, 1, "the real brain waking starts one automatic room connection");
-    if (values.shots) await page.screenshot({ path: path.join(values.shots, "explore-auto-joined.png") });
-    console.log("passed: default room waits for the real brain, including early Explore");
+    // A fresh profile: at home, alone in the picnic, however long it lives, with the room server there to be found.
+    const fresh = await browser.newContext();
+    try {
+      const page = await fresh.newPage();
+      const sockets: string[] = [];
+      page.on("websocket", (socket) => {
+        if (new URL(socket.url()).pathname === "/rooms") sockets.push(socket.url());
+      });
+      const launch = new URL(url);
+      launch.searchParams.set("rooms", roomsAt);
+      await page.goto(launch.href);
+      await gameUp(page);
+      await waitFor(page, "screen=title,brain=running", 120_000);
+      await page.keyboard.press("Enter");
+      await waitFor(page, "screen=play");
+      await waitForGameTime(page, 5);
+      const home = await readState(page);
+      assert.deepEqual([home.table, home.visit, home.home, home.place], ["", "-1", "picnic", "picnic"], "at home, alone, in the picnic");
+      assert.deepEqual(sockets, [], "a fresh profile never joins a room by itself");
+      console.log("passed: a fresh profile starts at home, alone");
+    } finally { await fresh.close(); }
+
+    // On a visit kept from an earlier launch: back to its room, but only once the real brain is awake.
+    const arriving = await browser.newContext();
+    let letBrainArrive!: () => void;
+    const brainGate = new Promise<void>((resolve) => { letBrainArrive = resolve; });
+    try {
+      await arriving.addInitScript(() => localStorage.setItem("flies.settings", JSON.stringify({ visit: 0 })));
+      await arriving.route("**/brain/connectome.*", async (route) => { await brainGate; await route.continue(); });
+      const page = await arriving.newPage();
+      const sockets: string[] = [];
+      page.on("websocket", (socket) => {
+        if (new URL(socket.url()).pathname === "/rooms") sockets.push(socket.url());
+      });
+      const launch = new URL(url);
+      launch.searchParams.set("rooms", roomsAt);
+      await page.goto(launch.href);
+      await gameUp(page);
+      await waitFor(page, "screen=loading,brain=loading,autoJoin=waiting,visit=0");
+      await waitForGameTime(page, 0.5);
+      assert.deepEqual(sockets, [], "the loading screen never joins before the real brain arrives");
+      await page.keyboard.press("Enter");
+      await waitFor(page, "screen=play,brain=loading,autoJoin=waiting");
+      await waitForGameTime(page, 0.5);
+      assert.deepEqual(sockets, [], "Explore keeps the brain gate on a visit's joining");
+      letBrainArrive();
+      await waitFor(page, "screen=play,brain=running,online=joined,everyone=yes");
+      assert.equal(sockets.length, 1, "the real brain waking starts one room connection");
+      if (values.shots) await page.screenshot({ path: path.join(values.shots, "explore-visit-joined.png") });
+      console.log("passed: a kept visit waits for the real brain, including early Explore");
+    } finally {
+      letBrainArrive();
+      await arriving.close();
+    }
   } finally {
-    letBrainArrive();
-    await arriving.close();
     await rooms.stop();
     await rm(roomData, { recursive: true, force: true });
   }
@@ -135,7 +163,7 @@ try {
           await waitFor(page, `tool=${id}`);
         }
         await shot(`${id}-gesture`);
-        if (id === "light" || id === "weather" || id === "view" || id === "place") {
+        if (id === "sky" || id === "view" || id === "place") {
           if (device === "remote") await page.keyboard.press("ArrowDown");
           else await press("kind", undefined);
           if (id === "place") {

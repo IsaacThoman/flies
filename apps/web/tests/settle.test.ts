@@ -24,7 +24,7 @@ function game() {
   const choice = new Settle(
     () => open && screen?.menu.focused?.id === "place",
     () => {
-      if (settings.place !== "turns" && settings.place !== here) carried.push((here = settings.place));
+      if (settings.place !== here) carried.push((here = settings.place));
     },
   );
   const shell = { settings, weatherOutside: false, shape: TV_FRAME, glyphs: "remote" as const, open: () => {}, back: () => (open = false), applySettings: () => choice.changed() };
@@ -43,8 +43,8 @@ function game() {
 
 test("stepping through the places carries the fly nowhere until it rests on one, then once, there", () => {
   const { settings, carried, press, wait } = game();
-  // Each in turn, the picnic, the windowsill, the lab bench, the greenhouse: a step a third of a second.
-  for (let i = 0; i < 4; i++) {
+  // From the picnic, the windowsill, the lab bench, the greenhouse: a step a third of a second.
+  for (let i = 0; i < 3; i++) {
     press("right");
     wait(0.3);
   }
@@ -58,7 +58,7 @@ test("stepping through the places carries the fly nowhere until it rests on one,
 
 test("leaving the row, or the screen, settles it at once", () => {
   const { carried, press, wait } = game();
-  press("right", "right", "right", "up");
+  press("right", "right", "up");
   wait(1 / 60);
   assert.deepEqual(carried, ["lab"], "up off the row");
   press("down", "right", "back");
@@ -66,11 +66,9 @@ test("leaving the row, or the screen, settles it at once", () => {
   assert.deepEqual(carried, ["lab", "greenhouse"], "back out of Settings");
 });
 
-test("resting on Each in turn, or on where it is, carries it nowhere", () => {
+test("resting on where it is carries it nowhere", () => {
   const { carried, press, wait } = game();
   press("right", "right", "left", "left");
-  wait(SETTLE + 0.1);
-  press("right");
   wait(SETTLE + 0.1);
   assert.deepEqual(carried, []);
 });

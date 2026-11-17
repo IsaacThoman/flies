@@ -7,15 +7,15 @@
 
 import { PACES } from "@fly/body";
 import type { DayPace } from "@fly/body";
-import { MAX_OWN } from "@fly/net";
+import { EVERYONE_SERIES, MAX_OWN } from "@fly/net";
 import type { Option } from "@fly/ui";
 import type { WallpaperStyle } from "./camera.ts";
 import { PIXEL_SIZES } from "./display.ts";
 import type { PixelSize } from "./display.ts";
 import { isPlaceId } from "./places/catalog.ts";
 import type { PlaceId } from "./places/catalog.ts";
-import { TOOLS } from "./tools/hands.ts";
-import type { ToolId } from "./tools/hands.ts";
+import { DIALS, TOOLS, kindsOf } from "./tools/hands.ts";
+import type { DialId, ToolId } from "./tools/hands.ts";
 
 export type EyesDetail = "off" | "low" | "high";
 /** When something shows over the picture: never, in the wallpaper, or while playing too. */
@@ -67,16 +67,16 @@ export type Settings = {
   rumble: boolean;
   /** Small frame-cost counters in a corner. */
   stats: boolean;
-  /** On the Weather and Light tools' "Now", the real weather and sunrise and sunset outside, where the Apple TV can tell them. */
+  /** On the Sky's "Now", the real weather and sunrise and sunset outside, where the Apple TV can tell them. */
   realWeather: boolean;
-  /** Where the fly lives: one place, or each in turn (it moves on during a long wallpaper). */
-  place: PlaceId | "turns";
+  /** Where the fly lives: its home, where a launch finds it and play is. */
+  place: PlaceId;
+  /** In the screensaver, whether it stays home or is carried to each place in turn (back home when play begins). */
+  wallpaperPlaces: "home" | "turns";
   /** How many flies this device lives, each with a brain of its own: the first is the one the player follows. */
   flies: number;
-  /** Where it was last, to come back to. */
-  scene: PlaceId;
-  /** Online: sit with everyone in a room open to all, once the brain is awake (docs/online.md, "Everyone"); off after Online → Disconnect. */
-  joinOthers: boolean;
+  /** The series of rooms open to everyone the player has taken the fly to visit (docs/online.md), until it goes home; -1 at home. */
+  visit: number;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -96,10 +96,10 @@ export const DEFAULT_SETTINGS: Settings = {
   rumble: true,
   stats: false,
   realWeather: true,
-  place: "turns",
+  place: "picnic",
+  wallpaperPlaces: "home",
   flies: 1,
-  scene: "picnic",
-  joinOthers: true,
+  visit: -1,
 };
 
 const showWhen = (v: ShowWhen) => ["off", "wallpaper", "always"].includes(v);
@@ -118,9 +118,10 @@ const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean 
   statsKind: (v) => ["brain", "day", "both", "signals"].includes(v),
   overlaySize: (v) => Object.hasOwn(OVERLAY_SIZES, v),
   overlayOpacity: (v) => Object.hasOwn(OVERLAY_OPACITIES, v),
-  place: (v) => v === "turns" || isPlaceId(v),
+  place: isPlaceId,
+  wallpaperPlaces: (v) => v === "home" || v === "turns",
   flies: (v) => Number.isInteger(v) && v >= 1 && v <= MAX_OWN,
-  scene: isPlaceId,
+  visit: (v) => Number.isInteger(v) && v >= -1 && v < EVERYONE_SERIES,
 };
 
 const SETTINGS_KEY = "flies.settings";
@@ -161,7 +162,14 @@ export function writeText(store: Storage | null, key: string, text: string) {
   }
 }
 
-/** Reads the saved settings, keeping only values the game can use. */
+/**
+ * Reads the saved settings, keeping only values the game can use. A save
+ * from before the fly had a home lived "each in turn" (then the default) and
+ * was online by default: it lives where it was last, still goes round the
+ * places in the screensaver, and is at home, as every launch now is until the
+ * player takes it to visit. Being online then was the default, never a
+ * choice, so there is no visit to keep.
+ */
 export function loadSettings(store: Storage | null = storage()): Settings {
   const settings = { ...DEFAULT_SETTINGS };
   const saved = read(store, SETTINGS_KEY);
@@ -170,6 +178,10 @@ export function loadSettings(store: Storage | null = storage()): Settings {
     const value = saved[key];
     const valid = VALID[key] as ((value: unknown) => boolean) | undefined;
     if (typeof value === typeof DEFAULT_SETTINGS[key] && (!valid || valid(value))) (settings as Record<string, unknown>)[key] = value;
+  }
+  if (saved.place === "turns") {
+    if (typeof saved.scene === "string" && isPlaceId(saved.scene)) settings.place = saved.scene;
+    if (saved.wallpaperPlaces === undefined) settings.wallpaperPlaces = "turns";
   }
   return settings;
 }
@@ -188,29 +200,35 @@ const HOUR = 3_600_000;
  * launch would open on no fly at all. Everything else starts fresh, on Feed
  * with sugar: one press of Select and the fly has something to find.
  */
-export const KEPT: { readonly [T in ToolId]?: { readonly for: number; readonly not?: readonly string[] } } = {
+export const KEPT: { readonly [D in DialId]: { readonly for: number; readonly not?: readonly string[] } } = {
   view: { for: Infinity, not: ["eyes"] },
   light: { for: 6 * HOUR },
   weather: { for: 6 * HOUR },
 };
 
-/** A kind chosen on the shelf (its id in its tool's kinds), and when (ms since 1970). */
+/** A kind chosen on the shelf (its id in its dial's kinds), and when (ms since 1970). */
 export type Chosen = { kind: string; at: number };
-export type ShelfChoices = { [T in ToolId]?: Chosen };
+/**
+ * Saved by the dial it was chosen on ("light" and "weather" are the Sky's two,
+ * by the names of the tools they were before the Sky had both, so a choice
+ * made then comes back on the Sky).
+ */
+export type ShelfChoices = { [D in DialId]?: Chosen };
 
-/** The shelf's kept choices still in time, each a kind its tool has today. */
+/** The shelf's kept choices still in time, each a kind its dial has today. */
 export function loadShelf(now: number, store: Storage | null = storage()): ShelfChoices {
   const shelf: ShelfChoices = {};
   const saved = read(store, SHELF_KEY);
   if (!saved) return shelf;
-  for (const tool of TOOLS) {
-    const kept = KEPT[tool.id];
-    const chosen = saved[tool.id] as Partial<Chosen> | null | undefined;
-    if (!kept || !chosen || typeof chosen !== "object") continue;
+  for (const id of Object.keys(KEPT) as DialId[]) {
+    const kept = KEPT[id];
+    const tool = TOOLS.find((t) => t.id === DIALS[id].tool);
+    const chosen = saved[id] as Partial<Chosen> | null | undefined;
+    if (!tool || !chosen || typeof chosen !== "object") continue;
     const { kind, at } = chosen;
     if (typeof kind !== "string" || typeof at !== "number" || !(now - at < kept.for)) continue;
-    if (kept.not?.includes(kind) || !tool.variants.some((v) => v.id === kind)) continue;
-    shelf[tool.id] = { kind, at };
+    if (kept.not?.includes(kind) || !kindsOf(tool, DIALS[id].dial).some((v) => v.id === kind)) continue;
+    shelf[id] = { kind, at };
   }
   return shelf;
 }
@@ -227,12 +245,13 @@ export function saveShelf(shelf: ShelfChoices, store: Storage | null = storage()
 export type Lesson = "arrival" | "tools" | "hand" | ToolId;
 export type Learned = { [L in Lesson]?: true };
 
-/** What the hints have taught, of the lessons this build has. */
+/** What the hints have taught, of the lessons this build has. The Sky is learned by one who used both the tools it was before, Light and Weather. */
 export function loadLearned(store: Storage | null = storage()): Learned {
   const learned: Learned = {};
   const saved = read(store, LEARNED_KEY);
   if (!saved) return learned;
   for (const lesson of ["arrival", "tools", "hand", ...TOOLS.map((t) => t.id)] as Lesson[]) if (saved[lesson] === true) learned[lesson] = true;
+  if (saved.light === true && saved.weather === true) learned.sky = true;
   return learned;
 }
 

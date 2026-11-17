@@ -44,6 +44,6 @@ The latest weather conditions and fetch time are saved locally for the next laun
 
 ## Your choices and questions
 
-You can leave a room from Online, and play alone. A saved room may reconnect at launch until you leave it. Clear the website's site data to remove its preferences, room key and offline caches; removing the installed app clears its local app data subject to your system's backup and restore settings. Revoking location permission stops future location requests. Contact <contact email> about privacy, access or deletion of server records, providing the room code privately if relevant. No account deletion is needed because there are no accounts. Do not send a room password or your device key.
+You can go home from Online, and play alone; the game joins no room by itself. A saved room, or a room open to everyone you are visiting, may reconnect at launch until you go home. Clear the website's site data to remove its preferences, room key and offline caches; removing the installed app clears its local app data subject to your system's backup and restore settings. Revoking location permission stops future location requests. Contact <contact email> about privacy, access or deletion of server records, providing the room code privately if relevant. No account deletion is needed because there are no accounts. Do not send a room password or your device key.
 
 Changes to network features, hosting retention or this policy will be reflected here with an updated date.

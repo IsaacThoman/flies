@@ -145,7 +145,8 @@ test("a keyboard's own keys: the numbers pick tools, R or Home takes the camera 
   assert.deepEqual(keyAction("KeyR", "r"), { kind: "home" });
   assert.deepEqual(keyAction("Home", "Home"), { kind: "home" });
   assert.equal(keyAction("KeyA", "a"), null);
-  assert.equal(keyAction("Digit0", "0"), null);
+  // The tenth tool is 0, after 9, as the keys lie.
+  assert.deepEqual(keyAction("Digit0", "0"), { kind: "tool", index: 9 });
   assert.deepEqual(keyAxis("Equal", "+"), { axis: "zoom", dir: -1 });
   assert.deepEqual(keyAxis("Minus", "-"), { axis: "zoom", dir: 1 });
   assert.deepEqual(keyAxis("KeyQ", "q"), { axis: "turn", dir: -1 });

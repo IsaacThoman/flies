@@ -1,6 +1,6 @@
 // The real weather outside, where the Apple TV app's host can give it
-// (globalThis.__native.weather, WeatherKit): on the Weather tool's "Now" it
-// takes the forecast's place, and on the Light tool's "Now" the real sunrise
+// (globalThis.__native.weather, WeatherKit): on the Sky's weather "Now" it
+// takes the forecast's place, and on its time of day "Now" the real sunrise
 // and sunset move the clock's day so that dawn and dusk come when they do
 // outside. Without it (a browser, no permission, no network, an answer too
 // old, or turned off in Settings) the made-up forecast and the clock's fixed
@@ -191,12 +191,12 @@ export class Outside {
     return this.#enabled && !this.#fed ? (this.#bridge?.error() ?? "") : "";
   }
 
-  /** The real weather is what the Weather tool's "Now" shows, or is easing in to. */
+  /** The real weather is what the Sky's weather "Now" shows, or is easing in to. */
   get following() {
     return this.#wantWeather;
   }
 
-  /** The real sunrise and sunset are what the Light tool's "Now" follows, or is easing in to. */
+  /** The real sunrise and sunset are what the Sky's time of day "Now" follows, or is easing in to. */
   get sunFollowing() {
     return this.#wantSun;
   }

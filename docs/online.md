@@ -20,15 +20,16 @@ together; the binary fly-state layout itself is unchanged.
 
 ## Playing
 
-- **Everyone.** Nobody has to do anything to be with others. Once the brain
-  is awake, the game sits this device's flies in a public room the room
-  server keeps (below), the one for where they live (Settings → Screensaver →
-  Where it lives): **Everyone**, whose place takes turns, for Each in turn,
-  the default; the place's own room for a place. Unless the player has
-  disconnected (Online → Disconnect, kept until Online → Go online), the game
-  was opened by a player-created room's link (or code), it remembers one, or
-  the device is offline.
-  It is quiet about it: a room server that can't be reached, or one that
+- **Home and visiting.** The fly lives at home: alone, in the place it
+  lives (Settings → Screensaver → Where it lives), where a launch finds it.
+  Nothing joins a room by itself. Rooms are somewhere the player takes it.
+  Choosing a room open to everyone (below) from Online's list, by its code
+  or by its link starts a **visit** there. From then on, until Online → Go
+  home, once the brain is awake the game keeps this device's flies in that
+  room's series, this launch and later ones. A reload, or opening the game
+  again, comes back to the room it was last let into, if it is still of that
+  series. Opened `?alone`, nothing is tried.
+  A visit is quiet about it: a room server that can't be reached, or one that
   turns the device away, leaves the fly playing alone as if nothing had been
   tried, with no note, and the game tries again in the background after 30 s,
   1, 2 and then every 5 minutes (at once when the network comes back). A try
@@ -36,18 +37,16 @@ together; the binary fly-state layout itself is unchanged.
   Unknown rooms, incompatible versions, removal and another window taking
   the same seat stop retries for that launch.
   Until it is let in, the fly eats its own food and Online shows the rooms
-  as if it were alone, with Disconnect above them. Disconnecting stops
-  automatic joining, this launch and later ones, until Go online. At a
-  player-created room nothing is tried; leaving it sits the device with
-  everyone again at once.
-- **Going somewhere else.** The place is the player's to choose, with
-  others as alone: in a room open to everyone, the Place tool and Where it
-  lives carry the fly to that place's own room (the fly is carried there at
-  once, and the others there appear as it is let in). The Place tool makes
-  the place where the fly lives, as Where it lives does. Choosing a room
-  open to everyone from the list, by its code or by its link does the same
-  the other way round: the fly lives in its place now (each in turn, for
-  Everyone's), and goes online if it was disconnected.
+  as if it were alone, with Go home above them. At a player-created room
+  nothing is tried; Go home there leaves it for home, and a room of someone's
+  own that ends by itself (closed, removed) is home again too, or back to the
+  visit, on one.
+- **Going somewhere else on a visit.** In a room open to everyone, the Place
+  tool carries the fly to that place's own room (the fly is carried there at
+  once, and the others there appear as it is let in): the visit moves there,
+  and home stays where it was. Settings → Where it lives changes only home.
+  Choosing another room open to everyone from the list, by its code or by its
+  link moves the visit to its series.
 - **The rooms open to everyone** (`EVERYONE_ROOMS`, `SCENE_ROOMS`,
   `packages/net/src/protocol.ts`) come in series of up to 64 each.
   Everyone's are Everyone, Everyone 2, Everyone 3, …, with the codes
@@ -71,17 +70,16 @@ together; the binary fly-state layout itself is unchanged.
     take turns by the server's clock, 20 minutes in each (greenhouse,
     picnic, windowsill, lab, restaurant, kitchen, by the wall clock, so every
     restart agrees), and carry everyone there together. In either, the
-    Place tool and Where it lives go to another place's room (Going
-    somewhere else), never fighting the room.
+    Place tool goes to another place's room (Going somewhere else on a
+    visit), never fighting the room.
   - **The light and the weather** are each device's own, as alone: "Now" is
     its own clock and sky (on an Apple TV, the weather outside), and the
-    Light and Weather tools change only what this device sees, and are kept
-    as alone. What the room shares doesn't depend on them: its visitors come
+    Sky changes only what this device sees, and is kept as alone. What the room shares doesn't depend on them: its visitors come
     by its own pace, and each device lets pass any its own sky doesn't suit
     (no butterfly in its rain, no gull in its night); the shared bubbles
     don't burst in anyone's rain.
   - Online, in one of them, shows its name, its QR code and code, and Share
-    the link, Browse rooms and Disconnect. Browse rooms is the list, with
+    the link, Browse rooms and Go home. Browse rooms is the list, with
     the fly still in the room until another is chosen (or Back).
 - **The rooms.** The menu → Online lists the rooms open to everyone first
   (the first of each series always, the others while someone is there),
@@ -91,7 +89,7 @@ together; the binary fly-state layout itself is unchanged.
   and a padlock if it has a password. The list follows the room server as
   rooms open, fill and empty. A full one can't be chosen, but for a room
   open to everyone, which sends whoever chooses it on to the next. Above the list are
-  Disconnect (Go online, when disconnected; not while browsing from a room),
+  Go home (on a visit not yet let in; not while browsing from a room),
   New room, and Code, for an unlisted room's code (the ten letters and digits of its
   link).
 - **A new room.** New room → its name (two words are suggested, to keep or
@@ -123,15 +121,14 @@ together; the binary fly-state layout itself is unchanged.
   one the camera follows: the pointer drifts back to it, and the eyes'
   picture, nervous system, stats, X-ray, activity and day's tally are its.
 - **The starter** (of a room someone made) chooses the place (the Place tool carries the whole table
-  there together), the light and the weather (their tools). Everyone else's
-  Light, Weather and Place tools show the table's choice and refuse to change
-  it. The starter can also take a device off the table: Online lists the
+  there together), the light and the weather (the Sky). Everyone else's
+  Sky and Place tools show the table's choice and refuse to change it. The starter can also take a device off the table: Online lists the
   others by their flies' colours, several dots for several flies, each with
   Remove. All that device's flies go. Its key is barred while among the last
   256 removed; clearing device storage creates another key.
 - **The table's clock** is the starter's. Their time zone goes with the
-  table when it is started, so "Now" on the Light tool is their time of day.
-  "Now" on the Weather tool is the made-up forecast from that clock, so
+  table when it is started, so the Sky's time of day "Now" is theirs. The
+  Sky's weather "Now" is the made-up forecast from that clock, so
   everyone sees the same rain. The real weather outside (WeatherKit) isn't
   used at a player-created table. Everyone keeps each device's own sky.
 - **Tools on other flies.** In public and unlisted rooms, everyone's tools
@@ -143,10 +140,10 @@ together; the binary fly-state layout itself is unchanged.
   device's flies at the table, resting together: wings folded, still, their
   near models dimmed. After 10 minutes away they leave; when the device comes
   back, retained seats keep their colours and positions are checked (Coming back).
-- **Leaving.** Online → Leave the room, in a player-created room: back with
-  everyone where the fly lives, as by default. Online → Disconnect, in any
-  room: the flies stay where they are, alone, with the place's own food, and
-  the light and weather its shelf had, until Go online.
+- **Going home.** Online → Go home, in any room or on the way to one: the
+  flies leave it, alone again, with the place's own food and the light and
+  weather the shelf had, and are carried home, to the place they live. A
+  later launch is at home too, until the player visits again.
 - **What goes wrong** is said in the heading's place, in a few words: a
   wrong password, too many tries, a full room, one that has closed, being
   taken off one.
@@ -181,11 +178,10 @@ join any open room; a password needs a keyboard. The game reaches typing only
 through `TextEntry` (`packages/contracts/src/text-entry.ts`), polled each
 frame, so the Apple TV can bring its own keyboard through the bridge.
 
-Solo play has no other players' bodies or room connection, except while
-Online browses or the game tries to join a room open to everyone.
-Disconnecting and `?alone` disable automatic joining; neither blocks an
-invitation or a remembered player-created room. Disconnect and remove any
-`?table=` invitation for a solo launch. `npm run tvos:check` uses `?alone`
+Solo play, at home, has no other players' bodies or room connection, except
+while Online browses. `?alone` keeps even a visit from joining; neither it
+nor home blocks an invitation or a remembered player-created room. Go home
+and remove any `?table=` invitation for a solo launch. `npm run tvos:check` uses `?alone`
 with controlled test settings. The device's own flies still live together, each with its own brain, senses and
 eyes, all eating from one pantry (`apps/web/src/company.ts`). A companion whose
 brain fails gets a replacement after a 5 s wait; if that fails, another
@@ -396,8 +392,8 @@ faking it. The room bounds positions, rates and food use to limit disruption (`p
   with more than 4 flies, or with a fly twice is dropped; a state in it for
   a fly that isn't the device's is left out.
   At most 64 connections open from one address (a house, a school or a
-  phone network behind one address, now that every device sits with
-  everyone by default). Opening tokens replenish at 60 a minute (burst 30),
+  phone network behind one address, with many devices visiting
+  everyone). Opening tokens replenish at 60 a minute (burst 30),
   and room starts at 30 an hour (burst 5; the rooms open to everyone aren't
   counted: nobody starts them). At most 128 flies a table (`MAX_FLIES`), 4 per device
   (`MAX_OWN`). A new device gets as many as it asks for or there are free seats,
@@ -625,20 +621,22 @@ server over real sockets, what hostile devices send
 (`apps/server/tests/hardening.test.ts`, and the fuzzing above), Online's
 screen and its list's line, `Online` itself (the flies the table seats it,
 bounded recount retries, where its flies stand coming back, and never
-taking its own flies for another player's), and sitting with everyone by default
-(`AutoJoin`: only once awake, enabled and online, quiet when it can't, no
-rejoining after leaving). `npm run e2e` runs two headless tabs at a table: they see each other, share
+taking its own flies for another player's), and visiting
+(`AutoJoin`: home at launch unless invited or on a visit, a visit only once
+awake and online, quiet when it can't, no rejoining after going home). `npm run e2e` runs two headless tabs at a table: they see each other, share
 food, rest while hidden, survive a server restart and a removal; then a
 named, locked room is made from the menus with the keys and joined from
 another tab's list, a wrong password first, and its link alone opens only
-its door; two tabs that just open the game find each other in Everyone, one
-leaves it from Online and stays alone, and a tab whose room server can't be
-reached plays alone without a word. It also
+its door; two tabs that just open the game stay at home until each visits
+Everyone from Online's list, where they find each other, one goes home from
+Online and stays there, across a reload, and a tab on a visit whose room
+server can't be reached plays alone without a word. It also
 checks eight flies against draw and triangle caps on its enumerated screen shapes, and checks
-that with Join others off single-player opens no connection. Suites using `holdSteady`
-with its default options disable Join others and the screensaver
-(`scripts/play.ts`). The first-minute suite instead checks automatic
-Everyone joining; the accessibility suite has its own room fixture. `npm run tables -- --clients 4 --seconds 120`
+that at home single-player opens no connection. Suites using `holdSteady`
+disable the screensaver, and are at home unless given a visit
+(`scripts/play.ts`). The first-minute suite checks that a fresh profile
+stays home and that a kept visit waits for the real brain; the accessibility
+suite has its own room fixture. `npm run tables -- --clients 4 --seconds 120`
 runs four real-brain tabs for 120 seconds, summing up what each saw. Add
 `--fake 4` for four synthetic peers.
 
@@ -673,8 +671,8 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
   `apps/web/src/ui/text-entry.ts`). There is no share sheet or clipboard, so
   no Share the link: at a room, Online shows its QR code and its code (as it
   does everywhere) for a phone to scan or another TV to type. The simulator
-  check opens the app `?alone`, so that it never sits with everyone on the
-  site's room server, and then sits it at a table of eight of its own. A
+  check opens the app `?alone`, so that a visit kept from an earlier run
+  never sits it with everyone on the site's room server, and then sits it at a table of eight of its own. A
   16 November 2026 capture on an Apple TV 4K (3rd generation), tvOS 27.2.1,
   release build, reported mean 59.9 fps in play (55–60 in 10-second windows)
   with seven synthetic peers. See `docs/apple-tv.md`, "Eight flies on a TV",

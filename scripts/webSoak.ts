@@ -96,20 +96,23 @@ async function move(page: Page, place: PlaceId) {
     const g = globalThis.__fly;
     // Other pages' GPU load must not change the render target used for a place's baseline.
     g.quality?.reset();
+    // Home there, so the game carries it nowhere else once it is.
+    g.settings.place = id;
     g.applySettings(false);
     g.moveTo(id);
   }, place);
   await waitFor(page, `place=${place},moving=`, 60_000);
 }
 
-async function choose(page: Page, tool: string, variant: string) {
-  await page.evaluate(({ tool, variant }) => {
+/** `dial`: which of the tool's dials (the Sky's second is its weather). */
+async function choose(page: Page, tool: string, variant: string, dial: 0 | 1 = 0) {
+  await page.evaluate(({ tool, variant, dial }) => {
     const hands = globalThis.__fly.hands;
     for (let i = 0; i < 12 && hands.current.id !== tool; i++) hands.stepTool(1);
-    while (hands.stepVariant(-1)) { /* Start at the first choice, even after a previous phase. */ }
-    while (hands.variant.id !== variant) if (!hands.stepVariant(1)) throw Error(`No ${variant} on ${tool}`);
-  }, { tool, variant });
-  await waitFor(page, `tool=${tool},variant=${variant}`);
+    while (hands.stepVariant(-1, false, dial)) { /* Start at the first choice, even after a previous phase. */ }
+    while (hands.variantOf(dial).id !== variant) if (!hands.stepVariant(1, false, dial)) throw Error(`No ${variant} on ${tool}`);
+  }, { tool, variant, dial });
+  await waitFor(page, dial === 1 ? `tool=${tool},sky~/${variant}$` : `tool=${tool},variant=${variant}`);
   if (tool === "view") await page.evaluate(() => globalThis.__fly.play());
 }
 
@@ -122,7 +125,6 @@ async function canonical(page: Page) {
     const g = globalThis.__fly;
     g.play();
     g.settings.wallpaperAfter = 0;
-    g.settings.place = "turns";
     g.settings.eyes = "low";
     g.settings.eyesInset = "always";
     g.settings.nerves = "always";
@@ -134,8 +136,8 @@ async function canonical(page: Page) {
     g.settings.pixels = "classic";
     g.applySettings();
   });
-  await choose(page, "light", "noon");
-  await choose(page, "weather", "clear");
+  await choose(page, "sky", "noon");
+  await choose(page, "sky", "clear", 1);
   await choose(page, "view", "follow");
   await page.waitForTimeout(2500);
 }
@@ -293,9 +295,9 @@ export async function run(args = process.argv.slice(2)) {
         return debug ? String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)) : "unavailable";
       })}`);
       // Upload the persistent, initially hidden tool/eye/blit resources before taking baselines.
-      for (const tool of TOOLS) for (const variant of tool.variants) {
+      for (const tool of TOOLS) for (const [dial, variant] of [...tool.variants.map((v) => [0, v] as const), ...(tool.second ?? []).map((v) => [1, v] as const)]) {
         if (tool.id === "place") continue;
-        await choose(page, tool.id, variant.id);
+        await choose(page, tool.id, variant.id, dial);
         if (variant.id === "inside") await page.waitForTimeout(1500);
         if (["feed", "swoop", "feather", "blow"].includes(tool.id)) await page.keyboard.press("Enter", { delay: 200 });
       }
@@ -351,10 +353,10 @@ export async function run(args = process.argv.slice(2)) {
           for (const place of PLACES) {
             await move(page, place.id);
             for (const weather of WEATHERS) {
-              await choose(page, "weather", weather);
+              await choose(page, "sky", weather, 1);
               await waitFor(page, `weather=${weather}`);
               for (const time of [...TIMES, "clock"]) {
-                await choose(page, "light", time);
+                await choose(page, "sky", time);
                 // Let the eased sky/rain and its PMREM rebuilds run, without advancing the clock.
                 for (let i = 0; i < 12; i++) { await page.waitForTimeout(1000); await sample(); }
                 await sample(false, true);
@@ -482,8 +484,8 @@ export async function run(args = process.argv.slice(2)) {
     if (phases.includes("wallpaper")) for (const place of PLACES.filter((p) => wallpaperPlaces.includes(p.id))) jobs.push(lane(place.id, async (page, sample, phase) => {
       await move(page, place.id);
       await page.evaluate((id) => { const g = globalThis.__fly; g.settings.place = id; g.settings.eyesInset = "wallpaper"; g.applySettings(); g.watch(); }, place.id);
-      await choose(page, "light", wallpaperTime);
-      await choose(page, "weather", wallpaperWeather);
+      await choose(page, "sky", wallpaperTime);
+      await choose(page, "sky", wallpaperWeather, 1);
       phase("wallpaper");
       const until = Date.now() + wallpaperMinutes * 60_000;
       while (Date.now() < until) { await sample(); await page.waitForTimeout(Math.min(1000, until - Date.now())); }

@@ -94,7 +94,12 @@ const OPACITY: Option<OverlayOpacity>[] = [
   { value: "soft", label: "Soft" },
   { value: "faint", label: "Faint" },
 ];
-const PLACE: Option<Settings["place"]>[] = [{ value: "turns", label: "Each in turn" }, ...PLACES.map((p) => ({ value: p.id, label: p.name }))];
+const PLACE: Option<Settings["place"]>[] = PLACES.map((p) => ({ value: p.id, label: p.name }));
+/** In the screensaver, home, or each place in turn. */
+const TOUR: Option<Settings["wallpaperPlaces"]>[] = [
+  { value: "home", label: "Home only" },
+  { value: "turns", label: "Each in turn" },
+];
 const flyCounts = (most: number): Option<number>[] => Array.from({ length: most }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
 const ON_OFF: Option<boolean>[] = [
   { value: false, label: "Off" },
@@ -113,8 +118,8 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
     rows: (shell) => [
       choice("wallpaperAfter", "Starts after", WALLPAPER_DELAYS),
       choice("wallpaperCamera", "Camera", CAMERA),
-      // Only when there is somewhere else to live.
-      ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE)] : []),
+      // Only when there is somewhere else to live: its home, and whether the screensaver goes round the others.
+      ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE), choice("wallpaperPlaces", "Places", TOUR)] : []),
       // How many flies live here; only where this device can run more than one brain.
       ...(shell.maxFlies > 1 ? [choice("flies", "Flies", flyCounts(shell.maxFlies))] : []),
       // Whether the sky follows the weather outside, only where the Apple TV can tell it.

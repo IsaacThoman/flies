@@ -15,19 +15,21 @@ try {
   await page.keyboard.press("Enter");
   await waitFor(page, "screen=play");
   await page.evaluate(() => { (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 0; });
-  for (let i=0;i<5;i++) {
+  const sky = TOOLS.findIndex(t=>t.id==="sky");
+  for (let i=0;i<sky;i++) {
     await page.keyboard.press("ArrowRight");
     await waitForGameTime(page,0.2);
   }
-  await waitFor(page,"tool=weather");
-  const choices = TOOLS.find(t=>t.id==="weather")!.variants;
+  await waitFor(page,"tool=sky");
+  // Select steps the Sky's weather, round and round.
+  const choices = TOOLS[sky].second!;
   let index = 0;
   for (const kind of ["clear","rain","heavyRain","storm","snow","sleet","overcast","mist","clear","now"]) {
     const target = choices.findIndex(v=>v.id===kind);
     while (index !== target) {
-      await page.keyboard.press(index<target?"ArrowDown":"ArrowUp");
-      index += index<target?1:-1;
-      await waitFor(page,`variant=${choices[index].id}`);
+      await page.keyboard.press("Enter");
+      index = (index + 1) % choices.length;
+      await waitFor(page,`sky~/${choices[index].id}$`);
     }
     if (kind !== "now") {
       await waitFor(page,`weather=${kind},weatherFrom=chosen`);
