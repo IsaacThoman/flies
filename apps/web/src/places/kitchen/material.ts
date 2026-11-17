@@ -110,6 +110,11 @@ export function surfaceMaterial() {
         vec2 pit=p.xz-vec2(25,155);
         float fibres=noise(vec2(atan(pit.y,pit.x)*35.0,length(pit)*.4))*noise(p.xz*6.0);
         diffuseColor.rgb *= .91+.09*micro-fibres*.11;
+        vec2 cell=floor(p.xz*6.8),f=fract(p.xz*6.8);
+        vec2 seed=vec2(hash(cell),hash(cell+7.3));
+        float pore=1.0-smoothstep(.09,.17,length((f-(.18+.64*seed))*vec2(1.3,.6)));
+        float keep=1.0-smoothstep(.25,.7,max(fwidth(p.x),fwidth(p.z))*6.8);
+        diffuseColor.rgb*=1.0-pore*.05*keep;
         float pocket=length(pit/vec2(9.8,14.8))+.14*(noise(p.xz*.8)-.5);
         diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.45,.12,.05),(1.0-smoothstep(.82,1.22,pocket))*.65);
         diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.70,.17,.07),smoothstep(.975,.998,length(q)));
@@ -191,6 +196,19 @@ export function surfaceMaterial() {
       `,
       )
       .replace(
+        "#include <normal_fragment_maps>",
+        `#include <normal_fragment_maps>
+        if(vKind>3.5 && vKind<4.5) {
+          float h=noise(vPlace.xz*6.0)*.012+noise(vPlace.xz*.8)*.018;
+          vec3 sx=dFdx(-vViewPosition),sy=dFdy(-vViewPosition);
+          vec3 rx=cross(sy,normal),ry=cross(normal,sx);
+          float determinant=dot(sx,rx);
+          vec3 gradient=sign(determinant)*(dFdx(h)*rx+dFdy(h)*ry);
+          normal=normalize(max(abs(determinant),1e-8)*normal-gradient);
+        }
+      `,
+      )
+      .replace(
         "#include <roughnessmap_fragment>",
         `#include <roughnessmap_fragment>
       if(vKind>1.5 && vKind<2.5) roughnessFactor=.28;
@@ -213,7 +231,7 @@ export function surfaceMaterial() {
         "#include <metalnessmap_fragment>\nif(vKind>7.5 && vKind<8.5) metalnessFactor=.7;",
       );
   };
-  material.customProgramCacheKey = () => "kitchen-surfaces-4";
+  material.customProgramCacheKey = () => "kitchen-surfaces-5";
   return {
     material,
     update(t: number, light: Daylight, weather: Weather) {

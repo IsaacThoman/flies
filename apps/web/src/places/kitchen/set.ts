@@ -251,11 +251,19 @@ export function buildSet(): SceneSet {
     profile.push([b.radius, KITCHEN_PEACH_BANDS[i + 1]?.bottom ?? p.cut]);
   }
   const outer = KITCHEN_PEACH_BANDS.at(-1)!.radius;
+  const rind = lathe(profile, 0, 0, 72);
+  const rp = rind.getAttribute("position"),
+    rn = rind.getAttribute("normal");
+  // Keep the exact bands, but shade their sub-millimetre steps as a smooth skin.
+  for (let i = 0; i < rp.count; i++) {
+    const x = rp.getX(i),
+      y = (rp.getY(i) - p.cut) / Math.pow(p.cut - p.base, 2),
+      z = rp.getZ(i);
+    const length = Math.hypot(x, y, z) || 1;
+    rn.setXYZ(i, x / length, y / length, z / length);
+  }
   add(
-    lathe(profile, 0, 0, 72)
-      .scale(p.rx, 1, p.rz)
-      .rotateY(p.angle)
-      .translate(p.x, 0, p.z),
+    rind.scale(p.rx, 1, p.rz).rotateY(p.angle).translate(p.x, 0, p.z),
     "#cc5630",
     KIND.skin,
   );
@@ -346,6 +354,21 @@ export function buildSet(): SceneSet {
     g.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
     g.setIndex(indices);
     g.computeVertexNormals();
+    const bp = g.getAttribute("position"),
+      bn = g.getAttribute("normal");
+    for (let i = 221 * 29; i < bp.count; i++) {
+      const t = Math.max(0, Math.min(1, (bp.getX(i) + 246) / 185));
+      const centre =
+        -68 -
+        29 * Math.sin(Math.PI * t) +
+        (rounds === KITCHEN_BANANAS[1] ? 33 : 0);
+      const r = 3 + 14 * Math.pow(Math.sin(Math.PI * t), 0.6);
+      const z = (bp.getZ(i) - centre) / r,
+        y = Math.min(0, (bp.getY(i) - 42) / r);
+      const x = ((29 * Math.PI) / 185) * Math.cos(Math.PI * t) * z;
+      const length = Math.hypot(x, y, z) || 1;
+      bn.setXYZ(i, x / length, y / length, z / length);
+    }
     add(g, "#ddb337", KIND.banana);
   }
   // Fine world slices follow the same sheared lid to within a fraction of a toe.

@@ -213,3 +213,45 @@ historical evidence; their reference camera behaviour predates the shared fixes.
 | R4 | U5 | 6.8 | 6.5 | 6.4 | 5.6 | 7 | 7.5 | 8.6 | 6.7 | 6.8875 |
 | R4 | K6 | 7.2 | 6.7 | 6.6 | 6.5 | 7.2 | 8.2 | 8.3 | 7.3 | 7.2500 |
 | R4 | A8 | 8.6 | 5.3 | 7.8 | 7.4 | 7.8 | 6.9 | 6.5 | 5.8 | 7.0125 |
+
+## Round 5
+
+Key: K6 = retained kitchen; S2 = smoothed fruit-side normals and peach pulp
+microtexture; F9 = byte-identical S2 decoy; A8 = windowsill reference. All four
+reviewers ranked S2/F9 above K6 and below A8. Every reviewer scored the decoy
+identically; no extra reviewers were needed. Retain S2. These captures predate the
+runtime merge; the following round recaptures every set on the merged runtime.
+
+| Reviewer | K6 | S2 | F9 | A8 | Ranking |
+|---|---:|---:|---:|---:|---|
+| R1 | 7.2500 | 7.3750 | 7.3750 | 7.5000 | A8 > S2 > F9 > K6 |
+| R2 | 6.6875 | 6.9375 | 6.9375 | 7.1250 | A8 > F9 > S2 > K6 |
+| R3 | 6.9375 | 7.0625 | 7.0625 | 7.2500 | A8 > F9 > S2 > K6 |
+| R4 | 7.0625 | 7.1875 | 7.1875 | 7.4375 | A8 > F9 > S2 > K6 |
+| Mean | 6.9844 | 7.1406 | 7.1406 | 7.3281 | Retain S2 |
+
+The remaining gap to the reference is foreground composition, glass readability,
+and convincing light/shadow connections between props and the worktop. The next
+candidate tests peach fibres/juice detail, restrained quartz markings, stronger
+glass edges and analytical prop shadows. The owner changed the landing rule:
+ready once the kitchen meets the existing reference and the integration checks;
+subsequent polishing belongs on a branch from the latest dev. No merge is authorized.
+
+| Reviewer | Set | H | C | L | M | S | W | TV | A | Mean |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| R1 | K6 | 8 | 6 | 7 | 6 | 8 | 8.5 | 8 | 6.5 | 7.2500 |
+| R1 | S2 | 8 | 6 | 7 | 6.5 | 8 | 8.5 | 8 | 7 | 7.3750 |
+| R1 | F9 | 8 | 6 | 7 | 6.5 | 8 | 8.5 | 8 | 7 | 7.3750 |
+| R1 | A8 | 8.5 | 7.5 | 7.5 | 6.5 | 8 | 8 | 7 | 7 | 7.5000 |
+| R2 | K6 | 7 | 5.5 | 6 | 5.5 | 6.5 | 8 | 8.5 | 6.5 | 6.6875 |
+| R2 | S2 | 7 | 5.5 | 6 | 6.5 | 7 | 8 | 8.5 | 7 | 6.9375 |
+| R2 | F9 | 7 | 5.5 | 6 | 6.5 | 7 | 8 | 8.5 | 7 | 6.9375 |
+| R2 | A8 | 8 | 7 | 7.5 | 7 | 8 | 6 | 7 | 6.5 | 7.1250 |
+| R3 | K6 | 7 | 6 | 6 | 6 | 8 | 8 | 8 | 6.5 | 6.9375 |
+| R3 | S2 | 7 | 6 | 6 | 6.5 | 8 | 8 | 8 | 7 | 7.0625 |
+| R3 | F9 | 7 | 6 | 6 | 6.5 | 8 | 8 | 8 | 7 | 7.0625 |
+| R3 | A8 | 8 | 7 | 7.5 | 6.5 | 8 | 7 | 7 | 7 | 7.2500 |
+| R4 | K6 | 7 | 6 | 6 | 6 | 8 | 8 | 9 | 6.5 | 7.0625 |
+| R4 | S2 | 7 | 6 | 6 | 6.5 | 8 | 8 | 9 | 7 | 7.1875 |
+| R4 | F9 | 7 | 6 | 6 | 6.5 | 8 | 8 | 9 | 7 | 7.1875 |
+| R4 | A8 | 9 | 6.5 | 8 | 7.5 | 8 | 7 | 7 | 6.5 | 7.4375 |
