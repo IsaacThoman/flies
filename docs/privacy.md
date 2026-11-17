@@ -1,6 +1,8 @@
 # Privacy policy — flies
 
-Draft for release, 16 November 2026. Operator: <operator name>. Privacy contact: <contact email>. These placeholders must be completed before publication.
+<!-- Owner draft: complete the publication build variables and confirm hosting retention before release. This note is not shipped. -->
+
+16 November 2026. Operator: <operator name>. Privacy contact: <contact email>.
 
 flies simulates a fruit fly on your device. It has no accounts, advertising, analytics, tracking SDKs, or app telemetry uploads. It does not ask for your name, email, contacts, photos, microphone or camera. The fly's eyes see the simulated world, not your camera. The app does not sell personal data or use it for advertising.
 

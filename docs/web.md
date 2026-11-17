@@ -441,8 +441,10 @@ after about a thousand first visits a month.
 
 ## Release documents
 
-The build checks and emits [third-party notices](licenses.md) and a static [privacy policy](privacy.md).
+The build checks and emits [third-party notices](licenses.md). A static [privacy policy](privacy.md)
+is emitted only when all four [owner build variables](deploy.md#privacy-publication) are complete.
 Serve `/privacy` as `privacy/index.html` (a directory redirect is fine), never as the game's SPA fallback.
 The supplied Caddy config and `scripts/serve.ts` handle that path. The service worker keeps the policy
 for offline navigation too. About → Acknowledgements reads its bundled notice sections without a fetch.
-Before publishing, complete the policy's operator/contact placeholders and verify production log/backup retention.
+Otherwise `/privacy` must answer 404. Owner draft placeholders are never shipped.
+Before publishing, verify production log/backup retention.

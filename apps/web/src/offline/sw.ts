@@ -14,6 +14,7 @@ declare const __FLY_VERSION__: string;
 const worker = self as unknown as ServiceWorkerGlobalScope;
 const PAGE_CACHE = "fly-page-";
 const CACHE = `${PAGE_CACHE}${__FLY_VERSION__}`;
+const HAS_POLICY = __FLY_PRECACHE__.includes("privacy/index.html");
 /** Long enough for a slow connection to answer, short enough that a dead one doesn't hold the page up. */
 const PAGE_TIMEOUT_MS = 4000;
 /** The brain's parts, beside the page wherever it lives: the page fetches and keeps those itself. */
@@ -41,6 +42,7 @@ worker.addEventListener("fetch", (event) => {
 /** The page from the network, or the kept one if the network fails, is too slow, or answers with an error (a host that is up but failing). */
 async function page(request: Request): Promise<Response> {
   const policy = /\/privacy(?:\/|\/index\.html)?$/.test(new URL(request.url).pathname);
+  if (policy && !HAS_POLICY) return new Response(null, { status: 404 });
   const kept = () => caches.match(policy ? "privacy/index.html" : "./", { cacheName: CACHE });
   const fresh = fetch(request);
   // Answered or not, it may still settle after the kept page is used.
@@ -48,6 +50,7 @@ async function page(request: Request): Promise<Response> {
   const late = new Promise<undefined>((resolve) => setTimeout(resolve, PAGE_TIMEOUT_MS));
   try {
     const first = await Promise.race([fresh, late]);
+    if (policy && first?.status === 404) return first;
     if (first?.ok) {
       if (policy) {
         try {

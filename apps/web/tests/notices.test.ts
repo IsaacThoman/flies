@@ -6,6 +6,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { bundledPackageNames, checkGenerated, embeddedNotices, notices, noticeText, privacyHtml, requireNotices, runtimeDependencies } from "../../../scripts/notices.ts";
 import { noticeWrap } from "../src/ui/screens/about.ts";
+import { PUBLIC_OWNER } from "./privacy-fixture.ts";
 
 const root = path.resolve(import.meta.dirname, "../../..");
 test("all declared shipping dependencies have current generated notices and full original grants", () => {
@@ -44,12 +45,36 @@ test("missing direct, transitive and bundled-development dependency notices fail
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("static policy escapes personal placeholders, has no external resources and follows its source", () => {
-  const html = privacyHtml();
-  assert.match(html, /&lt;contact email&gt;/);
+test("a policy is published only with completed owner build variables, escaped as text", () => {
+  assert.equal(privacyHtml({}), null);
+  for (const field of Object.keys(PUBLIC_OWNER)) assert.equal(privacyHtml({ ...PUBLIC_OWNER, [field]: "  " }), null, field);
+  assert.throws(() => privacyHtml({ ...PUBLIC_OWNER, FLIES_OPERATOR_NAME: "<operator name>" }), /placeholders/);
+  assert.throws(() => privacyHtml({ ...PUBLIC_OWNER, FLIES_CONTACT_EMAIL: "not an email" }), /email address/);
+  assert.throws(() => privacyHtml({ ...PUBLIC_OWNER, FLIES_SUPPORT_URL: "http://example.test" }), /HTTPS/);
+  assert.throws(() => privacyHtml({ ...PUBLIC_OWNER, FLIES_MARKETING_URL: "https://user:password@example.test" }), /credentials/);
+  const html = privacyHtml(PUBLIC_OWNER)!;
+  assert.match(html, /Example Operator &amp; Co\./);
+  assert.match(html, /privacy@example\.test/);
+  assert.match(html, /href="https:\/\/example\.test\/support"/);
+  assert.match(html, /href="https:\/\/example\.test\/flies"/);
+  assert.doesNotMatch(html, /operator name|contact email|Owner draft|placeholders/);
   assert.match(html, /one hour/);
   assert.match(html, /10 MB/);
   assert.doesNotMatch(html, /<script|<iframe|<img|<link|@import/);
+});
+
+test("both committed generated notice files fail the guard when stale", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "flies-stale-notices-"));
+  try {
+    mkdirSync(path.join(dir, "apps/web/src/ui"), { recursive: true });
+    checkGenerated(true, dir);
+    checkGenerated(false, dir);
+    for (const file of ["THIRD_PARTY_NOTICES", "apps/web/src/ui/notices.json"]) {
+      writeFileSync(path.join(dir, file), "stale");
+      assert.throws(() => checkGenerated(false, dir), /is stale/);
+      checkGenerated(true, dir);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("notice URLs stay inside a narrow reading column without losing characters", () => {
@@ -68,17 +93,20 @@ test("store copy fits Apple's field limits", () => {
   }
 });
 
-test("the static host serves /privacy and the notice with their own content types", async () => {
+test("the static host returns 404 without a published policy, and HTML with one", async () => {
   const { serveSite } = await import("../../../scripts/serve.ts");
   const dir = mkdtempSync(path.join(tmpdir(), "flies-policy-"));
   mkdirSync(path.join(dir, "privacy"));
-  writeFileSync(path.join(dir, "privacy/index.html"), privacyHtml());
+  writeFileSync(path.join(dir, "index.html"), "game");
   writeFileSync(path.join(dir, "THIRD_PARTY_NOTICES"), noticeText());
   const site = await serveSite({ dir });
   try {
+    for (const route of ["privacy", "privacy/", "privacy/index.html"]) assert.equal((await fetch(new URL(route, site.url))).status, 404, route);
+    writeFileSync(path.join(dir, "privacy/index.html"), privacyHtml(PUBLIC_OWNER)!);
     const policy = await fetch(new URL("privacy", site.url));
+    assert.equal(policy.status, 200);
     assert.match(policy.headers.get("content-type")!, /text\/html/);
-    assert.equal(await policy.text(), privacyHtml());
+    assert.equal(await policy.text(), privacyHtml(PUBLIC_OWNER));
     const notice = await fetch(new URL("THIRD_PARTY_NOTICES", site.url));
     assert.match(notice.headers.get("content-type")!, /text\/plain/);
     assert.equal(await notice.text(), noticeText());

@@ -34,9 +34,9 @@ The toolchain is pinned by `packages/brain-native/wasm.sh` and `wasm/build.json`
 
 Run `npm run notices` after changing dependencies, upstream licence copies or credits. It reads licences from the installed packages themselves and the fdlibm source header, and writes `THIRD_PARTY_NOTICES` and the in-engine reader's `apps/web/src/ui/notices.json`. `npm run notices:check` rejects drift. The build runs the same check and rejects unknown shipped package names. Tests include direct/transitive and missing-notice cases. New copied code, assets, fonts or runtime upgrades also require a human audit and registry/provenance updates; a dependency guard cannot discover arbitrary copied material.
 
-Both Vite configurations emit `THIRD_PARTY_NOTICES` and a static `privacy/index.html`. The iOS packaging script bundles the web output; tvOS bundles its own Vite output. The same notice sections are compiled into the game for offline use through About → Acknowledgements. Licence URLs are attribution text, not network requests. Left/right changes notice, up/down scrolls, Back returns to About; phones have previous/next and Back targets.
+Both Vite configurations emit `THIRD_PARTY_NOTICES`. They emit `privacy/index.html` only with complete public owner build variables (see [deployment](deploy.md#privacy-publication)). The iOS packaging script bundles the web output; tvOS bundles its own Vite output. The same notice sections are compiled into the game for offline use through About → Acknowledgements. Licence URLs are attribution text, not network requests. Left/right changes notice, up/down scrolls, Back returns to About; phones have previous/next and Back targets.
 
-The web host must serve `/privacy` as the directory's index (normally a redirect to `/privacy/`), not rewrite it to the game. Caddy and the local static server handle that explicitly. No external scripts, fonts or analytics are added to the policy page.
+The web host must serve a configured `/privacy` as the directory's index (normally a redirect to `/privacy/`), or answer 404 when absent, never rewrite it to the game. Caddy and the local static server handle that explicitly. No external scripts, fonts or analytics are added to the policy page.
 
 ## Before submission
 

@@ -26,6 +26,7 @@ import { build } from "vite";
 import { chromiumPath, gpuFlags, readState, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import { serveSite } from "../../../scripts/serve.ts";
 import { disableScreensaver } from "./settings.ts";
+import { PUBLIC_OWNER } from "../tests/privacy-fixture.ts";
 
 const root = path.join(import.meta.dirname, "../../..");
 const args = process.argv.slice(2);
@@ -36,7 +37,16 @@ const step = (name: string) => { currentStep = name; console.log(`· ${name}`); 
 const CUT_AT = 3_000_000;
 
 const out = mkdtempSync(path.join(tmpdir(), "fly-web-e2e-"));
-await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "warn", build: { outDir: out, emptyOutDir: true } });
+const savedOwner = Object.fromEntries(Object.keys(PUBLIC_OWNER).map((field) => [field, process.env[field]]));
+try {
+  Object.assign(process.env, PUBLIC_OWNER);
+  await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "warn", build: { outDir: out, emptyOutDir: true } });
+} finally {
+  for (const [field, value] of Object.entries(savedOwner)) {
+    if (value === undefined) delete process.env[field];
+    else process.env[field] = value;
+  }
+}
 let cuts = 0;
 const site = await serveSite({ dir: out, base: "/some/folder/fly/", cut: (file) => (file.startsWith("brain/connectome.") && cuts++ === 0 ? CUT_AT : null) });
 const browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });

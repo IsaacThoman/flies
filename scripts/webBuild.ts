@@ -249,7 +249,7 @@ export function webApp({ siteUrl = process.env.FLY_SITE_URL, teamId = process.en
       const version = offlineVersion(unique, documents);
       const sw = bundle["sw.js"];
       if (sw?.type !== "chunk") throw new Error("The service worker wasn't built");
-      sw.code = sw.code.replace("__FLY_PRECACHE__", JSON.stringify(unique)).replace("__FLY_VERSION__", JSON.stringify(version));
+      sw.code = sw.code.replaceAll("__FLY_PRECACHE__", JSON.stringify(unique)).replace("__FLY_VERSION__", JSON.stringify(version));
     },
   };
 }
