@@ -18,9 +18,9 @@ import { AWAY_LIMIT, REMOVED_MAX, Table, isTableRecord } from "../src/table.ts";
 import type { Link, Seat } from "../src/table.ts";
 import { Tables } from "../src/tables.ts";
 import type { Files } from "../src/tables.ts";
+import { WAIT } from "./wait.ts";
 
 const START: TableStart = { place: "picnic", light: "noon", weather: "clear", zone: "UTC", offset: 0 };
-const WAIT = 2000;
 
 const dirs: string[] = [];
 const servers: RoomServer[] = [];
@@ -58,7 +58,7 @@ function connect(port: number, from?: string): Promise<WebSocket> {
 /** The first JSON message a socket hears after now. */
 const answer = (ws: WebSocket) =>
   new Promise<ServerMessage>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("no answer")), WAIT);
+    const timer = setTimeout(() => reject(new Error(`waiting for the first JSON room answer after ${WAIT} ms`)), WAIT);
     ws.once("message", (data: Buffer) => {
       clearTimeout(timer);
       resolve(JSON.parse(data.toString("utf8")) as ServerMessage);
@@ -69,13 +69,19 @@ const closed = (ws: WebSocket) => new Promise<number>((resolve) => (ws.readyStat
 
 /** Says something raw over a plain TCP socket and waits for the server to answer or hang up. */
 function raw(port: number, request: string): Promise<string> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const socket = net.connect(port, "127.0.0.1", () => socket.write(request));
     let heard = "";
     socket.on("data", (d) => (heard += d.toString("latin1")));
     socket.on("error", () => {});
-    socket.on("close", () => resolve(heard));
-    setTimeout(() => socket.destroy(), WAIT).unref();
+    socket.on("close", () => {
+      clearTimeout(timer);
+      resolve(heard);
+    });
+    const timer = setTimeout(() => {
+      reject(new Error(`waiting for TCP response and close after ${WAIT} ms; heard ${JSON.stringify(heard)}`));
+      socket.destroy();
+    }, WAIT);
   });
 }
 
