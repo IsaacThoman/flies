@@ -704,3 +704,57 @@ test("a clear request removes only the sender's offerings and broadcasts gone id
   assert.equal(table.food.find(mine), null);
   assert.deepEqual(table.food.foods.map((f) => f.id), patches);
 });
+
+test("room listings return only the first fifty populated rooms in name order when occupancy ties", () => {
+  const tables = new Tables({ now: () => 0, wall: () => 0 });
+  for (let i = 50; i >= 0; i--) {
+    const alphabet = "23456789abcdefghjkmnpqrstuvwxyz";
+    const code = `aaaaaaaa${alphabet[Math.floor(i / 31)]}${alphabet[i % 31]}`;
+    const key = `key-${i}`;
+    const hello: Hello = { type: "hello", v: PROTOCOL, table: code, key, start: { ...START, name: `Room ${String(i).padStart(2, "0")}`, listed: true } };
+    const table = tables.open(key, hello, i);
+    assert.ok(table instanceof Table);
+    assert.equal(typeof table.hello(fakeLink(), key, hello), "object");
+  }
+  assert.deepEqual(tables.listed().map((r) => r.name), Array.from({ length: 50 }, (_, i) => `Room ${String(i).padStart(2, "0")}`));
+});
+
+test("a connected room cannot expire even when no message has refreshed its wall-clock timestamp", () => {
+  let wall = 0;
+  const tables = new Tables({ now: () => 0, wall: () => wall });
+  const hello: Hello = { type: "hello", v: PROTOCOL, table: CODE, key: "starter", start: { ...START, listed: true } };
+  const table = tables.open("starter", hello, 7);
+  assert.ok(table instanceof Table);
+  table.hello(fakeLink(), "starter", hello);
+  wall = TABLE_IDLE + 1;
+  tables.tick();
+  assert.equal(tables.get(CODE), table);
+  assert.equal(tables.listed().length, 1);
+});
+
+test("an unsupported save version does not restore rooms", async (t) => {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "flies-version-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const file = join(dir, "tables.json");
+  const { table, options } = room();
+  await writeFile(file, JSON.stringify({ v: 2, tables: [table.record()] }));
+  const tables = new Tables(options);
+  assert.equal(await tables.load(file), 0);
+  assert.equal(tables.size, 0);
+});
+
+test("a room lock accepts canonically equivalent passwords, uses a full random salt, and rejects malformed records", async () => {
+  const { lock, opens, isLock } = await import("../src/lock.ts");
+  const secured = await lock("Café");
+  assert.equal(await opens("Cafe\u0301", secured), true);
+  assert.equal(await opens("Cafe", secured), false);
+  assert.equal(Buffer.from(secured.salt, "base64url").length, 16);
+  const other = await lock("Café");
+  assert.notEqual(other.salt, secured.salt, "the same password is salted independently at each room");
+  assert.notEqual(other.hash, secured.hash);
+  assert.equal(isLock(secured), true);
+  for (const value of [null, {}, { salt: secured.salt }, { salt: secured.salt, hash: 42 }]) assert.equal(isLock(value), false);
+});

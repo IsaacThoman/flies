@@ -208,3 +208,39 @@ test("a table's code is ten letters and digits that can't be mistaken for one an
   assert.equal(seen.size, 200);
   for (const bad of ["", "abc", "ABCDEFGHJK", "abcdefghj1", "abcdefghjkm", null, 12345]) assert.ok(!isTableCode(bad), String(bad));
 });
+
+test("every truncated hand state is refused without changing the caller's state", () => {
+  const encoded = new DataView(new ArrayBuffer(FLY_MAX));
+  const n = encodeFly(encoded, TABLETOP_SCALE, sampleState());
+  for (let length = 0; length < n; length++) {
+    const state = createFlyState();
+    state.x = 42;
+    const untouched = structuredClone(state);
+    assert.equal(readState(new DataView(encoded.buffer, 0, length), 1, TABLETOP_SCALE, state), -1, `length ${length}`);
+    assert.deepEqual(state, untouched);
+  }
+});
+
+test("bites are bounded to sixteen, and incomplete or oversized requests deliver no bites", () => {
+  const out = new DataView(new ArrayBuffer(4 + 17 * 8));
+  const bites = Array.from({ length: 17 }, (_, i) => ({ food: i + 1, amount: 0.25 }));
+  const length = encodeBites(out, 42, bites);
+  assert.equal(length, 4 + 16 * 8);
+  const seen: number[] = [];
+  assert.equal(decodeBites(new DataView(out.buffer, 0, length), (id) => seen.push(id)), 42);
+  assert.deepEqual(seen, bites.slice(0, 16).map((b) => b.food));
+  for (let n = 0; n < length; n++) {
+    let calls = 0;
+    assert.equal(decodeBites(new DataView(out.buffer, 0, n), () => calls++), -1, `length ${n}`);
+    assert.equal(calls, 0);
+  }
+  out.setUint8(3, 17);
+  assert.equal(decodeBites(out, () => assert.fail("oversized request delivered a bite")), -1);
+});
+
+test("half a sequence space is ambiguous and never counts as a newer packet", () => {
+  for (const a of [0, 1, 12345, 32767]) {
+    assert.equal(seqAtOrAfter(a, a + 32768), false);
+    assert.equal(seqAtOrAfter(a + 32768, a), false);
+  }
+});

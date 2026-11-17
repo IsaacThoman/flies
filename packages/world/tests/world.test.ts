@@ -147,7 +147,7 @@ test("something the place puts out to be found is tasted where it lies, eaten up
   assert.ok(pantry.foods.includes(juice), "dropping more food doesn't push it out");
   assert.equal(pantry.foods.filter(isDropped).length, MAX_DROPPED);
   let eaten = 0;
-  while (pantry.foods.includes(juice) && eaten < 100) eaten += pantry.eat(juice, 1, 1);
+  for (let attempts = 0; attempts < 10 && pantry.foods.includes(juice); attempts++) eaten += pantry.eat(juice, 1, 1);
   assert.ok(!pantry.foods.includes(juice) && Math.abs(eaten - 1) < 1e-9, "eaten up, and gone");
 });
 
@@ -240,4 +240,37 @@ test("a bounded ray stops at its segment end, for both the floor and a solid", (
   assert.equal(w.raycast({ x: -10, y: 20, z: 0 }, { x: 1, y: 0, z: 0 }, hit(), 10)?.t, 9.5);
   assert.equal(w.raycast({ x: -10, y: 20, z: 0 }, { x: 0, y: -1, z: 0 }, hit(), 19), null);
   assert.equal(w.raycast({ x: -10, y: 20, z: 0 }, { x: 0, y: -1, z: 0 }, hit(), 20)?.t, 20);
+});
+
+test("taste follows a food's circular reach and its remaining sweetness", () => {
+  const pantry = new Pantry(openTable(300));
+  const honey = pantry.drop("honey", 0, 0);
+  const berry = pantry.drop("berry", 0, 0);
+  assert.equal(pantry.touching(1.5, 0, 0, 0), honey, "inside the radius, outside its square root");
+  assert.equal(pantry.touching(1.5, 0, 1.5, 0), null, "outside the circle even though each axis is within reach");
+  pantry.eat(honey, 1, 2);
+  assert.equal(pantry.touching(0, 0, 0, 0), berry, "a nearly eaten sweeter food loses to a whole berry");
+});
+
+test("eating clamps appetite and elapsed time, never creates food or eats more than remains", () => {
+  const pantry = new Pantry(openTable(300));
+  const food = pantry.drop("honey", 0, 0);
+  assert.equal(pantry.eat(food, -1, 1), 0);
+  assert.equal(pantry.eat(food, 1, -1), 0);
+  assert.equal(food.amount, 1);
+  const reference = pantry.drop("honey", 10, 0);
+  assert.equal(pantry.eat(food, 10, 1), pantry.eat(reference, 1, 1));
+  const remaining = food.amount;
+  assert.equal(pantry.eat(food, 1, 100), remaining);
+  assert.equal(food.amount, 0);
+  assert.equal(pantry.touching(0, 0, 0, 0), null);
+});
+
+test("removing a food that is already gone leaves the others on the table", () => {
+  const pantry = new Pantry(openTable(300));
+  const gone = pantry.drop("sugar", 0, 0);
+  const kept = pantry.drop("water", 10, 0);
+  pantry.remove(gone);
+  pantry.remove(gone);
+  assert.deepEqual(pantry.foods, [kept]);
 });

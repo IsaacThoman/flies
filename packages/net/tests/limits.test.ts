@@ -155,3 +155,29 @@ test("a password is anything typed, up to its length, and nothing invisible", ()
   assert.ok(isPassword("x".repeat(PASSWORD_MAX)));
   for (const bad of ["", "x".repeat(PASSWORD_MAX + 1), "a\u0000", "line\nbreak", "zero​width", 7, undefined]) assert.ok(!isPassword(bad), String(bad));
 });
+
+test("a rate refills only at its stated pace and never banks more than a burst", () => {
+  const rate = new Rate(6, 2);
+  assert.ok(rate.take(0));
+  assert.ok(rate.take(0));
+  assert.equal(rate.take(9999), false);
+  assert.ok(rate.take(10000));
+  assert.equal(rate.take(10000), false);
+  assert.ok(rate.take(600000));
+  assert.ok(rate.take(600000));
+  assert.equal(rate.take(600000), false);
+});
+
+test("a duplicate timestamp is refused without altering the last admitted fly; the future tolerance is inclusive", () => {
+  const leash = new Leash();
+  const last = at(start.x, start.z, 1000);
+  const duplicate = at(start.x + 1, start.z, 1000);
+  duplicate.seq = 12;
+  const unchanged = structuredClone(last);
+  assert.equal(leash.admit(world, last, duplicate, 1000), "refused");
+  assert.deepEqual(last, unchanged);
+  assert.equal(leash.admit(world, last, at(start.x, start.z, 1500), 1000), "taken");
+  const admitted = structuredClone(last);
+  assert.equal(leash.admit(world, last, at(start.x, start.z, 1501), 1000), "refused");
+  assert.deepEqual(last, admitted);
+});

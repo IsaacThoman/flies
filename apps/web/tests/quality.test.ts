@@ -118,3 +118,52 @@ test("the picture is the cheaper of the player's choice and the device's", () =>
   assert.equal(cheaperEyes("high", "low"), "low");
   assert.equal(cheaperEyes("off", "high"), "off");
 });
+
+// Binary-exact frame intervals close whole two-second windows without a
+// floating-point remainder moving a judgement to another window.
+function windows(q: Quality, count: number, interval = 15.625, speed = 1) {
+  for (let i = 0; i < count * 2000 / interval; i++) q.frame(interval, speed);
+}
+
+test("a brain just below real time gets a cheaper picture, including after a settings reset", () => {
+  const q = new Quality();
+  q.reset();
+  windows(q, 1, 15.625, 0.9);
+  assert.equal(q.level, 0);
+  windows(q, 1, 15.625, 0.9);
+  assert.equal(q.level, 1);
+});
+
+test("a window needs brain measurements on at least half its frames", () => {
+  const q = new Quality();
+  for (let w = 0; w < 2; w++) for (let i = 0; i < 128; i++) q.frame(15.625, i < 63 ? 0 : -1);
+  assert.equal(q.brainSpeed, -1);
+  assert.equal(q.level, 0, "a minority of living frames cannot condemn the device");
+  for (let w = 0; w < 2; w++) for (let i = 0; i < 128; i++) q.frame(15.625, i < 64 ? 0.9 : -1);
+  assert.ok(Math.abs(q.brainSpeed - 0.9) < 1e-9);
+  assert.equal(q.level, 1);
+});
+
+test("a good window breaks the bad streak; a bad window breaks the recovery streak", () => {
+  const q = new Quality();
+  windows(q, 1, 31.25);
+  windows(q, 1);
+  windows(q, 1, 31.25);
+  assert.equal(q.level, 0, "separated bad windows cannot force a downgrade");
+  windows(q, 1, 31.25);
+  assert.equal(q.level, 1);
+  windows(q, 14);
+  windows(q, 1, 31.25);
+  windows(q, 14);
+  assert.equal(q.level, 1, "recovery needs sustained good performance");
+  windows(q, 1);
+  assert.equal(q.level, 0);
+});
+
+test("an out-of-range persisted quality cannot select an unintended level", () => {
+  for (const value of ["-1", "0.5", "6", "NaN", "Infinity", "corrupt"]) {
+    const q = new Quality(store({ "flies.quality": value }));
+    assert.equal(q.level, 0, value);
+    assert.equal(q.current.fps, 60);
+  }
+});

@@ -237,7 +237,11 @@ test("a listed room shows in the list, by its name, place, flies and lock, as it
   assert.ok(look.heard.every((r) => !("json" in r) || r.json.type !== "rooms" || r.json.rooms.every((room) => room.code !== unlisted)), "never the unlisted room");
   // Browsing, it is told nothing else, and nothing it says sits it anywhere.
   look.send({ type: "hello", v: PROTOCOL, table: unlisted, key: newKey() });
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  // A pong follows the preceding frames on this socket, so the assertion
+  // observes a processed hello rather than guessing how long loopback takes.
+  const pong = new Promise<void>((resolve) => look.ws.once("pong", () => resolve()));
+  look.ws.ping();
+  await pong;
   assert.ok(look.heard.every((r) => "json" in r && r.json.type === "rooms"));
   look.ws.close();
 });

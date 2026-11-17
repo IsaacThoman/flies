@@ -166,3 +166,48 @@ test("overcast greys the sky and takes the sun away; mist whitens the horizon; c
   assert.ok(saturation(misty.horizon) < saturation(sunny.horizon) && misty.haze.getHSL({ h: 0, s: 0, l: 0 }).l >= sunny.haze.getHSL({ h: 0, s: 0, l: 0 }).l * 0.95, "the distance whitens");
   for (const l of [grey, misty]) for (const c of [l.zenith, l.middle, l.horizon, l.haze, l.skyColor]) assert.ok(c.r <= 1.0001 && c.g <= 1.0001 && c.b <= 1.0001 && c.r >= 0 && c.g >= 0 && c.b >= 0);
 });
+
+test("the clock's light repeats across positive and negative days, including midnight", () => {
+  const p = resolved(ROOM);
+  for (const hour of [0, 4, 6, 12, 20, 23.5]) {
+    const expected = clockLight(p, hour, blankLight());
+    for (const offset of [-48, -24, 24, 48]) {
+      const actual = clockLight(p, hour + offset, blankLight());
+      for (const c of COLOURS) assert.ok(colourGap(actual[c], expected[c]) < 1e-9, `${c} at ${hour + offset}`);
+      for (const n of NUMBERS) assert.ok(Math.abs(actual[n] - expected[n]) < 1e-9, `${n} at ${hour + offset}`);
+    }
+  }
+});
+
+test("time-of-day names include the first instant of each part of the day", () => {
+  for (const [hour, name] of [[5.5, "morning"], [9, "noon"], [16.5, "golden"], [19, "dusk"], [21, "night"]] as const) {
+    assert.equal(timeAt(hour), name);
+    assert.equal(timeAt(hour - 24), name);
+  }
+});
+
+test("a light crossing the azimuth seam takes the short way instead of swinging across the room", () => {
+  const palettes: Palettes = { ...ROOM, morning: { ...ROOM.morning, sunAround: 3.1 }, noon: { ...ROOM.noon, sunAround: -3.1 } };
+  const light = new Daylight("morning", palettes);
+  light.follow(9, true);
+  light.update(0, { ...KINDS.clear, wet: 0, kind: "clear" });
+  assert.ok(light.sunDirection.z > 0.8, "halfway between the bearings still faces the same wall");
+});
+
+test("a dusk light at the lamp threshold stays on through the night", () => {
+  const p = resolved({ ...ROOM, dusk: { ...ROOM.dusk, sunUp: SETTING } });
+  const light = clockLight(p, 22, blankLight());
+  assert.equal(light.sunUp, ROOM.night.sunUp);
+  assert.equal(light.sunIntensity, ROOM.night.sunIntensity);
+});
+
+test("rain changing by itself updates the light and darkens an overcast room", () => {
+  const light = new Daylight("noon", ROOM);
+  const weather: Weather = { cloud: 0.6, mist: 0, rain: 0, wet: 0, wind: 0, kind: "overcast" };
+  light.update(0, weather);
+  const middle = light.middle.clone();
+  const ambient = light.hemiIntensity;
+  assert.equal(light.update(0, { ...weather, rain: 0.8 }), true);
+  assert.ok(light.middle.r < middle.r && light.hemiIntensity < ambient);
+  assert.equal(light.update(0, { ...weather, rain: 0.8 }), false);
+});

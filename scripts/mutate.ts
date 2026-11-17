@@ -1,7 +1,8 @@
 // Runs deliberate faults in a disposable checkout: a killed process never
 // leaves the developer's sources mutated. No test or production dependency.
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,22 +10,41 @@ import { campaigns } from "./mutation-cases.ts";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const args = process.argv.slice(2);
+for (let i = 0; i < args.length; i += 2) {
+  if (!["--module", "--fault", "--out"].includes(args[i]) || !args[i + 1] || args[i + 1].startsWith("--")) {
+    throw new Error("Usage: node scripts/mutate.ts [--module substring] [--fault id] [--out file]");
+  }
+}
 const option = (flag: string) => args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined;
 const selected = campaigns.filter((c) => !option("--module") || c.file.includes(option("--module")!));
-if (!selected.length) throw new Error("No matching module");
+if (!selected.length || (option("--fault") && !selected.some((c) => c.faults.some(([id]) => id === option("--fault"))))) throw new Error("No matching mutation");
+const hash = (text: string) => createHash("sha256").update(text).digest("hex");
+for (const c of selected) {
+  const source = readFileSync(path.join(root, c.file), "utf8");
+  for (const [id, from] of c.faults) {
+    if (source.split(from).length !== 2) throw new Error(`Fault must match exactly once: ${c.file}: ${id}`);
+  }
+}
 const sandbox = mkdtempSync(path.join(tmpdir(), "flies-mutations-"));
-const results: { module: string; id: string; status: string; detail?: string }[] = [];
+const results: { module: string; id: string; status: string; exitCode: number | null; detail?: string }[] = [];
+const provenance = {
+  node: process.version, platform: process.platform, arch: process.arch,
+  catalogue: hash(readFileSync(new URL("./mutation-cases.ts", import.meta.url), "utf8")),
+  inputs: selected.map((c) => ({ module: c.file, tests: c.tests, hashes: Object.fromEntries([c.file, ...c.tests].map((f) => [f, hash(readFileSync(path.join(root, f), "utf8"))])) })),
+};
 const run = (tests: string[]) => spawnSync(process.execPath, ["--test", "--test-reporter=tap", ...tests], {
   cwd: sandbox, encoding: "utf8", timeout: 60_000, maxBuffer: 8 * 1024 * 1024,
 });
 try {
-  const files = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8" });
-  if (files.status !== 0) throw new Error(files.stderr);
-  for (const file of new Set(files.stdout.split("\0").filter(Boolean))) {
-    if (!existsSync(path.join(root, file))) continue;
-    const dest = path.join(sandbox, file);
-    mkdirSync(path.dirname(dest), { recursive: true });
-    cpSync(path.join(root, file), dest);
+  // A filesystem copy also works for archived review evidence without .git.
+  const excluded = new Set(["node_modules", ".git", "dist", "build", "data", "www"]);
+  for (const name of ["apps", "packages", "scripts", "docs"]) {
+    cpSync(path.join(root, name), path.join(sandbox, name), {
+      recursive: true, filter: (file) => !excluded.has(path.basename(file)),
+    });
+  }
+  for (const name of readdirSync(root)) {
+    if (/\.(json|js|ts)$/.test(name)) cpSync(path.join(root, name), path.join(sandbox, name));
   }
   mkdirSync(path.join(sandbox, "node_modules", "@fly"), { recursive: true });
   for (const entry of readdirSync(path.join(root, "node_modules"))) {
@@ -48,14 +68,14 @@ try {
         // Syntax/import failures and timeouts are infrastructure errors, never kills.
         const assertion = /ERR_ASSERTION|failureType: 'testCodeFailure'/.test(output) && !/SyntaxError|ERR_MODULE_NOT_FOUND/.test(output);
         const status = test.error || test.signal ? "error" : test.status === 0 ? "survived" : assertion ? "killed" : "error";
-        results.push({ module: campaign.file, id, status, ...(status === "error" ? { detail: output.slice(-4000) } : {}) });
+        results.push({ module: campaign.file, id, status, exitCode: test.status, ...(status !== "survived" ? { detail: output.slice(-5000) } : {}) });
         console.log(`${status.padEnd(8)} ${campaign.file}: ${id}`);
       } finally {
         writeFileSync(file, original);
       }
     }
   }
-  if (option("--out")) writeFileSync(path.resolve(option("--out")!), JSON.stringify({ results }, null, 2) + "\n");
+  if (option("--out")) writeFileSync(path.resolve(option("--out")!), JSON.stringify({ provenance, results }, null, 2) + "\n");
   const count = (status: string) => results.filter((r) => r.status === status).length;
   console.log(`${count("killed")} killed, ${count("survived")} survived, ${count("error")} errors`);
   if (count("error")) process.exitCode = 1;
