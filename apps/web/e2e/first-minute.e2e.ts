@@ -87,8 +87,6 @@ try {
       await waitFor(page, "screen=play,brain=loading,activity=waiting");
       assert.equal((await readState(page)).neurons, "0");
       await shot("exploring");
-      release();
-      await waitFor(page, "brain=running");
       if (device === "remote") {
         await swipe(page, [0, 0], [0.01, 0]);
         await lesson("hand");
@@ -139,6 +137,11 @@ try {
         });
         await shot(`${id}-used`);
       }
+      // Exercise gestures before the brain arrives so a spontaneous takeoff
+      // cannot turn a held feather into a test of the fly landing by chance.
+      // The actual brain handoff and persistence are checked immediately after.
+      release();
+      await waitFor(page, "brain=running");
       if (device === "remote") assert.equal((await readState(page)).device, "remote");
       const completed = await learned();
       const redrawProbe = await page.evaluate(async () => {
@@ -183,6 +186,7 @@ try {
       console.log(`passed: ${device}, early exploration and all tool lessons persist`);
     } catch (error) {
       const page = context.pages()[0];
+      console.error(await readState(page));
       console.error(await page?.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.brain.error));
       throw error;
     } finally {

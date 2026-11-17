@@ -192,7 +192,15 @@ Per the owner's process update, origin/dev is merged rather than rebased. Its
 sleep rhythm, whole-place screensaver/camera, lifecycle resets, menu-target
 identity, food clearing, room fixes, production guards and e2e fixes are retained.
 The wordless HUD suppresses the sugar-drop diagram for Clear dropped, matching
-the new dev variant. Type checking, lint and 117 relevant area tests pass.
+the new dev variant. Type checking, lint and 119 relevant area tests pass.
 Recorded blind evidence predates this integration; integrated browser validation
 is recorded separately, without claiming a fresh usability score for dev changes.
 The maintainer reviews and merges; this agent does not wait on GitHub CI.
+
+The integrated browser harness timed out once for touch and once for remote
+feather holds. Contact depends on the autonomous fly’s position and grounding;
+a fixed screen hold is not a deterministic gesture setup.
+The gesture checks now run while the real connectome is held at the network
+boundary, followed by the real brain handoff and relaunch checks. This exercises
+the supported early-exploration path without requiring a biological reaction
+or changing gameplay. Earlier complete modality runs also passed.
