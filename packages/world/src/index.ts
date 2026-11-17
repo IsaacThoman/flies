@@ -16,3 +16,4 @@ export * from "./places.ts";
 export * from "./kitchen.ts";
 export * from "./greenhouse.ts";
 export * from "./kit.ts";
+export * from "./odor.ts";

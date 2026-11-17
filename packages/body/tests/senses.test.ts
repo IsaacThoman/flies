@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PATCHES, Pantry, SOLIDS, World, createPicnic } from "@fly/world";
+import { ODORANTS, OdorField, PATCHES, Pantry, SOLIDS, STILL_DRAUGHT, World, createPicnic } from "@fly/world";
+import { ODORANTS as BRAIN_ODORANTS } from "../../brain/src/olfaction.ts";
 import { ANTENNA_AHEAD, FLY_LENGTH, FlyBody, HEAD_AHEAD, LOOM_DECAY, LOOM_HOLD, MOUTH_AHEAD, SenseTracker, WIND_FULL_SPEED, createIntent } from "../src/index.ts";
 import type { Intent, Looming, SenseInput } from "../src/index.ts";
 
@@ -214,4 +215,20 @@ test("mouth food remains eligible when the feet taste something stronger", () =>
   assert.equal(tracker.update(input(body, { world, pantry })).sweet, 0);
   assert.equal(tracker.tasting.food, null);
   assert.equal(tracker.tasting.byMouth, false);
+});
+
+test("each antenna smells the air at its tip: the one nearer the food more; with no smell in the air, no odour at all", () => {
+  assert.deepEqual(ODORANTS, BRAIN_ODORANTS);
+  const table = openTable(100);
+  const body = new FlyBody(table, { x: 0, z: 0, yaw: 0 });
+  // Ahead is +z; its left is +x. Food off to the left, in still air.
+  const field = new OdorField([{ x: 6, y: 0, z: 2, r: 1, emits: [1, 0, 0, 0, 0.5] }], { ...STILL_DRAUGHT, speed: 0 });
+  const s = new SenseTracker().update({ ...input(body), world: table, odor: field });
+  assert.ok(s.odor);
+  const [left, right] = [s.odor.left[0], s.odor.right[0]];
+  assert.ok(left > right && right > 0, `left ${left}, right ${right}`);
+  assert.equal(s.odor.left[4], left / 2);
+  const tracker = new SenseTracker();
+  tracker.update({ ...input(body), world: table, odor: field });
+  assert.equal(tracker.update({ ...input(body), world: table }).odor, undefined);
 });

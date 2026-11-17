@@ -7,7 +7,7 @@ import type { BrainDriver } from "@fly/contracts";
 import { Behavior, Crowd, FlyBody, Hunger, SenseTracker, Thirst } from "@fly/body";
 import type { Forces, Intent, Looming, Rhythm } from "@fly/body";
 import { Pantry } from "@fly/world";
-import type { Food, Place, Vec3, World } from "@fly/world";
+import type { Food, OdorField, Place, Vec3, World } from "@fly/world";
 
 /** What the fly is doing, in a word, for the screen and for tests. */
 export type Activity = "resting" | "sleeping" | "walking" | "backing" | "turning" | "grooming" | "feeding" | "tasting" | "singing" | "flying" | "falling" | "waiting";
@@ -44,6 +44,8 @@ export class Life {
    * they give it one). The game gives it one set to the real time of day.
    */
   rhythm: Rhythm | null = null;
+  /** What the air smells of where it is, or null: it smells nothing. */
+  odor: OdorField | null = null;
   /** The eyes' picture for this frame, when the brain has eyes and they're open. Set by the eyes before `step`. */
   light: { left: Float32Array; right: Float32Array } | null = null;
   /** The wing it sings with: 1 its left, -1 its right, toward the nearest other fly where there is one. */
@@ -139,6 +141,7 @@ export class Life {
       eyesOpen,
       proboscis: this.#proboscis,
       bodies: this.crowd,
+      odor: this.odor,
     });
     const sent = this.#sent;
     sent.loomLeft = felt.loomLeft;
@@ -157,6 +160,8 @@ export class Life {
     sent.water = felt.water;
     if (this.light) sent.light = this.light;
     else delete sent.light;
+    if (felt.odor) sent.odor = felt.odor;
+    else delete sent.odor;
     const rhythm = this.rhythm;
     if (rhythm) {
       sent.clockMorning = rhythm.clock.morning;

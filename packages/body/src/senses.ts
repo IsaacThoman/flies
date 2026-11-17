@@ -5,8 +5,8 @@
 // "supposed" to do next.
 
 import type { BrainSenses } from "@fly/brain";
-import type { Food, Pantry, Vec3, World } from "@fly/world";
-import { tasteIntensity } from "@fly/world";
+import type { Food, OdorField, Pantry, Vec3, World } from "@fly/world";
+import { ODORANTS, tasteIntensity } from "@fly/world";
 import { ease } from "./behavior.ts";
 import { FLY_HEIGHT, FLY_LENGTH, HEAD_AHEAD, HEAD_UP, MOUTH_AHEAD, MOUTH_UP, STEP_UP } from "./motion.ts";
 import type { FlyBody } from "./motion.ts";
@@ -35,6 +35,8 @@ export type SenseInput = {
   proboscis: number;
   /** Other flies' bodies, which the antennae press on as on a wall (at a table with others). */
   bodies?: Bodies;
+  /** What the air smells of, sampled at each antenna's tip; none, and the brain smells nothing. */
+  odor?: OdorField | null;
 };
 
 /** Angular expansion (rad/s) below which nothing looms, and at which it looms fully. */
@@ -121,6 +123,8 @@ export class SenseTracker {
   #maleTaste = 0;
   #head: Vec3 = { x: 0, y: 0, z: 0 };
   #probe: Vec3 = { x: 0, y: 0, z: 0 };
+  #tip: Vec3 = { x: 0, y: 0, z: 0 };
+  #odor = { left: new Float64Array(ODORANTS.length), right: new Float64Array(ODORANTS.length) };
 
   update(input: SenseInput): BrainSenses {
     const dt = Number.isFinite(input.dt) ? Math.max(0, input.dt) : 0;
@@ -213,6 +217,14 @@ export class SenseTracker {
     out.wingbeat = clamp01(body.wingbeat);
     out.bitter = clamp01(bitter);
     out.water = clamp01(water);
+    // Smell: what the air holds at each antenna's tip.
+    if (input.odor) {
+      for (const side of [1, -1] as const) {
+        const tip = body.point(HEAD_AHEAD + ANTENNA_AHEAD, HEAD_UP, side * ANTENNA_SIDE, this.#tip);
+        input.odor.at(tip.x, tip.y, tip.z, side === 1 ? this.#odor.left : this.#odor.right);
+      }
+      out.odor = this.#odor;
+    } else delete out.odor;
     return out;
   }
 
