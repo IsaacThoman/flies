@@ -74,6 +74,9 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   const { hands } = s;
   const L = s.layout;
   const pointing = s.glyphs === null;
+  const touch = pointing ? L.touch : null;
+  const labelY = touch?.labelY ?? L.labelY;
+  const menuY = touch?.menuY ?? L.menuY;
   // The shelf.
   const n = TOOLS.length;
   const gap = L.gap;
@@ -99,56 +102,58 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   const reserveGo = pointing && tool.id === "place";
   const go = reserveGo && hands.place !== s.here;
   const goWidth = 64;
-  const room = L.width - 16 - (reserveGo ? goWidth + 8 : 0);
+  const room = (touch?.labelWidth ?? L.width - 16) - (reserveGo ? goWidth + 8 : 0);
   const arrows = many ? (pointing ? 56 : 40) : 0;
   let label = many ? `${tool.name} · ${hands.label}` : tool.name;
-  const lw = many ? Math.min(280, room) : Math.max(150, hintWidth(g, label, 17));
+  const lw = many ? Math.min(280, room) : Math.min(room, Math.max(150, hintWidth(g, label, 17)));
   // Stable arrows can be reused without aiming again when a kind's name changes.
   if (many && hintWidth(g, label, 17) + arrows > lw) label = hands.label;
   g.font = font(17);
-  const labelSize = Math.min(17, 17 * (lw - arrows - 24) / Math.max(1, g.measureText(label).width));
-  const lx = cx - lw / 2 - (reserveGo ? (goWidth + 8) / 2 : 0);
+  const labelSize = Math.min(17, 17 * Math.max(1, lw - arrows - 24) / Math.max(1, g.measureText(label).width));
+  const lx = (touch?.labelCx ?? cx) - lw / 2 - (reserveGo ? (goWidth + 8) / 2 : 0);
   const pop = Math.max(0, 1 - s.changed * 4) * 3;
-  const ly = L.labelY - 17 - pop;
+  const ly = labelY - 17 - pop;
+  const hitHeight = touch?.targetHeight ?? 32;
+  const hitY = labelY - 17 - (hitHeight - 32) / 2;
   pill(g, lx, ly, lw, 32, "", { color: "glass" });
-  text(g, label, lx + lw / 2, L.labelY - pop, { size: labelSize, align: "center", baseline: "middle", color: INK });
+  text(g, label, lx + lw / 2, labelY - pop, { size: labelSize, align: "center", baseline: "middle", color: INK });
   if (many && pointing) {
-    chevron(g, lx + 18, L.labelY - pop, -1, true);
-    chevron(g, lx + lw - 18, L.labelY - pop, 1, true);
-    hits.add(HUD_HITS.kind, lx, ly, 44, 32, 0, -1);
-    hits.add(HUD_HITS.label, lx + 44, ly, lw - 88, 32, 0, 1);
-    hits.add(HUD_HITS.kind, lx + lw - 44, ly, 44, 32, 0, 1);
+    chevron(g, lx + 18, labelY - pop, -1, true);
+    chevron(g, lx + lw - 18, labelY - pop, 1, true);
+    hits.add(HUD_HITS.kind, lx, hitY, 44, hitHeight, 0, -1);
+    hits.add(HUD_HITS.label, lx + 44, hitY, lw - 88, hitHeight, 0, 1);
+    hits.add(HUD_HITS.kind, lx + lw - 44, hitY, 44, hitHeight, 0, 1);
   } else if (many) {
     // Up and down change it.
-    text(g, "▲", lx + 18, L.labelY - 5 - pop, { size: 9, align: "center", color: INK_SOFT });
-    text(g, "▼", lx + 18, L.labelY + 6 - pop, { size: 9, align: "center", color: INK_SOFT });
-    hits.add(HUD_HITS.label, lx, ly, lw, 32, 0, 1);
+    text(g, "▲", lx + 18, labelY - 5 - pop, { size: 9, align: "center", color: INK_SOFT });
+    text(g, "▼", lx + 18, labelY + 6 - pop, { size: 9, align: "center", color: INK_SOFT });
+    hits.add(HUD_HITS.label, lx, hitY, lw, hitHeight, 0, 1);
   }
   if (go) {
     pill(g, lx + lw + 8, ly, goWidth, 32, "Go", { color: "green" });
-    hits.add(HUD_HITS.go, lx + lw + 8, ly, goWidth, 32);
+    hits.add(HUD_HITS.go, lx + lw + 8, hitY, goWidth, hitHeight);
   }
 
   // The menu's button, or its hint: the caption keeps clear of it.
-  let menuRight: number;
+  let menuRight = touch?.menuAtFoot ? L.cx - L.width / 2 - 8 : L.menuX;
   if (pointing) {
-    iconButton(g, L.menuX + 18, L.menuY, 18, "menu");
-    hits.add(HUD_HITS.menu, L.menuX - 6, L.menuY - 24, 48, 48);
-    menuRight = L.menuX + 36;
+    iconButton(g, L.menuX + 18, menuY, 18, "menu");
+    hits.add(HUD_HITS.menu, L.menuX - 6, menuY - 24, 48, 48);
+    if (!touch?.menuAtFoot) menuRight = L.menuX + 36;
   } else {
-    drawGlyph(g, "playPause", L.menuX + 16, L.menuY, 25, 0, s.glyphs!);
-    hits.add(HUD_HITS.menu, L.menuX, L.menuY - 16, 36, 32);
+    drawGlyph(g, "playPause", L.menuX + 16, menuY, 25, 0, s.glyphs!);
+    hits.add(HUD_HITS.menu, L.menuX, menuY - 16, 36, 32);
     menuRight = L.menuX + 36;
   }
 
   if (s.hints) {
     if (!s.learned[tool.id] && !hands.fixed.has(tool.id) && !(tool.id === "feed" && hands.variant.id === "clear")) {
       if (tool.id === "light" || tool.id === "weather" || tool.id === "view" || tool.id === "place") {
-        if (pointing) ghostPress(g, go ? lx + lw + 40 : lx + lw - 18, L.labelY - 8, t, false);
-        else drawGlyph(g, tool.id === "place" && hands.place !== s.here ? "select" : "upDown", cx, L.labelY - 48, 28, t, s.glyphs!);
+        if (pointing) ghostPress(g, go ? lx + lw + 40 : lx + lw - 18, labelY - 8, t, false);
+        else drawGlyph(g, tool.id === "place" && hands.place !== s.here ? "select" : "upDown", cx, labelY - 48, 28, t, s.glyphs!);
       } else {
         const x = Math.max(L.cx - L.width / 2 + 65, Math.min(L.cx + L.width / 2 - 65, s.aimX ?? cx));
-        const y = Math.max(L.captionY + 70, Math.min(L.labelY - 58, s.aimY ?? L.labelY - 85));
+        const y = Math.max(L.captionY + (s.brainRunning ? 70 : 110), Math.min(labelY - 58, s.aimY ?? labelY - 85));
         drawDemonstration(g, t, tool.id, x, y, s.glyphs);
       }
     }

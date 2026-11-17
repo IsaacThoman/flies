@@ -45,7 +45,7 @@ const wheel = (dy: number, notch: boolean, zoom = false, dx = 0): Gesture => ({ 
 test("a click on the table uses the tool there when it lifts; a drag from the table turns the camera instead", () => {
   const { asked, send } = rig("once");
   send(true, down(0.5, 0.6), drag(0.501, 0.6, false), up(0.501, 0.6));
-  assert.deepEqual(asked, ["aim", "use"], "a click that wobbled a little is still a click");
+  assert.deepEqual(asked, ["aim", "aim", "use"], "a click that wobbled a little is still a click");
   asked.length = 0;
   send(true, down(0.5, 0.6), drag(0.6, 0.6), drag(0.7, 0.65), up(0.7, 0.65, false));
   assert.deepEqual(asked.slice(0, 3), ["aim", "unaim", "hold"]);
@@ -144,4 +144,32 @@ test("a mouse hovering puts the hand under it, but not over the shelf", () => {
   asked.length = 0;
   send(false, { type: "hover", x: 0.5, y: 0.5 });
   assert.deepEqual(asked, [], "a finger doesn't hover");
+});
+
+test("a release over another HUD target cancels, including a boundary crossed within tap slop", () => {
+  const { target, send, asked } = rig();
+  target.hudAt = (x) => ({ kind: HUD_HITS.tool, index: x < 0.5 ? 0 : 1, value: 0, x: 0, y: 0, w: 1, h: 1 });
+  send(false, down(0.499, 0.9, 0, true), up(0.501, 0.9));
+  assert.deepEqual(asked, []);
+  send(false, down(0.4, 0.9, 0, true), up(0.4, 0.9));
+  assert.deepEqual(asked, ["press tool"]);
+});
+
+test("a non-tap release cannot use a one-shot tool when its final move was lost", () => {
+  const { send, asked } = rig();
+  send(false, down(0.5, 0.6, 0, true), up(0.7, 0.6, false));
+  assert.deepEqual(asked, ["aim", "unaim"]);
+});
+
+test("a predominantly vertical drag across a label cannot step its kind", () => {
+  const { target, send, asked } = rig();
+  target.hudAt = () => ({ kind: HUD_HITS.label, index: 0, value: 1, x: 0, y: 0, w: 1, h: 1 });
+  send(false, down(0.4, 0.7, 0, true), drag(0.46, 0.9), up(0.46, 0.9, false));
+  assert.deepEqual(asked, []);
+});
+
+test("a world press released over the HUD cannot drop food underneath it", () => {
+  const { send, asked } = rig();
+  send(false, down(0.5, 0.79, 0, true), up(0.5, 0.801));
+  assert.deepEqual(asked, ["aim", "unaim"]);
 });
