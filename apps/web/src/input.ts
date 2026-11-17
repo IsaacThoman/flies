@@ -423,15 +423,15 @@ export class Pointers {
 /**
  * The keys a keyboard has that the remote hasn't (the arrows, Enter, Escape
  * and the space bar are the remote's): the number keys pick a tool, R or
- * Home gives the camera back to the cameraman; held, Q and E turn the camera
- * round the fly and + and − bring it in and take it out.
+ * Home takes the camera back to Follow's distance and height; held, Q and E
+ * turn the camera round the fly and + and − bring it in and take it out.
  */
-export type KeyAction = { kind: "tool"; index: number } | { kind: "handBack" };
+export type KeyAction = { kind: "tool"; index: number } | { kind: "home" };
 
 export function keyAction(code: string, key: string): KeyAction | null {
   const digit = /^(?:Digit|Numpad)([1-9])$/.exec(code);
   if (digit) return { kind: "tool", index: Number(digit[1]) - 1 };
-  if (code === "KeyR" || key === "Home") return { kind: "handBack" };
+  if (code === "KeyR" || key === "Home") return { kind: "home" };
   return null;
 }
 
@@ -528,7 +528,7 @@ type PadLike = { connected: boolean; mapping: string; buttons: readonly { presse
  * is Back, Start is Play/Pause, the d-pad the arrows, the shoulders the
  * tools); the left stick moves the hand as a finger on the touch surface
  * does, or, in a menu, steps as the arrows do; the right stick turns the
- * camera round the fly, and pressed in gives it back to the cameraman; the
+ * camera round the fly, and pressed in takes it back to Follow; the
  * triggers bring it in (right) and take it out (left), as far as they are
  * pressed.
  */
@@ -538,7 +538,7 @@ export class Gamepads {
   /** The triggers: -1 (right, all the way: nearer) to 1 (left: farther). */
   zoom = 0;
   /** The right stick was pressed in since the last frame. */
-  handBack = false;
+  home = false;
   #active = false;
   #padIndex = -1;
   #awaitingNeutral = false;
@@ -575,7 +575,7 @@ export class Gamepads {
     this.#stickHeld = null;
     this.#stickIn = false;
     this.look.x = this.look.y = this.zoom = 0;
-    this.handBack = false;
+    this.home = false;
   }
 
   /** Once a frame: `menus` says whether the left stick steps (a menu) or moves the hand (play). */
@@ -583,7 +583,7 @@ export class Gamepads {
     this.look.x = 0;
     this.look.y = 0;
     this.zoom = 0;
-    this.handBack = false;
+    this.home = false;
     if (!this.#active) return;
     const available = this.#pads();
     const index = available.findIndex((p) => p?.connected && p.mapping === "standard");
@@ -620,9 +620,9 @@ export class Gamepads {
     for (const [index, button] of PAD_SHOULDERS) press(index, button);
     const triggers = trigger(pad.buttons[6]?.value ?? 0) - trigger(pad.buttons[7]?.value ?? 0);
     const stickIn = !!pad.buttons[11]?.pressed;
-    if (stickIn && !this.#stickIn) this.handBack = true;
+    if (stickIn && !this.#stickIn) this.home = true;
     this.#stickIn = stickIn;
-    if (triggers !== 0 || this.handBack) {
+    if (triggers !== 0 || this.home) {
       this.zoom = triggers;
       this.#devices.use("pad", now);
       remote.lastInputAt = now;
