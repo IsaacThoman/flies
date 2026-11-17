@@ -8,7 +8,8 @@
 import { FOODS, Pantry } from "@fly/world";
 import type { Food, FoodKind, World } from "@fly/world";
 import type { Falling } from "../tools/hands.ts";
-import { DROP_ID, FoodMirror, foundId } from "@fly/net";
+import type { FoodWire } from "@fly/net";
+import { DROP_ID, FoodMirror, dropOwner, foundId } from "@fly/net";
 
 export class TablePantry extends Pantry {
   readonly mirror: FoodMirror;
@@ -36,8 +37,21 @@ export class TablePantry extends Pantry {
     return id;
   }
 
+  /** Take retained names before optimistic eating can remove their food locally. */
+  welcome(foods: readonly FoodWire[]) {
+    for (const food of foods) {
+      if (dropOwner(food[0]) === this.player) this.#dropped = Math.max(this.#dropped, food[0] % DROP_ID);
+    }
+    this.mirror.welcome(foods);
+  }
+
   #next() {
-    return this.player * DROP_ID + (++this.#dropped % DROP_ID);
+    let id: number;
+    do {
+      this.#dropped = (this.#dropped + 1) % DROP_ID;
+      id = this.player * DROP_ID + this.#dropped;
+    } while (this.foods.some((f) => f.id === id) || this.#named.some((f) => f.id === id));
+    return id;
   }
 
   clearDropped() {

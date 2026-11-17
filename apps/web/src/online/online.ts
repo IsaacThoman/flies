@@ -303,7 +303,7 @@ export class Online {
     this.#arrival = null;
     this.epoch = arrival.epoch;
     this.#scale = arrival.scale;
-    this.pantry.mirror.welcome(arrival.foods);
+    this.pantry.welcome(arrival.foods);
     if (arrival.spot) this.#host.life.body.place(arrival.spot[0], arrival.spot[1], arrival.spot[2], arrival.spot[3]);
     // Only the picnic has bubbles: the table's, from its seed and the place's count.
     const bubbles = this.#host.bubbles;
