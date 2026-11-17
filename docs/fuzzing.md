@@ -133,8 +133,7 @@ These are Node measurements, not a measurement of JavaScriptCore on the TV.
 The benchmark extracts only source files into a temporary directory and
 removes them before exiting.
 
-The benchmark currently fails for `--baseline HEAD` (and the inspected
-`origin/dev`): its extracted motion imports shape helpers from a generated
-world entry that does not export them. This is a suspected extraction bug
-in `scripts/bodyCost.ts`; the command describes the intended comparison,
-not a successfully reproduced benchmark on this revision.
+The temporary world entry now exports both world and shape helpers, addressing
+the extraction failure found in the earlier audit. A baseline still needs
+compatible source files and geometry conventions. This is an implementation
+check, not a fresh performance measurement.

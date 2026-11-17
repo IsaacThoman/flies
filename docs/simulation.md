@@ -95,7 +95,10 @@ lives (`packages/body/src/motion.ts` unless noted):
   ledges and slopes steeper than 65°. In the air it has weight, drag (7/s, through
   the air, which a puff or a gust moves) and
   the push of its wings: lift in proportion to the `wings` command (0.6 holds
-  its weight) and thrust along its heading.
+  its weight) and thrust along its heading. Body-reach probes resolve contact
+  at the head, abdomen and, while grounded, the legs. In a gap too narrow
+  for its current heading, it tries quarter turns to fit; these contacts are
+  part of the body physics, not neural choices.
 - **The take-off's direction.** The escape command launches it (380 to 620 mm/s
   up and 160 to 340 away, by how far past 0.4 it went); the direction is the
   body's: away from the ball if the ball is in the air, else straight ahead.
