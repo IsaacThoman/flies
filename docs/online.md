@@ -76,6 +76,14 @@ and the iPhone and iPad app's, whose web view has a WebSocket of its own
   wrong password, too many tries, a full room, one that has closed, being
   taken off one.
 
+Discovery gives a connection or first list 10 seconds before saying it
+cannot reach rooms. It retries automatically. A quiet list is checked by
+reopening its line after 30 seconds; if that gets no answer within 10
+seconds, the retained list is marked reconnecting and cannot be chosen.
+A fresh list clears the failure. A protocol mismatch says “Update needed”;
+installed apps need an app update and never reload their bundled game.
+Browsers still try one reload. Back always leaves Online for solo play.
+
 ### Typing
 
 Names, passwords and codes are typed into fields the game draws. In a
@@ -225,7 +233,7 @@ From the room:
 | `drop`, `ball`, `found`, `pop` | as above, to everyone else (`by` the player); a drop's `y` is the surface it lands on |
 | `world {light, weather, offset}`, `place {place, epoch, foods, spots, bubbles?}` | the starter's choices, to everyone; `spots` is where each fly is set down, and `bubbles` the picnic's bubbles as they stand (a room server from before them says none, and a device starts them at 0) |
 | `happening {kind, seed, at}` | a visitor comes |
-| `food {ack, amounts, gone, eaten}` | at most ten times a second while food changes: what is left, what is gone, this device's flies' total by the room's account, and the last of its bites counted |
+| `food {ack, amounts, gone, eaten, meal?}` | at most ten times a second while food changes: what is left, what is gone, this device's flies' total by the room's account, and the last of its bites counted; `meal`, what they were granted since (amount, sugar), shared among its flies by how long each was eating |
 
 A spot (`at`, `spots`) is x, z, yaw and the height of the surface the fly
 stands on, and each of `foods` carries the height it lies at: in the
@@ -533,3 +541,18 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
   offers the site's passwords in it. iOS suspends a
   backgrounded app, so away is the normal state there; the 10 minutes and
   coming back are what make it work. `docs/ios.md`, "Tables with others".
+
+### Bite acknowledgements
+
+Every processed bite, including a refusal, produces a food acknowledgement:
+known food carries its authoritative amount. With a nutrition receipt, an
+acknowledged food omitted from amounts no longer exists. Missing-food
+refusals never add arbitrary IDs to the room-wide disappearance list.
+Devices predict the food being eaten but feed hunger and the crop only after
+acknowledgement. The optional `meal: [amount, sugar]` receipt counts exactly
+what that player was granted since its previous acknowledgement, including
+the sweetness of partial bites. Rejoining discards undelivered receipts.
+Welcome advertises receipt support with optional `meals: true`. This is
+additive within protocol 3: older devices ignore receipts; new devices with
+older rooms retain their original optimistic nutrition accounting rather
+than treating historical or rounded cumulative totals as fresh nutrition.

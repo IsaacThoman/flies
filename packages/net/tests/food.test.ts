@@ -158,3 +158,26 @@ test("clearing dropped food is owned by the room, preserves patches and finds, a
   table.clearDropped(1);
   assert.equal(table.flush(), null, "a repeated clear makes no changes");
 });
+
+test("refused and trimmed bites reconcile quantities and drain predictions", () => {
+  for (const reason of ["far", "greedy", "unknown", "trimmed"] as const) {
+    const table = new TableFood(world, []);
+    const food = table.drop(1, DROP_ID + 1, "sugar", 20, 20)!;
+    if (reason === "trimmed") food.amount = 0.05;
+    const pantry = new Pantry(world);
+    const mirror = new FoodMirror(world, pantry);
+    mirror.welcome(table.foods.map(toWire));
+    const mine = pantry.foods[0];
+    const amount = reason === "greedy" ? 0.8 : 0.1;
+    mine.amount = Math.max(0, mine.amount - amount);
+    mirror.ate(mine, amount);
+    mirror.sent(1);
+    if (reason === "unknown") table.restore([]);
+    table.bite(1, mine.id, amount, [{ x: reason === "far" ? 100 : 20, y: mine.y, z: 20 }], 0);
+    const change = table.flush();
+    assert.ok(change, `${reason}: an acknowledgement must be sent even with no food changed`);
+    mirror.apply(1, change.amounts, change.gone, table.eaten.get(1) ?? 0, table.takeMeal(1));
+    assert.ok(Math.abs((pantry.foods[0]?.amount ?? 0) - (table.find(mine.id)?.amount ?? 0)) <= 1e-4, reason);
+    assert.equal(mirror.pending, 0);
+  }
+});

@@ -16,7 +16,7 @@ import { BODY_HALF, BODY_RADIUS, segmentToSegment } from "@fly/body";
 import type { Looming } from "@fly/body";
 import {
   AIRBORNE, AWAY, EATING, HANDS, HOLDING, LEAD, MAX_BITES, MAX_OWN, PLAYING, PROTOCOL, SEND_EVERY, TABLETOP_SCALE, TABLE_BUBBLES, TableBubbles, ballProgress,
-  createFlyState, decodeFlies, fromWire, mix, stream, tableHours, toV3, wireScale,
+  createFlyState, decodeFlies, fromWire, mix, roomTime, stream, tableHours, toV3, wireScale,
 } from "@fly/net";
 import type {
   BallWire, Bite, BubbleSnapshot, FlyState, FoodWire, HappeningWire, Refusal, RoomInfo, SeatedFly, ServerMessage, Spot, TableStart, WireScale,
@@ -149,8 +149,11 @@ export class Online {
     if (s.epoch !== (this.#arrival?.epoch ?? this.epoch)) return;
     // Rounded on the wire, a fly on its feet could come out a hair inside what it stands on, and be drawn on the floor under it.
     s.y += 0.5 / this.#heardScale.position;
+    s.t = roomTime(s.t, this.now);
     this.others.heard(s, this.now);
   };
+  /** How long each of this device's flies (in line) has been eating since the room last said what they were granted, s: its share of it. */
+  readonly #eating = new Float64Array(MAX_OWN);
   #sentAt = -Infinity;
   #bitesAt = -Infinity;
   #seq = 0;
@@ -267,6 +270,7 @@ export class Online {
         this.colour = m.colour;
         this.starter = m.starter;
         this.pantry.player = m.id;
+        this.pantry.confirmed = m.meals === true;
         // The hello asked for `asked`, and this answers it: anything asked before the line dropped is asked again from here if it still differs.
         this.#asking = 0;
         this.#tries = 0;
@@ -348,7 +352,7 @@ export class Online {
       case "pop":
         this.#table?.pop(m.slot, m.cycle, m.at / 1000);
         return;
-      case "food":
+      case "food": {
         for (const id of m.gone) {
           const falling = this.pantry.forgetFood(id);
           if (falling) {
@@ -357,9 +361,26 @@ export class Online {
           }
           for (const hand of this.#handList) hand.forgetFood(id);
         }
-        this.pantry.mirror.apply(m.ack, m.amounts, m.gone, m.eaten);
+        const [amount, sugar] = this.pantry.mirror.apply(m.ack, m.amounts, m.gone, m.eaten, m.meal);
+        if (amount > 0) this.#feed(amount, sugar);
         return;
+      }
     }
+  }
+
+  /**
+   * What the room granted this device's flies since it last said (its bites are the device's, not each fly's): shared among them as
+   * long as each has been eating since, all of it the followed fly's if none was.
+   */
+  #feed(amount: number, sugar: number) {
+    const lives = this.#lives();
+    let total = 0;
+    for (let i = 0; i < lives.length && i < MAX_OWN; i++) total += this.#eating[i];
+    for (let i = 0; i < lives.length && i < MAX_OWN; i++) {
+      const k = total > 0 ? this.#eating[i] / total : i === 0 ? 1 : 0;
+      if (k > 0) lives[i].feed(amount * k, sugar * k);
+    }
+    this.#eating.fill(0);
   }
 
   /** This device's flies are these at the table, in line: the company follows, each in its colour. */
@@ -464,6 +485,8 @@ export class Online {
     this.#lastRoomNow = roomNow;
     this.now = roomNow;
     const { life, company } = this.#host;
+    if (life.eating) this.#eating[0] += dt;
+    for (let i = 0; i < company.list.length && i + 1 < MAX_OWN; i++) if (company.list[i].life.eating) this.#eating[i + 1] += dt;
     this.#localTools(roomNow);
 
     // The other players' flies, for visitors to keep clear of, and the one visits are planned round (the lowest id, the same on every device).
@@ -508,7 +531,7 @@ export class Online {
       const hand = this.#handList[i];
       const other = this.others.get(hand.player);
       const newest = other?.present ? other.track.newest : null;
-      if (newest) hand.heard(newest);
+      hand.heard(newest && !other?.resting && !(newest.flags & AWAY) ? newest : null);
       hand.update(dt, roomNow, life.body, camera, time, floorAt);
       const h = hand.hands;
       this.stroke = Math.max(this.stroke, h.stroke);

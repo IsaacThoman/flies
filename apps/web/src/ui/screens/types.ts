@@ -1,3 +1,4 @@
+import type { LobbyStatus } from "../../online/lobby.ts";
 // What every screen is, and what it can ask of the game.
 
 import type { RemoteButton, TextEntry } from "@fly/contracts";
@@ -75,6 +76,7 @@ export interface Shell {
   /** Where the fly is now. */
   readonly here: PlaceId;
   /** The rooms anyone may join, while Online is showing them: null until the room server has said. */
+  readonly lobbyStatus?: LobbyStatus;
   readonly rooms: readonly RoomWire[] | null;
   /** Typing into a field the game draws, or null where there is no way to type. */
   readonly typing: TextEntry | null;

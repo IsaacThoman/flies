@@ -14,6 +14,10 @@
 // picture smoother; one that runs slower than real time is left so, and
 // the stats' real-time figure says by how much.
 //
+// A host can hold the picture at one level instead (globalThis.__quality,
+// set before the game boots): the end-to-end tests do, so that what they
+// check doesn't hang on how fast the machine running them draws.
+//
 // Allocates nothing per frame.
 
 import type { PixelSize } from "./display.ts";
@@ -70,6 +74,8 @@ type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 
 export class Quality {
   level = 0;
+  /** The level it is held at whatever the frames take, or null to follow the device. */
+  readonly pinned: number | null;
   /** Bumped whenever the level changes, for the game to apply it. */
   changes = 0;
   /** The last window's measures, for the stats corner and scripts. */
@@ -93,8 +99,13 @@ export class Quality {
   /** Just stepped up: windows left in which a bad one means the step was too far. */
   #trial = 0;
 
-  constructor(store: Storage | null = null) {
+  constructor(store: Storage | null = null, pinned: number | null = null) {
     this.#store = store;
+    this.pinned = pinned !== null && Number.isInteger(pinned) && pinned >= 0 && pinned < LEVELS.length ? pinned : null;
+    if (this.pinned !== null) {
+      this.level = this.pinned;
+      return;
+    }
     const saved = Number(this.#read());
     // One step better than last time: it may have been a bad moment.
     if (Number.isInteger(saved) && saved > 0 && saved < LEVELS.length) this.level = saved - 1;
@@ -127,7 +138,7 @@ export class Quality {
 
   /** The player changed a setting the levels touch: theirs is taken at its word until the device shows otherwise. */
   reset() {
-    this.#set(0);
+    this.#set(this.pinned ?? 0);
     this.#patience = PATIENCE;
     this.#brainBound = false;
     this.#brainFrom = -1;
@@ -146,6 +157,7 @@ export class Quality {
     this.brainSpeed = brainKnown ? this.#brainSum / this.#brainSamples : -1;
     const brainBehind = brainKnown && this.brainSpeed < BRAIN_BEHIND;
     this.#restartWindow();
+    if (this.pinned !== null) return;
 
     // Stepping down for the brain: done once it keeps up, and that level is kept. If even the
     // cheapest picture doesn't get it there, the picture goes back to where it was: a brain on a
@@ -204,6 +216,8 @@ export class Quality {
   }
 
   #save() {
+    // A held level says nothing about this device: what it settled at before stays for next time.
+    if (this.pinned !== null) return;
     try {
       this.#store?.setItem(KEY, String(this.level));
     } catch {

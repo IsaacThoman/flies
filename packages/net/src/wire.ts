@@ -53,7 +53,7 @@ function valid(m: Obj): boolean {
   switch (m.type) {
     case "welcome":
       return (
-        num(m.v) && player(m.id) && text(m.colour) && isSeated(m.flies) && (m.flies as SeatedFly[])[0].id === m.id && int(m.starter, 0, MAX_FLIES) && num(m.seed) && num(m.now) && num(m.wall) && num(m.offset) && text(m.place) &&
+        (m.meals === undefined || bool(m.meals)) && num(m.v) && player(m.id) && text(m.colour) && isSeated(m.flies) && (m.flies as SeatedFly[])[0].id === m.id && int(m.starter, 0, MAX_FLIES) && num(m.seed) && num(m.now) && num(m.wall) && num(m.offset) && text(m.place) &&
         int(m.epoch, 0, 255) && obj(m.world) && isWorld(m.world) && list(m.players, MAX_FLIES, isPlayer) && list(m.foods, WIRE_FOODS_MAX, isFood) &&
         list(m.balls, MAX_FLIES, isBall) && list(m.happenings, LIST_MAX, isHappening) && list(m.bubbles, LIST_MAX, isBubble) && isSpot(m.at) && obj(m.room) &&
         text(m.room.name) && bool(m.room.listed) && bool(m.room.locked)
@@ -87,7 +87,8 @@ function valid(m: Obj): boolean {
     case "found":
       return isFood(m.food);
     case "food":
-      return int(m.ack, 0, 0xffff) && list(m.amounts, WIRE_FOODS_MAX, isAmount) && list(m.gone, WIRE_FOODS_MAX, num) && num(m.eaten);
+      return int(m.ack, 0, 0xffff) && list(m.amounts, WIRE_FOODS_MAX, isAmount) && list(m.gone, WIRE_FOODS_MAX, num) && num(m.eaten) &&
+        (m.meal === undefined || (isAmount(m.meal) && (m.meal as number[])[0]! >= 0 && (m.meal as number[])[1]! >= 0 && (m.meal as number[])[1]! <= (m.meal as number[])[0]!));
     default:
       return false;
   }

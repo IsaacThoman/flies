@@ -67,6 +67,7 @@ export class Life {
   tendsPantry = true;
   #forces: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
   #wasEating = false;
+  #sugar = 0;
   #proboscis = 0;
   readonly #sent: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0, wingbeat: 0 };
 
@@ -76,6 +77,12 @@ export class Life {
     this.pantry = new Pantry(world, world.place.patches);
     this.body = new FlyBody(world, world.place.start);
     this.crowd = new Crowd(world);
+  }
+
+  /** Food accepted by the pantry, now or in a room acknowledgement. */
+  feed(amount: number, sugar: number) {
+    this.eaten += amount;
+    this.#sugar += sugar;
   }
 
   /** It eats from another pantry from now on: a table's, shared with others, or its own again. */
@@ -179,14 +186,14 @@ export class Life {
 
     // Eating: the brain wants to feed, and its mouthparts are on something sweet.
     this.eating = false;
-    let sugar = 0;
+
     if (intent.feeding && food && food.sweet > 0 && body.onFeet && this.senses.tasting.byMouth) {
       const bite = this.pantry.eat(food, intent.feed, dt);
-      this.eaten += bite;
-      sugar = bite * food.sweet;
+      this.feed(bite, bite * food.sweet);
       this.eating = true;
     }
-    this.hunger.step(dt, sugar);
+    this.hunger.step(dt, this.#sugar);
+    this.#sugar = 0;
     if (this.eating && !this.#wasEating) this.meals++;
     this.#wasEating = this.eating;
     this.#proboscis += ((intent.feeding ? 1 : 0) - this.#proboscis) * Math.min(1, dt * 6);

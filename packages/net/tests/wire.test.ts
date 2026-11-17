@@ -84,3 +84,10 @@ test("a device's own flies, in a welcome or as seated, are one to MAX_OWN, each 
   const four = { type: "seated", flies: many.slice(0, MAX_OWN), asked: MAX_OWN };
   assert.deepEqual(read(four), four);
 });
+
+test("nutrition receipts are optional and must be finite, nonnegative meals", () => {
+  const food = { type: "food", ack: 1, amounts: [], gone: [], eaten: 0 };
+  assert.deepEqual(read(food), food);
+  assert.deepEqual(read({ ...food, meal: [0.1, 0.08] }), { ...food, meal: [0.1, 0.08] });
+  for (const meal of [null, [1], [1, -1], [-1, 0], [0.1, 0.2], [1, Infinity]]) assert.equal(read({ ...food, meal }), null);
+});

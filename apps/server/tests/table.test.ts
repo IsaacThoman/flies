@@ -1119,3 +1119,69 @@ test("clearing dropped food from a multi-fly device clears that device's drops o
   step(150);
   for (const p of [a, b]) assert.ok(saidOf(p, "food").some((m) => m.gone.includes(mine)));
 });
+
+test("refused bites are acknowledged and exact nutrition is delivered once", () => {
+  const { table, join, bite, step } = room();
+  const a = join("key-1");
+  const p = a.seat.flies[0].state;
+  const food = table.food.drop(a.seat.id, DROP_ID + 1, "berry", p.x, p.z, p.y)!;
+  table.food.flush();
+  clear(a);
+  bite(a, food.id, 0.9);
+  step(100);
+  const refused = saidOf(a, "food").at(-1)!;
+  assert.ok(refused);
+  assert.equal(refused.ack, 1);
+  assert.deepEqual(refused.meal, [0, 0]);
+  assert.ok(refused.amounts.some(([id, amount]) => id === food.id && amount === 1));
+  clear(a);
+  bite(a, food.id, 0.1);
+  step(100);
+  const accepted = saidOf(a, "food").at(-1)!;
+  assert.equal(accepted.ack, 2);
+  assert.ok(Math.abs(accepted.meal![0] - 0.1) < 1e-6);
+  assert.ok(Math.abs(accepted.meal![1] - 0.08) < 1e-6);
+  bite(a, 99999999, 0.1);
+  step(100);
+  const missing = saidOf(a, "food").at(-1)!;
+  assert.equal(missing.ack, 3);
+  assert.deepEqual(missing.gone, []);
+  assert.deepEqual(missing.meal, [0, 0]);
+});
+
+test("many unknown-food refusals cannot overflow acknowledgements or lose another player's nutrition", () => {
+  const { table, join, bite, step } = room();
+  const a = join("key-1");
+  const b = join("key-2");
+  const p = b.seat.flies[0].state;
+  const food = table.food.drop(b.seat.id, 2 * DROP_ID + 1, "berry", p.x, p.z, p.y)!;
+  table.food.flush(); clear(a, b);
+  for (let packet = 0; packet < 7; packet++) {
+    const view = new DataView(new ArrayBuffer(256));
+    const bites = Array.from({ length: 16 }, (_, i) => ({ food: 900100000 + packet * 16 + i, amount: 0.01 }));
+    const length = encodeBites(view, packet + 1, bites);
+    table.receive(a.seat, new Uint8Array(view.buffer, 0, length));
+  }
+  bite(b, food.id, 0.1); step(100);
+  const message = saidOf(b, "food").at(-1)!;
+  assert.ok(message);
+  assert.equal(message.gone.length, 0);
+  assert.ok(Math.abs(message.meal![1] - 0.08) < 1e-6);
+});
+
+test("a multi-fly device's bites are acknowledged and its meal delivered once, whichever of its flies reached the food", () => {
+  const { table, join, bite, step } = room();
+  const a = join("key-1", { flies: 3 });
+  const p = a.seat.flies[2].state;
+  const food = table.food.drop(a.seat.id, DROP_ID + 1, "berry", p.x, p.z, p.y)!;
+  table.food.flush();
+  clear(a);
+  bite(a, food.id, 0.1);
+  step(100);
+  const accepted = saidOf(a, "food").at(-1)!;
+  assert.equal(accepted.ack, 1);
+  assert.ok(Math.abs(accepted.meal![0] - 0.1) < 1e-6);
+  clear(a);
+  step(100);
+  assert.ok(saidOf(a, "food").every((m) => !m.meal || m.meal[0] === 0), "the meal is not told twice");
+});
