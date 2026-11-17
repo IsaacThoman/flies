@@ -284,3 +284,20 @@ Record `data-calls` and `data-place-ms` alongside the pictures. Compare calls
 at the same eye-refresh phase: frames that refresh the brain's six eye views
 include those extra draws. Compare repeated builds on the same machine;
 wall-clock build times on a busy machine vary considerably.
+
+The picnic shares one fruit material between the glazed things, cherries,
+apple, citrus and berries; a per-vertex skin kind chooses the surface in the
+shader. The strawberry skin varies its roughness; the cut berry has a pale
+core, radiating flesh fibres and a darker rind. The cut fruit still follows
+the world's low dome, rather than pretending to be a flat walkable slice.
+Fine cloth detail fades with its pixel footprint and stays subordinate to
+the fly's legs. Small glass base and fill-edge accents join the existing
+glazed batch.
+
+Tabletop shadows follow the chosen sun or moon without extra lights, shadow
+maps or draws. They use the world's footprints and peak heights as columns:
+a deliberate silhouette approximation for rounded fruit, not a change to its
+collision surface. Only direct light is shadowed; the sky still fills it.
+Rain rings spread on the tabletop and in the saucer's pool. Hits on the fly
+or raised objects throw splash droplets without a suspended horizontal ring;
+the fly feels the same rain touch as before.

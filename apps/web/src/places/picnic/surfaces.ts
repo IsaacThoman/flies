@@ -299,10 +299,10 @@ skinHeight = 0.0;
     float core = 1.0 - smoothstep(0.12, 0.56, rho + sin(a * 5.0) * 0.035);
     vec3 flesh = mix(vec3(0.74, 0.055, 0.10), vec3(1.0, 0.34, 0.38), core);
     flesh = mix(flesh, vec3(1.0, 0.78, 0.67), core * 0.78);
-    flesh *= 0.91 + 0.12 * grain + 0.06 * fibres * resolved(px, 0.6);
+    flesh *= 0.91 + 0.12 * grain + 0.14 * fibres * resolved(px, 1.1);
     float rind = smoothstep(0.88, 0.96, rho);
     c = mix(flesh, vec3(0.52, 0.012, 0.025), rind);
-    skinRough = mix(0.12, 0.2, rind);
+    skinRough = mix(0.36, 0.2, rind);
     skinHeight = (grain + fibres * 0.25) * 0.025 * resolved(px, 0.5);
   } else if (kind == 4) {
     c *= 0.88 + 0.2 * vnoise3(p * 0.35);

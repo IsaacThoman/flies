@@ -15,6 +15,7 @@ import type { SceneSet } from "../types.ts";
 import { LAWN_Y } from "./backdrop.ts";
 import { Goings } from "./life.ts";
 import { outside } from "./outside.ts";
+import { TABLE_SHADOWS } from "./shadows.ts";
 import { LEAF_FRAGMENT, leafGeometry } from "./visitors.ts";
 import { BUMP, ENAMEL, GINGHAM, NOISE, SKIN, fruitSkins, skin } from "./surfaces.ts";
 
@@ -87,7 +88,7 @@ function tableTexture() {
  * the table without a vertex between them. In a gust ripples run across the
  * cloth.
  */
-type TableUniforms = { uWet: { value: number }; uGust: { value: THREE.Vector3 }; uTime: { value: number } };
+type TableUniforms = { uWet: { value: number }; uGust: { value: THREE.Vector3 }; uTime: { value: number }; uPicnicSun: { value: THREE.Vector3 } };
 
 function clothShader(material: THREE.MeshStandardMaterial, uniforms: TableUniforms) {
   const { napkin } = DECOR;
@@ -108,6 +109,7 @@ uniform float uTime;
 varying vec2 vTable;
 ${NOISE}
 ${ENAMEL(TABLE_RADIUS, JAR_RING)}
+${TABLE_SHADOWS}
 float enamelRough;
 vec2 enamelPeel;
 ${GINGHAM}
@@ -178,6 +180,7 @@ if (uWet > 0.02 && inside < 0.5) {
   diffuseColor.rgb *= 1.0 - beading * pow(1.0 - drop.z, 3.0) * 0.35;
 }`,
       )
+      .replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\nfloat tableShade = picnicShadow(vTable);\nreflectedLight.directDiffuse *= 1.0 - tableShade;\nreflectedLight.directSpecular *= 1.0 - tableShade;")
       .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor + enamelRough, 0.92, inside);\nroughnessFactor = mix(roughnessFactor, mix(mix(0.13, 0.025, puddle), 0.6, inside), uWet);\nroughnessFactor = mix(roughnessFactor, 0.02, beading);")
       .replace(
         "#include <normal_fragment_maps>",
@@ -265,36 +268,39 @@ function domeGeometry(solid: Solid, rings: number, segments: number) {
   const angle = f.kind === "circle" ? 0 : f.angle;
   const c = Math.cos(angle);
   const s = Math.sin(angle);
-  const positions: number[] = [];
-  const normals: number[] = [];
+  // Adjacent triangles share these samples; querying the world once per point keeps the veil short.
+  const count = (rings + 1) * (segments + 1);
+  const positions = new Float32Array(count * 3);
+  const normals = new Float32Array(count * 3);
+  const indices: number[] = [];
   const n = { x: 0, y: 1, z: 0 };
-  const point = (si: number, ti: number) => {
-    const sv = Math.min(0.9999, si / rings);
-    const th = (ti / segments) * Math.PI * 2;
-    const u = Math.cos(th) * rx * sv;
-    const v = Math.sin(th) * rz * sv;
-    const x = f.x + u * c + v * s;
-    const z = f.z - u * s + v * c;
-    const y = topHeight(solid, x, z);
-    topNormal(solid, x, z, n);
-    positions.push(x, y, z);
-    normals.push(n.x, n.y, n.z);
-  };
+  for (let i = 0; i <= rings; i++) {
+    const sv = Math.min(0.9999, i / rings);
+    for (let j = 0; j <= segments; j++) {
+      const th = (j / segments) * Math.PI * 2;
+      const u = Math.cos(th) * rx * sv;
+      const v = Math.sin(th) * rz * sv;
+      const x = f.x + u * c + v * s;
+      const z = f.z - u * s + v * c;
+      const y = topHeight(solid, x, z);
+      topNormal(solid, x, z, n);
+      const k = (i * (segments + 1) + j) * 3;
+      positions.set([x, y, z], k);
+      normals.set([n.x, n.y, n.z], k);
+    }
+  }
   for (let i = 0; i < rings; i++) {
     for (let j = 0; j < segments; j++) {
-      point(i, j);
-      point(i + 1, j + 1);
-      point(i + 1, j);
-      if (i > 0) {
-        point(i, j);
-        point(i, j + 1);
-        point(i + 1, j + 1);
-      }
+      const a = i * (segments + 1) + j;
+      const b = a + segments + 1;
+      indices.push(a, b + 1, b);
+      if (i > 0) indices.push(a, a + 1, b + 1);
     }
   }
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geometry.setIndex(indices);
   return geometry;
 }
 
@@ -403,7 +409,7 @@ export function buildTable(): SceneSet {
   const juicy = fruitSkins(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.16, metalness: 0, envMapIntensity: 0.55 }));
   const matte = veined(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, envMapIntensity: 0.5 }));
   const tableMaterial = new THREE.MeshStandardMaterial({ map: tableTexture(), roughness: 0.24, metalness: 0, envMapIntensity: 0.5 });
-  const tableUniforms: TableUniforms = { uWet: { value: 0 }, uGust: { value: new THREE.Vector3() }, uTime: { value: 0 } };
+  const tableUniforms: TableUniforms = { uWet: { value: 0 }, uGust: { value: new THREE.Vector3() }, uTime: { value: 0 }, uPicnicSun: { value: new THREE.Vector3(0, 1, 0) } };
   clothShader(tableMaterial, tableUniforms);
   const cloth = new THREE.MeshStandardMaterial({ roughness: 0.85, side: THREE.DoubleSide });
   coverShader(cloth);
@@ -733,12 +739,6 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
   freeze(grainMesh);
   group.add(grainMesh);
 
-  // Loose cotton fibres lie below a tenth of a millimetre: scale cues, not obstacles.
-  for (const [x, z, angle, length] of [[-12, -10, 0.7, 2.8], [-4, -12, -0.3, 3.4], [-17, -4, 2.1, 2.1], [-6, 1, 0.2, 2.5], [2, -19, 1.1, 3.2]]) {
-    const fibre = new THREE.QuadraticBezierCurve3(new THREE.Vector3(x, 0.065, z), new THREE.Vector3(x + Math.cos(angle + 0.8) * length * 0.5, 0.09, z + Math.sin(angle + 0.8) * length * 0.5), new THREE.Vector3(x + Math.cos(angle) * length, 0.055, z + Math.sin(angle) * length));
-    dry(paint(new THREE.TubeGeometry(fibre, 8, 0.035, 3, false), "#e4e7df"));
-  }
-
   // Crumbs and pips at the fly's own scale, with soft shadows under them (one merged draw, see contactShadows).
   const shadows: Spot[] = [];
   const crumbColor = (p: THREE.Vector3) => {
@@ -852,6 +852,7 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
     seen,
     update(time, light, weather) {
       goings.update(time, light, weather);
+      tableUniforms.uPicnicSun.value.copy(light.sunDirection);
       // Wet, glazes and fruit shine more, crumbs and cloth darken.
       const wet = weather.wet;
       if (Math.abs(wet - wetNow) > 0.003) {
