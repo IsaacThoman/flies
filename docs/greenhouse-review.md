@@ -319,3 +319,24 @@ All local browsers and servers were closed, the cancelled farm job was stopped, 
 Merge `8c468edf` brings in dev `f8675fd5` (performance, puff response, farm tooling and documentation). Its only conflict was the fuzzer place list: dev's packed-connectome wording and all other edits are retained, with `greenhouse` included. The greenhouse scene/world files still match `5b56304b` exactly.
 
 On this merged source, typecheck, lint, all 52 place/geometry tests and another 1,800-second body fuzz run pass. First-minute e2e still reports the same loading/socket assertion reproduced on the untouched `76787e51` baseline. The four other browser suites passed on the preceding `1d75e0f4` integration. The known startup assertion is not claimed as passing and does not change the greenhouse's requested landing checks.
+
+## Orbit, online and seasonal-weather integration
+
+The approved greenhouse was integrated with current dev through merge `09c102fc`. Implementation `8a0f1419` addresses the subsequent camera, room-rotation and shared-spawn contracts:
+
+- The fly retains its fig start at (20, 56), y=9. The cut face is level across the edible area and the 9 mm spawn ring, giving all eight flies distinct, level standing positions. The scene and eye geometry use the same updated world surface.
+- Orbit coverage samples the bench beside both terracotta pots, the watering can and seed tray, rather than looking for obstacles only at the raised fig's height. All existing camera clearance and continuity assertions remain in force.
+- `TABLE_PLACES` exposes the world's places through net; the server rotates through that shared list. A catalog-parity check covers online membership. The Everyone restore test derives its place from the rotation, drops food at the actual spawn height and sends its airborne state at that world's wire scale.
+- Storms increase pane runoff density and integrate its faster phase continuously. Lightning reaches the glazing; snow/sleet build frost from the actual glazing bars. The shared garden already supplies exterior snow and mixed precipitation. Weather effects remain visual/sensory and add no draw calls to the static set.
+
+Verification on the merged source:
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `node --test apps/web/tests/*.test.ts apps/server/tests/*.test.ts packages/net/tests/*.test.ts packages/world/tests/*.test.ts`: 790 passed, zero failed/skipped.
+- The drawn-versus-felt check samples 858 greenhouse tops and 510 sides: five meshes, 82,108 triangles, no exceptions.
+- Body fuzzer seed 42: 1,800 seconds, 41,810 steps, 30 starts and 60 probes, passed.
+- Real-browser captures of heavy rain, storm, snow and sleet at noon and night: all eight conditions show the greenhouse, report GL okay and have no browser errors. Frame draw calls range 13–27. These are desktop observations. Capture images and animations are on the orphan assets branch under `integration-weather/`.
+- Kitchen PR #81 was still open at the final integration check. The online place list is derived from worlds so subsequent registrations join it automatically; room assertions use rotation and spawn data rather than a named place or zero-height assumption.
+
+These are integration fixes after approval, not another aesthetic scoring panel. The blind scores above retain their original source/version scope.
