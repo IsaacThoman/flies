@@ -182,10 +182,10 @@ float sillTop;`,
     paintHeightRail = -flake * 0.08;
   }
   // Where the sun has baked it, the old gloss has crazed into a fine net of cracks, long along the grain, with dirt in them.
-  float crazed = smoothstep(0.6, 0.85, vnoise3(vWorld * 0.015 + 4.0)) * (1.0 - bare) * resolved(0.25) * window;
+  float crazed = smoothstep(0.72, 0.94, vnoise3(vWorld * 0.015 + 4.0)) * (1.0 - bare) * resolved(0.25) * window;
   float crack = 0.0;
   if (crazed > 0.0) {
-    vec2 cp = vec2(u * 0.16 + vnoise(vec2(u, v) * 0.5) * 0.35, v * 0.95);
+    vec2 cp = vec2(u * 0.65 + vnoise(vec2(u, v) * 0.5) * 0.35, v * 2.8);
     vec2 ci = floor(cp);
     vec2 cf = fract(cp);
     float f1 = 8.0;
@@ -200,20 +200,20 @@ float sillTop;`,
     }
     float e = f2 - f1;
     // Hairlines of varying width, some broken off: not every edge of the net has opened.
-    float width = 0.012 + 0.02 * vnoise(cp * 3.0);
+    float width = 0.006 + 0.009 * vnoise(cp * 3.0);
     float open = smoothstep(0.35, 0.6, vnoise(cp * 1.7 + 3.0));
     crack = (1.0 - smoothstep(width, width + fwidth(e) * 1.5, e)) * crazed * open;
-    c *= 1.0 - crack * 0.24;
+    c *= 1.0 - crack * 0.06;
   }
   // Dust: a few pale specks and darker grains, a fraction of a millimetre across.
   vec2 dc = floor(vWorld.xz * 3.0);
   float dh = hash21(dc + 5.1);
   float speck = step(0.985, dh) * (1.0 - smoothstep(0.06, 0.12, length(fract(vWorld.xz * 3.0) - 0.5 - (vec2(hash21(dc), hash21(dc + 9.0)) - 0.5) * 0.5))) * resolved(0.2) * step(0.5, wn.y);
   c = mix(c, dh > 0.994 ? vec3(0.35, 0.3, 0.26) : vec3(0.86, 0.84, 0.8), speck * 0.6);
-  paintRough = bareWood ? 0.42 + 0.1 * grain : mix(mix(0.22 + brush * 0.12, 0.5, chipped), 0.72, bare);
+  paintRough = bareWood ? 0.42 + 0.1 * grain : mix(mix(0.32 + brush * 0.08, 0.5, chipped), 0.72, bare);
   // Gloss paint's orange-peel, the grain under it, the brush's furrows, the step down into a chip, the cracks.
   float peel = vnoise(vec2(u, v) * 1.3) * resolved(0.5);
-  paintHeight = (grain * 0.012 + brush * 0.014 + peel * 0.01) * (1.0 - bare) * resolved(0.3) - chipped * 0.06 - bare * 0.05 - crack * 0.02 + speck * 0.04 + paintHeightRail;
+  paintHeight = (grain * 0.003 + brush * 0.004 + peel * 0.004) * (1.0 - bare) * resolved(0.3) - chipped * 0.06 - bare * 0.05 - crack * 0.001 + speck * 0.04 + paintHeightRail;
   if (sillTop > 0.5) {
     // A ring left by a glass: a hairline of dried wine, darker where it pooled at its edge.
     float d = abs(length(vWorld.xz - uRing.xy) - uRing.z);
@@ -472,7 +472,7 @@ export function glazeMaterial(sunlight: Sunlight, faces: { hands: { value: THREE
   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.45, 0.35, 0.28), speck * resolved(0.7));
   if (vSpeckle > 1.5) {
     // Spongeware: cobalt dabbed on with a sponge, in a band, each dab a ring of open cells.
-    vec3 q = vWorld * 0.11;
+    vec3 q = vWorld * 0.22;
     float dab = vnoise3(q) * 0.6 + vnoise3(q * 2.7) * 0.3 + vnoise3(q * 9.0) * 0.1;
     float aa = fwidth(dab) + 0.004;
     float inDab = smoothstep(0.53 - aa, 0.53 + aa, dab);
@@ -480,7 +480,8 @@ export function glazeMaterial(sunlight: Sunlight, faces: { hands: { value: THREE
     float lace = vnoise3(vWorld * 1.6) * resolved(0.5) + 0.55 * (1.0 - resolved(0.5));
     float laceAa = fwidth(lace) + 0.01;
     float blue = inDab * mix(smoothstep(0.42 - laceAa, 0.42 + laceAa, lace), 1.0, smoothstep(0.58, 0.68, dab));
-    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.13, 0.27, 0.6), blue * 0.9);
+    float band = smoothstep(8.0, 13.0, vWorld.y);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.1, 0.22, 0.5), blue * band * 0.8);
   }
 }
 ${faces.color}`,

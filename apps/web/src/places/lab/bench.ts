@@ -13,7 +13,7 @@ import type { Solid } from "@fly/world";
 import { Batch, canvas2d, canvasTexture, freeze, paint, random } from "../../scene/build.ts";
 import type { ColorFn } from "../../scene/build.ts";
 import type { SceneSet } from "../types.ts";
-import { SUNBEAM, benchMaterial, clearMaterial, finish, glints, sunbeam, surfaceMaterial } from "./materials.ts";
+import { SUNBEAM, benchMaterial, clearMaterial, finish, glints, liquidMaterial, sunbeam, surfaceMaterial } from "./materials.ts";
 import type { Finish } from "./materials.ts";
 import { DISPLAY, INK, PAGES, labelRegion, pagesRegion, paperMaterial, paperTexture, tapeRegion } from "./paper.ts";
 import type { Region } from "./paper.ts";
@@ -278,6 +278,7 @@ export function buildBench(): SceneSet {
   const beam = sunbeam();
   const surface = surfaceMaterial(shine, beam);
   const clear = clearMaterial(shine);
+  const liquid = liquidMaterial(shine);
   const atlas = paperTexture();
   const paper = paperMaterial(atlas, beam);
   const bench = benchMaterial(benchTexture(), beam, shine);
@@ -289,7 +290,7 @@ export function buildBench(): SceneSet {
   const shadows: Spot[] = [];
   const seen: THREE.Object3D[] = [];
 
-  const ENAMEL: Finish = { rough: 0.32 };
+  const ENAMEL: Finish = { rough: 0.23 };
   const SATIN: Finish = { rough: 0.55 };
   const MATTE: Finish = { rough: 0.85 };
   const RUBBER: Finish = { rough: 0.7 };
@@ -417,10 +418,10 @@ export function buildBench(): SceneSet {
     // Drawn from the mouth up, its faces turn outward; the lining, drawn down, faces in.
     big.add(surface, piece(new THREE.LatheGeometry([...bell].reverse(), 40), green, ENAMEL), turn);
     const inner = bell.map((v) => new THREE.Vector2(v.x - 0.8, v.y));
-    fine.add(surface, piece(new THREE.LatheGeometry(inner, 40), "#f4efe4", { rough: 0.6, glow: 0.18 }), turn);
+    fine.add(surface, piece(new THREE.LatheGeometry(inner, 40), "#f4efe4", { rough: 0.6, glow: 0.85 }), turn);
     fine.add(surface, piece(new THREE.TorusGeometry(50.2, 1.6, 6, 40).rotateX(Math.PI / 2).translate(0, -78, 0), green, ENAMEL), turn);
     // The bulb, which glows when the lamp is on.
-    fine.add(surface, piece(new THREE.SphereGeometry(15, 20, 14).translate(0, -34, 0), "#fff1d6", { rough: 0.3, glow: 2.2 }), turn);
+    fine.add(surface, piece(new THREE.SphereGeometry(15, 20, 14).translate(0, -34, 0), "#fff1d6", { rough: 0.3, glow: 3.2 }), turn);
     spot.position.copy(back).addScaledVector(axis, 34);
     spot.target.position.set(SHADE.aim.x, SHADE.aim.y, SHADE.aim.z);
     // The eyes' cameras see by it too.
@@ -520,7 +521,7 @@ export function buildBench(): SceneSet {
     }
     profile.push(new THREE.Vector2(r * 0.975, 1.2));
     profile.reverse();
-    big.add(surface, piece(new THREE.LatheGeometry(profile, 64).translate(x, 0, z), (p) => (p.y > agar - 0.2 ? "#6a1a45" : "#3e0d27"), { rough: 0.17 }));
+    big.add(surface, piece(new THREE.LatheGeometry(profile, 64).translate(x, 0, z), (p) => (p.y > agar - 0.2 ? "#64113c" : "#30091d"), { rough: 0.1 }));
     const yeast = new THREE.Shape();
     const { yeast: y } = LAB_DECOR;
     for (let i = 0; i <= 36; i++) {
@@ -611,7 +612,11 @@ export function buildBench(): SceneSet {
   // The beaker, covered with crinkled foil, a little water in it, and its marks.
   {
     const { x, z, r, height } = BEAKER;
-    glass.add(clear, paint(new THREE.CylinderGeometry(r * 0.97, r * 0.97, 40, 40, 1, false).translate(x, 21, z), "#cfe7f4"));
+    const waterProfile = [[0, 1], [r * 0.96, 1], [r * 0.96, 41], [r * 0.94, 41.2], [r * 0.88, 40.1], [r * 0.5, 39.8], [0, 39.8]].map(([radius, y]) => new THREE.Vector2(radius, y));
+    const water = new THREE.Mesh(paint(new THREE.LatheGeometry(waterProfile, 48).translate(x, 0, z), "#afd1da"), liquid);
+    water.renderOrder = 2;
+    freeze(water);
+    group.add(water);
     glass.add(clear, paint(new THREE.CylinderGeometry(r, r, height - 16, 48, 1, true).translate(x, (height - 16) / 2, z), "#f2fbff"));
     for (let i = 1; i <= 8; i++) {
       const long = i % 2 === 0;
@@ -727,7 +732,7 @@ export function buildBench(): SceneSet {
     for (let i = 0; i < cluster.count; i++) {
       const a = rnd.range(0, Math.PI * 2);
       const r = Math.sqrt(rnd.next()) * cluster.r;
-      const size = rnd.range(0.12, 0.34);
+      const size = rnd.range(0.12, 0.34) * (cluster.scale ?? 1);
       const x = cluster.x + Math.cos(a) * r;
       const z = cluster.z + Math.sin(a) * r;
       specks.push({ m: new THREE.Matrix4().compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd.range(0, 3), rnd.range(0, 6), rnd.range(0, 3))), new THREE.Vector3(size, size * 0.7, size * rnd.range(0.8, 1.3))), c: new THREE.Color(rnd.next() < 0.3 ? "#9a6a2a" : "#e2b45c") });
@@ -754,7 +759,7 @@ export function buildBench(): SceneSet {
   let lit = -1;
   return {
     group,
-    materials: [surface, clear, bench, paper, dropMesh.material as THREE.MeshStandardMaterial],
+    materials: [surface, clear, liquid, bench, paper, dropMesh.material as THREE.MeshStandardMaterial],
     seen,
     update(_time, light) {
       // The lamp comes on as the room darkens; by day the sun comes in at the windows.

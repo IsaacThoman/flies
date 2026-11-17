@@ -28,6 +28,7 @@
     "tvos:soak": "node scripts/tvosSoak.ts",
     "tvos:typecheck": "tsc -p apps/tvos",
     "tvos:art": "node scripts/art.ts",
+    "store:shots": "node scripts/storeShots.ts",
     "ios": "node scripts/ios.ts",
     "ios:check": "node apps/ios/tests/simulator.ios.ts",
     "brain:fetch": "node packages/brain/scripts/fetch.ts",

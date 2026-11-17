@@ -316,7 +316,10 @@ export function paperMaterial(map: THREE.Texture, beam: Sunbeam): THREE.MeshStan
   if (uv.x < ${p.u1.toFixed(5)} && uv.y > ${p.v0.toFixed(5)}) {
     vec2 mm = vec2((uv.x - ${p.u0.toFixed(5)}) / ${(p.u1 - p.u0).toFixed(5)} * ${PAGES.width.toFixed(1)}, (${p.v1.toFixed(5)} - uv.y) / ${(p.v1 - p.v0).toFixed(5)} * ${PAGES.height.toFixed(1)});
     float px = max(fwidth(mm.y), 1e-4);
-    float rule = mm.y > 20.0 && mm.y < ${(PAGES.height - 4).toFixed(1)} ? 1.0 - smoothstep(0.08, 0.08 + px, abs(fract((mm.y - 22.0) / 8.0 + 0.5) - 0.5) * 8.0) : 0.0;
+    // Integrating the hairline over the pixel keeps distant ruling pale instead of widening it into blue stripes.
+    vec2 edges = (vec2(mm.y - 22.0 - px * 0.5, mm.y - 22.0 + px * 0.5) + 0.08) / 8.0;
+    vec2 integral = floor(edges) * 0.16 + min(fract(edges) * 8.0, vec2(0.16));
+    float rule = mm.y > 20.0 && mm.y < ${(PAGES.height - 4).toFixed(1)} ? clamp((integral.y - integral.x) / px, 0.0, 1.0) : 0.0;
     float pageX = mm.x < ${PW.toFixed(1)} ? mm.x : mm.x - ${PW.toFixed(1)};
     float margin = 1.0 - smoothstep(0.09, 0.09 + max(fwidth(mm.x), 1e-4), abs(pageX - 16.0));
     ink = mix(ink, vec3(0.62, 0.76, 0.93), rule * 0.85);

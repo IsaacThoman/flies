@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MAX_PLAYERS, PROTOCOL, WIRE_FOODS_MAX, readServerMessage } from "../src/index.ts";
+import { EVERYONE, MAX_PLAYERS, PROTOCOL, WIRE_FOODS_MAX, readServerMessage } from "../src/index.ts";
 import type { ServerMessage } from "../src/index.ts";
 
 const welcome = {
@@ -32,6 +32,13 @@ test("the room's messages are read as they are", () => {
   for (const m of messages) assert.deepEqual(read(m), m, m.type);
 });
 
+test("a welcome keeps its room code and whether it is open to everyone", () => {
+  const room = { ...welcome.room, code: EVERYONE, everyone: true };
+  assert.deepEqual(read({ ...welcome, room }), { ...welcome, room });
+  for (const code of ["nope", "0000000000", 7, null]) assert.equal(read({ ...welcome, room: { ...room, code } }), null);
+  for (const everyone of ["yes", 1, null]) assert.equal(read({ ...welcome, room: { ...room, everyone } }), null);
+});
+
 test("a message out of shape is dropped whole: never half-used, never too long a list", () => {
   const bad: unknown[] = [
     null, 7, "welcome", [], { type: "nonsense" }, { type: "constructor" },
@@ -61,8 +68,9 @@ test("a message out of shape is dropped whole: never half-used, never too long a
 
 test("a list of rooms keeps the rooms that are rooms, named as a room may be", () => {
   const good = { code: "23456789ab", name: "Sunny crumbs", place: "picnic", flies: 2, locked: false };
-  const m = read({ type: "rooms", rooms: [good, { ...good, name: "ㅤ" }, { ...good, code: "nope" }, { ...good, flies: 99 }, { ...good, name: "‮evil" }, null] });
-  assert.deepEqual(m, { type: "rooms", rooms: [good] });
+  const everyone = { ...good, code: EVERYONE, everyone: true };
+  const m = read({ type: "rooms", rooms: [good, everyone, { ...everyone, everyone: "yes" }, { ...good, name: "ㅤ" }, { ...good, code: "nope" }, { ...good, flies: 99 }, { ...good, name: "‮evil" }, null] });
+  assert.deepEqual(m, { type: "rooms", rooms: [good, everyone] });
 });
 
 test("nutrition receipts are optional and must be finite, nonnegative meals", () => {

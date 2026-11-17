@@ -241,7 +241,7 @@ test("the title leaves room for the fly, clear of the name, the brain's state an
 test("at a room, its QR code and code are beside the menu or over it, inside the safe area, clear of the hints, and big enough to scan across a room", () => {
   // The starter of a full room: Remove for each of the other seven, and Share and Leave.
   const others = Array.from({ length: 7 }, (_, i) => ({ id: i + 2, colour: "#e53" }));
-  const table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://flies.isaacthoman.com/?table=abcdefghjk", starting: true, joined: true, others };
+  const table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://flies.isaacthoman.com/?table=abcdefghjk", starting: true, joined: true, everyone: false, others };
   const spec = { items: 9, maxRows: 7, width: 460, row: 40, heading: true, foot: 34, values: false, raise: 12 };
   for (const [name, frame] of [...frames(), ["the TV", TV_FRAME] as const]) {
     const a = safeRect(frame);
@@ -324,6 +324,46 @@ test("the loading screen and its failure panel: where they always were on the TV
   }
 });
 
+test("phone and Split View touch targets stay distinct, with Menu in portrait thumb reach", () => {
+  const world = createPicnic();
+  for (const [w, h] of [[390, 844], [430, 932], [375, 820], [507, 820], [844, 390], [932, 430], [820, 1180], [1180, 820]]) {
+    const frame = frameFor(w, h, { top: 59, bottom: 34, left: 0, right: 0 }, true);
+    const hands = new Hands(world);
+    hands.chooseTool(TOOLS.findIndex(t => t.id === "place"));
+    hands.stepVariant(1);
+    const hits = new HitMap();
+    const layout = hudLayout(frame);
+    drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 0, spikes: 0, brainRunning: true, eyes: null, layout }, hits);
+    const all = Array.from({ length: hits.count }, (_, i) => hits.get(i)!);
+    for (const hit of all) {
+      assert.ok(hit.w * frame.unit >= 44 - 1e-6 && hit.h * frame.unit >= 44 - 1e-6, `${w}×${h}: ${hit.kind} ${hit.w * frame.unit}×${hit.h * frame.unit}`);
+      for (const other of all) if (other !== hit) assert.ok(Math.min(hit.x + hit.w, other.x + other.w) - Math.max(hit.x, other.x) < 1e-6 || Math.min(hit.y + hit.h, other.y + other.h) - Math.max(hit.y, other.y) < 1e-6, `${w}×${h}: ${hit.kind} overlaps ${other.kind}`);
+    }
+    const menu = all.find(hit => hit.kind === HUD_HITS.menu)!;
+    assert.ok(h - (menu.y + menu.h / 2) * frame.unit <= 200);
+  }
+});
+
+test("the room form keeps its focused field above a phone or Split View keyboard", () => {
+  for (const [w, h, covered] of [[390, 844, 360], [844, 390, 200], [507, 820, 360], [375, 820, 360]]) {
+    const frame = frameFor(w, h, { top: h > w ? 59 : 0, bottom: covered, left: 0, right: 0 }, true);
+    const s = { ...shell(frame), typing: { active: null, end() {} } as Shell["typing"] };
+    const screen = new OnlineScreen(s);
+    screen.enter();
+    screen.press("select", false);
+    assert.equal(screen.view, "new");
+    screen.layout(frame);
+    // Password is just above Create, which the form initially focuses.
+    screen.press("up", false);
+    assert.equal(screen.menu.focused?.id, "password");
+    const hits = new HitMap();
+    screen.draw(blankCanvas(), 0, hits);
+    const rows = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).filter(hit => hit.kind === "row");
+    assert.ok(rows.length > 0);
+    for (const hit of rows) assert.ok(inside(hit, safeRect(frame), 1), `${w}×${h}: a form row is covered`);
+  }
+});
+
 
 test("Acknowledgements pages fit every screen and every document is reachable with a remote", () => {
   for (const [name, frame] of frames()) {
@@ -375,45 +415,5 @@ test("notice navigation clears the button hints on tall and short screens", () =
       const hit = hits.get(i)!;
       if (hit.kind === "notice") assert.ok(hit.y + hit.h < frame.design.height - frame.safe.bottom - 43, name);
     }
-  }
-});
-
-test("phone and Split View touch targets stay distinct, with Menu in portrait thumb reach", () => {
-  const world = createPicnic();
-  for (const [w, h] of [[390, 844], [430, 932], [375, 820], [507, 820], [844, 390], [932, 430], [820, 1180], [1180, 820]]) {
-    const frame = frameFor(w, h, { top: 59, bottom: 34, left: 0, right: 0 }, true);
-    const hands = new Hands(world);
-    hands.chooseTool(TOOLS.findIndex(t => t.id === "place"));
-    hands.stepVariant(1);
-    const hits = new HitMap();
-    const layout = hudLayout(frame);
-    drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 0, spikes: 0, brainRunning: true, eyes: null, layout }, hits);
-    const all = Array.from({ length: hits.count }, (_, i) => hits.get(i)!);
-    for (const hit of all) {
-      assert.ok(hit.w * frame.unit >= 44 - 1e-6 && hit.h * frame.unit >= 44 - 1e-6, `${w}×${h}: ${hit.kind} ${hit.w * frame.unit}×${hit.h * frame.unit}`);
-      for (const other of all) if (other !== hit) assert.ok(Math.min(hit.x + hit.w, other.x + other.w) - Math.max(hit.x, other.x) < 1e-6 || Math.min(hit.y + hit.h, other.y + other.h) - Math.max(hit.y, other.y) < 1e-6, `${w}×${h}: ${hit.kind} overlaps ${other.kind}`);
-    }
-    const menu = all.find(hit => hit.kind === HUD_HITS.menu)!;
-    assert.ok(h - (menu.y + menu.h / 2) * frame.unit <= 200);
-  }
-});
-
-test("the room form keeps its focused field above a phone or Split View keyboard", () => {
-  for (const [w, h, covered] of [[390, 844, 360], [844, 390, 200], [507, 820, 360], [375, 820, 360]]) {
-    const frame = frameFor(w, h, { top: h > w ? 59 : 0, bottom: covered, left: 0, right: 0 }, true);
-    const s = { ...shell(frame), typing: { active: null, end() {} } as Shell["typing"] };
-    const screen = new OnlineScreen(s);
-    screen.enter();
-    screen.press("select", false);
-    assert.equal(screen.view, "new");
-    screen.layout(frame);
-    // Password is just above Create, which the form initially focuses.
-    screen.press("up", false);
-    assert.equal(screen.menu.focused?.id, "password");
-    const hits = new HitMap();
-    screen.draw(blankCanvas(), 0, hits);
-    const rows = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).filter(hit => hit.kind === "row");
-    assert.ok(rows.length > 0);
-    for (const hit of rows) assert.ok(inside(hit, safeRect(frame), 1), `${w}×${h}: a form row is covered`);
   }
 });

@@ -10,9 +10,11 @@ export type FlyPose = {
   turn: number;
   /** Off the ground: legs tucked, wings beating. */
   airborne: boolean;
+  /** 0 to 1: extend the legs during approach; animation only, omitted means 0. */
+  landing?: number;
   /** 0 to 1: how hard the wings beat. On the ground, anything above 0 opens and buzzes them. */
   wings: number;
-  /** 0 to 1: grooming, rubbing its head and antennae with its front legs. */
+  /** 0 to 1: grooming: front legs clean the head, hind legs the abdomen and wings. */
   groom: number;
   /** 0 to 1: feeding, with the proboscis extended to what is under its head. */
   feed: number;

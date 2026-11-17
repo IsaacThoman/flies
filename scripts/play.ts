@@ -363,17 +363,19 @@ const CLOCK_SHIFT = ((((MORNING - start.getHours() - start.getMinutes() / 60 - s
  * a test with the machine or the hour it runs at: the picture stays at one of the levels in
  * apps/web/src/quality.ts (0, the full one) instead of following how fast this machine draws,
  * which without a GPU would draw the fly in pixels too big for the X-ray; the screensaver never
- * comes by itself (Never, as the saved setting), however long a step takes; and the clock reads
- * morning, whatever the hour, so the fly is awake rather than asleep on the real night's clock.
- * The tests check what the game does; the steps about the screensaver bring it themselves.
+ * comes by itself (Never, as the saved setting), however long a step takes; the fly stays alone
+ * (Join others off) unless `joinOthers`, so that only a test of playing with others sits with
+ * everyone; and the clock reads morning, whatever the hour, so the fly is awake rather than
+ * asleep on the real night's clock. The tests check what the game does; the steps about the
+ * screensaver bring it themselves.
  */
-export const holdSteady = (context: BrowserContext, quality = 0) =>
-  context.addInitScript(([quality, shift]) => {
+export const holdSteady = (context: BrowserContext, quality = 0, { joinOthers = false } = {}) =>
+  context.addInitScript(([quality, shift, joinOthers]) => {
     (globalThis as { __quality?: number }).__quality = quality;
     try {
       // apps/web/src/settings.ts's key; the rest of what was saved stays as it was.
       const saved = JSON.parse(localStorage.getItem("flies.settings") ?? "{}") as Record<string, unknown>;
-      localStorage.setItem("flies.settings", JSON.stringify({ ...saved, wallpaperAfter: 0 }));
+      localStorage.setItem("flies.settings", JSON.stringify({ ...saved, wallpaperAfter: 0, joinOthers }));
     } catch {
       // A page with no storage of its own (about:blank) has no game in it either.
     }
@@ -388,7 +390,7 @@ export const holdSteady = (context: BrowserContext, quality = 0) =>
       }
     }
     globalThis.Date = Shifted as DateConstructor;
-  }, [quality, CLOCK_SHIFT] as const);
+  }, [quality, CLOCK_SHIFT, joinOthers] as const);
 
 /** The browser context for a window of a size, or a device (a phone, a tablet) held either way. */
 export function contextFor({ width = 1280, height = 720, device, landscape = false }: OpenOptions): BrowserContextOptions {
