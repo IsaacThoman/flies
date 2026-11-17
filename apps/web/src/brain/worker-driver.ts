@@ -6,13 +6,14 @@
 // beyond that is dropped, so a slow brain runs slower than real time instead
 // of falling further behind.
 
-import { REGION_RATE_NAMES } from "@fly/brain";
+import { REGION_RATE_NAMES, RESTING_SENSES } from "@fly/brain";
 import type { BrainEngine, BrainRequest, BrainResponse, BrainSenses, BrainState, EyeMap } from "@fly/brain";
 import type { BrainDriver, BrainStatus } from "@fly/contracts";
 import { BrainLoadError } from "./download.ts";
 import type { LoadFailure } from "./download.ts";
 
 export type BrainWorkerPort = {
+  /** Snapshots the request synchronously, as Worker.postMessage does, before returning. */
   post(request: BrainRequest, transfer?: Transferable[]): void;
   terminate(): void;
 };
@@ -89,6 +90,7 @@ export class WorkerBrainDriver implements BrainDriver {
   #inFlight = false;
   #pendingMs = 0;
   #disposed = false;
+  readonly #tickRequest: Extract<BrainRequest, { type: "tick" }> = { type: "tick", dtMs: 0, senses: RESTING_SENSES };
 
   constructor({ createWorker, source, now = () => performance.now() }: { createWorker: BrainWorkerFactory; source: BrainSource; now?: () => number }) {
     this.#createWorker = createWorker;
@@ -167,10 +169,19 @@ export class WorkerBrainDriver implements BrainDriver {
     this.#waitedMs = 0;
     const dt = this.#pendingMs;
     this.#pendingMs = 0;
-    const { light, ...scalars } = senses;
-    // Copied: the caller reuses its senses and light arrays every frame.
-    const sent: BrainSenses = light ? { ...scalars, light: { left: Float32Array.from(light.left), right: Float32Array.from(light.right) } } : { ...scalars };
-    this.#worker.post({ type: "tick", dtMs: dt, senses: sent });
+    const light = senses.light;
+    let sent = senses;
+    if (light && (!wholeFloat32(light.left) || !wholeFloat32(light.right))) {
+      // Keep Float32 rounding for other array-likes, and never clone a large backing store or share mutable memory.
+      const { light: input, ...scalars } = senses;
+      sent = { ...scalars, light: { left: Float32Array.from(input!.left), right: Float32Array.from(input!.right) } };
+    }
+    // postMessage already copies the game's full Float32 buffers before the caller can reuse them.
+    const request = this.#tickRequest;
+    request.dtMs = dt;
+    request.senses = sent;
+    try { this.#worker.post(request); }
+    finally { request.senses = RESTING_SENSES; }
   }
 
   dispose(): void {
@@ -216,4 +227,8 @@ export class WorkerBrainDriver implements BrainDriver {
     this.error = message;
     this.failure = failure;
   }
+}
+
+function wholeFloat32(values: ArrayLike<number>): values is Float32Array<ArrayBuffer> {
+  return values instanceof Float32Array && values.buffer instanceof ArrayBuffer && values.byteOffset === 0 && values.byteLength === values.buffer.byteLength;
 }

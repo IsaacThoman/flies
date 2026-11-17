@@ -1,0 +1,355 @@
+// Repeatable web measurements; raw evidence stays outside git. See docs/web-perf.md.
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { parseArgs } from "node:util";
+import { gzipSync } from "node:zlib";
+import { chromium } from "playwright";
+import type { Browser, CDPSession, Page } from "playwright";
+import { build } from "vite";
+import type { Plugin } from "vite";
+import type { BrainFiles } from "../apps/web/src/brain/download.ts";
+import type { WorkerBrainDriver } from "../apps/web/src/brain/worker-driver.ts";
+import type { Game } from "../apps/web/src/game.ts";
+import { PLACES } from "../apps/web/src/places/catalog.ts";
+import type { PlaceId } from "../apps/web/src/places/catalog.ts";
+import { chromiumPath, gpuFlags, readState, waitFor, waitForGameTime } from "./play.ts";
+import { serveSite } from "./serve.ts";
+import { WorkerHeap } from "./webSoak.ts";
+import { withHeavySlot } from "./heavySlot.ts";
+
+export function distribution(xs: number[]) {
+  assert.ok(xs.length > 0 && xs.every(Number.isFinite), "measurements must be finite and nonempty");
+  const sorted = xs.toSorted((a, b) => a - b);
+  const quantile = (q: number) => sorted[Math.round((sorted.length - 1) * q)];
+  const mid = Math.floor(sorted.length / 2);
+  return { n: xs.length, median: xs.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2, min: sorted[0], max: sorted.at(-1)!, p95: quantile(0.95), samples: xs };
+}
+
+type Probe = { firstFrame: number; title: number; frames: { ms: number; interval: number; quality: number; calls: number; triangles: number }[]; heldFrame?: Game["frame"] };
+declare global { var __webPerf: Probe; }
+
+async function instrument(page: Page) {
+  await page.addInitScript(() => {
+    globalThis.__webPerf = { firstFrame: 0, title: 0, frames: [] };
+    const raf = window.requestAnimationFrame.bind(window);
+    let installed = false;
+    let last = 0;
+    window.requestAnimationFrame = (callback) => raf((now) => {
+      const g = (globalThis as unknown as { __fly?: Game }).__fly;
+      if (g && !installed) {
+        installed = true;
+        const frame = g.frame.bind(g);
+        g.frame = (dt, time) => {
+          const start = performance.now();
+          frame(dt, time);
+          const end = performance.now();
+          const p = globalThis.__webPerf;
+          p.firstFrame ||= end;
+          if (g.canvas.dataset.screen === "title" && g.brain.status === "running") p.title ||= end;
+          // Bounded storage: the memory lane clears this each sample.
+          if (p.frames.length < 100_000) p.frames.push({ ms: end - start, interval: last ? time - last : 0, quality: g.quality?.level ?? 0, calls: g.stage.renderer.info.render.calls, triangles: g.stage.renderer.info.render.triangles });
+          last = time;
+        };
+      }
+      callback(now);
+    });
+  });
+}
+
+function artifact(dir: string) {
+  const walk = (folder: string): string[] => readdirSync(folder).flatMap(name => {
+    const file = path.join(folder, name);
+    return statSync(file).isDirectory() ? walk(file) : [file];
+  });
+  const files = walk(dir).sort().map(file => ({ file: path.relative(dir, file), bytes: statSync(file).size, sha256: createHash("sha256").update(readFileSync(file)).digest("hex") }));
+  return { sha256: createHash("sha256").update(JSON.stringify(files)).digest("hex"), files };
+}
+
+const root = path.join(import.meta.dirname, "..");
+async function bundle(out: string, dir: string) {
+  return withHeavySlot(async () => {
+    const modules: { file: string; modules: { id: string; renderedBytes: number }[] }[] = [];
+    const accounting: Plugin = {
+      name: "web-perf-modules",
+      generateBundle(_options, chunks) {
+        for (const c of Object.values(chunks)) if (c.type === "chunk") modules.push({ file: c.fileName, modules: Object.entries(c.modules).map(([id, info]) => ({ id: path.relative(root, id), renderedBytes: info.renderedLength })).sort((a, b) => b.renderedBytes - a.renderedBytes) });
+      },
+    };
+    await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "warn", build: { outDir: dir, emptyOutDir: true }, plugins: [accounting], worker: { plugins: () => [accounting] } });
+    writeFileSync(path.join(out, "modules.json"), JSON.stringify(modules, null, 2));
+    const walk = (folder: string): string[] => readdirSync(folder).flatMap(name => {
+      const file = path.join(folder, name);
+      return statSync(file).isDirectory() ? walk(file) : [file];
+    });
+    writeFileSync(path.join(out, "bundle.json"), JSON.stringify(walk(dir).map(file => ({ file: path.relative(dir, file), bytes: statSync(file).size, gzipBytes: gzipSync(readFileSync(file), { level: 9 }).length })), null, 2));
+    return artifact(dir);
+  });
+}
+
+async function ready(page: Page, url: string) {
+  await page.goto(url);
+  await waitFor(page, "brain=running,screen=title", 180_000);
+  await page.waitForFunction(() => globalThis.__webPerf.title > 0);
+}
+
+async function metrics(cdp: CDPSession) {
+  const data = await cdp.send("Performance.getMetrics");
+  return Object.fromEntries(data.metrics.map(m => [m.name, m.value]));
+}
+
+async function move(page: Page, place: PlaceId, watch = false) {
+  if ((await readState(page)).wallpaper === "true") { await page.keyboard.press("Enter"); await waitFor(page, "wallpaper=false"); }
+  await page.evaluate(({ place, watch }) => {
+    const g = globalThis.__fly;
+    g.play();
+    g.settings.place = place;
+    g.settings.wallpaperAfter = 0;
+    g.settings.realWeather = false;
+    g.quality?.reset();
+    g.applySettings(false);
+    g.moveTo(place);
+    for (const [tool, variant] of [["light", "noon"], ["weather", "clear"], ["view", "follow"]]) {
+      for (let i = 0; i < 12 && g.hands.current.id !== tool; i++) g.hands.stepTool(1);
+      while (g.hands.stepVariant(-1)) { /* Reset to the first variant. */ }
+      for (let i = 0; i < 12 && g.hands.variant.id !== variant; i++) g.hands.stepVariant(1);
+    }
+    g.stage.setTime("noon");
+    g.stage.weather.choose("clear", true);
+    if (watch) g.watch();
+  }, { place, watch });
+  await waitFor(page, `place=${place},moving=,brain=running`);
+  await waitForGameTime(page, 3);
+  await waitFor(page, "time=noon,weather=clear");
+}
+
+async function frameSample(page: Page, cdp: CDPSession, seconds: number, play: boolean) {
+  await page.evaluate(() => { globalThis.__webPerf.frames.length = 0; });
+  const start = await metrics(cdp);
+  // An interaction cadence in game time, unaffected by wall-clock stalls.
+  for (let t = 0; t < seconds; t += 2) {
+    if (play) await page.keyboard.press("Enter");
+    await waitForGameTime(page, Math.min(2, seconds - t));
+  }
+  const end = await metrics(cdp);
+  const frames = await page.evaluate(() => globalThis.__webPerf.frames.splice(0));
+  const state = await readState(page);
+  return { jsMs: distribution(frames.map(f => f.ms)), intervalMs: distribution(frames.slice(1).map(f => f.interval)), longFrames50ms: frames.slice(1).filter(f => f.interval > 50).length,
+    longJs50ms: frames.filter(f => f.ms > 50).length, calls: distribution(frames.map(f => f.calls)), triangles: distribution(frames.map(f => f.triangles)), taskMsPerFrame: (end.TaskDuration - start.TaskDuration) * 1000 / frames.length,
+    qualities: [...new Set(frames.map(f => f.quality))], state };
+}
+
+async function main() {
+  const { values } = parseArgs({ options: {
+    out: { type: "string" }, dir: { type: "string" }, "compare-dir": { type: "string" },
+    phases: { type: "string", default: "loads,frames,memory,brain" },
+    runs: { type: "string", default: "3" }, seconds: { type: "string", default: "10" },
+    "memory-seconds": { type: "string", default: "600" },
+    build: { type: "boolean", default: false },
+  } });
+  assert.ok(values.out, "--out is required (outside the repository)");
+  const out = path.resolve(values.out);
+  assert.ok(out !== root && !out.startsWith(root + path.sep), "raw evidence belongs outside the repository");
+  mkdirSync(out, { recursive: true });
+  const dir = path.resolve(values.dir ?? path.join(out, "site"));
+  const directories = values["compare-dir"] ? [dir, path.resolve(values["compare-dir"])] : [dir];
+  const order = (run: number) => (run % 2 ? [...directories].reverse() : directories);
+  const runs = Number(values.runs), seconds = Number(values.seconds), memorySeconds = Number(values["memory-seconds"]);
+  assert.ok(Number.isInteger(runs) && runs >= 3, "at least 3 runs");
+  assert.ok(Number.isFinite(seconds) && seconds >= 2 && seconds <= 12 && Number.isFinite(memorySeconds) && memorySeconds >= 0);
+  const phases = values.phases.split(",");
+  assert.ok(phases.every(p => ["loads", "frames", "memory", "brain", "bundle"].includes(p)));
+  assert.ok(!values["compare-dir"] || (!values.build && phases.every(p => ["loads", "frames"].includes(p))), "--compare-dir uses prebuilt sites and loads/frames phases");
+  const batches = Array.from({ length: runs }, (_, i) => [i]);
+  const builtArtifact = values.build ? await bundle(out, dir) : null;
+  const report: Record<string, unknown> = { complete: false, runnerRevision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), dirty: execFileSync("git", ["diff", "--stat"], { encoding: "utf8" }), node: process.version, host: os.cpus()[0].model, options: values, notes: "Timings include instrumentation; title uses the canvas state, published about every 200 ms; frame submission is not GPU/display time. Phone CPU throttling affects page only. Memory includes worker Wasm separately; memory checkpoints n=1; active batches separated by a paused two-minute cooldown; GC queries hold frames briefly." };
+  const artifacts: Record<string, ReturnType<typeof artifact>> = {};
+  if (builtArtifact) artifacts["0"] = builtArtifact;
+  report.artifacts = artifacts;
+  const registerArtifact = (directory: string) => { artifacts[String(directories.indexOf(directory))] ??= artifact(directory); };
+  const save = () => {
+    const loads = (report.loads ?? []) as { variant?: number; profile: string; cache: string; title: number; firstFrame: number; titleBytes: number }[];
+    const frames = (report.frames ?? []) as { variant?: number; place: string; mode: string; jsMs: { median: number }; taskMsPerFrame: number; longFrames50ms: number }[];
+    const summary: Record<string, unknown> = {};
+    for (let variant = 0; variant < directories.length; variant++) for (const profile of ["desktop", "phone"]) for (const cache of ["cold", "warm"]) {
+      const rows = loads.filter(r => (r.variant ?? 0) === variant && r.profile === profile && r.cache === cache);
+      if (rows.length) summary[`${variant}/${profile}/${cache}`] = Object.fromEntries((["title", "firstFrame", "titleBytes"] as const).map(k => [k, distribution(rows.map(r => r[k]))]));
+    }
+    for (let variant = 0; variant < directories.length; variant++) for (const place of PLACES) for (const mode of ["play", "watch"]) {
+      const rows = frames.filter(r => (r.variant ?? 0) === variant && r.place === place.id && r.mode === mode);
+      if (rows.length) summary[`${variant}/${place.id}/${mode}`] = { jsMs: distribution(rows.map(r => r.jsMs.median)), taskMsPerFrame: distribution(rows.map(r => r.taskMsPerFrame)), longFrames50ms: distribution(rows.map(r => r.longFrames50ms)) };
+    }
+    report.summary = summary;
+    writeFileSync(path.join(out, "report.json"), JSON.stringify(report, null, 2));
+  };
+  if (phases.includes("loads")) {
+    const loads: unknown[] = [];
+    report.loads = loads;
+    for (const batch of batches) await withHeavySlot(async () => {
+    for (const run of batch) for (const profile of ["desktop", "phone"]) for (const directory of order(run)) {
+      registerArtifact(directory);
+      let serverBytes = 0;
+      const site = await serveSite({ dir: directory, base: "/fly/", transferred: (_file, bytes) => { serverBytes += bytes; } });
+      let browser: Browser | undefined;
+      try {
+        browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
+        report.browser = browser.version();
+        report.gpuFlags = gpuFlags();
+        const context = await browser.newContext({ viewport: profile === "phone" ? { width: 390, height: 844 } : { width: 1280, height: 720 }, isMobile: profile === "phone", hasTouch: profile === "phone", deviceScaleFactor: 1 });
+        const page = await context.newPage();
+        await instrument(page);
+        const cdp = await context.newCDPSession(page);
+        await cdp.send("Network.enable");
+        await cdp.send("Emulation.setCPUThrottlingRate", { rate: profile === "phone" ? 4 : 1 });
+        if (profile === "phone") await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: 150, downloadThroughput: 200_000, uploadThroughput: 93_750 });
+        let bytes = 0;
+        cdp.on("Network.loadingFinished", e => { bytes += e.encodedDataLength; });
+        for (const cache of ["cold", "warm"]) {
+          bytes = 0;
+          serverBytes = 0;
+          const errors: string[] = [];
+          const onError = (e: Error) => errors.push(e.message);
+          page.on("pageerror", onError);
+          await ready(page, site.url);
+          const probe = await page.evaluate(() => ({ firstFrame: globalThis.__webPerf.firstFrame, title: globalThis.__webPerf.title }));
+          const titleBytes = bytes;
+          const titleServerBodyBytes = serverBytes;
+          const state = await readState(page);
+          assert.equal(state.from, cache === "cold" ? "network" : "cache");
+          // Let installation and cache writes finish: warm means the offline shell and brain are complete.
+          await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+          await page.waitForFunction(() => { const source = (globalThis.__fly.brain as WorkerBrainDriver).source as BrainFiles; return source.connectome.kept === true && (!source.module || source.module.kept === true); });
+          loads.push({ run, variant: directories.indexOf(directory), profile, cache, ...probe, titleBytes, titleServerBodyBytes, settledServerBodyBytes: serverBytes, settledBytes: bytes, state, errors, loadAverage: os.loadavg() });
+          assert.deepEqual(errors, []);
+          page.off("pageerror", onError);
+          save();
+        }
+      } finally { await browser?.close(); await site.close(); }
+    }
+    });
+  }
+  async function lane(directory = dir) {
+    registerArtifact(directory);
+    const site = await serveSite({ dir: directory, base: "/fly/" });
+    let browser: Browser | undefined;
+    try {
+      browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
+        report.browser = browser.version();
+        report.gpuFlags = gpuFlags();
+      const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+      const page = await context.newPage();
+      const errors: string[] = [];
+      page.on("pageerror", e => errors.push(e.message));
+      await instrument(page);
+      const cdp = await context.newCDPSession(page);
+      await cdp.send("Performance.enable");
+      const workers = new WorkerHeap(cdp);
+      await workers.start();
+      await ready(page, site.url);
+      await page.keyboard.press("Enter");
+      await waitFor(page, "screen=play");
+      return { page, cdp, workers, errors, close: async () => { await browser!.close(); await site.close(); } };
+    } catch (error) { await browser?.close(); await site.close(); throw error; }
+  }
+  if (phases.includes("frames")) {
+    const frames: unknown[] = [];
+    report.frames = frames;
+    for (const batch of batches) await withHeavySlot(async () => {
+      for (const run of batch) for (const directory of order(run)) {
+        const l = await lane(directory);
+        try {
+          for (const place of (run % 2 ? [...PLACES].reverse() : PLACES)) for (const mode of ["play", "watch"]) {
+            await move(l.page, place.id, mode === "watch");
+            if (mode === "play") await l.page.evaluate(() => { while (globalThis.__fly.hands.current.id !== "swoop") globalThis.__fly.hands.stepTool(1); });
+            frames.push({ run, variant: directories.indexOf(directory), place: place.id, mode, ...await frameSample(l.page, l.cdp, seconds, mode === "play"), loadAverage: os.loadavg() });
+            save();
+          }
+          assert.deepEqual(l.errors, []);
+        } finally { await l.close(); }
+      }
+    });
+  }
+
+  if (phases.includes("memory")) {
+    const memory: unknown[] = [];
+    report.memory = memory;
+    let l: Awaited<ReturnType<typeof lane>> | undefined;
+    let started = 0;
+    let activeMs = 0;
+    const hold = async (held: boolean) => {
+      await l!.page.evaluate(held => {
+        const p = globalThis.__webPerf, g = globalThis.__fly;
+        if (held && !p.heldFrame) { p.heldFrame = g.frame; g.frame = () => {}; }
+        if (!held && p.heldFrame) { g.frame = p.heldFrame; delete p.heldFrame; g.wake(0); }
+      }, held);
+    };
+    const sample = async (label: string) => {
+      // Inspector collections can stop the worker long enough to trip its live-frame watchdog.
+      await hold(true);
+      try {
+        await l!.cdp.send("HeapProfiler.collectGarbage");
+        const heap = await l!.cdp.send("Runtime.getHeapUsage");
+        const worker = await l!.workers.sample();
+        const state = await readState(l!.page);
+        assert.equal(await l!.page.evaluate(() => globalThis.__fly.brain.status), "running");
+        memory.push({ label, elapsedMs: Date.now() - started, activeMs, heap, ...worker, state, dom: await l!.cdp.send("Memory.getDOMCounters") });
+        await l!.page.evaluate(() => { globalThis.__webPerf.frames.length = 0; });
+        save();
+      } finally { await hold(false); }
+    };
+    try {
+      do {
+        await withHeavySlot(async () => {
+          if (!l) { l = await lane(); await move(l.page, "picnic", true); started = Date.now(); await sample("start"); }
+          await hold(false);
+          const from = Date.now(), initial = activeMs;
+          const target = Math.min(memorySeconds * 1000, initial + 300_000);
+          while (activeMs < target) {
+            await waitForGameTime(l.page, Math.min(10, (target - activeMs) / 1000));
+            activeMs = initial + Date.now() - from;
+            await sample("watch");
+          }
+          if (activeMs >= memorySeconds * 1000) {
+            await sample("duration-checkpoint");
+            for (let i = 0; i < 10; i++) await move(l.page, PLACES[(i + 1) % PLACES.length].id, true);
+            await sample("ten-place-changes");
+          }
+          await hold(true);
+        });
+      } while (activeMs < memorySeconds * 1000);
+      assert.deepEqual(l!.errors, []);
+    } catch (error) { report.failure = String(error); save(); throw error; }
+    finally { await l?.close(); }
+  }
+  if (phases.includes("brain")) await withHeavySlot(async () => {
+    // The same deterministic senses and CPU timer as cost.budget.ts, independent of browser load.
+    const { CpuMeter } = await import("./cpuBudget.ts");
+    const { readConnectomeFile } = await import("../packages/brain/src/node.ts");
+    const { FlyBrain } = await import("../packages/brain/src/runtime.ts");
+    const { RESTING_SENSES } = await import("../packages/brain/src/types.ts");
+    const connectome = readConnectomeFile();
+    const rows: { rest: number; full: number; rawRest: number; rawFull: number }[] = [];
+    for (let i = 0; i < runs; i++) {
+      const brain = new FlyBrain(connectome, { seed: 1 });
+      const cost = (senses: typeof RESTING_SENSES) => {
+        for (let t = 0; t < 1008; t += 16) brain.tick(16, senses);
+        const meter = new CpuMeter();
+        for (let t = 0; t < 2048; t += 16) { brain.tick(16, senses); if ((t / 16) % 16 === 15) meter.lap(); }
+        return [meter.ms / 2048, meter.rawMs / 2048];
+      };
+      const [rest, rawRest] = cost(RESTING_SENSES);
+      const [full, rawFull] = cost({ ...RESTING_SENSES, loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1 });
+      rows.push({ rest, full, rawRest, rawFull });
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+    report.brain = { rest: distribution(rows.map(r => r.rest)), full: distribution(rows.map(r => r.full)), rows };
+  });
+  report.complete = true;
+  save();
+  console.log(path.join(out, "report.json"));
+}
+
+if (import.meta.main) await main();

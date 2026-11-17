@@ -157,3 +157,30 @@ contact diagnostic measures actual solved claws against posed mesh surfaces
 (head/antenna/abdomen) and a bounded wing plane; it does not establish rubbing
 area or segment clearance. The Seeds-inspired 12-second sequence remains an
 animation stand-in, not a model of dust-driven suppression.
+
+### Round 5 (duplicate control)
+
+Key: T1 = round-4 candidate; C7 = outer-span wing haze; J6 = byte-identical T1.
+Orders: T1,J6,C7; J6,C7,T1; J6,T1,C7; J6,T1,C7. Every reviewer ranked C7
+first and gave T1/J6 identical scores. Duplicate discrepancies were zero.
+
+| Reviewer | T1 = J6 scores | C7 scores | T1/J6 mean | C7 mean | Ranking |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 8,7,7,8,6.5,8,6,9 | 8,7,7,8,7,8,6.5,9 | 7.438 | 7.563 | C7 > T1 > J6 (tie) |
+| 2 | 8,7.5,7,8,6,8,6.5,8.5 | 8,7.5,7,8,7,8,7,8.5 | 7.438 | 7.625 | C7 > J6 > T1 (tie) |
+| 3 | 8,7.5,7,7.5,6.5,8,6,9 | 8,7.5,7,7.5,7,8,6.5,9 | 7.438 | 7.563 | C7 > J6 > T1 (tie) |
+| Tradeoff assessment | 8,7.5,7,7.5,6.5,8,6,8 | 8,7.5,7,7.5,7,8,6.5,8 | 7.313 | 7.438 | C7 > J6 > T1 (tie) |
+
+Primary-review mean: **7.438 → 7.583**. Accepted: move some static wing-haze
+opacity from the hinge toward the outer span. No proposal rejected. All three
+primary reviewers awarded a small flight/readability gain. The tradeoff review
+preferred the native-resolution contour while identifying a stronger sheet/fan
+appearance close up. This is explicitly a display approximation, not measured
+wing aerodynamics. Animation code, geometry counts, shader instructions and
+draw calls are identical. No CPU speed advantage is claimed.
+
+Remaining problems: low-hanging front legs in flight, ambiguous feeding and
+posterior grooming at native size, and incomplete measured turning/backing
+kinematics. Reviewer suggestions included attenuating secondary-copy veins,
+separating grooming stroke/return contact evidence, and measuring final solved
+claws independently of controller events.
