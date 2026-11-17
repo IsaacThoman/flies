@@ -172,6 +172,30 @@ test("a second tap or click soon after the first, in the same place, is a double
   assert.equal(tapAt(300), false, "somewhere else");
 });
 
+test("clicks and moves are timed by when they happened, not by when a busy frame hands them over", () => {
+  const { pointers, raw, tick } = rig();
+  const at = (e: RawPointer, timeStamp: number): RawPointer => ({ ...e, timeStamp });
+  pointers.down(at(raw(1, "mouse", 100, 100), 1000));
+  pointers.up(at(raw(1, "mouse", 100, 100, 0), 1040), false);
+  pointers.endFrame();
+  // A long frame: the second click, 80 ms after the first, is handed over 600 ms later.
+  tick(600);
+  pointers.down(at(raw(1, "mouse", 102, 100), 1080));
+  pointers.up(at(raw(1, "mouse", 102, 100, 0), 1120), false);
+  assert.equal((pointers.gestures[pointers.gestures.length - 1] as Extract<Gesture, { type: "up" }>).double, true);
+  pointers.endFrame();
+
+  // A mouse moved far in 100 ms is meant, however late its moves arrive.
+  const { pointers: hover, raw: hraw, tick: htick } = rig();
+  const step = DELIBERATE_MOVE * Math.hypot(1000, 500) * 0.6;
+  hover.move(at(hraw(1, "mouse", 100, 100, 0), 5000));
+  htick(500);
+  hover.move(at(hraw(1, "mouse", 100 + step, 100, 0), 5050));
+  htick(500);
+  hover.move(at(hraw(1, "mouse", 100 + 2 * step, 100, 0), 5100));
+  assert.equal(hover.deliberate, true);
+});
+
 test("a pad's buttons are the remote's, held directions repeat as the remote's do, and its sticks move the hand and look round", () => {
   const devices = new Devices("mouse");
   const remote = new Remote(new EventTarget() as unknown as Window, () => 0, devices);
@@ -402,4 +426,117 @@ test("coalesced out-and-back travel cancels a tap while queuing only the latest 
     if (previousDocument) Object.defineProperty(globalThis, "document", previousDocument);
     else Reflect.deleteProperty(globalThis, "document");
   }
+});
+
+test("lost focus, suspension and text focus release buttons and pending input", () => {
+  const document = Object.assign(new EventTarget(), { hidden: false });
+  const target = Object.assign(new EventTarget(), { document });
+  const remote = new Remote(target as unknown as Window);
+  const lose = [
+    () => target.dispatchEvent(new Event("blur")),
+    () => target.dispatchEvent(new Event("pagehide")),
+    () => { document.hidden = true; document.dispatchEvent(new Event("visibilitychange")); },
+    () => target.dispatchEvent(Object.assign(new Event("focusin"), { composedPath: () => [{ tagName: "INPUT" }] })),
+  ];
+  for (const loss of lose) {
+    document.hidden = false;
+    target.dispatchEvent(Object.assign(new Event("keydown"), { key: "Enter" }));
+    remote.receiveTouch({ x: 0, y: 0, touching: true });
+    loss();
+    assert.equal(remote.held.size, 0);
+    assert.equal(remote.presses.length, 0);
+    assert.equal(remote.touch.touching, false);
+  }
+});
+
+test("keyboard aliases and a pad release only their own holds, including disconnect and reconnect", () => {
+  const target = new EventTarget();
+  const devices = new Devices("keys");
+  const remote = new Remote(target as unknown as Window, () => 0, devices, "keys");
+  const buttons = Array.from({ length: 16 }, () => ({ pressed: false, value: 0 }));
+  const pad = { connected: true, mapping: "standard", buttons, axes: [0, 0, 0, 0] };
+  const pads = new Gamepads(remote, devices, () => pad.connected ? [pad] : []);
+  const key = (type: string, code: string) => target.dispatchEvent(Object.assign(new Event(type), { key: "Enter", code }));
+  buttons[0].pressed = true;
+  pads.poll(1 / 60, 0, false);
+  key("keydown", "Enter");
+  key("keydown", "NumpadEnter");
+  key("keyup", "Enter");
+  assert.equal(remote.held.has("select"), true);
+  pad.connected = false;
+  pads.poll(1 / 60, 1, false);
+  assert.equal(remote.held.has("select"), true, "the keypad Enter is still held");
+  key("keyup", "NumpadEnter");
+  assert.equal(remote.held.has("select"), false);
+  remote.endFrame();
+  pad.connected = true;
+  pads.poll(1 / 60, 2, false);
+  assert.equal(remote.held.has("select"), true, "a held button on reconnection is observed again");
+  assert.deepEqual(remote.presses, [{ button: "select", repeat: false }]);
+  pad.connected = false;
+  pads.poll(1 / 60, 3, false);
+  assert.equal(remote.held.has("select"), false, "the disconnected pad's missing button-up is released");
+});
+
+test("an orphaned key repeat cannot restore a hold after input loss", () => {
+  const target = new EventTarget();
+  const devices = new Devices("keys");
+  const remote = new Remote(target as unknown as Window, () => 0, devices, "keys");
+  const keyboard = new Keyboard(target as unknown as Window, remote, devices);
+  const down = (key: string, code: string, repeat: boolean) => target.dispatchEvent(Object.assign(new Event("keydown"), { key, code, repeat }));
+  down("Enter", "Enter", false);
+  down("q", "KeyQ", false);
+  target.dispatchEvent(new Event("blur"));
+  down("Enter", "Enter", true);
+  down("q", "KeyQ", true);
+  assert.equal(remote.held.has("select"), false);
+  assert.equal(remote.presses.length, 0);
+  assert.equal(keyboard.holding, false);
+  down("Enter", "Enter", false);
+  assert.equal(remote.held.has("select"), true, "a fresh press can hold again");
+});
+
+test("lifecycle loss cannot be undone by a stale held gamepad snapshot", () => {
+  const target = new EventTarget();
+  const devices = new Devices("pad");
+  const remote = new Remote(target as unknown as Window);
+  const buttons = Array.from({ length: 16 }, () => ({ pressed: false, value: 0 }));
+  const pad = { connected: true, mapping: "standard", buttons, axes: [0, 0, 0, 0] };
+  const pads = new Gamepads(remote, devices, () => [pad], target as unknown as Window);
+  target.dispatchEvent(new Event("gamepadconnected"));
+  buttons[0].pressed = true;
+  pads.poll(1 / 60, 0, false);
+  target.dispatchEvent(new Event("blur"));
+  pads.poll(1 / 60, 1, false);
+  assert.equal(remote.held.has("select"), false);
+  assert.deepEqual(remote.presses, []);
+  target.dispatchEvent(new Event("focus"));
+  pads.poll(1 / 60, 2, false);
+  assert.equal(remote.held.has("select"), false, "returning still requires letting the old hold go");
+  buttons[0].pressed = false;
+  pads.poll(1 / 60, 3, false);
+  buttons[0].pressed = true;
+  pads.poll(1 / 60, 4, false);
+  assert.equal(remote.held.has("select"), true);
+});
+
+test("disconnecting an unused controller does not repeat the selected controller's held Select", () => {
+  const target = new EventTarget();
+  const devices = new Devices("pad");
+  const remote = new Remote(target as unknown as Window);
+  const buttons = Array.from({ length: 16 }, () => ({ pressed: false, value: 0 }));
+  const pad = { connected: true, mapping: "standard", buttons, axes: [0, 0, 0, 0], index: 0 };
+  const pads = new Gamepads(remote, devices, () => [pad], target as unknown as Window);
+  target.dispatchEvent(new Event("gamepadconnected"));
+  buttons[0].pressed = true;
+  pads.poll(1 / 60, 0, false);
+  remote.endFrame();
+  target.dispatchEvent(Object.assign(new Event("gamepaddisconnected"), { gamepad: { index: 1 } }));
+  pads.poll(1 / 60, 1, false);
+  assert.equal(remote.held.has("select"), true);
+  assert.deepEqual(remote.presses, []);
+  pad.connected = false;
+  target.dispatchEvent(Object.assign(new Event("gamepaddisconnected"), { gamepad: { index: 0 } }));
+  assert.equal(remote.held.has("select"), false);
+
 });
