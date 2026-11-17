@@ -25,3 +25,25 @@ milliseconds, and tests run the budgets serially.
 For another measurement, record the capture date, commit, machine/device,
 OS and runtime, workload/seed, sample count and whether other work was running.
 Keep raw evidence outside the source branch and link a compact results table.
+
+Sleep measurements are maintained in the brain reference's sleep section.
+Their grounded/wingbeat remeasurement is reserved for the separate sleep
+follow-up; this pass leaves those tables intact.
+
+## Artifact sizes
+
+Measured 16 November 2026 on an Apple M5 Pro, macOS, Node 26.12.0 with
+zlib 1.2.12, at source revision `4a7db80` (sleep and grounded/wingbeat merged):
+
+| Artifact | Bytes | Local Node default gzip bytes |
+| --- | ---: | ---: |
+| Packed connectome | 40,404,208 | 21,081,614 |
+| Anatomy sidecar | 1,668,256 | 936,365 |
+| Browser WebAssembly module | 290,598 | 114,240 |
+
+The connectome SHA-256 is
+`51c97031b39f93c04a683f16683d88f15d291f1e1062694fc0a215e23c3b895c`,
+verified by `npm run brain:fetch`. These are local file/compression sizes,
+not a fresh measurement of the complete web build or a server's transfer
+encoding. The retained 268 KB / 106 KB module measurements predate the sleep
+module; download and compilation timings beside them remain historical.

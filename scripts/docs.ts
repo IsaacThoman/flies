@@ -42,9 +42,13 @@ export function checkDocs(root: string, files: string[]): string[] {
   const errors: string[] = [];
   const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts ?? {};
   const sourceFiles = files.map(file => file.replaceAll('\\', '/'));
+  const paths = new Set(sourceFiles);
+  for (const file of sourceFiles) {
+    for (let dir = dirname(file); dir !== '.'; dir = dirname(dir)) paths.add(dir);
+  }
   const mdAnchors = new Map<string, Set<string>>();
   // Ignored build output must not make a stale source reference pass locally.
-  const has = (path: string) => sourceFiles.some(file => file === path || file.startsWith(`${path.replace(/\/$/, '')}/`));
+  const has = (path: string) => paths.has(normalize(path).replace(/\/$/, ''));
   for (const doc of sourceFiles.filter(file => file.endsWith('.md'))) {
     const raw = readFileSync(join(root, doc), 'utf8');
     const shown = visible(raw);
@@ -116,7 +120,7 @@ export function checkDocs(root: string, files: string[]): string[] {
       if (!clean.includes('/') && sourceFiles.some(file => file.endsWith(`/${clean}`))) continue;
       report(match.index, `missing file reference ${token}`);
     }
-    for (const match of shown.matchAll(/(?<![\w./-])(?:apps|packages|scripts|docs|assets|\.github)\/[\w./-]+\.(?:md|ts|js|mjs|json|mm|cpp|hpp|h|swift|yml|yaml|sh|wasm|bin)\b/g)) {
+    for (const match of shown.matchAll(/(?<![\w./-])(?:\.\.?\/)*(?:apps|packages|scripts|docs|assets|\.github)\/[\w./-]+\.(?:md|ts|js|mjs|json|mm|cpp|hpp|h|swift|yml|yaml|sh|wasm|bin)\b/g)) {
       const path = match[0];
       if (!has(path) && !has(normalize(join(dirname(doc), path))) && !generated.includes(path)) {
         const line = raw.slice(0, match.index).split('\n').length;

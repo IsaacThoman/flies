@@ -33,7 +33,7 @@ test('documentation checks reject rot and accept valid local references', () => 
     for (const needle of ['missing link target', 'missing anchor', 'undefined link reference', 'missing line', 'scripts/gone.ts', 'absent.json', 'unknown npm script removed']) {
       assert.ok(errors.some(error => error.includes(needle)), `${needle}: ${errors.join('\n')}`);
     }
-    writeFileSync(join(root, 'README.md'), '[directory](docs/#absent)\n[zero](scripts/real.ts#L0)\n[reversed](scripts/real.ts#L2-L1)\n``src/absent.ts``\n```sh\nnode scripts/absent.ts\n```\n');
+    writeFileSync(join(root, 'README.md'), '[directory](docs/#absent)\n[zero](scripts/real.ts#L0)\n[reversed](scripts/real.ts#L2-L1)\n``src/absent.ts``\n```sh\nnode ./scripts/absent.ts\n```\n');
     const more = checkDocs(root, [...files.keys()]);
     for (const needle of ['docs/#absent', '#L0', '#L2-L1', 'src/absent.ts', 'scripts/absent.ts']) {
       assert.ok(more.some(error => error.includes(needle)), `${needle}: ${more.join('\n')}`);

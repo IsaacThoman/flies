@@ -247,7 +247,7 @@ Assign the property; don't `defineProperty` over it.
 implemented in `apps/tvos/src/BrainBridge.mm` over `packages/brain-native/include/fly_brain.h`:
 
 - `start(seed)` starts the brain thread (8 MB stack, QoS user-initiated: below the JavaScript
-  and render threads). It memory-maps the bundled `www/brain/connectome.bin` (38 MB) and builds
+  and render threads). It memory-maps the bundled `www/brain/connectome.bin` (40.4 MB) and builds
   the brain there; the main and JavaScript threads never wait for it. `status()` is `loading`
   until then (and before `start`), then `running` or `failed` with `error()`.
 - `neurons()`, `connections()`, `eyeDirections(side)` (a new `Float32Array` each call),
@@ -419,8 +419,9 @@ whose delegate runs on a queue of the bridge's own, never the JavaScript or main
 
 - What arrives waits in the line's inbox until the game takes it, once a frame
   (`apps/web/src/online/native-socket.ts`): `next` copies a binary message straight into the
-  game's one 64 KB `ArrayBuffer` (`JSObjectGetArrayBufferBytesPtr`), so taking one makes nothing
-  in JavaScript; the room's rare JSON comes back as a string. A frame with nothing new is two
+  game's one 64 KB `ArrayBuffer` (`JSObjectGetArrayBufferBytesPtr`). JavaScript
+  caches a `DataView` for each encountered message length and reuses it after
+  that first allocation; the room's rare JSON comes back as a string. A frame with nothing new is two
   native calls, each a lookup under a lock (the check times them: about a microsecond a frame in
   the simulator).
 - It keeps what a browser's line keeps (`apps/web/src/online/socket.ts`): at most 256 messages

@@ -45,6 +45,11 @@ over 60), and the abdomen swells with it: up to 12% wider and deeper and 5%
 longer, round numbers chosen to be seen. Another player's fly at a table
 doesn't show it: the crop isn't sent to the room.
 
+The body also supplies clock and sleep-pressure state; see
+[Sleep and the daily rhythm](../README.md#sleep-and-the-daily-rhythm).
+The [brain reference](../packages/brain/README.md#sleep-and-the-daily-rhythm)
+contains its model and measurements.
+
 ## What the body adds
 
 The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
@@ -105,7 +110,7 @@ lives (`packages/body/src/motion.ts` unless noted):
   about 1.5 s after the command fades. The crouch follows the
   raw escape command.
 
-The caption ("Walking", "Eating honey", "Grooming", "Flying") names what the
+The caption ("Walking", "Eating honey", "Grooming", "Flying", "Asleep") names what the
 body is doing on the brain's commands; the stats' In and out shows the
 commands and the neurons themselves.
 

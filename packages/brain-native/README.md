@@ -76,7 +76,7 @@ packages/brain-native/build.sh sanitize   # build/sanitize: the same with ASan a
 
 ## In a browser: WebAssembly
 
-The same sources, built as WebAssembly, are the brain a browser runs wherever it can (apps/web/src/brain/, docs/web.md): `wasm/fly-brain.wasm`, 268 KB (106 KB gzipped), behind the C interface, and `wasm/brain.ts`, which wraps it as packages/brain's `Brain`, so the browser's worker runs one or the other unchanged.
+The same sources, built as WebAssembly, are the brain a browser runs wherever it can (apps/web/src/brain/, docs/web.md): `wasm/fly-brain.wasm`, [dated artifact sizes](../../docs/measurements.md#artifact-sizes), behind the C interface, and `wasm/brain.ts`, which wraps it as packages/brain's `Brain`, so the browser's worker runs one or the other unchanged.
 
 ```sh
 npm run brain:wasm                         # wasm.sh: wasm/fly-brain.wasm, wasm/fly-brain-harness.wasm, wasm/build.json
@@ -91,7 +91,7 @@ packages/brain-native/wasm.sh --check      # builds into build/wasm/ and fails u
 - **Tested** as above: every comparison runs `fly-brain-harness.wasm` too, in Node's WASI, compared line for line with the TypeScript, internal state, retinas and the digest of every neuron included; and `wasm.test.ts` runs the shipped module through `brain.ts`.
 - **What it differs in, as the TV's brain does**: the senses and the commands and rates cross the C interface as floats, where the TypeScript keeps doubles (see "Where it can't be the same"). The eyes' acceptance is the TypeScript's double rounded to a float.
 
-Speed, in seconds of one core per simulated second (the least of six alternating one-second runs on a machine shared with other jobs; `node packages/brain-native/scripts/bench.ts` gives the same for Node, the native build alongside):
+Speed, in elapsed wall seconds per simulated second (not thread CPU time) (the least of six alternating one-second runs on a machine shared with other jobs; `node packages/brain-native/scripts/bench.ts` gives the same for Node, the native build alongside):
 
 | | TypeScript | WebAssembly | |
 | --- | --- | --- | --- |

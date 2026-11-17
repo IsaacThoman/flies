@@ -5,13 +5,14 @@ Historical timings and trial counts have [measurement provenance](measurements.m
 The game is a web page underneath, and the web build is a real way to have
 the fly: a link anyone can open on a laptop, a phone or a tablet and leave
 open as a screensaver, or install as an app. It is plain files that work from
-any static host and from any folder on it; nothing needs a server.
+a static HTTP host and any folder on it; solo play needs no application
+server. Online rooms use the separate room server.
 
 ## Building it
 
 ```sh
 npm install
-npm run brain:fetch      # the packed connectome, once (38 MB, not in git)
+npm run brain:fetch      # the packed connectome, once (not in git)
 npm run build            # the site, into dist/
 npm run serve -- --base /fly/   # try it as a host would serve it: http://127.0.0.1:8080/fly/
 ```
@@ -33,7 +34,7 @@ All of `dist/`, as it is, to any folder of the host. About 17 MB:
 | `assets/brain.worker-<hash>.js` | 108 KB | the same | `text/javascript` |
 | `assets/*-<hash>.png` | icons and the link preview, 1.3 MB | the same | `image/png` |
 | `brain/connectome.<n>.<hash>.bin` | the brain, in four parts of at most 4 MiB, 14.2 MB in all | the same | `application/octet-stream` (any will do) |
-| `brain/fly-brain.0.<hash>.wasm` | the brain's simulation as WebAssembly, 268 KB (106 KB gzipped) | the same | `application/wasm` (what hosts send for `.wasm`; any will do) |
+| `brain/fly-brain.0.<hash>.wasm` | the brain's simulation as WebAssembly; [dated artifact sizes](measurements.md#artifact-sizes) | the same | `application/wasm` (what hosts send for `.wasm`; any will do) |
 | `brain/anatomy.<n>.<hash>.bin` | where each neuron is (`packages/brain/src/anatomy.ts`), 0.9 MB, if `npm run brain:fetch` built it; nothing loads it yet | the same | the same |
 | `.well-known/apple-app-site-association` | which links open the iPhone and iPad app, on by default (`APPLE_TEAM_ID=0` disables it; [deploy.md](deploy.md#the-iphone-and-ipad-apps-links)); it must be at the host's root, with no redirect, and is never kept by the service worker | `no-cache` | `application/json` |
 
@@ -49,20 +50,21 @@ What matters, and why:
   warn about anything over 10 MB (Netlify); the brain's parts are well under
   both.
 - **The brain arrives as it is.** The connectome's parts are already gzipped (below) but
-  are plain binary files to a host: none ends in `.gz`, so no host takes one
-  for something to serve with `Content-Encoding: gzip`. A host that
+  are plain binary files to a host: none ends in `.gz`, so it should not be served as an HTTP-gzipped representation merely
+  because of its filename. A host that
   compresses them again on the way does no harm; the browser undoes it.
 - **Byte ranges** (`Accept-Ranges: bytes`, `206 Partial Content`) let a part
   that breaks off carry on from the byte where it stopped. Without them
   (Cloudflare's static assets answer a range with the whole file) that part
   starts again, which is at most 4 MiB; the parts already in hand are kept.
 - **https.** The service worker (opening offline), the browser's cache for the
-  brain and its module, the digest check and the wake lock all need a secure page. Over plain
-  http the game still runs, but downloads its brain every time.
+  brain and its module, the digest check and the wake lock all need a secure page. HTTP loopback is also a secure context. On insecure non-loopback HTTP
+  the game can still run, but unavailable APIs prevent the persistent
+  brain-cache and offline path; ordinary HTTP caching may still help.
 - **Nothing else.** No headers beyond these, no rewrites, no server code, no
   cross-origin isolation.
 
-The build makes no requests to any other site: no fonts, scripts, analytics
+Normal static loading makes no requests to another site: no fonts, scripts, analytics
 or CDNs. `apps/web/tests/build.test.ts` reads the built files for any, and
 the end-to-end run (`apps/web/e2e/web.e2e.ts`) records every request the
 browser makes and fails on one that isn't to the site.
@@ -73,8 +75,9 @@ Two files: the connectome, below, and the simulation that runs on it. That is
 the brain's C++ (`packages/brain-native`) built as WebAssembly, where the
 browser can run it (Chrome and Edge 137+, Firefox 131+, Safari 18.4+), and
 otherwise `packages/brain`'s TypeScript, which comes with the page's own
-script. Both are the same simulation, to the bit (the C++'s README says how);
-the WebAssembly one is faster in Chromium and needs half the memory
+script. Both implement the same model; exact comparisons require the
+[precision and engine conditions](../packages/brain-native/README.md#where-it-cant-be-the-same).
+The WebAssembly one was faster in the recorded runs in Chromium and used about half the brain memory
 (measured below). `?brain=typescript` or `?brain=wasm` on the page's address
 picks one, for tests and for comparing them; nothing shows it to players.
 
@@ -94,10 +97,10 @@ through the neuron numbers in small steps), and every 16- and 32-bit column is
 split into byte planes, so the near-empty high bytes run together. Gzipped,
 that is **14.2 MB**, a third less, decoded in the brain's worker as it is
 unzipped (`DecompressionStream`, about 80 ms of decoding on a desktop) with
-nothing held but the result. Brotli would make the plain file 15.3 MB but
-needs the host to serve it with `Content-Encoding: br`, which static hosts
-decide for themselves, and browsers can't unzip it from script; a
-pre-compressed file decompressed in the worker works the same on every host.
+streamed into the result buffer. A historical Brotli experiment made the
+plain file 15.3 MB. This loader implements gzip through
+`DecompressionStream`, not a Brotli decoder; explicit worker decompression
+avoids depending on a host's choice of transfer encoding.
 
 The gzipped file is cut into parts of at most 4 MiB, each named for its own
 contents (`scripts/webBuild.ts`), and `apps/web/src/brain/download.ts`:
@@ -105,18 +108,20 @@ contents (`scripts/webBuild.ts`), and `apps/web/src/brain/download.ts`:
 - takes each part from the browser's cache (the Cache API, `fly-brain`: a
   second data file, such as the neurons' positions, gets a cache of its own,
   made the same way by `dataFile` in `scripts/webBuild.ts`) when
-  it is there, checked against the SHA-256 the build recorded, and otherwise
+  it is there, checked against the build's SHA-256 when the digest API works, and otherwise
   fetches it, counting the bytes for the loading screen ("3.2 of 14.2 MB");
 - carries a broken or stalled part (nothing for 20 s) on from where it
   stopped, with a range request where the host serves them, a few times with
   growing pauses before it says so;
-- checks each part against its digest before keeping it, so a damaged or
-  wrong file is never kept, and keeps it the moment it is whole: a page closed
-  halfway through the download fetches only the rest next time;
-- lets go of any other brain in the cache: a new deploy with a new brain has
-  new part names, and the old ones are deleted, so a phone never holds two;
+- checks complete parts against their digest when that API works, then
+  starts saving them. Without a working digest it checks length; malformed
+  data may remain cached until a build failure and retry discard it.
+  Across page closes only successfully saved whole parts survive: an
+  unfinished part starts again. In-page retries can resume within a part;
+- tries to delete obsolete part names. Cleanup is best effort; failed writes
+  or overlapping tabs can temporarily retain parts from two versions;
 - runs on without keeping it if the browser's storage is full, and says so
-  under "Awake!".
+  in the "Awake!" heading, held for four seconds rather than the usual 1.2.
 
 The loading screen says what went wrong in a word or two, with **Try again**
 (Select or Enter, a tap or a click): you're offline (and it tries by itself
@@ -129,19 +134,23 @@ brings the same screen back.
 
 Measured on the built site (`npm run e2e`, Chromium on an M-series Mac):
 
-| | Over the wire | Time to the title (with the 1.2 s "Awake!") |
+| | Connectome bytes in that historical run | Time to the title (with the 1.2 s "Awake!") |
 | --- | --- | --- |
 | First visit, 2.5 MB/s, the first part broken off at 3 MB and resumed | 14.2 MB | 9.9–10.6 s |
 | Second visit, network off | 0 (the page from the service worker, the brain from the cache) | 1.7–2.1 s |
 
+The first-visit 14.2 MB above is the connectome payload, not a complete
+current visit total: the WebAssembly module and page assets are additional.
 What a slower device does with it is in the measurements below.
 
 ## Running on what people have
 
-The TypeScript brain costs about 0.12 s of one core per simulated second at
-rest and up to 0.4 s with the eyes busy (`packages/brain/README.md`). A slow
-brain runs the fly slower than real time rather than falling behind
-(`BrainDriver.tick`), and the stats' real-time figure shows by how much.
+Historical wall-time measurements put the TypeScript brain around 0.12 s
+per simulated second at rest and 0.4 s in some busy-eye workloads
+(`packages/brain/README.md`); these are observations, not upper bounds.
+When slow, the brain's simulated time falls behind and excess neural backlog
+is dropped. The body, food and hunger still advance on frame time; the
+whole game clock is not slowed to match the brain. Stats reports neural speed.
 
 In a browser the game watches its own pace (`apps/web/src/quality.ts`): the
 time between frames, and how fast the brain runs against real time, judged
@@ -152,15 +161,18 @@ time:
 | --- | --- | --- | --- |
 | 0 | 60 a second | as chosen | as chosen |
 | 1 | 60 | as chosen | no finer than Low |
-| 2 | 30 | as chosen | Low |
-| 3 | 30 | no finer than Chunky (half the frame each way) | Low |
-| 4 | 30 | Chunky | Low, refreshing half as often |
-| 5 | 30 | Chunkier (a third of it each way) | Low, half as often |
+| 2 | 30 | as chosen | no finer than Low |
+| 3 | 30 | no finer than Chunky (half the frame each way) | no finer than Low |
+| 4 | 30 | no finer than Chunky | no finer than Low, half normal refresh rate |
+| 5 | 30 | no finer than Chunkier (a third of it each way) | no finer than Low, half normal rate |
 
+These are caps: eyes chosen Off stay Off, and a swoop targets 60 Hz eye
+sampling even at the lower levels, subject to frame/readback availability.
 The frame takes the screen's shape (`display.ts`), so each step keeps it,
 square pixels and all, at a quarter and a ninth of the pixels: 370×208 and
 247×139 in a 16:9 window, 188×408 and 126×272 on a phone held upright. A step
-changes only the size the world is drawn at; nothing is built again. Never
+can change frame rate, world resolution and eye sampling. Place geometry
+is retained, but resolution changes recreate render targets and related buffers. Never
 more than Settings asks for, and the player choosing pixels or eyes in
 Settings is taken at their word until the device shows again that it can't
 keep up. After 30 s of easy going it tries a step back up; if that goes badly
@@ -170,10 +182,10 @@ phone whose cores share one power budget, less drawing leaves more for the
 brain); if even the cheapest picture doesn't get it there, the picture goes
 back to where it was and stays, and the brain is left running as fast as the
 device allows. Only a level that is known to have helped is remembered.
-The brain itself is never slowed, thinned or given less to see to make the
-picture smoother, and the eyes are never switched off. Hidden tabs, the
-moment a place is built, the pause menu and the loading screen are not held
-against the device. The level it settled at is kept and the next start
+The governor does not simplify the neuron model or select Eyes Off, but
+it does reduce the spatial detail and cadence of the pictures the brain
+receives. Hidden tabs, place transitions, loading and first/resumed frames
+are excluded from judgments. The title and pause menu are not excluded. The level it settled at is kept and the next start
 begins a step better. 120 Hz screens get 60 frames: twice the frames would be
 twice the work for nothing anyone sees. (A screen only a little faster than
 60 Hz is left alone: holding it to 60 would drop a frame every few seconds.
@@ -182,6 +194,10 @@ level or two the first time, since a capped screen and a slow one look alike
 from the page.)
 
 ### Measured
+
+Brain cost here is elapsed wall time divided by simulated time, including
+scheduling delays under load. It is not thread CPU time. The 4× and 6×
+worker figures are linear extrapolations, not phone measurements.
 
 `node scripts/measure.ts`, on an M5 Pro shared the whole time with many
 other jobs (load averages of 7 to 180 on 18 cores), so the times are on the
@@ -337,16 +353,17 @@ The build has a web app manifest: full screen, the theme colour of the space
 round the picture, and icons rendered from the game (`scripts/art.ts`,
 `assets/web/`): 192 and 512 px, a maskable 512 with the fly well inside the
 middle, a 180 px home-screen icon for iPhone and iPad, and a favicon of the
-fly alone. The page's title, description and link preview (1200×630, the
-launch image's shot with the wordmark) credit the connectome (FlyEM male CNS,
-Janelia Research Campus, CC-BY 4.0), as the About screen does. An installed
+fly alone. The page and social-preview descriptions credit FlyEM male CNS,
+Janelia Research Campus, CC-BY 4.0, as the About screen does. The title is
+just the name; the 1200×630 preview image is the launch shot with its wordmark. An installed
 copy asks the browser to keep its storage (`navigator.storage.persist()`), so
-the brain isn't cleared when space runs short; a plain tab doesn't ask,
+the browser may protect it from eviction if the request is granted;
+a plain tab doesn't ask,
 since Firefox would show a prompt.
 
-It is named "Flies", what the title screen's wordmark says:
-`APP_NAME` in `scripts/webBuild.ts` and the page's `<title>` are the two
-places it is set.
+It is named "flies". Its name appears in `APP_NAME` in
+`scripts/webBuild.ts`, the title and metadata in `apps/web/index.html`,
+and the separate wordmark literal in `apps/web/src/ui/wordmark.ts`.
 
 ## In an iPhone or iPad app
 

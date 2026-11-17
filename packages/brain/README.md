@@ -2,7 +2,7 @@
 
 Historical timings and trial counts have [measurement provenance](../../docs/measurements.md).
 
-A spiking simulation of the male fruit fly's whole central nervous system, about 167,000 neurons wired as they are in the real animal, that drives this game's fly. `src/types.ts` is the senses-and-commands contract with the game; this package turns senses into firing of the fly's sensory neurons (and, for the eyes, of the first neurons behind the photoreceptors) and reads its descending and motor neurons back out as commands, and, for display, how fast every part of the nervous system fires (Regions). `createBrain(data, { seed })` (`src/runtime.ts`) builds one from the packed connectome in about 0.3 s; it uses no Node APIs, so it runs in the browser game's Web Worker.
+A spiking model wired from the male fruit fly's central nervous system, about 167,000 neurons, that drives this game's fly. `src/types.ts` is the senses-and-commands contract with the game; this package turns senses into firing of the fly's sensory neurons (and, for the eyes, of the first neurons behind the photoreceptors) and reads its descending and motor neurons back out as commands, and, for display, how fast every part of the nervous system fires (Regions). `createBrain(data, { seed })` (`src/runtime.ts`) builds one from the packed connectome in about 0.3 s; it uses no Node APIs, so it runs in the browser game's Web Worker.
 
 ## Data
 
@@ -22,7 +22,7 @@ Or build it yourself: export the neuron and connection tables from Codex (`neuro
 npm run brain:pack -- --neurons neurons.csv --connections connections_princeton.csv
 ```
 
-That writes `packages/brain/data/connectome.bin` (gitignored; `--out` puts it elsewhere) in a couple of seconds: 166,700 neurons, 6,242,118 connected pairs, 89,860,280 synapses, 40 MB (21 MB gzipped). The output depends only on the data, so packing the same export twice gives the same bytes. Malformed rows and connections to unknown neurons stop the packer with the line number.
+That writes `packages/brain/data/connectome.bin` (gitignored; `--out` puts it elsewhere) in a couple of seconds: 166,700 neurons, 6,242,118 connected pairs, 89,860,280 synapses, 40.4 MB unpacked (about 21 MB gzipped; [dated byte counts](../../docs/measurements.md#artifact-sizes)). The output depends only on the data, so packing the same export twice gives the same bytes. Malformed rows and connections to unknown neurons stop the packer with the line number.
 
 ## File format
 

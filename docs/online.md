@@ -15,11 +15,11 @@ and the iPhone and iPad app's, whose web view has a WebSocket of its own
 
 ## Playing
 
-- **The rooms.** The menu → Online lists every public room with someone in
-  it, fullest first: its name, its place's colour, its flies as eight pips
+- **The rooms.** The menu → Online lists up to 50 public rooms with someone in
+  each, fullest first: its name, its place's colour, its flies as eight pips
   and a padlock if it has a password. The list follows the room server as
   rooms open, fill and empty. A full one can't be chosen. Above the list are
-  New room, and Code, for an unlisted room's code (the ten letters of its
+  New room, and Code, for an unlisted room's code (the ten letters and digits of its
   link).
 - **A new room.** New room → its name (two words are suggested, to keep or
   type over), its place (the fly's own to start with), Public or Unlisted
@@ -33,8 +33,9 @@ and the iPhone and iPad app's, whose web view has a WebSocket of its own
   code, comes to its door: its password, then Join. With a remote or the
   keys in hand the password is typed at once; with a finger, a tap on it.
   A wrong one says so where the room's name was, in pink, and the password
-  is typed again. A device that has once sat at the room comes back to it
-  (a dropped line, a reload) without it; its starter never needs it.
+  is typed again. A device whose seat is still retained comes back to it
+  (a dropped line, a reload) without the password; its starter never needs it.
+  A guest whose seat was replaced needs the password again.
 - **Joining.** Choosing an open room, typing its code, or opening its link sits this device's fly at the room, set
   down near the others, at the height of the place's start (in the
   restaurant, on the window table, not the floor under it). The device remembers its table: a reload, or opening
@@ -54,15 +55,16 @@ and the iPhone and iPad app's, whose web view has a WebSocket of its own
   "Now" on the Weather tool is the made-up forecast from that clock, so
   everyone sees the same rain. The real weather outside (WeatherKit) isn't
   used at a table.
-- **Tools on other flies.** The table is invite-only, so everyone's tools
+- **Tools on other flies.** At public and unlisted tables alike, everyone's tools
   reach everyone's fly through the world. A ball thrown is seen coming by
   every fly, a feather or a puff is felt by whichever fly it touches, and
   food dropped is food for all. This follows rule 1: other players act on
   your fly only through its senses.
 - **Away.** A hidden tab, a sleeping phone or a dropped connection leaves the
-  fly at the table, resting: wings folded, still, its body dimmed. After 10
-  minutes away it leaves; when its device comes back, it sits down again where
-  it was, in its colour.
+  fly at the table, resting: wings folded, still, and dimmed when drawn as
+  a nearby model (distant stand-ins are not dimmed). After 10 minutes away
+  it leaves the visible group. Its retained seat can restore its colour
+  and validated position; a seat given to someone else cannot.
 - **Leaving.** Online → Leave the room. The fly stays where it is, alone,
   with the place's own food, and the light and weather its shelf had.
 - **What goes wrong** is said in the heading's place, in a few words: a
@@ -87,8 +89,8 @@ join any open room; a password needs a keyboard. The game reaches typing only
 through `TextEntry` (`packages/contracts/src/text-entry.ts`), polled each
 frame, so the Apple TV can bring its own keyboard through the bridge.
 
-When not at a table nothing here runs: no connection, no other bodies, and
-the single-player game as it was.
+Solo play opens no room connection and draws no other flies. Opening Online
+without joining opens a browsing connection for the room list.
 
 ## Who owns what
 
@@ -97,22 +99,30 @@ the single-player game as it was.
 | A fly: where it is, its pose, its hand | Its player's device, where its brain and body run | About 20 states a second through the room, drawn about 100 ms in the past, interpolated (`packages/net/src/track.ts`) |
 | What a fly feels and does about the others | Its own device | The others are bodies its eyes see and its body meets (`packages/body/src/crowd.ts`); their hands are the same `Hands` as yours, driven from the wire (`apps/web/src/online/other-hands.ts`) |
 | The food: the place's patches, what is dropped, what the place puts out | The room (`TableFood`) | Each device eats at once and tells the room; the room's account, less what the device has eaten since, is what is left (`FoodMirror`) |
-| A thrown ball | The room's clock | Its path and the moment its dive starts: every device (and the room) puts it in the same place at the same moment (`ball.ts`), a round trip after Select so everyone sees the whole dive |
+| A thrown ball | The room's clock | Its path and the moment its dive starts: every device (and the room) puts it in the same place at the same moment (`ball.ts`), after a lead of 1.5 round trips, clamped to 200–600 ms, so peers can hear of the whole dive |
 | The place | The room | `place` tells every device to carry its fly there, and where each fly is set down |
 | The light, the weather, the clock | The room, chosen by the starter | `world` and the welcome's clock; "Now" follows the starter's time zone |
 | The high bubbles | The room's seed and clock | Each device works them out (`bubbles.ts`); a device whose fly bursts one says so |
-| Visitors (gust, gull, leaf, butterfly, ladybird, juice, boat) | The room says when, with a seed (the picnic's pace, `@fly/world`) | Each device starts the visit from that seed (`SceneSet.happen`); visitors keep clear of whichever fly is nearest |
-| The restaurant's ventilation | The room says when it comes on, by the same clock as alone (`VentilationClock`, `@fly/world`), with a seed | Each device draws how long it runs from the seed (`SceneSet.happen`), so every fly feels the same draught at the same time |
+| Visitors (gust, gull, leaf, butterfly, ladybird, juice, boat) | The room says when, with a seed (the picnic's pace, `@fly/world`) | Each device starts the visit from that seed (`SceneSet.happen`); butterfly and ladybird avoidance uses the nearest fly; leaves can touch the local fly |
+| The restaurant's ventilation | The room says when it comes on, by the same clock as alone (`VentilationClock`, `@fly/world`), with a seed | Each device draws how long it runs from the seed (`SceneSet.happen`), with a shared duration; local receipt and animation can differ in phase (see the timing limit below) |
 
 The four low bubbles that bob past each fly stay each device's own, so
 nobody else sees yours.
+
+### Timing limit
+
+Shared visitor events and seeds do not guarantee identical animation phase.
+A late or resumed client starts a received visitor when it processes it,
+without catching up its elapsed animation time. Ventilation duration is
+shared, but its local eddies and remaining run can differ. This is a known
+synchronization limitation, not a separate decision by the fly's brain.
 
 ## The wire
 
 One WebSocket per device, at `wss://<site>/rooms`. The first message is the
 device's `hello`, carrying the protocol version (now 3); the room refuses any
-other, and a page it refuses for its version reloads itself once, into the
-site's current game. A connection that only lists the rooms says `browse`
+other, and a browser page refused for its version attempts one reload. This does
+not guarantee a cache update; the Apple TV runtime does not support reload. A connection that only lists the rooms says `browse`
 instead, and is told `rooms` at once and again whenever the list changes
 (checked every 2 s); nothing else it says is listened to. The fast traffic is binary and little-endian, with a type byte
 first; everything rare is JSON (`packages/net/src/protocol.ts`,
@@ -142,16 +152,9 @@ carried to, during a move), and drops theirs from any other epoch. Another
 fly is drawn half a step up from where the wire puts it, so rounding never
 sinks one on its feet into what it stands on.
 
-Protocol 3 is protocol 2 with rooms: names, the list, and passwords. A
-device speaking 2 doesn't know a room can be locked, and would knock at a
-locked door forever, so it is turned away and reloads into 3.
-
-Protocol 2 is protocol 1 with each place's own scale. A tabletop's states
-are the same bytes as before, but the room is a place protocol 1 can't
-read: a device that doesn't know the restaurant would read its states at a
-tabletop's scale, clamped and wrong, and can't be carried there. So the
-version changed, and a device speaking 1 is turned away (and reloads into 2)
-rather than sitting at a table that may move to the restaurant.
+Protocol 3 is the current format. The server rejects other versions rather
+than interpreting another version's states as current ones. The decoder
+in `packages/net/src/protocol.ts` is the authority for message fields.
 
 | Field | Encoding |
 | --- | --- |
@@ -194,24 +197,26 @@ From the room:
 | Message | |
 | --- | --- |
 | `welcome {v, id, colour, starter, seed, now, wall, offset, place, epoch, world, players, foods, balls, happenings, bubbles, at, room}` | the table as it is, where this fly stands, and the room's `{name, listed, locked}`; then a `FLIES` batch of every other fly where it is now |
-| `refused {reason, name?}` | then the connection closes with the matching code: version 4001, full 4002, removed 4003, unknown table 4004, busy 4005 (too many rooms started, or passwords tried), malformed 4006, the same key sat down elsewhere 4007, locked 4008 (no password, or the wrong one: with the room's `name`, for its door); 4010 after `bye` |
+| `refused {reason, name?}` | then the connection closes with the matching code: version 4001, full 4002, removed 4003, unknown table 4004, busy 4005 (too many rooms started, or passwords tried), malformed 4006, locked 4008 (no password, or the wrong one: with the room's `name`, for its door). A replaced connection closes directly with 4007 (elsewhere), without `refused`; `bye` closes with 4010 |
 | `rooms {rooms}` | to a browsing connection: each listed room with a fly there, fullest first, at most 50, as `{code, name, place, flies, locked}` |
 | `joined {id, colour, away}`, `away {id, away}`, `left {id}` | who is at the table, and whose device has stopped |
-| `drop`, `ball`, `found`, `pop` | as above, to everyone else (`by` the player); a drop's `y` is the surface it lands on |
-| `world {light, weather, offset}`, `place {place, epoch, foods, spots, bubbles?}` | the starter's choices, to everyone; `spots` is where each fly is set down, and `bubbles` the picnic's bubbles as they stand (a room server from before them says none, and a device starts them at 0) |
+| `drop`, `ball`, `found`, `pop` | drop and ball carry `by`; found carries `{food: FoodWire}`, and pop carries `{slot, cycle, at}` without `by`. A drop's `y` is its landing surface |
+| `world {light, weather, offset}`, `place {place, epoch, foods, spots, bubbles?}` | the starter's choices, to everyone; `spots` is where each fly is set down and `bubbles` carries the picnic cycle state |
+| `happening {kind, seed, at}` | a visitor comes |
+| `food {ack, amounts, gone, eaten}` | at most ten times a second while food changes: what is left, what is gone, this player's total by the room's account, and the last of its bites counted |
 
 A spot (`at`, `spots`) is x, z, yaw and the height of the surface the fly
 stands on, and each of `foods` carries the height it lies at: in the
 restaurant one point can be the floor, a chair seat or the table over them.
-| `happening {kind, seed, at}` | a visitor comes |
-| `food {ack, amounts, gone, eaten}` | at most ten times a second while food changes: what is left, what is gone, this player's total by the room's account, and the last of its bites counted |
 
 ### Coming back
 
-A dropped line is opened again after 0.5, 1, 2, 4, 8, then 15 s, and at once
-when the page is shown again. A deploy closes every connection with 1012;
-devices come back within 0.3 to 1.5 s, spread out. The hello names the
-device's key, and the room gives it back its seat: the same id and colour.
+A dropped line retries on a nominal 0.5, 1, 2, 4, 8, then 15 s schedule,
+each multiplied by random jitter from 0.8 to 1.2, and promptly when the page
+is shown again. A deploy closes connections with 1012 and schedules a retry
+after 0.3 to 1.5 s; connection time and server downtime are additional. The hello names the
+device's key, and a retained seat restores its id and colour. Removed or
+replaced guest seats and expired rooms cannot provide that guarantee.
 Its fly carries on where it is if that is in the place the table is in (the
 hello's epoch) and within a walk of where the room last had it (20 mm/s for
 up to 10 s, on the same table or floor); otherwise it is put back where the
@@ -227,25 +232,19 @@ shows only rooms with a fly there).
 ## The limits
 
 Each device is the authority on its own fly, and nothing can stop a device
-faking it. The room keeps the fake within what a fly could do, so that it
+faking it. The room bounds implausible states and tool use, so that it
 can't spoil the others' screens or their food (`packages/net/src/limits.ts`):
 
-- **Moves.** A fly is never taken where its device says if a fly couldn't
-  have got there. Each state may move it as far as it could travel since the
-  last: 60 mm/s on its feet, 1.5 m/s in the air, with a second of travel
-  saved up for uneven sends. A move further than that is cut short, so the
-  others see the fly come only as far as it could have, and never jump. (The
-  spike took a fly where it said after ten refusals in a row, which let a
-  stalled or lying device's fly leap across everyone's screen; that is gone.)
-  A state from somewhere a fly can't be (inside anything, under the floor,
-  standing on nothing) leaves the fly where it was. Over each point it
-  stands on whatever is under it there, the floor beneath a table or the
-  table. A state from
-  the future or older than the last is dropped.
-- **Food.** Dropped offerings can be cleared only by their owner; patches and finds stay. Clear requests share the drop rate limit and must name the current place’s epoch. Only under your own name, only on the table. A bite counts only
+- **Moves.** States have a travel allowance: 60 mm/s standing or 1.5 m/s
+  airborne, with one second stored and 0.5 mm of slack per accepted state.
+  Longer moves are shortened. Position checks allow 1.5 mm of sinking and
+  3 mm off a standing surface; they are plausibility tolerances, not an
+  exact replay of physics. Timestamps over 500 ms ahead of the room or no
+  later than the previous state are dropped.
+- **Food.** Dropped offerings can be cleared only by their owner; patches and finds stay. Clear requests share the drop rate limit and must name the current place's epoch. Only under your own name, only on the table. A bite counts only
   within 4 mm of the food's edge of where the room has the fly, at the
-  food's height (not from the floor under its table), and no faster
-  than a fly eats (with a second's appetite saved up). Two flies at one sugar
+  food's height (not from the floor under its table), and at up to 1.5 times the normal eating rate (with one second of appetite
+  saved up and up to 5.5 mm of vertical tolerance). Two flies at one sugar
   never eat more than there was.
 - **Hands.** One ball in the air at a time per player (a new one replaces
   it), at most 12 throws a minute (3 at once), 30 drops (6 at once), 10 found
@@ -254,9 +253,11 @@ can't spoil the others' screens or their food (`packages/net/src/limits.ts`):
   once; past either, the oldest goes.
 - **Messages.** At most 60 a second from a device (120 at once); more are
   dropped. A message is at most 4 KB, and a device has 10 s to say hello.
-  At most 24 connections open from one address, 60 opened a minute (30 at
-  once), and 30 rooms started from one an hour (5 at once). At most 8 flies a table; a seat gone more than 10 minutes is given
-  up to a newcomer, never the starter's. What an address has done is kept
+  At most 24 connections open from one address, with connection starts limited
+  to a burst of 30 replenishing at 60/minute. Room starts have a burst of 5
+  replenishing at 30/hour. At most 8 flies a table; at capacity, a disconnected guest seat that is no
+  longer present can be reused, never the starter's. This follows 10 minutes
+  of absence, or an explicit Leave immediately. What an address has done is kept
   for an hour after its last connection closes, so closing and opening
   again doesn't start its counts afresh.
 
@@ -282,8 +283,7 @@ room keeps only a salted scrypt hash of it (`apps/server/src/lock.ts`:
 and worked out off the event loop. It is never written to the file of
 tables or the log, and it goes only over the room's socket (`wss` on the
 site), in the hello, until the room has welcomed the device. A room's code
-doesn't get round its lock: only the password does, or a key that has sat
-there before (128 random bits each device keeps). Tries at a password are
+doesn't get round its lock: only the password does, or a recognized retained seat key (128 random bits each device keeps). Tries at a password are
 counted where they come from and where they go: 5 at once then 3 a minute
 from an address, and 10 at once then 6 a minute at a room, whoever tries;
 a try past either is refused as busy, right or not. The list carries only
@@ -378,7 +378,8 @@ camera is the real model, posed: two draws. One too far to show more than
 about 9 pixels is a stand-in, all of them in one instanced draw and not
 posed at all. Every other fly's shadow is one instanced draw, and what the
 fly's eyes see of them (a 480-triangle stand-in each) is one more in each
-face of the eyes. Nothing is made per frame for them. The other players'
+face of the eyes. Geometry, matrices and crowd records are reused; this is not a blanket
+zero-allocation guarantee for interpolation or message reception. The other players'
 hands share their textures. `apps/web/e2e/tables.e2e.ts` holds a table of
 eight to the frame's budget on every screen shape.
 
@@ -392,7 +393,8 @@ npm run dev          # the game; Vite proxies /rooms to it
 Open the game, Online → New room → Create, and open the copied link in
 another browser (or a private window: a device is its storage), or choose
 the room from that browser's own list. `?rooms=ws://host:port/rooms`
-points a page at another room server. `npm run rooms` keeps its tables only
+points a page at another room server. Shared links retain only the table
+parameter; append the rooms override again for a custom server. `npm run rooms` keeps its tables only
 in memory; set `DATA_DIR` to keep them across restarts.
 
 | Environment | |
@@ -403,7 +405,7 @@ in memory; set `DATA_DIR` to keep them across restarts.
 | `TRUST_PROXY` | 1 behind a proxy that sets `X-Forwarded-For`, for counting connections by address (set in Docker); believed only from a loopback or private address |
 
 `GET /health` answers `{ok, protocol, tables, devices, flies, browsing, uptime}`. The
-log is one JSON object a line on stdout. In production the room server is
+log is one JSON object a line: info on stdout, warnings and errors on stderr. In production the room server is
 the `rooms` service of the Docker stack (`docs/deploy.md`).
 
 Checks: `npm test` covers the protocol, the limits (names, passwords),
@@ -419,7 +421,8 @@ another tab's list, a wrong password first, and its link alone opens only
 its door. It also
 holds eight flies to the frame's budget on every screen shape, and checks
 that single-player opens no connection. `npm run tables -- --clients 4 --seconds 120`
-is a longer run with several tabs and fake flies, summing up what each saw.
+is a longer run with four real-brain tabs, summing up what each saw. Add
+`--fake 4` for four additional synthetic flies.
 
 ## Apple hosts
 
