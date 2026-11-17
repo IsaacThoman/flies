@@ -19,7 +19,7 @@
     "typecheck": "tsc -p .",
     "test": "node --test 'scripts/*.test.ts' 'apps/*/tests/*.test.ts' 'packages/*/src/**/*.test.ts' 'packages/*/tests/*.test.ts' && npm run -s test:budgets",
     "test:budgets": "node --test --test-concurrency=1 'apps/*/tests/*.budget.ts' 'packages/*/src/**/*.budget.ts' 'packages/*/tests/*.budget.ts'",
-    "e2e": "node apps/web/e2e/play.e2e.ts && node apps/web/e2e/pointer.e2e.ts && node apps/web/e2e/web.e2e.ts && node apps/web/e2e/tables.e2e.ts",
+    "e2e": "node apps/web/e2e/play.e2e.ts && node apps/web/e2e/pointer.e2e.ts && node apps/web/e2e/web.e2e.ts && node apps/web/e2e/tables.e2e.ts && node apps/web/e2e/first-minute.e2e.ts",
     "serve": "node scripts/serve.ts",
     "rooms": "node apps/server/src/server.ts",
     "tables": "node scripts/tables.ts",

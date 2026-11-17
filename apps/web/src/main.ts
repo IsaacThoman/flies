@@ -16,7 +16,15 @@ import { loadingLayout } from "./ui/layout.ts";
 import { drawFailure } from "./ui/loading.ts";
 import { drawWordmark } from "./ui/wordmark.ts";
 
-const canvas = document.getElementById("game") as HTMLCanvasElement;
+let canvas = document.getElementById("game") as HTMLCanvasElement;
+if (canvas.dataset.boot) {
+  const screen = document.createElement("canvas");
+  screen.id = "game";
+  screen.width = canvas.width;
+  screen.height = canvas.height;
+  canvas.replaceWith(screen);
+  canvas = screen;
+}
 // The Apple TV host: the remote is all there is, and the screen never changes.
 const native = !!(globalThis as { __native?: unknown }).__native;
 const display = new Display(native);

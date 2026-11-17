@@ -123,7 +123,7 @@ test("the HUD's targets are where it draws them, inside the safe area, and big e
     hands.stepVariant(1);
     const hits = new HitMap();
     hits.begin("play");
-    const state: HudState = { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, spikes: 0, brainRunning: true, eyes: null, layout: hudLayout(frame) };
+    const state: HudState = { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, brainRunning: true, eyes: null, layout: hudLayout(frame) };
     drawHud(blankCanvas(), 0, state, hits);
     const kinds = new Set<string>();
     for (let i = 0; i < hits.count; i++) {
@@ -144,7 +144,7 @@ test("with the remote in hand the HUD records no targets of its own but the menu
   const hands = new Hands(createPicnic());
   const hits = new HitMap();
   hits.enabled = false;
-  drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: "remote", learned: {}, teachSwipe: true, changed: 10, spikes: 0, brainRunning: true, eyes: null, layout: hudLayout(TV_FRAME) }, hits);
+  drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: "remote", learned: {}, teachSwipe: true, changed: 10, brainRunning: true, eyes: null, layout: hudLayout(TV_FRAME) }, hits);
   assert.equal(hits.count, 0);
 });
 
@@ -293,7 +293,7 @@ test("with a remote, a keyboard or a pad in hand, the hints keep clear of the sh
         hands.chooseTool(TOOLS.findIndex((t) => t.id === tool));
         for (const learned of [{}, { tools: true }] as Learned[]) {
           const g = blankCanvas();
-          drawHud(g, 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs, learned, teachSwipe: true, changed: 10, spikes: 0, brainRunning: true, eyes: null, layout: hud }, new HitMap());
+          drawHud(g, 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs, learned, teachSwipe: true, changed: 10, brainRunning: true, eyes: null, layout: hud }, new HitMap());
           for (const chip of writtenOn(g).filter((w) => w.size === 13)) {
             // A chip: from the hints' edge on the left; on the right, its glyph before its words (a chip 13 high starts 0.95 of its 22.75 height before them), and a little after them.
             const left = chip.x < hud.cx ? hud.hintsX : chip.x - 0.95 * 22.75;
@@ -326,6 +326,24 @@ test("the loading screen and its failure panel: where they always were on the TV
   }
 });
 
+
+test("selector arrows stay put across kinds, including Place's Go appearing", () => {
+  for (const [, frame] of frames()) for (const id of ["feed", "light", "weather", "view", "place"]) {
+    const hands = new Hands(createPicnic());
+    const i = TOOLS.findIndex((t) => t.id === id);
+    hands.chooseTool(i);
+    let first: number[] | null = null;
+    for (let kind = 0; kind < TOOLS[i].variants.length; kind++) {
+      hands.variants[i] = kind;
+      const hits = new HitMap();
+      drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "resting", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, brainRunning: true, eyes: null, layout: hudLayout(frame) }, hits);
+      const arrows: number[] = [];
+      for (let j = 0; j < hits.count; j++) if (hits.get(j)!.kind === "kind") arrows.push(hits.get(j)!.x);
+      if (!first) first = arrows;
+      else assert.deepEqual(arrows, first, `${id}: the same place selects each next kind`);
+    }
+  }
+});
 
 test("the Flies row draws one enamel dot per fly on wide and compact screens, with chevrons to choose", () => {
   for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
