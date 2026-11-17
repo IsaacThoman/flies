@@ -14,33 +14,44 @@ childProcess.spawn = ((command, args, options) => {
     process.on("message", () => { if (child.connected) child.send("announce"); });
     return child;
   }
-  return originalSpawn(command, args, options);
+  return originalSpawn(command, args ?? [], options ?? {});
 }) as typeof spawn;
 syncBuiltinESMExports();
 
-chromium.launch = (async () => {
-  if (mode === "launch") throw new Error("injected launch failure");
-  const child = originalSpawn(process.execPath, [resource.pathname], { stdio: ["ignore", "ignore", "inherit", "ipc"] });
-  const [owned] = await once(child, "message");
+let browserChild: ReturnType<typeof spawn>;
+const realLaunch = chromium.launchServer.bind(chromium);
+chromium.launchServer = (async (options: Parameters<typeof chromium.launchServer>[0]) => {
+  if (mode === "launch") { process.send?.({ failed: true }); throw new Error("injected launch failure"); }
+  if (mode === "launch-interrupt") return realLaunch(options);
+  browserChild = originalSpawn(process.execPath, [resource.pathname], { stdio: ["ignore", "ignore", "inherit", "ipc"] });
+  const [owned] = await once(browserChild, "message");
   const acknowledged = once(process, "message");
   process.send?.(owned);
   await acknowledged;
+  return {
+    wsEndpoint: () => "fixture",
+    once(event: string, listener: () => void) { browserChild.once(event === "close" ? "exit" : event, listener); },
+    async kill() {
+      if (browserChild.exitCode !== null || browserChild.signalCode !== null) return;
+      const exit = once(browserChild, "exit");
+      browserChild.kill("SIGKILL");
+      await exit;
+    },
+  };
+}) as unknown as typeof chromium.launchServer;
+
+chromium.connect = (async () => {
   const page = {
     on(event: string, listener: (error: { message: string }) => void) { if (event === "pageerror") listener({ message: "useful page diagnostic" }); },
-    async goto() { if (mode === "navigation") throw new Error("injected navigation failure"); },
+    async goto() { if (mode === "navigation") { process.send?.({ failed: true }); throw new Error("injected navigation failure"); } },
     async waitForFunction() {
-      if (mode === "readiness") throw new Error("injected readiness failure");
+      if (mode === "readiness" || mode === "stuck-close") { process.send?.({ failed: true }); throw new Error(`injected ${mode} failure`); }
       process.send?.({ ready: true });
       return new Promise(() => {});
     },
   };
   return {
     async newContext() { return { async newPage() { return page; } }; },
-    async close() {
-      if (child.exitCode !== null || child.signalCode !== null) return;
-      const exit = once(child, "exit");
-      child.kill();
-      await exit;
-    },
+    async close() { return new Promise(() => {}); },
   };
-}) as typeof chromium.launch;
+}) as unknown as typeof chromium.connect;

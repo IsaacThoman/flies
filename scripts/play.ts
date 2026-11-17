@@ -38,7 +38,7 @@ import { existsSync, readdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { chromium, devices } from "playwright";
-import type { Browser, BrowserContextOptions, CDPSession, Page } from "playwright";
+import type { BrowserContextOptions, CDPSession, Page } from "playwright";
 
 const root = path.join(import.meta.dirname, "..");
 
@@ -308,11 +308,23 @@ export function contextFor({ width = 1280, height = 720, device, landscape = fal
   return { ...d, viewport: { width: w, height: h }, screen: { width: w, height: h } };
 }
 
-export async function openGame(options: OpenOptions, own: (browser: Browser) => void = () => {}, errors: string[] = []) {
+export async function openGame(options: OpenOptions, own: (stop: () => Promise<void>) => void = () => {}, errors: string[] = []) {
   const { url, headed = false } = options;
-  const browser = await chromium.launch({ headless: !headed, executablePath: chromiumPath(), args: gpuFlags() });
+  // Playwright kills a pending launch's process group on process exit too. The CLI's
+  // signal deadline below reaches that hook even before launchServer returns ownership.
+  const launched = await chromium.launchServer({ headless: !headed, executablePath: chromiumPath(), args: gpuFlags(), handleSIGINT: false, handleSIGTERM: false });
+  let stopping: Promise<void> | undefined;
+  const stop = () => stopping ??= launched.kill();
+  own(stop);
   try {
-    own(browser);
+    const browser = await chromium.connect(launched.wsEndpoint());
+    const close = browser.close.bind(browser);
+    browser.close = async (...args) => {
+      let timeout: ReturnType<typeof setTimeout>;
+      const forced = new Promise<void>((resolve, reject) => { timeout = setTimeout(() => void stop().then(resolve, reject), 1_000); });
+      try { await Promise.race([close(...args), forced]); }
+      finally { clearTimeout(timeout!); await stop(); }
+    };
     const context = await browser.newContext(contextFor(options));
     const page = await context.newPage();
     page.on("pageerror", (error) => errors.push(error.message));
@@ -323,7 +335,7 @@ export async function openGame(options: OpenOptions, own: (browser: Browser) => 
     await gameUp(page);
     return { browser, page, errors };
   } catch (error) {
-    await browser.close().catch((cleanupError: unknown) => console.error("Closing browser:", cleanupError));
+    await stop().catch((cleanupError: unknown) => console.error("Stopping browser:", cleanupError));
     throw error;
   }
 }
@@ -345,16 +357,21 @@ async function main() {
     else steps.push(args[i]);
   }
   let server: ChildProcess | null = null;
-  let browser: Browser | null = null;
+  let stopBrowser: (() => Promise<void>) | undefined;
   const errors: string[] = [];
   let closing: Promise<void> | undefined;
   const cleanup = () => closing ??= (async () => {
     const stopped = server ? stopServer(server) : Promise.resolve();
-    try { await browser?.close(); } finally { await stopped; }
+    try { await stopBrowser?.(); } finally { await stopped; }
   })();
   const report = () => { if (errors.length) console.log("page errors:\n" + errors.join("\n")); };
-  const interrupted = () => { void cleanup().finally(() => { report(); process.exit(130); }); };
-  const terminated = () => { void cleanup().finally(() => { report(); process.exit(143); }); };
+  const quit = (code: number) => {
+    const exit = () => { report(); process.exit(code); };
+    const deadline = setTimeout(exit, 3_000);
+    void cleanup().finally(() => { clearTimeout(deadline); exit(); });
+  };
+  const interrupted = () => quit(130);
+  const terminated = () => quit(143);
   process.once("SIGINT", interrupted);
   process.once("SIGTERM", terminated);
   try {
@@ -363,7 +380,7 @@ async function main() {
       url = started.url;
     }
     const [width, height] = (size || "1280x720").split("x").map(Number);
-    const { page } = await openGame({ url, width: size || !device ? width : undefined, height: size || !device ? height : undefined, headed, device, landscape }, (owned) => { browser = owned; }, errors);
+    const { page } = await openGame({ url, width: size || !device ? width : undefined, height: size || !device ? height : undefined, headed, device, landscape }, (owned) => { stopBrowser = owned; }, errors);
     if (device && size) await page.setViewportSize({ width, height });
     const fingers = await Fingers.on(page);
     const pt = (spec: string) => spec.split(",").map(Number) as Pt;
