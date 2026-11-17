@@ -115,6 +115,50 @@ try {
   assert.ok(firstFrame.renders > 0 && !firstFrame.early, "not ready until rendering finishes");
   assert.equal(firstFrame.after, "true", "ready immediately after the first frame");
   assert.equal(firstFrame.writes, 1, "readiness is only published once");
+  step("keys and taps wake the wallpaper and restart its full idle countdown");
+  await startup.waitForFunction(() => (globalThis as unknown as { __fly: Game }).__fly.brain.status === "running", null, { polling: 100, timeout: 90_000 });
+  const wakes = await startup.evaluate(() => {
+    const game = (globalThis as unknown as { __fly: Game }).__fly;
+    const canvas = document.getElementById("game") as HTMLCanvasElement;
+    let now = performance.now();
+    const clock = Object.getOwnPropertyDescriptor(performance, "now");
+    Object.defineProperty(performance, "now", { configurable: true, value: () => now });
+    // Canvas diagnostics publish every 200 ms; inspect the frame itself at the deadline.
+    const draw = (ms: number) => { now += ms; game.frame(0.1, now); return String(game.wallpaper); };
+    const key = () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+      window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight" }));
+    };
+    const tap = () => {
+      const rect = canvas.getBoundingClientRect();
+      const event = { pointerId: 1, pointerType: "touch", clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2, button: 0 };
+      canvas.dispatchEvent(new PointerEvent("pointerdown", { ...event, buttons: 1 }));
+      canvas.dispatchEvent(new PointerEvent("pointerup", { ...event, buttons: 0 }));
+    };
+    try {
+      // The startup page has no automatic frames: advance past the arrival screen.
+      game.frame(4, now);
+      game.frame(4, now);
+      game.play();
+      game.settings.wallpaperAfter = 2;
+      key();
+      draw(0);
+      return [key, tap].map((wake) => {
+        const asleep = draw(2001);
+        const tool = game.hands.tool;
+        wake();
+        const awake = draw(0);
+        const consumed = game.hands.tool === tool;
+        const beforeDeadline = draw(1999);
+        const afterDeadline = draw(2);
+        return { asleep, awake, consumed, beforeDeadline, afterDeadline };
+      });
+    } finally {
+      if (clock) Object.defineProperty(performance, "now", clock);
+      else Reflect.deleteProperty(performance, "now");
+    }
+  });
+  assert.deepEqual(wakes, Array.from({ length: 2 }, () => ({ asleep: "true", awake: "false", consumed: true, beforeDeadline: "false", afterDeadline: "true" })));
   await startup.close();
   step("the brain wakes and the title appears");
   const awake = await waitFor(page, "brain=running,screen=title", 90_000);
@@ -128,9 +172,9 @@ try {
   assert.equal(awake.ring, "false");
   await press("ArrowDown");
   await waitFor(page, "ring=true,focus=play");
-  await press("ArrowDown", 3);
-  await waitFor(page, "focus=settings");
   await press("ArrowDown", 2);
+  await waitFor(page, "focus=settings");
+  await press("ArrowDown");
   await waitFor(page, "focus=online");
   await press("ArrowUp");
   await waitFor(page, "focus=settings");
@@ -189,7 +233,7 @@ try {
   await waitFor(page, "focus=stats");
   await press("Escape");
   await waitFor(page, "screen=title,focus=settings");
-  await press("ArrowUp");
+  await press("ArrowDown", 2);
   await press("Enter");
   await waitFor(page, "screen=about");
   await press("Enter");
@@ -203,7 +247,7 @@ try {
   await press("ArrowDown", 3);
   await press("Escape");
   await waitFor(page, "screen=title,focus=about");
-  await press("ArrowUp", 2);
+  await press("ArrowUp", 4);
   await waitFor(page, "focus=play");
 
   step("play: the fly is on the table, and its brain is moving it");
@@ -273,8 +317,15 @@ try {
   assert.equal(corner.statsPanel, "hidden", "no stats unless asked for");
   console.log(`  what it sees and its nervous system, in the ${corner.eyesInset} corner`);
   await waitForGameTime(page, 1.5);
-  await press("ArrowRight");
-  const back = await waitFor(page, "wallpaper=false");
+  // A game-time wait after this press can exceed the two wall-clock seconds
+  // on software GL. Observe the waking frame and end the idle test together.
+  await page.keyboard.press("ArrowRight");
+  await page.waitForFunction(() => {
+    if (document.getElementById("game")?.dataset.wallpaper !== "false") return false;
+    (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 0;
+    return true;
+  });
+  const back = await readState(page);
   assert.equal(back.tool, "swoop", "the press that woke it did nothing else");
   assert.equal(back.screen, "play");
 

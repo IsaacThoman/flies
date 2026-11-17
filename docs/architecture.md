@@ -28,7 +28,7 @@ The game has no sound, by design.
 ## How it fits together
 
 Settings → Screensaver → Flies chooses one to four flies on hosts that support
-multiple brains. Each has its own brain, body and senses, sharing a pantry.
+multiple brains (three on an Apple TV, as measured there). Each has its own brain, body and senses, sharing a pantry.
 The first fly is the one followed by the camera and shown in the eye picture,
 nervous-system display and stats. `Company` keeps the companions;
 `OtherFlies` draws them alongside remote flies. A companion whose brain fails

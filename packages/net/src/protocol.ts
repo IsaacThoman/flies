@@ -11,6 +11,7 @@
 // The first message on a connection is the client's `hello` with PROTOCOL;
 // the room refuses a version it doesn't speak.
 
+import { WORLDS } from "@fly/world";
 import type { Place } from "@fly/world";
 import type { BubbleSnapshot } from "./bubbles.ts";
 
@@ -443,6 +444,9 @@ export type WorldWire = { light: string; weather: string };
 /** The Light and Weather tools' kinds, as they travel. */
 export const TABLE_LIGHTS = ["clock", "morning", "noon", "golden", "dusk", "night"] as const;
 export const TABLE_WEATHERS = ["now", "clear", "overcast", "mist", "rain", "heavyRain", "storm", "snow", "sleet"] as const;
+
+/** Online places follow the worlds' order, including places added to the game later. */
+export const TABLE_PLACES: readonly string[] = Object.freeze(Object.keys(WORLDS));
 
 /** A fly at the table: which, in what colour, whether its device has stopped, and which device's it is (`of`: the id of that device's first fly, the player's own id). */
 export type PlayerWire = { id: number; colour: string; away: boolean; of: number };

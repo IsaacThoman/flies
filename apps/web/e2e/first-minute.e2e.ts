@@ -60,7 +60,9 @@ try {
     await arriving.route("**/brain/connectome.*", async (route) => { await brainGate; await route.continue(); });
     const page = await arriving.newPage();
     const sockets: string[] = [];
-    page.on("websocket", (socket) => sockets.push(socket.url()));
+    page.on("websocket", (socket) => {
+      if (new URL(socket.url()).pathname === "/rooms") sockets.push(socket.url());
+    });
     const launch = new URL(url);
     launch.searchParams.set("rooms", `ws://127.0.0.1:${rooms.port}/rooms`);
     await page.goto(launch.href);

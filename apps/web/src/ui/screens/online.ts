@@ -28,7 +28,7 @@ import type { Ended } from "../../online/online.ts";
 import { suggestName } from "../../online/invite.ts";
 import { PLACES, isPlaceId, placeInfo } from "../../places/catalog.ts";
 import type { PlaceId } from "../../places/catalog.ts";
-import { fitMenu, roomLayout, safeRect } from "../layout.ts";
+import { fitMenu, menuSpace, roomLayout } from "../layout.ts";
 import type { MenuPanelSpec, RoomLayout } from "../layout.ts";
 import { RoomCard } from "../room-card.ts";
 import { MenuScreen } from "./menu-screen.ts";
@@ -73,6 +73,7 @@ export class OnlineScreen implements Screen {
   /** The new room as it is being made, the code being typed, and the door's password. */
   readonly #draft: NewRoom = { name: "", listed: true, password: "", place: "picnic" };
   #code = "";
+  #codeValid = false;
   #password = "";
   /** A note of this device's own (a name or a code that can't be one), shown until the next thing done. */
   #note: keyof typeof NOTES | null = null;
@@ -166,7 +167,7 @@ export class OnlineScreen implements Screen {
       case "rooms": {
         const rows: MenuItem[] = [
           { kind: "action", id: "new", label: "New room", disabled: !shell.canPlayOnline || this.#incompatible() },
-          { kind: "field", id: "code", label: "Code", value: this.#code, disabled: !shell.typing || this.#incompatible() },
+          { kind: "field", id: "code", label: "Code", value: this.#code, disabled: !shell.typing || this.#incompatible(), submit: { label: "Join", disabled: !this.#codeValid } },
         ];
         const rooms = shell.rooms;
         const status = shell.lobbyStatus;
@@ -179,14 +180,14 @@ export class OnlineScreen implements Screen {
         for (const r of rooms ?? []) {
           // A full room open to everyone sends whoever chooses it on to the next.
           const everyone = r.everyone === true;
-          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), description: isPlaceId(r.place) ? placeInfo(r.place).name : r.place, count: [r.flies, MAX_FLIES], locked: r.locked, everyone, disabled: unavailable || (r.flies >= MAX_FLIES && !everyone) });
+          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, hint: isPlaceId(r.place) ? placeInfo(r.place).name : undefined, swatch: colourOf(r.place), description: isPlaceId(r.place) ? placeInfo(r.place).name : r.place, count: [r.flies, MAX_FLIES], countLabel: `${r.flies}/${MAX_FLIES}`, locked: r.locked, everyone, disabled: unavailable || (r.flies >= MAX_FLIES && !everyone) });
         }
         return rows;
       }
       case "new": {
         const d = this.#draft;
         const place: ChoiceItem<PlaceId> = { kind: "choice", id: "place", label: "Place", options: WHERE, index: indexOf(WHERE, d.place) };
-        const listed: ChoiceItem<boolean> = { kind: "choice", id: "listed", label: "Room", options: LISTED, index: indexOf(LISTED, d.listed) };
+        const listed: ChoiceItem<boolean> = { kind: "choice", id: "listed", label: "Listing", options: LISTED, index: indexOf(LISTED, d.listed) };
         return [
           { kind: "field", id: "name", label: "Name", value: d.name, disabled: !shell.typing },
           place,
@@ -239,7 +240,7 @@ export class OnlineScreen implements Screen {
     const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
     const rooms = shell.rooms ? shell.rooms.map((r) => `${r.code}:${r.name}:${r.place}:${r.flies}:${r.locked}`).join(",") : "?";
     const at = table ? `${table.name}|${shell.here}|${table.joined}|${table.starting}|${table.everyone}|${this.#looking}|${copied}|${table.others.map((o) => `${this.#removalId(o)}/${o.colours.length}`).join(",")}` : "alone";
-    return `${this.view}|${this.#note}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}|${shell.lobbyStatus}`;
+    return `${this.view}|${this.#note}|${this.#codeValid}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}|${shell.lobbyStatus}`;
   }
 
   #build(focus?: string) {
@@ -259,7 +260,7 @@ export class OnlineScreen implements Screen {
       headingColor: note ? NOTE_COLOUR : undefined,
       place: (frame) => {
         this.#room = card ? roomLayout(frame, spec) : null;
-        return this.#room?.menu ?? fitMenu(safeRect(frame), spec);
+        return this.#room?.menu ?? fitMenu(menuSpace(frame), spec);
       },
       backdrop: (g) => {
         const table = shell.table;
@@ -272,6 +273,12 @@ export class OnlineScreen implements Screen {
         else if (item.id === "listed") this.#draft.listed = choiceValue(item as ChoiceItem<boolean>);
       },
       onEdit: (item) => this.#type(item),
+      onSubmit: (item) => {
+        if (item.id === "code") {
+          shell.typing?.end();
+          this.#joinCode();
+        }
+      },
       onBack: () => this.#back(),
     });
   }
@@ -451,18 +458,27 @@ export class OnlineScreen implements Screen {
     if (ended !== "done") return;
     // Return on the code, or on a door's password, is going in.
     if (id === "code" && this.#code) {
-      const code = this.#code.trim().toLowerCase();
-      if (isTableCode(code)) this.#shell.joinRoom(code);
-      else {
-        this.#note = "code";
-        this.#refresh("code");
-      }
+      this.#joinCode();
     } else if (id === "password" && this.view === "door") this.#knock();
+  }
+
+  #joinCode() {
+    const code = this.#code.trim().toLowerCase();
+    if (isTableCode(code)) this.#shell.joinRoom(code);
+    else {
+      this.#note = "code";
+      this.#refresh("code");
+    }
   }
 
   /** Keeps what was typed into a field, by its id, for the view it is in. */
   #store(id: string, value: string) {
-    if (id === "code") this.#code = value;
+    if (id === "code") {
+      if (value !== this.#code) {
+        this.#code = value;
+        this.#codeValid = isTableCode(value.trim().toLowerCase());
+      }
+    }
     else if (id === "name") this.#draft.name = value;
     else if (id === "password" && this.view === "new") this.#draft.password = value;
     else if (id === "password") this.#password = value;

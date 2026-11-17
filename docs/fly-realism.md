@@ -184,3 +184,146 @@ posterior grooming at native size, and incomplete measured turning/backing
 kinematics. Reviewer suggestions included attenuating secondary-copy veins,
 separating grooming stroke/return contact evidence, and measuring final solved
 claws independently of controller events.
+
+### Round 6 — rejected
+
+Key: P4 = retained round-5 model; E8 = 126 sparse leg setae.
+Orders: E8,P4; E8,P4; P4,E8; P4,E8.
+
+| Reviewer | P4 scores | E8 scores | P4 mean | E8 mean | Ranking |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 7.5,8,7.5,8,7,8,6,8 | 8,8,7.5,8,7,8,6,8 | 7.500 | 7.563 | E8 > P4 |
+| 2 | 8,7.5,7.2,7.5,7.5,8,6.5,8 | 8.3,7.5,7.2,7.5,7.5,8,6.5,8 | 7.525 | 7.563 | E8 > P4 |
+| 3 | 8,7.5,7,7.5,7.5,7.5,6,8 | 8.3,7.5,7,7.5,7.5,7.5,6,8 | 7.375 | 7.413 | E8 > P4 |
+| Tradeoff assessment | 8,7.5,7,7.5,7,8,6.5,8.5 | 8.3,7.5,7,7.5,7,8,6.5,8.5 | 7.500 | 7.538 | P4 > E8 |
+
+Primary-review mean: **7.467 → 7.513**. Rejected despite the primary-score
+increase: the tradeoff reviewer ranked P4 first. The added hairs improved
+close-up anatomy but increased model triangles from 15,408 to 18,432 (+19.6%)
+without a clear native-resolution benefit. The blind rule requires both higher
+scores and a preferred ranking; a favourable mean alone does not qualify.
+The hair geometry and its README changes were reverted. Draw calls and update
+code were unchanged, and no GPU timing penalty was established.
+
+Both sets also include an independent solved-claw report at 1000 Hz, in
+addition to controller-event timing. Forward stance-fit errors are −8.0% to
++9.6%; three-foot support is about 81% at 35 mm/s. The report names measured
+stance excursion separately from stride advance and includes turning/backing
+without pretending the straight-walk stance fit applies to them. At 30 Hz,
+short swings alias and sampled excursion/phase estimates become unreliable.
+This diagnostic is retained as measurement work, not a model-score gain.
+
+The claw reference is the solved tarsal endpoint at the claw bases; contact
+means proximity to the support plane, not measured force. The retained report
+also measures body-relative swing excursion and successive-footprint stride
+in a kinematically transported world frame.
+
+### Round 7 (duplicate control)
+
+Key: V3 = retained round-5 model; S2 = softer head/thorax/leg highlights;
+D2 = byte-identical V3. Orders: S2,V3,D2; V3,S2,D2; D2,S2,V3; D2,V3,S2.
+Every reviewer ranked S2 first. Duplicate scores matched exactly.
+
+| Reviewer | V3 = D2 scores | S2 scores | V3/D2 mean | S2 mean | Ranking |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 7.8,7.5,7,8,7.5,8,6.5,9 | 8,7.5,7,8,7.5,8,6.5,9 | 7.663 | 7.688 | S2 > V3 > D2 (tie) |
+| 2 | 8,7.5,7.5,8,7.5,8,6.5,8.5 | 8.2,7.5,7.5,8,7.5,8,6.5,8.5 | 7.688 | 7.713 | S2 > V3 > D2 (tie) |
+| 3 | 8,7.5,7,7.5,7,7.5,6,8.5 | 8,7.5,7,7.5,7,7.5,6,8.5 | 7.375 | 7.375 | S2 > D2 > V3 (tie) |
+| Tradeoff assessment | 7.5,7,7,7.5,7,8,6.5,8.5 | 8,7,7,7.5,7,8,6.5,8.5 | 7.375 | 7.438 | S2 > D2 > V3 (tie) |
+
+Primary-review mean: **7.575 → 7.592**. Accepted on the higher paired mean
+and unanimous forced preference; reviewer 3's numerical scores tie. The gain
+is small and confined to appearance. Rougher, less clear-coated head, thorax
+and legs reduce the polished-model impression; the abdomen and eyes retain
+their existing finish. No motion or native-resolution action gain is claimed.
+Material values are display choices, not measured cuticle reflectances.
+
+Evidence correction: the V3/D2 test log was accidentally copied from the
+rejected leg-hair prototype, reporting 18,432 triangles. The rendered models,
+source, and cost report consistently contain 15,408. All four assessments
+assigned equal cost to the sets; their preference was based on appearance.
+A run of the actual frozen reference passed all 36 fly tests and confirmed
+15,408 triangles. Its log replaced the misfiled one once reviews had ended;
+the incorrect original is retained locally. No model or image was changed.
+
+A separate interleaved interpreter benchmark compares the original bd88a01
+rig with the retained animation path: 108.611 versus 99.477 µs/update (8.4%
+lower), seven mixed-pose samples of 1,500 updates with V8 compilers disabled.
+This is a process-CPU proxy, not an Apple TV JavaScriptCore or GPU result.
+Both material sets use identical update code, 15,408 triangles and two draws.
+
+The solved-footfall script now separates stance excursion, swing excursion
+and successive-footprint stride. At 35 mm/s, the high-rate report measures
+21.6 ms swing, 26.7 ms stance and 1.690 mm footprint stride. The 30 Hz report
+is deliberately retained to expose aliasing, rather than treated as a second
+biological fit. Remaining priorities are flight-leg silhouette, posterior
+cleaning readability, and measured productive-stroke/rubbing contact.
+
+### Round 8
+
+Key: B6 = retained round-7 model; J9 = coordination blend width 6 rather than
+4. Independent random order draws happened to give B6,J9 for all four briefs.
+All four ranked J9 first and assigned it higher gait scores.
+
+| Reviewer | B6 scores | J9 scores | B6 mean | J9 mean | Ranking |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 8.5,7.7,8,8,7,8,6.5,9 | 8.5,8,8,8,7,8,6.5,9 | 7.838 | 7.875 | J9 > B6 |
+| 2 | 8,7.3,7.5,8,7,8,6,8.5 | 8,7.6,7.5,8,7,8,6,8.5 | 7.538 | 7.575 | J9 > B6 |
+| 3 | 8,7.3,7.5,8,7.5,8,6,8.5 | 8,7.6,7.5,8,7.5,8,6,8.5 | 7.600 | 7.638 | J9 > B6 |
+| Tradeoff assessment | 8,7,7.5,8,6.5,8,6,8.5 | 8,7.5,7.5,8,6.5,8,6,8.5 | 7.438 | 7.500 | J9 > B6 |
+
+Primary-review mean: **7.658 → 7.696**. Accepted: broaden the speed interval
+over which ipsilateral coordination approaches the fast tripod pattern.
+Stance/swing durations and geometry are unchanged. At 7.5 mm/s, measured
+four-foot support rises from 15.6% to 38.6%; at 10 mm/s, from 3.3% to 21.3%.
+At 25–35 mm/s, the solved timing and support patterns coincide. Tests retain
+the fast hind-leg lead, planted-foot compensation and continuous transitions.
+
+Before blind review, an implementation trial with width 8 failed the existing
+fast hind-leg-lead test. It was narrowed to 6; the test was kept intact. The
+frozen width-6 candidate and reference each pass all 36 fly tests.
+
+All assessments qualify the biological claim: four-foot support alone does
+not classify canonical tetrapod sequences, and the chosen width is not a fit
+to population phase distributions. The additional primary reference,
+[Chun et al. 2021](https://doi.org/10.7554/eLife.65878), reports predominantly
+modified tripod coordination across speeds. It was supplied to every reviewer
+alongside Mendes, Wosnitza and DeAngelis. The gain is rubric-specific, not proof
+that increased staggering is universally more realistic.
+
+Interleaved interpreter medians: B6 107.919, J9 107.619 µs/update, overlapping
+samples; no speed advantage between them is established. Both retain two draws,
+15,408 model triangles and the same update allocation structure. The original
+control in that run measured 119.273 µs/update.
+
+The loop stops at eight comparison rounds, below the score-9 stopping threshold.
+Seven candidates were retained; leg-seta geometry in round 6 was rejected.
+Future work should prioritize native-size feeding/posterior-cleaning silhouettes,
+phase-conditioned cleaning/rubbing contact, and flight-leg/load-acceptance cues.
+
+## Validation limits
+
+The interpreter benchmark also covered steady actions, including a full
+12-second grooming cycle. It measures process CPU with V8 compilers disabled,
+not Apple TV JavaScriptCore or GPU performance:
+
+| Action | Control µs | J9 µs | Change |
+| --- | --- | --- | --- |
+| idle | 105.383 | 82.247 | -22.0% |
+| walk | 108.264 | 86.424 | -20.2% |
+| groom-cycle | 111.015 | 93.093 | -16.1% |
+| feed | 107.379 | 82.439 | -23.2% |
+| flight | 119.211 | 117.271 | -1.6% |
+
+Local typecheck, lint, 152 fly/body/pose tests and the fly CPU budget pass on
+the final merge with dev.
+The farm's broad functional unit run passed with its five documented
+architecture-specific exclusions and x86 CPU-budget exclusion. An earlier
+full local run passed 723 functional tests but failed the then-current brain
+CPU budget under contention; the later contention-aware recheck skipped with
+zero failures. On the farm snapshot of feat-fly-wing-envelope (head 10f4556 plus then-current
+dev), web E2E passed; play and pointer failed wallpaper-state assertions, and
+tables failed restaurant relocation. Later dev merges were not covered by
+that browser sweep.
+Those app behaviors are outside this model/animation change and were preserved
+when merging dev. No GitHub CI wait or PR merge was performed by this work.

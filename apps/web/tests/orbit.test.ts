@@ -282,7 +282,9 @@ test("every way of turning and zooming reaches the same rig: a mouse, a finger, 
 test("turned round the fly past what stands by it, in every place, the camera comes in before it and goes back out after, never jumps, never flips in and out at an edge, and never goes into anything nor cuts into it", () => {
   for (const [id, scene] of Object.entries(SCENES)) {
     const place = new World(scene.place);
-    const spots = besideThings(place, scene.place.start, 4);
+    // The greenhouse starts on a fig; its tall orbit obstacles stand on the bench below it.
+    const bench = id === "greenhouse" ? { y: 0, names: ["terracotta pot", "watering can", "seed tray"] } : undefined;
+    const spots = besideThings(place, scene.place.start, 4, bench);
     assert.ok(spots.length >= 3, `${id}: things to go past`);
     for (const spot of spots) {
       for (const view of ["close", "follow", "wide"] as const) {
