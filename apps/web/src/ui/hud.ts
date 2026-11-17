@@ -27,6 +27,7 @@ export type HudState = {
   /** What it is tasting or eating, if anything. */
   food: string | null;
   hints: boolean;
+  previewTool?: number;
   /** Whose buttons the hints show, or null when the player is pointing at the screen (no hints, and buttons to press instead). */
   glyphs: GlyphSet | null;
   /** What the hints have taught: those hints aren't shown. */
@@ -113,9 +114,10 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
     hits.add(HUD_HITS.tool, x - gap / 2, sy - 26, gap, 52, i);
   }
   // The tool's name and kind, over the shelf. Pointing, arrows either side change the kind, and a place to go has its own button.
-  const tool = hands.current;
-  const many = tool.variants.length > 1;
-  const go = pointing && tool.id === "place" && hands.place !== s.here;
+  const preview = pointing && s.previewTool !== undefined && s.previewTool !== hands.tool ? TOOLS[s.previewTool] : undefined;
+  const tool = preview ?? hands.current;
+  const many = !preview && tool.variants.length > 1;
+  const go = !preview && pointing && tool.id === "place" && hands.place !== s.here;
   const goWidth = 64;
   const room = L.width - 16 - (go ? goWidth + 8 : 0);
   const arrows = many ? (pointing ? 56 : 40) : 0;
@@ -127,7 +129,7 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
     lw = Math.max(150, hintWidth(g, label, 17) + arrows);
   }
   const lx = cx - lw / 2 - (go ? (goWidth + 8) / 2 : 0);
-  const pop = Math.max(0, 1 - s.changed * 4) * 3;
+  const pop = preview ? 0 : Math.max(0, 1 - s.changed * 4) * 3;
   const ly = L.labelY - 18 - pop;
   pill(g, lx, ly, lw, 36, "", { color: "glass" });
   text(g, label, lx + lw / 2, L.labelY - pop, { size: 17, align: "center", baseline: "middle", color: INK });

@@ -2,14 +2,13 @@
 //
 //   menu ─┬─ Play
 //         ├─ Watch
-//         ├─ About
 //         ├─ Settings: Screensaver | On screen | Picture, as tabs
-//         └─ Online (in a browser): rooms with others (online.ts)
+//         ├─ Online (in a browser): rooms with others (online.ts)
+//         └─ About
 //
 // The menu is the title, at launch and from play alike (Back, Play/Pause or
 // the menu button), with the fly living on behind it; Back there carries on
 // playing (on the Apple TV it leaves the app, as the root of an app must).
-// Every setting is two steps from it.
 
 import { Menu, choiceValue, indexOf } from "@fly/ui";
 import type { ChoiceItem, MenuItem, Option } from "@fly/ui";
@@ -31,7 +30,7 @@ export function titleScreen(shell: Shell) {
     // With others, where there is a way to reach them.
     ...(shell.canPlayOnline ? [{ kind: "action" as const, id: "online", label: "Online" }] : []),
     { kind: "action", id: "about", label: "About" },
-  ]);
+  ], { wrap: true });
   // Laid out with the menu, for the backdrop to draw from.
   let title = titleLayout(shell.shape, menu.items.length);
   return new MenuScreen(shell, {
@@ -164,6 +163,7 @@ export function settingsScreen(shell: Shell) {
   return new MenuScreen(shell, {
     id: "settings",
     heading: "Settings",
+    trimEmpty: true,
     menu,
     place: (frame) => fitMenu(menuSpace(frame), { items: most, width: 540, row: frame.design.height >= 440 ? 44 : 36, heading: true, foot: 28, values: true, raise: 14 }),
     onEnter: show,
