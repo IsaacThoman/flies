@@ -5,7 +5,7 @@
 // so every device that puts it there names it alike; every bite is counted
 // for the room; and nothing is cleared away here, since the room says what goes.
 
-import { FOODS, Pantry } from "@fly/world";
+import { FOODS, Pantry, otherTastes } from "@fly/world";
 import type { Food, FoodKind, World } from "@fly/world";
 import type { Falling } from "../tools/hands.ts";
 import type { FoodWire } from "@fly/net";
@@ -85,7 +85,7 @@ export class TablePantry extends Pantry {
     const id = foundId(name, x, z);
     const known = this.foods.find((f) => f.id === id);
     if (known) return known;
-    const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, water: 0, bitter: 0, amount: 1, pool: false };
+    const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, ...otherTastes([], 0, "found", name), amount: 1, pool: false };
     this.foods.push(food);
     this.onFound(food, lasts);
     return food;

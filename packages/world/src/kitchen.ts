@@ -1,3 +1,4 @@
+import { TASTES } from "./tastes.ts";
 import type { FoodPatch } from "./pantry.ts";
 import type { Solid } from "./shapes.ts";
 import type { Place } from "./world.ts";
@@ -214,23 +215,23 @@ export const KITCHEN_SOLIDS: readonly Solid[] = [
 ];
 
 export const KITCHEN_PATCHES: readonly FoodPatch[] = [
-  { name: "banana", x: -158, z: -96, r: 5, sweet: 0.95 },
-  { name: "peach juice", x: 51, z: 170, r: 7, sweet: 0.9 },
-  { name: "peach juice", x: 68, z: 176, y: 14, r: 9, sweet: 0.9, pool: true },
-  { name: "grape juice", x: -151, z: 0, r: 4, sweet: 0.8 },
+  { name: "banana", x: -158, z: -96, r: 5, ...TASTES.banana },
+  { name: "peach juice", x: 51, z: 170, r: 7, ...TASTES.peach },
+  { name: "peach juice", x: 68, z: 176, y: 14, r: 9, ...TASTES.peach, pool: true },
+  { name: "grape juice", x: -151, z: 0, r: 4, ...TASTES.grapeJuice },
   {
     name: "orange juice",
     x: KITCHEN_GLASS.x,
     z: KITCHEN_GLASS.z,
     y: KITCHEN_GLASS.juice,
     r: 30,
-    sweet: 0.65,
+    ...TASTES.orangeJuice,
     pool: true,
   },
-  { name: "honey", x: 305, z: 160, r: 10, sweet: 1, pool: true },
+  { name: "honey", x: 305, z: 160, r: 10, ...TASTES.honey, pool: true },
   // A splash spilt pouring it.
-  { name: "orange juice", x: 225, z: -20, r: 8, sweet: 0.65, pool: true },
-  { name: "crumbs", x: 98, z: 183, r: 12, sweet: 0.25 },
+  { name: "orange juice", x: 225, z: -20, r: 8, ...TASTES.orangeJuice, pool: true },
+  { name: "crumbs", x: 98, z: 183, r: 12, ...TASTES.toast },
 ];
 export const KITCHEN: Place = {
   floor: { kind: "rect", ...COUNTER },

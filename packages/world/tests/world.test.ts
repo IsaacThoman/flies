@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { AMBIENT_TEMPERATURE, FOODS, LACED_BITTER, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TABLE_RADIUS, World, createPicnic, createSurface, isDropped, otherTastes } from "../src/index.ts";
+import { AMBIENT_TEMPERATURE, FOODS, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TASTES, TABLE_RADIUS, World, createPicnic, createSurface, isDropped, otherTastes } from "../src/index.ts";
 import type { RayHit, Solid } from "../src/index.ts";
 
 /** A bare round table this wide, with nothing on it. */
@@ -110,18 +110,20 @@ test("eating takes food down, dropped food is gone when eaten, patches come back
   assert.equal(water.sweet, 0);
 });
 
-test("dropped coffee is bitter and nothing else; bitter sugar is sugar spoiled with it, and a room rebuilds both by kind", () => {
+test("dropped coffee is an espresso and bitter sugar a lump soaked in one, and a room rebuilds both by kind", () => {
   const pantry = new Pantry(openTable(300));
   const coffee = pantry.drop("coffee", 0, 0);
-  assert.deepEqual([coffee.sweet, coffee.water, coffee.bitter], [0, 0, 1]);
+  assert.deepEqual([coffee.sweet, coffee.water, coffee.bitter], [TASTES.espresso.sweet, TASTES.espresso.water, TASTES.espresso.bitter]);
+  assert.equal(coffee.bitter, 1);
   const laced = pantry.drop("laced", 50, 0);
-  assert.deepEqual([laced.sweet, laced.water, laced.bitter], [FOODS.sugar.sweet, 0, LACED_BITTER]);
-  // Where the brain's measurements put bitterness that stops a starved fly feeding on full sugar (0.25 and over).
-  assert.ok(LACED_BITTER >= 0.25 && LACED_BITTER < FOODS.coffee.bitter);
+  assert.deepEqual([laced.sweet, laced.water, laced.bitter], [TASTES.sugaredEspresso.sweet, TASTES.sugaredEspresso.water, TASTES.sugaredEspresso.bitter]);
+  // As sweet as sugar; the sugar dissolved in its coffee thins the caffeine.
+  assert.equal(laced.sweet, FOODS.sugar.sweet);
+  assert.ok(laced.bitter > 0 && laced.bitter < coffee.bitter);
   assert.equal(pantry.touching(50, 0, 0, 0.3), laced);
   // The wire carries sweetness alone: the rest comes from the kind.
-  assert.deepEqual(otherTastes([], laced.id, "laced", laced.name), { water: 0, bitter: LACED_BITTER });
-  assert.deepEqual(otherTastes([], coffee.id, "coffee", coffee.name), { water: 0, bitter: 1 });
+  assert.deepEqual(otherTastes([], laced.id, "laced", laced.name), { water: laced.water, bitter: laced.bitter });
+  assert.deepEqual(otherTastes([], coffee.id, "coffee", coffee.name), { water: coffee.water, bitter: 1 });
 });
 
 test("at most a few dropped foods at once: the oldest makes way", () => {

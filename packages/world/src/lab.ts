@@ -6,6 +6,7 @@
 // in millimetres; a fruit fly is about 2.5 mm long. The bench's centre is the
 // origin, its top is y = 0, the windows lie toward -z and the room toward +z.
 
+import { TASTES } from "./tastes.ts";
 import type { FoodPatch } from "./pantry.ts";
 import type { Solid } from "./shapes.ts";
 import { World } from "./world.ts";
@@ -131,11 +132,11 @@ export const LAB_SOLIDS: readonly Solid[] = [
 /** The bench's own food. Heights come from the surface under each. */
 export const LAB_PATCHES: readonly FoodPatch[] = [
   // The agar, sweet with grape juice.
-  { name: "grape agar", x: AGAR_DISH.x, z: AGAR_DISH.z, r: AGAR_DISH.r * 0.9, sweet: 0.75 },
+  { name: "grape agar", x: AGAR_DISH.x, z: AGAR_DISH.z, r: AGAR_DISH.r * 0.9, ...TASTES.grapeAgar },
   // Drips of cornmeal and molasses food, spilt when the vials were filled.
-  { name: "fly food", x: 48, z: -24, r: 4.5, sweet: 0.85 },
-  { name: "fly food", x: 36, z: -8, r: 2.6, sweet: 0.85 },
-  { name: "fly food", x: 104, z: -30, r: 3.4, sweet: 0.85 },
+  { name: "fly food", x: 48, z: -24, r: 4.5, ...TASTES.flyFood },
+  { name: "fly food", x: 36, z: -8, r: 2.6, ...TASTES.flyFood },
+  { name: "fly food", x: 104, z: -30, r: 3.4, ...TASTES.flyFood },
 ];
 
 /** Where the fly first stands, and which way it faces: toward the drips of food and the open vial. */

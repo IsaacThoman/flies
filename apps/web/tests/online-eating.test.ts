@@ -9,7 +9,7 @@ import type { TableHost } from "../src/online/online.ts";
 import { Hands } from "../src/tools/hands.ts";
 import { Hunger } from "@fly/body";
 import { DROP_ID, TableFood, toWire } from "@fly/net";
-import { createPicnic } from "@fly/world";
+import { FOODS, createPicnic } from "@fly/world";
 import { TablePantry } from "../src/online/table-pantry.ts";
 
 for (const outcome of ["refused", "trimmed", "accepted"] as const) test(`${outcome} nutrition comes only from acknowledged eating`, () => {
@@ -33,9 +33,9 @@ for (const outcome of ["refused", "trimmed", "accepted"] as const) test(`${outco
   const changed = table.flush()!;
   const meal = pantry.mirror.apply(1, changed.amounts, changed.gone, table.eaten.get(1) ?? 0, table.takeMeal(1));
   assert.ok(Math.abs(meal[0] - result.granted) < 1e-8);
-  assert.ok(Math.abs(meal[1] - result.granted * 0.8) < 1e-8);
+  assert.ok(Math.abs(meal[1] - result.granted * FOODS.berry.sweet) < 1e-8);
   hunger.step(0.1, meal[1]);
-  expected.step(0.1, result.granted * 0.8);
+  expected.step(0.1, result.granted * FOODS.berry.sweet);
   assert.deepEqual(hunger, expected);
   assert.equal(pantry.mirror.pending, 0);
   assert.ok(Math.abs((pantry.foods[0]?.amount ?? 0) - (table.find(mine.id)?.amount ?? 0)) < 1e-4);
