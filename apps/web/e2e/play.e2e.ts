@@ -378,7 +378,7 @@ try {
   await toTool("feather");
   await page.keyboard.down("Enter");
   await waitFor(page, "touch>0.9");
-  const inside = await waitFor(page, "glow~.");
+  const inside = await waitWithin(page, "glow~head-bristles|bristles", 10);
   await page.keyboard.up("Enter");
   console.log(`  glowing while stroked: ${inside.glow.split(" ").slice(0, 4).join(" ")}`);
   assert.ok(/head-bristles|bristles/.test(inside.glow), `the touch it feels lights its touch neurons: ${inside.glow}`);
@@ -492,18 +492,69 @@ try {
   assert.equal(new Set(companions.map((c) => `${c.x},${c.z}`)).size, 2, "companions stand apart");
   await waitFor(page, "crowd=2");
   await waitFor(page, "screen=play");
-  // A brain can rest for a while; observe each companion for at most 30 seconds of fly time.
-  const moved = new Set<number>();
-  for (let i = 0; i < 15 && moved.size < companions.length; i++) {
-    await waitForGameTime(page, 2);
-    const living = companyOf(await readState(page));
-    for (const [j, c] of living.entries()) {
-      assert.equal(c.crowd, 2, "each fly meets the other two");
-      assert.ok(c.eyes > companions[j].eyes, "each fly keeps seeing");
-      if (Math.hypot(c.x - companions[j].x, c.z - companions[j].z) > 0.05) moved.add(j);
+  // Rest is a valid answer. Observe the real commands through the game's exposed
+  // Life objects, including their handoff to each body's intent, without asking
+  // the connectome to choose walking (or any other particular action).
+  const driving = await page.evaluate(() => new Promise<{
+    updates: number; ownCommands: boolean; ownIntent: boolean; live: boolean;
+  }[]>((resolve, reject) => {
+    const game = (globalThis as unknown as { __fly: Game }).__fly;
+    const lives = game.company.list.map((c) => c.life);
+    if (new Set([game.brain, ...lives.map((life) => life.brain)]).size !== 3) {
+      reject(new Error("each fly must have a separate brain driver"));
+      return;
     }
+    const probes = lives.map((life) => {
+      const update = life.behavior.update;
+      const step = life.body.step;
+      const probe = { updates: 0, ownCommands: true, ownIntent: true, live: false, at: life.brain.stateAt };
+      life.behavior.update = function (command, ...args) {
+        probe.ownCommands &&= command === (life.brain.state?.command ?? null);
+        if (life.brain.stateAt > probe.at) {
+          probe.updates++;
+          probe.at = life.brain.stateAt;
+        }
+        return update.call(this, command, ...args);
+      };
+      life.body.step = function (intent, ...args) {
+        probe.ownIntent &&= intent === life.intent;
+        probe.live ||= intent.live;
+        return step.call(this, intent, ...args);
+      };
+      return { probe, restore: () => { life.behavior.update = update; life.body.step = step; } };
+    });
+    const started = game.time;
+    const until = started + 30;
+    let frame = 0;
+    const finish = () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+      for (const p of probes) p.restore();
+    };
+    const timer = setTimeout(() => {
+      finish();
+      reject(new Error("companion command observation: game did not advance in 120 s"));
+    }, 120_000);
+    const sample = () => {
+      if ((game.time >= started + 2 && probes.every(({ probe }) => probe.updates >= 2 && probe.live)) || game.time >= until) {
+        finish();
+        resolve(probes.map(({ probe }) => probe));
+      } else frame = requestAnimationFrame(sample);
+    };
+    sample();
+  }));
+  for (const [i, result] of driving.entries()) {
+    assert.ok(result.updates >= 2, `companion ${i}: its own brain keeps producing motor commands`);
+    assert.ok(result.ownCommands, `companion ${i}: behavior consumes its own brain's commands`);
+    assert.ok(result.ownIntent && result.live, `companion ${i}: its body receives its own live intent`);
   }
-  assert.equal(moved.size, 2, "both companion brains move their own bodies");
+  const living = companyOf(await readState(page));
+  assert.equal(living.length, 2);
+  for (const [i, c] of living.entries()) {
+    assert.equal(c.brain, "running");
+    assert.equal(c.crowd, 2, "each fly meets the other two");
+    assert.ok(c.eyes > companions[i].eyes, "each fly keeps seeing");
+  }
   await page.reload();
   await disableScreensaver(page);
   await waitFor(page, "brain=running,screen=title", 120_000);
