@@ -18,22 +18,28 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
       wiring_(io::wire(connectome)),
       sim_(params::build(connectome, seed)),
       // A separate stream from the Poisson inputs', which input_seed derives from the same seed.
-      state_(seed ^ 0x5bd1e995u) {
+      state_(seed ^ 0x5bd1e995u),
+      modulation_(connectome, wiring_) {
   sense_inputs_.assign(wiring_.senses.size(), 0);
   for (size_t k = 0; k < wiring_.senses.size(); k++) {
     if (!wiring_.senses[k].spec.after_eyes) sense_inputs_[k] = sim_.add_input(wiring_.senses[k].spec.name, wiring_.senses[k].neurons);
   }
   for (const io::Group& group : wiring_.background) background_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
-  // Hunger scales how strongly the sweet neurons' spikes reach their targets (io.ts, HUNGER), and thirst the water neurons' (THIRST).
+  // Thirst scales how strongly the water neurons' spikes reach their targets (io.ts, THIRST).
   for (const io::Group& group : wiring_.senses) {
-    if (group.spec.sense == io::kSweet) sweet_gain_ = sim_.add_output_gain(group.spec.name, group.neurons);
-    else if (group.spec.sense == io::kWater) water_gain_ = sim_.add_output_gain(group.spec.name, group.neurons);
+    if (group.spec.sense == io::kWater) water_gain_ = sim_.add_output_gain(group.spec.name, group.neurons);
   }
   for (const io::ReadoutGroup& group : wiring_.readouts) {
     sim_.add_readout(group.spec.name, group.neurons);
     rate_names_.push_back(group.spec.name);
     rates_.push_back(0);
   }
+  sim_.set_tally(modulation_.sources);
+  for (uint32_t r = 0; r < modulation_.routes.size(); r++) {
+    const auto& route = modulation_.routes[r];
+    if (route.release && !route.carriers.empty()) release_.push_back({r, sim_.add_output_gain("release " + route.receptor, route.carriers)});
+  }
+  if (!modulation_.excitable.empty()) modulated_ = sim_.add_excitability("modulated", modulation_.excitable);
   // Every region is reported, after the readouts, whether or not it has neurons (an empty one stays at 0).
   std::vector<uint8_t> region_of = regions::of(connectome);
   region_sizes_.assign(regions::ids().size(), 0);
@@ -115,7 +121,9 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
     sim_.set_rate(sense_inputs_[k], group.max_rate * io::intensity(senses, group.spec.sense) * (group.spec.gated ? gate : 1));
   }
   const double hunger = io::hunger_of(senses);
-  sim_.set_output_gain(sweet_gain_, io::sweet_output_gain(hunger));
+  modulation_.set_state(senses, hunger);
+  modulation_.update(0);
+  modulate();
   state_.set_hunger(hunger);
   sim_.set_output_gain(water_gain_, io::water_output_gain(io::thirst_of(senses)));
   for (size_t k = 0; k < wiring_.state.size(); k++) {
@@ -167,6 +175,9 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
     sim_.advance(chunk);
     const double ran = sim_.time() - before;
     if (ran <= 0) continue;
+    sim_.drain_tally(modulation_.counts);
+    modulation_.update(ran);
+    modulate();
     sim_.drain_readouts(counts_);
     for (size_t r = 0; r < wiring_.readouts.size(); r++) {
       const double hz = (counts_[r] / static_cast<double>(wiring_.readouts[r].neurons.size()) / ran) * 1000;
@@ -190,6 +201,11 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
   stats.spikes = sim_.spikes() - spikes_before;
   stats.active = sim_.active();
   return io::decode(rates_);
+}
+
+void Brain::modulate() {
+  for (const auto& [route, group] : release_) sim_.set_output_gains(group, modulation_.routes[route].factors);
+  if (!modulation_.excitable.empty()) sim_.set_excitability(modulated_, modulation_.bias);
 }
 
 }  // namespace fly

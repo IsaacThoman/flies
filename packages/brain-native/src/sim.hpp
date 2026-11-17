@@ -170,13 +170,23 @@ class Simulation {
   void set_rates(uint32_t input, std::span<const double> rates_hz);
 
   /**
-   * Adds a group of neurons whose outgoing weights set_output_gain scales, all
-   * together (sim.ts's addOutputGain): how strongly each spike of theirs
+   * Adds a group of neurons whose outgoing weights set_output_gains scales, each
+   * by its own factor (sim.ts's addOutputGain): how strongly each spike of theirs
    * reaches its targets, not whether they fire. Starts at 1; returns its index.
    */
   uint32_t add_output_gain(const std::string& name, std::span<const uint32_t> neurons);
-  /** Scales a group's outgoing weights by factor (above 0) times their weights at 1, from the next spike delivered on. */
+  /** Scales each member's outgoing weights by its factor (above 0) times their weights at 1, from the next spike delivered on. */
+  void set_output_gains(uint32_t group, std::span<const double> factors);
+  /** Scales every member's outgoing weights by the same factor (sim.ts's setOutputGain). */
   void set_output_gain(uint32_t group, double factor);
+  const std::vector<uint32_t>& output_gain_members(uint32_t group) const { return output_gains_.at(group).members; }
+  uint32_t add_excitability(const std::string& name, std::span<const uint32_t> neurons);
+  void set_excitability(uint32_t group, std::span<const double> mv);
+  const std::vector<uint32_t>& excitability_members(uint32_t group) const { return excitability_.at(group).members; }
+  void set_tally(std::span<const uint32_t> neurons);
+  void drain_tally(std::vector<uint32_t>& into);
+  void set_weights(std::span<const float> weights);
+  void reset();
 
   /** Adds a group of neurons whose spikes drain_readouts counts; returns its index. */
   uint32_t add_readout(const std::string& name, std::span<const uint32_t> neurons);
@@ -222,12 +232,15 @@ class Simulation {
     bool on;
     bool withdraw;
     std::variant<PoissonInput, RatedPoissonInput> source;
+    std::vector<double> rates = {};
   };
 
   template <bool kCleanup>
   uint32_t sweep(uint32_t* out);
   uint32_t sweep_biased(uint32_t* out, uint32_t fired);
   void join(uint32_t i);
+  void rebuild_biased();
+  void scale_outputs(size_t group, size_t member);
   void merge_tail(uint32_t* out, uint32_t sorted, uint32_t fired);
   std::vector<uint32_t> members(std::span<const uint32_t> neurons, const std::string& what) const;
   void check_name(const std::string& name) const;
@@ -275,15 +288,19 @@ class Simulation {
   std::vector<Input> inputs_;
   std::vector<uint32_t> scratch_;
 
-  // Groups whose outgoing weights are scaled together: each group's edges,
-  // those edges' weights at factor 1, and the factor now.
+  // Per-member output gains keep unscaled weights so changes never compound.
   struct OutputGain {
     std::string name;
-    std::vector<uint32_t> edges;
+    std::vector<uint32_t> members, starts, edges;
     std::vector<float> base;
-    double factor = 1;
+    std::vector<double> factors;
   };
   std::vector<OutputGain> output_gains_;
+  struct Excitability { std::string name; std::vector<uint32_t> members; };
+  std::vector<Excitability> excitability_;
+  std::vector<uint8_t> pinned_;
+  std::vector<int32_t> tally_index_;
+  std::vector<uint32_t> tally_;
 
   std::vector<std::string> readout_names_;
   std::vector<std::vector<uint32_t>> readout_members_;

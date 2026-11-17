@@ -1,4 +1,5 @@
 #include "io.hpp"
+#include "params.hpp"
 
 #include <cmath>
 #include <initializer_list>
@@ -138,14 +139,16 @@ std::vector<InputSpec> background() {
 
 // Internal state the connectome can't supply, fed to the real neurons that
 // carry it in the fly (io.ts's STATE_INPUTS says why each).
+bool dfb_sleep(std::string_view t) { return (t.starts_with("FB6") || t.starts_with("FB7")) && !params::dfb_dopaminergic(t); }
+
 std::vector<StateSpec> state_inputs() {
   return {
       {"clock morning", "The morning oscillator's clock neurons, s-LNv and l-LNv (the M cells)", query({{kType, one_of({"s-LNv", "l-LNv"})}}), 5,
        kClockMorning},
       {"clock evening", "The evening oscillator's clock neurons, LNd and the 5th s-LNv (the E cells)",
        query({{kType, one_of({"LNd_b", "LNd_c", "5thsLNv_LNd6"})}}), 5, kClockEvening},
-      {"sleep pressure", "Tangential neurons of the fan-shaped body's dorsal layers 6 and 7 (FB6, FB7) and the R5 ring neurons (ER5)",
-       query({{kType, [](std::string_view t) { return t.starts_with("FB6") || t.starts_with("FB7") || t == "ER5"; }}}), 10, kSleepPressure},
+      {"sleep pressure", "The R5 ring neurons (ER5)",
+       query({{kType, [](std::string_view t) { return t == "ER5"; }}}), 10, kSleepPressure},
   };
 }
 
@@ -212,6 +215,10 @@ Wiring wire(const Connectome& c) {
     std::vector<uint32_t> neurons = c.find(spec.select);
     if (!neurons.empty()) w.thermo.push_back({std::move(spec), std::move(neurons)});
   }
+  NeuronQuery sleepy{};
+  sleepy[kType] = dfb_sleep;
+  auto excitable = c.find(sleepy);
+  if (!excitable.empty()) w.excitability.push_back({kSleepPressure, 7, std::move(excitable)});
   for (ReadoutSpec& spec : readouts()) {
     std::vector<uint32_t> neurons = c.find(spec.select);
     w.readouts.push_back({std::move(spec), std::move(neurons)});
@@ -233,6 +240,7 @@ Wiring wire(const Connectome& c) {
   }
   for (const StateGroup& group : w.state) driven.insert(group.neurons.begin(), group.neurons.end());
   for (const ThermoGroup& group : w.thermo) driven.insert(group.neurons.begin(), group.neurons.end());
+  for (const auto& group : w.excitability) driven.insert(group.neurons.begin(), group.neurons.end());
   for (const ReadoutGroup& group : w.readouts) {
     for (uint32_t i : group.neurons) {
       if (driven.count(i) != 0) throw std::runtime_error("Neuron " + std::to_string(i) + " is both driven and read (readout \"" + group.spec.name + "\")");
@@ -261,11 +269,6 @@ double intensity(const Senses& s, Sense sense) {
 }
 
 double hunger_of(const Senses& s) { return std::isfinite(s.hunger) ? js::min(1, js::max(0, s.hunger)) : 1; }
-
-// io.ts's HUNGER.sated: a just-fed fly's sweet neurons pass on 1/1.4 of a starved one's.
-constexpr double kSated = 1 / 1.4;
-
-double sweet_output_gain(double hunger) { return kSated + (1 - kSated) * hunger; }
 
 double thirst_of(const Senses& s) { return std::isfinite(s.thirst) ? js::min(1, js::max(0, s.thirst)) : 1; }
 

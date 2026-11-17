@@ -1,3 +1,4 @@
+import { OCTOPAMINERGIC, DFB_DOPAMINERGIC } from "../../brain/src/params.ts";
 // The eyes, built natively and as WebAssembly, against the TypeScript's: the column table is the one in
 // eye-columns.ts (src/eye_columns.cpp is generated from it and must be
 // current), fly_brain_eye_directions gives the very floats of the
@@ -110,6 +111,9 @@ for (const target of BUILDS) {
       "LPLC2", "LPLC", "LLPC1", "LPC1", "LPCx", "LC4 ", "xLC4", "Tm1é", "T4é", "LC١"]) {
       types.add(each);
     }
+    for (const t of ["OA-", "OA-a", "OA-a\r", "OA-a\u2028", "OA-a\u2029", "DNd02", "DNd03", "DNg34", "DNge138", "DNge149", "DNge150", "DNge152", "DNg66", "FB5H", "FB6H", "FB7B", "FB6A_a"]) {
+      for (const v of [t, t + "x", "x" + t, t.slice(0, -1), t.toLowerCase()]) types.add(v);
+    }
     const random = mulberry32(9);
     const alphabet = "LCTmYiPab12345dzA_ é";
     for (let k = 0; k < 20000; k++) {
@@ -122,7 +126,7 @@ for (const target of BUILDS) {
     const list = [...types].filter((t) => !t.includes("\n"));
     const columnar = /^(L[1-5]|C[23]|T[1-5][a-d]?|Tm\d+[a-zA-Z]*|TmY\d+[a-z]*|Y\d+|Mi\d+)$/;
     const lines = harness(target.dir(), ["patterns"], list.join("\n") + "\n");
-    const expected = list.map((t) => [columnar.test(t), /^T[45][a-d]$/.test(t), /^(LC|LPLC|LLPC|LPC)\d/.test(t)].map(Number).join(" "));
+    const expected = list.map((t) => [columnar.test(t), /^T[45][a-d]$/.test(t), /^(LC|LPLC|LLPC|LPC)\d/.test(t), OCTOPAMINERGIC.test(t), DFB_DOPAMINERGIC.includes(t), /^FB[67]/.test(t) && !DFB_DOPAMINERGIC.includes(t)].map(Number).join(" "));
     const wrong = list.filter((_, k) => lines[k] !== expected[k]).map((t) => JSON.stringify(t));
     assert.deepEqual(wrong.slice(0, 10), []);
     assert.ok(lines.filter((line) => line.startsWith("1")).length > 50);

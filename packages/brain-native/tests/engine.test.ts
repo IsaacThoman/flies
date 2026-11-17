@@ -12,7 +12,7 @@ import { test } from "node:test";
 import { Simulation, mulberry32 } from "../../brain/src/sim.ts";
 import { BUILDS, harness, hex32 } from "./compare.ts";
 
-type Change = { step: number; input: number; rate: number } | { step: number; bias: number[] | null } | { step: number; rated: number; rates: number[] };
+type Change = { step: number; factors: number[] } | { step: number; excite: number[]; mv: number[] } | { step: number; mv: number[] } | { step: number; weights: number[] } | { step: number; input: number; rate: number } | { step: number; bias: number[] | null } | { step: number; rated: number; rates: number[] };
 
 type Spec = {
   ptr: number[];
@@ -93,6 +93,10 @@ function randomSpec(seed: number): Spec {
     const which = Math.floor(random() * rated.length);
     changes.push({ step: Math.floor(random() * steps), rated: which, rates: rates(rated[which].neurons.length) });
   }
+  changes.push({ step: 10, factors: [0.25, 1.7, 2] }, { step: 80, factors: [0.25, 1, 0.5] },
+    { step: 100, excite: [7, 2, 7, 0], mv: [0, 0, 0] }, { step: 120, mv: [8.5, -2, 3.1] },
+    { step: 300, mv: [0, 0, 0] }, { step: 500, mv: [9, 7.8, 1] }, { step: 900, bias: null },
+    { step: 950, factors: [1.3, 1, 0.8] }, { step: 1100, weights: gain.map((g) => f(g * 0.71)) });
   changes.sort((a, b) => a.step - b.step);
   return {
     ptr,
@@ -145,6 +149,10 @@ function typescript(spec: Spec): string[] {
   );
   spec.inputs.forEach((input, k) => sim.addInput(`input ${k}`, input.neurons, input.rate));
   spec.rated.forEach((input, k) => sim.addRatedInput(`rated ${k}`, input.neurons, { withdraw: input.withdraw }));
+  sim.addOutputGain("release", [5, 0, 5, 2]);
+  assert.deepEqual([...sim.outputGainMembers("release")], [0, 2, 5]);
+  sim.setTally([7, 0, 2, 7]);
+  const tally = new Uint32Array(3);
   const lines: string[] = [];
   let next = 0;
   for (let s = 0; s < spec.steps; s++) {
@@ -152,12 +160,35 @@ function typescript(spec: Spec): string[] {
       const change = spec.changes[next++];
       if ("rate" in change) sim.setRate(`input ${change.input}`, change.rate);
       else if ("rates" in change) sim.setRates(`rated ${change.rated}`, change.rates);
+      else if ("factors" in change) sim.setOutputGains("release", change.factors);
+      else if ("weights" in change) sim.setWeights(Float32Array.from(change.weights), spec.postScale ? Float32Array.from(spec.postScale) : undefined);
+      else if ("mv" in change) {
+        if ("excite" in change) {
+          sim.addExcitability("tone", change.excite);
+          assert.deepEqual([...sim.excitabilityMembers("tone")], [0, 2, 7]);
+        }
+        sim.setExcitability("tone", change.mv);
+      }
       else sim.setBias(change.bias ? Float32Array.from(change.bias) : null);
     }
     sim.step();
     lines.push(`${s} ${sim.active}: ${[...sim.lastSpikes()].join(" ")}`);
   }
+  sim.drainTally(tally);
+  lines.push("tally " + [...tally].join(" "));
+  sim.drainTally(tally);
+  lines.push("tally " + [...tally].join(" "));
   for (let i = 0; i < n; i++) lines.push(`${hex32(sim.potential(i))} ${hex32(sim.drive(i))} ${hex32(sim.adaptationOf(i))}`);
+  sim.step();
+  sim.reset();
+  sim.drainTally(tally);
+  lines.push("reset tally " + [...tally].join(" "));
+  for (let s = 0; s < 40; s++) {
+    sim.step();
+    lines.push(`reset ${s} ${sim.active}: ${[...sim.lastSpikes()].join(" ")}`);
+  }
+  sim.drainTally(tally);
+  lines.push("reset tally " + [...tally].join(" "));
   return lines;
 }
 

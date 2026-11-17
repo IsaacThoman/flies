@@ -3,6 +3,7 @@
 // game's 0..1 values. No Node APIs; this runs in the browser game's Web Worker.
 
 import type { Connectome, NeuronQuery } from "./format.ts";
+import { DFB_DOPAMINERGIC } from "./params.ts";
 import type { BrainCommand, BrainSenses } from "./types.ts";
 
 /**
@@ -274,9 +275,9 @@ export const STATE_INPUTS: readonly StateSpec[] = [
   {
     state: "sleepPressure",
     name: "sleep pressure",
-    // Sleep need makes the dorsal fan-shaped body neurons fire (Donlea et al. 2014) and the R5 ring neurons fire more (Liu et al. 2016).
-    description: "Tangential neurons of the fan-shaped body's dorsal layers 6 and 7 (FB6, FB7) and the R5 ring neurons (ER5)",
-    select: { type: (t: string) => /^FB[67]/.test(t) || t === "ER5" },
+    // Sleep need makes the R5 ring neurons fire more (Liu et al. 2016, who called them R2).
+    description: "The R5 ring neurons of the ellipsoid body (ER5)",
+    select: { type: "ER5" },
     maxRate: 10,
   },
 ];
@@ -312,6 +313,37 @@ export const THERMO_INPUTS: readonly ThermoSpec[] = (["left", "right"] as const)
     maxRate: 0,
   },
 ]);
+
+/**
+ * The dorsal fan-shaped body's sleep-promoting neurons: its layers' 6 and 7
+ * tangential neurons (FB6*, FB7*, glutamatergic but for a few with no
+ * prediction), less the three dopaminergic types among them that promote
+ * waking (params.ts, DFB_DOPAMINERGIC).
+ */
+export const DFB_SLEEP: Selection = { type: (t: string) => /^FB[67]/.test(t) && !DFB_DOPAMINERGIC.includes(t) };
+
+/** Internal state that sets the excitability of the real neurons that carry it, mV added to their drive at 1. */
+export type ExcitabilitySpec = { state: StateKey; name: string; description: string; select: Selection; mV: number };
+
+/**
+ * Sleep need makes the dorsal fan-shaped body's sleep-promoting neurons more
+ * excitable: rested, they mostly don't fire to current injected into them;
+ * after sleep loss they do, with higher input resistances and longer time
+ * constants (Donlea, Pimentel & Miesenböck 2014, Neuron 81: 860; Pimentel et
+ * al. 2016). Not a firing rate of their own: a drive under them that the
+ * input they get then fires. At full pressure it brings them to threshold
+ * (7 mV), a round number: as excitable as the neuron model goes without
+ * firing on its own. Dopamine takes it away (modulation.ts, Dop1R2).
+ */
+export const STATE_EXCITABILITY: readonly ExcitabilitySpec[] = [
+  {
+    state: "sleepPressure",
+    name: "sleep pressure",
+    description: "The dorsal fan-shaped body's sleep-promoting neurons (FB6, FB7 but the dopaminergic FB6H and FB7B)",
+    select: DFB_SLEEP,
+    mV: 7,
+  },
+];
 
 /**
  * Spontaneous input, always on: the visual scene a fly at rest still sees.
@@ -371,44 +403,10 @@ export function decode(rates: Readonly<Record<string, number>>): BrainCommand {
   };
 }
 
-/**
- * Hunger (BrainSenses.hunger) acts on the sweet taste neurons' output, not on
- * how fast they fire. Starvation leaves sugar-sensing taste neurons' spiking
- * as it was but raises the calcium that enters their terminals for each
- * spike, through dopamine on their DopEcR receptors, and so how much they
- * release (Inagaki et al. 2012, Cell 148: 583): what the dopaminergic TH-VUM
- * neuron does, firing at about 1 Hz just after a meal and 25 Hz after a day
- * without food (Marella et al. 2012, Neuron 73: 941). Its own output is muted
- * here, as every dopaminergic neuron's is (params.ts), so this gain stands in
- * for it.
- *
- * `sated` is the gain just after a meal against 1 for a day's starvation:
- * dopamine raises the sugar-evoked calcium in the terminals 1.3 to 1.4 fold
- * (ibid., Figure 6G), taken here as release, one for one, so a fed fly's
- * sweet neurons pass on 1/1.4 of a starved one's. Release grows faster than
- * calcium at most synapses, so if anything this understates it. Between the
- * two the gain is linear in hunger, a round assumption.
- *
- * Inagaki et al. measured it in the labellum's Gr5a sugar neurons; the taste
- * pegs' and the pharynx's sugar neurons get the same gain, an assumption.
- *
- * At 1 the brain is what it was before it had a hunger: the synapses'
- * weights stand for a starved fly's, as in the proboscis extension assays,
- * which starve flies first. Which end of the range the weights stand for is
- * a choice the data can't make; it was made when the sweet neurons were
- * still chosen by what they do, and is kept.
- */
-export const HUNGER = { sated: 1 / 1.4 } as const;
-
 /** How hungry the senses say it is, 0..1: 1 (as it was before hunger) when left out or not a number. */
 export function hungerOf(senses: BrainSenses): number {
   const hunger = senses.hunger;
   return typeof hunger === "number" && Number.isFinite(hunger) ? Math.min(1, Math.max(0, hunger)) : 1;
-}
-
-/** The sweet taste neurons' output gain at this hunger (0..1): HUNGER.sated just fed, 1 starved. */
-export function sweetOutputGain(hunger: number): number {
-  return HUNGER.sated + (1 - HUNGER.sated) * hunger;
 }
 
 /**
@@ -425,7 +423,7 @@ export function sweetOutputGain(hunger: number): number {
  * whole gate, put at the one place the model can hold it.
  *
  * `sated` is the gain just after drinking against 1 for a thirsty fly: 1/1.4,
- * chosen by analogy with hunger's on the sweet neurons (HUNGER), for want of
+ * chosen by analogy with dopamine's on the sweet neurons (modulation.ts, DopEcR), for want of
  * a measurement, and linear between. At 1 the brain is what it was before it
  * had a thirst, as hunger's is at 1.
  */
@@ -502,6 +500,8 @@ export type Wiring = {
   state: { spec: StateSpec; neurons: Uint32Array; maxRate: number }[];
   /** The thermoreceptor inputs this connectome has neurons for. */
   thermo: { spec: ThermoSpec; neurons: Uint32Array }[];
+  /** The internal state that sets excitability, where this connectome has its neurons. */
+  excitability: { spec: ExcitabilitySpec; neurons: Uint32Array }[];
   readouts: { spec: ReadoutSpec; neurons: Uint32Array }[];
 };
 
@@ -524,14 +524,15 @@ export function wire(connectome: Connectome): Wiring {
   }
   const state = STATE_INPUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select), maxRate: spec.maxRate })).filter((g) => g.neurons.length > 0);
   const thermo = THERMO_INPUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select) })).filter((g) => g.neurons.length > 0);
+  const excitability = STATE_EXCITABILITY.map((spec) => ({ spec, neurons: select(connectome, spec.select) })).filter((g) => g.neurons.length > 0);
   const readouts = READOUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select) }));
   for (const group of [...senses, ...background, ...readouts]) {
     if (group.neurons.length === 0) throw new Error(`The connectome has no neurons for "${group.spec.name}" (${group.spec.description})`);
   }
   const driven = new Set<number>();
-  for (const group of [...senses, ...background, ...state, ...thermo]) for (const i of group.neurons) driven.add(i);
+  for (const group of [...senses, ...background, ...state, ...excitability, ...thermo]) for (const i of group.neurons) driven.add(i);
   for (const group of readouts) {
     for (const i of group.neurons) if (driven.has(i)) throw new Error(`Neuron ${i} is both driven and read (readout "${group.spec.name}")`);
   }
-  return { senses, background, state, thermo, readouts };
+  return { senses, background, state, excitability, thermo, readouts };
 }

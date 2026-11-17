@@ -106,6 +106,8 @@ Simulation::Simulation(std::vector<uint32_t> ptr, std::vector<Edge> edges, const
     }
   }
   state_.assign(neurons_, Neuron{0, 0, 0, 0});
+  bias_.assign(neurons_, 0);
+  pinned_.assign(neurons_, 0);
   const size_t words = (static_cast<size_t>(neurons_) + 63) / 64;
   in_set_.assign(words, 0);
   listed_.assign(words, 0);
@@ -131,19 +133,20 @@ void Simulation::set_bias(std::span<const float> bias) {
   if (!bias.empty() && bias.size() != neurons_) {
     throw std::invalid_argument("bias has " + std::to_string(bias.size()) + " entries, expected " + std::to_string(neurons_));
   }
+  if (bias.empty()) std::fill(bias_.begin(), bias_.end(), 0);
+  else bias_.assign(bias.begin(), bias.end());
+  rebuild_biased();
+}
+
+void Simulation::rebuild_biased() {
   // Neurons that had a bias rejoin the main sweep, which cuts them once at rest.
   for (uint32_t i : biased_) {
     listed_[i >> 6] |= uint64_t{1} << (i & 63);
     listed_count_++;
   }
   biased_.clear();
-  if (bias.empty()) {
-    bias_.clear();
-    return;
-  }
-  bias_.assign(bias.begin(), bias.end());
   for (uint32_t i = 0; i < neurons_; i++) {
-    if (bias_[i] != 0) biased_.push_back(i);
+    if (bias_[i] != 0 || pinned_[i] != 0) biased_.push_back(i);
   }
   for (uint32_t i : biased_) {
     const uint64_t bit = uint64_t{1} << (i & 63);
@@ -194,24 +197,121 @@ uint32_t Simulation::add_output_gain(const std::string& name, std::span<const ui
   for (const OutputGain& group : output_gains_) {
     if (group.name == name) throw std::invalid_argument("There is already an output gain called \"" + name + "\"");
   }
-  OutputGain group{name, {}, {}, 1};
-  for (uint32_t i : members(neurons, "output gain \"" + name + "\"")) {
+  OutputGain group;
+  group.name = name;
+  group.members = members(neurons, "output gain \"" + name + "\"");
+  group.starts.push_back(0);
+  for (uint32_t i : group.members) {
     for (uint32_t e = ptr_[i]; e < ptr_[i + 1]; e++) {
       group.edges.push_back(e);
       group.base.push_back(edges_[e].weight);
     }
+    group.starts.push_back(static_cast<uint32_t>(group.edges.size()));
   }
+  group.factors.assign(group.members.size(), 1);
   output_gains_.push_back(std::move(group));
   return static_cast<uint32_t>(output_gains_.size() - 1);
 }
 
+void Simulation::scale_outputs(size_t index, size_t m) {
+  const OutputGain& group = output_gains_[index];
+  for (size_t k = group.starts[m]; k < group.starts[m + 1]; k++)
+    edges_[group.edges[k]].weight = static_cast<float>(static_cast<double>(group.base[k]) * group.factors[m]);
+}
+
+void Simulation::set_output_gains(uint32_t index, std::span<const double> factors) {
+  OutputGain& group = output_gains_.at(index);
+  if (factors.size() != group.members.size()) throw std::invalid_argument("\"" + group.name + "\" has " + std::to_string(group.members.size()) + " neurons, not " + std::to_string(factors.size()));
+  for (double factor : factors) if (!(factor > 0 && std::isfinite(factor))) throw std::invalid_argument("An output gain must be a positive number");
+  for (size_t m = 0; m < factors.size(); m++) {
+    if (factors[m] == group.factors[m]) continue;
+    group.factors[m] = factors[m];
+    scale_outputs(index, m);
+  }
+}
+
 void Simulation::set_output_gain(uint32_t index, double factor) {
   OutputGain& group = output_gains_.at(index);
-  // Above 0, so a group that delivers its spikes keeps delivering them (see silent_).
   if (!(factor > 0 && std::isfinite(factor))) throw std::invalid_argument("An output gain must be a positive number");
-  if (factor == group.factor) return;
-  group.factor = factor;
-  for (size_t k = 0; k < group.edges.size(); k++) edges_[group.edges[k]].weight = static_cast<float>(static_cast<double>(group.base[k]) * factor);
+  for (size_t m = 0; m < group.members.size(); m++) {
+    if (factor == group.factors[m]) continue;
+    group.factors[m] = factor;
+    scale_outputs(index, m);
+  }
+}
+
+void Simulation::set_weights(std::span<const float> weights) {
+  if (weights.size() != edges_.size()) throw std::invalid_argument("weights must cover every edge");
+  std::fill(silent_.begin(), silent_.end(), 1);
+  for (uint32_t i = 0; i < neurons_; i++) for (uint32_t e = ptr_[i]; e < ptr_[i + 1]; e++) {
+    edges_[e].weight = weights[e];
+    if (weights[e] != 0) silent_[i] = 0;
+  }
+  for (size_t g = 0; g < output_gains_.size(); g++) {
+    auto& group = output_gains_[g];
+    for (size_t k = 0; k < group.edges.size(); k++) group.base[k] = edges_[group.edges[k]].weight;
+    for (size_t m = 0; m < group.members.size(); m++) scale_outputs(g, m);
+  }
+}
+
+uint32_t Simulation::add_excitability(const std::string& name, std::span<const uint32_t> neurons) {
+  for (const auto& group : excitability_) if (group.name == name) throw std::invalid_argument("There is already an excitability group called \"" + name + "\"");
+  auto list = members(neurons, "excitability \"" + name + "\"");
+  for (uint32_t i : list) if (pinned_[i]) throw std::invalid_argument("Neuron " + std::to_string(i) + " is already in an excitability group");
+  excitability_.push_back({name, list});
+  for (uint32_t i : list) pinned_[i] = 1;
+  rebuild_biased();
+  return static_cast<uint32_t>(excitability_.size() - 1);
+}
+
+void Simulation::set_excitability(uint32_t index, std::span<const double> mv) {
+  const auto& group = excitability_.at(index);
+  if (mv.size() != group.members.size()) throw std::invalid_argument("\"" + group.name + "\" has " + std::to_string(group.members.size()) + " neurons, not " + std::to_string(mv.size()));
+  for (double x : mv) if (!std::isfinite(x)) throw std::invalid_argument("Excitability must be a finite number of mV");
+  for (size_t m = 0; m < mv.size(); m++) bias_[group.members[m]] = static_cast<float>(mv[m]);
+}
+
+void Simulation::reset() {
+  std::fill(state_.begin(), state_.end(), Neuron{0, 0, 0, 0});
+  std::fill(in_set_.begin(), in_set_.end(), 0);
+  std::fill(listed_.begin(), listed_.end(), 0);
+  listed_count_ = 0;
+  biased_.clear();
+  rebuild_biased();
+  std::fill(ring_length_.begin(), ring_length_.end(), 0);
+  for (auto& slot : withdrawn_) slot.clear();
+  last_slot_ = -1;
+  carry_ms_ = 0;
+  steps_ = spikes_ = events_ = 0;
+  std::fill(readout_counts_.begin(), readout_counts_.end(), 0);
+  std::fill(part_counts_.begin(), part_counts_.end(), 0);
+  std::fill(tally_.begin(), tally_.end(), 0);
+  for (uint32_t k = 0; k < inputs_.size(); k++) {
+    auto& input = inputs_[k];
+    const auto neurons = std::visit([](const auto& source) { return source.neurons(); }, input.source);
+    if (std::holds_alternative<RatedPoissonInput>(input.source)) {
+      RatedPoissonInput source(neurons, js::input_seed(seed_, k));
+      const std::vector<double> zero(neurons.size(), 0);
+      source.set_probabilities(input.rates.empty() ? zero : input.rates, dt_ / 1000);
+      input.source = std::move(source);
+    } else {
+      PoissonInput source(neurons, js::input_seed(seed_, k));
+      source.set_probability((input.rate * dt_) / 1000);
+      input.source = std::move(source);
+    }
+  }
+}
+
+void Simulation::set_tally(std::span<const uint32_t> neurons) {
+  const auto list = members(neurons, "tally");
+  tally_index_.assign(neurons_, -1);
+  tally_.assign(list.size(), 0);
+  for (size_t k = 0; k < list.size(); k++) tally_index_[list[k]] = static_cast<int32_t>(k);
+}
+
+void Simulation::drain_tally(std::vector<uint32_t>& into) {
+  into = tally_;
+  std::fill(tally_.begin(), tally_.end(), 0);
 }
 
 uint32_t Simulation::add_rated_input(const std::string& name, std::span<const uint32_t> neurons, bool withdraw) {
@@ -243,6 +343,7 @@ void Simulation::set_rates(uint32_t index, std::span<const double> rates_hz) {
   }
   input.on = on;
   source->set_probabilities(rates_hz, dt_ / 1000);
+  input.rates.assign(rates_hz.begin(), rates_hz.end());
 }
 
 uint32_t Simulation::add_readout(const std::string& name, std::span<const uint32_t> neurons) {
@@ -529,6 +630,10 @@ void Simulation::step() {
     const uint8_t* const part_of = part_of_.data();
     uint32_t* const counts = part_counts_.data();
     for (uint32_t k = 0; k < fired; k++) counts[part_of[out[k]]]++;
+  }
+  if (!tally_index_.empty()) for (uint32_t k = 0; k < fired; k++) {
+    const int32_t t = tally_index_[out[k]];
+    if (t >= 0) tally_[t]++;
   }
 }
 

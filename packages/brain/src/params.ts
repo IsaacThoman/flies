@@ -76,6 +76,17 @@ const type = (c: Connectome, i: number) => c.columns.type.value(i);
 const predicted = (c: Connectome, i: number) => c.columns.nt.value(i);
 const MONOAMINES = new Set(["DA", "SER", "OCT"]);
 
+/**
+ * Cell types known to be octopaminergic by name: every OA- type, and the
+ * descending OA-VL1 and OA-VL2 (DNd02, DNd03) and OA-VPM1 (DNg34), and the
+ * OA-VUMd neurons (DNge138, DNge149, DNge150, DNge152, DNg66), which FlyEM
+ * names as descending neurons and cross-references to Busch et al. (2009)
+ * and Babski et al. (2024).
+ */
+export const OCTOPAMINERGIC = /^(OA-.+|DNd02|DNd03|DNg34|DNge138|DNge149|DNge150|DNge152|DNg66)$/;
+/** The dopaminergic tangential neurons of the dorsal fan-shaped body (Hulse et al. 2021, SS56699), which promote waking. */
+export const DFB_DOPAMINERGIC: readonly string[] = ["FB5H", "FB6H", "FB7B"];
+
 /** Transmitter corrections backed by known biology. */
 export const TRANSMITTER_FIXES: readonly TransmitterFix[] = [
   {
@@ -106,6 +117,18 @@ export const TRANSMITTER_FIXES: readonly TransmitterFix[] = [
       "Antennal lobe local neurons are overwhelmingly GABAergic (Chou et al. 2010). The prediction makes 75 lateral LNs (lLN1, lLN2T, lLN2X and others) cholinergic; wired densely to each other, they then lock the antennal lobe into saturated firing after any olfactory input. The least certain fix.",
     applies: (c, i) => /^lLN/.test(type(c, i)) && predicted(c, i) === "ACH",
     nt: "GABA",
+  },
+  {
+    reason:
+      "The octopaminergic neurons named for it (Busch et al. 2009's clusters, as FlyEM names them, OA-VL1 and OA-VL2 among them as DNd02 and DNd03) are octopaminergic; the prediction makes some glutamatergic, serotonergic or blank.",
+    applies: (c, i) => OCTOPAMINERGIC.test(type(c, i)),
+    nt: "OCT",
+  },
+  {
+    reason:
+      "The wake-promoting PPL1 neurons of the dorsal fan-shaped body (Liu et al. 2012; Ueno et al. 2012), FB5H, FB6H and FB7B in the hemibrain's types (Hulse et al. 2021), are dopaminergic; the prediction is blank.",
+    applies: (c, i) => DFB_DOPAMINERGIC.includes(type(c, i)),
+    nt: "DA",
   },
 ];
 

@@ -499,7 +499,7 @@ test("bias drives a lone neuron tonically and keeps it active; muted neurons del
   assert.equal(sim.potential(2), 0);
 });
 
-test("an output gain scales a group's outgoing weights and nothing else, and at 1 changes nothing", () => {
+test("an output gain scales each member's outgoing weights and nothing else, and at 1 changes nothing", () => {
   // 0 -> 2 with 3 synapses and 1 -> 2 with 4, at 0.5 mV a synapse.
   const net: Network = { ptr: Uint32Array.from([0, 1, 2, 2]), post: Uint32Array.from([2, 2]), count: Uint16Array.from([3, 4]) };
   const drive = (kicked: number, factor: number | null) => {
@@ -507,7 +507,7 @@ test("an output gain scales a group's outgoing weights and nothing else, and at 
     sim.addInput("kick", [kicked], 0);
     if (factor !== null) {
       sim.addOutputGain("taste", [0]);
-      sim.setOutputGain("taste", factor);
+      sim.setOutputGains("taste", [factor]);
     }
     sim.setRate("kick", 1e6);
     sim.step();
@@ -525,10 +525,11 @@ test("an output gain scales a group's outgoing weights and nothing else, and at 
   const sim = new Simulation(net, { gain: Float32Array.from([0.5, 0.5, 0]) });
   sim.addOutputGain("taste", [0]);
   assert.throws(() => sim.addOutputGain("taste", [1]), /already/);
-  assert.throws(() => sim.setOutputGain("smell", 1), /No output gain/);
-  for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) assert.throws(() => sim.setOutputGain("taste", bad), /positive/);
+  assert.throws(() => sim.setOutputGains("smell", [1]), /No output gain/);
+  assert.throws(() => sim.setOutputGains("taste", [1, 1]), /has 1 neurons, not 2/);
+  for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) assert.throws(() => sim.setOutputGains("taste", [bad]), /positive/);
   // Weights set again afterwards keep the factor.
-  sim.setOutputGain("taste", 2);
+  sim.setOutputGains("taste", [2]);
   sim.setWeights(Float32Array.from([1, 1, 0]));
   sim.addInput("kick", [0], 1e6);
   sim.step();
@@ -541,6 +542,104 @@ test("an output gain scales a group's outgoing weights and nothing else, and at 
   again.setRate("kick", 0);
   again.advance(3);
   assert.equal(doubled, again.drive(2));
+});
+
+test("output gains are each member's own, and a member's unchanged factor rewrites nothing", () => {
+  // 0 -> 2 with 3 synapses and 1 -> 2 with 4, at 0.5 mV a synapse.
+  const net: Network = { ptr: Uint32Array.from([0, 1, 2, 2]), post: Uint32Array.from([2, 2]), count: Uint16Array.from([3, 4]) };
+  const drive = (factors: number[] | null) => {
+    const sim = new Simulation(net, { gain: Float32Array.from([0.5, 0.5, 0]) });
+    sim.addInput("kick", [0, 1], 0);
+    if (factors) {
+      sim.addOutputGain("both", [1, 0, 1]);
+      assert.deepEqual([...sim.outputGainMembers("both")], [0, 1]);
+      sim.setOutputGains("both", factors);
+    }
+    sim.setRate("kick", 1e6);
+    sim.step();
+    sim.setRate("kick", 0);
+    sim.advance(3);
+    return sim.drive(2);
+  };
+  const plain = drive(null);
+  assert.equal(drive([1, 1]), plain);
+  // 3 × 0.5 × 2 + 4 × 0.5 × 0.5 against 3 × 0.5 + 4 × 0.5, as drives decayed alike.
+  assert.ok(Math.abs(drive([2, 0.5]) / plain - 4 / 3.5) < 1e-6);
+});
+
+test("one output gain for a whole group is each member's at that factor", () => {
+  const net: Network = { ptr: Uint32Array.from([0, 1, 2, 2]), post: Uint32Array.from([2, 2]), count: Uint16Array.from([3, 4]) };
+  const drive = (set: (sim: Simulation) => void) => {
+    const sim = new Simulation(net, { gain: Float32Array.from([0.5, 0.5, 0]) });
+    sim.addInput("kick", [0, 1], 0);
+    sim.addOutputGain("both", [0, 1]);
+    set(sim);
+    sim.setRate("kick", 1e6);
+    sim.step();
+    sim.setRate("kick", 0);
+    sim.advance(3);
+    return sim.drive(2);
+  };
+  assert.equal(drive((sim) => sim.setOutputGain("both", 1.5)), drive((sim) => sim.setOutputGains("both", [1.5, 1.5])));
+  assert.throws(() => drive((sim) => sim.setOutputGain("both", 0)), /positive/);
+});
+
+test("an excitability group is a bias its members keep, stepped whatever it is", () => {
+  // 0 -> 1 with 25 synapses of 1 mV.
+  const net: Network = { ptr: Uint32Array.from([0, 1, 1, 1]), post: Uint32Array.from([1]), count: Uint16Array.from([25]) };
+  const run = (set: (sim: Simulation) => void) => {
+    const sim = new Simulation(net, { gain: Float32Array.from([1, 0, 0]), seed: 3 });
+    sim.addInput("kick", [0], 30);
+    set(sim);
+    sim.setRecording(true);
+    const trace: number[] = [];
+    for (let k = 0; k < 2000; k++) {
+      sim.step();
+      trace.push(sim.potential(1), sim.drive(1));
+    }
+    return { trace, spikes: [...sim.recording!] };
+  };
+  const biased = run((sim) => sim.setBias(Float32Array.from([0, 3, 8])));
+  const excited = run((sim) => {
+    sim.addExcitability("tone", [2, 1]);
+    assert.deepEqual([...sim.excitabilityMembers("tone")], [1, 2]);
+    sim.setExcitability("tone", [3, 8]);
+  });
+  assert.deepEqual(excited, biased, "the same as setBias's drive, spike for spike and state for state");
+  assert.ok(biased.spikes[2] > 5 && biased.spikes[1] > 0);
+
+  const sim = new Simulation(net, { gain: Float32Array.from([1, 0, 0]) });
+  sim.addExcitability("tone", [2]);
+  assert.ok(sim.isActive(2), "a member is active at 0");
+  sim.advance(100);
+  assert.ok(sim.isActive(2) && sim.active === 1, "and stays so");
+  sim.setBias(null);
+  assert.ok(sim.isActive(2), "clearing the bias leaves it in the group");
+  assert.throws(() => sim.addExcitability("tone", [1]), /already an excitability group called/);
+  assert.throws(() => sim.addExcitability("again", [2]), /already in an excitability group/);
+  assert.throws(() => sim.setExcitability("tone", [1, 2]), /has 1 neurons, not 2/);
+  assert.throws(() => sim.setExcitability("tone", [Number.NaN]), /finite/);
+  assert.throws(() => sim.setExcitability("none", [1]), /No excitability group/);
+});
+
+test("the tally counts each listed neuron's spikes, as the recording does", () => {
+  const net: Network = { ptr: Uint32Array.from([0, 2, 2, 2]), post: Uint32Array.from([1, 2]), count: Uint16Array.from([40, 40]) };
+  const sim = new Simulation(net, { gain: Float32Array.from([1, 0, 0]), seed: 2 });
+  sim.addInput("kick", [0], 200);
+  sim.setTally([2, 0]);
+  sim.setRecording(true);
+  sim.advance(500);
+  const tally = new Uint32Array(2);
+  sim.drainTally(tally);
+  const recorded = sim.recording!;
+  assert.deepEqual([...tally], [recorded[0], recorded[2]]);
+  assert.ok(tally[0] > 50 && tally[1] > 0);
+  sim.drainTally(tally);
+  assert.deepEqual([...tally], [0, 0], "a drain zeroes it");
+  sim.advance(50);
+  sim.reset();
+  sim.drainTally(tally);
+  assert.deepEqual([...tally], [0, 0], "and so does a reset");
 });
 
 test("resetDrive clears the drive at each spike, so one strong input fires a neuron once", () => {

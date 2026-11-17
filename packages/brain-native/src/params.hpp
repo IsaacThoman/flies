@@ -49,6 +49,9 @@ SimulationOptions neuron(uint32_t seed);
 /** Each neuron's transmitter after params.ts's TRANSMITTER_FIXES, applied in order. */
 std::vector<std::string> transmitters(const Connectome& connectome);
 
+bool octopaminergic(std::string_view type);
+bool dfb_dopaminergic(std::string_view type);
+
 /** params.ts's COLUMNAR_CLASSES, /^(L[1-5]|C[23]|T[1-5][a-d]?|Tm\d+[a-zA-Z]*|TmY\d+[a-z]*|Y\d+|Mi\d+)$/, on a cell type. */
 bool columnar_class(std::string_view type);
 

@@ -6,8 +6,9 @@ import type { EyeColumn } from "./eye-columns.ts";
 import { buildEyes } from "./eyes.ts";
 import type { Eyes } from "./eyes.ts";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
-import { SLEEP_EYES, backgroundRates, decode, hungerOf, senseRates, smooth, stateOf, sweetOutputGain, thirstOf, waterOutputGain, wire } from "./io.ts";
+import { SLEEP_EYES, backgroundRates, decode, hungerOf, senseRates, smooth, stateOf, thirstOf, waterOutputGain, wire } from "./io.ts";
 import type { Wiring } from "./io.ts";
+import { Modulation } from "./modulation.ts";
 import { OPERATING_POINT, buildWeights } from "./params.ts";
 import type { OperatingPoint } from "./params.ts";
 import { REGIONS, REGION_RATE_NAMES, REGION_TAU, regionOf } from "./regions.ts";
@@ -50,6 +51,8 @@ export class FlyBrain implements Brain {
   readonly sim: Simulation;
   readonly wiring: Wiring;
   readonly state: InternalState;
+  /** Slow neuromodulation (modulation.ts): every modulatory neuron's level, and what its receptors do. */
+  readonly modulation: Modulation;
   readonly spontaneous: boolean;
   /** Each neuron's region, an index into REGIONS. */
   readonly regions: Uint8Array;
@@ -59,8 +62,9 @@ export class FlyBrain implements Brain {
   #vision: { name: string; size: number }[] = [];
   #regionSizes = new Uint32Array(REGIONS.length);
   #regionCounts = new Uint32Array(REGIONS.length);
-  // The sweet neurons' input, whose output gain hunger sets, and the water neurons', whose output gain thirst sets.
-  #sweet = "";
+  // The output gain groups of the receptors that change release, by route.
+  #release: { route: number; name: string }[] = [];
+  // The water neurons' input, whose output gain thirst sets.
   #water = "";
   /** The eyes' gain last set (SLEEP_EYES), and each eye's rates and L1's withdrawals scaled by it. */
   #eyeGain = 1;
@@ -79,13 +83,27 @@ export class FlyBrain implements Brain {
     this.sim = new Simulation(weights.network, { ...point.neuron, gain: weights.gain, seed });
     for (const { spec, neurons } of this.wiring.senses) if (!spec.afterEyes) this.sim.addInput(spec.name, neurons);
     for (const { spec, neurons } of this.wiring.background) this.sim.addInput(spec.name, neurons);
-    // Hunger scales how strongly the sweet neurons' spikes reach their targets (io.ts, HUNGER), and thirst the water neurons' (THIRST).
+    // Thirst scales how strongly the water neurons' spikes reach their targets (io.ts, THIRST).
     for (const { spec, neurons } of this.wiring.senses) {
-      if (spec.sense === "sweet") this.#sweet = spec.name;
-      else if (spec.sense === "water") this.#water = spec.name;
-      else continue;
+      if (spec.sense !== "water") continue;
+      this.#water = spec.name;
       this.sim.addOutputGain(spec.name, neurons);
     }
+    // Slow neuromodulation: the modulatory neurons' spikes are tallied one by
+    // one, and its receptors set some neurons' release and some's excitability.
+    this.modulation = new Modulation(connectome, {
+      nt: weights.nt,
+      senses: this.wiring.senses.map(({ spec, neurons }) => ({ sense: spec.sense, neurons })),
+      excitability: this.wiring.excitability.map(({ spec, neurons }) => ({ state: spec.state, mV: spec.mV, neurons })),
+    });
+    this.sim.setTally(this.modulation.sources);
+    this.modulation.routes.forEach((route, r) => {
+      if (!route.factors || route.carriers.length === 0) return;
+      const name = `release ${route.spec.receptor}`;
+      this.sim.addOutputGain(name, route.carriers);
+      this.#release.push({ route: r, name });
+    });
+    if (this.modulation.excitable.length > 0) this.sim.addExcitability("modulated", this.modulation.excitable);
     for (const { spec, neurons } of this.wiring.readouts) {
       this.sim.addReadout(spec.name, neurons);
       this.rates[spec.name] = 0;
@@ -147,7 +165,9 @@ export class FlyBrain implements Brain {
     }
     for (const [name, rate] of senseRates(this.wiring, senses)) this.sim.setRate(name, rate);
     const hunger = hungerOf(senses);
-    this.sim.setOutputGain(this.#sweet, sweetOutputGain(hunger));
+    this.modulation.setState(senses, hunger, stateOf);
+    this.modulation.update(0);
+    this.#modulate();
     this.state.hunger = hunger;
     this.sim.setOutputGain(this.#water, waterOutputGain(thirstOf(senses)));
     for (const { spec, maxRate } of this.wiring.state) this.sim.setRate(spec.name, maxRate * stateOf(senses, spec.state));
@@ -192,6 +212,9 @@ export class FlyBrain implements Brain {
       this.sim.advance(chunk);
       const ran = this.sim.time - before;
       if (ran <= 0) continue;
+      this.sim.drainTally(this.modulation.counts);
+      this.modulation.update(ran);
+      this.#modulate();
       this.sim.drainReadouts(this.#counts);
       for (const { spec, neurons } of this.wiring.readouts) {
         const hz = (this.#counts[spec.name] / neurons.length / ran) * 1000;
@@ -227,6 +250,12 @@ export class FlyBrain implements Brain {
       this.thermoreceptors.step(side, temperature[side], ms, rates);
       for (const { spec } of this.wiring.thermo) if (spec.side === side) this.sim.setRate(spec.name, rates[spec.cell]);
     }
+  }
+
+  // Hands what the receptors do now to the simulation: release factors and excitability.
+  #modulate() {
+    for (const { route, name } of this.#release) this.sim.setOutputGains(name, this.modulation.routes[route].factors!);
+    if (this.modulation.excitable.length > 0) this.sim.setExcitability("modulated", this.modulation.bias);
   }
 }
 
