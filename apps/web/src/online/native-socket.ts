@@ -7,6 +7,7 @@
 
 import { NATIVE_SOCKET_CLOSED, NATIVE_SOCKET_OPEN } from "@fly/contracts";
 import type { NativeSocketBridge, OpenTableSocket, TableSocket, TableSocketStatus } from "@fly/contracts";
+import { FLIES_MAX } from "@fly/net";
 
 /** The largest binary message taken: the room's are a few hundred bytes (eight flies' states), and it sends nothing over 4 KB. */
 export const NATIVE_MESSAGE_BYTES = 64 * 1024;
@@ -55,7 +56,8 @@ export class NativeSocket implements TableSocket {
       const m = bridge.next(this.#id, this.#buffer);
       if (m === 0) break;
       if (typeof m === "string") text(m);
-      else binary(this.#view(m));
+      // Longer than any batch the room sends: dropped before a view of its length is kept, so a server can't have one made for every length.
+      else if (m <= FLIES_MAX) binary(this.#view(m));
     }
     this.#poll();
   }

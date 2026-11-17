@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { DINING_ROOM, PASS, RESTAURANT, TABLE_TOPS, WORLDS } from "@fly/world";
 import {
   AIRBORNE, BITES, CLOSE, EATING, FLIES, FLY, FLY_MAX, HANDS, HOLDING, PROTOCOL, createFlyState, decodeBites, decodeFlies, dropOwner,
-  AIR_BEYOND, ROOM_SCALE, TABLETOP_SCALE, encodeBites, encodeFlies, encodeFly, foundId, isTableCode, readState, seqAtOrAfter, stateLength, tableCode, wireScale,
+  AIR_BEYOND, BITES_MAX, MAX_BITES, ROOM_SCALE, TABLETOP_SCALE, bitesEpoch, bitesLength, roomTime, encodeBites, encodeFlies, encodeFly, foundId, isTableCode, readState, seqAtOrAfter, stateLength, tableCode, wireScale,
 } from "../src/index.ts";
 import type { FlyState } from "../src/index.ts";
 
@@ -143,6 +143,38 @@ test("bites carry the food and how much, with the sender's count", () => {
   assert.equal(got[0][0], 3);
   assert.ok(Math.abs(got[0][1] - 0.0123) < 1e-6);
   assert.equal(got[1][0], 2_000_007);
+});
+
+test("bites name the place's epoch after them, where a reader of the bites alone still finds them as before", () => {
+  const view = new DataView(new ArrayBuffer(BITES_MAX));
+  const bites = [{ food: 3, amount: 0.0123 }, { food: 2_000_007, amount: 0.5 }];
+  const n = encodeBites(view, 9, bites, bites.length, 260);
+  assert.equal(n, 21);
+  const tagged = new DataView(view.buffer, 0, n);
+  assert.equal(bitesEpoch(tagged), 260 & 0xff);
+  const got: number[] = [];
+  assert.equal(decodeBites(tagged, (f) => got.push(f)), 9, "the bites are read as they always were");
+  assert.deepEqual(got, [3, 2_000_007]);
+  assert.equal(bitesEpoch(new DataView(view.buffer, 0, encodeBites(view, 9, bites))), null, "a device from before says no epoch");
+  assert.ok(BITES_MAX >= bitesLength(MAX_BITES) + 1);
+});
+
+test("a fly's time on the wire wraps at 2^32 ms, and is read back as the room time nearest the reader's", () => {
+  const wrap = 2 ** 32;
+  for (const now of [0, 1000, wrap - 10, wrap + 5, 3 * wrap + 123_456]) {
+    for (const offset of [-3000, -1, 0, 1, 499, 2000]) {
+      const t = now + offset;
+      if (t < 0) continue;
+      const view = new DataView(new ArrayBuffer(FLY_MAX));
+      const s = createFlyState();
+      s.t = t;
+      encodeFly(view, TABLETOP_SCALE, s);
+      const back = createFlyState();
+      readState(view, 1, TABLETOP_SCALE, back);
+      assert.ok(back.t < wrap);
+      assert.equal(roomTime(back.t, now), t, `${t} read at ${now}`);
+    }
+  }
 });
 
 test("sequence numbers compare across their wrap", () => {
