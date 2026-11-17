@@ -81,8 +81,9 @@ screensaver, using arrow, pointing or grabbing cursors elsewhere. It suppresses 
 selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
 
-The tools are, about the fly, **Feed** (sugar, honey, raspberry, water, and Clear dropped, which
-removes your offerings, including those still falling, leaving the place’s own food), **Tickle** (a feather: resting on
+The tools are, about the fly, **Feed** (sugar, honey, raspberry, water, coffee, bitter sugar,
+and Clear dropped, which removes your offerings, including those still falling, leaving the
+place’s own food; what a fly makes of each is in [the world](world.md#food)), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot) and **Swoop** (a dark
 beach ball dives at the spot and veers away); and, about its world and the
