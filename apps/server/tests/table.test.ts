@@ -705,6 +705,52 @@ test("a clear request removes only the sender's offerings and broadcasts gone id
   assert.deepEqual(table.food.foods.map((f) => f.id), patches);
 });
 
+test("found food deadlines survive a saved idle room and are gone on welcome", () => {
+  const { table, clock, join, send, options } = room();
+  const a = join("key-1");
+  send(a, { type: "found", id: 900000001, name: "strawberry juice", x: 20, z: 20, y: 0, r: 1, sweet: 0.8, lasts: 10, epoch: table.epoch });
+  const saved = table.record();
+  assert.equal(saved.foodExpires?.length, 1);
+  clock.wall += 10001;
+  const restored = new Table(CODE, START, "key-1", 7, options, saved);
+  const link = fakeLink();
+  restored.hello(link, "key-1", { type: "hello", v: PROTOCOL, table: CODE, key: "key-1" });
+  assert.ok(!saidOf(link, "welcome")[0].foods.some((f) => f[0] === 900000001));
+  assert.ok(!restored.record().foods.some((f) => f[0] === 900000001));
+  assert.deepEqual(restored.record().foodExpires, []);
+  clock.wall += 1000;
+  assert.ok(!table.record().foods.some((f) => f[0] === 900000001), "a room that never ticked expires before its next save");
+});
+
+test("a live idle room clears expired food before another welcome", () => {
+  const { table, clock, join, send } = room();
+  const a = join("key-1");
+  send(a, { type: "found", id: 900000001, name: "juice", x: 20, z: 20, y: 0, r: 1, sweet: 0.8, lasts: 10 });
+  clock.wall += 10001;
+  const b = join("key-2");
+  assert.ok(!saidOf(b, "welcome")[0].foods.some((f) => f[0] === 900000001));
+  assert.equal(table.food.find(900000001), null);
+});
+
+test("a replacement found food is announced after the previous lifetime's removal", () => {
+  const { table, clock, join, send, step } = room();
+  const a = join("key-1");
+  const b = join("key-2");
+  const found: ClientMessage = { type: "found", id: 900000001, name: "juice", x: 20, z: 20, y: 0, r: 1, sweet: 0.8, lasts: 10 };
+  send(a, found);
+  clear(b);
+  clock.wall += 10001;
+  table.food.update(0);
+  send(a, found);
+  step(100);
+  const messages = said(b);
+  const gone = messages.findIndex((m) => m.type === "food" && m.gone.includes(found.id));
+  const replacement = messages.findIndex((m) => m.type === "found" && m.food[0] === found.id);
+  assert.ok(gone >= 0 && replacement > gone);
+  assert.ok(!messages.slice(replacement).some((m) => m.type === "food" && m.gone.includes(found.id)));
+  assert.ok(table.food.find(found.id));
+});
+
 test("refused bites are acknowledged and exact nutrition is delivered once", () => {
   const { table, join, bite, step } = room();
   const a = join("key-1");
@@ -752,4 +798,24 @@ test("many unknown-food refusals cannot overflow acknowledgements or lose anothe
   assert.ok(message);
   assert.equal(message.gone.length, 0);
   assert.ok(Math.abs(message.meal![1] - 0.08) < 1e-6);
+});
+
+test("expiry replacement flushes pending bite receipts exactly once", () => {
+  const { table, clock, join, send, bite, step } = room();
+  const a = join("key-1");
+  const p = a.seat.state;
+  const food = table.food.drop(a.seat.id, DROP_ID + 1, "berry", p.x, p.z, p.y)!;
+  const found: ClientMessage = { type: "found", id: 900000001, name: "juice", x: 20, z: 20, y: 0, r: 1, sweet: 0.8, lasts: 10, epoch: table.epoch };
+  send(a, found);
+  clear(a);
+  clock.wall += 10001;
+  bite(a, food.id, 0.1);
+  send(a, found);
+  const receipt = saidOf(a, "food").at(-1)!;
+  assert.equal(receipt.ack, 1);
+  assert.ok(receipt.gone.includes(found.id));
+  assert.ok(Math.abs(receipt.meal![1] - 0.08) < 1e-6);
+  clear(a);
+  step(100);
+  assert.ok(saidOf(a, "food").every((m) => m.meal![1] === 0));
 });

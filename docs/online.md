@@ -466,6 +466,17 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
   backgrounded app, so away is the normal state there; the 10 minutes and
   coming back are what make it work. `docs/ios.md`, "Tables with others".
 
+### Found-food lifetime
+
+Found food carries an optional `lasts` duration (seconds, at most 1520).
+The picnic sends the time left until its juice or crumb finishes fading.
+The room owns that expiry and announces its disappearance as ordinary food
+`gone` IDs. Deadlines use the wall clock and are retained with the table,
+so idle rooms and restarts do not extend a lifetime. Welcome and save both
+clear expired food before taking a snapshot. Older devices and saves omit
+the duration or deadlines and receive the longest picnic lifetime; older
+rooms ignore the additive duration field. Protocol remains 3.
+
 ### Bite acknowledgements
 
 Every processed bite, including a refusal, produces a food acknowledgement:

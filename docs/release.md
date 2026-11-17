@@ -98,6 +98,11 @@ npm run tvos -- archive --version 0.1.1             # signs into apps/tvos/build
 npm run ios -- archive --version 0.1.1 --upload     # and uploads to TestFlight
 ```
 
+Ready pull requests that change Apple host inputs also run `.github/workflows/apple-compile.yml`: both
+hosts compile for a generic simulator on macOS, without signing credentials or a running device.
+The job caches npm downloads, the connectome and Xcode build data. Draft pull requests and
+documentation-only edits skip it; marking a matching draft ready starts the job.
+
 Ready pull requests and pushes to `dev` or `main` that change `packages/brain-native/**`
 (the build script and its pinned SDK version and digests included) or
 `.github/workflows/wasm-repro.yml` run that workflow on macOS. Draft pull requests skip it.
