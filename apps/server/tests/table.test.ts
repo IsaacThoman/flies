@@ -784,13 +784,13 @@ test("a seated device recounts up and down: seated lists its flies and others he
   clear(a, b, c);
   send(a, { type: "flies", count: 4 });
   assert.deepEqual(a.seat.flies.map((f) => f.id), [1, 2, 8]);
-  assert.deepEqual(saidOf(a, "seated"), [{ type: "seated", flies: seated(a) }]);
+  assert.deepEqual(saidOf(a, "seated"), [{ type: "seated", flies: seated(a), asked: 4 }]);
   for (const p of [b, c]) assert.deepEqual(saidOf(p, "joined"), [{ type: "joined", id: 8, colour: COLOURS[7], away: false, of: 1 }]);
   assert.deepEqual(saidOf(a, "joined"), []);
   assert.equal(table.present, 8);
   clear(a, b, c);
   send(a, { type: "flies", count: 1 });
-  assert.deepEqual(saidOf(a, "seated"), [{ type: "seated", flies: seated(a) }]);
+  assert.deepEqual(saidOf(a, "seated"), [{ type: "seated", flies: seated(a), asked: 1 }]);
   assert.equal(a.seat.flies[0], first);
   for (const p of [b, c]) assert.deepEqual(saidOf(p, "left"), [{ type: "left", id: 8 }, { type: "left", id: 2 }]);
   assert.deepEqual(saidOf(a, "left"), []);
@@ -803,19 +803,65 @@ test("a seated device recounts up and down: seated lists its flies and others he
   assert.equal(table.present, 6);
 });
 
-test("fly recounts use the changes rate and resume when its allowance refills", () => {
+test("fly recounts have an allowance of their own: the starter's changes never use it up, and one past it goes unanswered until it refills", () => {
   const { clock, join, send } = room();
   const a = join("key-1");
-  const [perMinute, burst] = LIMITS.changes;
-  for (let i = 0; i < burst; i++) send(a, { type: "flies", count: i % 2 ? 1 : 2 });
+  // The starter spends every change it has on the light: a recount is still answered.
+  for (let i = 0; i < LIMITS.changes[1] + 2; i++) send(a, { type: "world", light: i % 2 ? "noon" : "dusk" });
+  clear(a);
+  send(a, { type: "flies", count: 2 });
+  assert.deepEqual(saidOf(a, "seated"), [{ type: "seated", flies: seated(a), asked: 2 }]);
+  const [perMinute, burst] = LIMITS.recounts;
+  for (let i = 1; i < burst; i++) send(a, { type: "flies", count: i % 2 ? 2 : 1 });
   clear(a);
   send(a, { type: "flies", count: 4 });
-  assert.equal(a.seat.flies.length, 1);
-  assert.deepEqual(saidOf(a, "seated"), []);
+  assert.equal(a.seat.flies.length, 2);
+  assert.deepEqual(saidOf(a, "seated"), [], "dropped, and not answered: the device asks again");
   clock.now += 60_000 / perMinute;
   send(a, { type: "flies", count: 4 });
   assert.equal(a.seat.flies.length, 4);
-  assert.equal(saidOf(a, "seated").length, 1);
+  assert.deepEqual(saidOf(a, "seated"), [{ type: "seated", flies: seated(a), asked: 4 }]);
+});
+
+test("a starter who leaves keeps one seat, not four: their others are given up when needed, the list counts the seat kept, and they come back to what is free", () => {
+  const clock = { now: 0, wall: Date.UTC(2026, 5, 1) };
+  const tables = new Tables({ now: () => clock.now, wall: () => clock.wall });
+  const table = tables.open("key-s", { type: "hello", v: PROTOCOL, table: CODE, key: "key-s", start: { ...START, name: "Ours", listed: true } }, 1) as Table;
+  const sit = (key: string, flies = 1) => table.hello(fakeLink(), key, { type: "hello", v: PROTOCOL, table: CODE, key, flies });
+  const starter = sit("key-s", 4) as Seat;
+  assert.deepEqual(starter.flies.map((f) => f.id), [1, 2, 3, 4]);
+  table.receive(starter, JSON.stringify({ type: "bye" } satisfies ClientMessage));
+  for (const key of ["key-a", "key-b", "key-c", "key-d"]) assert.equal(typeof sit(key), "object");
+  assert.equal(table.present, 4);
+  // Four flies there, and the starter's four seats held until someone needs them: the list says five are taken, the one the starter keeps among them.
+  assert.equal(table.room().flies, 5);
+  assert.deepEqual(tables.listed().map((r) => r.flies), [5]);
+  const e = sit("key-e") as Seat;
+  assert.equal(typeof e, "object", "not refused as full");
+  assert.deepEqual(e.flies.map((f) => f.id), [2]);
+  assert.deepEqual(starter.flies.map((f) => f.id), [1], "the starter keeps their first fly's seat and colour");
+  assert.equal(table.room().flies, 6);
+  const back = sit("key-s", 4) as Seat;
+  assert.equal(back, starter);
+  assert.deepEqual(back.flies.map((f) => f.id), [1, 3, 4], "back, as many as are free");
+  assert.equal(table.room().flies, 8);
+  assert.equal(sit("key-f"), "full");
+});
+
+test("a starter gone after a long time away keeps one seat too, and a seat still on the line is never given up", () => {
+  const { table, clock, join, hello, step } = room();
+  const s = join("key-1", { flies: 4 });
+  const others = ["key-2", "key-3", "key-4", "key-5"].map((key) => join(key));
+  table.disconnected(s.seat, s.link);
+  clock.wall += AWAY_LIMIT + 1000;
+  step();
+  assert.equal(s.seat.present, false);
+  for (const p of others) table.receive(p.seat, JSON.stringify({ type: "ping", t: 0 } satisfies ClientMessage));
+  assert.equal(table.room().flies, 5);
+  const late = table.hello(fakeLink(), "key-6", hello("key-6", { flies: 4 })) as Seat;
+  assert.deepEqual(late.flies.map((f) => f.id), [2, 3, 4]);
+  assert.equal(table.room().flies, 8);
+  assert.equal(table.hello(fakeLink(), "key-7", hello("key-7")), "full");
 });
 
 test("removing any one of a device's flies removes all of them and bans its key", () => {

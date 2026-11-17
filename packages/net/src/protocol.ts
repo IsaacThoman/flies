@@ -429,7 +429,11 @@ export type TableStart = {
   listed?: boolean;
 };
 
-/** A room as the list shows it: its code (to join it), name, place, how many flies are there now, and whether it needs a password. */
+/**
+ * A room as the list shows it: its code (to join it), name, place, how many of
+ * its seats are taken (`flies`: each fly shown there, and the one place a
+ * starter who has gone keeps), and whether it needs a password.
+ */
 export type RoomWire = { code: string; name: string; place: string; flies: number; locked: boolean };
 
 /** What a table says of itself in its welcome: its name, whether it is listed, and whether it is locked. */
@@ -531,8 +535,11 @@ export type ServerMessage =
   | { type: "rooms"; rooms: RoomWire[] }
   | { type: "pong"; t: number; now: number }
   | ({ type: "joined" } & PlayerWire)
-  /** This device's flies now, after it asked for another count (`flies`): as many as there were seats for, each new one with where it is to stand. */
-  | { type: "seated"; flies: SeatedFly[] }
+  /**
+   * This device's flies now, after it asked for another count (`flies`): as many as there were seats for, each new one with where it is to
+   * stand. `asked`: the count this answers.
+   */
+  | { type: "seated"; flies: SeatedFly[]; asked: number }
   | { type: "away"; id: number; away: boolean }
   | { type: "left"; id: number }
   | { type: "drop"; by: number; id: number; kind: string; x: number; z: number; y: number; at: number }

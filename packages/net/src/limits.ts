@@ -201,13 +201,18 @@ export class Rate {
   }
 }
 
-/** Per player: balls thrown, food dropped, food the place put out reported, bubbles burst, and (the starter) changes to the table; and messages of any kind. */
+/**
+ * Per player: balls thrown, food dropped, food the place put out reported, bubbles burst, (the starter) changes to the table, and changes
+ * to how many flies it brings; and messages of any kind. A device's fly count has its own allowance, so a starter busy with the light
+ * and the weather never has a recount dropped.
+ */
 export const LIMITS = {
   throws: [12, 3],
   drops: [30, 6],
   found: [10, 4],
   pops: [120, 10],
   changes: [30, 6],
+  recounts: [20, 6],
   messages: [60 * 60, 120],
 } as const satisfies Record<string, readonly [perMinute: number, burst: number]>;
 

@@ -267,7 +267,7 @@ export class Table {
   }
 
   room(): RoomWire {
-    return { code: this.code, name: this.name, place: this.place, flies: this.present, locked: !!this.lock };
+    return { code: this.code, name: this.name, place: this.place, flies: this.taken, locked: !!this.lock };
   }
 
   /** Whether a device with this key (hashed) may sit down without the password: it has sat here before, or started the table. */
@@ -296,6 +296,17 @@ export class Table {
   get present() {
     let n = 0;
     for (const s of this.seats.values()) if (s.present) n += s.flies.length;
+    return n;
+  }
+
+  /**
+   * How many seats a newcomer can't have: every fly shown, every fly of a
+   * device still on the line, and the one place a starter who has gone keeps.
+   * The rest are free, or theirs who have gone (`#freeIds` gives those up).
+   */
+  get taken() {
+    let n = 0;
+    for (const s of this.seats.values()) n += s.present || s.link ? s.flies.length : s.key === this.#starter ? 1 : 0;
     return n;
   }
 
@@ -338,7 +349,7 @@ export class Table {
       heardAt: this.now,
       lastSeen: this.#options.wall(),
       ack: 0,
-      rates: { throws: rate("throws"), drops: rate("drops"), found: rate("found"), pops: rate("pops"), changes: rate("changes"), messages: rate("messages") },
+      rates: { throws: rate("throws"), drops: rate("drops"), found: rate("found"), pops: rate("pops"), changes: rate("changes"), recounts: rate("recounts"), messages: rate("messages") },
       shortened: 0,
       dropped: 0,
     };
@@ -373,8 +384,10 @@ export class Table {
 
   /**
    * Up to `n` fly ids no seat has, lowest first, for `seat` (or a newcomer, if
-   * null). A seat whose device has been gone longest is given up for them,
-   * whole, if there aren't enough: never the starter's, nor `seat` itself.
+   * null). If there aren't enough, the seats of whoever has gone (not `seat`
+   * itself) are given up for them, whole, the longest gone first; then, if
+   * the starter has gone, all their seats but their first fly's, so the
+   * table keeps their place (and its colour) for when they come back.
    */
   #freeIds(n: number, seat: Seat | null): number[] {
     const free = () => {
@@ -386,8 +399,12 @@ export class Table {
     while (ids.length < n) {
       let oldest: Seat | null = null;
       for (const s of this.seats.values()) if (s !== seat && !s.present && !s.link && s.key !== this.#starter && (!oldest || s.lastSeen < oldest.lastSeen)) oldest = s;
-      if (!oldest) break;
-      this.seats.delete(oldest.id);
+      if (oldest) this.seats.delete(oldest.id);
+      else {
+        const starter = this.starter;
+        if (!starter || starter === seat || starter.present || starter.link || starter.flies.length === 1) break;
+        starter.flies.length = 1;
+      }
       ids = free();
     }
     return ids;
@@ -583,11 +600,14 @@ export class Table {
         this.remove(other);
         return;
       }
-      case "flies":
-        if (!seat.rates.changes.take(now)) return;
-        this.#recount(seat, this.#wanted(m.count));
-        this.#send(seat, { type: "seated", flies: this.#seated(seat) });
+      case "flies": {
+        // One dropped for coming too often goes unanswered: the device asks again until it is answered.
+        if (!seat.rates.recounts.take(now)) return;
+        const asked = this.#wanted(m.count);
+        this.#recount(seat, asked);
+        this.#send(seat, { type: "seated", flies: this.#seated(seat), asked });
         return;
+      }
       case "pop":
         // A device bursting a bubble with its own fly: believed if that bubble was there then.
         if (!finite(m.slot, m.cycle, m.at) || !seat.rates.pops.take(now)) return;
