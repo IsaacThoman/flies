@@ -44,8 +44,8 @@ export type InputSpec = {
 export const STATE_KEYS = ["clockMorning", "clockEvening", "clockSleep", "sleepPressure", "sleepDepth"] as const;
 export type StateKey = (typeof STATE_KEYS)[number];
 
-/** The senses that are one intensity each; `light` is a picture, handled apart, and `hunger`, `thirst` and the clock and sleep internal state, not senses. */
-export type ScalarSense = Exclude<keyof BrainSenses, "light" | "hunger" | "thirst" | StateKey>;
+/** The senses that are one intensity each; `light` is a picture and `odor` a strength per odorant and antenna, handled apart, and `hunger`, `thirst` and the clock and sleep internal state, not senses. */
+export type ScalarSense = Exclude<keyof BrainSenses, "light" | "odor" | "hunger" | "thirst" | StateKey>;
 export type SenseSpec = InputSpec & {
   sense: ScalarSense;
   /**

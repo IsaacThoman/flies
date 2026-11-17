@@ -4,6 +4,7 @@
 // the README explains each.
 
 import type { Connectome, NeuronQuery } from "./format.ts";
+import { ORN_TABLE } from "./orn-table.ts";
 
 export type TransmitterFix = {
   /** What the fix is and why. */
@@ -154,7 +155,29 @@ const jo = (zone: string): CompletenessFix => ({
   select: { superClass: "cb_sensory", type: new RegExp(`^JO-${zone}`) },
 });
 
-export const COMPLETENESS_FIXES: readonly CompletenessFix[] = [jo("C"), jo("E"), jo("F")];
+// The olfactory receptor neurons, glomerulus by glomerulus. A fly's two
+// antennae carry the same neurons, which each glomerulus receives from both
+// sides (Stocker 1994; Couto et al. 2005), but here the left antenna's nerve
+// was traced less completely: in 49 of 53 glomeruli its neurons have fewer
+// output synapses, a median 1.5 times fewer, each neuron fewer too, while
+// both sides' reach the same partner types, ipsilateral and contralateral
+// apart, in the same proportions (cosine similarity 0.95 or more in 42
+// glomeruli). Left as they are, where the two sides' partners are less alike
+// than the least alike Johnston's organ zone corrected above (C, 0.75): DA3
+// (0.72), VA1v (0.62) and VM6l (0.69, whose left neurons are fragments of 20
+// synapses each). scripts/olfaction.ts prints the comparison.
+export const ORN_UNCORRECTED: readonly string[] = ["DA3", "VA1v", "VM6l"];
+const orn = (glomerulus: string): CompletenessFix => ({
+  reason: `Olfactory receptor neurons of ${glomerulus}: the same partners on both sides, but the left antenna's nerve traced less completely`,
+  select: { superClass: "cb_sensory", class: "olfactory", type: `ORN_${glomerulus}` },
+});
+
+export const COMPLETENESS_FIXES: readonly CompletenessFix[] = [
+  jo("C"),
+  jo("E"),
+  jo("F"),
+  ...ORN_TABLE.map((row) => row[0]).filter((g) => !ORN_UNCORRECTED.includes(g)).map(orn),
+];
 
 export const OPERATING_POINT: OperatingPoint = {
   // Shiu et al. 2024's w_syn, for both signs.

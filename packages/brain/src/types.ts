@@ -62,6 +62,14 @@ export type BrainSenses = {
   bitter: number;
   /** Water on the mouthparts: plain water, not a sugary or salty liquid. */
   water: number;
+  /**
+   * What each antenna smells: each odorant's strength there, 0 (none) to 1
+   * (as strong as the 10^-2 dilutions its receptor neurons were recorded
+   * with), in the order of the brain's `ODORANTS` (olfaction.ts). Leave it
+   * out, or an odorant, and there is none of it: the receptor neurons fire at
+   * their resting rates.
+   */
+  odor?: { left: ArrayLike<number>; right: ArrayLike<number> };
   /*
    * Internal state, not senses: the fly's daily clock and its need for
    * sleep, which the connectome can't supply (the clock is molecular and its
