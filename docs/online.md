@@ -206,6 +206,21 @@ colours; a lone fly wears none.
 The four low bubbles that bob past the followed fly stay each device's own, so
 nobody else sees yours.
 
+**What is built stays at home.** Pieces set down with the Build tool
+(`apps/web/src/tools/build.ts`, [the world](world.md#what-you-build)) are
+this device's alone, kept per place in its own storage, and never sent. They
+are in the world only at home. From the moment the player starts a visit
+(even before the room has let the device in, and whatever the visit's place),
+and at a player-created table once it has let the device in, the starter's
+included, the place is as it is made: every fly there has to meet the same
+world with its body and see it with its eyes, and the room's food is worked
+out against that world. So the pieces are put away (out of the world, not
+drawn), and the Build tool says "Only at home" and does nothing. Nobody can
+build in front of someone else's fly, and nobody sees anyone's builds. Go
+home, or leaving the table, brings them back where they were. Sharing them at
+a player's own table would mean the room carrying them, with a newer
+protocol; it doesn't.
+
 ## The wire
 
 One WebSocket for the room, plus a discovery socket while Online browses
