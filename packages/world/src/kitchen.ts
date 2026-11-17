@@ -218,7 +218,8 @@ export const KITCHEN_SOLIDS: readonly Solid[] = [
       c.x,
       c.z - c.hz + (i + 0.5) * ((c.hz * 2) / c.lidSlices),
       c.hx + 2,
-      c.hz / c.lidSlices,
+      // Footprints exclude their edge; a microscopic overlap closes slice seams.
+      c.hz / c.lidSlices + 1e-6,
       c.top + i * ((c.hz * 0.6) / c.lidSlices) + 4,
       c.top + i * ((c.hz * 0.6) / c.lidSlices),
     ),
@@ -227,7 +228,7 @@ export const KITCHEN_SOLIDS: readonly Solid[] = [
 
 export const KITCHEN_PATCHES: readonly FoodPatch[] = [
   { name: "banana", x: -158, z: -96, r: 5, sweet: 0.95 },
-  { name: "peach juice", x: 46, z: 165, r: 7, sweet: 0.9 },
+  { name: "peach juice", x: 51, z: 170, r: 7, sweet: 0.9 },
   { name: "peach juice", x: 68, z: 176, y: 14, r: 9, sweet: 0.9, pool: true },
   { name: "grape juice", x: -151, z: 0, r: 4, sweet: 0.8 },
   {
@@ -247,6 +248,6 @@ export const KITCHEN: Place = {
   floor: { kind: "rect", ...COUNTER },
   solids: KITCHEN_SOLIDS,
   patches: KITCHEN_PATCHES,
-  start: { x: 46, z: 165, y: 40, yaw: -Math.PI / 2 },
+  start: { x: 53, z: 173, y: 40, yaw: -Math.PI / 2 },
   ceiling: 300,
 };

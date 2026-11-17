@@ -70,7 +70,28 @@ export function surfaceMaterial() {
       varying float vKind; varying vec3 vPlace; uniform float uNight; uniform vec3 uSun; uniform float uSoft; uniform float uLamp; uniform vec4 uRings[4]; uniform float uTime;
       ${CLOCK_GLSL}
       float hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+      float columnShade(vec3 p,vec3 s,vec4 c) {
+        vec2 d=c.xy-p.xz;
+        float l=max(dot(s.xz,s.xz),1e-6);
+        float along=dot(d,s.xz)/l;
+        float miss=length(d-s.xz*along);
+        float chord=sqrt(max(c.z*c.z-miss*miss,0.0)/l);
+        if(along+chord<=.05) return 1.0;
+        float t=along-chord>.05?along-chord:along+chord;
+        float y=p.y+s.y*t;
+        float blur=(.55+abs(along)*.018)*(1.0+uSoft*5.0);
+        return 1.0-(1.0-smoothstep(-blur,blur,miss-c.z))*(1.0-smoothstep(-blur,blur,y-c.w))*smoothstep(-.1,.5,y);
+      }
       float noise(vec2 p) { vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
+
+      // The cut fruit's wet fibres are surface relief, below a fly's footstep.
+      float flesh(vec2 p) {
+        vec2 q=p-vec2(25,155);
+        float a=atan(q.y,q.x), r=length(q);
+        float fibres=pow(.5+.5*sin(a*115.0+noise(p*.45)*3.0),10.0);
+        float veins=pow(.5+.5*sin(a*24.0+noise(p*.12)*2.0),18.0);
+        return fibres*(.3+.7*noise(p*1.5))+veins*.45;
+      }
     `,
       )
       .replace(
@@ -79,7 +100,7 @@ export function surfaceMaterial() {
       vec3 p = vPlace; float k = vKind; float micro = noise(p.xz*6.0);
       if(k<0.5) {
         float vein = pow(0.5+0.5*sin(p.x*.026+p.z*.018+noise(p.xz*.009)*10.0),18.0);
-        diffuseColor.rgb *= 0.91 + noise(p.xz*.32)*.09 - vein*.12;
+        diffuseColor.rgb *= 0.91 + noise(p.xz*.32)*.09 - vein*.025;
         float shade = 1.0 - .28*exp(-pow(length((p.xz-vec2(-155,-35))/vec2(125,120)),6.0));
         shade *= 1.0-.25*exp(-pow(length((p.xz-vec2(354,110))/vec2(42,42)),8.0));
         diffuseColor.rgb *= shade;
@@ -109,7 +130,13 @@ export function surfaceMaterial() {
         float d=length(p.xz-vec2(25,155));
         vec2 pit=p.xz-vec2(25,155);
         float fibres=noise(vec2(atan(pit.y,pit.x)*35.0,length(pit)*.4))*noise(p.xz*6.0);
-        diffuseColor.rgb *= .91+.09*micro-fibres*.11;
+        float strand=flesh(p.xz);
+        float red=exp(-d*.085)*(.35+.65*noise(p.xz*.65));
+        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.66,.19,.07),red*.38+strand*.11);
+        diffuseColor.rgb *= .93+.07*micro-fibres*.11;
+        vec2 juice=p.xz-vec2(51,170);
+        float wet=1.0-smoothstep(3.5,6.8,length(juice)+noise(p.xz*.9)*.8);
+        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.89,.47,.13),wet*.16);
         vec2 cell=floor(p.xz*6.8),f=fract(p.xz*6.8);
         vec2 seed=vec2(hash(cell),hash(cell+7.3));
         float pore=1.0-smoothstep(.09,.17,length((f-(.18+.64*seed))*vec2(1.3,.6)));
@@ -180,6 +207,19 @@ export function surfaceMaterial() {
           reach*=smoothstep(4.0-b,8.0+b,abs(q.x+80.0));
         }
         reach=mix(reach,1.0,uLamp);
+        vec3 lightDirection=normalize(mix(uSun,normalize(vec3(260,430,-160)-vPlace),uLamp));
+        vec3 shadowPoint=vPlace+vec3(0,.35,0);
+        float objects=columnShade(shadowPoint,lightDirection,vec4(-155,-35,107,58));
+        objects*=columnShade(shadowPoint,lightDirection,vec4(354,110,37,108));
+        objects*=columnShade(shadowPoint,lightDirection,vec4(-369,-180,55,162));
+        // A low board casts a narrow edge shadow onto the worktop.
+        if(vPlace.y<13.8 && lightDirection.y>.01) {
+          vec2 at=vPlace.xz+lightDirection.xz*((14.0-vPlace.y)/lightDirection.y);
+          float b=1.0+uSoft*5.0;
+          float stop=(1.0-smoothstep(132.0-b,132.0+b,abs(at.x-80.0)))*(1.0-smoothstep(76.0-b,76.0+b,abs(at.y-170.0)));
+          objects*=1.0-stop*.8;
+        }
+        reach*=mix(.22,1.0,objects);
         reflectedLight.directDiffuse*=reach;
         reflectedLight.directSpecular*=reach;
         if(vKind>3.5 && vKind<4.5) {
@@ -199,7 +239,7 @@ export function surfaceMaterial() {
         "#include <normal_fragment_maps>",
         `#include <normal_fragment_maps>
         if(vKind>3.5 && vKind<4.5) {
-          float h=noise(vPlace.xz*6.0)*.012+noise(vPlace.xz*.8)*.018;
+          float h=noise(vPlace.xz*6.0)*.012+noise(vPlace.xz*.8)*.018+flesh(vPlace.xz)*.035;
           vec3 sx=dFdx(-vViewPosition),sy=dFdy(-vViewPosition);
           vec3 rx=cross(sy,normal),ry=cross(normal,sx);
           float determinant=dot(sx,rx);
@@ -217,7 +257,10 @@ export function surfaceMaterial() {
       if(vKind>7.5 && vKind<8.5) roughnessFactor=.24;
       if(vKind>8.5) roughnessFactor=.10;
       if(vKind>11.5) roughnessFactor=.78;
-      if(vKind>3.5 && vKind<4.5) roughnessFactor=.78;
+      if(vKind>3.5 && vKind<4.5) {
+        float wet=1.0-smoothstep(3.5,6.8,length(vPlace.xz-vec2(51,170))+noise(vPlace.xz*.9)*.8);
+        roughnessFactor=mix(.68,.27,wet);
+      }
       if(vKind>12.5 && vKind<13.5 || vKind<.5 && abs(vPlace.y)<.01 && vPlace.x>325.0 && vPlace.x<475.0 && vPlace.z>200.0) roughnessFactor=.96;
       if(vKind>13.5) roughnessFactor=.46;
     `,
@@ -231,7 +274,7 @@ export function surfaceMaterial() {
         "#include <metalnessmap_fragment>\nif(vKind>7.5 && vKind<8.5) metalnessFactor=.7;",
       );
   };
-  material.customProgramCacheKey = () => "kitchen-surfaces-5";
+  material.customProgramCacheKey = () => "kitchen-surfaces-6";
   return {
     material,
     update(t: number, light: Daylight, weather: Weather) {

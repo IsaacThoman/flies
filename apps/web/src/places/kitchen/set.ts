@@ -51,7 +51,7 @@ export function buildSet(): SceneSet {
         "#include <color_fragment>",
         `#include <color_fragment>
       float edge=pow(1.0-abs(dot(normalize(vNormal),normalize(vViewPosition))),3.0);
-      diffuseColor.a=.035+.32*edge;
+      diffuseColor.a=.055+.58*edge;
       if(abs(vGlass.z+300.0)<.1) {
         vec2 q=vec2(vGlass.x*.32,vGlass.y*.003+uKTime*.12);
         float cell=floor(q.x);
@@ -67,7 +67,7 @@ export function buildSet(): SceneSet {
     `,
       );
   };
-  glass.customProgramCacheKey = () => "kitchen-glass-rain-1";
+  glass.customProgramCacheKey = () => "kitchen-glass-rain-2";
   const glassBatch = new Batch();
   const addGlass = (g: THREE.BufferGeometry) =>
     glassBatch.add(glass, paint(g, "#ffffff"));
