@@ -4,7 +4,7 @@
 // nothing else of the world. For the README's tables.
 //
 //   node scripts/sleep.ts [--part day|threshold|cost] [--row <name>] [--minutes 30] [--seeds 1,2,3] [--trials 8]
-//       [--sleep wake=1,clock=3.5,pressure=4,depth=5] [--stimulus <name>] [--hunger <0..1>]
+//       [--sleep wake=1,clock=3.5,pressure=4,depth=4] [--stimulus <name>] [--hunger <0..1>]
 //
 // --sleep tries other weights for state.ts's sleep term (INTERNAL_STATE.sleep);
 // --stimulus picks the threshold's stimuli whose names start with it. --hunger
