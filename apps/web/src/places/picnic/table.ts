@@ -285,8 +285,12 @@ function domeGeometry(solid: Solid, rings: number, segments: number) {
       const y = topHeight(solid, x, z);
       topNormal(solid, x, z, n);
       const k = (i * (segments + 1) + j) * 3;
-      positions.set([x, y, z], k);
-      normals.set([n.x, n.y, n.z], k);
+      positions[k] = x;
+      positions[k + 1] = y;
+      positions[k + 2] = z;
+      normals[k] = n.x;
+      normals[k + 1] = n.y;
+      normals[k + 2] = n.z;
     }
   }
   for (let i = 0; i < rings; i++) {
