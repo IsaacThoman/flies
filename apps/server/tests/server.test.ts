@@ -9,12 +9,11 @@ import { WebSocket } from "ws";
 import { createPicnic } from "@fly/world";
 import { CLOSE, COLOURS, EVERYONE, EVERYONE_SERIES, FLY_MAX, MAX_FLIES, MAX_OWN, OWN_MAX, PROTOCOL, ROOMS_PATH, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, encodeOwn, everyoneCode, tableCode } from "@fly/net";
 import type { ClientMessage, FlyState, RoomWire, ServerMessage, Spot, TableStart } from "@fly/net";
+import { WAIT } from "./wait.ts";
 import { startServer } from "../src/server.ts";
 import type { RoomServer } from "../src/server.ts";
 
 const START: TableStart = { place: "picnic", light: "noon", weather: "clear", zone: "UTC", offset: 0 };
-/** Long enough for anything here to arrive on the loopback; a test that waits this long has failed. */
-const WAIT = 2000;
 
 const picnic = createPicnic();
 
@@ -28,6 +27,7 @@ after(async () => {
 async function serve(dataDir?: string, trustProxy = false) {
   const dir = dataDir ?? (await mkdtemp(path.join(os.tmpdir(), "fly-rooms-")));
   if (!dataDir) dirs.push(dir);
+  // startServer has no injectable scheduler; observe its real list timer through messages.
   const server = await startServer({ port: 0, host: "127.0.0.1", dataDir: dir, trustProxy, log: () => {}, listEvery: 50 });
   servers.push(server);
   return { server, dir };
@@ -60,7 +60,7 @@ async function device(port: number, from?: string) {
   });
 
   /** The first thing heard, from `from` on, that `match` makes something of. */
-  function until<T>(match: (r: Received) => T | undefined, from = 0): Promise<T> {
+  function until<T>(expected: string, match: (r: Received) => T | undefined, from = 0): Promise<T> {
     return new Promise((resolve, reject) => {
       let at = from;
       const look = () => {
@@ -76,14 +76,14 @@ async function device(port: number, from?: string) {
       };
       const timer = setTimeout(() => {
         waiting.delete(look);
-        reject(new Error(`not heard within ${WAIT} ms; heard ${JSON.stringify(heard.map((r) => ("json" in r ? r.json.type : "flies")))}`));
+        reject(new Error(`waiting for ${expected} after ${WAIT} ms; heard ${JSON.stringify(heard.map((r) => ("json" in r ? r.json.type : "flies")))}`));
       }, WAIT);
       waiting.add(look);
       look();
     });
   }
   const message = <T extends ServerMessage["type"]>(type: T, from = 0) =>
-    until((r) => ("json" in r && r.json.type === type ? (r.json as Extract<ServerMessage, { type: T }>) : undefined), from);
+    until(type, (r) => ("json" in r && r.json.type === type ? (r.json as Extract<ServerMessage, { type: T }>) : undefined), from);
 
   let clock = { now: 0, at: 0 };
   let seq = 0;
@@ -99,7 +99,7 @@ async function device(port: number, from?: string) {
     async hello(table: string, key: string, extra: Partial<Extract<ClientMessage, { type: "hello" }>> = {}) {
       const from = heard.length;
       ws.send(JSON.stringify({ type: "hello", v: PROTOCOL, table, key, ...extra } satisfies ClientMessage));
-      const answer = await until((r) => ("json" in r && (r.json.type === "welcome" || r.json.type === "refused") ? r.json : undefined), from);
+      const answer = await until("welcome or refused", (r) => ("json" in r && (r.json.type === "welcome" || r.json.type === "refused") ? r.json : undefined), from);
       if (answer.type === "welcome") {
         clock = { now: answer.now, at: performance.now() };
         id = answer.id;
@@ -209,8 +209,8 @@ test("two devices at a table hear each other's flies in the room's batches, and 
   const fromB = a.heard.length;
   a.fly(ax + 0.5, az);
   b.fly(bx - 0.5, bz);
-  const seenByB = await b.until((r) => ("flies" in r ? r.flies.find((s) => s.id === 1 && s.seq === 1) : undefined), fromA);
-  const seenByA = await a.until((r) => ("flies" in r ? r.flies.find((s) => s.id === 2 && s.seq === 1) : undefined), fromB);
+  const seenByB = await b.until("fly 1, sequence 1", (r) => ("flies" in r ? r.flies.find((s) => s.id === 1 && s.seq === 1) : undefined), fromA);
+  const seenByA = await a.until("fly 2, sequence 1", (r) => ("flies" in r ? r.flies.find((s) => s.id === 2 && s.seq === 1) : undefined), fromB);
   assert.ok(Math.abs(seenByB.x - (ax + 0.5)) < 0.05);
   assert.ok(Math.abs(seenByA.x - (bx - 0.5)) < 0.05);
   // Never its own fly back.
@@ -240,7 +240,7 @@ test("a restart sends everyone away to come back, and coming back they find the 
   const [bx, bz] = welcome.at;
   const from = a.heard.length;
   b.own(welcome.flies.map((f) => ({ id: f.id, at: [f.at[0] + 1, f.at[1] + 0.5, f.at[2], f.at[3]] })));
-  const seenFlies = await a.until((r) => ("flies" in r && r.flies.length === 3 && r.flies.every((s) => s.seq === 1) ? r.flies : undefined), from);
+  const seenFlies = await a.until("three companion flies, sequence 1", (r) => ("flies" in r && r.flies.length === 3 && r.flies.every((s) => s.seq === 1) ? r.flies : undefined), from);
   const seen = seenFlies[0];
 
   await server.stop();
@@ -272,13 +272,8 @@ test("a restart sends everyone away to come back, and coming back they find the 
 async function browser(port: number) {
   const d = await device(port);
   d.send({ type: "browse", v: PROTOCOL });
-  const list = async (match: (rooms: RoomWire[]) => boolean) => {
-    for (let from = 0; ; ) {
-      const m = await d.message("rooms", from);
-      from = d.heard.findIndex((r) => "json" in r && r.json === m) + 1;
-      if (match(m.rooms)) return m.rooms;
-    }
-  };
+  const list = (match: (rooms: RoomWire[]) => boolean) =>
+    d.until("room list matching the expected state", (r) => "json" in r && r.json.type === "rooms" && match(r.json.rooms) ? r.json.rooms : undefined);
   return { ...d, list };
 }
 
@@ -313,6 +308,8 @@ test("a listed room shows in the list, by its name, place, flies and lock, as it
   try {
     look.ws.ping();
     await pong;
+  } catch (cause) {
+    throw new Error("waiting for browsing pong after hello", { cause });
   } finally {
     controller.abort();
   }
@@ -420,13 +417,13 @@ test("real sockets welcome several flies per device, relay every id without echo
   assert.deepEqual(wa.flies.map((f) => [f.id, f.colour]), [1, 2, 3, 4].map((id) => [id, COLOURS[id - 1]]));
   assert.deepEqual(wb.flies.map((f) => f.id), [5, 6, 7, 8]);
   assert.deepEqual(wb.players, wa.flies.map((f) => ({ id: f.id, colour: f.colour, away: false, of: wa.id })));
-  await a.until((r) => "json" in r && r.json.type === "joined" && r.json.id === 8 ? r.json : undefined);
+  await a.until("joined fly 8", (r) => "json" in r && r.json.type === "joined" && r.json.id === 8 ? r.json : undefined);
   assert.deepEqual(a.heard.flatMap((r) => "json" in r && r.json.type === "joined" ? [r.json] : []), wb.flies.map((f) => ({ type: "joined", id: f.id, colour: f.colour, away: false, of: wb.id })));
   a.own(wa.flies);
   b.own(wb.flies);
   await Promise.all([
-    b.until((r) => "flies" in r && r.flies.length === 4 && r.flies.every((s) => s.seq === 1) ? r.flies : undefined),
-    a.until((r) => "flies" in r && r.flies.length === 4 && r.flies.every((s) => s.seq === 1) ? r.flies : undefined),
+    b.until("four flies from device a, sequence 1", (r) => "flies" in r && r.flies.length === 4 && r.flies.every((s) => s.seq === 1) ? r.flies : undefined),
+    a.until("four flies from device b, sequence 1", (r) => "flies" in r && r.flies.length === 4 && r.flies.every((s) => s.seq === 1) ? r.flies : undefined),
   ]);
   for (const [d, w] of [[a, wa], [b, wb]] as const) assert.ok(d.heard.every((r) => !("flies" in r) || r.flies.every((s) => !w.flies.some((f) => f.id === s.id))));
   const filling = await Promise.all(Array.from({ length: MAX_FLIES / MAX_OWN - 2 }, (_, i) => device(server.port, `198.51.100.${i + 1}`)));

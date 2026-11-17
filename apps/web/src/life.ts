@@ -4,7 +4,7 @@
 
 import type { BrainSenses } from "@fly/brain";
 import type { BrainDriver } from "@fly/contracts";
-import { Behavior, Crowd, FlyBody, Hunger, SenseTracker } from "@fly/body";
+import { Behavior, Crowd, FlyBody, Hunger, SenseTracker, Thirst } from "@fly/body";
 import type { Forces, Intent, Looming, Rhythm } from "@fly/body";
 import { Pantry } from "@fly/world";
 import type { Food, Place, Vec3, World } from "@fly/world";
@@ -31,6 +31,8 @@ export class Life {
   readonly senses = new SenseTracker();
   /** How hungry it is and how full its crop, from what it has eaten: the brain is sent the hunger. */
   readonly hunger = new Hunger();
+  /** How thirsty it is, from what it has drunk: the brain is sent it. */
+  readonly thirst = new Thirst();
   /** Its brain; a companion's that failed is replaced by a new one (company.ts). */
   brain: BrainDriver;
   /** Other flies (at a table with others, and the others this device lives): bodies it can't walk through, which its antennae and its body feel. */
@@ -156,6 +158,7 @@ export class Life {
     sent.grounded = felt.grounded;
     sent.maleTaste = felt.maleTaste;
     sent.hunger = this.hunger.level;
+    sent.thirst = this.thirst.level;
     sent.wingbeat = felt.wingbeat;
     sent.bitter = felt.bitter;
     sent.water = felt.water;
@@ -189,7 +192,7 @@ export class Life {
     const forces = this.#forces;
     forces.air = stimuli.air;
     forces.threat = stimuli.threat;
-    forces.meal = intent.feeding && food && food.sweet > 0 ? food : null;
+    forces.meal = intent.feeding && food && (food.sweet > 0 || food.water > 0) ? food : null;
     const { x, y, z } = body.position;
     const wasOnFeet = body.onFeet;
     body.step(intent, forces, dt);
@@ -200,16 +203,20 @@ export class Life {
     // On its feet before and after: a take-off's leap and a landing aren't walking.
     if (wasOnFeet && body.onFeet) this.walked += Math.hypot(body.position.x - x, body.position.y - y, body.position.z - z);
 
-    // Eating: the brain wants to feed, and its mouthparts are on something sweet.
+    // Eating, or drinking: the brain wants to feed, and its mouthparts are on something sweet or on water.
     this.eating = false;
-
-    if (intent.feeding && food && food.sweet > 0 && body.onFeet && this.senses.tasting.byMouth) {
+    let water = 0;
+    if (intent.feeding && food && (food.sweet > 0 || food.water > 0) && body.onFeet && this.senses.tasting.byMouth) {
+      const before = food.amount;
       const bite = this.pantry.eat(food, intent.feed, dt);
       this.feed(bite, bite * food.sweet);
+      // What it drank is what its bite took, here and now: a table's account of it (feed) carries sugar alone.
+      water = (before - food.amount) * food.water;
       this.eating = true;
     }
     this.hunger.step(dt, this.#sugar);
     this.#sugar = 0;
+    this.thirst.step(dt, water);
     if (this.eating && !this.#wasEating) this.meals++;
     this.#wasEating = this.eating;
     this.#proboscis += ((intent.feeding ? 1 : 0) - this.#proboscis) * Math.min(1, dt * 6);

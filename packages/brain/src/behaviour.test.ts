@@ -189,7 +189,7 @@ test("a fed fly leaves alone sugar that a starved one feeds on", { skip }, () =>
   assert.ok(fed < 0.6 * starved, `fed ${fed} against starved ${starved}`);
 });
 
-test("bitter on sugar stops the proboscis; water alone doesn't move it", { skip }, () => {
+test("bitter on sugar stops the proboscis; water alone doesn't move it, however thirsty", { skip }, () => {
   const feed = (senses: Partial<BrainSenses>) => {
     let sum = 0;
     for (const seed of [1, 2, 3]) {
@@ -203,6 +203,8 @@ test("bitter on sugar stops the proboscis; water alone doesn't move it", { skip 
   assert.ok(sugar > 0.2, `sugar ${sugar}`);
   assert.ok(feed({ sweet: 1, bitter: 0.25 }) < 0.05);
   assert.ok(feed({ water: 1 }) < 0.02);
+  // Thirst gates the water neurons' output (io.ts, THIRST), but nothing they reach extends the proboscis (README, Thirst).
+  assert.ok(feed({ water: 1, thirst: 0 }) < 0.02);
 });
 
 test("touch makes it back away, wind or a push on either antenna makes it groom, sweet makes it feed, and looming opens the wings", { skip }, () => {

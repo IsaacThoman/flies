@@ -331,6 +331,7 @@ export async function fuzzServer(seed: number, until: () => boolean, sockets = 6
         if (f.chance(0.02)) ws.terminate();
         else ws.send(f.chance(0.6) ? f.text(f.message(f.int(1, MAX_FLIES))) : f.binary(0, 0, [1, 2, 3, 4]));
       }
+      // Yield to real socket I/O and server timers; startServer has no injectable scheduler.
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
     for (const ws of live) ws.terminate();

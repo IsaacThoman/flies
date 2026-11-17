@@ -41,6 +41,13 @@ typedef struct fly_senses {
   /** Something bitter, and plain water, on the mouthparts, 0 to 1 each; 0, as a struct initialised without them leaves them. */
   float bitter, water;
   /**
+   * Internal state, not a sense: how thirsty it is, 0 just drunk to 1 thirsty
+   * (BrainSenses.thirst). 1, or NAN, for a host that keeps no account of
+   * thirst: the brain as it was before it had one. Not 0, which a struct
+   * initialised without it leaves: that is a fly that has just drunk.
+   */
+  float thirst;
+  /**
    * The air's temperature at the left and right antenna's arista, °C
    * (BrainSenses.temperatureLeft and Right). NAN for a host that has no
    * temperature: those thermoreceptors get no input, the brain as it was

@@ -115,6 +115,7 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     const each: BrainSenses = { ...RESTING_SENSES, ...senses };
     for (const key of SCALAR) each[key] = Math.fround(each[key]);
     if (each.hunger !== undefined) each.hunger = Math.fround(each.hunger);
+    if (each.thirst !== undefined) each.thirst = Math.fround(each.thirst);
     for (const key of STATE) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
     for (const key of TEMPERATURE) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
     ticks.push({ dt, senses: each, what });
@@ -144,6 +145,8 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     hold(500, 16, (t) => ({ sweet: 0.5, hunger: [Number.NaN, -1, 7, Number.NEGATIVE_INFINITY][Math.floor(t / 125)] }), "out-of-range hunger");
     hold(1000, 16, () => ({ loomLeft: 1, loomRight: 1 }), "looming on both sides");
     hold(1500, 16, () => ({ sweet: 1, bitter: 0.5 }), "sugar laced with something bitter");
+    hold(2000, 16, (t) => ({ sweet: 1, water: 1, thirst: 1 - t / 2000 }), "sugary water as thirst is quenched");
+    hold(500, 16, (t) => ({ water: 1, thirst: [Number.NaN, -1, 7, Number.NEGATIVE_INFINITY][Math.floor(t / 125)] }), "out-of-range thirst");
     hold(2000, 16, () => ({ loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1 }), "everything at once");
     hold(4000, 16, (t) => ({ loomRight: t % 1000 < 100 ? 1 : 0 }), "a looming pulse every second");
     hold(3000, () => Math.floor(random() * 50 * 4) / 4, () => Object.fromEntries(SCALAR.map((s) => [s, random() < 0.3 ? random() : 0])), "random ticks and senses");
@@ -299,6 +302,7 @@ export function script(ticks: readonly Tick[]): { input: string; frames: Uint8Ar
       ...STATE.map((s) => hex32(senses[s] ?? 0)),
       light,
       hex32(senses.hunger ?? 1),
+      hex32(senses.thirst ?? 1),
       ...TEMPERATURE.map((s) => hex32(senses[s] ?? Number.NaN)),
     ].join(" ");
   });

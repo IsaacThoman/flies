@@ -1,8 +1,8 @@
 // The fly remembers: in a real (headless) Chromium with the real brain, it
 // gives the followed fly a body no new fly has (just fed, its crop full,
-// needing sleep) at a spot the place never starts it at, reloads, and finds
+// parched, needing sleep) at a spot the place never starts it at, reloads, and finds
 // the same fly, as the canvas's state says: its id, its hunger and crop, its
-// sleep pressure, where it stood. Then a second fly: it comes back after a
+// thirst, its sleep pressure, where it stood. Then a second fly: it comes back after a
 // reload, and after the count goes down to one and up again.
 //
 //   node apps/web/e2e/remembers.e2e.ts            (starts its own Vite server)
@@ -56,6 +56,7 @@ try {
     life.setDown(x, z, start.yaw + 1);
     life.hunger.level = 0.05;
     life.hunger.fullness = 0.9;
+    life.thirst.level = 0.9;
     life.rhythm!.pressure = 0.95;
     return { x, z, start: [start.x, start.z] };
   });
@@ -63,15 +64,17 @@ try {
   await page.reload();
   await gameUp(page);
   const back = await readState(page);
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("flies.fly.0")!) as { id: string; body: { hunger: number; fullness: number; sleep: { pressure: number } }; where: { x: number; z: number } });
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("flies.fly.0")!) as { id: string; body: { hunger: number; fullness: number; thirst: number; sleep: { pressure: number } }; where: { x: number; z: number } });
 
-  step("the same fly: its id, its hunger and crop, its need for sleep and where it stood");
+  step("the same fly: its id, its hunger and crop, its thirst, its need for sleep and where it stood");
   assert.equal(kept(back).get(0), id);
   assert.equal(saved.id, id);
   assert.ok(Math.abs(saved.where.x - spot.x) < 2 && Math.abs(saved.where.z - spot.z) < 2, `saved where it was put: ${JSON.stringify(saved.where)}`);
   // The canvas gives hunger to three places: a saved 0.0504 reads back as 0.050.
   const hunger = Number(back.hunger);
   assert.ok(hunger >= saved.body.hunger - 0.0005 && hunger < 0.2, `hunger ${hunger}: as it was, a little hungrier for the time away (a new fly arrives at 0.7)`);
+  const thirst = Number(back.thirst);
+  assert.ok(thirst >= saved.body.thirst - 0.0005 && thirst > 0.85, `thirst ${thirst}: as it was, or a little thirstier (a new fly arrives at 0.28)`);
   assert.ok(Number(back.fullness) > 0.3, `fullness ${back.fullness}: its crop still full (a new fly's is empty)`);
   assert.ok(Math.abs(pressureOf(back) - saved.body.sleep.pressure) < 0.01, `pressure ${pressureOf(back)} against ${saved.body.sleep.pressure} saved`);
   const [x, z] = atOf(back);

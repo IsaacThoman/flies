@@ -2,13 +2,14 @@
 // kept in localStorage under `flies.fly.<slot>` (its place in line, 0 the
 // followed fly), says who it is (a random id, and when it first arrived) and
 // what its body was when it was last seen: how hungry, how full its crop, how
-// much sleep it needed, and where it stood. Coming back, the time away is
-// lived out by the body's own sums (Hunger.away, pressureLeftAlone), with no
-// brain to run: what the fly did while nobody watched is a stand-in. Its brain
-// is not kept; it wakes afresh, as it does at every launch.
+// thirsty, how much sleep it needed, and where it stood. Coming back, the time
+// away is lived out by the body's own sums (Hunger.away, Thirst.away,
+// pressureLeftAlone), with no brain to run: what the fly did while nobody
+// watched is a stand-in. Its brain is not kept; it wakes afresh, as it does at
+// every launch.
 //
 // Only the body's own state is kept, never what the brain makes of it, so the
-// record means the same whatever the brain does with hunger or sleep.
+// record means the same whatever the brain does with hunger, thirst or sleep.
 //
 // The record is a JSON object with a version, `v`. What another feature keeps
 // about a fly (what its brain has learned, its first moments) is one field of
@@ -37,8 +38,12 @@ export const FLY_VERSION = 1;
 export const FLY_LIMIT = 96 * 1024;
 const KEY = "flies.fly.";
 
-/** What makes its body this fly's: hunger (0 fed to 1 starved), how full its crop, and its sleep pressure (0 to 1) with the pace it was built at. */
-export type BodyState = { hunger: number; fullness: number; sleep: { pressure: number; pace: DayPace } | null };
+/**
+ * What makes its body this fly's: hunger (0 fed to 1 starved), how full its crop, thirst (0 just drunk to 1 thirsty;
+ * null in a record from before the body kept it, which leaves a fly's thirst where it starts) and its sleep pressure
+ * (0 to 1) with the pace it was built at.
+ */
+export type BodyState = { hunger: number; fullness: number; thirst: number | null; sleep: { pressure: number; pace: DayPace } | null };
 /** Where it stood: the place, and the spot there (mm; yaw in radians). */
 export type Where = { place: PlaceId; x: number; y: number; z: number; yaw: number };
 
@@ -64,7 +69,7 @@ function readBody(saved: unknown): BodyState | null {
   if (!object(saved) || !unit(saved.hunger) || !unit(saved.fullness)) return null;
   const sleep = saved.sleep;
   const kept = object(sleep) && unit(sleep.pressure) && (sleep.pace === "lively" || sleep.pace === "natural");
-  return { hunger: saved.hunger, fullness: saved.fullness, sleep: kept ? { pressure: sleep.pressure as number, pace: sleep.pace as DayPace } : null };
+  return { hunger: saved.hunger, fullness: saved.fullness, thirst: unit(saved.thirst) ? saved.thirst : null, sleep: kept ? { pressure: sleep.pressure as number, pace: sleep.pace as DayPace } : null };
 }
 
 function readWhere(saved: unknown): Where | null {
@@ -110,18 +115,19 @@ export function note(fly: FlyRecord, life: Life, place: PlaceId, now: number) {
   const r = life.rhythm;
   const { position, yaw } = life.body;
   fly.at = now;
-  fly.body = { hunger: life.hunger.level, fullness: life.hunger.fullness, sleep: r ? { pressure: r.pressure, pace: r.pace } : null };
+  fly.body = { hunger: life.hunger.level, fullness: life.hunger.fullness, thirst: life.thirst.level, sleep: r ? { pressure: r.pressure, pace: r.pace } : null };
   fly.where = { place, x: position.x, y: position.y, z: position.z, yaw };
 }
 
 /**
  * `seconds` away, from the hour `from`: its crop empties and it grows hungry
- * (to a point), and its need for sleep goes as a fly left to itself would
+ * and thirsty (each to a point), and its need for sleep goes as a fly left to itself would
  * have it. A clock gone backwards is no time at all.
  */
 export function liveAway(life: Life, seconds: number, from: number, sun: Sun) {
   if (!(seconds > 0)) return;
   life.hunger.away(seconds);
+  life.thirst.away(seconds);
   const r = life.rhythm;
   if (r) r.pressure = pressureLeftAlone(r.pressure, from, seconds, sun, r.pace);
 }
@@ -141,6 +147,8 @@ export function restore(fly: FlyRecord, life: Life, now: number, sun: Sun, here:
     life.hunger.level = body.hunger;
     life.hunger.fullness = body.fullness;
     life.hunger.away(seconds);
+    if (body.thirst !== null) life.thirst.level = body.thirst;
+    life.thirst.away(seconds);
     const r = life.rhythm;
     if (r && body.sleep?.pace === r.pace) r.pressure = pressureLeftAlone(body.sleep.pressure, clockHours(new Date(fly.at)), seconds, sun, r.pace);
   }

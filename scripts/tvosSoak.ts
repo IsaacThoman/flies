@@ -55,6 +55,9 @@ function chooseFlies(flies: number): Step[] {
   ];
 }
 
+/** How far along the shelf one tool is from another: Right for more, Left for fewer. */
+const along = (from: string, to: string) => TOOLS.findIndex((t) => t.id === to) - TOOLS.findIndex((t) => t.id === from);
+
 export function soakConfig(minutes = 30, flies?: number) {
   if (!Number.isFinite(minutes) || minutes < 2) throw Error("--minutes must be at least 2");
   const drive: Step[] = [];
@@ -73,19 +76,19 @@ export function soakConfig(minutes = 30, flies?: number) {
   press("ArrowDown");
   press("Enter");
   phase("feeding", 15000);
-  press("ArrowRight", 3);
+  press("ArrowRight", along("feed", "swoop"));
   wait({ tool: "swoop" });
   throws();
   // The Sky, from Now, whatever time of day a launch came back to.
-  press("ArrowRight");
+  press("ArrowRight", along("swoop", "sky"));
   press("ArrowUp", 5);
   press("ArrowDown", 2);
   wait({ time: "noon" });
   phase("daylight transition", 10000);
-  press("ArrowLeft");
+  press("ArrowLeft", along("swoop", "sky"));
   throws();
   // Past the Sky and Place to View.
-  press("ArrowRight", 3);
+  press("ArrowRight", along("swoop", "view"));
   press("ArrowUp", 6);
   press("ArrowDown", 5);
   wait({ view: "eyes" });
@@ -116,7 +119,7 @@ export function soakConfig(minutes = 30, flies?: number) {
   press("ArrowUp", 4);
   wait({ view: "follow" });
   // The shelf is on View. Clamp each choice from its first variant, regardless of saved settings.
-  const tools = ["feed", "feather", "blow", "swoop", "sky", "place", "view"];
+  const tools = TOOLS.map((t) => t.id as string);
   let tool = tools.indexOf("view");
   const choose = (id: string, variant: number) => {
     const next = tools.indexOf(id);
@@ -194,7 +197,7 @@ export function tableSoakConfig(minutes: number, code: string, rooms: string, fl
   press("ArrowDown");
   press("Enter");
   phase("table feeding", 15000);
-  press("ArrowRight");
+  press("ArrowRight", along("feed", "swoop"));
   wait({ tool: "swoop" });
   // The ball thrown once every 20 s while playing among them.
   const throws = Math.max(1, Math.round((minutes * 60) / 2 / 20));

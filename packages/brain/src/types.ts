@@ -45,6 +45,15 @@ export type BrainSenses = {
    */
   hunger?: number;
   /**
+   * How thirsty it is, from 0 (just drunk) to 1 (hours in dry air), as the
+   * body keeps account of it: internal state, not a sense. It sets how
+   * strongly the water taste neurons pass on what they taste, a stand-in for
+   * the thirst signals that gate water drinking downstream of them in the fly
+   * (io.ts, THIRST). Leave it out, or anything not a number, and the brain is
+   * what it was before it had a thirst: a thirsty fly's, at 1.
+   */
+  thirst?: number;
+  /**
    * How hard its own wings beat, from folded (0) to full flight power (1):
    * what the wings' and halteres' strain sensors feel of each stroke.
    */

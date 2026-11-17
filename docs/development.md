@@ -80,7 +80,7 @@ from a lost graphics context (`apps/web/src/page.ts`); `docs/web.md` has the
 rest. On the Apple TV it is `globalThis.__native.brain`
 (`apps/web/src/brain/native-driver.ts`), which reuses its buffers and decoded state during steady-state ticks;
 initialization and error handling can allocate.
-The settings, the shelf's kept choices and what the hints have taught are in
+The settings, the shelf's kept choices, what the hints have taught and what has been built in each place are in
 `localStorage` (`apps/web/src/settings.ts`), and so is each fly's record
 (`apps/web/src/fly-record.ts`, [From launch to launch](simulation.md#from-launch-to-launch));
 from a save made by another build, or a broken one, only what this build can use is kept.

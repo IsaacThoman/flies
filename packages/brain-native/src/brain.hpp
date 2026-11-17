@@ -96,6 +96,8 @@ class Brain {
   std::vector<uint32_t> background_inputs_;
   // The sweet neurons' output gain, which hunger sets (io::sweet_output_gain).
   uint32_t sweet_gain_ = 0;
+  // The water neurons' output gain, which thirst sets (io::water_output_gain).
+  uint32_t water_gain_ = 0;
   std::vector<uint32_t> state_inputs_;
   // Each antenna's heating and cooling cells, in wiring_.thermo's order, and what they have adapted to.
   std::vector<uint32_t> thermo_inputs_;

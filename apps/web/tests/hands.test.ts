@@ -75,9 +75,9 @@ test("frame end clears every hands event even when a pause skips the regular upd
   hands.stepVariant(1);
   hands.stepVariant(-1);
   hands.stepVariant(-1);
-  assert.deepEqual(hands.events, { dropped: "sugar", landed: "sugar", swooped: true, toolChanged: true, variantChanged: true, blocked: true });
+  assert.deepEqual(hands.events, { dropped: "sugar", landed: "sugar", swooped: true, built: false, toolChanged: true, variantChanged: true, blocked: true });
   hands.clearEvents();
-  assert.deepEqual(hands.events, { dropped: null, landed: null, swooped: false, toolChanged: false, variantChanged: false, blocked: false });
+  assert.deepEqual(hands.events, { dropped: null, landed: null, swooped: false, built: false, toolChanged: false, variantChanged: false, blocked: false });
 });
 
 test("food dropped where the pointer is under a table falls from under its top onto the floor there", () => {

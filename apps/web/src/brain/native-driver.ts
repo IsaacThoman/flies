@@ -68,8 +68,8 @@ export class NativeBrainDriver implements BrainDriver {
             ? senses.grounded
               ? 1
               : 0
-            : name === "hunger"
-              ? (senses.hunger ?? 1)
+            : name === "hunger" || name === "thirst"
+              ? (senses[name] ?? 1)
               : name === "temperatureLeft" || name === "temperatureRight"
                 ? (senses[name] ?? Number.NaN)
                 : (senses[name] ?? 0);
