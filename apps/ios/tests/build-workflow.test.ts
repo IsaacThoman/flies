@@ -29,3 +29,9 @@ test("unsigned iOS compilation cannot accidentally sign a device build or run te
     assert.match(result.stderr, /--no-sign requires --sim and cannot be used with --for-testing/);
   }
 });
+
+test("draft PRs skip Apple compilation and marking them ready triggers it", () => {
+  const workflow = readFileSync(path.join(root, ".github/workflows/apple-compile.yml"), "utf8");
+  assert.match(workflow, /pull_request:\n {4}types: \[opened, synchronize, reopened, ready_for_review\]/);
+  assert.match(workflow, /jobs:\n {2}compile:\n {4}if: github.event_name != 'pull_request' \|\| !github.event.pull_request.draft\n/);
+});

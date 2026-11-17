@@ -2,6 +2,7 @@ name: Apple compile
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'apps/ios/**'
       - 'apps/tvos/**'
@@ -25,6 +26,7 @@ concurrency:
 
 jobs:
   compile:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
