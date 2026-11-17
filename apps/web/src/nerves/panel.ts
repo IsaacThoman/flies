@@ -202,7 +202,7 @@ export class NervesPanel {
     glassPanel(g, 1, 1, width - 2, height - 2, radius, { tint: "night", shadow: false });
     const p = NERVES_PICTURE;
     roundedRect(g, p.x - 2, p.y - 2, p.width + 4, p.height + 4, 6);
-    g.fillStyle = "rgba(0, 16, 50, 0.5)";
+    g.fillStyle = "#bac9db";
     g.fill();
     text(g, "Nervous system", LABEL.x, LABEL.y, { size: LABEL.size, color: LABEL.color });
     this.#texture.needsUpdate = true;

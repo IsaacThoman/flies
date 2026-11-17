@@ -21,6 +21,8 @@ export type ActionItem = {
   swatch?: string;
   /** How many of how many, as pips at its right (the flies in a room), and a padlock, for what needs a password. */
   count?: readonly [number, number];
+  /** A cached counter for lists where the capacity must be explicit. */
+  countLabel?: string;
   locked?: boolean;
 };
 /** A choice; `tabs` draws its options side by side, every one to be pressed, as the tabs across the top of a page. */

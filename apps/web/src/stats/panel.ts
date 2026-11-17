@@ -205,7 +205,9 @@ export function statsLayout(frame: Frame, hud: HudLayout = hudLayout(frame), siz
     let under = full;
     for (const left of [true, false]) under = Math.min(under, (reach(left, W * under) - columnTop(left)) / H, (columnFoot(left) - topOf(left, W * under)) / H);
     const scale = Math.max(wide, under);
-    if (scale > best.scale + 1e-9) best = { scale, shape, inColumn: under > wide };
+    // A taller grid is worthwhile only when its type gets visibly larger.
+    const taller = shape.cols === 2 && !shape.side && best.shape.cols === 3 && !best.shape.side;
+    if (scale > best.scale * (taller ? 1.18 : 1) + 1e-9) best = { scale, shape, inColumn: under > wide };
   }
   const { shape, inColumn } = best;
   const scale = Math.max(0.05, best.scale);

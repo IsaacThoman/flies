@@ -22,8 +22,10 @@ const SCROLL_BUTTON = { color: "glass", size: 14 } as const;
 const SCROLL_DISABLED = { ...SCROLL_BUTTON, disabled: true } as const;
 const FIELD_SUBMIT = { color: "aqua", size: 14 } as const;
 const FIELD_SUBMIT_DISABLED = { ...FIELD_SUBMIT, disabled: true } as const;
-const ACTION_HINT = { size: 10, color: INK_SOFT, align: "center", baseline: "middle" } as const;
+const ACTION_HINT = { size: 12, color: INK, align: "center", baseline: "middle" } as const;
 const ACTION_HINT_FOCUSED = { ...ACTION_HINT, color: "#ffffff" } as const;
+const COUNT = { size: 12, color: INK, align: "center", baseline: "middle" } as const;
+const COUNT_FOCUSED = { ...COUNT, color: "#ffffff" } as const;
 
 /** What a menu's targets are, as recorded in the hit map: `index` is the item's, `value` a chevron's or a "more"'s direction. */
 export const MENU_HITS = { row: "row", step: "step", track: "track", more: "more", tab: "tab", submit: "submit" } as const;
@@ -166,7 +168,7 @@ export class MenuView {
     const focused = menu.focused;
     const inset = focused?.kind === "choice" && focused.tabs ? this.tabInset : 0;
     const cell = this.#at(0);
-    if (focused && ring) bubbleRing(g, this.#ringX.value + inset, this.#ring.value - (focused.kind === "action" ? 2 : 0), cell.width - inset, row, row / 2, t);
+    if (focused && ring) bubbleRing(g, this.#ringX.value + inset + 4, this.#ring.value + 4 - (focused.kind === "action" ? 2 : 0), cell.width - inset - 8, row - 8, (row - 8) / 2, t);
   }
 }
 
@@ -244,7 +246,11 @@ function drawAction(g: CanvasRenderingContext2D, item: ActionItem, x: number, y:
   const ink = focused ? "#ffffff" : INK;
   let right = x + w - h * 0.4;
   if (item.count) {
-    pips(g, right - PIPS.width, mid, item.count[0], item.count[1], ink, item.disabled);
+    if (item.countLabel) {
+      if (item.disabled) g.globalAlpha *= 0.45;
+      text(g, item.countLabel, right - PIPS.width / 2, mid, focused ? COUNT_FOCUSED : COUNT);
+      if (item.disabled) g.globalAlpha /= 0.45;
+    } else pips(g, right - PIPS.width, mid, item.count[0], item.count[1], ink, item.disabled);
     right -= PIPS.width + h * 0.18;
   }
   if (item.locked) padlock(g, right - h * 0.16, mid, h * 0.3, ink, item.disabled);

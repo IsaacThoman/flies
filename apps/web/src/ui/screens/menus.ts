@@ -27,10 +27,10 @@ export function titleScreen(shell: Shell) {
   const menu = new Menu([
     { kind: "action", id: "play", label: "Play" },
     { kind: "action", id: "watch", label: "Watch" },
-    { kind: "action", id: "about", label: "About" },
     { kind: "action", id: "settings", label: "Settings" },
     // With others, where there is a way to reach them.
     ...(shell.canPlayOnline ? [{ kind: "action" as const, id: "online", label: "Online" }] : []),
+    { kind: "action", id: "about", label: "About" },
   ]);
   // Laid out with the menu, for the backdrop to draw from.
   let title = titleLayout(shell.shape, menu.items.length);

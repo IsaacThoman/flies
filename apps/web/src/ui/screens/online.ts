@@ -133,7 +133,7 @@ export class OnlineScreen implements Screen {
         if (!rooms) rows.push({ kind: "action", id: "looking", label: "Looking for rooms…", disabled: true });
         else if (!rooms.length) rows.push({ kind: "action", id: "none", label: "No rooms open", disabled: true });
         for (const r of rooms ?? []) {
-          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, hint: isPlaceId(r.place) ? placeInfo(r.place).name : undefined, swatch: colourOf(r.place), count: [r.flies, MAX_PLAYERS], locked: r.locked, disabled: r.flies >= MAX_PLAYERS });
+          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, hint: isPlaceId(r.place) ? placeInfo(r.place).name : undefined, swatch: colourOf(r.place), count: [r.flies, MAX_PLAYERS], countLabel: `${r.flies}/${MAX_PLAYERS}`, locked: r.locked, disabled: r.flies >= MAX_PLAYERS });
         }
         return rows;
       }

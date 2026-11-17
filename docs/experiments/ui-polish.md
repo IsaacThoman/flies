@@ -65,3 +65,25 @@ Deferred: brighten inactive neural tissue or add explanatory captions to tools. 
 ### Validation so far
 
 Functional suite: 726 tests, zero failures, four skips. Lint and typecheck pass. `npm test` fails in the separate, unchanged brain CPU budget: 0.607 M5 Pro CPU s/s against 0.5; an isolated retry gives 0.543. No threshold or brain code was changed. Final validation follows the selected candidate.
+
+| Round 2 scorer | Set | Clarity | Polish | Remote | Touch | Fit | Legibility | Redundancy | Accessibility | Mean | Rank |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| K | R8 / T5 | 7 | 8 | 8 | 7 | 7 | 7 | 7 | 7 | 7.25 | tied |
+| K | M4 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 7 | 7.88 | 1 |
+| L | R8 / T5 | 7 | 8 | 8 | 8 | 8 | 8 | 8 | 7 | 7.75 | tied |
+| L | M4 | 8 | 8 | 8 | 9 | 9 | 8 | 9 | 8 | 8.38 | 1 |
+| M | R8 | 7 | 7.5 | 7.5 | 7 | 6.5 | 7 | 7.5 | 7 | 7.13 | 3 |
+| M | T5 | 7 | 7.5 | 7.5 | 7 | 7 | 7 | 7.5 | 7 | 7.19 | 2 |
+| M | M4 | 8.5 | 8.5 | 7.5 | 8.5 | 8 | 8 | 8.5 | 7.5 | 8.13 | 1 |
+
+**Accepted: M4, 8.13/10**, unanimously ranked first. All 82 duplicate PNGs and UI source files match. K and L score the decoy identically; M differs by 0.5 on Fit, below the >1 noise threshold. M describes a camera-marker difference between identical images; that claim is unsupported, so it does not drive a code change. No additional scorers are required by the stated decoy rule.
+
+The regression-only review flags the larger iPad stats panel obscuring more of the world and the smaller landscape heading. Keep the shorter heading to preserve four visible settings; next test a grid preference that avoids a much taller panel for a marginal type-size gain. The strongest remaining concerns are faint inactive anatomy, unexplained occupancy dots, tool discovery, and tight focus decoration.
+
+### Round 3 · preparation
+
+Use a contrasting backdrop behind anatomical tissue, without touching neural colours or activity. Replace room-occupancy pips with cached numeric counters, strengthen room subtitles, inset the focus decoration, and prefer the shorter stats grid unless the taller grid gives materially larger type. Put Settings and Online ahead of About: Settings then takes one fewer remote press, while About remains one click/tap away. Both versions are rendered again on the same rebased `dev` to keep camera and sleep updates out of the comparison.
+
+The new phone code-entry browser check passes, as does the complete Play e2e suite, including nervous-system and X-ray steps. A rebased full functional run has zero failures; the unchanged brain budget remains narrowly over at 0.508 s/s. The new test's required `dataDir` type was corrected and typecheck passes afterward. Its check is included in `npm run e2e`.
+
+Round 3 key: C6 is M4 re-rendered on current `dev`; V9 is the candidate. Orders: P V9/C6; Q V9/C6; R C6/V9; S (regressions) V9/C6. Fresh scorers use `high` effort. Candidate navigation traces show five to nine remote inputs including adjustment, with X-ray reachable in five rather than six. Seventy-seven targeted tests pass; lint and typecheck pass. Comparative review is pending.
