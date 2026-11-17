@@ -144,6 +144,15 @@ export type Scene = {
    * (scene/light.ts), in that measure.
    */
   open?: number;
+  /**
+   * How often the other flies' eyes refresh here, as a share of the followed
+   * fly's rate (1 if not said). Where every refresh of the eyes is dear on the
+   * Apple TV (a place whose shading is heavy), the others' come this much less
+   * often, still one fly's a frame, and the followed fly's always come first,
+   * at their full rate (eyes/eyes.ts). Between pictures a fly's brain sees the
+   * last one it was given, as it always does.
+   */
+  companionEyes?: number;
   /** Soap bubbles drifting over on the breeze (scene/bubbles.ts), and fireflies at dusk (scene/fireflies.ts): both are built for the picnic's open air and size. */
   bubbles: boolean;
   fireflies: boolean;

@@ -3,7 +3,9 @@
 // other flies, the ball, the bubbles and the food; not the menus or the
 // pointer), read back once and resampled to each facet
 // (packages/body/src/vision.ts). Each fly this device lives has eyes of its
-// own, and they take turns: one fly's refresh a frame.
+// own, and they take turns: one fly's refresh a frame. In a place whose
+// shading is heavy the others' eyes refresh less often (Scene.companionEyes),
+// and the followed fly's come first.
 //
 // When the brain has eyes (BrainDriver.eyes), the result is its `light`
 // sense, and the game sends no hand-wired looming. Until then the same
@@ -282,7 +284,9 @@ export class Eyes {
    * its brain. One fly's eyes refresh a frame, never more: whichever is most
    * overdue (with several, each a little less often), or while something
    * comes at it fast (`urgent`), the followed fly's, every frame, and the
-   * others' wait until it has passed.
+   * others' wait until it has passed. Where the place slows the others' eyes
+   * (Scene.companionEyes), theirs are due that much less often, and the
+   * followed fly's go first whenever they are due.
    */
   render(dt: number, showPicture: boolean, urgent = false, forInset = false) {
     const own = this.#sights[0];
@@ -291,6 +295,8 @@ export class Eyes {
     this.costCalls = 0;
     const detail = DETAIL[this.detail === "high" ? "high" : "low"];
     const hz = detail.hz * this.rate;
+    // Where the place makes every refresh dear, the others' come less often, and the followed fly's never wait for theirs.
+    const slower = this.#stage.current.companionEyes ?? 1;
     // A frame that rebuilt the reflections (34 draws) already costs about what the eyes' faces do: they refresh on the next, a frame
     // late, rather than double the frame's draws.
     const reflected = this.#stage.reflected;
@@ -310,10 +316,11 @@ export class Eyes {
         refreshed = 0;
         continue;
       }
-      const need = !sight.light ? Infinity : reflected ? 0 : sight.since * hz;
+      const need = !sight.light ? Infinity : reflected ? 0 : sight.since * (i === 0 ? hz : hz * slower);
       if (need >= 1 - 1e-3 * hz && need > most) {
         most = need;
         refreshed = i;
+        if (i === 0 && slower < 1) most = Infinity;
       }
     }
     if (refreshed >= 0) this.#refresh(sights[refreshed], refreshed, detail.resolution);

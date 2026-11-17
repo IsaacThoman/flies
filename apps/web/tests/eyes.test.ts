@@ -6,7 +6,7 @@ import { Eyes } from "../src/eyes/eyes.ts";
 import type { Life } from "../src/life.ts";
 import type { Stage } from "../src/stage.ts";
 
-function setup() {
+function setup(companionEyes?: number) {
   const map: EyeMap = {
     left: { directions: new Float32Array([0, 1, 0]) },
     right: { directions: new Float32Array([0, 1, 0]) },
@@ -37,7 +37,7 @@ function setup() {
     hemi: new THREE.HemisphereLight(),
     sun: new THREE.DirectionalLight(),
     light: {},
-    current: { camera: {} },
+    current: { camera: {}, companionEyes },
   } as unknown as Stage;
   return { eyes: new Eyes(stage, life), life, reads, stage, brain };
 }
@@ -219,4 +219,39 @@ test("dropping a companion waits for its pending read before disposing its targe
   await settled();
   assert.equal(disposed, 1);
   assert.equal(eyes.companyUpdates(0), 0);
+});
+
+test("where the place slows the others' eyes, theirs refresh that much less often, a fly at a time, and the followed fly's keep their full rate", async () => {
+  const { eyes, reads, life } = setup(0.25);
+  eyes.company([companion(life), companion(life)]);
+  let drawn = 0;
+  const followedAt: number[] = [];
+  for (let frame = 0; frame < 600; frame++) {
+    const before = reads.length;
+    const own = eyes.updates;
+    eyes.render(1 / 60, false);
+    assert.ok(reads.length - before <= 1, "never more than one fly's eyes a frame");
+    if (reads.length > before) drawn++;
+    for (const read of reads.slice(before)) read.finish();
+    await settled();
+    if (eyes.updates > own) followedAt.push(frame);
+  }
+  // Ten seconds at 60 frames a second, Low eyes: the followed fly at 20 Hz, each of the others at 5.
+  assert.ok(Math.abs(eyes.updates - 200) <= 1, `followed fly: ${eyes.updates} pictures`);
+  for (const i of [0, 1]) assert.ok(Math.abs(eyes.companyUpdates(i) - 50) <= 2, `companion ${i}: ${eyes.companyUpdates(i)} pictures`);
+  assert.ok(drawn <= 302, `the eyes drew in ${drawn} frames of 600, against every frame at the others' full rate`);
+  const gaps = new Set(followedAt.slice(2).map((f, i) => f - followedAt[i + 1]));
+  assert.deepEqual([...gaps], [3], "the followed fly's eyes never wait for the others'");
+});
+
+test("elsewhere the others' eyes keep the followed fly's rate", async () => {
+  const { eyes, reads, life } = setup(1);
+  eyes.company([companion(life), companion(life)]);
+  for (let frame = 0; frame < 180; frame++) {
+    const before = reads.length;
+    eyes.render(1 / 60, false);
+    for (const read of reads.slice(before)) read.finish();
+    await settled();
+  }
+  assert.deepEqual([eyes.updates, eyes.companyUpdates(0), eyes.companyUpdates(1)], [60, 60, 60]);
 });

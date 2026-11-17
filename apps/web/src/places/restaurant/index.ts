@@ -58,6 +58,8 @@ export const restaurant: Scene = {
   },
   // Big windows: a grey day greys it, and after dark the street's lamps and the room's own light it.
   open: 0.5,
+  // Its shading is the TV's heaviest: the company's eyes a quarter as often.
+  companionEyes: 0.25,
   bubbles: false,
   fireflies: false,
 };

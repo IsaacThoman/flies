@@ -315,7 +315,9 @@ other settings. A count saved as more than that lives, and shows, as three. An o
 without `spawn()` runs one fly and shows no Flies row. Each extra
 fly has its own body, senses and eyes (`apps/web/src/company.ts`); the camera, pointer and
 readouts follow the first. The eyes take turns, at most one fly's refresh a frame, whichever
-is most overdue; four at 60 fps each get about 15 Hz rather than 20. While a ball comes the
+is most overdue; four at 60 fps each get about 15 Hz rather than 20. In the bar and the
+restaurant, where every refresh is dear here, the others' are due a quarter as often (5 Hz with
+Low eyes) and the followed fly's, at 20, go first. While a ball comes the
 followed fly takes priority at up to 60 Hz and the others usually wait, so a frame never refreshes two. A companion fly
 whose brain thread fails is given a new one twice (after 5 s, then 30 s) and is then taken off.
 
@@ -615,7 +617,7 @@ decodes to the room's link.
 
 With one local fly, the game renders its eyes into small targets at 20 Hz with Low eyes,
 30 Hz with High eyes, or up to 60 Hz for urgent updates. Several flies share refresh slots as
-described above. Both of three's ways work and are checked by the test scene (`tests/scene.ts`, a
+described above; in the bar and the restaurant the others' eyes come at a quarter of that. Both of three's ways work and are checked by the test scene (`tests/scene.ts`, a
 32×16 target, red on the left and green on the right, checking red, green and alpha at one sampled pixel on each side; blue and other pixels are not asserted):
 
 - `renderer.readRenderTargetPixels(target, ...)` is synchronous: one `readPixels` query, so

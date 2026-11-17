@@ -212,6 +212,11 @@ left out while it looks round. The pictures shown on screen are still the
 followed fly's. While the ball is in the air the followed fly gets priority at a target of 60 Hz;
 others can refresh on frames when it is not due. No frame refreshes more than
 one fly's eyes. Pending readbacks and reflection refreshes can delay pictures.
+In the bar and the restaurant, whose shading makes every refresh dear on the
+Apple TV, the others' eyes are due a quarter as often (`companionEyes` in the
+place's scene): 5 Hz with Low eyes, 7.5 with High, against the followed fly's
+20 or 30, which go first whenever they are due. Between its pictures a fly's
+brain is given the last one, as at any rate; nothing is made up in between.
 
 Brightness is weighted as a fly's outer photoreceptors (Rh1, mostly blue-green)
 see it, 0.1 R + 0.45 G + 0.45 B, so a blue sky is bright to it. The picture is
