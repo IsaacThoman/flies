@@ -83,6 +83,15 @@ export class TableFood {
     return food;
   }
 
+  /** A player clears only their own offerings; the usual food update tells every device what is gone. */
+  clearDropped(by: number) {
+    if (!(by > 0)) return;
+    for (let i = this.foods.length - 1; i >= 0; i--) {
+      const food = this.foods[i];
+      if (food.kind !== "patch" && food.kind !== "found" && dropOwner(food.id) === by) this.#remove(food);
+    }
+  }
+
   /** Something the place put out, on the surface at or below `y`, as a device saw it; the first to say so names it. */
   found(id: number, name: string, x: number, z: number, r: number, sweet: number, y?: number): Food | null {
     if (!(id >= FOUND_ID) || typeof name !== "string" || name.length > 40 || this.find(id) || !this.#world.onTable(x, z) || !(r > 0 && r < 5) || !(sweet >= 0 && sweet <= 1)) return null;

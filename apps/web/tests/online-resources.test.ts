@@ -77,3 +77,22 @@ test("leaving a table frees pooled fly models and the instanced stand-ins withou
   assert.equal([...shadow.values()][0], 0);
   assert.deepEqual(scene.children, []);
 });
+
+test("a room removal cancels a remote offering still falling so it cannot reappear", async () => {
+  const { OtherHand } = await import("../src/online/other-hands.ts");
+  const { TablePantry } = await import("../src/online/table-pantry.ts");
+  const world = new World(WORLDS.picnic);
+  const pantry = new TablePantry(world);
+  const scene = new THREE.Scene();
+  const hand = new OtherHand(scene, world, 2, "#ff3355", pantry);
+  hand.drop(2_000_001, "honey", 0, 0, 0, 0);
+  hand.drop(2_000_002, "water", 10, 0, 0, 0);
+  hand.forgetFood(2_000_001);
+  assert.equal(hand.hands.falling.length, 1);
+  const camera = new THREE.PerspectiveCamera();
+  const fly = { position: { x: 100, y: 0, z: 0 }, yaw: 0, onFeet: true };
+  hand.update(1, 1000, fly, camera, 1, () => 0);
+  assert.ok(!pantry.foods.some((f) => f.id === 2_000_001));
+  assert.ok(pantry.foods.some((f) => f.id === 2_000_002), "an offering not removed lands normally");
+  hand.dispose();
+});

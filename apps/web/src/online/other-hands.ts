@@ -106,6 +106,14 @@ export class OtherHand {
     this.hands.falling.push({ kind, x, z, y: Math.max(floor, floor + DROP_HEIGHT - 0.5 * FALL * t * t), floor, vy: -FALL * t });
   }
 
+  /** A removed offering must not land later and put itself back in the pantry. */
+  forgetFood(id: number) {
+    const i = this.#falling.findIndex((f) => f.id === id);
+    if (i < 0) return;
+    this.#falling.splice(i, 1);
+    this.hands.falling.splice(i, 1);
+  }
+
   /** The table moved: nothing of theirs is in the air any more. */
   clear() {
     this.#ball = null;

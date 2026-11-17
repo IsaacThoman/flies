@@ -15,6 +15,8 @@ export class TablePantry extends Pantry {
   player = 0;
   /** Food the place put out here, for the room to hear of. */
   onFound: (food: Food) => void = () => {};
+  /** Requests a clear from the room, which decides what this player owns. */
+  onClear: () => void = () => {};
   readonly #world: World;
   #dropped = 0;
   /** Names given at the moment of dropping, waiting for the food to land: by kind, oldest first. */
@@ -35,6 +37,11 @@ export class TablePantry extends Pantry {
 
   #next() {
     return this.player * DROP_ID + (++this.#dropped % DROP_ID);
+  }
+
+  clearDropped() {
+    this.#named.length = 0;
+    this.onClear();
   }
 
   /** It landed, on the surface at or below `y` (the highest, if left out). */

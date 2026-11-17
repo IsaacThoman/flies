@@ -351,7 +351,8 @@ show the thing last used, and the screen hides the system's cursor, text
 selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
 
-The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
+The tools are **Feed** (sugar, honey, raspberry, water, and Clear dropped, which
+removes your offerings, including those still falling, leaving the place’s own food), **Swoop** (a dark
 beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot), **Light** (now, which follows the clock,

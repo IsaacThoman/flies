@@ -134,6 +134,17 @@ async function fingers() {
     await waitFor(page, "variant=honey");
     await feedHoney(page, () => dropFood(page, async () => touch.tap(await screenOf(page, "hand"))));
 
+    step("fingers: Clear dropped removes offerings without taking the place's food");
+    for (let i = 0; i < 3; i++) await tapOn("kind", 1);
+    await waitFor(page, "variant=clear");
+    const placeFoods = await game<number>(page, "g.life.pantry.foods.filter(f => f.kind === 'patch' || f.kind === 'found').length");
+    await touch.tap(await screenOf(page, "hand"));
+    await page.waitForFunction(() => {
+      const g = (globalThis as unknown as { __fly: Game }).__fly;
+      return g.hands.falling.length === 0 && !g.life.pantry.foods.some(f => f.kind !== "patch" && f.kind !== "found");
+    });
+    assert.equal(await game<number>(page, "g.life.pantry.foods.length"), placeFoods);
+
     step("fingers: a finger held on the fly strokes it with the feather");
     await tool("feather");
     await touch.hold(await screenOf(page, "fly"), () => waitFor(page, "touch>0.9"));

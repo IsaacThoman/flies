@@ -467,6 +467,9 @@ export class Table {
         if (food) this.#broadcast({ type: "drop", by: seat.id, id: food.id, kind: food.kind, x: food.x, z: food.z, y: food.y, at: clampTime(m.at, now) }, seat);
         return;
       }
+      case "clearFood":
+        if (m.epoch === this.epoch && seat.rates.drops.take(now)) this.food.clearDropped(seat.id);
+        return;
       case "ball": {
         if (!isV3(m.from) || !isV3(m.via) || !isV3(m.to) || !seat.rates.throws.take(now)) return;
         // A ball starts no later than a second from now, and is the thrower's only one in the air.
