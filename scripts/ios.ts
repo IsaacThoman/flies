@@ -22,10 +22,11 @@ const USAGE = `Usage: npm run ios -- [<command>] [options]
   (no command) [--sim <udid>] [--report <seconds>] [--rooms <url>]
         build for the simulator, then run it in the given simulator, or the one iOS simulator
         that is booted
-  build [--sim] [--debug] [--for-testing]
+  build [--sim] [--debug] [--for-testing] [--no-sign]
         build the web app (apps/web) with the brain into apps/ios/www/, generate the Xcode
         project and build the app for an iPhone or iPad (or, with --sim, the iOS simulator).
         --for-testing (implies --debug) also builds the tests that npm run ios:check runs
+        --no-sign compiles for the simulator without signing, for CI; cannot run tests
   run (--sim <udid> | --device <udid>) [--debug] [--report <seconds>] [--rooms <url>]
         install the built app and launch it, printing its console. --report prints the game's
         state that often (docs/ios.md, "Reports"); --rooms points its tables at another room
@@ -48,7 +49,7 @@ function run(command: string, args: string[], cwd = root, env: NodeJS.ProcessEnv
   if (result.status !== 0) throw Error(`${command} ${args.slice(0, 3).join(' ')} failed (exit ${result.status})`);
 }
 
-type BuildOptions = { sim: boolean; debug: boolean; forTesting: boolean };
+type BuildOptions = { sim: boolean; debug: boolean; forTesting: boolean; noSign?: boolean };
 
 /** Builds www/ and generates the Xcode project; returns xcodebuild's environment. */
 function prepare() {
@@ -71,13 +72,14 @@ export const appPath = (sim: boolean, debug = false) =>
   path.join(derivedData, `Build/Products/${configuration(debug)}-${sim ? 'iphonesimulator' : 'iphoneos'}/Flies.app`);
 
 export function build(options: BuildOptions) {
+  if (options.noSign && (!options.sim || options.forTesting)) throw Error('--no-sign requires --sim and cannot be used with --for-testing');
   const env = prepare();
   const debug = options.debug || options.forTesting;
   run('xcodebuild', [
     '-project', 'Flies.xcodeproj', '-scheme', 'Flies', '-configuration', configuration(debug),
     '-destination', options.sim ? 'generic/platform=iOS Simulator' : 'generic/platform=iOS', '-derivedDataPath', derivedData,
     // Signed to run locally in the simulator, as test runners must be.
-    ...(options.sim ? ['CODE_SIGN_IDENTITY=-', 'CODE_SIGN_STYLE=Manual', 'DEVELOPMENT_TEAM=', 'ARCHS=arm64'] : ['-allowProvisioningUpdates', '-allowProvisioningDeviceRegistration']),
+    ...(options.sim ? [...(options.noSign ? ['CODE_SIGNING_ALLOWED=NO'] : ['CODE_SIGN_IDENTITY=-', 'CODE_SIGN_STYLE=Manual']), 'DEVELOPMENT_TEAM=', 'ARCHS=arm64'] : ['-allowProvisioningUpdates', '-allowProvisioningDeviceRegistration']),
     '-quiet', options.forTesting ? 'build-for-testing' : 'build',
   ], appDir, env);
   console.log(`Built ${path.relative(root, appPath(options.sim, debug))}${options.forTesting ? ' and its tests' : ''}${LINKS ? ' with universal links' : ''}`);
@@ -120,7 +122,7 @@ function main() {
     build({ sim: true, debug: false, forTesting: false });
     return launch({ sim }, false, report, rooms);
   }
-  if (cmd === 'build') return build({ sim: has('--sim'), debug: has('--debug'), forTesting: has('--for-testing') });
+  if (cmd === 'build') return build({ sim: has('--sim'), debug: has('--debug'), forTesting: has('--for-testing'), noSign: has('--no-sign') });
   if (cmd === 'archive') {
     // A release reaches the site's room server; ROOMS_URL is for development builds.
     if (process.env.ROOMS_URL) throw Error('An archive is a release: unset ROOMS_URL, which points a development build at another room server.');
