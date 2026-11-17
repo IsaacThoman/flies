@@ -14,7 +14,7 @@ const context = new Proxy({}, { get: () => () => gradient });
 (globalThis as { document?: unknown }).document = { createElement: () => ({ getContext: () => context }) };
 (globalThis as { Path2D?: unknown }).Path2D = class { addPath() {} moveTo() {} bezierCurveTo() {} quadraticCurveTo() {} closePath() {} };
 
-test("other flies keep moving across u32 room-time wraps, including a new connection after several wraps", (t) => {
+test("other flies keep moving across u32 room-time wraps, including a synchronized clock after several wraps", (t) => {
   let now = 0;
   t.mock.method(performance, "now", () => now);
   const world = createPicnic();
@@ -30,17 +30,20 @@ test("other flies keep moving across u32 room-time wraps, including a new connec
   for (const cycle of [1, 3]) {
     online.others.forget();
     online.line.onMessage({ type: "joined", id: 2, colour: "#ffffff", away: false });
+    const offset = cycle === 3 ? 3 * 2 ** 32 - 400 : -6000;
     for (let i = -2; i <= 3; i++) {
-      now = cycle * 2 ** 32 + i * 50;
+      const roomNow = cycle * 2 ** 32 + i * 50;
+      now = roomNow - offset;
+      if (i === -2) online.line.clock.sample(now, roomNow, now);
       step();
       const state = createFlyState();
       state.id = 2;
       state.seq = i + 3;
-      state.t = now;
+      state.t = roomNow;
       state.x = i;
       const n = encodeFlies(batch, TABLETOP_SCALE, [state]);
       online.line.onFlies(new DataView(batch.buffer, 0, n));
-      assert.equal(online.others.get(2)!.track.newest!.t, now, `cycle ${cycle}, step ${i}`);
+      assert.equal(online.others.get(2)!.track.newest!.t, roomNow, `cycle ${cycle}, step ${i}`);
     }
     step();
     const other = online.others.get(2)!;
