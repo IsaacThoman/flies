@@ -1,10 +1,12 @@
 // Shared local capacity and a branch-wide cooldown keep long experiments fair.
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { setTimeout } from "node:timers/promises";
 
 const branch = execFileSync("git", ["branch", "--show-current"], { encoding: "utf8" }).trim();
-const key = branch.replace(/[^a-zA-Z0-9-]/g, "-");
+const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+const key = createHash("sha256").update(root).digest("hex").slice(0, 16);
 const lock = `/tmp/flies-heavy-${key}`;
 const cooldown = `${lock}.released`;
 const COOLDOWN_MS = 120_000;

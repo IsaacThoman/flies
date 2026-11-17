@@ -30,7 +30,7 @@ service-worker installation traffic in its own target; those counts exclude
 HTTP headers and bytes of incomplete responses.
 
 First frame is completion of the first game frame; title is the first frame
-with the brain running and the title visible. These include game setup,
+whose published canvas state is title (up to 200 ms after the title is drawn). These include game setup,
 download, worker startup and the deliberate Awake transition. Timing starts
 at navigation, using the page's performance clock. `modules.json` reports
 rendered module bytes before final chunk minification; they are not additive

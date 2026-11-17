@@ -154,7 +154,7 @@ async function main() {
   assert.ok(!values["compare-dir"] || (!values.build && phases.every(p => ["loads", "frames"].includes(p))), "--compare-dir uses prebuilt sites and loads/frames phases");
   const batches = directories.length === 1 ? [Array.from({ length: runs }, (_, i) => i)] : Array.from({ length: runs }, (_, i) => [i]);
   if (values.build) await bundle(out, dir);
-  const report: Record<string, unknown> = { complete: false, revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), dirty: execFileSync("git", ["diff", "--stat"], { encoding: "utf8" }), node: process.version, host: os.cpus()[0].model, options: values, notes: "Timings include instrumentation; frame submission is not GPU/display time. Phone CPU throttling affects page only. Memory includes worker Wasm separately; memory checkpoints n=1; active batches separated by a paused two-minute cooldown; GC queries hold frames briefly." };
+  const report: Record<string, unknown> = { complete: false, revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), dirty: execFileSync("git", ["diff", "--stat"], { encoding: "utf8" }), node: process.version, host: os.cpus()[0].model, options: values, notes: "Timings include instrumentation; title uses the canvas state, published about every 200 ms; frame submission is not GPU/display time. Phone CPU throttling affects page only. Memory includes worker Wasm separately; memory checkpoints n=1; active batches separated by a paused two-minute cooldown; GC queries hold frames briefly." };
   const save = () => {
     const loads = (report.loads ?? []) as { variant?: number; profile: string; cache: string; title: number; firstFrame: number; titleBytes: number }[];
     const frames = (report.frames ?? []) as { variant?: number; place: string; mode: string; jsMs: { median: number }; taskMsPerFrame: number; longFrames50ms: number }[];
@@ -180,6 +180,8 @@ async function main() {
       let browser: Browser | undefined;
       try {
         browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
+        report.browser = browser.version();
+        report.gpuFlags = gpuFlags();
         const context = await browser.newContext({ viewport: profile === "phone" ? { width: 390, height: 844 } : { width: 1280, height: 720 }, isMobile: profile === "phone", hasTouch: profile === "phone", deviceScaleFactor: 1 });
         const page = await context.newPage();
         await instrument(page);
@@ -218,6 +220,8 @@ async function main() {
     let browser: Browser | undefined;
     try {
       browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
+        report.browser = browser.version();
+        report.gpuFlags = gpuFlags();
       const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
       const page = await context.newPage();
       const errors: string[] = [];
@@ -255,7 +259,7 @@ async function main() {
     const memory: unknown[] = [];
     report.memory = memory;
     let l: Awaited<ReturnType<typeof lane>> | undefined;
-    const started = Date.now();
+    let started = 0;
     let activeMs = 0;
     const hold = async (held: boolean) => {
       await l!.page.evaluate(held => {
@@ -281,7 +285,7 @@ async function main() {
     try {
       do {
         await withHeavySlot(async () => {
-          if (!l) { l = await lane(); await move(l.page, "picnic", true); await sample("start"); }
+          if (!l) { l = await lane(); await move(l.page, "picnic", true); started = Date.now(); await sample("start"); }
           await hold(false);
           const from = Date.now(), initial = activeMs;
           const target = Math.min(memorySeconds * 1000, initial + 300_000);
