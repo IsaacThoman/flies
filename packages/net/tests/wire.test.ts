@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EVERYONE, MAX_FLIES, MAX_OWN, PROTOCOL, WIRE_FOODS_MAX, readServerMessage } from "../src/index.ts";
 import type { ServerMessage } from "../src/index.ts";
+import { TableFood, spawnSpot, toWire } from "../src/index.ts";
+import { KITCHEN, World } from "@fly/world";
 
 const welcome = {
   type: "welcome", v: PROTOCOL, id: 2, colour: "#2fb8ff", flies: [{ id: 2, colour: "#2fb8ff", at: [0, 0, 0, 0] }, { id: 4, colour: "#59e05a", at: [1, 1, 0] }], starter: 1, seed: 1, now: 5000, wall: 0, offset: 0, place: "picnic", epoch: 0,
@@ -11,6 +13,18 @@ const welcome = {
 } satisfies ServerMessage;
 
 const read = (m: unknown) => readServerMessage(JSON.stringify(m));
+
+test("kitchen room choices, arrivals and shared food survive the protocol", () => {
+  const world = new World(KITCHEN);
+  const foods = new TableFood(world, KITCHEN.patches).foods.map(toWire);
+  const at = spawnSpot(world, 2);
+  const arrival = { ...welcome, place: "kitchen", at, foods, flies: [{ id: 2, colour: "#2fb8ff", at }] };
+  assert.deepEqual(read(arrival), arrival);
+  const move = { type: "place", place: "kitchen", epoch: 1, foods, spots: { 2: at } };
+  assert.deepEqual(read(move), move);
+  const rooms = { type: "rooms", rooms: [{ code: EVERYONE, name: "Everyone", place: "kitchen", flies: 2, locked: false, everyone: true }] };
+  assert.deepEqual(read(rooms), rooms);
+});
 
 test("the room's messages are read as they are", () => {
   const messages: ServerMessage[] = [

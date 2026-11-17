@@ -3,7 +3,7 @@
 [Documentation index](../README.md#documentation).
 
 The place catalog includes Picnic table, Windowsill, Lab bench, Bar,
-Greenhouse and Restaurant (`apps/web/src/places/catalog.ts`). Greenhouse adds
+Greenhouse, Restaurant and Kitchen counter (`apps/web/src/places/catalog.ts`). Greenhouse adds
 a bench with pots, seed trays, fruit and a water saucer; its saucer water has
 configured sweetness 0.05 (`packages/world/src/greenhouse.ts`).
 
@@ -151,6 +151,21 @@ to find by walking and tasting. The butterfly and ladybird are in the fly's worl
 (and, without eye input, things that can loom); they keep clear of whichever
 fly is nearest. A falling leaf can also brush any fly with touch input, and the scheduler does not force a neural response: what each fly does about
 these events follows its brain commands and the documented body stand-ins.
+
+## Kitchen counter
+
+The kitchen counter is a metre-wide stone worktop with a glazed ceramic
+fruit bowl, spotty bananas and purple grapes, a cut peach on a scarred wooden
+chopping board, toast crumbs, a stemmed glass with red wine left in it, a
+honey jar and a spill, and a compost caddy with its lid ajar. A checked tea
+towel hangs over one corner and a wall dial tells the real time. The fly begins
+on the peach's cut face. Split fruit, peach flesh, grape juice,
+honey and wine are food; feet disturb the liquid pools. A tiled splashback
+and a window frame the worktop, with cabinets and the kitchen beyond; warm
+pendant light takes over from window daylight at dusk. The garden in the
+window is a stylised backdrop, not a simulated outdoor place. Heavy rain
+runs faster down the pane, storm flashes light the room, and snow falls
+outside, dusting the garden and frosting the foot of the glass.
 
 ## Windowsill
 

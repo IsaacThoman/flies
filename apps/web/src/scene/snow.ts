@@ -10,7 +10,7 @@ export class Snow {
   readonly #u = { uTime: { value: 0 }, uSnow: { value: 0 }, uOffset: { value: new THREE.Vector3() }, uColor: { value: new THREE.Color() } };
   #last = -1;
   readonly #wrap: number;
-  constructor(size: number, floor: number, outdoorsOnly = false) {
+  constructor(size: number, floor: number, outdoorsOnly = false, glassZ = -145) {
     this.#wrap = size * 2;
     const rnd = random(913);
     const g = new THREE.InstancedBufferGeometry();
@@ -40,7 +40,7 @@ void main() {
   vec3 up = vec3(viewMatrix[0][1],viewMatrix[1][1],viewMatrix[2][1]);
   vUv = position.xy;
   vAlpha = step(flake.w, uSnow) * smoothstep(8.0,40.0,dist) * step(${floor.toFixed(1)},p.y);
-  ${outdoorsOnly ? 'vAlpha *= 1.0 - step(-145.0,p.z);' : ''}
+  ${outdoorsOnly ? `vAlpha *= 1.0 - step(${glassZ.toFixed(1)},p.z);` : ''}
   gl_Position=projectionMatrix*viewMatrix*vec4(p+(right*position.x+up*position.y)*radius,1.0);
 }`,
       fragmentShader: /* glsl */ `uniform vec3 uColor; varying vec2 vUv; varying float vAlpha;
