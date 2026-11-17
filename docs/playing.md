@@ -34,7 +34,7 @@ fly's world.
 
 | On the remote | Does |
 | --- | --- |
-| Swipe on the touch surface | Moves your hand across the table. With View in hand, turns the camera round the fly and up or down instead. |
+| Swipe on the touch surface | Moves your hand across the table. With View in hand, turns the camera round the fly and up or down instead; on Why?, goes back and forth through what it plays. |
 | Left / Right | Picks a tool from the shelf. |
 | Up / Down | Picks the tool's kind: which food, how hard to blow, which piece to build, the time of day, the camera. |
 | Select | Uses the tool: drops food, throws the ball, sets a piece down, turns or takes one away. Hold it to tickle or blow. On the Sky it steps round the weathers, on View round the views. |
@@ -50,7 +50,7 @@ Pointing, the screen itself is what you press, and there are no button hints:
 | Tickle, Blow | Touch and hold, and drag: the feather strokes the fly while you hold it on it, and rests on it lightly while the hand is there; the puff follows the finger. | Hold the button, and drag. Hovering over the fly rests the feather on it. |
 | Sky, View, Place | The arrows either side of the tool's label (or a tap on the label, or a swipe along it) step its kind; tapping the tool again does too (on the Sky, its weather). The Sky has two labels side by side, the time of day and the weather, each with its own arrows (one over the other where they don't fit). Place has a Go button for somewhere the fly isn't. | The same, or the wheel over a label. |
 | Closer and farther | Pinch. | The wheel, or a trackpad's pinch. |
-| Round the fly | Drag anywhere but with the feather or the air in hand on the table (they go where the finger goes); or drag with two fingers. | Drag (the same), or drag with the right or middle button outside the HUD. A trackpad's two-finger scroll, round and up or down. |
+| Round the fly | Drag anywhere but with the feather or the air in hand on the table (they go where the finger goes); or drag with two fingers. On Why?, the same drag goes back and forth through it. | Drag (the same), or drag with the right or middle button outside the HUD. A trackpad's two-finger scroll, round and up or down. |
 | Back to Follow | Double-tap the air. | Double-click the air, or R. |
 | Tools | Tap one on the shelf. | Click one; the wheel over the shelf steps along it. |
 | Menus | Tap a row, a tab, a choice's arrows; a slider follows the finger. The round button at the top left, or a tap outside the pane, goes back. | The same, and a right click goes back. Hovering only brightens what is under the cursor: the focus ring is the remote's and the keys'. |
@@ -59,12 +59,13 @@ Pointing, the screen itself is what you press, and there are no button hints:
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
 Back, space for Play/Pause), its hints drawn as keys; the number keys pick a
 tool (1 the first, 0 the tenth), + and − held bring the camera in and take it out, Q and E held turn it
-round the fly, W and S up and down, and R (or Home) takes it back to Follow's distance and height. After a mouse
+round the fly (on Why?, go back and forth through it), W and S up and down, and R (or Home) takes it back to Follow's distance and height. After a mouse
 or a finger the menus show no focus; the first arrow shows it, on what was
 last pressed. A standard game pad (the Gamepad API) is the remote too: A is
 Select, B Back, Start Play/Pause, the d-pad and the shoulder buttons the
 arrows, the left stick moves your hand (and steps through a menu), the right
-stick turns the camera round and up (pressed in, back to Follow), the triggers bring
+stick turns the camera round and up (pressed in, back to Follow; on Why?,
+across goes back and forth through it), the triggers bring
 it in and take it out as far as they are pressed; its hints are drawn as its
 buttons. A pad that can
 rumble (`apps/web/src/haptics.ts`) is felt in the hand: a tick when food is
@@ -91,8 +92,9 @@ midday, golden hour, dusk, night, on Up and Down; and the weather: now, which
 follows the forecast, or clear, overcast, mist, rain, heavy rain, thunderstorm,
 snow, sleet, on Select, round and round), **Place** (where it lives; Up and
 Down choose, Select carries it there) and **View** (close up, follow, wide, the whole table, from above,
-through the fly's eyes, and inside it, close up with the fly as glass; Up
-brings the camera in, Down takes it out). On the shelf the two groups stand
+through the fly's eyes, inside it, close up with the fly as glass, and
+[Why?](#why), its last few seconds played back; Up brings the camera in, Down
+takes it out). On the shelf the two groups stand
 apart, or, on a screen too narrow for them in a row, the fly's over its
 world's; Left and Right go along all of them. Hints in the
 corners show what the buttons do, until they have been used: the shelf's goes
@@ -125,6 +127,52 @@ something to find. It comes back to the view last chosen (but never through
 the fly's eyes, which would open on no fly at all), and to a time of day or a
 weather chosen in the last six hours; after that it is back on Now, so the
 screensaver follows the clock again.
+
+## Why?
+
+**View → Why?** answers "why did it do that?" with what its nervous system
+did, and nothing else (`apps/web/src/why/`). The game keeps the followed
+fly's last six seconds all the time, 30 times a second: each region's firing
+rate as the nervous-system display gets it, the rate of each group of neurons
+a command is read from, the commands, every sense as its body sent it, and
+what the body did with them. Choosing Why? takes a copy of that and plays it
+back at a quarter of the speed, over and over, in a large glass card where
+what it sees would be: its nervous system from above, glowing as it did (the
+same drawing and glow as the corner panel, [rendering.md](rendering.md#its-nervous-system)),
+the In and out bars (as Stats → In and out has them) as they were, and under
+them a timeline with a line where the body acted.
+
+What it plays is the most striking thing the body began in those seconds: a
+take-off, then feeding, backing up, grooming, singing, a turn either way, and
+walking; the latest of the same. Each is the body's own state, so it begins
+where the body acted on a command (the take-off where the giant fiber passed
+its threshold). Marked on it: that command's row in Out, and rings round the
+somata of the neurons the brain package reads it from (DNp01 and the flight
+power motor neurons for a take-off, MN9 for feeding, MDN for backing, DNg12
+for grooming, pIP10 for song, the DNa02 of the side it turned to, DNg100 for
+walking), brighter as they fired, with their rates on the timeline and their
+names over it. Marked before it: each sense whose bar rose by a tenth in the
+second and a half before, and each region where senses come in (the eyes'
+pathway as far as the visual projection neurons, the antennae, the bristles,
+the taste organs, the legs' and wings' sensors) whose glow rose by 0.15. The
+light (a mean over both eyes, which a ball at one eye hardly moves), hunger
+and thirst (which move over minutes) aren't picked; with its eyes open a ball looms in
+its eyes' regions, not in the Loom bars, which carry only the loom felt with
+them shut. While something is marked, the rest of the drawing glows at 0.35
+of what was recorded, so the marked parts stand out; nothing is lit that
+didn't fire. If it began nothing in those seconds, it shows what it is still
+doing, without a run-up; if it did nothing at all, the last three seconds,
+unmarked. That something rose first doesn't say it caused what followed:
+Why? shows what came before and what fired.
+
+It pauses nothing: the fly lives on behind the card, and its brain keeps
+running. Going through it is the camera's gesture: a swipe on the remote with
+View in hand, Q and E, a pad's right stick across, a drag with a mouse or a
+finger (to the right, later; a drag the screen's width is all of it); it
+holds where it is left for a moment and plays on. Up, Select, or another
+view leaves it at once. Coming back to it takes what is kept then. It is
+never kept between launches. It is this device's own: nobody else at a table
+sees it, and it sends nothing.
 
 ## Camera
 

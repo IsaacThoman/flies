@@ -197,11 +197,12 @@ const HOUR = 3_600_000;
  * made (ms). A way of watching is the player's to keep. A time of day or a
  * weather is for now: a few hours on, a launch is back to following the clock,
  * as the wallpaper is meant to. Looking through its eyes isn't kept, as a
- * launch would open on no fly at all. Everything else starts fresh, on Feed
+ * launch would open on no fly at all, nor Why?, which would open on nothing
+ * yet recorded. Everything else starts fresh, on Feed
  * with sugar: one press of Select and the fly has something to find.
  */
 export const KEPT: { readonly [D in DialId]: { readonly for: number; readonly not?: readonly string[] } } = {
-  view: { for: Infinity, not: ["eyes"] },
+  view: { for: Infinity, not: ["eyes", "why"] },
   light: { for: 6 * HOUR },
   weather: { for: 6 * HOUR },
 };

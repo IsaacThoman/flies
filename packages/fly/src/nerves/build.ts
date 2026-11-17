@@ -28,6 +28,21 @@ export function restFrames(): Float32Array {
   return new FlyRig().joints.slice();
 }
 
+/**
+ * Where each command group's somata are drawn on the fly standing at rest, in
+ * its own units, seen from above as the panel sees them: x toward its left,
+ * z forward. The drawing puts them here; a picture can mark them.
+ */
+export function somaPlaces(): { rate: string; points: [number, number][] }[] {
+  return SOMA_GROUPS.map((group) => ({
+    rate: group.rate,
+    points: group.neurons.map((neuron): [number, number] => {
+      const p = neuron.cord ? cordPoint(neuron.p, 1) : brainPoint(neuron.p, 1);
+      return [p[0], p[2]];
+    }),
+  }));
+}
+
 export function buildNerves(rest: Float32Array = restFrames()): THREE.BufferGeometry {
   const b = new NerveBuilder(rest);
   b.backdrop();

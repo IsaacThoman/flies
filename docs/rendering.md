@@ -5,7 +5,8 @@
 ## Its nervous system
 
 The fly's brain, nerve cord and nerves can be watched at work, in two ways
-that draw the same model with the same glow, so they never disagree:
+that draw the same model with the same glow, so they never disagree, and
+played back in a third:
 
 - **The X-ray** (Settings → On screen → X-ray: off, in the screensaver, or
   always; or View → Inside it while playing, which also brings the camera in
@@ -27,6 +28,18 @@ that draw the same model with the same glow, so they never disagree:
   corner itself when that isn't shown, and moves round the corners with it;
   while playing it keeps to the top right. It never shows over a menu or
   View → Fly's eyes.
+- **Why?** (View → Why?, while playing; [playing.md](playing.md#why)): the
+  panel's drawing a quarter bigger, in a card in the middle of the screen
+  (where what it sees would be), glowing from the last seconds kept
+  (`apps/web/src/why/recorder.ts`) instead of the live brain, slowed to a
+  quarter. Its glow is the same envelope run over the recorded rates from the
+  start of what was kept (`glowSeries` in `apps/web/src/why/replay.ts`), so a
+  moment shows as the live panel showed it; it has a glow array of its own,
+  so the X-ray and the corner go on with the live fly. While it marks an
+  action, the parts it doesn't mark glow at 0.35 of that. Rings round the
+  marked command group's somata are drawn over the drawing, on the card, at
+  the positions the drawing puts them (`somaPlaces`). The corner pictures make
+  way for it, as for View → Fly's eyes.
 
 **The anatomy** (`packages/fly/src/nerves/`). The neuropils are measured from
 the FlyEM male CNS v1.0's own neuropil meshes (one male's brain, neck and
@@ -164,7 +177,11 @@ are among the middle leg's). The cord's interneurons light their side's
 whole cord together, for now. The region shapes are an anatomical drawing; only the command-group somata
 are individual measured positions. The canvas's `data-xray` (how far the fly is glass),
 `data-nerves` (the panel's corner, or `hidden`) and `data-glow` (each region
-glowing at 0.05 or more, brightest first) say what is shown.
+glowing at 0.05 or more, brightest first) say what is shown; Why? says what
+it plays (`data-why`: the action, `nothing`, or empty when it isn't shown),
+what it marks (`data-why-neurons`, `data-why-commands`, `data-why-senses`,
+`data-why-regions`) and where it is (`data-why-at`, seconds from when the body
+acted).
 
 ## The frame
 
@@ -237,7 +254,14 @@ the body's joint uniforms, its glow a uniform array of 24 vec4s, a float for eac
 16,000 triangles; the panel one more draw (the same geometry, its backdrop the
 first two triangles) and the same triangles; JavaScript per frame within the
 noise of none (the glow, the X-ray's easing and the corners together are
-about 12 µs a frame in V8's interpreter alone). These historical counts and timings
+about 12 µs a frame in V8's interpreter alone). Keeping the last six seconds
+for Why? goes on every frame: under 100 numbers copied into one ring of
+floats allocated at the start, 30 times a second, and each value's peak kept
+between (0.18 µs a frame on an M5 Pro, `apps/web/tests/why.budget.ts`).
+Asking for it copies the ring out and works out every part's glow through it
+once (0.16 ms on an M5 Pro). Shown, it is two draws (the drawing on its glass,
+and the card over it, a canvas drawn again at most 15 times a second while it
+plays) and the drawing's triangles again; hidden, none. These historical counts and timings
 are not current multi-fly or anatomy budgets; the glow-array layout above is a
 historical description too, not the current geometry's uniform capacity. The end-to-end test fails at or above 150
 draws or 500,000 triangles. Physical Apple TV measurements and the unattended
