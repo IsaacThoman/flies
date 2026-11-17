@@ -297,7 +297,7 @@ test("a memory this build can't read is carried through saves as it was; the lar
   assert.deepEqual(JSON.parse(store.saved["flies.fly.0"]).learned, { v: 99, data: "future" });
   // Every one of its 33,496 learning synapses changed: the memory's dense form, 24 bytes and one a synapse.
   fly.learned = { v: LEARNED_VERSION, data: toBase64(new Uint8Array(24 + 33_496).fill(200)) };
-  fly.body = { hunger: 0.5, fullness: 0.5, sleep: { pressure: 0.5, pace: "natural" } };
+  fly.body = { hunger: 0.5, fullness: 0.5, thirst: 0.5, sleep: { pressure: 0.5, pace: "natural" } };
   fly.where = { place: "picnic", x: 1, y: 2, z: 3, yaw: 4 };
   assert.ok(saveFly(0, fly, store));
   assert.ok(store.saved["flies.fly.0"].length < FLY_LIMIT / 2);

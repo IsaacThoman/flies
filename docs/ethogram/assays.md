@@ -93,29 +93,34 @@ bounds, not statistical confidence intervals. An unsupported assay never earns
 
 ## Training
 
-`node scripts/ethogram.ts --assay training [--seeds 1,2,3] [--hour 6] [--out report.json]`
+`node scripts/ethogram.ts --assay training [--pieces dish-blue,dish-yellow] [--seeds 1,2,3] [--hour 6] [--out report.json]`
 (`scripts/ethogram/training.ts`) asks whether the fly can be taught which of
-two coloured dishes is good or bad, as a player could teach it. It follows the
-design of the colour-learning assay of Vogt et al. (2014, eLife 3:e02395,
-Figure 1): differential conditioning, then a choice between the two colours
-without reinforcement, sugar the reward and a punishment the other. That
-paper's memory scores are given only in its figures, so no number is
-transcribed and nothing is scored: the row is context, `learning` in the
+two of the Build kit's coloured pieces is good or bad, as a player could teach
+it. It follows the design of the colour-learning assay of Vogt et al. (2014,
+eLife 3:e02395, Figure 1): differential conditioning, then a choice between
+the two colours without reinforcement, sugar the reward and a punishment the
+other. That paper's memory scores are given only in its figures, so no number
+is transcribed and nothing is scored: the row is context, `learning` in the
 scorecard's coverage.
 
 The whole animal runs through `Life`, its real brain, body, senses and
-hunger, in the 43 mm arena with two dishes on the floor, 8 mm in radius, their
-centres 10 mm either side of the middle: red and blue, which a fly sees as dark
-and bright (packages/body's `FLY_RGB`: 0.22 and 0.58 on a floor of 0.42). What
-its eyes see is drawn from its pose, not rendered: each facet's ray from the
-head meets a dish, the floor, the drop beyond the edge or the sky (the body's
-tilt and the facets' acceptance cones are left out). Training, 300 s: sugar
-lies on one dish, a food patch tasted through `Life` as any food is; or,
-instead of sugar, whenever the fly stands on that dish a dark disc looms from
-straight above (the swoop as its eyes would see it), at most once every 10 s.
-Test, 180 s: no sugar, no swoop; the preference is (time on the trained dish −
-time on the other) / their sum, on its feet. Each seed is run with red and
-with blue trained, each reinforcement, and each with the brain's learning on
+hunger, in an open disc 60 mm across with two of the kit's own pieces set down
+as the world's solids (packages/world's `withPieces`), their middles 14 mm
+either side of the middle; any two of the coloured ones (`--pieces`; blue and
+yellow dishes by default). It starts 20 mm from the middle, between them.
+What its eyes see is drawn from its pose 20 times a second, as the game's eyes
+refresh at their low detail: each facet's ray from the head is marched over the
+pieces' own shapes (a dish's 1.6 mm rim stands above the fly's eyes) and the
+floor, and takes the colour of what it meets, made light by packages/body's
+`FLY_RGB` and unshaded: blue 0.70, yellow 0.48, red 0.25, the floor 0.41 (the
+body's tilt, the facets' acceptance cones and the scene's lighting are left
+out). Training, 300 s: sugar lies in the trained dish's well, a food patch
+tasted through `Life` as any food is; or, instead, whenever the fly stands on
+the trained piece a dark disc looms from straight above (the swoop as its eyes
+would see it, drawn every frame), at most once every 10 s. Test, 180 s: no
+sugar, no swoop; the preference is (time on the trained piece − time on the
+other) / their sum, on its feet. Each seed is run with each piece trained, each
+reinforcement (sugar only in a dish), and each with the brain's learning on
 and off from the same start: the paired difference is what learning did.
 
 TRAINING_TABLE

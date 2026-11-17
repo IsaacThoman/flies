@@ -27,20 +27,24 @@
 // commands during each test odour after training, with learning less without.
 // Ranges are over seeds and both odours as the CS+.
 //
-// (dishes) The same conditioning with what the game's eyes would see
-// instead of an odour: coloured dishes on the table, the colours made light
-// as the game makes them (packages/body's FLY_RGB). A dish swings into view
-// from the side as the fly turns to it (0.5 s) and stays ahead and below
-// (1.5 s), 50 degrees across; the table and sky around it are steady. The US
-// is sugar or, seen through the eyes as the game's swoop would be, a dark
-// disc looming from above. Reported as the assay's, and the turn toward a
-// dish held 40 degrees to the right, after training, with learning less
-// without: conditioned approach (positive) or avoidance.
+// (dishes) The same with what the game's eyes would see instead of an odour:
+// the Build kit's dishes, their colours made light as the game makes them
+// (scripts/ethogram/training.ts, PIECE_LIGHT: blue bright, yellow middling,
+// red dark to the fly). First, how distinct the colours are before any
+// learning: each dish swings into view twice, and what the KCs and the visual
+// projection neurons that synapse onto them do. Then conditioning, blue
+// against yellow: a dish swings into view from the side as the fly turns to
+// it (0.5 s) and stays ahead and below (1.5 s), 50 degrees across, on a steady
+// floor and sky; the US is sugar or, seen through the eyes as the game's swoop
+// would be, a dark disc looming from above. Reported as the assay's, and the
+// turn toward a dish held 40 degrees to the right, after training, with
+// learning less without: conditioned approach (positive) or avoidance.
 
 import { parseArgs } from "node:util";
 import { DEFAULT_CONNECTOME_PATH, readConnectomeFile } from "../src/node.ts";
 import { FlyBrain } from "../src/runtime.ts";
 import { BATTERY, facetAngles, loom, render, separation } from "../src/stimuli.ts";
+import { PIECE_LIGHT, SCENE } from "../../../scripts/ethogram/training.ts";
 import type { Stimulus } from "../src/stimuli.ts";
 import { RESTING_SENSES } from "../src/types.ts";
 import type { BrainSenses } from "../src/types.ts";
@@ -256,13 +260,11 @@ if (parts.has("assay")) {
 }
 
 if (parts.has("dishes")) {
-  // The colours made light as the game's eyes make them (packages/body/src/vision.ts, FLY_RGB).
-  const FLY_RGB = [0.1, 0.45, 0.45];
-  const light = (rgb: readonly number[]) => rgb.reduce((sum, x, k) => sum + x * FLY_RGB[k], 0);
-  const DISHES = { red: light([0.85, 0.15, 0.15]), blue: light([0.15, 0.35, 0.9]) };
+  // The Build kit's dishes, as bright as each colour is to the fly, on the training assay's floor (scripts/ethogram/training.ts).
+  const DISHES = { blue: PIECE_LIGHT["dish-blue"], yellow: PIECE_LIGHT["dish-yellow"], red: PIECE_LIGHT["tile-red"] };
   type Dish = keyof typeof DISHES;
-  const TABLE = light([0.55, 0.45, 0.35]);
-  const SKY = light([0.75, 0.85, 1]);
+  const TABLE = SCENE.floor;
+  const SKY = SCENE.sky;
   const ground = (_t: number, _az: number, el: number) => (el < 0 ? TABLE : SKY);
   // A dish 50 degrees across, 35 below the horizon, its centre at azimuth `az`.
   const dish = (colour: Dish, az: number) => (t: number, a: number, e: number) => (separation(a, e, az, -35) <= 25 ? DISHES[colour] : ground(t, a, e));
@@ -304,7 +306,7 @@ if (parts.has("dishes")) {
       run(3, ground, null);
       return new Set(KC.filter((i, k) => r[i] > before[k]));
     };
-    const other: Dish = cs === "red" ? "blue" : "red";
+    const other: Dish = cs === "blue" ? "yellow" : "blue";
     run(2, ground, null);
     const plusKCs = responding(cs);
     const minusKCs = responding(other);
@@ -335,12 +337,63 @@ if (parts.has("dishes")) {
     return { kcs: [plusKCs.size, minusKCs.size], weights: [synapses(plusKCs), synapses(minusKCs)], plus: test(cs), minus: test(other) };
   };
 
-  console.log(`\n(dishes) luminance to the fly: red dish ${f(DISHES.red)}, blue dish ${f(DISHES.blue)}, table ${f(TABLE)}, sky ${f(SKY)}. KCs: of ${KC.length}, how many each dish fired. Synapses: the mean over every learning synapse of those KCs, after training / before. Turn toward the test dish (40 degrees right) and walk: learning on - off. Ranges over seeds and both dishes as CS+.`);
+  // How distinct the three colours are, before any learning: each dish swings in twice, 15 s apart, and what the KCs and the visual projection neurons that synapse onto them do.
+  const inputs = c.filter((i) => {
+    if (c.columns.superClass.value(i) !== "visual_projection") return false;
+    for (let e = c.ptr[i]; e < c.ptr[i + 1]; e++) if (/^KC./.test(type(c.post[e]))) return true;
+    return false;
+  });
+  const cosine = (a: number[], b: number[]) => {
+    let ab = 0, aa = 0, bb = 0;
+    for (let k = 0; k < a.length; k++) { ab += a[k] * b[k]; aa += a[k] * a[k]; bb += b[k] * b[k]; }
+    return aa > 0 && bb > 0 ? ab / Math.sqrt(aa * bb) : NaN;
+  };
+  const colours = Object.keys(DISHES) as Dish[];
+  const seen: Record<string, { kcs: number[]; hz: number[]; same: number[]; pairs: Record<string, number[]> }> = Object.fromEntries(colours.map((col) => [col, { kcs: [], hz: [], same: [], pairs: {} }]));
+  for (const seed of seeds) {
+    const brain = new FlyBrain(c, { seed });
+    const angles = facetAngles(brain.eyes!);
+    const view = { left: new Float32Array(brain.eyes!.left.directions.length / 3), right: new Float32Array(brain.eyes!.right.directions.length / 3) };
+    brain.sim.setRecording(true);
+    const r = brain.sim.recording!;
+    const show = (scene: (t: number, a: number, e: number) => number, seconds: number) => {
+      for (let k = 0; k < Math.round((seconds * 1000) / TICK); k++) {
+        render(scene, (k * TICK) / 1000, angles, view);
+        brain.tick(TICK, { ...RESTING_SENSES, light: view });
+      }
+    };
+    show(ground, 2);
+    const vectors: Record<string, number[][]> = Object.fromEntries(colours.map((col) => [col, []]));
+    for (let round = 0; round < 2; round++) {
+      for (const colour of colours) {
+        const before = Array.from(inputs, (i) => r[i]);
+        const kcBefore = Array.from(KC, (i) => r[i]);
+        show(arriving(colour, 0), 2.5);
+        vectors[colour].push(Array.from(inputs, (i, k) => r[i] - before[k]));
+        if (round === 0) {
+          seen[colour].kcs.push(KC.filter((i, k) => r[i] > kcBefore[k]).length);
+          seen[colour].hz.push(mean(vectors[colour][0]) / 2.5);
+        }
+        show(ground, 15);
+      }
+    }
+    for (const colour of colours) {
+      seen[colour].same.push(cosine(vectors[colour][0], vectors[colour][1]));
+      for (const other of colours) if (other !== colour) (seen[colour].pairs[other] ??= []).push(cosine(vectors[colour][0], vectors[other][1]));
+    }
+  }
+  console.log(`\n(dishes) how distinct the kit's colours are, as each dish swings into view (2.5 s), before any learning: the KCs it fires (of ${KC.length}); the ${inputs.length} visual projection neurons that synapse onto KCs, their mean rate, and the cosine similarity of their spike counts with the same colour shown again 15 s later and with each other colour shown then (range over seeds).`);
+  for (const colour of colours) {
+    const x = seen[colour];
+    console.log(`${colour} (${f(DISHES[colour])}): KCs ${range(x.kcs, 0)}; inputs ${range(x.hz)} Hz; again ${range(x.same)}; ` + Object.entries(x.pairs).map(([other, v]) => `against ${other} ${range(v)}`).join(", "));
+  }
+
+  console.log(`\n(dishes) luminance to the fly: blue dish ${f(DISHES.blue)}, yellow dish ${f(DISHES.yellow)}, red ${f(DISHES.red)}, floor ${f(TABLE)}, sky ${f(SKY)}. KCs: of ${KC.length}, how many each dish fired. Synapses: the mean over every learning synapse of those KCs, after training / before. Turn toward the test dish (40 degrees right) and walk: learning on - off. Ranges over seeds and both dishes as CS+.`);
   for (const us of ["sugar", "swoop"] as const) {
     for (const pairing of ["forward", "unpaired", "none"] as const) {
       if (us === "swoop" && pairing === "none") continue;
       const rows: { on: ReturnType<typeof trial>; off: ReturnType<typeof trial> }[] = [];
-      for (const seed of seeds) for (const cs of ["red", "blue"] as const) rows.push({ on: trial(seed, cs, us, pairing, true), off: trial(seed, cs, us, pairing, false) });
+      for (const seed of seeds) for (const cs of ["blue", "yellow"] as const) rows.push({ on: trial(seed, cs, us, pairing, true), off: trial(seed, cs, us, pairing, false) });
       const d = (side: "plus" | "minus", key: (typeof keys)[number]) => rows.map((x) => x.on[side][key] - x.off[side][key]);
       console.log(
         `${pairing === "none" ? "no US" : `${us}, ${pairing}`}: KCs firing CS+ ${range(rows.map((x) => x.on.kcs[0]), 0)}, CS- ${range(rows.map((x) => x.on.kcs[1]), 0)}; ` +

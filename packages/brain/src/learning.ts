@@ -307,19 +307,29 @@ export class MushroomBody {
       throw new Error("Learning needs positive time constants and a depression and potentiation from 0 to 1");
     }
     this.parameters = parameters;
-    const type = (i: number) => connectome.columns.type.value(i);
-    const side = (i: number) => connectome.columns.side.value(i);
+    // Everything below is decided by type and side, so each is decided once per table entry, not per neuron or edge:
+    // building the brain must stay quick (src/cost.budget.ts).
+    const types = connectome.columns.type;
+    const sides = connectome.columns.side;
+    const lobes: Lobe[] = ["g", "ab", "apbp"];
+    const lobeOf = Int8Array.from(types.table, (t) => {
+      const lobe = kcLobe(t);
+      return lobe === null ? -1 : lobes.indexOf(lobe);
+    });
+    const isDan = Uint8Array.from(types.table, (t) => (Object.hasOwn(DAN_COMPARTMENTS, t) ? 1 : 0));
+    const isMbon = Uint8Array.from(types.table, (t) => (Object.hasOwn(MBON_COMPARTMENTS, t) ? 1 : 0));
+    const hemisphereOf = Int8Array.from(sides.table, (h) => HEMISPHERES.indexOf(h as "left" | "right"));
     const per = COMPARTMENTS.length;
     this.compartments = HEMISPHERES.flatMap((h) => COMPARTMENTS.map((c) => `${c.id} ${h}`));
     const compartmentIndex = new Map(COMPARTMENTS.map((c, k) => [c.id as string, k]));
-    const hemisphere = (i: number) => HEMISPHERES.indexOf(side(i) as "left" | "right");
+    const hemisphere = (i: number) => hemisphereOf[sides.codes[i]];
 
     const kcs: number[] = [];
     const dans: number[] = [];
     for (let i = 0; i < connectome.neurons; i++) {
-      const t = type(i);
-      if (kcLobe(t) !== null && hemisphere(i) >= 0) kcs.push(i);
-      else if (Object.hasOwn(DAN_COMPARTMENTS, t)) dans.push(i);
+      const code = types.codes[i];
+      if (lobeOf[code] >= 0 && hemisphere(i) >= 0) kcs.push(i);
+      else if (isDan[code]) dans.push(i);
     }
     this.kcs = Uint32Array.from(kcs);
     this.dans = Uint32Array.from(dans);
@@ -330,28 +340,44 @@ export class MushroomBody {
 
     // A KC's synapses onto an MBON learn in the compartments that the MBON's
     // dendrites and the KC's lobe share, in the KC's hemisphere (its axon's).
+    // Gates are numbered in the order their compartments are first met.
     const gates = new Map<string, number>();
     const gateLists: number[][] = [];
+    // The gate for an MBON type and a KC's lobe and hemisphere (-1 for none), worked out the first time they meet.
+    const gateFor = new Map<number, number>();
+    const gateOf = (code: number, lobe: number, hemi: number) => {
+      const key = (code * lobes.length + lobe) * 2 + hemi;
+      let gate = gateFor.get(key);
+      if (gate === undefined) {
+        const list = MBON_COMPARTMENTS[types.table[code]].filter((c) => COMPARTMENTS[compartmentIndex.get(c)!].lobe === lobes[lobe]).map((c) => hemi * per + compartmentIndex.get(c)!);
+        gate = -1;
+        if (list.length > 0) {
+          const joined = list.join(",");
+          if (!gates.has(joined)) {
+            gates.set(joined, gateLists.length);
+            gateLists.push(list);
+          }
+          gate = gates.get(joined)!;
+        }
+        gateFor.set(key, gate);
+      }
+      return gate;
+    };
     const edges: number[] = [];
     const edgeKC: number[] = [];
     const edgeGate: number[] = [];
     const kcPtr = new Uint32Array(kcs.length + 1);
     kcs.forEach((i, k) => {
-      const lobe = kcLobe(type(i));
-      const offset = hemisphere(i) * per;
+      const lobe = lobeOf[types.codes[i]];
+      const hemi = hemisphere(i);
       for (let e = connectome.ptr[i]; e < connectome.ptr[i + 1]; e++) {
-        const post = type(connectome.post[e]);
-        const shared = (Object.hasOwn(MBON_COMPARTMENTS, post) ? MBON_COMPARTMENTS[post] : []).filter((c) => COMPARTMENTS[compartmentIndex.get(c)!].lobe === lobe);
-        if (shared.length === 0) continue;
-        const list = shared.map((c) => offset + compartmentIndex.get(c)!);
-        const key = list.join(",");
-        if (!gates.has(key)) {
-          gates.set(key, gateLists.length);
-          gateLists.push(list);
-        }
+        const code = types.codes[connectome.post[e]];
+        if (!isMbon[code]) continue;
+        const gate = gateOf(code, lobe, hemi);
+        if (gate < 0) continue;
         edges.push(e);
         edgeKC.push(k);
-        edgeGate.push(gates.get(key)!);
+        edgeGate.push(gate);
       }
       kcPtr[k + 1] = edges.length;
     });
@@ -359,8 +385,7 @@ export class MushroomBody {
     this.edgeKC = Uint32Array.from(edgeKC);
     this.edgeGate = Uint32Array.from(edgeGate);
     this.#kcPtr = kcPtr;
-    const lobes: Lobe[] = ["g", "ab", "apbp"];
-    this.#kcPlace = Uint8Array.from(kcs, (i) => hemisphere(i) * lobes.length + lobes.indexOf(kcLobe(type(i))!));
+    this.#kcPlace = Uint8Array.from(kcs, (i) => hemisphere(i) * lobes.length + lobeOf[types.codes[i]]);
     this.#compartmentPlace = Uint8Array.from(this.compartments, (_, c) => Math.floor(c / per) * lobes.length + lobes.indexOf(COMPARTMENTS[c % per].lobe));
     this.gatePtr = new Uint32Array(gateLists.length + 1);
     gateLists.forEach((list, g) => (this.gatePtr[g + 1] = this.gatePtr[g] + list.length));
@@ -376,9 +401,9 @@ export class MushroomBody {
       const synapses = [0, 0];
       for (let e = connectome.ptr[i]; e < connectome.ptr[i + 1]; e++) {
         const j = connectome.post[e];
-        const t = type(j);
+        const t = types.codes[j];
         const h = hemisphere(j);
-        if (h >= 0 && (kcLobe(t) !== null || Object.hasOwn(MBON_COMPARTMENTS, t))) synapses[h] += connectome.count[e];
+        if (h >= 0 && (lobeOf[t] >= 0 || isMbon[t])) synapses[h] += connectome.count[e];
       }
       const total = synapses[0] + synapses[1];
       if (total > 0) return synapses.map((s) => s / total);
@@ -387,7 +412,7 @@ export class MushroomBody {
     });
     const supply = new Float64Array(this.compartments.length);
     dans.forEach((i, d) => {
-      for (const c of DAN_COMPARTMENTS[type(i)]) for (let h = 0; h < 2; h++) supply[h * per + compartmentIndex.get(c)!] += share[d][h];
+      for (const c of DAN_COMPARTMENTS[types.table[types.codes[i]]]) for (let h = 0; h < 2; h++) supply[h * per + compartmentIndex.get(c)!] += share[d][h];
     });
     const danPtr = new Uint32Array(dans.length + 1);
     const danCompartment: number[] = [];
@@ -395,7 +420,7 @@ export class MushroomBody {
     dans.forEach((i, d) => {
       for (let h = 0; h < 2; h++) {
         if (share[d][h] === 0) continue;
-        for (const c of DAN_COMPARTMENTS[type(i)]) {
+        for (const c of DAN_COMPARTMENTS[types.table[types.codes[i]]]) {
           const at = h * per + compartmentIndex.get(c)!;
           danCompartment.push(at);
           danAmount.push(share[d][h] / supply[at]);
