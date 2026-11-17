@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
 import { FLY_HEIGHT, FlyBody, createIntent } from "@fly/body";
-import { Pantry, World, createSurface } from "@fly/world";
+import { Pantry, World, createSurface, inside, topHeight } from "@fly/world";
 import { CameraDirector, WALLPAPER } from "../src/camera.ts";
 import { PLACES, nextPlace } from "../src/places/catalog.ts";
 import type { PlaceId } from "../src/places/catalog.ts";
@@ -53,6 +53,27 @@ for (const info of PLACES) {
       const y = world.heightAt(patch.x, patch.z, patch.y);
       assert.ok(pantry.touching(patch.x, y, patch.z, 0.3), `${patch.name} can be tasted at ${patch.x}, ${patch.z}`);
       assert.ok(world.underside(patch.x, patch.z, y) - y >= FLY_HEIGHT, `${patch.name} has room over it for a fly`);
+
+      // Isolate the patch so another food cannot hide a missed contact.
+      const alone = new Pantry(world, [patch]);
+      const support = world.surface(patch.x, patch.z, createSurface(), patch.y).solid;
+      const solid = support >= 0 ? world.solids[support] : null;
+      const surface = createSurface();
+      let samples = 0;
+      for (let dx = -patch.r; dx <= patch.r; dx += 0.25) {
+        for (let dz = -patch.r; dz <= patch.r; dz += 0.25) {
+          const x = patch.x + dx;
+          const z = patch.z + dz;
+          if ((x - patch.x) ** 2 + (z - patch.z) ** 2 > patch.r * patch.r) continue;
+          if (solid && !inside(solid.footprint, x, z)) continue;
+          const height = solid ? topHeight(solid, x, z) : 0;
+          world.surface(x, z, surface, height);
+          if (!surface.onTable || surface.solid !== support || surface.normal.y < STANDABLE || surface.underside - height < FLY_HEIGHT) continue;
+          samples++;
+          assert.equal(alone.touching(x, height, z, 0), alone.foods[0], `${patch.name} can be tasted at ${x}, ${height}, ${z}`);
+        }
+      }
+      assert.ok(samples > 0, `${patch.name} has exposed, standable samples`);
     }
   });
 
