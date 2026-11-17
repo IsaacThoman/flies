@@ -30,14 +30,20 @@ export function runtimeDependencies(root = ROOT): string[] {
   const visit = (file: string) => {
     if (visited.has(file)) return;
     visited.add(file);
-    const pkg = JSON.parse(fs.readFileSync(file, "utf8")) as { dependencies?: Record<string, string> };
-    for (const name of Object.keys(pkg.dependencies ?? {})) {
+    const pkg = JSON.parse(fs.readFileSync(file, "utf8")) as {
+      dependencies?: Record<string, string>; optionalDependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>; peerDependenciesMeta?: Record<string, { optional?: boolean }>;
+    };
+    const dependencies = { ...pkg.dependencies, ...pkg.optionalDependencies, ...pkg.peerDependencies };
+    for (const name of Object.keys(dependencies)) {
       const own = workspaces.get(name);
       if (own) { visit(own); continue; }
-      names.add(name);
       const installed = path.join(root, "node_modules", name, "package.json");
       // Nested versions need a deliberate multi-version notice audit rather than the wrong root licence.
       const nested = path.join(path.dirname(file), "node_modules", name, "package.json");
+      const optional = Object.hasOwn(pkg.optionalDependencies ?? {}, name) || pkg.peerDependenciesMeta?.[name]?.optional;
+      if (optional && !fs.existsSync(installed) && !fs.existsSync(nested)) continue;
+      names.add(name);
       if (nested !== installed && fs.existsSync(nested)) throw new Error(`Nested shipped dependency needs a notice audit: ${name}`);
       visit(installed);
     }

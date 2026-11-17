@@ -18,7 +18,7 @@ Scientific model
 
 Shiu, P. K. et al. A Drosophila computational brain model reveals sensorimotor processing. Nature 634, 210–219 (2024). https://doi.org/10.1038/s41586-024-07763-9
 
-The leaky integrate-and-fire model follows this work; flies implements its own simulation on the male CNS wiring. This is a scientific citation, not a claim to redistribute the paper or its software. Simplified senses, physics, visual background and a body flight reflex stand in for missing biology; the brain chooses through those senses. See About and packages/brain/README.md for limits.
+The leaky integrate-and-fire model follows this work; flies implements its own simulation on the male CNS wiring. This is a scientific citation, not a claim to redistribute the paper or its software. Simplified senses, hunger and sleep drives, physics, visual background and a body flight reflex stand in for missing biology; the brain chooses through those senses. See About and packages/brain/README.md for limits.
 
 Fonts and Apple Weather
 =======================

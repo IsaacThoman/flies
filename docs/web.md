@@ -33,11 +33,13 @@ All of `dist/`, as it is, to any folder of the host. About 17 MB:
 | `brain/connectome.<n>.<hash>.bin` | the brain, in four parts of at most 4 MiB, 14.2 MB in all | the same | `application/octet-stream` (any will do) |
 | `brain/fly-brain.0.<hash>.wasm` | the brain's simulation as WebAssembly, 268 KB (106 KB gzipped) | the same | `application/wasm` (what hosts send for `.wasm`; any will do) |
 | `brain/anatomy.<n>.<hash>.bin` | where each neuron is (`packages/brain/src/anatomy.ts`), 0.9 MB, if `npm run brain:fetch` built it; nothing loads it yet | the same | the same |
+| `THIRD_PARTY_NOTICES` | generated legal notices | `no-cache` | `text/plain` |
+| `privacy/index.html` | static policy, served at `/privacy` | `no-cache` | `text/html` |
 | `.well-known/apple-app-site-association` | which links open the iPhone and iPad app, on by default (`APPLE_TEAM_ID=0` disables it; [deploy.md](deploy.md#the-iphone-and-ipad-apps-links)); it must be at the host's root, with no redirect, and is never kept by the service worker | `no-cache` | `application/json` |
 
 Every file whose contents can change has its contents in its name, so it can
 be kept forever; the few that can't (the page, its manifest, the service
-worker, and the app association when there is one) are small and must be asked for again each time (`no-cache`, which
+worker, the legal documents, and the app association when there is one) must be asked for again each time (`no-cache`, which
 still lets a browser revalidate and keep the page in its back-forward cache;
 not `no-store`). `scripts/serve.ts` serves exactly this.
 
@@ -435,3 +437,12 @@ lifetimes in the table above, a `_headers` file in `dist/`:
 GitHub Pages works too, if the repository is public or on a paid plan, but
 nothing about its responses can be set. Netlify's free traffic would run out
 after about a thousand first visits a month.
+
+
+## Release documents
+
+The build checks and emits [third-party notices](licenses.md) and a static [privacy policy](privacy.md).
+Serve `/privacy` as `privacy/index.html` (a directory redirect is fine), never as the game's SPA fallback.
+The supplied Caddy config and `scripts/serve.ts` handle that path. The service worker keeps the policy
+for offline navigation too. About → Acknowledgements reads its bundled notice sections without a fetch.
+Before publishing, complete the policy's operator/contact placeholders and verify production log/backup retention.
