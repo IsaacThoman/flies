@@ -38,7 +38,7 @@ import { existsSync, readdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { chromium, devices } from "playwright";
-import type { BrowserContextOptions, CDPSession, Page } from "playwright";
+import type { BrowserContext, BrowserContextOptions, CDPSession, Page } from "playwright";
 
 const root = path.join(import.meta.dirname, "..");
 
@@ -154,6 +154,37 @@ export async function waitFor(page: Page, spec: string, timeout = 60_000) {
     if (Date.now() - started > timeout) throw new Error(`Timed out waiting for ${spec}: ${JSON.stringify(state)}`);
     await page.waitForTimeout(100);
   }
+}
+
+/**
+ * Waits for the canvas's state to match within `seconds` of the game's time, however long that
+ * takes on the clock: for what the brain chooses to do in its own time (a fly landing).
+ */
+export async function waitWithin(page: Page, spec: string, seconds: number) {
+  const conditions = parseConditions(spec);
+  const time = () => page.evaluate(() => (globalThis as unknown as { __fly: { time: number } }).__fly.time);
+  const until = (await time()) + seconds;
+  for (;;) {
+    const state = await readState(page);
+    if (conditions.every((c) => c(state))) return state;
+    if ((await time()) > until) throw new Error(`No ${spec} within ${seconds} s of game time: ${JSON.stringify(state)}`);
+    await page.waitForTimeout(100);
+  }
+}
+
+/**
+ * A double click at a point on the page whose clicks happened 40 ms apart, however long a busy
+ * page takes to be handed them: Playwright's own sends each event only once the page has taken the
+ * last, so a slow frame between them would stretch them apart.
+ */
+export async function doubleClick(page: Page, x: number, y: number) {
+  const cdp = await page.context().newCDPSession(page);
+  const at = Date.now() / 1000;
+  const events = [["mousePressed", 0, 1], ["mouseReleased", 0.04, 1], ["mousePressed", 0.08, 2], ["mouseReleased", 0.12, 2]] as const;
+  for (const [type, after, clickCount] of events) {
+    await cdp.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mousePressed" ? 1 : 0, clickCount, timestamp: at + after });
+  }
+  await cdp.detach();
 }
 
 /** Waits for frames to advance the game's clock, even when long wall-clock frames are capped. */
@@ -296,7 +327,48 @@ export async function screenOf(page: Page, what: "fly" | "hand"): Promise<Pt> {
   }, what)) as Pt;
 }
 
-export type OpenOptions = { url: string; width?: number; height?: number; headed?: boolean; device?: string; landscape?: boolean };
+export type OpenOptions = { url: string; width?: number; height?: number; headed?: boolean; device?: string; landscape?: boolean; steady?: boolean };
+
+/**
+ * The local hour every page's clock reads when the run starts: just after sunrise, when a fly is up and about
+ * (packages/body/src/rhythm.ts) and the day is light. One shift for the whole run, so that tabs at
+ * one table agree; the clocks run on from there.
+ */
+const MORNING = 6;
+const start = new Date();
+const CLOCK_SHIFT = ((((MORNING - start.getHours() - start.getMinutes() / 60 - start.getSeconds() / 3600) % 24) + 36) % 24 - 12) * 3_600_000;
+
+/**
+ * In every page the context opens, reloads included, holds still what would otherwise change under
+ * a test with the machine or the hour it runs at: the picture stays at one of the levels in
+ * apps/web/src/quality.ts (0, the full one) instead of following how fast this machine draws,
+ * which without a GPU would draw the fly in pixels too big for the X-ray; the screensaver never
+ * comes by itself (Never, as the saved setting), however long a step takes; and the clock reads
+ * morning, whatever the hour, so the fly is awake rather than asleep on the real night's clock.
+ * The tests check what the game does; the steps about the screensaver bring it themselves.
+ */
+export const holdSteady = (context: BrowserContext, quality = 0) =>
+  context.addInitScript(([quality, shift]) => {
+    (globalThis as { __quality?: number }).__quality = quality;
+    try {
+      // apps/web/src/settings.ts's key; the rest of what was saved stays as it was.
+      const saved = JSON.parse(localStorage.getItem("flies.settings") ?? "{}") as Record<string, unknown>;
+      localStorage.setItem("flies.settings", JSON.stringify({ ...saved, wallpaperAfter: 0 }));
+    } catch {
+      // A page with no storage of its own (about:blank) has no game in it either.
+    }
+    const Real = Date;
+    class Shifted extends Real {
+      constructor(...args: unknown[]) {
+        if (args.length === 0) super(Real.now() + shift);
+        else super(...(args as [number]));
+      }
+      static now() {
+        return Real.now() + shift;
+      }
+    }
+    globalThis.Date = Shifted as DateConstructor;
+  }, [quality, CLOCK_SHIFT] as const);
 
 /** The browser context for a window of a size, or a device (a phone, a tablet) held either way. */
 export function contextFor({ width = 1280, height = 720, device, landscape = false }: OpenOptions): BrowserContextOptions {
@@ -326,6 +398,7 @@ export async function openGame(options: OpenOptions, own: (stop: () => Promise<v
       finally { clearTimeout(timeout!); await stop(); }
     };
     const context = await browser.newContext(contextFor(options));
+    if (options.steady) await holdSteady(context);
     const page = await context.newPage();
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("console", (message) => {
