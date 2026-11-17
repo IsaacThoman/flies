@@ -70,7 +70,8 @@ preserve the brain, set the fly at the new start (on the surface its `y`
 names) standing still, and replace all food with the new patches. Food
 dropped where the fly or a random start is lies on that surface, not on
 whatever is over it.
-Commands, readout/region rates, stats, senses and food amounts are checked.
+Commands, readout/region rates, stats, senses and food amounts are checked,
+and the body as the body fuzzer checks it, its reach included.
 Rolling ten-minute checks require walking, resting and motion with a live
 brain; runs of at least ten minutes must also eat. Reports include the
 observed activity durations, travel, meals, take-offs, stimuli and carry modes.
