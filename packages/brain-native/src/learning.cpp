@@ -73,12 +73,6 @@ uint32_t compartment_index(std::string_view id) {
   throw std::logic_error("No compartment " + std::string(id));
 }
 
-/** 0 left, 1 right, -1 neither. */
-int hemisphere(const Connectome& c, uint32_t i) {
-  const std::string& side = c.value(kSide, i);
-  return side == "left" ? 0 : side == "right" ? 1 : -1;
-}
-
 uint32_t fnv(uint32_t h, uint32_t word) { return (h ^ word) * 16777619u; }
 
 constexpr uint32_t kMagic = 0x4d594c46u, kVersion = 1, kHeader = 24, kEntry = 5;
@@ -169,11 +163,22 @@ MushroomBody::MushroomBody(const Connectome& c, const Parameters& parameters) : 
   compartments_ = 2 * per;
   const Table& dans_table = dan_compartments();
   const Table& mbons_table = mbon_compartments();
+  // Decided once per type and side (learning.ts says why), not per neuron or edge.
+  const std::vector<std::string>& types = c.table(kType);
+  std::vector<uint8_t> lobe_of(types.size()), is_dan(types.size()), is_mbon(types.size());
+  for (size_t t = 0; t < types.size(); t++) {
+    lobe_of[t] = kc_lobe(types[t]);
+    is_dan[t] = dans_table.count(types[t]) != 0;
+    is_mbon[t] = mbons_table.count(types[t]) != 0;
+  }
+  std::vector<int8_t> hemisphere_of;
+  for (const std::string& side : c.table(kSide)) hemisphere_of.push_back(side == "left" ? 0 : side == "right" ? 1 : -1);
+  const auto hemi = [&](uint32_t i) { return hemisphere_of[c.code(kSide, i)]; };
   for (uint32_t i = 0; i < c.neurons(); i++) {
-    const std::string& t = c.value(kType, i);
-    if (kc_lobe(t) != kLobes && hemisphere(c, i) >= 0) {
+    const uint32_t t = c.code(kType, i);
+    if (lobe_of[t] != kLobes && hemi(i) >= 0) {
       kcs_.push_back(i);
-    } else if (dans_table.count(t) != 0) {
+    } else if (is_dan[t] != 0) {
       dans_.push_back(i);
     }
   }
@@ -184,35 +189,44 @@ MushroomBody::MushroomBody(const Connectome& c, const Parameters& parameters) : 
 
   std::map<std::vector<uint32_t>, uint32_t> gates;
   std::vector<std::vector<uint32_t>> gate_lists;
+  // The gate for an MBON type and a KC's lobe and hemisphere: -1 for none, -2 not yet worked out.
+  std::vector<int32_t> gate_for(types.size() * kLobes * 2, -2);
   kc_ptr_.assign(kcs_.size() + 1, 0);
   for (size_t k = 0; k < kcs_.size(); k++) {
     const uint32_t i = kcs_[k];
-    const Lobe lobe = kc_lobe(c.value(kType, i));
-    const uint32_t offset = static_cast<uint32_t>(hemisphere(c, i)) * per;
+    const Lobe lobe = static_cast<Lobe>(lobe_of[c.code(kType, i)]);
+    const auto h = static_cast<uint32_t>(hemi(i));
     for (uint32_t e = c.ptr(i); e < c.ptr(i + 1); e++) {
-      const auto found = mbons_table.find(c.value(kType, c.post(e)));
-      if (found == mbons_table.end()) continue;
-      std::vector<uint32_t> list;
-      for (std::string_view id : found->second) {
-        const uint32_t at = compartment_index(id);
-        if (kCompartments[at].lobe == lobe) list.push_back(offset + at);
+      const uint32_t t = c.code(kType, c.post(e));
+      if (is_mbon[t] == 0) continue;
+      int32_t& gate = gate_for[(t * kLobes + lobe) * 2 + h];
+      if (gate == -2) {
+        std::vector<uint32_t> list;
+        for (std::string_view id : mbons_table.at(types[t])) {
+          const uint32_t at = compartment_index(id);
+          if (kCompartments[at].lobe == lobe) list.push_back(h * per + at);
+        }
+        gate = -1;
+        if (!list.empty()) {
+          auto found = gates.find(list);
+          if (found == gates.end()) {
+            found = gates.emplace(list, static_cast<uint32_t>(gate_lists.size())).first;
+            gate_lists.push_back(list);
+          }
+          gate = static_cast<int32_t>(found->second);
+        }
       }
-      if (list.empty()) continue;
-      auto gate = gates.find(list);
-      if (gate == gates.end()) {
-        gate = gates.emplace(list, static_cast<uint32_t>(gate_lists.size())).first;
-        gate_lists.push_back(list);
-      }
+      if (gate < 0) continue;
       edges_.push_back(e);
-      edge_gate_.push_back(gate->second);
+      edge_gate_.push_back(static_cast<uint32_t>(gate));
       layout_hash_ = fnv(layout_hash_, c.root_id(i));
       layout_hash_ = fnv(layout_hash_, c.root_id(c.post(e)));
-      for (uint32_t at : list) layout_hash_ = fnv(layout_hash_, at);
+      for (uint32_t at : gate_lists[static_cast<size_t>(gate)]) layout_hash_ = fnv(layout_hash_, at);
     }
     kc_ptr_[k + 1] = static_cast<uint32_t>(edges_.size());
   }
   kc_place_.reserve(kcs_.size());
-  for (uint32_t i : kcs_) kc_place_.push_back(static_cast<uint8_t>(hemisphere(c, i) * kLobes + kc_lobe(c.value(kType, i))));
+  for (uint32_t i : kcs_) kc_place_.push_back(static_cast<uint8_t>(hemi(i) * kLobes + lobe_of[c.code(kType, i)]));
   for (uint32_t at = 0; at < compartments_; at++) compartment_place_.push_back(static_cast<uint8_t>((at / per) * kLobes + kCompartments[at % per].lobe));
   gate_ptr_.assign(gate_lists.size() + 1, 0);
   for (size_t g = 0; g < gate_lists.size(); g++) {
@@ -230,15 +244,15 @@ MushroomBody::MushroomBody(const Connectome& c, const Parameters& parameters) : 
     std::array<double, 2> synapses{0, 0};
     for (uint32_t e = c.ptr(i); e < c.ptr(i + 1); e++) {
       const uint32_t j = c.post(e);
-      const std::string& t = c.value(kType, j);
-      const int h = hemisphere(c, j);
-      if (h >= 0 && (kc_lobe(t) != kLobes || mbons_table.count(t) != 0)) synapses[h] += c.count(e);
+      const uint32_t t = c.code(kType, j);
+      const int h = hemi(j);
+      if (h >= 0 && (lobe_of[t] != kLobes || is_mbon[t] != 0)) synapses[h] += c.count(e);
     }
     const double total = synapses[0] + synapses[1];
     if (total > 0) {
       share.push_back({synapses[0] / total, synapses[1] / total});
     } else {
-      const int own = hemisphere(c, i);
+      const int own = hemi(i);
       share.push_back(own >= 0 ? std::array<double, 2>{own == 0 ? 1.0 : 0.0, own == 1 ? 1.0 : 0.0} : std::array<double, 2>{0.5, 0.5});
     }
   }

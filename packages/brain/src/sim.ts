@@ -321,21 +321,25 @@ export class Simulation {
   }
 
   /**
-   * Makes these edges' weights settable one by one, each as a factor on its
+   * Makes these edges' weights settable one by one (ascending), each as a factor on its
    * weight now (setPlasticFactor), all at 1 to begin with. Edges, not
    * neurons: a synapse that learns. An edge can't also be in an output gain,
    * and a neuron stays as it was for #silent (its spikes still go out at a
    * factor of 0, adding nothing), so the active set doesn't depend on the factors.
    */
   setPlasticEdges(edges: ArrayLike<number>) {
-    const list = Uint32Array.from(edges);
+    // An edge is in an output gain when the neuron it leaves is. Ascending, the edges are checked against
+    // those neurons, and for being listed twice, without a set of them all: building the brain must stay quick.
     const inGain = new Set<number>();
-    for (const group of this.#outputGains) for (const e of group.edges) inGain.add(e);
-    for (const e of list) {
+    for (const group of this.#outputGains) for (const i of group.members) inGain.add(i);
+    for (let k = 0, pre = 0; k < edges.length; k++) {
+      const e = edges[k];
       if (!Number.isInteger(e) || e < 0 || e >= this.connections) throw new Error(`No edge ${e}`);
-      if (inGain.has(e)) throw new Error(`Edge ${e} is in an output gain`);
+      if (k > 0 && e <= edges[k - 1]) throw new Error("Plastic edges are listed once each, ascending");
+      while (this.#ptr[pre + 1] <= e) pre++;
+      if (inGain.has(pre)) throw new Error(`Edge ${e} is in an output gain`);
     }
-    if (new Set(list).size !== list.length) throw new Error("An edge is listed twice");
+    const list = Uint32Array.from(edges);
     for (let k = 0; k < this.#plasticEdges.length; k++) this.#weight[this.#plasticEdges[k]] = this.#plasticBase[k];
     this.#plasticEdges = list;
     this.#plasticBase = Float32Array.from(list, (e) => this.#weight[e]);

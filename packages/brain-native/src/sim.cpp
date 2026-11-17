@@ -318,13 +318,17 @@ void Simulation::drain_tally(std::vector<uint32_t>& into) {
 }
 
 void Simulation::set_plastic_edges(std::span<const uint32_t> edges) {
+  // sim.ts says why the edges are checked against the gains' neurons, ascending.
   std::unordered_set<uint32_t> in_gain;
-  for (const OutputGain& group : output_gains_) in_gain.insert(group.edges.begin(), group.edges.end());
-  for (uint32_t e : edges) {
+  for (const OutputGain& group : output_gains_) in_gain.insert(group.members.begin(), group.members.end());
+  uint32_t pre = 0;
+  for (size_t k = 0; k < edges.size(); k++) {
+    const uint32_t e = edges[k];
     if (e >= edges_.size()) throw std::invalid_argument("No edge " + std::to_string(e));
-    if (in_gain.count(e) != 0) throw std::invalid_argument("Edge " + std::to_string(e) + " is in an output gain");
+    if (k > 0 && e <= edges[k - 1]) throw std::invalid_argument("Plastic edges are listed once each, ascending");
+    while (ptr_[pre + 1] <= e) pre++;
+    if (in_gain.count(pre) != 0) throw std::invalid_argument("Edge " + std::to_string(e) + " is in an output gain");
   }
-  if (std::unordered_set<uint32_t>(edges.begin(), edges.end()).size() != edges.size()) throw std::invalid_argument("An edge is listed twice");
   for (size_t k = 0; k < plastic_edges_.size(); k++) edges_[plastic_edges_[k]].weight = plastic_base_[k];
   plastic_edges_.assign(edges.begin(), edges.end());
   plastic_base_.clear();

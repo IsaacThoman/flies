@@ -88,7 +88,7 @@ class Brain {
   /** What that antenna's thermoreceptors have adapted to, °C; NaN while it feels no temperature. */
   double adapted(io::Side side) const { return thermoreceptors_.adapted(side); }
   const Modulation& modulation() const { return modulation_; }
-  /** What the mushroom body has learned (runtime.ts's learning); empty when no KC -> MBON synapse can. */
+  /** What the mushroom body has learned (runtime.ts's learning); empty when the connectome has no Kenyon cell. */
   const std::optional<learning::MushroomBody>& learning() const { return learning_; }
   /** runtime.ts's memory and remember: what the mushroom body has learned, as bytes; remember throws std::invalid_argument, changing nothing, for bytes it can't take. */
   std::vector<uint8_t> memory() const;

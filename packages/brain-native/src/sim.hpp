@@ -191,7 +191,7 @@ class Simulation {
   void reset();
 
   /**
-   * Makes these edges' weights settable one by one, each as a factor on its
+   * Makes these edges' weights settable one by one (ascending), each as a factor on its
    * weight now, all at 1 to begin with (sim.ts's setPlasticEdges): a synapse
    * that learns. An edge can't also be in an output gain, and silent_ stays
    * as it was, so the active set doesn't depend on the factors.

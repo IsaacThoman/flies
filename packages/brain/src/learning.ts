@@ -246,10 +246,38 @@ export function readMemory(memory: Uint8Array, hash: number, count: number): { i
   return { index, factor };
 }
 
+/** The learning connections and what they have learned: built the first time they're needed (MushroomBody). */
+type Synapses = {
+  edges: Uint32Array;
+  edgeKC: Uint32Array;
+  edgeGate: Uint32Array;
+  gatePtr: Uint32Array;
+  gateCompartments: Uint32Array;
+  // Whether gate g has compartment c: gateHas[g * compartments + c].
+  gateHas: Uint8Array;
+  // KC -> its learning edges (indices into edges), as CSR.
+  kcPtr: Uint32Array;
+  layoutHash: number;
+  factors: Float64Array;
+  // Edges whose factor changed since the simulation was last told.
+  dirty: Uint32Array;
+  dirtyCount: number;
+  isDirty: Uint8Array;
+};
+
 /**
  * The mushroom body's learning for one brain: which KC -> MBON edges learn,
  * the DANs that teach each compartment, and the traces and factors (state per
  * brain, starting from the wiring: every factor 1).
+ *
+ * Building the brain must stay quick (src/cost.budget.ts), so how the DANs
+ * teach is worked out at the first DAN spike, and the learning connections
+ * are found only when first needed: when a compartment's DANs fire with one
+ * of its KCs still eligible, or for a memory. Until then no
+ * factor can have left 1 (depression needs a KC to have fired first, and
+ * potentiation gives back only what was lost), so the result is the same as
+ * if they had been there from the start. In the game, where nothing fires the
+ * KCs, they are found only for the fly's record.
  */
 export class MushroomBody {
   readonly parameters: LearningParameters;
@@ -258,36 +286,21 @@ export class MushroomBody {
   /** The Kenyon cells and DANs, as neuron indices. */
   readonly kcs: Uint32Array;
   readonly dans: Uint32Array;
-  /** Each learning edge: its index in the connectome, its KC (an index into kcs) and its gate (an index into gates). */
-  readonly edges: Uint32Array;
-  readonly edgeKC: Uint32Array;
-  readonly edgeGate: Uint32Array;
-  /** Each gate's compartments (a set of compartments of one hemisphere that an edge's synapses are in), as CSR. */
-  readonly gatePtr: Uint32Array;
-  readonly gateCompartments: Uint32Array;
-  /** Each learning edge's factor on its weight in the wiring, 0 to 1. */
-  readonly factors: Float64Array;
-  /**
-   * FNV-1a over each learning edge's presynaptic and postsynaptic root IDs
-   * and its compartments, in order: the same for the same connectome and
-   * compartment tables, so a memory is taken only by a brain it fits.
-   */
-  readonly layoutHash: number;
 
-  // KC -> its learning edges (indices into edges), as CSR.
-  #kcPtr: Uint32Array;
+  #connectome: Connectome;
+  #lobeOf: Int8Array;
+  #isMbon: Uint8Array;
+  #hemisphereOf: Int8Array;
+  #synapses: Synapses | null = null;
+  // The simulation the learning edges' weights are set in, once they are.
+  #sim: Simulation | null = null;
   // Each KC's and each compartment's lobe and hemisphere as one number: a KC can learn only in compartments with its own.
   #kcPlace: Uint8Array;
   #compartmentPlace: Uint8Array;
-  // DAN -> the compartments it releases into and how much of their dopamine one of its spikes is, as CSR.
-  #danPtr: Uint32Array;
-  #danCompartment: Uint32Array;
-  #danAmount: Float64Array;
-  // Whether gate g has compartment c: gateHas[g * compartments + c].
-  #gateHas: Uint8Array;
-  // Neuron -> its KC or DAN index, or -1.
-  #kcOf: Int32Array;
-  #danOf: Int32Array;
+  // DAN -> the compartments it releases into and how much of their dopamine one of its spikes is, as CSR: found at the first DAN spike.
+  #teaching: { danPtr: Uint32Array; danCompartment: Uint32Array; danAmount: Float64Array } | null = null;
+  // Neuron -> its KC index k (k), its DAN index d (-2 - d), or -1.
+  #role: Int32Array;
   // When each KC last fired, ms (-Infinity before it has).
   #fired: Float64Array;
   // KCs that fired within the window, in the order they first did since they were last out of it.
@@ -297,32 +310,28 @@ export class MushroomBody {
   // Each compartment's dopamine trace and when it was last brought up to date, ms.
   #dopamine: Float64Array;
   #dopamineAt: Float64Array;
-  // Edges whose factor changed since the simulation was last told.
-  #dirty: Uint32Array;
-  #dirtyCount = 0;
-  #isDirty: Uint8Array;
 
   constructor(connectome: Connectome, parameters: LearningParameters = LEARNING) {
     if (!(parameters.tau > 0 && parameters.window > 0 && parameters.depression >= 0 && parameters.depression <= 1 && parameters.potentiation >= 0 && parameters.potentiation <= 1)) {
       throw new Error("Learning needs positive time constants and a depression and potentiation from 0 to 1");
     }
     this.parameters = parameters;
-    // Everything below is decided by type and side, so each is decided once per table entry, not per neuron or edge:
-    // building the brain must stay quick (src/cost.budget.ts).
+    this.#connectome = connectome;
+    // Decided once per type and side, not per neuron or edge.
     const types = connectome.columns.type;
     const sides = connectome.columns.side;
-    const lobes: Lobe[] = ["g", "ab", "apbp"];
-    const lobeOf = Int8Array.from(types.table, (t) => {
+    this.#lobeOf = Int8Array.from(types.table, (t) => {
       const lobe = kcLobe(t);
-      return lobe === null ? -1 : lobes.indexOf(lobe);
+      return lobe === null ? -1 : LOBES.indexOf(lobe);
     });
     const isDan = Uint8Array.from(types.table, (t) => (Object.hasOwn(DAN_COMPARTMENTS, t) ? 1 : 0));
-    const isMbon = Uint8Array.from(types.table, (t) => (Object.hasOwn(MBON_COMPARTMENTS, t) ? 1 : 0));
-    const hemisphereOf = Int8Array.from(sides.table, (h) => HEMISPHERES.indexOf(h as "left" | "right"));
+    // An MBON type's compartments are needed for a DAN's share and to find the learning connections.
+    this.#isMbon = Uint8Array.from(types.table, (t) => (Object.hasOwn(MBON_COMPARTMENTS, t) ? 1 : 0));
+    this.#hemisphereOf = Int8Array.from(sides.table, (h) => HEMISPHERES.indexOf(h as "left" | "right"));
+    const lobeOf = this.#lobeOf;
+    const hemisphere = (i: number) => this.#hemisphereOf[sides.codes[i]];
     const per = COMPARTMENTS.length;
     this.compartments = HEMISPHERES.flatMap((h) => COMPARTMENTS.map((c) => `${c.id} ${h}`));
-    const compartmentIndex = new Map(COMPARTMENTS.map((c, k) => [c.id as string, k]));
-    const hemisphere = (i: number) => hemisphereOf[sides.codes[i]];
 
     const kcs: number[] = [];
     const dans: number[] = [];
@@ -333,120 +342,47 @@ export class MushroomBody {
     }
     this.kcs = Uint32Array.from(kcs);
     this.dans = Uint32Array.from(dans);
-    this.#kcOf = new Int32Array(connectome.neurons).fill(-1);
-    this.#danOf = new Int32Array(connectome.neurons).fill(-1);
-    kcs.forEach((i, k) => (this.#kcOf[i] = k));
-    dans.forEach((i, d) => (this.#danOf[i] = d));
+    this.#role = new Int32Array(connectome.neurons).fill(-1);
+    kcs.forEach((i, k) => (this.#role[i] = k));
+    dans.forEach((i, d) => (this.#role[i] = -2 - d));
+    this.#kcPlace = Uint8Array.from(kcs, (i) => hemisphere(i) * LOBES.length + lobeOf[types.codes[i]]);
+    this.#compartmentPlace = Uint8Array.from(this.compartments, (_, c) => Math.floor(c / per) * LOBES.length + LOBES.indexOf(COMPARTMENTS[c % per].lobe));
 
-    // A KC's synapses onto an MBON learn in the compartments that the MBON's
-    // dendrites and the KC's lobe share, in the KC's hemisphere (its axon's).
-    // Gates are numbered in the order their compartments are first met.
-    const gates = new Map<string, number>();
-    const gateLists: number[][] = [];
-    // The gate for an MBON type and a KC's lobe and hemisphere (-1 for none), worked out the first time they meet.
-    const gateFor = new Map<number, number>();
-    const gateOf = (code: number, lobe: number, hemi: number) => {
-      const key = (code * lobes.length + lobe) * 2 + hemi;
-      let gate = gateFor.get(key);
-      if (gate === undefined) {
-        const list = MBON_COMPARTMENTS[types.table[code]].filter((c) => COMPARTMENTS[compartmentIndex.get(c)!].lobe === lobes[lobe]).map((c) => hemi * per + compartmentIndex.get(c)!);
-        gate = -1;
-        if (list.length > 0) {
-          const joined = list.join(",");
-          if (!gates.has(joined)) {
-            gates.set(joined, gateLists.length);
-            gateLists.push(list);
-          }
-          gate = gates.get(joined)!;
-        }
-        gateFor.set(key, gate);
-      }
-      return gate;
-    };
-    const edges: number[] = [];
-    const edgeKC: number[] = [];
-    const edgeGate: number[] = [];
-    const kcPtr = new Uint32Array(kcs.length + 1);
-    kcs.forEach((i, k) => {
-      const lobe = lobeOf[types.codes[i]];
-      const hemi = hemisphere(i);
-      for (let e = connectome.ptr[i]; e < connectome.ptr[i + 1]; e++) {
-        const code = types.codes[connectome.post[e]];
-        if (!isMbon[code]) continue;
-        const gate = gateOf(code, lobe, hemi);
-        if (gate < 0) continue;
-        edges.push(e);
-        edgeKC.push(k);
-        edgeGate.push(gate);
-      }
-      kcPtr[k + 1] = edges.length;
-    });
-    this.edges = Uint32Array.from(edges);
-    this.edgeKC = Uint32Array.from(edgeKC);
-    this.edgeGate = Uint32Array.from(edgeGate);
-    this.#kcPtr = kcPtr;
-    this.#kcPlace = Uint8Array.from(kcs, (i) => hemisphere(i) * lobes.length + lobeOf[types.codes[i]]);
-    this.#compartmentPlace = Uint8Array.from(this.compartments, (_, c) => Math.floor(c / per) * lobes.length + lobes.indexOf(COMPARTMENTS[c % per].lobe));
-    this.gatePtr = new Uint32Array(gateLists.length + 1);
-    gateLists.forEach((list, g) => (this.gatePtr[g + 1] = this.gatePtr[g] + list.length));
-    this.gateCompartments = Uint32Array.from(gateLists.flat());
-    this.#gateHas = new Uint8Array(gateLists.length * this.compartments.length);
-    gateLists.forEach((list, g) => list.forEach((c) => (this.#gateHas[g * this.compartments.length + c] = 1)));
-
-    // Each DAN releases into its compartments in the hemispheres it reaches,
-    // in proportion to its synapses onto that hemisphere's KCs and MBONs (its
-    // own side if it has none). One of its spikes is its share of its
-    // compartment's DANs, so a compartment's dopamine counts spikes per DAN.
-    const share: number[][] = dans.map((i) => {
-      const synapses = [0, 0];
-      for (let e = connectome.ptr[i]; e < connectome.ptr[i + 1]; e++) {
-        const j = connectome.post[e];
-        const t = types.codes[j];
-        const h = hemisphere(j);
-        if (h >= 0 && (lobeOf[t] >= 0 || isMbon[t])) synapses[h] += connectome.count[e];
-      }
-      const total = synapses[0] + synapses[1];
-      if (total > 0) return synapses.map((s) => s / total);
-      const own = hemisphere(i);
-      return own >= 0 ? HEMISPHERES.map((_, h) => (h === own ? 1 : 0)) : [0.5, 0.5];
-    });
-    const supply = new Float64Array(this.compartments.length);
-    dans.forEach((i, d) => {
-      for (const c of DAN_COMPARTMENTS[types.table[types.codes[i]]]) for (let h = 0; h < 2; h++) supply[h * per + compartmentIndex.get(c)!] += share[d][h];
-    });
-    const danPtr = new Uint32Array(dans.length + 1);
-    const danCompartment: number[] = [];
-    const danAmount: number[] = [];
-    dans.forEach((i, d) => {
-      for (let h = 0; h < 2; h++) {
-        if (share[d][h] === 0) continue;
-        for (const c of DAN_COMPARTMENTS[types.table[types.codes[i]]]) {
-          const at = h * per + compartmentIndex.get(c)!;
-          danCompartment.push(at);
-          danAmount.push(share[d][h] / supply[at]);
-        }
-      }
-      danPtr[d + 1] = danCompartment.length;
-    });
-    this.#danPtr = danPtr;
-    this.#danCompartment = Uint32Array.from(danCompartment);
-    this.#danAmount = Float64Array.from(danAmount);
-
-    let hash = FNV_BASIS;
-    edges.forEach((e, p) => {
-      hash = fnv(hash, connectome.rootId[kcs[edgeKC[p]]]);
-      hash = fnv(hash, connectome.rootId[connectome.post[e]]);
-      for (const c of gateLists[edgeGate[p]]) hash = fnv(hash, c);
-    });
-    this.layoutHash = hash;
-    this.factors = new Float64Array(edges.length).fill(1);
     this.#fired = new Float64Array(kcs.length).fill(-Infinity);
     this.#eligible = new Uint32Array(kcs.length);
     this.#isEligible = new Uint8Array(kcs.length);
     this.#dopamine = new Float64Array(this.compartments.length);
     this.#dopamineAt = new Float64Array(this.compartments.length).fill(-Infinity);
-    this.#dirty = new Uint32Array(edges.length);
-    this.#isDirty = new Uint8Array(edges.length);
+  }
+
+  /** Each learning edge: its index in the connectome, its KC (an index into kcs) and its gate (an index into gates). */
+  get edges() {
+    return this.#found().edges;
+  }
+  get edgeKC() {
+    return this.#found().edgeKC;
+  }
+  get edgeGate() {
+    return this.#found().edgeGate;
+  }
+  /** Each gate's compartments (a set of compartments of one hemisphere that an edge's synapses are in), as CSR. */
+  get gatePtr() {
+    return this.#found().gatePtr;
+  }
+  get gateCompartments() {
+    return this.#found().gateCompartments;
+  }
+  /** Each learning edge's factor on its weight in the wiring, 0 to 1. */
+  get factors() {
+    return this.#found().factors;
+  }
+  /**
+   * FNV-1a over each learning edge's presynaptic and postsynaptic root IDs
+   * and its compartments, in order: the same for the same connectome and
+   * compartment tables, so a memory is taken only by a brain it fits.
+   */
+  get layoutHash() {
+    return this.#found().layoutHash;
   }
 
   /** The neurons whose spikes it needs: the KCs, then the DANs. */
@@ -480,49 +416,55 @@ export class MushroomBody {
     const { count, neurons, steps } = sim.drainSpikeLog();
     const dt = sim.dt;
     const { depression, potentiation } = this.parameters;
-    const factors = this.factors;
     const span = this.compartments.length;
     for (let q = 0; q < count; q++) {
       const i = neurons[q];
       const t = steps[q] * dt;
-      const d = this.#danOf[i];
-      if (d >= 0) {
-        for (let m = this.#danPtr[d]; m < this.#danPtr[d + 1]; m++) {
-          const c = this.#danCompartment[m];
-          const amount = this.#danAmount[m];
+      const role = this.#role[i];
+      if (role <= -2) {
+        const d = -2 - role;
+        const { danPtr, danCompartment, danAmount } = this.#taught();
+        for (let m = danPtr[d]; m < danPtr[d + 1]; m++) {
+          const c = danCompartment[m];
+          const amount = danAmount[m];
           this.#dopamine[c] = this.dopamine(c, t) + amount;
           this.#dopamineAt[c] = t;
+          if (this.#eligibleCount === 0) continue;
           // Forward: the KCs that fired before this release lose some of their synapses' strength in this compartment.
+          const s = this.#found(sim);
           const place = this.#compartmentPlace[c];
           for (let n = 0; n < this.#eligibleCount; n++) {
             const k = this.#eligible[n];
             if (this.#kcPlace[k] !== place) continue;
             const e = this.eligibility(k, t);
             if (e === 0) continue;
-            for (let p = this.#kcPtr[k]; p < this.#kcPtr[k + 1]; p++) {
-              const g = this.edgeGate[p];
-              if (this.#gateHas[g * span + c] === 0) continue;
-              const size = this.gatePtr[g + 1] - this.gatePtr[g];
-              factors[p] = factors[p] * (1 - (depression * amount * e) / size);
-              this.#mark(p);
+            for (let p = s.kcPtr[k]; p < s.kcPtr[k + 1]; p++) {
+              const g = s.edgeGate[p];
+              if (s.gateHas[g * span + c] === 0) continue;
+              const size = s.gatePtr[g + 1] - s.gatePtr[g];
+              s.factors[p] = s.factors[p] * (1 - (depression * amount * e) / size);
+              mark(s, p);
             }
           }
         }
         continue;
       }
-      const k = this.#kcOf[i];
-      if (k < 0) continue;
-      // Backward: dopamine released before this spike gives back some of what its synapses lost.
-      for (let p = this.#kcPtr[k]; p < this.#kcPtr[k + 1]; p++) {
-        if (factors[p] === 1) continue;
-        const g = this.edgeGate[p];
-        let dopamine = 0;
-        for (let m = this.gatePtr[g]; m < this.gatePtr[g + 1]; m++) dopamine += this.dopamine(this.gateCompartments[m], t);
-        if (dopamine === 0) continue;
-        const size = this.gatePtr[g + 1] - this.gatePtr[g];
-        // At most all the way back: a long run of the DANs' spikes doesn't overshoot.
-        factors[p] = factors[p] + Math.min(1, (potentiation * dopamine) / size) * (1 - factors[p]);
-        this.#mark(p);
+      if (role < 0) continue;
+      const k = role;
+      // Backward: dopamine released before this spike gives back some of what its synapses lost (none, before they are found).
+      const s = this.#synapses;
+      if (s) {
+        for (let p = s.kcPtr[k]; p < s.kcPtr[k + 1]; p++) {
+          if (s.factors[p] === 1) continue;
+          const g = s.edgeGate[p];
+          let dopamine = 0;
+          for (let m = s.gatePtr[g]; m < s.gatePtr[g + 1]; m++) dopamine += this.dopamine(s.gateCompartments[m], t);
+          if (dopamine === 0) continue;
+          const size = s.gatePtr[g + 1] - s.gatePtr[g];
+          // At most all the way back: a long run of the DANs' spikes doesn't overshoot.
+          s.factors[p] = s.factors[p] + Math.min(1, (potentiation * dopamine) / size) * (1 - s.factors[p]);
+          mark(s, p);
+        }
       }
       this.#fired[k] = t;
       if (this.#isEligible[k] === 0) {
@@ -538,17 +480,20 @@ export class MushroomBody {
       else this.#eligible[kept++] = k;
     }
     this.#eligibleCount = kept;
-    for (let n = 0; n < this.#dirtyCount; n++) {
-      const p = this.#dirty[n];
-      this.#isDirty[p] = 0;
-      sim.setPlasticFactor(p, factors[p]);
+    const s = this.#synapses;
+    if (!s) return;
+    for (let n = 0; n < s.dirtyCount; n++) {
+      const p = s.dirty[n];
+      s.isDirty[p] = 0;
+      sim.setPlasticFactor(p, s.factors[p]);
     }
-    this.#dirtyCount = 0;
+    s.dirtyCount = 0;
   }
 
   /** What it has learned, as bytes to keep (MEMORY). */
   memory(): Uint8Array {
-    return writeMemory(this.layoutHash, this.edges.length, this.factors);
+    const s = this.#found();
+    return writeMemory(s.layoutHash, s.edges.length, s.factors);
   }
 
   /**
@@ -558,21 +503,153 @@ export class MushroomBody {
    * The traces of what just fired are left as they are.
    */
   remember(memory: Uint8Array, sim: Simulation) {
-    const { index, factor } = readMemory(memory, this.layoutHash, this.edges.length);
-    for (let p = 0; p < this.factors.length; p++) {
-      if (this.factors[p] === 1) continue;
-      this.factors[p] = 1;
+    const s = this.#found(sim);
+    const { index, factor } = readMemory(memory, s.layoutHash, s.edges.length);
+    for (let p = 0; p < s.factors.length; p++) {
+      if (s.factors[p] === 1) continue;
+      s.factors[p] = 1;
       sim.setPlasticFactor(p, 1);
     }
     for (let n = 0; n < index.length; n++) {
-      this.factors[index[n]] = factor[n];
+      s.factors[index[n]] = factor[n];
       sim.setPlasticFactor(index[n], factor[n]);
     }
   }
 
-  #mark(p: number) {
-    if (this.#isDirty[p] !== 0) return;
-    this.#isDirty[p] = 1;
-    this.#dirty[this.#dirtyCount++] = p;
+  /** How each DAN teaches its compartments, found now if it hasn't been. */
+  #taught() {
+    if (this.#teaching) return this.#teaching;
+    const connectome = this.#connectome;
+    const types = connectome.columns.type;
+    const lobeOf = this.#lobeOf;
+    const isMbon = this.#isMbon;
+    const hemisphere = (i: number) => this.#hemisphereOf[connectome.columns.side.codes[i]];
+    const per = COMPARTMENTS.length;
+    // Each DAN releases into its compartments in the hemispheres it reaches,
+    // in proportion to its synapses onto that hemisphere's KCs and MBONs (its
+    // own side if it has none). One of its spikes is its share of its
+    // compartment's DANs, so a compartment's dopamine counts spikes per DAN.
+    const share: number[][] = Array.from(this.dans, (i) => {
+      const synapses = [0, 0];
+      for (let e = connectome.ptr[i]; e < connectome.ptr[i + 1]; e++) {
+        const j = connectome.post[e];
+        const t = types.codes[j];
+        const h = hemisphere(j);
+        if (h >= 0 && (lobeOf[t] >= 0 || isMbon[t])) synapses[h] += connectome.count[e];
+      }
+      const total = synapses[0] + synapses[1];
+      if (total > 0) return synapses.map((s) => s / total);
+      const own = hemisphere(i);
+      return own >= 0 ? HEMISPHERES.map((_, h) => (h === own ? 1 : 0)) : [0.5, 0.5];
+    });
+    const supply = new Float64Array(this.compartments.length);
+    this.dans.forEach((i, d) => {
+      for (const c of DAN_COMPARTMENTS[types.table[types.codes[i]]]) for (let h = 0; h < 2; h++) supply[h * per + COMPARTMENT_INDEX.get(c)!] += share[d][h];
+    });
+    const danPtr = new Uint32Array(this.dans.length + 1);
+    const danCompartment: number[] = [];
+    const danAmount: number[] = [];
+    this.dans.forEach((i, d) => {
+      for (let h = 0; h < 2; h++) {
+        if (share[d][h] === 0) continue;
+        for (const c of DAN_COMPARTMENTS[types.table[types.codes[i]]]) {
+          const at = h * per + COMPARTMENT_INDEX.get(c)!;
+          danCompartment.push(at);
+          danAmount.push(share[d][h] / supply[at]);
+        }
+      }
+      danPtr[d + 1] = danCompartment.length;
+    });
+    return (this.#teaching = { danPtr, danCompartment: Uint32Array.from(danCompartment), danAmount: Float64Array.from(danAmount) });
   }
+
+  /** The learning connections, found now if they haven't been; given the simulation, their weights are made settable there. */
+  #found(sim?: Simulation): Synapses {
+    const s = (this.#synapses ??= this.#find());
+    if (sim && this.#sim !== sim) {
+      sim.setPlasticEdges(s.edges);
+      this.#sim = sim;
+    }
+    return s;
+  }
+
+  #find(): Synapses {
+    const connectome = this.#connectome;
+    const types = connectome.columns.type;
+    const per = COMPARTMENTS.length;
+    // A KC's synapses onto an MBON learn in the compartments that the MBON's
+    // dendrites and the KC's lobe share, in the KC's hemisphere (its axon's).
+    // Gates are numbered in the order their compartments are first met.
+    const gates = new Map<string, number>();
+    const gateLists: number[][] = [];
+    // The gate for an MBON type and a KC's lobe and hemisphere (-1 for none), worked out the first time they meet.
+    const gateFor = new Map<number, number>();
+    const gateOf = (code: number, lobe: number, hemi: number) => {
+      const key = (code * LOBES.length + lobe) * 2 + hemi;
+      let gate = gateFor.get(key);
+      if (gate === undefined) {
+        const list = MBON_COMPARTMENTS[types.table[code]].filter((c) => COMPARTMENTS[COMPARTMENT_INDEX.get(c)!].lobe === LOBES[lobe]).map((c) => hemi * per + COMPARTMENT_INDEX.get(c)!);
+        gate = -1;
+        if (list.length > 0) {
+          const joined = list.join(",");
+          if (!gates.has(joined)) {
+            gates.set(joined, gateLists.length);
+            gateLists.push(list);
+          }
+          gate = gates.get(joined)!;
+        }
+        gateFor.set(key, gate);
+      }
+      return gate;
+    };
+    const edges: number[] = [];
+    const edgeKC: number[] = [];
+    const edgeGate: number[] = [];
+    const kcPtr = new Uint32Array(this.kcs.length + 1);
+    let hash = FNV_BASIS;
+    this.kcs.forEach((i, k) => {
+      const lobe = this.#lobeOf[types.codes[i]];
+      const hemi = this.#hemisphereOf[connectome.columns.side.codes[i]];
+      for (let e = connectome.ptr[i]; e < connectome.ptr[i + 1]; e++) {
+        const code = types.codes[connectome.post[e]];
+        if (!this.#isMbon[code]) continue;
+        const gate = gateOf(code, lobe, hemi);
+        if (gate < 0) continue;
+        edges.push(e);
+        edgeKC.push(k);
+        edgeGate.push(gate);
+        hash = fnv(hash, connectome.rootId[i]);
+        hash = fnv(hash, connectome.rootId[connectome.post[e]]);
+        for (const c of gateLists[gate]) hash = fnv(hash, c);
+      }
+      kcPtr[k + 1] = edges.length;
+    });
+    const gatePtr = new Uint32Array(gateLists.length + 1);
+    gateLists.forEach((list, g) => (gatePtr[g + 1] = gatePtr[g] + list.length));
+    const gateHas = new Uint8Array(gateLists.length * this.compartments.length);
+    gateLists.forEach((list, g) => list.forEach((c) => (gateHas[g * this.compartments.length + c] = 1)));
+    return {
+      edges: Uint32Array.from(edges),
+      edgeKC: Uint32Array.from(edgeKC),
+      edgeGate: Uint32Array.from(edgeGate),
+      gatePtr,
+      gateCompartments: Uint32Array.from(gateLists.flat()),
+      gateHas,
+      kcPtr,
+      layoutHash: hash,
+      factors: new Float64Array(edges.length).fill(1),
+      dirty: new Uint32Array(edges.length),
+      dirtyCount: 0,
+      isDirty: new Uint8Array(edges.length),
+    };
+  }
+}
+
+const LOBES: readonly Lobe[] = ["g", "ab", "apbp"];
+const COMPARTMENT_INDEX = new Map<string, number>(COMPARTMENTS.map((c, k) => [c.id, k]));
+
+function mark(s: Synapses, p: number) {
+  if (s.isDirty[p] !== 0) return;
+  s.isDirty[p] = 1;
+  s.dirty[s.dirtyCount++] = p;
 }

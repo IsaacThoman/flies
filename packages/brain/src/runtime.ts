@@ -61,7 +61,7 @@ export class FlyBrain implements Brain {
   /** Slow neuromodulation (modulation.ts): every modulatory neuron's level, and what its receptors do. */
   readonly modulation: Modulation;
   readonly spontaneous: boolean;
-  /** What the mushroom body has learned, and how it learns; null when it doesn't, or the connectome has no KC -> MBON synapse that can. */
+  /** What the mushroom body has learned, and how it learns; null when it doesn't, or the connectome has no Kenyon cell. */
   readonly learning: MushroomBody | null;
   /** Each neuron's region, an index into REGIONS. */
   readonly regions: Uint8Array;
@@ -167,11 +167,8 @@ export class FlyBrain implements Brain {
     // The reinforcement stand-ins after even those (io.ts, REINFORCEMENT).
     for (const { spec, neurons } of this.wiring.reinforcement) this.sim.addInput(spec.name, neurons);
     const learning = options.learning === false ? null : new MushroomBody(connectome, options.learning ?? LEARNING);
-    this.learning = learning && learning.edges.length > 0 ? learning : null;
-    if (this.learning) {
-      this.sim.setPlasticEdges(this.learning.edges);
-      this.sim.setSpikeLog(this.learning.watched);
-    }
+    this.learning = learning && learning.kcs.length > 0 ? learning : null;
+    if (this.learning) this.sim.setSpikeLog(this.learning.watched);
     // A separate stream from the Poisson inputs', which inputSeed derives from the same seed.
     this.state = new InternalState((seed ^ 0x5bd1e995) >>> 0, options.internalState ?? INTERNAL_STATE);
     this.spontaneous = options.spontaneous ?? true;

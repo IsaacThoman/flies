@@ -44,6 +44,8 @@ class MushroomBody {
  public:
   MushroomBody(const Connectome& connectome, const Parameters& parameters = {});
 
+  /** The Kenyon cells, as neuron indices. */
+  const std::vector<uint32_t>& kcs() const { return kcs_; }
   /** The learning edges' indices in the connectome, in order. */
   const std::vector<uint32_t>& edges() const { return edges_; }
   /** Each learning edge's factor on its weight in the wiring. */

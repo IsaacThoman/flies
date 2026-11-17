@@ -108,8 +108,10 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   for (const io::ThermoGroup& group : wiring_.thermo) thermo_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
   // The reinforcement stand-ins after even those (io.ts, REINFORCEMENT).
   for (const io::Group& group : wiring_.reinforcement) reinforcement_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
+  // runtime.ts finds the learning connections only when first needed, to keep building quick; natively building
+  // them takes a few ms, so they are found at once, which gives the same results.
   learning::MushroomBody body(connectome);
-  if (!body.edges().empty()) {
+  if (!body.kcs().empty()) {
     sim_.set_plastic_edges(body.edges());
     sim_.set_spike_log(body.watched());
     learning_.emplace(std::move(body));

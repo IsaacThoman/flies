@@ -665,7 +665,7 @@ test("a plastic edge's weight is its weight at 1 times its factor, edge by edge,
   assert.equal(sim.weightOf(0), 1.5);
   for (const bad of [-0.1, Number.NaN, Number.POSITIVE_INFINITY]) assert.throws(() => sim.setPlasticFactor(0, bad), /0 or more/);
   assert.throws(() => sim.setPlasticEdges([2]), /No edge/);
-  assert.throws(() => sim.setPlasticEdges([0, 0]), /twice/);
+  assert.throws(() => sim.setPlasticEdges([0, 0]), /once each, ascending/);
   // An edge can't be both plastic and in an output gain, whichever came first.
   assert.throws(() => sim.addOutputGain("all of 0", [0]), /plastic/);
   const gained = new Simulation(net, { gain: Float32Array.from([0.5, 0, 0]) });
