@@ -241,3 +241,168 @@ export class Quality {
     this.#brainSamples = 0;
   }
 }
+
+// A device that says how hot it is (the Apple TV) is held to what it can
+// sustain rather than to the most it can draw: a TV that runs a heavy place
+// flat out at 60 frames a second heats up until its system slows it far below
+// what a steady lower rate would have been. As it warms, the frame rate comes
+// down first, to 40 and then 30, and then the pixels coarsen; each step is
+// taken only while it stays warm. It steps back up only after it has been
+// cool for a long while, one step at a time, and if that step warms it again
+// it comes straight back down and waits twice as long before the next try.
+//
+// How warm a place makes the device differs by place: where each was last
+// held, and how long it waits there, is kept, and a place starts from there.
+// Not every device says "fair" before "serious" (the Apple TV goes straight
+// from nominal to serious), so a place that has made it hot once starts where
+// it stayed cool. Only the frame rate and the pixels change: the brain's time,
+// its senses and the eyes are the same at any level.
+//
+// Allocates nothing per frame.
+
+/** What a warming device is held to: frames a second at most, and the pixels no finer than. */
+export type Warm = { fps: 60 | 40 | 30; pixels: PixelSize };
+
+export const WARM_LEVELS: readonly Warm[] = [
+  { fps: 60, pixels: "classic" },
+  { fps: 40, pixels: "classic" },
+  { fps: 30, pixels: "classic" },
+  { fps: 30, pixels: "chunky" },
+  { fps: 30, pixels: "chunkier" },
+];
+
+/** How often the device is asked how hot it is, s. */
+export const THERMAL_EVERY = 1;
+/** By thermal state (nominal, fair, serious, critical): how long it must have been warm before the first step down, and how long between steps while it stays so, s. */
+export const STEP_AFTER: readonly number[] = [Infinity, 15, 0, 0];
+export const STEP_EVERY: readonly number[] = [Infinity, 60, 45, 15];
+/** Cool this long before a step back up, at first, s; doubled each time the place warms the device (once however many steps that takes), up to MAX_COOL. */
+export const COOL = 10 * 60;
+export const MAX_COOL = 2 * 60 * 60;
+/** After a step up, warming within this long means it went too far, s. */
+export const TRIAL = 10 * 60;
+const WARMTH_KEY = "flies.warmth";
+
+type Kept = { level: number; cool: number };
+
+export class Warmth {
+  level = 0;
+  /** Bumped whenever the level changes, for the game to apply it. */
+  changes = 0;
+  /** The device's thermal state as last read: 0 nominal, 1 fair, 2 serious, 3 critical. */
+  state = 0;
+  /** The place it is holding to, as `enter` was last told. */
+  place = "";
+  #read: () => number;
+  #store: Storage | null;
+  #kept: Record<string, Kept>;
+  #cool = COOL;
+  #sinceRead = 0;
+  #warmFor = 0;
+  #coolFor = 0;
+  #sinceStep = Infinity;
+  /** This spell of warmth has stepped down already (and lengthened the wait). */
+  #stepped = false;
+  /** Seconds left in which warming means the last step up was too far; 0 when none is being tried. */
+  #trial = 0;
+
+  /** `read` says how hot the device is (THERMAL in @fly/contracts). */
+  constructor(read: () => number, store: Storage | null = null) {
+    this.#read = read;
+    this.#store = store;
+    this.#kept = this.#load();
+  }
+
+  get current(): Warm {
+    return WARM_LEVELS[this.level];
+  }
+
+  /** The device is now drawing this place: it starts where the place was last held. */
+  enter(place: string) {
+    this.place = place;
+    const kept = this.#kept[place];
+    this.#cool = kept?.cool ?? COOL;
+    this.#coolFor = 0;
+    this.#trial = 0;
+    this.#set(kept?.level ?? 0);
+  }
+
+  /** Time passing, s: asks the device how hot it is every THERMAL_EVERY and steps when it should. */
+  update(dt: number) {
+    this.#sinceRead += dt;
+    if (this.#sinceRead < THERMAL_EVERY) return;
+    const s = this.#sinceRead;
+    this.#sinceRead = 0;
+    const state = Math.max(0, Math.min(3, Math.round(this.#read()) || 0));
+    this.state = state;
+    this.#sinceStep += s;
+    if (state > 0) {
+      this.#coolFor = 0;
+      this.#warmFor += s;
+      if (this.#trial > 0) {
+        // The step up was too far: back at once.
+        this.#trial = 0;
+        this.#down();
+      } else if (this.#warmFor >= STEP_AFTER[state] && this.#sinceStep >= STEP_EVERY[state]) {
+        this.#down();
+      }
+      return;
+    }
+    this.#warmFor = 0;
+    this.#stepped = false;
+    this.#coolFor += s;
+    if (this.#trial > 0) {
+      this.#trial -= s;
+      // Cool all through its trial: this level holds here.
+      if (this.#trial <= 0) {
+        this.#trial = 0;
+        this.#keep();
+      }
+      return;
+    }
+    if (this.level > 0 && this.#coolFor >= this.#cool) {
+      this.#coolFor = 0;
+      this.#trial = TRIAL;
+      this.#set(this.level - 1);
+    }
+  }
+
+  #down() {
+    this.#sinceStep = 0;
+    // However far down it already is, the place has warmed the device: wait longer before trying higher.
+    if (!this.#stepped) this.#cool = Math.min(MAX_COOL, this.#cool * 2);
+    this.#stepped = true;
+    this.#set(this.level + 1);
+    this.#keep();
+  }
+
+  #set(level: number) {
+    const next = Math.max(0, Math.min(WARM_LEVELS.length - 1, level));
+    if (next === this.level) return;
+    this.level = next;
+    this.changes++;
+  }
+
+  #keep() {
+    if (!this.place) return;
+    this.#kept[this.place] = { level: this.level, cool: this.#cool };
+    try {
+      this.#store?.setItem(WARMTH_KEY, JSON.stringify(this.#kept));
+    } catch {
+      // Not kept: each place starts at the top next time.
+    }
+  }
+
+  #load(): Record<string, Kept> {
+    try {
+      const kept = JSON.parse(this.#store?.getItem(WARMTH_KEY) ?? "{}") as Record<string, Kept>;
+      const sane: Record<string, Kept> = {};
+      for (const [place, k] of Object.entries(kept ?? {})) {
+        if (Number.isInteger(k?.level) && k.level >= 0 && k.level < WARM_LEVELS.length && k.cool >= COOL && k.cool <= MAX_COOL) sane[place] = { level: k.level, cool: k.cool };
+      }
+      return sane;
+    } catch {
+      return {};
+    }
+  }
+}

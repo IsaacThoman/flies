@@ -367,6 +367,8 @@ NATIVE(N_setAtRoot) {
   gHost.atRoot = argc && JSValueToBoolean(ctx, argv[0]);
   return JSValueMakeUndefined(ctx);
 }
+// thermalState(): how hot the device is, as tvOS says (ProcessInfo.thermalState): 0 nominal, 1 fair, 2 serious, 3 critical.
+NATIVE(N_thermalState) { return JSValueMakeNumber(ctx, (double)NSProcessInfo.processInfo.thermalState); }
 NATIVE(N_ready) {
   dispatch_async(dispatch_get_main_queue(), ^{
     void (^onReady)(void) = gHost.onReady;
@@ -427,6 +429,12 @@ NATIVE(N_input) {
     _wwwRoot = [[NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"www"] stringByStandardizingPath];
     gHost = self;
     _pending = [NSMutableArray array];
+    // Every change of the thermal state, in the log: the stats only sample it every few seconds.
+    [NSNotificationCenter.defaultCenter addObserverForName:NSProcessInfoThermalStateDidChangeNotification object:nil queue:nil usingBlock:^(NSNotification *) {
+      static NSString *const names[] = { @"nominal", @"fair", @"serious", @"critical" };
+      NSInteger state = NSProcessInfo.processInfo.thermalState;
+      HostLog(0, [NSString stringWithFormat:@"thermal state: %@", state >= 0 && state < 4 ? names[state] : @(state).stringValue]);
+    }];
   }
   return self;
 }
@@ -527,7 +535,7 @@ static void Define(JSContextRef ctx, JSObjectRef obj, const char *name, JSValueR
     { "readFile", N_readFile }, { "wake", N_wake }, { "now", N_now }, { "log", N_log },
     { "storageGet", N_storageGet }, { "storageSet", N_storageSet }, { "storageKeys", N_storageKeys },
     { "randomBytes", N_randomBytes }, { "setAtRoot", N_setAtRoot }, { "ready", N_ready },
-    { "registerFont", N_registerFont }, { "input", N_input },
+    { "registerFont", N_registerFont }, { "input", N_input }, { "thermalState", N_thermalState },
   };
   for (auto &f : fns) {
     JSStringRef s = JSStringCreateWithUTF8CString(f.name);
