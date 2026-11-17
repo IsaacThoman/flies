@@ -38,6 +38,7 @@ uniform vec3 uOffset;
 uniform vec3 uFall;
 uniform float uRain;
 uniform float uHeavy;
+uniform float uTime;
 uniform float uHalfHeight;
 uniform vec4 uJars[2];
 varying vec2 vUv;
@@ -66,8 +67,8 @@ void main() {
     vec2 d = head.xz - uJars[i].xy;
     if (dot(d, d) < uJars[i].z * uJars[i].z && head.y < uJars[i].w) dry = 0.0;
   }
-  float sheet = 0.55 + 0.45 * sin(head.x * 0.003 + head.z * 0.002 + uOffset.y * 0.001);
-  float shown = step(hash(drop.xyz), uRain * mix(1.0, 1.0 + sheet, uHeavy));
+  float sheet = 0.55 + 0.45 * sin(head.x * 0.004 + head.z * 0.001 + uTime * 0.55);
+  float shown = step(hash(drop.xyz), uRain * mix(1.0, 0.3 + 0.7 * sheet, uHeavy));
   vAlpha = shown * inBox * dry * smoothstep(5.0, 30.0, dist) * (WIDTH / width * (1.0 + uHeavy * 0.5));
   vUv = position.xy;
   gl_Position = projectionMatrix * viewMatrix * vec4(at, 1.0);
@@ -170,6 +171,7 @@ export class Rain {
     uFall: { value: new THREE.Vector3(0, -FALL_SPEED, 0) },
     uRain: { value: 0 },
     uHeavy: { value: 0 },
+    uTime: { value: 0 },
     uHalfHeight: { value: 240 },
     uJars: { value: [new THREE.Vector4(), new THREE.Vector4()] },
     uColor: { value: new THREE.Color() },
@@ -260,6 +262,7 @@ export class Rain {
       s.uRain.value = Math.min(1, rain * 1.1);
       const speed = FALL_SPEED * (1 + weather.heavy * 0.7);
       s.uHeavy.value = weather.heavy;
+      s.uTime.value = time;
       s.uFall.value.set(wind.x * (1 + weather.heavy), -speed, wind.z * (1 + weather.heavy));
       const o = s.uOffset.value;
       o.set((o.x + wind.x * dt) % WRAP, (o.y - speed * dt) % WRAP, (o.z + wind.z * dt) % WRAP);

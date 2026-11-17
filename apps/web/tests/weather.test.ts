@@ -126,3 +126,16 @@ test("snow settles gradually, persists after the fall, and melts into wetness", 
   for (let i = 0; i < 9000; i++) w.update(0.1);
   assert.ok(w.snowCover < 0.01);
 });
+
+test("clouds gather before manual precipitation and linger as it stops", () => {
+  const w = new WeatherNow();
+  w.choose("storm");
+  for (let i=0;i<30;i++) w.update(1/60);
+  assert.ok(w.cloud>0.1 && w.rain===0);
+  for (let i=0;i<360;i++) w.update(1/60);
+  assert.equal(w.kind,"storm");
+  assert.equal(w.rain,1);
+  w.choose("clear");
+  for (let i=0;i<120;i++) w.update(1/60);
+  assert.ok(w.cloud>=w.rain*0.85);
+});

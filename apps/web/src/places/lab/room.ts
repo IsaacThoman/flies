@@ -503,7 +503,10 @@ export function buildRoom(light: Daylight): SceneBackdrop {
     shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vPane;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPane=position;');
     shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uFrost; varying vec3 vPane;')
-      .replace('#include <opaque_fragment>', `float edge = 1.0 - smoothstep(0.0, 180.0, vPane.y - ${WINDOWS.y0.toFixed(1)});
+      .replace('#include <opaque_fragment>', `float xPane = mod(vPane.x + 775.0, 1550.0) - 775.0;
+float xFrame = abs(abs(xPane) - ${WINDOWS.hw.toFixed(1)});
+float yFrame = min(abs(vPane.y - ${WINDOWS.y0.toFixed(1)}), abs(vPane.y - ${WINDOWS.y1.toFixed(1)}));
+float edge = 1.0 - smoothstep(0.0, 150.0, min(xFrame, yFrame));
 float crystal = pow(abs(sin(vPane.x*0.06+vPane.y*0.08)),10.0);
 float ice=uFrost*edge*(0.45+0.55*crystal);
 outgoingLight=mix(outgoingLight,vec3(0.7,0.82,0.95),ice);

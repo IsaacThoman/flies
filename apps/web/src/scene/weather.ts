@@ -76,7 +76,7 @@ export function kindOf(w: Mix): WeatherKind {
 const scratch: Mix = { cloud: 0, mist: 0, rain: 0, wind: 0 };
 
 /** How fast the weather moves toward a choice, per second: a chosen weather arrives in about four seconds. */
-const EASE = 0.25;
+const EASE = 0.26;
 
 /** The weather now: following the forecast, or held at a chosen kind. */
 export class WeatherNow implements Weather {
@@ -139,13 +139,17 @@ export class WeatherNow implements Weather {
   update(dt: number) {
     const t = this.#target;
     const most = EASE * dt;
-    this.cloud = toward(this.cloud, t.cloud, most);
+    // Precipitation needs a cloud deck; when it ends the deck lingers.
+    const deck = Math.max(t.cloud, Math.min(0.9, (this.rain + this.snow) * 0.9));
+    this.cloud = toward(this.cloud, deck, most);
     this.mist = toward(this.mist, t.mist, most);
-    this.rain = toward(this.rain, t.rain, most);
+    const gathered = clamp((this.cloud - 0.25) / 0.75);
+    this.rain = toward(this.rain, t.rain > this.rain ? Math.min(t.rain, gathered) : t.rain, most);
     this.wind = toward(this.wind, t.wind, most);
     this.heavy = toward(this.heavy, t.heavy ?? 0, most);
     this.storm = toward(this.storm, t.storm ?? 0, most);
-    this.snow = toward(this.snow, t.snow ?? 0, most);
+    const snow = t.snow ?? 0;
+    this.snow = toward(this.snow, snow > this.snow ? Math.min(snow, gathered) : snow, most);
     const melt = this.snowCover * (1 - this.snow) * (1 + this.rain * 3) / 180;
     const deposit = this.snow * (1 - this.snowCover) / 65;
     this.snowCover = clamp(this.snowCover + (deposit - melt) * dt);
