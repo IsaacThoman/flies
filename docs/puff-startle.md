@@ -2,6 +2,13 @@
 
 Status: completed circuit investigation; no gameplay change proposed. The full check has a CPU-budget failure, detailed below.
 
+A real puff can initiate flight, while sustained wind can stop walking. The
+chemical-only model does not implement the verified fast JO-A electrical input
+or the real giant fibre's single-spike trigger. This investigation supports
+withholding a puff gameplay mapping; it does not establish that flies cannot
+escape from a puff or that missing electrical coupling alone causes the
+negative model result.
+
 ## Review rubric
 
 Each criterion is scored 0–10 by independent reviewers. A 10 requires:
@@ -16,9 +23,7 @@ Each criterion is scored 0–10 by independent reviewers. A 10 requires:
 
 ## Blind review log
 
-Pending evidence and independent review. Reviewer briefs contain only the rubric,
-neutral evidence sets and locations; scores and identities are recorded here
-after review.
+Recorded after independent reviews finish.
 
 ## What a real fly does
 
@@ -28,13 +33,15 @@ contact with a perch, and the animal's state matter. These are adult
 
 | Paper and figure | Verified observation | What it establishes |
 | --- | --- | --- |
-| [Yorozu et al. 2009, Nature 458:201–205](https://pmc.ncbi.nlm.nih.gov/articles/PMC2755041/), Fig. 1b–d, 3d–g | Walking arrests reversibly at 0.7–1.6 m/s; Fig. 1b n=6. JO-C/E ablation abolishes this wind-induced suppression of locomotion (WISL; Fig. 3, n=15). | Sustained wind need not make a perched fly leave. |
-| Same paper, Fig. 1i–l, 2d–o and 4 | Wind-selective cells are tonic; sound-selective cells are phasic, with occasional onset/offset spikes during wind. A/B and C/E are distinct sensory channels. | A sharp mechanical onset is not represented adequately by tonic C/E drive alone. |
+| [Yorozu et al. 2009, Nature 458:201–205](https://pmc.ncbi.nlm.nih.gov/articles/PMC2755041/), Fig. 1b–d, 3d–g | Walking arrests reversibly at 0.7–1.6 m/s; Fig. 1b n=6 group trials. JO-C/E ablation abolishes wind-induced suppression of locomotion (WISL; Fig. 3, n=15 group trials). The WISL protocol uses 20 flies per trial (Methods). | Sustained wind need not make a perched fly leave. |
+| Same paper, Fig. 1i–l, 2d–o and 5j–n | Wind-selective cells are tonic; sound-selective cells are phasic, with occasional onset/offset spikes during wind. A/B and C/E are distinct sensory channels. | A sharp mechanical onset is not represented adequately by tonic C/E drive alone. |
 | [Mu, Bacon, Ito & Strausfeld 2014, J Exp Biol 217:2121–2129](https://doi.org/10.1242/jeb.099135), Fig. 4A–D ([full text](https://jfly.uni-koeln.de/temp/reprints/2014_Mu_JExpBiol_giant_fiber.pdf)) | Air puffs depolarized 28/29 recorded giant descending neurons; onset evoked a large EPSP, later responses varied. A roughly 6 Hz puff train adapted. Combined light-off and puff responses exceeded either alone but were sublinear relative to their sum. | 28/29 is a membrane response count, **not** a jump or flight probability. Sensory depolarization often stayed below spike threshold. |
 | [Banerjee et al. 2004, J Neurosci 24:7869–7878](https://pmc.ncbi.nlm.nih.gov/articles/PMC1289272/), Fig. 3A and associated Results | Wild-type CS air-puff-evoked DLM flight patterns were reported in five of five animals; each of two itpr mutant combinations failed in four of four. | 5/5 is a small-sample tethered muscle-pattern result, **not** a free-standing take-off dose-response. |
 | [Iyengar & Wu 2014, J Neurogenet 28:316–328](https://pmc.ncbi.nlm.nih.gov/articles/PMC5555410/), Fig. 3 and Methods | A 500 ms puff reliably initiated tethered WT male flight (Fig. 3: 37 initiations from 14 flies). Non-fliers failed five puffs separated by 5 s. Onset DLM firing was 19.65±2.9 Hz versus 4.25±0.9 Hz in sustained flight. | Flight initiation is well established; these are muscle rates, not GF rates or single-puff jump percentages. |
 | [Ache et al. 2019, Nat Neurosci 22:1132–1139](https://pmc.ncbi.nlm.nih.gov/articles/PMC7444277/), Fig. 3d–f and Mechanosensory stimulation | Strong one-second posterior-lateral puffs moved antennae, legs and wings but did **not** initiate flight in this preparation. DNp10 was excited and DNp07 inhibited. | Direction and preparation matter; a non-GF mechanosensory response does not imply take-off. |
-| [Lebestky et al. 2009, Neuron 64:522–536](https://pmc.ncbi.nlm.nih.gov/articles/PMC2908595/), Fig. 1A–J, S2, S7 ([full text](https://www.bennington.edu/sites/default/files/sources/docs/Sherman_Two%20Different%20Forms%20of%20Arousal.pdf)) | Six 200 ms puffs, 5 s apart, 35 psi at the apparatus produced 7–10 min of hyperlocomotion. Peak velocity/distance saturated near four puffs. Sensitization persisted at 10 min but was absent at 30 min. | A persistent locomotor state (ReSH), not sustained GF spiking or a take-off count. The puffs physically displaced flies against mesh. Regulator psi is not air velocity at the antenna. |
+| [Lebestky et al. 2009, Neuron 64:522–536](https://pmc.ncbi.nlm.nih.gov/articles/PMC2908595/), Fig. 1A–J, S2, S7 ([full text](https://www.bennington.edu/sites/default/files/sources/docs/Sherman_Two%20Different%20Forms%20of%20Arousal.pdf)) | Six 200 ms puffs, 5 s apart, 35 psi at the apparatus produced 7–10 min of hyperlocomotion. Peak velocity/distance saturated near four puffs. Sensitization remained significant after 10 min. At 30 min the authors reported no statistically significant difference from naïve flies (data not shown); this is not proof of absence. | A persistent locomotor state (ReSH), not sustained GF spiking or a take-off count. The puffs physically displaced flies against mesh. Regulator psi is not air velocity at the antenna. |
+
+The group-trial WISL protocol (20 flies per trial) is also documented in [Yorozu’s author thesis, Methods, WISL assay protocol](https://thesis.caltech.edu/5882/1/Thesis_Suzuko_Yorozu.pdf).
 
 No verified free-standing, clean-air single-puff jump/take-off probability curve
 against calibrated airspeed was found in these sources. We therefore do not give
@@ -362,3 +369,41 @@ process group was paused and its slot released near nine minutes, then resumed
 after a two-minute cooldown in another owned slot. Only CPU/game-time checks
 remained active; no test or assertion was skipped to fit a slot. No server,
 browser or simulator was started for this investigation.
+
+## Matched twenty-seed control cohort
+
+The 100 Hz, 100 ms A/B condition was compared with sham, the LPLC2/LC4
+positive control, and the same A/B pulse plus a one-second C/E step, all with
+seeds 1–20. A fresh brain with a given seed has the same pre-stimulus resting
+state across these interventions. The neural rate/duration were fixed from
+the earlier sweep, not selected to induce a threshold crossing. Earlier
+three-/ten-seed captures overlap these expanded cohorts; they are not extra
+independent replicates and are never pooled into the condition fractions.
+
+| Condition | Escape peak range over 1.5 s | Events at >= 0.4 | Trials with any GF spike in first 100 ms | Mean excess GF spikes in first 100 ms, paired to sham |
+| --- | ---: | ---: | ---: | ---: |
+| rest | 0.000–0.167 | 0/20 | 4/20 | 0.00 |
+| AB | 0.147–0.315 | 0/20 | 20/20 | 7.80 |
+| AB+CE | 0.055–0.176 | 0/20 | 17/20 | 0.95 |
+| loom | 1.000–1.000 | 20/20 | 20/20 | 65.10 |
+
+This separates GF activity from its rate-based command: A/B produces GF spikes
+in every trial, yet no escape threshold event. A simplistic offline rule that
+calls any GF spike an escape would also flag four sham trials in the first
+100 ms. This is a decoder diagnostic, not a proposed decoder, physical flight
+replay or estimate of biological take-off probability. It uses cumulative
+spike counts rather than sub-millisecond event timing. No weight, threshold,
+command or sensory input mapping was changed.
+
+The positive control crossed in every trial, at 10–20 ms. The 0/20 condition
+fractions retain the two-sided exact 95% upper limit of 16.8%. The larger sham
+cohort bounds spontaneous threshold events here; it does not remove missing
+physiology or calibrate a puff to neural firing.
+
+```sh
+node packages/brain/scripts/puff.ts --simulate --populations rest,loom,AB+CE --rates 100 --durations 100 --seeds 20
+```
+
+The condition summary now contains 148 rows. All trial fractions are per
+condition; shared seeds, overlapping expansions and repeated sham captures
+must not be treated as independent animals.

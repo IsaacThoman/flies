@@ -3,7 +3,9 @@
 // node packages/brain/scripts/puff.ts --wiring
 // node packages/brain/scripts/puff.ts --simulate --seeds 5
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { readFileSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { DEFAULT_CONNECTOME_PATH, readConnectomeFile } from "../src/node.ts";
 import { SENSES, READOUTS } from "../src/io.ts";
@@ -33,8 +35,26 @@ const targets = ["DNp01", "DNp02", "DNp04", "DNp11", "DNp07", "DNp10"];
 const spikeGroups = new Map([...targets.map(type => [type, c.find({ type })] as const),
   ...READOUTS.filter(r => ["flight", "DNg12"].includes(r.name)).map(r => [r.name, c.find(r.select)] as const)]);
 const id = (i: number) => `${c.columns.type.value(i)}:${c.rootId[i]}:${c.columns.side.value(i)}:${c.columns.nt.value(i) || "unknown"}`;
+const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+const sourceDirectory = new URL("../src/", import.meta.url);
+const git = (...args: string[]) => {
+  try {
+    return execFileSync("git", args, { cwd: fileURLToPath(new URL("../../../", import.meta.url)), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return null;
+  }
+};
+const status = git("status", "--porcelain", "--untracked-files=no");
 console.log(JSON.stringify({ dataset: "FlyEM male CNS, Janelia Research Campus (CC-BY 4.0)",
-  sha256: createHash("sha256").update(readFileSync(values.path)).digest("hex"),
+  sha256: digest(readFileSync(values.path)),
+  // A dataset hash alone cannot identify which protocol or model made a capture.
+  provenance: {
+    capturedAtUtc: new Date().toISOString(), node: process.version, platform: process.platform, arch: process.arch,
+    argv: process.argv.slice(1), execArgv: process.execArgv, options: values, gitHead: git("rev-parse", "HEAD"), gitDirty: status === null ? null : status.length > 0,
+    probeSha256: digest(readFileSync(new URL(import.meta.url))),
+    runtimeSources: Object.fromEntries(readdirSync(sourceDirectory).filter(name => name.endsWith(".ts") && !/\.(test|budget)\.ts$/.test(name) && name !== "test-helpers.ts").sort()
+      .map(name => [name, digest(readFileSync(new URL(name, sourceDirectory)))])),
+  },
   note: "Raw chemical synapse counts; no electrical coupling in this graph. Paths are anatomical, not evidence of activation." }));
 
 if (values.wiring) {
