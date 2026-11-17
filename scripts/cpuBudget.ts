@@ -19,7 +19,8 @@
 // Budgets run alone after the other tests and accept measurements only when the
 // reference's median is at most 2x the M5 Pro baseline locally (4x on CI's slower
 // virtual Macs), its 90th/10th percentile ratio is at most 1.5, and each set of
-// five work samples spans at most 1.35x. A stable 2x work regression still fails.
+// five work samples spans at most 1.35x. No reference outlier may exceed 2x
+// the fastest reference; scaling uses the median so tails cannot hide a regression. A stable 2x work regression still fails.
 // Three contended attempts, separated by one-second pauses, skip locally with an
 // explicit rerun message; in CI they fail with that reason. Functional assertions
 // and measurement errors always fail. Only this thread's CPU counts, not helpers.
@@ -68,24 +69,20 @@ const timeReference = () => {
  */
 export class CpuMeter {
   #work = 0;
-  #reference = timeReference();
-  #references = 1;
-  #referenceSamples = [this.#reference];
+  #referenceSamples = [timeReference()];
   #since = threadMs();
 
   /** Ends a lap of the work here. */
   lap() {
     this.#work += threadMs() - this.#since;
     const sample = timeReference();
-    this.#reference += sample;
     this.#referenceSamples.push(sample);
-    this.#references++;
     this.#since = threadMs();
   }
 
   /** The work's CPU milliseconds so far, as an M5 Pro would spend them. */
   get ms() {
-    return (this.#work * REFERENCE_MS) / (this.#reference / this.#references);
+    return scaleCpuMs(this.#work, this.#referenceSamples);
   }
 
   /** The reference CPU times beside this work, for detecting contention. */
@@ -104,6 +101,9 @@ export const median = (samples: number[]) => {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 };
 
+
+/** The same robust reference statistic used to judge the measurement conditions. */
+export const scaleCpuMs = (rawMs: number, references: readonly number[]) => rawMs * REFERENCE_MS / median([...references]);
 
 type Measurement<T> = {
   value: T;
@@ -125,6 +125,7 @@ function contention<T>({ references, samples = [] }: Measurement<T>, ci: boolean
   const low = sorted[Math.floor((sorted.length - 1) * 0.1)];
   const high = sorted[Math.ceil((sorted.length - 1) * 0.9)];
   if (high / low > 1.5) return `reference p90/p10 ${(high / low).toFixed(2)} exceeds 1.5`;
+  if (sorted.at(-1)! / sorted[0] > 2) return `reference max/min ${(sorted.at(-1)! / sorted[0]).toFixed(2)} exceeds 2`;
   for (const series of samples) {
     const spread = Math.max(...series) / Math.min(...series);
     if (spread > 1.35) return `work sample max/min ${spread.toFixed(2)} exceeds 1.35`;

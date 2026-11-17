@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { measureBudget, REFERENCE_MS } from "../../../scripts/cpuBudget.ts";
+import { measureBudget, REFERENCE_MS, scaleCpuMs } from "../../../scripts/cpuBudget.ts";
 
 const clean = { value: 10, references: Array(20).fill(REFERENCE_MS) as number[], samples: [[10, 10.1, 10, 10.2, 10]] };
 const noisy = { ...clean, references: [4, 4, 4, 8, 8] };
@@ -41,4 +41,14 @@ test("CI fails explicitly if all attempts are contended, and tolerates its slowe
 test("measurement errors and invalid data cannot be hidden as contention", async () => {
   await assert.rejects(measureBudget(context(), () => { throw Error("broken work"); }), /broken work/);
   await assert.rejects(measureBudget(context(), () => ({ ...clean, references: [NaN] })), /invalid.*measurement/i);
+});
+
+
+test("rare reference outliers cannot scale a doubled workload back under budget", async () => {
+  const references = [...Array(10).fill(REFERENCE_MS) as number[], 44];
+  const doubled = scaleCpuMs(6, references);
+  assert.ok(doubled > 5.6, "normalization preserves the doubled cost");
+  const t = context();
+  assert.equal(await measureBudget(t, () => ({ value: doubled, references }), { ci: false, pause: async () => {} }), undefined);
+  assert.match(t.skipped[0], /reference max\/min/);
 });
