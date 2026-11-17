@@ -244,3 +244,53 @@ adds one GPU quad only while a touch-held tool points at the world; the TV
 creates no lens and retains its existing overlay behavior. No sound or extra
 on-screen instructions were added. Next device work is physical haptic timing,
 edge-gesture interaction, keyboard appearance and live Split View transitions.
+
+## Provisional press feedback pass
+
+Key: H8 = merged touch foundation; J3 = press feedback; N6 is an identical
+copy of J3. Source snapshots use the same dev input foundation. Orders:
+J3/N6/H8, H8/N6/J3, J3/H8/N6; regression review J3/N6/H8.
+
+| Reviewer | Set | Intent | Reach | Visibility | Conventions | Response | Resize | Other | Mean |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| D3 | H8 | 9 | 9 | 7 | 9 | 7 | 9 | 9 | 8.43 |
+| D3 | J3 = N6 | 9 | 9 | 8 | 9 | 10 | 9 | 9 | 9.00 |
+| U8 | H8 | 9 | 8 | 8 | 9 | 7 | 9 | 9 | 8.43 |
+| U8 | J3 = N6 | 9 | 8 | 8 | 9 | 10 | 9 | 9 | 8.86 |
+| K9 | H8 | 9 | 8 | 7 | 9 | 7 | 9 | 9 | 8.29 |
+| K9 | J3 = N6 | 9 | 8 | 8 | 9 | 10 | 9 | 9 | 8.86 |
+
+Mean **8.90** versus **8.38** for H8; all three rank J3/N6 first. Duplicate
+scores differ by zero on every criterion. Accepted. The independent regression
+review finds no supported regression in J3/N6. It correctly notes that H8's
+first strip frame records safe-area layout rather than an in-progress cancelled
+shelf press; source confirms the absent preview path, and H8's empty HUD samples
+are not a measured zero-frame response.
+
+An earlier comparison was excluded because its source snapshot predated dev's
+held-input changes, confounding touch feedback with another owner's fixes.
+Its B8/P4/C2 key and scores are retained here for audit, not as an accepted
+round: S4 8.14/9.14/9.14; L2 8.29/8.86/8.86; H7 8.29/9.00/9.00. Fresh reviewers
+assessed the aligned sets above; none continued an earlier review.
+
+Eligible shelf, label and Menu presses now acknowledge contact before release.
+Moving away clears feedback, crossing drag slop disarms it, and cancellation
+never commits it. Feedback transitions bypass the ordinary overlay upload cap;
+idle shimmer and the TV's remote overlay retain that cap. No camera or drag
+mapping changed. The touch helper can cancel a contact without sending a second
+release afterwards.
+
+Eight real-brain CDP sessions retain one food drop per intended tap, zero extra
+rotation-release drops, no page/GL errors, and one rendered frame for tool,
+held-tool, camera and HUD responses. Two-finger translation keeps zoom within
+1e-7 relative error. Focused checks pass 68/68, versus 66/66 on the aligned
+foundation. Lint and typecheck pass, including after merging newer dev artwork,
+default-room and acknowledgement changes. iPhone and iPad shell reruns each
+pass all 17 checks (238 and 223 seconds of tests); simulators were removed.
+Farm full verification is recorded in the PR when complete.
+
+Remaining findings: shelf feedback is concentrated beneath the fingertip and
+the portrait shelf has little room beyond its 44-pixel minimum. The next
+experiment previews a pending tool in the existing caption, without adding text
+or changing selection until release. Physical haptics, OS edge gestures, actual
+keyboard presentation and live Split View remain device-evidence gaps.
