@@ -1,23 +1,17 @@
-// What's on screen while playing: the shelf of tools, what each button does
-// right now, and a caption saying what the fly is doing. The caption says
-// only what the body is actually doing on the brain's commands.
-//
-// With a remote, a keyboard or a pad in hand, hint chips say what each button
-// does. Pointing at the screen, there are none: the shelf, the tool's label
-// and a button for the menu are what you press, and the table is where you
-// point. Every target is recorded as it is drawn (`hits`), so a tap lands on
-// what is on screen wherever the layout put it.
+// The shelf and gesture demonstrations share one HUD texture. A successful
+// action permanently retires its diagram; no diagram ever acts on the fly.
 
-import { INK, INK_SOFT, bubbleRing, chevron, font, glassPanel, hintChip, hintWidth, iconButton, orb, pill, text, wrap } from "@fly/ui";
-import type { Glyph, GlyphSet, Hit, HitMap } from "@fly/ui";
+import { INK, INK_SOFT, bubbleRing, chevron, font, glassPanel, drawGlyph, hintWidth, iconButton, orb, pill, roundedRect, text, wrap } from "@fly/ui";
+import type { GlyphSet, Hit, HitMap } from "@fly/ui";
 import type { Activity } from "../life.ts";
-import { placeInfo } from "../places/catalog.ts";
 import type { PlaceId } from "../places/catalog.ts";
 import type { Learned } from "../settings.ts";
 import { TOOLS } from "../tools/hands.ts";
 import type { Hands } from "../tools/hands.ts";
 import { drawToolIcon } from "../tools/view.ts";
+import type { Arriving } from "./loading.ts";
 import type { HudLayout } from "./layout.ts";
+import { drawDemonstration, ghostPress } from "./demonstration.ts";
 
 export type HudState = {
   hands: Hands;
@@ -35,12 +29,13 @@ export type HudState = {
   teachSwipe: boolean;
   /** Seconds since the tool or its kind last changed, for the label's little pop. */
   changed: number;
-  /** Spikes per second, for the brain's pulse. */
-  spikes: number;
   brainRunning: boolean;
+  arrival?: Arriving | null;
   /** Looking through the fly's eyes: how many facets, whether they're a stand-in, and whether they're off in Settings. */
   eyes: { facets: number; standIn: boolean; off: boolean } | null;
   layout: HudLayout;
+  aimX?: number;
+  aimY?: number;
   pressed?: Readonly<Hit> | null;
 };
 
@@ -62,32 +57,18 @@ const CAPTIONS: Record<Activity, string> = {
   waiting: "Waiting for its brain",
 };
 
-/** What the touch surface (or a pad's stick) does while the hand waits by the fly. */
-const SWIPE = "Move your hand";
-
 export function caption(activity: Activity, food: string | null) {
   if ((activity === "feeding" || activity === "tasting") && food) return `${CAPTIONS[activity]} ${food.toLowerCase()}`;
   return CAPTIONS[activity];
 }
 
-/** What Select does with the current tool, in a few words. */
-export function actionLabel(hands: Hands, here: PlaceId): { glyph: Glyph; label: string } | null {
-  const tool = hands.current;
-  const variant = hands.label.toLowerCase();
-  switch (tool.id) {
-    case "feed":
-      return hands.variant.id === "clear" ? null : { glyph: "select", label: `Drop ${variant}` };
-    case "swoop":
-      return { glyph: "select", label: "Throw the ball" };
-    case "feather":
-      return { glyph: "hold", label: "Hold to tickle" };
-    case "blow":
-      return { glyph: "hold", label: `Hold to blow ${hands.variant.id === "strong" ? "hard" : "gently"}` };
-    case "place":
-      return hands.place === here ? null : { glyph: "select", label: `Go to ${placeInfo(hands.place).to}` };
-    default:
-      return null;
-  }
+/** No periodic teaching redraws are needed once the visible lessons are done. */
+export function needsTeaching(s: HudState): boolean {
+  if (!s.hints) return false;
+  return (!s.learned[s.hands.current.id] && !s.hands.fixed.has(s.hands.current.id) && !(s.hands.current.id === "feed" && s.hands.variant.id === "clear")) ||
+    (!!s.glyphs && !s.learned.tools) ||
+    (!!s.glyphs && s.glyphs !== "keys" && s.teachSwipe && !s.learned.hand);
+
 }
 
 export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hits: HitMap) {
@@ -114,30 +95,24 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
     const y = pressed ? sy - 1 : on ? sy - 6 : sy;
     orb(g, x, y, r, on || pressed ? "aqua" : "glass");
     drawToolIcon(g, TOOLS[i].id, x, y + 1, r * 0.62);
-    if (on) bubbleRing(g, x - r, y - r, r * 2, r * 2, r, t);
+    if (on && s.hints && !s.learned[TOOLS[i].id] && !hands.fixed.has(TOOLS[i].id)) bubbleRing(g, x - r, y - r, r * 2, r * 2, r, t);
     hits.add(HUD_HITS.tool, x - gap / 2, sy - 26, gap, 52, i);
   }
   // The tool's name and kind, over the shelf. Pointing, arrows either side change the kind, and a place to go has its own button.
   const tool = hands.current;
   const many = tool.variants.length > 1;
-  const go = pointing && tool.id === "place" && hands.place !== s.here;
+  const reserveGo = pointing && tool.id === "place";
+  const go = reserveGo && hands.place !== s.here;
   const goWidth = 64;
-  const room = (touch?.labelWidth ?? L.width - 16) - (go ? goWidth + 8 : 0);
+  const room = (touch?.labelWidth ?? L.width - 16) - (reserveGo ? goWidth + 8 : 0);
   const arrows = many ? (pointing ? 56 : 40) : 0;
   let label = many ? `${tool.name} · ${hands.label}` : tool.name;
-  let lw = Math.max(150, hintWidth(g, label, 17) + arrows);
-  // Where there isn't room for the tool's name, its kind says enough: the shelf shows which tool it is.
-  if (many && lw > room) {
-    label = hands.label;
-    lw = Math.max(150, hintWidth(g, label, 17) + arrows);
-  }
-  let labelSize = 17;
-  if (touch) {
-    lw = Math.min(lw, room);
-    g.font = font(17);
-    labelSize = Math.min(17, 17 * Math.max(1, lw - arrows - 12) / Math.max(1, g.measureText(label).width));
-  }
-  const lx = (touch?.labelCx ?? cx) - lw / 2 - (go ? (goWidth + 8) / 2 : 0);
+  const lw = many ? Math.min(280, room) : Math.min(room, Math.max(150, hintWidth(g, label, 17)));
+  // Stable arrows can be reused without aiming again when a kind's name changes.
+  if (many && hintWidth(g, label, 17) + arrows > lw) label = hands.label;
+  g.font = font(17);
+  const labelSize = Math.min(17, 17 * Math.max(1, lw - arrows - 24) / Math.max(1, g.measureText(label).width));
+  const lx = (touch?.labelCx ?? cx) - lw / 2 - (reserveGo ? (goWidth + 8) / 2 : 0);
   const pop = Math.max(0, 1 - s.changed * 4) * 3;
   const ly = labelY - 17 - pop;
   const hitHeight = touch?.targetHeight ?? 32;
@@ -168,29 +143,28 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
     iconButton(g, L.menuX + 18, menuY, 18, "menu", s.pressed?.kind === HUD_HITS.menu);
     hits.add(HUD_HITS.menu, L.menuX - 6, menuY - 24, 48, 48);
     if (!touch?.menuAtFoot) menuRight = L.menuX + 36;
-  } else if (s.hints) {
-    // Up and down need no hint: the arrows on the tool's name say it. The shelf's and each tool's go once they've been used.
-    const set = s.glyphs!;
-    const hx = L.hintsX;
-    const hy = L.hintsY;
-    if (!s.learned.tools) hintChip(g, hx, hy, "leftRight", "Tools", t, 13, set);
-    const action = s.learned[tool.id] ? null : actionLabel(hands, s.here);
-    if (action) {
-      let ay = s.learned.tools ? hy : hy - 34;
-      // A keyboard's or a pad's chip is wider than the remote's: where it would reach the shelf's glass, it goes just over it.
-      if (hx + hintWidth(g, action.label, 13, action.glyph, set) > L.shelfLeft - 8) ay = Math.min(ay, L.shelfY - 26 - 2 - (13 * 1.75) / 2);
-      hintChip(g, hx, ay, action.glyph, action.label, t, 13, set);
+  } else {
+    drawGlyph(g, "playPause", L.menuX + 16, menuY, 25, 0, s.glyphs!);
+    hits.add(HUD_HITS.menu, L.menuX, menuY - 16, 36, 32);
+    menuRight = L.menuX + 36;
+  }
+
+  if (s.hints) {
+    if (!s.learned[tool.id] && !hands.fixed.has(tool.id) && !(tool.id === "feed" && hands.variant.id === "clear")) {
+      if (tool.id === "light" || tool.id === "weather" || tool.id === "view" || tool.id === "place") {
+        if (pointing) {
+          // Actual press feedback takes precedence over the gesture being taught.
+          if (!s.pressed) ghostPress(g, go ? lx + lw + 40 : lx + lw - 18, labelY - 8, t, false);
+        }
+        else drawGlyph(g, tool.id === "place" && hands.place !== s.here ? "select" : "upDown", cx, labelY - 48, 28, t, s.glyphs!);
+      } else {
+        const x = Math.max(L.cx - L.width / 2 + 65, Math.min(L.cx + L.width / 2 - 65, s.aimX ?? cx));
+        const y = Math.max(L.captionY + (s.brainRunning ? 70 : 110), Math.min(labelY - 58, s.aimY ?? labelY - 85));
+        drawDemonstration(g, t, tool.id, x, y, s.glyphs);
+      }
     }
-    // A keyboard's player moves the hand with the mouse, and needs no telling.
-    if (set !== "keys" && (s.teachSwipe || hands.following)) {
-      const sx = L.rightX - hintWidth(g, SWIPE, 13, "swipe", set);
-      // Over the shelf, where it would reach the shelf's glass.
-      const sy = sx < L.shelfLeft + gap * n + L.apart + 8 ? Math.min(L.rightY, L.shelfY - 26 - 2 - (13 * 1.75) / 2) : L.rightY;
-      hintChip(g, sx, sy, "swipe", SWIPE, t, 13, set);
-    }
-    const menu = hintChip(g, L.menuX, L.menuY, "playPause", "Menu", t, 12, set);
-    hits.add(HUD_HITS.menu, L.menuX, L.menuY - 12, menu, 24);
-    menuRight = L.menuX + menu;
+    if (!s.learned.tools && !pointing) drawGlyph(g, "leftRight", L.shelfLeft + L.split * gap / 2, sy - 34, 23, t, s.glyphs!);
+    if (!s.learned.hand && s.teachSwipe && s.glyphs && s.glyphs !== "keys") drawGlyph(g, "swipe", L.rightX - 20, L.rightY - 30, 28, t, s.glyphs);
   }
 
   if (s.eyes) drawEyesLabels(g, s.eyes, L);
@@ -208,10 +182,31 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   const cy = L.captionY;
   const kx = Math.max(cx, menuRight + 8 + cw / 2);
   glassPanel(g, kx - cw / 2, cy - 15, cw, 30, 15, { alpha: 0.8, shadow: false });
-  // The brain's pulse: quicker the more it fires.
-  const beat = s.brainRunning ? 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * Math.min(4, 0.5 + s.spikes / 30000)) : 0;
-  orb(g, kx - cw / 2 + 17, cy, 6 + beat * 1.5, s.brainRunning ? "pink" : "glass");
+  // Awake is a status, not a synthetic spike trace.
+  orb(g, kx - cw / 2 + 17, cy, 7, s.brainRunning ? "pink" : "glass");
   text(g, words, kx + 8, cy + 1, { size, align: "center", baseline: "middle", color: INK });
+  if (!s.brainRunning) {
+    const a = s.arrival;
+    const width = Math.min(140, cw - 16);
+    const by = cy + 23;
+    const left = kx - width / 2;
+    roundedRect(g, left, by, width, 5, 2.5);
+    g.fillStyle = "rgba(20,70,120,0.3)";
+    g.fill();
+    const downloading = a?.phase === "download";
+    const fill = downloading && a ? width * a.progress : 14;
+    if (fill > 0) {
+      const at = downloading ? 0 : (0.5 + 0.5 * Math.sin(t * 2)) * (width - 14);
+      roundedRect(g, left + at, by, fill, 5, Math.min(2.5, fill / 2));
+      g.fillStyle = "#c7efaf";
+      g.fill();
+    }
+    if (downloading && a) {
+      const amount = `${(a.source.received / 1e6).toFixed(1)} / ${(a.source.total / 1e6).toFixed(1)} MB`;
+      glassPanel(g, kx - 64, by + 10, 128, 22, 11, { alpha: 0.8, shadow: false });
+      text(g, amount, kx, by + 25, { size: 12, align: "center", color: INK });
+    }
+  }
 }
 
 /** The picture of what its eyes take in is drawn under this layer, in its panel; label it for what it is, inside the panel. */

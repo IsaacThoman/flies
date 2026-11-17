@@ -13,7 +13,7 @@ export function storeRoom() {
   return (request: StoreRoomRequest): StoreRoomReply => {
     if (request.kind === "start") {
       const start: TableStart = { place: "picnic", light: "morning", weather: "clear", zone: "UTC", offset: 0 };
-      table = new Table("abcd1234", start, "capture-0", 61, clock);
+      table = new Table("abcd234567", start, "capture-0", 61, clock);
       const record = table.record();
       record.seats = request.seats.map((at, i) => ({ id: i + 1, key: `capture-${i}`, at, airborne: false, lastSeen: wall }));
       table = Table.restore(record, clock);

@@ -252,7 +252,7 @@ export class Daylight {
   #blend = 1;
   #dirty = true;
   /** The weather the light was last shown under. */
-  #weather = { cloud: 0, mist: 0, rain: 0 };
+  #weather = { cloud: 0, mist: 0, rain: 0, heavy: 0, snow: 0, lightning: 0 };
   /** How much of the weather's light reaches the place (Scene.open). */
   #open = 1;
 
@@ -303,10 +303,13 @@ export class Daylight {
       this.#dirty = true;
     }
     const w = this.#weather;
-    if (w.cloud !== weather.cloud || w.mist !== weather.mist || w.rain !== weather.rain) {
+    if (w.cloud !== weather.cloud || w.mist !== weather.mist || w.rain !== weather.rain || w.heavy !== weather.heavy || w.snow !== weather.snow || w.lightning !== weather.lightning) {
       w.cloud = weather.cloud;
       w.mist = weather.mist;
       w.rain = weather.rain;
+      w.heavy = weather.heavy;
+      w.snow = weather.snow;
+      w.lightning = weather.lightning;
       this.#dirty = true;
     }
     if (!this.#dirty) return false;
@@ -317,13 +320,14 @@ export class Daylight {
   }
 
   /** The light as shown: the palette's, under the weather, as much of it as reaches the place: indoors, less, and after dark, when lamps light a room, hardly any. */
-  #show(l: Light, w: Pick<Weather, "cloud" | "mist" | "rain">) {
+  #show(l: Light, w: Pick<Weather, "cloud" | "mist" | "rain" | "heavy" | "snow" | "lightning">) {
     const open = this.#open * (1 - (1 - this.#open) * l.stars);
     const cloud = w.cloud * open;
     const mist = w.mist * open;
     const rain = w.rain * open;
+    const heavy = w.heavy * open;
     // The overcast's grey: the sky's own brightness without its colour, a little cool, darker in rain.
-    const lid = grey(scratchLid.copy(l.middle).lerp(l.horizon, 0.5), 0.97, 0.99, 1.03).multiplyScalar(1.05 - 0.3 * rain);
+    const lid = grey(scratchLid.copy(l.middle).lerp(l.horizon, 0.5), 0.97, 0.99, 1.03).multiplyScalar(1.05 - 0.3 * rain - 0.38 * heavy);
     // Mist: the horizon's brightness, white and a little warm.
     const veil = grey(scratchVeil.copy(l.horizon).lerp(l.haze, 0.5), 1.04, 1.03, 1.0).multiplyScalar(1.12);
     capped(veil);
@@ -342,6 +346,20 @@ export class Daylight {
     this.hemiIntensity = l.hemiIntensity * (1 + 0.3 * cloud + 0.15 * mist - 0.15 * rain);
     this.glow = l.glow * (1 - 0.85 * cloud) * (1 + 0.5 * mist);
     this.env = l.env * (1 - 0.3 * cloud);
+    this.hemiIntensity *= 1 - 0.3 * heavy;
+    this.skyColor.multiplyScalar(1 - 0.25 * heavy);
+    // A flash reaches the existing scene lights and hence the eye cubemap;
+    // it never writes a startle command. Indoors its reach is the window's.
+    const flash = w.lightning * this.#open;
+    this.zenith.addScalar(flash * 0.65);
+    this.middle.addScalar(flash * 0.9);
+    this.horizon.addScalar(flash * 0.7);
+    this.cloud.addScalar(flash * 1.2);
+    this.haze.addScalar(flash * 0.65);
+    this.skyColor.lerp(scratch.setRGB(0.78, 0.86, 1), flash * 0.8);
+    this.sunColor.lerp(scratch.setRGB(0.78, 0.86, 1), flash);
+    this.sunIntensity += flash * 2.8;
+    this.hemiIntensity += flash * 1.8;
     this.stars = l.stars;
     this.sunUp = l.sunUp;
     // Azimuth from -z (the picnic's lake) toward +x.

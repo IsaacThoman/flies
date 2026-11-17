@@ -13,6 +13,11 @@ This is the web's, the Apple TV's, whose host bridges a native WebSocket,
 and the iPhone and iPad app's, whose web view has a WebSocket of its own
 (below).
 
+The storm/snow forecast uses wire protocol 5, retaining protocol 4 fly batches. A client on the older forecast
+is refused with the existing version message instead of silently sharing a
+table whose weather disagrees. The room server and clients must be updated
+together; the binary fly-state layout itself is unchanged.
+
 ## Playing
 
 - **Everyone.** Nobody has to do anything to be with others. Once the brain

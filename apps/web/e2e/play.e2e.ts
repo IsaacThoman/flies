@@ -433,7 +433,7 @@ try {
   const again = await waitFor(page, "screen=play");
   assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["feed", "sugar", "wide", "noon", "clear"]);
   const learned = await page.evaluate(() => JSON.parse(localStorage.getItem("flies.learned") ?? "{}") as Record<string, true>);
-  assert.deepEqual(Object.keys(learned).sort(), ["feed", "place", "swoop", "tools"], "the hints for what was used aren't taught again");
+  assert.deepEqual(Object.keys(learned).sort(), ["arrival", "feed", "light", "place", "swoop", "tools", "view", "weather"], "the hints for what was used aren't taught again");
 
   step("three flies chosen in Settings live, see and meet each other, survive a reload, then return to one");
   await chooseFlies(page, 3);

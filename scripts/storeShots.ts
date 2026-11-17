@@ -27,7 +27,7 @@ try {
         try {
           await page.exposeFunction("__storeRoom", storeRoom());
           await page.clock.setFixedTime(new Date("2026-06-21T08:00:00Z"));
-          await page.goto(new URL("store.html", url).href);
+          await page.goto(new URL("store.html?alone", url).href);
           await page.waitForFunction(() => (globalThis as unknown as { __store?: { ready: boolean } }).__store?.ready);
           const evidence = await page.evaluate(async ({ story, tv }) => {
             const api = (globalThis as unknown as { __store: { capture(story: StoreStory, tv: boolean): Promise<unknown> } }).__store;

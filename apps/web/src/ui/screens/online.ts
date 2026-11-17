@@ -99,6 +99,32 @@ export class OnlineScreen implements Screen {
     return this.#screen.menu;
   }
 
+  get heading() { return this.#heading(); }
+  get semanticFocus() { return this.#screen.semanticFocus; }
+  focus(id: string) { this.#screen.focus(id); }
+
+  access(id: string, value?: number) { this.#screen.access(id, value); }
+
+  /** A host text control edits the same draft as the canvas keyboard. */
+  editValue(id: string, value: string) {
+    const item = this.menu.item(id);
+    if (item?.kind !== "field" || item.disabled) return;
+    const max = id === "code" ? CODE_LENGTH : id === "name" ? ROOM_NAME_MAX : PASSWORD_MAX;
+    this.#note = null;
+    item.value = [...value].slice(0, max).join("");
+    this.#store(id, item.value);
+    this.#shell.menuChanged?.();
+  }
+
+  submitField(id: string) {
+    this.#note = null;
+    if (id === "code" && this.#code) {
+      const code = this.#code.trim().toLowerCase();
+      if (isTableCode(code)) this.#shell.joinRoom(code);
+      else { this.#note = "code"; this.#refresh("code"); }
+    } else if (id === "password" && this.view === "door") this.#knock();
+  }
+
   /** What is said in place of the heading, if anything. */
   get note(): string {
     return this.#note ?? "";
@@ -153,7 +179,7 @@ export class OnlineScreen implements Screen {
         for (const r of rooms ?? []) {
           // A full room open to everyone sends whoever chooses it on to the next.
           const everyone = r.everyone === true;
-          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), count: [r.flies, MAX_FLIES], locked: r.locked, everyone, disabled: unavailable || (r.flies >= MAX_FLIES && !everyone) });
+          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), description: isPlaceId(r.place) ? placeInfo(r.place).name : r.place, count: [r.flies, MAX_FLIES], locked: r.locked, everyone, disabled: unavailable || (r.flies >= MAX_FLIES && !everyone) });
         }
         return rows;
       }
@@ -182,7 +208,7 @@ export class OnlineScreen implements Screen {
         if (!table) return [];
         const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
         const rows: MenuItem[] = shell.canShare ? [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", disabled: !table.joined }] : [];
-        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", swatch: o.colours });
+        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", description: `Player ${o.id}, ${o.colours.length} ${o.colours.length === 1 ? "fly" : "flies"}`, swatch: o.colours });
         if (table.everyone) rows.push({ kind: "action", id: "rooms", label: "Other rooms" });
         rows.push({ kind: "action", id: "leave", label: "Leave the room" });
         return rows;
@@ -212,7 +238,7 @@ export class OnlineScreen implements Screen {
     const table = shell.table;
     const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
     const rooms = shell.rooms ? shell.rooms.map((r) => `${r.code}:${r.name}:${r.place}:${r.flies}:${r.locked}`).join(",") : "?";
-    const at = table ? `${table.name}|${table.joined}|${table.starting}|${table.everyone}|${this.#looking}|${copied}|${table.others.map((o) => `${this.#removalId(o)}/${o.colours.length}`).join(",")}` : "alone";
+    const at = table ? `${table.name}|${shell.here}|${table.joined}|${table.starting}|${table.everyone}|${this.#looking}|${copied}|${table.others.map((o) => `${this.#removalId(o)}/${o.colours.length}`).join(",")}` : "alone";
     return `${this.view}|${this.#note}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}|${shell.lobbyStatus}`;
   }
 
@@ -352,8 +378,11 @@ export class OnlineScreen implements Screen {
   /** The rows again, keeping the focus where it was (or on `focus`). */
   #refresh(focus?: string) {
     const was = this.#screen.menu.focused?.id;
+    const semantic = this.#screen.semanticFocus;
     this.#screen = this.#build(focus ?? was);
     this.#screen.enter();
+    if (semantic) this.#screen.focus(this.menu.focused?.id ?? "");
+    this.#shell.menuChanged?.();
   }
 
   enter() {
@@ -405,7 +434,10 @@ export class OnlineScreen implements Screen {
     const at = active ? items.findIndex((i) => i.id === active && i.kind === "field") : -1;
     if (at >= 0) {
       this.#store(active!, typing.value);
-      (items[at] as FieldItem).value = typing.value;
+      if ((items[at] as FieldItem).value !== typing.value) {
+        (items[at] as FieldItem).value = typing.value;
+        this.#shell.menuChanged?.();
+      }
       view.typing.index = at;
       view.typing.caret = typing.caret;
     }
@@ -415,6 +447,7 @@ export class OnlineScreen implements Screen {
     this.#store(id, typing.value);
     const field = items.find((i) => i.id === id);
     if (field?.kind === "field") field.value = typing.value;
+    this.#shell.menuChanged?.();
     if (ended !== "done") return;
     // Return on the code, or on a door's password, is going in.
     if (id === "code" && this.#code) {
