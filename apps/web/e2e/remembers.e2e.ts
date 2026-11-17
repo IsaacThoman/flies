@@ -69,8 +69,9 @@ try {
   assert.equal(kept(back).get(0), id);
   assert.equal(saved.id, id);
   assert.ok(Math.abs(saved.where.x - spot.x) < 2 && Math.abs(saved.where.z - spot.z) < 2, `saved where it was put: ${JSON.stringify(saved.where)}`);
+  // The canvas gives hunger to three places: a saved 0.0504 reads back as 0.050.
   const hunger = Number(back.hunger);
-  assert.ok(hunger >= saved.body.hunger && hunger < 0.2, `hunger ${hunger}: as it was, a little hungrier for the time away (a new fly arrives at 0.7)`);
+  assert.ok(hunger >= saved.body.hunger - 0.0005 && hunger < 0.2, `hunger ${hunger}: as it was, a little hungrier for the time away (a new fly arrives at 0.7)`);
   assert.ok(Number(back.fullness) > 0.3, `fullness ${back.fullness}: its crop still full (a new fly's is empty)`);
   assert.ok(Math.abs(pressureOf(back) - saved.body.sleep.pressure) < 0.01, `pressure ${pressureOf(back)} against ${saved.body.sleep.pressure} saved`);
   const [x, z] = atOf(back);
