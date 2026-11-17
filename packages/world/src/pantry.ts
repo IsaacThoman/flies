@@ -48,6 +48,9 @@ export type Food = {
   pool: boolean;
 };
 
+/** The sweetness sent to the brain: it fades only over the last quarter of a food. */
+export const tasteIntensity = (food: Food): number => food.sweet * Math.min(1, food.amount * 4);
+
 /** Amount eaten per second at `feed` 1. A dropped food lasts about 6 s with `feed` near 0.5. */
 export const EAT_RATE = 0.33;
 /** A patch eaten down comes back over about this long, s. */
@@ -132,7 +135,7 @@ export class Pantry {
       // Follow the food's supporting surface, not its centre's height or a different layer.
       this.#world.surface(food.x, food.z, this.#support, food.y);
       if (this.#support.solid !== this.#contact.solid) continue;
-      if (!best || food.sweet * food.amount > best.sweet * best.amount) best = food;
+      if (!best || tasteIntensity(food) > tasteIntensity(best)) best = food;
     }
     return best;
   }
