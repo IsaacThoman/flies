@@ -19,7 +19,8 @@ try {
   peer = await fakeFly(endpoint, code, 0, new Set(), { place: "picnic", light: "clock", weather: "now", zone: "UTC", offset: 0, name: "Input table", listed: true });
   const served = await startServer();
   vite = served.server;
-  opened = await openGame({ url: `${served.url}?rooms=${encodeURIComponent(endpoint)}`, device: "iPhone 13" });
+  // Manual entry has its own room; automatic joining and adaptive quality are checked separately.
+  opened = await openGame({ url: `${served.url}?alone&rooms=${encodeURIComponent(endpoint)}`, device: "iPhone 13", steady: true });
   const { page, errors } = opened;
   await waitFor(page, "screen=title");
   const fingers = await Fingers.on(page);
