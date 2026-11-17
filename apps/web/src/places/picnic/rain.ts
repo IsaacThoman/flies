@@ -25,6 +25,8 @@ const LAYERS = [
   { size: 3200, count: 1400 },
 ] as const;
 const WRAP = 3200;
+const BASE_DROPS = LAYERS.reduce((n, l) => n + l.count, 0);
+const HEAVY_DROPS = 5600;
 /** How many splashes can be under way at once. */
 const SPLASHES = 56;
 /** Seconds a splash's ring takes to spread and fade; its crown is quicker. */
@@ -47,12 +49,12 @@ const float WIDTH = 0.45;
 const float SHUTTER = 0.011;
 float hash(vec3 p) { return fract(sin(dot(p, vec3(91.7, 13.1, 47.3))) * 43758.5453); }
 void main() {
-  float size = drop.w * mix(1.0, 0.62, uHeavy);
+  float size = abs(drop.w);
   // Where the drop is in the box round the camera, the box moving with the camera and the rain falling through it.
   vec3 rel = mod(drop.xyz * size + uOffset - cameraPosition + 0.5 * size, size) - 0.5 * size;
   vec3 head = cameraPosition + rel;
   vec3 axis = normalize(uFall);
-  vec3 at = head - axis * length(uFall) * SHUTTER * position.y;
+  vec3 at = head - axis * length(uFall) * mix(SHUTTER, 0.006, uHeavy) * position.y;
   vec3 toEye = cameraPosition - at;
   float dist = length(toEye);
   vec3 side = normalize(cross(toEye, axis));
@@ -68,7 +70,9 @@ void main() {
     if (dot(d, d) < uJars[i].z * uJars[i].z && head.y < uJars[i].w) dry = 0.0;
   }
   float sheet = 0.55 + 0.45 * sin(head.x * 0.004 + head.z * 0.001 + uTime * 0.55);
-  float shown = step(hash(drop.xyz), uRain * mix(1.0, 0.3 + 0.7 * sheet, uHeavy));
+  float coverage = uRain * mix(1.0, 0.3 + 0.7 * sheet, uHeavy);
+  coverage *= drop.w < 0.0 ? uHeavy : 1.0;
+  float shown = step(hash(drop.xyz), coverage);
   vAlpha = shown * inBox * dry * smoothstep(5.0, 30.0, dist) * (WIDTH / width * (1.0 + uHeavy * 0.5));
   vUv = position.xy;
   gl_Position = projectionMatrix * viewMatrix * vec4(at, 1.0);
@@ -190,14 +194,18 @@ export class Rain {
     const streaks = new THREE.InstancedBufferGeometry();
     streaks.setIndex([0, 1, 2, 0, 2, 3]);
     streaks.setAttribute("position", new THREE.Float32BufferAttribute([-1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1, 0], 3));
-    const total = LAYERS.reduce((n, l) => n + l.count, 0);
+    const total = BASE_DROPS + HEAVY_DROPS;
     const drops = new Float32Array(total * 4);
     let k = 0;
     for (const layer of LAYERS) {
       for (let i = 0; i < layer.count; i++, k++) drops.set([rnd.next(), rnd.next(), rnd.next(), layer.size], k * 4);
     }
+    for (; k < total; k++) {
+      const size = k < BASE_DROPS + 1400 ? 400 : k < BASE_DROPS + 3500 ? 800 : 3200;
+      drops.set([rnd.next(), rnd.next(), rnd.next(), -size], k * 4);
+    }
     streaks.setAttribute("drop", new THREE.InstancedBufferAttribute(drops, 4));
-    streaks.instanceCount = total;
+    streaks.instanceCount = BASE_DROPS;
     const jars = SOLIDS.filter((s) => s.name === "lemonade" || s.name === "jam");
     jars.forEach((jar, i) => {
       const f = jar.footprint as { x: number; z: number; r: number };
@@ -262,6 +270,7 @@ export class Rain {
       s.uRain.value = Math.min(1, rain * 1.1);
       const speed = FALL_SPEED * (1 + weather.heavy * 0.7);
       s.uHeavy.value = weather.heavy;
+      (this.#streaks.geometry as THREE.InstancedBufferGeometry).instanceCount = BASE_DROPS + Math.ceil(HEAVY_DROPS * weather.heavy);
       s.uTime.value = time;
       s.uFall.value.set(wind.x * (1 + weather.heavy), -speed, wind.z * (1 + weather.heavy));
       const o = s.uOffset.value;

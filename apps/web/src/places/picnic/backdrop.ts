@@ -82,11 +82,14 @@ void main() {
     c += vec3(0.04) * bow * fade * smoothstep(0.72, 0.6, a);
   }
   if (h < 0.0) c = mix(horizon, ground, smoothstep(0.0, -0.08, h));
-  if (flash > 0.02 && h > 0.025 && h < 0.4) {
+  float strike = floor(time / 19.0);
+  float forkShown = step(0.45, hash2(vec2(strike, 17.0)));
+  float bearing = (hash2(vec2(strike, 5.0)) - 0.5) * 0.5;
+  if (flash > 0.02 && forkShown > 0.5 && h > 0.025 && h < 0.4) {
     float y = h;
-    float fork = 0.13 + sin(floor(y * 85.0) * 5.3) * 0.012 + y * 0.3;
+    float fork = bearing + 0.13 + sin(floor(y * 85.0) * 5.3 + strike) * 0.012 + y * 0.3;
     float bolt = 1.0 - smoothstep(0.001, 0.003 + fwidth(d.x), abs(d.x - fork));
-    float branch = 1.0 - smoothstep(0.001, 0.003 + fwidth(d.x), abs(d.x - (0.15 - y * 0.5 + sin(floor(y * 100.0)) * 0.008)));
+    float branch = 1.0 - smoothstep(0.001, 0.003 + fwidth(d.x), abs(d.x - (bearing + 0.15 - y * 0.5 + sin(floor(y * 100.0) + strike) * 0.008)));
     c += vec3(0.7, 0.8, 1.0) * (bolt + branch * step(y, 0.18)) * flash * 2.5;
   }
   gl_FragColor = vec4(c, 1.0);

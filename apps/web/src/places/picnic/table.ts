@@ -839,7 +839,11 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
   const snow = new Snow(2200, 0);
   group.add(snow.mesh);
   const snowCover = { value: 0 };
-  for (const material of all) if (material !== glass && material !== liquid && material !== dewMaterial) snowDust(material, snowCover);
+  const shelters = [one("lemonade"), one("jam")].map(s => {
+    const f = s.footprint as { x:number; z:number; r:number };
+    return new THREE.Vector4(f.x, f.z, f.r, (s.top as { y:number }).y);
+  });
+  for (const material of all) if (material !== glass && material !== liquid && material !== dewMaterial) snowDust(material, snowCover, shelters);
   let wetNow = -1;
   return {
     group,

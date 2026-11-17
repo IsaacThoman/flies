@@ -56,19 +56,28 @@ void main() { float r=length(vUv); gl_FragColor=vec4(uColor,(1.0-smoothstep(0.35
 }
 
 /** Pigment on exposed upward faces, no extra mesh or draw, no collision stand-in. */
-export function snowDust(material: THREE.MeshStandardMaterial | THREE.MeshLambertMaterial, cover: {value:number}) {
+export function snowDust(material: THREE.MeshStandardMaterial | THREE.MeshLambertMaterial, cover: {value:number}, shelters: readonly THREE.Vector4[] = []) {
   const previous = material.onBeforeCompile;
   const key = material.customProgramCacheKey();
   material.onBeforeCompile=(shader,renderer)=>{
     previous.call(material,shader,renderer);
     shader.uniforms.uSnowCover=cover;
+    if (shelters.length) shader.uniforms.uSnowShelters={ value:shelters };
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vSnowAt; varying float vSnowUp;')
       .replace('#include <begin_vertex>','#include <begin_vertex>\nvSnowAt=(modelMatrix*vec4(position,1.0)).xyz; vSnowUp=(mat3(modelMatrix)*normal).y;');
-    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nuniform float uSnowCover; varying vec3 vSnowAt; varying float vSnowUp;')
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>\nuniform float uSnowCover; varying vec3 vSnowAt; varying float vSnowUp;\n${shelters.length ? 'uniform vec4 uSnowShelters[' + shelters.length + '];' : ''}`)
       .replace('#include <color_fragment>',`#include <color_fragment>
 float grain=fract(sin(dot(floor(vSnowAt.xz*2.0),vec2(12.9898,78.233)))*43758.5453);
-float dust=smoothstep(0.45,0.9,vSnowUp)*smoothstep(grain*0.25,grain*0.25+0.18,uSnowCover);
-diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.83,0.9,0.96)*(0.93+0.07*grain),dust);`);
+float drift=0.5+0.25*sin(vSnowAt.x*0.047+sin(vSnowAt.z*0.029)*2.0)+0.25*sin(vSnowAt.z*0.061);
+float powder=uSnowCover*(0.4+0.6*drift);
+float dust=smoothstep(0.45,0.9,vSnowUp)*smoothstep(0.12+grain*0.05,0.65,powder);
+${shelters.length ? `for (int i=0;i<${shelters.length};i++) {
+  vec4 jar=uSnowShelters[i];
+  vec2 delta=vSnowAt.xz-jar.xy;
+  if (dot(delta,delta)<jar.z*jar.z && vSnowAt.y<jar.w-0.3) dust=0.0;
+}` : ''}
+diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.83,0.9,0.96)*(0.93+0.07*grain),dust);`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,0.92,dust);');
   };
-  material.customProgramCacheKey=()=>key+'-snow-dust';
+  material.customProgramCacheKey=()=>key+'-snow-dust-'+shelters.length;
 }
