@@ -305,7 +305,7 @@ what more speed would cost.
   phone in a pocket, a tab frozen in the background) wakes the same way: the
   game notices the wall clock has jumped between two frames, since no event
   says so. Nor is it taken for a stalled brain: only time while frames are
-  coming counts toward the brain's 2 s stall limit.
+  coming counts toward the brain's 10 s stall limit.
 - **The screen stays awake** (the Screen Wake Lock API) while the screensaver
   shows in a visible tab, and is let go otherwise. Browsers without it, or that
   refuse it, let the screen sleep as usual.
