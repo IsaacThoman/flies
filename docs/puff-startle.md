@@ -37,6 +37,11 @@ contact with a perch, and the animal's state matter. These are adult
 
 The group-trial WISL protocol (20 flies per trial) is also documented in [Yorozu’s author thesis, Methods, WISL assay protocol](https://thesis.caltech.edu/5882/1/Thesis_Suzuko_Yorozu.pdf).
 
+Banerjee's Results attach the CS five-of-five statement to a citation of
+[Engel & Wu 1992](https://pubmed.ncbi.nlm.nih.gov/1328625/). The number above
+was verified in Banerjee's text; it was not independently extracted from the
+1992 paper or treated as a new free-flight probability estimate.
+
 No verified free-standing, clean-air single-puff jump/take-off probability curve
 against calibrated airspeed was found in these sources. We therefore do not give
 a universal percentage or fit a model probability to 5/5 tethered recordings.
@@ -407,6 +412,9 @@ conflicting duplicates fail. The cohort size is part of the condition key,
 so expanded trials never overwrite a smaller cohort or get pooled with it.
 Historical empty sham inputs labelled with a requested rate are normalized
 to zero drive. Their zero-neuron membership is checked.
+The script checks dataset identity but does not enforce matching runtime or
+protocol provenance across files; audit those headers against the provenance
+summary when combining captures.
 
 Retain the exploratory captures as `puff-sim.jsonl` and `puff-zones.jsonl`
 using the reproduction commands, and redirect the dose and timing commands
