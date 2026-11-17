@@ -96,3 +96,26 @@ test("opened after rain, the table is still wet", () => {
   assert.ok(now.wet > 0.3, `wet ${now.wet.toFixed(2)}`);
   assert.equal(now.rain, forecast(after, mix()).rain);
 });
+
+test("mixed weather is named for rain first, then mist, then cloud", () => {
+  assert.equal(kindOf({ rain: 0.4, mist: 0.7, cloud: 1 }), "rain");
+  assert.equal(kindOf({ rain: 0.2, mist: 0.7, cloud: 1 }), "mist");
+  assert.equal(kindOf({ rain: 0, mist: 0.2, cloud: 0.7 }), "overcast");
+  assert.equal(kindOf({ rain: 0, mist: 0, cloud: 0.2 }), "clear");
+});
+
+test("wind arrives with the chosen weather, whether eased or settled, and following the clock clears the choice", () => {
+  const w = new WeatherNow();
+  w.choose("clear", true);
+  const wind = w.wind;
+  w.choose("rain");
+  assert.equal(w.chosen, "rain");
+  w.update(1);
+  assert.ok(w.wind > wind && w.wind < KINDS.rain.wind, "wind approaches the choice gradually");
+  w.update(10);
+  assert.equal(w.wind, KINDS.rain.wind);
+  w.choose("clear", true);
+  assert.equal(w.wind, KINDS.clear.wind);
+  w.follow(START);
+  assert.equal(w.chosen, null);
+});
