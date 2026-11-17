@@ -727,7 +727,7 @@ export function buildSill(): SceneSet {
   {
     const { foot, z, width, length } = POSTCARD;
     const lean = Math.asin(foot / length);
-    add(plaster, paint(new THREE.BoxGeometry(0.4, length, width).translate(0, length / 2, 0).rotateZ(-lean).translate(SILL.hx - foot, 0, z), "#f6f2e6"));
+    add(plaster, paint(new THREE.BoxGeometry(0.4, length, width).translate(0, length / 2, 0).rotateZ(-lean).translate(SILL.hx - foot + 0.2, 0, z), "#f6f2e6"));
   }
 
   // Half a peach, cut face up on a small plate, its stone in it.

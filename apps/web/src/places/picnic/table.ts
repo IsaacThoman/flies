@@ -34,7 +34,7 @@ export const JAR_RING = { x: -40, z: -150, r: 34 };
  */
 export const LID_PRESS = (() => {
   const R = (one("lemonade").footprint as { r: number }).r;
-  return [[R, -0.6], [R - 0.4, 0], [R - 1.2, 0.25], [R - 2, 0], [R - 2.8, -0.3], [R - 4, -0.3], [R - 4.8, 0], [24, 0], [23, 0.28], [21.5, 0.28], [20.5, 0], [6, 0], [5, 0.18], [0, 0.22]] as const;
+  return [[R, -0.6], [R - 0.4, 0], [R - 1.2, 0.25], [R - 2, 0], [R - 2.8, -0.3], [R - 4, -0.3], [R - 4.8, 0], [24, 0], [23, 0.28], [21.5, 0.28], [20.5, 0], [6, 0], [5, 0.18], [0, 0.22]].map(([r, y]) => [r, y - 0.19] as const);
 })();
 /** The grommet round the straw where it goes through the lid: its tube's radius and how high its middle sits, mm. */
 export const GROMMET = { tube: 0.38, lift: 0.08 };

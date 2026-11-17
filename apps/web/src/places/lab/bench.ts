@@ -399,7 +399,7 @@ export function buildBench(): SceneSet {
       profile.push(new THREE.Vector2(f.r * s, topHeight(base, f.x + f.r * s * 0.9999, f.z)));
     }
     big.add(surface, piece(new THREE.LatheGeometry(profile, 56).translate(f.x, 0, f.z), green, ENAMEL));
-    big.add(surface, piece(new THREE.CylinderGeometry(LAMP.stem.r, LAMP.stem.r + 1.5, LAMP.stem.top, 20).translate(LAMP.stem.x, LAMP.stem.top / 2, LAMP.stem.z), "#c6cacf", STEEL));
+    big.add(surface, piece(new THREE.CylinderGeometry(LAMP.stem.r, LAMP.stem.r, LAMP.stem.top, 20).translate(LAMP.stem.x, LAMP.stem.top / 2, LAMP.stem.z), "#c6cacf", STEEL));
     const knuckle = new THREE.Vector3(LAMP.stem.x, LAMP.stem.top + 4, LAMP.stem.z);
     big.add(surface, piece(new THREE.SphereGeometry(10, 20, 12).translate(knuckle.x, knuckle.y, knuckle.z), green, ENAMEL));
     // Its arm, from the knuckle up and over to the back of the shade.
