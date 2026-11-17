@@ -15,7 +15,7 @@
 
 import { REGIONS } from "@fly/brain";
 import { NERVE_PARTS, SOMA_GROUPS } from "@fly/fly";
-import { partRegions } from "./regions.ts";
+import { UNLIT_PARTS, partRegions } from "./regions.ts";
 
 /** Seconds: how fast a part's glow rises toward its rate, and falls back. */
 export const GLOW_RISE = 0.05;
@@ -32,6 +32,7 @@ export class NerveGlow {
   readonly regions = new Float32Array(REGIONS.length);
   readonly #full = Float32Array.from(REGIONS, (r) => r.fullHz);
   readonly #partRegion = partRegions();
+  readonly #unlit = Uint16Array.from(UNLIT_PARTS, (id) => NERVE_PARTS.findIndex((p) => p.id === id));
   readonly #parts: Float32Array;
   readonly #somata = Uint16Array.from(SOMA_GROUPS, (g) => NERVE_PARTS.findIndex((p) => p.id === g.id));
 
@@ -52,6 +53,7 @@ export class NerveGlow {
     }
     const parts = this.#parts, partRegion = this.#partRegion;
     for (let p = 0; p < partRegion.length; p++) if (partRegion[p] >= 0) parts[p] = regions[partRegion[p]];
+    for (let p = 0; p < this.#unlit.length; p++) parts[this.#unlit[p]] = 0;
     for (let s = 0; s < SOMA_GROUPS.length; s++) {
       const group = SOMA_GROUPS[s], p = this.#somata[s];
       const target = glowTarget(readouts?.[group.rate] ?? 0, group.fullHz);

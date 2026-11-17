@@ -84,7 +84,7 @@ npm run tvos -- archive --version 0.1.1   # archive for the App Store (docs/rele
 2. bundles the runtime (`runtime/index.ts`) with rolldown into `www/runtime.js`;
 3. builds the page as one classic script, `www/game.js`, with Vite (`apps/tvos/vite.config.ts`):
    `apps/web/src/main.ts`, or `apps/tvos/tests/scene.ts` with `--test-scene`. The host has no
-   module loader, so everything is inlined; `apps/web/public` is copied beside it;
+   module loader, so everything is inlined; any configured public assets are copied beside it;
 4. copies `packages/brain/data/connectome.bin` to `www/brain/` (and stops, saying how to get
    it, if it isn't there);
 5. generates `Flies.xcodeproj` (XcodeGen, `project.yml`, with `weather.yml` and
@@ -806,3 +806,25 @@ place of fonts bundled by file name, `sessionStorage` in memory instead of shari
 stretch by default, the test scene and the simulator check, placeholder art drawn by script, and
 a WebSocket bridge of its own (polled, with nothing made per message) and the system keyboard, for
 tables with others.
+
+<!-- docs-check: base apps/tvos -->
+
+<!-- docs-check: base apps/tvos/src -->
+
+<!-- docs-check: base apps/tvos/runtime -->
+
+<!-- docs-check: generated runtime.js -->
+
+<!-- docs-check: generated game.js -->
+
+<!-- docs-check: generated src/generated/ops.h -->
+
+<!-- docs-check: generated www/runtime.js -->
+
+<!-- docs-check: generated www/game.js -->
+
+<!-- docs-check: generated packages/brain/data/connectome.bin -->
+
+<!-- docs-check: generated www/config.json -->
+
+<!-- docs-check: generated www/brain/connectome.bin -->
