@@ -63,6 +63,10 @@ const CAMERA: Option<Settings["wallpaperCamera"]>[] = [
   { value: "lively", label: "Lively" },
   { value: "whole", label: "Whole place" },
 ];
+const PACE: Option<Settings["pace"]>[] = [
+  { value: "lively", label: "Lively" },
+  { value: "natural", label: "Natural" },
+];
 const EYES: Option<EyesDetail>[] = [
   { value: "off", label: "Off" },
   { value: "low", label: "Low" },
@@ -117,6 +121,8 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       ...(shell.canPlayOnline ? [choice("joinOthers", "Join others", ON_OFF)] : []),
       // Whether the sky follows the weather outside, only where the Apple TV can tell it.
       ...(shell.weatherOutside ? [choice("realWeather", "Real weather", ON_OFF)] : []),
+      // How its day goes: livelier than a fly's, or as a fly's.
+      choice("pace", "Activity", PACE),
     ],
   },
   // Everything that can show over the world: each picture in a corner, the stats and the fly seen through, each off, in the screensaver, or always; then how the corners' pictures look.
