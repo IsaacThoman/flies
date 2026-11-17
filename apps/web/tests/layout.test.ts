@@ -35,6 +35,9 @@ function shell(frame: Frame, glyphs: Shell["glyphs"] = null, online = true): She
     brain: { status: "running", neurons: 166700, connections: 6242118, state: null } as unknown as Shell["brain"],
     meter: { history: new Float32Array(120), head: 0, spikesPerSecond: 0, active: 0, speed: 1 } as unknown as Shell["meter"],
     life: { sensed: { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, light: null }, activity: "resting" } as unknown as Shell["life"],
+    journal: null,
+    canSavePictures: false,
+    savePicture: async () => "failed",
     weatherOutside: false,
     weatherAttribution: () => null,
     shape: frame,
@@ -68,8 +71,9 @@ test("the TV keeps its HUD and title layout, with Settings below a separate head
   assert.equal(hud.cx, 427);
   assert.equal(hud.captionY, 25);
   assert.equal(hud.shelfY, 446);
-  assert.equal(hud.gap, 52);
-  assert.deepEqual([hud.shelfLeft, hud.split, hud.apart], [203, TOOLS.findIndex((t) => t.world), 32]);
+  // Nine tools come closer than eight did, keeping the shelf as wide as it was, clear of the bottom corners.
+  assert.equal(hud.gap, 46);
+  assert.deepEqual([hud.shelfLeft, hud.split, hud.apart], [204, TOOLS.findIndex((t) => t.world), 32]);
   assert.equal(hud.orb, 1);
   assert.equal(hud.labelY, 385);
   assert.deepEqual([hud.hintsX, hud.hintsY, hud.rightX, hud.rightY, hud.menuX, hud.menuY], [16, 446, 838, 446, 16, 24]);

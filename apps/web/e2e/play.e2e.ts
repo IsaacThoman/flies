@@ -236,7 +236,7 @@ try {
   await waitFor(page, "focus=stats");
   await press("Escape");
   await waitFor(page, "screen=title,focus=settings");
-  await press("ArrowDown", 2);
+  await press("ArrowDown", 3);
   await press("Enter");
   await waitFor(page, "screen=about");
   await press("Enter");
@@ -250,7 +250,7 @@ try {
   await press("ArrowDown", 3);
   await press("Escape");
   await waitFor(page, "screen=title,focus=about");
-  await press("ArrowUp", 4);
+  await press("ArrowUp", 5);
   await waitFor(page, "focus=play");
 
   step("play: the fly is on the table, and its brain is moving it");

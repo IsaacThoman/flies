@@ -243,7 +243,7 @@ async function fingers() {
     // Outside the pane is Back.
     await touch.tap([0.5, 0.97]);
     await waitFor(page, "screen=title");
-    await tapOn("row", 4);
+    await tapOn("row", 5);
     await waitFor(page, "screen=about");
     await tapOn("notice", 0);
     await waitFor(page, "acknowledgement=0");

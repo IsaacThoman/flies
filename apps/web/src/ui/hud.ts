@@ -29,6 +29,8 @@ export type HudState = {
   teachSwipe: boolean;
   /** Seconds since the tool or its kind last changed, for the label's little pop. */
   changed: number;
+  /** Seconds since the player last took a photo, for the screen's flash. */
+  shutter?: number;
   brainRunning: boolean;
   arrival?: Arriving | null;
   /** Looking through the fly's eyes: how many facets, whether they're a stand-in, and whether they're off in Settings. */
@@ -75,9 +77,16 @@ export function needsTeaching(s: HudState): boolean {
 
 }
 
+/** How long the screen flashes white as a photo is taken, s. It is drawn over the frame, after the picture was taken from it. */
+export const SHUTTER_FLASH = 0.25;
+
 export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hits: HitMap) {
   const { hands } = s;
   const L = s.layout;
+  if (s.shutter !== undefined && s.shutter < SHUTTER_FLASH) {
+    g.fillStyle = `rgba(255, 255, 255, ${(0.75 * (1 - s.shutter / SHUTTER_FLASH)).toFixed(3)})`;
+    g.fillRect(0, 0, g.canvas.width, g.canvas.height);
+  }
   const pointing = s.glyphs === null;
   const touch = pointing ? L.touch : null;
   const labelY = touch?.labelY ?? L.labelY;

@@ -34,10 +34,10 @@ fly's world.
 
 | On the remote | Does |
 | --- | --- |
-| Swipe on the touch surface | Moves your hand across the table. With View in hand, turns the camera round the fly and up or down instead; on Why?, goes back and forth through what it plays. |
+| Swipe on the touch surface | Moves your hand across the table. With View or Photo in hand, turns the camera round the fly and up or down instead; on Why?, goes back and forth through what it plays. |
 | Left / Right | Picks a tool from the shelf. |
-| Up / Down | Picks the tool's kind: which food, how hard to blow, which piece to build, the time of day, the camera. |
-| Select | Uses the tool: drops food, throws the ball, sets a piece down, turns or takes one away. Hold it to tickle or blow. On the Sky it steps round the weathers, on View round the views. |
+| Up / Down | Picks the tool's kind: which food, how hard to blow, which piece to build, the time of day, the camera. With Photo in hand, brings the camera in and takes it out. |
+| Select | Uses the tool: drops food, throws the ball, sets a piece down, turns or takes one away, takes a photo. Hold it to tickle or blow. On the Sky it steps round the weathers, on View round the views. |
 | Play/Pause, or Back | The menu. Play/Pause, or Play on it, carries on. |
 | Back on the menu | On Apple TV, leaves at the root. In the browser, returns to play after play has begun. |
 
@@ -47,6 +47,7 @@ Pointing, the screen itself is what you press, and there are no button hints:
 | --- | --- | --- |
 | Your hand | Where you touch the table. Touching the fly is touching the fly, not the table behind it. | Under the cursor, on whatever it is over (the cursor is hidden there: the ring is the cursor). |
 | Feed, Swoop, Build | Tap where you mean. | Click there. |
+| Photo | Tap the world, or the tool again. | Click the world, or the tool. |
 | Tickle, Blow | Touch and hold, and drag: the feather strokes the fly while you hold it on it, and rests on it lightly while the hand is there; the puff follows the finger. | Hold the button, and drag. Hovering over the fly rests the feather on it. |
 | Sky, View, Place | The arrows either side of the tool's label (or a tap on the label, or a swipe along it) step its kind; tapping the tool again does too (on the Sky, its weather). The Sky has two labels side by side, the time of day and the weather, each with its own arrows (one over the other where they don't fit). Place has a Go button for somewhere the fly isn't. | The same, or the wheel over a label. |
 | Closer and farther | Pinch. | The wheel, or a trackpad's pinch. |
@@ -92,12 +93,19 @@ below), **Sky** (the time of day: now, which follows the clock, or morning,
 midday, golden hour, dusk, night, on Up and Down; and the weather: now, which
 follows the forecast, or clear, overcast, mist, rain, heavy rain, thunderstorm,
 snow, sleet, on Select, round and round), **Place** (where it lives; Up and
-Down choose, Select carries it there) and **View** (close up, follow, wide, the whole table, from above,
+Down choose, Select carries it there), **View** (close up, follow, wide, the whole table, from above,
 through the fly's eyes, inside it, close up with the fly as glass, and
 [Why?](#why), its last few seconds played back; Up brings the camera in, Down
-takes it out). On the shelf the two groups stand
+takes it out) and **Photo** (a picture of the world as the camera shows it, for
+the fly's [journal](#journal): with it in hand your hand is off the table,
+swipes and drags turn the camera, Up and Down bring it in and out, and Select
+takes the picture; the screen flashes white after the picture has been taken,
+so the flash, the hints and everything else drawn over the world are never in
+it). On the shelf the two groups stand
 apart, or, on a screen too narrow for them in a row, the fly's over its
-world's; Left and Right go along all of them. Hints in the
+world's, with the menu's button beside the fly's row; Left and Right go along
+all of them. On the TV more than eight tools come closer together rather than
+reach the pictures in the bottom corners. Hints in the
 corners show what the buttons do, until they have been used: the shelf's goes
 once you have gone along it, and what Select does with a tool once you have
 used it (held it, for Tickle and Blow), on later launches too; the Sky's
@@ -293,7 +301,55 @@ or a bar it shows changes, at most four times a second.
 
 There is one menu: the title at launch, and the same menu from play (Back,
 Play/Pause, or the button at the top left), with the fly living on behind it.
-It has **Play**, **Watch** (the screensaver straight away), **About**, and
+It has **Play**, **Watch** (the screensaver straight away), **Settings**,
+**Online** (where it can be), **Journal** and **About**.
+
+## Journal
+
+**Journal** (`apps/web/src/ui/screens/journal.ts`) is the fly's pictures,
+newest first, each with its date and, for a first, an icon and a word or two
+where an icon can't say it (the food, the place, what it walked onto). The
+arrows go along and down them, Select opens one big, and there Left and Right
+go through them; Down reaches its buttons. With a finger or a mouse, a tap
+opens one, a drag or the wheel scrolls, and the arrows either side go through
+them.
+
+Two kinds of picture are in it. The player's own, taken with the Photo tool,
+and the fly's firsts, each kept once in its life and pictured as it happens:
+its first flight (a second of its wings beating in the air), its first meal of
+each food, its first groom (half a second of it), the first time it walks
+from one thing onto another, its first escape (its brain's escape command
+taking it off), its first sleep, and its first visit to each place. Each is
+read from what its life did (`apps/web/src/journal/moments.ts`, from the
+same counts and activity the day's tally keeps), never from a guess at how it
+felt. A first's picture is taken from a frame already drawn, as the camera
+films it then (yours in play, the cameraman's in the screensaver and behind
+the menu), within ten seconds of it and only from a frame that shows the fly
+well: in front of the camera, clear of the picture's edges, big enough to
+see, nothing fading over it. Arriving somewhere, the picture waits three
+seconds for the place to be seen. A first with no such frame in time is kept
+with its icon instead. Nothing waits on a picture and the camera is never
+moved for one: the frame is copied on the GPU and read back later, and made
+into a JPEG a millisecond a frame (`apps/web/src/journal/capture.ts`). Your
+hand's ring is left out of the frame a picture is taken from, so it blinks
+out for that one frame.
+
+The journal is kept on this device and never sent anywhere: not to the room,
+not to the other players, who see nothing of it. In a browser and the iPhone
+and iPad app it is kept in IndexedDB, up to 240 pictures, the player's at
+the screen's own size (up to 960 pixels across); on the Apple TV, which has
+only `localStorage` (in `NSUserDefaults`, where tvOS gives an app little
+room), up to 16, small (`apps/web/src/journal/store.ts`). When there is no
+more room the player's photos go, oldest first; a first loses its picture
+only once there are no photos left to go, and never its place in the
+journal. A broken save is read for what can be read. Where the host can hand
+a picture on, a picture opened big has **Save** (a download) or, on a phone,
+**Share** (the system's share sheet, where Save Image is); the player's own
+photos also have **Remove**. On the Apple TV the journal is the only place
+they are kept. It is the followed fly's, kept by its record's id
+([From launch to launch](simulation.md#from-launch-to-launch)): a
+companion, or a new fly, has none.
+
 ## Settings
 
 **Settings**: a row of tabs over each part of the game, every setting two
