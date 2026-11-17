@@ -67,7 +67,7 @@ export class Company {
     while (this.list.length > n) this.list.pop()!.life.brain.dispose();
     while (this.list.length < n) {
       const i = this.list.length;
-      const life = new Life(this.#world, this.#newBrain());
+      const life = new Life(this.#world, this.#newBrain(), i + 2);
       life.share(pantry);
       life.tendsPantry = false;
       life.rhythm = this.#newRhythm();

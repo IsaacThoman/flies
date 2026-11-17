@@ -27,7 +27,7 @@ export class Life {
   /** The food it can find: its own place's, or a table's shared with others (`share`). */
   pantry: Pantry;
   readonly body: FlyBody;
-  readonly behavior = new Behavior();
+  readonly behavior: Behavior;
   readonly senses = new SenseTracker();
   /** How hungry it is and how full its crop, from what it has eaten: the brain is sent the hunger. */
   readonly hunger = new Hunger();
@@ -71,8 +71,10 @@ export class Life {
   #proboscis = 0;
   readonly #sent: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0, wingbeat: 0 };
 
-  constructor(world: World, brain: BrainDriver) {
+  /** `seed` sets the body's voluntary take-offs (Behavior), so companions don't keep step. */
+  constructor(world: World, brain: BrainDriver, seed = 1) {
     this.world = world;
+    this.behavior = new Behavior(seed);
     this.brain = brain;
     this.pantry = new Pantry(world, world.place.patches);
     this.body = new FlyBody(world, world.place.start);
