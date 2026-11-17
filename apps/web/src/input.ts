@@ -581,7 +581,7 @@ export class Gamepads {
     const index = available.findIndex((p) => p?.connected && p.mapping === "standard");
     const pad = available[index];
     if (!pad) {
-      this.#reset();
+      if (this.#padIndex >= 0) this.#reset();
       return;
     }
     if (index !== this.#padIndex) {
@@ -590,7 +590,9 @@ export class Gamepads {
     }
     // A stale pressed snapshot after blur or keyboard takeover is not a fresh press.
     if (this.#awaitingNeutral) {
-      if (!pad.buttons.some((b) => b.pressed || b.value > 0.08) && !pad.axes.some((a) => Math.abs(a) >= STICK_DEAD)) this.#awaitingNeutral = false;
+      for (let i = 0; i < pad.buttons.length; i++) if (pad.buttons[i].pressed || pad.buttons[i].value > 0.08) return;
+      for (let i = 0; i < pad.axes.length; i++) if (Math.abs(pad.axes[i]) >= STICK_DEAD) return;
+      this.#awaitingNeutral = false;
       return;
     }
     const remote = this.#remote;
