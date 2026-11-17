@@ -55,3 +55,12 @@ Retain the strip on the scoring panel's higher paired mean and two substantive p
 Typecheck, lint, and all 60 place, drawn-versus-felt and world tests pass after merging current dev. No draw-count or geometry-count baseline changed in this branch. The full suite and e2e are not rerun for this shader-only round under the revised local-check process. All reviewer evidence directories contain PNGs only. G8/T1 reuse the exact U4 PNGs and P6 reuses the exact B9 PNGs; screenshots and the discarded setup's key remain auditable. Images are published separately on orphan branch `pr-assets-lab-calibration-strip` and excluded from feature history.
 
 This is worth landing as a small scale-cue gain with the dissent above recorded. The score is below the 9/10 ideal; further changes belong to a separate validated round and PR.
+
+
+## Integration on the landed indoor polish
+
+PR #74 merged while this round was being published. Its scenes and current dev were merged into this branch, preserving the strip as the only rendering delta. The blind G8/P6/T1 evidence above remains the controlled comparison at the recorded 9728568 base; it is not presented as a score of the changed fly model or other incoming work.
+
+Integration base: `b5033b1d0e54998086971d62f6223cc247caf59b`. Typecheck, lint and all **64/64** place, drawn-versus-felt and world tests pass. Set V2 is a fresh full 42-view capture of the integrated result, with two contact sheets. It is integration evidence, not another scored candidate. Sill draws remain 21–23; lab draws are 19–20 with the landed polish, and the strip adds none. No geometry-count allowance changes.
+
+Twelve alternating warm samples against current dev give sill **42.65 → 40.80 ms (−4.34%)**, lab **51.70 → 53.35 ms (+3.19%)**. The negative sill difference is shared-machine noise, not a speed claim. The construction limit remains satisfied. V2 has no shader errors. Its browser log includes two localhost room WebSocket handshake failures because this visual fixture supplies no room server; those network failures are recorded rather than presented as an empty error log. No online code was changed here.
