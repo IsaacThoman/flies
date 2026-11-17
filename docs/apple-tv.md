@@ -310,7 +310,7 @@ A historical simulator observation of the real brain (`packages/brain-native` as
 and keeps up with real time at 60 submits a second, on an M5 Pro. This is not a direct Apple TV brain-throughput measurement; hardware game observations are below.
 
 Settings → Screensaver → Flies chooses one to three here (`NATIVE_MOST`,
-`apps/web/src/brain/create.ts`; four in a browser), shown as enamel dots and saved with the
+`apps/web/src/brain/create.ts`; four in a browser) and saved with the
 other settings. A count saved as more than that lives, and shows, as three. An older host
 without `spawn()` runs one fly and shows no Flies row. Each extra
 fly has its own body, senses and eyes (`apps/web/src/company.ts`); the camera, pointer and

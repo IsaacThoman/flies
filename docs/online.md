@@ -93,7 +93,7 @@ together; the binary fly-state layout itself is unchanged.
   down around the place's start, at its height (in the
   restaurant, on the window table, not the floor under it). The device remembers its table: a reload, or opening
   the site again, comes back to it until it leaves. Settings → Screensaver →
-  Flies chooses how many, shown as one to four enamel dots (three on an Apple TV). The table seats
+  Flies chooses how many, one to four (three on an Apple TV). The table seats
   as many as there is room for, at least one, or refuses it as full. Changing
   the setting while seated retries briefly (see the `flies` message below); a seat freed
   later doesn't add a fly by itself. Coming back asks again too.
