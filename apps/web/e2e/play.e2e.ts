@@ -20,7 +20,7 @@
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
 import { gameUp, openGame, readState, startServer, swipe, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
-import { dropFood, feedHoney } from "./feeding.ts";
+import { dropFood, feedHoney, refuseBitterSugar } from "./feeding.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import type { Game } from "../src/game.ts";
 import { chooseFlies, companyAwake, companyOf, disableScreensaver } from "./settings.ts";
@@ -277,6 +277,16 @@ try {
   await waitForGameTime(page, 2);
   const printed = Number((await readState(page)).prints);
   console.log(printed > 0 ? `  walked off the honey, its feet printing (${printed} so far)` : "  no honey prints yet: walking is the brain's choice");
+
+  step("bitter: sugar spoiled with coffee at its mouth is tasted bitter, and the brain leaves it");
+  // Clear the honey first: on two foods as sweet, the one dropped first is the one tasted.
+  await press("ArrowDown", 5);
+  await waitFor(page, "tool=feed,variant=clear");
+  await press("Enter");
+  await waitFor(page, "food=0");
+  await press("ArrowUp");
+  await waitFor(page, "tool=feed,variant=laced");
+  await refuseBitterSugar(page, () => dropFood(page, () => press("Enter")));
 
   step("startle: the ball dives at it until it takes off (its brain decides; it doesn't every time)");
   await toTool("swoop");

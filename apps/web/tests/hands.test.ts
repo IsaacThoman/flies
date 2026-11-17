@@ -159,6 +159,22 @@ for (const [variant, speed] of Object.entries(PUFF_SPEED)) {
   });
 }
 
+for (const kind of ["coffee", "laced"] as const) {
+  test(`Feed drops ${kind} through the usual kind controls, and it lands as that kind`, () => {
+    const world = new World(bare);
+    const hands = new Hands(world);
+    const pantry = new Pantry(world);
+    hands.variants[0] = TOOLS[0].variants.findIndex((v) => v.id === kind);
+    assert.ok(hands.variants[0] >= 0);
+    const fly = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true };
+    const eye = { x: 0, y: 5, z: -10 };
+    hands.update(0, { use: true, holding: true, eye }, fly, pantry);
+    assert.equal(hands.events.dropped, kind);
+    hands.update(1, { use: false, holding: false, eye }, fly, pantry);
+    assert.deepEqual(pantry.foods.map((f) => f.kind), [kind]);
+  });
+}
+
 test("Feed's Clear dropped kind removes offerings and falling food, leaving patches and finds", () => {
   const world = new World(bare);
   const hands = new Hands(world);

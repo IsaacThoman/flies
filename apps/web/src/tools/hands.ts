@@ -57,7 +57,7 @@ const WEATHERS: readonly Variant[] = [{ id: "now", label: "Now" }, { id: "clear"
  * and what the shelf keeps follow from the list.
  */
 export const TOOLS: readonly Tool[] = [
-  { id: "feed", name: "Feed", verb: "Drop", hold: false, variants: [{ id: "sugar", label: "Sugar" }, { id: "honey", label: "Honey" }, { id: "berry", label: "Raspberry" }, { id: "water", label: "Water" }, { id: "clear", label: "Clear dropped" }] },
+  { id: "feed", name: "Feed", verb: "Drop", hold: false, variants: [{ id: "sugar", label: "Sugar" }, { id: "honey", label: "Honey" }, { id: "berry", label: "Raspberry" }, { id: "water", label: "Water" }, { id: "coffee", label: "Coffee" }, { id: "laced", label: "Bitter sugar" }, { id: "clear", label: "Clear dropped" }] },
   { id: "feather", name: "Tickle", verb: "Tickle", hold: true, variants: [{ id: "feather", label: "Feather" }] },
   { id: "blow", name: "Blow", verb: "Blow", hold: true, variants: [{ id: "gentle", label: "Gently" }, { id: "strong", label: "Hard" }] },
   { id: "swoop", name: "Swoop", verb: "Throw the ball", hold: false, variants: [{ id: "ball", label: "Beach ball" }] },
