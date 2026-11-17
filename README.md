@@ -47,8 +47,8 @@ from a wall. Hunger is accelerated. Song has a command and a wing pose, but
 the current sensory inputs do not produce courtship song.
 
 The [brain's limits](packages/brain/README.md#what-it-does-and-doesnt-reproduce)
-and [body's additions](docs/simulation.md#what-the-body-adds) say exactly what
-is real and what is a stand-in. [The eyes and nervous-system views](docs/simulation.md#the-eyes)
+and [body's additions](docs/simulation.md#what-the-body-adds) describe the model
+and its stand-ins. [The eyes and nervous-system views](docs/simulation.md#the-eyes)
 show the simulation's inputs and regional activity. The eye picture labels
 stand-ins; the guide explains the nervous-system drawing's limits.
 

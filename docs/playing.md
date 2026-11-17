@@ -68,7 +68,9 @@ buttons and orbit drags use their own system cursor shapes.
 
 ## Tools
 
-The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
+The tools are **Feed** (sugar, honey, raspberry, water, and Clear dropped,
+which removes your offerings, including falling ones, while leaving the
+place's food), **Swoop** (a dark
 beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot), **Light** (now, which follows the clock,
@@ -136,7 +138,8 @@ fly and follows it: the screensaver. A mouse resting on the desk doesn't keep it
 away, and a nudge of the desk doesn't end it; a mouse moved as if meant does.
 Its camera can take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
-(Lively). A bound press, tap, touch or deliberate mouse move brings the controls
+(Lively), or hold the Whole place view with a slow drift. A bound press,
+tap, touch or deliberate mouse move brings the controls
 back. One-shot presses and pointer taps are consumed; held Select or camera
 axes can act immediately on waking. When the title menu fades into the
 screensaver, the fly eases into the middle of the picture; play-only corner

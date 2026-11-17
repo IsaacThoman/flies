@@ -307,15 +307,15 @@ client. This is what it holds to, whatever a device sends, and where.
   named under its own id), its own bites, its own ball, its own goodbye.
   Only the starter's key moves the table, changes its light and weather,
   or removes a player, and never its own seat. A bubble bursts only if it
-  was there then; found food only on the table and in bounds. Keys are 128
-  random bits a device keeps, never sent to anyone else, and stored only
-  hashed: no one can sit as someone else without their device's storage.
+  was there then; found food only on the table and in bounds. The device sends its secret key to the room server; other players receive
+  no key, and the server persists only its hash. Possession of that key is
+  the seat credential.
 - **Locked and unlisted rooms.** Only the password opens a locked room, or a
   key that has sat there before (above). An unlisted room is never in the
   list or told to anyone but by its code, and the server answers no
   question that would tell whether a code is a room without trying to sit
-  at it: 50 bits of code, at 60 connections a minute from an address, can't
-  be guessed.
+  at it. Codes carry about 50 bits of entropy and attempts face the
+  per-address limits; those limits do not stop a botnet of addresses.
 - **Addresses.** The per-address limits count the visitor, not the proxy:
   with `TRUST_PROXY=1`, `X-Forwarded-For` is believed only when the
   connection itself comes from a loopback or private address (the proxy in
@@ -324,25 +324,21 @@ client. This is what it holds to, whatever a device sends, and where.
   address, whatever they write. An IPv4 address seen as IPv6 is the IPv4
   address, and IPv6 ones count by their /64, since one machine has a whole
   /64 to pick from.
-- **Bounds.** Nothing a client does grows the server without bound
-  (`apps/server/src/server.ts`): 4 KB a message, uncompressed; 60 messages
-  a second from a device; 10 s to say hello; a ping every 15 s, a
-  connection that didn't answer the last one dropped; a request's headers
-  within 10 s and 8 KB; 4096 sockets at once in all and 24 from an
-  address; a device that has 256 KB it hasn't taken is dropped rather than
-  its backlog kept; 8 passwords worked out at once (about 16 MB each, off
-  the event loop), a try past that refused as busy; 10,000 tables, and
-  when they are full, the one nobody has been at for longest is forgotten
-  to make room; 50,000 addresses remembered. A table holds at most 8
-  seats, 8 balls, 16 happenings, 6 dropped and 16 found foods besides the
-  place's own, and 256 removed keys. A table with nobody at it does no
-  work each beat, and its bubbles start afresh when someone comes (as on
-  a table started, or carried to the picnic), never replaying all the
-  time the server has been up. A message the table can't take costs its
-  sender the line (4006), never the server.
+- **Bounds.** Alongside [the per-device limits](#the-limits),
+  `apps/server/src/server.ts` caps the total at 4096 sockets; request headers
+  at 8 KB within 10 s; pending output at 256 KB per connection; concurrent
+  password checks at 8 (about 16 MB each, off the event loop); tables at
+  10,000; and remembered addresses at 50,000. At capacity it reclaims an
+  inactive table or closed-address entries, or refuses further work. A table
+  retains at most 16 happenings and 256 removed keys; its seat, ball and food
+  caps are above. An empty table skips its normal beat, and its bubbles
+  restart when someone returns. A table-message exception closes the sender
+  with 4006; these are explicit caps and error paths, not a proof against
+  every resource-exhaustion case.
 - **The file of tables.** Written whole to a new file, flushed to the disk,
-  then renamed over the old one, so the last good copy survives a crash or
-  a power cut halfway. Read back, each table is checked field by field
+  then renamed over the old one. The containing directory is not explicitly
+  synced, so this sequence alone does not establish a power-loss durability
+  guarantee; keep backups of the volume. Read back, each table is checked field by field
   against what the server writes (`isTableRecord`); one that doesn't fit is
   left out and logged, and a file that can't be read at all is moved aside
   as `tables.json.unreadable-<time>` and the server starts empty, rather

@@ -80,8 +80,8 @@ world, as yours do. Nothing else passes from fly to fly.
    [Flight](simulation.md#flight)). The brain still decides whether to go, steers, and can
    drive its wings harder; how long it stays up is the stand-in's. No neuron is both
    driven and read by a command; what is read only for display (the regions,
-   the vision stages) feeds no command. Every departure from the connectome is
-   documented in `packages/brain/README.md`.
+   the vision stages) feeds no command. Document departures from the connectome in
+   `packages/brain/README.md`.
 2. **Say what is real.** Anything shown to the player as "the brain doing X"
    has to be the brain doing X.
 3. **640×480.** On the TV the output frame is 640×480 and is stretched to the
