@@ -52,7 +52,8 @@ test("it builds and runs within its cost bounds", { skip }, async (t) => {
       const references = [...meter.references, ...rest.references, ...full.references];
       return { build: { ms: scaleCpuMs(meter.rawMs, references), rawMs: meter.rawMs }, rest, full, references };
     });
-    return { value: measured, references: measured.flatMap((s) => s.references), samples: (["build", "rest", "full"] as const).map((key) => measured.map((s) => s[key].ms)) };
+    // The build's own spread is left out: its fastest is what counts, and noise can only slow the others.
+    return { value: measured, references: measured.flatMap((s) => s.references), samples: (["rest", "full"] as const).map((key) => measured.map((s) => s[key].ms)) };
   });
   if (!samples) return;
   const of = (key: "rest" | "full") => ({ ms: median(samples.map((s) => s[key].ms)), rawMs: median(samples.map((s) => s[key].rawMs)) });

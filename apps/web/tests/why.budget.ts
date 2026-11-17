@@ -106,15 +106,19 @@ test("asking Why? (copying the six seconds out, picking, and the glow of every p
   };
   for (let i = 0; i < asks; i++) ask();
   const measured = await measureBudget(t, () => {
-    const meter = new CpuMeter();
     const times: number[] = [];
+    const references: number[] = [];
     for (let s = 0; s < SAMPLES; s++) {
-      const before = meter.ms;
-      for (let i = 0; i < asks; i++) ask();
-      meter.lap();
-      times.push((meter.ms - before) / asks);
+      const meter = new CpuMeter();
+      // A lap every 40, so the samples have 30 references beside them and one slow one moves none of their percentiles.
+      for (let i = 0; i < asks; i++) {
+        ask();
+        if (i % 40 === 39) meter.lap();
+      }
+      times.push(meter.ms / asks);
+      references.push(...meter.references);
     }
-    return { value: median(times), references: meter.references, samples: [times] };
+    return { value: median(times), references, samples: [times] };
   });
   if (measured === undefined) return;
   assert.equal(clip.length, CAPACITY);
