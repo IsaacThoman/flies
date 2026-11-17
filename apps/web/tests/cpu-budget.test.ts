@@ -10,7 +10,7 @@ function context() {
 }
 
 test("contended references or a wide spread of five work samples retry then skip locally", async () => {
-  for (const measurement of [noisy, { ...clean, references: Array(20).fill(REFERENCE_MS * 3) as number[] }, { ...clean, samples: [[10, 10, 10, 10, 20]] }]) {
+  for (const measurement of [noisy, { ...clean, references: Array(20).fill(5.1) as number[] }, { ...clean, samples: [[10, 10, 10, 10, 20]] }]) {
     const t = context();
     let attempts = 0, pauses = 0;
     const result = await measureBudget(t, () => { attempts++; return measurement; }, { ci: false, pause: async () => { pauses++; } });

@@ -17,10 +17,12 @@
 //
 // Cache and memory contention can affect the work and the reference differently.
 // Budgets run alone after the other tests and accept measurements only when the
-// reference's median is at most 2x the M5 Pro baseline locally (4x on CI's slower
+// reference's median is at most 1.2x the M5 Pro baseline locally (4x on CI's slower
 // virtual Macs), its 90th/10th percentile ratio is at most 1.5, and each set of
 // five work samples spans at most 1.35x. No reference outlier may exceed 2x
-// the fastest reference; scaling uses the median so tails cannot hide a regression. A stable 2x work regression still fails.
+// the fastest reference; scaling uses the median so tails cannot hide a regression.
+// A stable 2x work regression still fails. The strict local limit follows a
+// contended M5 Pro run: a 5.1 ms reference (27% slow) accompanied a false failure.
 // Three contended attempts, separated by one-second pauses, skip locally with an
 // explicit rerun message; in CI they fail with that reason. Functional assertions
 // and measurement errors always fail. Only this thread's CPU counts, not helpers.
@@ -101,7 +103,6 @@ export const median = (samples: number[]) => {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 };
 
-
 /** The same robust reference statistic used to judge the measurement conditions. */
 export const scaleCpuMs = (rawMs: number, references: readonly number[]) => rawMs * REFERENCE_MS / median([...references]);
 
@@ -120,7 +121,7 @@ function contention<T>({ references, samples = [] }: Measurement<T>, ci: boolean
   }
   const sorted = references.toSorted((a, b) => a - b);
   const middle = median(sorted);
-  const limit = REFERENCE_MS * (ci ? 4 : 2);
+  const limit = REFERENCE_MS * (ci ? 4 : 1.2);
   if (middle > limit) return `reference median ${middle.toFixed(2)} ms exceeds ${limit} ms`;
   const low = sorted[Math.floor((sorted.length - 1) * 0.1)];
   const high = sorted[Math.ceil((sorted.length - 1) * 0.9)];
