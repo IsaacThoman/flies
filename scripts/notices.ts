@@ -1,5 +1,6 @@
 // The registry is deliberately explicit: a dependency added to a shipping bundle needs an audit.
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import type { Plugin } from "vite";
 
@@ -53,6 +54,32 @@ export function runtimeDependencies(root = ROOT): string[] {
   return [...names].sort();
 }
 
+export type EmbeddedNotice = {
+  heading: string; package: string; version: string;
+  sources: { path: string; sha256: string }[];
+  notices: { file: string; url: string }[];
+};
+
+/** A package's top-level licence cannot substitute for its embedded code's notices. */
+export function embeddedNotices(root = ROOT, entries: readonly EmbeddedNotice[] = JSON.parse(fs.readFileSync(path.join(root, "docs/licenses/embedded.json"), "utf8"))): Notice[] {
+  return entries.map((entry) => {
+    const dir = path.join(root, "node_modules", entry.package);
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")) as { version: string };
+    if (pkg.version !== entry.version) throw new Error(`Embedded code needs a licence audit: ${entry.package} ${pkg.version}`);
+    for (const source of entry.sources) {
+      const hash = createHash("sha256").update(fs.readFileSync(path.join(dir, source.path))).digest("hex");
+      if (hash !== source.sha256) throw new Error(`Embedded code changed: ${entry.heading} (${source.path})`);
+    }
+    if (!entry.notices.length) throw new Error(`Embedded code has no notice: ${entry.heading}`);
+    const body = entry.notices.map(({ file, url }) => {
+      const text = fs.readFileSync(path.join(root, file), "utf8").trim();
+      if (!text) throw new Error(`Embedded code has an empty notice: ${entry.heading}`);
+      return `Source: ${url}\n\n${text}`;
+    }).join("\n\n");
+    return { heading: entry.heading, body };
+  });
+}
+
 export function notices(): Notice[] {
   const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8").trim();
   requireNotices(runtimeDependencies());
@@ -62,6 +89,7 @@ export function notices(): Notice[] {
     const body = read(`node_modules/${name}/${NPM_NOTICES[name]}`);
     result.push({ heading: `${name} ${pkg.version}`, body: name === "vite" ? body.split("# Licenses of bundled dependencies")[0].trim() : body });
   }
+  result.push(...embeddedNotices());
   const fdlibm = read("packages/brain-native/src/fdlibm.cpp");
   result.push({ heading: "fdlibm / V8", body: fdlibm.slice(fdlibm.indexOf("// The following is adapted"), fdlibm.indexOf("\n#include")).replace(/^\/\/ ?/gm, "").trim() });
   const sources: Record<string, string> = JSON.parse(read("docs/licenses/sources.json"));

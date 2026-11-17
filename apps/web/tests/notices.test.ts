@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { bundledPackageNames, checkGenerated, notices, noticeText, privacyHtml, requireNotices, runtimeDependencies } from "../../../scripts/notices.ts";
+import { bundledPackageNames, checkGenerated, embeddedNotices, notices, noticeText, privacyHtml, requireNotices, runtimeDependencies } from "../../../scripts/notices.ts";
 import { noticeWrap } from "../src/ui/screens/about.ts";
 
 const root = path.resolve(import.meta.dirname, "../../..");
@@ -93,4 +94,22 @@ test("a policy-only or notice-only release changes the offline cache version", a
   assert.equal(first, offlineVersion(files, { ...documents }));
   assert.notEqual(first, offlineVersion(files, { ...documents, "privacy/index.html": "policy two" }));
   assert.notEqual(first, offlineVersion(files, { ...documents, THIRD_PARTY_NOTICES: "notices two" }));
+});
+
+
+test("embedded ports require notices and an audit when their package or source changes", () => {
+  assert.ok(embeddedNotices().some((s) => /Earcut/.test(s.heading) && /ISC License/.test(s.body) && /2024, Mapbox/.test(s.body)));
+  const dir = mkdtempSync(path.join(tmpdir(), "flies-embedded-"));
+  try {
+    mkdirSync(path.join(dir, "node_modules/pkg"), { recursive: true });
+    writeFileSync(path.join(dir, "node_modules/pkg/package.json"), JSON.stringify({ version: "1" }));
+    writeFileSync(path.join(dir, "node_modules/pkg/copied.js"), "copied code");
+    writeFileSync(path.join(dir, "NOTICE"), "permission notice");
+    const entry = { heading: "copied library", package: "pkg", version: "1", sources: [{ path: "copied.js", sha256: createHash("sha256").update("copied code").digest("hex") }], notices: [{ file: "NOTICE", url: "https://example.org/licence" }] };
+    assert.match(embeddedNotices(dir, [entry])[0].body, /permission notice/);
+    assert.throws(() => embeddedNotices(dir, [{ ...entry, notices: [] }]), /no notice/);
+    assert.throws(() => embeddedNotices(dir, [{ ...entry, version: "2" }]), /licence audit/);
+    writeFileSync(path.join(dir, "node_modules/pkg/copied.js"), "changed code");
+    assert.throws(() => embeddedNotices(dir, [entry]), /Embedded code changed/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
