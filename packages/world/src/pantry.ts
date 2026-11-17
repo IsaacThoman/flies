@@ -25,7 +25,19 @@ export type FoodPatch = {
   pool?: boolean;
 };
 
-export type FoodKind = "sugar" | "honey" | "berry" | "water";
+export type FoodKind = "sugar" | "honey" | "berry" | "water" | "coffee" | "laced";
+
+/**
+ * How bitter the Bitter sugar is: a lump of sugar spoiled with coffee, half as
+ * bitter as the coffee drop. A strength chosen to be refused, from the brain's
+ * own taste measurements (packages/brain/README.md, Senses: on full sugar,
+ * `bitter` 0.1 halves the proboscis motor neuron's answer, 0.25 takes it under
+ * 1 Hz, 0.5 and over to 0 to 0.2 Hz), well inside the range where it stops,
+ * as caffeine in sugar stops flies feeding (Moon et al. 2006, Curr Biol
+ * 16:1812). Not a measured caffeine concentration: how the bitter neurons'
+ * rate follows concentration isn't modelled.
+ */
+export const LACED_BITTER = 0.5;
 
 /** What the player can drop, and how each tastes to a fly (0 to 1). */
 export const FOODS: Readonly<Record<FoodKind, { name: string; sweet: number; water: number; bitter: number; r: number }>> = {
@@ -33,6 +45,11 @@ export const FOODS: Readonly<Record<FoodKind, { name: string; sweet: number; wat
   honey: { name: "Honey", sweet: 1, water: 0, bitter: 0, r: 1.6 },
   berry: { name: "Raspberry", sweet: 0.8, water: 0, bitter: 0, r: 1.6 },
   water: { name: "Water", sweet: 0, water: 1, bitter: 0, r: 1.5 },
+  // A drop of black coffee as strong as an espresso, about 10 mM of caffeine,
+  // which is the scale's 1 (the restaurant's espresso dregs). No sugar, and too
+  // much dissolved in it for the water-sensing neurons, as juices are.
+  coffee: { name: "Coffee", sweet: 0, water: 0, bitter: 1, r: 1.5 },
+  laced: { name: "Bitter sugar", sweet: 1, water: 0, bitter: LACED_BITTER, r: 0.9 },
 };
 
 export type Food = {

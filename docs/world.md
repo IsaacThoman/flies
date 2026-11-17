@@ -290,6 +290,51 @@ the rain and take the snow, and the gull's shadow passes over them;
 indoors they stay dry, as the rooms' own things do. Nothing about them
 reaches the brain except through what it sees, feels and tastes.
 
+## Food
+
+Each place has food of its own, eaten down and slowly coming back, and Feed
+drops more (`packages/world/src/pantry.ts`). Every food tastes of sugar,
+plain water or bitterness, each 0 to 1, which reach the brain as `sweet`,
+`water` and `bitter` ([the fly's senses](simulation.md#the-flys-senses)).
+Sugar's 1 is all its taste neurons are driven to, a lump or honey; bitterness's
+is coffee as strong as an espresso, about 10 mM of caffeine. Feed's Coffee is
+a drop of it, with no sugar; its Bitter sugar is a lump spoiled with it, at
+half the coffee's bitterness, which is well inside the range where the brain's
+measured taste stops feeding on full sugar (0.1 halves it, 0.25 all but stops
+it: `packages/brain/README.md`, Senses), as caffeine in sugar does in flies.
+The other foods' tastes are judgements, ranked by eye, and don't follow how
+much sugar they hold: a raspberry has 4.4 g of sugar in 100 g and an orange
+9.4 g (USDA FoodData Central), yet the raspberry is the sweeter here. No
+mapping from a food's sugar to its taste neurons' rate is modelled.
+
+Whether the fly eats is the brain's. `node scripts/foods.ts` sets a fly down
+with its mouth on each food (each place's own as it lies, Feed's on a bare
+table), at a new fly's hunger and starved, and watches ten seconds, seeds 1
+to 3:
+
+- **Eaten every time**: dropped sugar, honey and raspberry, and every place's
+  sugar, honey, jam, syrups, juices and fruit as sweet as 0.65 or more, cake
+  and tart crumbs, coulis, soda, and the lab's agar and fly food. A starved
+  fly feeds 8 to 10 s of the ten on sugar, 4 to 7 on raspberry.
+- **Mostly, briefly**: the weakest of the rest, the picnic's orange, the
+  windowsill's orange juice, ketchup and the mints (0.6) and the restaurant's
+  juice ring (0.55). Starved flies all took them, for 1 to 3 s; of new flies
+  two in three took those at 0.6, for under a second, and one in three the
+  juice ring.
+- **Hardly ever**: the restaurant's bread crumbs and lemon (0.3) and the
+  kitchen's toast crumbs (0.25): no new fly ate them, and of starved flies
+  one in three took the restaurant's for a moment and none the kitchen's.
+  They are among the least sweet things there (a lemon
+  has 2.5 g of sugar in 100 g; bread's starch is most of it, which sugar
+  neurons hardly answer), and this fly needs stronger sugar than a real one:
+  sugar moves its proboscis more weakly than in a fly
+  ([the brain's taste](../packages/brain/README.md#senses)).
+- **Never**: plain water, dropped or in a saucer (nothing a thirsty fly's
+  water neurons reach extends its proboscis: [thirst](simulation.md#the-flys-senses));
+  Coffee, tasted but nothing to eat (bitterness alone makes the fly do nothing
+  it can be seen to); and Bitter sugar and the espresso's dregs, sweet as they
+  are, which the fly tastes and leaves.
+
 ## Footprints
 
 Wherever it lives, a fly that has stood in something sticky or wet leaves
@@ -297,8 +342,8 @@ footprints (`apps/web/src/scene/prints.ts`): faint prints of the two pads of
 its feet, each where its gait set that foot down, lying on whatever it walks
 on (the table, a fruit, a jar's rim, the sill). Honey and plain syrup leave them amber; jam,
 raspberry red; the juices, lemonade, the agar and the
-lab's fly food their own colours. Water (dropped, the basil's saucer, a drop
-or dew) leaves darker wet prints that dry in about half a minute; sticky ones
+lab's fly food their own colours; Bitter sugar, the espresso's dregs' brown. Water (dropped, the basil's saucer, a drop
+or dew) and Coffee leave darker wet prints that dry in about half a minute; sticky ones
 fade over a minute and a half. A foot carries only a little: the first steps
 off the food print clearly, the next fainter and then only now and then, and
 after ten or so it is clean, until it walks back into food. Sugar and crumbs

@@ -25,7 +25,7 @@ import type {
 } from "@fly/net";
 import type { FlyPose } from "@fly/contracts";
 import type { Company } from "../company.ts";
-import { BALL_RADIUS, SWOOP_SECONDS, WORLDS } from "@fly/world";
+import { BALL_RADIUS, FOODS, SWOOP_SECONDS, WORLDS } from "@fly/world";
 import type { FoodKind, Vec3, World } from "@fly/world";
 import type { Eyes } from "../eyes/eyes.ts";
 import type { FlyView } from "../fly-view.ts";
@@ -759,7 +759,7 @@ function writeState(s: FlyState, id: number, life: Life, p: FlyPose, seq: number
   q.roll = p.roll;
 }
 
-const isFood = (kind: string): kind is FoodKind => kind === "sugar" || kind === "honey" || kind === "berry" || kind === "water";
+const isFood = (kind: string): kind is FoodKind => Object.hasOwn(FOODS, kind);
 const scratchClosest = { ax: 0, az: 0, bx: 0, bz: 0 };
 
 /** The gap between two flies' bodies as capsules (mm; below 0 they overlap). */

@@ -59,7 +59,15 @@ export const INKS: Readonly<Record<string, Ink>> = {
 };
 
 /** What the player drops leaves, by its kind. */
-export const DROPPED: Readonly<Record<FoodKind, Ink | null>> = { sugar: null, honey: INKS.honey, berry: sticky(0xc22c4c), water: WATER };
+export const DROPPED: Readonly<Record<FoodKind, Ink | null>> = {
+  sugar: null,
+  honey: INKS.honey,
+  berry: sticky(0xc22c4c),
+  water: WATER,
+  // Coffee is thin, and dries as water does; the lump it spoiled is sticky with it, as the espresso's dregs are.
+  coffee: { tint: INKS.espresso.tint, wet: true },
+  laced: INKS.espresso,
+};
 
 export const inkOf = (food: Food): Ink | null => (isDropped(food) ? DROPPED[food.kind] : INKS[food.name]) ?? null;
 

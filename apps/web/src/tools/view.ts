@@ -10,7 +10,7 @@ import { canvas2d, canvasTexture, paint, random } from "../scene/build.ts";
 import { TOOLS } from "./hands.ts";
 import type { Hands, ToolId } from "./hands.ts";
 
-const KINDS: readonly FoodKind[] = ["sugar", "honey", "berry", "water"];
+const KINDS: readonly FoodKind[] = ["sugar", "honey", "berry", "water", "coffee", "laced"];
 const MAX_FOOD = 8;
 const BALL_COLORS = ["#b0183a", "#4a2060", "#e0284a", "#4a2060", "#b0183a", "#2c4a3a"];
 const PUFFS = 24;
@@ -356,6 +356,14 @@ function foodGeometry(kind: FoodKind) {
     }
     case "water":
       return paint(new THREE.SphereGeometry(r, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.5, 1), "#e8f8ff");
+    case "coffee":
+      // A drop of black coffee: dark, with a little crema-brown where it is thin at its edge.
+      return paint(new THREE.SphereGeometry(r, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.42, 1), (p) => (p.y > r * 0.12 ? "#2a1408" : "#6b3c1c"));
+    case "laced": {
+      // A sugar lump dipped in coffee: soaked brown from its foot, white above the line.
+      const s = r * 1.3;
+      return paint(new THREE.BoxGeometry(s, s, s, 1, 3, 1).translate(0, s / 2, 0), (p) => (p.y < s * 0.1 ? "#6e3a16" : p.y < s * 0.4 ? "#d2ab7e" : p.y > r ? "#ffffff" : "#f2f6fa"));
+    }
   }
 }
 
@@ -389,7 +397,7 @@ export class HandsView {
   #right = new THREE.Vector3();
   #iconSide = 1;
   #rnd = random(9);
-  #counts: Record<FoodKind, number> = { sugar: 0, honey: 0, berry: 0, water: 0 };
+  #counts: Record<FoodKind, number> = { sugar: 0, honey: 0, berry: 0, water: 0, coffee: 0, laced: 0 };
   /** 0 hides the pointer and tool (the wallpaper), 1 shows them. */
   opacity = 1;
   /** The tool's picture floats by the ring (not for another player's hand at a table, whose ring in their colour is enough). */
