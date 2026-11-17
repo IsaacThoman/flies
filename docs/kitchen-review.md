@@ -167,3 +167,49 @@ they are not directly comparable to the settled capture measurements.
 | R4 | C9 | 7 | 5.5 | 5.5 | 5.5 | 7 | 7 | 9 | 6 | 6.5625 |
 | R4 | J4 | 7 | 7 | 7 | 6.5 | 8 | 8 | 8 | 7 | 7.3125 |
 | R4 | B2 | 9 | 6 | 7.5 | 7.5 | 8 | 6.5 | 5 | 5 | 6.8125 |
+
+## Round 4
+
+Key: U5 = J4 recaptured with settled reflections; A8 = windowsill recaptured
+with settled reflections; K6 = quieter flesh highlights, smaller stone, liquid
+volume, jar shoulder/neck/lid, clock, towel, and coarse-eye body/underside geometry.
+Every reviewer ranked K6 above U5. Two ranked K6 first, two ranked A8 first.
+Retain K6. All captures wait 0.7 simulated seconds; none records an environment
+rebuild at the sampled frame.
+
+| Reviewer | U5 | K6 | A8 | Ranking |
+|---|---:|---:|---:|---|
+| R1 | 6.8125 | 7.3750 | 7.3750 | K6 > A8 > U5 |
+| R2 | 6.6875 | 7.1250 | 7.3750 | A8 > K6 > U5 |
+| R3 | 6.8750 | 7.5625 | 7.6250 | A8 > K6 > U5 |
+| R4 | 6.8875 | 7.2500 | 7.0125 | K6 > A8 > U5 |
+| Mean | 6.8156 | 7.3281 | 7.3469 | Retain K6 |
+
+Reviewers credited the domestic context, food clarity, material separation and
+physical/eye geometry. Remaining weaknesses were the quiet, broad peach face,
+looping stone-counter veins and sparse prop shadows. The next experiment tests
+smooth skin normals and fine pulp detail without changing physical shapes.
+
+During this round, `dev` advanced with shared collision, camera, input, sleep and
+resource-cleanup fixes. The feature was rebased onto it. Its stricter geometry test
+found protruding banana outlines and a lid mismatch. Both were repaired in the
+common baseline, without exceptions: exact banana envelope bounds and finer lid
+slices now pass 3,030 top and 1,526 side samples. The opaque glass-rim decoration was
+removed in favor of the glass material's Fresnel edge. Subsequent comparisons use
+the rebased runtime and these repairs on both variants. Earlier images remain
+historical evidence; their reference camera behaviour predates the shared fixes.
+
+| Reviewer | Set | H | C | L | M | S | W | TV | A | Mean |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| R1 | K6 | 7.5 | 6.5 | 6.5 | 6 | 7.5 | 8.5 | 9 | 7.5 | 7.3750 |
+| R1 | U5 | 7 | 6 | 6 | 5.5 | 7.5 | 7 | 9 | 6.5 | 6.8125 |
+| R1 | A8 | 9 | 6 | 8 | 7.5 | 8.5 | 6.5 | 7 | 6.5 | 7.3750 |
+| R2 | U5 | 6.5 | 6 | 6 | 5.5 | 7.5 | 6.5 | 9 | 6.5 | 6.6875 |
+| R2 | K6 | 7 | 6 | 6.5 | 6 | 7.5 | 8 | 9 | 7 | 7.1250 |
+| R2 | A8 | 8.5 | 6 | 8 | 7.5 | 8 | 7 | 7.5 | 6.5 | 7.3750 |
+| R3 | K6 | 7.5 | 6.5 | 6.5 | 6 | 8 | 9 | 9 | 8 | 7.5625 |
+| R3 | U5 | 7 | 6 | 6 | 5.5 | 8 | 7 | 9 | 6.5 | 6.8750 |
+| R3 | A8 | 9 | 7 | 8 | 7.5 | 8.5 | 6.5 | 7.5 | 7 | 7.6250 |
+| R4 | U5 | 6.8 | 6.5 | 6.4 | 5.6 | 7 | 7.5 | 8.6 | 6.7 | 6.8875 |
+| R4 | K6 | 7.2 | 6.7 | 6.6 | 6.5 | 7.2 | 8.2 | 8.3 | 7.3 | 7.2500 |
+| R4 | A8 | 8.6 | 5.3 | 7.8 | 7.4 | 7.8 | 6.9 | 6.5 | 5.8 | 7.0125 |

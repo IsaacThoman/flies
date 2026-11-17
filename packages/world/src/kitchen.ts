@@ -8,7 +8,14 @@ export const KITCHEN_BOWL = { x: -155, z: -35, r: 124 };
 export const KITCHEN_BOARD = { x: 80, z: 170, hx: 132, hz: 76, top: 14 };
 export const KITCHEN_GLASS = { x: 186, z: -65, r: 43, wine: 112, rim: 187 };
 export const KITCHEN_JAR = { x: 354, z: 110, r: 38, top: 112 };
-export const KITCHEN_CADDY = { x: -369, z: -180, hx: 66, hz: 55, top: 162 };
+export const KITCHEN_CADDY = {
+  x: -369,
+  z: -180,
+  hx: 66,
+  hz: 55,
+  top: 162,
+  lidSlices: 440,
+};
 
 const box = (
   name: string,
@@ -129,8 +136,15 @@ export const KITCHEN_SOLIDS: readonly Solid[] = [
   })),
   {
     name: "kitchen stone",
-    footprint: { kind: "ellipse", x: 25, z: 155, rx: 8, rz: 13, angle: -0.35 },
-    top: { kind: "dome", base: 40, height: 6.5, power: 0.6 },
+    footprint: {
+      kind: "ellipse",
+      x: 25,
+      z: 155,
+      rx: 7.8,
+      rz: 12,
+      angle: -0.35,
+    },
+    top: { kind: "dome", base: 40, height: 4.2, power: 0.6 },
   },
   ...[
     [97, 178, 2.8],
@@ -178,23 +192,35 @@ export const KITCHEN_SOLIDS: readonly Solid[] = [
       z: KITCHEN_JAR.z,
       r: KITCHEN_JAR.r,
     },
-    top: { kind: "flat", y: KITCHEN_JAR.top },
+    top: { kind: "dome", base: 86, height: 11, power: 0.5 },
   },
+  {
+    name: "kitchen honey neck",
+    footprint: { kind: "circle", x: KITCHEN_JAR.x, z: KITCHEN_JAR.z, r: 32 },
+    top: { kind: "flat", y: 108 },
+  },
+  {
+    name: "kitchen honey lid",
+    footprint: { kind: "circle", x: KITCHEN_JAR.x, z: KITCHEN_JAR.z, r: 38 },
+    bottom: 108,
+    top: { kind: "flat", y: 112 },
+  },
+
   box("kitchen compost", c.x, c.z, c.hx - 3, c.hz - 3, c.top - 12),
   box("kitchen caddy", c.x - c.hx + 1.5, c.z, 1.5, c.hz, c.top),
   box("kitchen caddy", c.x + c.hx - 1.5, c.z, 1.5, c.hz, c.top),
   box("kitchen caddy", c.x, c.z - c.hz + 1.5, c.hx, 1.5, c.top),
   box("kitchen caddy", c.x, c.z + c.hz - 1.5, c.hx, 1.5, c.top),
   // Thin level slices follow the tilted lid, leaving a genuine fly-sized opening.
-  ...Array.from({ length: 55 }, (_, i) =>
+  ...Array.from({ length: c.lidSlices }, (_, i) =>
     box(
       "kitchen lid",
       c.x,
-      c.z - c.hz + i * 2 + 1,
+      c.z - c.hz + (i + 0.5) * ((c.hz * 2) / c.lidSlices),
       c.hx + 2,
-      1,
-      c.top + i * 0.6 + 4,
-      c.top + i * 0.6,
+      c.hz / c.lidSlices,
+      c.top + i * ((c.hz * 0.6) / c.lidSlices) + 4,
+      c.top + i * ((c.hz * 0.6) / c.lidSlices),
     ),
   ),
 ];

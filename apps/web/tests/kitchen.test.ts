@@ -18,3 +18,24 @@ test("kitchen set merges mixed glass geometry and keeps its meshes finite and fr
   disposeAll(set.group);
   for (const object of set.seen) disposeAll(object);
 });
+
+test("the coarse eyes see the jar's body and the underside of the wine glass", () => {
+  const set = buildSet();
+  const ray = new THREE.Raycaster(
+    new THREE.Vector3(354, 40, 200),
+    new THREE.Vector3(0, 0, -1),
+  );
+  const jar = ray.intersectObjects(set.seen, false)[0];
+  assert.ok(
+    jar && Math.abs(jar.distance - 52) < 0.1,
+    "the jar's lower body blocks the eye before the wall",
+  );
+  ray.set(new THREE.Vector3(196, 80, -65), new THREE.Vector3(0, 1, 0));
+  const cup = ray.intersectObjects(set.seen, false)[0];
+  assert.ok(
+    cup && Math.abs(cup.distance - 20) < 0.1,
+    "the cup's underside is visible from beneath it",
+  );
+  disposeAll(set.group);
+  for (const object of set.seen) disposeAll(object);
+});

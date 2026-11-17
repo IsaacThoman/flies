@@ -229,7 +229,7 @@ for (const scene of Object.values(SCENES)) test(`${scene.id}: drawn tops and sid
     meshes++;
     triangles += (object.geometry.index?.count ?? object.geometry.attributes.position.count) / 3 * (object instanceof THREE.InstancedMesh ? object.count : 1);
   });
-  const budget = { picnic: [24, 53307], windowsill: [15, 62144], lab: [9, 71020], bar: [8, 93060], restaurant: [40, 371299] }[scene.id];
+  const budget = { picnic: [24, 53307], windowsill: [15, 62144], lab: [9, 71020], bar: [8, 93060], restaurant: [40, 371299], kitchen: [2, 90000] }[scene.id];
   assert.ok(meshes <= budget[0] && triangles <= budget[1], `${meshes} meshes, ${triangles} triangles: repairs stay within the original geometry budgets`);
   const drawn = drawnSet(set.group, scene.id === "restaurant");
   const ray = new THREE.Raycaster();

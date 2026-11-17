@@ -163,7 +163,8 @@ or timed at the fly: what it does about any of it is its brain's.
 The kitchen counter is a metre-wide stone worktop with a glazed ceramic
 fruit bowl, spotty bananas and purple grapes, a cut peach on a scarred wooden
 chopping board, toast crumbs, a stemmed glass with red wine left in it, a
-honey jar and a spill, and a compost caddy with its lid ajar. The fly begins
+honey jar and a spill, and a compost caddy with its lid ajar. A checked tea
+towel hangs over one corner and a wall dial tells the real time. The fly begins
 on the peach's cut face. Split fruit, peach flesh, grape juice,
 honey and wine are food; feet disturb the liquid pools. A tiled splashback
 and a window frame the worktop, with cabinets and the kitchen beyond; warm

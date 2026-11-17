@@ -42,3 +42,11 @@ test("the peach has a flat feeding face and real air beneath its curved edge", (
   assert.equal(world.heightAt(60, 158, 14), 14);
   assert.ok(world.underside(60, 158, 14) > 25);
 });
+
+test("the honey jar has a curved shoulder with real clearance beneath its lid", () => {
+  const world = new World(KITCHEN);
+  const y = world.heightAt(389, 110, 107);
+  assert.ok(y > 86 && y < 97);
+  assert.equal(world.underside(389, 110, y), 108);
+  assert.equal(world.heightAt(389, 110), 112);
+});

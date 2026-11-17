@@ -5,6 +5,7 @@ import {
   KITCHEN_PATCHES,
   KITCHEN_PEACH,
   KITCHEN_PEACH_BANDS,
+  KITCHEN_CADDY,
   inside,
   topHeight,
 } from "@fly/world";
@@ -49,6 +50,8 @@ export function buildSet(): SceneSet {
       .replace(
         "#include <color_fragment>",
         `#include <color_fragment>
+      float edge=pow(1.0-abs(dot(normalize(vNormal),normalize(vViewPosition))),3.0);
+      diffuseColor.a=.035+.32*edge;
       if(abs(vGlass.z+300.0)<.1) {
         vec2 q=vec2(vGlass.x*.32,vGlass.y*.003+uKTime*.12);
         float cell=floor(q.x);
@@ -85,6 +88,8 @@ export function buildSet(): SceneSet {
   for (const s of KITCHEN_SOLIDS) {
     const f = s.footprint;
     if (
+      s.name === "kitchen honey neck" ||
+      s.name === "kitchen honey lid" ||
       s.name === "kitchen peach" ||
       s.name === "kitchen banana" ||
       s.name === "kitchen lid" ||
@@ -110,6 +115,15 @@ export function buildSet(): SceneSet {
         "#661c32",
         KIND.wine,
       );
+      add(
+        new THREE.CylinderGeometry(18, 18, 12, 48, 1, true).translate(
+          f.x,
+          106,
+          f.z,
+        ),
+        "#661c32",
+        KIND.wine,
+      );
       continue;
     }
     if (s.name.startsWith("kitchen glass")) {
@@ -122,35 +136,21 @@ export function buildSet(): SceneSet {
     }
     if (s.name === "kitchen honey jar") {
       add(
-        lathe(
-          [
-            [0, 0],
-            [32, 0],
-            [38, 5],
-            [38, 86],
-            [32, 97],
-            [32, 108],
-            [0, 108],
-          ],
-          f.x,
-          f.z,
-        ),
-        "#ba741e",
+        new THREE.CylinderGeometry(36.5, 36.5, 74, 64).translate(f.x, 38, f.z),
+        "#a96519",
         KIND.honey,
       );
-      addGlass(
-        lathe(
-          [
-            [34, 0],
-            [39, 4],
-            [39, 87],
-            [33, 98],
-            [33, 108],
-          ],
-          f.x,
-          f.z,
-        ),
-      );
+      const profile: number[][] = [
+        [0, 0],
+        [38, 0],
+        [38, 86],
+      ];
+      for (let i = 0; i <= 24; i++) {
+        const r = 38 - (6 * i) / 24;
+        profile.push([r, topHeight(s, f.x + r, f.z)]);
+      }
+      profile.push([32, 108]);
+      addGlass(lathe(profile, f.x, f.z));
       add(
         lathe(
           [
@@ -165,9 +165,8 @@ export function buildSet(): SceneSet {
         "#b79b62",
         KIND.metal,
       );
-      // A plain paper band, with no on-screen copy.
       add(
-        new THREE.CylinderGeometry(38.15, 38.15, 34, 64, 1, true).translate(
+        new THREE.CylinderGeometry(38.1, 38.1, 34, 64, 1, true).translate(
           f.x,
           51,
           f.z,
@@ -177,37 +176,29 @@ export function buildSet(): SceneSet {
       continue;
     }
     const k =
-      s.name === "kitchen wall"
-        ? KIND.wall
-        : s.name === "kitchen board"
-          ? KIND.wood
-          : s.name === "kitchen peach"
-            ? KIND.peach
-            : s.name === "kitchen grape"
-              ? KIND.grape
-              : s.name === "kitchen compost" ||
-                  s.name === "kitchen stone" ||
-                  s.name === "kitchen crumb"
-                ? KIND.compost
-                : KIND.glaze;
+      s.name === "kitchen board"
+        ? KIND.wood
+        : s.name === "kitchen grape"
+          ? KIND.grape
+          : ["kitchen compost", "kitchen stone", "kitchen crumb"].includes(
+                s.name,
+              )
+            ? KIND.compost
+            : KIND.glaze;
     const color =
-      s.name === "kitchen wall"
-        ? "#b4c8b8"
-        : s.name === "kitchen board"
-          ? "#bc8b50"
-          : s.name === "kitchen peach"
-            ? "#ffb048"
-            : s.name === "kitchen grape"
-              ? "#58364c"
-              : s.name === "kitchen compost"
-                ? "#55432b"
-                : s.name === "kitchen stone"
-                  ? "#9e4e23"
-                  : s.name === "kitchen crumb"
-                    ? "#ca9c57"
-                    : s.name === "kitchen caddy"
-                      ? "#547068"
-                      : "#e3d8bc";
+      s.name === "kitchen board"
+        ? "#bc8b50"
+        : s.name === "kitchen grape"
+          ? "#58364c"
+          : s.name === "kitchen compost"
+            ? "#55432b"
+            : s.name === "kitchen stone"
+              ? "#9e4e23"
+              : s.name === "kitchen crumb"
+                ? "#ca9c57"
+                : s.name === "kitchen caddy"
+                  ? "#547068"
+                  : "#e3d8bc";
     if (f.kind === "box") {
       const y = s.top.kind === "flat" ? s.top.y : 0;
       add(
@@ -226,8 +217,8 @@ export function buildSet(): SceneSet {
       add(
         surface(
           s,
-          s.name === "kitchen bowl" ? 48 : s.name === "kitchen peach" ? 40 : 20,
-          s.name === "kitchen bowl" ? 72 : s.name === "kitchen peach" ? 64 : 32,
+          s.name === "kitchen bowl" ? 48 : 20,
+          s.name === "kitchen bowl" ? 72 : 32,
         ),
         color,
         k,
@@ -300,24 +291,22 @@ export function buildSet(): SceneSet {
       indices: number[] = [];
     for (let i = 0; i <= 220; i++) {
       const x = -250 + (193 * i) / 220;
-      const t = Math.max(0, Math.min(1, (x + 246) / 185));
-      const z =
-        -68 -
-        29 * Math.sin(Math.PI * t) +
-        (rounds === KITCHEN_BANANAS[1] ? 33 : 0);
-      let width = 0;
+      let lo = Infinity,
+        hi = -Infinity;
       for (const s of rounds) {
         const f = s.footprint;
         if (f.kind !== "ellipse") continue;
         const u = (x - f.x) / f.rx;
-        if (Math.abs(u) < 1)
-          width = Math.max(
-            width,
-            Math.abs(f.z - z) + f.rz * Math.sqrt(1 - u * u),
-          );
+        if (Math.abs(u) < 1) {
+          const width = f.rz * Math.sqrt(1 - u * u);
+          lo = Math.min(lo, f.z - width);
+          hi = Math.max(hi, f.z + width);
+        }
       }
       for (let j = 0; j <= 28; j++) {
-        const pz = z + width * Math.sin((j / 28 - 0.5) * Math.PI) * 0.9999;
+        const pz =
+          (lo + hi) / 2 +
+          ((hi - lo) / 2) * Math.sin((j / 28 - 0.5) * Math.PI) * 0.9999;
         let y = 42;
         for (const s of rounds)
           if (inside(s.footprint, x, pz)) y = Math.max(y, topHeight(s, x, pz));
@@ -359,11 +348,20 @@ export function buildSet(): SceneSet {
     g.computeVertexNormals();
     add(g, "#ddb337", KIND.banana);
   }
-  // The lid has the same slope and extents as its two-millimetre world slices.
-  add(
-    box(0, 0, 0, 136, 4, 114).rotateX(-0.292).translate(-369, 180, -180),
-    "#547068",
-  );
+  // Fine world slices follow the same sheared lid to within a fraction of a toe.
+  const c = KITCHEN_CADDY;
+  const lid = box(c.x, 0, c.z, (c.hx + 2) * 2, 4, c.hz * 2);
+  const lp = lid.getAttribute("position");
+  for (let i = 0; i < lp.count; i++)
+    lp.setY(
+      i,
+      c.top +
+        (lp.getZ(i) - (c.z - c.hz) - c.hz / c.lidSlices) * 0.3 +
+        lp.getY(i) +
+        2,
+    );
+  lid.computeVertexNormals();
+  add(lid, "#547068");
   // Small dry flecks are below the half-millimetre scenery limit.
   for (let i = 0; i < 100; i++)
     add(
@@ -387,12 +385,6 @@ export function buildSet(): SceneSet {
       p.name === "wine" ? KIND.wine : KIND.honey,
     );
   }
-  add(
-    new THREE.TorusGeometry(41.7, 0.32, 6, 64)
-      .rotateX(Math.PI / 2)
-      .translate(186, 187, -65),
-    "#d5e0d7",
-  );
   // The pendant's domed shade and flat underside use the world's slab.
   const pendant = KITCHEN_SOLIDS.find((s) => s.name === "kitchen pendant")!;
   add(surface(pendant, 20, 48), "#496d61");
@@ -413,6 +405,18 @@ export function buildSet(): SceneSet {
     for (let i = 0; i < 3; i++)
       add(box(side * (660 + i * 205), 395, -16, 196, 438, 10), "#849486");
   }
+  // Cloth is flat on the worktop; its hanging end lies below the reachable floor.
+  add(
+    new THREE.PlaneGeometry(150, 50).translate(400, -25, 300.05),
+    "#6d8b9b",
+    KIND.cloth,
+  );
+  // A single dial avoids overlapping enamel layers at the far pass's depth precision.
+  add(
+    new THREE.CircleGeometry(74, 64).translate(385, 355, -299.65),
+    "#ece0c3",
+    KIND.clock,
+  );
   batch.build(group);
   glassBatch.build(group);
   // Eyes get only coarse solid silhouettes, excluding the skin grids and small flecks.
@@ -459,6 +463,48 @@ export function buildSet(): SceneSet {
       "#c88945",
     ),
   );
+  // Eye caps alone vanish from below: the body columns and slab undersides matter too.
+  for (const s of KITCHEN_SOLIDS) {
+    const f = s.footprint;
+    if (
+      f.kind === "box" ||
+      s.name === "kitchen peach" ||
+      s.name === "kitchen lid" ||
+      s.name === "kitchen stone" ||
+      s.name.includes("crumb")
+    )
+      continue;
+    const rx = f.kind === "circle" ? f.r : f.rx,
+      rz = f.kind === "circle" ? f.r : f.rz;
+    const angle = f.kind === "circle" ? 0 : f.angle;
+    const bottom = s.bottom ?? 0;
+    if (s.top.kind === "flat" || s.top.kind === "dome") {
+      const top = s.top.kind === "flat" ? s.top.y : s.top.base;
+      if (top > bottom)
+        seenBatch.add(
+          seenM,
+          paint(
+            new THREE.CylinderGeometry(1, 1, top - bottom, 12, 1, true)
+              .scale(rx, 1, rz)
+              .rotateY(angle)
+              .translate(f.x, (top + bottom) / 2, f.z),
+            s.name.includes("banana") ? "#dcb938" : "#998561",
+          ),
+        );
+    }
+    if (s.bottom !== undefined)
+      seenBatch.add(
+        seenM,
+        paint(
+          new THREE.CircleGeometry(1, 12)
+            .rotateX(Math.PI / 2)
+            .scale(rx, 1, rz)
+            .rotateY(angle)
+            .translate(f.x, bottom, f.z),
+          "#998561",
+        ),
+      );
+  }
   seenBatch.build(seenGroup);
   return {
     group,
