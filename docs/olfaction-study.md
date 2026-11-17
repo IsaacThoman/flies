@@ -330,6 +330,8 @@ Thus the strict mismatch remains in fluctuating descending/command trajectories,
 particularly steering, while sustained olfactory, population, individual-readout
 and sparse-cell activation are not demonstrated within these windows and bounds.
 No inference about unmeasured slow adaptation or longer times follows.
+These averaging windows and the coarse cell cutoff also leave smaller sustained
+changes and brief high-rate bursts unresolved.
 
 ### Perturbation and drift attribution
 
@@ -397,6 +399,11 @@ background's left/right balancing, are retained.
 The recovery-control study above tests longer washout, mean-matched background
 pinning and a non-olfactory perturbation without changing the measured circuit.
 It does not establish population-level reliability from three evaluation seeds.
+The next recovery experiment should preregister progressively smaller
+perturbations from identical network checkpoints, with shared and independently
+reseeded future background streams. That can characterize paired trajectory
+divergence directly; within-run drift is not its null distribution. Lock the
+windows and analysis before measurement and retain this study's endpoint.
 Obtain channel-specific baseline and stimulus rates from the relevant
 electrophysiology before claiming natural-odour responses.
 
@@ -486,7 +493,10 @@ The five helper tests cover percentile ordering, calibration validation, the
 strict fallback, exogenous mean determinism and anatomy-only input matching.
 Both reducers check protocol completeness and pre-stimulus equality. The
 follow-up additionally validates paired exogenous states and hashed late-cell
-records. Model/runtime/native sources and parameters are unchanged; the only
+records. Evaluation validates the locked calibration bytes and embedded drift
+derivation; its source-record input-hash manifest requires a separate audit.
+Independent reviewers rechecked those calibration input hashes and found no
+discrepancy. Model/runtime/native sources and parameters are unchanged; the only
 `packages/brain/src` difference from the study's base is the upstream budget
 **test** change. No performance bound is relaxed by this PR.
 
