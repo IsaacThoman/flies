@@ -31,8 +31,9 @@ export class Life {
   readonly senses = new SenseTracker();
   /** How hungry it is and how full its crop, from what it has eaten: the brain is sent the hunger. */
   readonly hunger = new Hunger();
-  readonly brain: BrainDriver;
-  /** Other flies at a table with others (none alone): bodies it can't walk through, which its antennae and its body feel. */
+  /** Its brain; a companion's that failed is replaced by a new one (company.ts). */
+  brain: BrainDriver;
+  /** Other flies (at a table with others, and the others this device lives): bodies it can't walk through, which its antennae and its body feel. */
   readonly crowd: Crowd;
   readonly stimuli: Stimuli = { looming: [], stroke: 0, air: { x: 0, y: 0, z: 0 }, threat: null };
   /**
@@ -58,6 +59,12 @@ export class Life {
   activity: Activity = "waiting";
   /** Eating this frame. */
   eating = false;
+  /**
+   * Whether its steps move the pantry on (patches filling again): a pantry
+   * shared by several flies this device lives is moved on once a frame, by
+   * the one that owns it.
+   */
+  tendsPantry = true;
   #forces: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
   #wasEating = false;
   #sugar = 0;
@@ -93,7 +100,12 @@ export class Life {
   move(place: Place) {
     this.world.load(place);
     this.pantry.reset(place.patches);
-    this.body.place(place.start.x, place.start.z, place.start.yaw, place.start.y);
+    this.setDown(place.start.x, place.start.z, place.start.yaw, place.start.y);
+  }
+
+  /** Stands it at (x, z) facing `yaw`, on the surface at or below `y` (the highest, if left out), in the world as it is. */
+  setDown(x: number, z: number, yaw: number, y?: number) {
+    this.body.place(x, z, yaw, y);
     this.eating = false;
     this.#wasEating = false;
   }
@@ -185,7 +197,7 @@ export class Life {
     if (this.eating && !this.#wasEating) this.meals++;
     this.#wasEating = this.eating;
     this.#proboscis += ((intent.feeding ? 1 : 0) - this.#proboscis) * Math.min(1, dt * 6);
-    this.pantry.update(dt);
+    if (this.tendsPantry) this.pantry.update(dt);
     this.activity = this.#describe(intent, felt.sweet);
     // Still is resting, or standing on food without eating it; anything else is moving. What it does is the brain's: this only watches.
     if (rhythm) {

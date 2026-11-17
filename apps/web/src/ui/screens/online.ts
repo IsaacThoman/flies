@@ -20,7 +20,7 @@
 // What goes wrong is said in the heading's place, briefly, in pink.
 
 import type { RemoteButton } from "@fly/contracts";
-import { CODE_LENGTH, MAX_PLAYERS, PASSWORD_MAX, ROOM_NAME_MAX, isTableCode, roomName } from "@fly/net";
+import { CODE_LENGTH, MAX_FLIES, PASSWORD_MAX, ROOM_NAME_MAX, isTableCode, roomName } from "@fly/net";
 import { Menu, choiceValue, indexOf } from "@fly/ui";
 import type { ChoiceItem, FieldItem, HitMap, MenuItem, Option } from "@fly/ui";
 import type { Frame } from "../../display.ts";
@@ -153,7 +153,7 @@ export class OnlineScreen implements Screen {
         for (const r of rooms ?? []) {
           // A full room open to everyone sends whoever chooses it on to the next.
           const everyone = r.everyone === true;
-          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), count: [r.flies, MAX_PLAYERS], locked: r.locked, everyone, disabled: unavailable || (r.flies >= MAX_PLAYERS && !everyone) });
+          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), count: [r.flies, MAX_FLIES], locked: r.locked, everyone, disabled: unavailable || (r.flies >= MAX_FLIES && !everyone) });
         }
         return rows;
       }
@@ -182,7 +182,7 @@ export class OnlineScreen implements Screen {
         if (!table) return [];
         const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
         const rows: MenuItem[] = shell.canShare ? [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", disabled: !table.joined }] : [];
-        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", swatch: o.colour });
+        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", swatch: o.colours });
         if (table.everyone) rows.push({ kind: "action", id: "rooms", label: "Other rooms" });
         rows.push({ kind: "action", id: "leave", label: "Leave the room" });
         return rows;
@@ -200,7 +200,7 @@ export class OnlineScreen implements Screen {
     return "Online";
   }
 
-  /** A seat number can be reused between frames; the previous occupant's removal must expire. */
+  /** A device's player id can be another device's between frames (one left and another sat down there): the one before's removal must expire. */
   #removalId(other: TableNow["others"][number]) {
     let sequence = this.#occupants.get(other);
     if (sequence === undefined) this.#occupants.set(other, sequence = ++this.#occupantSequence);
@@ -212,7 +212,7 @@ export class OnlineScreen implements Screen {
     const table = shell.table;
     const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
     const rooms = shell.rooms ? shell.rooms.map((r) => `${r.code}:${r.name}:${r.place}:${r.flies}:${r.locked}`).join(",") : "?";
-    const at = table ? `${table.name}|${table.joined}|${table.starting}|${table.everyone}|${this.#looking}|${copied}|${table.others.map((o) => this.#removalId(o)).join(",")}` : "alone";
+    const at = table ? `${table.name}|${table.joined}|${table.starting}|${table.everyone}|${this.#looking}|${copied}|${table.others.map((o) => `${this.#removalId(o)}/${o.colours.length}`).join(",")}` : "alone";
     return `${this.view}|${this.#note}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}|${shell.lobbyStatus}`;
   }
 
