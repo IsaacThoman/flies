@@ -15,7 +15,7 @@ import path from "node:path";
 import { EVERYONE_ROOMS, LISTED_MAX, everyoneCode, everyoneIndex } from "@fly/net";
 import type { ClientMessage, Refusal, RoomWire } from "@fly/net";
 import type { Lock } from "./lock.ts";
-import { Table, everyonePlace, isTableRecord } from "./table.ts";
+import { Table, everyonePlace, isTableRecord, wantedFlies } from "./table.ts";
 import type { TableOptions, TableRecord } from "./table.ts";
 
 /** A table nobody has sat at for this long (ms) is forgotten, and its invitation leads nowhere. */
@@ -61,7 +61,7 @@ export class Tables {
   /** The table a hello is for: found, or started if the hello starts it (with `lock`, if it is to have a password); for a room open to everyone, whichever has room. */
   open(key: string, hello: Extract<ClientMessage, { type: "hello" }>, seed: number, lock: Lock | null = null): Table | Refusal {
     // Nobody starts a room open to everyone, nor one with any of their codes.
-    if (everyoneIndex(hello.table) >= 0) return this.everyone(key, hello.table);
+    if (everyoneIndex(hello.table) >= 0) return this.everyone(key, hello.table, hello.flies);
     const known = this.#tables.get(hello.table);
     if (known) return known;
     if (!hello.start) return "unknown";
@@ -106,21 +106,27 @@ export class Tables {
   }
 
   /**
-   * The room open to everyone a device (its key, hashed) is to sit in, asking
-   * for `wanted`: that one if its fly is still there (coming back after a
-   * moment away), otherwise the first with room for it, opening the next
-   * when every one before is full. A refusal when all of them are. Where it
+   * The room open to everyone a device (its key, hashed) is to sit in,
+   * bringing `flies`: that one if its flies are still there (coming back
+   * after a moment away), otherwise the first with a seat for every one of
+   * them, opening the next when every one before is full (rooms fill by
+   * flies, not devices); only if none has, the first with a seat for some of
+   * them, which it is given. A refusal when all of them are full. Where it
    * sits, it is in the place the clock has it now: a room nobody was in
    * hasn't been keeping time.
    */
-  everyone(key: string, wanted: string): Table | Refusal {
+  everyone(key: string, wanted: string, flies: unknown = 1): Table | Refusal {
     const there = this.#tables.get(wanted);
     if (there?.everyone && there.seated(key)) return there.keepTurn();
+    const n = wantedFlies(flies);
+    let some: Table | null = null;
     for (let i = 0; i < EVERYONE_ROOMS; i++) {
       const table = this.#everyone(i);
-      if (table.hasRoomFor(key)) return table.keepTurn();
+      const room = table.roomFor(key);
+      if (room >= n) return table.keepTurn();
+      if (room > 0) some ??= table;
     }
-    return "full";
+    return some ? some.keepTurn() : "full";
   }
 
   /**

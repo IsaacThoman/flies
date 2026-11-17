@@ -25,27 +25,40 @@ of the brain's commands, how it moves, what its eyes see) and `packages/ui`
 (the menu kit). `docs/places.md` is about the places the fly can live and how
 to add one, and `docs/web.md` about the web build: getting the brain to a
 browser, running well on what people have, being a good tab, and hosting.
-`docs/online.md` is about tables with others: up to eight people's flies at
-one table, in a room open to everyone or joined by a link, and the room
-server between them. For a Docker
+`docs/online.md` is about tables with others: up to eight flies at
+one table, one to four per device, in a room open to everyone or joined by a
+link, and the room server between them. For a Docker
 Compose stack on your own server, behind your own HTTPS reverse proxy, see
 [Self-hosting Flies](docs/deploy.md).
 Releases to TestFlight, and setting them up, are in [docs/release.md](docs/release.md).
 
 ## Playing
 
-By default the fly isn't alone: once its brain is awake, on the web, the Apple
-TV, an iPhone or an iPad, it sits down in **Everyone**, a public room the room
-server keeps, with up to seven other people's flies, each marked with a dab of
-its player's colour. A full one sends you on to Everyone 2, and so on. The
-room's place takes turns by the clock; its light and weather are your own.
-Nothing is said if the room server can't be reached: the fly plays alone and
-the game tries again later. Settings → Screensaver → Join others turns it off, and
-leaving the room from **Online** keeps the fly alone until the next launch.
-**Online** (on the menu) also lists the other public rooms and makes new
-ones: named, public or unlisted, with a password if you like. Whoever joins,
-by the list, a code or the room's link, sits their fly down beside yours
+By default the flies aren't alone: once their brains are awake, on the web,
+the Apple TV, an iPhone or an iPad, they sit down in **Everyone**, a public
+room the room server keeps, with up to eight flies in all, each marked with
+its own dab of enamel. A device whose flies don't all fit goes on to
+Everyone 2, and so on. The room's place takes turns by the clock; its light
+and weather are your own. Nothing is said if the room server can't be
+reached: the flies play alone and the game tries again later. Settings →
+Screensaver → Join others turns it off, and leaving the room from **Online**
+keeps them alone until the next launch. **Online** (on the menu) also lists
+the other public rooms and makes new ones: named, public or unlisted, with a
+password if you like. Whoever joins, by the list, a code or the room's link,
+sits their flies down beside yours, up to eight altogether, each marked with its own dab of enamel
 (`docs/online.md`).
+
+**Settings → Screensaver → Flies** chooses one to four, shown as enamel
+dots in the table colours, kept between launches. Each is a whole fly, with
+its own brain, body, senses and eyes; they see and meet one another, eat
+from the same pantry, feel the place's wind and goings-on where they are,
+and the tools and bubbles reach any of them. Nothing is scripted around
+their brains (`apps/web/src/company.ts`). The camera follows the first:
+the pointer drifts back to it, and the eyes' picture, nervous system,
+stats, X-ray, activity and day's tally are its. Alone with several, it
+wears yellow enamel and the others the next colours; a lone fly wears none.
+At a table the device gets as many flies as there is room for. An older
+Apple TV host that can run only one brain shows no Flies row.
 
 The fly can live in more than one place (`docs/places.md`), and the player can
 carry it from one to another: the **Place** tool, or Settings → Screensaver →
@@ -165,7 +178,8 @@ and now and then something new to find: a drop of juice seeping from a
 strawberry, or a crumb blown in on a gust, put out in the pantry for the fly
 to find by walking and tasting. The butterfly, the ladybird and the falling
 leaf are in the fly's world only as things it sees (and, for a brain without
-eyes, things that can loom); they keep clear of it, and none of it is aimed
+eyes, things that can loom); they keep clear of it (of whichever fly is
+nearest, with several), a falling leaf brushes any of them, and none of it is aimed
 or timed at the fly: what it does about any of it is its brain's.
 
 The windowsill is the deep sill of a cottage kitchen window, painted cream
@@ -465,7 +479,7 @@ Play/Pause, or the button at the top left), with the fly living on behind it.
 It has **Play**, **Watch** (the screensaver straight away), **About**, and
 **Settings**: a row of tabs over each part of the game, every setting two
 steps from the menu and none scrolling: **Screensaver** (when it starts, how
-its camera films, where the fly lives, and, on an Apple TV that can tell,
+its camera films, where the flies live, how many, and, on an Apple TV that can tell,
 the real weather), **On screen** (everything that can show over the world:
 what it sees, its nervous system and its stats in the corners, what the
 stats are of, the corners' size and opacity, and the X-ray), and **Picture**
@@ -487,12 +501,12 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | --- | --- |
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
 | `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
-| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
-| `bumpLeft`, `bumpRight` | Something pushing an antenna back: its tip, just ahead of the head and to its side, inside another fly's body or, in the air, inside anything; on its feet, at anything taller than a step that it walks into, or that it stands against where its foreleg on that side doesn't (standing, its forelegs' tarsi reach further forward than its antennae, so a wall they meet holds its head off it, while a stem between them still touches). Nothing past the table's edge, where there is nothing to touch. 1 while it lasts, however long (any contact deflects an antenna further than its push neurons need, and they answer for as long as it is held), easing out over 0.3 s. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
+| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (on this device or at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
+| `bumpLeft`, `bumpRight` | Something pushing an antenna back: its tip, just ahead of the head and to its side, inside another fly's body (on this device or at a table) or, in the air, inside anything; on its feet, at anything taller than a step that it walks into, or that it stands against where its foreleg on that side doesn't (standing, its forelegs' tarsi reach further forward than its antennae, so a wall they meet holds its head off it, while a stem between them still touches). Nothing past the table's edge, where there is nothing to touch. 1 while it lasts, however long (any contact deflects an antenna further than its push neurons need, and they answer for as long as it is held), easing out over 0.3 s. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
 | `grounded` | On its feet: its legs' load sensors bear its weight. |
-| `maleTaste` | A front leg's tarsus on another fly's body, while it stands (at a table with others; every fly there is a male): the taste of a male's cuticle, 1 while touching, easing out over 0.3 s. |
+| `maleTaste` | A front leg's tarsus on another fly's body, while it stands (on this device or at a table with others; every fly is a male): the taste of a male's cuticle, 1 while touching, easing out over 0.3 s. |
 | `hunger` | Not a sense: how hungry it is (below). |
 | `wingbeat` | How hard its own wings beat, felt by their and the halteres' strain sensors: in the air, the drive it flies with (the brain's `wings`, or the tarsal reflex's floor where that is higher, see Flight); on its feet, only as far as the pose opens them, so 0 with the wings folded, and 0 from the step it lands in (tarsal contact stops a fly's wings). |
 
@@ -568,11 +582,11 @@ lives (`packages/body/src/motion.ts` unless noted):
   or mouth are on something sweet, the body shuffles the last millimetre to put
   its mouth on it. Stopping is the brain's (sugar stops DNg100); the shuffle
   isn't.
-- **Other flies** (`packages/body/src/crowd.ts`, at a table with others:
+- **Other flies** (`packages/body/src/crowd.ts`, on this device or at a table with others:
   `docs/online.md`). Two flies can't stand in the same spot: walking into
   another fly's body it is pushed back out, so it stops against it or slides
   past, and flying into one it bounces off. Each device moves only its own
-  fly, out of where it sees the others.
+  flies, out of where it sees the others.
 - **The song's wing.** Singing, it holds out the wing on the side
   of the nearest other fly (else the one it last sang with; a male extends the
   wing nearer the one he courts), vibrating too fast to see as strokes. The
@@ -694,12 +708,22 @@ sensors, so they glow only as much as the brain answers the strokes.
 
 ## The eyes
 
-`apps/web/src/eyes/eyes.ts` and `packages/body/src/vision.ts`. Every 50 ms
-(Settings → Picture → The fly's eyes: Low is 16×16 views at 20 Hz, High 32×32 at 30 Hz,
-Off sends no light) the world is rendered round the fly's head as six 90° views
+`apps/web/src/eyes/eyes.ts` and `packages/body/src/vision.ts`. With one fly,
+every 50 ms (Settings → Picture → The fly's eyes: Low is 16×16 views at 20 Hz,
+High 32×32 at 30 Hz, Off sends no light) the world is rendered round the
+fly's head as six 90° views
 of a low-detail layer of the scene (sky, table, fruit and jars, ball, bubbles,
-food, feather; never the menus or the pointer), read back once, and resampled
-to each facet (bilinear, by the facet's direction in the head frame).
+food, feather, every other fly; never the menus or the pointer), read back
+once, and resampled to each facet (bilinear, by the facet's direction in the
+head frame).
+
+With several flies their eyes take turns, normally one fly's refresh a frame,
+whichever is most overdue: four at 60 fps each get about 15 Hz instead of
+20. Each has its own picture and light adaptation, and its own stand-in is
+left out while it looks round. The pictures shown on screen are still the
+followed fly's. While the ball is in the air the others wait, so a frame
+never refreshes more than one fly's eyes.
+
 Brightness is weighted as a fly's outer photoreceptors (Rh1, mostly blue-green)
 see it, 0.1 R + 0.45 G + 0.45 B, so a blue sky is bright to it. The picture is
 then adapted to the light, as a fly's photoreceptors adapt their gain to it
@@ -714,7 +738,7 @@ screen's dusk cut a dark ball's contrast from 0.89 to 0.70, and at night to
 goes below 1). What is left of a fly's poorer sight in dim light is the cap: at
 4, night came up to midday's level and a quiet night set the fly off more often
 with nothing thrown at it. While the ball
-is in the air the eyes refresh every frame: the looming detectors answer how
+is in the air the followed fly's eyes refresh every frame: the looming detectors answer how
 fast dark area grows, and at 20 Hz a throw set off the escape about one time in
 six against one in two at 60 Hz.
 

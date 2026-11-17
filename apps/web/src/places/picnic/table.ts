@@ -906,5 +906,8 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
     live(dt, around) {
       goings.live(dt, around);
     },
+    feel(dt, at, felt) {
+      goings.feel(dt, at, felt);
+    },
   };
 }

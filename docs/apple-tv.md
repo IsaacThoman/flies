@@ -6,7 +6,7 @@ public JavaScriptCore framework, with a small browser in TypeScript (`apps/tvos/
 fakes enough of the DOM and Web APIs for three.js and the game. three's ordinary
 `WebGLRenderer` draws through a home-made WebGL 2 that records calls into shared command
 buffers, which native code replays on OpenGL ES 3.0. 2D canvases are CoreGraphics, and the fly's
-brain is C++ on a thread of its own. Built with WeatherKit, a Swift service tells the game the
+brain is C++ on a thread of its own, one per fly. Built with WeatherKit, a Swift service tells the game the
 weather outside. Public APIs only, so it can go through App Review.
 
 The host is the one built for aerodance (github.com/IsaacThoman/aerodance, `apps/tvos`), which
@@ -17,14 +17,14 @@ benchmarks). See [What came from aerodance](#what-came-from-aerodance).
 
 ## How it works
 
-Four threads:
+Three threads for the host, and one per brain:
 
 | Thread | Owns | Code |
 | --- | --- | --- |
 | Main | UIKit: the layer frames are shown in, the remote's presses and touches, the GameController framework, the splash | `src/main.mm`, `src/Remote.mm` |
 | JavaScript | The JavaScriptCore context: runs `runtime.js`, then `game.js`, animation frames from a `CADisplayLink`, timers, events | `src/Host.mm`, `runtime/` |
 | Render | The OpenGL ES context: replays WebGL and 2D canvas commands a frame behind JavaScript, presents | `src/Renderer.mm`, `src/Executor.mm`, `src/Canvas2D.mm` |
-| Brain | The `fly_brain`: loads the connectome, steps the simulation whenever time is waiting | `src/BrainBridge.mm`, `packages/brain-native` |
+| Brain, one per fly | Its own `fly_brain`: loads the connectome, steps the simulation whenever time is waiting | `src/BrainBridge.mm`, `packages/brain-native` |
 
 Built with WeatherKit, the weather outside is found on the main thread (Core Location, timers)
 and in Swift's own tasks (the request), and read from the JavaScript thread
@@ -252,10 +252,15 @@ Assign the property; don't `defineProperty` over it.
 `globalThis.__native.brain` is `NativeBrainBridge` (`packages/contracts/src/brain.ts`),
 implemented in `src/BrainBridge.mm` over `packages/brain-native/include/fly_brain.h`:
 
-- `start(seed)` starts the brain thread (8 MB stack, QoS user-initiated: below the JavaScript
+- `start(seed)` starts this bridge's brain thread, once (8 MB stack, QoS user-initiated: below the JavaScript
   and render threads). It memory-maps the bundled `www/brain/connectome.bin` (38 MB) and builds
   the brain there; the main and JavaScript threads never wait for it. `status()` is `loading`
   until then (and before `start`), then `running` or `failed` with `error()`.
+- `spawn()` on the first bridge makes another bridge, with its own brain and thread when
+  `start(seed)` is called on it, reading the same bundled connectome. A spawned bridge's
+  `stop()` wakes its thread to end and frees the brain; reducing the fly count calls it through
+  `NativeBrainDriver.dispose()`. The first brain is kept by the host. Each bridge has its own
+  senses, time waiting, results and locks; no brain waits for another.
 - `neurons()`, `connections()`, `eyeDirections(side)` (a new `Float32Array` each call),
   `eyeAcceptance()` and `rateNames()` are fixed once running; ask once.
 - `submit(dtMs, scalars, lightLeft, lightRight)` copies the senses (`Float32Array`s; scalars in
@@ -278,6 +283,22 @@ implemented in `src/BrainBridge.mm` over `packages/brain-native/include/fly_brai
 In the simulator the real brain (`packages/brain-native` as of 15 November) loads in about 150 ms
 and keeps up with real time at 60 submits a second, on an M5 Pro. How fast it runs on an Apple TV
 is not measured yet.
+
+Settings → Screensaver → Flies chooses one to four, shown as enamel dots and saved with the
+other settings. An older host without `spawn()` runs one fly and shows no Flies row. Each extra
+fly has its own body, senses and eyes (`apps/web/src/company.ts`); the camera, pointer and
+readouts follow the first. The eyes take turns, normally one fly's refresh a frame, whichever
+is most overdue; four at 60 fps each get about 15 Hz rather than 20. While a ball comes the
+followed fly's refresh every frame and the others' wait, so a frame never refreshes two. A fly
+whose brain thread fails is given a new one twice (after 5 s, then 30 s) and is then taken off.
+
+Four native brains take about 4 × 58 MB. Each is estimated to use 13 to 45% of an A15
+performance core (`packages/brain-native/README.md`), on its own thread. The four flies'
+meeting, senses, bodies, poses and nearby models took 19 M5 Pro CPU µs a frame, with a budget
+of 34 (`apps/web/tests/company.budget.ts`), about 0.3 ms here by the TV's 16× JavaScript cost.
+The eyes' frame is about 83 draws instead of 34, now normally every frame rather than one in
+three. Several local brains and that extra eyes load have not yet been measured on an Apple
+TV device; the eight-fly soak below ran only one local brain.
 
 ## The weather outside
 
@@ -440,10 +461,10 @@ whose delegate runs on a queue of the bridge's own, never the JavaScript or main
   that came before the close has been taken, as a browser hands on its messages before its close
   event.
 - When the app goes to the background (`sceneDidEnterBackground`, in `src/main.mm`) the game
-  hears it first (`visibilitychange`: at a table, the room is told at once that the fly is
+  hears it first (`visibilitychange`: at a table, the room is told at once that its flies are
   away), then every line is closed with 1001, both on the JavaScript thread
-  and in a short background task, before tvOS suspends the app. The fly rests at the table, and
-  after 10 minutes away it leaves (the room's rule). Coming back, the game wakes as a shown tab
+  and in a short background task, before tvOS suspends the app. Its flies rest together at the table,
+  and after 10 minutes away they leave (the room's rule). Coming back, the game wakes as a shown tab
   does and opens its line again at once, rather than waiting out its retry.
 
 ### Where the room is
@@ -541,7 +562,8 @@ The TV was warm from an earlier soak and reported thermal state 2 (serious) thro
 | Playing at the table | 55–60, mean 59.9 | 7.5 ms | 13.1 ms, 26.6 ms | 48.7 |
 | Screensaver at the table | 59.9–60 | 6.2 ms | 8.9 ms, 18.6 ms | 48.4 |
 
-All seven others were there throughout, with no reconnects; memory stayed at 183–187 MB. The
+This was one locally simulated fly and seven sent from elsewhere. All seven others were there
+throughout, with no reconnects; memory stayed at 183–187 MB. The
 host's draws are a mean over every frame: with the eyes at 20 Hz, two frames in three are the
 usual 34 and the third refreshes the eyes (about 83). `state.calls` is one frame sampled every
 200 ms, every twelfth frame at 60 fps, so it can lock onto the eyes' frames and read about 85
@@ -575,7 +597,7 @@ starts, before the next frame (most of that is three's 4 ms polling interval). T
 path is correct and cheap on a Mac; they say nothing about the Apple TV, where the wait is for
 its render thread and GPU. On a device, run the test scene (`build --test-scene
 --stand-in-brain`, `run --device <udid>`) and read `readback` and `readbackAsync` in its
-`report` lines. The game uses the async path with at most one read in flight, retaining the last
+`report` lines. The game uses the async path with at most one read in flight per fly, retaining the last
 completed facet values while it waits. Resolution changes wait for the read before disposing
 its target, and keep the previous light until the new picture arrives. `data-eyes-updates`
 counts completed pictures; `data-eyes-ms` includes submission and resampling CPU time, excluding
