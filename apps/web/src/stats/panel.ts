@@ -45,7 +45,7 @@ export const REDRAWS = 4;
 const VALUE = { size: 18, color: "#ffffff" };
 const UNIT = { size: 14, color: "#e4f3ff" };
 
-/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger, internal state, 1 when left out. */
+/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger and thirst, internal state, 1 when left out. */
 const SENSES = [
   ["loomLeft", "Loom L"],
   ["loomRight", "Loom R"],
@@ -61,6 +61,7 @@ const SENSES = [
   ["wingbeat", "Wingbeat"],
   ["light", "Light"],
   ["hunger", "Hunger"],
+  ["thirst", "Thirst"],
 ] as const;
 /** What comes out, and the neurons each is read from, by their rates' names in stats.rates. */
 const COMMANDS = [
@@ -303,7 +304,7 @@ export function readSignals(s: StatsState, out: Float32Array) {
   let i = 0;
   for (let k = 0; k < SENSES.length; k++) {
     const key = SENSES[k][0];
-    out[i++] = step(key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : key === "hunger" ? (sensed.hunger ?? 1) : sensed[key]);
+    out[i++] = step(key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : key === "hunger" || key === "thirst" ? (sensed[key] ?? 1) : sensed[key]);
   }
   const command = s.brain?.command;
   for (let k = 0; k < COMMANDS.length; k++) out[i++] = command ? step(command[COMMANDS[k].key]) : 0;

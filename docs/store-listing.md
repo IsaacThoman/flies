@@ -20,7 +20,7 @@ Set out a crumb. Blow a gentle puff. Roll a ball past its eyes. Or leave flies a
 
 Under the tiny body is a simulation of 166,700 spiking neurons, connected using the FlyEM male central nervous system dataset. The simulation runs on your device. Sensory inputs reach its neurons; activity in its own neural circuits becomes walking, steering, grooming and feeding.
 
-This is a model, not a living animal. The neurons are simplified. The game supplies hunger and sleep drives; the body supplies physics and a flight reflex. A made-up visual background stands in for missing biological input. About explains these stand-ins and the model's limits.
+This is a model, not a living animal. The neurons are simplified. The game supplies hunger, thirst and sleep drives; the body supplies physics and a flight reflex. A made-up visual background stands in for missing biological input. About explains these stand-ins and the model's limits.
 
 Watch its nervous system glow with the simulation's activity. Explore its little places, change the light and weather, or share a room with other people's flies through Online. Each fly keeps its own simulation running on its own device. No account needed.
 

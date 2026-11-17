@@ -24,9 +24,10 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
     if (!wiring_.senses[k].spec.after_eyes) sense_inputs_[k] = sim_.add_input(wiring_.senses[k].spec.name, wiring_.senses[k].neurons);
   }
   for (const io::Group& group : wiring_.background) background_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
-  // Hunger scales how strongly the sweet neurons' spikes reach their targets (io.ts, HUNGER).
+  // Hunger scales how strongly the sweet neurons' spikes reach their targets (io.ts, HUNGER), and thirst the water neurons' (THIRST).
   for (const io::Group& group : wiring_.senses) {
     if (group.spec.sense == io::kSweet) sweet_gain_ = sim_.add_output_gain(group.spec.name, group.neurons);
+    else if (group.spec.sense == io::kWater) water_gain_ = sim_.add_output_gain(group.spec.name, group.neurons);
   }
   for (const io::ReadoutGroup& group : wiring_.readouts) {
     sim_.add_readout(group.spec.name, group.neurons);
@@ -114,6 +115,7 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
   const double hunger = io::hunger_of(senses);
   sim_.set_output_gain(sweet_gain_, io::sweet_output_gain(hunger));
   state_.set_hunger(hunger);
+  sim_.set_output_gain(water_gain_, io::water_output_gain(io::thirst_of(senses)));
   for (size_t k = 0; k < wiring_.state.size(); k++) {
     const io::StateGroup& group = wiring_.state[k];
     sim_.set_rate(state_inputs_[k], group.spec.max_rate * io::state_of(senses, group.spec.state));

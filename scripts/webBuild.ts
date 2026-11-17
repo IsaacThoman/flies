@@ -25,7 +25,7 @@ const sha256 = (data: Uint8Array | string) => createHash("sha256").update(data).
 /** The name the app is installed under: what the title screen's wordmark says. */
 export const APP_NAME = "flies";
 export const DESCRIPTION =
-  "A fruit fly that lives on your screen. A simplified simulation of its nervous system, 166,700 neurons wired from the FlyEM male CNS connectome (Janelia Research Campus, CC-BY 4.0), chooses through its senses; the game supplies physics, hunger and sleep drives, and a flight reflex.";
+  "A fruit fly that lives on your screen. A simplified simulation of its nervous system, 166,700 neurons wired from the FlyEM male CNS connectome (Janelia Research Campus, CC-BY 4.0), chooses through its senses; the game supplies physics, hunger, thirst and sleep drives, and a flight reflex.";
 /** The colour round the picture and behind the loading screen (apps/web/index.html). */
 export const BACKGROUND = "#04122b";
 

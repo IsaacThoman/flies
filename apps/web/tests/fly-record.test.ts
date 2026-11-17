@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { BrainDriver } from "@fly/contracts";
-import { HUNGER, Rhythm, SUMMER, pressureLeftAlone, usualPressure } from "@fly/body";
+import { HUNGER, Rhythm, SUMMER, THIRST_START, pressureLeftAlone, usualPressure } from "@fly/body";
 import { Pantry, createPicnic } from "@fly/world";
 import { Company } from "../src/company.ts";
 import { FLY_LIMIT, FLY_VERSION, KEEP_EVERY, Remembered, liveAway, loadFly, note, restore, saveFly } from "../src/fly-record.ts";
@@ -50,6 +50,7 @@ test("a fly comes back as it was saved: its id, its body and where it stood", ()
   const before = life();
   before.hunger.level = 0.31;
   before.hunger.fullness = 0.42;
+  before.thirst.level = 0.64;
   before.rhythm!.pressure = 0.53;
   before.setDown(30, -20, 1.2);
   note(fly, before, "picnic", NOON);
@@ -61,17 +62,18 @@ test("a fly comes back as it was saved: its id, its body and where it stood", ()
   assert.deepEqual(again, { ...fly, others: {} });
   const after = life();
   restore(again, after, NOON, SUMMER, "picnic", true);
-  assert.deepEqual([after.hunger.level, after.hunger.fullness, after.rhythm!.pressure], [0.31, 0.42, 0.53]);
+  assert.deepEqual([after.hunger.level, after.hunger.fullness, after.thirst.level, after.rhythm!.pressure], [0.31, 0.42, 0.64, 0.53]);
   assert.deepEqual([after.body.position.x, after.body.position.z, after.body.yaw], [30, -20, 1.2]);
   assert.equal(after.body.position.y, before.body.position.y);
 });
 
-test("time away is lived out: hungrier (to a point), the crop emptier, the sleep pressure as a fly left to itself would have it", () => {
+test("time away is lived out: hungrier and thirstier (to a point), the crop emptier, the sleep pressure as a fly left to itself would have it", () => {
   const store = memory();
   const fly = loadFly(0, NOON, make, store);
   const before = life();
   before.hunger.level = 0.1;
   before.hunger.fullness = 0.9;
+  before.thirst.level = 0;
   before.rhythm!.pressure = 0.2;
   note(fly, before, "picnic", NOON);
   saveFly(0, fly, store);
@@ -80,6 +82,7 @@ test("time away is lived out: hungrier (to a point), the crop emptier, the sleep
   restore(loadFly(0, later, make, store), after, later, SUMMER, "picnic", true);
   assert.equal(after.hunger.level, HUNGER.start, "three hours away at hunger's pace: as hungry as a fly arrives, no more");
   assert.ok(after.hunger.fullness < 1e-6);
+  assert.equal(after.thirst.level, THIRST_START, "and as thirsty as a fly arrives, no more");
   assert.equal(after.rhythm!.pressure, pressureLeftAlone(0.2, 12, 3 * 3600, SUMMER, "lively"));
   assert.ok(after.rhythm!.pressure > 0.2, "awake through a lively afternoon, it needs more sleep");
 
@@ -93,8 +96,15 @@ test("time away is lived out: hungrier (to a point), the crop emptier, the sleep
   const hidden = life();
   hidden.rhythm!.pressure = 0.2;
   hidden.hunger.level = 0.1;
+  hidden.thirst.level = 0;
   liveAway(hidden, 3 * 3600, hidden.rhythm!.hours, SUMMER);
-  assert.deepEqual([hidden.hunger.level, hidden.rhythm!.pressure], [after.hunger.level, after.rhythm!.pressure]);
+  assert.deepEqual([hidden.hunger.level, hidden.thirst.level, hidden.rhythm!.pressure], [after.hunger.level, after.thirst.level, after.rhythm!.pressure]);
+
+  // A fly that left thirstier than a new one comes back no less thirsty.
+  const parched = life();
+  parched.thirst.level = 0.9;
+  liveAway(parched, 3 * 3600, 12, SUMMER);
+  assert.ok(parched.thirst.level >= 0.9);
 });
 
 test("a clock gone backwards is no time away", () => {
@@ -164,7 +174,7 @@ test("a broken record is a new fly; a broken part of one is a fresh part", () =>
   const zero = loadFly(0, NOON, make, store);
   assert.deepEqual([zero.id, zero.born, zero.at, zero.body, zero.where], [id, NOON, NOON, null, null]);
   const one = loadFly(1, NOON, make, store);
-  assert.deepEqual([one.id, one.born, one.body, one.where], [id, NOON - HOUR, { hunger: 0.4, fullness: 0.5, sleep: null }, null]);
+  assert.deepEqual([one.id, one.born, one.body, one.where], [id, NOON - HOUR, { hunger: 0.4, fullness: 0.5, thirst: null, sleep: null }, null]);
 });
 
 test("a record from a newer build keeps its identity and everything it holds, but none of its state is read", () => {

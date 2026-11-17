@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
-import { BACKGROUND, HUNGER, READOUTS, SCALES, SENSES, WINGBEAT_RATE, backgroundRates, balanceFactor, decode, hungerOf, intensity, outputSynapses, senseRates, smooth, sweetOutputGain, wire } from "./io.ts";
+import { BACKGROUND, HUNGER, READOUTS, SCALES, SENSES, THIRST, WINGBEAT_RATE, backgroundRates, balanceFactor, decode, hungerOf, intensity, outputSynapses, senseRates, smooth, sweetOutputGain, thirstOf, waterOutputGain, wire } from "./io.ts";
 import { OPERATING_POINT, buildWeights, completenessFactors } from "./params.ts";
 import { REGIONS, REGION_RATE_NAMES } from "./regions.ts";
 import { createBrain, FlyBrain, MAX_TICK_MS } from "./runtime.ts";
@@ -302,6 +302,29 @@ test("hunger: left out it is 1, the brain as it was; lower, the sweet neurons pa
   const fed = run(0);
   assert.ok(fed.feed < before.feed, `fed ${fed.feed}, hungry ${before.feed}`);
   assert.ok(fed.state < before.state);
+});
+
+test("thirst: left out it is 1, the brain as it was; lower, the water neurons pass on less", () => {
+  assert.equal(thirstOf(RESTING_SENSES), 1);
+  for (const [given, taken] of [[0, 0], [0.25, 0.25], [1, 1], [-3, 0], [7, 1], [Number.NaN, 1], [Number.NEGATIVE_INFINITY, 1]]) {
+    assert.equal(thirstOf({ ...RESTING_SENSES, thirst: given }), taken, `thirst ${given}`);
+  }
+  assert.equal(waterOutputGain(1), 1);
+  assert.equal(waterOutputGain(0), THIRST.sated);
+  assert.ok(waterOutputGain(0.5) > THIRST.sated && waterOutputGain(0.5) < 1);
+
+  // In the synthetic wiring, water reaches nothing that is read; with it, sugar's answer is the same at any thirst.
+  const run = (senses: Partial<BrainSenses>, ms = 600) => {
+    const brain = new FlyBrain(load(), { seed: 5 });
+    const rates: string[] = [];
+    for (let t = 0; t < ms; t += 16) rates.push(JSON.stringify(brain.tick(16, { ...RESTING_SENSES, sweet: 0.6, water: 1, ...senses }).stats.rates));
+    return rates;
+  };
+  const before = run({});
+  assert.deepEqual(run({ thirst: 1 }), before, "thirst 1 is the brain without thirst, spike for spike");
+  assert.deepEqual(run({ thirst: Number.NaN }), before);
+  // Without water on its mouth, thirst touches nothing at all.
+  assert.deepEqual(run({ water: 0, thirst: 0 }), run({ water: 0 }));
 });
 
 test("the eyes: shut, the brain is the same as one without them; open, darkness reaches the lamina and on", () => {

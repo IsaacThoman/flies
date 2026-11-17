@@ -43,8 +43,8 @@ export type InputSpec = {
 export const STATE_KEYS = ["clockMorning", "clockEvening", "clockSleep", "sleepPressure", "sleepDepth"] as const;
 export type StateKey = (typeof STATE_KEYS)[number];
 
-/** The senses that are one intensity each; `light` is a picture, handled apart, and `hunger` and the clock and sleep internal state, not senses. */
-export type ScalarSense = Exclude<keyof BrainSenses, "light" | "hunger" | StateKey>;
+/** The senses that are one intensity each; `light` is a picture, handled apart, and `hunger`, `thirst` and the clock and sleep internal state, not senses. */
+export type ScalarSense = Exclude<keyof BrainSenses, "light" | "hunger" | "thirst" | StateKey>;
 export type SenseSpec = InputSpec & {
   sense: ScalarSense;
   /**
@@ -374,6 +374,37 @@ export function hungerOf(senses: BrainSenses): number {
 /** The sweet taste neurons' output gain at this hunger (0..1): HUNGER.sated just fed, 1 starved. */
 export function sweetOutputGain(hunger: number): number {
   return HUNGER.sated + (1 - HUNGER.sated) * hunger;
+}
+
+/**
+ * Thirst (BrainSenses.thirst) acts on the water taste neurons' output, as
+ * hunger does on the sweet ones'. In the fly the gate is further in: thirst
+ * raises the osmolality of the hemolymph, which quietens the four
+ * interoceptive SEZ neurons (ISNs), and quieter ISNs let water be drunk and
+ * sugar less (Jourjine et al. 2016, Cell 166: 855, Figures 4 to 7); their
+ * targets, and so where the water pathway is gated, aren't known. Water
+ * taste is what a thirsty fly drinks by (Cameron et al. 2010, Nature 465: 91;
+ * Chen, Wang & Wang 2010, J Neurosci 30: 6247), and thirst makes water a
+ * reward (Lin et al. 2014, Nat Neurosci 17: 1536). Nothing has measured a
+ * thirsty fly's water neurons releasing more, so this is a stand-in for the
+ * whole gate, put at the one place the model can hold it.
+ *
+ * `sated` is the gain just after drinking against 1 for a thirsty fly: 1/1.4,
+ * chosen by analogy with hunger's on the sweet neurons (HUNGER), for want of
+ * a measurement, and linear between. At 1 the brain is what it was before it
+ * had a thirst, as hunger's is at 1.
+ */
+export const THIRST = { sated: 1 / 1.4 } as const;
+
+/** How thirsty the senses say it is, 0..1: 1 (as it was before thirst) when left out or not a number. */
+export function thirstOf(senses: BrainSenses): number {
+  const thirst = senses.thirst;
+  return typeof thirst === "number" && Number.isFinite(thirst) ? Math.min(1, Math.max(0, thirst)) : 1;
+}
+
+/** The water taste neurons' output gain at this thirst (0..1): THIRST.sated just after drinking, 1 thirsty. */
+export function waterOutputGain(thirst: number): number {
+  return THIRST.sated + (1 - THIRST.sated) * thirst;
 }
 
 /** Each sense's intensity, 0..1 (grounded as 0 or 1). */

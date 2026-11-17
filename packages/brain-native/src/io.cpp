@@ -248,6 +248,13 @@ constexpr double kSated = 1 / 1.4;
 
 double sweet_output_gain(double hunger) { return kSated + (1 - kSated) * hunger; }
 
+double thirst_of(const Senses& s) { return std::isfinite(s.thirst) ? js::min(1, js::max(0, s.thirst)) : 1; }
+
+// io.ts's THIRST.sated: a fly that has just drunk has its water neurons pass on 1/1.4 of a thirsty one's.
+constexpr double kQuenched = 1 / 1.4;
+
+double water_output_gain(double thirst) { return kQuenched + (1 - kQuenched) * thirst; }
+
 double state_of(const Senses& s, StateKey key) { return key < kStateCount ? js::clamp(s.state[key], 0, 1) : 0; }
 
 double sleep_gate(const Senses& s) { return 1 - kSleepGate * state_of(s, kSleepDepth); }

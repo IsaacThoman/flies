@@ -63,7 +63,7 @@ export class NativeBrainDriver implements BrainDriver {
       const s = this.#scalars;
       for (let i = 0; i < SENSE_ORDER.length; i++) {
         const name = SENSE_ORDER[i];
-        s[i] = name === "grounded" ? (senses.grounded ? 1 : 0) : name === "hunger" ? (senses.hunger ?? 1) : (senses[name] ?? 0);
+        s[i] = name === "grounded" ? (senses.grounded ? 1 : 0) : name === "hunger" || name === "thirst" ? (senses[name] ?? 1) : (senses[name] ?? 0);
       }
       let left: Float32Array | null = null;
       let right: Float32Array | null = null;

@@ -40,8 +40,8 @@ export interface BrainDriver {
 }
 
 /**
- * The order the scalar senses are packed in for the native brain. `grounded` is 0 or 1; `hunger`, internal
- * state rather than a sense, is 1 when the body keeps no account of it (BrainSenses.hunger); the daily clock and sleep after it are 0 when left out.
+ * The order the scalar senses are packed in for the native brain. `grounded` is 0 or 1; `hunger` and `thirst`, internal
+ * state rather than senses, are 1 when the body keeps no account of them (BrainSenses.hunger, .thirst); the daily clock and sleep are 0 when left out.
  */
 export const SENSE_ORDER = [
   "loomLeft",
@@ -62,6 +62,7 @@ export const SENSE_ORDER = [
   "sleepDepth",
   "bitter",
   "water",
+  "thirst",
 ] as const;
 /** The order commands come back in from the native brain. */
 export const COMMAND_ORDER = ["walk", "turn", "back", "escape", "wings", "groom", "feed", "sing"] as const;
