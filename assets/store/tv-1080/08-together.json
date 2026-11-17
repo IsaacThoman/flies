@@ -2,12 +2,14 @@
   "width": 1920,
   "height": 1080,
   "story": "08-together",
-  "fingerprint": "44fd6cd7",
-  "frames": 301,
+  "wallpaper": true,
+  "staging": "three initial positions on existing strawberry juice",
+  "fingerprint": "a086a5bf",
+  "frames": 421,
   "neurons": 166700,
-  "activity": "turning",
+  "activity": "tasting",
   "eaten": 0,
   "takeOffs": 0,
-  "eyeUpdates": 99,
+  "eyeUpdates": 139,
   "peers": 2
 }

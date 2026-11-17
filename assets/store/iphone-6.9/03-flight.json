@@ -2,12 +2,14 @@
   "width": 2868,
   "height": 1320,
   "story": "03-flight",
-  "fingerprint": "4c111ec6",
-  "frames": 301,
+  "wallpaper": false,
+  "staging": null,
+  "fingerprint": "7452299b",
+  "frames": 451,
   "neurons": 166700,
   "activity": "flying",
   "eaten": 0,
   "takeOffs": 1,
-  "eyeUpdates": 141,
+  "eyeUpdates": 235,
   "peers": 0
 }

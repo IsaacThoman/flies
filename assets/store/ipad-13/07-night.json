@@ -2,12 +2,14 @@
   "width": 2752,
   "height": 2064,
   "story": "07-night",
-  "fingerprint": "9e719422",
-  "frames": 301,
+  "wallpaper": true,
+  "staging": null,
+  "fingerprint": "890bb0d0",
+  "frames": 421,
   "neurons": 166700,
-  "activity": "walking",
+  "activity": "resting",
   "eaten": 0,
   "takeOffs": 0,
-  "eyeUpdates": 101,
+  "eyeUpdates": 141,
   "peers": 0
 }

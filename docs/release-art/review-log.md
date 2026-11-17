@@ -112,3 +112,28 @@ Key: D8 = retained N4; K9 = same icon with restored play-mode feeding/X-ray and 
 | R4 / D8 | 6.5 | 8 | 9 | 5 | 6.5 | 9 | 10 | 7.71 |
 
 All four rank K9 first. R1/R2: K9 > P2 > W6 > D8; R3: K9 > W6 > P2 > D8; regression: K9 > P2 > D8 > W6. Three-reviewer means: K9 **7.69**, P2 **7.52**, W6 **7.31**, D8 **7.33**. Keep K9. Compact wings disappear into the cloth; overhead wings read better but fail the safe-circle/TV crop stress and turn the fruit into an abstract red field. The complete three-fly shot and restored feeding context are preferred unanimously. Next: a closer real flight capture, dusk play-mode X-ray and a larger shelf subject. All capture-only staging and group framing are disclosed in the evidence.
+
+## Round 5
+
+Key: A5 = close-view real flight, dusk play-mode X-ray and tighter shelf over a blue cloth check; K2 = retained K9. Orders: R1: A5, K2; R2: K2, A5; R3: A5, K2; R4: K2, A5. R4 is the regression reviewer.
+
+| Reviewer / set | Read | Appeal | Consistency | Story | Colour | Technical | Honesty | Mean |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| R1 / A5 | 5.5 | 8 | 9 | 6 | 7 | 9 | 9.5 | 7.71 |
+| R1 / K2 | 5.5 | 8 | 9 | 5.5 | 6.5 | 9 | 9.5 | 7.57 |
+| R2 / A5 | 5.5 | 7.5 | 9 | 7.5 | 7.5 | 9 | 10 | 8.00 |
+| R2 / K2 | 5.5 | 7.5 | 9 | 6.5 | 6.5 | 9 | 10 | 7.71 |
+| R3 / A5 | 5 | 7 | 9 | 7 | 7 | 9 | 9 | 7.57 |
+| R3 / K2 | 5 | 7 | 9 | 6 | 6 | 9 | 9 | 7.29 |
+| R4 / A5 | 5.5 | 7 | 9 | 7.5 | 7.5 | 9.5 | 9.5 | 7.93 |
+| R4 / K2 | 5.5 | 7 | 9 | 6.5 | 7 | 9.5 | 9.5 | 7.71 |
+
+All four rank A5 > K2. Paired scoring means: A5 **7.76**, K2 **7.52**. Keep A5. The closer flight's beating wings separate from open sky and dusk exposes more X-ray detail. The regression review prefers K2's quieter shelf edge but still ranks A5 first. Remaining weaknesses are small-icon wings, faint X-ray detail and a distant fly in the rainy kitchen. Higher-camera and wider-framing probes are reserved for a subsequent branch, not included in this validated step.
+
+The owner changed the process after this review: merge latest origin/dev, publish the validated step and mark its PR ready. The branch merged origin/dev without conflicts, retaining all dev behavior. Subsequent source and image checks are recorded below; the earlier draft-only rule is superseded by that explicit instruction. No merge of the PR is performed here.
+
+## Post-merge validation for publication
+
+Merged origin/dev with a merge commit, preserving its runtime behavior. The room's new Node-only lock import required moving the production Table into scripts/storeRoom.ts; the browser still runs three production Online clients and exchanges their actual messages through a fixed-clock local bridge. No server or gameplay code was changed. Platform art and all 32 store images were regenerated from the merged game. All 64 fresh-page store observations matched their paired simulation records and PNGs exactly; the separate three-brain bridge probe also matched. Current contact sheets show these regenerated files; historical blind scores refer to the frozen evidence from their respective rounds.
+
+Post-merge typecheck, lint and web build tests passed. The updated brain CPU-budget test skipped locally after three contended reference measurements under dev's new policy; it did not establish a passing CPU budget. Before this merge, web and play browser e2e suites passed, and the full functional suite passed 733 tests with two skips. Its former CPU-budget phase failed as recorded above. No GitHub CI result is awaited. The owner requested this validated step be marked ready for the maintainer to review and merge.

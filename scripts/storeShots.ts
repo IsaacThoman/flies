@@ -3,10 +3,11 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
 import { chromiumPath, gpuFlags, startServer } from "./play.ts";
+import { storeRoom } from "./storeRoom.ts";
 import type { StoreStory } from "../apps/web/src/store-art.ts";
 const stories: StoreStory[] = ["01-portrait", "02-feeding", "03-flight", "04-inside", "05-eyes", "06-rain", "07-night", "08-together"];
 const args = process.argv.slice(2);
-const out = args.includes("--out") ? path.resolve(args[args.indexOf("--out") + 1]) : path.resolve("assets/store");
+const out = args.includes("--out") ? path.resolve(args[args.indexOf("--out") + 1]) : path.join(import.meta.dirname, "..", "assets", "store");
 const verify = args.includes("--verify");
 const only = args.includes("--only") ? args[args.indexOf("--only") + 1] : "";
 const devices = [["iphone-6.9", 2868, 1320], ["ipad-13", 2752, 2064], ["tv-1080", 1920, 1080], ["tv-4k", 3840, 2160]] as const;
@@ -21,9 +22,11 @@ try {
       for (let pass = 0; pass < (verify ? 2 : 1); pass++) {
         const mobile = !device.startsWith("tv-");
         const scale = device === "iphone-6.9" ? 3 : device === "ipad-13" ? 2 : 1;
-        const page = await browser.newPage({ viewport: { width: width / scale, height: height / scale }, deviceScaleFactor: scale, hasTouch: mobile, isMobile: mobile });
+        const page = await browser.newPage({ viewport: { width: width / scale, height: height / scale }, deviceScaleFactor: scale, hasTouch: mobile, isMobile: mobile, timezoneId: "UTC" });
+        page.on("pageerror", error => console.error(error.message));
         try {
-          await page.clock.setFixedTime(new Date("2026-06-21T12:00:00Z"));
+          await page.exposeFunction("__storeRoom", storeRoom());
+          await page.clock.setFixedTime(new Date("2026-06-21T08:00:00Z"));
           await page.goto(new URL("store.html", url).href);
           await page.waitForFunction(() => (globalThis as unknown as { __store?: { ready: boolean } }).__store?.ready);
           const evidence = await page.evaluate(async ({ story, tv }) => {

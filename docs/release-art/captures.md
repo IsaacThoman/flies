@@ -16,10 +16,14 @@ and a bounded wait for the brain's take-off. No motor command or firing rate is 
 capture code. A failure to choose the action aborts generation rather than substituting a pose.
 
 The shared-table shot runs three separately seeded WASM brains in three production Game instances.
-The production server `Table` and production `Online` clients exchange their actual wire messages
-through queued in-process sockets, advanced on the same clock. This is a local deterministic
+The production server `Table` runs in Node (`scripts/storeRoom.ts`). The production `Online`
+clients exchange their actual wire messages through a queued local browser-to-Node bridge,
+advanced on the same fixed clock between frames. This is a local deterministic
 transport for an actual multiplayer simulation, not fake players or duplicated rendered flies.
-It doesn't demonstrate Internet latency or real remote human players.
+It does not demonstrate Internet latency or real remote human players. Three initial room
+positions are staged around the existing strawberry juice patch using the room's saved-position
+mechanism. Every subsequent movement and feeding response comes from those brains. A capture-only
+group camera frames their actual positions; that framing does not add a group-camera feature to play.
 
 Each JSON record stores dimensions, simulation frames, neuron count, actual activity, consumption,
 take-offs and peer count. Repeatability is within the same Chromium/GPU renderer; cross-GPU PNG
@@ -35,15 +39,17 @@ with the remote's interface. There are no promotional overlays or retouched game
 of body position/velocity, motor commands, neural region rates and eye input must match exactly.
 PNGs are compared byte for byte first. Where GPU glass/nerve rasterization rounds differently,
 the verifier permits at most three channel levels in no more than 0.01% of pixels; larger image
-differences fail. A TV capture also showed a two-level difference in 30 pixels. The first observation was a one-level blue difference in 12 of 3,785,760
-pixels. The script preserves the first image unchanged.
+differences fail. Observed differences include one blue level in 12 of 3,785,760 pixels and two channel levels
+in 84 pixels of a 4K TV image. The script preserves the first image unchanged.
 
 The eyes read back the real rendered eye views synchronously for capture, then complete their
 normal sampling promises before the next step. This prevents GPU fence timing from changing
 which visual input reaches a given brain tick. Capture records include completed eye updates.
 
-The eight-story sequence is portrait, feeding on strawberry juice, Swoop flight, night X-ray
+The eight-story sequence is portrait, feeding on strawberry juice, Swoop flight, dusk X-ray
 with its normal nervous-system panel, fly's eyes, the rainy kitchen windowsill, the bar at night,
 and three flies at a morning picnic table. These are normal camera/tool/settings choices,
-with one initial placement on existing fruit for feeding. The flight camera uses the same
-turn gesture available in play; the camera implementation is unchanged.
+with initial placements on existing fruit for feeding and sharing. The flight camera uses the
+same close view and turn gesture available in play. The bar and sharing use the production
+watch mode and wait for its UI fade. Other stories retain the normal play interface.
+The game's camera implementation is unchanged; only the group photograph uses capture-only framing.
