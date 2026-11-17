@@ -38,7 +38,7 @@ test("fog, or seeing less than a kilometre, is mist; haze is some", () => {
   assert.ok(outsideMix(outside({ condition: "haze", visibility: 9000 }), mix()).mist >= 0.5);
 });
 
-test("precipitation is rain, light rain at the most", () => {
+test("precipitation preserves light and heavy rain", () => {
   assert.equal(kindFor({ condition: "drizzle", precipitation: 0.1, cloudCover: 1 }), "rain");
   assert.equal(kindFor({ condition: "rain", precipitation: 0.8, cloudCover: 1 }), "rain");
   assert.equal(outsideMix(outside({ condition: "heavyRain", precipitation: 12 }), mix()).rain, 1);
@@ -46,13 +46,27 @@ test("precipitation is rain, light rain at the most", () => {
   assert.equal(outsideMix(outside({ precipitation: 0.02 }), mix()).rain, 0, "a trace isn't rain");
 });
 
-test("what the game hasn't got is the nearest it has: snow a white mist, flurries a grey sky, sleet and hail rain, thunder heavy rain", () => {
+test("WeatherKit sun showers reach the fly and wet surfaces under sparse cloud", () => {
+  for (const cloudCover of [0, 0.1, 0.4]) {
+    const conditions = outside({ condition: "sunShowers", precipitation: 0.5, cloudCover });
+    const target = outsideMix(conditions, mix());
+    const w = new WeatherNow();
+    w.follow(NOW / 3_600_000, false, { blend: m => outsideMix(conditions, m) });
+    for (let i = 0; i < 600; i++) w.update(0.1);
+    assert.equal(w.rain, target.rain);
+    assert.equal(w.cloud, target.cloud);
+    assert.equal(w.kind, "rain");
+    assert.ok(w.wet > 0.4);
+  }
+});
+
+test("conditions distinguish snow, flurries, sleet and electrical storms", () => {
   const snow = outsideMix(outside({ condition: "snow", precipitation: 1.5, cloudCover: 0.7, visibility: 3000 }), mix());
   assert.equal(snow.rain, 0, "no rain falls in snow");
-  assert.equal(kindOf(snow), "mist");
+  assert.equal(kindOf(snow), "snow");
   assert.ok(snow.cloud >= 0.9);
-  assert.equal(kindFor({ condition: "flurries", precipitation: 0.2, cloudCover: 0.5 }), "overcast");
-  assert.equal(kindFor({ condition: "sleet", precipitation: 0.6, cloudCover: 1 }), "rain");
+  assert.equal(kindFor({ condition: "flurries", precipitation: 0.2, cloudCover: 0.5 }), "snow");
+  assert.equal(kindFor({ condition: "sleet", precipitation: 0.6, cloudCover: 1 }), "sleet");
   assert.equal(kindFor({ condition: "hail", precipitation: 0, cloudCover: 1 }), "rain");
   assert.ok(outsideMix(outside({ condition: "thunderstorms", precipitation: 0.3, cloudCover: 1 }), mix()).rain >= 0.8);
 });

@@ -159,20 +159,20 @@ test("figures in three digits, distances and times as a watcher reads them", () 
   assert.equal(duration(5400), "1.5 h");
 });
 
-test("the panel shows what it is doing over its day, and its brain's numbers, each with a word, nothing else", () => {
+test("the panel shows real figures and their units without a duplicate activity caption", () => {
   const history = new Float32Array(HISTORY_SAMPLES).fill(250_000);
   const day: Day = { date: "2026-11-16", walked: 1420, meals: 3, takeOffs: 7, flown: 42, groomed: 130 };
   const sensed = { loomLeft: 0.4, loomRight: 0, touch: 1, bumpLeft: 0, bumpRight: 0.2, wind: 0, sweet: 0, grounded: true, maleTaste: 0, wingbeat: 0 };
-  const state: StatsState = { activity: "grooming", spikes: 1_240_000, active: 41_234, speed: 0.98, history, head: 3, day, sensed, brain: null };
+  const state: StatsState = { spikes: 1_240_000, active: 41_234, speed: 0.98, history, head: 3, day, sensed, brain: null };
   const written = (kind: StatsKind, cols = 3, side = false) => {
     const g = blankCanvas();
     drawStatsPanel(g, statsShape(kind, cols, side), state);
     return writtenOn(g).map((w) => w.text);
   };
-  assert.deepEqual(written("brain"), ["Its brain", "1.24M", "spikes/s", "41.2k", "active", "0.98×", "real time"]);
-  assert.deepEqual(written("signals", 2, true), ["Grooming", "In", "Loom L", "Loom R", "Touch", "Antenna L", "Antenna R", "Wind", "Sweet", "On legs", "Male taste", "Wingbeat", "Light", "Hunger", "Out", "Hz", "Walk", "0", "Steer", "0·0", "Back up", "0", "Escape", "0", "Wings", "0", "Groom", "0", "Feed", "0", "Sing", "0"]);
-  assert.deepEqual(written("day"), ["Grooming", "1.42", "m", "walked", "3", "meals", "7", "take-offs", "42", "s", "flying", "2", "min", "grooming"]);
-  for (const [cols, side] of [[3, false], [2, false], [3, true]] as const) assert.equal(written("both", cols, side).length, 1 + 2 * 8 + 3, `${cols} across${side ? ", side by side" : ""}`);
+  assert.deepEqual(written("brain"), ["1.24M", "spikes/s", "41.2k", "active", "0.98×", "real time"]);
+  assert.deepEqual(written("signals", 2, true), ["In", "Loom L", "Loom R", "Touch", "Antenna L", "Antenna R", "Wind", "Sweet", "On legs", "Male taste", "Wingbeat", "Light", "Hunger", "Out", "Hz", "Walk", "0", "Steer", "0·0", "Back up", "0", "Escape", "0", "Wings", "0", "Groom", "0", "Feed", "0", "Sing", "0"]);
+  assert.deepEqual(written("day"), ["1.42", "m", "walked", "3", "meals", "7", "take-offs", "42", "s", "flying", "2", "min", "grooming"]);
+  for (const [cols, side] of [[3, false], [2, false], [3, true]] as const) assert.equal(written("both", cols, side).length, 2 * 8 + 3, `${cols} across${side ? ", side by side" : ""}`);
   // Every cell inside the panel, in every arrangement.
   for (const kind of ["brain", "day", "both", "signals"] as const) {
     const arrangements = kind === "signals" ? ([[2, true], [1, false], [3, true]] as const) : ([[3, false], [2, false], ...(kind === "both" ? [[3, true] as const] : [])] as const);
@@ -195,7 +195,7 @@ test("in and out are the senses as sent and the commands as answered, each to th
     command: { walk: 0.8, turn: -0.5, back: 0, escape: 0, wings: 1, groom: 0, feed: 0.25, sing: 0 },
     stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: { DNg100: 41.6, "DNa02 left": 30.2, "DNa02 right": 12.7, flight: 180, MN9: 3.4, pIP10: 0.2 } },
   };
-  const state: StatsState = { activity: "walking", spikes: 0, active: 0, speed: 1, history: new Float32Array(HISTORY_SAMPLES), head: 0, day: freshDay("2026-11-16"), sensed, brain };
+  const state: StatsState = { spikes: 0, active: 0, speed: 1, history: new Float32Array(HISTORY_SAMPLES), head: 0, day: freshDay("2026-11-16"), sensed, brain };
   const v = Array.from(readSignals(state, new Float32Array(SIGNALS)), (x) => Number(x.toFixed(2)));
   assert.deepEqual(v.slice(0, 12), [0.5, 0, 0, 0, 0, 0.25, 1, 0, 0.75, 0.5, 0.5, 0.3], "the senses: the light is the mean over every facet, a sense too small to show is none; then hunger");
   assert.deepEqual(v.slice(12, 20), [0.8, -0.5, 0, 0, 1, 0, 0.25, 0], "the commands, steering signed");
@@ -203,5 +203,5 @@ test("in and out are the senses as sent and the commands as answered, each to th
   const g = blankCanvas();
   drawStatsPanel(g, statsShape("signals", 1, false), state);
   const words = writtenOn(g).map((w) => w.text);
-  assert.ok(words.includes("Walking") && words.includes("42") && words.includes("30·13") && words.includes("180"), words.join(" "));
+  assert.ok(words.includes("42") && words.includes("30·13") && words.includes("180"), words.join(" "));
 });

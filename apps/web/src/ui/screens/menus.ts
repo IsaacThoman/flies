@@ -3,14 +3,15 @@
 //   menu ─┬─ Play
 //         ├─ Watch
 //         ├─ About
-//         ├─ Settings: Screensaver | On screen | Picture, as tabs
-//         └─ Online (in a browser): rooms with others (online.ts)
+//         ├─ Settings: Screensaver (and how many flies) | On screen | Picture, as tabs
+//         └─ Online (where it can be): rooms with others (online.ts)
 //
 // The menu is the title, at launch and from play alike (Back, Play/Pause or
 // the menu button), with the fly living on behind it; Back there carries on
 // playing (on the Apple TV it leaves the app, as the root of an app must).
 // Every setting is two steps from it.
 
+import { COLOURS } from "@fly/net";
 import { Menu, choiceValue, indexOf } from "@fly/ui";
 import type { ChoiceItem, MenuItem, Option } from "@fly/ui";
 import { INK_SOFT, font, glassPanel, orb, text } from "@fly/ui";
@@ -19,6 +20,7 @@ import { PLACES } from "../../places/catalog.ts";
 import { WALLPAPER_DELAYS } from "../../settings.ts";
 import type { EyesDetail, OverlayOpacity, OverlaySize, Settings, ShowWhen, StatsKind } from "../../settings.ts";
 import { fitMenu, safeRect, titleLayout } from "../layout.ts";
+import { arriving } from "../loading.ts";
 import { drawWordmark } from "../wordmark.ts";
 import { MenuScreen } from "./menu-screen.ts";
 import type { SettingsPage, Shell } from "./types.ts";
@@ -51,7 +53,7 @@ export function titleScreen(shell: Shell) {
       // How the brain is doing, quietly, under the name.
       const brain = shell.brain;
       const awake = brain.status === "running";
-      const label = awake ? `Brain awake · ${brain.neurons.toLocaleString("en-US")} neurons` : brain.status === "failed" ? "Its brain couldn't wake" : "Its brain is waking…";
+      const label = awake ? `Brain awake · ${brain.neurons.toLocaleString("en-US")} neurons` : brain.status === "failed" ? "Its brain couldn't wake" : arriving(brain) && brain.phase === "download" ? `Brain · ${(brain.source.received / 1e6).toFixed(1)} / ${(brain.source.total / 1e6).toFixed(1)} MB` : "Its brain is waking…";
       glassPanel(g, status.x, status.y, status.w, status.h, 17, { alpha: 0.85, shadow: false });
       orb(g, status.x + 20, status.y + 17, 8, awake ? "green" : brain.status === "failed" ? "pink" : "orange");
       // Smaller, if it must be, to stay in its pane.
@@ -101,6 +103,7 @@ const OPACITY: Option<OverlayOpacity>[] = [
   { value: "faint", label: "Faint" },
 ];
 const PLACE: Option<Settings["place"]>[] = [{ value: "turns", label: "Each in turn" }, ...PLACES.map((p) => ({ value: p.id, label: p.name }))];
+const flyCounts = (most: number): Option<number>[] => Array.from({ length: most }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
 const ON_OFF: Option<boolean>[] = [
   { value: false, label: "Off" },
   { value: true, label: "On" },
@@ -120,6 +123,10 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       choice("wallpaperCamera", "Camera", CAMERA),
       // Only when there is somewhere else to live.
       ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE)] : []),
+      // How many flies live here, each in its enamel; only where this device can run more than one brain.
+      ...(shell.maxFlies > 1 ? [{ ...choice("flies", "Flies", flyCounts(shell.maxFlies)), dots: COLOURS }] : []),
+      // With everyone, in a room open to all, once awake: only where the device can be online.
+      ...(shell.canPlayOnline ? [choice("joinOthers", "Join others", ON_OFF)] : []),
       // Whether the sky follows the weather outside, only where the Apple TV can tell it.
       ...(shell.weatherOutside ? [choice("realWeather", "Real weather", ON_OFF)] : []),
     ],
@@ -139,7 +146,7 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
   },
   picture: {
     heading: "Picture",
-    rows: () => [choice("pixels", "Pixels", PIXELS), choice("eyes", "The fly's eyes", EYES), choice("hints", "Button hints", ON_OFF), choice("rumble", "Rumble", ON_OFF), choice("stats", "Frame stats", ON_OFF)],
+    rows: () => [choice("pixels", "Pixels", PIXELS), choice("eyes", "The fly's eyes", EYES), choice("hints", "Hints", ON_OFF), choice("rumble", "Rumble", ON_OFF), choice("stats", "Frame stats", ON_OFF)],
   },
 };
 

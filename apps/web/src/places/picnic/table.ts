@@ -1,3 +1,4 @@
+import { Snow, snowDust } from "../../scene/snow.ts";
 // The picnic's table and everything on it, built from the world's description
 // (packages/world/src/picnic.ts) so that what the fly stands on is exactly
 // what is drawn. Merged by material into a few meshes. Everything on it gets
@@ -15,6 +16,7 @@ import type { SceneSet } from "../types.ts";
 import { LAWN_Y } from "./backdrop.ts";
 import { Goings } from "./life.ts";
 import { outside } from "./outside.ts";
+import { TABLE_SHADOWS } from "./shadows.ts";
 import { LEAF_FRAGMENT, leafGeometry } from "./visitors.ts";
 import { BUMP, ENAMEL, GINGHAM, NOISE, SKIN, fruitSkins, skin } from "./surfaces.ts";
 
@@ -87,7 +89,7 @@ function tableTexture() {
  * the table without a vertex between them. In a gust ripples run across the
  * cloth.
  */
-type TableUniforms = { uWet: { value: number }; uGust: { value: THREE.Vector3 }; uTime: { value: number } };
+type TableUniforms = { uWet: { value: number }; uGust: { value: THREE.Vector3 }; uTime: { value: number }; uPicnicSun: { value: THREE.Vector3 } };
 
 function clothShader(material: THREE.MeshStandardMaterial, uniforms: TableUniforms) {
   const { napkin } = DECOR;
@@ -108,9 +110,11 @@ uniform float uTime;
 varying vec2 vTable;
 ${NOISE}
 ${ENAMEL(TABLE_RADIUS, JAR_RING)}
+${TABLE_SHADOWS}
 float enamelRough;
 vec2 enamelPeel;
 ${GINGHAM}
+${BUMP}
 const float CHECK = ${(napkin.size / 12).toFixed(3)};
 // Where the water lies thickest on the enamel: soft blobs a few centimetres across, spreading as it gets wetter.
 float puddles(vec2 p) {
@@ -146,10 +150,12 @@ vec2 uv = nap.xy;
 float edge = nap.z;
 float aa = fwidth(edge) + 0.02;
 float inside = 1.0 - smoothstep(-aa, aa, edge);
-vec3 cloth = gingham(uv, CHECK, vec3(0.13, 0.40, 0.86));
+vec3 cloth = gingham(uv, CHECK, vec3(0.16, 0.34, 0.62));
 // The hem: folded under (a touch darker) and stitched in blue.
 float hem = smoothstep(-2.6, -2.4, edge);
 cloth *= 1.0 - hem * 0.06;
+float fold = exp(-uv.x * uv.x / 5.0) + exp(-uv.y * uv.y / 5.0);
+cloth *= 1.0 - fold * 0.035;
 float stitchLine = 1.0 - smoothstep(0.07, 0.07 + fwidth(edge) + 0.03, abs(edge + 1.7));
 float along = (abs(uv.x) > abs(uv.y) ? uv.y : uv.x) / 1.7;
 float dash = step(0.35, fract(along));
@@ -178,6 +184,7 @@ if (uWet > 0.02 && inside < 0.5) {
   diffuseColor.rgb *= 1.0 - beading * pow(1.0 - drop.z, 3.0) * 0.35;
 }`,
       )
+      .replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\nfloat tableShade = picnicShadow(vTable);\nreflectedLight.directDiffuse *= 1.0 - tableShade;\nreflectedLight.directSpecular *= 1.0 - tableShade;")
       .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor + enamelRough, 0.92, inside);\nroughnessFactor = mix(roughnessFactor, mix(mix(0.13, 0.025, puddle), 0.6, inside), uWet);\nroughnessFactor = mix(roughnessFactor, 0.02, beading);")
       .replace(
         "#include <normal_fragment_maps>",
@@ -186,7 +193,7 @@ if (uWet > 0.02 && inside < 0.5) {
   // Where it was folded in four: two soft ridges across the middle.
   vec3 nap2 = napkinUV();
   float inside2 = 1.0 - step(0.0, nap2.z);
-  vec2 slope = vec2(-nap2.x * exp(-nap2.x * nap2.x / 3.0), -nap2.y * exp(-nap2.y * nap2.y / 3.0)) * 0.06 * inside2;
+  vec2 slope = vec2(-nap2.x * exp(-nap2.x * nap2.x / 3.0), -nap2.y * exp(-nap2.y * nap2.y / 3.0)) * 0.10 * inside2;
   vec3 tilted = normalize(vec3(-slope.x, 1.0, -slope.y));
   float c = cos(uNapkin.w), s = sin(uNapkin.w);
   tilted = vec3(tilted.x * c + tilted.z * s, tilted.y, -tilted.x * s + tilted.z * c);
@@ -195,6 +202,7 @@ if (uWet > 0.02 && inside < 0.5) {
   tilted = normalize(tilted - vec3(uGust.x, 0.0, uGust.y) * cos(dot(vTable, uGust.xy) * 0.35 - uTime * 7.0) * 0.06 * uGust.z * inside2);
   tilted = normalize(mix(tilted, normalize(vec3(-drop.x, 1.0, -drop.y)), beading));
   normal = normalize((viewMatrix * vec4(tilted, 0.0)).xyz);
+  normal = bumped(normal, wovenHeight(nap2.xy) * inside2);
 }`,
       );
   };
@@ -265,36 +273,43 @@ function domeGeometry(solid: Solid, rings: number, segments: number) {
   const angle = f.kind === "circle" ? 0 : f.angle;
   const c = Math.cos(angle);
   const s = Math.sin(angle);
-  const positions: number[] = [];
-  const normals: number[] = [];
+  // Adjacent triangles share these samples; querying the world once per point keeps the veil short.
+  const count = (rings + 1) * (segments + 1);
+  const positions = new Float32Array(count * 3);
+  const normals = new Float32Array(count * 3);
+  const indices: number[] = [];
   const n = { x: 0, y: 1, z: 0 };
-  const point = (si: number, ti: number) => {
-    const sv = Math.min(0.9999, si / rings);
-    const th = (ti / segments) * Math.PI * 2;
-    const u = Math.cos(th) * rx * sv;
-    const v = Math.sin(th) * rz * sv;
-    const x = f.x + u * c + v * s;
-    const z = f.z - u * s + v * c;
-    const y = topHeight(solid, x, z);
-    topNormal(solid, x, z, n);
-    positions.push(x, y, z);
-    normals.push(n.x, n.y, n.z);
-  };
+  for (let i = 0; i <= rings; i++) {
+    const sv = Math.min(0.9999, i / rings);
+    for (let j = 0; j <= segments; j++) {
+      const th = (j / segments) * Math.PI * 2;
+      const u = Math.cos(th) * rx * sv;
+      const v = Math.sin(th) * rz * sv;
+      const x = f.x + u * c + v * s;
+      const z = f.z - u * s + v * c;
+      const y = topHeight(solid, x, z);
+      topNormal(solid, x, z, n);
+      const k = (i * (segments + 1) + j) * 3;
+      positions[k] = x;
+      positions[k + 1] = y;
+      positions[k + 2] = z;
+      normals[k] = n.x;
+      normals[k + 1] = n.y;
+      normals[k + 2] = n.z;
+    }
+  }
   for (let i = 0; i < rings; i++) {
     for (let j = 0; j < segments; j++) {
-      point(i, j);
-      point(i + 1, j + 1);
-      point(i + 1, j);
-      if (i > 0) {
-        point(i, j);
-        point(i, j + 1);
-        point(i + 1, j + 1);
-      }
+      const a = i * (segments + 1) + j;
+      const b = a + segments + 1;
+      indices.push(a, b + 1, b);
+      if (i > 0) indices.push(a, a + 1, b + 1);
     }
   }
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geometry.setIndex(indices);
   return geometry;
 }
 
@@ -403,7 +418,7 @@ export function buildTable(): SceneSet {
   const juicy = fruitSkins(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.16, metalness: 0, envMapIntensity: 0.55 }));
   const matte = veined(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, envMapIntensity: 0.5 }));
   const tableMaterial = new THREE.MeshStandardMaterial({ map: tableTexture(), roughness: 0.24, metalness: 0, envMapIntensity: 0.5 });
-  const tableUniforms: TableUniforms = { uWet: { value: 0 }, uGust: { value: new THREE.Vector3() }, uTime: { value: 0 } };
+  const tableUniforms: TableUniforms = { uWet: { value: 0 }, uGust: { value: new THREE.Vector3() }, uTime: { value: 0 }, uPicnicSun: { value: new THREE.Vector3(0, 1, 0) } };
   clothShader(tableMaterial, tableUniforms);
   const cloth = new THREE.MeshStandardMaterial({ roughness: 0.85, side: THREE.DoubleSide });
   coverShader(cloth);
@@ -447,10 +462,14 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
   jar.renderOrder = 3;
   freeze(jar);
   group.add(jar);
+  for (const [r, y, tube] of [[lf.r - 1, 2.0, 0.8], [lf.r - 0.2, lidTop - 10, 0.65]]) {
+    batch.add(glossy, paint(new THREE.TorusGeometry(r, tube, 3, 32).rotateX(Math.PI / 2).translate(lf.x, y, lf.z), "#dce9df"));
+  }
   const drink = new THREE.Mesh(paint(new THREE.CylinderGeometry(lf.r - 1.5, lf.r - 1.5, lidTop - 26, 40).translate(lf.x, (lidTop - 26) / 2 + 1, lf.z), (p) => (p.y > lidTop - 30 ? "#fff6b8" : "#ffe14f")), liquid);
   drink.renderOrder = 2;
   freeze(drink);
   group.add(drink);
+  batch.add(glossy, paint(new THREE.TorusGeometry(lf.r - 1.7, 0.38, 3, 32).rotateX(Math.PI / 2).translate(lf.x, lidTop - 25, lf.z), "#fff0a1"));
   seen.push(drink);
   // The lid: knurled round its side, and pressed on top (LID_PRESS).
   {
@@ -482,8 +501,8 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
     const f = saucer.footprint as { x: number; z: number; r: number };
     const top = saucer.top as { inner: number; lip: number };
     const profile: THREE.Vector2[] = [];
-    for (let i = 0; i <= 32; i++) {
-      const r = lf.r - 2 + ((f.r - lf.r + 2) * i) / 32;
+    for (let i = 0; i <= 26; i++) {
+      const r = lf.r - 2 + ((f.r - lf.r + 2) * i) / 26;
       profile.push(new THREE.Vector2(r, topHeight(saucer, f.x + Math.min(r, f.r * 0.9999), f.z)));
     }
     // Outside in, so its faces point up.
@@ -601,12 +620,12 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
 
   // Strawberries: a whole one with seeds and leaves, and a half one, cut face up.
   const berry = one("strawberry");
-  fruit(SKIN.plain, paint(domeGeometry(berry, 14, 40), (p) => {
+  fruit(SKIN.strawberry, paint(domeGeometry(berry, 14, 40), (p) => {
     const k = Math.min(1, p.y / 20);
     return new THREE.Color("#c3001f").lerp(new THREE.Color("#ff3048"), k);
   }));
   const half = one("strawberry half");
-  fruit(SKIN.plain, paint(domeGeometry(half, 10, 40), (p) => {
+  fruit(SKIN.cutBerry, paint(domeGeometry(half, 10, 40), (p) => {
     const hf = half.footprint as { x: number; z: number; rx: number; rz: number; angle: number };
     const s = Math.min(1, Math.hypot((p.x - hf.x) / hf.rx, (p.z - hf.z) / hf.rz));
     return s > 0.86 ? "#e0102c" : s > 0.7 ? "#ff6b7c" : s > 0.25 ? "#ffb3bd" : "#fff0f0";
@@ -848,6 +867,14 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
   seen.push(...goings.seen);
   const all = [glossy, juicy, matte, tableMaterial, cloth, glass, liquid, dewMaterial, ...materials];
   for (const material of all) shaded(material);
+  const snow = new Snow(2200, 0);
+  group.add(snow.mesh);
+  const snowCover = { value: 0 };
+  const shelters = [one("lemonade"), one("jam")].map(s => {
+    const f = s.footprint as { x:number; z:number; r:number };
+    return new THREE.Vector4(f.x, f.z, f.r, (s.top as { y:number }).y);
+  });
+  for (const material of all) if (material !== glass && material !== liquid && material !== dewMaterial) snowDust(material, snowCover, shelters);
   let wetNow = -1;
   return {
     group,
@@ -855,6 +882,9 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
     seen,
     update(time, light, weather) {
       goings.update(time, light, weather);
+      snow.update(time, light, weather);
+      snowCover.value = weather.snowCover;
+      tableUniforms.uPicnicSun.value.copy(light.sunDirection);
       // Wet, glazes and fruit shine more, crumbs and cloth darken.
       const wet = weather.wet;
       if (Math.abs(wet - wetNow) > 0.003) {
@@ -886,6 +916,9 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
     },
     live(dt, around) {
       goings.live(dt, around);
+    },
+    feel(dt, at, felt) {
+      goings.feel(dt, at, felt);
     },
   };
 }

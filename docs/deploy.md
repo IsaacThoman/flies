@@ -39,7 +39,8 @@ Coolify v4 with its default Traefik proxy.
    `CLIENT_IP_HEADERS=CF-Connecting-IP X-Forwarded-For` (see
    [visitors' addresses](#visitors-addresses)). App links are on by default;
    `APPLE_TEAM_ID` overrides the team, or `0` disables them ([the iPhone and
-   iPad app's links](#the-iphone-and-ipad-apps-links)).
+   iPad app's links](#the-iphone-and-ipad-apps-links)). To publish `/privacy`,
+   supply the four public [owner build variables](#privacy-publication).
 5. **Deploy**, and check `https://flies.isaacthoman.com/`. Coolify shows a
    service healthy when its Docker health check passes: `web` serves its
    entry file to itself on `127.0.0.1:8080/healthz`, and `rooms` answers
@@ -200,7 +201,7 @@ git pull --ff-only && docker compose up -d --build --wait
 
 The second line is the update command. npm dependencies and the fetched brain
 are separate cached layers, so ordinary game edits do not download them
-again. The brain layer includes `anatomy.bin`: its packer uses only npm
+again. The brain layer includes `packages/brain/data/anatomy.bin`: its packer uses only npm
 dependencies, and both public downloads are hash checked. A failed download
 or annotation pack fails the build rather than publishing a partial image;
 retry the build. No host Node installation or local brain data is needed.
@@ -274,7 +275,10 @@ and, for a locked one, a salted scrypt hash of its password (never the
 password; nor does the log ever have one). Tables kept by an older server
 are read as they are, unlisted and without a password. A new protocol (3,
 for rooms) reaches open tabs as a refusal they answer by reloading into the
-new site, once. Rolling the rooms back past it forgets nothing, but an older
+new site, once. The rooms open to everyone, which every device now sits in
+by default, need nothing set: the server opens Everyone as it starts and keeps
+it in the same file; they came within protocol 3, so open tabs and the apps
+already installed keep working across the update. Rolling the rooms back past it forgets nothing, but an older
 server would let anyone with a locked room's link in. An update restarts it with SIGTERM: it writes
 the tables, tells every connected device it is restarting, and the devices
 reconnect to their tables within a couple of seconds. Keep `rooms_data`, and
@@ -286,6 +290,44 @@ small: it relays about 1 KB/s up and 7 KB/s down per player at a table of
 eight. Rolling back works as for the site: tag `flies-rooms:local` as `flies-rooms:rollback` before an update.
 The iPhone and iPad app reaches the same `wss://flies.isaacthoman.com/rooms`
 (docs/ios.md, "Tables with others").
+
+## Privacy publication
+
+The game and its offline acknowledgements work without owner details. By
+default the build writes no privacy page: `/privacy`, `/privacy/` and
+`/privacy/index.html` answer 404, including in Vite dev/preview. No privacy
+link is added to the game. The source policy and store listing in `docs/`
+are owner drafts, not public build files.
+
+To publish the policy, set **all four** public build variables in Coolify
+(available at build time), or your Compose `.env`, and rebuild/redeploy:
+
+| Variable | Supply |
+| --- | --- |
+| `FLIES_OPERATOR_NAME` | The public person or organisation responsible for the app. |
+| `FLIES_CONTACT_EMAIL` | A public mailbox for privacy questions and deletion requests. |
+| `FLIES_SUPPORT_URL` | An HTTPS support page people can use. |
+| `FLIES_MARKETING_URL` | An HTTPS page describing the app. |
+
+Missing or blank values leave the policy unpublished. A complete configuration
+with placeholder values, an invalid email, or non-HTTPS URLs stops the build.
+The name/contact replace the draft markers; support/marketing become links
+on the policy. These values are public, not secrets. Runtime container
+variables cannot change an already-built page. Docker and Compose pass these
+arguments just as they pass `APPLE_TEAM_ID`; a direct `npm run build` reads
+them from its environment. Native builds use the same variables if their
+bundle should contain the policy.
+
+Before publication, confirm access-log retention at the host and every proxy
+or provider, and room-volume backup retention; update `docs/privacy.md` to
+match. The supplied logs rotate at 10 MB × three files per service, with no
+time-based limit. This does not establish the provider's retention policy.
+After deployment, check `/privacy` for the completed public text, or a 404
+when disabled. Preserve that 404 instead of rewriting it to the game.
+
+`THIRD_PARTY_NOTICES` and the reader's `apps/web/src/ui/notices.json` are committed generated
+files. `npm run notices` regenerates them. Tests and every build reject stale
+contents through `checkGenerated()`; builds then emit the same notice text.
 
 ## The iPhone and iPad app's links
 
@@ -323,3 +365,5 @@ repository variable `IOS_LINKS=0` to omit the entitlement from releases.
 
 `scripts/checkDeploy.ts` checks the file's type, contents and absence of redirects
 when the build has one, and that the path is a 404 when it doesn't.
+
+<!-- docs-check: generated packages/brain/data/anatomy.bin -->

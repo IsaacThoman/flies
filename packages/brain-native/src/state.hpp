@@ -58,7 +58,7 @@ class InternalState {
   static constexpr double kBias = -1;
   static constexpr double kHungerWeight = 0.9;
   // How far the clock's oscillators raise arousal, and its push toward sleep, sleep pressure and sleep depth lower it, at 1.
-  static constexpr double kSleepWake = 1, kSleepClock = 3.5, kSleepPressure = 4, kSleepDepth = 5;
+  static constexpr double kSleepWake = 1, kSleepClock = 3.5, kSleepPressure = 4, kSleepDepth = 4;
 
   explicit InternalState(uint32_t seed) : normal_(seed) {}
 

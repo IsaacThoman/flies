@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HitMap } from "@fly/ui";
+import { COLOURS } from "@fly/net";
 import { TV_FRAME, frameFor } from "../src/display.ts";
 import type { Frame } from "../src/display.ts";
 import { DEFAULT_SETTINGS } from "../src/settings.ts";
@@ -11,6 +12,7 @@ import type { HudState } from "../src/ui/hud.ts";
 import { hudLayout, loadingLayout, roomLayout, safeRect, titleLayout } from "../src/ui/layout.ts";
 import { LOADING_HITS, drawLoading } from "../src/ui/loading.ts";
 import type { Rect } from "../src/ui/layout.ts";
+import NOTICES from "../src/ui/notices.json" with { type: "json" };
 import { AboutScreen } from "../src/ui/screens/about.ts";
 import { settingsScreen, titleScreen } from "../src/ui/screens/menus.ts";
 import { OnlineScreen } from "../src/ui/screens/online.ts";
@@ -28,6 +30,7 @@ const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y
 function shell(frame: Frame, glyphs: Shell["glyphs"] = null, online = true): Shell {
   return {
     settings: { ...DEFAULT_SETTINGS },
+    maxFlies: 4,
     brain: { status: "running", neurons: 166700, connections: 6242118, state: null } as unknown as Shell["brain"],
     meter: { history: new Float32Array(120), head: 0, spikesPerSecond: 0, active: 0, speed: 1 } as unknown as Shell["meter"],
     life: { sensed: { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, light: null }, activity: "resting" } as unknown as Shell["life"],
@@ -120,7 +123,7 @@ test("the HUD's targets are where it draws them, inside the safe area, and big e
     hands.stepVariant(1);
     const hits = new HitMap();
     hits.begin("play");
-    const state: HudState = { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, spikes: 0, brainRunning: true, eyes: null, layout: hudLayout(frame) };
+    const state: HudState = { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, brainRunning: true, eyes: null, layout: hudLayout(frame) };
     drawHud(blankCanvas(), 0, state, hits);
     const kinds = new Set<string>();
     for (let i = 0; i < hits.count; i++) {
@@ -141,7 +144,7 @@ test("with the remote in hand the HUD records no targets of its own but the menu
   const hands = new Hands(createPicnic());
   const hits = new HitMap();
   hits.enabled = false;
-  drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: "remote", learned: {}, teachSwipe: true, changed: 10, spikes: 0, brainRunning: true, eyes: null, layout: hudLayout(TV_FRAME) }, hits);
+  drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: "remote", learned: {}, teachSwipe: true, changed: 10, brainRunning: true, eyes: null, layout: hudLayout(TV_FRAME) }, hits);
   assert.equal(hits.count, 0);
 });
 
@@ -239,8 +242,8 @@ test("the title leaves room for the fly, clear of the name, the brain's state an
 
 test("at a room, its QR code and code are beside the menu or over it, inside the safe area, clear of the hints, and big enough to scan across a room", () => {
   // The starter of a full room: Remove for each of the other seven, and Share and Leave.
-  const others = Array.from({ length: 7 }, (_, i) => ({ id: i + 2, colour: "#e53" }));
-  const table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://flies.isaacthoman.com/?table=abcdefghjk", starting: true, joined: true, others };
+  const others = Array.from({ length: 7 }, (_, i) => ({ id: i + 2, colours: ["#e53"] }));
+  const table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://flies.isaacthoman.com/?table=abcdefghjk", starting: true, joined: true, everyone: false, others };
   const spec = { items: 9, maxRows: 7, width: 460, row: 40, heading: true, foot: 34, values: false, raise: 12 };
   for (const [name, frame] of [...frames(), ["the TV", TV_FRAME] as const]) {
     const a = safeRect(frame);
@@ -290,7 +293,7 @@ test("with a remote, a keyboard or a pad in hand, the hints keep clear of the sh
         hands.chooseTool(TOOLS.findIndex((t) => t.id === tool));
         for (const learned of [{}, { tools: true }] as Learned[]) {
           const g = blankCanvas();
-          drawHud(g, 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs, learned, teachSwipe: true, changed: 10, spikes: 0, brainRunning: true, eyes: null, layout: hud }, new HitMap());
+          drawHud(g, 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs, learned, teachSwipe: true, changed: 10, brainRunning: true, eyes: null, layout: hud }, new HitMap());
           for (const chip of writtenOn(g).filter((w) => w.size === 13)) {
             // A chip: from the hints' edge on the left; on the right, its glyph before its words (a chip 13 high starts 0.95 of its 22.75 height before them), and a little after them.
             const left = chip.x < hud.cx ? hud.hintsX : chip.x - 0.95 * 22.75;
@@ -320,5 +323,102 @@ test("the loading screen and its failure panel: where they always were on the TV
     drawLoading(blankCanvas(), 0, failed, l, hits);
     const hit = hits.at(l.retry.x + l.retry.w / 2, l.retry.y + l.retry.h / 2);
     assert.equal(hit?.kind, LOADING_HITS.retry, `${name}: Try again is where it is drawn`);
+  }
+});
+
+
+test("selector arrows stay put across kinds, including Place's Go appearing", () => {
+  for (const [, frame] of frames()) for (const id of ["feed", "light", "weather", "view", "place"]) {
+    const hands = new Hands(createPicnic());
+    const i = TOOLS.findIndex((t) => t.id === id);
+    hands.chooseTool(i);
+    let first: number[] | null = null;
+    for (let kind = 0; kind < TOOLS[i].variants.length; kind++) {
+      hands.variants[i] = kind;
+      const hits = new HitMap();
+      drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "resting", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, brainRunning: true, eyes: null, layout: hudLayout(frame) }, hits);
+      const arrows: number[] = [];
+      for (let j = 0; j < hits.count; j++) if (hits.get(j)!.kind === "kind") arrows.push(hits.get(j)!.x);
+      if (!first) first = arrows;
+      else assert.deepEqual(arrows, first, `${id}: the same place selects each next kind`);
+    }
+  }
+});
+
+test("the Flies row draws one enamel dot per fly on wide and compact screens, with chevrons to choose", () => {
+  for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
+    for (let count = 1; count <= 4; count++) {
+      const host = shell(frame);
+      host.settings.flies = count;
+      const screen = settingsScreen(host);
+      screen.enter();
+      const row = screen.menu.items.findIndex((i) => i.id === "flies");
+      screen.menu.focusOn("flies");
+      const g = blankCanvas();
+      const colours: string[] = [];
+      g.fill = () => {
+        if (COLOURS.some((colour) => colour === String(g.fillStyle))) colours.push(String(g.fillStyle));
+      };
+      const hits = new HitMap();
+      hits.begin(screen.id);
+      screen.draw(g, 0, hits);
+      assert.deepEqual(colours, COLOURS.slice(0, count), `${name}: ${count} enamel dots`);
+      assert.ok(!writtenOn(g).some((w) => w.text === String(count)), "count shown as dots");
+      const steps = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).filter((h) => h.kind === "step" && h.index === row);
+      assert.equal(steps.length, 2, `${name}: both chevrons target this row`);
+    }
+  }
+});
+
+test("Acknowledgements pages fit every screen and every document is reachable with a remote", () => {
+  for (const [name, frame] of frames()) {
+    let exits = 0;
+    const host = shell(frame);
+    host.back = () => { exits++; };
+    const screen = new AboutScreen(host);
+    const draw = () => {
+      const g = blankCanvas();
+      const hits = new HitMap();
+      hits.begin("about");
+      screen.draw(g, 0, hits);
+      for (let i = 0; i < hits.count; i++) assert.ok(inside(hits.get(i)!, safeRect(frame)), name);
+      return { words: writtenOn(g).map((w) => w.text), hits };
+    };
+    assert.ok(draw().words.includes("Acknowledgements →"));
+    screen.press("select", false);
+    const first = draw();
+    assert.ok(first.words.includes("Acknowledgements"));
+    assert.ok(first.words.join(" ").includes("FlyEM male CNS data"));
+    const seen = new Set<string>();
+    for (let page = 0; page < NOTICES.length; page++) {
+      const { words, hits } = draw();
+      const count = words.find((w) => /^\d+ \/ \d+$/.test(w))!;
+      if (seen.has(count)) break;
+      seen.add(count);
+      for (let i = 0; i < hits.count; i++) if (hits.get(i)!.kind === "notice") assert.ok(hits.get(i)!.h >= 40, name);
+      screen.press("down", false);
+      screen.press("right", false);
+    }
+    assert.equal(seen.size, NOTICES.length, `${name}: every notice category reachable`);
+    screen.press("back", false);
+    assert.equal(exits, 0, "Back returns from notices to About");
+    assert.ok(draw().words.includes("About the fly"));
+    screen.press("back", false);
+    assert.equal(exits, 1, "Back leaves About");
+  }
+});
+
+
+test("notice navigation clears the button hints on tall and short screens", () => {
+  for (const [name, frame] of frames()) {
+    const screen = new AboutScreen(shell(frame, "keys"));
+    screen.press("select", false);
+    const hits = new HitMap();
+    hits.begin("about");
+    screen.draw(blankCanvas(), 0, hits);
+    for (let i = 0; i < hits.count; i++) {
+      const hit = hits.get(i)!;
+      if (hit.kind === "notice") assert.ok(hit.y + hit.h < frame.design.height - frame.safe.bottom - 43, name);
+    }
   }
 });

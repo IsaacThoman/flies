@@ -12,7 +12,7 @@ import type { View } from "../camera.ts";
 import { PLACES } from "../places/catalog.ts";
 import type { PlaceId } from "../places/catalog.ts";
 import type { TimeOfDay } from "../scene/light.ts";
-import type { WeatherKind } from "@fly/world";
+import type { WeatherKind } from "../scene/weather.ts";
 
 export type ToolId = "feed" | "swoop" | "feather" | "blow" | "light" | "weather" | "view" | "place";
 
@@ -27,7 +27,7 @@ export const TOOLS: readonly Tool[] = [
   // "Now" follows the clock, so the wallpaper's light changes with the day outside.
   { id: "light", name: "Light", verb: "", hold: false, variants: [{ id: "clock", label: "Now" }, { id: "morning", label: "Morning" }, { id: "noon", label: "Midday" }, { id: "golden", label: "Golden hour" }, { id: "dusk", label: "Dusk" }, { id: "night", label: "Night" }] },
   // "Now" is the weather outside where the Apple TV can tell it ("Outside"), else wanders as a forecast worked out from the clock would; the others hold.
-  { id: "weather", name: "Weather", verb: "", hold: false, variants: [{ id: "now", label: "Now" }, { id: "clear", label: "Clear" }, { id: "overcast", label: "Overcast" }, { id: "mist", label: "Mist" }, { id: "rain", label: "Rain" }] },
+  { id: "weather", name: "Weather", verb: "", hold: false, variants: [{ id: "now", label: "Now" }, { id: "clear", label: "Clear" }, { id: "overcast", label: "Overcast" }, { id: "mist", label: "Mist" }, { id: "rain", label: "Rain" }, { id: "heavyRain", label: "Heavy rain" }, { id: "storm", label: "Thunderstorm" }, { id: "snow", label: "Snow" }, { id: "sleet", label: "Sleet" }] },
   // Nearest first, so Up brings the camera in and Down takes it out; then through its eyes, and inside it (close up, its body as glass).
   { id: "view", name: "View", verb: "", hold: false, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }, { id: "inside", label: "Inside it" }] },
   // Where it lives: Up and Down choose, Select carries it there. Only when there is somewhere else to go.
@@ -121,6 +121,8 @@ export class Hands {
   /** Tools whose kind can't be changed now: at a table with others, the light, the weather and the place are the starter's to choose. */
   fixed: ReadonlySet<ToolId> = new Set();
   #idle = 0;
+  /** Select was held at the last update. */
+  #holding = false;
   #world: World;
 
   /** `start`: a kind to start on for some tools, by id; any the shelf doesn't have are passed over. */
@@ -177,7 +179,7 @@ export class Hands {
     return TOOLS[LIGHT_TOOL].variants[this.variants[LIGHT_TOOL]].id as TimeOfDay | "clock";
   }
 
-  /** The weather chosen on the Weather tool: one of the four, or the forecast's ("now"). */
+  /** The weather chosen on the Weather tool: a kind, or the forecast's ("now"). */
   get weather(): WeatherKind | "now" {
     return TOOLS[WEATHER_TOOL].variants[this.variants[WEATHER_TOOL]].id as WeatherKind | "now";
   }
@@ -239,9 +241,10 @@ export class Hands {
     this.stroke = 0;
     this.blowing = false;
     this.stroking = false;
+    this.#holding = false;
   }
 
-  update(dt: number, input: HandsInput, fly: { position: Vec3; yaw: number; onFeet: boolean }, pantry: Pantry) {
+  update(dt: number, input: HandsInput, fly: { readonly position: Vec3; readonly yaw: number; readonly onFeet: boolean }, pantry: Pantry) {
     const ev = this.events;
     const world = this.#world;
     this.#idle += dt;
@@ -297,36 +300,44 @@ export class Hands {
       } else swoopAt(ball.from, ball.via, ball.to, ball.t, ball.position);
     }
 
-    // The feather: resting on the fly, or stroking it while Select is held.
-    this.stroking = false;
-    this.stroke = 0;
-    if (tool === "feather" && fly.onFeet) {
-      const d = Math.hypot(this.pointer.x - fly.position.x, this.pointer.y - fly.position.y, this.pointer.z - fly.position.z);
-      if (d < FEATHER_REACH) {
-        this.stroking = input.holding;
-        this.stroke = input.holding ? 1 : FEATHER_REST;
-      }
-    }
-
-    // A puff of air: from where the player sits, through the pointer.
+    // The feather and a puff, on the fly the pointer follows.
+    this.#holding = input.holding;
     this.blowing = tool === "blow" && input.holding;
-    this.air.x = 0;
-    this.air.y = 0;
-    this.air.z = 0;
     if (this.blowing) {
+      // From where the player sits, through the pointer.
       const dx = this.pointer.x - input.eye.x;
       const dz = this.pointer.z - input.eye.z;
       const d = Math.hypot(dx, dz) || 1;
       this.puffDirection.x = dx / d;
       this.puffDirection.y = -0.15;
       this.puffDirection.z = dz / d;
-      const speed = PUFF_SPEED[this.variant.id as keyof typeof PUFF_SPEED] ?? PUFF_SPEED.gentle;
-      const away = Math.hypot(fly.position.x - this.pointer.x, (fly.position.y - this.pointer.y) * 1.5, fly.position.z - this.pointer.z);
-      const felt = Math.max(0, 1 - away / PUFF_RADIUS);
-      this.air.x = this.puffDirection.x * speed * felt;
-      this.air.y = this.puffDirection.y * speed * felt;
-      this.air.z = this.puffDirection.z * speed * felt;
     }
+    this.air.x = 0;
+    this.air.y = 0;
+    this.air.z = 0;
+    this.stroke = this.reach(fly, this.air);
+    this.stroking = this.stroke > 0 && input.holding;
+  }
+
+  /**
+   * What the hands do to a fly this frame (the one the pointer follows, or
+   * any other where it is), after `update`: the feather resting on it or
+   * stroking it while Select is held, as a stroke (0 to 1, returned), and a
+   * puff's air at it, added to `air`.
+   */
+  reach(fly: { readonly position: Vec3; readonly onFeet: boolean }, air: Vec3): number {
+    const p = fly.position;
+    if (this.blowing) {
+      const speed = PUFF_SPEED[this.variant.id as keyof typeof PUFF_SPEED] ?? PUFF_SPEED.gentle;
+      const away = Math.hypot(p.x - this.pointer.x, (p.y - this.pointer.y) * 1.5, p.z - this.pointer.z);
+      const felt = Math.max(0, 1 - away / PUFF_RADIUS) * speed;
+      air.x += this.puffDirection.x * felt;
+      air.y += this.puffDirection.y * felt;
+      air.z += this.puffDirection.z * felt;
+    }
+    if (this.current.id !== "feather" || !fly.onFeet) return 0;
+    const d = Math.hypot(this.pointer.x - p.x, this.pointer.y - p.y, this.pointer.z - p.z);
+    return d < FEATHER_REACH ? (this.#holding ? 1 : FEATHER_REST) : 0;
   }
 
   /** Clears the per-frame events the screen has read. */
