@@ -1,12 +1,31 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
+import { KITCHEN, World } from "@fly/world";
 import { buildSet } from "../src/places/kitchen/set.ts";
 import { buildBackdrop } from "../src/places/kitchen/backdrop.ts";
 import { PALETTES } from "../src/places/kitchen/palettes.ts";
 import { Daylight } from "../src/scene/light.ts";
 import { WeatherNow } from "../src/scene/weather.ts";
 import { disposeAll } from "../src/scene/build.ts";
+
+test("the bowl's drawn inner slope meets its felt surface beside the banana", () => {
+  const set = buildSet();
+  const world = new World(KITCHEN);
+  const ray = new THREE.Raycaster();
+  set.group.updateMatrixWorld(true);
+  for (const [x, z] of [
+    [-76.41666666666669, -59.95537044259771],
+    [-76.14910950675657, -59.82629426003556],
+  ]) {
+    ray.set(new THREE.Vector3(x, 40.5, z), new THREE.Vector3(0, -1, 0));
+    const drawn = ray.intersectObject(set.group, true)[0];
+    assert.ok(drawn);
+    assert.ok(Math.abs(drawn.point.y - world.heightAt(x, z, 40.5)) < 0.1);
+  }
+  disposeAll(set.group);
+  for (const object of set.seen) disposeAll(object);
+});
 
 test("the kitchen shows snowfall outside and heavier rain deepens the window's haze", () => {
   const backdrop = buildBackdrop();

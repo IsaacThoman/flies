@@ -229,7 +229,7 @@ export function buildSet(): SceneSet {
         surface(
           s,
           s.name === "kitchen bowl" ? 48 : 20,
-          s.name === "kitchen bowl" ? 72 : 32,
+          s.name === "kitchen bowl" ? 112 : 32,
         ),
         color,
         k,

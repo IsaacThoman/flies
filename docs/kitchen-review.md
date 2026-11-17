@@ -354,3 +354,21 @@ quality score is claimed for this compatibility work.
 Typecheck, lint and all 233 requested place, weather, server and net tests pass.
 The kitchen passes 3,028 top and 2,798 side samples in the drawn/felt check, with
 two static meshes and 85,346 triangles, without exceptions.
+
+## Orbit clearance investigation
+
+The exact reported failure reproduces at the bowl point
+(-76.4167, 39.5555, -59.9554), on a walkable roughly 54-degree inner slope.
+Removing every solid except the bowl reproduces the same failure at 0.95 s.
+The camera reaches its 0.3 mm minimum arm; clearance is 0.49562 mm at the first
+failure and falls to about 0.385 mm through the turn, against its 0.5 mm contract.
+The fallback in orbit.ts stops shortening at CLOSEST even if clearAt is false,
+then places the camera there. Its near plane is 0.5 mm from the eye.
+
+Separately, the drawn bowl had about 0.105 mm of interpolation error at these
+points. Finer angular sampling reduces this to 0.041–0.043 mm and adds a surface
+regression, keeping two meshes and 89,186 triangles inside the 90,000 budget.
+The world's bowl and banana dimensions are unchanged. No camera rule or existing
+test was changed. Places, drawn/felt, room rotation, eight-fly spawning, typecheck
+and lint pass; the orbit test remains blocked on the camera clearance rule. This
+head is not cleared for merging on an all-tests-pass basis.
