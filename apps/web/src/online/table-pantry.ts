@@ -8,7 +8,8 @@
 import { FOODS, Pantry } from "@fly/world";
 import type { Food, FoodKind, World } from "@fly/world";
 import type { Falling } from "../tools/hands.ts";
-import { DROP_ID, FoodMirror, foundId } from "@fly/net";
+import type { FoodWire } from "@fly/net";
+import { DROP_ID, FoodMirror, dropOwner, foundId } from "@fly/net";
 
 export class TablePantry extends Pantry {
   readonly mirror: FoodMirror;
@@ -17,9 +18,9 @@ export class TablePantry extends Pantry {
   /** The room supports nutrition receipts; older rooms retain their original optimistic feeding. */
   confirmed = false;
   /** Food the place put out here, for the room to hear of. */
-  onFound: (food: Food) => void = () => {};
   /** Requests a clear from the room, which decides what this player owns. */
   onClear: () => void = () => {};
+  onFound: (food: Food, lasts?: number) => void = () => {};
   readonly #world: World;
   #dropped = 0;
   /** Names given at the moment of dropping, waiting for the food to land: by kind, oldest first. */
@@ -38,8 +39,21 @@ export class TablePantry extends Pantry {
     return id;
   }
 
+  /** Remember retained names even after the room acknowledges their removal. */
+  welcome(foods: readonly FoodWire[]) {
+    for (const food of foods) {
+      if (dropOwner(food[0]) === this.player) this.#dropped = Math.max(this.#dropped, food[0] % DROP_ID);
+    }
+    this.mirror.welcome(foods);
+  }
+
   #next() {
-    return this.player * DROP_ID + (++this.#dropped % DROP_ID);
+    let id: number;
+    do {
+      this.#dropped = (this.#dropped + 1) % DROP_ID;
+      id = this.player * DROP_ID + this.#dropped;
+    } while (this.foods.some((f) => f.id === id) || this.#named.some((f) => f.id === id));
+    return id;
   }
 
   clearDropped() {
@@ -67,13 +81,13 @@ export class TablePantry extends Pantry {
     this.mirror.add({ id, kind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, amount: 1, pool: false });
   }
 
-  add(name: string, x: number, z: number, r: number, sweet: number, y?: number): Food {
+  add(name: string, x: number, z: number, r: number, sweet: number, y?: number, lasts?: number): Food {
     const id = foundId(name, x, z);
     const known = this.foods.find((f) => f.id === id);
     if (known) return known;
     const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, amount: 1, pool: false };
     this.foods.push(food);
-    this.onFound(food);
+    this.onFound(food, lasts);
     return food;
   }
 

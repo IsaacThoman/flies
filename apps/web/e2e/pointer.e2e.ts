@@ -204,7 +204,7 @@ async function fingers() {
     step("fingers: the menu's button, its back button, and Settings changed by tapping");
     await tapOn("menu");
     await waitFor(page, "screen=title,ring=false");
-    await tapOn("row", 3);
+    await tapOn("row", 2);
     await waitFor(page, "screen=settings,tab=wallpaper");
     await tapOn("tab", 2);
     await waitFor(page, "tab=picture");
@@ -218,7 +218,7 @@ async function fingers() {
     // Outside the pane is Back.
     await touch.tap([0.5, 0.97]);
     await waitFor(page, "screen=title");
-    await tapOn("row", 2);
+    await tapOn("row", 4);
     await waitFor(page, "screen=about");
     await tapOn("notice", 0);
     await waitFor(page, "acknowledgement=0");
@@ -288,7 +288,7 @@ async function mouse() {
     await waitFor(page, "ring=true,focus=play,device=keys");
     await page.keyboard.press("ArrowDown");
     await waitFor(page, "focus=watch");
-    await click("row", 3);
+    await click("row", 2);
     await waitFor(page, "screen=settings,ring=false");
     // A right click is Back.
     const p0 = await canvasPoint(page, [0.5, 0.5]);

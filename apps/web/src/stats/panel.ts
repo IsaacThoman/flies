@@ -33,11 +33,11 @@ import type { HudLayout } from "../ui/layout.ts";
 
 /** The panel, design units at full size: a heading, then a grid of cells (a number over its unit), with a trace over the brain's. */
 const RADIUS = 14;
-const HEADING = { x: 12, y: 19, size: 12, color: "#eaf6ff" };
-const TOP = 27;
-const FOOT = 5;
-const TRACE = 22;
-const CELL = { width: 52, height: 28 };
+const HEADING = { x: 12, y: 21, size: 14, color: "#eaf6ff" };
+const TOP = 31;
+const FOOT = 7;
+const TRACE = 26;
+const CELL = { width: 72, height: 38 };
 const BRAIN_CELLS = 3;
 const DAY_CELLS = 5;
 /** Between it and the others, design units. */
@@ -45,8 +45,8 @@ const GAP = 8;
 /** The most times a second it is drawn again. */
 export const REDRAWS = 4;
 
-const VALUE = { size: 13, color: "#ffffff" };
-const UNIT = { size: 9, color: "rgba(220, 240, 255, 0.72)" };
+const VALUE = { size: 18, color: "#ffffff" };
+const UNIT = { size: 14, color: "#e4f3ff" };
 
 /** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger, internal state, 1 when left out. */
 const SENSES = [
@@ -92,7 +92,8 @@ const OUT_COLOR = "#ffd59a";
 const IN_HEADING = { size: 10, color: IN_COLOR };
 const OUT_HEADING = { size: 10, color: OUT_COLOR };
 const RATE = { size: 9, color: "#ffffff", align: "right" as const };
-const HZ_UNIT = { ...UNIT, align: "right" as const };
+const SIGNAL_LABEL = { size: 10, color: "#e4f3ff" };
+const HZ_UNIT = { ...SIGNAL_LABEL, align: "right" as const };
 /** Between its columns. */
 const APART = 14;
 
@@ -108,7 +109,7 @@ function signalColumns(cols: number) {
   const half = Math.ceil(SENSES.length / 2);
   const split = (out: boolean) => (out ? [[0, COMMANDS.length]] : cols === 3 ? [[0, half], [half, SENSES.length - half]] : [[0, SENSES.length]]);
   const columns: SignalColumn[] = [];
-  let x = 10, y = TOP, bottom = 0;
+  let x = 10, y = 27, bottom = 0;
   for (const out of [false, true]) {
     for (const [from, rows] of split(out)) {
       columns.push({ out, from, rows, x, y });
@@ -118,7 +119,7 @@ function signalColumns(cols: number) {
     }
   }
   const width = cols === 1 ? 20 + OUT_WIDTH : x - APART + 10;
-  return { columns, width, height: bottom + FOOT };
+  return { columns, width, height: bottom + 5 };
 }
 const SIGNAL_COLUMNS = [1, 2, 3].map(signalColumns);
 
@@ -183,7 +184,7 @@ export function statsLayout(frame: Frame, hud: HudLayout = hudLayout(frame), siz
   const topFor = (width: number) => (a.w / 2 - 120 - margin - 8 >= width ? a.y + margin : hud.captionY + 23);
   const floorFor = (width: number) => (hud.shelfLeft > a.x + margin + width ? a.y + a.h - margin : hud.labelY - 25);
   // While playing it is at the top: clear of the menu's button on the left, and of the hints under each side.
-  const reach = (left: boolean, width: number) => Math.min(floorFor(width), left ? hud.hintsY - 50 : hud.rightY - 20);
+  const reach = (left: boolean, width: number) => hud.reserveHints ? Math.min(floorFor(width), left ? hud.hintsY - 50 : hud.rightY - 20) : floorFor(width);
   const topOf = (left: boolean, width: number) => Math.max(topFor(width), left ? hud.menuY + 26 : -Infinity);
   // Under the others at the top, as they are when both show, and over them at the bottom.
   const columnTop = (left: boolean) => {
@@ -204,7 +205,9 @@ export function statsLayout(frame: Frame, hud: HudLayout = hudLayout(frame), siz
     let under = full;
     for (const left of [true, false]) under = Math.min(under, (reach(left, W * under) - columnTop(left)) / H, (columnFoot(left) - topOf(left, W * under)) / H);
     const scale = Math.max(wide, under);
-    if (scale > best.scale + 1e-9) best = { scale, shape, inColumn: under > wide };
+    // A taller grid is worthwhile only when its type gets visibly larger.
+    const taller = shape.cols === 2 && !shape.side && best.shape.cols === 3 && !best.shape.side;
+    if (scale > best.scale * (taller ? 1.18 : 1) + 1e-9) best = { scale, shape, inColumn: under > wide };
   }
   const { shape, inColumn } = best;
   const scale = Math.max(0.05, best.scale);
@@ -247,6 +250,8 @@ export const statsSlot = (layout: StatsLayout, eyes: CornerWanted, nerves: Corne
 /** What it shows, as the game has it now. */
 export type StatsState = {
   activity: Activity;
+  /** Keep activity visible when the HUD caption is hidden. */
+  activityHeading?: boolean;
   spikes: number;
   active: number;
   speed: number;
@@ -335,12 +340,12 @@ function signalColumn(g: CanvasRenderingContext2D, c: SignalColumn, v: Float32Ar
   for (let i = c.from; i < c.from + c.rows; i++) {
     const ry = y + SUB + (i - c.from) * ROW;
     if (!out) {
-      text(g, SENSES[i][1], x, ry + 8, UNIT);
+      text(g, SENSES[i][1], x, ry + 8, SIGNAL_LABEL);
       bar(g, x + NAME.in, ry + 3, v[i], IN_COLOR, false);
       continue;
     }
     const command = COMMANDS[i];
-    text(g, command.label, x, ry + 8, UNIT);
+    text(g, command.label, x, ry + 8, SIGNAL_LABEL);
     bar(g, x + NAME.out, ry + 3, v[SENSES.length + i], OUT_COLOR, command.key === "turn");
     text(g, command.rates.length === 2 ? `${v[r]}·${v[r + 1]}` : String(v[r]), x + OUT_WIDTH, ry + 8, RATE);
     r += command.rates.length;
@@ -353,20 +358,19 @@ function cell(g: CanvasRenderingContext2D, x: number, y: number, cols: number, i
   const cy = y + Math.floor(i / cols) * CELL.height;
   const space = value.lastIndexOf(" ");
   const figure = space < 0 ? value : value.slice(0, space);
-  text(g, figure, cx, cy + 12, VALUE);
+  text(g, figure, cx, cy + 17, VALUE);
   if (space >= 0) {
     g.font = font(VALUE.size);
-    text(g, value.slice(space + 1), cx + g.measureText(figure).width + 2, cy + 12, UNIT);
+    text(g, value.slice(space + 1), cx + g.measureText(figure).width + 2, cy + 17, UNIT);
   }
-  text(g, what, cx, cy + 23, UNIT);
+  text(g, what, cx, cy + 34, UNIT);
 }
 
 /** The panel in its own design units at full size: the glass, then what it shows, as the game has it now. */
 export function drawStatsPanel(g: CanvasRenderingContext2D, shape: StatsShape, s: StatsState, signalsNow?: Float32Array) {
   const { kind, cols, side, width, height } = shape;
   glassPanel(g, 1, 1, width - 2, height - 2, RADIUS, { tint: "night", shadow: false });
-  // What it is doing heads its day, and what goes in and out; the brain alone is only the brain. Smaller, if it must be, to fit.
-  const heading = kind === "brain" ? "Its brain" : caption(s.activity, null);
+  const heading = kind === "brain" ? "Its brain" : s.activityHeading !== false ? caption(s.activity, null) : kind === "day" ? "Its day" : kind === "signals" ? "In and out" : "Brain + day";
   g.font = font(HEADING.size);
   const size = Math.min(HEADING.size, Math.floor((HEADING.size * (width - 2 * HEADING.x)) / g.measureText(heading).width));
   text(g, heading, HEADING.x, HEADING.y, { size, color: HEADING.color });
@@ -442,7 +446,7 @@ export class StatsPanel {
   #kind: StatsKind = "both";
   #since = 1;
   /** What it last drew, to tell when it has changed; what goes in and out as last drawn, and as it is now. */
-  readonly #drawn = { kind: "", activity: "", head: -1, walked: -1, meals: -1, takeOffs: -1, flown: -1, groomed: -1, date: "" };
+  readonly #drawn = { kind: "", activity: "", activityHeading: true, head: -1, walked: -1, meals: -1, takeOffs: -1, flown: -1, groomed: -1, date: "" };
   #signalsDrawn = new Float32Array(SIGNALS);
   #signalsNow = new Float32Array(SIGNALS);
 
@@ -534,7 +538,7 @@ export class StatsPanel {
   /** Whether anything it shows has changed since it was drawn, to the figure it is shown to. */
   #changed(s: StatsState) {
     const d = this.#drawn, day = s.day, kind = this.#kind;
-    if (d.kind !== kind) {
+    if (d.kind !== kind || d.activityHeading !== (s.activityHeading !== false)) {
       if (kind === "signals") readSignals(s, this.#signalsNow);
       return true;
     }
@@ -552,6 +556,7 @@ export class StatsPanel {
     const d = this.#drawn, day = s.day;
     d.kind = this.#kind;
     d.activity = s.activity;
+    d.activityHeading = s.activityHeading !== false;
     d.head = s.head;
     d.date = day.date;
     d.walked = Math.round(day.walked);

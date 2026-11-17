@@ -34,6 +34,7 @@ export type MenuScreenOptions = {
   onChange?(item: ChoiceItem | SliderItem): void;
   /** Select on a field: start typing into it. */
   onEdit?(item: FieldItem): void;
+  onSubmit?(item: FieldItem): void;
   onBack(): void;
   /** Drawn first, under the pane. */
   backdrop?(g: CanvasRenderingContext2D, t: number): void;
@@ -113,7 +114,7 @@ export class MenuScreen implements Screen {
   point(p: Point) {
     const menu = this.menu;
     const hit = p.hit;
-    const row = hit && (hit.kind === MENU_HITS.row || hit.kind === MENU_HITS.step || hit.kind === MENU_HITS.tab || hit.kind === MENU_HITS.track);
+    const row = hit && (hit.kind === MENU_HITS.row || hit.kind === MENU_HITS.step || hit.kind === MENU_HITS.tab || hit.kind === MENU_HITS.track || hit.kind === MENU_HITS.submit);
     // The list may have refreshed since these pixels were drawn.
     if (row && (!hit.id || menu.items[hit.index]?.id !== hit.id)) {
       if (p.type !== "hover") this.#held = null;
@@ -154,6 +155,10 @@ export class MenuScreen implements Screen {
         if (!hit) {
           if (!this.#options.root) this.#outcome({ kind: "back" });
         } else if (hit.kind === SCREEN_HITS.back) this.#outcome({ kind: "back" });
+        else if (hit.kind === MENU_HITS.submit) {
+          const item = menu.items[hit.index];
+          if (item?.kind === "field" && !item.disabled && item.submit && !item.submit.disabled) this.#options.onSubmit?.(item);
+        }
         else if (hit.kind === MENU_HITS.step) this.#outcome(menu.stepAt(hit.index, hit.value < 0 ? -1 : 1));
         else if (hit.kind === MENU_HITS.tab) this.#outcome(menu.chooseAt(hit.index, hit.value));
         else if (hit.kind === MENU_HITS.more) {
@@ -216,20 +221,20 @@ export class MenuScreen implements Screen {
       // Over the row it sits beside.
       hits.add(SCREEN_HITS.back, b.x - 22, b.y - 22, 44, 44);
     }
-    drawMenuHints(g, t, this.#shell);
+    drawMenuHints(g, t, this.#shell, "Back", this.menu.focused?.kind === "choice" ? "Adjust" : this.menu.focused?.kind === "field" ? "Type" : "Choose");
   }
 }
 
 /** The hints every menu shows for the buttons in hand: how to move, choose and go back, along the foot of the safe area. None for a pointer. */
-export function drawMenuHints(g: CanvasRenderingContext2D, t: number, shell: { shape: Frame; glyphs: GlyphSet | null }, back = "Back") {
+export function drawMenuHints(g: CanvasRenderingContext2D, t: number, shell: { shape: Frame; glyphs: GlyphSet | null }, back = "Back", choose: string | null = "Choose", move = "Move") {
   const set = shell.glyphs;
   if (!set) return;
   const { design, safe } = shell.shape;
   const y = design.height - safe.bottom - 26;
   const gap = 10;
-  const total = hintWidth(g, "Move", 13, "upDown", set) + hintWidth(g, "Choose", 13, "select", set) + hintWidth(g, back, 13, "back", set) + 2 * gap;
+  const total = hintWidth(g, move, 13, "upDown", set) + (choose ? hintWidth(g, choose, 13, "select", set) + gap : 0) + hintWidth(g, back, 13, "back", set) + gap;
   let x = safe.left + (design.width - safe.left - safe.right - total) / 2;
-  x += hintChip(g, x, y, "upDown", "Move", t, 13, set) + gap;
-  x += hintChip(g, x, y, "select", "Choose", t, 13, set) + gap;
+  x += hintChip(g, x, y, "upDown", move, t, 13, set) + gap;
+  if (choose) x += hintChip(g, x, y, "select", choose, t, 13, set) + gap;
   hintChip(g, x, y, "back", back, t, 13, set);
 }

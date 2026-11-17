@@ -49,6 +49,7 @@ type Point = { x: number; y: number };
 export type NervesLayout = {
   /** Its size, as a share of the full size. */
   scale: number;
+  heading: number;
   /** Beside what it sees, rather than under (or over) it. */
   across: boolean;
   /** At each corner: alone there, and next to what it sees. */
@@ -70,7 +71,7 @@ export function nervesLayout(frame: Frame, hud: HudLayout = hudLayout(frame), si
   const { margin } = INSET_PANEL;
   const { width: W, height: H } = NERVES_PANEL;
   const top = eyes.rects["top-right"].y;
-  const foot = Math.min(eyes.rects["bottom-right"].y + eyes.rects["bottom-right"].height, hud.rightY - 20);
+  const foot = Math.min(eyes.rects["bottom-right"].y + eyes.rects["bottom-right"].height, hud.reserveHints ? hud.rightY - 20 : Infinity);
   const eyesHeight = eyes.rects["top-right"].height, eyesWidth = eyes.rects["top-right"].width;
   const full = cornerScale(a, W, size);
   const under = Math.min(full, Math.min(foot - (top + eyesHeight + GAP), eyes.rects["bottom-right"].y - GAP - top) / H);
@@ -94,7 +95,7 @@ export function nervesLayout(frame: Frame, hud: HudLayout = hudLayout(frame), si
     rects[c] = [alone, next];
     origins[c] = [at(alone), at(next)];
   }
-  return { scale, across, rects, origins, panel: { width: Math.round(width * ppu.x), height: Math.round(height * ppu.y) }, ppu };
+  return { scale, heading: Math.min(22, Math.max(12, Math.ceil(12 / (frame.unit * scale)))), across, rects, origins, panel: { width: Math.round(width * ppu.x), height: Math.round(height * ppu.y) }, ppu };
 }
 
 /**
@@ -202,9 +203,9 @@ export class NervesPanel {
     glassPanel(g, 1, 1, width - 2, height - 2, radius, { tint: "night", shadow: false });
     const p = NERVES_PICTURE;
     roundedRect(g, p.x - 2, p.y - 2, p.width + 4, p.height + 4, 6);
-    g.fillStyle = "rgba(0, 16, 50, 0.5)";
+    g.fillStyle = "#bac9db";
     g.fill();
-    text(g, "Nervous system", LABEL.x, LABEL.y, { size: LABEL.size, color: LABEL.color });
+    text(g, this.#layout.heading > LABEL.size ? "Nerves" : "Nervous system", LABEL.x, LABEL.y, { size: this.#layout.heading, color: LABEL.color });
     this.#texture.needsUpdate = true;
   }
 }

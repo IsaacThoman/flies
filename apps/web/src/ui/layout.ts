@@ -34,6 +34,8 @@ export type HudLayout = {
   apart: number;
   /** The tool's label: its middle, down. */
   labelY: number;
+  /** Whether input hints need space beside the corner panels. */
+  reserveHints: boolean;
   /** The hints: the left column's left edge and its lowest chip's middle; the right one's right edge and middle. */
   hintsX: number;
   hintsY: number;
@@ -55,7 +57,7 @@ export type HudLayout = {
 /** The TV's shelf: the space each tool has, and how far apart its halves are (the tools that act on the fly, and those about its world and the camera); narrower, they come closer, then the tools do. */
 const SHELF_GAP = 52;
 const SHELF_APART = 32;
-const SHELF_APART_LEAST = 20;
+const SHELF_APART_LEAST = 12;
 /**
  * The picture through the fly's eyes, as the TV has it: the share of the
  * width its panel takes, its top and bottom as shares of the height, the
@@ -65,7 +67,7 @@ const SHELF_APART_LEAST = 20;
  */
 const PICTURE = { width: 0.84, top: 0.11, foot: 0.73, sides: 0.04, heading: 57.6, under: 24, stretch: (0.76 * 427) / (0.45 * 480), wrapsUnder: 480 };
 
-export function hudLayout(frame: Frame): HudLayout {
+export function hudLayout(frame: Frame, reserveHints = true): HudLayout {
   const tools = TOOLS.length;
   const split = WORLD_TOOLS;
   const a = safeRect(frame);
@@ -96,11 +98,12 @@ export function hudLayout(frame: Frame): HudLayout {
     captionY: a.y + 25,
     shelfY,
     gap,
-    orb: Math.min(1, gap / SHELF_GAP + 0.2),
+    orb: Math.min(1, (gap / 2 - 1) / 22),
     shelfLeft,
     split: apart > 0 ? split : tools,
     apart,
     labelY,
+    reserveHints,
     hintsX: a.x + 16,
     hintsY,
     rightX: a.x + a.w - 16,
@@ -132,7 +135,7 @@ export type MenuPanel = {
   panel: Rect;
   /** The heading's baseline and size, or none where there isn't room. */
   heading: { y: number; size: number } | null;
-  list: { x: number; y: number; width: number; row: number; gap: number; compact: boolean; columns: number };
+  list: { x: number; y: number; width: number; row: number; gap: number; compact: boolean; columns: number; scrollControls?: boolean };
   rows: number;
 };
 
@@ -168,11 +171,12 @@ export function fitMenu(space: Rect, spec: MenuPanelSpec): MenuPanel {
   const tiers = [
     { row: compact ? 54 : spec.row, gap: compact ? 8 : 12, top: spec.heading ? 70 : 26, foot: spec.foot, heading: spec.heading ? { dy: 46, size: 28 } : null },
     { row: compact ? 52 : spec.row, gap: 8, top: spec.heading ? 56 : 18, foot: 18, heading: spec.heading ? { dy: 38, size: 24 } : null },
-    { row: compact ? 50 : Math.max(34, spec.row - 4), gap: 6, top: 14, foot: 14, heading: null },
+    { row: compact ? 50 : Math.max(36, spec.row - 4), gap: 4, top: spec.heading ? 40 : 14, foot: spec.heading ? 8 : 14, heading: spec.heading ? { dy: 27, size: 22 } : null },
+    { row: compact ? 50 : 36, gap: 4, top: spec.heading ? 36 : 10, foot: 2, heading: spec.heading ? { dy: 23, size: 18 } : null },
   ];
   const fits = (t: (typeof tiers)[number]) => Math.floor((room - t.top - t.foot + t.gap) / (t.row + t.gap));
   // A list short enough to show whole: the roomiest spacing that shows it all, in two columns if it may and one won't do. One that scrolls anyway: the roomiest that shows a few rows, keeping its heading.
-  const few = Math.min(want, 4);
+  const few = Math.min(want, spec.heading ? 5 : 4);
   const whole = want === spec.items;
   let columns = 1;
   let tier = whole ? tiers.find((t) => fits(t) >= want) : undefined;
@@ -188,14 +192,14 @@ export function fitMenu(space: Rect, spec: MenuPanelSpec): MenuPanel {
   return {
     panel: { x, y, w: width, h },
     heading: tier.heading ? { y: y + tier.heading.dy, size: tier.heading.size } : null,
-    list: { x: x + pad, y: y + tier.top, width: listWidth, row: tier.row, gap: tier.gap, compact, columns },
+    list: { x: x + pad, y: y + tier.top, width: listWidth - (rows < spec.items ? 44 : 0), row: tier.row, gap: tier.gap, compact: compact || (spec.values && listWidth - (rows < spec.items ? 44 : 0) < 380), columns, ...(rows < spec.items ? { scrollControls: true } : {}) },
     rows,
   };
 }
 
 /** A pane of text or readings: the TV's size if it fits, else as much of the safe area as it can have; on a screen taller than it is wide, as tall as it likes. */
 export function fitPane(frame: Frame, width: number, height: number, raise: number): Rect {
-  const a = safeRect(frame);
+  const a = menuSpace(frame);
   if (a.h > a.w) height = Math.max(height, a.h);
   const margin = Math.min(12, a.w * 0.03);
   const w = Math.min(width, a.w - 2 * margin);
@@ -221,6 +225,13 @@ function spot(frame: Frame, x: number, y: number) {
 
 /** What the menus' hints take along the foot of the safe area (drawMenuHints). */
 const HINTS_ROOM = 38;
+
+/** Keep the menus clear of button hints; a keyboard already takes that edge. */
+export function menuSpace(frame: Frame): Rect {
+  const a = safeRect(frame);
+  if (frame.safe.bottom < 80) a.h = Math.max(1, a.h - HINTS_ROOM);
+  return a;
+}
 
 /** The wordmark's size for a width: a 6.5th of it, in proportion to the brain's state under it. */
 const wordmarkFor = (width: number, most: number) => Math.max(24, Math.min(most, (width - 32) / 6.5));
@@ -267,8 +278,8 @@ export function titleLayout(frame: Frame, items: number): TitleLayout {
   const y = a.y + 22 + size * 0.85;
   const w = Math.min(356, a.w - 24);
   const status = { x: cx - w / 2, y: y + 22, w, h: 34, size: w < 300 ? 13 : 15 };
-  const fitted = fitMenu({ x: a.x, y: status.y + status.h, w: a.w, h: a.y + a.h - status.y - status.h }, { ...spec, raise: 0 });
-  const menu = shiftMenu(fitted, a.y + a.h - 12 - fitted.panel.h - fitted.panel.y);
+  const fitted = fitMenu({ x: a.x, y: status.y + status.h, w: a.w, h: a.y + a.h - HINTS_ROOM - status.y - status.h }, { ...spec, raise: 0 });
+  const menu = shiftMenu(fitted, a.y + a.h - HINTS_ROOM - 12 - fitted.panel.h - fitted.panel.y);
   const middle = (status.y + status.h + menu.panel.y) / 2;
   return { menu, wordmark: { x: cx, y, size }, status, fly: spot(frame, cx, middle) };
 }

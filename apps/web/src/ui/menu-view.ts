@@ -14,19 +14,28 @@ import { Eased, INK, INK_SOFT, bubbleRing, chevron, font, pill, slider, text } f
 import type { ActionItem, ChoiceItem, FieldItem, HitMap, Menu, MenuItem } from "@fly/ui";
 
 /** `columns`: how many columns the rows are in (1 unless they don't fit in one). */
-export type MenuLayout = { x: number; y: number; width: number; row: number; gap: number; compact?: boolean; columns?: number };
+export type MenuLayout = { x: number; y: number; width: number; row: number; gap: number; compact?: boolean; columns?: number; scrollControls?: boolean };
 
 /** Between columns, design units. */
 const COLUMN_GAP = 12;
+const SCROLL_BUTTON = { color: "glass", size: 14 } as const;
+const SCROLL_DISABLED = { ...SCROLL_BUTTON, disabled: true } as const;
+const FIELD_SUBMIT = { color: "aqua", size: 14 } as const;
+const FIELD_SUBMIT_DISABLED = { ...FIELD_SUBMIT, disabled: true } as const;
+const ACTION_HINT = { size: 12, color: INK, align: "center", baseline: "middle" } as const;
+const ACTION_HINT_FOCUSED = { ...ACTION_HINT, color: "#ffffff" } as const;
+const COUNT = { size: 12, color: INK, align: "center", baseline: "middle" } as const;
+const COUNT_FOCUSED = { ...COUNT, color: "#ffffff" } as const;
 
 /** What a menu's targets are, as recorded in the hit map: `index` is the item's, `value` a chevron's or a "more"'s direction. */
-export const MENU_HITS = { row: "row", step: "step", track: "track", more: "more", tab: "tab" } as const;
+export const MENU_HITS = { row: "row", step: "step", track: "track", more: "more", tab: "tab", submit: "submit" } as const;
 
 /** The slider's track, from the row's right edge: where it starts and how long it is. */
 const TRACK = { from: 170, length: 140 };
 
 /** The field being typed into, by its item's index (-1: none), and where its caret is (characters into its value). */
 export type Typing = { index: number; caret: number };
+type TabLayout = { width: number; height: number; options: ChoiceItem["options"] | null; size: number; widths: Float64Array };
 
 export class MenuView {
   readonly menu: Menu;
@@ -41,6 +50,7 @@ export class MenuView {
   /** Where a visible row goes: its left edge, top and width. */
   readonly #cell = { x: 0, y: 0, width: 0 };
   #press = new Eased(0, 12);
+  readonly #tabs: TabLayout = { width: -1, height: -1, options: null, size: 0, widths: new Float64Array(0) };
 
   constructor(menu: Menu, layout: MenuLayout) {
     this.menu = menu;
@@ -69,7 +79,7 @@ export class MenuView {
   }
 
   #visibleIndex(i: number) {
-    return i - this.menu.scroll;
+    return i < this.menu.pinned ? i : i - this.menu.scroll;
   }
 
   #rowY(visible: number) {
@@ -132,49 +142,63 @@ export class MenuView {
       size = most;
       for (let i = menu.scroll; i < end; i++) size = Math.min(size, Math.floor((most * room) / g.measureText(menu.items[i].label).width));
     }
-    for (let i = menu.scroll; i < end; i++) {
+    for (let visible = 0; visible < menu.rows; visible++) {
+      const i = visible < menu.pinned ? visible : menu.scroll + visible;
       const item = menu.items[i];
       const { x, y, width } = this.#at(this.#visibleIndex(i));
       const focused = ring && i === menu.focus;
       const press = i === menu.focus ? this.#press.value : 0;
       hits.add(MENU_HITS.row, x, y, width, row, i, 0, item.id);
       const caret = i === this.typing.index ? this.typing.caret : -1;
-      if (item.kind === "choice" && item.tabs) drawTabs(g, item, x + this.tabInset, y, width - this.tabInset, row, hits, i);
-      else if (item.kind === "field") drawField(g, item, x, y, width, row, focused, i === hover, caret, t, !!this.layout.compact);
+      if (item.kind === "choice" && item.tabs) drawTabs(g, item, x + this.tabInset, y, width - this.tabInset, row, hits, i, this.#tabs);
+      else if (item.kind === "field") drawField(g, item, x, y, width, row, focused, i === hover, caret, t, !!this.layout.compact, hits, i);
       else if (this.layout.compact) drawStacked(g, item, x, y, width, row, focused, i === hover, press, hits, i, this.track);
       else drawItem(g, item, x, y, width, row, focused, i === hover, press, hits, i, this.track, size);
     }
-    // At the list's right edge, clear of a heading centred over it.
-    if (menu.scroll > 0) {
-      text(g, "▲ more", x + width - 4, this.#rowY(0) - 8, { size: 11, align: "right", color: INK_SOFT });
-      hits.add(MENU_HITS.more, x + width - 60, this.#rowY(0) - 22, 60, 18, 0, -1);
-    }
-    if (end < menu.items.length) {
-      text(g, "▼ more", x + width - 4, this.#rowY(menu.rows) + 6, { size: 11, align: "right", color: INK_SOFT });
-      hits.add(MENU_HITS.more, x + width - 60, this.#rowY(menu.rows) - 8, 60, 18, 0, 1);
+    if (this.layout.scrollControls && menu.items.length > menu.rows) {
+      const sx = x + width + 6;
+      const top = this.#rowY(menu.pinned);
+      const bottom = this.#rowY(menu.rows - 1) + row - 36;
+      const up = menu.scroll > 0, down = end < menu.items.length;
+      pill(g, sx, top, 36, 36, "▲", up ? SCROLL_BUTTON : SCROLL_DISABLED);
+      pill(g, sx, bottom, 36, 36, "▼", down ? SCROLL_BUTTON : SCROLL_DISABLED);
+      if (up) hits.add(MENU_HITS.more, sx, top, 36, 36, 0, -1);
+      if (down) hits.add(MENU_HITS.more, sx, bottom, 36, 36, 0, 1);
     }
     const focused = menu.focused;
     const inset = focused?.kind === "choice" && focused.tabs ? this.tabInset : 0;
     const cell = this.#at(0);
-    if (focused && ring) bubbleRing(g, this.#ringX.value + inset, this.#ring.value - (focused.kind === "action" ? 2 : 0), cell.width - inset, row, row / 2, t);
+    if (focused && ring) bubbleRing(g, this.#ringX.value + inset + 4, this.#ring.value + 4 - (focused.kind === "action" ? 2 : 0), cell.width - inset - 8, row - 8, (row - 8) / 2, t);
   }
 }
 
 /** The smallest a tab's label is drawn (design units); narrower, the tabs become one choice. */
-const SMALLEST_TAB = 7;
+const SMALLEST_TAB = 12;
 
 /** A choice as tabs: its options side by side, the chosen one lit. */
-function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: number, w: number, h: number, hits: HitMap, index: number) {
+function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: number, w: number, h: number, hits: HitMap, index: number, layout: TabLayout) {
   const n = item.options.length;
   const gap = 6;
-  const tw = (w - gap * (n - 1)) / n;
-  // No taller than a TV's row, and every label the same size, small enough for the widest to fit.
+  const padding = 16;
   const th = Math.min(h, 40);
   const most = Math.round(th * 0.46);
-  g.font = font(most);
-  let size = most;
-  // Each label measured at the largest size: the smallest it needs is the one for all.
-  for (const option of item.options) size = Math.min(size, Math.floor((most * (tw - 14)) / g.measureText(option.label).width));
+  if (layout.width !== w || layout.height !== h || layout.options !== item.options) {
+    layout.width = w;
+    layout.height = h;
+    layout.options = item.options;
+    if (layout.widths.length !== n) layout.widths = new Float64Array(n);
+    g.font = font(most);
+    let words = 0;
+    for (let k = 0; k < n; k++) {
+      const width = g.measureText(item.options[k].label).width;
+      layout.widths[k] = width;
+      words += width;
+    }
+    layout.size = Math.min(most, Math.floor((most * (w - gap * (n - 1) - padding * n)) / Math.max(1, words)));
+    const extra = (w - gap * (n - 1) - words * layout.size / most - padding * n) / n;
+    for (let k = 0; k < n; k++) layout.widths[k] = layout.widths[k] * layout.size / most + padding + extra;
+  }
+  const size = layout.size;
   if (size < SMALLEST_TAB) {
     // Too narrow for every tab to be read: the one chosen, between arrows that step along them, as a choice is.
     const y0 = y + (h - th) / 2, mid = y0 + th / 2;
@@ -185,10 +209,16 @@ function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: n
     hits.add(MENU_HITS.step, x + w - 44, y, 44, h, index, 1, item.id);
     return;
   }
+  let tx = x;
   for (let k = 0; k < n; k++) {
-    const tx = x + k * (tw + gap);
+    const tw = layout.widths[k];
     pill(g, tx, y + (h - th) / 2, tw, th, item.options[k].label, { color: k === item.index ? "aqua" : "glass", disabled: item.disabled, size });
+    if (k === item.index) {
+      g.fillStyle = "#ffffff";
+      g.fillRect(tx + tw * 0.3, y + (h + th) / 2 - 5, tw * 0.4, 2);
+    }
     hits.add(MENU_HITS.tab, tx, y, tw, h, index, k, item.id);
+    tx += tw + gap;
   }
 }
 
@@ -204,13 +234,23 @@ function drawAction(g: CanvasRenderingContext2D, item: ActionItem, x: number, y:
     g.font = font(most);
     words = Math.max(8, Math.min(most, Math.floor((most * room) / Math.max(1, g.measureText(item.label).width))));
   }
-  pill(g, x, y, w, h, item.label, { focused, hover, disabled: item.disabled, press, size: words });
+  pill(g, x, y, w, h, item.hint ? "" : item.label, { focused, hover, disabled: item.disabled, press, size: words });
+  if (item.hint) {
+    if (item.disabled) g.globalAlpha *= 0.45;
+    text(g, item.label, x + w / 2, mid - 7, { size: words ?? Math.round(h * 0.46), color: focused ? "#ffffff" : INK, align: "center", baseline: "middle" });
+    text(g, item.hint, x + w / 2, mid + 12, focused ? ACTION_HINT_FOCUSED : ACTION_HINT);
+    if (item.disabled) g.globalAlpha /= 0.45;
+  }
   if (item.swatch) swatch(g, x + h * 0.62, mid, h * 0.22, item.swatch);
   if (!marks) return;
   const ink = focused ? "#ffffff" : INK;
   let right = x + w - h * 0.4;
   if (item.count) {
-    pips(g, right - PIPS.width, mid, item.count[0], item.count[1], ink, item.disabled);
+    if (item.countLabel) {
+      if (item.disabled) g.globalAlpha *= 0.45;
+      text(g, item.countLabel, right - PIPS.width / 2, mid, focused ? COUNT_FOCUSED : COUNT);
+      if (item.disabled) g.globalAlpha /= 0.45;
+    } else pips(g, right - PIPS.width, mid, item.count[0], item.count[1], ink, item.disabled);
     right -= PIPS.width + h * 0.18;
   }
   if (item.locked) padlock(g, right - h * 0.16, mid, h * 0.3, ink, item.disabled);
@@ -267,7 +307,7 @@ function padlock(g: CanvasRenderingContext2D, x: number, y: number, s: number, i
  * typed into; a blinking caret while it is. Narrow, the label is over the
  * value, as a choice's is.
  */
-function drawField(g: CanvasRenderingContext2D, item: FieldItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, caret: number, t: number, compact: boolean) {
+function drawField(g: CanvasRenderingContext2D, item: FieldItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, caret: number, t: number, compact: boolean, hits: HitMap, index: number) {
   const typing = caret >= 0;
   pill(g, x, y, w, h, "", { focused: false, hover: hover || typing, color: "glass", disabled: item.disabled });
   const mid = compact ? y + h * 0.66 : y + h / 2 + 1;
@@ -275,7 +315,19 @@ function drawField(g: CanvasRenderingContext2D, item: FieldItem, x: number, y: n
   text(g, item.label, x + 22, compact ? y + h * 0.3 : mid, { size: labelSize, color: compact ? INK_SOFT : INK, baseline: "middle" });
   g.font = font(labelSize);
   const left = compact ? x + 22 : x + 22 + g.measureText(item.label).width + 18;
-  const right = x + w - 22;
+  const submit = item.submit;
+  if (submit) {
+    const sy = y + (h - 36) / 2;
+    pill(g, x + w - 64, sy, 56, 36, submit.label, submit.disabled ? FIELD_SUBMIT_DISABLED : FIELD_SUBMIT);
+    hits.add(MENU_HITS.submit, x + w - 64, sy, 56, 36, index, 0, item.id);
+  }
+  const right = x + w - (submit ? 76 : 22);
+  g.strokeStyle = typing ? "#0a6fc0" : INK_SOFT;
+  g.lineWidth = 1.4;
+  g.beginPath();
+  g.moveTo(left, y + h * (compact ? 0.9 : 0.8));
+  g.lineTo(right, y + h * (compact ? 0.9 : 0.8));
+  g.stroke();
   const room = right - left;
   const shown = item.secret ? "•".repeat([...item.value].length) : item.value;
   const before = item.secret ? "•".repeat([...item.value.slice(0, Math.max(0, caret))].length) : item.value.slice(0, Math.max(0, caret));
@@ -324,8 +376,8 @@ function drawItem(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: num
     chevron(g, vx - 64, mid, -1, item.index > 0);
     chevron(g, right - 10, mid, 1, item.index < item.options.length - 1);
     text(g, label, (vx - 64 + right - 10) / 2, mid, { size: Math.round(h * 0.38), color: focused ? "#0a6fc0" : INK, align: "center", baseline: "middle" });
-    hits.add(MENU_HITS.step, vx - 64 - 20, y, 40, h, index, -1, item.id);
-    hits.add(MENU_HITS.step, right - 30, y, 40, h, index, 1, item.id);
+    hits.add(MENU_HITS.step, vx - 64 - 20, y, 44, h, index, -1, item.id);
+    hits.add(MENU_HITS.step, right - 32, y, 44, h, index, 1, item.id);
   } else {
     const k = (item.value - item.min) / (item.max - item.min);
     slider(g, track.x, mid, track.w, k, focused);

@@ -105,7 +105,7 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   for (let i = 0; i < n; i++) {
     const x = L.shelfLeft + (i + 0.5) * gap + (i < split ? 0 : L.apart);
     const on = i === hands.tool;
-    const r = (on ? 22 : 17) * L.orb;
+    const r = on ? 22 * L.orb : Math.min(17, gap / 2 - 1);
     const y = on ? sy - 6 : sy;
     orb(g, x, y, r, on ? "aqua" : "glass");
     drawToolIcon(g, TOOLS[i].id, x, y + 1, r * 0.62);
@@ -128,24 +128,24 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   }
   const lx = cx - lw / 2 - (go ? (goWidth + 8) / 2 : 0);
   const pop = Math.max(0, 1 - s.changed * 4) * 3;
-  const ly = L.labelY - 17 - pop;
-  pill(g, lx, ly, lw, 32, "", { color: "glass" });
+  const ly = L.labelY - 18 - pop;
+  pill(g, lx, ly, lw, 36, "", { color: "glass" });
   text(g, label, lx + lw / 2, L.labelY - pop, { size: 17, align: "center", baseline: "middle", color: INK });
   if (many && pointing) {
     chevron(g, lx + 18, L.labelY - pop, -1, true);
     chevron(g, lx + lw - 18, L.labelY - pop, 1, true);
-    hits.add(HUD_HITS.kind, lx, ly, 44, 32, 0, -1);
-    hits.add(HUD_HITS.label, lx + 44, ly, lw - 88, 32, 0, 1);
-    hits.add(HUD_HITS.kind, lx + lw - 44, ly, 44, 32, 0, 1);
+    hits.add(HUD_HITS.kind, lx, ly, 44, 36, 0, -1);
+    hits.add(HUD_HITS.label, lx + 44, ly, lw - 88, 36, 0, 1);
+    hits.add(HUD_HITS.kind, lx + lw - 44, ly, 44, 36, 0, 1);
   } else if (many) {
     // Up and down change it.
     text(g, "▲", lx + 18, L.labelY - 5 - pop, { size: 9, align: "center", color: INK_SOFT });
     text(g, "▼", lx + 18, L.labelY + 6 - pop, { size: 9, align: "center", color: INK_SOFT });
-    hits.add(HUD_HITS.label, lx, ly, lw, 32, 0, 1);
+    hits.add(HUD_HITS.label, lx, ly, lw, 36, 0, 1);
   }
   if (go) {
-    pill(g, lx + lw + 8, ly, goWidth, 32, "Go", { color: "green" });
-    hits.add(HUD_HITS.go, lx + lw + 8, ly, goWidth, 32);
+    pill(g, lx + lw + 8, ly, goWidth, 36, "Go", { color: "green" });
+    hits.add(HUD_HITS.go, lx + lw + 8, ly, goWidth, 36);
   }
 
   // The menu's button, or its hint: the caption keeps clear of it.
