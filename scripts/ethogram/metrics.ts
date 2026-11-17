@@ -96,7 +96,7 @@ export class Ethogram {
     this.halfWindow = Math.round(0.05 / dt);
   }
   add(s: Observation) {
-    if (Math.abs(s.dt - this.dt) > 1e-8 || ![s.speed, s.yawRate, s.yaw].every(Number.isFinite) || s.speed < 0) throw new Error('invalid observation');
+    if (Math.abs(s.dt - this.dt) > 1e-8 || ![s.dt, s.speed, s.yawRate, s.yaw].every(Number.isFinite) || s.speed < 0) throw new Error('invalid observation');
     this.seconds += s.dt;
     const walking = s.onFeet && s.speed > 0.5;
     const yaw = Math.abs(s.yawRate) * 180 / Math.PI;

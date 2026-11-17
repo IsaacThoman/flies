@@ -101,6 +101,7 @@ test('duration and seed validation refuses ambiguous or misleading runs', () => 
   assert.throws(() => validateOptions({ ...valid, seeds: [1, 1] }));
   assert.throws(() => validateOptions({ ...valid, seeds: [1.5] }));
   assert.throws(() => validateOptions({ ...valid, place: 'absent' }));
+  assert.throws(() => validateOptions({ ...valid, place: 'toString' }));
   assert.throws(() => validateOptions({ ...valid, burnSeconds: 0.001 }));
   assert.throws(() => new Ethogram(0.03));
 });
@@ -130,4 +131,10 @@ test('observation edges cannot create complete saccades or peak angles', () => {
   assert.equal(e.result().samples.saccades, 0);
   assert.equal(e.result().samples.saccadeAngles, 0);
   assert.deepEqual(e.result().censoring.saccades, { left: 1, right: 1 });
+});
+
+test('nonfinite observations cannot corrupt the report', () => {
+  const e = new Ethogram(0.01);
+  for (const key of ['dt', 'speed', 'yawRate', 'yaw']) assert.throws(() => e.add({ ...sample, [key]: NaN }));
+  assert.equal(e.result().seconds, 0);
 });

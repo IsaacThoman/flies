@@ -116,3 +116,24 @@ non-looming controls and per-l/v denominators), body-part grooming observables,
 and a rate-to-motion calibration from primary data. Sleep, hunger, grounded and
 the eyes' ON pathway remain owned by other experiments; any related findings
 belong in proposals rather than edits. No hill-climb improvement is claimed.
+
+Escape research also needs two distinct observables. [von Reyn et al. (2014),
+A spike-timing mechanism for action selection](https://doi.org/10.1038/nn.3741)
+shows that GF timing relative to parallel circuits selects fast versus longer
+escape sequences. A GF-only takeoff readout cannot establish that both paths
+are reproduced. [Card and Dickinson (2008), Visually mediated motor planning
+in the escape response of Drosophila](https://doi.org/10.1016/j.cub.2008.07.094)
+examines directional preparation, which a body choosing the direction away
+from `threat` cannot validate as a neural decision. Both should be explicit
+coverage gaps in a future battery; neither is a reason to inject stronger
+looming input or relabel a body reflex as brain fidelity.
+
+For a future steering calibration, [Rayshubskiy et al., Neural circuit mechanisms
+for steering control in walking Drosophila](https://doi.org/10.7554/eLife.102230),
+Figures 2–3, relates bilateral DNa02 firing-rate differences to yaw, including
+backward walking. The four paired recordings and analysis code are linked in
+its data-availability statement (Harvard Dataverse DOI
+10.7910/DVN/0NCLP1). This is an independent candidate calibration source;
+extracting a gain and its uncertainty from those recordings is required before
+changing the body mapping. An axis limit in a published plot is not a measured
+maximum or a defensible gain. No gain is inferred from it in this experiment.

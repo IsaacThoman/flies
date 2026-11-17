@@ -20,7 +20,7 @@ export type RunOptions = { hours: number; burnSeconds: number; seeds: number[]; 
 export function validateOptions(o: RunOptions) {
   if (!Number.isFinite(o.hours) || o.hours <= 0 || o.hours > 24) throw new Error('hours must be >0 and ≤24 per seed');
   if (!Number.isFinite(o.burnSeconds) || o.burnSeconds < 0 || o.burnSeconds > 3600) throw new Error('burn seconds must be in [0,3600]');
-  if (!(o.place in PLACES)) throw new Error(`unknown place ${o.place}`);
+  if (!Object.hasOwn(PLACES, o.place)) throw new Error(`unknown place ${o.place}`);
   if (!o.seeds.length || o.seeds.some(s => !Number.isInteger(s) || s < 0 || s > 0xffffffff) || new Set(o.seeds).size !== o.seeds.length) throw new Error('seeds must be distinct uint32 integers');
   if ([o.hours * 3600, o.burnSeconds].some(s => Math.abs(s / DT - Math.round(s / DT)) > 1e-7)) throw new Error('duration must be an integer number of 10 ms frames');
 }
@@ -87,7 +87,7 @@ export function markdown(results: ReturnType<typeof measure>) {
     const scores = results.map(r => r.comparisons[i].exploratoryScore?.toFixed(2) ?? 'N/A').join(', ');
     text.push(`| ${ref.label} (${ref.unit}) | ${ref.value} ± ${ref.tolerance} | ${values} | ${scores} | [${ref.paper.split(',')[0]}](${ref.url}), ${ref.location} |`);
   }
-  text.push('', 'Validated overall behaviour score: **N/A** (no condition-matched assays).', '', ...results.map(r => `Seed ${r.seed}: exploratory mean ${r.exploratoryMean?.toFixed(2) ?? 'N/A'}/10 over ${r.observedReferences}/${r.registeredReferences} references; ${(r.measured.seconds / 3600).toFixed(4)} recorded hours; ${r.cpuSeconds.toFixed(1)} CPU seconds.`), '', 'Full diagnostics, sample counts, censoring, assay caveats and tolerance provenance are in the JSON report.');
+  text.push('', 'Validated overall behaviour score: **N/A** (no condition-matched assays).', '', ...results.map(r => `Seed ${r.seed}: exploratory mean ${r.exploratoryMean?.toFixed(2) ?? 'N/A'}/10 over ${r.observedReferences}/${r.registeredReferences} references; ${(r.measured.seconds / 3600).toFixed(4)} recorded hours; ${r.cpuSeconds.toFixed(1)} CPU seconds.`), '', 'Full diagnostics, sample counts, censoring, assay caveats and tolerance provenance are in the JSON report.', '', 'FlyEM male CNS connectome, Janelia Research Campus (CC-BY 4.0).' );
   return text.join('\n');
 }
 
@@ -100,11 +100,12 @@ function main() {
   const options: RunOptions = { hours: Number(values.hours), burnSeconds: Number(values['burn-seconds']), seeds: values.seeds.split(',').map(Number), place: values.place };
   validateOptions(options);
   const data = Uint8Array.from(readFileSync(values.data)).buffer;
+  const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const dirty = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0;
   const results = measure(data, options);
   const report = {
     schema: 1, options, dtSeconds: DT,
-    commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
-    dirty: execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0,
+    commit, dirty,
     connectomeSha256: createHash('sha256').update(new Uint8Array(data)).digest('hex'),
     attribution: 'FlyEM male CNS connectome, Janelia Research Campus (CC-BY 4.0)',
     protocol: 'Unstimulated free behaviour; uniform facet luminance 0.5, natural Life hunger (its metabolism clock runs 60× faster than motion); no imposed commands, no teleportation, no sensory overrides. Arena is a 43 mm disc with the existing edge reflex, not a walled chamber. No feeding, dust, loom, air-puff or optomotor trial battery.',
