@@ -56,7 +56,7 @@ function arrange(shot: ArtShot) {
   stage.light.set(shot.time);
   for (let i = 0; i < 40; i++) {
     stage.weather.update(0.1);
-    stage.light.update(0.1, stage.weather);
+    stage.update(i * 0.1, 0.1, camera);
   }
   const c = shot.camera;
   const y = world.heightAt(shot.fly.x, shot.fly.z);
@@ -123,7 +123,7 @@ function render(shot: ArtShot): string {
   const out = document.createElement("canvas");
   out.width = width;
   out.height = height;
-  const g = out.getContext("2d")!;
+  const g = out.getContext("2d", { alpha: shot.layer === "fly" || shot.layer === "table" })!;
   const image = g.createImageData(width, height);
   for (let y = 0; y < height; y++) {
     const from = (height - 1 - y) * width * 4;

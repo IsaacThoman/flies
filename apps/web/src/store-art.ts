@@ -1,0 +1,165 @@
+// A capture-only entry point: fixed-step real games, including their real brains.
+// No requestAnimationFrame, worker timing, invented commands or synthetic region rates.
+import { REGION_RATE_NAMES } from "@fly/brain";
+import type { Brain, BrainSenses, BrainState } from "@fly/brain";
+import { WasmBrainModule } from "@fly/brain-native";
+import type { BrainDriver, TableSocket } from "@fly/contracts";
+import type { ClientMessage, TableStart } from "@fly/net";
+import { Table } from "../../server/src/table.ts";
+import type { Link, Seat } from "../../server/src/table.ts";
+import { BRAIN_FILE, BRAIN_MODULE } from "./brain/create.ts";
+import { BrainDownload, BrainFiles } from "./brain/download.ts";
+import { unpackConnectome } from "./brain/wire.ts";
+import { Display } from "./display.ts";
+import { Game } from "./game.ts";
+import { Devices, Remote } from "./input.ts";
+import { Online } from "./online/online.ts";
+import type { TableHost } from "./online/online.ts";
+import { TOOLS } from "./tools/hands.ts";
+
+export const STORE_STORIES = ["01-portrait", "02-feeding", "03-flight", "04-inside", "05-eyes", "06-rain", "07-night", "08-together"] as const;
+export type StoreStory = typeof STORE_STORIES[number];
+
+let now = 0;
+Object.defineProperty(performance, "now", { value: () => now });
+
+class CaptureBrain implements BrainDriver {
+  readonly status = "running";
+  readonly error = null;
+  readonly engine = "wasm";
+  readonly neurons: number;
+  readonly connections: number;
+  readonly eyes: Brain["eyes"];
+  state: BrainState | null = null;
+  stateAt = 0;
+  readonly regionRates = new Float32Array(REGION_RATE_NAMES.length);
+  readonly brain: Brain;
+  constructor(brain: Brain) {
+    this.brain = brain;
+    this.neurons = brain.neurons;
+    this.connections = brain.connections;
+    this.eyes = brain.eyes;
+  }
+  tick(dt: number, senses: BrainSenses) {
+    this.state = this.brain.tick(dt, senses);
+    this.stateAt = now;
+    REGION_RATE_NAMES.forEach((name, i) => this.regionRates[i] = this.state!.stats.rates[name] ?? 0);
+  }
+  dispose() {}
+}
+
+// The production room and clients, with a queued in-process transport. This
+// removes network jitter without replacing any fly, protocol or room logic.
+function connection(table: Table): TableSocket {
+  const queue: (string | Uint8Array)[] = [];
+  let seat: Seat | null = null;
+  let status: "open" | "closed" = "open";
+  let closeCode = 1000, closeReason = "";
+  const link: Link = {
+    send: data => queue.push(typeof data === "string" ? data : data.slice()),
+    close: (code, reason) => { status = "closed"; closeCode = code; closeReason = reason; },
+  };
+  return {
+    get status() { return status; },
+    get closeCode() { return closeCode; },
+    get closeReason() { return closeReason; },
+    send(data) {
+      if (seat) table.receive(seat, data);
+      else {
+        const hello = JSON.parse(data as string) as Extract<ClientMessage, { type: "hello" }>;
+        const result = table.hello(link, hello.key, hello);
+        if (typeof result === "string") throw new Error(result);
+        seat = result;
+      }
+    },
+    drain(text, binary) {
+      for (const data of queue.splice(0)) {
+        if (typeof data === "string") text(data);
+        else binary(new DataView(data.buffer, data.byteOffset, data.byteLength));
+      }
+    },
+    close() { if (seat) table.disconnected(seat, link); status = "closed"; },
+  };
+}
+
+async function capture(story: StoreStory, tv = false) {
+  if (!BRAIN_FILE || !BRAIN_MODULE) throw new Error("Run npm run brain:fetch first");
+  const env = { fetch: window.fetch.bind(window), caches: null, subtle: crypto.subtle, online: () => true };
+  const source = new BrainFiles(new BrainDownload(BRAIN_FILE, document.baseURI, env), new BrainDownload(BRAIN_MODULE, document.baseURI, env));
+  const { data, module } = await source.load();
+  if (!module) throw new Error("Missing brain module");
+  let random = 719;
+  Math.random = () => { random = (Math.imul(random, 1664525) + 1013904223) >>> 0; return random / 4294967296; };
+  const games: Game[] = [];
+  const make = async (index: number) => {
+    const wasm = await WasmBrainModule.instantiate(module);
+    await unpackConnectome(data.slice(0), bytes => wasm.connectomeSpace(bytes));
+    const driver = new CaptureBrain(wasm.create(179 + index));
+    localStorage.clear();
+    const place = story === "06-rain" ? "windowsill" : story === "07-night" ? "bar" : "picnic";
+    localStorage.setItem("flies.settings", JSON.stringify({ place, scene: place, wallpaperAfter: 0, hints: false, stats: false, eyesInset: "off", nerves: "off", statsPanel: "off", xray: story === "04-inside" ? "always" : "off", realWeather: false }));
+    localStorage.setItem("flies.shelf", JSON.stringify({ light: { kind: story === "07-night" ? "night" : "noon", at: Date.now() }, weather: { kind: story === "06-rain" ? "rain" : "clear", at: Date.now() } }));
+    const canvas = index === 0 ? document.getElementById("game") as HTMLCanvasElement : document.body.appendChild(document.createElement("canvas"));
+    if (index) canvas.className = "peer";
+    const display = new Display(tv);
+    const devices = new Devices(tv ? "remote" : "touch");
+    const remote = new Remote(window, undefined, devices);
+    const game = new Game(canvas, remote, driver, display, { devices });
+    game.play();
+    games.push(game);
+    return game;
+  };
+  const game = await make(0);
+  const tool = (id: string, kind?: string) => {
+    const index = TOOLS.findIndex(t => t.id === id);
+    game.hands.chooseTool(index);
+    if (kind) game.hands.variants[index] = TOOLS[index].variants.findIndex(v => v.id === kind);
+  };
+  let table: Table | null = null;
+  if (story === "08-together") {
+    await make(1); await make(2);
+    const start: TableStart = { place: "picnic", light: "morning", weather: "clear", zone: "UTC", offset: 0 };
+    table = new Table("abcd1234", start, "capture-0", 61, { now: () => now, wall: () => Date.now() });
+    games.forEach((g, i) => {
+      const host: TableHost = {
+        scene: g.stage.scene, stage: g.stage, life: g.life, hands: g.hands, fly: g.fly, eyes: g.eyes, bubbles: g.bubbles,
+        felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] },
+        here: () => g.here, moving: () => false, moveTo: id => g.moveTo(id),
+        onWorld: () => { g.stage.setTime("morning"); g.stage.weather.choose("clear", true); },
+      };
+      g.online = new Online(host, () => connection(table!), location.href, "abcd1234", `capture-${i}`, i ? null : start);
+    });
+  }
+  if (story === "02-feeding") {
+    // Set down at a real fruit patch; taste and the brain must decide whether to feed.
+    game.life.body.place(18, 52, 0.6);
+    tool("feed", "honey");
+  }
+  if (story === "03-flight") tool("swoop");
+  if (story === "05-eyes") {
+    game.hands.chooseView("eyes");
+    game.director.setView("follow");
+    tool("view", "eyes");
+  } else {
+    const view = story === "06-rain" || story === "07-night" ? "wide" : story === "08-together" ? "follow" : "close";
+    game.hands.chooseView(view); game.director.setView(view);
+  }
+  if (story === "04-inside") tool("view", "inside");
+  let captured = false;
+  for (let frame = 0; frame < 1800; frame++) {
+    now = (frame + 1) * (1000 / 60);
+    if (story === "03-flight" && frame >= 240 && frame % 180 === 60) {
+      game.hands.release();
+      game.hands.update(0, { use: true, holding: false, eye: game.director.camera.position }, game.life.body, game.life.pantry);
+    }
+    for (const g of games) g.frame(1 / 60, now);
+    table?.tick();
+    const ready = frame >= 300;
+    const chosen = story === "02-feeding" ? game.life.eating && game.fly.pose.feed > 0.15 : story === "03-flight" ? game.life.body.mode === "airborne" && game.fly.pose.wings > 0.4 : true;
+    if (ready && chosen) { captured = true; break; }
+  }
+  if (!captured) throw new Error(`The brain did not choose ${story} within 30 seconds`);
+  if (story === "08-together" && game.online!.others.list.filter(o => o.present).length !== 2) throw new Error("Missing real peers");
+  return { story, frames: Math.round(now * 60 / 1000), neurons: game.brain.neurons, activity: game.life.activity, eaten: game.life.eaten, takeOffs: game.life.takeOffs, peers: game.online?.others.list.filter(o => o.present).length ?? 0 };
+}
+(globalThis as unknown as { __store: unknown }).__store = { capture, ready: true };
