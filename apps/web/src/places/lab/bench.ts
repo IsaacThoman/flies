@@ -13,7 +13,7 @@ import type { Solid } from "@fly/world";
 import { Batch, canvas2d, canvasTexture, freeze, paint, random } from "../../scene/build.ts";
 import type { ColorFn } from "../../scene/build.ts";
 import type { SceneSet } from "../types.ts";
-import { SUNBEAM, benchMaterial, clearMaterial, finish, glints, sunbeam, surfaceMaterial } from "./materials.ts";
+import { SUNBEAM, benchMaterial, clearMaterial, finish, glints, liquidMaterial, sunbeam, surfaceMaterial } from "./materials.ts";
 import type { Finish } from "./materials.ts";
 import { DISPLAY, INK, PAGES, labelRegion, pagesRegion, paperMaterial, paperTexture, tapeRegion } from "./paper.ts";
 import type { Region } from "./paper.ts";
@@ -278,6 +278,7 @@ export function buildBench(): SceneSet {
   const beam = sunbeam();
   const surface = surfaceMaterial(shine, beam);
   const clear = clearMaterial(shine);
+  const liquid = liquidMaterial(shine);
   const atlas = paperTexture();
   const paper = paperMaterial(atlas, beam);
   const bench = benchMaterial(benchTexture(), beam, shine);
@@ -610,7 +611,11 @@ export function buildBench(): SceneSet {
   // The beaker, covered with crinkled foil, a little water in it, and its marks.
   {
     const { x, z, r, height } = BEAKER;
-    glass.add(clear, paint(new THREE.CylinderGeometry(r * 0.97, r * 0.97, 40, 40, 1, false).translate(x, 21, z), "#cfe7f4"));
+    const waterProfile = [[0, 1], [r * 0.96, 1], [r * 0.96, 41], [r * 0.94, 41.2], [r * 0.88, 40.1], [r * 0.5, 39.8], [0, 39.8]].map(([radius, y]) => new THREE.Vector2(radius, y));
+    const water = new THREE.Mesh(paint(new THREE.LatheGeometry(waterProfile, 48).translate(x, 0, z), "#afd1da"), liquid);
+    water.renderOrder = 2;
+    freeze(water);
+    group.add(water);
     glass.add(clear, paint(new THREE.CylinderGeometry(r, r, height - 16, 48, 1, true).translate(x, (height - 16) / 2, z), "#f2fbff"));
     for (let i = 1; i <= 8; i++) {
       const long = i % 2 === 0;
@@ -753,7 +758,7 @@ export function buildBench(): SceneSet {
   let lit = -1;
   return {
     group,
-    materials: [surface, clear, bench, paper, dropMesh.material as THREE.MeshStandardMaterial],
+    materials: [surface, clear, liquid, bench, paper, dropMesh.material as THREE.MeshStandardMaterial],
     seen,
     update(_time, light) {
       // The lamp comes on as the room darkens; by day the sun comes in at the windows.

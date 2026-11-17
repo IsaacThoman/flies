@@ -264,6 +264,22 @@ diffuseColor.a = clamp(0.055 + edge * 0.6 + dot(outgoingLight, vec3(0.33)) * 0.0
   return material;
 }
 
+/** A separate liquid surface sorts beneath the vessel wall, so its meniscus stays distinct from glass rims. */
+export function liquidMaterial(shine: Glints): THREE.MeshStandardMaterial {
+  const material = clearMaterial(shine);
+  material.side = THREE.FrontSide;
+  const compile = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, renderer) => {
+    compile.call(material, shader, renderer);
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "clamp(0.055 + edge * 0.6 + dot(outgoingLight, vec3(0.33)) * 0.07, 0.0, 0.85)",
+      "clamp(0.08 + edge * 0.55 + dot(outgoingLight, vec3(0.33)) * 0.06, 0.0, 0.8)",
+    );
+  };
+  material.customProgramCacheKey = () => "lab-liquid";
+  return material;
+}
+
 /**
  * The bench's epoxy top: pale grey resin, flecked finely darker and lighter
  * as cast resin is, satin, with the soft shadows and old stains of the

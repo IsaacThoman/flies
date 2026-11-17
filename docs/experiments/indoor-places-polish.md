@@ -145,3 +145,22 @@ Key: K8 and L2 = identical incumbent; J4 = more, smaller canopy clusters with re
 | Panel | Lab | | 7.02 | | 7.08 | 3/3 J4 |
 
 Both retained, but gains are small and concentrated outside. All decoy criterion differences are zero. The relative-weakness reviewer preferred J4's sill and narrowly preferred its lab on a score tie. One reviewer noted exposed isolated foliage; the dominant mass still needs better structure. Paired build medians: sill 40.65 / 43.05 ms (+5.9%), lab 48.05 / 48.4 ms (+0.7%). Draw counts unchanged; all shader/browser errors empty. Lint, typecheck and place tests pass.
+
+### Round 6 — split selection
+
+From this comparison onward, the fixture holds both clock hands (10:30) and the fly's resting pose/fullness constant. The incumbent was recaptured with the same fixture as D4; no comparison mixes the fixture versions. This removes incidental clock/pose cues to capture order. D4 is the same scene code as J4.
+
+Key: D4 = recaptured incumbent; F2 = denser bottle tint and separately sorted beaker liquid with a meniscus. Orders D4/F2, F2/D4, D4/F2; relative-weakness F2/D4.
+
+| Review | Place | D4 scores | Mean | F2 scores | Mean | Preference |
+| --- | --- | --- | ---: | --- | ---: | --- |
+| R1 | Sill | 7,7.2,7.3,7,8,7.2,7.4 | 7.30 | 7,7.2,7.3,7,8,7.2,7.4 | 7.30 | D4, arbitrary tie |
+| R1 | Lab | 7.2,7.5,6.8,7.7,8,6.2,6.9 | 7.19 | 7.2,7.5,7,7.7,8,6.2,7.2 | 7.26 | F2 |
+| R2 | Sill | 7,7,7.5,7,8,7.5,7.5 | 7.36 | 7,7,7.5,7,8,7.5,7.5 | 7.36 | F2, arbitrary tie |
+| R2 | Lab | 7,7.5,7,7.5,8,6,7 | 7.14 | 7,7.5,7,7.5,8,6,7.5 | 7.21 | F2 |
+| R3 | Sill | 7,7,7,7,8,7.5,7.5 | 7.29 | 7,7,7,7,8,7.5,7.5 | 7.29 | D4, arbitrary tie |
+| R3 | Lab | 7,7.5,6.5,8,8,6,7.5 | 7.21 | 7,7.5,6.7,8,8,6,7.7 | 7.27 | F2 |
+| **Panel** | **Sill** | | **7.31** | | **7.31** | **No meaningful winner** |
+| **Panel** | **Lab** | | **7.18** | | **7.25** | **3/3 F2** |
+
+Reverted the sill change: forced tie-breaks do not count as improvements. Retained the lab liquid, whose lower boundary and contact read more coherently, for one extra draw (19–20 versus 18–19 in the controlled views). I6 is the selected combination: D4 sill, F2 lab. The separate liquid is single-sided, has no transmission framebuffer pass, and reuses existing light uniforms; nothing is allocated each frame. Shader/browser errors are empty; lint, typecheck and 21 place tests pass. Relative-weakness report pending.
