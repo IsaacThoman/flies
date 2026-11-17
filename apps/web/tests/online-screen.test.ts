@@ -471,12 +471,12 @@ test("a valid room code has an in-engine Join action with the same result as Ret
   const { screen, typing, did, focus, press, step } = world();
   focus("code");
   press("select");
-  const clickSubmit = () => {
+  const clickSubmit = (stale = false) => {
     const hits = new HitMap();
     screen.draw(blankCanvas(), 0, hits);
     const hit = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).find((h) => h.kind === "submit")!;
     assert.ok(hit && hit.w >= 44 && hit.h >= 36);
-    const point = { x: hit.x + hit.w / 2, y: hit.y + hit.h / 2, dx: 0, dy: 0, hit, tap: true };
+    const point = { x: hit.x + hit.w / 2, y: hit.y + hit.h / 2, dx: 0, dy: 0, hit: stale ? { ...hit, id: "expired" } : hit, tap: true };
     screen.point({ ...point, type: "down" });
     screen.point({ ...point, type: "up" });
   };
@@ -485,6 +485,8 @@ test("a valid room code has an in-engine Join action with the same result as Ret
   typing.type("ABCDEFGHJK");
   step();
   assert.equal((screen.menu.item("code") as FieldItem).submit?.disabled, false);
+  clickSubmit(true);
+  assert.deepEqual(did, [], "a submit target must retain its drawn identity");
   clickSubmit();
   assert.deepEqual(did, ["join abcdefghjk"]);
   assert.equal(typing.active, null);

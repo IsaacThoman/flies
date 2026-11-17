@@ -114,7 +114,7 @@ export class MenuScreen implements Screen {
   point(p: Point) {
     const menu = this.menu;
     const hit = p.hit;
-    const row = hit && (hit.kind === MENU_HITS.row || hit.kind === MENU_HITS.step || hit.kind === MENU_HITS.tab || hit.kind === MENU_HITS.track);
+    const row = hit && (hit.kind === MENU_HITS.row || hit.kind === MENU_HITS.step || hit.kind === MENU_HITS.tab || hit.kind === MENU_HITS.track || hit.kind === MENU_HITS.submit);
     // The list may have refreshed since these pixels were drawn.
     if (row && (!hit.id || menu.items[hit.index]?.id !== hit.id)) {
       if (p.type !== "hover") this.#held = null;

@@ -319,7 +319,7 @@ function drawField(g: CanvasRenderingContext2D, item: FieldItem, x: number, y: n
   if (submit) {
     const sy = y + (h - 36) / 2;
     pill(g, x + w - 64, sy, 56, 36, submit.label, submit.disabled ? FIELD_SUBMIT_DISABLED : FIELD_SUBMIT);
-    hits.add(MENU_HITS.submit, x + w - 64, sy, 56, 36, index);
+    hits.add(MENU_HITS.submit, x + w - 64, sy, 56, 36, index, 0, item.id);
   }
   const right = x + w - (submit ? 76 : 22);
   g.strokeStyle = typing ? "#0a6fc0" : INK_SOFT;
