@@ -172,6 +172,30 @@ test("a second tap or click soon after the first, in the same place, is a double
   assert.equal(tapAt(300), false, "somewhere else");
 });
 
+test("clicks and moves are timed by when they happened, not by when a busy frame hands them over", () => {
+  const { pointers, raw, tick } = rig();
+  const at = (e: RawPointer, timeStamp: number): RawPointer => ({ ...e, timeStamp });
+  pointers.down(at(raw(1, "mouse", 100, 100), 1000));
+  pointers.up(at(raw(1, "mouse", 100, 100, 0), 1040), false);
+  pointers.endFrame();
+  // A long frame: the second click, 80 ms after the first, is handed over 600 ms later.
+  tick(600);
+  pointers.down(at(raw(1, "mouse", 102, 100), 1080));
+  pointers.up(at(raw(1, "mouse", 102, 100, 0), 1120), false);
+  assert.equal((pointers.gestures[pointers.gestures.length - 1] as Extract<Gesture, { type: "up" }>).double, true);
+  pointers.endFrame();
+
+  // A mouse moved far in 100 ms is meant, however late its moves arrive.
+  const { pointers: hover, raw: hraw, tick: htick } = rig();
+  const step = DELIBERATE_MOVE * Math.hypot(1000, 500) * 0.6;
+  hover.move(at(hraw(1, "mouse", 100, 100, 0), 5000));
+  htick(500);
+  hover.move(at(hraw(1, "mouse", 100 + step, 100, 0), 5050));
+  htick(500);
+  hover.move(at(hraw(1, "mouse", 100 + 2 * step, 100, 0), 5100));
+  assert.equal(hover.deliberate, true);
+});
+
 test("a pad's buttons are the remote's, held directions repeat as the remote's do, and its sticks move the hand and look round", () => {
   const devices = new Devices("mouse");
   const remote = new Remote(new EventTarget() as unknown as Window, () => 0, devices);
