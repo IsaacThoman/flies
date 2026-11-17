@@ -48,10 +48,16 @@
 // processes keeping more than OTHERS_LIMIT cores busy on average beside it is
 // contention as well. A quiet runner's other processes keep about a tenth of a
 // core busy during the budgets; Spotlight kept one to one and a half, so CI turns
-// it off before checking out (.github/workflows/ci.yml).
+// it off before checking out (.github/workflows/ci.yml). The runner's desktop
+// session still wakes its daemons in bursts of seconds (GitHub's provisioning
+// agent every ten seconds or so at a quarter of a core, and assistants, updates
+// and indexers together at up to three), which a retry a second later meets
+// again: so each attempt first waits for a second in which the others keep under
+// QUIET_CORES busy, up to a minute in CI and three seconds locally, where the
+// others are usually there for good.
 //
-// Three contended attempts, separated by one-second pauses, skip locally with an
-// explicit rerun message; in CI they fail with that reason. Functional assertions
+// Three contended attempts skip locally with an explicit rerun message; in CI
+// they fail with that reason. Functional assertions
 // and measurement errors always fail. Only this thread's CPU counts, not helpers.
 //
 // After a change of Node that moves the reference, `node scripts/cpuBudget.ts`
@@ -151,6 +157,19 @@ export function watchOthers() {
   return () => (machineBusyMs() - machine - (processMs() - own)) / (performance.now() - start);
 }
 
+/** How few cores other processes must keep busy for a second for the machine to count as quiet. */
+export const QUIET_CORES = 0.25;
+
+/** Waits, a second at a time, until a quiet second or `seconds` of them have passed; whether it found one. */
+async function untilQuiet(watch: typeof watchOthers, wait: (ms: number) => Promise<unknown>, seconds: number) {
+  for (let i = 0; i < seconds; i++) {
+    const others = watch();
+    await wait(1_000);
+    if (others() < QUIET_CORES) return true;
+  }
+  return false;
+}
+
 type Measurement<T> = {
   value: T;
   references: readonly number[];
@@ -189,13 +208,15 @@ export async function measureBudget<T>(t: BudgetContext, measure: () => Measurem
   const watch = conditions.others ?? watchOthers;
   let reason = "";
   for (let attempt = 1; attempt <= 3; attempt++) {
+    // A shared machine is busy in bursts, so a retry a moment later would land in the same one. Locally the
+    // others are usually there for good, and a short wait spares rerunning by hand.
+    await untilQuiet(watch, wait, ci ? 60 : 3);
     const others = watch();
     const measured = measure();
     const busy = contention(measured, ci, others());
     if (!busy) return measured.value;
     reason = busy;
     t.diagnostic(`CPU measurement ${attempt}/3 contended: ${reason}`);
-    if (attempt < 3) await wait(1_000);
   }
   const message = `machine too busy to measure; rerun when idle (${reason}; 3 attempts)`;
   if (ci) throw Error(message);

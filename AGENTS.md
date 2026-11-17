@@ -31,8 +31,9 @@ the rules the whole thing is built on.
   run beside it (`scripts/cpuBudget.ts`). They live in `*.budget.ts` files,
   which `npm test` runs one at a time after the rest. Contended measurements,
   including any taken while other processes keep more than a core busy,
-  retry three times with pauses, then skip locally (rerun when idle) or fail
-  explicitly in CI; `scripts/cpuBudget.ts` states the acceptance bounds.
+  retry three times, each after waiting for the machine to go quiet, then skip
+  locally (rerun when idle) or fail explicitly in CI; `scripts/cpuBudget.ts`
+  states the acceptance bounds.
   The brain chooses: observe its inputs and commands, and bound retries for its choices.
 - Comments say why, not what. No dead code, no leftover experiments.
 - Shut down what you start as soon as you no longer need it: dev and

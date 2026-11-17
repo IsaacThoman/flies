@@ -19,7 +19,7 @@ test("contended references or a wide spread of five work samples retry then skip
     const result = await measureBudget(t, () => { attempts++; return measurement; }, { ci: false, pause: async () => { pauses++; }, others: quiet });
     assert.equal(result, undefined);
     assert.equal(attempts, 3);
-    assert.equal(pauses, 2);
+    assert.equal(pauses, 3, "a quiet second before each attempt");
     assert.match(t.skipped[0], /machine too busy to measure; rerun when idle/);
     assert.ok(t.messages.length >= 3, "each unreliable attempt explains its contention");
   }
@@ -87,12 +87,28 @@ test("other processes keeping the machine busy are contention, however steady th
 
 test("a retry once the others have gone is measured and still fails a doubled-work regression", async () => {
   const t = context();
-  let watched = 0;
-  const others = () => { const busy = ++watched === 1 ? OTHERS_LIMIT * 3 : 0.1; return () => busy; };
-  const doubled = await measureBudget(t, () => ({ ...clean, value: 20, samples: [[20, 20, 20, 20, 20]] }), { ci: true, pause: async () => {}, others });
-  assert.equal(watched, 2);
+  let attempts = 0;
+  const others = () => { const busy = attempts === 0 ? OTHERS_LIMIT * 3 : 0.1; return () => busy; };
+  const doubled = await measureBudget(t, () => { attempts++; return { ...clean, value: 20, samples: [[20, 20, 20, 20, 20]] }; }, { ci: true, pause: async () => {}, others });
+  assert.equal(attempts, 2);
   assert.match(t.messages[0], /other processes kept 3\.0 cores busy/);
   assert.throws(() => assert.ok(doubled! < 15, "budget 15"), /budget 15/);
+});
+
+test("each attempt waits for a quiet second first, up to a minute in CI and three seconds locally", async () => {
+  for (const [ci, seconds] of [[true, 60], [false, 3]] as const) {
+    let pauses = 0;
+    const t = context();
+    const result = measureBudget(t, () => clean, { ci, pause: async (ms) => { assert.equal(ms, 1000); pauses++; }, others: () => () => OTHERS_LIMIT + 1 });
+    await (ci ? assert.rejects(result, /other processes kept 2\.0 cores busy/) : result);
+    assert.equal(pauses, 3 * seconds);
+  }
+  let pauses = 0;
+  let quiet = false;
+  // Busy for five seconds, then quiet: the attempt waits them out and is measured.
+  const others = () => { const busy = pauses < 5 ? 1 : 0.1; return () => { quiet = busy < 0.25; return busy; }; };
+  assert.equal(await measureBudget(context(), () => { assert.ok(quiet, "measured once quiet"); return clean; }, { ci: true, pause: async () => { pauses++; }, others }), 10);
+  assert.equal(pauses, 6);
 });
 
 test("the machine is watched over each attempt's own measurement", async () => {
