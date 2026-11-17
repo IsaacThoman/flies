@@ -65,7 +65,7 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
 | `src/Report.swift` | Reports for checks and measurements (below); off unless asked for |
 | `src/Launch.storyboard` | The launch screen: the launch image filling a screen of any shape |
 | `src/Settings.bundle` | The app's page in the Settings app: the Haptics switch |
-| `src/PrivacyInfo.xcprivacy` | No tracking, no data collected; `NSUserDefaults` for the Haptics switch (CA92.1) |
+| `src/PrivacyInfo.xcprivacy` | No tracking; Online data collection is declared (see [App Privacy draft](app-store-answers.md)); `NSUserDefaults` for the Haptics switch (CA92.1) |
 
 ### What the app tells the page, and what it reads
 
