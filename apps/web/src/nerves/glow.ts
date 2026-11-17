@@ -12,7 +12,8 @@
 // quiet regions are visible without being made to look busy.
 
 import { REGIONS } from "@fly/brain";
-import { partRegions } from "./regions.ts";
+import { NERVE_PARTS } from "@fly/fly";
+import { UNLIT_PARTS, partRegions } from "./regions.ts";
 
 /** Seconds: how fast a part's glow rises toward its rate, and falls back. */
 export const GLOW_RISE = 0.05;
@@ -29,6 +30,7 @@ export class NerveGlow {
   readonly regions = new Float32Array(REGIONS.length);
   readonly #full = Float32Array.from(REGIONS, (r) => r.fullHz);
   readonly #partRegion = partRegions();
+  readonly #unlit = Uint16Array.from(UNLIT_PARTS, (id) => NERVE_PARTS.findIndex((p) => p.id === id));
   readonly #parts: Float32Array;
 
   /** `parts` is the drawing's glow array (FlyNerves.glow), filled in place. */
@@ -47,7 +49,8 @@ export class NerveGlow {
       regions[r] = g + (target - g) * (target > g ? up : down);
     }
     const parts = this.#parts, partRegion = this.#partRegion;
-    for (let p = 0; p < partRegion.length; p++) parts[p] = regions[partRegion[p]];
+    for (let p = 0; p < partRegion.length; p++) if (partRegion[p] >= 0) parts[p] = regions[partRegion[p]];
+    for (let p = 0; p < this.#unlit.length; p++) parts[this.#unlit[p]] = 0;
   }
 
   /** All dark at once: a new brain, or nothing to show. */

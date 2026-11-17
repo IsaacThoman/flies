@@ -801,9 +801,13 @@ each segment. Sense organs are small clusters: the bristles' sockets where
 the model's bristles are, the femoral chordotonal organs, the campaniform
 sensilla on the legs and at the bases of the wings and halteres.
 
-**Where each region is drawn** (`apps/web/src/nerves/regions.ts`). All 63 of
-the brain's regions have a place and every part of the drawing belongs to
-exactly one region (a test holds it). Where several regions share a place in
+**Where each region is drawn** (`apps/web/src/nerves/regions.ts`). The 62
+placed regions each light their own anatomy. The remaining `unplaced` group
+mixes neurons whose annotations do not establish a location; its rate is
+retained but lights nothing. The connective's midline stays as unlit
+anatomical context, rather than locating those neurons in the neck.
+Every lit part belongs to exactly one region (a test holds it).
+Where several regions share a place in
 the fly, each is drawn as what is its own there: motor neurons as their
 cell bodies at the cord's edge and the nerves their axons leave by, sensory
 neurons as the organs and nerves they come in from, descending and ascending
@@ -818,7 +822,8 @@ fill them.
 | central brain, other | the rind of cell bodies round the central brain, drawn as an edge (that is where those neurons' cell bodies are) |
 | smell · Johnston's organ · head bristles · mouthparts · head sensory, other | the third antennal segment and its strand of the antennal nerve · the second segment's organ and its strand to the AMMC · the head's bristle sockets · the labellum, the pharynx's taste organs and the labial nerves' sensory axons · the pharyngeal nerves |
 | head motor · neuroendocrine | the labial nerves' motor axons · the pars intercerebralis, its nerve to the corpora cardiaca, the frontal ganglion |
-| descending · ascending (each side) · unplaced | tracts from the brain down the neck and along the cord's top · from the cord's floor up into the brain · a thread down the connective's midline |
+| descending · ascending (each side) | tracts from the brain down the neck and along the cord's top · from the cord's floor up into the brain |
+| unplaced | not assigned an anatomical location; no activity drawn |
 | front, middle, hind leg motor (each side) · wing and haltere motor · neck motor · abdomen motor | cell bodies at the leg neuropil's edge and the leg nerve's motor strand · cell bodies over the wing tectulum and the dorsal nerves · the cervical nerve · the abdominal trunk's motor strand |
 | leg sensory · wing, haltere and thorax sensory · abdomen sensory · proprioceptors · body bristles | the leg nerves' sensory strands · the wing and haltere nerves · the abdominal trunk's sensory strand · the chordotonal organs and campaniform sensilla · the body's bristle sockets |
 | cord interneurons (each side) · cord, midline · cord, efferent | the leg neuropils T1, T2, T3, the abdominal neuromeres and the neck, wing and haltere tectulum of its side · the cord's ventral midline · its dorsal median fibres and median nerves |
