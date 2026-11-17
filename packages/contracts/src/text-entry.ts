@@ -15,7 +15,7 @@ export type TextRequest = {
   id: string;
   kind: TextKind;
   value: string;
-  /** At most this many characters. */
+  /** At most this many Unicode code points. */
   max: number;
   /** What the field is called, for a keyboard that says so over what is typed (the Apple TV's). */
   label?: string;
@@ -24,7 +24,7 @@ export type TextRequest = {
 export interface TextEntry {
   /** The field being typed into, or null. */
   readonly active: string | null;
-  /** What it holds now, and where the caret is (characters in). */
+  /** What it holds now, and where the caret is (a UTF-16 offset, as in a DOM selection). */
   readonly value: string;
   readonly caret: number;
   /** How the typing ended, once, if it has since the last call: Return ("done"), Escape ("cancel"); then `active` is null. */
