@@ -307,3 +307,16 @@ feature's visual iteration here. No merge is performed.
 | R4 | N4 | 7 | 6.5 | 6.5 | 5.5 | 7.5 | 8 | 8 | 7 | 7.0000 |
 | R4 | P3 | 7 | 7 | 7 | 7 | 8 | 8 | 8 | 7 | 7.3750 |
 | R4 | O6 | 8.5 | 6 | 8 | 8 | 8.5 | 8 | 7 | 5.5 | 7.4375 |
+
+## Landing verification
+
+A second merge of dev (56071a13) retained its scene contracts, fly model, taste,
+networking, legal and release behaviour. The only conflict was the geometry-budget
+table: keep dev's revised windowsill/lab limits and the kitchen's entry.
+
+The coarse eye mesh now includes the counter, the sheared caddy lid, and the wall
+and frame around an open view of the sky. It uses the scene's lighting. Ray probes
+verify the ground, lid, jar body, cup underside, window opening and mullion. These
+are functional perception repairs; the scored player-facing materials are retained.
+The final evidence is recaptured on this merged runtime. No further visual hill
+climb is claimed on this feature branch.

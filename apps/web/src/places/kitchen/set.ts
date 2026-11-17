@@ -79,7 +79,10 @@ export function buildSet(): SceneSet {
   const rnd = random(812);
   for (const x of [-240.5, 80.5])
     addGlass(new THREE.PlaneGeometry(309, 707).translate(x, 633.5, -300));
-  add(box(0, -20, 0, 1000, 40, 600), "#c7c1ae", KIND.stone);
+  const counter = box(0, -20, 0, 1000, 40, 600);
+  const counterSeen = counter.clone();
+  const windowSeen: THREE.BufferGeometry[] = [];
+  add(counter, "#c7c1ae", KIND.stone);
   // Drawer fronts below the reachable worktop give its edge a household scale.
   for (const x of [-375, -125, 125, 375]) {
     add(box(x, -210, 285, 246, 370, 25), "#748576");
@@ -282,16 +285,20 @@ export function buildSet(): SceneSet {
     box(0, 1300, -325, 3600, 600, 50),
     box(-1102.5, 632.5, -325, 1395, 735, 50),
     box(1022.5, 632.5, -325, 1555, 735, 50),
-  ])
+  ]) {
+    windowSeen.push(paint(g.clone(), "#b5c7b5"));
     add(g, "#b5c7b5", KIND.wall);
+  }
   for (const g of [
     box(-80, 268, -305, 670, 24, 10),
     box(-80, 997, -305, 670, 20, 10),
     box(-405, 633, -305, 20, 735, 10),
     box(245, 633, -305, 20, 735, 10),
     box(-80, 633, -305, 12, 735, 10),
-  ])
+  ]) {
+    windowSeen.push(paint(g.clone(), "#e0d7bc"));
     add(g, "#e0d7bc");
+  }
 
   // Continuous banana skins sample the envelope, never drawing the hidden seams between rounds.
   for (const rounds of KITCHEN_BANANAS) {
@@ -384,6 +391,7 @@ export function buildSet(): SceneSet {
         2,
     );
   lid.computeVertexNormals();
+  const lidSeen = lid.clone();
   add(lid, "#547068");
   // Small dry flecks are below the half-millimetre scenery limit.
   for (let i = 0; i < 100; i++)
@@ -445,12 +453,22 @@ export function buildSet(): SceneSet {
   // Eyes get only coarse solid silhouettes, excluding the skin grids and small flecks.
   const seenGroup = new THREE.Group(),
     seenBatch = new Batch();
-  const seenM = new THREE.MeshBasicMaterial({ vertexColors: true });
+  const seenM = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.8,
+    metalness: 0,
+    envMapIntensity: 0.3,
+    side: THREE.DoubleSide,
+  });
+  seenBatch.add(seenM, paint(counterSeen, "#c7c1ae"));
+  for (const g of windowSeen) seenBatch.add(seenM, g);
+  seenBatch.add(seenM, paint(lidSeen, "#547068"));
   const peachTop = KITCHEN_SOLIDS.find((s) => s.name === "kitchen peach");
   for (const s of KITCHEN_SOLIDS) {
     if (
       (s.name === "kitchen peach" && s !== peachTop) ||
       s.name === "kitchen lid" ||
+      s.name === "kitchen wall" ||
       s.name.includes("crumb") ||
       s.name === "kitchen stone"
     )

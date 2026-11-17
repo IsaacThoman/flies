@@ -19,7 +19,7 @@ test("kitchen set merges mixed glass geometry and keeps its meshes finite and fr
   for (const object of set.seen) disposeAll(object);
 });
 
-test("the coarse eyes see the jar's body and the underside of the wine glass", () => {
+test("the coarse eyes see the jar body, glass underside and raised caddy lid", () => {
   const set = buildSet();
   const ray = new THREE.Raycaster(
     new THREE.Vector3(354, 40, 200),
@@ -36,6 +36,18 @@ test("the coarse eyes see the jar's body and the underside of the wine glass", (
     cup && Math.abs(cup.distance - 20) < 0.1,
     "the cup's underside is visible from beneath it",
   );
+  ray.set(new THREE.Vector3(-369, 250, -170), new THREE.Vector3(0, -1, 0));
+  const lid = ray.intersectObjects(set.seen, false)[0];
+  assert.ok(
+    lid && lid.point.y > 180 && lid.point.y < 190,
+    "the raised lid hides the compost from above",
+  );
+  ray.set(new THREE.Vector3(0, 30, 250), new THREE.Vector3(0, -1, 0));
+  assert.equal(ray.intersectObjects(set.seen, false)[0]?.point.y, 0, "the counter is visible under the fly");
+  ray.set(new THREE.Vector3(-240, 400, -250), new THREE.Vector3(0, 0, -1));
+  assert.equal(ray.intersectObjects(set.seen, false).length, 0, "the glazed opening shows the sky to the eyes");
+  ray.set(new THREE.Vector3(-80, 400, -250), new THREE.Vector3(0, 0, -1));
+  assert.ok(ray.intersectObjects(set.seen, false).length > 0, "the window mullion remains visible");
   disposeAll(set.group);
   for (const object of set.seen) disposeAll(object);
 });
