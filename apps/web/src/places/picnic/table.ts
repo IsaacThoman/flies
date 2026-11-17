@@ -1,3 +1,4 @@
+import { Snow, snowDust } from "../../scene/snow.ts";
 // The picnic's table and everything on it, built from the world's description
 // (packages/world/src/picnic.ts) so that what the fly stands on is exactly
 // what is drawn. Merged by material into a few meshes. Everything on it gets
@@ -866,6 +867,14 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
   seen.push(...goings.seen);
   const all = [glossy, juicy, matte, tableMaterial, cloth, glass, liquid, dewMaterial, ...materials];
   for (const material of all) shaded(material);
+  const snow = new Snow(2200, 0);
+  group.add(snow.mesh);
+  const snowCover = { value: 0 };
+  const shelters = [one("lemonade"), one("jam")].map(s => {
+    const f = s.footprint as { x:number; z:number; r:number };
+    return new THREE.Vector4(f.x, f.z, f.r, (s.top as { y:number }).y);
+  });
+  for (const material of all) if (material !== glass && material !== liquid && material !== dewMaterial) snowDust(material, snowCover, shelters);
   let wetNow = -1;
   return {
     group,
@@ -873,6 +882,8 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
     seen,
     update(time, light, weather) {
       goings.update(time, light, weather);
+      snow.update(time, light, weather);
+      snowCover.value = weather.snowCover;
       tableUniforms.uPicnicSun.value.copy(light.sunDirection);
       // Wet, glazes and fruit shine more, crumbs and cloth darken.
       const wet = weather.wet;

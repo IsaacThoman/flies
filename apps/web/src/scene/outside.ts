@@ -7,12 +7,11 @@
 // summer day go on as before. Every change eases in: a new observation over
 // minutes, and the switch between real and made-up over a minute.
 //
-// What WeatherKit says is mapped onto the game's four kinds of weather as
-// near as they go (outsideMix): there is no snow or thunder in the game.
+// Conditions retain their precipitation phase and electrical activity (outsideMix).
 
 import type { NativeWeatherBridge, OutsideConditions, OutsideStatus, WeatherAttribution } from "@fly/contracts";
 import { CLOCK_SUNRISE, CLOCK_SUNSET } from "./light.ts";
-import type { Mix } from "@fly/world";
+import type { Mix } from "./weather.ts";
 
 /** An observation older than this (ms) is too old to be the weather now. */
 export const STALE = 2 * 3_600_000;
@@ -44,21 +43,14 @@ const HAZY = new Set(["haze", "smoky", "blowingDust"]);
 
 /** Wind speed (m/s) the game's windiest day is: a fresh breeze, Beaufort 5. */
 export const WINDIEST = 10;
-/** Rain (mm an hour) the game's rain is at its fullest: it only has light rain. */
+/** Rain (mm/hour) at which the light-rain particle coverage is full; heavy rain adds density. */
 export const FULLEST_RAIN = 1;
 
-/**
- * The game's weather for real conditions. Cloud cover is the cloud; mist
- * comes with the visibility (all of it in fog, under a kilometre, none past
- * eight) or a haze; rain with the precipitation, the most the game shows
- * being light rain. Snow, which the game hasn't got, is a white mist under a
- * grey sky (rain would be wrong, and nothing falls), flurries a grey sky;
- * sleet, freezing rain and hail are rain, and thunderstorms heavy rain with
- * no lightning. Wind is the real speed, a fresh breeze the windiest.
- */
+/** Precipitation phase comes from the reported condition, never a guessed temperature. */
 export function outsideMix(c: OutsideConditions, out: Mix): Mix {
   const condition = c.condition;
   const snow = SNOWY.has(condition);
+  const sleet = condition === "sleet" || condition === "wintryMix";
   let cloud = clamp01(c.cloudCover);
   let mist = 1 - smooth(1000, 8000, c.visibility);
   if (condition === "foggy") mist = 1;
@@ -69,12 +61,15 @@ export function outsideMix(c: OutsideConditions, out: Mix): Mix {
   if (snow) {
     rain = 0;
     cloud = Math.max(cloud, 0.9);
-    mist = Math.max(mist, 0.6);
+    mist = Math.max(mist, 0.25);
   } else if (FLURRIES.has(condition)) {
     rain = 0;
     cloud = Math.max(cloud, 0.8);
-    mist = Math.max(mist, 0.3);
+    mist = Math.max(mist, 0.15);
   }
+  out.snow = snow ? 1 : FLURRIES.has(condition) ? 0.45 : sleet ? 0.55 : 0;
+  out.heavy = condition === "heavyRain" || STORMY.has(condition) ? 1 : clamp01((c.precipitation - 2.5) / 7.5);
+  out.storm = STORMY.has(condition) ? 1 : 0;
   out.cloud = cloud;
   out.mist = mist;
   out.rain = rain;
@@ -266,6 +261,9 @@ export class Outside {
     m.mist = from.mist + (to.mist - from.mist) * k;
     m.rain = from.rain + (to.rain - from.rain) * k;
     m.wind = from.wind + (to.wind - from.wind) * k;
+    m.snow = (from.snow ?? 0) + ((to.snow ?? 0) - (from.snow ?? 0)) * k;
+    m.heavy = (from.heavy ?? 0) + ((to.heavy ?? 0) - (from.heavy ?? 0)) * k;
+    m.storm = (from.storm ?? 0) + ((to.storm ?? 0) - (from.storm ?? 0)) * k;
   }
 
   #take(c: OutsideConditions, settle: boolean) {
@@ -291,6 +289,9 @@ export class Outside {
     forecast.mist += (m.mist - forecast.mist) * k;
     forecast.rain += (m.rain - forecast.rain) * k;
     forecast.wind += (m.wind - forecast.wind) * k;
+    forecast.snow = (forecast.snow ?? 0) + ((m.snow ?? 0) - (forecast.snow ?? 0)) * k;
+    forecast.heavy = (forecast.heavy ?? 0) + ((m.heavy ?? 0) - (forecast.heavy ?? 0)) * k;
+    forecast.storm = (forecast.storm ?? 0) + ((m.storm ?? 0) - (forecast.storm ?? 0)) * k;
     return forecast;
   }
 
