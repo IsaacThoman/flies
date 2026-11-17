@@ -187,8 +187,7 @@ turn is not proof of attraction or avoidance. For example, DM1's walk change
 ranges from −0.016 to +0.034 across seeds at 100 events/s; V consistently raises
 backing a little (+0.016 to +0.031), while DA2 does not show an equally clear
 avoidance command. Both antennae are driven; DM1's leftward turn cannot be
-called turning toward an odour. The [compact results](olfaction-results.json)
-retain every rate and seed, across-seed means/ranges, all commands, readouts,
+called turning toward an odour. The summary reducer regenerates compact results containing every rate and seed, across-seed means/ranges, all commands, readouts,
 peaks and washout differences. The unabridged reducer additionally retains
 each seed's 1 s time course.
 
@@ -281,7 +280,7 @@ node packages/brain/scripts/olfaction.ts --part audit > /tmp/olfaction-audit.jso
 node packages/brain/scripts/olfaction.ts --part simulate --seeds 1 > /tmp/olfaction-seed1.json
 node packages/brain/scripts/olfaction.ts --part simulate --seeds 2,3 > /tmp/olfaction-seed23.json
 node packages/brain/scripts/olfaction-summary.ts --results /tmp/olfaction-seed1.json,/tmp/olfaction-seed23.json > /tmp/olfaction-summary.json
-# For the checked-in compact summary, append --compact. A partial run needs --partial.
+# Append --compact for a compact summary. A partial run needs --partial.
 ```
 
 Simulation and the full repository checks need a `/tmp/flies-heavy/slot-N` on
@@ -309,5 +308,4 @@ without that pause. The summary reducer also verifies identical pre-stimulation
 bins and rejects missing protocol seeds unless `--partial` is explicit; partial
 outputs are marked `completeProtocol: false`.
 
-Independent audit scores and comparison keys are in the
-[review log](olfaction-review.md).
+Independent audit scores and comparison keys are recorded in the PR description.
