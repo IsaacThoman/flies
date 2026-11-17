@@ -10,6 +10,7 @@ for (const outcome of ["refused", "trimmed", "accepted"] as const) test(`${outco
   const table = new TableFood(world, []);
   const food = table.drop(1, DROP_ID + 1, "berry", 20, 20)!;
   const pantry = new TablePantry(world);
+  pantry.confirmed = true;
   pantry.mirror.welcome([toWire(food)]);
   const mine = pantry.foods[0];
   if (outcome === "trimmed") food.amount = 0.03;
@@ -40,6 +41,7 @@ test("a refused final bite restores food removed by local prediction", () => {
   const food = table.drop(1, DROP_ID + 1, "sugar", 20, 20)!;
   food.amount = 0.01;
   const pantry = new TablePantry(world);
+  pantry.confirmed = true;
   pantry.mirror.welcome([toWire(food)]);
   const mine = pantry.foods[0];
   pantry.eat(mine, 1, 0.1);
@@ -48,4 +50,14 @@ test("a refused final bite restores food removed by local prediction", () => {
   const change = table.flush()!;
   pantry.mirror.apply(1, change.amounts, change.gone, 0, table.takeMeal(1));
   assert.equal(pantry.foods[0]?.amount, 0.01);
+});
+
+test("an older room retains optimistic nutrition without crediting its historical cumulative total twice", () => {
+  const world = createPicnic();
+  const pantry = new TablePantry(world);
+  const food = pantry.drop("berry", 20, 20);
+  const bite = pantry.eat(food, 1, 0.1);
+  assert.ok(bite > 0);
+  pantry.mirror.sent(1);
+  assert.deepEqual(pantry.mirror.apply(1, [[food.id, 0.9]], [], 10), [0, 0]);
 });

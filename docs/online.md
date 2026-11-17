@@ -461,11 +461,14 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
 ### Bite acknowledgements
 
 Every processed bite, including a refusal, produces a food acknowledgement:
-known food carries its authoritative amount and missing food is gone.
+known food carries its authoritative amount. With a nutrition receipt, an
+acknowledged food omitted from amounts no longer exists. Missing-food
+refusals never add arbitrary IDs to the room-wide disappearance list.
 Devices predict the food being eaten but feed hunger and the crop only after
 acknowledgement. The optional `meal: [amount, sugar]` receipt counts exactly
 what that player was granted since its previous acknowledgement, including
 the sweetness of partial bites. Rejoining discards undelivered receipts.
-This is additive within protocol 3: older devices ignore the receipt; a
-new device with an older room bounds its cumulative eaten delta by the
-acknowledged bites and uses their average sweetness.
+Welcome advertises receipt support with optional `meals: true`. This is
+additive within protocol 3: older devices ignore receipts; new devices with
+older rooms retain their original optimistic nutrition accounting rather
+than treating historical or rounded cumulative totals as fresh nutrition.

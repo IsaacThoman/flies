@@ -140,7 +140,7 @@ test("refused and trimmed bites reconcile quantities and drain predictions", () 
     table.bite(1, mine.id, amount, reason === "far" ? 100 : 20, mine.y, 20, 0);
     const change = table.flush();
     assert.ok(change, `${reason}: an acknowledgement must be sent even with no food changed`);
-    mirror.apply(1, change.amounts, change.gone, table.eaten.get(1) ?? 0);
+    mirror.apply(1, change.amounts, change.gone, table.eaten.get(1) ?? 0, table.takeMeal(1));
     assert.ok(Math.abs((pantry.foods[0]?.amount ?? 0) - (table.find(mine.id)?.amount ?? 0)) <= 1e-4, reason);
     assert.equal(mirror.pending, 0);
   }

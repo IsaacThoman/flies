@@ -208,6 +208,7 @@ export class Online {
         this.colour = m.colour;
         this.starter = m.starter;
         this.pantry.player = m.id;
+        this.pantry.confirmed = m.meals === true;
         host.fly.model.mark(m.colour);
         this.#clock = { at: m.now, wall: m.wall, offset: m.offset };
         this.now = this.#roomNow();

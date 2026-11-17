@@ -517,6 +517,8 @@ export type ServerMessage =
       epoch: number;
       world: WorldWire;
       players: PlayerWire[];
+      /** Supports exact nutrition receipts in food acknowledgements. */
+      meals?: boolean;
       foods: FoodWire[];
       balls: BallWire[];
       happenings: HappeningWire[];

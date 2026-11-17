@@ -41,6 +41,7 @@ export class TableFood {
   /** Ids changed or gone since the last `flush`. */
   readonly #changed = new Set<number>();
   readonly #gone: number[] = [];
+  #bitten = false;
   readonly #meals = new Map<number, [number, number]>();
   readonly #appetite = new Map<number, Appetite>();
   readonly #world: World;
@@ -111,11 +112,9 @@ export class TableFood {
    * floor under the table it is on) and isn't eating faster than a fly can.
    */
   bite(by: number, id: number, amount: number, x: number, y: number, z: number, now: number): Granted {
+    this.#bitten = true;
     const food = this.find(id);
-    if (!food) {
-      if (!this.#gone.includes(id)) this.#gone.push(id);
-      return this.#refuse("unknown");
-    }
+    if (!food) return this.#refuse("unknown");
     // Even a refused bite needs an authoritative amount and an acknowledgement.
     this.#changed.add(id);
     if (!(amount > 0)) return this.#refuse("unknown");
@@ -169,7 +168,8 @@ export class TableFood {
 
   /** What changed since the last call, for the room to tell everyone; null if nothing did. */
   flush(): { amounts: [number, number][]; gone: number[] } | null {
-    if (this.#changed.size === 0 && this.#gone.length === 0) return null;
+    if (!this.#bitten && this.#changed.size === 0 && this.#gone.length === 0) return null;
+    this.#bitten = false;
     const amounts: [number, number][] = [];
     for (const id of this.#changed) {
       const f = this.find(id);
@@ -181,7 +181,7 @@ export class TableFood {
   }
 }
 
-type Pending = { seq: number; food: number; amount: number; sweet: number };
+type Pending = { seq: number; food: number; amount: number };
 
 /**
  * A device's side of it: its pantry is the room's food, less what its own fly
@@ -193,7 +193,6 @@ export class FoodMirror {
   /** Bites sent and not yet acknowledged. */
   readonly #pending: Pending[] = [];
   /** Bites not yet sent: food id to amount. */
-  readonly #sweet = new Map<number, number>();
   readonly unsent = new Map<number, number>();
   /** Everything this fly has eaten by its own reckoning, and what the room has granted it. */
   predicted = 0;
@@ -210,7 +209,6 @@ export class FoodMirror {
   ate(food: Food, amount: number) {
     if (!(amount > 0)) return;
     this.predicted += amount;
-    this.#sweet.set(food.id, food.sweet);
     // Keep exhausted predictions until the room can restore a refused bite.
     if (!this.#pantry.foods.includes(food)) this.#pantry.foods.push(food);
     this.unsent.set(food.id, (this.unsent.get(food.id) ?? 0) + amount);
@@ -218,9 +216,8 @@ export class FoodMirror {
 
   /** The unsent bites went out as message `seq`. */
   sent(seq: number) {
-    for (const [food, amount] of this.unsent) this.#pending.push({ seq, food, amount, sweet: this.#sweet.get(food) ?? 0 });
+    for (const [food, amount] of this.unsent) this.#pending.push({ seq, food, amount });
     this.unsent.clear();
-    this.#sweet.clear();
   }
 
   /** The table's food as a newcomer finds it. */
@@ -228,7 +225,6 @@ export class FoodMirror {
     // Bites the room hasn't counted are lost with the old connection: the room's word is the account.
     this.#pending.length = 0;
     this.unsent.clear();
-    this.#sweet.clear();
     const pantry = this.#pantry;
     pantry.foods.length = 0;
     for (const w of foods) pantry.foods.push(fromWire(this.#world, w));
@@ -247,16 +243,15 @@ export class FoodMirror {
   /** The room's account: what is left of what changed, what is gone, and this device's bites it has counted (through `ack`). */
   apply(ack: number, amounts: readonly [number, number][], gone: readonly number[], granted: number | undefined, meal?: readonly [number, number]): [number, number] {
     const pending = this.#pending;
-    let counted = 0;
-    let sugar = 0;
     while (pending.length && seqAtOrAfter(ack, pending[0].seq)) {
       const p = pending.shift()!;
-      counted += p.amount;
-      sugar += p.amount * p.sweet;
+      // Receipt-capable rooms include every processed, surviving food in
+      // amounts, even on refusal. An omitted acknowledged ID no longer exists.
+      if (meal && !amounts.some(([id]) => id === p.food)) {
+        const i = this.#pantry.foods.findIndex((f) => f.id === p.food);
+        if (i >= 0) this.#pantry.foods.splice(i, 1);
+      }
     }
-    // Older rooms omit nutrition receipts. Bound their cumulative account by
-    // this acknowledgement's predictions, retaining their average sweetness.
-    const accepted = Math.min(counted, Math.max(0, (granted ?? this.granted) - this.granted));
     const foods = this.#pantry.foods;
     for (const [id, amount] of amounts) {
       const f = foods.find((x) => x.id === id);
@@ -271,6 +266,6 @@ export class FoodMirror {
       if (this.unsent.has(id) || pending.some((p) => p.food === id)) this.lostBites++;
     }
     if (granted !== undefined) this.granted = granted;
-    return meal ? [meal[0], meal[1]] : [accepted, counted > 0 ? sugar * accepted / counted : 0];
+    return meal ? [meal[0], meal[1]] : [0, 0];
   }
 }

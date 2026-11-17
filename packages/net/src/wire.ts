@@ -50,7 +50,7 @@ function valid(m: Obj): boolean {
   switch (m.type) {
     case "welcome":
       return (
-        num(m.v) && player(m.id) && text(m.colour) && int(m.starter, 0, MAX_PLAYERS) && num(m.seed) && num(m.now) && num(m.wall) && num(m.offset) && text(m.place) &&
+        (m.meals === undefined || bool(m.meals)) && num(m.v) && player(m.id) && text(m.colour) && int(m.starter, 0, MAX_PLAYERS) && num(m.seed) && num(m.now) && num(m.wall) && num(m.offset) && text(m.place) &&
         int(m.epoch, 0, 255) && obj(m.world) && isWorld(m.world) && list(m.players, MAX_PLAYERS, isPlayer) && list(m.foods, WIRE_FOODS_MAX, isFood) &&
         list(m.balls, MAX_PLAYERS, isBall) && list(m.happenings, LIST_MAX, isHappening) && list(m.bubbles, LIST_MAX, isBubble) && isSpot(m.at) && obj(m.room) &&
         text(m.room.name) && bool(m.room.listed) && bool(m.room.locked)

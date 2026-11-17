@@ -412,6 +412,7 @@ export class Table {
     seat.away = false;
     this.#send(seat, {
       type: "welcome",
+      meals: true,
       v: PROTOCOL,
       id: seat.id,
       colour: seat.colour,
