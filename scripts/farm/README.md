@@ -11,8 +11,10 @@ ssh ubuntu-thinkpad flies-check <branch> --with-dev
 `--with-dev` merges the fetched `origin/dev` before checking and lists conflicts.
 Branches, `origin/<branch>`, and pushed SHAs work. The checkout's SHA is printed.
 Use `--only lint|types|unit|e2e|all` (default `all`); `types` includes tvOS.
-For targeted runs, append `--files path/to/a.test.ts path/to/b.test.ts` to
-`--only unit`, or `.e2e.ts` paths to `--only e2e`. All runs exit nonzero on
+For targeted runs, use `--files path/to/a.test.ts path/to/b.test.ts` (or `.e2e.ts`
+paths). With default `all`, this retains lint, typechecks and build but runs only
+the selected test files; a test stage with no selected files is explicitly skipped.
+You can also combine it with `--only unit` or `--only e2e`. All runs exit nonzero on
 failure. Each stage reports status, seconds and failure context. Container stages
 time out after 30 minutes; complete logs
 remain under `~/flies-farm/logs/<id>/`. Remove old logs when no longer needed.

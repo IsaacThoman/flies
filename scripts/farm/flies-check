@@ -15,7 +15,15 @@ while (($#)); do
   esac
 done
 case $only in all|lint|types|unit|e2e) ;; *) usage ;; esac
-if ((${#files[@]})) && [[ $only != unit && $only != e2e ]]; then usage; fi
+if ((${#files[@]})) && [[ $only == lint || $only == types ]]; then usage; fi
+unit_files=(); e2e_files=()
+for file in "${files[@]}"; do
+  case $file in
+    *.test.ts) [[ $only != e2e ]] || usage; unit_files+=("$file") ;;
+    *.e2e.ts) [[ $only != unit ]] || usage; e2e_files+=("$file") ;;
+    *) usage ;;
+  esac
+done
 farm=$HOME/flies-farm
 cache=$HOME/repos/flies
 mkdir -p "$farm/locks" "$farm/logs"
@@ -116,7 +124,11 @@ if [[ $only == all || $only == types ]]; then
   stage tvos-types run_container npm run tvos:typecheck || true
 fi
 if [[ $only == all ]]; then stage build run_container npm run build || true; fi
-if [[ $only == all || $only == unit ]]; then
+if [[ $only == all ]] && ((${#files[@]})); then
+  ((${#unit_files[@]})) || echo 'SKIP unit: no unit files selected'
+  ((${#e2e_files[@]})) || echo 'SKIP e2e: no e2e files selected'
+fi
+if [[ $only == all || $only == unit ]] && { ((${#files[@]} == 0)) || ((${#unit_files[@]} > 0)); }; then
   # Exact names are deliberately narrow: all other tests in these files still run.
   skip="^(?:on the real connectome every tick is the TypeScript's, bit for bit, the eyes shut and open \(WebAssembly\)|exp, log, log1p, expm1, sin and cos are V8's to the bit \(WebAssembly\)|every tick of 70 simulated seconds is the TypeScript's, bit for bit, for several seeds \(WebAssembly\)|with its eyes open every tick is the TypeScript's, bit for bit, for several seeds \(WebAssembly\)|broken or odd eye columns come out as in TypeScript \(WebAssembly\))$"
   echo "needs Apple silicon (exact test-name exclusions):"
@@ -128,15 +140,15 @@ with its eyes open every tick is the TypeScript's, bit for bit, for several seed
 broken or odd eye columns come out as in TypeScript (WebAssembly)
 SKIPS
   echo 'SKIP CPU budgets: M5 Pro calibration is not accepted on this x86 farm (see README).'
-  tests=("${files[@]}")
+  tests=("${unit_files[@]}")
   if ((${#tests[@]} == 0)); then
     mapfile -t tests < <(node --input-type=module -e 'import {globSync} from "node:fs"; console.log(globSync(["apps/*/tests/*.test.ts","packages/*/src/**/*.test.ts","packages/*/tests/*.test.ts"]).sort().join("\n"))')
   fi
   for file in "${tests[@]}"; do [[ $file == *.test.ts && -f $file && $file != -* ]] || { echo "Invalid unit test: $file"; exit 2; }; done
   stage unit run_container node --test --test-concurrency=4 --test-reporter=tap --test-skip-pattern="$skip" "${tests[@]}" || true
 fi
-if [[ $only == all || $only == e2e ]]; then
-  tests=("${files[@]}")
+if [[ $only == all || $only == e2e ]] && { ((${#files[@]} == 0)) || ((${#e2e_files[@]} > 0)); }; then
+  tests=("${e2e_files[@]}")
   if ((${#tests[@]} == 0)); then tests=(apps/web/e2e/{play,pointer,web,tables}.e2e.ts); fi
   for file in "${tests[@]}"; do
     [[ $file == *.e2e.ts && -f $file && $file != -* ]] || { echo "Invalid e2e test: $file"; exit 2; }
