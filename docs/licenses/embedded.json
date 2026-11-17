@@ -1,0 +1,145 @@
+[
+  {
+    "heading": "Earcut 3.0.2 (Mapbox)",
+    "package": "three",
+    "version": "0.186.1",
+    "sources": [
+      {
+        "path": "src/extras/lib/earcut.js",
+        "sha256": "1e1d25448661b04a034155fba7df43662a8f039e3ec33b1f7a1c16283d688d5a"
+      }
+    ],
+    "notices": [
+      {
+        "file": "docs/licenses/earcut.txt",
+        "url": "https://raw.githubusercontent.com/mapbox/earcut/v3.0.2/LICENSE"
+      }
+    ]
+  },
+  {
+    "heading": "Linearly transformed cosines / ACES fit",
+    "package": "three",
+    "version": "0.186.1",
+    "sources": [
+      {
+        "path": "src/renderers/shaders/ShaderChunk/lights_physical_pars_fragment.glsl.js",
+        "sha256": "db6a69d8c31df6d3ad95c25300c437087ffe8a650006ef06018f179ead7c19da"
+      },
+      {
+        "path": "src/renderers/shaders/ShaderChunk/tonemapping_pars_fragment.glsl.js",
+        "sha256": "447958b93d07616c83d9273829ed810eb734d02ebbe60f12fc9bdda4f7928f44"
+      }
+    ],
+    "notices": [
+      {
+        "file": "docs/licenses/ltc.txt",
+        "url": "https://raw.githubusercontent.com/selfshadow/ltc_code/31e5e96b54f98f33098f8503003119ba2231a1c6/LICENSE"
+      }
+    ]
+  },
+  {
+    "heading": "gl-matrix (matrix inversion reference)",
+    "package": "three",
+    "version": "0.186.1",
+    "sources": [
+      {
+        "path": "src/math/Matrix4.js",
+        "sha256": "d942c20d95e0864246aa6794934656f6a2871a6e863ce7b096581837810fb555"
+      }
+    ],
+    "notices": [
+      {
+        "file": "docs/licenses/gl-matrix.txt",
+        "url": "https://raw.githubusercontent.com/toji/gl-matrix/6f96d577ee0217b5cfce334e2cad92a6ac3572d2/LICENSE.md"
+      }
+    ]
+  },
+  {
+    "heading": "Paper.js (interior-point port)",
+    "package": "three",
+    "version": "0.186.1",
+    "sources": [
+      {
+        "path": "src/extras/core/ShapePath.js",
+        "sha256": "c04bd651c4af33246242a7313949b9182b5a1956c87f81064c2dc21abcfceef4"
+      }
+    ],
+    "notices": [
+      {
+        "file": "docs/licenses/paperjs.txt",
+        "url": "https://raw.githubusercontent.com/paperjs/paper.js/0d1446a1bb040e3c87533b28bcc384d87663587b/LICENSE.txt"
+      }
+    ]
+  },
+  {
+    "heading": "Filament (shading and AgX adaptations)",
+    "package": "three",
+    "version": "0.186.1",
+    "sources": [
+      {
+        "path": "src/renderers/shaders/ShaderChunk/lights_physical_pars_fragment.glsl.js",
+        "sha256": "db6a69d8c31df6d3ad95c25300c437087ffe8a650006ef06018f179ead7c19da"
+      },
+      {
+        "path": "src/renderers/shaders/ShaderChunk/tonemapping_pars_fragment.glsl.js",
+        "sha256": "447958b93d07616c83d9273829ed810eb734d02ebbe60f12fc9bdda4f7928f44"
+      },
+      {
+        "path": "src/renderers/shaders/ShaderChunk/envmap_physical_pars_fragment.glsl.js",
+        "sha256": "735d82e075b500159f37bbda74585b2765c7bef9dec3d2f476a470cd3f47eb02"
+      }
+    ],
+    "notices": [
+      {
+        "file": "docs/licenses/filament-license.txt",
+        "url": "https://raw.githubusercontent.com/google/filament/7cb728c177984e52123bba0c3dbd6b14f07b210f/LICENSE"
+      },
+      {
+        "file": "docs/licenses/filament-brdf.txt",
+        "url": "https://raw.githubusercontent.com/google/filament/7cb728c177984e52123bba0c3dbd6b14f07b210f/shaders/src/surface_brdf.fs"
+      },
+      {
+        "file": "docs/licenses/filament-tone.txt",
+        "url": "https://raw.githubusercontent.com/google/filament/7cb728c177984e52123bba0c3dbd6b14f07b210f/filament/src/ToneMapper.cpp"
+      }
+    ]
+  },
+  {
+    "heading": "Geometric Tools (ray/segment distance reference)",
+    "package": "three",
+    "version": "0.186.1",
+    "sources": [
+      {
+        "path": "src/math/Ray.js",
+        "sha256": "4c88adbbefe35fefdeef8f971ce90220d44fa1699c39fc17d1c584a0c012b648"
+      }
+    ],
+    "notices": [
+      {
+        "file": "docs/licenses/geometric-tools.txt",
+        "url": "https://raw.githubusercontent.com/pmjoniak/GeometricTools/ae6e933f9ab3a5474d830700ea8d9445cc78ef4b/GTEngine/Include/Mathematics/GteDistRaySegment.h"
+      },
+      {
+        "file": "docs/licenses/boost.txt",
+        "url": "https://www.boost.org/LICENSE_1_0.txt"
+      }
+    ]
+  },
+  {
+    "heading": "Minimal AgX contrast fit",
+    "package": "three",
+    "version": "0.186.1",
+    "sources": [
+      {
+        "path": "src/renderers/shaders/ShaderChunk/tonemapping_pars_fragment.glsl.js",
+        "sha256": "447958b93d07616c83d9273829ed810eb734d02ebbe60f12fc9bdda4f7928f44"
+      }
+    ],
+    "notices": [
+      {
+        "file": "docs/licenses/agx.txt",
+        "url": "https://iolite-engine.com/blog_posts/minimal_agx_implementation"
+      }
+    ]
+  }
+]

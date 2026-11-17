@@ -15,6 +15,10 @@ services:
         SERVICE_URL_WEB: ${SERVICE_URL_WEB:-}
         # Empty uses the build script's team; 0 disables app links.
         APPLE_TEAM_ID: ${APPLE_TEAM_ID:-}
+        FLIES_OPERATOR_NAME: ${FLIES_OPERATOR_NAME:-}
+        FLIES_CONTACT_EMAIL: ${FLIES_CONTACT_EMAIL:-}
+        FLIES_SUPPORT_URL: ${FLIES_SUPPORT_URL:-}
+        FLIES_MARKETING_URL: ${FLIES_MARKETING_URL:-}
     environment:
       ROOMS_HOST: ${ROOMS_HOST:-rooms}
       ROOMS_PORT: ${ROOMS_PORT:-3000}
