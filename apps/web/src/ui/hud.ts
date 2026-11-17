@@ -160,11 +160,11 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   }
 
   // The menu's button, or its hint: the caption keeps clear of it.
-  let menuRight = touch && menuY !== L.menuY ? L.cx - L.width / 2 - 8 : L.menuX;
+  let menuRight = touch?.menuAtFoot ? L.cx - L.width / 2 - 8 : L.menuX;
   if (pointing) {
     iconButton(g, L.menuX + 18, menuY, 18, "menu");
     hits.add(HUD_HITS.menu, L.menuX - 6, menuY - 24, 48, 48);
-    if (!touch || menuY === L.menuY) menuRight = L.menuX + 36;
+    if (!touch?.menuAtFoot) menuRight = L.menuX + 36;
   } else if (s.hints) {
     // Up and down need no hint: the arrows on the tool's name say it. The shelf's and each tool's go once they've been used.
     const set = s.glyphs!;

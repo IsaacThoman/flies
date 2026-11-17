@@ -346,8 +346,7 @@ test("phone and Split View touch targets stay distinct, with Menu in portrait th
 test("the room form keeps its focused field above a phone or Split View keyboard", () => {
   for (const [w, h, covered] of [[390, 844, 360], [844, 390, 200], [507, 820, 360], [375, 820, 360]]) {
     const frame = frameFor(w, h, { top: h > w ? 59 : 0, bottom: covered, left: 0, right: 0 }, true);
-    const s = shell(frame);
-    s.typing = { active: null, end() {} } as Shell["typing"];
+    const s = { ...shell(frame), typing: { active: null, end() {} } as Shell["typing"] };
     const screen = new OnlineScreen(s);
     screen.enter();
     screen.press("select", false);

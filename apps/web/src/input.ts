@@ -168,6 +168,10 @@ type Box = { left: number; top: number; width: number; height: number };
  */
 export class Pointers {
   readonly gestures: Gesture[] = [];
+  /** Captures the identity under the first press, before asynchronous menu updates can replace it. */
+  onDown: ((x: number, y: number) => void) | null = null;
+  /** Runs during a recognized release, while WebKit still permits a touch to raise its keyboard. */
+  onTap: ((x: number, y: number, fromX: number, fromY: number) => void) | null = null;
   /** Something meant since the last frame, to wake the wallpaper with. */
   deliberate = false;
   /** performance.now() of the last deliberate input. */
@@ -177,6 +181,7 @@ export class Pointers {
   readonly #devices: Devices | null;
   #primary = -1;
   #touch = false;
+  #button = 0;
   #start = { x: 0, y: 0 };
   #moved = 0;
   readonly #fingers = new Map<number, { x: number; y: number }>();
@@ -222,6 +227,10 @@ export class Pointers {
     // Safari's own pinch and double-tap zoom, and the page's rubber band.
     for (const type of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(type, (e) => e.preventDefault(), opts);
     document.addEventListener("touchmove", (e) => e.preventDefault(), opts);
+    // Field focus happens in pointerup, before the next game frame can apply a resize.
+    window.addEventListener("resize", () => this.cancel());
+    window.addEventListener("orientationchange", () => this.cancel());
+    window.visualViewport?.addEventListener("resize", () => this.cancel());
     window.addEventListener("blur", () => this.cancel(true));
     document.addEventListener("visibilitychange", () => { if (document.hidden) this.cancel(true); });
   }
@@ -262,9 +271,11 @@ export class Pointers {
     }
     this.#primary = e.pointerId;
     this.#touch = touch;
+    this.#button = e.button;
     this.#start = p;
     this.#moved = 0;
     this.gestures.push({ type: "down", x: p.x, y: p.y, touch, button: e.button });
+    this.onDown?.(p.x, p.y);
   }
 
   move(e: RawPointer) {
@@ -355,6 +366,7 @@ export class Pointers {
     last.x = p.x;
     last.y = p.y;
     this.gestures.push({ type: "up", x: p.x, y: p.y, tap, double });
+    if (tap && this.#button === 0) this.onTap?.(p.x, p.y, this.#start.x, this.#start.y);
   }
 
   /** Geometry or focus changed: coordinates from the previous screen cannot commit an action. */

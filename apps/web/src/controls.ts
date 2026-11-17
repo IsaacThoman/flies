@@ -17,6 +17,7 @@
 // eases in over a moment, so turning the wheel moves the camera in one smooth
 // glide, as a trackpad's scroll does, not in hops.
 
+import { sameTarget } from "@fly/ui";
 import type { Hit } from "@fly/ui";
 import type { Gesture } from "./input.ts";
 import { HUD_HITS } from "./ui/hud.ts";
@@ -190,16 +191,16 @@ export class PlayControls {
         if (!grip) return;
         if (grip.kind === "hud") {
           const hit = target.hudAt(g.x, g.y);
-          if (g.tap && grip.swiped === 0 && hit?.kind === grip.hit.kind && hit.index === grip.hit.index && hit.value === grip.hit.value) target.pressHud(grip.hit);
+          if (g.tap && grip.swiped === 0 && sameTarget(grip.hit, hit)) target.pressHud(grip.hit);
         } else if (grip.kind === "press") {
-          if (g.tap && target.tool() === "once") target.use();
+          if (g.tap && target.tool() === "once" && !target.hudAt(g.x, g.y) && target.aim(g.x, g.y, true)) target.use();
           if (!mouse) target.unaim();
         } else if (grip.kind === "tool") {
           if (!mouse) target.unaim();
         } else if (grip.kind === "turn") {
           target.holdCamera(false);
           // A double click or tap in the air: back to the cameraman, without the rest of a wheel's clicks taking it on again.
-          if (g.double) {
+          if (g.double && !target.hudAt(g.x, g.y)) {
             this.#glide = 0;
             target.handBack();
           }

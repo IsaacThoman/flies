@@ -24,7 +24,7 @@ export type HudLayout = {
   cx: number;
   width: number;
   /** Touch layouts keep portrait Menu in thumb range and a short screen's label beside its shelf. */
-  touch: { labelCx: number; labelY: number; labelWidth: number; menuY: number; targetHeight: number } | null;
+  touch: { labelCx: number; labelY: number; labelWidth: number; menuY: number; menuAtFoot: boolean; targetHeight: number } | null;
   /** The caption's middle, down. */
   captionY: number;
   /** The shelf: its middle, down; the space each tool has; how big the orbs are (1 on the TV); where the first slot starts; the first tool of its second half, and how far that half is apart. */
@@ -73,10 +73,10 @@ export function hudLayout(frame: Frame): HudLayout {
   const a = safeRect(frame);
   const cx = a.x + a.w / 2;
   const bottom = a.y + a.h;
-  const compact = frame.coarse && a.h < 360 && a.w > a.h * 1.4;
-  const gapWanted = compact ? 44 / frame.unit : SHELF_GAP;
+  const compact = frame.coarse && a.h < 360 && a.w > a.h * 1.4 && a.w * frame.unit >= 700;
   const touchApart = Math.min(SHELF_APART, a.w - 16 - tools * (44 / frame.unit));
   const apart = frame.coarse ? (touchApart >= 16 ? (compact ? 16 : touchApart) : 0) : split > 0 && split < tools ? Math.max(SHELF_APART_LEAST, Math.min(SHELF_APART, a.w - 16 - tools * SHELF_GAP)) : 0;
+  const gapWanted = compact ? Math.max(44 / frame.unit, Math.min(SHELF_GAP, (a.w - 32 - apart - 216) / tools)) : SHELF_GAP;
   const gap = Math.min(gapWanted, (a.w - 16 - apart) / tools);
   const shelfY = bottom - 34;
   const labelY = shelfY - 61;
@@ -88,7 +88,8 @@ export function hudLayout(frame: Frame): HudLayout {
     labelCx: compact ? (shelfLeft + shelfWidth + 16 + a.x + a.w - 8) / 2 : cx + (menuBeside ? 28 : 0),
     labelWidth: compact ? a.x + a.w - 8 - (shelfLeft + shelfWidth + 16) : a.w - 16 - (menuBeside ? 56 : 0),
     labelY: compact ? shelfY : labelY,
-    menuY: menuAtFoot ? labelY - (menuBeside ? 0 : 45) : a.y + 24,
+    menuY: menuAtFoot ? labelY - (menuBeside ? 0 : 45) : a.y + 32,
+    menuAtFoot,
     targetHeight: Math.max(32, 44 / frame.unit),
   } : null;
   // The hints keep to the corners beside the shelf (the lowest, "Tools", is beside it), unless the shelf reaches them: then above the label.
