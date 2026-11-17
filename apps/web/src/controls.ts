@@ -8,9 +8,9 @@
 // down, wherever it starts, with whichever button, by the same amount for the
 // same distance dragged every time, unless the tool in hand is one that is
 // held on the fly (the feather, the air), which a left-button drag over the
-// table carries. The wheel, a trackpad's two-finger scroll up and down and a
-// pinch bring it in and take it out, and nothing else; a trackpad's scroll
-// across turns it. A click or a tap uses the tool where it lands; a double
+// table carries. A mouse wheel's clicks and a pinch bring it in and take it
+// out, and nothing else; a trackpad's two-finger scroll turns it round and up,
+// as a drag does. A click or a tap uses the tool where it lands; a double
 // click or tap in the air takes the camera back to Follow's distance and
 // height, still on the same side of the fly. Where they leave the camera it
 // stays: nothing else moves it.
@@ -55,11 +55,11 @@ export const DRAG_ROUND = 3;
 export const DRAG_UP = 1.6;
 /** One click of a mouse wheel brings the camera this much nearer or farther (the camera eases it in). */
 export const NOTCH_ZOOM = 1.2;
-/** A trackpad's scroll and pinch: how much nearer or farther per CSS pixel scrolled (as a power of e). */
-const SCROLL_ZOOM = 0.004;
+/** A trackpad's pinch: how much nearer or farther per CSS pixel it reports (as a power of e). */
 const PINCH_ZOOM = 0.01;
-/** A trackpad's scroll across: radians round per CSS pixel. */
+/** A trackpad's scroll: radians round, and up, per CSS pixel, in the same proportion as a drag's. */
 const SCROLL_ROUND = 0.006;
+const SCROLL_UP = (SCROLL_ROUND * DRAG_UP) / DRAG_ROUND;
 /** A swipe along the tool's label this far (design units) steps its kind; and the shelf's wheel steps a tool for this much trackpad scroll. */
 export const LABEL_SWIPE = 36;
 const SHELF_SCROLL = 140;
@@ -234,7 +234,7 @@ export class PlayControls {
     target.holdCamera(true);
   }
 
-  /** The wheel, or a trackpad's two fingers: over the shelf, the tools; over the label, the kinds; else the camera, nearer or farther (and, scrolled across, round). */
+  /** The wheel, or a trackpad's two fingers: over the shelf, the tools; over the label, the kinds; else the camera, nearer or farther by a wheel's click or a pinch, round and up by a scroll. */
   #wheel(g: Extract<Gesture, { type: "wheel" }>, target: PlayTarget) {
     const hit = target.hudAt(g.x, g.y);
     if (hit) {
@@ -254,9 +254,7 @@ export class PlayControls {
     }
     if (g.zoom) target.zoom(Math.exp(g.dy * PINCH_ZOOM));
     else if (g.notch) target.zoom(Math.pow(NOTCH_ZOOM, Math.sign(g.dy)));
-    else {
-      if (g.dy !== 0) target.zoom(Math.exp(g.dy * SCROLL_ZOOM));
-      if (g.dx !== 0) target.turn(g.dx * SCROLL_ROUND, 0);
-    }
+    // The page's content follows the fingers, so the camera turns as a drag the same way would.
+    else target.turn(g.dx * SCROLL_ROUND, -g.dy * SCROLL_UP);
   }
 }

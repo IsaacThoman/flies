@@ -191,8 +191,8 @@ test("zooming changes only the distance: the same way round, the same field of v
   }
   assert.equal(director.reach, NEAREST);
   assert.equal(director.view, "close");
-  // A trackpad's scroll and a pinch out, all the way to the whole table.
-  for (let i = 0; i < 40; i++) zoom({ type: "wheel", x: 0.5, y: 0.5, dx: 0, dy: 40, notch: false, zoom: false }, 4);
+  // A trackpad's pinch (a wheel with Ctrl, or Safari's) and a touch screen's, out all the way to the whole table.
+  for (let i = 0; i < 40; i++) zoom({ type: "wheel", x: 0.5, y: 0.5, dx: 0, dy: 40, notch: false, zoom: true }, 4);
   for (let i = 0; i < 20; i++) zoom({ type: "pinch", scale: 0.8, dx: 0, dy: 0 }, 4);
   zoom({ type: "pinchEnd" }, 60);
   assert.equal(director.view, "table");
