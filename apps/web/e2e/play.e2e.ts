@@ -2,7 +2,8 @@
 // brain: boots it, waits for the brain, walks the menus with the keys (stepping
 // through where the fly lives carries it only where the choice rests), feeds
 // the fly and checks its taste senses and feed command, throws the ball until the fly takes
-// off, checks the wallpaper comes and goes with what it sees and its nervous
+// off, turns the camera with a swipe while the View tool is in hand, checks
+// the wallpaper comes and goes with what it sees and its nervous
 // system in a corner, that the X-ray comes where the fly is big enough,
 // carries the fly to every place, leaving its footprints behind each time,
 // feeds it the weather outside as the Apple TV would, reloads and finds the
@@ -18,7 +19,7 @@
 
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
-import { gameUp, openGame, readState, startServer, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
+import { gameUp, openGame, readState, startServer, swipe, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
 import { dropFood, feedHoney } from "./feeding.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import type { Game } from "../src/game.ts";
@@ -301,6 +302,17 @@ try {
   });
   await waitFor(page, "eyesInset=top-right");
 
+  step("with View in hand a swipe on the touch surface turns the camera round the fly, as far as it went, and it stays there");
+  const unturned = Number((await readState(page)).yaw);
+  await swipe(page, [-0.5, 0], [0.3, 0]);
+  await page.waitForFunction((yaw) => Math.abs(Number((document.getElementById("game") as HTMLCanvasElement).dataset.yaw) - yaw) > 1, unturned, { timeout: 30_000 });
+  await waitForGameTime(page, 0.5);
+  const swiped = Number((await readState(page)).yaw);
+  // Round by three quarters of a drag across the screen for four tenths of the surface's width: 1.2 rad, the other way.
+  assert.ok(Math.abs(Math.atan2(Math.sin(swiped - unturned + 1.2), Math.cos(swiped - unturned + 1.2))) < 0.02, `${unturned} → ${swiped}`);
+  await waitForGameTime(page, 3);
+  assert.equal(Number((await readState(page)).yaw), swiped, "left alone, it stays");
+
   step("its nervous system: in the corner with what it sees, the fly as glass where it is big enough to see inside, never over the full picture");
   await page.evaluate(() => {
     const settings = (globalThis as unknown as { __fly: { settings: { nerves: string; xray: string } } }).__fly.settings;
@@ -421,7 +433,7 @@ try {
   const again = await waitFor(page, "screen=play");
   assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["feed", "sugar", "wide", "noon", "clear"]);
   const learned = await page.evaluate(() => JSON.parse(localStorage.getItem("flies.learned") ?? "{}") as Record<string, true>);
-  assert.deepEqual(Object.keys(learned).sort(), ["feed", "place", "swoop", "tools"], "the hints for what was used aren't taught again");
+  assert.deepEqual(Object.keys(learned).sort(), ["arrival", "feed", "light", "place", "swoop", "tools", "view", "weather"], "the hints for what was used aren't taught again");
 
   step("three flies chosen in Settings live, see and meet each other, survive a reload, then return to one");
   await chooseFlies(page, 3);

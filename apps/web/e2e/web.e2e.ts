@@ -135,15 +135,17 @@ try {
   // The browser's own check for a new service worker escapes Playwright's offline switch; nothing of the page's may.
   const reached = site.requests.slice(before).filter((r) => !r.path.endsWith("/sw.js"));
   assert.deepEqual(reached.map((r) => r.path), [], "nothing reached the server");
-  await context.setOffline(false);
 
-  step("?brain=typescript runs the TypeScript brain on the kept connectome, without the module");
+  step("offline ?brain=typescript runs the kept TypeScript brain, without the module");
   const asked = site.requests.length;
   await page.goto(`${site.url}?brain=typescript`);
   const typescript = await waitFor(page, "brain=running,screen=title", 60_000);
   assert.equal(typescript.brainEngine, "typescript");
   assert.equal(typescript.from, "cache");
-  assert.deepEqual(site.requests.slice(asked).filter((r) => r.path.includes("/brain/")), [], "nothing of the brain fetched");
+  // A service worker's earlier document revalidation can finish after the offline navigation.
+  const fetchedCode = site.requests.slice(asked).filter((r) => r.path.includes("/brain/") || (r.path.endsWith(".js") && !r.path.endsWith("/sw.js")));
+  assert.deepEqual(fetchedCode, [], "neither the fallback code nor brain data is fetched");
+  await context.setOffline(false);
   await page.goto(site.url);
   await waitFor(page, "brain=running,screen=title,brainEngine=wasm", 60_000);
 

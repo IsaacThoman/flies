@@ -60,10 +60,10 @@ export class Overlay {
     this.#since = 1;
   }
 
-  /** Redraws with `draw` (in design units) if dirty and allowed this frame, as `owner` (a screen's id) for the hit map. Returns true if it drew. */
-  redraw(dt: number, owner: string, draw: (g: CanvasRenderingContext2D, hits: HitMap) => void): boolean {
+  /** Provisional input feedback can bypass the upload cap so it never waits an extra frame. */
+  redraw(dt: number, owner: string, draw: (g: CanvasRenderingContext2D, hits: HitMap) => void, immediate = false): boolean {
     this.#since += dt;
-    if (!this.dirty || this.#since < 1 / MAX_REDRAWS) return false;
+    if (!this.dirty || (!immediate && this.#since < 1 / MAX_REDRAWS)) return false;
     this.#since = 0;
     this.dirty = false;
     const g = this.g;

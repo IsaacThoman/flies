@@ -7,7 +7,7 @@
 
 import type * as THREE from "three";
 import {
-  ABDOMEN, ABDOMINAL_SEGMENTS, EYE, HALTERE, HEAD, J, LEG_COUNT, LEG_SEGMENTS, LEGS, PIVOT, PROBOSCIS,
+  ABDOMEN, ABDOMINAL_SEGMENTS, ANTENNA, EYE, HALTERE, HEAD, J, LEG_COUNT, LEG_SEGMENTS, LEGS, PIVOT, PROBOSCIS,
   SCUTELLUM, THORAX, legPair,
 } from "./anatomy.ts";
 import type { Vec3 } from "./anatomy.ts";
@@ -51,15 +51,17 @@ const C = {
   bristle: rgb("#24180f"),
 };
 
+// Anatomy: Genetics 2024 doi:10.1093/genetics/iyae129. These finishes are
+// display choices, not measured cuticle reflectances.
 // roughness, clearcoat, sheen, region
 const M = {
-  thorax: [0.55, 0.3, 0.6, 2] as Mat,
-  head: [0.5, 0.35, 0.4, 0] as Mat,
+  thorax: [0.68, 0.16, 0.6, 2] as Mat,
+  head: [0.58, 0.23, 0.4, 0] as Mat,
   eye: [0.3, 0, 0.35, 1] as Mat,
   ocellus: [0.12, 1, 0, 0] as Mat,
   abdomen: [0.38, 0.6, 0.25, 0] as Mat,
   membrane: [0.6, 0.2, 0.3, 0] as Mat,
-  leg: [0.45, 0.4, 0.3, 0] as Mat,
+  leg: [0.6, 0.23, 0.3, 0] as Mat,
   claw: [0.25, 0.8, 0, 0] as Mat,
   bristle: [0.35, 0.5, 0, 0] as Mat,
   soft: [0.55, 0.15, 0.5, 0] as Mat,
@@ -332,7 +334,7 @@ export function buildBody(): THREE.BufferGeometry {
 
 function antenna(b: MeshBuilder, mirror: boolean) {
   const joint = J.antenna + (mirror ? 1 : 0);
-  const ellipsoid = (centre: number[], axis: number[], len: number, w: number, th: number, color: Rgb, mat: Mat, nu = 8, nv = 5) => {
+  const ellipsoid = (centre: readonly number[], axis: readonly number[], len: number, w: number, th: number, color: Rgb, mat: Mat, nu = 8, nv = 5) => {
     const x = unit(axis), side = unit(cross(x, [0, 0, 1])), up = cross(side, x);
     b.surface({
       joint, pivot: [0, 0, 0], nu, nv, mat, color: () => color, mirror,
@@ -344,13 +346,13 @@ function antenna(b: MeshBuilder, mirror: boolean) {
   };
   // Scape and pedicel, then the large oval third segment hanging in front of the face.
   ellipsoid([0, 0, 0], [0.2, -0.3, 0.9], 0.01, 0.01, 0.01, C.pedicel, M.head);
-  const pedicelAxis = unit([0.25, -0.55, 0.8]);
+  const pedicelAxis = ANTENNA.pedicelAxis;
   const pedicel = scale(pedicelAxis, 0.014);
   ellipsoid(pedicel, pedicelAxis, 0.013, 0.011, 0.011, C.pedicel, M.head);
-  const funAxis = unit([0.15, -0.9, 0.38]);
+  const funAxis = ANTENNA.funiculusAxis;
   const funBase = scale(pedicelAxis, 0.024);
-  const fun = add(funBase, scale(funAxis, 0.026));
-  ellipsoid(fun, funAxis, 0.029, 0.016, 0.011, C.funiculus, M.soft, 12, 8);
+  const fun = ANTENNA.centre;
+  ellipsoid(fun, funAxis, ANTENNA.length, ANTENNA.width, ANTENNA.thickness, C.funiculus, M.soft, 12, 8);
 
   // The arista: a feathery bristle from the top of the third segment, with branches above and below.
   const root = add(funBase, add(scale(funAxis, 0.008), [0.01, 0, 0.005]));

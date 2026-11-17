@@ -47,7 +47,10 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   eyes_ = eyes::build(connectome, columns);
   if (eyes_) {
     for (io::Side side : {io::kLeft, io::kRight}) retinas_.emplace_back((*eyes_)[side]);
-    for (io::Side side : {io::kLeft, io::kRight}) gained_[side].assign(retinas_[side].rates().size(), 0);
+    for (io::Side side : {io::kLeft, io::kRight}) {
+      gained_[side].assign(retinas_[side].rates().size(), 0);
+      gained_withdrawals_[side].assign(retinas_[side].withdrawals().size(), 0);
+    }
     std::unordered_set<uint32_t> read;
     for (const io::ReadoutGroup& group : wiring_.readouts) read.insert(group.neurons.begin(), group.neurons.end());
     for (io::Side side : {io::kLeft, io::kRight}) {
@@ -79,8 +82,12 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   for (size_t k = 0; k < wiring_.senses.size(); k++) {
     if (wiring_.senses[k].spec.after_eyes) sense_inputs_[k] = sim_.add_input(wiring_.senses[k].spec.name, wiring_.senses[k].neurons);
   }
-  // Last of all, so they too leave every other input's stream as it was.
+  // After those, so they too leave every other input's stream as it was.
   for (const io::StateGroup& group : wiring_.state) state_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
+  // L1's withdrawals under brightening last of all, so every other input's stream is as it was without them.
+  for (size_t side = 0; side < retinas_.size(); side++) {
+    withdrawn_inputs_[side] = sim_.add_rated_input(std::string("eye ") + (side == io::kLeft ? "left" : "right") + " withdrawn", retinas_[side].l1(), true);
+  }
 }
 
 io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& light, TickStats& stats) {
@@ -130,11 +137,17 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
       if (!changed && eye_gain == eye_gain_) continue;
       if (eye_gain == 1) {
         sim_.set_rates(eye_inputs_[side], retinas_[side].rates());
+        sim_.set_rates(withdrawn_inputs_[side], retinas_[side].withdrawals());
       } else {
+        // Sleepiness lowers the lamina's input whichever way the light changes.
         const std::vector<double>& rates = retinas_[side].rates();
         std::vector<double>& gained = gained_[side];
         for (size_t n = 0; n < gained.size(); n++) gained[n] = rates[n] * eye_gain;
         sim_.set_rates(eye_inputs_[side], gained);
+        const std::vector<double>& withdrawals = retinas_[side].withdrawals();
+        std::vector<double>& gained_withdrawals = gained_withdrawals_[side];
+        for (size_t n = 0; n < gained_withdrawals.size(); n++) gained_withdrawals[n] = withdrawals[n] * eye_gain;
+        sim_.set_rates(withdrawn_inputs_[side], gained_withdrawals);
       }
     }
     if (!retinas_.empty()) eye_gain_ = eye_gain;

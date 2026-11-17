@@ -14,7 +14,7 @@ import { REGIONS } from "@fly/brain";
 import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttribution } from "@fly/contracts";
 import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
 import { Navigator, sameTarget } from "@fly/ui";
-import type { GlyphSet, Hit } from "@fly/ui";
+import type { GlyphSet, Hit, HitMap } from "@fly/ui";
 import { BALL_RADIUS, Pantry, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
 import type { RayHit, Vec3 } from "@fly/world";
 import { Haptics } from "./haptics.ts";
@@ -27,11 +27,11 @@ import type { Display, Frame } from "./display.ts";
 import { Eyes } from "./eyes/eyes.ts";
 import { EyesInset, insetWanted } from "./eyes/inset.ts";
 import { FlyView } from "./fly-view.ts";
-import { PlayControls } from "./controls.ts";
+import { DRAG_ROUND, DRAG_UP, PlayControls } from "./controls.ts";
 import type { PlayTarget, ToolUse } from "./controls.ts";
 import { COLOURS, MAX_OWN, PROTOCOL, everyoneIndex } from "@fly/net";
 import type { SeatedFly, TableStart } from "@fly/net";
-import { TAP_SLOP } from "./input.ts";
+import { TouchLoupe } from "./ui/touch-loupe.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
 import { Life } from "./life.ts";
 import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart, tryProtocolReload } from "./online/invite.ts";
@@ -64,7 +64,7 @@ import { KEPT, OVERLAY_OPACITIES, OVERLAY_SIZES, loadLearned, loadSettings, load
 import type { Learned, Lesson, Settings, ShelfChoices, TableSeat } from "./settings.ts";
 import { Stage } from "./stage.ts";
 import { aimAt } from "./tools/aim.ts";
-import { Hands, SWOOP_BEARING, TOOLS } from "./tools/hands.ts";
+import { Hands, TOOLS } from "./tools/hands.ts";
 import type { ToolId } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
 import { StatsPanel, statsSlot, statsWanted } from "./stats/panel.ts";
@@ -72,7 +72,7 @@ import type { StatsState } from "./stats/panel.ts";
 import { Tally } from "./stats/tally.ts";
 import { CornerDeck, waitFor } from "./ui/corners.ts";
 import type { CornerPicture } from "./ui/corners.ts";
-import { HUD_HITS, drawHud } from "./ui/hud.ts";
+import { HUD_HITS, drawHud, needsTeaching } from "./ui/hud.ts";
 import type { HudState } from "./ui/hud.ts";
 import { hudLayout, loadingLayout, playRoom, titleLayout, touchSlop } from "./ui/layout.ts";
 import type { HudLayout, LoadingLayout } from "./ui/layout.ts";
@@ -89,13 +89,16 @@ import { OnlineScreen } from "./ui/screens/online.ts";
 import { BrowserTextEntry, NativeTextEntry, nativeKeyboard } from "./ui/text-entry.ts";
 
 /** Seconds the loading screen stays after the brain wakes, so "Awake!" is seen; longer when it has more to say. */
-const AWAKE_HOLD = 1.2;
+const AWAKE_HOLD = 0.2;
 const AWAKE_HOLD_NOTE = 4;
 /** Hidden longer than this (ms), the page wakes with the sky and the weather where the clock has them now, not easing there. */
 const AWAY_SETTLE_MS = 30_000;
 /** How sensitive the touch surface is: screen widths per full swipe. */
 const SWIPE_GAIN = 0.9;
-/** How often the HUD redraws for its shimmer alone, per second. */
+/** With the View tool in hand, a swipe across the touch surface (2 units) turns the camera as far round as a drag across the screen, and one up it about as far up. */
+const SWIPE_ROUND = DRAG_ROUND / 2;
+const SWIPE_UP = DRAG_UP / 2;
+/** The refresh cap for animated teaching, loading status and frame stats, Hz. */
 const HUD_SHIMMER_FPS = 10;
 /** Seconds of wallpaper in one place before the fly moves on, when it lives in each in turn. */
 const PLACE_TURN = 20 * 60;
@@ -106,7 +109,7 @@ const VEIL_IN = 0.9;
 const QUIET_AFTER = 60;
 /** How often the clock, the forecast and the weather outside are looked at again, s: the light moves on that slowly. */
 const CLOCK_EVERY = 2;
-/** Seconds of tickling or blowing that teach holding Select, longer than a press. */
+/** Seconds of sustained tickling or blowing that distinguish a hold from a press. */
 const HOLD_TAUGHT = 0.5;
 /** A pad's right stick at full tilt: radians a second round the fly, and up; and Q or E held, round. */
 const PAD_ROUND = 2.4;
@@ -204,6 +207,8 @@ export class Game implements Shell {
   knock: Knock | null = null;
   /** Typing into the fields the game draws (a room's name, its password), where there is a way to. */
   readonly typing: TextEntry | null;
+  #typingHit: Hit | null = null;
+  readonly touchLoupe: TouchLoupe | null;
   /** The line that lists the rooms, while Online shows them. */
   #lobby: Lobby | null = null;
   /** The fly's own food, kept while it tries a room, to have back if the room never lets it in. */
@@ -238,7 +243,7 @@ export class Game implements Shell {
   #awakeAt = -1;
   #datasetAt = 0;
   /** What the HUD last drew, to tell when it needs drawing again. */
-  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1 };
+  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1, here: null as PlaceId | null, fixed: false, outside: false, surface: "", running: false, pressed: null as Readonly<Hit> | null };
   #hudAt = 0;
   #changedAt = -10;
   #touched = false;
@@ -284,10 +289,8 @@ export class Game implements Shell {
   /** What the hints have taught, as saved; and how many times that has changed, for the HUD to redraw. */
   #learned: Learned = loadLearned();
   #taught = 0;
-  /** Seconds Select has been tickling or blowing. */
+  /** Seconds the held tool has been tickling or blowing. */
   #held = 0;
-  /** Button hints as last applied: turned on again, they teach everything again. */
-  #hints = true;
   /** The weather outside's state when last logged. */
   #outsideState = "";
   readonly #inputs: Inputs;
@@ -308,6 +311,7 @@ export class Game implements Shell {
   #ringShown = true;
   /** A game has been played since launch: Back from the menu carries on with it. */
   #played = false;
+  #firstVisit = Object.keys(this.#learned).length === 0;
   #cursor = "";
   #seenInput = 0;
   #glyphsDrawn: GlyphSet | null | undefined = undefined;
@@ -377,6 +381,8 @@ export class Game implements Shell {
     this.nerves = new NervesPanel(this.fly.model.nerves);
     this.overlay.scene.add(this.nerves.mesh);
     this.overlay.scene.add(this.statsPanel.mesh);
+    this.touchLoupe = inputs.pointers ? new TouchLoupe() : null;
+    if (this.touchLoupe) this.overlay.scene.add(this.touchLoupe.mesh);
     this.#pictures = [this.inset, this.nerves, this.statsPanel];
     this.tally = new Tally(this.life, Date.now());
     this.#statsState = { spikes: 0, active: 0, speed: 0, history: this.meter.history, head: 0, day: this.tally.day, sensed: this.life.sensed, brain: null };
@@ -392,8 +398,7 @@ export class Game implements Shell {
     };
     this.#hudLayout = hudLayout(display.frame);
     this.#loadingLayout = loadingLayout(display.frame);
-    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, glyphs: this.glyphs, learned: this.#learned, teachSwipe: true, changed: 10, spikes: 0, brainRunning: false, eyes: null, layout: this.#hudLayout };
-    this.#hints = this.settings.hints;
+    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, glyphs: this.glyphs, learned: this.#learned, teachSwipe: true, changed: 10, brainRunning: false, arrival: arriving(this.brain) ? this.brain : null, eyes: null, layout: this.#hudLayout };
     // Nothing points on the Apple TV: nothing to record.
     this.overlay.hits.enabled = !!inputs.pointers;
     this.#applyFrame();
@@ -435,7 +440,13 @@ export class Game implements Shell {
       const code = invited ?? (kept && everyoneIndex(kept) < 0 ? kept : null);
       if (code) this.#sit(code, null);
       // A phone's keyboard comes up only for a field focused during the tap itself: the frame that handles the tap is too late.
-      if (inputs.pointers) this.#typeOnTap(canvas);
+      if (inputs.pointers) {
+        inputs.pointers.onDown = (x, y) => {
+          const hit = this.#hitAt(x, y);
+          this.#typingHit = hit && { ...hit };
+        };
+        inputs.pointers.onTap = (x, y) => this.#typeOnTap(x, y);
+      }
       // A link opened while the app runs (a universal link on a phone): this room, leaving any other.
       window.addEventListener?.(INVITE_EVENT, (event) => {
         const code = invitedTo(String((event as CustomEvent<unknown>).detail));
@@ -444,6 +455,10 @@ export class Game implements Shell {
         this.joinRoom(code);
       });
     }
+  }
+
+  get teachingMenu() {
+    return this.#firstVisit && !this.#played;
   }
 
   /** Rooms with others need a line to the room server: a WebSocket, or the Apple TV host's. */
@@ -523,26 +538,10 @@ export class Game implements Shell {
   }
 
   /** Starts typing into a field as a tap on it lifts, while the browser still counts it as the player's doing. */
-  #typeOnTap(canvas: HTMLCanvasElement) {
-    let from = { x: 0, y: 0 };
-    let pressed: Hit | null = null;
-    const at = (e: PointerEvent) => {
-      const box = canvas.getBoundingClientRect();
-      return { x: (e.clientX - box.left) / Math.max(1, box.width), y: (e.clientY - box.top) / Math.max(1, box.height) };
-    };
-    canvas.addEventListener("pointerdown", (e) => {
-      from = at(e);
-      const hit = this.#hitAt(from.x, from.y);
-      pressed = hit && { ...hit };
-    });
-    canvas.addEventListener("pointerup", (e) => {
-      const p = at(e);
-      const { width, height } = this.shape.design;
-      if (Math.hypot((p.x - from.x) * width, (p.y - from.y) * height) > TAP_SLOP.touch) return;
-      const hit = this.#hitAt(p.x, p.y);
-      const current = this.nav.current;
-      if (hit?.kind === MENU_HITS.row && sameTarget(pressed, hit) && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index, hit.id ?? "");
-    });
+  #typeOnTap(x: number, y: number) {
+    const hit = this.#hitAt(x, y);
+    const current = this.nav.current;
+    if (hit?.kind === MENU_HITS.row && sameTarget(this.#typingHit, hit) && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index, hit.id ?? "");
   }
 
   /** The link to the table this device is at. */
@@ -779,7 +778,7 @@ export class Game implements Shell {
     p.away = typeof document !== "undefined" && document.hidden;
     p.handsOut = playing;
     p.playing = playing && (performance.now() - Math.max(this.remote.lastInputAt, this.devices.at)) / 1000 < QUIET_AFTER;
-    p.holding = playing && (this.remote.held.has("select") || this.#controls.holding);
+    p.holding = playing && (this.remote.held.has("select") || (this.#controls.holding && this.#aim.onWorld));
     this.#copyEye();
     p.eye = this.#eye;
     return p;
@@ -802,6 +801,10 @@ export class Game implements Shell {
     const first = this.#frameVersion < 0;
     this.#frameVersion = this.display.version;
     const frame = this.display.frame;
+    if (!first) {
+      this.#inputs.pointers?.cancel();
+      this.#letGo();
+    }
     // The Apple TV's frame is the one everything starts in: nothing to resize there.
     if (frame !== TV_FRAME) {
       this.stage.resize(frame);
@@ -855,6 +858,18 @@ export class Game implements Shell {
     return this.outside.attribution();
   }
 
+  /** Optional host hook, never polled by the frame loop. */
+  accessibilityChanged: (() => void) | null = null;
+  get loading() { return this.#loading; }
+  menuChanged() { this.accessibilityChanged?.(); }
+
+  /** Host commands consume their input before the next frame can wake Watch. */
+  accessInput() {
+    this.devices.at = performance.now();
+    this.#seenInput = this.devices.at;
+    if (this.wallpaper) this.#stopWallpaper();
+  }
+
   get screen(): ScreenId {
     return this.nav.current;
   }
@@ -875,6 +890,7 @@ export class Game implements Shell {
 
   play() {
     this.#played = true;
+    this.#learn("arrival");
     this.nav.reset("title");
     this.nav.push("play");
     this.#entered();
@@ -903,8 +919,6 @@ export class Game implements Shell {
     this.#chosen.eyes = s.eyes;
     this.#applyPicture();
     this.director.wallpaperStyle = s.wallpaperCamera;
-    if (s.hints && !this.#hints) this.#unlearn();
-    this.#hints = s.hints;
     if (this.outside.enabled !== s.realWeather) {
       this.outside.enabled = s.realWeather;
       this.#clockAt = 0;
@@ -1055,8 +1069,9 @@ export class Game implements Shell {
     this.#syncCamera();
     this.#grip = this.#grip && { kind: "spent" };
     this.#controls.spend();
-    this.director.hand.held = false;
+    this.director.held = false;
     this.overlay.dirty = true;
+    this.menuChanged();
   }
 
   #syncCamera() {
@@ -1101,9 +1116,10 @@ export class Game implements Shell {
       // A finger already down isn't "Try again".
       this.#touchWas = remote.touch.touching;
       this.#syncCamera();
+      this.menuChanged();
     }
     if (this.#loading) {
-      if (brain.status !== "loading" && this.#awakeAt < 0) this.#awakeAt = this.time;
+      if (brain.status !== "loading" && this.#awakeAt < 0) { this.#awakeAt = this.time; this.menuChanged(); }
       const hold = brain.status === "running" ? (arriving(brain) && brain.source.storageFull ? AWAKE_HOLD_NOTE : AWAKE_HOLD) : arriving(brain) ? Infinity : 3;
       if (this.#awakeAt >= 0 && this.time - this.#awakeAt > hold) {
         this.#loading = false;
@@ -1129,10 +1145,9 @@ export class Game implements Shell {
 
     const playing = this.nav.current === "play" && !this.wallpaper;
     this.#copyEye();
-    const holding = remote.held.has("select") || this.#controls.holding;
+    const holding = remote.held.has("select") || (this.#controls.holding && this.#aim.onWorld);
     this.hands.update(dt, { use: false, holding: playing && holding, eye: this.#eye }, life.body, life.pantry);
-    // Holding Select is taught by holding it: a finger or a mouse button held teaches the remote nothing.
-    this.#held = (this.hands.stroking || this.hands.blowing) && remote.held.has("select") ? this.#held + dt : 0;
+    this.#held = this.hands.stroking || this.hands.blowing ? this.#held + dt : 0;
     if (this.#held > HOLD_TAUGHT) this.#learn(this.hands.current.id);
     this.#live(dt);
     this.#feel();
@@ -1163,8 +1178,6 @@ export class Game implements Shell {
     this.fly.update(life.body, life.intent, life.eating, life.hunger.fullness, dt, life.songSide, life.activity === "sleeping");
     this.prints.update(this.fly.model, life.body.onFeet, this.fly.pose.groom > 0.02, life.world, life.pantry, this.time);
     this.online?.send(this.#playerNow());
-    // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
-    director.prefer = this.hands.current.id === "swoop" && this.nav.current === "play" && !this.wallpaper ? Math.PI - SWOOP_BEARING : null;
     director.update(life.body, dt);
     this.#xray(dt);
     if (this.time > this.#clockAt) this.#followLight();
@@ -1192,10 +1205,11 @@ export class Game implements Shell {
     if (!this.glLost) {
       stage.beginFrame();
       stage.render(director.camera, dt);
+      this.touchLoupe?.update(stage.renderer, this.shape, this.#aim.x, this.#aim.y, this.devices.current === "touch" && this.#controls.holding && this.#aim.onWorld && playing);
       const showEyes = this.#showEyes();
       const screen = this.#loading ? "loading" : this.nav.current;
       const settings = this.settings;
-      const eyesWanted = insetWanted(settings.eyesInset, screen, this.wallpaper, showEyes, this.eyes.detail === "off");
+      const eyesWanted = insetWanted(settings.eyesInset, screen, this.wallpaper, showEyes, this.eyes.detail === "off" || brain.status !== "running");
       const nervesNow = nervesWanted(settings.nerves, screen, this.wallpaper, showEyes);
       const statsNow = statsWanted(settings.statsPanel, screen, this.wallpaper, showEyes);
       this.#layCorners();
@@ -1459,21 +1473,31 @@ export class Game implements Shell {
           pointers.gestures.length = 0;
         }
       }
-    } else if (!this.#loading && after > 0 && idle > after && (current === "play" || current === "title") && !this.#grip && !this.#controls.pressed && !this.director.hand.held && !keyboard?.holding) {
+    } else if (!this.#loading && after > 0 && idle > after && (current === "play" || (current === "title" && !this.teachingMenu)) && !this.#grip && !this.#controls.pressed && !this.director.held && !keyboard?.holding) {
       // Not while a finger or a button is still down on something, however still.
       this.#startWallpaper();
     }
     this.uiAlpha += ((this.wallpaper ? 0 : 1) - this.uiAlpha) * Math.min(1, dt * (this.wallpaper ? 1.2 : 6));
 
     if (this.#loading) {
-      // Select, or a touch, is "Try again" on a failure.
+      // The same focused control retries a failure or opens the world while it waits.
       const touched = remote.touch.touching && !this.#touchWas;
       this.#touchWas = remote.touch.touching;
-      let select = touched;
+      let select = touched && this.brain.status === "failed";
       for (const press of remote.presses) if (press.button === "select" && !press.repeat) select = true;
-      // A tap or a click on "Try again".
-      if (pointers) for (const g of pointers.gestures) if (g.type === "up" && g.tap && this.#hitAt(g.x, g.y)?.kind === LOADING_HITS.retry) select = true;
-      if (select && this.brain.status === "failed") this.retryBrain();
+      if (pointers) for (const g of pointers.gestures) {
+        if (g.type !== "up" || !g.tap) continue;
+        const kind = this.#hitAt(g.x, g.y)?.kind;
+        if (kind === LOADING_HITS.retry || kind === LOADING_HITS.explore) select = true;
+      }
+      if (select) {
+        if (this.brain.status === "failed") this.retryBrain();
+        else {
+          this.#loading = false;
+          this.play();
+          this.outside.begin();
+        }
+      }
       remote.presses.length = 0;
       return;
     }
@@ -1492,14 +1516,15 @@ export class Game implements Shell {
     if (keyboard && playing) {
       for (const action of keyboard.actions) {
         if (action.kind === "tool") this.#chooseTool(action.index);
-        else this.#handBack();
+        else this.#home();
       }
     }
-    if (playing && (remote.dx !== 0 || remote.dy !== 0)) this.#movePointer(remote.dx, remote.dy);
-    if (playing) {
-      this.#steer(dt);
-      this.#controls.glide(dt, this.#target);
+    if (playing && (remote.dx !== 0 || remote.dy !== 0)) {
+      // With the View tool in hand the hand has nothing to do, so a swipe turns the camera, as a drag does.
+      if (this.hands.current.id === "view") this.#turnCamera(-remote.dx * SWIPE_ROUND, -remote.dy * SWIPE_UP);
+      else this.#movePointer(remote.dx, remote.dy);
     }
+    if (playing) this.#steer(dt);
     if (pointers) {
       for (const g of pointers.gestures) this.#gesture(g);
       this.#followAim();
@@ -1522,14 +1547,14 @@ export class Game implements Shell {
       round += pads.look.x * PAD_ROUND;
       up += pads.look.y * PAD_UP;
       zoom += pads.zoom * PAD_ZOOM;
-      if (pads.handBack) this.#handBack();
+      if (pads.home) this.#home();
     }
     const turning = round !== 0 || up !== 0;
     // Let go only when they are let go themselves: a finger or the mouse may be holding the camera too.
     if (turning) {
-      this.director.hand.held = true;
+      this.director.held = true;
       this.#turnCamera(round * dt, up * dt);
-    } else if (this.#turning) this.director.hand.held = false;
+    } else if (this.#turning) this.director.held = false;
     this.#turning = turning;
     if (zoom !== 0) this.#zoomCamera(Math.exp(zoom * dt));
   }
@@ -1558,16 +1583,18 @@ export class Game implements Shell {
     if (hands.current.id === "view") this.#changedAt = this.time;
   }
 
-  /** The camera back to the cameraman, now. */
-  #handBack() {
+  /** The camera back to Follow's distance and pitch, at the same yaw. */
+  #home() {
     if (this.hands.view === "eyes") return;
-    this.director.handBack();
+    this.director.home();
+    this.#viewFollows();
   }
 
   /** Picks a tool from the shelf by its place (a tap on it, a number key); picking the one in hand steps its kind instead. */
   #chooseTool(index: number) {
     const hands = this.hands;
     if (hands.chooseTool(index)) {
+      this.#learn("tools");
       this.#changedAt = this.time;
     } else if (index === hands.tool && hands.stepVariant(1, true)) this.#variantChanged();
   }
@@ -1598,6 +1625,7 @@ export class Game implements Shell {
     // At a table the whole table goes, when the table says so.
     if (online) {
       online.choosePlace(hands.place);
+      this.#learn("place");
       return true;
     }
     // Chosen by hand: if it lives in one place, this is now that place.
@@ -1606,6 +1634,7 @@ export class Game implements Shell {
       saveSettings(this.settings);
     }
     this.moveTo(hands.place);
+    this.#learn("place");
     return true;
   }
 
@@ -1614,7 +1643,8 @@ export class Game implements Shell {
     const hits = this.overlay.hits;
     if (hits.owner !== (this.#loading ? "loading" : this.nav.current)) return null;
     const { width, height } = this.shape.design;
-    const hit = hits.at(x * width, y * height, touchSlop(this.shape));
+    // Play targets already take a finger; padding them steals taps on the nearby world.
+    const hit = hits.at(x * width, y * height, this.nav.current === "play" ? 0 : touchSlop(this.shape));
     return hit?.kind === "panel" && this.nav.current === "play" ? null : hit;
   }
 
@@ -1658,12 +1688,9 @@ export class Game implements Shell {
       turn: (yaw, pitch) => this.#turnCamera(yaw, pitch),
       zoom: (factor) => this.#zoomCamera(factor),
       holdCamera: (held) => {
-        this.director.hand.held = held;
+        this.director.held = held;
       },
-      keepCamera: () => {
-        if (this.hands.view !== "eyes") this.director.hand.kept = true;
-      },
-      handBack: () => this.#handBack(),
+      home: () => this.#home(),
     };
   }
 
@@ -1672,7 +1699,7 @@ export class Game implements Shell {
     this.#grip = null;
     this.#controls.reset();
     this.#aim.active = false;
-    this.director.hand.held = false;
+    this.director.held = false;
   }
 
   /** A tap on something on the HUD. */
@@ -1731,7 +1758,7 @@ export class Game implements Shell {
         p.dy = (g.y - grip.y) * height;
         if (g.type === "up") {
           p.hit = this.#hitAt(g.x, g.y);
-          p.tap = g.tap;
+          p.tap = g.tap && sameTarget(grip.hit, p.hit);
           this.#grip = null;
         }
         break;
@@ -1767,7 +1794,10 @@ export class Game implements Shell {
     aim.onWorld = false;
     if (!follow) return false;
     const hit = this.#cast(x, y);
-    if (hit) this.hands.movePointer(hit.point, hit.normal);
+    if (hit) {
+      this.hands.movePointer(hit.point, hit.normal);
+      this.#learn("hand");
+    }
     aim.onWorld = !!hit;
     return !!hit;
   }
@@ -1843,6 +1873,7 @@ export class Game implements Shell {
   #variantChanged() {
     this.#changedAt = this.time;
     const id = this.hands.current.id;
+    if (id === "light" || id === "weather" || id === "view") this.#learn(id);
     if (id === "light" || id === "weather") {
       this.#followLight();
       this.online?.chooseWorld(this.hands.timeOfDay, this.hands.weather);
@@ -1868,15 +1899,10 @@ export class Game implements Shell {
     saveLearned(this.#learned);
   }
 
-  #unlearn() {
-    for (const lesson of Object.keys(this.#learned) as Lesson[]) delete this.#learned[lesson];
-    this.#taught++;
-    saveLearned(this.#learned);
-  }
-
   /** The finger moved on the touch surface: the pointer moves the same way across the screen, staying on the world. */
   #movePointer(dx: number, dy: number) {
     this.#touched = true;
+    this.#learn("hand");
     const camera = this.director.camera;
     const p = this.hands.pointer;
     const ndc = this.#ndc.set(p.x, p.y, p.z).project(camera);
@@ -1918,8 +1944,8 @@ export class Game implements Shell {
       hud.glyphs = glyphs;
       hud.teachSwipe = !this.#touched;
       hud.changed = this.time - this.#changedAt;
-      hud.spikes = this.meter.spikesPerSecond;
       hud.brainRunning = this.brain.status === "running";
+      hud.pressed = this.#controls.preview;
       if (this.#showEyes()) {
         const e = this.#eyesInfo;
         e.facets = this.eyes.facets;
@@ -1928,8 +1954,9 @@ export class Game implements Shell {
         hud.eyes = e;
       } else hud.eyes = null;
       const k = this.#hudKey;
-      const changed = k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught;
-      if (changed || hud.changed < 0.3 || this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS) {
+      const pressedChanged = k.pressed !== hud.pressed;
+      const changed = pressedChanged || k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught || k.here !== hud.here || k.fixed !== this.hands.fixed.has(this.hands.current.id) || k.outside !== this.hands.outside || k.surface !== this.hands.surface || k.running !== hud.brainRunning;
+      if (changed || hud.changed < 0.3 || ((stats || !hud.brainRunning || needsTeaching(hud)) && this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS)) {
         k.tool = this.hands.tool;
         k.variant = this.hands.variants[this.hands.tool];
         k.activity = hud.activity;
@@ -1939,13 +1966,17 @@ export class Game implements Shell {
         k.hints = hud.hints;
         k.eyes = !!hud.eyes;
         k.taught = this.#taught;
+        k.here = hud.here;
+        k.fixed = this.hands.fixed.has(this.hands.current.id);
+        k.outside = this.hands.outside;
+        k.surface = this.hands.surface;
+        k.running = hud.brainRunning;
+        k.pressed = hud.pressed ?? null;
         this.#hudAt = this.time;
         overlay.dirty = true;
       }
-      overlay.redraw(dt, current, (g, hits) => {
-        drawHud(g, this.time, hud, hits);
-        if (stats) drawStats(g, this, hud.layout.statsX, hud.layout.statsY);
-      });
+      overlay.redraw(dt, current, this.#drawPlay, pressedChanged);
+
       return;
     }
     const screen = this.screens[current];
@@ -1955,6 +1986,19 @@ export class Game implements Shell {
       if (stats) drawStats(g, this, this.#hudLayout.statsX, this.#hudLayout.statsY);
     });
   }
+
+  // Kept once, rather than allocating a new redraw closure on every frame.
+  #drawPlay = (g: CanvasRenderingContext2D, hits: HitMap) => {
+    const hud = this.#hud;
+    if (hud.hints && !this.#learned[this.hands.current.id] && !this.hands.fixed.has(this.hands.current.id)) {
+      const p = this.hands.pointer;
+      this.#ndc.set(p.x, p.y, p.z).project(this.director.camera);
+      hud.aimX = (this.#ndc.x + 1) * this.shape.design.width / 2;
+      hud.aimY = (1 - this.#ndc.y) * this.shape.design.height / 2;
+    }
+    drawHud(g, this.time, hud, hits);
+    if (this.settings.stats) drawStats(g, this, hud.layout.statsX, hud.layout.statsY);
+  };
 
   /** The regions glowing now, brightest first, as id:glow, for scripts to read the nervous system's state. */
   #glowSummary() {
@@ -1976,7 +2020,8 @@ export class Game implements Shell {
     const menu = shown === "play" ? null : (this.screens[shown] as { menu?: { focused?: { id: string } } }).menu;
     d.focus = menu?.focused?.id ?? "";
     // Whether the menus show their focus (the remote's, the keys', a pad's): hidden while a pointer is in use.
-    d.ring = String(shown !== "play" && this.#ringShown);
+    const semanticRing = (shown === "title" || shown === "settings" || shown === "online") && this.screens[shown].semanticFocus;
+    d.ring = String(shown !== "play" && (this.#ringShown || semanticRing));
     d.tab = shown === "settings" ? settingsTab(this.screens.settings) : "";
     if (shown === "online") this.screens.online.publish(d);
     if (shown === "about") this.screens.about.publish(d);
@@ -2085,7 +2130,8 @@ export class Game implements Shell {
     }
     d.device = this.devices.current;
     d.frame = `${this.shape.width}x${this.shape.height}`;
-    d.looking = String(this.director.handled);
+    d.yaw = this.director.yaw.toFixed(4);
+    d.pitch = this.director.pitch.toFixed(4);
     d.reach = this.director.reach.toFixed(1);
   }
 }

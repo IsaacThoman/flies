@@ -121,7 +121,7 @@ hands are drawn in its dial's shader, turned by the time each frame, so they
 cost no draw and stay sharp however close the camera comes.
 
 So does the weather, unless you choose one (the **Weather** tool): clear,
-overcast, mist or light rain. On "Now" it follows a forecast worked out from
+overcast, mist, light or heavy rain, thunderstorm, snow or sleet. On "Now" it follows a forecast worked out from
 the clock, the same for everyone at the same hour and on any restart: spells
 of a few hours each, changing over an hour, in systems a day or two long, so
 some days are fine and some grey. Mist forms only in the early morning and
@@ -132,7 +132,22 @@ the table, the fruit and the lemonade's pool (crowns of droplets, rings in
 the wet), beads the table and the fruit, soaks the napkin darker, speckles
 the lake; the table dries over the next half hour or so, and if the sun
 comes out while it's wet a rainbow stands opposite it. Rain bursts the bubbles, and the fireflies shelter from it. A
-drop landing on the fly is felt (`touch`).
+drop landing on the fly is felt (`touch`). Heavy rain thickens into windblown
+sheets; storm gusts enter through the same wind sense. Thunderstorms are
+silent: lightning brightens actual scene lights and the eyes, with an
+occasional distant fork. The current retinal model has no ON response to
+brightening; its darkening tail can excite the OFF pathway. No startle
+command is manufactured.
+
+Snow drifts past the picnic and through indoor views, dusts exposed picnic
+surfaces, and gradually melts into wetness. The layer is cosmetic and thinner
+than 0.35 mm, with no changed collision surface. Lab and windowsill panes
+frost at their edges; bar and restaurant receive the shared weather light.
+Cold itself is not modelled in the brain and no sluggishness is imposed.
+A possible labelled stand-in is a proposal requiring owner approval, not an
+active behavior ([weather details](docs/places.md#storms-and-winter-precipitation)).
+The invented forecast assumes northern temperate seasons: winter snow and
+summer storms. Shared tables use protocol 4 so clients agree on that forecast.
 
 **The weather outside.** An Apple TV app built with WeatherKit
 ([docs/apple-tv.md](docs/apple-tv.md#the-weather-outside)) follows the real
@@ -141,13 +156,12 @@ title is up, the TV asks whether the app may know where it is; from then on,
 while the app is open, Apple Weather is asked every 20 minutes for the
 conditions about where the TV is and the day's sunrise and sunset. The Weather
 tool's "Now" then says "Outside" and is the real weather, as near as the
-game's four kinds go: the cloud cover is the cloud; fog, or seeing less than a
-kilometre, is mist, fading out by eight, and a haze is some; precipitation is
-rain, light rain at the heaviest, since that is all the game has. There is no
-snow or thunder in the game yet, so each is the nearest it has: snow is a
-white mist under a grey sky, with nothing falling (rain would be wrong),
-flurries a grey sky; sleet, freezing rain and hail are rain; a thunderstorm is
-heavy rain, with no lightning. The real wind speed is how windy the day is, a
+game can show it: cloud cover is the cloud; fog, or seeing less than a
+kilometre, is mist, fading out by eight, and haze is some. Heavy rain and
+thunderstorm conditions retain their intensity and lightning; snow and
+flurries fall as snow, while sleet and wintry mix combine rain and snow.
+Freezing rain and hail use rain as a visual approximation; no ice impact
+or cold physiology is modelled. The real wind speed is how windy the day is, a
 fresh breeze (10 m/s) the windiest, so the picnic's gusts come more often and
 harder on a windy day and the trees and the lake move more. The Light tool's
 "Now" stretches or squeezes the clock's day so that its sun comes up at the
@@ -217,6 +231,25 @@ shadows go soft; on cold mornings and damp days the glass mists at its foot;
 in mist the houses fade to ghosts; in the rain it falls across the garden,
 drops bead on the pane and run down it, and it stays streaked as it dries.
 There are no bubbles or fireflies indoors.
+
+The greenhouse is a weathered wooden potting bench behind rain-streaked glass,
+with a garden beyond its green glazing bars. Filled terracotta pots hold solid
+leafy crowns, and a twelve-cell seed tray sits beside an old green watering can.
+A trowel, flat plant labels, coiled string and scattered soil keep their human
+scale beside the 2.5 mm fly. Fallen overripe tomatoes and an opened fig provide
+food on their surfaces and in a little juice on the wood; the water in a
+terracotta saucer responds with rings to the fly's feet and a roof leak. The
+fly is set down on the fig's flesh, so the shared close views begin among its
+seeds rather than on an empty part of the bench. The
+leak starts only during quiet rainy spells, at a fixed point on the roof, and reaches
+the fly through touch alone. Glazing bars lay moving shadows over the grain;
+the wood darkens when damp, rain beads and runs down the panes, and condensation
+clouds their lower edges at dawn. Storms send faster runoff down the glass and
+lightning brightens it; snow and sleet frost the glazing bars while flakes fall
+in the garden beyond. Weather reaches 70% of its light. The garden
+backdrop is shared with the windowsill; there are no bubbles, and fireflies
+appear at dusk. Plant crowns are solid approximations, with leaf veins drawn
+in their surfaces rather than air beneath individual leaves.
 
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
 wiring was traced: a stereo microscope with a fly pad on its stage (its base
@@ -328,7 +361,7 @@ fly's world.
 
 | On the remote | Does |
 | --- | --- |
-| Swipe on the touch surface | Moves your hand across the table. |
+| Swipe on the touch surface | Moves your hand across the table. With View in hand, turns the camera round the fly and up or down instead. |
 | Left / Right | Picks a tool from the shelf. |
 | Up / Down | Picks the tool's kind: which food, how hard to blow, the time of day, the weather, the camera. |
 | Select | Uses the tool: drops food, throws the ball. Hold it to tickle or blow. On Light, Weather and View it steps round the choices. |
@@ -345,7 +378,7 @@ Pointing, the screen itself is what you press, and there are no button hints:
 | Light, Weather, View, Place | The arrows either side of the tool's label (or a tap on the label, or a swipe along it) step its kind; tapping the tool again does too. Place has a Go button for somewhere the fly isn't. | The same, or the wheel over the label. |
 | Closer and farther | Pinch. | The wheel, a trackpad's scroll up and down, or its pinch. |
 | Round the fly | Drag anywhere but with the feather or the air in hand on the table (they go where the finger goes); or drag with two fingers. | Drag (the same), or drag with the right or middle button anywhere. A trackpad's sideways scroll. |
-| The camera back | Double-tap the air. | Double-click the air. |
+| Back to Follow | Double-tap the air. | Double-click the air, or R. |
 | Tools | Tap one on the shelf. | Click one; the wheel over the shelf steps along it. |
 | Menus | Tap a row, a tab, a choice's arrows; a slider follows the finger. The round button at the top left, or a tap outside the pane, goes back. | The same, and a right click goes back. Hovering only brightens what is under the cursor: the focus ring is the remote's and the keys'. |
 | The menu | The round button at the top left. | The same. |
@@ -353,12 +386,12 @@ Pointing, the screen itself is what you press, and there are no button hints:
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
 Back, space for Play/Pause), its hints drawn as keys; the number keys pick a
 tool, + and − held bring the camera in and take it out, Q and E held turn it
-round the fly, and R (or Home) gives it back to the cameraman. After a mouse
+round the fly, and R (or Home) takes it back to Follow's distance and height. After a mouse
 or a finger the menus show no focus; the first arrow shows it, on what was
 last pressed. A standard game pad (the Gamepad API) is the remote too: A is
 Select, B Back, Start Play/Pause, the d-pad and the shoulder buttons the
 arrows, the left stick moves your hand (and steps through a menu), the right
-stick turns the camera round (pressed in, gives it back), the triggers bring
+stick turns the camera round and up (pressed in, back to Follow), the triggers bring
 it in and take it out as far as they are pressed; its hints are drawn as its
 buttons. A pad that can
 rumble (`apps/web/src/haptics.ts`) is felt in the hand: a tick when food is
@@ -379,7 +412,7 @@ beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot), **Light** (now, which follows the clock,
 or morning, midday, golden hour, dusk, night), **Weather** (now, which
-follows the forecast, or clear, overcast, mist, rain), **View** (close up, follow, wide, the whole table, from above,
+follows the forecast, or clear, overcast, mist, rain, heavy rain, thunderstorm, snow, sleet), **View** (close up, follow, wide, the whole table, from above,
 through the fly's eyes, and inside it, close up with the fly as glass; Up
 brings the camera in, Down takes it out) and
 **Place** (where it lives; Up and Down choose, Select carries it there). On
@@ -398,34 +431,47 @@ the fly's eyes, which would open on no fly at all), and to a time of day or a
 weather chosen in the last six hours; after that it is back on Now, so the
 screensaver follows the clock again.
 
-The camera (`apps/web/src/camera.ts`) works like a patient nature cameraman.
-In Follow the fly is about 170 pixels long, seen from low down and a little
-behind its side, with the table, the fruit or the place's view (the picnic's lake) behind it; Close up is
-about twice that, Wide about a third. It keeps its place round the fly and
+The camera in play (`apps/web/src/orbit.ts`) is a plain orbit round the
+fly, on three numbers that only you change: how far round it is, how far up,
+and how far out. A drag turns it round and up by the same amount for the same
+distance dragged, every time, at every zoom, and stops when you stop; it can
+go from just above the table to nearly overhead. The wheel, a pinch or a
+trackpad's scroll brings it in or takes it out, from near enough for the fly
+to fill the picture to the whole place, and changes nothing else: the fly
+stays in the middle of the picture and the field of view stays the same. The
+camera goes along with the fly, a little smoothed so a stride doesn't shake
+the picture, but never turns by itself: not when the fly turns, not after a
+while, not to find a better side. Where you leave it, it stays.
+
+One rule keeps it out of things. When something comes between the fly and
+the camera, or the camera would be in it or so near it that the edge of the
+picture cuts into it, the camera comes in along its line of sight until it
+isn't, quickly but smoothly, looking a moment ahead of where your turn and the
+fly are taking it, so it is in front of a bottle before the bottle is in the
+way. Once the way has been clear for a moment it goes back out, gently. It
+never turns or tilts to get round anything, and never jumps.
+
+The View tool's views are places on the same orbit, reached over a moment.
+Follow is 11 mm out, low over the table, the fly about 170 pixels long;
+Close up is about twice that size, Wide about a third. Whole table goes out
+to the whole place, to the side the screensaver films it from; From above
+looks down from behind the fly. Each sets only how far out and how far up
+(and those two, which way round); you can turn and zoom from there at once,
+and the View tool names the view you are nearest. R, a double click or tap in
+the air, or the pad's right stick pressed in takes it back to Follow's
+distance and height, on the same side of the fly. The screensaver takes the
+camera from wherever you left it, and gives it back where it found you.
+
+Behind the loading screen and the menu, and in the screensaver, the camera
+films the fly by itself (`apps/web/src/cameraman.ts`), like a patient nature
+cameraman. It keeps the fly small and to the left, clear of the menu, or in
+the middle once the menu has faded; it keeps its place round the fly and
 moves only when it has to (the fly has turned its back for more than a
 second, something is in the way, or there is fruit or a jar to have behind
 it), never crossing over the fly when it can help it. Every move is a
 critically damped spring, so nothing overshoots or pops; walking it keeps
 pace a little ahead, and in a jump it pulls back, widens and whips round
-after the fly. It is never inside anything, nor closer to the fly than most of
-the shot's distance. With the ball in hand it goes round to the side across the
-fly from where the ball will come, so the dive is seen past the fly. Behind the
-loading screen and the menu it keeps the fly small and to the left, clear of
-them.
-
-You can take the camera from the cameraman. Closer and farther is one smooth
-range, from the facets of the fly's eyes out to the whole table (where it
-turns from the fly to the table's middle); the named views are points on it,
-and the View tool names the one it is nearest. It stays wherever you leave it.
-Turned round the fly, it stays where you put it for five seconds after you let
-go; then the cameraman carries on from there, moving only when it would have
-anyway. A mouse or a trackpad orbits it freely instead: turned round the fly,
-up or down, or brought in or out, it stays just where you put it, however the
-fly turns, until you give it back; each click of a mouse wheel eases in, so a
-turn of the wheel is one smooth move. Handed back (R, a double click or tap in
-the air, the pad's right stick pressed in), or a view chosen on the View tool,
-the cameraman takes it at once, at the named view nearest your zoom or the one chosen.
-The screensaver takes it too, and gives your zoom back after.
+after the fly. Going into play eases from its shot into yours, and out again.
 
 After 30 seconds with no press (Settings → Screensaver: 15 s to 5 min, or never)
 the hints, the shelf and the pointer fade, and the camera settles beside the
@@ -501,7 +547,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | --- | --- |
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
 | `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
-| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (on this device or at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
+| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (on this device or at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, at full heavy rain about one every 13 s: chosen rates, not measured biology). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
 | `bumpLeft`, `bumpRight` | Something pushing an antenna back: its tip, just ahead of the head and to its side, inside another fly's body (on this device or at a table) or, in the air, inside anything; on its feet, at anything taller than a step that it walks into, or that it stands against where its foreleg on that side doesn't (standing, its forelegs' tarsi reach further forward than its antennae, so a wall they meet holds its head off it, while a stem between them still touches). Nothing past the table's edge, where there is nothing to touch. 1 while it lasts, however long (any contact deflects an antenna further than its push neurons need, and they answer for as long as it is held), easing out over 0.3 s. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
@@ -742,8 +788,10 @@ is in the air the followed fly's eyes refresh every frame: the looming detectors
 fast dark area grows, and at 20 Hz a throw set off the escape about one time in
 six against one in two at 60 Hz.
 
-The ball is dark in green and blue for the same reason: the eyes answer
-darkening, not brightening. It dives in low from the fly's front-right (higher
+The ball is dark in green and blue because a dark shape growing is what the
+eyes' looming pathway answers best, as a fly's does: a light disc looming on a
+dim ground takes the fly off too, but only through LC4, a limitation of the
+model (`packages/brain/README.md`, Seeing). It dives in low from the fly's front-right (higher
 over anything standing in its way, and round what it can't come in over, such
 as a window), where the connectome's looming pathway is strongest and where the
 fly is seen against the bright table, stops just short, hangs a moment and
@@ -761,6 +809,30 @@ midday (8 minutes, escape at most 0.35) or at dusk (12 minutes, at most 0.37),
 and at night 0.3 times a minute (16 minutes). Before, the night gave 0.5 to 0.7
 a minute, mostly from soap bubbles drawn as bright as by day drifting past it.
 `apps/web/tests/swoop-escape.budget.ts` checks the chain in Node.
+
+Since the eyes have an ON pathway (brightening reaches it through L1, as in a
+fly; `packages/brain/README.md`, Seeing), a sudden brightening can set off the
+escape too, through the same looming detector, LC4, that a large darkening
+does. Measured in the game with the brain built both ways (the TypeScript
+brain, ON pathway off and on), at midday and at midnight (the fly's clock set
+to it too, so its sleepy eyes are measured), ordinary life never sets it off,
+with or without it: no take-off in four rounds of carrying the fly to every
+place (six seconds after each of 20 arrivals, by day and by night), ten
+switches of the bar's, the lab's and the restaurant's lights between night and
+midday, twenty jumps of the picnic's time of day by day and by night, three
+minutes of fireflies, five of soap bubbles drifting by and popping, five of the
+screensaver and five of free play by day and by night: about 5,700 seconds of
+its life each way, the escape peaking at 0.38 at most. (On the version of the
+game before the legs' load sensors were narrowed and sleep added, arriving at
+a place did set it off, at the restaurant without the ON pathway and at the
+picnic too with it.) The ball takes it off as before, and never in the half
+second after the ball has gone: through the brain's own eyes in Node
+(`apps/web/tests/swoop-escape.budget.ts`, seeds 1 to 5, 8 throws each), 38
+throws of 40 with the ON pathway against 39 without. In the game the count
+swings from run to run with where the fly comes to stand (40 throws at midday:
+29 and, in a run where it stopped seeing the ball after the second, 2 with it;
+33 without). There is no lightning in this game's weather, and the fireflies
+aren't drawn into the eyes.
 
 **View → Fly's eyes** shows the same picture to the player: one dot per facet
 (the brain's 1,772, or, for a brain without eyes, a stand-in layout labelled as
@@ -834,11 +906,12 @@ each segment. Sense organs are small clusters: the bristles' sockets where
 the model's bristles are, the femoral chordotonal organs, the campaniform
 sensilla on the legs and at the bases of the wings and halteres.
 
-**Where each region is drawn** (`apps/web/src/nerves/regions.ts`). The 62
-placed regions each light their own anatomy. The remaining `unplaced` group
-mixes neurons whose annotations do not establish a location; its rate is
-retained but lights nothing. The connective's midline stays as unlit
-anatomical context, rather than locating those neurons in the neck.
+**Where each region is drawn** (`apps/web/src/nerves/regions.ts`). The 61
+placed regions each light their own anatomy. The `unplaced` group mixes
+neurons whose annotations do not establish a location; `head-sensory-other`
+has no recorded organ. Their rates are retained but light nothing. The
+connective's midline and pharyngeal nerves stay as unlit anatomical context,
+rather than assigning those neurons to an unsupported location or organ.
 Every lit part belongs to exactly one region or command group (a test holds it).
 Where several regions share a place in
 the fly, each is drawn as what is its own there: motor neurons as their
@@ -853,7 +926,8 @@ fill them.
 | optic lobe, other · visual projection · visual centrifugal | the inner chiasm's fibres · the optic tracts into the central brain · fibres back out |
 | antennal lobe, mushroom body, superior protocerebrum, lateral horn, ventrolateral (with the optic tubercle), inferior and ventromedial, subesophageal (each side); central complex | their neuropils; the mushroom body as calyx, peduncle and lobes; the central complex as bridge, fan-shaped body, ellipsoid body, noduli |
 | central brain, other | the rind of cell bodies round the central brain, drawn as an edge (that is where those neurons' cell bodies are) |
-| smell · Johnston's organ · head bristles · mouthparts · head sensory, other | the third antennal segment and its strand of the antennal nerve · the second segment's organ and its strand to the AMMC · the head's bristle sockets · the labellum, the pharynx's taste organs and the labial nerves' sensory axons · the pharyngeal nerves |
+| smell · Johnston's organ · head bristles · mouthparts | the third antennal segment and its strand of the antennal nerve · the second segment's organ and its strand to the AMMC · the head's bristle sockets · the labellum, the pharynx's taste organs and the labial nerves' sensory axons |
+| head sensory, other | organ unknown; no activity assigned to a specific organ |
 | head motor · neuroendocrine | the labial nerves' motor axons · the pars intercerebralis, its nerve to the corpora cardiaca, the frontal ganglion |
 | descending · ascending (each side) | tracts from the brain down the neck and along the cord's top · from the cord's floor up into the brain |
 | unplaced | not assigned an anatomical location; no activity drawn |
@@ -942,7 +1016,7 @@ the next frame; nothing in the world is built again.
 
 The shots are framed for 16:9. On a wider screen the camera keeps their
 height and sees more to the sides; on a narrower one it keeps seven tenths of
-the extra height as field of view (`camera.ts`, `fieldOfView`), so on a phone
+the extra height as field of view (`display.ts`, `fieldOfView`), so on a phone
 held upright the fly is about two fifths of the screen across in Follow (on
 the TV, a quarter of its width) rather than a quarter (keeping the TV's width,
 a small fly in a great deal of sky and table) or a half (keeping its pixels,
@@ -1049,7 +1123,13 @@ goings-on (none while the remote is in use, never two close together, each
 about as often as it should be); the world's standing, bumping, ray and food
 queries, round and rectangular tops, and becoming another place; every place
 (the fly starts standing, its food can be tasted where it lies, every time of
-day, every shot keeps the camera out of everything with the fly in view); the body's thresholds, motion, collisions, falls, flight, landing,
+day, every shot keeps the camera out of everything with the fly in view); the
+play camera (a drag of so many pixels turns it exactly so far, in every place
+and at every zoom; left alone it never turns, however the fly walks, turns and
+flies; zooming moves only its distance, the fly held in the middle; each view
+lands where it says and leaves the camera to the player; turned past what
+stands by the fly in every place, and zoomed out through the restaurant, it
+is never inside anything nor cuts into it, and never jumps); the body's thresholds, motion, collisions, falls, flight, landing,
 wall turning and mouth alignment; every sense; the facet layout, cube mapping
 and resampling; both brain drivers against fakes and the worker's host (a
 stalled brain fails, a page asleep for an hour doesn't count, each failure
@@ -1112,11 +1192,11 @@ light and the weather as they were left, the shelf on Feed and the hints for
 what was used gone, and the frame stays within its draw budget. Then
 `apps/web/e2e/pointer.e2e.ts` plays it with fingers on a phone with a notch
 (the menus and the shelf tapped, honey dropped and eaten, the feather and the
-puff held on the fly, a pinch, a look round that stays a while, the phone
+puff held on the fly, a pinch, a look round that stays where it was put, the phone
 turned on its side, the screensaver woken by a tap that does nothing else) and
 with a mouse and keys on a desktop (hovering moves no focus, the wheel zooms
 smoothly and stays, drags with each button turn the camera without dropping
-food and it stays where it was put, R and a double click give it back, a trackpad's pinch and + zoom too). Then it builds the site and serves it from a folder of a static
+food and it stays where it was put, R and a double click take it back to Follow, a trackpad's pinch and + zoom too). Then it builds the site and serves it from a folder of a static
 server (`apps/web/e2e/web.e2e.ts`): a first visit on a slow connection that
 breaks off partway counts the brain's bytes and carries on from the break, a
 second loads with the network off, a hidden tab sleeps and wakes without a

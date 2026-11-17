@@ -18,6 +18,10 @@ Retina::Retina(const eyes::Eye& eye, const RetinaParameters& parameters) : param
     }
   }
   rates_.assign(neurons_.size(), 0);
+  for (int32_t i : eye.l1) {
+    if (i >= 0) l1_.push_back(static_cast<uint32_t>(i));
+  }
+  withdrawals_.assign(l1_.size(), 0);
   ambient_.assign(facets_, 0);
   recent_.assign(facets_, 0);
   seen_.assign(facets_, 0);
@@ -29,11 +33,15 @@ bool Retina::step(double dt, const std::span<const float>* light) {
   const double floor = parameters_.floor;
   const double max_rate = parameters_.max_rate;
   const double tonic = parameters_.tonic;
+  const double withdraw = parameters_.withdraw;
   const bool was = firing_;
   if (light == nullptr) {
     open_ = false;
     firing_ = false;
-    if (was) std::fill(rates_.begin(), rates_.end(), 0);
+    if (was) {
+      std::fill(rates_.begin(), rates_.end(), 0);
+      std::fill(withdrawals_.begin(), withdrawals_.end(), 0);
+    }
     return was;
   }
   double* const ambient = ambient_.data();
@@ -65,8 +73,11 @@ bool Retina::step(double dt, const std::span<const float>* light) {
     for (uint32_t k = 0; k < facets_; k++) {
       const double before = seen[k];
       const double x = lum(k);
-      ambient[k] = x + (before + (ambient[k] - before) * idle_ambient - x) * keep_ambient;
-      recent[k] = x + (before + (recent[k] - before) * idle_recent - x) * keep_recent;
+      // A level a step no longer moves is the light (vision.ts says why).
+      const double next_ambient = x + (before + (ambient[k] - before) * idle_ambient - x) * keep_ambient;
+      const double next_recent = x + (before + (recent[k] - before) * idle_recent - x) * keep_recent;
+      ambient[k] = next_ambient == ambient[k] ? x : next_ambient;
+      recent[k] = next_recent == recent[k] ? x : next_recent;
       seen[k] = x;
     }
     idle_ = 0;
@@ -77,6 +88,12 @@ bool Retina::step(double dt, const std::span<const float>* light) {
     const double contrast = ((transient_[n] != 0 ? recent[k] : ambient[k]) - seen[k]) / (ambient[k] + floor);
     const double rate = js::min(max_rate, js::max(0, tonic + max_rate * contrast));
     rates_[n] = rate;
+    if (rate > 0) firing = true;
+  }
+  for (size_t n = 0; n < withdrawals_.size(); n++) {
+    const uint32_t k = facet_[n];
+    const double rate = js::min(max_rate, js::max(0, withdraw * max_rate * ((seen[k] - recent[k]) / (ambient[k] + floor))));
+    withdrawals_[n] = rate;
     if (rate > 0) firing = true;
   }
   firing_ = firing;

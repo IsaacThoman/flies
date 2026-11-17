@@ -127,3 +127,134 @@ round did not establish a further speed gain. The model remains two draws.
 
 Remaining priorities: actual grooming-surface contact, clearer posterior-action
 silhouettes, and a wing envelope that survives bright backgrounds at game scale.
+
+### Round 4
+
+Key: B2 = round-3 candidate; N5 = posed-surface grooming candidate.
+Orders: B2,N5; B2,N5; N5,B2; B2,N5. All four reviewers ranked N5 first.
+
+| Reviewer | B2 scores | N5 scores | B2 mean | N5 mean | Ranking |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 8,8,3,7.5,7,7,6,8 | 8,8,8,7.5,7,7.5,6,8 | 6.813 | 7.500 | N5 > B2 |
+| 2 | 8,7,3,7,6.5,7.5,5.5,7.5 | 8,7,7.5,7,6.5,7.5,5.5,7.5 | 6.500 | 7.063 | N5 > B2 |
+| 3 | 8,7.5,3,8,6.5,7.5,5.5,7.5 | 8,7.5,7.5,8,6.5,7.5,5.5,7.5 | 6.688 | 7.250 | N5 > B2 |
+| Tradeoff assessment | 8,7.5,3,7.5,7,7.5,6,8 | 8,7.5,7,7.5,7,7.5,5.5,8 | 6.813 | 7.250 | N5 > B2 |
+
+Primary-review mean: **6.667 → 7.271**. Accepted: eye/antenna targets attached
+to the articulated head; posterior targets attached to the breathing, swollen
+abdomen and folded wings; a small posture shift toward supporting feet; and
+full surface reach for weak grooming commands. Strength still controls vigour.
+No proposal rejected. The anatomy geometry and draw counts are unchanged.
+Interpreter medians overlap (140.999 vs 139.097 µs/update), establishing no speed
+advantage. Contact-stroke samples, including return strokes, reach surfaces in
+66–75% of samples at strength 0.2 and 69–75% at strength 1. The predecessor
+reaches none at strength 0.2 and only antennae at strength 1.
+
+The tradeoff reviewer reduced chunky readability from 6 to 5.5: surface-hugging
+hind legs merge into the body silhouette. Remaining problems include local
+tarsal orientation, whole-leg penetration checks, and faint flight wings. The
+contact diagnostic measures actual solved claws against posed mesh surfaces
+(head/antenna/abdomen) and a bounded wing plane; it does not establish rubbing
+area or segment clearance. The Seeds-inspired 12-second sequence remains an
+animation stand-in, not a model of dust-driven suppression.
+
+### Round 5 (duplicate control)
+
+Key: T1 = round-4 candidate; C7 = outer-span wing haze; J6 = byte-identical T1.
+Orders: T1,J6,C7; J6,C7,T1; J6,T1,C7; J6,T1,C7. Every reviewer ranked C7
+first and gave T1/J6 identical scores. Duplicate discrepancies were zero.
+
+| Reviewer | T1 = J6 scores | C7 scores | T1/J6 mean | C7 mean | Ranking |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 8,7,7,8,6.5,8,6,9 | 8,7,7,8,7,8,6.5,9 | 7.438 | 7.563 | C7 > T1 > J6 (tie) |
+| 2 | 8,7.5,7,8,6,8,6.5,8.5 | 8,7.5,7,8,7,8,7,8.5 | 7.438 | 7.625 | C7 > J6 > T1 (tie) |
+| 3 | 8,7.5,7,7.5,6.5,8,6,9 | 8,7.5,7,7.5,7,8,6.5,9 | 7.438 | 7.563 | C7 > J6 > T1 (tie) |
+| Tradeoff assessment | 8,7.5,7,7.5,6.5,8,6,8 | 8,7.5,7,7.5,7,8,6.5,8 | 7.313 | 7.438 | C7 > J6 > T1 (tie) |
+
+Primary-review mean: **7.438 → 7.583**. Accepted: move some static wing-haze
+opacity from the hinge toward the outer span. No proposal rejected. All three
+primary reviewers awarded a small flight/readability gain. The tradeoff review
+preferred the native-resolution contour while identifying a stronger sheet/fan
+appearance close up. This is explicitly a display approximation, not measured
+wing aerodynamics. Animation code, geometry counts, shader instructions and
+draw calls are identical. No CPU speed advantage is claimed.
+
+Remaining problems: low-hanging front legs in flight, ambiguous feeding and
+posterior grooming at native size, and incomplete measured turning/backing
+kinematics. Reviewer suggestions included attenuating secondary-copy veins,
+separating grooming stroke/return contact evidence, and measuring final solved
+claws independently of controller events.
+
+### Round 6 — rejected
+
+Key: P4 = retained round-5 model; E8 = 126 sparse leg setae.
+Orders: E8,P4; E8,P4; P4,E8; P4,E8.
+
+| Reviewer | P4 scores | E8 scores | P4 mean | E8 mean | Ranking |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 7.5,8,7.5,8,7,8,6,8 | 8,8,7.5,8,7,8,6,8 | 7.500 | 7.563 | E8 > P4 |
+| 2 | 8,7.5,7.2,7.5,7.5,8,6.5,8 | 8.3,7.5,7.2,7.5,7.5,8,6.5,8 | 7.525 | 7.563 | E8 > P4 |
+| 3 | 8,7.5,7,7.5,7.5,7.5,6,8 | 8.3,7.5,7,7.5,7.5,7.5,6,8 | 7.375 | 7.413 | E8 > P4 |
+| Tradeoff assessment | 8,7.5,7,7.5,7,8,6.5,8.5 | 8.3,7.5,7,7.5,7,8,6.5,8.5 | 7.500 | 7.538 | P4 > E8 |
+
+Primary-review mean: **7.467 → 7.513**. Rejected despite the primary-score
+increase: the tradeoff reviewer ranked P4 first. The added hairs improved
+close-up anatomy but increased model triangles from 15,408 to 18,432 (+19.6%)
+without a clear native-resolution benefit. The blind rule requires both higher
+scores and a preferred ranking; a favourable mean alone does not qualify.
+The hair geometry and its README changes were reverted. Draw calls and update
+code were unchanged, and no GPU timing penalty was established.
+
+Both sets also include an independent solved-claw report at 1000 Hz, in
+addition to controller-event timing. Forward stance-fit errors are −8.0% to
++9.6%; three-foot support is about 81% at 35 mm/s. The report names measured
+stance excursion separately from stride advance and includes turning/backing
+without pretending the straight-walk stance fit applies to them. At 30 Hz,
+short swings alias and sampled excursion/phase estimates become unreliable.
+This diagnostic is retained as measurement work, not a model-score gain.
+
+The claw reference is the solved tarsal endpoint at the claw bases; contact
+means proximity to the support plane, not measured force. The retained report
+also measures body-relative swing excursion and successive-footprint stride
+in a kinematically transported world frame.
+
+### Round 7 (duplicate control)
+
+Key: V3 = retained round-5 model; S2 = softer head/thorax/leg highlights;
+D2 = byte-identical V3. Orders: S2,V3,D2; V3,S2,D2; D2,S2,V3; D2,V3,S2.
+Every reviewer ranked S2 first. Duplicate scores matched exactly.
+
+| Reviewer | V3 = D2 scores | S2 scores | V3/D2 mean | S2 mean | Ranking |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 7.8,7.5,7,8,7.5,8,6.5,9 | 8,7.5,7,8,7.5,8,6.5,9 | 7.663 | 7.688 | S2 > V3 > D2 (tie) |
+| 2 | 8,7.5,7.5,8,7.5,8,6.5,8.5 | 8.2,7.5,7.5,8,7.5,8,6.5,8.5 | 7.688 | 7.713 | S2 > V3 > D2 (tie) |
+| 3 | 8,7.5,7,7.5,7,7.5,6,8.5 | 8,7.5,7,7.5,7,7.5,6,8.5 | 7.375 | 7.375 | S2 > D2 > V3 (tie) |
+| Tradeoff assessment | 7.5,7,7,7.5,7,8,6.5,8.5 | 8,7,7,7.5,7,8,6.5,8.5 | 7.375 | 7.438 | S2 > D2 > V3 (tie) |
+
+Primary-review mean: **7.575 → 7.592**. Accepted on the higher paired mean
+and unanimous forced preference; reviewer 3's numerical scores tie. The gain
+is small and confined to appearance. Rougher, less clear-coated head, thorax
+and legs reduce the polished-model impression; the abdomen and eyes retain
+their existing finish. No motion or native-resolution action gain is claimed.
+Material values are display choices, not measured cuticle reflectances.
+
+Evidence correction: the V3/D2 test log was accidentally copied from the
+rejected leg-hair prototype, reporting 18,432 triangles. The rendered models,
+source, and cost report consistently contain 15,408. All four assessments
+assigned equal cost to the sets; their preference was based on appearance.
+A run of the actual frozen reference passed all 36 fly tests and confirmed
+15,408 triangles. Its log replaced the misfiled one once reviews had ended;
+the incorrect original is retained locally. No model or image was changed.
+
+A separate interleaved interpreter benchmark compares the original bd88a01
+rig with the retained animation path: 108.611 versus 99.477 µs/update (8.4%
+lower), seven mixed-pose samples of 1,500 updates with V8 compilers disabled.
+This is a process-CPU proxy, not an Apple TV JavaScriptCore or GPU result.
+Both material sets use identical update code, 15,408 triangles and two draws.
+
+The solved-footfall script now separates stance excursion, swing excursion
+and successive-footprint stride. At 35 mm/s, the high-rate report measures
+21.6 ms swing, 26.7 ms stance and 1.690 mm footprint stride. The 30 Hz report
+is deliberately retained to expose aliasing, rather than treated as a second
+biological fit. Remaining priorities are flight-leg silhouette, posterior
+cleaning readability, and measured productive-stroke/rubbing contact.

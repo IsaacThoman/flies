@@ -42,6 +42,8 @@ export type NewRoom = { name: string; listed: boolean; password: string; place: 
 
 /** The game, as the screens see it. */
 export interface Shell {
+  /** Optional host semantics; called only when menu state changes. */
+  menuChanged?(): void;
   readonly settings: Settings;
   readonly brain: BrainDriver;
   readonly meter: BrainMeter;
