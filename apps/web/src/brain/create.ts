@@ -41,7 +41,7 @@ const createWorker: BrainWorkerFactory = (onMessage, onError) => {
     onError(event.message || "The fly's brain crashed (perhaps this browser can't run a module worker).");
   };
   return {
-    post: (request, transfer) => transfer ? worker.postMessage(request, transfer) : worker.postMessage(request),
+    post: (request, transfer = []) => worker.postMessage(request, transfer),
     terminate: () => worker.terminate(),
   };
 };
