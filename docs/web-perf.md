@@ -26,7 +26,7 @@ throttling and 1.6 Mbit/s, 150 ms network latency. Chromium does not apply
 that CPU throttle to the worker; it is not a real phone measurement.
 Each cold visit has a fresh browser context and its paired warm visit uses
 the completed page/brain caches. The static server sends uncompressed files,
-so transfer numbers describe that host; `bundle.json` also gives gzip sizes.
+so transfer numbers describe that host; bundle.json also gives gzip sizes.
 CDP encoded bytes through title include page requests and cache hits as CDP
 reports them. The server also counts completed response body bytes, including
 service-worker installation traffic in its own target; those counts exclude
@@ -35,9 +35,9 @@ HTTP headers and bytes of incomplete responses.
 First frame is completion of the first game frame; title is the first frame
 whose published canvas state is title (up to 200 ms after the title is drawn). These include game setup,
 download, worker startup and the deliberate Awake transition. Timing starts
-at navigation, using the page's performance clock. `modules.json` reports
+at navigation, using the page's performance clock. modules.json reports
 rendered module bytes before final chunk minification; they are not additive
-gzip contributions. `bundle.json` reports actual emitted sizes.
+gzip contributions. bundle.json reports actual emitted sizes.
 
 Frames are recorded individually by wrapping the game's frame function.
 This adds equal instrumentation overhead to both versions. Reports include
@@ -51,7 +51,7 @@ Memory checkpoints briefly hold frames while forcing GC in the page and brain wo
 heaps, backing stores and the worker's Wasm separately, plus renderer object
 counts. These exclude GPU/native allocations and perturb frames; compare
 frame scenarios separately. Brain step costs use the deterministic seed,
-senses, warmup, lap calibration and CPU timer from `cost.budget.ts`.
+senses, warmup, lap calibration and CPU timer from `packages/brain/src/cost.budget.ts`.
 
 Review rubric (0–10 each):
 
