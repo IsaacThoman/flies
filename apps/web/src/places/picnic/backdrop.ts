@@ -34,7 +34,7 @@ const SKY_FS = /* glsl */ `
 uniform vec3 zenith; uniform vec3 middle; uniform vec3 horizon;
 uniform vec3 sunDir; uniform vec3 sunColor; uniform float glow; uniform float stars; uniform float time;
 uniform vec3 ground;
-uniform float flash;
+uniform float flash; uniform float squall;
 uniform float cover; uniform float mist; uniform float bow; uniform vec2 drift;
 varying vec3 vDir;
 float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
@@ -57,9 +57,11 @@ void main() {
   if (cover > 0.01 && h > -0.05) {
     vec2 p = d.xz / (max(h, 0.0) + 0.1) * 1.4 + drift;
     deck = noise(p) * 0.5 + noise(p * 2.3 + 7.0) * 0.3 + noise(p * 5.1 + 3.0) * 0.2;
-    float shade = mix(1.0, 0.82 + 0.3 * deck, cover);
+    float underside = mix(0.82 + 0.3 * deck, 0.42 + 0.82 * deck, squall);
+    float shade = mix(1.0, underside, cover);
     c *= mix(shade, 1.0, smoothstep(0.25, -0.02, h) * 0.6);
     c += sunColor * pow(s, 4.0) * 0.18 * cover * deck;
+    c += vec3(0.10,0.13,0.20) * flash * cover * deck * deck;
   }
   // The glow round the sun, wide at sunset.
   c += sunColor * (pow(s, 6.0) * glow + pow(s, 48.0) * 0.35);
@@ -318,6 +320,7 @@ export function buildBackdrop(light: Daylight): SceneBackdrop {
 
   const skyUniforms = {
     flash: { value: 0 },
+    squall: { value: 0 },
     zenith: { value: light.zenith },
     middle: { value: light.middle },
     horizon: { value: light.horizon },
@@ -573,6 +576,7 @@ gl_Position = projectionMatrix * mvPosition;`,
     update(time, camera, daylight, weather: Weather) {
       snowCover.value = weather.snowCover;
       skyUniforms.flash.value = weather.lightning;
+      skyUniforms.squall.value = weather.heavy;
       const dt = last < 0 ? 0 : Math.min(0.1, Math.max(0, time - last));
       last = time;
       sky.position.copy(camera.position);

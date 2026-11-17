@@ -460,10 +460,16 @@ void main() {
     for (int layer=0;layer<3;layer++) {
       float scale = 40.0 + float(layer)*27.0;
       vec2 p = d.xy / max(-d.z,0.3) * scale + vec2(time*0.45,time*(1.0+float(layer)*0.6));
-      vec2 cell = floor(p); vec2 q = fract(p)-0.5;
-      q.x += sin(time*0.8+hash(cell)*6.28)*0.2;
-      float flake = 1.0 - smoothstep(0.03,0.08+fwidth(p.x),length(q));
-      c = mix(c,vec3(0.8,0.87,0.95),flake*step(hash(cell+3.0),snow)*0.7);
+      vec2 cell = floor(p);
+      vec2 seed = vec2(hash(cell+3.7),hash(cell+19.3));
+      vec2 q = fract(p) - mix(vec2(0.1),vec2(0.9),seed);
+      q.x += sin(time*0.8+seed.x*6.28)*0.08;
+      // Resolve a distant flake's energy, rather than expanding it into a grid of white dots.
+      float aa = max(fwidth(p.x),fwidth(p.y));
+      float radius = 0.03 + seed.y*0.06;
+      float flake = 1.0 - smoothstep(radius,radius+aa*0.65,length(q));
+      float energy = radius*radius/(radius*radius+aa*aa*0.3);
+      c = mix(c,vec3(0.8,0.87,0.95),flake*energy*step(hash(cell+7.1),snow*0.45)*0.85);
     }
   }
   gl_FragColor = vec4(c, 1.0);

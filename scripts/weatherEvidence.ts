@@ -1,5 +1,6 @@
 // Weather evidence, driven through the same Outside feed as WeatherKit.
 // Run in a /tmp/flies-heavy slot: node scripts/weatherEvidence.ts /tmp/weather-evidence
+// WEATHER_PLACES=lab,windowsill splits a render sweep into smaller batches.
 // Requires ffmpeg and CHROMIUM_PATH; writes no artifacts into the repository.
 import { mkdir, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
@@ -21,6 +22,7 @@ try {
   await waitFor(page, "screen=play");
   const stats = [];
   for (const { id: place } of PLACES) {
+    if (process.env.WEATHER_PLACES && !process.env.WEATHER_PLACES.split(",").includes(place)) continue;
     await page.evaluate(place => {
       const g = (globalThis as unknown as { __fly: Game }).__fly;
       g.settings.place = place; g.moveTo(place); g.settings.wallpaperAfter = 0;
