@@ -275,7 +275,7 @@ export class Online {
           for (const hand of this.#handList) hand.forgetFood(id);
         }
         const [amount, sugar] = this.pantry.mirror.apply(m.ack, m.amounts, m.gone, m.eaten, m.meal);
-        host.life.feed(amount, sugar);
+        if (amount > 0) host.life.feed(amount, sugar);
         return;
       }
     }
