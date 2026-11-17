@@ -861,11 +861,12 @@ each segment. Sense organs are small clusters: the bristles' sockets where
 the model's bristles are, the femoral chordotonal organs, the campaniform
 sensilla on the legs and at the bases of the wings and halteres.
 
-**Where each region is drawn** (`apps/web/src/nerves/regions.ts`). The 62
-placed regions each light their own anatomy. The remaining `unplaced` group
-mixes neurons whose annotations do not establish a location; its rate is
-retained but lights nothing. The connective's midline stays as unlit
-anatomical context, rather than locating those neurons in the neck.
+**Where each region is drawn** (`apps/web/src/nerves/regions.ts`). The 61
+placed regions each light their own anatomy. The `unplaced` group mixes
+neurons whose annotations do not establish a location; `head-sensory-other`
+has no recorded organ. Their rates are retained but light nothing. The
+connective's midline and pharyngeal nerves stay as unlit anatomical context,
+rather than assigning those neurons to an unsupported location or organ.
 Every lit part belongs to exactly one region or command group (a test holds it).
 Where several regions share a place in
 the fly, each is drawn as what is its own there: motor neurons as their
@@ -880,7 +881,8 @@ fill them.
 | optic lobe, other · visual projection · visual centrifugal | the inner chiasm's fibres · the optic tracts into the central brain · fibres back out |
 | antennal lobe, mushroom body, superior protocerebrum, lateral horn, ventrolateral (with the optic tubercle), inferior and ventromedial, subesophageal (each side); central complex | their neuropils; the mushroom body as calyx, peduncle and lobes; the central complex as bridge, fan-shaped body, ellipsoid body, noduli |
 | central brain, other | the rind of cell bodies round the central brain, drawn as an edge (that is where those neurons' cell bodies are) |
-| smell · Johnston's organ · head bristles · mouthparts · head sensory, other | the third antennal segment and its strand of the antennal nerve · the second segment's organ and its strand to the AMMC · the head's bristle sockets · the labellum, the pharynx's taste organs and the labial nerves' sensory axons · the pharyngeal nerves |
+| smell · Johnston's organ · head bristles · mouthparts | the third antennal segment and its strand of the antennal nerve · the second segment's organ and its strand to the AMMC · the head's bristle sockets · the labellum, the pharynx's taste organs and the labial nerves' sensory axons |
+| head sensory, other | organ unknown; no activity assigned to a specific organ |
 | head motor · neuroendocrine | the labial nerves' motor axons · the pars intercerebralis, its nerve to the corpora cardiaca, the frontal ganglion |
 | descending · ascending (each side) | tracts from the brain down the neck and along the cord's top · from the cord's floor up into the brain |
 | unplaced | not assigned an anatomical location; no activity drawn |
