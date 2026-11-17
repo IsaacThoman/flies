@@ -25,6 +25,8 @@ and the iPhone and iPad app (`apps/ios`) go together, as one app, "Flies", at on
    `npm run tvos -- archive` (`scripts/apple.ts`) and uploads them to App Store Connect. They
    appear in TestFlight once Apple has processed them.
 
+Archives reject `TVOS_ENTRY`: diagnostic entries are for local tvOS builds only.
+
 The version is set at build time: `MARKETING_VERSION` is the release (`1.2.3`) and
 `CURRENT_PROJECT_VERSION` is the Unix time, which keeps increasing, reruns included. Neither is
 committed; `apps/version.yml` only numbers local builds.
@@ -68,6 +70,13 @@ Ready pull requests that change Apple host inputs also run `.github/workflows/ap
 hosts compile for a generic simulator on macOS, without signing credentials or a running device.
 The job caches npm downloads, the connectome and Xcode build data. Draft pull requests and
 documentation-only edits skip it; marking a matching draft ready starts the job.
+
+Ready pull requests and pushes to `dev` or `main` that change `packages/brain-native/**`
+(the build script and its pinned SDK version and digests included) or
+`.github/workflows/wasm-repro.yml` run that workflow on macOS. Draft pull requests skip it.
+It caches the pinned, digest-verified wasi-sdk and runs `wasm.sh --check` unconditionally,
+rebuilding both WebAssembly modules and their manifest and comparing them byte for byte
+with the committed files. This check cannot skip when the SDK is missing.
 
 ## The weather outside
 

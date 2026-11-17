@@ -13,6 +13,8 @@ import { FOUND_ID, dropOwner, seqAtOrAfter } from "./protocol.ts";
 
 /** A fly's mouth and feet reach this far past a food's edge, mm, measured from where it stands: its length, and some slack for being seen late. */
 export const BITE_REACH = 4;
+/** At most this many foods the place put out at once at a table; the oldest goes past it. A place puts out a few at a time. */
+export const MAX_FOUND = 16;
 /** A player may eat at most this much faster than EAT_RATE allows, to forgive uneven sends; any more is refused. */
 const APPETITE_SLACK = 1.5;
 /** Seconds of appetite a player may save up. */
@@ -39,6 +41,8 @@ export class TableFood {
   /** Ids changed or gone since the last `flush`. */
   readonly #changed = new Set<number>();
   readonly #gone: number[] = [];
+  #bitten = false;
+  readonly #meals = new Map<number, [number, number]>();
   readonly #appetite = new Map<number, Appetite>();
   readonly #world: World;
   /** Bites refused, by reason. */
@@ -92,9 +96,11 @@ export class TableFood {
     }
   }
 
-  /** Something the place put out, on the surface at or below `y`, as a device saw it; the first to say so names it. */
+  /** Something the place put out, on the surface at or below `y`, as a device saw it; the first to say so names it. The oldest found goes past MAX_FOUND. */
   found(id: number, name: string, x: number, z: number, r: number, sweet: number, y?: number): Food | null {
     if (!(id >= FOUND_ID) || typeof name !== "string" || name.length > 40 || this.find(id) || !this.#world.onTable(x, z) || !(r > 0 && r < 5) || !(sweet >= 0 && sweet <= 1)) return null;
+    const found = this.foods.filter((f) => f.kind === "found");
+    if (found.length >= MAX_FOUND) this.#remove(found[0]);
     const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, amount: 1, pool: false };
     this.foods.push(food);
     return food;
@@ -106,8 +112,12 @@ export class TableFood {
    * floor under the table it is on) and isn't eating faster than a fly can.
    */
   bite(by: number, id: number, amount: number, x: number, y: number, z: number, now: number): Granted {
+    this.#bitten = true;
     const food = this.find(id);
-    if (!food || !(amount > 0)) return this.#refuse("unknown");
+    if (!food) return this.#refuse("unknown");
+    // Even a refused bite needs an authoritative amount and an acknowledgement.
+    this.#changed.add(id);
+    if (!(amount > 0)) return this.#refuse("unknown");
     if (Math.hypot(food.x - x, food.z - z) > food.r + BITE_REACH || Math.abs(food.y - y) > TASTE_HEIGHT + BITE_REACH) return this.#refuse("far");
     const appetite = this.#appetite.get(by) ?? { stored: EAT_RATE * APPETITE_STORE * APPETITE_SLACK, at: now };
     appetite.stored = Math.min(EAT_RATE * APPETITE_STORE * APPETITE_SLACK, appetite.stored + ((now - appetite.at) / 1000) * EAT_RATE * APPETITE_SLACK);
@@ -117,10 +127,21 @@ export class TableFood {
     appetite.stored -= amount;
     const granted = Math.min(food.amount, amount);
     food.amount -= granted;
+    const meal = this.#meals.get(by) ?? [0, 0];
+    meal[0] += granted;
+    meal[1] += granted * food.sweet;
+    this.#meals.set(by, meal);
     this.eaten.set(by, (this.eaten.get(by) ?? 0) + granted);
     if (food.amount <= 1e-6 && food.kind !== "patch") this.#remove(food);
     else this.#changed.add(food.id);
     return { granted, refused: null };
+  }
+
+  /** Nutrition granted since this player's last food acknowledgement. */
+  takeMeal(by: number): [number, number] {
+    const meal = this.#meals.get(by) ?? [0, 0];
+    this.#meals.delete(by);
+    return meal;
   }
 
   #refuse(reason: "unknown" | "far" | "greedy"): Granted {
@@ -147,7 +168,8 @@ export class TableFood {
 
   /** What changed since the last call, for the room to tell everyone; null if nothing did. */
   flush(): { amounts: [number, number][]; gone: number[] } | null {
-    if (this.#changed.size === 0 && this.#gone.length === 0) return null;
+    if (!this.#bitten && this.#changed.size === 0 && this.#gone.length === 0) return null;
+    this.#bitten = false;
     const amounts: [number, number][] = [];
     for (const id of this.#changed) {
       const f = this.find(id);
@@ -187,6 +209,8 @@ export class FoodMirror {
   ate(food: Food, amount: number) {
     if (!(amount > 0)) return;
     this.predicted += amount;
+    // Keep exhausted predictions until the room can restore a refused bite.
+    if (!this.#pantry.foods.includes(food)) this.#pantry.foods.push(food);
     this.unsent.set(food.id, (this.unsent.get(food.id) ?? 0) + amount);
   }
 
@@ -212,10 +236,22 @@ export class FoodMirror {
     this.#pantry.foods.push(food);
   }
 
+  get pending() {
+    return this.#pending.length + this.unsent.size;
+  }
+
   /** The room's account: what is left of what changed, what is gone, and this device's bites it has counted (through `ack`). */
-  apply(ack: number, amounts: readonly [number, number][], gone: readonly number[], granted: number | undefined) {
+  apply(ack: number, amounts: readonly [number, number][], gone: readonly number[], granted: number | undefined, meal?: readonly [number, number]): [number, number] {
     const pending = this.#pending;
-    while (pending.length && seqAtOrAfter(ack, pending[0].seq)) pending.shift();
+    while (pending.length && seqAtOrAfter(ack, pending[0].seq)) {
+      const p = pending.shift()!;
+      // Receipt-capable rooms include every processed, surviving food in
+      // amounts, even on refusal. An omitted acknowledged ID no longer exists.
+      if (meal && !amounts.some(([id]) => id === p.food)) {
+        const i = this.#pantry.foods.findIndex((f) => f.id === p.food);
+        if (i >= 0) this.#pantry.foods.splice(i, 1);
+      }
+    }
     const foods = this.#pantry.foods;
     for (const [id, amount] of amounts) {
       const f = foods.find((x) => x.id === id);
@@ -230,5 +266,6 @@ export class FoodMirror {
       if (this.unsent.has(id) || pending.some((p) => p.food === id)) this.lostBites++;
     }
     if (granted !== undefined) this.granted = granted;
+    return meal ? [meal[0], meal[1]] : [0, 0];
   }
 }

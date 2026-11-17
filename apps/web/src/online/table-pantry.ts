@@ -14,6 +14,8 @@ export class TablePantry extends Pantry {
   readonly mirror: FoodMirror;
   /** This player at the table: the first part of what it names its food. */
   player = 0;
+  /** The room supports nutrition receipts; older rooms retain their original optimistic feeding. */
+  confirmed = false;
   /** Food the place put out here, for the room to hear of. */
   onFound: (food: Food) => void = () => {};
   /** Requests a clear from the room, which decides what this player owns. */
@@ -78,6 +80,6 @@ export class TablePantry extends Pantry {
   eat(food: Food, appetite: number, dt: number): number {
     const bite = super.eat(food, appetite, dt);
     this.mirror.ate(food, bite);
-    return bite;
+    return this.confirmed ? 0 : bite;
   }
 }

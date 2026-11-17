@@ -15,7 +15,7 @@ import { BODY_HALF, BODY_RADIUS, segmentToSegment } from "@fly/body";
 import type { Looming } from "@fly/body";
 import {
   AIRBORNE, AWAY, EATING, HANDS, HOLDING, LEAD, MAX_BITES, PLAYING, PROTOCOL, SEND_EVERY, TABLETOP_SCALE, TABLE_BUBBLES, TableBubbles, ballProgress, createFlyState,
-  decodeFlies, fromWire, mix, stream, tableHours, toV3, wireScale,
+  decodeFlies, fromWire, mix, roomTime, stream, tableHours, toV3, wireScale,
 } from "@fly/net";
 import type { BallWire, Bite, BubbleSnapshot, FlyState, FoodWire, HappeningWire, Refusal, RoomInfo, ServerMessage, Spot, TableStart, WireScale } from "@fly/net";
 import { BALL_RADIUS, SWOOP_SECONDS, WORLDS } from "@fly/world";
@@ -119,6 +119,7 @@ export class Online {
     if (s.epoch !== (this.#arrival?.epoch ?? this.epoch)) return;
     // Rounded on the wire, a fly on its feet could come out a hair inside what it stands on, and be drawn on the floor under it.
     s.y += 0.5 / this.#heardScale.position;
+    s.t = roomTime(s.t, this.now);
     this.others.heard(s, this.now);
   };
   #sentAt = -Infinity;
@@ -135,7 +136,7 @@ export class Online {
   #table: TableBubbles | null = null;
   /** The table's seed, for its bubbles. */
   #seed = 0;
-  readonly #burst = (slot: number, cycle: number, at: number) => this.line.send({ type: "pop", slot, cycle, at: at * 1000 });
+  readonly #burst = (slot: number, cycle: number, at: number) => this.line.send({ type: "pop", slot, cycle, at: at * 1000, epoch: this.epoch });
 
   /** `password`: a locked room's, said in the hello until the room has welcomed this device (it knows the device after that). */
   constructor(host: TableHost, open: OpenTableSocket, url: string, code: string, key: string, start: TableStart | null, password: string | null = null) {
@@ -148,7 +149,7 @@ export class Online {
     this.pantry.onClear = () => {
       if (this.joined && !this.#arrival && !this.#host.moving()) this.line.send({ type: "clearFood", epoch: this.epoch });
     };
-    this.pantry.onFound = (food) => this.line.send({ type: "found", id: food.id, name: food.name, x: food.x, z: food.z, y: food.y, r: food.r, sweet: food.sweet });
+    this.pantry.onFound = (food) => this.line.send({ type: "found", id: food.id, name: food.name, x: food.x, z: food.z, y: food.y, r: food.r, sweet: food.sweet, epoch: this.epoch });
     this.shared = { others: this.#othersAt, anchor: this.#anchor };
     this.triedPassword = !!password;
     let starting = start;
@@ -208,6 +209,7 @@ export class Online {
         this.colour = m.colour;
         this.starter = m.starter;
         this.pantry.player = m.id;
+        this.pantry.confirmed = m.meals === true;
         host.fly.model.mark(m.colour);
         this.#clock = { at: m.now, wall: m.wall, offset: m.offset };
         this.now = this.#roomNow();
@@ -256,7 +258,7 @@ export class Online {
         for (const hand of this.#handList) hand.clear();
         this.#mineFlying = false;
         this.#visits.length = 0;
-        this.#arrive(m.place, m.epoch, m.foods, m.spots[this.id] ?? null, null);
+        this.#arrive(m.place, m.epoch, m.foods, m.spots[this.id] ?? null, m.bubbles ?? null);
         return;
       case "happening":
         this.#visits.push(m);
@@ -264,7 +266,7 @@ export class Online {
       case "pop":
         this.#table?.pop(m.slot, m.cycle, m.at / 1000);
         return;
-      case "food":
+      case "food": {
         for (const id of m.gone) {
           const falling = this.pantry.forgetFood(id);
           if (falling) {
@@ -273,8 +275,10 @@ export class Online {
           }
           for (const hand of this.#handList) hand.forgetFood(id);
         }
-        this.pantry.mirror.apply(m.ack, m.amounts, m.gone, m.eaten);
+        const [amount, sugar] = this.pantry.mirror.apply(m.ack, m.amounts, m.gone, m.eaten, m.meal);
+        if (amount > 0) host.life.feed(amount, sugar);
         return;
+      }
     }
   }
 
@@ -400,7 +404,7 @@ export class Online {
       const hand = this.#handList[i];
       const other = this.others.get(hand.player);
       const newest = other?.present ? other.track.newest : null;
-      if (newest) hand.heard(newest);
+      hand.heard(newest && !other?.resting && !(newest.flags & AWAY) ? newest : null);
       hand.update(dt, roomNow, life.body, camera, time, floorAt);
       const h = hand.hands;
       this.stroke = Math.max(this.stroke, h.stroke);
@@ -458,11 +462,12 @@ export class Online {
       toV3(mine.via, ball.via);
       toV3(mine.to, ball.to);
       this.#mineFlying = true;
-      this.line.send({ type: "ball", at: mine.at, from: mine.from, via: mine.via, to: mine.to });
+      // Each of these names the place it was done in: one in flight as the table moves is dropped by the room, not done in the next place.
+      this.line.send({ type: "ball", at: mine.at, from: mine.from, via: mine.via, to: mine.to, epoch: this.epoch });
     }
     if (ev.dropped) {
       const f = hands.falling[hands.falling.length - 1];
-      if (f) this.line.send({ type: "drop", id: this.pantry.name(f.kind, f), kind: f.kind, x: f.x, z: f.z, y: f.floor, at: roomNow });
+      if (f) this.line.send({ type: "drop", id: this.pantry.name(f.kind, f), kind: f.kind, x: f.x, z: f.z, y: f.floor, at: roomNow, epoch: this.epoch });
     }
   }
 
@@ -486,7 +491,7 @@ export class Online {
       }
       if (n > 0) {
         const seq = ++this.#biteSeq & 0xffff;
-        this.line.sendBites(seq, this.#bites, n);
+        this.line.sendBites(seq, this.#bites, n, this.epoch);
         mirror.sent(seq);
       }
     }

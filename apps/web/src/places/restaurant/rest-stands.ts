@@ -213,7 +213,7 @@ export function buildStation(b: Builder, solids: readonly Solid[]) {
     { g: spoonShape(), at: [[2, 44, Math.PI + 0.01], [-6, 76, -0.012]] },
   ];
   for (const { g, at } of cutlery) {
-    const placed = at.map(([dx, dz, a]) => ({ matrix: mat4({ x: t.x + dx, y: floor + 0.4 - 3.4, z: t.z + dz }, new THREE.Euler(0, a, 0)), color: new THREE.Color(1, 1, 1) }));
+    const placed = at.map(([dx, dz, a]) => ({ matrix: mat4({ x: t.x + dx, y: floor - 3.4, z: t.z + dz }, new THREE.Euler(0, a, 0)), color: new THREE.Color(1, 1, 1) }));
     b.detailPainted(area, scatter(g, placed, REST_KIND.polish), REST_KIND.polish);
     g.dispose();
   }

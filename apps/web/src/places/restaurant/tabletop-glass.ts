@@ -66,7 +66,7 @@ export function wineGlass(b: Builder, area: number, foot: Solid, stem: Solid, bo
       const r = footR - 1 - (footR - 1 - stemR - 0.6) * (i / 6) ** 0.7;
       return [r, footTop(r)];
     }),
-    [stemR, (stem.bottom ?? 0) + 0.5],
+    [stemR, stem.bottom ?? 0],
     [stemR, under - 0.5],
     [stemR + 0.5, under],
     [edge - 0.8, under],
