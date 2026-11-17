@@ -67,9 +67,9 @@ test('missing references and no observed events never earn scores', () => {
   const e = new Ethogram(0.01);
   e.add(sample);
   const rows = comparisons(e.result());
-  assert.ok(rows.filter(r => r.observable === null).every(r => r.measured === null && r.exploratoryScore === null));
-  assert.ok(rows.every(r => r.validatedScore === null));
-  assert.equal(rows.find(r => r.id === 'saccade-angle')!.exploratoryScore, null);
+  assert.ok(rows.filter(r => r.observable === null).every(r => r.measured === null && r.score === null));
+  assert.ok(rows.every(r => r.score === null));
+  assert.equal(rows.find(r => r.id === 'saccade-angle')!.score, null);
 });
 
 test('score uses distance outside the acceptance band, rejects invalid scales', () => {
@@ -106,10 +106,10 @@ test('duration and seed validation refuses ambiguous or misleading runs', () => 
   assert.throws(() => new Ethogram(0.03));
 });
 
-test('each of 15 reference entries retains provenance, statistic and tolerance policy', () => {
-  assert.equal(REFERENCES.length, 15);
+test('each registered reference retains provenance and reported uncertainty without invented ranges', () => {
+  assert.equal(REFERENCES.length, 21);
   assert.equal(new Set(REFERENCES.map(r => r.id)).size, REFERENCES.length);
-  assert.ok(REFERENCES.every(r => r.paper && r.url.startsWith('https://') && r.location && r.statistic && r.assay && r.limitation && r.toleranceKind && Number.isFinite(r.value) && r.tolerance > 0));
+  assert.ok(REFERENCES.every(r => r.paper && r.url.startsWith('https://') && r.location && r.statistic && r.assay && r.limitation && r.toleranceKind && Number.isFinite(r.value) && (r.tolerance === null || r.tolerance > 0)));
 });
 
 test('nearby peaks remain separate events even when their 100 ms windows overlap', () => {

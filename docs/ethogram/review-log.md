@@ -31,17 +31,15 @@ No claim of validated biological agreement is made.
 The reviewers' three shared objections were lack of measured behaviour and
 regression evidence; non-equivalent assay/observable definitions; and inadequate
 population metadata and acceptance-scale justification. All recommended a strict
-machine-readable scoring eligibility gate. `validatedScore` and
-`validatedOverall` therefore stay null: unsupported or incompatible evidence
-cannot earn biological-agreement credit. Separate exploratory distances are
-labelled as such and always show coverage.
+machine-readable scoring eligibility gate. A whole-animal point score therefore stays unidentified: unsupported or incompatible evidence
+cannot earn biological-agreement credit. The initial implementation retained separate exploratory distances; the subsequent assay revision removes them entirely.
 
 Rejected behaviour changes: fitting speed to an unmatched female dataset,
 raising turn gain until saccades appear, and scripting feeding/grooming patterns.
 No behaviour improvement or completed hill-climb round is claimed from this
 citation audit.
 
-## Implementation comparison (results received so far)
+## Implementation comparison
 
 Private key released here: R8 is the auditor at `223fd4c`; F3 is the working
 implementation with input validation, ground-window exclusion, provenance
@@ -58,6 +56,8 @@ judgments on later measurements.
 | V7 | R8 | 5 | 6 | 0 | 4 | 3.75 | |
 | D2 | F3 | 5 | 7 | 0 | 5 | 4.25 | F3 > R8 |
 | D2 | R8 | 4 | 6 | 0 | 4 | 3.50 | |
+| J4 | F3 | 6 | 9 | 0 | 5 | 5.00 | F3 > R8 |
+| J4 | R8 | 5 | 8 | 0 | 4 | 4.25 | |
 
 Both independently reproduced the targeted tests (13 and 11 respectively),
 found identical production model/body code, and verified the central source
@@ -66,8 +66,7 @@ corruption; F3 excluded those observations. They explicitly found **no behaviour
 improvement**. Main remaining objections: unmatched assays still have numerical
 exploratory distances, missing real behavioural evidence within their permitted
 files, and insufficiently visible inherited motor/background stand-ins. The CLI
-now explicitly lists those stand-ins. A third implementation review and the
-separate regression review remain outstanding; this is not a completed hill-climb.
+now explicitly lists those stand-ins. All three implementation reviewers ranked F3 higher; mean 4.58 versus 3.83. A separate regression review remains outstanding; this is an auditor improvement, not a behavioural climb.
 
 ## Validation received after evidence freeze
 
