@@ -2,6 +2,7 @@
 // loop. In a browser also the page's lifecycle (page.ts) and the frame rate
 // this device can afford (quality.ts); if it can't draw at all, it says so.
 
+import { nativeAccessibility } from "./accessibility/native.ts";
 import { browserAccessibility } from "./accessibility/browser.ts";
 import { AT_ROOT_PROPERTY } from "@fly/contracts";
 import { HitMap } from "@fly/ui";
@@ -50,6 +51,7 @@ if (game) {
     browserAccessibility(game);
     Page.keepForOffline();
   } else {
+    nativeAccessibility(game);
     // The host stops frames in the background and says so: a room hears at once that the fly is
     // away, and coming back the line to it is opened again at once.
     let hiddenAt = 0;

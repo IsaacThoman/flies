@@ -1,5 +1,6 @@
 // Browser-only host adapter. The tree is available without detecting a screen
 // reader (browsers deliberately provide no reliable API for that).
+import { CODE_LENGTH, ROOM_NAME_MAX, PASSWORD_MAX } from "@fly/net";
 import type { Game } from "../game.ts";
 import { MenuAccess } from "./model.ts";
 import type { AccessibleItem } from "./model.ts";
@@ -21,6 +22,7 @@ export function browserAccessibility(game: Game) {
   let key = "";
   let engaged = false;
   let pending = false;
+  let restoreFocus = false;
   const send = (id: string, action: "activate" | "value" | "submit", value?: string | number) => { engaged = true; model.send({ id, action, value }); };
   root.addEventListener("keydown", (e) => {
     e.stopPropagation();
@@ -37,10 +39,11 @@ export function browserAccessibility(game: Game) {
       select.addEventListener("change", () => send(item.id, "value", select.selectedIndex));
     } else if (item.kind === "field" || item.kind === "slider") {
       node = document.createElement("input");
+      node.name = item.id;
       node.type = item.kind === "slider" ? "range" : item.secret ? "password" : "text";
       node.style.fontSize = "16px";
       node.autocomplete = item.secret ? (key === "online:new" ? "new-password" : "current-password") : "off";
-      node.maxLength = item.id === "code" ? 10 : item.id === "name" ? 32 : 64;
+      node.maxLength = item.id === "code" ? CODE_LENGTH : item.id === "name" ? ROOM_NAME_MAX : PASSWORD_MAX;
       const input = node;
       input.addEventListener("input", () => send(item.id, "value", input.value));
       input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); send(item.id, "submit"); } });
@@ -49,7 +52,7 @@ export function browserAccessibility(game: Game) {
       node.type = "button";
       node.addEventListener("click", () => send(item.id, "activate"));
     }
-    node.addEventListener("focus", () => { engaged = true; model.send({ id: item.id, action: "focus" }); });
+    node.addEventListener("focus", () => { restoreFocus = false; engaged = true; model.send({ id: item.id, action: "focus" }); });
     return node;
   }
 
@@ -58,6 +61,8 @@ export function browserAccessibility(game: Game) {
     const state = model.read();
     const changed = key !== state.key;
     const ownedFocus = root.contains(document.activeElement);
+    const focusedId = [...nodes].find(([, node]) => node === document.activeElement)?.[0];
+    if (focusedId && !state.items.some((item) => item.id === focusedId && !item.disabled)) restoreFocus = true;
     if (changed) { controls.replaceChildren(); nodes.clear(); key = state.key; }
     root.setAttribute("aria-label", state.name);
     heading.textContent = state.name;
@@ -71,24 +76,32 @@ export function browserAccessibility(game: Game) {
       let node = nodes.get(item.id);
       if (!node) { node = create(item); nodes.set(item.id, node); }
       // Keep the focused node in place while network rows change around it.
-      if (node.previousElementSibling !== previous) controls.insertBefore(node, previous ? previous.nextSibling : controls.firstChild);
+      if (node.parentElement !== controls || node.previousElementSibling !== previous) controls.insertBefore(node, previous ? previous.nextSibling : controls.firstChild);
       previous = node;
       node.setAttribute("aria-label", item.name);
       if (node instanceof HTMLButtonElement) node.textContent = item.name;
       if (node instanceof HTMLSelectElement) {
         const options = item.options ?? [];
+        // An inline native list keeps keyboard choices in the semantic tree;
+        // a clipped popup select cannot open a usable visual menu.
+        node.size = Math.max(2, options.length);
         if (node.options.length !== options.length || options.some((label, i) => node.options[i].text !== label)) node.replaceChildren(...options.map((label) => new Option(label)));
         node.selectedIndex = Number(item.value);
       }
       if (node instanceof HTMLInputElement) {
         if (node.type === "range") { node.min = String(item.min); node.max = String(item.max); node.step = String(item.step); }
-        if (document.activeElement !== node) node.value = String(item.value ?? "");
+        if (node.value !== String(item.value ?? "")) node.value = String(item.value ?? "");
       }
       (node as HTMLButtonElement).disabled = !!item.disabled;
     }
-    if (engaged && (changed || (ownedFocus && !root.contains(document.activeElement)))) {
-      const target = nodes.get(state.focus) ?? [...nodes.values()].find((n) => !(n as HTMLButtonElement).disabled);
+    if (engaged && (changed || restoreFocus || (ownedFocus && !root.contains(document.activeElement)))) {
+      const preferred = nodes.get(state.focus);
+      const available = preferred && !(preferred as HTMLButtonElement).disabled;
+      const target = available ? preferred : [...nodes.values()].find((n) => !(n as HTMLButtonElement).disabled);
       target?.focus({ preventScroll: true });
+      // Joining temporarily disables the door's controls. Return to its field
+      // when the server answers, including on an incorrect password.
+      restoreFocus = !available;
     }
   }
   game.accessibilityChanged = () => {

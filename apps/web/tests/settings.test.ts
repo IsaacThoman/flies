@@ -34,7 +34,7 @@ const NOW = Date.UTC(2026, 10, 16, 20);
 
 test("settings come back as they were saved", () => {
   const store = memory();
-  const settings: Settings = { pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "whole", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, rumble: false, stats: true, realWeather: false, place: "lab", scene: "bar" };
+  const settings: Settings = { reduceMotion: "on", pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "whole", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, rumble: false, stats: true, realWeather: false, place: "lab", scene: "bar" };
   saveSettings(settings, store);
   assert.deepEqual(loadSettings(store), settings);
 });
@@ -99,6 +99,7 @@ test("a broken save, or none, is the defaults; nothing throws", () => {
 
 test("each setting keeps only a value the game can use", () => {
   const bad: Record<keyof Settings, unknown[]> = {
+    reduceMotion: [true, "yes", 1, null],
     rumble: [0, 1, "off", null],
     pixels: ["huge", "toString", "__proto__", 2],
     wallpaperAfter: [-30, "60"],

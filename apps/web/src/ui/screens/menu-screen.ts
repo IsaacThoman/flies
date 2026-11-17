@@ -100,7 +100,7 @@ export class MenuScreen implements Screen {
     this.#outcome(value === undefined ? this.menu.tap(at) : item.kind === "choice" ? this.menu.chooseAt(at, value) : this.menu.slideAt(at, value));
   }
 
-  get heading() { return this.#options.heading ?? this.id; }
+  get heading() { return this.#options.heading ?? (this.id[0].toUpperCase() + this.id.slice(1)); }
 
   #outcome(outcome: Outcome) {
     switch (outcome.kind) {

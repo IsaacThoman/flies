@@ -635,6 +635,7 @@ export class Game implements Shell {
   /** Optional host hook, never polled by the frame loop. */
   accessibilityChanged: (() => void) | null = null;
   systemReduceMotion = false;
+  #cameraPlaced = false;
   get reducedMotion() { return this.settings.reduceMotion === "on" || (this.settings.reduceMotion === "system" && this.systemReduceMotion); }
   get loading() { return this.#loading; }
   menuChanged() { this.accessibilityChanged?.(); }
@@ -809,6 +810,7 @@ export class Game implements Shell {
     this.prints.clear();
     this.hands.clear();
     this.director.useScene(scene.camera);
+    this.#cameraPlaced = false;
     this.#settle();
     this.settings.scene = id;
     saveSettings(this.settings);
@@ -840,6 +842,7 @@ export class Game implements Shell {
   }
 
   #syncCamera() {
+    this.#cameraPlaced = false;
     // The menu and what it opens keep the title's shot; once the menu has faded for the wallpaper, the fly is filmed as it is in play's.
     const playing = !this.#loading && this.nav.current === "play";
     this.director.title = !playing && !this.wallpaper;
@@ -881,9 +884,10 @@ export class Game implements Shell {
       // A finger already down isn't "Try again".
       this.#touchWas = remote.touch.touching;
       this.#syncCamera();
+      this.menuChanged();
     }
     if (this.#loading) {
-      if (brain.status !== "loading" && this.#awakeAt < 0) this.#awakeAt = this.time;
+      if (brain.status !== "loading" && this.#awakeAt < 0) { this.#awakeAt = this.time; this.menuChanged(); }
       const hold = brain.status === "running" ? (arriving(brain) && brain.source.storageFull ? AWAKE_HOLD_NOTE : AWAKE_HOLD) : arriving(brain) ? Infinity : 3;
       if (this.#awakeAt >= 0 && this.time - this.#awakeAt > hold) {
         this.#loading = false;
@@ -941,7 +945,11 @@ export class Game implements Shell {
     this.online?.send(this.#playerNow());
     // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
     director.prefer = this.hands.current.id === "swoop" && this.nav.current === "play" && !this.wallpaper ? Math.PI - SWOOP_BEARING : null;
-    if (!this.reducedMotion) director.update(life.body, dt);
+    if (!this.reducedMotion || !this.#cameraPlaced) {
+      if (this.reducedMotion) director.snap();
+      director.update(life.body, this.reducedMotion ? 0 : dt);
+      this.#cameraPlaced = true;
+    }
     this.#xray(dt);
     if (this.time > this.#clockAt) this.#followLight();
     stage.update(this.time, dt, director.camera);

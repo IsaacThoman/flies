@@ -101,12 +101,14 @@ export class OnlineScreen implements Screen {
     const item = this.menu.item(id);
     if (item?.kind !== "field" || item.disabled) return;
     const max = id === "code" ? CODE_LENGTH : id === "name" ? ROOM_NAME_MAX : PASSWORD_MAX;
+    this.#note = null;
     item.value = value.slice(0, max);
     this.#store(id, item.value);
     this.#shell.menuChanged?.();
   }
 
   submitField(id: string) {
+    this.#note = null;
     if (id === "code" && this.#code) {
       const code = this.#code.trim().toLowerCase();
       if (isTableCode(code)) this.#shell.joinRoom(code);
@@ -402,6 +404,7 @@ export class OnlineScreen implements Screen {
     this.#store(id, typing.value);
     const field = items.find((i) => i.id === id);
     if (field?.kind === "field") field.value = typing.value;
+    this.#shell.menuChanged?.();
     if (ended !== "done") return;
     // Return on the code, or on a door's password, is going in.
     if (id === "code" && this.#code) {

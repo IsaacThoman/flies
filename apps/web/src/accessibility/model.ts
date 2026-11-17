@@ -41,7 +41,8 @@ export class MenuAccess {
     const id = g.screen;
     const screen = id === "title" || id === "settings" || id === "online" ? g.screens[id] : null;
     const table = g.table;
-    const status = id === "online" ? [g.screens.online.heading, table ? table.joined ? `Joined ${table.name ?? "room"}. Code ${table.code}` : "Joining room" : g.tableEnded === "left" ? "Left the room" : ""].filter(Boolean).join(". ") : "";
+    const rooms = g.screens.online.view === "rooms" ? g.rooms === null ? "Looking for rooms" : g.rooms.length ? `${g.rooms.length} ${g.rooms.length === 1 ? "room" : "rooms"} available` : "No rooms open" : "";
+    const status = id === "online" ? [g.screens.online.heading, table ? table.joined ? `Joined ${table.name ?? "room"}. Code ${table.code}` : "Joining room" : g.tableEnded === "left" ? "Left the room" : "", rooms].filter(Boolean).join(". ") : id === "title" ? "Brain awake" : "";
     const items = screen ? screen.menu.items.map(projectItem) : [];
     if (id !== "title") items.push({ id: "back", name: id === "play" ? "Open menu" : "Back", kind: "action" });
     return { key: id === "online" ? `online:${g.screens.online.view}` : id, name: id === "title" ? "Flies" : screen?.heading ?? (id === "play" ? "Playing" : "About"), status, focus: screen?.menu.focused?.id ?? "back", items, body: id === "about" ? ABOUT.map((b) => `${b.heading ?? ""}. ${b.body}`).join("\n\n") : undefined };
@@ -50,6 +51,7 @@ export class MenuAccess {
   send(command: AccessCommand) {
     const g = this.game;
     g.accessInput();
+    if ((command.id === "retry" || command.id === "back") && command.action === "focus") return;
     if (command.id === "retry") { g.retryBrain(); return; }
     if (command.id === "back") { g.back(); return; }
     const id = g.screen;

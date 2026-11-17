@@ -5,6 +5,7 @@
 #import "Renderer.h"
 #import "BrainBridge.h"
 #import "KeyboardBridge.h"
+#import "AccessibilityBridge.h"
 #import "Remote.h"
 #import "SocketBridge.h"
 #import "WeatherBridge.h"
@@ -503,6 +504,7 @@ static void Define(JSContextRef ctx, JSObjectRef obj, const char *name, JSValueR
   if (JSObjectRef weather = MakeWeatherBridge(ctx)) Define(ctx, native, "weather", weather);
   // A table's line to its room, and tvOS's keyboard for typing its code.
   Define(ctx, native, "socket", MakeSocketBridge(ctx));
+  Define(ctx, native, "accessibility", MakeAccessibilityBridge(ctx));
   Define(ctx, native, "keyboard", MakeKeyboardBridge(ctx, self.config[@"typed"]));
   NSData *json = [NSJSONSerialization dataWithJSONObject:self.config options:0 error:nil];
   Define(ctx, native, "config", MakeString(ctx, [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding]));
