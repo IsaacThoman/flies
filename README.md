@@ -440,8 +440,7 @@ they take.
 Stats of: its brain, its day, both, or in and out) is a small panel of numbers, each a
 figure and a word: the brain's spikes a second, neurons active and speed
 against real time (from the brain's meter), under
-a trace of its last twenty seconds; and, headed by what the fly is doing now
-(the HUD's caption, so it can be read in the screensaver too), its day: how far
+a trace of its last twenty seconds; and its day: how far
 it has walked, its meals, its take-offs, and its time flying and grooming.
 The day is counted from what the fly's life did (`life.ts`: its legs' steps
 on its feet, a meal from its first taste, each leap into the air, each
@@ -450,7 +449,8 @@ second it was flying or grooming), once each, kept across launches as
 from the other pictures, at the same edge (at the top left while you play),
 and moves round with them; on a screen too narrow for that, under them; its
 cells two to a row on a narrow screen, and its brain beside its day on a
-short one. In and out, also headed by what the fly is doing, is a bar for
+short one. It retains the values and their units, without repeating the
+behaviour caption. In and out is a bar for
 each sense going into the brain as the body sends it (a loom at either eye,
 touch, either antenna, wind, sweet, weight on its legs, a male's taste on
 its front legs, and the light, the mean over every facet), and its hunger, and for each
@@ -773,7 +773,7 @@ that draw the same model with the same glow, so they never disagree:
 - **The panel** (Settings → On screen → Nervous system: off, in the
   screensaver, the default, or always): the same model from above, head up,
   the fly's left on the left, standing at rest so that it holds still,
-  cropped to the brain and the cord, labelled "Nervous system". It shares
+  cropped to the brain and the cord, with no heading. It shares
   its corner with what it sees, under it (over it at the bottom; beside it,
   smaller, where the screen is too short, as a phone on its side), at the
   corner itself when that isn't shown, and moves round the corners with it;
@@ -846,7 +846,7 @@ nothing flickers between brain states. **How a glow is drawn**
 (`packages/fly/src/nerves/materials.ts`, one function for both views): a
 part's colour goes from its tissue's toward its role's, blue for sensory
 neurons, amber for the neurons between, red for motor and neurosecretory
-ones, by (glow / 0.4)², all the way at 0.4, covering more of what is behind
+ones, by (glow / 0.35)², all the way at 0.35, covering more of what is behind
 it as it does, and it gives off light in that colour in proportion to
 glow². The square keeps the low hum of background activity near the tissue's
 colour and lets a burst stand out: in a ball's dive the optic lobes go from
@@ -857,19 +857,42 @@ reads in a dark room (the same at all times for every part, as an X-ray
 shows bone); in the panel a faint constant stain on the dark glass, as a
 neuropil stain shows anatomy in a micrograph.
 
+**Command-group somata** (`packages/fly/src/nerves/somata.ts`). The 64
+neurons already read for walking, steering, backing, escape, flight power,
+grooming, feeding and song are also drawn as tiny cell bodies at their actual
+`somaLocation` from `anatomy.bin`. `node packages/fly/scripts/somata.ts`
+regenerates the static atlas after validating the anatomy/connectome SHA-256
+pair. The same fitted brain and cord frames used for the neuropil meshes
+register these points; they retain the specimen's asymmetry. Every member is
+included, with no subsampling and no `tosomaLocation` fibre fallbacks. A
+3.6 µm nominal glyph radius is enlarged to a two-pixel diameter when necessary.
+This is a display convention, not a measurement of soma size.
+They are merged into the existing nervous-system geometry: no extra draws.
+
+These are **group-rate markers, not individual spike flashes**. Every soma
+in a readout shares that group's actual smoothed mean rate, normalized by
+the command's existing full-scale rate (40 Hz walking/steering/backing/
+feeding/song, 60 Hz grooming, 120 Hz flight power, 200 Hz giant fibre), with
+the same 50 ms rise and 400 ms fall as the regions. A bright point does not
+establish that this individual neuron fired. The workers and the native TV
+already report these nine rates; no new messages, counters, simulation work
+or inferred axon paths are added. A host missing a readout leaves its group
+dark. Region surfaces remain region averages. The static blue tissue stain
+and outline have higher contrast; only activity changes their warm glow.
+
 **What stays dark, and what it can't show.** The retina, smell and the legs',
 wings and thorax's and abdomen's sensory neurons never fire in this model (the
 light enters one synapse in, at the lamina; there is no sense of smell; of
 the body's senses only touch and the legs' load are driven): they are drawn,
 and stay dark. The mushroom body, lateral horn, superior protocerebrum,
 antennal lobe and central complex fire under 2 Hz on a 5 Hz scale and stay
-nearly dark. A region glows with the mean of all its neurons, so a command
+nearly dark. A region glows with the mean of all its neurons, so in its regional surface a command
 carried by a few hardly shows: the giant fibre's escape is one neuron among
 660 descending ones, and what shows of an escape is the optic lobes, the
 visual projection neurons and the motor neurons it sets going (the jump's
 are among the middle leg's). The cord's interneurons light their side's
-whole cord together, for now. The shapes are an anatomical drawing, not where
-each neuron is. The canvas's `data-xray` (how far the fly is glass),
+whole cord together, for now. The region shapes are an anatomical drawing; only the command-group somata
+are individual measured positions. The canvas's `data-xray` (how far the fly is glass),
 `data-nerves` (the panel's corner, or `hidden`) and `data-glow` (each region
 glowing at 0.05 or more, brightest first) say what is shown.
 
