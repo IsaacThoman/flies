@@ -365,10 +365,11 @@ export function buildSill(): SceneSet {
   for (const x of bar.at) painted(box(x - bar.half, x + bar.half, rail.top, FRAME_HEAD, WINDOW.glass - 12, WINDOW.glass + bar.depth), FRAME, 1);
   // Each column of panes, between the jambs, the glazing bars and the mullion: the transom across it, and putty where its panes meet the wood below.
   const panes = [[-SILL.hx + jamb.width, bar.at[0] - bar.half], [bar.at[0] + bar.half, -mullion.half], [mullion.half, bar.at[1] - bar.half], [bar.at[1] + bar.half, SILL.hx - jamb.width]];
+  // Putty beds into the rail: its bevel must not add an unfelt step on top.
   const bevel = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(5, 0), new THREE.Vector2(0, 5)]);
   for (const [x0, x1] of panes) {
     painted(box(x0, x1, transom.y - transom.half, transom.y + transom.half, WINDOW.glass - 12, WINDOW.glass + bar.depth), FRAME, 0);
-    for (const y of [rail.top, transom.y + transom.half]) painted(new THREE.ExtrudeGeometry(bevel, { depth: x1 - x0, bevelEnabled: false }).rotateY(-Math.PI / 2).translate(x1, y, WINDOW.glass), "#e6e0cf", 0);
+    for (const y of [rail.top, transom.y + transom.half]) painted(new THREE.ExtrudeGeometry(bevel, { depth: x1 - x0, bevelEnabled: false }).rotateY(-Math.PI / 2).translate(x1, y - 5, WINDOW.glass), "#e6e0cf", 0);
   }
   // A brass catch on the mullion.
   {
@@ -644,8 +645,8 @@ export function buildSill(): SceneSet {
     for (const plum of byName("plum")) {
       const f = plum.footprint as { x: number; z: number; r: number };
       const y = (plum.top as { base: number }).base;
-      fruity(new THREE.SphereGeometry(f.r, 26, 16).scale(1, 1.04, 0.96).translate(f.x, y, f.z), (_p, n) => blend("#3a1240", "#6a2a5c", Math.max(0, n.y) * 0.5), 3);
-      fruity(new THREE.CylinderGeometry(0.5, 0.7, 4, 5).rotateX(0.3).translate(f.x, y + f.r + 1.6, f.z), "#5a4a2a", 0);
+      fruity(new THREE.SphereGeometry(f.r, 26, 16).scale(1, 1, 0.96).translate(f.x, y, f.z), (_p, n) => blend("#3a1240", "#6a2a5c", Math.max(0, n.y) * 0.5), 3);
+      fruity(new THREE.CylinderGeometry(0.5, 0.7, 4, 5).rotateX(0.3).translate(f.x, y + f.r - 2.2, f.z), "#5a4a2a", 0);
     }
     // Plum juice run into the bowl from a split.
     const juice = patch("plum juice");
@@ -716,7 +717,7 @@ export function buildSill(): SceneSet {
     const lid = top - 9;
     fruity(lathe([[0, 0], [r - 2.5, 0], [r - 0.3, 1.2], [r, 4], [r, lid - 7], [r - 1, lid - 6], [0, lid - 6]], 36, x, z), "#d0861a", 7);
     glassBatch.add(bottleGlass, paint(lathe([[r, lid - 7.5], [r, lid - 6], [r - 2.4, lid - 3], [r - 3.4, lid - 1]], 36, x, z), "#d9e0d8"));
-    add(metal, paint(lathe([[r - 3.6, lid - 1], [r + 0.5, lid], [r + 0.7, lid + 1], [r + 0.7, top - 1], [r + 0.2, top], [0, top]], 36, x, z), "#d0a64e"));
+    add(metal, paint(lathe([[r - 3.6, lid - 1], [r - 0.2, lid], [r, lid + 1], [r, top - 1], [r - 0.2, top], [0, top]], 36, x, z), "#d0a64e"));
     add(plaster, paint(new THREE.CylinderGeometry(r + 0.15, r + 0.15, 24, 36, 12, true, -2.4, 2.4).translate(x, 26, z), (p) => (Math.abs(p.y - 26) > 9.5 ? tone("#8a5a22") : tone("#f2e6c8"))));
   }
   const [glassMesh] = glassBatch.build(group);

@@ -33,7 +33,7 @@ export const JAR_RING = { x: -40, z: -150, r: 34 };
  * half a millimetre of flat, for the fly walking on it.
  */
 export const LID_PRESS = (() => {
-  const R = (one("lemonade").footprint as { r: number }).r + 1.5;
+  const R = (one("lemonade").footprint as { r: number }).r;
   return [[R, -0.6], [R - 0.4, 0], [R - 1.2, 0.25], [R - 2, 0], [R - 2.8, -0.3], [R - 4, -0.3], [R - 4.8, 0], [24, 0], [23, 0.28], [21.5, 0.28], [20.5, 0], [6, 0], [5, 0.18], [0, 0.22]] as const;
 })();
 /** The grommet round the straw where it goes through the lid: its tube's radius and how high its middle sits, mm. */
@@ -569,7 +569,7 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
   group.add(jamGlass);
   fruit(SKIN.jam, paint(new THREE.CylinderGeometry(jf.r - 1.2, jf.r - 1.2, jamTop - 16, 40).translate(jf.x, (jamTop - 16) / 2 + 1, jf.z), "#d4123e"));
   // Its cloth, laid out flat in millimetres for the weave: across the top, and round and down the skirt.
-  const skirt = new THREE.CylinderGeometry(jf.r + 3, jf.r + 9, 13, COVER_AROUND, 3, true);
+  const skirt = new THREE.CylinderGeometry(jf.r, jf.r, 13, COVER_AROUND, 3, true);
   {
     const pos = skirt.attributes.position;
     const weave = new Float32Array(pos.count * 2);
@@ -584,7 +584,7 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
     }
     skirt.setAttribute("weave", new THREE.BufferAttribute(weave, 2));
   }
-  const lid = new THREE.CircleGeometry(jf.r + 3, COVER_AROUND).rotateX(-Math.PI / 2);
+  const lid = new THREE.CircleGeometry(jf.r, COVER_AROUND).rotateX(-Math.PI / 2);
   {
     const pos = lid.attributes.position;
     const weave = new Float32Array(pos.count * 2);
@@ -597,7 +597,7 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
   freeze(cover);
   group.add(cover);
   seen.push(cover);
-  batch.add(glossy, paint(new THREE.TorusGeometry(jf.r + 3.6, 1.6, 6, 48).rotateX(Math.PI / 2).translate(jf.x, jamTop - 6, jf.z), "#ff7eb6"));
+  batch.add(glossy, paint(new THREE.TorusGeometry(jf.r - 1.6, 1.6, 6, 48).rotateX(Math.PI / 2).translate(jf.x, jamTop - 6, jf.z), "#ff7eb6"));
 
   // Strawberries: a whole one with seeds and leaves, and a half one, cut face up.
   const berry = one("strawberry");
@@ -625,9 +625,22 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
     for (let i = 0; i < 7; i++) {
       const leaf = new THREE.ShapeGeometry(sepal, 4).rotateX(-Math.PI / 2);
       const m = mat4({ x: ex, y: ey + 0.6, z: ez }, new THREE.Euler(0.25 * Math.sin(i * 1.7), (i / 7) * Math.PI * 2 + bf.angle, -0.35, "YXZ"));
-      dry(paint(leaf, (p) => (p.y > ey + 1 ? "#62d84a" : "#2fa83a")), m);
+      // A leaf bridging the falling berry surface leaves a fly under the sepal.
+      leaf.applyMatrix4(m);
+      const pos = leaf.attributes.position;
+      for (let j = 0; j < pos.count; j++) {
+        const x = pos.getX(j), z = pos.getZ(j);
+        const dx = x - bf.x, dz = z - bf.z;
+        const u = dx * Math.cos(bf.angle) - dz * Math.sin(bf.angle);
+        const v = dx * Math.sin(bf.angle) + dz * Math.cos(bf.angle);
+        const inset = Math.max(1, Math.hypot(u / bf.rx, v / bf.rz) / 0.98);
+        const px = bf.x + dx / inset, pz = bf.z + dz / inset;
+        pos.setXYZ(j, px, topHeight(berry, px, pz) - 0.45, pz);
+      }
+      leaf.computeVertexNormals();
+      dry(paint(leaf, "#2fa83a"));
     }
-    dry(paint(new THREE.CylinderGeometry(0.9, 1.2, 7, 6).rotateZ(0.5).translate(ex + 1, ey + 3, ez), "#3c9a2e"));
+    dry(paint(new THREE.CylinderGeometry(0.9, 1.2, 7, 6).rotateZ(0.5).translate(ex + 1, ey - 3.5, ez), "#3c9a2e"));
   }
   // Seeds on the whole strawberry, following its surface.
   const seeds: THREE.Matrix4[] = [];
@@ -720,10 +733,10 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
     for (let i = 0; i < 70; i++) {
       const a = rnd.range(0, Math.PI * 2);
       const r = Math.sqrt(rnd.next()) * p.r * 1.3;
-      grains.push(mat4({ x: p.x + Math.cos(a) * r, y: 0.3, z: p.z + Math.sin(a) * r }, new THREE.Euler(rnd.range(0, 3), rnd.range(0, 3), rnd.range(0, 3)), { x: 1, y: 1, z: 1 }));
+      grains.push(mat4({ x: p.x + Math.cos(a) * r, y: 0.175, z: p.z + Math.sin(a) * r }, new THREE.Euler(rnd.range(0, 3), rnd.range(0, 3), rnd.range(0, 3)), { x: 1, y: 1, z: 1 }));
     }
   }
-  const grainMesh = new THREE.InstancedMesh(paint(new THREE.BoxGeometry(0.6, 0.6, 0.6), "#ffffff"), glossy, grains.length);
+  const grainMesh = new THREE.InstancedMesh(paint(new THREE.BoxGeometry(0.35, 0.35, 0.35), "#ffffff"), glossy, grains.length);
   grains.forEach((m, i) => grainMesh.setMatrixAt(i, m));
   grainMesh.computeBoundingSphere();
   freeze(grainMesh);
