@@ -82,3 +82,29 @@ Key: N6 = incumbent; H9 = second candidate. Orders H9/N6, N6/H9, H9/N6; relative
 The relative-weakness reviewer preferred H9's scale cues on the sill but preferred N6 in the lab, citing waxy-looking food and broad oval shadows. Retained on the scoring panel's paired means and majority ranking, with that dissent recorded for the next iteration. This is a small result, particularly in the lab, not a decisive gain.
 
 The isolated H9 build sweep measured 71.5 / 83.7 ms, so construction was checked by alternating original and candidate builds in the same browser, 12 warm samples each. Median original/candidate: sill 40.6 / 40.1 ms; lab 48.05 / 48.0 ms. Both satisfy the 20% limit. Original decoration was restored during each original measurement. Every screenshot's draw count remains unchanged; browser/shader errors are empty.
+
+## Validation
+
+- Full `npm test`: main suite 732 passed, 2 skipped, no failures. Serialized budgets: 3 passed, 1 failed. The unchanged brain budget reported 0.545 M5 Pro CPU seconds per simulated second against 0.5; targeted retry reported 0.560. `packages/brain` and `scripts/cpuBudget.ts` have no diff from the base branch. This remains a validation failure, not a scene regression claim or a reason to change unrelated code.
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `node apps/web/e2e/play.e2e.ts`: passed, including X-ray, place transfers and weather. Peak 91 calls / 350,949 triangles across the entire test, which also visits unrelated places; the experiment's per-view comparisons remain the scene cost evidence.
+- Targeted `apps/web/tests/places.test.ts`: 21 passed on each retained iteration so far.
+- All rendered evidence sets have empty browser/shader error logs.
+
+### Round 3 — split selection
+
+Key: H9 = incumbent; P5 = identical H9 decoy; V3 = smaller, fewer nearby grains, a smaller windowsill canopy and brighter lab lamp lining/bulb. Orders P5/V3/H9, V3/H9/P5, H9/P5/V3; relative-weakness review V3/H9. Fresh reviewers use high effort under the updated shared rule.
+
+| Review | Place | H9 = P5 scores | Mean | V3 scores | Mean | Preference |
+| --- | --- | --- | ---: | --- | ---: | --- |
+| R1 | Sill | 7,7,7.5,8,8,7,6.5 | 7.29 | 7,7,7.5,7.5,7.5,7,6.5 | 7.14 | H9 |
+| R1 | Lab | 7,7,6.5,8,7.5,5.5,6 | 6.79 | 7,7.5,6.5,7.5,7.5,5.5,6.5 | 6.86 | V3 |
+| R2 | Sill | 7,7,7,7,8,7.5,7 | 7.21 | 7,7,7,6.5,7.5,7.5,7 | 7.07 | H9 |
+| R2 | Lab | 7,7.5,6,6.5,7,5.5,6 | 6.50 | 7,7.5,6.5,7,7.5,5.5,7 | 6.86 | V3 |
+| R3 | Sill | 7,7,7,6.5,7.5,7,7 | 7.00 | 7.5,7,7,7.5,7.5,6.5,6.5 | 7.07 | V3 |
+| R3 | Lab | 7,6.5,6.5,6.5,7.5,5.5,7 | 6.64 | 7.5,6.5,6.5,7.5,7.5,5.5,6.5 | 6.86 | V3 |
+| **Panel** | **Sill** | | **7.17** | | **7.10** | **2/3 H9** |
+| **Panel** | **Lab** | | **6.64** | | **6.86** | **3/3 V3** |
+
+Reverted the windowsill's entire third candidate: the reduced debris weakened scale, while exposed canopy fragments looked detached. Retained the lab changes: more convincing light-source motivation and fewer waxy foreground mounds. Decoy differences were zero. M7 is the selected combination: H9 windowsill evidence and V3 lab evidence; the places are independent builds. No draw-call increase, no shader/browser errors.

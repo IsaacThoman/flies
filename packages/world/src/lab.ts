@@ -155,7 +155,7 @@ export const LAB_DECOR = {
     { x: 46, z: -18, r: 16, count: 50 },
     { x: 100, z: -32, r: 9, count: 16 },
     { x: 26, z: 8, r: 8, count: 14 },
-    { x: 16, z: 31, r: 4, count: 8 },
+    { x: 16, z: 31, r: 4, count: 4, scale: 0.6 },
   ],
 };
 

@@ -417,10 +417,10 @@ export function buildBench(): SceneSet {
     // Drawn from the mouth up, its faces turn outward; the lining, drawn down, faces in.
     big.add(surface, piece(new THREE.LatheGeometry([...bell].reverse(), 40), green, ENAMEL), turn);
     const inner = bell.map((v) => new THREE.Vector2(v.x - 0.8, v.y));
-    fine.add(surface, piece(new THREE.LatheGeometry(inner, 40), "#f4efe4", { rough: 0.6, glow: 0.18 }), turn);
+    fine.add(surface, piece(new THREE.LatheGeometry(inner, 40), "#f4efe4", { rough: 0.6, glow: 0.85 }), turn);
     fine.add(surface, piece(new THREE.TorusGeometry(50.2, 1.6, 6, 40).rotateX(Math.PI / 2).translate(0, -78, 0), green, ENAMEL), turn);
     // The bulb, which glows when the lamp is on.
-    fine.add(surface, piece(new THREE.SphereGeometry(15, 20, 14).translate(0, -34, 0), "#fff1d6", { rough: 0.3, glow: 2.2 }), turn);
+    fine.add(surface, piece(new THREE.SphereGeometry(15, 20, 14).translate(0, -34, 0), "#fff1d6", { rough: 0.3, glow: 3.2 }), turn);
     spot.position.copy(back).addScaledVector(axis, 34);
     spot.target.position.set(SHADE.aim.x, SHADE.aim.y, SHADE.aim.z);
     // The eyes' cameras see by it too.
@@ -726,7 +726,7 @@ export function buildBench(): SceneSet {
     for (let i = 0; i < cluster.count; i++) {
       const a = rnd.range(0, Math.PI * 2);
       const r = Math.sqrt(rnd.next()) * cluster.r;
-      const size = rnd.range(0.12, 0.34);
+      const size = rnd.range(0.12, 0.34) * (cluster.scale ?? 1);
       const x = cluster.x + Math.cos(a) * r;
       const z = cluster.z + Math.sin(a) * r;
       specks.push({ m: new THREE.Matrix4().compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd.range(0, 3), rnd.range(0, 6), rnd.range(0, 3))), new THREE.Vector3(size, size * 0.7, size * rnd.range(0.8, 1.3))), c: new THREE.Color(rnd.next() < 0.3 ? "#9a6a2a" : "#e2b45c") });
