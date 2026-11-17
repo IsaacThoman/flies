@@ -112,7 +112,8 @@ export function brain(): Plugin {
   const info = (file: Built | null): BrainFile | null => file && { bytes: file.bytes, parts: file.parts };
   return {
     name: "fly-brain",
-    config() {
+    config(_config, { command }) {
+      if (command === "build" && !fs.existsSync(CONNECTOME)) throw new Error("connectome.bin is missing: npm run brain:fetch before building");
       const connectome = brainFile();
       const module = moduleFile();
       const anatomy = anatomyFile();

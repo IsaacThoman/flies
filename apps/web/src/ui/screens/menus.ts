@@ -71,6 +71,7 @@ const CAMERA: Option<Settings["wallpaperCamera"]>[] = [
   { value: "follow", label: "Follow" },
   { value: "calm", label: "Calm" },
   { value: "lively", label: "Lively" },
+  { value: "whole", label: "Whole place" },
 ];
 const EYES: Option<EyesDetail>[] = [
   { value: "off", label: "Off" },

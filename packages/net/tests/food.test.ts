@@ -98,3 +98,50 @@ test("in the restaurant the room's food lies at its heights, and is eaten only f
   const [id, kind, name, fx, fz, r, sweet, amount, pool] = toWire(sugar);
   assert.equal(fromWire(room, [id, kind, name, fx, fz, r, sweet, amount, pool]).y, room.heightAt(fx, fz));
 });
+
+test("clearing dropped food is owned by the room, preserves patches and finds, and reaches every mirror", () => {
+  const table = new TableFood(world, PATCHES);
+  const patchIds = table.foods.map((f) => f.id);
+  const found = table.found(900_000_001, "crumb", 0, 0, 1, 0.5)!;
+  const mine = table.drop(1, DROP_ID + 1, "honey", 0, 0)!;
+  const theirs = table.drop(2, 2 * DROP_ID + 1, "water", 0, 0)!;
+  const pantry = new Pantry(world);
+  const mirror = new FoodMirror(world, pantry);
+  mirror.welcome(table.foods.map(toWire));
+  table.clearDropped(0);
+  assert.ok(table.find(mine.id) && table.find(theirs.id), "invalid owner clears nothing");
+  table.clearDropped(1);
+  assert.equal(table.find(mine.id), null);
+  assert.ok(table.find(theirs.id));
+  assert.ok(table.find(found.id));
+  for (const id of patchIds) assert.ok(table.find(id));
+  const change = table.flush()!;
+  assert.deepEqual(change.gone, [mine.id]);
+  mirror.apply(0, change.amounts, change.gone, undefined);
+  assert.deepEqual(pantry.foods.map((f) => f.id), table.foods.map((f) => f.id));
+  table.clearDropped(1);
+  assert.equal(table.flush(), null, "a repeated clear makes no changes");
+});
+
+test("refused and trimmed bites reconcile quantities and drain predictions", () => {
+  for (const reason of ["far", "greedy", "unknown", "trimmed"] as const) {
+    const table = new TableFood(world, []);
+    const food = table.drop(1, DROP_ID + 1, "sugar", 20, 20)!;
+    if (reason === "trimmed") food.amount = 0.05;
+    const pantry = new Pantry(world);
+    const mirror = new FoodMirror(world, pantry);
+    mirror.welcome(table.foods.map(toWire));
+    const mine = pantry.foods[0];
+    const amount = reason === "greedy" ? 0.8 : 0.1;
+    mine.amount = Math.max(0, mine.amount - amount);
+    mirror.ate(mine, amount);
+    mirror.sent(1);
+    if (reason === "unknown") table.restore([]);
+    table.bite(1, mine.id, amount, reason === "far" ? 100 : 20, mine.y, 20, 0);
+    const change = table.flush();
+    assert.ok(change, `${reason}: an acknowledgement must be sent even with no food changed`);
+    mirror.apply(1, change.amounts, change.gone, table.eaten.get(1) ?? 0, table.takeMeal(1));
+    assert.ok(Math.abs((pantry.foods[0]?.amount ?? 0) - (table.find(mine.id)?.amount ?? 0)) <= 1e-4, reason);
+    assert.equal(mirror.pending, 0);
+  }
+});

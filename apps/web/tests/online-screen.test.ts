@@ -9,6 +9,7 @@ import { CLOSE, MAX_PLAYERS, PROTOCOL } from "@fly/net";
 import type { RoomWire } from "@fly/net";
 import { HitMap } from "@fly/ui";
 import type { ActionItem, FieldItem } from "@fly/ui";
+import { Pointers } from "../src/input.ts";
 import { TV_FRAME } from "../src/display.ts";
 import { Lobby } from "../src/online/lobby.ts";
 import { suggestName } from "../src/online/invite.ts";
@@ -59,7 +60,7 @@ const ROOMS: RoomWire[] = [
 function world(canShare = true) {
   const typing = new FakeTyping();
   const did: string[] = [];
-  const state = { rooms: null as RoomWire[] | null, table: null as TableNow | null, knock: null as Knock | null, ended: null as Shell["tableEnded"], started: null as NewRoom | null };
+  const state = { lobbyStatus: "connecting" as Lobby["status"], rooms: null as RoomWire[] | null, table: null as TableNow | null, knock: null as Knock | null, ended: null as Shell["tableEnded"], started: null as NewRoom | null };
   const shell: Shell = {
     settings: { ...DEFAULT_SETTINGS },
     brain: { status: "running" } as unknown as Shell["brain"],
@@ -92,6 +93,7 @@ function world(canShare = true) {
       return state.rooms;
     },
     typing,
+    get lobbyStatus() { return state.lobbyStatus; },
     canShare,
     startRoom(room) {
       state.started = room;
@@ -351,7 +353,7 @@ test("the lobby asks to browse once open, takes each list it is told (only well-
   sockets[0].status = "closed";
   sockets[0].closeCode = 1006;
   lobby.update(0.016);
-  assert.equal(lobby.status, "lost");
+  assert.equal(lobby.status, "stale");
   assert.deepEqual(lobby.rooms, [ROOMS[0]], "the last list it had, until it hears again");
   lobby.update(1);
   assert.equal(sockets.length, 2, "again");
@@ -359,4 +361,157 @@ test("the lobby asks to browse once open, takes each list it is told (only well-
   sockets[1].closeCode = CLOSE.version;
   lobby.update(0.016);
   assert.equal(lobby.status, "version", "a newer room server: the page reloads");
+});
+
+test("room refreshes never turn a drawn room or removal into a different action", () => {
+  for (const action of ["join", "remove"] as const) {
+    for (const change of ["insert", "remove", "reorder"] as const) {
+      for (const timing of ["before down", "while held"] as const) {
+        for (const redraw of [false, true]) {
+          const { screen, state, step, did } = world();
+          const rooms = [ROOMS[0], { ...ROOMS[1], locked: false }];
+          const others = [{ id: 2, colour: "red" }, { id: 3, colour: "blue" }];
+          if (action === "join") state.rooms = rooms;
+          else state.table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, others };
+          step();
+          const index = screen.menu.items.findIndex((item) => action === "join" ? item.id === `room:${ROOMS[0].code}` : item.id.startsWith("remove:2:"));
+          const hits = new HitMap();
+          const draw = () => { hits.begin("online"); screen.draw(blankCanvas(), 0, hits); };
+          draw();
+          const drawn = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).find((hit) => hit.kind === "row" && hit.index === index)!;
+          assert.ok(drawn);
+          const hit = { ...drawn };
+          const point = (type: "down" | "up") => screen.point({ type, x: hit.x + hit.w / 2, y: hit.y + hit.h / 2, dx: 0, dy: 0, tap: true, hit });
+          if (timing === "while held") point("down");
+          if (action === "join") {
+            state.rooms = change === "insert" ? [ROOMS[2], ...rooms] : change === "remove" ? rooms.slice(1) : [...rooms].reverse();
+          } else {
+            state.table = { ...state.table!, others: change === "insert" ? [{ id: 4, colour: "green" }, ...others] : change === "remove" ? others.slice(1) : [...others].reverse() };
+          }
+          step();
+          if (redraw) draw();
+          if (timing === "before down") point("down");
+          point("up");
+          assert.deepEqual(did, [], `${action}: ${change}, ${timing}, redraw ${redraw}`);
+        }
+      }
+    }
+  }
+});
+
+test("a room tap must release on its pressed action, while an unchanged drawn room still joins", () => {
+  const { screen, state, step, did } = world();
+  state.rooms = [ROOMS[0], { ...ROOMS[1], locked: false }];
+  step();
+  const hits = new HitMap();
+  hits.begin("online");
+  screen.draw(blankCanvas(), 0, hits);
+  const rows = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).filter((hit) => hit.kind === "row" && screen.menu.items[hit.index].id.startsWith("room:"));
+  const point = (type: "down" | "up", hit: (typeof rows)[number]) => screen.point({ type, hit, x: hit.x + hit.w / 2, y: hit.y + hit.h / 2, dx: 0, dy: 0, tap: true });
+  point("down", rows[0]);
+  point("up", rows[1]);
+  assert.deepEqual(did, []);
+  point("down", rows[0]);
+  point("up", rows[0]);
+  assert.deepEqual(did, [`join ${ROOMS[0].code}`]);
+});
+
+test("a departed player's reused seat cannot inherit its drawn removal target", () => {
+  for (const held of [false, true]) {
+    const { screen, state, step, did } = world();
+    const table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, others: [{ id: 2, colour: "red" }] };
+    state.table = table;
+    step();
+    const hits = new HitMap();
+    hits.begin("online");
+    screen.draw(blankCanvas(), 0, hits);
+    const drawn = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).find((hit) => hit.kind === "row" && screen.menu.items[hit.index].id.startsWith("remove:"))!;
+    const hit = { ...drawn };
+    const point = (type: "down" | "up") => screen.point({ type, hit, x: hit.x, y: hit.y, dx: 0, dy: 0, tap: true });
+    if (held) point("down");
+    state.table = { ...table, others: [{ id: 2, colour: "red" }] };
+    step();
+    if (!held) point("down");
+    point("up");
+    assert.deepEqual(did, [], `seat reused ${held ? "while held" : "before press"}`);
+  }
+});
+
+
+test("pointer release uses the redrawn target and cancels a changed room", () => {
+  const { screen, state, step, did } = world();
+  state.rooms = [ROOMS[0], { ...ROOMS[1], locked: false }];
+  step();
+  const hits = new HitMap();
+  const draw = () => { hits.begin("online"); screen.draw(blankCanvas(), 0, hits); };
+  draw();
+  const row = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).find((hit) => hit.kind === "row" && screen.menu.items[hit.index].id === `room:${ROOMS[0].code}`)!;
+  const x = row.x + row.w / 2, y = row.y + row.h / 2;
+  const pointers = new Pointers(() => ({ left: 0, top: 0, width: TV_FRAME.design.width, height: TV_FRAME.design.height }));
+  const event = { pointerId: 1, pointerType: "mouse", clientX: x, clientY: y, button: 0, buttons: 1 };
+  const send = () => {
+    for (const gesture of pointers.gestures) {
+      if (gesture.type !== "down" && gesture.type !== "up") continue;
+      const hit = hits.at(gesture.x * TV_FRAME.design.width, gesture.y * TV_FRAME.design.height);
+      screen.point({ type: gesture.type, x, y, hit, tap: gesture.type === "up" && gesture.tap, dx: 0, dy: 0 });
+    }
+    pointers.endFrame();
+  };
+  pointers.down(event);
+  send();
+  // Change this menu in place so its held press survives the redraw.
+  const items = screen.menu.items;
+  [items[row.index], items[row.index + 1]] = [items[row.index + 1], items[row.index]];
+  draw();
+  pointers.up({ ...event, buttons: 0 }, false);
+  send();
+  assert.deepEqual(did, []);
+});
+
+test("room discovery failures replace searching, stale choices are disabled, and recovery clears the message", () => {
+  const { screen, state, step, press, did } = world();
+  state.lobbyStatus = "lost";
+  step();
+  assert.equal(screen.menu.items.at(-1)?.label, "Can't reach rooms");
+  state.rooms = ROOMS;
+  state.lobbyStatus = "stale";
+  step();
+  assert.equal(screen.menu.items[2].label, "Reconnecting…");
+  assert.ok(screen.menu.items.slice(3).every((item) => item.disabled));
+  state.lobbyStatus = "version";
+  step();
+  const g = blankCanvas(); screen.draw(g, 0, new HitMap());
+  assert.equal(writtenOn(g).filter((w) => w.text === "Update needed").length, 1);
+  assert.ok(screen.menu.items.every((item) => item.disabled));
+  state.lobbyStatus = "open";
+  step();
+  assert.ok(!screen.menu.items.some((item) => item.id === "unavailable"));
+  assert.equal(screen.menu.items[2].disabled, false);
+  press("back");
+  assert.deepEqual(did, ["back"], "solo remains reachable");
+});
+
+test("a version mismatch disables forms already open and says an update is needed", () => {
+  const { screen, state, step, press, focus, did } = world();
+  focus("new"); press("select");
+  state.lobbyStatus = "version"; step();
+  assert.equal(screen.menu.items.find((i) => i.id === "create")?.disabled, true);
+  const g = blankCanvas(); screen.draw(g, 0, new HitMap());
+  assert.ok(writtenOn(g).some((w) => w.text === "Update needed"));
+  press("select"); assert.deepEqual(did, []);
+  press("back"); press("back"); assert.deepEqual(did, ["back"]);
+  state.knock = { code: "bbbbbbbbbb", name: "Secret Sugar", wrong: false, seq: 1 }; step();
+  assert.equal(screen.menu.items.find((i) => i.id === "join")?.disabled, true);
+});
+
+test("an invitation's version failure clears when compatible discovery recovers", () => {
+  const { screen, state, step, press, focus } = world();
+  state.ended = "version"; step();
+  assert.equal(screen.note, "version");
+  assert.equal(screen.menu.items[0].disabled, true);
+  state.lobbyStatus = "open"; state.rooms = []; step();
+  assert.equal(screen.note, "");
+  assert.equal(screen.menu.items[0].disabled, false);
+  focus("new"); press("select");
+  assert.equal(screen.menu.items.find((item) => item.id === "create")?.disabled, false);
 });

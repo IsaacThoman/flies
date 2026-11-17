@@ -166,7 +166,10 @@ must see each visitor's own. Caddy believes `X-Forwarded-For` only from
 ranges: `private_ranges` unless set). It reads the header from the right, so
 a visitor cannot claim another address, and hands the rooms service just the
 visitor's. Without the right setting, every visitor counts as the proxy, and
-one person's guesses lock everyone out.
+one person's guesses lock everyone out. The rooms service in turn believes
+the header only from a loopback or private address, Caddy's on the stack's
+own network, and takes its last entry, so nothing that reaches it directly
+can choose what it is counted as.
 
 - **Coolify**: Traefik reaches `web` over a Docker network, inside
   `private_ranges`, and replaces any `X-Forwarded-For` a visitor sends with

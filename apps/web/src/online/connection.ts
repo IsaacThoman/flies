@@ -7,7 +7,7 @@
 // away (removed from the table, the table gone, the protocol changed) ends it.
 
 import type { OpenTableSocket, TableSocket } from "@fly/contracts";
-import { CLOSE, FLIES, FLY_MAX, MAX_BITES, RoomClock, bitesLength, encodeBites, encodeFly } from "@fly/net";
+import { BITES_MAX, CLOSE, FLIES, FLY_MAX, RoomClock, encodeBites, encodeFly, readServerMessage } from "@fly/net";
 import type { Bite, ClientMessage, FlyState, Refusal, ServerMessage, WireScale } from "@fly/net";
 
 /** The clock is asked often at first, to settle quickly, then once a second. */
@@ -46,7 +46,7 @@ export class TableLine {
   readonly #fly = new DataView<ArrayBuffer>(new ArrayBuffer(FLY_MAX));
   /** One view per length a fly's state can be, so sending one makes nothing new. */
   readonly #flyViews = new Map<number, Uint8Array<ArrayBuffer>>();
-  readonly #bites = new DataView<ArrayBuffer>(new ArrayBuffer(bitesLength(MAX_BITES)));
+  readonly #bites = new DataView<ArrayBuffer>(new ArrayBuffer(BITES_MAX));
   #pings = 0;
   #pingAt = -Infinity;
   #helloAt = 0;
@@ -83,12 +83,8 @@ export class TableLine {
 
   #receiveText(text: string) {
     this.bytesIn += text.length;
-    let message: ServerMessage;
-    try {
-      message = JSON.parse(text) as ServerMessage;
-    } catch {
-      return;
-    }
+    const message = readServerMessage(text);
+    if (!message) return;
     if (message.type === "pong") this.clock.sample(message.t, message.now, performance.now());
     else if (message.type === "welcome") {
       this.status = "joined";
@@ -126,9 +122,10 @@ export class TableLine {
     this.#socket.send(view);
   }
 
-  sendBites(seq: number, bites: readonly Bite[], count: number) {
+  /** Sends bites taken in the place of `epoch`, which the room drops if it has since moved. */
+  sendBites(seq: number, bites: readonly Bite[], count: number, epoch: number) {
     if (this.status !== "joined" || !this.#socket || count === 0) return;
-    const n = encodeBites(this.#bites, seq, bites, count);
+    const n = encodeBites(this.#bites, seq, bites, count, epoch);
     this.bytesOut += n;
     this.#socket.send(new Uint8Array(this.#bites.buffer, 0, n));
   }
