@@ -47,6 +47,8 @@ export class Photographer {
   #done: ((picture: Picture | null) => void) | null = null;
   /** Encoding time spent, ms, for the frame stats and the budgets. */
   costMs = 0;
+  /** Pictures taken from the frame: each one copy of it and one draw, on that frame alone. */
+  shots = 0;
 
   constructor(quality: number) {
     this.#encoder = new JpegEncoder(quality);
@@ -86,6 +88,7 @@ export class Photographer {
     if (this.#pixels.length !== w * h * 4) this.#pixels = new Uint8Array(w * h * 4);
     this.#w = w;
     this.#h = h;
+    this.shots++;
     renderer.copyFramebufferToTexture(copy);
     this.#material.uniforms.frame.value = copy;
     // Made no smaller, a picture is the frame as it is.

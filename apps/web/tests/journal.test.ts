@@ -297,6 +297,50 @@ test("pictures take the screen's shape, at the host's size", () => {
 const yes = () => true;
 const no = () => false;
 
+/** A renderer that counts what the journal asks of the GPU, and reads back at once. */
+function countingRenderer() {
+  const gpu = { copies: 0, draws: 0, reads: 0 };
+  let target: unknown = null;
+  const renderer = {
+    copyFramebufferToTexture: () => void gpu.copies++,
+    render: () => void gpu.draws++,
+    getRenderTarget: () => target,
+    setRenderTarget: (t: unknown) => void (target = t),
+    readRenderTargetPixelsAsync: () => (gpu.reads++, Promise.resolve()),
+  };
+  return { gpu, renderer: renderer as unknown as Parameters<Photos["shoot"]>[0] };
+}
+
+test("a first waiting for a frame that shows the fly costs the GPU nothing; it is taken once, one copy and one draw, on that frame alone", async () => {
+  const photos = new Photos(Promise.resolve({ shelf: memoryShelf(), keeping: SMALL }), "fly");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const { gpu, renderer } = countingRenderer();
+  let shows = false;
+  let asked = 0;
+  const good = () => (asked++, shows);
+  const frame = (time: number) => {
+    if (photos.wants(time, good)) photos.shoot(renderer, 640, 480, 16 / 9, time, "picnic");
+    photos.update(1 / 60);
+  };
+  photos.arrived("picnic", "Picnic table", 0);
+  // Before it is due, nothing is even asked of the frame.
+  for (let f = 0; f < 120; f++) frame(f / 60);
+  assert.equal(asked, 0);
+  // Due, waiting for the fly to be in the picture: asked each frame (on the CPU), drawn nothing.
+  for (let f = 0; f < 300; f++) frame(3 + f / 60);
+  assert.ok(asked > 200);
+  assert.deepEqual(gpu, { copies: 0, draws: 0, reads: 0 });
+  shows = true;
+  for (let f = 0; f < 600; f++) {
+    frame(8 + f / 60);
+    await Promise.resolve();
+  }
+  assert.deepEqual(gpu, { copies: 1, draws: 1, reads: 1 }, "one picture, taken once");
+  assert.equal(photos.shots, 1);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(photos.journal!.entries.map((e) => [e.key, e.size > 0]), [["place:picnic", true]]);
+});
+
 test("the player's photo is taken from the next frame, whatever it shows; a first's only from one that shows the fly, or kept bare in time", async () => {
   const photos = new Photos(Promise.resolve({ shelf: memoryShelf(), keeping: SMALL }), "fly");
   assert.equal(photos.snap(), false, "not before the journal is open");

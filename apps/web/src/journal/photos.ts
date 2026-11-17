@@ -138,6 +138,11 @@ export class Photos {
     this.#photographer?.update();
   }
 
+  /** Pictures taken from frames so far: the only frames the journal draws anything in. */
+  get shots() {
+    return this.#photographer?.shots ?? 0;
+  }
+
   /** Encoding time spent so far, ms. */
   get costMs() {
     return this.#photographer?.costMs ?? 0;

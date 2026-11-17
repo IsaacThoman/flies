@@ -111,6 +111,9 @@ try {
   await waitFor(page, "screen=journal,journalOpen=");
 
   step("after a reload, everything is still there, pictures and all");
+  // Each picture was one frame's copy: none taken again, none taken while a first waited for the fly to be in view.
+  const state = await readState(page);
+  assert.equal(state.photosShots, state.pictures, "a frame copied for each picture, and no more");
   const before = await journal(page);
   await page.reload();
   await gameUp(page);

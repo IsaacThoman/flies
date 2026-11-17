@@ -86,8 +86,9 @@ The settings, the shelf's kept choices, what the hints have taught and what has 
 from a save made by another build, or a broken one, only what this build can use is kept.
 The followed fly's journal is in IndexedDB, or `localStorage` where there is none, under
 its record's id (`apps/web/src/journal/store.ts`), never in the record itself; the canvas
-says what it holds (`data-journal`, each entry's first, or `photo`, with `+` for a picture)
-and whether a picture is being taken (`data-photos`).
+says what it holds (`data-journal`, each entry's first, or `photo`, with `+` for a picture),
+whether a picture is being taken (`data-photos`), and how many frames have been
+copied for one (`data-photos-shots`): the only frames the journal draws anything in.
 
 <!-- docs-check: base apps/web/src -->
 

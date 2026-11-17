@@ -2326,6 +2326,7 @@ export class Game implements Shell {
     // The journal: whether it is open and taking a picture, and its entries, oldest first, each a first's key (or "photo"), "+" with a picture.
     d.photos = this.photos.state;
     d.photosMs = this.photos.costMs.toFixed(1);
+    d.photosShots = String(this.photos.shots);
     const journal = this.photos.journal;
     if (journal && journal.changes !== this.#journalSeen) {
       this.#journalSeen = journal.changes;
