@@ -11,8 +11,8 @@
 //     (EAT_RATE, its taste fading as it runs out): how long the fly feeds
 //     before it stops of its own accord, and how much it eats, at a fixed
 //     hunger and with hunger falling as it eats (@fly/body's Hunger);
-// (d) what resetting the sweet neurons' output gain costs, which a tick does
-//     whenever hunger has changed.
+// (d) what slow neuromodulation's update costs, every chunk, and resetting the
+//     sweet neurons' release, which it does whenever hunger has changed.
 //
 // Resting behaviour at a hunger is report.ts's section (c) with --hunger.
 // Runs are deterministic for a seed. It takes about five minutes.
@@ -125,16 +125,21 @@ for (const fixed of [true, false]) {
 }
 
 // (d)
-console.log("\n(d) Cost: resetting the sweet neurons' output gain, as a tick does whenever hunger has changed (every frame in the game).");
+console.log("\n(d) Cost: slow neuromodulation's update, which runs every chunk (every 10 ms of fly time), and resetting the sweet neurons' release, which it does whenever hunger has changed (every frame in the game).");
 {
   const b = rested(1, 1);
-  const name = b.wiring.senses.find((group) => group.spec.sense === "sweet")!.spec.name;
   const calls = 100_000;
-  const times: number[] = [];
-  for (let k = 0; k < 3; k++) {
-    const started = performance.now();
-    for (let i = 0; i < calls; i++) b.sim.setOutputGain(name, 0.75 + (i % 2) * 0.2);
-    times.push(((performance.now() - started) / calls) * 1000);
-  }
-  console.log(`    ${times.map((t) => t.toFixed(2)).join(", ")} µs a time (three runs of ${calls.toLocaleString("en-US")})`);
+  const time = (each: (i: number) => void) => {
+    const times: number[] = [];
+    for (let k = 0; k < 3; k++) {
+      const started = performance.now();
+      for (let i = 0; i < calls; i++) each(i);
+      times.push(((performance.now() - started) / calls) * 1000);
+    }
+    return `${times.map((t) => t.toFixed(2)).join(", ")} µs a time (three runs of ${calls.toLocaleString("en-US")})`;
+  };
+  console.log(`    update: ${time(() => b.modulation.update(10))}`);
+  const route = b.modulation.routes.find((r) => r.spec.receptor === "DopEcR")!;
+  const factors = [new Float64Array(route.carriers.length).fill(0.75), new Float64Array(route.carriers.length).fill(0.95)];
+  console.log(`    release: ${time((i) => b.sim.setOutputGains("release DopEcR", factors[i % 2]))}`);
 }

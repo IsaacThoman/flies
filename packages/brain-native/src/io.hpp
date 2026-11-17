@@ -81,6 +81,10 @@ struct StateSpec {
   StateKey state;
 };
 
+struct ExcitabilityGroup { StateKey state; double mv; std::vector<uint32_t> neurons; };
+
+bool dfb_sleep(std::string_view type);
+
 struct ReadoutSpec {
   /** Name in the tick's rates. */
   std::string name;
@@ -120,6 +124,7 @@ struct Wiring {
   std::vector<Group> background;
   /** The internal-state inputs this connectome has neurons for. */
   std::vector<StateGroup> state;
+  std::vector<ExcitabilityGroup> excitability;
   std::vector<ReadoutGroup> readouts;
 };
 
@@ -131,9 +136,6 @@ double intensity(const Senses& senses, Sense sense);
 
 /** How hungry the senses say it is, 0..1: 1 (as it was before hunger) when not a number (io.ts's hungerOf). */
 double hunger_of(const Senses& senses);
-
-/** The sweet taste neurons' output gain at this hunger (io.ts's sweetOutputGain and HUNGER, which say why). */
-double sweet_output_gain(double hunger);
 
 /** How thirsty the senses say it is, 0..1: 1 (as it was before thirst) when not a number (io.ts's thirstOf). */
 double thirst_of(const Senses& senses);
