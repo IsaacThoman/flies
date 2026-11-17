@@ -104,7 +104,9 @@ export class Remote {
     const button = REMOTE_KEYS[event.key];
     if (!button) return;
     event.preventDefault?.();
-    this.button(button, down, !!event.repeat, this.#keys, `key:${event.code || event.key}`);
+    const source = `key:${event.code || event.key}`;
+    if (down && event.repeat && !this.#sources.get(button)?.has(source)) return;
+    this.button(button, down, !!event.repeat, this.#keys, source);
   }
 
   /** A button going down or up: the remote's, a key's, or a pad's. Letting go is not doing something new: only a press says which device is in hand. */
@@ -445,7 +447,7 @@ export class Keyboard {
   constructor(target: InputTarget, remote: Remote, devices: Devices, now: () => number = () => performance.now()) {
     target.addEventListener("keydown", (event) => {
       const e = event as KeyboardEvent;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || (e.repeat && !this.#held.has(e.code))) return;
       const action = keyAction(e.code, e.key);
       const axis = action ? null : keyAxis(e.code, e.key);
       if (!action && !axis) return;
@@ -530,6 +532,8 @@ export class Gamepads {
   /** The right stick was pressed in since the last frame. */
   handBack = false;
   #active = false;
+  #padIndex = -1;
+  #awaitingNeutral = false;
   readonly #pressed = new Map<number, boolean>();
   readonly #repeatAt = new Map<RemoteButton, number>();
   #stickHeld: RemoteButton | null = null;
@@ -545,13 +549,19 @@ export class Gamepads {
     target?.addEventListener("gamepadconnected", () => {
       this.#active = true;
     });
-    target?.addEventListener("gamepaddisconnected", () => this.#reset());
-    if (target) onInputLost(target, () => this.#reset());
+    target?.addEventListener("gamepaddisconnected", (event) => {
+      if ((event as GamepadEvent).gamepad?.index === this.#padIndex) this.#reset();
+    });
+    if (target) onInputLost(target, () => {
+      this.#reset();
+      this.#awaitingNeutral = true;
+    });
     if (!target) this.#active = true;
   }
 
   #reset() {
     this.#remote.release("pad");
+    this.#padIndex = -1;
     this.#pressed.clear();
     this.#repeatAt.clear();
     this.#stickHeld = null;
@@ -567,9 +577,20 @@ export class Gamepads {
     this.zoom = 0;
     this.handBack = false;
     if (!this.#active) return;
-    const pad = this.#pads().find((p) => p?.connected && p.mapping === "standard");
+    const available = this.#pads();
+    const index = available.findIndex((p) => p?.connected && p.mapping === "standard");
+    const pad = available[index];
     if (!pad) {
       this.#reset();
+      return;
+    }
+    if (index !== this.#padIndex) {
+      this.#reset();
+      this.#padIndex = index;
+    }
+    // A stale pressed snapshot after blur or keyboard takeover is not a fresh press.
+    if (this.#awaitingNeutral) {
+      if (!pad.buttons.some((b) => b.pressed || b.value > 0.08) && !pad.axes.some((a) => Math.abs(a) >= STICK_DEAD)) this.#awaitingNeutral = false;
       return;
     }
     const remote = this.#remote;
