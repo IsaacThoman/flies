@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mulberry32 } from "@fly/brain";
+import { FLY_HEIGHT } from "@fly/body";
 import { World } from "@fly/world";
 import { Life } from "../../apps/web/src/life.ts";
 import { InProcessBrain } from "./brain.ts";
@@ -75,7 +76,12 @@ export function fuzzLife(id: PlaceId, seed: number, duration: number, data: Arra
           life.stimuli.threat = loom.position;
         }
       }
-      life.stimuli.stroke = event === 2 && time < eventUntil ? 0.4 + random() * 0.6 : 0;
+      // A feather somewhere on it or near it, from above.
+      life.stimuli.contacts.clear();
+      if (event === 2 && time < eventUntil) {
+        const p = life.body.position;
+        life.stimuli.contacts.add(p.x + (random() * 2 - 1) * 3, p.y + FLY_HEIGHT, p.z + (random() * 2 - 1) * 3, 0.5 + random(), 0.4 + random() * 0.6);
+      }
       if (time >= eventUntil || event !== 3) Object.assign(life.stimuli.air, { x: 0, y: 0, z: 0 });
       if (event === 4 && time < eventUntil) {
         loom.position.z -= 80 * dt;

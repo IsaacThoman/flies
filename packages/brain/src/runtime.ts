@@ -6,7 +6,7 @@ import type { EyeColumn } from "./eye-columns.ts";
 import { buildEyes } from "./eyes.ts";
 import type { Eyes } from "./eyes.ts";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
-import { SLEEP_EYES, backgroundRates, decode, hungerOf, senseRates, smooth, stateOf, thirstOf, waterOutputGain, wire } from "./io.ts";
+import { SLEEP_EYES, backgroundRates, decode, hungerOf, regionRate, senseRates, smooth, stateOf, thirstOf, waterOutputGain, wire } from "./io.ts";
 import type { Wiring } from "./io.ts";
 import { Modulation } from "./modulation.ts";
 import { OPERATING_POINT, buildWeights } from "./params.ts";
@@ -19,6 +19,9 @@ import type { InternalStateParameters } from "./state.ts";
 import { RETINA, Retina, VISION_STAGES, stageName } from "./vision.ts";
 import type { RetinaParameters } from "./vision.ts";
 import type { Brain, BrainSenses, BrainState, EyeMap } from "./types.ts";
+
+/** A group of touch regions as the simulation drives it: each neuron's rate, and each region's. */
+type Regional = { group: Wiring["senses"][number]; rates: Float64Array; felt: Float64Array };
 
 export type BrainOptions = {
   /** Seeds the Poisson inputs and the internal state. Default 1. */
@@ -61,6 +64,8 @@ export class FlyBrain implements Brain {
   #counts: Record<string, number> = {};
   #vision: { name: string; size: number }[] = [];
   #regionSizes = new Uint32Array(REGIONS.length);
+  // The groups of touch regions, each one input of a rate per neuron, and each region's rate last set.
+  #regional: Regional[] = [];
   #regionCounts = new Uint32Array(REGIONS.length);
   // The output gain groups of the receptors that change release, by route.
   #release: { route: number; name: string }[] = [];
@@ -81,7 +86,14 @@ export class FlyBrain implements Brain {
     this.wiring = wire(connectome);
     const weights = buildWeights(connectome, point);
     this.sim = new Simulation(weights.network, { ...point.neuron, gain: weights.gain, seed });
-    for (const { spec, neurons } of this.wiring.senses) if (!spec.afterEyes) this.sim.addInput(spec.name, neurons);
+    for (const group of this.wiring.senses) {
+      if (group.spec.afterEyes) continue;
+      if (group.ends) {
+        // A rate for each region: one input still, so every later input's stream is where it was.
+        this.sim.addRatedInput(group.spec.name, group.neurons);
+        this.#regional.push({ group, rates: new Float64Array(group.neurons.length), felt: new Float64Array(group.ends.length) });
+      } else this.sim.addInput(group.spec.name, group.neurons);
+    }
     for (const { spec, neurons } of this.wiring.background) this.sim.addInput(spec.name, neurons);
     // Thirst scales how strongly the water neurons' spikes reach their targets (io.ts, THIRST).
     for (const { spec, neurons } of this.wiring.senses) {
@@ -164,6 +176,7 @@ export class FlyBrain implements Brain {
       }
     }
     for (const [name, rate] of senseRates(this.wiring, senses)) this.sim.setRate(name, rate);
+    for (const regional of this.#regional) this.#touch(regional, senses);
     const hunger = hungerOf(senses);
     this.modulation.setState(senses, hunger, stateOf);
     this.modulation.update(0);
@@ -250,6 +263,20 @@ export class FlyBrain implements Brain {
       this.thermoreceptors.step(side, temperature[side], ms, rates);
       for (const { spec } of this.wiring.thermo) if (spec.side === side) this.sim.setRate(spec.name, rates[spec.cell]);
     }
+  }
+
+  // Sets a group of regions' rates, where any region's has changed: setting them redraws the input's next spike, so only then.
+  #touch({ group, rates, felt }: Regional, senses: BrainSenses) {
+    const { ends, spec } = group;
+    let changed = false;
+    for (let r = 0; r < ends!.length; r++) {
+      const rate = regionRate(group, spec.regions![r], senses);
+      if (rate === felt[r]) continue;
+      felt[r] = rate;
+      changed = true;
+      rates.fill(rate, r === 0 ? 0 : ends![r - 1], ends![r]);
+    }
+    if (changed) this.sim.setRates(spec.name, rates);
   }
 
   // Hands what the receptors do now to the simulation: release factors and excitability.

@@ -112,6 +112,8 @@ export type BodyEvents = {
   landed: boolean;
   /** It hit something in the air this frame, with the speed it hit at (mm/s). */
   hit: number;
+  /** The way out of what it hit hardest this frame, a unit vector: it hit it with the side of its body facing the other way. */
+  readonly hitFrom: Vec3;
 };
 
 /** What the world does to the body this frame, besides the brain. */
@@ -157,7 +159,7 @@ export class FlyBody {
   readonly surface: Surface = createSurface();
   /** Pressed against something it is facing (its head is at a wall). */
   blocked = false;
-  readonly events: BodyEvents = { tookOff: false, jumped: false, landed: false, hit: 0 };
+  readonly events: BodyEvents = { tookOff: false, jumped: false, landed: false, hit: 0, hitFrom: { x: 0, y: 1, z: 0 } };
   /** Speed over the ground last frame, mm/s, along its heading (negative backing). */
   groundSpeed = 0;
   /** Its yaw rate last frame, rad/s. */
@@ -219,6 +221,16 @@ export class FlyBody {
     out.y = this.position.y + up * L;
     out.z = this.position.z + (c * ahead - s * left) * L;
     return out;
+  }
+
+  /** It hit something at `speed` (mm/s) whose way out is the unit vector (nx, ny, nz): kept if it is the hardest hit this frame. */
+  hitAgainst(speed: number, nx: number, ny: number, nz: number) {
+    const ev = this.events;
+    if (!(speed > ev.hit)) return;
+    ev.hit = speed;
+    ev.hitFrom.x = nx;
+    ev.hitFrom.y = ny;
+    ev.hitFrom.z = nz;
   }
 
   /** Puts the fly somewhere, standing on the surface there at or below `y` (the highest, if left out). */
@@ -493,7 +505,7 @@ export class FlyBody {
     if (into < 0) {
       v.x -= into * nx * 1.4;
       v.z -= into * nz * 1.4;
-      this.events.hit = Math.max(this.events.hit, -into);
+      this.hitAgainst(-into, nx, 0, nz);
       this.blocked ||= facing < -0.3;
     }
     return this.#slide(px, pz) ? MOVED : STUCK;
@@ -748,7 +760,7 @@ export class FlyBody {
           if (into < 0) {
             v.x -= into * hit.normal.x * 1.4;
             v.z -= into * hit.normal.z * 1.4;
-            this.events.hit = Math.max(this.events.hit, -into);
+            this.hitAgainst(-into, hit.normal.x, 0, hit.normal.z);
             this.blocked = fx * hit.normal.x + fz * hit.normal.z < -0.3;
           }
         } else if (hit.normal.y < 0) {
@@ -756,7 +768,7 @@ export class FlyBody {
           // the rest of the way unless something stands in that way.
           const y = solidBottom(world.solids[hit.solid]) - FLY_HEIGHT;
           if (v.y > 0) {
-            this.events.hit = Math.max(this.events.hit, v.y);
+            this.hitAgainst(v.y, 0, -1, 0);
             v.y *= -0.4;
           }
           const hx = hit.point.x;
@@ -777,7 +789,7 @@ export class FlyBody {
               if (stop.normal.y === 0 && into < 0) {
                 v.x -= into * stop.normal.x * 1.4;
                 v.z -= into * stop.normal.z * 1.4;
-                this.events.hit = Math.max(this.events.hit, -into);
+                this.hitAgainst(-into, stop.normal.x, 0, stop.normal.z);
               }
             }
           }
@@ -807,7 +819,7 @@ export class FlyBody {
         return;
       }
       if (under.normal.y >= MAX_SLOPE_COS) {
-        this.events.hit = Math.max(this.events.hit, -v.y);
+        this.hitAgainst(-v.y, under.normal.x, under.normal.y, under.normal.z);
         p.y = under.y;
         v.x = v.y = v.z = 0;
         this.mode = "standing";
@@ -825,7 +837,7 @@ export class FlyBody {
         v.y -= into * n.y * 1.3;
         v.z -= into * n.z * 1.3;
       }
-      this.events.hit = Math.max(this.events.hit, -into);
+      this.hitAgainst(-into, n.x, n.y, n.z);
     } else if (onIt || under.underside < Math.max(p.y, under.y) + FLY_HEIGHT) {
       // Flew into its side, or its body into something over it: back out, bounced off.
       const mx = p.x - px;
@@ -839,7 +851,7 @@ export class FlyBody {
         if (into < 0) {
           v.x -= into * wall.x * 1.4;
           v.z -= into * wall.z * 1.4;
-          this.events.hit = Math.max(this.events.hit, -into);
+          this.hitAgainst(-into, wall.x, 0, wall.z);
           this.blocked = fx * wall.x + fz * wall.z < -0.3;
         }
       } else {

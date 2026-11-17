@@ -9,7 +9,7 @@
 // else, in play, to the world and the camera (controls.ts).
 
 import * as THREE from "three";
-import { FLY_LENGTH, Rhythm, SUMMER } from "@fly/body";
+import { Contacts, FLY_LENGTH, Rhythm, SUMMER, TOUCH_PARTS } from "@fly/body";
 import { REGIONS } from "@fly/brain";
 import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttribution } from "@fly/contracts";
 import { AT_ROOT_PROPERTY, COMMAND_ORDER, INVITE_EVENT } from "@fly/contracts";
@@ -283,7 +283,7 @@ export class Game implements Shell {
   #clockAt = 0;
   #air = new THREE.Vector3();
   /** What the place's own goings-on did to the fly this frame, and what they are given. */
-  #felt: Felt = { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] };
+  #felt: Felt = { air: { x: 0, y: 0, z: 0 }, contacts: new Contacts(), looming: [] };
   #around: { -readonly [K in keyof Around]: Around[K] };
   #puff = { x: 0, y: 0, z: 0 };
   #middle = new THREE.Vector3();
@@ -1512,7 +1512,7 @@ export class Game implements Shell {
     felt.air.x = 0;
     felt.air.y = 0;
     felt.air.z = 0;
-    felt.touch = 0;
+    felt.contacts.clear();
     felt.looming.length = 0;
     const live = this.stage.set.live;
     if (!live || this.#moving) return;
@@ -1556,7 +1556,7 @@ export class Game implements Shell {
       const c = list[i];
       const { life, felt, air } = c;
       felt.air.x = felt.air.y = felt.air.z = 0;
-      felt.touch = 0;
+      felt.contacts.clear();
       felt.looming.length = 0;
       set?.feel?.(dt, life.body.position, felt);
       air.x = felt.air.x;
@@ -1566,7 +1566,16 @@ export class Game implements Shell {
       if (stroked >= 1) hands.stroking = true;
       this.#companyStroke = Math.max(this.#companyStroke, stroked);
       const stimuli = life.stimuli;
-      stimuli.stroke = Math.max(stroked, this.bubbles.brushedBy[i], felt.touch, online?.reach(life.body, air) ?? 0);
+      // Where each touches it: the feather (this player's, or another's at a table), a bubble that burst on it, the place's raindrops.
+      const contacts = stimuli.contacts;
+      contacts.clear();
+      contacts.addAll(felt.contacts);
+      hands.touch(life.body, contacts);
+      this.bubbles.touch(i + 1, contacts);
+      if (online) {
+        online.reach(life.body, air);
+        online.touch(life.body, contacts);
+      }
       stimuli.air = air;
       // What could loom is wherever it is: the same balls, bubbles and visitors as the followed fly's, and what the place says of this one.
       stimuli.looming.length = 0;
@@ -1586,8 +1595,13 @@ export class Game implements Shell {
     const hands = this.hands;
     const felt = this.#felt;
     const online = this.online;
-    // The feather (this player's, or another's at a table), a bubble that burst on it last frame, or something from the place itself (a raindrop).
-    stimuli.stroke = Math.max(hands.stroke, this.bubbles.brushed, felt.touch, online?.stroke ?? 0);
+    // Where each touches it: the feather (this player's, or another's at a table), a bubble that burst on it last frame, the place's raindrops.
+    const contacts = stimuli.contacts;
+    contacts.clear();
+    contacts.addAll(felt.contacts);
+    hands.touch(this.life.body, contacts);
+    this.bubbles.touch(0, contacts);
+    online?.touch(this.life.body, contacts);
     // A puff from the player (and the others at a table) and the place's own air (a gust) together.
     const air = this.#puff;
     air.x = hands.air.x + felt.air.x + (online?.air.x ?? 0);
@@ -2348,9 +2362,13 @@ export class Game implements Shell {
     // The Sky's two dials, chosen: the time of day and the weather.
     d.sky = `${this.hands.timeOfDay}/${this.hands.weather}`;
     d.pointer = this.hands.following ? "following" : "free";
-    d.senses = `loom ${s.loomLeft.toFixed(2)}/${s.loomRight.toFixed(2)} touch ${s.touch.toFixed(2)} bump ${s.bumpLeft.toFixed(2)}/${s.bumpRight.toFixed(2)} wind ${s.wind.toFixed(2)} sweet ${s.sweet.toFixed(2)} grounded ${s.grounded ? 1 : 0} male ${s.maleTaste.toFixed(2)} bitter ${s.bitter.toFixed(2)} water ${s.water.toFixed(2)}`;
+    d.senses = `loom ${s.loomLeft.toFixed(2)}/${s.loomRight.toFixed(2)} touch ${life.senses.touched.toFixed(2)} bump ${s.bumpLeft.toFixed(2)}/${s.bumpRight.toFixed(2)} wind ${s.wind.toFixed(2)} sweet ${s.sweet.toFixed(2)} grounded ${s.grounded ? 1 : 0} male ${s.maleTaste.toFixed(2)} bitter ${s.bitter.toFixed(2)} water ${s.water.toFixed(2)}`;
     d.loom = Math.max(s.loomLeft, s.loomRight).toFixed(3);
-    d.touch = s.touch.toFixed(3);
+    // How hard it is touched, wherever, and the parts it is touched on, as the brain is told them.
+    d.touch = life.senses.touched.toFixed(3);
+    let parts = "";
+    for (const part of TOUCH_PARTS) if ((s[part] ?? 0) > 0) parts += `${parts ? " " : ""}${part.slice(5)} ${(s[part] ?? 0).toFixed(2)}`;
+    d.touched = parts;
     d.wind = s.wind.toFixed(3);
     d.sweet = s.sweet.toFixed(3);
     d.eaten = life.eaten.toFixed(3);

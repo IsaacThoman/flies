@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Pantry, World } from "@fly/world";
-import { BODY_RADIUS, CONTACT_TOUCH, Crowd, FlyBody, MAX_NEIGHBOURS, SenseTracker, createIntent, segmentToSegment } from "../src/index.ts";
+import { BODY_HALF, BODY_RADIUS, BODY_UP, CONTACT_TOUCH, Crowd, FlyBody, MAX_NEIGHBOURS, SenseTracker, createIntent, pointToSegment, segmentToSegment } from "../src/index.ts";
 import type { Forces, Intent } from "../src/index.ts";
 
 const openTable = (r: number) => new World({ floor: { kind: "circle", r }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320 });
@@ -33,6 +33,13 @@ test("walking into another fly, it can't go through: it stops against it or slid
       crowd.resolve(body, DT);
       deepest = Math.max(deepest, -gap(body, { x: 0, z: 0, yaw }));
       touched = Math.max(touched, crowd.touch);
+      // Where it is pushed: where the two met, inside the other's body, at its middle's height.
+      if (crowd.touch > 0) {
+        const s = Math.sin(yaw) * BODY_HALF;
+        const c = Math.cos(yaw) * BODY_HALF;
+        const into = pointToSegment(crowd.contact.x, crowd.contact.z, -s, -c, s, c, scratch);
+        assert.ok(into <= BODY_RADIUS + 1e-9 && Math.abs(crowd.contact.y - body.position.y - BODY_UP) < 1e-9, `${z}/${yaw}: pushed at ${JSON.stringify(crowd.contact)}`);
+      }
     }
     // Pushed out each frame: never more than a frame's walk inside it.
     assert.ok(deepest < (10 * DT) + 1e-6, `${z}/${yaw}: ${deepest} mm into it`);
@@ -47,7 +54,7 @@ test("its antennae press on another fly's body as on a wall", () => {
   const crowd = new Crowd(world);
   const senses = new SenseTracker();
   const pantry = new Pantry(world, []);
-  const feel = () => senses.update({ dt: DT, body, world, pantry, looming: [], stroke: 0, air: { x: 0, y: 0, z: 0 }, eyesOpen: true, proboscis: 0, bodies: crowd });
+  const feel = () => senses.update({ dt: DT, body, world, pantry, looming: [], air: { x: 0, y: 0, z: 0 }, eyesOpen: true, proboscis: 0, bodies: crowd });
   assert.equal(feel().bumpLeft, 0);
   // Another fly crossways just ahead of its head, a little to its left.
   Object.assign(crowd.add()!, { x: 0.3, y: 0, z: 2.2, yaw: Math.PI / 2 });
@@ -99,7 +106,7 @@ test("a front leg on another fly tastes him, on its feet; the nearest other fly'
   const crowd = new Crowd(world);
   const senses = new SenseTracker();
   const pantry = new Pantry(world, []);
-  const feel = () => senses.update({ dt: DT, body, world, pantry, looming: [], stroke: 0, air: { x: 0, y: 0, z: 0 }, eyesOpen: true, proboscis: 0, bodies: crowd });
+  const feel = () => senses.update({ dt: DT, body, world, pantry, looming: [], air: { x: 0, y: 0, z: 0 }, eyesOpen: true, proboscis: 0, bodies: crowd });
   assert.equal(feel().maleTaste, 0);
   assert.equal(crowd.sideOf(body), 0);
   // Another fly crossways ahead, its body under the front legs' tarsi, more to the fly's left (it faces +z; its left is +x).

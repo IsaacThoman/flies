@@ -4,6 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { Contacts } from "@fly/body";
 import { Pantry, World, WORLDS } from "@fly/world";
 import type { Vec3 } from "@fly/world";
 import { Goings } from "../src/places/picnic/life.ts";
@@ -16,7 +17,7 @@ const context = new Proxy({}, { get: () => () => gradient });
 (globalThis as { document?: unknown }).document = { createElement: () => ({ getContext: () => context }) };
 (globalThis as { Path2D?: unknown }).Path2D = class { addPath() {} moveTo() {} bezierCurveTo() {} quadraticCurveTo() {} closePath() {} };
 
-const felt = (): Felt => ({ air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] });
+const felt = (): Felt => ({ air: { x: 0, y: 0, z: 0 }, contacts: new Contacts(), looming: [] });
 
 function around(fly: Vec3, company: Vec3[], others: Vec3[] | null): Around {
   const world = new World(WORLDS.picnic);
@@ -104,7 +105,7 @@ test("the picnic's falling leaf brushes a companion it passes, once, through fee
     companion.z = loose.position.z;
     const f = felt();
     goings.feel(1 / 60, companion, f);
-    if (f.touch > 0) touches.push(f.touch);
+    if (f.contacts.count > 0) touches.push(f.contacts.strongest);
   }
   assert.deepEqual(touches, [0.4]);
 });

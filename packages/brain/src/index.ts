@@ -5,6 +5,8 @@
 
 export { createBrain } from "./runtime.ts";
 export { RESTING_SENSES } from "./types.ts";
+export { TOUCH_SENSES } from "./io.ts";
+export type { TouchSense } from "./io.ts";
 export type { Brain, BrainCommand, BrainEngine, BrainRequest, BrainResponse, BrainSenses, BrainState, BrainStats, Eye, EyeMap } from "./types.ts";
 export {
   CATEGORY_COLUMNS,

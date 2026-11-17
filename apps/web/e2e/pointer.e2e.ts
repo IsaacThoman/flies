@@ -178,9 +178,12 @@ async function fingers() {
     });
     assert.equal(await game<number>(page, "g.life.pantry.foods.length"), placeFoods);
 
-    step("fingers: a finger held on the fly strokes it with the feather");
+    step("fingers: a finger held on the fly strokes it with the feather, on its back");
     await tool("feather");
-    await touch.hold(await screenOf(page, "fly"), () => waitFor(page, "touch>0.9"));
+    await touch.hold(await screenOf(page, "fly"), async () => {
+      const stroked = await waitFor(page, "touch>0.9");
+      assert.ok(/Notum 1\.00/.test(stroked.touched) && !/Front/.test(stroked.touched), `stroked on its back, not its face: ${stroked.touched}`);
+    });
 
     step("fingers: a finger held beside it blows");
     await tool("blow");

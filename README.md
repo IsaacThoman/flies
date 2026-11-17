@@ -118,9 +118,12 @@ or more classified as resting or tasting counts as sleep, and that inactivity de
 this is an activity-based stand-in, not a test for every displacement or joint movement.
 When resting is classified as sleeping, the fly settles a little lower on its legs, its head bowed, without the idle
 glances and shifts of its feet (the pose's `sleep`, `packages/fly`), and the caption says
-"Asleep". Asleep, a raindrop doesn't wake it; the feather resting on it doesn't move it, but makes it
-groom where it stands, which wakes it (a departure: `packages/brain/README.md`, the arousal
-threshold); stroking it nearly always does within a few seconds, and a swoop does. An activity other than resting or tasting resets this sleep score. The canvas's `data-rhythm` gives the hour, the
+"Asleep". Touch lands where it does. Asleep, a raindrop doesn't wake it, nor the feather resting
+on its back, which touches its notum and wings, not its head; resting at its face, where it
+follows the fly, the feather makes it groom where it stands, which wakes it (a departure:
+`packages/brain/README.md`, the arousal threshold); stroking its face wakes it within a few
+seconds, and a swoop does. At night touch on its body, even stroking its back, moves it neither
+awake nor asleep. An activity other than resting or tasting resets this sleep score. The canvas's `data-rhythm` gives the hour, the
 clock, the pressure, the depth and how long it has been still.
 
 ## Credits

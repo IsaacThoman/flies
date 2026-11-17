@@ -60,7 +60,8 @@ test("it builds and runs within its cost bounds", { skip }, async (t) => {
   const rest = of("rest");
   const full = of("full");
   console.log(`  M5 Pro CPU (here): build ${built.ms.toFixed(0)} ms (${built.rawMs.toFixed(0)}), rest ${rest.ms.toFixed(3)} s/s (${rest.rawMs.toFixed(3)}), everything at once ${full.ms.toFixed(3)} s/s (${full.rawMs.toFixed(3)}); median of ${SAMPLES}`);
-  // On an M5 Pro: build 0.15 s, rest 0.095 s/s and everything at once 0.28 s/s (packages/brain/README.md aims for 0.15 and 0.5).
+  // On an M5 Pro: build 0.15 s, rest 0.095 s/s and everything at once 0.28 s/s before touch landed anywhere, a quarter more
+  // since (packages/brain/README.md, Cost, aims for 0.15 and 0.5).
   assert.ok(built.ms < 250, `built in ${built.ms.toFixed(0)} M5 Pro CPU ms; budget 250`);
   assert.ok(rest.ms < 0.16, `${rest.ms.toFixed(3)} M5 Pro CPU s per simulated second at rest; budget 0.16`);
   assert.ok(full.ms < 0.5, `${full.ms.toFixed(3)} M5 Pro CPU s per simulated second with everything at once; budget 0.5`);

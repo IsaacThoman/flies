@@ -1,5 +1,6 @@
 #include "brain.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <stdexcept>
 #include <string_view>
@@ -22,7 +23,15 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
       modulation_(connectome, wiring_) {
   sense_inputs_.assign(wiring_.senses.size(), 0);
   for (size_t k = 0; k < wiring_.senses.size(); k++) {
-    if (!wiring_.senses[k].spec.after_eyes) sense_inputs_[k] = sim_.add_input(wiring_.senses[k].spec.name, wiring_.senses[k].neurons);
+    const io::Group& group = wiring_.senses[k];
+    if (group.spec.after_eyes) continue;
+    if (group.ends.empty()) {
+      sense_inputs_[k] = sim_.add_input(group.spec.name, group.neurons);
+      continue;
+    }
+    // A rate for each region: one input still, so every later input's stream is where it was.
+    sense_inputs_[k] = sim_.add_rated_input(group.spec.name, group.neurons);
+    regional_.push_back({k, std::vector<double>(group.neurons.size(), 0), std::vector<double>(group.ends.size(), 0)});
   }
   for (const io::Group& group : wiring_.background) background_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
   // Thirst scales how strongly the water neurons' spikes reach their targets (io.ts, THIRST).
@@ -118,8 +127,10 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
   const double gate = io::sleep_gate(senses);
   for (size_t k = 0; k < wiring_.senses.size(); k++) {
     const io::Group& group = wiring_.senses[k];
+    if (!group.ends.empty()) continue;
     sim_.set_rate(sense_inputs_[k], group.max_rate * io::intensity(senses, group.spec.sense) * (group.spec.gated ? gate : 1));
   }
+  for (Regional& regional : regional_) touch(regional, senses);
   const double hunger = io::hunger_of(senses);
   modulation_.set_state(senses, hunger);
   modulation_.update(0);
@@ -201,6 +212,20 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
   stats.spikes = sim_.spikes() - spikes_before;
   stats.active = sim_.active();
   return io::decode(rates_);
+}
+
+// Sets a group of regions' rates, where any region's has changed: setting them redraws the input's next spike, so only then.
+void Brain::touch(Regional& regional, const io::Senses& senses) {
+  const io::Group& group = wiring_.senses[regional.group];
+  bool changed = false;
+  for (size_t r = 0; r < group.ends.size(); r++) {
+    const double rate = io::region_rate(group, r, senses);
+    if (rate == regional.felt[r]) continue;
+    regional.felt[r] = rate;
+    changed = true;
+    std::fill(regional.rates.begin() + (r == 0 ? 0 : group.ends[r - 1]), regional.rates.begin() + group.ends[r], rate);
+  }
+  if (changed) sim_.set_rates(sense_inputs_[regional.group], regional.rates);
 }
 
 void Brain::modulate() {

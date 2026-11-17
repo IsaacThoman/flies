@@ -198,6 +198,9 @@ test("in and out are the senses as sent and the commands as answered, each to th
   const state: StatsState = { spikes: 0, active: 0, speed: 1, history: new Float32Array(HISTORY_SAMPLES), head: 0, day: freshDay("2026-11-16"), sensed, brain };
   const v = Array.from(readSignals(state, new Float32Array(SIGNALS)), (x) => Number(x.toFixed(2)));
   assert.deepEqual(v.slice(0, 15), [0.5, 0, 0, 0, 0, 0.25, 1, 0.25, 0, 0, 0.75, 0.5, 0.5, 0.3, 0.5], "the senses: the light is the mean over every facet, a sense too small to show is none; then hunger and thirst");
+  // Touch is the most any part of it is touched.
+  const touched = readSignals({ ...state, sensed: { ...sensed, touchNotum: 0.25, touchEyeLeft: 0.5 } }, new Float32Array(SIGNALS));
+  assert.equal(touched[2], 0.5);
   assert.deepEqual(v.slice(15, 23), [0.8, -0.5, 0, 0, 1, 0, 0.25, 0], "the commands, steering signed");
   assert.deepEqual(v.slice(23), [42, 30, 13, 0, 0, 180, 0, 3, 0], "each command's neurons, in whole Hz; a rate the brain doesn't report is none");
   const g = blankCanvas();

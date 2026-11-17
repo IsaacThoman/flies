@@ -15,6 +15,7 @@
 // moving round with them (ui/corners.ts); or, on a screen too narrow for
 // that, under them, where there is more room.
 
+import { TOUCH_SENSES } from "@fly/brain";
 import type { BrainSenses, BrainState } from "@fly/brain";
 import * as THREE from "three";
 import { font, glassPanel, roundedRect, text } from "@fly/ui";
@@ -45,7 +46,7 @@ export const REDRAWS = 4;
 const VALUE = { size: 18, color: "#ffffff" };
 const UNIT = { size: 14, color: "#e4f3ff" };
 
-/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger and thirst, internal state, 1 when left out. */
+/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger and thirst, internal state, 1 when left out; touch, the most any part of it is touched. */
 export const SENSES = [
   ["loomLeft", "Loom L"],
   ["loomRight", "Loom R"],
@@ -295,6 +296,13 @@ export function meanLight(light: BrainSenses["light"]) {
   return n > 0 ? sum / n : 0;
 }
 
+/** The most any part of it is touched, as the brain is told: each part feels the stronger of its own touch and `touch`, all of it at once. */
+function touchOf(sensed: BrainSenses) {
+  let most = sensed.touch;
+  for (let k = 0; k < TOUCH_SENSES.length; k++) most = Math.max(most, sensed[TOUCH_SENSES[k]] ?? 0);
+  return most;
+}
+
 /** A bar's length in whole design units of its width: the steps it is drawn in, so only a change that shows counts. */
 const step = (v: number) => Math.round(Math.max(-1, Math.min(1, Number.isFinite(v) ? v : 0)) * BAR.width) / BAR.width;
 
@@ -304,7 +312,9 @@ export function readSignals(s: StatsState, out: Float32Array) {
   let i = 0;
   for (let k = 0; k < SENSES.length; k++) {
     const key = SENSES[k][0];
-    out[i++] = step(key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : key === "hunger" || key === "thirst" ? (sensed[key] ?? 1) : sensed[key]);
+    out[i++] = step(
+      key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : key === "hunger" || key === "thirst" ? (sensed[key] ?? 1) : key === "touch" ? touchOf(sensed) : sensed[key],
+    );
   }
   const command = s.brain?.command;
   for (let k = 0; k < COMMANDS.length; k++) out[i++] = command ? step(command[COMMANDS[k].key]) : 0;

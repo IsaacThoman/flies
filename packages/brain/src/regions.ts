@@ -377,7 +377,7 @@ export const REGIONS: readonly Region[] = [
     place: "the six legs, most in the feet; axons to the leg neuropils of the ventral nerve cord",
     side: "both",
     neurons: 1640,
-    fullHz: 5,
+    fullHz: 8.1,
   },
   {
     id: "thorax-sensory",
@@ -386,7 +386,7 @@ export const REGIONS: readonly Region[] = [
     place: "the wings, the halteres and the back of the thorax (notum), both sides; axons to the ventral nerve cord's dorsal neuropils",
     side: "both",
     neurons: 868,
-    fullHz: 5,
+    fullHz: 13,
   },
   {
     id: "abdomen-sensory",
@@ -395,7 +395,7 @@ export const REGIONS: readonly Region[] = [
     place: "the abdomen; axons to the abdominal ganglion at the back of the ventral nerve cord",
     side: "both",
     neurons: 1143,
-    fullHz: 5,
+    fullHz: 45,
   },
   {
     id: "proprioceptors",
@@ -409,11 +409,11 @@ export const REGIONS: readonly Region[] = [
   {
     id: "bristles",
     name: "Body bristles",
-    description: "Touch and taste bristles of the thorax, abdomen and legs, recorded by organ but not by place. `touch` drives the touch bristles.",
+    description: "Touch and taste bristles of the thorax, abdomen and legs, recorded by organ but not by place. Touch drives the touch bristles, each part's where it lands (their types tell the parts apart).",
     place: "the bristles over the thorax, abdomen and legs; the exact places aren't recorded",
     side: "both",
     neurons: 2276,
-    fullHz: 9.8,
+    fullHz: 45,
   },
   ...pair(
     "cord-interneurons",

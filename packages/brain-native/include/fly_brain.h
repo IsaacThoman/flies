@@ -15,6 +15,9 @@ extern "C" {
 
 typedef struct fly_brain fly_brain;
 
+/** How many parts of the body touch can land on (fly_senses.touch_parts). */
+#define FLY_TOUCH_PARTS 12
+
 /** What the body feels. Intensities run 0 to 1; see BrainSenses in packages/brain/src/types.ts. */
 typedef struct fly_senses {
   float loom_left, loom_right, touch, bump_left, bump_right, wind, sweet;
@@ -54,6 +57,14 @@ typedef struct fly_senses {
    * before them. Not 0: that is freezing.
    */
   float temperature_left, temperature_right;
+  /**
+   * Touch where it lands, 0 to 1 each, in this order: the left and right
+   * eye's, front's, occiput's and mouthparts' bristles, then the notum's, the
+   * wings', the abdomen's and the legs' (types.ts's BrainSenses says what
+   * each part is). 0, as a struct initialised without them leaves them. A
+   * part feels the stronger of its own and `touch`, which is all of them.
+   */
+  float touch_parts[FLY_TOUCH_PARTS];
 } fly_senses;
 
 /** What the brain wants done. All 0 to 1 except turn, which runs -1 (hard left) to 1 (hard right). */

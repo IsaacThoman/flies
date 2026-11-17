@@ -8,7 +8,7 @@ import { roundedRect } from "@fly/ui";
 import { BALL_RADIUS, FOODS, isDropped } from "@fly/world";
 import type { FoodKind, Pantry, Vec3 } from "@fly/world";
 import { canvas2d, canvasTexture, paint, random } from "../scene/build.ts";
-import { TOOLS } from "./hands.ts";
+import { FEATHER_BRUSH, TOOLS } from "./hands.ts";
 import type { Hands, ToolId } from "./hands.ts";
 
 const KINDS: readonly FoodKind[] = ["sugar", "honey", "berry", "water", "coffee", "laced"];
@@ -609,7 +609,7 @@ export class HandsView {
       // Leaning back toward the camera, swaying; stroking, it brushes to and fro.
       const wiggle = hands.stroking ? Math.sin(time * 14) * 0.5 : Math.sin(time * 2) * 0.12;
       this.#right.setFromMatrixColumn(camera.matrixWorld, 0);
-      const brush = hands.stroking ? Math.sin(time * 14) * 0.5 : 0;
+      const brush = hands.stroking ? Math.sin(time * 14) * FEATHER_BRUSH : 0;
       feather.position.set(p.x + this.#right.x * brush, p.y + 0.15, p.z + this.#right.z * brush);
       feather.quaternion.copy(camera.quaternion);
       feather.rotateX(-0.5);

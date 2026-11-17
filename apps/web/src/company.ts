@@ -15,6 +15,7 @@
 
 import type { BrainDriver, FlyPose } from "@fly/contracts";
 import { RESTING_POSE } from "@fly/contracts";
+import { Contacts } from "@fly/body";
 import type { Pantry, Vec3, World } from "@fly/world";
 import { COLOURS, spawnSpot } from "@fly/net";
 import type { Spot } from "@fly/net";
@@ -80,7 +81,7 @@ export class Company {
       life.tendsPantry = false;
       const [x, z, yaw, y] = spot(i);
       life.setDown(x, z, yaw, y);
-      const c: Companion = { life, slot, pose: { ...RESTING_POSE }, colour: COLOURS[(i + 1) % COLOURS.length], id: 0, felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] }, air: { x: 0, y: 0, z: 0 }, tries: 0, retryAt: -1 };
+      const c: Companion = { life, slot, pose: { ...RESTING_POSE }, colour: COLOURS[(i + 1) % COLOURS.length], id: 0, felt: { air: { x: 0, y: 0, z: 0 }, contacts: new Contacts(), looming: [] }, air: { x: 0, y: 0, z: 0 }, tries: 0, retryAt: -1 };
       this.list.push(c);
       this.#arrive(c);
     }

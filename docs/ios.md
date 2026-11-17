@@ -187,8 +187,8 @@ the game again. Its settings are kept; the fly's moment is not.
 ### Haptics
 
 While playing (never in the screensaver, where nobody's finger is on the glass): a soft tap with the
-fly's own touch sense while the feather is on it (`data-touch` above 0.35 with `data-tool`
-`feather`: resting on it 0.4, stroking 1), and a knock when it takes off. Both follow the fly's published
+fly's touch while the feather is on it (`data-touch`, how hard the hardest thing touching it
+presses wherever it lands, above 0.35 with `data-tool` `feather`: resting on it 0.4, stroking 1), and a knock when it takes off. Both follow the fly's published
 state. The feather check uses the selected tool and aggregate touch, so it does not identify
 whether that touch came from the local feather, another player or the environment. Canvas publication is checked after more than 200 ms between samples, so its nominal
 five-times-a-second cadence can be slower with frame scheduling. Off with the Haptics switch in the app's page of the Settings app,

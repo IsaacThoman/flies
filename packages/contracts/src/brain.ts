@@ -41,7 +41,7 @@ export interface BrainDriver {
 
 /**
  * The order the scalar senses are packed in for the native brain. `grounded` is 0 or 1; `hunger` and `thirst`, internal
- * state rather than senses, are 1 when the body keeps no account of them (BrainSenses.hunger, .thirst); the daily clock and sleep are 0 when left out.
+ * state rather than senses, are 1 when the body keeps no account of them (BrainSenses.hunger, .thirst); the daily clock and sleep, and touch where it lands, are 0 when left out.
  * The temperature at each antenna (°C) is NaN when left out: no temperature felt.
  */
 export const SENSE_ORDER = [
@@ -66,6 +66,18 @@ export const SENSE_ORDER = [
   "thirst",
   "temperatureLeft",
   "temperatureRight",
+  "touchEyeLeft",
+  "touchEyeRight",
+  "touchFrontLeft",
+  "touchFrontRight",
+  "touchOcciputLeft",
+  "touchOcciputRight",
+  "touchMouthpartsLeft",
+  "touchMouthpartsRight",
+  "touchNotum",
+  "touchWings",
+  "touchAbdomen",
+  "touchLegs",
 ] as const;
 /** The order commands come back in from the native brain. */
 export const COMMAND_ORDER = ["walk", "turn", "back", "escape", "wings", "groom", "feed", "sing"] as const;

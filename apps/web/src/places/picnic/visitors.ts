@@ -599,6 +599,11 @@ export class Leaves {
   }
 
   /** Whether one can come down now: none is lying loose on the table. */
+  /** Where the loose leaf is now: what brushes a fly is its nearest edge. */
+  get at(): Readonly<Vec3> {
+    return this.#p;
+  }
+
   get free() {
     return this.state === "off";
   }
