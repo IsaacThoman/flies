@@ -87,10 +87,13 @@ these are kept out of the sides of things, and of slopes too steep to stand
 on: a fly flying at a pane bounces off it with its head on the room's side, a
 fly turning beside a wall swings its legs clear of it, one walking into a wall
 stops with its front feet at it. Moved out of one thing into another, it is
-moved again; between two things too close for it as it faces, they turn it a
-quarter turn if it fits so; where nothing fits its legs (closer than 2.65 mm),
-only its body is kept out. On its feet what rises less than a step under its
-body is what it steps up onto, and a slope it could walk up is not in its way.
+moved again; between two things too close for it as it faces, they turn it
+along the slot between them, or a quarter turn, if it fits so; where nothing
+fits its legs (closer than 2.65 mm), its body is kept out and it stands evenly
+between them. On its feet what rises less than a step under its body is what
+it steps up onto, and so is a stair a step higher than the one before it (the
+alarm clock's slices), and a slope it could walk up is not in its way; in the
+air its body rides up over a slope it could stand on.
 So nothing it can reach may be closer to a wall than that: a gap narrower than
 the fly's legs is a gap it only stands in with its legs against both sides.
 
