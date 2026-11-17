@@ -87,7 +87,7 @@ export function surfaceMaterial() {
       // The cut fruit's wet fibres are surface relief, below a fly's footstep.
       float flesh(vec2 p) {
         vec2 q=p-vec2(25,155);
-        float a=atan(q.y,q.x), r=length(q);
+        float a=atan(q.y,q.x);
         float fibres=pow(.5+.5*sin(a*115.0+noise(p*.45)*3.0),10.0);
         float veins=pow(.5+.5*sin(a*24.0+noise(p*.12)*2.0),18.0);
         return fibres*(.3+.7*noise(p*1.5))+veins*.45;

@@ -255,3 +255,55 @@ subsequent polishing belongs on a branch from the latest dev. No merge is author
 | R4 | S2 | 7 | 6 | 6 | 6.5 | 8 | 8 | 9 | 7 | 7.1875 |
 | R4 | F9 | 7 | 6 | 6 | 6.5 | 8 | 8 | 9 | 7 | 7.1875 |
 | R4 | A8 | 9 | 6.5 | 8 | 7.5 | 8 | 7 | 7 | 6.5 | 7.4375 |
+
+## Round 6
+
+Key: N4 = retained kitchen recaptured on the merged runtime; P3 = quieter quartz
+markings, directional prop shadows, peach fibres/wetness, stronger glass edges and
+a feeding position near the fruit rim; O6 = windowsill reference on the same
+runtime. Four fresh high-effort reviewers; brief orders O6/P3/N4, O6/P3/N4,
+P3/N4/O6, N4/P3/O6 were independently shuffled.
+
+All four rank P3 above N4. Two rank P3 first and two rank O6 first. P3's mean is
+7.3281 versus O6's 7.2344, meeting the owner's average-score reference criterion.
+Retain P3. This is a narrow average lead, not unanimous superiority to the reference.
+
+| Reviewer | N4 | P3 | O6 | Ranking |
+|---|---:|---:|---:|---|
+| R1 | 6.8750 | 7.3125 | 7.0000 | P3 > O6 > N4 |
+| R2 | 6.9375 | 7.0625 | 7.2500 | O6 > P3 > N4 |
+| R3 | 7.2500 | 7.5625 | 7.2500 | P3 > O6 > N4 |
+| R4 | 7.0000 | 7.3750 | 7.4375 | O6 > P3 > N4 |
+| Mean | 7.0156 | 7.3281 | 7.2344 | Retain P3 |
+
+The reviewers preferred the fruit fibres, visible rim, stronger glass and prop
+shadows. Remaining weaknesses are the broad morning wet highlight, sparse
+household staging and weaker atmospheric depth than the reference.
+
+One reviewer found zero captured taste at P3's spawn. A runtime probe confirmed
+that equal-height nested peach slabs assigned the patch and spawn to different
+supporting solids. The physical shape is unchanged; the widest band now owns the
+continuous cut face. A regression samples the patch and spawn to prove they taste
+peach juice. The coarse-eye cap follows the same widest band. This small functional
+repair follows review; no additional visual experiment is claimed. Set H8 records
+its final rendered verification and live taste state. The microscopic lid-slice
+seams were also closed; both versions in this comparison share that repair.
+
+The owner now requests readiness at this bar, with further visual experiments on
+a branch from current dev. The shipping visual result remains P3; stop this
+feature's visual iteration here. No merge is performed.
+
+| Reviewer | Set | H | C | L | M | S | W | TV | A | Mean |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| R1 | N4 | 7 | 6 | 6 | 5.5 | 7.5 | 8 | 8 | 7 | 6.8750 |
+| R1 | P3 | 7 | 6.5 | 7 | 7 | 8 | 8 | 8 | 7 | 7.3125 |
+| R1 | O6 | 8 | 7 | 7 | 6 | 7 | 8 | 7 | 6 | 7.0000 |
+| R2 | N4 | 7 | 6.5 | 6 | 5.5 | 8 | 7.5 | 8 | 7 | 6.9375 |
+| R2 | P3 | 7 | 6.5 | 7 | 7 | 8 | 6 | 8 | 7 | 7.0625 |
+| R2 | O6 | 9 | 6.5 | 7.5 | 7 | 8 | 7 | 7 | 6 | 7.2500 |
+| R3 | N4 | 7.5 | 7 | 6 | 5.5 | 8 | 8 | 9 | 7 | 7.2500 |
+| R3 | P3 | 7.5 | 7 | 7 | 6.5 | 8 | 8 | 9 | 7.5 | 7.5625 |
+| R3 | O6 | 8.5 | 6 | 8 | 7 | 8.5 | 7 | 7 | 6 | 7.2500 |
+| R4 | N4 | 7 | 6.5 | 6.5 | 5.5 | 7.5 | 8 | 8 | 7 | 7.0000 |
+| R4 | P3 | 7 | 7 | 7 | 7 | 8 | 8 | 8 | 7 | 7.3750 |
+| R4 | O6 | 8.5 | 6 | 8 | 8 | 8.5 | 8 | 7 | 5.5 | 7.4375 |
