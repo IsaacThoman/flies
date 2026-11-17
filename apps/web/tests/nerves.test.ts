@@ -15,13 +15,15 @@ import { DEFAULT_SETTINGS } from "../src/settings.ts";
 const SENSORY = /^(retina|antenna-smell|johnston|head-bristles|mouthparts|head-sensory-other|leg-sensory|thorax-sensory|abdomen-sensory|proprioceptors|bristles)/;
 const MOTOR = /(motor|endocrine|efferent)/;
 
-test("placed regions have unique anatomy; unplaced neurons light no anatomical part", () => {
+const UNLOCATED = ["unplaced", "head-sensory-other"];
+
+test("placed regions have unique anatomy; unknown locations light no anatomical part", () => {
   const parts = new Map(NERVE_PARTS.map((p) => [p.id, p]));
   const owner = new Map<string, string>();
   for (const region of REGIONS) {
     const ids = REGION_PARTS[region.id];
     assert.ok(ids, `${region.id} has a mapping`);
-    assert.equal(ids.length === 0, region.id === "unplaced", `${region.id}: only unplaced lacks a location`);
+    assert.equal(ids.length === 0, UNLOCATED.includes(region.id), `${region.id}: only known locations are drawn`);
     for (const id of ids) {
       assert.ok(parts.has(id), `${region.id}: no part ${id}`);
       assert.ok(!owner.has(id), `${id} lit by both ${owner.get(id)} and ${region.id}`);
@@ -37,17 +39,21 @@ test("placed regions have unique anatomy; unplaced neurons light no anatomical p
   assert.equal([...partRegions()].filter((r) => r < 0).length, UNLIT_PARTS.length + SOMA_GROUPS.length);
 });
 
-test("unplaced activity is retained as a rate but cannot light the neck or another location", () => {
+test("activity of unknown location or organ is retained but lights no anatomical part", () => {
   const parts = new Float32Array(NERVE_PARTS.length), glow = new NerveGlow(parts);
   const rates = new Float32Array(REGIONS.length);
-  const unplaced = REGIONS.findIndex((r) => r.id === "unplaced");
-  rates[unplaced] = REGIONS[unplaced].fullHz;
-  for (let i = 0; i < 120; i++) glow.update(rates, 1 / 60);
-  assert.ok(glow.regions[unplaced] > 0.99, "the measured rate is preserved");
-  assert.ok(parts.every((g) => g === 0), "unknown location never illuminates an anatomical place");
-  parts[NERVE_PARTS.findIndex((p) => p.id === "connective-midline")] = 1;
-  glow.update(rates, 0);
-  assert.ok(parts.every((g) => g === 0), "a prior display value cannot leave the context lit");
+  for (const id of UNLOCATED) {
+    glow.clear();
+    rates.fill(0);
+    const r = REGIONS.findIndex((region) => region.id === id);
+    rates[r] = REGIONS[r].fullHz;
+    for (let i = 0; i < 120; i++) glow.update(rates, 1 / 60);
+    assert.ok(glow.regions[r] > 0.99, `${id}: the measured rate is preserved`);
+    assert.ok(parts.every((g) => g === 0), `${id}: no invented location lights`);
+    for (const part of UNLIT_PARTS) parts[NERVE_PARTS.findIndex((p) => p.id === part)] = 1;
+    glow.update(rates, 0);
+    assert.ok(parts.every((g) => g === 0), "a prior display value cannot leave the context lit");
+  }
 });
 
 test("a region is drawn on its own side, in its role's parts", () => {

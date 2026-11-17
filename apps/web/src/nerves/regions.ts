@@ -1,7 +1,7 @@
 // Where each of the brain's regions is drawn on the fly's nervous system
 // (packages/fly/src/nerves): the parts its firing rate lights. A part belongs
-// to at most one region. The mixed unplaced group has no defensible location,
-// so it lights nothing; the connective's midline remains anatomical context.
+// to at most one region. Groups whose location or organ is unknown light
+// nothing; the corresponding strands remain unlit anatomical context.
 //
 // The drawing has its own parts for things the regions don't yet tell apart:
 // the cord is drawn segment by segment (T1, T2, T3, the abdominal neuromeres
@@ -22,7 +22,7 @@ const same = (...ids: string[]) => each((side) => ids.map((id) => [`${id}-${side
 const legs = (part: string, side: string) => LEG_NAMES.map((leg) => `${part}-${leg}-${side}`);
 
 /** Anatomy retained for context, with no measured rate assignable to it. */
-export const UNLIT_PARTS = ["connective-midline"] as const;
+export const UNLIT_PARTS = ["connective-midline", "pharyngeal-nerves"] as const;
 
 export const REGION_PARTS: Readonly<Record<string, readonly string[]>> = Object.fromEntries([
   ...same("retina", "lamina", "medulla", "lobula", "lobula-plate"),
@@ -35,7 +35,7 @@ export const REGION_PARTS: Readonly<Record<string, readonly string[]>> = Object.
   ["antenna-smell", ["antenna-olfactory-left", "antenna-olfactory-right"]],
   ["head-bristles", ["head-bristle-sockets"]],
   ["mouthparts", ["labellum-taste"]],
-  ["head-sensory-other", ["pharyngeal-nerves"]],
+  ["head-sensory-other", []],
   ...same("antennal-lobe", "mushroom-body", "superior-protocerebrum", "lateral-horn", "ventrolateral-protocerebrum", "inferior-ventromedial", "subesophageal"),
   ["central-complex", ["central-complex"]],
   ["central-brain-other", ["brain-rind"]],
