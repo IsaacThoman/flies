@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Isolate each checkout, dependencies and process tree; share only immutable data and caches.
+main() {
 set -Eeuo pipefail
 usage() { echo 'Usage: flies-check <branch-or-sha> [--with-dev] [--only lint|types|unit|e2e|all] [--files <test files...>]' >&2; exit 2; }
 [[ $# -gt 0 && $1 != -* ]] || usage
@@ -143,3 +144,5 @@ if [[ $only == all || $only == e2e ]]; then
   done
 fi
 exit "$failed"
+}
+main "$@"

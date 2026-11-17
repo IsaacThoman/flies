@@ -37,7 +37,15 @@ override or system Chromium installation is needed.
 
 Requires Bash, git, Node 24/npm, Docker access, `flock` and a populated clone at
 `~/repos/flies` with `npm ci` and `npm run brain:fetch` already completed.
-Install the runner as `~/bin/flies-check`. Put `export PATH="$HOME/bin:$PATH"`
+Install atomically so existing runs keep their script open:
+
+```sh
+mkdir -p ~/bin
+install -m 755 scripts/farm/flies-check ~/bin/flies-check.new
+mv ~/bin/flies-check.new ~/bin/flies-check
+```
+
+Put `export PATH="$HOME/bin:$PATH"`
 at the **top** of `~/.bashrc`, before its non-interactive early return, so SSH
 commands can find it. No service or published port is needed.
 
