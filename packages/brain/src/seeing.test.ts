@@ -42,9 +42,11 @@ test("with the eyes shut the brain is what it was before it had eyes, wherever n
   // on the commit before the eyes were added (b373345), and again, with the
   // columnar synapses at 1 as they were then, when Johnston's organ's right
   // half was made to count as much as its left (it changes wind and bump) and
-  // when `grounded` was narrowed to the legs' load sensors (it changes rest)
-  // and when `sweet` was given the mouth's sugar neurons by what they are:
-  // the same as a brain built without eyes, the columnar synapses at 1.
+  // when `grounded` was narrowed to the legs' load sensors (it changes rest),
+  // when `sweet` was given the mouth's sugar neurons by what they are, and
+  // when eleven of the head's mechanosensory neurons were unmuted (it changes
+  // touch and bump): the same as a brain built without eyes, the columnar
+  // synapses at 1.
   const b = new FlyBrain(connectome!, { seed: 1 });
   const phases = [
     RESTING_SENSES,
@@ -62,7 +64,7 @@ test("with the eyes shut the brain is what it was before it had eyes, wherever n
       hash = (Math.imul(hash, 31) + spikes) >>> 0;
     }
   }
-  assert.deepEqual({ total, hash }, { total: 460567, hash: 2187919625 });
+  assert.deepEqual({ total, hash }, { total: 461935, hash: 2841715797 });
 });
 
 test("a dark disc looming at an eye fires the giant fiber through the optic lobe; a passing dot or a receding disc doesn't", { skip }, () => {

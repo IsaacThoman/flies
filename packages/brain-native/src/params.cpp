@@ -51,6 +51,13 @@ std::vector<std::string> transmitters(const Connectome& c) {
         // neurons outside the eye are cholinergic; the prediction is blank for
         // about 2,100 of them, most head bristle neurons among them.
         {super_class.find("sensory") != std::string::npos && super_class != "ol_sensory" && predicted.empty(), "ACH"},
+        // The head's mechanosensory neurons, its bristles' (BM) and Johnston's
+        // organ's (JO), are cholinergic like the rest of their types: the
+        // dataset's own type-level transmitter for them is acetylcholine.
+        // Eleven are predicted a monoamine one by one, at low confidence, and
+        // so were muted, among them the right side's whole route from the
+        // head's bristles to grooming.
+        {super_class == "cb_sensory" && (starts(type, "BM") || starts(type, "JO-")) && (predicted == "DA" || predicted == "SER" || predicted == "OCT"), "ACH"},
         // Antennal lobe local neurons are overwhelmingly GABAergic (Chou et al.
         // 2010). The prediction makes 75 lateral LNs (lLN1, lLN2T, lLN2X and
         // others) cholinergic; wired densely to each other, they then lock the

@@ -67,6 +67,8 @@ const seeds = values.seeds.split(",").map(Number);
 
 /** Moving, as Life counts it: anything but standing still. */
 const moving = (i: Intent) => i.walking || i.backing || i.groom > 0 || i.feeding || Math.abs(i.yawRate) > 0.3 || i.takeOff !== null;
+/** Moving away: moving, but not grooming in place. */
+const movingAway = (i: Intent) => moving(i) && !(i.groom > 0 && !i.walking && !i.backing && Math.abs(i.yawRate) <= 0.3 && i.takeOff === null && !i.feeding);
 
 function tell(senses: BrainSenses, r: Rhythm) {
   senses.clockMorning = r.clock.morning;
@@ -149,9 +151,10 @@ function threshold() {
     { name: "the looming pulse (0.1 s, eyes shut)", ms: 1000, senses: (t, s) => void (s.loomRight = t < 100 ? 1 : 0) },
     { name: "a disc looming at the right eye (eyes open)", ms: disc.seconds * 1000, senses: (t, s) => void (s.light = lit(disc.scene, t / 1000)) },
   ];
-  console.log(`Woken (moved within the stimulus and 1 s after) in ${trials} seeds, at night (clock push 1, pressure 0.5); awake = still but depth 0, asleep = depth 1:`);
+  console.log(`Woken (moved within the stimulus and 1 s after; in brackets, moved away, not only groomed in place) in ${trials} seeds, at night (clock push 1, pressure 0.5); awake = still but depth 0, asleep = depth 1:`);
   for (const stimulus of STIMULI.filter((s) => !values.stimulus || s.name.startsWith(values.stimulus))) {
     const woken = { awake: 0, asleep: 0 };
+    const away = { awake: 0, asleep: 0 };
     for (const depth of [0, 1] as const) {
       for (let k = 0; k < trials; k++) {
         const brain = new FlyBrain(connectome, { seed: 200 + k, internalState });
@@ -161,15 +164,19 @@ function threshold() {
         if (eyes) senses.light = ground;
         for (let t = 0; t < 20_000; t += TICK) behavior.update(brain.tick(TICK, senses).command, 0, true, TICK / 1000);
         let woke = false;
+        let left = false;
         for (let t = 0; t < stimulus.ms + 1000; t += TICK) {
           const each: BrainSenses = { ...senses };
           if (t < stimulus.ms) stimulus.senses(t, each);
-          if (moving(behavior.update(brain.tick(TICK, each).command, 0, true, TICK / 1000))) woke = true;
+          const intent = behavior.update(brain.tick(TICK, each).command, 0, true, TICK / 1000);
+          if (moving(intent)) woke = true;
+          if (movingAway(intent)) left = true;
         }
         if (woke) woken[depth === 0 ? "awake" : "asleep"]++;
+        if (left) away[depth === 0 ? "awake" : "asleep"]++;
       }
     }
-    console.log(`${stimulus.name} | awake ${woken.awake}/${trials} | asleep ${woken.asleep}/${trials}`);
+    console.log(`${stimulus.name} | awake ${woken.awake}/${trials} (${away.awake}) | asleep ${woken.asleep}/${trials} (${away.asleep})`);
   }
 }
 
