@@ -13,7 +13,7 @@ import { PLACES } from "../src/places/catalog.ts";
 const { url, server } = await startServer();
 let browser: Browser | undefined;
 try {
-  const opened = await openGame({ url });
+  const opened = await openGame({ url, steady: true });
   browser = opened.browser;
   const { page, errors } = opened;
   await waitFor(page, "screen=title");
