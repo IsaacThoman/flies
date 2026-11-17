@@ -23,8 +23,9 @@
 //   touchdrag:<x0>,<y0>:<x1>,<y1>[:<ms>]  a finger drags between points
 //   twofingerdrag:<x0>,<y0>:<x1>,<y1> two fingers move together, without changing spread
 //   pinch:<x>,<y>:<from>:<to> two fingers about a point, from one spread to another (shares of the width)
-//   tapon:<kind>[:<index>]    a finger taps the middle of a target drawn on screen (from the game's hit map: tool, kind, label, go, menu, row, step, tab, back...)
-//   clickon:<kind>[:<index>]  the mouse clicks one
+//   tapon:<kind>[:<index>[:<dial>]]  a finger taps the middle of a target drawn on screen (from the game's hit map: tool, kind, label, go, menu, row, step, tab, back...);
+//                             a kind's index is its direction, and its dial which of the tool's (the Sky's weather is 1)
+//   clickon:<kind>[:<index>[:<dial>]]  the mouse clicks one
 //   resize:<w>x<h>            the window (or the device's screen) changes shape
 //   sleep:<ms>                wait
 //   shot:<file.png>           screenshot the game as shown
@@ -309,29 +310,31 @@ export class Fingers {
 }
 
 /** The middle of a target drawn on screen (0 to 1 across and down the canvas), found in the game's hit map by its kind and index. */
-export async function targetOf(page: Page, kind: string, index?: number): Promise<Pt> {
+/** `dial`: for a kind's arrow or a label, which of the tool's dials (the Sky's weather is 1); any, the last drawn, without. */
+export async function targetOf(page: Page, kind: string, index?: number, dial?: number): Promise<Pt> {
   // A screen just opened may not have been drawn yet: give it a moment.
   const until = Date.now() + 60_000;
   for (;;) {
-    const found = await findTarget(page, kind, index);
+    const found = await findTarget(page, kind, index, dial);
     if (found) return found;
     if (Date.now() > until) throw new Error(`Nothing drawn on screen is a ${kind}${index === undefined ? "" : ` ${index}`}`);
     await page.waitForTimeout(100);
   }
 }
 
-function findTarget(page: Page, kind: string, index?: number): Promise<Pt | null> {
+function findTarget(page: Page, kind: string, index?: number, dial?: number): Promise<Pt | null> {
   return page.evaluate(
-    ([kind, index]) => {
+    ([kind, index, dial]) => {
       const game = (globalThis as unknown as { __fly: { overlay: { hits: { count: number; get(i: number): { kind: string; index: number; value: number; x: number; y: number; w: number; h: number } } }; shape: { design: { width: number; height: number } } } }).__fly;
       const hits = game.overlay.hits;
       for (let i = hits.count - 1; i >= 0; i--) {
         const h = hits.get(i);
+        if (dial !== null && (kind === "kind" || kind === "label") && h.index !== dial) continue;
         if (h.kind === kind && (index === null || ((kind === "kind" || kind === "tab") ? h.value === index : h.index === index))) return [(h.x + h.w / 2) / game.shape.design.width, (h.y + h.h / 2) / game.shape.design.height];
       }
       return null;
     },
-    [kind, index ?? null] as const,
+    [kind, index ?? null, dial ?? null] as const,
   ) as Promise<Pt | null>;
 }
 
@@ -363,19 +366,21 @@ const CLOCK_SHIFT = ((((MORNING - start.getHours() - start.getMinutes() / 60 - s
  * a test with the machine or the hour it runs at: the picture stays at one of the levels in
  * apps/web/src/quality.ts (0, the full one) instead of following how fast this machine draws,
  * which without a GPU would draw the fly in pixels too big for the X-ray; the screensaver never
- * comes by itself (Never, as the saved setting), however long a step takes; the fly stays alone
- * (disconnected) unless `joinOthers`, so that only a test of playing with others sits with
- * everyone; and the clock reads morning, whatever the hour, so the fly is awake rather than
+ * comes by itself (Never, as the saved setting), however long a step takes; the fly is at home,
+ * as every launch is, unless `visit` takes it to a series of rooms open to everyone from the
+ * first launch (a visit chosen in the game is kept across reloads, as it would be); and the clock
+ * reads morning, whatever the hour, so the fly is awake rather than
  * asleep on the real night's clock. The tests check what the game does; the steps about the
  * screensaver bring it themselves.
  */
-export const holdSteady = (context: BrowserContext, quality = 0, { joinOthers = false } = {}) =>
-  context.addInitScript(([quality, shift, joinOthers]) => {
+export const holdSteady = (context: BrowserContext, quality = 0, { visit = null as number | null } = {}) =>
+  context.addInitScript(([quality, shift, visit]) => {
     (globalThis as { __quality?: number }).__quality = quality;
     try {
       // apps/web/src/settings.ts's key; the rest of what was saved stays as it was.
       const saved = JSON.parse(localStorage.getItem("flies.settings") ?? "{}") as Record<string, unknown>;
-      localStorage.setItem("flies.settings", JSON.stringify({ ...saved, wallpaperAfter: 0, joinOthers }));
+      const first = !("visit" in saved) && visit !== null ? { visit } : {};
+      localStorage.setItem("flies.settings", JSON.stringify({ ...saved, wallpaperAfter: 0, ...first }));
     } catch {
       // A page with no storage of its own (about:blank) has no game in it either.
     }
@@ -390,7 +395,7 @@ export const holdSteady = (context: BrowserContext, quality = 0, { joinOthers = 
       }
     }
     globalThis.Date = Shifted as DateConstructor;
-  }, [quality, CLOCK_SHIFT, joinOthers] as const);
+  }, [quality, CLOCK_SHIFT, visit] as const);
 
 /** The browser context for a window of a size, or a device (a phone, a tablet) held either way. */
 export function contextFor({ width = 1280, height = 720, device, landscape = false }: OpenOptions): BrowserContextOptions {
@@ -518,9 +523,9 @@ async function main() {
         await page.mouse.wheel(rest[2] && rest[2] !== "ctrl" ? Number(rest[2]) : 0, Number(rest[1]));
         if (rest[2] === "ctrl") await page.keyboard.up("Control");
       } else if (kind === "tap") await fingers.tap(pt(rest[0]), Number(rest[1] ?? 60));
-      else if (kind === "tapon") await fingers.tap(await targetOf(page, rest[0], rest[1] === undefined ? undefined : Number(rest[1])));
+      else if (kind === "tapon") await fingers.tap(await targetOf(page, rest[0], rest[1] === undefined ? undefined : Number(rest[1]), rest[2] === undefined ? undefined : Number(rest[2])));
       else if (kind === "clickon") {
-        const p = await canvasPoint(page, await targetOf(page, rest[0], rest[1] === undefined ? undefined : Number(rest[1])));
+        const p = await canvasPoint(page, await targetOf(page, rest[0], rest[1] === undefined ? undefined : Number(rest[1]), rest[2] === undefined ? undefined : Number(rest[2])));
         await page.mouse.click(p.x, p.y);
       }
       else if (kind === "touchdrag") await fingers.drag(pt(rest[0]), pt(rest[1]), Number(rest[2] ?? 400));

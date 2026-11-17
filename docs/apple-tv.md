@@ -442,7 +442,7 @@ unless requested, and the game uses its made-up forecast.
    makes an explicit development profile for the App ID with the entitlement, in place of the
    wildcard one.
 4. On the TV, the first time the title comes up, allow the app to use your location while it is
-   in use. Settings → Screensaver now has Real weather (on); on the Weather tool "Now" becomes "Outside" within
+   in use. Settings → Screensaver now has Real weather (on); on the Sky the weather's "Now" becomes "Outside" within
    a few seconds; About the fly ends with Apple Weather's attribution.
 5. If it stays "Now", read the console (`run --device` prints it) for `weather outside: …`:
    `unauthorised` with a `WDSJWTAuthenticator` error means WeatherKit doesn't accept the App ID
@@ -469,10 +469,11 @@ README's Tests).
 ## Playing together
 
 The Apple TV plays online, in rooms with others, as a browser does (`docs/online.md`).
-Online is the default: once the brain is running, the game tries the room open to everyone for
-where the fly lives. A player-created room's invitation or a retained one is resumed instead,
-and `?alone` suppresses the automatic attempt for the launch. Failed automatic attempts leave
-the fly alone and may retry. Online → Disconnect plays alone until Go online. Its runtime has no
+The fly is at home, alone, until the player takes it to visit a room open to everyone from
+Online; on a visit, once the brain is running, the game tries that room, this launch and later
+ones, until Online → Go home. A player-created room's invitation or a retained one is resumed
+instead, and `?alone` suppresses a visit's attempt for the launch. Failed attempts leave
+the fly alone and may retry. Its runtime has no
 `WebSocket`, so the host gives it one, and tvOS's own keyboard for typing a table's code.
 
 ### The line to the room

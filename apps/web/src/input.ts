@@ -490,8 +490,9 @@ export class Pointers {
 export type KeyAction = { kind: "tool"; index: number } | { kind: "home" };
 
 export function keyAction(code: string, key: string): KeyAction | null {
-  const digit = /^(?:Digit|Numpad)([1-9])$/.exec(code);
-  if (digit) return { kind: "tool", index: Number(digit[1]) - 1 };
+  // 1 to 9 along the shelf, and 0 the tenth, as the keys lie.
+  const digit = /^(?:Digit|Numpad)([0-9])$/.exec(code);
+  if (digit) return { kind: "tool", index: (Number(digit[1]) + 9) % 10 };
   if (code === "KeyR" || key === "Home") return { kind: "home" };
   return null;
 }

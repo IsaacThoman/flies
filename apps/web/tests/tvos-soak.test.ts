@@ -4,12 +4,14 @@ import { driveMs, soakConfig, tableSoakConfig } from "../../../scripts/tvosSoak.
 import { NATIVE_MOST } from "../src/brain/create.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import { TIMES } from "../src/scene/light.ts";
-import { WEATHERS } from "@fly/world";
+import { TOOLS } from "../src/tools/hands.ts";
 
 test("the device soak visits every place, weather and daylight and divides wallpaper time among them", () => {
   const config = soakConfig(60);
   const logs = config.drive.filter((s) => s[0] === "log").map((s) => s[1]);
-  for (const place of PLACES) for (const weather of WEATHERS) for (const time of TIMES) assert.ok(logs.includes(`${place.id} ${weather} ${time}`));
+  // Once round the Sky's weathers (from wherever a launch left them), each at every time of day.
+  const weathers = TOOLS.find((t) => t.id === "sky")!.second!.length;
+  for (const place of PLACES) for (let weather = 1; weather <= weathers; weather++) for (const time of TIMES) assert.ok(logs.includes(`${place.id} weather ${weather} ${time}`));
   let wallpaperMs = 0;
   config.drive.forEach((step, i) => {
     if (step[0] === "log" && step[1].endsWith(" wallpaper")) {
@@ -24,8 +26,8 @@ test("the device soak visits every place, weather and daylight and divides wallp
   assert.deepEqual(waits[0], { ready: "true" });
   assert.ok(waits.some((s) => s.screen === "settings" && s.tab === "picture"));
   assert.ok(waits.some((s) => s.tab === "wallpaper"));
-  // Stepping through Settings' place carries the fly to each place on the way: pin once, then the Place tool moves the pin.
-  assert.equal(waits.filter((s) => s.focus === "place").length, 1);
+  // The screensaver set to stay home once, so the long wallpaper phases never go round the places.
+  assert.equal(waits.filter((s) => s.focus === "wallpaperPlaces").length, 1);
   // The wallpaper's default minute must not race a wait's own default minute.
   assert.ok(config.drive.every((s) => s[0] !== "wait" || (s[1] as Record<string, string>).wallpaper !== "true" || (s[2] ?? 0) > 60000));
   assert.ok(waits.every((s) => !["pause", "wallpaper", "picture"].includes(s.screen)));

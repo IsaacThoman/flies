@@ -2,7 +2,9 @@
 
 [Documentation index](../README.md#documentation).
 
-Online works on the browser and Apple hosts; see [joining and hosting rooms](online.md#playing).
+The fly lives at home: alone, in the place it lives, where every launch
+finds it. Rooms with others are somewhere you take it, from Online, on the
+browser and Apple hosts; see [visiting and hosting rooms](online.md#playing).
 
 **Settings → Screensaver → Flies** chooses one to four (up to three on Apple TV), shown as enamel
 dots in the table colours, kept between launches. Each is a whole fly, with
@@ -34,8 +36,8 @@ fly's world.
 | --- | --- |
 | Swipe on the touch surface | Moves your hand across the table. With View in hand, turns the camera round the fly and up or down instead. |
 | Left / Right | Picks a tool from the shelf. |
-| Up / Down | Picks the tool's kind: which food, how hard to blow, the time of day, the weather, the camera. |
-| Select | Uses the tool: drops food, throws the ball. Hold it to tickle or blow. On Light, Weather and View it steps round the choices. |
+| Up / Down | Picks the tool's kind: which food, how hard to blow, the time of day, the camera. |
+| Select | Uses the tool: drops food, throws the ball. Hold it to tickle or blow. On the Sky it steps round the weathers, on View round the views. |
 | Play/Pause, or Back | The menu. Play/Pause, or Play on it, carries on. |
 | Back on the menu | On Apple TV, leaves at the root. In the browser, returns to play after play has begun. |
 
@@ -46,7 +48,7 @@ Pointing, the screen itself is what you press, and there are no button hints:
 | Your hand | Where you touch the table. Touching the fly is touching the fly, not the table behind it. | Under the cursor, on whatever it is over (the cursor is hidden there: the ring is the cursor). |
 | Feed, Swoop | Tap where you mean. | Click there. |
 | Tickle, Blow | Touch and hold, and drag: the feather strokes the fly while you hold it on it, and rests on it lightly while the hand is there; the puff follows the finger. | Hold the button, and drag. Hovering over the fly rests the feather on it. |
-| Light, Weather, View, Place | The arrows either side of the tool's label (or a tap on the label, or a swipe along it) step its kind; tapping the tool again does too. Place has a Go button for somewhere the fly isn't. | The same, or the wheel over the label. |
+| Sky, View, Place | The arrows either side of the tool's label (or a tap on the label, or a swipe along it) step its kind; tapping the tool again does too (on the Sky, its weather). The Sky has two labels side by side, the time of day and the weather, each with its own arrows (one over the other where they don't fit). Place has a Go button for somewhere the fly isn't. | The same, or the wheel over a label. |
 | Closer and farther | Pinch. | The wheel, or a trackpad's pinch. |
 | Round the fly | Drag anywhere but with the feather or the air in hand on the table (they go where the finger goes); or drag with two fingers. | Drag (the same), or drag with the right or middle button outside the HUD. A trackpad's two-finger scroll, round and up or down. |
 | Back to Follow | Double-tap the air. | Double-click the air, or R. |
@@ -56,7 +58,7 @@ Pointing, the screen itself is what you press, and there are no button hints:
 
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
 Back, space for Play/Pause), its hints drawn as keys; the number keys pick a
-tool, + and − held bring the camera in and take it out, Q and E held turn it
+tool (1 the first, 0 the tenth), + and − held bring the camera in and take it out, Q and E held turn it
 round the fly, W and S up and down, and R (or Home) takes it back to Follow's distance and height. After a mouse
 or a finger the menus show no focus; the first arrow shows it, on what was
 last pressed. A standard game pad (the Gamepad API) is the remote too: A is
@@ -78,21 +80,24 @@ screensaver, using arrow, pointing or grabbing cursors elsewhere. It suppresses 
 selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
 
-The tools are **Feed** (sugar, honey, raspberry, water, and Clear dropped, which
-removes your offerings, including those still falling, leaving the place’s own food), **Swoop** (a dark
-beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
+The tools are, about the fly, **Feed** (sugar, honey, raspberry, water, and Clear dropped, which
+removes your offerings, including those still falling, leaving the place’s own food), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
-from where you sit toward the spot), **Light** (now, which follows the clock,
-or morning, midday, golden hour, dusk, night), **Weather** (now, which
-follows the forecast, or clear, overcast, mist, rain, heavy rain, thunderstorm, snow, sleet), **View** (close up, follow, wide, the whole table, from above,
+from where you sit toward the spot) and **Swoop** (a dark
+beach ball dives at the spot and veers away); and, about its world and the
+camera, **Sky** (the time of day: now, which follows the clock, or morning,
+midday, golden hour, dusk, night, on Up and Down; and the weather: now, which
+follows the forecast, or clear, overcast, mist, rain, heavy rain, thunderstorm,
+snow, sleet, on Select, round and round), **Place** (where it lives; Up and
+Down choose, Select carries it there) and **View** (close up, follow, wide, the whole table, from above,
 through the fly's eyes, and inside it, close up with the fly as glass; Up
-brings the camera in, Down takes it out) and
-**Place** (where it lives; Up and Down choose, Select carries it there). On
-the shelf the four that act on the fly stand apart from the four about its
-world and the camera; Left and Right go along all of them. Hints in the
+brings the camera in, Down takes it out). On the shelf the two groups stand
+apart, or, on a screen too narrow for them in a row, the fly's over its
+world's; Left and Right go along all of them. Hints in the
 corners show what the buttons do, until they have been used: the shelf's goes
 once you have gone along it, and what Select does with a tool once you have
-used it (held it, for Tickle and Blow), on later launches too. The way to the
+used it (held it, for Tickle and Blow), on later launches too; the Sky's
+shows Up and Down over its time of day and Select over its weather. The way to the
 menu stays visible. With hints enabled, a remote or pad also teaches hand
 movement until that lesson is learned; it is kept between launches.
 Settings → Picture → Hints controls whether this teaching is shown. A caption at the top says what the fly is doing.
@@ -161,6 +166,10 @@ After 30 seconds with no press (Settings → Screensaver: 15 s to 5 min, or neve
 the hints, the shelf and the pointer fade, and the camera settles beside the
 fly and follows it: the screensaver. A mouse resting on the desk doesn't keep it
 away, and a nudge of the desk doesn't end it; a mouse moved as if meant does.
+The fly stays home, in the place it lives, unless Settings → Screensaver →
+Places is Each in turn: then, alone at home, the screensaver carries it on to
+the next place after 20 minutes watched in one, and play begins with it
+carried home ([The world](world.md)).
 Its camera can take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
 (Lively), or keep the whole place in view with a slow drift (Whole place).
@@ -222,14 +231,15 @@ It has **Play**, **Watch** (the screensaver straight away), **About**, and
 
 **Settings**: a row of tabs over each part of the game, every setting two
 steps from the menu, with rows scrolling on shorter screens: **Screensaver** (when it starts, how
-its camera films, where the flies live, how many, and, on an Apple TV that can tell,
+its camera films, where the flies live and whether the screensaver goes round
+the places, how many, and, on an Apple TV that can tell,
 the real weather), **On screen** (everything that can show over the world:
 what it sees, its nervous system and its stats in the corners, what the
 stats are of, the corners' size and opacity, and the X-ray), and **Picture**
 (pixel size, the eyes' detail, Hints, rumble, frame stats). Where it
-can be online, the menu has **Online**, rooms shared with others: the game
-sits with everyone where the fly lives by default, and Online → Disconnect
-plays alone until Go online. The title menu shows all its rows: on a screen too short for its rows (a phone on its side) they are
+can be online, the menu has **Online**, rooms shared with others: the fly
+is at home, alone, until you take it to visit a room open to everyone, or
+to make or join a room of your own, and Online → Go home brings it back. The title menu shows all its rows: on a screen too short for its rows (a phone on its side) they are
 in two columns, Left and Right going across, Up and Down along the list as
 ever. Where the settings' tabs are too
 narrow to read (the smallest phones), they are one choice, the tab shown

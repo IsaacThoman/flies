@@ -33,9 +33,10 @@ opens the menu. A mouse or finger points into the world; hold Tickle or Blow
 to use it continuously. [Controls, tools, camera and displays](docs/playing.md)
 cover the remote, keyboard, game pad and touch gestures.
 
-The game tries to join a public room by default. Each fly's brain stays on
-its owner's device. [Online](docs/online.md#playing) explains joining, making
-a room and staying alone. [The world](docs/world.md) describes the places,
+The fly lives at home, alone, until you take it to visit a room open to
+everyone, or to a room of your own, from Online. Each fly's brain stays on
+its owner's device. [Online](docs/online.md#playing) explains visiting, making
+a room and going home. [The world](docs/world.md) describes the places,
 weather, food and visitors; [adding a place](docs/places.md) is the authoring
 reference.
 

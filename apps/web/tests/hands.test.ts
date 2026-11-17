@@ -69,9 +69,9 @@ test("frame end clears every hands event even when a pause skips the regular upd
   const { hands, update } = setup();
   update(0, true);
   update(0.2);
-  hands.stepTool(1);
+  hands.chooseTool(TOOLS.findIndex((t) => t.id === "swoop"));
   update(0, true);
-  hands.stepTool(-1);
+  hands.chooseTool(0);
   hands.stepVariant(1);
   hands.stepVariant(-1);
   hands.stepVariant(-1);

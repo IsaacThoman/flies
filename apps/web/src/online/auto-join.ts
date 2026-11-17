@@ -1,14 +1,26 @@
-// Being with others by default: once the brain is awake, the game sits this
-// device in a room open to everyone (docs/online.md, "Everyone"): the one for
-// the place it lives in, or Everyone's, which take turns, if it lives in each
-// in turn. Unless the player has disconnected, is at a room of their own, or
-// is offline. It is quiet about it. A room server that can't be reached, or
-// one that turns the device away, leaves the fly playing alone as if nothing
-// had been tried, and it tries again later, less often each time. Choosing
-// another place moves it to that place's room.
+// Visiting: a fly lives at home, alone, until the player takes it to a room
+// open to everyone (docs/online.md, "Home and visiting"). From then on, until
+// it goes home, once the brain is awake the game keeps this device in that
+// series of rooms: the one for a place, or Everyone's, which take turns,
+// unless it is at a room of someone's own or offline. It is quiet about it.
+// A room server that can't be reached, or one that turns the device away,
+// leaves the fly playing alone as if nothing had been tried, and it tries
+// again later, less often each time. Choosing another place on a visit moves
+// it to that place's room.
 
 import { everyoneSeries, seriesCode } from "@fly/net";
 import type { Ended } from "./online.ts";
+
+/**
+ * Where a launch sits down: a room of someone's own it was invited to (a link,
+ * a code) or was still at when it last closed (`sit`); or a room open to
+ * everyone it was invited to, which starts a visit there (`visit`). Anything
+ * else is home, or the visit it was already on (`AutoJoin`).
+ */
+export function launchSeat(invited: string | null, kept: string | null): { sit: string | null; visit: string | null } {
+  if (invited) return everyoneSeries(invited) >= 0 ? { sit: null, visit: invited } : { sit: invited, visit: null };
+  return { sit: kept && everyoneSeries(kept) < 0 ? kept : null, visit: null };
+}
 
 /** Seconds a try has to be welcomed before it is given up, quietly. */
 export const ATTEMPT = 10;
@@ -17,7 +29,7 @@ export const RETRY = [30, 60, 120, 300];
 
 /** What the game tells it each frame. */
 export type AutoJoinNow = {
-  /** The player is online (the Online menu's Disconnect turns it off). */
+  /** On a visit (choosing a room open to everyone starts one, Online → Go home ends it). */
   enabled: boolean;
   /** The brain has woken and the menu is up. */
   awake: boolean;
@@ -25,9 +37,9 @@ export type AutoJoinNow = {
   network: boolean;
   /** This device is at a room, or trying one, of any kind, or at a locked one's door. */
   atRoom: boolean;
-  /** The series of rooms open to everyone it belongs in: the place it lives in's, or Everyone's (`seriesFor`). */
+  /** The series of rooms open to everyone it is visiting: a place's, or Everyone's. */
   series: number;
-  /** The series of the room open to everyone it has been let into, if it is in one by default; -1 otherwise. */
+  /** The series of the room open to everyone it has been let into, if it is in one on its visit; -1 otherwise. */
   atSeries: number;
 };
 
@@ -37,7 +49,7 @@ export type AutoJoinAction = "join" | "switch" | "abandon" | null;
 export class AutoJoin {
   /** For good, this launch: opened `?alone`, another window of this device took its seat, or no room server it can sit with. */
   stopped = false;
-  /** The room open to everyone this device was last in (its flies may still be there). */
+  /** The room open to everyone this device was last in (its flies may still be there), to come back to on a visit to its series. */
   #last: string | null;
   #series = 0;
   #time = 0;

@@ -76,8 +76,8 @@ test("only visible unfinished lessons need teaching redraws", () => {
   state.learned.tools = true;
   state.learned.hand = true;
   assert.equal(needsTeaching(state), false);
-  hands.tool = TOOLS.findIndex((t) => t.id === "light");
+  hands.tool = TOOLS.findIndex((t) => t.id === "sky");
   assert.equal(needsTeaching(state), true);
-  hands.fixed = new Set(["light"]);
+  hands.fixed = new Set(["sky"]);
   assert.equal(needsTeaching(state), false, "an unavailable control must not nag");
 });

@@ -56,7 +56,10 @@ function iconTexture(tool: ToolId) {
 }
 
 /** A tool's picture, centred on (x, y), `r` across in each direction. Shared with the shelf. */
-export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolId, x: number, y: number, r: number) {
+/** What a tool's picture can be of: a tool, or one of the Sky's dials (its time of day, its weather). */
+export type ToolIcon = ToolId | "light" | "weather";
+
+export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolIcon, x: number, y: number, r: number) {
   g.save();
   g.translate(x, y);
   g.lineCap = "round";
@@ -168,6 +171,34 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolId, x: numbe
         g.lineTo(i * r * 0.32 - r * 0.04, r * 0.78);
         g.stroke();
       }
+      break;
+    }
+    case "sky": {
+      // The sun, rayed, with a cloud passing low in front of it: the time of day and the weather.
+      g.fillStyle = "#ffcf2e";
+      g.strokeStyle = "#e88a00";
+      g.lineWidth = r * 0.08;
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        g.beginPath();
+        g.moveTo(r * 0.22 + Math.cos(a) * r * 0.42, -r * 0.22 + Math.sin(a) * r * 0.42);
+        g.lineTo(r * 0.22 + Math.cos(a) * r * 0.66, -r * 0.22 + Math.sin(a) * r * 0.66);
+        g.stroke();
+      }
+      g.beginPath();
+      g.arc(r * 0.22, -r * 0.22, r * 0.32, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      g.fillStyle = "#ffffff";
+      g.strokeStyle = "#5a7ea8";
+      g.beginPath();
+      g.moveTo(-r * 0.7, r * 0.5);
+      g.arc(-r * 0.5, r * 0.3, r * 0.24, Math.PI * 0.6, Math.PI * 1.45);
+      g.arc(-r * 0.14, r * 0.12, r * 0.34, Math.PI * 1.1, Math.PI * 1.9);
+      g.arc(r * 0.34, r * 0.3, r * 0.26, Math.PI * 1.45, Math.PI * 0.45);
+      g.closePath();
+      g.fill();
+      g.stroke();
       break;
     }
     case "view": {

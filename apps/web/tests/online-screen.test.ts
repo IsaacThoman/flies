@@ -106,18 +106,13 @@ function world(canShare = true) {
     joinRoom: (code, password) => did.push(`join ${code}${password ? ` ${password}` : ""}`),
     shareTable: async () => "copied",
     removeFly: (id) => did.push(`remove ${id}`),
-    leaveTable: () => did.push("leave"),
-    get isOnline() {
-      return shell.settings.joinOthers;
+    get visiting() {
+      return shell.settings.visit >= 0;
     },
-    disconnect() {
-      shell.settings.joinOthers = false;
+    goHome() {
+      shell.settings.visit = -1;
       state.table = null;
-      did.push("disconnect");
-    },
-    goOnline() {
-      shell.settings.joinOthers = true;
-      did.push("online");
+      did.push("home");
     },
   };
   const screen = new OnlineScreen(shell);
@@ -135,49 +130,48 @@ function world(canShare = true) {
   return { screen, shell, state, typing, did, step, press, focus };
 }
 
-test("the rooms: Disconnect, a new one, a code, then each listed room by its name, its place's colour, its flies as pips and a padlock; a full one can't be chosen", () => {
+test("the rooms at home: a new one, a code, then each listed room by its name, its place's colour, its flies as pips and a padlock; a full one can't be chosen", () => {
   const { screen, state, step } = world();
   assert.equal(screen.view, "rooms");
-  assert.deepEqual(screen.menu.items.map((i) => i.id), ["disconnect", "new", "code", "looking"], "until the room server has said");
+  assert.deepEqual(screen.menu.items.map((i) => i.id), ["new", "code", "looking"], "until the room server has said");
   state.rooms = ROOMS;
   step();
   const rows = screen.menu.items as ActionItem[];
-  assert.deepEqual(rows.map((i) => i.id), ["disconnect", "new", "code", "room:aaaaaaaaaa", "room:bbbbbbbbbb", "room:cccccccccc"]);
-  assert.deepEqual([rows[3].label, rows[3].swatch, rows[3].count, rows[3].locked], ["Sunny Crumbs", placeInfo("greenhouse").colour, [3, MAX_FLIES], false]);
-  assert.equal(rows[4].locked, true);
-  assert.equal(rows[5].disabled, true, "full");
+  assert.deepEqual(rows.map((i) => i.id), ["new", "code", "room:aaaaaaaaaa", "room:bbbbbbbbbb", "room:cccccccccc"]);
+  assert.deepEqual([rows[2].label, rows[2].swatch, rows[2].count, rows[2].locked], ["Sunny Crumbs", placeInfo("greenhouse").colour, [3, MAX_FLIES], false]);
+  assert.equal(rows[3].locked, true);
+  assert.equal(rows[4].disabled, true, "full");
   // The list changes as the room server says: a room empties out of it.
   state.rooms = ROOMS.slice(1);
   step();
-  assert.deepEqual(screen.menu.items.map((i) => i.id), ["disconnect", "new", "code", "room:bbbbbbbbbb", "room:cccccccccc"]);
+  assert.deepEqual(screen.menu.items.map((i) => i.id), ["new", "code", "room:bbbbbbbbbb", "room:cccccccccc"]);
   state.rooms = [];
   step();
-  assert.deepEqual(screen.menu.items.map((i) => i.id), ["disconnect", "new", "code", "none"]);
+  assert.deepEqual(screen.menu.items.map((i) => i.id), ["new", "code", "none"]);
 });
 
-test("Disconnect leaves for good, until Go online; at a room of someone's own, Leave the room goes back to everyone and Disconnect is alone", () => {
+test("Go home ends a visit, from its room or on the way to it, and leaves a room of someone's own; at home the rooms are still a step away", () => {
   const { screen, shell, state, did, step, press, focus } = world();
+  shell.settings.visit = 0;
+  step();
+  assert.deepEqual(screen.menu.items.map((i) => i.id), ["home", "new", "code", "looking"], "on the way to the room it is visiting");
   state.table = EVERYONE_TABLE;
   step();
-  focus("disconnect");
+  focus("home");
   press("select");
-  assert.deepEqual(did, ["disconnect"]);
-  assert.equal(shell.isOnline, false);
+  assert.deepEqual(did, ["home"]);
+  assert.equal(shell.visiting, false);
   assert.equal(screen.view, "rooms");
-  assert.equal(screen.menu.focused?.id, "online");
-  assert.deepEqual(screen.menu.items.map((i) => i.id), ["online", "new", "code", "looking"], "the rooms can still be browsed, and joined, offline");
-  press("select");
-  assert.deepEqual(did, ["disconnect", "online"]);
-  assert.equal(shell.isOnline, true);
-  assert.equal(screen.menu.items[0].id, "disconnect");
+  assert.equal(screen.menu.focused?.id, "new");
+  assert.deepEqual(screen.menu.items.map((i) => i.id), ["new", "code", "looking"], "the rooms can still be browsed, and joined, from home");
 
   state.table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://x/?table=abcdefghjk", starting: false, joined: true, everyone: false, others: [] };
   step();
-  assert.deepEqual(screen.menu.items.map((i) => i.id), ["share", "leave", "disconnect"]);
-  assert.equal(screen.menu.item("leave")?.label, "Leave the room");
-  focus("disconnect");
+  assert.deepEqual(screen.menu.items.map((i) => i.id), ["share", "home"]);
+  assert.equal(screen.menu.item("home")?.label, "Go home");
+  focus("home");
   press("select");
-  assert.deepEqual(did, ["disconnect", "online", "disconnect"]);
+  assert.deepEqual(did, ["home", "home"]);
   assert.equal(screen.view, "rooms");
 });
 
@@ -249,10 +243,10 @@ test("while the door opens it says so, and once in, the room's own face: its nam
   state.knock = null;
   step();
   assert.equal(screen.view, "room");
-  assert.deepEqual(screen.menu.items.map((i) => i.id), ["share", "leave", "disconnect"], "only the starter removes flies");
+  assert.deepEqual(screen.menu.items.map((i) => i.id), ["share", "home"], "only the starter removes flies");
   screen.press("down", false);
   screen.press("select", false);
-  assert.deepEqual(did, ["leave"]);
+  assert.deepEqual(did, ["home"]);
 });
 
 test("at a room, its QR code and its code beside the menu, once in; Share only where a link can be handed on", () => {
@@ -260,7 +254,7 @@ test("at a room, its QR code and its code beside the menu, once in; Share only w
     const { screen, state, step } = world(canShare);
     state.table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://x/?table=abcdefghjk", starting: false, joined: true, everyone: false, others: [] };
     step();
-    assert.deepEqual(screen.menu.items.map((i) => i.id), canShare ? ["share", "leave", "disconnect"] : ["leave", "disconnect"]);
+    assert.deepEqual(screen.menu.items.map((i) => i.id), canShare ? ["share", "home"] : ["home"]);
     const g = blankCanvas();
     screen.draw(g, 0, new HitMap());
     // The code in two halves, read in groups of five and typed as one.
@@ -275,13 +269,13 @@ test("at a room, its QR code and its code beside the menu, once in; Share only w
   assert.ok(!writtenOn(g).some((w) => w.text === "abcde"));
 });
 
-test("a room open to everyone offers sharing where available, browsing the rooms and disconnecting, not leaving", () => {
+test("a room open to everyone offers sharing where available, browsing the rooms and going home", () => {
   for (const canShare of [true, false]) {
     const { screen, state, step } = world(canShare);
     state.table = EVERYONE_TABLE;
     step();
     assert.equal(screen.view, "room");
-    assert.deepEqual(screen.menu.items.map((item) => item.id), canShare ? ["share", "rooms", "disconnect"] : ["rooms", "disconnect"]);
+    assert.deepEqual(screen.menu.items.map((item) => item.id), canShare ? ["share", "rooms", "home"] : ["rooms", "home"]);
     assert.equal(screen.menu.item("rooms")?.label, "Browse rooms");
   }
 });
@@ -657,7 +651,8 @@ test("a non-message JSON value cannot stop the room list receiving a later list"
 });
 
 test("room discovery failures replace searching, stale choices are disabled, and recovery clears the message", () => {
-  const { screen, state, step, press, did } = world();
+  const { screen, shell, state, step, press, did } = world();
+  shell.settings.visit = 0;
   state.lobbyStatus = "lost";
   step();
   assert.equal(screen.menu.items.at(-1)?.label, "Can't reach rooms");
@@ -670,8 +665,8 @@ test("room discovery failures replace searching, stale choices are disabled, and
   step();
   const g = blankCanvas(); screen.draw(g, 0, new HitMap());
   assert.equal(writtenOn(g).filter((w) => w.text === "Update needed").length, 1);
-  // Being alone is always within reach.
-  assert.ok(screen.menu.items.every((item) => !!item.disabled === (item.id !== "disconnect")));
+  // Home is always within reach.
+  assert.ok(screen.menu.items.every((item) => !!item.disabled === (item.id !== "home")));
   state.lobbyStatus = "open";
   step();
   assert.ok(!screen.menu.items.some((item) => item.id === "unavailable"));
@@ -707,12 +702,12 @@ test("an invitation's version failure clears when compatible discovery recovers"
 
 test("let into a room while the list showed, or opened again, Online starts at the top of what it shows, not on a row that shares the last one's id", () => {
   const { screen, state, step } = world();
-  assert.equal(screen.menu.focused?.id, "disconnect");
+  assert.equal(screen.menu.focused?.id, "new");
   state.table = EVERYONE_TABLE;
   step();
   assert.equal(screen.view, "room");
   assert.equal(screen.menu.focused?.id, "share");
-  screen.menu.focusOn("disconnect");
+  screen.menu.focusOn("home");
   screen.enter();
   assert.equal(screen.menu.focused?.id, "share");
 });

@@ -14,33 +14,65 @@ import type { PlaceId } from "../places/catalog.ts";
 import type { TimeOfDay } from "../scene/light.ts";
 import type { WeatherKind } from "../scene/weather.ts";
 
-export type ToolId = "feed" | "swoop" | "feather" | "blow" | "light" | "weather" | "view" | "place";
+export type ToolId = "feed" | "feather" | "blow" | "swoop" | "sky" | "view" | "place";
 
 export type Variant = { id: string; label: string };
-export type Tool = { id: ToolId; name: string; verb: string; hold: boolean; variants: readonly Variant[]; /** The kind chosen at the start, if not the first. */ initial?: number };
+export type Tool = {
+  id: ToolId;
+  name: string;
+  verb: string;
+  hold: boolean;
+  variants: readonly Variant[];
+  /** The kind chosen at the start, if not the first. */
+  initial?: number;
+  /** A second dial of kinds beside the first, chosen on its own: the Sky's weather, beside its time of day. Select steps it. */
+  second?: readonly Variant[];
+  /** About the fly's world and the camera, not the fly: the shelf's second group. */
+  world?: true;
+};
+/** Which of a tool's dials: its kinds, or its second dial's. */
+export type Dial = 0 | 1;
 
+const LIGHTS: readonly Variant[] = [{ id: "clock", label: "Now" }, { id: "morning", label: "Morning" }, { id: "noon", label: "Midday" }, { id: "golden", label: "Golden hour" }, { id: "dusk", label: "Dusk" }, { id: "night", label: "Night" }];
+const WEATHERS: readonly Variant[] = [{ id: "now", label: "Now" }, { id: "clear", label: "Clear" }, { id: "overcast", label: "Overcast" }, { id: "mist", label: "Mist" }, { id: "rain", label: "Rain" }, { id: "heavyRain", label: "Heavy rain" }, { id: "storm", label: "Thunderstorm" }, { id: "snow", label: "Snow" }, { id: "sleet", label: "Sleet" }];
+
+/**
+ * The shelf, in order: the tools about the fly, then those about its world
+ * and the camera (`world`), the groups apart on screen and one row to the
+ * remote. A tool is one entry here; the layout, the number keys, the hints
+ * and what the shelf keeps follow from the list.
+ */
 export const TOOLS: readonly Tool[] = [
   { id: "feed", name: "Feed", verb: "Drop", hold: false, variants: [{ id: "sugar", label: "Sugar" }, { id: "honey", label: "Honey" }, { id: "berry", label: "Raspberry" }, { id: "water", label: "Water" }, { id: "clear", label: "Clear dropped" }] },
-  { id: "swoop", name: "Swoop", verb: "Throw the ball", hold: false, variants: [{ id: "ball", label: "Beach ball" }] },
   { id: "feather", name: "Tickle", verb: "Tickle", hold: true, variants: [{ id: "feather", label: "Feather" }] },
   { id: "blow", name: "Blow", verb: "Blow", hold: true, variants: [{ id: "gentle", label: "Gently" }, { id: "strong", label: "Hard" }] },
-  // "Now" follows the clock, so the wallpaper's light changes with the day outside.
-  { id: "light", name: "Light", verb: "", hold: false, variants: [{ id: "clock", label: "Now" }, { id: "morning", label: "Morning" }, { id: "noon", label: "Midday" }, { id: "golden", label: "Golden hour" }, { id: "dusk", label: "Dusk" }, { id: "night", label: "Night" }] },
+  { id: "swoop", name: "Swoop", verb: "Throw the ball", hold: false, variants: [{ id: "ball", label: "Beach ball" }] },
+  // The time of day, and the weather. "Now" follows the clock, so the wallpaper's light changes with the day outside; the weather's
   // "Now" is the weather outside where the Apple TV can tell it ("Outside"), else wanders as a forecast worked out from the clock would; the others hold.
-  { id: "weather", name: "Weather", verb: "", hold: false, variants: [{ id: "now", label: "Now" }, { id: "clear", label: "Clear" }, { id: "overcast", label: "Overcast" }, { id: "mist", label: "Mist" }, { id: "rain", label: "Rain" }, { id: "heavyRain", label: "Heavy rain" }, { id: "storm", label: "Thunderstorm" }, { id: "snow", label: "Snow" }, { id: "sleet", label: "Sleet" }] },
-  // Nearest first, so Up brings the camera in and Down takes it out; then through its eyes, and inside it (close up, its body as glass).
-  { id: "view", name: "View", verb: "", hold: false, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }, { id: "inside", label: "Inside it" }] },
+  { id: "sky", name: "Sky", verb: "", hold: false, world: true, variants: LIGHTS, second: WEATHERS },
   // Where it lives: Up and Down choose, Select carries it there. Only when there is somewhere else to go.
-  ...(PLACES.length > 1 ? [{ id: "place", name: "Place", verb: "Go", hold: false, variants: PLACES.map((p) => ({ id: p.id, label: p.name })) } satisfies Tool] : []),
+  ...(PLACES.length > 1 ? [{ id: "place", name: "Place", verb: "Go", hold: false, world: true, variants: PLACES.map((p) => ({ id: p.id, label: p.name })) } satisfies Tool] : []),
+  // Nearest first, so Up brings the camera in and Down takes it out; then through its eyes, and inside it (close up, its body as glass).
+  { id: "view", name: "View", verb: "", hold: false, world: true, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }, { id: "inside", label: "Inside it" }] },
 ];
 
 /** The tools before this one act on the fly; from it on, they are about its world and the camera. */
-export const WORLD_TOOLS = TOOLS.findIndex((t) => t.id === "light");
+export const WORLD_TOOLS = Math.max(0, TOOLS.findIndex((t) => t.world));
 /** Where the Place tool is on the shelf, or -1 without one. */
 export const PLACE_TOOL = TOOLS.findIndex((t) => t.id === "place");
-const LIGHT_TOOL = TOOLS.findIndex((t) => t.id === "light");
-const WEATHER_TOOL = TOOLS.findIndex((t) => t.id === "weather");
+const SKY_TOOL = TOOLS.findIndex((t) => t.id === "sky");
 const VIEW_TOOL = TOOLS.findIndex((t) => t.id === "view");
+
+/** A tool's kinds on one of its dials. */
+export const kindsOf = (tool: Tool, dial: Dial): readonly Variant[] => (dial === 1 ? tool.second ?? [] : tool.variants);
+
+/** The choices the shelf can keep between launches, each a dial of a tool. */
+export const DIALS = {
+  view: { tool: "view", dial: 0 },
+  light: { tool: "sky", dial: 0 },
+  weather: { tool: "sky", dial: 1 },
+} as const satisfies Record<string, { tool: ToolId; dial: Dial }>;
+export type DialId = keyof typeof DIALS;
 
 /** Where the ball comes from, radians round from straight ahead toward the fly's right. */
 export const SWOOP_BEARING = 0.9;
@@ -94,6 +126,8 @@ const v3 = (x = 0, y = 0, z = 0): Vec3 => ({ x, y, z });
 export class Hands {
   tool = 0;
   readonly variants: number[] = TOOLS.map((t) => t.initial ?? 0);
+  /** The kind on each tool's second dial, where it has one (the Sky's weather). */
+  readonly seconds: number[] = TOOLS.map(() => 0);
   /** The pointer's place in the world and the way the surface there faces. */
   readonly pointer = v3();
   readonly normal = v3(0, 1, 0);
@@ -116,22 +150,39 @@ export class Hands {
   readonly landedNormal = v3(0, 1, 0);
   /** What the fly stands on where it is now ("table", "sill"), for the name of the whole-place view. */
   surface = "table";
-  /** The Weather tool's "Now" is the real weather outside: it is called "Outside". */
+  /** The Sky's weather "Now" is the real weather outside: it is called "Outside". */
   outside = false;
-  /** Tools whose kind can't be changed now: at a table with others, the light, the weather and the place are the starter's to choose. */
+  /** Tools whose kind can't be changed now: at a table with others, the sky and the place are the starter's to choose. */
   fixed: ReadonlySet<ToolId> = new Set();
   #idle = 0;
   /** Select was held at the last update. */
   #holding = false;
   #world: World;
 
-  /** `start`: a kind to start on for some tools, by id; any the shelf doesn't have are passed over. */
-  constructor(world: World, start: { readonly [T in ToolId]?: { readonly kind: string } } = {}) {
+  /** `start`: a kind to start on for some dials, by id; any the shelf doesn't have are passed over. */
+  constructor(world: World, start: { readonly [D in DialId]?: { readonly kind: string } } = {}) {
     this.#world = world;
-    TOOLS.forEach((tool, i) => {
-      const kind = tool.variants.findIndex((v) => v.id === start[tool.id]?.kind);
-      if (kind >= 0) this.variants[i] = kind;
-    });
+    for (const id of Object.keys(DIALS) as DialId[]) {
+      const kind = start[id]?.kind;
+      if (kind !== undefined) this.setKind(id, kind);
+    }
+  }
+
+  /** The kind on a kept dial, by its id. */
+  kindOf(id: DialId): string {
+    const { tool, dial } = DIALS[id];
+    const i = TOOLS.findIndex((t) => t.id === tool);
+    return i < 0 ? "" : kindsOf(TOOLS[i], dial)[(dial === 1 ? this.seconds : this.variants)[i]].id;
+  }
+
+  /** Puts a kept dial on a kind, by its id; false if the shelf has no such kind there. */
+  setKind(id: DialId, kind: string): boolean {
+    const { tool, dial } = DIALS[id];
+    const i = TOOLS.findIndex((t) => t.id === tool);
+    const k = i < 0 ? -1 : kindsOf(TOOLS[i], dial).findIndex((v) => v.id === kind);
+    if (k < 0) return false;
+    (dial === 1 ? this.seconds : this.variants)[i] = k;
+    return true;
   }
 
   get current(): Tool {
@@ -156,39 +207,50 @@ export class Hands {
     return true;
   }
 
-  /** Steps through the current tool's kinds (up and down, or round and round with `wrap`); false when it has only one or is at the end. */
-  stepVariant(dir: -1 | 1, wrap = false): boolean {
-    const n = this.current.variants.length;
+  /** Steps through the current tool's kinds on a dial (up and down, or round and round with `wrap`); false when it has only one or is at the end. */
+  stepVariant(dir: -1 | 1, wrap = false, dial: Dial = 0): boolean {
+    const n = kindsOf(this.current, dial).length;
     if (this.fixed.has(this.current.id)) {
       this.events.blocked = true;
       return false;
     }
-    let next = this.variants[this.tool] + dir;
+    const kinds = dial === 1 ? this.seconds : this.variants;
+    let next = kinds[this.tool] + dir;
     if (wrap && n > 1) next = (next + n) % n;
     if (n <= 1 || next < 0 || next >= n) {
       this.events.blocked = true;
       return false;
     }
-    this.variants[this.tool] = next;
+    kinds[this.tool] = next;
     this.events.variantChanged = true;
     return true;
   }
 
-  /** The time of day chosen on the Light tool: one of the five, or the time outside by the clock. */
+  /** The time of day chosen on the Sky: one of the five, or the time outside by the clock. */
   get timeOfDay(): TimeOfDay | "clock" {
-    return TOOLS[LIGHT_TOOL].variants[this.variants[LIGHT_TOOL]].id as TimeOfDay | "clock";
+    return TOOLS[SKY_TOOL].variants[this.variants[SKY_TOOL]].id as TimeOfDay | "clock";
   }
 
-  /** The weather chosen on the Weather tool: a kind, or the forecast's ("now"). */
+  /** The weather chosen on the Sky: a kind, or the forecast's ("now"). */
   get weather(): WeatherKind | "now" {
-    return TOOLS[WEATHER_TOOL].variants[this.variants[WEATHER_TOOL]].id as WeatherKind | "now";
+    return TOOLS[SKY_TOOL].second![this.seconds[SKY_TOOL]].id as WeatherKind | "now";
   }
 
-  /** The kind's name as shown: the whole-place view is named for what the fly stands on there, and "Now" for where the weather comes from. */
+  /** The current tool's kind on a dial. */
+  variantOf(dial: Dial): Variant {
+    return dial === 1 ? kindsOf(this.current, 1)[this.seconds[this.tool]] : this.variant;
+  }
+
+  /** The kind's name as shown: the whole-place view is named for what the fly stands on there. */
   get label(): string {
-    const v = this.variant;
+    return this.labelOf(0);
+  }
+
+  /** The name of the current tool's kind on a dial: the weather's "Now" is "Outside" when it is the weather outside. */
+  labelOf(dial: Dial): string {
+    const v = this.variantOf(dial);
     if (this.current.id === "view" && v.id === "table") return `Whole ${this.surface}`;
-    return this.current.id === "weather" && v.id === "now" && this.outside ? "Outside" : v.label;
+    return dial === 1 && this.current.id === "sky" && v.id === "now" && this.outside ? "Outside" : v.label;
   }
 
   /** The place chosen on the Place tool. */

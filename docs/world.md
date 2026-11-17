@@ -7,14 +7,23 @@ Greenhouse, Restaurant and Kitchen counter (`apps/web/src/places/catalog.ts`). G
 a bench with pots, seed trays, fruit and a water saucer; its saucer water has
 configured sweetness 0.05 (`packages/world/src/greenhouse.ts`).
 
-The fly can live in more than one place (`docs/places.md`). In solo play,
-the **Place** tool or Settings → Screensaver → Where it lives carries it
-elsewhere. The setting applies once the choice rests there a second or the
-row is left (places stepped past on the way aren't built). At a named room,
-its starter changes place with the Place tool; the setting does not move
-the room. Everyone locks Place and rotates places by its clock; other guests
-follow their room starter. In solo play, living in each in turn (the default),
-it moves on after 20 minutes of accumulated screensaver time at that place.
+The fly can live in more than one place (`docs/places.md`), and the one it
+lives in is its home: every launch finds it there, and play is there. At
+home, the **Place** tool or Settings → Screensaver → Where it lives carries it
+to another, which is home from then on. The setting applies once the choice
+rests there a second or the row is left (places stepped past on the way
+aren't built). On a visit to a room open to everyone, the Place tool goes to
+that place's room and home stays where it was ([online.md](online.md#playing)).
+At a named room, its starter changes place with the Place tool; the setting
+does not move the room. Everyone rotates places by its clock; other guests
+follow their room starter.
+
+Settings → Screensaver → Places chooses what the screensaver does: Home only
+(the default) keeps the fly at home; Each in turn, alone at home, carries it on to the
+next place after 20 minutes watched in one (`apps/web/src/places/tour.ts`),
+counting only screensaver time, and carries it home again as soon as play
+begins. A save from before the fly had a home lived each in turn, then the
+default: it lives where it was last and keeps going round in the screensaver.
 It is the same fly, its brain running on; the world fades out, the place is
 built behind the veil, and it is set down there.
 
@@ -54,7 +63,7 @@ the moon's, so at night it is faint, to the player and to the fly's eyes alike
 then with nothing thrown at it). At dusk and at
 night fireflies drift round the table and blink.
 
-The sky follows the clock unless you choose a time (the **Light** tool):
+The sky follows the clock unless you choose a time (the **Sky** tool's time of day):
 between each place's five palettes the colours ease with the hour, the sun
 rises out of the morning's side, crosses through each palette's place and
 sets, and the moon rises after it (indoors, where a lamp lights the evening,
@@ -73,7 +82,7 @@ three in the morning, so it never looks wrong under the night's light. Its
 hands are drawn in its dial's shader, turned by the time each frame, so they
 cost no draw and stay sharp however close the camera comes.
 
-So does the weather, unless you choose one (the **Weather** tool): clear,
+So does the weather, unless you choose one (the **Sky** tool's weather): clear,
 overcast, mist, light or heavy rain, thunderstorm, snow or sleet. On "Now" it follows a forecast worked out from
 the clock, the same for the same local date and hour and on any restart: spells
 of a few hours each, changing over an hour, in systems a day or two long, so
@@ -119,8 +128,8 @@ flurries fall as snow, while sleet and wintry mix combine rain and snow.
 Freezing rain and hail use rain as a visual approximation; no ice impact
 or cold physiology is modelled. The real wind speed is how windy the day is, a
 fresh breeze (10 m/s) the windiest, so the picnic's gusts come more often and
-harder on a windy day and the trees and the lake move more. The Light tool's
-"Now" stretches or squeezes the clock's day so that its sun comes up at the
+harder on a windy day and the trees and the lake move more. The Sky's time
+of day "Now" stretches or squeezes the clock's day so that its sun comes up at the
 real sunrise and goes down at the real sunset, each colour of the day keeping
 its place between: on a winter afternoon it is dark at five. Where the sun
 doesn't set that day, the light swings slowly between high noon and a low

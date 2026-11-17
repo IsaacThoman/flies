@@ -219,7 +219,7 @@ export function clockLight(p: Readonly<Record<TimeOfDay, Light>>, hours: number,
   return out;
 }
 
-/** Seconds a change of the Light tool's choice takes. */
+/** Seconds a change of the Sky's time of day takes. */
 const CHANGE = 2.5;
 
 /** The light as it is now: the chosen time of day or the clock's, eased toward it, under the weather. */

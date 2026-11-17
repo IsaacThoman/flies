@@ -3,7 +3,9 @@
 In solo play the fly can live in more than one place, and the player can
 carry it between them (the Place tool, or Settings → Screensaver → Where it lives, which carries it
 once the choice rests a second or the row is left, not to each place stepped
-past; "Each in turn" moves it on after 20 minutes of screensaver). It is the same fly with the same brain, running
+past); the one it lives in is its home. Settings → Screensaver → Places,
+Each in turn, moves it on after 20 minutes of screensaver, and home again
+when play begins ([The world](world.md)). It is the same fly with the same brain, running
 on: the world fades to black, the new place is built behind the veil, and the
 fly is set down where that place starts it. At a shared table, personal
 place changes and rotation are off; a player-created table shares the
@@ -140,7 +142,7 @@ crossings become smaller than a pixel, without extra meshes or draws.
   backdrop is drawn only where that opening falls on the screen, or not at
   all while it is behind the camera (the restaurant's street, through its shop
   front).
-- **Light** (`palettes`): the five times of day. Chosen on the Light tool, the
+- **Light** (`palettes`): the five times of day. Chosen on the Sky's time of day, the
   light eases to one and holds it; on "Now" it follows the clock between them
   (`scene/light.ts`, `clockLight`): each palette's colours are full at its
   hour (morning 7:30, midday 10:30 to 15:15, golden 17:45, dusk 20:00, night
@@ -162,7 +164,7 @@ crossings become smaller than a pixel, without extra meshes or draws.
   dark it is. `env` scales the reflections in the set's `materials`.
 - **Weather** (`scene/weather.ts`): clear, overcast, mist, light/heavy rain,
   thunderstorm, snow or sleet, from
-  the Weather tool or, on "Now", the weather outside where the Apple TV can
+  the Sky's weather or, on "Now", the weather outside where the Apple TV can
   tell it (`scene/outside.ts`), else a forecast worked out from the clock. Every
   place gets its light from it without doing anything, as much as its
   optional `open` lets in (1 if not said; the lab's is 0.4, as it sees the
@@ -340,7 +342,7 @@ TV has (`places/restaurant/`):
 
 ### Storms and winter precipitation
 
-The Weather tool also holds Heavy rain, Thunderstorm, Snow or Sleet. Heavy
+The Sky's weather also holds Heavy rain, Thunderstorm, Snow or Sleet. Heavy
 rain reuses the instanced rain pass with denser windblown sheets and faster
 drops. Storm gusts go to `Felt.air`; heavier drops use the existing touch
 path, never a movement command. Thunderstorms are **silent**. Lightning

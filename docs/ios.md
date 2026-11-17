@@ -168,10 +168,10 @@ page out of a window is hidden, and the game sleeps as in a hidden browser tab
 (`apps/web/src/page.ts`): no frames, so no further simulation time is issued to the workers
 (already-issued ticks can finish). Shown again each fly carries on where it was:
 the game's step is capped at 100 ms and the brain's at 100 ms of fly time, which bounds the time advanced on resuming, and
-after more than half a minute away the solo sky follows the clock only when Light is set to
-Now (the internal value `clock`), and weather follows the forecast only when weather is set to Now; fixed choices remain.
+after more than half a minute away the solo sky follows the clock only when the Sky's time of day is
+Now (the internal value `clock`), and weather follows the forecast only when its weather is Now; fixed choices remain.
 At player-created tables the room's clock supplies the Now choices; rooms open to everyone
-use each device's own clock and forecast. Fixed Light and Weather choices are applied instead
+use each device's own clock and forecast. Fixed time-of-day and weather choices on the Sky are applied instead
 when selected.
 WebKit hides an app's page in the background by itself; the still is for the heat, when the app
 is still on screen (hiding the web view, `isHidden`, doesn't hide the page).
