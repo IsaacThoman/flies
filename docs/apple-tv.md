@@ -627,6 +627,21 @@ described above. Both of three's ways work and are checked by the test scene (`t
   still a query (it waits for the render thread to catch up, but not for the GPU). The answer arrives later through timer polling and represents an earlier picture; its age
   depends on completion and scheduling.
 
+  On the Apple TV, OpenGL ES's `glReadPixels` into a pixel-pack buffer waits until the GPU has
+  drawn what it reads. The fly's eyes are drawn just after the frame's scene, so reading them
+  held the render thread for the GPU's whole frame, and the next frame could only start once
+  the GPU was idle: JavaScript, GL replay and the GPU in turn rather than side by side. Where the
+  GPU took most of a frame, that was 40 frames a second (the bar and the restaurant, "Measured
+  on peev"). So the executor reads an RGBA8 picture
+  in two halves (`Executor::deferRead`): at once, a blit on the GPU into a renderbuffer of its
+  own, with a GL fence after it; then, when the render thread finds that fence signalled, the
+  `glReadPixels` from its copy into the page's buffer, which no longer waits. WebGL fences the
+  page makes in between are held until the read is done, so a fence after a read still
+  signals after it, and anything that would see the buffer (`getBufferSubData`, deleting it,
+  `finish`, a `clientWaitSync` with a timeout) finishes the reads first. Other formats, and
+  the multisampled default framebuffer, are read at once as before. The test scene's
+  `readbackAsync` goes this way.
+
 Historically measured in the simulator (M5 Pro, the software renderer, mode 2; capture date unknown): the synchronous read takes
 0.08 ms on average (0.5 ms at most) on tvOS 27 and 0.11 ms (1.9 ms at most) on tvOS 26, and the
 frame rate is the same with or without it (60 fps); the async read resolves about 5 ms after it

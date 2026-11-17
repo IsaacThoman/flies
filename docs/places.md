@@ -306,10 +306,9 @@ TV has (`places/restaurant/`):
   while playing (capture date, machine and play state unknown)
   (Settings → Picture → Frame stats, or the canvas's `data-calls` and `data-triangles`);
   a new place should stay close to that, near the fly and in its whole view.
-  Its GPU pays for every pixel's shader, too, 640×480 as the picture is: the
-  bar's and the restaurant's single materials are what hold them under 60
-  frames a second there, not their draws (`docs/apple-tv.md`, "Measured on
-  peev"). Value noise comes from a texture (`scene/noise.ts`) rather than from
+  Its GPU pays for every pixel's shader, too, 640×480 as the picture is: what
+  the bar and the restaurant cost there is their single materials' shading,
+  not their draws (`docs/apple-tv.md`, "Measured on peev"). Value noise comes from a texture (`scene/noise.ts`) rather than from
   hashes, a light's shadow and shading are worked out only where it can reach
   (`scene/lit.ts`), loops over things run only as far as there are things, and
   anything multiplied away (a pattern too fine for the pixel, a light that is
