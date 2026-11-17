@@ -17,7 +17,12 @@
 // wall: at dawn, its morning peak, in a box 16 mm across walled 5 mm high, for
 //   --minutes: how often it walked into a wall, how soon the brain stopped
 //   walking once it had (the median, and the longest it kept on), how often the body turned it away (motion.ts,
-//   WALL_PATIENCE), how much of it the antennae felt a push, and grooming.
+//   WALL_PATIENCE), how much of it the antennae felt a push, and grooming; and
+//   what the brain itself did about it: how often it backed (behavior.ts's
+//   backing), and, while only one antenna was pushed, the brain's mean `turn`
+//   away from that side (positive away, negative toward it). --numb runs it
+//   with the push kept from the brain (the body still feels and counts it), as
+//   a control for what the eyes do at a wall.
 // occupancy: left to itself in --place (arena: an open disc 43 mm across) for
 //   --minutes after a minute settling, on the behaviour audit's terms (10 ms
 //   frames, every facet at 0.5, no daily clock): how much of it grooming, how
@@ -31,6 +36,7 @@ import { parseArgs } from "node:util";
 import { ANTENNA_AHEAD, FLY_LENGTH, HEAD_AHEAD, Rhythm, SUMMER, WALL_TURN } from "@fly/body";
 import { PICNIC, WORLDS, World } from "@fly/world";
 import type { Place } from "@fly/world";
+import type { BrainSenses } from "@fly/brain";
 import { Life } from "../apps/web/src/life.ts";
 import { InProcessBrain, brainData } from "./fuzz/brain.ts";
 
@@ -40,6 +46,7 @@ const { values } = parseArgs({
     minutes: { type: "string", default: "10" },
     seeds: { type: "string", default: "1,2,3" },
     place: { type: "string", default: "picnic" },
+    numb: { type: "boolean", default: false },
   },
 });
 const DT = 1 / 60;
@@ -49,6 +56,13 @@ const data = brainData();
 const BARE: Place = { floor: { kind: "circle", r: 200 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 300 };
 const jam = PICNIC.solids.find((s) => s.name === "jam")!.footprint as { x: number; z: number; r: number };
 
+
+/** A brain that never feels the antennae pushed: the wall assay's control (--numb). */
+class NumbBrain extends InProcessBrain {
+  override tick(dtMs: number, senses: BrainSenses) {
+    super.tick(dtMs, { ...senses, bumpLeft: 0, bumpRight: 0 });
+  }
+}
 
 /** Counts what an antenna's push did over a run: seconds felt, and pushes begun. */
 class Pushes {
@@ -157,9 +171,9 @@ const BOX: Place = {
 };
 
 function walls() {
-  console.log(`At dawn in a box 16 mm across, ${minutes} minutes:`);
+  console.log(`At dawn in a box 16 mm across, ${minutes} minutes${values.numb ? ", the push kept from the brain" : ""}:`);
   for (const seed of seeds) {
-    const life = new Life(new World(BOX), new InProcessBrain(data, seed));
+    const life = new Life(new World(BOX), values.numb ? new NumbBrain(data, seed) : new InProcessBrain(data, seed));
     life.rhythm = new Rhythm(SUMMER.sunrise, SUMMER);
     const pushes = new Pushes();
     let into = 0;
@@ -169,11 +183,24 @@ function walls() {
     let since = -1;
     let longest = 0;
     const stops: number[] = [];
+    let backed = 0;
+    let wasBacking = false;
+    let oneSided = 0;
+    let away = 0;
     const s = minutes * 60;
     for (let t = 0; t < s; t += DT) {
       life.step(DT, performance.now());
       pushes.frame(life);
       const body = life.body;
+      if (life.intent.backing && !wasBacking) backed++;
+      wasBacking = life.intent.backing;
+      const { bumpLeft, bumpRight } = life.sensed;
+      const turn = life.brain.state?.command.turn ?? 0;
+      // turn is positive toward the fly's right: away from a push on its left antenna.
+      if ((bumpLeft > 0) !== (bumpRight > 0)) {
+        oneSided += DT;
+        away += (bumpLeft > 0 ? turn : -turn) * DT;
+      }
       if (body.blocked && !wasBlocked) {
         into++;
         since = 0;
@@ -195,7 +222,7 @@ function walls() {
     stops.sort((a, b) => a - b);
     const median = stops.length ? stops[Math.floor(stops.length / 2)] : NaN;
     console.log(
-      `seed ${seed} | walked into a wall ${into} times | walking stopped after a median ${(median * 1000).toFixed(0)} ms (${stops.length} stops), at most ${longest.toFixed(1)} s | turned away by the body ${turns} times | antennae pressed ${pct(pushes.felt, s)} (${pushes.begun} pushes) | grooming ${pct(life.groomed, s)}`,
+      `seed ${seed} | walked into a wall ${into} times | walking stopped after a median ${(median * 1000).toFixed(0)} ms (${stops.length} stops), at most ${longest.toFixed(1)} s | turned away by the body ${turns} times | antennae pressed ${pct(pushes.felt, s)} (${pushes.begun} pushes) | grooming ${pct(life.groomed, s)} | the brain backed ${backed} times | one antenna alone pressed ${oneSided.toFixed(0)} s, turn away ${oneSided > 0 ? (away / oneSided).toFixed(3) : "-"}`,
     );
   }
 }
