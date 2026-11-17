@@ -48,7 +48,6 @@ try {
           const z = focus ? focus.z + p.z * focus.follow : p.z * 0.35;
           const camera = g.director.camera.position;
           g.director.turnBy(0.04 - Math.atan2(camera.x - x, camera.z - z), 0);
-          g.director.snap();
         }
         g.stage.setTime(time);
         g.settings.eyesInset = "off";

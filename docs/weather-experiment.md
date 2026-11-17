@@ -187,3 +187,20 @@ discrepancy. The pending rain-veil, near-flake
 and melt-trail experiments are preserved separately and excluded from this
 handoff. Further climbing uses a new branch and PR, with newly spawned
 reviewers at high reasoning effort.
+
+
+## Approved PR integration
+
+At the owner's request, the approved branch merged `origin/dev` again
+(`97cce645`), retaining several-fly batches, the picnic/window/lab polish and
+the drawn-versus-felt checks. Dev independently used protocol 4 for fly
+batches, so this combined branch uses protocol 5 for the additional weather
+semantics while preserving that batch layout. New light fixtures initialize
+the extended weather channels to zero. The capture helper uses the current
+camera director API without editing camera code.
+
+Typecheck, lint and all 219 places, drawn-versus-felt, weather, light,
+controls, forecast, protocol and server tests pass. The picnic geometry
+check permits the one added instanced snow quad mesh; its triangle ceiling
+is unchanged. The later depth/thaw experiments remain on a separate branch
+and are excluded from this approved handoff. No GitHub CI wait is required.

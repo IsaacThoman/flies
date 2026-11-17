@@ -230,8 +230,9 @@ for (const scene of Object.values(SCENES)) test(`${scene.id}: drawn tops and sid
     triangles += (object.geometry.index?.count ?? object.geometry.attributes.position.count) / 3 * (object instanceof THREE.InstancedMesh ? object.count : 1);
   });
   // Indoor decoration adds 160 sill triangles; lab grains and a separately sorted
-  // liquid add 736 triangles and one mesh, within the places' two-draw allowance.
-  const budget = { picnic: [24, 53307], windowsill: [15, 62304], lab: [10, 71756], bar: [8, 93060], restaurant: [40, 371299] }[scene.id];
+  // liquid add 736 triangles and one mesh. Picnic snowfall adds one instanced
+  // quad mesh; the existing triangle ceiling still holds.
+  const budget = { picnic: [25, 53307], windowsill: [15, 62304], lab: [10, 71756], bar: [8, 93060], restaurant: [40, 371299] }[scene.id];
   assert.ok(meshes <= budget[0] && triangles <= budget[1], `${meshes} meshes, ${triangles} triangles: stay within the measured geometry budgets`);
   const drawn = drawnSet(set.group, scene.id === "restaurant");
   const ray = new THREE.Raycaster();

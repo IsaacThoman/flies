@@ -64,7 +64,7 @@ export function wetten(wet: number, w: Pick<Mix, "rain" | "cloud" | "mist">, dt:
 }
 
 /** The kind a mix of weather is most like. */
-export function kindOf(w: Mix): WeatherKind {
+export function kindOf(w: Pick<Mix, "rain" | "cloud" | "mist" | "heavy" | "storm" | "snow">): WeatherKind {
   if ((w.snow ?? 0) > 0.3) return w.rain > 0.25 ? "sleet" : "snow";
   if ((w.storm ?? 0) > 0.4) return "storm";
   if ((w.heavy ?? 0) > 0.4) return "heavyRain";
