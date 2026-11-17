@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import * as THREE from "three";
+import type { BrainDriver, TableSocket } from "@fly/contracts";
+import { Life } from "../src/life.ts";
+import { Online } from "../src/online/online.ts";
+import type { TableHost } from "../src/online/online.ts";
+import { Hands } from "../src/tools/hands.ts";
 import { Hunger } from "@fly/body";
 import { DROP_ID, TableFood, toWire } from "@fly/net";
 import { createPicnic } from "@fly/world";
@@ -60,4 +66,28 @@ test("an older room retains optimistic nutrition without crediting its historica
   assert.ok(bite > 0);
   pantry.mirror.sent(1);
   assert.deepEqual(pantry.mirror.apply(1, [[food.id, 0.9]], [], 10), [0, 0]);
+});
+
+test("an online food receipt feeds Life and its hunger exactly once", (t) => {
+  const gradient = { addColorStop() {} };
+  const context = new Proxy({}, { get: () => () => gradient });
+  (globalThis as { document?: unknown }).document = { createElement: () => ({ getContext: () => context }) };
+  const world = createPicnic();
+  const brain = { status: "running", stateAt: 0, state: { command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 } }, tick() {} } as unknown as BrainDriver;
+  const life = new Life(world, brain);
+  const host = { scene: new THREE.Scene(), life, hands: new Hands(world), fly: { model: { mark() {} } }, bubbles: { table: null } } as unknown as TableHost;
+  const socket: TableSocket = { status: "connecting", closeCode: 0, closeReason: "", send() {}, drain() {}, close() {} };
+  const online = new Online(host, () => socket, "ws://test", "abcdefghjk", "key", null);
+  t.after(() => { online.leave(); online.dispose(); });
+  const expected = new Hunger();
+  online.line.onMessage({ type: "food", ack: 1, amounts: [], gone: [], eaten: 0.1, meal: [0.1, 0.08] });
+  assert.equal(life.eaten, 0.1);
+  life.step(0.1, 0);
+  expected.step(0.1, 0.08);
+  assert.deepEqual(life.hunger, expected);
+  online.line.onMessage({ type: "food", ack: 1, amounts: [], gone: [], eaten: 0.1, meal: [0, 0] });
+  life.step(0.1, 0);
+  expected.step(0.1, 0);
+  assert.equal(life.eaten, 0.1);
+  assert.deepEqual(life.hunger, expected);
 });
