@@ -3,7 +3,8 @@ import { test } from "node:test";
 import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
 import type { FlyBody } from "@fly/body";
-import { DINING_ROOM, RESTAURANT, TABLES, TABLE_TOPS, World, ZINC_BAR, createPicnic } from "@fly/world";
+import { DINING_ROOM, RESTAURANT, TABLES, TABLE_TOPS, World, ZINC_BAR, createPicnic, solidBottom, topPeak } from "@fly/world";
+import type { Solid } from "@fly/world";
 import { picnic } from "../src/places/picnic/index.ts";
 import { SCENES } from "../src/places/index.ts";
 import type { SceneCamera } from "../src/places/types.ts";
@@ -31,6 +32,26 @@ function lengthOnScreen(camera: THREE.PerspectiveCamera, body: FlyBody) {
   const a = project(camera, { x: body.position.x + fx * h, y, z: body.position.z + fz * h });
   const b = project(camera, { x: body.position.x - fx * h, y, z: body.position.z - fz * h });
   return Math.hypot(((a.x - b.x) * RENDER_WIDTH) / 2, ((a.y - b.y) * 480) / 2);
+}
+
+const corner = new THREE.Vector3();
+const toCorner = { x: 0, y: 0, z: 0 };
+const cornerHit = { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 0 }, solid: -1, t: 0 };
+/** What the picture's near plane cuts into, if anything: what a corner of it or its middle is in or under, or what stands between the eye and one. */
+function nearPlaneCuts(world: World, camera: THREE.PerspectiveCamera): string | null {
+  const eye = camera.position;
+  for (const [x, y] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0]]) {
+    corner.set(x, y, -1).unproject(camera);
+    const inside = world.solidAt(corner.x, corner.y, corner.z);
+    if (inside >= 0) return world.solids[inside].name;
+    if (corner.y < world.heightAt(corner.x, corner.z, corner.y)) return "the surface under it";
+    const length = corner.distanceTo(eye);
+    toCorner.x = (corner.x - eye.x) / length;
+    toCorner.y = (corner.y - eye.y) / length;
+    toCorner.z = (corner.z - eye.z) / length;
+    if (world.raycast(eye, toCorner, cornerHit, length)) return world.solids[cornerHit.solid]?.name ?? "the floor";
+  }
+  return null;
 }
 
 function settle(director: CameraDirector, body: FlyBody, seconds: number) {
@@ -91,6 +112,8 @@ test("the camera keeps a walking, turning fly in the picture, never jumps, and i
       worstStep = Math.max(worstStep, cam.distanceTo(last));
       last.copy(cam);
       assert.ok(cam.y >= world.heightAt(cam.x, cam.z) + 0.5, `${view}: inside something at ${t.toFixed(1)} s`);
+      const cut = nearPlaneCuts(world, director.camera);
+      assert.equal(cut, null, `${view}: the near edge of the picture cuts into ${cut} at ${t.toFixed(1)} s`);
       const at = project(director.camera, { x: body.position.x, y: body.position.y + 0.75, z: body.position.z });
       assert.ok(Math.abs(at.x) < 0.95 && Math.abs(at.y) < 0.95 && at.z < 1, `${view}: the fly left the picture at ${t.toFixed(1)} s (${at.x.toFixed(2)}, ${at.y.toFixed(2)})`);
     }
@@ -608,5 +631,79 @@ test("in the restaurant every view and wallpaper shot keeps the camera out of ev
   for (let i = 0; i < 5; i++) {
     check(`wallpaper shot ${i}`);
     director.startWallpaper();
+  }
+});
+
+/** A few places for the fly beside what stands near where it starts, on what it starts on: a few mm off the nearest few things taller than it. */
+function besideThings(world: World, start: { x: number; z: number; y?: number }, count: number) {
+  const floor = world.heightAt(start.x, start.z, start.y);
+  const centre = (s: Solid) => s.footprint;
+  const size = (s: Solid) => (s.footprint.kind === "circle" ? s.footprint.r : s.footprint.kind === "ellipse" ? Math.max(s.footprint.rx, s.footprint.rz) : Math.hypot(s.footprint.hx, s.footprint.hz));
+  const things = world.solids
+    .filter((s) => solidBottom(s) <= floor + 1 && topPeak(s.top) > floor + 2 && size(s) < 200 && Math.hypot(centre(s).x - start.x, centre(s).z - start.z) < 400)
+    .sort((a, b) => Math.hypot(centre(a).x - start.x, centre(a).z - start.z) - Math.hypot(centre(b).x - start.x, centre(b).z - start.z));
+  const spots: { name: string; x: number; y: number; z: number }[] = [];
+  for (const thing of things) {
+    for (let k = 0; k < 8 && spots.length < count; k++) {
+      const a = (k * Math.PI) / 4;
+      const x = centre(thing).x + Math.sin(a) * (size(thing) + 5);
+      const z = centre(thing).z + Math.cos(a) * (size(thing) + 5);
+      const y = world.heightAt(x, z, floor + 1);
+      if (!world.onTable(x, z) || Math.abs(y - floor) > 1 || world.solidAt(x, y + 1, z) >= 0) continue;
+      spots.push({ name: thing.name, x, y, z });
+      break;
+    }
+  }
+  return spots;
+}
+
+test("turned round the fly by a mouse past what stands by it, in every place, the camera comes in before it and goes back out after, never jumps, never flips in and out at an edge, and never goes into anything nor cuts into it", () => {
+  for (const [id, scene] of Object.entries(SCENES)) {
+    const place = new World(scene.place);
+    const spots = besideThings(place, scene.place.start, 4);
+    assert.ok(spots.length >= 3, `${id}: things to go past`);
+    for (const spot of spots) {
+      // Close, Follow and Wide; a steady drag, and a quick one.
+      for (const zoom of [0.6, 1, 2.6]) {
+        for (const rate of [1.2, 3]) {
+          const what = `${id}, by the ${spot.name}, ${zoom}× out, at ${rate} rad/s`;
+          const director = new CameraDirector(place, 16 / 9, scene.camera);
+          const body = { position: { x: spot.x, y: spot.y, z: spot.z }, velocity: { x: 0, y: 0, z: 0 }, yaw: 0.6, mode: "standing" } as unknown as FlyBody;
+          settle(director, body, 4);
+          director.hand.held = true;
+          director.hand.kept = true;
+          director.zoomBy(zoom);
+          settle(director, body, 1);
+          const middle = middleOf(body);
+          const last = director.camera.position.clone();
+          let way = 0;
+          let turned = director.camera.position.distanceTo(middle);
+          let lastTurn = -Infinity;
+          for (let i = 0; i < (60 * 2 * Math.PI) / rate; i++) {
+            director.turnBy(rate / 60, 0);
+            director.update(body, 1 / 60);
+            const eye = director.camera.position;
+            const at = `${what}, ${(i / 60).toFixed(2)} s round`;
+            const distance = eye.distanceTo(middle);
+            // Along the arc it is turned on, and in or out by no more than a tenth of how far out it is in a frame.
+            const step = eye.distanceTo(last);
+            assert.ok(step < (distance * rate) / 60 + 0.1 * director.reach, `${at}: jumped ${step.toFixed(2)} mm`);
+            last.copy(eye);
+            // In and back out again is fine; in, out and in again within a moment is flip-flopping at an edge.
+            if ((way >= 0 && distance < turned * 0.97) || (way <= 0 && distance > turned * 1.03)) {
+              if (way !== 0) {
+                assert.ok(i - lastTurn > 6, `${at}: in and out again within ${i - lastTurn} frames`);
+                lastTurn = i;
+              }
+              way = distance < turned ? -1 : 1;
+              turned = distance;
+            } else if ((way >= 0 && distance > turned) || (way <= 0 && distance < turned)) turned = distance;
+            assert.ok(place.solidAt(eye.x, eye.y, eye.z) < 0 && eye.y >= place.heightAt(eye.x, eye.z, eye.y) + 0.5, `${at}: inside ${place.solids[place.solidAt(eye.x, eye.y, eye.z)]?.name ?? "the surface"}`);
+            const cut = nearPlaneCuts(place, director.camera);
+            assert.equal(cut, null, `${at}: the near edge of the picture cuts into ${cut}`);
+          }
+        }
+      }
+    }
   }
 });
