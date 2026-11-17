@@ -699,6 +699,16 @@ game holds itself to what the TV can sustain (`Warmth` in `apps/web/src/quality.
   show them. The iPhone app doesn't pass its thermal state to the page, so a browser keeps to its
   frame-time quality alone.
 
+On peev on the night of 16 November, starting cool: the picnic's, the windowsill's, the lab's
+and the bar's screensavers at midday and at night held 59.9–60 FPS at level 0, nominal
+throughout. The restaurant, from a fresh install, held 59.7–60 FPS in every 10-second window of
+10 minutes of its midday screensaver and 10 of its night one, at level 0 and nominal; run again
+straight after, with its weather and light sweep first (56.6–60 FPS), the same, until the TV went
+to sleep for want of a press of its remote. The TV never warmed that night, so the governor had
+nothing to do there; its steps are checked by `apps/web/tests/warmth.test.ts`, and on a TV by
+the launch config's `thermal`. Earlier the same day, on a TV already hot from hours of tests,
+the restaurant at 60 sank as low as 15 FPS ("Measured on peev").
+
 ## Checking it
 
 ### Measured on peev
@@ -740,7 +750,8 @@ everywhere else.
   7.5 ms.
 - **The bar holds 60 FPS.** Every 10-second window of its screensaver, at midday and at night,
   was 59.1–60 FPS, and the TV stayed thermally nominal.
-- **The restaurant holds 60 FPS while the TV is cool, not for long once it is hot.** Its GPU work
+- **The restaurant holds 60 FPS while the TV is cool, not for long once it is hot** (the game now
+  holds itself to what the TV can sustain: [Holding to what it can sustain](#holding-to-what-it-can-sustain)). Its GPU work
   fills most of a frame at 60 FPS, where the read's waiting had held it to 40, and the TV heats
   up: its thermal state went to serious (2) during its weather sweep and stayed there, and the
   screensaver fell from 60 to as low as 15 FPS as the TV slowed its GPU and CPU (JavaScript rose
