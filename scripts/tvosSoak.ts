@@ -5,17 +5,53 @@
 // (scripts/tables.ts) start one in a room server the TV can reach (--rooms, the site's by
 // default) and walk round the TV's fly for as long as the soak lasts, while the TV plays, throws
 // the ball among them and watches them as the wallpaper (docs/apple-tv.md, "Eight flies on a TV").
+//
+// --flies N (1 to NATIVE_MOST, the most an Apple TV lives) first sets Settings' Flies, how many
+// flies the TV lives, each with a brain thread of its own; at a table it then brings N and the
+// fakes take the other seats. The count stays set after the soak.
 import { spawnSync } from "node:child_process";
 import { MAX_FLIES, tableCode } from "@fly/net";
 import { WEATHERS } from "@fly/world";
 import { PLACES } from "../apps/web/src/places/catalog.ts";
 import { TIMES } from "../apps/web/src/scene/light.ts";
 import { APP_ROOMS } from "../apps/web/src/online/invite.ts";
+import { NATIVE_MOST } from "../apps/web/src/brain/create.ts";
 import type { FakeFly } from "./tables.ts";
 
 type Step = ["wait", Record<string, string>, number?] | ["press", string] | ["sleep", number] | ["log", string];
 
-export function soakConfig(minutes = 30) {
+/**
+ * From the title, focused on Play: Settings' Flies set to `flies`, waiting until that many live,
+ * and back to Play with Settings left on its tabs, where the soaks expect to find it.
+ */
+function chooseFlies(flies: number): Step[] {
+  if (!Number.isInteger(flies) || flies < 1 || flies > NATIVE_MOST) throw Error(`--flies must be 1 to ${NATIVE_MOST}`);
+  const press = (key: string, times = 1): Step[] => Array.from({ length: times }, () => ["press", key]);
+  return [
+    // The title may already be the wallpaper: the first press only wakes it.
+    ...press("ArrowUp"),
+    ["wait", { wallpaper: "false", focus: "play" }],
+    ...press("ArrowDown", 3),
+    ["wait", { focus: "settings" }],
+    ...press("Enter"),
+    ["wait", { screen: "settings", tab: "wallpaper", focus: "page" }],
+    ...press("ArrowDown", 4),
+    ["wait", { focus: "flies" }],
+    ...press("ArrowLeft", NATIVE_MOST - 1),
+    ...press("ArrowRight", flies - 1),
+    // Each new fly's brain loads before it is there.
+    ["wait", { flies: String(flies) }, 180000],
+    ["log", `${flies} flies`],
+    ...press("ArrowUp", 4),
+    ["wait", { focus: "page" }],
+    ...press("Escape"),
+    ["wait", { screen: "title", focus: "settings" }],
+    ...press("ArrowUp", 3),
+    ["wait", { focus: "play" }],
+  ];
+}
+
+export function soakConfig(minutes = 30, flies?: number) {
   if (!Number.isFinite(minutes) || minutes < 2) throw Error("--minutes must be at least 2");
   const drive: Step[] = [];
   const wait = (state: Record<string, string>, timeout?: number) => drive.push(timeout ? ["wait", state, timeout] : ["wait", state]);
@@ -26,6 +62,7 @@ export function soakConfig(minutes = 30) {
   // The splash lifts at ready: the log line's [js ms] is the time from launch.
   wait({ ready: "true" });
   wait({ screen: "title", brain: "running" });
+  if (flies !== undefined) drive.push(...chooseFlies(flies));
   phase("title", 15000);
   press("Enter");
   wait({ screen: "play", tool: "feed" });
@@ -52,7 +89,7 @@ export function soakConfig(minutes = 30) {
   // The menu (Play/Pause), Settings, the Picture tab, the fly's eyes up a step, and back to play.
   press("MediaPlayPause");
   wait({ screen: "title", focus: "play" });
-  press("ArrowDown", 4);
+  press("ArrowDown", 3);
   wait({ focus: "settings" });
   press("Enter");
   wait({ screen: "settings", focus: "page" });
@@ -67,7 +104,7 @@ export function soakConfig(minutes = 30) {
   // Restore Low so an unattended run leaves the user's usual eye detail in place: the menu and Settings remember where they were.
   press("MediaPlayPause");
   wait({ screen: "title" });
-  press("ArrowDown", 4);
+  press("ArrowDown", 3);
   press("Enter");
   wait({ screen: "settings", tab: "picture", focus: "eyes" });
   press("ArrowLeft");
@@ -96,7 +133,7 @@ export function soakConfig(minutes = 30) {
       press("MediaPlayPause");
       wait({ screen: "title", focus: "play" });
       press("ArrowUp", 4);
-      press("ArrowDown", 4);
+      press("ArrowDown", 3);
       press("Enter");
       wait({ screen: "settings" });
       press("ArrowUp", 8);
@@ -132,7 +169,8 @@ export function soakConfig(minutes = 30) {
     }
   }
   drive.push(["log", "soak complete"]);
-  return { script: "game.js", stats: 10, logFile: true, drive };
+  // Alone: otherwise the game sits down with everyone once its brain is awake.
+  return { script: "game.js", stats: 10, logFile: true, url: "http://fly.local/?alone", drive };
 }
 
 /**
@@ -141,13 +179,14 @@ export function soakConfig(minutes = 30) {
  * wallpaper. Half the minutes each. The table's light, weather and place are its starter's, one
  * of the fakes, so this soak leaves them be.
  */
-export function tableSoakConfig(minutes: number, code: string, rooms: string) {
+export function tableSoakConfig(minutes: number, code: string, rooms: string, flies?: number) {
   if (!Number.isFinite(minutes) || minutes < 2) throw Error("--minutes must be at least 2");
   const drive: Step[] = [];
   const wait = (state: Record<string, string>) => drive.push(["wait", state]);
   const press = (key: string, times = 1) => { for (let i = 0; i < times; i++) drive.push(["press", key]); };
   const phase = (name: string, ms: number) => { drive.push(["log", name], ["sleep", ms]); };
   wait({ screen: "title", brain: "running", online: "joined" });
+  if (flies !== undefined) drive.push(...chooseFlies(flies));
   phase("table title", 15000);
   press("Enter");
   wait({ screen: "play", tool: "feed" });
@@ -176,38 +215,39 @@ export function tableSoakConfig(minutes: number, code: string, rooms: string) {
 export const driveMs = (drive: Step[]) => drive.reduce((ms, step) => ms + (step[0] === "sleep" ? step[1] : 0), 0);
 
 /** Starts a table of seven fake flies in `rooms`, launches the TV at it, and keeps them walking until the soak is done. */
-async function tableSoak(device: string, minutes: number, rooms: string) {
+async function tableSoak(device: string, minutes: number, rooms: string, flies = 1) {
   // Only now: tables.ts brings Playwright with it.
   const { fakeFly } = await import("./tables.ts");
   const code = tableCode((bytes) => crypto.getRandomValues(bytes));
   const start = { place: "picnic", light: "noon", weather: "clear", zone: "UTC", offset: 0, name: "Soak", listed: false };
   const fakes = new Set<number>();
-  const flies: FakeFly[] = [];
-  for (let k = 0; k < MAX_FLIES - 1; k++) flies.push(await fakeFly(rooms, code, k, fakes, k === 0 ? start : undefined));
-  console.log(`${flies.length} fake flies at table ${code} in ${rooms}`);
-  const config = tableSoakConfig(minutes, code, rooms);
+  const fakeFlies: FakeFly[] = [];
+  for (let k = 0; k < MAX_FLIES - flies; k++) fakeFlies.push(await fakeFly(rooms, code, k, fakes, k === 0 ? start : undefined));
+  console.log(`${fakeFlies.length} fake flies at table ${code} in ${rooms}`);
+  const config = tableSoakConfig(minutes, code, rooms, flies);
   const result = spawnSync(process.execPath, ["scripts/tvos.ts", "run", "--device", device, "--detached", "--config", JSON.stringify(config)], { stdio: "inherit", cwd: new URL("..", import.meta.url) });
   if (result.error || result.status !== 0) {
-    for (const fly of flies) fly.close();
+    for (const fly of fakeFlies) fly.close();
     throw result.error ?? Error(`launching failed (exit ${result.status})`);
   }
   // The drive's sleeps, and five minutes for its waits and the TV's start.
   const until = Date.now() + driveMs(config.drive) + 5 * 60_000;
   console.log(`The fakes stay until ${new Date(until).toLocaleTimeString()}; the TV logs "drive: soak complete" when it is done.`);
   await new Promise((resolve) => setTimeout(resolve, until - Date.now()));
-  for (const fly of flies) fly.close();
+  for (const fly of fakeFlies) fly.close();
 }
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const device = args[args.indexOf("--device") + 1];
-  if (!args.includes("--device") || !device) throw Error("Use --device <paired Apple TV UDID> [--minutes 30] [--table [--rooms wss://…/rooms]]");
+  if (!args.includes("--device") || !device) throw Error("Use --device <paired Apple TV UDID> [--minutes 30] [--flies 1-3] [--table [--rooms wss://…/rooms]]");
   const minutes = args.includes("--minutes") ? Number(args[args.indexOf("--minutes") + 1]) : 30;
+  const flies = args.includes("--flies") ? Number(args[args.indexOf("--flies") + 1]) : undefined;
   if (args.includes("--table")) {
-    await tableSoak(device, minutes, args.includes("--rooms") ? args[args.indexOf("--rooms") + 1] : APP_ROOMS);
+    await tableSoak(device, minutes, args.includes("--rooms") ? args[args.indexOf("--rooms") + 1] : APP_ROOMS, flies);
     process.exit(0);
   }
-  const result = spawnSync(process.execPath, ["scripts/tvos.ts", "run", "--device", device, "--detached", "--config", JSON.stringify(soakConfig(minutes))], { stdio: "inherit", cwd: new URL("..", import.meta.url) });
+  const result = spawnSync(process.execPath, ["scripts/tvos.ts", "run", "--device", device, "--detached", "--config", JSON.stringify(soakConfig(minutes, flies))], { stdio: "inherit", cwd: new URL("..", import.meta.url) });
   if (result.error) throw result.error;
   process.exitCode = result.status ?? 1;
 }
