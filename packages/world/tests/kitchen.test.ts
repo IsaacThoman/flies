@@ -28,3 +28,10 @@ test("the kitchen's board and ajar caddy have surfaces at their drawn heights", 
   assert.ok(world.underside(-369, -170, 150) > 175);
   assert.ok(world.heightAt(-369, -170) > 179);
 });
+
+test("grape juice is on exposed fruit in the bowl's flat well", () => {
+  const world = new World(KITCHEN);
+  const patch = KITCHEN_PATCHES.find((p) => p.name === "grape juice")!;
+  assert.equal(world.heightAt(patch.x, patch.z), 31);
+  assert.equal(world.heightAt(patch.x, patch.z, 9), 9);
+});

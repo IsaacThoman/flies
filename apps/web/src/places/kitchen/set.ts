@@ -17,9 +17,9 @@ export function buildSet(): SceneSet {
     surfaces = surfaceMaterial();
   const glass = new THREE.MeshStandardMaterial({
     color: "#dbe1d9",
-    roughness: 0.07,
+    roughness: 0.05,
     transparent: true,
-    opacity: 0.18,
+    opacity: 0.26,
     depthWrite: false,
     side: THREE.DoubleSide,
     envMapIntensity: 1.5,
@@ -41,15 +41,23 @@ export function buildSet(): SceneSet {
   }
   for (const s of KITCHEN_SOLIDS) {
     const f = s.footprint;
-    if (s.name === "kitchen banana" || s.name === "kitchen lid") continue;
+    if (
+      s.name === "kitchen banana" ||
+      s.name === "kitchen lid" ||
+      s.name === "kitchen wall" ||
+      s.name === "kitchen cord" ||
+      s.name === "kitchen pendant"
+    )
+      continue;
     if (s.name === "kitchen wine") {
       const profile: number[][] = [];
       for (let i = 0; i <= 80; i++) {
         const r = (43 * i) / 80;
         profile.push([r, topHeight(s, f.x + Math.min(r, 42.9999), f.z)]);
       }
-      // The lower outside returns to the stem; the inside is exactly the world's dish.
-      profile.push([42.2, 187], [35, 145], [22, 109], [3, 100]);
+      profile.push([43 * 0.43, 112], [43 * 0.97, 187]);
+      profile.sort((a, b) => a[0] - b[0]);
+      profile.push([0, 100]);
       addGlass(lathe(profile, f.x, f.z));
       add(
         new THREE.CircleGeometry(18, 64)
@@ -171,7 +179,15 @@ export function buildSet(): SceneSet {
         k,
       );
     } else {
-      add(surface(s), color, k);
+      add(
+        surface(
+          s,
+          s.name === "kitchen bowl" ? 48 : s.name === "kitchen peach" ? 40 : 20,
+          s.name === "kitchen bowl" ? 72 : s.name === "kitchen peach" ? 64 : 32,
+        ),
+        color,
+        k,
+      );
       if (
         s.top.kind === "dome" &&
         s.top.base > 0 &&
@@ -192,6 +208,23 @@ export function buildSet(): SceneSet {
         );
     }
   }
+  // A glazed window occupies the wall's opening; in the world the pane is still a barrier.
+  for (const g of [
+    box(0, -342.5, -325, 3600, 1215, 50),
+    box(0, 1300, -325, 3600, 600, 50),
+    box(-1102.5, 632.5, -325, 1395, 735, 50),
+    box(1022.5, 632.5, -325, 1555, 735, 50),
+  ])
+    add(g, "#b5c7b5", KIND.wall);
+  for (const g of [
+    box(-80, 268, -305, 670, 24, 10),
+    box(-80, 997, -305, 670, 20, 10),
+    box(-405, 633, -305, 20, 735, 10),
+    box(245, 633, -305, 20, 735, 10),
+    box(-80, 633, -305, 12, 735, 10),
+  ])
+    add(g, "#e0d7bc");
+  addGlass(new THREE.PlaneGeometry(650, 735).translate(-80, 632.5, -310));
   // Continuous banana skins sample the envelope, never drawing the hidden seams between rounds.
   for (const rounds of KITCHEN_BANANAS) {
     const positions: number[] = [],
@@ -265,22 +298,12 @@ export function buildSet(): SceneSet {
   // Small dry flecks are below the half-millimetre scenery limit.
   for (let i = 0; i < 100; i++)
     add(
-      new THREE.TetrahedronGeometry(rnd.range(0.12, 0.45)).translate(
-        rnd.range(63, 165),
-        14.2,
-        rnd.range(140, 205),
-      ),
+      new THREE.IcosahedronGeometry(rnd.range(0.12, 0.45), 0)
+        .scale(1, 0.35, 0.7)
+        .translate(rnd.range(63, 165), 14.2, rnd.range(140, 205)),
       "#d6b77d",
       KIND.compost,
     );
-  // Grape stalks stay within the fruit's collision envelope.
-  add(
-    new THREE.CylinderGeometry(1.1, 1.4, 28, 8)
-      .rotateZ(0.6)
-      .translate(-113, 41, 6),
-    "#74703a",
-    KIND.compost,
-  );
   for (const p of KITCHEN_PATCHES) {
     if (p.name !== "honey" && p.name !== "wine") continue;
     add(
@@ -291,28 +314,27 @@ export function buildSet(): SceneSet {
       p.name === "honey" ? KIND.honey : KIND.wine,
     );
   }
-  // A pendant and cabinets extend beyond the walkable worktop.
   add(
-    new THREE.CylinderGeometry(1.5, 1.5, 450, 8).translate(10, 1075, 150),
-    "#3a3b34",
+    new THREE.TorusGeometry(41.7, 0.32, 6, 64)
+      .rotateX(Math.PI / 2)
+      .translate(186, 187, -65),
+    "#d5e0d7",
+  );
+  // The pendant's domed shade and flat underside use the world's slab.
+  const pendant = KITCHEN_SOLIDS.find((s) => s.name === "kitchen pendant")!;
+  add(surface(pendant, 20, 48), "#496d61");
+  add(
+    new THREE.CircleGeometry(70, 48)
+      .rotateX(Math.PI / 2)
+      .translate(260, 430, -160),
+    "#fff0cb",
+    KIND.bulb,
+  );
+  add(
+    new THREE.CylinderGeometry(1.5, 1.5, 910, 8).translate(260, 945, -160),
+    "#343a34",
     KIND.metal,
   );
-  add(
-    lathe(
-      [
-        [0, 856],
-        [16, 856],
-        [94, 760],
-        [98, 754],
-        [94, 748],
-        [20, 845],
-      ],
-      10,
-      150,
-    ),
-    "#e6d4ad",
-  );
-  add(new THREE.SphereGeometry(15, 12, 8).translate(10, 775, 150), "#fff2ce");
   for (const side of [-1, 1]) {
     add(box(side * 865, 395, -170, 610, 450, 300), "#7d8d7e");
     for (let i = 0; i < 3; i++)

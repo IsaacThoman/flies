@@ -168,7 +168,7 @@ on the board beside the crumbs. Split fruit, peach flesh, grape juice,
 honey and wine are food; feet disturb the liquid pools. A tiled splashback
 and a window frame the worktop, with cabinets and the kitchen beyond; warm
 pendant light takes over from window daylight at dusk. The garden in the
-window is a stylised shader backdrop, not a simulated outdoor place.
+window is a stylised backdrop, not a simulated outdoor place.
 
 The windowsill is the deep sill of a cottage kitchen window, painted cream
 over sage over pine, its old gloss crazed where the sun bakes it and chipped

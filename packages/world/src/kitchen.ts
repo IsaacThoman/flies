@@ -54,18 +54,30 @@ export const KITCHEN_BANANAS = [0, 1].map((row) =>
 );
 
 export const KITCHEN_GRAPES = [
-  [-130, 17, 24],
-  [-109, 21, 24],
-  [-90, 10, 27],
-  [-109, -1, 37],
-  [-128, -5, 38],
-  [-146, 3, 27],
-  [-96, 35, 21],
-  [-123, 40, 22],
-].map(([x, z, base]) => dome("kitchen grape", x, z, 11, base, 10));
+  [-174, -9, 21],
+  [-151, 0, 22],
+  [-128, -13, 19],
+  [-138, -34, 22],
+  [-160, -29, 20],
+  [-182, -31, 18],
+  [-127, -36, 18],
+  [-160, -5, 23],
+].map(([x, z, height]) => dome("kitchen grape", x, z, 11, 9, height));
 
 const c = KITCHEN_CADDY;
 export const KITCHEN_SOLIDS: readonly Solid[] = [
+  {
+    name: "kitchen pendant",
+    footprint: { kind: "circle", x: 260, z: -160, r: 70 },
+    bottom: 430,
+    top: { kind: "dome", base: 430, height: 62, power: 1 },
+  },
+  {
+    name: "kitchen cord",
+    footprint: { kind: "circle", x: 260, z: -160, r: 1.5 },
+    bottom: 490,
+    top: { kind: "flat", y: 1400 },
+  },
   box("kitchen wall", 0, -325, 1800, 25, 1600),
   {
     name: "kitchen bowl",
@@ -154,7 +166,7 @@ export const KITCHEN_SOLIDS: readonly Solid[] = [
 export const KITCHEN_PATCHES: readonly FoodPatch[] = [
   { name: "banana", x: -158, z: -96, r: 5, sweet: 0.95 },
   { name: "peach juice", x: 46, z: 165, r: 7, sweet: 0.9 },
-  { name: "grape juice", x: -123, z: 40, r: 4, sweet: 0.8 },
+  { name: "grape juice", x: -151, z: 0, r: 4, sweet: 0.8 },
   {
     name: "red wine",
     x: KITCHEN_GLASS.x,
