@@ -40,7 +40,8 @@ const isFood = (v: unknown): v is FoodWire =>
   Array.isArray(v) && (v.length === 9 || v.length === 10) && num(v[0]) && text(v[1]) && text(v[2]) && near(v[3]) && near(v[4]) && num(v[5]) && num(v[6]) && num(v[7]) &&
   (v[8] === 0 || v[8] === 1) && (v[9] === undefined || near(v[9]));
 const isBubble = (v: unknown) => obj(v) && int(v.slot, 0, LIST_MAX) && int(v.cycle, 0, 2 ** 31) && num(v.t0) && num(v.poppedAt) && num(v.goneAt);
-const isRoom = (v: unknown): v is RoomWire => obj(v) && isTableCode(v.code) && roomName(v.name) === v.name && text(v.place) && int(v.flies, 0, MAX_PLAYERS) && bool(v.locked);
+const isRoom = (v: unknown): v is RoomWire =>
+  obj(v) && isTableCode(v.code) && roomName(v.name) === v.name && text(v.place) && int(v.flies, 0, MAX_PLAYERS) && bool(v.locked) && (v.everyone === undefined || bool(v.everyone));
 const isAmount = (v: unknown) => Array.isArray(v) && v.length === 2 && num(v[0]) && num(v[1]);
 const isSpots = (v: unknown) => obj(v) && Object.keys(v).length <= MAX_PLAYERS && Object.entries(v).every(([id, spot]) => player(Number(id)) && isSpot(spot));
 const isWorld = (m: Obj) => text(m.light) && text(m.weather);
@@ -50,10 +51,11 @@ function valid(m: Obj): boolean {
   switch (m.type) {
     case "welcome":
       return (
-        num(m.v) && player(m.id) && text(m.colour) && int(m.starter, 0, MAX_PLAYERS) && num(m.seed) && num(m.now) && num(m.wall) && num(m.offset) && text(m.place) &&
+        (m.meals === undefined || bool(m.meals)) && num(m.v) && player(m.id) && text(m.colour) && int(m.starter, 0, MAX_PLAYERS) && num(m.seed) && num(m.now) && num(m.wall) && num(m.offset) && text(m.place) &&
         int(m.epoch, 0, 255) && obj(m.world) && isWorld(m.world) && list(m.players, MAX_PLAYERS, isPlayer) && list(m.foods, WIRE_FOODS_MAX, isFood) &&
         list(m.balls, MAX_PLAYERS, isBall) && list(m.happenings, LIST_MAX, isHappening) && list(m.bubbles, LIST_MAX, isBubble) && isSpot(m.at) && obj(m.room) &&
-        text(m.room.name) && bool(m.room.listed) && bool(m.room.locked)
+        text(m.room.name) && bool(m.room.listed) && bool(m.room.locked) && (m.room.code === undefined || isTableCode(m.room.code)) &&
+        (m.room.everyone === undefined || bool(m.room.everyone))
       );
     case "refused":
       return REFUSALS.includes(m.reason as Refusal) && (m.name === undefined || text(m.name));
@@ -82,7 +84,8 @@ function valid(m: Obj): boolean {
     case "found":
       return isFood(m.food);
     case "food":
-      return int(m.ack, 0, 0xffff) && list(m.amounts, WIRE_FOODS_MAX, isAmount) && list(m.gone, WIRE_FOODS_MAX, num) && num(m.eaten);
+      return int(m.ack, 0, 0xffff) && list(m.amounts, WIRE_FOODS_MAX, isAmount) && list(m.gone, WIRE_FOODS_MAX, num) && num(m.eaten) &&
+        (m.meal === undefined || (isAmount(m.meal) && (m.meal as number[])[0]! >= 0 && (m.meal as number[])[1]! >= 0 && (m.meal as number[])[1]! <= (m.meal as number[])[0]!));
     default:
       return false;
   }

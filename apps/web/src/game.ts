@@ -32,7 +32,7 @@ import type { TableStart } from "@fly/net";
 import { TAP_SLOP } from "./input.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
 import { Life } from "./life.ts";
-import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart } from "./online/invite.ts";
+import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart, tryProtocolReload } from "./online/invite.ts";
 import type { Shared } from "./online/invite.ts";
 import { AutoJoin } from "./online/auto-join.ts";
 import type { AutoJoinNow } from "./online/auto-join.ts";
@@ -461,6 +461,10 @@ export class Game implements Shell {
     return this.#lobby?.rooms ?? null;
   }
 
+  get lobbyStatus() {
+    return this.#lobby?.status ?? "connecting";
+  }
+
   /** The list of rooms is open while Online is up and this device is at none (on its other faces too, so that coming back to the list finds it as it is). */
   #browse(dt: number) {
     // In a room open to everyone the list is there too, to go to another from.
@@ -472,7 +476,7 @@ export class Game implements Shell {
     }
     this.#lobby?.update(dt);
     // A room server newer than this page: the newer page speaks its protocol.
-    if (this.#lobby?.status === "version") reloadOnce();
+    if (this.#lobby?.status === "version") tryProtocolReload(this.#app, reloadOnce);
   }
 
   /** Starts typing into a field as a tap on it lifts, while the browser still counts it as the player's doing. */
@@ -605,10 +609,12 @@ export class Game implements Shell {
     const ended = online.ended;
     if (!ended) return;
     // A page from before the server's last deploy: the newer page speaks its protocol.
-    if (ended === "version" && reloadOnce()) return;
+    if (ended === "version" && tryProtocolReload(this.#app, reloadOnce)) return;
     // Sat with everyone by default: alone again, quietly, and perhaps another try later.
-    if (this.#autoOnline) this.#auto?.ended(ended);
-    this.#stand(ended, this.#autoOnline);
+    const quiet = this.#autoOnline;
+    if (quiet) this.#auto?.ended(ended);
+    this.#stand(ended, quiet);
+    if (ended === "version" && !quiet && this.nav.current !== "online") this.open("online");
   }
 
   /** Sitting with everyone by default, once the brain is awake: or giving up a try that comes to nothing, quietly. */

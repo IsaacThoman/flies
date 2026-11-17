@@ -84,8 +84,9 @@ export class AutoJoin {
   ended(why: Ended) {
     this.#trying = false;
     // Left: the player's doing. Elsewhere: another window of this device sits there now, and two would take the seat from each other forever.
-    // Unknown: a room server without rooms open to everyone. Removed: nobody can be, but if it happened it would be meant.
-    if (why === "left" || why === "elsewhere" || why === "unknown" || why === "removed") this.stopped = true;
+    // Unknown: a room server without rooms open to everyone. Version: a room server this build can't speak to, nor will it later.
+    // Removed: nobody can be, but if it happened it would be meant.
+    if (why === "left" || why === "elsewhere" || why === "unknown" || why === "version" || why === "removed") this.stopped = true;
     else this.#later();
   }
 

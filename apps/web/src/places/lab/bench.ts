@@ -337,15 +337,15 @@ export function buildBench(): SceneSet {
     const H = MICROSCOPE.height;
     add(big, new RoundedBoxGeometry(MICROSCOPE.hx * 2, H, MICROSCOPE.hz * 2, 3, 2.5).translate(0, H / 2, 0), (p) => (p.y < 3 ? "#d9d7cf" : cream), ENAMEL);
     // A dark band round the base's foot, and the black stage plate let into its top with a chrome ring.
-    add(fine, new THREE.BoxGeometry(MICROSCOPE.hx * 2 + 0.6, 4, MICROSCOPE.hz * 2 + 0.6).translate(0, 4, 0), dark, SATIN);
+    add(fine, new THREE.BoxGeometry(MICROSCOPE.hx * 2, 4, MICROSCOPE.hz * 2).translate(0, 4, 0), dark, SATIN);
     // The seam where the casting meets its cover; the switch and its green light on the front; vents in its end, behind the dimmer.
-    add(fine, new THREE.BoxGeometry(MICROSCOPE.hx * 2 + 0.3, 0.6, MICROSCOPE.hz * 2 + 0.3).translate(0, H - 8, 0), "#b9b5aa", ENAMEL);
-    add(fine, new RoundedBoxGeometry(14, 8, 2.4, 2, 0.8).translate(-70, 15, MICROSCOPE.hz + 0.6), "#26282c", SATIN);
-    add(fine, new THREE.BoxGeometry(12, 3.4, 0.6).rotateX(0.25).translate(-70, 16.2, MICROSCOPE.hz + 1.8), "#3a3d42", SATIN);
-    add(fine, new THREE.CylinderGeometry(1.4, 1.4, 0.8, 12).rotateX(Math.PI / 2).translate(-52, 15, MICROSCOPE.hz + 0.3), "#5ee08a", { rough: 0.3, glow: 2 });
-    for (let i = 0; i < 6; i++) add(fine, new THREE.BoxGeometry(0.6, 1.8, 22).translate(MICROSCOPE.hx + 0.1, 11 + (i % 2) * 6, -72 + Math.floor(i / 2) * 26), "#2a2b2e", SATIN);
+    add(fine, new THREE.BoxGeometry(MICROSCOPE.hx * 2, 0.6, MICROSCOPE.hz * 2).translate(0, H - 8, 0), "#b9b5aa", ENAMEL);
+    add(fine, new RoundedBoxGeometry(14, 8, 2.4, 2, 0.8).translate(-70, 15, MICROSCOPE.hz - 1.2), "#26282c", SATIN);
+    add(fine, new THREE.BoxGeometry(12, 3.4, 0.6).rotateX(0.25).translate(-70, 16.2, MICROSCOPE.hz - 0.5), "#3a3d42", SATIN);
+    add(fine, new THREE.CylinderGeometry(1.4, 1.4, 0.8, 12).rotateX(Math.PI / 2).translate(-52, 15, MICROSCOPE.hz - 0.4), "#5ee08a", { rough: 0.3, glow: 2 });
+    for (let i = 0; i < 6; i++) add(fine, new THREE.BoxGeometry(0.6, 1.8, 22).translate(MICROSCOPE.hx - 0.3, 11 + (i % 2) * 6, -72 + Math.floor(i / 2) * 26), "#2a2b2e", SATIN);
     add(big, new THREE.CylinderGeometry(52, 52, 0.3, 64).translate(0, H + 0.15, 14), "#141518", { rough: 0.18 });
-    add(fine, new THREE.TorusGeometry(52.4, 0.7, 6, 64).rotateX(Math.PI / 2).translate(0, H, 14), "#d8dadd", CHROME);
+    add(fine, new THREE.TorusGeometry(52.4, 0.3, 6, 64).rotateX(Math.PI / 2).translate(0, H, 14), "#d8dadd", CHROME);
     // Two spring clips on the stage, flat enough not to matter underfoot.
     for (const s of [-1, 1]) {
       add(fine, new THREE.BoxGeometry(4, 0.4, 36).rotateY(s * 0.25).translate(s * 36, H + 0.2, 34), "#c9ccd0", CHROME);
@@ -399,7 +399,7 @@ export function buildBench(): SceneSet {
       profile.push(new THREE.Vector2(f.r * s, topHeight(base, f.x + f.r * s * 0.9999, f.z)));
     }
     big.add(surface, piece(new THREE.LatheGeometry(profile, 56).translate(f.x, 0, f.z), green, ENAMEL));
-    big.add(surface, piece(new THREE.CylinderGeometry(LAMP.stem.r, LAMP.stem.r + 1.5, LAMP.stem.top, 20).translate(LAMP.stem.x, LAMP.stem.top / 2, LAMP.stem.z), "#c6cacf", STEEL));
+    big.add(surface, piece(new THREE.CylinderGeometry(LAMP.stem.r, LAMP.stem.r, LAMP.stem.top, 20).translate(LAMP.stem.x, LAMP.stem.top / 2, LAMP.stem.z), "#c6cacf", STEEL));
     const knuckle = new THREE.Vector3(LAMP.stem.x, LAMP.stem.top + 4, LAMP.stem.z);
     big.add(surface, piece(new THREE.SphereGeometry(10, 20, 12).translate(knuckle.x, knuckle.y, knuckle.z), green, ENAMEL));
     // Its arm, from the knuckle up and over to the back of the shade.
@@ -432,7 +432,7 @@ export function buildBench(): SceneSet {
 
   // Vials: clear tubes with a plug of cornmeal food at the bottom, foam plugs, labels in marker, and pupae up the walls.
   const pupae: THREE.Matrix4[] = [];
-  const vial = (x: number, z: number, top: number, food: number, label: number, facing: number, plugColor: string, plug: { bottom: number; top: number; base: number } | null) => {
+  const vial = (x: number, z: number, top: number, food: number, label: number, facing: number, plugColor: string, plug: { bottom: number; top: number; shape: Solid } | null) => {
     glass.add(clear, paint(new THREE.CylinderGeometry(VIAL_RADIUS, VIAL_RADIUS, top - 1, 40, 1, true).translate(x, (top + 1) / 2, z), "#f4fbff"));
     glass.add(clear, paint(new THREE.TorusGeometry(VIAL_RADIUS - 0.4, 0.45, 5, 40).rotateX(Math.PI / 2).translate(x, top, z), "#ffffff"));
     // The food: golden, a little darker at the bottom where the molasses settles, its top a little sunken.
@@ -446,8 +446,9 @@ export function buildBench(): SceneSet {
     if (plug) {
       const foam = new THREE.CylinderGeometry(VIAL_RADIUS - 1.2, VIAL_RADIUS - 1.4, plug.top - plug.bottom, 32, 2).translate(x, (plug.top + plug.bottom) / 2, z);
       big.add(surface, piece(foam, plugColor, FOAM));
-      const cap = new THREE.SphereGeometry(VIAL_RADIUS - 1.2, 32, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, (plug.base - plug.top) / (VIAL_RADIUS - 1.2), 1);
-      big.add(surface, piece(cap.translate(x, plug.top, z), plugColor, FOAM));
+      // Foam must follow the felt parabola; an ellipsoid stands proud midway out.
+      const shape = plug.shape;
+      big.add(surface, piece(solidTop(shape, 6, 32), plugColor, FOAM));
     }
     // The label, wrapped round the side that faces out.
     const band = new THREE.CylinderGeometry(VIAL_RADIUS + 0.12, VIAL_RADIUS + 0.12, 22, 16, 1, true, facing - 0.85, 1.7);
@@ -470,7 +471,7 @@ export function buildBench(): SceneSet {
     vials.forEach((v, i) => {
       const f = v.footprint as { x: number; z: number };
       const top = (v.top as { base: number }).base;
-      vial(f.x, f.z, top, rnd.range(16, 24), i, RACK.angle, plugs[i % plugs.length], { bottom: top - 14, top: top + 0.01, base: top + 5 });
+      vial(f.x, f.z, top, rnd.range(16, 24), i, RACK.angle, plugs[i % plugs.length], { bottom: top - 14, top: top + 0.01, shape: v });
     });
     // The rack: white plastic plates with holes for the vials, clear acrylic sides.
     const m = frame(RACK.x, RACK.z, RACK.angle);
@@ -497,7 +498,7 @@ export function buildBench(): SceneSet {
     }
   }
   // The open vial: its plug pulled up out of the rim, ready to tip the flies out.
-  vial(OPEN_VIAL.x, OPEN_VIAL.z, OPEN_VIAL.rim, OPEN_VIAL.food, 7, -0.4, "#e9d7a9", { bottom: OPEN_VIAL.rim - 8, top: OPEN_VIAL.plug - 3, base: OPEN_VIAL.plug });
+  vial(OPEN_VIAL.x, OPEN_VIAL.z, OPEN_VIAL.rim, OPEN_VIAL.food, 7, -0.4, "#e9d7a9", { bottom: OPEN_VIAL.rim - 8, top: OPEN_VIAL.plug - 3, shape: one("plug") });
   shadows.push({ x: OPEN_VIAL.x + 2, z: OPEN_VIAL.z + 3, rx: 15, rz: 15, angle: 0, strength: 0.35 });
   const pupaMesh = new THREE.InstancedMesh(piece(new THREE.SphereGeometry(1, 8, 6), (p) => (p.y > 0.6 ? "#8a5a2c" : "#6b3f1c"), { rough: 0.4 }), surface, pupae.length);
   pupae.forEach((m, i) => pupaMesh.setMatrixAt(i, m));
@@ -655,11 +656,11 @@ export function buildBench(): SceneSet {
     const m = frame(TIMER.x, TIMER.z, TIMER.angle);
     big.add(surface, piece(new RoundedBoxGeometry(TIMER.hx * 2, TIMER.height, TIMER.hz * 2, 3, 5).translate(0, TIMER.height / 2, 0), (p) => (p.y > TIMER.height - 2 ? "#e4e6e7" : "#cfd3d6"), SATIN), m);
     sheets.add(paper, paperPiece(new THREE.PlaneGeometry(48, 22).rotateX(-Math.PI / 2).translate(0, TIMER.height + 0.02, -8), "#a9b6a0", labelRegion(DISPLAY)), m);
-    for (let i = 0; i < 3; i++) fine.add(surface, piece(new THREE.CylinderGeometry(4.5, 4.8, 0.9, 20).translate(-15 + i * 15, TIMER.height + 0.25, 15), ["#d24e3a", "#3a7fd2", "#5a5f66"][i], { rough: 0.45 }), m);
+    for (let i = 0; i < 3; i++) fine.add(surface, piece(new THREE.CylinderGeometry(4.5, 4.8, 0.9, 20).translate(-15 + i * 15, TIMER.height - 0.45, 15), ["#d24e3a", "#3a7fd2", "#5a5f66"][i], { rough: 0.45 }), m);
     // The seam between its two halves, and the grey rubber band round its foot that keeps it from sliding.
-    fine.add(surface, piece(new THREE.BoxGeometry(TIMER.hx * 2 - 4, 0.5, TIMER.hz * 2 + 0.2).translate(0, 13, 0), "#9fa4a8", SATIN), m);
-    fine.add(surface, piece(new THREE.BoxGeometry(TIMER.hx * 2 + 0.2, 0.5, TIMER.hz * 2 - 4).translate(0, 13, 0), "#9fa4a8", SATIN), m);
-    fine.add(surface, piece(new RoundedBoxGeometry(TIMER.hx * 2 + 0.6, 3, TIMER.hz * 2 + 0.6, 2, 1.4).translate(0, 1.5, 0), "#7d8287", RUBBER), m);
+    fine.add(surface, piece(new THREE.BoxGeometry(TIMER.hx * 2 - 4, 0.5, TIMER.hz * 2).translate(0, 13, 0), "#9fa4a8", SATIN), m);
+    fine.add(surface, piece(new THREE.BoxGeometry(TIMER.hx * 2, 0.5, TIMER.hz * 2 - 4).translate(0, 13, 0), "#9fa4a8", SATIN), m);
+    fine.add(surface, piece(new RoundedBoxGeometry(TIMER.hx * 2, 3, TIMER.hz * 2, 2, 1.4).translate(0, 1.5, 0), "#7d8287", RUBBER), m);
   }
 
   // The box of pipette tips: a blue box, a white plate of yellow tips, a clear lid.

@@ -18,15 +18,16 @@
 
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
-import { openGame, readState, startServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
+import { gameUp, openGame, readState, startServer, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
 import { dropFood, feedHoney } from "./feeding.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import type { Game } from "../src/game.ts";
-import { pinSettings } from "./settings.ts";
 
 /** The frame's budget on the Apple TV. */
 const MAX_CALLS = 150;
 const MAX_TRIANGLES = 500_000;
+/** How long a move to another place may take (ms). */
+const PLACE_BUILT = 240_000;
 
 const args = process.argv.slice(2);
 let url = args.includes("--url") ? args[args.indexOf("--url") + 1] : "";
@@ -37,8 +38,7 @@ if (!url) {
   server = started.server;
 }
 
-const { browser, page, errors } = await openGame({ url });
-await pinSettings(page);
+const { browser, page, errors } = await openGame({ url, steady: true });
 let maxCalls = 0;
 let maxTriangles = 0;
 const watch = setInterval(() => {
@@ -64,6 +64,12 @@ const toTool = async (id: string) => {
   }
   await waitFor(page, `tool=${id}`);
 };
+/** The player's choice of pixels, as Settings makes it: the harness holds the picture at its finest, and this only ever chooses bigger ones. */
+const pixels = (choice: string) => page.evaluate((choice) => {
+  const game = (globalThis as unknown as { __fly: Game }).__fly;
+  game.settings.pixels = choice as Game["settings"]["pixels"];
+  game.applySettings();
+}, choice);
 let currentStep = "startup";
 const step = (name: string) => { currentStep = name; console.log(`· ${name}`); };
 let failed = false;
@@ -82,7 +88,6 @@ try {
   const firstFrame = await startup.evaluate(async () => {
     const { __fly: game, __drawFrame: draw } = globalThis as unknown as { __fly: Game; __drawFrame: () => void };
     game.settings.wallpaperAfter = 0;
-    game.settings.joinOthers = false;
     const canvas = document.getElementById("game") as HTMLCanvasElement;
     const before = canvas.dataset.ready;
     let writes = 0, renders = 0, early = false;
@@ -205,7 +210,7 @@ try {
   await waitFor(page, "time=noon");
   // The light changing so much can make it jump (its brain's answer): let it come down and settle before the honey drops at its mouth.
   await waitForGameTime(page, 3);
-  await waitFor(page, "mode~standing|walking");
+  await waitWithin(page, "mode~standing|walking", 60);
   await toTool("feed");
 
   step("feeding: honey at its mouth reaches taste senses and the brain produces a feed command");
@@ -221,7 +226,11 @@ try {
   await press("ArrowRight");
   await waitFor(page, "tool=swoop");
   let tookOff = false;
-  for (let throws = 1; throws <= 8 && !tookOff; throws++) {
+  // Its looming detectors answer how quickly the ball's darkness grows in its eyes (eyes.ts). A software
+  // GPU drawing the whole picture finely hands the eyes their pictures late and few, and it took off
+  // from one throw in three; in bigger pixels, as a player may choose, from most.
+  await pixels("chunkier");
+  for (let throws = 1; throws <= 16 && !tookOff; throws++) {
     const before = Number((await readState(page)).takeoffs);
     await press("Enter");
     await waitForGameTime(page, 2.4);
@@ -230,7 +239,8 @@ try {
     console.log(`  throw ${throws}: escape peak ${after.escapePeak}, ${tookOff ? "took off" : "stayed"}`);
   }
   assert.ok(tookOff, "the fly never took off");
-  await waitFor(page, "mode~standing|walking");
+  await pixels("classic");
+  await waitWithin(page, "mode~standing|walking", 60);
 
   step("the menu with Play/Pause, and Play/Pause carries on; the same with Back");
   await press(" ");
@@ -288,8 +298,9 @@ try {
     settings.nerves = "always";
     settings.xray = "always";
   });
-  const inside = await waitFor(page, "view=follow,eyesInset=top-right,nerves=top-right,xray>0.9");
-  assert.ok(inside.glow.length > 0, "its brain's regions glow at rest");
+  await waitFor(page, "view=follow,eyesInset=top-right,nerves=top-right,xray>0.9");
+  // At rest its activity comes and goes: some of its regions glow within a few seconds.
+  const inside = await waitWithin(page, "glow~.", 5);
   console.log(`  glowing: ${inside.glow.split(" ").slice(0, 4).join(" ")}`);
   await press("ArrowDown");
   await waitFor(page, "view=wide,xray<0.05");
@@ -321,12 +332,15 @@ try {
   assert.equal(counted[2], stats.meals, "meals today, as the fly's life counted them");
   console.log(`  its day: ${stats.day}`);
   await page.evaluate(() => {
-    const settings = (globalThis as unknown as { __fly: { settings: { statsPanel: string; wallpaperAfter: number } } }).__fly.settings;
-    settings.statsPanel = "wallpaper";
-    settings.wallpaperAfter = 2;
+    (globalThis as unknown as { __fly: { settings: { statsPanel: string } } }).__fly.settings.statsPanel = "wallpaper";
   });
   await waitFor(page, "statsPanel=hidden", 3000);
-  const together = await waitFor(page, "wallpaper=true,statsPanel~^(top|bottom)-(left|right)$,eyesInset~^(top|bottom)-(left|right)$", 10_000);
+  // Only then the wallpaper, sooner: nothing has been pressed for a while, so it comes at once, and
+  // a slow machine may draw no frame in between.
+  await page.evaluate(() => {
+    (globalThis as unknown as { __fly: { settings: { wallpaperAfter: number } } }).__fly.settings.wallpaperAfter = 2;
+  });
+  const together = await waitFor(page, "wallpaper=true,statsPanel~^(top|bottom)-(left|right)$,eyesInset~^(top|bottom)-(left|right)$");
   assert.equal(together.statsPanel.split("-")[0], together.eyesInset.split("-")[0], "at the same edge as the others");
   assert.notEqual(together.statsPanel, together.eyesInset, "across the screen from them");
   await page.evaluate(() => {
@@ -338,18 +352,24 @@ try {
   await waitFor(page, "wallpaper=false,statsPanel=hidden,tool=view", 3000);
 
   step("carried to each place in turn with the Place tool, it lives there, and the frame keeps to its budget");
+  // Each place is built a part a frame with everything in it drawn, and a software GPU draws a frame of
+  // it at full size in seconds: built in the biggest pixels, it is a tenth of that.
+  await pixels("chunkier");
   await toTool("place");
   for (const place of PLACES.slice(1)) {
     await press("ArrowDown");
     await press("Enter");
-    const arrived = await waitFor(page, `place=${place.id},moving=`, 30_000);
+    // A place is built a part a frame behind the veil, fifty frames or so: minutes on a software GPU.
+    const arrived = await waitFor(page, `place=${place.id},moving=`, PLACE_BUILT);
     assert.equal(arrived.prints, "0", "its prints are left behind where it was");
-    await waitFor(page, "mode~standing|walking");
+    // Set down, it may fly first (its brain's choice).
+    await waitWithin(page, "mode~standing|walking", 60);
     await waitForGameTime(page, 3);
   }
   await press("ArrowUp", PLACES.length - 1);
   await press("Enter");
-  await waitFor(page, `place=${PLACES[0].id},moving=`, 30_000);
+  await waitFor(page, `place=${PLACES[0].id},moving=`, PLACE_BUILT);
+  await pixels("classic");
 
   step("the weather outside: on Now it is what the Apple TV says, called Outside, and too old an answer goes back to the forecast");
   const before = await readState(page);
@@ -375,7 +395,7 @@ try {
 
   step("a reload: the settings, the view, the light and the weather as they were left, the shelf on Feed, and the hints for what was used gone");
   await page.reload();
-  await pinSettings(page);
+  await gameUp(page);
   await waitFor(page, "brain=running,screen=title", 90_000);
   assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.haptics.enabled), false, "rumble stays off after reloading");
   await press("Enter");

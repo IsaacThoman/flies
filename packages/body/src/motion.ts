@@ -13,7 +13,9 @@
 //
 // - Physics: it stays on the surface it walks on, slides along what it walks
 //   into, falls off ledges, and in the air has weight, drag and its wings'
-//   force, and bounces off what it flies into, an underside included. A
+//   force, and bounces off what it flies into, an underside included. Its
+//   head, abdomen and legs keep out of what they reach (#clear), which can
+//   turn it between things too close for it as it faces (#turnToFit). A
 //   take-off is the escape command's; its direction is the body's: away
 //   from a threat it knows of, else straight ahead. In the air it turns to
 //   face its course (VANE_RATE).
@@ -32,7 +34,7 @@
 //   (FEED_ALIGN): stopping is the brain's doing, the last shuffle isn't.
 
 import type { Food, RayHit, Surface, Vec3, World } from "@fly/world";
-import { TOUCH, createSurface, sideNormal, solidBottom, topHeight } from "@fly/world";
+import { TOUCH, createSurface, inside, sideNormal, solidBottom, topHeight } from "@fly/world";
 import type { Intent } from "./behavior.ts";
 import { ease } from "./behavior.ts";
 
@@ -45,6 +47,22 @@ export const MOUTH_AHEAD = 0.5;
 export const MOUTH_UP = 0.08;
 /** The room its body takes over its feet, mm: up to its folded wings. More than a step. */
 export const FLY_HEIGHT = 1.3;
+/**
+ * How far the body reaches from its feet, in body lengths: its head's front
+ * and its abdomen's tip, ahead and behind, and its thorax's sides, from
+ * BODY_LOW over its feet up to FLY_HEIGHT; and, on its feet, where each of
+ * its six feet stands ([ahead, left] pairs, as packages/fly's model stands).
+ * The column over its feet keeps out of everything as it moves; these are
+ * then kept out of every side (BODY_REACH first, FEET_REACH after it).
+ */
+export const BODY_REACH = [0.5, 0, -0.5, 0, 0.135, 0.16, 0.135, -0.16] as const;
+export const FEET_REACH = [0.66, 0.27, 0.66, -0.27, 0.1, 0.53, 0.1, -0.53, -0.34, 0.38, -0.34, -0.38] as const;
+const reachOf = (reach: readonly number[]) => Math.max(...reach.map((_, k) => (k % 2 ? 0 : Math.hypot(reach[k], reach[k + 1]))));
+/** The farthest its body, and its body and feet, reach from its feet, in body lengths. */
+const BODY_RADIUS = reachOf(BODY_REACH);
+const FEET_RADIUS = Math.max(BODY_RADIUS, reachOf(FEET_REACH));
+/** The underside of its thorax over its feet, in body lengths. */
+export const BODY_LOW = 0.18;
 /** Highest step (mm) its legs take in their stride. */
 export const STEP_UP = 0.9;
 /** A drop deeper than this (mm) is a ledge it falls from. */
@@ -112,6 +130,17 @@ const v3 = (x = 0, y = 0, z = 0): Vec3 => ({ x, y, z });
  * of it rather than inside it.
  */
 const SLACK = 1e-4;
+/** How far (mm) past a side #clear sets what its body reaches, so the next frame's rays start clear of it. */
+const CLEAR = 1e-5;
+const CLEAR_PASSES = 3;
+/** The longest step (mm) #clear moves it on its feet at a time. */
+const PUSH_STEP = 0.3;
+/** How many stairs #clear looks up past, on its feet, for a wall beyond them. */
+const STAIRS = 3;
+/** What one of #clear's looks found. */
+const CLEARED = 0;
+const MOVED = 1;
+const STUCK = 2;
 
 export class FlyBody {
   readonly position: Vec3;
@@ -144,7 +173,17 @@ export class FlyBody {
   #awayLeft = 0;
   #awayDir = 1;
   #probe = createSurface();
+  #before = createSurface();
   #wall = v3();
+  /** The side its front was kept out of last frame, walking into it (see #clear), if it was. */
+  #facing = v3();
+  #front = false;
+  /** The way #clear last pushed it. */
+  #pushed = v3(1);
+  /** Where, facing which way and how, #clear last found its body clear (y NaN: nowhere). */
+  #cleared = v3(NaN);
+  #clearedYaw = 0;
+  #clearedOnFeet = false;
   #inward = v3();
   #flightOrigin = v3();
   #flightDir = v3();
@@ -192,6 +231,7 @@ export class FlyBody {
     this.blocked = false;
     this.groundSpeed = this.turnRate = this.wingbeat = 0;
     this.#pressed = this.#awayLeft = 0;
+    this.#cleared.y = NaN;
     this.events.tookOff = this.events.jumped = this.events.landed = false;
     this.events.hit = 0;
     this.#easeUp(this.surface.normal, 1);
@@ -209,11 +249,265 @@ export class FlyBody {
     // Long frames must not destabilize drag or skip a wall between samples.
     const steps = dt <= 1 / 60 ? 1 : Math.ceil(dt / (1 / 60));
     const h = dt / steps;
-    for (let i = 0; i < steps; i++) {
-      if (this.mode === "airborne") this.#fly(intent, forces, h);
-      else this.#walk(intent, forces, h);
-    }
+    for (let i = 0; i < steps; i++) this.#move(intent, forces, h);
     this.wingbeat = this.mode === "airborne" ? intent.wings : flying ? 0 : intent.wingPose;
+  }
+
+  #move(intent: Intent, forces: Forces, dt: number) {
+    const p = this.position;
+    const x = p.x;
+    const y = p.y;
+    const z = p.z;
+    const yaw = this.yaw;
+    const walking = this.mode !== "airborne";
+    if (walking) {
+      copySurface(this.surface, this.#before);
+      this.#walk(intent, forces, dt);
+    } else this.#fly(intent, forces, dt);
+    // Whether all it reaches was found clear where it is (#clear's last finding, as it stands still).
+    const fitted = this.#clearHere();
+    if (!this.#clear(intent)) {
+      // Its body can't be kept out of what that went into: from where it fitted, it doesn't go there (flying, it
+      // keeps its height and speed). Landed in it, or still in it there, it is between things too close for it
+      // as it faces: they turn it, if it fits between them turned. Where it didn't fit already, it may go on,
+      // or it could never get out.
+      let clear = false;
+      if (walking && this.onFeet && fitted) {
+        p.x = x;
+        p.y = y;
+        p.z = z;
+        this.yaw = yaw;
+        this.turnRate = 0;
+        copySurface(this.#before, this.surface);
+        clear = this.#clear(intent);
+      } else if (!this.onFeet && fitted) {
+        // Back where it was, its feet no lower than the surface there nor its body in what is over it.
+        p.y = this.#within(x, z, y, p.y);
+        p.x = x;
+        p.z = z;
+        clear = this.#clear(intent);
+      }
+      if (!clear) this.#turnToFit(intent);
+    }
+    if (!walking || !this.onFeet) return;
+    // What it made of the way over the ground, after anything its body was kept out of.
+    const mx = p.x - x;
+    const mz = p.z - z;
+    const moved = (mx * Math.sin(this.yaw) + mz * Math.cos(this.yaw)) / dt;
+    this.groundSpeed = Number.isFinite(moved) ? moved : 0;
+    this.mode = Math.abs(this.groundSpeed) > 0.2 || Math.abs(this.turnRate) > 0.2 ? "walking" : "standing";
+    this.velocity.x = mx / dt;
+    this.velocity.y = 0;
+    this.velocity.z = mz / dt;
+    this.#easeUp(this.surface.normal, dt);
+  }
+
+  /**
+   * Turns it along the way between what it is between (square to the way it was last pushed), or else a
+   * quarter turn either way, if it fits there so (see #move); or keeps only its body out of what it is in.
+   */
+  #turnToFit(intent: Intent): boolean {
+    const p = this.position;
+    const x = p.x;
+    const y = p.y;
+    const z = p.z;
+    const yaw = this.yaw;
+    const mode = this.mode;
+    copySurface(this.surface, this.#before);
+    // Square to the push, the nearer way round first, then the other; then a quarter turn either way from where it faced.
+    // Failing those, its legs can't fit there however it turns: its body is kept out, as it faces if it fits so,
+    // else turned as before, and its legs are left as evenly between what they go into as it can stand.
+    const along = Math.atan2(-this.#pushed.z, this.#pushed.x);
+    const nearer = Math.abs(wrap(along - yaw)) <= Math.PI / 2 ? along : along + Math.PI;
+    let fits = false;
+    for (let k = 0; k < 9 && !fits; k++) {
+      const turn = k < 4 ? k : k - 5;
+      this.yaw = wrap(turn < 0 ? yaw : turn < 2 ? nearer + turn * Math.PI : yaw + (turn === 2 ? 1 : -1) * (Math.PI / 2));
+      fits = this.#clear(intent, k < 4);
+      if (fits && k < 4) return true;
+      if (fits) break;
+      p.x = x;
+      p.y = y;
+      p.z = z;
+      this.mode = mode;
+      copySurface(this.#before, this.surface);
+    }
+    if (!fits) {
+      this.yaw = yaw;
+      this.#clear(intent, false);
+    }
+    for (let k = 0; k < CLEAR_PASSES && this.onFeet && this.#clearOnce(intent, true, true) === MOVED; k++) this.#clear(intent, false);
+    return false;
+  }
+
+  /**
+   * Keeps what its body reaches (BODY_REACH, and FEET_REACH on its feet)
+   * out of the sides of things: its feet's column alone would let a fly
+   * flying at a pane, or turning by a wall, put its head or its legs through
+   * it. Each point's ray out from over its feet meets the side it would go
+   * into, and the body is moved back out of the deepest, square to each
+   * side, as far as it can move; in the air it bounces off as its feet do.
+   * Moved out of one side into another (a corner), it looks again, up to
+   * CLEAR_PASSES times.
+   */
+  #clear(intent: Intent, feet = true): boolean {
+    const p = this.position;
+    const c = this.#cleared;
+    this.#front = false;
+    // The world stands still: a body where it was clear last time, as it was, still is (a fly at rest).
+    if (feet && this.#clearHere()) return true;
+    for (let pass = 0; pass < CLEAR_PASSES; pass++) {
+      const result = this.#clearOnce(intent, feet);
+      if (result === MOVED) continue;
+      if (result === CLEARED && feet) {
+        c.x = p.x;
+        c.y = p.y;
+        c.z = p.z;
+        this.#clearedYaw = this.yaw;
+        this.#clearedOnFeet = this.mode !== "airborne";
+      } else c.y = NaN;
+      return result === CLEARED;
+    }
+    c.y = NaN;
+    return false;
+  }
+
+  /** Whether #clear last found all it reaches clear just where and as it is now. */
+  #clearHere() {
+    const p = this.position;
+    const c = this.#cleared;
+    return c.y === p.y && c.x === p.x && c.z === p.z && this.#clearedYaw === this.yaw && this.#clearedOnFeet === (this.mode !== "airborne");
+  }
+
+  /**
+   * One look for #clear (at its feet too, if `feet`): whether its body was clear, or it moved it, or it
+   * couldn't. `even`, it is moved half the sum of what each point goes in, toward even between them.
+   */
+  #clearOnce(intent: Intent, feet: boolean, even = false): number {
+    const world = this.#world;
+    const p = this.position;
+    const s = Math.sin(this.yaw);
+    const c = Math.cos(this.yaw);
+    const L = FLY_LENGTH;
+    const onFeet = this.mode !== "airborne";
+    const origin = this.#flightOrigin;
+    const dir = this.#flightDir;
+    const hit = this.#flightHit;
+    // On its feet, it meets only what rises past a step, which it would step up onto; in the air, all its body meets.
+    const low = onFeet ? STEP_UP + 1e-6 : BODY_LOW * L;
+    const near = world.gather(p.x, p.z, (onFeet && feet ? FEET_RADIUS : BODY_RADIUS) * L, p.y + low, p.y + FLY_HEIGHT);
+    if (near === 0 || (near === 1 && onFeet && rounded(world, world.gathered(0), this.surface.solid))) return CLEARED;
+    let px = 0;
+    let pz = 0;
+    let py = 0;
+    for (let k = 0, n = BODY_REACH.length + (onFeet && feet ? FEET_REACH.length : 0); k < n; k += 2) {
+      const foot = k >= BODY_REACH.length;
+      const ahead = foot ? FEET_REACH[k - BODY_REACH.length] : BODY_REACH[k];
+      const left = foot ? FEET_REACH[k - BODY_REACH.length + 1] : BODY_REACH[k + 1];
+      const ox = (s * ahead + c * left) * L;
+      const oz = (c * ahead - s * left) * L;
+      const length = Math.hypot(ox, oz);
+      origin.x = p.x;
+      origin.y = p.y + low;
+      origin.z = p.z;
+      dir.x = ox / length;
+      dir.y = 0;
+      dir.z = oz / length;
+      // A side, or a top too steep to stand on (a pot's inside), is a wall to it. On its feet, a top it could walk
+      // up is not, nor a side no higher than a step over what is before it, a stair it would step up (the clock's
+      // slices): it looks on from the stair's top. In the air, its body rides up over a top it could stand on.
+      let from = 0;
+      let wall = false;
+      for (let stair = 0; stair <= STAIRS; stair++) {
+        if (!world.raycastNear(origin, dir, hit, length - from, foot ? 0 : Math.max(0, p.y + FLY_HEIGHT - SLACK - origin.y))) break;
+        if (hit.normal.y >= MAX_SLOPE_COS) {
+          if (!onFeet) py = Math.max(py, this.#rise(hit.solid, origin, dir, hit.t, length - from));
+          break;
+        }
+        if (onFeet && hit.normal.y === 0 && stair < STAIRS) {
+          const ground = world.heightAt(hit.point.x - dir.x * 1e-3, hit.point.z - dir.z * 1e-3, origin.y);
+          const top = topHeight(world.solids[hit.solid], hit.point.x + dir.x * 1e-3, hit.point.z + dir.z * 1e-3);
+          if (top - ground <= STEP_UP) {
+            from += hit.t + 1e-3;
+            origin.x = hit.point.x + dir.x * 1e-3;
+            origin.y = top + STEP_UP + 1e-6;
+            origin.z = hit.point.z + dir.z * 1e-3;
+            continue;
+          }
+        }
+        wall = true;
+        break;
+      }
+      if (!wall) continue;
+      const level = Math.hypot(hit.normal.x, hit.normal.z);
+      if (level < 1e-9) continue;
+      const nx = hit.normal.x / level;
+      const nz = hit.normal.z / level;
+      const into = (length - from - hit.t) * -(dir.x * nx + dir.z * nz);
+      if (even) {
+        px += (nx * into) / 2;
+        pz += (nz * into) / 2;
+        continue;
+      }
+      const depth = into + CLEAR - (px * nx + pz * nz);
+      if (depth > 0) {
+        px += nx * depth;
+        pz += nz * depth;
+      }
+    }
+    if (py > 0) {
+      // Up only if there is room over it there.
+      if (world.underside(p.x, p.z, p.y + py) < p.y + py + FLY_HEIGHT) return STUCK;
+      p.y += py;
+      if (this.velocity.y < 0) this.velocity.y = 0;
+      if (px === 0 && pz === 0) return MOVED;
+    }
+    if (px === 0 && pz === 0) return CLEARED;
+    const length = Math.hypot(px, pz);
+    if (even && length < 0.01) return CLEARED;
+    const nx = px / length;
+    const nz = pz / length;
+    this.#pushed.x = nx;
+    this.#pushed.z = nz;
+    const facing = s * nx + c * nz;
+    if (onFeet) {
+      // Its front at a wall it walks into: pressed against it, as at its head (WALL_PATIENCE).
+      if (facing < -0.5 && intent.speed > 0) {
+        this.blocked = this.#front = true;
+        this.#facing.x = nx;
+        this.#facing.z = nz;
+      }
+      // In short steps, as it would walk there: up a slope it can climb, a long push at once would rise past a step.
+      const pieces = Math.ceil(length / PUSH_STEP);
+      for (let k = 0; k < pieces; k++) {
+        const moved = this.#tryMove(px / pieces, pz / pieces, true);
+        if (moved === "blocked") return k > 0 ? MOVED : STUCK;
+        if (moved === "fell") return MOVED;
+      }
+      return MOVED;
+    }
+    const v = this.velocity;
+    const into = v.x * nx + v.z * nz;
+    if (into < 0) {
+      v.x -= into * nx * 1.4;
+      v.z -= into * nz * 1.4;
+      this.events.hit = Math.max(this.events.hit, -into);
+      this.blocked ||= facing < -0.3;
+    }
+    return this.#slide(px, pz) ? MOVED : STUCK;
+  }
+
+  /** How far up a ray at `origin` must go to pass over solid `i` between `from` and `to` along it, mm. */
+  #rise(i: number, origin: Vec3, dir: Vec3, from: number, to: number) {
+    const solid = this.#world.solids[i];
+    let top = -Infinity;
+    for (let k = 0; k <= 4; k++) {
+      const t = from + ((to - from) * k) / 4;
+      const x = origin.x + dir.x * t;
+      const z = origin.z + dir.z * t;
+      if (inside(solid.footprint, x, z)) top = Math.max(top, topHeight(solid, x, z));
+    }
+    return top - origin.y + CLEAR;
   }
 
   #takeOff(strength: number, threat: Vec3 | null) {
@@ -273,7 +567,7 @@ export class FlyBody {
     } else {
       if (this.blocked && speed > 0) this.#pressed += dt;
       else this.#pressed = 0;
-      if (this.#pressed >= WALL_PATIENCE && world.wallNormal(this.point(HEAD_AHEAD + 0.2, 0, 0, scratchA).x, scratchA.z, p.y + STEP_UP, this.#wall, p.y + FLY_HEIGHT)) {
+      if (this.#pressed >= WALL_PATIENCE && this.#pressedBy(p)) {
         // Turn the way that brings its heading round to the wall's outward normal soonest, about a third of a turn.
         const leftOf = this.#wall.x * Math.cos(this.yaw) - this.#wall.z * Math.sin(this.yaw);
         this.#awayDir = leftOf >= 0 ? 1 : -1;
@@ -304,29 +598,27 @@ export class FlyBody {
           }
           // Facing into it: the antennae are at the wall.
           this.blocked = fx * this.#wall.x + fz * this.#wall.z < -0.5 && speed > 0;
-          if (this.#tryMove(mx, mz) === "blocked") {
-            mx = 0;
-            mz = 0;
-          }
-        } else {
-          mx = 0;
-          mz = 0;
+          this.#tryMove(mx, mz);
         }
       }
     }
-    const moved = (mx * fx + mz * fz) / dt;
-    this.groundSpeed = Number.isFinite(moved) ? moved : 0;
-    this.mode = this.mode === "airborne" ? "airborne" : Math.abs(this.groundSpeed) > 0.2 || Math.abs(yawRate) > 0.2 ? "walking" : "standing";
-    if (this.mode !== "airborne") {
-      this.velocity.x = mx / dt;
-      this.velocity.y = 0;
-      this.velocity.z = mz / dt;
-      this.#easeUp(this.surface.normal, dt);
-    }
   }
 
-  /** Moves over the surface by (mx, mz) if it can: "moved", "blocked", or "fell" off a ledge. */
-  #tryMove(mx: number, mz: number): "moved" | "blocked" | "fell" {
+  /** What it is pressed against, facing it, into #wall: the wall at its head, or the side its front was kept out of. */
+  #pressedBy(p: Vec3) {
+    if (this.#world.wallNormal(this.point(HEAD_AHEAD + 0.2, 0, 0, scratchA).x, scratchA.z, p.y + STEP_UP, this.#wall, p.y + FLY_HEIGHT)) return true;
+    if (!this.#front) return false;
+    this.#wall.x = this.#facing.x;
+    this.#wall.y = 0;
+    this.#wall.z = this.#facing.z;
+    return true;
+  }
+
+  /**
+   * Moves over the surface by (mx, mz) if it can: "moved", "blocked", or "fell" off a ledge. Pushed out of
+   * something (`pushed`), what its head and tail reach is #clear's to keep out, not the move's.
+   */
+  #tryMove(mx: number, mz: number, pushed = false): "moved" | "blocked" | "fell" {
     const world = this.#world;
     const p = this.position;
     const x = p.x + mx;
@@ -350,6 +642,8 @@ export class FlyBody {
       dir.z = mz / length;
       const hit = world.raycast(origin, dir, this.#flightHit, length);
       if (hit && hit.normal.y === 0) return "blocked";
+    }
+    if (length > 0 && !pushed) {
       const sign = mx * Math.sin(this.yaw) + mz * Math.cos(this.yaw) >= 0 ? 1 : -1;
       const reach = HEAD_AHEAD * FLY_LENGTH * sign;
       const allowed = STEP_UP + (Math.abs(reach) / 3) * MAX_SLOPE_TAN;
@@ -564,11 +858,11 @@ export class FlyBody {
   }
 
   /** Moves it level by (mx, mz) in the air, if nothing is in the way and there is room for its body there. */
-  #slide(mx: number, mz: number) {
+  #slide(mx: number, mz: number): boolean {
     const world = this.#world;
     const p = this.position;
     const length = Math.hypot(mx, mz);
-    if (length < 1e-9) return;
+    if (length < 1e-9) return false;
     const origin = this.#flightOrigin;
     origin.x = p.x;
     origin.y = p.y + 1e-6;
@@ -577,10 +871,11 @@ export class FlyBody {
     dir.x = mx / length;
     dir.y = 0;
     dir.z = mz / length;
-    if (world.raycast(origin, dir, this.#flightHit, length, FLY_HEIGHT - SLACK)) return;
-    if (world.underside(p.x + mx, p.z + mz, p.y) < p.y + FLY_HEIGHT) return;
+    if (world.raycast(origin, dir, this.#flightHit, length, FLY_HEIGHT - SLACK)) return false;
+    if (world.underside(p.x + mx, p.z + mz, p.y) < p.y + FLY_HEIGHT) return false;
     p.x += mx;
     p.z += mz;
+    return true;
   }
 
   /** A height at (x, z) as near `to` as the air it was in at `from` allows: on the surface under it or above, its body clear of what is over it. */
@@ -600,6 +895,17 @@ export class FlyBody {
     u.y /= l;
     u.z /= l;
   }
+}
+
+/**
+ * Whether solid `i` is the round dome it stands on (`standing`), which its body and feet can't go into: a
+ * round dome whose flanks are steeper the lower they are (power 1 or less) is no steeper up it than where
+ * it stands, and it can stand there.
+ */
+function rounded(world: World, i: number, standing: number) {
+  if (i !== standing) return false;
+  const { top, footprint } = world.solids[i];
+  return footprint.kind === "circle" && top.kind === "dome" && top.power <= 1;
 }
 
 const levelUp: Vec3 = { x: 0, y: 1, z: 0 };

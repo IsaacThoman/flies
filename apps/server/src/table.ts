@@ -428,11 +428,13 @@ export class Table {
     seat.lastSeen = wall;
     seat.fresh = true;
     seat.ack = 0;
+    this.food.takeMeal(seat.id);
     const shown = returning && seat.present;
     seat.present = true;
     seat.away = false;
     this.#send(seat, {
       type: "welcome",
+      meals: true,
       v: PROTOCOL,
       id: seat.id,
       colour: seat.colour,
@@ -751,7 +753,7 @@ export class Table {
       const changes = this.food.flush();
       if (changes) {
         // Each player is told which of its own bites have been counted.
-        for (const p of this.seats.values()) if (p.link) this.#send(p, { type: "food", ack: p.ack, ...changes, eaten: Math.round((this.food.eaten.get(p.id) ?? 0) * 1e4) / 1e4 });
+        for (const p of this.seats.values()) if (p.link) this.#send(p, { type: "food", ack: p.ack, ...changes, eaten: Math.round((this.food.eaten.get(p.id) ?? 0) * 1e4) / 1e4, meal: this.food.takeMeal(p.id) });
       }
     }
     const bubbles = this.bubbles;

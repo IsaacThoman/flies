@@ -20,8 +20,12 @@ export type BrainWorkerFactory = (onMessage: (response: BrainResponse) => void, 
 
 /** Most fly time one tick covers, ms. */
 export const MAX_TICK_MS = 100;
-/** A tick unanswered for this long while the game runs means the brain has stalled. */
-export const STALL_MS = 2000;
+/**
+ * A tick unanswered for this long while the game runs means the brain has stalled. Long enough for
+ * a page too busy to read the brain's answer for a while (on a CPU-only machine, the menus' first
+ * shaders compiling kept answers of a few tens of ms waiting 2 to 4 s), which isn't the brain's doing.
+ */
+export const STALL_MS = 10_000;
 /** Building the brain may take a while, but not this long. */
 export const LOAD_TIMEOUT_MS = 30_000;
 /**
