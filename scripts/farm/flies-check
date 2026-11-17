@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# Isolate each checkout, dependencies and process tree; share only immutable data and caches.
+set -Eeuo pipefail
+usage() { echo 'Usage: flies-check <branch-or-sha> [--with-dev] [--only lint|types|unit|e2e|all] [--files <test files...>]' >&2; exit 2; }
+[[ $# -gt 0 && $1 != -* ]] || usage
+ref=$1; shift
+only=all; merge=false; files=()
+while (($#)); do
+  case $1 in
+    --with-dev) merge=true; shift ;;
+    --only) (($# >= 2)) || usage; only=$2; shift 2 ;;
+    --files) shift; while (($#)) && [[ $1 != --* ]]; do files+=("$1"); shift; done; ((${#files[@]})) || usage ;;
+    *) usage ;;
+  esac
+done
+case $only in all|lint|types|unit|e2e) ;; *) usage ;; esac
+if ((${#files[@]})) && [[ $only != unit && $only != e2e ]]; then usage; fi
+farm=$HOME/flies-farm
+cache=$HOME/repos/flies
+mkdir -p "$farm/locks" "$farm/logs"
+id=$(date -u +%Y%m%dT%H%M%S)-$$
+checkout=$farm/$id
+logs=$farm/logs/$id
+mkdir "$logs"
+container=flies-check-$id
+child=
+cleanup() {
+  local code=$?
+  trap - EXIT INT TERM HUP
+  if [[ -n $child ]]; then kill -TERM -- "-$child" 2>/dev/null || kill -TERM "$child" 2>/dev/null || true; fi
+  docker rm -f "$container" >/dev/null 2>&1 || true
+  if [[ -d $checkout ]]; then
+    flock "$farm/locks/git" git -C "$cache" worktree remove --force "$checkout" || true
+  fi
+  echo "Logs: $logs"
+  exit "$code"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+echo "Run $id: $ref; waiting for one of four farm slots"
+while :; do
+  for slot in {1..4}; do
+    exec 9>"$farm/locks/slot-$slot"
+    if flock -n 9; then break 2; fi
+    exec 9>&-
+  done
+  sleep 2
+done
+echo "Run $id: slot $slot acquired"
+# Serialize fetch/ref resolution/worktree bookkeeping, never the checks themselves.
+(
+  flock 8
+  git -C "$cache" fetch --quiet origin
+  revision=$ref
+  if [[ $ref != origin/* ]] && git -C "$cache" rev-parse --verify --quiet "refs/remotes/origin/$ref^{commit}" >/dev/null; then revision=origin/$ref; fi
+  sha=$(git -C "$cache" rev-parse --verify --end-of-options "$revision^{commit}")
+  git -C "$cache" worktree add --quiet --detach "$checkout" "$sha"
+) 8>"$farm/locks/git"
+cd "$checkout"
+echo "Commit: $(git rev-parse HEAD)"
+if $merge; then
+  if ! git merge --no-edit origin/dev >"$logs/merge.log" 2>&1; then
+    echo 'FAIL merge origin/dev; conflicting files:'
+    git diff --name-only --diff-filter=U
+    cat "$logs/merge.log"
+    exit 1
+  fi
+fi
+ln -s "$cache/packages/brain/data" packages/brain/data
+failed=0
+stage() {
+  local name=$1; shift
+  local start=$SECONDS status=0
+  echo "START $name"
+  "$@" >"$logs/$name.log" 2>&1 &
+  child=$!
+  wait "$child" || status=$?
+  child=
+  if ((status)); then
+    echo "FAIL $name ($((SECONDS-start))s, exit $status)"
+    # TAP failures retain their test names; other checks retain the useful error context.
+    grep -E '^not ok|^✖|^FAIL|^Error:' "$logs/$name.log" || true
+    tail -40 "$logs/$name.log"
+    failed=1
+  else
+    echo "PASS $name ($((SECONDS-start))s)"
+  fi
+  return "$status"
+}
+stage dependencies setsid npm ci --cache "$HOME/.npm" --prefer-offline --no-audit --no-fund || exit 1
+version=$(node -p 'JSON.parse(require("fs").readFileSync("node_modules/playwright/package.json")).version')
+image=flies-farm:$version
+docker image inspect "$image" >/dev/null 2>&1 || { echo "Missing $image; build scripts/farm/Dockerfile (see README)"; exit 1; }
+run_container() {
+  local status=0
+  timeout --foreground --kill-after=15s 30m docker run --rm --init --name "$container" --network none --cpus=4 --memory=6g --pids-limit=512 --shm-size=1g \
+    --user "$(id -u):$(id -g)" -e HOME=/tmp -e PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    -v "$checkout:$checkout" -v "$cache/packages/brain/data:$cache/packages/brain/data:ro" -w "$checkout" "$image" "$@" || status=$?
+  docker rm -f "$container" >/dev/null 2>&1 || true
+  return "$status"
+}
+if [[ $only == all || $only == lint ]]; then stage lint run_container npm run lint || true; fi
+if [[ $only == all || $only == types ]]; then
+  stage types run_container npm run typecheck || true
+  stage tvos-types run_container npm run tvos:typecheck || true
+fi
+if [[ $only == all ]]; then stage build run_container npm run build || true; fi
+if [[ $only == all || $only == unit ]]; then
+  # Exact names are deliberately narrow: all other tests in these files still run.
+  skip="^(?:on the real connectome every tick is the TypeScript's, bit for bit, the eyes shut and open \(WebAssembly\)|exp, log, log1p, expm1, sin and cos are V8's to the bit \(WebAssembly\)|every tick of 70 simulated seconds is the TypeScript's, bit for bit, for several seeds \(WebAssembly\)|with its eyes open every tick is the TypeScript's, bit for bit, for several seeds \(WebAssembly\)|broken or odd eye columns come out as in TypeScript \(WebAssembly\))$"
+  echo "needs Apple silicon (exact test-name exclusions):"
+  cat <<'SKIPS'
+on the real connectome every tick is the TypeScript's, bit for bit, the eyes shut and open (WebAssembly)
+exp, log, log1p, expm1, sin and cos are V8's to the bit (WebAssembly)
+every tick of 70 simulated seconds is the TypeScript's, bit for bit, for several seeds (WebAssembly)
+with its eyes open every tick is the TypeScript's, bit for bit, for several seeds (WebAssembly)
+broken or odd eye columns come out as in TypeScript (WebAssembly)
+SKIPS
+  echo 'SKIP CPU budgets: M5 Pro calibration is not accepted on this x86 farm (see README).'
+  tests=("${files[@]}")
+  if ((${#tests[@]} == 0)); then
+    mapfile -t tests < <(node --input-type=module -e 'import {globSync} from "node:fs"; console.log(globSync(["apps/*/tests/*.test.ts","packages/*/src/**/*.test.ts","packages/*/tests/*.test.ts"]).sort().join("\n"))')
+  fi
+  for file in "${tests[@]}"; do [[ $file == *.test.ts && -f $file && $file != -* ]] || { echo "Invalid unit test: $file"; exit 2; }; done
+  stage unit run_container node --test --test-concurrency=2 --test-reporter=tap --test-skip-pattern="$skip" "${tests[@]}" || true
+fi
+if [[ $only == all || $only == e2e ]]; then
+  tests=("${files[@]}")
+  if ((${#tests[@]} == 0)); then tests=(apps/web/e2e/{play,pointer,web,tables}.e2e.ts); fi
+  for file in "${tests[@]}"; do
+    [[ $file == *.e2e.ts && -f $file && $file != -* ]] || { echo "Invalid e2e test: $file"; exit 2; }
+    stage "e2e-$(basename "$file" .e2e.ts)" run_container node "$file" || true
+  done
+fi
+exit "$failed"
