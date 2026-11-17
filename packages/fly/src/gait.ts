@@ -1,7 +1,7 @@
-// Where the six feet are on the ground. The fly walks with the alternating
-// tripod: front and hind legs of one side step together with the middle leg
-// of the other (L1 R2 L3, then R1 L2 R3), with a small metachronal lag that
-// lifts the hind leg of each tripod a moment before the front one.
+// Ground contacts follow a speed-dependent continuum, not discrete gait
+// switches: wave-like at low speeds, tetrapod-like between, tripod at speed.
+// Mendes et al. 2013 doi:10.7554/eLife.00231; Wosnitza et al. 2013
+// doi:10.1242/jeb.078139; DeAngelis et al. 2019 doi:10.7554/eLife.46409.
 //
 // Feet live in the model's own space (the ground under the fly). A planted
 // foot is carried backwards by exactly the motion the pose says the body
@@ -14,16 +14,20 @@
 import { LEG_COUNT, LEGS, legPair } from "./anatomy.ts";
 
 /** Phase offset of each leg (L1 R1 L2 R2 L3 R3) within the step cycle. */
-const OFFSET = [0, 0.5, 0.5, 0, 0.04, 0.54].map((o, leg) => o - (legPair(leg) === 0 ? 0.04 : 0));
+const OFFSET = [-0.02, 0.48, 0.5, 0, 0.02, 0.52];
 /** Radius at which turning counts as walking, for the step frequency. */
 const TURN_RADIUS = 0.35;
 const MOVING = 0.02;
 const SETTLE = 0.012;
 
 /** Stride length in body lengths for a body speed in body lengths per second. */
-export const strideLength = (speed: number) => Math.min(0.5, 0.22 + 0.045 * speed);
+// Stance travel is ~0.9 mm for a 2.5 mm male, near the DeAngelis stance
+// fit (932.8 * v_mm^-1.025 ms). A small speed effect avoids rigid strides.
+// This is a dimensional approximation to the data, not a fitted dataset.
+export const strideLength = (speed: number) => speed * (stanceDuration(speed) + swingDuration(stanceDuration(speed) / 0.55));
+export const stanceDuration = (speed: number) => (0.34 + 0.002 * Math.min(20, speed)) / Math.max(0.02, speed);
 /** Swing duration for a step period: insects keep the swing short and vary the stance. */
-export const swingDuration = (period: number) => Math.min(0.1, Math.max(0.03, 0.4 * period));
+export const swingDuration = (period: number) => Math.min(0.035, Math.max(0.022, 0.45 * period));
 
 export class Gait {
   /** Foot (claw) positions, x y z per leg, in the model's space. */
@@ -38,6 +42,7 @@ export class Gait {
   private readonly elapsed = new Float64Array(LEG_COUNT);
   private readonly duration = new Float64Array(LEG_COUNT);
   private sinceLift = 0;
+  private readonly offsets = new Float64Array(OFFSET);
 
   constructor(home: Float64Array) {
     this.reset(home);
@@ -54,9 +59,10 @@ export class Gait {
     const feet = this.feet;
     const effective = Math.sqrt(speed * speed + turn * TURN_RADIUS * turn * TURN_RADIUS);
     const moving = effective > MOVING;
-    const frequency = moving ? effective / strideLength(effective) : 0;
-    const period = moving ? 1 / frequency : 0.3;
-    const swing = moving ? swingDuration(period) : 0.09;
+    const stance = stanceDuration(effective);
+    const swing = moving ? swingDuration(stance / 0.55) : 0.09;
+    const period = moving ? stance + swing : 0.3;
+    const frequency = moving ? 1 / period : 0;
     const stanceHalf = moving ? (period - swing) / 2 : 0;
     const oldPhase = this.phase;
     this.phase = (this.phase + frequency * dt) % 64;
@@ -72,6 +78,8 @@ export class Gait {
       feet[i + 1] = 0;
     }
 
+    const fast = Math.min(1, Math.max(0, (effective - 0.5) / 4));
+    const blend = fast * fast * (3 - 2 * fast);
     for (let leg = 0; leg < LEG_COUNT; leg++) {
       const i = leg * 3;
       const hx = home[i], hz = home[i + 2];
@@ -80,18 +88,31 @@ export class Gait {
       let tz = hz + (speed - turn * hx) * stanceHalf;
       // Land no further out than leaves room for the stance that follows.
       const reach = LEGS[legPair(leg)].reach;
-      const ox = tx - hx, oz = tz - hz, offset = Math.sqrt(ox * ox + oz * oz), limit = reach * 0.8;
+      const ox = tx - hx, oz = tz - hz, offset = Math.sqrt(ox * ox + oz * oz), limit = reach * 0.95;
       if (offset > limit) {
         tx = hx + (ox * limit) / offset;
         tz = hz + (oz * limit) / offset;
       }
 
+      // Ipsilateral offsets spread into a metachronal wave as speed falls.
+      // Offset changes are rate limited so a speed jump cannot skip a cycle.
+      const pair = legPair(leg), oldOffset = this.offsets[leg];
+      const wave = pair / 3 + (leg & 1) * 0.5;
+      const tripod = pair === 0 ? -0.02 : pair === 1 ? 0.5 : 1.02;
+      const target = wave + (tripod + (leg & 1) * 0.5 - wave) * blend;
+      this.offsets[leg] += Math.max(-dt, Math.min(dt, target - oldOffset));
+      const due = moving && Math.floor(this.phase + this.offsets[leg]) !== Math.floor(oldPhase + oldOffset);
+
       if (!this.swinging[leg]) {
         const dx = feet[i] - hx, dz = feet[i + 2] - hz, away = Math.sqrt(dx * dx + dz * dz);
-        const due = moving && Math.floor(this.phase + OFFSET[leg]) !== Math.floor(oldPhase + OFFSET[leg]);
         const settle = !moving && away > SETTLE && this.sinceLift > 0.05 && !this.neighbourSwinging(leg);
         // A foot dragged to the edge of its reach lifts whatever the phase.
-        if (due || settle || away > reach) this.lift(leg, swing);
+        if (due || settle || away > reach) {
+          this.lift(leg, swing);
+          // Sample the first swing near its midpoint; a 30 Hz frame must not
+          // skip an entire 25–35 ms recovery and show a teleporting foot.
+          this.elapsed[leg] = -Math.min(dt * 0.5, swing * 0.5);
+        }
         else continue;
       }
 
@@ -116,7 +137,7 @@ export class Gait {
 
   /** Where leg `leg` is in the step cycle, 0 to 1, with 0 the moment it lifts. */
   legPhase(leg: number): number {
-    const p = this.phase + OFFSET[leg];
+    const p = this.phase + this.offsets[leg];
     return p - Math.floor(p);
   }
 

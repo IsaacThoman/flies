@@ -34,7 +34,8 @@ const lag = (dt: number, tau: number) => 1 - Math.exp(-dt / tau);
  * courting males), level, and vibrated through a small arc far too fast to
  * see as strokes (the song's 150 to 250 Hz), so it shows as a haze.
  */
-const SONG_ANGLE = 0.25;
+// Bennet-Clark & Ewing 1968 doi:10.1242/jeb.49.1.117: unilateral song.
+const SONG_ANGLE = 0.08;
 const SONG_ARC = 0.18;
 const SONG_LIFT = 0.04;
 /** Moves `x` toward `target` by at most `rate` per second: limbs take a moment to get anywhere. */
@@ -99,6 +100,7 @@ export class FlyRig {
 
   private groomPhase = 0;
   private boutPhase = 0;
+  private groomTime = 0;
   private readonly seed = new Uint32Array([0x2545f491]);
   private readonly idle = new Float64Array(8); // head yaw, pitch; antenna L yaw, pitch; R yaw, pitch; spare
   private readonly idleTarget = new Float64Array(8);
@@ -161,8 +163,10 @@ export class FlyRig {
     this.pitch += (Math.max(-1.6, Math.min(1.6, finite(pose.pitch))) - this.pitch) * lag(dt, 0.06);
     this.roll += (Math.max(-1.6, Math.min(1.6, finite(pose.roll))) - this.roll) * lag(dt, 0.06);
     const sing = Math.max(-1, Math.min(1, finite(pose.sing)));
-    if (sing !== 0) this.singSide = sing > 0 ? 1 : -1;
-    this.sing += (Math.abs(sing) * (airborne ? 0 : 1) - this.sing) * lag(dt, 0.06);
+    const requestedSide = sing > 0 ? 1 : -1;
+    if (sing !== 0 && this.sing < 0.005) this.singSide = requestedSide;
+    const songTarget = requestedSide === this.singSide ? Math.abs(sing) : 0;
+    this.sing += (songTarget * (airborne ? 0 : 1) - this.sing) * lag(dt, 0.14);
     // The crop fills over a meal and empties over minutes: a slow lag only keeps a jump from showing.
     this.fullness += (clamp01(pose.fullness ?? 0) - this.fullness) * lag(dt, 0.5);
 
@@ -172,9 +176,9 @@ export class FlyRig {
     if (!airborne && this.airborne) this.dipVelocity -= 0.6 * this.tuck;
     this.airborne = airborne;
     if (airborne) this.airTime += dt;
-    const tuckTarget = airborne ? smooth(0.05, 0.22, this.airTime) : 0;
+    const tuckTarget = airborne ? smooth(0.05, 0.22, this.airTime) * (1 - clamp01(pose.landing ?? 0)) : 0;
     // Legs fold up fast after take-off and reach out again a little more slowly to land.
-    this.tuck = toward(this.tuck, tuckTarget, airborne ? 7 : 5, dt);
+    this.tuck = toward(this.tuck, tuckTarget, airborne ? 6 : 5, dt);
     const push = airborne ? 1 - smooth(0.0, 0.12, this.airTime) : 0;
     // A damped spring for the dip as the legs take the weight on landing.
     this.dipVelocity += (-180 * this.dip - 20 * this.dipVelocity) * dt;
@@ -188,13 +192,25 @@ export class FlyRig {
 
     // Grooming rhythm: sweeps over the eyes alternate with bouts of rubbing the legs together.
     const vigour = this.groom;
-    this.groomPhase += dt * (2.2 + 2.6 * vigour);
+    this.groomPhase += dt * (2 + 1.3 * vigour);
     this.boutPhase += dt * 0.32;
+    // Seeds et al. 2014 doi:10.7554/eLife.02951: anterior cleaning precedes
+    // abdomen and wings, interleaved with leg rubbing. The command has no
+    // body-site information: this cycle is animation, not a dust hierarchy.
+    if (this.groom < 0.02) this.groomTime = 0;
+    else this.groomTime += dt * (1 - walking) * ground;
     // A feeding fly keeps its front legs down: the head is bowed to the food
     // and the proboscis is out, so grooming waits until it has finished.
-    this.groomBlend = toward(this.groomBlend, smooth(0.02, 0.3, this.groom) * (1 - smooth(0.1, 0.6, this.feed)), 5, dt);
+    this.groomBlend = toward(this.groomBlend, smooth(0.02, 0.3, this.groom) * (1 - smooth(0.1, 0.6, this.feed)) * (1 - walking), 4, dt);
     const groomOn = ease(this.groomBlend) * ground;
-    const rub = smooth(0.25, 0.75, 0.5 - 0.5 * Math.cos(TAU * this.boutPhase));
+    const cycle = this.groomTime % 12;
+    const rear = smooth(4.7, 5.2, cycle) * (1 - smooth(11.3, 11.8, cycle));
+    const frontOn = groomOn * (1 - rear);
+    const rearOn = groomOn * rear;
+    const antenna = smooth(2.7, 3.1, cycle) * (1 - smooth(4.2, 4.6, cycle));
+    const wingClean = smooth(7.1, 7.6, cycle);
+    const rearRub = smooth(9.4, 9.8, cycle);
+    const rub = 1 - smooth(0.5, 0.85, cycle) * (1 - smooth(4.1, 4.6, cycle));
     const sweep = 1 - rub;
     const sweepS = this.groomPhase - Math.floor(this.groomPhase);
     const stroke = sweepS < 0.62 ? smooth(0, 0.62, sweepS) : 1 - smooth(0.62, 1, sweepS);
@@ -216,8 +232,8 @@ export class FlyRig {
 
     // Head: idle glances, leading the turn, bowing to feed and into the grooming sweeps.
     const head = J.head * 12;
-    const groomPitch = groomOn * sweep * (0.08 + 0.22 * stroke) * (0.6 + 0.4 * vigour);
-    const groomRoll = groomOn * sweep * 0.14 * Math.sin(TAU * 2 * this.boutPhase);
+    const groomPitch = frontOn * sweep * (0.08 + 0.22 * stroke) * (0.6 + 0.4 * vigour);
+    const groomRoll = frontOn * sweep * 0.14 * Math.sin(TAU * 2 * this.boutPhase);
     this.child(head, 0, PIVOT.neck, PIVOT.thorax, 1);
     rotateY(jt, head, this.idle[0] + 0.06 * this.turn * walking);
     rotateX(jt, head, this.idle[1] + 0.26 * this.feed + groomPitch - 0.1 * this.flight + 0.06 * this.crouch + 0.1 * this.sleep);
@@ -227,7 +243,7 @@ export class FlyRig {
       const o = (J.antenna + side) * 12, sign = side === 0 ? 1 : -1;
       this.child(o, head, PIVOT.antenna, PIVOT.neck, sign);
       rotateY(jt, o, sign * this.idle[2 + side * 2]);
-      rotateX(jt, o, this.idle[3 + side * 2] - 0.25 * this.flight + 0.15 * groomOn * rub);
+      rotateX(jt, o, this.idle[3 + side * 2] - 0.25 * this.flight + 0.15 * frontOn * rub);
     }
 
     this.proboscis(t);
@@ -250,7 +266,7 @@ export class FlyRig {
       rotateX(jt, o, flutter * 0.7 * (this.random() * 2 - 1) + 0.04 * breathe);
     }
 
-    this.legs(t, dt, push, groomOn, sweep, rub, sweepS, vigour);
+    this.legs(t, dt, push, frontOn, rearOn, antenna, wingClean, rearRub, sweep, rub, sweepS, vigour);
     this.wingFrames();
   }
 
@@ -381,7 +397,7 @@ export class FlyRig {
     setFrame(jt, o, ax, ay, az, yx, yy, yz, ay * yz - az * yy, az * yx - ax * yz, ax * yy - ay * yx, x, y, z);
   }
 
-  private legs(t: number, dt: number, push: number, groomOn: number, sweep: number, rub: number, sweepS: number, vigour: number): void {
+  private legs(t: number, dt: number, push: number, groomOn: number, rearOn: number, antenna: number, wingClean: number, rearRub: number, sweep: number, rub: number, sweepS: number, vigour: number): void {
     const jt = this.joints, s = this.scratch, L = this.leg;
     const ground = 1 - ease(this.tuck);
 
@@ -408,14 +424,15 @@ export class FlyRig {
       const hl = Math.sqrt(hx * hx + hz * hz) || 1;
       hx /= hl; hz /= hl;
       const g = 0.14 + 0.9 * lifted + 0.4 * push, b = 0.62 + 0.45 * lifted + 0.3 * push;
-      let dx = hx * Math.cos(g), dy = -Math.sin(g), dz = hz * Math.cos(g);
-      let bx = hx * Math.cos(b), by = -Math.sin(b), bz = hz * Math.cos(b);
+      const cg = Math.cos(g), cb = Math.cos(b);
+      let dx = hx * cg, dy = -Math.sin(g), dz = hz * cg;
+      let bx = hx * cb, by = -Math.sin(b), bz = hz * cb;
       let px = side * spec.knee[0], py = spec.knee[1], pz = spec.knee[2];
 
       // Grooming: the front legs leave the ground for the head.
       const w = pair === 0 ? groomOn : 0;
       if (w > 0) {
-        this.groomTarget(side, sweep, rub, sweepS, vigour, s);
+        this.groomTarget(side, sweep, rub, sweepS, vigour, antenna, s);
         const head = J.head * 12;
         transformPoint(jt, head, s[0], s[1], s[2], s, 9);
         rotateVector(jt, head, s[3], s[4], s[5], s, 12);
@@ -426,8 +443,27 @@ export class FlyRig {
         px += (side * 0.7 - px) * w; py += (0.1 - py) * w; pz += (0.7 - pz) * w;
       }
 
+      if (pair === 2 && rearOn > 0) {
+        // A contact stroke runs forward along the ipsilateral abdomen/wing;
+        // its return clears the cuticle. Tarsi point back along the surface.
+        const u = (this.groomPhase + (side > 0 ? 0 : 0.08)) % 1;
+        const stroke = u < 0.65 ? smooth(0, 0.65, u) : 1 - smooth(0.65, 1, u);
+        const clear = u < 0.65 ? 0 : 0.035 * Math.sin(Math.PI * (u - 0.65) / 0.35);
+        const rubPhase = TAU * this.groomPhase * 2 + (side > 0 ? 0 : Math.PI);
+        const x = side * ((0.125 - 0.025 * wingClean + clear) * (1 - rearRub) + 0.012 * rearRub);
+        const y = (0.025 + 0.075 * wingClean + clear) * (1 - rearRub) + (-0.17 + 0.016 * Math.cos(rubPhase)) * rearRub;
+        const z = (-0.50 + 0.21 * stroke + 0.08 * wingClean) * (1 - rearRub) + (-0.49 + 0.035 * Math.sin(rubPhase)) * rearRub;
+        transformPoint(jt, thorax, x, y, z, s, 9);
+        rotateVector(jt, thorax, side * -0.2, -0.3, -0.93, s, 12);
+        rotateVector(jt, thorax, side * -0.15, 0.4, -0.9, s, 15);
+        fx += (s[9] - fx) * rearOn; fy += (s[10] - fy) * rearOn; fz += (s[11] - fz) * rearOn;
+        dx += (s[12] - dx) * rearOn; dy += (s[13] - dy) * rearOn; dz += (s[14] - dz) * rearOn;
+        bx += (s[15] - bx) * rearOn; by += (s[16] - by) * rearOn; bz += (s[17] - bz) * rearOn;
+        px += (side * 0.9 - px) * rearOn; py += (0.4 - py) * rearOn; pz += (-0.6 - pz) * rearOn;
+      }
+
       // In the air: folded and trailing, with a little swing from the airflow.
-      const a = ease(this.tuck);
+      const a = 1 - ground;
       if (a > 0) {
         const tk = TUCK[pair], wob = 0.012 * Math.sin(TAU * (3.1 + leg * 0.37) * t + leg);
         transformPoint(jt, thorax, side * tk.foot[0], tk.foot[1] + wob, tk.foot[2], s, 9);
@@ -455,7 +491,7 @@ export class FlyRig {
    * the eye from the back of the head to the face, or rubbing against the
    * other front leg below the face.
    */
-  private groomTarget(side: number, sweep: number, rub: number, sweepS: number, vigour: number, s: Float64Array): void {
+  private groomTarget(side: number, sweep: number, rub: number, sweepS: number, vigour: number, antenna: number, s: Float64Array): void {
     const ex = EYE.centre[0], ey = EYE.centre[1] - PIVOT.neck[1], ez = EYE.centre[2] - PIVOT.neck[2];
     const ax = EYE.radii[0], ay = EYE.radii[1], az = EYE.radii[2];
     const lag = side > 0 ? 0 : 0.06;
@@ -481,7 +517,9 @@ export class FlyRig {
     const rbx = -0.35, rby = 0.55, rbz = 0.75;
 
     const w = sweep, v = rub;
-    s[0] = side * (sx * w + rx * v); s[1] = sy * w + ry * v; s[2] = sz * w + rz * v;
+    s[0] = side * ((sx + (0.032 + 0.02 * p - sx) * antenna) * w + rx * v);
+    s[1] = (sy + (0.018 - 0.06 * p - sy) * antenna) * w + ry * v;
+    s[2] = (sz + (0.17 - sz) * antenna) * w + rz * v;
     s[3] = side * (tx * w + rdx * v); s[4] = ty * w + rdy * v; s[5] = tz * w + rdz * v;
     s[6] = side * (bx0 * w + rbx * v); s[7] = by0 * w + rby * v; s[8] = bz0 * w + rbz * v;
   }
@@ -506,12 +544,14 @@ export class FlyRig {
       haze = Math.max(haze, blur);
       const arc = amplitude * (1 - song) + SONG_ARC * song;
       const centre = mean * (1 - song) + SONG_ANGLE * song;
+      const rotationStrength = Math.max(strength, song * 0.12);
+      const elevationStrength = Math.max(strength, song * 0.2);
       const raise = (lift - 0.25 * this.crouch * open) * (1 - song) + SONG_LIFT * song;
       for (let c = 0; c < WING_COPIES; c++) {
         const phase = jitter + blur * (c / WING_COPIES) * 0.5;
         const sweepAngle = centre + 0.5 * arc * Math.cos(TAU * phase);
-        const elevation = raise + 0.07 * Math.sin(2 * TAU * phase) * blur;
-        const rotation = 0.7 * Math.sin(TAU * phase) * blur;
+        const elevation = raise + 0.07 * Math.sin(2 * TAU * phase) * blur * elevationStrength;
+        const rotation = 0.7 * Math.sin(TAU * phase) * blur * rotationStrength;
         const strokeAngle = (Math.PI / 2 + 0.13) * (1 - open) + sweepAngle * open;
         const elev = -0.1 * (1 - open) + elevation * open;
         const alpha = (c === 0 ? 1 : 0) * (1 - blur) + blur * (0.16 + (c === bright ? 0.2 : 0));
