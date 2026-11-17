@@ -315,12 +315,15 @@ not Apple TV JavaScriptCore or GPU performance:
 | feed | 107.379 | 82.439 | -23.2% |
 | flight | 119.211 | 117.271 | -1.6% |
 
-Local typecheck, lint, 151 fly/body/pose tests and the fly CPU budget pass.
+Local typecheck, lint, 152 fly/body/pose tests and the fly CPU budget pass on
+the final merge with dev.
 The farm's broad functional unit run passed with its five documented
 architecture-specific exclusions and x86 CPU-budget exclusion. An earlier
 full local run passed 723 functional tests but failed the then-current brain
 CPU budget under contention; the later contention-aware recheck skipped with
-zero failures. Broader farm E2Es are not green: web passes; play and pointer
-fail wallpaper-state assertions, and tables fails restaurant relocation.
+zero failures. On the farm snapshot of feat-fly-wing-envelope (head 10f4556 plus then-current
+dev), web E2E passed; play and pointer failed wallpaper-state assertions, and
+tables failed restaurant relocation. Later dev merges were not covered by
+that browser sweep.
 Those app behaviors are outside this model/animation change and were preserved
 when merging dev. No GitHub CI wait or PR merge was performed by this work.
