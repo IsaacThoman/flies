@@ -29,6 +29,7 @@ test("other flies keep moving across u32 room-time wraps, including a synchroniz
   const batch = new DataView(new ArrayBuffer(100));
   for (const cycle of [1, 3]) {
     online.others.forget();
+    online.line.clock.reset();
     online.line.onMessage({ type: "joined", id: 2, colour: "#ffffff", away: false });
     const offset = cycle === 3 ? 3 * 2 ** 32 - 400 : -6000;
     for (let i = -2; i <= 3; i++) {
