@@ -143,7 +143,7 @@ export class WeatherNow implements Weather {
     const deck = Math.max(t.cloud, Math.min(0.9, (this.rain + this.snow) * 0.9));
     this.cloud = toward(this.cloud, deck, most);
     this.mist = toward(this.mist, t.mist, most);
-    const gathered = clamp((this.cloud - 0.25) / 0.75);
+    const gathered = clamp((this.cloud - 0.25) / 0.65);
     this.rain = toward(this.rain, t.rain > this.rain ? Math.min(t.rain, gathered) : t.rain, most);
     this.wind = toward(this.wind, t.wind, most);
     this.heavy = toward(this.heavy, t.heavy ?? 0, most);

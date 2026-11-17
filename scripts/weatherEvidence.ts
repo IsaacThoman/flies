@@ -39,6 +39,15 @@ try {
         const g = (globalThis as unknown as { __fly: Game }).__fly;
         const [lt, choice, wt, vt, view] = variants;
         g.director.setView("table");
+        if (g.stage.current.id !== "picnic") {
+          const p = g.life.body.position;
+          const focus = g.stage.current.camera.focus;
+          const x = focus ? focus.x + p.x * focus.follow : p.x * 0.35;
+          const z = focus ? focus.z + p.z * focus.follow : p.z * 0.35;
+          const camera = g.director.camera.position;
+          g.director.turnBy(0.04 - Math.atan2(camera.x - x, camera.z - z), 0);
+          g.director.snap();
+        }
         g.stage.setTime(time);
         g.settings.eyesInset = "off";
         g.hands.variants[lt] = choice; g.hands.variants[wt] = 0; g.hands.variants[vt] = view;

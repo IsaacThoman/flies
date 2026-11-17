@@ -21,7 +21,8 @@ import type { BubbleSnapshot } from "./bubbles.ts";
  * be listed and locked, and a device may browse them; a device speaking 2
  * would sit at a locked room's door forever, not knowing why it was refused.
  */
-export const PROTOCOL = 3;
+// Seasonal forecasts and precipitation phases must agree at a shared table.
+export const PROTOCOL = 4;
 
 /** Where the room server answers WebSockets, on the site's own host. */
 export const ROOMS_PATH = "/rooms";

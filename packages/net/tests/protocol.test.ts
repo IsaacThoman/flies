@@ -151,8 +151,8 @@ test("sequence numbers compare across their wrap", () => {
   assert.ok(seqAtOrAfter(7, 7));
 });
 
-test("the protocol is 3: a device that doesn't know rooms can be locked is turned away (and reloads into one that does)", () => {
-  assert.equal(PROTOCOL, 3);
+test("protocol 4 keeps devices on the same seasonal weather and precipitation vocabulary", () => {
+  assert.equal(PROTOCOL, 4);
   assert.equal(CLOSE.locked, 4008);
 });
 

@@ -54,7 +54,7 @@ void main() {
   vec3 rel = mod(drop.xyz * size + uOffset - cameraPosition + 0.5 * size, size) - 0.5 * size;
   vec3 head = cameraPosition + rel;
   vec3 axis = normalize(uFall);
-  vec3 at = head - axis * length(uFall) * mix(SHUTTER, 0.006, uHeavy) * position.y;
+  vec3 at = head - axis * length(uFall) * mix(SHUTTER, 0.0035, uHeavy) * position.y;
   vec3 toEye = cameraPosition - at;
   float dist = length(toEye);
   vec3 side = normalize(cross(toEye, axis));
@@ -73,7 +73,7 @@ void main() {
   float coverage = uRain * mix(1.0, 0.3 + 0.7 * sheet, uHeavy);
   coverage *= drop.w < 0.0 ? uHeavy : 1.0;
   float shown = step(hash(drop.xyz), coverage);
-  vAlpha = shown * inBox * dry * smoothstep(5.0, 30.0, dist) * (WIDTH / width * (1.0 + uHeavy * 0.5));
+  vAlpha = shown * inBox * dry * smoothstep(mix(5.0, 80.0, uHeavy), mix(30.0, 200.0, uHeavy), dist) * (WIDTH / width * (1.0 + uHeavy * 0.5));
   vUv = position.xy;
   gl_Position = projectionMatrix * viewMatrix * vec4(at, 1.0);
 }`;
@@ -272,7 +272,7 @@ export class Rain {
       s.uHeavy.value = weather.heavy;
       (this.#streaks.geometry as THREE.InstancedBufferGeometry).instanceCount = BASE_DROPS + Math.ceil(HEAVY_DROPS * weather.heavy);
       s.uTime.value = time;
-      s.uFall.value.set(wind.x * (1 + weather.heavy), -speed, wind.z * (1 + weather.heavy));
+      s.uFall.value.set(wind.x, -speed, wind.z);
       const o = s.uOffset.value;
       o.set((o.x + wind.x * dt) % WRAP, (o.y - speed * dt) % WRAP, (o.z + wind.z * dt) % WRAP);
       // Drops are lit by the sky behind and round them: pale, a little brighter than the haze.

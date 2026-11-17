@@ -118,10 +118,12 @@ async function device(port: number) {
 
 test("a device speaking another version of the protocol is refused and closed", async () => {
   const { server } = await serve();
-  const d = await device(server.port);
-  const answer = await d.hello(newCode(), newKey(), { v: PROTOCOL + 1 });
-  assert.deepEqual(answer, { type: "refused", reason: "version" });
-  assert.equal((await d.closed).code, CLOSE.version);
+  for (const v of [PROTOCOL - 1, PROTOCOL + 1]) {
+    const d = await device(server.port);
+    const answer = await d.hello(newCode(), newKey(), { v });
+    assert.deepEqual(answer, { type: "refused", reason: "version" });
+    assert.equal((await d.closed).code, CLOSE.version);
+  }
 });
 
 test("a hello for a table nobody has started, without starting it, is refused as unknown", async () => {

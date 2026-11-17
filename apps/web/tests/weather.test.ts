@@ -139,3 +139,11 @@ test("clouds gather before manual precipitation and linger as it stops", () => {
   for (let i=0;i<120;i++) w.update(1/60);
   assert.ok(w.cloud>=w.rain*0.85);
 });
+
+test("manual snow and sleet reach their target density under their cloud deck", () => {
+  for (const kind of ["snow", "sleet"] as const) {
+    const w = new WeatherNow(); w.choose(kind);
+    for (let i=0;i<600;i++) w.update(1/60);
+    assert.equal(w.snow, kind === "snow" ? 1 : 0.55);
+  }
+});
