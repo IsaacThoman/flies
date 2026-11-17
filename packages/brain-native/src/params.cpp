@@ -26,6 +26,15 @@ SimulationOptions neuron(uint32_t seed) {
   return options;
 }
 
+bool octopaminergic(std::string_view t) {
+  return (t.starts_with("OA-") && t.size() > 3 && t.find_first_of("\n\r") == std::string_view::npos &&
+          t.find("\xe2\x80\xa8") == std::string_view::npos && t.find("\xe2\x80\xa9") == std::string_view::npos) ||
+         t == "DNd02" || t == "DNd03" || t == "DNg34" || t == "DNge138" || t == "DNge149" ||
+         t == "DNge150" || t == "DNge152" || t == "DNg66";
+}
+
+bool dfb_dopaminergic(std::string_view t) { return t == "FB5H" || t == "FB6H" || t == "FB7B"; }
+
 std::vector<std::string> transmitters(const Connectome& c) {
   const uint32_t n = c.neurons();
   const auto starts = [](const std::string& s, const char* prefix) { return s.rfind(prefix, 0) == 0; };
@@ -64,6 +73,8 @@ std::vector<std::string> transmitters(const Connectome& c) {
         // antennal lobe into saturated firing after any olfactory input. The
         // least certain fix.
         {starts(type, "lLN") && predicted == "ACH", "GABA"},
+        {octopaminergic(type), "OCT"},
+        {dfb_dopaminergic(type), "DA"},
     };
     out[i] = predicted;
     for (const Fix& fix : fixes) {

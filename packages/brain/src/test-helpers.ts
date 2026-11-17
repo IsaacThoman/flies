@@ -46,6 +46,8 @@ export type Synthetic = { bytes: Uint8Array; index: Record<string, number[]>; ne
  * MDN; wind JO -> DNg12; sweet taste -> MN9; bitter taste -> an inhibitory
  * interneuron -> MN9; water taste -> nothing; a male's taste on the front
  * legs -> pIP10; the wings' campaniform sensilla -> the flight motor neurons;
+ * head and body bristles -> a dopaminergic neuron of the dorsal fan-shaped
+ * body -> its sleep-promoting neurons, which the R5 ring neurons drive too;
  * each eye's LC10a -> that side's
  * DNa02 and DNg100. Each eye also has four columns of L1, L2 and L3 (see
  * syntheticEyeColumns), whose L2s drive that eye's LPLC2. Leave groups out
@@ -88,6 +90,14 @@ export function syntheticConnectome({ without = [], change = {} }: { without?: r
   add("MN9", 2, { type: "MN9", superClass: "cb_motor", side: "left" });
   add("interneuron", 2, { type: "GNG001", superClass: "cb_intrinsic", side: "center", nt: "GABA" });
   add("pIP10", 2, { type: "pIP10", superClass: "descending_neuron", side: "left", nt: "ACH" });
+  // Slow neuromodulation (modulation.ts): a wake-promoting dopaminergic neuron
+  // of the dorsal fan-shaped body (its transmitter blank, as in the data, for
+  // params.ts to fix), the sleep-promoting neurons it reaches, and the R5 ring
+  // neurons; an octopaminergic neuron whose level is kept but acts on nothing.
+  add("dFB dopamine", 1, { type: "FB6H", superClass: "cb_intrinsic", side: "left" });
+  add("dFB", 2, { type: "FB6A_a", superClass: "cb_intrinsic", side: "left", nt: "GLUT" });
+  add("R5", 2, { type: "ER5", superClass: "cb_intrinsic", side: "left", nt: "GABA" });
+  add("OA", 1, { type: "OA-VUMa1", superClass: "cb_intrinsic", side: "center" });
   // The front legs' male-taste neurons are picked by root ID (io.ts), so these
   // carry real ones, last because root IDs ascend; a mid leg's LgLG1a, by an ID
   // that isn't the front legs', must be left out.
@@ -117,6 +127,12 @@ export function syntheticConnectome({ without = [], change = {} }: { without?: r
   wire("bristle", "MDN", 20);
   wire("LgLG1a", "pIP10", 120);
   wire("LgAG1", "pIP10", 120);
+  wire("bristle", "dFB dopamine", 40);
+  wire("dFB dopamine", "dFB", 30);
+  wire("dFB", "interneuron", 10);
+  wire("R5", "dFB", 30);
+  wire("bristle", "OA", 40);
+  wire("OA", "DNg100", 20);
   return { bytes: packSynthetic(neurons, edges), index, neurons };
 }
 

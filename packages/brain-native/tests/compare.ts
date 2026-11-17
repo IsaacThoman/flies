@@ -327,6 +327,20 @@ function retinaDigest(brain: FlyBrain): string {
   return h.toString(16).padStart(8, "0");
 }
 
+/** FNV-1a over source levels, stand-ins, route engagement and factors, then bias. */
+function modulationDigest(brain: FlyBrain): string {
+  const m = brain.modulation;
+  const lists = [m.level, m.standIns.flatMap((s) => [s.level, s.target]), ...m.routes.flatMap((r) => [r.engaged, r.factors ?? []]), m.bias];
+  const bits = new DataView(new ArrayBuffer(8));
+  let h = 2166136261;
+  for (const list of lists) for (const x of list) {
+    bits.setFloat64(0, x, true);
+    h = Math.imul(h ^ bits.getUint32(0, true), 16777619) >>> 0;
+    h = Math.imul(h ^ bits.getUint32(4, true), 16777619) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
 /** FNV-1a over the bits of every neuron's v, g and a (tools/harness.cpp has the same). */
 export function digest(sim: Simulation): string {
   const bits = new DataView(new ArrayBuffer(4));
@@ -366,6 +380,7 @@ export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick
           rates.map(hex32).join(" "),
           [brain.state.arousal.value, brain.state.scene.left.value, brain.state.scene.right.value, brain.state.sleep].map(hex64).join(" "),
           retinaDigest(brain),
+          modulationDigest(brain),
           tick++ % 50 === 49 ? digest(brain.sim) : "-",
         ].join(" | "),
       );

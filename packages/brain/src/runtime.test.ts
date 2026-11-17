@@ -5,7 +5,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
-import { BACKGROUND, HUNGER, READOUTS, SCALES, SENSES, THIRST, WINGBEAT_RATE, backgroundRates, balanceFactor, decode, hungerOf, intensity, outputSynapses, senseRates, smooth, sweetOutputGain, thirstOf, waterOutputGain, wire } from "./io.ts";
+import { BACKGROUND, READOUTS, SCALES, SENSES, THIRST, WINGBEAT_RATE, backgroundRates, balanceFactor, decode, hungerOf, intensity, outputSynapses, senseRates, smooth, thirstOf, waterOutputGain, wire } from "./io.ts";
+import { RECEPTORS, STAND_INS } from "./modulation.ts";
 import { OPERATING_POINT, buildWeights, completenessFactors } from "./params.ts";
 import { REGIONS, REGION_RATE_NAMES } from "./regions.ts";
 import { createBrain, FlyBrain, MAX_TICK_MS } from "./runtime.ts";
@@ -271,10 +272,19 @@ test("hunger: left out it is 1, the brain as it was; lower, the sweet neurons pa
   for (const [given, taken] of [[0, 0], [0.25, 0.25], [1, 1], [-3, 0], [7, 1], [Number.NaN, 1], [Number.NEGATIVE_INFINITY, 1]]) {
     assert.equal(hungerOf({ ...RESTING_SENSES, hunger: given }), taken, `hunger ${given}`);
   }
-  assert.equal(sweetOutputGain(1), 1);
-  assert.equal(sweetOutputGain(0), HUNGER.sated);
-  assert.ok(Math.abs(HUNGER.sated * 1.4 - 1) < 1e-12);
-  assert.ok(sweetOutputGain(0.5) > HUNGER.sated && sweetOutputGain(0.5) < 1);
+  // Hunger sets the stand-in TH-VUM's rate, whose dopamine on DopEcR sets the sweet neurons' release.
+  const factor = (hunger: number) => {
+    const brain = new FlyBrain(load());
+    brain.tick(0, { ...RESTING_SENSES, hunger });
+    const route = brain.modulation.routes.find((r) => r.spec.receptor === "DopEcR")!;
+    assert.deepEqual([...route.carriers], synthetic.index.sweet);
+    return route.factors![0];
+  };
+  const [vum] = STAND_INS;
+  assert.equal(vum.low + (vum.high - vum.low), RECEPTORS[0].full, "TH-VUM starved engages DopEcR fully");
+  assert.equal(factor(1), 1, "starved, the weights as wired");
+  assert.ok(Math.abs(factor(0) - (1 + 0.4 / 25) / 1.4) < 1e-12, `fed ${factor(0)}`);
+  assert.ok(factor(0.5) > factor(0) && factor(0.5) < 1);
 
   // The hunger term is 0 at 1 and lowers both eyes' background below it.
   const a = new InternalState(4);

@@ -17,6 +17,7 @@
 #include "connectome.hpp"
 #include "eyes.hpp"
 #include "io.hpp"
+#include "modulation.hpp"
 #include "sim.hpp"
 #include "state.hpp"
 #include "vision.hpp"
@@ -82,19 +83,22 @@ class Brain {
 
   const Simulation& sim() const { return sim_; }
   const InternalState& state() const { return state_; }
+  const Modulation& modulation() const { return modulation_; }
 
  private:
+  void modulate();
   uint32_t neurons_;
   uint32_t connections_;
   io::Wiring wiring_;
   Simulation sim_;
   InternalState state_;
+  Modulation modulation_;
   std::vector<uint32_t> sense_inputs_;
   std::vector<uint32_t> background_inputs_;
-  // The sweet neurons' output gain, which hunger sets (io::sweet_output_gain).
-  uint32_t sweet_gain_ = 0;
   // The water neurons' output gain, which thirst sets (io::water_output_gain).
   uint32_t water_gain_ = 0;
+  std::vector<std::pair<uint32_t, uint32_t>> release_;
+  uint32_t modulated_ = 0;
   std::vector<uint32_t> state_inputs_;
   std::vector<double> rates_;
   std::vector<std::string> rate_names_;

@@ -126,6 +126,26 @@ std::string retina_digest(const fly::Brain& brain) {
   return buffer;
 }
 
+std::string modulation_digest(const fly::Modulation& m) {
+  uint32_t h = 2166136261u;
+  const auto add = [&](double x) {
+    uint64_t bits;
+    std::memcpy(&bits, &x, 8);
+    h = (h ^ static_cast<uint32_t>(bits)) * 16777619u;
+    h = (h ^ static_cast<uint32_t>(bits >> 32)) * 16777619u;
+  };
+  for (double x : m.level) add(x);
+  for (const auto& s : m.stand_ins) { add(s.level); add(s.target); }
+  for (const auto& r : m.routes) {
+    for (double x : r.engaged) add(x);
+    for (double x : r.factors) add(x);
+  }
+  for (double x : m.bias) add(x);
+  char buffer[12];
+  std::snprintf(buffer, sizeof buffer, "%08" PRIx32, h);
+  return buffer;
+}
+
 std::vector<std::vector<float>> read_frames(const char* path) {
   const std::vector<uint8_t> bytes = read_file(path);
   std::vector<std::vector<float>> frames;
@@ -257,6 +277,7 @@ int brain(const char* path, uint32_t seed, const Options& options) {
     const fly::InternalState& state = b->brain.state();
     out += " | " + hex64(state.arousal()) + " " + hex64(state.scene(fly::io::kLeft)) + " " + hex64(state.scene(fly::io::kRight)) + " " + hex64(state.sleep()) + " | ";
     out += retina_digest(b->brain) + " | ";
+    out += modulation_digest(b->brain.modulation()) + " | ";
     out += tick++ % 50 == 49 ? digest(b->brain.sim()) : "-";
     std::puts(out.c_str());
   }
@@ -352,6 +373,10 @@ int engine() {
     sim.add_rated_input("rated " + std::to_string(k), indices(doc.member(input, "neurons")), doc.member(input, "withdraw")->type == fly::json::Type::True);
   }
   // Changes, each applied just before its step: {step, input, rate}, {step, rated, rates} or {step, bias}.
+  const uint32_t release = sim.add_output_gain("release", std::vector<uint32_t>{5, 0, 5, 2});
+  if (sim.output_gain_members(release) != std::vector<uint32_t>{0, 2, 5}) throw std::runtime_error("output gain order");
+  sim.set_tally(std::vector<uint32_t>{7, 0, 2, 7});
+  uint32_t tone = 0;
   const fly::json::Value* changes = doc.member(spec, "changes");
   size_t next = 0;
   const auto steps = static_cast<uint32_t>(number(spec, "steps"));
@@ -363,6 +388,20 @@ int engine() {
         sim.set_rate(static_cast<uint32_t>(number(change, "input")), number(change, "rate"));
       } else if (doc.member(change, "rates") != nullptr) {
         sim.set_rates(static_cast<uint32_t>(inputs->items.size() + number(change, "rated")), numbers(doc.member(change, "rates")));
+      } else if (doc.member(change, "factors") != nullptr) {
+        sim.set_output_gains(release, numbers(doc.member(change, "factors")));
+      } else if (doc.member(change, "weights") != nullptr) {
+        const auto changed_gain = floats(doc.member(change, "weights"));
+        std::vector<float> weights(post.size());
+        for (size_t i = 0; i + 1 < ptr.size(); i++) for (uint32_t e = ptr[i]; e < ptr[i + 1]; e++)
+          weights[e] = post_scale.empty() ? fly::Simulation::weight(count[e], changed_gain[i]) : fly::Simulation::weight(count[e], changed_gain[i], post_scale[post[e]]);
+        sim.set_weights(weights);
+      } else if (doc.member(change, "mv") != nullptr) {
+        if (doc.member(change, "excite") != nullptr) {
+          tone = sim.add_excitability("tone", indices(doc.member(change, "excite")));
+          if (sim.excitability_members(tone) != std::vector<uint32_t>{0, 2, 7}) throw std::runtime_error("excitability order");
+        }
+        sim.set_excitability(tone, numbers(doc.member(change, "mv")));
       } else {
         sim.set_bias(floats(doc.member(change, "bias")));
       }
@@ -372,9 +411,32 @@ int engine() {
     for (uint32_t i : sim.last_spikes()) out += (out.empty() ? "" : " ") + std::to_string(i);
     std::printf("%u %u: %s\n", s, sim.active(), out.c_str());
   }
+  std::vector<uint32_t> tally;
+  for (int k = 0; k < 2; k++) {
+    sim.drain_tally(tally);
+    std::printf("tally");
+    for (uint32_t x : tally) std::printf(" %u", x);
+    std::printf("\n");
+  }
   for (uint32_t i = 0; i < sim.neurons(); i++) {
     std::printf("%s %s %s\n", hex32(sim.potential(i)).c_str(), hex32(sim.drive(i)).c_str(), hex32(sim.adaptation(i)).c_str());
   }
+  sim.step();
+  sim.reset();
+  sim.drain_tally(tally);
+  std::printf("reset tally");
+  for (uint32_t x : tally) std::printf(" %u", x);
+  std::printf("\n");
+  for (uint32_t s = 0; s < 40; s++) {
+    sim.step();
+    out.clear();
+    for (uint32_t i : sim.last_spikes()) out += (out.empty() ? "" : " ") + std::to_string(i);
+    std::printf("reset %u %u: %s\n", s, sim.active(), out.c_str());
+  }
+  sim.drain_tally(tally);
+  std::printf("reset tally");
+  for (uint32_t x : tally) std::printf(" %u", x);
+  std::printf("\n");
   return 0;
 }
 
@@ -397,7 +459,7 @@ int hypot() {
 int patterns() {
   std::string type;
   while (std::getline(std::cin, type)) {
-    std::printf("%d %d %d\n", fly::params::columnar_class(type) ? 1 : 0, fly::vision::t4_t5(type) ? 1 : 0, fly::vision::lobula_columnar(type) ? 1 : 0);
+    std::printf("%d %d %d %d %d %d\n", fly::params::columnar_class(type) ? 1 : 0, fly::vision::t4_t5(type) ? 1 : 0, fly::vision::lobula_columnar(type) ? 1 : 0, fly::params::octopaminergic(type) ? 1 : 0, fly::params::dfb_dopaminergic(type) ? 1 : 0, fly::io::dfb_sleep(type) ? 1 : 0);
   }
   return 0;
 }

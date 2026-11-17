@@ -178,9 +178,20 @@ export class Simulation {
   #partOf: Uint8Array | null = null;
   #partCounts = new Uint32Array(0);
 
-  // Groups whose outgoing weights are scaled by a factor (setOutputGain): each
-  // group's edges, those edges' weights at factor 1, and the factor now.
-  #outputGains: { name: string; edges: Uint32Array; base: Float32Array; factor: number }[] = [];
+  // Groups whose neurons' outgoing weights are scaled, each neuron by a factor
+  // of its own (setOutputGains): the members, where each member's edges start
+  // in `edges` (CSR), those edges' weights at factor 1, and the factors now.
+  #outputGains: { name: string; members: Uint32Array; starts: Uint32Array; edges: Uint32Array; base: Float32Array; factors: Float64Array }[] = [];
+
+  // Groups whose neurons' excitability is set from outside (setExcitability):
+  // a bias, as setBias's, kept for each member. Members are stepped with the
+  // biased neurons, whatever their bias, so a change never moves them between lists.
+  #excitability: { name: string; members: Uint32Array }[] = [];
+  #pinned: Uint8Array;
+
+  // Neurons whose spikes are counted one by one (setTally): each one's place in the count, or -1.
+  #tallyIndex: Int32Array | null = null;
+  #tally = new Uint32Array(0);
 
   #recording: Uint32Array | null = null;
   #carryMs = 0;
@@ -228,6 +239,7 @@ export class Simulation {
     this.#active = new Uint32Array(n);
     this.#scratch = new Uint32Array(n);
     this.#watched = new Uint8Array(n);
+    this.#pinned = new Uint8Array(n);
     this.#ring = Array.from({ length: this.delaySteps }, () => new Uint32Array(Math.min(n, 256)));
     this.#ringLength = new Uint32Array(this.delaySteps);
     this.#withdrawn = Array.from({ length: this.delaySteps }, () => new Uint32Array(Math.min(n, 256)));
@@ -288,61 +300,146 @@ export class Simulation {
     }
     for (const group of this.#outputGains) {
       for (let k = 0; k < group.edges.length; k++) group.base[k] = weight[group.edges[k]];
-      this.#scaleOutputs(group);
+      for (let m = 0; m < group.members.length; m++) this.#scaleOutputs(group, m);
     }
   }
 
   /**
-   * Adds a named group of neurons whose outgoing weights setOutputGain
-   * scales, all together: how strongly each spike of theirs reaches its
-   * targets (their transmitter release), not whether they fire. At factor 1,
-   * where it starts, every weight is what it was.
+   * Adds a named group of neurons whose outgoing weights setOutputGains
+   * scales, each neuron's by its own factor: how strongly each spike of theirs
+   * reaches its targets (their transmitter release), not whether they fire.
+   * At factor 1, where each starts, every weight is what it was.
    */
   addOutputGain(name: string, neurons: ArrayLike<number>) {
     if (this.#outputGains.some((g) => g.name === name)) throw new Error(`There is already an output gain called "${name}"`);
     const members = this.#members(neurons, `output gain "${name}"`);
+    const starts = new Uint32Array(members.length + 1);
     const edges: number[] = [];
-    for (const i of members) for (let e = this.#ptr[i]; e < this.#ptr[i + 1]; e++) edges.push(e);
+    members.forEach((i, m) => {
+      for (let e = this.#ptr[i]; e < this.#ptr[i + 1]; e++) edges.push(e);
+      starts[m + 1] = edges.length;
+    });
     const list = Uint32Array.from(edges);
-    this.#outputGains.push({ name, edges: list, base: Float32Array.from(list, (e) => this.#weight[e]), factor: 1 });
+    this.#outputGains.push({ name, members, starts, edges: list, base: Float32Array.from(list, (e) => this.#weight[e]), factors: new Float64Array(members.length).fill(1) });
   }
 
-  /** Scales a group's outgoing weights by `factor` (above 0) times their weights at 1, from the next spike delivered on. */
+  /**
+   * Scales each member's outgoing weights by its factor (above 0) times their
+   * weights at 1, from the next spike delivered on. The factors are in the
+   * order of `outputGainMembers`; a member whose factor is unchanged costs nothing.
+   */
+  setOutputGains(name: string, factors: ArrayLike<number>) {
+    const group = this.#outputGain(name);
+    if (factors.length !== group.members.length) throw new Error(`"${name}" has ${group.members.length} neurons, not ${factors.length}`);
+    // Above 0, so a neuron that delivers its spikes keeps delivering them (see #silent).
+    for (let m = 0; m < factors.length; m++) if (!(factors[m] > 0 && Number.isFinite(factors[m]))) throw new Error("An output gain must be a positive number");
+    for (let m = 0; m < factors.length; m++) {
+      if (factors[m] === group.factors[m]) continue;
+      group.factors[m] = factors[m];
+      this.#scaleOutputs(group, m);
+    }
+  }
+
+  /** Scales every member's outgoing weights by the same factor (above 0), as setOutputGains does each one's. */
   setOutputGain(name: string, factor: number) {
+    const group = this.#outputGain(name);
+    if (!(factor > 0 && Number.isFinite(factor))) throw new Error("An output gain must be a positive number");
+    for (let m = 0; m < group.members.length; m++) {
+      if (factor === group.factors[m]) continue;
+      group.factors[m] = factor;
+      this.#scaleOutputs(group, m);
+    }
+  }
+
+  /** The neurons of an output gain group, ascending: the order of setOutputGains' factors. */
+  outputGainMembers(name: string): Uint32Array {
+    return this.#outputGain(name).members;
+  }
+
+  #outputGain(name: string) {
     const group = this.#outputGains.find((g) => g.name === name);
     if (!group) throw new Error(`No output gain called "${name}"`);
-    // Above 0, so a group that delivers its spikes keeps delivering them (see #silent).
-    if (!(factor > 0 && Number.isFinite(factor))) throw new Error("An output gain must be a positive number");
-    if (factor === group.factor) return;
-    group.factor = factor;
-    this.#scaleOutputs(group);
+    return group;
   }
 
-  #scaleOutputs(group: { edges: Uint32Array; base: Float32Array; factor: number }) {
+  #scaleOutputs(group: { starts: Uint32Array; edges: Uint32Array; base: Float32Array; factors: Float64Array }, m: number) {
     const weight = this.#weight;
-    for (let k = 0; k < group.edges.length; k++) weight[group.edges[k]] = group.base[k] * group.factor;
+    const factor = group.factors[m];
+    for (let k = group.starts[m]; k < group.starts[m + 1]; k++) weight[group.edges[k]] = group.base[k] * factor;
+  }
+
+  /**
+   * Adds a named group of neurons whose excitability setExcitability sets: a
+   * steady drive, mV, as setBias's, one for each. Its members are stepped
+   * every step from now on, at 0 as at any other bias, and never leave the
+   * active set.
+   */
+  addExcitability(name: string, neurons: ArrayLike<number>) {
+    if (this.#excitability.some((g) => g.name === name)) throw new Error(`There is already an excitability group called "${name}"`);
+    const members = this.#members(neurons, `excitability "${name}"`);
+    for (const i of members) if (this.#pinned[i]) throw new Error(`Neuron ${i} is already in an excitability group`);
+    this.#excitability.push({ name, members });
+    for (const i of members) this.#pinned[i] = 1;
+    this.#rebuildBiased();
+  }
+
+  /** Sets each member's drive, mV, in the order of `excitabilityMembers`, from the next step on. */
+  setExcitability(name: string, mV: ArrayLike<number>) {
+    const group = this.#excitability.find((g) => g.name === name);
+    if (!group) throw new Error(`No excitability group called "${name}"`);
+    if (mV.length !== group.members.length) throw new Error(`"${name}" has ${group.members.length} neurons, not ${mV.length}`);
+    for (let m = 0; m < mV.length; m++) if (!Number.isFinite(mV[m])) throw new Error("Excitability must be a finite number of mV");
+    for (let m = 0; m < mV.length; m++) this.#bias[group.members[m]] = mV[m];
+  }
+
+  /** The neurons of an excitability group, ascending: the order of setExcitability's values. */
+  excitabilityMembers(name: string): Uint32Array {
+    const group = this.#excitability.find((g) => g.name === name);
+    if (!group) throw new Error(`No excitability group called "${name}"`);
+    return group.members;
+  }
+
+  /** Counts the spikes of each of these neurons apart, from now on, replacing any earlier tally; drainTally reads them. */
+  setTally(neurons: ArrayLike<number>) {
+    const members = this.#members(neurons, "tally");
+    const index = new Int32Array(this.neurons).fill(-1);
+    members.forEach((i, k) => {
+      index[i] = k;
+    });
+    this.#tallyIndex = index;
+    this.#tally = new Uint32Array(members.length);
+  }
+
+  /** Each tallied neuron's spikes since the last drain, ascending by neuron, into `into`; then zeroes them. */
+  drainTally(into: Uint32Array) {
+    into.set(this.#tally);
+    this.#tally.fill(0);
   }
 
   /**
    * Sets a steady drive, mV, added to each neuron's g when integrating v (so v
    * settles at g + bias). Neurons with a bias never leave the active set, so
-   * each costs an update every step. Pass null to clear it.
+   * each costs an update every step. Pass null to clear it. This sets every
+   * neuron's, excitability groups' members' included.
    */
   setBias(bias: Float32Array | null) {
     if (bias && bias.length !== this.neurons) throw new Error(`bias has ${bias.length} entries, expected ${this.neurons}`);
+    for (let i = 0; i < this.neurons; i++) this.#bias[i] = bias ? bias[i] : 0;
+    this.#rebuildBiased();
+  }
+
+  // The biased list is every neuron with a bias and every excitability group's member.
+  #rebuildBiased() {
     // Neurons that had a bias rejoin the active list, which cuts them once at rest.
     for (const i of this.#biased) this.#active[this.#activeCount++] = i;
     const biased: number[] = [];
-    for (let i = 0; i < this.neurons; i++) {
-      this.#bias[i] = bias ? bias[i] : 0;
-      if (this.#bias[i] !== 0) biased.push(i);
-    }
+    for (let i = 0; i < this.neurons; i++) if (this.#bias[i] !== 0 || this.#pinned[i] !== 0) biased.push(i);
     this.#biased = Uint32Array.from(biased);
     if (biased.length > 0) {
       let kept = 0;
       for (let k = 0; k < this.#activeCount; k++) {
         const i = this.#active[k];
-        if (this.#bias[i] === 0) this.#active[kept++] = i;
+        if (this.#bias[i] === 0 && this.#pinned[i] === 0) this.#active[kept++] = i;
       }
       this.#activeCount = kept;
     }
@@ -540,6 +637,7 @@ export class Simulation {
     this.stats.events = 0;
     this.#readoutCounts.fill(0);
     this.#partCounts.fill(0);
+    this.#tally.fill(0);
     this.#recording?.fill(0);
     this.#inputs.forEach((input, k) => {
       if (input.rates) {
@@ -718,6 +816,14 @@ export class Simulation {
     if (partOf !== null) {
       const counts = this.#partCounts;
       for (let k = 0; k < fired; k++) counts[partOf[out[k]]]++;
+    }
+    const tallyIndex = this.#tallyIndex;
+    if (tallyIndex !== null) {
+      const tally = this.#tally;
+      for (let k = 0; k < fired; k++) {
+        const t = tallyIndex[out[k]];
+        if (t >= 0) tally[t]++;
+      }
     }
   }
 

@@ -45,7 +45,9 @@ test("with the eyes shut the brain is what it was before it had eyes, wherever n
   // when `grounded` was narrowed to the legs' load sensors (it changes rest),
   // when `sweet` was given the mouth's sugar neurons by what they are, and
   // when eleven of the head's mechanosensory neurons were unmuted (it changes
-  // touch and bump): the same as a brain built without eyes, the columnar
+  // touch and bump), and when slow neuromodulation muted OA-VL2 (DNd03) as
+  // octopaminergic and stepped the dorsal fan-shaped body's sleep-promoting
+  // neurons always (modulation.ts): the same as a brain built without eyes, the columnar
   // synapses at 1.
   const b = new FlyBrain(connectome!, { seed: 1 });
   const phases = [
@@ -64,7 +66,7 @@ test("with the eyes shut the brain is what it was before it had eyes, wherever n
       hash = (Math.imul(hash, 31) + spikes) >>> 0;
     }
   }
-  assert.deepEqual({ total, hash }, { total: 461935, hash: 2841715797 });
+  assert.deepEqual({ total, hash }, { total: 464056, hash: 2755828298 });
 });
 
 test("a dark disc looming at an eye fires the giant fiber through the optic lobe; a passing dot or a receding disc doesn't", { skip }, () => {
