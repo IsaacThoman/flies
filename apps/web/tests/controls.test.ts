@@ -87,11 +87,11 @@ test("a double click or tap in the air takes the camera back to Follow", () => {
   assert.ok(asked.includes("home"));
 });
 
-test("a trackpad: a scroll and a pinch bring the camera in or out, and a sideways scroll turns it; over the shelf the wheel and the trackpad step the tools", () => {
+test("a trackpad: a pinch brings the camera in or out, and a scroll turns it round and up as a drag would; over the shelf the wheel and the trackpad step the tools", () => {
   const { asked, send, tick } = rig();
-  send(true, wheel(-20, false), wheel(-6, false, true), wheel(0, false, false, 30));
-  assert.ok(asked[0].startsWith("zoom 0.9") && Number(asked[1].split(" ")[1]) < 1, `a trackpad's scroll up and its pinch both bring it in: ${asked}`);
-  assert.deepEqual(asked.slice(2), ["turn 0.18 0.00"], "across: round, and only round");
+  send(true, wheel(-6, false, true), wheel(0, false, false, 30), wheel(-30, false), wheel(20, false));
+  assert.ok(asked[0].startsWith("zoom 0.9"), `a pinch out brings it in: ${asked}`);
+  assert.deepEqual(asked.slice(1), ["turn 0.18 0.00", "turn 0.00 0.10", "turn 0.00 -0.06"], "across: round; fingers down (the content scrolled up): higher, as a drag down; and back");
   asked.length = 0;
   const overShelf: Gesture = { type: "wheel", x: 0.5, y: 0.9, dx: 0, dy: 100, notch: true, zoom: false };
   send(true, overShelf);

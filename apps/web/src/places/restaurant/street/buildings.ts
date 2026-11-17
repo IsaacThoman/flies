@@ -25,7 +25,7 @@ export function rowOfBuildings(): Building[] {
   const rnd = random(907);
   const row: Building[] = [];
   const height = () => STREET.pavement + SHOP_FLOOR + STOREY * Math.floor(rnd.range(2, 5)) + 700;
-  // Leftward from the corner of the side street; the corner bar's house first.
+  // Leftward from the corner of the side street; the ice-cream parlour's house first.
   let x = STREET.side.x0;
   const left: Building[] = [{ x0: -6400, x1: x, top: STREET.pavement + SHOP_FLOOR + STOREY * 4 + 700, seed: 0.37 }];
   x = -6400;

@@ -6,6 +6,7 @@ import {
   KITCHEN_PEACH,
   KITCHEN_PEACH_BANDS,
   KITCHEN_CADDY,
+  KITCHEN_GLASS,
   inside,
   topHeight,
 } from "@fly/world";
@@ -109,39 +110,33 @@ export function buildSet(): SceneSet {
       s.name === "kitchen pendant"
     )
       continue;
-    if (s.name === "kitchen wine") {
+    if (s.name === "kitchen glass") {
+      const { r, juice, rim } = KITCHEN_GLASS;
       const profile: number[][] = [];
       for (let i = 0; i <= 80; i++) {
-        const r = (43 * i) / 80;
-        profile.push([r, topHeight(s, f.x + Math.min(r, 42.9999), f.z)]);
+        const d = (r * i) / 80;
+        profile.push([d, topHeight(s, f.x + Math.min(d, r - 1e-4), f.z)]);
       }
-      profile.push([43 * 0.43, 112], [43 * 0.97, 187]);
+      profile.push([r * 0.88, juice], [r * 0.96, rim]);
       profile.sort((a, b) => a[0] - b[0]);
-      profile.push([0, 100]);
+      profile.push([0, 0]);
       addGlass(lathe(profile, f.x, f.z));
+      // The juice fills the tumbler above its thick base, seen through its wall.
       add(
-        new THREE.CircleGeometry(18, 64)
+        new THREE.CircleGeometry(r * 0.88, 64)
           .rotateX(-Math.PI / 2)
-          .translate(f.x, 112.015, f.z),
-        "#661c32",
-        KIND.wine,
+          .translate(f.x, juice + 0.015, f.z),
+        "#f39220",
+        KIND.juice,
       );
       add(
-        new THREE.CylinderGeometry(18, 18, 12, 48, 1, true).translate(
+        new THREE.CylinderGeometry(r * 0.88, r * 0.88, juice - 6, 64, 1, true).translate(
           f.x,
-          106,
+          (juice + 6) / 2,
           f.z,
         ),
-        "#661c32",
-        KIND.wine,
-      );
-      continue;
-    }
-    if (s.name.startsWith("kitchen glass")) {
-      addGlass(
-        s.name.endsWith("foot")
-          ? surface(s, 12, 48)
-          : new THREE.CylinderGeometry(3, 3, 100, 16).translate(f.x, 53, f.z),
+        "#f39220",
+        KIND.juice,
       );
       continue;
     }
@@ -411,7 +406,8 @@ export function buildSet(): SceneSet {
       KIND.compost,
     );
   for (const p of KITCHEN_PATCHES) {
-    if (!p.pool || p.name === "red wine") continue;
+    // The tumbler's juice is drawn with the tumbler.
+    if (!p.pool || p.y === KITCHEN_GLASS.juice) continue;
     add(
       new THREE.CircleGeometry(p.r, 48)
         .rotateX(-Math.PI / 2)
@@ -420,8 +416,8 @@ export function buildSet(): SceneSet {
         ? "#be791f"
         : p.name === "peach juice"
           ? "#da9b45"
-          : "#6a2436",
-      p.name === "wine" ? KIND.wine : KIND.honey,
+          : "#f39220",
+      p.name === "orange juice" ? KIND.juice : KIND.honey,
     );
   }
   // The pendant's domed shade and flat underside use the world's slab.
@@ -493,7 +489,11 @@ export function buildSet(): SceneSet {
         seenM,
         paint(
           surface(s, 5, 12),
-          s.name.includes("banana") ? "#dcb938" : "#998561",
+          s.name.includes("banana")
+            ? "#dcb938"
+            : s.name === "kitchen glass"
+              ? "#d08a3a"
+              : "#998561",
         ),
       );
   }
@@ -527,6 +527,19 @@ export function buildSet(): SceneSet {
       rz = f.kind === "circle" ? f.r : f.rz;
     const angle = f.kind === "circle" ? 0 : f.angle;
     const bottom = s.bottom ?? 0;
+    // The few rings of the tumbler's coarse top miss its straight wall.
+    if (s.name === "kitchen glass")
+      seenBatch.add(
+        seenM,
+        paint(
+          new THREE.CylinderGeometry(rx, rx, KITCHEN_GLASS.rim, 12, 1, true).translate(
+            f.x,
+            KITCHEN_GLASS.rim / 2,
+            f.z,
+          ),
+          "#d08a3a",
+        ),
+      );
     if (s.top.kind === "flat" || s.top.kind === "dome") {
       const top = s.top.kind === "flat" ? s.top.y : s.top.base;
       if (top > bottom)

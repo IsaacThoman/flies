@@ -39,22 +39,15 @@ export const INKS: Readonly<Record<string, Ink>> = {
   "strawberry juice": sticky(0xd23c4e),
   lemonade: sticky(0xe8d264),
   orange: sticky(0xf0a446),
+  "orange juice": sticky(0xf0962a),
   banana: sticky(0xdccb8e),
   "peach juice": sticky(0xf0a264),
   "grape juice": sticky(0x773d66),
   "plum juice": sticky(0x86305e),
-  wine: sticky(0x7e1a32),
   "grape agar": sticky(0x9c5274),
   "fly food": sticky(0xb08444),
   syrup: sticky(0xd08a32),
-  "cherry syrup": sticky(0xb41a32),
-  cocktail: sticky(0xc8445e),
-  lime: sticky(0xc8d892),
-  beer: sticky(0xd8a446),
-  "beer foam": sticky(0xe6d6aa),
-  "red wine": sticky(0x7e1a32),
-  "white wine": sticky(0xe0d08a),
-  "wine ring": sticky(0x8e3a4a),
+  "juice ring": sticky(0xd88a34),
   ketchup: sticky(0xb02418),
   espresso: sticky(0x6a4426),
   peach: sticky(0xf0a264),
@@ -71,14 +64,14 @@ export const DROPPED: Readonly<Record<FoodKind, Ink | null>> = { sugar: null, ho
 export const inkOf = (food: Food): Ink | null => (isDropped(food) ? DROPPED[food.kind] : INKS[food.name]) ?? null;
 
 /** Things standing in the world that are water (dew, a drop): a foot set on one comes away wet. */
-export const WET_SOLIDS: ReadonlySet<string> = new Set(["dew", "drop", "ice"]);
+export const WET_SOLIDS: ReadonlySet<string> = new Set(["dew", "drop"]);
 /**
  * Where a print would not lie on what is drawn: a drink's surface (the
- * restaurant's wine in its glass, the espresso's dregs in its cup), a head of
- * foam, water, and things drawn rougher than the world's smooth shape of them
- * (a heap of peanuts, a crumpled wipe, a brush's bristles, a bush of basil).
+ * restaurant's juice in its glass, the espresso's dregs in its cup), water,
+ * and things drawn rougher than the world's smooth shape of them (a crumpled
+ * wipe, a brush's bristles, a bush of basil).
  */
-export const NO_PRINTS: ReadonlySet<string> = new Set(["greenhouse leaves", "seedling crown", "water saucer", "kitchen wine", "cocktail", "beer", "wine glass", "espresso cup", "ice", "dew", "drop", "peanuts", "wipe", "bristles", "stems"]);
+export const NO_PRINTS: ReadonlySet<string> = new Set(["greenhouse leaves", "seedling crown", "water saucer", "kitchen glass", "juice glass", "espresso cup", "dew", "drop", "wipe", "bristles", "stems"]);
 
 /** How many prints there can be at once; a new one takes the oldest's place. */
 export const PRINTS = 128;

@@ -5,7 +5,7 @@
 // and the things on the sill are all there, lit as the scene is.
 
 import * as THREE from "three";
-import { ALARM_CLOCK, BANANA, BASIL_CROWN, HONEY_JAR, POSTCARD, WINE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_SOLIDS, WINDOW, bananaAt } from "@fly/world";
+import { ALARM_CLOCK, BANANA, BASIL_CROWN, HONEY_JAR, POSTCARD, JUICE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_SOLIDS, WINDOW, bananaAt } from "@fly/world";
 import { EYE_LAYER } from "../../eyes/eyes.ts";
 import { Batch, paint } from "../../scene/build.ts";
 import { FRAME_HEAD, sunlit } from "./light.ts";
@@ -66,8 +66,8 @@ export function buildSeen(sunlight: Sunlight, colors: { sill: string; frame: str
     const r = BANANA.radius(t);
     add(new THREE.IcosahedronGeometry(r, 1).scale(1.4, 0.8, 1.4).translate(p.x, 0, p.z), "#e8bb3a");
   }
-  add(new THREE.CylinderGeometry(WINE_BOTTLE.r, WINE_BOTTLE.r, WINE_BOTTLE.shoulder + 20, 12).translate(WINE_BOTTLE.x, (WINE_BOTTLE.shoulder + 20) / 2, WINE_BOTTLE.z), "#1e3a20");
-  add(new THREE.CylinderGeometry(WINE_BOTTLE.neck, WINE_BOTTLE.neck, WINE_BOTTLE.top, 8).translate(WINE_BOTTLE.x, WINE_BOTTLE.top / 2, WINE_BOTTLE.z), "#1e3a20");
+  add(new THREE.CylinderGeometry(JUICE_BOTTLE.r, JUICE_BOTTLE.r, JUICE_BOTTLE.shoulder + 20, 12).translate(JUICE_BOTTLE.x, (JUICE_BOTTLE.shoulder + 20) / 2, JUICE_BOTTLE.z), "#e88a2a");
+  add(new THREE.CylinderGeometry(JUICE_BOTTLE.neck, JUICE_BOTTLE.neck, JUICE_BOTTLE.top, 8).translate(JUICE_BOTTLE.x, JUICE_BOTTLE.top / 2, JUICE_BOTTLE.z), "#c9d2cc");
   add(new THREE.CylinderGeometry(PEACH_PLATE.r, PEACH_PLATE.r - 4, 5, 14).translate(PEACH_PLATE.x, 2.5, PEACH_PLATE.z), "#f4f0e8");
   add(new THREE.CylinderGeometry(25, 27, 16, 12).translate(PEACH_PLATE.x - 5, 8, PEACH_PLATE.z - 3), "#e88a34");
 

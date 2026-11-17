@@ -2,7 +2,7 @@
 
 [Documentation index](../README.md#documentation).
 
-The place catalog includes Picnic table, Windowsill, Lab bench, Bar,
+The place catalog includes Picnic table, Windowsill, Lab bench,
 Greenhouse, Restaurant and Kitchen counter (`apps/web/src/places/catalog.ts`). Greenhouse adds
 a bench with pots, seed trays, fruit and a water saucer; its saucer water has
 configured sweetness 0.05 (`packages/world/src/greenhouse.ts`).
@@ -65,8 +65,8 @@ fifth for a few seconds. The hours are a fixed summer day's (sunrise about
 5:40, sunset about 20:10), unless the Apple TV can tell the real sunrise and
 sunset (the weather outside, below).
 
-Indoors the clocks (the alarm clock on the windowsill and the one on the
-kitchen wall, the lab's on its wall, the bar's behind the bar) tell the real
+Indoors the clocks (the alarm clock on the windowsill, the one on the
+kitchen wall and the lab's on its wall) tell the real
 time, whatever light you have chosen: a clock that showed another time would be a
 broken one, and a twelve-hour dial can't tell three in the afternoon from
 three in the morning, so it never looks wrong under the night's light. Its
@@ -95,7 +95,7 @@ command is manufactured.
 Snow drifts past the picnic and through indoor views, dusts exposed picnic
 surfaces, and gradually melts into wetness. The layer is cosmetic and thinner
 than 0.35 mm, with no changed collision surface. Lab and windowsill panes
-frost at their edges; bar and restaurant receive the shared weather light.
+frost at their edges; the restaurant receives the shared weather light.
 Cold itself is not modelled in the brain and no sluggishness is imposed.
 A possible labelled stand-in is a proposal requiring owner approval, not an
 active behavior ([weather details](places.md#storms-and-winter-precipitation)).
@@ -156,16 +156,16 @@ these events follows its brain commands and the documented body stand-ins.
 
 The kitchen counter is a metre-wide stone worktop with a glazed ceramic
 fruit bowl, spotty bananas and purple grapes, a cut peach on a scarred wooden
-chopping board, toast crumbs, a stemmed glass with red wine left in it, a
-honey jar and a spill, and a compost caddy with its lid ajar. A checked tea
+chopping board, toast crumbs, a tumbler of orange juice with a splash spilt
+beside it, a honey jar and a spill, and a compost caddy with its lid ajar. A checked tea
 towel hangs over one corner and a wall dial tells the real time. The fly begins
 on the peach's cut face. Split fruit, peach flesh, grape juice,
-honey and wine are food; feet disturb the liquid pools. A tiled splashback
+honey and orange juice are food; feet disturb the liquid pools. A tiled splashback
 and a window frame the worktop, with cabinets and the kitchen beyond; warm
 pendant light takes over from window daylight at dusk. The garden in the
 window is a stylised backdrop, not a simulated outdoor place. Heavy rain
 runs faster down the pane, storm flashes light the room, and snow falls
-outside, dusting the garden and frosting the foot of the glass.
+outside, dusting the garden and frosting the foot of the pane.
 
 ## Windowsill
 
@@ -184,8 +184,8 @@ plums, whose side a fly can walk up, round its rim and down to where plum
 juice has run; an overripe, freckled banana it can climb from its tip, split
 near the stalk; half a peach on a plate with its stone; a pot of basil in a
 saucer with water round the pot's foot, a bushy mound of broad, glossy, veined
-leaves in opposite pairs, coming into flower, that a fly can land on; a bottle
-of red wine that has dripped a pool on the sill, where drips and the fly's
+leaves in opposite pairs, coming into flower, that a fly can land on; a glass
+bottle of orange juice that has dripped a pool on the sill, where drips and the fly's
 feet set rings spreading, as they do on the saucer's water; a teaspoon with
 honey in it and the jar it came from, glowing when the sun is behind it;
 crumbs of toast and spilt sugar, drops from watering the basil, pebbles,
@@ -253,47 +253,19 @@ room is dark round it but for lit windows across the way. Under a grey sky the
 view outside goes flat and grey, in mist it fades to a pale veil, and in the
 rain it falls past the windows. There are no bubbles or fireflies indoors.
 
-## Bar
-
-The bar is the walnut counter of a small, warm bar in the evening: a cocktail
-on the rocks with a wedge of lime on its rim, a tall beer with its head of
-foam, salted peanuts heaped in a fluted ramekin (two have fallen out), two
-maraschino cherries, printed card coasters, a folded paper napkin, and a
-candle in a storm lantern whose cap is a perch and whose flame is out of
-reach. A sticky ring of syrup marks where a glass stood; the cherries' syrup,
-the lime, the beer's head and the cocktail itself are sweet too (a fly that
-lands in the drink can climb out up the meniscus onto the rim), and spilt beer
-takes its feet as rings, as does the cocktail when the ice settles. At the
-fly's scale the walnut's grain and open pores show under the varnish, with
-fine scratches and the milky rings of old glasses; salt crystals and bits of
-peanut lie about; the cold glasses are beaded with condensation and bubbles
-rise through the beer. Behind the bar, labelled bottles glow on glass shelves
-before an old mirror, under brass pendant lamps, and in the walnut pier
-between the shelves hangs an old drop-dial clock with a brass bezel and an
-ivory face. It tells the real time: its blued hands turn and a red second hand
-sweeps, and in the evening a little brass lamp lights its face. The walls are
-papered in green flock over walnut panelling and hung with paintings, and a
-buttoned leather banquette runs along the far wall; off the counter's end a
-window looks over a square to a row of houses. By day the room is unlit and
-the light is the window's, falling away from it, and the varnish mirrors the
-dark room and the bright window; at golden hour the sun comes in low across
-the counter and the glasses throw long shadows coloured by what is in them; at
-dusk and night the lamps, the flickering candle and the back bar light it, and
-lights out of focus glow behind the fly.
-
 ## Footprints
 
 Wherever it lives, a fly that has stood in something sticky or wet leaves
 footprints (`apps/web/src/scene/prints.ts`): faint prints of the two pads of
 its feet, each where its gait set that foot down, lying on whatever it walks
 on (the table, a fruit, a jar's rim, the sill). Honey and plain syrup leave them amber; jam,
-raspberry, wine and cherry syrup red; the juices, lemonade, beer, the agar and the
+raspberry red; the juices, lemonade, the agar and the
 lab's fly food their own colours. Water (dropped, the basil's saucer, a drop
 or dew) leaves darker wet prints that dry in about half a minute; sticky ones
 fade over a minute and a half. A foot carries only a little: the first steps
 off the food print clearly, the next fainter and then only now and then, and
 after ten or so it is clean, until it walks back into food. Sugar and crumbs
-are dry and leave nothing. There are none on a drink, a head of foam or
+are dry and leave nothing. There are none on a drink or
 anything drawn rougher than the fly feels it. Changing place clears the
 prints and cleans its feet. They are only drawn: the fly doesn't taste or
 feel its own prints, they aren't food, and nothing about them reaches its
@@ -303,7 +275,7 @@ brain.
 
 The restaurant is a whole room, not a tabletop: a small city bistro, closed
 for the night. The fly starts on a round marble table in the window, between
-a glass caddy of sugar packets and a glass with red wine left in it, a rose
+a glass caddy of sugar packets and a tumbler with orange juice left in it, a rose
 in a bud vase and an unlit votive beside them, a torn sugar packet spilt
 across the marble and the ring a glass left; from there it can walk under
 the table, fly to the next, to the floor's black and white penny rounds, to
@@ -313,15 +285,16 @@ menu on one, the bread basket on another, an espresso cup with sugar in the
 bottom on the banquette's). Along the bar are leather stools under three
 enamel pendants, the middle one left on; on the hammered zinc a bowl of
 fruit with a bruised peach, a board with a cut lemon, a mat with syrup
-spilt on it, two glasses of wine and a cake under a glass cloche. Behind
-it, bottles on shelves before an old mirror over the drinks fridge's glowing
-doors; at the back, a plate sent back to the pass with crumbs of tart and
+spilt on it, a milk jug upturned to dry, glasses of orange juice and
+lemonade and a cake under a glass cloche. Behind it, bright bottles of
+coffee syrups, juice, water and oil on shelves before an old mirror over the
+drinks fridge's glowing doors; at the back, a plate sent back to the pass with crumbs of tart and
 raspberry coulis, under the heat lamps' faint red; by the door the host's
 stand with a sticky menu and a bowl of mints, the exit sign's green over it.
 The marble's veins, the cane's weave, the zinc's hammering, the oak's grain,
 the floor's glaze and grout and the pressed-tin ceiling are worked out in the
 shaders, crisp however close the camera comes. Outside the shop front is a
-street with a corner bar's neon across it; by day the daylight comes in at
+street with an ice-cream parlour's neon cone across it; by day the daylight comes in at
 the glass, its frames laying their shadows across the tables and the floor,
 long and gold at golden hour; after dark the street lamp throws the window's
 shape in and the tables' shadows back, passing cars sweep their headlamps

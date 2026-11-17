@@ -1,13 +1,13 @@
 // What was left on the zinc at closing: the fruit bowl with its oranges,
 // lemons and a bruised peach; the cutting board with half a lemon, slices
-// and the knife; the bar mat with a shaker tin upturned to dry, syrup spilt
-// beside it; two glasses with red and white left in them; and the cake
+// and the knife; the bar mat with the milk jug upturned to dry, syrup spilt
+// beside it; two glasses with orange juice and lemonade left in them; and the cake
 // under its cloche, crumbs on the stand's edge. Each at the world's exact
 // shape, and the food where the world's patches say it lies.
 
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { ON_BAR, RESTAURANT_PATCHES, WINE_GLASS, ZINC_BAR, topHeight } from "@fly/world";
+import { ON_BAR, RESTAURANT_PATCHES, ZINC_BAR, topHeight } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { mat4, random } from "../../scene/build.ts";
 import { areaOf } from "./areas.ts";
@@ -16,6 +16,7 @@ import { Mesh, film, turn } from "./counter-shapes.ts";
 import { CTR, domeAt } from "./counter-seats.ts";
 import { scatter } from "./geometry.ts";
 import { KIND } from "./kinds.ts";
+import { LEMONADE, ORANGE_JUICE, juiceGlass } from "./tabletop-glass.ts";
 
 const ON = ZINC_BAR.zinc.top;
 type Profile = [number, number][];
@@ -217,8 +218,8 @@ function mat(b: Builder, s: Solid) {
   }
 }
 
-/** The shaker tin, upturned on the mat to dry: its rolled mouth down, its base the world's dome; drops of water round it. */
-function shakerTin(b: Builder, s: Solid, mat: Solid | undefined) {
+/** The milk jug, upturned on the mat to dry: its rolled mouth down, its base the world's dome; drops of water round it. */
+function milkJug(b: Builder, s: Solid, mat: Solid | undefined) {
   const f = s.footprint as { x: number; z: number; r: number };
   const top = s.top as { base: number; height: number };
   const y0 = (s.bottom ?? 0) - 0.05;
@@ -255,51 +256,11 @@ function shakerTin(b: Builder, s: Solid, mat: Solid | undefined) {
   drop.dispose();
 }
 
-/** The two glasses left on the zinc: foot, stem and bowl turned in one, the wine pooled in the bottom. */
+/** The two glasses left on the zinc, tumblers like the table's: orange juice in one, lemonade in the other. */
 function glass(b: Builder, s: Solid) {
-  const { x, z } = s.footprint;
-  const area = areaOf(s);
-  const on = (s.bottom ?? 0) - WINE_GLASS.stem.top;
-  const inner = (r: number) => topHeight(s, x + r, z);
-  const { foot, bowl } = WINE_GLASS;
-  const well = on + bowl.well;
-  // The glass's own bottom under the wine, below the world's well (inside it): the wine fills it to the well.
-  const under: Profile = [[15.3, well], [13, well - 2.4], [9, well - 5.8], [4, well - 8], [0, well - 8.6]];
-  const profile: Profile = [
-    [foot.r, on - 0.05],
-    [foot.r, on + 1.2],
-    [foot.r - 0.6, on + 1.9],
-    [30, on + 2.3],
-    [18, on + 2.75],
-    [8, on + 2.95],
-    [4, on + 3],
-    [3.7, on + 8],
-    [3.7, on + 85],
-    [4, on + 95],
-    [11, on + 97.2],
-    [18, on + 101.8],
-    [23, on + 111],
-    [26.8, on + 130],
-    [29.4, on + 153],
-    [32.4, on + 172],
-    [36.2, on + 189],
-    [39.6, on + 201],
-    [40.3, on + 203.4],
-    [40.35, on + 204],
-    [40.25, on + 204.8],
-    [40, inner(40)],
-    ...[39.5, 38.5, 37, 35.5, 34, 32, 30, 28, 26, 24, 21, 18, 16.5].map((r): Profile[number] => [r, inner(r)]),
-    ...under,
-  ];
-  b.detail(area, turn(profile, 32, x, z), "#f4f8ff", KIND.glass);
-  const red = Math.hypot(patch("red wine", x, z).x - x, patch("red wine", x, z).z - z) < 1;
-  const kind = red ? KIND.wine : KIND.whiteWine;
-  const color = red ? "#5a0a18" : "#e6cc6a";
-  // The wine: its underside just inside the glass's bottom, its surface the world's well.
-  const wine: Profile = [[0, well - 8.45], [3.9, well - 7.85], [8.9, well - 5.65], [12.9, well - 2.25], [15.3, well + 0.1], [0, well + 0.1]];
-  b.detail(area, turn(wine, 32, x, z), color, kind);
-  b.standIn(area, turn([[4, on + 95], [30, on + 160], [40.3, on + 204], [0, well]], 6, x, z), "#f4f8ff", KIND.glass);
-  b.standIn(area, turn([[15, well + 0.1], [0, well + 0.1]], 6, x, z), color, kind);
+  const juice = patch("orange juice", s.footprint.x, s.footprint.z);
+  const orange = Math.hypot(juice.x - s.footprint.x, juice.z - s.footprint.z) < 1;
+  juiceGlass(b, areaOf(s), s, orange ? ORANGE_JUICE : LEMONADE);
 }
 
 const C = ON_BAR.cake;
@@ -419,10 +380,10 @@ export function buildThings(b: Builder, solids: readonly Solid[]) {
       case "bar mat":
         mat(b, s);
         break;
-      case "shaker tin":
-        shakerTin(b, s, named("bar mat"));
+      case "milk jug":
+        milkJug(b, s, named("bar mat"));
         break;
-      case "wine glass":
+      case "juice glass":
         glass(b, s);
         break;
       case "cake plate":
@@ -439,5 +400,5 @@ export function buildThings(b: Builder, solids: readonly Solid[]) {
   knife(b, named("knife"), named("knife handle"));
 }
 
-/** The names of the solids drawn here (the glass's foot and stem with its bowl, the stand's foot and stem with its plate). */
-export const THINGS = new Set(["fruit bowl", "orange", "lemon", "peach", "board", "lemon slice", "knife", "knife handle", "bar mat", "shaker tin", "cake stand", "cake plate", "cloche", "cloche knob", "glass foot", "glass stem", "wine glass"]);
+/** The names of the solids drawn here (the stand's foot and stem with its plate). */
+export const THINGS = new Set(["fruit bowl", "orange", "lemon", "peach", "board", "lemon slice", "knife", "knife handle", "bar mat", "milk jug", "cake stand", "cake plate", "cloche", "cloche knob", "juice glass"]);

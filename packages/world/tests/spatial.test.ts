@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mulberry32 } from "@fly/brain";
-import { BAR, LAB, PICNIC, WINDOWSILL, World } from "../src/index.ts";
+import { LAB, PICNIC, WINDOWSILL, World } from "../src/index.ts";
 import type { RayHit } from "../src/index.ts";
 
 const hit = (): RayHit => ({ point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 0 }, solid: -1, t: 0 });
 
 test("short spatial queries match full rays across cell edges in every place", () => {
   const random = mulberry32(42);
-  for (const place of [PICNIC, WINDOWSILL, LAB, BAR]) {
+  for (const place of [PICNIC, WINDOWSILL, LAB]) {
     const world = new World(place);
     const full = hit();
     const bounded = hit();

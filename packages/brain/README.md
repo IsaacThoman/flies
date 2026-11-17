@@ -756,6 +756,18 @@ Resting behaviour held at an hour of a summer day (sunrise 05:40, sunset 20:10) 
 
 So the peaks are the most active hours of its day, more so than the brain without a clock at the same hunger: the oscillators' lift outweighs the day's pressure. Male flies are most active round dawn and dusk and least at night, with much of the midday asleep (Helfrich-Förster 2000; Isaac et al. 2010; Ishimoto et al. 2012). The siesta is mostly sleep, in one to three long bouts, with short walks between them, the wandering arousal crossing the clock's push now and then. The night is the quietest and the most asleep, in one or two bouts. Kept awake through the night it walks a tenth as much at dawn, its peak, and sleeps a quarter of that hour, as sleep-deprived flies sleep more the next morning (Shaw et al. 2000; Huber et al. 2004).
 
+**The lively pace.** The game starts on Lively (Settings → Screensaver → Activity; `PACES` in rhythm.ts), a day shaped for a fly to watch, not one measured: the oscillators spread four hours either side of dawn and dusk; the day is never shorter than the summer one (05:40 to 20:10), so a winter evening is still the evening peak; the clock pushes 0.1 by day and 0.6 at night; and the brain is told a fifth of the sleep pressure (the homeostat itself runs as above; changing the pace starts it at what the new pace gives the hour). Nothing in the brain changes. The push and the pressure were chosen from a sweep of the push held alone (pressure about 0.14, seeds 1 to 3, 30 minutes): walking 19% at 0.2, 15% at 0.3, 11% at 0.4, 8% at 0.5 and 5% at 0.6, against 2% at the natural siesta's 0.8. Told all of its pressure, a fly that hardly sleeps by day would come to the evening with nearly the night's push from pressure alone. `node scripts/sleep.ts --part day --pace lively --hunger 0.7 --minutes 30`, seeds 1 and 2:
+
+| Held at | Pressure (felt) | Walking | Starts per 10 min | Longest still | Asleep |
+|---|---|---|---|---|---|
+| dawn (05:40), the morning peak | 0.42 (0.08) | 54.2%, 52.9% | 137, 127 | 0.4, 0.4 min | 0, 0 |
+| 13:00 | 0.69 (0.14) | 25.1%, 23.0% | 109, 111 | 1.2, 1.4 min | 0, 0 |
+| dusk (20:10), the evening peak | 0.83 (0.17) | 48.0%, 46.8% | 146, 140 | 0.6, 0.5 min | 0, 0 |
+| 23:00 | 0.86 (0.17) | 7.8%, 8.5% | 48, 39 | 6.8, 2.5 min | 6% (1), 0 |
+| 01:00, night | 0.47 (0.09) | 5.4%, 5.9% | 36, 36 | 6.8, 6.0 min | 6% (1), 3% (1) |
+
+So it is as busy at its peaks as a natural fly, walks a quarter of the midday where a natural one walks 2%, keeps its evening peak till about 22:00 whatever the season, and from late evening to dawn mostly rests, stirring often and napping briefly. Natural is the pace for a fly's day.
+
 Sleep is consolidated as it wasn't while `grounded` drove all 426 campaniform sensilla tonically while the fly stood, 413 of them the wings' and halteres' (Senses): then a brief step forward or back, 0.2 to 0.4 s, every few minutes ended each bout, and it slept 15 to 50% of the night and 9 to 46% of the siesta (six seeds each, hunger 0.7, the depth weight at 5). What still falls short: the siesta varies from seed to seed (33 to 86% asleep), and a male's night sleep is longer than an hour's bouts can show. A stronger gate would consolidate sleep further, but stroking would then rarely wake it (at 0.5, 2 times in 8).
 
 The arousal threshold, at night (clock push 1, pressure 0.5, so the eyes at 0.7 of their gain), 8 seeds each: woken is moving during the stimulus or the second after. "Still" is a fly that has stopped (depth 0); "asleep" is one that has slept a while (depth 1):

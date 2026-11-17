@@ -2,8 +2,8 @@
 // or on a quiet morning. The restaurant's own pavement with a bicycle at its
 // rack, a bin and the terrace stacked away; the road, its parked cars and now
 // and then one going by; the far pavement with its plane trees; the row of
-// houses across, shuttered shops along their feet, a corner bar still lit
-// with a wine glass in neon in its window, a late shop further along, flats
+// houses across, shuttered shops along their feet, an ice-cream parlour on
+// the corner still lit, a cone in neon in its window, a late shop further along, flats
 // above with windows lit and going dark through the night; a side street
 // running away opposite, its lanterns on brackets; and a strip of sky over
 // the roofs, stars in it and the city's glow. By day the same street in
@@ -23,14 +23,14 @@ import type { Daylight } from "../../scene/light.ts";
 import type { SceneBackdrop } from "../types.ts";
 import { buildBuildings, rowOfBuildings } from "./street/buildings.ts";
 import { f, lighting, NOISE, SHOP_FLOOR, STOREY, VERTEX } from "./street/glsl.ts";
-import { CORNER_BAR, HEADLAMPS, LAMPS, LATE_SHOP, STREET } from "./street/layout.ts";
+import { HEADLAMPS, LAMPS, LATE_SHOP, PARLOUR, STREET } from "./street/layout.ts";
 import { KIND, Pieces } from "./street/pieces.ts";
 import { car, PAINTS, buildProps } from "./street/props.ts";
 import { traffic } from "./traffic.ts";
 
 const LAMP = new THREE.Color(1.0, 0.74, 0.44);
 const NEON = new THREE.Color(1.0, 0.2, 0.5);
-const BAR = new THREE.Color(1.0, 0.56, 0.26);
+const PARLOUR_LIGHT = new THREE.Color(1.0, 0.56, 0.26);
 const SHOP = new THREE.Color(0.82, 0.92, 1.0);
 const HOME = new THREE.Color(1.0, 0.7, 0.42);
 const CAR_LENGTH = 4400;
@@ -109,9 +109,9 @@ vec3 seen(vec3 p, vec3 r) {
         float win = band(fx, 0.3, 0.7, 0.06) * band(fy, 0.22, 0.82, 0.06) * step(v, b.z - ${f(STREET.pavement + 900)});
         c += vec3(1.0, 0.68, 0.38) * 0.9 * win * windowLit(vec2(cell + floor(b.x / 100.0), s), b.w);
       } else {
-        float bar = band(h.x, ${f(CORNER_BAR.x0)}, ${f(CORNER_BAR.x1)}, 200.0) * band(v, 500.0, 3200.0, 200.0);
+        float parlour = band(h.x, ${f(PARLOUR.x0)}, ${f(PARLOUR.x1)}, 200.0) * band(v, 500.0, 3200.0, 200.0);
         float shop = band(h.x, ${f(LATE_SHOP.x0)}, ${f(LATE_SHOP.x1)}, 200.0) * band(v, 300.0, 3100.0, 200.0);
-        c += uBarLight * bar * 0.14 + uShopLight * shop * 0.14;
+        c += uParlourLight * parlour * 0.14 + uShopLight * shop * 0.14;
       }
       return c;
     }
@@ -141,7 +141,7 @@ vec3 glints(vec3 p, vec3 r, vec2 spread) {
     c += streak(p, r, l, vec3(1.0, 0.95, 0.86) * car.w * 0.05 * (0.3 + 0.7 * step(0.0, toward)), spread);
     c += streak(p, r, l - vec3(car.z * 4500.0, -100.0, 0.0), vec3(1.0, 0.08, 0.04) * car.w * 0.02, spread);
   }
-  c += streak(p, r, vec3(${f(CORNER_BAR.neon.x)}, ${f(CORNER_BAR.neon.y)}, ${f(STREET.facades)}), uNeon * 0.4, spread * vec2(0.4, 0.6));
+  c += streak(p, r, vec3(${f(PARLOUR.neon.x)}, ${f(PARLOUR.neon.y)}, ${f(STREET.facades)}), uNeon * 0.4, spread * vec2(0.4, 0.6));
   return c;
 }
 `;
@@ -239,14 +239,19 @@ float lines(float x, float period, float width, float px) {
   float d = abs(fract(x / period + 0.5) - 0.5) * period;
   return mix(1.0 - smoothstep(width * 0.5, width * 0.5 + px, d), width / period, smoothstep(period * 0.1, period * 0.4, px));
 }
-// The neon in the corner bar's window: a wine glass, a little wine in it. Distances (mm) to its tubes, the glass's and the wine's.
+float segment(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a;
+  vec2 ba = b - a;
+  return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
+}
+// The neon in the ice-cream parlour's window: a waffle cone, a scoop on it. Distances (mm) to its tubes, the cone's and the scoop's.
 vec2 neonSign(vec2 q) {
-  vec2 b = q - vec2(0.0, 120.0);
-  float bowl = b.y < 0.0 ? abs(length(b) - 300.0) : length(vec2(abs(b.x) - (300.0 - 0.3 * min(b.y, 230.0)), max(b.y - 230.0, 0.0)));
-  float stem = length(vec2(q.x, q.y - clamp(q.y, -480.0, -180.0)));
-  float foot = length(vec2(q.x - clamp(q.x, -210.0, 210.0), q.y + 480.0));
-  float wine = length(vec2(q.x - clamp(q.x, -255.0, 255.0), q.y - 10.0));
-  return vec2(min(bowl, min(stem, foot)), wine);
+  vec2 m = vec2(abs(q.x), q.y);
+  float cone = min(segment(m, vec2(0.0, -480.0), vec2(200.0, 90.0)), segment(m, vec2(0.0, 90.0), vec2(215.0, 90.0)));
+  cone = min(cone, min(segment(q, vec2(-81.0, -250.0), vec2(150.0, -50.0)), segment(q, vec2(81.0, -250.0), vec2(-150.0, -50.0))));
+  vec2 s = q - vec2(0.0, 170.0);
+  float scoop = s.y > -80.0 ? abs(length(s) - 210.0) : length(vec2(abs(s.x) - 194.2, s.y + 80.0));
+  return vec2(cone, scoop);
 }
 // A shop's window at night: what is behind its glass. u along the face, v up from the pavement, px the pixel's size.
 vec3 interior(float u, float v, float px, float which) {
@@ -257,13 +262,13 @@ vec3 interior(float u, float v, float px, float which) {
     vec3 c = mix(goods * 0.8, vec3(0.25), shelf) * step(v, 2300.0) + vec3(1.0) * step(2300.0, v);
     return c * uShopLight * 0.16;
   }
-  // The corner bar, lit low: its counter dark across the bottom, bottles on the back bar's shelves against the light, pendants over it.
+  // The ice-cream parlour, lit low: its counter dark across the bottom, jars of sweets and cones on the shelves behind against the light, pendants over it.
   float counter = 1.0 - smoothstep(1050.0, 1100.0, v);
-  float bottles = band(v, 1500.0, 1820.0, 10.0) * step(0.35, fract(u / 95.0)) * step(v - 1500.0, 160.0 + 160.0 * hash21(vec2(floor(u / 95.0), 1.0)));
-  bottles = mix(bottles, 0.3, smoothstep(15.0, 40.0, px));
-  vec3 c = vec3(0.35 + 0.65 * smoothstep(400.0, 2600.0, v)) * (1.0 - 0.85 * counter) * (1.0 - 0.7 * bottles);
+  float jars = band(v, 1500.0, 1760.0, 10.0) * step(0.3, fract(u / 140.0)) * step(v - 1500.0, 110.0 + 90.0 * hash21(vec2(floor(u / 140.0), 1.0)));
+  jars = mix(jars, 0.3, smoothstep(15.0, 40.0, px));
+  vec3 c = vec3(0.35 + 0.65 * smoothstep(400.0, 2600.0, v)) * (1.0 - 0.85 * counter) * (1.0 - 0.7 * jars);
   float pendant = 1.0 - smoothstep(30.0, 160.0, length(vec2(mod(u + 800.0, 1600.0) - 800.0, v - 2650.0)));
-  return uBarLight * (c * 0.12 + pendant * 0.8);
+  return uParlourLight * (c * 0.12 + pendant * 0.8);
 }
 // A building's face at p: its windows over the shops, the shops' fronts, the courses of its stone.
 vec3 facade(vec3 p, vec3 n, vec3 v, vec3 wall, float px, inout vec3 emit, inout float sharp, inout float shine) {
@@ -333,16 +338,16 @@ vec3 facade(vec3 p, vec3 n, vec3 v, vec3 wall, float px, inout vec3 emit, inout 
       c = mix(c, vec3(0.16, 0.12, 0.1), door);
       glass = win * (1.0 - lines(wx, 160.0, 20.0, px));
     } else {
-      float bar = step(${f(CORNER_BAR.x0)}, u) * step(u, ${f(CORNER_BAR.x1)});
+      float parlour = step(${f(PARLOUR.x0)}, u) * step(u, ${f(PARLOUR.x1)});
       float late = step(${f(LATE_SHOP.x0)}, u) * step(u, ${f(LATE_SHOP.x1)});
-      float kind = bar > 0.5 ? 2.0 : (late > 0.5 ? 3.0 : floor(fract(seed * 23.3) * 3.0));
+      float kind = parlour > 0.5 ? 2.0 : (late > 0.5 ? 3.0 : floor(fract(seed * 23.3) * 3.0));
       vec3 front = vec3(0.12, 0.22, 0.17);
       float pick = fract(seed * 31.7);
       if (pick < 0.2) front = vec3(0.32, 0.08, 0.08);
       else if (pick < 0.4) front = vec3(0.09, 0.12, 0.22);
       else if (pick < 0.6) front = vec3(0.06, 0.06, 0.06);
       else if (pick < 0.75) front = vec3(0.72, 0.68, 0.58);
-      if (bar > 0.5) front = vec3(0.3, 0.06, 0.07);
+      if (parlour > 0.5) front = vec3(0.46, 0.68, 0.6);
       // Pilasters at either end, the fascia board along the top (signs without words), the opening between.
       float pil = 1.0 - band(u, u0 + 320.0, u1 - 320.0, px);
       float fascia = band(h, 3300.0, 4050.0, px);
@@ -361,11 +366,11 @@ vec3 facade(vec3 p, vec3 n, vec3 v, vec3 wall, float px, inout vec3 emit, inout 
           c = mix(vec3(0.05), front, max(riser, frame));
           glass = (1.0 - riser) * (1.0 - frame);
           if (kind > 1.5) {
-            vec2 sign = neonSign(vec2(u, h) - vec2(${f(CORNER_BAR.neon.x)}, ${f(CORNER_BAR.neon.y - STREET.pavement)}));
+            vec2 sign = neonSign(vec2(u, h) - vec2(${f(PARLOUR.neon.x)}, ${f(PARLOUR.neon.y - STREET.pavement)}));
             // The tubes: a white-hot line down their middles, their colour round it, and their glow on the glass.
             float tube = 1.0 - smoothstep(11.0, 11.0 + px, sign.x);
-            float wine = 1.0 - smoothstep(11.0, 11.0 + px, sign.y);
-            vec3 neon = (uNeon + vec3(0.25) * length(uNeon)) * tube + uNeon * vec3(0.9, 0.2, 0.6) * wine;
+            float scoop = 1.0 - smoothstep(11.0, 11.0 + px, sign.y);
+            vec3 neon = (uNeon + vec3(0.25) * length(uNeon)) * tube + uNeon * vec3(0.9, 0.2, 0.6) * scoop;
             neon += uNeon * (exp(-sign.x / 45.0) * 0.18 + exp(-sign.y / 45.0) * 0.1);
             lit = (kind > 2.5 ? interior(u, h, px, 2.0) : interior(u, h, px, 1.0)) * glass + neon * glass;
             // The late shop's sign: a lit box over its door, a stripe of colour on white.
@@ -555,7 +560,7 @@ export function buildStreet(light: Daylight): SceneBackdrop {
     uLampLight: { value: new THREE.Color() },
     uCars: { value: [new THREE.Vector4(), new THREE.Vector4()] },
     uNeon: { value: new THREE.Color() },
-    uBarLight: { value: new THREE.Color() },
+    uParlourLight: { value: new THREE.Color() },
     uShopLight: { value: new THREE.Color() },
     uHomeLight: { value: new THREE.Color() },
     uDark: { value: 0 },
@@ -614,7 +619,7 @@ export function buildStreet(light: Daylight): SceneBackdrop {
     at.push(l.x, l.y, l.z, -1);
     look.push(LAMP.r * 1.6, LAMP.g * 1.6, LAMP.b * 1.6, 150);
   }
-  at.push(CORNER_BAR.neon.x, CORNER_BAR.neon.y, STREET.facades - 150, 0);
+  at.push(PARLOUR.neon.x, PARLOUR.neon.y, STREET.facades - 150, 0);
   look.push(NEON.r * 0.12, NEON.g * 0.12, NEON.b * 0.12, 500);
   for (const slot of [1, 2]) {
     for (const s of [-1, 1]) {
@@ -678,7 +683,7 @@ export function buildStreet(light: Daylight): SceneBackdrop {
       u.uBounce.value.copy(daylight.sunColor).multiplyScalar(0.14 * day * up * (1 - 0.7 * weather.cloud)).add(scratch.copy(u.uSky.value).multiplyScalar(0.4));
       u.uLampLight.value.copy(LAMP).multiplyScalar(13 * t.lamps);
       u.uNeon.value.copy(NEON).multiplyScalar(1.4 * t.neon);
-      u.uBarLight.value.copy(BAR).multiplyScalar(5 * dark);
+      u.uParlourLight.value.copy(PARLOUR_LIGHT).multiplyScalar(5 * dark);
       u.uShopLight.value.copy(SHOP).multiplyScalar(7 * dark);
       u.uHomeLight.value.copy(HOME).multiplyScalar(1.5 * dark);
       u.uLit.value = 0.05 + 0.4 * dark + 0.1 * weather.cloud;

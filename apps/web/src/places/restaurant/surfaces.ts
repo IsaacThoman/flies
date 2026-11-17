@@ -243,7 +243,7 @@ if (rK == K_MARBLE) {
   rRough = 0.26 + vein * 0.08 + smudge * 0.22 + speck * 0.3 - glint * 0.18;
   rCoat = 0.42 * (1.0 - smudge * 0.5);
   rCoatRough = 0.12 + smudge * 0.15;
-  // Rings where glasses and cups stood, a wine stain, a smear: each the rim of a ring, a little dull.
+  // Rings where glasses and cups stood, a juice stain, a smear: each the rim of a ring, a little dull.
   for (int i = 0; i < 6; i++) {
     vec4 ring = uRings[i];
     if (ring.z <= 0.0) continue;
@@ -252,7 +252,7 @@ if (rK == K_MARBLE) {
     float a = atan(dd.y, dd.x);
     float rim = (1.0 - smoothstep(0.4, 1.4 + fwidth(e), abs(e))) * (0.55 + 0.45 * rNoise(vec2(a * 5.0, ring.w)));
     float fill = (1.0 - smoothstep(-2.0, 0.0, e)) * 0.25;
-    vec3 tint = ring.w < 1.0 ? vec3(0.62, 0.4, 0.44) : ring.w < 2.0 ? vec3(0.78, 0.66, 0.52) : vec3(0.85, 0.85, 0.85);
+    vec3 tint = ring.w < 1.0 ? vec3(0.86, 0.6, 0.36) : ring.w < 2.0 ? vec3(0.78, 0.66, 0.52) : vec3(0.85, 0.85, 0.85);
     float k = max(rim, fill) * (ring.w < 2.0 ? 0.55 : 0.3);
     diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * tint, k);
     rCoat *= 1.0 - k * 0.6;

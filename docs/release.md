@@ -12,11 +12,11 @@ and upload in separate jobs, so one can succeed while the other fails.
    in the repository settings checked on 16 November 2026; recheck them if the workflow changes.
 2. To release, open a pull request from `dev` into `main` and merge it with a **merge commit**,
    not a squash, so `main` keeps `dev`'s history and the two don't drift apart.
-3. CI (`.github/workflows/ci.yml`) runs the checks on `main`, as it does on every pull request
-   and push to `dev` (draft pull requests skip tests and E2E):
+3. CI (`.github/workflows/ci.yml`) runs the checks on `main`, as it does on every push to `dev`
+   (not on pull requests: a full run takes about a quarter of an hour):
    - the Compose configuration check, lint, both typechecks and the web build, on Linux;
    - `npm test`, including CPU budgets, on `macos-latest` (the brain parity tests need Apple silicon);
-   - the four E2E suites in separate jobs, with an aggregate `e2e` check that fails if a suite fails.
+   - the four E2E suites in separate jobs.
 
    The release job waits for `checks` and `test`, not E2E.
 
@@ -64,10 +64,9 @@ legal texts and confirm live WeatherKit attribution in a signed build.
 
 Listed rooms expose user-chosen names, with no chat channel. Decide whether
 to keep that public feature and answer the user-generated-content and
-public-posting questions accordingly. The bar/restaurant contain persistent
-alcohol imagery: review the frequency answers and accept Apple's resulting
-regional age rating; do not submit as a Kids Category app. The rationale is
-in [App Store answers](app-store-answers.md).
+public-posting questions accordingly. The answers aim at 4+, which needs no
+alcohol and no cartoon violence anywhere in the game; do not submit as a Kids
+Category app. The rationale is in [App Store answers](app-store-answers.md).
 
 The large notice files are committed generated output. `npm run notices`
 regenerates `THIRD_PARTY_NOTICES` and `apps/web/src/ui/notices.json`; tests

@@ -4,7 +4,7 @@
 // into a few meshes; the small things are instanced.
 
 import * as THREE from "three";
-import { ALARM_CLOCK, BANANA, BASIL_CROWN, HONEY_JAR, POSTCARD, WINE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_DECOR, SILL_PATCHES, SILL_SOLIDS, TEASPOON, WINDOW, bananaAt, inside, topHeight, topNormal, topPeak } from "@fly/world";
+import { ALARM_CLOCK, BANANA, BASIL_CROWN, HONEY_JAR, POSTCARD, JUICE_BOTTLE, FRUIT_BOWL, PEACH_PLATE, BASIL_POT, SILL, SILL_DECOR, SILL_PATCHES, SILL_SOLIDS, TEASPOON, WINDOW, bananaAt, inside, topHeight, topNormal, topPeak } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { Batch, freeze, mat4, paint, random } from "../../scene/build.ts";
 import { WallClock } from "../../scene/clock.ts";
@@ -243,8 +243,8 @@ function casters(): { balls: Ball[]; columns: Column[] } {
   }
   const columns: Column[] = [
     { x: BASIL_POT.x, z: BASIL_POT.z, r: BASIL_POT.r + 1.5, top: BASIL_POT.rim },
-    { x: WINE_BOTTLE.x, z: WINE_BOTTLE.z, r: WINE_BOTTLE.r, top: WINE_BOTTLE.shoulder + 14 },
-    { x: WINE_BOTTLE.x, z: WINE_BOTTLE.z, r: WINE_BOTTLE.neck, top: WINE_BOTTLE.top },
+    { x: JUICE_BOTTLE.x, z: JUICE_BOTTLE.z, r: JUICE_BOTTLE.r, top: JUICE_BOTTLE.shoulder + 14 },
+    { x: JUICE_BOTTLE.x, z: JUICE_BOTTLE.z, r: JUICE_BOTTLE.neck, top: JUICE_BOTTLE.top },
     { x: FRUIT_BOWL.x, z: FRUIT_BOWL.z, r: FRUIT_BOWL.r * 0.78, top: 28 },
     { x: HONEY_JAR.x, z: HONEY_JAR.z, r: HONEY_JAR.r, top: HONEY_JAR.top },
     { x: PEACH_PLATE.x, z: PEACH_PLATE.z, r: PEACH_PLATE.r * 0.9, top: 5 },
@@ -257,7 +257,7 @@ function contacts(): Contact[] {
   const out: Contact[] = [
     { x: BASIL_POT.x, z: BASIL_POT.z, r: BASIL_POT.saucer, dark: 0.45 },
     { x: FRUIT_BOWL.x, z: FRUIT_BOWL.z, r: FRUIT_BOWL.r * 0.92, dark: 0.45 },
-    { x: WINE_BOTTLE.x, z: WINE_BOTTLE.z, r: WINE_BOTTLE.r, dark: 0.55 },
+    { x: JUICE_BOTTLE.x, z: JUICE_BOTTLE.z, r: JUICE_BOTTLE.r, dark: 0.55 },
     { x: PEACH_PLATE.x, z: PEACH_PLATE.z, r: PEACH_PLATE.r * 0.95, dark: 0.35 },
     { x: TEASPOON.x, z: TEASPOON.z, r: TEASPOON.rx, dark: 0.25 },
     { x: HONEY_JAR.x, z: HONEY_JAR.z, r: HONEY_JAR.r, dark: 0.45 },
@@ -687,28 +687,34 @@ export function buildSill(): SceneSet {
   // The banana: ripe past yellow, freckled, its tip black and its stalk green-brown.
   add(fruit, tag(bananaGeometry(), "skin", 1));
 
-  // The bottle of wine: green glass, the wine dark inside it, a cream label, a cork. Its glass and the honey jar's are one draw.
+  // The bottle of orange juice: clear glass, the juice bright inside it, a paper label with an orange on it, a screw cap. Its glass and the honey jar's are one draw.
   const glassBatch = new Batch();
   {
-    const { x, z, r, shoulder, neck, top } = WINE_BOTTLE;
-    const glassProfile: [number, number][] = [[0, 2], [r - 6, 2], [r - 1, 0.5], [r, 4], [r, shoulder]];
+    const { x, z, r, shoulder, neck, top } = JUICE_BOTTLE;
+    const cap = 14;
+    const fill = shoulder - 14;
+    // The glass neck is a little narrower than the felt one, so that the cap screwed onto it is flush with the world's.
+    const throat = neck - 1.2;
+    const glassProfile: [number, number][] = [[0, 2], [r - 6, 2], [r - 1, 0.5], [r, 4], [r, fill - 0.5], [r, fill], [r, shoulder]];
     for (let i = 1; i <= 10; i++) {
-      const a = (i / 10) * (Math.PI / 2);
-      glassProfile.push([neck + (r - neck) * Math.cos(a), shoulder + Math.sin(a) * 28]);
+      const across = r + (throat - r) * (i / 10);
+      glassProfile.push([across, shoulder + 26 * Math.sqrt(1 - (across / r) ** 2)]);
     }
-    glassProfile.push([neck, top - 22], [neck + 1.6, top - 20], [neck + 1.6, top - 12], [neck, top - 10]);
-    glassBatch.add(bottleGlass, paint(lathe(glassProfile, 48, x, z), (p) => (p.y > top - 22 ? tone("#2e5a2a") : tone("#2f6b34"))));
-    fruity(lathe([[0, 3], [r - 2, 3], [r - 2, 95], [0, 95]], 40, x, z), "#2a0710", 0);
-    // The label, facing the room: cream paper, a claret band along its top, gilt rules, and a crest.
-    add(plaster, paint(new THREE.CylinderGeometry(r + 0.4, r + 0.4, 84, 48, 24, true, -1.2, 2.4).translate(x, 112, z), (p) => {
-      const across = Math.atan2(p.x - x, p.z - z);
-      if (p.y > 141) return tone("#6e1424");
-      if (Math.abs(p.y - 138) < 1.1 || Math.abs(p.y - 76) < 1.1) return tone("#b8913a");
-      if (Math.hypot(across * 30, p.y - 116) < 12) return Math.hypot(across * 30, p.y - 116) > 10 ? tone("#b8913a") : tone("#7a1a2a");
-      if (Math.abs(across) < 0.55 && (Math.abs(p.y - 96) < 1.4 || Math.abs(p.y - 89) < 0.9)) return tone("#4a3a34");
-      return tone("#f2ead6");
+    glassProfile.push([throat, top - cap]);
+    // Where the juice is behind it the glass takes its colour, or its veil would grey the juice to brown.
+    glassBatch.add(bottleGlass, paint(lathe(glassProfile, 48, x, z), (p) => (p.y < fill ? tone("#ffa030") : tone("#e4ece6"))));
+    fruity(lathe([[0, 3], [r - 2, 3], [r - 2, fill], [0, fill]], 40, x, z), "#ffa020", 7);
+    // The label, facing the room: white paper, a green band along its top, an orange with its leaf, a line of print.
+    add(plaster, paint(new THREE.CylinderGeometry(r + 0.4, r + 0.4, 76, 48, 24, true, -1.2, 2.4).translate(x, 100, z), (p) => {
+      const across = Math.atan2(p.x - x, p.z - z) * r;
+      if (p.y > 126) return tone("#3f8f3a");
+      const fruit = Math.hypot(across, p.y - 100);
+      if (fruit < 15) return fruit > 13.5 ? tone("#d0661a") : tone("#f39222");
+      if (Math.hypot((across - 7) / 2, p.y - 117) < 3) return tone("#3f8f3a");
+      if (Math.abs(across) < 20 && Math.abs(p.y - 76) < 1.2) return tone("#4a3a34");
+      return tone("#fbf7ec");
     }));
-    clayed(new THREE.CylinderGeometry(neck - 2.6, neck - 2.6, 22, 16).translate(x, top - 11, z), "#c79a64", 0);
+    glazed(new THREE.CylinderGeometry(neck, neck, cap, 32).translate(x, top - cap / 2, z), "#ef7d1c", 0);
   }
 
   // The jar of honey, full: the honey glowing through the glass with the light through it, clear glass at its shoulder, a gold lid, a paper label.
@@ -900,8 +906,8 @@ export function buildSill(): SceneSet {
     add(leaf, g.rotateX(-Math.PI / 2), mat4({ x: dry.x, y: 0.1, z: dry.z }, new THREE.Euler(0, dry.angle, 0)));
   }
 
-  // The pools: wine run down the bottle onto the sill, and water standing in the basil's saucer. Rings spread on them from drips and the fly's feet.
-  const wine = patch("wine");
+  // The pools: orange juice run down the bottle onto the sill, and water standing in the basil's saucer. Rings spread on them from drips and the fly's feet.
+  const juice = patch("orange juice");
   const waterPatch = patch("water");
   const ripples = new Float32Array(RIPPLES * 4).fill(-100);
   const poolUniforms = { uRipples: { value: ripples } };
@@ -935,7 +941,7 @@ export function buildSill(): SceneSet {
         );
       },
     });
-    const wineGeometry = paint(blob(wine.x, wine.z, wine.r, 0.08, 4), "#4a0618");
+    const juiceGeometry = paint(blob(juice.x, juice.z, juice.r, 0.08, 4), "#ffa030");
     const sf = saucer.footprint as { x: number; z: number; r: number };
     const sTop = saucer.top as { well: number; inner: number };
     const inMoat = (x: number, z: number): [number, number] => {
@@ -947,7 +953,7 @@ export function buildSill(): SceneSet {
     };
     const waterGeometry = paint(blob(waterPatch.x, waterPatch.z, 3.4, sTop.well + 0.06, 1, inMoat), "#9fb8b0");
     const merged = new Batch();
-    merged.add(poolMaterial, wineGeometry);
+    merged.add(poolMaterial, juiceGeometry);
     merged.add(poolMaterial, waterGeometry);
     const [poolMesh] = merged.build(group);
     poolMesh.renderOrder = 2;
@@ -1054,11 +1060,11 @@ export function buildSill(): SceneSet {
       u.uMist.value = mist;
       room.update(lamp);
       clock.update();
-      // Now and then a drop runs down the bottle into the wine.
+      // Now and then a drop runs down the bottle into the juice.
       if (time > nextDrip) {
         const a = rnd.range(0, Math.PI * 2);
-        const r = Math.sqrt(rnd.next()) * wine.r * 0.6;
-        ripple(wine.x + Math.cos(a) * r, wine.z + Math.sin(a) * r, rnd.range(0.3, 0.8));
+        const r = Math.sqrt(rnd.next()) * juice.r * 0.6;
+        ripple(juice.x + Math.cos(a) * r, juice.z + Math.sin(a) * r, rnd.range(0.3, 0.8));
         nextDrip = time + rnd.range(6, 16);
       }
     },
