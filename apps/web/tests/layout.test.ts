@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HitMap } from "@fly/ui";
 import type { Hit } from "@fly/ui";
-import { COLOURS } from "@fly/net";
 import { TV_FRAME, frameFor } from "../src/display.ts";
 import type { Frame } from "../src/display.ts";
 import { DEFAULT_SETTINGS } from "../src/settings.ts";
@@ -450,7 +449,7 @@ test("selector arrows stay put across kinds, including Place's Go appearing", ()
   }
 });
 
-test("the Flies row draws one enamel dot per fly on wide and compact screens, with chevrons to choose", () => {
+test("the Flies row writes its count on wide and compact screens, with chevrons to choose", () => {
   for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
     for (let count = 1; count <= 4; count++) {
       const host = shell(frame);
@@ -460,15 +459,10 @@ test("the Flies row draws one enamel dot per fly on wide and compact screens, wi
       const row = screen.menu.items.findIndex((i) => i.id === "flies");
       screen.menu.focusOn("flies");
       const g = blankCanvas();
-      const colours: string[] = [];
-      g.fill = () => {
-        if (COLOURS.some((colour) => colour === String(g.fillStyle))) colours.push(String(g.fillStyle));
-      };
       const hits = new HitMap();
       hits.begin(screen.id);
       screen.draw(g, 0, hits);
-      assert.deepEqual(colours, COLOURS.slice(0, count), `${name}: ${count} enamel dots`);
-      assert.ok(!writtenOn(g).some((w) => w.text === String(count)), "count shown as dots");
+      assert.ok(writtenOn(g).some((w) => w.text === String(count)), `${name}: ${count} written`);
       const steps = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).filter((h) => h.kind === "step" && h.index === row);
       assert.equal(steps.length, 2, `${name}: both chevrons target this row`);
     }

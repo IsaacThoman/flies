@@ -90,7 +90,7 @@ WebAssembly was faster in Chromium and used about half the brain memory.
 `?brain=typescript` or `?brain=wasm` on the page's address
 picks one, for tests and comparisons; nothing shows it to players.
 
-Settings → Screensaver → Flies chooses one to four, shown as enamel dots.
+Settings → Screensaver → Flies chooses one to four.
 Each has its own brain in its own worker, its own body, senses and eyes;
 the camera and readouts follow the first. `InTurn`
 (`apps/web/src/brain/create.ts`) loads their files one brain after another

@@ -1,7 +1,7 @@
 // Draws a Menu (packages/ui) as a column of glossy rows: actions as jelly
 // buttons (with, for a room, its place's colour, its flies as pips and a
-// padlock), choices with their value between chevrons (a count as dots of
-// colour; or, as tabs, all their options side by side), sliders as glossy tracks, fields as what is typed
+// padlock), choices with their value between chevrons (or, as tabs, all
+// their options side by side), sliders as glossy tracks, fields as what is typed
 // in them, with a caret while it is. The soap-bubble ring
 // glides to the focused row, for the remote, a keyboard and a pad; for a
 // mouse or a finger there is no ring, and what the mouse is over only
@@ -394,8 +394,7 @@ function drawItem(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: num
     const vx = right - 96;
     chevron(g, vx - 64, mid, -1, item.index > 0);
     chevron(g, right - 10, mid, 1, item.index < item.options.length - 1);
-    if (item.dots) dots(g, item, (vx - 64 + right - 10) / 2, mid, h);
-    else text(g, label, (vx - 64 + right - 10) / 2, mid, { size: Math.round(h * 0.38), color: focused ? "#0a6fc0" : INK, align: "center", baseline: "middle" });
+    text(g, label, (vx - 64 + right - 10) / 2, mid, { size: Math.round(h * 0.38), color: focused ? "#0a6fc0" : INK, align: "center", baseline: "middle" });
     hits.add(MENU_HITS.step, vx - 64 - 20, y, 44, h, index, -1, item.id);
     hits.add(MENU_HITS.step, right - 32, y, 44, h, index, 1, item.id);
   } else {
@@ -404,15 +403,6 @@ function drawItem(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: num
     text(g, String(Math.round(item.value)), right, mid, { size: Math.round(h * 0.36), color: INK, align: "right", baseline: "middle" });
     hits.add(MENU_HITS.track, track.x - 14, y, track.w + 28, h, index, 0, item.id);
   }
-}
-
-/** A choice's value as so many dots of its colours, centred on (x, y), for a row `h` tall. */
-function dots(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: number, h: number) {
-  const colours = item.dots!;
-  const n = Math.max(0, Math.round(Number(item.options[item.index].value)));
-  const r = h * 0.17;
-  const step = h * 0.5;
-  for (let i = 0; i < n; i++) swatch(g, x + (i - (n - 1) / 2) * step, y, r, colours[i % colours.length]);
 }
 
 /** A dot of colour, ringed so that a pale one shows on the glass. */
@@ -442,8 +432,7 @@ function drawStacked(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: 
   if (item.kind === "choice") {
     chevron(g, x + 26, low, -1, item.index > 0);
     chevron(g, x + w - 26, low, 1, item.index < item.options.length - 1);
-    if (item.dots) dots(g, item, x + w / 2, low, h * 0.8);
-    else text(g, item.options[item.index].label, x + w / 2, low, { size: Math.round(h * 0.3), color: focused ? "#0a6fc0" : INK, align: "center", baseline: "middle" });
+    text(g, item.options[item.index].label, x + w / 2, low, { size: Math.round(h * 0.3), color: focused ? "#0a6fc0" : INK, align: "center", baseline: "middle" });
     hits.add(MENU_HITS.step, x, y, 56, h, index, -1, item.id);
     hits.add(MENU_HITS.step, x + w - 56, y, 56, h, index, 1, item.id);
   } else {

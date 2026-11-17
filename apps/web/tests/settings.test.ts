@@ -374,7 +374,6 @@ test("Flies is offered only where several brains can run, with counts up to the 
     assert.ok(row?.kind === "choice");
     assert.equal(row.label, "Flies");
     assert.deepEqual(row.options.map((o) => o.value), Array.from({ length: maxFlies }, (_, i) => i + 1));
-    assert.ok(row.dots && row.dots.length >= maxFlies);
     screen.menu.focusOn("flies");
     for (let n = 2; n <= maxFlies; n++) {
       press(screen, "right");

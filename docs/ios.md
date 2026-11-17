@@ -23,7 +23,7 @@ stops it on background transitions or critical heat, decides when the screen may
 nothing of the game. Normal host policy follows the canvas state; optional reports also inspect
 the game's internals and can apply settings.
 
-Settings → Screensaver → Flies chooses one to four, shown as enamel dots,
+Settings → Screensaver → Flies chooses one to four,
 kept between launches. Each has its own body, senses, eyes and brain worker;
 the camera and readouts follow the first. Workers load the brain's files from the bundle
 one after another (`InTurn`, `apps/web/src/brain/create.ts`). The previously reported

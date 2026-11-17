@@ -28,11 +28,8 @@ export type ActionItem = {
   locked?: boolean;
   everyone?: boolean;
 };
-/**
- * A choice; `tabs` draws its options side by side, every one to be pressed, as the tabs across the top of a page.
- * `dots`: its value is a count, drawn as that many dots of these colours in turn (how many flies) in place of its label.
- */
-export type ChoiceItem<V = unknown> = { kind: "choice"; id: string; label: string; options: readonly Option<V>[]; index: number; disabled?: boolean; hint?: string; tabs?: boolean; dots?: readonly string[] };
+/** A choice; `tabs` draws its options side by side, every one to be pressed, as the tabs across the top of a page. */
+export type ChoiceItem<V = unknown> = { kind: "choice"; id: string; label: string; options: readonly Option<V>[]; index: number; disabled?: boolean; hint?: string; tabs?: boolean };
 export type SliderItem = { kind: "slider"; id: string; label: string; min: number; max: number; step: number; value: number; disabled?: boolean; hint?: string };
 /** Words to type: a name, a password (`secret`: shown masked), a code. Select starts typing into it; `placeholder` shows while it is empty. */
 export type FieldItem = { kind: "field"; id: string; label: string; value: string; placeholder?: string; secret?: boolean; disabled?: boolean; hint?: string; submit?: { label: string; disabled: boolean } };
