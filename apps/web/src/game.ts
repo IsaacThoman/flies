@@ -1427,7 +1427,8 @@ export class Game implements Shell {
         p.dx = (g.x - grip.x) * width;
         p.dy = (g.y - grip.y) * height;
         if (g.type === "up") {
-          p.tap = g.tap && sameTarget(grip.hit, this.#hitAt(g.x, g.y));
+          p.hit = this.#hitAt(g.x, g.y);
+          p.tap = g.tap;
           this.#grip = null;
         }
         break;

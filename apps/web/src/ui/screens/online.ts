@@ -28,7 +28,7 @@ import { fitMenu, roomLayout, safeRect } from "../layout.ts";
 import type { MenuPanelSpec, RoomLayout } from "../layout.ts";
 import { RoomCard } from "../room-card.ts";
 import { MenuScreen } from "./menu-screen.ts";
-import type { NewRoom, Point, Screen, Shell } from "./types.ts";
+import type { NewRoom, Point, Screen, Shell, TableNow } from "./types.ts";
 
 /** Seconds "Link copied" shows before the button says what it does again. */
 const COPIED_FOR = 2.5;
@@ -77,6 +77,8 @@ export class OnlineScreen implements Screen {
   #knocked = -1;
   #copied = -1;
   #time = 0;
+  readonly #occupants = new WeakMap<object, number>();
+  #occupantSequence = 0;
   /** At a room: where its card is, and the card. */
   #room: RoomLayout | null = null;
   readonly #card = new RoomCard();
@@ -158,7 +160,7 @@ export class OnlineScreen implements Screen {
         if (!table) return [];
         const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
         const rows: MenuItem[] = shell.canShare ? [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", disabled: !table.joined }] : [];
-        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: `remove:${o.id}`, label: "Remove", swatch: o.colour });
+        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", swatch: o.colour });
         rows.push({ kind: "action", id: "leave", label: "Leave the room" });
         return rows;
       }
@@ -174,12 +176,19 @@ export class OnlineScreen implements Screen {
     return "Online";
   }
 
+  /** A seat number can be reused between frames; the previous occupant's removal must expire. */
+  #removalId(other: TableNow["others"][number]) {
+    let sequence = this.#occupants.get(other);
+    if (sequence === undefined) this.#occupants.set(other, sequence = ++this.#occupantSequence);
+    return `remove:${other.id}:${sequence}`;
+  }
+
   #key() {
     const shell = this.#shell;
     const table = shell.table;
     const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
     const rooms = shell.rooms ? shell.rooms.map((r) => `${r.code}:${r.name}:${r.place}:${r.flies}:${r.locked}`).join(",") : "?";
-    const at = table ? `${table.name}|${table.joined}|${table.starting}|${copied}|${table.others.map((o) => o.id).join(",")}` : "alone";
+    const at = table ? `${table.name}|${table.joined}|${table.starting}|${copied}|${table.others.map((o) => this.#removalId(o)).join(",")}` : "alone";
     return `${this.view}|${this.#note}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}`;
   }
 
@@ -252,7 +261,10 @@ export class OnlineScreen implements Screen {
       shell.leaveTable();
       this.view = "rooms";
       this.#refresh("new");
-    } else if (id.startsWith("remove:")) shell.removeFly(Number(id.slice(7)));
+    } else if (id.startsWith("remove:")) {
+      const other = shell.table?.others.find((o) => this.#removalId(o) === id);
+      if (other) shell.removeFly(other.id);
+    }
   }
 
   /** Into the locked room with the password typed. */
