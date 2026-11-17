@@ -40,7 +40,8 @@ worker.addEventListener("fetch", (event) => {
 
 /** The page from the network, or the kept one if the network fails, is too slow, or answers with an error (a host that is up but failing). */
 async function page(request: Request): Promise<Response> {
-  const kept = () => caches.match("./", { cacheName: CACHE });
+  const policy = /\/privacy(?:\/|\/index\.html)?$/.test(new URL(request.url).pathname);
+  const kept = () => caches.match(policy ? "privacy/index.html" : "./", { cacheName: CACHE });
   const fresh = fetch(request);
   // Answered or not, it may still settle after the kept page is used.
   fresh.catch(() => {});

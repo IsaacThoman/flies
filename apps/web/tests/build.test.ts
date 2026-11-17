@@ -9,6 +9,7 @@ import path from "node:path";
 import { after, before, test } from "node:test";
 import { gunzipSync } from "node:zlib";
 import { build } from "vite";
+import { noticeText, privacyHtml } from "../../../scripts/notices.ts";
 import { siteAssociation } from "../../../scripts/webBuild.ts";
 
 const root = path.join(import.meta.dirname, "../../..");
@@ -44,7 +45,8 @@ const TEXT = /\.(html|js|css|webmanifest|json)$/;
  * they hand on (apps/web/src/online/invite.ts). Anything else is a request to
  * somebody else's server until shown otherwise.
  */
-const NOT_REQUESTS = new Set(["http://www.w3.org/1999/xhtml", "https://jcgt.org/published/0007/04/01/", "https://flies.isaacthoman.com/"]);
+const CREDIT_URLS = [...(noticeText() + privacyHtml()).matchAll(/https?:\/\/[^\s"'`)<>\\]+/g)].map((m) => m[0]);
+const NOT_REQUESTS = new Set([...CREDIT_URLS, "http://www.w3.org/1999/xhtml", "https://jcgt.org/published/0007/04/01/", "https://flies.isaacthoman.com/"]);
 
 test("nothing in the build asks another site for anything: no fonts, scripts, analytics or CDNs", () => {
   const html = read("index.html");
@@ -76,8 +78,8 @@ test("every path is relative, so the site works from any folder", () => {
 
 test("what may be kept forever has its contents in its name; the few that may not are small", () => {
   const unhashed = files().filter((f) => !/[.-][A-Za-z0-9_-]{8,}\.[a-z]+$/.test(f));
-  assert.deepEqual(unhashed.sort(), [".well-known/apple-app-site-association", "index.html", "manifest.webmanifest", "sw.js"]);
-  for (const file of unhashed) assert.ok(statSync(path.join(out, file)).size < 8_000, `${file} is small`);
+  assert.deepEqual(unhashed.sort(), [".well-known/apple-app-site-association", "THIRD_PARTY_NOTICES", "index.html", "manifest.webmanifest", "privacy/index.html", "sw.js"]);
+  for (const file of unhashed.filter((f) => f !== "THIRD_PARTY_NOTICES" && f !== "privacy/index.html")) assert.ok(statSync(path.join(out, file)).size < 8_000, `${file} is small`);
 });
 
 test("the page is an installable app, credits the connectome, and its service worker keeps every file but the brain", () => {
@@ -143,4 +145,9 @@ test("the brain built as WebAssembly is beside the page as it is, one file named
   assert.equal(createHash("sha256").update(bytes).digest("hex").slice(0, 16), module.split(".")[2]);
   const js = files().filter((f) => f.startsWith("assets/index-") && f.endsWith(".js")).map(read).join("");
   assert.ok(js.includes(module), "the page knows it");
+});
+
+test("the web build ships the exact notices and a readable static privacy policy", () => {
+  assert.equal(read("THIRD_PARTY_NOTICES"), noticeText());
+  assert.equal(read("privacy/index.html"), privacyHtml());
 });

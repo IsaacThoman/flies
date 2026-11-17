@@ -115,7 +115,10 @@ Done once, by the account holder, before the first release:
    if an Apple TV record already exists, add iOS to it).
    Sharing one bundle ID makes it a universal purchase: one listing, bought once for the
    iPhone, iPad and Apple TV, with one TestFlight group for all of them. Then add a TestFlight
-   group and the privacy answers (no data collected).
+   group and the privacy answers from [the audited draft](app-store-answers.md).
+   Online keeps pseudonymous identifiers and gameplay records: do not select "Data Not Collected".
+   Complete the [privacy policy](privacy.md), [store listing](store-listing.md) and
+   [licence audit](licenses.md), replace their placeholders and obtain legal review before submission.
 3. **The `testflight` environment** in this repository (Settings → Environments → New
    environment, `testflight`):
    - under **Deployment branches and tags**, choose "Selected branches and tags" and add the
