@@ -259,8 +259,8 @@ TV has (`places/restaurant/`):
   (Settings → Picture → Frame stats, or the canvas's `data-calls` and `data-triangles`);
   a new place should stay close to that, near the fly and in its whole view.
 - **Building is a pause behind the veil.** `data-place-ms` on the canvas says
-  how long the place took to build: the picnic 36 ms in desktop Chromium, so
-  about half a second on the TV. Keep it there, or build in steps
+  how long the place took to build. A reference picnic build was 36 ms in
+  desktop Chromium, so about half a second on the TV. Keep it there, or build in steps
   (`SceneSet.more`, above): then `data-place-step-ms` is the longest frame
   of it, and that is what to keep there.
 - **Register it** in `catalog.ts` and `index.ts`. `apps/web/tests/places.test.ts`

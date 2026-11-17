@@ -169,8 +169,9 @@ const at = (name: string) => {
 const apple = at("apple");
 const LENTICELS = Math.round((2 * Math.PI * apple.r) / 1.3);
 const orange = at("orange slice");
-const cutBerry = SOLIDS.find((s) => s.name === "strawberry half")!.footprint;
-if (cutBerry.kind !== "ellipse") throw new Error("The cut strawberry needs an elliptical footprint");
+const cutFootprint = SOLIDS.find((s) => s.name === "strawberry half")!.footprint;
+if (cutFootprint.kind !== "ellipse") throw new Error("The cut strawberry needs an elliptical footprint");
+const cutBerry = cutFootprint;
 
 /**
  * The fruit's skins, by `skin`: plain and glossy (the saucer, the lemon, the
