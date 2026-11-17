@@ -9,7 +9,7 @@
 // what is on screen wherever the layout put it.
 
 import { INK, INK_SOFT, bubbleRing, chevron, font, glassPanel, hintChip, hintWidth, iconButton, orb, pill, text, wrap } from "@fly/ui";
-import type { Glyph, GlyphSet, HitMap } from "@fly/ui";
+import type { Glyph, GlyphSet, Hit, HitMap } from "@fly/ui";
 import type { Activity } from "../life.ts";
 import { placeInfo } from "../places/catalog.ts";
 import type { PlaceId } from "../places/catalog.ts";
@@ -41,6 +41,7 @@ export type HudState = {
   /** Looking through the fly's eyes: how many facets, whether they're a stand-in, and whether they're off in Settings. */
   eyes: { facets: number; standIn: boolean; off: boolean } | null;
   layout: HudLayout;
+  pressed?: Readonly<Hit> | null;
 };
 
 /** What the HUD's targets are, as recorded in the hit map. */
@@ -108,9 +109,10 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   for (let i = 0; i < n; i++) {
     const x = L.shelfLeft + (i + 0.5) * gap + (i < split ? 0 : L.apart);
     const on = i === hands.tool;
-    const r = (on ? 22 : 17) * L.orb;
-    const y = on ? sy - 6 : sy;
-    orb(g, x, y, r, on ? "aqua" : "glass");
+    const pressed = s.pressed?.kind === HUD_HITS.tool && s.pressed.index === i;
+    const r = (on ? 22 : pressed ? 20 : 17) * L.orb;
+    const y = pressed ? sy - 1 : on ? sy - 6 : sy;
+    orb(g, x, y, r, on || pressed ? "aqua" : "glass");
     drawToolIcon(g, TOOLS[i].id, x, y + 1, r * 0.62);
     if (on) bubbleRing(g, x - r, y - r, r * 2, r * 2, r, t);
     hits.add(HUD_HITS.tool, x - gap / 2, sy - 26, gap, 52, i);
@@ -140,7 +142,8 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   const ly = labelY - 17 - pop;
   const hitHeight = touch?.targetHeight ?? 32;
   const hitY = labelY - 17 - (hitHeight - 32) / 2;
-  pill(g, lx, ly, lw, 32, "", { color: "glass" });
+  const labelPressed = s.pressed?.kind === HUD_HITS.kind || s.pressed?.kind === HUD_HITS.label;
+  pill(g, lx, ly, lw, 32, "", { color: labelPressed ? "aqua" : "glass", press: labelPressed ? 1 : 0 });
   text(g, label, lx + lw / 2, labelY - pop, { size: labelSize, align: "center", baseline: "middle", color: INK });
   if (many && pointing) {
     chevron(g, lx + 18, labelY - pop, -1, true);
@@ -155,14 +158,14 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
     hits.add(HUD_HITS.label, lx, hitY, lw, hitHeight, 0, 1);
   }
   if (go) {
-    pill(g, lx + lw + 8, ly, goWidth, 32, "Go", { color: "green" });
+    pill(g, lx + lw + 8, ly, goWidth, 32, "Go", { color: "green", press: s.pressed?.kind === HUD_HITS.go ? 1 : 0 });
     hits.add(HUD_HITS.go, lx + lw + 8, hitY, goWidth, hitHeight);
   }
 
   // The menu's button, or its hint: the caption keeps clear of it.
   let menuRight = touch?.menuAtFoot ? L.cx - L.width / 2 - 8 : L.menuX;
   if (pointing) {
-    iconButton(g, L.menuX + 18, menuY, 18, "menu");
+    iconButton(g, L.menuX + 18, menuY, 18, "menu", s.pressed?.kind === HUD_HITS.menu);
     hits.add(HUD_HITS.menu, L.menuX - 6, menuY - 24, 48, 48);
     if (!touch?.menuAtFoot) menuRight = L.menuX + 36;
   } else if (s.hints) {
