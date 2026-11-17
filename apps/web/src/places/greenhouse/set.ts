@@ -79,17 +79,6 @@ export function buildBench(): SceneSet {
       if (s.name === "trowel blade") { color = "#99a6a0"; kind = K.metal; }
       if (s.name === "trowel handle") { color = "#ad7848"; kind = K.wood; }
       const g = solidGeometry(s, s.name === "terracotta pot" ? 60 : 28, 48);
-      if (s.name === "water saucer") {
-        // The world's well is the liquid surface; clay below it must not compete for depth.
-        const p = g.getAttribute("position");
-        for (let i=0;i<p.count;i++) {
-          const d=Math.hypot(p.getX(i)-SAUCER.x,p.getZ(i)-SAUCER.z);
-          if (d<32.68 && p.getY(i)<=SAUCER.water+1e-4) {
-            const t=Math.max(0,Math.min(1,(d-31.6)/1.08));
-            p.setY(i,p.getY(i)-0.24*(1-t*t*(3-2*t)));
-          }
-        }
-      }
       const colors = s.name === "terracotta pot" ? (p: THREE.Vector3) => {
         const f = s.footprint as { x: number; z: number; r: number };
         return Math.hypot(p.x - f.x, p.z - f.z) < f.r * 0.82 ? "#30251b" : color;
@@ -198,6 +187,7 @@ export function buildBench(): SceneSet {
   const ripples = Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, -100, 0));
   const time = { value: 0 };
   const water = waterMaterial();
+  water.polygonOffset=true; water.polygonOffsetFactor=-1; water.polygonOffsetUnits=-2;
   const compileWater = water.onBeforeCompile;
   water.onBeforeCompile = (shader,renderer) => {
     compileWater(shader,renderer);
@@ -212,7 +202,6 @@ outgoingLight += wave * 0.22;
   water.customProgramCacheKey = () => "greenhouse-water";
   const pools = new Batch();
   pools.add(water,paint(new THREE.CircleGeometry(31,64).rotateX(-Math.PI/2).translate(SAUCER.x,SAUCER.water,SAUCER.z),"#ffffff"));
-  pools.add(water,paint(new THREE.CylinderGeometry(31,31,0.24,64,1,true).translate(SAUCER.x,SAUCER.water-0.12,SAUCER.z),"#ffffff"));
   pools.build(group);
   let nextRing = 0;
   const ripple = (x: number, z: number, strength: number) => {

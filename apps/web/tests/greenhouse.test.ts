@@ -70,4 +70,13 @@ test("greenhouse pool is drawn at the felt water height and within its food foot
     if (n.getY(i)>0.99) { assert.equal(p.getY(i),SAUCER.water); cap++; }
   }
   assert.ok(cap>100);
+  while(set.more?.());
+  const clay=set.group.children.find(o=>o instanceof THREE.Mesh && o.material===set.materials[0]) as THREE.Mesh;
+  const cp=clay.geometry.attributes.position, cn=clay.geometry.attributes.normal;
+  let rim=0;
+  for(let i=0;i<cp.count;i++) {
+    const d=Math.hypot(cp.getX(i)-SAUCER.x,cp.getZ(i)-SAUCER.z);
+    if(d>31 && d<32.5 && cn.getY(i)>0.99) { assert.equal(cp.getY(i),SAUCER.water); rim++; }
+  }
+  assert.ok(rim>20,"the dry clay beside the water supports the feet too");
 });
