@@ -275,6 +275,9 @@ void main() {
 }`;
 
 const UP = new THREE.Vector3(0, 1, 0);
+/** The ghost where a piece will go, or on the piece to turn; and where one won't, or on the piece to take away. */
+const GHOST_OK = new THREE.Color("#9fe8ff");
+const GHOST_NO = new THREE.Color("#ff8f8f");
 
 export class KitView {
   readonly group = new THREE.Group();
@@ -359,7 +362,7 @@ export class KitView {
     ghost.quaternion.setFromAxisAngle(UP, pieceAngle(p));
     // The piece the hand is on, a little larger than it, so it glows over it.
     ghost.scale.setScalar(target ? 1.05 : 1);
-    this.#ghostMaterial.color.set(!aim.ok || (target && removing) ? "#ff8f8f" : "#9fe8ff");
+    this.#ghostMaterial.color.copy(!aim.ok || (target && removing) ? GHOST_NO : GHOST_OK);
     this.#ghostMaterial.opacity = opacity * (0.42 + 0.08 * Math.sin(time * 4));
   }
 
