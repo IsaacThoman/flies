@@ -234,6 +234,7 @@ export async function mouseDrag(page: Page, from: Pt, to: Pt, button: "left" | "
 export class Fingers {
   #cdp: CDPSession;
   #page: Page;
+  #active = false;
 
   private constructor(page: Page, cdp: CDPSession) {
     this.#page = page;
@@ -244,13 +245,19 @@ export class Fingers {
     return new Fingers(page, await page.context().newCDPSession(page));
   }
 
-  async #send(type: "touchStart" | "touchMove" | "touchEnd", points: Pt[]) {
+  async #send(type: "touchStart" | "touchMove" | "touchEnd" | "touchCancel", points: Pt[]) {
     const touchPoints = [];
     for (let i = 0; i < points.length; i++) {
       const p = await canvasPoint(this.#page, points[i]);
       touchPoints.push({ x: p.x, y: p.y, id: i, radiusX: 8, radiusY: 8, force: 1 });
     }
-    await this.#cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : touchPoints });
+    await this.#cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" || type === "touchCancel" ? [] : touchPoints });
+    this.#active = type === "touchStart" || type === "touchMove";
+  }
+
+  /** The system took the contacts; no pending press should commit. */
+  async cancel() {
+    await this.#send("touchCancel", []);
   }
 
   async tap(at: Pt, ms = 60) {
@@ -263,7 +270,7 @@ export class Fingers {
     try {
       return await until();
     } finally {
-      await this.#send("touchEnd", []);
+      if (this.#active) await this.#send("touchEnd", []);
     }
   }
 

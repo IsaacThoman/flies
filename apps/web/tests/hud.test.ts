@@ -4,7 +4,7 @@ import { createPicnic } from "@fly/world";
 import { HitMap } from "@fly/ui";
 import { frameFor } from "../src/display.ts";
 import { Hands, TOOLS } from "../src/tools/hands.ts";
-import { drawHud } from "../src/ui/hud.ts";
+import { drawHud, needsTeaching } from "../src/ui/hud.ts";
 import type { HudState } from "../src/ui/hud.ts";
 import { hudLayout, safeRect } from "../src/ui/layout.ts";
 import { blankCanvas, writtenOn } from "./canvas.ts";
@@ -38,5 +38,27 @@ test("wordless world-tool hints clear touch controls and exploration progress at
         assert.ok(bounds.y > layout.captionY + 55, "the diagram clears the progress bar and byte count");
       }
     }
+  }
+});
+
+test("a real HUD press temporarily replaces the button gesture without retiring its lesson", () => {
+  const hands = new Hands(createPicnic());
+  const s: HudState = { hands, here: "picnic", activity: "resting", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 1, brainRunning: true, eyes: null, layout: hudLayout(frameFor(390, 844, { top: 59, bottom: 34, left: 0, right: 0 }, true)) };
+  for (const id of ["light", "weather", "view", "place"]) {
+    hands.tool = TOOLS.findIndex(tool => tool.id === id);
+    const draw = () => {
+      const g = blankCanvas();
+      let paths = 0;
+      g.beginPath = () => { paths++; };
+      const hits = new HitMap();
+      drawHud(g, 1, s, hits);
+      return { paths, hit: hits.get(0)! };
+    };
+    const teaching = draw();
+    s.pressed = teaching.hit;
+    assert.ok(draw().paths < teaching.paths, `${id}: the teaching finger yields to the real press`);
+    assert.equal(needsTeaching(s), true, "a preview does not complete the lesson");
+    s.pressed = null;
+    assert.equal(draw().paths, teaching.paths, "cancellation restores the unfinished gesture");
   }
 });

@@ -173,3 +173,26 @@ test("a world press released over the HUD cannot drop food underneath it", () =>
   send(false, down(0.5, 0.79, 0, true), up(0.5, 0.801));
   assert.deepEqual(asked, ["aim", "unaim"]);
 });
+
+test("HUD press feedback previews an eligible target and clears without acting on drag or cancellation", () => {
+  const { controls, target, send, asked } = rig();
+  const preview = () => controls.preview?.kind ?? null;
+  send(false, down(0.5, 0.81, 0, true));
+  assert.equal(preview(), HUD_HITS.tool);
+  assert.equal(asked.length, 0);
+  send(false, drag(0.5, 0.799, false));
+  assert.equal(preview(), null, "outside the target clears its preview");
+  send(false, drag(0.5, 0.81, false));
+  assert.equal(preview(), HUD_HITS.tool, "returning within tap slop can re-arm it");
+  send(false, drag(0.5, 0.7, true), drag(0.5, 0.81, true));
+  assert.equal(preview(), null, "a drag stays cancelled on returning");
+  send(false, up(0.5, 0.81, false));
+  assert.equal(asked.length, 0);
+  send(false, down(0.5, 0.9, 0, true), { type: "cancel" });
+  assert.equal(preview(), null);
+  assert.ok(!asked.some(a => a.startsWith("press")));
+  controls.gesture(down(0.5, 0.9), target, true);
+  assert.equal(preview(), HUD_HITS.tool, "mouse has the same feedback");
+  controls.spend();
+  assert.equal(preview(), null);
+});

@@ -243,7 +243,7 @@ export class Game implements Shell {
   #awakeAt = -1;
   #datasetAt = 0;
   /** What the HUD last drew, to tell when it needs drawing again. */
-  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1, here: null as PlaceId | null, fixed: false, outside: false, surface: "", running: false };
+  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1, here: null as PlaceId | null, fixed: false, outside: false, surface: "", running: false, pressed: null as Readonly<Hit> | null };
   #hudAt = 0;
   #changedAt = -10;
   #touched = false;
@@ -1943,6 +1943,7 @@ export class Game implements Shell {
       hud.teachSwipe = !this.#touched;
       hud.changed = this.time - this.#changedAt;
       hud.brainRunning = this.brain.status === "running";
+      hud.pressed = this.#controls.preview;
       if (this.#showEyes()) {
         const e = this.#eyesInfo;
         e.facets = this.eyes.facets;
@@ -1951,7 +1952,8 @@ export class Game implements Shell {
         hud.eyes = e;
       } else hud.eyes = null;
       const k = this.#hudKey;
-      const changed = k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught || k.here !== hud.here || k.fixed !== this.hands.fixed.has(this.hands.current.id) || k.outside !== this.hands.outside || k.surface !== this.hands.surface || k.running !== hud.brainRunning;
+      const pressedChanged = k.pressed !== hud.pressed;
+      const changed = pressedChanged || k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught || k.here !== hud.here || k.fixed !== this.hands.fixed.has(this.hands.current.id) || k.outside !== this.hands.outside || k.surface !== this.hands.surface || k.running !== hud.brainRunning;
       if (changed || hud.changed < 0.3 || ((stats || !hud.brainRunning || needsTeaching(hud)) && this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS)) {
         k.tool = this.hands.tool;
         k.variant = this.hands.variants[this.hands.tool];
@@ -1967,10 +1969,11 @@ export class Game implements Shell {
         k.outside = this.hands.outside;
         k.surface = this.hands.surface;
         k.running = hud.brainRunning;
+        k.pressed = hud.pressed ?? null;
         this.#hudAt = this.time;
         overlay.dirty = true;
       }
-      overlay.redraw(dt, current, this.#drawPlay);
+      overlay.redraw(dt, current, this.#drawPlay, pressedChanged);
 
       return;
     }
