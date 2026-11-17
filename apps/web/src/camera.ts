@@ -79,7 +79,7 @@ export const SHOTS: Record<Exclude<View, "table">, Shot> = {
 const TITLE: Shot = { around: "fly", distance: 18, height: 2.2, side: 1.75, low: 0.1, fov: 30, settle: 3, orbit: 0.01, scout: true, across: -0.56 };
 
 /** How the wallpaper films: one framing that follows the fly, or a round of shots held for a long or a shorter while. */
-export type WallpaperStyle = "follow" | "calm" | "lively";
+export type WallpaperStyle = "follow" | "calm" | "lively" | "whole";
 
 /** The wallpaper that just follows the fly: one medium shot, kept to the fly's side, never changing. */
 const FOLLOW: Shot = { around: "fly", distance: 11, height: 1.6, side: 1.7, low: 0.1, fov: 28, settle: 3.5, scout: true };
@@ -330,6 +330,7 @@ export class CameraDirector {
       return this.#title;
     }
     if (!this.wallpaper) return this.#made;
+    if (this.wallpaperStyle === "whole") return this.#scene.whole;
     return this.wallpaperStyle === "follow" ? FOLLOW : WALLPAPER[this.#shot];
   }
 
@@ -398,7 +399,7 @@ export class CameraDirector {
       cam.updateMatrixWorld();
       return;
     }
-    if (this.wallpaper && !this.title && this.wallpaperStyle !== "follow") {
+    if (this.wallpaper && !this.title && (this.wallpaperStyle === "calm" || this.wallpaperStyle === "lively")) {
       this.#shotTime += dt;
       if (this.#shotTime > (this.wallpaperStyle === "lively" ? 14 : 24)) {
         this.#shotTime = 0;
@@ -410,10 +411,10 @@ export class CameraDirector {
     }
     // The player's own shot, along the range; the title's and the wallpaper's are their own.
     const own = !this.title && !this.wallpaper;
-    const table = own ? this.#shape(this.#reach) : 0;
+    const table = own ? this.#shape(this.#reach) : !this.title && this.wallpaperStyle === "whole" ? 1 : 0;
     const shot = this.shot;
     this.#orbit += (shot.orbit ?? 0) * dt;
-    this.#tableDrift += table > 0 ? (this.#scene.whole.orbit ?? 0) * dt : 0;
+    this.#tableDrift += own && table > 0 ? (this.#scene.whole.orbit ?? 0) * dt : 0;
     this.#easeHand(dt);
     const airborne = body.mode === "airborne";
     const p = body.position;
@@ -455,7 +456,7 @@ export class CameraDirector {
     const target = this.#target.set(mix(focus.x, mix(wx, p.x, lean), middle), mix(focus.y, mix(wy, p.y, lean), middle), mix(focus.z, mix(wz, p.z, lean), middle));
     follow = mix(follow, whole.settle, table);
     aimSettle = mix(aimSettle, whole.settle * 0.8, table);
-    const goal = this.#goal + wrap(whole.side + this.#tableDrift + this.#tableTurn - this.#goal) * table;
+    const goal = this.#goal + wrap(whole.side + (own ? this.#tableDrift + this.#tableTurn : 0) - this.#goal) * table;
     if (this.#zooming > 0) {
       this.#zooming -= dt;
       settle = Math.min(settle, ZOOM_SETTLE / 0.8);

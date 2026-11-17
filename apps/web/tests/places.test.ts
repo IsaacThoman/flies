@@ -95,3 +95,34 @@ for (const info of PLACES) {
     }
   });
 }
+
+for (const { id, name } of PLACES) {
+  for (const aspect of [16 / 9, 9 / 16]) {
+    test(`${name}: whole-place screensaver drifts safely with the fly in frame at ${aspect}`, () => {
+      const scene = SCENES[id];
+      const world = new World(scene.place);
+      const body = new FlyBody(world, scene.place.start);
+      const director = new CameraDirector(world, aspect, scene.camera);
+      director.wallpaperStyle = "whole";
+      director.startWallpaper();
+      assert.equal(director.shot, scene.camera.whole, "reuses the place's own framing");
+      const start = new THREE.Vector3();
+      const at = new THREE.Vector3();
+      for (let frame = 0; frame < 120 * 30; frame++) {
+        director.update(body, 1 / 30);
+        const eye = director.camera.position;
+        if (frame === 0) start.copy(eye);
+        assert.ok(world.solidAt(eye.x, eye.y, eye.z) < 0, `frame ${frame}: outside solids`);
+        assert.ok(eye.y >= world.heightAt(eye.x, eye.z, eye.y) + 0.5, `frame ${frame}: above ground`);
+        at.set(body.position.x, body.position.y + 0.75, body.position.z).project(director.camera);
+        assert.ok(Math.abs(at.x) < 1 && Math.abs(at.y) < 1 && at.z > -1 && at.z < 1, `frame ${frame}: fly in frame`);
+      }
+      assert.ok(start.distanceTo(director.camera.position) > 0.5, "drifts rather than freezing");
+      assert.equal(director.shotChanges, 0, "never cycles to fly shots");
+      director.stopWallpaper();
+      for (let frame = 0; frame < 300; frame++) director.update(body, 1 / 30);
+      assert.equal(director.view, "follow", "leaves the player's view as it was");
+      assert.ok(director.camera.position.distanceTo(body.position) < 30, "returns to the player's close framing");
+    });
+  }
+}

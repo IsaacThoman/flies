@@ -410,7 +410,8 @@ fly and follows it: the screensaver. A mouse resting on the desk doesn't keep it
 away, and a nudge of the desk doesn't end it; a mouse moved as if meant does.
 Its camera can take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
-(Lively). Any press, touch, tap, click, key or deliberate move of the mouse
+(Lively), or keep the whole place in view with a slow drift (Whole place).
+Any press, touch, tap, click, key or deliberate move of the mouse
 brings the controls back and does nothing else.
 A small picture of what the fly's eyes see sits in a corner of the screensaver
 (Settings → On screen → Fly POV: off, in the screensaver, or always, the default, which keeps it in
