@@ -7,7 +7,9 @@
 // fly at a table; the player's tools reach them through the world, as they
 // reach another player's fly. Nothing else passes between them. The camera,
 // the pointer, the pictures in the corners and the stats are the followed
-// fly's; these are drawn among the other flies (online/others.ts).
+// fly's; these are drawn among the other flies (online/others.ts). A
+// companion whose brain fails is given a new one a couple of times, and then
+// taken off: a fly with no brain is never left standing as if it lived.
 
 import type { Rhythm } from "@fly/body";
 import type { BrainDriver, FlyPose } from "@fly/contracts";
@@ -30,13 +32,21 @@ export type Companion = {
   /** What the place's goings-on do to it this frame, and the air at it. */
   readonly felt: Felt;
   readonly air: Vec3;
+  /** New brains it has been given after its brain failed, and when it gets the next (game seconds; -1 until its brain has failed). */
+  tries: number;
+  retryAt: number;
 };
+
+/** A companion whose brain has failed gets a new one after each of these waits, seconds; once they are spent, it is taken off. */
+export const COMPANION_RETRIES = [5, 30] as const;
 
 /** Where a device's flies stand when it has them alone, by their place in line: the followed fly where the place starts it, the others round it as a table would set them down. */
 export const companionSpot = (world: World, index: number): Spot => spawnSpot(world, index + 2);
 
 export class Company {
   readonly list: Companion[] = [];
+  /** Flies taken off because their brains wouldn't run: the device lives that many fewer until the player asks for another count. */
+  lost = 0;
   readonly #world: World;
   readonly #newBrain: () => BrainDriver;
   readonly #newRhythm: () => Rhythm | null;
@@ -63,8 +73,39 @@ export class Company {
       life.rhythm = this.#newRhythm();
       const [x, z, yaw, y] = spot(i);
       life.setDown(x, z, yaw, y);
-      this.list.push({ life, pose: { ...RESTING_POSE }, colour: COLOURS[(i + 1) % COLOURS.length], id: 0, felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] }, air: { x: 0, y: 0, z: 0 } });
+      this.list.push({ life, pose: { ...RESTING_POSE }, colour: COLOURS[(i + 1) % COLOURS.length], id: 0, felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] }, air: { x: 0, y: 0, z: 0 }, tries: 0, retryAt: -1 });
     }
+  }
+
+  /**
+   * Each frame, at game time `time` (s): a companion whose brain has failed
+   * (a worker out of memory, a download that failed offline) is given a new
+   * one after a wait, as many times as COMPANION_RETRIES says; after that it is
+   * taken off, and counted in `lost`. Returns whether any was taken off.
+   */
+  tend(time: number): boolean {
+    let changed = false;
+    for (let i = this.list.length - 1; i >= 0; i--) {
+      const c = this.list[i];
+      const brain = c.life.brain;
+      if (brain.status !== "failed") continue;
+      if (c.retryAt < 0) {
+        if (c.tries < COMPANION_RETRIES.length) c.retryAt = time + COMPANION_RETRIES[c.tries];
+        else {
+          brain.dispose();
+          this.list.splice(i, 1);
+          this.lost++;
+          changed = true;
+        }
+        continue;
+      }
+      if (time < c.retryAt) continue;
+      brain.dispose();
+      c.life.brain = this.#newBrain();
+      c.tries++;
+      c.retryAt = -1;
+    }
+    return changed;
   }
 
   /** Every one eats from this pantry from now on: a table's, or their own again. */
@@ -74,7 +115,8 @@ export class Company {
 
   /** Poses each from what it did this frame. */
   pose() {
-    for (const c of this.list) {
+    for (let i = 0; i < this.list.length; i++) {
+      const c = this.list[i];
       const life = c.life;
       poseOf(life.body, life.intent, life.eating, life.hunger.fullness, life.songSide, life.activity === "sleeping", c.pose);
     }

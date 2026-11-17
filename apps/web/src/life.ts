@@ -31,7 +31,8 @@ export class Life {
   readonly senses = new SenseTracker();
   /** How hungry it is and how full its crop, from what it has eaten: the brain is sent the hunger. */
   readonly hunger = new Hunger();
-  readonly brain: BrainDriver;
+  /** Its brain; a companion's that failed is replaced by a new one (company.ts). */
+  brain: BrainDriver;
   /** Other flies (at a table with others, and the others this device lives): bodies it can't walk through, which its antennae and its body feel. */
   readonly crowd: Crowd;
   readonly stimuli: Stimuli = { looming: [], stroke: 0, air: { x: 0, y: 0, z: 0 }, threat: null };

@@ -16,7 +16,7 @@ import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
 import { Navigator } from "@fly/ui";
 import type { GlyphSet, Hit } from "@fly/ui";
 import { BALL_RADIUS, Pantry, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
-import type { RayHit } from "@fly/world";
+import type { RayHit, Vec3 } from "@fly/world";
 import { Haptics } from "./haptics.ts";
 import type { Brains } from "./brain/create.ts";
 import { BrainMeter } from "./brain/meter.ts";
@@ -118,6 +118,11 @@ const FIXED_AT_TABLE: ReadonlySet<ToolId> = new Set(["light", "weather", "place"
 const NOTHING_FIXED: ReadonlySet<ToolId> = new Set();
 
 /** Reloads the page, once a session: whether it did. */
+/** Adds each of `from` to `to`, without the iterator a for…of would make: it runs every frame for every fly. */
+function pushAll<T>(to: T[], from: readonly T[]) {
+  for (let i = 0; i < from.length; i++) to.push(from[i]);
+}
+
 function reloadOnce(): boolean {
   try {
     if (sessionStorage.getItem("flies.reloaded")) return false;
@@ -210,6 +215,10 @@ export class Game implements Shell {
   glLost = false;
   /** The middles of the other flies this device lives, for the bubbles: one each, kept. */
   readonly #middles: THREE.Vector3[] = [];
+  /** Where each of the company is, for the place's visitors to keep clear of. */
+  readonly #companyAt: Vec3[] = [];
+  /** The Flies setting as last seen: when the player changes it, flies taken off for brains that wouldn't run may be tried again. */
+  #fliesChosen = 0;
   /** How hard this player's feather is on any of the other flies this device lives, this frame. */
   #companyStroke = 0;
   /** The enamel the followed fly wears now (none alone with no others to tell it from). */
@@ -341,7 +350,7 @@ export class Game implements Shell {
     this.handsView = new HandsView(this.stage.scene);
     this.eyes = new Eyes(this.stage, this.life);
     this.eyes.standIns = this.others;
-    this.#around = { fly: this.life.body.position, airborne: false, world, pantry: this.life.pantry, weather: this.stage.weather, quiet: false, felt: this.#felt, shared: null };
+    this.#around = { fly: this.life.body.position, airborne: false, world, pantry: this.life.pantry, weather: this.stage.weather, quiet: false, felt: this.#felt, company: this.#companyAt, shared: null };
     this.eyes.see(this.bubbles.mesh);
     for (const object of this.handsView.seen) this.eyes.see(object);
     this.inset = new EyesInset(this.eyes);
@@ -517,9 +526,9 @@ export class Game implements Shell {
     return 1 + this.company.list.length;
   }
 
-  /** How many the player keeps, as many as this device can live. */
+  /** How many the player keeps, as many as this device can live (less any whose brains wouldn't run). */
   #fliesWanted() {
-    return Math.max(1, Math.min(this.maxFlies, this.settings.flies));
+    return Math.max(1, Math.min(this.maxFlies - this.company.lost, this.settings.flies));
   }
 
   /**
@@ -529,6 +538,15 @@ export class Game implements Shell {
    * asking it again when the player changes how many.
    */
   #flock() {
+    if (this.settings.flies !== this.#fliesChosen) {
+      this.#fliesChosen = this.settings.flies;
+      this.company.lost = 0;
+    }
+    // A companion whose brain wouldn't run, even given new ones, is taken off: alone the rest move up in line, at a table it asks for one fewer.
+    if (this.company.tend(this.time)) {
+      if (!this.online) this.#colourAlone();
+      this.#companyChanged();
+    }
     const online = this.online;
     if (online) {
       if (online.joined) online.recount(this.#fliesWanted());
@@ -538,11 +556,17 @@ export class Game implements Shell {
     const company = this.company.list;
     if (wanted === company.length || (wanted > company.length && this.brain.status !== "running")) return;
     this.company.resize(wanted, this.life.pantry);
-    for (const [i, c] of company.entries()) {
-      c.id = 0;
-      c.colour = COLOURS[(i + 1) % COLOURS.length];
-    }
+    this.#colourAlone();
     this.#companyChanged();
+  }
+
+  /** Alone, each of the company wears the colour of its place in line. */
+  #colourAlone() {
+    const list = this.company.list;
+    for (let i = 0; i < list.length; i++) {
+      list[i].id = 0;
+      list[i].colour = COLOURS[(i + 1) % COLOURS.length];
+    }
   }
 
   /** The table seats these of this device's flies, in line: as many as it lives, each in its colour. */
@@ -569,6 +593,8 @@ export class Game implements Shell {
     this.eyes.company(list.map((c) => c.life));
     while (this.#middles.length < list.length) this.#middles.push(new THREE.Vector3());
     this.#middles.length = list.length;
+    this.#companyAt.length = 0;
+    for (const c of list) this.#companyAt.push(c.life.body.position);
     if (!this.online) this.#markFollowed(list.length > 0 ? COLOURS[0] : null);
     this.overlay.dirty = true;
   }
@@ -620,10 +646,7 @@ export class Game implements Shell {
     this.#alone = null;
     // Its flies are its own again, in their colours alone.
     this.#markFollowed(null);
-    for (const [i, c] of this.company.list.entries()) {
-      c.id = 0;
-      c.colour = COLOURS[(i + 1) % COLOURS.length];
-    }
+    this.#colourAlone();
     this.#companyChanged();
     for (const id of ["light", "weather"] as const) {
       const i = TOOLS.findIndex((t) => t.id === id);
@@ -1052,7 +1075,11 @@ export class Game implements Shell {
     this.bubbles.rain = stage.weather.rain;
     const middle = this.#middle.set(life.body.position.x, life.body.position.y + 0.75, life.body.position.z);
     this.bubbles.lightBy(stage.light);
-    for (const [i, c] of this.company.list.entries()) this.#middles[i].set(c.life.body.position.x, c.life.body.position.y + 0.75, c.life.body.position.z);
+    const company = this.company.list;
+    for (let i = 0; i < company.length; i++) {
+      const p = company[i].life.body.position;
+      this.#middles[i].set(p.x, p.y + 0.75, p.z);
+    }
     this.bubbles.update(this.time, dt, director.camera, stage.light.sunDirection, this.#air, middle, this.#middles);
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
     this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
@@ -1160,7 +1187,8 @@ export class Game implements Shell {
     const body = this.life.body;
     this.others.update(this.online?.now ?? 0, dt, camera.position, pixels, body);
     this.others.crowd(this.life.crowd, body, body);
-    for (const c of this.company.list) this.others.crowd(c.life.crowd, c.life.body, body);
+    const company = this.company.list;
+    for (let i = 0; i < company.length; i++) this.others.crowd(company[i].life.crowd, company[i].life.body, body);
   }
 
   /**
@@ -1196,9 +1224,9 @@ export class Game implements Shell {
       // What could loom is wherever it is: the same balls, bubbles and visitors as the followed fly's, and what the place says of this one.
       stimuli.looming.length = 0;
       stimuli.looming.push(hands.looming[0]);
-      if (this.bubbles.enabled) for (const b of this.bubbles.looming) stimuli.looming.push(b);
-      for (const l of felt.looming) stimuli.looming.push(l);
-      if (online) for (const l of online.looming) stimuli.looming.push(l);
+      if (this.bubbles.enabled) pushAll(stimuli.looming, this.bubbles.looming);
+      pushAll(stimuli.looming, felt.looming);
+      if (online) pushAll(stimuli.looming, online.looming);
       stimuli.threat = own.threat;
       life.step(dt, now);
     }

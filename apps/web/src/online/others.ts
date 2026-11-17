@@ -337,8 +337,12 @@ export class OtherFlies {
 export function meet(crowd: Crowd, self: FlyBody, followed: FlyBody, company: readonly Companion[], others: readonly Other[]) {
   crowd.clear();
   if (self !== followed) addBody(crowd, followed.position, followed.yaw, followed.velocity);
-  for (const c of company) if (c.life.body !== self) addBody(crowd, c.life.body.position, c.life.body.yaw, c.life.body.velocity);
-  for (const o of others) {
+  for (let i = 0; i < company.length; i++) {
+    const body = company[i].life.body;
+    if (body !== self) addBody(crowd, body.position, body.yaw, body.velocity);
+  }
+  for (let i = 0; i < others.length; i++) {
+    const o = others[i];
     if (!o.present) continue;
     const s = o.state;
     const n = crowd.add();
