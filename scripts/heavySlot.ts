@@ -1,4 +1,5 @@
 // Shared with other local experiments: acquire only for CPU-heavy work, never reviews.
+import { rmdirSync } from "node:fs";
 import { mkdir, rmdir } from "node:fs/promises";
 import { setTimeout } from "node:timers/promises";
 
@@ -13,6 +14,9 @@ export async function withHeavySlot<T>(work: () => Promise<T>): Promise<T> {
     }
     if (!slot) await setTimeout(5000);
   }
+  // Playwright handles termination signals by closing its browser and exiting.
+  const onExit = () => { try { rmdirSync(slot); } catch { /* Already released. */ } };
+  process.once("exit", onExit);
   try { return await work(); }
-  finally { await rmdir(slot); }
+  finally { process.off("exit", onExit); await rmdir(slot); }
 }

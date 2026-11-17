@@ -7,8 +7,11 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { gzipSync } from "node:zlib";
 import { chromium } from "playwright";
-import type { CDPSession, Page } from "playwright";
+import type { Browser, CDPSession, Page } from "playwright";
 import { build } from "vite";
+import type { Plugin } from "vite";
+import type { BrainFiles } from "../apps/web/src/brain/download.ts";
+import type { WorkerBrainDriver } from "../apps/web/src/brain/worker-driver.ts";
 import type { Game } from "../apps/web/src/game.ts";
 import { PLACES } from "../apps/web/src/places/catalog.ts";
 import type { PlaceId } from "../apps/web/src/places/catalog.ts";
@@ -59,13 +62,15 @@ async function instrument(page: Page) {
 const root = path.join(import.meta.dirname, "..");
 async function bundle(out: string, dir: string) {
   await withHeavySlot(async () => {
-    await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "warn", build: { outDir: dir, emptyOutDir: true }, plugins: [{
+    const modules: { file: string; modules: { id: string; renderedBytes: number }[] }[] = [];
+    const accounting: Plugin = {
       name: "web-perf-modules",
       generateBundle(_options, chunks) {
-        const modules = Object.values(chunks).filter(c => c.type === "chunk").map(c => ({ file: c.fileName, modules: Object.entries(c.modules).map(([id, info]) => ({ id: path.relative(root, id), renderedBytes: info.renderedLength })).sort((a, b) => b.renderedBytes - a.renderedBytes) }));
-        writeFileSync(path.join(out, "modules.json"), JSON.stringify(modules, null, 2));
+        for (const c of Object.values(chunks)) if (c.type === "chunk") modules.push({ file: c.fileName, modules: Object.entries(c.modules).map(([id, info]) => ({ id: path.relative(root, id), renderedBytes: info.renderedLength })).sort((a, b) => b.renderedBytes - a.renderedBytes) });
       },
-    }] });
+    };
+    await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "warn", build: { outDir: dir, emptyOutDir: true }, plugins: [accounting], worker: { plugins: () => [accounting] } });
+    writeFileSync(path.join(out, "modules.json"), JSON.stringify(modules, null, 2));
     const walk = (folder: string): string[] => readdirSync(folder).flatMap(name => {
       const file = path.join(folder, name);
       return statSync(file).isDirectory() ? walk(file) : [file];
@@ -86,6 +91,7 @@ async function metrics(cdp: CDPSession) {
 }
 
 async function move(page: Page, place: PlaceId, watch = false) {
+  if ((await readState(page)).wallpaper === "true") { await page.keyboard.press("Enter"); await waitFor(page, "wallpaper=false"); }
   await page.evaluate(({ place, watch }) => {
     const g = globalThis.__fly;
     g.play();
@@ -95,10 +101,18 @@ async function move(page: Page, place: PlaceId, watch = false) {
     g.quality?.reset();
     g.applySettings(false);
     g.moveTo(place);
+    for (const [tool, variant] of [["light", "noon"], ["weather", "clear"], ["view", "follow"]]) {
+      for (let i = 0; i < 12 && g.hands.current.id !== tool; i++) g.hands.stepTool(1);
+      while (g.hands.stepVariant(-1)) { /* Reset to the first variant. */ }
+      for (let i = 0; i < 12 && g.hands.variant.id !== variant; i++) g.hands.stepVariant(1);
+    }
+    g.stage.setTime("noon");
+    g.stage.weather.choose("clear", true);
     if (watch) g.watch();
   }, { place, watch });
   await waitFor(page, `place=${place},moving=,brain=running`);
   await waitForGameTime(page, 3);
+  await waitFor(page, "time=noon,weather=clear");
 }
 
 async function frameSample(page: Page, cdp: CDPSession, seconds: number, play: boolean) {
@@ -112,7 +126,7 @@ async function frameSample(page: Page, cdp: CDPSession, seconds: number, play: b
   const end = await metrics(cdp);
   const frames = await page.evaluate(() => globalThis.__webPerf.frames.splice(0));
   const state = await readState(page);
-  return { jsMs: distribution(frames.map(f => f.ms)), intervalMs: distribution(frames.slice(1).map(f => f.interval)), longFrames50ms: frames.filter(f => f.interval > 50).length,
+  return { jsMs: distribution(frames.map(f => f.ms)), intervalMs: distribution(frames.slice(1).map(f => f.interval)), longFrames50ms: frames.slice(1).filter(f => f.interval > 50).length,
     longJs50ms: frames.filter(f => f.ms > 50).length, taskMsPerFrame: (end.TaskDuration - start.TaskDuration) * 1000 / frames.length,
     qualities: [...new Set(frames.map(f => f.quality))], state };
 }
@@ -132,19 +146,35 @@ async function main() {
   const dir = path.resolve(values.dir ?? path.join(out, "site"));
   const runs = Number(values.runs), seconds = Number(values.seconds), memorySeconds = Number(values["memory-seconds"]);
   assert.ok(Number.isInteger(runs) && runs >= 3, "at least 3 runs");
-  assert.ok(seconds >= 2 && memorySeconds >= 0);
+  assert.ok(Number.isFinite(seconds) && seconds >= 2 && Number.isFinite(memorySeconds) && memorySeconds >= 0);
   const phases = values.phases.split(",");
   assert.ok(phases.every(p => ["loads", "frames", "memory", "brain"].includes(p)));
   if (values.build) await bundle(out, dir);
-  const report: Record<string, unknown> = { revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), dirty: execFileSync("git", ["diff", "--stat"], { encoding: "utf8" }), node: process.version, host: os.cpus()[0].model, options: values, notes: "Timings include instrumentation; frame submission is not GPU/display time. Phone CPU throttling affects page only. Memory includes worker Wasm separately; memory checkpoints n=1, real time." };
-  const save = () => writeFileSync(path.join(out, "report.json"), JSON.stringify(report, null, 2));
+  const report: Record<string, unknown> = { complete: false, revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), dirty: execFileSync("git", ["diff", "--stat"], { encoding: "utf8" }), node: process.version, host: os.cpus()[0].model, options: values, notes: "Timings include instrumentation; frame submission is not GPU/display time. Phone CPU throttling affects page only. Memory includes worker Wasm separately; memory checkpoints n=1, real time." };
+  const save = () => {
+    const loads = (report.loads ?? []) as { profile: string; cache: string; title: number; firstFrame: number; titleBytes: number }[];
+    const frames = (report.frames ?? []) as { place: string; mode: string; jsMs: { median: number }; taskMsPerFrame: number; longFrames50ms: number }[];
+    const summary: Record<string, unknown> = {};
+    for (const profile of ["desktop", "phone"]) for (const cache of ["cold", "warm"]) {
+      const rows = loads.filter(r => r.profile === profile && r.cache === cache);
+      if (rows.length) summary[`${profile}/${cache}`] = Object.fromEntries((["title", "firstFrame", "titleBytes"] as const).map(k => [k, distribution(rows.map(r => r[k]))]));
+    }
+    for (const place of PLACES) for (const mode of ["play", "watch"]) {
+      const rows = frames.filter(r => r.place === place.id && r.mode === mode);
+      if (rows.length) summary[`${place.id}/${mode}`] = { jsMs: distribution(rows.map(r => r.jsMs.median)), taskMsPerFrame: distribution(rows.map(r => r.taskMsPerFrame)), longFrames50ms: distribution(rows.map(r => r.longFrames50ms)) };
+    }
+    report.summary = summary;
+    writeFileSync(path.join(out, "report.json"), JSON.stringify(report, null, 2));
+  };
   if (phases.includes("loads")) {
     const loads: unknown[] = [];
     report.loads = loads;
     for (let run = 0; run < runs; run++) for (const profile of ["desktop", "phone"]) await withHeavySlot(async () => {
-      const site = await serveSite({ dir, base: "/fly/" });
-      const browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
+      let serverBytes = 0;
+      const site = await serveSite({ dir, base: "/fly/", transferred: (_file, bytes) => { serverBytes += bytes; } });
+      let browser: Browser | undefined;
       try {
+        browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
         const context = await browser.newContext({ viewport: profile === "phone" ? { width: 390, height: 844 } : { width: 1280, height: 720 }, isMobile: profile === "phone", hasTouch: profile === "phone", deviceScaleFactor: 1 });
         const page = await context.newPage();
         await instrument(page);
@@ -156,29 +186,32 @@ async function main() {
         cdp.on("Network.loadingFinished", e => { bytes += e.encodedDataLength; });
         for (const cache of ["cold", "warm"]) {
           bytes = 0;
+          serverBytes = 0;
           const errors: string[] = [];
           const onError = (e: Error) => errors.push(e.message);
           page.on("pageerror", onError);
           await ready(page, site.url);
           const probe = await page.evaluate(() => ({ firstFrame: globalThis.__webPerf.firstFrame, title: globalThis.__webPerf.title }));
           const titleBytes = bytes;
+          const titleServerBodyBytes = serverBytes;
           const state = await readState(page);
           assert.equal(state.from, cache === "cold" ? "network" : "cache");
           // Let installation and cache writes finish: warm means the offline shell and brain are complete.
           await page.evaluate(async () => { await navigator.serviceWorker.ready; });
-          await page.waitForFunction(() => globalThis.__fly.canvas.dataset.kept === "true");
-          loads.push({ run, profile, cache, ...probe, titleBytes, settledBytes: bytes, state, errors, loadAverage: os.loadavg() });
+          await page.waitForFunction(() => { const source = (globalThis.__fly.brain as WorkerBrainDriver).source as BrainFiles; return source.connectome.kept === true && (!source.module || source.module.kept === true); });
+          loads.push({ run, profile, cache, ...probe, titleBytes, titleServerBodyBytes, settledServerBodyBytes: serverBytes, settledBytes: bytes, state, errors, loadAverage: os.loadavg() });
           assert.deepEqual(errors, []);
           page.off("pageerror", onError);
           save();
         }
-      } finally { await browser.close(); await site.close(); }
+      } finally { await browser?.close(); await site.close(); }
     });
   }
   if (phases.includes("frames") || phases.includes("memory")) await withHeavySlot(async () => {
     const site = await serveSite({ dir, base: "/fly/" });
-    const browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
+    let browser: Browser | undefined;
     try {
+      browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
       const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
       const page = await context.newPage();
       const errors: string[] = [];
@@ -216,12 +249,12 @@ async function main() {
         await sample("start");
         // Real elapsed time, sampled in short waits; never accelerate the simulation.
         while (Date.now() - started < memorySeconds * 1000) { await waitForGameTime(page, 10); await sample("watch"); }
-        await sample("ten-minute-checkpoint");
+        await sample("duration-checkpoint");
         for (let i = 0; i < 10; i++) await move(page, PLACES[(i + 1) % PLACES.length].id, true);
         await sample("ten-place-changes");
       }
       assert.deepEqual(errors, []);
-    } finally { await browser.close(); await site.close(); }
+    } finally { await browser?.close(); await site.close(); }
   });
   if (phases.includes("brain")) await withHeavySlot(async () => {
     // The same deterministic senses and CPU timer as cost.budget.ts, independent of browser load.
@@ -245,6 +278,7 @@ async function main() {
     }
     report.brain = { rest: distribution(rows.map(r => r.rest)), full: distribution(rows.map(r => r.full)), rows };
   });
+  report.complete = true;
   save();
   console.log(path.join(out, "report.json"));
 }

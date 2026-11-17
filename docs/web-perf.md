@@ -21,7 +21,9 @@ Each cold visit has a fresh browser context and its paired warm visit uses
 the completed page/brain caches. The static server sends uncompressed files,
 so transfer numbers describe that host; `bundle.json` also gives gzip sizes.
 CDP encoded bytes through title include page requests and cache hits as CDP
-reports them, but omit service worker installation traffic in its own target.
+reports them. The server also counts completed response body bytes, including
+service-worker installation traffic in its own target; those counts exclude
+HTTP headers and bytes of incomplete responses.
 
 First frame is completion of the first game frame; title is the first frame
 with the brain running and the title visible. These include game setup,
@@ -54,6 +56,16 @@ Review rubric (0–10 each):
   fingerprints, with no quality reduction.
 - Simplicity/safety: 10 means small comprehensible changes with tested failure
   paths and unchanged supported environments.
+
+`node scripts/webPerfFixtures.ts /absolute/built/site /tmp/fly-fixtures`
+uses the same Playwright driver helpers to capture static render fixtures.
+The civil clock and page randomness are fixed, automatic frames and life
+updates are held, and fixed frame steps draw the real scenes. These compare
+rendering only; the real brain and behavioral tests remain separate evidence.
+`node scripts/workerCost.ts --baseline <revision> --out /tmp/worker-cost.json`
+isolates sending senses with synchronous structured cloning, alternating
+versions over nine CPU-time repetitions after two warmups. It is a Node
+microbenchmark, not a substitute for measured browser frames.
 
 Independent reviewers assign absolute scores to each neutral evidence set
 and rank them. The experiment log records keys, scores and rejected attempts.
