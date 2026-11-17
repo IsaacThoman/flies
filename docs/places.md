@@ -310,7 +310,13 @@ TV has (`places/restaurant/`):
   extrapolation, not a device measurement. Build in steps (`SceneSet.more`,
   above) when needed: `data-place-step-ms` is the longest timed synchronous
   build operation, not the longest rendered frame.
-- **Register it** in `catalog.ts` and `index.ts`. `apps/web/tests/places.test.ts`
+- **Register the shared world**: export it from `packages/world/src/index.ts`
+  and add its id and `Place` value to `WORLDS` in
+  `packages/world/src/places.ts`. The room server constructs and switches
+  worlds through that registry (`apps/server/src/table.ts`); there is no
+  separate renderer registration in the server.
+- **Register the client scene** in `apps/web/src/places/catalog.ts` and
+  `SCENES` in `apps/web/src/places/index.ts`. `apps/web/tests/places.test.ts`
   then checks it like every other place: the fly starts standing on the table,
   its food can be tasted where it lies with room over it for a fly, it has
   every time of day, and sampled whole-place, follow/zoom and wallpaper views
@@ -329,12 +335,13 @@ a distant fork sometimes shows through the picnic's cloud deck. The fly's
 six eye renders use those same scene lights. No escape, looming or motor
 input is manufactured for lightning.
 
-The current retina has no ON response: sudden brightening produces zero
-L1/L2/L3 input rates. The flash's falling edge can excite its OFF pathway as
-the adapted light falls again. `apps/web/tests/storm.test.ts` checks these
-retinal responses. This is a limit of the model, not evidence that
-a fly detected a lightning strike or was startled by it. Short flashes can
-also fall between eye refreshes.
+The retina has an ON pathway: brightening can withdraw L1 input, while
+falling light can produce OFF input. Zero positive L1/L2/L3 rates do not
+establish neural silence. `apps/web/tests/storm.test.ts` checks positive
+input rates, not a complete neural startle response. See
+[the visual model](../packages/brain/README.md#the-eyes). Short flashes can
+also fall between eye refreshes; a rendered strike does not prove detection
+or escape.
 
 Snowflakes are instanced and animated in the shader. Exposed upward picnic
 surfaces and the windowsill garden acquire a cosmetic dusting, less than
