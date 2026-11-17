@@ -38,7 +38,7 @@ import { existsSync, readdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { chromium, devices } from "playwright";
-import type { BrowserContextOptions, CDPSession, Page } from "playwright";
+import type { BrowserContext, BrowserContextOptions, CDPSession, Page } from "playwright";
 
 const root = path.join(import.meta.dirname, "..");
 
@@ -77,20 +77,55 @@ export function fullChromiumPath(): string | undefined {
 /** Headless Chromium falls back to software WebGL unless told to use the GPU. */
 export const gpuFlags = () => (process.platform === "darwin" ? ["--use-angle=metal"] : ["--ignore-gpu-blocklist", "--enable-gpu"]);
 
-/** Starts Vite on a free port; resolves with its URL. */
-export function startServer(): Promise<{ url: string; server: ChildProcess }> {
+/** Waits for the owned server to exit; an unresponsive child cannot hold cleanup open. */
+export async function stopServer(server: ChildProcess) {
+  if (!server.pid || server.exitCode !== null || server.signalCode !== null) return;
+  await new Promise<void>((resolve) => {
+    const killed = setTimeout(() => server.kill("SIGKILL"), 1_000);
+    server.once("close", () => { clearTimeout(killed); resolve(); });
+    server.kill();
+  });
+}
+
+/** Starts Vite on a free port; ownership is handed over before waiting for readiness. */
+export function startServer(own: (server: ChildProcess) => void = () => {}): Promise<{ url: string; server: ChildProcess }> {
   return new Promise((resolve, reject) => {
     const server = spawn(process.execPath, [path.join(root, "node_modules/vite/bin/vite.js"), "--port", "0", "--strictPort", "false"], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    own(server);
     let output = "";
+    let settled = false;
+    const detach = () => {
+      clearTimeout(timeout);
+      server.stdout.off("data", onData);
+      server.stderr.off("data", onData);
+      server.off("close", onExit);
+      server.off("error", onError);
+      server.stdout.resume();
+      server.stderr.resume();
+    };
+    const fail = (message: string) => {
+      if (settled) return;
+      settled = true;
+      detach();
+      void stopServer(server).then(() => reject(new Error(`${message}: ${output}`)));
+    };
     const onData = (chunk: Buffer) => {
-      output += chunk.toString();
+      output = (output + chunk.toString()).slice(-32_768);
       // eslint-disable-next-line no-control-regex
       const match = output.replace(/\x1b\[[0-9;]*m/g, "").match(/Local:\s+(http:\/\/\S+)/);
-      if (match) resolve({ url: match[1], server });
+      if (match) {
+        settled = true;
+        detach();
+        resolve({ url: match[1], server });
+      }
     };
+    const onExit = (code: number | null) => fail(`vite exited (${code})`);
+    const onError = (error: Error) => fail(`vite failed (${error.message})`);
+    const timeout = setTimeout(() => fail("Timed out starting vite"), 30_000);
     server.stdout.on("data", onData);
     server.stderr.on("data", onData);
-    server.on("exit", (code) => reject(new Error(`vite exited (${code}): ${output}`)));
+    server.once("close", onExit);
+    server.once("error", onError);
   });
 }
 
@@ -119,6 +154,37 @@ export async function waitFor(page: Page, spec: string, timeout = 60_000) {
     if (Date.now() - started > timeout) throw new Error(`Timed out waiting for ${spec}: ${JSON.stringify(state)}`);
     await page.waitForTimeout(100);
   }
+}
+
+/**
+ * Waits for the canvas's state to match within `seconds` of the game's time, however long that
+ * takes on the clock: for what the brain chooses to do in its own time (a fly landing).
+ */
+export async function waitWithin(page: Page, spec: string, seconds: number) {
+  const conditions = parseConditions(spec);
+  const time = () => page.evaluate(() => (globalThis as unknown as { __fly: { time: number } }).__fly.time);
+  const until = (await time()) + seconds;
+  for (;;) {
+    const state = await readState(page);
+    if (conditions.every((c) => c(state))) return state;
+    if ((await time()) > until) throw new Error(`No ${spec} within ${seconds} s of game time: ${JSON.stringify(state)}`);
+    await page.waitForTimeout(100);
+  }
+}
+
+/**
+ * A double click at a point on the page whose clicks happened 40 ms apart, however long a busy
+ * page takes to be handed them: Playwright's own sends each event only once the page has taken the
+ * last, so a slow frame between them would stretch them apart.
+ */
+export async function doubleClick(page: Page, x: number, y: number) {
+  const cdp = await page.context().newCDPSession(page);
+  const at = Date.now() / 1000;
+  const events = [["mousePressed", 0, 1], ["mouseReleased", 0.04, 1], ["mousePressed", 0.08, 2], ["mouseReleased", 0.12, 2]] as const;
+  for (const [type, after, clickCount] of events) {
+    await cdp.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mousePressed" ? 1 : 0, clickCount, timestamp: at + after });
+  }
+  await cdp.detach();
 }
 
 /** Waits for frames to advance the game's clock, even when long wall-clock frames are capped. */
@@ -261,7 +327,48 @@ export async function screenOf(page: Page, what: "fly" | "hand"): Promise<Pt> {
   }, what)) as Pt;
 }
 
-export type OpenOptions = { url: string; width?: number; height?: number; headed?: boolean; device?: string; landscape?: boolean };
+export type OpenOptions = { url: string; width?: number; height?: number; headed?: boolean; device?: string; landscape?: boolean; steady?: boolean };
+
+/**
+ * The local hour every page's clock reads when the run starts: just after sunrise, when a fly is up and about
+ * (packages/body/src/rhythm.ts) and the day is light. One shift for the whole run, so that tabs at
+ * one table agree; the clocks run on from there.
+ */
+const MORNING = 6;
+const start = new Date();
+const CLOCK_SHIFT = ((((MORNING - start.getHours() - start.getMinutes() / 60 - start.getSeconds() / 3600) % 24) + 36) % 24 - 12) * 3_600_000;
+
+/**
+ * In every page the context opens, reloads included, holds still what would otherwise change under
+ * a test with the machine or the hour it runs at: the picture stays at one of the levels in
+ * apps/web/src/quality.ts (0, the full one) instead of following how fast this machine draws,
+ * which without a GPU would draw the fly in pixels too big for the X-ray; the screensaver never
+ * comes by itself (Never, as the saved setting), however long a step takes; and the clock reads
+ * morning, whatever the hour, so the fly is awake rather than asleep on the real night's clock.
+ * The tests check what the game does; the steps about the screensaver bring it themselves.
+ */
+export const holdSteady = (context: BrowserContext, quality = 0) =>
+  context.addInitScript(([quality, shift]) => {
+    (globalThis as { __quality?: number }).__quality = quality;
+    try {
+      // apps/web/src/settings.ts's key; the rest of what was saved stays as it was.
+      const saved = JSON.parse(localStorage.getItem("flies.settings") ?? "{}") as Record<string, unknown>;
+      localStorage.setItem("flies.settings", JSON.stringify({ ...saved, wallpaperAfter: 0 }));
+    } catch {
+      // A page with no storage of its own (about:blank) has no game in it either.
+    }
+    const Real = Date;
+    class Shifted extends Real {
+      constructor(...args: unknown[]) {
+        if (args.length === 0) super(Real.now() + shift);
+        else super(...(args as [number]));
+      }
+      static now() {
+        return Real.now() + shift;
+      }
+    }
+    globalThis.Date = Shifted as DateConstructor;
+  }, [quality, CLOCK_SHIFT] as const);
 
 /** The browser context for a window of a size, or a device (a phone, a tablet) held either way. */
 export function contextFor({ width = 1280, height = 720, device, landscape = false }: OpenOptions): BrowserContextOptions {
@@ -273,19 +380,37 @@ export function contextFor({ width = 1280, height = 720, device, landscape = fal
   return { ...d, viewport: { width: w, height: h }, screen: { width: w, height: h } };
 }
 
-export async function openGame(options: OpenOptions) {
+export async function openGame(options: OpenOptions, own: (stop: () => Promise<void>) => void = () => {}, errors: string[] = []) {
   const { url, headed = false } = options;
-  const browser = await chromium.launch({ headless: !headed, executablePath: chromiumPath(), args: gpuFlags() });
-  const context = await browser.newContext(contextFor(options));
-  const page = await context.newPage();
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  await page.goto(url);
-  await gameUp(page);
-  return { browser, page, errors };
+  // Playwright kills a pending launch's process group on process exit too. The CLI's
+  // signal deadline below reaches that hook even before launchServer returns ownership.
+  const launched = await chromium.launchServer({ headless: !headed, executablePath: chromiumPath(), args: gpuFlags(), handleSIGINT: false, handleSIGTERM: false });
+  let stopping: Promise<void> | undefined;
+  const stop = () => stopping ??= launched.kill();
+  own(stop);
+  try {
+    const browser = await chromium.connect(launched.wsEndpoint());
+    const close = browser.close.bind(browser);
+    browser.close = async (...args) => {
+      let timeout: ReturnType<typeof setTimeout>;
+      const forced = new Promise<void>((resolve, reject) => { timeout = setTimeout(() => void stop().then(resolve, reject), 1_000); });
+      try { await Promise.race([close(...args), forced]); }
+      finally { clearTimeout(timeout!); await stop(); }
+    };
+    const context = await browser.newContext(contextFor(options));
+    if (options.steady) await holdSteady(context);
+    const page = await context.newPage();
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    await page.goto(url);
+    await gameUp(page);
+    return { browser, page, errors };
+  } catch (error) {
+    await stop().catch((cleanupError: unknown) => console.error("Stopping browser:", cleanupError));
+    throw error;
+  }
 }
 
 async function main() {
@@ -305,17 +430,33 @@ async function main() {
     else steps.push(args[i]);
   }
   let server: ChildProcess | null = null;
-  if (!url) {
-    const started = await startServer();
-    url = started.url;
-    server = started.server;
-  }
-  const [width, height] = (size || "1280x720").split("x").map(Number);
-  const { browser, page, errors } = await openGame({ url, width: size || !device ? width : undefined, height: size || !device ? height : undefined, headed, device, landscape });
-  if (device && size) await page.setViewportSize({ width, height });
-  const fingers = await Fingers.on(page);
-  const pt = (spec: string) => spec.split(",").map(Number) as Pt;
+  let stopBrowser: (() => Promise<void>) | undefined;
+  const errors: string[] = [];
+  let closing: Promise<void> | undefined;
+  const cleanup = () => closing ??= (async () => {
+    const stopped = server ? stopServer(server) : Promise.resolve();
+    try { await stopBrowser?.(); } finally { await stopped; }
+  })();
+  const report = () => { if (errors.length) console.log("page errors:\n" + errors.join("\n")); };
+  const quit = (code: number) => {
+    const exit = () => { report(); process.exit(code); };
+    const deadline = setTimeout(exit, 3_000);
+    void cleanup().finally(() => { clearTimeout(deadline); exit(); });
+  };
+  const interrupted = () => quit(130);
+  const terminated = () => quit(143);
+  process.once("SIGINT", interrupted);
+  process.once("SIGTERM", terminated);
   try {
+    if (!url) {
+      const started = await startServer((owned) => { server = owned; });
+      url = started.url;
+    }
+    const [width, height] = (size || "1280x720").split("x").map(Number);
+    const { page } = await openGame({ url, width: size || !device ? width : undefined, height: size || !device ? height : undefined, headed, device, landscape }, (owned) => { stopBrowser = owned; }, errors);
+    if (device && size) await page.setViewportSize({ width, height });
+    const fingers = await Fingers.on(page);
+    const pt = (spec: string) => spec.split(",").map(Number) as Pt;
     for (const step of steps) {
       const [kind, ...rest] = step.split(":");
       const arg = rest.join(":");
@@ -378,9 +519,11 @@ async function main() {
       else throw new Error(`Unknown step: ${step}`);
     }
   } finally {
-    if (errors.length) console.log("page errors:\n" + errors.join("\n"));
-    await browser.close();
-    server?.kill();
+    try { await cleanup(); } finally {
+      process.off("SIGINT", interrupted);
+      process.off("SIGTERM", terminated);
+      report();
+    }
   }
 }
 

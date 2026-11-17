@@ -13,7 +13,7 @@ import { FLY_LENGTH, Rhythm, SUMMER } from "@fly/body";
 import { REGIONS } from "@fly/brain";
 import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttribution } from "@fly/contracts";
 import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
-import { Navigator } from "@fly/ui";
+import { Navigator, sameTarget } from "@fly/ui";
 import type { GlyphSet, Hit } from "@fly/ui";
 import { BALL_RADIUS, Pantry, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
 import type { RayHit } from "@fly/world";
@@ -31,7 +31,7 @@ import type { TableStart } from "@fly/net";
 import { TAP_SLOP } from "./input.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
 import { Life } from "./life.ts";
-import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart } from "./online/invite.ts";
+import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart, tryProtocolReload } from "./online/invite.ts";
 import type { Shared } from "./online/invite.ts";
 import { Lobby } from "./online/lobby.ts";
 import { Online } from "./online/online.ts";
@@ -419,6 +419,10 @@ export class Game implements Shell {
     return this.#lobby?.rooms ?? null;
   }
 
+  get lobbyStatus() {
+    return this.#lobby?.status ?? "connecting";
+  }
+
   /** The list of rooms is open while Online is up and this device is at none (on its other faces too, so that coming back to the list finds it as it is). */
   #browse(dt: number) {
     const wanted = this.nav.current === "online" && !this.online && this.canPlayOnline;
@@ -429,24 +433,29 @@ export class Game implements Shell {
     }
     this.#lobby?.update(dt);
     // A room server newer than this page: the newer page speaks its protocol.
-    if (this.#lobby?.status === "version") reloadOnce();
+    if (this.#lobby?.status === "version") tryProtocolReload(this.#app, reloadOnce);
   }
 
   /** Starts typing into a field as a tap on it lifts, while the browser still counts it as the player's doing. */
   #typeOnTap(canvas: HTMLCanvasElement) {
     let from = { x: 0, y: 0 };
+    let pressed: Hit | null = null;
     const at = (e: PointerEvent) => {
       const box = canvas.getBoundingClientRect();
       return { x: (e.clientX - box.left) / Math.max(1, box.width), y: (e.clientY - box.top) / Math.max(1, box.height) };
     };
-    canvas.addEventListener("pointerdown", (e) => (from = at(e)));
+    canvas.addEventListener("pointerdown", (e) => {
+      from = at(e);
+      const hit = this.#hitAt(from.x, from.y);
+      pressed = hit && { ...hit };
+    });
     canvas.addEventListener("pointerup", (e) => {
       const p = at(e);
       const { width, height } = this.shape.design;
       if (Math.hypot((p.x - from.x) * width, (p.y - from.y) * height) > TAP_SLOP.touch) return;
       const hit = this.#hitAt(p.x, p.y);
       const current = this.nav.current;
-      if (hit?.kind === MENU_HITS.row && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index);
+      if (hit?.kind === MENU_HITS.row && sameTarget(pressed, hit) && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index, hit.id ?? "");
     });
   }
 
@@ -540,8 +549,9 @@ export class Game implements Shell {
     const ended = online.ended;
     if (!ended) return;
     // A page from before the server's last deploy: the newer page speaks its protocol.
-    if (ended === "version" && reloadOnce()) return;
+    if (ended === "version" && tryProtocolReload(this.#app, reloadOnce)) return;
     this.#stand(ended);
+    if (ended === "version" && this.nav.current !== "online") this.open("online");
   }
 
   /** What the table hears of the player with its fly: whether it is living, at the remote, and where the hand is. */
@@ -1422,6 +1432,7 @@ export class Game implements Shell {
         p.dx = (g.x - grip.x) * width;
         p.dy = (g.y - grip.y) * height;
         if (g.type === "up") {
+          p.hit = this.#hitAt(g.x, g.y);
           p.tap = g.tap;
           this.#grip = null;
         }

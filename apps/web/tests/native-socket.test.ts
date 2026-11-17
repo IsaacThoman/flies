@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { NATIVE_SOCKET_CLOSED, NATIVE_SOCKET_CONNECTING, NATIVE_SOCKET_OPEN } from "@fly/contracts";
 import type { NativeSocketBridge } from "@fly/contracts";
-import { CLOSE, FLIES } from "@fly/net";
+import { CLOSE, FLIES, FLIES_MAX, PROTOCOL } from "@fly/net";
 import type { ServerMessage } from "@fly/net";
 import { TableLine } from "../src/online/connection.ts";
 import { NATIVE_MESSAGE_BYTES, nativeSockets } from "../src/online/native-socket.ts";
@@ -81,6 +81,17 @@ test("messages arrive in order, binary ones as views of one buffer made once", (
   assert.ok(NATIVE_MESSAGE_BYTES >= 4096);
 });
 
+test("a binary message longer than any batch the room sends is dropped, and no view is kept for its length", () => {
+  const host = new FakeHost();
+  const socket = nativeSockets(host)("ws://x/rooms");
+  host.line(0).status = NATIVE_SOCKET_OPEN;
+  const lengths = new Set<number>();
+  for (let n = FLIES_MAX + 1; n < FLIES_MAX + 2000; n++) host.line(0).inbox.push(new Uint8Array(n).fill(FLIES));
+  host.line(0).inbox.push(flies(1));
+  socket.drain(() => {}, (v) => lengths.add(v.byteLength));
+  assert.deepEqual([...lengths], [35]);
+});
+
 test("a frame with nothing new asks the host twice: one look at the inbox, one at the line", () => {
   const host = new FakeHost();
   const socket = nativeSockets(host)("ws://x/rooms");
@@ -133,7 +144,7 @@ test("a table's line over the host's socket: hello, welcome, a drop while the ap
   host.line(0).status = NATIVE_SOCKET_OPEN;
   line.update(0.016);
   assert.equal(JSON.parse(host.line(0).sent[0] as string).type, "hello");
-  const welcome = { type: "welcome", v: 2, id: 1, colour: "#fff", starter: true, seed: 1, now: 1000, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0, 0] } as unknown as ServerMessage;
+  const welcome: ServerMessage = { type: "welcome", v: PROTOCOL, id: 1, colour: "#fff", starter: 1, seed: 1, now: 1000, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0, 0], room: { name: "Flies", listed: false, locked: false } };
   host.line(0).inbox.push(JSON.stringify(welcome), flies(2));
   let heard = 0;
   line.onFlies = () => heard++;

@@ -1,3 +1,4 @@
+import type { LobbyStatus } from "../../online/lobby.ts";
 // What every screen is, and what it can ask of the game.
 
 import type { RemoteButton, TextEntry } from "@fly/contracts";
@@ -72,6 +73,7 @@ export interface Shell {
   /** Where the fly is now. */
   readonly here: PlaceId;
   /** The rooms anyone may join, while Online is showing them: null until the room server has said. */
+  readonly lobbyStatus?: LobbyStatus;
   readonly rooms: readonly RoomWire[] | null;
   /** Typing into a field the game draws, or null where there is no way to type. */
   readonly typing: TextEntry | null;
@@ -115,7 +117,7 @@ export interface Screen {
   /** Draws, recording what can be pointed at in `hits`. */
   draw(g: CanvasRenderingContext2D, t: number, hits: HitMap): void;
   /** A tap is lifting off the row of the item at `index`, now, during the browser's own event: a field there starts being typed into, so a phone's keyboard comes up (it comes only for a field focused during the tap itself). */
-  typeNow?(index: number): void;
+  typeNow?(index: number, id: string): void;
 }
 
 /** What the screens' own targets are, as recorded in the hit map. */
