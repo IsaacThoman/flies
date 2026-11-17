@@ -960,3 +960,16 @@ test("a clear request removes only the sender's offerings and broadcasts gone id
   assert.equal(table.food.find(mine), null);
   assert.deepEqual(table.food.foods.map((f) => f.id), patches);
 });
+
+test("a room open to everyone that nobody was in keeps no beat, yet whoever comes is sat in the place the clock has it now, as the list says", () => {
+  const { tables, clock, join } = pool(EVERYONE_TURN * 10);
+  const before = tables.get(EVERYONE)!.place;
+  clock.wall += EVERYONE_TURN;
+  clock.now += 50;
+  tables.tick();
+  assert.equal(tables.get(EVERYONE)!.place, before, "an empty room isn't ticked");
+  assert.equal(tables.listed()[0].place, everyonePlace(clock.wall), "the list says where it is now");
+  const { table, link } = join("late");
+  assert.equal(table.place, everyonePlace(clock.wall));
+  assert.equal(saidOf(link, "welcome")[0].place, everyonePlace(clock.wall));
+});

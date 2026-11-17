@@ -297,8 +297,10 @@ export class Table {
     return { name: this.name, listed: this.listed, locked: !!this.lock, code: this.code, everyone: this.everyone };
   }
 
+  /** A room open to everyone nobody is in keeps no beat, so not its place either: the list says where the clock has it, where whoever comes is sat (Tables.everyone). */
   room(): RoomWire {
-    return { code: this.code, name: this.name, place: this.place, flies: this.present, locked: !!this.lock, ...(this.everyone ? { everyone: true } : {}) };
+    const place = this.everyone ? everyonePlace(this.#options.wall()) : this.place;
+    return { code: this.code, name: this.name, place, flies: this.present, locked: !!this.lock, ...(this.everyone ? { everyone: true } : {}) };
   }
 
   /** Whether a device with this key (hashed) may sit down without the password: it has sat here before, or started the table. */
