@@ -1,0 +1,28 @@
+name: WebAssembly reproducibility
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wasm-repro-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: packages/brain-native/build/wasi-sdk-*
+          key: wasi-sdk-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/brain-native/wasm.sh') }}
+      # --check downloads the pinned, digest-verified SDK on a cache miss and compares
+      # both modules and build.json. It neither skips nor replaces committed files.
+      - name: Rebuild and compare committed modules
+        run: packages/brain-native/wasm.sh --check
