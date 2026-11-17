@@ -247,6 +247,8 @@ export class Pointers {
   attach(canvas: HTMLCanvasElement) {
     const opts = { passive: false } as const;
     canvas.addEventListener("pointerdown", (e) => {
+      // Compatibility mouse events must not blur a field focused on the touch's release.
+      e.preventDefault();
       canvas.setPointerCapture?.(e.pointerId);
       this.down(e);
     });

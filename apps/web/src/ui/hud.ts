@@ -21,6 +21,7 @@ export type HudState = {
   /** What it is tasting or eating, if anything. */
   food: string | null;
   hints: boolean;
+  previewTool?: number;
   /** Whose buttons the hints show, or null when the player is pointing at the screen (no hints, and buttons to press instead). */
   glyphs: GlyphSet | null;
   /** What the hints have taught: those hints aren't shown. */
@@ -91,7 +92,7 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
     const x = L.shelfLeft + (i + 0.5) * gap + (i < split ? 0 : L.apart);
     const on = i === hands.tool;
     const pressed = s.pressed?.kind === HUD_HITS.tool && s.pressed.index === i;
-    const r = (on ? 22 : pressed ? 20 : 17) * L.orb;
+    const r = on ? 22 * L.orb : Math.min(pressed ? 20 : 17, gap / 2 - 1);
     const y = pressed ? sy - 1 : on ? sy - 6 : sy;
     orb(g, x, y, r, on || pressed ? "aqua" : "glass");
     drawToolIcon(g, TOOLS[i].id, x, y + 1, r * 0.62);
@@ -100,24 +101,27 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   }
   // The tool's name and kind, over the shelf. Pointing, arrows either side change the kind, and a place to go has its own button.
   const tool = hands.current;
-  const many = tool.variants.length > 1;
+  const preview = pointing && !s.pressed && s.previewTool !== undefined && s.previewTool !== hands.tool ? TOOLS[s.previewTool] : undefined;
+  const activeMany = tool.variants.length > 1;
+  const many = !preview && activeMany;
   const reserveGo = pointing && tool.id === "place";
-  const go = reserveGo && hands.place !== s.here;
+  const go = !preview && reserveGo && hands.place !== s.here;
   const goWidth = 64;
   const room = (touch?.labelWidth ?? L.width - 16) - (reserveGo ? goWidth + 8 : 0);
-  const arrows = many ? (pointing ? 56 : 40) : 0;
-  let label = many ? `${tool.name} · ${hands.label}` : tool.name;
-  const lw = many ? Math.min(280, room) : Math.min(room, Math.max(150, hintWidth(g, label, 17)));
+  const arrows = activeMany ? (pointing ? 56 : 40) : 0;
+  let label = activeMany ? `${tool.name} · ${hands.label}` : tool.name;
+  const lw = activeMany ? Math.min(280, room) : Math.min(room, Math.max(150, hintWidth(g, label, 17)));
   // Stable arrows can be reused without aiming again when a kind's name changes.
-  if (many && hintWidth(g, label, 17) + arrows > lw) label = hands.label;
+  if (activeMany && hintWidth(g, label, 17) + arrows > lw) label = hands.label;
+  if (preview) label = preview.name;
   g.font = font(17);
   const labelSize = Math.min(17, 17 * Math.max(1, lw - arrows - 24) / Math.max(1, g.measureText(label).width));
   const lx = (touch?.labelCx ?? cx) - lw / 2 - (reserveGo ? (goWidth + 8) / 2 : 0);
   // Identify the pending tool clear of the finger without committing it.
   const pending = pointing && s.pressed?.kind === HUD_HITS.tool ? TOOLS[s.pressed.index] : undefined;
-  const pop = Math.max(0, 1 - s.changed * 4) * 3;
+  const pop = preview ? 0 : Math.max(0, 1 - s.changed * 4) * 3;
   const ly = labelY - 17 - pop;
-  const hitHeight = touch?.targetHeight ?? 32;
+  const hitHeight = Math.max(36, touch?.targetHeight ?? 32);
   const hitY = labelY - 17 - (hitHeight - 32) / 2;
   const labelPressed = s.pressed?.kind === HUD_HITS.kind || s.pressed?.kind === HUD_HITS.label;
   pill(g, lx, ly, lw, 32, "", { color: labelPressed || pending ? "aqua" : "glass", press: labelPressed ? 1 : 0 });
@@ -152,7 +156,7 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
     menuRight = L.menuX + 36;
   }
 
-  if (s.hints) {
+  if (s.hints && !preview) {
     if (!s.learned[tool.id] && !hands.fixed.has(tool.id) && !(tool.id === "feed" && hands.variant.id === "clear")) {
       if (tool.id === "light" || tool.id === "weather" || tool.id === "view" || tool.id === "place") {
         if (pointing) {

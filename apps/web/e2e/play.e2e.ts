@@ -128,9 +128,9 @@ try {
   assert.equal(awake.ring, "false");
   await press("ArrowDown");
   await waitFor(page, "ring=true,focus=play");
-  await press("ArrowDown", 3);
-  await waitFor(page, "focus=settings");
   await press("ArrowDown", 2);
+  await waitFor(page, "focus=settings");
+  await press("ArrowDown");
   await waitFor(page, "focus=online");
   await press("ArrowUp");
   await waitFor(page, "focus=settings");
@@ -189,7 +189,7 @@ try {
   await waitFor(page, "focus=stats");
   await press("Escape");
   await waitFor(page, "screen=title,focus=settings");
-  await press("ArrowUp");
+  await press("ArrowDown", 2);
   await press("Enter");
   await waitFor(page, "screen=about");
   await press("Enter");
@@ -203,7 +203,7 @@ try {
   await press("ArrowDown", 3);
   await press("Escape");
   await waitFor(page, "screen=title,focus=about");
-  await press("ArrowUp", 2);
+  await press("ArrowUp", 4);
   await waitFor(page, "focus=play");
 
   step("play: the fly is on the table, and its brain is moving it");
