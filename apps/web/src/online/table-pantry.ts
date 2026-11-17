@@ -39,7 +39,7 @@ export class TablePantry extends Pantry {
     return id;
   }
 
-  /** Take retained names before optimistic eating can remove their food locally. */
+  /** Remember retained names even after the room acknowledges their removal. */
   welcome(foods: readonly FoodWire[]) {
     for (const food of foods) {
       if (dropOwner(food[0]) === this.player) this.#dropped = Math.max(this.#dropped, food[0] % DROP_ID);

@@ -38,7 +38,7 @@ test("100 reloads and rejoins keep dropped food IDs unique and positions equal t
   }
 });
 
-test("retained IDs are remembered before optimistic eating removes the food", () => {
+test("retained IDs stay reserved through pending bites and acknowledged removal", () => {
   const world = createPicnic();
   const room = new TableFood(world, []);
   const old = room.drop(2, 2000001, "sugar", 0, 0)!;
@@ -47,8 +47,17 @@ test("retained IDs are remembered before optimistic eating removes the food", ()
   returning.welcome([toWire(old)]);
   const food = returning.foods[0];
   returning.eat(food, 1, 4);
-  assert.equal(returning.foods.length, 0);
+  assert.equal(returning.foods.length, 1, "exhausted prediction stays available for reconciliation");
+  assert.equal(food.amount, 0);
+  assert.equal(returning.mirror.pending, 1);
+  const pendingId = returning.name("sugar");
+  assert.notEqual(pendingId, old.id);
+  returning.mirror.sent(1);
+  returning.mirror.apply(1, [], [old.id], undefined, [1, 1]);
+  assert.equal(returning.foods.length, 0, "only the room removes an acknowledged exhausted food");
+  assert.equal(returning.mirror.pending, 0);
   const id = returning.name("sugar");
+  assert.notEqual(id, pendingId);
   assert.notEqual(id, old.id);
   assert.ok(room.drop(2, id, "sugar", 2, 0));
 });
