@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { mulberry32 } from "@fly/brain";
-import { BODY_REACH, FEET_REACH, FLY_HEIGHT, FlyBody, MAX_SLOPE_COS, STEP_UP, createIntent } from "@fly/body";
+import { BODY_REACH, FEET_REACH, FLY_HEIGHT, FLY_LENGTH, FlyBody, MAX_SLOPE_COS, STEP_UP, createIntent } from "@fly/body";
 import type { Forces } from "@fly/body";
-import { BAR, LAB, PICNIC, RESTAURANT, WINDOWSILL, World, createSurface } from "@fly/world";
+import { BAR, LAB, PICNIC, RESTAURANT, WINDOWSILL, World, createSurface, topHeight } from "@fly/world";
 import type { Place, Vec3 } from "@fly/world";
 
 export const places = { picnic: PICNIC, windowsill: WINDOWSILL, lab: LAB, bar: BAR, restaurant: RESTAURANT };
@@ -136,7 +136,7 @@ function wallAlong(world: World, p: Vec3, dx: number, dz: number, length: number
     if (hit.normal.y >= MAX_SLOPE_COS) return -1;
     if (hit.normal.y !== 0) return from + hit.t;
     const ground = world.heightAt(hit.point.x - dx * 1e-3, hit.point.z - dz * 1e-3, stair.y);
-    const top = world.heightAt(hit.point.x + dx * 1e-3, hit.point.z + dz * 1e-3);
+    const top = topHeight(world.solids[hit.solid], hit.point.x + dx * 1e-3, hit.point.z + dz * 1e-3);
     if (top - ground > STEP_UP) return from + hit.t;
     from += hit.t + 1e-3;
     stair.x = hit.point.x + dx * 1e-3;
@@ -205,7 +205,28 @@ export function checkRecovery(body: FlyBody, world: World) {
     }
   }
   assert.ok(canJump, "take-off cannot escape reached surface in eight directions");
-  assert.ok(canWalk, "no walking escape in eight directions within 3s");
+  assert.ok(canWalk || boxedIn(world, landed.position), "no walking escape in eight directions within 3s");
+}
+
+/** Half the width of the way its body needs to walk through, mm: its thorax's sides (BODY_REACH). */
+const HALF_WIDTH = BODY_REACH[5] * FLY_LENGTH;
+
+/**
+ * Whether every way out from feet at `p` is narrower than its body within the 3 mm a walking probe
+ * must go, its head's reach beyond: fallen into a pocket among things, it can only fly out.
+ */
+function boxedIn(world: World, p: Vec3) {
+  for (let k = 0; k < 16; k++) {
+    const dx = Math.sin((k * Math.PI) / 8);
+    const dz = Math.cos((k * Math.PI) / 8);
+    let narrow = false;
+    for (const side of [-1, 0, 1]) {
+      const from = { x: p.x + dz * side * HALF_WIDTH, y: p.y, z: p.z - dx * side * HALF_WIDTH };
+      narrow ||= world.solidAt(from.x, from.y + STEP_UP + 1e-6, from.z) >= 0 || wallAlong(world, from, dx, dz, 3 + BODY_REACH[0] * FLY_LENGTH, true) >= 0;
+    }
+    if (!narrow) return false;
+  }
+  return true;
 }
 
 /**

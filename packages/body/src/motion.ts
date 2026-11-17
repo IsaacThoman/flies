@@ -264,12 +264,15 @@ export class FlyBody {
       copySurface(this.surface, this.#before);
       this.#walk(intent, forces, dt);
     } else this.#fly(intent, forces, dt);
+    // Whether all it reaches was found clear where it is (#clear's last finding, as it stands still).
+    const fitted = this.#clearHere();
     if (!this.#clear(intent)) {
-      // Its body can't be kept out of what that went into: it doesn't go there (flying, it keeps its height
-      // and speed). Landed in it, or still in it there, it is between things too close for it as it faces:
-      // they turn it, if it fits between them turned.
+      // Its body can't be kept out of what that went into: from where it fitted, it doesn't go there (flying, it
+      // keeps its height and speed). Landed in it, or still in it there, it is between things too close for it
+      // as it faces: they turn it, if it fits between them turned. Where it didn't fit already, it may go on,
+      // or it could never get out.
       let clear = false;
-      if (walking && this.onFeet) {
+      if (walking && this.onFeet && fitted) {
         p.x = x;
         p.y = y;
         p.z = z;
@@ -277,7 +280,7 @@ export class FlyBody {
         this.turnRate = 0;
         copySurface(this.#before, this.surface);
         clear = this.#clear(intent);
-      } else if (!this.onFeet) {
+      } else if (!this.onFeet && fitted) {
         // Back where it was, its feet no lower than the surface there nor its body in what is over it.
         p.y = this.#within(x, z, y, p.y);
         p.x = x;
@@ -303,7 +306,7 @@ export class FlyBody {
    * Turns it along the way between what it is between (square to the way it was last pushed), or else a
    * quarter turn either way, if it fits there so (see #move); or keeps only its body out of what it is in.
    */
-  #turnToFit(intent: Intent) {
+  #turnToFit(intent: Intent): boolean {
     const p = this.position;
     const x = p.x;
     const y = p.y;
@@ -312,22 +315,29 @@ export class FlyBody {
     const mode = this.mode;
     copySurface(this.surface, this.#before);
     // Square to the push, the nearer way round first, then the other; then a quarter turn either way from where it faced.
+    // Failing those, its legs can't fit there however it turns: its body is kept out, as it faces if it fits so,
+    // else turned as before, and its legs are left as evenly between what they go into as it can stand.
     const along = Math.atan2(-this.#pushed.z, this.#pushed.x);
     const nearer = Math.abs(wrap(along - yaw)) <= Math.PI / 2 ? along : along + Math.PI;
-    for (let k = 0; k < 4; k++) {
-      this.yaw = wrap(k < 2 ? nearer + k * Math.PI : yaw + (k === 2 ? 1 : -1) * (Math.PI / 2));
-      if (this.#clear(intent)) return;
+    let fits = false;
+    for (let k = 0; k < 9 && !fits; k++) {
+      const turn = k < 4 ? k : k - 5;
+      this.yaw = wrap(turn < 0 ? yaw : turn < 2 ? nearer + turn * Math.PI : yaw + (turn === 2 ? 1 : -1) * (Math.PI / 2));
+      fits = this.#clear(intent, k < 4);
+      if (fits && k < 4) return true;
+      if (fits) break;
       p.x = x;
       p.y = y;
       p.z = z;
       this.mode = mode;
       copySurface(this.#before, this.surface);
     }
-    // It doesn't fit there on its feet at all: its body is kept out, and its legs left as evenly between what
-    // they go into as it can stand.
-    this.yaw = yaw;
-    this.#clear(intent, false);
+    if (!fits) {
+      this.yaw = yaw;
+      this.#clear(intent, false);
+    }
     for (let k = 0; k < CLEAR_PASSES && this.onFeet && this.#clearOnce(intent, true, true) === MOVED; k++) this.#clear(intent, false);
+    return false;
   }
 
   /**
@@ -343,10 +353,9 @@ export class FlyBody {
   #clear(intent: Intent, feet = true): boolean {
     const p = this.position;
     const c = this.#cleared;
-    const onFeet = this.mode !== "airborne";
     this.#front = false;
     // The world stands still: a body where it was clear last time, as it was, still is (a fly at rest).
-    if (feet && c.y === p.y && c.x === p.x && c.z === p.z && this.#clearedYaw === this.yaw && this.#clearedOnFeet === onFeet) return true;
+    if (feet && this.#clearHere()) return true;
     for (let pass = 0; pass < CLEAR_PASSES; pass++) {
       const result = this.#clearOnce(intent, feet);
       if (result === MOVED) continue;
@@ -361,6 +370,13 @@ export class FlyBody {
     }
     c.y = NaN;
     return false;
+  }
+
+  /** Whether #clear last found all it reaches clear just where and as it is now. */
+  #clearHere() {
+    const p = this.position;
+    const c = this.#cleared;
+    return c.y === p.y && c.x === p.x && c.z === p.z && this.#clearedYaw === this.yaw && this.#clearedOnFeet === (this.mode !== "airborne");
   }
 
   /**

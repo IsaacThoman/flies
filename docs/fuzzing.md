@@ -56,7 +56,9 @@ Every 30 simulated seconds, recovery probes remove wind and wings, require a
 landing inside 20 seconds, then try eight walking headings (3 seconds each)
 and take-off headings. At least one walking heading must travel 3 mm and at
 least one launch must rise 2 mm, except under something lower than that over
-its body, where walking out is the only way. These checks sample recovery; they are not an
+its body, where walking out is the only way, and in a pocket it fell into
+whose every way out within those 3 mm is narrower than its body, where flying
+out is the only way. These checks sample recovery; they are not an
 exhaustive proof of every point in the world.
 
 The life fuzzer uses `InProcessBrain`, a synchronous `BrainDriver` backed by
