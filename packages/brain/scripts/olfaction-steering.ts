@@ -16,7 +16,7 @@ import { FlyBrain } from "../src/runtime.ts";
 import { RESTING_SENSES } from "../src/types.ts";
 import type { BrainSenses } from "../src/types.ts";
 
-const { values } = parseArgs({ options: { out: { type: "string" }, seeds: { type: "string", default: "31,32,33,34,35,36,37,38,39,40" }, reduce: { type: "boolean", default: false } } });
+const { values } = parseArgs({ options: { out: { type: "string" }, seeds: { type: "string", default: "41,42,43,44,45,46,47,48,49,50" }, reduce: { type: "boolean", default: false } } });
 assert(values.out);
 const out = values.out;
 const SETTLE = 20;
@@ -72,7 +72,8 @@ if (!values.reduce) {
 } else {
   const runs: Run[] = readdirSync(out).filter((f) => f.endsWith(".json")).map((f) => JSON.parse(readFileSync(join(out, f), "utf8")));
   const seeds = [...new Set(runs.map((r) => r.seed))].sort((a, b) => a - b);
-  assert.deepEqual(seeds, [31, 32, 33, 34, 35, 36, 37, 38, 39, 40], "Part C runs seeds 31-40");
+  // Seeds 31-40 on the model with resting firing, 41-50 on the one without (protocol, Amendment 1).
+  assert(["31,32,33,34,35,36,37,38,39,40", "41,42,43,44,45,46,47,48,49,50"].includes(seeds.join(",")), "Part C runs seeds 31-40 or 41-50");
   // Two-sided 95% t quantile with 9 degrees of freedom.
   const T9 = 2.2621571627409915;
   const result = CONDITIONS.map((condition) => {

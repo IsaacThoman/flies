@@ -124,3 +124,30 @@ Opt-in, in a script (`scripts/plume.ts`); the game is not changed by it.
   turned on in the game, with the plume constants above unchanged.
 
 No constant above is changed after a measurement of this part.
+
+## Amendment 1, before any measurement on the configuration it names
+
+Part C ran as written on the model above (the result stands and is
+reported: P1 passed). Before Parts A, B or D were measured, the brain's own
+tests found a fault that model's resting firing causes. At the recorded
+resting rates (mean 13 Hz), the antennal lobe's broad local neurons, each
+summing about 30,000 ORN synapses in one point compartment, fire at 250–310
+Hz (il3LN6, lLN2F, lLN2T, lLN2P), the GABAergic multiglomerular MZ_lv2PN at
+210 Hz, and most projection neurons fall silent (median 0 Hz); real local
+neurons fire about 5–20 Hz at rest. Their inhibition reaches the backing
+pathway's premotor inputs: touch's backing at night (sleep.test, depth 0,
+touch 0.6) fell from 0.24 to 0.06. The cause is the model's single
+compartment and missing presynaptic gain control, not the recordings, and
+no measured constant could be found to repair it without choosing one.
+
+So the model under test is now the same model with the ORNs' resting firing
+off (`BrainOptions.restingSmell`, default false): each ORN fires at its
+recorded answer to the odorants present, from silence, inhibition floored at
+silence. With no odour it is the brain as it was, spike for spike. The
+recordings and every other constant are unchanged.
+
+On it, unchanged otherwise: Part A, Part B (decision rules as written) and
+Part C again on seeds 41–50, used by nothing before, with the same rule (the
+reducer's seed list is the only change). Part D, if reached, runs on it too.
+Also reported, with no decision: the touch trial above with fermenting-fruit
+odour (the five odorants at 1) at both antennae.

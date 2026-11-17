@@ -81,15 +81,16 @@ export function odorOf(senses: BrainSenses, into: Float64Array): Float64Array {
 }
 
 /**
- * A group's rate, Hz: its spontaneous rate plus each odorant's answer at its
- * strength, never below silence. Mixtures add: ORNs answer most binary
+ * A group's rate, Hz: each odorant's answer at its strength, on top of its
+ * spontaneous rate where the ORNs fire at rest (`resting`; off in the brain
+ * as it runs: README, Smell), never below silence. Mixtures add: ORNs answer most binary
  * mixtures close to the sum of their parts (Silbering & Galizia 2007, J
  * Neurosci 27: 11966), which strong odours exceed, as the refractory period
  * caps it here. Neurons whose antenna isn't known smell the mean of the two.
  */
-export function ornRate(group: OrnGroup, odor: Float64Array): number {
+export function ornRate(group: OrnGroup, odor: Float64Array, resting: boolean): number {
   const n = ODORANTS.length;
-  let rate = group.spontaneous;
+  let rate = resting ? group.spontaneous : 0;
   for (let k = 0; k < n; k++) {
     const strength = group.side === "left" ? odor[k] : group.side === "right" ? odor[n + k] : (odor[k] + odor[n + k]) / 2;
     rate += group.answers[k] * strength;

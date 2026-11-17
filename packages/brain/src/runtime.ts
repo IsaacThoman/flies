@@ -30,6 +30,12 @@ export type BrainOptions = {
   retina?: RetinaParameters;
   /** Turn the internal state's background drive off (it is on by default). */
   spontaneous?: boolean;
+  /**
+   * For experiments: the olfactory receptor neurons fire at their recorded
+   * resting rates (off by default: in this model those rates drive the
+   * antennal lobe's broad local neurons to saturation; README, Smell).
+   */
+  restingSmell?: boolean;
   /** The eyes' columns (eye-columns.ts by default), for tests on a synthetic connectome. */
   eyeColumns?: { readonly right: readonly EyeColumn[]; readonly left: readonly EyeColumn[] };
 };
@@ -55,6 +61,8 @@ export class FlyBrain implements Brain {
   /** Slow neuromodulation (modulation.ts): every modulatory neuron's level, and what its receptors do. */
   readonly modulation: Modulation;
   readonly spontaneous: boolean;
+  /** Whether the olfactory receptor neurons fire at rest (BrainOptions.restingSmell). */
+  readonly restingSmell: boolean;
   /** Each neuron's region, an index into REGIONS. */
   readonly regions: Uint8Array;
   /** Smoothed mean rate of each readout group, Hz. */
@@ -145,13 +153,14 @@ export class FlyBrain implements Brain {
     for (const { spec, neurons } of this.wiring.state) this.sim.addInput(spec.name, neurons);
     // L1's withdrawals under brightening (vision.ts) last of all, so every other input's stream is as it was without them.
     if (this.vision) for (const side of ["left", "right"] as const) this.sim.addRatedInput(`eye ${side} withdrawn`, this.vision.retina[side].l1, { withdraw: true });
-    // The receptor neurons of smell after even those. They fire at rest, so
-    // the brain is not the same without odour as before them (README, Smell).
+    // The receptor neurons of smell after even those: with no odour (and no
+    // resting firing) every stream is as it was before them.
     this.smell = wireOlfaction(connectome);
+    this.restingSmell = options.restingSmell ?? false;
     const readouts = new Set(this.wiring.readouts.flatMap((group) => [...group.neurons]));
     for (const { name, neurons, spontaneous } of this.smell) {
       for (const i of neurons) if (readouts.has(i)) throw new Error(`Neuron ${i} is both driven by "${name}" and read`);
-      this.sim.addInput(name, neurons, spontaneous);
+      this.sim.addInput(name, neurons, this.restingSmell ? spontaneous : 0);
     }
     // A separate stream from the Poisson inputs', which inputSeed derives from the same seed.
     this.state = new InternalState((seed ^ 0x5bd1e995) >>> 0, options.internalState ?? INTERNAL_STATE);
@@ -172,7 +181,7 @@ export class FlyBrain implements Brain {
     }
     for (const [name, rate] of senseRates(this.wiring, senses)) this.sim.setRate(name, rate);
     odorOf(senses, this.#odor);
-    for (const group of this.smell) this.sim.setRate(group.name, ornRate(group, this.#odor));
+    for (const group of this.smell) this.sim.setRate(group.name, ornRate(group, this.#odor, this.restingSmell));
     const hunger = hungerOf(senses);
     this.modulation.setState(senses, hunger, stateOf);
     this.modulation.update(0);
