@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { GREENHOUSE_SOLIDS } from "@fly/world";
 import { BUMP, NOISE } from "../windowsill/surfaces.ts";
 
-export const K = { wood: 0, clay: 1, soil: 2, leaf: 3, tomato: 4, fig: 5, metal: 6, paint: 7, label: 8, string: 9 };
+export const K = { wood: 0, clay: 1, soil: 2, leaf: 3, tomato: 4, fig: 5, metal: 6, paint: 7, label: 8, string: 9, juice: 10, fallen: 11 };
 
 /** One material keeps all the bench's opaque detail in a single draw. */
 export function surfaces() {
@@ -38,16 +38,16 @@ vec3 surface(vec3 c) {
  float fine = vnoise3(p * 7.0) * resolved(0.35);
  if (vKind < 0.5) {
    float knot = exp(-length((p.xz - vec2(-52.0, 74.0)) * vec2(0.035, 0.17)));
-   float grain = sin(p.z * 5.2 + vnoise(p.xz * vec2(0.025, 0.14)) * 7.0 + knot * 9.0);
+   float grain = sin(p.z * 1.8 + vnoise(p.xz * vec2(0.025, 0.14)) * 7.0 + knot * 9.0);
    float stripe = fract((p.z + 200.0) / 66.6667);
    float seam = 1.0 - smoothstep(0.002, 0.012, min(stripe, 1.0 - stripe));
    float wear = vnoise(p.xz * vec2(0.016, 0.06));
-   c *= 0.76 + 0.30 * wear + 0.1 * grain * resolved(1.2);
+   c *= 0.76 + 0.30 * wear + 0.045 * grain * resolved(3.0);
    c = mix(c, vec3(0.19, 0.24, 0.17), smoothstep(0.65, 0.9, wear) * 0.35);
    c *= 1.0 - seam * 0.8;
    float wet = uWet * (0.3 + 0.5 * vnoise(p.xz * 0.035));
    c *= 1.0 - wet * 0.32; rough = 0.85 - wet * 0.55;
-   relief = grain * 0.035 * resolved(1.2) - seam * 0.1;
+   relief = grain * 0.009 * resolved(3.0) - seam * 0.1;
    // Rusted nail heads and their dark halos at the ends of each plank.
    vec2 nail = vec2(abs(p.x) - 300.0, mod(p.z + 200.0, 66.6667) - 9.0);
    float n = 1.0 - smoothstep(1.1, 1.65, length(nail));
@@ -87,6 +87,10 @@ vec3 surface(vec3 c) {
    float bruise = smoothstep(0.57, 0.8, vnoise(p.xz * 0.17 + 7.0));
    c = mix(c, vec3(0.2, 0.037, 0.012), bruise * 0.7);
    c *= 0.9 + fine * 0.22; rough = 0.3 + bruise * 0.2; relief = fine * 0.018;
+   vec2 centre = p.x < -55.0 ? vec2(-82.0,51.0) : vec2(-32.0,30.0);
+   float radius = p.x < -55.0 ? 4.0 : 7.0;
+   float split = 1.0-smoothstep(radius*0.72,radius,length(p.xz-centre)+vnoise(p.xz*1.4)*0.7);
+   c = mix(c,vec3(0.39,0.055,0.018),split*0.65); rough = mix(rough,0.16,split);
  } else if (vKind < 5.5) {
    vec2 q = (p.xz - vec2(20.0, 56.0)) / vec2(19.0, 25.0);
    float flesh = 1.0 - smoothstep(0.62, 0.78, length(q));
@@ -104,7 +108,16 @@ vec3 surface(vec3 c) {
  } else if (vKind < 8.5) {
    float line = step(0.7, sin(p.z * 6.0 + sin(p.x * 2.7))) * step(0.45, vnoise(p.xz * 0.5));
    c *= 1.0 - line * 0.6 * resolved(0.7); rough = 1.0;
- } else { relief = sin(p.x * 14.0 + p.z * 7.0) * 0.035 * resolved(0.5); }
+ } else if (vKind < 9.5) { relief = sin(p.x * 14.0 + p.z * 7.0) * 0.035 * resolved(0.5); }
+ else if (vKind < 10.5) { rough = 0.16; c *= 0.92 + 0.08 * vnoise(p.xz * 0.6); }
+ else {
+   float u = (p.x + 6.0) / 15.0;
+   float mid = p.z - 15.0 - sin(u * 3.14159) * 1.2;
+   float vein = exp(-abs(mid) * 18.0) + pow(max(0.0,cos((p.x+abs(mid)*1.5)*5.0)),14.0)*0.35;
+   c *= 0.85 + 0.15 * vnoise(p.xz * 2.0);
+   c += vec3(0.08,0.09,0.025)*vein*resolved(0.7);
+   rough = 0.65;
+ }
  return c;
 }
 `)

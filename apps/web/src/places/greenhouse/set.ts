@@ -5,6 +5,7 @@ import { Batch, freeze, paint, random } from "../../scene/build.ts";
 import type { SceneSet } from "../types.ts";
 import { tag } from "../windowsill/surfaces.ts";
 import { K, surfaces } from "./surfaces.ts";
+import { foliage } from "./foliage.ts";
 import { sunShafts } from "./shafts.ts";
 import { glazing } from "./glass.ts";
 
@@ -59,7 +60,7 @@ export function buildBench(): SceneSet {
   for (const s of GREENHOUSE_SOLIDS) if (s.name !== "greenhouse pane") eyes.add(eyeMat, paint(solidGeometry(s, 4, 12), s.name.includes("tomato") ? "#bd4528" : s.name.includes("fig") ? "#60354e" : s.name.includes("crown") || s.name.includes("leaves") ? "#466d3a" : "#8a7960"));
   const seen = eyes.build(new THREE.Group());
   function* construct() {
-    add(box(0, -15, 0, GREENHOUSE_BENCH.hx * 2, 30, GREENHOUSE_BENCH.hz * 2), "#89705a", K.wood);
+    add(box(0, -15, 0, GREENHOUSE_BENCH.hx * 2, 30, GREENHOUSE_BENCH.hz * 2), "#92794e", K.wood);
     for (const x of [-275, 275]) for (const z of [-160, 160]) add(box(x, -410, z, 35, 790, 35), "#64523d", K.wood);
     for (const z of [-160, 160]) add(box(0, -620, z, 580, 28, 28), "#64523d", K.wood);
     add(box(0, -700, 0, 580, 22, 330), "#706047", K.wood);
@@ -80,7 +81,11 @@ export function buildBench(): SceneSet {
         const f = s.footprint as { x: number; z: number; r: number };
         return Math.hypot(p.x - f.x, p.z - f.z) < f.r * 0.82 ? "#30251b" : color;
       } : color;
-      add(g, colors, kind);
+      if (s.name === "greenhouse leaves" || s.name === "seedling crown") {
+        g.translate(0,-0.12,0);
+        add(g,"#25451e",K.leaf);
+        batch.add(opaque.material,tag(foliage(s),"kind",K.leaf));
+      } else add(g, colors, kind);
       yield;
     }
     // Seed cells sit flush in the tray; the seedlings are crowns above them.
@@ -120,9 +125,29 @@ export function buildBench(): SceneSet {
         add(g, "#4b6230", K.leaf);
       }
     }
-    add(new THREE.CircleGeometry(6, 40).rotateX(-Math.PI / 2).translate(-14, 0.035, 8), "#a94422", K.tomato);
+    const spill = new THREE.Shape();
+    for (let i = 0; i <= 48; i++) {
+      const a = i / 48 * Math.PI * 2, r = 6 * (0.9 + Math.sin(a * 3) * 0.07 + Math.sin(a * 7 + 1) * 0.05);
+      if (i === 0) spill.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else spill.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    add(new THREE.ShapeGeometry(spill).rotateX(-Math.PI / 2).translate(-14, 0.08, 8), "#a94422", K.juice);
 
     yield;
+    // A fallen cotyledon is flat enough for the feet to step across it.
+    const leafPoints: number[] = [];
+    const leafPoint = (i: number, j: number) => {
+      const u = i / 12, w = j / 4 * 2 - 1;
+      const width = Math.pow(Math.sin(u * Math.PI), 0.8) * 2.4;
+      leafPoints.push(-6 + u * 15, 0.18 + Math.sin(u * Math.PI) * (1-w*w) * 0.1, 15 + w * width + Math.sin(u * Math.PI) * 1.2);
+    };
+    for (let i=0;i<12;i++) for (let j=0;j<4;j++) {
+      leafPoint(i,j); leafPoint(i+1,j+1); leafPoint(i+1,j);
+      leafPoint(i,j); leafPoint(i,j+1); leafPoint(i+1,j+1);
+    }
+    const fallenLeaf = new THREE.BufferGeometry();
+    fallenLeaf.setAttribute("position",new THREE.Float32BufferAttribute(leafPoints,3)); fallenLeaf.computeVertexNormals();
+    add(fallenLeaf,"#6f8539",K.fallen);
     // The frame is beyond walking range, so its joinery is decorative.
     for (const x of [-GLAZING.x, GLAZING.x]) {
       for (const z of [-640, -320, 0, 320, 640]) add(box(x, 20, z, 22, 1720, 18), "#697f73", K.paint);

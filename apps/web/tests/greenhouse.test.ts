@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { GREENHOUSE, GREENHOUSE_SOLIDS, SAUCER, TRAY, World, inside, topHeight } from "@fly/world";
 import { buildBench, solidGeometry } from "../src/places/greenhouse/set.ts";
+import { foliage } from "../src/places/greenhouse/foliage.ts";
 import { NO_PRINTS } from "../src/scene/prints.ts";
 
 test("greenhouse curved surfaces are sampled directly from their collision tops", () => {
@@ -43,4 +44,15 @@ test("greenhouse detail builds in bounded steps and keeps its eyes available thr
   }
   assert.ok(steps > 10);
   assert.ok(set.group.children.length <= 6);
+});
+
+test("greenhouse leaf detail stays on its solid crown", () => {
+  for (const s of GREENHOUSE_SOLIDS.filter(s => s.name === "greenhouse leaves" || s.name === "seedling crown")) {
+    const g=foliage(s), p=g.attributes.position;
+    for (let i=0;i<p.count;i++) {
+      assert.ok(inside(s.footprint,p.getX(i),p.getZ(i)));
+      assert.ok(Math.abs(p.getY(i)-topHeight(s,p.getX(i),p.getZ(i))) < 0.13);
+    }
+    g.dispose();
+  }
 });
