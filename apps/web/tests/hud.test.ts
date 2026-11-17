@@ -28,6 +28,7 @@ test("wordless world-tool hints clear touch controls and exploration progress at
       // Bounds include the target, moving tool and ghost finger throughout a cycle.
       const bounds = { x: x - 60, y: y - 40, w: 120, h: 72 };
       assert.ok(bounds.x >= safe.x && bounds.x + bounds.w <= safe.x + safe.w && bounds.y >= safe.y && bounds.y + bounds.h <= safe.y + safe.h);
+      assert.ok(bounds.y + bounds.h < (layout.touch?.labelY ?? layout.labelY) - 17, "the diagram clears the pending icon pill, including tools without label hit targets");
       for (let i = 0; i < hits.count; i++) {
         const hit = hits.get(i)!;
         const overlaps = bounds.x < hit.x + hit.w && hit.x < bounds.x + bounds.w && bounds.y < hit.y + hit.h && hit.y < bounds.y + bounds.h;

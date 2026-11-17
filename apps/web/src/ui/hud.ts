@@ -113,13 +113,16 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   g.font = font(17);
   const labelSize = Math.min(17, 17 * Math.max(1, lw - arrows - 24) / Math.max(1, g.measureText(label).width));
   const lx = (touch?.labelCx ?? cx) - lw / 2 - (reserveGo ? (goWidth + 8) / 2 : 0);
+  // Identify the pending tool clear of the finger without committing it.
+  const pending = pointing && s.pressed?.kind === HUD_HITS.tool ? TOOLS[s.pressed.index] : undefined;
   const pop = Math.max(0, 1 - s.changed * 4) * 3;
   const ly = labelY - 17 - pop;
   const hitHeight = touch?.targetHeight ?? 32;
   const hitY = labelY - 17 - (hitHeight - 32) / 2;
   const labelPressed = s.pressed?.kind === HUD_HITS.kind || s.pressed?.kind === HUD_HITS.label;
-  pill(g, lx, ly, lw, 32, "", { color: labelPressed ? "aqua" : "glass", press: labelPressed ? 1 : 0 });
-  text(g, label, lx + lw / 2, labelY - pop, { size: labelSize, align: "center", baseline: "middle", color: INK });
+  pill(g, lx, ly, lw, 32, "", { color: labelPressed || pending ? "aqua" : "glass", press: labelPressed ? 1 : 0 });
+  if (pending) drawToolIcon(g, pending.id, lx + lw / 2, labelY - pop, 12);
+  else text(g, label, lx + lw / 2, labelY - pop, { size: labelSize, align: "center", baseline: "middle", color: INK });
   if (many && pointing) {
     chevron(g, lx + 18, labelY - pop, -1, true);
     chevron(g, lx + lw - 18, labelY - pop, 1, true);
