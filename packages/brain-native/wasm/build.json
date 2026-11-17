@@ -17,7 +17,7 @@
     "src/sim.cpp": "e8faa7da860b607f4739441521296bb6a1a57f6fe224cd19577365c8eb61ea28",
     "src/state.cpp": "fcf598f0b461c84780243d3ee0466c0269fb9e660f51379b2668348fcffca2b8",
     "src/thermo.cpp": "a3c9492cc67b6fea96caa0028d0e80b871892c0551f7f58863dc4bdb81ee43f0",
-    "src/vision.cpp": "e48118ae053271ebf2cafbc9e61c4c78f43caced303ca674cd70aee74f900d36",
+    "src/vision.cpp": "d6ca6a667521470c413070cc91fc8fe6dab0367ba59d483ea3ea9c4a2fffe8f4",
     "src/brain.hpp": "e9fae0aa5c4e32a4576b16a5a559a7282a72ba38075d128b93031dcf2ed909c4",
     "src/connectome.hpp": "d6c11161d737ff16dd680b0492c2b232aae25d4095ed1871acc0bb01c171205d",
     "src/exact.hpp": "165c919429ef4b2bc7408b12b50a88b3004cda3f02a9e06d9ab20051a92391a1",
@@ -32,11 +32,11 @@
     "src/sim.hpp": "eeed8f9e500e0c0a564c2dfe53815e0a91a56fdac311acc8c21324203670224e",
     "src/state.hpp": "776df39f21d493c53ae37fbdbb4b13914cd47921859af652acaa294831b19589",
     "src/thermo.hpp": "bc04eaf21dfac9c8f6629aa50c2df81dafa4c99617390edeede75cae49812d15",
-    "src/vision.hpp": "1d0fa684829454eb437c2be979bbe83b88eac07cfa57453573752b7815b1ce99",
+    "src/vision.hpp": "74ae8458aa72f11456f1e32e180742404d4c0b6e917d09ed0e49b14a622b0bb2",
     "tools/harness.cpp": "7bdcb3ee0224740937baaf2af53ee1bf2d7da1b75978a35bfdb12955ac829f79"
   },
   "modules": {
-    "fly-brain.wasm": "56199ac4b9723aaeda76010c07d488fbf7bcda69cac523babe643e4616b15750",
-    "fly-brain-harness.wasm": "bbd5c6264e821a4264be5ec28c06e4fafde8cb2f5d9a1858efbd6ddf1a1df9fc"
+    "fly-brain.wasm": "576e44d13374113352b9e5cc1b0907fd24c5cfd4a2fa8f9741da9e5fe1968a2b",
+    "fly-brain-harness.wasm": "eb043f90b697b15539ed5a565101543f1bbb883b5732367ef7f4f183dbbcd53a"
   }
 }

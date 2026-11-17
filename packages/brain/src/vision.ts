@@ -53,6 +53,10 @@ export type RetinaParameters = {
   tonic: number;
   /** Factor on L1's withdrawals under brightening, 1 for the same scale as darkening (0: no ON pathway). */
   withdraw: number;
+  /** L1's sustained component: its response to a facet's light against the level of `luminance`, as a fraction of its transient response to the same contrast (0: none). */
+  sustained: number;
+  /** Time constant, ms, of the level L1's sustained component measures the light against. */
+  luminance: number;
 };
 
 export const RETINA: RetinaParameters = {
@@ -62,6 +66,8 @@ export const RETINA: RetinaParameters = {
   maxRate: 200,
   tonic: 0,
   withdraw: 1,
+  sustained: 0.3,
+  luminance: 100_000,
 };
 
 /** One eye's photoreceptors and lamina: luminance per facet in, a rate per driven lamina cell out. */
@@ -81,6 +87,7 @@ export class Retina {
   #transient: Uint8Array;
   #ambient: Float64Array;
   #recent: Float64Array;
+  #slow: Float64Array;
   // Each facet's luminance at the last step, clamped to 0..1.
   #seen: Float64Array;
   #open = false;
@@ -115,6 +122,7 @@ export class Retina {
     this.rates = new Float64Array(neurons.length);
     this.#ambient = new Float64Array(this.facets);
     this.#recent = new Float64Array(this.facets);
+    this.#slow = new Float64Array(this.facets);
     this.#seen = new Float64Array(this.facets);
   }
 
@@ -128,7 +136,7 @@ export class Retina {
    * when it changes.
    */
   step(dt: number, light: ArrayLike<number> | null): boolean {
-    const { ambient: tauAmbient, transient: tauTransient, floor, maxRate, tonic, withdraw } = this.parameters;
+    const { ambient: tauAmbient, transient: tauTransient, floor, maxRate, tonic, withdraw, sustained, luminance: tauSlow } = this.parameters;
     const was = this.#firing;
     if (light === null) {
       this.#open = false;
@@ -142,6 +150,7 @@ export class Retina {
     if (light.length !== this.facets) throw new Error(`An eye has ${this.facets} facets, but the light gives ${light.length}`);
     const ambient = this.#ambient;
     const recent = this.#recent;
+    const slow = this.#slow;
     const seen = this.#seen;
     const lum = (k: number) => {
       const x = light[k];
@@ -150,7 +159,7 @@ export class Retina {
     if (!this.#open) {
       this.#open = true;
       this.#idle = 0;
-      for (let k = 0; k < this.facets; k++) ambient[k] = recent[k] = seen[k] = lum(k);
+      for (let k = 0; k < this.facets; k++) ambient[k] = recent[k] = slow[k] = seen[k] = lum(k);
     } else {
       let same = true;
       for (let k = 0; k < this.facets && same; k++) same = lum(k) === seen[k];
@@ -162,8 +171,10 @@ export class Retina {
       }
       const idleAmbient = Math.exp(-this.#idle / tauAmbient);
       const idleRecent = Math.exp(-this.#idle / tauTransient);
+      const idleSlow = Math.exp(-this.#idle / tauSlow);
       const keepAmbient = Math.exp(-dt / tauAmbient);
       const keepRecent = Math.exp(-dt / tauTransient);
+      const keepSlow = Math.exp(-dt / tauSlow);
       for (let k = 0; k < this.facets; k++) {
         const before = seen[k];
         const x = lum(k);
@@ -172,8 +183,10 @@ export class Retina {
         // stay a hair above 0 and the eye would never fall quiet.
         const nextAmbient = x + (before + (ambient[k] - before) * idleAmbient - x) * keepAmbient;
         const nextRecent = x + (before + (recent[k] - before) * idleRecent - x) * keepRecent;
+        const nextSlow = x + (before + (slow[k] - before) * idleSlow - x) * keepSlow;
         ambient[k] = nextAmbient === ambient[k] ? x : nextAmbient;
         recent[k] = nextRecent === recent[k] ? x : nextRecent;
+        slow[k] = nextSlow === slow[k] ? x : nextSlow;
         seen[k] = x;
       }
       this.#idle = 0;
@@ -182,18 +195,24 @@ export class Retina {
     const facetOf = this.#facet;
     const isTransient = this.#transient;
     let firing = false;
-    for (let n = 0; n < rates.length; n++) {
+    const withdrawals = this.withdrawals;
+    // L1 comes first in `neurons`: its transient and sustained components
+    // are one depolarisation, released above its resting level as spikes
+    // and below it as withdrawals.
+    for (let n = 0; n < withdrawals.length; n++) {
+      const k = facetOf[n];
+      const drive = (recent[k] - seen[k]) / (ambient[k] + floor) + sustained * ((slow[k] - seen[k]) / (slow[k] + floor));
+      const rate = Math.min(maxRate, Math.max(0, tonic + maxRate * drive));
+      rates[n] = rate;
+      const withdrawn = Math.min(maxRate, Math.max(0, withdraw * maxRate * -drive));
+      withdrawals[n] = withdrawn;
+      if (rate > 0 || withdrawn > 0) firing = true;
+    }
+    for (let n = withdrawals.length; n < rates.length; n++) {
       const k = facetOf[n];
       const contrast = ((isTransient[n] ? recent[k] : ambient[k]) - seen[k]) / (ambient[k] + floor);
       const rate = Math.min(maxRate, Math.max(0, tonic + maxRate * contrast));
       rates[n] = rate;
-      if (rate > 0) firing = true;
-    }
-    const withdrawals = this.withdrawals;
-    for (let n = 0; n < withdrawals.length; n++) {
-      const k = facetOf[n];
-      const rate = Math.min(maxRate, Math.max(0, withdraw * maxRate * ((seen[k] - recent[k]) / (ambient[k] + floor))));
-      withdrawals[n] = rate;
       if (rate > 0) firing = true;
     }
     this.#firing = firing;

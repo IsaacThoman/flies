@@ -24,6 +24,7 @@ Retina::Retina(const eyes::Eye& eye, const RetinaParameters& parameters) : param
   withdrawals_.assign(l1_.size(), 0);
   ambient_.assign(facets_, 0);
   recent_.assign(facets_, 0);
+  slow_.assign(facets_, 0);
   seen_.assign(facets_, 0);
 }
 
@@ -34,6 +35,8 @@ bool Retina::step(double dt, const std::span<const float>* light) {
   const double max_rate = parameters_.max_rate;
   const double tonic = parameters_.tonic;
   const double withdraw = parameters_.withdraw;
+  const double sustained = parameters_.sustained;
+  const double tau_slow = parameters_.luminance;
   const bool was = firing_;
   if (light == nullptr) {
     open_ = false;
@@ -46,6 +49,7 @@ bool Retina::step(double dt, const std::span<const float>* light) {
   }
   double* const ambient = ambient_.data();
   double* const recent = recent_.data();
+  double* const slow = slow_.data();
   double* const seen = seen_.data();
   // NaN reads as 0, as `x > 0 ? Math.min(1, x) : 0` has it.
   const float* const luminance = light->data();
@@ -56,7 +60,7 @@ bool Retina::step(double dt, const std::span<const float>* light) {
   if (!open_) {
     open_ = true;
     idle_ = 0;
-    for (uint32_t k = 0; k < facets_; k++) ambient[k] = recent[k] = seen[k] = lum(k);
+    for (uint32_t k = 0; k < facets_; k++) ambient[k] = recent[k] = slow[k] = seen[k] = lum(k);
   } else {
     bool same = true;
     for (uint32_t k = 0; k < facets_ && same; k++) same = lum(k) == seen[k];
@@ -68,32 +72,42 @@ bool Retina::step(double dt, const std::span<const float>* light) {
     }
     const double idle_ambient = fdlibm::exp(-idle_ / tau_ambient);
     const double idle_recent = fdlibm::exp(-idle_ / tau_transient);
+    const double idle_slow = fdlibm::exp(-idle_ / tau_slow);
     const double keep_ambient = fdlibm::exp(-dt / tau_ambient);
     const double keep_recent = fdlibm::exp(-dt / tau_transient);
+    const double keep_slow = fdlibm::exp(-dt / tau_slow);
     for (uint32_t k = 0; k < facets_; k++) {
       const double before = seen[k];
       const double x = lum(k);
       // A level a step no longer moves is the light (vision.ts says why).
       const double next_ambient = x + (before + (ambient[k] - before) * idle_ambient - x) * keep_ambient;
       const double next_recent = x + (before + (recent[k] - before) * idle_recent - x) * keep_recent;
+      const double next_slow = x + (before + (slow[k] - before) * idle_slow - x) * keep_slow;
       ambient[k] = next_ambient == ambient[k] ? x : next_ambient;
       recent[k] = next_recent == recent[k] ? x : next_recent;
+      slow[k] = next_slow == slow[k] ? x : next_slow;
       seen[k] = x;
     }
     idle_ = 0;
   }
   bool firing = false;
-  for (size_t n = 0; n < rates_.size(); n++) {
+  // L1 comes first in neurons(): its transient and sustained components are
+  // one depolarisation, released above its resting level as spikes and below
+  // it as withdrawals.
+  for (size_t n = 0; n < withdrawals_.size(); n++) {
+    const uint32_t k = facet_[n];
+    const double drive = (recent[k] - seen[k]) / (ambient[k] + floor) + sustained * ((slow[k] - seen[k]) / (slow[k] + floor));
+    const double rate = js::min(max_rate, js::max(0, tonic + max_rate * drive));
+    rates_[n] = rate;
+    const double withdrawn = js::min(max_rate, js::max(0, withdraw * max_rate * -drive));
+    withdrawals_[n] = withdrawn;
+    if (rate > 0 || withdrawn > 0) firing = true;
+  }
+  for (size_t n = withdrawals_.size(); n < rates_.size(); n++) {
     const uint32_t k = facet_[n];
     const double contrast = ((transient_[n] != 0 ? recent[k] : ambient[k]) - seen[k]) / (ambient[k] + floor);
     const double rate = js::min(max_rate, js::max(0, tonic + max_rate * contrast));
     rates_[n] = rate;
-    if (rate > 0) firing = true;
-  }
-  for (size_t n = 0; n < withdrawals_.size(); n++) {
-    const uint32_t k = facet_[n];
-    const double rate = js::min(max_rate, js::max(0, withdraw * max_rate * ((seen[k] - recent[k]) / (ambient[k] + floor))));
-    withdrawals_[n] = rate;
     if (rate > 0) firing = true;
   }
   firing_ = firing;

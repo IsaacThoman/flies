@@ -35,6 +35,10 @@ struct RetinaParameters {
   double tonic = 0;
   /** Factor on L1's withdrawals under brightening, 1 for the same scale as darkening (0: no ON pathway). */
   double withdraw = 1;
+  /** L1's sustained component: its response to a facet's light against the level of `luminance`, as a fraction of its transient response to the same contrast (0: none). */
+  double sustained = 0.3;
+  /** Time constant, ms, of the level L1's sustained component measures the light against. */
+  double luminance = 100000;
 };
 
 /** One eye's photoreceptors and lamina: luminance per facet in, a rate per driven lamina cell out. */
@@ -74,6 +78,7 @@ class Retina {
   std::vector<uint8_t> transient_;
   std::vector<double> ambient_;
   std::vector<double> recent_;
+  std::vector<double> slow_;
   // Each facet's luminance at the last step, clamped to 0..1.
   std::vector<double> seen_;
   bool open_ = false;
