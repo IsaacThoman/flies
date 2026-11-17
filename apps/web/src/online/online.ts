@@ -46,6 +46,9 @@ const BITES_EVERY = 100;
 const LATE_VISIT = 3000;
 /** At the table again after a moment away, this device's fly is put where the table has it only if it is further off than this, mm. */
 const PUT_BACK = 1;
+/** A count of flies asked for and not answered (the room drops what comes too often) is asked again after this long (ms), twice as long each time, this many times in all. */
+const RECOUNT_WAIT = 1000;
+const RECOUNT_TRIES = 5;
 
 const LIGHT_TOOL = TOOLS.findIndex((t) => t.id === "light");
 const WEATHER_TOOL = TOOLS.findIndex((t) => t.id === "weather");
@@ -103,8 +106,14 @@ export class Online {
   colour = "";
   /** This device's flies at the table, in line, as the table last seated them. */
   mine: readonly SeatedFly[] = [];
-  /** How many flies this device last asked the table for. */
+  /** How many flies this device last asked the table for and was answered: in its hello, or by `seated`. */
   asked = 0;
+  /** A count asked for and not yet answered (0: none), when it was last said (performance ms) and how many times. */
+  #asking = 0;
+  #askingAt = 0;
+  #tries = 0;
+  /** A count asked for as many times as it may be, unanswered: not asked again until the player changes it or the line comes back. */
+  #unanswered = 0;
   starter = 0;
   epoch = 0;
   place: PlaceId | null = null;
@@ -196,10 +205,28 @@ export class Online {
     return [this.#host.life, ...this.#host.company.list.map((c) => c.life)];
   }
 
-  /** The player wants another number of flies at the table: it asks, and is seated as many as there are seats for. */
-  recount(n: number) {
-    if (!this.joined || n === this.asked) return;
-    this.asked = n;
+  /**
+   * The player wants `n` flies at the table (called each frame): it asks, and
+   * is seated as many as there are seats for. One question at a time, the
+   * newest count: one the room hasn't answered is asked again, later each
+   * time, a few times.
+   */
+  recount(n: number, now = performance.now()) {
+    if (!this.joined) return;
+    if (this.#asking) {
+      if (now - this.#askingAt < RECOUNT_WAIT * 2 ** (this.#tries - 1)) return;
+      if (this.#tries >= RECOUNT_TRIES) {
+        this.#unanswered = this.#asking;
+        this.#asking = 0;
+        this.#tries = 0;
+      }
+    }
+    if (!this.#asking && (n === this.asked || n === this.#unanswered)) return;
+    this.#unanswered = 0;
+    if (n !== this.#asking) this.#tries = 0;
+    this.#asking = n;
+    this.#askingAt = now;
+    this.#tries++;
     this.line.send({ type: "flies", count: n });
   }
 
@@ -237,6 +264,10 @@ export class Online {
         this.colour = m.colour;
         this.starter = m.starter;
         this.pantry.player = m.id;
+        // The hello asked for `asked`, and this answers it: anything asked before the line dropped is asked again from here if it still differs.
+        this.#asking = 0;
+        this.#tries = 0;
+        this.#unanswered = 0;
         this.#seat(m.flies);
         this.#clock = { at: m.now, wall: m.wall, offset: m.offset };
         this.now = this.#roomNow();
@@ -261,6 +292,11 @@ export class Online {
         return;
       }
       case "seated": {
+        this.asked = m.asked;
+        if (m.asked === this.#asking) {
+          this.#asking = 0;
+          this.#tries = 0;
+        }
         const known = new Set(this.mine.map((f) => f.id));
         this.#seat(m.flies);
         // The new ones stand where the table set them down: now, or once carried to its place.
@@ -416,7 +452,7 @@ export class Online {
     const { life, company } = this.#host;
     this.#localTools(roomNow);
 
-    // The other flies where this one can meet them, and the one visits are planned round (the lowest id, the same on every device).
+    // The other players' flies, for visitors to keep clear of, and the one visits are planned round (the lowest id, the same on every device).
     this.#othersAt.length = 0;
     let anchorId = this.mine[0]?.id || 255;
     const a = this.#anchor;
@@ -424,9 +460,9 @@ export class Online {
     a.x = mine.x;
     a.y = mine.y;
     a.z = mine.z;
-    for (const c of company.list) {
+    for (let i = 0; i < company.list.length; i++) {
+      const c = company.list[i];
       const p = c.life.body.position;
-      this.#othersAt.push(p);
       if (c.id > 0 && c.id < anchorId) {
         anchorId = c.id;
         a.x = p.x;
@@ -579,7 +615,9 @@ export class Online {
     const seq = ++this.#seq & 0xffff;
     const playing = (player.away ? AWAY : 0) | (player.playing ? PLAYING : 0);
     let n = 0;
-    for (const f of this.mine) {
+    const mine = this.mine;
+    for (let i = 0; i < mine.length; i++) {
+      const f = mine[i];
       const c = n === 0 ? null : company.list[n - 1];
       if (n > 0 && (!c || c.id !== f.id)) break;
       const s = this.#mine[n];
