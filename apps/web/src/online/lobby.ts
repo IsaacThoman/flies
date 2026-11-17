@@ -38,7 +38,7 @@ export class Lobby {
       this.#tries = 0;
       this.#answered = true;
       this.#heardAt = this.#time;
-    } else if (m.type === "refused" && m.reason === "version") {
+    } else if (m?.type === "refused" && m.reason === "version") {
       this.status = "version";
       this.#socket?.close();
       this.#socket = null;
