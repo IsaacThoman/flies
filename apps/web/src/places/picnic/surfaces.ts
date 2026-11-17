@@ -67,6 +67,17 @@ vec3 gingham(vec2 uv, float check, vec3 dye) {
   }
   return cloth;
 }
+// Thread relief vanishes before a crossing becomes smaller than a pixel.
+float wovenHeight(vec2 uv) {
+  vec2 th = uv / 0.22;
+  float detail = 1.0 - smoothstep(0.25, 0.65, max(fwidth(th.x), fwidth(th.y)));
+  vec2 f = fract(th);
+  bool warpOnTop = mod(floor(th.x) + floor(th.y), 2.0) < 1.0;
+  float across = warpOnTop ? f.y : f.x;
+  float along = warpOnTop ? f.x : f.y;
+  float roundThread = sin(3.14159 * across);
+  return roundThread * roundThread * (0.75 + 0.25 * sin(3.14159 * along)) * 0.015 * detail;
+}
 `;
 
 /**

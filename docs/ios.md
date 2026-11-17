@@ -477,3 +477,7 @@ No iPhone or iPad was connected while this was built. Everything above ran in th
 - **Universal links and AutoFill with the site's passwords**, which need the Team ID, the
   capability and a signed build (On a device, step 4); the simulator check hands the app a link
   the way iOS does, but not from Messages.
+
+<!-- docs-check: base apps/ios -->
+
+<!-- docs-check: generated apps/ios/www/ -->

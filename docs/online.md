@@ -147,10 +147,10 @@ that is every launch.
 | A fly: where it is, its pose, its hand | Its player's device, where its brain and body run | About 20 states a second through the room, drawn about 100 ms in the past, interpolated (`packages/net/src/track.ts`) |
 | What a fly feels and does about the others | Its own device | The others are bodies its eyes see and its body meets (`packages/body/src/crowd.ts`); their hands are the same `Hands` as yours, driven from the wire (`apps/web/src/online/other-hands.ts`) |
 | The food: the place's patches, what is dropped, what the place puts out | The room (`TableFood`) | Each device eats at once and tells the room; the room's account, less what the device has eaten since, is what is left (`FoodMirror`) |
-| A thrown ball | The room's clock | Its path and the moment its dive starts: every device (and the room) puts it in the same place at the same moment (`ball.ts`), a round trip after Select so everyone sees the whole dive |
+| A thrown ball | The room's clock | Its path and the moment its dive starts: every device (and the room) puts it in the same place at the same moment (`packages/net/src/ball.ts`), a round trip after Select so everyone sees the whole dive |
 | The place | The room | `place` tells every device to carry its fly there, and where each fly is set down |
 | The light, the weather, the clock | The room, chosen by the starter; in a room open to everyone, each device | `world` and the welcome's clock; "Now" follows the starter's time zone. In a room open to everyone the room says "clock" and "now" and nobody listens: each device keeps its own |
-| The high bubbles | The room's seed and clock | Each device works them out (`bubbles.ts`); a device whose fly bursts one says so |
+| The high bubbles | The room's seed and clock | Each device works them out (`packages/net/src/bubbles.ts`); a device whose fly bursts one says so |
 | Visitors (gust, gull, leaf, butterfly, ladybird, juice, boat) | The room says when, with a seed (the picnic's pace, `@fly/world`) | Each device starts the visit from that seed (`SceneSet.happen`); visitors keep clear of whichever fly is nearest |
 | The restaurant's ventilation | The room says when it comes on, by the same clock as alone (`VentilationClock`, `@fly/world`), with a seed | Each device draws how long it runs from the seed (`SceneSet.happen`), so every fly feels the same draught at the same time |
 
@@ -567,3 +567,5 @@ Welcome advertises receipt support with optional `meals: true`. This is
 additive within protocol 3: older devices ignore receipts; new devices with
 older rooms retain their original optimistic nutrition accounting rather
 than treating historical or rounded cumulative totals as fresh nutrition.
+
+<!-- docs-check: generated DATA_DIR/tables.json -->

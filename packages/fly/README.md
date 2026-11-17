@@ -242,3 +242,5 @@ groom path is a stylised sweep.
 - Schwarz et al. (2017), [Motor control of Drosophila feeding behavior](https://doi.org/10.7554/eLife.19892).
 
 See `docs/fly-realism.md` for the experiment rubric, measurements and blind review log.
+
+<!-- docs-check: base packages/fly/src/nerves -->
