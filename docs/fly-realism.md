@@ -101,3 +101,29 @@ All reviewers found remaining weak labellar contact and small-scale wing/action
 readability. Two identified an 80 ms ground-motion filter causing foot sliding
 through acceleration and changing turns. A targeted transport test measured
 0.264 body lengths of drift, motivating the next candidate.
+
+### Round 3 (duplicate control)
+
+Key: F4 = round-2 candidate, A9 = `81343d64`, H8 = byte-identical F4.
+Orders: H8,F4,A9; H8,A9,F4; A9,F4,H8; A9,F4,H8. Every reviewer preferred
+A9 and scored F4/H8 identically. No duplicate discrepancy exceeded one point;
+additional primary reviewers were not required.
+
+| Reviewer | F4 = H8 scores | A9 scores | F4/H8 mean | A9 mean | Ranking |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 8,7,6.5,4.5,7,6,6.5,7 | 8,8,6.5,8,7,8,6.5,7 | 6.563 | 7.375 | A9 > H8 = F4 |
+| 2 | 7.5,7,6.5,4.5,7,6,5.5,8 | 7.5,8,6.5,8,7,8,5.5,8 | 6.500 | 7.313 | A9 > H8 > F4 (tie) |
+| 3 | 8,7,6.5,4.5,7.5,6,6,7 | 8,8,6.5,8.5,7.5,8,6,7 | 6.563 | 7.438 | A9 > F4 > H8 (tie) |
+| Tradeoff assessment | 8,6.5,7,4.5,7,6,6,7.5 | 8,8,7,8,7,8,6,7.5 | 6.563 | 7.438 | A9 > F4 > H8 (tie) |
+
+Primary-review mean: **6.542 → 7.375**. Accepted: body-travel compensation
+without velocity filtering; a deeper feeding crouch; fixed-length two-link
+mouthpart reach; horizontal paired pads; and contact diagnostics in the viewer.
+No proposal rejected. Maximum world-space planted-claw drift fell from 0.2635
+to 5.34e-8 body lengths in the common acceleration/turn profile. Both labellar
+undersides stayed 0.000734 body lengths above the plane; stem scale stayed 1.0.
+The direct predecessor CPU medians (146.174 vs 148.143 µs) overlapped, so this
+round did not establish a further speed gain. The model remains two draws.
+
+Remaining priorities: actual grooming-surface contact, clearer posterior-action
+silhouettes, and a wing envelope that survives bright backgrounds at game scale.
