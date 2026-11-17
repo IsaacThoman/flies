@@ -170,7 +170,7 @@ test("the panel shows real figures and their units without a duplicate activity 
     return writtenOn(g).map((w) => w.text);
   };
   assert.deepEqual(written("brain"), ["1.24M", "spikes/s", "41.2k", "active", "0.98×", "real time"]);
-  assert.deepEqual(written("signals", 2, true), ["In", "Loom L", "Loom R", "Touch", "Antenna L", "Antenna R", "Wind", "Sweet", "Bitter", "Water", "On legs", "Male taste", "Wingbeat", "Light", "Hunger", "Thirst", "Out", "Hz", "Walk", "0", "Steer", "0·0", "Back up", "0", "Escape", "0", "Wings", "0", "Groom", "0", "Feed", "0", "Sing", "0"]);
+  assert.deepEqual(written("signals", 2, true), ["In", "Loom L", "Loom R", "Touch", "Antenna L", "Antenna R", "Wind", "Sweet", "Bitter", "Water", "On legs", "Male taste", "Wingbeat", "Legs L", "Legs R", "Light", "Hunger", "Thirst", "Out", "Hz", "Walk", "0", "Steer", "0·0", "Back up", "0", "Escape", "0", "Wings", "0", "Groom", "0", "Feed", "0", "Sing", "0"]);
   assert.deepEqual(written("day"), ["1.42", "m", "walked", "3", "meals", "7", "take-offs", "42", "s", "flying", "2", "min", "grooming"]);
   for (const [cols, side] of [[3, false], [2, false], [3, true]] as const) assert.equal(written("both", cols, side).length, 2 * 8 + 3, `${cols} across${side ? ", side by side" : ""}`);
   // Every cell inside the panel, in every arrangement.
@@ -190,19 +190,19 @@ test("the panel shows real figures and their units without a duplicate activity 
 });
 
 test("in and out are the senses as sent and the commands as answered, each to the step it is drawn in, with the rates of the neurons each is read from", () => {
-  const sensed = { loomLeft: 0.5, loomRight: 0.004, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0.25, sweet: 1, grounded: false, maleTaste: 0.75, hunger: 0.3, thirst: 0.5, wingbeat: 0.5, bitter: 0.25, water: 0, light: { left: [0.2, 0.4], right: [0.6, 0.8] } };
+  const sensed = { loomLeft: 0.5, loomRight: 0.004, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0.25, sweet: 1, grounded: false, maleTaste: 0.75, hunger: 0.3, thirst: 0.5, wingbeat: 0.5, bitter: 0.25, water: 0, legsLeft: 0.25, light: { left: [0.2, 0.4], right: [0.6, 0.8] } };
   const brain: BrainState = {
     command: { walk: 0.8, turn: -0.5, back: 0, escape: 0, wings: 1, groom: 0, feed: 0.25, sing: 0 },
     stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: { DNg100: 41.6, "DNa02 left": 30.2, "DNa02 right": 12.7, flight: 180, MN9: 3.4, pIP10: 0.2 } },
   };
   const state: StatsState = { spikes: 0, active: 0, speed: 1, history: new Float32Array(HISTORY_SAMPLES), head: 0, day: freshDay("2026-11-16"), sensed, brain };
   const v = Array.from(readSignals(state, new Float32Array(SIGNALS)), (x) => Number(x.toFixed(2)));
-  assert.deepEqual(v.slice(0, 15), [0.5, 0, 0, 0, 0, 0.25, 1, 0.25, 0, 0, 0.75, 0.5, 0.5, 0.3, 0.5], "the senses: the light is the mean over every facet, a sense too small to show is none; then hunger and thirst");
+  assert.deepEqual(v.slice(0, 17), [0.5, 0, 0, 0, 0, 0.25, 1, 0.25, 0, 0, 0.75, 0.5, 0.25, 0, 0.5, 0.3, 0.5], "the senses: a leg left out is none, the light is the mean over every facet, a sense too small to show is none; then hunger and thirst");
   // Touch is the most any part of it is touched.
   const touched = readSignals({ ...state, sensed: { ...sensed, touchNotum: 0.25, touchEyeLeft: 0.5 } }, new Float32Array(SIGNALS));
   assert.equal(touched[2], 0.5);
-  assert.deepEqual(v.slice(15, 23), [0.8, -0.5, 0, 0, 1, 0, 0.25, 0], "the commands, steering signed");
-  assert.deepEqual(v.slice(23), [42, 30, 13, 0, 0, 180, 0, 3, 0], "each command's neurons, in whole Hz; a rate the brain doesn't report is none");
+  assert.deepEqual(v.slice(17, 25), [0.8, -0.5, 0, 0, 1, 0, 0.25, 0], "the commands, steering signed");
+  assert.deepEqual(v.slice(25), [42, 30, 13, 0, 0, 180, 0, 3, 0], "each command's neurons, in whole Hz; a rate the brain doesn't report is none");
   const g = blankCanvas();
   drawStatsPanel(g, statsShape("signals", 1, false), state);
   const words = writtenOn(g).map((w) => w.text);

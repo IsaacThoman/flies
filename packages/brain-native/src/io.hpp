@@ -32,6 +32,8 @@ enum Sense : uint8_t {
   kWingbeat,
   kBitter,
   kWater,
+  kLegsLeft,
+  kLegsRight,
   kTouchEyeLeft,
   kTouchEyeRight,
   kTouchFrontLeft,
@@ -68,6 +70,7 @@ struct Senses {
   double temperature_left = std::numeric_limits<double>::quiet_NaN(), temperature_right = std::numeric_limits<double>::quiet_NaN();
   /** Touch where it lands, from kTouchEyeLeft on in Sense's order; 0, left out. */
   double touch_parts[kTouchParts] = {};
+  double legs_left = 0, legs_right = 0;
 };
 
 struct Command {
@@ -109,6 +112,10 @@ struct InputSpec {
   bool gated = false;
   /** When not empty, the group is these regions' neurons, region after region, each its own sense (io.ts's SenseSpec.regions). */
   std::vector<TouchRegion> regions = {};
+  /** Added after every other input (io.ts's InputSpec.last). */
+  bool last = false;
+  /** The intensity at which these neurons reach their full rate (io.ts's SenseSpec.full); 0 for none: linear. */
+  double full = 0;
 };
 
 /** io.ts's SLEEP_GATE: how much of a mechanosensory sense's strength is lost at full sleep depth. */

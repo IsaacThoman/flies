@@ -68,10 +68,12 @@ const FULL: { [K in ScalarSense]: BrainSenses[K] } = {
   wingbeat: 1,
   bitter: 1,
   water: 1,
+  legsLeft: 1,
+  legsRight: 1,
 };
 const label = (key: ScalarSense) => (key === "grounded" ? "airborne" : key);
 const apply = (keys: readonly (ScalarSense)[]): BrainSenses => {
-  const senses: Record<ScalarSense, number | boolean> = { ...RESTING_SENSES };
+  const senses: Partial<Record<ScalarSense, number | boolean>> = { ...RESTING_SENSES };
   for (const key of keys) senses[key] = FULL[key];
   return senses as BrainSenses;
 };

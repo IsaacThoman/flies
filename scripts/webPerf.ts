@@ -340,7 +340,7 @@ async function main() {
         return [meter.ms / 2048, meter.rawMs / 2048];
       };
       const [rest, rawRest] = cost(RESTING_SENSES);
-      const [full, rawFull] = cost({ ...RESTING_SENSES, loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1 });
+      const [full, rawFull] = cost({ ...RESTING_SENSES, loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1, legsLeft: 1, legsRight: 1 });
       rows.push({ rest, full, rawRest, rawFull });
       await new Promise<void>(resolve => setImmediate(resolve));
     }

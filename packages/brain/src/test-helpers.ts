@@ -8,6 +8,8 @@ import type { EyeColumn } from "./eye-columns.ts";
 import { CATEGORY_NAMES, writeConnectome } from "./format.ts";
 import type { CategoryName, ConnectomeData } from "./format.ts";
 import { FORELEG_MALE_TASTE } from "./io.ts";
+import { LEG_ORGANS, LEG_PROPRIOCEPTORS } from "./leg-sensors.ts";
+import type { LegOrgan } from "./leg-sensors.ts";
 
 export type SyntheticNeuron = { type: string; superClass: string; class?: string; subClass?: string; side?: string; nt?: string; nerve?: string; rootId?: number };
 
@@ -113,8 +115,18 @@ export function syntheticConnectome({ without = [], change = {} }: { without?: r
   // carry real ones, last because root IDs ascend; a mid leg's LgLG1a, by an ID
   // that isn't the front legs', must be left out.
   add("LgLG1a mid leg", 1, { type: "LgLG1a", superClass: "vnc_sensory", class: "gustatory", side: "left", nt: "ACH" }, [90000]);
+  // A claw neuron by an ID none of the legs' lists has, which must be left out too.
+  add("claw unlisted", 1, { type: "SNpp50", superClass: "vnc_sensory", class: "mechanosensory_proprioceptive", subClass: "chordotonal_organ", nt: "ACH" }, [90001]);
   add("LgAG1", 1, { type: "LgAG1", superClass: "sensory_ascending", class: "gustatory", side: "left", nt: "ACH" }, FORELEG_MALE_TASTE.LgAG1);
   add("LgLG1a", 2, { type: "LgLG1a", superClass: "vnc_sensory", class: "gustatory", side: "left", nt: "ACH" }, FORELEG_MALE_TASTE.LgLG1a);
+  // The legs' proprioceptors are picked by root ID too (leg-sensors.ts): each
+  // organ and side's last, all after the male-taste neurons', in ascending order.
+  const legs = (Object.keys(LEG_PROPRIOCEPTORS) as LegOrgan[])
+    .flatMap((organ) => (["left", "right"] as const).map((side) => ({ organ, side, rootId: LEG_PROPRIOCEPTORS[organ][side].at(-1)! })))
+    .sort((a, b) => a.rootId - b.rootId);
+  for (const { organ, side, rootId } of legs) {
+    add(`${organ} ${side}`, 1, { type: LEG_ORGANS[organ][0], superClass: "vnc_sensory", class: "mechanosensory_proprioceptive", nt: "ACH" }, [rootId]);
+  }
 
   const edges: [number, number, number][] = [];
   const wire = (from: string, to: string, count: number) => {

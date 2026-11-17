@@ -97,6 +97,8 @@ type Scalar = (typeof SCALAR)[number];
 const STATE = ["clockMorning", "clockEvening", "clockSleep", "sleepPressure", "sleepDepth"] as const;
 /** The temperature at each antenna, last in the harness's line; left out, NaN. */
 const TEMPERATURE = ["temperatureLeft", "temperatureRight"] as const;
+/** The legs, at the end of the harness's line, after the touch parts. */
+const LEGS = ["legsLeft", "legsRight"] as const;
 
 /**
  * The scripted senses: rest standing and airborne, each sense alone, partial
@@ -120,6 +122,7 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     for (const key of STATE) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
     for (const key of TEMPERATURE) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
     for (const key of TOUCH_SENSES) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
+    for (const key of LEGS) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
     ticks.push({ dt, senses: each, what });
     if (dt >= 0 && dt <= 1000) total += dt;
   };
@@ -138,6 +141,13 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
       hold(1500, cycle % 2 === 0 ? 16 : 33, () => ({ [sense]: 1 }), `${sense} at full strength`);
       hold(800, 16, () => ({}), `rest after ${sense}`);
     }
+    for (const legs of LEGS) {
+      hold(1500, cycle % 2 === 0 ? 16 : 33, () => ({ [legs]: 1 }), `${legs} at full strength`);
+      hold(800, 16, () => ({}), `rest after ${legs}`);
+    }
+    hold(2000, 16, (t) => ({ legsLeft: (t / 2000) * 0.08, legsRight: 0.3 + 0.4 * Math.sin(t / 300) }), "legs stepping, slowly and wavering");
+    hold(500, 16, (t) => ({ legsLeft: [Number.NaN, -1, 7, Number.POSITIVE_INFINITY][Math.floor(t / 125)], legsRight: 0.02 }), "out-of-range legs");
+    hold(1500, 16, () => ({ clockSleep: 1, sleepDepth: 1, legsLeft: 0.6, legsRight: 0.6 }), "walking asleep");
     hold(1000, 33, (t) => ({ loomLeft: t / 1000 }), "loomLeft ramping up");
     hold(600, 16, (t) => ({ sweet: 0.5 + 0.5 * Math.sin(t / 50) }), "sweet wavering");
     hold(2000, frame, () => ({ touch: 0.4, wind: 0.5, grounded: false }), "held and dragged");
@@ -158,7 +168,7 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     hold(1000, 16, () => ({ clockSleep: 1, sleepPressure: 0.6, sleepDepth: 1, touchFrontRight: 1, touchOcciputRight: 0.4 }), "asleep, its face stroked");
     hold(500, 16, (t) => ({ touchLegs: [Number.NaN, -1, 7, Number.POSITIVE_INFINITY][Math.floor(t / 125)], touchAbdomen: 0.5 }), "out-of-range touch parts");
     hold(1000, 16, () => Object.fromEntries(TOUCH_SENSES.map((s) => [s, random() < 0.3 ? random() : 0])), "random touch parts");
-    hold(2000, 16, () => ({ loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1 }), "everything at once");
+    hold(2000, 16, () => ({ loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1, legsLeft: 1, legsRight: 1 }), "everything at once");
     hold(4000, 16, (t) => ({ loomRight: t % 1000 < 100 ? 1 : 0 }), "a looming pulse every second");
     hold(3000, () => Math.floor(random() * 50 * 4) / 4, () => Object.fromEntries(SCALAR.map((s) => [s, random() < 0.3 ? random() : 0])), "random ticks and senses");
     for (const dt of [0.4, 0.6, 0.25, 0, 0, 0.75, 1, 1.5, 2.5]) add(dt, { touch: 0.3 }, "short ticks");
@@ -316,6 +326,7 @@ export function script(ticks: readonly Tick[]): { input: string; frames: Uint8Ar
       hex32(senses.thirst ?? 1),
       ...TEMPERATURE.map((s) => hex32(senses[s] ?? Number.NaN)),
       TOUCH_SENSES.map((s) => hex32(senses[s] ?? 0)).join(","),
+      ...LEGS.map((s) => hex32(senses[s] ?? 0)),
     ].join(" ");
   });
   const frames = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));

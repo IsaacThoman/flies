@@ -32,7 +32,7 @@ const mean = (b: FlyBrain, ms: number, senses: BrainSenses) => {
   }
   return Object.fromEntries(Object.entries(sum).map(([k, v]) => [k, v / n])) as BrainCommand;
 };
-const FULL: BrainSenses = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1 };
+const FULL: BrainSenses = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1, legsLeft: 1, legsRight: 1 };
 const only = (key: keyof BrainSenses): BrainSenses => ({ ...RESTING_SENSES, [key]: FULL[key] });
 const SENSES = Object.keys(FULL) as (keyof BrainSenses)[];
 
@@ -53,6 +53,12 @@ test("every group finds its neurons in the real connectome, and none is both dri
     wingbeat: 413,
     bitter: 38,
     water: 23,
+    "claw left": 50,
+    "claw right": 44,
+    "club left": 72,
+    "club right": 65,
+    "hair plates left": 37,
+    "hair plates right": 41,
     "background left": 4424,
     "background right": 4466,
     DNg100: 2,

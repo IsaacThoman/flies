@@ -4,13 +4,15 @@
 // nothing else of the world. For the README's tables.
 //
 //   node scripts/sleep.ts [--part day|threshold|cost] [--row <name>] [--minutes 30] [--seeds 1,2,3] [--trials 8]
-//       [--sleep wake=1,clock=3.5,pressure=4,depth=4] [--stimulus <name>] [--hunger <0..1>] [--pace natural|lively]
+//       [--sleep wake=1,clock=3.5,pressure=4,depth=4] [--stimulus <name>] [--hunger <0..1>] [--pace natural|lively] [--still-legs]
 //
 // --sleep tries other weights for state.ts's sleep term (INTERNAL_STATE.sleep);
 // --stimulus picks the threshold's stimuli whose names start with it. --hunger
 // holds the fly at that hunger throughout (left out, 1: the brain as it was
 // before it had one; the game starts a fly at 0.7). --pace shapes the day as
-// the game's Activity setting does (rhythm.ts PACES; left out, natural).
+// the game's Activity setting does (rhythm.ts PACES; left out, natural). Its
+// legs feel its steps as the game's body feels them (legMovement); with
+// --still-legs they feel nothing, the brain as it was before it had them.
 //
 // day: at each hour of a summer day (and after a night or a day kept awake),
 //   held there for --minutes of fly time from the sleep pressure the hour
@@ -28,7 +30,7 @@
 //   night asleep.
 
 import { parseArgs } from "node:util";
-import { Behavior, FLY_HEIGHT, FLY_LENGTH, HEAD_AHEAD, MOUTH_AHEAD, PACES, Rhythm, SUMMER, TOUCH_PARTS, press } from "@fly/body";
+import { Behavior, FLY_HEIGHT, FLY_LENGTH, HEAD_AHEAD, MOUTH_AHEAD, PACES, Rhythm, SUMMER, TOUCH_PARTS, legMovement, press } from "@fly/body";
 import type { Intent, DayPace } from "@fly/body";
 import { RAIN_DROP, RAIN_TOUCH } from "../apps/web/src/places/picnic/life.ts";
 import { FEATHER_BRUSH, FEATHER_REST, FEATHER_TIP } from "../apps/web/src/tools/hands.ts";
@@ -51,6 +53,7 @@ const { values } = parseArgs({
     hunger: { type: "string" },
     sleep: { type: "string" },
     pace: { type: "string", default: "natural" },
+    "still-legs": { type: "boolean", default: false },
   },
 });
 const weights: { wake: number; clock: number; pressure: number; depth: number } = { ...INTERNAL_STATE.sleep };
@@ -74,6 +77,13 @@ const seeds = values.seeds.split(",").map(Number);
 const moving = (i: Intent) => i.walking || i.backing || i.groom > 0 || i.feeding || Math.abs(i.yawRate) > 0.3 || i.takeOff !== null;
 /** Moving away: moving, but not grooming in place. */
 const movingAway = (i: Intent) => moving(i) && !(i.groom > 0 && !i.walking && !i.backing && Math.abs(i.yawRate) <= 0.3 && i.takeOff === null && !i.feeding);
+
+/** Its legs feel how fast its last step moved them, as the game's body has them feel it (packages/body senses.ts). */
+function feel(senses: BrainSenses, i: Intent) {
+  if (values["still-legs"]) return;
+  senses.legsLeft = legMovement(i.speed, i.yawRate, 1);
+  senses.legsRight = legMovement(i.speed, i.yawRate, -1);
+}
 
 function tell(senses: BrainSenses, r: Rhythm) {
   senses.clockMorning = r.clock.morning;
@@ -111,6 +121,7 @@ function day() {
       for (let t = 0; t < minutes * 60_000; t += TICK) {
         if (rhythm) tell(senses, rhythm);
         const intent = behavior.update(brain.tick(TICK, senses).command, 0, true, TICK / 1000);
+        feel(senses, intent);
         const m = moving(intent);
         if (intent.walking) walking += TICK / 1000;
         if (m && !was) starts++;
@@ -203,13 +214,14 @@ function threshold() {
         const senses: BrainSenses = { ...resting(), clockSleep: 1, sleepPressure: 0.5, sleepDepth: depth };
         const eyes = stimulus.name.includes("eyes open");
         if (eyes) senses.light = ground;
-        for (let t = 0; t < 20_000; t += TICK) behavior.update(brain.tick(TICK, senses).command, 0, true, TICK / 1000);
+        for (let t = 0; t < 20_000; t += TICK) feel(senses, behavior.update(brain.tick(TICK, senses).command, 0, true, TICK / 1000));
         let woke = false;
         let left = false;
         for (let t = 0; t < stimulus.ms + 1000; t += TICK) {
           const each: BrainSenses = { ...senses };
           if (t < stimulus.ms) stimulus.senses(t, each, k);
           const intent = behavior.update(brain.tick(TICK, each).command, 0, true, TICK / 1000);
+          feel(senses, intent);
           if (moving(intent)) woke = true;
           if (movingAway(intent)) left = true;
         }

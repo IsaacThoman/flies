@@ -138,6 +138,8 @@ int tick(fly_brain* brain, double dt_ms, const fly_senses* senses, const Light& 
     in.temperature_left = senses->temperature_left;
     in.temperature_right = senses->temperature_right;
     for (int k = 0; k < FLY_TOUCH_PARTS; k++) in.touch_parts[k] = senses->touch_parts[k];
+    in.legs_left = senses->legs_left;
+    in.legs_right = senses->legs_right;
     fly::TickStats out;
     const fly::io::Command c = brain->brain.tick(dt_ms, in, light, out);
     if (command != nullptr) {

@@ -35,9 +35,9 @@ type Exports = {
 const MAX_TICK_MS = 1000;
 const ERROR_BYTES = 512;
 // fly_brain.h's structs as wasm32 lays them out: fly_senses is seven floats, an int, two pointers, three floats (maleTaste,
-// hunger, wingbeat), five floats of internal state, three more (bitter, water, thirst), two of temperature and the twelve
-// touch parts; fly_command eight floats; fly_stats two doubles and two uint32s.
-const SENSES_BYTES = 140;
+// hunger, wingbeat), five floats of internal state, three more (bitter, water, thirst), two of temperature, the twelve
+// touch parts and two of the legs; fly_command eight floats; fly_stats two doubles and two uint32s.
+const SENSES_BYTES = 148;
 const COMMAND_BYTES = 32;
 const STATS_BYTES = 24;
 const SCALARS = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet"] as const;
@@ -49,6 +49,8 @@ const BITTER_AT = 72;
 const TEMPERATURE_AT = 84;
 /** fly_senses's touch parts, after the temperatures, in TOUCH_SENSES's order. */
 const TOUCH_AT = 92;
+/** fly_senses's legs, after the touch parts. */
+const LEGS_AT = 140;
 
 const utf8 = new TextDecoder();
 
@@ -199,6 +201,8 @@ class WasmBrain implements Brain {
     view.setFloat32(s + TEMPERATURE_AT, senses.temperatureLeft ?? Number.NaN, true);
     view.setFloat32(s + TEMPERATURE_AT + 4, senses.temperatureRight ?? Number.NaN, true);
     for (let k = 0; k < TOUCH_SENSES.length; k++) view.setFloat32(s + TOUCH_AT + 4 * k, senses[TOUCH_SENSES[k]] ?? 0, true);
+    view.setFloat32(s + LEGS_AT, senses.legsLeft ?? 0, true);
+    view.setFloat32(s + LEGS_AT + 4, senses.legsRight ?? 0, true);
     const failed = e.fly_brain_tick(this.#brain, dtMs, s, this.#command, this.#stats, this.#rates, this.#error, ERROR_BYTES);
     // The tick may have grown the memory, which leaves the old views empty.
     this.#views();
