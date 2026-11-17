@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import type { TableSocket, TableSocketStatus } from "@fly/contracts";
-import { CLOSE, PROTOCOL, TABLETOP_SCALE, TABLE_LIGHTS, TABLE_WEATHERS, createFlyState, decodeBites, readState } from "@fly/net";
+import { CLOSE, PROTOCOL, TABLETOP_SCALE, TABLE_LIGHTS, TABLE_WEATHERS, bitesEpoch, createFlyState, decodeBites, readState } from "@fly/net";
 import type { ClientMessage, ServerMessage } from "@fly/net";
 import { WORLDS } from "@fly/world";
 import { TableLine } from "../src/online/connection.ts";
@@ -142,15 +142,23 @@ test("a message from the room out of shape is dropped before the game sees it, a
   l.onMessage = (m) => heard.push(m);
   sockets[0].status = "open";
   l.update(0.016);
-  const bad = [{ ...welcome(5000), players: "everyone" }, { ...welcome(5000), id: 1_000_000 }, { type: "joined", id: 1e6, colour: "#fff", away: false }, { type: "place", place: "lab", epoch: 1, foods: [], spots: null }];
-  for (const m of bad) sockets[0].say(m as ServerMessage);
+  const bad = [null, ...[undefined, null, "5000"].map((now) => ({ ...welcome(5000), now })), { ...welcome(5000), players: "everyone" }, { ...welcome(5000), id: 1_000_000 }, { type: "joined", id: 1e6, colour: "#fff", away: false }, { type: "place", place: "lab", epoch: 1, foods: [], spots: null }];
+  for (const m of bad) sockets[0].raw(JSON.stringify(m));
   l.update(0.016);
   assert.equal(l.status, "connecting", "no welcome taken from a broken one");
   assert.equal(heard.length, 0);
+  assert.equal(l.clock.synced, false);
   sockets[0].say(welcome(5000));
   l.update(0.016);
   assert.equal(l.status, "joined");
   assert.deepEqual(heard.map((m) => m.type), ["welcome"]);
+  for (const pong of [{ type: "pong", t: 1000 }, { type: "pong", t: null, now: 0 }, { type: "pong", t: 1000, now: "0" }]) {
+    sockets[0].raw(JSON.stringify(pong));
+    l.update(0);
+    assert.equal(l.clock.now(1000), 5000, "a malformed pong cannot poison an established clock");
+  }
+  assert.deepEqual(heard.map((m) => m.type), ["welcome"]);
+  l.leave();
 });
 
 test("an invitation is the page's address with the table's code, and the room server is the site's own /rooms", () => {
@@ -184,21 +192,6 @@ test("the table knows every place, light and weather the game does, by the same 
   assert.deepEqual([...TABLE_WEATHERS], TOOLS.find((t) => t.id === "weather")!.variants.map((v) => v.id));
 });
 
-
-test("a non-message JSON value is ignored while the line can still be welcomed", () => {
-  const { line: l, sockets } = line();
-  sockets[0].status = "open";
-  l.update(0);
-  sockets[0].say(null);
-  assert.doesNotThrow(() => l.update(0));
-  assert.equal(l.status, "connecting");
-  sockets[0].say(welcome(5000));
-  l.update(0);
-  assert.equal(l.status, "joined");
-  l.leave();
-});
-
-
 test("only a joined line sends tools and binary state; an empty bite report sends nothing", (t) => {
   let now = 1000;
   t.mock.method(performance, "now", () => now);
@@ -209,7 +202,7 @@ test("only a joined line sends tools and binary state; an empty bite report send
   const send = () => {
     l.send({ type: "world", light: "night" });
     l.sendFly(TABLETOP_SCALE, fly);
-    l.sendBites(42, [{ food: 7, amount: 0.25 }], 1);
+    l.sendBites(42, [{ food: 7, amount: 0.25 }], 1, 7);
   };
   send();
   assert.deepEqual(socket.sent, []);
@@ -232,7 +225,8 @@ test("only a joined line sends tools and binary state; an empty bite report send
   const bites: [number, number][] = [];
   assert.equal(decodeBites(view(socket.binary[1]), (id, amount) => bites.push([id, amount])), 42);
   assert.deepEqual(bites, [[7, 0.25]]);
-  l.sendBites(43, [], 0);
+  assert.equal(bitesEpoch(view(socket.binary[1])), 7, "the report belongs to the place it was eaten in");
+  l.sendBites(43, [], 0, 7);
   assert.equal(socket.binary.length, 2);
   l.leave();
   assert.equal(l.refusal, "left");
@@ -278,32 +272,6 @@ test("a welcome from a restarted room replaces every sample from the previous ro
   sockets[1].say(welcome(100));
   l.update(0);
   assert.equal(l.clock.now(now), 100);
-  l.leave();
-});
-
-
-test("a malformed clock message cannot welcome a line or poison an established room clock", () => {
-  const { line: l, sockets } = line();
-  const socket = sockets[0];
-  socket.status = "open";
-  l.update(0);
-  const messages: ServerMessage[] = [];
-  l.onMessage = (message) => messages.push(message);
-  for (const now of [undefined, null, "5000"]) {
-    socket.raw(JSON.stringify({ type: "welcome", now }));
-    l.update(0);
-    assert.equal(l.status, "connecting");
-    assert.equal(l.clock.synced, false);
-  }
-  assert.deepEqual(messages, []);
-  socket.say(welcome(5000));
-  l.update(0);
-  for (const pong of [{ type: "pong", t: 1000 }, { type: "pong", t: null, now: 0 }, { type: "pong", t: 1000, now: "0" }]) {
-    socket.raw(JSON.stringify(pong));
-    l.update(0);
-    assert.equal(l.clock.now(1000), 5000);
-  }
-  assert.equal(messages.length, 1, "only the valid welcome reached the game");
   l.leave();
 });
 

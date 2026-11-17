@@ -32,7 +32,7 @@ export const campaigns: Campaign[] = [
   },
   {
     file: "apps/server/src/tables.ts",
-    tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts"],
+    tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts", "apps/server/tests/hardening.test.ts"],
     faults: [
       ["unlisted-leak", "table.listed && table.present > 0", "table.present > 0"],
       ["room-order", "b.flies - a.flies", "a.flies - b.flies"],
@@ -44,12 +44,12 @@ export const campaigns: Campaign[] = [
   },
   {
     file: "apps/server/src/lock.ts",
-    tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts"],
+    tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts", "apps/server/tests/hardening.test.ts"],
     faults: [
       ["password-check", "timingSafeEqual(got, want)", "true"],
       ["salt-size", "randomBytes(16)", "randomBytes(1)"],
       ["normalization", "password.normalize(\"NFC\")", "password"],
-      ["lock-shape", "typeof (v as Lock).hash === \"string\"", "true"],
+      ["lock-shape", "typeof l.hash === \"string\"", "true"],
     ],
   },
   {

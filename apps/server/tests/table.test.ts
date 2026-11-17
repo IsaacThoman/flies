@@ -756,7 +756,7 @@ test("a room lock accepts canonically equivalent passwords, uses a full random s
   assert.notEqual(other.salt, secured.salt, "the same password is salted independently at each room");
   assert.notEqual(other.hash, secured.hash);
   assert.equal(isLock(secured), true);
-  for (const value of [null, {}, { salt: secured.salt }, { salt: secured.salt, hash: 42 }]) assert.equal(isLock(value), false);
+  for (const value of [null, {}, { salt: secured.salt }, { salt: secured.salt, hash: 42 }, { salt: secured.salt, hash: [] }, { salt: secured.salt, hash: { length: 32 } }]) assert.equal(isLock(value), false);
 });
 
 test("equally full rooms with the same name have a stable code order regardless of arrival order", () => {

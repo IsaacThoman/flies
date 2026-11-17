@@ -10,7 +10,7 @@ export const challenges: Campaign[] = [
   },
   {
     file: "apps/server/src/lock.ts",
-    tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts"],
+    tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts", "apps/server/tests/hardening.test.ts"],
     faults: [["constant-salt", "randomBytes(16)", "Buffer.alloc(16)"]],
   },
   {
@@ -20,7 +20,7 @@ export const challenges: Campaign[] = [
   },
   {
     file: "apps/server/src/tables.ts",
-    tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts"],
+    tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts", "apps/server/tests/hardening.test.ts"],
     faults: [["reverse-room-tie", "a.code.localeCompare(b.code)", "b.code.localeCompare(a.code)"]],
   },
   {
