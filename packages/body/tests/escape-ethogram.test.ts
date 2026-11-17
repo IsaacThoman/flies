@@ -119,3 +119,11 @@ test('optical options fail before an expensive free-behaviour run begins', () =>
   for (const seed of [-1, 1.5, 0xffffffff]) assert.throws(() => validateEscapeOptions(8, 6, seed));
   assert.throws(() => validateEscapeOptions(8, 24, 20000));
 });
+
+
+test('control takeoffs never acquire a fabricated zero TTC', () => {
+  const s = summarizeEscape([{ ...trial, kind: 'flash', lvMs: 40, takeoffMs: 30, flown: true }]);
+  assert.equal(s.flash.takeoffMsMean, 30);
+  assert.equal(s.flash.ttcMsMean, null);
+  assert.equal(s.flash.perLv.find(r => r.lvMs === 40)!.ttcMsMean, null);
+});

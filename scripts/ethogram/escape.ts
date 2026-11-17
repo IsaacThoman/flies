@@ -68,9 +68,10 @@ export function summarizeEscape(trials: readonly EscapeTrial[]) {
     const all = trials.filter(t => t.kind === kind), eligible = all.filter(t => t.eligible);
     const successful = eligible.filter(t => t.flown && t.takeoffMs !== null);
     const fit = regression(successful.map(t => ({ x: t.lvMs, y: t.ttcMs! })));
-    return { attempted: all.length, n: eligible.length, readinessFailures: all.length - eligible.length, successes: successful.length, probability: eligible.length ? successful.length / eligible.length : null, probabilityCI95: wilson(successful.length, eligible.length), fit, perLv: LV_MS.map(lv => {
-      const each = eligible.filter(t => t.lvMs === lv), jumps = each.filter(t => t.takeoffMs !== null);
-      return { lvMs: lv, n: each.length, successes: each.filter(t => t.flown).length, takeoffMsMean: mean(jumps.map(t => t.takeoffMs!)), ttcMsMean: mean(jumps.map(t => t.ttcMs!)) };
+    const timed = successful.filter(t => t.ttcMs !== null);
+    return { takeoffMsMean: mean(successful.map(t => t.takeoffMs!)), ttcMsMean: mean(timed.map(t => t.ttcMs!)), attempted: all.length, n: eligible.length, readinessFailures: all.length - eligible.length, successes: successful.length, probability: eligible.length ? successful.length / eligible.length : null, probabilityCI95: wilson(successful.length, eligible.length), fit, perLv: LV_MS.map(lv => {
+      const each = eligible.filter(t => t.lvMs === lv), jumps = each.filter(t => t.flown && t.takeoffMs !== null);
+      return { lvMs: lv, n: each.length, successes: each.filter(t => t.flown).length, takeoffMsMean: mean(jumps.map(t => t.takeoffMs!)), ttcMsMean: mean(jumps.filter(t => t.ttcMs !== null).map(t => t.ttcMs!)) };
     }) };
   };
   const black = group('black'), checkerboard = group('checkerboard'), flash = group('flash'), blank = group('blank');
