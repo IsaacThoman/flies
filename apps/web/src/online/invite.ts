@@ -113,3 +113,8 @@ const THINGS = ["Crumbs", "Sugar", "Picnic", "Window", "Honey", "Berries", "Teac
 export function suggestName(pick: (n: number) => number = (n) => Math.floor(Math.random() * n)): string {
   return `${KINDS[pick(KINDS.length)]} ${THINGS[pick(THINGS.length)]}`;
 }
+
+/** Bundled apps need an app update; only a browser can fetch a newer game by reloading. */
+export function tryProtocolReload(app: boolean, reload: () => boolean): boolean {
+  return !app && reload();
+}

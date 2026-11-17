@@ -112,6 +112,19 @@ test("it starts a step better than where it settled last time, and the player's 
   assert.equal(q.level, 0);
 });
 
+test("a host can hold it at one level: slow frames, a slow brain and the player's choice leave it there, and what the device settled at stays saved", () => {
+  const saved = store({ "flies.quality": "4" });
+  const q = new Quality(saved, 0);
+  assert.equal(q.level, 0);
+  run(q, 120, 200, 0.5);
+  assert.equal(q.level, 0);
+  assert.ok(q.frameMs > 100, "still measured, for the stats");
+  q.reset();
+  assert.equal(q.level, 0);
+  assert.equal(saved.items.get("flies.quality"), "4");
+  assert.equal(new Quality(null, LEVELS.length).pinned, null, "not a level: it follows the device");
+});
+
 test("the picture is the cheaper of the player's choice and the device's", () => {
   assert.equal(cheaperPixels("classic", "chunky"), "chunky");
   assert.equal(cheaperPixels("chunkier", "chunky"), "chunkier");

@@ -138,6 +138,31 @@ function vaultS2(f: Footprint, x: number, z: number): number {
   return Math.min(1, f.hx <= f.hz ? (u / f.hx) ** 2 : (v / f.hz) ** 2);
 }
 
+/**
+ * How far out from its middle (as a share of its footprint's size) a dome
+ * stands at least `y` high: 1 at or below its base, 0 at or above its peak.
+ */
+export function domeScale(top: { base: number; height: number; power: number }, y: number): number {
+  if (y <= top.base) return 1;
+  if (y >= top.base + top.height) return 0;
+  return Math.sqrt(1 - Math.pow((y - top.base) / top.height, 1 / top.power));
+}
+
+/** Where the smoothstep reaches `k` (0 to 1). */
+const unsmooth = (k: number) => 0.5 - Math.sin(Math.asin(1 - 2 * Math.min(1, Math.max(0, k))) / 3);
+
+/**
+ * Where a dish stands at least `y` high, as shares of its footprint's size
+ * from its middle: a ring from `out[0]` (0 where its well does too) to
+ * `out[1]`. False where it is nowhere that high.
+ */
+export function dishScales(top: Extract<Top, { kind: "dish" }>, foot: number, y: number, out: [number, number]): boolean {
+  if (y > top.rim) return false;
+  out[0] = y <= top.well ? 0 : top.inner + (top.lip - top.inner) * unsmooth((y - top.well) / (top.rim - top.well));
+  out[1] = y <= foot ? 1 : top.lip + (1 - top.lip) * unsmooth((top.rim - y) / (top.rim - foot));
+  return true;
+}
+
 /** The top's height at a point inside the footprint. */
 export function topHeight(solid: Solid, x: number, z: number): number {
   const { top } = solid;
@@ -237,18 +262,20 @@ export function sideNormal(f: Footprint, x: number, z: number, out: Vec3): Vec3 
 /**
  * Where a ray enters and leaves the footprint's infinite vertical prism, as
  * distances along it: [t0, t1], or null when it misses. Only x and z of the
- * ray matter.
+ * ray matter. With `scale`, the footprint's, shrunk about its centre to that
+ * share of its size: where a dome stands at least a height (`domeScale`).
  */
-export function prismSpan(f: Footprint, ox: number, oz: number, dx: number, dz: number, out: [number, number] = [0, 0]): [number, number] | null {
+export function prismSpan(f: Footprint, ox: number, oz: number, dx: number, dz: number, out: [number, number] = [0, 0], scale = 1): [number, number] | null {
   let u0: number;
   let v0: number;
   let du: number;
   let dv: number;
   if (f.kind === "circle") {
-    u0 = (ox - f.x) / f.r;
-    v0 = (oz - f.z) / f.r;
-    du = dx / f.r;
-    dv = dz / f.r;
+    const r = f.r * scale;
+    u0 = (ox - f.x) / r;
+    v0 = (oz - f.z) / r;
+    du = dx / r;
+    dv = dz / r;
   } else {
     const o = local(f, ox, oz, scratch);
     u0 = o.u;
@@ -257,8 +284,8 @@ export function prismSpan(f: Footprint, ox: number, oz: number, dx: number, dz: 
     const s = f.angle === 0 ? 0 : Math.sin(f.angle);
     du = dx * c - dz * s;
     dv = dx * s + dz * c;
-    const ru = f.kind === "ellipse" ? f.rx : f.hx;
-    const rv = f.kind === "ellipse" ? f.rz : f.hz;
+    const ru = (f.kind === "ellipse" ? f.rx : f.hx) * scale;
+    const rv = (f.kind === "ellipse" ? f.rz : f.hz) * scale;
     u0 /= ru;
     v0 /= rv;
     du /= ru;

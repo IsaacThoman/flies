@@ -143,6 +143,7 @@ function main() {
   if (!cmd || cmd === 'help' || cmd === '--help') return console.log(USAGE);
   if (cmd === 'build') return build({ sim: has('--sim'), testScene: has('--test-scene'), standInBrain: has('--stand-in-brain'), standInWeather: has('--stand-in-weather'), localRooms: has('--local-rooms') });
   if (cmd === 'archive') {
+    if (process.env.TVOS_ENTRY !== undefined) throw Error('An archive is a release: unset TVOS_ENTRY, which selects a diagnostic entry instead of the game.');
     // A release reaches the site's room server; ROOMS_URL is for development builds (and a ws:// one adds an ATS exception).
     if (process.env.ROOMS_URL) throw Error('An archive is a release: unset ROOMS_URL, which points a development build at another room server.');
     const options = archiveOptions(flag('--version'), flag('--build-number'), has('--upload'));

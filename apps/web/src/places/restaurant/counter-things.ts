@@ -38,7 +38,7 @@ function patch(name: string, x: number, z: number) {
 /** The fruit bowl: the world's dish turned exactly, white glaze with two blue lines round its outside. */
 function bowl(b: Builder, s: Solid) {
   const { x, z } = s.footprint;
-  const top = s.top as { rim: number; lip: number };
+  const top = s.top as { well: number; rim: number; lip: number };
   const f = s.footprint as { r: number };
   const area = areaOf(s);
   const at = (r: number) => topHeight(s, x + r, z);
@@ -59,7 +59,8 @@ function bowl(b: Builder, s: Solid) {
   const profile: Profile = [
     [outside(ON), ON - 0.1],
     ...heights.map((y): Profile[number] => [outside(y), y]),
-    ...[top.lip * f.r, 132, 128, 122, 114, 104, 94, 86, 83, 50, 0].map((r): Profile[number] => [r, at(r)]),
+    // Chords across the concave inside must lie beneath the smooth felt dish.
+    ...[top.lip * f.r, 132, 128, 122, 114, 104, 94, 86, 83, 50, 0].map((r): Profile[number] => [r, Math.max(top.well, at(r) - 0.7)]),
   ];
   let start = 0;
   let blue = false;

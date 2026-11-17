@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FOODS, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TABLE_RADIUS, World, createPicnic, createSurface, isDropped } from "../src/index.ts";
-import type { RayHit } from "../src/index.ts";
+import type { RayHit, Solid } from "../src/index.ts";
 
 /** A bare round table this wide, with nothing on it. */
 const openTable = (r: number) => new World({ floor: { kind: "circle", r }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320 });
@@ -248,7 +248,7 @@ test("taste follows a food's circular reach and its remaining sweetness", () => 
   const berry = pantry.drop("berry", 0, 0);
   assert.equal(pantry.touching(1.5, 0, 0, 0), honey, "inside the radius, outside its square root");
   assert.equal(pantry.touching(1.5, 0, 1.5, 0), null, "outside the circle even though each axis is within reach");
-  pantry.eat(honey, 1, 2);
+  pantry.eat(honey, 1, 2.5);
   assert.equal(pantry.touching(0, 0, 0, 0), berry, "a nearly eaten sweeter food loses to a whole berry");
 });
 
@@ -284,4 +284,67 @@ test("an exhausted patch recovers gradually, half full halfway through its recov
   assert.equal(patch.amount, 0.5);
   pantry.update(45);
   assert.equal(patch.amount, 1);
+});
+
+test("a level ray meets a dome or a dish where it first stands as high as the ray, as a fine walk along it finds", () => {
+  const solids: Solid[] = [
+    { name: "dome", footprint: { kind: "circle", x: 0, z: 0, r: 10 }, top: { kind: "dome", base: 2, height: 6, power: 0.6 } },
+    { name: "egg", footprint: { kind: "ellipse", x: 30, z: 0, rx: 8, rz: 5, angle: 0.4 }, top: { kind: "dome", base: 0, height: 5, power: 1 } },
+    { name: "cushion", footprint: { kind: "box", x: -30, z: 0, hx: 6, hz: 9, angle: 0.3 }, top: { kind: "dome", base: 1, height: 3, power: 1.15 } },
+    { name: "dish", footprint: { kind: "circle", x: 0, z: 30, r: 12 }, top: { kind: "dish", well: 3, rim: 6, inner: 0.6, lip: 0.85 } },
+    { name: "plate", footprint: { kind: "circle", x: 0, z: -30, r: 12 }, top: { kind: "dish", well: 9, rim: 10, inner: 0.7, lip: 0.9 }, bottom: 8 },
+  ];
+  const place = new World({ floor: { kind: "rect", hx: 60, hz: 60 }, solids, patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 100 });
+  let seed = 9;
+  const random = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32);
+  let met = 0;
+  for (const s of solids) {
+    for (let i = 0; i < 400; i++) {
+      const f = s.footprint;
+      const angle = random() * 2 * Math.PI;
+      const o = { x: f.x + Math.cos(angle) * 16 * random(), y: (s.bottom ?? 0) + 0.01 + random() * 10, z: f.z + Math.sin(angle) * 16 * random() };
+      if (place.solidAt(o.x, o.y, o.z) >= 0) continue;
+      const turn = random() * 2 * Math.PI;
+      const d = { x: Math.cos(turn), y: 0, z: Math.sin(turn) };
+      const ray = place.raycast(o, d, hit(), 30);
+      // The first point along it, in steps of a thousandth of a millimetre, that is inside something.
+      let first = Infinity;
+      for (let t = 0; t <= 30; t += 0.001) if (place.solidAt(o.x + d.x * t, o.y, o.z + d.z * t) >= 0) { first = t; break; }
+      if (first === Infinity) {
+        assert.ok(!ray || ray.t > 29.99, `${s.name}: met nothing a walk finds`);
+        continue;
+      }
+      met++;
+      // Through its side, a hair over its base, it is met at the side (the side's height is taken just inside it).
+      assert.ok(ray && ray.t < first + 0.002, `${s.name}: met at ${ray?.t}, after a walk finds it at ${first}`);
+      if (ray.normal.y !== 0) assert.ok(Math.abs(ray.t - first) < 0.002, `${s.name}: met at ${ray.t}, a walk finds ${first}`);
+    }
+  }
+  assert.ok(met > 300);
+});
+
+test("a short ray among what was gathered round a point meets what a ray through the whole world meets", () => {
+  const place = createPicnic();
+  let seed = 4;
+  const random = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32);
+  let near = 0;
+  for (const s of SOLIDS) {
+    const f = s.footprint as { x: number; z: number };
+    for (let i = 0; i < 40; i++) {
+      const o = { x: f.x + (random() * 2 - 1) * 40, y: random() * 30, z: f.z + (random() * 2 - 1) * 40 };
+      if (place.gather(o.x, o.z, 2, o.y, o.y + 1) === 0) {
+        assert.equal(place.solidAt(o.x, o.y, o.z), -1);
+        continue;
+      }
+      near++;
+      for (let k = 0; k < 8; k++) {
+        const d = { x: Math.cos(k), y: 0, z: Math.sin(k) };
+        const a = place.raycastNear(o, d, hit(), 2, 1);
+        const b = place.raycast(o, d, hit(), 2, 1);
+        assert.equal(a?.solid ?? null, b && b.solid >= 0 ? b.solid : null);
+        if (a && b) assert.equal(a.t, b.t);
+      }
+    }
+  }
+  assert.ok(near > 50);
 });

@@ -27,12 +27,12 @@ import type { BrowserContextOptions, Page } from "playwright";
 import { MAX_PLAYERS, tableCode } from "@fly/net";
 import { startServer as startRooms } from "../../server/src/server.ts";
 import type { RoomServer } from "../../server/src/server.ts";
-import { chromiumPath, gpuFlags, readState, startServer, waitFor } from "../../../scripts/play.ts";
+import { chromiumPath, gpuFlags, holdSteady, readState, startServer, waitFor } from "../../../scripts/play.ts";
 import { fakeFly } from "../../../scripts/tables.ts";
 import type { FakeFly } from "../../../scripts/tables.ts";
 import { frameFor } from "../src/display.ts";
+import { LEVELS } from "../src/quality.ts";
 import { SHAPES } from "../tests/shapes.ts";
-import { disableScreensaver } from "./settings.ts";
 
 /** The frame's budget on the Apple TV, as play.e2e.ts holds it to. */
 const MAX_CALLS = 150;
@@ -63,6 +63,9 @@ const tabs: Tab[] = [];
 /** A tab in a context of its own: storage of its own, so a device key of its own. */
 async function open(options: BrowserContextOptions = { viewport: { width: 960, height: 540 } }): Promise<Tab> {
   const context = await browser.newContext(options);
+  // What is shared at a table, not how it looks: the cheapest picture, so that two tabs drawing on a
+  // software GPU (and building the restaurant, a part a frame) keep their frames short.
+  await holdSteady(context, LEVELS.length - 1);
   const page = await context.newPage();
   const tab: Tab = { page, errors: [], sockets: [] };
   page.on("pageerror", (error) => tab.errors.push(error.message));
@@ -86,13 +89,19 @@ const othersOf = (s: Record<string, string>): Other[] =>
 /** Its food at the table, by id, from its `tableFoods`. */
 const foodsOf = (s: Record<string, string>) => new Map((s.tableFoods ?? "").split(";").filter(Boolean).map((f) => f.split(":").map(Number) as [number, number]));
 
-/** Until a tab's state passes `check`. */
+/**
+ * Until a tab's state passes `check`, within `timeout` ms of that tab's own game time: what a table
+ * shares comes at the pace of its tabs' frames, a few a second on a software GPU. Never past five
+ * minutes on the clock, for a tab whose time has stopped.
+ */
 async function waitUntil(page: Page, what: string, check: (s: Record<string, string>) => boolean, timeout = 10_000) {
+  const time = () => page.evaluate(() => (globalThis as unknown as { __fly: { time: number } }).__fly.time * 1000);
+  const until = (await time()) + timeout;
   const started = Date.now();
   for (;;) {
     const s = await readState(page);
     if (check(s)) return s;
-    if (Date.now() - started > timeout) throw new Error(`Timed out waiting for ${what}: ${JSON.stringify(s)}`);
+    if ((await time()) > until || Date.now() - started > 300_000) throw new Error(`Timed out waiting for ${what}: ${JSON.stringify(s)}`);
     await page.waitForTimeout(100);
   }
 }
@@ -209,7 +218,6 @@ try {
   step("two tabs at one table: each its own player, the first its starter, and each sees the other's fly where it is");
   const [a, b] = [await open(), await open()];
   await a.page.goto(`${url}?rooms=${roomsAt}`);
-  await disableScreensaver(a.page);
   await waitFor(a.page, "brain=running,screen=title", 120_000);
   await fly(a.page, "g.startRoom({ name: 'Two tabs', listed: false, password: '', place: g.here })");
   const first = await waitFor(a.page, "online=joined,table=yes", 20_000);
@@ -218,7 +226,6 @@ try {
   const link = await fly<string>(a.page, "g.tableLink");
   assert.match(link, /\?table=[2-9a-z]{10}$/);
   await b.page.goto(`${link}&rooms=${roomsAt}`);
-  await disableScreensaver(b.page);
   const second = await waitFor(b.page, "online=joined,brain=running", 120_000);
   assert.equal(second.player, "2", "a player of its own");
   assert.equal(second.starter, "1");
@@ -283,7 +290,8 @@ try {
 
   step("the starter carries the table to the restaurant: both flies are set down on the window table, and each sees the other where it is");
   await fly(a.page, "g.online.choosePlace('restaurant')");
-  for (const t of [a, b]) await waitFor(t.page, "place=restaurant,moving=,epoch=1", 60_000);
+  // Built a part a frame behind the veil, fifty frames or so: a minute or more on a software GPU drawing two tabs.
+  for (const t of [a, b]) await waitFor(t.page, "place=restaurant,moving=,epoch=1", 240_000);
   await seesFly(a.page, 2, false, 10_000);
   await seesFly(b.page, 1, false, 10_000);
   const heights = await Promise.all([a, b].map((t) => fly<number>(t.page, "g.life.body.position.y")));
@@ -305,7 +313,6 @@ try {
   step("a named, locked room made from the menus with the keys; another tab finds it in Online's list, is told a wrong password is wrong, and gets in with the right one; its link alone opens only its door");
   const maker = await open();
   await maker.page.goto(`${url}?rooms=${roomsAt}`);
-  await disableScreensaver(maker.page);
   await waitFor(maker.page, "brain=running,screen=title", 120_000);
   await fly(maker.page, "g.open('online')");
   await waitFor(maker.page, "screen=online,onlineView=rooms,focus=new");
@@ -323,7 +330,6 @@ try {
 
   const guest = await open();
   await guest.page.goto(`${url}?rooms=${roomsAt}`);
-  await disableScreensaver(guest.page);
   await waitFor(guest.page, "brain=running,screen=title", 120_000);
   await fly(guest.page, "g.open('online')");
   const listed = await waitFor(guest.page, `screen=online,rooms~${lockedCode}:Locked Lab:picnic:1:1`, 10_000);
@@ -344,7 +350,6 @@ try {
 
   const linked = await open();
   await linked.page.goto(`${url}?table=${lockedCode}&rooms=${roomsAt}`);
-  await disableScreensaver(linked.page);
   const door = await waitFor(linked.page, "screen=online,onlineView=door,table=", 60_000);
   assert.ok(!("online" in door), "not at the room");
   for (const tab of [maker, guest, linked]) await tab.page.context().close();
@@ -352,7 +357,6 @@ try {
   step("alone, nothing changes: no table, no line to a room, and the frame in its budget");
   const solo = await open();
   await solo.page.goto(url);
-  await disableScreensaver(solo.page);
   await waitFor(solo.page, "brain=running,screen=title", 120_000);
   await solo.page.keyboard.press("Enter");
   await waitFor(solo.page, "screen=play");
@@ -382,7 +386,6 @@ try {
     const tab = await open(options);
     const page = tab.page;
     await page.goto(`${url}?table=${code}&rooms=${roomsAt}`);
-    await disableScreensaver(page);
     await waitFor(page, "brain=running,screen=title,online=joined", 120_000);
     await waitUntil(page, `${MAX_PLAYERS - 1} other flies there`, (s) => othersOf(s).filter((o) => o.present && !o.resting).length === MAX_PLAYERS - 1, 15_000);
     await page.keyboard.press("Enter");

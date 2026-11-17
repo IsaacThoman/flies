@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PATCHES, Pantry, SOLIDS, World, createPicnic } from "@fly/world";
-import { FlyBody, LOOM_DECAY, LOOM_HOLD, SenseTracker, WIND_FULL_SPEED } from "../src/index.ts";
-import type { Looming, SenseInput } from "../src/index.ts";
+import { ANTENNA_AHEAD, FLY_LENGTH, FlyBody, HEAD_AHEAD, LOOM_DECAY, LOOM_HOLD, MOUTH_AHEAD, SenseTracker, WIND_FULL_SPEED, createIntent } from "../src/index.ts";
+import type { Intent, Looming, SenseInput } from "../src/index.ts";
 
 /** A bare round table this wide, with nothing on it. */
 const openTable = (r: number) => new World({ floor: { kind: "circle", r }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320 });
@@ -61,16 +61,48 @@ test("a loom holds briefly then fades; with the eyes open there is no hand-wired
   assert.equal(open.left + open.right, 0);
 });
 
-test("antennae feel a wall the fly faces, on the side that meets it", () => {
+/** Walks `body` forward until it is pushing against what it faces (bounded). */
+function walkInto(body: FlyBody) {
+  const walk: Intent = { ...createIntent(), live: true, walking: true, speed: 10 };
+  for (let t = 0; t < 3 && !body.blocked; t += DT) body.step(walk, { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null }, DT);
+  assert.ok(body.blocked, "it walked into it");
+}
+
+test("standing at a wall, its forelegs hold its antennae off it; walking into the wall pushes them in", () => {
   const jam = SOLIDS.find((s) => s.name === "jam")!.footprint as { x: number; z: number; r: number };
-  // Facing straight into the jar's side: both antennae meet it.
-  const body = new FlyBody(world, { x: jam.x - jam.r - 1.4, z: jam.z, yaw: Math.PI / 2 });
-  const s = new SenseTracker().update(input(body));
-  assert.equal(s.bumpLeft, 1);
-  assert.equal(s.bumpRight, 1);
-  const away = new FlyBody(world, { x: jam.x - jam.r - 1.4, z: jam.z, yaw: -Math.PI / 2 });
+  // Where a walk into the jar's side ends: its head at the glass, its forelegs' tarsi against it.
+  const at = jam.x - jam.r - HEAD_AHEAD * FLY_LENGTH - 0.01;
+  const standing = new FlyBody(world, { x: at, z: jam.z, yaw: Math.PI / 2 });
+  const held = new SenseTracker().update(input(standing));
+  assert.equal(held.bumpLeft + held.bumpRight, 0);
+  // Walking into it straight on: both antennae.
+  const square = new FlyBody(world, { x: at - 2, z: jam.z, yaw: Math.PI / 2 });
+  walkInto(square);
+  const pushed = new SenseTracker().update(input(square));
+  assert.equal(pushed.bumpLeft, 1);
+  assert.equal(pushed.bumpRight, 1);
+  // Facing away from it, nothing.
+  const away = new FlyBody(world, { x: at, z: jam.z, yaw: -Math.PI / 2 });
   const t = new SenseTracker().update(input(away));
   assert.equal(t.bumpLeft + t.bumpRight, 0);
+});
+
+test("standing still, it feels a stem between its forelegs on its antennae, and nothing past the table's edge", () => {
+  // A stem 0.8 mm across, just ahead of its head: between its antennae's tips, short of its forelegs' tarsi.
+  const ahead = (HEAD_AHEAD + ANTENNA_AHEAD) * FLY_LENGTH;
+  const stem = new World({ floor: { kind: "circle", r: 100 }, solids: [{ name: "stem", footprint: { kind: "circle", x: 0, z: ahead, r: 0.4 }, top: { kind: "flat", y: 20 } }], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320 });
+  const body = new FlyBody(stem, { x: 0, z: 0, yaw: 0 });
+  const tracker = new SenseTracker();
+  let s = tracker.update({ ...input(body), world: stem });
+  for (let k = 0; k < 600; k++) s = tracker.update({ ...input(body), world: stem });
+  assert.equal(s.bumpLeft, 1, "held as long as it touches");
+  assert.equal(s.bumpRight, 1);
+  // At the edge of a bare table, facing out: its antennae are over the drop, touching nothing.
+  const table = openTable(50);
+  const edge = new FlyBody(table, { x: 0, z: 50 - HEAD_AHEAD * FLY_LENGTH - 0.01, yaw: 0 });
+  walkInto(edge);
+  const out = new SenseTracker().update({ ...input(edge), world: table });
+  assert.equal(out.bumpLeft + out.bumpRight, 0);
 });
 
 test("it tastes sugar with its feet and its mouth, only while on its feet", () => {
@@ -115,4 +147,55 @@ test("bumping into something in flight is felt as touch", () => {
   const tracker = new SenseTracker();
   body.events.hit = 400;
   assert.equal(tracker.update(input(body)).touch, 1);
+});
+
+test("the strongest contacted intensity wins regardless of food order or taste site", () => {
+  const world = openTable(30);
+  const body = new FlyBody(world, { x: 0, z: 0, yaw: 0 });
+  const mouth = body.point(MOUTH_AHEAD, 0, 0, { x: 0, y: 0, z: 0 });
+  const pairs = [
+    [{ sweet: 1, amount: 0.25 }, { sweet: 0.5, amount: 1 }],
+    [{ sweet: 1, amount: 0.25 }, { sweet: 0.5, amount: 0.5 }],
+    [{ sweet: 1, amount: 0.1 }, { sweet: 0.5, amount: 0.25 }],
+    [{ sweet: 1, amount: 0.05 }, { sweet: 0.5, amount: 0.15 }],
+  ];
+  // Both foods at either site, then one at each site in both arrangements.
+  for (const positions of [[-0.6, -0.6], [mouth.z, mouth.z], [-0.6, mouth.z], [mouth.z, -0.6]]) {
+    for (const pair of pairs) {
+      for (const order of [[0, 1], [1, 0]]) {
+        const pantry = new Pantry(world);
+        for (const i of order) {
+          const food = pantry.add(`food ${i}`, 0, positions[i], 0.05, pair[i].sweet);
+          food.amount = pair[i].amount;
+        }
+        const tracker = new SenseTracker();
+        const felt = tracker.update(input(body, { world, pantry }));
+        const expected = Math.max(...pair.map(f => f.sweet * Math.min(1, 4 * f.amount)));
+        assert.equal(felt.sweet, expected, JSON.stringify({ positions, pair, order }));
+      }
+    }
+  }
+});
+
+test("mouth food remains eligible when the feet taste something stronger", () => {
+  const world = openTable(30);
+  const body = new FlyBody(world, { x: 0, z: 0, yaw: 0 });
+  const mouth = body.point(MOUTH_AHEAD, 0, 0, { x: 0, y: 0, z: 0 });
+  const pantry = new Pantry(world);
+  const feetFood = pantry.add("sugar", 0, -0.6, 0.05, 1);
+  const tracker = new SenseTracker();
+  assert.equal(tracker.update(input(body, { world, pantry })).sweet, 1);
+  assert.equal(tracker.tasting.food, feetFood);
+  assert.equal(tracker.tasting.byMouth, false);
+  for (const sweet of [0.4, 0]) {
+    const mouthFood = pantry.add("mouth food", mouth.x, mouth.z, 0.05, sweet);
+    assert.equal(tracker.update(input(body, { world, pantry })).sweet, 1);
+    assert.equal(tracker.tasting.food, mouthFood);
+    assert.equal(tracker.tasting.byMouth, true);
+    pantry.remove(mouthFood);
+  }
+  body.mode = "airborne";
+  assert.equal(tracker.update(input(body, { world, pantry })).sweet, 0);
+  assert.equal(tracker.tasting.food, null);
+  assert.equal(tracker.tasting.byMouth, false);
 });
