@@ -41,8 +41,8 @@ static int BytesPerPixel(GLenum format, GLenum type) {
   }
 }
 
-Executor::Executor(DisplayTarget *display, bool gpuTiming, bool checkErrors, int32_t *fencesDone)
-    : display_(display), gpuTiming_(gpuTiming), checkErrors_(checkErrors), fencesDone_(fencesDone), canvas_(new Canvas2D()) {
+Executor::Executor(DisplayTarget *display, bool gpuTiming, bool checkErrors, bool deferReads, int32_t *fencesDone)
+    : display_(display), gpuTiming_(gpuTiming), checkErrors_(checkErrors), deferReads_(deferReads), fencesDone_(fencesDone), canvas_(new Canvas2D()) {
   names_.resize(1024);
 }
 Executor::~Executor() { delete canvas_; }
@@ -594,7 +594,7 @@ void Executor::runGL(int op, const int32_t *w, int words) {
     case OP_RESIZE_DEFAULT_FB: resizeDefault(w[1], w[2], w[3], w[4], w[5], w[6]); break;
     case OP_RELEASE_IMAGE: gPayloads.releaseImage(w[1]); break;
     case OP_READ_PIXELS:
-      if (!deferRead(w[1], w[2], w[3], w[4], w[5], w[6], w[7])) readPixels(w[1], w[2], w[3], w[4], w[5], w[6], (void *)(intptr_t)w[7]);
+      if (!deferReads_ || !deferRead(w[1], w[2], w[3], w[4], w[5], w[6], w[7])) readPixels(w[1], w[2], w[3], w[4], w[5], w[6], (void *)(intptr_t)w[7]);
       break;
 
     case OP_ACTIVE_TEXTURE: activeUnit_ = w[1] - GL_TEXTURE0; glActiveTexture(w[1]); break;

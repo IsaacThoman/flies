@@ -577,7 +577,9 @@ static void Define(JSContextRef ctx, JSObjectRef obj, const char *name, JSValueR
   self.runLoop = CFRunLoopGetCurrent();
   NSDictionary *c = self.config;
   int mode = c[@"mode"] ? [c[@"mode"] intValue] : 2;
-  _renderer = std::make_unique<Renderer>(mode, self.display, [c[@"gpuTiming"] boolValue], [c[@"glDebug"] boolValue]);
+  // The simulator renders in software, with no GPU for a read to wait for: it reads at once, as a device did before.
+  bool deferReads = c[@"deferReads"] ? [c[@"deferReads"] boolValue] : !TARGET_OS_SIMULATOR;
+  _renderer = std::make_unique<Renderer>(mode, self.display, [c[@"gpuTiming"] boolValue], [c[@"glDebug"] boolValue], deferReads);
   JSContextGroupRef group = JSContextGroupCreate();
   self.context = JSGlobalContextCreateInGroup(group, nullptr);
   [self installNatives];

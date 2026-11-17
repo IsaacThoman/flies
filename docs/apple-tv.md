@@ -133,6 +133,7 @@ JSON, from `--config` on the command line, else `www/config.json` (what the home
 | `logFile` | Redirects stderr to `Library/Caches/performance.log` in the app container, replacing the previous run's log; defaults to `false` |
 | `profile` | With `stats`: time spent in each WebGL and 2D canvas method |
 | `gpuTiming` | `glFinish` after every frame, to time the GPU (slows it down) |
+| `deferReads` | Reads into a pixel-pack buffer wait for their copy rather than for the GPU ([Reading pixels back](#reading-pixels-back)): on by default on a device, off in the simulator |
 | `glDebug` | Checks `glGetError` after every GL command |
 | `typed` | Answers for the keyboard in unattended runs: each keyboard shown is answered with the next after 1.5 s, as if typed and confirmed (`null`: as if the player went back). The check uses it; nothing else should |
 | `drive` | Scripted remote input for unattended runs, waiting on the canvas's `data-*` state: `[["wait", {"ready": "true"}], ["press", "ArrowRight", 650], ["swipe", "ArrowUp"], ["touch", 0.5, -0.2, true], ["sleep", 500], ["log", "mark"]]`. Presses, swipes and touches go through the same native code as the remote's (`runtime/report.ts`) |
@@ -639,8 +640,12 @@ described above. Both of three's ways work and are checked by the test scene (`t
   page makes in between are held until the read is done, so a fence after a read still
   signals after it, and anything that would see the buffer (`getBufferSubData`, deleting it,
   `finish`, a `clientWaitSync` with a timeout) finishes the reads first. Other formats, and
-  the multisampled default framebuffer, are read at once as before. The test scene's
-  `readbackAsync` goes this way.
+  the multisampled default framebuffer, are read at once as before. The simulator renders in
+  software, with no GPU for a read to wait for, so there it reads at once unless the launch
+  config asks otherwise (`deferReads`): the simulator check's test scene does, so its
+  `readbackAsync` goes this way, and its real game doesn't. With the deferral on, the real game's
+  table of eight in the simulator, which already stalls for 10 to 25 seconds rendering in
+  software, lost its room more often: 1 of 5 checks passed against 3 of 5 on `dev`.
 
 Historically measured in the simulator (M5 Pro, the software renderer, mode 2; capture date unknown): the synchronous read takes
 0.08 ms on average (0.5 ms at most) on tvOS 27 and 0.11 ms (1.9 ms at most) on tvOS 26, and the

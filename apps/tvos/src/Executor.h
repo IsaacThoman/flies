@@ -19,7 +19,7 @@ class Canvas2D;
 
 class Executor {
  public:
-  Executor(DisplayTarget *display, bool gpuTiming, bool checkErrors, int32_t *fencesDone);
+  Executor(DisplayTarget *display, bool gpuTiming, bool checkErrors, bool deferReads, int32_t *fencesDone);
   ~Executor();
   /** Creates the GL context on first use and makes it current on this thread. */
   void makeCurrent();
@@ -50,6 +50,8 @@ class Executor {
   DisplayTarget *display_;
   EAGLContext *context_ = nil;
   bool gpuTiming_, checkErrors_;
+  // Reads into a pixel-pack buffer are deferred (reads_): on a device, unless the launch config says otherwise.
+  bool deferReads_;
   // WebGL fences, oldest first. GL signals them in order, so JavaScript only needs the newest
   // signalled one, which pollFences writes to fencesDone_ without JavaScript having to wait.
   std::deque<std::pair<int, GLsync>> fences_;
