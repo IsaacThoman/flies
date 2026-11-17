@@ -32,16 +32,18 @@ test("making the Apple TV's picture of a first into a JPEG costs little, all of 
     while (!encoder.step(2));
     return jpegDataUrl(encoder.bytes).length;
   };
-  for (let i = 0; i < 20; i++) encode();
+  // Each sample tens of milliseconds of pictures, after as many unmeasured, so neither the JIT nor one burst decides it.
+  const PICTURES = 100;
+  for (let i = 0; i < PICTURES; i++) encode();
   const measured = await measureBudget(t, () => {
     const samples: number[] = [];
     const references: number[] = [];
     let chars = 0;
     for (let s = 0; s < SAMPLES; s++) {
       const meter = new CpuMeter();
-      for (let i = 0; i < 20; i++) chars = encode();
+      for (let i = 0; i < PICTURES; i++) chars = encode();
       meter.lap();
-      samples.push(meter.ms / 20);
+      samples.push(meter.ms / PICTURES);
       references.push(...meter.references);
     }
     return { value: { ms: median(samples), chars }, references, samples: [samples] };
@@ -57,7 +59,8 @@ test("watching for the fly's firsts costs next to nothing a frame", async (t) =>
   const life: { -readonly [K in keyof Lived]: Lived[K] } = { activity: "walking", meals: 0, takeOffs: 0, body: { mode: "walking", surface: { solid: -1 } }, world: { solids: [] }, senses: { tasting: { food: null } } };
   const found: Moment[] = [];
   const moments = new Moments(["flight", "groom", "climb", "escape", "sleep"]);
-  const FRAMES = 200_000;
+  // Tens of milliseconds of frames a sample.
+  const FRAMES = 5_000_000;
   const run = () => {
     for (let i = 0; i < FRAMES; i++) {
       life.activity = i % 3 ? "walking" : "grooming";

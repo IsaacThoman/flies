@@ -16,7 +16,7 @@ import type { Recorded } from "../src/why/recorder.ts";
 import { glowSeries } from "../src/why/replay.ts";
 
 const DT = 1 / 60;
-const FRAMES = 6_000;
+const FRAMES = 120_000;
 const SAMPLES = 5;
 const PARTS = Math.ceil(NERVE_PARTS.length / 4) * 4;
 
@@ -52,30 +52,39 @@ function living(): Recorded & { tick(i: number): void } {
   return f;
 }
 
-/** A minute and a half of frames kept: ms of this thread's CPU a frame, as an M5 Pro would spend it. */
-function frames() {
+/**
+ * The followed fly recorded, its first minute and a half kept unmeasured. Each `sample` keeps FRAMES more, on
+ * from the last, and returns ms of this thread's CPU a frame, as an M5 Pro would spend it: a frame costs a fifth
+ * of a microsecond, so a sample needs tens of thousands of them to be milliseconds of work, and a new recorder
+ * each sample would leave garbage whose collection fell inside the next.
+ */
+function recording() {
   const recorder = new Recorder();
   const fly = living();
-  for (let i = 0; i < FRAMES; i++) {
-    fly.tick(i);
-    recorder.record(DT, fly);
-  }
-  const meter = new CpuMeter();
-  let work = 0;
-  for (let lap = 0; lap < 10; lap++) {
-    for (let i = 0; i < FRAMES / 10; i++) {
-      fly.tick(i + lap * 600);
+  let at = 0;
+  const run = (n: number) => {
+    for (let i = 0; i < n; i++, at++) {
+      fly.tick(at);
       recorder.record(DT, fly);
-      work++;
     }
-    meter.lap();
-  }
-  return { ms: meter.ms / work, raw: meter.rawMs / work, references: meter.references, recorder };
+  };
+  run(6_000);
+  const sample = () => {
+    const meter = new CpuMeter();
+    for (let lap = 0; lap < 4; lap++) {
+      run(FRAMES / 4);
+      meter.lap();
+    }
+    return { ms: meter.ms / FRAMES, raw: meter.rawMs / FRAMES, references: meter.references };
+  };
+  return { recorder, sample };
 }
 
 test("keeping the last six seconds costs a fraction of a microsecond of JavaScript a frame", async (t) => {
+  const recorded = recording();
+  recorded.sample();
   const measured = await measureBudget(t, () => {
-    const samples = Array.from({ length: SAMPLES }, frames);
+    const samples = Array.from({ length: SAMPLES }, recorded.sample);
     return { value: { ms: median(samples.map((s) => s.ms)), raw: median(samples.map((s) => s.raw)) }, references: samples.flatMap((s) => s.references), samples: [samples.map((s) => s.ms)] };
   });
   if (!measured) return;
@@ -85,20 +94,23 @@ test("keeping the last six seconds costs a fraction of a microsecond of JavaScri
 });
 
 test("asking Why? (copying the six seconds out, picking, and the glow of every part through them) costs well under a frame", async (t) => {
-  const { recorder } = frames();
+  const { recorder } = recording();
   const clip = new Clip();
   const series = new Float32Array(CAPACITY * PARTS);
-  const asks = 40;
+  // Each sample tens of milliseconds of asking, after as many unmeasured, so neither the JIT nor one burst decides it.
+  const asks = 200;
+  const ask = () => {
+    recorder.copyTo(clip);
+    explain(clip);
+    glowSeries(clip, series, PARTS);
+  };
+  for (let i = 0; i < asks; i++) ask();
   const measured = await measureBudget(t, () => {
     const meter = new CpuMeter();
     const times: number[] = [];
     for (let s = 0; s < SAMPLES; s++) {
       const before = meter.ms;
-      for (let i = 0; i < asks; i++) {
-        recorder.copyTo(clip);
-        explain(clip);
-        glowSeries(clip, series, PARTS);
-      }
+      for (let i = 0; i < asks; i++) ask();
       meter.lap();
       times.push((meter.ms - before) / asks);
     }

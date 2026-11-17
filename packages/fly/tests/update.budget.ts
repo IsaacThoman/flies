@@ -18,11 +18,12 @@ test("update is quick with a JIT", async (t) => {
   const samples = await measureBudget(t, () => {
     const measured = Array.from({ length: SAMPLES }, () => {
       const meter = new CpuMeter();
-      for (let i = 0; i < 5000; i++) {
+      // 60 ms of updates a sample, so one burst or collection can't decide it.
+      for (let i = 0; i < 20000; i++) {
         fly.update(poses[(i >> 6) & 3], DT);
-        if (i % 500 === 499) meter.lap();
+        if (i % 2000 === 1999) meter.lap();
       }
-      return { micros: meter.ms / 5, rawMicros: meter.rawMs / 5, references: meter.references };
+      return { micros: meter.ms / 20, rawMicros: meter.rawMs / 20, references: meter.references };
     });
     return { value: measured, references: measured.flatMap((s) => [...s.references]), samples: [measured.map((s) => s.micros)] };
   });
