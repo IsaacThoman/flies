@@ -1,11 +1,12 @@
 import * as THREE from "three";
-import { GREENHOUSE_SOLIDS } from "@fly/world";
+import { GREENHOUSE_PATCHES, GREENHOUSE_SOLIDS } from "@fly/world";
 import { BUMP, NOISE } from "../windowsill/surfaces.ts";
 
 export const K = { wood: 0, clay: 1, soil: 2, leaf: 3, tomato: 4, fig: 5, metal: 6, paint: 7, label: 8, string: 9, juice: 10, fallen: 11 };
 
 /** One material keeps all the bench's opaque detail in a single draw. */
 export function surfaces() {
+  const fig = GREENHOUSE_PATCHES.find(p => p.name === "fig flesh")!;
   const uniforms = {
     uCrowns: { value: GREENHOUSE_SOLIDS.filter(s => s.name === "greenhouse leaves" || s.name === "seedling crown").map(s => {
       const f = s.footprint;
@@ -103,8 +104,8 @@ vec3 surface(vec3 c) {
    }
    // A rosette of overlapping pointed leaves, with paired side veins.
    float r = length(q);
-   float ring = height<20.0 ? 0.0 : floor(r / (reach * 0.3));
-   float count = height<20.0 ? 4.0 : 5.0 + ring * 3.0;
+   float ring = height<15.0 ? 0.0 : floor(r / (reach * 0.3));
+   float count = height<15.0 ? 4.0 : 3.0 + ring * 2.0;
    float around = atan(q.y,q.x) / 6.28318 * count + ring * 0.37;
    float w = (fract(around) - 0.5) * 2.0;
    float along = fract(r / (reach * 0.3));
@@ -123,21 +124,24 @@ vec3 surface(vec3 c) {
    float split = 1.0-smoothstep(radius*0.72,radius,length(p.xz-centre)+vnoise(p.xz*1.4)*0.7);
    c = mix(c,vec3(0.39,0.055,0.018),split*0.65); rough = mix(rough,0.16,split);
  } else if (vKind < 5.5) {
-   vec2 d = p.xz-vec2(20.0,56.0);
-   vec2 q = vec2(0.939373*d.x+0.342898*d.y,-0.342898*d.x+0.939373*d.y) / vec2(19.0,25.0);
-   float flesh = 1.0 - smoothstep(0.62, 0.78, length(q));
-   float radius = length(q);
+   vec2 d = p.xz-vec2(${fig.x.toFixed(1)},${fig.z.toFixed(1)});
+   float radius = length(d)/${fig.r.toFixed(1)};
+   float flesh = 1.0-smoothstep(0.975,1.0,radius);
    float fibres = vnoise(p.xz*vec2(4.2,2.1)+vnoise(p.xz*0.7)*1.7) * resolved(0.25);
    vec3 inside = mix(vec3(0.24,0.025,0.032),vec3(0.61,0.14,0.12),fibres*0.55+vnoise(p.xz*0.85)*0.3);
    vec2 cell = floor(p.xz * 2.1);
    vec2 seedPoint = fract(p.xz * 2.1) - vec2(hash21(cell+1.7),hash21(cell+6.1))*0.5-0.25;
-   float seed = 1.0-smoothstep(0.13,0.21,length(seedPoint*vec2(0.85,1.5)));
-   seed *= smoothstep(0.03,0.18,radius)*resolved(0.22);
+   float angle = hash21(cell+3.2)*6.28318;
+   seedPoint = mat2(cos(angle),-sin(angle),sin(angle),cos(angle))*seedPoint;
+   float size = 0.08+hash21(cell+4.3)*0.13;
+   float seed = 1.0-smoothstep(size,size+0.05,length(seedPoint*vec2(0.85,1.5)));
+   float cluster = smoothstep(0.32,0.65,vnoise(p.xz*0.55+7.0));
+   seed *= cluster*step(0.25,hash21(cell+9.1))*smoothstep(0.03,0.18,radius)*resolved(0.22);
    inside = mix(inside,vec3(0.74,0.48,0.20),seed*0.7);
-   float pith = smoothstep(0.53,0.65,radius)*(1.0-smoothstep(0.75,0.82,radius));
-   inside = mix(inside,vec3(0.76,0.53,0.39),pith*0.85);
+   float pith = smoothstep(0.97,1.0,radius)*(1.0-smoothstep(1.08,1.18,radius));
+   c = mix(c,vec3(0.61,0.40,0.31),pith*0.8);
    c = mix(c * (0.8 + fine * 0.4), inside, flesh);
-   rough = mix(0.75,0.37,flesh); relief = (fibres*0.035+seed*0.055)*flesh + fine*0.012;
+   rough = mix(0.75,0.5,flesh); relief = (fibres*0.035+seed*0.055)*flesh + fine*0.012;
  } else if (vKind < 6.5) {
    rough = 0.27 + fine * 0.2; shine = 0.72; relief = fine * 0.012;
  } else if (vKind < 7.5) {
@@ -179,7 +183,11 @@ vec3 surface(vec3 c) {
 float transmitted = 1.0-glazingShadow(vWorld)*uDirect*0.75;
 reflectedLight.directDiffuse *= transmitted;
 reflectedLight.directSpecular *= transmitted;
-if (vKind>9.5 && vKind<10.5) reflectedLight.indirectSpecular *= 0.25;`)
+if (vKind>9.5 && vKind<10.5) reflectedLight.indirectSpecular *= 0.25;
+if (vKind>4.5 && vKind<5.5) {
+ reflectedLight.indirectSpecular *= 0.45;
+ reflectedLight.directSpecular *= 0.65;
+}`)
     .replace("#include <opaque_fragment>", `
 float shadow = 0.0;
 float ao = 1.0;

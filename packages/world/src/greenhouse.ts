@@ -13,7 +13,7 @@ export const SAUCER = { x: 104, z: 40, r: 43, water: 2 };
 const box = (name: string, x: number, z: number, hx: number, hz: number, y: number, bottom?: number): Solid => ({ name, footprint: { kind: "box", x, z, hx, hz, angle: 0 }, top: { kind: "flat", y }, ...(bottom === undefined ? {} : { bottom }) });
 export const GREENHOUSE_SOLIDS: readonly Solid[] = [
   ...POTS.map(p => ({ name: "terracotta pot", footprint: { kind: "circle" as const, x: p.x, z: p.z, r: p.r }, top: { kind: "dish" as const, well: p.height - 5, rim: p.height, inner: 0.83, lip: 0.93 } })),
-  ...POTS.map(p => ({ name: "greenhouse leaves", bottom: p.height - 5, footprint: { kind: "circle" as const, x: p.x, z: p.z, r: p.r * 0.78 }, top: { kind: "dome" as const, base: p.height - 5, height: p.r * 1.1, power: 0.65 } })),
+  ...POTS.map(p => ({ name: "greenhouse leaves", bottom: p.height - 5, footprint: { kind: "circle" as const, x: p.x, z: p.z, r: p.r * 0.78 }, top: { kind: "dome" as const, base: p.height - 5, height: p.r * 0.52, power: 1 } })),
   box("seed tray", TRAY.x, TRAY.z, TRAY.hx, TRAY.hz, TRAY.height),
   ...Array.from({ length: 12 }, (_, i): Solid => ({ name: "seedling crown", bottom: TRAY.height, footprint: { kind: "ellipse", x: TRAY.x - 54 + i % 4 * 36, z: TRAY.z - 24 + Math.floor(i / 4) * 24, rx: 12, rz: 9, angle: i * 0.7 }, top: { kind: "dome", base: TRAY.height, height: 10 + i % 3 * 2, power: 0.7 } })),
   { name: "watering can", footprint: { kind: "circle", x: 230, z: -80, r: 39 }, top: { kind: "flat", y: 88 } },

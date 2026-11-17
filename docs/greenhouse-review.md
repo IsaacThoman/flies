@@ -206,6 +206,27 @@ Key: `Q5` = greenhouse `8fd2a350`; `N6` = byte-identical Q5 decoy; `H8` = greenh
 
 Accepted over the prior greenhouse: all four panels score and rank Q5/N6 above H8 (6.73 versus 6.48). Duplicate scores match exactly, so no larger noise panel is required; their forced ordering is a presentation-order tie-break. **Landing bar not met:** every reviewer ranks the existing reference first, and its mean is 7.17. The greenhouse remains draft. The owner requested continued work when below the reference, superseding the initial eight-round stopping cap. The next candidate addresses sparse fly-height composition, noisy glass and weak fruit/water material identity.
 
+## Round 9
+
+Key: `A7` = greenhouse `17806e45`; `C6` = greenhouse `8fd2a350`; `L3` = windowsill from `8fd2a350`. The fly starts on the fig in A7; each set retains its documented native start. Rendering controls and weather fixture match.
+
+| Reviewer | Set | Scores (criteria 1–8) | Mean | Forced ranking |
+| --- | --- | --- | ---: | --- |
+| 1 | C6 | 6.5, 6.5, 6, 5.5, 7, 8, 8.5, 6.5 | 6.81 | L3 > A7 > C6 |
+| 1 | L3 | 8, 8, 7.5, 7.5, 8, 7.5, 7, 8 | 7.69 | L3 > A7 > C6 |
+| 1 | A7 | 7, 7, 7, 6.5, 7.5, 8, 8.5, 6.5 | 7.25 | L3 > A7 > C6 |
+| 2 | L3 | 8, 6.5, 7, 7, 7, 8, 5.5, 6 | 6.88 | A7 > L3 > C6 |
+| 2 | A7 | 6.5, 6.5, 7, 6.5, 8, 8.5, 8, 7 | 7.25 | A7 > L3 > C6 |
+| 2 | C6 | 6, 6, 5.5, 5.5, 7, 8.5, 8, 6 | 6.56 | A7 > L3 > C6 |
+| 3 | A7 | 7, 7, 7, 6.5, 7.5, 8, 7, 7 | 7.12 | A7 > L3 > C6 |
+| 3 | C6 | 6, 6, 5.5, 5, 6, 6.5, 7, 5 | 5.88 | A7 > L3 > C6 |
+| 3 | L3 | 8, 5.5, 7.5, 7, 8, 7.5, 5.5, 5.5 | 6.81 | A7 > L3 > C6 |
+| 4 | A7 | 6, 6, 6, 6, 7, 8, 7, 6 | 6.50 | L3 > A7 > C6 |
+| 4 | C6 | 5, 5, 5, 5, 6, 8, 7, 5 | 5.75 | L3 > A7 > C6 |
+| 4 | L3 | 8, 7, 7, 7, 8, 8, 6, 7 | 7.25 | L3 > A7 > C6 |
+
+Accepted over C6: every reviewer scores and ranks A7 higher (7.03 versus 6.25). Two rank it above the reference, but the reference mean remains 7.16; **landing bar not met**. Retained the fig perch, sparser rain filtering, roof reflection in water and revised light. Reviewers still find uniform fig seeds, striped condensation and cone-like crowns. One also identifies elliptical drawn flesh extending beyond the circular taste patch; the following candidate makes that boundary explicit from the food definition.
+
 ## Validation
 
 - Baseline full test suite, lint and typecheck passed. The browser play suite passed, including every registered place.
@@ -215,7 +236,7 @@ Accepted over the prior greenhouse: all four panels score and rank Q5/N6 above H
 
 Images are held only on the orphan `pr-assets-place-greenhouse` branch and embedded in the PR. No screenshots or recordings belong in this branch.
 
-## Integration evidence
+## Round 8 integration evidence
 
 The landing capture uses source `8fd2a350`, including merge `b4695d27` from dev. Its matched fixture resets full body placement, hides the interface, and starts each weather condition with the same wetness. The previous greenhouse source `176fb512` is rendered with that same fixture. The windowsill reference is captured from the merged source. No errors were reported by either browser capture.
 
@@ -241,3 +262,5 @@ Evidence for every round uses five views at all five times of day, plus rain, ov
 - Round 7: [contact sheet](https://github.com/IsaacThoman/flies/blob/pr-assets-place-greenhouse/water/contact.png?raw=true), [full view set](https://github.com/IsaacThoman/flies/tree/pr-assets-place-greenhouse/water).
 - Round 8: [contact sheet](https://github.com/IsaacThoman/flies/blob/pr-assets-place-greenhouse/landing/contact.png?raw=true), [full view set](https://github.com/IsaacThoman/flies/tree/pr-assets-place-greenhouse/landing).
 - Landing reference: [contact sheet](https://github.com/IsaacThoman/flies/blob/pr-assets-place-greenhouse/landing-reference/contact.png?raw=true).
+
+Round 9 evidence: [all views](https://github.com/IsaacThoman/flies/tree/pr-assets-place-greenhouse/fig-perch). Its capture measured 12–26 calls, 96 ms total construction and a 33 ms largest step, with no browser errors. From the fig start, body seed 42 passed 1,800 seconds; life seeds 42 and 43 each passed 900 seconds, recording 139 meals and 24 take-offs. Typecheck, lint and all place/geometry tests passed on that source.

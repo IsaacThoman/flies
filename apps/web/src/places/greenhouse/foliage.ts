@@ -12,14 +12,14 @@ export function foliage(crown: Solid) {
   const tint = new THREE.Color();
   const young=crown.name === "seedling crown";
   for (let ring = 0; ring < (young ? 2 : 3); ring++) {
-    const count = young ? 2 : 5 + ring * 3;
+    const count = young ? 2 : 3 + ring * 2;
     for (let leaf = 0; leaf < count; leaf++) {
       const a = leaf / count * Math.PI * 2 + (young ? ring*Math.PI/2 : ring*0.57);
       tint.setHSL(0.24 + (leaf % 3) * 0.009, young ? 0.5 : 0.4, young ? 0.38+ring*0.035 : 0.26 + (leaf % 4) * 0.017).convertSRGBToLinear();
       const vertex = (i: number, j: number) => {
         const u = i / 8, w = j / 4 * 2 - 1;
         const r = young ? u*(ring===0 ? 0.98 : 0.72) : ring * 0.2 + u * (0.65 - ring * 0.025);
-        const width = Math.pow(Math.sin(u * Math.PI), 0.75) * (young ? 0.4 : 0.22);
+        const width = Math.pow(Math.sin(u * Math.PI), 0.75) * (young ? 0.4 : 0.38);
         let x = Math.cos(a) * r - Math.sin(a) * w * width;
         let z = Math.sin(a) * r + Math.cos(a) * w * width;
         const k = Math.min(1, 0.997 / Math.hypot(x, z)); x *= k; z *= k;

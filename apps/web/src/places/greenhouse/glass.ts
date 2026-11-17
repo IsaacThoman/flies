@@ -31,8 +31,7 @@ void main() {
  float radius = 0.45+h*1.6;
  vec2 b = (p - (cell + offset) * 16.0) / vec2(radius, radius*1.15);
  float still = (1.0 - smoothstep(1.0-px/radius*0.5, 1.0+px/radius*0.5, length(b))) * min(1.0,4.0*radius*radius/(px*px)) * step(h, uWet * (0.12+0.35*vnoise(cell*0.4)));
- float runoff = smoothstep(0.78,0.86,vnoise(vec2(p.x*0.12,3.0)));
- fog *= (0.7+0.3*vnoise(p*0.025)) * (1.0-max(trail,runoff)*0.8);
+ fog *= (0.8+0.2*vnoise(p*0.008)) * (1.0-trail*0.8);
  float film = vnoise(p * vec2(0.25, 0.012)) * uWet * 0.08;
  float alpha = clamp(0.012 + fresnel * 0.12 + fog * 0.72 + bead * 0.55 + still * 0.32 + trail * 0.08 + film, 0.0, 0.84);
  float glint = pow(max(dot(reflect(-view, normalize(vNormal)), uDirection), 0.0), 140.0);
