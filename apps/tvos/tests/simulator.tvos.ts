@@ -373,8 +373,12 @@ try {
   await waitUntil(() => state().online === 'joined');
   const drawn = windows.filter((w) => w.frames > 0);
   const calls = Math.max(...windows.map((w) => Number(w.state.calls)));
-  const draws = Math.max(...windows.map((w) => w.drawsPerFrame));
   const frames = drawn.reduce((sum, w) => sum + w.frames, 0);
+  assert.ok(frames > 0, 'frames drawn in the room');
+  // The host's draws a frame over the five windows together. A window counts the draws made in it
+  // but only the frames that began in it, so one that a starved simulator presented no frame in
+  // holds a long frame's draws over none (the host's figure divides by one).
+  const draws = Math.round(windows.reduce((sum, w) => sum + w.drawsPerFrame * Math.max(1, w.frames), 0) / frames);
   const jsMean = drawn.reduce((sum, w) => sum + w.jsMs.mean * w.frames, 0) / Math.max(1, frames);
   const jsP95 = Math.max(...drawn.map((w) => w.jsMs.p95));
   const restingAtWorst = Math.max(...windows.map((w) => resting(w.state)));
