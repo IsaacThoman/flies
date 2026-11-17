@@ -70,7 +70,13 @@ export type Around = {
   readonly shared: SharedTable | null;
 };
 
-export type SharedTable = { readonly others: readonly Readonly<Vec3>[]; readonly anchor: Readonly<Vec3> };
+/**
+ * The others at a table, and the fly the table's visits are planned round.
+ * `ownSky`: in a room open to everyone each device keeps its own light and
+ * weather, so a visit the table sends that doesn't suit this device's sky
+ * (a butterfly in its rain, a gull in its night) doesn't come here.
+ */
+export type SharedTable = { readonly others: readonly Readonly<Vec3>[]; readonly anchor: Readonly<Vec3>; ownSky: boolean };
 
 /** What the place does to the fly this frame, all through its senses. */
 export type Felt = {
