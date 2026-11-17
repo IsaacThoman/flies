@@ -1,22 +1,43 @@
-// Shared with other local experiments: acquire only for CPU-heavy work, never reviews.
-import { rmdirSync } from "node:fs";
-import { mkdir, rmdir } from "node:fs/promises";
+// Shared local capacity and a branch-wide cooldown keep long experiments fair.
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { setTimeout } from "node:timers/promises";
 
+const branch = execFileSync("git", ["branch", "--show-current"], { encoding: "utf8" }).trim();
+const key = branch.replace(/[^a-zA-Z0-9-]/g, "-");
+const lock = `/tmp/flies-heavy-${key}`;
+const cooldown = `${lock}.released`;
+const COOLDOWN_MS = 120_000;
+
+function claim(dir: string) {
+  try { mkdirSync(dir); return true; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; return false; }
+}
+
 export async function withHeavySlot<T>(work: () => Promise<T>): Promise<T> {
-  await mkdir("/tmp/flies-heavy", { recursive: true });
+  mkdirSync("/tmp/flies-heavy", { recursive: true });
+  while (!claim(lock)) await setTimeout(1000 + Math.random() * 1000);
   let slot = "";
-  while (!slot) {
-    for (let n = 1; n <= 4; n++) {
-      const candidate = `/tmp/flies-heavy/slot-${n}`;
-      try { await mkdir(candidate); slot = candidate; break; }
-      catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    if (slot) { rmSync(slot, { recursive: true, force: true }); writeFileSync(cooldown, String(Date.now())); }
+    rmSync(lock, { recursive: true, force: true });
+  };
+  process.once("exit", release);
+  let deadline: ReturnType<typeof globalThis.setTimeout> | undefined;
+  try {
+    let last = 0;
+    try { last = Number(readFileSync(cooldown, "utf8")); } catch { /* First batch. */ }
+    while (Date.now() - last < COOLDOWN_MS) await setTimeout(Math.min(30_000, COOLDOWN_MS - (Date.now() - last)));
+    while (!slot) {
+      for (let n = 1; n <= 8; n++) if (claim(`/tmp/flies-heavy/slot-${n}`)) { slot = `/tmp/flies-heavy/slot-${n}`; break; }
+      if (!slot) await setTimeout(1000 + Math.random() * 2000);
     }
-    if (!slot) await setTimeout(5000);
-  }
-  // Playwright handles termination signals by closing its browser and exiting.
-  const onExit = () => { try { rmdirSync(slot); } catch { /* Already released. */ } };
-  process.once("exit", onExit);
-  try { return await work(); }
-  finally { process.off("exit", onExit); await rmdir(slot); }
+    writeFileSync(`${slot}/owner`, branch + "\n");
+    // Browser processes handle SIGTERM and close their owned children. Leave time for cleanup.
+    deadline = globalThis.setTimeout(() => { console.error("Heavy batch exceeded 9m50s; split it into smaller batches."); process.kill(process.pid, "SIGTERM"); }, 590_000);
+    return await work();
+  } finally { if (deadline) clearTimeout(deadline); process.off("exit", release); release(); }
 }

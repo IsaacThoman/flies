@@ -8,10 +8,14 @@ CHROMIUM_PATH=... node scripts/webPerf.ts --build --out /tmp/fly-perf-A
 ```
 
 Each build and measurement acquires an atomic `/tmp/flies-heavy/slot-1` through
-`slot-4`, releasing it when complete. No slot is held during reviews.
+`slot-8`, writing the branch into `owner` and removing the slot when complete.
+Batches end before ten minutes; the branch waits two minutes between batches.
+No slot is held during reviews.
 `--phases loads,frames,memory,brain` selects work; `--dir` reuses a built site.
 Loads and frame scenarios run three times by default (`--runs`, minimum 3).
-The memory lane runs once, for 600 real seconds plus ten place changes.
+The memory lane runs once, for 600 active seconds in two five-minute batches,
+with frames held during the two-minute cooldown, plus ten place changes.
+Both active and total wall time are recorded.
 It is a duration check, not a bound on future memory growth.
 
 The desktop is 1280×720. The phone is 390×844 with touch, 4× page CPU
@@ -40,7 +44,7 @@ places are visited in play (a swoop every two game seconds) and screensaver;
 order reverses each repetition. Adaptation remains active and is recorded,
 so a cheaper picture must never be counted as a speed win.
 
-Memory checkpoints force GC in the page and brain worker and record their
+Memory checkpoints briefly hold frames while forcing GC in the page and brain worker, and record their
 heaps, backing stores and the worker's Wasm separately, plus renderer object
 counts. These exclude GPU/native allocations and perturb frames; compare
 frame scenarios separately. Brain step costs use the deterministic seed,

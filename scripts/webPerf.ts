@@ -28,7 +28,7 @@ export function distribution(xs: number[]) {
   return { n: xs.length, median: xs.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2, min: sorted[0], max: sorted.at(-1)!, p95: quantile(0.95), samples: xs };
 }
 
-type Probe = { firstFrame: number; title: number; frames: { ms: number; interval: number; quality: number; calls: number; triangles: number }[] };
+type Probe = { firstFrame: number; title: number; frames: { ms: number; interval: number; quality: number; calls: number; triangles: number }[]; heldFrame?: Game["frame"] };
 declare global { var __webPerf: Probe; }
 
 async function instrument(page: Page) {
@@ -150,7 +150,7 @@ async function main() {
   const phases = values.phases.split(",");
   assert.ok(phases.every(p => ["loads", "frames", "memory", "brain"].includes(p)));
   if (values.build) await bundle(out, dir);
-  const report: Record<string, unknown> = { complete: false, revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), dirty: execFileSync("git", ["diff", "--stat"], { encoding: "utf8" }), node: process.version, host: os.cpus()[0].model, options: values, notes: "Timings include instrumentation; frame submission is not GPU/display time. Phone CPU throttling affects page only. Memory includes worker Wasm separately; memory checkpoints n=1, real time." };
+  const report: Record<string, unknown> = { complete: false, revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), dirty: execFileSync("git", ["diff", "--stat"], { encoding: "utf8" }), node: process.version, host: os.cpus()[0].model, options: values, notes: "Timings include instrumentation; frame submission is not GPU/display time. Phone CPU throttling affects page only. Memory includes worker Wasm separately; memory checkpoints n=1; active batches separated by a paused two-minute cooldown; GC queries hold frames briefly." };
   const save = () => {
     const loads = (report.loads ?? []) as { profile: string; cache: string; title: number; firstFrame: number; titleBytes: number }[];
     const frames = (report.frames ?? []) as { place: string; mode: string; jsMs: { median: number }; taskMsPerFrame: number; longFrames50ms: number }[];
@@ -169,7 +169,8 @@ async function main() {
   if (phases.includes("loads")) {
     const loads: unknown[] = [];
     report.loads = loads;
-    for (let run = 0; run < runs; run++) for (const profile of ["desktop", "phone"]) await withHeavySlot(async () => {
+    await withHeavySlot(async () => {
+    for (let run = 0; run < runs; run++) for (const profile of ["desktop", "phone"]) {
       let serverBytes = 0;
       const site = await serveSite({ dir, base: "/fly/", transferred: (_file, bytes) => { serverBytes += bytes; } });
       let browser: Browser | undefined;
@@ -205,9 +206,10 @@ async function main() {
           save();
         }
       } finally { await browser?.close(); await site.close(); }
+    }
     });
   }
-  if (phases.includes("frames") || phases.includes("memory")) await withHeavySlot(async () => {
+  async function lane() {
     const site = await serveSite({ dir, base: "/fly/" });
     let browser: Browser | undefined;
     try {
@@ -224,38 +226,78 @@ async function main() {
       await ready(page, site.url);
       await page.keyboard.press("Enter");
       await waitFor(page, "screen=play");
-      if (phases.includes("frames")) {
-        const frames: unknown[] = [];
-        report.frames = frames;
-        for (let run = 0; run < runs; run++) for (const place of (run % 2 ? [...PLACES].reverse() : PLACES)) for (const mode of ["play", "watch"]) {
-          await move(page, place.id, mode === "watch");
-          if (mode === "play") await page.evaluate(() => { while (globalThis.__fly.hands.current.id !== "swoop") globalThis.__fly.hands.stepTool(1); });
-          frames.push({ run, place: place.id, mode, ...await frameSample(page, cdp, seconds, mode === "play"), loadAverage: os.loadavg() });
+      return { page, cdp, workers, errors, close: async () => { await browser!.close(); await site.close(); } };
+    } catch (error) { await browser?.close(); await site.close(); throw error; }
+  }
+  if (phases.includes("frames")) {
+    const frames: unknown[] = [];
+    report.frames = frames;
+    await withHeavySlot(async () => {
+    for (let run = 0; run < runs; run++) {
+      const l = await lane();
+      try {
+        for (const place of (run % 2 ? [...PLACES].reverse() : PLACES)) for (const mode of ["play", "watch"]) {
+          await move(l.page, place.id, mode === "watch");
+          if (mode === "play") await l.page.evaluate(() => { while (globalThis.__fly.hands.current.id !== "swoop") globalThis.__fly.hands.stepTool(1); });
+          frames.push({ run, place: place.id, mode, ...await frameSample(l.page, l.cdp, seconds, mode === "play"), loadAverage: os.loadavg() });
           save();
         }
-      }
-      if (phases.includes("memory")) {
-        const memory: unknown[] = [];
-        report.memory = memory;
-        const sample = async (label: string) => {
-          await cdp.send("HeapProfiler.collectGarbage");
-          const heap = await cdp.send("Runtime.getHeapUsage");
-          memory.push({ label, elapsedMs: Date.now() - started, heap, ...await workers.sample(), state: await readState(page), dom: await cdp.send("Memory.getDOMCounters") });
-          await page.evaluate(() => { globalThis.__webPerf.frames.length = 0; });
-          save();
-        };
-        await move(page, "picnic", true);
-        const started = Date.now();
-        await sample("start");
-        // Real elapsed time, sampled in short waits; never accelerate the simulation.
-        while (Date.now() - started < memorySeconds * 1000) { await waitForGameTime(page, 10); await sample("watch"); }
-        await sample("duration-checkpoint");
-        for (let i = 0; i < 10; i++) await move(page, PLACES[(i + 1) % PLACES.length].id, true);
-        await sample("ten-place-changes");
-      }
-      assert.deepEqual(errors, []);
-    } finally { await browser?.close(); await site.close(); }
-  });
+        assert.deepEqual(l.errors, []);
+      } finally { await l.close(); }
+    }
+    });
+  }
+  if (phases.includes("memory")) {
+    const memory: unknown[] = [];
+    report.memory = memory;
+    let l: Awaited<ReturnType<typeof lane>> | undefined;
+    const started = Date.now();
+    let activeMs = 0;
+    const hold = async (held: boolean) => {
+      await l!.page.evaluate(held => {
+        const p = globalThis.__webPerf, g = globalThis.__fly;
+        if (held && !p.heldFrame) { p.heldFrame = g.frame; g.frame = () => {}; }
+        if (!held && p.heldFrame) { g.frame = p.heldFrame; delete p.heldFrame; g.wake(0); }
+      }, held);
+    };
+    const sample = async (label: string) => {
+      // Inspector collections can stop the worker long enough to trip its live-frame watchdog.
+      await hold(true);
+      try {
+        await l!.cdp.send("HeapProfiler.collectGarbage");
+        const heap = await l!.cdp.send("Runtime.getHeapUsage");
+        const worker = await l!.workers.sample();
+        const state = await readState(l!.page);
+        assert.equal(await l!.page.evaluate(() => globalThis.__fly.brain.status), "running");
+        memory.push({ label, elapsedMs: Date.now() - started, activeMs, heap, ...worker, state, dom: await l!.cdp.send("Memory.getDOMCounters") });
+        await l!.page.evaluate(() => { globalThis.__webPerf.frames.length = 0; });
+        save();
+      } finally { await hold(false); }
+    };
+    try {
+      do {
+        await withHeavySlot(async () => {
+          if (!l) { l = await lane(); await move(l.page, "picnic", true); await sample("start"); }
+          await hold(false);
+          const from = Date.now(), initial = activeMs;
+          const target = Math.min(memorySeconds * 1000, initial + 300_000);
+          while (activeMs < target) {
+            await waitForGameTime(l.page, Math.min(10, (target - activeMs) / 1000));
+            activeMs = initial + Date.now() - from;
+            await sample("watch");
+          }
+          if (activeMs >= memorySeconds * 1000) {
+            await sample("duration-checkpoint");
+            for (let i = 0; i < 10; i++) await move(l.page, PLACES[(i + 1) % PLACES.length].id, true);
+            await sample("ten-place-changes");
+          }
+          await hold(true);
+        });
+      } while (activeMs < memorySeconds * 1000);
+      assert.deepEqual(l!.errors, []);
+    } catch (error) { report.failure = String(error); save(); throw error; }
+    finally { await l?.close(); }
+  }
   if (phases.includes("brain")) await withHeavySlot(async () => {
     // The same deterministic senses and CPU timer as cost.budget.ts, independent of browser load.
     const { CpuMeter } = await import("./cpuBudget.ts");
