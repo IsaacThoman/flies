@@ -29,16 +29,18 @@ npm run fuzz -- --kind body --place restaurant --seeds 1,2,3 --duration 21600 --
 
 The harness reports are JSON lines on stdout (`npm run --silent fuzz -- ...`
 suppresses npm's own banner), with life progress each simulated minute on
-stderr. Redirect stdout to keep summaries. A failure stops the run, naming the
-place, seed, step, simulated time, replay command and state. Body failures
+stderr. Redirect stdout to keep summaries. Caught step or probe failures stop
+the run with place, seed, step, simulated time, replay command and state.
+Setup, loading and random-start errors outside those blocks can lack this
+context. Caught body failures
 include the input and a single-step checkpoint; recovery failures identify
 an assertion in the counterfactual probe. Replaying the seed reproduces
 private wall-turn state too. Physics regressions reduce discovered failures
 to small independent tests in `packages/body/tests/motion.test.ts`.
 
 The body fuzzer changes intents abruptly, including contradictory feeding,
-walking, backing and flight drives; varies frames from 10 microseconds to two
-seconds; blows gusts with each horizontal component up to 600 mm/s; and starts elsewhere every simulated
+walking, backing and flight drives; draws candidate frames from 10 microseconds to two
+seconds (the final frame can be clipped below that range); blows gusts with each horizontal component up to 600 mm/s; and starts elsewhere every simulated
 minute. Each step checks finite coordinates, velocities, normals and motion
 scalars, nonpenetration (its feet out of every solid, and its body's 1.3 mm
 over them clear of every underside, walking or flying), its reach (`checkReach`:

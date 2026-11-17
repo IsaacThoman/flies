@@ -262,7 +262,7 @@ and `/rooms/*` on the site's own origin, WebSocket upgrades included, to
 through your proxy. It counts visitors by the address Caddy passes on in
 `X-Forwarded-For` (`TRUST_PROXY=1`; see [visitors' addresses](#visitors-addresses)). It
 has no public port, and no `depends_on`: the site works while it is down
-(only `/rooms` answers 502 then).
+(`/rooms` and `/rooms/*` fail while that upstream is unavailable).
 
 ```sh
 docker compose ps                    # rooms should be healthy too
@@ -281,7 +281,7 @@ server admits anyone with a locked room's link and discards room names,
 listing choices and password hashes when it next saves. Codes and seats
 can survive, but that metadata does not. An update restarts it with SIGTERM: it writes
 the tables, tells every connected device it is restarting, and the devices
-reconnect to their tables within a couple of seconds. Keep `rooms_data`, and
+schedule their first retry after 0.3–1.5 seconds; completing the reconnection depends on server readiness and the network. Keep `rooms_data`, and
 do not run `docker compose down -v` on the server: deleting it forgets every table and every invitation. `ROOMS_PORT` is the common internal-port setting read by Caddy and
 the service; other host, proxy and build settings are listed in
 [the environment example](../.env.example). Browsing the list of rooms uses the same `/rooms`

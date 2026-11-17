@@ -20,7 +20,7 @@ the next frame; nothing in the world is built again.
 
 The shots are framed for 16:9. On a wider screen the camera keeps their
 height and sees more to the sides; on a narrower one it keeps seven tenths of
-the extra height as field of view (`camera.ts`, `fieldOfView`), so on a phone
+the extra height as field of view (`apps/web/src/camera.ts`, `fieldOfView`), so on a phone
 held upright the fly is about two fifths of the screen across in Follow (on
 the TV, a quarter of its width) rather than a quarter (keeping the TV's width,
 a small fly in a great deal of sky and table) or a half (keeping its pixels,
@@ -81,7 +81,7 @@ the body's joint uniforms, its glow a uniform array of 24 vec4s, a float for eac
 16,000 triangles; the panel one more draw (the same geometry, its backdrop the
 first two triangles) and the same triangles; JavaScript per frame within the
 noise of none (the glow, the X-ray's easing and the corners together are
-about 12 µs a frame in V8's interpreter alone). The end-to-end test fails above 150
+about 12 µs a frame in V8's interpreter alone). The end-to-end test fails at or above 150
 draws or 500,000 triangles. Physical Apple TV measurements and the unattended
 soak command are in [docs/apple-tv.md](apple-tv.md).
 

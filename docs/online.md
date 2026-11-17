@@ -99,10 +99,10 @@ without joining opens a browsing connection for the room list.
 | A fly: where it is, its pose, its hand | Its player's device, where its brain and body run | About 20 states a second through the room, drawn about 100 ms in the past, interpolated (`packages/net/src/track.ts`) |
 | What a fly feels and does about the others | Its own device | The others are bodies its eyes see and its body meets (`packages/body/src/crowd.ts`); their hands are the same `Hands` as yours, driven from the wire (`apps/web/src/online/other-hands.ts`) |
 | The food: the place's patches, what is dropped, what the place puts out | The room (`TableFood`) | Each device eats at once and tells the room; the room's account, less what the device has eaten since, is what is left (`FoodMirror`) |
-| A thrown ball | The room's clock | Its path and the moment its dive starts: every device (and the room) puts it in the same place at the same moment (`ball.ts`), after a lead of 1.5 round trips, clamped to 200–600 ms, so peers can hear of the whole dive |
+| A thrown ball | The room's clock | Its path and the moment its dive starts: every device (and the room) puts it in the same place at the same moment (`packages/net/src/ball.ts`), after a lead of 1.5 round trips, clamped to 200–600 ms, so peers can hear of the whole dive |
 | The place | The room | `place` tells every device to carry its fly there, and where each fly is set down |
 | The light, the weather, the clock | The room, chosen by the starter | `world` and the welcome's clock; "Now" follows the starter's time zone |
-| The high bubbles | The room's seed and clock | Each device works them out (`bubbles.ts`); a device whose fly bursts one says so |
+| The high bubbles | The room's seed and clock | Each device works them out (`packages/net/src/bubbles.ts`); a device whose fly bursts one says so |
 | Visitors (gust, gull, leaf, butterfly, ladybird, juice, boat) | The room says when, with a seed (the picnic's pace, `@fly/world`) | Each device starts the visit from that seed (`SceneSet.happen`); butterfly and ladybird avoidance uses the nearest fly; leaves can touch the local fly |
 | The restaurant's ventilation | The room says when it comes on, by the same clock as alone (`VentilationClock`, `@fly/world`), with a seed | Each device draws how long it runs from the seed (`SceneSet.happen`), with a shared duration; local receipt and animation can differ in phase (see the timing limit below) |
 
@@ -218,8 +218,10 @@ after 0.3 to 1.5 s; connection time and server downtime are additional. The hell
 device's key, and a retained seat restores its id and colour. Removed or
 replaced guest seats and expired rooms cannot provide that guarantee.
 Its fly carries on where it is if that is in the place the table is in (the
-hello's epoch) and within a walk of where the room last had it (20 mm/s for
-up to 10 s, on the same table or floor); otherwise it is put back where the
+hello's epoch), has standing clearance and lies within a straight-line
+distance allowance of 20 mm/s for up to 10 s, plus 3 mm. This does not check
+a walkable path or require the same supporting surface; a raised surface can
+be accepted. Otherwise it is put back where the
 room had it. The room keeps every table in a file (`DATA_DIR/tables.json`)
 every 30 s and as it stops, and reads it back as it starts, with each
 room's name, whether it is listed, and its lock (tables kept before rooms

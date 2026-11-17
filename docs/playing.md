@@ -74,8 +74,7 @@ the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot), **Light** (now, which follows the clock,
 or morning, midday, golden hour, dusk, night), **Weather** (now, which
 follows the forecast, or clear, overcast, mist, rain), **View** (close up, follow, wide, the whole table, from above,
-through the fly's eyes, and inside it, close up with the fly as glass; Up
-brings the camera in, Down takes it out) and
+through the fly's eyes, and inside it, close up with the fly as glass; Up/Down step through the ordinary zooms, then the special views) and
 **Place** (where it lives; Up and Down choose, Select carries it there). On
 the shelf the four that act on the fly stand apart from the four about its
 world and the camera; Left and Right go along all of them. Hints in the
@@ -106,8 +105,9 @@ emergency collision correction can be immediate. Obstacle feelers usually bring
 it in over several frames and let it out more slowly once the way stays clear. Walking, it keeps
 pace a little ahead, and in a jump it pulls back, widens and whips round
 after the fly. Collision checks try to keep it outside solids, taking precedence over
-the desired shot distance; in tight spaces it can come much closer. With the ball in hand it goes round to the side across the
-fly from where the ball will come, so the dive is seen past the fly. Behind the
+the desired shot distance; in tight spaces it can come much closer. With the ball in hand it prefers the side opposite the nominal approach.
+It does not adjust that preference to an obstacle-rerouted ball, and manual
+control can keep another angle. Behind the
 loading screen and the menu it frames it around the title/menu layout: small and left on wide screens,
 more central on tall ones.
 
@@ -122,7 +122,10 @@ up or down, or brought in or out, it stays just where you put it, however the
 fly turns, until you give it back; each click of a mouse wheel eases in, so a
 turn of the wheel is one smooth move. Handed back (R, a double click or tap in
 the air, the pad's right stick pressed in), or a view chosen on the View tool,
-the cameraman takes it at once, at the named view nearest your zoom or the one chosen.
+the explicit handback returns control at once, at the named view nearest
+your zoom. Choosing a different mapped view also returns control; choosing
+Inside from an already Close up view can retain manual control, a suspected
+`setView` early-return bug.
 The screensaver takes it too, and gives your zoom back after.
 
 ## Screensaver and corner pictures
@@ -160,7 +163,7 @@ against real time (from the brain's meter), under
 a trace of its last twenty seconds; and, headed by what the fly is doing now
 (the activity caption without the HUD's food-name suffix), its day: how far
 it has walked, its meals, its take-offs, and its time flying and grooming.
-The day is counted from what the fly's life did (`life.ts`: its displacement while on its feet, including crowd pushes, a meal when eating starts, each leap into the air, each
+The day is counted from what the fly's life did (`apps/web/src/life.ts`: its displacement while on its feet, including crowd pushes, a meal when eating starts, each leap into the air, each
 second it was flying or grooming), once each, kept across launches as
 `flies.day` and begun again at midnight. The panel sits across the screen
 from the other pictures, at the same edge (at the top left while you play),

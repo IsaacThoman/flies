@@ -45,10 +45,35 @@ over 60), and the abdomen swells with it: up to 12% wider and deeper and 5%
 longer, round numbers chosen to be seen. Another player's fly at a table
 doesn't show it: the crop isn't sent to the room.
 
-The body also supplies clock and sleep-pressure state; see
-[Sleep and the daily rhythm](../README.md#sleep-and-the-daily-rhythm).
-The [brain reference](../packages/brain/README.md#sleep-and-the-daily-rhythm)
-contains its model and measurements.
+## Sleep and the daily rhythm
+
+The numerical sleep observations are retained from earlier runs and are being
+remeasured separately. The rhythm described here is the configured drive,
+not a guarantee for every bout.
+
+The fly keeps the real time of day, whatever light is chosen: its clock follows the
+device's clock and, on an Apple TV that knows them, the available real sunrise and sunset
+(otherwise the game's summer day, 05:40 to 20:10). Its clock drive is arranged around a
+morning peak of activity round dawn and an evening one round dusk, each beginning
+about three hours ahead, a siesta between them, and sleep through the night. Sleep
+pressure builds while it is awake (over about 12 hours) and discharges while it sleeps
+(over about 3): a fly kept awake by play, or woken again and again at night, is
+sleepier, and it starts each visit as sleepy as the hour would leave a fly left to itself.
+
+None of this moves the fly. The body works the clock and the pressure out
+(`packages/body/src/rhythm.ts`) and tells the brain, which drives the clock neurons
+and the sleep-promoting neurons the connectome has and shifts its made-up arousal; it
+is the brain that stops walking (`packages/brain/README.md`, Sleep and the daily rhythm,
+says how, with what is real and what stands in). The body only watches: five minutes
+or more of resting or tasting activity counts as sleep, as the field scores it, and stillness deepens it.
+When its activity is resting and it is asleep, the fly settles lower on its
+legs with its head bowed, suppresses idle glances and foot shifts (the pose's
+`sleep`, `packages/fly`), and the caption says "Asleep". Tasting also counts
+toward quiet time, but keeps its tasting caption and normal pose. The retained stimulus observations discuss resting-feather, rain,
+stroking and swoop responses; the tests allow occasional responses to weak
+stimuli. See the [brain sleep reference](../packages/brain/README.md#sleep-and-the-daily-rhythm). An activity outside resting/tasting wakes it; this is not a detector of every
+small displacement or joint movement. The canvas's `data-rhythm` gives the hour, the
+clock, the pressure, the depth and how long it has been still.
 
 ## What the body adds
 
@@ -56,9 +81,9 @@ The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
 with thresholds, smoothing and hysteresis: walk above 0.3
 until below 0.15, back up when `back` is above 0.3 and beats `walk` by 0.15, then persist
 while `back` is at least 0.15 and no less than `walk`, take off as
-`escape` rises past 0.4 (the giant fiber at 80 Hz: why there, in `behavior.ts`), groom and wing poses above 0.2, feed above 0.15 until
+`escape` reaches 0.4 once armed and outside its refractory period (the giant fiber at 80 Hz: why there, in `packages/body/src/behavior.ts`), groom and wing poses above 0.2, feed above 0.15 until
 below 0.05, sing above 0.4 until below 0.2 and only on its feet (pIP10, the
-song command neuron: why there, in `behavior.ts`), commands older than 500 ms ignored). Steering is continuous: `turn`
+song command neuron: why there, in `packages/body/src/behavior.ts`), commands older than 500 ms ignored). Steering is continuous: `turn`
 sets the yaw rate (3 rad/s at full turn walking, about a third of that standing (0.35×), 5
 in the air).
 
@@ -74,7 +99,7 @@ lives (`packages/body/src/motion.ts` unless noted):
 - **The take-off's direction.** The escape command launches it (380 to 620 mm/s
   up and 160 to 340 away, by how far past 0.4 it went); the direction is the
   body's: away from the ball if the ball is in the air, else straight ahead.
-- **Flying on: the tarsal reflex** (`behavior.ts`, see Flight). Off its feet,
+- **Flying on: the tarsal reflex** (`packages/body/src/behavior.ts`, see Flight). Off its feet,
   the body keeps a floor under the wings' drive until it lands.
 - **Facing its course.** In the air it turns to face the way it is going (at
   up to 8/s of the angle between), and the brain's `turn` steers on top:
@@ -146,9 +171,10 @@ a few millimetres, over in a tenth of a second (`packages/brain/README.md`,
 What it does and doesn't reproduce). So while
 its feet are off the ground the body keeps a floor under the wings' drive:
 
-- a take-off goes straight into it (the giant fiber drives the jump muscle and,
-  through the PSI, the wings' power muscles, so the first downstroke comes
-  with the jump); off its feet any other way, walking off a ledge, it starts
+- a take-off arms the floor; the current update order applies it on the next
+  airborne update, rather than during launch itself. The intended simultaneous
+  jump/downstroke is a suspected ordering bug in `packages/body/src/behavior.ts`.
+  Off its feet any other way, walking off a ledge, it starts
   0.05 s later, so a step down of a few millimetres is over first;
 - for 0.7 s it holds 0.62, a little over its weight, so it flies on at about
   0.28 m/s (a fruit fly cruises at about 0.3 m/s);
@@ -207,7 +233,7 @@ to each facet (bilinear, by the facet's direction in the head frame).
 Brightness is weighted as a fly's outer photoreceptors (Rh1, mostly blue-green)
 see it, 0.1 R + 0.45 G + 0.45 B, so a blue sky is bright to it. The picture is
 then adapted to the light, as a fly's photoreceptors adapt their gain to it
-(`Adaptation` in `vision.ts`): where the scene renders dim, it is scaled up
+(`Adaptation` in `packages/body/src/vision.ts`): where the scene renders dim, it is scaled up
 toward the level midday has (a mean of 0.5), by up to 2 times, following the
 picture's mean over 4 s. The screen's dusk is 0.15 and its night 0.07 to 0.09
 against midday's 0.6, but real dusk is far above the light at which a fly's
@@ -291,9 +317,10 @@ paragraph use the anatomy module's 2.4 mm reference body length; the game
 scales the model to 2.5 mm. The neuropils are measured from
 the FlyEM male CNS v1.0's own neuropil meshes (one male's brain, neck and
 cord in one EM volume, CC-BY 4.0) by `packages/fly/scripts/nerves.ts`, which
-writes `measured.ts`: each neuropil's surface as its radius in each direction
-round its centre, the farthest of its mesh's vertices within 15° of each
-direction (left side only, mirrored, so the drawing is symmetric); the
+writes `packages/fly/src/nerves/measured.ts`: each neuropil's surface as its radius in each direction
+round its centre, a radial approximation from subsampled mesh vertices within 15° of each
+direction, with missing directions filled and radii smoothed and rounded
+(left side only, mirrored, so the drawing is symmetric); the
 lamina as a curved plate round the centre of the sphere that fits it; the
 mushroom body's peduncle and lobes and the protocerebral bridge as rods
 through slices of their meshes; the ellipsoid body as the torus that fits it;

@@ -68,7 +68,7 @@ node scripts/play.ts 'eval:__fly.outside.feed({observedAt:Date.now(),cloudCover:
 ```
 
 The fields use milliseconds since the epoch, cloud fraction, mm/hour, metres,
-m/s and local solar hours. `feed` settles the change immediately by default;
+m/s and local civil clock hours from midnight. `feed` settles the change immediately by default;
 its optional second argument `false` eases the transition. In that page,
 `__fly.outside.feed(null)` removes the supplied observation and returns to
 any host service, or the forecast without one. Use Weather → Now and Light →
@@ -87,11 +87,14 @@ the observation is; the feed does not contact a weather provider.
 `npm test` includes a fast documentation check. Run only that check with
 `node --test scripts/docs.test.ts`. It checks local Markdown links and
 anchors, source-file references in inline code and repository paths in command examples, and documented `npm run`
-commands. It does not fetch external URLs or run the documented commands.
+commands, including common npm flags and explicit package-directory overrides.
+It parses Markdown for links/headings, so code examples do not invent links or
+anchors. Command/file checks still inspect the examples. It does not fetch
+external URLs or execute documented commands.
 
 Use a relative Markdown link when pointing readers to another document.
 Write source paths in inline code relative to the repository root, or to
-the document. Label generated paths and example placeholders as such; they
+the document; a matching basename elsewhere is not sufficient. Label generated paths and example placeholders as such; they
 are not existing source files. For an exact generated-path exemption, add
 `<!-- docs-check: generated path/to/output -->` to that document. Local
 Markdown links are always checked, including links to generated paths. Use

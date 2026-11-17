@@ -28,9 +28,10 @@ its own, and the system keyboard on the main thread ([Playing together](#playing
 
 WebGL calls that return nothing are encoded into a 4 MB command buffer (about 0.2–0.3 µs a call
 in a historical device measurement; date and device model not recorded) and run later on the render thread. Object handles are numbered in
-JavaScript, so creating a buffer or texture doesn't wait. Calls that need an answer
-(`getParameter`, shader and link status, `readPixels`, `getBufferSubData`, `getImageData`)
-hand the buffer over and wait for the render thread to catch up: see [Reading pixels
+JavaScript, so creating a buffer or texture doesn't wait. Uncached native queries
+(such as pixel readback) hand the buffer over and wait for the render thread
+to catch up. Many `getParameter` values and shader/program statuses are
+local or cached and do not synchronize: see [Reading pixels
 back](#reading-pixels-back). 2D canvas drawing goes into the same stream, so a `CanvasTexture`
 always sees what was drawn before it was uploaded.
 
@@ -81,8 +82,8 @@ npm run tvos -- archive --version 0.1.1   # archive for the App Store (docs/rele
    module loader, so everything is inlined; any configured public assets are copied beside it;
 4. copies `packages/brain/data/connectome.bin` to `www/brain/` (and stops, saying how to get
    it, if it isn't there);
-5. generates `Flies.xcodeproj` (XcodeGen, `project.yml`, with `weather.yml` and
-   `weatherkit.yml` merged in when the weather is wanted, and `local-rooms.yml` for a room server
+5. generates `Flies.xcodeproj` (XcodeGen, `apps/tvos/project.yml`, with `apps/tvos/weather.yml` and
+   `apps/tvos/weatherkit.yml` merged in when the weather is wanted, and `apps/tvos/local-rooms.yml` for a room server
    without TLS: [Playing together](#playing-together)) and builds it with xcodebuild.
 
 The Xcode project compiles every source under `packages/brain-native/src/` with the
@@ -124,9 +125,8 @@ way.
 Use `--detached` with `logFile` for device measurements. `tvos:soak` installs and launches the
 last physical-device build without attaching. It logs when the splash lifts (`drive:
 {"ready":"true"}`; the line's `[js ms]` is the time since the host started), exercises feeding,
-ball throws, the eye picture at Low and High, and pause/settings, then is intended to carry the fly to each place in turn. It pins the first through Settings, so the screensaver doesn't move it on (each
-step of that choice carries the fly at once, so it is set only once; the Place tool moves the
-pin after that), shows each place in every weather and light for 5 seconds, and watches its
+ball throws, the eye picture at Low and High, and pause/settings, then is intended to carry the fly to each place in turn. It pins the first through Settings, so the screensaver doesn't move it on (the choice settles after one second or when its row is left; the Place
+tool moves the pin after that), shows each place in every weather and light for 5 seconds, and watches its
 screensaver at midday and at night, `--minutes` in total split among them. Each screensaver phase
 normally starts after the default 30 seconds without input; saved settings
 can change or disable that delay. The earlier 55-minute total for a
@@ -152,7 +152,8 @@ growth. The host retains about 68 seconds of frame history, so use a stats inter
 
 ## The Web APIs that exist
 
-Everything else is missing, and code that reaches for it gets `undefined` or an exception. In
+This is a selected compatibility inventory, not an exhaustive list. Some
+unsupported methods are inert shims rather than exceptions. In
 JavaScriptCore itself: all of ES2023, `Intl`, typed arrays, `Promise`, `WeakRef`,
 `FinalizationRegistry`. There is no JIT: JavaScript runs about 16 times slower than in a
 desktop browser.
@@ -463,7 +464,7 @@ network (`npm run rooms`) is plain `ws://`. Reached by its IP address (`ws://192
 it needs nothing: ATS leaves addresses alone (checked in the simulator: the check passes with and
 without the exception). Reached by a name (`ws://my-mac.local:8787/rooms`), it needs
 `NSAllowsLocalNetworking`, which a build for a local room server adds
-(`apps/tvos/local-rooms.yml`, merged into `project.yml` by XcodeGen only when it is wanted):
+(`apps/tvos/local-rooms.yml`, merged into `apps/tvos/project.yml` by XcodeGen only when it is wanted):
 `npm run tvos -- build --local-rooms`, any build whose `ROOMS_URL` is `ws://`, and the simulator
 check. Never ship one of those.
 

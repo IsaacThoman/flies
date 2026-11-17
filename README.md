@@ -90,33 +90,10 @@ with `npm run brain:wasm` as well.
 
 ## Sleep and the daily rhythm
 
-The sleep measurements are being remeasured separately. The account below
-describes the intended clock rhythm and retained observations, not a
-guarantee for every bout.
-
-The fly keeps the real time of day, whatever light is chosen: its clock follows the
-device's clock and, on an Apple TV that knows them, the available real sunrise and sunset
-(otherwise the game's summer day, 05:40 to 20:10). Its clock drive is arranged around a
-morning peak of activity round dawn and an evening one round dusk, each beginning
-about three hours ahead, a siesta between them, and sleep through the night. Sleep
-pressure builds while it is awake (over about 12 hours) and discharges while it sleeps
-(over about 3): a fly kept awake by play, or woken again and again at night, is
-sleepier, and it starts each visit as sleepy as the hour would leave a fly left to itself.
-
-None of this moves the fly. The body works the clock and the pressure out
-(`packages/body/src/rhythm.ts`) and tells the brain, which drives the clock neurons
-and the sleep-promoting neurons the connectome has and shifts its made-up arousal; it
-is the brain that stops walking (`packages/brain/README.md`, Sleep and the daily rhythm,
-says how, with what is real and what stands in). The body only watches: five minutes
-or more of resting or tasting activity counts as sleep, as the field scores it, and stillness deepens it.
-Asleep, the fly settles a little lower on its legs, its head bowed, without the idle
-glances and shifts of its feet (the pose's `sleep`, `packages/fly`), and the caption says
-"Asleep". The retained stimulus observations discuss resting-feather, rain,
-stroking and swoop responses; the tests allow occasional responses to weak
-stimuli. See the [brain sleep reference](packages/brain/README.md#sleep-and-the-daily-rhythm). An activity outside resting/tasting wakes it; this is not a detector of every
-small displacement or joint movement. The canvas's `data-rhythm` gives the hour, the
-clock, the pressure, the depth and how long it has been still.
-
+The clock, sleep pressure and arousal threshold include labelled stand-ins.
+See [the body's sleep state](docs/simulation.md#sleep-and-the-daily-rhythm)
+and [the brain's model and retained measurements](packages/brain/README.md#sleep-and-the-daily-rhythm).
+The sleep tables are being remeasured separately.
 
 ## Credits
 

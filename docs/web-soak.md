@@ -1,7 +1,9 @@
 # Browser soak
 
 Run `npm install` and `npm run brain:fetch` first. Install Chromium with `npx playwright install chromium`, or set
-`CHROMIUM_PATH` to an existing Playwright Chromium executable. The harness uses Playwright's
+`CHROMIUM_PATH` to an existing Playwright Chromium executable. In `--built`
+mode, a cached full Chromium is preferred and can bypass that variable;
+see `fullChromiumPath()` in `scripts/play.ts`. The harness uses Playwright's
 headless Chromium with the GPU enabled and a real brain worker in every page.
 There is no simulated or accelerated time.
 
@@ -93,8 +95,9 @@ The CSV includes screen/tab/brain engine/weather/time/view/eyes/inset/variant fo
 The browser cannot report per-page GPU allocation bytes or the TV's resident
 memory, thermal behavior or actual scanout pacing. Three's resource counts
 are not GPU bytes; JS heaps exclude most native allocations. Forced GC and
-concurrent pages perturb frame timings, so use a single screensaver phase or the
-real device for precise performance comparisons.
+concurrent pages perturb frame timings. For one browser page, use
+`--phases wallpaper --places picnic`; a phase alone still starts a page per
+selected place. Use a real device for device performance comparisons.
 
 Room sockets bound both unread traffic and stalled sends. A reader that stops
 draining reconnects for a fresh snapshot instead of retaining and replaying old
@@ -103,8 +106,12 @@ injects hidden-page state in a two-page room, tests reconnection separately
 through a server restart, and checks frame budgets with seven synthetic
 peers. It does not combine real OS hiding, seven peers and wake reconnection.
 
-Run `npm run tvos:soak -- --device <udid> --minutes 60` on the Apple TV for that
-last evidence. Its generated plan covers every place, weather and daylight preset, pins each
+The combined OS hide/wake, seven-peer and reconnection case needs a separate
+device exercise; neither soak command below automates it.
+
+`npm run tvos:soak -- --device <udid> --minutes 60` generates a solo TV sweep.
+It currently has a [menu-navigation defect](apple-tv.md#unattended-soak) and
+can stop waiting for Settings; it is not evidence of a completed sweep. Its generated plan covers every place, weather and daylight preset, pins each
 place against rotation, and divides its requested screensaver minutes among all
 five places, half midday and half night. Interaction time is additional. Keep
 raw CSVs, logs and charts out of git; retain a compact results table in the PR.

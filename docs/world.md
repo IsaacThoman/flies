@@ -111,7 +111,9 @@ day), it is the forecast and the summer day as before, and the tool says
 "Now". Settings → Screensaver → Real weather turns it off. Apple Weather's attribution is in
 About the fly. Weather reaches the body through the picture, wind and rain touch.
 Sunrise and sunset also set the body's internal clock directly, independently
-of the chosen light; those clock/sleep inputs are labelled stand-ins.
+of the chosen light; those clock/sleep inputs are labelled stand-ins. The
+`sunTimes` getter currently omits the age gate used by scene light, so expired
+solar hours can still reach the body clock, a suspected freshness bug.
 
 While nobody is using the remote (the screensaver, or a minute of play without
 a press), the picnic has its own goings-on, about ten an hour, never two
@@ -239,7 +241,9 @@ fade over a minute and a half. A foot carries only a little: the first steps
 off the food print clearly, the next fainter and then only now and then, and
 after ten or so it is clean, until it walks back into food. Sugar and crumbs
 are dry and leave nothing. There are none on a drink, a head of foam or
-anything drawn rougher than the fly feels it, and they are cleared when the
+most named rough surfaces. The intended basil exclusion is missing from
+`NO_PRINTS`, so prints can be eligible on its smooth collision crown despite
+the drawn leaves, a suspected name mismatch. Prints are cleared when the
 fly is carried somewhere else, not restored on returning. They are only drawn: the fly doesn't taste or
 feel its own prints, they aren't food, and nothing about them reaches its
 brain.
@@ -248,7 +252,7 @@ brain.
 
 The restaurant is a whole room, not a tabletop: a small city bistro, closed
 for the night. The fly starts on a round marble table in the window, between
-a glass caddy of sugar packets and a glass with red wine left in it, a rose
+a steel wire rack of sugar packets and a glass with red wine left in it, a rose
 in a bud vase and an unlit votive beside them, a torn sugar packet spilt
 across the marble and the ring a glass left; from there it can walk under
 the table, fly to the next, to the floor's black and white penny rounds, to

@@ -26,13 +26,13 @@ the web's, `--only ios/` for the iPhone and iPad's).
 
 | Path | What | Sizes |
 | --- | --- | --- |
-| `tv-icon/<size>/` | The home-screen icon, in layers numbered back to front (`1-sky.png`, `2-table.png`, `3-fly.png`). tvOS moves them apart for the parallax effect. Two to five layers; the back one opaque, the others transparent. | `1280x768` (App Store), `400x240` and `800x480` (home screen, 1x and 2x) |
-| `top-shelf/standard/` | The Top Shelf banner, shown above the top row when the app is in it: `top-shelf.png`, `top-shelf@2x.png`. tvOS may crop the edges. | 1920×720, 3840×1440 |
+| `tv-icon/<size>/` | The home-screen icon, in layers numbered back to front (`tv-icon/1280x768/1-sky.png`, `tv-icon/1280x768/2-table.png`, `tv-icon/1280x768/3-fly.png`). tvOS moves them apart for the parallax effect. Two to five layers; the back one opaque, the others transparent. | `1280x768` (App Store), `400x240` and `800x480` (home screen, 1x and 2x) |
+| `top-shelf/standard/` | The Top Shelf banner, shown above the top row when the app is in it: `top-shelf/standard/top-shelf.png`, `top-shelf/standard/top-shelf@2x.png`. tvOS may crop the edges. | 1920×720, 3840×1440 |
 | `top-shelf/wide/` | The wide Top Shelf banner, the same way. | 2320×720, 4640×1440 |
-| `splash/` | The launch image, which stays up until the first game screen is drawn, with a 30-second fallback. | `splash-1920x1080.png`, `splash-3840x2160.png` |
+| `splash/` | The launch image, which stays up until the first game screen is drawn, with a 30-second fallback. | `splash/splash-1920x1080.png`, `splash/splash-3840x2160.png` |
 | `web/icon-192.png`, `web/icon-512.png` | The web app's icon: the fly close up on the napkin, square, full bleed. | 192×192, 512×512 |
 | `web/icon-maskable-512.png` | The same framed looser, for launchers that cut icons to a circle or a squircle (the fly inside the middle 80%). | 512×512 |
 | `web/apple-touch-icon.png` | The icon an iPhone or iPad puts on its home screen. | 180×180 |
 | `web/favicon.png` | The browser tab's icon: the fly alone, from nearly above, transparent. | 64×64 |
 | `web/preview.png` | The picture a link to the site shows in chats and feeds: the launch image's shot, with the wordmark. | 1200×630 |
-| `ios/` | The iPhone and iPad app's icon, the web app's at full size (`icon.png`) and at night for the dark appearance (`icon-dark.png`), and its launch image (`launch.png`). | 1024×1024; 2048×2048 |
+| `ios/` | The iPhone and iPad app's icon, the web app's at full size (`ios/icon.png`) and at night for the dark appearance (`ios/icon-dark.png`), and its launch image (`ios/launch.png`). | 1024×1024; 2048×2048 |

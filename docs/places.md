@@ -175,7 +175,7 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   `(time, camera, light, weather)`; implementations may omit unused trailing arguments.
   A windowsill can run rain down its pane by `rain` and leave it streaked by
   `wet`; the picnic's rain, wet table, overcast deck, mist and rainbow are
-  worked examples (`apps/web/src/places/picnic/rain.ts`, `table.ts`, `backdrop.ts`), and
+  worked examples (`apps/web/src/places/picnic/rain.ts`, `apps/web/src/places/picnic/table.ts`, `apps/web/src/places/picnic/backdrop.ts`), and
   the lab shows it in the view through its windows (`apps/web/src/places/lab/room.ts`). Rain
   bursts the bubbles and sends the fireflies to shelter wherever they are.
 - **What the fly's eyes see** (`SceneSet.seen`): the big shapes only. They are
@@ -205,7 +205,7 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   for a brain without eyes). Food goes into the pantry with `pantry.add`, to
   be found by walking and tasting. Start comings and goings only while
   `quiet`, so what the fly does while someone plays answers what they do. The
-  picnic's (`apps/web/src/places/picnic/life.ts`, paced in `pace.ts`) are the worked
+  picnic's (`apps/web/src/places/picnic/life.ts`, paced in `packages/world/src/pace.ts`) are the worked
   example.
 - **A shadow passing over** (`apps/web/src/scene/shade.ts`, optional): `shaded(material)`
   teaches a lit material to take a shadow cast from high up (the picnic's
@@ -230,7 +230,7 @@ fly can live at any table, at the bar or on the floor, and the camera can be
 anywhere in it. Drawn as one, its detail would cost far more than the Apple
 TV has (`places/restaurant/`):
 
-- **Areas.** The room is split into areas (`areas.ts`): each table with its
+- **Areas.** The room is split into areas (`apps/web/src/places/restaurant/areas.ts`): each table with its
   chairs and what is on it, the bar in three lengths, the back bar in two,
   the pass, the host's stand, the service station, the banquette in two, the
   window's ledge. Each area's detail is merged by material into a mesh or two
@@ -243,7 +243,7 @@ TV has (`places/restaurant/`):
   (kind + 128 × area), and a uniform mask of the areas in detail folds their
   stand-ins away in the vertex shader. Each frame is a loop over the areas'
   distances from the camera, a few `visible` flags and the mask: no rebuilding
-  and no area-detail draws for distant areas (`set.ts`). `SceneSet.update` is handed the
+  and no area-detail draws for distant areas (`apps/web/src/places/restaurant/set.ts`). `SceneSet.update` is handed the
   camera for this.
 - **One material, kinds in the shader.** Merged solid fabric and area detail use one
   physical material and their clear geometry another. Separate materials
@@ -251,9 +251,9 @@ TV has (`places/restaurant/`):
   (marble, oak, zinc, the floor's penny rounds, the tin ceiling...) is its
   `kind`, shaded in the fragment shader from where it is in the room, so a
   whole area is one or two draws and the detail is in the shader, crisp close
-  up and faded where a pixel can't show it (`kinds.ts`, `surfaces.ts`). The
+  up and faded where a pixel can't show it (`apps/web/src/places/restaurant/kinds.ts`, `apps/web/src/places/restaurant/surfaces.ts`). The
   room is built in parts, each owning the world's solids it draws and a range
-  of kinds of its own (`parts.ts`).
+  of kinds of its own (`apps/web/src/places/restaurant/parts.ts`).
 - **The eyes' stand-in.** The fly's eyes reuse the room-wide opaque geometry, with
   nothing folded away and the shop front's openings bright: the big shapes,
   six times a refresh, so it is kept lean.
@@ -272,7 +272,7 @@ TV has (`places/restaurant/`):
   highlights. The tables, chairs, stools and the zinc shadow the sun, the
   street lamp and the pendant as blocks. In the nearest eligible lit area
   within 650 mm, up to 16 tall solids add approximate circular-column
-  shadows (`light.ts`); soft shadows on
+  shadows (`apps/web/src/places/restaurant/light.ts`); soft shadows on
   the floor under everything are painted once from the layout.
 - **Built in steps.** The whole room is several times the picnic's work to
   build, so it is built a part a frame behind the veil (`SceneSet.more`): the
@@ -302,11 +302,12 @@ TV has (`places/restaurant/`):
 - **Building is a pause behind the veil.** `data-place-ms` on the canvas says
   how long the place took to build: the picnic 36 ms in desktop Chromium, so
   about half a second on the TV. Keep it there, or build in steps
-  (`SceneSet.more`, above): then `data-place-step-ms` is the longest frame
+  (`SceneSet.more`, above): then `data-place-step-ms` is the longest timed synchronous construction/build operation
   of it, and that is what to keep there.
 - **Test it.** After registration, `apps/web/tests/places.test.ts`
   then checks it like every other place: the fly starts standing on the table,
-  its food can be tasted where it lies with room over it for a fly, it has
-  every time of day, and every shot keeps the camera out of everything with
-  the fly in the picture. Add it to the fuzzers' places too
+  its food can be tasted where it lies with room over it for a fly, and
+  selected lighting and sampled camera shots at each place's start keep the
+  camera clear with the fly in the picture. This samples particular states;
+  it does not prove every position, view or aspect ratio. Add it to the fuzzers' places too
   (`scripts/fuzz/body.ts`).

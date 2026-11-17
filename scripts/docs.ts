@@ -1,141 +1,142 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, normalize, relative, resolve } from 'node:path';
+import { marked } from 'marked';
+import GithubSlugger from 'github-slugger';
+import { decodeHTML } from 'entities';
 
 function visible(text: string): string {
   return text.replace(/<!--[\s\S]*?-->/g, match => match.replace(/[^\n]/g, ' '));
 }
 
-function prose(text: string): string {
-  let fence = '';
-  return text.split('\n').map(line => {
-    const marker = /^\s{0,3}(`{3,}|~{3,})/.exec(line)?.[1];
-    if (marker && (!fence || (marker[0] === fence[0] && marker.length >= fence.length))) {
-      fence = fence ? '' : marker;
-      return '';
-    }
-    return fence ? '' : line;
-  }).join('\n');
-}
-
 export function anchors(text: string): Set<string> {
   const found = new Set<string>();
-  const counts = new Map<string, number>();
-  const body = prose(visible(text));
-  for (const match of body.matchAll(/(?:^|\n) {0,3}#{1,6}\s+(.+)|(?:^|\n)([^\n]+)\n {0,3}(?:=+|-+)\s*(?=\n|$)/g)) {
-    const title = (match[1] ?? match[2]).replace(/\s+#+\s*$/, '')
-      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/<[^>]+>/g, '')
-      .replace(/&amp;/g, '&').replace(/&(?:lt|gt|quot);/g, '')
-      .toLowerCase().replace(/[^\p{L}\p{M}\p{N}_\-\s]/gu, '').replace(/\s/g, '-');
-    const n = counts.get(title) ?? 0;
-    let slug = n ? `${title}-${n}` : title;
-    let next = n;
-    while (found.has(slug)) slug = `${title}-${++next}`;
-    counts.set(title, next + 1);
-    found.add(slug);
-  }
-  for (const match of body.matchAll(/\b(?:id|name)\s*=\s*["']([^"']+)["']/g)) found.add(match[1]);
+  const slugger = new GithubSlugger();
+  marked.walkTokens(marked.lexer(visible(text)), token => {
+    if (token.type === 'heading') {
+      const html = marked.parseInline(token.text, { async: false });
+      found.add(slugger.slug(decodeHTML(html.replace(/<[^>]*>/g, ''))));
+    } else if (token.type === 'html') {
+      for (const tag of token.text.matchAll(/<[a-z][^>]*>/gi)) {
+        for (const match of tag[0].matchAll(/\b(?:id|name)\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/gi)) {
+          found.add(decodeHTML(match[1] ?? match[2] ?? match[3]));
+        }
+      }
+    }
+  });
   return found;
 }
 
+// These are literal path references; expressions, globs and placeholders are not files.
+const FILE = /\.(?:md|[cm]?[jt]sx?|json|css|scss|py|c|cc|mm|cpp|hpp|h|swift|yml|yaml|sh|wasm|bin|html|webmanifest|png|svg|jpe?g|webp|avif|ico|woff2?|ttf|otf|csv|txt|gz|zip|plist|xcprivacy)(?:#.*)?$/i;
+const PREFIX = /^(?:\.\.?\/|apps\/|packages\/|scripts\/|docs\/|assets\/|src\/|\.github\/)/;
+const words = (text: string) => [...text.matchAll(/"([^"\n]*)"|'([^'\n]*)'|([^\s`]+)/g)].map(match => match[1] ?? match[2] ?? match[3]);
+
 export function checkDocs(root: string, files: string[]): string[] {
-  const errors: string[] = [];
-  const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts ?? {};
+  const errors = new Set<string>();
   const sourceFiles = files.map(file => file.replaceAll('\\', '/'));
   const paths = new Set(sourceFiles);
   for (const file of sourceFiles) {
     for (let dir = dirname(file); dir !== '.'; dir = dirname(dir)) paths.add(dir);
   }
-  const mdAnchors = new Map<string, Set<string>>();
-  // Ignored build output must not make a stale source reference pass locally.
   const has = (path: string) => paths.has(normalize(path).replace(/\/$/, ''));
+  const mdAnchors = new Map<string, Set<string>>();
+  const manifests = new Map<string, Record<string, string>>();
+  const scriptsAt = (directory: string) => {
+    const path = normalize(join(directory, 'package.json'));
+    if (!has(path)) return null;
+    if (!manifests.has(path)) manifests.set(path, JSON.parse(readFileSync(join(root, path), 'utf8')).scripts ?? {});
+    return manifests.get(path)!;
+  };
   for (const doc of sourceFiles.filter(file => file.endsWith('.md'))) {
     const raw = readFileSync(join(root, doc), 'utf8');
     const shown = visible(raw);
-    const body = prose(shown);
-    const links = body.replace(/(`+)([\s\S]*?)\1/g, match => match.replace(/[^\n]/g, ' '));
-    const report = (at: number, message: string) => {
-      const line = body.slice(0, at).split('\n').length;
-      errors.push(`${doc}:${line}: ${message}`);
+    const report = (at: number, message: string) => errors.add(`${doc}:${shown.slice(0, Math.max(0, at)).split('\n').length}: ${message}`);
+    const generated = new Set([...raw.matchAll(/<!-- docs-check: (?:generated|external) (.+?) -->/g)].map(match => match[1]));
+    const checkFile = (token: string, at: number) => {
+      if (/^(?:node|npm|git)\s/.test(token) || /\s--/.test(token) || /^\.[^./]+$/.test(token)) return;
+      if (/[<>{}*|=():?]/.test(token) || token.startsWith('/') || token.startsWith('--')) return;
+      if (!PREFIX.test(token) && !FILE.test(token)) return;
+      if (generated.has(token)) return;
+      const clean = token.replace(/#.*$/, '').replace(/\/$/, '');
+      if (!has(clean) && !has(normalize(join(dirname(doc), clean)))) report(at, `missing file reference ${token}`);
     };
     const checkLink = (url: string, at: number) => {
       if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(url)) return;
-      let decoded: string;
-      try { decoded = decodeURIComponent(url); } catch { report(at, `invalid URL ${url}`); return; }
-      const [pathQuery, fragment] = decoded.split('#');
-      const path = pathQuery.split('?')[0];
+      const [beforeHash, ...hash] = url.split('#');
+      let path: string, fragment: string;
+      try {
+        path = decodeURIComponent(beforeHash.split('?')[0]);
+        fragment = decodeURIComponent(hash.join('#'));
+      } catch { report(at, `invalid URL ${url}`); return; }
       let target = path ? resolve(root, path.startsWith('/') ? `.${path}` : join(dirname(doc), path)) : resolve(root, doc);
-      if (relative(root, target).startsWith('..') || !existsSync(target)) {
+      const rel = relative(root, target);
+      // A local build artifact must not conceal a broken source link.
+      if (rel === '..' || rel.startsWith('../') || !has(rel) || !existsSync(target)) {
         report(at, `missing link target ${url}`); return;
       }
       if (!fragment) return;
       if (statSync(target).isDirectory()) {
         target = join(target, 'README.md');
-        if (!existsSync(target)) { report(at, `cannot verify directory anchor ${url}`); return; }
+        if (!has(relative(root, target)) || !existsSync(target)) { report(at, `cannot verify directory anchor ${url}`); return; }
       }
       if (/\.md$/i.test(target)) {
         if (!mdAnchors.has(target)) mdAnchors.set(target, anchors(readFileSync(target, 'utf8')));
         if (!mdAnchors.get(target)!.has(fragment)) report(at, `missing anchor ${url}`);
       } else if (/^L\d+(?:-L\d+)?$/.test(fragment)) {
         const lines = fragment.split('-').map(line => Number(line.slice(1)));
-        const count = readFileSync(target, 'utf8').split('\n').length;
+        const content = readFileSync(target, 'utf8');
+        const count = content ? content.split('\n').length - Number(content.endsWith('\n')) : 0;
         if (lines.some(line => line < 1 || line > count) || lines[0] > lines.at(-1)!) report(at, `missing line ${url}`);
       } else report(at, `cannot verify anchor ${url}`);
     };
-    const definitions = new Map<string, string>();
-    const key = (label: string) => label.trim().replace(/\s+/g, ' ').toLowerCase();
-    for (const match of links.matchAll(/^ {0,3}\[([^\]]+)\]:\s*(?:<([^>]+)>|(\S+))/gm)) {
-      definitions.set(key(match[1]), match[2] ?? match[3]);
-      checkLink(match[2] ?? match[3], match.index);
-    }
-    // Balanced parentheses occur in real file names and heading fragments.
-    for (const match of links.matchAll(/!?\[[^\]\n]*\]\(/g)) {
-      const start = match.index + match[0].length;
-      let end = start, depth = 1;
-      for (; end < body.length && depth; end++) {
-        if (body[end] === '\\') { end++; continue; }
-        if (body[end] === '(') depth++;
-        if (body[end] === ')') depth--;
+    const checkCommands = (command: string, base = 0) => {
+      for (const match of command.matchAll(/\b(node|npm)\s+([^\n`;&|]+)/g)) {
+        const args = words(match[2]);
+        if (match[1] === 'node') {
+          if (args.includes('-e') || args.includes('--eval') || args.includes('-p') || args.includes('--print')) continue;
+          for (const arg of args.filter(arg => !arg.startsWith('-'))) {
+            if (FILE.test(arg)) { checkFile(arg, base + match.index); break; }
+          }
+        } else {
+          const run = args.findIndex(arg => arg === 'run' || arg === 'run-script');
+          if (run < 0 || (run > 0 && !args[0].startsWith('-'))) continue;
+          const valued = new Set(['--prefix', '-C', '--workspace', '-w', '--loglevel', '--userconfig', '--cache', '--registry']);
+          let name: string | undefined;
+          for (let i = run + 1; i < args.length; i++) {
+            if (valued.has(args[i])) { i++; continue; }
+            if (!args[i].startsWith('-')) { name = args[i]; break; }
+          }
+          if (!name || !/^[\w:-]+$/.test(name)) continue;
+          const prefix = args.findIndex(arg => arg === '--prefix' || arg === '-C' || arg === '--workspace' || arg === '-w');
+          const directory = prefix >= 0 ? args[prefix + 1] : args.find(arg => arg.startsWith('--prefix=') || arg.startsWith('--workspace='))?.split('=').slice(1).join('=') ?? '.';
+          const scripts = scriptsAt(directory);
+          if (!scripts) report(base + match.index, `missing npm package ${directory}/package.json`);
+          else if (!Object.hasOwn(scripts, name)) report(base + match.index, `unknown npm script ${name}`);
+        }
       }
-      if (depth) { report(match.index, 'unclosed Markdown link'); continue; }
-      const destination = body.slice(start, end - 1).trim();
-      const url = destination.startsWith('<') ? destination.slice(1, destination.indexOf('>')) : destination.split(/\s+["']/)[0];
-      checkLink(url.replace(/\\([()])/g, '$1'), match.index);
-    }
-    for (const match of links.matchAll(/!?\[([^\]\n]+)\](?:\[([^\]\n]*)\])?(?!\(|:)/g)) {
-      const label = key(match[2] || match[1]);
-      if (definitions.has(label)) checkLink(definitions.get(label)!, match.index);
-      else if (match[2] !== undefined) report(match.index, `undefined link reference ${label}`);
-    }
-    for (const match of links.matchAll(/\b(?:href|src)=["']([^"']+)["']/g)) checkLink(match[1], match.index);
-    const generated = [...raw.matchAll(/<!-- docs-check: (?:generated|external) (.+?) -->/g)].map(match => match[1]);
-    for (const match of body.matchAll(/(?<!`)(`+)([^`\n]+)\1(?!`)/g)) {
-      const token = match[2];
-      if (/\s|[<>{}*|=():?]/.test(token) || token.startsWith('/') || token.startsWith('--')) continue;
-      if (!/^(?:\.?\.?\/|apps\/|packages\/|scripts\/|docs\/|assets\/|\.github\/)/.test(token)
-          && !/^[\w./-]+\.(?:md|ts|js|mjs|json|mm|cpp|hpp|h|swift|yml|yaml|sh|wasm|bin|html|webmanifest|png|csv|txt|gz|xcprivacy)$/.test(token)) continue;
-      const clean = token.replace(/#.*$/, '').replace(/\/$/, '');
-      if (generated.includes(token)) continue;
-      if (has(clean) || has(normalize(join(dirname(doc), clean)))) continue;
-      if (!clean.includes('/') && sourceFiles.some(file => file.endsWith(`/${clean}`))) continue;
-      report(match.index, `missing file reference ${token}`);
-    }
-    for (const match of shown.matchAll(/(?<![\w./-])(?:\.\.?\/)*(?:apps|packages|scripts|docs|assets|\.github)\/[\w./-]+\.(?:md|ts|js|mjs|json|mm|cpp|hpp|h|swift|yml|yaml|sh|wasm|bin)\b/g)) {
-      const path = match[0];
-      if (!has(path) && !has(normalize(join(dirname(doc), path))) && !generated.includes(path)) {
-        const line = raw.slice(0, match.index).split('\n').length;
-        const message = `${doc}:${line}: missing file reference ${path}`;
-        if (!errors.includes(message)) errors.push(message);
+    };
+    checkCommands(shown);
+    marked.walkTokens(marked.lexer(shown), token => {
+      const at = shown.indexOf(token.raw);
+      if (token.type === 'link' || token.type === 'image') checkLink(token.href, at);
+      else if (token.type === 'codespan') { checkFile(token.text, at); checkCommands(token.text, at); }
+      else if (token.type === 'html') {
+        for (const tag of token.text.matchAll(/<[a-z][^>]*>/gi)) {
+          for (const match of tag[0].matchAll(/\b(?:href|src)\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/gi)) {
+            checkLink(decodeHTML(match[1] ?? match[2] ?? match[3]), at);
+          }
+        }
+      } else if (token.type === 'text' && !token.tokens) {
+        // Explicit reference syntax with no definition is usually a deleted destination.
+        for (const match of token.raw.matchAll(/\[([^\]\n]+)\]\[([^\]\n]*)\]/g)) report(at, `undefined link reference ${match[2] || match[1]}`);
       }
-    }
-    for (const match of shown.matchAll(/\bnpm\s+run\s+(?:(?:--silent|-s)\s+)?([\w:-]+)/g)) {
-      if (!(match[1] in scripts)) {
-        const line = raw.slice(0, match.index).split('\n').length;
-        errors.push(`${doc}:${line}: unknown npm script ${match[1]}`);
-      }
+    });
+    for (const match of shown.matchAll(/(?<![\w./-])(?:\.\.?\/|apps\/|packages\/|scripts\/|docs\/|assets\/|\.github\/)[\w./-]+\.[\w]+\b/g)) {
+      if (!/[<{*-]/.test(shown[match.index + match[0].length] ?? '')) checkFile(match[0], match.index);
     }
   }
-  return errors;
+  return [...errors];
 }
 
 export function repositoryDocs(root: string): string[] {

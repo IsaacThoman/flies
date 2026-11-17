@@ -26,7 +26,7 @@ measurements are in `src/anatomy.ts`; the shapes and colours in `src/body.ts`.
 | Compound eyes | Ellipsoid caps sunk into the sides of the head, deep brick red. The fragment shader draws a hexagonal lattice of roughly 1,180 cells per full eye cap (a decorative lattice, not the brain's facet map), each a small dome that catches the light, and the **pseudopupil**: the dark spot where you look straight down the ommatidia, which follows the viewer across the eye. Facet detail fades with screen-space derivatives below a pixel; the pseudopupil is not faded by that detail term. |
 | Ocelli | Three glossy amber domes in a triangle on a dark ocellar triangle on the vertex. |
 | Antennae | Scape, pedicel and the oval third segment hanging in front of the face, and the **arista**: a fine plumose bristle from the top of the third segment with branches above and below. Each antenna is a joint that twitches. |
-| Proboscis | Rostrum, haustellum and the two-lobed labellum with its food channels, each a joint. Folded up under the head at rest; extended it reaches the surface just in front of the head (the haustellum telescopes within 0.6–1.5 times its nominal length), the lobes spread flat on the food and pulse. |
+| Proboscis | Rostrum, haustellum and the two-lobed labellum with its food channels, each a joint. Folded up under the head at rest; extended it reaches the surface just in front of the head (the haustellum's target is clamped to 0.6–1.5 times its nominal length before pumping, which can shorten it by another 6%), the lobes spread flat on the food and pulse. |
 | Thorax | A deformed ellipsoid: broad blunt shoulders, the scutum arching up behind the neck, flatter sternum. Tan, darker above, paler pleura, faint dorsocentral stripes. The **microchaetae** (the rows of tiny hairs) are a procedural pattern that fades out when small; the **macrochaetae** are real geometry: humerals, notopleurals, supra- and post-alars, dorsocentrals, katepisternals. |
 | Scutellum | A flattened lobe over the base of the abdomen with its basal bristles and the long crossing apical scutellars. |
 | Abdomen | Six visible segments (a male), each tergite ridged where it overlaps the next and dark along its back edge, A5 and A6 dark all over; pale pleural membrane and sternites underneath. Two joints, so it breathes, lifts in flight and bows when feeding. |
@@ -40,7 +40,7 @@ measurements are in `src/anatomy.ts`; the shapes and colours in `src/body.ts`.
 `src/nerves/` builds the fly's brain, optic lobes, neck connective, ventral
 nerve cord and nerves, inside the body, for the game's X-ray and its corner
 panel ([the game reference](../../docs/simulation.md#its-nervous-system) says how they are shown and
-lit). `createFly()` returns it as `nerves`: its 93 parts (`parts.ts`: each
+lit). `createFly()` returns it as `nerves`: its 93 parts (`src/nerves/parts.ts`: each
 with a role, sensory, central or motor, and a kind), a `glow` array the game
 fills (a float a part), and `xray`, 0 to 1.
 
@@ -50,7 +50,7 @@ fills (a float a part), and `xray`, 0 to 1.
   `src/nerves/measured.ts`): each as its radius in a grid of directions round
   its centre, the lamina as a curved plate round the sphere that fits it, the
   mushroom body's lobes and the protocerebral bridge as rods, the ellipsoid
-  body as a torus, and where the cord's nerves leave it. `anatomy.ts` places
+  body as a torus, and where the cord's nerves leave it. `src/nerves/anatomy.ts` places
   the brain in the head (0.88 of true size, its optic lobes under the eyes)
   and the cord on the thorax's floor (true size), and says what the dataset
   doesn't hold (the retina, the neck's path, the pars intercerebralis).
@@ -74,8 +74,9 @@ fills (a float a part), and `xray`, 0 to 1.
 ## How it moves
 
 `src/rig.ts` turns the pose into a frame for every rigid piece. Inputs are
-smoothed first (first-order lags and rate limits), so any pose, however
-jumpy, gives continuous motion.
+mostly smoothed first (first-order lags and rate limits). Song-side changes
+switch the held-out wing immediately, and wing-copy jitter varies per update;
+these channels do not promise continuous transforms.
 
 - **Walking** (`src/gait.ts`). The alternating tripod: L1 R2 L3 then R1 L2
   R3, with a small metachronal lag that lifts the hind leg of each tripod

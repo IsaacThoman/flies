@@ -19,7 +19,7 @@ npm run serve -- --base /fly/   # try it as a host would serve it: http://127.0.
 
 `FLY_SITE_URL=https://example.org/fly/ npm run build` makes the link
 preview's picture and address absolute, which most sites that show link
-previews need; without it they are relative and the rest works the same.
+previews need; without it the picture stays relative and no explicit `og:url` is emitted.
 
 ## What to upload
 
@@ -35,7 +35,7 @@ All of `dist/`, as it is, to any folder of the host. About 17 MB:
 | `assets/*-<hash>.png` | icons and the link preview, 1.3 MB | the same | `image/png` |
 | `brain/connectome.<n>.<hash>.bin` | the brain, in four parts of at most 4 MiB, 14.2 MB in all | the same | `application/octet-stream` (any will do) |
 | `brain/fly-brain.0.<hash>.wasm` | the brain's simulation as WebAssembly; [dated artifact sizes](measurements.md#artifact-sizes) | the same | `application/wasm` (what hosts send for `.wasm`; any will do) |
-| `brain/anatomy.<n>.<hash>.bin` | where each neuron is (`packages/brain/src/anatomy.ts`), 0.9 MB, if `npm run brain:fetch` built it; nothing loads it yet | the same | the same |
+| `brain/anatomy.<n>.<hash>.bin` | where each neuron is (`packages/brain/src/anatomy.ts`), 0.9 MB, if `npm run brain:fetch` built it; nothing loads it yet | the same | `application/octet-stream` |
 | `.well-known/apple-app-site-association` | which links open the iPhone and iPad app, on by default (`APPLE_TEAM_ID=0` disables it; [deploy.md](deploy.md#the-iphone-and-ipad-apps-links)); it must be at the host's root, with no redirect, and is never kept by the service worker | `no-cache` | `application/json` |
 
 Every file whose contents can change has its contents in its name, so it can
@@ -66,8 +66,9 @@ What matters, and why:
 
 Normal static loading makes no requests to another site: no fonts, scripts, analytics
 or CDNs. `apps/web/tests/build.test.ts` reads the built files for any, and
-the end-to-end run (`apps/web/e2e/web.e2e.ts`) records every request the
-browser makes and fails on one that isn't to the site.
+the end-to-end run (`apps/web/e2e/web.e2e.ts`) records requests from its initial context, excluding data/blob URLs, and
+fails if that collected set contains another site. Later failure-test
+contexts are not covered by that listener.
 
 ## Getting the brain to the browser
 
@@ -168,7 +169,7 @@ time:
 
 These are caps: eyes chosen Off stay Off, and a swoop targets 60 Hz eye
 sampling even at the lower levels, subject to frame/readback availability.
-The frame takes the screen's shape (`display.ts`), so each step keeps it,
+The frame takes the screen's shape (`apps/web/src/display.ts`), so each step keeps it,
 square pixels and all, at a quarter and a ninth of the pixels: 370×208 and
 247×139 in a 16:9 window, 188×408 and 126×272 on a phone held upright. A step
 can change frame rate, world resolution and eye sampling. Place geometry
@@ -221,7 +222,7 @@ unmeasured. A first visit at 6× on a 1.6 Mbit/s, 150 ms connection had the
 brain running after 80 s, 71 s of it the 14.2 MB at that speed, its progress
 read 330 times and never going back.
 
-The brain's own cost, in seconds of one core per second of fly time (the
+The brain's own cost, in elapsed wall seconds per simulated second (the
 median and the slowest tenth of one-second spans), and the speed against
 real time that would give on a CPU four or six times slower:
 
@@ -293,7 +294,7 @@ WebAssembly run). The eyes are open throughout; every run kept 60 frames.
   the page's process was 45 to 70 MB smaller with it in four runs of six,
   and in the other two it went either way by more, as garbage collection
   fell.
-- **Starting**: compiling the 268 KB module takes 2 or 3 ms; the brain is
+- **Starting**: compiling the earlier measured 268 KB module took 2 or 3 ms; the brain is
   running 200 to 240 ms after the connectome arrives, against 230 to 290
   for the TypeScript.
 - Measured again, a second time each with the load average at 60 to 110,
@@ -340,8 +341,9 @@ what more speed would cost.
   context loss, caching and offline recovery remain in `npm run e2e`.
 
 
-The service worker (`apps/web/src/offline/sw.ts`) keeps the page and every
-file it loads, so it opens with no network; it asks the network for the page
+The service worker (`apps/web/src/offline/sw.ts`) precaches the page
+and its listed build dependencies, so those resources can open offline. An
+uncached request goes to the network without being added to that cache; it asks the network for the page
 first, so a new version shows as soon as there is one. A new version's
 service worker waits until every tab of the old one has closed, so a page
 left open as a screensaver keeps the files it started with. The brain is not the
@@ -417,7 +419,9 @@ whole file, so a broken part starts again, which costs at most 4 MiB. A CI
 job would run `npm ci`, `npm run brain:fetch`, `npm run build`, then
 `npx wrangler deploy` with a `wrangler.jsonc` naming `./dist` as its
 `assets.directory`; nothing has been set up or deployed. For the cache
-lifetimes in the table above, a `_headers` file in `dist/`:
+lifetimes in the table above, a `_headers` file in `dist/` for a root
+deployment (prefix these page/asset paths with `/fly` when mounted at `/fly/`;
+the app association stays at the host root):
 
 ```text
 /index.html
@@ -425,6 +429,8 @@ lifetimes in the table above, a `_headers` file in `dist/`:
 /sw.js
   Cache-Control: no-cache
 /manifest.webmanifest
+  Cache-Control: no-cache
+/.well-known/apple-app-site-association
   Cache-Control: no-cache
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
@@ -439,3 +445,5 @@ after about a thousand first visits a month.
 <!-- docs-check: generated sw.js -->
 <!-- docs-check: generated ./dist -->
 <!-- docs-check: generated manifest.webmanifest -->
+
+<!-- docs-check: generated index.html -->

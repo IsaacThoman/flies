@@ -66,7 +66,7 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
 | `apps/ios/src/Haptics.swift` | The feather on the fly, and its take-offs, felt through the glass |
 | `apps/ios/src/Report.swift` | Reports for checks and measurements (below); off unless asked for |
 | `apps/ios/src/Launch.storyboard` | The launch screen: the launch image filling a screen of any shape |
-| `src/Settings.bundle` | The app's page in the Settings app: the Haptics switch |
+| `apps/ios/src/Settings.bundle` | The app's page in the Settings app: the Haptics switch |
 | `apps/ios/src/PrivacyInfo.xcprivacy` | No tracking, no data collected; `NSUserDefaults` for the Haptics switch (CA92.1) |
 
 ### What the app tells the page, and what it reads
@@ -245,7 +245,7 @@ A table's link opens the app where it is installed, instead of Safari, when both
   which plays them as well ([deploy.md](deploy.md#the-iphone-and-ipad-apps-links)).
 - **The app** has the Associated Domains entitlement (`applinks:flies.isaacthoman.com` and
   `webcredentials:flies.isaacthoman.com`) only when it is built with `IOS_LINKS=1`
-  (`apps/ios/links.yml`, merged into `project.yml` as `apps/tvos/weatherkit.yml` is for the Apple
+  (`apps/ios/links.yml`, merged into `apps/ios/project.yml` as `apps/tvos/weatherkit.yml` is for the Apple
   TV). TestFlight releases turn it on by default; set the repository variable `IOS_LINKS` to `0`
   to turn it off. Local builds and archives still require `IOS_LINKS=1` to opt in (omit it or
   use `IOS_LINKS=0` to leave it out). Associated Domains is already enabled on the owner's App ID;
@@ -320,7 +320,7 @@ npm run tvos:art -- --only ios/           # render the icon and launch image aga
 `build` writes the asset catalog from `assets/ios` (`scripts/iosAssets.ts`), builds the web app
 with the root Vite config into `apps/ios/www/` (17 MB, the brain's parts included; the same files
 `npm run build` makes for a web host), generates
-`Flies.xcodeproj` from `apps/ios/project.yml` (with `links.yml` merged in under `IOS_LINKS=1`)
+`Flies.xcodeproj` from `apps/ios/project.yml` (with `apps/ios/links.yml` merged in under `IOS_LINKS=1`)
 and builds it. Release by default; `--debug` makes the page inspectable in Safari's Web Inspector.
 
 ### The app's identity
@@ -352,7 +352,7 @@ version, the bundle ID, the art pipeline and the web build, lives outside both.
 
 ### Reports
 
-`-FlyReport <seconds>` on the command line (as `npm run ios -- --report`, and the check, pass it):
+`-FlyReport <seconds>` on the command line (as `npm run ios -- --report 2`, and the check, pass it):
 that often the app reports the canvas's state, the brain's speed against real time and what its
 steps cost, frames, taps and keys the page saw, the safe area the page was given, what the
 browser's cache holds of the brain, where the menu's first row is, and the app's own memory,
