@@ -1,7 +1,5 @@
 # Air puffs and take-off: investigation
 
-Status: completed circuit investigation; no gameplay change proposed. The full check has a CPU-budget failure, detailed below.
-
 A real puff can initiate flight, while sustained wind can stop walking. The
 chemical-only model does not implement the verified fast JO-A electrical input
 or the real giant fibre's single-spike trigger. This investigation supports
@@ -20,10 +18,6 @@ Each criterion is scored 0–10 by independent reviewers. A 10 requires:
 | Principle | Only biological sensory populations are driven; brain commands decide actions; all assumptions and absent mechanisms are explicit. |
 | Measurement | Controls, several strengths and seeds, transient and sustained stimuli, DNp01, flight motor and grooming results support a bounded conclusion. |
 | Regression | Fingerprint, behaviour and relevant CPU budgets pass; required repository checks reported with failures and limitations. |
-
-## Blind review log
-
-Recorded after independent reviews finish.
 
 ## What a real fly does
 
@@ -66,7 +60,7 @@ A real puff can excite the phasic displacement/vibration channel at its onset
 (and offset), as well as tonic displacement-sensitive C/E while deflected.
 Driving all A/B together is an experimental upper-envelope stimulus, not a
 verified natural recruitment fraction or rate. No claim that a puff recruits
-all A–F is justified: F's natural stimulus remains uncertain ([Hampel et al. 2020](https://pmc.ncbi.nlm.nih.gov/articles/PMC7652415/), Fig. 5 and supplements). The current model
+all A–F is justified. Zone-D puff recruitment is left unspecified here; F's natural stimulus remains uncertain ([Hampel et al. 2020](https://pmc.ncbi.nlm.nih.gov/articles/PMC7652415/), Fig. 5 and supplements). The current model
 has neither antennal mechanics nor electrical junctions nor dopamine-mediated
 ReSH. Its Poisson input also omits millisecond synchrony and graded receptor
 potentials. A negative result here cannot establish absence of the pathway in
@@ -146,7 +140,7 @@ The real GF can trigger its fast escape sequence with a single action potential
 ([Ache et al. 2019](https://pmc.ncbi.nlm.nih.gov/articles/PMC7444277/), Introduction).
 The game's readout is different: it averages the two DNp01 cells, smooths their
 rate with a 40 ms time constant, and divides by 200 Hz. Passing 0.4 requires a
-smoothed population mean above 80 Hz. One unilateral spike in a 10 ms chunk,
+smoothed population mean of at least 80 Hz. One unilateral spike in a 10 ms chunk,
 from a zero readout, gives `50 × (1 − exp(−10/40)) / 200 = 0.0553`, not a
 threshold crossing. A bilateral spike gives 0.1106. Thus reporting no threshold
 crossing does not mean no GF spikes, nor does this model reproduce the real
@@ -164,40 +158,48 @@ At 100 Hz, for a 100 ms transient (range across seeds):
 
 | Population | DNp01 peak, Hz | Flight MN peak, Hz | DNg12 peak, Hz | Escape peak | Threshold events |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Sham / rest | 0.00–23.81 | 0.00–5.75 | 0.00–0.00 | 0.00–0.12 | 0/3 |
-| wind | 0.00–30.86 | 23.89–25.08 | 23.46–27.91 | 0.00–0.15 | 0/3 |
-| A | 0.00–24.19 | 0.00–8.01 | 0.00–0.00 | 0.00–0.12 | 0/3 |
-| B | 67.60–73.67 | 2.79–10.54 | 0.00–0.25 | 0.34–0.37 | 0/3 |
-| AB | 38.21–47.77 | 0.00–5.83 | 0.00–0.00 | 0.19–0.24 | 0/3 |
-| ABCE | 11.06–22.12 | 23.38–26.77 | 18.86–23.12 | 0.06–0.11 | 0/3 |
-| all | 11.06–22.14 | 17.89–21.39 | 20.82–27.31 | 0.06–0.11 | 0/3 |
-| loom | 312.88–312.99 | 98.13–101.01 | 8.61–8.92 | 1.00–1.00 | 3/3 |
+| rest | 0.00–23.81 | 0.00–5.75 | 0.00–0.00 | 0.00–0.12 | 0/3 |
+| wind | 0.00–31.21 | 24.88–27.72 | 22.52–27.59 | 0.00–0.16 | 0/3 |
+| A | 0.00–32.26 | 0.00–6.37 | 0.00–0.00 | 0.00–0.16 | 0/3 |
+| B | 68.87–76.36 | 4.76–8.54 | 0.00–0.25 | 0.34–0.38 | 0/3 |
+| AB | 36.84–48.87 | 0.00–7.76 | 0.00–0.00 | 0.18–0.24 | 0/3 |
+| ABCE | 17.80–35.12 | 19.75–24.19 | 22.62–24.40 | 0.09–0.18 | 0/3 |
+| all | 0.00–39.52 | 21.52–22.52 | 19.38–35.56 | 0.00–0.20 | 0/3 |
+| loom | 301.82–308.85 | 98.25–100.12 | 8.55–9.28 | 1.00–1.00 | 3/3 |
 
-Raising the injected rate to 200 Hz for 100 ms made isolated B cross in 3/3
-(escape 0.440–0.488), but A/B remained 0/3 (0.308–0.361), A/B/C/E 0/3
-(0.179–0.197), and all JO 0/3 (0.098–0.132). Isolated B's direct chemical
-route is not evidence that recruiting B alone is a natural air-puff stimulus.
-Adding other sensory populations can recruit inhibition as well as excitation.
-These interventions demonstrate the net result, not which interneuron caused
-it. A causal inhibition claim would require selective perturbations.
+At 200 Hz for 100 ms:
 
-For the one-second step, B crossed at 100 and 200 Hz (3/3 each), A/B at 200 Hz
-(3/3; peak 0.401–0.427), while A, wind, A/B/C/E and all JO had no threshold
-crossings at any tested rate. None of the JO populations crossed for a 20 ms
-transient in this sweep. This is a duration/strength dependence of this model,
-not a physical puff calibration.
+| Population | Escape peak range | Threshold events |
+| --- | ---: | ---: |
+| B | 0.459–0.493 | 3/3 |
+| AB | 0.335–0.374 | 0/3 |
+| ABCE | 0.115–0.187 | 0/3 |
+| all | 0.071–0.140 | 0/3 |
 
-At 100 Hz for 100 ms, B gave DNp11 9–13 raw spikes per pair over 1.5 s
-(3–4.33 Hz per cell), DNp02 exactly 3 (1 Hz), and DNp04 none. A/B/C/E gave
-DNp11 and DNp02 0–1 spikes and DNp04 none. The looming control gave DNp02
-49–50, DNp04 67–68 and DNp11 42–43 spikes. Other escape-related DNs are thus
-measured, but this probe does not invent an additional body command from them.
-Wind, in contrast, gave DNp10 24–26 spikes; that is a mechanosensory response
-in a landing-related DN, not proof of flight initiation.
+Isolated B's direct chemical route is not evidence that recruiting B alone
+is a natural puff. Adding other populations recruits a different signed
+network; these interventions do not identify the causal inhibitory relay.
+A causal inhibition claim requires selective perturbations.
 
-The isolated-B 200 Hz transient's GF spikes were predominantly left-sided:
-20–22 on the left versus 0–4 on the right over 1.5 s. The asymmetry in the
-chemical reconstruction therefore matters to the game’s two-cell mean.
+One-second step conditions with threshold events (seeds 1–3):
+
+| Population | Requested rate | Escape peak range | Threshold events |
+| --- | ---: | ---: | ---: |
+| B | 100 Hz | 0.405–0.453 | 3/3 |
+| B | 200 Hz | 0.506–0.555 | 3/3 |
+| AB | 200 Hz | 0.404–0.452 | 3/3 |
+
+No JO condition crossed for a 20 ms transient in this sweep. This is neural duration/strength dependence, not physical puff calibration.
+
+B, 100 Hz / 100 ms: total raw spikes over the 1.5 s observation per descending group: DNp02 3–4; DNp04 0–0; DNp11 9–12; DNp10 0–0.
+
+ABCE, 100 Hz / 100 ms: total raw spikes over the 1.5 s observation per descending group: DNp02 0–1; DNp04 0–0; DNp11 0–1; DNp10 23–24.
+
+loom, 100 Hz / 100 ms: total raw spikes over the 1.5 s observation per descending group: DNp02 48–50; DNp04 67–67; DNp11 42–43; DNp10 0–0.
+
+wind, 100 Hz / 100 ms: total raw spikes over the 1.5 s observation per descending group: DNp02 0–0; DNp04 0–0; DNp11 0–0; DNp10 26–28.
+
+The isolated-B 200 Hz transient gives 22–27 left GF spikes; 0–4 right GF spikes. The reconstruction asymmetry matters to the two-cell mean.
 
 ## Chemical wiring results
 
@@ -279,150 +281,121 @@ would be needed before comparing a game probability curve to real take-offs.
 
 ## Expanded transient check
 
-A/B, 100 ms onset drive, seeds 1–20; a fresh brain uses the same seed at each strength. The explicit sham sweep used seeds 1–3:
+A/B, 100 ms onset drive, seeds 1–20; a fresh brain uses the same seed at each strength:
 
 | Requested neural rate | Realized population rate during pulse | Escape peak range | Threshold-event fraction |
 | --- | ---: | ---: | ---: |
-| 25 Hz | 22.4–27.8 Hz | 0.083–0.200 | 0/20 |
-| 50 Hz | 44.1–51.4 Hz | 0.118–0.207 | 0/20 |
-| 100 Hz | 87.2–96.7 Hz | 0.147–0.315 | 0/20 |
-| 200 Hz | 159.5–173.2 Hz | 0.243–0.395 | 0/20 |
+| 25 Hz | 23.1–27.2 Hz | 0.098–0.196 | 0/20 |
+| 50 Hz | 45.0–50.9 Hz | 0.095–0.215 | 0/20 |
+| 100 Hz | 87.6–95.6 Hz | 0.141–0.315 | 0/20 |
+| 200 Hz | 163.4–172.9 Hz | 0.260–0.388 | 0/20 |
 
-Every strength had 0/20 observed threshold events. This does **not** estimate a
-zero biological probability: the two-sided 95% exact binomial interval for
-0/20 is 0–16.8%, and seeds sample model stochasticity, not animal-to-animal
-variation. The 200 Hz condition approaches threshold in some seeds. The
-realized rate is below the requested Poisson rate because driven neurons
-retain their refractory period. No conversion to airflow strength is known.
-This neural dose-response is therefore not quantitatively comparable with
-the 5/5 tethered DLM observation or a free-standing fly's take-off probability.
-
-Reproduce the expansion:
+Seeds sample model stochasticity, not animal-to-animal variability. For a
+0/20 condition, the two-sided 95% exact binomial interval is 0–16.8%; a small
+observed count is not proof of a zero biological probability. Realized rates
+are below requested Poisson rates because neurons keep their refractory
+period. No airflow-strength conversion is known, so this curve cannot be
+compared quantitatively with tethered DLM initiation or real free take-offs.
 
 ```sh
-node packages/brain/scripts/puff.ts --simulate --populations AB --rates 25,50,100,200 --durations 100 --seeds 20
+node packages/brain/scripts/puff.ts --simulate --populations AB --rates 25,50,100,200 --durations 100 --seeds 20 > /tmp/puff-dose.jsonl
 ```
 
-The script also records cumulative spike snapshots at 20 ms, stimulus end,
-1,000 ms and 1,500 ms, and realized input firing, allowing onset, held and
-recovery intervals to be recovered by subtraction. It counts the body's
-inclusive threshold (`>= 0.4`); no measured result here lies exactly on it.
+The script records cumulative spikes at 20 ms, stimulus end, 1,000 ms and
+1,500 ms, and realized input firing. Subtraction gives onset/held/recovery
+counts. The event threshold is the body's inclusive `escape >= 0.4`.
 
 ## Timing control
 
-Onset A/B plus tonic C/E was tested separately (seeds 1–10). A/B received a
-20 or 100 ms pulse; disjoint C/E received the same requested rate for 1 s.
-This is a temporal-recruitment experiment, not a measured antenna waveform.
-The C/E completeness corrections remained in place.
+Onset A/B plus tonic C/E was tested separately, seeds 1–10. A/B receives
+a 20 or 100 ms pulse; disjoint C/E receives the same requested rate for 1 s.
+This is a recruitment/timing experiment, not a measured antenna waveform.
+Existing completeness corrections remain in place.
 
 | Requested rate | A/B pulse | Largest escape peak across 10 seeds | Threshold events |
 | --- | ---: | ---: | ---: |
-| 50 Hz | 20 ms | 0.141 | 0/10 |
-| 50 Hz | 100 ms | 0.209 | 0/10 |
-| 100 Hz | 20 ms | 0.185 | 0/10 |
-| 100 Hz | 100 ms | 0.129 | 0/10 |
-| 200 Hz | 20 ms | 0.184 | 0/10 |
-| 200 Hz | 100 ms | 0.214 | 0/10 |
+| 50 Hz | 20 ms | 0.209 | 0/10 |
+| 50 Hz | 100 ms | 0.166 | 0/10 |
+| 100 Hz | 20 ms | 0.221 | 0/10 |
+| 100 Hz | 100 ms | 0.221 | 0/10 |
+| 200 Hz | 20 ms | 0.175 | 0/10 |
+| 200 Hz | 100 ms | 0.198 | 0/10 |
 
-No threshold event occurred in this timing control. Its 0/10 condition counts
-have wide uncertainty (two-sided exact 95% upper limit 30.8%); pooling different
-strengths would not estimate a single puff probability. The result rules out
-neither other timing/recruitment patterns nor an electrical pathway absent
-from the model. It supports withholding this particular sensory mapping.
+A 0/10 fraction has a two-sided exact 95% upper limit of 30.8%; pooling
+strengths would not estimate a single puff probability. Other recruitment
+patterns and missing electrical transmission remain untested.
 
 ```sh
-node packages/brain/scripts/puff.ts --simulate --populations AB+CE --rates 50,100,200 --durations 20,100 --seeds 10
+node packages/brain/scripts/puff.ts --simulate --populations AB+CE --rates 50,100,200 --durations 20,100 --seeds 10 > /tmp/puff-temporal.jsonl
 ```
 
 ## Validation
 
-Against base `bd88a01` (the origin/dev tip when this branch was created), the
-production brain, native brain, body and tool sources are unchanged. The diff
-adds this report, numerical/provenance summaries, the Node-only research probe and a
-README link. New commits on dev are not treated as part of this experiment.
+The branch merged `origin/dev` at `1ebc3a446892349e88d1ff1dbf7c719f2d2ca3f2`
+with merge commit `cecaab0d5ef50a64d837e592cd6160fe31468846`. Relative to
+that dev revision, production brain/native/body/tool code and CPU budgets
+are unchanged. This PR adds one research write-up, machine-readable numerical
+and provenance summaries, two Node research scripts and a README pointer.
+No behaviour change is proposed here.
 
-- Full `npm test`: main suite **717 passed, 0 failed, 4 skipped** (721 tests).
-  This includes the real-connectome behaviour/fingerprint tests and native and
-  committed-WASM parity. Skips: three optional anatomy/Feather checks (sidecar
-  absent) and rebuilding WASM byte-for-byte (wasi-sdk absent). No native source
-  or WASM output changed.
-- The four subsequent CPU-budget tests: **3 passed, 1 failed**. Swoop/flight
-  integration and fly-update budgets passed. Brain build **225 ms < 250**;
-  rest **0.100 s/s < 0.16**; everything-at-once **0.597 s/s > 0.5** failed.
-- Isolated rerun of `node --test packages/brain/src/cost.budget.ts` also failed:
-  build **213 ms**, rest **0.097 s/s**, everything-at-once **0.566 s/s**.
-  These are normalized thread CPU measurements (median of five), not wall time.
-- `npm run lint` and `npm run typecheck`: passed.
-- No browser e2e flow is changed; no UI or browser render was needed to verify
-  the documentation/probe-only change.
+At the clean merge commit, with the real connectome available:
 
-Thus **the full npm test command is not green**. No budget was relaxed and no
-model parameter was adjusted. The failed budget and all its imported runtime
-sources are byte-identical to the base. `scripts/cpuBudget.ts` explicitly warns
-that its reference cannot normalize other processes thrashing shared caches
-and memory; the observed failure is consistent with that limitation, but its
-cause has not been experimentally isolated. A quiet-machine budget check is
-still needed. The report does not claim an all-green regression run.
+- `npm test`: exit 0. Main suite **867 passed, 0 failed, 4 skipped** out of
+  871 tests, including real-connectome behaviour/fingerprint and native and
+  committed-WASM parity. The four optional skips are three anatomy/Feather
+  checks (sidecar absent) and a byte-for-byte WASM rebuild (SDK absent).
+- Budget suite: **2 passed, 0 failed, 2 skipped**. Fallback swoop and fly-update
+  checks passed. Swoop-through-eyes and brain construction/run budgets each
+  exhausted three contention attempts and skipped locally under dev's
+  `measureBudget` policy; their reference medians were 4.96 and 4.97 ms,
+  above the local 4.8 ms acceptance limit. Those CPU budgets are **unmeasured**,
+  not demonstrated passes. Executed functional throws still recorded 8/8
+  take-offs with the eyes open and 6/6 through the fallback loom. No acceptance
+  bound was changed by this PR.
+- `npm run typecheck` and `npm run lint`: exit 0.
+- No browser e2e flow changed; no server, browser or simulator was needed.
 
-The provenance summary records a clean tested commit/tree for the subsequent
-summary-regeneration, lint and typecheck run (`c4fc7686`). Regeneration also
-checked rejection of conflicting duplicates, mixed neural strengths and
-unmatched seeds. The earlier functional/budget logs predate that manifest:
-their tested revision was not recorded contemporaneously. Source comparisons
-establish unchanged production code; they do not retroactively certify an
-exact tested snapshot or make the CPU failures pass.
+The provenance summary records the clean tested commit/tree, commands, exit
+statuses and log hashes. The earlier branch, before dev's contention policy
+landed, had all-senses measurements of 0.597 and 0.566 CPU s/s against 0.5.
+Those remain historical failures, not evidence of current compliance or
+proof of overload causation. A quiet-machine CPU measurement is still useful;
+readiness does not turn a contention skip into a pass. GitHub CI was not
+waited on, following the owner's process instruction.
 
-Heavy runs used the shared slots. Following the fairness update, the full test
-process group was paused and its slot released near nine minutes, then resumed
-after a two-minute cooldown in another owned slot. Only CPU/game-time checks
-remained active; no test or assertion was skipped to fit a slot. No server,
-browser or simulator was started for this investigation.
+Heavy runs used an owned shared slot for at most nine minutes at a time,
+with the process group suspended while releasing a slot and taking the
+required two-minute cooldown if needed. No local process or device is left
+running by this study.
 
 ## Matched twenty-seed control cohort
 
-The 100 Hz, 100 ms A/B condition was compared with sham, the LPLC2/LC4
-positive control, and the same A/B pulse plus a one-second C/E step, all with
-seeds 1–20. A fresh brain with a given seed has the same pre-stimulus resting
-state across these interventions. The neural rate/duration were fixed from
-the earlier sweep, not selected to induce a threshold crossing. Earlier
-three-/ten-seed captures overlap these expanded cohorts; they are not extra
-independent replicates and are never pooled into the condition fractions.
+A fixed 100 Hz, 100 ms A/B condition is compared with sham, LPLC2/LC4
+positive control and the same pulse plus a one-second C/E step, seeds 1–20.
+The pre-stimulus resting state is matched by seed. Earlier three-/ten-seed
+cohorts overlap the expansions and are not extra independent replicates.
 
-| Condition | Escape peak range over 1.5 s | Events at >= 0.4 | Trials with any GF spike in first 100 ms | Mean excess GF spikes in first 100 ms, paired to sham (approximate 95% bootstrap interval) |
+| Condition | Escape peak range | Events >= 0.4 | Trials with any GF spike in first 100 ms | Mean excess early GF spikes, paired to sham (approximate 95% bootstrap interval) |
 | --- | ---: | ---: | ---: | ---: |
 | rest | 0.000–0.167 | 0/20 | 4/20 | reference |
-| AB | 0.147–0.315 | 0/20 | 20/20 | 7.80 (7.20–8.45) |
-| AB+CE | 0.055–0.176 | 0/20 | 17/20 | 0.95 (0.50–1.35) |
-| loom | 1.000–1.000 | 20/20 | 20/20 | 65.10 (64.70–65.45) |
+| AB | 0.141–0.315 | 0/20 | 20/20 | 8.25 (7.60–8.90) |
+| AB+CE | 0.055–0.221 | 0/20 | 20/20 | 1.50 (1.15–1.85) |
+| loom | 1.000–1.000 | 20/20 | 20/20 | 65.05 (64.65–65.45) |
 
-This separates GF activity from its rate-based command: A/B produces GF spikes
-in every trial, yet no escape threshold event. A simplistic offline rule that
-calls any GF spike an escape would also flag four sham trials in the first
-100 ms. This is a decoder diagnostic, not a proposed decoder, physical flight
-replay or estimate of biological take-off probability. It uses cumulative
-spike counts rather than sub-millisecond event timing. No weight, threshold,
-command or sensory input mapping was changed.
+GF activity is distinct from this rate-based command. An offline rule
+calling any GF spike an escape also flags sham trials; it is a diagnostic,
+not a proposed decoder or physical flight replay. Counts are cumulative,
+not sub-millisecond event times. No weight, threshold or mapping changed.
 
-The positive control crossed in every trial, at 10–20 ms. The 0/20 condition
-fractions retain the two-sided exact 95% upper limit of 16.8%. The larger sham
-cohort bounds spontaneous threshold events here; it does not remove missing
-physiology or calibrate a puff to neural firing.
+The positive control crossed at 10–20 ms. Condition fractions and paired spike intervals describe model-seed
+uncertainty, not biological take-off probabilities. The paired percentile
+bootstrap draws twenty seed differences with replacement, 20,000 times per
+condition, using `mulberry32(1)`. Its sorted endpoints are indices 499 and
+19,500. Coverage is approximate. The executable summarizer reproduces it.
 
 ```sh
-node packages/brain/scripts/puff.ts --simulate --populations rest,AB,AB+CE,loom --rates 100 --durations 100 --seeds 20
+node packages/brain/scripts/puff.ts --simulate --populations rest,loom,AB+CE,AB --rates 100 --durations 100 --seeds 20 > /tmp/puff-matched.jsonl
 ```
-
-The condition summary now contains 148 rows. All trial fractions are per
-condition; shared seeds, overlapping expansions and repeated sham captures
-must not be treated as independent animals.
-
-The intervals resample the twenty paired seed differences, with replacement,
-20,000 times, taking the mean of each resample and the sorted elements at
-zero-based indices 499 and 19,500. Each condition starts `mulberry32(1)`;
-each draw selects `floor(random() * 20)`. They describe uncertainty across
-model RNG seeds, with approximate percentile-bootstrap coverage; they are
-not biological intervals or a guarantee of exact coverage. The paired
-differences and complete algorithm settings are in the provenance summary.
 
 ## Regenerating the summaries
 
@@ -451,31 +424,47 @@ The retained captures reproduce all **148 response rows**, all **720 wiring
 rows**, and all three paired bootstrap intervals. The CSVs use six-decimal
 rounding; the paired calculation uses the unrounded trial counts. These
 regeneration checks run without a heavy simulation sweep. They verify the
-summary transformation, not the missing capture provenance of historical
-exploratory trials.
+summary transformation; physiological validity still requires measurements
+of a real puff and its sensory recruitment.
 
 ## Capture provenance and replay
 
-The [provenance summary](puff-startle-provenance.json) records two canonical
-captures from clean commit `01b1da5f5704cd017371d42c519813088fad4ee0`:
-the wiring query and the four matched twenty-seed conditions above. Headers
-record Node/architecture/arguments, the probe's SHA-256, all 19 runtime source
-hashes, and the packed dataset hash. Raw-capture and payload hashes are
-supplied; payload hashing omits the changing provenance header. Generate
-JSONL with the commands above to reproduce the numerical payload. Source
-hashes identify the captured revision even after this report changes.
+The [provenance summary](puff-startle-provenance.json) identifies every
+response and wiring capture used here, all taken from clean merge commit
+`cecaab0d5ef50a64d837e592cd6160fe31468846`. Each JSONL header records Node,
+architecture, arguments, probe hash, all 19 runtime source hashes and the
+packed dataset hash. Raw and numerical-payload hashes are supplied; payload
+hashing omits the changing provenance header. The supplied commands and
+summary script reproduce the values without relying on an unrecorded probe
+revision. This certifies the current sweep, not a complete archived operating
+system or a physical-flight replay.
 
-The canonical replay exactly matches all **80/80 trial records** from the
-earlier matched captures and **70/70 wiring records**. All 19 recorded runtime
-source SHA-256 values match the branch's base commit. The Git tree listing
-for 105 tracked production files across the brain, native brain, body, tools
-and CPU-budget helper also matches that base, and those working-tree paths
-were clean at capture. This is explicit source evidence, rather than an
-empty diff presented without its command or exit status.
+This rerun covers the full exploratory grid, the four-strength twenty-seed
+A/B expansion, six timing-control conditions and the matched twenty-seed
+cohort. The older captures were superseded rather than retroactively assigned
+source metadata. Model RNG samples overlap across conditions/cohorts and are
+not pooled as independent animals.
 
-Earlier exploratory captures did not record the probe revision/hash. Their
-full provenance cannot be recovered retroactively: the canonical replay
-certifies the wiring and fixed controls, **not** every cell of the historical
-exploratory grid. The report does not claim a complete archived environment
-or a replay of physical flight. The current probe emits provenance on every
-run so future sweeps can retain that information.
+## Compatibility with the merged senses
+
+Antenna contact #114 changes when the **body** reports `bump`: a wall held
+off by the forelegs or empty space beyond a table edge no longer counts as a
+push. It does not change the JO-C/E selector or `wind` selector. This isolated
+brain protocol holds `bumpLeft = bumpRight = 0`, so it does not simulate those
+contacts. Its result cannot diagnose grooming at a particular wall.
+
+Grounded/wingbeat #68 is present in both the initial study base and this merge:
+`grounded` drives the 13 leg campaniform neurons, and `wingbeat` the other 413.
+The experiment uses `RESTING_SENSES`: grounded true, wingbeat zero, eyes shut,
+all other external senses zero, hunger omitted (the brain defaults to 1), and
+optional clock/sleep fields omitted (zero).
+Thus it describes the awake, no-clock resting operating point, not the game's
+night-time sleep state. No protected sense was edited.
+
+The merged clock/sleep support appends internal-state input groups. At zero
+state their rates are zero, but the research inputs subsequently added by the
+probe receive different RNG indices. The numerical sweep was therefore
+rerun on the merge; no claim of byte-identical stimulated trajectories across
+the two model revisions is made. Wiring counts remain the same chemical
+connectome. The conclusion concerns the tested recruitment/decoder, not
+absence of any real-fly puff pathway.
