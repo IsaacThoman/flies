@@ -6,8 +6,10 @@
 // world as this player's do (other-hands.ts). The rest of the world there is
 // the table's: the place, the food (table-pantry.ts), the light and the
 // weather by the starter's clock, the bubbles from its seed and clock, and
-// when a visitor comes. Nothing passes between the flies but what their
-// bodies can sense.
+// when a visitor comes. In a room open to everyone nobody started it: the
+// room's clock chooses the place, and the light and the weather stay each
+// device's own. Nothing passes between the flies but what their bodies can
+// sense.
 
 import * as THREE from "three";
 import type { OpenTableSocket } from "@fly/contracts";
@@ -15,7 +17,7 @@ import { BODY_HALF, BODY_RADIUS, segmentToSegment } from "@fly/body";
 import type { Looming } from "@fly/body";
 import {
   AIRBORNE, AWAY, EATING, HANDS, HOLDING, LEAD, MAX_BITES, PLAYING, PROTOCOL, SEND_EVERY, TABLETOP_SCALE, TABLE_BUBBLES, TableBubbles, ballProgress, createFlyState,
-  decodeFlies, fromWire, mix, roomTime, stream, tableHours, toV3, wireScale,
+  decodeFlies, everyoneIndex, fromWire, mix, roomTime, stream, tableHours, toV3, wireScale,
 } from "@fly/net";
 import type { BallWire, Bite, BubbleSnapshot, FlyState, FoodWire, HappeningWire, Refusal, RoomInfo, ServerMessage, Spot, TableStart, WireScale } from "@fly/net";
 import { BALL_RADIUS, SWOOP_SECONDS, WORLDS } from "@fly/world";
@@ -73,7 +75,8 @@ export type PlayerNow = { away: boolean; playing: boolean; handsOut: boolean; ho
 export type Ended = Refusal | "left";
 
 export class Online {
-  readonly code: string;
+  /** The room's code: the one asked for, until the room says which it is (a room open to everyone that is full sends a device on to the next). */
+  code: string;
   readonly line: TableLine;
   readonly others: OtherFlies;
   readonly pantry: TablePantry;
@@ -145,12 +148,11 @@ export class Online {
     this.#world = host.life.world;
     this.others = new OtherFlies(host.scene, this.#world);
     this.pantry = new TablePantry(this.#world);
-    host.life.share(this.pantry);
     this.pantry.onClear = () => {
       if (this.joined && !this.#arrival && !this.#host.moving()) this.line.send({ type: "clearFood", epoch: this.epoch });
     };
-    this.pantry.onFound = (food) => this.line.send({ type: "found", id: food.id, name: food.name, x: food.x, z: food.z, y: food.y, r: food.r, sweet: food.sweet, epoch: this.epoch });
-    this.shared = { others: this.#othersAt, anchor: this.#anchor };
+    this.pantry.onFound = (food, lasts) => this.line.send({ type: "found", id: food.id, name: food.name, x: food.x, z: food.z, y: food.y, r: food.r, sweet: food.sweet, lasts, epoch: this.epoch });
+    this.shared = { others: this.#othersAt, anchor: this.#anchor, ownSky: false };
     this.triedPassword = !!password;
     let starting = start;
     let opening = password;
@@ -158,7 +160,7 @@ export class Online {
       const p = host.life.body.position;
       // Coming back after a moment away, the fly carries on where it is (in the place of the table's epoch it is in); the first time, the table says where it stands.
       const back = this.#welcomed ? { at: [p.x, p.z, host.life.body.yaw, p.y] as Spot, epoch: this.epoch } : {};
-      return { type: "hello" as const, v: PROTOCOL, table: code, key, ...back, ...(starting ? { start: starting } : {}), ...(opening ? { password: opening } : {}) };
+      return { type: "hello" as const, v: PROTOCOL, table: this.code, key, ...back, ...(starting ? { start: starting } : {}), ...(opening ? { password: opening } : {}) };
     });
     this.line.onMessage = (m) => {
       if (m.type === "welcome") {
@@ -179,6 +181,11 @@ export class Online {
     return this.#welcomed;
   }
 
+  /** A room open to everyone: nobody started it, and each device there keeps its own light and weather. Known from its code until it has said. */
+  get everyone(): boolean {
+    return this.room?.everyone ?? everyoneIndex(this.code) >= 0;
+  }
+
   /** This player started the table: theirs are the place, the light and the weather. */
   get starting() {
     return this.id > 0 && this.id === this.starter;
@@ -189,9 +196,9 @@ export class Online {
     return this.line.status === "refused" ? this.line.refusal : null;
   }
 
-  /** The table's clock now: local hours since the epoch where its starter is, or null before the table has said. */
+  /** The table's clock now: local hours since the epoch where its starter is, or null before the table has said, or in a room open to everyone (each device keeps its own). */
   hours(): number | null {
-    return this.#welcomed ? tableHours(this.now, this.#clock.at, this.#clock.wall, this.#clock.offset) : null;
+    return this.#welcomed && !this.everyone ? tableHours(this.now, this.#clock.at, this.#clock.wall, this.#clock.offset) : null;
   }
 
   #roomNow() {
@@ -205,6 +212,10 @@ export class Online {
         const back = this.#welcomed;
         this.#welcomed = true;
         this.room = m.room;
+        if (typeof m.room?.code === "string" && m.room.code) this.code = m.room.code;
+        this.shared.ownSky = this.everyone;
+        // The table's food from now: until the room had let it in, the fly still ate its own.
+        if (!back) host.life.share(this.pantry);
         this.id = m.id;
         this.colour = m.colour;
         this.starter = m.starter;
@@ -307,7 +318,7 @@ export class Online {
     this.#arrival = null;
     this.epoch = arrival.epoch;
     this.#scale = arrival.scale;
-    this.pantry.mirror.welcome(arrival.foods);
+    this.pantry.welcome(arrival.foods);
     if (arrival.spot) this.#host.life.body.place(arrival.spot[0], arrival.spot[1], arrival.spot[2], arrival.spot[3]);
     // Only the picnic has bubbles: the table's, from its seed and the place's count.
     const bubbles = this.#host.bubbles;
@@ -335,8 +346,9 @@ export class Online {
     this.#handList.splice(this.#handList.indexOf(hand), 1);
   }
 
-  /** The table's light and weather: shown on the Light and Weather tools, and followed. */
+  /** The table's light and weather: shown on the Light and Weather tools, and followed. Not in a room open to everyone, where they are each device's own. */
   #takeWorld(light: string, weather: string, settle: boolean) {
+    if (this.everyone) return;
     const hands = this.#host.hands;
     const l = TOOLS[LIGHT_TOOL].variants.findIndex((v) => v.id === light);
     const w = TOOLS[WEATHER_TOOL].variants.findIndex((v) => v.id === weather);
@@ -426,7 +438,8 @@ export class Online {
 
     const table = this.#table;
     if (table) {
-      table.rain = this.#host.stage.weather.rain;
+      // Each device's own rain, in a room open to everyone, would burst the bubbles on some screens and not others.
+      table.rain = this.everyone ? 0 : this.#host.stage.weather.rain;
       if (this.#mineFlying) {
         if (ballProgress(this.#mine, roomNow) >= 1) this.#mineFlying = false;
         else if (ballProgress(this.#mine, roomNow) > 0) table.hitBy(Math.max(this.#mine.at, prev) / 1000, roomNow / 1000, BALL_RADIUS, this.#mine);

@@ -28,6 +28,7 @@
     "tvos:soak": "node scripts/tvosSoak.ts",
     "tvos:typecheck": "tsc -p apps/tvos",
     "tvos:art": "node scripts/art.ts",
+    "store:shots": "node scripts/storeShots.ts",
     "ios": "node scripts/ios.ts",
     "ios:check": "node apps/ios/tests/simulator.ios.ts",
     "brain:fetch": "node packages/brain/scripts/fetch.ts",
@@ -38,7 +39,9 @@
     "fuzz:rooms": "node scripts/fuzzRooms.ts",
     "soak:web": "node scripts/webSoak.ts",
     "e2e:soak": "node scripts/webSoak.ts --quick",
-    "release": "semantic-release"
+    "release": "semantic-release",
+    "notices": "node scripts/notices.ts",
+    "notices:check": "node scripts/notices.ts --check"
   },
   "dependencies": {
     "three": "^0.186.1"

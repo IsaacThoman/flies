@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { REGIONS } from "@fly/brain";
-import { NERVE_PARTS } from "@fly/fly";
+import { NERVE_PARTS, SOMA_GROUPS } from "@fly/fly";
 import { GLOW_FALL, GLOW_RISE, NerveGlow, glowTarget } from "../src/nerves/glow.ts";
 import { REGION_PARTS, partRegions } from "../src/nerves/regions.ts";
 import { XRAY_PIXELS, xrayForSize, xrayWanted } from "../src/nerves/xray.ts";
@@ -16,7 +16,7 @@ import { DEFAULT_SETTINGS } from "../src/settings.ts";
 const SENSORY = /^(retina|antenna-smell|johnston|head-bristles|mouthparts|head-sensory-other|leg-sensory|thorax-sensory|abdomen-sensory|proprioceptors|bristles)/;
 const MOTOR = /(motor|endocrine|efferent)/;
 
-test("every region is drawn, and every part of the drawing is lit by exactly one region", () => {
+test("every region is drawn, and every part is lit by one measured region or command group", () => {
   const parts = new Map(NERVE_PARTS.map((p) => [p.id, p]));
   const owner = new Map<string, string>();
   for (const region of REGIONS) {
@@ -28,9 +28,9 @@ test("every region is drawn, and every part of the drawing is lit by exactly one
       owner.set(id, region.id);
     }
   }
-  for (const part of NERVE_PARTS) assert.ok(owner.has(part.id), `${part.id} is lit by a region`);
+  for (const part of NERVE_PARTS) assert.ok(owner.has(part.id) || SOMA_GROUPS.some((g) => g.id === part.id), `${part.id} is lit by a measured rate`);
   assert.deepEqual(Object.keys(REGION_PARTS).sort(), REGIONS.map((r) => r.id).sort(), "no place for a region the brain doesn't report");
-  assert.ok(!partRegions().includes(-1));
+  assert.equal([...partRegions()].filter((r) => r < 0).length, SOMA_GROUPS.length);
 });
 
 test("a region is drawn on its own side, in its role's parts", () => {
@@ -77,6 +77,21 @@ test("a glow is the rate on its region's own full scale, and nothing else", () =
   assert.ok(glow.regions[lamina] > 0.5 * peak, `falls with ${GLOW_FALL} s: ${glow.regions[lamina]} of ${peak}`);
   step(2);
   assert.ok(glow.regions[lamina] < 0.01);
+});
+
+test("command somata show only their actual group's rate, including missing native readouts", () => {
+  const parts = new Float32Array(NERVE_PARTS.length + 3), glow = new NerveGlow(parts);
+  const rates = new Float32Array(REGIONS.length);
+  for (const group of SOMA_GROUPS) {
+    glow.clear();
+    const readouts = { [group.rate]: group.fullHz * 0.5 };
+    for (let i = 0; i < 120; i++) glow.update(rates, 1 / 60, readouts);
+    for (let p = 0; p < NERVE_PARTS.length; p++) {
+      assert.ok(Math.abs(parts[p] - (NERVE_PARTS[p].id === group.id ? 0.5 : 0)) < 1e-5);
+    }
+    for (let i = 0; i < 240; i++) glow.update(rates, 1 / 60);
+    assert.ok(parts.every((g) => g < 0.0001));
+  }
 });
 
 test("the X-ray: asked for by the setting or the View tool, and only where the fly is big enough to see inside", () => {
