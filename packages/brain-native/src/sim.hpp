@@ -3,10 +3,12 @@
 // anything. sim.ts's opening comment is the specification; in short, each
 // neuron has a membrane potential v, a synaptic drive g and an adaptation a,
 // all in mV above rest, and step s does, in order:
-//   1. deliver the spikes fired at step s - delay, in ascending neuron order;
+//   1. deliver the spikes fired at step s - delay, in ascending neuron order,
+//      then the withdrawals drawn then, each its synapses' opposite;
 //   2. update every active neuron: decay g and a; if refractory, count down
 //      and hold v at 0, otherwise integrate v and fire at threshold;
-//   3. fire the neurons the Poisson inputs pick, unless refractory.
+//   3. fire the neurons the Poisson inputs pick, unless refractory, and note
+//      the withdrawals the withdrawing inputs pick.
 //
 // The results are sim.ts's to the bit: state is held in single precision and
 // computed in double, operation for operation as there. How the active set is
@@ -158,8 +160,12 @@ class Simulation {
    * of its own (set_rates; all 0 to begin with); returns its index. The
    * neurons keep the order given, which is the order of the rates, and must
    * be distinct. It draws from its own stream, like a group input.
+   *
+   * With withdraw, a picked neuron doesn't fire: its release falls below its
+   * resting level for a moment, which its targets feel, after the synaptic
+   * delay, as the opposite of one of its spikes (sim.ts's addRatedInput).
    */
-  uint32_t add_rated_input(const std::string& name, std::span<const uint32_t> neurons);
+  uint32_t add_rated_input(const std::string& name, std::span<const uint32_t> neurons, bool withdraw = false);
   /** Changes each neuron's rate, Hz, of a rated input from the next step on, in the order its neurons were given. */
   void set_rates(uint32_t input, std::span<const double> rates_hz);
 
@@ -214,6 +220,7 @@ class Simulation {
     std::string name;
     double rate;
     bool on;
+    bool withdraw;
     std::variant<PoissonInput, RatedPoissonInput> source;
   };
 
@@ -261,6 +268,9 @@ class Simulation {
   std::vector<std::vector<uint32_t>> ring_;
   std::vector<uint32_t> ring_length_;
   int64_t last_slot_ = -1;
+  // Withdrawals by the step they were drawn in, modulo the delay, ascending:
+  // delivered as their synapses' opposite. They are not spikes.
+  std::vector<std::vector<uint32_t>> withdrawn_;
 
   std::vector<Input> inputs_;
   std::vector<uint32_t> scratch_;

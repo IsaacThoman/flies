@@ -3,7 +3,8 @@
 // (a per-neuron bias; a per-target weight scale; drive reset and adaptation
 // on and off; other steps, delays, refractory periods and cleanup intervals)
 // and rated inputs, a rate per neuron as the eyes drive the lamina, with
-// rates from 0 to past one spike a step changed mid-run: each step's spikes
+// rates from 0 to past one spike a step changed mid-run, firing or
+// withdrawing (as L1 under brightening): each step's spikes
 // and active count, and every neuron's v, g and a at the end, bit for bit.
 
 import assert from "node:assert/strict";
@@ -31,8 +32,8 @@ type Spec = {
   resetDrive: boolean;
   adaptation: { increment: number; tau: number } | null;
   inputs: { neurons: number[]; rate: number }[];
-  /** Added after `inputs`, each its neurons in their order (distinct). */
-  rated: { neurons: number[] }[];
+  /** Added after `inputs`, each its neurons in their order (distinct); a withdrawing one delivers its synapses' opposite instead of firing. */
+  rated: { neurons: number[]; withdraw: boolean }[];
   changes: Change[];
   steps: number;
 };
@@ -66,7 +67,11 @@ function randomSpec(seed: number): Spec {
     while (out.size < k) out.add(Math.floor(random() * n));
     return [...out];
   };
-  const rated = [{ neurons: distinct(40) }, { neurons: distinct(8) }];
+  const rated = [
+    { neurons: distinct(40), withdraw: false },
+    { neurons: distinct(8), withdraw: false },
+    { neurons: distinct(25), withdraw: true },
+  ];
   // Each neuron's rate: silent, slow, fast, or one spike a step and more (probability 1).
   const rates = (k: number) => {
     const kind = random();
@@ -139,7 +144,7 @@ function typescript(spec: Spec): string[] {
     },
   );
   spec.inputs.forEach((input, k) => sim.addInput(`input ${k}`, input.neurons, input.rate));
-  spec.rated.forEach((input, k) => sim.addRatedInput(`rated ${k}`, input.neurons));
+  spec.rated.forEach((input, k) => sim.addRatedInput(`rated ${k}`, input.neurons, { withdraw: input.withdraw }));
   const lines: string[] = [];
   let next = 0;
   for (let s = 0; s < spec.steps; s++) {

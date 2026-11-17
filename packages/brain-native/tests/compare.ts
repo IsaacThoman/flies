@@ -213,6 +213,7 @@ function sight(eyes: EyeMap, cycle: number, random: () => number, add: Add, hold
   show(loom, 1000, 1000 / 60, "a loom while held and dragged", () => ({ touch: 0.4, wind: 0.5, grounded: false }));
   show(scene("flicker"), 1000, 16, "flicker while sweet", () => ({ sweet: 1 }));
   show(loom, 1000, 16, "a loom while asleep, the eyes at a sleepy gain", () => ({ clockSleep: 1, sleepPressure: 0.6, sleepDepth: 1 }));
+  show(scene("light loom right"), 1000, 16, "a light disc looming while asleep, L1's withdrawals at the sleepy gain", () => ({ clockSleep: 1, sleepPressure: 0.6, sleepDepth: 1 }));
   hold(600, 16, (t) => ({ light: grey, clockSleep: t / 600, sleepPressure: 0.2 }), "a steady scene as sleepiness rises, the gain alone changing");
   show(scene("grating, clockwise"), 600, 16, "a grating waking up", (t) => ({ clockSleep: 1 - t / 600 }));
   show(scene("bar right, front to back"), 1000, 16, "a bar with random senses", () =>
@@ -305,16 +306,18 @@ export function eyeMap(data: ArrayBuffer, columns?: Columns): EyeMap | null {
   }
 }
 
-/** FNV-1a over the bits of both retinas' rates, as doubles (tools/harness.cpp has the same). */
+/** FNV-1a over the bits of both retinas' rates, then their withdrawals, as doubles (tools/harness.cpp has the same). */
 function retinaDigest(brain: FlyBrain): string {
   if (!brain.vision) return "-";
   const bits = new DataView(new ArrayBuffer(8));
   let h = 2166136261;
   for (const side of ["left", "right"] as const) {
-    for (const x of brain.vision.retina[side].rates) {
-      bits.setFloat64(0, x, true);
-      h = Math.imul(h ^ bits.getUint32(0, true), 16777619) >>> 0;
-      h = Math.imul(h ^ bits.getUint32(4, true), 16777619) >>> 0;
+    for (const list of [brain.vision.retina[side].rates, brain.vision.retina[side].withdrawals]) {
+      for (const x of list) {
+        bits.setFloat64(0, x, true);
+        h = Math.imul(h ^ bits.getUint32(0, true), 16777619) >>> 0;
+        h = Math.imul(h ^ bits.getUint32(4, true), 16777619) >>> 0;
+      }
     }
   }
   return h.toString(16).padStart(8, "0");

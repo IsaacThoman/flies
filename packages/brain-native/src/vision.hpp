@@ -33,6 +33,8 @@ struct RetinaParameters {
   double max_rate = 200;
   /** Rate, Hz, of a lamina cell in a steady scene. */
   double tonic = 0;
+  /** Factor on L1's withdrawals under brightening, 1 for the same scale as darkening (0: no ON pathway). */
+  double withdraw = 1;
 };
 
 /** One eye's photoreceptors and lamina: luminance per facet in, a rate per driven lamina cell out. */
@@ -44,6 +46,10 @@ class Retina {
   const std::vector<uint32_t>& neurons() const { return neurons_; }
   /** Hz per neuron of neurons(), as of the last step. */
   const std::vector<double>& rates() const { return rates_; }
+  /** Every facet's L1 that exists, as at the start of neurons(): the cells brightening withdraws. */
+  const std::vector<uint32_t>& l1() const { return l1_; }
+  /** Hz per neuron of l1(), as of the last step: how often its release is withdrawn. */
+  const std::vector<double>& withdrawals() const { return withdrawals_; }
   uint32_t facets() const { return facets_; }
 
   /**
@@ -61,6 +67,8 @@ class Retina {
   uint32_t facets_;
   std::vector<uint32_t> neurons_;
   std::vector<double> rates_;
+  std::vector<uint32_t> l1_;
+  std::vector<double> withdrawals_;
   // For each driven cell, its facet and whether it is transient (L1, L2) or sustained (L3).
   std::vector<uint32_t> facet_;
   std::vector<uint8_t> transient_;
