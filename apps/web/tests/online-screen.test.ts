@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { TableSocket, TableSocketStatus, TextEntry, TextRequest } from "@fly/contracts";
-import { CLOSE, MAX_PLAYERS, PROTOCOL } from "@fly/net";
+import { CLOSE, EVERYONE, MAX_PLAYERS, PROTOCOL, everyoneCode } from "@fly/net";
 import type { RoomWire } from "@fly/net";
 import { HitMap } from "@fly/ui";
 import type { ActionItem, FieldItem } from "@fly/ui";
@@ -56,6 +56,9 @@ const ROOMS: RoomWire[] = [
   { code: "bbbbbbbbbb", name: "Secret Sugar", place: "lab", flies: 1, locked: true },
   { code: "cccccccccc", name: "Packed", place: "picnic", flies: MAX_PLAYERS, locked: false },
 ];
+
+const EVERYONE_ROOM: RoomWire = { code: EVERYONE, name: "Everyone", place: "picnic", flies: MAX_PLAYERS, locked: false, everyone: true };
+const EVERYONE_TABLE: TableNow = { name: "Everyone", code: EVERYONE, link: `https://x/?table=${EVERYONE}`, starting: false, joined: true, everyone: true, others: [{ id: 1, colour: "#ffd21f" }] };
 
 function world(canShare = true) {
   const typing = new FakeTyping();
@@ -187,11 +190,11 @@ test("while the door opens it says so, and once in, the room's own face: its nam
   state.knock = { code: "bbbbbbbbbb", name: "Secret Sugar", wrong: false, seq: 1 };
   step();
   assert.equal(screen.view, "door");
-  state.table = { name: null, code: "bbbbbbbbbb", link: "https://x/?table=bbbbbbbbbb", starting: false, joined: false, others: [] };
+  state.table = { name: null, code: "bbbbbbbbbb", link: "https://x/?table=bbbbbbbbbb", starting: false, joined: false, everyone: false, others: [] };
   step();
   assert.equal(screen.view, "door", "on its way in");
   assert.deepEqual(screen.menu.items.map((i) => [i.id, i.label, !!i.disabled]), [["password", "Password", true], ["join", "Joining…", true]]);
-  state.table = { name: "Secret Sugar", code: "bbbbbbbbbb", link: "https://x/?table=bbbbbbbbbb", starting: false, joined: true, others: [{ id: 1, colour: "#ffd21f" }] };
+  state.table = { name: "Secret Sugar", code: "bbbbbbbbbb", link: "https://x/?table=bbbbbbbbbb", starting: false, joined: true, everyone: false, others: [{ id: 1, colour: "#ffd21f" }] };
   state.knock = null;
   step();
   assert.equal(screen.view, "room");
@@ -204,7 +207,7 @@ test("while the door opens it says so, and once in, the room's own face: its nam
 test("at a room, its QR code and its code beside the menu, once in; Share only where a link can be handed on", () => {
   for (const canShare of [true, false]) {
     const { screen, state, step } = world(canShare);
-    state.table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://x/?table=abcdefghjk", starting: false, joined: true, others: [] };
+    state.table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://x/?table=abcdefghjk", starting: false, joined: true, everyone: false, others: [] };
     step();
     assert.deepEqual(screen.menu.items.map((i) => i.id), canShare ? ["share", "leave"] : ["leave"]);
     const g = blankCanvas();
@@ -214,11 +217,93 @@ test("at a room, its QR code and its code beside the menu, once in; Share only w
   }
   // On the way in there is no card yet.
   const { screen, state, step } = world();
-  state.table = { name: null, code: "abcdefghjk", link: "https://x/?table=abcdefghjk", starting: false, joined: false, others: [] };
+  state.table = { name: null, code: "abcdefghjk", link: "https://x/?table=abcdefghjk", starting: false, joined: false, everyone: false, others: [] };
   step();
   const g = blankCanvas();
   screen.draw(g, 0, new HitMap());
   assert.ok(!writtenOn(g).some((w) => w.text === "abcde"));
+});
+
+test("a room open to everyone offers sharing where available, other rooms and leaving", () => {
+  for (const canShare of [true, false]) {
+    const { screen, state, step } = world(canShare);
+    state.table = EVERYONE_TABLE;
+    step();
+    assert.equal(screen.view, "room");
+    assert.deepEqual(screen.menu.items.map((item) => item.id), canShare ? ["share", "rooms", "leave"] : ["rooms", "leave"]);
+    assert.equal(screen.menu.item("rooms")?.label, "Other rooms");
+  }
+});
+
+test("looking at other rooms keeps the current table, and choosing it or pressing Back returns to its room view", () => {
+  for (const returnBy of ["current", "back"]) {
+    const { screen, shell, state, did, step, press, focus } = world();
+    state.table = EVERYONE_TABLE;
+    state.rooms = [EVERYONE_ROOM, ...ROOMS];
+    step();
+    focus("rooms");
+    press("select");
+    step();
+    assert.equal(screen.view, "rooms", "the next frame does not return to the occupied room");
+    assert.deepEqual(screen.menu.items.map((item) => item.id), ["new", "code", `room:${EVERYONE}`, ...ROOMS.map((room) => `room:${room.code}`)]);
+    assert.equal(shell.table, EVERYONE_TABLE);
+    assert.deepEqual(did, [], "browsing leaves the fly where it is");
+    if (returnBy === "current") {
+      focus(`room:${EVERYONE}`);
+      press("select");
+    } else press("back");
+    step();
+    assert.equal(screen.view, "room", returnBy);
+    assert.equal(shell.table, EVERYONE_TABLE);
+    assert.deepEqual(did, [], "returning neither joins nor leaves nor closes Online");
+  }
+});
+
+test("a locked room's door, come to from a room open to everyone, can be typed into and joined: being in that room isn't being on the way into this one", () => {
+  const { screen, state, did, step, press, focus } = world();
+  const locked = ROOMS.find((room) => room.locked)!;
+  state.table = EVERYONE_TABLE;
+  state.rooms = [EVERYONE_ROOM, ...ROOMS];
+  step();
+  focus("rooms");
+  press("select");
+  focus(`room:${locked.code}`);
+  press("select");
+  step();
+  assert.equal(screen.view, "door");
+  assert.deepEqual(screen.menu.items.map((i) => [i.id, i.label, !!i.disabled]), [["password", "Password", false], ["join", "Join", true]]);
+  assert.deepEqual(did, [], "nothing joined or left before the password");
+});
+
+test("a full room open to everyone remains selectable and marked as everyone's while a full ordinary room is disabled", () => {
+  const { screen, state, step, press, focus, did } = world();
+  state.rooms = [EVERYONE_ROOM, ...ROOMS];
+  step();
+  const everyone = screen.menu.item(`room:${EVERYONE}`) as ActionItem;
+  assert.equal(everyone.everyone, true);
+  assert.equal(everyone.disabled, false);
+  assert.deepEqual(everyone.count, [MAX_PLAYERS, MAX_PLAYERS]);
+  const ordinary = screen.menu.item(`room:${ROOMS[2].code}`) as ActionItem;
+  assert.equal(ordinary.everyone, false);
+  assert.equal(ordinary.disabled, true);
+  focus(`room:${EVERYONE}`);
+  press("select");
+  assert.deepEqual(did, [`join ${EVERYONE}`], "the server can send a full everyone room's next arrival on to another");
+});
+
+test("choosing another room while at everyone's table asks the shell to join its code", () => {
+  for (const room of [ROOMS[0], { ...EVERYONE_ROOM, code: everyoneCode(1), name: "Everyone 2" }]) {
+    const { shell, state, did, step, press, focus } = world();
+    state.table = EVERYONE_TABLE;
+    state.rooms = [EVERYONE_ROOM, room];
+    step();
+    focus("rooms");
+    press("select");
+    focus(`room:${room.code}`);
+    press("select");
+    assert.deepEqual(did, [`join ${room.code}`]);
+    assert.equal(shell.table, EVERYONE_TABLE, "the shell owns leaving the old table before joining the new one");
+  }
 });
 
 test("on the Apple TV a field is typed on the system's keyboard: the whole of it at once, Back giving up, another field or leaving taking it down", () => {
@@ -372,7 +457,7 @@ test("room refreshes never turn a drawn room or removal into a different action"
           const rooms = [ROOMS[0], { ...ROOMS[1], locked: false }];
           const others = [{ id: 2, colour: "red" }, { id: 3, colour: "blue" }];
           if (action === "join") state.rooms = rooms;
-          else state.table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, others };
+          else state.table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, everyone: false, others };
           step();
           const index = screen.menu.items.findIndex((item) => action === "join" ? item.id === `room:${ROOMS[0].code}` : item.id.startsWith("remove:2:"));
           const hits = new HitMap();
@@ -419,7 +504,7 @@ test("a room tap must release on its pressed action, while an unchanged drawn ro
 test("a departed player's reused seat cannot inherit its drawn removal target", () => {
   for (const held of [false, true]) {
     const { screen, state, step, did } = world();
-    const table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, others: [{ id: 2, colour: "red" }] };
+    const table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, everyone: false, others: [{ id: 2, colour: "red" }] };
     state.table = table;
     step();
     const hits = new HitMap();
@@ -466,6 +551,19 @@ test("pointer release uses the redrawn target and cancels a changed room", () =>
   pointers.up({ ...event, buttons: 0 }, false);
   send();
   assert.deepEqual(did, []);
+});
+
+test("a non-message JSON value cannot stop the room list receiving a later list", () => {
+  const socket = new FakeSocket();
+  const lobby = new Lobby(() => socket, "ws://rooms");
+  socket.status = "open";
+  socket.inbox.push("null");
+  assert.doesNotThrow(() => lobby.update(0));
+  assert.equal(lobby.rooms, null);
+  socket.inbox.push(JSON.stringify({ type: "rooms", rooms: ROOMS }));
+  lobby.update(0);
+  assert.deepEqual(lobby.rooms, ROOMS);
+  lobby.close();
 });
 
 test("room discovery failures replace searching, stale choices are disabled, and recovery clears the message", () => {

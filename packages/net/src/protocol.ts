@@ -20,6 +20,9 @@ import type { BubbleSnapshot } from "./bubbles.ts";
  * know the restaurant would read at a tabletop's. 3: rooms have names, may
  * be listed and locked, and a device may browse them; a device speaking 2
  * would sit at a locked room's door forever, not knowing why it was refused.
+ * The rooms open to everyone (`everyoneCode`) came within 3: they only add
+ * to what is said, and a device that doesn't know them is seated there as at
+ * any room.
  */
 export const PROTOCOL = 3;
 
@@ -434,11 +437,16 @@ export type TableStart = {
   listed?: boolean;
 };
 
-/** A room as the list shows it: its code (to join it), name, place, how many flies are there now, and whether it needs a password. */
-export type RoomWire = { code: string; name: string; place: string; flies: number; locked: boolean };
+/** A room as the list shows it: its code (to join it), name, place, how many flies are there now, whether it needs a password, and whether it is one of the rooms open to everyone. */
+export type RoomWire = { code: string; name: string; place: string; flies: number; locked: boolean; everyone?: boolean };
 
-/** What a table says of itself in its welcome: its name, whether it is listed, and whether it is locked. */
-export type RoomInfo = { name: string; listed: boolean; locked: boolean };
+/**
+ * What a table says of itself in its welcome: its name, whether it is listed,
+ * whether it is locked; its code, which for a room open to everyone may not
+ * be the one asked for (a full one sends the device on to the next); and
+ * whether it is one of those.
+ */
+export type RoomInfo = { name: string; listed: boolean; locked: boolean; code?: string; everyone?: boolean };
 
 export type ClientMessage =
   | {
@@ -593,3 +601,32 @@ export function tableCode(random: (bytes: Uint8Array<ArrayBuffer>) => Uint8Array
   }
   return code;
 }
+
+/**
+ * The rooms open to everyone, which the room server keeps and nobody starts
+ * (docs/online.md, "Everyone"): this many at most, each the code below. A
+ * hello for any of them is a hello for whichever has room, that one first.
+ */
+export const EVERYONE_ROOMS = 64;
+const EVERYONE_PREFIX = "222222";
+
+/** The code of the `i`th room open to everyone: "2222222222", "2222222223", …, plainly a code where it is shown, never a word. */
+export function everyoneCode(i: number): string {
+  let code = "";
+  for (let k = 0, n = i; k < CODE_LENGTH - EVERYONE_PREFIX.length; k++, n = Math.floor(n / CODE_ALPHABET.length)) code = CODE_ALPHABET[n % CODE_ALPHABET.length] + code;
+  return EVERYONE_PREFIX + code;
+}
+
+/** Which room open to everyone a code is, or -1 if it isn't one. */
+export function everyoneIndex(code: string): number {
+  if (!isTableCode(code) || !code.startsWith(EVERYONE_PREFIX)) return -1;
+  let i = 0;
+  for (const c of code.slice(EVERYONE_PREFIX.length)) i = i * CODE_ALPHABET.length + CODE_ALPHABET.indexOf(c);
+  return i < EVERYONE_ROOMS ? i : -1;
+}
+
+/** The first room open to everyone: where a device goes to be with others. */
+export const EVERYONE = everyoneCode(0);
+
+/** What the `i`th room open to everyone is called. */
+export const everyoneName = (i: number) => (i === 0 ? "Everyone" : `Everyone ${i + 1}`);

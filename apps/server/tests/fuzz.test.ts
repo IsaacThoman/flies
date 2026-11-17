@@ -14,8 +14,8 @@ const within = (ms: number) => {
 };
 
 test(`a table takes whatever devices send and stays within its bounds (seed ${seed})`, (t) => {
-  const { steps, messages } = fuzzTable(seed, within(800));
-  t.diagnostic(`${steps} steps, ${messages} messages`);
+  const { steps, messages, everyoneRooms } = fuzzTable(seed, within(800));
+  t.diagnostic(`${steps} steps, ${messages} messages, ${everyoneRooms} rooms open to everyone`);
 });
 
 test(`a server on the loopback stays up and seats a fair device after devices send whatever they like (seed ${seed})`, async (t) => {
