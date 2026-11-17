@@ -121,3 +121,24 @@ test("eyes with no picture yet refresh even in a frame that rebuilt the reflecti
   eyes.render(1 / 60, false);
   assert.equal(reads.length, 1);
 });
+
+
+test("an arriving brain never receives a picture sampled for stand-in eyes", async () => {
+  const { eyes, life, reads } = setup();
+  const actual = life.brain.eyes;
+  life.brain.eyes = null;
+  life.brain.status = "loading";
+  eyes.render(1, false, false, true);
+  reads[0].finish();
+  await settled();
+  assert.ok(eyes.light, "the loading inset has a complete stand-in picture");
+  life.brain.eyes = actual;
+  life.brain.status = "running";
+  eyes.beforeStep();
+  assert.equal(life.light, null, "stand-in facet counts cannot reach the brain");
+  eyes.render(1, false);
+  reads[1].finish();
+  await settled();
+  eyes.beforeStep();
+  assert.equal(life.light!.left.length, actual!.left.directions.length / 3);
+});

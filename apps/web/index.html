@@ -36,7 +36,8 @@
         if (!g) return;
         function draw(now) {
           if (!canvas.isConnected) return;
-          const w = 640, h = 480, t = now / 1000;
+          const h = 480, w = Math.max(240, Math.round(h * innerWidth / innerHeight)), t = now / 1000;
+          if (canvas.width !== w) canvas.width = w;
           const sky = g.createLinearGradient(0, 0, 0, h);
           sky.addColorStop(0, "#377dba");
           sky.addColorStop(1, "#c9eaff");

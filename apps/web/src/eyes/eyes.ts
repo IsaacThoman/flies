@@ -200,7 +200,9 @@ export class Eyes {
 
   /** Before the fly's frame: hands the brain the last picture, if it has eyes. */
   beforeStep() {
-    this.#life.light = this.inUse && this.#hasLight ? this.#light : null;
+    // A picture made while loading may use the stand-in geometry. Only light
+    // sampled for the arriving brain's actual eye map can be sent to it.
+    this.#life.light = this.inUse ? this.light : null;
   }
 
   /** The facets in use: the brain's, or the stand-in for the picture. */

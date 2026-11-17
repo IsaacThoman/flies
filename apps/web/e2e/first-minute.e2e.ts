@@ -106,6 +106,10 @@ try {
       assert.deepEqual(errors, []);
       if (values.shots) await writeFile(path.join(values.shots, device, "result.json"), JSON.stringify({ completed, state: await readState(page), errors }, null, 2));
       console.log(`passed: ${device}, early exploration and all tool lessons persist`);
+    } catch (error) {
+      const page = context.pages()[0];
+      console.error(await page?.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.brain.error));
+      throw error;
     } finally {
       release();
       await context.close();
