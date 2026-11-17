@@ -305,5 +305,44 @@
     "wiringCsvSha256": "ba601adb786a2e9ecaa42dcd6794622155d564a46da7e58fd7ed8fcb65384b7a",
     "pairedResultsSha256": "0e952be347ace1a0b452ecebbdaa0d05e906dc6830e92d5186bd015522435094",
     "verification": "Response values match all historical summary rows; normalized two zero representations from 0.0 to 0. Wiring CSV and three paired uncertainty records exactly reproduce."
+  },
+  "validation": {
+    "gitHead": "c4fc7686efa392436c2514cf47a3524731954ce4",
+    "gitDirty": false,
+    "trackedGitTreeSha256": "30d5b0a04de99d00c1a5f00070bb05197d86497762e9f1f36342be08b7c6a8b3",
+    "node": "v26.12.0",
+    "checks": [
+      {
+        "command": [
+          "python3",
+          "/tmp/puff-verify-summaries.py"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 0.961,
+        "logSha256": "171a9342c93a038256de3cf1112b4ffb5b280843c2c029068a24ebcaddcaf449"
+      },
+      {
+        "command": [
+          "npm",
+          "run",
+          "lint"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 5.466,
+        "logSha256": "6b148cf52572c95543b3992a0dfece0c25946ba5a35fa53b2071cc4cb129e99a"
+      },
+      {
+        "command": [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 4.907,
+        "logSha256": "14b3236da411098d61e3268a4044ccba8ea9ce7b74851153c9ee337451a9ddff"
+      }
+    ],
+    "verificationHarnessSha256": "3c5659a47862f1a202539e090bc4b5769e8437f4c88cc93bd679b2961982562d",
+    "scope": "Source-bound regeneration, lint and typecheck. Earlier functional and CPU-budget logs lack a tested-commit manifest and are not retroactively certified by this record."
   }
 }

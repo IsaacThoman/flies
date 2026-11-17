@@ -364,6 +364,14 @@ and memory; the observed failure is consistent with that limitation, but its
 cause has not been experimentally isolated. A quiet-machine budget check is
 still needed. The report does not claim an all-green regression run.
 
+The provenance summary records a clean tested commit/tree for the subsequent
+summary-regeneration, lint and typecheck run (`c4fc7686`). Regeneration also
+checked rejection of conflicting duplicates, mixed neural strengths and
+unmatched seeds. The earlier functional/budget logs predate that manifest:
+their tested revision was not recorded contemporaneously. Source comparisons
+establish unchanged production code; they do not retroactively certify an
+exact tested snapshot or make the CPU failures pass.
+
 Heavy runs used the shared slots. Following the fairness update, the full test
 process group was paused and its slot released near nine minutes, then resumed
 after a two-minute cooldown in another owned slot. Only CPU/game-time checks
