@@ -38,8 +38,10 @@ reference; plotting limits are not calibration data.
 
 ## Assay coverage
 
-Individual feeding contacts/bursts, body-part dust and posterior grooming, and
-visual looming trials are missing. Continuous intake cannot be counted as repeated
+Individual feeding contacts/bursts, dust loads and posterior grooming
+readouts are missing. Optical looming is now executable,
+as documented in `assays.md`; its surrogate limitations remain explicit.
+Continuous intake cannot be counted as repeated
 sips, head grooming cannot establish a whole-body hierarchy, and injecting the
 loom-detector input cannot validate a projected visual escape. Hunger and the eyes'
 ON pathway remain with their existing owners. More unconditioned simulation hours
@@ -64,7 +66,7 @@ Do not lower ESCAPE_ON to make checkerboards succeed. Eye ON-pathway or
 other protected neural work belongs to its owners; this finding is a proposal
 for pathway/readout validation, not a code change to those areas.
 
-The fixed 112-trial cohort (seeds 20000–20111, 06:00) confirmed the pattern:
+The historical dev `588da9b1` 112-trial cohort (seeds 20000–20111, 06:00) confirmed the pattern:
 20/48 black squares, 1/48 checkerboards, 7/8 uniform flashes, 0/8 blanks;
 all met stationary readiness. Black-square TTC fit: slope 2.259 (model SE
 0.442), intercept −81.574 ms (model SE 11.833). The paper's central intercept
@@ -83,3 +85,12 @@ pathway. Lowering the body threshold to manufacture checkerboard success
 would neither restore that missing pathway nor establish correct WT light-off
 selectivity. The clipped, smoothed command also cannot be treated as an exact
 single-spike timestamp. No threshold change is made here.
+
+Current dev `58481d6c` changes the quantitative picture: black-square responses
+are 44/48 in both independent cohorts, checkerboard 26/48 and 27/48, flash
+8/8 and blank 0/8. The two complete optical engineering composites are 3.9375
+and 4.7361/10. Timing and checkerboard selectivity remain poor; the historical
+counts above must not be presented as current measurements. Upstream antenna,
+collision and sleep work landed together, so no isolated mechanism is inferred.
+See `current-dev.md` for exact fits and uncertainty. A body impulse change did
+not alter response timing in its paired experiment and was rejected in review.

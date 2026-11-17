@@ -42,7 +42,9 @@ is adjusted to increase responses. A 4×4 checkerboard tests expansion without
 a net screen luminance decrease. Pixel geometry tests cover both patterns.
 
 Takeoff is the body's leg-departure event, sampled at 5 ms. Jump-and-flight
-requires ≥50 ms airborne with wing drive ≥0.6 and wingbeat >0.15. This rule
+requires one continuous ≥50 ms powered episode in the first airborne bout,
+with wing drive ≥0.6 and wingbeat >0.15. A landing ends eligibility; a later
+departure cannot qualify the first takeoff. This rule
 is an operational approximation, declared explicitly: the paper used 400 fps
 video, and the model's sustained flight comes from a body tarsal reflex.
 The final square is held for 250 ms; late responses and negative TTC remain
@@ -99,7 +101,7 @@ verified protocols/targets; neither receives an invented target.
 
 Only complete, trial-backed optical records can earn scores. The estimator validates
 the condition grid, unique seed cohort, fixed clock, geometry, sensory route and
-TTC consistency, then recomputes all coefficients from raw trials. Scalars cannot
+TTC consistency and finite capture-window bounds, then recomputes all coefficients from raw trials. Scalars cannot
 earn credit. The composite weights probability and timing equally and is N/A if
 either pattern or any timing fit is unavailable. Registry-average bounds are
 not bounds on whole-animal fidelity; whole-animal coverage is listed by domain.

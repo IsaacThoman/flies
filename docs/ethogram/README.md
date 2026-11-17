@@ -76,7 +76,7 @@ engineering scale. No claimed biological acceptance range is inferred from
 SE, histogram bins or an author-selected width. See [the exact score
 policy](assays.md#score-definition).
 
-Separate optical probability/timing means is reported only over estimable comparisons. Schema 3 requires a continuous ≥50 ms powered episode in the first airborne
+Separate optical probability/timing means are reported only over estimable comparisons. Schema 3 requires a continuous ≥50 ms powered episode in the first airborne
 bout; cumulative intervals and later jumps cannot qualify it. Missing
 latencies remain N/A, so an absent response cannot masquerade as a zero latency.
 A validated whole-animal point score is **not identified**. Registry-average bounds
@@ -90,14 +90,14 @@ and tarsal flight support. All observed behaviour includes these mechanisms.
 Protected sleep, hunger, grounded signals, visual ON pathway and antenna-contact
 work remain with their owners. No neural threshold is tuned to increase scores.
 
-[Review record](review-log.md), [historical unclocked measurement](baseline.md), [dev 588da9b1 measurement](dev-588da9b1.md),
+[Current dev measurements](current-dev.md), [review record](review-log.md), [historical unclocked measurement](baseline.md), [dev 588da9b1 measurement](dev-588da9b1.md),
 and [model proposals](proposals.md) preserve findings and rejected approaches.
 A broad biological score needs more matched assays; the registry alone cannot
 supply one.
 
 Only complete, trial-backed optical records can earn scores. The estimator validates
 the condition grid, unique seed cohort, fixed clock, geometry, sensory route and
-TTC consistency, then recomputes all coefficients from raw trials. Scalars cannot
+TTC consistency and finite capture-window bounds, then recomputes all coefficients from raw trials. Scalars cannot
 earn credit. The composite weights probability and timing equally and is N/A if
 either pattern or any timing fit is unavailable. Registry-average bounds are
 not bounds on whole-animal fidelity; whole-animal coverage is listed by domain.

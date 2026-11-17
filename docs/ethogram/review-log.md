@@ -66,7 +66,7 @@ corruption; F3 excluded those observations. They explicitly found **no behaviour
 improvement**. Main remaining objections: unmatched assays still have numerical
 exploratory distances, missing real behavioural evidence within their permitted
 files, and insufficiently visible inherited motor/background stand-ins. The CLI
-now explicitly lists those stand-ins. All three implementation reviewers ranked F3 higher; mean 4.58 versus 3.83. A separate regression review remains outstanding; this is an auditor improvement, not a behavioural climb.
+now explicitly lists those stand-ins. All three implementation reviewers ranked F3 higher; mean 4.58 versus 3.83. At this evidence freeze a separate regression review was outstanding; later regression reviews are recorded below. This is an auditor improvement, not a behavioural climb.
 
 ## Validation received after evidence freeze
 
@@ -162,3 +162,84 @@ brain/body/world/Life source has **zero feature diff** from that dev. Earlier
 588da9b1 measurements are versioned history in `dev-588da9b1.md`. A fresh hour
 and optical battery at 06:00 use the continuous first-bout endpoint; any upstream
 phenotype improvement is not attributed to the rejected launch experiment.
+
+## Continuous-flight estimator and current-dev evidence
+
+Key: **R6 = schema-3 continuous first-flight estimator; N4 = identical decoy;
+Z7 = cumulative estimator**. All production brain/body/world/Life sources
+are identical across the three archives. Both raw optical cohorts and the
+supplementary one-hour record are shared; copying them adds no animals.
+Presentation orders: F8 N4/R6/Z7; J2 Z7/N4/R6; S5 N4/R6/Z7.
+Each fresh reviewer independently checked primary publications on the web,
+verified source hashes and recomputed the trial summaries/fits/scorecards.
+
+| Reviewer | Set | Validity | Honesty | Behaviour | Regressions/cost | Mean | Forced ranking |
+|---|---|---:|---:|---:|---:|---:|---|
+| F8 | R6 / N4 | 7 | 6 | 2 | 7 | 5.50 | N4 > R6 > Z7 |
+| F8 | Z7 | 6 | 5 | 2 | 9 | 5.50 | |
+| J2 | R6 / N4 | 8 | 7 | 2 | 7 | 6.00 | N4 > R6 > Z7 |
+| J2 | Z7 | 6 | 6 | 2 | 8 | 5.50 | |
+| S5 | R6 / N4 | 7 | 7 | 2 | 6.5 | 5.625 | N4 > R6 > Z7 |
+| S5 | Z7 | 5 | 5 | 2 | 8 | 5.00 | |
+
+Mean R6/N4 **5.7083**, Z7 **5.3333**. Every reviewer assigned identical
+decoy scores and explicitly called their order a presentation tie-break.
+No noise threshold was exceeded. All preferred the continuous estimator to
+the cumulative one, although F8's four-criterion mean tied. This is an audit
+correctness preference, not a physical behaviour improvement. Broad behaviour
+remained 2/10 in every set; six optical comparisons do not establish broad
+whole-animal agreement.
+
+All central numerical references held up. F8 could not independently resolve
+two detailed method statements (Itskov 30 ms-bin modes; Fotowat SD/SE wording);
+J2/S5 independently verified the corresponding primary text, and S5 confirmed
+both. These are retained with the source's exact uncertainty conflict rather
+than choosing a favourable interpretation. No reviewer found a fabricated
+numeric target. They accepted withholding scores for all unmatched free-motion
+and unsupported feeding rows.
+
+All three reproduced both optical composites, **3.9375** and **4.7361/10**,
+including the same Wilson intervals and OLS coefficient SEs. Both cohorts have
+44/48 black responses; checkerboard 26/48 and 27/48. Every recorded jump also
+met the continuous criterion, so changing the estimator does not change these
+observations. Synthetic interrupted-flight, landing/relaunch and exact-ten-frame
+probes distinguish the estimators. The schema-2 CLI cannot replay schema 3;
+it remains historical, not a supported analysis path.
+
+Remaining shared limits: unvalidated flight surrogate/body support, one
+supplementary free seed, missing broad biological coverage, and engineering
+fit-spread scales rather than biological acceptance bands. Reviewers proposed
+compact frame/run-length traces for independent continuity replay. Current
+records expose only the maximum run and derived success; the tests verify the
+tracker, but raw frame continuity cannot be independently reconstructed.
+
+Fresh regression-only reviewer V4, order Z7/R6/N4, scored R6/N4 **8/10** and
+Z7 **5/10**, ranking R6 > N4 > Z7 (decoy tie-break). It reran 46/46 versus
+45/45 targeted/motion tests. It found that all validators accepted a takeoff
+at 1,000,000 ms or a 1,000,000 s powered run. Capture/replay now share the exact
+response and follow-up windows; records exceeding either are rejected. A
+targeted boundary test accepts the last observable takeoff/run and rejects
+one additional frame. Both complete recorded cohorts pass the tighter gate
+and retain their scores. This small follow-up fix is tested, not independently
+rescored. Current focused audit tests: **25/25 passed**.
+
+V4 requested completed budget measurements. A subsequent dedicated current-code
+run passed three cases (including optical swoop, 8/8 responses) and skipped the
+brain-cost case after three reference medians 4.88/4.90/4.87 ms exceeded the
+4.8 ms contention guard. The full suite had passed two budgets and skipped two.
+Neither result establishes all four current budgets passing. The exact same
+production runtime passed all four with the weaker estimator at 0.273 CPU s/s;
+the separate unchanged-dev control failed at 0.585 against 0.500. These varied
+under contention; no idle reproduction or introduced cost regression is claimed.
+
+The final rebase onto dev `7b69740e` includes no additional brain/body/world
+change relative to measurement base `58481d6c`. `Life` adds companion support:
+mutable driver, an unused set-down helper and a pantry-update flag defaulting
+true. These solo no-food assays retain the same path. Production source has
+zero feature diff from the final dev base; the actual measurement hashes stay
+recorded, rather than being relabelled as a fresh simulation on the rebase.
+
+The launch candidate lost; the continuous estimator won on correctness without
+changing any supplied response. No accepted body mapping or broad fidelity
+gain is claimed. Further body constants cannot repair absent sip events or
+parallel escape decisions. Proposals remain separate from protected neural work.
