@@ -41,6 +41,7 @@ export class Lobby {
     } else if (m.type === "refused" && m.reason === "version") {
       this.status = "version";
       this.#socket?.close();
+      this.#socket = null;
     }
   };
   readonly #binary = () => {};
@@ -66,11 +67,11 @@ export class Lobby {
       return;
     }
     socket.drain(this.#text, this.#binary);
+    if (this.#socket !== socket) return;
     if (socket.status === "open" && !this.#asked) {
       this.#asked = true;
       socket.send(JSON.stringify({ type: "browse", v: PROTOCOL }));
     }
-    if (this.status === "version") return;
     // Unchanged lists have no traffic. Reopen periodically to check both the
     // connection and the list without requiring a newer room server.
     if (this.#answered && this.#time - this.#heardAt >= 30) {
