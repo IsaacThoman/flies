@@ -159,7 +159,7 @@ async function main() {
   const order = (run: number) => (run % 2 ? [...directories].reverse() : directories);
   const runs = Number(values.runs), seconds = Number(values.seconds), memorySeconds = Number(values["memory-seconds"]);
   assert.ok(Number.isInteger(runs) && runs >= 3, "at least 3 runs");
-  assert.ok(Number.isFinite(seconds) && seconds >= 2 && seconds <= 120 && Number.isFinite(memorySeconds) && memorySeconds >= 0);
+  assert.ok(Number.isFinite(seconds) && seconds >= 2 && seconds <= 12 && Number.isFinite(memorySeconds) && memorySeconds >= 0);
   const phases = values.phases.split(",");
   assert.ok(phases.every(p => ["loads", "frames", "memory", "brain", "bundle"].includes(p)));
   assert.ok(!values["compare-dir"] || (!values.build && phases.every(p => ["loads", "frames"].includes(p))), "--compare-dir uses prebuilt sites and loads/frames phases");
@@ -257,26 +257,20 @@ async function main() {
   if (phases.includes("frames")) {
     const frames: unknown[] = [];
     report.frames = frames;
-    // Split long samples as well as repetitions, reserving time for scene setup and cleanup.
-    const casesPerBatch = Math.max(1, Math.floor(420 / (directories.length * (seconds + 10))));
-    for (let run = 0; run < runs; run++) {
-      const cases = (run % 2 ? [...PLACES].reverse() : PLACES).flatMap(place =>
-        (["play", "watch"] as const).map(mode => ({ place, mode })));
-      for (let from = 0; from < cases.length; from += casesPerBatch) await withHeavySlot(async () => {
-        for (const directory of order(run)) {
-          const l = await lane(directory);
-          try {
-            for (const { place, mode } of cases.slice(from, from + casesPerBatch)) {
-              await move(l.page, place.id, mode === "watch");
-              if (mode === "play") await l.page.evaluate(() => { while (globalThis.__fly.hands.current.id !== "swoop") globalThis.__fly.hands.stepTool(1); });
-              frames.push({ run, variant: directories.indexOf(directory), place: place.id, mode, ...await frameSample(l.page, l.cdp, seconds, mode === "play"), loadAverage: os.loadavg() });
-              save();
-            }
-            assert.deepEqual(l.errors, []);
-          } finally { await l.close(); }
-        }
-      });
-    }
+    for (const batch of batches) await withHeavySlot(async () => {
+      for (const run of batch) for (const directory of order(run)) {
+        const l = await lane(directory);
+        try {
+          for (const place of (run % 2 ? [...PLACES].reverse() : PLACES)) for (const mode of ["play", "watch"]) {
+            await move(l.page, place.id, mode === "watch");
+            if (mode === "play") await l.page.evaluate(() => { while (globalThis.__fly.hands.current.id !== "swoop") globalThis.__fly.hands.stepTool(1); });
+            frames.push({ run, variant: directories.indexOf(directory), place: place.id, mode, ...await frameSample(l.page, l.cdp, seconds, mode === "play"), loadAverage: os.loadavg() });
+            save();
+          }
+          assert.deepEqual(l.errors, []);
+        } finally { await l.close(); }
+      }
+    });
   }
 
   if (phases.includes("memory")) {
