@@ -228,7 +228,7 @@ The visual gains are worth landing under the owner's revised local-check process
 
 ## Final checks on the rebased branch
 
-The final branch includes the current dev camera/menu/room fixes without editing those systems. `places.test.ts` now passes **33/33**, including the incoming whole-place screensaver cases. Lint and typecheck pass. The final paired original/selected build medians are **39.25 / 39.35 ms** for the sill (+0.25%) and **42.3 / 42.55 ms** for the lab (+0.59%); 12 alternating warm samples each. The selected lab adds one draw; the sill adds none. These are desktop measurements, not TV timings. R8's 42 final screenshots have no shader/browser errors.
+The final branch includes the current dev camera/menu/room fixes without editing those systems. `apps/web/tests/places.test.ts` now passes **33/33**, including the incoming whole-place screensaver cases. Lint and typecheck pass. The final paired original/selected build medians are **39.25 / 39.35 ms** for the sill (+0.25%) and **42.3 / 42.55 ms** for the lab (+0.59%); 12 alternating warm samples each. The selected lab adds one draw; the sill adds none. These are desktop measurements, not TV timings. R8's 42 final screenshots have no shader/browser errors.
 
 The earlier play e2e run passed. Its final rerun after rebasing failed at the known nervous-system check, `its brain’s regions glow at rest`, while still in the untouched picnic scene. The failure is recorded alongside the unchanged brain CPU-budget failure; neither is claimed green. The original full npm test run's main suite was green (732 pass, 2 skip), but its serialized brain budget and targeted retry failed. No brain, camera, bar or restaurant code was changed by this branch.
 

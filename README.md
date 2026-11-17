@@ -664,7 +664,7 @@ raise the brain's own wing drive in the air, but never to the floor, so they
 change no flight; and without the floor every take-off is the same hop with
 them as without. They don't make the reflex any less needed, and its floor
 stays as it was. Measured in Node on the real connectome, the swoop thrown as
-`apps/web/tests/swoop-escape.test.ts` throws it (eyes open, seeds 1 to 4, 8
+`apps/web/tests/swoop-escape.budget.ts` throws it (eyes open, seeds 1 to 4, 8
 throws each):
 
 | | With the floor | Without it |
@@ -783,7 +783,7 @@ that draw the same model with the same glow, so they never disagree:
 **The anatomy** (`packages/fly/src/nerves/`). The neuropils are measured from
 the FlyEM male CNS v1.0's own neuropil meshes (one male's brain, neck and
 cord in one EM volume, CC-BY 4.0) by `packages/fly/scripts/nerves.ts`, which
-writes `measured.ts`: each neuropil's surface as its radius in each direction
+writes `packages/fly/src/nerves/measured.ts`: each neuropil's surface as its radius in each direction
 round its centre, the farthest of its mesh's vertices within 15° of each
 direction (left side only, mirrored, so the drawing is symmetric); the
 lamina as a curved plate round the centre of the sphere that fits it; the
@@ -860,7 +860,7 @@ neuropil stain shows anatomy in a micrograph.
 **Command-group somata** (`packages/fly/src/nerves/somata.ts`). The 64
 neurons already read for walking, steering, backing, escape, flight power,
 grooming, feeding and song are also drawn as tiny cell bodies at their actual
-`somaLocation` from `anatomy.bin`. `node packages/fly/scripts/somata.ts`
+`somaLocation` from `packages/brain/data/anatomy.bin`. `node packages/fly/scripts/somata.ts`
 regenerates the static atlas after validating the anatomy/connectome SHA-256
 pair. The same fitted brain and cord frames used for the neuropil meshes
 register these points; they retain the specimen's asymmetry. Every member is
@@ -1117,3 +1117,9 @@ The wiring, and the shapes its nervous system is drawn with, are the
 Research Campus, CC-BY 4.0). The neuron model follows Shiu et al.,
 "A Drosophila computational brain model reveals sensorimotor processing",
 Nature 634 (2024).
+
+<!-- docs-check: base apps/web/src -->
+
+<!-- docs-check: base packages/body/src -->
+
+<!-- docs-check: generated packages/brain/data/anatomy.bin -->
