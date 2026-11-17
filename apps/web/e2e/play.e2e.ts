@@ -116,7 +116,7 @@ try {
   assert.equal(firstFrame.after, "true", "ready immediately after the first frame");
   assert.equal(firstFrame.writes, 1, "readiness is only published once");
   step("keys and taps wake the wallpaper and restart its full idle countdown");
-  await startup.waitForFunction(() => (globalThis as unknown as { __fly: Game }).__fly.brain.status === "running", null, { timeout: 90_000 });
+  await startup.waitForFunction(() => (globalThis as unknown as { __fly: Game }).__fly.brain.status === "running", null, { polling: 100, timeout: 90_000 });
   const wakes = await startup.evaluate(() => {
     const game = (globalThis as unknown as { __fly: Game }).__fly;
     const canvas = document.getElementById("game") as HTMLCanvasElement;
