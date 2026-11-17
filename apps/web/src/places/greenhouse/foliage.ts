@@ -14,7 +14,7 @@ export function foliage(crown: Solid) {
     const count = 5 + ring * 3;
     for (let leaf = 0; leaf < count; leaf++) {
       const a = leaf / count * Math.PI * 2 + ring * 0.57;
-      tint.setHSL(0.24 + (leaf % 3) * 0.009, 0.4, 0.26 + (leaf % 4) * 0.017);
+      tint.setHSL(0.24 + (leaf % 3) * 0.009, 0.4, 0.26 + (leaf % 4) * 0.017).convertSRGBToLinear();
       const vertex = (i: number, j: number) => {
         const u = i / 8, w = j / 4 * 2 - 1;
         const r = ring * 0.2 + u * (0.65 - ring * 0.025);

@@ -170,6 +170,13 @@ export function buildBench(): SceneSet {
       batch.add(glass.material, paint(g, "#ffffff"));
       for (const z of [-640, -320, 0, 320, 640]) add(box(0, 0, 0, width, 18, 18).rotateZ(-sign * slope).translate(sign * GLAZING.x / 2, (GLAZING.ridge + GLAZING.eave) / 2, z), "#697f73", K.paint);
     }
+    for (const x of [-506.666,-253.333,253.333,506.666]) add(box(x,GLAZING.ridge-Math.abs(x)*(GLAZING.ridge-GLAZING.eave)/GLAZING.x,0,14,14,1280),"#697f73",K.paint);
+    // Seal the gables without a second glass pass or a collision seam.
+    for (const z of [-GLAZING.z,GLAZING.z]) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position",new THREE.Float32BufferAttribute([-GLAZING.x,GLAZING.eave,z, 0,GLAZING.ridge,z, GLAZING.x,GLAZING.eave,z],3));
+      g.computeVertexNormals(); batch.add(glass.material,paint(g,"#ffffff"));
+    }
     add(box(0, GLAZING.ridge, 0, 22, 22, 1280), "#697f73", K.paint);
     yield;
     batch.build(group);
@@ -191,7 +198,7 @@ for (int i=0; i<4; i++) { float age = uTime-uRings[i].z; float d=length(vPool.xz
 outgoingLight += wave * 0.22;
 #include <opaque_fragment>`);
   };
-  const pool = new THREE.Mesh(new THREE.CircleGeometry(32.6, 64).rotateX(-Math.PI / 2).translate(SAUCER.x, SAUCER.water + 0.15, SAUCER.z), water);
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(31, 64).rotateX(-Math.PI / 2).translate(SAUCER.x, SAUCER.water + 0.15, SAUCER.z), water);
   freeze(pool); group.add(pool);
   let nextRing = 0;
   const ripple = (x: number, z: number, strength: number) => {

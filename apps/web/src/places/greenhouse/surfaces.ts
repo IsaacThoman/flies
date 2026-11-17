@@ -29,6 +29,36 @@ uniform vec4 uCrowns[14];
 uniform vec4 uContacts[${uniforms.uContacts.value.length}];
 ${NOISE}
 ${BUMP}
+// First intersection with the pitched roof or the four glazed walls.
+float glazingShadow(vec3 p) {
+ if (uSun.y < 0.06) return 0.0;
+ float nearest = 1e6;
+ vec3 hit = p;
+ float roofHit = 1.0;
+ for (int side=0; side<2; side++) {
+  float signX = float(side)*2.0-1.0;
+  float slope = 340.0/760.0;
+  float den = uSun.y+signX*slope*uSun.x;
+  float t = (1220.0-signX*slope*p.x-p.y)/den;
+  vec3 q = p+uSun*t;
+  if (den > 0.001 && t > 0.0 && t < nearest && q.x*signX >= 0.0 && abs(q.x) <= 760.0 && abs(q.z) <= 640.0) { nearest=t;hit=q; }
+ }
+ if (abs(uSun.z)>0.001) {
+  float t = (sign(uSun.z)*640.0-p.z)/uSun.z;
+  vec3 q = p+uSun*t;
+  if (t>0.0 && t<nearest && abs(q.x)<760.0 && q.y<880.0) { nearest=t;hit=q;roofHit=0.0; }
+ }
+ if (abs(uSun.x)>0.001) {
+  float t = (sign(uSun.x)*760.0-p.x)/uSun.x;
+  vec3 q = p+uSun*t;
+  if (t>0.0 && t<nearest && abs(q.z)<640.0 && q.y<880.0) { nearest=t;hit=q;roofHit=-1.0; }
+ }
+ float across = abs(mod(hit.x+760.0+126.6665,253.333)-126.6665);
+ float along = abs(mod(hit.z+640.0+160.0,320.0)-160.0);
+ if (roofHit>0.5) return 1.0-smoothstep(7.0,11.0,min(across,along));
+ float height = min(abs(hit.y+160.0),min(abs(hit.y-320.0),abs(hit.y-880.0)));
+ return 1.0-smoothstep(9.0,13.0,min(height,roofHit< -0.5 ? along : across));
+}
 float relief = 0.0;
 float rough = 0.8;
 float shine = 0.0;
@@ -125,11 +155,12 @@ vec3 surface(vec3 c) {
     .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = rough;")
     .replace("#include <metalnessmap_fragment>", "#include <metalnessmap_fragment>\nmetalnessFactor = shine;")
     .replace("#include <normal_fragment_maps>", "#include <normal_fragment_maps>\nnormal = bumped(normal, relief);")
+    .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>
+float transmitted = 1.0-glazingShadow(vWorld)*uDirect*0.75;
+reflectedLight.directDiffuse *= transmitted;
+reflectedLight.directSpecular *= transmitted;`)
     .replace("#include <opaque_fragment>", `
-// Glazing bars intercept the sun at the roof plane. Overcast softens them.
-vec2 roof = vWorld.xz + uSun.xz * (880.0 - vWorld.y) / max(0.08, uSun.y);
-vec2 bars = abs(fract((roof + vec2(760.0, 640.0)) / vec2(253.333, 320.0)) - 0.5);
-float shadow = max(smoothstep(0.465, 0.49, bars.x), smoothstep(0.465, 0.49, bars.y));
+float shadow = 0.0;
 float ao = 1.0;
 for (int i = 0; i < ${uniforms.uContacts.value.length}; i++) {
  vec4 a = uContacts[i];
