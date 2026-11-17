@@ -188,8 +188,8 @@ test("sequence numbers compare across their wrap", () => {
   assert.ok(seqAtOrAfter(7, 7));
 });
 
-test("the protocol is 4: devices must understand batches of their own flies", () => {
-  assert.equal(PROTOCOL, 4);
+test("protocol 5 retains fly batches and agrees on seasonal weather", () => {
+  assert.equal(PROTOCOL, 5);
   assert.equal(CLOSE.locked, 4008);
 });
 
