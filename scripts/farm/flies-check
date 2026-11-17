@@ -132,7 +132,7 @@ SKIPS
     mapfile -t tests < <(node --input-type=module -e 'import {globSync} from "node:fs"; console.log(globSync(["apps/*/tests/*.test.ts","packages/*/src/**/*.test.ts","packages/*/tests/*.test.ts"]).sort().join("\n"))')
   fi
   for file in "${tests[@]}"; do [[ $file == *.test.ts && -f $file && $file != -* ]] || { echo "Invalid unit test: $file"; exit 2; }; done
-  stage unit run_container node --test --test-concurrency=2 --test-reporter=tap --test-skip-pattern="$skip" "${tests[@]}" || true
+  stage unit run_container node --test --test-concurrency=4 --test-reporter=tap --test-skip-pattern="$skip" "${tests[@]}" || true
 fi
 if [[ $only == all || $only == e2e ]]; then
   tests=("${files[@]}")

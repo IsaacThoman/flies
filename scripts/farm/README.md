@@ -13,7 +13,8 @@ Branches, `origin/<branch>`, and pushed SHAs work. The checkout's SHA is printed
 Use `--only lint|types|unit|e2e|all` (default `all`); `types` includes tvOS.
 For targeted runs, append `--files path/to/a.test.ts path/to/b.test.ts` to
 `--only unit`, or `.e2e.ts` paths to `--only e2e`. All runs exit nonzero on
-failure. Each stage reports status, seconds and failure context (container stages time out after 30 minutes); complete logs
+failure. Each stage reports status, seconds and failure context. Container stages
+time out after 30 minutes; complete logs
 remain under `~/flies-farm/logs/<id>/`. Remove old logs when no longer needed.
 
 Four advisory file locks in `~/flies-farm/locks/` cap simultaneous runs; others
@@ -24,8 +25,9 @@ removed on exit, including errors, Ctrl-C and SSH disconnect. SIGKILL cannot run
 cleanup: remove that run's named container and worktree manually if necessary.
 Checks continue after a failed stage so one invocation collects all failures.
 
-Unit and browser processes run in a Node 24 / Playwright container limited to
-four CPUs and 6 GiB. Lint, typechecks, build, unit and browser stages all use the container. No ports are published and networking is disabled; test
+All check stages run in a Node 24 / Playwright container limited to four CPUs
+and 6 GiB. Unit files use four workers to use that CPU allowance. No ports are
+published and networking is disabled; test
 servers can communicate only inside their own container. The official browser
 cache is `/ms-playwright`; `scripts/play.ts` finds it through
 `PLAYWRIGHT_BROWSERS_PATH`, retaining its Linux GPU flags. No `CHROMIUM_PATH`
