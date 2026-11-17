@@ -243,3 +243,77 @@ The launch candidate lost; the continuous estimator won on correctness without
 changing any supplied response. No accepted body mapping or broad fidelity
 gain is claimed. Further body constants cannot repair absent sip events or
 parallel escape decisions. Proposals remain separate from protected neural work.
+
+
+## Paired dev snapshots and replicated checkerboard loss
+
+Key: **D9 = dev 58481d6c; C5 = dev cb9b9da2**, with the same scoring/audit
+implementation in both archives. These compare upstream snapshots, not a
+feature-owned neural/body candidate. Presentation orders: L8 C5/D9; T4 D9/C5;
+V6 C5/D9. Each fresh reviewer verified all 105 supplied source hashes, checked
+primary papers independently through web search and recomputed all four raw
+optical batteries, including Wilson intervals, fits, coefficient SEs and scores.
+
+| Reviewer | Set | Validity | Honesty | Behaviour | Regressions/cost | Mean | Ranking |
+|---|---|---:|---:|---:|---:|---:|---|
+| L8 | D9 | 6 | 6 | 3 | 7 | 5.50 | D9 > C5 |
+| L8 | C5 | 6 | 6 | 2 | 8 | 5.50 | |
+| T4 | D9 | 7 | 6 | 2.5 | 8 | 5.875 | D9 > C5 |
+| T4 | C5 | 7 | 6 | 2 | 7 | 5.50 | |
+| V6 | D9 | 7 | 8 | 3 | 7 | 6.25 | D9 > C5 |
+| V6 | C5 | 7 | 8 | 2 | 6 | 5.75 | |
+
+Mean **D9 5.875**, **C5 5.5833**. Every reviewer preferred D9's replicated
+checkerboard agreement; L8's four-criterion means tied because C5 had stronger
+check evidence. Both remain poor broad-fidelity demonstrations. No numerical
+reference target was found fabricated; incompatible assays remain unscored.
+L8 requested a more precise Cruz label, now "Paper walking fraction; model
+activity proxy" rather than implying the instantaneous model classifier is
+Cruz's walking segmentation.
+
+Checkerboard responses changed 26/48 → 11/48 and 27/48 → 11/48. Paired
+losses/gains are 18/3 and 17/1, with identical readiness/eligibility for every
+paired seed. Black responses changed 44/48 → 45/48 and 44/48 → 44/48. Flash
+remained 8/8 and blank 0/8. Optical engineering composites changed 3.9375 →
+3.104167 and 4.736103 → 3.413598. The free hours were separately rerun on the
+same seed and yield exactly equal behavioural summaries; they are not added
+anatomical replication. No gain is attributed to this branch, and protected
+upstream visual work is not reverted or modified. The finding is in the owner
+proposal and versioned reports.
+
+Fresh regression-only reviewer N7, order D9/C5, gave overall regression
+assurance **D9 6/10, C5 4/10**. It confirmed the checkerboard loss and found the
+inherited HS selectivity test relaxed from 2× to 1.3×. It also observed that the
+passing all-senses brain budget has no changing facet input, so cannot clear
+active ON-pathway cost. These are upstream findings, not changes in this
+feature diff. A bounded alternating native/WASM visual benchmark is proposed;
+no unmeasured current performance delta is asserted.
+
+The paired packet includes C5's 1105 farm unit passes, lint/types/build passes,
+seven Apple-silicon WASM parity passes, all five budgets passing (brain 0.263
+against 0.500 CPU s/s) and the arm64 FMA guard. D9 retains both its 0.585 failure
+and a matching-production repeat passing all four budgets at 0.273. The
+code/estimator scope difference of that repeat is explicit; passing later does
+not erase earlier failure. Neither snapshot was measured on an idle machine.
+
+All three full reviewers again requested independently replayable raw frames:
+free-hour JSON contains only derived summaries, and optical records expose the
+maximum powered episode rather than its underlying states. Compact traces and
+replay are the next audit change; these do not alter the biological score.
+
+## Completed farm browser checks and scope
+
+The supplied snapshot packet froze before all browser checks completed. Later
+results, not seen in full by those reviewers: web/offline e2e **passed** (257 s).
+Play failed at wallpaper wake on the feature (549 s) and unchanged cb9b9da2
+control (626 s). Pointer failed reading undefined `held` at orientation change
+(860 s). Tables failed waiting for restaurant/epoch 1 after a move (441 s).
+These are retained failures. No production UI or browser-test feature diff
+exists, and only the wallpaper failure was independently rerun on the control.
+The farm command cleaned up its Docker containers and owned worktrees.
+
+All completed stages were recorded under farm run 20261117T035954-181689;
+script-only container failure under 20261117T041210-195633; unchanged-dev play
+control under 20261117T043112-212105. The script-only container cannot see linked
+Git metadata; its intended eight tests pass on the farm host in the matching
+checkout. This is a wrapper workaround, not an infrastructure fix.
