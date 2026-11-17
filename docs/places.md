@@ -318,7 +318,9 @@ surfaces and the windowsill garden acquire a cosmetic dusting, less than
 0.35 mm (no added collision surface). It grows over roughly a minute and
 melts over minutes, faster in rain, leaving wetness. Snowfall is not rain:
 it does not trigger raindrop touch. Flakes through the windows remain
-outside. Frost grows at the lab and windowsill pane edges with the dusting;
+outside. The kitchen uses the same instanced outdoor flakes, with dust on
+the garden and faster pane streaks in heavy rain. Frost grows at the lab,
+windowsill and kitchen pane edges with the dusting;
 it is a visual illustration of winter, not a measured pane temperature.
 Bar and restaurant receive the shared weather light only, as their scene
 files are outside this experiment's scope. Their precipitation and glass

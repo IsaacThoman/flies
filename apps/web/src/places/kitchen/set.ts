@@ -29,12 +29,16 @@ export function buildSet(): SceneSet {
   });
   const glassTime = { value: 0 },
     glassRain = { value: 0 },
-    glassWet = { value: 0 };
+    glassWet = { value: 0 },
+    glassHeavy = { value: 0 },
+    glassFrost = { value: 0 };
   glass.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, {
       uKTime: glassTime,
       uKRain: glassRain,
       uKWet: glassWet,
+      uKHeavy: glassHeavy,
+      uKFrost: glassFrost,
     });
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vGlass;")
@@ -45,7 +49,7 @@ export function buildSet(): SceneSet {
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
-        "#include <common>\nvarying vec3 vGlass;uniform float uKTime;uniform float uKRain;uniform float uKWet;",
+        "#include <common>\nvarying vec3 vGlass;uniform float uKTime;uniform float uKRain;uniform float uKWet;uniform float uKHeavy;uniform float uKFrost;",
       )
       .replace(
         "#include <color_fragment>",
@@ -53,21 +57,25 @@ export function buildSet(): SceneSet {
       float edge=pow(1.0-abs(dot(normalize(vNormal),normalize(vViewPosition))),3.0);
       diffuseColor.a=.055+.58*edge;
       if(abs(vGlass.z+300.0)<.1) {
-        vec2 q=vec2(vGlass.x*.32,vGlass.y*.003+uKTime*.12);
+        vec2 q=vec2(vGlass.x*.32,vGlass.y*.003+uKTime*(.12+.2*uKHeavy));
         float cell=floor(q.x);
         float seed=fract(sin(cell*127.1)*43758.5453);
         float dx=abs(fract(q.x)-(.15+seed*.7));
-        float trace=(1.0-smoothstep(.025,.025+fwidth(q.x),dx));
+        float width=.025+.025*uKHeavy;
+        float trace=(1.0-smoothstep(width,width+fwidth(q.x),dx));
         float along=fract(q.y+seed*7.0);
         trace*=smoothstep(.0,.07,along)*(1.0-smoothstep(.25,.55,along));
-        trace*=step(seed,uKRain*.8+uKWet*.15)*max(uKRain,uKWet*.25);
+        trace*=step(seed,uKRain*.8+uKWet*.15+uKHeavy*.15)*max(uKRain,uKWet*.25);
         diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.78,.86,.9),trace*.7);
-        diffuseColor.a+=trace*.32;
+        diffuseColor.a+=trace*(.32+.2*uKHeavy);
+        float frost=uKFrost*(1.0-smoothstep(280.0,360.0,vGlass.y));
+        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.83,.9,.96),frost*.7);
+        diffuseColor.a+=frost*.3;
       }
     `,
       );
   };
-  glass.customProgramCacheKey = () => "kitchen-glass-rain-2";
+  glass.customProgramCacheKey = () => "kitchen-glass-weather-3";
   const glassBatch = new Batch();
   const addGlass = (g: THREE.BufferGeometry) =>
     glassBatch.add(glass, paint(g, "#ffffff"));
@@ -556,6 +564,8 @@ export function buildSet(): SceneSet {
       glassTime.value = time;
       glassRain.value = weather.rain;
       glassWet.value = weather.wet;
+      glassHeavy.value = weather.heavy;
+      glassFrost.value = weather.snowCover;
     },
     ripple: surfaces.ripple,
   };

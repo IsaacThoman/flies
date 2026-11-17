@@ -250,6 +250,7 @@ export const KITCHEN: Place = {
   floor: { kind: "rect", ...COUNTER },
   solids: KITCHEN_SOLIDS,
   patches: KITCHEN_PATCHES,
-  start: { x: 53, z: 173, y: 40, yaw: -Math.PI / 2 },
+  // Leave room on the cut face for all eight shared-table spawn positions.
+  start: { x: 50, z: 168, y: 40, yaw: -Math.PI / 2 },
   ceiling: 300,
 };

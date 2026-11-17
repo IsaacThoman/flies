@@ -9,6 +9,7 @@ import {
 } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
 import { PLACES } from "../src/places/catalog.ts";
+import { KINDS } from "../src/scene/weather.ts";
 
 const { url, server } = await startServer();
 let browser: Browser | undefined;
@@ -65,6 +66,7 @@ try {
   await press("ArrowDown", 2);
   await waitFor(page, "view=table");
   const calls: number[] = [];
+  const weathers = Object.keys(KINDS);
   for (const time of ["morning", "noon", "golden", "dusk", "night"]) {
     await tool("light");
     await press("ArrowUp", 6);
@@ -74,8 +76,8 @@ try {
     );
     await waitFor(page, `time=${time}`);
     await tool("weather");
-    await press("ArrowUp", 5);
-    for (const weather of ["clear", "overcast", "mist", "rain"]) {
+    await press("ArrowUp", weathers.length + 1);
+    for (const weather of weathers) {
       await press("ArrowDown");
       await waitFor(page, `weather=${weather}`);
       await waitForGameTime(page, 4);
@@ -90,7 +92,7 @@ try {
   assert.ok(calls[Math.floor(calls.length / 2)] <= 35, JSON.stringify(calls));
   assert.deepEqual(errors, []);
   console.log(
-    `kitchen: carried with remote, all food tastable, 20 light/weather combinations, median ${calls[10]} draws`,
+    `kitchen: carried with remote, all food tastable, ${calls.length} light/weather combinations, median ${calls[Math.floor(calls.length / 2)]} draws`,
   );
   await tool("place");
   await press("ArrowUp", kitchen);

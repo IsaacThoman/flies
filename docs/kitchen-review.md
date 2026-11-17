@@ -333,3 +333,24 @@ Set H8 contains all 65 final captures: no errors, 9–15 draws, 66 ms constructi
 and sweet 0.900 at spawn. These are desktop values; the reference recorded 20–37
 draws and 81 ms. CPU-budget tests report one pass and three explicit contention
 skips after three retries, with no cost-bound failure. No physical TV was used.
+
+## Integration after owner approval
+
+Merged origin/dev with a merge commit, retaining protocol 5, shared-device flies,
+server-clock default-room rotation, the orbit camera and the other places' polish.
+The drawn/felt conflict keeps dev's snowfall mesh allowance and the kitchen budget.
+Online room choices and default-room turns derive from WORLDS; the kitchen is in
+that registry and the web catalog. Regressions cover moving two four-fly devices,
+rotating Everyone into the kitchen, and carrying kitchen spots/food through net
+messages. The start moved from (53,173) to (50,168) on the same peach face so eight
+spawn positions remain apart; dev's shared spawn algorithm is unchanged.
+
+Heavy rain runs faster down the pane. Storm flashes use the shared scene lighting.
+The shared snow renderer stays beyond the kitchen pane, with cosmetic garden dust
+and frost along the glass foot. Its default plane for other places is unchanged.
+No sound, temperature model or movement command was added. No additional blind
+quality score is claimed for this compatibility work.
+
+Typecheck, lint and all 233 requested place, weather, server and net tests pass.
+The kitchen passes 3,028 top and 2,798 side samples in the drawn/felt check, with
+two static meshes and 85,346 triangles, without exceptions.

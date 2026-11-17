@@ -555,6 +555,42 @@ test("in the restaurant, with nobody at the remote, the table says when the vent
 });
 
 const RESTAURANT_AT: TableStart = { ...START, place: "restaurant" };
+
+test("a table carries every device's flies to the kitchen with its food and slab heights", () => {
+  const { table, join, send } = room();
+  const a = join("key-1", { flies: 4 });
+  const b = join("key-2", { flies: 4 });
+  clear(a, b);
+  send(a, { type: "place", place: "kitchen" });
+  assert.equal(table.place, "kitchen");
+  const ids = [...a.seat.flies, ...b.seat.flies].map((f) => f.id);
+  assert.equal(ids.length, 8);
+  for (const p of [a, b]) {
+    const [moved] = saidOf(p, "place");
+    assert.equal(moved.place, "kitchen");
+    assert.deepEqual(moved.spots, Object.fromEntries(ids.map((id) => [id, spawnSpot(table.world, id)])));
+    assert.deepEqual(moved.foods, table.food.foods.map(toWire));
+    assert.ok(Object.values(moved.spots).every((spot) => spot[3] === 40));
+  }
+  assert.deepEqual(table.food.foods.map((f) => f.name), WORLDS.kitchen.patches.map((p) => p.name));
+});
+
+test("the default room's server clock carries all flies into the kitchen", () => {
+  const index = Object.keys(WORLDS).indexOf("kitchen");
+  assert.ok(index > 0);
+  const turn = index * EVERYONE_TURN;
+  const { tables, clock, join } = pool(turn - 1);
+  const a = join("key-1", { flies: 2 });
+  clear(a);
+  clock.wall = turn;
+  clock.now += 50;
+  tables.tick();
+  const [moved] = saidOf(a, "place");
+  assert.equal(moved.place, "kitchen");
+  assert.equal(a.table.place, "kitchen");
+  assert.deepEqual(moved.spots, Object.fromEntries(a.seat.flies.map((f) => [f.id, spawnSpot(a.table.world, f.id)])));
+  assert.deepEqual(moved.foods, a.table.food.foods.map(toWire));
+});
 const WINDOW_TABLE = TABLE_TOPS.round.top;
 /** Rounded on a room's wire. */
 const near = (a: number, b: number) => Math.abs(a - b) <= 0.5 / ROOM_SCALE.position + 1e-9;

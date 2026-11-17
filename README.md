@@ -205,7 +205,9 @@ on the peach's cut face. Split fruit, peach flesh, grape juice,
 honey and wine are food; feet disturb the liquid pools. A tiled splashback
 and a window frame the worktop, with cabinets and the kitchen beyond; warm
 pendant light takes over from window daylight at dusk. The garden in the
-window is a stylised backdrop, not a simulated outdoor place.
+window is a stylised backdrop, not a simulated outdoor place. Heavy rain
+runs faster down the pane, storm flashes light the room, and snow falls
+outside, dusting the garden and frosting the foot of the glass.
 
 The windowsill is the deep sill of a cottage kitchen window, painted cream
 over sage over pine, its old gloss crazed where the sun bakes it and chipped

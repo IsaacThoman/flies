@@ -2,7 +2,36 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
 import { buildSet } from "../src/places/kitchen/set.ts";
+import { buildBackdrop } from "../src/places/kitchen/backdrop.ts";
+import { PALETTES } from "../src/places/kitchen/palettes.ts";
+import { Daylight } from "../src/scene/light.ts";
+import { WeatherNow } from "../src/scene/weather.ts";
 import { disposeAll } from "../src/scene/build.ts";
+
+test("the kitchen shows snowfall outside and heavier rain deepens the window's haze", () => {
+  const backdrop = buildBackdrop();
+  const camera = new THREE.PerspectiveCamera();
+  const light = new Daylight("noon", PALETTES, 0.45);
+  const weather = new WeatherNow();
+  const flakes = backdrop.scene.children.find((o) => o instanceof THREE.Mesh && o.geometry instanceof THREE.InstancedBufferGeometry);
+  assert.ok(flakes instanceof THREE.Mesh);
+  weather.choose("rain", true);
+  light.update(0, weather);
+  backdrop.update(0, camera, light, weather);
+  const rainFar = (backdrop.scene.fog as THREE.Fog).far;
+  assert.equal(flakes.visible, false);
+  weather.choose("heavyRain", true);
+  light.update(0, weather);
+  backdrop.update(1, camera, light, weather);
+  assert.ok((backdrop.scene.fog as THREE.Fog).far < rainFar);
+  for (const kind of ["snow", "sleet", "clear"] as const) {
+    weather.choose(kind, true);
+    light.update(0, weather);
+    backdrop.update(2, camera, light, weather);
+    assert.equal(flakes.visible, kind !== "clear");
+  }
+  disposeAll(backdrop.scene);
+});
 
 test("kitchen set merges mixed glass geometry and keeps its meshes finite and frozen", () => {
   const set = buildSet();

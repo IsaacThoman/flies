@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { Batch, paint, random } from "../../scene/build.ts";
 import type { SceneBackdrop } from "../types.ts";
 import { box } from "./geometry.ts";
+import { Snow } from "../../scene/snow.ts";
 
 export function buildBackdrop(): SceneBackdrop {
   const scene = new THREE.Scene(),
@@ -37,6 +38,19 @@ export function buildBackdrop(): SceneBackdrop {
     );
   const garden = new Batch();
   const outdoor = new THREE.MeshBasicMaterial({ vertexColors: true });
+  const snowCover = { value: 0 };
+  outdoor.onBeforeCompile = (shader) => {
+    shader.uniforms.uKitchenSnow = snowCover;
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying float vSnowUp;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvSnowUp=normal.y;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying float vSnowUp; uniform float uKitchenSnow;")
+      .replace("#include <color_fragment>", "#include <color_fragment>\nfloat dust=smoothstep(.45,.9,vSnowUp)*smoothstep(.12,.65,uKitchenSnow);\ndiffuseColor.rgb=mix(diffuseColor.rgb,diffuse*vec3(.83,.9,.96),dust);");
+  };
+  outdoor.customProgramCacheKey = () => "kitchen-garden-snow-1";
+  const snow = new Snow(14000, -915, true, -300);
+  scene.add(snow.mesh);
   const plant = (g: THREE.BufferGeometry, c: string) =>
     garden.add(outdoor, paint(g, c));
   const rnd = random(763);
@@ -94,15 +108,18 @@ export function buildBackdrop(): SceneBackdrop {
   scene.add(hemi, sun);
   return {
     scene,
-    update(_time, _camera, l, weather) {
+    update(time, _camera, l, weather) {
+      snow.update(time, l, weather);
+      snowCover.value = weather.snowCover;
       const fog = scene.fog as THREE.Fog;
       fog.color.copy(l.haze);
-      fog.near = 8000 - weather.mist * 6500 - weather.rain * 3500;
-      fog.far = 80000 - weather.mist * 68000 - weather.rain * 18000;
+      fog.near = 8000 - weather.mist * 6500 - weather.rain * 3500 - weather.heavy * 1500;
+      fog.far = 80000 - weather.mist * 68000 - weather.rain * 18000 - weather.heavy * 20000;
       outdoor.color
         .copy(day)
         .lerp(dark, l.stars * 0.9)
-        .multiplyScalar(1 - weather.cloud * 0.2);
+        .multiplyScalar(1 - weather.cloud * 0.2)
+        .addScalar(weather.lightning * 0.65);
       sky.copy(l.horizon).lerp(l.haze, weather.mist * 0.7);
       scene.background = sky;
       hemi.color.copy(l.skyColor);
