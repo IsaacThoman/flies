@@ -97,7 +97,7 @@ export function solveLeg(spec: LegSpec, input: LegInput, out: Float32Array, o: n
   const pl = Math.sqrt(pole[0] * pole[0] + pole[1] * pole[1] + pole[2] * pole[2]) || 1;
   const pd = (pole[0] * s[D] + pole[1] * s[D + 1] + pole[2] * s[D + 2]) / pl;
   const bd = bend[b] * s[D] + bend[b + 1] * s[D + 1] + bend[b + 2] * s[D + 2];
-  for (let k = 0; k < 3; k++) s[P + k] = pole[k] / pl - s[D + k] * pd + 0.7 * (bend[b + k] - s[D + k] * bd);
+  for (let k = 0; k < 3; k++) s[P + k] = pole[k] / pl - s[D + k] * pd + 1.5 * (bend[b + k] - s[D + k] * bd);
   if (normalize(P) < 1e-6) {
     s[P] = 0; s[P + 1] = 1; s[P + 2] = 0;
   }
