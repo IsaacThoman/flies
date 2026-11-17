@@ -71,7 +71,7 @@ Completed lessons omit the diagram and its projection; no extra overlay uploads
 or draw calls are scheduled. Round 1 retained the pre-existing HUD pulse at 10 Hz; the next candidate tests state-driven redraws.
 
 The Wide-view framing problem reported by the baseline player is left outside
-this experiment: `camera.ts` is explicitly excluded.
+this experiment: `apps/web/src/camera.ts` is explicitly excluded.
 
 Candidate validation caught an early-access boundary defect: the existing
 picture-only stand-in eyes had 889 left facets, while the arriving brain had
