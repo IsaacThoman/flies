@@ -358,8 +358,8 @@ export class Daylight {
     this.haze.addScalar(flash * 0.65);
     this.skyColor.lerp(scratch.setRGB(0.78, 0.86, 1), flash * 0.8);
     this.sunColor.lerp(scratch.setRGB(0.78, 0.86, 1), flash);
-    this.sunIntensity += flash * 2.8;
-    this.hemiIntensity += flash * 1.8;
+    this.sunIntensity += flash * 1.8;
+    this.hemiIntensity += flash * 1.15;
     this.stars = l.stars;
     this.sunUp = l.sunUp;
     // Azimuth from -z (the picnic's lake) toward +x.

@@ -16,13 +16,16 @@ export type { Mix, WeatherKind } from "@fly/net";
 const clamp = (x: number) => Math.max(0, Math.min(1, x));
 const toward = (now: number, to: number, most: number) => now + Math.max(-most, Math.min(most, to - now));
 
-/** A sparse, deterministic double pulse. No sound or behavioral command accompanies it. */
+/** Sparse deterministic pulses. No sound or behavioral command accompanies them. */
 export function lightningAt(seconds: number, storm: number): number {
   const cycle = Math.floor(seconds / 19);
   const offset = 3 + 7 * fract(Math.sin(cycle * 127.1 + 7.3) * 43758.5453);
   const age = seconds - cycle * 19 - offset;
   if (age < 0 || age > 0.65) return 0;
-  return storm * Math.max(Math.exp(-age * 18), 0.7 * Math.exp(-Math.abs(age - 0.22) * 28));
+  const seed = fract(Math.sin(cycle * 73.7 + 1.9) * 19341.37);
+  const strength = 0.72 + 0.28 * seed;
+  const echo = seed > 0.35 ? (0.3 + seed * 0.4) * Math.exp(-Math.abs(age - (0.12 + seed * 0.18)) * 36) : 0;
+  return storm * strength * Math.max(Math.exp(-age * (14 + seed * 16)), echo);
 }
 const fract = (x: number) => x - Math.floor(x);
 

@@ -88,7 +88,7 @@ function tableTexture() {
  * the table without a vertex between them. In a gust ripples run across the
  * cloth.
  */
-type TableUniforms = { uWet: { value: number }; uGust: { value: THREE.Vector3 }; uTime: { value: number } };
+type TableUniforms = { uThaw: { value: number }; uWet: { value: number }; uGust: { value: THREE.Vector3 }; uTime: { value: number } };
 
 function clothShader(material: THREE.MeshStandardMaterial, uniforms: TableUniforms) {
   const { napkin } = DECOR;
@@ -104,6 +104,7 @@ function clothShader(material: THREE.MeshStandardMaterial, uniforms: TableUnifor
         /* glsl */ `#include <common>
 uniform vec4 uNapkin;
 uniform float uWet;
+uniform float uThaw;
 uniform vec3 uGust;
 uniform float uTime;
 varying vec2 vTable;
@@ -167,6 +168,17 @@ diffuseColor.rgb *= mix(worn.rgb, vec3(1.0), inside);
 enamelRough = worn.a * (1.0 - inside);
 enamelPeel = peel(vTable, tablePx) * (1.0 - inside);
 float puddle = puddles(vTable) * uWet;
+// A shallow film drains toward the edge; wetness stays where the snow has melted.
+if (uThaw>0.002 && inside<0.5) {
+  float r=length(vTable);
+  vec2 radial=vTable/max(r,1.0);
+  float lane=abs(sin(radial.x*29.0+radial.y*17.0+sin(r*0.035)*0.18));
+  float channel=1.0-smoothstep(0.015,0.04+fwidth(lane),lane);
+  float moving=0.35+0.65*pow(0.5+0.5*sin(r*0.45-uTime*0.8),2.0);
+  float flow=channel*smoothstep(15.0,90.0,r)*uThaw*moving;
+  puddle=max(puddle,flow);
+  diffuseColor.rgb*=mix(vec3(1.0),vec3(0.72,0.81,0.90),flow*0.35);
+}
 diffuseColor.rgb *= 1.0 - (1.0 - inside) * puddle * 0.05;
 // Beads, two sizes, faded out where they would be smaller than the pixels.
 vec3 drop = vec3(0.0, 0.0, -1.0);
@@ -404,7 +416,7 @@ export function buildTable(): SceneSet {
   const juicy = fruitSkins(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.16, metalness: 0, envMapIntensity: 0.55 }));
   const matte = veined(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, envMapIntensity: 0.5 }));
   const tableMaterial = new THREE.MeshStandardMaterial({ map: tableTexture(), roughness: 0.24, metalness: 0, envMapIntensity: 0.5 });
-  const tableUniforms: TableUniforms = { uWet: { value: 0 }, uGust: { value: new THREE.Vector3() }, uTime: { value: 0 } };
+  const tableUniforms: TableUniforms = { uThaw: { value: 0 }, uWet: { value: 0 }, uGust: { value: new THREE.Vector3() }, uTime: { value: 0 } };
   clothShader(tableMaterial, tableUniforms);
   const cloth = new THREE.MeshStandardMaterial({ roughness: 0.85, side: THREE.DoubleSide });
   coverShader(cloth);
@@ -849,13 +861,13 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
   seen.push(...goings.seen);
   const all = [glossy, juicy, matte, tableMaterial, cloth, glass, liquid, dewMaterial, ...materials];
   for (const material of all) shaded(material);
-  const snow = new Snow(2200, 0);
-  group.add(snow.mesh);
   const snowCover = { value: 0 };
   const shelters = [one("lemonade"), one("jam")].map(s => {
     const f = s.footprint as { x:number; z:number; r:number };
     return new THREE.Vector4(f.x, f.z, f.r, (s.top as { y:number }).y);
   });
+  const snow = new Snow(2200, LAWN_Y, false, TABLE_RADIUS, shelters);
+  group.add(snow.mesh);
   for (const material of all) if (material !== glass && material !== liquid && material !== dewMaterial) snowDust(material, snowCover, shelters);
   let wetNow = -1;
   return {
@@ -866,6 +878,7 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
       goings.update(time, light, weather);
       snow.update(time, light, weather);
       snowCover.value = weather.snowCover;
+      tableUniforms.uThaw.value = Math.min(1, weather.snowCover * (1 - weather.snow) * (1 + weather.rain * 3));
       // Wet, glazes and fruit shine more, crumbs and cloth darken.
       const wet = weather.wet;
       if (Math.abs(wet - wetNow) > 0.003) {

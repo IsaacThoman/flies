@@ -42,6 +42,8 @@ uniform float uRain;
 uniform float uHeavy;
 uniform float uTime;
 uniform float uHalfHeight;
+varying vec3 vWorld;
+varying float vSheet;
 uniform vec4 uJars[2];
 varying vec2 vUv;
 varying float vAlpha;
@@ -49,6 +51,19 @@ const float WIDTH = 0.45;
 const float SHUTTER = 0.011;
 float hash(vec3 p) { return fract(sin(dot(p, vec3(91.7, 13.1, 47.3))) * 43758.5453); }
 void main() {
+  vSheet = 0.0;
+  if (drop.w == 0.0) {
+    vec3 right=vec3(viewMatrix[0][0],viewMatrix[1][0],viewMatrix[2][0]);
+    vec3 up=vec3(viewMatrix[0][1],viewMatrix[1][1],viewMatrix[2][1]);
+    vec3 ahead=-vec3(viewMatrix[0][2],viewMatrix[1][2],viewMatrix[2][2]);
+    float distance=900.0+drop.x*850.0;
+    vWorld=cameraPosition+ahead*distance+right*position.x*distance*1.2/projectionMatrix[0][0]+up*(position.y*2.0-1.0)*distance*1.2/projectionMatrix[1][1];
+    vSheet=drop.x+1.0;
+    vUv=vec2(0.0); vAlpha=0.0;
+    gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.0);
+    return;
+  }
+  vWorld=vec3(0.0);
   float size = abs(drop.w);
   // Where the drop is in the box round the camera, the box moving with the camera and the rain falling through it.
   vec3 rel = mod(drop.xyz * size + uOffset - cameraPosition + 0.5 * size, size) - 0.5 * size;
@@ -81,9 +96,26 @@ void main() {
 const STREAK_FS = /* glsl */ `
 uniform vec3 uColor;
 uniform vec3 uShade;
+uniform float uTime; uniform float uRain; uniform float uHeavy; uniform float uSheetDrift;
+varying vec3 vWorld; varying float vSheet;
+float hash(vec2 p) { return fract(sin(dot(mod(p,16.0),vec2(127.1,311.7)))*43758.5453); }
+float noise(vec2 p) {
+  vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.0),f.x),f.y);
+}
 varying vec2 vUv;
 varying float vAlpha;
 void main() {
+  // Three distant veils share the drop batch: heavy rain loses contrast in sheets.
+  if (vSheet>0.5) {
+    float seed=(vSheet-1.0)*4.7;
+    vec2 p=vec2(vWorld.x*0.002-uSheetDrift,vWorld.y*0.0008+uTime*0.2)+seed;
+    float curtain=smoothstep(0.3,0.85,noise(p));
+    float fine=noise(p*vec2(5.0,1.0)+vec2(seed,uTime*0.5));
+    float alpha=(0.035+0.09*curtain)*(0.65+0.35*fine)*uHeavy*uRain;
+    gl_FragColor=vec4(uColor,alpha);
+    return;
+  }
   // A drop is a lens: a bright line down its middle, the world behind it darker and turned over at its sides, so it shows against the white table as against the hills.
   float x = abs(vUv.x);
   float core = 1.0 - smoothstep(0.0, 0.45, x);
@@ -176,6 +208,7 @@ export class Rain {
     uRain: { value: 0 },
     uHeavy: { value: 0 },
     uTime: { value: 0 },
+    uSheetDrift: { value: 0 },
     uHalfHeight: { value: 240 },
     uJars: { value: [new THREE.Vector4(), new THREE.Vector4()] },
     uColor: { value: new THREE.Color() },
@@ -194,18 +227,20 @@ export class Rain {
     const streaks = new THREE.InstancedBufferGeometry();
     streaks.setIndex([0, 1, 2, 0, 2, 3]);
     streaks.setAttribute("position", new THREE.Float32BufferAttribute([-1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1, 0], 3));
-    const total = BASE_DROPS + HEAVY_DROPS;
+    const total = BASE_DROPS + HEAVY_DROPS + 3;
     const drops = new Float32Array(total * 4);
-    let k = 0;
+    // A zero box size selects a veil; the rest are ordinary falling drops.
+    for (let i=0;i<3;i++) drops.set([i,0,0,0],i*4);
+    let k = 3;
     for (const layer of LAYERS) {
       for (let i = 0; i < layer.count; i++, k++) drops.set([rnd.next(), rnd.next(), rnd.next(), layer.size], k * 4);
     }
     for (; k < total; k++) {
-      const size = k < BASE_DROPS + 1400 ? 400 : k < BASE_DROPS + 3500 ? 800 : 3200;
+      const size = k < BASE_DROPS + 1403 ? 400 : k < BASE_DROPS + 3503 ? 800 : 3200;
       drops.set([rnd.next(), rnd.next(), rnd.next(), -size], k * 4);
     }
     streaks.setAttribute("drop", new THREE.InstancedBufferAttribute(drops, 4));
-    streaks.instanceCount = BASE_DROPS;
+    streaks.instanceCount = BASE_DROPS + 3;
     const jars = SOLIDS.filter((s) => s.name === "lemonade" || s.name === "jam");
     jars.forEach((jar, i) => {
       const f = jar.footprint as { x: number; z: number; r: number };
@@ -216,7 +251,6 @@ export class Rain {
     this.#streaks.renderOrder = 5;
     this.#streaks.visible = false;
     this.group.add(this.#streaks);
-
     // The splashes: per splash a ring lying on the surface, and six droplets facing the camera.
     const corners = [-1, -1, 1, -1, 1, 1, -1, 1];
     const position: number[] = [];
@@ -270,8 +304,10 @@ export class Rain {
       s.uRain.value = Math.min(1, rain * 1.1);
       const speed = FALL_SPEED * (1 + weather.heavy * 0.7);
       s.uHeavy.value = weather.heavy;
-      (this.#streaks.geometry as THREE.InstancedBufferGeometry).instanceCount = BASE_DROPS + Math.ceil(HEAVY_DROPS * weather.heavy);
+      (this.#streaks.geometry as THREE.InstancedBufferGeometry).instanceCount = BASE_DROPS + 3 + Math.ceil(HEAVY_DROPS * weather.heavy);
       s.uTime.value = time;
+      // The noise repeats every 16 cells, matching this integrated wrap.
+      s.uSheetDrift.value = (s.uSheetDrift.value + (wind.x + wind.z * 0.35) * dt * 0.002) % 16;
       s.uFall.value.set(wind.x, -speed, wind.z);
       const o = s.uOffset.value;
       o.set((o.x + wind.x * dt) % WRAP, (o.y - speed * dt) % WRAP, (o.z + wind.z * dt) % WRAP);

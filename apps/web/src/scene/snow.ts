@@ -10,7 +10,7 @@ export class Snow {
   readonly #u = { uTime: { value: 0 }, uSnow: { value: 0 }, uOffset: { value: new THREE.Vector3() }, uColor: { value: new THREE.Color() } };
   #last = -1;
   readonly #wrap: number;
-  constructor(size: number, floor: number, outdoorsOnly = false) {
+  constructor(size: number, floor: number, outdoorsOnly = false, tableRadius = 0, shelters: readonly THREE.Vector4[] = []) {
     this.#wrap = size * 2;
     const rnd = random(913);
     const g = new THREE.InstancedBufferGeometry();
@@ -19,27 +19,39 @@ export class Snow {
     const flakes = new Float32Array(1600 * 4);
     for (let i = 0; i < 1600; i++) flakes.set([rnd.next(), rnd.next(), rnd.next(), rnd.next()], i * 4);
     g.setAttribute("flake", new THREE.InstancedBufferAttribute(flakes, 4));
+    const boxes=new Float32Array(1600);
+    for(let i=0;i<1600;i++) boxes[i]=outdoorsOnly && i<600?size/4:size;
+    g.setAttribute("box",new THREE.InstancedBufferAttribute(boxes,1));
     g.instanceCount = 1600;
     this.mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({
-      uniforms: this.#u, transparent: true, depthWrite: false,
+      uniforms: { ...this.#u, uShelters: { value: shelters } }, transparent: true, depthWrite: false,
       vertexShader: /* glsl */ `
-attribute vec4 flake;
+attribute vec4 flake; attribute float box;
 uniform float uTime; uniform float uSnow; uniform vec3 uOffset;
+${shelters.length ? `uniform vec4 uShelters[${shelters.length}];` : ''}
 varying vec2 vUv; varying float vAlpha;
 void main() {
-  float size = ${size.toFixed(1)};
-  vec3 origin = ${outdoorsOnly ? 'vec3(0.0, 0.0, -6000.0)' : 'cameraPosition'};
+  float size = box;
+  vec3 origin = ${outdoorsOnly ? `mix(vec3(0.0,0.0,-6000.0),cameraPosition,1.0-step(${(size*0.5).toFixed(1)},box))` : 'cameraPosition'};
   float t = uTime * (0.65 + flake.w * 0.65);
   float speed = 0.5 + floor(flake.w * 3.0) * 0.5;
   vec3 p = origin + mod(flake.xyz * size + uOffset * speed - origin + size * 0.5, size) - size * 0.5;
   p.x += sin(t * 0.8 + flake.z * 40.0) * 18.0;
   p.z += cos(t * 0.65 + flake.x * 30.0) * 12.0;
   float dist = length(p-cameraPosition);
-  float radius = max(0.45 + flake.w * 1.1, dist / (projectionMatrix[1][1] * 480.0));
+  float radius = max(0.6 + flake.w * 1.7, dist / (projectionMatrix[1][1] * 480.0));
   vec3 right = vec3(viewMatrix[0][0],viewMatrix[1][0],viewMatrix[2][0]);
   vec3 up = vec3(viewMatrix[0][1],viewMatrix[1][1],viewMatrix[2][1]);
   vUv = position.xy;
-  vAlpha = step(flake.w, uSnow) * smoothstep(8.0,40.0,dist) * step(${floor.toFixed(1)},p.y);
+  vec3 edge=abs(p-origin)/(size*0.5);
+  float boxFade=1.0-smoothstep(0.7,1.0,max(edge.x,max(edge.y,edge.z)));
+  float ground=${floor.toFixed(1)};
+  ${tableRadius > 0 ? `if(length(p.xz)<${tableRadius.toFixed(1)})ground=0.0;` : ''}
+  vAlpha = smoothstep(0.0,0.08,uSnow-flake.w) * smoothstep(10.0,65.0,dist) * step(ground,p.y) * boxFade;
+  ${shelters.length ? `for(int i=0;i<${shelters.length};i++) {
+    vec2 delta=p.xz-uShelters[i].xy;
+    if(dot(delta,delta)<uShelters[i].z*uShelters[i].z && p.y<uShelters[i].w) vAlpha=0.0;
+  }` : ''}
   ${outdoorsOnly ? 'vAlpha *= 1.0 - step(-145.0,p.z);' : ''}
   gl_Position=projectionMatrix*viewMatrix*vec4(p+(right*position.x+up*position.y)*radius,1.0);
 }`,
@@ -49,6 +61,9 @@ void main() { float r=length(vUv); gl_FragColor=vec4(uColor,(1.0-smoothstep(0.35
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 5;
     this.mesh.visible = false;
+    this.mesh.matrixAutoUpdate=false;
+    this.mesh.updateMatrixWorld(true);
+    this.mesh.matrixWorldAutoUpdate=false;
   }
   update(time: number, light: Daylight, w: Weather) {
     this.mesh.visible = w.snow > 0.01;
@@ -80,10 +95,12 @@ float grain=fract(sin(dot(floor(vSnowAt.xz*2.0),vec2(12.9898,78.233)))*43758.545
 float footprint=max(fwidth(vSnowAt.x),fwidth(vSnowAt.z));
 float grit=1.0-smoothstep(0.25,1.0,footprint);
 grain=mix(0.5,grain,grit);
-float drift=0.5+0.25*sin(vSnowAt.x*0.047+sin(vSnowAt.z*0.029)*2.0)+0.25*sin(vSnowAt.z*0.061);
+float terrain=1.0-smoothstep(-600.0,-100.0,vSnowAt.y);
+vec2 scale=mix(vec2(0.047,0.061),vec2(0.00017,0.00023),terrain);
+float drift=0.5+0.25*sin(vSnowAt.x*scale.x+sin(vSnowAt.z*scale.y*0.5)*2.0)+0.25*sin(vSnowAt.z*scale.y);
 drift=mix(0.5,drift,1.0-smoothstep(10.0,60.0,footprint));
 float powder=uSnowCover*(0.4+0.6*drift);
-float dust=smoothstep(0.45,0.9,vSnowUp)*smoothstep(0.12+grain*0.05,0.65,powder);
+float dust=smoothstep(0.45,0.9,vSnowUp)*smoothstep(0.12+grain*0.05,mix(0.65,0.85,terrain),powder);
 ${shelters.length ? `for (int i=0;i<${shelters.length};i++) {
   vec4 jar=uSnowShelters[i];
   vec2 delta=vSnowAt.xz-jar.xy;
