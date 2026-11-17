@@ -493,6 +493,19 @@ test("a valid room code has an in-engine Join action with the same result as Ret
   assert.equal(typing.active, null);
 });
 
+test("a non-message JSON value cannot stop the room list receiving a later list", () => {
+  const socket = new FakeSocket();
+  const lobby = new Lobby(() => socket, "ws://rooms");
+  socket.status = "open";
+  socket.inbox.push("null");
+  assert.doesNotThrow(() => lobby.update(0));
+  assert.equal(lobby.rooms, null);
+  socket.inbox.push(JSON.stringify({ type: "rooms", rooms: ROOMS }));
+  lobby.update(0);
+  assert.deepEqual(lobby.rooms, ROOMS);
+  lobby.close();
+});
+
 test("room discovery failures replace searching, stale choices are disabled, and recovery clears the message", () => {
   const { screen, state, step, press, did } = world();
   state.lobbyStatus = "lost";
