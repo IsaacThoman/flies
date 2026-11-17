@@ -104,6 +104,8 @@ test('evidence gate rejects missing trials, duplicate seeds, direct loom input a
     assert.throws(() => validateOpticalEvidence({ ...valid, trials: valid.trials.map((t, i) => i ? t : { ...t, ...change }) }));
   }
   assert.throws(() => validateOpticalEvidence({ ...valid, protocol: { ...valid.protocol, perRatio: 2 } }));
+  const swapped = valid.trials.map((t, i) => i === 0 ? { ...t, kind: 'checkerboard' as const } : i === 6 ? { ...t, kind: 'black' as const } : t);
+  assert.throws(() => validateOpticalEvidence({ ...valid, trials: swapped }), /stimulus sequence/);
 });
 
 test('replay rejects takeoffs and flight durations outside the actual capture windows', () => {

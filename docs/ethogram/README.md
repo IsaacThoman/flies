@@ -13,10 +13,10 @@ npm ci
 npm run brain:fetch
 # One recorded hour, then independent visual trials; no extra slot wrapper.
 node scripts/ethogram.ts --assay all --hours 1 --seeds 1 --hour 6 \
-  --trials 8 --seed-base 20000 --out /tmp/ethogram.json
+  --trials 8 --seed-base 20000 --trace-dir /tmp/ethogram-frames --out /tmp/ethogram.json
 # Optical battery only: 48 black-square + 48 checkerboard + 8 flash + 8 blank.
 node scripts/ethogram.ts --assay escape --hour 6 --trials 8 \
-  --seed-base 30000 --out /tmp/escape.json
+  --seed-base 30000 --trace-dir /tmp/escape-frames --out /tmp/escape.json
 ```
 
 The default free run uses three seeds, 60 s burn-in and one recorded hour each.
@@ -101,3 +101,13 @@ TTC consistency and finite capture-window bounds, then recomputes all coefficien
 earn credit. The composite weights probability and timing equally and is N/A if
 either pattern or any timing fit is unavailable. Registry-average bounds are
 not bounds on whole-animal fidelity; whole-animal coverage is listed by domain.
+
+
+For independently replayable captures, use `--trace-dir` with a **new directory**
+that does not yet exist. Schema 4 stores exact binary body observations and
+SHA-256 digests. The CLI reconstructs the free statistics from positions and
+headings and independently derives first-flight continuity from optical states
+before writing the report. `--analyse` repeats digest and replay checks.
+Schema 3 remains readable but has no raw-frame verification; schema 2 requires
+rerunning. The byte layout and limits are in [trace format](traces.md).
+Raw files are external experiment evidence and must not be committed.

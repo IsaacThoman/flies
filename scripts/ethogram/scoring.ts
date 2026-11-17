@@ -16,6 +16,10 @@ export function validateOpticalEvidence(e: OpticalEvidence) {
   for (const t of e.trials) {
     if (!Number.isInteger(t.seed) || seen.has(t.seed) || t.seed < p.firstSeed || t.seed >= p.firstSeed + e.trials.length) throw new Error('invalid or duplicate optical trial seed');
     seen.add(t.seed);
+    const condition = Math.floor((t.seed - p.firstSeed) / p.perRatio);
+    const expectedKind = condition < 6 ? 'black' : condition < 12 ? 'checkerboard' : condition === 12 ? 'flash' : 'blank';
+    const expectedLv = condition < 12 ? LV_MS[condition % 6] : 40;
+    if (t.kind !== expectedKind || t.lvMs !== expectedLv) throw new Error('seed does not match the registered stimulus sequence');
     if (typeof t.eligible !== 'boolean' || typeof t.flown !== 'boolean' || t.hour !== p.hour || !Number.isFinite(t.quietWaitSeconds) || t.quietWaitSeconds < 0 || !Number.isFinite(t.maxEscape) || t.maxLoomInput !== 0 || (t.eligible && t.quietWaitSeconds < 3)) throw new Error('invalid optical readiness, clock or sensory route');
     const window = opticalWindow(t.kind, t.lvMs);
     // Departure is measured at the end of a frame whose start precedes the response cutoff.

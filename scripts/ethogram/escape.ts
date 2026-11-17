@@ -5,6 +5,9 @@ import type { Place } from '@fly/world';
 import { Life } from '../../apps/web/src/life.ts';
 import { InProcessBrain } from '../fuzz/brain.ts';
 import { mean } from './metrics.ts';
+import { join } from 'node:path';
+import { ESCAPE_FLAGS, FrameWriter } from './trace.ts';
+import type { TraceInfo } from './trace.ts';
 
 export const LV_MS = [5, 10, 20, 40, 60, 80] as const;
 export const SCREEN = { distanceMm: 67.5, pixelsPerMm: 1.65, firstHalfPixels: 2, lastHalfPixels: 220, black: 7.6 / 87.5, gray: 47.4 / 87.5, white: 1, frameSeconds: 0.005 } as const;
@@ -12,7 +15,7 @@ export const ESCAPE_PLACE: Place = { floor: { kind: 'circle', r: 2.5 }, solids: 
 export type EscapeKind = 'black' | 'checkerboard' | 'flash' | 'blank';
 export type Vec = { x: number; y: number; z: number };
 export type ScreenPose = { center: Vec; right: Vec; horizontal: Vec };
-export type EscapeTrial = { seed: number; kind: EscapeKind; lvMs: number; eligible: boolean; quietWaitSeconds: number; baselineTakeoffs: number; readyActivity: string; takeoffMs: number | null; ttcMs: number | null; jumpSpeedMmS: number | null; jumpAngleDeg: number | null; flown: boolean; longestPoweredFlightSeconds: number; maxEscape: number; maxLoomInput: number; hour: number };
+export type EscapeTrial = { seed: number; kind: EscapeKind; lvMs: number; eligible: boolean; quietWaitSeconds: number; baselineTakeoffs: number; readyActivity: string; takeoffMs: number | null; ttcMs: number | null; jumpSpeedMmS: number | null; jumpAngleDeg: number | null; flown: boolean; longestPoweredFlightSeconds: number; maxEscape: number; maxLoomInput: number; hour: number; trace?: TraceInfo };
 
 /** Pixel rounding and endpoints follow Fotowat et al. 2009, Visual stimulation. */
 export function loomGeometry(lvMs: number) {
@@ -99,7 +102,7 @@ export class EscapeFlight {
   get flown() { return this.longestSeconds >= 0.05; }
 }
 
-export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: number, seed: number, hour: number, checkpoint: () => Promise<void>): Promise<EscapeTrial> {
+export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: number, seed: number, hour: number, checkpoint: () => Promise<void>, traceDir?: string): Promise<EscapeTrial> {
   await checkpoint();
   const driver = new InProcessBrain(data, seed);
   const life = new Life(new World(ESCAPE_PLACE), driver);
@@ -129,6 +132,7 @@ export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: nu
   const geometry = loomGeometry(lvMs);
   const { responseEnd, frames } = opticalWindow(kind, lvMs);
   const flight = new EscapeFlight();
+  const writer = traceDir ? new FrameWriter(join(traceDir, `escape-${seed}.bin`), 'escape') : null;
   try {
     for (let i = 0; i < frames; i++) {
       if (i % 200 === 0) await checkpoint();
@@ -139,6 +143,7 @@ export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: nu
         for (let k = 0; k < out.length; k++) out[k] = facetLuminance(kind, geometry.halfPixels(Math.min(t, geometry.seconds)), pose, eye, life.body.yaw, directions[3 * k], directions[3 * k + 1], directions[3 * k + 2], t < 0.025);
       }
       step();
+      writer?.write((life.body.onFeet ? ESCAPE_FLAGS.onFeet : 0) | (life.body.events.jumped ? ESCAPE_FLAGS.jumped : 0), [driver.state?.command.wings ?? 0, life.intent.wings, life.intent.reflex, life.body.wingbeat, life.intent.escape, life.sensed.loomLeft, life.sensed.loomRight]);
       result.maxEscape = Math.max(result.maxEscape, life.intent.escape);
       result.maxLoomInput = Math.max(result.maxLoomInput, life.sensed.loomLeft, life.sensed.loomRight);
       // A late response can have negative TTC; excluding it would bias the fitted timing.
@@ -152,7 +157,7 @@ export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: nu
       if (result.takeoffMs !== null) flight.step(!life.body.onFeet, life.intent.wings >= 0.6 && life.body.wingbeat > 0.15);
       result.longestPoweredFlightSeconds = flight.longestSeconds;
     }
-  } finally { driver.dispose(); }
+  } finally { driver.dispose(); if (writer) result.trace = writer.close(); }
   // A jump followed by one continuous ≥50 ms episode of powered airborne wing drive operationalizes jump-and-flight; report the rule.
   result.flown = result.takeoffMs !== null && flight.flown;
   return result;
@@ -164,14 +169,14 @@ export function validateEscapeOptions(perRatio: number, hour: number, seedBase: 
   if (!Number.isInteger(seedBase) || seedBase < 0 || seedBase + 14 * perRatio > 0x100000000) throw new Error('trial seeds must be uint32');
 }
 
-export async function escapeBattery(data: ArrayBuffer, perRatio: number, hour: number, checkpoint: () => Promise<void>, seedBase = 10000) {
+export async function escapeBattery(data: ArrayBuffer, perRatio: number, hour: number, checkpoint: () => Promise<void>, seedBase = 10000, traceDir?: string) {
   validateEscapeOptions(perRatio, hour, seedBase);
   const firstSeed = seedBase;
   const trials: EscapeTrial[] = [];
   for (const kind of ['black', 'checkerboard'] as const) for (const lv of LV_MS) for (let n = 0; n < perRatio; n++) {
-    trials.push(await opticalTrial(data, kind, lv, seedBase++, hour, checkpoint));
+    trials.push(await opticalTrial(data, kind, lv, seedBase++, hour, checkpoint, traceDir));
     process.stderr.write(`${kind} l/v=${lv} ms: ${n + 1}/${perRatio}\n`);
   }
-  for (const kind of ['flash', 'blank'] as const) for (let n = 0; n < perRatio; n++) trials.push(await opticalTrial(data, kind, 40, seedBase++, hour, checkpoint));
+  for (const kind of ['flash', 'blank'] as const) for (let n = 0; n < perRatio; n++) trials.push(await opticalTrial(data, kind, 40, seedBase++, hour, checkpoint, traceDir));
   return { protocol: { hour, sunrise: 6, sunset: 18, lvMs: LV_MS, perRatio, firstSeed, screen: SCREEN, source: 'Fotowat et al. 2009, Figures 1–3; Visual stimulation; Video recordings and analysis', limitations: ['Clock time was not reported in the publication; assay pins ZT0 to remove clock variation.', 'The virtual 5 mm platform reproduces the funnel exit diameter, not climbing inside the funnel.', 'Facet luminance preserves measured contrast ratios; spectral composition and absolute photon flux are not modeled.', 'Flash is a uniform 25 ms luminance-off surrogate, not a geometric model of four LEDs.', 'Takeoff time resolution is 5 ms; powered-flight criterion is one continuous 50 ms episode in the first airborne bout with wing drive ≥0.6 and wingbeat >0.15, not a reconstruction of wing kinematics.', 'The final square is held for a 250 ms response window; negative TTC responses are retained. Flash has a 250 ms onset response window.'] }, trials, summary: summarizeEscape(trials) };
 }
