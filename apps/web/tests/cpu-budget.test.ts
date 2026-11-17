@@ -38,12 +38,12 @@ test("CI fails explicitly if all attempts are contended, and tolerates its slowe
   const t = context();
   await assert.rejects(measureBudget(t, () => noisy, { ci: true, pause: async () => {}, others: quiet }), /machine too busy to measure; rerun when idle/);
   assert.equal(t.skipped.length, 0);
-  assert.equal(await measureBudget(t, () => ({ ...clean, references: Array(20).fill(REFERENCE_MS * 3) as number[] }), { ci: true, others: quiet }), 10);
+  assert.equal(await measureBudget(t, () => ({ ...clean, references: Array(20).fill(REFERENCE_MS * 3) as number[] }), { ci: true, pause: async () => {}, others: quiet }), 10);
 });
 
 test("measurement errors and invalid data cannot be hidden as contention", async () => {
-  await assert.rejects(measureBudget(context(), () => { throw Error("broken work"); }), /broken work/);
-  await assert.rejects(measureBudget(context(), () => ({ ...clean, references: [NaN] }), { others: quiet }), /invalid.*measurement/i);
+  await assert.rejects(measureBudget(context(), () => { throw Error("broken work"); }, { pause: async () => {}, others: quiet }), /broken work/);
+  await assert.rejects(measureBudget(context(), () => ({ ...clean, references: [NaN] }), { pause: async () => {}, others: quiet }), /invalid.*measurement/i);
 });
 
 
@@ -114,7 +114,7 @@ test("each attempt waits for a quiet second first, up to a minute in CI and thre
 test("the machine is watched over each attempt's own measurement", async () => {
   let watching = false;
   const others = () => { watching = true; return () => { watching = false; return 0; }; };
-  await measureBudget(context(), () => { assert.ok(watching, "measured while watched"); return clean; }, { others });
+  await measureBudget(context(), () => { assert.ok(watching, "measured while watched"); return clean; }, { pause: async () => {}, others });
   assert.equal(watching, false);
 });
 

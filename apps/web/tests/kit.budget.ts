@@ -59,7 +59,12 @@ function built(full: boolean) {
   return { world, builder };
 }
 
-function frames(full: boolean) {
+/**
+ * The fly among what `full` builds, its frames warmed up. Each `sample` runs FRAMES more of them, on from the last,
+ * and returns ms of this thread's CPU a frame, as an M5 Pro would spend them: the same place throughout, since a
+ * place built again for each sample left garbage whose collection fell inside the next sample's few milliseconds.
+ */
+function kit(full: boolean) {
   const { world, builder } = built(full);
   const brain = new Walker();
   const life = new Life(world, brain);
@@ -82,25 +87,30 @@ function frames(full: boolean) {
     const aim = builder.point("tile-blue", hand, true, p, flies, life.pantry.foods);
     view.update(builder, aim, false, 1, now / 1000, light, weather, true);
   };
-  for (let i = 0; i < 300; i++) frame(i * 16);
-  const meter = new CpuMeter();
-  for (let i = 0; i < FRAMES; i++) {
-    frame((300 + i) * 16);
-    // Few laps, each long: a frame with nothing built is a few microseconds, so laps of 60 held under a millisecond
-    // of work beside each reference, and one collection of the garbage the samples leave spread five samples past 1.35x.
-    if (i % 300 === 299) meter.lap();
-  }
-  return { ms: meter.ms / FRAMES, raw: meter.rawMs / FRAMES, references: meter.references, pieces: builder.pieces.length, met };
+  let at = 0;
+  for (; at < 300; at++) frame(at * 16);
+  const sample = () => {
+    const meter = new CpuMeter();
+    for (let i = 0; i < FRAMES; i++) {
+      frame(at++ * 16);
+      // Few laps, each long: a frame with nothing built is a few microseconds, so laps of 60 held under a millisecond of work beside each reference.
+      if (i % 300 === 299) meter.lap();
+    }
+    return { ms: meter.ms / FRAMES, raw: meter.rawMs / FRAMES, references: meter.references };
+  };
+  return { sample, pieces: builder.pieces.length, met };
 }
 
 test(`with the most a place keeps built (${MAX_PIECES} pieces), a frame costs little more JavaScript than with none`, async (t) => {
+  const nothing = kit(false);
+  const most = kit(true);
   // The first samples in a process would include the JIT tiering the frame up: one of each runs unmeasured first.
-  frames(false);
-  frames(true);
+  nothing.sample();
+  most.sample();
   const measured = await measureBudget(t, () => {
-    const bare = Array.from({ length: SAMPLES }, () => frames(false));
-    const full = Array.from({ length: SAMPLES }, () => frames(true));
-    const value = { bare: median(bare.map((s) => s.ms)), full: median(full.map((s) => s.ms)), raw: median(full.map((s) => s.raw)), pieces: full[0].pieces, met: full[0].met };
+    const bare = Array.from({ length: SAMPLES }, nothing.sample);
+    const full = Array.from({ length: SAMPLES }, most.sample);
+    const value = { bare: median(bare.map((s) => s.ms)), full: median(full.map((s) => s.ms)), raw: median(full.map((s) => s.raw)), pieces: most.pieces, met: most.met };
     return { value, references: [...bare, ...full].flatMap((s) => s.references), samples: [bare.map((s) => s.ms), full.map((s) => s.ms)] };
   });
   if (!measured) return;
