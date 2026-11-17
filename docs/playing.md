@@ -120,8 +120,11 @@ the camera, or the camera would be in it or so near it that the edge of the
 picture cuts into it, the camera comes in along its line of sight until it
 isn't, quickly but smoothly, looking a moment ahead of where your turn and the
 fly are taking it, so it is in front of a bottle before the bottle is in the
-way. Once the way has been clear for a moment it goes back out, gently. It
-never turns or tilts to get round anything. An obstruction that outruns the
+way. Once the way has been clear for a moment it goes back out, gently. Where
+coming in would bring it nearer than you can zoom, down in a bowl or on a
+slope, it looks from a little higher instead, as little as opens the way, and
+comes back down to where you had it once it can. It never turns round
+anything. An obstruction that outruns the
 smoothing can pull the camera inward immediately during collision recovery.
 
 The View tool's views are places on the same orbit, reached over a moment.
