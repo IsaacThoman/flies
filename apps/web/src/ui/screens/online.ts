@@ -92,6 +92,28 @@ export class OnlineScreen implements Screen {
     return this.#screen.menu;
   }
 
+  get heading() { return this.#heading(); }
+
+  access(id: string, value?: number) { this.#screen.access(id, value); }
+
+  /** A host text control edits the same draft as the canvas keyboard. */
+  editValue(id: string, value: string) {
+    const item = this.menu.item(id);
+    if (item?.kind !== "field" || item.disabled) return;
+    const max = id === "code" ? CODE_LENGTH : id === "name" ? ROOM_NAME_MAX : PASSWORD_MAX;
+    item.value = value.slice(0, max);
+    this.#store(id, item.value);
+    this.#shell.menuChanged?.();
+  }
+
+  submitField(id: string) {
+    if (id === "code" && this.#code) {
+      const code = this.#code.trim().toLowerCase();
+      if (isTableCode(code)) this.#shell.joinRoom(code);
+      else { this.#note = "code"; this.#refresh("code"); }
+    } else if (id === "password" && this.view === "door") this.#knock();
+  }
+
   /** What is said in place of the heading, if anything. */
   get note(): string {
     return this.#note ?? "";
@@ -132,7 +154,7 @@ export class OnlineScreen implements Screen {
         if (!rooms) rows.push({ kind: "action", id: "looking", label: "Looking for rooms…", disabled: true });
         else if (!rooms.length) rows.push({ kind: "action", id: "none", label: "No rooms open", disabled: true });
         for (const r of rooms ?? []) {
-          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), count: [r.flies, MAX_PLAYERS], locked: r.locked, disabled: r.flies >= MAX_PLAYERS });
+          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), description: isPlaceId(r.place) ? placeInfo(r.place).name : r.place, count: [r.flies, MAX_PLAYERS], locked: r.locked, disabled: r.flies >= MAX_PLAYERS });
         }
         return rows;
       }
@@ -160,7 +182,7 @@ export class OnlineScreen implements Screen {
         if (!table) return [];
         const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
         const rows: MenuItem[] = shell.canShare ? [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", disabled: !table.joined }] : [];
-        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", swatch: o.colour });
+        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", description: `Fly ${o.id}`, swatch: o.colour });
         rows.push({ kind: "action", id: "leave", label: "Leave the room" });
         return rows;
       }
@@ -315,6 +337,7 @@ export class OnlineScreen implements Screen {
     const was = this.#screen.menu.focused?.id;
     this.#screen = this.#build(focus ?? was);
     this.#screen.enter();
+    this.#shell.menuChanged?.();
   }
 
   enter() {
@@ -366,7 +389,10 @@ export class OnlineScreen implements Screen {
     const at = active ? items.findIndex((i) => i.id === active && i.kind === "field") : -1;
     if (at >= 0) {
       this.#store(active!, typing.value);
-      (items[at] as FieldItem).value = typing.value;
+      if ((items[at] as FieldItem).value !== typing.value) {
+        (items[at] as FieldItem).value = typing.value;
+        this.#shell.menuChanged?.();
+      }
       view.typing.index = at;
       view.typing.caret = typing.caret;
     }

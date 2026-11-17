@@ -19,6 +19,8 @@ export type ActionItem = {
   hint?: string;
   /** A dot of colour at its left: what it is about, where words would be too many (a fly at a table, by its player's colour; a room's place). */
   swatch?: string;
+  /** Meaning of a decorative swatch, without relying on colour. */
+  description?: string;
   /** How many of how many, as pips at its right (the flies in a room), and a padlock, for what needs a password. */
   count?: readonly [number, number];
   locked?: boolean;

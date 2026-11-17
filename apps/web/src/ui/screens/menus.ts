@@ -118,6 +118,7 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
     rows: (shell) => [
       choice("wallpaperAfter", "Starts after", WALLPAPER_DELAYS),
       choice("wallpaperCamera", "Camera", CAMERA),
+      choice("reduceMotion", "Reduce motion", [{ value: "system", label: "System" }, { value: "on", label: "On" }, { value: "off", label: "Off" }]),
       // Only when there is somewhere else to live.
       ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE)] : []),
       // Whether the sky follows the weather outside, only where the Apple TV can tell it.

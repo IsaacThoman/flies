@@ -632,6 +632,19 @@ export class Game implements Shell {
     return this.outside.attribution();
   }
 
+  /** Optional host hook, never polled by the frame loop. */
+  accessibilityChanged: (() => void) | null = null;
+  systemReduceMotion = false;
+  get reducedMotion() { return this.settings.reduceMotion === "on" || (this.settings.reduceMotion === "system" && this.systemReduceMotion); }
+  get loading() { return this.#loading; }
+  menuChanged() { this.accessibilityChanged?.(); }
+
+  /** Semantic activation is deliberate input, including waking the screensaver. */
+  accessInput() {
+    this.devices.at = performance.now();
+    if (this.wallpaper) this.#stopWallpaper();
+  }
+
   get screen(): ScreenId {
     return this.nav.current;
   }
@@ -764,7 +777,7 @@ export class Game implements Shell {
   #move(dt: number) {
     const moving = this.#moving;
     if (!moving) return;
-    moving.t += dt;
+    moving.t += this.reducedMotion ? VEIL_OUT + VEIL_IN : dt;
     if (!moving.arrived && moving.t >= VEIL_OUT) {
       // Black now: build the place. This frame is long (it is all JavaScript), and nobody sees it.
       this.stage.veil = 1;
@@ -778,6 +791,7 @@ export class Game implements Shell {
       moving.t = VEIL_OUT;
       return;
     }
+    if (this.reducedMotion && moving.arrived) moving.t = VEIL_OUT + VEIL_IN;
     const k = moving.arrived ? 1 - (moving.t - VEIL_OUT) / VEIL_IN : moving.t / VEIL_OUT;
     this.stage.veil = Math.max(0, Math.min(1, k * k * (3 - 2 * k)));
     if (moving.arrived && moving.t >= VEIL_OUT + VEIL_IN) {
@@ -822,6 +836,7 @@ export class Game implements Shell {
     this.#controls.spend();
     this.director.hand.held = false;
     this.overlay.dirty = true;
+    this.menuChanged();
   }
 
   #syncCamera() {
@@ -926,7 +941,7 @@ export class Game implements Shell {
     this.online?.send(this.#playerNow());
     // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
     director.prefer = this.hands.current.id === "swoop" && this.nav.current === "play" && !this.wallpaper ? Math.PI - SWOOP_BEARING : null;
-    director.update(life.body, dt);
+    if (!this.reducedMotion) director.update(life.body, dt);
     this.#xray(dt);
     if (this.time > this.#clockAt) this.#followLight();
     stage.update(this.time, dt, director.camera);
@@ -1160,7 +1175,8 @@ export class Game implements Shell {
       // Not while a finger or a button is still down on something, however still.
       this.#startWallpaper();
     }
-    this.uiAlpha += ((this.wallpaper ? 0 : 1) - this.uiAlpha) * Math.min(1, dt * (this.wallpaper ? 1.2 : 6));
+    if (this.reducedMotion) this.uiAlpha = this.wallpaper ? 0 : 1;
+    else this.uiAlpha += ((this.wallpaper ? 0 : 1) - this.uiAlpha) * Math.min(1, dt * (this.wallpaper ? 1.2 : 6));
 
     if (this.#loading) {
       // Select, or a touch, is "Try again" on a failure.

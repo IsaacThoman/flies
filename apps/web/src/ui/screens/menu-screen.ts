@@ -91,6 +91,17 @@ export class MenuScreen implements Screen {
     this.#outcome(this.menu.press(button, repeat));
   }
 
+  /** Host semantics use the same outcomes as the canvas's hit targets. */
+  access(id: string, value?: number) {
+    const at = this.menu.items.findIndex((item) => item.id === id);
+    const item = this.menu.items[at];
+    if (!item || item.disabled) return;
+    this.menu.focusOn(id);
+    this.#outcome(value === undefined ? this.menu.tap(at) : item.kind === "choice" ? this.menu.chooseAt(at, value) : this.menu.slideAt(at, value));
+  }
+
+  get heading() { return this.#options.heading ?? this.id; }
+
   #outcome(outcome: Outcome) {
     switch (outcome.kind) {
       case "activate":
@@ -108,6 +119,7 @@ export class MenuScreen implements Screen {
         break;
     }
     this.#dirty = true;
+    this.#shell.menuChanged?.();
   }
 
   point(p: Point) {
