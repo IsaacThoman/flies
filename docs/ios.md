@@ -97,8 +97,9 @@ and whenever it is shown again). The app adds no input of its own.
 ## Loading the brain
 
 The web build cuts the brain into gzipped parts of at most 4 MiB, named for their contents
-([web.md](web.md)), and the page fetches them, checks each against the SHA-256 the build
-recorded, and keeps each in the browser's cache (the Cache API) for next time. In the app the
+([web.md](web.md)), and the page fetches them. Digest verification and persistent caching depend
+on working browser APIs; [the web loading reference](web.md#getting-the-brain-to-the-browser)
+describes those conditions and failure paths. In the app the
 parts are in the bundle (`www/brain/`, 14 MB, and the WebAssembly brain (see [current artifact sizes](measurements.md#artifact-sizes))) and come through
 the scheme handler; the module is compiled from its bytes, so its `Content-Type` doesn't matter. The page there
 is a secure context, so it has the Cache API and `crypto.subtle`: every part's digest is checked.

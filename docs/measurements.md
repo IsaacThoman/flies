@@ -47,3 +47,8 @@ verified by `npm run brain:fetch`. These are local file/compression sizes,
 not a fresh measurement of the complete web build or a server's transfer
 encoding. The retained 268 KB / 106 KB module measurements predate the sleep
 module; download and compilation timings beside them remain historical.
+
+A read-only instantiation during the native-source audit on the same machine
+and Node runtime allocated 99,680,256 bytes (95.0625 MiB) of WebAssembly linear
+memory after creating the real brain. This is the module's memory capacity,
+not total worker or browser resident memory.

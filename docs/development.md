@@ -39,6 +39,49 @@ rooms. They observe canvas `data-*` attributes because the game draws its UI.
 | Verify Apple hosts | [Apple TV checks](apple-tv.md#device-and-simulator-checks), [iOS checks](ios.md#checking-it) |
 | Change the brain in both languages | [Native brain workflow](../packages/brain-native/README.md#when-the-model-changes) |
 
+
+## Test map
+
+| File or directory | What to look for |
+| --- | --- |
+| `apps/web/e2e/play.e2e.ts` | Keyboard menus, feeding, take-off, screensaver, corner pictures, X-ray, places, settings and frame budgets with the real brain |
+| `apps/web/e2e/pointer.e2e.ts` | Phone taps/drags/pinches and desktop mouse, wheel and keyboard camera input |
+| `apps/web/e2e/web.e2e.ts` | Built-site downloads, interrupted first load, offline revisit, injected visibility changes, wake lock, graphics-context recovery and startup failures including missing WebGL 2 |
+| `apps/web/e2e/tables.e2e.ts` | Online rooms, shared objects, joining/leaving, room lists and socket lifecycle |
+| `apps/web/tests` | Game systems in isolation: input, menus, camera, eyes, weather, downloads, Online and resource ownership |
+| `packages/body/tests` | Senses, behavior, flight, hunger, crowd contact and daily rhythm |
+| `packages/world/tests` | Solids, spatial queries, food contact and place geometry |
+
+The [brain reference's tests](../packages/brain/README.md#tests) describe
+model coverage; [native parity checks](../packages/brain-native/README.md#how-it-is-tested)
+compare the two implementations. Browser lifecycle tests inject visibility
+state; they do not establish every operating system's real suspension behavior.
+
+## Feed weather in a browser
+
+A browser has no native weather service. Scripts can provide conditions
+through `__fly.outside.feed`, taking `OutsideConditions` without `source`
+(`packages/contracts/src/weather.ts`). For example:
+
+```sh
+node scripts/play.ts 'eval:__fly.outside.feed({observedAt:Date.now(),cloudCover:0.8,precipitation:1,visibility:5000,wind:3,condition:"drizzle",daylight:true,sunrise:6,sunset:18,noon:12})'
+```
+
+The fields use milliseconds since the epoch, cloud fraction, mm/hour, metres,
+m/s and local solar hours. `feed` settles the change immediately by default;
+its optional second argument `false` eases the transition. In that page,
+`__fly.outside.feed(null)` removes the supplied observation and returns to
+any host service, or the forecast without one. Use Weather → Now and Light →
+Now to follow it. If outside conditions were disabled in saved settings,
+set `__fly.outside.enabled = true` for the page; the Real weather setting is
+shown only on a host with the native service.
+
+The canvas reports `data-weather-from` (`outside`, `forecast`, `chosen`),
+`data-sun-from` (`outside`, `clock`, `chosen`), `data-outside` (`fed`, `none`,
+`off`, or the host status including `idle`) and `data-outside-age` (seconds,
+empty with no observation). These show which source is in use and how old
+the observation is; the feed does not contact a weather provider.
+
 ## Documentation checks
 
 `npm test` includes a fast documentation check. Run only that check with

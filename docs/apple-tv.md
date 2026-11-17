@@ -85,7 +85,7 @@ npm run tvos -- archive --version 0.1.1   # archive for the App Store (docs/rele
    `weatherkit.yml` merged in when the weather is wanted, and `local-rooms.yml` for a room server
    without TLS: [Playing together](#playing-together)) and builds it with xcodebuild.
 
-The Xcode project compiles every source under `packages/brain-native/src/` with that
+The Xcode project compiles every source under `packages/brain-native/src/` with the
 TV target flags (`-O2 -DNDEBUG -ffp-contract=off`); the standalone package
 uses `-O2 -DNDEBUG` and controls contraction in source. `--stand-in-brain` compiles
 `apps/tvos/tests/brain-stand-in/` instead: a fake `fly_brain` with predictable answers, for
@@ -320,7 +320,9 @@ has no Swift and no `__native.weather`, and the game keeps its made-up forecast.
 
 ### What Apple's documentation says it needs
 
-Checked against Apple's documentation in November 2026:
+SDK declarations were checked locally; the linked WeatherKit pricing, attribution
+and privacy pages were checked on 16 November 2026. These are service/account
+requirements, separate from what the implementation can prove:
 
 - [WeatherKit](https://developer.apple.com/documentation/weatherkit) is on tvOS from 16 (this
   app targets 26), and so is
@@ -341,37 +343,33 @@ Checked against Apple's documentation in November 2026:
   (`com.apple.developer.weatherkit`), on an App ID registered with
   [WeatherKit ticked under App Services and under Capabilities](https://developer.apple.com/help/account/configure-app-services/weatherkit/).
   A wildcard App ID can't have it, so a device build signs with an explicit one.
-- [Attribution](https://developer.apple.com/weatherkit/get-started/): an app that shows weather
-  data from Apple must "clearly display the Apple Weather trademark ( Weather), as well as
-  the legal link to other data sources", and one that shows it changed ("value-added") must
-  attribute it to " Weather" "along with a notice that the data provided by Apple has been
-  modified". tvOS can't open the link, and
-  [`legalAttributionText`](https://developer.apple.com/documentation/weatherkit/weatherattribution/legalattributiontext)
-  (tvOS 16.4) is the "text that should be made available to users for apps that cannot display
-  the attributionURL contents in a Safari view". About the fly shows the mark, that the game
-  has modified the data, the legal text and the legal page's address, all from
-  `WeatherService.attribution`; the screensaver shows none of it. The game shows no weather
-  alerts, which have rules of their own.
+- [Attribution](https://developer.apple.com/weatherkit/#apple-weather-and-third-party-attribution):
+  Apple requires its weather mark and data-source attribution, with a modification
+  notice for value-added data. `legalAttributionText` (tvOS 16.4) supplies text for
+  apps unable to show the legal page. About the fly shows the mark, modification
+  notice, legal text and address from `WeatherService.attribution`; the screensaver
+  shows none of it. The game shows no weather alerts. Check the linked requirements
+  when changing how weather is presented.
 - [Quotas](https://developer.apple.com/weatherkit/): 500,000 calls a month come with the
   developer membership; more is a subscription (a million a month for US$49.99, up to 200
   million). Unused calls don't roll over.
-- Privacy. The [privacy manifest](../apps/tvos/src/PrivacyInfo.xcprivacy) still declares no
-  collected data: Apple's ["collect"](https://developer.apple.com/app-store/app-privacy-details/)
-  is "transmitting data off the device in a way that allows you and/or your third-party partners
-  to access it for a period longer than what is necessary to service the transmitted request in
-  real time", and "you are not responsible for disclosing data collected by Apple". The rounded
-  location goes only to Apple's WeatherKit, to answer that request; nothing is sent anywhere
-  else, kept off the device, or linked to anyone. Two decimal places is what Apple calls coarse
-  location ("lower resolution than a latitude and longitude with three or more decimal
-  places"). The service's one required-reason API is `NSUserDefaults`, for its own last answer,
-  already declared (CA92.1); Core Location isn't one.
+- Privacy. The [manifest](../apps/tvos/src/PrivacyInfo.xcprivacy) declares empty
+  collected-data arrays. The weather service rounds location to two decimal
+  places, sends it to WeatherKit and keeps the returned conditions rather than
+  the coordinates. Its `NSUserDefaults` use is declared with reason CA92.1;
+  the app also declares its system-boot-time API use. The manifest is not proof
+  that the whole app needs no disclosures: Online persists room state and logs.
+  Review [Apple's disclosure guidance](https://developer.apple.com/app-store/app-privacy-details/)
+  for the current release ([release setup](release.md#one-time-setup)).
 
 ### Cost
 
 At a 20-minute successful-refresh interval: 72 a day for a TV
 that shows the fly around the clock, about 2,200 a month, so the membership's 500,000 cover
-about 230 TVs doing that, and none while a TV sleeps (tvOS suspends the app). The attribution is
-asked for once a run; Apple doesn't say whether that counts.
+about 230 TVs doing that. This is refresh arithmetic, not a measured billing
+bound: expiry, failures, restarts and suspension change the total. Attribution
+is requested separately and retried if it fails; its quota treatment has not
+been established here.
 
 ### Turning it on (for the owner)
 
