@@ -43,7 +43,7 @@ The retained fixture uses the fly's world-defined start; eye offsets for follow,
 
 Initial L8 evidence is excluded: its fixture bypassed stage light application, had unsettled HUD fades and unpinned camera scouting. Three independent assessments scored it, but those numbers do not measure the product consistently and are not used to select changes. The fixture was corrected and baseline evidence recaptured as R4, with fresh independent reviewers. No game-camera code was changed.
 
-R4 build measurements: windowsill 65.3 ms, lab 56.0 ms. Steady screenshot draw counts: windowsill 21–23, lab 18–19. UI and fly-eye passes are excluded in this visual fixture; these counts are for comparisons within the experiment. Construction timings on the shared desktop are noisy and do not establish Apple TV frame performance.
+R4 build measurements: windowsill 65.3 ms, lab 56.0 ms. Steady screenshot draw counts: windowsill 21–23, lab 18–19. UI is hidden and brain stepping is suspended in this visual fixture; these steady counts are for comparisons within the experiment, not end-to-end TV totals. Construction timings on the shared desktop are noisy and do not establish Apple TV frame performance.
 
 ### Round 1 — retained
 
@@ -163,4 +163,71 @@ Key: D4 = recaptured incumbent; F2 = denser bottle tint and separately sorted be
 | **Panel** | **Sill** | | **7.31** | | **7.31** | **No meaningful winner** |
 | **Panel** | **Lab** | | **7.18** | | **7.25** | **3/3 F2** |
 
-Reverted the sill change: forced tie-breaks do not count as improvements. Retained the lab liquid, whose lower boundary and contact read more coherently, for one extra draw (19–20 versus 18–19 in the controlled views). I6 is the selected combination: D4 sill, F2 lab. The separate liquid is single-sided, has no transmission framebuffer pass, and reuses existing light uniforms; nothing is allocated each frame. Shader/browser errors are empty; lint, typecheck and 21 place tests pass. Relative-weakness report pending.
+Reverted the sill change: forced tie-breaks do not count as improvements. Retained the lab liquid, whose lower boundary and contact read more coherently, for one extra draw (19–20 versus 18–19 in the controlled views). I6 is the selected combination: D4 sill, F2 lab. The separate liquid is single-sided, has no transmission framebuffer pass, and reuses existing light uniforms; nothing is allocated each frame. Shader/browser errors are empty; lint, typecheck and 21 place tests pass. The relative-weakness reviewer found no meaningful difference in either place; its forced ordering was administrative. The lab retention therefore rests on the three scoring reviews, not unanimity across all four reviews.
+
+
+### Round 7 — rejected
+
+Key: I6 and Q3 = identical incumbent; W8 = brighter night fill and stronger lab lamp. Orders Q3/W8/I6, W8/I6/Q3, I6/Q3/W8; relative-weakness W8/I6.
+
+| Review | Place | I6 = Q3 scores | Mean | W8 scores | Mean | Forced first |
+| --- | --- | --- | ---: | --- | ---: | --- |
+| R1 | windowsill | 7,7,7.5,7,8,7.5,7 | 7.29 | 7,7,7.5,7,8,7.5,7 | 7.29 | set-Q3 |
+| R1 | lab | 7,7.5,6.5,7.5,8,6,7 | 7.07 | 7,7.5,6.5,7.5,8,6,7 | 7.07 | set-Q3 |
+| R2 | windowsill | 7,7,7,7.5,8,7.5,7.5 | 7.36 | 7,7,7,7.5,8,7.5,7.5 | 7.36 | set-Q3 |
+| R2 | lab | 7,7.5,6.5,7.5,8,6,7 | 7.07 | 7,7.5,6.5,7.5,8,6,6.5 | 7.00 | set-Q3 |
+| R3 | windowsill | 7.5,7.5,7,7.5,8,7.5,7.5 | 7.50 | 7.5,7.7,7,7.5,8,7.5,7.5 | 7.53 | set-W8 |
+| R3 | lab | 7.5,7,6.5,7.5,8,6,7 | 7.07 | 7.5,7.2,6.5,7.5,8,6,7 | 7.10 | set-W8 |
+| Panel | Sill | | 7.38 | | 7.39 | No meaningful majority |
+| Panel | Lab | | 7.07 | | 7.06 | No candidate majority |
+
+Reverted all night changes. Most scoring judgments were tied; only one scorer identified a tiny lighting benefit. The lab's mean fell, and the relative-weakness reviewer preferred the incumbent's less conspicuous foil striping. Arbitrary forced tie-breaks are not wins. Duplicate criterion differences were zero. Draw counts unchanged and shader/browser errors empty. This is the sill's second consecutive attempt without a meaningful improvement (round 6 tied), so its code is frozen for the final round. The lab has one unsuccessful attempt since its round-6 gain.
+
+
+### Round 8 — rejected; original baseline confirmation
+
+Key: O8 = original scene code recaptured under the locked fixture (original decoration restored in the fixture); I6 = incumbent; Z5 = lower-opacity lab rain streaks. The sill's code was held constant after its round-7 stopping condition. Orders I6/O8/Z5, Z5/I6/O8, O8/Z5/I6; relative-weakness Z5/I6/O8.
+
+| Review | Place | Set | Scores | Mean |
+| --- | --- | --- | --- | ---: |
+| R1 | windowsill | set-O8 | 7,7.5,7,6.5,7,7,6.5 | 6.93 |
+| R1 | windowsill | set-I6 | 7.5,7.3,7.5,7.5,8,7.5,7.5 | 7.54 |
+| R1 | windowsill | set-Z5 | 7.5,7.5,7.5,7.5,8,7.5,7.5 | 7.57 |
+| R1 | lab | set-O8 | 7,7,7,7.5,7.5,5.5,6.5 | 6.86 |
+| R1 | lab | set-I6 | 7.5,7.5,7,7.5,8,6.5,7.5 | 7.36 |
+| R1 | lab | set-Z5 | 7.5,7.5,7,7.5,8,6.5,7.5 | 7.36 |
+| R2 | windowsill | set-O8 | 6,7,7,6,7,7,6 | 6.57 |
+| R2 | windowsill | set-I6 | 7,7,7,7,8,7,8 | 7.29 |
+| R2 | windowsill | set-Z5 | 7,7,7,7,8,7,8 | 7.29 |
+| R2 | lab | set-O8 | 7,7,6,8,8,5,7 | 6.86 |
+| R2 | lab | set-I6 | 7,7,6,8,8,6,8 | 7.14 |
+| R2 | lab | set-Z5 | 7,7,6,8,8,6,8 | 7.14 |
+| R3 | windowsill | set-O8 | 7,7,6.5,6.5,7,6.5,6 | 6.64 |
+| R3 | windowsill | set-I6 | 7.5,7,7,7.5,7.5,7,7.5 | 7.29 |
+| R3 | windowsill | set-Z5 | 7.5,7,7,7.5,7.5,7,7.5 | 7.29 |
+| R3 | lab | set-O8 | 7,6.5,6.5,7,7.5,5.5,6.5 | 6.64 |
+| R3 | lab | set-I6 | 7.5,7,7,7.5,7.5,7.5,7 | 7.29 |
+| R3 | lab | set-Z5 | 7.5,7,7,7.5,7.5,7.5,7 | 7.29 |
+| Panel | Sill | O8 | | 6.71 |
+| Panel | Sill | I6 | | 7.37 |
+| Panel | Sill | Z5 | | 7.38 |
+| Panel | Lab | O8 | | 6.79 |
+| Panel | Lab | I6 | | 7.26 |
+| Panel | Lab | Z5 | | 7.26 |
+
+Forced orders: R1 sill Z5/I6/O8, lab I6/Z5/O8; R2 and R3 both places Z5/I6/O8. All lab I6/Z5 scores were identical, and reviewers explicitly called the tie-breaks arbitrary. The sill has no code difference between I6/Z5; one scorer's 0.2 lighting difference is scoring noise and is not counted as progress. Reverted the lab rain change. The relative-weakness reviewer also found I6/Z5 tied and preferred both over O8.
+
+All three scoring reviewers ranked the retained result over the original for both places, with higher absolute scores. Final paired original → retained: sill **6.71 → 7.37**, lab **6.79 → 7.26**. R8 is a fresh capture of the selected code on the final rebased branch. The experiment stops at eight rounds, below 9/10; the lab also has two consecutive unsuccessful attempts (7–8). No ninth iteration is claimed.
+
+## Final assessment
+
+The strongest result is the quieter, correctly scaled painted sill. The lab gains clearer outside layers, less intrusive notebook/window striping, stronger lamp-source cues and a better separated beaker liquid. No solids or food changed. Remaining weaknesses include glass optics, night shadow banding and equipment separation, simplified exterior foliage, and fly visibility in whole-place framing. A useful next experiment would be a restrained millimetre calibration mark or slide near the fly, alongside better local night lighting; camera work remains outside this experiment.
+
+The visual gains are worth maintainer review. Keep the PR draft: the score target was not reached and unrelated validation failures remain. It has never been marked ready or merged.
+
+
+## Final checks on the rebased branch
+
+The final branch includes the current dev camera/menu/room fixes without editing those systems. `places.test.ts` now passes **33/33**, including the incoming whole-place screensaver cases. Lint and typecheck pass. The final paired original/selected build medians are **39.25 / 39.35 ms** for the sill (+0.25%) and **42.3 / 42.55 ms** for the lab (+0.59%); 12 alternating warm samples each. The selected lab adds one draw; the sill adds none. These are desktop measurements, not TV timings. R8's 42 final screenshots have no shader/browser errors.
+
+The earlier play e2e run passed. Its final rerun after rebasing failed at the known nervous-system check, `its brain’s regions glow at rest`, while still in the untouched picnic scene. The failure is recorded alongside the unchanged brain CPU-budget failure; neither is claimed green. The original full npm test run's main suite was green (732 pass, 2 skip), but its serialized brain budget and targeted retry failed. No brain, camera, bar or restaurant code was changed by this branch.
