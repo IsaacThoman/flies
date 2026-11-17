@@ -50,7 +50,7 @@ export function buildNerves(rest: Float32Array = restFrames()): THREE.BufferGeom
   for (const group of SOMA_GROUPS) {
     for (const neuron of group.neurons) {
       const p = neuron.cord ? cordPoint(neuron.p, 1) : brainPoint(neuron.p, 1);
-      b.ellipsoid(group.id, neuron.cord ? J.thorax : J.head, p, [0.0015, 0.0015, 0.0015], { nu: 6, nv: 4, dot: true });
+      b.ellipsoid(group.id, neuron.cord ? J.thorax : J.head, p, [0.0015, 0.0015, 0.0015], { nu: 4, nv: 2, dot: true });
     }
   }
   const missing = b.missing();
