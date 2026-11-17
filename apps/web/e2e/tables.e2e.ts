@@ -429,8 +429,8 @@ try {
   await maker.page.goto(`${url}?rooms=${roomsAt}`);
   await waitFor(maker.page, "brain=running,screen=title", 120_000);
   await fly(maker.page, "g.open('online')");
-  // Disconnected, Go online comes first.
-  await waitFor(maker.page, "screen=online,onlineView=rooms,focus=online");
+  // At home, New room comes first.
+  await waitFor(maker.page, "screen=online,onlineView=rooms,focus=new");
   await keyTo(maker.page, "new", "ArrowDown");
   await maker.page.keyboard.press("Enter");
   await waitFor(maker.page, "onlineView=new,focus=create");
