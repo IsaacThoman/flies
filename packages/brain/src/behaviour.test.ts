@@ -156,6 +156,16 @@ test("left and right mirror each other: either eye's loom escapes alike, and a s
   assert.ok(turns[1] > 0.2, `a scene on the right turns ${turns[1]}`);
   const ratio = Math.abs(turns[0] / turns[1]);
   assert.ok(ratio > 1 / 1.6 && ratio < 1.6, `left ${turns[0]} against right ${turns[1]}`);
+
+  // Either side's front-of-head bristles reach grooming. Measured: groom 0.26 from the left and 0.24 from the
+  // right; 0.15 and 0 while five of the right's were muted as serotonergic (params.ts).
+  const grooms = (["left", "right"] as const).map((side) => {
+    const b = brain({ spontaneous: false });
+    b.sim.addInput("bristles", connectome!.find({ superClass: "cb_sensory", type: "BM", side }), 50);
+    run(b, 1000);
+    return mean(b, 1000, RESTING_SENSES).groom;
+  });
+  for (const groom of grooms) assert.ok(groom > 0.1, `bristles: groom ${grooms}`);
 });
 
 test("a fed fly leaves alone sugar that a starved one feeds on", { skip }, () => {

@@ -74,6 +74,7 @@ const superClass = (c: Connectome, i: number) => c.columns.superClass.value(i);
 const side = (c: Connectome, i: number) => c.columns.side.value(i);
 const type = (c: Connectome, i: number) => c.columns.type.value(i);
 const predicted = (c: Connectome, i: number) => c.columns.nt.value(i);
+const MONOAMINES = new Set(["DA", "SER", "OCT"]);
 
 /** Transmitter corrections backed by known biology. */
 export const TRANSMITTER_FIXES: readonly TransmitterFix[] = [
@@ -92,6 +93,12 @@ export const TRANSMITTER_FIXES: readonly TransmitterFix[] = [
     reason:
       "Mechanosensory, gustatory, olfactory and other primary sensory neurons outside the eye are cholinergic; the prediction is blank for about 2,100 of them, most head bristle neurons among them.",
     applies: (c, i) => /sensory/.test(superClass(c, i)) && superClass(c, i) !== "ol_sensory" && predicted(c, i) === "",
+    nt: "ACH",
+  },
+  {
+    reason:
+      "The head's mechanosensory neurons, its bristles' (BM) and Johnston's organ's (JO), are cholinergic like the rest of their types: the dataset's own type-level transmitter for them is acetylcholine. Eleven are predicted a monoamine one by one, at low confidence (51-73%, against a median of 95% for the bristles predicted cholinergic), and so were muted: seven bristle neurons, five of them on the right, which were the right side's whole route from the head's bristles to grooming, and four of the right antenna's zone E.",
+    applies: (c, i) => superClass(c, i) === "cb_sensory" && /^(BM|JO-)/.test(type(c, i)) && MONOAMINES.has(predicted(c, i)),
     nt: "ACH",
   },
   {
