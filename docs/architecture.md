@@ -100,7 +100,9 @@ when constructing a brain.
    Flight has a procedural wing-drive floor that holds and then decreases
    while airborne (`packages/body/src/behavior.ts`, [Flight](../README.md#flight)).
    Escape takeoff and air steering use brain commands; falling off a surface
-   also activates the floor. Neural wing drive can exceed it. No neuron is
+   also activates the floor. Neural wing drive can exceed it. A walking fly's
+   occasional voluntary take-off is a body stand-in too, gated on the brain's
+   walking (`VOLUNTARY_WALK` in the same file). No neuron is
    both driven and read by a command; what is read only for display (the regions,
    the vision stages) feeds no command. Document departures from the connectome
    in `packages/brain/README.md`.

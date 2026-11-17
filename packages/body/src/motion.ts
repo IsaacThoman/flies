@@ -16,14 +16,15 @@
 //   force, and bounces off what it flies into, an underside included. Its
 //   head, abdomen and legs keep out of what they reach (#clear), which can
 //   turn it between things too close for it as it faces (#turnToFit). A
-//   take-off is the escape command's; its direction is the body's: away
-//   from a threat it knows of, else straight ahead. In the air it turns to
-//   face its course (VANE_RATE).
+//   take-off is the escape command's, or the body's voluntary one
+//   (behavior.ts, VOLUNTARY_WALK); its direction is the body's: away from a
+//   threat it knows of, else straight ahead. In the air it turns to face its
+//   course (VANE_RATE).
 // - Flight itself, once its feet are off the ground, is held up by the
 //   tarsal reflex in behavior.ts (TARSAL_ONSET), not the brain.
 // - Staying in the world: it doesn't walk off the table, and in the air is
-//   drawn back toward it near the edges of the world, sliding round
-//   anything standing in its way back.
+//   drawn back toward it near the edges of the world, turned to face back
+//   over them, and sliding round anything standing in its way back.
 // - Turning away from a wall it has been pressed against, facing it, for
 //   WALL_PATIENCE seconds. The brain feels the wall on its antennae and
 //   grooms them, but nothing in the model turns it away or backs it off (a
@@ -686,7 +687,14 @@ export class FlyBody {
     const sx = v.x - forces.air.x;
     const sz = v.z - forces.air.z;
     const course = Math.hypot(sx, sz);
-    const vane = course > 1e-6 ? wrap(Math.atan2(sx, sz) - this.yaw) * VANE_RATE * Math.min(1, course / VANE_SPEED) : 0;
+    const out = world.beyond(p.x, p.z, this.#inward);
+    // Past the world's edge it faces back over it: drawn in alone, its wings would carry it round and round outside.
+    const vane =
+      out > 0
+        ? wrap(Math.atan2(this.#inward.x, this.#inward.z) - this.yaw) * VANE_RATE
+        : course > 1e-6
+          ? wrap(Math.atan2(sx, sz) - this.yaw) * VANE_RATE * Math.min(1, course / VANE_SPEED)
+          : 0;
     const yawRate = intent.airYawRate + vane;
     this.yaw = wrap(this.yaw + yawRate * dt);
     this.turnRate = yawRate;
@@ -698,7 +706,6 @@ export class FlyBody {
     let ay = LIFT * w - GRAVITY - DRAG * (v.y - forces.air.y);
     let az = fz * THRUST * w - DRAG * (v.z - forces.air.z);
     // Drawn back into the world near its edges: the body's, see the top of the file.
-    const out = world.beyond(p.x, p.z, this.#inward);
     if (out > 0) {
       ax += this.#inward.x * out * AIR_PULL;
       az += this.#inward.z * out * AIR_PULL;

@@ -1,6 +1,7 @@
 // What the body makes of the brain's commands: thresholds, smoothing and
-// hysteresis. This decides nothing by itself: every
-// action starts with a command read from the fly's own neurons.
+// hysteresis. Every action starts with a command read from the fly's own
+// neurons, but for one stand-in: the voluntary take-off (VOLUNTARY_WALK),
+// which the body adds to walking the brain chose.
 
 import type { BrainCommand } from "@fly/brain";
 
@@ -72,7 +73,8 @@ export const ESCAPE_REFRACTORY = 1.5;
  *   other way (walking off a ledge), it starts TARSAL_ONSET after the feet
  *   leave, a stand-in for the time the flight motor takes to come up to
  *   power: a step down of a few millimetres is over before then.
- * - For FLIGHT_HOLD it holds FLIGHT_WINGS, a little over what holds the fly
+ * - For FLIGHT_HOLD (CRUISE_HOLD after a voluntary take-off, VOLUNTARY_WALK)
+ *   it holds FLIGHT_WINGS, a little over what holds the fly
  *   up, so it flies on, level or climbing a little, at about 0.28 m/s: a
  *   fruit fly cruises at about 0.3 m/s and can reach about 1 m/s (David 1978).
  * - Then it eases over FLIGHT_FADE to LAND_WINGS, short of holding it up, and
@@ -98,6 +100,38 @@ export const FLIGHT_WINGS = 0.62;
 export const FLIGHT_HOLD = 0.7;
 export const FLIGHT_FADE = 0.4;
 export const LAND_WINGS = 0.54;
+/**
+ * The voluntary take-off: a fly walking about now and then flies off, and the
+ * body does that for it. A stand-in for circuitry the model lacks, not the
+ * brain's choice.
+ *
+ * Flies take off without a threat, and those take-offs aren't escapes: the
+ * wings are raised before the legs push off, the jump is slower and steadier,
+ * and the giant fiber isn't needed (Card & Dickinson 2008, J Exp Biol 211:341;
+ * von Reyn et al. 2014). What starts them isn't known well enough to read. In
+ * the model nothing does: at rest the flight motor neurons wander under
+ * `wings` 0.21 (10 minutes, seeds 1 to 3), a third of what holds the fly up,
+ * and none of the descending neurons that drive them stands out as a take-off
+ * command (packages/brain/README.md, What it does and doesn't reproduce). Left
+ * to the brain the fly never leaves the ground unless something looms at it.
+ *
+ * So while the brain walks it, on its feet and not feeding or singing, the
+ * body counts down a span of walking drawn at random, VOLUNTARY_WALK seconds
+ * on average, then raises the wings for VOLUNTARY_RAISE and jumps, gently
+ * (VOLUNTARY_STRENGTH), along its heading. What the brain does still decides
+ * when: a fly that rests, sleeps or feeds doesn't count down, and one that
+ * stops walking while its wings are raised stays. The rate is chosen for a fly
+ * worth watching, not measured: on the lively day's peaks, where it walks
+ * about half the time, about once a minute.
+ *
+ * In the air the tarsal reflex (TARSAL_ONSET) holds it up for CRUISE_HOLD,
+ * longer than an escape's FLIGHT_HOLD: a flight to go somewhere, not a dash
+ * away, steered by the brain's `turn` as any flight is.
+ */
+export const VOLUNTARY_WALK = 30;
+export const VOLUNTARY_RAISE = 0.15;
+export const VOLUNTARY_STRENGTH = 0;
+export const CRUISE_HOLD = 2.5;
 /** Wings and grooming below this are the brain idling, not an action: the pose gets nothing, and what's above is stretched back over 0 to 1. */
 export const POSE_FLOOR = 0.2;
 /**
@@ -141,6 +175,8 @@ export type Intent = {
   airYawRate: number;
   /** A take-off this frame, with its strength 0 to 1; null otherwise. */
   takeOff: number | null;
+  /** That take-off is the body's voluntary one (VOLUNTARY_WALK), not the giant fiber's. */
+  voluntary: boolean;
   /** The flight muscles' drive, 0 to 1, for the wings' force in the air: the brain's, or the tarsal reflex's floor where that is higher. */
   wings: number;
   /** The floor the tarsal reflex (TARSAL_ONSET) keeps under `wings` now: 0 on its feet. */
@@ -169,6 +205,7 @@ export const createIntent = (): Intent => ({
   yawRate: 0,
   airYawRate: 0,
   takeOff: null,
+  voluntary: false,
   wings: 0,
   reflex: 0,
   wingPose: 0,
@@ -183,7 +220,10 @@ export const createIntent = (): Intent => ({
 type Channel = "walk" | "turn" | "back" | "wings" | "groom" | "feed" | "sing";
 const CHANNELS: readonly Channel[] = ["walk", "turn", "back", "wings", "groom", "feed", "sing"];
 
-/** Turns the brain's latest command into what the body is asked to do. Allocates nothing per frame. */
+/**
+ * Turns the brain's latest command into what the body is asked to do. Allocates nothing per frame.
+ * `seed` sets the voluntary take-off's draws (VOLUNTARY_WALK), so a life replays the same.
+ */
 export class Behavior {
   readonly intent = createIntent();
   #smoothed: Record<Channel, number> = { walk: 0, turn: 0, back: 0, wings: 0, groom: 0, feed: 0, sing: 0 };
@@ -192,6 +232,25 @@ export class Behavior {
   #armed = false;
   #refractory = 0;
   #aloft = 0;
+  #hold = FLIGHT_HOLD;
+  #random: number;
+  #walkLeft: number;
+  /** Seconds left with its wings raised before a voluntary take-off; -1 while none is coming. */
+  #raising = -1;
+
+  constructor(seed = 1) {
+    this.#random = seed >>> 0 || 1;
+    this.#walkLeft = this.#draw();
+  }
+
+  /** A span of walking, exponentially distributed with mean VOLUNTARY_WALK (mulberry32). */
+  #draw() {
+    let t = (this.#random = (this.#random + 0x6d2b79f5) >>> 0);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    const u = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    return -Math.log(1 - u) * VOLUNTARY_WALK;
+  }
 
   /**
    * `command` is the latest from the brain (null if none), `ageMs` how old it
@@ -202,11 +261,14 @@ export class Behavior {
     const out = this.intent;
     this.#refractory = Math.max(0, this.#refractory - step);
     this.#aloft = onFeet ? 0 : this.#aloft + step;
+    if (onFeet) this.#hold = FLIGHT_HOLD;
     out.takeOff = null;
+    out.voluntary = false;
     if (!command || !(ageMs <= COMMAND_STALE_MS)) {
       this.#fresh = false;
       this.#grooming = 0;
       this.#armed = false;
+      this.#raising = -1;
       for (const channel of CHANNELS) this.#smoothed[channel] = 0;
       Object.assign(out, createIntent());
       return out;
@@ -240,7 +302,7 @@ export class Behavior {
     out.airYawRate = -s.turn * AIR_TURN_RATE;
     // The tarsal reflex: a floor under the wings' drive while its feet are off the ground (see TARSAL_ONSET).
     const flying = this.#aloft - TARSAL_ONSET;
-    const held = flying <= FLIGHT_HOLD ? 1 : Math.max(0, 1 - (flying - FLIGHT_HOLD) / FLIGHT_FADE);
+    const held = flying <= this.#hold ? 1 : Math.max(0, 1 - (flying - this.#hold) / FLIGHT_FADE);
     out.reflex = onFeet || flying < 0 ? 0 : LAND_WINGS + (FLIGHT_WINGS - LAND_WINGS) * held;
     out.wings = Math.max(s.wings, out.reflex);
     out.wingPose = posed(out.wings);
@@ -261,7 +323,27 @@ export class Behavior {
       out.takeOff = clamp((escape - ESCAPE_ON) / (1 - ESCAPE_ON), 0, 1);
       // Into flight with the jump (see TARSAL_ONSET).
       this.#aloft = TARSAL_ONSET;
+      this.#raising = -1;
+      return out;
     }
+
+    // The voluntary take-off (see VOLUNTARY_WALK): only while the brain walks it.
+    const walkingOff = onFeet && out.walking && !out.backing && !out.feeding && !out.singing;
+    if (!walkingOff) this.#raising = -1;
+    else if (this.#raising < 0) {
+      this.#walkLeft -= step;
+      if (this.#walkLeft <= 0) this.#raising = VOLUNTARY_RAISE;
+    } else if ((this.#raising -= step) <= 0) {
+      this.#raising = -1;
+      this.#walkLeft = this.#draw();
+      out.takeOff = VOLUNTARY_STRENGTH;
+      out.voluntary = true;
+      this.#aloft = TARSAL_ONSET;
+      this.#hold = CRUISE_HOLD;
+      return out;
+    }
+    // Wings up and open before the legs push off, as a fly raises them for a voluntary take-off.
+    if (this.#raising >= 0) out.wingPose = Math.max(out.wingPose, posed(FLIGHT_WINGS));
     return out;
   }
 }

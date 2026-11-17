@@ -47,7 +47,7 @@ not a complete biological fly. It reads sensory input and synthetic internal
 state and produces movement/activity commands.
 
 The body supplies collision handling, a wing-drive floor for sustained
-flight, food alignment, hunger, the daily clock and sleep pressure. The rig
+flight, voluntary take-offs while the brain walks it, food alignment, hunger, the daily clock and sleep pressure. The rig
 supplies gait and idle motion. Those are stand-ins. Song is shown as wing
 movement; there is no audio. See [model limits](packages/brain/README.md#what-it-does-and-doesnt-reproduce),
 [body and sensory mechanisms](docs/simulation.md), and the retained sleep

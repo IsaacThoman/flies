@@ -79,7 +79,9 @@ lives (`packages/body/src/motion.ts` unless noted):
   have its wings carry it straight back.
 - **Staying in the world.** It doesn't walk off the table's edge, and in the
   air soft forces draw it toward the place's floor boundary and below its ceiling;
-  these are place-dependent, not hard clamps.
+  these are place-dependent, not hard clamps. Past the floor's edge it is also
+  turned to face back over it: drawn in alone, a long flight's thrust carried it
+  round and round just outside the picnic table.
 - **Turning from a wall.** Pressed against a wall it faces for 2 s, it turns
   away (about 125°). The brain feels the wall on its antennae and grooms
   them (Johnston's organ's displacement-sensitive neurons drive the
@@ -121,8 +123,9 @@ proportion to the wings' drive, 0.6 holding its weight, and thrust along its
 body), driven by the brain's flight motor neurons and, while its feet are off
 the ground, by a body reflex standing in for circuitry the model lacks.
 
-**What the brain does.** It decides whether to go: the body takes off only when
-the giant fiber (DNp01) fires, and nothing else starts a take-off. It steers in
+**What the brain does.** It decides whether to escape: the body jumps away when
+the giant fiber (DNp01) fires. Otherwise only the body's voluntary take-off
+(below) starts a flight, and only while the brain walks the fly. It steers in
 the air (`turn`, 5 rad/s at full). Its own wing drive counts whenever it is
 higher than the reflex's: the hand-wired loom (eyes off) drives the flight motor
 neurons to `wings` 0.8 to 0.9, and the fly then climbs and flies longer.
@@ -158,6 +161,27 @@ a stand-in: what a real fly
 does with an escape flight and where it chooses to land is decided in circuits
 the model doesn't reproduce well enough to read, and no landing command is read
 from it. Without a brain (its commands stale) there is no reflex either.
+
+**What the body adds: the voluntary take-off** (`packages/body/src/behavior.ts`,
+`VOLUNTARY_WALK`). Flies also take off with no threat, and those take-offs
+aren't escapes: the wings come up before the legs push off, the jump is slower,
+and the giant fiber isn't needed (Card & Dickinson 2008). The model has nothing
+that starts one: at rest its flight motor neurons reach a third of what holds
+the fly up at most, and no descending neuron stands out as the command
+(`packages/brain/README.md`, What it does and doesn't reproduce). Left to the
+brain, the fly never left the ground unless something loomed at it. So while
+the brain walks it, on its feet and not feeding or singing, the body counts
+down a span of walking drawn at random, 30 s on average, then raises the
+wings for 0.15 s and jumps gently along its heading. A fly that rests, sleeps
+or feeds never counts down, and one whose brain stops walking while its wings
+are up stays on the ground. The reflex then holds flight power for 2.5 s
+instead of an escape's 0.7: a flight of about 4 s and a few hundred
+millimetres, steered by the brain's `turn`, then the glide down. The rate is
+chosen for a fly worth watching, not measured. With the real connectome on the
+picnic table (lively pace, eyes shut, 10 minutes each, seeds 1 and 2), the fly
+took off 6 and 8 times at dusk (walking 50% and 39% of the time), 3 and 4 at
+13:00 (28% and 23%), and 2 and 1 at 01:00 (8% and 7%). The caption says
+"Flying" and the stats count the take-off; nothing shows it as the brain's.
 
 **The wings' own sensors** (`wingbeat`, The fly's senses) feel the strokes the
 floor makes as they would any others, providing direct proprioceptive feedback. Its changed motion also changes
