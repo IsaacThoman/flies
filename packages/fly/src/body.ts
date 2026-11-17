@@ -51,15 +51,17 @@ const C = {
   bristle: rgb("#24180f"),
 };
 
+// Anatomy: Genetics 2024 doi:10.1093/genetics/iyae129. These finishes are
+// display choices, not measured cuticle reflectances.
 // roughness, clearcoat, sheen, region
 const M = {
-  thorax: [0.55, 0.3, 0.6, 2] as Mat,
-  head: [0.5, 0.35, 0.4, 0] as Mat,
+  thorax: [0.68, 0.16, 0.6, 2] as Mat,
+  head: [0.58, 0.23, 0.4, 0] as Mat,
   eye: [0.3, 0, 0.35, 1] as Mat,
   ocellus: [0.12, 1, 0, 0] as Mat,
   abdomen: [0.38, 0.6, 0.25, 0] as Mat,
   membrane: [0.6, 0.2, 0.3, 0] as Mat,
-  leg: [0.45, 0.4, 0.3, 0] as Mat,
+  leg: [0.6, 0.23, 0.3, 0] as Mat,
   claw: [0.25, 0.8, 0, 0] as Mat,
   bristle: [0.35, 0.5, 0, 0] as Mat,
   soft: [0.55, 0.15, 0.5, 0] as Mat,
