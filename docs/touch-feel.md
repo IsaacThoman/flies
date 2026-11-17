@@ -198,9 +198,49 @@ code was changed. The iPad shell also passed all 17 tests (231 s); its simulator
 
 ## Coalesced-input pass
 
-Key: set-C9 is this pass; set-R6 is the preceding reach/edge pass. Scores and
-randomized order pending. The DOM pointer handler keeps maximum travel across
+Key: set-C9 is this pass; set-R6 is the preceding reach/edge pass.
+Order: R6/C9, R6/C9, C9/R6; regression review R6/C9.
+
+| Reviewer | Set | Intent | Reach | Visibility | Conventions | Response | Resize | Other | Mean |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| U3 | R6 | 8 | 8.5 | 8.5 | 9 | 10 | 9 | 9 | 8.86 |
+| U3 | C9 | 9.5 | 8.5 | 8.5 | 9.5 | 10 | 9 | 9 | 9.14 |
+| G8 | R6 | 8 | 8.5 | 8.5 | 8 | 10 | 9 | 9 | 8.71 |
+| G8 | C9 | 8.5 | 8.5 | 8.5 | 9 | 9 | 9 | 9 | 8.79 |
+| A5 | R6 | 7.5 | 8 | 8 | 8 | 10 | 9 | 9 | 8.50 |
+| A5 | C9 | 9 | 8 | 8 | 8.5 | 10 | 9 | 9 | 8.79 |
+
+Mean: **8.90**, versus **8.69** for R6 in this comparison. All three prefer
+C9. The regression review confirms the coalesced-motion fix and finds no other
+comparative regression.
+
+Coverage correction: the initial 844×390 session had an airborne fly and an
+offscreen hand; no actual world tap was delivered, so this was not counted as
+a missed input. That viewport was repeated with a visible, grounded hand,
+using at most twelve half-second game-time retries. The corrected session is
+retained separately as set-D4; the original C9 evidence is preserved. The
+review scores above remain those given to C9, including its coverage limit. The DOM pointer handler keeps maximum travel across
 all coalesced samples but queues only the final drag. Both mouse and touch
 out-and-back batches now cancel the tap and synchronous field focus, with a
 focused test confirming that no extra drag gestures are allocated. 58 focused
 tests pass. No further visual/menu changes in this pass.
+
+## Local validation and limits
+
+The final full run before the latest dev merge passed all 784 ordinary tests
+(780 passed, four expected skips). The separate unchanged TypeScript-brain
+cost budget failed at 0.609 CPU s/s versus 0.5; earlier observations were 0.592
+and 0.570. The remote-play run stopped at the known region-glow assertion.
+These results are retained rather than represented as a green full run.
+
+Both iPhone and iPad `ios:check` runs passed all 17 checks, including lifecycle,
+same-seat reconnect and invitation handling; their fresh simulators were
+removed. Lint, typecheck, pointer, web and tables e2e passed. A merge commit
+incorporates current dev, including held-input cleanup, event timestamps,
+menu identity and text entry. Local post-merge checks are recorded in the PR.
+
+Touch changes stay out of camera.ts and drag-to-camera behavior. The lens
+adds one GPU quad only while a touch-held tool points at the world; the TV
+creates no lens and retains its existing overlay behavior. No sound or extra
+on-screen instructions were added. Next device work is physical haptic timing,
+edge-gesture interaction, keyboard appearance and live Split View transitions.
