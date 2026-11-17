@@ -31,7 +31,6 @@ import { DRAG_ROUND, DRAG_UP, PlayControls } from "./controls.ts";
 import type { PlayTarget, ToolUse } from "./controls.ts";
 import { COLOURS, MAX_OWN, PROTOCOL, everyoneIndex } from "@fly/net";
 import type { SeatedFly, TableStart } from "@fly/net";
-import { TAP_SLOP } from "./input.ts";
 import { TouchLoupe } from "./ui/touch-loupe.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
 import { Life } from "./life.ts";
