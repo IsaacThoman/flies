@@ -159,11 +159,11 @@ async function main() {
   const order = (run: number) => (run % 2 ? [...directories].reverse() : directories);
   const runs = Number(values.runs), seconds = Number(values.seconds), memorySeconds = Number(values["memory-seconds"]);
   assert.ok(Number.isInteger(runs) && runs >= 3, "at least 3 runs");
-  assert.ok(Number.isFinite(seconds) && seconds >= 2 && Number.isFinite(memorySeconds) && memorySeconds >= 0);
+  assert.ok(Number.isFinite(seconds) && seconds >= 2 && seconds <= 120 && Number.isFinite(memorySeconds) && memorySeconds >= 0);
   const phases = values.phases.split(",");
   assert.ok(phases.every(p => ["loads", "frames", "memory", "brain", "bundle"].includes(p)));
   assert.ok(!values["compare-dir"] || (!values.build && phases.every(p => ["loads", "frames"].includes(p))), "--compare-dir uses prebuilt sites and loads/frames phases");
-  const batches = directories.length === 1 ? [Array.from({ length: runs }, (_, i) => i)] : Array.from({ length: runs }, (_, i) => [i]);
+  const batches = Array.from({ length: runs }, (_, i) => [i]);
   const builtArtifact = values.build ? await bundle(out, dir) : null;
   const report: Record<string, unknown> = { complete: false, runnerRevision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), dirty: execFileSync("git", ["diff", "--stat"], { encoding: "utf8" }), node: process.version, host: os.cpus()[0].model, options: values, notes: "Timings include instrumentation; title uses the canvas state, published about every 200 ms; frame submission is not GPU/display time. Phone CPU throttling affects page only. Memory includes worker Wasm separately; memory checkpoints n=1; active batches separated by a paused two-minute cooldown; GC queries hold frames briefly." };
   const artifacts: Record<string, ReturnType<typeof artifact>> = {};
@@ -257,21 +257,28 @@ async function main() {
   if (phases.includes("frames")) {
     const frames: unknown[] = [];
     report.frames = frames;
-    for (const batch of batches) await withHeavySlot(async () => {
-    for (const run of batch) for (const directory of order(run)) {
-      const l = await lane(directory);
-      try {
-        for (const place of (run % 2 ? [...PLACES].reverse() : PLACES)) for (const mode of ["play", "watch"]) {
-          await move(l.page, place.id, mode === "watch");
-          if (mode === "play") await l.page.evaluate(() => { while (globalThis.__fly.hands.current.id !== "swoop") globalThis.__fly.hands.stepTool(1); });
-          frames.push({ run, variant: directories.indexOf(directory), place: place.id, mode, ...await frameSample(l.page, l.cdp, seconds, mode === "play"), loadAverage: os.loadavg() });
-          save();
+    // Split long samples as well as repetitions, reserving time for scene setup and cleanup.
+    const casesPerBatch = Math.max(1, Math.floor(420 / (directories.length * (seconds + 10))));
+    for (let run = 0; run < runs; run++) {
+      const cases = (run % 2 ? [...PLACES].reverse() : PLACES).flatMap(place =>
+        (["play", "watch"] as const).map(mode => ({ place, mode })));
+      for (let from = 0; from < cases.length; from += casesPerBatch) await withHeavySlot(async () => {
+        for (const directory of order(run)) {
+          const l = await lane(directory);
+          try {
+            for (const { place, mode } of cases.slice(from, from + casesPerBatch)) {
+              await move(l.page, place.id, mode === "watch");
+              if (mode === "play") await l.page.evaluate(() => { while (globalThis.__fly.hands.current.id !== "swoop") globalThis.__fly.hands.stepTool(1); });
+              frames.push({ run, variant: directories.indexOf(directory), place: place.id, mode, ...await frameSample(l.page, l.cdp, seconds, mode === "play"), loadAverage: os.loadavg() });
+              save();
+            }
+            assert.deepEqual(l.errors, []);
+          } finally { await l.close(); }
         }
-        assert.deepEqual(l.errors, []);
-      } finally { await l.close(); }
+      });
     }
-    });
   }
+
   if (phases.includes("memory")) {
     const memory: unknown[] = [];
     report.memory = memory;
@@ -342,6 +349,7 @@ async function main() {
       const [rest, rawRest] = cost(RESTING_SENSES);
       const [full, rawFull] = cost({ ...RESTING_SENSES, loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1 });
       rows.push({ rest, full, rawRest, rawFull });
+      await new Promise<void>(resolve => setImmediate(resolve));
     }
     report.brain = { rest: distribution(rows.map(r => r.rest)), full: distribution(rows.map(r => r.full)), rows };
   });
