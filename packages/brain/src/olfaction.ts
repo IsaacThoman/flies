@@ -41,9 +41,11 @@ const SIDES: readonly OrnSide[] = ["left", "right", "unknown"];
  * glomerulus fire at the median spontaneous rate and answer nothing.
  */
 export function wireOlfaction(connectome: Connectome): OrnGroup[] {
+  // One pass over the connectome: the olfactory neurons, then each glomerulus's among them.
+  const olfactory = connectome.find({ superClass: "cb_sensory", class: "olfactory" });
   const groups: OrnGroup[] = [];
   const add = (glomerulus: string, type: string, spontaneous: number, answers: readonly number[]) => {
-    const all = connectome.find({ superClass: "cb_sensory", class: "olfactory", type });
+    const all = olfactory.filter((i) => connectome.columns.type.value(i) === type);
     for (const side of SIDES) {
       const neurons = all.filter((i) => (connectome.columns.side.value(i) || "unknown") === side);
       if (neurons.length === 0) continue;
