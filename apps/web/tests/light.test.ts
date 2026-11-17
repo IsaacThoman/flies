@@ -211,3 +211,13 @@ test("rain changing by itself updates the light and darkens an overcast room", (
   assert.ok(light.middle.r < middle.r && light.hemiIntensity < ambient);
   assert.equal(light.update(0, { ...weather, rain: 0.8 }), false);
 });
+
+test("mist changing by itself updates the haze, then holds until the weather changes again", () => {
+  const light = new Daylight("noon", ROOM);
+  const weather: Weather = { ...KINDS.clear, kind: "clear", wet: 0 };
+  light.update(0, weather);
+  const haze = light.haze.clone();
+  assert.equal(light.update(0, { ...weather, mist: 0.8 }), true);
+  assert.ok(colourGap(light.haze, haze) > 0.01, "mist reaches the distance even when cloud and rain hold");
+  assert.equal(light.update(0, { ...weather, mist: 0.8 }), false);
+});

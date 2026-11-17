@@ -3,6 +3,7 @@
 The catalogue in `scripts/mutation-cases.ts` introduces one deliberate fault
 at a time. `node scripts/mutate.ts --out /tmp/mutations.json` runs only the
 covering test files. `--module <substring>` and `--fault <id>` narrow it.
+`--catalogue challenges` runs the separate independently proposed faults.
 No new dependency. Sources and workspace package links are copied to a
 scratch checkout; original files are never mutated. Clean tests must pass
 first. Invalid mutations and process timeouts are errors, not kills.
@@ -31,6 +32,14 @@ The fixed sample has 68 faults over 11 modules. Initial targeted routing
 killed 20; including the existing server restart test in the table campaign
 kills 21 in the control. All scores below use that covering-test correction
 where noted. No equivalent faults have been excluded.
+The three independent challenges (repeating the first bite amount, a 0.94
+brain threshold, and missing mist-only light invalidation) all survived
+Q2 and all are killed by the candidate. They are kept in a separate
+catalogue and do not change the original 68-fault denominator.
+
+Reports include Node/platform information, SHA-256 fingerprints of the
+catalogue and each source/test input, exit status, and failure diagnostics.
+The runner also works from a source archive without Git metadata.
 
 | Module | Initial killed/sample | Hardened killed/sample |
 | --- | --- | --- |

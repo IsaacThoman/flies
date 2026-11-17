@@ -167,3 +167,11 @@ test("an out-of-range persisted quality cannot select an unintended level", () =
     assert.equal(q.current.fps, 60);
   }
 });
+
+test("brain speed below 95 percent steps down, while 95 percent keeps its picture", () => {
+  for (const [speed, level] of [[0.949, 1], [0.95, 0], [1, 0]]) {
+    const q = new Quality();
+    windows(q, 2, 15.625, speed);
+    assert.equal(q.level, level, `brain speed ${speed}`);
+  }
+});

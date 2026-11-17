@@ -143,6 +143,7 @@ test("bites carry the food and how much, with the sender's count", () => {
   assert.equal(got[0][0], 3);
   assert.ok(Math.abs(got[0][1] - 0.0123) < 1e-6);
   assert.equal(got[1][0], 2_000_007);
+  assert.ok(Math.abs(got[1][1] - 0.5) < 1e-6, "each bite carries its own amount");
 });
 
 test("bites name the place's epoch after them, where a reader of the bites alone still finds them as before", () => {

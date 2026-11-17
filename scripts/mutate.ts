@@ -7,16 +7,19 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { campaigns } from "./mutation-cases.ts";
+import { challenges } from "./mutation-challenges.ts";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i += 2) {
-  if (!["--module", "--fault", "--out"].includes(args[i]) || !args[i + 1] || args[i + 1].startsWith("--")) {
-    throw new Error("Usage: node scripts/mutate.ts [--module substring] [--fault id] [--out file]");
+  if (!["--module", "--fault", "--out", "--catalogue"].includes(args[i]) || !args[i + 1] || args[i + 1].startsWith("--")) {
+    throw new Error("Usage: node scripts/mutate.ts [--module substring] [--fault id] [--out file] [--catalogue sample|challenges]");
   }
 }
 const option = (flag: string) => args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined;
-const selected = campaigns.filter((c) => !option("--module") || c.file.includes(option("--module")!));
+const catalogue = option("--catalogue") ?? "sample";
+if (!["sample", "challenges"].includes(catalogue)) throw new Error("Unknown catalogue");
+const selected = (catalogue === "sample" ? campaigns : challenges).filter((c) => !option("--module") || c.file.includes(option("--module")!));
 if (!selected.length || (option("--fault") && !selected.some((c) => c.faults.some(([id]) => id === option("--fault"))))) throw new Error("No matching mutation");
 const hash = (text: string) => createHash("sha256").update(text).digest("hex");
 for (const c of selected) {
@@ -29,7 +32,7 @@ const sandbox = mkdtempSync(path.join(tmpdir(), "flies-mutations-"));
 const results: { module: string; id: string; status: string; exitCode: number | null; detail?: string }[] = [];
 const provenance = {
   node: process.version, platform: process.platform, arch: process.arch,
-  catalogue: hash(readFileSync(new URL("./mutation-cases.ts", import.meta.url), "utf8")),
+  catalogue, catalogueHash: hash(readFileSync(new URL(catalogue === "sample" ? "./mutation-cases.ts" : "./mutation-challenges.ts", import.meta.url), "utf8")),
   inputs: selected.map((c) => ({ module: c.file, tests: c.tests, hashes: Object.fromEntries([c.file, ...c.tests].map((f) => [f, hash(readFileSync(path.join(root, f), "utf8"))])) })),
 };
 const run = (tests: string[]) => spawnSync(process.execPath, ["--test", "--test-reporter=tap", ...tests], {
