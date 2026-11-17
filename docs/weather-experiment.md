@@ -1,6 +1,6 @@
 # Weather experiment
 
-This stays a draft. Weather reaches the fly only through existing senses;
+This records the reviewed weather step. Weather reaches the fly only through existing senses;
 there is no sound and no brain or cold-response change. The place-specific
 scope excludes the bar and restaurant scenes.
 
@@ -128,3 +128,21 @@ post-rebase run again passed all ordinary tests, lint and typecheck but
 failed that budget at 0.615 against 0.5. Brain code and its budget test have
 no feature-branch diff from dev; no threshold was relaxed. These failures
 remain visible to the maintainer. No TV hardware was used.
+
+
+## Maintainer handoff
+
+The owner changed the process to ready validated steps without waiting on
+GitHub CI. `origin/dev` was merged into this branch with a merge commit;
+conflict resolution retained dev's antenna description and network
+hardening while preserving the shared weather extension. Typecheck, lint
+and 117 area tests passed on that integration. Earlier full-run failures
+above are historical results from before this merge; no budget was relaxed.
+
+The completed first comparison unanimously beat the baseline. Two second
+comparison scorers have returned 7.875 and 7.625 for T7 and its identical
+decoy, with both ranking them above J9; the remaining assessments are pending.
+They found no decoy scoring discrepancy. The pending rain-veil, near-flake
+and melt-trail experiments are preserved separately and excluded from this
+handoff. Further climbing uses a new branch and PR, with newly spawned
+reviewers at high reasoning effort.
