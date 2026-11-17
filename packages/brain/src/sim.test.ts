@@ -24,8 +24,8 @@ type Setup = {
   inputs: { neurons: number[]; rate: number }[];
   /** Rate changes applied just before the given step. */
   changes: { step: number; input: number; rate: number }[];
-  /** Inputs with a rate per neuron, added after the group inputs, and their changes (whole sets of rates). */
-  rated: { neurons: number[]; rates: number[] }[];
+  /** Inputs with a rate per neuron, added after the group inputs, and their changes (whole sets of rates). A withdrawing one delivers its synapses' opposite instead of firing. */
+  rated: { neurons: number[]; rates: number[]; withdraw?: boolean }[];
   ratedChanges: { step: number; input: number; rates: number[] }[];
 };
 
@@ -93,8 +93,9 @@ function randomSetup(seed: number, overrides: Partial<Setup> = {}): Setup {
   };
 }
 
-// Two inputs with a rate per neuron: one starting with mixed rates (some 0),
-// one silent at first; their rates are reset several times, once to all 0.
+// Three inputs with a rate per neuron: one starting with mixed rates (some 0),
+// one silent at first, and one withdrawing, overlapping the first; their rates
+// are reset several times, once to all 0.
 function ratedInputs(random: () => number, n: number): Pick<Setup, "rated" | "ratedChanges"> {
   const distinct = (k: number) => {
     const out = new Set<number>();
@@ -104,15 +105,19 @@ function ratedInputs(random: () => number, n: number): Pick<Setup, "rated" | "ra
   const rates = (k: number, top: number) => Array.from({ length: k }, () => (random() < 0.3 ? 0 : random() * top));
   const a = distinct(20);
   const b = distinct(8);
+  const c = [...a.slice(0, 5), ...distinct(15).filter((i) => !a.slice(0, 5).includes(i))];
   return {
     rated: [
       { neurons: a, rates: rates(a.length, 300) },
       { neurons: b, rates: b.map(() => 0) },
+      { neurons: c, rates: rates(c.length, 200), withdraw: true },
     ],
     ratedChanges: [
       { step: 500, input: 1, rates: rates(b.length, 2000) },
+      { step: 1000, input: 2, rates: rates(c.length, 2000) },
       { step: 1200, input: 0, rates: a.map(() => 0) },
       { step: 1300, input: 1, rates: rates(b.length, 40) },
+      { step: 1600, input: 2, rates: c.map(() => 0) },
       { step: 1900, input: 0, rates: rates(a.length, 150) },
     ],
   };
@@ -158,7 +163,7 @@ function runEngine(setup: Setup, steps: number): Run & { sim: Simulation; active
   if (setup.bias) sim.setBias(setup.bias);
   setup.inputs.forEach((input, q) => sim.addInput(`input ${q}`, input.neurons, input.rate));
   setup.rated.forEach((input, q) => {
-    sim.addRatedInput(`rated ${q}`, input.neurons);
+    sim.addRatedInput(`rated ${q}`, input.neurons, { withdraw: input.withdraw });
     sim.setRates(`rated ${q}`, input.rates);
   });
   const spikes: number[][] = [];
@@ -219,6 +224,7 @@ function runReference(setup: Setup, steps: number, cut: boolean): Run {
   });
   const picked = new Uint32Array(n);
   const spikes: number[][] = [];
+  const withdrawals: number[][] = [];
   for (let s = 0; s < steps; s++) {
     for (const change of setup.changes) {
       if (change.step !== s || change.rate === rates[change.input]) continue;
@@ -228,8 +234,10 @@ function runReference(setup: Setup, steps: number, cut: boolean): Run {
     for (const change of setup.ratedChanges) if (change.step === s) rated[change.input].setProbabilities(change.rates, dt / 1000);
     if (s >= delay) {
       for (const pre of spikes[s - delay]) for (let e = net.ptr[pre]; e < net.ptr[pre + 1]; e++) g[net.post[e]] += weight[e];
+      for (const pre of withdrawals[s - delay]) for (let e = net.ptr[pre]; e < net.ptr[pre + 1]; e++) g[net.post[e]] -= weight[e];
     }
     const fired: number[] = [];
+    const withdrawn: number[] = [];
     const cleanup = cut && s % setup.cleanupInterval === setup.cleanupInterval - 1;
     for (let i = 0; i < n; i++) {
       const gi = g[i];
@@ -259,6 +267,10 @@ function runReference(setup: Setup, steps: number, cut: boolean): Run {
     [...sources, ...rated].forEach((source, q) => {
       if (q < sources.length && rates[q] === 0) return;
       const m = source.sample(picked);
+      if (q >= sources.length && setup.rated[q - sources.length].withdraw) {
+        for (let k = 0; k < m; k++) withdrawn.push(picked[k]);
+        return;
+      }
       for (let k = 0; k < m; k++) {
         const i = picked[k];
         if (left[i] !== 0) continue;
@@ -270,6 +282,7 @@ function runReference(setup: Setup, steps: number, cut: boolean): Run {
       }
     });
     spikes.push(fired.sort((a, b) => a - b));
+    withdrawals.push(withdrawn.sort((a, b) => a - b));
   }
   return { spikes, v, g, a };
 }
@@ -428,6 +441,37 @@ test("advance runs whole steps and carries the remainder", () => {
   assert.equal(sim.stats.steps, 6);
   assert.equal(sim.advance(dt * 10), 10);
   assert.ok(Math.abs(sim.time - 16 * dt) < 1e-9);
+});
+
+test("a withdrawal reaches the targets as the opposite of a spike, after the delay, and isn't a spike", () => {
+  // Neuron 0 excites 1 through 3 synapses; withdrawn, it inhibits it as much.
+  const net: Network = { ptr: Uint32Array.from([0, 1, 1]), post: Uint32Array.from([1]), count: Uint16Array.from([3]) };
+  const gain = Float32Array.from([2, 0]);
+  const run = (withdraw: boolean) => {
+    const sim = new Simulation(net, { gain, dt: 1, delay: 2, tauSyn: 5 });
+    sim.addRatedInput("x", [0], { withdraw });
+    sim.setRates("x", [1e9]);
+    sim.step();
+    sim.setRates("x", [0]);
+    const spiked = sim.lastSpikes().length;
+    const drive: number[][] = [];
+    for (let s = 0; s < 3; s++) {
+      drive.push([sim.drive(0), sim.drive(1)]);
+      sim.step();
+    }
+    return { sim, spiked, drive };
+  };
+  const fired = run(false);
+  const withdrawn = run(true);
+  assert.equal(fired.spiked, 1);
+  assert.equal(withdrawn.spiked, 0, "a withdrawal is not a spike");
+  assert.equal(withdrawn.sim.stats.spikes, 0);
+  assert.equal(withdrawn.sim.potential(0), 0, "the withdrawn neuron itself is left as it is");
+  // Nothing arrives before the delay; then exactly the opposite of the spike's drive.
+  assert.deepEqual(withdrawn.drive[0], [0, 0]);
+  assert.ok(fired.drive[2][1] > 0);
+  assert.equal(withdrawn.drive[2][1], -fired.drive[2][1]);
+  assert.equal(withdrawn.sim.stats.events, fired.sim.stats.events);
 });
 
 test("bias drives a lone neuron tonically and keeps it active; muted neurons deliver nothing", () => {

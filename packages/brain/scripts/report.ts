@@ -240,7 +240,11 @@ let bandHigh: number;
       return spikes;
     };
     /** The lamina's total input from both eyes, spikes per second. */
-    const lamina = () => (["left", "right"] as const).reduce((sum, side) => sum + b.vision!.retina[side].rates.reduce((a, x) => a + x, 0), 0);
+    const lamina = () =>
+      (["left", "right"] as const).reduce((sum, side) => {
+        const retina = b.vision!.retina[side];
+        return sum + retina.rates.reduce((a, x) => a + x, 0) + retina.withdrawals.reduce((a, x) => a + x, 0);
+      }, 0);
     return { show, lamina, wall: () => wall };
   };
   const everything = apply(Object.keys(FULL) as ScalarSense[]);

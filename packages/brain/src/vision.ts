@@ -13,14 +13,26 @@
 // - Sign. The photoreceptors' histamine hyperpolarises the lamina monopolar
 //   cells to light, so they depolarise to darkening: darkening raises the
 //   rate, brightening lowers it (below the tonic rate, if there is one).
+// - L1's hyperpolarisation, the ON pathway's input. These cells release
+//   transmitter tonically at the adapted level, and L1's terminals signal
+//   increments as much as decrements, as a fall below baseline (Ketkar et al.
+//   2022); its partners Mi1, Tm3, L5, C2 and C3 become ON cells because L1's
+//   glutamate inhibits them through GluCl-alpha (Molina-Obando et al. 2019).
+//   A spiking point neuron can't be released from inhibition it isn't
+//   getting, so brightening draws withdrawals of L1's release instead
+//   (Simulation.addRatedInput, `withdraw`): through L1's own synapses, with
+//   the sign reversed, at the rate the same contrast of darkening would fire
+//   it. Linearised about rest, a graded synapse's fall is the opposite of its
+//   rise. L2's output is rectified (Reiff et al. 2010) and L3's partners are
+//   silent at rest, so neither withdraws.
 // - Time course. L1 and L2 respond transiently to a change, L3 in a
 //   sustained way (Silies et al. 2013; Ketkar et al. 2020): L1 and L2 compare
 //   the light with its mean over the last `transient` ms, L3 with its mean
 //   over `ambient` ms, which is also what all three are normalised by.
 //
 // What it leaves out: the cells are graded, not spiking, and the stage turns
-// their depolarisation into a Poisson rate; L1's sustained component and
-// L2's slight rectification are ignored; one facet feeds one column (neural
+// their depolarisation into a Poisson rate; L1's sustained component is
+// ignored, and L2's slight rectification made complete; one facet feeds one column (neural
 // superposition pools six photoreceptors from six neighbouring ommatidia that
 // look the same way, which is the same thing here); no colour, no
 // polarisation (the dorsal rim's R7 and R8 aren't modelled).
@@ -39,6 +51,8 @@ export type RetinaParameters = {
   maxRate: number;
   /** Rate, Hz, of a lamina cell in a steady scene. */
   tonic: number;
+  /** Factor on L1's withdrawals under brightening, 1 for the same scale as darkening (0: no ON pathway). */
+  withdraw: number;
 };
 
 export const RETINA: RetinaParameters = {
@@ -47,6 +61,7 @@ export const RETINA: RetinaParameters = {
   floor: 0.05,
   maxRate: 200,
   tonic: 0,
+  withdraw: 1,
 };
 
 /** One eye's photoreceptors and lamina: luminance per facet in, a rate per driven lamina cell out. */
@@ -57,6 +72,10 @@ export class Retina {
   /** Hz per neuron of `neurons`, as of the last step. */
   readonly rates: Float64Array;
   readonly facets: number;
+  /** Every facet's L1 that exists, as at the start of `neurons`: the cells brightening withdraws. */
+  readonly l1: Int32Array;
+  /** Hz per neuron of `l1`, as of the last step: how often its release is withdrawn. */
+  readonly withdrawals: Float64Array;
   // For each driven cell, its facet and whether it is transient (L1, L2) or sustained (L3).
   #facet: Int32Array;
   #transient: Uint8Array;
@@ -89,6 +108,8 @@ export class Retina {
       });
     }
     this.neurons = Int32Array.from(neurons);
+    this.l1 = Int32Array.from(cells.l1.filter((i) => i >= 0));
+    this.withdrawals = new Float64Array(this.l1.length);
     this.#facet = Int32Array.from(facet);
     this.#transient = Uint8Array.from(transient);
     this.rates = new Float64Array(neurons.length);
@@ -107,12 +128,15 @@ export class Retina {
    * when it changes.
    */
   step(dt: number, light: ArrayLike<number> | null): boolean {
-    const { ambient: tauAmbient, transient: tauTransient, floor, maxRate, tonic } = this.parameters;
+    const { ambient: tauAmbient, transient: tauTransient, floor, maxRate, tonic, withdraw } = this.parameters;
     const was = this.#firing;
     if (light === null) {
       this.#open = false;
       this.#firing = false;
-      if (was) this.rates.fill(0);
+      if (was) {
+        this.rates.fill(0);
+        this.withdrawals.fill(0);
+      }
       return was;
     }
     if (light.length !== this.facets) throw new Error(`An eye has ${this.facets} facets, but the light gives ${light.length}`);
@@ -143,8 +167,13 @@ export class Retina {
       for (let k = 0; k < this.facets; k++) {
         const before = seen[k];
         const x = lum(k);
-        ambient[k] = x + (before + (ambient[k] - before) * idleAmbient - x) * keepAmbient;
-        recent[k] = x + (before + (recent[k] - before) * idleRecent - x) * keepRecent;
+        // A level a step no longer moves has come within rounding of the
+        // light, and is the light: left a few ulps short, its contrast would
+        // stay a hair above 0 and the eye would never fall quiet.
+        const nextAmbient = x + (before + (ambient[k] - before) * idleAmbient - x) * keepAmbient;
+        const nextRecent = x + (before + (recent[k] - before) * idleRecent - x) * keepRecent;
+        ambient[k] = nextAmbient === ambient[k] ? x : nextAmbient;
+        recent[k] = nextRecent === recent[k] ? x : nextRecent;
         seen[k] = x;
       }
       this.#idle = 0;
@@ -158,6 +187,13 @@ export class Retina {
       const contrast = ((isTransient[n] ? recent[k] : ambient[k]) - seen[k]) / (ambient[k] + floor);
       const rate = Math.min(maxRate, Math.max(0, tonic + maxRate * contrast));
       rates[n] = rate;
+      if (rate > 0) firing = true;
+    }
+    const withdrawals = this.withdrawals;
+    for (let n = 0; n < withdrawals.length; n++) {
+      const k = facetOf[n];
+      const rate = Math.min(maxRate, Math.max(0, withdraw * maxRate * ((seen[k] - recent[k]) / (ambient[k] + floor))));
+      withdrawals[n] = rate;
       if (rate > 0) firing = true;
     }
     this.#firing = firing;
