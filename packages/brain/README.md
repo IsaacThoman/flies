@@ -817,7 +817,7 @@ What it leaves out:
 
 - **Drinking.** A thirsty fly extends its proboscis to water and drinks it (Cameron et al. 2010); this one doesn't (Not reproduced).
 - **The ISNs themselves**, and the hormones and osmolality that set them: thirst acts as a gain on the water neurons instead. Through the ISNs thirst also takes away sugar feeding; here it doesn't, except a little through the water neurons when the sugar is wet.
-- **Water in food, and humidity.** Only plain water quenches it, and the air is always dry (`packages/body/src/thirst.ts`). Seeking water, through the antennae's humidity sensors (Enjin et al. 2016, Curr Biol 26: 1352; Knecht et al. 2016, eLife 5: e17879) or the Janu neurons (Landayan et al. 2021), isn't modelled.
+- **Water in food, and humidity.** What a food quenches is its water taste, standing in for the water it holds: plain water fully, a dilute juice or fruit nearly as much (tomato, lemon) or down to a third (grape, banana), as far as its sugar leaves the water neurons answering; syrups, honey, jam and anything past 1 M of sugar not at all (`packages/world/src/tastes.ts`, `docs/world.md`). How much water a food really holds isn't counted, and the air is always dry (`packages/body/src/thirst.ts`). Seeking water, through the antennae's humidity sensors (Enjin et al. 2016, Curr Biol 26: 1352; Knecht et al. 2016, eLife 5: e17879) or the Janu neurons (Landayan et al. 2021), isn't modelled.
 
 ## Sleep and the daily rhythm
 
