@@ -3,7 +3,7 @@ import { mulberry32 } from "@fly/brain";
 import { World } from "@fly/world";
 import { Life } from "../../apps/web/src/life.ts";
 import { InProcessBrain } from "./brain.ts";
-import { checkBody, checkRecovery, places, randomStart, snapshot } from "./body.ts";
+import { checkBody, checkReach, checkRecovery, places, randomStart, snapshot } from "./body.ts";
 import type { PlaceId } from "./body.ts";
 
 export function checkMove(life: Life, id: PlaceId) {
@@ -85,6 +85,7 @@ export function fuzzLife(id: PlaceId, seed: number, duration: number, data: Arra
       }
       life.step(dt, performance.now());
       checkBody(life.body, life.world);
+      checkReach(life.body, life.world);
       assert.equal(life.sensed.light, undefined, "eyes must stay shut");
       assert.ok(life.intent.live, "live brain produced stale commands");
       const state = brain.state!;

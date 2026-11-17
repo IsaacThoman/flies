@@ -532,7 +532,11 @@ lives (`packages/body/src/motion.ts` unless noted):
   ledges and slopes steeper than 65°. In the air it has weight, drag (7/s, through
   the air, which a puff or a gust moves) and
   the push of its wings: lift in proportion to the `wings` command (0.6 holds
-  its weight) and thrust along its heading.
+  its weight) and thrust along its heading. Its head, abdomen and legs keep
+  out of what they reach, as its feet do: flying at a pane it bounces off with
+  its head on the near side, and turning beside a wall its legs swing clear;
+  between two things too close for it as it faces, they turn it a quarter
+  turn if it fits so.
 - **The take-off's direction.** The escape command launches it (380 to 620 mm/s
   up and 160 to 340 away, by how far past 0.4 it went); the direction is the
   body's: away from the ball if the ball is in the air, else straight ahead.
