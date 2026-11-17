@@ -106,3 +106,59 @@ changes are incorporated. Their integration still requires a fresh code review.
 
 No duplicate-control noise threshold was exceeded. This transcription check
 by itself is not counted as a behavioural hill-climb improvement.
+
+## Launch mapping comparison — rejected
+
+Key: **B3 = inherited launch; X8 = balanced launch components with conserved
+initial impulse energy**. The source roots had independent local @fly module
+resolution. Each received its own exact-source full tests, raw optical battery,
+scorecard table and mechanics probe. The supplementary one-hour free record
+was explicitly shared context, not a paired comparison. Orders were B3/X8,
+X8/B3, X8/B3, independently randomized. Three fresh reviewers independently
+checked all references and the Card & Dickinson mechanical source via the web.
+
+| Reviewer | Set | Validity | Honesty | Behaviour | Regressions/cost | Mean | Ranking |
+|---|---|---:|---:|---:|---:|---:|---|
+| U2 | B3 | 8 | 8 | 2 | 9 | 6.75 | B3 > X8 |
+| U2 | X8 | 8 | 8 | 2 | 7 | 6.25 | |
+| G6 | B3 | 7.5 | 8 | 2 | 9 | 6.625 | B3 > X8 |
+| G6 | X8 | 7.5 | 8 | 2.5 | 7 | 6.25 | |
+| K9 | B3 | 8 | 7 | 2 | 9 | 6.50 | B3 > X8 |
+| K9 | X8 | 8 | 7 | 3 | 6 | 6.00 | |
+
+Mean: B3 **6.625**, X8 **6.167**. All three preferred the control, so the
+launch change is **reverted**. They accepted the central reference numbers and
+mechanical rationale, but not a universal exact 45° distribution or a broad
+fidelity claim. All 112 optical readiness, takeoff, TTC and flight outcomes
+were unchanged; probability agreement stayed 3.7375/10. No climb is claimed.
+The candidate full suite failed one brain CPU case (0.502 versus 0.500), while
+the control passed at 0.400. Separate unchanged-brain measurements also failed
+at 0.546. Reviewers did not establish a causal body-to-brain-cost regression,
+but did not count the failed required check as passing.
+
+A separate fresh regression reviewer, R5, had inspected earlier neutral roots
+A9/D4 (A9 inherited, D4 balanced), order A9/D4. It scored D4 7/10 and A9 5/10,
+primarily because only D4's motion hash had full/play transcripts. That packet
+was incomplete for a fair regression preference. The paired exact-source full
+runs above supplied the missing control evidence; the provisional ranking is
+not treated as proof of behavioural improvement. R5 flagged reduced vertical
+clearance and requested the paired optical cohort, subsequently recorded.
+
+The full reviewers found poor checkerboard selectivity, late black-square
+responses (18/20 after projected collision), unmatched walking/grooming/feeding
+assays, and body-supported flight. G6 also found that the optical classifier
+could accumulate disjoint powered frames. Schema 3 now requires ≥50 ms
+**continuous power in the first airborne episode**, records its longest run,
+and refuses a later jump as evidence for the first departure. A trace test
+covers disconnected runs and landing; historical schema 2 is not silently
+rescored as schema 3. Feeding modes now explicitly retain the 30 ms-bin
+histogram definition. No numeric source transcription was found false.
+
+## Current-dev replication
+
+Dev advanced during the experiment. The branch is rebased on `58481d6c`, with
+upstream antenna/contact, collision and sleep-after-grounded work. Production
+brain/body/world/Life source has **zero feature diff** from that dev. Earlier
+588da9b1 measurements are versioned history in `dev-588da9b1.md`. A fresh hour
+and optical battery at 06:00 use the continuous first-bout endpoint; any upstream
+phenotype improvement is not attributed to the rejected launch experiment.
