@@ -528,7 +528,9 @@ Their eyes take turns, at most one refresh per frame, choosing the most
 overdue eligible fly. Pending GPU reads and reflection work can defer them;
 with four at 60 fps, 15 refreshes per second each is an ideal maximum under
 even scheduling. A ball approaching gives the followed fly priority, capped
-at 60 Hz, rather than guaranteeing a refresh every frame. Four flies'
+at 60 Hz, rather than guaranteeing a refresh every frame. In the bar and the
+restaurant the others' eyes on a device are due a quarter as often (5 Hz with
+Low eyes) and its followed fly's go first. Four flies'
 meeting, senses, bodies, poses and nearby models were reported at 19 M5 Pro
 CPU µs a frame in Node 26, with a 34 µs budget in
 `apps/web/tests/company.budget.ts`. Measured on an Apple TV 4K on 16 November

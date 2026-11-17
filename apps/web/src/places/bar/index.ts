@@ -40,6 +40,8 @@ export const bar: Scene = {
   },
   // It sees the weather through its street window.
   open: 0.35,
+  // Its shading is the TV's heaviest but the restaurant's: the company's eyes a quarter as often.
+  companionEyes: 0.25,
   bubbles: false,
   fireflies: false,
 };

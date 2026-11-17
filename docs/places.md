@@ -221,6 +221,11 @@ crossings become smaller than a pixel, without extra meshes or draws.
   time under any chosen light. The windowsill's, the lab's and the bar's are
   worked examples. The medium shot looks low across the table, so anything
   meant to be seen behind the fly, a clock included, should stand low.
+- **The company's eyes** (`companionEyes`, optional): with several flies on a
+  device their eyes take turns, one fly's refresh a frame. A place whose
+  shading makes every refresh dear on the Apple TV (the bar, the restaurant)
+  sets how often the others' are due, as a share of the followed fly's rate;
+  the followed fly's then go first.
 - **Bubbles and fireflies** are built for the picnic's open air and size; a
   place says whether it has them.
 - **The Place tool's name** for it, what it is carried "to", and what the fly

@@ -97,7 +97,8 @@ the camera and readouts follow the first. `InTurn`
 from the same cache, so loads do not
 overlap. Completed cache writes can be reused; where parts were not kept they are fetched again, still in turn. The eyes take turns too: at most one fly's refresh a frame, normally the most overdue; while a ball comes the
 followed
-fly gets priority when its readback is ready. A companion whose worker fails
+fly gets priority when its readback is ready. In the bar and the restaurant the others' eyes are due a quarter as
+often (5 Hz with Low eyes) and the followed fly's go first (`docs/simulation.md`, The eyes). A companion whose worker fails
 is retried after 5 s and 30 s, and taken off if both retries fail. At a table the same flies travel
 in one batch over one connection, up to the table's eight-fly limit
 ([online.md](online.md)).
