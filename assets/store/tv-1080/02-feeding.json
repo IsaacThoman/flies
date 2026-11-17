@@ -1,0 +1,15 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "story": "02-feeding",
+  "wallpaper": false,
+  "staging": null,
+  "fingerprint": "31f82afa",
+  "frames": 301,
+  "neurons": 166700,
+  "activity": "feeding",
+  "eaten": 0.520180701956725,
+  "takeOffs": 0,
+  "eyeUpdates": 101,
+  "peers": 0
+}

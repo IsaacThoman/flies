@@ -61,23 +61,8 @@ export class FlyView {
 
   /** Places and poses the model for this frame; `songSide` is the wing it sings with (1 its left, -1 its right), `asleep` by the body's reckoning (five minutes still: rhythm.ts). */
   update(body: FlyBody, intent: Intent, eating: boolean, fullness: number, dt: number, songSide: 1 | -1 = 1, asleep = false) {
-    const pose = this.pose;
-    const airborne = body.mode === "airborne";
-    pose.speed = body.groundSpeed / FLY_LENGTH;
-    pose.turn = body.turnRate;
-    pose.airborne = airborne;
-    pose.wings = airborne ? Math.max(intent.wingPose, Math.min(1, intent.wings * 1.2)) : intent.wingPose;
-    pose.groom = !airborne && !intent.walking && !intent.backing ? intent.groom : 0;
-    pose.feed = !airborne && intent.feeding ? Math.min(1, intent.feed * (eating ? 2 : 1.5)) : 0;
-    pose.crouch = !airborne ? Math.min(1, intent.escape * 0.9) : 0;
-    pose.sing = !airborne && intent.singing ? songSide * Math.min(1, intent.sing * 1.5) : 0;
-    pose.sleep = asleep && !airborne ? 1 : 0;
-    const v = body.velocity;
-    const horizontal = Math.hypot(v.x, v.z);
-    pose.pitch = airborne ? Math.max(-0.6, Math.min(0.8, Math.atan2(v.y, Math.max(60, horizontal)) * 0.6)) : 0;
-    pose.roll = airborne ? Math.max(-0.6, Math.min(0.6, -body.turnRate * 0.12)) : 0;
-    pose.fullness = fullness;
-    this.model.update(pose, dt);
+    poseOf(body, intent, eating, fullness, songSide, asleep, this.pose);
+    this.model.update(this.pose, dt);
     this.place(body.position, body.yaw, body.up);
   }
 
@@ -97,6 +82,30 @@ export class FlyView {
     shadow.visible = fade > 0.02;
     (shadow.material as THREE.MeshBasicMaterial).opacity = fade;
   }
+}
+
+/** How a fly is posed from what its body and its brain are doing (`songSide`: the wing it sings with, 1 its left, -1 its right; `asleep` by the body's reckoning), into `pose`. */
+export function poseOf(body: FlyBody, intent: Intent, eating: boolean, fullness: number, songSide: 1 | -1, asleep: boolean, pose: FlyPose): FlyPose {
+  const airborne = body.mode === "airborne";
+  pose.speed = body.groundSpeed / FLY_LENGTH;
+  pose.turn = body.turnRate;
+  pose.airborne = airborne;
+  pose.wings = airborne ? Math.max(intent.wingPose, Math.min(1, intent.wings * 1.2)) : intent.wingPose;
+  pose.groom = !airborne && !intent.walking && !intent.backing ? intent.groom : 0;
+  pose.feed = !airborne && intent.feeding ? Math.min(1, intent.feed * (eating ? 2 : 1.5)) : 0;
+  pose.crouch = !airborne ? Math.min(1, intent.escape * 0.9) : 0;
+  pose.sing = !airborne && intent.singing ? songSide * Math.min(1, intent.sing * 1.5) : 0;
+  pose.sleep = asleep && !airborne ? 1 : 0;
+  const v = body.velocity;
+  // The body supplies trajectory and its last support plane, not a
+  // visual landing command. This animation proxy adds no surface sensing.
+  // van Breugel & Dickinson 2012 doi:10.1242/jeb.066498: legs extend in approach.
+  pose.landing = airborne ? landingExtension(Math.max(0, body.position.y - body.surface.y), v.y) : 0;
+  const horizontal = Math.hypot(v.x, v.z);
+  pose.pitch = airborne ? Math.max(-0.6, Math.min(0.8, Math.atan2(v.y, Math.max(60, horizontal)) * 0.6)) : 0;
+  pose.roll = airborne ? Math.max(-0.6, Math.min(0.6, -body.turnRate * 0.12)) : 0;
+  pose.fullness = fullness;
+  return pose;
 }
 
 /** The soft shadow under a fly, as a material: one for every fly's shadow. */
@@ -126,3 +135,9 @@ export function flyShadow(world: World, p: Vec3, yaw: THREE.Quaternion, shadow: 
 const AXIS_Y = new THREE.Vector3(0, 1, 0);
 const scratchSurface = createSurface();
 const scratchNormal = new THREE.Vector3();
+
+/** A bounded time-to-contact proxy for the pose, not a landing reflex. */
+export function landingExtension(height: number, verticalSpeed: number): number {
+  if (verticalSpeed >= 0 || height < 0 || height > 30) return 0;
+  return Math.max(0, Math.min(1, (0.16 - height / -verticalSpeed) / 0.12));
+}

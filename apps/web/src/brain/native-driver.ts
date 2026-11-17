@@ -92,7 +92,8 @@ export class NativeBrainDriver implements BrainDriver {
   }
 
   dispose(): void {
-    // The host owns the brain's thread and keeps it for the app's lifetime.
+    // The host keeps the first brain's thread for the app's lifetime; another fly's goes with it.
+    this.#bridge.stop?.();
     this.status = "failed";
     this.error = "Stopped.";
   }

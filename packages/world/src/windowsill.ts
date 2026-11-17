@@ -288,6 +288,7 @@ export const SILL_DECOR = {
     { x: 42, z: 40, r: 16, count: 50 },
     { x: -30, z: 92, r: 10, count: 16 },
     { x: 150, z: 20, r: 9, count: 12 },
+    { x: 70, z: 25, r: 4, count: 8 },
   ],
   /** A fallen basil leaf, dried flat. */
   leaf: { x: -112, z: 46, length: 26, angle: 0.4 },

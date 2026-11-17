@@ -41,3 +41,15 @@ test("semantic DOM is enabled only by an explicit opt-in", () => {
   assert.equal(accessibilityEnabled("?accessibility=true"), false);
   assert.equal(accessibilityEnabled("?accessibility=1"), true);
 });
+
+
+test("everyone rooms and multi-fly devices retain meaningful semantics", () => {
+  assert.equal(projectItem({ id: "room:all", kind: "action", label: "Everyone", swatch: ["red", "blue"], everyone: true, count: [8, 8] }).name, "Everyone, 8 of 8 flies, Open to everyone");
+  const game = {
+    loading: false, screen: "online", here: "picnic", rooms: [],
+    screens: { online: { view: "room", heading: "Garden", menu: new Menu([]) } },
+    table: { joined: true, name: "Garden", code: "abcdefghjk", others: [{ id: 2, colours: ["red", "blue", "green"] }] },
+    online: { place: "picnic", room: { locked: false }, mine: [{}, {}], others: { list: [{}, {}, {}] } },
+  } as unknown as Game;
+  assert.equal(new MenuAccess(game).read().body, "Picnic table, 5 of 8 flies, No password");
+});

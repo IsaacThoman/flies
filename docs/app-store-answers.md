@@ -55,3 +55,7 @@ Network: `apps/web/src/brain/{create,download}.ts`, `offline/sw.ts`, `online/{so
 Payload/persistence: `packages/net/src/protocol.ts`; `apps/server/src/{server,tables,table,lock,log}.ts`; `compose.yaml`, `Caddyfile`, `Dockerfile`. `TABLE_IDLE` is 30 days, `LISTED_IDLE` one day, `ADDRESS_KEPT` one hour. Docker logs rotate by bytes, not days. Caddy access logging is enabled.
 
 Local storage: `apps/web/src/settings.ts` (`flies.settings`, `.shelf`, `.learned`, `.table`, `.day`); `quality.ts` (`flies.quality`); `game.ts` (`flies.reloaded` in sessionStorage); `offline/sw.ts` page cache and `brain/download.ts` data/module caches; native `apps/tvos/src/Host.mm` and Swift weather `UserDefaults`. No cookie-based tracking, advertising identifier, analytics SDK, geolocation in web/iOS, camera or microphone access was found.
+
+<!-- docs-check: base apps/web/src -->
+
+<!-- docs-check: base apps/ios/src -->

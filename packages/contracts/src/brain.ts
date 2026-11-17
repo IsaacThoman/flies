@@ -98,4 +98,12 @@ export interface NativeBrainBridge {
    * caller can tell a new one from the one it already has. 0 means none yet.
    */
   read(out: Float32Array): number;
+  /**
+   * Another brain, a fly's own, on a thread of its own, from the same
+   * connectome: started with `start` as this one is. Only the first brain's
+   * bridge has it, and a host from before there could be several has none.
+   */
+  spawn?(): NativeBrainBridge;
+  /** Stops a spawned brain's thread and frees it: its fly is gone. Not the first's, which the host keeps. */
+  stop?(): void;
 }

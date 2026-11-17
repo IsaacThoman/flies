@@ -1,6 +1,6 @@
 // Optional host projection: no DOM, draw calls, polling or simulation commands.
 import type { MenuItem } from "@fly/ui";
-import { MAX_PLAYERS } from "@fly/net";
+import { MAX_FLIES } from "@fly/net";
 import { placeInfo } from "../places/catalog.ts";
 import type { Game } from "../game.ts";
 import { ABOUT } from "../ui/screens/about.ts";
@@ -23,7 +23,7 @@ export type AccessCommand = { id: string; action: "activate" | "focus" | "value"
 export function projectItem(item: MenuItem): AccessibleItem {
   const result: AccessibleItem = { id: item.id, name: item.label || "Settings page", kind: item.kind, disabled: item.disabled };
   if (item.kind === "action") {
-    const details = [item.description, item.count ? `${item.count[0]} of ${item.count[1]} flies` : "", item.locked ? "Password required" : ""];
+    const details = [item.description, item.count ? `${item.count[0]} of ${item.count[1]} flies` : "", item.locked ? "Password required" : "", item.everyone ? "Open to everyone" : ""];
     result.name = [result.name, ...details].filter(Boolean).join(", ");
   } else if (item.kind === "choice") {
     result.options = item.options.map((o) => o.label);
@@ -45,7 +45,7 @@ export class MenuAccess {
     const table = g.table;
     const rooms = g.screens.online.view === "rooms" ? g.lobbyStatus === "lost" ? "Can't reach rooms" : g.lobbyStatus === "stale" ? "Reconnecting to rooms" : g.lobbyStatus === "version" ? "Update needed" : g.rooms === null ? "Looking for rooms" : g.rooms.length ? `${g.rooms.length} ${g.rooms.length === 1 ? "room" : "rooms"} available` : "No rooms open" : "";
     const atDoor = g.screens.online.view === "door";
-    const context = table?.joined && g.online ? `${placeInfo(g.online.place ?? g.here).name}, ${table.others.length + 1} of ${MAX_PLAYERS} flies, ${g.online.room?.locked ? "Password required" : "No password"}` : "";
+    const context = table?.joined && g.online ? `${placeInfo(g.online.place ?? g.here).name}, ${g.online.others.list.length + g.online.mine.length} of ${MAX_FLIES} flies, ${g.online.room?.locked ? "Password required" : "No password"}` : "";
     const status = id === "online" && atDoor ? `${g.knock?.name ?? "Room"}. ${g.screens.online.note ? g.screens.online.heading : "Password required"}` : id === "online" ? [g.screens.online.heading, table ? table.joined ? `Joined ${table.name ?? "room"}. Code ${table.code}` : "Joining room" : g.tableEnded === "left" ? "Left the room" : "", rooms, context].filter(Boolean).join(". ") : id === "title" ? g.brain.status === "running" ? "Brain awake" : g.brain.status === "failed" ? "Its brain could not wake" : "Its brain is waking" : "";
     const items = screen ? screen.menu.items.map(projectItem) : [];
     if (id !== "title") items.push({ id: "back", name: id === "play" ? "Open menu" : "Back", kind: "action" });

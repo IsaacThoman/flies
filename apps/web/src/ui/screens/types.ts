@@ -17,14 +17,16 @@ export type SettingsPage = "wallpaper" | "screen" | "picture";
 /** The menu (the title, at launch and from play alike), play, and what the menu opens. */
 export type ScreenId = "title" | "play" | "settings" | "about" | "online";
 
-/** The room this device is at, as the screens show it: what it is called (once it has said), its code and link, whether this player started it, and the others there. */
+/** The room this device is at, as the screens show it: what it is called (once it has said), its code and link, whether this player started it, whether it is a room open to everyone, and the others there. */
 export type TableNow = {
   readonly name: string | null;
   readonly code: string;
   readonly link: string;
   readonly starting: boolean;
   readonly joined: boolean;
-  readonly others: readonly { readonly id: number; readonly colour: string }[];
+  readonly everyone: boolean;
+  /** The other devices at the table, each by its player's id, with its flies' colours. */
+  readonly others: readonly { readonly id: number; readonly colours: readonly string[] }[];
 };
 
 /**
@@ -48,6 +50,8 @@ export interface Shell {
   readonly life: Life;
   /** The Apple TV can tell the game the weather outside (it is built with WeatherKit). */
   readonly weatherOutside: boolean;
+  /** How many flies this device can live, each with a brain of its own (1 where it can run only one). */
+  readonly maxFlies: number;
   /** Apple Weather's attribution, for About, once the host has it. */
   weatherAttribution(): WeatherAttribution | null;
   /** The screen's shape. */

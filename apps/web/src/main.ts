@@ -6,7 +6,7 @@ import { accessibilityEnabled, browserAccessibility } from "./accessibility/brow
 import { AT_ROOT_PROPERTY } from "@fly/contracts";
 import { HitMap } from "@fly/ui";
 import { Display } from "./display.ts";
-import { createBrainDriver } from "./brain/create.ts";
+import { createBrains } from "./brain/create.ts";
 import { Game } from "./game.ts";
 import type { Inputs } from "./game.ts";
 import { Devices, Gamepads, Keyboard, Pointers, Remote, initialDevice } from "./input.ts";
@@ -34,7 +34,7 @@ if (!native) {
 
 let game: Game | null = null;
 try {
-  game = new Game(canvas, remote, createBrainDriver(), display, inputs);
+  game = new Game(canvas, remote, createBrains(), display, inputs);
 } catch (error) {
   if (native) throw error;
   cannotDraw(error);

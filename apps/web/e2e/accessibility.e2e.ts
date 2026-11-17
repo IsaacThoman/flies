@@ -89,8 +89,11 @@ try {
   await audit("settings");
   await activate("Back");
   assert.equal(await page.getByRole("button", { name: "Settings", exact: true }).evaluate((node) => node === document.activeElement), true);
+  await waitFor(page, "online=joined,everyone=yes");
   await activate("Online");
   await waitFor(page, "screen=online");
+  await activate("Other rooms");
+  await waitFor(page, "onlineView=rooms");
   await dump("rooms");
   const garden = await tab("button", /^Garden, Picnic table, 1 of 8 flies, Password required$/);
   const focusedRoom = await garden.elementHandle();

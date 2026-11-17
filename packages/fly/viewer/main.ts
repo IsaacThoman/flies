@@ -10,6 +10,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { RESTING_POSE } from "@fly/contracts";
 import type { FlyAnchor, FlyPose } from "@fly/contracts";
+import { J, LEG_COUNT, LEG_SEGMENTS, LEGS, legPair } from "../src/anatomy.ts";
 import { NERVE_PARTS, createFly, createNervesPanelMaterial } from "../src/index.ts";
 
 const params = new URLSearchParams(location.search);
@@ -355,6 +356,19 @@ const api = {
     resize();
   },
   anchor: (name: FlyAnchor) => fly.anchor(name, anchor).toArray(),
+  // Solved claws expose transient reach errors and grooming contacts that a
+  // gait target alone would hide. Allocations belong only to this diagnostic.
+  contacts() {
+    fly.object.updateMatrixWorld(true);
+    const m = fly.rig.joints, width = renderer.domElement.width, height = renderer.domElement.height;
+    return Array.from({ length: LEG_COUNT }, (_, leg) => {
+      const o = (J.leg + leg * LEG_SEGMENTS + 4) * 12, length = LEGS[legPair(leg)].tarsus;
+      anchor.set(m[o] * length + m[o + 3], m[o + 4] * length + m[o + 7], m[o + 8] * length + m[o + 11]).applyMatrix4(fly.object.matrixWorld);
+      const position = anchor.toArray(), planted = fly.rig.gait.swinging[leg] === 0 && anchor.y < 0.02;
+      anchor.project(camera);
+      return { position, screen: [(anchor.x + 1) * width / 2, (1 - anchor.y) * height / 2], planted, step: fly.rig.gait.steps[leg] };
+    });
+  },
   xray(amount: number, glow = "all", part = 0) {
     fly.nerves.xray = amount;
     state.glow = glow;
