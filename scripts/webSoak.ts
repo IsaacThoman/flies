@@ -42,7 +42,7 @@ export function trend(rows: { seconds: number; value: number }[], tolerance: num
 }
 
 // Workers are separate V8 isolates: the page's Performance metrics omit the brain.
-class WorkerHeap {
+export class WorkerHeap {
   #cdp: CDPSession;
   #sessions = new Set<string>();
   #pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();

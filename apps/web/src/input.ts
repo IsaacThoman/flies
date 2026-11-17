@@ -211,6 +211,10 @@ type Box = { left: number; top: number; width: number; height: number };
  */
 export class Pointers {
   readonly gestures: Gesture[] = [];
+  /** Captures the identity under the first press, before asynchronous menu updates can replace it. */
+  onDown: ((x: number, y: number) => void) | null = null;
+  /** Runs during a recognized release, while WebKit still permits a touch to raise its keyboard. */
+  onTap: ((x: number, y: number, fromX: number, fromY: number) => void) | null = null;
   /** Something meant since the last frame, to wake the wallpaper with. */
   deliberate = false;
   /** performance.now() of the last deliberate input. */
@@ -220,10 +224,11 @@ export class Pointers {
   readonly #devices: Devices | null;
   #primary = -1;
   #touch = false;
+  #button = 0;
   #start = { x: 0, y: 0 };
   #moved = 0;
   readonly #fingers = new Map<number, { x: number; y: number }>();
-  #pinch: { distance: number; x: number; y: number } | null = null;
+  #pinch: { a: number; b: number; distance: number; x: number; y: number } | null = null;
   /** A pinch ended, or the system cancelled: ignore what is left until every finger is up. */
   #spent = false;
   #travel = 0;
@@ -246,8 +251,15 @@ export class Pointers {
       this.down(e);
     });
     canvas.addEventListener("pointermove", (e) => {
-      // A fast mouse sends several moves a frame; the browser has them all.
       const events = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
+      // A batch can leave tap slop and return. Preserve that travel without queuing every sample.
+      if (events.length > 1 && e.pointerId === this.#primary) {
+        const box = this.#box();
+        for (let i = 0; i < events.length - 1; i++) {
+          const p = events[i];
+          this.#moved = Math.max(this.#moved, Math.hypot(p.clientX - box.left - this.#start.x * box.width, p.clientY - box.top - this.#start.y * box.height));
+        }
+      }
       this.move(events.length ? events[events.length - 1] : e);
     });
     canvas.addEventListener("pointerup", (e) => this.up(e, false));
@@ -265,6 +277,12 @@ export class Pointers {
     // Safari's own pinch and double-tap zoom, and the page's rubber band.
     for (const type of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(type, (e) => e.preventDefault(), opts);
     document.addEventListener("touchmove", (e) => e.preventDefault(), opts);
+    // Field focus happens in pointerup, before the next game frame can apply a resize.
+    window.addEventListener("resize", () => this.cancel());
+    window.addEventListener("orientationchange", () => this.cancel());
+    window.visualViewport?.addEventListener("resize", () => this.cancel());
+    window.addEventListener("blur", () => this.cancel(true));
+    document.addEventListener("visibilitychange", () => { if (document.hidden) this.cancel(true); });
   }
 
   /** When an event happened: its own time if it has one, else now. */
@@ -293,8 +311,11 @@ export class Pointers {
       if (this.#fingers.size === 2 && !this.#spent) {
         if (this.#primary >= 0) this.gestures.push({ type: "cancel" });
         this.#primary = -1;
-        const [a, b] = [...this.#fingers.values()];
-        this.#pinch = { distance: this.#distance(a, b), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const [aId, bId] = [...this.#fingers.keys()];
+        const a = this.#fingers.get(aId)!;
+        const b = this.#fingers.get(bId)!;
+        this.#lastTap.at = -Infinity;
+        this.#pinch = { a: aId, b: bId, distance: this.#distance(a, b), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
         return;
       }
       if (this.#fingers.size > 1 || this.#spent) return;
@@ -305,9 +326,11 @@ export class Pointers {
     }
     this.#primary = e.pointerId;
     this.#touch = touch;
+    this.#button = e.button;
     this.#start = p;
     this.#moved = 0;
     this.gestures.push({ type: "down", x: p.x, y: p.y, touch, button: e.button });
+    this.onDown?.(p.x, p.y);
   }
 
   move(e: RawPointer) {
@@ -317,7 +340,9 @@ export class Pointers {
       this.#fingers.set(e.pointerId, p);
       const pinch = this.#pinch;
       if (pinch) {
-        const [a, b] = [...this.#fingers.values()];
+        if (e.pointerId !== pinch.a && e.pointerId !== pinch.b) return;
+        const a = this.#fingers.get(pinch.a)!;
+        const b = this.#fingers.get(pinch.b)!;
         const distance = this.#distance(a, b);
         const x = (a.x + b.x) / 2;
         const y = (a.y + b.y) / 2;
@@ -368,7 +393,7 @@ export class Pointers {
   up(e: RawPointer, cancelled: boolean) {
     if (e.pointerType === "touch") {
       this.#fingers.delete(e.pointerId);
-      if (this.#pinch) {
+      if (this.#pinch && (e.pointerId === this.#pinch.a || e.pointerId === this.#pinch.b)) {
         this.#pinch = null;
         this.#spent = this.#fingers.size > 0;
         this.gestures.push({ type: "pinchEnd" });
@@ -379,20 +404,34 @@ export class Pointers {
     if (e.pointerId !== this.#primary) return;
     this.#primary = -1;
     if (cancelled) {
+      this.#lastTap.at = -Infinity;
       this.gestures.push({ type: "cancel" });
       return;
     }
     const p = this.#at(e);
+    const box = this.#box();
+    this.#moved = Math.max(this.#moved, Math.hypot((p.x - this.#start.x) * box.width, (p.y - this.#start.y) * box.height));
     const tap = this.#moved < (this.#touch ? TAP_SLOP.touch : TAP_SLOP.mouse);
     const now = this.#when(e);
     const last = this.#lastTap;
-    const box = this.#box();
     const double = tap && now - last.at < DOUBLE_WITHIN && Math.hypot((p.x - last.x) * box.width, (p.y - last.y) * box.height) < DOUBLE_NEAR;
     // A third tap starts again rather than making a second double.
     last.at = tap && !double ? now : -Infinity;
     last.x = p.x;
     last.y = p.y;
     this.gestures.push({ type: "up", x: p.x, y: p.y, tap, double });
+    if (tap && this.#button === 0) this.onTap?.(p.x, p.y, this.#start.x, this.#start.y);
+  }
+
+  /** Geometry or focus changed: coordinates from the previous screen cannot commit an action. */
+  cancel(forget = false) {
+    if (forget) this.#fingers.clear();
+    this.gestures.length = 0;
+    this.gestures.push({ type: "cancel" });
+    this.#primary = -1;
+    this.#pinch = null;
+    this.#spent = this.#fingers.size > 0;
+    this.#lastTap.at = -Infinity;
   }
 
   wheel(e: { clientX: number; clientY: number; deltaX: number; deltaY: number; deltaMode: number; ctrlKey: boolean; metaKey?: boolean }) {
