@@ -107,6 +107,9 @@ jumpy, gives continuous motion.
   and antennal sweeps. The hind legs subsequently sweep the abdomen, folded
   wings, and rub together. The opposite pair stays planted during each stage.
   The sequence crossfades through six-foot support and repeats every 12 s.
+  Targets follow the posed eye, antenna, abdominal and wing surfaces, including
+  breathing and crop swelling. The thorax shifts toward supporting pairs.
+  Command strength controls vigour, while active strokes still reach the skin.
   Seeds et al. (2014) motivates anterior-to-posterior ordering and interleaved
   leg rubbing. The command has no dirt level or cleaning-site selection:
   the clock and site targets are explicitly an animation stand-in, not a
