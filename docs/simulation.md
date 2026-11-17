@@ -142,10 +142,11 @@ a few millimetres, over in a tenth of a second (`packages/brain/README.md`,
 What it does and doesn't reproduce). So while
 its feet are off the ground the body keeps a floor under the wings' drive:
 
-- a take-off goes straight into it (the giant fiber drives the jump muscle and,
-  through the PSI, the wings' power muscles, so the first downstroke comes
-  with the jump); off its feet any other way, walking off a ledge, it starts
-  0.05 s later, so a step down of a few millimetres is over first;
+- an escape jump schedules the floor immediately. There is an ordering gap:
+  `Behavior.update` computes wing drive before setting the jump's airborne
+  timer, so the floor is applied on the following update. The source comment
+  intends it to accompany the jump. Off its feet another way, such as walking
+  off a ledge, it starts 0.05 s later, so a short step down can finish first;
 - for 0.7 s it holds 0.62, a little over its weight, so it flies on at about
   0.28 m/s (a fruit fly cruises at about 0.3 m/s);
 - then over 0.4 s it eases to 0.54, short of its weight, and the fly glides
