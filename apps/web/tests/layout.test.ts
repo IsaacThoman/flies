@@ -69,7 +69,7 @@ test("the TV keeps its HUD and title layout, with Settings below a separate head
   assert.equal(hud.captionY, 25);
   assert.equal(hud.shelfY, 446);
   assert.equal(hud.gap, 52);
-  assert.deepEqual([hud.shelfLeft, hud.split, hud.apart], [229, TOOLS.findIndex((t) => t.world), 32]);
+  assert.deepEqual([hud.shelfLeft, hud.split, hud.apart], [203, TOOLS.findIndex((t) => t.world), 32]);
   assert.equal(hud.orb, 1);
   assert.equal(hud.labelY, 385);
   assert.deepEqual([hud.hintsX, hud.hintsY, hud.rightX, hud.rightY, hud.menuX, hud.menuY], [16, 446, 838, 446, 16, 24]);
@@ -100,7 +100,7 @@ test("at every shape the HUD is inside the safe area, nothing on it overlaps, an
   for (const [name, frame] of frames()) {
     const a = safeRect(frame);
     const hud = hudLayout(frame);
-    const shelf = { x: hud.shelfLeft - 8, y: hud.shelfY - 26, w: hud.gap * TOOLS.length + 16, h: 52 };
+    const shelf = hud.shelf;
     const label = { x: hud.cx - 100, y: hud.labelY - 17, w: 200, h: 32 };
     const menu = { x: hud.menuX, y: hud.menuY - 18, w: 36, h: 36 };
     // The widest caption, kept clear of the menu's button as the HUD keeps it, and no wider than fits beside it.
@@ -141,8 +141,13 @@ test("a shelf of ten tools in its two groups fits every shape: one row where a f
   const phone = frames().find(([name]) => name === "a phone upright")![1];
   const stacked = hudLayout(phone, true, ten);
   assert.ok(stacked.toolY[0] < stacked.toolY[9], "the fly's tools over its world's");
-  // Today's shelf keeps its one row on every shape.
-  for (const [name, frame] of frames()) assert.equal(new Set(hudLayout(frame).toolY).size, 1, name);
+  // Today's shelf of eight: one row on the TV and wherever each tool takes a finger in one, else the fly's tools over its world's.
+  assert.equal(new Set(hudLayout(TV_FRAME).toolY).size, 1);
+  for (const [name, frame] of frames()) {
+    const hud = hudLayout(frame);
+    if (new Set(hud.toolY).size === 1) assert.ok(!frame.coarse || hud.gap * frame.unit >= 42, `${name}: one row, a finger each`);
+    else assert.ok(hud.toolY[0] < hud.toolY[TOOLS.length - 1], `${name}: the fly's tools over its world's`);
+  }
 });
 
 test("the HUD's targets are where it draws them, inside the safe area, and big enough for a finger", () => {
@@ -167,7 +172,8 @@ test("the HUD's targets are where it draws them, inside the safe area, and big e
     // Each tool's slot is under its orb.
     const slots = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).filter((h) => h.kind === HUD_HITS.tool);
     assert.equal(slots.length, TOOLS.length);
-    for (let i = 1; i < slots.length; i++) assert.ok(slots[i].x >= slots[i - 1].x + slots[i - 1].w - 1e-6, `${name}: slots side by side`);
+    // Side by side along a row; where the groups stack, the world's row under the fly's.
+    for (let i = 1; i < slots.length; i++) assert.ok(slots[i].y === slots[i - 1].y ? slots[i].x >= slots[i - 1].x + slots[i - 1].w - 1e-6 : slots[i].y >= slots[i - 1].y + slots[i - 1].h - 1e-6, `${name}: slots side by side`);
   }
 });
 

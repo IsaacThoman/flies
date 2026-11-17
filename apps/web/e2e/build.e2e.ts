@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import type { Browser, Page } from "playwright";
-import { openGame, readState, startServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
+import { openGame, readState, startServer, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
 import { TOOLS } from "../src/tools/hands.ts";
 
@@ -45,6 +45,34 @@ async function choose(page: Page, kind: string) {
 const setDown = (page: Page, x: number, z: number, yaw = 0) =>
   page.evaluate(([x, z, yaw]) => (globalThis as unknown as { __fly: Game }).__fly.life.setDown(x, z, yaw), [x, z, yaw] as const);
 
+/**
+ * Select where the ghost shows the piece fits, until there are `count`: the fly is free to walk
+ * into the spot between a look at the ghost and the press, which then refuses it.
+ */
+async function build(page: Page, kind: string, count: number) {
+  for (let i = 0; i < 5; i++) {
+    await waitFor(page, `buildAim~^${kind} ok`);
+    await press(page, "Enter");
+    try {
+      await waitWithin(page, `built=${count}`, 1);
+      return;
+    } catch {
+      // Refused: the fly was in the way. Again, where the ghost is now.
+    }
+  }
+  await waitFor(page, `built=${count}`, 1);
+}
+
+/** The fewest draws a frame over a second: frames that refresh the fly's eyes draw its six views too. */
+async function fewestDraws(page: Page) {
+  let fewest = Infinity;
+  for (let i = 0; i < 8; i++) {
+    fewest = Math.min(fewest, Number((await readState(page)).calls));
+    await waitForGameTime(page, 0.13);
+  }
+  return fewest;
+}
+
 const pieces = (page: Page) => page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.builder.pieces.map((p) => ({ ...p })));
 
 try {
@@ -56,15 +84,13 @@ try {
   await setDown(page, -40, -190, 0);
   await choose(page, "tile-blue");
   // The hand waits just in front of the fly: the tile goes down as near as it has room.
-  await waitFor(page, "buildAim~^tile-blue ok");
-  const before = Number((await readState(page)).calls);
-  await press(page, "Enter");
-  await waitFor(page, "built=1");
+  const before = await fewestDraws(page);
+  await build(page, "tile-blue", 1);
   const [tile] = await pieces(page);
   assert.equal(tile.kind, "tile-blue");
-  // Two draws more: the pieces and their shadows (and the ghost, which is drawn already).
-  const after = Number((await readState(page)).calls);
-  assert.ok(after - before <= 3, `draws ${before} to ${after}`);
+  // Two draws more: the pieces and their shadows (the ghost is drawn already).
+  const after = await fewestDraws(page);
+  assert.ok(after - before <= 2, `draws ${before} to ${after}`);
 
   // Its body on the tile: what it stands on is the tile, half a millimetre up.
   await setDown(page, tile.x, tile.z, Math.PI);
@@ -78,9 +104,7 @@ try {
     const g = (globalThis as unknown as { __fly: Game }).__fly;
     g.hands.movePointer({ x, y: 0, z }, { x: 0, y: 1, z: 0 });
   }, [wallAt.x, wallAt.z] as const);
-  await waitFor(page, "buildAim~^wall ok");
-  await press(page, "Enter");
-  await waitFor(page, "built=2");
+  await build(page, "wall", 2);
   // Set down facing it, 6 mm short of it: wherever its brain takes it for a while, it is never inside it.
   await setDown(page, wallAt.x, wallAt.z - 6, 0);
   for (let t = 0; t < 20; t++) {
