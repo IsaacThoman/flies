@@ -19,11 +19,15 @@ export const GREENHOUSE_SOLIDS: readonly Solid[] = [
   { name: "watering can", footprint: { kind: "circle", x: 230, z: -80, r: 39 }, top: { kind: "flat", y: 88 } },
   // The spout is a sequence of overlapping flat sections, without air pockets.
   ...Array.from({ length: 10 }, (_, i) => box("watering spout", 265 + i * 3, -80, 5, 7 - i * 0.2, 26 + i * 4, 16 + i * 4)),
-  box("can handle", 228, -80, 5, 8, 134, 126),
-  box("can handle", 207, -80, 4, 8, 130, 88),
-  box("can handle", 249, -80, 4, 8, 130, 88),
+  ...Array.from({length: 33},(_,i) => {
+    const x = 205+i*46/32;
+    const y = 107+Math.sqrt(Math.max(0,23*23-(x-228)*(x-228)));
+    return box("can handle",x,-80,0.78,5,y+4,y-4);
+  }),
+  box("can handle", 205, -80, 4, 5, 108, 88),
+  box("can handle", 251, -80, 4, 5, 108, 88),
   { name: "water saucer", footprint: { kind: "circle", x: SAUCER.x, z: SAUCER.z, r: SAUCER.r }, top: { kind: "dish", well: SAUCER.water, rim: 6, inner: 0.76, lip: 0.91 } },
-  { name: "fallen tomato", footprint: { kind: "circle", x: -32, z: 30, r: 19 }, top: { kind: "dome", base: 0, height: 24, power: 0.55 } },
+  { name: "fallen tomato", footprint: { kind: "circle", x: -50, z: -12, r: 19 }, top: { kind: "dome", base: 0, height: 24, power: 0.55 } },
   { name: "fallen tomato", footprint: { kind: "circle", x: -82, z: 51, r: 13 }, top: { kind: "dome", base: 0, height: 17, power: 0.6 } },
   { name: "split fig", footprint: { kind: "ellipse", x: 20, z: 56, rx: 19, rz: 25, angle: -0.35 }, top: { kind: "dome", base: 0, height: 9, power: 1 } },
   { name: "trowel blade", footprint: { kind: "ellipse", x: -187, z: 66, rx: 20, rz: 38, angle: -0.6 }, top: { kind: "dome", base: 0, height: 3.5, power: 1 } },
@@ -36,10 +40,11 @@ export const GREENHOUSE_SOLIDS: readonly Solid[] = [
 ];
 
 export const GREENHOUSE_PATCHES: readonly FoodPatch[] = [
-  { name: "tomato juice", x: -32, z: 30, r: 7, sweet: 0.72 },
+  { name: "tomato juice", x: -50, z: -12, r: 7, sweet: 0.72 },
   { name: "tomato juice", x: -82, z: 51, r: 4, sweet: 0.72 },
   { name: "fig flesh", x: 20, z: 56, r: 12, sweet: 0.95 },
   { name: "tomato juice", x: -14, z: 8, r: 6, sweet: 0.72 },
+  ...Array.from({length: 4},(_,i) => ({name: "tomato juice",x:-30+i*4,z:-5+i*3,r:1.4+i*0.15,sweet:0.72})),
   { name: "water", x: SAUCER.x, z: SAUCER.z, r: 31, sweet: 0.05, pool: true },
 ];
 export const GREENHOUSE: Place = {

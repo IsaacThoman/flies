@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { GREENHOUSE_BENCH, GLAZING, GREENHOUSE_SOLIDS, SAUCER, TRAY, topHeight, topNormal } from "@fly/world";
+import { GREENHOUSE_BENCH, GLAZING, GREENHOUSE_PATCHES, GREENHOUSE_SOLIDS, SAUCER, TRAY, topHeight, topNormal } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { Batch, freeze, paint, random } from "../../scene/build.ts";
 import type { SceneSet } from "../types.ts";
@@ -66,6 +66,7 @@ export function buildBench(): SceneSet {
     add(box(0, -700, 0, 580, 22, 330), "#706047", K.wood);
     yield;
 
+    let smallParts = 0;
     for (const s of GREENHOUSE_SOLIDS) {
       if (s.name === "greenhouse pane") continue;
       let color = "#466d3a", kind = K.leaf;
@@ -86,7 +87,7 @@ export function buildBench(): SceneSet {
         add(g,"#25451e",K.leaf);
         batch.add(opaque.material,tag(foliage(s),"kind",K.leaf));
       } else add(g, colors, kind);
-      yield;
+      if (s.name !== "can handle" && s.name !== "watering spout" || ++smallParts % 8 === 0) yield;
     }
     // Seed cells sit flush in the tray; the seedlings are crowns above them.
     for (let i = 0; i < 12; i++) {
@@ -132,6 +133,7 @@ export function buildBench(): SceneSet {
       else spill.lineTo(Math.cos(a) * r, Math.sin(a) * r);
     }
     add(new THREE.ShapeGeometry(spill).rotateX(-Math.PI / 2).translate(-14, 0.08, 8), "#a94422", K.juice);
+    for (const patch of GREENHOUSE_PATCHES) if (patch.name === "tomato juice" && patch.r < 2) add(new THREE.CircleGeometry(patch.r,24).rotateX(-Math.PI/2).translate(patch.x,0.08,patch.z),"#a94422",K.juice);
 
     yield;
     // A fallen cotyledon is flat enough for the feet to step across it.

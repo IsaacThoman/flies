@@ -117,7 +117,7 @@ vec3 surface(vec3 c) {
    float bruise = smoothstep(0.57, 0.8, vnoise(p.xz * 0.17 + 7.0));
    c = mix(c, vec3(0.2, 0.037, 0.012), bruise * 0.7);
    c *= 0.9 + fine * 0.22; rough = 0.3 + bruise * 0.2; relief = fine * 0.018;
-   vec2 centre = p.x < -55.0 ? vec2(-82.0,51.0) : vec2(-32.0,30.0);
+   vec2 centre = p.x < -55.0 ? vec2(-82.0,51.0) : vec2(-50.0,-12.0);
    float radius = p.x < -55.0 ? 4.0 : 7.0;
    float split = 1.0-smoothstep(radius*0.72,radius,length(p.xz-centre)+vnoise(p.xz*1.4)*0.7);
    c = mix(c,vec3(0.39,0.055,0.018),split*0.65); rough = mix(rough,0.16,split);
@@ -158,7 +158,8 @@ vec3 surface(vec3 c) {
     .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>
 float transmitted = 1.0-glazingShadow(vWorld)*uDirect*0.75;
 reflectedLight.directDiffuse *= transmitted;
-reflectedLight.directSpecular *= transmitted;`)
+reflectedLight.directSpecular *= transmitted;
+if (vKind>9.5 && vKind<10.5) reflectedLight.indirectSpecular *= 0.25;`)
     .replace("#include <opaque_fragment>", `
 float shadow = 0.0;
 float ao = 1.0;
