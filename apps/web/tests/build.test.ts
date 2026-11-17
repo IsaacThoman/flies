@@ -161,6 +161,10 @@ test("the web build ships the exact notices and a readable static privacy policy
   assert.equal(read("THIRD_PARTY_NOTICES"), noticeText());
   assert.equal(read("privacy/index.html"), privacyHtml(PUBLIC_OWNER));
   assert.equal(existsSync(path.join(unpublished, "privacy/index.html")), false);
+  const worker = readFileSync(path.join(unpublished, "sw.js"), "utf8");
+  const precache = JSON.parse(/addAll\((\[[^\]]*\])\)/.exec(worker)![1]) as string[];
+  assert.ok(!precache.includes("privacy/index.html"), "an unpublished policy cannot break offline installation");
+  assert.doesNotMatch(worker, /__FLY_PRECACHE__|__FLY_VERSION__/);
   for (const dir of [out, unpublished]) {
     const source = readFileSync(path.join(dir, "index.html"), "utf8") + readdirSync(path.join(dir, "assets")).filter((f) => f.endsWith(".js")).map((f) => readFileSync(path.join(dir, "assets", f), "utf8")).join("");
     assert.doesNotMatch(source, /<operator name>|<contact email>|&lt;(operator name|contact email)&gt;/);
