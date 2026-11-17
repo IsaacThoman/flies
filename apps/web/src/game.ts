@@ -377,7 +377,7 @@ export class Game implements Shell {
     this.overlay.scene.add(this.statsPanel.mesh);
     this.#pictures = [this.inset, this.nerves, this.statsPanel];
     this.tally = new Tally(this.life, Date.now());
-    this.#statsState = { activity: "waiting", spikes: 0, active: 0, speed: 0, history: this.meter.history, head: 0, day: this.tally.day, sensed: this.life.sensed, brain: null };
+    this.#statsState = { spikes: 0, active: 0, speed: 0, history: this.meter.history, head: 0, day: this.tally.day, sensed: this.life.sensed, brain: null };
     this.glow = new NerveGlow(this.fly.model.nerves.glow);
     this.#settle();
     const title = titleScreen(this);
@@ -1157,7 +1157,7 @@ export class Game implements Shell {
     this.peaks.escape = Math.max(this.peaks.escape * fade, command?.escape ?? 0);
     this.peaks.loom = Math.max(this.peaks.loom * fade, life.sensed.loomLeft, life.sensed.loomRight);
     this.peaks.looming = Math.max(this.peaks.looming * fade, rates?.["vision.looming left"] ?? 0, rates?.["vision.looming right"] ?? 0);
-    this.glow.update(life.brain.regionRates, dt);
+    this.glow.update(life.brain.regionRates, dt, rates);
     this.fly.update(life.body, life.intent, life.eating, life.hunger.fullness, dt, life.songSide, life.activity === "sleeping");
     this.prints.update(this.fly.model, life.body.onFeet, this.fly.pose.groom > 0.02, life.world, life.pantry, this.time);
     this.online?.send(this.#playerNow());
@@ -1206,7 +1206,6 @@ export class Game implements Shell {
       this.inset.update(dt, waitFor(eyesWanted, this.corners, 0, this.inset, pictures), this.corners, opacity);
       this.nerves.update(dt, waitFor(nervesNow, this.corners, slot, this.nerves, pictures), this.corners, slot, opacity);
       const stats = this.#statsState;
-      stats.activity = life.activity;
       stats.spikes = this.meter.spikesPerSecond;
       stats.active = this.meter.active;
       stats.speed = this.meter.speed;

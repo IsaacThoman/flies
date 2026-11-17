@@ -12,6 +12,8 @@
 // that.
 
 /** Sensory neurons bring news in, motor (and neurosecretory) neurons send commands out, central ones are everything between. */
+import { SOMA_GROUPS } from "./somata.ts";
+
 export type NerveRole = "sensory" | "central" | "motor";
 
 /**
@@ -22,7 +24,7 @@ export type NerveRole = "sensory" | "central" | "motor";
  * bodies: sense cells in a sense organ, or motor neurons at the edge of the
  * cord.
  */
-export type NerveKind = "neuropil" | "rind" | "tract" | "nerve" | "organ";
+export type NerveKind = "neuropil" | "rind" | "tract" | "nerve" | "organ" | "soma";
 
 export type NerveSide = "left" | "right" | "midline" | "both";
 
@@ -101,6 +103,7 @@ export const NERVE_PARTS: readonly NervePart[] = [
   ...paired("wing-nerve", "sensory", "nerve", "Wing nerve, from the wing's base"),
   ...paired("haltere-nerve", "sensory", "nerve", "Haltere nerve, from the haltere"),
   part("abdominal-sensory", "sensory", "nerve", "midline", "Abdominal sensory axons up the abdominal nerve trunk"),
+  ...SOMA_GROUPS.map((g) => part(g.id, g.role, "soma", "both", `${g.rate}: measured somata, lit by the group's mean rate`)),
 ];
 
 export const PART_INDEX: ReadonlyMap<string, number> = new Map(NERVE_PARTS.map((p, i) => [p.id, i]));

@@ -462,3 +462,15 @@ The supplied Caddy config and `scripts/serve.ts` handle that path. The service w
 for offline navigation too. About → Acknowledgements reads its bundled notice sections without a fetch.
 Otherwise `/privacy` must answer 404. Owner draft placeholders are never shipped.
 Before publishing, verify production log/backup retention.
+
+<!-- docs-check: base apps/web/src -->
+
+<!-- docs-check: generated index.html -->
+
+<!-- docs-check: generated sw.js -->
+
+<!-- docs-check: generated manifest.webmanifest -->
+
+<!-- docs-check: generated privacy/index.html -->
+
+<!-- docs-check: generated ./dist -->

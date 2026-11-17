@@ -37,6 +37,8 @@
 import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { BRAIN_FRAME as BRAIN, CORD_FRAME as CORD, registeredPoint as into } from "../src/nerves/registration.ts";
+import type { AnatomyFrame as Frame } from "../src/nerves/registration.ts";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
@@ -56,7 +58,7 @@ const out = path.join(import.meta.dirname, "../src/nerves/measured.ts");
 
 type V = [number, number, number];
 const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const dot = (a: V, b: V) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const scale = (a: V, s: number): V => [a[0] * s, a[1] * s, a[2] * s];
 const len = (a: V) => Math.sqrt(dot(a, a));
 const unit = (a: V): V => scale(a, 1 / (len(a) || 1));
@@ -80,31 +82,6 @@ async function mesh(layer: Layer, name: string): Promise<V[]> {
 }
 
 // --- The frames ---------------------------------------------------------------
-
-type Frame = { origin: V; x: V; y: V; z: V };
-/** A frame from its origin, its left-right axis and (roughly) its ventral one: +x left, +y dorsal, +z anterior. */
-function frame(origin: V, left: V, ventral: V): Frame {
-  const x = unit(left);
-  const y = unit(scale(sub(ventral, scale(x, dot(ventral, x))), -1));
-  return { origin, x, y, z: cross(x, y) };
-}
-const into = (f: Frame, p: V): V => {
-  const d = sub(p, f.origin);
-  return [dot(d, f.x), dot(d, f.y), dot(d, f.z)];
-};
-
-// The brain's left-right axis and midline are fitted to 36 pairs of left and
-// right neuropils (their volume-weighted centroids); the foramen's narrowest
-// point is where the hole through the brain tissue is smallest in z-slices.
-const BRAIN = frame([388.7, 253.3, 217.6], [0.9988, -0.0445, -0.0188], [0, 1, 0]);
-// The cord's from its paired neuropils too; its long axis runs back with the
-// back end slightly dorsal, which the ventral axis absorbs.
-const CORD_LONG: V = [0.015, -0.106, 0.994];
-const CORD = (() => {
-  const x = unit([0.9976, 0.0616, -0.0307]);
-  const z = unit(scale(sub(CORD_LONG, scale(x, dot(CORD_LONG, x))), -1));
-  return { origin: [401, 420, 527.6] as V, x, y: cross(z, x), z };
-})();
 
 // --- Measuring ----------------------------------------------------------------
 

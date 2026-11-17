@@ -340,7 +340,7 @@ together, after the display lands. This PR does none of that.
 ### Serving and future bundling
 
 Vite serves `/brain/anatomy.bin` in dev and preview and copies it beside
-`brain/connectome.bin` in production; no fetch or consumer is added to the game.
+`brain/connectome.<n>.<hash>.bin` in production; no fetch or consumer is added to the game.
 The connectome URL and browser caching/loading code are unchanged. A later tvOS
 change would need to copy the matching sidecar into its app resources, expose
 its bytes to the display and use the same hash validation (or an equivalently
@@ -1032,3 +1032,29 @@ With the eyes open (`report.ts` section e): a steady scene costs what shut eyes 
 ## Tests
 
 `node --test 'packages/brain/src/*.test.ts'` from the repository root (or `npm test` for all packages). Without the real data: the format, the packer, the engine against a dense reference, and the runtime on a small synthetic connectome (`src/test-helpers.ts`): decoding, the sense-to-rate mapping, left/right balancing, a male's taste picked by root ID (a mid leg's LgLG1a left out), the legs' campaniform sensilla for `grounded` and every other for `wingbeat`, Johnston's organ's completeness fix (on each zone's less complete side only, by the ratio of synapses), that no neuron is both driven and read, `createBrain` end to end and its errors, determinism, hunger (left out, 1 and NaN the same brain spike for spike; 0 passes on less sugar and quietens the background; the engine's output gain scaling only its group and exact at 1), and a four-column eye on it (shut, the brain is spike for spike the one without eyes; open, darkness reaches the lamina, the looming detectors and the giant fiber). Also without the data: the regions' catalog (unique ids, every field filled in, pairs alike but for their side), their rules on examples of every kind of neuron and every catch-all, and on the synthetic brain that every region is reported after the readouts, an empty one at 0, and that no command reads them; the engine's partition (every spike counted by its neuron's part, the run unchanged); the column table, the viewing directions (unit vectors, none alike, mirrored, the frontal overlap, the dorsal rim looking up), and the input stage (adaptation, contrast, transient and sustained cells, steady scenes costing nothing, skipping steps exactly). With `data/connectome.bin` (skipped without it), `src/behaviour.test.ts` checks the requirements: the real groups and their disjointness, no seizure after each sense and all at once, loom → escape timing, escape below 0.3 otherwise, mirrored looms and steering, touch → back, wind and a push on either antenna → groom, sweet → feed, a fed fly ignoring sugar a starved one feeds on, loom → wings, P1 → sing and no sense, a male's taste among them, near singing, the wings' own sensors driving the flight motor neurons short of holding the fly up and the loop they close with the body dying away, three minutes of resting behaviour (walking 20–70% of the time in at least 15 bouts, turns both ways, no escapes, sing under 0.25; 10 minutes is in `report.ts`); `src/cost.budget.ts`, which `npm test` runs on its own after the rest, construction time and cost in M5 Pro CPU time, 1.7 to 1.8 times what they take (`scripts/cpuBudget.ts`); `src/eyes.test.ts` that every column's cells are the right type and side; `src/regions.test.ts` the partition (every neuron in one region, as many in each as the catalog says, none empty), that the senses' and the readouts' neurons are in the regions the catalog says, and that the region rates respond where they should (at rest the descending neurons stay under 1.5 Hz; the looming pulse raises them more than threefold and the wing and haltere motor neurons with them; a disc looming at the left eye drives the left lamina, medulla and lobula more than twice as hard as the right ones; sweet drives the mouthparts, the head motor neurons and the subesophageal zone); `src/sleep.test.ts` sleep: the internal state left out gives the same spikes as all of it at 0, its groups are found and not read, at night the fly hardly walks, asleep a raindrop and the resting feather don't wake it while stroking and the looming pulse do, and the gate keeps touch 0.6 from waking a sleeping fly that it wakes when only still; and `src/seeing.test.ts` the eyes: shut, the same spikes as the commit before the eyes (a fingerprint); a loom at the right eye passing escape 0.5 and dots and a receding disc not; a steady scene sending the lamina nothing; HS preferring front-to-back and H2 back-to-front motion and a rotation turning the fly with it; and no seizure after a loom, a grating or a flicker, alone and with every other sense. It takes about a minute and a half.
+
+<!-- docs-check: base packages/brain/src -->
+
+<!-- docs-check: base packages/brain/scripts -->
+
+<!-- docs-check: external neurons.csv -->
+
+<!-- docs-check: external connections_princeton.csv -->
+
+<!-- docs-check: external model.py -->
+
+<!-- docs-check: external ME_assigned_columns.csv -->
+
+<!-- docs-check: external column_coord.png -->
+
+<!-- docs-check: generated packages/brain/data/connectome.bin -->
+
+<!-- docs-check: generated connectome.bin -->
+
+<!-- docs-check: generated anatomy.bin -->
+
+<!-- docs-check: generated packages/brain/data/ -->
+
+<!-- docs-check: generated data/connectome.bin -->
+
+<!-- docs-check: generated packages/brain/data/annotations.feather -->

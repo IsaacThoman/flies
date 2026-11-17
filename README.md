@@ -454,8 +454,7 @@ they take.
 Stats of: its brain, its day, both, or in and out) is a small panel of numbers, each a
 figure and a word: the brain's spikes a second, neurons active and speed
 against real time (from the brain's meter), under
-a trace of its last twenty seconds; and, headed by what the fly is doing now
-(the HUD's caption, so it can be read in the screensaver too), its day: how far
+a trace of its last twenty seconds; and its day: how far
 it has walked, its meals, its take-offs, and its time flying and grooming.
 The day is counted from what the fly's life did (`life.ts`: its legs' steps
 on its feet, a meal from its first taste, each leap into the air, each
@@ -464,7 +463,8 @@ second it was flying or grooming), once each, kept across launches as
 from the other pictures, at the same edge (at the top left while you play),
 and moves round with them; on a screen too narrow for that, under them; its
 cells two to a row on a narrow screen, and its brain beside its day on a
-short one. In and out, also headed by what the fly is doing, is a bar for
+short one. It retains the values and their units, without repeating the
+behaviour caption. In and out is a bar for
 each sense going into the brain as the body sends it (a loom at either eye,
 touch, either antenna, wind, sweet, weight on its legs, a male's taste on
 its front legs, and the light, the mean over every facet), and its hunger, and for each
@@ -678,7 +678,7 @@ raise the brain's own wing drive in the air, but never to the floor, so they
 change no flight; and without the floor every take-off is the same hop with
 them as without. They don't make the reflex any less needed, and its floor
 stays as it was. Measured in Node on the real connectome, the swoop thrown as
-`apps/web/tests/swoop-escape.test.ts` throws it (eyes open, seeds 1 to 4, 8
+`apps/web/tests/swoop-escape.budget.ts` throws it (eyes open, seeds 1 to 4, 8
 throws each):
 
 | | With the floor | Without it |
@@ -797,7 +797,7 @@ that draw the same model with the same glow, so they never disagree:
 - **The panel** (Settings → On screen → Nervous system: off, in the
   screensaver, the default, or always): the same model from above, head up,
   the fly's left on the left, standing at rest so that it holds still,
-  cropped to the brain and the cord, labelled "Nervous system". It shares
+  cropped to the brain and the cord, with no heading. It shares
   its corner with what it sees, under it (over it at the bottom; beside it,
   smaller, where the screen is too short, as a phone on its side), at the
   corner itself when that isn't shown, and moves round the corners with it;
@@ -807,7 +807,7 @@ that draw the same model with the same glow, so they never disagree:
 **The anatomy** (`packages/fly/src/nerves/`). The neuropils are measured from
 the FlyEM male CNS v1.0's own neuropil meshes (one male's brain, neck and
 cord in one EM volume, CC-BY 4.0) by `packages/fly/scripts/nerves.ts`, which
-writes `measured.ts`: each neuropil's surface as its radius in each direction
+writes `packages/fly/src/nerves/measured.ts`: each neuropil's surface as its radius in each direction
 round its centre, the farthest of its mesh's vertices within 15° of each
 direction (left side only, mirrored, so the drawing is symmetric); the
 lamina as a curved plate round the centre of the sphere that fits it; the
@@ -834,9 +834,13 @@ each segment. Sense organs are small clusters: the bristles' sockets where
 the model's bristles are, the femoral chordotonal organs, the campaniform
 sensilla on the legs and at the bases of the wings and halteres.
 
-**Where each region is drawn** (`apps/web/src/nerves/regions.ts`). All 63 of
-the brain's regions have a place and every part of the drawing belongs to
-exactly one region (a test holds it). Where several regions share a place in
+**Where each region is drawn** (`apps/web/src/nerves/regions.ts`). The 62
+placed regions each light their own anatomy. The remaining `unplaced` group
+mixes neurons whose annotations do not establish a location; its rate is
+retained but lights nothing. The connective's midline stays as unlit
+anatomical context, rather than locating those neurons in the neck.
+Every lit part belongs to exactly one region or command group (a test holds it).
+Where several regions share a place in
 the fly, each is drawn as what is its own there: motor neurons as their
 cell bodies at the cord's edge and the nerves their axons leave by, sensory
 neurons as the organs and nerves they come in from, descending and ascending
@@ -851,7 +855,8 @@ fill them.
 | central brain, other | the rind of cell bodies round the central brain, drawn as an edge (that is where those neurons' cell bodies are) |
 | smell · Johnston's organ · head bristles · mouthparts · head sensory, other | the third antennal segment and its strand of the antennal nerve · the second segment's organ and its strand to the AMMC · the head's bristle sockets · the labellum, the pharynx's taste organs and the labial nerves' sensory axons · the pharyngeal nerves |
 | head motor · neuroendocrine | the labial nerves' motor axons · the pars intercerebralis, its nerve to the corpora cardiaca, the frontal ganglion |
-| descending · ascending (each side) · unplaced | tracts from the brain down the neck and along the cord's top · from the cord's floor up into the brain · a thread down the connective's midline |
+| descending · ascending (each side) | tracts from the brain down the neck and along the cord's top · from the cord's floor up into the brain |
+| unplaced | not assigned an anatomical location; no activity drawn |
 | front, middle, hind leg motor (each side) · wing and haltere motor · neck motor · abdomen motor | cell bodies at the leg neuropil's edge and the leg nerve's motor strand · cell bodies over the wing tectulum and the dorsal nerves · the cervical nerve · the abdominal trunk's motor strand |
 | leg sensory · wing, haltere and thorax sensory · abdomen sensory · proprioceptors · body bristles | the leg nerves' sensory strands · the wing and haltere nerves · the abdominal trunk's sensory strand · the chordotonal organs and campaniform sensilla · the body's bristle sockets |
 | cord interneurons (each side) · cord, midline · cord, efferent | the leg neuropils T1, T2, T3, the abdominal neuromeres and the neck, wing and haltere tectulum of its side · the cord's ventral midline · its dorsal median fibres and median nerves |
@@ -870,7 +875,7 @@ nothing flickers between brain states. **How a glow is drawn**
 (`packages/fly/src/nerves/materials.ts`, one function for both views): a
 part's colour goes from its tissue's toward its role's, blue for sensory
 neurons, amber for the neurons between, red for motor and neurosecretory
-ones, by (glow / 0.4)², all the way at 0.4, covering more of what is behind
+ones, by (glow / 0.35)², all the way at 0.35, covering more of what is behind
 it as it does, and it gives off light in that colour in proportion to
 glow². The square keeps the low hum of background activity near the tissue's
 colour and lets a burst stand out: in a ball's dive the optic lobes go from
@@ -881,19 +886,42 @@ reads in a dark room (the same at all times for every part, as an X-ray
 shows bone); in the panel a faint constant stain on the dark glass, as a
 neuropil stain shows anatomy in a micrograph.
 
+**Command-group somata** (`packages/fly/src/nerves/somata.ts`). The 64
+neurons already read for walking, steering, backing, escape, flight power,
+grooming, feeding and song are also drawn as tiny cell bodies at their actual
+`somaLocation` from `packages/brain/data/anatomy.bin`. `node packages/fly/scripts/somata.ts`
+regenerates the static atlas after validating the anatomy/connectome SHA-256
+pair. The same fitted brain and cord frames used for the neuropil meshes
+register these points; they retain the specimen's asymmetry. Every member is
+included, with no subsampling and no `tosomaLocation` fibre fallbacks. A
+3.6 µm nominal glyph radius is enlarged to a two-pixel diameter when necessary.
+This is a display convention, not a measurement of soma size.
+They are merged into the existing nervous-system geometry: no extra draws.
+
+These are **group-rate markers, not individual spike flashes**. Every soma
+in a readout shares that group's actual smoothed mean rate, normalized by
+the command's existing full-scale rate (40 Hz walking/steering/backing/
+feeding/song, 60 Hz grooming, 120 Hz flight power, 200 Hz giant fibre), with
+the same 50 ms rise and 400 ms fall as the regions. A bright point does not
+establish that this individual neuron fired. The workers and the native TV
+already report these nine rates; no new messages, counters, simulation work
+or inferred axon paths are added. A host missing a readout leaves its group
+dark. Region surfaces remain region averages. The static blue tissue stain
+and outline have higher contrast; only activity changes their warm glow.
+
 **What stays dark, and what it can't show.** The retina, smell and the legs',
 wings and thorax's and abdomen's sensory neurons never fire in this model (the
 light enters one synapse in, at the lamina; there is no sense of smell; of
 the body's senses only touch and the legs' load are driven): they are drawn,
 and stay dark. The mushroom body, lateral horn, superior protocerebrum,
 antennal lobe and central complex fire under 2 Hz on a 5 Hz scale and stay
-nearly dark. A region glows with the mean of all its neurons, so a command
+nearly dark. A region glows with the mean of all its neurons, so in its regional surface a command
 carried by a few hardly shows: the giant fibre's escape is one neuron among
 660 descending ones, and what shows of an escape is the optic lobes, the
 visual projection neurons and the motor neurons it sets going (the jump's
 are among the middle leg's). The cord's interneurons light their side's
-whole cord together, for now. The shapes are an anatomical drawing, not where
-each neuron is. The canvas's `data-xray` (how far the fly is glass),
+whole cord together, for now. The region shapes are an anatomical drawing; only the command-group somata
+are individual measured positions. The canvas's `data-xray` (how far the fly is glass),
 `data-nerves` (the panel's corner, or `hidden`) and `data-glow` (each region
 glowing at 0.05 or more, brightest first) say what is shown.
 
@@ -1118,3 +1146,9 @@ The wiring, and the shapes its nervous system is drawn with, are the
 Research Campus, CC-BY 4.0). The neuron model follows Shiu et al.,
 "A Drosophila computational brain model reveals sensorimotor processing",
 Nature 634 (2024).
+
+<!-- docs-check: base apps/web/src -->
+
+<!-- docs-check: base packages/body/src -->
+
+<!-- docs-check: generated packages/brain/data/anatomy.bin -->
