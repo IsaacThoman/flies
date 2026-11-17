@@ -98,7 +98,9 @@ function table(n: number, references: number[]) {
       const meter = new CpuMeter();
       for (let i = 0; i < FRAMES; i++) {
         frame(at++);
-        if (i % 60 === 59) meter.lap();
+        // Few laps, each long: every lap runs the reference beside it, and one reference in a hundred slowed by a shared CI host would
+        // turn the whole measurement away as contended.
+        if (i % 300 === 299) meter.lap();
       }
       references.push(...meter.references);
       return { ms: meter.ms / FRAMES, raw: meter.rawMs / FRAMES };
