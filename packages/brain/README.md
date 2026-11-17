@@ -917,6 +917,13 @@ With the eyes open (`report.ts` section e): a steady scene costs what shut eyes 
 
 ## Tools
 
+`node packages/brain/scripts/puff.ts --wiring` reports Johnston's organ zone
+membership and raw chemical synapse counts along one-, two- and three-hop
+routes to escape and landing descending neurons. `--simulate --seeds 5` compares
+20/100 ms transients with a 1 s step at several input rates. This is a research
+probe, not a gameplay sense; [the air-puff investigation](../../docs/puff-startle.md)
+separates real-fly evidence from what this chemical-only model can reproduce.
+
 `node packages/brain/scripts/probe.ts --type LPLC2,LC4 --side left` drives any group (by `--type`, `--superClass`, `--class`, `--subClass`, `--side`, `--nt`: comma-separated values or a `/regex/`) at `--rate` Hz for `--ms` and lists what responds, by super class and type, at the operating point. `--only <regex>` limits the list to some super classes, `--after <ms>` keeps running with the drive off to show what keeps going (driven neurons included), and `--set excitatory=0.2`, `--set saturation=0` and so on try another operating point. `--each type --target MN9` ranks each type in the selection by what it does to a target, and `--greedy` builds a set as `sweet`'s was built. The comment at the top of the file lists every option.
 
 `node packages/brain/scripts/wingbeat.ts` checks which campaniform sensilla are the legs' against FlyEM's nerves, and measures `grounded` and `wingbeat`: rest standing and in the air, `wingbeat` held, and the loop it closes with the body, with and without the body's floor (Senses; What it does and doesn't reproduce). `--rate` tries another rate for `wingbeat`.
