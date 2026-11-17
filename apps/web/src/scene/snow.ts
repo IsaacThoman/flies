@@ -12,13 +12,13 @@ export class Snow {
     const rnd = random(913);
     const g = new THREE.InstancedBufferGeometry();
     g.setIndex([0, 1, 2, 0, 2, 3]);
-    g.setAttribute("position", new THREE.Float32BufferAttribute([-1,-1,0, 1,-1,0, 1,1,0, -1,1,0],3));
+    g.setAttribute("position", new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], 3));
     const flakes = new Float32Array(1600 * 4);
-    for (let i=0;i<1600;i++) flakes.set([rnd.next(),rnd.next(),rnd.next(),rnd.next()],i*4);
-    g.setAttribute("flake",new THREE.InstancedBufferAttribute(flakes,4));
-    g.instanceCount=1600;
-    this.mesh=new THREE.Mesh(g,new THREE.ShaderMaterial({
-      uniforms:this.#u, transparent:true, depthWrite:false,
+    for (let i = 0;i < 1600;i++) flakes.set([rnd.next(), rnd.next(), rnd.next(), rnd.next()], i * 4);
+    g.setAttribute("flake", new THREE.InstancedBufferAttribute(flakes, 4));
+    g.instanceCount = 1600;
+    this.mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({
+      uniforms: this.#u, transparent: true, depthWrite: false,
       vertexShader: /* glsl */ `
 attribute vec4 flake;
 uniform float uTime; uniform float uSnow; uniform float uWind;
@@ -42,31 +42,31 @@ void main() {
       fragmentShader: /* glsl */ `uniform vec3 uColor; varying vec2 vUv; varying float vAlpha;
 void main() { float r=length(vUv); gl_FragColor=vec4(uColor,(1.0-smoothstep(0.35,1.0,r))*vAlpha*0.85); }`,
     }));
-    this.mesh.frustumCulled=false;
-    this.mesh.renderOrder=5;
-    this.mesh.visible=false;
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 5;
+    this.mesh.visible = false;
   }
   update(time: number, light: Daylight, w: Weather) {
-    this.mesh.visible=w.snow>0.01;
-    this.#u.uTime.value=time;
-    this.#u.uSnow.value=w.snow;
-    this.#u.uWind.value=w.wind;
+    this.mesh.visible = w.snow > 0.01;
+    this.#u.uTime.value = time;
+    this.#u.uSnow.value = w.snow;
+    this.#u.uWind.value = w.wind;
     this.#u.uColor.value.copy(light.skyColor).multiplyScalar(0.55).addScalar(0.3 + w.lightning);
   }
 }
 
 /** Pigment on exposed upward faces, no extra mesh or draw, no collision stand-in. */
-export function snowDust(material: THREE.MeshStandardMaterial | THREE.MeshLambertMaterial, cover: {value:number}, shelters: readonly THREE.Vector4[] = []) {
+export function snowDust(material: THREE.MeshStandardMaterial | THREE.MeshLambertMaterial, cover: { value: number ;}, shelters: readonly THREE.Vector4[] = []) {
   const previous = material.onBeforeCompile;
   const key = material.customProgramCacheKey();
-  material.onBeforeCompile=(shader,renderer)=>{
-    previous.call(material,shader,renderer);
-    shader.uniforms.uSnowCover=cover;
-    if (shelters.length) shader.uniforms.uSnowShelters={ value:shelters };
-    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vSnowAt; varying float vSnowUp;')
-      .replace('#include <begin_vertex>','#include <begin_vertex>\nvSnowAt=(modelMatrix*vec4(position,1.0)).xyz; vSnowUp=(mat3(modelMatrix)*normal).y;');
-    shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>\nuniform float uSnowCover; varying vec3 vSnowAt; varying float vSnowUp;\n${shelters.length ? 'uniform vec4 uSnowShelters[' + shelters.length + '];' : ''}`)
-      .replace('#include <color_fragment>',`#include <color_fragment>
+  material.onBeforeCompile = (shader, renderer) => {
+    previous.call(material, shader, renderer);
+    shader.uniforms.uSnowCover = cover;
+    if (shelters.length) shader.uniforms.uSnowShelters = { value: shelters };
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vSnowAt; varying float vSnowUp;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSnowAt=(modelMatrix*vec4(position,1.0)).xyz; vSnowUp=(mat3(modelMatrix)*normal).y;');
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\nuniform float uSnowCover; varying vec3 vSnowAt; varying float vSnowUp;\n${shelters.length ? 'uniform vec4 uSnowShelters[' + shelters.length + '];' : ''}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
 float grain=fract(sin(dot(floor(vSnowAt.xz*2.0),vec2(12.9898,78.233)))*43758.5453);
 float drift=0.5+0.25*sin(vSnowAt.x*0.047+sin(vSnowAt.z*0.029)*2.0)+0.25*sin(vSnowAt.z*0.061);
 float powder=uSnowCover*(0.4+0.6*drift);
@@ -77,7 +77,7 @@ ${shelters.length ? `for (int i=0;i<${shelters.length};i++) {
   if (dot(delta,delta)<jar.z*jar.z && vSnowAt.y<jar.w-0.3) dust=0.0;
 }` : ''}
 diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.83,0.9,0.96)*(0.93+0.07*grain),dust);`)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,0.92,dust);');
+      .replace('#include <metalnessmap_fragment>', 'roughnessFactor=mix(roughnessFactor,0.92,dust);\n#include <metalnessmap_fragment>');
   };
-  material.customProgramCacheKey=()=>key+'-snow-dust-'+shelters.length;
+  material.customProgramCacheKey = () => key + '-snow-dust-' + shelters.length;
 }
