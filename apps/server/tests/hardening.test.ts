@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { WebSocket } from "ws";
-import { DROP_ID, FLY_MAX, FOUND_ID, LIMITS, MAX_FOUND, MAX_OWN, PROTOCOL, ROOMS_PATH, ROOM_LIMITS, TABLETOP_SCALE, createFlyState, encodeBites, encodeFly, tableCode } from "@fly/net";
+import { DROP_ID, FLY_MAX, FOUND_ID, LIMITS, MAX_FLIES, MAX_FOUND, MAX_OWN, PROTOCOL, ROOMS_PATH, ROOM_LIMITS, TABLETOP_SCALE, createFlyState, encodeBites, encodeFly, tableCode } from "@fly/net";
 import type { ClientMessage, ServerMessage, TableStart } from "@fly/net";
 import { clientAddress, post, startServer } from "../src/server.ts";
 import type { RoomServer } from "../src/server.ts";
@@ -423,7 +423,7 @@ test("a kept table's seats are checked fly by fly: each device 1 to MAX_OWN flie
     [a, { ...b, flies: "two" }],
     [a, { ...b, flies: [fly(5), fly(4)] }],
     [{ ...a, flies: Array.from({ length: MAX_OWN + 1 }, (_, i) => fly(i + 1)) }],
-    [a, { ...b, flies: [fly(4), fly(9)] }],
+    [a, { ...b, flies: [fly(4), fly(MAX_FLIES + 1)] }],
     [a, { ...b, flies: [fly(4), { ...fly(5), at: [0, 0, 1e9, 0] }] }],
     [a, { ...b, flies: [fly(4), { ...fly(5), airborne: "yes" }] }],
     [a, { ...b, flies: [fly(4), null] }],

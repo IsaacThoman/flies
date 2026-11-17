@@ -10,7 +10,7 @@
 // flies the TV lives, each with a brain thread of its own; at a table it then brings N and the
 // fakes take the other seats. The count stays set after the soak.
 import { spawnSync } from "node:child_process";
-import { MAX_FLIES, tableCode } from "@fly/net";
+import { tableCode } from "@fly/net";
 import { WEATHERS } from "@fly/world";
 import { PLACES } from "../apps/web/src/places/catalog.ts";
 import { TIMES } from "../apps/web/src/scene/light.ts";
@@ -215,6 +215,13 @@ export function tableSoakConfig(minutes: number, code: string, rooms: string, fl
 /** How long a soak's drive sleeps in all, ms: the least it takes. */
 export const driveMs = (drive: Step[]) => drive.reduce((ms, step) => ms + (step[0] === "sleep" ? step[1] : 0), 0);
 
+/**
+ * The flies at a soak's table, the TV's among them: eight, as measured on a TV (docs/apple-tv.md).
+ * Not a full table (MAX_FLIES): the fakes all come from this Mac, and a room server lets one
+ * address open only so many connections (ROOM_LIMITS).
+ */
+const TABLE = 8;
+
 /** Starts a table of seven fake flies in `rooms`, launches the TV at it, and keeps them walking until the soak is done. */
 async function tableSoak(device: string, minutes: number, rooms: string, flies = 1) {
   // Only now: tables.ts brings Playwright with it.
@@ -223,7 +230,7 @@ async function tableSoak(device: string, minutes: number, rooms: string, flies =
   const start = { place: "picnic", light: "noon", weather: "clear", zone: "UTC", offset: 0, name: "Soak", listed: false };
   const fakes = new Set<number>();
   const fakeFlies: FakeFly[] = [];
-  for (let k = 0; k < MAX_FLIES - flies; k++) fakeFlies.push(await fakeFly(rooms, code, k, fakes, k === 0 ? start : undefined));
+  for (let k = 0; k < TABLE - flies; k++) fakeFlies.push(await fakeFly(rooms, code, k, fakes, k === 0 ? start : undefined));
   console.log(`${fakeFlies.length} fake flies at table ${code} in ${rooms}`);
   const config = tableSoakConfig(minutes, code, rooms, flies);
   const result = spawnSync(process.execPath, ["scripts/tvos.ts", "run", "--device", device, "--detached", "--config", JSON.stringify(config)], { stdio: "inherit", cwd: new URL("..", import.meta.url) });

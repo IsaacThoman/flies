@@ -1,4 +1,4 @@
-// One table shared by up to eight flies, from as many devices as bring them:
+// One table shared by up to 128 flies (MAX_FLIES), from as many devices as bring them:
 // who is at it, and what everyone there must agree on. Each fly's brain and
 // body run on its owner's device, which is the authority on its flies (one
 // device may bring several); the table only keeps what it
@@ -133,6 +133,8 @@ export type TableOptions = {
   wall: () => number;
   /** Something worth a line in the log. */
   log?: (event: string, fields: Record<string, unknown>) => void;
+  /** How many flies it seats: MAX_FLIES, unless a test wants a table it can fill by hand. */
+  seats?: number;
 };
 
 const isV3 = (v: unknown): v is V3 => Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === "number" && Number.isFinite(x) && Math.abs(x) < 10_000);
@@ -225,6 +227,8 @@ export class Table {
   #offset: number;
   readonly #options: TableOptions;
   readonly #scratch = createFlyState();
+  /** The ids read so far from a device's batch, for telling a fly sent twice. */
+  readonly #seen = new Uint8Array(MAX_OWN);
   readonly #batch = new DataView(new ArrayBuffer(FLIES_MAX));
   readonly #fresh: FlyState[] = [];
   /** Whose each fresh state is, for leaving a device's own out of what it is sent. */
@@ -472,7 +476,7 @@ export class Table {
   #freeIds(n: number, seat: Seat | null): number[] {
     const free = () => {
       const ids: number[] = [];
-      for (let id = 1; id <= MAX_FLIES && ids.length < n; id++) if (!this.seatOf(id)) ids.push(id);
+      for (let id = 1; id <= this.#seats && ids.length < n; id++) if (!this.seatOf(id)) ids.push(id);
       return ids;
     };
     let ids = free();
@@ -618,7 +622,11 @@ export class Table {
   roomFor(key: string): number {
     if (this.removed.has(key)) return 0;
     for (const s of this.seats.values()) if (s.key === key) return MAX_OWN;
-    return MAX_FLIES - this.taken;
+    return this.#seats - this.taken;
+  }
+
+  get #seats() {
+    return this.#options.seats ?? MAX_FLIES;
   }
 
   #player(seat: Seat, fly: SeatFly): PlayerWire {
@@ -791,12 +799,13 @@ export class Table {
       const now = this.now;
       // The whole batch is read before any of it is used: one cut short, with more flies than a device brings, or with a fly twice, is
       // dropped whole rather than half taken.
+      const seen = this.#seen;
       let ids = 0;
       let whole = true;
       const count = decodeFlies(view, this.scale, this.#scratch, (s) => {
-        const bit = 1 << s.id;
-        if (s.id < 1 || s.id > MAX_FLIES || ids & bit) whole = false;
-        ids |= bit;
+        if (s.id < 1 || s.id > MAX_FLIES || ids === MAX_OWN) whole = false;
+        for (let i = 0; i < ids; i++) if (seen[i] === s.id) whole = false;
+        if (ids < MAX_OWN) seen[ids++] = s.id;
       }, FLY);
       if (count < 0 || count > MAX_OWN || !whole) return;
       let heard = false;

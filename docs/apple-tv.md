@@ -559,7 +559,7 @@ path of hundreds of squares.
 
 ### Eight flies on a TV
 
-The simulator check (below) sits the app in a room of eight and requires sampled canvas draw
+The simulator check (below) sits the app at a table of eight and requires sampled canvas draw
 counts and host window-average draws below 150, but
 the simulator draws in software and has a Mac's CPU, so whether eight flies hold 60 fps on an
 Apple TV has to be measured there before it is promised. `tvos:soak --table` does it: seven fake
@@ -782,7 +782,7 @@ Each case ran `tvos:soak --flies N` detached with 10-second stats. Alone: the wh
 place in every weather and light, then its screensaver at midday and at night), `--minutes 10`
 for one fly and `--minutes 2` for three and four, about 27 minutes each. At a table:
 `--table --flies 4 --minutes 10` against a room server on the Mac over the local network, the
-TV's four flies and four fake devices' (a full table of eight), at the picnic. The first window
+TV's four flies and four fake devices' (a table of eight, full as tables then were), at the picnic. The first window
 of each phase is left out. Two flies weren't measured.
 
 The screensaver, FPS over its 10-second windows (mean, and lowest to highest):
@@ -906,8 +906,8 @@ with a `drive` and `?alone` (suppressing automatic room joining), and checks wha
   scene, and the press that asked is let go as it comes up; frames go on meanwhile;
 - the host's frame stats.
 
-It then launches the bundled real game with the same stand-in brain, in a room of eight in a
-room server it runs (keeping its rooms in a temporary folder): seven fake flies
+It then launches the bundled real game with the same stand-in brain, at a table of eight in a
+room server it runs (a full table, of 128, is `apps/web/e2e/tables.e2e.ts`'s) (keeping its rooms in a temporary folder): seven fake flies
 (`scripts/tables.ts`) start an unlisted room and walk round the game's fly, and the game, given
 the room server and `alone` by its launch config's URL, goes to Online, Code, and is answered the room's code
 (in capitals) by `typed`. It checks the game publishes its own readiness (the test scene's can't

@@ -28,8 +28,10 @@ import type { BubbleSnapshot } from "./bubbles.ts";
  * own: its FLY message is a batch, as FLIES is, and the room's seats are
  * flies, not devices.
  * 5: seasonal weather and precipitation phases must agree across devices.
+ * 6: a table seats 128 flies, not 8: fly ids and the lists of them run to
+ * MAX_FLIES, past what an older device accepts.
  */
-export const PROTOCOL = 5;
+export const PROTOCOL = 6;
 
 /** Where the room server answers WebSockets, on the site's own host. */
 export const ROOMS_PATH = "/rooms";
@@ -39,8 +41,14 @@ export const FLY = 1;
 export const FLIES = 2;
 export const BITES = 3;
 
-/** At most this many flies at a table, whoever's they are. Fly ids are 1 to this: one byte on the wire. */
-export const MAX_FLIES = 8;
+/**
+ * At most this many flies at a table, whoever's they are. Fly ids are 1 to
+ * this: one byte on the wire. A device poses only the nearest of the others
+ * and draws the rest as one instanced stand-in (apps/web/src/online/others.ts),
+ * so a full table takes no more draws a frame than a table of eight
+ * (docs/online.md, Cost).
+ */
+export const MAX_FLIES = 128;
 /**
  * At most this many flies from one device, at a table or alone: each is a
  * whole brain of its own, and the Apple TV fits four (docs/online.md, Cost).
@@ -609,7 +617,7 @@ export type ServerMessage =
    */
   | { type: "food"; ack: number; amounts: [number, number][]; gone: number[]; eaten: number; meal?: [amount: number, sugar: number] };
 
-/** Each fly's colour, as a dab of paint on the thorax: bright enamels, as researchers mark flies. By fly id. */
+/** Each fly's colour, as a dab of paint on the thorax: bright enamels, as researchers mark flies. By fly id, round again past the eighth. */
 export const COLOURS = ["#ffd21f", "#2fb8ff", "#ff4fa3", "#59e05a", "#ff7a1a", "#f4f4f4", "#a466ff", "#ff2a2a"] as const;
 
 /**

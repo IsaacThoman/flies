@@ -95,7 +95,7 @@ try {
   await activate("Other rooms");
   await waitFor(page, "onlineView=rooms");
   await dump("rooms");
-  const garden = await tab("button", /^Garden, Picnic table, 1 of 8 flies, Password required$/);
+  const garden = await tab("button", /^Garden, Picnic table, 1 of 128 flies, Password required$/);
   const focusedRoom = await garden.elementHandle();
   await waitFor(page, "ring=true");
   const peer = new WebSocket(`ws://127.0.0.1:${rooms.port}/rooms`);
@@ -105,7 +105,7 @@ try {
     peer.onmessage = (event) => { if (typeof event.data === "string" && JSON.parse(event.data).type === "welcome") resolve(); };
     peer.onerror = () => reject(new Error("Occupancy fixture failed"));
   });
-  await page.getByRole("button", { name: /^Garden, Picnic table, 2 of 8 flies, Password required$/ }).waitFor();
+  await page.getByRole("button", { name: /^Garden, Picnic table, 2 of 128 flies, Password required$/ }).waitFor();
   assert.equal(await focusedRoom!.evaluate((node) => node === document.activeElement), true);
   await dump("rooms-occupied");
   peer.send(JSON.stringify({ type: "bye" }));
@@ -124,7 +124,7 @@ try {
   await audit("joined");
   await activate("Leave the room");
   await waitFor(page, "onlineView=rooms");
-  await activate(/^Garden, Picnic table, 1 of 8 flies, Password required$/);
+  await activate(/^Garden, Picnic table, 1 of 128 flies, Password required$/);
   // Password fields have no implicit textbox role in browsers.
   const password = page.getByLabel("Password", { exact: true });
   await password.waitFor();
@@ -141,7 +141,7 @@ try {
   await dump("joined-locked");
   await activate("Leave the room");
   await waitFor(page, "onlineView=rooms");
-  await page.getByRole("button", { name: /^Garden, Picnic table, 1 of 8 flies, Password required$/ }).waitFor();
+  await page.getByRole("button", { name: /^Garden, Picnic table, 1 of 128 flies, Password required$/ }).waitFor();
   await dump("left");
   await audit("left");
   await page.evaluate(() => {

@@ -59,8 +59,8 @@ test("a message out of shape is dropped whole: never half-used, never too long a
     null, 7, "welcome", [], { type: "nonsense" }, { type: "constructor" },
     { ...welcome, players: "everyone" },
     { ...welcome, players: Array.from({ length: MAX_FLIES + 1 }, (_, i) => ({ id: (i % MAX_FLIES) + 1, colour: "#fff", away: false, of: 1 })) },
-    { ...welcome, players: [{ id: 1, colour: "#ffd21f", away: false }] }, { ...welcome, players: [{ id: 1, colour: "#ffd21f", away: false, of: 9 }] },
-    { ...welcome, id: 9 }, { ...welcome, id: 0 }, { ...welcome, id: 1.5 },
+    { ...welcome, players: [{ id: 1, colour: "#ffd21f", away: false }] }, { ...welcome, players: [{ id: 1, colour: "#ffd21f", away: false, of: MAX_FLIES + 1 }] },
+    { ...welcome, id: MAX_FLIES + 1 }, { ...welcome, id: 0 }, { ...welcome, id: 1.5 },
     { ...welcome, foods: Array.from({ length: WIRE_FOODS_MAX + 1 }, (_, i) => [i, "patch", "x", 0, 0, 1, 1, 1, 0]) },
     { ...welcome, foods: [[1, "patch", "x", 0, 0, 1, 1, 1, 7]] },
     { ...welcome, at: [0, "0", 0] }, { ...welcome, at: [1e9, 0, 0] }, { ...welcome, world: null }, { ...welcome, room: { name: 3 } },
@@ -71,7 +71,7 @@ test("a message out of shape is dropped whole: never half-used, never too long a
     { type: "joined", id: 2, colour: { toString: 1 }, away: false },
     { type: "left", id: "2" },
     { type: "place", place: "lab", epoch: 1, foods: [], spots: null },
-    { type: "place", place: "lab", epoch: 1, foods: [], spots: { 99: [0, 0, 0] } },
+    { type: "place", place: "lab", epoch: 1, foods: [], spots: { [MAX_FLIES + 1]: [0, 0, 0] } },
     { type: "food", ack: 1, amounts: [[1]], gone: [], eaten: 0 },
     { type: "food", ack: 1, amounts: [], gone: [], eaten: Infinity },
     { type: "found", food: null },
@@ -87,7 +87,7 @@ test("a message out of shape is dropped whole: never half-used, never too long a
 test("a list of rooms keeps the rooms that are rooms, named as a room may be", () => {
   const good = { code: "23456789ab", name: "Sunny crumbs", place: "picnic", flies: 2, locked: false };
   const everyone = { ...good, code: EVERYONE, everyone: true };
-  const m = read({ type: "rooms", rooms: [good, everyone, { ...everyone, everyone: "yes" }, { ...good, name: "ㅤ" }, { ...good, code: "nope" }, { ...good, flies: 99 }, { ...good, name: "‮evil" }, null] });
+  const m = read({ type: "rooms", rooms: [good, everyone, { ...everyone, everyone: "yes" }, { ...good, name: "ㅤ" }, { ...good, code: "nope" }, { ...good, flies: MAX_FLIES + 1 }, { ...good, name: "‮evil" }, null] });
   assert.deepEqual(m, { type: "rooms", rooms: [good, everyone] });
 });
 
@@ -96,7 +96,7 @@ test("a device's own flies, in a welcome or as seated, are one to MAX_OWN, each 
   const many = Array.from({ length: MAX_OWN + 1 }, (_, i) => fly(i + 1));
   const bad: unknown[] = [
     { ...welcome, flies: undefined }, { ...welcome, flies: [] }, { ...welcome, flies: many }, { ...welcome, flies: [fly(2), fly(2)] },
-    { ...welcome, flies: [fly(3), fly(2)] }, { ...welcome, flies: [fly(2), fly(9)] }, { ...welcome, flies: [fly(2), { ...fly(4), at: [0, NaN, 0] }] },
+    { ...welcome, flies: [fly(3), fly(2)] }, { ...welcome, flies: [fly(2), fly(MAX_FLIES + 1)] }, { ...welcome, flies: [fly(2), { ...fly(4), at: [0, NaN, 0] }] },
     { ...welcome, flies: [fly(2), { id: 4, at: [0, 0, 0] }] }, { ...welcome, flies: [fly(2), null] },
     { type: "seated", flies: [], asked: 1 }, { type: "seated", flies: many, asked: 4 }, { type: "seated", flies: [fly(1), fly(1)], asked: 2 },
     { type: "seated", flies: [fly(1)], asked: 0 }, { type: "seated", flies: [fly(1)], asked: MAX_OWN + 1 }, { type: "seated", flies: [fly(1)], asked: 1.5 },

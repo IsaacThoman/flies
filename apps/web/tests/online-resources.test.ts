@@ -3,6 +3,9 @@ import { test } from "node:test";
 import * as THREE from "three";
 import { World, WORLDS } from "@fly/world";
 import { HandsView } from "../src/tools/view.ts";
+import { FlyBody } from "@fly/body";
+import { createFlyState } from "@fly/net";
+import type { FlyView } from "../src/fly-view.ts";
 import { OtherFlies } from "../src/online/others.ts";
 
 const gradient = { addColorStop() {} };
@@ -53,11 +56,24 @@ test("a remote hand frees its geometry, materials and instance buffers while sha
 
 test("leaving a table frees pooled fly models and the instanced stand-ins without disposing the shared shadow", () => {
   const scene = new THREE.Scene();
-  const others = new OtherFlies(scene, new World(WORLDS.picnic));
-  let first: ReturnType<OtherFlies["join"]> | undefined;
-  for (let i = 0; i < 200; i++) { first = others.join(i, "#ff3355", false); others.leave(i); }
+  const world = new World(WORLDS.picnic);
+  const others = new OtherFlies(scene, world);
+  const followed = new FlyBody(world, { x: 0, z: 0, yaw: 0 });
+  const camera = new THREE.Vector3(0, 20, 0);
+  let model: FlyView | null = null;
+  // Each comes close enough to be posed, then leaves: one model, handed from each to the next.
+  for (let i = 1; i <= 200; i++) {
+    const s = createFlyState();
+    s.id = i;
+    s.y = 10;
+    others.join(i, "#ff3355", false).track.push(s, 0);
+    others.update(0, 1 / 60, camera, 1000, followed);
+    model = others.get(i)!.view;
+    others.leave(i);
+  }
+  assert.ok(model);
   const resources = owned(scene);
-  for (const material of first!.view.model.nerves.materials) resources.add(material);
+  for (const material of model.model.nerves.materials) resources.add(material);
   const ended = disposals(resources);
   const shared = new Set<THREE.Texture>();
   const instances: THREE.InstancedMesh[] = [];

@@ -7,16 +7,20 @@
 // among them, and its body meets them (Life.crowd). Nothing else of them
 // reaches it.
 //
-// Eight flies have to fit the frame on the slowest device, where the cost
-// follows draw calls and JavaScript, not triangles. So only a fly near the
-// camera is the real model, posed (two draws); one too far to show more than
-// a few pixels is a stand-in, all of them in one instanced draw and not posed
-// at all. Their shadows are one instanced draw, and what the eyes see of them
-// another. Nothing here is made per frame.
+// A full table has to fit the frame on the slowest device, where the cost
+// follows draw calls and JavaScript, not triangles. So only the flies nearest
+// the camera are the real model, posed (two draws each), no more of them than
+// a table of eight had (MODELS_MOST); any other, or one too far to show more
+// than a few pixels, is a stand-in, all of them in one instanced draw and not
+// posed at all. Their shadows are one instanced draw, and what the eyes see
+// of them another, a coarser stand-in of only the nearest (EYES_MOST). The
+// models are a pool as big as the most posed at once, handed to whichever
+// flies are nearest. Nothing here is made per frame.
 
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { FLY_LENGTH } from "@fly/body";
+import { MAX_NEIGHBOURS } from "@fly/body";
 import type { Crowd, FlyBody } from "@fly/body";
 import { AIRBORNE, AWAY, FlyTrack, MAX_FLIES, createFlyState } from "@fly/net";
 import type { FlyState } from "@fly/net";
@@ -29,6 +33,20 @@ import { FlyView, flyShadow, flyShadowMaterial } from "../fly-view.ts";
 export const SILENT_AFTER = 1500;
 /** A fly shorter than this on screen (pixels of the picture the game draws) is a stand-in. */
 export const FAR_PIXELS = 9;
+/**
+ * At most this many flies besides the followed one are posed models at
+ * once: this device's others first, then the other players' nearest the
+ * camera. A table of eight, measured on an Apple TV (docs/apple-tv.md), had
+ * at most this many.
+ */
+export const MODELS_MOST = 7;
+/**
+ * The eyes see at most this many of the other players' flies, those nearest
+ * the followed fly (as many as a body meets: MAX_NEIGHBOURS). Each is drawn
+ * in every face of the eyes, and a fly a few body lengths off is under a
+ * facet or two; a full table of them would be most of a frame's triangles.
+ */
+export const EYES_MOST = MAX_NEIGHBOURS;
 /** How far a resting fly is dimmed. */
 const RESTING_DIM = 0.45;
 
@@ -38,8 +56,8 @@ export type Other = {
   /** Whose it is: the id of its device's first fly (its player's), whose state carries their hand. */
   of: number;
   readonly track: FlyTrack;
-  /** Its model while it is near the camera: from a pool, kept for whoever comes next when it leaves. */
-  view: FlyView;
+  /** Its model while it is posed: from a pool, given back when it is a stand-in again or leaves. */
+  view: FlyView | null;
   /** Where it is drawn now. */
   readonly state: FlyState;
   readonly position: Vec3;
@@ -50,13 +68,20 @@ export type Other = {
   away: boolean;
   /** Shown at rest: away, or not heard from for a while. */
   resting: boolean;
+  /** How long it is on screen, pixels of the picture the game draws. */
+  size: number;
+  /** Posed as the real model: big enough on screen, and among the nearest. */
   near: boolean;
 };
 
-/** What the eyes see of another fly, and what a distant one is drawn as: its head, thorax, abdomen and folded wings, a few hundred triangles in all, in its colours. */
-function standInGeometry() {
+/**
+ * What the eyes see of another fly, and what a distant one is drawn as: its
+ * head, thorax, abdomen and folded wings, in its colours, each part a sphere
+ * of `around` × `down` segments.
+ */
+function standInGeometry(around: number, down: number) {
   const part = (centre: [number, number, number], radii: [number, number, number], colour: string) => {
-    const g = new THREE.SphereGeometry(1, 10, 7);
+    const g = new THREE.SphereGeometry(1, around, down);
     g.scale(...radii).translate(...centre);
     const c = new THREE.Color(colour);
     const n = g.attributes.position.count;
@@ -128,6 +153,8 @@ export class OtherFlies {
   readonly #shadows: THREE.InstancedMesh<THREE.BufferGeometry, THREE.Material>;
   /** One fly's stand-in, kept while its own eyes look round without it. */
   readonly #hidden = new Float32Array(16);
+  /** How far each of the other players' flies is from the followed one, squared, for choosing those the eyes see. */
+  readonly #distances = new Float64Array(MAX_FLIES);
   #hiddenAt = -1;
   readonly #m = new THREE.Matrix4();
   readonly #q = new THREE.Quaternion();
@@ -143,11 +170,14 @@ export class OtherFlies {
   constructor(parent: THREE.Object3D, world: World) {
     this.#parent = parent;
     this.#world = world;
-    const geometry = standInGeometry();
     const material = new THREE.MeshLambertMaterial({ vertexColors: true });
-    this.#eyes = instanced(geometry, material, parent);
+    // The eyes draw every fly in each of their faces, at a few degrees a facet: a full table's worth of 480-triangle stand-ins
+    // there would be most of a frame's triangles, and 144 look the same to them.
+    this.#eyes = instanced(standInGeometry(6, 4), material, parent);
     this.#eyes.layers.set(EYE_LAYER);
-    this.#far = instanced(geometry, material, parent);
+    // 320 triangles: what a distant fly, or a near one beyond the posed few, is drawn as on screen. A full table's of them keep the
+    // frame within its triangles (apps/web/e2e/tables.e2e.ts).
+    this.#far = instanced(standInGeometry(8, 6), material, parent);
     this.#shadows = instanced(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), flyShadowMaterial(), parent);
     this.#shadows.renderOrder = 1;
   }
@@ -164,10 +194,7 @@ export class OtherFlies {
       known.away = away;
       return known;
     }
-    const view = this.#pool.pop() ?? new FlyView(this.#parent, this.#world, false);
-    view.model.mark(colour);
-    view.root.visible = false;
-    const other: Other = { id, colour, of, track: new FlyTrack(), view, state: createFlyState(), position: { x: 0, y: -1e4, z: 0 }, up: { x: 0, y: 1, z: 0 }, present: false, away, resting: away, near: false };
+    const other: Other = { id, colour, of, track: new FlyTrack(), view: null, state: createFlyState(), position: { x: 0, y: -1e4, z: 0 }, up: { x: 0, y: 1, z: 0 }, present: false, away, resting: away, size: 0, near: false };
     this.list.push(other);
     return other;
   }
@@ -175,9 +202,7 @@ export class OtherFlies {
   leave(id: number) {
     const i = this.list.findIndex((o) => o.id === id);
     if (i < 0) return;
-    const view = this.list[i].view;
-    view.root.visible = false;
-    this.#pool.push(view);
+    this.#release(this.list[i]);
     this.list.splice(i, 1);
   }
 
@@ -231,28 +256,49 @@ export class OtherFlies {
         view.model.update(c.pose, dt);
         view.place(body.position, body.yaw, body.up);
       }
-      this.#standIn(body.position, body.yaw, body.up, !near, true);
+      this.#standIn(body.position, body.yaw, body.up, true, !near, true);
     }
-    for (let i = 0; i < this.list.length; i++) {
-      const o = this.list[i];
+    const list = this.list;
+    for (let i = 0; i < list.length; i++) {
+      const o = list[i];
       const s = o.state;
-      const view = o.view;
+      o.near = false;
       o.present = o.track.sample(now - o.track.delay, s) !== "empty";
-      if (!o.present) {
-        view.root.visible = false;
-        continue;
-      }
-      o.resting = o.away || !!(s.flags & AWAY) || now - o.track.heardAt > SILENT_AFTER;
+      if (!o.present) continue;
       o.position.x = s.x;
       o.position.y = s.y;
       o.position.z = s.z;
+      o.size = this.#size(o.position, camera, pixels);
+    }
+    // The eyes see the nearest to the followed fly: those no further than the EYES_MOST-th nearest.
+    const at = followed.position;
+    let present = 0;
+    for (let i = 0; i < list.length; i++) if (list[i].present) this.#distances[present++] = distance2(at, list[i].position);
+    const seen = present > EYES_MOST ? kth(this.#distances, present, EYES_MOST - 1) : Infinity;
+    let eyed = 0;
+    // The nearest are posed, as many as the models left over from this device's own.
+    for (let posed = company.length; posed < MODELS_MOST; posed++) {
+      let nearest: Other | null = null;
+      for (let i = 0; i < list.length; i++) {
+        const o = list[i];
+        if (o.present && !o.near && o.size >= FAR_PIXELS && (!nearest || o.size > nearest.size)) nearest = o;
+      }
+      if (!nearest) break;
+      nearest.near = true;
+    }
+    // Models given back before any is handed out, so the pool never holds more than are posed at once.
+    for (let i = 0; i < list.length; i++) if (!list[i].near) this.#release(list[i]);
+    for (let i = 0; i < list.length; i++) {
+      const o = list[i];
+      if (!o.present) continue;
+      const s = o.state;
+      o.resting = o.away || !!(s.flags & AWAY) || now - o.track.heardAt > SILENT_AFTER;
       o.up.x = s.upX;
       o.up.z = s.upZ;
       o.up.y = Math.sqrt(Math.max(0, 1 - s.upX * s.upX - s.upZ * s.upZ));
       const airborne = !!(s.flags & AIRBORNE) && !o.resting;
-      o.near = this.#near(o.position, camera, pixels);
-      view.root.visible = o.near;
       if (o.near) {
+        const view = this.#viewFor(o);
         const pose = view.pose;
         const p = s.pose;
         // A fly whose device has stopped stands still where it was last seen, wings folded.
@@ -270,28 +316,51 @@ export class OtherFlies {
         view.model.dim(o.resting ? RESTING_DIM : 0);
         view.place(o.position, s.yaw, o.up);
       }
-      this.#standIn(o.position, s.yaw, o.up, !o.near, true);
+      const eyes = eyed < EYES_MOST && distance2(at, o.position) <= seen;
+      if (eyes) eyed++;
+      this.#standIn(o.position, s.yaw, o.up, eyes, !o.near, true);
     }
     // Last, so that while its own eyes look round it is simply left off the end: alone, they draw no flies at all.
-    this.#standIn(followed.position, followed.yaw, followed.up, false, false);
+    this.#standIn(followed.position, followed.yaw, followed.up, true, false, false);
     commit(this.#eyes, this.#eyeCount);
     commit(this.#far, this.#farCount);
     commit(this.#shadows, this.#shadowCount);
   }
 
   #near(p: Vec3, camera: THREE.Vector3, pixels: number) {
-    const distance = Math.max(1, camera.distanceTo(this.#p.set(p.x, p.y, p.z)));
-    return (FLY_LENGTH / distance) * pixels >= FAR_PIXELS;
+    return this.#size(p, camera, pixels) >= FAR_PIXELS;
   }
 
-  /** A fly as the eyes see it, as a distant one is drawn (`far`), and its shadow (`shadow`: the followed fly has its own). */
-  #standIn(p: Vec3, yaw: number, up: Vec3, far: boolean, shadow: boolean) {
-    if (this.#eyeCount >= MAX_FLIES) return;
+  #size(p: Vec3, camera: THREE.Vector3, pixels: number) {
+    return (FLY_LENGTH / Math.max(1, camera.distanceTo(this.#p.set(p.x, p.y, p.z)))) * pixels;
+  }
+
+  /** Another player's fly's model, from the pool if it has none, marked in its colour. */
+  #viewFor(o: Other): FlyView {
+    if (o.view) return o.view;
+    const view = (o.view = this.#pool.pop() ?? new FlyView(this.#parent, this.#world, false));
+    view.model.mark(o.colour);
+    view.root.visible = true;
+    return view;
+  }
+
+  /** Gives another player's fly's model back to the pool: it is a stand-in now, or gone. */
+  #release(o: Other) {
+    const view = o.view;
+    if (!view) return;
+    view.root.visible = false;
+    this.#pool.push(view);
+    o.view = null;
+  }
+
+  /** A fly as the eyes see it (`eyes`), as a distant one is drawn (`far`), and its shadow (`shadow`: the followed fly has its own). */
+  #standIn(p: Vec3, yaw: number, up: Vec3, eyes: boolean, far: boolean, shadow: boolean) {
+    if (this.#eyeCount >= MAX_FLIES || this.#farCount >= MAX_FLIES) return;
     this.#yaw.setFromAxisAngle(UP, yaw);
     this.#up.set(up.x, up.y, up.z);
     this.#q.setFromUnitVectors(UP, this.#up).multiply(this.#yaw);
     this.#m.compose(this.#p.set(p.x, p.y, p.z), this.#q, this.#s.setScalar(FLY_LENGTH));
-    this.#eyes.setMatrixAt(this.#eyeCount++, this.#m);
+    if (eyes) this.#eyes.setMatrixAt(this.#eyeCount++, this.#m);
     if (far) this.#far.setMatrixAt(this.#farCount++, this.#m);
     if (!shadow) return;
     const fade = flyShadow(this.#world, p, this.#yaw, this.#shadow);
@@ -361,17 +430,19 @@ export class OtherFlies {
 /** Puts every fly but `self` in its way: the followed one, a device's others (`company`), and other players' that are there (`others`). */
 export function meet(crowd: Crowd, self: FlyBody, followed: FlyBody, company: readonly Companion[], others: readonly Other[]) {
   crowd.clear();
-  if (self !== followed) addBody(crowd, followed.position, followed.yaw, followed.velocity);
+  const at = self.position;
+  if (self !== followed) addBody(crowd, at, followed.position, followed.yaw, followed.velocity);
   for (let i = 0; i < company.length; i++) {
     const body = company[i].life.body;
-    if (body !== self) addBody(crowd, body.position, body.yaw, body.velocity);
+    if (body !== self) addBody(crowd, at, body.position, body.yaw, body.velocity);
   }
   for (let i = 0; i < others.length; i++) {
     const o = others[i];
     if (!o.present) continue;
     const s = o.state;
-    const n = crowd.add();
-    if (!n) return;
+    // A crowd holds only so many: the nearest.
+    const n = crowd.add(distance2(at, s));
+    if (!n) continue;
     n.x = s.x;
     n.y = s.y;
     n.z = s.z;
@@ -382,8 +453,8 @@ export function meet(crowd: Crowd, self: FlyBody, followed: FlyBody, company: re
   }
 }
 
-function addBody(crowd: Crowd, p: Vec3, yaw: number, v: Vec3) {
-  const n = crowd.add();
+function addBody(crowd: Crowd, at: Vec3, p: Vec3, yaw: number, v: Vec3) {
+  const n = crowd.add(distance2(at, p));
   if (!n) return;
   n.x = p.x;
   n.y = p.y;
@@ -392,6 +463,37 @@ function addBody(crowd: Crowd, p: Vec3, yaw: number, v: Vec3) {
   n.vx = v.x;
   n.vy = v.y;
   n.vz = v.z;
+}
+
+/** The `k`th smallest (from 0) of the first `n` of `a`, which it reorders: a quickselect, no sorting. */
+function kth(a: Float64Array, n: number, k: number) {
+  let lo = 0;
+  let hi = n - 1;
+  while (lo < hi) {
+    const pivot = a[(lo + hi) >> 1];
+    let i = lo;
+    let j = hi;
+    while (i <= j) {
+      while (a[i] < pivot) i++;
+      while (a[j] > pivot) j--;
+      if (i <= j) {
+        const t = a[i];
+        a[i++] = a[j];
+        a[j--] = t;
+      }
+    }
+    if (k <= j) hi = j;
+    else if (k >= i) lo = i;
+    else return a[k];
+  }
+  return a[k];
+}
+
+function distance2(a: Vec3, b: Vec3) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  const dz = a.z - b.z;
+  return dx * dx + dy * dy + dz * dz;
 }
 
 function commit(mesh: THREE.InstancedMesh, count: number) {

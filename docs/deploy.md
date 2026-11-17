@@ -312,7 +312,9 @@ settings are listed in `.env.example`. Browsing the list of rooms uses the
 same `/rooms` WebSocket, so nothing about the proxy changes for it.
 
 Earlier traffic estimates were about 1 KB/s up and 7 KB/s down per player at a
-table of eight; the capture date, machine and workload are unknown. Actual
+table of eight; the capture date, machine and workload are unknown. What comes
+down grows with the table, about 1 KB/s for each other fly: a full table of 128
+is about 127 KB/s down to each device, and about 16 MB/s out of the server. Actual
 traffic depends on activity and protocol overhead. Rolling back works as for
 the site: tag `flies-rooms:local` as `flies-rooms:rollback` before an update.
 By default the iPhone and iPad app reaches the same

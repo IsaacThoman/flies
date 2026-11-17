@@ -1,6 +1,6 @@
 # Flies online
 
-Up to eight flies can share a room (a table, in the code: the place the
+Up to 128 flies can share a room (a table, in the code: the place the
 flies share), with one to four from each device. Each fly's brain and body
 run on its owner's device, exactly as they do alone. A small room server
 (`apps/server`) runs no brains and draws nothing: it passes each fly's state
@@ -47,7 +47,7 @@ together; the binary fly-state layout itself is unchanged.
   otherwise the first with a seat for every fly it brings, by flies, not
   devices (only if none has, the first with a seat for some of them, which
   it is given). So a full Everyone sends a newcomer on to Everyone 2, and
-  its link leads to whichever has room; the 64 hold at most 512 flies. They
+  its link leads to whichever has room; the 64 hold at most 8,192 flies. They
   have no password and no starter, so nobody chooses for anyone else,
   nobody can take a device off, and no seat is kept for anyone gone:
   - **The place** takes turns by the server's clock, 20 minutes in each
@@ -371,7 +371,7 @@ faking it. The room bounds positions, rates and food use to limit disruption (`p
   phone network behind one address, now that every device sits with
   everyone by default). Opening tokens replenish at 60 a minute (burst 30),
   and room starts at 30 an hour (burst 5; the rooms open to everyone aren't
-  counted: nobody starts them). At most 8 flies a table (`MAX_FLIES`), 4 per device
+  counted: nobody starts them). At most 128 flies a table (`MAX_FLIES`), 4 per device
   (`MAX_OWN`). A new device gets as many as it asks for or there are free seats,
   whichever is fewer; with none free it is refused as full. Reducing the
   count takes the last flies off first. A disconnected device no longer
@@ -501,18 +501,31 @@ meet (`docs/deploy.md`).
 
 ## Cost
 
-Eight flies have to fit the frame on the slowest device, where the cost
-follows draw calls and JavaScript (`AGENTS.md`). Every fly but the followed
-one is drawn by `OtherFlies` (`apps/web/src/online/others.ts`), whether its
-brain runs here or on another device. Near the camera it is the real model,
-posed: two draws. One too far to show more than about 9 pixels is a stand-in,
-all of them in one instanced draw and not posed at all. Their shadows are
-one instanced draw, and what each fly's eyes see of all the others (a
-480-triangle stand-in each) is one more in each face of the eyes. Its own
+A full table of 128 flies has to fit the frame on the slowest device, where
+the cost follows draw calls and JavaScript (`AGENTS.md`). Every fly but the
+followed one is drawn by `OtherFlies` (`apps/web/src/online/others.ts`),
+whether its brain runs here or on another device. The nearest to the camera
+are the real model, posed: two draws each, and no more of them than a table of
+eight had (`MODELS_MOST`, 7: this device's others first, then the other
+players' nearest). The models are a pool that size, handed to whichever flies
+are nearest. Any other fly, and any too far to show more than about 9 pixels,
+is a stand-in (320 triangles), all of them in one instanced draw and not posed
+at all. Their shadows are one instanced draw, and what each fly's eyes see of
+the others is one more in each face of the eyes: the 32 nearest the followed
+fly (`EYES_MOST`), each a coarser 144-triangle stand-in, since a fly a few body
+lengths off is under a facet or two. So the draws a frame don't grow with the
+table, and a full table keeps within the frame's triangles
+(`apps/web/e2e/tables.e2e.ts`); the JavaScript grows, a little. Each
+fly's body meets only the 32 others nearest it (`MAX_NEIGHBOURS`,
+`packages/body/src/crowd.ts`). `apps/web/tests/table.budget.ts` holds a full
+table's JavaScript a frame (reading the others' states, drawing them,
+and this device's four flies meeting them) to 115 M5 Pro CPU µs: 66 measured
+on 17 November 2026 against 15 for a table of eight, about 1.1 ms a frame on an
+Apple TV by the usual factor of 16. A full table has not been measured on a TV. Its own
 stand-in is left out while it looks round. Geometry, matrices and crowd objects are reused; this is no guarantee
 of zero allocations throughout the online path. The other players' hands share their textures.
 `apps/web/e2e/tables.e2e.ts` checks draw and triangle caps with one real fly and
-seven synthetic peers on its enumerated screen shapes; it does not measure TV frame time.
+127 synthetic peers, a full table, on its enumerated screen shapes; it does not measure TV frame time.
 
 One device runs at most four. Each brain runs off the JavaScript
 thread: a Web Worker in a browser, its own native thread on the TV. Retained estimates put each native brain at about 58 MB and 13 to 45%
@@ -564,10 +577,12 @@ in memory; set `DATA_DIR` to keep them across restarts.
 log is one JSON object a line: info on stdout, warnings and errors on stderr. In production the room server is
 the `rooms` service of the Docker stack (`docs/deploy.md`).
 
-The rooms open to everyone hold at most 64 × 8 = 512 flies on one server.
-A device with one fly sends about 1 KB/s up and receives 7 KB/s down in
-full-room binary state payload (excluding framing and other traffic), so a server whose
-rooms fill should be watched (`/health`'s `devices` and `flies`); a device
+The rooms open to everyone hold at most 64 × 128 = 8,192 flies on one server.
+A device with one fly sends about 1 KB/s up and receives about 1 KB/s down for
+each other fly at its table in binary state payload (excluding framing and
+other traffic): 7 KB/s at a table of eight, about 127 KB/s at a full table, so
+a full room sends about 16 MB/s in all. A server whose rooms fill should be
+watched (`/health`'s `devices` and `flies`); a device
 automatically joining Everyone retries later if refused as full.
 
 Checks: `npm test` covers the protocol, the limits (names, passwords),
@@ -631,7 +646,7 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
   no Share the link: at a room, Online shows its QR code and its code (as it
   does everywhere) for a phone to scan or another TV to type. The simulator
   check opens the app `?alone`, so that it never sits with everyone on the
-  site's room server, and then sits it in a room of eight of its own. A
+  site's room server, and then sits it at a table of eight of its own. A
   16 November 2026 capture on an Apple TV 4K (3rd generation), tvOS 27.2.1,
   release build, reported mean 59.9 fps in play (55–60 in 10-second windows)
   with seven synthetic peers. See `docs/apple-tv.md`, "Eight flies on a TV",
