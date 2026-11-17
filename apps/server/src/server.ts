@@ -11,7 +11,8 @@
 //   PORT          where it listens (8787)
 //   HOST          the address it listens on (0.0.0.0)
 //   DATA_DIR      where the tables are kept across restarts (none: they last as long as the process)
-//   TRUST_PROXY   1 behind a proxy that sets X-Forwarded-For (the site's web server), for counting connections by address
+//   TRUST_PROXY   1 behind a proxy that sets X-Forwarded-For (the site's web server), for counting connections by address:
+//                 believed only from a loopback or private address, the proxy's own
 //
 // A deploy stops it with SIGTERM: it keeps the tables, tells every device it
 // is restarting (close code 1012), and the devices come back to their tables
@@ -20,6 +21,8 @@
 import { createHash, randomInt } from "node:crypto";
 import http from "node:http";
 import type { IncomingMessage } from "node:http";
+import { isIP } from "node:net";
+import type { Duplex } from "node:stream";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { WebSocketServer } from "ws";
@@ -45,8 +48,19 @@ const SAVE_EVERY = 30_000;
 const LIST_EVERY = 2_000;
 /** What an address has done is remembered this long (ms) after its last connection closes, so that closing and opening again doesn't start its counts afresh. */
 const ADDRESS_KEPT = 3_600_000;
+/** At most this many addresses remembered: past it, those with nothing open are forgotten first. */
+const ADDRESSES_MAX = 50_000;
+/** At most this many sockets open at once, from everyone: each is a file descriptor and some memory. */
+const SOCKETS_MAX = 4096;
+/** A request's headers must have come within this long (ms), and be no bigger than this (bytes): a WebSocket's are a few hundred. */
+const HEADERS_WITHIN = 10_000;
+const HEADERS_MAX = 8192;
+/** A device that has this much (bytes) the server has sent and it hasn't taken is dropped: about a minute of its table's batches. */
+const BACKLOG_MAX = 256 * 1024;
+/** At most this many passwords worked out at once (about 16 MB each); past it, a hello that needs one is refused as busy. */
+const HASHING_MAX = 8;
 
-type Address = { connections: number; starts: Rate; knocks: Rate; closedAt: number };
+type Address = { connections: number; opens: Rate; starts: Rate; knocks: Rate; closedAt: number };
 
 export type ServerOptions = {
   port: number;
@@ -69,6 +83,65 @@ export type RoomServer = {
 /** A device's key as the server keeps it: hashed, so the file of tables holds nothing that would let anyone sit as someone else. */
 export const hashKey = (key: string) => createHash("sha256").update(`fly-table-key:${key}`).digest("base64url").slice(0, 32);
 
+/** Private, loopback and link-local addresses: where a proxy in front of the server is. */
+const PRIVATE = /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|::1$|f[cd][0-9a-f]{2}:|fe[89ab][0-9a-f]:)/i;
+
+/** An IPv6 address's first 64 bits, written out: one machine has a whole /64 to pick from, so that is what rates count. */
+function prefix64(ip: string): string {
+  const [head, tail = ""] = ip.toLowerCase().split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const groups = ip.includes("::") ? [...left, ...Array<string>(8 - left.length - right.length).fill("0"), ...right] : left;
+  return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":")}::/64`;
+}
+
+/**
+ * Who a connection is from, as the per-address limits count it. Behind a
+ * proxy (`trustProxy`), X-Forwarded-For names the visitor, but only when
+ * the connection comes from the proxy itself (a private or loopback
+ * address): anyone who reaches the server directly could write the header
+ * themselves. Of a list, the last address is the one the nearest proxy
+ * added. An IPv4 address in IPv6 is the IPv4 address; any other IPv6 one
+ * counts by its /64.
+ */
+export function clientAddress(peer: string | undefined, forwarded: string | string[] | undefined, trustProxy: boolean): string {
+  const plain = (ip: string) => (ip.toLowerCase().startsWith("::ffff:") && isIP(ip.slice(7)) === 4 ? ip.slice(7) : ip);
+  let ip = plain(peer ?? "");
+  if (trustProxy && PRIVATE.test(ip) && forwarded !== undefined) {
+    const named = (Array.isArray(forwarded) ? forwarded.join(",") : forwarded).split(",").map((a) => plain(a.trim())).filter((a) => isIP(a) !== 0);
+    if (named.length) ip = named[named.length - 1];
+  }
+  if (!isIP(ip)) return "unknown";
+  return isIP(ip) === 6 ? prefix64(ip) : ip;
+}
+
+/** A request's path, or null if its target can't be read as one. */
+function pathOf(req: IncomingMessage): string | null {
+  try {
+    return new URL(req.url ?? "/", "http://localhost").pathname;
+  } catch {
+    return null;
+  }
+}
+
+/** Turns an upgrade away before it is a WebSocket. */
+function turnAway(socket: Duplex, status: number, reason: string) {
+  if (!socket.writable) return socket.destroy();
+  // Closed once the answer has gone, not before.
+  socket.once("finish", () => socket.destroy());
+  socket.end(`HTTP/1.1 ${status} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+}
+
+/** Sends, unless the device has stopped taking what it is sent (`max` bytes are waiting for it): then it is dropped, rather than its backlog kept in memory without end. */
+export function post(ws: Pick<WebSocket, "readyState" | "OPEN" | "bufferedAmount" | "send" | "terminate">, data: string | Uint8Array, max = BACKLOG_MAX) {
+  if (ws.readyState !== ws.OPEN) return;
+  if (ws.bufferedAmount > max) {
+    ws.terminate();
+    return;
+  }
+  ws.send(data);
+}
+
 const isStart = (v: unknown): v is TableStart => {
   const s = v as TableStart;
   return (
@@ -76,6 +149,11 @@ const isStart = (v: unknown): v is TableStart => {
     typeof s.offset === "number" && (s.name === undefined || roomName(s.name) !== null) && (s.listed === undefined || typeof s.listed === "boolean")
   );
 };
+
+/** Whether a hello is one the server answers: a table's code, a device's key, and a start and password that are each one, if given. */
+export const isHello = (hello: Extract<ClientMessage, { type: "hello" }>) =>
+  isTableCode(hello.table) && typeof hello.key === "string" && hello.key.length >= 16 && hello.key.length <= 64 && (hello.start === undefined || isStart(hello.start)) &&
+  (hello.password === undefined || isPassword(hello.password));
 
 export async function startServer(options: ServerOptions): Promise<RoomServer> {
   const write = options.log ?? log;
@@ -90,14 +168,36 @@ export async function startServer(options: ServerOptions): Promise<RoomServer> {
   /** Connections browsing the listed rooms, and what they were last told. */
   const browsing = new Set<WebSocket>();
   let listing = "";
-  const address = (req: IncomingMessage) => {
-    const forwarded = options.trustProxy ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() : "";
-    return forwarded || req.socket.remoteAddress || "unknown";
+  const address = (req: IncomingMessage) => clientAddress(req.socket.remoteAddress, req.headers["x-forwarded-for"], !!options.trustProxy);
+  /** What an address has done, remembered: a new one forgets the longest-closed of those with nothing open, when there are too many. */
+  const addressOf = (from: string): Address | null => {
+    const seen = addresses.get(from);
+    if (seen) return seen;
+    if (addresses.size >= ADDRESSES_MAX) {
+      for (const [other, them] of addresses) {
+        if (them.connections <= 0) addresses.delete(other);
+        if (addresses.size < ADDRESSES_MAX * 0.9) break;
+      }
+      if (addresses.size >= ADDRESSES_MAX) return null;
+    }
+    const fresh: Address = { connections: 0, opens: new Rate(...ROOM_LIMITS.opens), starts: new Rate(...ROOM_LIMITS.starts), knocks: new Rate(...ROOM_LIMITS.knocks), closedAt: 0 };
+    addresses.set(from, fresh);
+    return fresh;
+  };
+  let hashing = 0;
+  /** Works out a password, if no more than HASHING_MAX are being worked out already; null if too many are. */
+  const hashed = async <T>(work: () => Promise<T>): Promise<T | null> => {
+    if (hashing >= HASHING_MAX) return null;
+    hashing++;
+    try {
+      return await work();
+    } finally {
+      hashing--;
+    }
   };
 
-  const server = http.createServer((req, res) => {
-    const url = new URL(req.url ?? "/", "http://localhost");
-    if (url.pathname === "/health") {
+  const server = http.createServer({ maxHeaderSize: HEADERS_MAX, headersTimeout: HEADERS_WITHIN, requestTimeout: HEADERS_WITHIN, connectionsCheckingInterval: 1000 }, (req, res) => {
+    if (pathOf(req) === "/health") {
       let devices = 0;
       let flies = 0;
       for (const t of tables.values()) {
@@ -112,22 +212,18 @@ export async function startServer(options: ServerOptions): Promise<RoomServer> {
     res.end("not found\n");
   });
 
+  server.maxConnections = SOCKETS_MAX;
+  // A socket's error (a reset mid-handshake) is the socket's, not the server's.
+  server.on("clientError", (_error, socket) => socket.destroy());
+
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE, perMessageDeflate: false });
   server.on("upgrade", (req, socket, head) => {
-    const url = new URL(req.url ?? "/", "http://localhost");
-    if (url.pathname !== ROOMS_PATH) {
-      socket.destroy();
-      return;
-    }
-    const from = address(req);
-    const seen = addresses.get(from) ?? { connections: 0, starts: new Rate(...ROOM_LIMITS.starts), knocks: new Rate(...ROOM_LIMITS.knocks), closedAt: 0 };
-    if (seen.connections >= ROOM_LIMITS.connections) {
-      socket.destroy();
-      return;
-    }
+    socket.on("error", () => socket.destroy());
+    if (pathOf(req) !== ROOMS_PATH) return turnAway(socket, 404, "Not Found");
+    const seen = addressOf(address(req));
+    if (!seen || seen.connections >= ROOM_LIMITS.connections || !seen.opens.take(Date.now())) return turnAway(socket, 429, "Too Many Requests");
     wss.handleUpgrade(req, socket, head, (ws) => {
       seen.connections++;
-      addresses.set(from, seen);
       ws.once("close", () => {
         seen.connections--;
         seen.closedAt = Date.now();
@@ -148,7 +244,7 @@ export async function startServer(options: ServerOptions): Promise<RoomServer> {
     let alive = true;
     const link: Link = {
       send(data) {
-        if (ws.readyState === ws.OPEN) ws.send(data);
+        post(ws, data);
       },
       close(code, reason) {
         ws.close(code, reason);
@@ -168,7 +264,13 @@ export async function startServer(options: ServerOptions): Promise<RoomServer> {
     };
     ws.on("message", (data: Buffer, binary: boolean) => {
       if (table && seat) {
-        table.receive(seat, binary ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength) : data.toString("utf8"));
+        try {
+          table.receive(seat, binary ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength) : data.toString("utf8"));
+        } catch (error) {
+          // A message the table couldn't take costs its sender the line, never the server everyone else's tables.
+          write("error", "message", { table: table.code, error: (error as Error).message });
+          ws.close(CLOSE.malformed, "malformed");
+        }
         return;
       }
       if (greeted) return;
@@ -185,7 +287,7 @@ export async function startServer(options: ServerOptions): Promise<RoomServer> {
       if (first.v !== PROTOCOL) return refuse("version");
       if (first.type === "browse") {
         browsing.add(ws);
-        ws.send(rooms());
+        post(ws, rooms());
         return;
       }
       sit(first).catch((error: Error) => {
@@ -206,19 +308,23 @@ export async function startServer(options: ServerOptions): Promise<RoomServer> {
      * tries at it are counted, from this address and at that table.
      */
     async function sit(hello: Extract<ClientMessage, { type: "hello" }>) {
-      if (!isTableCode(hello.table) || typeof hello.key !== "string" || hello.key.length < 16 || hello.key.length > 64) return refuse("malformed");
-      if ((hello.start !== undefined && !isStart(hello.start)) || (hello.password !== undefined && !isPassword(hello.password))) return refuse("malformed");
+      if (!isHello(hello)) return refuse("malformed");
       const key = hashKey(hello.key);
       const known = tables.get(hello.table);
       let made: Lock | null = null;
       if (!known && hello.start) {
         if (!from.starts.take(Date.now())) return refuse("busy");
-        if (hello.password) made = await lock(hello.password);
+        if (hello.password) {
+          made = await hashed(() => lock(hello.password!));
+          if (!made) return refuse("busy");
+        }
       } else if (known?.lock && !known.knows(key) && !known.removed.has(key)) {
         if (!hello.password) return refuse("locked", known.name);
         const now = Date.now();
         if (!from.knocks.take(now) || !known.knocks.take(now)) return refuse("busy");
-        if (!(await opens(hello.password, known.lock))) {
+        const right = await hashed(() => opens(hello.password!, known.lock!));
+        if (right === null) return refuse("busy");
+        if (!right) {
           write("info", "refused", { table: known.code, reason: "password" });
           return refuse("locked", known.name);
         }
@@ -250,7 +356,7 @@ export async function startServer(options: ServerOptions): Promise<RoomServer> {
     const next = rooms();
     if (next === listing) return;
     listing = next;
-    for (const ws of browsing) if (ws.readyState === ws.OPEN) ws.send(next);
+    for (const ws of browsing) post(ws, next);
   }, options.listEvery ?? LIST_EVERY);
   const heartbeat = setInterval(() => {
     for (const ws of wss.clients) (ws as WebSocket & { heartbeat?: () => void }).heartbeat?.();

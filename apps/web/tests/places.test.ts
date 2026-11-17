@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
 import { FLY_HEIGHT, FlyBody, createIntent } from "@fly/body";
-import { Pantry, World, createSurface } from "@fly/world";
+import { Pantry, TOUCH, World, createSurface, inside, topHeight } from "@fly/world";
 import { CameraDirector, WALLPAPER } from "../src/camera.ts";
 import { PLACES, nextPlace } from "../src/places/catalog.ts";
 import type { PlaceId } from "../src/places/catalog.ts";
@@ -53,6 +53,36 @@ for (const info of PLACES) {
       const y = world.heightAt(patch.x, patch.z, patch.y);
       assert.ok(pantry.touching(patch.x, y, patch.z, 0.3), `${patch.name} can be tasted at ${patch.x}, ${patch.z}`);
       assert.ok(world.underside(patch.x, patch.z, y) - y >= FLY_HEIGHT, `${patch.name} has room over it for a fly`);
+
+      // Isolate the patch so another food cannot hide a missed contact.
+      const alone = new Pantry(world, [patch]);
+      const support = world.surface(patch.x, patch.z, createSurface(), patch.y).solid;
+      const solid = support >= 0 ? world.solids[support] : null;
+      const surface = createSurface();
+      const lower = createSurface();
+      let samples = 0;
+      for (let dx = -patch.r; dx <= patch.r; dx += 0.25) {
+        for (let dz = -patch.r; dz <= patch.r; dz += 0.25) {
+          const x = patch.x + dx;
+          const z = patch.z + dz;
+          if ((x - patch.x) ** 2 + (z - patch.z) ** 2 > patch.r * patch.r) continue;
+          if (solid && !inside(solid.footprint, x, z)) continue;
+          const height = solid ? topHeight(solid, x, z) : 0;
+          world.surface(x, z, surface, height);
+          if (surface.solid !== support || surface.underside <= height + TOUCH) {
+            assert.equal(alone.touching(x, height, z, 0), null, `${patch.name} is hidden at ${x}, ${height}, ${z}`);
+            continue;
+          }
+          if (!surface.onTable || surface.normal.y < STANDABLE || surface.underside - height < FLY_HEIGHT) continue;
+          samples++;
+          assert.equal(alone.touching(x, height, z, 0), alone.foods[0], `${patch.name} can be tasted at ${x}, ${height}, ${z}`);
+          world.surface(x, z, lower, height - 2 * TOUCH);
+          if (lower.solid !== support && lower.normal.y >= STANDABLE && lower.underside - lower.y >= FLY_HEIGHT) {
+            assert.equal(alone.touching(x, lower.y, z, 0.3), null, `${patch.name} cannot be tasted from the layer at ${lower.y}`);
+          }
+        }
+      }
+      assert.ok(samples > 0, `${patch.name} has exposed, standable samples`);
     }
   });
 
@@ -92,6 +122,57 @@ for (const info of PLACES) {
     for (let i = 0; i < WALLPAPER.length; i++) {
       check(`wallpaper shot ${i}`);
       director.startWallpaper();
+    }
+  });
+}
+
+for (const { id, name } of PLACES) {
+  for (const aspect of [16 / 9, 9 / 16]) {
+    test(`${name}: whole-place screensaver drifts safely with the fly in frame at ${aspect}`, () => {
+      const scene = SCENES[id];
+      const world = new World(scene.place);
+      const body = new FlyBody(world, scene.place.start);
+      const director = new CameraDirector(world, aspect, scene.camera);
+      director.wallpaperStyle = "whole";
+      director.startWallpaper();
+      assert.equal(director.shot, scene.camera.whole, "reuses the place's own framing");
+      const start = new THREE.Vector3();
+      const at = new THREE.Vector3();
+      for (let frame = 0; frame < 120 * 30; frame++) {
+        director.update(body, 1 / 30);
+        const eye = director.camera.position;
+        if (frame === 0) start.copy(eye);
+        assert.ok(world.solidAt(eye.x, eye.y, eye.z) < 0, `frame ${frame}: outside solids`);
+        assert.ok(eye.y >= world.heightAt(eye.x, eye.z, eye.y) + 0.5, `frame ${frame}: above ground`);
+        at.set(body.position.x, body.position.y + 0.75, body.position.z).project(director.camera);
+        assert.ok(Math.abs(at.x) < 1 && Math.abs(at.y) < 1 && at.z > -1 && at.z < 1, `frame ${frame}: fly in frame`);
+      }
+      assert.ok(start.distanceTo(director.camera.position) > 0.5, "drifts rather than freezing");
+      assert.equal(director.shotChanges, 0, "never cycles to fly shots");
+      director.stopWallpaper();
+      for (let frame = 0; frame < 300; frame++) director.update(body, 1 / 30);
+      assert.equal(director.view, "follow", "leaves the player's view as it was");
+      assert.ok(director.camera.position.distanceTo(body.position) < 30, "returns to the player's close framing");
+    });
+  }
+}
+
+for (const [id, x, z, yaw] of [["picnic", 180, -170, 0.4], ["bar", -425, 0, 0]] as const) {
+  test(`${id}: entering whole-place screensaver away from spawn keeps the fly in frame and camera outside scenery`, () => {
+    const scene = SCENES[id];
+    const world = new World(scene.place);
+    const body = new FlyBody(world, { x, z, yaw });
+    const director = new CameraDirector(world, 16 / 9, scene.camera);
+    for (let frame = 0; frame < 300; frame++) director.update(body, 1 / 30);
+    director.wallpaperStyle = "whole";
+    director.startWallpaper();
+    const at = new THREE.Vector3();
+    for (let frame = 0; frame < 3600; frame++) {
+      director.update(body, 1 / 30);
+      const eye = director.camera.position;
+      assert.ok(world.solidAt(eye.x, eye.y, eye.z) < 0, `frame ${frame}: outside solids`);
+      at.set(x, body.position.y + 0.75, z).project(director.camera);
+      assert.ok(Math.abs(at.x) < 1 && Math.abs(at.y) < 1 && at.z > -1 && at.z < 1, `frame ${frame}: fly in frame`);
     }
   });
 }

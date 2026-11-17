@@ -35,6 +35,7 @@
     "brain:wasm": "packages/brain-native/wasm.sh",
     "fly:viewer": "vite --config packages/fly/viewer/vite.config.ts",
     "fuzz": "node scripts/fuzz.ts",
+    "fuzz:rooms": "node scripts/fuzzRooms.ts",
     "soak:web": "node scripts/webSoak.ts",
     "e2e:soak": "node scripts/webSoak.ts --quick",
     "release": "semantic-release"
