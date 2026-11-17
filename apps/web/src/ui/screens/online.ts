@@ -115,9 +115,15 @@ export class OnlineScreen implements Screen {
       const note = this.#ended && this.#ended !== "locked" && this.#ended !== "left" ? this.#ended : null;
       if (note && note in NOTES) this.#note = note;
     }
+    if (this.#note === "version" && shell.lobbyStatus === "open") this.#note = null;
     if (table && (table.joined || this.view !== "door")) this.view = "room";
     else if (!table && this.view === "room") this.view = knock ? "door" : "rooms";
     if (this.view === "door" && !knock && !table) this.view = "rooms";
+  }
+
+  #incompatible() {
+    const shell = this.#shell;
+    return shell.lobbyStatus === "version" || (shell.tableEnded === "version" && shell.lobbyStatus !== "open");
   }
 
   /** The rows for the view as it is now. */
@@ -126,13 +132,13 @@ export class OnlineScreen implements Screen {
     switch (this.view) {
       case "rooms": {
         const rows: MenuItem[] = [
-          { kind: "action", id: "new", label: "New room", disabled: !shell.canPlayOnline || shell.lobbyStatus === "version" },
-          { kind: "field", id: "code", label: "Code", value: this.#code, disabled: !shell.typing || shell.lobbyStatus === "version" },
+          { kind: "action", id: "new", label: "New room", disabled: !shell.canPlayOnline || this.#incompatible() },
+          { kind: "field", id: "code", label: "Code", value: this.#code, disabled: !shell.typing || this.#incompatible() },
         ];
         const rooms = shell.rooms;
         const status = shell.lobbyStatus;
-        const unavailable = status === "lost" || status === "stale" || status === "version";
-        if (unavailable) rows.push({ kind: "action", id: "unavailable", label: status === "version" ? "Update needed" : status === "stale" ? "Reconnecting…" : "Can't reach rooms", disabled: true });
+        const unavailable = status === "lost" || status === "stale" || this.#incompatible();
+        if (unavailable) rows.push({ kind: "action", id: "unavailable", label: this.#incompatible() ? "Update needed" : status === "stale" ? "Reconnecting…" : "Can't reach rooms", disabled: true });
         else if (!rooms) rows.push({ kind: "action", id: "looking", label: "Looking for rooms…", disabled: true });
         else if (!rooms.length) rows.push({ kind: "action", id: "none", label: "No rooms open", disabled: true });
         for (const r of rooms ?? []) {
@@ -149,14 +155,14 @@ export class OnlineScreen implements Screen {
           place,
           listed,
           { kind: "field", id: "password", label: "Password", value: d.password, placeholder: "None", secret: true, disabled: !shell.typing },
-          { kind: "action", id: "create", label: "Create", disabled: shell.lobbyStatus === "version" },
+          { kind: "action", id: "create", label: "Create", disabled: this.#incompatible() },
         ];
       }
       case "door": {
         const joining = !!shell.table;
         return [
           { kind: "field", id: "password", label: "Password", value: this.#password, secret: true, disabled: !shell.typing || joining },
-          { kind: "action", id: "join", label: joining ? "Joining…" : "Join", disabled: joining || !this.#password || shell.lobbyStatus === "version" },
+          { kind: "action", id: "join", label: joining ? "Joining…" : "Join", disabled: joining || !this.#password || this.#incompatible() },
         ];
       }
       case "room": {
@@ -173,7 +179,7 @@ export class OnlineScreen implements Screen {
 
   #heading() {
     const shell = this.#shell;
-    if (shell.lobbyStatus === "version") return "Update needed";
+    if (this.#incompatible()) return "Update needed";
     if (this.#note) return NOTES[this.#note] ?? "";
     if (this.view === "new") return "New room";
     if (this.view === "door") return shell.knock?.name ?? "Online";

@@ -502,3 +502,15 @@ test("a version mismatch disables forms already open and says an update is neede
   state.knock = { code: "bbbbbbbbbb", name: "Secret Sugar", wrong: false, seq: 1 }; step();
   assert.equal(screen.menu.items.find((i) => i.id === "join")?.disabled, true);
 });
+
+test("an invitation's version failure clears when compatible discovery recovers", () => {
+  const { screen, state, step, press, focus } = world();
+  state.ended = "version"; step();
+  assert.equal(screen.note, "version");
+  assert.equal(screen.menu.items[0].disabled, true);
+  state.lobbyStatus = "open"; state.rooms = []; step();
+  assert.equal(screen.note, "");
+  assert.equal(screen.menu.items[0].disabled, false);
+  focus("new"); press("select");
+  assert.equal(screen.menu.items.find((item) => item.id === "create")?.disabled, false);
+});
