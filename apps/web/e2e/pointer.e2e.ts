@@ -390,6 +390,14 @@ async function mouse() {
     await page.keyboard.press("r");
     await waitWithin(page, `view=follow,reach~^11\\.1$,yaw=${zoomedAt}`, 15);
 
+    step("mouse: a trackpad's two-finger scroll turns the camera up and round, as a drag does, and leaves its distance");
+    const level = Number((await readState(page)).pitch);
+    for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -8);
+    await waitFor(page, `pitch>${level + 0.1}`);
+    for (let i = 0; i < 6; i++) await page.mouse.wheel(-8, 0);
+    await turnedFrom(page, zoomedAt);
+    assert.equal((await readState(page)).reach, "11.1", "a scroll is no zoom");
+
     step("mouse: a drag from the table, a right-drag and a middle-drag turn the camera, and drop nothing; it stays where it was put");
     for (const button of ["left", "right", "middle"] as const) {
       const food = (await readState(page)).food;
