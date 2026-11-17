@@ -19,9 +19,16 @@
 // Budgets run alone after the other tests and accept measurements only when the
 // reference's median is at most 1.2x the M5 Pro baseline locally (4x on CI's slower
 // virtual Macs), its 90th/10th percentile ratio is at most 1.5, and each set of
-// five work samples spans at most 1.35x. No reference outlier may exceed 2x
-// the fastest reference; scaling uses the median so tails cannot hide a regression.
-// A stable 2x work regression still fails. The strict local limit follows a
+// five work samples spans at most 1.35x. At most one reference in 20 may exceed
+// 2x the fastest, so a series of fewer than 20 may have none. Once none could at
+// any length, but on CI's virtual Macs one turns up in most runs of a hundred
+// laps, so the brain's budget, which times about a hundred an attempt, was
+// rejected three times out of three run after run while its median and p90/p10
+// held. Scaling uses the median, which so few outliers barely move, so
+// tails cannot hide a regression, and a stable 2x work regression still fails.
+// Work timed in a single lap is scaled by the references of the laps around it
+// as well: by its own two alone, one outlier could move it by half and spread
+// five samples of it past 1.35x. The strict local limit follows a
 // contended M5 Pro run: a 5.1 ms reference (27% slow) accompanied a false failure.
 // Three contended attempts, separated by one-second pauses, skip locally with an
 // explicit rerun message; in CI they fail with that reason. Functional assertions
@@ -126,10 +133,12 @@ function contention<T>({ references, samples = [] }: Measurement<T>, ci: boolean
   const low = sorted[Math.floor((sorted.length - 1) * 0.1)];
   const high = sorted[Math.ceil((sorted.length - 1) * 0.9)];
   if (high / low > 1.5) return `reference p90/p10 ${(high / low).toFixed(2)} exceeds 1.5`;
-  if (sorted.at(-1)! / sorted[0] > 2) return `reference max/min ${(sorted.at(-1)! / sorted[0]).toFixed(2)} exceeds 2`;
-  for (const series of samples) {
+  const outliers = sorted.filter((sample) => sample > 2 * sorted[0]).length;
+  const allowed = Math.floor(sorted.length / 20);
+  if (outliers > allowed) return `${outliers} of ${sorted.length} references exceed 2x the fastest (reference max/min ${(sorted.at(-1)! / sorted[0]).toFixed(2)}; at most ${allowed} may)`;
+  for (const [i, series] of samples.entries()) {
     const spread = Math.max(...series) / Math.min(...series);
-    if (spread > 1.35) return `work sample max/min ${spread.toFixed(2)} exceeds 1.35`;
+    if (spread > 1.35) return `work sample max/min ${spread.toFixed(2)} exceeds 1.35 (series ${i + 1} of ${samples.length})`;
   }
   return null;
 }

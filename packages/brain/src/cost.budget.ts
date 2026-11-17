@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { test } from "node:test";
-import { CpuMeter, measureBudget, median } from "../../../scripts/cpuBudget.ts";
+import { CpuMeter, measureBudget, median, scaleCpuMs } from "../../../scripts/cpuBudget.ts";
 import { DEFAULT_CONNECTOME_PATH, readConnectomeFile } from "./node.ts";
 import { FlyBrain } from "./runtime.ts";
 import { RESTING_SENSES } from "./types.ts";
@@ -34,6 +34,11 @@ const cost = (b: FlyBrain, senses: BrainSenses) => {
 };
 
 test("it builds and runs within its cost bounds", { skip }, async (t) => {
+  // A process's first few builds take up to 1.5x as long as later ones while the
+  // JIT and the heap warm up, which spread the first attempt's build samples past
+  // what measureBudget accepts: as many brains as there are samples are built and
+  // run unmeasured first, as the fly's update budget warms its update.
+  for (let i = 0; i < SAMPLES; i++) run(new FlyBrain(connectome!, { seed: 1 }), 1000, RESTING_SENSES);
   // Each sample is a new brain with the same seed through the same senses, so
   // they all do the same work and differ only in the machine's noise.
   const samples = await measureBudget(t, () => {
@@ -41,9 +46,13 @@ test("it builds and runs within its cost bounds", { skip }, async (t) => {
       const meter = new CpuMeter();
       const b = new FlyBrain(connectome!, { seed: 1 });
       meter.lap();
-      return { build: { ms: meter.ms, rawMs: meter.rawMs, references: meter.references }, rest: cost(b, RESTING_SENSES), full: cost(b, FULL) };
+      const rest = cost(b, RESTING_SENSES);
+      const full = cost(b, FULL);
+      // The build is one lap, so its two references alone would let one outlier halve or double it.
+      const references = [...meter.references, ...rest.references, ...full.references];
+      return { build: { ms: scaleCpuMs(meter.rawMs, references), rawMs: meter.rawMs }, rest, full, references };
     });
-    return { value: measured, references: measured.flatMap((s) => [...s.build.references, ...s.rest.references, ...s.full.references]), samples: (["build", "rest", "full"] as const).map((key) => measured.map((s) => s[key].ms)) };
+    return { value: measured, references: measured.flatMap((s) => s.references), samples: (["build", "rest", "full"] as const).map((key) => measured.map((s) => s[key].ms)) };
   });
   if (!samples) return;
   const of = (key: "build" | "rest" | "full") => ({ ms: median(samples.map((s) => s[key].ms)), rawMs: median(samples.map((s) => s[key].rawMs)) });

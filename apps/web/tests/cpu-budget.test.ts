@@ -52,3 +52,21 @@ test("rare reference outliers cannot scale a doubled workload back under budget"
   assert.equal(await measureBudget(t, () => ({ value: doubled, references }), { ci: false, pause: async () => {} }), undefined);
   assert.match(t.skipped[0], /reference max\/min/);
 });
+
+test("a few stalls in a hundred references are measured, scaled by the median, and a doubled workload still fails", async () => {
+  // A hundred laps, as the brain's budget times: five stalls between 2x and 11x the fastest.
+  const references = [...Array(95).fill(REFERENCE_MS) as number[], 8.4, 10, 12, 20, 44];
+  const t = context();
+  const doubled = await measureBudget(t, () => ({ value: scaleCpuMs(6, references), references, samples: [[6, 6.1, 6, 6.2, 6]] }), { ci: true, pause: async () => {} });
+  assert.equal(t.messages.length, 0);
+  assert.equal(doubled, 6, "the median ignores the stalls");
+  assert.throws(() => assert.ok(doubled! < 5.6, "budget 5.6"), /budget 5.6/);
+});
+
+test("stalls in more than one reference in 20 are contention, at any number of laps", async () => {
+  for (const [length, stalls] of [[11, 1], [19, 1], [40, 3], [100, 6]]) {
+    const references = [...Array(length - stalls).fill(REFERENCE_MS) as number[], ...Array(stalls).fill(REFERENCE_MS * 2.5) as number[]];
+    const t = context();
+    await assert.rejects(measureBudget(t, () => ({ value: 1, references }), { ci: true, pause: async () => {} }), new RegExp(`${stalls} of ${length} references exceed 2x the fastest`));
+  }
+});
