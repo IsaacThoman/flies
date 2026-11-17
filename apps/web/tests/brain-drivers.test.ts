@@ -4,7 +4,8 @@ import type { BrainRequest, BrainResponse, BrainSenses, BrainState } from "@fly/
 import { REGION_RATE_NAMES, RESTING_SENSES } from "@fly/brain";
 import { COMMAND_ORDER, SENSE_ORDER, STATE_STATS } from "@fly/contracts";
 import type { BrainStatus, NativeBrainBridge } from "@fly/contracts";
-import { workerEngine } from "../src/brain/create.ts";
+import { MAX_OWN } from "@fly/net";
+import { NATIVE_MOST, createBrains, workerEngine } from "../src/brain/create.ts";
 import { createBrainHost } from "../src/brain/host.ts";
 import { BrainMeter } from "../src/brain/meter.ts";
 import { NativeBrainDriver } from "../src/brain/native-driver.ts";
@@ -349,4 +350,26 @@ test("the worker runs the WebAssembly brain where the browser can, and ?brain= p
   assert.equal(workerEngine("?brain=typescript", true), "typescript");
   assert.equal(workerEngine("?x=1&brain=wasm", false), "wasm", "forced, even where it will fail: for tests");
   assert.equal(workerEngine("?brain=fast", true), "wasm");
+});
+
+test("an Apple TV lives at most NATIVE_MOST flies, and one where its host can't spawn another brain", () => {
+  const started: number[] = [];
+  const bridge = (spawn: boolean): NativeBrainBridge => ({
+    start: (seed: number) => void started.push(seed),
+    ...(spawn ? { spawn: () => bridge(false) } : {}),
+  }) as unknown as NativeBrainBridge;
+  const host = globalThis as { __native?: { brain?: NativeBrainBridge } };
+  try {
+    host.__native = { brain: bridge(true) };
+    const brains = createBrains();
+    assert.equal(brains.most, NATIVE_MOST);
+    assert.ok(NATIVE_MOST > 1 && NATIVE_MOST < MAX_OWN, "fewer than a table lets a device bring, as measured on the TV");
+    assert.ok(brains.another);
+    host.__native = { brain: bridge(false) };
+    const one = createBrains();
+    assert.equal(one.another, null);
+    assert.equal(one.most, 1);
+  } finally {
+    delete host.__native;
+  }
 });

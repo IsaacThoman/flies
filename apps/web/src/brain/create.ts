@@ -7,6 +7,7 @@
 
 import { wasmBrainSupported } from "@fly/brain-native";
 import type { BrainDriver } from "@fly/contracts";
+import { MAX_OWN } from "@fly/net";
 import { BRAIN_MODULE_CACHE, BrainDownload, BrainFiles } from "./download.ts";
 import type { BrainFile } from "./download.ts";
 import { NativeBrainDriver, nativeBridge } from "./native-driver.ts";
@@ -58,8 +59,18 @@ const missing = {
   discard: () => Promise.resolve(),
 };
 
-/** A brain for the first fly, and a way to make another for each fly after it, where this device can (null: one fly only). */
-export type Brains = { first: BrainDriver; another: (() => BrainDriver) | null };
+/**
+ * A brain for the first fly, a way to make another for each fly after it where this device can
+ * (null: one fly only), and how many flies it lives at most.
+ */
+export type Brains = { first: BrainDriver; another: (() => BrainDriver) | null; most: number };
+
+/**
+ * The most flies an Apple TV lives. Measured on an Apple TV 4K (A15): with three, its
+ * screensaver keeps 58 to 60 fps in the lighter places; with four it falls to 54 (docs/apple-tv.md,
+ * "Several flies on peev"). Each brain is on a thread of its own and none ran short; the cost is the frame.
+ */
+export const NATIVE_MOST = 3;
 
 const seed = () => (Math.random() * 0x7fffffff) | 0;
 
@@ -68,7 +79,11 @@ export function createBrains(): Brains {
   if (bridge) {
     // An Apple TV host from before it could run more than one brain runs one fly.
     const spawn = bridge.spawn?.bind(bridge);
-    return { first: new NativeBrainDriver(bridge, { seed: seed() }), another: spawn ? () => new NativeBrainDriver(spawn(), { seed: seed() }) : null };
+    return {
+      first: new NativeBrainDriver(bridge, { seed: seed() }),
+      another: spawn ? () => new NativeBrainDriver(spawn(), { seed: seed() }) : null,
+      most: spawn ? NATIVE_MOST : 1,
+    };
   }
   const env = {
     fetch: (...args: Parameters<typeof fetch>) => fetch(...args),
@@ -79,7 +94,7 @@ export function createBrains(): Brains {
   const module = BRAIN_MODULE && workerEngine(location.search) === "wasm" ? new BrainDownload(BRAIN_MODULE, document.baseURI, env, BRAIN_MODULE_CACHE) : null;
   const source = BRAIN_FILE ? new InTurn(new BrainFiles(new BrainDownload(BRAIN_FILE, document.baseURI, env), module)) : missing;
   const worker = () => new WorkerBrainDriver({ createWorker, source });
-  return { first: worker(), another: worker };
+  return { first: worker(), another: worker, most: MAX_OWN };
 }
 
 /**
