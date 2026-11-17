@@ -236,6 +236,8 @@ export class Pointers {
   #hover = { x: 0, y: 0, known: false };
   /** The last tap's lift, for telling a double one. */
   #lastTap = { x: 0, y: 0, at: -Infinity };
+  /** Safari's trackpad pinch, as far as it has spread so far (1 when none is under way). */
+  #trackpadPinch = 1;
 
   constructor(box: () => Box, now: () => number = () => performance.now(), devices: Devices | null = null) {
     this.#box = box;
@@ -276,8 +278,14 @@ export class Pointers {
       this.wheel(e);
     }, opts);
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-    // Safari's own pinch and double-tap zoom, and the page's rubber band.
-    for (const type of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(type, (e) => e.preventDefault(), opts);
+    // Safari's own pinch and double-tap zoom, and the page's rubber band. A trackpad's pinch in Safari comes only as these, not as a wheel with Ctrl.
+    document.addEventListener("dblclick", (e) => e.preventDefault(), opts);
+    for (const type of ["gesturestart", "gesturechange", "gestureend"]) {
+      document.addEventListener(type, (e) => {
+        e.preventDefault();
+        this.trackpadPinch(type, (e as Event & { scale?: number }).scale ?? 1);
+      }, opts);
+    }
     document.addEventListener("touchmove", (e) => e.preventDefault(), opts);
     // Field focus happens in pointerup, before the next game frame can apply a resize.
     window.addEventListener("resize", () => this.cancel());
@@ -434,6 +442,17 @@ export class Pointers {
     this.#pinch = null;
     this.#spent = this.#fingers.size > 0;
     this.#lastTap.at = -Infinity;
+  }
+
+  /** Safari's gesture events: a trackpad's pinch, `scale` its spread since it began. A touch screen's fingers are pinches of their own. */
+  trackpadPinch(type: string, scale: number) {
+    if (this.#fingers.size > 0 || !(scale > 0)) return;
+    if (type === "gesturestart") this.#trackpadPinch = 1;
+    else if (type === "gesturechange") {
+      this.#meant(false);
+      this.gestures.push({ type: "pinch", scale: scale / this.#trackpadPinch, dx: 0, dy: 0 });
+      this.#trackpadPinch = scale;
+    } else this.#trackpadPinch = 1;
   }
 
   wheel(e: { clientX: number; clientY: number; deltaX: number; deltaY: number; deltaMode: number; ctrlKey: boolean; metaKey?: boolean }) {

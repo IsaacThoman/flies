@@ -91,6 +91,25 @@ test("the wheel: a mouse's click is a notch; a trackpad's scroll is small steps;
   assert.equal(pointers.deliberate, true);
 });
 
+test("Safari's trackpad pinch: each change is the step since the last; a touch screen's fingers are pinches of their own", () => {
+  const { pointers, raw } = rig();
+  pointers.trackpadPinch("gesturestart", 1);
+  pointers.trackpadPinch("gesturechange", 1.2);
+  pointers.trackpadPinch("gesturechange", 1.5);
+  pointers.trackpadPinch("gestureend", 1.5);
+  pointers.trackpadPinch("gesturestart", 1);
+  pointers.trackpadPinch("gesturechange", 0.8);
+  const pinches = pointers.gestures as Extract<Gesture, { type: "pinch" }>[];
+  assert.deepEqual(pinches.map((g) => [g.type, g.scale.toFixed(3), g.dx, g.dy]), [["pinch", "1.200", 0, 0], ["pinch", "1.250", 0, 0], ["pinch", "0.800", 0, 0]]);
+  assert.equal(pointers.deliberate, true);
+  pointers.endFrame();
+  pointers.down(raw(1, "touch", 100, 100));
+  pointers.down(raw(2, "touch", 200, 100));
+  pointers.endFrame();
+  pointers.trackpadPinch("gesturechange", 2);
+  assert.equal(pointers.gestures.length, 0);
+});
+
 test("which device is in hand: the remote on the TV, else a finger or a mouse by the screen; then whatever was used last", () => {
   assert.equal(initialDevice(true, false), "remote");
   assert.equal(initialDevice(false, true), "touch");
