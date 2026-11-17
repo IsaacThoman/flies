@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PATCHES, Pantry, SOLIDS, World, createPicnic } from "@fly/world";
+import { PATCHES, Pantry, SOLIDS, WINDOWSILL, World, createPicnic } from "@fly/world";
 import { ANTENNA_AHEAD, FLY_LENGTH, FlyBody, HEAD_AHEAD, LOOM_DECAY, LOOM_HOLD, MOUTH_AHEAD, SenseTracker, WIND_FULL_SPEED, createIntent } from "../src/index.ts";
 import type { Intent, Looming, SenseInput } from "../src/index.ts";
 
@@ -119,6 +119,22 @@ test("it tastes sugar with its feet and its mouth, only while on its feet", () =
   const m = new SenseTracker();
   assert.ok(m.update(input(near)).sweet > 0);
   assert.equal(m.tasting.byMouth, true);
+});
+
+test("facing up a fruit's curve, its mouth tastes what is on the fruit ahead of it", () => {
+  // The windowsill's banana: the split near its stalk, with the fly a little down its side, its mouth on the juice.
+  const sill = new World(WINDOWSILL);
+  const pantry = new Pantry(sill, WINDOWSILL.patches);
+  const banana = pantry.foods.find((f) => f.name === "banana")!;
+  const yaw = Math.atan2(banana.x, banana.z);
+  const back = MOUTH_AHEAD * FLY_LENGTH;
+  const body = new FlyBody(sill, { x: banana.x - Math.sin(yaw) * back, z: banana.z - Math.cos(yaw) * back, yaw, y: banana.y + 0.5 });
+  const mouth = body.point(MOUTH_AHEAD, 0, 0, { x: 0, y: 0, z: 0 });
+  assert.ok(sill.heightAt(mouth.x, mouth.z, body.position.y + 0.5) > body.position.y + 0.05, "the banana rises under its mouth");
+  const tracker = new SenseTracker();
+  assert.equal(tracker.update(input(body, { world: sill, pantry })).sweet, banana.sweet);
+  assert.equal(tracker.tasting.food, banana);
+  assert.equal(tracker.tasting.byMouth, true);
 });
 
 test("it tastes water and bitterness as it tastes sugar: plain water as water, sugar as not, coffee's dregs as bitter", () => {

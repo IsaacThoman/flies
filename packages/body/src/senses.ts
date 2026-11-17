@@ -205,7 +205,10 @@ export class SenseTracker {
     if (body.onFeet) {
       const mouth = body.point(MOUTH_AHEAD, MOUTH_UP, 0, this.#probe);
       const reach = MOUTH_REACH + PROBOSCIS_REACH * clamp01(input.proboscis);
-      const atMouth = pantry.touching(mouth.x, body.position.y, mouth.z, reach);
+      // The head goes down to the ground under it: on a rise it could step onto (up a fruit's curve) that is
+      // where its mouth is, not level with its feet, where the surface found would be the table under the fruit.
+      const feet = body.position.y;
+      const atMouth = pantry.touching(mouth.x, Math.max(feet, world.heightAt(mouth.x, mouth.z, feet + STEP_UP)), mouth.z, reach);
       const underfoot = pantry.touching(body.position.x, body.position.y, body.position.z, FOOT_SPREAD);
       // Stronger foot taste must not prevent eating a food already at the mouth.
       tasting.food = atMouth ?? underfoot;
