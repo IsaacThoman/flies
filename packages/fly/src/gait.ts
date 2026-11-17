@@ -77,7 +77,10 @@ export class Gait {
     const frameStart = this.time;
     this.time += dt;
     const a = turn * dt, c = Math.cos(a), s = Math.sin(a);
-    const fast = Math.min(1, Math.max(0, (effective - 0.5) / 4));
+    // Retain metachronal spread through moderate walking (Mendes Fig. 4;
+    // Wosnitza 2013). This width is an animation approximation, not a fitted
+    // population boundary; rapid walking still retains the hind-leg lead.
+    const fast = Math.min(1, Math.max(0, (effective - 0.5) / 6));
     const blend = fast * fast * (3 - 2 * fast);
     for (let leg = 0; leg < LEG_COUNT; leg++) {
       const i = leg * 3, hx = home[i], hz = home[i + 2];
