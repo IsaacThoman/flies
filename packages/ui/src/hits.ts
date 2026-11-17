@@ -6,6 +6,8 @@
 export type Hit = {
   /** What it is, in the screen's own words: "row", "tool", "chevron"... */
   kind: string;
+  /** Stable identity of the item as it was drawn, independent of its row index. */
+  id?: string;
   /** Which one (a row's index, a tool's), and a second number if it needs one (a chevron's direction). */
   index: number;
   value: number;
@@ -30,10 +32,11 @@ export class HitMap {
   }
 
   /** Records a target drawn at x, y, w × h (design units). Later targets are over earlier ones. */
-  add(kind: string, x: number, y: number, w: number, h: number, index = 0, value = 0) {
+  add(kind: string, x: number, y: number, w: number, h: number, index = 0, value = 0, id = "") {
     if (!this.enabled) return;
     let hit = this.#hits[this.count];
     if (!hit) this.#hits[this.count] = hit = { kind, index, value, x, y, w, h };
+    hit.id = id;
     hit.kind = kind;
     hit.index = index;
     hit.value = value;
@@ -69,4 +72,9 @@ export class HitMap {
     }
     return near;
   }
+}
+
+/** A release belongs to the same drawn action as its press, including a choice's direction or tab. */
+export function sameTarget(a: Hit | null, b: Hit | null): boolean {
+  return a === null || b === null ? a === b : a.kind === b.kind && a.id === b.id && a.index === b.index && a.value === b.value;
 }

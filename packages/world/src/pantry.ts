@@ -97,6 +97,12 @@ export class Pantry {
     return food;
   }
 
+  /** Removes the player's offerings, leaving the place's patches and finds alone. True: falling food can go too; a shared pantry waits for its room. */
+  clearDropped() {
+    for (let i = this.foods.length - 1; i >= 0; i--) if (isDropped(this.foods[i])) this.remove(this.foods[i]);
+    return true;
+  }
+
   remove(food: Food) {
     const i = this.foods.indexOf(food);
     if (i >= 0) this.foods.splice(i, 1);

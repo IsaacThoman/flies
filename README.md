@@ -365,7 +365,8 @@ show the thing last used, and the screen hides the system's cursor, text
 selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
 
-The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
+The tools are **Feed** (sugar, honey, raspberry, water, and Clear dropped, which
+removes your offerings, including those still falling, leaving the place’s own food), **Swoop** (a dark
 beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot), **Light** (now, which follows the clock,
@@ -424,7 +425,8 @@ fly and follows it: the screensaver. A mouse resting on the desk doesn't keep it
 away, and a nudge of the desk doesn't end it; a mouse moved as if meant does.
 Its camera can take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
-(Lively). Any press, touch, tap, click, key or deliberate move of the mouse
+(Lively), or keep the whole place in view with a slow drift (Whole place).
+Any press, touch, tap, click, key or deliberate move of the mouse
 brings the controls back and does nothing else.
 A small picture of what the fly's eyes see sits in a corner of the screensaver
 (Settings → On screen → Fly POV: off, in the screensaver, or always, the default, which keeps it in
@@ -491,7 +493,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
 | `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
 | `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, at full heavy rain about one every 13 s: chosen rates, not measured biology). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
-| `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, another fly's body, or past the table's edge. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
+| `bumpLeft`, `bumpRight` | Something pushing an antenna back: its tip, just ahead of the head and to its side, inside another fly's body or, in the air, inside anything; on its feet, at anything taller than a step that it walks into, or that it stands against where its foreleg on that side doesn't (standing, its forelegs' tarsi reach further forward than its antennae, so a wall they meet holds its head off it, while a stem between them still touches). Nothing past the table's edge, where there is nothing to touch. 1 while it lasts, however long (any contact deflects an antenna further than its push neurons need, and they answer for as long as it is held), easing out over 0.3 s. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
 | `grounded` | On its feet: its legs' load sensors bear its weight. |
@@ -544,7 +546,11 @@ lives (`packages/body/src/motion.ts` unless noted):
   ledges and slopes steeper than 65°. In the air it has weight, drag (7/s, through
   the air, which a puff or a gust moves) and
   the push of its wings: lift in proportion to the `wings` command (0.6 holds
-  its weight) and thrust along its heading.
+  its weight) and thrust along its heading. Its head, abdomen and legs keep
+  out of what they reach, as its feet do: flying at a pane it bounces off with
+  its head on the near side, and turning beside a wall its legs swing clear;
+  between two things too close for it as it faces, they turn it a quarter
+  turn if it fits so.
 - **The take-off's direction.** The escape command launches it (380 to 620 mm/s
   up and 160 to 340 away, by how far past 0.4 it went); the direction is the
   body's: away from the ball if the ball is in the air, else straight ahead.

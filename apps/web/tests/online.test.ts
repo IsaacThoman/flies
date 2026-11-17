@@ -125,6 +125,23 @@ test("the table turning the device away ends the line for good", () => {
   }
 });
 
+test("a message from the room out of shape is dropped before the game sees it, and the line carries on", () => {
+  const { line: l, sockets } = line();
+  const heard: ServerMessage[] = [];
+  l.onMessage = (m) => heard.push(m);
+  sockets[0].status = "open";
+  l.update(0.016);
+  const bad = [{ ...welcome(5000), players: "everyone" }, { ...welcome(5000), id: 1_000_000 }, { type: "joined", id: 1e6, colour: "#fff", away: false }, { type: "place", place: "lab", epoch: 1, foods: [], spots: null }];
+  for (const m of bad) sockets[0].say(m as ServerMessage);
+  l.update(0.016);
+  assert.equal(l.status, "connecting", "no welcome taken from a broken one");
+  assert.equal(heard.length, 0);
+  sockets[0].say(welcome(5000));
+  l.update(0.016);
+  assert.equal(l.status, "joined");
+  assert.deepEqual(heard.map((m) => m.type), ["welcome"]);
+});
+
 test("an invitation is the page's address with the table's code, and the room server is the site's own /rooms", () => {
   const link = inviteLink("https://flies.example/?rooms=ws://x/rooms#top", "abcdefghjk");
   assert.equal(link, "https://flies.example/?table=abcdefghjk");

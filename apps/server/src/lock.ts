@@ -28,4 +28,7 @@ export async function opens(password: string, lock: Lock): Promise<boolean> {
 }
 
 /** Whether something read back from the file of tables is a lock. */
-export const isLock = (v: unknown): v is Lock => !!v && typeof (v as Lock).salt === "string" && typeof (v as Lock).hash === "string";
+export const isLock = (v: unknown): v is Lock => {
+  const l = v as Lock;
+  return !!l && typeof l.salt === "string" && typeof l.hash === "string" && l.salt.length <= 64 && l.hash.length <= 64;
+};

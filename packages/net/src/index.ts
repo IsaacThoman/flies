@@ -2,7 +2,8 @@
 // device (clock.ts), another fly as it has been heard of (track.ts), the
 // shared food (food.ts), thrown balls (ball.ts), the table's bubbles
 // (bubbles.ts), the randomness every device draws alike (random.ts) and what
-// a player may do (limits.ts). No sockets and no drawing: the room server
+// a player may do (limits.ts), and a device's check of what the room sends
+// (wire.ts). No sockets and no drawing: the room server
 // and the game both use it.
 
 export * from "./protocol.ts";
@@ -13,4 +14,5 @@ export * from "./ball.ts";
 export * from "./bubbles.ts";
 export * from "./random.ts";
 export * from "./limits.ts";
+export * from "./wire.ts";
 export * from "./weather.ts";
