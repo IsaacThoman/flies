@@ -131,9 +131,8 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
     label = hands.label;
     lw = Math.max(150, hintWidth(g, label, 17) + arrows);
   }
-  // The caption stays clear of the finger without committing its pending tool.
+  // Identify the pending tool clear of the finger without committing it.
   const pending = pointing && s.pressed?.kind === HUD_HITS.tool ? TOOLS[s.pressed.index] : undefined;
-  if (pending) label = pending.name;
   let labelSize = 17;
   if (touch) {
     lw = Math.min(lw, room);
@@ -147,7 +146,8 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   const hitY = labelY - 17 - (hitHeight - 32) / 2;
   const labelPressed = s.pressed?.kind === HUD_HITS.kind || s.pressed?.kind === HUD_HITS.label;
   pill(g, lx, ly, lw, 32, "", { color: labelPressed || pending ? "aqua" : "glass", press: labelPressed ? 1 : 0 });
-  text(g, label, lx + lw / 2, labelY - pop, { size: labelSize, align: "center", baseline: "middle", color: INK });
+  if (pending) drawToolIcon(g, pending.id, lx + lw / 2, labelY - pop, 12);
+  else text(g, label, lx + lw / 2, labelY - pop, { size: labelSize, align: "center", baseline: "middle", color: INK });
   if (many && pointing) {
     chevron(g, lx + 18, labelY - pop, -1, true);
     chevron(g, lx + lw - 18, labelY - pop, 1, true);

@@ -346,3 +346,22 @@ The farm's shared foundation passes 953 ordinary tests with three skips; its
 five Apple-specific exact-name exclusions and CPU-budget exclusion are covered
 by the Apple-silicon run. Farm lint, web/tvOS types and build pass. E2e farm
 results and post-merge validation are recorded in the PR.
+
+## Landing revision
+
+The owner requested icons in place of the pending-tool name in #134. The landing
+revision draws the existing tool icon in that same unobscured HUD pill, with
+unchanged selection and hit targets. The 9.19 blind score above belongs to the
+text prototype; it is retained as experiment history, not assigned to the icon
+revision. The updated layout check verifies icon drawing and absence of pending
+caption text for every tool at all eight sizes.
+
+The stack incorporates dev's plain orbit rig (#129), multiple flies (#106) and
+menu identity (#102), keeping their behavior. Camera.ts and orbit.ts match dev;
+this branch adds no drag/pinch mapping. Input/controls checks pass on all three
+stack layers (39, 40, 40), with 17 additional layout checks on the icon revision.
+Typecheck and lint pass on each layer. The older farm run passed units but failed
+remote-play wallpaper wake at 0.14x simulation speed; the current local remote-play
+rerun passed. Remaining older farm/browser sweeps were stopped for this requested
+integration rather than left running. Their partial results are not a green full
+e2e claim for the updated stack.
