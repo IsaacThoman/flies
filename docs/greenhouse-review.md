@@ -294,7 +294,22 @@ The accepted rendered/runtime source is `5b56304b`. Later commits only record ev
 - Final place, greenhouse and drawn-versus-felt suites: 52 tests passed. Greenhouse samples: 826 tops and 510 sides, no added exceptions; five main-camera meshes, 82,108 triangles. Footprint tests passed earlier with unchanged footprint definitions.
 - Final body fuzzer, seed 42: 1,800 simulated seconds, 41,810 steps, 30 starts, 60 probes, passed.
 - Final life fuzzers: seeds 42 and 43, 900 simulated seconds each, 51,435 total steps, 143 meals, 24 take-offs, passed. Batches honor the ten-minute heavy-slot limit and two-minute cooldown. The earlier baseline also passed a continuous 1,800-second life run.
-- Full local `npm test`, including Apple-specific checks and budgets, passed during integration. Farm lint, web/TV typechecks, build and 905 unit tests passed (902 passed, 3 skipped); the farm excludes architecture-specific exact-math tests and M5 CPU budgets. Its wrapper changed during the run and failed parsing after unit completion; e2e was submitted separately and is queued. Earlier local browser play e2e passed, including every registered place.
+- Full local `npm test`, including Apple-specific checks and budgets, passed during integration. Farm lint, web/TV typechecks, build and 905 unit tests passed (902 passed, 3 skipped); the farm excludes architecture-specific exact-math tests and M5 CPU budgets. Its wrapper changed during the run and failed parsing after unit completion; e2e was submitted separately, then cancelled after over 30 minutes without a farm slot. Browser checks were run locally instead.
 - Final browser evidence: 11–26 frame draws, 120,235–142,261 frame triangles, 72 ms total construction and 25 ms largest step. No browser errors. These desktop measurements do not certify device timings or prove absence of temporal flicker.
 
 Round 10 evidence: [contact sheet](https://github.com/IsaacThoman/flies/blob/pr-assets-place-greenhouse/crown-and-flesh/contact.png?raw=true), [all views](https://github.com/IsaacThoman/flies/tree/pr-assets-place-greenhouse/crown-and-flesh). All 533 image files are held only on the parentless assets branch. The PR is ready for the maintainer; this task does not merge it and does not wait for GitHub CI.
+
+## Final dev integration
+
+Merge `1d75e0f4` brings in dev `76787e5150dfe9fe105975f72717b7f1675cfca2`. The only conflict was the drawn-versus-felt budget table: dev's updated picnic, windowsill and lab bounds are preserved, with the greenhouse's five-mesh/82,108-triangle bound added. The greenhouse world and scene files remain byte-identical to the blind winner `5b56304b`.
+
+The merge also preserves dev's play orbit, weather, fly posing, companions, accessibility and shared backdrop changes. The blind images and measurements above are snapshots of their stated source commits, rather than claims about every later shared renderer change.
+
+After refreshing dev's added dependencies:
+
+- Typecheck, lint and all 52 place/greenhouse/drawn-versus-felt tests pass.
+- Another 1,800-second body fuzz run passes: 41,810 steps, 30 starts and 60 probes.
+- Play, pointer, web and shared-table browser e2e suites pass. The shared-table suite exercises a full eight-fly table across screen sizes. Its pre-merge food-sync failure is cleared by the dev merge.
+- The newly landed first-minute e2e fails at line 70: loading opens a room socket before the real brain arrives. The identical assertion fails on an untouched archived dev snapshot `76787e51` with its own dependencies and no greenhouse code. It occurs before greenhouse selection. This baseline startup failure is reported, not changed or counted as a passing check.
+
+All local browsers and servers were closed, the cancelled farm job was stopped, and the isolated baseline directory was removed. No GitHub CI wait or merge was performed. The PR remains ready for the maintainer; subsequent place polish belongs in a separate branch/PR after landing.
