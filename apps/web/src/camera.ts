@@ -449,7 +449,7 @@ export class CameraDirector {
     let wy = (room ? room.y : 60) + p.y * 0.3;
     const wz = room ? room.z + p.z * room.follow : p.z * 0.35;
     // A whole-place focus can fall inside scenery as the fly moves. Rays must start outside it.
-    const inside = this.#world.solidAt(wx, wy, wz);
+    const inside = table > 0 ? this.#world.solidAt(wx, wy, wz) : -1;
     if (inside >= 0) wy = topPeak(this.#world.solids[inside].top) + CLEARANCE;
     const tx = mix(focus.x, wx, middle);
     const ty = mix(focus.y, wy, middle);
