@@ -126,3 +126,23 @@ for (const { id, name } of PLACES) {
     });
   }
 }
+
+for (const [id, x, z, yaw] of [["picnic", 180, -170, 0.4], ["bar", -425, 0, 0]] as const) {
+  test(`${id}: entering whole-place screensaver away from spawn keeps the fly in frame and camera outside scenery`, () => {
+    const scene = SCENES[id];
+    const world = new World(scene.place);
+    const body = new FlyBody(world, { x, z, yaw });
+    const director = new CameraDirector(world, 16 / 9, scene.camera);
+    for (let frame = 0; frame < 300; frame++) director.update(body, 1 / 30);
+    director.wallpaperStyle = "whole";
+    director.startWallpaper();
+    const at = new THREE.Vector3();
+    for (let frame = 0; frame < 3600; frame++) {
+      director.update(body, 1 / 30);
+      const eye = director.camera.position;
+      assert.ok(world.solidAt(eye.x, eye.y, eye.z) < 0, `frame ${frame}: outside solids`);
+      at.set(x, body.position.y + 0.75, z).project(director.camera);
+      assert.ok(Math.abs(at.x) < 1 && Math.abs(at.y) < 1 && at.z > -1 && at.z < 1, `frame ${frame}: fly in frame`);
+    }
+  });
+}

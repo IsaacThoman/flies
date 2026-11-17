@@ -446,8 +446,11 @@ export class CameraDirector {
     const room = this.#scene.focus;
     const middle = table * table * table;
     const wx = room ? room.x + p.x * room.follow : p.x * 0.35;
-    const wy = (room ? room.y : 60) + p.y * 0.3;
+    let wy = (room ? room.y : 60) + p.y * 0.3;
     const wz = room ? room.z + p.z * room.follow : p.z * 0.35;
+    // A whole-place focus can fall inside scenery as the fly moves. Rays must start outside it.
+    const inside = this.#world.solidAt(wx, wy, wz);
+    if (inside >= 0) wy = topPeak(this.#world.solids[inside].top) + CLEARANCE;
     const tx = mix(focus.x, wx, middle);
     const ty = mix(focus.y, wy, middle);
     const tz = mix(focus.z, wz, middle);
@@ -903,6 +906,7 @@ export class CameraDirector {
   startWallpaper() {
     this.handBack(true);
     this.wallpaper = true;
+    if (this.wallpaperStyle === "whole") this.snap();
     this.#shotTime = 0;
     this.#shot = (this.#shot + 1) % WALLPAPER.length;
     this.#scoutIn = 0;
