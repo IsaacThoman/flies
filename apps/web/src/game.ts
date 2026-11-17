@@ -9,7 +9,7 @@
 // else, in play, to the world and the camera (controls.ts).
 
 import * as THREE from "three";
-import { FLY_LENGTH } from "@fly/body";
+import { FLY_LENGTH, Rhythm, SUMMER } from "@fly/body";
 import { REGIONS } from "@fly/brain";
 import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttribution } from "@fly/contracts";
 import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
@@ -311,6 +311,8 @@ export class Game implements Shell {
     this.#followLight(true);
     this.fireflies = new Fireflies(this.stage.scene);
     this.life = new Life(world, brain);
+    // Its clock keeps the real time of day, whatever light is chosen, and its sleep pressure starts as the hour makes it.
+    this.life.rhythm = new Rhythm(clockHours(new Date()), this.outside.sunTimes ?? SUMMER);
     this.fly = new FlyView(this.stage.scene, world);
     this.prints = new Footprints(this.stage.scene);
     this.director = new CameraDirector(world, display.frame.aspect, scene.camera);
@@ -818,9 +820,9 @@ export class Game implements Shell {
   }
 
   #syncCamera() {
-    // The menu and what it opens keep the title's shot.
+    // The menu and what it opens keep the title's shot; once the menu has faded for the wallpaper, the fly is filmed as it is in play's.
     const playing = !this.#loading && this.nav.current === "play";
-    this.director.title = !playing;
+    this.director.title = !playing && !this.wallpaper;
     if (!playing || this.wallpaper) {
       if (!this.director.wallpaper) this.director.startWallpaper();
     } else {
@@ -836,6 +838,7 @@ export class Game implements Shell {
     this.hands.release();
     this.#controls.reset();
     this.director.startWallpaper();
+    this.director.title = false;
   }
 
   #stopWallpaper() {
@@ -913,7 +916,7 @@ export class Game implements Shell {
     this.peaks.loom = Math.max(this.peaks.loom * fade, life.sensed.loomLeft, life.sensed.loomRight);
     this.peaks.looming = Math.max(this.peaks.looming * fade, rates?.["vision.looming left"] ?? 0, rates?.["vision.looming right"] ?? 0);
     this.glow.update(life.brain.regionRates, dt);
-    this.fly.update(life.body, life.intent, life.eating, life.hunger.fullness, dt, life.songSide);
+    this.fly.update(life.body, life.intent, life.eating, life.hunger.fullness, dt, life.songSide, life.activity === "sleeping");
     this.prints.update(this.fly.model, life.body.onFeet, this.fly.pose.groom > 0.02, life.world, life.pantry, this.time);
     this.online?.send(this.#playerNow());
     // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
@@ -1067,6 +1070,8 @@ export class Game implements Shell {
   /** Sets the light and the weather to the tools' choices; on "Now", to the clock's and the weather outside's (or the forecast's), looked at again every few seconds. With `settle`, there at once. */
   #followLight(settle = false) {
     const now = new Date();
+    // The fly's own clock is set right from the real hour and today's sun, at a table too: it lives here.
+    this.life?.rhythm?.setTime(clockHours(now), this.outside.sunTimes ?? SUMMER);
     // At a table its clock is the starter's, and its weather the forecast's from that clock: the same for everyone there.
     const tableHours = this.online?.hours() ?? null;
     if (tableHours !== null) {
@@ -1671,6 +1676,9 @@ export class Game implements Shell {
     d.brainEngine = life.brain.engine ?? "";
     d.neurons = String(life.brain.neurons);
     d.activity = life.activity;
+    const r = life.rhythm;
+    // The fly's clock and sleep as the brain is told them, and how long it has been still (s).
+    d.rhythm = r ? `hours ${r.hours.toFixed(2)} morning ${r.clock.morning.toFixed(2)} evening ${r.clock.evening.toFixed(2)} sleep ${r.clock.sleep.toFixed(2)} pressure ${r.pressure.toFixed(3)} depth ${r.depth.toFixed(2)} still ${r.still.toFixed(0)}` : "";
     d.mode = life.body.mode;
     d.tool = this.hands.current.id;
     d.variant = this.hands.variant.id;

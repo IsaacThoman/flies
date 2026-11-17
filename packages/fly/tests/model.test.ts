@@ -171,6 +171,24 @@ test("anchors sit where they should and follow the object", () => {
   assert.ok(Math.abs(fly.anchor("head", new THREE.Vector3()).y - (5 + local.head.clone().applyMatrix4(m).y)) < 1e-9);
 });
 
+test("asleep it settles lower and holds its head still, and is up at once when it wakes", () => {
+  const fly = createFly();
+  run(fly, pose(), 1);
+  const back = (v = new THREE.Vector3()) => fly.anchor("back", v).y;
+  const awake = back();
+  run(fly, pose({ sleep: 1 }), 0.5);
+  assert.ok(back() > awake - 0.03, "it settles over seconds, not at once");
+  run(fly, pose({ sleep: 1 }), 12);
+  const asleep = back();
+  assert.ok(asleep < awake - 0.03, `lower asleep (${asleep} against ${awake})`);
+  // No glances: the head stays where it is.
+  const head = fly.anchor("head", new THREE.Vector3());
+  run(fly, pose({ sleep: 1 }), 5);
+  assert.ok(fly.anchor("head", new THREE.Vector3()).distanceTo(head) < 0.002, "the head holds still");
+  run(fly, pose(), 0.8);
+  assert.ok(back() > awake - 0.005, "awake again within a second");
+});
+
 test("every pose value across its range, extremes and rapid changes, stays finite", () => {
   const fly = createFly();
   let seed = 7;

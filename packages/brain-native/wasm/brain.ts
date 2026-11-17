@@ -31,12 +31,15 @@ type Exports = {
 /** The longest tick the brain takes, ms (runtime.ts's MAX_TICK_MS). */
 const MAX_TICK_MS = 1000;
 const ERROR_BYTES = 512;
-// fly_brain.h's structs as wasm32 lays them out: fly_senses is seven floats, an int, two pointers and three floats (maleTaste, hunger, wingbeat);
-// fly_command eight floats; fly_stats two doubles and two uint32s.
-const SENSES_BYTES = 52;
+// fly_brain.h's structs as wasm32 lays them out: fly_senses is seven floats, an int, two pointers, three floats (maleTaste,
+// hunger, wingbeat) and five floats of internal state; fly_command eight floats; fly_stats two doubles and two uint32s.
+const SENSES_BYTES = 72;
 const COMMAND_BYTES = 32;
 const STATS_BYTES = 24;
 const SCALARS = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet"] as const;
+/** fly_senses's clock and sleep, after wingbeat. */
+const STATE = ["clockMorning", "clockEvening", "clockSleep", "sleepPressure", "sleepDepth"] as const;
+const STATE_AT = 52;
 
 const utf8 = new TextDecoder();
 
@@ -159,6 +162,7 @@ class WasmBrain implements Brain {
     const s = this.#senses;
     for (let i = 0; i < SCALARS.length; i++) f32[(s >> 2) + i] = senses[SCALARS[i]];
     view.setInt32(s + 28, senses.grounded ? 1 : 0, true);
+    for (let i = 0; i < STATE.length; i++) f32[((s + STATE_AT) >> 2) + i] = senses[STATE[i]] ?? 0;
     let left = 0;
     let right = 0;
     // As runtime.ts: a tick of the wrong length is refused before the light is looked at (the C side says so), and

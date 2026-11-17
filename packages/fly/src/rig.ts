@@ -76,6 +76,7 @@ export class FlyRig {
   time = 0;
 
   private crouch = 0;
+  private sleep = 0;
   private feed = 0;
   private groom = 0;
   private beat = 0;
@@ -147,6 +148,9 @@ export class FlyRig {
     this.speed += (speed - this.speed) * lag(dt, 0.08);
     this.turn += (turn - this.turn) * lag(dt, 0.08);
     this.crouch += (clamp01(pose.crouch) - this.crouch) * lag(dt, 0.07);
+    // It settles into sleep over a few seconds and is up at once when it wakes.
+    const sleep = clamp01(pose.sleep ?? 0);
+    this.sleep += (sleep - this.sleep) * lag(dt, sleep > this.sleep ? 2.5 : 0.15);
     this.feed += (clamp01(pose.feed) - this.feed) * lag(dt, 0.16);
     this.groom += (clamp01(pose.groom) - this.groom) * lag(dt, 0.12);
     this.beat += (clamp01(pose.wings) - this.beat) * lag(dt, 0.05);
@@ -180,7 +184,7 @@ export class FlyRig {
     const ground = 1 - ease(this.tuck);
     const walking = Math.min(1, Math.sqrt(this.speed * this.speed + 0.12 * this.turn * this.turn) * 2);
     const busy = Math.max(walking, this.groom, this.feed, this.crouch, this.flight, this.open, this.sing);
-    this.updateIdle(dt, busy);
+    this.updateIdle(dt, Math.max(busy, this.sleep));
 
     // Grooming rhythm: sweeps over the eyes alternate with bouts of rubbing the legs together.
     const vigour = this.groom;
@@ -200,8 +204,9 @@ export class FlyRig {
     const bob = walking * 0.004 * Math.cos(TAU * 2 * gaitPhase);
     const sway = walking * 0.025 * Math.sin(TAU * gaitPhase);
     const breathe = Math.sin(TAU * 0.45 * t);
-    const height = PIVOT.thorax[1] - 0.075 * this.crouch - 0.032 * this.feed - 0.012 * groomOn + bob + this.dip + 0.002 * breathe * (1 - walking);
-    const noseDown = 0.07 * this.feed - 0.045 * groomOn + 0.03 * this.crouch;
+    // Asleep it sits lower, body nearer the ground, head a little bowed: drawn to read as rest, its stillness is what is real.
+    const height = PIVOT.thorax[1] - 0.075 * this.crouch - 0.04 * this.sleep - 0.032 * this.feed - 0.012 * groomOn + bob + this.dip + 0.002 * breathe * (1 - walking);
+    const noseDown = 0.07 * this.feed - 0.045 * groomOn + 0.03 * this.crouch + 0.02 * this.sleep;
     const jt = this.joints;
     identity(jt, 0);
     translate(jt, 0, PIVOT.thorax[0], height, PIVOT.thorax[2]);
@@ -215,7 +220,7 @@ export class FlyRig {
     const groomRoll = groomOn * sweep * 0.14 * Math.sin(TAU * 2 * this.boutPhase);
     this.child(head, 0, PIVOT.neck, PIVOT.thorax, 1);
     rotateY(jt, head, this.idle[0] + 0.06 * this.turn * walking);
-    rotateX(jt, head, this.idle[1] + 0.26 * this.feed + groomPitch - 0.1 * this.flight + 0.06 * this.crouch);
+    rotateX(jt, head, this.idle[1] + 0.26 * this.feed + groomPitch - 0.1 * this.flight + 0.06 * this.crouch + 0.1 * this.sleep);
     rotateZ(jt, head, groomRoll);
 
     for (let side = 0; side < 2; side++) {
@@ -230,7 +235,7 @@ export class FlyRig {
     // Abdomen: breathing, held up in flight, bowed a little when feeding.
     const abd = J.abdomen * 12, tip = J.abdomenTip * 12;
     this.child(abd, 0, PIVOT.abdomen, PIVOT.thorax, 1);
-    rotateX(jt, abd, 0.012 * breathe - 0.08 * this.flight + 0.03 * this.feed + 0.04 * this.crouch);
+    rotateX(jt, abd, 0.012 * breathe - 0.08 * this.flight + 0.03 * this.feed + 0.04 * this.crouch + 0.05 * this.sleep);
     rotateY(jt, abd, -sway * 0.5);
     const swell = this.fullness;
     scale(jt, abd, 1 + SWELL.wide * swell, 1 + SWELL.wide * swell, 1 + SWELL.long * swell);
@@ -306,7 +311,7 @@ export class FlyRig {
     // Head turns are quick glances, antennae quicker twitches.
     const kh = 1 - Math.exp(-dt / 0.07), ka = 1 - Math.exp(-dt / 0.04);
     for (let i = 0; i < 2; i++) this.idle[i] += (this.idleTarget[i] * calm - this.idle[i]) * kh;
-    for (let i = 2; i < 6; i++) this.idle[i] += (this.idleTarget[i] - this.idle[i]) * ka;
+    for (let i = 2; i < 6; i++) this.idle[i] += (this.idleTarget[i] * (1 - this.sleep) - this.idle[i]) * ka;
 
     // Now and then a resting fly shifts a foot.
     this.nextFidget -= dt;

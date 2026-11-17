@@ -9,10 +9,11 @@
 // over the fly to the other side unless it must, and every move eases in and
 // out (critically damped springs, so nothing overshoots or pops). It aims a
 // little ahead of where the fly is going, so it follows a walk or a jump
-// without lagging off it. It never goes inside anything, and nothing big
-// stands between it and the fly: a table top over the fly or a wall behind
-// it brings the camera in front of it (at once), and it eases back out once
-// clear.
+// without lagging off it. It never goes inside anything, nor near enough a
+// surface for the edge of the picture to cut into it, and nothing big stands
+// between it and the fly: a table top over the fly, a wall behind it or a
+// bottle it is turned past brings the camera in front of it, coming in
+// quickly but smoothly, before it gets there, and easing back out once clear.
 //
 // The shots are framed for the TV's 16:9. On a wider screen the camera sees
 // more to the sides; on a narrower one (a tablet, a phone held upright) it
@@ -130,8 +131,23 @@ const ZOOM_SETTLE = 0.18;
 /** How far the camera can be swung up or down by hand (radians of elevation). */
 const LOOK_PITCH = [0.03, 1.45] as const;
 
-/** How far (mm) the camera keeps above whatever is under it, and from anything in the way. */
+/** How far (mm) the camera keeps above whatever is under it, and from anything in the way: more than the near edge of the picture is from the eye. */
 const CLEARANCE = 1.1;
+/** Inside something whose top is no more than this (mm) over it, the eye rises over it rather than coming in. */
+const RISE = CLEARANCE;
+/** In something all the same, it goes out over it rather than in front of it if its top is no higher than this over it (of its distance from the fly). */
+const CLIMB = 0.5;
+/** Seconds the eye takes to come in before something in the way (quick, but over several frames), and to go back out once the way has been clear for a moment (s). */
+const PULL_IN = 0.1;
+const LET_OUT = 0.9;
+const CLEAR_FOR = 0.35;
+/** How much farther out the way must be clear (of the eye's distance) before it goes back out. */
+const SLACK = 0.06;
+/** The feelers either side of the line of sight reach out this far at the eye (of its distance), and as far again as it is going sideways in this long (s). */
+const FEEL = 0.25;
+const FEEL_AHEAD = 0.4;
+/** Feelers: one behind the eye, the rest ahead of it. */
+const FEELERS = 4;
 /** What stands in the line of sight but not in it from this much higher (of the eye's distance, up to a few body lengths) is a bump it grazes, not in the way. */
 const RAISE = 0.15;
 const RAISE_MOST = 4 * FLY_LENGTH;
@@ -211,8 +227,10 @@ export class CameraDirector {
   #height = 2;
   #fov = 30;
   #low = 0;
-  /** Spring speeds: center xyz, aim xyz, azimuth, distance, height, fov, low. */
-  #v = new Float64Array(11);
+  /** Where the fly sits across the picture, eased: the title's menu fading into the wallpaper brings it from the side to the middle, and back. */
+  #across = 0;
+  /** Spring speeds: center xyz, aim xyz, azimuth, distance, height, fov, low, across. */
+  #v = new Float64Array(12);
   /** The angle round the fly the camera is making for, and one it is considering. */
   #goal = 0;
   #pending = 0;
@@ -231,9 +249,18 @@ export class CameraDirector {
   #dir = { x: 0, y: 0, z: 0 };
   #from = { x: 0, y: 0, z: 0 };
   #under = createSurface();
-  /** How far from what it films the eye may be, for what is in the way (Infinity: nothing is), and that reach's spring speed. */
+  /** How far from what it films the eye may be, for what is in the way (Infinity: nothing is), that reach's spring speed, how long the way has been clear farther out, and the nearest it has had to be since. */
   #arm = Infinity;
   #armV = new Float64Array(1);
+  #clearFor = 0;
+  #held = Infinity;
+  /** Just cut to a new shot: the reach is what the way allows, at once. */
+  #fresh = true;
+  /** Where the eye was meant to be last frame, for which way it is going. */
+  #was = new THREE.Vector3();
+  /** A feeler's way, and how far the line of sight is clear for what it meets, whatever that is. */
+  #ray = { x: 0, y: 0, z: 0 };
+  #raw = Infinity;
   #title: Shot = { ...TITLE };
   /** Where the player has the camera along the range (mm from the focus), and whether it looks straight down (From above) or across. */
   #reach = reachOf(SHOTS.follow);
@@ -456,6 +483,7 @@ export class CameraDirector {
     if (own && this.room.wider !== 1) fov = (Math.atan(Math.tan((fov * Math.PI) / 360) * this.room.wider) * 360) / Math.PI;
     this.#fov = damp(this.#fov, fov, s, 9, fovSettle, dt);
     this.#low = damp(this.#low, shot.low + (own ? this.room.lower : 0), s, 10, settle * 0.8, dt);
+    this.#across = damp(this.#across, shot.across ?? 0, s, 11, settle * 0.8, dt);
     const view = fieldOfView(this.#fov, cam.aspect, mix(NARROW_KEEP, 1, table));
 
     const eye = this.#eye;
@@ -489,7 +517,7 @@ export class CameraDirector {
       }
     }
     // What it keeps in sight is what it circles: the fly, or on the way out to the whole place the point that turns into.
-    this.#keepInSight(this.#sight.set(tx, ty, tz), eye, settle, dt);
+    this.#keepInSight(this.#sight.set(tx, ty, tz), eye, dt);
 
     // Aim so the fly sits `low` below the middle of the picture.
     const ground = Math.hypot(eye.x - c.x, eye.z - c.z);
@@ -499,7 +527,7 @@ export class CameraDirector {
     const speed = Math.hypot(v.x, v.y, v.z);
     const lead = speed > 0 ? Math.min(aimSettle, MAX_LEAD / speed) * (1 - table) : 0;
     // To put the fly to one side, aim the other way along the camera's right.
-    const aside = -(shot.across ?? 0) * ground * Math.tan((view * Math.PI) / 360) * this.camera.aspect;
+    const aside = -this.#across * ground * Math.tan((view * Math.PI) / 360) * this.camera.aspect;
     const a = this.#aim;
     a.x = damp(a.x, target.x + v.x * lead + Math.cos(az) * aside, s, 3, aimSettle, dt);
     a.y = damp(a.y, target.y + lift + v.y * lead, s, 4, aimSettle, dt);
@@ -516,61 +544,162 @@ export class CameraDirector {
   }
 
   /**
-   * Keeps the eye out of everything, with nothing between it and the focus.
-   * Inside something, it rides up over it if the fly is in sight from there
-   * (a strawberry under a wide shot), as it always has. Anything else in the
-   * way (a wall behind it, a table top over the fly) brings it in front of
-   * that, at once, and it eases back out once clear. But a bump the line of
-   * sight only grazes (one it would clear from a little higher), and
-   * something right by the fly, are left for the cameraman to go round
-   * (#chooseSide) rather than coming in to the fly's side. Last, it keeps
-   * clear of the surface under it and of anything over it.
+   * Keeps the eye out of everything, with nothing between it and the focus,
+   * moving it only along its line of sight to the focus, so a camera turned
+   * by hand stays on the arc it is turned along. Rays find how far out the
+   * way is clear (#clear): the line of sight, and feelers round the eye's arc,
+   * one behind it and the rest ahead, as far as it will go in a moment, so it
+   * comes in before it gets to what it would go into or what would come
+   * between it and the fly. It comes in quickly but over several frames,
+   * never in one, and goes back out slowly, once the way has been clear by a
+   * margin for a moment, so an edge it is at does not flip it in and out.
+   * Only if it is inside something all the same (turned faster than it could
+   * come in) does it go out over it, if that is not far, or in front of it,
+   * at once. Last it keeps clear of a side beside it and of the surface under
+   * and over it, so the near edge of the picture never cuts into a surface.
    */
-  #keepInSight(focus: THREE.Vector3, eye: THREE.Vector3, settle: number, dt: number) {
+  #keepInSight(focus: THREE.Vector3, eye: THREE.Vector3, dt: number) {
     const world = this.#world;
-    const over = world.topAbove(eye.x, eye.y, eye.z) + CLEARANCE;
-    if (over > eye.y + CLEARANCE && this.#inSight(focus, eye.x, over, eye.z) === Infinity) eye.y = over;
     const wanted = eye.distanceTo(focus);
     if (wanted > 1e-6) {
-      const clear = this.#inSight(focus, eye.x, eye.y, eye.z);
-      if (clear < this.#arm) {
-        this.#arm = clear;
-        this.#armV[0] = 0;
-      } else if (this.#arm !== Infinity) {
-        this.#arm = damp(this.#arm, Math.min(clear, wanted + 1), this.#armV, 0, settle * 0.5, dt);
-        if (this.#arm >= Math.min(clear, wanted)) this.#arm = clear;
+      const d = this.#dir;
+      d.x = (eye.x - focus.x) / wanted;
+      d.y = (eye.y - focus.y) / wanted;
+      d.z = (eye.z - focus.z) / wanted;
+      // Across the line of sight, level.
+      const across = Math.hypot(d.x, d.z);
+      const sx = across > 1e-6 ? d.z / across : 1;
+      const sz = across > 1e-6 ? -d.x / across : 0;
+      const was = this.#was;
+      const sideways = this.#fresh ? 0 : ((eye.x - was.x) * sx + (eye.z - was.z) * sz) / Math.max(1e-3, dt);
+      was.copy(eye);
+      const now = Math.min(this.#arm, wanted);
+      const hold = this.handled;
+      let free = this.#clear(focus, eye.x, eye.y, eye.z, now, hold, true);
+      const centre = this.#raw;
+      // The feelers are where the eye would be a little way round its arc either way, and farther the way it is going.
+      const dx = eye.x - focus.x;
+      const dz = eye.z - focus.z;
+      const round = Math.max(1e-3, Math.hypot(dx, dz));
+      const reach = Math.max(CLEARANCE, now * FEEL);
+      const going = sideways >= 0 ? 1 : -1;
+      const coming = Math.abs(sideways) * FEEL_AHEAD;
+      const ahead = Math.min(round, reach + coming);
+      for (let i = 0; i < FEELERS; i++) {
+        // Behind it, the least way round; ahead, out to where it will be in a moment, in even steps, so nothing narrow is missed between them.
+        const arc = i === 0 ? reach : (ahead * i) / (FEELERS - 1);
+        const a = ((i === 0 ? -going : going) * arc) / round;
+        const cos = Math.cos(a);
+        const sin = Math.sin(a);
+        // What will be in the way where it is going counts already: coming in only once it is, it would come in through it.
+        free = Math.min(free, this.#clear(focus, focus.x + dx * cos + dz * sin, eye.y, focus.z + dz * cos - dx * sin, now, hold, i > 0 && arc <= coming));
       }
-      if (this.#arm < wanted) {
-        const k = this.#arm / wanted;
-        eye.set(focus.x + (eye.x - focus.x) * k, focus.y + (eye.y - focus.y) * k, focus.z + (eye.z - focus.z) * k);
+      // The nearest it has had to be lately: farther only once the way has been clear by a margin for a moment.
+      const v = this.#armV;
+      if (this.#fresh || free < this.#held) {
+        this.#held = free;
+        this.#clearFor = 0;
+      } else if (free < this.#held + SLACK * wanted) this.#clearFor = 0;
+      else if ((this.#clearFor += dt) >= CLEAR_FOR) this.#held = free;
+      const goal = Math.min(this.#held, wanted);
+      if (this.#fresh) {
+        this.#arm = goal < wanted ? goal : Infinity;
+        v[0] = 0;
+      } else if (goal < now - 1e-6) this.#arm = damp(now, goal, v, 0, PULL_IN, dt);
+      else if (goal > now + 1e-6) {
+        // Aimed past where it may go, so it gets there rather than creeping up on it.
+        this.#arm = damp(now, goal + SLACK * wanted, v, 0, LET_OUT, dt);
+        if (this.#arm >= goal) {
+          this.#arm = goal < wanted ? goal : Infinity;
+          v[0] = 0;
+        }
+      } else {
+        this.#arm = goal < wanted ? goal : Infinity;
+        v[0] = 0;
       }
+      const reachNow = Math.min(this.#arm, wanted);
+      eye.set(focus.x + d.x * reachNow, focus.y + d.y * reachNow, focus.z + d.z * reachNow);
+      if (world.solidAt(eye.x, eye.y, eye.z) >= 0) {
+        // In something all the same: out over the top of it, if that is not far (as over the surface under it); else in front of it, at once.
+        const top = world.topAbove(eye.x, eye.y, eye.z) - eye.y;
+        if (top <= Math.max(RISE, reachNow * CLIMB)) eye.y += top + CLEARANCE;
+        else if (centre < reachNow) {
+          eye.set(focus.x + d.x * centre, focus.y + d.y * centre, focus.z + d.z * centre);
+          this.#arm = centre;
+          v[0] = 0;
+        }
+      }
+      // Clear of a side it is beside: the line of sight is clear, but a wall along it could be under the picture's edge.
+      this.#beside(eye, sx, sz);
     }
+    this.#fresh = false;
     const s = world.surface(eye.x, eye.z, this.#under, eye.y);
     eye.y = s.underside - s.y < 2 * CLEARANCE ? (s.y + s.underside) / 2 : Math.min(s.underside - CLEARANCE, Math.max(s.y + CLEARANCE, eye.y));
   }
 
-  /** How far toward an eye at (x, y, z) the camera can be with nothing in the way between it and the focus (see #keepInSight), or Infinity when nothing is. */
-  #inSight(focus: THREE.Vector3, x: number, y: number, z: number): number {
+  /**
+   * How far out toward a point the eye may be (Infinity: as far as it likes)
+   * for what a ray from the focus to it meets, short of it by the clearance.
+   * What the point is in, or the eye would be in that far along the ray
+   * (`near`, where it is now), counts: the eye is there or about to be.
+   * Something merely in the way counts only on the line of sight and where
+   * the eye is about to be (`sight`), and for the cameraman not a bump it
+   * only grazes (one it would clear from a little higher). Nor does anything
+   * right by the fly for the cameraman, who goes round it instead
+   * (#chooseSide). It is never nearer than the nearest the hand brings it.
+   * Leaves in #raw how far it may be for what the ray met, whatever that is.
+   */
+  #clear(focus: THREE.Vector3, x: number, y: number, z: number, near: number, hold: boolean, sight: boolean): number {
     const world = this.#world;
-    const d = this.#dir;
-    const wanted = Math.hypot(x - focus.x, y - focus.y, z - focus.z);
-    if (wanted < 1e-6) return Infinity;
-    d.x = (x - focus.x) / wanted;
-    d.y = (y - focus.y) / wanted;
-    d.z = (z - focus.z) / wanted;
-    const hit = world.raycast(focus, d, this.#hit, wanted + CLEARANCE);
+    const r = this.#ray;
+    const length = Math.hypot(x - focus.x, y - focus.y, z - focus.z);
+    this.#raw = Infinity;
+    if (length < 1e-6) return Infinity;
+    r.x = (x - focus.x) / length;
+    r.y = (y - focus.y) / length;
+    r.z = (z - focus.z) / length;
+    const hit = world.raycast(focus, r, this.#hit, length + CLEARANCE);
     if (!hit) return Infinity;
     // Short of it by the clearance, measured square to it (but not without end, grazing it).
-    const clear = Math.max(hit.t * 0.5, hit.t - CLEARANCE / Math.max(0.25, -(d.x * hit.normal.x + d.y * hit.normal.y + d.z * hit.normal.z)));
-    if (world.solidAt(x, y, z) >= 0) return clear;
-    if (hit.t < BY_THE_FLY) return Infinity;
-    const graze = Math.max(CLEARANCE, Math.min(RAISE_MOST, wanted * RAISE));
-    const r = this.#from;
-    const length = Math.hypot(x - focus.x, y + graze - focus.y, z - focus.z);
-    r.x = (x - focus.x) / length;
-    r.y = (y + graze - focus.y) / length;
-    r.z = (z - focus.z) / length;
-    return world.raycast(focus, r, this.#hit, length) ? clear : Infinity;
+    const clear = Math.max(hit.t * 0.5, hit.t - CLEARANCE / Math.max(0.25, -(r.x * hit.normal.x + r.y * hit.normal.y + r.z * hit.normal.z)));
+    this.#raw = clear;
+    if (!hold && hit.t < BY_THE_FLY) return Infinity;
+    if (this.#inside(x, y, z)) return Math.max(clear, NEAREST);
+    if (near < length) {
+      const k = near / length;
+      if (this.#inside(focus.x + (x - focus.x) * k, focus.y + (y - focus.y) * k, focus.z + (z - focus.z) * k)) return Math.max(clear, NEAREST);
+    }
+    if (!sight) return Infinity;
+    if (hold) return Math.max(clear, NEAREST);
+    const graze = Math.max(CLEARANCE, Math.min(RAISE_MOST, length * RAISE));
+    const g = this.#from;
+    const raised = Math.hypot(x - focus.x, y + graze - focus.y, z - focus.z);
+    g.x = (x - focus.x) / raised;
+    g.y = (y + graze - focus.y) / raised;
+    g.z = (z - focus.z) / raised;
+    return world.raycast(focus, g, this.#hit, raised) ? Math.max(clear, NEAREST) : Infinity;
+  }
+
+  /** Whether an eye there would be inside something, and not something low it rises over (#keepInSight). */
+  #inside(x: number, y: number, z: number) {
+    return this.#world.solidAt(x, y, z) >= 0 && this.#world.topAbove(x, y, z) - y > RISE;
+  }
+
+  /** Moves the eye away from a steep side it is nearer than the clearance to, either way across the line of sight (but not into something else). */
+  #beside(eye: THREE.Vector3, sx: number, sz: number) {
+    const world = this.#world;
+    const r = this.#ray;
+    r.y = 0;
+    let push = 0;
+    for (let sign = -1; sign <= 1; sign += 2) {
+      r.x = sx * sign;
+      r.z = sz * sign;
+      // A side, not the slope of something low under it, which the eye rises over.
+      if (world.raycast(eye, r, this.#hit, CLEARANCE) && Math.abs(this.#hit.normal.y) < 0.5) push -= sign * (CLEARANCE - this.#hit.t);
+    }
+    if (push === 0 || world.solidAt(eye.x + sx * push, eye.y, eye.z + sz * push) >= 0) return;
+    eye.x += sx * push;
+    eye.z += sz * push;
   }
 
   /** While the hand is on the camera, or has kept it, it stays put; let go a while, the tilt and the turn of the whole table ease back. */
@@ -757,6 +886,7 @@ export class CameraDirector {
   /** Puts the camera straight into the shot's place. */
   #jump(x: number, y: number, z: number, azimuth: number, shot: Shot, distance: number, height: number) {
     this.#arm = Infinity;
+    this.#fresh = true;
     this.#center.set(x, y, z);
     this.#aim.set(x, y, z);
     this.#azimuth = azimuth;
@@ -764,6 +894,7 @@ export class CameraDirector {
     this.#height = height;
     this.#fov = shot.fov;
     this.#low = shot.low;
+    this.#across = shot.across ?? 0;
     this.#v.fill(0);
   }
 

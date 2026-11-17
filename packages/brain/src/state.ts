@@ -9,7 +9,7 @@
 // level is
 //
 //   logistic(arousal.weight × arousal + scene.weight × scene[eye] + bias
-//            + hunger.weight × (hunger - 1))
+//            + hunger.weight × (hunger - 1) + sleep)
 //
 // from 0 to 1, multiplying that eye's maximum background rate.
 //
@@ -26,6 +26,19 @@
 // 1 to 3: 1/1.52 to 1/1.59 at 0.9, 1/1.63 to 1/1.75 at 1), as Yu et al.
 // measured: about 60% more locomotion in starved flies than fed ones (their
 // Figure 1d).
+//
+// Sleep adds a term of its own inside the logistic (`sleep`): the clock's
+// morning and evening oscillators raise arousal, and its push toward sleep,
+// the homeostatic sleep pressure and how deeply the fly sleeps lower it, all
+// as the body reports them (types.ts). In the fly the clock reaches sleep and
+// wake mostly through peptides (PDF, DH31, CNMa among them) and the
+// homeostat through modulated excitability, none of which the connectome
+// has; driving the clock neurons and the sleep-promoting neurons that it does
+// have reaches no command (README, Sleep and the daily rhythm). So this term
+// stands for them: a made-up shift of arousal, labelled as such, that moves
+// the spontaneous activity the background drives. The wandering arousal still
+// crosses it, so sleep and waking come in bouts of the arousal's own making.
+// Left out, it is 0 and the background is what it was.
 
 import { mulberry32 } from "./sim.ts";
 
@@ -34,6 +47,8 @@ export const INTERNAL_STATE = {
   scene: { tau: 4, weight: 1.5 },
   bias: -1,
   hunger: { weight: 0.9 },
+  // How far the clock's oscillators raise arousal, and its push toward sleep, sleep pressure and sleep depth lower it, at 1.
+  sleep: { wake: 1, clock: 3.5, pressure: 4, depth: 5 },
 } as const;
 
 export type InternalStateParameters = {
@@ -41,6 +56,7 @@ export type InternalStateParameters = {
   scene: { tau: number; weight: number };
   bias: number;
   hunger: { weight: number };
+  sleep: { wake: number; clock: number; pressure: number; depth: number };
 };
 
 /** A zero-mean, unit-variance Ornstein-Uhlenbeck process with time constant tau (s). */
@@ -88,6 +104,8 @@ export class InternalState {
   readonly scene: { left: Wander; right: Wander };
   /** How hungry the fly is, 0..1 (io.ts, hungerOf); set by the brain each tick. */
   hunger = 1;
+  /** The sleep term: how far the clock, sleep pressure and sleep depth move arousal now (above 0 at the clock's peaks). */
+  sleep = 0;
 
   constructor(seed: number, parameters: InternalStateParameters = INTERNAL_STATE) {
     this.parameters = parameters;
@@ -103,9 +121,20 @@ export class InternalState {
     this.scene.right.step(dt);
   }
 
+  /** Sets the sleep term from the clock's oscillators (the higher of the two), its push toward sleep, sleep pressure and sleep depth, each 0 to 1. */
+  rest(wake: number, clockSleep: number, pressure: number, depth: number) {
+    const { sleep } = this.parameters;
+    this.sleep = sleep.wake * wake - (sleep.clock * clockSleep + sleep.pressure * pressure + sleep.depth * depth);
+  }
+
+  /** How sleepy the term makes it, 0 to 1: how far it lowers arousal against the clock's full push toward sleep. */
+  sleepiness() {
+    return Math.min(1, Math.max(0, -this.sleep / this.parameters.sleep.clock));
+  }
+
   /** The background level of one eye, 0 to 1. */
   level(eye: "left" | "right") {
     const { arousal, scene, bias, hunger } = this.parameters;
-    return logistic(arousal.weight * this.arousal.value + scene.weight * this.scene[eye].value + bias + hunger.weight * (this.hunger - 1));
+    return logistic(arousal.weight * this.arousal.value + scene.weight * this.scene[eye].value + bias + hunger.weight * (this.hunger - 1) + this.sleep);
   }
 }

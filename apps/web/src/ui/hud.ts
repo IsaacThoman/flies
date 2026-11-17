@@ -48,6 +48,7 @@ export const HUD_HITS = { tool: "tool", kind: "kind", label: "label", go: "go", 
 
 const CAPTIONS: Record<Activity, string> = {
   resting: "Resting",
+  sleeping: "Asleep",
   walking: "Walking",
   backing: "Backing away",
   turning: "Turning",

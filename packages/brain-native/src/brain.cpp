@@ -47,6 +47,7 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   eyes_ = eyes::build(connectome, columns);
   if (eyes_) {
     for (io::Side side : {io::kLeft, io::kRight}) retinas_.emplace_back((*eyes_)[side]);
+    for (io::Side side : {io::kLeft, io::kRight}) gained_[side].assign(retinas_[side].rates().size(), 0);
     std::unordered_set<uint32_t> read;
     for (const io::ReadoutGroup& group : wiring_.readouts) read.insert(group.neurons.begin(), group.neurons.end());
     for (io::Side side : {io::kLeft, io::kRight}) {
@@ -78,6 +79,8 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   for (size_t k = 0; k < wiring_.senses.size(); k++) {
     if (wiring_.senses[k].spec.after_eyes) sense_inputs_[k] = sim_.add_input(wiring_.senses[k].spec.name, wiring_.senses[k].neurons);
   }
+  // Last of all, so they too leave every other input's stream as it was.
+  for (const io::StateGroup& group : wiring_.state) state_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
 }
 
 io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& light, TickStats& stats) {
@@ -96,13 +99,21 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
       }
     }
   }
+  const double gate = io::sleep_gate(senses);
   for (size_t k = 0; k < wiring_.senses.size(); k++) {
     const io::Group& group = wiring_.senses[k];
-    sim_.set_rate(sense_inputs_[k], group.max_rate * io::intensity(senses, group.spec.sense));
+    sim_.set_rate(sense_inputs_[k], group.max_rate * io::intensity(senses, group.spec.sense) * (group.spec.gated ? gate : 1));
   }
   const double hunger = io::hunger_of(senses);
   sim_.set_output_gain(sweet_gain_, io::sweet_output_gain(hunger));
   state_.set_hunger(hunger);
+  for (size_t k = 0; k < wiring_.state.size(); k++) {
+    const io::StateGroup& group = wiring_.state[k];
+    sim_.set_rate(state_inputs_[k], group.spec.max_rate * io::state_of(senses, group.spec.state));
+  }
+  state_.rest(js::max(io::state_of(senses, io::kClockMorning), io::state_of(senses, io::kClockEvening)), io::state_of(senses, io::kClockSleep),
+              io::state_of(senses, io::kSleepPressure), io::state_of(senses, io::kSleepDepth));
+  const double eye_gain = 1 - io::kSleepEyes * state_.sleepiness();
   double left = dt_ms;
   while (left > 1e-9) {
     const double chunk = js::min(kChunkMs, left);
@@ -115,8 +126,18 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
     }
     for (size_t side = 0; side < retinas_.size(); side++) {
       const std::span<const float>* seen = light.open ? &*(side == io::kLeft ? light.left : light.right) : nullptr;
-      if (retinas_[side].step(chunk, seen)) sim_.set_rates(eye_inputs_[side], retinas_[side].rates());
+      const bool changed = retinas_[side].step(chunk, seen);
+      if (!changed && eye_gain == eye_gain_) continue;
+      if (eye_gain == 1) {
+        sim_.set_rates(eye_inputs_[side], retinas_[side].rates());
+      } else {
+        const std::vector<double>& rates = retinas_[side].rates();
+        std::vector<double>& gained = gained_[side];
+        for (size_t n = 0; n < gained.size(); n++) gained[n] = rates[n] * eye_gain;
+        sim_.set_rates(eye_inputs_[side], gained);
+      }
     }
+    if (!retinas_.empty()) eye_gain_ = eye_gain;
     const double before = sim_.time();
     sim_.advance(chunk);
     const double ran = sim_.time() - before;
