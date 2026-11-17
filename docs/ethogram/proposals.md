@@ -1,12 +1,16 @@
 # Findings requiring follow-up
 
-## Open edges become antennal contact
+## Historical open-edge antennal contact
+
+This finding was captured on dev `c53a64c` and handed to the antenna-contact
+owner. It is now fixed upstream by #114; the fresh `cb9b9da2` hour records zero
+bump input and zero grooming. No antenna code is changed by this branch.
 
 The one-hour disc run spent 84.38% of recorded time displaying head grooming,
 94.59% of grounded time in the outer half of the disc, and only 4.91% translating.
 This is an environmental diagnostic, not a published grooming comparison.
 
-`SenseTracker.#pressing` (`packages/body/src/senses.ts`) returns `body.onFeet`
+`SenseTracker.#pressing` (`packages/body/src/senses.ts`) then returned `body.onFeet`
 when an antenna tip lies outside `world.onTable`. Empty space beyond the floor
 therefore supplies full contact to that antenna. This drives Johnston's-organ
 C/E input, which the existing brain README documents as causing head grooming
@@ -94,3 +98,34 @@ counts above must not be presented as current measurements. Upstream antenna,
 collision and sleep work landed together, so no isolated mechanism is inferred.
 See `current-dev.md` for exact fits and uncertainty. A body impulse change did
 not alter response timing in its paired experiment and was rejected in review.
+
+
+## Visual update and paired checkerboard loss
+
+A fresh rebase onto dev `cb9b9da2` includes the protected ON pathway (#104).
+Using the same assay and fixed seeds as dev `58481d6c`, checkerboard responses
+fell 26/48 to 11/48 and 27/48 to 11/48 in the two independent seed cohorts.
+There were 18 paired losses/3 gains and 17 losses/1 gain. Readiness times and
+eligibility match exactly; black-square responses changed 44/48 to 45/48 and
+44/48 to 44/48, flash stayed 8/8 and blank 0/8. Every free-hour diagnostic
+matches exactly. The six-comparison engineering composites changed 3.9375 to
+3.104167 and 4.736103 to 3.413598. These are upstream snapshot observations,
+not changes made by this branch or population-level biological statistics.
+
+The brain README describes ON activity inhibiting OFF-pathway responses and
+weak directional selectivity; that is a possible mechanism, not isolated here.
+Proposal to the visual-pathway owner: replay this fixed-screen 4×4 checkerboard
+battery, inspect L1 withdrawals, T4/T5, LC4/LPLC2 and descending activity, and
+separate the ON interaction from the missing parallel escape readout. The
+paper pools an orientation mixture, while this model uses a right-side screen;
+counterbalance that reconstruction asymmetry in a separate validation assay.
+Do not raise sensory gain or lower a body threshold solely to recover 87%.
+No protected eye or neural code is edited here.
+
+The regression review also found that the inherited HS direction-selectivity
+guard changed from 2× to 1.3× in `packages/brain/src/seeing.test.ts`. A pass
+under the latter bound does not establish preservation of the former. This
+change belongs to the upstream visual work, not the ethogram feature diff.
+All five current CPU budgets pass, but the all-senses brain case supplies only
+scalar senses; it does not exercise active visual withdrawals. A controlled
+native/WASM checkerboard, grating and flicker cost replay remains needed.

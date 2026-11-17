@@ -57,6 +57,10 @@ are not provided in the cited results text. Model Wilson intervals describe
 model trials only, never inferred reference counts. Sex and clock time are
 not specified in the paper's Methods. Funnel climbing, spectral sensitivity,
 absolute photon flux, head/wing kinematics and pigmentation are not modeled.
+The paper pooled 65% parallel/monocular presentations with 35% at 45–90° to
+the screen (Methods, Behavioral experiments). This battery fixes the screen
+on the fly's right at stimulus onset; it does not reconstruct that orientation
+mixture or counterbalance the connectome's left/right reconstruction asymmetry.
 Uniform 25 ms dark flash approximates the LED experiment and is **excluded
 from scoring**; its WT reference is 0/10, not the white-eyed 45% cohort.
 

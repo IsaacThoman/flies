@@ -1,4 +1,4 @@
-# Current dev 58481d6c — continuous first-flight assay
+# Dev cb9b9da2 — clock-pinned behaviour and optical escape
 
 Clock held at 6 h; sunrise 06:00, sunset 18:00. No validated whole-animal point score is identified. Optical scores are limited engineering comparisons; unmatched and unsupported metrics remain N/A.
 
@@ -22,138 +22,141 @@ Airborne duration and grooming display occupancy include those body mechanisms; 
 | Sips per burst, 8 h deprived (sips) | 8.3 | N/A | N/A | [Itskov et al. (2014)](https://doi.org/10.1038/ncomms5560), Figure 6b |
 | Inter-burst interval, fed (s) | 78 | N/A | N/A | [Itskov et al. (2014)](https://doi.org/10.1038/ncomms5560), Figure 6c |
 | Inter-burst interval, 4 h deprived (s) | 29 | N/A | N/A | [Itskov et al. (2014)](https://doi.org/10.1038/ncomms5560), Figure 6c |
-| Black-square jump-and-flight probability (fraction) | 0.82 | 0.9167 | 9.03 | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Results, Looming stimuli evoke reliable jump and flight after reaching a fixed angular threshold size |
-| Checkerboard jump-and-flight probability (fraction) | 0.87 | 0.5417 | 6.72 | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Results, Looming is sufficient to trigger escape; Figure 3 |
-| Black-square TTC–l/v slope (ms/ms) | 2 (±0.2) | 1.5874 | 0.00 | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Figure 2 caption |
-| Black-square TTC intercept (ms) | -6 (±11) | -30.8595 | 0.00 | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Figure 2 caption |
-| Checkerboard TTC–l/v slope (ms/ms) | 2.1 (±0.1) | 1.4236 | 0.00 | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Results, Looming is sufficient to trigger escape; Figure 3 |
-| Checkerboard TTC intercept (ms) | -22 (±5) | -60.2175 | 0.00 | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Results, Looming is sufficient to trigger escape; Figure 3 |
+| Black-square jump-and-flight probability (fraction) | 0.82 | 0.9375 | 8.82 | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Results, Looming stimuli evoke reliable jump and flight after reaching a fixed angular threshold size |
+| Checkerboard jump-and-flight probability (fraction) | 0.87 | 0.2292 | 3.59 | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Results, Looming is sufficient to trigger escape; Figure 3 |
+| Black-square TTC–l/v slope (ms/ms) | 2 (±0.2) | 1.4916 | 0.00 | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Figure 2 caption |
+| Black-square TTC intercept (ms) | -6 (±11) | -29.6681 | 0.00 | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Figure 2 caption |
+| Checkerboard TTC–l/v slope (ms/ms) | 2.1 (±0.1) | 1.1224 | 0.00 | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Results, Looming is sufficient to trigger escape; Figure 3 |
+| Checkerboard TTC intercept (ms) | -22 (±5) | -68.4630 | 0.00 | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Results, Looming is sufficient to trigger escape; Figure 3 |
 | WT light-off jump-and-flight probability (fraction) | 0 | 1.0000 | N/A | [Fotowat et al. (2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817277/), Results, Light-off and looming stimuli evoke distinct behaviors in white-eyed flies, opening paragraph |
 
-Black square: 44/48 eligible responses; 0/48 readiness failures; model Wilson 95% interval 0.804–0.967; timing fit 44 successes across 6 l/v values, slope SE 0.200, intercept SE 8.201 ms.
+Black square: 45/48 eligible responses; 0/48 readiness failures; model Wilson 95% interval 0.832–0.979; timing fit 45 successes across 6 l/v values, slope SE 0.157, intercept SE 6.524 ms.
 
-Checkerboard: 26/48 eligible responses; 0/48 readiness failures; model Wilson 95% interval 0.403–0.674; timing fit 26 successes across 6 l/v values, slope SE 0.186, intercept SE 8.472 ms.
+Checkerboard: 11/48 eligible responses; 0/48 readiness failures; model Wilson 95% interval 0.133–0.365; timing fit 11 successes across 5 l/v values, slope SE 0.151, intercept SE 8.340 ms.
 
 Flash surrogate: 8/8 eligible responses; 0/8 readiness failures; model Wilson 95% interval 0.676–1.000; timing fit N/A.
 
 Blank: 0/8 eligible responses; 0/8 readiness failures; model Wilson 95% interval 0.000–0.324; timing fit N/A.
 
-Optical probability mean: **7.88/10**; timing mean **0.00/10**; equal probability/timing composite **3.94/10**. 6/21 registered comparisons estimable. Whole-animal score: **N/A**. Registry-average bounds **0.75–7.89/10** describe only these rows, not biological fidelity or confidence intervals.
+Optical probability mean: **6.21/10**; timing mean **0.00/10**; equal probability/timing composite **3.10/10**. 6/21 registered comparisons estimable. Whole-animal score: **N/A**. Registry-average bounds **0.59–7.73/10** describe only these rows, not biological fidelity or confidence intervals.
 
-Seed 1: 1.0000 recorded hours; 624.8 CPU seconds.
+Seed 1: 1.0000 recorded hours; 391.1 CPU seconds.
 
 Full sample counts, trial denominators, readiness failures, censoring, assay blockers and uncertainty labels are in JSON.
 
 FlyEM male CNS connectome, Janelia Research Campus (CC-BY 4.0).
 
+## Replication and source provenance
 
-## Independent seed cohort
-
-The second fixed cohort uses seeds 30000–30111 under the same protocol and
-production source. It is a stochastic replication of one connectome, not a
-second anatomical population. All attempts met readiness; no direct loom input
-was supplied.
-
-| Measurement | Seeds 20000–20111 | Seeds 30000–30111 |
-|---|---:|---:|
-| Black-square jump-and-flight | 44/48 | 44/48 |
-| Checkerboard jump-and-flight | 26/48 | 27/48 |
-| Flash surrogate (unscored) | 8/8 | 8/8 |
-| Blank | 0/8 | 0/8 |
-| Optical probability score | 7.8750/10 | 7.9792/10 |
-| Optical timing score | 0.0000/10 | 1.4930/10 |
-| Supported optical composite | 3.9375/10 | 4.7361/10 |
-
-The score difference is sampling variation, not a code improvement. Both
-cohorts estimate all six optical reference comparisons. The remaining 15
-registry conditions are unsupported or context only. A validated whole-fly
-point score is still unidentified. The composite is an engineering utility,
-not a biological normality test: timing uses explicitly labelled reported fit
-spread, whose SD/SE interpretation conflicts within the source paper.
-
-## Free behaviour and provenance
-
-Runtime source `be6bc708`, clean tree, rebased on dev `58481d6c`; production
-brain/body/world/Life source matches that dev byte-for-byte. Replication source
-`747c909e` differs only in documentation. The packed connectome SHA-256 is
+Both recordings used clean runtime `29942c80c01ad5117290ac225205a58bf6ee9fb0`,
+rebased onto dev `cb9b9da277a0cfe1f84dd16538ea41286fd5b6a6`, including the
+upstream ON pathway (#104). Brain/body/world/Life/native production source has
+zero feature diff from that dev. The connectome SHA-256 remains
 `51c97031b39f93c04a683f16683d88f15d291f1e1062694fc0a215e23c3b895c`.
+The hour uses seed 1 after 60 s burn-in; the two optical cohorts use distinct
+seeds on one anatomical connectome, not independent anatomical populations.
+All assays hold 06:00, sunrise 06:00, sunset 18:00. Raw evidence is outside git.
 
-The free observation is one seed, 60 s burn-in + 3600 s recorded, in a 43 mm
-open disc with uniform luminance 0.5 and no food/dust. Clock held at 06:00,
-sunrise 06:00, sunset 18:00; natural sleep pressure and the existing accelerated
-metabolic clock. CPU 624.79 s; wall 935.68 s including lease scheduling.
+| Quantity | Seeds 20000–20111 | Seeds 30000–30111 |
+|---|---:|---:|
+| Black-square escape | 45/48 | 44/48 |
+| Checkerboard escape | 11/48 | 11/48 |
+| Flash surrogate, unscored | 8/8 | 8/8 |
+| Blank | 0/8 | 0/8 |
+| Probability mean /10 | 6.208333 | 6.312500 |
+| Timing mean /10 | 0.000000 | 0.514695 |
+| Optical composite /10 | 3.104167 | 3.413598 |
 
-| Diagnostic | Observation |
-|---|---:|
-| Translation occupancy | 43.111% |
-| Translation or rotation occupancy | 54.541% |
-| Moving speed p10 / median / p90 | 6.65 / 9.65 / 12.25 mm/s |
-| Mean / median complete walk bout | 1.881 / 1.010 s |
-| Complete walking bouts | 825 |
-| Mean / median complete stop bout | 2.477 / 1.100 s |
-| Complete stopping bouts | 824 |
-| Head-grooming display occupancy | 0.000% |
-| Antenna-bump time >0.05 | 0.00 s |
-| Outer-half-area grounded occupancy | 69.164% |
-| Body ground yaw differing from intent | 69.28 s |
-| Sleep / feeding / airborne / takeoffs / saccades | 0 observed |
+All 224 attempts met readiness and had zero direct loom input.
 
-Grooming and phantom bump fell from the historical 84.87% / 91.02% to zero
-after upstream work including [antenna contact #114](https://github.com/IsaacThoman/flies/pull/114).
-Other upstream changes also landed; this is not an isolated causal comparison
-and no gain is attributed to this branch. Zero spontaneous grooming in a clean
-arena is not claimed as a validated biological target or hierarchy.
+First cohort, black: model Wilson 95% interval 0.831646–0.978517; TTC fit slope 1.491597 (model SE 0.156892), intercept -29.668091 ms (SE 6.523551), n=45 successes over 6 l/v values.
 
-## Endpoint integrity
+First cohort, checkerboard: model Wilson 95% interval 0.133078–0.365393; TTC fit slope 1.122385 (model SE 0.151243), intercept -68.463043 ms (SE 8.340200), n=11 successes over 5 l/v values.
 
-Schema 3 requires ten consecutive 5 ms powered airborne frames in the first
-airborne episode. A landing ends that episode; later jumps cannot qualify the
-first departure. Every observed jump in these cohorts met the condition: 78
-and 79 jumps/flights including controls, with minimum qualifying runs 0.24
-and 0.25 s. No observed outcome changes when replacing the weaker cumulative
-criterion here; disconnected intervals are nevertheless rejected in tests.
-Neither the body tarsal reflex nor the flash surrogate is concealed as neural
-flight or a condition-matched LED assay. Replay also rejects takeoffs beyond
-the recorded response window and continuous durations beyond the available
-follow-up. Both cohorts pass that stricter gate unchanged. Frame-level power
-traces are not retained; reviewers could check the recorded maximum and
-tracker tests, but could not reconstruct continuity from raw frames. Raw
-records remain outside git.
+Replication, black: model Wilson 95% interval 0.804467–0.967116; TTC fit slope 1.414511 (model SE 0.180156), intercept -25.735341 ms (SE 7.398163), n=44 successes over 6 l/v values.
 
-## Rejected mapping and checks
-
-The literature-based launch-angle candidate did not change any of 112 paired
-optical response/timing outcomes on the historical dev snapshot. All three
-blind reviewers preferred the control (mean 6.625 versus 6.167). It is reverted;
-there is no accepted production body/brain change. See [review log](review-log.md)
-and [calibration limits](calibration.md).
-
-Current full functional tests: 998 passed, zero failed, two optional-data/SDK
-skips. Lint and typecheck passed. The full budget run passed two cases and
-skipped two because the host was contended; skips are not passes. An unchanged
-dev control failed the all-senses case at **0.585 versus 0.500 CPU s/s**. The
-same production code also measured 0.273 and passed in another run. Historical
-branch/control values (0.520/0.546 and 0.502/0.400) are retained in the review
-record. A later dedicated budget run passed three cases and skipped brain
-cost after the contention reference exceeded 4.8 ms on three attempts
-(4.88/4.90/4.87 ms). No bound was relaxed and no idle-machine reproduction
-is claimed. The farm run and final review results are recorded in `review-log.md`.
+Replication, checkerboard: model Wilson 95% interval 0.133078–0.365393; TTC fit slope 0.701904 (model SE 0.203936), intercept -50.939058 ms (SE 8.836023), n=11 successes over 6 l/v values.
 
 
-## Final rebase and review scope
+Six of 21 reference comparisons are estimable. The composite is an engineering
+utility with equal probability/timing weights; the paper does not validate its
+fit-spread bands, the 50 ms flight endpoint or the idealized assay as biological
+acceptance criteria. A whole-animal score remains unidentified. Unsupported
+feeding and unmatched free-motion rows do not earn numerical agreement credit.
 
-The final branch is rebased onto dev `7b69740e`. Compared with the actual
-measurement base `58481d6c`, no brain/body/world source changed. `Life` gained
-companion support (a mutable driver, set-down helper, and pantry-update flag
-that defaults true); the solo, no-food assay still follows the same path.
-These observations retain their original runtime hashes and are not relabelled
-as new runs on the later rebase.
+## Paired dev snapshots
 
-Three final blind reviewers independently reproduced both scorecards and
-confirmed the source values. Their mean four-criterion rubric score was
-**5.7083/10**, versus **5.3333** for the cumulative estimator, and they preferred
-the continuous estimator. The identical decoy received identical scores.
-Broad behaviour stayed **2/10** for every version. A fresh regression-only
-reviewer gave the continuous estimator **8/10**, found the capture-window
-validation gap, and that small follow-up is now covered by tests (25 focused
-passes). See `review-log.md` for all keys, per-reviewer scores and limitations.
+[Dev 58481d6c](dev-58481d6c.md) retains the preceding clock-pinned measurements.
+On the same fixed cohorts, checkerboard responses changed **26/48 → 11/48**
+and **27/48 → 11/48**. Paired changes were 18 losses/3 gains and 17 losses/1
+gain. Black responses changed 44/48 → 45/48 and 44/48 → 44/48. Readiness times
+and eligibility were identical for every paired seed. Flash remained 8/8 and
+blank 0/8 in both cohorts. Optical composites changed **3.9375 → 3.104167**
+and **4.736103 → 3.413598**. These are observations across upstream snapshots,
+not a body-mapping gain or a change implemented by this branch. Their pooled
+reference probabilities also include an orientation mixture this battery does
+not reconstruct; see `assays.md`.
+
+Every reported free-behaviour metric is exactly equal between these snapshots:
+translation 43.111%, activity 54.541%, moving median 9.65 mm/s, mean complete
+walking bout 1.8812 s, outer-half-area occupancy 69.164%, and zero grooming,
+antenna bump, feeding, airborne bouts, takeoffs, saccades or observed sleep.
+Zero grooming in a clean, dust-free arena is not a validated hierarchy result.
+This run took **391.07 CPU s / 394.71 wall s** for the free hour; cost variation
+under shared-host load is not interpreted as behaviour improvement.
+
+The checkerboard loss is referred to the protected visual-pathway owner as a
+proposal. No eye input, neural parameter or motor threshold is changed to
+recover the score. The model's giant-fiber readout and missing parallel escape
+output remain separate validation questions.
+
+## Endpoint and mapping limits
+
+Flight requires ten consecutive 5 ms powered airborne frames in the first
+bout; a landing ends eligibility. Interrupted bursts and later jumps cannot
+qualify the first departure. Replay bounds takeoff and powered duration by the
+actual response/follow-up windows. Frame-level traces are not retained, so
+continuity is independently testable in the tracker but not reconstructible
+from raw frames in these captures. Body tarsal support makes flight follow
+most departures; this does not validate an autonomous neural flight controller.
+
+The balanced launch experiment was rejected and reverted (blind means 6.625
+control / 6.167 candidate). It preserved all 112 response/timing outcomes.
+The scored optical endpoints concern triggering and timing; rotating a
+post-trigger impulse cannot restore a missing descending decision. No accepted
+body or brain change remains. Further mappings need an independently calibrated
+command-to-motion relationship, not a constant selected to improve this table.
+
+The review history and test provenance are in `review-log.md`. Earlier
+unclocked and clock-pinned reports remain versioned history, rather than being
+silently overwritten or presented as current evidence.
+
+
+## Verification on this runtime
+
+The farm tested merge `dfdf08c9`, tree
+`17a1ba9502b7dff360974f5fb1c6461e222c3389`, identical to capture/runtime
+`29942c80`. Lint, web types, tvOS types and build pass. Functional unit tests:
+**1105 passed, zero failed, three recorded platform/data/toolchain skips**.
+The farm omits five named Apple-silicon WASM cases by policy; seven WASM cases
+including those five passed on the Mac, as did its additional arm64 FMA guard.
+All **five current CPU budgets pass**, zero skips. The all-senses brain case is
+**0.263 M5 Pro CPU s/s versus 0.500**, build **185 ms versus 250**, rest
+**0.064 s/s versus 0.160**. Valid samples followed rejected noisy attempts;
+load was about 8–11, so no idle-machine claim follows. The scalar-sense brain
+budget does not measure active ON-pathway visual workloads.
+
+The script-only farm Docker run failed because linked Git metadata was not
+mounted (three failing top-level cases). All eight tests passed directly on
+the farm host in the matching checkout. The
+new report links also pass the local four-test documentation checker after
+installing the upstream manifest's missing documentation dependencies.
+
+The extra browser play test fails waiting for `wallpaper=false` on the feature
+and the unchanged `cb9b9da2` control (549 s and 626 s). Pointer e2e fails reading
+an undefined `held` property during orientation-change testing (860 s).
+These are recorded failures, not passes or fixes claimed here; no production
+UI or browser-test feature diff exists. Remaining browser-suite results are
+recorded in the review log when complete. Historical CPU failures and skips
+remain preserved in the earlier reports and review log rather than being
+erased by the later passing run.

@@ -90,7 +90,7 @@ and tarsal flight support. All observed behaviour includes these mechanisms.
 Protected sleep, hunger, grounded signals, visual ON pathway and antenna-contact
 work remain with their owners. No neural threshold is tuned to increase scores.
 
-[Current dev measurements](current-dev.md), [review record](review-log.md), [historical unclocked measurement](baseline.md), [dev 588da9b1 measurement](dev-588da9b1.md),
+[Current dev measurements](current-dev.md), [review record](review-log.md), [historical unclocked measurement](baseline.md), [dev 588da9b1 measurement](dev-588da9b1.md), [dev 58481d6c measurement](dev-58481d6c.md),
 and [model proposals](proposals.md) preserve findings and rejected approaches.
 A broad biological score needs more matched assays; the registry alone cannot
 supply one.
