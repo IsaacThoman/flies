@@ -458,13 +458,13 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
   freeze(jar);
   group.add(jar);
   for (const [r, y, tube] of [[lf.r - 1, 2.0, 0.8], [lf.r - 0.2, lidTop - 10, 0.65]]) {
-    batch.add(glossy, paint(new THREE.TorusGeometry(r, tube, 6, 48).rotateX(Math.PI / 2).translate(lf.x, y, lf.z), "#dce9df"));
+    batch.add(glossy, paint(new THREE.TorusGeometry(r, tube, 3, 32).rotateX(Math.PI / 2).translate(lf.x, y, lf.z), "#dce9df"));
   }
   const drink = new THREE.Mesh(paint(new THREE.CylinderGeometry(lf.r - 1.5, lf.r - 1.5, lidTop - 26, 40).translate(lf.x, (lidTop - 26) / 2 + 1, lf.z), (p) => (p.y > lidTop - 30 ? "#fff6b8" : "#ffe14f")), liquid);
   drink.renderOrder = 2;
   freeze(drink);
   group.add(drink);
-  batch.add(glossy, paint(new THREE.TorusGeometry(lf.r - 1.7, 0.38, 5, 48).rotateX(Math.PI / 2).translate(lf.x, lidTop - 25, lf.z), "#fff0a1"));
+  batch.add(glossy, paint(new THREE.TorusGeometry(lf.r - 1.7, 0.38, 3, 32).rotateX(Math.PI / 2).translate(lf.x, lidTop - 25, lf.z), "#fff0a1"));
   seen.push(drink);
   // The lid: knurled round its side, and pressed on top (LID_PRESS).
   {
@@ -496,8 +496,8 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
     const f = saucer.footprint as { x: number; z: number; r: number };
     const top = saucer.top as { inner: number; lip: number };
     const profile: THREE.Vector2[] = [];
-    for (let i = 0; i <= 32; i++) {
-      const r = lf.r - 2 + ((f.r - lf.r + 2) * i) / 32;
+    for (let i = 0; i <= 26; i++) {
+      const r = lf.r - 2 + ((f.r - lf.r + 2) * i) / 26;
       profile.push(new THREE.Vector2(r, topHeight(saucer, f.x + Math.min(r, f.r * 0.9999), f.z)));
     }
     // Outside in, so its faces point up.
@@ -620,7 +620,7 @@ outgoingLight += vec3(0.05, 0.06, 0.07) * pow(along, 2.0);
     return new THREE.Color("#c3001f").lerp(new THREE.Color("#ff3048"), k);
   }));
   const half = one("strawberry half");
-  fruit(SKIN.cutBerry, paint(domeGeometry(half, 16, 64), (p) => {
+  fruit(SKIN.cutBerry, paint(domeGeometry(half, 10, 40), (p) => {
     const hf = half.footprint as { x: number; z: number; rx: number; rz: number; angle: number };
     const s = Math.min(1, Math.hypot((p.x - hf.x) / hf.rx, (p.z - hf.z) / hf.rz));
     return s > 0.86 ? "#e0102c" : s > 0.7 ? "#ff6b7c" : s > 0.25 ? "#ffb3bd" : "#fff0f0";
