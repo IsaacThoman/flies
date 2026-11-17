@@ -205,7 +205,7 @@ export function saveShelf(shelf: ShelfChoices, store: Storage | null = storage()
  * with a tool (by its id). Once the player has done it, its hint goes, and a
  * later launch doesn't teach it again.
  */
-export type Lesson = "tools" | ToolId;
+export type Lesson = "tools" | "hand" | ToolId;
 export type Learned = { [L in Lesson]?: true };
 
 /** What the hints have taught, of the lessons this build has. */
@@ -213,7 +213,7 @@ export function loadLearned(store: Storage | null = storage()): Learned {
   const learned: Learned = {};
   const saved = read(store, LEARNED_KEY);
   if (!saved) return learned;
-  for (const lesson of ["tools", ...TOOLS.map((t) => t.id)] as Lesson[]) if (saved[lesson] === true) learned[lesson] = true;
+  for (const lesson of ["tools", "hand", ...TOOLS.map((t) => t.id)] as Lesson[]) if (saved[lesson] === true) learned[lesson] = true;
   return learned;
 }
 

@@ -27,6 +27,44 @@
   </head>
   <body>
     <canvas id="game" width="640" height="480"></canvas>
+    <script>
+      // This canvas needs no downloads. The game replaces it before requesting
+      // WebGL, since a canvas that has drawn in 2D cannot become a WebGL canvas.
+      (() => {
+        const canvas = document.getElementById("game");
+        const g = canvas.getContext("2d");
+        if (!g) return;
+        function draw(now) {
+          if (!canvas.isConnected) return;
+          const w = 640, h = 480, t = now / 1000;
+          const sky = g.createLinearGradient(0, 0, 0, h);
+          sky.addColorStop(0, "#377dba");
+          sky.addColorStop(1, "#c9eaff");
+          g.fillStyle = sky;
+          g.fillRect(0, 0, w, h);
+          for (let i = 0; i < 9; i++) {
+            const x = w * (0.12 + (i * 0.137) % 0.8) + Math.sin(t * 0.5 + i) * 18;
+            const y = h - ((t * (9 + i % 3) + i * 61) % (h + 60));
+            g.beginPath();
+            g.arc(x, y, 5 + i % 4 * 3, 0, Math.PI * 2);
+            g.fillStyle = "rgba(240,252,255,0.16)";
+            g.fill();
+            g.lineWidth = 1.5;
+            g.strokeStyle = "rgba(240,252,255,0.5)";
+            g.stroke();
+          }
+          g.textAlign = "center";
+          g.font = "bold 58px ui-rounded, system-ui, sans-serif";
+          g.fillStyle = "#effaff";
+          g.fillText("flies", w / 2, h * 0.42);
+          g.font = "16px ui-rounded, system-ui, sans-serif";
+          g.fillText("Loading", w / 2, h * 0.55);
+          canvas.dataset.boot = "true";
+          requestAnimationFrame(draw);
+        }
+        draw(performance.now());
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
