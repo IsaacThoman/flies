@@ -539,6 +539,15 @@ void Executor::finishRead() {
   if (!r.fences.empty()) glFlush();
 }
 
+/** Finishes the reads, oldest first, up to the last one into `pbo` (another fly's read into its own buffer waits on). */
+void Executor::finishReadsInto(GLuint pbo) {
+  for (size_t i = reads_.size(); i > 0; i--) {
+    if (reads_[i - 1].pbo != pbo) continue;
+    for (size_t k = 0; k < i; k++) finishRead();
+    return;
+  }
+}
+
 /** Reads whatever has been copied by now, oldest first, without waiting. */
 void Executor::pollReads() {
   while (!reads_.empty()) {
@@ -670,7 +679,7 @@ void Executor::runGL(int op, const int32_t *w, int words) {
       if (!n) break;
       switch (w[1]) {
         case K_BUFFER:
-          for (const PendingRead &r : reads_) if (r.pbo == n) { flushReads(); break; }
+          finishReadsInto(n);
           glDeleteBuffers(1, &n);
           break;
         case K_TEXTURE: glDeleteTextures(1, &n); rgba8Textures_.erase(w[2]); break;
@@ -712,7 +721,7 @@ void Executor::runGL(int op, const int32_t *w, int words) {
     case OP_BIND_VERTEX_ARRAY: glBindVertexArray(name(w[1])); break;
 
     case OP_BUFFER_DATA: {
-      if (w[1] == GL_PIXEL_PACK_BUFFER) flushReads();
+      if (w[1] == GL_PIXEL_PACK_BUFFER) finishReadsInto(name(boundPixelPack_));
       std::vector<uint8_t> holder;
       size_t length;
       const uint8_t *data = payload(w + 3, holder, &length);
@@ -720,7 +729,7 @@ void Executor::runGL(int op, const int32_t *w, int words) {
       break;
     }
     case OP_BUFFER_SUB_DATA: {
-      if (w[1] == GL_PIXEL_PACK_BUFFER) flushReads();
+      if (w[1] == GL_PIXEL_PACK_BUFFER) finishReadsInto(name(boundPixelPack_));
       std::vector<uint8_t> holder;
       size_t length;
       const uint8_t *data = payload(w + 3, holder, &length);
@@ -1036,8 +1045,11 @@ id Executor::query(int kind, const double *a, void *out, size_t outLength) {
       return @(1);
     }
     case Q_BUFFER_SUB_DATA: {
-      flushReads();
-      GLenum target = a[0]; GLintptr offset = a[1]; GLsizeiptr length = a[2];
+      GLenum target = a[0];
+      // Its own read must be done; another fly's, into another buffer, needn't.
+      if (target == GL_PIXEL_PACK_BUFFER) finishReadsInto(name(boundPixelPack_));
+      else flushReads();
+      GLintptr offset = a[1]; GLsizeiptr length = a[2];
       void *src = glMapBufferRange(target, offset, length, GL_MAP_READ_BIT);
       if (src && out) memcpy(out, src, std::min((size_t)length, outLength));
       glUnmapBuffer(target);

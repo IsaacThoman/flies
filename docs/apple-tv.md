@@ -638,8 +638,9 @@ described above. Both of three's ways work and are checked by the test scene (`t
   own, with a GL fence after it; then, when the render thread finds that fence signalled, the
   `glReadPixels` from its copy into the page's buffer, which no longer waits. WebGL fences the
   page makes in between are held until the read is done, so a fence after a read still
-  signals after it, and anything that would see the buffer (`getBufferSubData`, deleting it,
-  `finish`, a `clientWaitSync` with a timeout) finishes the reads first. Other formats, and
+  signals after it, and anything that would see the buffer (`getBufferSubData`, deleting it, new
+  data in it, `finish`, a `clientWaitSync` with a timeout) finishes the reads into it first:
+  several flies' eyes, each read into a buffer of its own, don't wait on one another. Other formats, and
   the multisampled default framebuffer, are read at once as before. The simulator renders in
   software, with no GPU for a read to wait for, so there it reads at once unless the launch
   config asks otherwise (`deferReads`): the simulator check's test scene does, so its

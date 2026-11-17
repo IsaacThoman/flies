@@ -71,6 +71,7 @@ class Executor {
   void finishRead();
   void pollReads();
   void flushReads() { while (!reads_.empty()) finishRead(); }
+  void finishReadsInto(GLuint pbo);
   int boundPixelPack_ = 0;
   int packRowLength_ = 0, packSkipPixels_ = 0, packSkipRows_ = 0;
   GLuint copyFBO_ = 0;
