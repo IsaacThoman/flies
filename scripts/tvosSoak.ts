@@ -11,14 +11,17 @@
 // fakes take the other seats. The count stays set after the soak.
 import { spawnSync } from "node:child_process";
 import { tableCode } from "@fly/net";
-import { WEATHERS } from "@fly/world";
 import { PLACES } from "../apps/web/src/places/catalog.ts";
 import { TIMES } from "../apps/web/src/scene/light.ts";
+import { TOOLS } from "../apps/web/src/tools/hands.ts";
 import { APP_ROOMS } from "../apps/web/src/online/invite.ts";
 import { NATIVE_MOST } from "../apps/web/src/brain/create.ts";
 import type { FakeFly } from "./tables.ts";
 
 type Step = ["wait", Record<string, string>, number?] | ["press", string] | ["sleep", number] | ["log", string];
+
+/** The Sky's weathers, Now among them. */
+const SKY_WEATHERS = TOOLS.find((t) => t.id === "sky")!.second!.length;
 
 /**
  * From the title, focused on Play: Settings' Flies set to `flies`, waiting until that many live,
@@ -70,19 +73,19 @@ export function soakConfig(minutes = 30, flies?: number) {
   press("ArrowDown");
   press("Enter");
   phase("feeding", 15000);
-  press("ArrowRight");
+  press("ArrowRight", 3);
   wait({ tool: "swoop" });
   throws();
-  // From Now, whatever time of day a launch came back to.
-  press("ArrowRight", 3);
+  // The Sky, from Now, whatever time of day a launch came back to.
+  press("ArrowRight");
   press("ArrowUp", 5);
   press("ArrowDown", 2);
   wait({ time: "noon" });
   phase("daylight transition", 10000);
-  press("ArrowLeft", 3);
+  press("ArrowLeft");
   throws();
-  // Past Light and Weather to View.
-  press("ArrowRight", 5);
+  // Past the Sky and Place to View.
+  press("ArrowRight", 3);
   press("ArrowUp", 6);
   press("ArrowDown", 5);
   wait({ view: "eyes" });
@@ -113,23 +116,22 @@ export function soakConfig(minutes = 30, flies?: number) {
   press("ArrowUp", 4);
   wait({ view: "follow" });
   // The shelf is on View. Clamp each choice from its first variant, regardless of saved settings.
-  const tools = ["feed", "swoop", "feather", "blow", "light", "weather", "view", "place"];
+  const tools = ["feed", "feather", "blow", "swoop", "sky", "place", "view"];
   let tool = tools.indexOf("view");
   const choose = (id: string, variant: number) => {
     const next = tools.indexOf(id);
     press(next > tool ? "ArrowRight" : "ArrowLeft", Math.abs(next - tool));
     tool = next;
     wait({ tool: id });
-    press("ArrowUp", id === "light" ? 5 : 4);
+    press("ArrowUp", id === "sky" ? TIMES.length : PLACES.length - 1);
     press("ArrowDown", variant);
   };
   for (const [index, place] of PLACES.entries()) {
     choose("place", index);
     press("Enter");
     wait({ place: place.id, moving: "" });
-    // Pin the place once, at the first: a long wallpaper phase must not trigger the normal 20-minute rotation.
-    // Each step of Settings' choice carries the fly there at once, so only step from Each in turn to here;
-    // once pinned, the Place tool moves the pin with the fly.
+    // Once, at the first: the screensaver stays home, so a long wallpaper phase never goes round the places
+    // (Settings → Screensaver → Places, Home only); the Place tool carries home with the fly.
     if (index === 0) {
       press("MediaPlayPause");
       wait({ screen: "title", focus: "play" });
@@ -141,26 +143,24 @@ export function soakConfig(minutes = 30, flies?: number) {
       wait({ focus: "page" });
       press("ArrowLeft", 3);
       wait({ tab: "wallpaper" });
-      press("ArrowDown", 3);
-      wait({ focus: "place" });
-      press("ArrowLeft", PLACES.length);
-      press("ArrowRight");
+      press("ArrowDown", 4);
+      wait({ focus: "wallpaperPlaces" });
+      press("ArrowLeft");
       press("MediaPlayPause");
       wait({ screen: "play", place: place.id });
     }
-    for (const [weatherIndex, weather] of WEATHERS.entries()) {
-      choose("weather", weatherIndex + 1);
-      wait({ variant: weather });
+    // Select steps the Sky's weather round, from wherever a launch left it: once round is every weather and Now.
+    for (let weather = 1; weather <= SKY_WEATHERS; weather++) {
+      choose("sky", 1);
+      press("Enter");
       for (const [timeIndex, time] of TIMES.entries()) {
-        choose("light", timeIndex + 1);
+        choose("sky", timeIndex + 1);
         wait({ time });
-        phase(`${place.id} ${weather} ${time}`, 5000);
+        phase(`${place.id} weather ${weather} ${time}`, 5000);
       }
     }
-    choose("weather", 1);
-    wait({ variant: "clear" });
     for (const [variant, time] of [[2, "noon"], [5, "night"]] as const) {
-      choose("light", variant);
+      choose("sky", variant);
       wait({ time });
       // The wallpaper comes after a minute without a press (the default), as long as a wait's default timeout: leave room.
       wait({ wallpaper: "true" }, 150000);

@@ -484,8 +484,8 @@ export async function run(args = process.argv.slice(2)) {
     if (phases.includes("wallpaper")) for (const place of PLACES.filter((p) => wallpaperPlaces.includes(p.id))) jobs.push(lane(place.id, async (page, sample, phase) => {
       await move(page, place.id);
       await page.evaluate((id) => { const g = globalThis.__fly; g.settings.place = id; g.settings.eyesInset = "wallpaper"; g.applySettings(); g.watch(); }, place.id);
-      await choose(page, "light", wallpaperTime);
-      await choose(page, "weather", wallpaperWeather);
+      await choose(page, "sky", wallpaperTime);
+      await choose(page, "sky", wallpaperWeather, 1);
       phase("wallpaper");
       const until = Date.now() + wallpaperMinutes * 60_000;
       while (Date.now() < until) { await sample(); await page.waitForTimeout(Math.min(1000, until - Date.now())); }

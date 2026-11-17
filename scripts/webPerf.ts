@@ -112,11 +112,10 @@ async function move(page: Page, place: PlaceId, watch = false) {
     g.quality?.reset();
     g.applySettings(false);
     g.moveTo(place);
-    for (const [tool, variant] of [["light", "noon"], ["weather", "clear"], ["view", "follow"]]) {
-      for (let i = 0; i < 12 && g.hands.current.id !== tool; i++) g.hands.stepTool(1);
-      while (g.hands.stepVariant(-1)) { /* Reset to the first variant. */ }
-      for (let i = 0; i < 12 && g.hands.variant.id !== variant; i++) g.hands.stepVariant(1);
-    }
+    g.hands.setKind("light", "noon");
+    g.hands.setKind("weather", "clear");
+    g.hands.setKind("view", "follow");
+    for (let i = 0; i < 12 && g.hands.current.id !== "view"; i++) g.hands.stepTool(1);
     g.stage.setTime("noon");
     g.stage.weather.choose("clear", true);
     if (watch) g.watch();
