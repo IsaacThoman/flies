@@ -146,6 +146,25 @@ test("a mouse hovering puts the hand under it, but not over the shelf", () => {
   assert.deepEqual(asked, [], "a finger doesn't hover");
 });
 
+
+test("tool names preview on hover or touch without selecting until a tap completes", () => {
+  const { controls, send, asked } = rig();
+  send(true, { type: "hover", x: 0.5, y: 0.9 });
+  assert.equal(controls.previewTool, 2);
+  assert.ok(!asked.includes("press tool"));
+  send(true, { type: "leave" });
+  assert.equal(controls.previewTool, -1);
+  asked.length = 0;
+  send(false, down(0.5, 0.9, 0, true));
+  assert.equal(controls.previewTool, 2);
+  assert.deepEqual(asked, []);
+  send(false, up(0.5, 0.9));
+  assert.deepEqual(asked, ["press tool"]);
+  assert.equal(controls.previewTool, -1);
+  send(false, down(0.5, 0.9, 0, true), { type: "cancel" });
+  assert.equal(controls.previewTool, -1);
+});
+
 test("a release over another HUD target cancels, including a boundary crossed within tap slop", () => {
   const { target, send, asked } = rig();
   target.hudAt = (x) => ({ kind: HUD_HITS.tool, index: x < 0.5 ? 0 : 1, value: 0, x: 0, y: 0, w: 1, h: 1 });

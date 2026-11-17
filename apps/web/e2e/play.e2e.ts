@@ -115,6 +115,50 @@ try {
   assert.ok(firstFrame.renders > 0 && !firstFrame.early, "not ready until rendering finishes");
   assert.equal(firstFrame.after, "true", "ready immediately after the first frame");
   assert.equal(firstFrame.writes, 1, "readiness is only published once");
+  step("keys and taps wake the wallpaper and restart its full idle countdown");
+  await startup.waitForFunction(() => (globalThis as unknown as { __fly: Game }).__fly.brain.status === "running", null, { polling: 100, timeout: 90_000 });
+  const wakes = await startup.evaluate(() => {
+    const game = (globalThis as unknown as { __fly: Game }).__fly;
+    const canvas = document.getElementById("game") as HTMLCanvasElement;
+    let now = performance.now();
+    const clock = Object.getOwnPropertyDescriptor(performance, "now");
+    Object.defineProperty(performance, "now", { configurable: true, value: () => now });
+    // Canvas diagnostics publish every 200 ms; inspect the frame itself at the deadline.
+    const draw = (ms: number) => { now += ms; game.frame(0.1, now); return String(game.wallpaper); };
+    const key = () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+      window.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowRight" }));
+    };
+    const tap = () => {
+      const rect = canvas.getBoundingClientRect();
+      const event = { pointerId: 1, pointerType: "touch", clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2, button: 0 };
+      canvas.dispatchEvent(new PointerEvent("pointerdown", { ...event, buttons: 1 }));
+      canvas.dispatchEvent(new PointerEvent("pointerup", { ...event, buttons: 0 }));
+    };
+    try {
+      // The startup page has no automatic frames: advance past the arrival screen.
+      game.frame(4, now);
+      game.frame(4, now);
+      game.play();
+      game.settings.wallpaperAfter = 2;
+      key();
+      draw(0);
+      return [key, tap].map((wake) => {
+        const asleep = draw(2001);
+        const tool = game.hands.tool;
+        wake();
+        const awake = draw(0);
+        const consumed = game.hands.tool === tool;
+        const beforeDeadline = draw(1999);
+        const afterDeadline = draw(2);
+        return { asleep, awake, consumed, beforeDeadline, afterDeadline };
+      });
+    } finally {
+      if (clock) Object.defineProperty(performance, "now", clock);
+      else Reflect.deleteProperty(performance, "now");
+    }
+  });
+  assert.deepEqual(wakes, Array.from({ length: 2 }, () => ({ asleep: "true", awake: "false", consumed: true, beforeDeadline: "false", afterDeadline: "true" })));
   await startup.close();
   step("the brain wakes and the title appears");
   const awake = await waitFor(page, "brain=running,screen=title", 90_000);
@@ -128,9 +172,9 @@ try {
   assert.equal(awake.ring, "false");
   await press("ArrowDown");
   await waitFor(page, "ring=true,focus=play");
-  await press("ArrowDown", 3);
-  await waitFor(page, "focus=settings");
   await press("ArrowDown", 2);
+  await waitFor(page, "focus=settings");
+  await press("ArrowDown");
   await waitFor(page, "focus=online");
   await press("ArrowUp");
   await waitFor(page, "focus=settings");
@@ -189,7 +233,7 @@ try {
   await waitFor(page, "focus=stats");
   await press("Escape");
   await waitFor(page, "screen=title,focus=settings");
-  await press("ArrowUp");
+  await press("ArrowDown", 2);
   await press("Enter");
   await waitFor(page, "screen=about");
   await press("Enter");
@@ -203,7 +247,7 @@ try {
   await press("ArrowDown", 3);
   await press("Escape");
   await waitFor(page, "screen=title,focus=about");
-  await press("ArrowUp", 2);
+  await press("ArrowUp", 4);
   await waitFor(page, "focus=play");
 
   step("play: the fly is on the table, and its brain is moving it");
@@ -273,8 +317,15 @@ try {
   assert.equal(corner.statsPanel, "hidden", "no stats unless asked for");
   console.log(`  what it sees and its nervous system, in the ${corner.eyesInset} corner`);
   await waitForGameTime(page, 1.5);
-  await press("ArrowRight");
-  const back = await waitFor(page, "wallpaper=false");
+  // A game-time wait after this press can exceed the two wall-clock seconds
+  // on software GL. Observe the waking frame and end the idle test together.
+  await page.keyboard.press("ArrowRight");
+  await page.waitForFunction(() => {
+    if (document.getElementById("game")?.dataset.wallpaper !== "false") return false;
+    (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 0;
+    return true;
+  });
+  const back = await readState(page);
   assert.equal(back.tool, "swoop", "the press that woke it did nothing else");
   assert.equal(back.screen, "play");
 
@@ -327,7 +378,7 @@ try {
   await toTool("feather");
   await page.keyboard.down("Enter");
   await waitFor(page, "touch>0.9");
-  const inside = await waitFor(page, "glow~.");
+  const inside = await waitWithin(page, "glow~head-bristles|bristles", 10);
   await page.keyboard.up("Enter");
   console.log(`  glowing while stroked: ${inside.glow.split(" ").slice(0, 4).join(" ")}`);
   assert.ok(/head-bristles|bristles/.test(inside.glow), `the touch it feels lights its touch neurons: ${inside.glow}`);
@@ -441,18 +492,69 @@ try {
   assert.equal(new Set(companions.map((c) => `${c.x},${c.z}`)).size, 2, "companions stand apart");
   await waitFor(page, "crowd=2");
   await waitFor(page, "screen=play");
-  // A brain can rest for a while; observe each companion for at most 30 seconds of fly time.
-  const moved = new Set<number>();
-  for (let i = 0; i < 15 && moved.size < companions.length; i++) {
-    await waitForGameTime(page, 2);
-    const living = companyOf(await readState(page));
-    for (const [j, c] of living.entries()) {
-      assert.equal(c.crowd, 2, "each fly meets the other two");
-      assert.ok(c.eyes > companions[j].eyes, "each fly keeps seeing");
-      if (Math.hypot(c.x - companions[j].x, c.z - companions[j].z) > 0.05) moved.add(j);
+  // Rest is a valid answer. Observe the real commands through the game's exposed
+  // Life objects, including their handoff to each body's intent, without asking
+  // the connectome to choose walking (or any other particular action).
+  const driving = await page.evaluate(() => new Promise<{
+    updates: number; ownCommands: boolean; ownIntent: boolean; live: boolean;
+  }[]>((resolve, reject) => {
+    const game = (globalThis as unknown as { __fly: Game }).__fly;
+    const lives = game.company.list.map((c) => c.life);
+    if (new Set([game.brain, ...lives.map((life) => life.brain)]).size !== 3) {
+      reject(new Error("each fly must have a separate brain driver"));
+      return;
     }
+    const probes = lives.map((life) => {
+      const update = life.behavior.update;
+      const step = life.body.step;
+      const probe = { updates: 0, ownCommands: true, ownIntent: true, live: false, at: life.brain.stateAt };
+      life.behavior.update = function (command, ...args) {
+        probe.ownCommands &&= command === (life.brain.state?.command ?? null);
+        if (life.brain.stateAt > probe.at) {
+          probe.updates++;
+          probe.at = life.brain.stateAt;
+        }
+        return update.call(this, command, ...args);
+      };
+      life.body.step = function (intent, ...args) {
+        probe.ownIntent &&= intent === life.intent;
+        probe.live ||= intent.live;
+        return step.call(this, intent, ...args);
+      };
+      return { probe, restore: () => { life.behavior.update = update; life.body.step = step; } };
+    });
+    const started = game.time;
+    const until = started + 30;
+    let frame = 0;
+    const finish = () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+      for (const p of probes) p.restore();
+    };
+    const timer = setTimeout(() => {
+      finish();
+      reject(new Error("companion command observation: game did not advance in 120 s"));
+    }, 120_000);
+    const sample = () => {
+      if ((game.time >= started + 2 && probes.every(({ probe }) => probe.updates >= 2 && probe.live)) || game.time >= until) {
+        finish();
+        resolve(probes.map(({ probe }) => probe));
+      } else frame = requestAnimationFrame(sample);
+    };
+    sample();
+  }));
+  for (const [i, result] of driving.entries()) {
+    assert.ok(result.updates >= 2, `companion ${i}: its own brain keeps producing motor commands`);
+    assert.ok(result.ownCommands, `companion ${i}: behavior consumes its own brain's commands`);
+    assert.ok(result.ownIntent && result.live, `companion ${i}: its body receives its own live intent`);
   }
-  assert.equal(moved.size, 2, "both companion brains move their own bodies");
+  const living = companyOf(await readState(page));
+  assert.equal(living.length, 2);
+  for (const [i, c] of living.entries()) {
+    assert.equal(c.brain, "running");
+    assert.equal(c.crowd, 2, "each fly meets the other two");
+    assert.ok(c.eyes > companions[i].eyes, "each fly keeps seeing");
+  }
   await page.reload();
   await disableScreensaver(page);
   await waitFor(page, "brain=running,screen=title", 120_000);

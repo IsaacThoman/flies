@@ -87,6 +87,7 @@ npm run tvos -- run --device <udid> --config '{"script":"game.js","stats":2}'
 npm run tvos -- run --device <udid> --detached --config '{"script":"game.js","stats":10,"logFile":true}'
 npm run tvos:soak -- --device <udid> --minutes 30
 npm run tvos:soak -- --device <udid> --minutes 20 --table   # ...in a room of eight
+npm run tvos:soak -- --device <udid> --minutes 10 --flies 3 # ...living three flies (also with --table)
 npm run tvos -- build --local-rooms      # ...that can reach a room server over plain ws://
 ROOMS_URL=ws://192.168.1.20:8787/rooms npm run tvos -- build   # with that room server built in
 npm run tvos:check                       # the simulator check (below)
@@ -128,7 +129,7 @@ JSON, from `--config` on the command line, else `www/config.json` (what the home
 | `pixelated` | Nearest-neighbour scaling, default `true`; `false` for linear |
 | `mode` | `2` (default): GL runs on the render thread a frame behind. `1`: on the JavaScript thread at the end of each frame. `0`: as each call is made, for comparison |
 | `fps` | Caps the frame rate (default 60) |
-| `stats` | Logs frame timings every N seconds as `stats {json}`: fps, JavaScript and GL ms per frame, draws, memory |
+| `stats` | Logs frame timings every N seconds as `stats {json}`: fps, JavaScript and GL ms per frame, draws, memory, and `cpu`, the percentage of a core each of the host's threads used since the last line: the JavaScript and render threads, each fly's brain (`flies.brain.N`), the rest as `other`, and `total` |
 | `logFile` | Redirects stderr to `Library/Caches/performance.log` in the app container, replacing the previous run's log; defaults to `false` |
 | `profile` | With `stats`: time spent in each WebGL and 2D canvas method |
 | `gpuTiming` | `glFinish` after every frame, to time the GPU (slows it down) |
@@ -150,7 +151,9 @@ sets the pin once and the Place tool moves it afterward. It shows each place in 
 screensaver at midday and at night, `--minutes` in total split among them. The screensaver delay is a saved setting (30 seconds by default). A historical
 30-minute soak took about 55 minutes. It assumes the
 default tool variants and Low eyes, and restores Low before the screensaver phases. It leaves the
-app running, pinned to the last place. Do not attach a console or enable `profile`,
+app running, pinned to the last place. `--flies N` first sets Settings' Flies to N and waits
+until that many live (at a table it brings N, and the fakes take the other seats); the count
+stays set afterwards. Do not attach a console or enable `profile`,
 `gpuTiming` or `glDebug` for the final measurement. Pull its log while it runs or after `drive: soak complete`:
 
 ```sh
@@ -304,23 +307,22 @@ implemented in `src/BrainBridge.mm` over `packages/brain-native/include/fly_brai
 A historical simulator observation of the real brain (`packages/brain-native` as of 15 November 2026) loads in about 150 ms
 and keeps up with real time at 60 submits a second, on an M5 Pro. This is not a direct Apple TV brain-throughput measurement; hardware game observations are below.
 
-Settings → Screensaver → Flies chooses one to four, shown as enamel dots and saved with the
-other settings. An older host without `spawn()` runs one fly and shows no Flies row. Each extra
+Settings → Screensaver → Flies chooses one to three here (`NATIVE_MOST`,
+`apps/web/src/brain/create.ts`; four in a browser), shown as enamel dots and saved with the
+other settings. A count saved as more than that lives, and shows, as three. An older host
+without `spawn()` runs one fly and shows no Flies row. Each extra
 fly has its own body, senses and eyes (`apps/web/src/company.ts`); the camera, pointer and
 readouts follow the first. The eyes take turns, at most one fly's refresh a frame, whichever
 is most overdue; four at 60 fps each get about 15 Hz rather than 20. While a ball comes the
 followed fly takes priority at up to 60 Hz and the others usually wait, so a frame never refreshes two. A companion fly
 whose brain thread fails is given a new one twice (after 5 s, then 30 s) and is then taken off.
 
-The retained estimate for four native brains is about 4 × 58 MB (capture date and machine
-for the per-brain memory figure are unknown). Each is estimated to use 13 to 45% of an A15
-performance core (`packages/brain-native/README.md`), on its own thread. The four flies'
-meeting, senses, bodies, poses and nearby models were reported to take 19 M5 Pro CPU µs a frame
-(capture date unknown), with a budget
-of 34 (`apps/web/tests/company.budget.ts`), about 0.3 ms here by the TV's 16× JavaScript cost.
-The historical eye-refresh estimate was about 83 draws instead of 34. With several flies,
-refreshes can occupy successive frames rather than one in three; this is not a fresh draw-count measurement. Several local brains and that extra eyes load have not yet been measured on an Apple
-TV device; the eight-fly soak below ran only one local brain.
+Each native brain takes about 58 MB, on its own thread. On peev none ran short: a brain thread
+averaged 8 to 39% of a core and its busiest 10 seconds 87%. The limit is the frame, measured in
+[Several flies on peev](#several-flies-on-peev): with four the screensaver falls below 60 fps
+even at the picnic, with three it keeps 58 to 60 there. From three flies on an eye refresh comes
+every frame (the eyes' frame is about 80 draws against 34), and the bar and the restaurant,
+already held by the render thread with one fly, fall to 30 and about 20 fps.
 
 ## The weather outside
 
@@ -695,6 +697,73 @@ Steady screensaver by place. The windows at the start and end of each 3-minute p
 
 These historical single-player measurements did not include Online. The current app uses
 the native socket bridge described above, including the separate eight-fly observation.
+
+### Several flies on peev
+
+Measured 16 November 2026 on peev, Apple TV 4K (3rd generation, A15), tvOS 27.2.1: signed
+Release of pull request #106 at `52c93dbb`, which let an Apple TV live four, with the host's
+per-thread `cpu` in its stats; 640×480, mode 2, the real connectome, Low eyes, no WeatherKit.
+Each case ran `tvos:soak --flies N` detached with 10-second stats. Alone: the whole tour (each
+place in every weather and light, then its screensaver at midday and at night), `--minutes 10`
+for one fly and `--minutes 2` for three and four, about 27 minutes each. At a table:
+`--table --flies 4 --minutes 10` against a room server on the Mac over the local network, the
+TV's four flies and four fake devices' (a full table of eight), at the picnic. The first window
+of each phase is left out. Two flies weren't measured.
+
+The screensaver, FPS over its 10-second windows (mean, and lowest to highest):
+
+| Place | 1 fly | 3 flies | 4 flies |
+| --- | --- | --- | --- |
+| Picnic | 59.9 (59.1–60) | 59.6 (57.8–60) | 54.7 (45.2–58.9) |
+| Windowsill | 59.9 (59.0–60) | 58.1 (50.3–60) | 53.8 (50.5–57.6) |
+| Lab | 59.9 (58.9–60) | 58.1 (49.5–60) | 57.8 (46.7–60) |
+| Bar | not reached; 40–58 in [Measured on peev](#measured-on-peev) | 30.1 (29.9–30.8) | 30.1 (30.0–30.9) |
+| Restaurant | 41.0 (40–43.1) playing, at launch | 18.9 (17.8–21.8) | 20.4 (17.9–25.8) |
+
+At the picnic, where the flies meet most: its sweep through every weather and light, then its
+screensaver (at the table, playing among the others, then its screensaver):
+
+| | 1 fly | 3 flies | 4 flies | 4 at a table of 8 |
+| --- | --- | --- | --- | --- |
+| FPS | 58.9 / 59.9 | 56.1 / 59.6 | 54.6 / 54.7 | 45.5 / 54.7 |
+| Frame-start interval p95 (mean of windows) | 19.3 / 19.2 ms | 26.8 / 26.1 ms | 26.1 / 25.8 ms | 30.7 / 23.3 ms |
+| JavaScript a frame (mean; highest window's p95) | 3.79; 11.2 / 3.76; 9.8 ms | 6.62; 12.7 / 5.30; 9.3 ms | 7.94; 14.5 / 9.27; 18.0 ms | 13.56; 31.2 / 11.69; 21.5 ms |
+| GL replay a frame | 13.8 / 13.5 ms | 10.5 / 12.3 ms | 9.3 / 7.9 ms | 7.8 / 5.4 ms |
+| Draws a frame (host's mean) | 38 / 38 | 72 / 67 | 77 / 78 | 83 / 74 |
+
+Over each whole run:
+
+| | 1 fly | 3 flies | 4 flies | 4 at a table of 8 |
+| --- | --- | --- | --- | --- |
+| Each brain thread, mean share of a core | 39% | 15–17% | 19–24% | 8–24% |
+| Any brain thread's busiest 10 s | 87% | 71% | 64% | 48% |
+| JavaScript thread | 28% | 34% | 40% | 72% |
+| Whole process, mean (busiest 10 s) | 75% (146%) | 91% (232%) | 131% (276%) | 131% (214%) |
+| Memory | 162–221 MB | 271–334 MB | 327–405 MB | 333–336 MB |
+| Thermal state, share of windows | serious 95%, critical 1% | nominal 34%, serious 63%, critical 4% | nominal 30%, serious 70% | serious 98% |
+
+- **Three is the most an Apple TV lives** (`NATIVE_MOST`). With four the screensaver misses 60 fps
+  at the picnic (54.7, windows down to 45) and the windowsill (53.8); with three it keeps 58 to 60
+  in the lighter places, as one fly does.
+- **No brain ran short.** Each thread stayed well under a core, the busiest 10 seconds of any at
+  87% (the one fly, in the lab's sweep). A lone fly's brain was busier than each of several's.
+- **The frame is the limit.** JavaScript a frame doubles from one fly to four (3.8 to 7.9–9.3 ms at
+  the picnic, 13.6 ms playing at a full table), and frames come later than JavaScript and GL
+  replay together account for: frame-start p95 is 26 ms with three or four against 19 with one.
+  That is time neither counts, and most likely the eyes' readbacks, from three flies one every
+  frame, waiting for the render thread ([Reading pixels back](#reading-pixels-back)).
+- **The bar and the restaurant fall with any company from three flies.** Already held by the render
+  thread with one fly (40 FPS in the restaurant), their GL replay grows from 21 to 35–40 ms in
+  the restaurant and 17 to 23–24 ms in the bar, to about 20 and 30 FPS with three as with four.
+  Fewer flies won't bring them back; fewer eye refreshes with company would.
+- **Memory grows by about 58 MB a fly**, as expected of a native brain: 405 MB at most with four,
+  in the restaurant.
+- **It runs warm.** Every run reached serious (2) within four minutes, even one fly's, and the
+  nominal windows with three and four were mostly in the bar and the restaurant, where frames are
+  fewest. Critical (3) came briefly in the lab's sweep with three and in the bar with one.
+- The one-fly run stopped writing its log 24 minutes in, during the bar's sweep just after a
+  critical window, though its process was still there an hour later; it isn't known why, and it
+  has no bar or restaurant screensaver.
 
 ### Sustained performance on Rufus
 

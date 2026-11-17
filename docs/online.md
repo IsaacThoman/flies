@@ -93,7 +93,7 @@ together; the binary fly-state layout itself is unchanged.
   down around the place's start, at its height (in the
   restaurant, on the window table, not the floor under it). The device remembers its table: a reload, or opening
   the site again, comes back to it until it leaves. Settings → Screensaver →
-  Flies chooses how many, shown as one to four enamel dots. The table seats
+  Flies chooses how many, shown as one to four enamel dots (three on an Apple TV). The table seats
   as many as there is room for, at least one, or refuses it as full. Changing
   the setting while seated retries briefly (see the `flies` message below); a seat freed
   later doesn't add a fly by itself. Coming back asks again too.
@@ -521,22 +521,21 @@ of an A15 performance core; a WebAssembly worker at about 95 MB
 are unknown.
 The workers load one after another from the same kept connectome
 (`InTurn`, `apps/web/src/brain/create.ts`), so nothing downloads twice at once.
-An older Apple TV host without `brain.spawn` runs only one fly and has no
-Flies setting.
+An Apple TV lives at most three; an older Apple TV host without `brain.spawn`
+runs only one fly and has no Flies setting.
 
 Their eyes take turns, at most one refresh per frame, choosing the most
 overdue eligible fly. Pending GPU reads and reflection work can defer them;
 with four at 60 fps, 15 refreshes per second each is an ideal maximum under
 even scheduling. A ball approaching gives the followed fly priority, capped
-at 60 Hz, rather than guaranteeing a refresh every frame. The retained TV
-draw estimate is about 83 with an eyes refresh against 34 without (capture
-date and exact build unknown); several flies can make refreshes more frequent.
-Four flies' meeting, senses, bodies,
-poses and nearby models were reported at 19 M5 Pro CPU µs a frame in Node 26
-(capture date and exact build unknown), with a 34 µs budget in
-`apps/web/tests/company.budget.ts`: about 0.3 ms on the TV by its 16×
-JavaScript cost. These are estimates for several local flies, not
-measurements on an Apple TV device; that still needs doing.
+at 60 Hz, rather than guaranteeing a refresh every frame. Four flies'
+meeting, senses, bodies, poses and nearby models were reported at 19 M5 Pro
+CPU µs a frame in Node 26, with a 34 µs budget in
+`apps/web/tests/company.budget.ts`. Measured on an Apple TV 4K on 16 November
+2026, JavaScript a frame went from 3.8 ms with one fly to 7.9–9.3 ms with
+four, 13.6 ms at a full table; draws a frame from 38 to about 77 at the
+picnic; and four kept the screensaver below 60 fps where one and three hold
+it, so a TV lives three (`docs/apple-tv.md`, "Several flies on peev").
 
 ## Running it locally
 

@@ -61,7 +61,7 @@ function shell(frame: Frame, glyphs: Shell["glyphs"] = null, online = true): She
   };
 }
 
-test("on the TV everything is where it always was", () => {
+test("the TV keeps its HUD and title layout, with Settings below a separate heading", () => {
   const hud = hudLayout(TV_FRAME);
   assert.equal(hud.cx, 427);
   assert.equal(hud.captionY, 25);
@@ -86,8 +86,8 @@ test("on the TV everything is where it always was", () => {
   const s = shell(TV_FRAME, "remote", false);
   const settings = settingsScreen(s);
   // Sized for its longest tab (On screen: the tabs and seven rows, as Wallpaper was on an Apple TV that can tell the weather), so it keeps its size from tab to tab.
-  assert.deepEqual(settings.pane.panel, { x: 157, y: 13, w: 540, h: 426 });
-  assert.deepEqual(settings.pane.list, { x: 185, y: 39, width: 484, row: 36, gap: 12, compact: false, columns: 1 });
+  assert.deepEqual(settings.pane.panel, { x: 157, y: 12, w: 540, h: 264 });
+  assert.deepEqual(settings.pane.list, { x: 185, y: 52, width: 484, row: 40, gap: 4, compact: false, columns: 1 });
   assert.equal(settings.menu.rows, settings.menu.items.length);
 
   const loading = loadingLayout(TV_FRAME);
@@ -208,7 +208,7 @@ test("the settings' tabs can be read at every shape: every one, or, where they a
       const tabs = writtenOn(g).filter((w) => labels.includes(w.text));
       const where = `${name}, ${glyphs ?? "pointing"}`;
       if (tabs.length === labels.length) {
-        assert.ok(tabs.every((w) => w.size === tabs[0].size && w.size >= 7), `${where}: tabs at ${tabs.map((w) => w.size).join(", ")}`);
+        assert.ok(tabs.every((w) => w.size === tabs[0].size && w.size >= 12), `${where}: tabs at ${tabs.map((w) => w.size).join(", ")}`);
       } else {
         assert.deepEqual(tabs.map((w) => w.text), ["Screensaver"], `${where}: the tab chosen`);
         assert.ok(tabs[0].size >= 12, `${where}: at ${tabs[0].size}`);
@@ -218,10 +218,10 @@ test("the settings' tabs can be read at every shape: every one, or, where they a
       }
     }
   }
-  // The TV's four tabs are as big as a row's words.
+  // The TV's three tabs are as big as a row's words.
   const g = blankCanvas();
   settingsScreen(shell(TV_FRAME, "remote")).draw(g, 0, new HitMap());
-  assert.ok(writtenOn(g).filter((w) => labels.includes(w.text)).every((w) => w.size === 17), "on the TV");
+  assert.ok(writtenOn(g).filter((w) => labels.includes(w.text)).every((w) => w.size === 18), "on the TV");
 });
 
 test("the title leaves room for the fly, clear of the name, the brain's state and the menu", () => {
@@ -326,6 +326,66 @@ test("the loading screen and its failure panel: where they always were on the TV
   }
 });
 
+test("touch controls meet 44 CSS pixels on the requested phone and tablet shapes", () => {
+  const world = createPicnic();
+  for (const [width, height] of [[390, 844], [844, 390], [1024, 1366]]) {
+    const frame = frameFor(width, height, undefined, true);
+    const s = shell(frame);
+    const settings = settingsScreen(s);
+    settings.press("right", false);
+    const hits = new HitMap();
+    settings.draw(blankCanvas(), 0, hits);
+    for (let i = 0; i < hits.count; i++) {
+      const h = hits.get(i)!;
+      if (h.kind !== "panel") assert.ok(Math.min(h.w, h.h) * frame.unit >= 44, `${width}×${height}: ${h.kind} meets the touch minimum`);
+    }
+    const hands = new Hands(world);
+    hits.begin("play");
+    drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, brainRunning: true, eyes: null, layout: hudLayout(frame) }, hits);
+    for (let i = 0; i < hits.count; i++) {
+      const h = hits.get(i)!;
+      assert.ok(Math.min(h.w, h.h) * frame.unit >= 44, `${width}×${height}: HUD ${h.kind} meets the touch minimum`);
+    }
+  }
+});
+
+test("the landscape room form keeps Back clear of every field", () => {
+  const frame = frameFor(844, 390, undefined, true);
+  const online = new OnlineScreen(shell(frame));
+  online.menu.focusOn("new");
+  online.press("select", false);
+  const hits = new HitMap();
+  online.draw(blankCanvas(), 0, hits);
+  const all = Array.from({ length: hits.count }, (_, i) => hits.get(i)!);
+  const back = all.find((h) => h.kind === "back")!;
+  assert.ok(back);
+  for (const field of all.filter((h) => h.kind === "row")) assert.ok(!overlaps(back, field), `Back stays clear of row ${field.index}`);
+});
+
+test("the Settings tab strip stays available at the bottom of a short screen", () => {
+  const screen = settingsScreen(shell(frameFor(844, 390, undefined, true)));
+  screen.press("right", false);
+  screen.menu.focusOn("xray");
+  assert.ok(screen.menu.scroll > 0);
+  const hits = new HitMap();
+  screen.draw(blankCanvas(), 0, hits);
+  assert.ok(Array.from({ length: hits.count }, (_, i) => hits.get(i)!).some((h) => h.kind === "tab" && h.index === 0));
+  screen.menu.scrollBy(-1);
+  assert.ok(screen.menu.focus >= screen.menu.scroll + screen.menu.pinned);
+});
+
+test("code entry stays above a reserved phone keyboard area", () => {
+  for (const [width, height, bottom] of [[390, 844, 320], [844, 390, 200]]) {
+    const frame = frameFor(width, height, { top: 0, left: 0, right: 0, bottom }, true);
+    const screen = new OnlineScreen(shell(frame));
+    const hits = new HitMap();
+    screen.draw(blankCanvas(), 0, hits);
+    const all = Array.from({ length: hits.count }, (_, i) => hits.get(i)!);
+    assert.ok(all.some((h) => h.kind === "row" && h.index === 1), "the code field stays visible");
+    for (const h of all) assert.ok(inside(h, safeRect(frame)), `${width}×${height}: ${h.kind} above the keyboard area`);
+  }
+});
+
 test("phone and Split View touch targets stay distinct, with Menu in portrait thumb reach", () => {
   const world = createPicnic();
   for (const [w, h] of [[390, 844], [430, 932], [375, 820], [507, 820], [844, 390], [932, 430], [820, 1180], [1180, 820]]) {
@@ -366,6 +426,15 @@ test("the room form keeps its focused field above a phone or Split View keyboard
   }
 });
 
+
+test("the title panel clears the footer at every requested screen shape", () => {
+  for (const [w, h] of [[1920, 1080], [1440, 900], [390, 844], [844, 390], [1024, 1366]]) {
+    const frame = frameFor(w, h);
+    const a = safeRect(frame);
+    const { panel } = titleLayout(frame, 5).menu;
+    assert.ok(panel.y + panel.h <= a.y + a.h - 38, `${w}×${h}: title clears hints`);
+  }
+});
 
 test("selector arrows stay put across kinds, including Place's Go appearing", () => {
   for (const [, frame] of frames()) for (const id of ["feed", "light", "weather", "view", "place"]) {
@@ -463,6 +532,35 @@ test("notice navigation clears the button hints on tall and short screens", () =
   }
 });
 
+test("Settings trims unused space while each tab and setting keeps its position", () => {
+  for (const [w, h] of [[1920, 1080], [390, 844], [844, 390], [1024, 1366]]) {
+    const s = settingsScreen(shell(frameFor(w, h)));
+    const first = { ...s.pane.panel };
+    const hits = new HitMap();
+    s.draw(blankCanvas(), 0, hits);
+    let rowBottom = 0;
+    for (let i = 0; i < hits.count; i++) {
+      const hit = hits.get(i)!;
+      if (hit.kind === "row") rowBottom = Math.max(rowBottom, hit.y + hit.h);
+    }
+    assert.ok(first.y + first.h - rowBottom <= 34, `${w}×${h}: no empty rows after the content`);
+    const tabY = s.pane.list.y;
+    s.press("right", false);
+    assert.equal(s.pane.panel.y, first.y);
+    assert.equal(s.pane.list.y, tabY);
+    assert.ok(s.pane.panel.h >= first.h, `${w}×${h}: the longer tab gets enough room`);
+    s.press("left", false);
+    assert.deepEqual(s.pane.panel, first);
+  }
+});
+
+test("About is a single upward step from Play", () => {
+  const title = titleScreen(shell(TV_FRAME));
+  title.press("up", false);
+  assert.equal(title.menu.focused?.id, "about");
+  title.press("down", false);
+  assert.equal(title.menu.focused?.id, "play");
+});
 
 test("a pending tool is shown as an icon clear of the shelf without changing its committed tool or hit targets", () => {
   for (const [w, h] of [[390, 844], [844, 390], [430, 932], [932, 430], [820, 1180], [1180, 820], [507, 820], [375, 820]]) {
@@ -477,6 +575,7 @@ test("a pending tool is shown as an icon clear of the shelf without changing its
     const original = Array.from({ length: hits.count }, (_, i) => ({ ...hits.get(i)! }));
     for (let i = 0; i < TOOLS.length; i++) {
       const pressed = original.find(hit => hit.kind === HUD_HITS.tool && hit.index === i)!;
+      s.previewTool = pressed.index;
       s.pressed = pressed;
       const g = blankCanvas();
       const iconOrigins: { x: number; y: number }[] = [];
@@ -490,6 +589,7 @@ test("a pending tool is shown as an icon clear of the shelf without changing its
       assert.deepEqual(Array.from({ length: previewHits.count }, (_, i) => ({ ...previewHits.get(i)! })), original, "press feedback cannot move hit targets");
     }
     s.pressed = null;
+    s.previewTool = -1;
     const g = blankCanvas();
     drawHud(g, 0, s, new HitMap());
     assert.ok(writtenOn(g).some(word => word.text.includes("Sugar")), "cancellation restores the committed label");
