@@ -39,7 +39,7 @@ own HTTPS proxy, use [self-hosting](docs/deploy.md).
 The connectome supplies the wiring; a leaky integrate-and-fire model supplies
 the spikes. The game reads commands from identified descending and motor
 neurons. It is not a reproduction of a whole living fly: the model has no
-smell, learning or memory, and lacks several reflexes. The body supplies
+smell or synaptic learning, and lacks several reflexes. The body supplies
 physics and named stand-ins, including sustained flight and turning away
 from a wall. Hunger is accelerated. Song has a command and a wing pose, but
 the current sensory inputs do not produce courtship song.

@@ -1,5 +1,7 @@
 # Rendering
 
+Historical timings and trial counts have [measurement provenance](measurements.md).
+
 ## Frame and cost
 
 On the Apple TV the game renders 640×480, laid out for 16:9 (the picture is
@@ -24,7 +26,7 @@ a small fly in a great deal of sky and table) or a half (keeping its pixels,
 too big to turn round in). The whole table keeps its width, so it always
 fits. Playing on a short screen, where the shelf and the label take more of
 the height, the fly is raised clear of them and drawn a little smaller
-(`ui/layout.ts`, `playRoom`). Every layout (the shelf, the hints, the
+(`apps/web/src/ui/layout.ts`, `playRoom`). Every layout (the shelf, the hints, the
 caption, the fly's-eye picture and the corner one, the title, the menus,
 About) is worked out from the frame in design units (480
 to the shorter side, and at least 1.25 CSS pixels on a touch screen, so that

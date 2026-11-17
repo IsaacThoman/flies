@@ -323,3 +323,4 @@ repository variable `IOS_LINKS=0` to omit the entitlement from releases.
 
 `scripts/checkDeploy.ts` checks the file's type, contents and absence of redirects
 when the build has one, and that the path is a 404 when it doesn't.
+<!-- docs-check: generated anatomy.bin -->

@@ -421,39 +421,15 @@ holds eight flies to the frame's budget on every screen shape, and checks
 that single-player opens no connection. `npm run tables -- --clients 4 --seconds 120`
 is a longer run with several tabs and fake flies, summing up what each saw.
 
-## The Apple TV and the iPhone
+## Apple hosts
 
-The game reaches the room only through `TableSocket`
-(`packages/contracts/src/socket.ts`): send, and once a frame drain what has
-arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
+The game reaches a room through `TableSocket` (`packages/contracts/src/socket.ts`).
+The browser and iOS app use `BrowserSocket`; Apple TV uses a native socket
+bridge. All hosts expose Online on the menu. The TV uses its system keyboard
+and shows a QR code and room code; the browser and iOS can also share a link.
 
-- **Apple TV.** Its runtime has no `WebSocket`, so its host bridges one as
-  `globalThis.__native.socket` (`apps/tvos/src/SocketBridge.mm`), an
-  `NSURLSessionWebSocketTask` on a queue of its own; the room's line and
-  the Lobby's both go through it. The game polls it each frame
-  (`apps/web/src/online/native-socket.ts`): each binary message is copied
-  into one buffer kept in JavaScript, so nothing is made per message, and a
-  frame with nothing new is two native calls. The host keeps as much waiting
-  as a browser does, and closes every line (1001) when the app goes to the
-  background; the fly rests in the room meanwhile, and coming back the line
-  opens again at once. Its room server is `wss://flies.isaacthoman.com/rooms`
-  (`ROOMS_URL` at build, or `?rooms=` in the launch config's URL, for
-  another), which App Transport Security allows as it is. Typing (a room's
-  name, a password, a code) is tvOS's own keyboard, as
-  `globalThis.__native.keyboard`, made a `TextEntry` (`NativeTextEntry`,
-  `apps/web/src/ui/text-entry.ts`). There is no share sheet or clipboard, so
-  no Share the link: at a room, Online shows its QR code and its code (as it
-  does everywhere) for a phone to scan or another TV to type. The simulator
-  check sits the app in a room of eight, and on an Apple TV 4K a room of
-  eight holds 60 fps (`npm run tvos:soak -- --table`, `docs/apple-tv.md`,
-  "Eight flies on a TV").
-- **iPhone and iPad.** No bridge: the app is the web build in a web view,
-  whose own WebSocket reaches `wss://flies.isaacthoman.com/rooms` (and a room
-  server of your own at an address or a `.local` name, for development), and
-  whose `navigator.share` is the system share sheet. Names and passwords are
-  typed as in Safari, with the phone's keyboard and AutoFill. The links it
-  shares are the site's; with `APPLE_TEAM_ID` on the site and the app built
-  with `IOS_LINKS=1`, they open the app (universal links), and AutoFill
-  offers the site's passwords in it. iOS suspends a
-  backgrounded app, so away is the normal state there; the 10 minutes and
-  coming back are what make it work. `docs/ios.md`, "Tables with others".
+Host-specific setup and measurements have one home:
+
+- [Apple TV sockets, keyboard and room checks](apple-tv.md#playing-together).
+- [iPhone and iPad sockets, sharing, universal links and AutoFill](ios.md#tables-with-others).
+<!-- docs-check: generated DATA_DIR/tables.json -->

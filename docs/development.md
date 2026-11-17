@@ -41,7 +41,7 @@ rooms. They observe canvas `data-*` attributes because the game draws its UI.
 
 `npm test` includes a fast documentation check. Run only that check with
 `node --test scripts/docs.test.ts`. It checks local Markdown links and
-anchors, source-file references in inline code, and documented `npm run`
+anchors, source-file references in inline code and repository paths in command examples, and documented `npm run`
 commands. It does not fetch external URLs or run the documented commands.
 
 Use a relative Markdown link when pointing readers to another document.
@@ -49,4 +49,8 @@ Write source paths in inline code relative to the repository root, or to
 the document. Label generated paths and example placeholders as such; they
 are not existing source files. For an exact generated-path exemption, add
 `<!-- docs-check: generated path/to/output -->` to that document. Local
-Markdown links are always checked, including links to generated paths.
+Markdown links are always checked, including links to generated paths. Use
+`<!-- docs-check: external file.csv -->` for a specifically named input
+provided outside the repository. Exemptions are exact paths in that document,
+not directory-wide exclusions. All documented npm commands run from the
+repository root unless the command says otherwise.

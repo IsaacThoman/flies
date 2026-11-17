@@ -1,5 +1,7 @@
 # The fly in the game
 
+Historical timings and trial counts have [measurement provenance](measurements.md).
+
 The body turns the world into senses and the brain's commands into motion.
 For the neuron model, data and limits of the biology, see the
 [brain reference](../packages/brain/README.md#what-it-does-and-doesnt-reproduce).
@@ -350,11 +352,12 @@ reads in a dark room (the same at all times for every part, as an X-ray
 shows bone); in the panel a faint constant stain on the dark glass, as a
 neuropil stain shows anatomy in a micrograph.
 
-**What stays dark, and what it can't show.** The retina, smell and the legs',
-wings and thorax's and abdomen's sensory neurons never fire in this model (the
-light enters one synapse in, at the lamina; there is no sense of smell; of
-the body's senses only touch and the legs' load are driven): they are drawn,
-and stay dark. The mushroom body, lateral horn, superior protocerebrum,
+**What stays dark, and what it can't show.** The retina and smell neurons
+are not driven: light enters one synapse in, at the lamina, and there is no
+sense of smell. The body does drive selected sensory neurons: bristles,
+Johnston's organ, taste, the legs' load sensors and the wings' and halteres'
+strain sensors. A whole sensory region need not glow visibly when only a
+few of its neurons are active. The mushroom body, lateral horn, superior protocerebrum,
 antennal lobe and central complex fire under 2 Hz on a 5 Hz scale and stay
 nearly dark. A region glows with the mean of all its neurons, so a command
 carried by a few hardly shows: the giant fibre's escape is one neuron among

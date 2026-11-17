@@ -55,17 +55,17 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
 
 | File | What it does |
 | --- | --- |
-| `src/App.swift` | The app and its one scene: one window, since a second would be a second fly with a second brain; a table's link that opened it, or reached it while running |
-| `src/Links.swift` | Which links are a table's, and the page's address: the room server and the table |
-| `src/GameViewController.swift` | The web view, edge to edge; the launch image over it until the game is ready; the safe area; stopping the game when it can't be seen; a reload if iOS ends the page's process |
-| `src/BundleSchemeHandler.swift` | Serves `www/` at `fly://app/`: memory-mapped, in 1 MB slices, one per turn of the main run loop, so the brain's progress is real and nothing outside `www/` is served |
-| `src/PageScripts.swift` | What the app adds to the page: a watch on the canvas's state |
-| `src/Power.swift` | When the screen may sleep and when the game must stop (below) |
-| `src/Haptics.swift` | The feather on the fly, and its take-offs, felt through the glass |
-| `src/Report.swift` | Reports for checks and measurements (below); off unless asked for |
-| `src/Launch.storyboard` | The launch screen: the launch image filling a screen of any shape |
+| `apps/ios/src/App.swift` | The app and its one scene: one window, since a second would be a second fly with a second brain; a table's link that opened it, or reached it while running |
+| `apps/ios/src/Links.swift` | Which links are a table's, and the page's address: the room server and the table |
+| `apps/ios/src/GameViewController.swift` | The web view, edge to edge; the launch image over it until the game is ready; the safe area; stopping the game when it can't be seen; a reload if iOS ends the page's process |
+| `apps/ios/src/BundleSchemeHandler.swift` | Serves `www/` at `fly://app/`: memory-mapped, in 1 MB slices, one per turn of the main run loop, so the brain's progress is real and nothing outside `www/` is served |
+| `apps/ios/src/PageScripts.swift` | What the app adds to the page: a watch on the canvas's state |
+| `apps/ios/src/Power.swift` | When the screen may sleep and when the game must stop (below) |
+| `apps/ios/src/Haptics.swift` | The feather on the fly, and its take-offs, felt through the glass |
+| `apps/ios/src/Report.swift` | Reports for checks and measurements (below); off unless asked for |
+| `apps/ios/src/Launch.storyboard` | The launch screen: the launch image filling a screen of any shape |
 | `src/Settings.bundle` | The app's page in the Settings app: the Haptics switch |
-| `src/PrivacyInfo.xcprivacy` | No tracking, no data collected; `NSUserDefaults` for the Haptics switch (CA92.1) |
+| `apps/ios/src/PrivacyInfo.xcprivacy` | No tracking, no data collected; `NSUserDefaults` for the Haptics switch (CA92.1) |
 
 ### What the app tells the page, and what it reads
 
@@ -245,7 +245,7 @@ A table's link opens the app where it is installed, instead of Safari, when both
   use `IOS_LINKS=0` to leave it out). Associated Domains is already enabled on the owner's App ID;
   another App ID needs the capability before signing a build with links.
 
-The app takes a link (`src/Links.swift`, unit-tested) only if it is https, to
+The app takes a link (`apps/ios/src/Links.swift`, unit-tested) only if it is https, to
 `flies.isaacthoman.com`, its own page, with a `table` that could be a table's code; anything else
 is ignored. The game is given the code and nothing more, so a link can't point it at another room
 server.
@@ -368,13 +368,13 @@ simulator, runs them, then shuts it down and deletes it:
 - unit tests (`tests/unit`): the power policy's table; what the scheme handler serves (the site,
   nothing outside it, JavaScript as JavaScript); when haptics play; which links are a table's, and
   the page and script the game is given for one;
-- the UI tests, driving the app as a person would. `tests/ui/AliveTests.swift`: the brain is read
+- the UI tests, driving the app as a person would. `apps/ios/tests/ui/AliveTests.swift`: the brain is read
   from the bundle, wakes, and the title shows, with nothing of the brain in the browser's cache;
   frames go on being drawn and the brain keeps real time; a tap on the title's first row starts
   play; away for 6 s (another app over the whole screen), most of that time passes with the brain
   stopped, and in front again it carries on at real time; a setting changed in one run, the app
   killed, is there in the next, and the relaunch again copies nothing of the brain into the cache.
-  `tests/ui/TablesTests.swift`, against a room server the check starts on a port of its own, with a
+  `apps/ios/tests/ui/TablesTests.swift`, against a room server the check starts on a port of its own, with a
   fake fly (`scripts/tables.ts`) starting each of two tables: the app, launched by the first
   table's link (`-FlyInvite`, `-FlyRooms`), sits down and sees the fly there; play starts; away for
   10 s, the room has its fly resting, and the check drops its line meanwhile; in front again it is

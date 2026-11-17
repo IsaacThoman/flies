@@ -9,22 +9,16 @@ buffers, which native code replays on OpenGL ES 3.0. 2D canvases are CoreGraphic
 brain is C++ on a thread of its own. Built with WeatherKit, a Swift service tells the game the
 weather outside. Public APIs only, so it can go through App Review.
 
-The host is the one built for aerodance (github.com/IsaacThoman/aerodance, `apps/tvos`), which
-holds 60 fps there on an Apple TV 4K; its `docs/apple-tv.md` records the measurements and the
-alternatives that were tried and dropped (tvOS WebKit, WebGPU, React Native, streaming). This app
-copies its generic parts and leaves out the rest (pairing, networking, file transfer, songs,
-benchmarks). See [What came from aerodance](#what-came-from-aerodance).
-
 ## How it works
 
 Four threads:
 
 | Thread | Owns | Code |
 | --- | --- | --- |
-| Main | UIKit: the layer frames are shown in, the remote's presses and touches, the GameController framework, the splash | `src/main.mm`, `src/Remote.mm` |
-| JavaScript | The JavaScriptCore context: runs `runtime.js`, then `game.js`, animation frames from a `CADisplayLink`, timers, events | `src/Host.mm`, `runtime/` |
-| Render | The OpenGL ES context: replays WebGL and 2D canvas commands a frame behind JavaScript, presents | `src/Renderer.mm`, `src/Executor.mm`, `src/Canvas2D.mm` |
-| Brain | The `fly_brain`: loads the connectome, steps the simulation whenever time is waiting | `src/BrainBridge.mm`, `packages/brain-native` |
+| Main | UIKit: the layer frames are shown in, the remote's presses and touches, the GameController framework, the splash | `apps/tvos/src/main.mm`, `apps/tvos/src/Remote.mm` |
+| JavaScript | The JavaScriptCore context: runs `runtime.js`, then `game.js`, animation frames from a `CADisplayLink`, timers, events | `apps/tvos/src/Host.mm`, `runtime/` |
+| Render | The OpenGL ES context: replays WebGL and 2D canvas commands a frame behind JavaScript, presents | `apps/tvos/src/Renderer.mm`, `apps/tvos/src/Executor.mm`, `apps/tvos/src/Canvas2D.mm` |
+| Brain | The `fly_brain`: loads the connectome, steps the simulation whenever time is waiting | `apps/tvos/src/BrainBridge.mm`, `packages/brain-native` |
 
 Built with WeatherKit, the weather outside is found on the main thread (Core Location, timers)
 and in Swift's own tasks (the request), and read from the JavaScript thread
@@ -32,7 +26,7 @@ and in Swift's own tasks (the request), and read from the JavaScript thread
 its own, and the system keyboard on the main thread ([Playing together](#playing-together)).
 
 WebGL calls that return nothing are encoded into a 4 MB command buffer (about 0.2–0.3 µs a call
-on the device, per aerodance) and run later on the render thread. Object handles are numbered in
+in a historical device measurement; date and device model not recorded) and run later on the render thread. Object handles are numbered in
 JavaScript, so creating a buffer or texture doesn't wait. Calls that need an answer
 (`getParameter`, shader and link status, `readPixels`, `getBufferSubData`, `getImageData`)
 hand the buffer over and wait for the render thread to catch up: see [Reading pixels
@@ -79,9 +73,9 @@ npm run tvos -- archive --version 0.1.1   # archive for the App Store (docs/rele
 
 `build`:
 
-1. writes `src/generated/ops.h` (the command stream's opcodes) and the asset catalog from
+1. writes `apps/tvos/src/generated/ops.h` (the command stream's opcodes) and the asset catalog from
    `assets/` (`scripts/tvosAssets.ts`);
-2. bundles the runtime (`runtime/index.ts`) with rolldown into `www/runtime.js`;
+2. bundles the runtime (`apps/tvos/runtime/index.ts`) with rolldown into `www/runtime.js`;
 3. builds the page as one classic script, `www/game.js`, with Vite (`apps/tvos/vite.config.ts`):
    `apps/web/src/main.ts`, or `apps/tvos/tests/scene.ts` with `--test-scene`. The host has no
    module loader, so everything is inlined; any configured public assets are copied beside it;
@@ -118,7 +112,7 @@ JSON, from `--config` on the command line, else `www/config.json` (what the home
 | `gpuTiming` | `glFinish` after every frame, to time the GPU (slows it down) |
 | `glDebug` | Checks `glGetError` after every GL command |
 | `typed` | Answers for the keyboard in unattended runs: each keyboard shown is answered with the next after 1.5 s, as if typed and confirmed (`null`: as if the player went back). The check uses it; nothing else should |
-| `drive` | Scripted remote input for unattended runs, waiting on the canvas's `data-*` state: `[["wait", {"ready": "true"}], ["press", "ArrowRight", 650], ["swipe", "ArrowUp"], ["touch", 0.5, -0.2, true], ["sleep", 500], ["log", "mark"]]`. Presses, swipes and touches go through the same native code as the remote's (`runtime/report.ts`) |
+| `drive` | Scripted remote input for unattended runs, waiting on the canvas's `data-*` state: `[["wait", {"ready": "true"}], ["press", "ArrowRight", 650], ["swipe", "ArrowUp"], ["touch", 0.5, -0.2, true], ["sleep", 500], ["log", "mark"]]`. Presses, swipes and touches go through the same native code as the remote's (`apps/tvos/runtime/report.ts`) |
 
 `devicectl ... --console` (what `run --device` uses) attaches a debugger, which slows
 JavaScript down by about 1.5x (aerodance's measurement): don't trust frame timings taken that
@@ -230,7 +224,7 @@ Per `packages/contracts/src/remote.ts`, all on `window`:
 | Play/Pause | `MediaPlayPause` |
 | Finger on the touch surface | `remotetouch` CustomEvent, `{ x, y, touching }`, -1 to 1, y up |
 
-Buttons come from UIKit presses (`src/Remote.mm`). A held button repeats: `keydown` with
+Buttons come from UIKit presses (`apps/tvos/src/Remote.mm`). A held button repeats: `keydown` with
 `repeat: true` after 400 ms, then every 100 ms, until `keyup`. Swipes (UIKit swipe recognisers)
 are an arrow `keydown` and `keyup` at once, with no repeat.
 
@@ -250,7 +244,7 @@ Assign the property; don't `defineProperty` over it.
 ## The brain
 
 `globalThis.__native.brain` is `NativeBrainBridge` (`packages/contracts/src/brain.ts`),
-implemented in `src/BrainBridge.mm` over `packages/brain-native/include/fly_brain.h`:
+implemented in `apps/tvos/src/BrainBridge.mm` over `packages/brain-native/include/fly_brain.h`:
 
 - `start(seed)` starts the brain thread (8 MB stack, QoS user-initiated: below the JavaScript
   and render threads). It memory-maps the bundled `www/brain/connectome.bin` (38 MB) and builds
@@ -282,17 +276,16 @@ is not measured yet.
 ## The weather outside
 
 Built with `TVOS_WEATHERKIT=1`, the app tells the game the real weather where the TV is, and
-today's sunrise and sunset (what the game makes of them is in [the README](../README.md), "The
-weather outside", and `apps/web/src/scene/outside.ts`). `globalThis.__native.weather` is
-`NativeWeatherBridge` (`packages/contracts/src/weather.ts`), made by `src/WeatherBridge.mm` over a
+today's sunrise and sunset (what the game makes of them is in [the world guide](world.md#light-weather-and-visitors), and `apps/web/src/scene/outside.ts`). `globalThis.__native.weather` is
+`NativeWeatherBridge` (`packages/contracts/src/weather.ts`), made by `apps/tvos/src/WeatherBridge.mm` over a
 Swift service it finds by its Objective-C name (`FlyOutsideWeather`). A build without the service
 has no Swift and no `__native.weather`, and the game keeps its made-up forecast.
 
-- `weather/Shared/OutsideWeather.swift` holds what the JavaScript thread reads (status, error,
+- `apps/tvos/weather/Shared/OutsideWeather.swift` holds what the JavaScript thread reads (status, error,
   the last answer as JSON, Apple Weather's attribution, a version that counts answers) under a
   lock it holds only to copy, and keeps the last answer in `NSUserDefaults` (the conditions and
   when they were fetched, never where) for the next run.
-- `weather/WeatherKit/Service.swift` finds the answer, on the main actor. `start()` (the game
+- `apps/tvos/weather/WeatherKit/Service.swift` finds the answer, on the main actor. `start()` (the game
   calls it once the title is up, and when Settings → Screensaver → Real weather is turned on) asks for When
   In Use location permission the first time; after that it takes one location fix at a time
   (`requestLocation`) and uses it for six hours, a TV not being one to move. It rounds the
@@ -400,7 +393,7 @@ and the game goes back to the made-up forecast.
 
 ### Checking it
 
-The simulator check (below) builds the stand-in service (`tests/weather-stand-in/Service.swift`,
+The simulator check (below) builds the stand-in service (`apps/tvos/tests/weather-stand-in/Service.swift`,
 `--stand-in-weather`): with no WeatherKit and no location, it answers with the same conditions
 every time, and the check makes sure they reach the test scene as sent and with nothing else in
 them, that it reports `fetching` then `ok`, and that stopped it says `idle`.
@@ -411,7 +404,7 @@ unsigned as simulator builds are, is refused and says so: `unauthorised`, with W
 with the capability.
 
 In a browser there is no service: scripts feed the game conditions (`__fly.outside.feed`, in the
-README's Tests).
+[development guide](development.md)).
 
 ## Playing together
 
@@ -421,7 +414,7 @@ The Apple TV plays online, in rooms with others, as a browser does (`docs/online
 ### The line to the room
 
 `globalThis.__native.socket` is `NativeSocketBridge` (`packages/contracts/src/socket.ts`), made
-by `src/SocketBridge.mm`. Each line is an `NSURLSessionWebSocketTask` in an ephemeral session
+by `apps/tvos/src/SocketBridge.mm`. Each line is an `NSURLSessionWebSocketTask` in an ephemeral session
 whose delegate runs on a queue of the bridge's own, never the JavaScript or main thread.
 
 - What arrives waits in the line's inbox until the game takes it, once a frame
@@ -439,7 +432,7 @@ whose delegate runs on a queue of the bridge's own, never the JavaScript or main
   the room's own close keeps its code and reason. The line reports closed only once everything
   that came before the close has been taken, as a browser hands on its messages before its close
   event.
-- When the app goes to the background (`sceneDidEnterBackground`, in `src/main.mm`) the game
+- When the app goes to the background (`sceneDidEnterBackground`, in `apps/tvos/src/main.mm`) the game
   hears it first (`visibilitychange`: at a table, the room is told at once that the fly is
   away), then every line is closed with 1001, both on the JavaScript thread
   and in a short background task, before tvOS suspends the app. The fly rests at the table, and
@@ -472,7 +465,7 @@ check. Never ship one of those.
 ### Typing
 
 `globalThis.__native.keyboard` is `NativeKeyboardBridge` (`packages/contracts/src/text-entry.ts`),
-made by `src/KeyboardBridge.mm`. `ask(title, value, kind, done)` returns at once; on the main
+made by `apps/tvos/src/KeyboardBridge.mm`. `ask(title, value, kind, done)` returns at once; on the main
 thread the host presents an alert titled with the field's label, holding what the field holds,
 brings up tvOS's full-screen keyboard for it, and calls `done` on the JavaScript thread with what
 was typed (OK), or null (Cancel, or Back). The kind sets the keyboard: `code` (ASCII, no
@@ -554,7 +547,7 @@ decodes to the room's link.
 ## Reading pixels back
 
 The game renders what the fly's eyes see into a small render target and reads it back every
-frame or two. Both of three's ways work and are checked by the test scene (`tests/scene.ts`, a
+frame or two. Both of three's ways work and are checked by the test scene (`apps/tvos/tests/scene.ts`, a
 32×16 target, red on the left and green on the right, read back pixel-exact):
 
 - `renderer.readRenderTargetPixels(target, ...)` is synchronous: one `readPixels` query, so
@@ -785,28 +778,11 @@ No Apple TV was connected while this was built, so none of this has run on one:
   through a TV's network; plain `ws://` to a room server on the local network by name (from a
   `--local-rooms` build); and the QR code scanned off a TV across a room by a phone's camera.
 
-## What came from aerodance
-
-Copied and adapted: the host (`Host.mm`, `JSHost.h`, `Host.h`), the command executor
-(`Renderer`, `Executor`, `Canvas2D`, `Fonts.mm`),
-the runtime (`dom.ts`, `web.ts`, `webgl.ts`, `canvas2d.ts`, `color.ts`, `glConstants.ts`,
-`ops.ts`, `native.ts`), the frame-stats and `drive` hooks (`runtime/report.ts`), the XcodeGen
-spec, the privacy manifest, the build script, the asset-catalog pipeline and App Store archiving
-(`scripts/apple.ts`, [release.md](release.md)).
-
-Left out: phone pairing and the relay, its WebSocket and EventSource, HTTP `fetch` and the
-log/report uploads, the page's file store, `crypto.subtle`, React-specific mount points, songs,
-the benchmarks and their natives, Now Playing.
-
-Changed or added: the remote (its own `Remote` class; Play/Pause is its own key; key repeat;
-the touch surface through GameController; the root flag pushed from JavaScript instead of polled
-from the game's state), the brain bridge and its stand-in, real WebGL fences, `FontFace` in
-place of fonts bundled by file name, `sessionStorage` in memory instead of sharing
-`localStorage`'s store, readiness from `data-ready`, nearest-neighbour
-stretch by default, the test scene and the simulator check, placeholder art drawn by script, and
-a WebSocket bridge of its own (polled, with nothing made per message) and the system keyboard, for
-tables with others.
-
 <!-- docs-check: generated runtime.js -->
 <!-- docs-check: generated game.js -->
 <!-- docs-check: generated packages/brain/data/connectome.bin -->
+<!-- docs-check: generated apps/tvos/src/generated/ops.h -->
+<!-- docs-check: generated www/runtime.js -->
+<!-- docs-check: generated www/game.js -->
+<!-- docs-check: generated www/config.json -->
+<!-- docs-check: generated www/brain/connectome.bin -->

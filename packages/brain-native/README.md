@@ -1,5 +1,7 @@
 # brain-native
 
+Historical timings and trial counts have [measurement provenance](../../docs/measurements.md).
+
 The fly's brain, `packages/brain`, as portable C++20 for the Apple TV, where JavaScript has no JIT and is far too slow to run it. It is the same simulation, not a lookalike: for the same connectome, seed and senses it fires the same spikes at the same steps and reports the same commands and rates, to the last bit, as the TypeScript does under Node. That is what makes the browser fly and the TV fly one fly, and what makes this port testable at all.
 
 The interface is `include/fly_brain.h`, plain C: build a brain from the bytes of `connectome.bin`, ask it where each facet of its eyes looks, tick it with senses and what each facet sees, get commands, stats and the readout rates back. Every failure, bad data included, comes back as a message in the caller's buffer; nothing throws across it and nothing aborts. One brain is used from one thread at a time. The standard library is the only dependency.
@@ -177,3 +179,6 @@ Not fixed there (that is for `packages/brain`), and matched here:
 - Left/right balancing (`io.ts`, `balanceFactor`) counts the raw synapses, while the network uses the saturated counts, so at full strength the two sides deliver the same raw synapse-spikes, not quite the same effective ones as the README says.
 - `loadConnectome` reads past the last connection, as `undefined`, when `ptr` overshoots before coming back; harmless, since a later decrease is always reported, but it is a read out of bounds that only JavaScript forgives.
 - **With the eyes shut the brain is not quite what it was before it had eyes** (its README and `seeing.test.ts` said it was when this was found, and have been corrected). The graded columnar synapses apply with the eyes shut too, and a columnar cell can fire without light: in this repository's scripted senses (`scenario()` in `tests/compare.ts`, seed 1), after 3 s at rest, 1 s airborne, `loomLeft` 1.5 s and 0.8 s of rest, a TmY17 of the right eye fires once under `loomRight` at full strength, and at tick 446 the brain fires 2,725 spikes against 2,732 with `graded: 1`. The fingerprint test only drives `loomLeft`, touch and wind, and sweet and `bumpRight`, which happen not to reach one. (It was found as this port's comparison, still on the model before the eyes, failing at that tick.)
+
+<!-- docs-check: generated packages/brain/data/connectome.bin -->
+<!-- docs-check: generated connectome.bin -->

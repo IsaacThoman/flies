@@ -1,5 +1,7 @@
 # The web build
 
+Historical timings and trial counts have [measurement provenance](measurements.md).
+
 The game is a web page underneath, and the web build is a real way to have
 the fly: a link anyone can open on a laptop, a phone or a tablet and leave
 open as a screensaver, or install as an app. It is plain files that work from
@@ -348,30 +350,11 @@ places it is set.
 
 ## In an iPhone or iPad app
 
-`apps/ios` ([ios.md](ios.md)) shows the web build in a WKWebView, loading `index.html` from its
-own bundle through a custom URL scheme (`WKURLSchemeHandler`). That works
-as it is, with no network:
-
-- the scheme handler serves `dist/` as it is, the brain's parts and its
-  WebAssembly module included, at paths relative to the page; any
-  `Content-Type` will do (the module is compiled from its bytes, not
-  streamed). WKWebView runs WebAssembly, and on iOS and iPadOS 18.4+ this
-  module; before that the page runs the TypeScript brain;
-- there is no service worker (it isn't offered there; registering fails
-  quietly), and the Cache API, though there, keeps only `http` and `https`
-  responses, so nothing is copied and the brain is read from the bundle on
-  every launch, which is quick from local storage (measured in the iPhone
-  and iPad app, [ios.md](ios.md));
-- the page is a secure context there, so `crypto.subtle` checks each part's
-  digest; where it is missing the check is skipped, and gzip's own check and
-  the connectome's loader catch damage;
-- its WebSocket and `navigator.share` work as in Safari, so a table with
-  others needs nothing of the app beyond the room server's address and the
-  site's links, which the game knows it is in an app for (`fly:`);
-- or the app runs the C++ brain itself and exposes it as
-  `globalThis.__native.brain` (`NativeBrainBridge` in
-  `packages/contracts/src/brain.ts`), as the Apple TV app does: the game then
-  skips the download and the worker altogether.
+The iOS app bundles this build and serves it through a custom URL scheme.
+Its brain loads locally, with no service worker or persistent brain-cache
+copy. See [the iOS host](ios.md#loading-the-brain) for scheme handling, worker
+support and measured loading behaviour, and [its online setup](ios.md#tables-with-others)
+for sockets and app links.
 
 ## Browsers
 
@@ -438,3 +421,4 @@ after about a thousand first visits a month.
 
 <!-- docs-check: generated sw.js -->
 <!-- docs-check: generated ./dist -->
+<!-- docs-check: generated manifest.webmanifest -->

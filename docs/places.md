@@ -1,5 +1,7 @@
 # Places
 
+Historical timings and trial counts have [measurement provenance](measurements.md).
+
 The fly can live in more than one place, and the player can carry it between
 them (the Place tool, or Settings → Screensaver → Where it lives, which carries it
 once the choice rests a second or the row is left, not to each place stepped
@@ -18,6 +20,23 @@ The scene is built from the world's description, so that what the fly stands
 on is exactly what is drawn. `apps/web/src/places/types.ts` is the contract;
 the picnic (`packages/world/src/picnic.ts`, `apps/web/src/places/picnic/`) is
 the worked example.
+
+## Add a place
+
+1. Define a `Place` in `packages/world/src/` and export it through
+   `packages/world/src/index.ts`. Use the picnic as a small worked example.
+2. Add its id and world to `WORLDS` in `packages/world/src/places.ts`, so the
+   room server can load it without drawing.
+3. Implement its `Scene` under `apps/web/src/places/`, using the contract in
+   `apps/web/src/places/types.ts` and the same solids and patches as the world.
+4. Register its labels in `apps/web/src/places/catalog.ts` and its scene in
+   `apps/web/src/places/index.ts`. Keep ids identical in both registries.
+5. Include it in `scripts/fuzz/body.ts`. Check the place tests, body fuzzing,
+   and the renderer's frame cost; see [development](development.md) and
+   [the rendering budget](rendering.md). A large place needs the extra
+   treatment under [A large place](#a-large-place).
+
+The sections below describe the geometry, scene hooks and limits for those steps.
 
 ## The world
 
@@ -125,7 +144,7 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   window's view, a bar's lights can all be backdrop.
 - **Light** (`palettes`): the five times of day. Chosen on the Light tool, the
   light eases to one and holds it; on "Now" it follows the clock between them
-  (`scene/light.ts`, `clockLight`): each palette's colours are full at its
+  (`apps/web/src/scene/light.ts`, `clockLight`): each palette's colours are full at its
   hour (morning 7:30, midday 10:30 to 15:15, golden 17:45, dusk 20:00, night
   21:30 to 4:30, and dawn borrows dusk's colours at 5:55). Where the dusk
   palette's sun is low (`sunUp` under 0.25: it is setting), the sun rises from
@@ -138,13 +157,13 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   way a palette's `sunUp` and `sunAround` are where its light is at that
   hour. Where the Apple TV knows the real sunrise and sunset, the hour is
   moved first so that the clock's day comes up and goes down with the real
-  one (`scene/outside.ts`): a place's palettes don't change for it. Indoors
+  one (`apps/web/src/scene/outside.ts`): a place's palettes don't change for it. Indoors
   the "sun" is the light coming in at the window and the sky what is seen
   through it; a lamp at night can be a warm "sun". `stars` (0 to 1) is how
   dark it is. `env` scales the reflections in the set's `materials`.
-- **Weather** (`scene/weather.ts`): clear, overcast, mist or light rain, from
+- **Weather** (`apps/web/src/scene/weather.ts`): clear, overcast, mist or light rain, from
   the Weather tool or, on "Now", the weather outside where the Apple TV can
-  tell it (`scene/outside.ts`), else a forecast worked out from the clock. Every
+  tell it (`apps/web/src/scene/outside.ts`), else a forecast worked out from the clock. Every
   place gets its light from it without doing anything, as much as its
   optional `open` lets in (1 if not said; the lab's is 0.4 and the bar's
   0.35, as they see the sky only through windows, and after dark, lit by
@@ -156,8 +175,8 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   `kind`) as their last argument, which a place that ignores it can leave off.
   A windowsill can run rain down its pane by `rain` and leave it streaked by
   `wet`; the picnic's rain, wet table, overcast deck, mist and rainbow are
-  worked examples (`places/picnic/rain.ts`, `table.ts`, `backdrop.ts`), and
-  the lab shows it in the view through its windows (`places/lab/room.ts`). Rain
+  worked examples (`apps/web/src/places/picnic/rain.ts`, `table.ts`, `backdrop.ts`), and
+  the lab shows it in the view through its windows (`apps/web/src/places/lab/room.ts`). Rain
   bursts the bubbles and sends the fireflies to shelter wherever they are.
 - **What the fly's eyes see** (`SceneSet.seen`): the big shapes only. They are
   rendered six times at 16 or 32 pixels for the brain's eyes, so the small
@@ -186,12 +205,12 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   for a brain without eyes). Food goes into the pantry with `pantry.add`, to
   be found by walking and tasting. Start comings and goings only while
   `quiet`, so what the fly does while someone plays answers what they do. The
-  picnic's (`places/picnic/life.ts`, paced in `pace.ts`) are the worked
+  picnic's (`apps/web/src/places/picnic/life.ts`, paced in `pace.ts`) are the worked
   example.
-- **A shadow passing over** (`scene/shade.ts`, optional): `shaded(material)`
+- **A shadow passing over** (`apps/web/src/scene/shade.ts`, optional): `shaded(material)`
   teaches a lit material to take a shadow cast from high up (the picnic's
   gull), set in `SHADE`; the fly takes it already.
-- **A clock** (`scene/clock.ts`, optional): a `WallClock`, updated in the
+- **A clock** (`apps/web/src/scene/clock.ts`, optional): a `WallClock`, updated in the
   place's `update`, turns a dial's hands to the real time by a uniform; the
   hands are drawn in the dial's own material (`CLOCK_GLSL`, found by where the
   dial is in the world, `onDial`), so they cost no draw. It tells the real
@@ -281,7 +300,7 @@ TV has (`places/restaurant/`):
   about half a second on the TV. Keep it there, or build in steps
   (`SceneSet.more`, above): then `data-place-step-ms` is the longest frame
   of it, and that is what to keep there.
-- **Register it** in `catalog.ts` and `index.ts`. `apps/web/tests/places.test.ts`
+- **Test it.** After registration, `apps/web/tests/places.test.ts`
   then checks it like every other place: the fly starts standing on the table,
   its food can be tasted where it lies with room over it for a fly, it has
   every time of day, and every shot keeps the camera out of everything with

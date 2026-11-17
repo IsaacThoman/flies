@@ -1,5 +1,7 @@
 # packages/fly
 
+Historical timings and trial counts have [measurement provenance](../../docs/measurements.md).
+
 The fly's body: a male *Drosophila melanogaster* built entirely in code (no
 model files, no downloaded textures), posed every frame from a `FlyPose`.
 It implements `FlyModel` from `packages/contracts/src/fly.ts`:
@@ -37,7 +39,7 @@ measurements are in `src/anatomy.ts`; the shapes and colours in `src/body.ts`.
 
 `src/nerves/` builds the fly's brain, optic lobes, neck connective, ventral
 nerve cord and nerves, inside the body, for the game's X-ray and its corner
-panel (the game's README, Its nervous system, says how they are shown and
+panel ([the game reference](../../docs/simulation.md#its-nervous-system) says how they are shown and
 lit). `createFly()` returns it as `nerves`: its 93 parts (`parts.ts`: each
 with a role, sensory, central or motor, and a kind), a `glow` array the game
 fills (a float a part), and `xray`, 0 to 1.

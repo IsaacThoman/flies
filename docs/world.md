@@ -9,7 +9,7 @@ place is built behind the veil, and it is set down there.
 
 [Adding a place](places.md) describes how the world and its scene are built.
 
-## Places, light and weather
+## Picnic
 
 The first place is the picnic: a round café table by a lake: lemonade, a jam
 jar, a strawberry and a half, cherries, a slice of orange, a green apple,
@@ -44,6 +44,8 @@ the moon's, so at night it is faint, to the player and to the fly's eyes alike
 (drawn as bright as by day, each one drifting past set the fly off now and
 then with nothing thrown at it). At dusk and at
 night fireflies drift round the table and blink.
+
+## Light, weather and visitors
 
 The sky follows the clock unless you choose a time (the **Light** tool):
 between each place's five palettes the colours ease with the hour, the sun
@@ -125,6 +127,8 @@ leaf are in the fly's world only as things it sees (and, for a brain without
 eyes, things that can loom); they keep clear of it, and none of it is aimed
 or timed at the fly: what it does about any of it is its brain's.
 
+## Windowsill
+
 The windowsill is the deep sill of a cottage kitchen window, painted cream
 over sage over pine, its old gloss crazed where the sun bakes it and chipped
 along its front edge, its bottom rail flaking and tide-marked where
@@ -161,6 +165,8 @@ in mist the houses fade to ghosts; in the rain it falls across the garden,
 drops bead on the pane and run down it, and it stays streaked as it dries.
 There are no bubbles or fireflies indoors.
 
+## Lab bench
+
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
 wiring was traced: a stereo microscope with a fly pad on its stage (its base
 and pillar are solid; a fly can land on it), a rack of plugged vials with
@@ -188,6 +194,8 @@ room is dark round it but for lit windows across the way. Under a grey sky the
 view outside goes flat and grey, in mist it fades to a pale veil, and in the
 rain it falls past the windows. There are no bubbles or fireflies indoors.
 
+## Bar
+
 The bar is the walnut counter of a small, warm bar in the evening: a cocktail
 on the rocks with a wedge of lime on its rim, a tall beer with its head of
 foam, salted peanuts heaped in a fluted ramekin (two have fallen out), two
@@ -214,6 +222,8 @@ the counter and the glasses throw long shadows coloured by what is in them; at
 dusk and night the lamps, the flickering candle and the back bar light it, and
 lights out of focus glow behind the fly.
 
+## Footprints
+
 Wherever it lives, a fly that has stood in something sticky or wet leaves
 footprints (`apps/web/src/scene/prints.ts`): faint prints of the two pads of
 its feet, each where its gait set that foot down, lying on whatever it walks
@@ -229,6 +239,8 @@ anything drawn rougher than the fly feels it, and they stay behind when the
 fly is carried somewhere else. They are only drawn: the fly doesn't taste or
 feel its own prints, they aren't food, and nothing about them reaches its
 brain.
+
+## Restaurant
 
 The restaurant is a whole room, not a tabletop: a small city bistro, closed
 for the night. The fly starts on a round marble table in the window, between

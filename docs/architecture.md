@@ -5,14 +5,14 @@ your TV, which you can feed, startle and watch. The fly is not scripted. A
 simulation of the fruit fly's whole central nervous system decides what it
 does, from what it sees, tastes and feels in the world.
 
-The game currently has no sound, by design, pending a new sound design.
+The game currently has no sound, by design.
 
 ## The parts
 
 | Path | What it is |
 | --- | --- |
 | `packages/brain` | The nervous system: 166,700 spiking neurons wired from the FlyEM male CNS connectome (CC-BY 4.0). TypeScript. Its README is the reference for the model and its limits. |
-| `packages/brain-native` | The same simulation in C++, behind the C interface in `include/fly_brain.h`, for the Apple TV, and built as WebAssembly for browsers. |
+| `packages/brain-native` | The same simulation in C++, behind the C interface in `packages/brain-native/include/fly_brain.h`, for the Apple TV, and built as WebAssembly for browsers. |
 | `packages/fly` | The fly's body: a 3D model that knows how a fly moves its legs, wings and mouthparts, with its nervous system drawn inside it. |
 | `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver, the weather outside, a table's line to its room, typing into a field the game draws. |
 | `packages/net` | How flies share a table: the wire format, the room's clock, other flies as they are heard of, the shared food, balls and bubbles, and what a player may do. Runs in a browser and in Node. |
@@ -66,13 +66,13 @@ world, as yours do. Nothing else passes from fly to fly.
 
 1. **The brain decides.** Nothing the fly does is scripted around the brain.
    The body may add reflexes the model has no way to produce, and each one is
-   written down as such where it lives and in the README. The largest is
+   written down as such where it lives and in [the body reference](simulation.md#what-the-body-adds). The largest is
    flight itself: in a fly, losing the ground under its feet keeps the wings
    beating (the tarsal reflex), and nothing in the model does that (the wings'
    own sensors feed their strokes back, too weakly to keep them going), so
    once the giant fiber has taken the fly off, the body holds its wings at
    flight power for a while and lets it glide down (`packages/body/src/behavior.ts`,
-   the README's Flight). The brain still decides whether to go, steers, and can
+   [Flight](simulation.md#flight)). The brain still decides whether to go, steers, and can
    drive its wings harder; how long it stays up is the stand-in's. No neuron is both
    driven and read by a command; what is read only for display (the regions,
    the vision stages) feeds no command. Every departure from the connectome is
@@ -91,7 +91,5 @@ world, as yours do. Nothing else passes from fly to fly.
 
 ## The brain belongs to this project
 
-The brain began as a copy of the [Computerbug desktop pet's](https://github.com/IsaacThoman/ladybug).
-It is now independent: model changes are made here directly, with no need to
-keep either project in step with the other. `packages/brain` is the TypeScript
-reference and `packages/brain-native` is this game's matching C++ implementation.
+`packages/brain` is the TypeScript reference and `packages/brain-native` is
+this game's matching C++ implementation. Model changes are made here directly.

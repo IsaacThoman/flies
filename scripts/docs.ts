@@ -39,7 +39,8 @@ export function checkDocs(root: string, files: string[]): string[] {
   const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts ?? {};
   const sourceFiles = files.map(file => file.replaceAll('\\', '/'));
   const mdAnchors = new Map<string, Set<string>>();
-  const has = (path: string) => existsSync(resolve(root, path));
+  // Ignored build output must not make a stale source reference pass locally.
+  const has = (path: string) => sourceFiles.some(file => file === path || file.startsWith(`${path.replace(/\/$/, '')}/`));
   for (const doc of sourceFiles.filter(file => file.endsWith('.md'))) {
     const raw = readFileSync(join(root, doc), 'utf8');
     const body = prose(raw);
@@ -93,17 +94,25 @@ export function checkDocs(root: string, files: string[]): string[] {
       else if (match[2] !== undefined) report(match.index, `undefined link reference ${label}`);
     }
     for (const match of links.matchAll(/\b(?:href|src)=["']([^"']+)["']/g)) checkLink(match[1], match.index);
-    const generated = [...raw.matchAll(/<!-- docs-check: generated (.+?) -->/g)].map(match => match[1]);
+    const generated = [...raw.matchAll(/<!-- docs-check: (?:generated|external) (.+?) -->/g)].map(match => match[1]);
     for (const match of body.matchAll(/(?<!`)`([^`\n]+)`(?!`)/g)) {
       const token = match[1];
       if (/\s|[<>{}*|=():?]/.test(token) || token.startsWith('/') || token.startsWith('--')) continue;
       if (!/^(?:\.?\.?\/|apps\/|packages\/|scripts\/|docs\/|assets\/|\.github\/)/.test(token)
-          && !/^[\w.-]+\.(?:md|ts|js|mjs|json|mm|cpp|h|swift|yml|yaml|sh)$/.test(token)) continue;
+          && !/^[\w./-]+\.(?:md|ts|js|mjs|json|mm|cpp|hpp|h|swift|yml|yaml|sh|wasm|bin|html|webmanifest|png|csv|txt|gz|xcprivacy)$/.test(token)) continue;
       const clean = token.replace(/#.*$/, '').replace(/\/$/, '');
       if (generated.includes(token)) continue;
       if (has(clean) || has(normalize(join(dirname(doc), clean)))) continue;
       if (!clean.includes('/') && sourceFiles.some(file => file.endsWith(`/${clean}`))) continue;
       report(match.index, `missing file reference ${token}`);
+    }
+    for (const match of raw.matchAll(/(?<![\w./-])(?:apps|packages|scripts|docs|assets|\.github)\/[\w./-]+\.(?:md|ts|js|mjs|json|mm|cpp|hpp|h|swift|yml|yaml|sh|wasm|bin)\b/g)) {
+      const path = match[0];
+      if (!has(path) && !has(normalize(join(dirname(doc), path))) && !generated.includes(path)) {
+        const line = raw.slice(0, match.index).split('\n').length;
+        const message = `${doc}:${line}: missing file reference ${path}`;
+        if (!errors.includes(message)) errors.push(message);
+      }
     }
     for (const match of raw.matchAll(/\bnpm\s+run\s+(?:(?:--silent|-s)\s+)?([\w:-]+)/g)) {
       if (!(match[1] in scripts)) {

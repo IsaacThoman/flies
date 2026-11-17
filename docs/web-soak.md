@@ -1,6 +1,7 @@
 # Browser soak
 
-Run `npm install` and `npm run brain:fetch` first. The harness uses Playwright's
+Run `npm install` and `npm run brain:fetch` first. Install Chromium with `npx playwright install chromium`, or set
+`CHROMIUM_PATH` to an existing Playwright Chromium executable. The harness uses Playwright's
 headless Chromium with the GPU enabled and a real brain worker in every page.
 There is no simulated or accelerated time.
 
@@ -11,21 +12,22 @@ npm run soak:web -- --phases climate,eyes --minutes 10 --interval 10
 npm run soak:web -- --phases wallpaper --places picnic --wallpaper-time noon --wallpaper-weather clear --wallpaper-minutes 60
 ```
 
-`e2e:soak` is the separate, roughly two-minute CI check beside `npm run e2e`:
-four circuits (16 place visits), then table join/leave churn and four cleanup
-visits, with assertions that textures return exactly
+`e2e:soak` is a quick check separate from `npm run e2e`; the current CI
+workflow does not invoke it. It makes four circuits (20 place visits), then
+table join/leave churn and five cleanup visits, with assertions that textures return exactly
 to each place's warmed baseline. Geometry may vary by one and programs by two:
 the fireflies' first appearance uploads a persistent mesh and its program.
 The default full run uses 200 circuits, 30 minutes per interaction phase, and
-60 minutes of screensaver **in each place**. Options:
+60 minutes of screensaver **in each place**. The CLI retains `wallpaper` in phase and flag names; the player-facing name
+is screensaver. Options:
 
 | Option | Meaning |
 | --- | --- |
 | `--phases places,climate,tools,menus,eyes,tables,wallpaper` | Select phases; default all, or places/tables with `--quick`. |
-| `--cycles 200` | Full four-place circuits in the places phase. |
+| `--cycles 200` | Full five-place circuits in the places phase. |
 | `--minutes 30` | Minimum real minutes per other interaction phase. Climate finishes a complete matrix even if this takes longer. |
-| `--wallpaper-minutes 60` | Real minutes per place, in four parallel isolated contexts. |
-| `--places picnic,windowsill,lab,bar` | Places to run screensaver in; interaction phases still visit every place. |
+| `--wallpaper-minutes 60` | Real minutes per place, in one isolated context per selected place. |
+| `--places picnic,windowsill,lab,bar,restaurant` | Places to run screensaver in; interaction phases still visit every place. |
 | `--wallpaper-time clock` | Clock or a held daylight preset (morning/noon/golden/dusk/night). |
 | `--wallpaper-weather now` | Forecast or a held weather preset (clear/overcast/mist/rain). |
 | `--interval 10` | Sample interval in seconds. Overruns skip a tick; GCs never queue indefinitely. |
@@ -34,7 +36,7 @@ The default full run uses 200 circuits, 30 minutes per interaction phase, and
 | `--url http://localhost:5173/` | Use an existing server; otherwise start and stop Vite. |
 | `--quick` | Four circuits and strict resource assertions. Keep the places phase when selecting phases. |
 
-Interaction runs in a fifth context alongside screensaver. Each screensaver page
+Interaction runs in a separate context alongside screensaver. Each screensaver page
 is pinned to its place and by default follows the real clock and forecast.
 The interaction page waits for `data-moving` to clear between places; climate visits every
 weather and all five daylight presets plus the clock, holding each combination
@@ -97,5 +99,16 @@ checks a real hidden tab with seven peers and reconnection on wake.
 Run `npm run tvos:soak -- --device <udid> --minutes 60` on the Apple TV for that
 last evidence. It now visits every place, weather and daylight preset, pins each
 place against rotation, and divides its requested screensaver minutes among all
-four places, half midday and half night. Interaction time is additional. Keep
+five places, half midday and half night. Interaction time is additional. Keep
 raw CSVs, logs and charts out of git; retain a compact results table in the PR.
+
+## Reproducing a failure
+
+Keep the command, commit, browser version, machine, CSV and console error
+outside git. Repeat the same command and compare matching phase/place
+checkpoints. Use `--phases` to isolate the failing phase and `--places` for
+its screensaver pages; interaction still visits every place. Keep
+`--phases places,tables --quick` for strict quick resource assertions.
+A count that grows during play but returns at each warmed checkpoint is
+not itself evidence of a leak. The check cannot replay the exact same
+brain trajectory: the browser runs in real time.

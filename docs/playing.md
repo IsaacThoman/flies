@@ -23,6 +23,8 @@ fly's world.
 | Play/Pause, or Back | The menu. Play/Pause, or Play on it, carries on. |
 | Back on the menu | Leaves the app. |
 
+## Touch, mouse and trackpad
+
 Pointing, the screen itself is what you press, and there are no button hints:
 
 | | With a finger | With a mouse or trackpad |
@@ -37,6 +39,8 @@ Pointing, the screen itself is what you press, and there are no button hints:
 | Tools | Tap one on the shelf. | Click one; the wheel over the shelf steps along it. |
 | Menus | Tap a row, a tab, a choice's arrows; a slider follows the finger. The round button at the top left, or a tap outside the pane, goes back. | The same, and a right click goes back. Hovering only brightens what is under the cursor: the focus ring is the remote's and the keys'. |
 | The menu | The round button at the top left. | The same. |
+
+## Keyboard and game pad
 
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
 Back, space for Play/Pause), its hints drawn as keys; the number keys pick a
@@ -61,6 +65,8 @@ show the thing last used, and the screen hides the system's cursor, text
 selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
 
+## Tools
+
 The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
 beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
@@ -84,6 +90,8 @@ something to find. It comes back to the view last chosen (but never through
 the fly's eyes, which would open on no fly at all), and to a time of day or a
 weather chosen in the last six hours; after that it is back on Now, so the
 screensaver follows the clock again.
+
+## Camera
 
 The camera (`apps/web/src/camera.ts`) works like a patient nature cameraman.
 In Follow the fly is about 170 pixels long, seen from low down and a little
@@ -113,6 +121,8 @@ turn of the wheel is one smooth move. Handed back (R, a double click or tap in
 the air, the pad's right stick pressed in), or a view chosen on the View tool,
 the cameraman takes it at once, at the named view nearest your zoom or the one chosen.
 The screensaver takes it too, and gives your zoom back after.
+
+## Screensaver and corner pictures
 
 After 30 seconds with no press (Settings → Screensaver: 15 s to 5 min, or never)
 the hints, the shelf and the pointer fade, and the camera settles beside the
@@ -160,6 +170,8 @@ MDN, DNp01, the flight motor neurons, DNg12, MN9, pIP10) in Hz: the senses besid
 screen, or split in two on a short one. It is drawn again only when a figure
 or a bar it shows changes, at most four times a second.
 
+## Menu and settings
+
 There is one menu: the title at launch, and the same menu from play (Back,
 Play/Pause, or the button at the top left), with the fly living on behind it.
 It has **Play**, **Watch** (the screensaver straight away), **About**, and
@@ -169,8 +181,8 @@ its camera films, where the fly lives, and, on an Apple TV that can tell,
 the real weather), **On screen** (everything that can show over the world:
 what it sees, its nervous system and its stats in the corners, what the
 stats are of, the corners' size and opacity, and the X-ray), and **Picture**
-(pixel size, the eyes' detail, button hints, rumble, frame stats). In a browser it
-also has **Online**, rooms shared with others. The menu never scrolls
+(pixel size, the eyes' detail, button hints, rumble, frame stats). It also has **Online**, rooms shared with others on the web, Apple TV,
+iPhone and iPad. The menu never scrolls
 either: on a screen too short for its rows (a phone on its side) they are
 in two columns, Left and Right going across, Up and Down along the list as
 ever. Where the settings' tabs are too
