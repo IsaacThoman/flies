@@ -74,6 +74,12 @@ export class Menu {
     this.#keepInView();
   }
 
+  /** A tab strip stays available while its settings scroll beneath it. */
+  get pinned(): number {
+    const first = this.items[0];
+    return this.rows > 1 && first?.kind === "choice" && first.tabs ? 1 : 0;
+  }
+
   get focused(): MenuItem | undefined {
     return this.items[this.focus];
   }
@@ -160,7 +166,7 @@ export class Menu {
     if (next === this.scroll) return false;
     this.scroll = next;
     const last = this.scroll + this.rows - 1;
-    if (this.focus < this.scroll) this.focus = this.#nextEnabled(this.scroll - 1, 1) ?? this.focus;
+    if (this.focus >= this.pinned && this.focus < this.scroll + this.pinned) this.focus = this.#nextEnabled(this.scroll + this.pinned - 1, 1) ?? this.focus;
     else if (this.focus > last) this.focus = this.#nextEnabled(last + 1, -1) ?? this.focus;
     return true;
   }
@@ -232,7 +238,7 @@ export class Menu {
 
   #keepInView() {
     const maxScroll = Math.max(0, this.items.length - this.rows);
-    if (this.focus < this.scroll) this.scroll = this.focus;
+    if (this.focus < this.scroll + this.pinned) this.scroll = Math.max(0, this.focus - this.pinned);
     if (this.focus >= this.scroll + this.rows) this.scroll = this.focus - this.rows + 1;
     this.scroll = Math.min(maxScroll, Math.max(0, this.scroll));
   }

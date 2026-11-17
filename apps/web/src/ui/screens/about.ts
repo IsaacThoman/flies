@@ -38,8 +38,8 @@ export function weatherBlock(a: WeatherAttribution): Block {
   };
 }
 
-const BODY = 15;
-const LINE = 21;
+const BODY = 16;
+const LINE = 23;
 const HEADING = 19;
 
 export class AboutScreen implements Screen {

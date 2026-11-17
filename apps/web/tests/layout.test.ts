@@ -322,3 +322,51 @@ test("the loading screen and its failure panel: where they always were on the TV
     assert.equal(hit?.kind, LOADING_HITS.retry, `${name}: Try again is where it is drawn`);
   }
 });
+
+test("touch controls meet 44 CSS pixels on the requested phone and tablet shapes", () => {
+  const world = createPicnic();
+  for (const [width, height] of [[390, 844], [844, 390], [1024, 1366]]) {
+    const frame = frameFor(width, height, undefined, true);
+    const s = shell(frame);
+    const settings = settingsScreen(s);
+    settings.press("right", false);
+    const hits = new HitMap();
+    settings.draw(blankCanvas(), 0, hits);
+    for (let i = 0; i < hits.count; i++) {
+      const h = hits.get(i)!;
+      if (h.kind !== "panel") assert.ok(Math.min(h.w, h.h) * frame.unit >= 44, `${width}×${height}: ${h.kind} meets the touch minimum`);
+    }
+    const hands = new Hands(world);
+    hits.begin("play");
+    drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "walking", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, spikes: 0, brainRunning: true, eyes: null, layout: hudLayout(frame) }, hits);
+    for (let i = 0; i < hits.count; i++) {
+      const h = hits.get(i)!;
+      assert.ok(Math.min(h.w, h.h) * frame.unit >= 44, `${width}×${height}: HUD ${h.kind} meets the touch minimum`);
+    }
+  }
+});
+
+test("the landscape room form keeps Back clear of every field", () => {
+  const frame = frameFor(844, 390, undefined, true);
+  const online = new OnlineScreen(shell(frame));
+  online.menu.focusOn("new");
+  online.press("select", false);
+  const hits = new HitMap();
+  online.draw(blankCanvas(), 0, hits);
+  const all = Array.from({ length: hits.count }, (_, i) => hits.get(i)!);
+  const back = all.find((h) => h.kind === "back")!;
+  assert.ok(back);
+  for (const field of all.filter((h) => h.kind === "row")) assert.ok(!overlaps(back, field), `Back stays clear of row ${field.index}`);
+});
+
+test("the Settings tab strip stays available at the bottom of a short screen", () => {
+  const screen = settingsScreen(shell(frameFor(844, 390, undefined, true)));
+  screen.press("right", false);
+  screen.menu.focusOn("xray");
+  assert.ok(screen.menu.scroll > 0);
+  const hits = new HitMap();
+  screen.draw(blankCanvas(), 0, hits);
+  assert.ok(Array.from({ length: hits.count }, (_, i) => hits.get(i)!).some((h) => h.kind === "tab" && h.index === 0));
+  screen.menu.scrollBy(-1);
+  assert.ok(screen.menu.focus >= screen.menu.scroll + screen.menu.pinned);
+});

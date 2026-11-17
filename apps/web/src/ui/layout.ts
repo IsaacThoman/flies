@@ -55,7 +55,7 @@ export type HudLayout = {
 /** The TV's shelf: the space each tool has, and how far apart its halves are (the tools that act on the fly, and those about its world and the camera); narrower, they come closer, then the tools do. */
 const SHELF_GAP = 52;
 const SHELF_APART = 32;
-const SHELF_APART_LEAST = 20;
+const SHELF_APART_LEAST = 12;
 /**
  * The picture through the fly's eyes, as the TV has it: the share of the
  * width its panel takes, its top and bottom as shares of the height, the
@@ -132,7 +132,7 @@ export type MenuPanel = {
   panel: Rect;
   /** The heading's baseline and size, or none where there isn't room. */
   heading: { y: number; size: number } | null;
-  list: { x: number; y: number; width: number; row: number; gap: number; compact: boolean; columns: number };
+  list: { x: number; y: number; width: number; row: number; gap: number; compact: boolean; columns: number; scrollControls?: boolean };
   rows: number;
 };
 
@@ -168,7 +168,7 @@ export function fitMenu(space: Rect, spec: MenuPanelSpec): MenuPanel {
   const tiers = [
     { row: compact ? 54 : spec.row, gap: compact ? 8 : 12, top: spec.heading ? 70 : 26, foot: spec.foot, heading: spec.heading ? { dy: 46, size: 28 } : null },
     { row: compact ? 52 : spec.row, gap: 8, top: spec.heading ? 56 : 18, foot: 18, heading: spec.heading ? { dy: 38, size: 24 } : null },
-    { row: compact ? 50 : Math.max(34, spec.row - 4), gap: 6, top: 14, foot: 14, heading: null },
+    { row: compact ? 50 : Math.max(36, spec.row - 4), gap: 6, top: spec.heading ? 48 : 14, foot: 14, heading: spec.heading ? { dy: 32, size: 22 } : null },
   ];
   const fits = (t: (typeof tiers)[number]) => Math.floor((room - t.top - t.foot + t.gap) / (t.row + t.gap));
   // A list short enough to show whole: the roomiest spacing that shows it all, in two columns if it may and one won't do. One that scrolls anyway: the roomiest that shows a few rows, keeping its heading.
@@ -188,7 +188,7 @@ export function fitMenu(space: Rect, spec: MenuPanelSpec): MenuPanel {
   return {
     panel: { x, y, w: width, h },
     heading: tier.heading ? { y: y + tier.heading.dy, size: tier.heading.size } : null,
-    list: { x: x + pad, y: y + tier.top, width: listWidth, row: tier.row, gap: tier.gap, compact, columns },
+    list: { x: x + pad, y: y + tier.top, width: listWidth - (rows < spec.items ? 44 : 0), row: tier.row, gap: tier.gap, compact: compact || (spec.values && listWidth - (rows < spec.items ? 44 : 0) < 380), columns, ...(rows < spec.items ? { scrollControls: true } : {}) },
     rows,
   };
 }

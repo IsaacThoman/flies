@@ -131,15 +131,15 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       choice("eyesInset", "Fly POV", SHOWN),
       choice("nerves", "Nervous system", SHOWN),
       choice("statsPanel", "Stats", SHOWN),
-      choice("statsKind", "Stats of", STATS),
-      choice("overlaySize", "Size", SIZE),
-      choice("overlayOpacity", "Opacity", OPACITY),
+      choice("statsKind", "Stats content", STATS),
+      choice("overlaySize", "Overlay size", SIZE),
+      choice("overlayOpacity", "Overlay opacity", OPACITY),
       choice("xray", "X-ray", SHOWN),
     ],
   },
   picture: {
     heading: "Picture",
-    rows: () => [choice("pixels", "Pixels", PIXELS), choice("eyes", "The fly's eyes", EYES), choice("hints", "Button hints", ON_OFF), choice("rumble", "Rumble", ON_OFF), choice("stats", "Frame stats", ON_OFF)],
+    rows: () => [choice("pixels", "Pixels", PIXELS), choice("eyes", "Vision detail", EYES), choice("hints", "Button hints", ON_OFF), choice("rumble", "Rumble", ON_OFF), choice("stats", "Frame stats", ON_OFF)],
   },
 };
 

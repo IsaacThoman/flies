@@ -49,8 +49,8 @@ export function glassPanel(g: Ctx, x: number, y: number, w: number, h: number, r
   if (style.shadow !== false) softShadow(g, x, y, w, h, r, 10, 0.28);
   const body = g.createLinearGradient(0, y, 0, y + h);
   if (tint === "night") {
-    body.addColorStop(0, "rgba(40, 70, 130, 0.86)");
-    body.addColorStop(1, "rgba(10, 24, 60, 0.9)");
+    body.addColorStop(0, "rgba(24, 47, 91, 0.96)");
+    body.addColorStop(1, "rgba(8, 20, 47, 0.98)");
   } else if (tint === "mint") {
     body.addColorStop(0, "rgba(236, 255, 248, 0.9)");
     body.addColorStop(0.5, "rgba(190, 245, 226, 0.84)");
@@ -65,7 +65,7 @@ export function glassPanel(g: Ctx, x: number, y: number, w: number, h: number, r
   g.fill();
   // The gloss: a bright band over the top half.
   const gloss = g.createLinearGradient(0, y, 0, y + h * 0.5);
-  gloss.addColorStop(0, tint === "night" ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.85)");
+  gloss.addColorStop(0, tint === "night" ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.85)");
   gloss.addColorStop(1, "rgba(255,255,255,0.05)");
   roundedRect(g, x + 3, y + 3, w - 6, h * 0.46, Math.max(0, r - 3));
   g.fillStyle = gloss;

@@ -143,3 +143,23 @@ test("an eased value settles on its target", () => {
   for (let i = 0; i < 200 && moving; i++) moving = e.update(1 / 60);
   assert.equal(e.value, 1);
 });
+
+test("scrolling a tabbed menu keeps the tab strip separate from visible settings", () => {
+  const tabs = { kind: "choice", id: "tabs", label: "", tabs: true, options: [{ value: 0, label: "Page" }], index: 0 } as const;
+  const menu = new Menu([tabs, ...Array.from({ length: 7 }, (_, i) => ({ kind: "action" as const, id: String(i), label: String(i) }))], { rows: 4 });
+  menu.focusOn("6");
+  assert.equal(menu.scroll, 4);
+  assert.equal(menu.pinned, 1);
+  menu.press("up");
+  menu.press("up");
+  menu.press("up");
+  assert.equal(menu.focus, 4);
+  assert.equal(menu.scroll, 3);
+  menu.focusIndex(0);
+  assert.equal(menu.scroll, 0);
+  menu.scrollBy(4);
+  assert.equal(menu.focus, 0);
+  menu.press("down");
+  assert.equal(menu.focus, 1);
+  assert.equal(menu.scroll, 0);
+});

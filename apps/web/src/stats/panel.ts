@@ -46,7 +46,7 @@ const GAP = 8;
 export const REDRAWS = 4;
 
 const VALUE = { size: 13, color: "#ffffff" };
-const UNIT = { size: 9, color: "rgba(220, 240, 255, 0.72)" };
+const UNIT = { size: 10, color: "#e4f3ff" };
 
 /** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger, internal state, 1 when left out. */
 const SENSES = [
