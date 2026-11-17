@@ -137,11 +137,14 @@ export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: nu
 
 export async function escapeBattery(data: ArrayBuffer, perRatio: number, hour: number, checkpoint: () => Promise<void>, seedBase = 10000) {
   if (!Number.isInteger(perRatio) || perRatio < 1 || perRatio > 100) throw new Error('trials must be an integer in [1,100] per ratio and pattern');
+  if (!Number.isFinite(hour) || hour < 0 || hour >= 24) throw new Error('hour must be in [0,24)');
+  if (!Number.isInteger(seedBase) || seedBase < 0 || seedBase + 14 * perRatio > 0x100000000) throw new Error('trial seeds must be uint32');
+  const firstSeed = seedBase;
   const trials: EscapeTrial[] = [];
   for (const kind of ['black', 'checkerboard'] as const) for (const lv of LV_MS) for (let n = 0; n < perRatio; n++) {
     trials.push(await opticalTrial(data, kind, lv, seedBase++, hour, checkpoint));
     process.stderr.write(`${kind} l/v=${lv} ms: ${n + 1}/${perRatio}\n`);
   }
   for (const kind of ['flash', 'blank'] as const) for (let n = 0; n < perRatio; n++) trials.push(await opticalTrial(data, kind, 40, seedBase++, hour, checkpoint));
-  return { protocol: { hour, sunrise: 6, sunset: 18, lvMs: LV_MS, perRatio, screen: SCREEN, source: 'Fotowat et al. 2009, Figures 1–3; Visual stimulation; Video recordings and analysis', limitations: ['Clock time was not reported in the publication; assay pins ZT0 to remove clock variation.', 'The virtual 5 mm platform reproduces the funnel exit diameter, not climbing inside the funnel.', 'Facet luminance preserves measured contrast ratios; spectral composition and absolute photon flux are not modeled.', 'Flash is a uniform 25 ms luminance-off surrogate, not a geometric model of four LEDs.', 'Takeoff time resolution is 5 ms; powered-flight criterion is 50 ms with wing drive ≥0.6 and wingbeat >0.15, not a reconstruction of wing kinematics.', 'The final square is held for a 250 ms response window; negative TTC responses are retained. Flash has a 250 ms onset response window.'] }, trials, summary: summarizeEscape(trials) };
+  return { protocol: { hour, sunrise: 6, sunset: 18, lvMs: LV_MS, perRatio, firstSeed, screen: SCREEN, source: 'Fotowat et al. 2009, Figures 1–3; Visual stimulation; Video recordings and analysis', limitations: ['Clock time was not reported in the publication; assay pins ZT0 to remove clock variation.', 'The virtual 5 mm platform reproduces the funnel exit diameter, not climbing inside the funnel.', 'Facet luminance preserves measured contrast ratios; spectral composition and absolute photon flux are not modeled.', 'Flash is a uniform 25 ms luminance-off surrogate, not a geometric model of four LEDs.', 'Takeoff time resolution is 5 ms; powered-flight criterion is 50 ms with wing drive ≥0.6 and wingbeat >0.15, not a reconstruction of wing kinematics.', 'The final square is held for a 250 ms response window; negative TTC responses are retained. Flash has a 250 ms onset response window.'] }, trials, summary: summarizeEscape(trials) };
 }
