@@ -429,6 +429,7 @@ Synapse-count asymmetry alone cannot reproduce that physiology.
 
 From the repository root, with dependencies installed:
 
+<!-- docs-check: generated packages/brain/data/annotations.feather -->
 ```sh
 npm run brain:fetch
 curl -fL https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather -o packages/brain/data/annotations.feather
