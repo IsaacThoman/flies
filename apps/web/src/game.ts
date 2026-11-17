@@ -643,6 +643,9 @@ export class Game implements Shell {
   /** Semantic activation is deliberate input, including waking the screensaver. */
   accessInput() {
     this.devices.at = performance.now();
+    // The command is consumed here, outside the remote queue. In particular,
+    // Watch must not be woken by its own activation on the next frame.
+    this.#seenInput = this.devices.at;
     if (this.wallpaper) this.#stopWallpaper();
   }
 

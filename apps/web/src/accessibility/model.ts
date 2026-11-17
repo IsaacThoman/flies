@@ -1,5 +1,7 @@
 // Optional host projection: no DOM, draw calls, polling or simulation commands.
 import type { MenuItem } from "@fly/ui";
+import { MAX_PLAYERS } from "@fly/net";
+import { placeInfo } from "../places/catalog.ts";
 import type { Game } from "../game.ts";
 import { ABOUT } from "../ui/screens/about.ts";
 
@@ -42,15 +44,17 @@ export class MenuAccess {
     const screen = id === "title" || id === "settings" || id === "online" ? g.screens[id] : null;
     const table = g.table;
     const rooms = g.screens.online.view === "rooms" ? g.rooms === null ? "Looking for rooms" : g.rooms.length ? `${g.rooms.length} ${g.rooms.length === 1 ? "room" : "rooms"} available` : "No rooms open" : "";
-    const status = id === "online" ? [g.screens.online.heading, table ? table.joined ? `Joined ${table.name ?? "room"}. Code ${table.code}` : "Joining room" : g.tableEnded === "left" ? "Left the room" : "", rooms].filter(Boolean).join(". ") : id === "title" ? "Brain awake" : "";
+    const atDoor = g.screens.online.view === "door";
+    const context = table?.joined && g.online ? `${placeInfo(g.online.place ?? g.here).name}, ${table.others.length + 1} of ${MAX_PLAYERS} flies, ${g.online.room?.locked ? "Password required" : "No password"}` : "";
+    const status = id === "online" && atDoor ? `${g.knock?.name ?? "Room"}. ${g.screens.online.note ? g.screens.online.heading : "Password required"}` : id === "online" ? [g.screens.online.heading, table ? table.joined ? `Joined ${table.name ?? "room"}. Code ${table.code}` : "Joining room" : g.tableEnded === "left" ? "Left the room" : "", rooms, context].filter(Boolean).join(". ") : id === "title" ? "Brain awake" : "";
     const items = screen ? screen.menu.items.map(projectItem) : [];
     if (id !== "title") items.push({ id: "back", name: id === "play" ? "Open menu" : "Back", kind: "action" });
-    return { key: id === "online" ? `online:${g.screens.online.view}` : id, name: id === "title" ? "Flies" : screen?.heading ?? (id === "play" ? "Playing" : "About"), status, focus: screen?.menu.focused?.id ?? "back", items, body: id === "about" ? ABOUT.map((b) => `${b.heading ?? ""}. ${b.body}`).join("\n\n") : undefined };
+    return { key: id === "online" ? `online:${g.screens.online.view}` : id, name: id === "title" ? "Flies" : id === "online" && atDoor ? `Join ${g.knock?.name ?? "room"}` : screen?.heading ?? (id === "play" ? "Playing" : "About"), status, focus: screen?.menu.focused?.id ?? "back", items, body: id === "about" ? ABOUT.map((b) => `${b.heading ?? ""}. ${b.body}`).join("\n\n") : context || undefined };
   }
 
   send(command: AccessCommand) {
     const g = this.game;
-    g.accessInput();
+    if (command.action !== "focus" || !g.wallpaper) g.accessInput();
     if ((command.id === "retry" || command.id === "back") && command.action === "focus") return;
     if (command.id === "retry") { g.retryBrain(); return; }
     if (command.id === "back") { g.back(); return; }

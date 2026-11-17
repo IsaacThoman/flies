@@ -53,3 +53,21 @@ Browser tree tests do not prove Safari VoiceOver, WKWebView touch exploration, v
 The first axe run caught the existing viewport (`maximum-scale=1, user-scalable=no`), a WCAG zoom violation. The task audit retains it in raw evidence and fails on any additional A/AA rule violations. The adapter does not change the viewport or the touch branch's zoom behavior; adopting accessible page zoom requires coordinating that work.
 
 Keyboard testing rejected a clipped popup `<select>`: its native popup could not change the value reliably in Chromium. Choices use native inline single-selection lists so options and current selection are present in the tree without a popup. WKWebView/VoiceOver behavior remains an acceptance test, not an inference from Chromium.
+
+### Round 1
+
+Key: K7 = untouched build; M4 = semantic host adapters at d9004460. Evidence order randomized separately per reviewer.
+
+| Reviewer | Set | Tasks | Names | Focus | Sighted/cost | Separation | Motion | Colour | Mean | Ranking |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | K7 | 0 | 0 | 0 | 4 | 2 | 0 | 2 | 1.14 | M4 > K7 |
+| 1 | M4 | 7 | 8 | 7 | 7 | 8 | 8 | 6 | 7.29 | M4 > K7 |
+| 2 | K7 | 0 | 0 | 0 | 5 | 2 | 0 | 2 | 1.29 | M4 > K7 |
+| 2 | M4 | 8 | 8 | 7 | 7 | 8 | 8 | 7 | 7.57 | M4 > K7 |
+| 3 | K7 | 0 | 0 | 0 | 4 | 0 | 0 | 1 | 0.71 | M4 > K7 |
+| 3 | M4 | 8 | 8 | 7 | 6 | 8 | 8 | 5 | 7.14 | M4 > K7 |
+
+M4 mean **7.33**, K7 mean 1.05. All three ranked M4 higher. The independent regression reviewer found no demonstrated M4 regression; zoom restriction is shared. Each reviewer inspected built artifacts and transcripts; independent reruns were blocked by occupied heavy slots. Orders: 1: set-K7, set-M4; 2: set-K7, set-M4; 3: set-K7, set-M4; 4: set-M4, set-K7.
+
+Highest-value findings: retain room destination on password errors and place/occupancy/lock context at a joined room; verify list churn, focus returns, screensaver and veil transitions. Response: contextual semantic state and those black-box checks, plus a WebKit attempt. Zoom and sighted place dots remain separate adoption work. The full suite also caught a shifted Place row; Reduce Motion was moved after existing rows rather than changing the tests' expectations.
+

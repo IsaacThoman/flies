@@ -212,7 +212,7 @@ export class OnlineScreen implements Screen {
     const table = shell.table;
     const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
     const rooms = shell.rooms ? shell.rooms.map((r) => `${r.code}:${r.name}:${r.place}:${r.flies}:${r.locked}`).join(",") : "?";
-    const at = table ? `${table.name}|${table.joined}|${table.starting}|${copied}|${table.others.map((o) => this.#removalId(o)).join(",")}` : "alone";
+    const at = table ? `${table.name}|${shell.here}|${table.joined}|${table.starting}|${copied}|${table.others.map((o) => this.#removalId(o)).join(",")}` : "alone";
     return `${this.view}|${this.#note}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}`;
   }
 

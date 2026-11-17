@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { chromium } from "playwright";
+import { chromium, webkit } from "playwright";
 import axe from "axe-core";
 import { build } from "vite";
 import { startServer } from "../../server/src/server.ts";
@@ -16,11 +16,12 @@ const arg = (name: string) => process.argv.includes(name) ? process.argv[process
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "flies-access-"));
 const dir = arg("--site") ?? path.join(scratch, "site");
 const evidence = arg("--evidence");
+const nextTab = arg("--browser") === "webkit" ? "Alt+Tab" : "Tab";
 if (evidence) fs.mkdirSync(evidence, { recursive: true });
 if (!arg("--site")) await build({ logLevel: "warn", build: { outDir: dir, emptyOutDir: true } });
 const site = await serveSite({ dir });
 const rooms = await startServer({ port: 0, dataDir: path.join(scratch, "rooms"), log() {} });
-const browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
+const browser = arg("--browser") === "webkit" ? await webkit.launch({ executablePath: process.env.WEBKIT_PATH }) : await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
 const code = tableCode((bytes) => crypto.getRandomValues(bytes));
 const fake = new WebSocket(`ws://127.0.0.1:${rooms.port}/rooms`);
 await new Promise<void>((resolve, reject) => {
@@ -28,6 +29,7 @@ await new Promise<void>((resolve, reject) => {
   fake.onmessage = (event) => { if (typeof event.data === "string" && JSON.parse(event.data).type === "welcome") resolve(); };
   fake.onerror = () => reject(new Error("Room fixture failed"));
 });
+const extraPeers: WebSocket[] = [];
 const transcript: string[] = [];
 const errors: string[] = [];
 try {
@@ -39,7 +41,10 @@ try {
   async function dump(name: string) {
     const tree = await page.locator("body").ariaSnapshot();
     transcript.push(`\n${name}\n${tree}`);
-    if (evidence) fs.writeFileSync(path.join(evidence, `${name}.tree.txt`), tree);
+    if (evidence) {
+      fs.writeFileSync(path.join(evidence, `${name}.tree.txt`), tree);
+      if (/rooms|joined|password/.test(name)) await page.locator("#game").screenshot({ path: path.join(evidence, `${name}.png`) });
+    }
   }
   // Only inspect the accessibility name/role and move the keyboard focus with Tab.
   async function tab(role: "button" | "textbox" | "listbox", name: string | RegExp) {
@@ -47,7 +52,7 @@ try {
     await target.waitFor();
     for (let n = 0; n < 40; n++) {
       if (await target.evaluate((node) => node === document.activeElement)) return target;
-      await page.keyboard.press("Tab");
+      await page.keyboard.press(nextTab);
     }
     throw new Error(`Tab never reached ${name}`);
   }
@@ -68,6 +73,7 @@ try {
   await dump("playing");
   await activate("Open menu");
   await waitFor(page, "screen=title");
+  assert.equal(await page.getByRole("button", { name: "Play", exact: true }).evaluate((node) => node === document.activeElement), true);
   await activate("Settings");
   await waitFor(page, "screen=settings");
   await tab("listbox", "Starts after");
@@ -77,9 +83,27 @@ try {
   await dump("settings");
   await audit("settings");
   await activate("Back");
+  assert.equal(await page.getByRole("button", { name: "Settings", exact: true }).evaluate((node) => node === document.activeElement), true);
   await activate("Online");
   await waitFor(page, "screen=online");
   await dump("rooms");
+  const garden = await tab("button", /^Garden, Picnic table, 1 of 8 flies, Password required$/);
+  const focusedRoom = await garden.elementHandle();
+  const peer = new WebSocket(`ws://127.0.0.1:${rooms.port}/rooms`);
+  extraPeers.push(peer);
+  await new Promise<void>((resolve, reject) => {
+    peer.onopen = () => peer.send(JSON.stringify({ type: "hello", v: PROTOCOL, table: code, key: crypto.randomUUID(), password: "apples" }));
+    peer.onmessage = (event) => { if (typeof event.data === "string" && JSON.parse(event.data).type === "welcome") resolve(); };
+    peer.onerror = () => reject(new Error("Occupancy fixture failed"));
+  });
+  await page.getByRole("button", { name: /^Garden, Picnic table, 2 of 8 flies, Password required$/ }).waitFor();
+  assert.equal(await focusedRoom!.evaluate((node) => node === document.activeElement), true);
+  await dump("rooms-occupied");
+  peer.send(JSON.stringify({ type: "bye" }));
+  peer.close();
+  await garden.waitFor();
+  assert.equal(await focusedRoom!.evaluate((node) => node === document.activeElement), true);
+  transcript.push("Room occupancy changed 1 → 2 → 1 while the same DOM node retained keyboard focus. Menu focus returned to Play and Settings on navigation.");
   await activate("New room");
   await type("Name", "Orchard");
   await dump("create");
@@ -93,7 +117,7 @@ try {
   // Password fields have no implicit textbox role in browsers.
   const password = page.getByLabel("Password", { exact: true });
   await password.waitFor();
-  for (let n = 0; n < 30 && !await password.evaluate((node) => node === document.activeElement); n++) await page.keyboard.press("Tab");
+  for (let n = 0; n < 30 && !await password.evaluate((node) => node === document.activeElement); n++) await page.keyboard.press(nextTab);
   await page.keyboard.type("wrong");
   await page.keyboard.press("Enter");
   await page.getByRole("status").filter({ hasText: "Wrong password" }).waitFor();
@@ -135,6 +159,34 @@ try {
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Enter");
   assert.equal((await camera()).reduced, true);
+  await page.evaluate(() => {
+    const samples: { veil: number; alpha: number }[] = [];
+    (globalThis as unknown as { __motionSamples: typeof samples }).__motionSamples = samples;
+    const sample = () => {
+      const g = (globalThis as unknown as { __fly: { stage: { veil: number }; uiAlpha: number } }).__fly;
+      samples.push({ veil: g.stage.veil, alpha: g.uiAlpha });
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await tab("listbox", "Where it lives");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await waitFor(page, "place=windowsill,moving=");
+  await activate("Back");
+  await activate("Watch");
+  await waitFor(page, "wallpaper=true");
+  const watching = await camera();
+  await waitForGameTime(page, 2);
+  assert.deepEqual(await camera(), watching);
+  await activate("Open menu");
+  await waitFor(page, "wallpaper=false");
+  const motion = await page.evaluate(() => (globalThis as unknown as { __motionSamples: { veil: number; alpha: number }[] }).__motionSamples);
+  assert.ok(motion.some((s) => s.veil === 1), "place change was observed behind the veil");
+  assert.ok(motion.every((s) => s.veil === 0 || s.veil === 1), "veil cuts without fading");
+  assert.ok(motion.every((s) => s.alpha === 0 || s.alpha === 1), "screensaver UI cuts without fading");
+  transcript.push("Reduced motion: place change sampled only opaque/clear veil; screensaver camera static across two seconds; UI opacity sampled only 0 or 1 on entry and exit.");
+  await activate("Settings");
   if (evidence) {
     // Stop the game's RAF after its pending frame so two screenshots compare the
     // DOM adapter's paint alone, without the fly moving between captures.
@@ -155,6 +207,7 @@ try {
 } finally {
   if (evidence) fs.writeFileSync(path.join(evidence, "transcript.txt"), transcript.join("\n"));
   fake.close();
+  for (const peer of extraPeers) peer.close();
   await browser.close();
   await rooms.stop();
   await site.close();
