@@ -139,17 +139,19 @@ export class WeatherNow implements Weather {
   update(dt: number) {
     const t = this.#target;
     const most = EASE * dt;
-    // Precipitation needs a cloud deck; when it ends the deck lingers.
-    const deck = Math.max(t.cloud, Math.min(0.9, (this.rain + this.snow) * 0.9));
+    // A departing shower leaves its deck behind; observed sun showers retain
+    // their sparse cloud cover rather than waiting forever for an overcast sky.
+    const clearing = this.rain > t.rain || this.snow > (t.snow ?? 0);
+    const deck = clearing ? Math.max(t.cloud, Math.min(0.9, (this.rain + this.snow) * 0.9)) : t.cloud;
     this.cloud = toward(this.cloud, deck, most);
     this.mist = toward(this.mist, t.mist, most);
-    const gathered = clamp((this.cloud - 0.25) / 0.65);
-    this.rain = toward(this.rain, t.rain > this.rain ? Math.min(t.rain, gathered) : t.rain, most);
+    const gathered = t.cloud > 0.25 ? clamp((this.cloud - 0.25) / (t.cloud - 0.25)) : 1;
+    this.rain = toward(this.rain, t.rain > this.rain ? t.rain * gathered : t.rain, most);
     this.wind = toward(this.wind, t.wind, most);
     this.heavy = toward(this.heavy, t.heavy ?? 0, most);
     this.storm = toward(this.storm, t.storm ?? 0, most);
     const snow = t.snow ?? 0;
-    this.snow = toward(this.snow, snow > this.snow ? Math.min(snow, gathered) : snow, most);
+    this.snow = toward(this.snow, snow > this.snow ? snow * gathered : snow, most);
     const melt = this.snowCover * (1 - this.snow) * (1 + this.rain * 3) / 180;
     const deposit = this.snow * (1 - this.snowCover) / 65;
     this.snowCover = clamp(this.snowCover + (deposit - melt) * dt);
