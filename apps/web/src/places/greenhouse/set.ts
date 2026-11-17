@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GREENHOUSE_BENCH, GLAZING, GREENHOUSE_PATCHES, GREENHOUSE_SOLIDS, SAUCER, TRAY, topHeight, topNormal } from "@fly/world";
 import type { Solid } from "@fly/world";
+import { EYE_LAYER } from "../../eyes/eyes.ts";
 import { Batch, paint, random } from "../../scene/build.ts";
 import type { SceneSet } from "../types.ts";
 import { tag } from "../windowsill/surfaces.ts";
@@ -54,12 +55,14 @@ export function buildBench(): SceneSet {
   const group = new THREE.Group();
   const batch = new Batch(), eyes = new Batch();
   const opaque = surfaces(), glass = glazing();
-  const eyeMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+  const eyeMat = new THREE.MeshLambertMaterial({ vertexColors: true });
   const add = (g: THREE.BufferGeometry, color: string | ((p: THREE.Vector3) => string), kind: number) => batch.add(opaque.material, tag(paint(g, color), "kind", kind));
   // Keep the eyes ready when the game binds them, even while detail builds.
   eyes.add(eyeMat, paint(box(0, -15, 0, GREENHOUSE_BENCH.hx * 2, 30, GREENHOUSE_BENCH.hz * 2), "#89705a"));
   for (const s of GREENHOUSE_SOLIDS) if (s.name !== "greenhouse pane") eyes.add(eyeMat, paint(solidGeometry(s, 4, 12), s.name.includes("tomato") ? "#bd4528" : s.name.includes("fig") ? "#60354e" : s.name.includes("crown") || s.name.includes("leaves") ? "#466d3a" : "#8a7960"));
-  const seen = eyes.build(new THREE.Group());
+  for (const p of GREENHOUSE_PATCHES) if (p.name === "tomato juice" && (p.r<2 || p.x===-14)) eyes.add(eyeMat,paint(new THREE.CircleGeometry(p.r,16).rotateX(-Math.PI/2).translate(p.x,0.08,p.z),"#a94422"));
+  const seen = eyes.build(group);
+  for (const mesh of seen) mesh.layers.set(EYE_LAYER);
   function* construct() {
     add(box(0, -15, 0, GREENHOUSE_BENCH.hx * 2, 30, GREENHOUSE_BENCH.hz * 2), "#92794e", K.wood);
     for (const x of [-275, 275]) for (const z of [-160, 160]) add(box(x, -410, z, 35, 790, 35), "#64523d", K.wood);
@@ -121,7 +124,7 @@ export function buildBench(): SceneSet {
         const positions: number[] = [];
         for (const [dx, dz] of [[-0.7, 0], [0, 7], [0.7, 0]]) {
           const x = f.x + dx * Math.cos(a) + dz * Math.sin(a), z = f.z - dx * Math.sin(a) + dz * Math.cos(a);
-          positions.push(x, topHeight(s, x, z) + 0.12, z);
+          positions.push(x, topHeight(s, x, z) + 0.06, z);
         }
         const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3)); g.computeVertexNormals();
         add(g, "#4b6230", K.leaf);

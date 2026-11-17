@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { GREENHOUSE, GREENHOUSE_SOLIDS, SAUCER, TRAY, World, inside, topHeight } from "@fly/world";
 import { buildBench, solidGeometry } from "../src/places/greenhouse/set.ts";
 import { foliage } from "../src/places/greenhouse/foliage.ts";
+import { EYE_LAYER } from "../src/eyes/eyes.ts";
 import { NO_PRINTS } from "../src/scene/prints.ts";
 
 test("greenhouse curved surfaces are sampled directly from their collision tops", () => {
@@ -38,6 +39,9 @@ test("greenhouse detail builds in bounded steps and keeps its eyes available thr
   const set = buildBench();
   assert.equal(set.seen.length, 1);
   const seen = set.seen[0];
+  assert.equal(seen.parent,set.group,"the eyes render the proxy as part of the actual set");
+  assert.equal(seen.layers.mask,1<<EYE_LAYER,"the proxy stays out of the main camera");
+  assert.ok((seen as THREE.Mesh).material instanceof THREE.MeshLambertMaterial,"the eyes see the day and night light");
   let steps = 0;
   while (set.more?.()) {
     assert.equal(set.seen[0], seen);
