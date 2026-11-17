@@ -127,13 +127,13 @@ vec3 surface(vec3 c) {
    vec2 q = vec2(0.939373*d.x+0.342898*d.y,-0.342898*d.x+0.939373*d.y) / vec2(19.0,25.0);
    float flesh = 1.0 - smoothstep(0.62, 0.78, length(q));
    float radius = length(q);
-   float fibres = pow(abs(sin(atan(q.y, q.x) * 46.0 + radius * 24.0 + vnoise(p.xz*0.8)*3.0)), 6.0) * resolved(0.45);
-   vec3 inside = mix(vec3(0.29, 0.035, 0.055), vec3(0.71, 0.22, 0.23), fibres * 0.65 + 0.2 + vnoise(p.xz*0.65)*0.15);
+   float fibres = vnoise(p.xz*vec2(4.2,2.1)+vnoise(p.xz*0.7)*1.7) * resolved(0.25);
+   vec3 inside = mix(vec3(0.24,0.025,0.032),vec3(0.61,0.14,0.12),fibres*0.55+vnoise(p.xz*0.85)*0.3);
    vec2 cell = floor(p.xz * 2.1);
    vec2 seedPoint = fract(p.xz * 2.1) - vec2(hash21(cell+1.7),hash21(cell+6.1))*0.5-0.25;
    float seed = 1.0-smoothstep(0.13,0.21,length(seedPoint*vec2(0.85,1.5)));
    seed *= smoothstep(0.03,0.18,radius)*resolved(0.22);
-   inside = mix(inside,vec3(0.83,0.55,0.25),seed*0.85);
+   inside = mix(inside,vec3(0.74,0.48,0.20),seed*0.7);
    float pith = smoothstep(0.53,0.65,radius)*(1.0-smoothstep(0.75,0.82,radius));
    inside = mix(inside,vec3(0.76,0.53,0.39),pith*0.85);
    c = mix(c * (0.8 + fine * 0.4), inside, flesh);
