@@ -154,3 +154,17 @@ unreconciled recording supplies a universal body gain. No steering constant is
 changed or numeric calibration target invented here. A further experiment
 should establish units, per-recording spike extraction, temporal alignment,
 state conditioning and between-fly uncertainty across all four recordings.
+
+
+## CPU calibration at low host load
+
+After rebasing onto dev 6eda5cb4, the full five-case budget run passed four
+and skipped brain cost. Three rejected samples had work max/min 1.52 > 1.35,
+then reference max/min 2.26 and 2.27 > 2. Load was 1.21 before / 1.46 after
+on 18 logical CPUs. A bounded brain-only repeat rejected work ratio 1.45,
+then reference ratios 2.73 and 2.49. Prior matching CNS source passed at
+0.263 against 0.500 M5 Pro CPU s/s under higher load. Aggregate load therefore
+does not by itself establish calibration validity. The budget owner could
+investigate core placement, frequency changes and sample granularity while
+preserving existing limits and raw variance. These are hypotheses, not causes
+isolated by this audit. A rejected sample is neither a pass nor a cost failure.

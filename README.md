@@ -69,6 +69,7 @@ unknown capture dates and machines are identified rather than inferred.
 | <a id="remote-and-host"></a><a id="tests"></a>Run checks or drive the game | [Development](docs/development.md) |
 | Run long browser checks or investigate a soak failure | [Web soak](docs/web-soak.md) |
 | Run seeded body/neural fuzzing | [Fuzzing](docs/fuzzing.md) |
+| Measure headless behaviour against published assays | [Behaviour scorecard](docs/ethogram/README.md) |
 | Build, cache or host the browser game | [Web](docs/web.md) |
 | Run the room server behind Coolify | [Deployment](docs/deploy.md) |
 | Understand room authority, protocol and limits | [Online](docs/online.md) |

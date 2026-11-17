@@ -68,3 +68,11 @@ filesystem behaviour and host load (about 3.4) limit extrapolation. This fixture
 measures writing, not whole-file replay cost or complete real-CNS throughput.
 It establishes identical observed metrics for this deterministic input and
 quantifies offline observer cost; it is not an app CPU-budget result.
+
+A later whole-CLI analysis of the primary recording on the integration rebase
+matched 360,000 free frames and 112 optical traces. One POSIX `time` observation
+was 0.42 user + 0.04 system CPU s / 0.35 wall s, including startup, JSON I/O,
+digest checks and replay. This does not isolate replay or establish repeated
+throughput; it complements the synthetic writing-only fixture. Original capture
+hashes are preserved in the analysed JSON, with the analysis head recorded
+separately. See [provenance](current-dev.md#integration-rebase).

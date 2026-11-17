@@ -370,3 +370,67 @@ build pass. Eight host script tests pass. The unchanged production core also
 has seven local WASM parity passes, its arm64 FMA guard and all five CPU
 budgets passing. Browser failures and missing active-ON workload cost coverage
 remain recorded; no all-green or idle-machine claim follows.
+
+## Observer-cost verification and identical control
+
+Key: **F2 = traced cb9b9da2 with observer fixture; V8 = byte-identical decoy**.
+Presentation orders: C8 V8/F2; M2 V8/F2; Q5 F2/V8. All were fresh independent
+reviewers at high reasoning effort, with only the rubric, neutral permitted
+code and evidence. Each searched primary papers and independently decoded the
+225 recordings. This is the eighth full blind evidence round.
+
+| Reviewer | Sets | Validity | Honesty | Behaviour | Regressions/cost | Mean | Forced order |
+|---|---|---:|---:|---:|---:|---:|---|
+| C8 | F2 = V8 | 7 | 7 | 2 | 8 | 6.00 | V8 > F2, presentation tie-break |
+| M2 | F2 = V8 | 7 | 7 | 2 | 8 | 6.00 | V8 > F2, presentation tie-break |
+| Q5 | F2 = V8 | 7 | 7 | 2 | 8 | 6.00 | F2 > V8, presentation tie-break |
+
+Both mean **6.00/10**. All found equality and assigned identical scores within
+each pair; no duplicate-control discrepancy requires additional reviewers.
+They confirmed the numeric references, assay exclusions, both optical fits/
+scores and independent raw-frame reconstruction again. All ran the synthetic
+observer fixture, obtaining identical metric hashes. Recorded medians recompute
+to 0.582887 incremental CPU s; independent pairs varied, as expected. The
+fixture does not measure whole-file replay or full CNS throughput.
+
+Their shared unresolved problems are limited biological coverage, reflex-
+supported flight, weak checkerboard/timing agreement, engineering rather than
+biological acceptance scales, and incomplete active-vision/browser cost checks.
+Readiness/retinal trace retention and orientation-stratified held-out assays
+remain proposals. There is no fabricated target or uncorrected numeric
+transcription finding. No physical fidelity gain is claimed from this round.
+The shared loop stops at its eight-round limit, below the desired score of 9;
+there is no accepted body-mapping candidate. The earlier launch candidate lost
+and remains reverted. Further progress needs validated observables/calibration
+or separately owned neural biology rather than fitting body constants.
+
+## Integration after the frozen evidence packet
+
+The final packet predates the rebase onto dev 6eda5cb4. Arena/optical CNS,
+body, Life and world physics are byte-identical; added places are unselected.
+Farm run 20261117T061341-274724 at 5feae07b passes lint, web/tvOS types and
+build. Functional results: **1172 pass, 1 fail, 3 skips**. The failure is the
+TV soak's exact floating-point equality: 3,600,000.0000000005 ms versus
+3,600,000 ms after dividing time among the expanded place list. The test,
+soak script and place catalog match dev exactly. Unchanged-dev control run
+20261117T062234-282436 reproduces the same failing test (2 pass, 1 fail).
+No unrelated test or timing constant is changed to hide it.
+
+The rebase budget run passes four cases and skips brain cost after invalid
+calibration samples, despite host load about 1.21–1.46 on 18 logical CPUs.
+Rejected work ratio 1.52 > 1.35, then reference ratios 2.26/2.27 > 2; one
+bounded repeat rejects 1.45, 2.73 and 2.49. This is not a measured limit failure.
+Prior identical CNS source passed all five budgets at 0.263 against 0.500.
+Both outcomes and historical failures remain retained. Review scores above
+are not retroactively raised or lowered using checks absent from their packet.
+
+The eighth round's fresh regression-only reviewer E7 saw order V8/F2 and
+assigned equal rubric vectors **[7,8,2,7]**, no-regression assurance **7/10**
+to both. Its forced order V8/F2 was presentation-only. It independently decoded
+all 225 binaries, checked 94 selected source hashes, verified primary numeric
+citations, and reran both fixture modes in both sets. No relative regression
+was found. Browser/control gaps, the inherited checkerboard/timing discrepancy,
+body support and missing domains remain its objections. It independently
+confirmed the 0.582887 CPU s observer increment and 768 KiB median RSS difference.
+Its readiness/retina-digest proposal is retained; no unreviewed causal or
+whole-animal success claim is added.

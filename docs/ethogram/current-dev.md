@@ -49,7 +49,8 @@ FlyEM male CNS connectome, Janelia Research Campus (CC-BY 4.0).
 ## Replication and source provenance
 
 The initial schema-3 recordings used clean runtime
-`29942c80c01ad5117290ac225205a58bf6ee9fb0`, rebased onto dev `cb9b9da277a0cfe1f84dd16538ea41286fd5b6a6`, including the
+`29942c80c01ad5117290ac225205a58bf6ee9fb0`, rebased onto dev
+`cb9b9da277a0cfe1f84dd16538ea41286fd5b6a6`, including the
 upstream ON pathway (#104). Brain/body/world/Life/native production source has
 zero feature diff from that dev. The connectome SHA-256 remains
 `51c97031b39f93c04a683f16683d88f15d291f1e1062694fc0a215e23c3b895c`.
@@ -115,8 +116,9 @@ output remain separate validation questions.
 Flight requires ten consecutive 5 ms powered airborne frames in the first
 bout; a landing ends eligibility. Interrupted bursts and later jumps cannot
 qualify the first departure. Replay bounds takeoff and powered duration by the
-actual response/follow-up windows. The initial schema-3 captures retained only summaries. The subsequent schema-4
-captures below retain the underlying frames and reproduce every observation. Body tarsal support makes flight follow
+actual response/follow-up windows. The initial schema-3 captures retained only
+summaries. The subsequent schema-4 captures below retain the underlying frames
+and reproduce every observation. Body tarsal support makes flight follow
 most departures; this does not validate an autonomous neural flight controller.
 
 The balanced launch experiment was rejected and reverted (blind means 6.625
@@ -166,7 +168,7 @@ The earlier merge `dfdf08c9`, tree `17a1ba9502b7dff360974f5fb1c6461e222c3389`,
 identical to runtime `29942c80`, passed 1105 functional tests with three skips.
 The farm omits five named Apple-silicon WASM cases by policy; seven WASM cases
 including those five passed on the Mac, as did its additional arm64 FMA guard.
-All **five current CPU budgets pass**, zero skips. The all-senses brain case is
+That matching-production run passed **all five CPU budgets**, zero skips. The all-senses brain case is
 **0.263 M5 Pro CPU s/s versus 0.500**, build **185 ms versus 250**, rest
 **0.064 s/s versus 0.160**. Valid samples followed rejected noisy attempts;
 load was about 8–11, so no idle-machine claim follows. The scalar-sense brain
@@ -182,8 +184,41 @@ The extra browser play test fails waiting for `wallpaper=false` on the feature
 and the unchanged `cb9b9da2` control (549 s and 626 s). Pointer e2e fails reading
 an undefined `held` property during orientation-change testing (860 s).
 These are recorded failures, not passes or fixes claimed here; no production
-UI or browser-test feature diff exists. Web/offline passed (257 s); tables failed waiting for restaurant/epoch 1 after
-a move (441 s). Only play was independently repeated on unchanged dev.
-The final exact-source audit run selected unit tests, not browser suites. Historical CPU failures and skips
+UI or browser-test feature diff exists. Web/offline passed (257 s); tables
+failed waiting for restaurant/epoch 1 after a move (441 s). Only play was
+independently repeated on unchanged dev. That exact-source audit run selected
+unit tests, not browser suites. Historical CPU failures and skips
 remain preserved in the earlier reports and review log rather than being
 erased by the later passing run.
+
+
+## Integration rebase
+
+The branch subsequently rebased onto dev
+`6eda5cb4c3e04fd79cedbc62d388e39540853307` at head
+`5feae07b338233ca16bd986699ef6f2a2e5cb298`. Brain, native brain, body,
+`apps/web/src/life.ts`, the in-process driver and world physics/pantry sources
+used by these arena and optical protocols are byte-identical to cb9b9da2.
+The new kitchen/greenhouse definitions are imported but not selected. No new
+CNS recording is relabelled as part of this rebase. Rendered fly gait, UI and
+browser-test changes are covered by a separate integration check.
+
+A local all-budget repeat on this rebase gives four passes, no failures and
+one contention skip. The brain-cost case rejected all three attempts:
+work-sample max/min 1.52 exceeds 1.35, then reference max/min 2.26 and 2.27
+exceed 2. Host load was 1.21 before / 1.46 after on 18 logical CPUs. Low load
+does not make unstable calibration a valid timing result. The earlier five
+passes remain recorded on the matching physics/CNS source; this repeat is
+not counted as a fifth pass or an idle-machine failure.
+
+A bounded brain-only repeat also skipped after three invalid attempts: work
+sample ratio 1.45 > 1.35; reference ratios 2.73 and 2.49 > 2. No further
+repeats or relaxed guards are used to obtain a favourable number. This is
+calibration instability, not a measured cost exceeding the 0.500 limit.
+
+Post-rebase `--analyse` also reverified the primary schema-4 capture: 360,000
+free frames and all 112 optical traces match; composite remains 3.104167.
+The analysis records head 5feae07b and dirty=true for documentation edits.
+A single whole CLI analysis, including imports, JSON I/O, hash checks and
+reconstruction, used 0.42 user + 0.04 system CPU s and 0.35 wall s. This is
+one offline observation, not a repeated throughput or production benchmark.
