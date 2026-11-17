@@ -6,7 +6,8 @@
 // slides sliders, steps choices by their arrows, picks tabs and scrolls the
 // list by dragging it; hovering only brightens what it is over, and the
 // focus ring is hidden while it is in use. Tapping outside the pane, or its
-// back button, is Back.
+// back button, is Back; at the root, which has no Back for a pointer, tapping
+// outside does what the screen says.
 
 import type { RemoteButton } from "@fly/contracts";
 import { INK, font, glassPanel, drawGlyph, iconButton, sameTarget, text } from "@fly/ui";
@@ -28,6 +29,8 @@ export type MenuScreenOptions = {
   place(frame: Frame): MenuPanel;
   /** The root of the game, which a pointer can't go back from. */
   root?: boolean;
+  /** At the root, a tap outside the pane. */
+  onOutside?(): void;
   /** Keep the header and rows still while hiding unused panel space. */
   trimEmpty?: boolean;
   /** Each time it comes to the top. */
@@ -194,6 +197,7 @@ export class MenuScreen implements Screen {
         if (!p.tap || !held || !sameTarget(held.hit, hit) || held.dragging || held.slider >= 0) break;
         if (!hit) {
           if (!this.#options.root) this.#outcome({ kind: "back" });
+          else this.#options.onOutside?.();
         } else if (hit.kind === SCREEN_HITS.back) this.#outcome({ kind: "back" });
         else if (hit.kind === MENU_HITS.submit) {
           const item = menu.items[hit.index];

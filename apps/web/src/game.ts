@@ -111,10 +111,11 @@ const QUIET_AFTER = 60;
 const CLOCK_EVERY = 2;
 /** Seconds of sustained tickling or blowing that distinguish a hold from a press. */
 const HOLD_TAUGHT = 0.5;
-/** A pad's right stick at full tilt: radians a second round the fly, and up; and Q or E held, round. */
+/** A pad's right stick at full tilt: radians a second round the fly, and up; and Q or E held, round, W or S, up. */
 const PAD_ROUND = 2.4;
 const PAD_UP = 1.2;
 const KEY_ROUND = 1.6;
+const KEY_UP = 0.8;
 /** How fast + and − held, or a trigger pressed all the way, bring the camera in or take it out (as a power of e, a second). */
 const KEY_ZOOM = 1.4;
 const PAD_ZOOM = 1.6;
@@ -1558,7 +1559,7 @@ export class Game implements Shell {
     this.#ringShown = !devices.pointing;
   }
 
-  /** The camera, by keys held (Q and E round, + and − in and out) and a pad's right stick and triggers. */
+  /** The camera, by keys held (Q and E round, W and S up, + and − in and out) and a pad's right stick and triggers. */
   #steer(dt: number) {
     const { keyboard, pads } = this.#inputs;
     let round = 0;
@@ -1566,6 +1567,7 @@ export class Game implements Shell {
     let zoom = 0;
     if (keyboard) {
       round += keyboard.turn * KEY_ROUND;
+      up += keyboard.tilt * KEY_UP;
       zoom += keyboard.zoom * KEY_ZOOM;
     }
     if (pads) {
