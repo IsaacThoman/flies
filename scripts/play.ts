@@ -38,7 +38,7 @@ import { existsSync, readdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { chromium, devices } from "playwright";
-import type { BrowserContextOptions, CDPSession, Page } from "playwright";
+import type { Browser, BrowserContextOptions, CDPSession, Page } from "playwright";
 
 const root = path.join(import.meta.dirname, "..");
 
@@ -77,20 +77,55 @@ export function fullChromiumPath(): string | undefined {
 /** Headless Chromium falls back to software WebGL unless told to use the GPU. */
 export const gpuFlags = () => (process.platform === "darwin" ? ["--use-angle=metal"] : ["--ignore-gpu-blocklist", "--enable-gpu"]);
 
-/** Starts Vite on a free port; resolves with its URL. */
-export function startServer(): Promise<{ url: string; server: ChildProcess }> {
+/** Waits for the owned server to exit; an unresponsive child cannot hold cleanup open. */
+export async function stopServer(server: ChildProcess) {
+  if (!server.pid || server.exitCode !== null || server.signalCode !== null) return;
+  await new Promise<void>((resolve) => {
+    const killed = setTimeout(() => server.kill("SIGKILL"), 1_000);
+    server.once("close", () => { clearTimeout(killed); resolve(); });
+    server.kill();
+  });
+}
+
+/** Starts Vite on a free port; ownership is handed over before waiting for readiness. */
+export function startServer(own: (server: ChildProcess) => void = () => {}): Promise<{ url: string; server: ChildProcess }> {
   return new Promise((resolve, reject) => {
     const server = spawn(process.execPath, [path.join(root, "node_modules/vite/bin/vite.js"), "--port", "0", "--strictPort", "false"], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    own(server);
     let output = "";
+    let settled = false;
+    const detach = () => {
+      clearTimeout(timeout);
+      server.stdout.off("data", onData);
+      server.stderr.off("data", onData);
+      server.off("close", onExit);
+      server.off("error", onError);
+      server.stdout.resume();
+      server.stderr.resume();
+    };
+    const fail = (message: string) => {
+      if (settled) return;
+      settled = true;
+      detach();
+      void stopServer(server).then(() => reject(new Error(`${message}: ${output}`)));
+    };
     const onData = (chunk: Buffer) => {
-      output += chunk.toString();
+      output = (output + chunk.toString()).slice(-32_768);
       // eslint-disable-next-line no-control-regex
       const match = output.replace(/\x1b\[[0-9;]*m/g, "").match(/Local:\s+(http:\/\/\S+)/);
-      if (match) resolve({ url: match[1], server });
+      if (match) {
+        settled = true;
+        detach();
+        resolve({ url: match[1], server });
+      }
     };
+    const onExit = (code: number | null) => fail(`vite exited (${code})`);
+    const onError = (error: Error) => fail(`vite failed (${error.message})`);
+    const timeout = setTimeout(() => fail("Timed out starting vite"), 30_000);
     server.stdout.on("data", onData);
     server.stderr.on("data", onData);
-    server.on("exit", (code) => reject(new Error(`vite exited (${code}): ${output}`)));
+    server.once("close", onExit);
+    server.once("error", onError);
   });
 }
 
@@ -273,19 +308,24 @@ export function contextFor({ width = 1280, height = 720, device, landscape = fal
   return { ...d, viewport: { width: w, height: h }, screen: { width: w, height: h } };
 }
 
-export async function openGame(options: OpenOptions) {
+export async function openGame(options: OpenOptions, own: (browser: Browser) => void = () => {}, errors: string[] = []) {
   const { url, headed = false } = options;
   const browser = await chromium.launch({ headless: !headed, executablePath: chromiumPath(), args: gpuFlags() });
-  const context = await browser.newContext(contextFor(options));
-  const page = await context.newPage();
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  await page.goto(url);
-  await gameUp(page);
-  return { browser, page, errors };
+  try {
+    own(browser);
+    const context = await browser.newContext(contextFor(options));
+    const page = await context.newPage();
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    await page.goto(url);
+    await gameUp(page);
+    return { browser, page, errors };
+  } catch (error) {
+    await browser.close().catch((cleanupError: unknown) => console.error("Closing browser:", cleanupError));
+    throw error;
+  }
 }
 
 async function main() {
@@ -305,17 +345,28 @@ async function main() {
     else steps.push(args[i]);
   }
   let server: ChildProcess | null = null;
-  if (!url) {
-    const started = await startServer();
-    url = started.url;
-    server = started.server;
-  }
-  const [width, height] = (size || "1280x720").split("x").map(Number);
-  const { browser, page, errors } = await openGame({ url, width: size || !device ? width : undefined, height: size || !device ? height : undefined, headed, device, landscape });
-  if (device && size) await page.setViewportSize({ width, height });
-  const fingers = await Fingers.on(page);
-  const pt = (spec: string) => spec.split(",").map(Number) as Pt;
+  let browser: Browser | null = null;
+  const errors: string[] = [];
+  let closing: Promise<void> | undefined;
+  const cleanup = () => closing ??= (async () => {
+    const stopped = server ? stopServer(server) : Promise.resolve();
+    try { await browser?.close(); } finally { await stopped; }
+  })();
+  const report = () => { if (errors.length) console.log("page errors:\n" + errors.join("\n")); };
+  const interrupted = () => { void cleanup().finally(() => { report(); process.exit(130); }); };
+  const terminated = () => { void cleanup().finally(() => { report(); process.exit(143); }); };
+  process.once("SIGINT", interrupted);
+  process.once("SIGTERM", terminated);
   try {
+    if (!url) {
+      const started = await startServer((owned) => { server = owned; });
+      url = started.url;
+    }
+    const [width, height] = (size || "1280x720").split("x").map(Number);
+    const { page } = await openGame({ url, width: size || !device ? width : undefined, height: size || !device ? height : undefined, headed, device, landscape }, (owned) => { browser = owned; }, errors);
+    if (device && size) await page.setViewportSize({ width, height });
+    const fingers = await Fingers.on(page);
+    const pt = (spec: string) => spec.split(",").map(Number) as Pt;
     for (const step of steps) {
       const [kind, ...rest] = step.split(":");
       const arg = rest.join(":");
@@ -378,9 +429,11 @@ async function main() {
       else throw new Error(`Unknown step: ${step}`);
     }
   } finally {
-    if (errors.length) console.log("page errors:\n" + errors.join("\n"));
-    await browser.close();
-    server?.kill();
+    try { await cleanup(); } finally {
+      process.off("SIGINT", interrupted);
+      process.off("SIGTERM", terminated);
+      report();
+    }
   }
 }
 
