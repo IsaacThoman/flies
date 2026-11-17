@@ -135,7 +135,11 @@ crossings become smaller than a pixel, without extra meshes or draws.
 - **Two passes** (`apps/web/src/stage.ts`): the set (`buildSet`, from 0.5 mm to
   4 m from the camera, or its camera's `reach`) is drawn over the backdrop
   (`buildBackdrop`, from 200 mm to 3 km). Indoors, a room's far walls, a
-  window's view, a bar's lights can all be backdrop.
+  window's view, a bar's lights can all be backdrop. A closed room whose
+  backdrop shows through one opening gives its corners (`through`), and the
+  backdrop is drawn only where that opening falls on the screen, or not at
+  all while it is behind the camera (the restaurant's street, through its shop
+  front).
 - **Light** (`palettes`): the five times of day. Chosen on the Light tool, the
   light eases to one and holds it; on "Now" it follows the clock between them
   (`scene/light.ts`, `clockLight`): each palette's colours are full at its

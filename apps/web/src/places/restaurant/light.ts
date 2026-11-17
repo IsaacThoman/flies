@@ -177,19 +177,20 @@ vec3 rCast(vec3 p, vec3 l, float size, bool sun) {
   vec2 dxz = d.xz;
   float dd = max(dot(dxz, dxz), 1e-6);
   float len = sqrt(dd + d.y * d.y);
+  float across = 1.0 / dd;
+  float up = d.y > 1e-3 ? 1.0 / d.y : 0.0;
   for (int i = 0; i < uCastCount; i++) {
     vec4 o = uCast[i];
     // Nothing on or above a caster's top is in its shadow (a flat thing's top is wider than its disc).
     if (p.y > o.w - 0.5) continue;
     vec2 c = o.xy - p.xz;
-    if (dot(c, c) < (o.z + 0.4) * (o.z + 0.4)) continue;
-    float along = dot(c, dxz) / dd;
-    if (along <= 0.0) continue;
+    float along = dot(c, dxz) * across;
+    if (along <= 0.0 || dot(c, c) < (o.z + 0.4) * (o.z + 0.4)) continue;
     // Where along the way the light is between the column's bottom and its top.
-    float lo = d.y > 1e-3 ? (uCastBottom[i] - p.y) / d.y : -1.0;
-    float hi = d.y > 1e-3 ? (o.w - p.y) / d.y : 1.0;
-    float t = clamp(along, max(lo, 0.0), min(hi, 1.0));
+    float lo = d.y > 1e-3 ? (uCastBottom[i] - p.y) * up : -1.0;
+    float hi = d.y > 1e-3 ? (o.w - p.y) * up : 1.0;
     if (hi < 0.0 || lo > 1.0) continue;
+    float t = clamp(along, max(lo, 0.0), min(hi, 1.0));
     float dist = length(c - dxz * t);
     float w = (sun ? size * t * len : size * t / max(1.0 - t, 0.03)) + 0.35;
     // Clear of its penumbra, it lets all the light by.
@@ -283,11 +284,11 @@ vec3 rKeyLight(vec3 p) {
   vec3 s = rWorldDir(directionalLights[0].direction);
   k += directionalLights[0].color * max(s.y, 0.0) * rSun(directionalLights[0].direction);
   #endif
-  k += streetLight(p, vec3(0.0, 1.0, 0.0)) * rStreetShadow(p) * 3.14159;
+  k += streetLight(p, vec3(0.0, 1.0, 0.0)) * rStreetShadow() * 3.14159;
   if (uPendant.w > 0.0) {
     vec3 c;
     vec3 d = rPendantDir(p, c);
-    k += c * max(d.y, 0.0) * rPendantShadow(p);
+    k += c * max(d.y, 0.0) * rPendantShadow();
   }
   return k;
 }`;
@@ -357,29 +358,43 @@ ${ROOM_LIGHT}
 ${STREET_LIGHT_GLSL}
 ${ROOM_SEEN}
 bool rCasting;
+// Each light's shadow at the fragment, worked out once: the light loop, the room's lights and
+// what glows with the light through it (rKeyLight) all ask for it, at the fragment's own point.
+// There is the one sun (stage.ts).
+bool rSunAsked = false;
+vec3 rSunLit;
 vec3 rSun(vec3 dirView) {
+  if (rSunAsked) return rSunLit;
+  rSunAsked = true;
   vec3 s = rWorldDir(dirView);
   float lit = rGlass(vWorld, s);
-  if (lit <= 0.0) return vec3(0.0);
-  lit *= rBlocks(vWorld, s, 1e5, uSunSoft * 0.6 + 0.004);
-  if (rCasting) return lit * rCast(vWorld, s, uSunSoft * 0.7 + 0.002, true);
-  return vec3(lit);
+  if (lit > 0.0) lit *= rBlocks(vWorld, s, 1e5, uSunSoft * 0.6 + 0.004);
+  rSunLit = rCasting && lit > 0.0 ? lit * rCast(vWorld, s, uSunSoft * 0.7 + 0.002, true) : vec3(max(lit, 0.0));
+  return rSunLit;
 }
 // The street's light (traffic.ts) comes mostly from the lamp outside: the tables, the chairs and the casters shadow it as if all of it did.
-vec3 rStreetShadow(vec3 p) {
+bool rStreetAsked = false;
+vec3 rStreetLit;
+vec3 rStreetShadow() {
+  if (rStreetAsked) return rStreetLit;
+  rStreetAsked = true;
   vec3 l = vec3(${f(NEAR_LAMP.x)}, ${f(NEAR_LAMP.y)}, ${f(NEAR_LAMP.z)});
-  vec3 d = l - p;
+  vec3 d = l - vWorld;
   float far = length(d);
-  float lit = rBlocks(p, d / far, far, 0.05);
-  if (rCasting) return lit * rCast(p, l, 140.0, false);
-  return vec3(lit);
+  float lit = rBlocks(vWorld, d / far, far, 0.05);
+  rStreetLit = rCasting && lit > 0.0 ? lit * rCast(vWorld, l, 140.0, false) : vec3(lit);
+  return rStreetLit;
 }
-vec3 rPendantShadow(vec3 p) {
+bool rPendantAsked = false;
+vec3 rPendantLit;
+vec3 rPendantShadow() {
+  if (rPendantAsked) return rPendantLit;
+  rPendantAsked = true;
   vec3 l = vec3(${f(PENDANT_LIGHT.x)}, ${f(PENDANT_LIGHT.y)}, ${f(PENDANT_LIGHT.z)});
-  vec3 d = l - p;
+  vec3 d = l - vWorld;
   float far = length(d);
   // Things on the zinc don't shadow it by the zinc itself.
-  float lit = p.y > ${f(ZINC_BAR.zinc.top - 2)} ? 1.0 : rBlocks(p, d / far, far - 20.0, 0.12);
-  if (rCasting) return lit * rCast(p, l, ${f(PENDANT_LIGHT.r * 0.6)}, false);
-  return vec3(lit);
+  float lit = vWorld.y > ${f(ZINC_BAR.zinc.top - 2)} ? 1.0 : rBlocks(vWorld, d / far, far - 20.0, 0.12);
+  rPendantLit = rCasting && lit > 0.0 ? lit * rCast(vWorld, l, ${f(PENDANT_LIGHT.r * 0.6)}, false) : vec3(lit);
+  return rPendantLit;
 }`;

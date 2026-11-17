@@ -158,13 +158,13 @@ const ROOM_LIGHTS = /* glsl */ `
     lamp.direction = normalize((viewMatrix * vec4(dir, 0.0)).xyz);
     // Its shadow and its shading only where it can add anything (scene/lit.ts).
     if (color != vec3(0.0) && (dot(geometryNormal, lamp.direction) > 0.0 || dot(geometryClearcoatNormal, lamp.direction) > 0.0)) {
-      lamp.color = color * rPendantShadow(vWorld);
+      lamp.color = color * rPendantShadow();
       lamp.visible = true;
       RE_Direct(lamp, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);
     }
   }
   vec3 street = streetLight(vWorld, wn);
-  if (street.r + street.g + street.b > 0.0) reflectedLight.directDiffuse += street * rStreetShadow(vWorld) * diffuseColor.rgb;
+  if (street.r + street.g + street.b > 0.0) reflectedLight.directDiffuse += street * rStreetShadow() * diffuseColor.rgb;
 }`;
 
 const SOLID_AFTER = /* glsl */ `

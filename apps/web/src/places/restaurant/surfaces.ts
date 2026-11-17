@@ -227,8 +227,9 @@ if (rK == K_MARBLE) {
   float hair2 = (1.0 - smoothstep(0.0, 0.02 + fwidth(hv2) * 1.5, abs(hv2 - 0.5))) * rDetail(h2 * 6.0) * smoothstep(0.35, 0.7, rNoise(mp * 0.02 + 5.0));
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.5, 0.52, 0.55), hair1 * 0.45 + hair2 * 0.3);
   // Its grains: calcite crystals under a millimetre, each a little different, catching the light at its own angle.
-  vec4 grain = rGrains(mp / 0.7 + rNoise(mp * 0.3) * 0.6);
+  // Where they are too fine to show, every use of them below is multiplied away: not worked out.
   float gd = rDetail(mp / 0.7);
+  vec4 grain = gd > 0.0 ? rGrains(mp / 0.7 + rNoise(mp * 0.3) * 0.6) : vec4(0.0, 0.0, 0.5, 1.0);
   diffuseColor.rgb *= 1.0 + (grain.z - 0.5) * 0.04 * gd - (1.0 - smoothstep(0.0, 0.1, grain.w)) * 0.015 * gd;
   // Most lie flat under the polish; one in thirty is a facet tilted to the light, and glints.
   float glint = step(0.967, grain.z) * gd;
@@ -317,8 +318,9 @@ if (rK == K_CANE) {
 if (rK == K_ZINC) {
   // Hammered all over, the rolled nose too: the pattern laid on whichever way the surface faces.
   vec2 zp = abs(rN.y) > 0.6 ? vWorld.xz : abs(rN.x) > abs(rN.z) ? vWorld.zy : vWorld.xy;
-  vec3 dim = rDimples(zp);
   float d = rDetail(zp / 7.0);
+  // Too fine to show, they tilt nothing (rBump below): not worked out.
+  vec3 dim = d > 0.0 ? rDimples(zp) : vec3(0.0);
   float patina = rFbm(zp * 0.006) * 0.7 + rNoise(zp * 0.05) * 0.3;
   vec3 c = mix(vec3(0.6, 0.62, 0.63), vec3(0.4, 0.42, 0.43), smoothstep(0.35, 0.75, patina));
   // Water marks: pale rings and runs left by wet glasses and cloths.
