@@ -27,10 +27,19 @@ child=
 cleanup() {
   local code=$?
   trap - EXIT INT TERM HUP
-  if [[ -n $child ]]; then kill -TERM -- "-$child" 2>/dev/null || kill -TERM "$child" 2>/dev/null || true; fi
   docker rm -f "$container" >/dev/null 2>&1 || true
+  if [[ -n $child ]]; then
+    kill -TERM -- "-$child" 2>/dev/null || kill -TERM "$child" 2>/dev/null || true
+    for _ in {1..20}; do
+      kill -0 -- "-$child" 2>/dev/null || break
+      sleep 0.1
+    done
+    kill -KILL -- "-$child" 2>/dev/null || true
+    wait "$child" 2>/dev/null || true
+  fi
   if [[ -d $checkout ]]; then
     flock "$farm/locks/git" git -C "$cache" worktree remove --force "$checkout" || true
+    rm -rf -- "$checkout"
   fi
   echo "Logs: $logs"
   exit "$code"
