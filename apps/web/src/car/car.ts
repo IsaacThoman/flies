@@ -12,16 +12,20 @@ export const CAR = {
   wheelbase: 2.7,
   /** Full lock (rad), at walking pace; less at speed (`steerLimit`). */
   lock: 0.55,
-  /** Sideways grip, m/s²: how sharply it can turn at speed without sliding. */
-  grip: 7,
+  /**
+   * Sideways grip, m/s²: how sharply it can turn at speed. More than a road
+   * car's tyres give, so the loop's tightest bend (67 m) goes at about
+   * 100 km/h and only the fastest few corners need the brake.
+   */
+  grip: 12,
   /** How fast the wheels follow the asked-for angle, rad/s. */
   steerRate: 2.2,
   accel: 5.5,
   reverseAccel: 3,
   brake: 11,
-  /** Rolling resistance (1/s) and air drag (1/m): together they hold it under about 50 m/s with the pedal down. */
+  /** Rolling resistance (1/s) and air drag (1/m): together they hold it under about 39 m/s (140 km/h) with the pedal down. */
   rolling: 0.04,
-  drag: 0.0018,
+  drag: 0.0025,
   reverseTop: 7,
 };
 

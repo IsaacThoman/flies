@@ -9,7 +9,7 @@ apps don't include it.
 
 ## Controls
 
-| | Keyboard | Game pad | Touch or mouse |
+| | Keyboard | Game pad | Touch |
 | --- | --- | --- | --- |
 | Throttle | Up or W | Right trigger, D-pad up | Hold anywhere |
 | Brake, then reverse | Down or S | Left trigger, D-pad down | Hold and pull down |
@@ -17,7 +17,13 @@ apps don't include it.
 | Hand the wheel to the fly, or take it back | Enter, space or F | A | Tap |
 | Back onto the road where you are | R | Y | |
 
-Driving at all takes the wheel back. The lamp above the centre screen is
+The mouse does nothing, so a click to bring the window forward doesn't hand
+over the wheel. Driving at all takes the wheel back.
+
+The car grips harder than a road car (12 m/s² sideways): the loop's tightest
+bend, 67 m across, goes at about 100 km/h, and flat out it does about
+140 km/h, so the fastest corners need the brake. The view widens with speed
+and glances into turns. The lamp above the centre screen is
 green while the fly drives, blinks amber while its brain loads and is red if
 the brain failed; the fly can't take the wheel until the brain is running.
 
@@ -40,9 +46,9 @@ time whoever drives.
 - **Its walking and turning drive.** The brain's commands go through the fly
   game's `Behavior` (thresholds, smoothing, the giant fiber's arming) as for
   the fly on its table. Its walking speed in body lengths a second becomes
-  the car's in car lengths a second (16 mm/s at full drive, 28 m/s); its yaw
-  rate is the car's, as far as the steering's lock and the tyres' grip allow
-  at that speed. Backing up reverses. The fly is posed from the same
+  the car's in car lengths a second (16 mm/s at full drive, 28 m/s). The car
+  turns at a fifth of its yaw rate, as far as the steering's lock and the
+  tyres' grip allow at that speed (below). Backing up reverses. The fly is posed from the same
   commands, so it walks and turns on its ball as the car goes.
 
 Stand-ins, not the brain:
@@ -53,6 +59,22 @@ Stand-ins, not the brain:
   seconds instead of halting, as a car does.
 - **The rails.** A car pushed against a rail swings round to run along it
   and scrapes on; that is the car's physics, not a choice of the fly's.
+
+The turning gain is the rig's, as in a lab's virtual reality for a fly on a
+ball, where the experimenter sets how far the world turns for a turn of the
+ball; which way and when are still the brain's. At 1 (the car turning as
+fast as the fly) its turning bouts swing the car into the rails, and once
+round to drive the loop backwards. Measured on 2026-11-17, two 90-second
+drives at each gain on the development Mac, each a fresh brain:
+
+| Turning gain | Driven (m) | Round the loop (m) | Against a rail | Walking |
+| --- | --- | --- | --- | --- |
+| 1 | 356, 481 | 336, −338 | 10%, 19% | 36%, 59% |
+| 0.4 | 441, 704 | 413, 679 | 8%, 9% | 37%, 44% |
+| 0.2 | 522, 801 | 506, 780 | 9%, 8% | 33%, 46% |
+
+Two drives each is few, and drives vary with how much the fly walks, but
+both pairs ran the same way; 0.2 is the setting.
 
 What to expect: it drives in bouts, rests for seconds at a time, and turns a
 great deal. In the runs made while building it (seeds unrecorded, a minute

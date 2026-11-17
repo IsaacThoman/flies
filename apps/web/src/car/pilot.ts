@@ -21,6 +21,8 @@ import type { Contact, Controls } from "./car.ts";
 const TOUCH_FADE = 4;
 /** Below this speed (m/s) the steering is worked out as if at it: a turn from a standstill still turns the wheels. */
 const CREEP = 2;
+/** The car's turning for the fly's: see `Pilot.turnGain`. */
+export const TURN_GAIN = 0.2;
 /** How firmly the car is held to the fly's speed: throttle or brake per m/s off it. */
 const SPEED_GAIN = 0.35;
 /**
@@ -40,6 +42,15 @@ export class Pilot {
   wanted = 0;
   /** Seconds left of braking after its giant fiber fired. */
   startled = 0;
+  /**
+   * How the car's turning answers the fly's: 1 turns the car as fast as the
+   * fly turns on its ball. A rig's setting, as in a lab's virtual reality for
+   * a fly on a ball, where the experimenter chooses how far the world turns
+   * for a turn of the ball; the brain still chooses which way and when.
+   * At 1 its turning bouts swing the car into the rails or round to face the
+   * way it came; at 0.2 it went about half again as far (docs/drive.md).
+   */
+  turnGain = TURN_GAIN;
   /** Take-offs it would have made: times the giant fiber fired. */
   escapes = 0;
   #touch = 0;
@@ -81,7 +92,7 @@ export class Pilot {
       controls.throttle = 0;
       controls.brake = Math.min(1, Math.abs(off) * SPEED_GAIN);
     }
-    controls.steer = steering(intent.live ? intent.yawRate : 0, speed);
+    controls.steer = steering(intent.live ? intent.yawRate * this.turnGain : 0, speed);
     return intent;
   }
 }

@@ -23,8 +23,12 @@ import { Track } from "./track.ts";
 /** The world's layer, seen by the driver and the fly; the car's inside, seen by the driver only. */
 const WORLD_LAYER = 0;
 const COCKPIT_LAYER = 2;
-/** The driver's vertical field of view on a 16:9 screen, degrees. */
+/** The driver's vertical field of view on a 16:9 screen, degrees, and how much it widens at top speed: the sense of going fast. */
 const FOV = 62;
+const FOV_FAST = 8;
+/** How far the driver glances into a turn, s (of the car's yaw rate), and at most, rad. */
+const GLANCE = 0.18;
+const GLANCE_MOST = 0.14;
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const display = new Display(false);
@@ -58,6 +62,7 @@ const hands = new Hands(window, canvas);
 (globalThis as { __drive?: unknown }).__drive = { car, pilot, brain, eyes, roads };
 
 let autopilot = false;
+let glance = 0;
 const head = new THREE.Vector3();
 const shown: Record<string, string> = {};
 let sinceShown = Infinity;
@@ -66,11 +71,22 @@ function resize() {
   const frame = display.frame;
   renderer.setSize(frame.width, frame.height, false);
   camera.aspect = frame.aspect;
-  // Upright, a little more of the road than the TV's width keeps: less roof and floor.
-  camera.fov = fieldOfView(FOV, frame.aspect, 0.5);
-  camera.updateProjectionMatrix();
 }
 resize();
+
+/** The driver's view this frame: wider with speed, glancing into the turn. */
+function look(dt: number) {
+  const fast = Math.min(1, Math.abs(car.speed) / 39);
+  // Upright, a little more of the road than the TV's width keeps: less roof and floor.
+  const fov = fieldOfView(FOV + FOV_FAST * fast * fast, display.frame.aspect, 0.5);
+  if (Math.abs(fov - camera.fov) > 0.01) {
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }
+  const want = Math.max(-GLANCE_MOST, Math.min(GLANCE_MOST, car.turnRate * GLANCE));
+  glance += (want - glance) * Math.min(1, dt * 4);
+  camera.rotation.y = Math.PI + glance;
+}
 
 function show(key: string, value: string) {
   if (shown[key] === value) return;
@@ -102,6 +118,7 @@ function frame(now: number) {
   trafficView.update(roads.cars);
   const lamp: BrainLamp = brain.status === "failed" ? "failed" : !running ? "waiting" : autopilot ? "on" : "off";
   cockpit.update(car, intent, lamp, dt);
+  look(dt);
 
   if (brain.eyes) {
     cockpit.root.updateMatrixWorld();

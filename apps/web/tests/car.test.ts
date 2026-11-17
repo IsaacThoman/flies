@@ -62,12 +62,15 @@ test("the rails keep it on the road: a hit is felt at that front corner, and it 
   let right = false;
   let impact = 0;
   let widest = 0;
-  drive(car, { steer: -1, throttle: 1, brake: 0 }, 8, null, () => {
+  // Up to speed, then hard left until it hits.
+  drive(car, { steer: 0, throttle: 1, brake: 0 }, 3);
+  for (let t = 0; t < 8 && !left && !right; t += DT) {
+    car.step({ steer: -1, throttle: 1, brake: 0 }, [], DT);
     left ||= car.contact.frontLeft;
     right ||= car.contact.frontRight;
     impact = Math.max(impact, car.contact.impact);
     widest = Math.max(widest, Math.abs(car.road.lateral));
-  });
+  }
   assert.ok(left && !right, "into the left rail, felt on the left");
   assert.ok(impact > 0, "it hit");
   assert.ok(widest <= ROAD.half - CAR.width / 2 + 1e-6, `${widest} m from the middle`);

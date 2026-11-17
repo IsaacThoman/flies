@@ -1,12 +1,15 @@
 // The player's hands on the car: the keyboard (arrows or WASD), a game pad,
-// or a finger or the mouse dragged on the screen (across to steer, held to
-// go, pulled down to brake). Enter, space, the pad's A or a tap hands the
-// wheel to the fly and takes it back; driving at all takes it back too.
+// or a finger dragged on the screen (across to steer, held to go, pulled
+// down to brake). Enter, space, the pad's A or a tap of a finger hands the
+// wheel to the fly and takes it back; driving at all takes it back too. The
+// mouse does nothing: a click to bring the window forward must not hand the
+// fly the wheel.
 
 import type { Controls } from "./car.ts";
 
-/** How quickly a key's steering comes on and goes off, per second: a key is all or nothing, a wheel isn't. */
-const KEY_STEER = 3.5;
+/** How quickly a key's steering comes on, and goes back to the middle, per second: a key is all or nothing, a wheel isn't. */
+const KEY_STEER = 6;
+const KEY_CENTRE = 10;
 /** A drag this far across (a share of the screen's width) is full lock. */
 const DRAG_LOCK = 0.22;
 /** A press shorter and smaller than this is a tap. */
@@ -39,7 +42,7 @@ export class Hands {
     target.addEventListener("keyup", (event) => this.#keys.delete(event.code));
     target.addEventListener("blur", () => this.#keys.clear());
     canvas.addEventListener("pointerdown", (event) => {
-      if (this.#pointer) return;
+      if (this.#pointer || event.pointerType === "mouse") return;
       canvas.setPointerCapture?.(event.pointerId);
       this.#pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, dx: 0, dy: 0, at: event.timeStamp, moved: false };
     });
@@ -82,7 +85,8 @@ export class Hands {
     let gas = keys.has("ArrowUp") || keys.has("KeyW") ? 1 : 0;
     let stop = keys.has("ArrowDown") || keys.has("KeyS") ? 1 : 0;
     const want = (right ? 1 : 0) - (left ? 1 : 0);
-    let steer = want === 0 ? toward(c.steer, 0, KEY_STEER * 2 * dt) : toward(c.steer, want, KEY_STEER * dt);
+    // Reversing the key straightens up first, as fast as letting go.
+    let steer = want === 0 || want * c.steer < 0 ? toward(c.steer, 0, KEY_CENTRE * dt) : toward(c.steer, want, KEY_STEER * dt);
     let held = left || right;
 
     const p = this.#pointer;
