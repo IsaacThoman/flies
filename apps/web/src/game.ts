@@ -419,6 +419,10 @@ export class Game implements Shell {
     return this.#lobby?.rooms ?? null;
   }
 
+  get lobbyStatus() {
+    return this.#lobby?.status ?? "connecting";
+  }
+
   /** The list of rooms is open while Online is up and this device is at none (on its other faces too, so that coming back to the list finds it as it is). */
   #browse(dt: number) {
     const wanted = this.nav.current === "online" && !this.online && this.canPlayOnline;
@@ -429,7 +433,7 @@ export class Game implements Shell {
     }
     this.#lobby?.update(dt);
     // A room server newer than this page: the newer page speaks its protocol.
-    if (this.#lobby?.status === "version") reloadOnce();
+    if (!this.#app && this.#lobby?.status === "version") reloadOnce();
   }
 
   /** Starts typing into a field as a tap on it lifts, while the browser still counts it as the player's doing. */
@@ -545,7 +549,7 @@ export class Game implements Shell {
     const ended = online.ended;
     if (!ended) return;
     // A page from before the server's last deploy: the newer page speaks its protocol.
-    if (ended === "version" && reloadOnce()) return;
+    if (ended === "version" && !this.#app && reloadOnce()) return;
     this.#stand(ended);
   }
 

@@ -41,6 +41,7 @@ export type OnlineView = "rooms" | "new" | "door" | "room";
 
 /** What went wrong, as the heading says it instead of its name. */
 const NOTES: Partial<Record<Ended | "wrong" | "name" | "code", string>> = {
+  version: "Update needed",
   wrong: "Wrong password",
   busy: "Too many tries. Wait a minute",
   full: "That room is full",
@@ -125,14 +126,17 @@ export class OnlineScreen implements Screen {
     switch (this.view) {
       case "rooms": {
         const rows: MenuItem[] = [
-          { kind: "action", id: "new", label: "New room", disabled: !shell.canPlayOnline },
-          { kind: "field", id: "code", label: "Code", value: this.#code, disabled: !shell.typing },
+          { kind: "action", id: "new", label: "New room", disabled: !shell.canPlayOnline || shell.lobbyStatus === "version" },
+          { kind: "field", id: "code", label: "Code", value: this.#code, disabled: !shell.typing || shell.lobbyStatus === "version" },
         ];
         const rooms = shell.rooms;
-        if (!rooms) rows.push({ kind: "action", id: "looking", label: "Looking for rooms…", disabled: true });
+        const status = shell.lobbyStatus;
+        const unavailable = status === "lost" || status === "stale" || status === "version";
+        if (unavailable) rows.push({ kind: "action", id: "unavailable", label: status === "version" ? "Update needed" : status === "stale" ? "Reconnecting…" : "Can't reach rooms", disabled: true });
+        else if (!rooms) rows.push({ kind: "action", id: "looking", label: "Looking for rooms…", disabled: true });
         else if (!rooms.length) rows.push({ kind: "action", id: "none", label: "No rooms open", disabled: true });
         for (const r of rooms ?? []) {
-          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), count: [r.flies, MAX_PLAYERS], locked: r.locked, disabled: r.flies >= MAX_PLAYERS });
+          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), count: [r.flies, MAX_PLAYERS], locked: r.locked, disabled: unavailable || r.flies >= MAX_PLAYERS });
         }
         return rows;
       }
@@ -189,7 +193,7 @@ export class OnlineScreen implements Screen {
     const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
     const rooms = shell.rooms ? shell.rooms.map((r) => `${r.code}:${r.name}:${r.place}:${r.flies}:${r.locked}`).join(",") : "?";
     const at = table ? `${table.name}|${table.joined}|${table.starting}|${copied}|${table.others.map((o) => this.#removalId(o)).join(",")}` : "alone";
-    return `${this.view}|${this.#note}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}`;
+    return `${this.view}|${this.#note}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}|${shell.lobbyStatus}`;
   }
 
   #build(focus?: string) {
