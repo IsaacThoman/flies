@@ -108,3 +108,22 @@ Key: H9 = incumbent; P5 = identical H9 decoy; V3 = smaller, fewer nearby grains,
 | **Panel** | **Lab** | | **6.64** | | **6.86** | **3/3 V3** |
 
 Reverted the windowsill's entire third candidate: the reduced debris weakened scale, while exposed canopy fragments looked detached. Retained the lab changes: more convincing light-source motivation and fewer waxy foreground mounds. Decoy differences were zero. M7 is the selected combination: H9 windowsill evidence and V3 lab evidence; the places are independent builds. No draw-call increase, no shader/browser errors.
+
+The round-3 relative-weakness reviewer preferred V3 for both places, valuing its smaller fragments and more exposed exterior. The scoring panel's sill preference still determines the selected sill; the dissent is retained here rather than treated as a unanimous result.
+
+### Round 4 — retained
+
+Key: M7 = split incumbent; K8 = quieter sill crazing and area-filtered notebook ruling. Orders M7/K8, K8/M7, M7/K8; relative-weakness review K8/M7.
+
+| Review | Place | M7 scores | Mean | K8 scores | Mean | Preference |
+| --- | --- | --- | ---: | --- | ---: | --- |
+| R1 | Sill | 7.5,7,7,8,7.5,6.5,7 | 7.21 | 7.5,7,7,8,8,6.5,7.5 | 7.36 | K8 |
+| R1 | Lab | 7.5,7.5,7,8,8,5.5,7 | 7.21 | 7.5,7.5,7,8,8,5.5,8 | 7.36 | K8 |
+| R2 | Sill | 7,7.5,7,7.5,7.5,7,7 | 7.21 | 7,7.5,7.5,8,8,7,7.5 | 7.50 | K8 |
+| R2 | Lab | 7,7,6.5,8,8.5,5.5,7.5 | 7.14 | 7,7,6.5,8,8,5.5,7.5 | 7.07 | M7 |
+| R3 | Sill | 7,7,7.5,7,8,7.5,7 | 7.29 | 7,7,7.5,7,8,7.5,7.5 | 7.36 | K8 |
+| R3 | Lab | 7,7.5,7,7.5,8,6,6.5 | 7.07 | 7.5,7.5,7,7.5,8,6,7.5 | 7.29 | K8 |
+| **Panel** | **Sill** | | **7.24** | | **7.40** | **3/3 K8** |
+| **Panel** | **Lab** | | **7.14** | | **7.24** | **2/3 K8** |
+
+Retained both. The dissent preferred stronger ruling as a notebook identity cue; the majority preferred reduced stripe interference. Paired original/candidate construction medians: sill 41.05 / 40.95 ms, lab 48.6 / 48.5 ms; 12 warm samples each. Draw counts unchanged; shader/browser errors empty. Relative-weakness report pending.

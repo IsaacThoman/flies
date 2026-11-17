@@ -182,7 +182,7 @@ float sillTop;`,
     paintHeightRail = -flake * 0.08;
   }
   // Where the sun has baked it, the old gloss has crazed into a fine net of cracks, long along the grain, with dirt in them.
-  float crazed = smoothstep(0.6, 0.85, vnoise3(vWorld * 0.015 + 4.0)) * (1.0 - bare) * resolved(0.25) * window;
+  float crazed = smoothstep(0.72, 0.94, vnoise3(vWorld * 0.015 + 4.0)) * (1.0 - bare) * resolved(0.25) * window;
   float crack = 0.0;
   if (crazed > 0.0) {
     vec2 cp = vec2(u * 0.65 + vnoise(vec2(u, v) * 0.5) * 0.35, v * 2.8);
@@ -203,7 +203,7 @@ float sillTop;`,
     float width = 0.006 + 0.009 * vnoise(cp * 3.0);
     float open = smoothstep(0.35, 0.6, vnoise(cp * 1.7 + 3.0));
     crack = (1.0 - smoothstep(width, width + fwidth(e) * 1.5, e)) * crazed * open;
-    c *= 1.0 - crack * 0.12;
+    c *= 1.0 - crack * 0.06;
   }
   // Dust: a few pale specks and darker grains, a fraction of a millimetre across.
   vec2 dc = floor(vWorld.xz * 3.0);
