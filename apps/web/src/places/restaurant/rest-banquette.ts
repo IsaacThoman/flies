@@ -198,7 +198,7 @@ export function buildBanquette(b: Builder, solids: readonly Solid[]) {
     b.detail(area, wood.geometry(), "#d8c0b0", KIND.mahogany);
 
     // From afar: one section along it, the seat and the back.
-    const far: P[] = [...[12, 9, 6, 3, 0].map((i) => rollSection[i]), [face, q.seat - 3], [(q.x0 + q.x1) / 2, q.seat], [q.x0, q.seat - 12], [q.x0, 0]];
+    const far: P[] = [...[12, 9, 6, 3, 0].map((i) => rollSection[i]), [face, seatAt(face, 0) - 0.02], [(q.x0 + q.x1) / 2, q.seat], [q.x0, q.seat - 12], [q.x0, 0]];
     const stand = prism(new Faces(), far, "z", za, zb, false);
     for (const [end, facing] of [
       [q.z0, -1],

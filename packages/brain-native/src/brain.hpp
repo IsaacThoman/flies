@@ -93,6 +93,7 @@ class Brain {
   std::vector<uint32_t> background_inputs_;
   // The sweet neurons' output gain, which hunger sets (io::sweet_output_gain).
   uint32_t sweet_gain_ = 0;
+  std::vector<uint32_t> state_inputs_;
   std::vector<double> rates_;
   std::vector<std::string> rate_names_;
   std::vector<uint32_t> counts_;
@@ -100,6 +101,9 @@ class Brain {
   // Indexed by io::Side, as are their rated inputs.
   std::vector<vision::Retina> retinas_;
   std::array<uint32_t, 2> eye_inputs_{};
+  /** The eyes' gain last set (io::kSleepEyes), and each eye's rates scaled by it. */
+  double eye_gain_ = 1;
+  std::array<std::vector<double>, 2> gained_;
   // The regions, which follow the readouts in rates(): each one's size and its spikes in a chunk.
   std::vector<double> region_sizes_;
   std::vector<uint32_t> region_counts_;

@@ -44,9 +44,18 @@ export type SiteOptions = {
 };
 
 export async function serveSite({ dir, base = "/", port = 0, cut, transferred }: SiteOptions) {
+  dir = path.resolve(dir);
   const requests: Hit[] = [];
   const server = http.createServer((req, res) => {
-    const url = new URL(req.url ?? "/", "http://localhost");
+    let url: URL;
+    let suffix: string;
+    try {
+      url = new URL(req.url ?? "/", "http://localhost");
+      suffix = decodeURIComponent(url.pathname.slice(base.length));
+    } catch {
+      res.writeHead(400).end();
+      return;
+    }
     const request: Hit = { path: url.pathname, range: req.headers.range ?? null };
     requests.push(request);
     if (url.pathname === base.slice(0, -1)) {
@@ -57,10 +66,11 @@ export async function serveSite({ dir, base = "/", port = 0, cut, transferred }:
       res.writeHead(404).end();
       return;
     }
-    let file = decodeURIComponent(url.pathname.slice(base.length)) || "index.html";
+    let file = suffix || "index.html";
     if (file.endsWith("/")) file += "index.html";
-    const full = path.join(dir, file);
-    if (!full.startsWith(path.resolve(dir)) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
+    const full = path.resolve(dir, file);
+    const relative = path.relative(dir, full);
+    if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
       res.writeHead(404).end();
       return;
     }
@@ -74,7 +84,7 @@ export async function serveSite({ dir, base = "/", port = 0, cut, transferred }:
     let end = size - 1;
     const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
     if (range && (range[1] || range[2])) {
-      start = range[1] ? Number(range[1]) : size - Number(range[2]);
+      start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
       end = range[1] && range[2] ? Math.min(size - 1, Number(range[2])) : size - 1;
       if (start > end || start >= size) {
         res.writeHead(416, { "Content-Range": `bytes */${size}` }).end();
@@ -83,14 +93,16 @@ export async function serveSite({ dir, base = "/", port = 0, cut, transferred }:
       headers["Content-Range"] = `bytes ${start}-${end}/${size}`;
     }
     headers["Content-Length"] = String(end - start + 1);
-    res.writeHead(range ? 206 : 200, headers);
-    if (req.method === "HEAD") {
+    res.writeHead(range && (range[1] || range[2]) ? 206 : 200, headers);
+    if (req.method === "HEAD" || size === 0) {
       res.end();
       return;
     }
     res.on("finish", () => transferred?.(file, end - start + 1));
     const stop = cut?.(file, request);
     const stream = fs.createReadStream(full, { start, end: stop != null ? Math.min(end, start + stop - 1) : end });
+    stream.on("error", () => res.destroy());
+    res.on("close", () => stream.destroy());
     stream.pipe(res, { end: stop == null });
     if (stop != null) stream.on("end", () => res.destroy());
   });

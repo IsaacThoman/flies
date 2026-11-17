@@ -14,6 +14,8 @@ npm run build            # the site, into dist/
 npm run serve -- --base /fly/   # try it as a host would serve it: http://127.0.0.1:8080/fly/
 ```
 
+The build fails if the connectome is missing; the development server only warns.
+
 `FLY_SITE_URL=https://example.org/fly/ npm run build` makes the link
 preview's picture and address absolute, which most sites that show link
 previews need; without it they are relative and the rest works the same.
@@ -303,7 +305,7 @@ what more speed would cost.
   phone in a pocket, a tab frozen in the background) wakes the same way: the
   game notices the wall clock has jumped between two frames, since no event
   says so. Nor is it taken for a stalled brain: only time while frames are
-  coming counts toward the brain's 2 s stall limit.
+  coming counts toward the brain's 10 s stall limit.
 - **The screen stays awake** (the Screen Wake Lock API) while the screensaver
   shows in a visible tab, and is let go otherwise. Browsers without it, or that
   refuse it, let the screen sleep as usual.

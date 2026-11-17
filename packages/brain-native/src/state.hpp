@@ -9,11 +9,16 @@
 // is
 //
 //   logistic(arousal.weight × arousal + scene.weight × scene[eye] + bias
-//            + hunger.weight × (hunger - 1))
+//            + hunger.weight × (hunger - 1) + sleep)
 //
 // from 0 to 1, multiplying that eye's maximum background rate. The hunger
 // term stands in for starvation-induced hyperactivity; state.ts says why and
 // where its weight comes from.
+//
+// Sleep adds a term of its own inside the logistic: the daily clock's
+// oscillators raise arousal, its push toward sleep, the homeostatic sleep
+// pressure and sleep depth lower it, a made-up stand-in for the clock's and
+// the homeostat's outputs the connectome lacks (state.ts says more).
 
 #ifndef FLY_STATE_HPP
 #define FLY_STATE_HPP
@@ -52,11 +57,21 @@ class InternalState {
   static constexpr double kSceneTau = 4, kSceneWeight = 1.5;
   static constexpr double kBias = -1;
   static constexpr double kHungerWeight = 0.9;
+  // How far the clock's oscillators raise arousal, and its push toward sleep, sleep pressure and sleep depth lower it, at 1.
+  static constexpr double kSleepWake = 1, kSleepClock = 3.5, kSleepPressure = 4, kSleepDepth = 5;
 
   explicit InternalState(uint32_t seed) : normal_(seed) {}
 
   /** Advances by dt seconds. */
   void step(double dt);
+  /** Sets the sleep term from the clock's oscillators (the higher of the two), its push toward sleep, sleep pressure and sleep depth, each 0 to 1. */
+  void rest(double wake, double clock_sleep, double pressure, double depth) {
+    sleep_ = kSleepWake * wake - (kSleepClock * clock_sleep + kSleepPressure * pressure + kSleepDepth * depth);
+  }
+  /** The sleep term (above 0 at the clock's peaks). */
+  double sleep() const { return sleep_; }
+  /** How sleepy the term makes it, 0 to 1: 1 at the clock's full push toward sleep. */
+  double sleepiness() const { return js::min(1, js::max(0, -sleep_ / kSleepClock)); }
   /** The background level of one eye, 0 to 1. */
   double level(io::Side eye) const;
   /** How hungry the fly is, 0..1 (io::hunger_of); set by the brain each tick. */
@@ -69,6 +84,7 @@ class InternalState {
   Wander arousal_{kArousalTau};
   Wander scene_[2] = {{kSceneTau}, {kSceneTau}};
   double hunger_ = 1;
+  double sleep_ = 0;
 };
 
 }  // namespace fly

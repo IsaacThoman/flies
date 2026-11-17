@@ -96,17 +96,17 @@ std::vector<InputSpec> senses() {
       {"loomLeft", "Looming detectors (LPLC2, LC4) of the left eye", sided(kLooming, kLeft), 100, "", kLoomLeft, kLeft},
       {"loomRight", "Looming detectors (LPLC2, LC4) of the right eye", sided(kLooming, kRight), 100, "", kLoomRight, kLeft},
       {"touch head", "Mechanosensory bristle neurons of the head (BM types)", query({{kSuperClass, is("cb_sensory")}, {kType, starts_with("BM")}}), 50,
-       "", kTouch, kLeft},
+       "", kTouch, kLeft, {}, false, true},
       {"touch body", "Mechanosensory bristle neurons of the thorax, abdomen and legs",
-       query({{kSuperClass, is("vnc_sensory")}, {kSubClass, is("mechanosensory_bristle")}}), 10, "", kTouch, kLeft},
-      {"bumpLeft", "Displacement-sensitive Johnston's organ neurons (zones C and E) of the left antenna", sided(kAntenna, kLeft), 100, "", kBumpLeft, kLeft},
+       query({{kSuperClass, is("vnc_sensory")}, {kSubClass, is("mechanosensory_bristle")}}), 10, "", kTouch, kLeft, {}, false, true},
+      {"bumpLeft", "Displacement-sensitive Johnston's organ neurons (zones C and E) of the left antenna", sided(kAntenna, kLeft), 100, "", kBumpLeft, kLeft, {}, false, true},
       {"bumpRight", "Displacement-sensitive Johnston's organ neurons (zones C and E) of the right antenna", sided(kAntenna, kRight), 100, "", kBumpRight,
-       kLeft},
+       kLeft, {}, false, true},
       {"wind", "Wind- and gravity-sensitive Johnston's organ neurons of both antennae", query({{kSuperClass, is("cb_sensory")}, {kSubClass, is("wind_gravity")}}),
-       100, "", kWind, kLeft},
+       100, "", kWind, kLeft, {}, false, true},
       {"sweet", kSweetDescription, query({{kSuperClass, is("cb_sensory")}, {kClass, is("gustatory")}, {kType, sweet_types()}}), 100, "", kSweet, kLeft},
       {"grounded", "Campaniform sensilla (load sensors) of the legs (SNpp53), firing tonically while standing",
-       query({{kSubClass, is("campaniform_sensilla")}, {kType, is(kLegCampaniform)}}), 20, "", kGrounded, kLeft},
+       query({{kSubClass, is("campaniform_sensilla")}, {kType, is(kLegCampaniform)}}), 20, "", kGrounded, kLeft, {}, false, true},
       {"maleTaste", "Front legs' taste neurons for a male's pheromones: LgLG1a (ppk23 M cells) and LgAG1 (Gr32a/Gr33a)",
        query({{kType, one_of({"LgLG1a", "LgAG1"})}}), 50, "", kMaleTaste, kLeft, kForelegMaleTaste, true},
       {"wingbeat", "Campaniform sensilla (strain sensors) of the wings and halteres, firing with each stroke",
@@ -132,6 +132,19 @@ std::vector<InputSpec> background() {
                    6, "background " + other, kSenseCount, side});
   }
   return out;
+}
+
+// Internal state the connectome can't supply, fed to the real neurons that
+// carry it in the fly (io.ts's STATE_INPUTS says why each).
+std::vector<StateSpec> state_inputs() {
+  return {
+      {"clock morning", "The morning oscillator's clock neurons, s-LNv and l-LNv (the M cells)", query({{kType, one_of({"s-LNv", "l-LNv"})}}), 5,
+       kClockMorning},
+      {"clock evening", "The evening oscillator's clock neurons, LNd and the 5th s-LNv (the E cells)",
+       query({{kType, one_of({"LNd_b", "LNd_c", "5thsLNv_LNd6"})}}), 5, kClockEvening},
+      {"sleep pressure", "Tangential neurons of the fan-shaped body's dorsal layers 6 and 7 (FB6, FB7) and the R5 ring neurons (ER5)",
+       query({{kType, [](std::string_view t) { return t.starts_with("FB6") || t.starts_with("FB7") || t == "ER5"; }}}), 10, kSleepPressure},
+  };
 }
 
 std::vector<ReadoutSpec> readouts() {
@@ -174,6 +187,11 @@ Wiring wire(const Connectome& c) {
       }
     }
   }
+  // A connectome without them (a test's) leaves them out.
+  for (StateSpec& spec : state_inputs()) {
+    std::vector<uint32_t> neurons = c.find(spec.select);
+    if (!neurons.empty()) w.state.push_back({std::move(spec), std::move(neurons)});
+  }
   for (ReadoutSpec& spec : readouts()) {
     std::vector<uint32_t> neurons = c.find(spec.select);
     w.readouts.push_back({std::move(spec), std::move(neurons)});
@@ -193,6 +211,7 @@ Wiring wire(const Connectome& c) {
   for (const std::vector<Group>* groups : {&w.senses, &w.background}) {
     for (const Group& group : *groups) driven.insert(group.neurons.begin(), group.neurons.end());
   }
+  for (const StateGroup& group : w.state) driven.insert(group.neurons.begin(), group.neurons.end());
   for (const ReadoutGroup& group : w.readouts) {
     for (uint32_t i : group.neurons) {
       if (driven.count(i) != 0) throw std::runtime_error("Neuron " + std::to_string(i) + " is both driven and read (readout \"" + group.spec.name + "\")");
@@ -224,6 +243,10 @@ double hunger_of(const Senses& s) { return std::isfinite(s.hunger) ? js::min(1, 
 constexpr double kSated = 1 / 1.4;
 
 double sweet_output_gain(double hunger) { return kSated + (1 - kSated) * hunger; }
+
+double state_of(const Senses& s, StateKey key) { return key < kStateCount ? js::clamp(s.state[key], 0, 1) : 0; }
+
+double sleep_gate(const Senses& s) { return 1 - kSleepGate * state_of(s, kSleepDepth); }
 
 // Rate, Hz, at which each command reaches 1.
 constexpr double kWalk = 40, kTurn = 40, kBack = 40, kEscape = 200, kWings = 120, kGroom = 60, kFeed = 40, kSing = 40;

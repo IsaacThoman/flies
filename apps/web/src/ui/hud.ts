@@ -48,6 +48,7 @@ export const HUD_HITS = { tool: "tool", kind: "kind", label: "label", go: "go", 
 
 const CAPTIONS: Record<Activity, string> = {
   resting: "Resting",
+  sleeping: "Asleep",
   walking: "Walking",
   backing: "Backing away",
   turning: "Turning",
@@ -74,7 +75,7 @@ export function actionLabel(hands: Hands, here: PlaceId): { glyph: Glyph; label:
   const variant = hands.label.toLowerCase();
   switch (tool.id) {
     case "feed":
-      return { glyph: "select", label: `Drop ${variant}` };
+      return hands.variant.id === "clear" ? null : { glyph: "select", label: `Drop ${variant}` };
     case "swoop":
       return { glyph: "select", label: "Throw the ball" };
     case "feather":
