@@ -139,14 +139,13 @@ async function fingers() {
     await tapOn("row", 0);
     await waitFor(page, "screen=play,stack=title>play");
 
-    step("fingers: clear weather and midday, picked from the shelf and the label's arrows");
-    await tool("weather");
-    await tapOn("kind", 1);
-    await waitFor(page, "variant=clear");
-    await tool("light");
-    await tapOn("kind", 1);
-    await tapOn("kind", 1);
-    await waitFor(page, "time=noon");
+    step("fingers: clear weather and midday, picked from the shelf and the arrows of the Sky's two labels");
+    await tool("sky");
+    await touch.tap(await targetOf(page, "kind", 1, 1));
+    await waitFor(page, "sky=clock/clear,weather=clear");
+    await touch.tap(await targetOf(page, "kind", 1, 0));
+    await touch.tap(await targetOf(page, "kind", 1, 0));
+    await waitFor(page, "sky=noon/clear,time=noon");
     await waitForGameTime(page, 3);
     await waitWithin(page, "mode~standing|walking", 60);
 

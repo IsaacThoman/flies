@@ -37,8 +37,14 @@ export type HudState = {
   pressed?: Readonly<Hit> | null;
 };
 
-/** What the HUD's targets are, as recorded in the hit map. */
+/** What the HUD's targets are, as recorded in the hit map. A kind's arrows and its label say which of the tool's dials they are on as their index. */
 export const HUD_HITS = { tool: "tool", kind: "kind", label: "label", go: "go", menu: "menu" } as const;
+
+/** The Sky's two dials side by side each take at most this much, and need at least this much; with less they are one over the other. */
+const DIAL_WIDTH = 230;
+const DIAL_LEAST = 160;
+/** One over the other, the time of day is this far over the weather. */
+const DIAL_ROW = 40;
 
 const CAPTIONS: Record<Activity, string> = {
   resting: "Resting",
@@ -80,13 +86,11 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   const n = TOOLS.length;
   const gap = L.gap;
   const cx = L.cx;
-  const sy = L.shelfY;
-  // The tools that act on the fly, then, a little apart, those about its world and the camera: two shelves to the eye, one row to the remote.
-  const split = L.split;
-  glassPanel(g, L.shelfLeft - 8, sy - 26, split * gap + 16, 52, 26, { alpha: 0.75, shadow: false });
-  if (split < n) glassPanel(g, L.shelfLeft - 8 + split * gap + L.apart, sy - 26, (n - split) * gap + 16, 52, 26, { alpha: 0.75, shadow: false });
+  // The tools that act on the fly, then, a little apart (or, too many for a row, over them), those about its world and the camera: two shelves to the eye, one row to the remote.
+  for (const r of L.groups) glassPanel(g, r.x, r.y, r.w, r.h, 26, { alpha: 0.75, shadow: false });
   for (let i = 0; i < n; i++) {
-    const x = L.shelfLeft + (i + 0.5) * gap + (i < split ? 0 : L.apart);
+    const x = L.toolX[i];
+    const sy = L.toolY[i];
     const on = i === hands.tool;
     const pressed = s.pressed?.kind === HUD_HITS.tool && s.pressed.index === i;
     const r = on ? 22 * L.orb : Math.min(pressed ? 20 : 17, gap / 2 - 1);
@@ -99,6 +103,17 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   // The tool's name and kind, over the shelf. Pointing, arrows either side change the kind, and a place to go has its own button.
   const tool = hands.current;
   const preview = pointing && !s.pressed && s.previewTool !== undefined && s.previewTool !== hands.tool ? TOOLS[s.previewTool] : undefined;
+  // Identify the pending tool clear of the finger without committing it.
+  const pending = pointing && s.pressed?.kind === HUD_HITS.tool ? TOOLS[s.pressed.index] : undefined;
+  const pop = preview ? 0 : Math.max(0, 1 - s.changed * 4) * 3;
+  const hitHeight = Math.max(36, touch?.targetHeight ?? 32);
+  const hitY = labelY - 17 - (hitHeight - 32) / 2;
+  const teach = s.hints && !pointing && !s.learned[tool.id] && !hands.fixed.has(tool.id);
+  if (tool.second && !preview && !pending) {
+    drawDials(g, t, s, hits, labelY, pop, hitHeight, teach);
+    drawMenuAndCaption(g, t, s, hits, menuY);
+    return;
+  }
   const activeMany = tool.variants.length > 1;
   const many = !preview && activeMany;
   const reserveGo = pointing && tool.id === "place";
@@ -114,12 +129,7 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   g.font = font(17);
   const labelSize = Math.min(17, 17 * Math.max(1, lw - arrows - 24) / Math.max(1, g.measureText(label).width));
   const lx = (touch?.labelCx ?? cx) - lw / 2 - (reserveGo ? (goWidth + 8) / 2 : 0);
-  // Identify the pending tool clear of the finger without committing it.
-  const pending = pointing && s.pressed?.kind === HUD_HITS.tool ? TOOLS[s.pressed.index] : undefined;
-  const pop = preview ? 0 : Math.max(0, 1 - s.changed * 4) * 3;
   const ly = labelY - 17 - pop;
-  const hitHeight = Math.max(36, touch?.targetHeight ?? 32);
-  const hitY = labelY - 17 - (hitHeight - 32) / 2;
   const labelPressed = s.pressed?.kind === HUD_HITS.kind || s.pressed?.kind === HUD_HITS.label;
   pill(g, lx, ly, lw, 32, "", { color: labelPressed || pending ? "aqua" : "glass", press: labelPressed ? 1 : 0 });
   if (pending) drawToolIcon(g, pending.id, lx + lw / 2, labelY - pop, 12);
@@ -140,7 +150,75 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
     pill(g, lx + lw + 8, ly, goWidth, 32, "Go", { color: "green", press: s.pressed?.kind === HUD_HITS.go ? 1 : 0 });
     hits.add(HUD_HITS.go, lx + lw + 8, hitY, goWidth, hitHeight);
   }
+  // Pointing has no button hints: what can be pressed is on the screen.
+  if (teach && !(tool.id === "feed" && hands.variant.id === "clear")) {
+    const choose = tool.id === "view" || (tool.id === "place" && hands.place === s.here);
+    drawGlyph(g, tool.id === "feather" || tool.id === "blow" ? "hold" : choose ? "upDown" : "select", cx, labelY - 48, 28, t, s.glyphs!);
+  }
+  drawMenuAndCaption(g, t, s, hits, menuY);
+}
 
+/**
+ * A tool with two dials (the Sky: its time of day, and its weather), each
+ * its own label with its own picture, side by side, or one over the other
+ * where they don't fit. Pointing, each has arrows either side; with the
+ * remote, Up and Down step the first and Select the second, as their hints
+ * show.
+ */
+function drawDials(g: CanvasRenderingContext2D, t: number, s: HudState, hits: HitMap, labelY: number, pop: number, hitHeight: number, teach: boolean) {
+  const { hands } = s;
+  const L = s.layout;
+  const touch = s.glyphs === null ? L.touch : null;
+  const pointing = s.glyphs === null;
+  const room = touch?.labelWidth ?? L.width - 16;
+  const mid = touch?.labelCx ?? L.cx;
+  const side = (room - 8) / 2 >= DIAL_LEAST;
+  const w = side ? Math.min(DIAL_WIDTH, (room - 8) / 2) : Math.min(280, room);
+  for (const dial of [0, 1] as const) {
+    const x = side ? mid - 4 - w + dial * (w + 8) : mid - w / 2;
+    const y = side ? labelY : labelY - (1 - dial) * DIAL_ROW;
+    const pressed = (s.pressed?.kind === HUD_HITS.kind || s.pressed?.kind === HUD_HITS.label) && s.pressed.index === dial;
+    pill(g, x, y - 17 - pop, w, 32, "", { color: pressed ? "aqua" : "glass", press: pressed ? 1 : 0 });
+    // Pointing, arrows at both ends; with the remote, Up and Down's at the start of the first.
+    const start = pointing || dial === 0 ? 36 : 12;
+    const end = pointing ? 36 : 12;
+    // Its picture, then its kind's name, centred between the ends, as large as fits up to the other labels' size.
+    const label = hands.labelOf(dial);
+    const space = w - start - end - 22;
+    g.font = font(17);
+    const wide = g.measureText(label).width;
+    const size = Math.min(17, (17 * space) / Math.max(1, wide));
+    const left = x + start + (space - (wide * size) / 17) / 2;
+    drawToolIcon(g, dial === 0 ? "light" : "weather", left + 9, y - pop, 9);
+    text(g, label, left + 22, y - pop, { size, baseline: "middle", color: INK });
+    const hitY = y - 17 - (hitHeight - 32) / 2;
+    if (pointing) {
+      chevron(g, x + 18, y - pop, -1, true);
+      chevron(g, x + w - 18, y - pop, 1, true);
+      hits.add(HUD_HITS.kind, x, hitY, 44, hitHeight, dial, -1);
+      hits.add(HUD_HITS.label, x + 44, hitY, w - 88, hitHeight, dial, 1);
+      hits.add(HUD_HITS.kind, x + w - 44, hitY, 44, hitHeight, dial, 1);
+    } else {
+      if (dial === 0) {
+        text(g, "▲", x + 18, y - 5 - pop, { size: 9, align: "center", color: INK_SOFT });
+        text(g, "▼", x + 18, y + 6 - pop, { size: 9, align: "center", color: INK_SOFT });
+      }
+      hits.add(HUD_HITS.label, x, hitY, w, hitHeight, dial, 1);
+    }
+    if (teach) {
+      // Over each its own button; one over the other, both over the first.
+      const gx = side ? x + w / 2 : L.cx + (dial === 0 ? -30 : 30);
+      drawGlyph(g, dial === 0 ? "upDown" : "select", gx, labelY - (side ? 0 : DIAL_ROW) - 48, 28, t, s.glyphs!);
+    }
+  }
+}
+
+/** The menu's button or its hint, the shelf's and the hand's hints, the eyes' labels, and the caption: whatever tool is in hand. */
+function drawMenuAndCaption(g: CanvasRenderingContext2D, t: number, s: HudState, hits: HitMap, menuY: number) {
+  const L = s.layout;
+  const pointing = s.glyphs === null;
+  const touch = pointing ? L.touch : null;
+  const cx = L.cx;
   // The menu's button, or its hint: the caption keeps clear of it.
   let menuRight = touch?.menuAtFoot ? L.cx - L.width / 2 - 8 : L.menuX;
   if (pointing) {
@@ -155,11 +233,8 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
 
   // Pointing has no button hints: what can be pressed is on the screen.
   if (s.hints && !pointing) {
-    if (!s.learned[tool.id] && !hands.fixed.has(tool.id) && !(tool.id === "feed" && hands.variant.id === "clear")) {
-      const choose = tool.id === "light" || tool.id === "weather" || tool.id === "view" || (tool.id === "place" && hands.place === s.here);
-      drawGlyph(g, tool.id === "feather" || tool.id === "blow" ? "hold" : choose ? "upDown" : "select", cx, labelY - 48, 28, t, s.glyphs!);
-    }
-    if (!s.learned.tools) drawGlyph(g, "leftRight", L.shelfLeft + L.split * gap / 2, sy - 34, 23, t, s.glyphs!);
+    const first = L.groups[0];
+    if (!s.learned.tools) drawGlyph(g, "leftRight", first.x + first.w / 2, first.y - 8, 23, t, s.glyphs!);
     if (!s.learned.hand && s.teachSwipe && s.glyphs && s.glyphs !== "keys") drawGlyph(g, "swipe", L.rightX - 20, L.rightY - 30, 28, t, s.glyphs);
   }
 

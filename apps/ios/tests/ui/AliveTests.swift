@@ -11,8 +11,8 @@ import XCTest
 final class AliveTests: XCTestCase {
   private let app = XCUIApplication()
   private let reporting = ["-FlyReport", "0.25"]
-  /// Alone: the check is of the app, not of the site's rooms, which the game would otherwise join once awake (kept, like any setting).
-  private let alone = #"{"joinOthers":false}"#
+  /// At home: the check is of the app, not of the site's rooms, which a visit kept from an earlier run would join once awake (kept, like any setting).
+  private let alone = #"{"visit":-1}"#
 
   override func setUp() {
     continueAfterFailure = false
@@ -61,7 +61,7 @@ final class AliveTests: XCTestCase {
     // A setting changed through the game's own settings, then the app killed as the app switcher
     // does: the next launch has it.
     app.terminate()
-    app.launchArguments = reporting + ["-FlySettings", #"{"eyes":"off","joinOthers":false}"#]
+    app.launchArguments = reporting + ["-FlySettings", #"{"eyes":"off","visit":-1}"#]
     app.launch()
     try app.wait("the eyes turned off", timeout: 180) { $0.data("brain") == "running" && $0.data("eyes") == "off" }
     app.terminate()

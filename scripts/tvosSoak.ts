@@ -170,7 +170,7 @@ export function soakConfig(minutes = 30, flies?: number) {
     }
   }
   drive.push(["log", "soak complete"]);
-  // Alone: otherwise the game sits down with everyone once its brain is awake.
+  // Alone: a visit kept from an earlier run would otherwise sit it with everyone once its brain is awake.
   return { script: "game.js", stats: 10, logFile: true, url: "http://fly.local/?alone", drive };
 }
 

@@ -85,17 +85,15 @@ export interface Shell {
   readonly typing: TextEntry | null;
   /** Whether a link can be handed on here: a share sheet or a clipboard (the Apple TV has neither, and shows the room's QR code for a phone instead). */
   readonly canShare: boolean;
-  /** Makes a room and sits at it; sits at one by its code (with its password, if it is locked); hands its link on (from a press: the share sheet or the clipboard); takes another's fly off it (the starter); leaves it. */
+  /** Makes a room and sits at it; sits at one by its code (with its password, if it is locked); hands its link on (from a press: the share sheet or the clipboard); takes another's fly off it (the starter). */
   startRoom(room: NewRoom): void;
   joinRoom(code: string, password?: string): void;
   shareTable(): Promise<"shared" | "copied" | "failed">;
   removeFly(id: number): void;
-  leaveTable(): void;
-  /** Whether the player is online: sat with everyone in the place it lives by default (when it can be), or at a room. */
-  readonly isOnline: boolean;
-  /** Alone, and not sat with anyone by default until `goOnline`, this launch or a later one. */
-  disconnect(): void;
-  goOnline(): void;
+  /** Whether the player has taken the fly to visit a room open to everyone (in it, or on the way): until it goes home, this launch and later ones. */
+  readonly visiting: boolean;
+  /** Out of any room, alone in the place it lives. */
+  goHome(): void;
 }
 
 /**

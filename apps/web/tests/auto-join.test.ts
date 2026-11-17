@@ -1,15 +1,44 @@
-// Sitting with everyone waits for the brain and the network, gives up quietly,
-// never undoes a player's choice to disconnect, and follows the place chosen
+// A launch is at home unless it is invited, or still at a room of its own, or
+// on a visit; a visit waits for the brain and the network, gives up quietly,
+// never goes on once the player has gone home, and follows the place chosen
 // to that place's room.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EVERYONE, EVERYONE_SERIES, everyoneCode, seriesCode, seriesFor } from "@fly/net";
-import { ATTEMPT, AutoJoin, RETRY } from "../src/online/auto-join.ts";
+import { ATTEMPT, AutoJoin, RETRY, launchSeat } from "../src/online/auto-join.ts";
 import type { AutoJoinNow } from "../src/online/auto-join.ts";
 
 const READY: AutoJoinNow = { enabled: true, awake: true, network: true, atRoom: false, series: 0, atSeries: -1 };
 const TRYING: AutoJoinNow = { ...READY, atRoom: true };
+
+test("at home a launch sits nowhere, however long it waits, awake and online, even with a room open to everyone it was last in", () => {
+  assert.deepEqual(launchSeat(null, null), { sit: null, visit: null });
+  assert.deepEqual(launchSeat(null, EVERYONE), { sit: null, visit: null }, "the room open to everyone a visit (or an older build) was last in");
+  const home = { ...READY, enabled: false };
+  for (const kept of [null, EVERYONE, seriesCode(seriesFor("lab"), 2)]) {
+    const auto = new AutoJoin(kept);
+    for (let i = 0; i < 100; i++) assert.equal(auto.update(60, home, false, false), null);
+    // A network coming back, or the page shown again, doesn't start a visit either.
+    auto.hurry();
+    auto.resume();
+    assert.equal(auto.update(0, home, false, false), null);
+  }
+});
+
+test("a launch sits at a room of someone's own it is invited to or was still at, and visits a room open to everyone it is invited to", () => {
+  assert.deepEqual(launchSeat("abcdefghjk", null), { sit: "abcdefghjk", visit: null });
+  assert.deepEqual(launchSeat(null, "abcdefghjk"), { sit: "abcdefghjk", visit: null });
+  assert.deepEqual(launchSeat("bcdefghjkm", "abcdefghjk"), { sit: "bcdefghjkm", visit: null }, "the invitation, over the room it was at");
+  assert.deepEqual(launchSeat(EVERYONE, "abcdefghjk"), { sit: null, visit: EVERYONE });
+  assert.deepEqual(launchSeat(seriesCode(seriesFor("kitchen")), null), { sit: null, visit: seriesCode(seriesFor("kitchen")) });
+});
+
+test("on a visit, its room comes back on a later launch, the one it was last let into", () => {
+  const auto = new AutoJoin(everyoneCode(3));
+  assert.equal(auto.update(0, READY, false, false), "join");
+  assert.equal(auto.code, everyoneCode(3));
+});
 
 test("joining waits until the brain is awake, the setting is on, a network is available and no room is occupied", () => {
   for (const blocked of [{ awake: false }, { enabled: false }, { network: false }, { atRoom: true }]) {

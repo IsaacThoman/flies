@@ -72,18 +72,18 @@ try {
   await waitFor(page, "view=table");
   const calls: number[] = [];
   const weathers = Object.keys(KINDS);
+  // The Sky: Up and Down for the time of day, Select round the weathers.
+  await tool("sky");
   for (const time of ["morning", "noon", "golden", "dusk", "night"]) {
-    await tool("light");
     await press("ArrowUp", 6);
     await press(
       "ArrowDown",
       ["morning", "noon", "golden", "dusk", "night"].indexOf(time) + 1,
     );
     await waitFor(page, `time=${time}`);
-    await tool("weather");
-    await press("ArrowUp", weathers.length + 1);
+    for (let i = 0; i < 10 && !(await readState(page)).sky.endsWith("/now"); i++) await press("Enter");
     for (const weather of weathers) {
-      await press("ArrowDown");
+      await press("Enter");
       await waitFor(page, `weather=${weather}`);
       await waitForGameTime(page, 4);
       const s = await readState(page);

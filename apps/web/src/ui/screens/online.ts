@@ -1,12 +1,12 @@
 // Playing with others online: rooms of up to 128 flies
 // (docs/online.md). Few words, one pane, four faces:
 //
-// - the rooms: Go online (or Disconnect, while it is on the way to its
-//   room), a new one, a code to type, and every listed room with someone in
-//   it, by its name, its place's colour, its flies as pips and a padlock if
-//   it has a password, the rooms open to everyone first (Everyone's, then
-//   each place's), each with a globe; the list follows the room server as it
-//   changes;
+// - the rooms: Go home (while on the way to a room it is visiting), a new
+//   one, a code to type, and every listed room with someone in it, by its
+//   name, its place's colour, its flies as pips and a padlock if it has a
+//   password, the rooms open to everyone first (Everyone's, then each
+//   place's), each with a globe, to take the fly to visit; the list follows
+//   the room server as it changes;
 // - a new room: its name (one is suggested), its place, whether it is listed
 //   or only reached by its link, and a password if it is to have one;
 // - a locked room's door: its password;
@@ -15,10 +15,9 @@
 //   its player's colour, to take it off; beside them, the room's QR code for
 //   a phone to scan and its code to type. Who is there shows in the world
 //   itself, a dab of each player's colour on their fly. In a room open to
-//   everyone (where a device is by default), Browse rooms, to go to another
+//   everyone (somewhere the fly is visiting), Browse rooms, to go to another
 //   from: the list, with this room still about the fly until another is
-//   chosen; in one of someone's own, Leave the room, back to everyone. Then
-//   Disconnect, to be alone until going online again.
+//   chosen. Then Go home, alone where it lives.
 //
 // What goes wrong is said in the heading's place, briefly, in pink.
 
@@ -169,8 +168,8 @@ export class OnlineScreen implements Screen {
     switch (this.view) {
       case "rooms": {
         const rows: MenuItem[] = [];
-        // Not looking from a room: whether it is with everyone (on its way, or unable to reach them) or alone by choice.
-        if (!this.#looking && shell.canPlayOnline) rows.push(shell.isOnline ? { kind: "action", id: "disconnect", label: "Disconnect" } : { kind: "action", id: "online", label: "Go online" });
+        // Not looking from a room: on a visit, on its way to the room or unable to reach it, home is a step away.
+        if (!this.#looking && shell.canPlayOnline && shell.visiting) rows.push({ kind: "action", id: "home", label: "Go home" });
         rows.push(
           { kind: "action", id: "new", label: "New room", disabled: !shell.canPlayOnline || this.#incompatible() },
           { kind: "field", id: "code", label: "Code", value: this.#code, disabled: !shell.typing || this.#incompatible(), submit: { label: "Join", disabled: !this.#codeValid } },
@@ -219,8 +218,7 @@ export class OnlineScreen implements Screen {
         const rows: MenuItem[] = shell.canShare ? [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", disabled: !table.joined }] : [];
         if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", description: `Player ${o.id}, ${o.colours.length} ${o.colours.length === 1 ? "fly" : "flies"}`, swatch: o.colours });
         if (table.everyone) rows.push({ kind: "action", id: "rooms", label: "Browse rooms" });
-        else rows.push({ kind: "action", id: "leave", label: "Leave the room" });
-        rows.push({ kind: "action", id: "disconnect", label: "Disconnect" });
+        rows.push({ kind: "action", id: "home", label: "Go home" });
         return rows;
       }
     }
@@ -249,7 +247,7 @@ export class OnlineScreen implements Screen {
     const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
     const rooms = shell.rooms ? shell.rooms.map((r) => `${r.code}:${r.name}:${r.place}:${r.flies}:${r.locked}`).join(",") : "?";
     const at = table ? `${table.name}|${shell.here}|${table.joined}|${table.starting}|${table.everyone}|${this.#looking}|${copied}|${table.others.map((o) => `${this.#removalId(o)}/${o.colours.length}`).join(",")}` : "alone";
-    return `${this.view}|${this.#note}|${this.#codeValid}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}|${shell.isOnline}|${shell.lobbyStatus}`;
+    return `${this.view}|${this.#note}|${this.#codeValid}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}|${shell.visiting}|${shell.lobbyStatus}`;
   }
 
   #build(focus?: string) {
@@ -332,19 +330,11 @@ export class OnlineScreen implements Screen {
         if (how === "copied") this.#copied = this.#time;
         this.#refresh("share");
       });
-    } else if (id === "leave") {
-      // Back to everyone, in the place it lives: its card once the room there has let it in.
-      shell.leaveTable();
-      this.view = "rooms";
-      this.#refresh("disconnect");
-    } else if (id === "disconnect") {
-      shell.disconnect();
+    } else if (id === "home") {
+      shell.goHome();
       this.#looking = false;
       this.view = "rooms";
-      this.#refresh("online");
-    } else if (id === "online") {
-      shell.goOnline();
-      this.#refresh("disconnect");
+      this.#refresh("new");
     } else if (id.startsWith("remove:")) {
       const other = shell.table?.others.find((o) => this.#removalId(o) === id);
       if (other) shell.removeFly(other.id);

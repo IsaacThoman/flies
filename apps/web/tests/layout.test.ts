@@ -58,10 +58,8 @@ function shell(frame: Frame, glyphs: Shell["glyphs"] = null, online = true): She
     joinRoom() {},
     shareTable: async () => "failed",
     removeFly() {},
-    leaveTable() {},
-    isOnline: true,
-    disconnect() {},
-    goOnline() {},
+    visiting: true,
+    goHome() {},
   };
 }
 
@@ -71,7 +69,7 @@ test("the TV keeps its HUD and title layout, with Settings below a separate head
   assert.equal(hud.captionY, 25);
   assert.equal(hud.shelfY, 446);
   assert.equal(hud.gap, 52);
-  assert.deepEqual([hud.shelfLeft, hud.split, hud.apart], [203, TOOLS.findIndex((t) => t.id === "light"), 32]);
+  assert.deepEqual([hud.shelfLeft, hud.split, hud.apart], [229, TOOLS.findIndex((t) => t.world), 32]);
   assert.equal(hud.orb, 1);
   assert.equal(hud.labelY, 385);
   assert.deepEqual([hud.hintsX, hud.hintsY, hud.rightX, hud.rightY, hud.menuX, hud.menuY], [16, 446, 838, 446, 16, 24]);
@@ -88,8 +86,8 @@ test("the TV keeps its HUD and title layout, with Settings below a separate head
   // The Apple TV has no way to a table yet.
   const s = shell(TV_FRAME, "remote", false);
   const settings = settingsScreen(s);
-  // Spaced for its longest tab (On screen: the tabs and seven rows), and as tall as the tab open: the Screensaver's tabs and five rows here.
-  assert.deepEqual(settings.pane.panel, { x: 157, y: 12, w: 540, h: 308 });
+  // Spaced for its longest tab (On screen: the tabs and seven rows), and as tall as the tab open: the Screensaver's tabs and six rows here.
+  assert.deepEqual(settings.pane.panel, { x: 157, y: 12, w: 540, h: 352 });
   assert.deepEqual(settings.pane.list, { x: 185, y: 52, width: 484, row: 40, gap: 4, compact: false, columns: 1 });
   assert.equal(settings.menu.rows, settings.menu.items.length);
 
@@ -115,6 +113,36 @@ test("at every shape the HUD is inside the safe area, nothing on it overlaps, an
     // About a finger's width (44 CSS pixels is Apple's guide); on a phone, eight tools in two halves across leave a little less, and on the narrowest less again.
     if (frame.coarse) assert.ok(hud.gap * frame.unit >= (a.w * frame.unit >= 370 ? 42 : 34), `${name}: each tool ${(hud.gap * frame.unit).toFixed(0)} px across`);
   }
+});
+
+test("a shelf of ten tools in its two groups fits every shape: one row where a finger can tell them apart, else the fly's over its world's", () => {
+  // About the fly: Feed, Finger, Tickle, Blow, Swoop; about its world and the camera: Build, Sky, Place, View, Photo.
+  const ten = [...Array.from({ length: 5 }, () => ({})), ...Array.from({ length: 5 }, () => ({ world: true as const }))];
+  for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
+    const a = safeRect(frame);
+    const hud = hudLayout(frame, true, ten);
+    assert.equal(hud.toolX.length, 10);
+    assert.ok(inside(hud.shelf, a), `${name}: the shelf inside the safe area`);
+    // The groups are apart: one row with a gap between them, or one over the other.
+    assert.equal(hud.groups.length, 2, `${name}: two groups`);
+    assert.ok(!overlaps(hud.groups[0], hud.groups[1]), `${name}: the groups apart`);
+    for (let i = 0; i < 10; i++) {
+      const slot = { x: hud.toolX[i] - hud.gap / 2, y: hud.toolY[i] - 26, w: hud.gap, h: 52 };
+      assert.ok(inside(slot, hud.groups[i < 5 ? 0 : 1]), `${name}: tool ${i} in its group`);
+      // Along the shelf as the remote goes: left to right, the second row after the first.
+      if (i > 0) assert.ok(hud.toolY[i] > hud.toolY[i - 1] || hud.toolX[i] > hud.toolX[i - 1], `${name}: tool ${i} after ${i - 1}`);
+    }
+    const label = { x: hud.cx - 100, y: hud.labelY - 17, w: 200, h: 32 };
+    if (!hud.touch || hud.touch.labelY !== hud.shelfY) assert.ok(!overlaps(hud.shelf, label), `${name}: the label over the shelf`);
+    if (frame.coarse) assert.ok(hud.gap * frame.unit >= 42, `${name}: each of ten tools ${(hud.gap * frame.unit).toFixed(0)} px across`);
+  }
+  // The TV, a window: one row, the halves apart. An upright phone: the halves one over the other.
+  assert.equal(new Set(hudLayout(TV_FRAME, true, ten).toolY).size, 1);
+  const phone = frames().find(([name]) => name === "a phone upright")![1];
+  const stacked = hudLayout(phone, true, ten);
+  assert.ok(stacked.toolY[0] < stacked.toolY[9], "the fly's tools over its world's");
+  // Today's shelf keeps its one row on every shape.
+  for (const [name, frame] of frames()) assert.equal(new Set(hudLayout(frame).toolY).size, 1, name);
 });
 
 test("the HUD's targets are where it draws them, inside the safe area, and big enough for a finger", () => {
@@ -437,13 +465,15 @@ test("the title panel clears the footer at every requested screen shape", () => 
 });
 
 test("selector arrows stay put across kinds, including Place's Go appearing", () => {
-  for (const [, frame] of frames()) for (const id of ["feed", "light", "weather", "view", "place"]) {
+  for (const [, frame] of frames()) for (const id of ["feed", "sky", "view", "place"]) {
     const hands = new Hands(createPicnic());
     const i = TOOLS.findIndex((t) => t.id === id);
     hands.chooseTool(i);
     let first: number[] | null = null;
-    for (let kind = 0; kind < TOOLS[i].variants.length; kind++) {
-      hands.variants[i] = kind;
+    // Each kind on each of its dials (the Sky's time of day, then its weather).
+    const steps = [...TOOLS[i].variants.map((_, kind) => [0, kind] as const), ...(TOOLS[i].second ?? []).map((_, kind) => [1, kind] as const)];
+    for (const [dial, kind] of steps) {
+      (dial === 1 ? hands.seconds : hands.variants)[i] = kind;
       const hits = new HitMap();
       drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "resting", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, brainRunning: true, eyes: null, layout: hudLayout(frame) }, hits);
       const arrows: number[] = [];
@@ -578,7 +608,7 @@ test("the TV remote reaches Play, Settings and Online from the title", () => {
   const settings = settingsScreen(s);
   settings.enter();
   assert.equal(settings.menu.focused?.id, "page");
-  for (const id of ["wallpaperAfter", "wallpaperCamera", "place", "flies"]) {
+  for (const id of ["wallpaperAfter", "wallpaperCamera", "place", "wallpaperPlaces", "flies"]) {
     settings.press("down", false);
     assert.equal(settings.menu.focused?.id, id);
   }

@@ -37,7 +37,7 @@ import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./i
 import { Life } from "./life.ts";
 import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart, tryProtocolReload } from "./online/invite.ts";
 import type { Shared } from "./online/invite.ts";
-import { AutoJoin } from "./online/auto-join.ts";
+import { AutoJoin, launchSeat } from "./online/auto-join.ts";
 import type { AutoJoinNow } from "./online/auto-join.ts";
 import { Lobby } from "./online/lobby.ts";
 import { Online } from "./online/online.ts";
@@ -47,7 +47,8 @@ import { NEWER_KEY, reloadForNewer } from "./online/newer.ts";
 import { OtherFlies, devicesOf } from "./online/others.ts";
 import type { Device, Other } from "./online/others.ts";
 import { BrowserSocket } from "./online/socket.ts";
-import { isPlaceId, nextPlace, placeInfo } from "./places/catalog.ts";
+import { isPlaceId, placeInfo } from "./places/catalog.ts";
+import { Tour } from "./places/tour.ts";
 import type { PlaceId } from "./places/catalog.ts";
 import { NerveGlow } from "./nerves/glow.ts";
 import { NervesPanel, nervesSlot, nervesWanted } from "./nerves/panel.ts";
@@ -65,8 +66,8 @@ import { KEPT, OVERLAY_OPACITIES, OVERLAY_SIZES, loadLearned, loadSettings, load
 import type { Learned, Lesson, Settings, ShelfChoices, TableSeat } from "./settings.ts";
 import { Stage } from "./stage.ts";
 import { aimAt } from "./tools/aim.ts";
-import { Hands, TOOLS } from "./tools/hands.ts";
-import type { ToolId } from "./tools/hands.ts";
+import { DIALS, Hands, TOOLS } from "./tools/hands.ts";
+import type { Dial, DialId, ToolId } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
 import { StatsPanel, statsSlot, statsWanted } from "./stats/panel.ts";
 import type { StatsState } from "./stats/panel.ts";
@@ -101,8 +102,6 @@ const SWIPE_ROUND = DRAG_ROUND / 2;
 const SWIPE_UP = DRAG_UP / 2;
 /** The refresh cap for animated teaching, loading status and frame stats, Hz. */
 const HUD_SHIMMER_FPS = 10;
-/** Seconds of wallpaper in one place before the fly moves on, when it lives in each in turn. */
-const PLACE_TURN = 20 * 60;
 /** Seconds the world takes to fade out before the fly is carried somewhere else, and to fade in after. */
 const VEIL_OUT = 0.45;
 const VEIL_IN = 0.9;
@@ -123,7 +122,7 @@ const PAD_ZOOM = 1.6;
 
 type MenuScreenId = Exclude<ScreenId, "play">;
 
-const FIXED_AT_TABLE: ReadonlySet<ToolId> = new Set(["light", "weather", "place"]);
+const FIXED_AT_TABLE: ReadonlySet<ToolId> = new Set(["sky", "place"]);
 const NOTHING_FIXED: ReadonlySet<ToolId> = new Set();
 
 /** Adds each of `from` to `to`, without the iterator a for…of would make: it runs every frame for every fly. */
@@ -283,10 +282,8 @@ export class Game implements Shell {
   #here: PlaceId;
   /** Being carried to another place: where, and seconds since the veil began to fall. */
   #moving: { to: PlaceId; t: number; arrived: boolean } | null = null;
-  /** Seconds of wallpaper spent where it is now. */
-  #stayed = 0;
-  /** Where it lives, once the player has settled on it in Settings: online, the room open to everyone it belongs in follows it. */
-  #lives: Settings["place"];
+  /** Going round the places in the screensaver, if the player chose to. */
+  readonly tour = new Tour();
   /** A place stepped to in Settings, waiting for the player to settle on it. */
   #placeChoice = new Settle(
     () => this.#choosingPlace(),
@@ -333,12 +330,10 @@ export class Game implements Shell {
   /** The other devices at the table as the screens have them, by the first of their flies heard of. */
   readonly #devices = new WeakMap<Other, Device>();
   readonly #titleItems: number;
-  /** Sitting this device with others by default, once the brain is awake (null where it can't play online); and whether the room this device is at, or trying, is its doing (it ends quietly). */
+  /** Keeping this device in the room open to everyone it is visiting, once the brain is awake (null where it can't play online); and whether the room this device is at, or trying, is a visit's (it ends quietly). */
   #auto: AutoJoin | null = null;
   #autoOnline = false;
-  /** Whether the player is online (Online → Disconnect, Go online), as last applied, to tell when it changes. */
-  #joinOthers = true;
-  /** What sitting with everyone is told each frame, kept: nothing is made per frame. */
+  /** What the visit is told each frame, kept: nothing is made per frame. */
   readonly #autoNow: AutoJoinNow = { enabled: true, awake: false, network: true, atRoom: false, series: 0, atSeries: -1 };
 
   constructor(canvas: HTMLCanvasElement, remote: Remote, brains: Brains, display: Display, inputs: Inputs) {
@@ -351,10 +346,8 @@ export class Game implements Shell {
     this.#controls = new PlayControls(() => this.shape.design);
     this.#target = this.#playTarget();
     this.settings = loadSettings();
-    const place = this.settings.place;
-    this.#lives = place;
-    this.#joinOthers = this.settings.joinOthers;
-    this.#here = place !== "turns" && isPlaceId(place) ? place : isPlaceId(this.settings.scene) ? this.settings.scene : "picnic";
+    // Every launch is at home: a visit, or a room of its own, sits it down where that is once it can.
+    this.#here = this.settings.place;
     const scene = SCENES[this.#here];
     const world = new World(scene.place);
     this.#shelf = loadShelf(Date.now());
@@ -450,16 +443,15 @@ export class Game implements Shell {
     const native = !!(globalThis as { __native?: unknown }).__native;
     this.typing = !this.canPlayOnline ? null : keyboard ? new NativeTextEntry(keyboard) : typeof document !== "undefined" && !native ? new BrowserTextEntry() : null;
     // Invited to a room, or still at one of its own it was at when it last closed: it sits down there.
-    // Otherwise, once the brain is awake, with everyone in the place it lives (AutoJoin), unless disconnected or opened `?alone` (for checks and scripts).
+    // Otherwise at home, or, on a visit, once the brain is awake, in the room open to everyone it is visiting (AutoJoin), unless opened `?alone` (for checks and scripts).
     if (this.canPlayOnline) {
-      const invited = invitedTo(location.href);
       const kept = this.#seat.table;
+      const launch = launchSeat(invitedTo(location.href), kept);
       this.#auto = new AutoJoin(kept);
       if (new URL(location.href).searchParams.has("alone")) this.#auto.stop();
-      // A link to a room open to everyone is to its place, with everyone there, as soon as the brain is awake.
-      if (invited && everyoneSeries(invited) >= 0) this.#belongIn(invited);
-      const code = invited && everyoneSeries(invited) < 0 ? invited : !invited && kept && everyoneSeries(kept) < 0 ? kept : null;
-      if (code) this.#sit(code, null);
+      // A link to a room open to everyone is a visit there, as soon as the brain is awake.
+      if (launch.visit) this.#belongIn(launch.visit);
+      if (launch.sit) this.#sit(launch.sit, null);
       // A phone's keyboard comes up only for a field focused during the tap itself: the frame that handles the tap is too late.
       if (inputs.pointers) {
         inputs.pointers.onDown = (x, y) => {
@@ -494,7 +486,7 @@ export class Game implements Shell {
     this.#sit(newTableCode(), start, room.password || null);
   }
 
-  /** Sits at a room by its code, with its password if it is locked. A room open to everyone is the player's place from now on, sat in as by default. */
+  /** Sits at a room by its code, with its password if it is locked. A room open to everyone is a visit from now on, until the player goes home. */
   joinRoom(code: string, password?: string) {
     if (this.online?.code === code || !this.#mayChoose(code)) return;
     if (everyoneSeries(code) < 0) {
@@ -506,32 +498,29 @@ export class Game implements Shell {
     this.#sit(code, null, null, true);
   }
 
-  /** A room open to everyone, chosen by the player (from the list, by its code or its link): the fly lives in its place now (each in turn, for Everyone's), online, and that room is where it comes back to. */
+  /** A room open to everyone, chosen by the player (from the list, by its code or its link): the fly visits its series now, and comes back to that room, this launch and later ones, until it goes home. */
   #belongIn(code: string) {
-    const place = seriesPlace(everyoneSeries(code));
-    this.settings.place = place !== null && isPlaceId(place) ? place : "turns";
-    this.#lives = this.settings.place;
-    this.settings.joinOthers = this.#joinOthers = true;
+    this.settings.visit = everyoneSeries(code);
     saveSettings(this.settings);
     this.#auto?.at(code);
     this.#auto?.resume();
   }
 
-  /** Online → Disconnect: alone, and not sat with anyone by default until the player goes online again, this launch or a later one. */
-  disconnect() {
-    this.settings.joinOthers = false;
-    this.applySettings();
+  /** Online → Go home: out of whatever room it is in, alone, and carried to the place it lives. */
+  goHome() {
+    this.settings.visit = -1;
+    saveSettings(this.settings);
+    if (this.online) {
+      const quiet = this.#autoOnline;
+      this.online.leave();
+      this.#stand("left", quiet);
+    }
+    this.#settlePlace();
   }
 
-  /** Online → Go online: with everyone in the place it lives, as soon as it can be. */
-  goOnline() {
-    this.settings.joinOthers = true;
-    this.applySettings();
-  }
-
-  /** Whether the player is online: sat with everyone by default, or at a room. */
-  get isOnline() {
-    return this.settings.joinOthers;
+  /** Visiting a room open to everyone, taken there by the player (in it, or trying to be). */
+  get visiting() {
+    return this.settings.visit >= 0;
   }
 
   /** Whether the player may go to a room of their choosing now (`code`, if it is one already made): alone, or in a room open to everyone (or on the way to one), which is left for it. */
@@ -546,7 +535,7 @@ export class Game implements Shell {
     return true;
   }
 
-  /** On the way to a room open to everyone by default, not yet let in: to the player, still alone. */
+  /** On the way to the room open to everyone it is visiting, not yet let in: to the player, still alone. */
   get #pending() {
     return !!this.online && this.#autoOnline && !this.online.welcomed;
   }
@@ -715,7 +704,7 @@ export class Game implements Shell {
     this.online?.remove(id);
   }
 
-  /** Leaves the table: the fly is alone again where it is, until it is sat with everyone in its place again (at once, if the player is online). */
+  /** Leaves the table: the fly is alone again where it is, until a visit sits it in its room again (at once, on one). */
   leaveTable() {
     if (!this.online) return;
     const quiet = this.#pending;
@@ -724,7 +713,7 @@ export class Game implements Shell {
     this.#auto?.hurry();
   }
 
-  /** `auto`: sat with everyone by default (AutoJoin), not by the player: how it ends is not news. */
+  /** `auto`: a visit's room (AutoJoin): how it ends is not news. */
   #sit(code: string, start: TableStart | null, password: string | null = null, auto = false) {
     this.tableEnded = null;
     if (!this.#openSocket) return;
@@ -738,7 +727,7 @@ export class Game implements Shell {
     this.#lockTools();
   }
 
-  /** Takes the table out of the world: it ended (`why`), or the player left. `quiet`: a try at sitting with everyone by default, which nobody needs to hear about. */
+  /** Takes the table out of the world: it ended (`why`), or the player left. `quiet`: a visit's try, which nobody needs to hear about. */
   #stand(why: Ended, quiet = false) {
     const online = this.online;
     if (!online) return;
@@ -759,11 +748,7 @@ export class Game implements Shell {
     this.#markFollowed(null);
     this.#colourAlone();
     this.#companyChanged();
-    for (const id of ["light", "weather"] as const) {
-      const i = TOOLS.findIndex((t) => t.id === id);
-      const kind = TOOLS[i].variants.findIndex((v) => v.id === this.#shelf[id]?.kind);
-      this.hands.variants[i] = Math.max(0, kind);
-    }
+    for (const id of ["light", "weather"] as const) this.hands.setKind(id, this.#shelf[id]?.kind ?? (id === "light" ? "clock" : "now"));
     this.#lockTools();
     this.#followLight(true);
     this.#seat.table = null;
@@ -799,26 +784,28 @@ export class Game implements Shell {
     if (!ended) return;
     // A page from before the server's last deploy: the newer page speaks its protocol.
     if (ended === "version" && tryProtocolReload(this.#app, reloadForNewerProtocol)) return;
-    // Sat with everyone by default: alone again, quietly, and perhaps another try later.
+    // On a visit: alone again, quietly, and perhaps another try later.
     const quiet = this.#autoOnline;
     if (quiet) this.#auto?.ended(ended);
     this.#stand(ended, quiet);
+    // A room of someone's own gone: home again (a visit, unless it can't be, waits there to try again).
+    if (!quiet) this.#settlePlace();
     if (ended === "version" && !quiet && this.nav.current !== "online") this.open("online");
   }
 
-  /** Sitting with everyone in the place it lives by default, once the brain is awake, and going to another place's room when it lives somewhere else: or giving up a try that comes to nothing, quietly. */
+  /** On a visit, sitting in the room open to everyone it is visiting once the brain is awake, and going to another place's room when the visit moves there: or giving up a try that comes to nothing, quietly. */
   #autoJoin(dt: number) {
     const auto = this.#auto;
     if (!auto) return;
     const online = this.online;
     const mine = online && this.#autoOnline ? online : null;
     const now = this.#autoNow;
-    now.enabled = this.settings.joinOthers;
+    now.enabled = this.settings.visit >= 0;
     now.awake = !this.#loading && this.brain.status === "running";
     now.network = typeof navigator === "undefined" || navigator.onLine !== false;
-    // At a locked room's door in Online, on the way in: sat with everyone now, the door would give way to that room's face.
+    // At a locked room's door in Online, on the way in: sat in the visit's room now, the door would give way to that room's face.
     now.atRoom = !!online || (!!this.knock && this.nav.current === "online");
-    now.series = seriesFor(this.#lives);
+    now.series = Math.max(0, this.settings.visit);
     now.atSeries = mine?.welcomed ? everyoneSeries(mine.code) : -1;
     const act = auto.update(dt, now, !!mine?.welcomed, (mine?.line.reconnects ?? 0) > 0);
     if (act === "join") this.#sit(auto.code, null, null, true);
@@ -995,15 +982,6 @@ export class Game implements Shell {
     }
     // The flies' clocks take a new pace when they are next put right: on the next frame.
     if (this.life?.rhythm && this.life.rhythm.pace !== s.pace) this.#clockAt = 0;
-    // Disconnected: out of whatever room it is in. Online again: with everyone soon, whatever stopped it before.
-    if (s.joinOthers !== this.#joinOthers) {
-      this.#joinOthers = s.joinOthers;
-      if (!s.joinOthers && this.online) {
-        const quiet = this.#autoOnline;
-        this.online.leave();
-        this.#stand("left", quiet);
-      } else if (s.joinOthers) this.#auto?.resume();
-    }
     if (save) saveSettings(s);
   }
 
@@ -1085,11 +1063,10 @@ export class Game implements Shell {
     return this.nav.current === "settings" && this.screens.settings.menu.focused?.id === "place";
   }
 
-  /** Carries the fly to the place it lives in, if it lives in one and isn't there; in a room open to everyone, to that place's room (#autoJoin). At a table, the table's place is the starter's to choose, with the Place tool. */
+  /** Carries the fly home, to the place it lives, if it is at home and isn't there. On a visit, or at a table, the room has the place; in the screensaver, it may be going round them. */
   #settlePlace() {
     const place = this.settings.place;
-    this.#lives = place;
-    if (!this.online && place !== "turns" && isPlaceId(place) && place !== this.#here) this.moveTo(place);
+    if (!this.online && this.settings.visit < 0 && !this.wallpaper && place !== this.#here) this.moveTo(place);
   }
 
   /** Carries the fly to another place: the world fades out, the place is built behind the veil, and fades in. */
@@ -1129,7 +1106,7 @@ export class Game implements Shell {
   #arrive(id: PlaceId) {
     const scene = SCENES[id];
     this.#here = id;
-    this.#stayed = 0;
+    this.tour.arrived();
     this.stage.load(scene);
     this.life.move(scene.place);
     for (const [i, c] of this.company.list.entries()) {
@@ -1140,8 +1117,6 @@ export class Game implements Shell {
     this.hands.clear();
     this.director.useScene(scene.camera);
     this.#settle();
-    this.settings.scene = id;
-    saveSettings(this.settings);
     this.online?.arrived();
   }
 
@@ -1194,6 +1169,8 @@ export class Game implements Shell {
   #stopWallpaper() {
     this.wallpaper = false;
     this.#syncCamera();
+    // Gone round the places while watched: home for play.
+    this.#settlePlace();
   }
 
   frame(dt: number, now: number) {
@@ -1232,10 +1209,10 @@ export class Game implements Shell {
     this.#autoJoin(dt);
     this.#browse(dt);
     this.#drawOthers(dt);
-    // Living in each place in turn, it moves on during a long wallpaper (alone: a table's place is the table's).
-    if (this.wallpaper && !this.#moving && !this.online) {
-      this.#stayed += dt;
-      if (this.settings.place === "turns" && this.#stayed > PLACE_TURN && nextPlace(this.#here) !== this.#here) this.moveTo(nextPlace(this.#here));
+    // Going round the places in the screensaver, it moves on during a long one (at home: a room's place is the room's).
+    if (!this.#moving) {
+      const next = this.tour.next(dt, this.#here, this.wallpaper, !this.online && this.settings.visit < 0, this.settings.wallpaperPlaces === "turns");
+      if (next) this.moveTo(next);
     }
 
     const playing = this.nav.current === "play" && !this.wallpaper;
@@ -1702,12 +1679,16 @@ export class Game implements Shell {
     if (hands.chooseTool(index)) {
       this.#learn("tools");
       this.#changedAt = this.time;
-    } else if (index === hands.tool && hands.stepVariant(1, true)) this.#variantChanged();
+    } else if (index === hands.tool) {
+      // The one in hand again: what Select does with it, on the dial Select steps.
+      const dial = hands.current.second ? 1 : 0;
+      if (hands.stepVariant(1, true, dial)) this.#variantChanged(dial);
+    }
   }
 
-  /** The tool's kind, stepped by a pointer: round and round. */
-  #stepKind(dir: -1 | 1) {
-    if (this.hands.stepVariant(dir, true)) this.#variantChanged();
+  /** The tool's kind on a dial, stepped by a pointer: round and round. */
+  #stepKind(dir: -1 | 1, dial: Dial) {
+    if (this.hands.stepVariant(dir, true, dial)) this.#variantChanged(dial);
     else this.#refuse();
   }
 
@@ -1727,10 +1708,11 @@ export class Game implements Shell {
       this.#refuse();
       return false;
     }
-    // In a room open to everyone, it lives there now, and goes to that place's room (#autoJoin).
-    if (online?.everyone && this.#autoOnline) {
-      this.settings.place = this.#lives = hands.place;
+    // On a visit, it visits that place's room instead (#autoJoin), carried there at once while it isn't in one; home stays where it was.
+    if (this.settings.visit >= 0 && (!online || (online.everyone && this.#autoOnline))) {
+      this.settings.visit = seriesFor(hands.place);
       saveSettings(this.settings);
+      if (!online) this.moveTo(hands.place);
       this.#learn("place");
       return true;
     }
@@ -1745,11 +1727,9 @@ export class Game implements Shell {
       this.#learn("place");
       return true;
     }
-    // Chosen by hand: if it lives in one place, this is now that place.
-    if (this.settings.place !== "turns") {
-      this.settings.place = hands.place;
-      saveSettings(this.settings);
-    }
+    // At home: it lives there now.
+    this.settings.place = hands.place;
+    saveSettings(this.settings);
     this.moveTo(hands.place);
     this.#learn("place");
     return true;
@@ -1800,7 +1780,7 @@ export class Game implements Shell {
         if (this.hands.events.swooped) this.#learn("swoop");
       },
       pressHud: (hit) => this.#pressHud(hit),
-      stepKind: (dir) => this.#stepKind(dir),
+      stepKind: (dir, dial) => this.#stepKind(dir, dial),
       stepTool: (dir) => this.#chooseTool((this.hands.tool + dir + TOOLS.length) % TOOLS.length),
       turn: (yaw, pitch) => this.#turnCamera(yaw, pitch),
       zoom: (factor) => this.#zoomCamera(factor),
@@ -1827,7 +1807,7 @@ export class Game implements Shell {
         break;
       case HUD_HITS.kind:
       case HUD_HITS.label:
-        this.#stepKind(hit.value < 0 ? -1 : 1);
+        this.#stepKind(hit.value < 0 ? -1 : 1, hit.index as Dial);
         break;
       case HUD_HITS.go:
         this.#goToPlace();
@@ -1970,9 +1950,10 @@ export class Game implements Shell {
         if (repeat) break;
         if (hands.current.id === "place") {
           if (this.#goToPlace()) this.#learn("place");
-        } else if (hands.current.id === "light" || hands.current.id === "weather" || hands.current.id === "view") {
-          // Select steps round the times of day, the weathers or the views, for a remote held in one hand.
-          if (hands.stepVariant(1, true)) this.#variantChanged();
+        } else if (hands.current.id === "sky" || hands.current.id === "view") {
+          // Select steps round the weathers (Up and Down have the times of day) or the views, for a remote held in one hand.
+          const dial = hands.current.second ? 1 : 0;
+          if (hands.stepVariant(1, true, dial)) this.#variantChanged(dial);
           else this.#refuse();
         } else {
           this.#useTool();
@@ -1987,25 +1968,27 @@ export class Game implements Shell {
     }
   }
 
-  #variantChanged() {
+  #variantChanged(dial: Dial = 0) {
     this.#changedAt = this.time;
     const id = this.hands.current.id;
-    if (id === "light" || id === "weather" || id === "view") this.#learn(id);
-    if (id === "light" || id === "weather") {
+    if (id === "sky" || id === "view") this.#learn(id);
+    if (id === "sky") {
       this.#followLight();
       this.online?.chooseWorld(this.hands.timeOfDay, this.hands.weather);
     }
     if (id === "view") this.#syncCamera();
     // A table's light and weather aren't this player's own to come back to; in a room open to everyone they are.
-    if (!this.online || this.online.everyone || (id !== "light" && id !== "weather")) this.#remember();
+    if (!this.online || this.online.everyone || id !== "sky") this.#remember(dial);
   }
 
-  /** Keeps the kind just chosen, if it is one a launch comes back to. */
-  #remember() {
+  /** Keeps the kind just chosen on a dial, if it is one a launch comes back to. */
+  #remember(dial: Dial) {
     const tool = this.hands.current.id;
-    if (!KEPT[tool]) return;
-    this.#shelf[tool] = { kind: this.hands.variant.id, at: Date.now() };
-    saveShelf(this.#shelf);
+    for (const id of Object.keys(KEPT) as DialId[]) {
+      if (DIALS[id].tool !== tool || DIALS[id].dial !== dial) continue;
+      this.#shelf[id] = { kind: this.hands.kindOf(id), at: Date.now() };
+      saveShelf(this.#shelf);
+    }
   }
 
   /** The player has done what a hint shows: it goes, now and on later launches. */
@@ -2150,6 +2133,8 @@ export class Game implements Shell {
     d.mode = life.body.mode;
     d.tool = this.hands.current.id;
     d.variant = this.hands.variant.id;
+    // The Sky's two dials, chosen: the time of day and the weather.
+    d.sky = `${this.hands.timeOfDay}/${this.hands.weather}`;
     d.pointer = this.hands.following ? "following" : "free";
     d.senses = `loom ${s.loomLeft.toFixed(2)}/${s.loomRight.toFixed(2)} touch ${s.touch.toFixed(2)} bump ${s.bumpLeft.toFixed(2)}/${s.bumpRight.toFixed(2)} wind ${s.wind.toFixed(2)} sweet ${s.sweet.toFixed(2)} grounded ${s.grounded ? 1 : 0} male ${s.maleTaste.toFixed(2)} bitter ${s.bitter.toFixed(2)} water ${s.water.toFixed(2)}`;
     d.loom = Math.max(s.loomLeft, s.loomRight).toFixed(3);
@@ -2223,6 +2208,9 @@ export class Game implements Shell {
       .join(";");
     d.view = this.hands.view;
     d.place = this.#here;
+    // Where it lives, and the series of rooms open to everyone it is visiting (-1 at home).
+    d.home = this.settings.place;
+    d.visit = String(this.settings.visit);
     d.placeMs = this.stage.buildMs.toFixed(0);
     d.placeStepMs = this.stage.buildStepMs.toFixed(0);
     d.moving = this.#moving ? this.#moving.to : "";

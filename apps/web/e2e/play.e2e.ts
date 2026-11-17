@@ -195,8 +195,8 @@ try {
     };
   });
   const carried = () => page.evaluate(() => (globalThis as unknown as { __carried: string[] }).__carried);
-  // Each in turn, then the first three places, a step at a time, quicker than it settles.
-  await press("ArrowRight", 3);
+  // From the picnic, the next two places, a step at a time, quicker than it settles.
+  await press("ArrowRight", 2);
   assert.deepEqual(await carried(), [], "nowhere on the way");
   await waitFor(page, `place=${PLACES[2].id},moving=`, 30_000);
   assert.deepEqual(await carried(), [PLACES[2].id], "once, to where it rested");
@@ -204,13 +204,16 @@ try {
   await press("ArrowUp");
   await waitFor(page, `place=${PLACES[0].id},moving=`, 30_000);
   assert.deepEqual(await carried(), [PLACES[2].id, PLACES[0].id], "leaving the row settles it");
-  // Back to living in each in turn, which carries it nowhere.
-  await press("ArrowDown");
-  await press("ArrowLeft");
+  // Going round the places in the screensaver, chosen here, carries it nowhere now; then back to staying home.
+  await press("ArrowDown", 2);
+  await waitFor(page, "focus=wallpaperPlaces");
+  await press("ArrowRight");
   await waitForGameTime(page, 1.5);
   assert.deepEqual(await carried(), [PLACES[2].id, PLACES[0].id]);
-  assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.settings.place), "turns");
-  await press("ArrowUp", 3);
+  assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperPlaces), "turns");
+  await press("ArrowLeft");
+  assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperPlaces), "home");
+  await press("ArrowUp", 4);
   await waitFor(page, "focus=page");
   await press("ArrowRight");
   await waitFor(page, "tab=screen");
@@ -255,13 +258,12 @@ try {
   await waitFor(page, "screen=play,stack=title>play,atRoot=false");
 
   step("clear weather and daylight: no rain must touch the fly, and the dark ball needs a bright background for it to see");
-  await toTool("weather");
-  await press("ArrowDown");
-  await waitFor(page, "variant=clear");
-  await waitFor(page, "weather=clear");
-  await toTool("light");
+  // The Sky: Select steps its weather, Up and Down its time of day.
+  await toTool("sky");
+  await press("Enter");
+  await waitFor(page, "sky=clock/clear,weather=clear");
   await press("ArrowDown", 2);
-  await waitFor(page, "time=noon");
+  await waitFor(page, "sky=noon/clear,time=noon");
   // The light changing so much can make it jump (its brain's answer): let it come down and settle before the honey drops at its mouth.
   await waitForGameTime(page, 3);
   await waitWithin(page, "mode~standing|walking", 60);
@@ -456,9 +458,10 @@ try {
   step("the weather outside: on Now it is what the Apple TV says, called Outside, and too old an answer goes back to the forecast");
   const before = await readState(page);
   assert.equal(before.outside, "none", "a browser can't tell the weather outside");
-  await toTool("weather");
-  await press("ArrowUp");
-  await waitFor(page, "variant=now,weatherFrom=forecast");
+  await toTool("sky");
+  // Round the weathers from Clear to Now.
+  await press("Enter", 8);
+  await waitFor(page, "sky~/now$,weatherFrom=forecast");
   const fog = { cloudCover: 0.8, precipitation: 0, visibility: 300, wind: 1, condition: "foggy", daylight: true, sunrise: 7, sunset: 17, noon: 12 };
   await page.evaluate((c) => (globalThis as unknown as { __fly: { outside: { feed(c: unknown): void } } }).__fly.outside.feed({ ...c, observedAt: Date.now() - 60_000 }), fog);
   const foggy = await waitFor(page, "outside=fed,weatherFrom=outside,weather=mist,outsideAge<120");
@@ -468,8 +471,8 @@ try {
   await page.evaluate(() => (globalThis as unknown as { __fly: { outside: { feed(c: null): void } } }).__fly.outside.feed(null));
   await waitFor(page, "outside=none,outsideAge=");
   // Clear again, kept for the reload at the end.
-  await press("ArrowDown");
-  await waitFor(page, "variant=clear,weatherFrom=chosen,weather=clear");
+  await press("Enter");
+  await waitFor(page, "sky~/clear$,weatherFrom=chosen,weather=clear");
 
   step("Back to the menu, where (on the Apple TV) Back leaves the app");
   await press("Escape");
@@ -484,7 +487,7 @@ try {
   const again = await waitFor(page, "screen=play");
   assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["feed", "sugar", "wide", "noon", "clear"]);
   const learned = await page.evaluate(() => JSON.parse(localStorage.getItem("flies.learned") ?? "{}") as Record<string, true>);
-  assert.deepEqual(Object.keys(learned).sort(), ["arrival", "feed", "light", "place", "swoop", "tools", "view", "weather"], "the hints for what was used aren't taught again");
+  assert.deepEqual(Object.keys(learned).sort(), ["arrival", "feed", "place", "sky", "swoop", "tools", "view"], "the hints for what was used aren't taught again");
 
   step("three flies chosen in Settings live, see and meet each other, survive a reload, then return to one");
   await chooseFlies(page, 3);

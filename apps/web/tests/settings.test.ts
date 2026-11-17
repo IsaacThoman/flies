@@ -34,21 +34,36 @@ const NOW = Date.UTC(2026, 10, 16, 20);
 
 test("settings come back as they were saved", () => {
   const store = memory();
-  const settings: Settings = { flies: 3, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "whole", pace: "natural", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, rumble: false, stats: true, realWeather: false, place: "lab", scene: "greenhouse", joinOthers: false };
+  const settings: Settings = { flies: 3, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "whole", pace: "natural", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, rumble: false, stats: true, realWeather: false, place: "lab", wallpaperPlaces: "turns", visit: 3 };
   saveSettings(settings, store);
   assert.deepEqual(loadSettings(store), settings);
 });
 
-test("joining others starts on for new and older saves and keeps an explicit opt-out", () => {
-  assert.equal(DEFAULT_SETTINGS.joinOthers, true);
-  assert.equal(loadSettings(null).joinOthers, true);
-  assert.equal(loadSettings(memory()).joinOthers, true);
-  assert.equal(loadSettings(settingsSaved({ hints: false })).joinOthers, true);
+test("a fresh profile is at home in the picnic, staying home in the screensaver, and a visit chosen is kept until it goes home", () => {
+  for (const settings of [DEFAULT_SETTINGS, loadSettings(null), loadSettings(memory()), loadSettings(settingsSaved({ hints: false }))]) {
+    assert.equal(settings.visit, -1);
+    assert.equal(settings.place, "picnic");
+    assert.equal(settings.wallpaperPlaces, "home");
+  }
   const store = memory();
-  saveSettings({ ...DEFAULT_SETTINGS, joinOthers: false }, store);
-  assert.equal(loadSettings(store).joinOthers, false);
-  saveSettings({ ...DEFAULT_SETTINGS, joinOthers: true }, store);
-  assert.equal(loadSettings(store).joinOthers, true);
+  saveSettings({ ...DEFAULT_SETTINGS, visit: 0 }, store);
+  assert.equal(loadSettings(store).visit, 0, "visiting Everyone");
+  saveSettings({ ...DEFAULT_SETTINGS, visit: -1 }, store);
+  assert.equal(loadSettings(store).visit, -1, "home again");
+});
+
+test("a save from before the fly had a home is at home where it was last, still going round the places in the screensaver", () => {
+  // Online by default then, and each in turn: neither was a choice of the player's, but the screensaver's going round is kept.
+  const before = loadSettings(settingsSaved({ ...DEFAULT_SETTINGS, place: "turns", scene: "lab", joinOthers: true, wallpaperPlaces: undefined, visit: undefined }));
+  assert.deepEqual(before, { ...DEFAULT_SETTINGS, place: "lab", wallpaperPlaces: "turns", visit: -1 });
+  // Disconnected then: at home, as everyone now is.
+  assert.equal(loadSettings(settingsSaved({ place: "turns", scene: "greenhouse", joinOthers: false })).visit, -1);
+  // A place it lived in, chosen: its home, and the screensaver stays there.
+  assert.deepEqual(loadSettings(settingsSaved({ place: "windowsill", scene: "lab", joinOthers: true })), { ...DEFAULT_SETTINGS, place: "windowsill" });
+  // Each in turn somewhere gone: home is the first place.
+  assert.deepEqual(loadSettings(settingsSaved({ place: "turns", scene: "moon" })), { ...DEFAULT_SETTINGS, wallpaperPlaces: "turns" });
+  // Saved since: what it says.
+  assert.equal(loadSettings(settingsSaved({ place: "kitchen", wallpaperPlaces: "home" })).wallpaperPlaces, "home");
 });
 
 test("rumble starts on, including saves without the setting or with an invalid value", () => {
@@ -129,8 +144,8 @@ test("each setting keeps only a value the game can use", () => {
     stats: [0, "on"],
     realWeather: ["off", 0],
     place: ["moon", 3, null],
-    scene: ["turns", "moon", {}],
-    joinOthers: ["off", 0, null],
+    wallpaperPlaces: ["moon", "turn", 1, true],
+    visit: [-2, 8, 1.5, "0", null],
   };
   for (const [key, values] of Object.entries(bad)) {
     for (const value of values) assert.deepEqual(loadSettings(settingsSaved({ [key]: value })), DEFAULT_SETTINGS, `${key}: ${JSON.stringify(value)}`);
@@ -150,7 +165,7 @@ test("a saved wallpaper delay outside the menu's choices falls back to the defau
   }
 });
 
-test("the shelf keeps the view, the light and the weather, and nothing else", () => {
+test("the shelf keeps the view and the Sky's time of day and weather, and nothing else", () => {
   assert.deepEqual(Object.keys(KEPT).sort(), ["light", "view", "weather"]);
   const store = memory();
   saveShelf({ view: { kind: "wide", at: NOW - HOUR }, light: { kind: "dusk", at: NOW - HOUR }, weather: { kind: "rain", at: NOW - HOUR } }, store);
@@ -185,10 +200,24 @@ test("a kind or a tool the shelf no longer has is passed over, as is anything ma
   assert.deepEqual(loadShelf(NOW, shelfSaved({ light: null, weather: { kind: 4, at: NOW }, view: { kind: "wide", at: "yesterday" } })), {});
 });
 
+test("a time of day and a weather chosen on the Light and Weather tools come back on the Sky", () => {
+  // As the shelf saved them before the Sky had both: by the tools' names, which are the Sky's dials' now.
+  const kept = loadShelf(NOW, shelfSaved({ light: { kind: "golden", at: NOW - HOUR }, weather: { kind: "snow", at: NOW - HOUR }, view: { kind: "above", at: NOW - HOUR } }));
+  const hands = new Hands(new World(bare), kept);
+  assert.equal(hands.timeOfDay, "golden");
+  assert.equal(hands.weather, "snow");
+  assert.equal(hands.view, "above");
+  hands.chooseTool(TOOLS.findIndex((t) => t.id === "sky"));
+  assert.deepEqual([hands.labelOf(0), hands.labelOf(1)], ["Golden hour", "Snow"]);
+});
+
 test("what the hints have taught comes back, of the lessons this build has", () => {
   const store = memory();
   saveLearned({ arrival: true, tools: true, hand: true, feed: true, feather: true }, store);
   assert.deepEqual(loadLearned(store), { arrival: true, tools: true, hand: true, feed: true, feather: true });
+  // The Sky is taught to one who hadn't used both of the tools it was before.
+  assert.deepEqual(loadLearned(memory({ "flies.learned": JSON.stringify({ light: true, weather: true }) })), { sky: true });
+  assert.deepEqual(loadLearned(memory({ "flies.learned": JSON.stringify({ light: true }) })), {});
   // A tool since dropped, or a value that isn't a plain yes, is passed over.
   const old = memory({ "flies.learned": JSON.stringify({ tools: true, lamp: true, swoop: 1, blow: "yes", place: true }) });
   assert.deepEqual(loadLearned(old), { tools: true, place: true });
@@ -198,6 +227,7 @@ test("what the hints have taught comes back, of the lessons this build has", () 
 
 const bare: Place = { floor: { kind: "rect", hx: 500, hz: 500 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 300 };
 const kindOf = (hands: Hands, tool: string) => {
+  // A tool's first dial.
   const i = TOOLS.findIndex((t) => t.id === tool);
   return TOOLS[i].variants[hands.variants[i]].id;
 };
@@ -222,11 +252,11 @@ test("the weather kept is Now by its id, whether Now was the real weather outsid
   const hands = new Hands(new World(bare), { weather: { kind: "now" }, light: { kind: "clock" } });
   assert.equal(hands.weather, "now");
   assert.equal(hands.timeOfDay, "clock");
-  hands.tool = TOOLS.findIndex((t) => t.id === "weather");
-  assert.equal(hands.label, "Now");
+  hands.tool = TOOLS.findIndex((t) => t.id === "sky");
+  assert.deepEqual([hands.labelOf(0), hands.labelOf(1)], ["Now", "Now"]);
   hands.outside = true;
-  assert.equal(hands.label, "Outside");
-  assert.equal(hands.variant.id, "now", "what is kept is the kind, not what it is called");
+  assert.deepEqual([hands.labelOf(0), hands.labelOf(1)], ["Now", "Outside"], "only the weather's Now is the weather outside");
+  assert.equal(hands.variantOf(1).id, "now", "what is kept is the kind, not what it is called");
 });
 
 /** A game for the screens to ask things of: it keeps the settings and remembers what it was asked. */
@@ -287,7 +317,7 @@ test("the settings are a row of tabs over each part's settings: Left and Right o
 });
 
 test("every setting the player chooses is on exactly one tab, and every tab fits without scrolling", () => {
-  // Real weather only where the Apple TV can tell the weather outside; being online is the Online menu's (Disconnect, Go online), not a setting's.
+  // Real weather only where the Apple TV can tell the weather outside; a visit is the Online menu's (a room open to everyone, Go home), not a setting's.
   for (const [weatherOutside, online] of [[false, false], [true, false], [false, true], [true, true]]) {
     const screen = settingsScreen(fakeShell(undefined, weatherOutside, online));
     const ids: string[] = [];
@@ -302,7 +332,7 @@ test("every setting the player chooses is on exactly one tab, and every tab fits
     assert.deepEqual(
       [...ids].sort(),
       Object.keys(DEFAULT_SETTINGS)
-        .filter((key) => key !== "scene" && key !== "joinOthers" && (weatherOutside || key !== "realWeather"))
+        .filter((key) => key !== "visit" && (weatherOutside || key !== "realWeather"))
         .sort(),
     );
   }

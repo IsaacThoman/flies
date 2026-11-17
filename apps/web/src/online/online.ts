@@ -35,7 +35,6 @@ import { isPlaceId } from "../places/catalog.ts";
 import type { Felt, SharedTable } from "../places/types.ts";
 import type { Bubbles } from "../scene/bubbles.ts";
 import type { Stage } from "../stage.ts";
-import { TOOLS } from "../tools/hands.ts";
 import type { Hands } from "../tools/hands.ts";
 import { TableLine } from "./connection.ts";
 import { OtherHand } from "./other-hands.ts";
@@ -52,8 +51,6 @@ const PUT_BACK = 1;
 const RECOUNT_WAIT = 1000;
 const RECOUNT_TRIES = 5;
 
-const LIGHT_TOOL = TOOLS.findIndex((t) => t.id === "light");
-const WEATHER_TOOL = TOOLS.findIndex((t) => t.id === "weather");
 
 /** The parts of the game a table reaches into. */
 export type TableHost = {
@@ -463,14 +460,12 @@ export class Online {
     this.#handList.splice(this.#handList.indexOf(hand), 1);
   }
 
-  /** The table's light and weather: shown on the Light and Weather tools, and followed. Not in a room open to everyone, where they are each device's own. */
+  /** The table's light and weather: shown on the Sky, and followed. Not in a room open to everyone, where they are each device's own. */
   #takeWorld(light: string, weather: string, settle: boolean) {
     if (this.everyone) return;
     const hands = this.#host.hands;
-    const l = TOOLS[LIGHT_TOOL].variants.findIndex((v) => v.id === light);
-    const w = TOOLS[WEATHER_TOOL].variants.findIndex((v) => v.id === weather);
-    if (l >= 0) hands.variants[LIGHT_TOOL] = l;
-    if (w >= 0) hands.variants[WEATHER_TOOL] = w;
+    hands.setKind("light", light);
+    hands.setKind("weather", weather);
     this.#host.onWorld(settle);
   }
 

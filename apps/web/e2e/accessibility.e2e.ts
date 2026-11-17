@@ -9,7 +9,7 @@ import axe from "axe-core";
 import { build } from "vite";
 import { startServer } from "../../server/src/server.ts";
 import { serveSite } from "../../../scripts/serve.ts";
-import { chromiumPath, gpuFlags, waitFor, waitForGameTime } from "../../../scripts/play.ts";
+import { chromiumPath, gpuFlags, readState, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import { PROTOCOL, tableCode } from "@fly/net";
 
 const arg = (name: string) => process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : null;
@@ -89,11 +89,10 @@ try {
   await audit("settings");
   await activate("Back");
   assert.equal(await page.getByRole("button", { name: "Settings", exact: true }).evaluate((node) => node === document.activeElement), true);
-  await waitFor(page, "online=joined,everyone=yes");
+  // At home: Online is the rooms at once, to visit or make.
+  assert.equal((await readState(page)).table, "", "at home, alone");
   await activate("Online");
-  await waitFor(page, "screen=online");
-  await activate("Browse rooms");
-  await waitFor(page, "onlineView=rooms");
+  await waitFor(page, "screen=online,onlineView=rooms");
   await dump("rooms");
   const garden = await tab("button", /^Garden, Picnic table, 1 of 128 flies, Password required$/);
   const focusedRoom = await garden.elementHandle();
@@ -122,11 +121,9 @@ try {
   await waitFor(page, "online=joined");
   await dump("joined");
   await audit("joined");
-  // Leaving a room of someone's own is back with everyone, whose rooms are a step away.
-  await activate("Leave the room");
-  await waitFor(page, "online=joined,everyone=yes,onlineView=room");
-  await activate("Browse rooms");
-  await waitFor(page, "onlineView=rooms");
+  // Home from a room of someone's own, with the rooms still there.
+  await activate("Go home");
+  await waitFor(page, "onlineView=rooms,table=");
   await activate(/^Garden, Picnic table, 1 of 128 flies, Password required$/);
   // Password fields have no implicit textbox role in browsers.
   const password = page.getByLabel("Password", { exact: true });
@@ -142,11 +139,8 @@ try {
   await page.keyboard.press("Enter");
   await waitFor(page, "online=joined");
   await dump("joined-locked");
-  // Leaving a room of someone's own is back with everyone, whose rooms are a step away.
-  await activate("Leave the room");
-  await waitFor(page, "online=joined,everyone=yes,onlineView=room");
-  await activate("Browse rooms");
-  await waitFor(page, "onlineView=rooms");
+  await activate("Go home");
+  await waitFor(page, "onlineView=rooms,table=");
   await page.getByRole("button", { name: /^Garden, Picnic table, 1 of 128 flies, Password required$/ }).waitFor();
   await dump("left");
   await audit("left");

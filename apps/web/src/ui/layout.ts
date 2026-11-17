@@ -5,7 +5,8 @@
 
 import { TV_FRAME } from "../display.ts";
 import type { Frame } from "../display.ts";
-import { TOOLS, WORLD_TOOLS } from "../tools/hands.ts";
+import { TOOLS } from "../tools/hands.ts";
+import type { Tool } from "../tools/hands.ts";
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
@@ -27,13 +28,19 @@ export type HudLayout = {
   touch: { labelCx: number; labelY: number; labelWidth: number; menuY: number; menuAtFoot: boolean; targetHeight: number } | null;
   /** The caption's middle, down. */
   captionY: number;
-  /** The shelf: its middle, down; the space each tool has; how big the orbs are (1 on the TV); where the first slot starts; the first tool of its second half, and how far that half is apart. */
+  /** The shelf: its lowest row's middle, down; the space each tool has; how big the orbs are (1 on the TV); where the first slot starts; the first tool of its second half, and how far that half is apart along the row (0 when the halves are one over the other, or together). */
   shelfY: number;
   gap: number;
   orb: number;
   shelfLeft: number;
   split: number;
   apart: number;
+  /** Each tool's middle, in the shelf's order. */
+  toolX: number[];
+  toolY: number[];
+  /** The glass under each half (one, when the halves are together), and all of it. */
+  groups: Rect[];
+  shelf: Rect;
   /** The tool's label: its middle, down. */
   labelY: number;
   /** Whether input hints need space beside the corner panels. */
@@ -60,6 +67,10 @@ export type HudLayout = {
 const SHELF_GAP = 52;
 const SHELF_APART = 32;
 const SHELF_APART_LEAST = 12;
+/** Narrower than this a slot (design units, about 40 CSS pixels on a phone), a finger can't tell the tools apart: the halves go one over the other, the fly's over its world's. */
+const STACK_UNDER = 32;
+/** Rows of the shelf, middle to middle, when its halves are one over the other: its glass and a little between. */
+const SHELF_ROW = 58;
 /**
  * The picture through the fly's eyes, as the TV has it: the share of the
  * width its panel takes, its top and bottom as shares of the height, the
@@ -69,21 +80,50 @@ const SHELF_APART_LEAST = 12;
  */
 const PICTURE = { width: 0.84, top: 0.11, foot: 0.73, sides: 0.04, heading: 57.6, under: 24, stretch: (0.76 * 427) / (0.45 * 480), wrapsUnder: 480 };
 
-export function hudLayout(frame: Frame, reserveHints = true): HudLayout {
-  const tools = TOOLS.length;
-  const split = WORLD_TOOLS;
+/** `shelf`: the tools, for a layout of a shelf other than today's. */
+export function hudLayout(frame: Frame, reserveHints = true, shelf: readonly Pick<Tool, "world">[] = TOOLS): HudLayout {
+  const tools = shelf.length;
+  const split = Math.max(0, shelf.findIndex((t) => t.world));
+  const halves = split > 0 && split < tools;
   const a = safeRect(frame);
   const cx = a.x + a.w / 2;
   const bottom = a.y + a.h;
   const compact = frame.coarse && a.h < 360 && a.w > a.h * 1.4 && a.w * frame.unit >= 700;
   const touchApart = Math.min(SHELF_APART, a.w - 16 - tools * (44 / frame.unit));
-  const apart = frame.coarse ? (a.w > a.h * 1.2 && frame.unit > 1.25 ? Math.max(SHELF_APART, a.w - 16 - tools * SHELF_GAP) : touchApart >= 16 ? (compact ? 16 : touchApart) : 0) : split > 0 && split < tools ? Math.max(SHELF_APART_LEAST, Math.min(SHELF_APART, a.w - 16 - tools * SHELF_GAP)) : 0;
+  let apart = frame.coarse ? (a.w > a.h * 1.2 && frame.unit > 1.25 ? Math.max(SHELF_APART, a.w - 16 - tools * SHELF_GAP) : touchApart >= 16 ? (compact ? 16 : touchApart) : 0) : halves ? Math.max(SHELF_APART_LEAST, Math.min(SHELF_APART, a.w - 16 - tools * SHELF_GAP)) : 0;
+  if (!halves) apart = 0;
   const gapWanted = compact ? Math.max(44 / frame.unit, Math.min(SHELF_GAP, (a.w - 32 - apart - 216) / tools)) : SHELF_GAP;
-  const gap = Math.min(gapWanted, (a.w - 16 - apart) / tools);
+  let gap = Math.min(gapWanted, (a.w - 16 - apart) / tools);
+  // Too many for one row a finger can use: the fly's tools over its world's, each row as wide as it needs.
+  const stacked = halves && !compact && gap < STACK_UNDER;
+  if (stacked) {
+    apart = 0;
+    gap = Math.min(SHELF_GAP, (a.w - 16) / Math.max(split, tools - split));
+  }
   const shelfY = bottom - 34;
-  const labelY = shelfY - 61;
-  const shelfWidth = gap * tools + apart;
+  const topRow = stacked ? shelfY - SHELF_ROW : shelfY;
+  const labelY = topRow - 61;
+  const shelfWidth = stacked ? gap * Math.max(split, tools - split) : gap * tools + apart;
   const shelfLeft = compact ? a.x + 8 : cx - shelfWidth / 2;
+  const toolX: number[] = [];
+  const toolY: number[] = [];
+  const groups: Rect[] = [];
+  const group = (from: number, to: number, left: number, y: number) => {
+    for (let i = from; i < to; i++) {
+      toolX.push(left + (i - from + 0.5) * gap);
+      toolY.push(y);
+    }
+    groups.push({ x: left - 8, y: y - 26, w: (to - from) * gap + 16, h: 52 });
+  };
+  if (stacked) {
+    group(0, split, cx - (split * gap) / 2, topRow);
+    group(split, tools, cx - ((tools - split) * gap) / 2, shelfY);
+  } else if (apart > 0) {
+    group(0, split, shelfLeft, shelfY);
+    group(split, tools, shelfLeft + split * gap + apart, shelfY);
+  } else group(0, tools, shelfLeft, shelfY);
+  const shelfRect = { x: Math.min(...groups.map((r) => r.x)), y: topRow - 26, w: 0, h: shelfY - topRow + 52 };
+  shelfRect.w = Math.max(...groups.map((r) => r.x + r.w)) - shelfRect.x;
   const menuAtFoot = frame.coarse;
   const menuBeside = menuAtFoot && a.w * frame.unit >= 375;
   const touch = frame.coarse ? {
@@ -95,7 +135,7 @@ export function hudLayout(frame: Frame, reserveHints = true): HudLayout {
     targetHeight: Math.max(32, 44 / frame.unit),
   } : null;
   // The hints keep to the corners beside the shelf (the lowest, "Tools", is beside it), unless the shelf reaches them: then above the label.
-  const beside = shelfLeft - 8 > a.x + 16 + 100;
+  const beside = shelfRect.x > a.x + 16 + 100;
   const hintsY = beside ? shelfY : labelY - 36;
   // The picture between the caption and the label: as big as fits, keeping the dots' proportions.
   const top = Math.max(a.y + a.h * PICTURE.top, a.y + 25 + 23);
@@ -117,8 +157,12 @@ export function hudLayout(frame: Frame, reserveHints = true): HudLayout {
     gap,
     orb: Math.min(1, (gap / 2 - 1) / 22),
     shelfLeft,
-    split: apart > 0 ? split : tools,
+    split: apart > 0 || stacked ? split : tools,
     apart,
+    toolX,
+    toolY,
+    groups,
+    shelf: shelfRect,
     labelY,
     reserveHints,
     hintsX: a.x + 16,

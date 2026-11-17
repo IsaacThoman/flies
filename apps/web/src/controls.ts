@@ -18,6 +18,7 @@
 import { sameTarget } from "@fly/ui";
 import type { Hit } from "@fly/ui";
 import type { Gesture } from "./input.ts";
+import type { Dial } from "./tools/hands.ts";
 import { HUD_HITS } from "./ui/hud.ts";
 
 /** How the tool in hand is used on the table: once, where a click or a tap lands (food, the ball); held, where the pointer is held (the feather, the air); or not there at all. */
@@ -35,9 +36,9 @@ export interface PlayTarget {
   unaim(): void;
   /** Uses the tool in hand once, where the hand is. */
   use(): void;
-  /** A tap on something on the HUD, or a swipe along its label (a step of the kind). */
+  /** A tap on something on the HUD, or a swipe along its label (a step of the kind on that label's dial). */
   pressHud(hit: Hit): void;
-  stepKind(dir: -1 | 1): void;
+  stepKind(dir: -1 | 1, dial: Dial): void;
   /** Steps the tool on the shelf (the wheel over it). */
   stepTool(dir: -1 | 1): void;
   /** Turns the camera round the fly (radians round, and up). */
@@ -183,7 +184,7 @@ export class PlayControls {
           if (grip.swiped === 0 && Math.abs(dx) <= Math.abs(g.y * design.height - grip.y)) return;
           const steps = Math.trunc(dx / LABEL_SWIPE) - grip.swiped;
           grip.swiped += steps;
-          for (let i = 0; i < Math.abs(steps); i++) target.stepKind(steps < 0 ? 1 : -1);
+          for (let i = 0; i < Math.abs(steps); i++) target.stepKind(steps < 0 ? 1 : -1, grip.hit.index as Dial);
         }
         return;
       case "up":
@@ -249,7 +250,7 @@ export class PlayControls {
       const dir = shelf.scrolled > 0 ? 1 : -1;
       shelf.scrolled = 0;
       if (hit.kind === HUD_HITS.tool) target.stepTool(dir);
-      else if (hit.kind === HUD_HITS.kind || hit.kind === HUD_HITS.label) target.stepKind(dir);
+      else if (hit.kind === HUD_HITS.kind || hit.kind === HUD_HITS.label) target.stepKind(dir, hit.index as Dial);
       return;
     }
     if (g.zoom) target.zoom(Math.exp(g.dy * PINCH_ZOOM));

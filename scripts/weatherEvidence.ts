@@ -31,15 +31,14 @@ try {
     for (const time of ["noon", "night"] as const) for (const condition of ["heavyRain", "thunderstorms", "snow", "sleet"]) {
       const name = `${place}-${time}-${condition}`;
       const variants = [
-        TOOLS.findIndex(t => t.id === "light"),
-        TOOLS.find(t => t.id === "light")!.variants.findIndex(v => v.id === time),
-        TOOLS.findIndex(t => t.id === "weather"),
+        TOOLS.findIndex(t => t.id === "sky"),
+        TOOLS.find(t => t.id === "sky")!.variants.findIndex(v => v.id === time),
         TOOLS.findIndex(t => t.id === "view"),
         TOOLS.find(t => t.id === "view")!.variants.findIndex(v => v.id === "table"),
       ];
       await page.evaluate(({ time, condition, variants }) => {
         const g = (globalThis as unknown as { __fly: Game }).__fly;
-        const [lt, choice, wt, vt, view] = variants;
+        const [st, choice, vt, view] = variants;
         g.director.setView("table");
         if (g.stage.current.id !== "picnic") {
           const p = g.life.body.position;
@@ -51,7 +50,7 @@ try {
         }
         g.stage.setTime(time);
         g.settings.eyesInset = "off";
-        g.hands.variants[lt] = choice; g.hands.variants[wt] = 0; g.hands.variants[vt] = view;
+        g.hands.variants[st] = choice; g.hands.seconds[st] = 0; g.hands.variants[vt] = view;
         g.outside.feed({ condition, observedAt: Date.now(), cloudCover: 1, visibility: 12000,
           precipitation: condition === "snow" ? 2 : 12, wind: 9,
           sunrise: 7, sunset: 17, noon: 12, daylight: time === "noon" });
