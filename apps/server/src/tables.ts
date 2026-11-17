@@ -5,14 +5,17 @@
 // stops (and every half minute, in case it doesn't stop cleanly), and read
 // back as it starts, so everyone's devices find their tables as they left
 // them when they reconnect. And the list of rooms anyone may browse: the
-// listed ones with someone there.
+// listed ones with someone there. And the rooms open to everyone, which the
+// server keeps itself: the first always, the next ones as the ones before
+// fill, none ever forgotten.
 
+import { randomInt } from "node:crypto";
 import * as fs from "node:fs/promises";
 import path from "node:path";
-import { LISTED_MAX } from "@fly/net";
+import { EVERYONE_ROOMS, LISTED_MAX, everyoneCode, everyoneIndex } from "@fly/net";
 import type { ClientMessage, Refusal, RoomWire } from "@fly/net";
 import type { Lock } from "./lock.ts";
-import { Table, isTableRecord } from "./table.ts";
+import { Table, everyonePlace, isTableRecord } from "./table.ts";
 import type { TableOptions, TableRecord } from "./table.ts";
 
 /** A table nobody has sat at for this long (ms) is forgotten, and its invitation leads nowhere. */
@@ -40,6 +43,7 @@ export class Tables {
     this.#options = options;
     this.#max = max;
     this.#files = files;
+    this.#everyone(0);
   }
 
   get size() {
@@ -54,8 +58,10 @@ export class Tables {
     return this.#tables.values();
   }
 
-  /** The table a hello is for: found, or started if the hello starts it (with `lock`, if it is to have a password). */
+  /** The table a hello is for: found, or started if the hello starts it (with `lock`, if it is to have a password); for a room open to everyone, whichever has room. */
   open(key: string, hello: Extract<ClientMessage, { type: "hello" }>, seed: number, lock: Lock | null = null): Table | Refusal {
+    // Nobody starts a room open to everyone, nor one with any of their codes.
+    if (everyoneIndex(hello.table) >= 0) return this.everyone(key, hello.table);
     const known = this.#tables.get(hello.table);
     if (known) return known;
     if (!hello.start) return "unknown";
@@ -68,12 +74,12 @@ export class Tables {
     return table;
   }
 
-  /** Forgets the table nobody has been at for longest, so that tables nobody comes back to can't keep new ones from being started; false if every table has someone there. */
+  /** Forgets the table nobody has been at for longest, so that tables nobody comes back to can't keep new ones from being started; false if every table has someone there. Never a room open to everyone. */
   #forgetOne(): boolean {
     let oldest: Table | null = null;
     let oldestAt = Infinity;
     for (const table of this.#tables.values()) {
-      if (table.connected > 0 || table.present > 0) continue;
+      if (table.everyone || table.connected > 0 || table.present > 0) continue;
       const at = lastAt(table);
       if (at < oldestAt) {
         oldest = table;
@@ -86,12 +92,54 @@ export class Tables {
     return true;
   }
 
-  /** The rooms anyone may see: listed, with someone there, fullest first (then by name), at most LISTED_MAX. */
+  /** The `i`th room open to everyone, opened now if it hasn't been. */
+  #everyone(i: number): Table {
+    const code = everyoneCode(i);
+    const known = this.#tables.get(code);
+    if (known) return known;
+    const start = { place: everyonePlace(this.#options.wall()), light: "clock", weather: "now", zone: "", offset: 0 };
+    const table = new Table(code, start, "", randomInt(2 ** 31), this.#options);
+    this.#tables.set(code, table);
+    this.#changed = true;
+    this.#options.log?.("started", { table: table.code, place: table.place, name: table.name, everyone: true, tables: this.#tables.size });
+    return table;
+  }
+
+  /**
+   * The room open to everyone a device (its key, hashed) is to sit in, asking
+   * for `wanted`: that one if its fly is still there (coming back after a
+   * moment away), otherwise the first with room for it, opening the next
+   * when every one before is full. A refusal when all of them are. Where it
+   * sits, it is in the place the clock has it now: a room nobody was in
+   * hasn't been keeping time.
+   */
+  everyone(key: string, wanted: string): Table | Refusal {
+    const there = this.#tables.get(wanted);
+    if (there?.everyone && there.seated(key)) return there.keepTurn();
+    for (let i = 0; i < EVERYONE_ROOMS; i++) {
+      const table = this.#everyone(i);
+      if (table.hasRoomFor(key)) return table.keepTurn();
+    }
+    return "full";
+  }
+
+  /**
+   * The rooms anyone may see: those open to everyone first, in order (the
+   * first always, so there is always somewhere to go; the others while
+   * someone is there), then the listed ones with someone there, fullest
+   * first (then by name), at most LISTED_MAX in all.
+   */
   listed(): RoomWire[] {
+    const everyone: Table[] = [];
     const rooms: RoomWire[] = [];
-    for (const table of this.#tables.values()) if (table.listed && table.present > 0) rooms.push(table.room());
+    for (const table of this.#tables.values()) {
+      if (table.everyone) {
+        if (table.present > 0 || table.code === everyoneCode(0)) everyone.push(table);
+      } else if (table.listed && table.present > 0) rooms.push(table.room());
+    }
+    everyone.sort((a, b) => everyoneIndex(a.code) - everyoneIndex(b.code));
     rooms.sort((a, b) => b.flies - a.flies || a.name.localeCompare(b.name) || a.code.localeCompare(b.code));
-    return rooms.slice(0, LISTED_MAX);
+    return [...everyone.map((t) => t.room()), ...rooms].slice(0, LISTED_MAX);
   }
 
   /**
@@ -108,6 +156,7 @@ export class Tables {
         this.#changed = true;
         continue;
       }
+      if (table.everyone) continue;
       if (wall - lastAt(table) > (table.listed ? LISTED_IDLE : TABLE_IDLE)) {
         this.#tables.delete(table.code);
         this.#changed = true;
@@ -173,7 +222,10 @@ export class Tables {
     }
     let skipped = 0;
     for (const record of kept.tables as unknown[]) {
-      if (this.#tables.size >= this.#max || !isTableRecord(record) || this.#tables.has(record.code)) {
+      // The room open to everyone opened as the server started is empty: the one kept takes its place.
+      const known = isTableRecord(record) ? this.#tables.get(record.code) : undefined;
+      const fresh = !!known?.everyone && known.seats.size === 0;
+      if (this.#tables.size >= this.#max || !isTableRecord(record) || (known && !fresh)) {
         skipped++;
         continue;
       }

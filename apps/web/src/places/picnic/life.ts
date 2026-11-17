@@ -166,6 +166,7 @@ export class Goings {
     const around = this.#around;
     const busy = (kind === "butterfly" && this.#butterfly.active) || (kind === "ladybird" && this.#ladybird.active) || (kind === "gull" && outside.gull.on) || (kind === "boat" && outside.boat.on) || (kind === "leaf" && !this.#leaves.free) || (kind === "gust" && this.#gust.on);
     if (!around || busy) return;
+    if (around.shared?.ownSky && kind !== "juice" && !this.#can(kind, around.weather)) return;
     this.#random = this.#butterfly.random = this.#ladybird.random = this.#leaves.random = random;
     this.#start(kind, around);
   }
