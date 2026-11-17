@@ -2019,12 +2019,6 @@ export class Game implements Shell {
   // Kept once, rather than allocating a new redraw closure on every frame.
   #drawPlay = (g: CanvasRenderingContext2D, hits: HitMap) => {
     const hud = this.#hud;
-    if (hud.hints && !this.#learned[this.hands.current.id] && !this.hands.fixed.has(this.hands.current.id)) {
-      const p = this.hands.pointer;
-      this.#ndc.set(p.x, p.y, p.z).project(this.director.camera);
-      hud.aimX = (this.#ndc.x + 1) * this.shape.design.width / 2;
-      hud.aimY = (1 - this.#ndc.y) * this.shape.design.height / 2;
-    }
     drawHud(g, this.time, hud, hits);
     if (this.settings.stats) drawStats(g, this, hud.layout.statsX, hud.layout.statsY);
   };

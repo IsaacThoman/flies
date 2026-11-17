@@ -48,7 +48,7 @@ function shown(tool: ToolId, learned: Learned, hints = true, glyphs: HudState["g
   return { words, marks };
 }
 
-test("all tool demonstrations teach without tutorial captions for every input", () => {
+test("tool hints teach without tutorial captions for every input", () => {
   for (const glyphs of [null, "remote", "keys", "pad"] as const) for (const tool of TOOLS) {
     const { words } = shown(tool.id, {}, true, glyphs);
     for (const prose of ["Tools", "Drop sugar", "Throw the ball", "Hold to tickle", "Hold to blow gently", "Move your hand", "Menu"]) assert.ok(!words.includes(prose), `${tool.id}: ${prose}`);
