@@ -76,6 +76,17 @@ the WebAssembly one is faster in Chromium and needs half the memory
 (measured below). `?brain=typescript` or `?brain=wasm` on the page's address
 picks one, for tests and for comparing them; nothing shows it to players.
 
+Settings → Screensaver → Flies chooses one to four, shown as enamel dots.
+Each has its own brain in its own worker, its own body, senses and eyes;
+the camera and readouts follow the first. `InTurn`
+(`apps/web/src/brain/create.ts`) loads their files one brain after another
+from the same cache, so nothing downloads twice at once. Where files can't
+be kept they are fetched again, still in turn. The eyes take turns too:
+one fly's refresh a frame, the most overdue; the followed fly's still
+refresh every frame while a ball comes. At a table the same flies travel
+in one batch over one connection, up to the table's eight-fly limit
+([online.md](online.md)).
+
 The module, `brain/fly-brain.0.<hash>.wasm`, is fetched first (it is small)
 and kept the same way as the connectome's parts, in a cache of its own
 (`fly-brain-module`), counted with them on the loading screen ("3.2 of 14.5
@@ -270,7 +281,7 @@ WebAssembly run). The eyes are open throughout; every run kept 60 frames.
   times less. JavaScriptCore compiles the TypeScript's typed-array loops
   nearly as well as the C++, so the gain is small, but it is there, and an
   iPhone's brain is no slower for it.
-- **Memory**: the module holds 95 MB once the brain is built, the
+- **Memory**: each WebAssembly worker holds 95 MB once its brain is built, the
   TypeScript brain about 180 MB (`node packages/brain-native/scripts/bench.ts`);
   the page's process was 45 to 70 MB smaller with it in four runs of six,
   and in the other two it went either way by more, as garbage collection
@@ -293,7 +304,7 @@ what more speed would cost.
 
 `apps/web/src/page.ts`, in a browser only:
 
-- **Hidden**, the fly's life and its brain stop with the frames (the game
+- **Hidden**, every fly's life and its brain stop with the frames (the game
   skips them even where a browser keeps frames coming for a hidden page).
   Shown again, it carries on from where it was, the first frame no longer
   than any other; after more than half a minute away,

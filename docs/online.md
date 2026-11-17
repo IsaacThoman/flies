@@ -1,8 +1,8 @@
 # Flies online
 
-Up to eight people's flies can share a room (a table, in the code: the
-place the flies share). Each fly's brain and body run
-on its owner's device, exactly as they do alone. A small room server
+Up to eight flies can share a room (a table, in the code: the place the
+flies share), with one to four from each device. Each fly's brain and body
+run on its owner's device, exactly as they do alone. A small room server
 (`apps/server`) runs no brains and draws nothing: it passes each fly's state
 on to the others, and it owns the rest of the world there. That means the
 place, the food, thrown balls, the light and the weather, and the seed and
@@ -16,7 +16,7 @@ and the iPhone and iPad app's, whose web view has a WebSocket of its own
 ## Playing
 
 - **The rooms.** The menu → Online lists every public room with someone in
-  it, fullest first: its name, its place's colour, its flies as eight pips
+  it, fullest first: its name, its place's colour, its flies as eight pips (one per fly)
   and a padlock if it has a password. The list follows the room server as
   rooms open, fill and empty. A full one can't be chosen. Above the list are
   New room, and Code, for an unlisted room's code (the ten letters of its
@@ -24,7 +24,7 @@ and the iPhone and iPad app's, whose web view has a WebSocket of its own
 - **A new room.** New room → its name (two words are suggested, to keep or
   type over), its place (the fly's own to start with), Public or Unlisted
   and a password (none, unless one is typed). Create sits this device's
-  fly there, under its light and weather. Share the link opens the system's
+  flies there, under its light and weather. Share the link opens the system's
   share sheet, or copies the link where there is none. The link is
   `https://<site>/?table=<code>`. Ten letters and digits (about 50 bits):
   for an unlisted room without a password, they are the only permission
@@ -35,35 +35,41 @@ and the iPhone and iPad app's, whose web view has a WebSocket of its own
   A wrong one says so where the room's name was, in pink, and the password
   is typed again. A device that has once sat at the room comes back to it
   (a dropped line, a reload) without it; its starter never needs it.
-- **Joining.** Choosing an open room, typing its code, or opening its link sits this device's fly at the room, set
+- **Joining.** Choosing an open room, typing its code, or opening its link sits this device's flies at the room, set
   down near the others, at the height of the place's start (in the
   restaurant, on the window table, not the floor under it). The device remembers its table: a reload, or opening
-  the site again, comes back to it until it leaves.
+  the site again, comes back to it until it leaves. Settings → Screensaver →
+  Flies chooses how many, shown as one to four enamel dots. The table seats
+  as many as there is room for, at least one, or refuses it as full. Changing
+  the setting while seated asks again; a seat freed later doesn't add a fly
+  by itself. Coming back asks again too.
 - **Who is who.** No names and no chat. Each fly wears a dab of enamel on its
-  thorax in its player's colour, as researchers mark flies. Other players'
-  pointers show as rings in their colours. Your fly is the one the camera
-  follows.
+  thorax in its own colour, given by its id, as researchers mark flies. Other players'
+  pointers show as rings in their first fly's colour. Your first fly is the
+  one the camera follows: the pointer drifts back to it, and the eyes'
+  picture, nervous system, stats, X-ray, activity and day's tally are its.
 - **The starter** chooses the place (the Place tool carries the whole table
   there together), the light and the weather (their tools). Everyone else's
   Light, Weather and Place tools show the table's choice and refuse to change
-  it. The starter can also take a fly off the table: Online lists the
-  others by colour, each with Remove. A removed device can't sit at that
-  table again.
+  it. The starter can also take a device off the table: Online lists the
+  others by their flies' colours, several dots for several flies, each with
+  Remove. All that device's flies go, and its key can't sit at that table again.
 - **The table's clock** is the starter's. Their time zone goes with the
   table when it is started, so "Now" on the Light tool is their time of day.
   "Now" on the Weather tool is the made-up forecast from that clock, so
   everyone sees the same rain. The real weather outside (WeatherKit) isn't
   used at a table.
 - **Tools on other flies.** The table is invite-only, so everyone's tools
-  reach everyone's fly through the world. A ball thrown is seen coming by
+  reach everyone's flies through the world. A ball thrown is seen coming by
   every fly, a feather or a puff is felt by whichever fly it touches, and
   food dropped is food for all. This follows rule 1: other players act on
   your fly only through its senses.
 - **Away.** A hidden tab, a sleeping phone or a dropped connection leaves the
-  fly at the table, resting: wings folded, still, its body dimmed. After 10
-  minutes away it leaves; when its device comes back, it sits down again where
-  it was, in its colour.
-- **Leaving.** Online → Leave the room. The fly stays where it is, alone,
+  device's flies at the table, resting together: wings folded, still, their
+  bodies dimmed. After 10 minutes away they leave; when the device comes back,
+  they sit down again where they were, in their colours, unless their seats
+  have been given to someone else.
+- **Leaving.** Online → Leave the room. The flies stay where they are, alone,
   with the place's own food, and the light and weather its shelf had.
 - **What goes wrong** is said in the heading's place, in a few words: a
   wrong password, too many tries, a full room, one that has closed, being
@@ -87,20 +93,23 @@ join any open room; a password needs a keyboard. The game reaches typing only
 through `TextEntry` (`packages/contracts/src/text-entry.ts`), polled each
 frame, so the Apple TV can bring its own keyboard through the bridge.
 
-When not at a table nothing here runs: no connection, no other bodies, and
-the single-player game as it was.
+When not at a table there is no connection or other players' bodies. The
+device's own flies still live together, each with its own brain, senses and
+eyes, all eating from one pantry (`apps/web/src/company.ts`). Alone with
+several, the followed fly wears yellow enamel and the others the next
+colours; a lone fly wears none.
 
 ## Who owns what
 
 | | Owner | How the others get it |
 | --- | --- | --- |
-| A fly: where it is, its pose, its hand | Its player's device, where its brain and body run | About 20 states a second through the room, drawn about 100 ms in the past, interpolated (`packages/net/src/track.ts`) |
+| A fly: where it is, its pose | Its player's device, where its brain and body run | About 20 states a second through the room, in one batch of the device's flies, drawn about 100 ms in the past, interpolated (`packages/net/src/track.ts`); only its first fly carries the player's hand |
 | What a fly feels and does about the others | Its own device | The others are bodies its eyes see and its body meets (`packages/body/src/crowd.ts`); their hands are the same `Hands` as yours, driven from the wire (`apps/web/src/online/other-hands.ts`) |
 | The food: the place's patches, what is dropped, what the place puts out | The room (`TableFood`) | Each device eats at once and tells the room; the room's account, less what the device has eaten since, is what is left (`FoodMirror`) |
 | A thrown ball | The room's clock | Its path and the moment its dive starts: every device (and the room) puts it in the same place at the same moment (`ball.ts`), a round trip after Select so everyone sees the whole dive |
-| The place | The room | `place` tells every device to carry its fly there, and where each fly is set down |
+| The place | The room | `place` tells every device to carry its flies there, and where each fly is set down |
 | The light, the weather, the clock | The room, chosen by the starter | `world` and the welcome's clock; "Now" follows the starter's time zone |
-| The high bubbles | The room's seed and clock | Each device works them out (`bubbles.ts`); a device whose fly bursts one says so |
+| The high bubbles | The room's seed and clock | Each device works them out (`bubbles.ts`); when any of its flies bursts one, it says so |
 | Visitors (gust, gull, leaf, butterfly, ladybird, juice, boat) | The room says when, with a seed (the picnic's pace, `@fly/world`) | Each device starts the visit from that seed (`SceneSet.happen`); visitors keep clear of whichever fly is nearest |
 | The restaurant's ventilation | The room says when it comes on, by the same clock as alone (`VentilationClock`, `@fly/world`), with a seed | Each device draws how long it runs from the seed (`SceneSet.happen`), so every fly feels the same draught at the same time |
 
@@ -110,7 +119,7 @@ nobody else sees yours.
 ## The wire
 
 One WebSocket per device, at `wss://<site>/rooms`. The first message is the
-device's `hello`, carrying the protocol version (now 3); the room refuses any
+device's `hello`, carrying the protocol version (now 4); the room refuses any
 other, and a page it refuses for its version reloads itself once, into the
 site's current game. A connection that only lists the rooms says `browse`
 instead, and is told `rooms` at once and again whenever the list changes
@@ -120,8 +129,8 @@ first; everything rare is JSON (`packages/net/src/protocol.ts`,
 
 | Type | Direction | Layout | Bytes |
 | --- | --- | --- | --- |
-| 1 `FLY` | device to room, every 50 ms | type, state | 33, or 47 with the hand |
-| 2 `FLIES` | room to device, every 50 ms when anything is new | type, count, then each fly's player id and state | 2 + 33 or 47 a fly |
+| 1 `FLY` | device to room, every 50 ms | type, count, then each fly's id and state; only the first carries the hand | 2 + 33 a fly, + 14 with the hand |
+| 2 `FLIES` | room to device, every 50 ms when anything is new | type, count, then each fly's id and state | 2 + 33 a fly, + 14 for each hand |
 | 3 `BITES` | device to room, at most every 100 ms | type, sequence (u16), count, then each food's id (u32) and amount (f32) | 4 + 8 a bite |
 
 A fly's state (32 bytes, 46 with the hand). Its lengths are at its place's
@@ -141,6 +150,11 @@ others' at the scale of the place the table is in (the one it is being
 carried to, during a move), and drops theirs from any other epoch. Another
 fly is drawn half a step up from where the wire puts it, so rounding never
 sinks one on its feet into what it stands on.
+
+Protocol 4 is protocol 3 with several flies from one device: the seats
+count flies, each with its own id and colour, and `FLY` is a batch like
+`FLIES`. A device speaking 3 sends one state without its id, so it is
+turned away and reloads into 4.
 
 Protocol 3 is protocol 2 with rooms: names, the list, and passwords. A
 device speaking 2 doesn't know a room can be locked, and would knock at a
@@ -170,13 +184,14 @@ JSON, from the device:
 
 | Message | |
 | --- | --- |
-| `hello {v, table, key, start?, password?, at?, epoch?}` | the table's code; this device's key; `start` (place, light, weather, time zone and offset, and the room's `name` and whether it is `listed`) to start the table if it doesn't exist; `password`, the lock a new room is to have, or the key to a locked one, sent only until welcomed; `at`, where its fly is, coming back after a moment away, and the `epoch` of the place it is in |
+| `hello {v, table, key, start?, password?, flies?, at?, epoch?}` | the table's code; this device's key; `start` (place, light, weather, time zone and offset, and the room's `name` and whether it is `listed`) to start the table if it doesn't exist; `password`, the lock a new room is to have, or the key to a locked one, sent only until welcomed; `flies`, how many it asks for (1 to 4, 1 if left out); `at`, an array of each fly's spot in seated order, coming back after a moment away, and the `epoch` of their place |
 | `browse {v}` | instead of a hello: this connection only lists the rooms |
 | `ping {t}` | answered `pong {t, now}` with the room's time |
-| `drop {id, kind, x, z, y, at}` | food dropped onto the surface at or below `y` (the floor under a table, or the table), named by the device (player id × 1,000,000 + its count) so its fly can eat it before the room has heard |
+| `drop {id, kind, x, z, y, at}` | food dropped onto the surface at or below `y` (the floor under a table, or the table), named by the device (player id × 1,000,000 + its count) so its flies can eat it before the room has heard |
 | `ball {at, from, via, to}` | a throw, starting at room time `at` |
-| `world {light, weather}`, `place {place}`, `remove {id}` | the starter's choices |
-| `pop {slot, cycle, at}` | its fly burst a bubble |
+| `world {light, weather}`, `place {place}`, `remove {id}` | the starter's choices; `remove` takes any fly's id and removes its whole device |
+| `flies {count}` | how many flies this device now asks for, answered by `seated` |
+| `pop {slot, cycle, at}` | one of its flies burst a bubble |
 | `found {id, name, x, z, y, r, sweet}` | the place put food out on this device, named from where it lies |
 | `bye` | leaving for good |
 
@@ -184,40 +199,43 @@ From the room:
 
 | Message | |
 | --- | --- |
-| `welcome {v, id, colour, starter, seed, now, wall, offset, place, epoch, world, players, foods, balls, happenings, bubbles, at, room}` | the table as it is, where this fly stands, and the room's `{name, listed, locked}`; then a `FLIES` batch of every other fly where it is now |
+| `welcome {v, id, colour, flies, starter, seed, now, wall, offset, place, epoch, world, players, foods, balls, happenings, bubbles, at, room}` | the table as it is, this device's `flies` as `{id, colour, at}` each, and the room's `{name, listed, locked}`; `id`, `colour` and `at` are the first fly's, its id also the player's; `players` is every other device's flies as `{id, colour, away, of}`, where `of` is its device's first fly's id; then a `FLIES` batch of those other flies where they are now |
 | `refused {reason, name?}` | then the connection closes with the matching code: version 4001, full 4002, removed 4003, unknown table 4004, busy 4005 (too many rooms started, or passwords tried), malformed 4006, the same key sat down elsewhere 4007, locked 4008 (no password, or the wrong one: with the room's `name`, for its door); 4010 after `bye` |
 | `rooms {rooms}` | to a browsing connection: each listed room with a fly there, fullest first, at most 50, as `{code, name, place, flies, locked}` |
-| `joined {id, colour, away}`, `away {id, away}`, `left {id}` | who is at the table, and whose device has stopped |
+| `joined {id, colour, away, of}`, `away {id, away}`, `left {id}` | one message per fly coming, resting or leaving; `of` is whose it is, the id of its device's first fly |
+| `seated {flies}` | this device's flies after a count change, each as `{id, colour, at}` |
 | `drop`, `ball`, `found`, `pop` | as above, to everyone else (`by` the player); a drop's `y` is the surface it lands on |
 | `world {light, weather, offset}`, `place {place, epoch, foods, spots}` | the starter's choices, to everyone; `spots` is where each fly is set down |
+| `happening {kind, seed, at}` | a visitor comes |
+| `food {ack, amounts, gone, eaten}` | at most ten times a second while food changes: what is left, what is gone, this device's flies' total by the room's account, and the last of its bites counted |
 
 A spot (`at`, `spots`) is x, z, yaw and the height of the surface the fly
 stands on, and each of `foods` carries the height it lies at: in the
 restaurant one point can be the floor, a chair seat or the table over them.
-| `happening {kind, seed, at}` | a visitor comes |
-| `food {ack, amounts, gone, eaten}` | at most ten times a second while food changes: what is left, what is gone, this player's total by the room's account, and the last of its bites counted |
 
 ### Coming back
 
 A dropped line is opened again after 0.5, 1, 2, 4, 8, then 15 s, and at once
 when the page is shown again. A deploy closes every connection with 1012;
 devices come back within 0.3 to 1.5 s, spread out. The hello names the
-device's key, and the room gives it back its seat: the same id and colour.
-Its fly carries on where it is if that is in the place the table is in (the
-hello's epoch) and within a walk of where the room last had it (20 mm/s for
-up to 10 s, on the same table or floor); otherwise it is put back where the
-room had it. The room keeps every table in a file (`DATA_DIR/tables.json`)
-every 30 s and as it stops, and reads it back as it starts, with each
+device's key, and the room gives it back its flies: the same ids and colours,
+unless their seats have been given up. Each carries on where it is if that
+is in the place the table is in (the hello's epoch) and within a walk of
+where the room last had it (20 mm/s for up to 10 s, on the same table or
+floor); otherwise it is put back where the room had it. The room keeps
+every table in a file (`DATA_DIR/tables.json`) every 30 s and as it stops,
+and reads it back as it starts, with each
 room's name, whether it is listed, and its lock (tables kept before rooms
-had them come back unlisted, unlocked, named "Flies"). Room time is
-each server process's own, so a device takes up the restarted room's clock
+had them come back unlisted, unlocked, named "Flies"). Each device's seat
+keeps its flies in `seats[].flies`; older records with one fly per seat
+still load. Room time is each server process's own, so a device takes up the restarted room's clock
 from its welcome. A table nobody has sat at for 30 days is forgotten; a
 listed one after a day (it has long since dropped out of the list, which
 shows only rooms with a fly there).
 
 ## The limits
 
-Each device is the authority on its own fly, and nothing can stop a device
+Each device is the authority on its own flies, and nothing can stop a device
 faking it. The room keeps the fake within what a fly could do, so that it
 can't spoil the others' screens or their food (`packages/net/src/limits.ts`):
 
@@ -233,20 +251,24 @@ can't spoil the others' screens or their food (`packages/net/src/limits.ts`):
   stands on whatever is under it there, the floor beneath a table or the
   table. A state from
   the future or older than the last is dropped.
-- **Food.** Only under your own name, only on the table. A bite counts only
-  within 4 mm of the food's edge of where the room has the fly, at the
-  food's height (not from the floor under its table), and no faster
-  than a fly eats (with a second's appetite saved up). Two flies at one sugar
-  never eat more than there was.
+- **Food.** One account per device. A bite counts only within 4 mm of the
+  food's edge of where the room has any of its flies, at the food's height
+  (not from the floor under its table), and no faster than that many flies
+  eat (with a second's appetite saved up). Two flies at one sugar never eat
+  more than there was (`TableFood.bite`, `packages/net/src/food.ts`).
 - **Hands.** One ball in the air at a time per player (a new one replaces
   it), at most 12 throws a minute (3 at once), 30 drops (6 at once), 10 found
-  foods, 120 bubbles burst, and 30 of the starter's changes.
+  foods, 120 bubbles burst, and 30 changes (the starter's choices and any
+  device's fly count, from the same allowance).
 - **Messages.** At most 60 a second from a device (120 at once); more are
   dropped. A message is at most 4 KB, and a device has 10 s to say hello.
   At most 24 connections from one address, and 30 rooms started from one an
-  hour (5 at once). At most 8 flies a table; a seat gone more than 10 minutes is given
-  up to a newcomer, never the starter's. What an address has done is kept
-  for an hour after its last connection closes, so closing and opening
+  hour (5 at once). At most 8 flies a table (`MAX_FLIES`), 4 per device
+  (`MAX_OWN`). A new device gets as many as it asks for or there are free seats,
+  whichever is fewer; with none free it is refused as full. Reducing the
+  count takes the last flies off first. A device gone more than 10 minutes
+  gives up all its seats together to make room, never the starter's. What an
+  address has done is kept for an hour after its last connection closes, so closing and opening
   again doesn't start its counts afresh.
 
 ### Rooms, names and passwords
@@ -282,14 +304,36 @@ hash of each.
 ## Cost
 
 Eight flies have to fit the frame on the slowest device, where the cost
-follows draw calls and JavaScript (`AGENTS.md`). So another fly near the
-camera is the real model, posed: two draws. One too far to show more than
-about 9 pixels is a stand-in, all of them in one instanced draw and not
-posed at all. Every other fly's shadow is one instanced draw, and what the
-fly's eyes see of them (a 480-triangle stand-in each) is one more in each
-face of the eyes. Nothing is made per frame for them. The other players'
-hands share their textures. `apps/web/e2e/tables.e2e.ts` holds a table of
-eight to the frame's budget on every screen shape.
+follows draw calls and JavaScript (`AGENTS.md`). Every fly but the followed
+one is drawn by `OtherFlies` (`apps/web/src/online/others.ts`), whether its
+brain runs here or on another device. Near the camera it is the real model,
+posed: two draws. One too far to show more than about 9 pixels is a stand-in,
+all of them in one instanced draw and not posed at all. Their shadows are
+one instanced draw, and what each fly's eyes see of all the others (a
+480-triangle stand-in each) is one more in each face of the eyes. Its own
+stand-in is left out while it looks round. Nothing is made per frame for
+them. The other players' hands share their textures.
+`apps/web/e2e/tables.e2e.ts` holds a table of eight to the frame's budget on
+every screen shape.
+
+One device runs at most four. Each brain runs off the JavaScript
+thread: a Web Worker in a browser, its own native thread on the TV. Natively
+each takes about 58 MB, and an estimated 13 to 45% of an A15 performance
+core; a WebAssembly worker takes about 95 MB (`packages/brain-native/README.md`).
+The workers load one after another from the same kept connectome
+(`InTurn`, `apps/web/src/brain/create.ts`), so nothing downloads twice at once.
+An older Apple TV host without `brain.spawn` runs only one fly and has no
+Flies setting.
+
+Their eyes take turns, normally one fly's refresh a frame, whichever is most overdue;
+with four at 60 fps each looks round about 15 times a second rather than
+20. The followed fly still looks every frame while a ball comes. The TV's
+eyes frame is about 83 draws against 34 without: with four flies it comes
+every frame rather than one in three. Four flies' meeting, senses, bodies,
+poses and nearby models took 19 M5 Pro CPU µs a frame, held below 34 by
+`apps/web/tests/company.budget.ts`: about 0.3 ms on the TV by its 16×
+JavaScript cost. These are estimates for several local flies, not
+measurements on an Apple TV device; that still needs doing.
 
 ## Running it locally
 
@@ -329,6 +373,13 @@ holds eight flies to the frame's budget on every screen shape, and checks
 that single-player opens no connection. `npm run tables -- --clients 4 --seconds 120`
 is a longer run with several tabs and fake flies, summing up what each saw.
 
+For scripts, the canvas's `data-flies` counts this device's flies and
+`data-crowd` counts the followed fly's neighbours. `data-company` lists each
+other local fly as `id:brain:activity:x,z:eyeUpdates:crowd:colour`, separated
+by semicolons (id 0 alone). At a table, `data-mine` lists its seated flies as
+`id:colour`, `data-asked` is how many it asked for, and each `data-others`
+entry ends in `:of`, the id of that fly's device's first fly.
+
 ## The Apple TV and the iPhone
 
 The game reaches the room only through `TableSocket`
@@ -343,7 +394,7 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
   into one buffer kept in JavaScript, so nothing is made per message, and a
   frame with nothing new is two native calls. The host keeps as much waiting
   as a browser does, and closes every line (1001) when the app goes to the
-  background; the fly rests in the room meanwhile, and coming back the line
+  background; its flies rest in the room meanwhile, and coming back the line
   opens again at once. Its room server is `wss://flies.isaacthoman.com/rooms`
   (`ROOMS_URL` at build, or `?rooms=` in the launch config's URL, for
   another), which App Transport Security allows as it is. Typing (a room's
@@ -352,9 +403,10 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
   `apps/web/src/ui/text-entry.ts`). There is no share sheet or clipboard, so
   no Share the link: at a room, Online shows its QR code and its code (as it
   does everywhere) for a phone to scan or another TV to type. The simulator
-  check sits the app in a room of eight, and on an Apple TV 4K a room of
-  eight holds 60 fps (`npm run tvos:soak -- --table`, `docs/apple-tv.md`,
-  "Eight flies on a TV").
+  check sits the app in a room of eight. On an Apple TV 4K, one local fly
+  with seven sent from elsewhere held 60 fps (`npm run tvos:soak -- --table`,
+  `docs/apple-tv.md`, "Eight flies on a TV"); several local brains have not
+  yet been measured there.
 - **iPhone and iPad.** No bridge: the app is the web build in a web view,
   whose own WebSocket reaches `wss://flies.isaacthoman.com/rooms` (and a room
   server of your own at an address or a `.local` name, for development), and

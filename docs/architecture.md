@@ -16,28 +16,43 @@ The game currently has no sound, by design, pending a new sound design.
 | `packages/fly` | The fly's body: a 3D model that knows how a fly moves its legs, wings and mouthparts, with its nervous system drawn inside it. |
 | `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver, the weather outside, a table's line to its room, typing into a field the game draws. |
 | `packages/net` | How flies share a table: the wire format, the room's clock, other flies as they are heard of, the shared food, balls and bubbles, and what a player may do. Runs in a browser and in Node. |
-| `apps/web` | The game: the world, the fly's life in it, its senses, the remote's tools and menus. Runs in a browser as it is. |
-| `apps/server` | The room server for rooms of up to eight people's flies (`docs/online.md`), and the list of those open to anyone: one Node process over WebSockets. It runs no brains and draws nothing. |
+| `apps/web` | The game: the world, each fly's life in it and its senses, the remote's tools and menus. `company.ts` keeps the other flies this device simulates beside the one the camera follows. Runs in a browser as it is. |
+| `apps/server` | The room server for rooms of up to eight flies, one to four per device (`docs/online.md`), and the list of those open to anyone: one Node process over WebSockets. It runs no brains and draws nothing. |
 | `apps/tvos` | The Apple TV app: a native host that runs the web build's JavaScript in JavaScriptCore and draws it through OpenGL ES. |
 | `apps/ios` | The iPhone and iPad app: the web build in a `WKWebView`, served from the app's bundle, in a small Swift shell ([ios.md](ios.md)). |
 
 ## How it fits together
 
-Each frame the game works out what the fly's body feels (what each facet of
+Settings → Screensaver → Flies chooses one to four flies, shown as enamel
+dots, saved as `flies` with the other settings. Each is a whole fly: its own
+brain, body, senses, crowd and eyes, all eating from one pantry. Each frame
+the game works out what each body feels (what each facet of
 its eyes sees, what its feet and mouthparts taste, touch, wind, whether it is
 on its feet) and hands that to a `BrainDriver`. The brain answers with
 commands read from the fly's own descending and motor neurons: walk, turn,
 back up, take off, beat the wings, groom, feed, sing. The game moves the body
-accordingly and poses the model (`FlyPose`).
+accordingly and poses the model (`FlyPose`). The first fly is the one the
+camera follows, the pointer drifts back to, and the eyes' picture, nervous
+system, stats, X-ray, activity and day's tally show. `Company` keeps the
+others; `OtherFlies` draws them with the other players' flies. Each fly
+sees every other and meets it through `Life.crowd`; the player's tools
+reach any of them through the world. A place can supply
+`SceneSet.feel(dt, at, felt)` to let its wind, touch and visitors reach each
+where it is. The eyes take
+turns, the most overdue fly's refresh each frame; the followed fly's still
+refresh every frame while a ball comes.
 
-In a browser, and so in the iPhone and iPad app, the brain runs in a Web Worker, fed a compressed
+In a browser, and so in the iPhone and iPad app, each brain runs in its own Web Worker, fed a compressed
 form of the connectome that the page downloads once and keeps (the app has it in its bundle):
 `packages/brain-native` built as WebAssembly where the browser can run it, `packages/brain` itself
-where it can't; the browser build is plain files for any static host (`docs/web.md`). On the Apple TV
+where it can't. `InTurn` (`apps/web/src/brain/create.ts`) loads the brains
+one after another from the kept files, so nothing downloads twice at once;
+the browser build is plain files for any static host (`docs/web.md`). On the Apple TV
 JavaScript has no JIT and is far too slow for it, so the host runs
-`packages/brain-native` on its own thread and exposes it as
-`globalThis.__native.brain` (`NativeBrainBridge`). The game only ever sees a
-`BrainDriver`.
+`packages/brain-native` on a thread per brain and exposes the first as
+`globalThis.__native.brain` (`NativeBrainBridge`). Its `spawn()` makes
+another, whose `stop()` frees it. An older host without `spawn` runs one
+fly and shows no Flies row. The game only ever sees a `BrainDriver` for each.
 
 Built with WeatherKit, the Apple TV app also tells the game the weather
 outside and today's sunrise and sunset, as `globalThis.__native.weather`
@@ -56,7 +71,10 @@ wraps the web build says what its screen's notch covers through
 `packages/contracts/src/screen.ts`.
 
 At a table with others (`docs/online.md`) each fly still lives entirely on
-its own device. The room server passes each fly's state to the others and
+its owner's device. Protocol 4 carries a batch of that device's flies over
+one connection; only its first fly carries the hand. The table seats up to
+eight flies, giving each device as many of its one to four as there is room
+for. The room server passes each fly's state to the others and
 keeps the rest of the world there (the place, the food, the balls, the light
 and the weather, when visitors come). Another player's fly is a body this
 fly's eyes see and its body bumps into; their tools reach it through the
