@@ -123,7 +123,22 @@ other) / their sum, on its feet. Each seed is run with each piece trained, each
 reinforcement (sugar only in a dish), and each with the brain's learning on
 and off from the same start: the paired difference is what learning did.
 
-TRAINING_TABLE
+Measured (seeds 1 to 3, 06:00; each line is six flies with learning and the
+same six without):
+
+| Pieces, reinforcement | Trained piece's time in training (s) | Preference with learning / without | Paired difference | Pairs alike to the frame | KC spikes | Synapses changed |
+|---|---|---|---|---|---|---|
+| Blue and yellow dishes, sugar | 0 to 245 (eating 0 to 81) | 0.24 / 0.38 (four and five flies on a dish) | 0.02 (0 to 0.07) | 4 of 6 | 4 to 16 | 13 to 22 |
+| Blue and yellow dishes, swoop | 0.5 to 0.9 (one swoop each) | none on a dish in the test | none | 6 of 6 | 11 to 25 | 16 to 19 |
+| Blue and red tiles, swoop | 0 to 1.0 (one swoop or none) | none on a tile in the test | none | 6 of 6 | 8 to 18 | 13 to 16 |
+
+No learning shows. The KCs fire a few times in 8 minutes, to the swoop's loom
+and the scene going by, not to a piece: no KC fires to any of the kit's
+colours (packages/brain/README.md, Learning). A fly that found the sugar
+stayed on its dish and chose it again without learning. The pairs that
+parted in training (one with sugar, one with the tiles) did so from the first
+changed synapse, the brain's chaos rather than a learned cue.
+
 
 ## Other requested domains
 
