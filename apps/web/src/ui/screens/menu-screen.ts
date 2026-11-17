@@ -52,6 +52,7 @@ export class MenuScreen implements Screen {
   /** What a pointer went down on: a slider it is sliding, or the list it may drag. */
   #held: { slider: number; hit: Hit | null; scroll: number; dragging: boolean } | null = null;
   #wheel = 0;
+  semanticFocus = false;
   /** The row a mouse is over, or -1. */
   #hover = -1;
 
@@ -88,7 +89,14 @@ export class MenuScreen implements Screen {
   }
 
   press(button: RemoteButton, repeat: boolean) {
+    this.semanticFocus = false;
     this.#outcome(this.menu.press(button, repeat));
+  }
+
+  focus(id: string) {
+    this.menu.focusOn(id);
+    this.semanticFocus = true;
+    this.#dirty = true;
   }
 
   /** Host semantics use the same outcomes as the canvas's hit targets. */
@@ -96,7 +104,7 @@ export class MenuScreen implements Screen {
     const at = this.menu.items.findIndex((item) => item.id === id);
     const item = this.menu.items[at];
     if (!item || item.disabled) return;
-    this.menu.focusOn(id);
+    this.focus(id);
     this.#outcome(value === undefined ? this.menu.tap(at) : item.kind === "choice" ? this.menu.chooseAt(at, value) : this.menu.slideAt(at, value));
   }
 
@@ -123,6 +131,7 @@ export class MenuScreen implements Screen {
   }
 
   point(p: Point) {
+    if (p.type === "down" || p.type === "hover") this.semanticFocus = false;
     const menu = this.menu;
     const hit = p.hit;
     const row = hit && (hit.kind === MENU_HITS.row || hit.kind === MENU_HITS.step || hit.kind === MENU_HITS.tab || hit.kind === MENU_HITS.track);
@@ -220,7 +229,7 @@ export class MenuScreen implements Screen {
     const pointing = this.#shell.glyphs === null;
     const backed = pointing && !this.#options.root;
     this.view.tabInset = backed && !head ? 44 : 0;
-    this.view.draw(g, t, hits, !pointing, pointing ? this.#hover : -1);
+    this.view.draw(g, t, hits, !pointing || this.semanticFocus, pointing && !this.semanticFocus ? this.#hover : -1);
     if (backed) {
       const list = this.#pane.list;
       const b = head ? backButton(panel, head.y) : { x: list.x + 17, y: list.y + list.row / 2, r: 17 };

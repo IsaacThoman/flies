@@ -93,6 +93,8 @@ export class OnlineScreen implements Screen {
   }
 
   get heading() { return this.#heading(); }
+  get semanticFocus() { return this.#screen.semanticFocus; }
+  focus(id: string) { this.#screen.focus(id); }
 
   access(id: string, value?: number) { this.#screen.access(id, value); }
 
@@ -102,7 +104,7 @@ export class OnlineScreen implements Screen {
     if (item?.kind !== "field" || item.disabled) return;
     const max = id === "code" ? CODE_LENGTH : id === "name" ? ROOM_NAME_MAX : PASSWORD_MAX;
     this.#note = null;
-    item.value = value.slice(0, max);
+    item.value = [...value].slice(0, max).join("");
     this.#store(id, item.value);
     this.#shell.menuChanged?.();
   }
@@ -337,8 +339,10 @@ export class OnlineScreen implements Screen {
   /** The rows again, keeping the focus where it was (or on `focus`). */
   #refresh(focus?: string) {
     const was = this.#screen.menu.focused?.id;
+    const semantic = this.#screen.semanticFocus;
     this.#screen = this.#build(focus ?? was);
     this.#screen.enter();
+    if (semantic) this.#screen.focus(this.menu.focused?.id ?? "");
     this.#shell.menuChanged?.();
   }
 

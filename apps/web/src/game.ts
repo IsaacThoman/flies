@@ -1700,7 +1700,8 @@ export class Game implements Shell {
     const menu = shown === "play" ? null : (this.screens[shown] as { menu?: { focused?: { id: string } } }).menu;
     d.focus = menu?.focused?.id ?? "";
     // Whether the menus show their focus (the remote's, the keys', a pad's): hidden while a pointer is in use.
-    d.ring = String(shown !== "play" && this.#ringShown);
+    const semanticRing = (shown === "title" || shown === "settings" || shown === "online") && this.screens[shown].semanticFocus;
+    d.ring = String(shown !== "play" && (this.#ringShown || semanticRing));
     d.tab = shown === "settings" ? settingsTab(this.screens.settings) : "";
     if (shown === "online") this.screens.online.publish(d);
     d.atRoot = String((window as unknown as Record<string, unknown>)[AT_ROOT_PROPERTY]);

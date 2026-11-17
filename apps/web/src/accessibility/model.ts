@@ -63,7 +63,7 @@ export class MenuAccess {
     const screen = g.screens[id];
     const item = screen.menu.item(command.id);
     if (!item || item.disabled) return;
-    if (command.action === "focus") { screen.menu.focusOn(item.id); return; }
+    if (command.action === "focus") { screen.focus(item.id); return; }
     if (command.action === "submit") { if (id === "online") g.screens.online.submitField(item.id); }
     else if (command.action === "value" && item.kind === "field") {
       if (id === "online") g.screens.online.editValue(item.id, String(command.value ?? ""));

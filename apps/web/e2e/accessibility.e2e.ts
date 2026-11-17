@@ -89,6 +89,7 @@ try {
   await dump("rooms");
   const garden = await tab("button", /^Garden, Picnic table, 1 of 8 flies, Password required$/);
   const focusedRoom = await garden.elementHandle();
+  await waitFor(page, "ring=true");
   const peer = new WebSocket(`ws://127.0.0.1:${rooms.port}/rooms`);
   extraPeers.push(peer);
   await new Promise<void>((resolve, reject) => {
@@ -105,6 +106,8 @@ try {
   assert.equal(await focusedRoom!.evaluate((node) => node === document.activeElement), true);
   transcript.push("Room occupancy changed 1 → 2 → 1 while the same DOM node retained keyboard focus. Menu focus returned to Play and Settings on navigation.");
   await activate("New room");
+  await type("Name", "𐐀".repeat(25));
+  assert.equal(await page.getByRole("textbox", { name: "Name", exact: true }).inputValue(), "𐐀".repeat(24));
   await type("Name", "Orchard");
   await dump("create");
   await activate("Create");

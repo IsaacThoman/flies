@@ -1,6 +1,5 @@
 // Browser-only host adapter. The tree is available without detecting a screen
 // reader (browsers deliberately provide no reliable API for that).
-import { CODE_LENGTH, ROOM_NAME_MAX, PASSWORD_MAX } from "@fly/net";
 import type { Game } from "../game.ts";
 import { MenuAccess } from "./model.ts";
 import type { AccessibleItem } from "./model.ts";
@@ -19,6 +18,7 @@ export function browserAccessibility(game: Game) {
   root.append(heading, body, controls, live);
   document.body.append(root);
   const nodes = new Map<string, HTMLElement>();
+  const composing = new WeakSet<Element>();
   let key = "";
   let engaged = false;
   let pending = false;
@@ -43,9 +43,10 @@ export function browserAccessibility(game: Game) {
       node.type = item.kind === "slider" ? "range" : item.secret ? "password" : "text";
       node.style.fontSize = "16px";
       node.autocomplete = item.secret ? (key === "online:new" ? "new-password" : "current-password") : "off";
-      node.maxLength = item.id === "code" ? CODE_LENGTH : item.id === "name" ? ROOM_NAME_MAX : PASSWORD_MAX;
       const input = node;
-      input.addEventListener("input", () => send(item.id, "value", input.value));
+      input.addEventListener("compositionstart", () => composing.add(input));
+      input.addEventListener("compositionend", () => { composing.delete(input); send(item.id, "value", input.value); });
+      input.addEventListener("input", () => { if (!composing.has(input)) send(item.id, "value", input.value); });
       input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); send(item.id, "submit"); } });
     } else {
       node = document.createElement("button");
@@ -90,7 +91,7 @@ export function browserAccessibility(game: Game) {
       }
       if (node instanceof HTMLInputElement) {
         if (node.type === "range") { node.min = String(item.min); node.max = String(item.max); node.step = String(item.step); }
-        if (node.value !== String(item.value ?? "")) node.value = String(item.value ?? "");
+        if (!composing.has(node) && node.value !== String(item.value ?? "")) node.value = String(item.value ?? "");
       }
       (node as HTMLButtonElement).disabled = !!item.disabled;
     }
