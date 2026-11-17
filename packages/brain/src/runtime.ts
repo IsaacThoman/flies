@@ -6,7 +6,7 @@ import type { EyeColumn } from "./eye-columns.ts";
 import { buildEyes } from "./eyes.ts";
 import type { Eyes } from "./eyes.ts";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
-import { SLEEP_EYES, backgroundRates, decode, hungerOf, senseRates, smooth, stateOf, sweetOutputGain, wire } from "./io.ts";
+import { SLEEP_EYES, backgroundRates, decode, hungerOf, senseRates, smooth, stateOf, sweetOutputGain, thirstOf, waterOutputGain, wire } from "./io.ts";
 import type { Wiring } from "./io.ts";
 import { OPERATING_POINT, buildWeights } from "./params.ts";
 import type { OperatingPoint } from "./params.ts";
@@ -58,8 +58,9 @@ export class FlyBrain implements Brain {
   #vision: { name: string; size: number }[] = [];
   #regionSizes = new Uint32Array(REGIONS.length);
   #regionCounts = new Uint32Array(REGIONS.length);
-  // The sweet neurons' input, whose output gain hunger sets.
+  // The sweet neurons' input, whose output gain hunger sets, and the water neurons', whose output gain thirst sets.
   #sweet = "";
+  #water = "";
   /** The eyes' gain last set (SLEEP_EYES), and each eye's rates and L1's withdrawals scaled by it. */
   #eyeGain = 1;
   #gained: Record<"left" | "right", { rates: Float64Array; withdrawals: Float64Array }> | null = null;
@@ -74,10 +75,11 @@ export class FlyBrain implements Brain {
     this.sim = new Simulation(weights.network, { ...point.neuron, gain: weights.gain, seed });
     for (const { spec, neurons } of this.wiring.senses) if (!spec.afterEyes) this.sim.addInput(spec.name, neurons);
     for (const { spec, neurons } of this.wiring.background) this.sim.addInput(spec.name, neurons);
-    // Hunger scales how strongly the sweet neurons' spikes reach their targets (io.ts, HUNGER).
+    // Hunger scales how strongly the sweet neurons' spikes reach their targets (io.ts, HUNGER), and thirst the water neurons' (THIRST).
     for (const { spec, neurons } of this.wiring.senses) {
-      if (spec.sense !== "sweet") continue;
-      this.#sweet = spec.name;
+      if (spec.sense === "sweet") this.#sweet = spec.name;
+      else if (spec.sense === "water") this.#water = spec.name;
+      else continue;
       this.sim.addOutputGain(spec.name, neurons);
     }
     for (const { spec, neurons } of this.wiring.readouts) {
@@ -141,6 +143,7 @@ export class FlyBrain implements Brain {
     const hunger = hungerOf(senses);
     this.sim.setOutputGain(this.#sweet, sweetOutputGain(hunger));
     this.state.hunger = hunger;
+    this.sim.setOutputGain(this.#water, waterOutputGain(thirstOf(senses)));
     for (const { spec, maxRate } of this.wiring.state) this.sim.setRate(spec.name, maxRate * stateOf(senses, spec.state));
     this.state.rest(
       Math.max(stateOf(senses, "clockMorning"), stateOf(senses, "clockEvening")),

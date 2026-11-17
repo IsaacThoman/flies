@@ -2144,6 +2144,7 @@ export class Game implements Shell {
     d.eaten = life.eaten.toFixed(3);
     d.hunger = life.hunger.level.toFixed(3);
     d.fullness = life.hunger.fullness.toFixed(3);
+    d.thirst = life.thirst.level.toFixed(3);
     d.meals = String(life.meals);
     d.food = String(life.pantry.foods.filter(isDropped).length);
     d.prints = String(this.prints.prints.count(this.time));

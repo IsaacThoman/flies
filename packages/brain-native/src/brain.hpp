@@ -93,6 +93,8 @@ class Brain {
   std::vector<uint32_t> background_inputs_;
   // The sweet neurons' output gain, which hunger sets (io::sweet_output_gain).
   uint32_t sweet_gain_ = 0;
+  // The water neurons' output gain, which thirst sets (io::water_output_gain).
+  uint32_t water_gain_ = 0;
   std::vector<uint32_t> state_inputs_;
   std::vector<double> rates_;
   std::vector<std::string> rate_names_;

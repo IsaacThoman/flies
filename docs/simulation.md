@@ -20,6 +20,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | `grounded` | On its feet: its legs' load sensors bear its weight. |
 | `maleTaste` | A front leg's tarsus on another fly's body, while it stands (on this device or at a table with others; every fly is a male): the taste of a male's cuticle, 1 while touching, easing out over 0.3 s. |
 | `hunger` | Not a sense: how hungry it is (below). |
+| `thirst` | Not a sense: how thirsty it is (below). |
 | `wingbeat` | How hard its own wings beat, felt by their and the halteres' strain sensors: in the air, the drive it flies with (the brain's `wings`, or the tarsal reflex's floor where that is higher, see Flight); on its feet, only as far as the pose opens them, so 0 with the wings folded, and 0 from the step it lands in (tarsal contact stops a fly's wings). |
 
 **Hunger** (`packages/body/src/hunger.ts`). The body keeps account of how
@@ -43,6 +44,24 @@ over 60), and the abdomen swells with it: up to 12% wider and deeper and 5%
 longer, round numbers chosen to be seen. Another player's fly at a table
 doesn't show it: the crop isn't sent to the room.
 
+**Thirst** (`packages/body/src/thirst.ts`). The body keeps account of how
+thirsty the fly is too, from 0 just drunk to 1 thirsty, the same way. It
+rises toward 1 with a time constant of 6 minutes: flies kept in dry air drink
+more after two hours and are well dehydrated after six (Jourjine et al. 2016),
+and thirst runs 60 times fast too. A new fly starts two dry hours in, at 0.28.
+What it drinks brings it down by the food's water times how much it drank, so
+a whole dropped drop of Water takes a thirsty fly to quenched. Only plain water
+counts: foods don't say how much water they hold, so juice and fruit quench
+nothing, and the air's humidity isn't modelled. The fly drinks the way it eats,
+when the brain's `feed` says so with its mouthparts on water, and the brain is
+sent its thirst every frame, which sets how strongly the water taste neurons
+pass on what they taste (`packages/brain/README.md`, Thirst).
+
+What changes: nothing it does. Water reaches nothing in the model that
+extends the proboscis, thirsty or not, so the fly never drinks: of 20 flies
+on water, none starts to feed, at any thirst. Away from plain water it grows
+thirsty and stays so.
+
 With them go the fly's daily clock and its need for sleep (`packages/body/src/rhythm.ts`),
 not senses but internal state the connectome can't supply: the morning and evening
 oscillators, the clock's push toward sleep, sleep pressure and how deeply it sleeps ([Sleep and the daily rhythm](../README.md#sleep-and-the-daily-rhythm)).
@@ -53,7 +72,7 @@ Each fly this device lives is one fly from launch to launch
 (`apps/web/src/fly-record.ts`). Its record, kept on the device under
 `flies.fly.0` to `flies.fly.3` by its place in line (0 the followed fly), says
 who it is (a random id, and when it first arrived) and what its body was when
-it was last seen: its hunger, how full its crop, its sleep pressure and the
+it was last seen: its hunger, how full its crop, its thirst, its sleep pressure and the
 pace that pressure was built at, and where it stood (the place, and the spot
 there). It is saved every 30 s while the game runs, as the page is hidden or
 left, and as a fly goes. Fewer flies in Settings, or a companion whose brain
@@ -66,7 +85,9 @@ run: what it did while nobody watched is a stand-in. Its crop empties and its
 hunger grows as they would here (`Hunger.away`), but no further than the 0.7
 a new fly arrives with, a game rule: at hunger's pace any absence of more than
 half an hour would otherwise always end in a starved fly. A fly that left
-hungrier than that is no less hungry. Its sleep pressure goes as a fly left to
+hungrier than that is no less hungry. Its thirst grows the same way, to no more
+than the 0.28 a new fly arrives with (`Thirst.away`); a record from before the
+body kept thirst gives the fly a new fly's. Its sleep pressure goes as a fly left to
 itself would have it (`pressureLeftAlone`): asleep whenever the clock pushes it
 more than halfway toward sleep, awake otherwise, in five-minute steps of a
 model day under today's sun. Two days are enough to forget where it started,

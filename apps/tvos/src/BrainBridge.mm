@@ -22,9 +22,11 @@
 namespace {
 constexpr double kMaxStepMs = 100;
 // SENSE_ORDER, COMMAND_ORDER and STATE_STATS in packages/contracts/src/brain.ts.
-constexpr int kScalars = 18, kCommands = 8, kStats = 4;
+constexpr int kScalars = 19, kCommands = 8, kStats = 4;
 // Where hunger is among the scalars; a game that sends fewer keeps no account of it, which is 1.
 constexpr int kHunger = 9;
+// And thirst, which is 1 the same way.
+constexpr int kThirst = 18;
 // Where the wings' own beat is; a game that sends fewer has its wings folded, 0.
 constexpr int kWingbeat = 10;
 enum Status { kLoading, kRunning, kFailed };
@@ -132,7 +134,7 @@ void *Run(void *arg) {
     fly_senses senses = {
       scalars[0], scalars[1], scalars[2], scalars[3], scalars[4], scalars[5], scalars[6], scalars[7] > 0.5f,
       eyes ? light[0].data() : nullptr, eyes ? light[1].data() : nullptr, scalars[8], scalars[kHunger], scalars[kWingbeat],
-      scalars[11], scalars[12], scalars[13], scalars[14], scalars[15], scalars[16], scalars[17],
+      scalars[11], scalars[12], scalars[13], scalars[14], scalars[15], scalars[16], scalars[17], scalars[kThirst],
     };
     fly_command c = {};
     fly_stats stats = {};
@@ -238,6 +240,7 @@ NATIVE(B_submit) {
     b.pendingMs = std::min(b.pendingMs + dt, kMaxStepMs);
     std::fill(b.scalars, b.scalars + kScalars, 0.f);
     b.scalars[kHunger] = 1.f;
+    b.scalars[kThirst] = 1.f;
     if (scalars) std::copy(scalars, scalars + std::min<size_t>(ns, kScalars), b.scalars);
     b.eyesOpen = left && right && b.facets[0] && b.facets[1];
     if (b.eyesOpen) {

@@ -94,6 +94,30 @@ test("what it eats feeds its hunger, which goes to the brain, and fills its crop
   assert.ok(life.sensed.hunger! < before - 0.1, "and the brain is sent the lower hunger");
 });
 
+test("it drinks plain water when the brain feeds there, which quenches its thirst and not its hunger", () => {
+  const brain = new Commands();
+  const life = new Life(new World(places.picnic), brain);
+  const start = life.thirst.level;
+  life.step(1 / 60, performance.now());
+  assert.equal(life.sensed.thirst, start, "the brain is sent the thirst");
+  assert.ok(life.thirst.level > start, "it grows thirstier while it doesn't drink");
+
+  const water = life.pantry.drop("water", life.body.position.x, life.body.position.z, life.body.position.y);
+  const thirsty = life.thirst.level;
+  for (let i = 0; i < 30; i++) life.step(1 / 60, performance.now());
+  assert.equal(water.amount, 1, "without the brain's feed, it only tastes it");
+  assert.equal(life.sensed.water, 1);
+
+  brain.state.command.feed = 1;
+  const hunger = life.hunger.level;
+  for (let i = 0; i < 60; i++) life.step(1 / 60, performance.now());
+  assert.ok(life.eating && life.activity === "feeding");
+  assert.ok(water.amount < 0.8, `${water.amount} left`);
+  assert.ok(life.thirst.level < thirsty - 0.15, `${life.thirst.level} after drinking, ${thirsty} before`);
+  assert.ok(life.hunger.level >= hunger, "water feeds nothing");
+  assert.equal(life.hunger.fullness, 0);
+});
+
 test("with a rhythm it tells the brain the clock and its sleep, and is asleep after five minutes still", () => {
   const brain = new Commands();
   const life = new Life(new World(places.picnic), brain);

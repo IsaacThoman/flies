@@ -32,6 +32,8 @@ struct Senses {
   /** In StateKey's order; 0, left out. */
   double state[kStateCount] = {};
   double bitter = 0, water = 0;
+  /** Internal state, not a sense (types.ts's BrainSenses.thirst): 0 just drunk to 1 thirsty; anything not a number counts as 1. */
+  double thirst = 1;
 };
 
 struct Command {
@@ -132,6 +134,12 @@ double hunger_of(const Senses& senses);
 
 /** The sweet taste neurons' output gain at this hunger (io.ts's sweetOutputGain and HUNGER, which say why). */
 double sweet_output_gain(double hunger);
+
+/** How thirsty the senses say it is, 0..1: 1 (as it was before thirst) when not a number (io.ts's thirstOf). */
+double thirst_of(const Senses& senses);
+
+/** The water taste neurons' output gain at this thirst (io.ts's waterOutputGain and THIRST, which say why). */
+double water_output_gain(double thirst);
 
 /** An internal state's value, 0..1. */
 double state_of(const Senses& senses, StateKey key);
