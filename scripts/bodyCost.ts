@@ -25,8 +25,10 @@ const temp = mkdtempSync(join(tmpdir(), "fly-body-cost-"));
 try {
   for (const [file, source] of Object.entries({ "motion.ts": "packages/body/src/motion.ts", "behavior.ts": "packages/body/src/behavior.ts", "world.ts": "packages/world/src/world.ts", "shapes.ts": "packages/world/src/shapes.ts" })) {
     const code = execFileSync("git", ["show", `${ref}:${source}`], { encoding: "utf8" });
-    writeFileSync(join(temp, file), code.replaceAll('"@fly/world"', '"./world.ts"'));
+    writeFileSync(join(temp, file), code.replaceAll('"@fly/world"', '"./world-index.ts"'));
   }
+  // The body takes the world's shapes as well as the world from @fly/world.
+  writeFileSync(join(temp, "world-index.ts"), 'export * from "./world.ts";\nexport * from "./shapes.ts";\n');
   const { FlyBody: BeforeBody } = await import(pathToFileURL(join(temp, "motion.ts")).href) as { FlyBody: typeof FlyBody };
   const { World: BeforeWorld } = await import(pathToFileURL(join(temp, "world.ts")).href) as { World: typeof World };
   const walking = { ...createIntent(), live: true, walking: true, speed: 10, yawRate: 0.7 };

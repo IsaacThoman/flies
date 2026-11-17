@@ -113,7 +113,8 @@ function limeWedge(solid: Solid) {
   const faces: number[] = [];
   const at = (t: number, phi: number, k: number) => {
     const r = top.height * Math.sqrt(Math.max(0, 1 - t * t)) * k;
-    return [t * f.rx, top.base + r * Math.cos(phi), r * Math.sin(phi)];
+    // Across the cut, the footprint is narrower than the vertical radius.
+    return [t * f.rx, top.base + r * Math.cos(phi), (r * f.rz / top.height) * Math.sin(phi)];
   };
   const quad = (out: number[], a: number[], b: number[], c: number[], d: number[]) => out.push(...a, ...b, ...c, ...a, ...c, ...d);
   for (let i = 0; i < along; i++) {

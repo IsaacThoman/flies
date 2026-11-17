@@ -16,3 +16,11 @@ test("body fuzz: a diner of slabs, rails just over the floor among them, fixed s
 test("windowsill high-start seed 4 no longer reaches the perch behind the glass", () => {
   fuzzBody("windowsill", 4, 2017, true);
 });
+
+// What the reach check first found, each replayed past where it failed.
+test("body fuzz finds: the fly wedged between the pane's rail and a pebble, at the restaurant wall on the banquette's back, on the alarm clock's stairs, among the cocktail's ice", () => {
+  fuzzBody("windowsill", 508, 30);
+  fuzzBody("restaurant", 0, 910);
+  fuzzBody("windowsill", 101, 1160);
+  fuzzBody("bar", 634, 550);
+});
