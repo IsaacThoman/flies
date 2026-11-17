@@ -21,6 +21,12 @@ export function loomGeometry(lvMs: number) {
   const seconds = collisionSeconds - k / SCREEN.lastHalfPixels;
   return { collisionSeconds, seconds, halfPixels: (time: number) => Math.min(SCREEN.lastHalfPixels, Math.ceil(k / Math.max(1e-9, collisionSeconds - time))) };
 }
+
+/** Capture and replay must use the same finite response and follow-up windows. */
+export function opticalWindow(kind: EscapeKind, lvMs: number) {
+  const responseEnd = kind === 'flash' ? 0.25 : loomGeometry(lvMs).seconds + 0.25;
+  return { responseEnd, frames: Math.ceil((responseEnd + 0.1) / SCREEN.frameSeconds) };
+}
 export function screenAt(eye: Vec, yaw: number): ScreenPose {
   const right = { x: -Math.cos(yaw), y: 0, z: Math.sin(yaw) };
   return { center: { x: eye.x + right.x * SCREEN.distanceMm, y: eye.y, z: eye.z + right.z * SCREEN.distanceMm }, right, horizontal: { x: Math.sin(yaw), y: 0, z: Math.cos(yaw) } };
@@ -121,12 +127,10 @@ export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: nu
   life.body.point(0.42, 0.3, 0, eye);
   const pose = screenAt(eye, life.body.yaw);
   const geometry = loomGeometry(lvMs);
-  const presentation = kind === 'flash' ? 0.025 : geometry.seconds;
-  const responseEnd = kind === 'flash' ? 0.25 : presentation + 0.25;
-  const duration = responseEnd + 0.1;
+  const { responseEnd, frames } = opticalWindow(kind, lvMs);
   const flight = new EscapeFlight();
   try {
-    for (let i = 0; i < Math.ceil(duration / dt); i++) {
+    for (let i = 0; i < frames; i++) {
       if (i % 200 === 0) await checkpoint();
       const t = i * dt;
       life.body.point(0.42, 0.3, 0, eye);

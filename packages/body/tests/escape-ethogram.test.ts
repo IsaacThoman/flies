@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { loomGeometry, facetLuminance, screenAt, regression, summarizeEscape, wilson, SCREEN, LV_MS, validateEscapeOptions, EscapeFlight } from '../../../scripts/ethogram/escape.ts';
+import { loomGeometry, facetLuminance, screenAt, regression, summarizeEscape, wilson, SCREEN, LV_MS, validateEscapeOptions, EscapeFlight, opticalWindow } from '../../../scripts/ethogram/escape.ts';
 import type { EscapeTrial } from '../../../scripts/ethogram/escape.ts';
 import { scorecard, validateOpticalEvidence } from '../../../scripts/ethogram/scoring.ts';
 import { validateOptions } from '../../../scripts/ethogram.ts';
@@ -104,6 +104,20 @@ test('evidence gate rejects missing trials, duplicate seeds, direct loom input a
     assert.throws(() => validateOpticalEvidence({ ...valid, trials: valid.trials.map((t, i) => i ? t : { ...t, ...change }) }));
   }
   assert.throws(() => validateOpticalEvidence({ ...valid, protocol: { ...valid.protocol, perRatio: 2 } }));
+});
+
+test('replay rejects takeoffs and flight durations outside the actual capture windows', () => {
+  const valid = evidence(true);
+  const replace = (change: Partial<EscapeTrial>) => ({ ...valid, trials: valid.trials.map((t, i) => i ? t : { ...t, ...change }) });
+  const takeoffMs = 1000000;
+  assert.throws(() => validateOpticalEvidence(replace({ takeoffMs, ttcMs: loomGeometry(valid.trials[0].lvMs).collisionSeconds * 1000 - takeoffMs })));
+  assert.throws(() => validateOpticalEvidence(replace({ longestPoweredFlightSeconds: 1000000 })));
+  assert.throws(() => validateOpticalEvidence(replace({ takeoffMs: null, ttcMs: null, flown: false, longestPoweredFlightSeconds: 0.01 })));
+  const t = valid.trials[0], window = opticalWindow(t.kind, t.lvMs);
+  const lastMs = Math.ceil(window.responseEnd / SCREEN.frameSeconds) * SCREEN.frameSeconds * 1000;
+  const remaining = (window.frames + 1) * SCREEN.frameSeconds - lastMs / 1000;
+  validateOpticalEvidence(replace({ takeoffMs: lastMs, ttcMs: loomGeometry(t.lvMs).collisionSeconds * 1000 - lastMs, longestPoweredFlightSeconds: remaining }));
+  assert.throws(() => validateOpticalEvidence(replace({ takeoffMs: lastMs, ttcMs: loomGeometry(t.lvMs).collisionSeconds * 1000 - lastMs, longestPoweredFlightSeconds: remaining + SCREEN.frameSeconds })));
 });
 
 test('clock is explicit and invalid hours are refused', () => {

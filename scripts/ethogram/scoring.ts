@@ -1,6 +1,6 @@
 import { REFERENCES } from './references.ts';
 import { distanceScore, mean } from './metrics.ts';
-import { LV_MS, SCREEN, loomGeometry, summarizeEscape } from './escape.ts';
+import { LV_MS, SCREEN, loomGeometry, opticalWindow, summarizeEscape } from './escape.ts';
 import type { EscapeTrial } from './escape.ts';
 
 export type Measurements = Record<string, unknown>;
@@ -17,8 +17,13 @@ export function validateOpticalEvidence(e: OpticalEvidence) {
     if (!Number.isInteger(t.seed) || seen.has(t.seed) || t.seed < p.firstSeed || t.seed >= p.firstSeed + e.trials.length) throw new Error('invalid or duplicate optical trial seed');
     seen.add(t.seed);
     if (typeof t.eligible !== 'boolean' || typeof t.flown !== 'boolean' || t.hour !== p.hour || !Number.isFinite(t.quietWaitSeconds) || t.quietWaitSeconds < 0 || !Number.isFinite(t.maxEscape) || t.maxLoomInput !== 0 || (t.eligible && t.quietWaitSeconds < 3)) throw new Error('invalid optical readiness, clock or sensory route');
-    if (t.takeoffMs !== null && (!t.eligible || !Number.isFinite(t.takeoffMs) || t.takeoffMs < 0)) throw new Error('invalid takeoff observation');
+    const window = opticalWindow(t.kind, t.lvMs);
+    // Departure is measured at the end of a frame whose start precedes the response cutoff.
+    const latestTakeoffMs = Math.ceil(window.responseEnd / SCREEN.frameSeconds) * SCREEN.frameSeconds * 1000;
+    if (t.takeoffMs !== null && (!t.eligible || !Number.isFinite(t.takeoffMs) || t.takeoffMs <= 0 || t.takeoffMs > latestTakeoffMs + 1e-6)) throw new Error('takeoff outside the observed response window');
     if (!Number.isFinite(t.longestPoweredFlightSeconds) || t.longestPoweredFlightSeconds < 0 || t.flown !== (t.takeoffMs !== null && t.longestPoweredFlightSeconds >= 0.05)) throw new Error('flight does not match a continuous powered episode');
+    const availableFlightSeconds = t.takeoffMs === null ? 0 : (window.frames + 1) * SCREEN.frameSeconds - t.takeoffMs / 1000;
+    if (t.longestPoweredFlightSeconds > availableFlightSeconds + 1e-9) throw new Error('flight exceeds the observed follow-up window');
     if (t.kind === 'black' || t.kind === 'checkerboard') {
       if (!LV_MS.includes(t.lvMs as typeof LV_MS[number])) throw new Error('unregistered expansion rate');
       if (t.takeoffMs !== null && (t.ttcMs === null || !Number.isFinite(t.ttcMs) || Math.abs(t.ttcMs - (loomGeometry(t.lvMs).collisionSeconds * 1000 - t.takeoffMs)) > 1e-6)) throw new Error('TTC inconsistent with stimulus and takeoff');
