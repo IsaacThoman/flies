@@ -103,5 +103,6 @@ test(`with the most a place keeps built (${MAX_PIECES} pieces), a frame costs li
   console.log(`  nothing built: ${(bare * 1000).toFixed(1)} M5 Pro CPU µs a frame; ${pieces} pieces: ${(full * 1000).toFixed(1)} (${(raw * 1000).toFixed(1)} here), on them ${met.on} frames and held at them ${met.blocked}`);
   assert.equal(pieces, MAX_PIECES);
   assert.ok(met.on > 0 && met.blocked > 0, "the fly walks onto pieces and into them");
-  assert.ok(full < 0.05, `${(full * 1000).toFixed(1)} M5 Pro CPU µs a frame; budget 50`);
+  // 23 µs on an M5 Pro in Node 26 (nothing built, 7): its body clearing so many things near it; about 0.4 ms a frame on the Apple TV.
+  assert.ok(full < 0.04, `${(full * 1000).toFixed(1)} M5 Pro CPU µs a frame; budget 40`);
 });
