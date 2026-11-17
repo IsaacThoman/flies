@@ -10,6 +10,7 @@
 
 import * as THREE from "three";
 import { Contacts, FLY_LENGTH, Rhythm, SUMMER, TOUCH_PARTS } from "@fly/body";
+import type { FlyBody } from "@fly/body";
 import { REGIONS } from "@fly/brain";
 import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttribution } from "@fly/contracts";
 import { AT_ROOT_PROPERTY, COMMAND_ORDER, INVITE_EVENT } from "@fly/contracts";
@@ -78,6 +79,8 @@ import type { Aim } from "./tools/build.ts";
 import { DIALS, Hands, TOOLS } from "./tools/hands.ts";
 import type { Dial, DialId, ToolId } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
+import { Finger } from "./tools/finger.ts";
+import { FingerView } from "./tools/finger-view.ts";
 import { SENSES, StatsPanel, statsSlot, statsWanted } from "./stats/panel.ts";
 import type { StatsState } from "./stats/panel.ts";
 import { Tally } from "./stats/tally.ts";
@@ -169,7 +172,7 @@ const isArrow = (button: RemoteButton) => button === "up" || button === "down" |
 
 /** How a tool is used on the table, by a pointer. */
 function toolUse(id: string): ToolUse {
-  return id === "feed" || id === "swoop" || id === "build" || id === "photo" ? "once" : id === "feather" || id === "blow" ? "hold" : "none";
+  return id === "feed" || id === "swoop" || id === "build" || id === "photo" ? "once" : id === "feather" || id === "blow" ? "hold" : id === "finger" ? "place" : "none";
 }
 
 export class Game implements Shell {
@@ -201,6 +204,11 @@ export class Game implements Shell {
   readonly kit: KitView;
   /** What the Build tool in hand points at this frame, if it is in hand. */
   #buildAim: Aim | null = null;
+  /** The player's fingertip in the fly's world (the Finger tool), and how it looks. */
+  readonly finger: Finger;
+  readonly fingerView: FingerView;
+  /** Every fly this device lives, for the finger to rest on or carry: refilled each frame. */
+  readonly #bodies: FlyBody[] = [];
   readonly haptics: Haptics;
   readonly eyes: Eyes;
   readonly inset: EyesInset;
@@ -417,6 +425,10 @@ export class Game implements Shell {
     this.bubbles = new Bubbles(this.stage.scene, world);
     this.handsView = new HandsView(this.stage.scene);
     this.kit = new KitView(this.stage.scene);
+    this.finger = new Finger(world);
+    // A piece of the kit is never built into the fingertip, nor onto it.
+    this.builder.keepOut = (piece) => this.finger.blocks(piece);
+    this.fingerView = new FingerView(this.stage.scene);
     this.eyes = new Eyes(this.stage, this.life);
     this.eyes.standIns = this.others;
     this.#around = { fly: this.life.body.position, airborne: false, world, pantry: this.life.pantry, weather: this.stage.weather, quiet: false, felt: this.#felt, company: this.#companyAt, shared: null };
@@ -424,6 +436,7 @@ export class Game implements Shell {
     this.eyes.see(this.kit.built);
     this.#fliesAt.push(this.life.body.position);
     for (const object of this.handsView.seen) this.eyes.see(object);
+    for (const object of this.fingerView.seen) this.eyes.see(object);
     this.inset = new EyesInset(this.eyes);
     this.overlay.scene.add(this.inset.mesh);
     this.nerves = new NervesPanel(this.fly.model.nerves);
@@ -1232,6 +1245,7 @@ export class Game implements Shell {
     }
     this.prints.clear();
     this.hands.clear();
+    this.finger.clear();
     this.director.useScene(scene.camera);
     this.#settle();
     this.photos.arrived(id, placeInfo(id).name, this.time);
@@ -1339,6 +1353,7 @@ export class Game implements Shell {
     this.#copyEye();
     const holding = remote.held.has("select") || (this.#controls.holding && this.#aim.onWorld);
     this.hands.update(dt, { use: false, holding: playing && holding, eye: this.#eye }, life.body, life.pantry);
+    this.#moveFinger(dt, playing);
     this.#held = this.hands.stroking || this.hands.blowing ? this.#held + dt : 0;
     if (this.#held > HOLD_TAUGHT) this.#learn(this.hands.current.id);
     this.#live(dt);
@@ -1404,6 +1419,7 @@ export class Game implements Shell {
     this.handsView.update(this.hands, life.pantry, director.camera, this.time, dt, this.#floorAt, life.body.position);
     this.#buildAim = playing ? this.#pointBuild() : null;
     this.kit.update(this.builder, this.#buildAim, this.hands.variant.id === "remove", this.handsView.opacity, this.time, stage.light, stage.weather, (stage.current.open ?? 1) >= 1);
+    this.fingerView.update(this.finger, this.#floorAt);
 
     this.#overlay(dt);
 
@@ -1444,7 +1460,7 @@ export class Game implements Shell {
       stats.brain = life.brain.state;
       this.statsPanel.update(dt, waitFor(statsNow, this.corners, statsAt, this.statsPanel, pictures), this.corners, statsAt, opacity, stats);
       this.why.update(dt, showWhy);
-      this.eyes.render(dt, showEyes, this.hands.ball.active, this.inset.watching);
+      this.eyes.render(dt, showEyes, this.hands.ball.active || this.finger.urgent(life.body.position), this.inset.watching);
       stage.renderer.render(this.overlay.scene, this.overlay.camera);
       if (!this.#ready) {
         // The TV's splash can give way once both the world and its loading panel are drawn.
@@ -1566,20 +1582,22 @@ export class Game implements Shell {
       if (stroked >= 1) hands.stroking = true;
       this.#companyStroke = Math.max(this.#companyStroke, stroked);
       const stimuli = life.stimuli;
-      // Where each touches it: the feather (this player's, or another's at a table), a bubble that burst on it, the place's raindrops.
+      // Where each touches it: the feather (this player's, or another's at a table), the fingertip, a bubble that burst on it, the place's raindrops.
       const contacts = stimuli.contacts;
       contacts.clear();
       contacts.addAll(felt.contacts);
       hands.touch(life.body, contacts);
+      this.finger.touch(life.body, contacts);
       this.bubbles.touch(i + 1, contacts);
       if (online) {
         online.reach(life.body, air);
         online.touch(life.body, contacts);
       }
+      this.#carriedAir(life.body, air);
       stimuli.air = air;
       // What could loom is wherever it is: the same balls, bubbles and visitors as the followed fly's, and what the place says of this one.
       stimuli.looming.length = 0;
-      stimuli.looming.push(hands.looming[0]);
+      stimuli.looming.push(hands.looming[0], this.finger.looming);
       if (this.bubbles.enabled) pushAll(stimuli.looming, this.bubbles.looming);
       pushAll(stimuli.looming, felt.looming);
       if (online) pushAll(stimuli.looming, online.looming);
@@ -1595,11 +1613,12 @@ export class Game implements Shell {
     const hands = this.hands;
     const felt = this.#felt;
     const online = this.online;
-    // Where each touches it: the feather (this player's, or another's at a table), a bubble that burst on it last frame, the place's raindrops.
+    // Where each touches it: the feather (this player's, or another's at a table), the fingertip, a bubble that burst on it last frame, the place's raindrops.
     const contacts = stimuli.contacts;
     contacts.clear();
     contacts.addAll(felt.contacts);
     hands.touch(this.life.body, contacts);
+    this.finger.touch(this.life.body, contacts);
     this.bubbles.touch(0, contacts);
     online?.touch(this.life.body, contacts);
     // A puff from the player (and the others at a table) and the place's own air (a gust) together.
@@ -1607,14 +1626,37 @@ export class Game implements Shell {
     air.x = hands.air.x + felt.air.x + (online?.air.x ?? 0);
     air.y = hands.air.y + felt.air.y + (online?.air.y ?? 0);
     air.z = hands.air.z + felt.air.z + (online?.air.z ?? 0);
+    this.#carriedAir(this.life.body, air);
     stimuli.air = air;
-    // Things that could loom: the balls, the bubbles, and whatever comes by.
+    // Things that could loom: the balls, the fingertip, the bubbles, and whatever comes by.
     stimuli.looming.length = 0;
-    stimuli.looming.push(hands.looming[0]);
+    stimuli.looming.push(hands.looming[0], this.finger.looming);
     if (this.bubbles.enabled) for (const b of this.bubbles.looming) stimuli.looming.push(b);
     for (const l of felt.looming) stimuli.looming.push(l);
     if (online) for (const l of online.looming) stimuli.looming.push(l);
-    stimuli.threat = hands.ball.active ? hands.ball.position : (online?.threat ?? null);
+    stimuli.threat = hands.ball.active ? hands.ball.position : (this.finger.threat ?? online?.threat ?? null);
+  }
+
+  /**
+   * The fingertip's frame, before the flies live theirs: in hand while it is
+   * the tool in play; it goes where the hand is, and carries whichever of
+   * this device's flies stand on it.
+   */
+  #moveFinger(dt: number, playing: boolean) {
+    const bodies = this.#bodies;
+    bodies.length = 0;
+    bodies.push(this.life.body);
+    for (const c of this.company.list) bodies.push(c.life.body);
+    this.finger.update(dt, playing && this.hands.current.id === "finger" && !this.#moving, this.hands.pointer, this.life.body.position, bodies);
+  }
+
+  /** A fly the finger carries moves through the air at the finger's speed: the air moves past it the other way. */
+  #carriedAir(body: FlyBody, air: Vec3) {
+    const finger = this.finger;
+    if (!finger.carries(body)) return;
+    air.x -= finger.velocity.x;
+    air.y -= finger.velocity.y;
+    air.z -= finger.velocity.z;
   }
 
   #reactions() {
@@ -1878,6 +1920,11 @@ export class Game implements Shell {
       this.#snap();
       return;
     }
+    if (hands.current.id === "finger") {
+      this.finger.use();
+      this.#learn("finger");
+      return;
+    }
     this.#copyEye();
     hands.update(0, { use: true, holding: true, eye: this.#eye }, this.life.body, this.life.pantry);
     if (hands.events.blocked) this.#refuse();
@@ -2107,7 +2154,8 @@ export class Game implements Shell {
   /** Keeps the hand under a pointer that is still while the camera moves. */
   #followAim() {
     const aim = this.#aim;
-    if (!aim.active || this.nav.current !== "play" || this.wallpaper) return;
+    // The fingertip stays where it was put while the camera follows a fly it carries, or it would carry it on for ever.
+    if (!aim.active || this.nav.current !== "play" || this.wallpaper || this.hands.current.id === "finger") return;
     if (aim.moved) {
       aim.moved = false;
       return;
@@ -2120,7 +2168,15 @@ export class Game implements Shell {
   /** What is under a point on the screen: the fly, or the world, if anything is there. */
   #cast(x: number, y: number): RayHit | null {
     this.#ray.setFromCamera(this.#ndc2.set(x * 2 - 1, 1 - y * 2), this.director.camera);
-    return aimAt(this.life.world, this.#ray.ray.origin, this.#ray.ray.direction, this.life.body.position, this.#hit);
+    const world = this.life.world;
+    // The hand is never on the fingertip it holds: under it, on the table.
+    const present = world.movingPresent;
+    world.movingPresent = false;
+    // The fingertip goes where the hand points, not under the fly: under a fly it carries, it would follow the fly it moves.
+    const finger = this.hands.current.id === "finger";
+    const hit = finger ? world.raycast(this.#ray.ray.origin, this.#ray.ray.direction, this.#hit) : aimAt(world, this.#ray.ray.origin, this.#ray.ray.direction, this.life.body.position, this.#hit);
+    world.movingPresent = present;
+    return hit;
   }
 
   /** The system's cursor: none over the table (the hand is the cursor), a hand to grab the air with (it turns the camera), a pointing hand over things to press, else the arrow. */
@@ -2223,7 +2279,11 @@ export class Game implements Shell {
     ndc.x = Math.max(-0.97, Math.min(0.97, ndc.x + dx * SWIPE_GAIN));
     ndc.y = Math.max(-0.95, Math.min(0.9, ndc.y + dy * SWIPE_GAIN * 1.2));
     this.#ray.setFromCamera(this.#ndc2.set(ndc.x, ndc.y), camera);
-    const hit = this.life.world.raycast(this.#ray.ray.origin, this.#ray.ray.direction, this.#hit);
+    const world = this.life.world;
+    const present = world.movingPresent;
+    world.movingPresent = false;
+    const hit = world.raycast(this.#ray.ray.origin, this.#ray.ray.direction, this.#hit);
+    world.movingPresent = present;
     if (hit) this.hands.movePointer(hit.point, hit.normal);
   }
 
@@ -2362,6 +2422,13 @@ export class Game implements Shell {
     // The Sky's two dials, chosen: the time of day and the weather.
     d.sky = `${this.hands.timeOfDay}/${this.hands.weather}`;
     d.pointer = this.hands.following ? "following" : "free";
+    // The fingertip: away, raised or down; how high its underside is over what is under it (mm), its speed (mm/s), and how many flies stand on it.
+    const finger = this.finger;
+    d.finger = finger.state;
+    d.fingerHeight = finger.present ? (finger.tip.y - finger.floor).toFixed(2) : "";
+    d.fingerSpeed = finger.speed.toFixed(0);
+    d.fingerCarrying = String(finger.carried);
+    d.onFinger = finger.carries(life.body) ? "yes" : "";
     d.senses = `loom ${s.loomLeft.toFixed(2)}/${s.loomRight.toFixed(2)} touch ${life.senses.touched.toFixed(2)} bump ${s.bumpLeft.toFixed(2)}/${s.bumpRight.toFixed(2)} wind ${s.wind.toFixed(2)} sweet ${s.sweet.toFixed(2)} grounded ${s.grounded ? 1 : 0} male ${s.maleTaste.toFixed(2)} bitter ${s.bitter.toFixed(2)} water ${s.water.toFixed(2)}`;
     d.loom = Math.max(s.loomLeft, s.loomRight).toFixed(3);
     // How hard it is touched, wherever, and the parts it is touched on, as the brain is told them.

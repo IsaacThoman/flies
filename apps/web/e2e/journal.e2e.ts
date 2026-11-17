@@ -87,7 +87,8 @@ try {
   await shot(page, "first-meal-play");
 
   step("the Photo tool: Select takes the world as the camera shows it, without the HUD");
-  await page.keyboard.press(`Digit${TOOLS.findIndex((t) => t.id === "photo") + 1}`);
+  // The number keys pick a tool, 1 the first and 0 the tenth.
+  await page.keyboard.press(`Digit${(TOOLS.findIndex((t) => t.id === "photo") + 1) % 10}`);
   await waitFor(page, "tool=photo");
   await page.keyboard.press("ArrowUp");
   await waitForGameTime(page, 1);

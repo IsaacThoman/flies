@@ -11,7 +11,7 @@ import { ease } from "./behavior.ts";
 import { FLY_HEIGHT, FLY_LENGTH, HEAD_AHEAD, HEAD_UP, MOUTH_AHEAD, MOUTH_UP, STEP_UP } from "./motion.ts";
 import type { FlyBody } from "./motion.ts";
 import type { Bodies } from "./crowd.ts";
-import { POINT_REACH, TOUCH_PARTS, press, pressFlat } from "./touch.ts";
+import { POINT_REACH, TOUCH_PARTS, press, pressContacts, pressFlat } from "./touch.ts";
 import type { Contacts } from "./touch.ts";
 
 /**
@@ -192,7 +192,7 @@ export class SenseTracker {
     const pressed = this.#pressed;
     pressed.fill(0);
     const contacts = input.contacts;
-    if (contacts) for (let k = 0; k < contacts.count; k++) press(body, contacts.x[k], contacts.y[k], contacts.z[k], contacts.reach[k], contacts.strength[k], pressed);
+    if (contacts) pressContacts(body, contacts, pressed);
     const pushed = input.pushed;
     if (pushed && pushed.touch > 0) press(body, pushed.contact.x, pushed.contact.y, pushed.contact.z, POINT_REACH, clamp01(pushed.touch), pressed);
     const hit = clamp01(body.events.hit / HIT_FULL_SPEED);

@@ -9,12 +9,13 @@ import { FLY_HEIGHT, FLY_LENGTH, MOUTH_AHEAD, STEP_UP } from "@fly/body";
 import { BALL_RADIUS, SWOOP_SECONDS, createSurface, swoopAt } from "@fly/world";
 import type { FoodKind, Pantry, PieceKind, Vec3, World } from "@fly/world";
 import type { View } from "../camera.ts";
+import { FINGER_HALF_WIDTH } from "./finger.ts";
 import { PLACES } from "../places/catalog.ts";
 import type { PlaceId } from "../places/catalog.ts";
 import type { TimeOfDay } from "../scene/light.ts";
 import type { WeatherKind } from "../scene/weather.ts";
 
-export type ToolId = "feed" | "feather" | "blow" | "swoop" | "build" | "sky" | "view" | "place" | "photo";
+export type ToolId = "feed" | "finger" | "feather" | "blow" | "swoop" | "build" | "sky" | "view" | "place" | "photo";
 
 export type Variant = { id: string; label: string };
 
@@ -58,6 +59,8 @@ const WEATHERS: readonly Variant[] = [{ id: "now", label: "Now" }, { id: "clear"
  */
 export const TOOLS: readonly Tool[] = [
   { id: "feed", name: "Feed", verb: "Drop", hold: false, variants: [{ id: "sugar", label: "Sugar" }, { id: "honey", label: "Honey" }, { id: "berry", label: "Raspberry" }, { id: "water", label: "Water" }, { id: "coffee", label: "Coffee" }, { id: "laced", label: "Bitter sugar" }, { id: "clear", label: "Clear dropped" }] },
+  // A fingertip in the fly's world (tools/finger.ts): Select puts it down on the table or lifts it.
+  { id: "finger", name: "Finger", verb: "Put down or lift", hold: false, variants: [{ id: "fingertip", label: "Fingertip" }] },
   { id: "feather", name: "Tickle", verb: "Tickle", hold: true, variants: [{ id: "feather", label: "Feather" }] },
   { id: "blow", name: "Blow", verb: "Blow", hold: true, variants: [{ id: "gentle", label: "Gently" }, { id: "strong", label: "Hard" }] },
   { id: "swoop", name: "Swoop", verb: "Throw the ball", hold: false, variants: [{ id: "ball", label: "Beach ball" }] },
@@ -73,6 +76,22 @@ export const TOOLS: readonly Tool[] = [
   // A picture of the world as the camera sees it, for the fly's journal: framed with the camera (swipes turn it, Up and Down bring it in and out), Select takes it.
   { id: "photo", name: "Photo", verb: "Take", hold: false, world: true, variants: [{ id: "picture", label: "Picture" }] },
 ];
+
+/**
+ * Each tool as it travels to a table (packages/net: a byte), whatever its
+ * place on the shelf: the codes released builds send (Feed, Swoop, Tickle,
+ * Blow, Light, Weather, View, Place), the Sky taking Light's and Weather's
+ * (its time of day is Light's kinds), and new tools after. A device that
+ * doesn't know a newer tool reads its code as past its own last tool, which
+ * acts on no fly.
+ */
+const WIRE: readonly ToolId[] = ["feed", "swoop", "feather", "blow", "sky", "sky", "view", "place", "finger", "build", "photo"];
+
+/** A tool's code on the wire, from its place on the shelf. */
+export const toolToWire = (index: number) => WIRE.indexOf(TOOLS[index].id);
+
+/** A tool's place on the shelf from its code on the wire, or -1 for one this shelf hasn't. */
+export const toolFromWire = (code: number) => (code < WIRE.length ? TOOLS.findIndex((t) => t.id === WIRE[code]) : -1);
 
 /** The tools before this one act on the fly; from it on, they are about its world and the camera. */
 export const WORLD_TOOLS = Math.max(0, TOOLS.findIndex((t) => t.world));
@@ -120,6 +139,8 @@ export const PUFF_RADIUS = 30;
 /** Food falls from this high (mm), and falls this fast (mm/s²). */
 export const DROP_HEIGHT = 30;
 export const FALL = 2400;
+/** How far (mm) ahead of the fly's mouth the fingertip's edge comes, taken up while the hand waits by the fly. */
+export const FINGER_CLEAR = 5;
 /** Seconds after the last touch before the pointer drifts back to the fly. */
 export const POINTER_RETURN = 15;
 
@@ -337,7 +358,19 @@ export class Hands {
     const ev = this.events;
     const world = this.#world;
     this.#idle += dt;
-    if (!this.following && this.#idle > POINTER_RETURN) this.following = true;
+    if (this.current.id === "finger") {
+      // Taken up while the hand waits by the fly, the fingertip comes to a spot just ahead of it, clear of its head.
+      if (this.following) {
+        const reach = MOUTH_AHEAD * FLY_LENGTH + FINGER_HALF_WIDTH + FINGER_CLEAR;
+        this.pointer.x = fly.position.x + Math.sin(fly.yaw) * reach;
+        this.pointer.z = fly.position.z + Math.cos(fly.yaw) * reach;
+        const s = world.surface(this.pointer.x, this.pointer.z, surface, fly.position.y + STEP_UP);
+        this.pointer.y = s.y;
+        copy(this.normal, s.normal);
+      }
+      // It stays where it was put, and goes where the hand goes: a hand drifting after the fly would carry it along, or press on it.
+      this.following = false;
+    } else if (!this.following && this.#idle > POINTER_RETURN) this.following = true;
     if (this.following) {
       // Just in front of its mouth, on whatever is there at its feet (within a step) or below them.
       const reach = (MOUTH_AHEAD + 0.55) * FLY_LENGTH;
