@@ -2,7 +2,7 @@
 // turning it away ends it; the lists the table and the game share agree.
 
 import assert from "node:assert/strict";
-import { beforeEach, test } from "node:test";
+import { afterEach, beforeEach, mock, test } from "node:test";
 import type { TableSocket, TableSocketStatus } from "@fly/contracts";
 import { CLOSE, PROTOCOL, TABLETOP_SCALE, TABLE_LIGHTS, TABLE_WEATHERS, createFlyState, decodeBites, readState } from "@fly/net";
 import type { ClientMessage, ServerMessage } from "@fly/net";
@@ -12,10 +12,11 @@ import { APP_ROOMS, APP_SITE, inApp, invitedTo, inviteLink, roomsUrl } from "../
 import { PLACES } from "../src/places/catalog.ts";
 import { TOOLS } from "../src/tools/hands.ts";
 
-beforeEach((t) => {
-  t.mock.method(performance, "now", () => 1000);
-  t.mock.method(Math, "random", () => 0.5);
+beforeEach(() => {
+  mock.method(performance, "now", () => 1000);
+  mock.method(Math, "random", () => 0.5);
 });
+afterEach(() => mock.reset());
 
 class FakeSocket implements TableSocket {
   status: TableSocketStatus = "connecting";
