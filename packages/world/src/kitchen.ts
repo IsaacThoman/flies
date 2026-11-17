@@ -121,7 +121,9 @@ export const KITCHEN_SOLIDS: readonly Solid[] = [
     KITCHEN_BOARD.hz,
     KITCHEN_BOARD.top,
   ),
-  ...KITCHEN_PEACH_BANDS.map(({ bottom, radius }): Solid => ({
+  // Equal-height surfaces choose the first solid. The widest band owns the
+  // continuous cut face so its food remains tastable across the smaller bands.
+  ...KITCHEN_PEACH_BANDS.toReversed().map(({ bottom, radius }): Solid => ({
     name: "kitchen peach",
     footprint: {
       kind: "ellipse",

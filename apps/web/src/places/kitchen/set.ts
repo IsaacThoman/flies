@@ -446,7 +446,7 @@ export function buildSet(): SceneSet {
   const seenGroup = new THREE.Group(),
     seenBatch = new Batch();
   const seenM = new THREE.MeshBasicMaterial({ vertexColors: true });
-  const peachTop = KITCHEN_SOLIDS.findLast((s) => s.name === "kitchen peach");
+  const peachTop = KITCHEN_SOLIDS.find((s) => s.name === "kitchen peach");
   for (const s of KITCHEN_SOLIDS) {
     if (
       (s.name === "kitchen peach" && s !== peachTop) ||

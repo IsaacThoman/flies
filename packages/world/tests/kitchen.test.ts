@@ -43,6 +43,18 @@ test("the peach has a flat feeding face and real air beneath its curved edge", (
   assert.ok(world.underside(60, 158, 14) > 25);
 });
 
+test("peach juice tastes across its continuous cut face and at the fly's start", () => {
+  const world = new World(KITCHEN);
+  const pantry = new Pantry(world, KITCHEN_PATCHES);
+  const patch = KITCHEN_PATCHES.find((p) => p.name === "peach juice" && !p.pool)!;
+  for (let dx = -6; dx <= 6; dx++)
+    for (let dz = -6; dz <= 6; dz++) {
+      if (dx * dx + dz * dz > 36) continue;
+      assert.equal(pantry.touching(patch.x + dx, 40, patch.z + dz, 0)?.name, "peach juice");
+    }
+  assert.equal(pantry.touching(KITCHEN.start.x, 40, KITCHEN.start.z, 0)?.name, "peach juice");
+});
+
 test("the honey jar has a curved shoulder with real clearance beneath its lid", () => {
   const world = new World(KITCHEN);
   const y = world.heightAt(389, 110, 107);
