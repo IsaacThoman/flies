@@ -7,7 +7,7 @@ import { DINING_ROOM, RESTAURANT, TABLES, TABLE_TOPS, World, ZINC_BAR, createPic
 import { picnic } from "../src/places/picnic/index.ts";
 import { SCENES } from "../src/places/index.ts";
 import type { SceneCamera } from "../src/places/types.ts";
-import { CameraDirector, HAND_HOLD, NARROW_KEEP, NEAREST, SHOTS, fieldOfView } from "../src/camera.ts";
+import { CameraDirector, HAND_HOLD, NARROW_KEEP, NEAREST, SHOTS, WALLPAPER, fieldOfView } from "../src/camera.ts";
 import type { View } from "../src/camera.ts";
 
 const RENDER_WIDTH = 640;
@@ -285,6 +285,44 @@ test("the title's room for the fly comes from its layout: on a tall screen, betw
 });
 
 const middleOf = (body: FlyBody) => ({ x: body.position.x, y: body.position.y + 0.75, z: body.position.z });
+
+test("the title's menu fading into the wallpaper eases the fly from beside the menu to the middle, as play's wallpaper has it, and back when the menu returns", () => {
+  for (const style of ["follow", "calm"] as const) {
+    // As the game has it: the title is the wallpaper's camera, with the title's own shot.
+    const director = new CameraDirector(world, 16 / 9, picnic.camera);
+    director.wallpaperStyle = style;
+    director.startWallpaper();
+    director.title = true;
+    const body = fakeBody(-8, -8, 0.6);
+    settle(director, body, 10);
+    const across = () => project(director.camera, middleOf(body)).x;
+    assert.ok(Math.abs(across() - director.room.across) < 0.1, `${style}, the menu showing: ${across().toFixed(2)}`);
+
+    // The menu fades, and the wallpaper starts as it does in play.
+    director.startWallpaper();
+    director.title = false;
+    let worst = 0;
+    let last = across();
+    for (let t = 0; t < 8; t += 1 / 60) {
+      director.update(body, 1 / 60);
+      worst = Math.max(worst, Math.abs(across() - last));
+      last = across();
+    }
+    // Over seconds, as the menu fades: the aim's own quick spring alone would take it there in a few tenths of one.
+    assert.ok(worst < 0.006, `${style}: eased, not cut (${worst.toFixed(3)} of the half-width in a frame)`);
+    const played = new CameraDirector(world, 16 / 9, picnic.camera);
+    played.wallpaperStyle = style;
+    played.startWallpaper();
+    settle(played, body, 18);
+    const centred = Math.abs(project(played.camera, middleOf(body)).x) + 0.1;
+    assert.ok(Math.abs(across()) < centred, `${style}, the menu faded: ${across().toFixed(2)}, as play's wallpaper (${(centred - 0.1).toFixed(2)})`);
+    assert.ok(style === "follow" ? director.shot === played.shot : WALLPAPER.includes(director.shot), `${style}: one of play's wallpaper's shots`);
+
+    director.title = true;
+    settle(director, body, 10);
+    assert.ok(Math.abs(across() - director.room.across) < 0.1, `${style}, the menu back: ${across().toFixed(2)}`);
+  }
+});
 
 /** Runs the camera on, watching that it never jumps (mm in a frame at most) and keeps the fly in the picture. */
 function watch(director: CameraDirector, body: FlyBody, seconds: number) {
