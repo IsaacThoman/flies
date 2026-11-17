@@ -1,0 +1,58 @@
+name: Apple compile
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'apps/ios/**'
+      - 'apps/tvos/**'
+      - 'apps/web/**'
+      - 'apps/version.yml'
+      - 'packages/**'
+      - 'scripts/**'
+      - 'assets/**'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
+      - 'package*.json'
+      - '.github/actions/brain/**'
+      - '.github/workflows/apple-compile.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apple-compile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: ./.github/actions/brain
+      - run: brew install xcodegen
+      - name: Toolchain
+        id: xcode
+        run: echo "version=$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            apps/ios/build
+            apps/tvos/build
+            node_modules/.cache/fly-brain
+          key: apple-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode.outputs.version }}-${{ hashFiles('package-lock.json', 'apps/**/*.yml', 'scripts/**') }}-${{ github.sha }}
+          restore-keys: |
+            apple-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode.outputs.version }}-${{ hashFiles('package-lock.json', 'apps/**/*.yml', 'scripts/**') }}-
+      - name: Compile iPhone and iPad host
+        run: node scripts/ios.ts build --sim --no-sign
+      - name: Compile Apple TV host
+        run: node scripts/tvos.ts build --sim
+        env:
+          TVOS_WEATHERKIT: 1

@@ -39,7 +39,9 @@
     "soak:web": "node scripts/webSoak.ts",
     "e2e:soak": "node scripts/webSoak.ts --quick",
     "release": "semantic-release",
-    "e2e:accessibility": "node apps/web/e2e/accessibility.e2e.ts"
+    "e2e:accessibility": "node apps/web/e2e/accessibility.e2e.ts",
+    "notices": "node scripts/notices.ts",
+    "notices:check": "node scripts/notices.ts --check"
   },
   "dependencies": {
     "three": "^0.186.1"
