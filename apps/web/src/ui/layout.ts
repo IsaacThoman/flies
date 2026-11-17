@@ -71,6 +71,8 @@ const SHELF_APART_LEAST = 12;
 const SHELF_MOST = 8 * SHELF_GAP + SHELF_APART;
 /** Narrower than this a slot (design units, about 42 CSS pixels on a phone), a finger can't tell the tools apart: the halves go one over the other, the fly's over its world's. */
 const STACK_UNDER = 34;
+/** Where the fly's row starts at the least, beside the menu's button, when the halves are one over the other (design units from the safe area's left). */
+const MENU_CLEAR = 60;
 /** Rows of the shelf, middle to middle, when its halves are one over the other: its glass and a little between. */
 const SHELF_ROW = 58;
 /**
@@ -100,7 +102,8 @@ export function hudLayout(frame: Frame, reserveHints = true, shelf: readonly Pic
   const stacked = halves && !compact && gap < STACK_UNDER;
   if (stacked) {
     apart = 0;
-    gap = Math.min(SHELF_GAP, (a.w - 16) / Math.max(split, tools - split));
+    // As wide as the wider row allows, and the fly's row, beside the menu's button, no wider than the room right of it.
+    gap = Math.min(SHELF_GAP, (a.w - 16) / Math.max(split, tools - split), (a.w - 8 - MENU_CLEAR) / split);
   }
   const shelfY = bottom - 34;
   const topRow = stacked ? shelfY - SHELF_ROW : shelfY;
@@ -119,7 +122,7 @@ export function hudLayout(frame: Frame, reserveHints = true, shelf: readonly Pic
   };
   if (stacked) {
     // The menu's button is beside the fly's row, in reach of a thumb: the row keeps clear of it.
-    group(0, split, Math.min(a.x + a.w - 8 - split * gap, Math.max(cx - (split * gap) / 2, a.x + 60)), topRow);
+    group(0, split, Math.min(a.x + a.w - 8 - split * gap, Math.max(cx - (split * gap) / 2, a.x + MENU_CLEAR)), topRow);
     group(split, tools, cx - ((tools - split) * gap) / 2, shelfY);
   } else if (apart > 0) {
     group(0, split, shelfLeft, shelfY);

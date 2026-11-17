@@ -68,6 +68,19 @@ test("a held tool (the feather, the air) is carried by a drag over the table, an
   assert.equal(controls.turning, false);
 });
 
+test("a placed tool (the fingertip) goes where a press goes and is carried by a drag; a tap puts it down or lifts it, a drag doesn't", () => {
+  const { asked, send } = rig("place");
+  send(true, down(0.5, 0.6), up(0.5, 0.6));
+  assert.deepEqual(asked, ["aim", "use"]);
+  asked.length = 0;
+  send(false, down(0.5, 0.6, 0, true), drag(0.6, 0.6), drag(0.7, 0.65), up(0.7, 0.65, false));
+  assert.deepEqual(asked, ["aim", "aim", "aim", "unaim"], "a finger's drag carries it, and lifting the finger leaves it there");
+  asked.length = 0;
+  // From the air, a drag still turns the camera.
+  send(true, down(0.5, 0.2), drag(0.6, 0.2), up(0.6, 0.2, false));
+  assert.deepEqual(asked.slice(0, 3), ["aim", "unaim", "hold"]);
+});
+
 test("the right and middle buttons turn the camera wherever they go down, even over the table, and use nothing", () => {
   for (const button of [1, 2]) {
     const { asked, send, controls } = rig("once");

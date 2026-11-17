@@ -35,6 +35,7 @@ import { isPlaceId } from "../places/catalog.ts";
 import type { Felt, SharedTable } from "../places/types.ts";
 import type { Bubbles } from "../scene/bubbles.ts";
 import type { Stage } from "../stage.ts";
+import { toolToWire } from "../tools/hands.ts";
 import type { Hands } from "../tools/hands.ts";
 import { TableLine } from "./connection.ts";
 import { OtherHand } from "./other-hands.ts";
@@ -673,7 +674,7 @@ export class Online {
         h.eyeX = player.eye.x;
         h.eyeY = player.eye.y;
         h.eyeZ = player.eye.z;
-        h.tool = hands.tool;
+        h.tool = toolToWire(hands.tool);
         h.variant = hands.variants[hands.tool];
       }
       if (++n >= MAX_OWN) break;

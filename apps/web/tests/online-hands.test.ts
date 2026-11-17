@@ -9,7 +9,7 @@ import { Life } from "../src/life.ts";
 import { Online } from "../src/online/online.ts";
 import { OtherFlies } from "../src/online/others.ts";
 import type { TableHost } from "../src/online/online.ts";
-import { Hands, TOOLS } from "../src/tools/hands.ts";
+import { Hands, TOOLS, toolToWire } from "../src/tools/hands.ts";
 
 const gradient = { addColorStop() {} };
 const context = new Proxy({}, { get: () => () => gradient });
@@ -35,7 +35,7 @@ for (const tool of ["feather", "blow"]) for (const stop of ["away", "flag", "sil
     state.id = 2;
     state.t = now;
     state.flags = HANDS | HOLDING;
-    state.hand.tool = TOOLS.findIndex((toolSpec) => toolSpec.id === tool);
+    state.hand.tool = toolToWire(TOOLS.findIndex((toolSpec) => toolSpec.id === tool));
     state.hand.eyeZ = -10;
     const batch = new DataView(new ArrayBuffer(100));
     const hear = () => { const n = encodeFlies(batch, TABLETOP_SCALE, [state]); online.line.onFlies(new DataView(batch.buffer, 0, n)); };

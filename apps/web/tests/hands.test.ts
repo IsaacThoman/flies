@@ -3,7 +3,9 @@ import { test } from "node:test";
 import { Pantry, World } from "@fly/world";
 import type { Place } from "@fly/world";
 import { DINER } from "../../../packages/world/tests/diner.ts";
-import { FEATHER_REACH, FEATHER_REST, PUFF_RADIUS, PUFF_SPEED, Hands, TOOLS } from "../src/tools/hands.ts";
+import { FLY_LENGTH, MOUTH_AHEAD } from "@fly/body";
+import { FEATHER_REACH, FEATHER_REST, POINTER_RETURN, PUFF_RADIUS, PUFF_SPEED, Hands, TOOLS, toolFromWire, toolToWire } from "../src/tools/hands.ts";
+import { FINGER_HALF_WIDTH } from "../src/tools/finger.ts";
 
 const bare: Place = { floor: { kind: "rect", hx: 500, hz: 500 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 300 };
 
@@ -196,4 +198,29 @@ test("Feed's Clear dropped kind removes offerings and falling food, leaving patc
   assert.equal(hands.events.landed, null);
   hands.update(0, { use: true, holding: true, eye }, fly, pantry);
   assert.deepEqual(pantry.foods, [patch, found], "clearing an empty table is harmless");
+});
+
+test("a tool travels to a table by a code of its own, not its place on the shelf: the shelf's order can change, and a code this shelf hasn't is no tool", () => {
+  const codes = TOOLS.map((_, i) => toolToWire(i));
+  assert.equal(new Set(codes).size, TOOLS.length, "each its own");
+  for (let i = 0; i < TOOLS.length; i++) assert.equal(toolFromWire(codes[i]), i);
+  // The codes released builds send keep their meaning (the Sky taking Light's and Weather's): an older device reads them as it always has.
+  for (const [code, id] of ["feed", "swoop", "feather", "blow", "sky", "sky", "view", "place", "finger", "build", "photo"].entries()) assert.equal(TOOLS[toolFromWire(code)].id, id);
+  assert.equal(toolFromWire(200), -1);
+});
+
+test("taken up while the hand waits by the fly, the fingertip comes to a spot just ahead of it and stays there, never drifting back", () => {
+  const world = new World({ floor: { kind: "rect", hx: 500, hz: 500 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 300 });
+  const hands = new Hands(world);
+  const pantry = new Pantry(world);
+  const fly = { position: { x: 0, y: 0, z: 0 }, yaw: 0, onFeet: true };
+  const eye = { x: 0, y: 5, z: -10 };
+  hands.tool = TOOLS.findIndex((t) => t.id === "finger");
+  hands.update(1 / 60, { use: false, holding: false, eye }, fly, pantry);
+  assert.equal(hands.following, false);
+  assert.ok(hands.pointer.z > MOUTH_AHEAD * FLY_LENGTH + FINGER_HALF_WIDTH, `at ${hands.pointer.z}`);
+  const at = hands.pointer.z;
+  fly.position.z = 30;
+  for (let t = 0; t < POINTER_RETURN + 1; t += 0.5) hands.update(0.5, { use: false, holding: false, eye }, fly, pantry);
+  assert.equal(hands.pointer.z, at);
 });

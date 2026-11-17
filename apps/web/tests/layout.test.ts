@@ -71,10 +71,10 @@ test("the TV keeps its HUD and title layout, with Settings below a separate head
   assert.equal(hud.cx, 427);
   assert.equal(hud.captionY, 25);
   assert.equal(hud.shelfY, 446);
-  // Nine tools come closer than eight did, keeping the shelf as wide as it was, clear of the bottom corners.
-  assert.equal(hud.gap, 46);
-  assert.deepEqual([hud.shelfLeft, hud.split, hud.apart], [204, TOOLS.findIndex((t) => t.world), 32]);
-  assert.equal(hud.orb, 1);
+  // Ten tools come closer than eight did, keeping the shelf as wide as it was, clear of the bottom corners; the one in hand's orb a little smaller to fit.
+  assert.equal(hud.gap, 41);
+  assert.deepEqual([hud.shelfLeft, hud.split, hud.apart], [206, TOOLS.findIndex((t) => t.world), 32]);
+  assert.ok(Math.abs(hud.orb - 19.5 / 22) < 1e-9, String(hud.orb));
   assert.equal(hud.labelY, 385);
   assert.deepEqual([hud.hintsX, hud.hintsY, hud.rightX, hud.rightY, hud.menuX, hud.menuY], [16, 446, 838, 446, 16, 24]);
   const p = hud.picture;
@@ -145,7 +145,7 @@ test("a shelf of ten tools in its two groups fits every shape: one row where a f
   const phone = frames().find(([name]) => name === "a phone upright")![1];
   const stacked = hudLayout(phone, true, ten);
   assert.ok(stacked.toolY[0] < stacked.toolY[9], "the fly's tools over its world's");
-  // Today's shelf of eight: one row on the TV and wherever each tool takes a finger in one, else the fly's tools over its world's.
+  // Today's shelf of ten: one row on the TV and wherever each tool takes a finger in one, else the fly's tools over its world's.
   assert.equal(new Set(hudLayout(TV_FRAME).toolY).size, 1);
   for (const [name, frame] of frames()) {
     const hud = hudLayout(frame);

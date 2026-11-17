@@ -44,6 +44,8 @@ export class Builder {
   active = true;
   /** Counts each change to what is in the world, for the view to build it again. */
   version = 0;
+  /** What else in the world a piece must keep out of, besides the place, the other pieces, the flies and their food: the player's fingertip (tools/finger.ts). */
+  keepOut: (piece: Piece) => boolean = () => false;
   /** The way new pieces are set down, in eighths of a turn: the way the last was turned. */
   turns = 0;
   readonly aim: Aim = { piece: { kind: "tile-blue", x: 0, z: 0, turns: 0, y: 0 }, showing: "none", ok: false, target: -1 };
@@ -124,7 +126,7 @@ export class Builder {
     copy(aim.piece, this.#found);
     aim.showing = "piece";
     // Flies and food move: whether it covers them now is asked every time.
-    aim.ok = this.#foundOk && this.pieces.length < MAX_PIECES && !covers(aim.piece, flies, this.#place.start, foods);
+    aim.ok = this.#foundOk && this.pieces.length < MAX_PIECES && !covers(aim.piece, flies, this.#place.start, foods) && !this.keepOut(aim.piece);
     return aim;
   }
 
@@ -149,7 +151,7 @@ export class Builder {
     found.z = snap(z);
     const rest = restingHeight(this.base, found.x, found.z, y + 0.3);
     found.y = rest ?? y;
-    return rest !== null && fits(this.base, this.pieces, found) && !covers(found, flies, this.#place.start, foods);
+    return rest !== null && fits(this.base, this.pieces, found) && !covers(found, flies, this.#place.start, foods) && !this.keepOut(found);
   }
 
   /** Does what `point` last found: sets the piece down, turns it, takes it away, or clears them all. Whether it did. */
@@ -165,7 +167,7 @@ export class Builder {
       let found = false;
       for (let k = 1; k < 8 && !found; k++) {
         turned.turns = (piece.turns + k) % 8;
-        found = fits(this.base, this.pieces, turned, aim.target) && !covers(turned, flies, this.#place.start, foods);
+        found = fits(this.base, this.pieces, turned, aim.target) && !covers(turned, flies, this.#place.start, foods) && !this.keepOut(turned);
       }
       if (!found) return false;
       this.pieces[aim.target] = turned;
