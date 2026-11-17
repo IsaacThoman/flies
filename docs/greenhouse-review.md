@@ -313,3 +313,9 @@ After refreshing dev's added dependencies:
 - The newly landed first-minute e2e fails at line 70: loading opens a room socket before the real brain arrives. The identical assertion fails on an untouched archived dev snapshot `76787e51` with its own dependencies and no greenhouse code. It occurs before greenhouse selection. This baseline startup failure is reported, not changed or counted as a passing check.
 
 All local browsers and servers were closed, the cancelled farm job was stopped, and the isolated baseline directory was removed. No GitHub CI wait or merge was performed. The PR remains ready for the maintainer; subsequent place polish belongs in a separate branch/PR after landing.
+
+### Subsequent dev merge
+
+Merge `8c468edf` brings in dev `f8675fd5` (performance, puff response, farm tooling and documentation). Its only conflict was the fuzzer place list: dev's packed-connectome wording and all other edits are retained, with `greenhouse` included. The greenhouse scene/world files still match `5b56304b` exactly.
+
+On this merged source, typecheck, lint, all 52 place/geometry tests and another 1,800-second body fuzz run pass. First-minute e2e still reports the same loading/socket assertion reproduced on the untouched `76787e51` baseline. The four other browser suites passed on the preceding `1d75e0f4` integration. The known startup assertion is not claimed as passing and does not change the greenhouse's requested landing checks.
