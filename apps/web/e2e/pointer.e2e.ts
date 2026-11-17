@@ -330,7 +330,9 @@ async function mouse() {
     const p0 = await canvasPoint(page, [0.5, 0.5]);
     await page.mouse.click(p0.x, p0.y, { button: "right" });
     await waitFor(page, "screen=title,focus=settings");
-    await click("row", 0);
+    // A click on the world behind the title plays.
+    const world = await canvasPoint(page, [0.2, 0.8]);
+    await page.mouse.click(world.x, world.y);
     await waitFor(page, "screen=play");
 
     step("mouse: the hand is under the cursor, and the system's cursor is hidden over the table");

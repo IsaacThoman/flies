@@ -13,13 +13,11 @@
 import { COLOURS } from "@fly/net";
 import { Menu, choiceValue, indexOf } from "@fly/ui";
 import type { ChoiceItem, MenuItem, Option } from "@fly/ui";
-import { INK_SOFT, font, glassPanel, orb, text } from "@fly/ui";
 import type { PixelSize } from "../../display.ts";
 import { PLACES } from "../../places/catalog.ts";
 import { WALLPAPER_DELAYS } from "../../settings.ts";
 import type { EyesDetail, OverlayOpacity, OverlaySize, Settings, ShowWhen, StatsKind } from "../../settings.ts";
 import { fitMenu, menuSpace, titleLayout } from "../layout.ts";
-import { arriving } from "../loading.ts";
 import { drawWordmark } from "../wordmark.ts";
 import { MenuScreen } from "./menu-screen.ts";
 import type { SettingsPage, Shell } from "./types.ts";
@@ -45,20 +43,12 @@ export function titleScreen(shell: Shell) {
       else if (item.id === "watch") shell.watch();
       else shell.open(item.id as "about" | "settings" | "online");
     },
+    // The world behind the menu is the game: tapping it plays.
+    onOutside: () => shell.play(),
     onBack: () => shell.back(),
     backdrop(g) {
-      const { wordmark, status } = title;
+      const { wordmark } = title;
       drawWordmark(g, wordmark.x, wordmark.y, wordmark.size);
-      // How the brain is doing, quietly, under the name.
-      const brain = shell.brain;
-      const awake = brain.status === "running";
-      const label = awake ? `Brain awake · ${brain.neurons.toLocaleString("en-US")} neurons` : brain.status === "failed" ? "Its brain couldn't wake" : arriving(brain) && brain.phase === "download" ? `Brain · ${(brain.source.received / 1e6).toFixed(1)} / ${(brain.source.total / 1e6).toFixed(1)} MB` : "Its brain is waking…";
-      glassPanel(g, status.x, status.y, status.w, status.h, 17, { alpha: 0.85, shadow: false });
-      orb(g, status.x + 20, status.y + 17, 8, awake ? "green" : brain.status === "failed" ? "pink" : "orange");
-      // Smaller, if it must be, to stay in its pane.
-      g.font = font(status.size);
-      const size = Math.min(status.size, Math.floor((status.size * (status.w - 48)) / g.measureText(label).width));
-      text(g, label, status.x + 36, status.y + 18, { size, color: INK_SOFT, baseline: "middle" });
     },
   });
 }

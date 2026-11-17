@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HitMap } from "@fly/ui";
+import type { Hit } from "@fly/ui";
 import { COLOURS } from "@fly/net";
 import { TV_FRAME, frameFor } from "../src/display.ts";
 import type { Frame } from "../src/display.ts";
@@ -16,6 +17,7 @@ import NOTICES from "../src/ui/notices.json" with { type: "json" };
 import { AboutScreen } from "../src/ui/screens/about.ts";
 import { settingsScreen, titleScreen } from "../src/ui/screens/menus.ts";
 import { OnlineScreen } from "../src/ui/screens/online.ts";
+import { SCREEN_HITS } from "../src/ui/screens/types.ts";
 import type { Shell } from "../src/ui/screens/types.ts";
 import { createPicnic } from "@fly/world";
 import { blankCanvas, writtenOn } from "./canvas.ts";
@@ -79,7 +81,6 @@ test("the TV keeps its HUD and title layout, with Settings below a separate head
   assert.deepEqual(title.menu.panel, { x: 494, y: 112, w: 320, h: 300 });
   assert.deepEqual(title.menu.list, { x: 522, y: 138, width: 264, row: 40, gap: 12, compact: false, columns: 1 });
   assert.ok(near(title.wordmark.x, 250) && title.wordmark.y === 100 && title.wordmark.size === 60);
-  assert.ok(near(title.status.x, 72) && title.status.y === 128 && title.status.w === 356 && title.status.size === 15);
   assert.ok(near(title.fly.across, -0.56) && title.fly.low === 0.1);
 
   // The Apple TV has no way to a table yet.
@@ -190,9 +191,6 @@ test("every menu fits inside the safe area at every shape, its rows big enough f
       const w = writtenOn(drawn).find((t) => t.text === item.label)!;
       assert.ok(w.width <= rows[0].w - 16, `${name}: "${item.label}" ${w.width.toFixed(0)} wide on a button ${rows[0].w.toFixed(0)} wide`);
     }
-    // The brain's state, under the name, clear of the menu.
-    const t = titleLayout(frame, title.menu.items.length);
-    assert.ok(!overlaps(t.status, t.menu.panel) && inside(t.status, a), `${name}: the brain's state`);
   }
 });
 
@@ -224,19 +222,17 @@ test("the settings' tabs can be read at every shape: every one, or, where they a
   assert.ok(writtenOn(g).filter((w) => labels.includes(w.text)).every((w) => w.size === 18), "on the TV");
 });
 
-test("the title leaves room for the fly, clear of the name, the brain's state and the menu", () => {
+test("the title leaves room for the fly, clear of the menu", () => {
   for (const [name, frame] of frames()) {
     const t = titleLayout(frame, 5);
     const a = safeRect(frame);
     const { width, height } = frame.design;
     assert.ok(inside(t.menu.panel, a), `${name}: menu`);
-    assert.ok(inside(t.status, a), `${name}: status`);
-    assert.ok(!overlaps(t.status, t.menu.panel), `${name}: the brain's state and the menu`);
     // Where the fly is, in design units.
     const fx = (t.fly.across + 1) * (width / 2);
     const fy = (t.fly.low + 1) * (height / 2);
     const fly = { x: fx - 20, y: fy - 12, w: 40, h: 24 };
-    assert.ok(!overlaps(fly, t.menu.panel) && !overlaps(fly, t.status), `${name}: the fly at ${fx.toFixed(0)}, ${fy.toFixed(0)} is in the clear`);
+    assert.ok(!overlaps(fly, t.menu.panel), `${name}: the fly at ${fx.toFixed(0)}, ${fy.toFixed(0)} is in the clear`);
   }
 });
 
@@ -593,6 +589,29 @@ test("the TV remote reaches Play, Settings and Online from the title", () => {
   assert.equal(title.menu.focused?.id, "online");
   title.press("select", false);
   assert.deepEqual(actions, ["play", "settings", "online"]);
+});
+
+test("a tap on the world behind the title plays, and one that strays onto a button presses nothing", () => {
+  const s = shell(TV_FRAME);
+  let played = 0;
+  s.play = () => played++;
+  let backs = 0;
+  s.back = () => backs++;
+  const title = titleScreen(s);
+  title.enter();
+  const tap = (hit: Hit | null, tapped = true) => {
+    title.point({ type: "down", x: 100, y: 300, dx: 0, dy: 0, tap: false, hit });
+    title.point({ type: "up", x: 100, y: 300, dx: 0, dy: 0, tap: tapped, hit });
+  };
+  tap(null);
+  assert.equal(played, 1);
+  // A drag across the world is no tap.
+  tap(null, false);
+  assert.equal(played, 1);
+  // On the pane, between the buttons, is not the world.
+  tap({ kind: SCREEN_HITS.panel, index: 0, value: 0, x: 0, y: 0, w: 1, h: 1 } as Hit);
+  assert.equal(played, 1);
+  assert.equal(backs, 0);
 });
 
 test("a pending tool is shown as an icon clear of the shelf without changing its committed tool or hit targets", () => {

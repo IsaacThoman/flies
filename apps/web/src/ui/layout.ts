@@ -256,14 +256,12 @@ const wordmarkFor = (width: number, most: number) => Math.max(24, Math.min(most,
 export type TitleLayout = {
   menu: MenuPanel;
   wordmark: { x: number; y: number; size: number };
-  /** How the brain is doing, under the name: its pane and its text's size. */
-  status: Rect & { size: number };
   /** Where the camera puts the fly, clear of all of it. */
   fly: { across: number; low: number };
 };
 
 /**
- * The title: on a wide screen the name and the brain's state on the left, the
+ * The title: on a wide screen the name on the left, the
  * menu on the right and the fly small under the name; on a tall one the name
  * at the top, the menu at the bottom, the fly between.
  */
@@ -285,20 +283,17 @@ export function titleLayout(frame: Frame, items: number): TitleLayout {
     const size = wordmarkFor(left, 60);
     const x = a.x + left * (250 / 494);
     const y = Math.max(a.y + size * 0.9, menu.panel.y - 12);
-    const w = Math.min(356, left - 24);
-    // Under the name, and clear of the menu where the name is pushed against it.
-    const status = { x: Math.max(a.x + 12, Math.min(x - w / 2, menuX - 12 - w)), y: y + 28, w, h: 34, size: w < 300 ? 13 : 15 };
-    return { menu, wordmark: { x, y, size }, status, fly: { across: spot(frame, a.x + left * (187.88 / 494), 0).across, low: 0.1 } };
+    return { menu, wordmark: { x, y, size }, fly: { across: spot(frame, a.x + left * (187.88 / 494), 0).across, low: 0.1 } };
   }
   const size = wordmarkFor(a.w, 60);
   const cx = a.x + a.w / 2;
   const y = a.y + 22 + size * 0.85;
-  const w = Math.min(356, a.w - 24);
-  const status = { x: cx - w / 2, y: y + 22, w, h: 34, size: w < 300 ? 13 : 15 };
-  const fitted = fitMenu({ x: a.x, y: status.y + status.h, w: a.w, h: a.y + a.h - HINTS_ROOM - status.y - status.h }, { ...spec, raise: 0 });
+  // Under the name's descenders.
+  const top = y + 22;
+  const fitted = fitMenu({ x: a.x, y: top, w: a.w, h: a.y + a.h - HINTS_ROOM - top }, { ...spec, raise: 0 });
   const menu = shiftMenu(fitted, a.y + a.h - HINTS_ROOM - 12 - fitted.panel.h - fitted.panel.y);
-  const middle = (status.y + status.h + menu.panel.y) / 2;
-  return { menu, wordmark: { x: cx, y, size }, status, fly: spot(frame, cx, middle) };
+  const middle = (top + menu.panel.y) / 2;
+  return { menu, wordmark: { x: cx, y, size }, fly: spot(frame, cx, middle) };
 }
 
 export type RoomLayout = {
