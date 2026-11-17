@@ -49,7 +49,8 @@ export type Synthetic = { bytes: Uint8Array; index: Record<string, number[]>; ne
  * head and body bristles -> a dopaminergic neuron of the dorsal fan-shaped
  * body -> its sleep-promoting neurons, which the R5 ring neurons drive too;
  * each eye's LC10a -> that side's
- * DNa02 and DNg100. Each eye also has four columns of L1, L2 and L3 (see
+ * DNa02 and DNg100; a left mushroom body whose Kenyon cells the left
+ * looming detectors fire and whose PPL1-γ1pedc touch fires. Each eye also has four columns of L1, L2 and L3 (see
  * syntheticEyeColumns), whose L2s drive that eye's LPLC2. Leave groups out
  * with `without`, or change their annotations with `change`, to get broken
  * ones.
@@ -98,6 +99,16 @@ export function syntheticConnectome({ without = [], change = {} }: { without?: r
   add("dFB", 2, { type: "FB6A_a", superClass: "cb_intrinsic", side: "left", nt: "GLUT" });
   add("R5", 2, { type: "ER5", superClass: "cb_intrinsic", side: "left", nt: "GABA" });
   add("OA", 1, { type: "OA-VUMa1", superClass: "cb_intrinsic", side: "center" });
+  // A mushroom body, the left one: Kenyon cells of the γ and α/β lobes
+  // (predicted dopaminergic, as the real ones are), MBONs of γ1pedc, γ4 and β1,
+  // PPL1-γ1pedc and the γ4 reward DANs.
+  add("KCg", 6, { type: "KCg-m", superClass: "cb_intrinsic", class: "Kenyon_Cell", side: "left", nt: "DA" });
+  add("KCab", 4, { type: "KCab-s", superClass: "cb_intrinsic", class: "Kenyon_Cell", side: "left", nt: "DA" });
+  add("MBON11", 1, { type: "MBON11", superClass: "cb_intrinsic", class: "MBON", side: "left", nt: "GABA" });
+  add("MBON05", 1, { type: "MBON05", superClass: "cb_intrinsic", class: "MBON", side: "left", nt: "GLUT" });
+  add("MBON06", 1, { type: "MBON06", superClass: "cb_intrinsic", class: "MBON", side: "left", nt: "GLUT" });
+  add("PPL101", 1, { type: "PPL101", superClass: "cb_intrinsic", class: "DAN", side: "left", nt: "DA" });
+  add("PAM08", 2, { type: "PAM08", superClass: "cb_intrinsic", class: "DAN", side: "left", nt: "DA" });
   // The front legs' male-taste neurons are picked by root ID (io.ts), so these
   // carry real ones, last because root IDs ascend; a mid leg's LgLG1a, by an ID
   // that isn't the front legs', must be left out.
@@ -126,6 +137,19 @@ export function syntheticConnectome({ without = [], change = {} }: { without?: r
   wire("wing campaniform", "DLM", 40);
   wire("bristle", "MDN", 20);
   wire("LgLG1a", "pIP10", 120);
+  // Looming on the left fires the KCs and touch PPL1-γ1pedc, so the senses
+  // pair them either way round; MBON-γ1pedc inhibits the left DNa02.
+  wire("LC4 left", "KCg", 30);
+  wire("LC4 left", "KCab", 30);
+  wire("KCg", "MBON11", 20);
+  wire("KCg", "MBON05", 20);
+  wire("KCab", "MBON11", 20);
+  wire("KCab", "MBON06", 20);
+  wire("BM left", "PPL101", 60);
+  wire("PPL101", "KCg", 10);
+  wire("PPL101", "MBON11", 10);
+  wire("PAM08", "KCg", 10);
+  wire("MBON11", "DNa02 left", 30);
   wire("LgAG1", "pIP10", 120);
   wire("bristle", "dFB dopamine", 40);
   wire("dFB dopamine", "dFB", 30);

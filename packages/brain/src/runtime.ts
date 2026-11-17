@@ -6,9 +6,11 @@ import type { EyeColumn } from "./eye-columns.ts";
 import { buildEyes } from "./eyes.ts";
 import type { Eyes } from "./eyes.ts";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
-import { SLEEP_EYES, backgroundRates, decode, hungerOf, regionRate, senseRates, smooth, stateOf, thirstOf, waterOutputGain, wire } from "./io.ts";
+import { SLEEP_EYES, backgroundRates, decode, hungerOf, intensity, regionRate, senseRates, smooth, stateOf, thirstOf, waterOutputGain, wire } from "./io.ts";
 import type { Wiring } from "./io.ts";
 import { Modulation } from "./modulation.ts";
+import { LEARNING, EMPTY_LAYOUT_HASH, MushroomBody, emptyMemory, readMemory } from "./learning.ts";
+import type { LearningParameters } from "./learning.ts";
 import { OPERATING_POINT, buildWeights } from "./params.ts";
 import type { OperatingPoint } from "./params.ts";
 import { REGIONS, REGION_RATE_NAMES, REGION_TAU, regionOf } from "./regions.ts";
@@ -30,6 +32,8 @@ export type BrainOptions = {
   operatingPoint?: OperatingPoint;
   internalState?: InternalStateParameters;
   retina?: RetinaParameters;
+  /** The mushroom body's learning (learning.ts), or false for a brain that doesn't learn. */
+  learning?: LearningParameters | false;
   /** Turn the internal state's background drive off (it is on by default). */
   spontaneous?: boolean;
   /** The eyes' columns (eye-columns.ts by default), for tests on a synthetic connectome. */
@@ -57,6 +61,8 @@ export class FlyBrain implements Brain {
   /** Slow neuromodulation (modulation.ts): every modulatory neuron's level, and what its receptors do. */
   readonly modulation: Modulation;
   readonly spontaneous: boolean;
+  /** What the mushroom body has learned, and how it learns; null when it doesn't, or the connectome has no KC -> MBON synapse that can. */
+  readonly learning: MushroomBody | null;
   /** Each neuron's region, an index into REGIONS. */
   readonly regions: Uint8Array;
   /** Smoothed mean rate of each readout group, Hz. */
@@ -158,9 +164,27 @@ export class FlyBrain implements Brain {
     if (this.vision) for (const side of ["left", "right"] as const) this.sim.addRatedInput(`eye ${side} withdrawn`, this.vision.retina[side].l1, { withdraw: true });
     // The thermoreceptors after even those: with no temperature felt, every stream is as it was before them.
     for (const { spec, neurons } of this.wiring.thermo) this.sim.addInput(spec.name, neurons);
+    // The reinforcement stand-ins after even those (io.ts, REINFORCEMENT).
+    for (const { spec, neurons } of this.wiring.reinforcement) this.sim.addInput(spec.name, neurons);
+    const learning = options.learning === false ? null : new MushroomBody(connectome, options.learning ?? LEARNING);
+    this.learning = learning && learning.edges.length > 0 ? learning : null;
+    if (this.learning) {
+      this.sim.setPlasticEdges(this.learning.edges);
+      this.sim.setSpikeLog(this.learning.watched);
+    }
     // A separate stream from the Poisson inputs', which inputSeed derives from the same seed.
     this.state = new InternalState((seed ^ 0x5bd1e995) >>> 0, options.internalState ?? INTERNAL_STATE);
     this.spontaneous = options.spontaneous ?? true;
+  }
+
+  memory(): Uint8Array {
+    return this.learning ? this.learning.memory() : emptyMemory();
+  }
+
+  remember(memory: Uint8Array): void {
+    if (!(memory instanceof Uint8Array)) throw new Error("This isn't a fly's memory");
+    if (this.learning) this.learning.remember(memory, this.sim);
+    else readMemory(memory, EMPTY_LAYOUT_HASH, 0);
   }
 
   tick(dtMs: number, senses: BrainSenses): BrainState {
@@ -177,6 +201,7 @@ export class FlyBrain implements Brain {
     }
     for (const [name, rate] of senseRates(this.wiring, senses)) this.sim.setRate(name, rate);
     for (const regional of this.#regional) this.#touch(regional, senses);
+    for (const { spec, maxRate } of this.wiring.reinforcement) this.sim.setRate(spec.name, maxRate * intensity(senses, spec.sense));
     const hunger = hungerOf(senses);
     this.modulation.setState(senses, hunger, stateOf);
     this.modulation.update(0);
@@ -228,6 +253,7 @@ export class FlyBrain implements Brain {
       this.sim.drainTally(this.modulation.counts);
       this.modulation.update(ran);
       this.#modulate();
+      this.learning?.learn(this.sim, this.sim.time);
       this.sim.drainReadouts(this.#counts);
       for (const { spec, neurons } of this.wiring.readouts) {
         const hz = (this.#counts[spec.name] / neurons.length / ran) * 1000;

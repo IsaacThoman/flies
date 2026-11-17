@@ -642,6 +642,55 @@ test("the tally counts each listed neuron's spikes, as the recording does", () =
   assert.deepEqual([...tally], [0, 0], "and so does a reset");
 });
 
+test("a plastic edge's weight is its weight at 1 times its factor, edge by edge, and its neuron's other edges are untouched", () => {
+  // 0 -> 1 with 3 synapses, 0 -> 2 with 4, at 0.5 mV a synapse.
+  const net: Network = { ptr: Uint32Array.from([0, 2, 2, 2]), post: Uint32Array.from([1, 2]), count: Uint16Array.from([3, 4]) };
+  const sim = new Simulation(net, { gain: Float32Array.from([0.5, 0, 0]) });
+  sim.setPlasticEdges([0]);
+  assert.equal(sim.weightOf(0), 1.5);
+  sim.setPlasticFactor(0, 0.25);
+  assert.equal(sim.weightOf(0), 0.375);
+  assert.equal(sim.weightOf(1), 2);
+  // Even at 0 the neuron still delivers (its other edge, and nothing through this one).
+  sim.setPlasticFactor(0, 0);
+  sim.addInput("kick", [0], 1e6);
+  sim.step();
+  sim.setRate("kick", 0);
+  sim.advance(3);
+  assert.equal(sim.drive(1), 0);
+  assert.ok(sim.drive(2) > 0);
+  // Weights set again afterwards keep the factor.
+  sim.setPlasticFactor(0, 0.5);
+  sim.setWeights(Float32Array.from([1, 0, 0]));
+  assert.equal(sim.weightOf(0), 1.5);
+  for (const bad of [-0.1, Number.NaN, Number.POSITIVE_INFINITY]) assert.throws(() => sim.setPlasticFactor(0, bad), /0 or more/);
+  assert.throws(() => sim.setPlasticEdges([2]), /No edge/);
+  assert.throws(() => sim.setPlasticEdges([0, 0]), /twice/);
+  // An edge can't be both plastic and in an output gain, whichever came first.
+  assert.throws(() => sim.addOutputGain("all of 0", [0]), /plastic/);
+  const gained = new Simulation(net, { gain: Float32Array.from([0.5, 0, 0]) });
+  gained.addOutputGain("all of 0", [0]);
+  assert.throws(() => gained.setPlasticEdges([1]), /output gain/);
+});
+
+test("the spike log keeps its neurons' spikes with their steps, in the order fired, until drained", () => {
+  const net: Network = { ptr: new Uint32Array(5), post: new Uint32Array(0), count: new Uint16Array(0) };
+  const sim = new Simulation(net, { gain: new Float32Array(4), dt: 1, refractory: 1 });
+  sim.addInput("all", [0, 1, 2, 3], 1e6);
+  sim.setSpikeLog([3, 1]);
+  sim.advance(3);
+  const log = sim.drainSpikeLog();
+  assert.deepEqual([...log.neurons.subarray(0, log.count)], [1, 3, 1, 3, 1, 3]);
+  assert.deepEqual([...log.steps.subarray(0, log.count)], [0, 0, 1, 1, 2, 2]);
+  assert.equal(sim.drainSpikeLog().count, 0);
+  // It grows as it needs to, and null stops it.
+  sim.advance(600);
+  assert.equal(sim.drainSpikeLog().count, 1200);
+  sim.setSpikeLog(null);
+  sim.advance(4);
+  assert.equal(sim.drainSpikeLog().count, 0);
+});
+
 test("resetDrive clears the drive at each spike, so one strong input fires a neuron once", () => {
   // 0 -> 1 with 100 synapses of 1 mV: one spike gives neuron 1 a drive of 100 mV.
   const net: Network = { ptr: Uint32Array.from([0, 1, 1]), post: Uint32Array.from([1]), count: Uint16Array.from([100]) };

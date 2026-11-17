@@ -18,6 +18,7 @@
 #include "eyes.hpp"
 #include "io.hpp"
 #include "modulation.hpp"
+#include "learning.hpp"
 #include "sim.hpp"
 #include "state.hpp"
 #include "thermo.hpp"
@@ -87,6 +88,11 @@ class Brain {
   /** What that antenna's thermoreceptors have adapted to, °C; NaN while it feels no temperature. */
   double adapted(io::Side side) const { return thermoreceptors_.adapted(side); }
   const Modulation& modulation() const { return modulation_; }
+  /** What the mushroom body has learned (runtime.ts's learning); empty when no KC -> MBON synapse can. */
+  const std::optional<learning::MushroomBody>& learning() const { return learning_; }
+  /** runtime.ts's memory and remember: what the mushroom body has learned, as bytes; remember throws std::invalid_argument, changing nothing, for bytes it can't take. */
+  std::vector<uint8_t> memory() const;
+  void remember(std::span<const uint8_t> memory);
 
  private:
   void modulate();
@@ -114,6 +120,8 @@ class Brain {
   // Each antenna's heating and cooling cells, in wiring_.thermo's order, and what they have adapted to.
   std::vector<uint32_t> thermo_inputs_;
   thermo::Thermoreceptors thermoreceptors_;
+  std::vector<uint32_t> reinforcement_inputs_;
+  std::optional<learning::MushroomBody> learning_;
   std::vector<double> rates_;
   std::vector<std::string> rate_names_;
   std::vector<uint32_t> counts_;

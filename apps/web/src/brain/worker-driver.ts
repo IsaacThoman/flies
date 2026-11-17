@@ -91,6 +91,10 @@ export class WorkerBrainDriver implements BrainDriver {
   #pendingMs = 0;
   #disposed = false;
   readonly #tickRequest: Extract<BrainRequest, { type: "tick" }> = { type: "tick", dtMs: 0, senses: RESTING_SENSES };
+  // Answers awaited from the worker, in the order asked (it answers in order), and memories given before it was running.
+  #memories: ((memory: Uint8Array | null) => void)[] = [];
+  #remembering: ((taken: boolean) => void)[] = [];
+  #toRemember: { memory: Uint8Array; taken: (taken: boolean) => void }[] = [];
 
   constructor({ createWorker, source, now = () => performance.now() }: { createWorker: BrainWorkerFactory; source: BrainSource; now?: () => number }) {
     this.#createWorker = createWorker;
@@ -184,7 +188,37 @@ export class WorkerBrainDriver implements BrainDriver {
     finally { request.senses = RESTING_SENSES; }
   }
 
+  exportMemory(): Promise<Uint8Array | null> {
+    if (this.status !== "running" || !this.#worker || this.#disposed) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      this.#memories.push(resolve);
+      this.#worker!.post({ type: "memory" });
+    });
+  }
+
+  importMemory(memory: Uint8Array): Promise<boolean> {
+    if (this.status === "failed" || this.#disposed) return Promise.resolve(false);
+    return new Promise((taken) => {
+      if (this.status === "running") this.#remember(memory, taken);
+      else this.#toRemember.push({ memory, taken });
+    });
+  }
+
+  #remember(memory: Uint8Array, taken: (taken: boolean) => void) {
+    const copy = memory.slice().buffer;
+    this.#remembering.push(taken);
+    this.#worker!.post({ type: "remember", memory: copy }, [copy]);
+  }
+
+  // Everything still awaited ends unanswered: no memory, nothing taken.
+  #abandon() {
+    for (const resolve of this.#memories.splice(0)) resolve(null);
+    for (const taken of this.#remembering.splice(0)) taken(false);
+    for (const { taken } of this.#toRemember.splice(0)) taken(false);
+  }
+
   dispose(): void {
+    this.#abandon();
     this.#disposed = true;
     this.#worker?.terminate();
     this.#worker = null;
@@ -203,6 +237,13 @@ export class WorkerBrainDriver implements BrainDriver {
         this.buildMs = this.#now() - this.#postedAt;
         this.status = "running";
         this.phase = "done";
+        for (const { memory, taken } of this.#toRemember.splice(0)) this.#remember(memory, taken);
+        break;
+      case "memory":
+        this.#memories.shift()?.(new Uint8Array(response.memory));
+        break;
+      case "remembered":
+        this.#remembering.shift()?.(response.refused === null);
         break;
       case "state":
         if (!this.#inFlight) return;
@@ -219,6 +260,7 @@ export class WorkerBrainDriver implements BrainDriver {
 
   #fail(message: string, failure: BrainFailure = failureOf(message, this.phase === "build")) {
     if (this.#disposed) return;
+    this.#abandon();
     this.#worker?.terminate();
     this.#worker = null;
     this.#inFlight = false;

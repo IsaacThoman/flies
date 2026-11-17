@@ -253,6 +253,14 @@ std::vector<ReadoutSpec> readouts() {
   };
 }
 
+// io.ts's REINFORCEMENT, which says why.
+std::vector<InputSpec> reinforcement() {
+  return {
+      {"sweet reward", "Reward dopaminergic neurons of the mushroom body's β'2a and γ4 compartments (PAM02, PAM07, PAM08), which sugar excites",
+       query({{kType, one_of({"PAM02", "PAM07", "PAM08"})}}), 20, "", kSweet, kLeft},
+  };
+}
+
 Wiring wire(const Connectome& c) {
   Wiring w;
   for (InputSpec& spec : senses()) {
@@ -296,6 +304,11 @@ Wiring wire(const Connectome& c) {
   sleepy[kType] = dfb_sleep;
   auto excitable = c.find(sleepy);
   if (!excitable.empty()) w.excitability.push_back({kSleepPressure, 7, std::move(excitable)});
+  for (InputSpec& spec : reinforcement()) {
+    std::vector<uint32_t> neurons = c.find(spec.select);
+    const double rate = spec.max_rate;
+    if (!neurons.empty()) w.reinforcement.push_back({std::move(spec), std::move(neurons), rate});
+  }
   for (ReadoutSpec& spec : readouts()) {
     std::vector<uint32_t> neurons = c.find(spec.select);
     w.readouts.push_back({std::move(spec), std::move(neurons)});
@@ -318,6 +331,7 @@ Wiring wire(const Connectome& c) {
   for (const StateGroup& group : w.state) driven.insert(group.neurons.begin(), group.neurons.end());
   for (const ThermoGroup& group : w.thermo) driven.insert(group.neurons.begin(), group.neurons.end());
   for (const auto& group : w.excitability) driven.insert(group.neurons.begin(), group.neurons.end());
+  for (const Group& group : w.reinforcement) driven.insert(group.neurons.begin(), group.neurons.end());
   for (const ReadoutGroup& group : w.readouts) {
     for (uint32_t i : group.neurons) {
       if (driven.count(i) != 0) throw std::runtime_error("Neuron " + std::to_string(i) + " is both driven and read (readout \"" + group.spec.name + "\")");

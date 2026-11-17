@@ -19,6 +19,7 @@ import { escapeBattery, summarizeEscape, validateEscapeOptions } from './ethogra
 import { FrameWriter, FREE_FLAGS } from './ethogram/trace.ts';
 import type { FreeInitial, FreeTrace, TraceInfo } from './ethogram/trace.ts';
 import { verifyTraces } from './ethogram/replay.ts';
+import { trainingBattery } from './ethogram/training.ts';
 
 export const ARENA: Place = { floor: { kind: 'circle', r: 21.5 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 30 };
 const DT = 0.01;
@@ -129,7 +130,7 @@ async function leased<T>(work: (checkpoint: () => Promise<void>) => Promise<T>) 
 async function main() {
   const { values } = parseArgs({ options: { hours: { type: 'string', default: '1' }, 'burn-seconds': { type: 'string', default: '60' }, seeds: { type: 'string', default: '1,2,3' }, place: { type: 'string', default: 'arena' }, hour: { type: 'string', default: '6' }, assay: { type: 'string', default: 'all' }, trials: { type: 'string', default: '8' }, 'seed-base': { type: 'string', default: '20000' }, data: { type: 'string', default: DEFAULT_CONNECTOME_PATH }, out: { type: 'string' }, analyse: { type: 'string' }, 'trace-dir': { type: 'string' }, help: { type: 'boolean' } } });
   if (values.help) {
-    console.log('node scripts/ethogram.ts [--hours 1] [--seeds 1,2,3] [--place arena|lab|picnic|restaurant|windowsill] [--burn-seconds 60] [--hour 6] [--assay free|escape|all] [--trials 8] [--data path] [--out report.json] [--analyse recording.json] [--trace-dir directory]\nAutomatically leases one of eight heavy-work slots, yielding after 9.5 min and cooling down 2 min. No rendering, no sound.');
+    console.log('node scripts/ethogram.ts [--hours 1] [--seeds 1,2,3] [--place arena|lab|picnic|restaurant|windowsill] [--burn-seconds 60] [--hour 6] [--assay free|escape|all|training] [--trials 8] [--data path] [--out report.json] [--analyse recording.json] [--trace-dir directory]\nAutomatically leases one of eight heavy-work slots, yielding after 9.5 min and cooling down 2 min. No rendering, no sound.');
     return;
   }
   if (values.analyse) {
@@ -145,7 +146,15 @@ async function main() {
   }
   const options: RunOptions = { hours: Number(values.hours), burnSeconds: Number(values['burn-seconds']), seeds: values.seeds.split(',').map(Number), place: values.place, hour: Number(values.hour), traceDir: values['trace-dir'] };
   validateOptions(options);
-  if (!['free', 'escape', 'all'].includes(values.assay)) throw new Error('assay must be free, escape or all');
+  if (!['free', 'escape', 'all', 'training'].includes(values.assay)) throw new Error('assay must be free, escape, all or training');
+  if (values.assay === 'training') {
+    const data = Uint8Array.from(readFileSync(values.data)).buffer;
+    const training = await leased(checkpoint => trainingBattery(data, options.seeds, checkpoint, options.hour));
+    const report = { schema: 1, assay: 'training', commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), dirty: execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0, connectomeSha256: createHash('sha256').update(new Uint8Array(data)).digest('hex'), attribution: 'FlyEM male CNS connectome, Janelia Research Campus (CC-BY 4.0)', standIns: STAND_INS, ...training };
+    if (values.out) writeFileSync(values.out, JSON.stringify(report, null, 2) + '\n');
+    console.log(JSON.stringify(training.summary, null, 2));
+    return;
+  }
   if (values.assay !== 'free') validateEscapeOptions(Number(values.trials), options.hour!, Number(values['seed-base']));
   const data = Uint8Array.from(readFileSync(values.data)).buffer;
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
