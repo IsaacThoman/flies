@@ -322,3 +322,22 @@ test("the loading screen and its failure panel: where they always were on the TV
     assert.equal(hit?.kind, LOADING_HITS.retry, `${name}: Try again is where it is drawn`);
   }
 });
+
+
+test("selector arrows stay put across kinds, including Place's Go appearing", () => {
+  for (const [, frame] of frames()) for (const id of ["feed", "light", "weather", "view", "place"]) {
+    const hands = new Hands(createPicnic());
+    const i = TOOLS.findIndex((t) => t.id === id);
+    hands.chooseTool(i);
+    let first: number[] | null = null;
+    for (let kind = 0; kind < TOOLS[i].variants.length; kind++) {
+      hands.variants[i] = kind;
+      const hits = new HitMap();
+      drawHud(blankCanvas(), 0, { hands, here: "picnic", activity: "resting", food: null, hints: true, glyphs: null, learned: {}, teachSwipe: false, changed: 10, brainRunning: true, eyes: null, layout: hudLayout(frame) }, hits);
+      const arrows: number[] = [];
+      for (let j = 0; j < hits.count; j++) if (hits.get(j)!.kind === "kind") arrows.push(hits.get(j)!.x);
+      if (!first) first = arrows;
+      else assert.deepEqual(arrows, first, `${id}: the same place selects each next kind`);
+    }
+  }
+});

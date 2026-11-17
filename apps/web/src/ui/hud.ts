@@ -94,22 +94,22 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   // The tool's name and kind, over the shelf. Pointing, arrows either side change the kind, and a place to go has its own button.
   const tool = hands.current;
   const many = tool.variants.length > 1;
-  const go = pointing && tool.id === "place" && hands.place !== s.here;
+  const reserveGo = pointing && tool.id === "place";
+  const go = reserveGo && hands.place !== s.here;
   const goWidth = 64;
-  const room = L.width - 16 - (go ? goWidth + 8 : 0);
+  const room = L.width - 16 - (reserveGo ? goWidth + 8 : 0);
   const arrows = many ? (pointing ? 56 : 40) : 0;
   let label = many ? `${tool.name} · ${hands.label}` : tool.name;
-  let lw = Math.max(150, hintWidth(g, label, 17) + arrows);
-  // Where there isn't room for the tool's name, its kind says enough: the shelf shows which tool it is.
-  if (many && lw > room) {
-    label = hands.label;
-    lw = Math.max(150, hintWidth(g, label, 17) + arrows);
-  }
-  const lx = cx - lw / 2 - (go ? (goWidth + 8) / 2 : 0);
+  const lw = many ? Math.min(280, room) : Math.max(150, hintWidth(g, label, 17));
+  // Stable arrows can be reused without aiming again when a kind's name changes.
+  if (many && hintWidth(g, label, 17) + arrows > lw) label = hands.label;
+  g.font = font(17);
+  const labelSize = Math.min(17, 17 * (lw - arrows - 24) / Math.max(1, g.measureText(label).width));
+  const lx = cx - lw / 2 - (reserveGo ? (goWidth + 8) / 2 : 0);
   const pop = Math.max(0, 1 - s.changed * 4) * 3;
   const ly = L.labelY - 17 - pop;
   pill(g, lx, ly, lw, 32, "", { color: "glass" });
-  text(g, label, lx + lw / 2, L.labelY - pop, { size: 17, align: "center", baseline: "middle", color: INK });
+  text(g, label, lx + lw / 2, L.labelY - pop, { size: labelSize, align: "center", baseline: "middle", color: INK });
   if (many && pointing) {
     chevron(g, lx + 18, L.labelY - pop, -1, true);
     chevron(g, lx + lw - 18, L.labelY - pop, 1, true);

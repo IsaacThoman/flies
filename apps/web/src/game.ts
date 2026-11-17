@@ -204,7 +204,7 @@ export class Game implements Shell {
   #awakeAt = -1;
   #datasetAt = 0;
   /** What the HUD last drew, to tell when it needs drawing again. */
-  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1 };
+  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1, here: null as PlaceId | null, fixed: false, outside: false, surface: "", running: false };
   #hudAt = 0;
   #changedAt = -10;
   #touched = false;
@@ -272,6 +272,7 @@ export class Game implements Shell {
   #ringShown = true;
   /** A game has been played since launch: Back from the menu carries on with it. */
   #played = false;
+  #firstVisit = Object.keys(this.#learned).length === 0;
   #cursor = "";
   #seenInput = 0;
   #glyphsDrawn: GlyphSet | null | undefined = undefined;
@@ -379,6 +380,10 @@ export class Game implements Shell {
         this.joinRoom(code);
       });
     }
+  }
+
+  get teachingMenu() {
+    return this.#firstVisit && !this.#played;
   }
 
   /** Rooms with others need a line to the room server: a WebSocket, or the Apple TV host's. */
@@ -642,6 +647,7 @@ export class Game implements Shell {
 
   play() {
     this.#played = true;
+    this.#learn("arrival");
     this.nav.reset("title");
     this.nav.push("play");
     this.#entered();
@@ -1140,7 +1146,7 @@ export class Game implements Shell {
           pointers.gestures.length = 0;
         }
       }
-    } else if (!this.#loading && after > 0 && idle > after && (current === "play" || current === "title") && !this.#grip && !this.#controls.pressed && !this.director.hand.held && !keyboard?.holding) {
+    } else if (!this.#loading && after > 0 && idle > after && (current === "play" || (current === "title" && !this.teachingMenu)) && !this.#grip && !this.#controls.pressed && !this.director.hand.held && !keyboard?.holding) {
       // Not while a finger or a button is still down on something, however still.
       this.#startWallpaper();
     }
@@ -1619,7 +1625,7 @@ export class Game implements Shell {
         hud.eyes = e;
       } else hud.eyes = null;
       const k = this.#hudKey;
-      const changed = k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught;
+      const changed = k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught || k.here !== hud.here || k.fixed !== this.hands.fixed.has(this.hands.current.id) || k.outside !== this.hands.outside || k.surface !== this.hands.surface || k.running !== hud.brainRunning;
       if (changed || hud.changed < 0.3 || ((stats || !hud.brainRunning || needsTeaching(hud)) && this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS)) {
         k.tool = this.hands.tool;
         k.variant = this.hands.variants[this.hands.tool];
@@ -1630,6 +1636,11 @@ export class Game implements Shell {
         k.hints = hud.hints;
         k.eyes = !!hud.eyes;
         k.taught = this.#taught;
+        k.here = hud.here;
+        k.fixed = this.hands.fixed.has(this.hands.current.id);
+        k.outside = this.hands.outside;
+        k.surface = this.hands.surface;
+        k.running = hud.brainRunning;
         this.#hudAt = this.time;
         overlay.dirty = true;
       }

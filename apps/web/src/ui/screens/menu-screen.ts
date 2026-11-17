@@ -215,9 +215,9 @@ export class MenuScreen implements Screen {
 }
 
 /** The hints every menu shows for the buttons in hand: how to move, choose and go back, along the foot of the safe area. None for a pointer. */
-export function drawMenuHints(g: CanvasRenderingContext2D, _t: number, shell: { shape: Frame; glyphs: GlyphSet | null; settings?: { hints: boolean } }) {
+export function drawMenuHints(g: CanvasRenderingContext2D, _t: number, shell: { shape: Frame; glyphs: GlyphSet | null; settings?: { hints: boolean }; teachingMenu?: boolean }) {
   const set = shell.glyphs;
-  if (!set || shell.settings?.hints === false) return;
+  if (!set || shell.settings?.hints === false || shell.teachingMenu === false) return;
   const { design, safe } = shell.shape;
   const y = design.height - safe.bottom - 26;
   const gap = Math.min(72, (design.width - safe.left - safe.right) / 4);

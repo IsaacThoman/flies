@@ -135,3 +135,33 @@ activity changes. Whole-frame averages were 0.801 and 0.803 ms respectively,
 which does not establish a CPU speed difference. The intended proof is removal
 of callback allocation and periodic teaching uploads, not Apple TV timing.
 Shared dash/palette arrays also remove new explicit per-drawing array allocation.
+
+## Round 2
+
+Frozen key: C8 = accepted round-1 build 245cbd6; D3 = a2af514. Presentation
+orders: A C8/D3; B D3/C8; C D3/C8; regression-only D3/C8. All reviewers were
+fresh, independent and high effort. All three preferred D3.
+
+| Set | A | B | C | Mean | Ranking |
+|---|---|---|---|---|---|
+| D3 | 9,7,5,9,9,8,8 | 9,7,5,9,8,7,8 | 9,7,5,9,8,7,8 | 7.67 | First, all three |
+| C8 | 9,6,5,8,8,6,2 | 9,5,5,7,8,6,2 | 9,5,5,7,8,5,2 | 6.05 | Second, all three |
+
+Accepted: runtime retirement, measured progress during Explore, startup retry,
+native-host event/glyph coverage and the unclipped tool-selection cue. Main
+regression concern: glyph-only menu legends are less explicit; the text-free
+constraint makes this a tradeoff. The naive player still omitted Blow, while
+using several world controls. No population-level discovery improvement is claimed.
+Next targets: first-entry menu hiding and moving selector-arrow positions, both
+responsible for observed wasted inputs. The long indeterminate module-download
+phase remains a limitation; its timing is kept distinct from brain download.
+
+Round 3 proposal: keep the first arrival's menu visible until Play/Watch, save
+that arrival experience, retire its menu legend, and keep selector-arrow hit
+positions stable across every kind and the Place Go control appearing. New HUD
+keys preserve redraws for actual place, availability, weather-source, surface and
+brain-status changes. A two-second test with a one-second idle threshold confirms
+first-visit controls stay visible; after entry the normal wallpaper resumes.
+The browser checks pass every input mode and confirm Go clears after arrival.
+A completed-player probe reuses one callback and redraws eleven times for eleven
+activity changes across 481 frames; no periodic shimmer or upload is added.

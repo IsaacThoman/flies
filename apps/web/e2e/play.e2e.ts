@@ -381,7 +381,7 @@ try {
   const again = await waitFor(page, "screen=play");
   assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["feed", "sugar", "wide", "noon", "clear"]);
   const learned = await page.evaluate(() => JSON.parse(localStorage.getItem("flies.learned") ?? "{}") as Record<string, true>);
-  assert.deepEqual(Object.keys(learned).sort(), ["feed", "light", "place", "swoop", "tools", "view", "weather"], "the hints for what was used aren't taught again");
+  assert.deepEqual(Object.keys(learned).sort(), ["arrival", "feed", "light", "place", "swoop", "tools", "view", "weather"], "the hints for what was used aren't taught again");
 
   step(`the frame's budget: at most ${maxCalls} draws and ${maxTriangles.toLocaleString("en-US")} triangles`);
   assert.ok(maxCalls > 0 && maxCalls < MAX_CALLS, `${maxCalls} draws`);

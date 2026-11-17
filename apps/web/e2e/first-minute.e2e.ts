@@ -38,7 +38,15 @@ try {
     await page.keyboard.press("Enter");
     await gameUp(page);
     await waitFor(page, "screen=title,brain=running");
+    await page.evaluate(() => { (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 1; });
+    await waitForGameTime(page, 2);
+    assert.equal((await readState(page)).wallpaper, "false", "first arrival stays interactive while being read");
     if (values.shots) await page.screenshot({ path: path.join(values.shots, "bootstrap-recovered.png") });
+    const begin = await canvasPoint(page, await targetOf(page, "row", 0));
+    await page.mouse.click(begin.x, begin.y);
+    await waitFor(page, "screen=play");
+    await waitForGameTime(page, 2);
+    await waitFor(page, "wallpaper=true");
     console.log("passed: bootstrap script failure and keyboard retry");
   } finally { await recovery.close(); }
   for (const device of ["mouse", "touch", "remote"] as const) {
@@ -123,6 +131,12 @@ try {
           }
         }
         await lesson(id);
+        if (id === "place") await page.waitForFunction(() => {
+          const game = (globalThis as unknown as { __fly: Game }).__fly;
+          if (game.here !== game.hands.place || document.getElementById("game")?.dataset.moving) return false;
+          for (let i = 0; i < game.overlay.hits.count; i++) if (game.overlay.hits.get(i)?.kind === "go") return false;
+          return true;
+        });
         await shot(`${id}-used`);
       }
       if (device === "remote") assert.equal((await readState(page)).device, "remote");
