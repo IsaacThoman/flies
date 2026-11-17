@@ -121,3 +121,13 @@ Findings are now concentrated on the shared colour-only place dot, disabled page
 
 
 
+
+## Current scoped acceptance
+
+The owner's updated process narrowed this PR to the browser mirror, with tvOS, Reduce Motion and visual colour work deferred. The branch contains merge commits from current dev, including #102, #100 and #119. No adapter is installed unless the URL explicitly contains `accessibility=1`.
+
+Two fresh blind reviewers have independently completed all tasks in Chromium and WebKit on the narrowed built artifact, with no blockers; each reported 9/10 overall. Their per-area scores were task completion 10/10, names/values 10/10, focus/errors 9/10 and 10/10, isolation 10/10 and 9/10, separation 9/10. A third scoped review is running. These are browser-engine results; actual VoiceOver remains unverified.
+
+Local checks after the merge: typecheck and lint passed; 52 focused tests passed; the full test command passed with 891 unit tests passed and four optional skips. Its budget stage passed one test and skipped three on the calibrated reference's contention guard (reference load exceeded 4.8 ms), with no failures. Earlier full runs passed all four budgets. The browser task suite passed in Chromium and WebKit; the standard play, pointer/touch, web lifecycle and online-table suites passed during the preceding integration. The known page-zoom axe violation remains recorded.
+
+The prototype's camera/native/colour work is preserved for follow-up PRs based on latest origin/dev. This PR can land with its switch off while the owner decides on the DOM exception.
