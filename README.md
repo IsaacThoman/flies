@@ -1,14 +1,20 @@
 # flies
 
-A fruit fly that lives on your Apple TV, or in a browser tab. It isn't
-scripted: a simulation of the fly's whole nervous system, 166,700 neurons
-wired as they are in the real animal, decides what it does from what it sees,
+A fruit fly that lives on your Apple TV, or in a browser tab.
+A spiking model of the male fruit fly's central nervous system, 166,700 neurons
+wired from the connectome, supplies movement and activity commands from what it sees,
 tastes and feels. Feed it, startle it, tickle it and watch it with the
-remote; leave it alone and it is a living screensaver.
+remote; leave it alone and it is a living screensaver. The body adds physics,
+reflex stand-ins and procedural posing (see What the body adds). There is no sound.
+
+Development needs Node 22.18 or later and npm. Historical measurements below
+retain their recorded numbers, not guarantees for current code or every scene.
+Their capture dates and exact machines were not recorded here; runtime or machine
+families are given where known. They have not been rerun for this factual audit.
 
 ```sh
 npm install
-npm run brain:fetch   # the packed connectome, 38 MB, once
+npm run brain:fetch   # fetch the packed connectome and anatomy annotations
 npm run dev           # the game in a browser
 npm test              # unit tests (Node)
 npm run e2e           # plays the game in headless Chromium with the real brain, then the built site
@@ -16,6 +22,9 @@ npm run build         # the web build, plain files for any static host (docs/web
 npm run ios           # the iPhone and iPad app in a simulator (docs/ios.md)
 npm run rooms         # the room server for tables with others (docs/online.md)
 ```
+
+The packed connectome was reported as 38 MB; exact bytes and the unit convention
+were not recorded.
 
 `docs/architecture.md` describes the parts and the rules. This file is about
 the game (`apps/web`), which is also the iPhone and iPad app
@@ -34,7 +43,7 @@ Releases to TestFlight, and setting them up, are in [docs/release.md](docs/relea
 
 ## Playing
 
-By default the flies aren't alone: once their brains are awake, on the web,
+By default the flies aren't alone: once the first brain is awake, on the web,
 the Apple TV, an iPhone or an iPad, they sit down in **Everyone**, a public
 room the room server keeps, with up to eight flies in all, each marked with
 its own dab of enamel. A device whose flies don't all fit goes on to
@@ -52,20 +61,24 @@ sits their flies down beside yours, up to eight altogether, each marked with its
 dots in the table colours, kept between launches. Each is a whole fly, with
 its own brain, body, senses and eyes; they see and meet one another, eat
 from the same pantry, feel the place's wind and goings-on where they are,
-and the tools and bubbles reach any of them. Nothing is scripted around
-their brains (`apps/web/src/company.ts`). The camera follows the first:
+and the tools and bubbles reach any of them. Movement and activity commands come from their brains; body reflexes and
+procedural posing still apply (`apps/web/src/company.ts`). The camera follows the first:
 the pointer drifts back to it, and the eyes' picture, nervous system,
 stats, X-ray, activity and day's tally are its. Alone with several, it
 wears yellow enamel and the others the next colours; a lone fly wears none.
 At a table the device gets as many flies as there is room for. An older
 Apple TV host that can run only one brain shows no Flies row.
 
-The fly can live in more than one place (`docs/places.md`), and the player can
-carry it from one to another: the **Place** tool, or Settings → Screensaver →
-Where it lives, once the choice rests there a second or the row is left (the
-places stepped past on the way aren't built). Living in each in turn (the default), it moves on after 20 minutes of
-screensaver. It is the same fly, its brain running on; the world fades out, the
-place is built behind the veil, and it is set down there.
+The fly can live in more than one place (`docs/places.md`). In solo play,
+the **Place** tool or Settings → Screensaver → Where it lives carries it
+elsewhere. The setting applies once the choice rests there a second or the
+row is left (places stepped past on the way aren't built). At a named room,
+its starter changes place with the Place tool; the setting does not move
+the room. Everyone locks Place and rotates places by its clock; other guests
+follow their room starter. In solo play, living in each in turn (the default),
+it moves on after 20 minutes of accumulated screensaver time at that place.
+It is the same fly, its brain running on; the world fades out, the place is
+built behind the veil, and it is set down there.
 
 The first place is the picnic: a round café table by a lake: lemonade, a jam
 jar, a strawberry and a half, cherries, a slice of orange, a green apple,
@@ -122,7 +135,7 @@ cost no draw and stay sharp however close the camera comes.
 
 So does the weather, unless you choose one (the **Weather** tool): clear,
 overcast, mist, light or heavy rain, thunderstorm, snow or sleet. On "Now" it follows a forecast worked out from
-the clock, the same for everyone at the same hour and on any restart: spells
+the clock, the same for the same local date and hour and on any restart: spells
 of a few hours each, changing over an hour, in systems a day or two long, so
 some days are fine and some grey. Mist forms only in the early morning and
 burns off before noon; clouds gather before rain and clear after it.
@@ -135,8 +148,8 @@ comes out while it's wet a rainbow stands opposite it. Rain bursts the bubbles, 
 drop landing on the fly is felt (`touch`). Heavy rain thickens into windblown
 sheets; storm gusts enter through the same wind sense. Thunderstorms are
 silent: lightning brightens actual scene lights and the eyes, with an
-occasional distant fork. The current retinal model has no ON response to
-brightening; its darkening tail can excite the OFF pathway. No startle
+occasional distant fork. The retinal model now includes L1-mediated brightening input as well as
+darkening input; either can reach the escape pathway. No startle
 command is manufactured.
 
 Snow drifts past the picnic and through indoor views, dusts exposed picnic
@@ -147,17 +160,18 @@ Cold itself is not modelled in the brain and no sluggishness is imposed.
 A possible labelled stand-in is a proposal requiring owner approval, not an
 active behavior ([weather details](docs/places.md#storms-and-winter-precipitation)).
 The invented forecast assumes northern temperate seasons: winter snow and
-summer storms. Shared tables use protocol 4 so clients agree on that forecast.
+summer storms. Shared tables use protocol 5 so clients agree on that forecast.
 
 **The weather outside.** An Apple TV app built with WeatherKit
 ([docs/apple-tv.md](docs/apple-tv.md#the-weather-outside)) follows the real
 weather instead (`apps/web/src/scene/outside.ts`). The first time, once the
 title is up, the TV asks whether the app may know where it is; from then on,
-while the app is open, Apple Weather is asked every 20 minutes for the
-conditions about where the TV is and the day's sunrise and sunset. The Weather
+while the app is open, Apple Weather is asked for conditions and the day's sunrise and sunset.
+While continuously active, after a successful answer the next timed request waits 20 minutes to an hour,
+following its expiration date; failures retry sooner. The Weather
 tool's "Now" then says "Outside" and is the real weather, as near as the
 game can show it: cloud cover is the cloud; fog, or seeing less than a
-kilometre, is mist, fading out by eight, and haze is some. Heavy rain and
+kilometre, is mist, fading out by eight kilometres, and haze is some. Heavy rain and
 thunderstorm conditions retain their intensity and lightning; snow and
 flurries fall as snow, while sleet and wintry mix combine rain and snow.
 Freezing rain and hail use rain as a visual approximation; no ice impact
@@ -175,8 +189,9 @@ answer (no permission, no network, WeatherKit refusing the app) or one more
 than two hours old (two days for sunrise and sunset, which move by minutes a
 day), it is the forecast and the summer day as before, and the tool says
 "Now". Settings → Screensaver → Real weather turns it off. Apple Weather's attribution is in
-About the fly. None of it reaches the fly but as everything else does: what
-it sees and the wind it feels.
+About the fly. Weather conditions reach the fly through what it sees, the wind it feels
+and rain touching its body. Retained sunrise and sunset also inform its
+internal daily rhythm, as described below.
 
 While nobody is using the remote (the screensaver, or a minute of play without
 a press), the picnic has its own goings-on, about ten an hour, never two
@@ -190,11 +205,10 @@ butterfly that flutters over and may settle on the fruit a while, a ladybird
 that walks across and around anything standing, a sailboat crossing the lake,
 and now and then something new to find: a drop of juice seeping from a
 strawberry, or a crumb blown in on a gust, put out in the pantry for the fly
-to find by walking and tasting. The butterfly, the ladybird and the falling
-leaf are in the fly's world only as things it sees (and, for a brain without
-eyes, things that can loom); they keep clear of it (of whichever fly is
-nearest, with several), a falling leaf brushes any of them, and none of it is aimed
-or timed at the fly: what it does about any of it is its brain's.
+to find by walking and tasting. The butterfly and ladybird are in the fly's world as things it sees
+(and, without eye input, things that can loom); they keep clear of whichever
+fly is nearest. A falling leaf can also brush any fly with touch input, and the scheduler does not force a neural response: what each fly does about
+these events follows its brain commands and the documented body stand-ins.
 
 The windowsill is the deep sill of a cottage kitchen window, painted cream
 over sage over pine, its old gloss crazed where the sun bakes it and chipped
@@ -307,16 +321,16 @@ lights out of focus glow behind the fly.
 Wherever it lives, a fly that has stood in something sticky or wet leaves
 footprints (`apps/web/src/scene/prints.ts`): faint prints of the two pads of
 its feet, each where its gait set that foot down, lying on whatever it walks
-on (the table, a fruit, a jar's rim, the sill). Honey leaves them amber; jam,
-raspberry, wine and syrup red; the juices, lemonade, beer, the agar and the
+on (the table, a fruit, a jar's rim, the sill). Honey and plain syrup leave them amber; jam,
+raspberry, wine and cherry syrup red; the juices, lemonade, beer, the agar and the
 lab's fly food their own colours. Water (dropped, the basil's saucer, a drop
 or dew) leaves darker wet prints that dry in about half a minute; sticky ones
 fade over a minute and a half. A foot carries only a little: the first steps
 off the food print clearly, the next fainter and then only now and then, and
 after ten or so it is clean, until it walks back into food. Sugar and crumbs
 are dry and leave nothing. There are none on a drink, a head of foam or
-anything drawn rougher than the fly feels it, and they stay behind when the
-fly is carried somewhere else. They are only drawn: the fly doesn't taste or
+anything drawn rougher than the fly feels it. Changing place clears the
+prints and cleans its feet. They are only drawn: the fly doesn't taste or
 feel its own prints, they aren't food, and nothing about them reaches its
 brain.
 
@@ -366,7 +380,7 @@ fly's world.
 | Up / Down | Picks the tool's kind: which food, how hard to blow, the time of day, the weather, the camera. |
 | Select | Uses the tool: drops food, throws the ball. Hold it to tickle or blow. On Light, Weather and View it steps round the choices. |
 | Play/Pause, or Back | The menu. Play/Pause, or Play on it, carries on. |
-| Back on the menu | Leaves the app. |
+| Back on the menu | On Apple TV, leaves at the root. In the browser, returns to play after play has begun. |
 
 Pointing, the screen itself is what you press, and there are no button hints:
 
@@ -402,7 +416,8 @@ phone that can vibrate (Android) buzzes for the same; the iPhone and iPad app
 plays its own haptics. Settings → Picture → Rumble turns the pad and Android
 rumble off; it starts on and is kept between launches. It is never felt in
 the screensaver. The hints always
-show the thing last used, and the screen hides the system's cursor, text
+show the thing last used, and the screen hides the system's cursor over the world and in the
+screensaver, using arrow, pointing or grabbing cursors elsewhere. It suppresses text
 selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
 
@@ -421,8 +436,9 @@ world and the camera; Left and Right go along all of them. Hints in the
 corners show what the buttons do, until they have been used: the shelf's goes
 once you have gone along it, and what Select does with a tool once you have
 used it (held it, for Tickle and Blow), on later launches too. The way to the
-menu, and how to move your hand while it waits by the fly, always show.
-Turning Settings → Picture → Button hints off and on again brings them all
+menu stays visible. With hints enabled, a remote or pad also teaches hand
+movement until that lesson is learned; it is kept between launches.
+Turning Settings → Picture → Hints off and on again brings them all
 back. A caption at the top says what the fly is doing.
 
 A launch starts on Feed with sugar, so that one press of Select gives the fly
@@ -449,7 +465,8 @@ picture cuts into it, the camera comes in along its line of sight until it
 isn't, quickly but smoothly, looking a moment ahead of where your turn and the
 fly are taking it, so it is in front of a bottle before the bottle is in the
 way. Once the way has been clear for a moment it goes back out, gently. It
-never turns or tilts to get round anything, and never jumps.
+never turns or tilts to get round anything. An obstruction that outruns the
+smoothing can pull the camera inward immediately during collision recovery.
 
 The View tool's views are places on the same orbit, reached over a moment.
 Follow is 11 mm out, low over the table, the fly about 170 pixels long;
@@ -469,7 +486,7 @@ the middle once the menu has faded; it keeps its place round the fly and
 moves only when it has to (the fly has turned its back for more than a
 second, something is in the way, or there is fruit or a jar to have behind
 it), never crossing over the fly when it can help it. Every move is a
-critically damped spring, so nothing overshoots or pops; walking it keeps
+critically damped spring, to smooth its movement; walking it keeps
 pace a little ahead, and in a jump it pulls back, widens and whips round
 after the fly. Going into play eases from its shot into yours, and out again.
 
@@ -487,11 +504,11 @@ A small picture of what the fly's eyes see sits in a corner of the screensaver
 the top right while you play too), and under it a picture of its nervous
 system at work (Nervous system, the same choices). Each time the screensaver
 moves on to a new shot, and at least once a minute, they fade out and come
-back together in the next corner, so none is left in one place long
-enough to mark an OLED screen. The corners aren't chosen: a picture pinned
+back together in the next corner, reducing how long bright edges stay in one
+place; this is not a guarantee against OLED burn-in. The corners aren't chosen: a picture pinned
 to one would sit there for hours in a screensaver, its glass edge and its
 words the sharpest, brightest things on screen, which is how an OLED screen
-is marked, and keeping them moving costs nothing. Instead Size (small,
+is marked, so the overlays move periodically. Instead Size (small,
 medium, the default, or large) and Opacity (solid, the default, soft or
 faint, which also dims them for the screen) set how much of the screensaver
 they take.
@@ -502,8 +519,8 @@ figure and a word: the brain's spikes a second, neurons active and speed
 against real time (from the brain's meter), under
 a trace of its last twenty seconds; and its day: how far
 it has walked, its meals, its take-offs, and its time flying and grooming.
-The day is counted from what the fly's life did (`life.ts`: its legs' steps
-on its feet, a meal from its first taste, each leap into the air, each
+The day is counted from what the fly's life did (`life.ts`: its displacement while
+on its feet, a meal when actual eating begins, each leap into the air, each
 second it was flying or grooming), once each, kept across launches as
 `flies.day` and begun again at midnight. The panel sits across the screen
 from the other pictures, at the same edge (at the top left while you play),
@@ -513,7 +530,7 @@ short one. It retains the values and their units, without repeating the
 behaviour caption. In and out is a bar for
 each sense going into the brain as the body sends it (a loom at either eye,
 touch, either antenna, wind, sweet, weight on its legs, a male's taste on
-its front legs, and the light, the mean over every facet), and its hunger, and for each
+its front legs, wingbeat, and the light, the mean over every facet), and its hunger, and for each
 command coming out (walk, steer, back up, escape, wings, groom, feed, sing),
 with the firing rate of the neurons each is read from (DNg100, the two DNa02s,
 MDN, DNp01, the flight motor neurons, DNg12, MN9, pIP10) in Hz: the senses beside the commands, under them on a narrow
@@ -524,15 +541,14 @@ There is one menu: the title at launch, and the same menu from play (Back,
 Play/Pause, or the button at the top left), with the fly living on behind it.
 It has **Play**, **Watch** (the screensaver straight away), **About**, and
 **Settings**: a row of tabs over each part of the game, every setting two
-steps from the menu and none scrolling: **Screensaver** (when it starts, how
+steps from the menu, with rows scrolling on shorter screens: **Screensaver** (when it starts, how
 its camera films, where the flies live, how many, and, on an Apple TV that can tell,
 the real weather), **On screen** (everything that can show over the world:
 what it sees, its nervous system and its stats in the corners, what the
 stats are of, the corners' size and opacity, and the X-ray), and **Picture**
-(pixel size, the eyes' detail, button hints, rumble, frame stats). Where it
+(pixel size, the eyes' detail, Hints, rumble, frame stats). Where it
 can be online, Screensaver also has Join others (sitting with everyone by
-default), and the menu has **Online**, rooms shared with others. The menu never scrolls
-either: on a screen too short for its rows (a phone on its side) they are
+default), and the menu has **Online**, rooms shared with others. The title menu shows all its rows: on a screen too short for its rows (a phone on its side) they are
 in two columns, Left and Right going across, Up and Down along the list as
 ever. Where the settings' tabs are too
 narrow to read (the smallest phones), they are one choice, the tab shown
@@ -546,10 +562,10 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | Sense | From |
 | --- | --- |
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
-| `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
-| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (on this device or at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, at full heavy rain about one every 13 s: chosen rates, not measured biology). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
+| `loomLeft`, `loomRight` | When no eye picture is supplied (including eyes Off): how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
+| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (on this device or at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, for the followed fly at full heavy rain about one every 13 s (companions use the base rain rate): chosen rates, not measured biology). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
 | `bumpLeft`, `bumpRight` | Something pushing an antenna back: its tip, just ahead of the head and to its side, inside another fly's body (on this device or at a table) or, in the air, inside anything; on its feet, at anything taller than a step that it walks into, or that it stands against where its foreleg on that side doesn't (standing, its forelegs' tarsi reach further forward than its antennae, so a wall they meet holds its head off it, while a stem between them still touches). Nothing past the table's edge, where there is nothing to touch. 1 while it lasts, however long (any contact deflects an antenna further than its push neurons need, and they answer for as long as it is held), easing out over 0.3 s. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
-| `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
+| `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic lasts 4 to 10 s; its speed depends on forecast wind, event strength, fade and flutter. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
 | `grounded` | On its feet: its legs' load sensors bear its weight. |
 | `maleTaste` | A front leg's tarsus on another fly's body, while it stands (on this device or at a table with others; every fly is a male): the taste of a male's cuticle, 1 while touching, easing out over 0.3 s. |
@@ -586,11 +602,11 @@ Sleep and the daily rhythm).
 
 The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
 with thresholds, smoothing and hysteresis: walk above 0.3
-until below 0.15, back up when `back` beats `walk` by 0.15, take off as
-`escape` rises past 0.4 (the giant fiber at 80 Hz: why there, in `behavior.ts`), groom and wing poses above 0.2, feed above 0.15 until
+until below 0.15, back up above `back` 0.3 when it also beats `walk` by 0.15, take off on its feet when rearmed and outside the 1.5 s refractory period, as
+`escape` reaches 0.4 (the giant fiber at 80 Hz: why there, in `behavior.ts`), groom and wing poses above 0.2, feed above 0.15 until
 below 0.05, sing above 0.4 until below 0.2 and only on its feet (pIP10, the
 song command neuron: why there, in `behavior.ts`), commands older than 500 ms ignored). Steering is continuous: `turn`
-sets the yaw rate (3 rad/s at full turn walking, a third of that standing, 5
+sets the yaw rate (3 rad/s at full turn walking, 35% of that standing, 5
 in the air).
 
 Things the body does that the brain did not decide, each written down where it
@@ -616,7 +632,8 @@ lives (`packages/body/src/motion.ts` unless noted):
   thrust is along its body, so a jump away from the ball would otherwise
   have its wings carry it straight back.
 - **Staying in the world.** It doesn't walk off the table's edge, and in the
-  air it is drawn back inside 360 mm of the middle and below 320 mm.
+  air soft forces draw it toward the place's floor boundary and below its ceiling;
+  these are place-dependent, not hard clamps.
 - **Turning from a wall.** Pressed against a wall it faces for 2 s, it turns
   away (about 125°). The brain feels the wall on its antennae and grooms
   them (Johnston's organ's displacement-sensitive neurons drive the
@@ -636,14 +653,14 @@ lives (`packages/body/src/motion.ts` unless noted):
 - **The song's wing.** Singing, it holds out the wing on the side
   of the nearest other fly (else the one it last sang with; a male extends the
   wing nearer the one he courts), vibrating too fast to see as strokes. The
-  song is shown, not heard. In
-  practice it never does: nothing it meets reaches the courtship neurons (P1)
-  that make pIP10 sing, a male's taste and the sight of one included
+  song is shown, not heard. Recorded probes did not elicit song from the available sensory inputs,
+  including male taste and sight; this is not a hard disable of pIP10
   (`packages/brain/README.md`, Courtship). Another player's fly is not shown
   singing (the table doesn't carry it).
 - **The pose.** Grooming is shown only while it stands, and a bout lingers
   about 1.5 s after the command fades. The crouch follows the
-  raw escape command.
+  raw escape command. Idle head and antenna movements, breathing and occasional
+  foot shifts are procedural animation, not neural readouts (`packages/fly/src/rig.ts`).
 
 The caption ("Walking", "Eating honey", "Grooming", "Flying", "Asleep") names what the
 body is doing on the brain's commands; the stats' In and out shows the
@@ -652,8 +669,8 @@ commands and the neurons themselves.
 ## Sleep and the daily rhythm
 
 The fly keeps the real time of day, whatever light is chosen: its clock follows the
-device's clock and, on an Apple TV that knows them, today's real sunrise and sunset
-(otherwise the game's summer day, 05:40 to 20:10). Like a male fly's, its day has a
+device's clock and, while Real weather is enabled on an Apple TV, its retained
+sunrise and sunset when usable (the rhythm getter does not age-check them; otherwise the game's summer day, 05:40 to 20:10). Like a male fly's, its day has a
 morning peak of activity round dawn and an evening one round dusk, each beginning
 about three hours ahead, a siesta between them, and sleep through the night. Sleep
 pressure builds while it is awake (over about 12 hours) and discharges while it sleeps
@@ -665,17 +682,18 @@ None of this moves the fly. The body works the clock and the pressure out
 and the sleep-promoting neurons the connectome has and shifts its made-up arousal; it
 is the brain that stops walking (`packages/brain/README.md`, Sleep and the daily rhythm,
 says how, with what is real and what stands in). The body only watches: five minutes
-or more without moving is sleep, as the field scores it, and stillness deepens it.
-Asleep, the fly settles a little lower on its legs, its head bowed, without the idle
+or more classified as resting or tasting counts as sleep, and that inactivity deepens it;
+this is an activity-based stand-in, not a test for every displacement or joint movement.
+When resting is classified as sleeping, the fly settles a little lower on its legs, its head bowed, without the idle
 glances and shifts of its feet (the pose's `sleep`, `packages/fly`), and the caption says
 "Asleep". Asleep, the feather resting on it or a raindrop doesn't wake it; stroking it
-nearly always does within a few seconds, and a swoop does. Moving at all wakes it. The canvas's `data-rhythm` gives the hour, the
+nearly always does within a few seconds, and a swoop does. An activity other than resting or tasting resets this sleep score. The canvas's `data-rhythm` gives the hour, the
 clock, the pressure, the depth and how long it has been still.
 
 
 ## Flight
 
-A swoop that fires the giant fiber makes the fly jump and fly: up for a second
+In recorded swoop samples the fly jumped and flew: up for a second
 and a half to three, a few hundred millimetres away from the ball,
 then a glide down onto whatever is under it. Flight is simple physics (lift in
 proportion to the wings' drive, 0.6 holding its weight, and thrust along its
@@ -720,9 +738,8 @@ from it. Without a brain (its commands stale) there is no reflex either.
 **The wings' own sensors** (`wingbeat`, The fly's senses) feel the strokes the
 floor makes as they would any others, so the reflex reaches the brain only
 through them, as a fly's own strokes would: no neuron is driven for it. They
-raise the brain's own wing drive in the air, but never to the floor, so they
-change no flight; and without the floor every take-off is the same hop with
-them as without. They don't make the reflex any less needed, and its floor
+raised the brain's own wing drive in the recorded samples, without reaching
+the floor; without the floor the sampled take-offs were hops with them as without. They don't make the reflex any less needed, and its floor
 stays as it was. Measured in Node on the real connectome, the swoop thrown as
 `apps/web/tests/swoop-escape.budget.ts` throws it (eyes open, seeds 1 to 4, 8
 throws each):
@@ -739,8 +756,8 @@ second later the brain's `wings` is 0 to 0.12 with the floor or without it
 without the floor, lets its wings down within half a second
 (`packages/brain/README.md`, What it does and doesn't reproduce).
 
-Every take-off with the eyes open is a flight of 1.5 to 1.6 s, 375 to 407 mm
-along its way, rising 59 to 72 mm, and lands on its feet; with the eyes shut
+The recorded take-offs with the eyes open were flights of 1.5 to 1.6 s, 375 to 407 mm
+along their way, rising 59 to 72 mm, and landed on their feet; with the eyes shut
 (the hand-wired loom, 6 throws a seed), 2.0 to 3.2 s and 507 to 781 mm.
 Before the reflex they were in the air for 0.07 to 0.12 s. The
 fly often crosses the edge of the picnic table and is drawn back over it to land
@@ -767,8 +784,9 @@ With several flies their eyes take turns, normally one fly's refresh a frame,
 whichever is most overdue: four at 60 fps each get about 15 Hz instead of
 20. Each has its own picture and light adaptation, and its own stand-in is
 left out while it looks round. The pictures shown on screen are still the
-followed fly's. While the ball is in the air the others wait, so a frame
-never refreshes more than one fly's eyes.
+followed fly's. While the ball is in the air the followed fly gets priority at a target of 60 Hz;
+others can refresh on frames when it is not due. No frame refreshes more than
+one fly's eyes. Pending readbacks and reflection refreshes can delay pictures.
 
 Brightness is weighted as a fly's outer photoreceptors (Rh1, mostly blue-green)
 see it, 0.1 R + 0.45 G + 0.45 B, so a blue sky is bright to it. The picture is
@@ -784,7 +802,7 @@ screen's dusk cut a dark ball's contrast from 0.89 to 0.70, and at night to
 goes below 1). What is left of a fly's poorer sight in dim light is the cap: at
 4, night came up to midday's level and a quiet night set the fly off more often
 with nothing thrown at it. While the ball
-is in the air the followed fly's eyes refresh every frame: the looming detectors answer how
+is in the air the followed fly's eyes target 60 Hz, subject to those delays: the looming detectors answer how
 fast dark area grows, and at 20 Hz a throw set off the escape about one time in
 six against one in two at 60 Hz.
 
@@ -831,8 +849,9 @@ second after the ball has gone: through the brain's own eyes in Node
 throws of 40 with the ON pathway against 39 without. In the game the count
 swings from run to run with where the fly comes to stand (40 throws at midday:
 29 and, in a run where it stopped seeing the ball after the second, 2 with it;
-33 without). There is no lightning in this game's weather, and the fireflies
-aren't drawn into the eyes.
+33 without). Those observations predate the current lightning effects;
+fireflies are not drawn into the eyes. They do not establish current storm
+response rates.
 
 **View → Fly's eyes** shows the same picture to the player: one dot per facet
 (the brain's 1,772, or, for a brain without eyes, a stand-in layout labelled as
@@ -886,15 +905,16 @@ lamina as a curved plate round the centre of the sphere that fits it; the
 mushroom body's peduncle and lobes and the protocerebral bridge as rods
 through slices of their meshes; the ellipsoid body as the torus that fits it;
 and where each of the cord's nerves leaves it. The brain is drawn at 0.88 of
-true size (the model's head is a little narrower than a real male's, its
+nominal atlas size (using a 2.4 mm body length; the model's head is a little narrower than a real male's, its
 eyes true to size) and tipped 7° nose-down so the subesophageal zone sits over
-the proboscis; the cord at true size, tipped up 6° to lie along the thorax's
+the proboscis; the cord at nominal atlas size, tipped up 6° to lie along the thorax's
 floor, its leg neuropils over the coxae and their nerves leaving where the
 dataset's do (the hind leg's straight back off T3, as in the fly). The
 dataset is a CNS dissected out of the fly, so its brain–cord posture isn't
 the fly's: the two are placed separately and joined by a connective through
 the neck. The retina isn't in the dataset; it is drawn as a cup bent to the
-model's eye, 80–100 µm of photoreceptors under the lens. Nerves follow the
+model's eye, a schematic plate 0.026 body lengths thick at most: 62.4 µm in the
+2.4 mm atlas convention, 65 µm at the game's 2.5 mm fly scale. Nerves follow the
 literature and the dataset's nerve stubs: each leg's motor axons go as far as
 the tibia (there are no muscles in the tarsus), its sensory axons from the
 tip of the tarsus; the flight motor axons up the posterior dorsal
@@ -983,15 +1003,15 @@ or inferred axon paths are added. A host missing a readout leaves its group
 dark. Region surfaces remain region averages. The static blue tissue stain
 and outline have higher contrast; only activity changes their warm glow.
 
-**What stays dark, and what it can't show.** The retina, smell and the legs',
-wings and thorax's and abdomen's sensory neurons never fire in this model (the
-light enters one synapse in, at the lamina; there is no sense of smell; of
-the body's senses only touch and the legs' load are driven): they are drawn,
-and stay dark. The mushroom body, lateral horn, superior protocerebrum,
-antennal lobe and central complex fire under 2 Hz on a 5 Hz scale and stay
-nearly dark. A region glows with the mean of all its neurons, so in its regional surface a command
-carried by a few hardly shows: the giant fibre's escape is one neuron among
-660 descending ones, and what shows of an escape is the optic lobes, the
+**What stays dark, and what it can't show.** The retina and smell have no
+direct sensory drive: light enters at the lamina and there is no smell input.
+Body inputs also include antenna displacement, wind, sweet taste, male taste,
+leg load and wingbeat, as well as touch; sensory regions must not be assumed
+silent. Historical observations put the mushroom body, lateral horn, superior
+protocerebrum, antennal lobe and central complex under 2 Hz on a 5 Hz scale;
+these are observations, not enforced activity limits. A region glows with the mean of all its neurons, so in its regional surface a command
+carried by a few hardly shows: each side's giant fibre is one neuron among roughly
+660 descending ones (662 left, 654 right), and what shows of an escape is the optic lobes, the
 visual projection neurons and the motor neurons it sets going (the jump's
 are among the middle leg's). The cord's interneurons light their side's
 whole cord together, for now. The region shapes are an anatomical drawing; only the command-group somata
@@ -1004,11 +1024,12 @@ glowing at 0.05 or more, brightest first) say what is shown.
 On the Apple TV the game renders 640×480, laid out for 16:9 (the picture is
 squeezed into the 4:3 buffer and stretched back out), with no antialiasing and
 a pixel ratio of 1. Elsewhere (`apps/web/src/display.ts`) the frame takes the
-screen's shape with square pixels and the same number of them, 640×480 =
-307,200: 739×416 in a 16:9 window, exactly 640×480 at 4:3, 376×815 on a phone
+screen's shape with square pixels between aspect ratios 1:4 and 4:1
+(more extreme shapes stretch), with rounded dimensions near 640×480 =
+307,200 pixels: 739×416 in a 16:9 window, exactly 640×480 at 4:3, 376×815 on a phone
 held upright, 853×360 on an ultrawide. So the pixels are as chunky for the
 size of the screen as on the TV (each covers about the same area of it), the
-GPU fills as many, and nothing costs more for the shape. Settings → Picture →
+GPU fills approximately as many; visible geometry and layout costs can still vary. Settings → Picture →
 Pixels renders the world at a half or a third of the frame each way (on the
 TV 320×240 or 214×160) under crisp menus at the frame's own size. Resizing or
 turning the screen lays the frame and every layout out again at the start of
@@ -1030,27 +1051,27 @@ to the shorter side, and at least 1.25 CSS pixels on a touch screen, so that
 a finger has room) inside the screen's safe area, and comes out exactly where
 it always was on the TV.
 
-The backdrop (sky, clouds, hills, lollipop trees, lawn, daisies,
+At the picnic, the backdrop (sky, clouds, hills, lollipop trees, lawn, daisies,
 lake) and the table are two passes with their own depth ranges. Static things
 are merged by material into a handful of meshes with vertex colours and frozen
 matrices (the crumbs, pips and saucer go into those too, and the small things'
 contact shadows are one merged mesh); seeds, sugar grains, dew, trees,
-daisies, clouds, bubbles, fireflies, puffs and food are instanced. Rain is
-three draws, only while it rains: the streaks (one quad a drop, placed and
-moved entirely in the shader from the time), the splashes (a pool of 56, each
-a ring and a crown of droplets, one instanced draw) and the beads on the fruit;
+daisies, clouds, bubbles, fireflies, puffs and dropped food are instanced. Rain and lingering wetness use
+three instanced meshes, each gated separately: the streaks (one quad per drop, positioned in the shader from shared
+camera, offset and weather uniforms; JavaScript advances the shared offset), the splashes (a pool of 56, each
+a ring and a crown of droplets in one instanced mesh) and the beads on the fruit, which can remain while it dries;
 the table's own beads and puddles are in its shader, as many as there are
 pixels for. The ripple round food that has just landed is one draw for under
 a second. Each visitor is one draw while it is about, the gull's shadow is
-in the table's and the fly's own shading, and nothing is allocated per frame.
+in the table's and the fly's own shading, with reusable animation state.
 The footprints are one instanced draw while any are left (at most 128, two
 triangles each), multiplied into what they lie on, so they need no light; a
 print is written only when a foot is set down, and fades in the shader.
 Menus and hints are one 2D canvas drawn over the frame,
-uploaded only when something on it changes (at most 30 times a second; the
-in-game shimmer at 10).
+uploaded when dirty, normally capped at 30 redraws a second between resizes;
+a resize permits an immediate redraw. The in-game shimmer marks it dirty at 10 Hz.
 
-Measured in Chromium on an M-series Mac (Settings → Picture → Frame stats shows it live,
+Historical measurements in Chromium on an M-series Mac (exact model and capture date not recorded) (Settings → Picture → Frame stats shows it live,
 and the canvas's `data-calls`, `data-triangles`, `data-frame-ms` and
 `data-eyes-ms`): playing, 23 draws and about 106,000 triangles a frame (in
 rain 26 and 118,000, and about 0.07 ms more JavaScript; with a butterfly, a
@@ -1069,7 +1090,9 @@ the body's joint uniforms, its glow a uniform array of 24 vec4s, a float for eac
 16,000 triangles; the panel one more draw (the same geometry, its backdrop the
 first two triangles) and the same triangles; JavaScript per frame within the
 noise of none (the glow, the X-ray's easing and the corners together are
-about 12 µs a frame in V8's interpreter alone). The end-to-end test fails above 150
+about 12 µs a frame in V8's interpreter alone). These historical counts and timings
+are not current multi-fly or anatomy budgets; the glow-array layout above is a
+historical description too, not the current geometry's uniform capacity. The end-to-end test fails at or above 150
 draws or 500,000 triangles. Physical Apple TV measurements and the unattended
 soak command are in [docs/apple-tv.md](docs/apple-tv.md).
 
@@ -1083,21 +1106,27 @@ measurements. On the Apple TV it is drawn as it always was.
 ## Remote and host
 
 The game reads the remote only as `packages/contracts/src/remote.ts` describes,
-and sets `window.__flyAtRoot` while on the title (or loading), where Back
-leaves the app. A host that wraps the web build (the iPhone and iPad app)
+and sets `window.__flyAtRoot` while on the title (or loading), where the Apple TV host handles Back
+by leaving the app. A host that wraps the web build (the iPhone and iPad app)
 shows it edge to edge and says what its notch and home indicator cover by
 assigning `window.__flySafeArea` (`packages/contracts/src/screen.ts`) and
 dispatching a `resize`; otherwise CSS `env(safe-area-inset-*)` says. Arrow presses that arrive during a fast swipe are taken as the
-swipe's and ignored. In a browser the brain is `packages/brain` in a Web Worker
-(`apps/web/src/brain/worker-driver.ts`), fed the connectome in its wire form
+swipe's and ignored. In a browser the brain runs in a Web Worker: `packages/brain-native` as
+WebAssembly by default where supported, with `packages/brain` TypeScript as
+fallback (`?brain=wasm` or `?brain=typescript` selects explicitly)
+(`apps/web/src/brain/create.ts`; worker transport in
+`apps/web/src/brain/worker-driver.ts`), fed the connectome in its wire form
 (`apps/web/src/brain/wire.ts`: 14 MB gzipped where plain gzip makes 21),
 which `apps/web/src/brain/download.ts` fetches with its bytes counted, keeps
-in the browser's cache and checks against the digest the build recorded
+in the browser's cache, checks each part's length and, when WebCrypto is
+available and succeeds, checks its recorded SHA-256
 (`scripts/webBuild.ts`; the dev server serves the same file). The page sleeps
-while hidden, holds the screen awake while it is the screensaver, and recovers
+while hidden, requests a screen wake lock while visible in screensaver mode
+where supported (requests can be refused), and recovers
 from a lost graphics context (`apps/web/src/page.ts`); `docs/web.md` has the
 rest. On the Apple TV it is `globalThis.__native.brain`
-(`apps/web/src/brain/native-driver.ts`), which allocates nothing per frame.
+(`apps/web/src/brain/native-driver.ts`), which reuses its buffers and decoded state during steady-state ticks;
+initialization and error handling can allocate.
 The settings, the shelf's kept choices and what the hints have taught are in
 `localStorage` (`apps/web/src/settings.ts`); from a save made by another
 build, or a broken one, only what this build can use is kept.
@@ -1112,10 +1141,11 @@ and the moon by night, or a lamp's light on and still through the night, for
 every place's palettes and an indoor-like set; a room sees less of the
 weather); the
 weather (the same forecast for the same hour, changing slowly over a month,
-every kind over two months with clear the commonest, mist only in the morning
-and rain only under cloud, wetting and drying); the weather outside
-(WeatherKit's conditions to the game's weathers, snow and thunder to the
-nearest; the real sunrise and sunset on the clock's day for long and short
+the four base kinds over two months with clear the commonest, mist only in the
+morning and rain only under cloud, wetting and drying; seasonal precipitation
+and the extended weather presets separately); the weather outside
+(WeatherKit's conditions to the game's weathers, distinct snow, flurries,
+sleet and electrical storms; the real sunrise and sunset on the clock's day for long and short
 days, a sunset before the clock's, polar day and night, never jumping; easing
 in and out, too old an answer, turning it off, one kept from the last run, and
 feeding it in a browser); the pacing of the picnic's
@@ -1148,24 +1178,28 @@ kept between launches (the settings, the shelf's choices and what the hints
 have taught come back as saved, old and broken saves fall back to the
 defaults, the light and the weather only for six hours, never the fly's eyes),
 which hints show once something has been used, and the settings' pages
-(every setting on one page, a step from the top, none scrolling); the
+(settings grouped into pages, with short-screen scrolling); the
 camera (the fly's size on screen in each view, kept in the picture through a
-long wandering walk and a jump, never inside anything, never jumping); the
+scripted walking trajectory; the airborne test requires it in frame for more than
+60% of flight frames and allows 1.5 s for landing recovery; collision and
+continuity checks cover sampled trajectories); the
 corner pictures (when what it sees and its nervous system show, their way
 round the corners together, stacked and never overlapping, clear of the
 hints, every facet a dot inside its picture); the nervous system (every
-region drawn and every part lit by exactly one, on its own side and in its
+placed region mapped, unplaced rates retained without lighting anatomy,
+and each lit part assigned to exactly one region or command group, on its own side and in its
 role's colour; a glow is its rate on its region's scale and rises and falls
 as it should; the X-ray only where it's asked for and the fly is big enough;
 the brain inside the head and the cord on the thorax's floor, the nerves
-inside the legs in every pose; nothing allocated per frame); the
+inside the legs in tested poses; the glow, X-ray and corner probe permits
+boxed-number-sized samples but rejects sampled allocations of other sizes); the
 bubbles (low ones mostly pass the fly, pop on surfaces without settling,
 keep coming, and burst on the fly and are felt);
 that the crumbs, pips, strawberry and saucer can be walked over, and the
 lemonade's lid and straw are drawn where the fly stands; at the windowsill the
 banana, the bowl, the basil's saucer and its crown, the alarm clock and its
 bells, the honey jar and the finds from the beach, with the glass a wall and
-a ledge at its foot, and no hollow where a falling fly could be caught; that
+a ledge at its foot, and sampled crown heights and slopes; that
 the bar's clock is out of reach and seen over the counter from anywhere on
 it; that the ball comes over what is in its way, and round a window.
 
@@ -1202,13 +1236,15 @@ breaks off partway counts the brain's bytes and carries on from the break, a
 second loads with the network off, a hidden tab sleeps and wakes without a
 jump, the screensaver holds the screen awake, a lost graphics context comes
 back, losing the network on a first visit and a browser without WebGL 2 each
-say so, and nothing is asked of any other site. A browser has no weather outside: scripts
+say so, and checks that its solo build needs no other site. Then
+`apps/web/e2e/tables.e2e.ts` tests online rooms and shared state, followed by
+`apps/web/e2e/first-minute.e2e.ts` for early exploration and lessons. A browser has no weather outside: scripts
 feed it with `__fly.outside.feed({...})` (`OutsideConditions` without its
 `source`, or `null` to take it away; `node scripts/play.ts eval:...`), and the
 canvas's `data-weather-from` (`outside`, `forecast` or `chosen`),
 `data-sun-from` (`outside`, `clock` or `chosen`), `data-outside` (the
 service's state: `none` without one, `off`, `fed`, `locating`, `fetching`,
-`ok`, `denied`, `no-location`, `offline`, `unauthorised`, `failed`) and
+`idle`, `ok`, `denied`, `no-location`, `offline`, `unauthorised`, `failed`) and
 `data-outside-age` (seconds) say where the weather comes from and how old it
 is. `node scripts/play.ts` drives and screenshots the game step by step (see
 the comment at its top); `node scripts/measure.ts` measures it on a throttled
