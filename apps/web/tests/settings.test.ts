@@ -186,8 +186,8 @@ test("a kind or a tool the shelf no longer has is passed over, as is anything ma
 
 test("what the hints have taught comes back, of the lessons this build has", () => {
   const store = memory();
-  saveLearned({ tools: true, feed: true, feather: true }, store);
-  assert.deepEqual(loadLearned(store), { tools: true, feed: true, feather: true });
+  saveLearned({ arrival: true, tools: true, hand: true, feed: true, feather: true }, store);
+  assert.deepEqual(loadLearned(store), { arrival: true, tools: true, hand: true, feed: true, feather: true });
   // A tool since dropped, or a value that isn't a plain yes, is passed over.
   const old = memory({ "flies.learned": JSON.stringify({ tools: true, lamp: true, swoop: 1, blow: "yes", place: true }) });
   assert.deepEqual(loadLearned(old), { tools: true, place: true });

@@ -10,6 +10,7 @@ import { BELOW, Daylight, SETTING, TIMES, aboveHorizon, blankLight, clockLight, 
 import type { Light, Palette, Palettes, TimeOfDay } from "../src/scene/light.ts";
 import { KINDS } from "@fly/world";
 import type { Weather } from "../src/scene/weather.ts";
+import { WeatherNow } from "../src/scene/weather.ts";
 
 /** Palettes unlike the picnic's: a room whose "sun" is a window, high all day, and a lamp at night. */
 const ROOM: Palettes = Object.fromEntries(
@@ -107,7 +108,7 @@ test("the time of day a clock hour is called", () => {
   assert.equal(timeAt(3), "night");
 });
 
-const clear: Weather = { ...KINDS.clear, wet: 0, kind: "clear" };
+const clear: Weather = { ...KINDS.clear, wet: 0, heavy: 0, storm: 0, snow: 0, snowCover: 0, lightning: 0, kind: "clear" };
 
 test("a chosen time eases in over a couple of seconds and then is exactly its palette", () => {
   const palettes = SCENES.picnic.palettes;
@@ -140,7 +141,7 @@ test("following the clock eases there from a chosen time, then moves with it; se
 test("a room open to the weather only through its windows feels it less", () => {
   const out = new Daylight("noon", ROOM);
   const room = new Daylight("noon", ROOM, 0.4);
-  const grey: Weather = { ...KINDS.overcast, wet: 0, kind: "overcast" };
+  const grey: Weather = { ...KINDS.overcast, wet: 0, heavy: 0, storm: 0, snow: 0, snowCover: 0, lightning: 0, kind: "overcast" };
   out.update(0, grey);
   room.update(0, grey);
   assert.ok(room.sunIntensity > out.sunIntensity * 2, "more of its daylight left");
@@ -190,7 +191,7 @@ test("a light crossing the azimuth seam takes the short way instead of swinging 
   const palettes: Palettes = { ...ROOM, morning: { ...ROOM.morning, sunAround: 3.1 }, noon: { ...ROOM.noon, sunAround: -3.1 } };
   const light = new Daylight("morning", palettes);
   light.follow(9, true);
-  light.update(0, { ...KINDS.clear, wet: 0, kind: "clear" });
+  light.update(0, { ...new WeatherNow(), ...KINDS.clear, wet: 0, kind: "clear" });
   assert.ok(light.sunDirection.z > 0.8, "halfway between the bearings still faces the same wall");
 });
 
@@ -203,7 +204,7 @@ test("a dusk light at the lamp threshold stays on through the night", () => {
 
 test("rain changing by itself updates the light and darkens an overcast room", () => {
   const light = new Daylight("noon", ROOM);
-  const weather: Weather = { cloud: 0.6, mist: 0, rain: 0, wet: 0, wind: 0, kind: "overcast" };
+  const weather: Weather = { ...new WeatherNow(), cloud: 0.6, mist: 0, rain: 0, wet: 0, wind: 0, kind: "overcast" };
   light.update(0, weather);
   const middle = light.middle.clone();
   const ambient = light.hemiIntensity;
@@ -214,7 +215,7 @@ test("rain changing by itself updates the light and darkens an overcast room", (
 
 test("mist changing by itself updates the haze, then holds until the weather changes again", () => {
   const light = new Daylight("noon", ROOM);
-  const weather: Weather = { ...KINDS.clear, kind: "clear", wet: 0 };
+  const weather: Weather = { ...new WeatherNow(), ...KINDS.clear, kind: "clear", wet: 0 };
   light.update(0, weather);
   const haze = light.haze.clone();
   assert.equal(light.update(0, { ...weather, mist: 0.8 }), true);

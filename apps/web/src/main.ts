@@ -2,6 +2,7 @@
 // loop. In a browser also the page's lifecycle (page.ts) and the frame rate
 // this device can afford (quality.ts); if it can't draw at all, it says so.
 
+import { accessibilityEnabled, browserAccessibility } from "./accessibility/browser.ts";
 import { AT_ROOT_PROPERTY } from "@fly/contracts";
 import { HitMap } from "@fly/ui";
 import { Display } from "./display.ts";
@@ -15,7 +16,15 @@ import { loadingLayout } from "./ui/layout.ts";
 import { drawFailure } from "./ui/loading.ts";
 import { drawWordmark } from "./ui/wordmark.ts";
 
-const canvas = document.getElementById("game") as HTMLCanvasElement;
+let canvas = document.getElementById("game") as HTMLCanvasElement;
+if (canvas.dataset.boot) {
+  const screen = document.createElement("canvas");
+  screen.id = "game";
+  screen.width = canvas.width;
+  screen.height = canvas.height;
+  canvas.replaceWith(screen);
+  canvas = screen;
+}
 // The Apple TV host: the remote is all there is, and the screen never changes.
 const native = !!(globalThis as { __native?: unknown }).__native;
 const display = new Display(native);
@@ -46,6 +55,7 @@ if (game) {
     game.quality = new Quality(storage(), (globalThis as { __quality?: number }).__quality ?? null);
     game.applySettings(false);
     page = new Page(game, canvas);
+    if (accessibilityEnabled(location.search)) browserAccessibility(game);
     Page.keepForOffline();
   } else {
     // The host stops frames in the background and says so: a room hears at once that the fly is
