@@ -12,7 +12,7 @@
 
 import * as THREE from "three";
 import type { Food, Vec3, World } from "@fly/world";
-import { BREEZE, PATCHES, Pace, SOLIDS, TABLE_RADIUS } from "@fly/world";
+import { BREEZE, PATCHES, Pace, SOLIDS, TABLE_RADIUS, createSurface } from "@fly/world";
 import type { Happening } from "@fly/world";
 import { paint } from "../../scene/build.ts";
 import type { Daylight } from "../../scene/light.ts";
@@ -106,6 +106,7 @@ export class Goings {
   #world: World | null = null;
   #fly: Readonly<Vec3> = { x: 0, y: 0, z: 0 };
   #wind = { x: 0, z: 0 };
+  #rainSurface = createSurface();
   #splashes = { near: 0, close: 0, far: 0, pool: 0 };
   #time = 0;
   #last = -1;
@@ -165,6 +166,7 @@ export class Goings {
     const around = this.#around;
     const busy = (kind === "butterfly" && this.#butterfly.active) || (kind === "ladybird" && this.#ladybird.active) || (kind === "gull" && outside.gull.on) || (kind === "boat" && outside.boat.on) || (kind === "leaf" && !this.#leaves.free) || (kind === "gust" && this.#gust.on);
     if (!around || busy) return;
+    if (around.shared?.ownSky && kind !== "juice" && !this.#can(kind, around.weather)) return;
     this.#random = this.#butterfly.random = this.#ladybird.random = this.#leaves.random = random;
     this.#start(kind, around);
   }
@@ -373,10 +375,11 @@ export class Goings {
       const x = f.x + u * Math.cos(f.angle) + v * Math.sin(f.angle);
       const z = f.z - u * Math.sin(f.angle) + v * Math.cos(f.angle);
       if (around.world.heightAt(x, z) > 0.3) continue;
-      slot.food = around.pantry.add("strawberry juice", x, z, 1.1, 0.8);
+      const lasts = this.#range(...JUICE_LASTS);
+      slot.food = around.pantry.add("strawberry juice", x, z, 1.1, 0.8, undefined, lasts + 20);
       slot.to.set(x, slot.food.y, z);
       slot.from.copy(slot.to);
-      this.#show(slot, this.#range(...JUICE_LASTS), 4);
+      this.#show(slot, lasts, 4);
       return;
     }
   }
@@ -429,7 +432,7 @@ export class Goings {
           // Rolling to a stop against the fly, it stops short of it.
           if (k >= 1 || Math.hypot(f.mesh.position.x - fly.x, f.mesh.position.z - fly.z) < 3) {
             const { x, z } = f.mesh.position;
-            f.food = pantry.add("biscuit crumb", x, z, 0.9, 0.5);
+            f.food = pantry.add("biscuit crumb", x, z, 0.9, 0.5, undefined, Math.max(0.001, f.lasts + 20 - f.age));
           }
           continue;
         }
@@ -482,13 +485,14 @@ export class Goings {
     }
     if (Math.random() < (dt * rain) / RAIN_HIT_EVERY) {
       felt.touch = Math.max(felt.touch, RAIN_TOUCH);
-      this.rain.splash(fly.x, fly.y + 0.9, fly.z, 0.9);
+      this.rain.splash(fly.x, fly.y + 0.9, fly.z, 0.9, false);
     }
   }
 
   #land(world: Around["world"], x: number, z: number) {
     if (!world.onTable(x, z)) return;
-    this.rain.splash(x, world.heightAt(x, z), z, range(0.9, 1.5));
+    const surface = world.surface(x, z, this.#rainSurface);
+    this.rain.splash(x, surface.y, z, range(0.9, 1.5), surface.solid < 0);
   }
 }
 

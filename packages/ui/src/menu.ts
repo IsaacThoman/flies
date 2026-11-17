@@ -19,9 +19,10 @@ export type ActionItem = {
   hint?: string;
   /** A dot of colour at its left: what it is about, where words would be too many (a fly at a table, by its player's colour; a room's place). */
   swatch?: string;
-  /** How many of how many, as pips at its right (the flies in a room), and a padlock, for what needs a password. */
+  /** How many of how many, as pips at its right (the flies in a room); a padlock, for what needs a password; a globe, for a room open to everyone. */
   count?: readonly [number, number];
   locked?: boolean;
+  everyone?: boolean;
 };
 /** A choice; `tabs` draws its options side by side, every one to be pressed, as the tabs across the top of a page. */
 export type ChoiceItem<V = unknown> = { kind: "choice"; id: string; label: string; options: readonly Option<V>[]; index: number; disabled?: boolean; hint?: string; tabs?: boolean };

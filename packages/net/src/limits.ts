@@ -213,14 +213,16 @@ export const LIMITS = {
 
 /**
  * What each address may do with rooms, as [per minute, at once] where it is
- * a rate: connections open at once; connections opened (a device opens one
+ * a rate: connections open at once (enough for a house, a school or a phone
+ * network behind one address, now that every device sits in a room open to
+ * everyone unless told not to); connections opened (a device opens one
  * again only after it drops, later each time, so this is many devices'
  * worth; and it keeps guessing tables' codes hopeless); rooms started (an hour's worth: 30);
  * tries at a locked room's password, from one address and at one room, so
  * that guessing one is hopeless (a few dozen tries an hour at most).
  */
 export const ROOM_LIMITS = {
-  connections: 24,
+  connections: 64,
   opens: [60, 30],
   starts: [0.5, 5],
   knocks: [3, 5],

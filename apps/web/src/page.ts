@@ -43,7 +43,7 @@ export class Page {
     });
     canvas.addEventListener("webglcontextlost", () => game.contextLost());
     canvas.addEventListener("webglcontextrestored", () => game.contextRestored());
-    window.addEventListener("online", () => game.retryBrain(true));
+    window.addEventListener("online", () => game.networkBack());
     // Opened in a background tab: asleep until it is first seen.
     if (document.hidden) this.#sleep();
     this.#publish();
