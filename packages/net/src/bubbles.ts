@@ -58,12 +58,18 @@ export class TableBubbles {
   /** How hard it is raining (0 to 1): the table's weather. */
   rain = 0;
 
-  constructor(seed: number, world: World, count: number) {
+  /**
+   * Each slot's first bubble is blown at room time `start` (s). The room
+   * starts them when it does (a table started, carried here, or woken), and
+   * tells every device the bubbles as they stand: from 0, they would have
+   * all the time the room has been up to catch up on first.
+   */
+  constructor(seed: number, world: World, count: number, start = 0) {
     this.#seed = seed;
     this.#world = world;
     for (let i = 0; i < count; i++) {
       const b = {} as TableBubble;
-      this.#blow(b, i, 0, 0);
+      this.#blow(b, i, 0, start);
       // Spread along their way at the start, as the scene's are.
       b.x0 += stream(mix(this.#seed, i, -1))() * 900;
       this.slots.push(b);

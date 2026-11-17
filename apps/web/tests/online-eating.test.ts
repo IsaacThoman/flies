@@ -1,0 +1,93 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import * as THREE from "three";
+import type { BrainDriver, TableSocket } from "@fly/contracts";
+import { Life } from "../src/life.ts";
+import { Online } from "../src/online/online.ts";
+import type { TableHost } from "../src/online/online.ts";
+import { Hands } from "../src/tools/hands.ts";
+import { Hunger } from "@fly/body";
+import { DROP_ID, TableFood, toWire } from "@fly/net";
+import { createPicnic } from "@fly/world";
+import { TablePantry } from "../src/online/table-pantry.ts";
+
+for (const outcome of ["refused", "trimmed", "accepted"] as const) test(`${outcome} nutrition comes only from acknowledged eating`, () => {
+  const world = createPicnic();
+  const table = new TableFood(world, []);
+  const food = table.drop(1, DROP_ID + 1, "berry", 20, 20)!;
+  const pantry = new TablePantry(world);
+  pantry.confirmed = true;
+  pantry.mirror.welcome([toWire(food)]);
+  const mine = pantry.foods[0];
+  if (outcome === "trimmed") food.amount = 0.03;
+  const hunger = new Hunger();
+  const expected = new Hunger();
+  const predicted = pantry.eat(mine, 1, 0.3);
+  assert.equal(predicted, 0, "an unconfirmed bite must not feed the hunger account");
+  hunger.step(0.3, predicted * mine.sweet);
+  expected.step(0.3, 0);
+  assert.deepEqual(hunger, expected);
+  pantry.mirror.sent(1);
+  const result = table.bite(1, mine.id, 0.099, outcome === "refused" ? 200 : 20, mine.y, 20, 0);
+  const changed = table.flush()!;
+  const meal = pantry.mirror.apply(1, changed.amounts, changed.gone, table.eaten.get(1) ?? 0, table.takeMeal(1));
+  assert.ok(Math.abs(meal[0] - result.granted) < 1e-8);
+  assert.ok(Math.abs(meal[1] - result.granted * 0.8) < 1e-8);
+  hunger.step(0.1, meal[1]);
+  expected.step(0.1, result.granted * 0.8);
+  assert.deepEqual(hunger, expected);
+  assert.equal(pantry.mirror.pending, 0);
+  assert.ok(Math.abs((pantry.foods[0]?.amount ?? 0) - (table.find(mine.id)?.amount ?? 0)) < 1e-4);
+  assert.deepEqual(table.takeMeal(1), [0, 0], "nutrition is granted once");
+});
+
+test("a refused final bite restores food removed by local prediction", () => {
+  const world = createPicnic();
+  const table = new TableFood(world, []);
+  const food = table.drop(1, DROP_ID + 1, "sugar", 20, 20)!;
+  food.amount = 0.01;
+  const pantry = new TablePantry(world);
+  pantry.confirmed = true;
+  pantry.mirror.welcome([toWire(food)]);
+  const mine = pantry.foods[0];
+  pantry.eat(mine, 1, 0.1);
+  pantry.mirror.sent(1);
+  table.bite(1, mine.id, 0.01, 200, mine.y, 20, 0);
+  const change = table.flush()!;
+  pantry.mirror.apply(1, change.amounts, change.gone, 0, table.takeMeal(1));
+  assert.equal(pantry.foods[0]?.amount, 0.01);
+});
+
+test("an older room retains optimistic nutrition without crediting its historical cumulative total twice", () => {
+  const world = createPicnic();
+  const pantry = new TablePantry(world);
+  const food = pantry.drop("berry", 20, 20);
+  const bite = pantry.eat(food, 1, 0.1);
+  assert.ok(bite > 0);
+  pantry.mirror.sent(1);
+  assert.deepEqual(pantry.mirror.apply(1, [[food.id, 0.9]], [], 10), [0, 0]);
+});
+
+test("an online food receipt feeds Life and its hunger exactly once", (t) => {
+  const gradient = { addColorStop() {} };
+  const context = new Proxy({}, { get: () => () => gradient });
+  (globalThis as { document?: unknown }).document = { createElement: () => ({ getContext: () => context }) };
+  const world = createPicnic();
+  const brain = { status: "running", stateAt: 0, state: { command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 } }, tick() {} } as unknown as BrainDriver;
+  const life = new Life(world, brain);
+  const host = { scene: new THREE.Scene(), life, hands: new Hands(world), fly: { model: { mark() {} } }, bubbles: { table: null } } as unknown as TableHost;
+  const socket: TableSocket = { status: "connecting", closeCode: 0, closeReason: "", send() {}, drain() {}, close() {} };
+  const online = new Online(host, () => socket, "ws://test", "abcdefghjk", "key", null);
+  t.after(() => { online.leave(); online.dispose(); });
+  const expected = new Hunger();
+  online.line.onMessage({ type: "food", ack: 1, amounts: [], gone: [], eaten: 0.1, meal: [0.1, 0.08] });
+  assert.equal(life.eaten, 0.1);
+  life.step(0.1, 0);
+  expected.step(0.1, 0.08);
+  assert.deepEqual(life.hunger, expected);
+  online.line.onMessage({ type: "food", ack: 1, amounts: [], gone: [], eaten: 0.1, meal: [0, 0] });
+  life.step(0.1, 0);
+  expected.step(0.1, 0);
+  assert.equal(life.eaten, 0.1);
+  assert.deepEqual(life.hunger, expected);
+});

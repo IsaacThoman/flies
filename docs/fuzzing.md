@@ -40,17 +40,25 @@ walking, backing and flight drives; varies frames from 10 microseconds to two
 seconds; blows gusts up to 600 mm/s; and starts elsewhere every simulated
 minute. Each step checks finite coordinates, velocities, normals and motion
 scalars, nonpenetration (its feet out of every solid, and its body's 1.3 mm
-over them clear of every underside, walking or flying), standing on the
+over them clear of every underside, walking or flying), its reach (`checkReach`:
+its head, thorax and abdomen out of everything in the air, and on its feet
+those and its legs out of every side, and every slope too steep to stand on,
+past a step over its feet; its legs only where it stands between two things
+facing each other, against both, closer than they reach), standing on the
 surface at or below its feet (height, slope, floor, and the surface it
 thinks it stands on), landing events and bounded excursions from the floor
 and ceiling. Straight walking paths are
 also ray-checked for tunneling; bent sliding paths cannot be checked using
-their chord. Dedicated regressions check thin walls and a grazing box corner.
+their chord. Dedicated regressions check thin walls and a grazing box corner,
+and what the body reaches at panes, walls, corners, a card thinner than its
+head, a slab's edge and a gap narrower than its legs (`packages/body/tests/reach.test.ts`).
 Every 30 simulated seconds, recovery probes remove wind and wings, require a
 landing inside 20 seconds, then try eight walking headings (3 seconds each)
 and take-off headings. At least one walking heading must travel 3 mm and at
 least one launch must rise 2 mm, except under something lower than that over
-its body, where walking out is the only way. These checks sample recovery; they are not an
+its body, where walking out is the only way, and in a pocket it fell into
+whose every way out within those 3 mm is narrower than its body, where flying
+out is the only way. These checks sample recovery; they are not an
 exhaustive proof of every point in the world.
 
 The life fuzzer uses `InProcessBrain`, a synchronous `BrainDriver` backed by
@@ -64,7 +72,8 @@ preserve the brain, set the fly at the new start (on the surface its `y`
 names) standing still, and replace all food with the new patches. Food
 dropped where the fly or a random start is lies on that surface, not on
 whatever is over it.
-Commands, readout/region rates, stats, senses and food amounts are checked.
+Commands, readout/region rates, stats, senses and food amounts are checked,
+and the body as the body fuzzer checks it, its reach included.
 Rolling ten-minute checks require walking, resting and motion with a live
 brain; runs of at least ten minutes must also eat. Reports include the
 observed activity durations, travel, meals, take-offs, stimuli and carry modes.
