@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { GREENHOUSE_PATCHES, GREENHOUSE_SOLIDS } from "@fly/world";
+import { GREENHOUSE_PATCHES, GREENHOUSE_SOLIDS, topPeak } from "@fly/world";
 import { BUMP, NOISE } from "../windowsill/surfaces.ts";
 
 export const K = { wood: 0, clay: 1, soil: 2, leaf: 3, tomato: 4, fig: 5, metal: 6, paint: 7, label: 8, string: 9, juice: 10, fallen: 11 };
@@ -15,7 +15,7 @@ export function surfaces() {
     uWet: { value: 0 }, uSun: { value: new THREE.Vector3(0, 1, 0) }, uDirect: { value: 1 },
     uContacts: { value: GREENHOUSE_SOLIDS.filter(s => ["terracotta pot", "watering can", "water saucer", "fallen tomato", "split fig", "trowel blade"].includes(s.name)).map(s => {
       const f = s.footprint;
-      return new THREE.Vector4(f.x, f.z, f.kind === "circle" ? f.r : f.kind === "ellipse" ? f.rx : f.hx, s.top.kind === "flat" ? s.top.y : s.top.kind === "dish" ? s.top.rim : s.top.base + s.top.height);
+      return new THREE.Vector4(f.x, f.z, f.kind === "circle" ? f.r : f.kind === "ellipse" ? f.rx : f.hx, topPeak(s.top));
     }) },
   };
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, envMapIntensity: 0.7 });
