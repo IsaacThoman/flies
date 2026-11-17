@@ -13,10 +13,10 @@ import os from "node:os";
 import path from "node:path";
 import { WebSocket } from "ws";
 import {
-  BITES, BITES_MAX, DROP_ID, EVERYONE, EVERYONE_ROOMS, FLIES, FLY, FLY_MAX, FOUND_ID, HANDS, MAX_PLAYERS, PROTOCOL, ROOMS_PATH, TABLE_LIGHTS, TABLE_WEATHERS, WIRE_FOODS_MAX, createFlyState,
-  decodeFlies, encodeBites, encodeFly, everyoneCode, everyoneIndex, readServerMessage, stream,
+  BITES, DROP_ID, EVERYONE, EVERYONE_ROOMS, FLIES, FLY, FOUND_ID, HANDS, MAX_FLIES, MAX_OWN, PROTOCOL, ROOMS_PATH, TABLE_LIGHTS, TABLE_WEATHERS, WIRE_FOODS_MAX,
+  createFlyState, decodeFlies, encodeBites, encodeOwn, everyoneCode, everyoneIndex, readServerMessage, stream,
 } from "@fly/net";
-import type { ClientMessage, TableStart } from "@fly/net";
+import type { ClientMessage, ServerMessage, TableStart } from "@fly/net";
 import { WORLDS } from "@fly/world";
 import { hashKey, isHello, startServer } from "../src/server.ts";
 import { REMOVED_MAX, Table, everyonePlace, isTableRecord } from "../src/table.ts";
@@ -80,9 +80,15 @@ export class Fuzz {
   hello(code: string, key: string): ClientMessage {
     return {
       type: "hello", v: this.or(PROTOCOL, 0.95), table: this.or(code, 0.95), key: this.or(key, 0.95), start: this.chance(0.5) ? this.start() : undefined,
-      password: this.chance(0.3) ? this.or(this.pick(["right one", "wrong", "x".repeat(70)])) : undefined, at: this.chance(0.3) ? this.or([this.num(), this.num(), this.num(), this.num()]) : undefined,
-      epoch: this.chance(0.3) ? this.num(300) : undefined,
+      password: this.chance(0.3) ? this.or(this.pick(["right one", "wrong", "x".repeat(70)])) : undefined, at: this.chance(0.3) ? this.spots() : undefined,
+      epoch: this.chance(0.3) ? this.num(300) : undefined, flies: this.chance(0.7) ? this.or(this.int(0, MAX_OWN + 2)) : undefined,
     } as ClientMessage;
+  }
+
+  /** Where a device coming back says its flies are: a spot for each (or too many), one spot as a device with one fly once said it, or nonsense. */
+  spots(): unknown {
+    const spot = () => this.or([this.num(), this.num(), this.num(), this.num()]);
+    return this.pick<() => unknown>([() => Array.from({ length: this.int(0, MAX_OWN + 3) }, spot), spot, () => this.weird()])();
   }
 
   /** The place epoch an action says it was done in: the table's, one it has left, none (a device from before), or nonsense. */
@@ -98,7 +104,8 @@ export class Fuzz {
       () => ({ type: "ball", at: this.num(1e6), from: this.v3(), via: this.v3(), to: this.v3() }),
       () => ({ type: "world", light: this.or(this.pick(TABLE_LIGHTS)), weather: this.or(this.pick(TABLE_WEATHERS)) }),
       () => ({ type: "place", place: this.or(this.pick(PLACES)) }),
-      () => ({ type: "remove", id: this.or(this.int(0, MAX_PLAYERS + 1)) }),
+      () => ({ type: "remove", id: this.or(this.int(0, MAX_FLIES + 1)) }),
+      () => ({ type: "flies", count: this.or(this.int(-1, MAX_OWN + 2)) }),
       () => ({ type: "pop", slot: this.or(this.int(-1, 9)), cycle: this.or(this.int(0, 5)), at: this.num(1e6) }),
       () => ({ type: "found", id: this.or(FOUND_ID + this.int(0, 1e6)), name: this.or("juice"), x: this.num(), z: this.num(), y: this.num(), r: this.num(5), sweet: this.num(1) }),
       () => ({ type: "clearFood", epoch: this.epoch(epoch) }),
@@ -117,22 +124,29 @@ export class Fuzz {
     return this.pick([json.slice(0, this.int(0, json.length)), "[".repeat(this.int(1, 4000)), "\uD800", "{\"type\":\"ping\",\"t\":1}".repeat(3)]);
   }
 
-  /** A binary message: a fly's state or bites, whole or broken, or noise. */
-  binary(now: number, epoch: number): Uint8Array {
-    const view = new DataView(new ArrayBuffer(Math.max(FLY_MAX, BITES_MAX)));
+  /**
+   * A binary message: the device's flies' states or its bites, whole or broken, or noise. `ids`: its flies'; a batch names them mostly,
+   * now and then another's, one twice, more than a device brings or none.
+   */
+  binary(now: number, epoch: number, ids: readonly number[] = [1]): Uint8Array {
+    const view = new DataView(new ArrayBuffer(2 + (MAX_OWN + 2) * 64));
     let n: number;
     const kind = this.next();
     if (kind < 0.6) {
-      const s = createFlyState();
-      s.flags = this.int(0, 255) & (this.chance(0.5) ? HANDS : 0xff);
-      s.epoch = this.chance(0.9) ? epoch : this.int(0, 255);
-      s.seq = this.int(0, 65535);
-      s.t = now + (this.next() - 0.7) * 2000;
-      s.x = (this.next() - 0.5) * 600;
-      s.y = this.next() * 100;
-      s.z = (this.next() - 0.5) * 600;
-      s.yaw = this.next() * 7;
-      n = encodeFly(view, this.pick([{ position: 50, pointer: 20, eye: 10 }, { position: 5, pointer: 4, eye: 2 }]), s);
+      const states = Array.from({ length: this.chance(0.8) ? this.int(1, ids.length) : this.int(0, MAX_OWN + 2) }, (_, i) => {
+        const s = createFlyState();
+        s.id = this.chance(0.85) ? ids[i % ids.length] : this.int(0, 255);
+        s.flags = this.int(0, 255) & (this.chance(0.5) ? HANDS : 0xff);
+        s.epoch = this.chance(0.9) ? epoch : this.int(0, 255);
+        s.seq = this.int(0, 65535);
+        s.t = now + (this.next() - 0.7) * 2000;
+        s.x = (this.next() - 0.5) * 600;
+        s.y = this.next() * 100;
+        s.z = (this.next() - 0.5) * 600;
+        s.yaw = this.next() * 7;
+        return s;
+      });
+      n = encodeOwn(view, this.pick([{ position: 50, pointer: 20, eye: 10 }, { position: 5, pointer: 4, eye: 2 }]), states);
     } else if (kind < 0.85) {
       const bites = Array.from({ length: this.int(0, 20) }, () => ({ food: this.chance(0.7) ? this.int(1, 30) : this.int(0, 2 ** 32 - 1), amount: this.chance(0.9) ? this.next() * 0.01 : (this.weird() as number) }));
       const tag = this.epoch(epoch);
@@ -167,8 +181,25 @@ export function fuzzTable(seed: number, until: () => boolean) {
   /** Everything the table sends must be a message the game reads; every batch, one it decodes. */
   const scratch = createFlyState();
   const heard = (data: string | Uint8Array, table: Table) => {
-    if (typeof data === "string") assert.ok(readServerMessage(data), `the game would drop: ${data.slice(0, 200)}`);
+    if (typeof data === "string") {
+      const m = readServerMessage(data);
+      assert.ok(m, `the game would drop: ${data.slice(0, 200)}`);
+      if ((m.type === "welcome" || m.type === "seated") && f.chance(0.3)) misread(m);
+    }
     else assert.ok(decodeFlies(new DataView(data.buffer, data.byteOffset, data.byteLength), table.scale, scratch, () => {}) >= 0, "a batch the game can't read");
+  };
+  /** The device's own flies as a hostile server might tell them, a field of one of them (or the list) wrong: dropped, or read as a device brings them. */
+  const misread = (m: Extract<ServerMessage, { type: "welcome" | "seated" }>) => {
+    const flies: unknown[] = m.flies.map((fly) => ({ ...fly }));
+    const pick = f.int(0, flies.length);
+    if (pick === flies.length) flies.push(f.chance(0.5) ? { ...(flies[0] as object) } : f.weird());
+    else (flies[pick] as Record<string, unknown>)[f.pick(["id", "colour", "at"])] = f.chance(0.5) ? f.weird() : f.int(-1, MAX_FLIES + 1);
+    const back = readServerMessage(JSON.stringify({ ...m, flies: f.chance(0.1) ? f.weird() : flies }));
+    if (!back) return;
+    assert.ok(back.type === "welcome" || back.type === "seated");
+    const ids = back.flies.map((fly) => fly.id);
+    assert.ok(ids.length >= 1 && ids.length <= MAX_OWN && new Set(ids).size === ids.length && ids.every((id) => Number.isInteger(id) && id >= 1 && id <= MAX_FLIES), JSON.stringify(back.flies));
+    if (back.type === "welcome") assert.equal(ids[0], back.id);
   };
   const steps = { count: 0 };
   while (!until()) {
@@ -204,7 +235,7 @@ export function fuzzTable(seed: number, until: () => boolean) {
         const table = [...tables.values()].find((t) => device.seat && t.seats.get(device.seat.id) === device.seat);
         if (!table || !device.seat || !device.open) break step;
         messages++;
-        table.receive(device.seat, f.chance(0.6) ? f.text(f.message(device.seat.id, table.epoch)) : f.binary(clock.now, table.epoch));
+        table.receive(device.seat, f.chance(0.6) ? f.text(f.message(device.seat.id, table.epoch)) : f.binary(clock.now, table.epoch, device.seat.flies.map((fly) => fly.id)));
       }
     }
     const everyone: Table[] = [];
@@ -219,12 +250,29 @@ export function fuzzTable(seed: number, until: () => boolean) {
         assert.deepEqual(t.worldWire, { light: "clock", weather: "now" });
         if (ticked && t.present > 0) assert.equal(t.place, everyonePlace(clock.wall));
       }
-      assert.ok(t.seats.size <= MAX_PLAYERS);
+      assert.ok(t.seats.size <= MAX_FLIES);
       assert.ok(t.food.foods.length <= WIRE_FOODS_MAX, `${t.food.foods.length} foods`);
-      assert.ok(t.balls.length <= MAX_PLAYERS);
+      assert.ok(t.balls.length <= MAX_FLIES);
       assert.ok(t.happenings.length <= 16);
       assert.ok(t.removed.size <= REMOVED_MAX);
-      for (const s of t.seats.values()) assert.ok(Number.isFinite(s.state.x + s.state.y + s.state.z), "a fly somewhere that isn't");
+      // Every seat has 1 to MAX_OWN flies, the first under its own id, and no fly id is two flies'.
+      const ids = new Set<number>();
+      for (const s of t.seats.values()) {
+        assert.ok(s.flies.length >= 1 && s.flies.length <= MAX_OWN, `a device with ${s.flies.length} flies`);
+        assert.equal(s.flies[0].id, s.id);
+        for (const fly of s.flies) {
+          assert.ok(fly.id >= 1 && fly.id <= MAX_FLIES && !ids.has(fly.id), `fly ${fly.id} twice or out of range`);
+          ids.add(fly.id);
+          assert.ok(Number.isFinite(fly.state.x + fly.state.y + fly.state.z + fly.state.t), "a fly somewhere that isn't");
+        }
+      }
+      assert.ok(t.taken <= MAX_FLIES);
+      // Nobody started a room open to everyone, so nobody's seat is kept there once they have gone: what it counts as taken is the flies shown or on the line.
+      if (t.everyone) {
+        let shown = 0;
+        for (const s of t.seats.values()) if (s.present || s.link) shown += s.flies.length;
+        assert.equal(t.taken, shown);
+      }
     }
     everyone.sort((a, b) => everyoneIndex(a.code) - everyoneIndex(b.code));
     assert.ok(everyone.length > 0, "Everyone always exists");
@@ -277,7 +325,7 @@ export async function fuzzServer(seed: number, until: () => boolean, sockets = 6
         if (ws.readyState !== ws.OPEN) continue;
         sent++;
         if (f.chance(0.02)) ws.terminate();
-        else ws.send(f.chance(0.6) ? f.text(f.message(f.int(1, MAX_PLAYERS))) : f.binary(0, 0));
+        else ws.send(f.chance(0.6) ? f.text(f.message(f.int(1, MAX_FLIES))) : f.binary(0, 0, [1, 2, 3, 4]));
       }
       await new Promise((resolve) => setTimeout(resolve, 5));
     }

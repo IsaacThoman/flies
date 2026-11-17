@@ -29,6 +29,20 @@ export const ABDOMEN = { centre: [0, 0.295, -0.25] as Vec3, radii: [0.128, 0.11,
 /** Where each abdominal segment (A1 to A6) ends, as a fraction of the abdomen from front to tip. */
 export const ABDOMINAL_SEGMENTS = [0.12, 0.3, 0.47, 0.63, 0.8, 1];
 
+// Shared surface parameters keep grooming targets on the articulated antenna.
+const pedLength = Math.sqrt(0.25 ** 2 + 0.55 ** 2 + 0.8 ** 2);
+const funLength = Math.sqrt(0.15 ** 2 + 0.9 ** 2 + 0.38 ** 2);
+const pedAxis = [0.25 / pedLength, -0.55 / pedLength, 0.8 / pedLength] as Vec3;
+const funAxis = [0.15 / funLength, -0.9 / funLength, 0.38 / funLength] as Vec3;
+const funSideLength = Math.hypot(funAxis[0], funAxis[1]);
+export const ANTENNA = {
+  pedicelAxis: pedAxis,
+  funiculusAxis: funAxis,
+  centre: [pedAxis[0] * 0.024 + funAxis[0] * 0.026, pedAxis[1] * 0.024 + funAxis[1] * 0.026, pedAxis[2] * 0.024 + funAxis[2] * 0.026] as Vec3,
+  outward: [-funAxis[1] / funSideLength, funAxis[0] / funSideLength, 0] as Vec3,
+  length: 0.029, width: 0.016, thickness: 0.011,
+};
+
 export const PROBOSCIS = { rostrum: 0.05, haustellum: 0.085, labellum: 0.04, padDepth: 0.015 };
 export const HALTERE = { stalk: 0.045, knob: 0.0125 };
 export const WING = { length: 0.8 };

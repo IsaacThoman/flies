@@ -25,7 +25,8 @@ export type TableNow = {
   readonly starting: boolean;
   readonly joined: boolean;
   readonly everyone: boolean;
-  readonly others: readonly { readonly id: number; readonly colour: string }[];
+  /** The other devices at the table, each by its player's id, with its flies' colours. */
+  readonly others: readonly { readonly id: number; readonly colours: readonly string[] }[];
 };
 
 /**
@@ -47,6 +48,8 @@ export interface Shell {
   readonly life: Life;
   /** The Apple TV can tell the game the weather outside (it is built with WeatherKit). */
   readonly weatherOutside: boolean;
+  /** How many flies this device can live, each with a brain of its own (1 where it can run only one). */
+  readonly maxFlies: number;
   /** Apple Weather's attribution, for About, once the host has it. */
   weatherAttribution(): WeatherAttribution | null;
   /** The screen's shape. */

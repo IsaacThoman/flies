@@ -16,20 +16,22 @@ import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
 import { Navigator, sameTarget } from "@fly/ui";
 import type { GlyphSet, Hit } from "@fly/ui";
 import { BALL_RADIUS, Pantry, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
-import type { RayHit } from "@fly/world";
+import type { RayHit, Vec3 } from "@fly/world";
 import { Haptics } from "./haptics.ts";
+import type { Brains } from "./brain/create.ts";
 import { BrainMeter } from "./brain/meter.ts";
+import { Company, companionSpot } from "./company.ts";
 import { CameraDirector, VIEWS } from "./camera.ts";
 import { TV_FRAME, worldSize } from "./display.ts";
 import type { Display, Frame } from "./display.ts";
 import { Eyes } from "./eyes/eyes.ts";
 import { EyesInset, insetWanted } from "./eyes/inset.ts";
 import { FlyView } from "./fly-view.ts";
-import { PlayControls } from "./controls.ts";
-import { TouchLoupe } from "./ui/touch-loupe.ts";
+import { DRAG_ROUND, DRAG_UP, PlayControls } from "./controls.ts";
 import type { PlayTarget, ToolUse } from "./controls.ts";
-import { everyoneIndex } from "@fly/net";
-import type { TableStart } from "@fly/net";
+import { COLOURS, MAX_OWN, PROTOCOL, everyoneIndex } from "@fly/net";
+import type { SeatedFly, TableStart } from "@fly/net";
+import { TouchLoupe } from "./ui/touch-loupe.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
 import { Life } from "./life.ts";
 import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart, tryProtocolReload } from "./online/invite.ts";
@@ -40,6 +42,9 @@ import { Lobby } from "./online/lobby.ts";
 import { Online } from "./online/online.ts";
 import type { Ended, PlayerNow, TableHost } from "./online/online.ts";
 import { nativeSocketBridge, nativeSockets } from "./online/native-socket.ts";
+import { NEWER_KEY, reloadForNewer } from "./online/newer.ts";
+import { OtherFlies, devicesOf } from "./online/others.ts";
+import type { Device, Other } from "./online/others.ts";
 import { BrowserSocket } from "./online/socket.ts";
 import { isPlaceId, nextPlace, placeInfo } from "./places/catalog.ts";
 import type { PlaceId } from "./places/catalog.ts";
@@ -59,7 +64,7 @@ import { KEPT, OVERLAY_OPACITIES, OVERLAY_SIZES, loadLearned, loadSettings, load
 import type { Learned, Lesson, Settings, ShelfChoices, TableSeat } from "./settings.ts";
 import { Stage } from "./stage.ts";
 import { aimAt } from "./tools/aim.ts";
-import { Hands, SWOOP_BEARING, TOOLS } from "./tools/hands.ts";
+import { Hands, TOOLS } from "./tools/hands.ts";
 import type { ToolId } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
 import { StatsPanel, statsSlot, statsWanted } from "./stats/panel.ts";
@@ -90,6 +95,9 @@ const AWAKE_HOLD_NOTE = 4;
 const AWAY_SETTLE_MS = 30_000;
 /** How sensitive the touch surface is: screen widths per full swipe. */
 const SWIPE_GAIN = 0.9;
+/** With the View tool in hand, a swipe across the touch surface (2 units) turns the camera as far round as a drag across the screen, and one up it about as far up. */
+const SWIPE_ROUND = DRAG_ROUND / 2;
+const SWIPE_UP = DRAG_UP / 2;
 /** How often the HUD redraws for its shimmer alone, per second. */
 const HUD_SHIMMER_FPS = 10;
 /** Seconds of wallpaper in one place before the fly moves on, when it lives in each in turn. */
@@ -118,12 +126,19 @@ const FIXED_AT_TABLE: ReadonlySet<ToolId> = new Set(["light", "weather", "place"
 const FIXED_FOR_EVERYONE: ReadonlySet<ToolId> = new Set(["place"]);
 const NOTHING_FIXED: ReadonlySet<ToolId> = new Set();
 
-/** Reloads the page, once a session: whether it did. */
-function reloadOnce(): boolean {
+/** Adds each of `from` to `to`, without the iterator a for…of would make: it runs every frame for every fly. */
+function pushAll<T>(to: T[], from: readonly T[]) {
+  for (let i = 0; i < from.length; i++) to.push(from[i]);
+}
+
+/** Reloads the page into the build that speaks the room's newer protocol, when it may (online/newer.ts): whether it did. */
+function reloadForNewerProtocol(): boolean {
   try {
-    if (sessionStorage.getItem("flies.reloaded")) return false;
-    sessionStorage.setItem("flies.reloaded", "1");
+    const next = reloadForNewer(sessionStorage.getItem(NEWER_KEY), PROTOCOL, Date.now());
+    if (!next) return false;
+    sessionStorage.setItem(NEWER_KEY, next);
   } catch {
+    // Without the session's memory a reload that brought this page back would reload again every frame.
     return false;
   }
   location.reload();
@@ -151,8 +166,15 @@ export class Game implements Shell {
   readonly settings: Settings;
   readonly stage: Stage;
   readonly director: CameraDirector;
+  /** The fly the player follows: the camera, the pointer, the pictures in the corners and the stats are its. */
   readonly life: Life;
   readonly fly: FlyView;
+  /** The other flies this device lives, each with a brain of its own (Settings → Flies). */
+  readonly company: Company;
+  /** Every fly but the followed one, as drawn: this device's others, and the other players' at a table. */
+  readonly others: OtherFlies;
+  /** How many flies this device can live: one where it can run only one brain. */
+  readonly maxFlies: number;
   /** What its feet leave after it has stood in something sticky or wet: only drawn, never felt. */
   readonly prints: Footprints;
   readonly meter = new BrainMeter();
@@ -204,6 +226,16 @@ export class Game implements Shell {
   quality: Quality | null = null;
   /** The graphics context was lost, and nothing can be drawn until it is restored. */
   glLost = false;
+  /** The middles of the other flies this device lives, for the bubbles: one each, kept. */
+  readonly #middles: THREE.Vector3[] = [];
+  /** Where each of the company is, for the place's visitors to keep clear of. */
+  readonly #companyAt: Vec3[] = [];
+  /** The Flies setting as last seen: when the player changes it, flies taken off for brains that wouldn't run may be tried again. */
+  #fliesChosen = 0;
+  /** How hard this player's feather is on any of the other flies this device lives, this frame. */
+  #companyStroke = 0;
+  /** The enamel the followed fly wears now (none alone with no others to tell it from). */
+  #mark: string | null = null;
   /** Recent peaks of the giant fibre's escape command, the hand-wired loom, and the eyes' looming detectors (Hz). */
   readonly peaks = { escape: 0, loom: 0, looming: 0 };
   #loading = true;
@@ -291,6 +323,8 @@ export class Game implements Shell {
   readonly #app: boolean;
   readonly #player: PlayerNow = { away: false, playing: false, handsOut: false, holding: false, eye: { x: 0, y: 0, z: 0 } };
   readonly #tableHost: TableHost;
+  /** The other devices at the table as the screens have them, by the first of their flies heard of. */
+  readonly #devices = new WeakMap<Other, Device>();
   readonly #titleItems: number;
   /** Sitting this device with others by default, once the brain is awake (null where it can't play online); and whether the room this device is at, or trying, is its doing (it ends quietly). */
   #auto: AutoJoin | null = null;
@@ -300,7 +334,7 @@ export class Game implements Shell {
   /** What sitting with everyone is told each frame, kept: nothing is made per frame. */
   readonly #autoNow: AutoJoinNow = { enabled: true, awake: false, network: true, atRoom: false };
 
-  constructor(canvas: HTMLCanvasElement, remote: Remote, brain: BrainDriver, display: Display, inputs: Inputs) {
+  constructor(canvas: HTMLCanvasElement, remote: Remote, brains: Brains, display: Display, inputs: Inputs) {
     this.canvas = canvas;
     this.remote = remote;
     this.display = display;
@@ -324,16 +358,21 @@ export class Game implements Shell {
     this.stage = new Stage(canvas, time === "clock" ? timeAt(this.outside.lightHours(clockHours(new Date()))) : time, scene);
     this.#followLight(true);
     this.fireflies = new Fireflies(this.stage.scene);
-    this.life = new Life(world, brain);
+    this.life = new Life(world, brains.first);
     // Its clock keeps the real time of day, whatever light is chosen, and its sleep pressure starts as the hour makes it.
-    this.life.rhythm = new Rhythm(clockHours(new Date()), this.outside.sunTimes ?? SUMMER);
+    this.life.rhythm = this.#rhythm();
     this.fly = new FlyView(this.stage.scene, world);
+    this.maxFlies = brains.another ? MAX_OWN : 1;
+    this.company = new Company(world, brains.another ?? (() => brains.first), () => this.#rhythm());
+    this.others = new OtherFlies(this.stage.scene, world);
+    this.others.company = this.company.list;
     this.prints = new Footprints(this.stage.scene);
     this.director = new CameraDirector(world, display.frame.aspect, scene.camera);
     this.bubbles = new Bubbles(this.stage.scene, world);
     this.handsView = new HandsView(this.stage.scene);
     this.eyes = new Eyes(this.stage, this.life);
-    this.#around = { fly: this.life.body.position, airborne: false, world, pantry: this.life.pantry, weather: this.stage.weather, quiet: false, felt: this.#felt, shared: null };
+    this.eyes.standIns = this.others;
+    this.#around = { fly: this.life.body.position, airborne: false, world, pantry: this.life.pantry, weather: this.stage.weather, quiet: false, felt: this.#felt, company: this.#companyAt, shared: null };
     this.eyes.see(this.bubbles.mesh);
     for (const object of this.handsView.seen) this.eyes.see(object);
     this.inset = new EyesInset(this.eyes);
@@ -370,10 +409,15 @@ export class Game implements Shell {
       scene: this.stage.scene,
       stage: this.stage,
       life: this.life,
+      company: this.company,
+      others: this.others,
       hands: this.hands,
       fly: this.fly,
       eyes: this.eyes,
       bubbles: this.bubbles,
+      flies: () => this.#fliesWanted(),
+      seat: (flies) => this.#seated(flies),
+      share: (pantry) => this.#share(pantry),
       felt: this.#felt,
       here: () => this.#here,
       moving: () => !!this.#moving && !this.#moving.arrived,
@@ -486,7 +530,7 @@ export class Game implements Shell {
     }
     this.#lobby?.update(dt);
     // A room server newer than this page: the newer page speaks its protocol.
-    if (this.#lobby?.status === "version") tryProtocolReload(this.#app, reloadOnce);
+    if (this.#lobby?.status === "version") tryProtocolReload(this.#app, reloadForNewerProtocol);
   }
 
   /** Starts typing into a field as a tap on it lifts, while the browser still counts it as the player's doing. */
@@ -512,15 +556,104 @@ export class Game implements Shell {
     return link ? share(link) : Promise.resolve("failed");
   }
 
-  /** The room as the screens show it. */
+  /** The room as the screens show it: each other device there by its player, with its flies' colours. */
   get table(): TableNow | null {
     const online = this.online;
     const link = this.tableLink;
     if (!online || !link || this.#pending) return null;
-    return { name: online.room?.name ?? null, code: online.code, link, starting: online.starting, joined: online.joined, everyone: online.everyone, others: online.others.list };
+    return { name: online.room?.name ?? null, code: online.code, link, starting: online.starting, joined: online.joined, everyone: online.everyone, others: devicesOf(online.others.list, this.#devices) };
   }
 
-  /** The starter takes another's fly off the table. */
+  /** A fly's clock, as every fly's here keeps it: the real time of day, and the sun's times where the TV can tell them. */
+  #rhythm() {
+    return new Rhythm(clockHours(new Date()), this.outside.sunTimes ?? SUMMER);
+  }
+
+  /** How many flies this device lives now, the followed one among them. */
+  get flies() {
+    return 1 + this.company.list.length;
+  }
+
+  /** How many the player keeps, as many as this device can live (less any whose brains wouldn't run). */
+  #fliesWanted() {
+    return Math.max(1, Math.min(this.maxFlies - this.company.lost, this.settings.flies));
+  }
+
+  /**
+   * As many flies as there should be: alone, as many as the player keeps
+   * (once the first fly's brain is awake, so that every brain after it finds
+   * the connectome already here); at a table, as many as the table seated,
+   * asking it again when the player changes how many.
+   */
+  #flock() {
+    if (this.settings.flies !== this.#fliesChosen) {
+      this.#fliesChosen = this.settings.flies;
+      this.company.lost = 0;
+    }
+    // A companion whose brain wouldn't run, even given new ones, is taken off: alone the rest move up in line, at a table it asks for one fewer.
+    if (this.company.tend(this.time)) {
+      if (!this.online) this.#colourAlone();
+      this.#companyChanged();
+    }
+    const online = this.online;
+    if (online) {
+      if (online.joined) online.recount(this.#fliesWanted());
+      return;
+    }
+    const wanted = this.#fliesWanted() - 1;
+    const company = this.company.list;
+    if (wanted === company.length || (wanted > company.length && this.brain.status !== "running")) return;
+    this.company.resize(wanted, this.life.pantry);
+    this.#colourAlone();
+    this.#companyChanged();
+  }
+
+  /** Alone, each of the company wears the colour of its place in line. */
+  #colourAlone() {
+    const list = this.company.list;
+    for (let i = 0; i < list.length; i++) {
+      list[i].id = 0;
+      list[i].colour = COLOURS[(i + 1) % COLOURS.length];
+    }
+  }
+
+  /** The table seats these of this device's flies, in line: as many as it lives, each in its colour. */
+  #seated(flies: readonly SeatedFly[]) {
+    this.company.resize(Math.min(this.maxFlies, flies.length) - 1, this.life.pantry);
+    for (const [i, c] of this.company.list.entries()) {
+      c.id = flies[i + 1].id;
+      c.colour = flies[i + 1].colour;
+    }
+    this.#markFollowed(flies[0].colour);
+    this.#companyChanged();
+  }
+
+  /** The followed fly's enamel: its colour at a table; alone, the first colour when there are others to tell it from. */
+  #markFollowed(colour: string | null) {
+    if (colour === this.#mark) return;
+    this.#mark = colour;
+    this.fly.model.mark(colour);
+  }
+
+  /** The company has changed: their eyes, and their middles for the bubbles. */
+  #companyChanged() {
+    const list = this.company.list;
+    this.eyes.company(list.map((c) => c.life));
+    while (this.#middles.length < list.length) this.#middles.push(new THREE.Vector3());
+    this.#middles.length = list.length;
+    this.#companyAt.length = 0;
+    for (const c of list) this.#companyAt.push(c.life.body.position);
+    if (!this.online) this.#markFollowed(list.length > 0 ? COLOURS[0] : null);
+    this.overlay.dirty = true;
+  }
+
+  /** Every fly this device lives eats from `pantry` from now on. */
+  #share(pantry: Pantry) {
+    this.life.share(pantry);
+    this.company.share(pantry);
+  }
+
+  /** The starter takes another device's flies off the table. */
   removeFly(id: number) {
     this.online?.remove(id);
   }
@@ -563,8 +696,12 @@ export class Game implements Shell {
       if (this.nav.current !== "online") this.open("online");
     } else if (!quiet && why !== "busy") this.knock = null;
     // Its own food again (as it was, if the room never let it in), and its own light and weather, as its shelf had them.
-    this.life.share(!online.welcomed && this.#alone ? this.#alone : new Pantry(this.life.world, this.life.world.place.patches));
+    this.#share(!online.welcomed && this.#alone ? this.#alone : new Pantry(this.life.world, this.life.world.place.patches));
     this.#alone = null;
+    // Its flies are its own again, in their colours alone.
+    this.#markFollowed(null);
+    this.#colourAlone();
+    this.#companyChanged();
     for (const id of ["light", "weather"] as const) {
       const i = TOOLS.findIndex((t) => t.id === id);
       const kind = TOOLS[i].variants.findIndex((v) => v.id === this.#shelf[id]?.kind);
@@ -593,7 +730,7 @@ export class Game implements Shell {
   #table(dt: number) {
     const online = this.online;
     if (!online) return;
-    online.update(dt, this.director.camera, this.shape.height, this.time, this.#floorAt);
+    online.update(dt, this.director.camera, this.time, this.#floorAt);
     if (this.hands.fixed !== this.#fixedTools()) this.#lockTools();
     // A room open to everyone may not be the one asked for: a reload comes back to the one it is.
     if (online.welcomed && this.#seat.table !== online.code) {
@@ -603,7 +740,7 @@ export class Game implements Shell {
     const ended = online.ended;
     if (!ended) return;
     // A page from before the server's last deploy: the newer page speaks its protocol.
-    if (ended === "version" && tryProtocolReload(this.#app, reloadOnce)) return;
+    if (ended === "version" && tryProtocolReload(this.#app, reloadForNewerProtocol)) return;
     // Sat with everyone by default: alone again, quietly, and perhaps another try later.
     const quiet = this.#autoOnline;
     if (quiet) this.#auto?.ended(ended);
@@ -885,6 +1022,10 @@ export class Game implements Shell {
     this.#stayed = 0;
     this.stage.load(scene);
     this.life.move(scene.place);
+    for (const [i, c] of this.company.list.entries()) {
+      const [x, z, yaw, y] = companionSpot(this.life.world, i);
+      c.life.setDown(x, z, yaw, y);
+    }
     this.prints.clear();
     this.hands.clear();
     this.director.useScene(scene.camera);
@@ -913,7 +1054,7 @@ export class Game implements Shell {
     this.#syncCamera();
     this.#grip = this.#grip && { kind: "spent" };
     this.#controls.spend();
-    this.director.hand.held = false;
+    this.director.held = false;
     this.overlay.dirty = true;
   }
 
@@ -975,8 +1116,10 @@ export class Game implements Shell {
     this.#placeChoice.update(dt);
     this.#move(dt);
     this.#table(dt);
+    this.#flock();
     this.#autoJoin(dt);
     this.#browse(dt);
+    this.#drawOthers(dt);
     // Living in each place in turn, it moves on during a long wallpaper (alone: a table's place is the table's).
     if (this.wallpaper && !this.#moving && !this.online) {
       this.#stayed += dt;
@@ -994,11 +1137,12 @@ export class Game implements Shell {
     this.#feel();
     this.eyes.beforeStep();
     life.step(dt, now);
+    this.#liveCompany(dt, now);
     this.tally.update(life, Date.now(), dt);
     this.#reactions();
     this.#paddle(dt);
     const hands = this.hands;
-    this.haptics.held(playing && hands.current.id === "feather" ? hands.stroke : 0, hands.blowing ? (hands.variant.id === "strong" ? 1 : 0.55) : 0, dt);
+    this.haptics.held(playing && hands.current.id === "feather" ? Math.max(hands.stroke, this.#companyStroke) : 0, hands.blowing ? (hands.variant.id === "strong" ? 1 : 0.55) : 0, dt);
     this.meter.update(life.brain, now);
     if (this.quality) {
       // Loading and the building of a place aren't this device's everyday pace.
@@ -1018,8 +1162,6 @@ export class Game implements Shell {
     this.fly.update(life.body, life.intent, life.eating, life.hunger.fullness, dt, life.songSide, life.activity === "sleeping");
     this.prints.update(this.fly.model, life.body.onFeet, this.fly.pose.groom > 0.02, life.world, life.pantry, this.time);
     this.online?.send(this.#playerNow());
-    // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
-    director.prefer = this.hands.current.id === "swoop" && this.nav.current === "play" && !this.wallpaper ? Math.PI - SWOOP_BEARING : null;
     director.update(life.body, dt);
     this.#xray(dt);
     if (this.time > this.#clockAt) this.#followLight();
@@ -1031,7 +1173,12 @@ export class Game implements Shell {
     this.bubbles.rain = stage.weather.rain;
     const middle = this.#middle.set(life.body.position.x, life.body.position.y + 0.75, life.body.position.z);
     this.bubbles.lightBy(stage.light);
-    this.bubbles.update(this.time, dt, director.camera, stage.light.sunDirection, this.#air, middle);
+    const company = this.company.list;
+    for (let i = 0; i < company.length; i++) {
+      const p = company[i].life.body.position;
+      this.#middles[i].set(p.x, p.y + 0.75, p.z);
+    }
+    this.bubbles.update(this.time, dt, director.camera, stage.light.sunDirection, this.#air, middle, this.#middles);
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
     this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
     this.handsView.update(this.hands, life.pantry, director.camera, this.time, dt, this.#floorAt, life.body.position);
@@ -1128,6 +1275,62 @@ export class Game implements Shell {
     live.call(this.stage.set, dt, around);
   }
 
+  /**
+   * Every fly but the followed one drawn where it is now, and every fly this
+   * device lives put in the others' way: before any of them lives its frame.
+   */
+  #drawOthers(dt: number) {
+    const camera = this.director.camera;
+    const pixels = this.shape.height / (2 * Math.tan((camera.fov * Math.PI) / 360));
+    const body = this.life.body;
+    this.others.update(this.online?.now ?? 0, dt, camera.position, pixels, body);
+    this.others.crowd(this.life.crowd, body, body);
+    const company = this.company.list;
+    for (let i = 0; i < company.length; i++) this.others.crowd(company[i].life.crowd, company[i].life.body, body);
+  }
+
+  /**
+   * The other flies this device lives, each its frame: what the hands (this
+   * player's and, at a table, the others'), the bubbles and the place do to
+   * it, as they reach the followed fly, and what it does about it. The
+   * followed fly has lived its frame already.
+   */
+  #liveCompany(dt: number, now: number) {
+    const list = this.company.list;
+    this.#companyStroke = 0;
+    if (list.length === 0) return;
+    const hands = this.hands;
+    const online = this.online;
+    const set = this.#moving ? null : this.stage.set;
+    const own = this.life.stimuli;
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i];
+      const { life, felt, air } = c;
+      felt.air.x = felt.air.y = felt.air.z = 0;
+      felt.touch = 0;
+      felt.looming.length = 0;
+      set?.feel?.(dt, life.body.position, felt);
+      air.x = felt.air.x;
+      air.y = felt.air.y;
+      air.z = felt.air.z;
+      const stroked = hands.reach(life.body, air);
+      if (stroked >= 1) hands.stroking = true;
+      this.#companyStroke = Math.max(this.#companyStroke, stroked);
+      const stimuli = life.stimuli;
+      stimuli.stroke = Math.max(stroked, this.bubbles.brushedBy[i], felt.touch, online?.reach(life.body, air) ?? 0);
+      stimuli.air = air;
+      // What could loom is wherever it is: the same balls, bubbles and visitors as the followed fly's, and what the place says of this one.
+      stimuli.looming.length = 0;
+      stimuli.looming.push(hands.looming[0]);
+      if (this.bubbles.enabled) pushAll(stimuli.looming, this.bubbles.looming);
+      pushAll(stimuli.looming, felt.looming);
+      if (online) pushAll(stimuli.looming, online.looming);
+      stimuli.threat = own.threat;
+      life.step(dt, now);
+    }
+    this.company.pose();
+  }
+
   /** What the hands and the world do to the fly this frame, for its senses. */
   #feel() {
     const { stimuli } = this.life;
@@ -1169,8 +1372,12 @@ export class Game implements Shell {
   /** Sets the light and the weather to the tools' choices; on "Now", to the clock's and the weather outside's (or the forecast's), looked at again every few seconds. With `settle`, there at once. */
   #followLight(settle = false) {
     const now = new Date();
-    // The fly's own clock is set right from the real hour and today's sun, at a table too: it lives here.
-    this.life?.rhythm?.setTime(clockHours(now), this.outside.sunTimes ?? SUMMER);
+    // Each fly's own clock is set right from the real hour and today's sun, at a table too: they live here.
+    const hours = clockHours(now);
+    const sun = this.outside.sunTimes ?? SUMMER;
+    this.life?.rhythm?.setTime(hours, sun);
+    // Before the company is made, the first time.
+    if (this.company) for (const c of this.company.list) c.life.rhythm?.setTime(hours, sun);
     // At a table its clock is the starter's, and its weather the forecast's from that clock: the same for everyone there.
     const tableHours = this.online?.hours() ?? null;
     if (tableHours !== null) {
@@ -1250,7 +1457,7 @@ export class Game implements Shell {
           pointers.gestures.length = 0;
         }
       }
-    } else if (!this.#loading && after > 0 && idle > after && (current === "play" || current === "title") && !this.#grip && !this.#controls.pressed && !this.director.hand.held && !keyboard?.holding) {
+    } else if (!this.#loading && after > 0 && idle > after && (current === "play" || current === "title") && !this.#grip && !this.#controls.pressed && !this.director.held && !keyboard?.holding) {
       // Not while a finger or a button is still down on something, however still.
       this.#startWallpaper();
     }
@@ -1283,14 +1490,15 @@ export class Game implements Shell {
     if (keyboard && playing) {
       for (const action of keyboard.actions) {
         if (action.kind === "tool") this.#chooseTool(action.index);
-        else this.#handBack();
+        else this.#home();
       }
     }
-    if (playing && (remote.dx !== 0 || remote.dy !== 0)) this.#movePointer(remote.dx, remote.dy);
-    if (playing) {
-      this.#steer(dt);
-      this.#controls.glide(dt, this.#target);
+    if (playing && (remote.dx !== 0 || remote.dy !== 0)) {
+      // With the View tool in hand the hand has nothing to do, so a swipe turns the camera, as a drag does.
+      if (this.hands.current.id === "view") this.#turnCamera(-remote.dx * SWIPE_ROUND, -remote.dy * SWIPE_UP);
+      else this.#movePointer(remote.dx, remote.dy);
     }
+    if (playing) this.#steer(dt);
     if (pointers) {
       for (const g of pointers.gestures) this.#gesture(g);
       this.#followAim();
@@ -1313,14 +1521,14 @@ export class Game implements Shell {
       round += pads.look.x * PAD_ROUND;
       up += pads.look.y * PAD_UP;
       zoom += pads.zoom * PAD_ZOOM;
-      if (pads.handBack) this.#handBack();
+      if (pads.home) this.#home();
     }
     const turning = round !== 0 || up !== 0;
     // Let go only when they are let go themselves: a finger or the mouse may be holding the camera too.
     if (turning) {
-      this.director.hand.held = true;
+      this.director.held = true;
       this.#turnCamera(round * dt, up * dt);
-    } else if (this.#turning) this.director.hand.held = false;
+    } else if (this.#turning) this.director.held = false;
     this.#turning = turning;
     if (zoom !== 0) this.#zoomCamera(Math.exp(zoom * dt));
   }
@@ -1349,10 +1557,11 @@ export class Game implements Shell {
     if (hands.current.id === "view") this.#changedAt = this.time;
   }
 
-  /** The camera back to the cameraman, now. */
-  #handBack() {
+  /** The camera back to Follow's distance and pitch, at the same yaw. */
+  #home() {
     if (this.hands.view === "eyes") return;
-    this.director.handBack();
+    this.director.home();
+    this.#viewFollows();
   }
 
   /** Picks a tool from the shelf by its place (a tap on it, a number key); picking the one in hand steps its kind instead. */
@@ -1450,12 +1659,9 @@ export class Game implements Shell {
       turn: (yaw, pitch) => this.#turnCamera(yaw, pitch),
       zoom: (factor) => this.#zoomCamera(factor),
       holdCamera: (held) => {
-        this.director.hand.held = held;
+        this.director.held = held;
       },
-      keepCamera: () => {
-        if (this.hands.view !== "eyes") this.director.hand.kept = true;
-      },
-      handBack: () => this.#handBack(),
+      home: () => this.#home(),
     };
   }
 
@@ -1464,7 +1670,7 @@ export class Game implements Shell {
     this.#grip = null;
     this.#controls.reset();
     this.#aim.active = false;
-    this.director.hand.held = false;
+    this.director.held = false;
   }
 
   /** A tap on something on the HUD. */
@@ -1843,6 +2049,13 @@ export class Game implements Shell {
       const why = outside.error;
       console.log(`weather outside: ${outside.state}${why ? ` (${why})` : ""}`);
     }
+    // This device's flies: how many, the followed one's neighbours as its body meets them, and each other one as it lives (its table id, its brain,
+    // what it is doing, where, its eyes' pictures so far, and how many flies its body meets).
+    d.flies = String(this.flies);
+    d.crowd = String(life.crowd.count);
+    d.company = this.company.list
+      .map((c, i) => `${c.id}:${c.life.brain.status}:${c.life.activity}:${c.life.body.position.x.toFixed(2)},${c.life.body.position.z.toFixed(2)}:${this.eyes.companyUpdates(i)}:${c.life.crowd.count}:${c.colour}`)
+      .join(";");
     d.view = this.hands.view;
     d.place = this.#here;
     d.placeMs = this.stage.buildMs.toFixed(0);
@@ -1873,7 +2086,8 @@ export class Game implements Shell {
     }
     d.device = this.devices.current;
     d.frame = `${this.shape.width}x${this.shape.height}`;
-    d.looking = String(this.director.handled);
+    d.yaw = this.director.yaw.toFixed(4);
+    d.pitch = this.director.pitch.toFixed(4);
     d.reach = this.director.reach.toFixed(1);
   }
 }

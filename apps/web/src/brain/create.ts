@@ -2,6 +2,8 @@
 // Apple TV, otherwise one in a Web Worker, fed the connectome the build put
 // beside the page (download.ts): packages/brain-native built as WebAssembly
 // wherever the browser can run it, packages/brain's TypeScript elsewhere.
+// Each fly this device lives has a brain of its own, made the same way: one
+// worker each, or one native thread each.
 
 import { wasmBrainSupported } from "@fly/brain-native";
 import type { BrainDriver } from "@fly/contracts";
@@ -9,7 +11,7 @@ import { BRAIN_MODULE_CACHE, BrainDownload, BrainFiles } from "./download.ts";
 import type { BrainFile } from "./download.ts";
 import { NativeBrainDriver, nativeBridge } from "./native-driver.ts";
 import { WorkerBrainDriver } from "./worker-driver.ts";
-import type { BrainWorkerFactory } from "./worker-driver.ts";
+import type { BrainSource, BrainWorkerFactory } from "./worker-driver.ts";
 
 // Set by the web build and its dev server (vite.config.ts); not by the Apple TV's, which has its own brain.
 declare const __FLY_BRAIN__: BrainFile | null | undefined;
@@ -56,9 +58,18 @@ const missing = {
   discard: () => Promise.resolve(),
 };
 
-export function createBrainDriver(): BrainDriver {
+/** A brain for the first fly, and a way to make another for each fly after it, where this device can (null: one fly only). */
+export type Brains = { first: BrainDriver; another: (() => BrainDriver) | null };
+
+const seed = () => (Math.random() * 0x7fffffff) | 0;
+
+export function createBrains(): Brains {
   const bridge = nativeBridge();
-  if (bridge) return new NativeBrainDriver(bridge, { seed: (Math.random() * 0x7fffffff) | 0 });
+  if (bridge) {
+    // An Apple TV host from before it could run more than one brain runs one fly.
+    const spawn = bridge.spawn?.bind(bridge);
+    return { first: new NativeBrainDriver(bridge, { seed: seed() }), another: spawn ? () => new NativeBrainDriver(spawn(), { seed: seed() }) : null };
+  }
   const env = {
     fetch: (...args: Parameters<typeof fetch>) => fetch(...args),
     caches: typeof caches === "undefined" ? null : caches,
@@ -66,6 +77,47 @@ export function createBrainDriver(): BrainDriver {
     online: () => navigator.onLine !== false,
   };
   const module = BRAIN_MODULE && workerEngine(location.search) === "wasm" ? new BrainDownload(BRAIN_MODULE, document.baseURI, env, BRAIN_MODULE_CACHE) : null;
-  const source = BRAIN_FILE ? new BrainFiles(new BrainDownload(BRAIN_FILE, document.baseURI, env), module) : missing;
-  return new WorkerBrainDriver({ createWorker, source });
+  const source = BRAIN_FILE ? new InTurn(new BrainFiles(new BrainDownload(BRAIN_FILE, document.baseURI, env), module)) : missing;
+  const worker = () => new WorkerBrainDriver({ createWorker, source });
+  return { first: worker(), another: worker };
+}
+
+/**
+ * One source for every fly's brain, loaded one brain at a time: each load
+ * after the first finds the files kept from it (or fetches them again where
+ * nothing can be kept), and none is downloaded twice at once.
+ */
+class InTurn implements BrainSource {
+  readonly #source: BrainSource;
+  #turn: Promise<unknown> = Promise.resolve();
+
+  constructor(source: BrainSource) {
+    this.#source = source;
+  }
+
+  get received() {
+    return this.#source.received;
+  }
+
+  get total() {
+    return this.#source.total;
+  }
+
+  get from() {
+    return this.#source.from;
+  }
+
+  get storageFull() {
+    return this.#source.storageFull;
+  }
+
+  load(onProgress: () => void) {
+    const loaded = this.#turn.then(() => this.#source.load(onProgress));
+    this.#turn = loaded.catch(() => {});
+    return loaded;
+  }
+
+  discard() {
+    return this.#source.discard();
+  }
 }

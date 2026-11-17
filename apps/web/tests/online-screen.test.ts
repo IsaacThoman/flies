@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { TableSocket, TableSocketStatus, TextEntry, TextRequest } from "@fly/contracts";
-import { CLOSE, EVERYONE, MAX_PLAYERS, PROTOCOL, everyoneCode } from "@fly/net";
+import { CLOSE, EVERYONE, MAX_FLIES, PROTOCOL, everyoneCode } from "@fly/net";
 import type { RoomWire } from "@fly/net";
 import { HitMap } from "@fly/ui";
 import type { ActionItem, FieldItem } from "@fly/ui";
@@ -54,11 +54,11 @@ class FakeTyping implements TextEntry {
 const ROOMS: RoomWire[] = [
   { code: "aaaaaaaaaa", name: "Sunny Crumbs", place: "bar", flies: 3, locked: false },
   { code: "bbbbbbbbbb", name: "Secret Sugar", place: "lab", flies: 1, locked: true },
-  { code: "cccccccccc", name: "Packed", place: "picnic", flies: MAX_PLAYERS, locked: false },
+  { code: "cccccccccc", name: "Packed", place: "picnic", flies: MAX_FLIES, locked: false },
 ];
 
-const EVERYONE_ROOM: RoomWire = { code: EVERYONE, name: "Everyone", place: "picnic", flies: MAX_PLAYERS, locked: false, everyone: true };
-const EVERYONE_TABLE: TableNow = { name: "Everyone", code: EVERYONE, link: `https://x/?table=${EVERYONE}`, starting: false, joined: true, everyone: true, others: [{ id: 1, colour: "#ffd21f" }] };
+const EVERYONE_ROOM: RoomWire = { code: EVERYONE, name: "Everyone", place: "picnic", flies: MAX_FLIES, locked: false, everyone: true };
+const EVERYONE_TABLE: TableNow = { name: "Everyone", code: EVERYONE, link: `https://x/?table=${EVERYONE}`, starting: false, joined: true, everyone: true, others: [{ id: 1, colours: ["#ffd21f"] }] };
 
 function world(canShare = true) {
   const typing = new FakeTyping();
@@ -66,6 +66,7 @@ function world(canShare = true) {
   const state = { lobbyStatus: "connecting" as Lobby["status"], rooms: null as RoomWire[] | null, table: null as TableNow | null, knock: null as Knock | null, ended: null as Shell["tableEnded"], started: null as NewRoom | null };
   const shell: Shell = {
     settings: { ...DEFAULT_SETTINGS },
+    maxFlies: 4,
     brain: { status: "running" } as unknown as Shell["brain"],
     meter: {} as Shell["meter"],
     life: {} as Shell["life"],
@@ -130,7 +131,7 @@ test("the rooms: a new one, a code, then each listed room by its name, its place
   step();
   const rows = screen.menu.items as ActionItem[];
   assert.deepEqual(rows.map((i) => i.id), ["new", "code", "room:aaaaaaaaaa", "room:bbbbbbbbbb", "room:cccccccccc"]);
-  assert.deepEqual([rows[2].label, rows[2].swatch, rows[2].count, rows[2].locked], ["Sunny Crumbs", placeInfo("bar").colour, [3, MAX_PLAYERS], false]);
+  assert.deepEqual([rows[2].label, rows[2].swatch, rows[2].count, rows[2].locked], ["Sunny Crumbs", placeInfo("bar").colour, [3, MAX_FLIES], false]);
   assert.equal(rows[3].locked, true);
   assert.equal(rows[4].disabled, true, "full");
   // The list changes as the room server says: a room empties out of it.
@@ -194,7 +195,7 @@ test("while the door opens it says so, and once in, the room's own face: its nam
   step();
   assert.equal(screen.view, "door", "on its way in");
   assert.deepEqual(screen.menu.items.map((i) => [i.id, i.label, !!i.disabled]), [["password", "Password", true], ["join", "Joining…", true]]);
-  state.table = { name: "Secret Sugar", code: "bbbbbbbbbb", link: "https://x/?table=bbbbbbbbbb", starting: false, joined: true, everyone: false, others: [{ id: 1, colour: "#ffd21f" }] };
+  state.table = { name: "Secret Sugar", code: "bbbbbbbbbb", link: "https://x/?table=bbbbbbbbbb", starting: false, joined: true, everyone: false, others: [{ id: 1, colours: ["#ffd21f"] }] };
   state.knock = null;
   step();
   assert.equal(screen.view, "room");
@@ -282,7 +283,7 @@ test("a full room open to everyone remains selectable and marked as everyone's w
   const everyone = screen.menu.item(`room:${EVERYONE}`) as ActionItem;
   assert.equal(everyone.everyone, true);
   assert.equal(everyone.disabled, false);
-  assert.deepEqual(everyone.count, [MAX_PLAYERS, MAX_PLAYERS]);
+  assert.deepEqual(everyone.count, [MAX_FLIES, MAX_FLIES]);
   const ordinary = screen.menu.item(`room:${ROOMS[2].code}`) as ActionItem;
   assert.equal(ordinary.everyone, false);
   assert.equal(ordinary.disabled, true);
@@ -448,6 +449,20 @@ test("the lobby asks to browse once open, takes each list it is told (only well-
   assert.equal(lobby.status, "version", "a newer room server: the page reloads");
 });
 
+test("the starter removes a whole device using one row with all its flies' colour swatches", () => {
+  const { screen, state, step, focus, did } = world();
+  const colours = ["#2fb8ff", "#ff4fa3", "#59e05a"];
+  state.table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://x/?table=abcdefghjk", starting: true, joined: true, everyone: false, others: [{ id: 2, colours }] };
+  step();
+  const row = screen.menu.items.find((i) => i.id.startsWith("remove:2:"));
+  assert.ok(row?.kind === "action");
+  assert.equal(row.label, "Remove");
+  assert.deepEqual(row.swatch, colours);
+  focus(row.id);
+  screen.press("select", false);
+  assert.deepEqual(did, ["remove 2"]);
+});
+
 test("room refreshes never turn a drawn room or removal into a different action", () => {
   for (const action of ["join", "remove"] as const) {
     for (const change of ["insert", "remove", "reorder"] as const) {
@@ -455,7 +470,7 @@ test("room refreshes never turn a drawn room or removal into a different action"
         for (const redraw of [false, true]) {
           const { screen, state, step, did } = world();
           const rooms = [ROOMS[0], { ...ROOMS[1], locked: false }];
-          const others = [{ id: 2, colour: "red" }, { id: 3, colour: "blue" }];
+          const others = [{ id: 2, colours: ["red"] }, { id: 3, colours: ["blue", "pink"] }];
           if (action === "join") state.rooms = rooms;
           else state.table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, everyone: false, others };
           step();
@@ -471,7 +486,7 @@ test("room refreshes never turn a drawn room or removal into a different action"
           if (action === "join") {
             state.rooms = change === "insert" ? [ROOMS[2], ...rooms] : change === "remove" ? rooms.slice(1) : [...rooms].reverse();
           } else {
-            state.table = { ...state.table!, others: change === "insert" ? [{ id: 4, colour: "green" }, ...others] : change === "remove" ? others.slice(1) : [...others].reverse() };
+            state.table = { ...state.table!, others: change === "insert" ? [{ id: 4, colours: ["green"] }, ...others] : change === "remove" ? others.slice(1) : [...others].reverse() };
           }
           step();
           if (redraw) draw();
@@ -504,7 +519,7 @@ test("a room tap must release on its pressed action, while an unchanged drawn ro
 test("a departed player's reused seat cannot inherit its drawn removal target", () => {
   for (const held of [false, true]) {
     const { screen, state, step, did } = world();
-    const table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, everyone: false, others: [{ id: 2, colour: "red" }] };
+    const table = { name: "Table", code: ROOMS[0].code, link: "", starting: true, joined: true, everyone: false, others: [{ id: 2, colours: ["red", "blue"] }] };
     state.table = table;
     step();
     const hits = new HitMap();
@@ -514,7 +529,7 @@ test("a departed player's reused seat cannot inherit its drawn removal target", 
     const hit = { ...drawn };
     const point = (type: "down" | "up") => screen.point({ type, hit, x: hit.x, y: hit.y, dx: 0, dy: 0, tap: true });
     if (held) point("down");
-    state.table = { ...table, others: [{ id: 2, colour: "red" }] };
+    state.table = { ...table, others: [{ id: 2, colours: ["red", "blue"] }] };
     step();
     if (!held) point("down");
     point("up");

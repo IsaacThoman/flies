@@ -120,11 +120,11 @@ test("on the TV the remote's keys are the remote's, as they always were", () => 
   assert.equal(remote.held.size, 0);
 });
 
-test("a keyboard's own keys: the numbers pick tools, R or Home hands the camera back; held, Q and E turn it and + and − zoom it", () => {
+test("a keyboard's own keys: the numbers pick tools, R or Home takes the camera back to Follow; held, Q and E turn it and + and − zoom it", () => {
   assert.deepEqual(keyAction("Digit1", "1"), { kind: "tool", index: 0 });
   assert.deepEqual(keyAction("Numpad8", "8"), { kind: "tool", index: 7 });
-  assert.deepEqual(keyAction("KeyR", "r"), { kind: "handBack" });
-  assert.deepEqual(keyAction("Home", "Home"), { kind: "handBack" });
+  assert.deepEqual(keyAction("KeyR", "r"), { kind: "home" });
+  assert.deepEqual(keyAction("Home", "Home"), { kind: "home" });
   assert.equal(keyAction("KeyA", "a"), null);
   assert.equal(keyAction("Digit0", "0"), null);
   assert.deepEqual(keyAxis("Equal", "+"), { axis: "zoom", dir: -1 });
@@ -149,7 +149,7 @@ test("a keyboard's own keys: the numbers pick tools, R or Home hands the camera 
   key("keydown", "KeyR", "r");
   key("keydown", "KeyR", "r", { repeat: true });
   key("keydown", "KeyR", "r", { ctrlKey: true });
-  assert.deepEqual(keyboard.actions, [{ kind: "handBack" }], "once, and never with the browser's own shortcuts");
+  assert.deepEqual(keyboard.actions, [{ kind: "home" }], "once, and never with the browser's own shortcuts");
 });
 
 test("a second tap or click soon after the first, in the same place, is a double one; a third starts again", () => {
@@ -247,9 +247,9 @@ test("a pad's buttons are the remote's, held directions repeat as the remote's d
   buttons[6].value = 0;
   buttons[11].pressed = true;
   pads.poll(1 / 60, 860, false);
-  assert.equal(pads.handBack, true, "the right stick pressed in hands the camera back");
+  assert.equal(pads.home, true, "the right stick pressed in takes the camera back to Follow");
   pads.poll(1 / 60, 880, false);
-  assert.equal(pads.handBack, false, "once");
+  assert.equal(pads.home, false, "once");
 });
 
 test("a mouse whose lift was lost (the window lost focus mid-drag) can press again: the old press is cancelled", () => {
