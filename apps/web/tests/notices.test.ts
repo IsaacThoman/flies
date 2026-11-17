@@ -18,6 +18,7 @@ test("all declared shipping dependencies have current generated notices and full
 
 test("missing direct, transitive and bundled-development dependency notices fail closed", () => {
   assert.deepEqual([...bundledPackageNames(["/node_modules/three/node_modules/unknown/index.js", "/node_modules/@scope/pkg/file.js"])], ["unknown", "@scope/pkg"]);
+  for (const name of ["constructor", "valueOf", "toString", "__proto__"]) assert.throws(() => requireNotices([name]), /no notice/);
   assert.throws(() => requireNotices(["unreviewed-addon"]), /no notice: unreviewed-addon/);
   const dir = mkdtempSync(path.join(tmpdir(), "flies-notices-"));
   try {
@@ -81,4 +82,15 @@ test("the static host serves /privacy and the notice with their own content type
     assert.match(notice.headers.get("content-type")!, /text\/plain/);
     assert.equal(await notice.text(), noticeText());
   } finally { await site.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+
+test("a policy-only or notice-only release changes the offline cache version", async () => {
+  const { offlineVersion } = await import("../../../scripts/webBuild.ts");
+  const files = ["./", "privacy/index.html", "THIRD_PARTY_NOTICES"];
+  const documents = { "index.html": "game", "privacy/index.html": "policy one", THIRD_PARTY_NOTICES: "notices one" };
+  const first = offlineVersion(files, documents);
+  assert.equal(first, offlineVersion(files, { ...documents }));
+  assert.notEqual(first, offlineVersion(files, { ...documents, "privacy/index.html": "policy two" }));
+  assert.notEqual(first, offlineVersion(files, { ...documents, THIRD_PARTY_NOTICES: "notices two" }));
 });

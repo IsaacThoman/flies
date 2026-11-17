@@ -18,7 +18,7 @@
 // Needs the connectome (npm run brain:fetch) and a Playwright Chromium.
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
@@ -250,9 +250,13 @@ try {
   step("the privacy policy remains a policy when opened offline");
   await page.goto(new URL("privacy", site.url).href);
   assert.match(await page.locator("main").innerText(), /Privacy policy/);
+  const policyFile = path.join(out, "privacy/index.html");
+  writeFileSync(policyFile, readFileSync(policyFile, "utf8").replace("</main>", "<p>Policy revision fixture</p></main>"));
+  await page.reload();
+  assert.match(await page.locator("main").innerText(), /Policy revision fixture/);
   await context.setOffline(true);
   await page.reload();
-  assert.match(await page.locator("main").innerText(), /Privacy policy/);
+  assert.match(await page.locator("main").innerText(), /Policy revision fixture/);
   assert.equal(await page.locator("canvas").count(), 0);
   await context.setOffline(false);
 

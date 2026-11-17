@@ -8,7 +8,7 @@ export const NPM_NOTICES: Readonly<Record<string, string>> = { three: "LICENSE",
 export type Notice = { heading: string; body: string };
 
 export function requireNotices(names: Iterable<string>, registry = NPM_NOTICES) {
-  for (const name of names) if (!registry[name]) throw new Error(`Shipped dependency has no notice: ${name}`);
+  for (const name of names) if (!Object.hasOwn(registry, name) || !registry[name]) throw new Error(`Shipped dependency has no notice: ${name}`);
 }
 
 /** Installed production dependencies, including transitive dependencies. Workspaces are our own code. */
@@ -65,7 +65,7 @@ export function notices(): Notice[] {
   const fdlibm = read("packages/brain-native/src/fdlibm.cpp");
   result.push({ heading: "fdlibm / V8", body: fdlibm.slice(fdlibm.indexOf("// The following is adapted"), fdlibm.indexOf("\n#include")).replace(/^\/\/ ?/gm, "").trim() });
   const sources: Record<string, string> = JSON.parse(read("docs/licenses/sources.json"));
-  for (const [file, url] of Object.entries(sources)) result.push({ heading: file === "cc-by-4.0.txt" ? "CC BY 4.0 — legal terms" : `WebAssembly runtime: ${file.replace(/\.txt$/, "")}`, body: `Source: ${url}\n\n${read(`docs/licenses/${file}`)}` });
+  for (const [file, url] of Object.entries(sources)) result.push({ heading: file === "cc-by-4.0.txt" ? "CC BY 4.0 — legal terms" : file === "v8.txt" ? "V8 — BSD licence" : `WebAssembly runtime: ${file.replace(/\.txt$/, "")}`, body: `Source: ${url}\n\n${read(`docs/licenses/${file}`)}` });
   return result;
 }
 

@@ -362,3 +362,18 @@ test("Acknowledgements pages fit every screen and every document is reachable wi
     assert.equal(exits, 1, "Back leaves About");
   }
 });
+
+
+test("notice navigation clears the button hints on tall and short screens", () => {
+  for (const [name, frame] of frames()) {
+    const screen = new AboutScreen(shell(frame, "keys"));
+    screen.press("select", false);
+    const hits = new HitMap();
+    hits.begin("about");
+    screen.draw(blankCanvas(), 0, hits);
+    for (let i = 0; i < hits.count; i++) {
+      const hit = hits.get(i)!;
+      if (hit.kind === "notice") assert.ok(hit.y + hit.h < frame.design.height - frame.safe.bottom - 43, name);
+    }
+  }
+});

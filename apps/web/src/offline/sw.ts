@@ -48,7 +48,15 @@ async function page(request: Request): Promise<Response> {
   const late = new Promise<undefined>((resolve) => setTimeout(resolve, PAGE_TIMEOUT_MS));
   try {
     const first = await Promise.race([fresh, late]);
-    if (first?.ok) return first;
+    if (first?.ok) {
+      if (policy) {
+        try {
+          const cache = await caches.open(CACHE);
+          await cache.put("privacy/index.html", first.clone());
+        } catch { /* A full cache must not hide the policy available from the network. */ }
+      }
+      return first;
+    }
     return (await kept()) ?? first ?? (await fresh);
   } catch {
     return (await kept()) ?? Response.error();

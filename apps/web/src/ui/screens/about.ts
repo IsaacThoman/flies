@@ -44,6 +44,13 @@ const BODY = 15;
 const LINE = 21;
 const HEADING = 19;
 
+/** Keep the footer above button hints, even when a keyboard is used on a tall screen. */
+function readingPane(frame: Frame): Rect {
+  const pane = fitPane(frame, 620, 404, 8);
+  pane.h = Math.min(pane.h, frame.design.height - frame.safe.bottom - 51 - pane.y);
+  return pane;
+}
+
 export class AboutScreen implements Screen {
   readonly id = "about" as const;
   readonly #shell: Shell;
@@ -60,7 +67,7 @@ export class AboutScreen implements Screen {
 
   constructor(shell: Shell) {
     this.#shell = shell;
-    this.#pane = fitPane(shell.shape, 620, 404, 8);
+    this.#pane = readingPane(shell.shape);
   }
 
   enter() {
@@ -73,7 +80,7 @@ export class AboutScreen implements Screen {
   }
 
   layout(frame: Frame) {
-    this.#pane = fitPane(frame, 620, 404, 8);
+    this.#pane = readingPane(frame);
     // Wrapped again to the new width.
     this.#lines = null;
     this.#dirty = true;

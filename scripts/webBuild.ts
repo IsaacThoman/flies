@@ -172,6 +172,12 @@ export function siteAssociation(teamId = process.env.APPLE_TEAM_ID): string | nu
   return `${JSON.stringify(association, null, 2)}\n`;
 }
 
+/** Fixed document names still need a content version: a policy-only release must replace offline text. */
+export function offlineVersion(files: readonly string[], documents: Readonly<Record<string, string | Uint8Array>>): string {
+  const contents = Object.entries(documents).sort(([a], [b]) => a.localeCompare(b)).map(([name, source]) => `${name}:${sha256(source)}`);
+  return sha256(files.join("\n") + contents.join("\n")).slice(0, 16);
+}
+
 /**
  * The parts that make the page an app: the manifest with its icons, the
  * service worker that keeps the page for opening offline (it leaves the brain
@@ -235,7 +241,12 @@ export function webApp({ siteUrl = process.env.FLY_SITE_URL, teamId = process.en
       if (page?.type !== "asset") throw new Error("The page must be written before the service worker's list");
       const files = ["./", ...[...Object.keys(bundle), ...emitted].filter((name) => name !== "sw.js" && name !== "index.html" && name !== SITE_ASSOCIATION && !/\.map$|\/preview-/.test(name))];
       const unique = [...new Set(files)].sort();
-      const version = sha256(unique.join("\n") + String(page.source)).slice(0, 16);
+      const documents: Record<string, string | Uint8Array> = { "index.html": page.source };
+      for (const name of unique) {
+        const asset = bundle[name];
+        if (asset?.type === "asset") documents[name] = asset.source;
+      }
+      const version = offlineVersion(unique, documents);
       const sw = bundle["sw.js"];
       if (sw?.type !== "chunk") throw new Error("The service worker wasn't built");
       sw.code = sw.code.replace("__FLY_PRECACHE__", JSON.stringify(unique)).replace("__FLY_VERSION__", JSON.stringify(version));
