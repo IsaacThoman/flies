@@ -1,18 +1,23 @@
 // Static render fixtures: freeze life and the automatic clock, then draw fixed steps.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { chromium } from "playwright";
+import type { Browser } from "playwright";
 import { serveSite } from "./serve.ts";
 import { chromiumPath, gpuFlags, waitFor } from "./play.ts";
 import { withHeavySlot } from "./heavySlot.ts";
 import { PLACES } from "../apps/web/src/places/catalog.ts";
 import type { Game } from "../apps/web/src/game.ts";
 declare global { var __fixture: { game: Game; frame(dt: number, now: number): void }; }
-const [dir, out] = process.argv.slice(2);
-mkdirSync(out,{recursive:true});
+const pairs = process.argv.slice(2);
+if (!pairs.length || pairs.length % 2) throw Error("Pass built-site/output-folder pairs");
 await withHeavySlot(async () => {
+ for (let pair = 0; pair < pairs.length; pair += 2) {
+ const dir = pairs[pair], out = pairs[pair + 1];
+ mkdirSync(out,{recursive:true});
  const site = await serveSite({dir,base:"/fly/"});
- const browser = await chromium.launch({ executablePath:chromiumPath(),args:gpuFlags() });
+ let browser: Browser | undefined;
  try {
+  browser = await chromium.launch({ executablePath:chromiumPath(),args:gpuFlags() });
   const context = await browser.newContext({viewport:{width:1280,height:720}});
   const page = await context.newPage();
   await page.addInitScript(() => {
@@ -53,5 +58,6 @@ await withHeavySlot(async () => {
    await page.locator("#game").screenshot({path:`${out}/${place.id}.png`});
   }
   writeFileSync(`${out}/fixture.txt`,"1280x720; seeded page randomness; fixed civil clock; life.step held; fixed manual frame steps; real renderer and built site. These fixtures establish render equivalence, not behavioral equivalence.\n");
- }finally{await browser.close();await site.close();}
+ }finally{await browser?.close();await site.close();}
+ }
 });

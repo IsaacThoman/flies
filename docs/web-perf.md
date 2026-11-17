@@ -86,3 +86,15 @@ For a bundle-only pass, use `--build --phases bundle`. For frame comparisons,
 retain the whole distributions and long-frame counts: a low median does not
 exclude a visible first-use or readback stall. Match actual pixels, eye detail,
 eye cadence and frame rate as well as the adaptive-level label.
+
+For paired measurements of existing builds:
+
+```
+CHROMIUM_PATH=... node scripts/webPerf.ts --dir /tmp/site-A --compare-dir /tmp/site-B --phases loads,frames --out /tmp/fly-pair
+```
+
+Each repetition runs both variants, reversing their order on alternate
+repetitions. Every repetition is a bounded batch. The report retains each
+variant separately, including full draw/triangle distributions so workload
+changes remain visible. Memory is measured separately with a single live page.
+The fixture script accepts multiple built-site/output-folder pairs in one batch.

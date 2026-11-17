@@ -176,7 +176,8 @@ export class WorkerBrainDriver implements BrainDriver {
     const request = this.#tickRequest;
     request.dtMs = dt;
     request.senses = sent;
-    this.#worker.post(request);
+    try { this.#worker.post(request); }
+    finally { request.senses = RESTING_SENSES; }
   }
 
   dispose(): void {

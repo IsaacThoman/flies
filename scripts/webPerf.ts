@@ -127,13 +127,13 @@ async function frameSample(page: Page, cdp: CDPSession, seconds: number, play: b
   const frames = await page.evaluate(() => globalThis.__webPerf.frames.splice(0));
   const state = await readState(page);
   return { jsMs: distribution(frames.map(f => f.ms)), intervalMs: distribution(frames.slice(1).map(f => f.interval)), longFrames50ms: frames.slice(1).filter(f => f.interval > 50).length,
-    longJs50ms: frames.filter(f => f.ms > 50).length, taskMsPerFrame: (end.TaskDuration - start.TaskDuration) * 1000 / frames.length,
+    longJs50ms: frames.filter(f => f.ms > 50).length, calls: distribution(frames.map(f => f.calls)), triangles: distribution(frames.map(f => f.triangles)), taskMsPerFrame: (end.TaskDuration - start.TaskDuration) * 1000 / frames.length,
     qualities: [...new Set(frames.map(f => f.quality))], state };
 }
 
 async function main() {
   const { values } = parseArgs({ options: {
-    out: { type: "string" }, dir: { type: "string" },
+    out: { type: "string" }, dir: { type: "string" }, "compare-dir": { type: "string" },
     phases: { type: "string", default: "loads,frames,memory,brain" },
     runs: { type: "string", default: "3" }, seconds: { type: "string", default: "10" },
     "memory-seconds": { type: "string", default: "600" },
@@ -144,24 +144,28 @@ async function main() {
   assert.ok(!out.startsWith(root + path.sep), "raw evidence belongs outside the repository");
   mkdirSync(out, { recursive: true });
   const dir = path.resolve(values.dir ?? path.join(out, "site"));
+  const directories = values["compare-dir"] ? [dir, path.resolve(values["compare-dir"])] : [dir];
+  const order = (run: number) => (run % 2 ? [...directories].reverse() : directories);
   const runs = Number(values.runs), seconds = Number(values.seconds), memorySeconds = Number(values["memory-seconds"]);
   assert.ok(Number.isInteger(runs) && runs >= 3, "at least 3 runs");
   assert.ok(Number.isFinite(seconds) && seconds >= 2 && Number.isFinite(memorySeconds) && memorySeconds >= 0);
   const phases = values.phases.split(",");
   assert.ok(phases.every(p => ["loads", "frames", "memory", "brain", "bundle"].includes(p)));
+  assert.ok(!values["compare-dir"] || (!values.build && phases.every(p => ["loads", "frames"].includes(p))), "--compare-dir uses prebuilt sites and loads/frames phases");
+  const batches = directories.length === 1 ? [Array.from({ length: runs }, (_, i) => i)] : Array.from({ length: runs }, (_, i) => [i]);
   if (values.build) await bundle(out, dir);
   const report: Record<string, unknown> = { complete: false, revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), dirty: execFileSync("git", ["diff", "--stat"], { encoding: "utf8" }), node: process.version, host: os.cpus()[0].model, options: values, notes: "Timings include instrumentation; frame submission is not GPU/display time. Phone CPU throttling affects page only. Memory includes worker Wasm separately; memory checkpoints n=1; active batches separated by a paused two-minute cooldown; GC queries hold frames briefly." };
   const save = () => {
-    const loads = (report.loads ?? []) as { profile: string; cache: string; title: number; firstFrame: number; titleBytes: number }[];
-    const frames = (report.frames ?? []) as { place: string; mode: string; jsMs: { median: number }; taskMsPerFrame: number; longFrames50ms: number }[];
+    const loads = (report.loads ?? []) as { variant?: number; profile: string; cache: string; title: number; firstFrame: number; titleBytes: number }[];
+    const frames = (report.frames ?? []) as { variant?: number; place: string; mode: string; jsMs: { median: number }; taskMsPerFrame: number; longFrames50ms: number }[];
     const summary: Record<string, unknown> = {};
-    for (const profile of ["desktop", "phone"]) for (const cache of ["cold", "warm"]) {
-      const rows = loads.filter(r => r.profile === profile && r.cache === cache);
-      if (rows.length) summary[`${profile}/${cache}`] = Object.fromEntries((["title", "firstFrame", "titleBytes"] as const).map(k => [k, distribution(rows.map(r => r[k]))]));
+    for (let variant = 0; variant < directories.length; variant++) for (const profile of ["desktop", "phone"]) for (const cache of ["cold", "warm"]) {
+      const rows = loads.filter(r => (r.variant ?? 0) === variant && r.profile === profile && r.cache === cache);
+      if (rows.length) summary[`${variant}/${profile}/${cache}`] = Object.fromEntries((["title", "firstFrame", "titleBytes"] as const).map(k => [k, distribution(rows.map(r => r[k]))]));
     }
-    for (const place of PLACES) for (const mode of ["play", "watch"]) {
-      const rows = frames.filter(r => r.place === place.id && r.mode === mode);
-      if (rows.length) summary[`${place.id}/${mode}`] = { jsMs: distribution(rows.map(r => r.jsMs.median)), taskMsPerFrame: distribution(rows.map(r => r.taskMsPerFrame)), longFrames50ms: distribution(rows.map(r => r.longFrames50ms)) };
+    for (let variant = 0; variant < directories.length; variant++) for (const place of PLACES) for (const mode of ["play", "watch"]) {
+      const rows = frames.filter(r => (r.variant ?? 0) === variant && r.place === place.id && r.mode === mode);
+      if (rows.length) summary[`${variant}/${place.id}/${mode}`] = { jsMs: distribution(rows.map(r => r.jsMs.median)), taskMsPerFrame: distribution(rows.map(r => r.taskMsPerFrame)), longFrames50ms: distribution(rows.map(r => r.longFrames50ms)) };
     }
     report.summary = summary;
     writeFileSync(path.join(out, "report.json"), JSON.stringify(report, null, 2));
@@ -169,10 +173,10 @@ async function main() {
   if (phases.includes("loads")) {
     const loads: unknown[] = [];
     report.loads = loads;
-    await withHeavySlot(async () => {
-    for (let run = 0; run < runs; run++) for (const profile of ["desktop", "phone"]) {
+    for (const batch of batches) await withHeavySlot(async () => {
+    for (const run of batch) for (const profile of ["desktop", "phone"]) for (const directory of order(run)) {
       let serverBytes = 0;
-      const site = await serveSite({ dir, base: "/fly/", transferred: (_file, bytes) => { serverBytes += bytes; } });
+      const site = await serveSite({ dir: directory, base: "/fly/", transferred: (_file, bytes) => { serverBytes += bytes; } });
       let browser: Browser | undefined;
       try {
         browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
@@ -200,7 +204,7 @@ async function main() {
           // Let installation and cache writes finish: warm means the offline shell and brain are complete.
           await page.evaluate(async () => { await navigator.serviceWorker.ready; });
           await page.waitForFunction(() => { const source = (globalThis.__fly.brain as WorkerBrainDriver).source as BrainFiles; return source.connectome.kept === true && (!source.module || source.module.kept === true); });
-          loads.push({ run, profile, cache, ...probe, titleBytes, titleServerBodyBytes, settledServerBodyBytes: serverBytes, settledBytes: bytes, state, errors, loadAverage: os.loadavg() });
+          loads.push({ run, variant: directories.indexOf(directory), profile, cache, ...probe, titleBytes, titleServerBodyBytes, settledServerBodyBytes: serverBytes, settledBytes: bytes, state, errors, loadAverage: os.loadavg() });
           assert.deepEqual(errors, []);
           page.off("pageerror", onError);
           save();
@@ -209,8 +213,8 @@ async function main() {
     }
     });
   }
-  async function lane() {
-    const site = await serveSite({ dir, base: "/fly/" });
+  async function lane(directory = dir) {
+    const site = await serveSite({ dir: directory, base: "/fly/" });
     let browser: Browser | undefined;
     try {
       browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
@@ -232,14 +236,14 @@ async function main() {
   if (phases.includes("frames")) {
     const frames: unknown[] = [];
     report.frames = frames;
-    await withHeavySlot(async () => {
-    for (let run = 0; run < runs; run++) {
-      const l = await lane();
+    for (const batch of batches) await withHeavySlot(async () => {
+    for (const run of batch) for (const directory of order(run)) {
+      const l = await lane(directory);
       try {
         for (const place of (run % 2 ? [...PLACES].reverse() : PLACES)) for (const mode of ["play", "watch"]) {
           await move(l.page, place.id, mode === "watch");
           if (mode === "play") await l.page.evaluate(() => { while (globalThis.__fly.hands.current.id !== "swoop") globalThis.__fly.hands.stepTool(1); });
-          frames.push({ run, place: place.id, mode, ...await frameSample(l.page, l.cdp, seconds, mode === "play"), loadAverage: os.loadavg() });
+          frames.push({ run, variant: directories.indexOf(directory), place: place.id, mode, ...await frameSample(l.page, l.cdp, seconds, mode === "play"), loadAverage: os.loadavg() });
           save();
         }
         assert.deepEqual(l.errors, []);
