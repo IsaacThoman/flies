@@ -127,9 +127,23 @@ They are merged into the existing nervous-system geometry: no extra draws.
 
 These are **group-rate markers, not individual spike flashes**. Every soma
 in a readout shares that group's actual smoothed mean rate, normalized by
-the command's existing full-scale rate (40 Hz walking/steering/backing/
-feeding/song, 60 Hz grooming, 120 Hz flight power, 200 Hz giant fibre), with
-the same 50 ms rise and 400 ms fall as the regions. A bright point does not
+a documented display reference. `packages/fly/scripts/soma-rates.ts` measures
+the existing readouts over seeds 1, 2 and 3: 60 seconds of rest after two seconds of
+settling, each full scalar sense, the combined senses, a looming pulse and
+the region calibration's vision battery. The reference is the larger of
+the observed peak, four times the largest resting mean and 5 Hz, rounded
+upward to two significant figures; the two steering sides share the larger
+reference. The atlas uses these measured references: walking 56 Hz,
+steering 43 Hz,
+backing 45 Hz, escape 350 Hz, flight 160 Hz, grooming 44 Hz, feeding 50 Hz
+and song 11 Hz.
+The pinned measurements, connectome hash and brain-tree revision are in
+`packages/fly/src/nerves/soma-rates.ts`. To recalibrate, run
+`node packages/fly/scripts/soma-rates.ts`, then
+`node packages/fly/scripts/somata.ts`.
+These are observed reference rates, not biological maxima. The command
+decoder is unchanged. Display envelopes retain the same 50 ms rise and
+400 ms fall as the regions. A bright point does not
 establish that this individual neuron fired. The workers and the native TV
 already report these nine rates; no new messages, counters, simulation work
 or inferred axon paths are added. A host missing a readout leaves its group
