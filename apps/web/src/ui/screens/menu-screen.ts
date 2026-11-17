@@ -9,7 +9,7 @@
 // back button, is Back.
 
 import type { RemoteButton } from "@fly/contracts";
-import { INK, font, glassPanel, hintChip, hintWidth, iconButton, sameTarget, text } from "@fly/ui";
+import { INK, font, glassPanel, drawGlyph, iconButton, sameTarget, text } from "@fly/ui";
 import type { ChoiceItem, FieldItem, GlyphSet, Hit, HitMap, Menu, MenuItem, Outcome, SliderItem } from "@fly/ui";
 import type { Frame } from "../../display.ts";
 import { backButton } from "../layout.ts";
@@ -53,6 +53,7 @@ export class MenuScreen implements Screen {
   /** What a pointer went down on: a slider it is sliding, or the list it may drag. */
   #held: { slider: number; hit: Hit | null; scroll: number; dragging: boolean } | null = null;
   #wheel = 0;
+  semanticFocus = false;
   /** The row a mouse is over, or -1. */
   #hover = -1;
 
@@ -89,8 +90,26 @@ export class MenuScreen implements Screen {
   }
 
   press(button: RemoteButton, repeat: boolean) {
+    this.semanticFocus = false;
     this.#outcome(this.menu.press(button, repeat));
   }
+
+  focus(id: string) {
+    this.menu.focusOn(id);
+    this.semanticFocus = true;
+    this.#dirty = true;
+  }
+
+  /** Host semantics use the same outcomes as the canvas's hit targets. */
+  access(id: string, value?: number) {
+    const at = this.menu.items.findIndex((item) => item.id === id);
+    const item = this.menu.items[at];
+    if (!item || item.disabled) return;
+    this.focus(id);
+    this.#outcome(value === undefined ? this.menu.tap(at) : item.kind === "choice" ? this.menu.chooseAt(at, value) : this.menu.slideAt(at, value));
+  }
+
+  get heading() { return this.#options.heading ?? (this.id[0].toUpperCase() + this.id.slice(1)); }
 
   #outcome(outcome: Outcome) {
     switch (outcome.kind) {
@@ -109,9 +128,11 @@ export class MenuScreen implements Screen {
         break;
     }
     this.#dirty = true;
+    this.#shell.menuChanged?.();
   }
 
   point(p: Point) {
+    if (p.type === "down" || p.type === "hover") this.semanticFocus = false;
     const menu = this.menu;
     const hit = p.hit;
     const row = hit && (hit.kind === MENU_HITS.row || hit.kind === MENU_HITS.step || hit.kind === MENU_HITS.tab || hit.kind === MENU_HITS.track || hit.kind === MENU_HITS.submit);
@@ -213,7 +234,7 @@ export class MenuScreen implements Screen {
     const pointing = this.#shell.glyphs === null;
     const backed = pointing && !this.#options.root;
     this.view.tabInset = backed && !head ? 44 : 0;
-    this.view.draw(g, t, hits, !pointing, pointing ? this.#hover : -1);
+    this.view.draw(g, t, hits, !pointing || this.semanticFocus, pointing && !this.semanticFocus ? this.#hover : -1);
     if (backed) {
       const list = this.#pane.list;
       const b = head ? backButton(panel, head.y) : { x: list.x + 17, y: list.y + list.row / 2, r: 17 };
@@ -221,20 +242,19 @@ export class MenuScreen implements Screen {
       // Over the row it sits beside.
       hits.add(SCREEN_HITS.back, b.x - 22, b.y - 22, 44, 44);
     }
-    drawMenuHints(g, t, this.#shell, "Back", this.menu.focused?.kind === "choice" ? "Adjust" : this.menu.focused?.kind === "field" ? "Type" : "Choose");
+    drawMenuHints(g, t, this.#shell);
   }
 }
 
 /** The hints every menu shows for the buttons in hand: how to move, choose and go back, along the foot of the safe area. None for a pointer. */
-export function drawMenuHints(g: CanvasRenderingContext2D, t: number, shell: { shape: Frame; glyphs: GlyphSet | null }, back = "Back", choose: string | null = "Choose", move = "Move") {
+export function drawMenuHints(g: CanvasRenderingContext2D, _t: number, shell: { shape: Frame; glyphs: GlyphSet | null; settings?: { hints: boolean }; teachingMenu?: boolean }) {
   const set = shell.glyphs;
-  if (!set) return;
+  if (!set || shell.settings?.hints === false || shell.teachingMenu === false) return;
   const { design, safe } = shell.shape;
   const y = design.height - safe.bottom - 26;
-  const gap = 10;
-  const total = hintWidth(g, move, 13, "upDown", set) + (choose ? hintWidth(g, choose, 13, "select", set) + gap : 0) + hintWidth(g, back, 13, "back", set) + gap;
-  let x = safe.left + (design.width - safe.left - safe.right - total) / 2;
-  x += hintChip(g, x, y, "upDown", move, t, 13, set) + gap;
-  if (choose) x += hintChip(g, x, y, "select", choose, t, 13, set) + gap;
-  hintChip(g, x, y, "back", back, t, 13, set);
+  const gap = Math.min(72, (design.width - safe.left - safe.right) / 4);
+  const cx = safe.left + (design.width - safe.left - safe.right) / 2;
+  drawGlyph(g, "upDown", cx - gap, y, 25, 0, set);
+  drawGlyph(g, "select", cx, y, 25, 0, set);
+  drawGlyph(g, "back", cx + gap, y, 25, 0, set);
 }

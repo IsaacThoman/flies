@@ -1,7 +1,5 @@
-// The loading screen while the brain wakes: the world is already there behind
-// it, and the brain's size counts up as its bytes arrive and it is wired
-// together. If it can't wake, it says why, in a word or two, and offers to try
-// again: Select, or a tap or a click on the button (recorded in `hits`).
+// Download bytes are measured. Wiring has no intermediate progress signal, so
+// it uses an indeterminate bead. The player may explore the world during both.
 
 import type { BrainDriver } from "@fly/contracts";
 import { INK, INK_SOFT, font, glassPanel, pill, roundedRect, text, wrap } from "@fly/ui";
@@ -10,12 +8,8 @@ import type { BrainFailure, BrainSource } from "../brain/worker-driver.ts";
 import type { LoadingLayout } from "./layout.ts";
 import { drawWordmark } from "./wordmark.ts";
 
-/** The connectome's size, known before it arrives (packages/brain/README.md). */
-export const NEURONS = 166_700;
-export const CONNECTIONS = 6_242_118;
-
 /** A brain that arrives over the network (worker-driver.ts): what the loading screen follows. */
-type Arriving = BrainDriver & { phase: "download" | "build" | "done"; progress: number; failure: BrainFailure | null; source: BrainSource; retry(): void };
+export type Arriving = BrainDriver & { phase: "download" | "build" | "done"; progress: number; failure: BrainFailure | null; source: BrainSource; retry(): void };
 
 export const arriving = (brain: BrainDriver): brain is Arriving => "source" in brain && "phase" in brain;
 
@@ -23,7 +17,7 @@ export const arriving = (brain: BrainDriver): brain is Arriving => "source" in b
 export type PageFailure = "webgl";
 
 /** What "Try again" is, as recorded in the hit map. */
-export const LOADING_HITS = { retry: "retry" } as const;
+export const LOADING_HITS = { retry: "retry", explore: "explore" } as const;
 
 const format = (n: number) => Math.round(n).toLocaleString("en-US");
 const megabytes = (bytes: number) => (bytes / 1e6).toFixed(1);
@@ -42,30 +36,35 @@ export function drawLoading(g: CanvasRenderingContext2D, t: number, brain: Brain
   const cx = x + w / 2;
   glassPanel(g, x, y, w, h, 26);
   const running = brain.status === "running";
-  const fill = running ? 1 : phase === "download" ? progress * 0.9 : 0.9 + 0.1 * (1 - Math.exp(-t * 0.5));
-  const title = running ? (loading?.source.storageFull ? "Awake! (not kept: storage full)" : "Awake!") : phase === "download" ? "Waking the fly's brain" : "Wiring up its neurons";
-  text(g, title, cx, y + 36, { size: 19, align: "center", color: INK_SOFT });
-  text(g, `${format(running ? brain.neurons : NEURONS * fill)} neurons`, cx, y + 76, { size: 34, align: "center", color: INK });
-  // The progress bar: a glossy tube filling with green, with the bytes under it while they come over the network.
-  const bx = x + Math.min(40, w / 11);
-  const by = y + 92;
-  const bw = w - 2 * (bx - x);
-  roundedRect(g, bx, by, bw, 14, 7);
-  g.fillStyle = "rgba(10, 60, 120, 0.25)";
+  const downloading = phase === "download";
+  const title = running ? (loading?.source.storageFull ? "Awake · storage full" : "Awake") : downloading ? "Downloading brain" : "Waking brain";
+  text(g, title, cx, y + 27, { size: 18, align: "center", color: INK_SOFT });
+  // Bytes are measurable; initialization is not. Never turn elapsed time into
+  // a neuron count or imply that a partial connectome can already decide.
+  const amount = running ? `${format(brain.neurons)} neurons` : downloading && loading ? `${megabytes(loading.source.received)} / ${megabytes(loading.source.total)} MB` : "";
+  text(g, amount, cx, y + 56, { size: 24, align: "center", color: INK });
+  const bx = x + 32;
+  const by = y + 69;
+  const bw = w - 64;
+  roundedRect(g, bx, by, bw, 8, 4);
+  g.fillStyle = "rgba(10,60,120,0.2)";
   g.fill();
-  roundedRect(g, bx, by, Math.max(14, bw * fill), 14, 7);
-  const grad = g.createLinearGradient(0, by, 0, by + 14);
-  grad.addColorStop(0, "#c9ff9c");
-  grad.addColorStop(0.5, "#5fd13a");
-  grad.addColorStop(1, "#2f9d22");
-  g.fillStyle = grad;
-  g.fill();
-  roundedRect(g, bx + 4, by + 2, Math.max(6, bw * fill - 8), 4, 2);
-  g.fillStyle = "rgba(255,255,255,0.6)";
-  g.fill();
-  if (loading && phase === "download" && loading.source.from === "network") {
-    text(g, `${megabytes(loading.source.received)} of ${megabytes(loading.source.total)} MB`, cx, by + 30, { size: 13, align: "center", color: INK_SOFT });
+  if (downloading || running) {
+    const fill = running ? 1 : Math.max(0, Math.min(1, progress));
+    if (fill > 0) {
+      roundedRect(g, bx, by, bw * fill, 8, Math.min(4, bw * fill / 2));
+      g.fillStyle = "#78d85b";
+      g.fill();
+    }
+  } else {
+    // A moving bead means work, without promising how much is left.
+    const at = (0.5 + 0.5 * Math.sin(t * 2)) * (bw - 18);
+    roundedRect(g, bx + at, by, 18, 8, 4);
+    g.fillStyle = "#9ee8ff";
+    g.fill();
   }
+  pill(g, cx - 65, y + 90, 130, 32, "Explore", { focused: true });
+  hits.add(LOADING_HITS.explore, cx - 65, y + 90, 130, 32);
 }
 
 /** What to say for each way it can fail: a heading, and a line on what happens next. */

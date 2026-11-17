@@ -20,6 +20,7 @@ import { PLACES } from "../../places/catalog.ts";
 import { WALLPAPER_DELAYS } from "../../settings.ts";
 import type { EyesDetail, OverlayOpacity, OverlaySize, Settings, ShowWhen, StatsKind } from "../../settings.ts";
 import { fitMenu, menuSpace, titleLayout } from "../layout.ts";
+import { arriving } from "../loading.ts";
 import { drawWordmark } from "../wordmark.ts";
 import { MenuScreen } from "./menu-screen.ts";
 import type { SettingsPage, Shell } from "./types.ts";
@@ -52,7 +53,7 @@ export function titleScreen(shell: Shell) {
       // How the brain is doing, quietly, under the name.
       const brain = shell.brain;
       const awake = brain.status === "running";
-      const label = awake ? `Brain awake · ${brain.neurons.toLocaleString("en-US")} neurons` : brain.status === "failed" ? "Its brain couldn't wake" : "Its brain is waking…";
+      const label = awake ? `Brain awake · ${brain.neurons.toLocaleString("en-US")} neurons` : brain.status === "failed" ? "Its brain couldn't wake" : arriving(brain) && brain.phase === "download" ? `Brain · ${(brain.source.received / 1e6).toFixed(1)} / ${(brain.source.total / 1e6).toFixed(1)} MB` : "Its brain is waking…";
       glassPanel(g, status.x, status.y, status.w, status.h, 17, { alpha: 0.85, shadow: false });
       orb(g, status.x + 20, status.y + 17, 8, awake ? "green" : brain.status === "failed" ? "pink" : "orange");
       // Smaller, if it must be, to stay in its pane.
@@ -145,7 +146,8 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
   },
   picture: {
     heading: "Picture",
-    rows: () => [choice("pixels", "Pixels", PIXELS), choice("eyes", "Vision detail", EYES), choice("hints", "Button hints", ON_OFF), choice("rumble", "Rumble", ON_OFF), choice("stats", "Frame stats", ON_OFF)],
+    rows: () => [choice("pixels", "Pixels", PIXELS), choice("eyes", "Vision detail", EYES), choice("hints", "Hints", ON_OFF), choice("rumble", "Rumble", ON_OFF), choice("stats", "Frame stats", ON_OFF)],
+
   },
 };
 

@@ -202,7 +202,7 @@ export class AboutScreen implements Screen {
       hits.add("notice", x + w - 72, foot - 7, 48, 48, 1);
       text(g, this.#pageLabel, x + w / 2, foot + 23, { size: 14, align: "center", color: INK_SOFT });
     }
-    if (this.#notice < 0) drawMenuHints(g, t, this.#shell, "Back", "Notices", "Scroll");
+    if (this.#notice < 0) drawMenuHints(g, t, this.#shell);
     else if (this.#shell.glyphs) {
       const set = this.#shell.glyphs;
       const total = hintWidth(g, "Scroll", 13, "upDown", set) + hintWidth(g, "Notice", 13, "leftRight", set) + hintWidth(g, "Back", 13, "back", set) + 20;

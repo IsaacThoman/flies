@@ -193,7 +193,8 @@ export class Stage {
     this.weather.update(dt);
     if (this.light.update(dt, this.weather)) {
       this.#applyLight();
-      this.#envDirty ||= this.#envStale();
+      // A sub-second flash uses direct light; rebuilding PMREM would stall it.
+      if (this.weather.lightning < 0.001) this.#envDirty ||= this.#envStale();
     }
     this.backdrop.update(time, camera, this.light, this.weather);
     this.set.update(time, this.light, this.weather, camera);

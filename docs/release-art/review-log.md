@@ -137,3 +137,55 @@ The owner changed the process after this review: merge latest origin/dev, publis
 Merged origin/dev with a merge commit, preserving its runtime behavior. The room's new Node-only lock import required moving the production Table into scripts/storeRoom.ts; the browser still runs three production Online clients and exchanges their actual messages through a fixed-clock local bridge. No server or gameplay code was changed. Platform art and all 32 store images were regenerated from the merged game. All 64 fresh-page store observations matched their paired simulation records and PNGs exactly; the separate three-brain bridge probe also matched. Current contact sheets show these regenerated files; historical blind scores refer to the frozen evidence from their respective rounds.
 
 Post-merge typecheck, lint and web build tests passed. The updated brain CPU-budget test skipped locally after three contended reference measurements under dev's new policy; it did not establish a passing CPU budget. Before this merge, web and play browser e2e suites passed, and the full functional suite passed 733 tests with two skips. Its former CPU-budget phase failed as recorded above. No GitHub CI result is awaited. The owner requested this validated step be marked ready for the maintainer to review and merge.
+
+## Round 6 — rejected framing variants
+
+On feat-release-art-framing, created from latest origin/dev with the ready release-art step carried in. Key: V8 = retained icon rendered on this base; B4 = byte-identical V8 decoy; Q3 = wider camera; H6 = elevated camera over a blue check nearer the fruit. Screenshot images and records are identical across all four sets. Orders: R1: V8, Q3, H6, B4; R2: B4, Q3, H6, V8; R3: B4, Q3, H6, V8; R4: Q3, B4, V8, H6. R4 is the regression reviewer.
+
+| Reviewer / set | Read | Appeal | Consistency | Story | Colour | Technical | Honesty | Mean |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| R1 / V8 | 6.5 | 7.5 | 9 | 6.5 | 7 | 9 | 9.5 | 7.86 |
+| R1 / B4 | 6.5 | 7.5 | 9 | 6.5 | 7 | 9 | 9.5 | 7.86 |
+| R1 / Q3 | 6 | 7 | 9 | 6.5 | 6.5 | 9 | 9.5 | 7.64 |
+| R1 / H6 | 6 | 6 | 8 | 6.5 | 6 | 9 | 9.5 | 7.29 |
+| R2 / V8 | 5.5 | 7 | 9 | 6 | 6.5 | 8.5 | 9 | 7.36 |
+| R2 / B4 | 5.5 | 7 | 9 | 6 | 6.5 | 8.5 | 9 | 7.36 |
+| R2 / Q3 | 5.5 | 7 | 9 | 6 | 7 | 9 | 9 | 7.50 |
+| R2 / H6 | 6 | 6 | 8 | 6 | 6 | 9 | 9 | 7.14 |
+| R3 / V8 | 6.5 | 7.5 | 9 | 6.5 | 7 | 8.5 | 9 | 7.71 |
+| R3 / B4 | 6.5 | 7.5 | 9 | 6.5 | 7 | 8.5 | 9 | 7.71 |
+| R3 / Q3 | 6 | 7.3 | 9 | 6.5 | 6.8 | 9 | 9 | 7.66 |
+| R3 / H6 | 6 | 6.3 | 8.5 | 6.5 | 6.2 | 9 | 9 | 7.36 |
+| R4 / V8 | 6.2 | 7.5 | 8.5 | 6.5 | 7.2 | 7.8 | 9.5 | 7.60 |
+| R4 / B4 | 6.2 | 7.5 | 8.5 | 6.5 | 7.2 | 7.8 | 9.5 | 7.60 |
+| R4 / Q3 | 5.8 | 7.5 | 8.5 | 6.5 | 7 | 8 | 9.5 | 7.54 |
+| R4 / H6 | 6.3 | 5.8 | 7.5 | 6.5 | 6.2 | 8.5 | 9.5 | 7.19 |
+
+R1/R3 and the regression reviewer prefer V8/B4 > Q3 > H6; R2 prefers Q3 > V8/B4 > H6. Identical decoys received identical scores in every criterion from all four reviewers; no noise-triggered additional reviews were required. Paired means: V8 **7.64**, Q3 **7.60**, H6 **7.26**. Reject both candidates and retain V8. Wider framing improves clearance but spends too many pixels on cloth; elevation loses recognizable fruit. One consecutive round without improvement. The next attempt addresses the shared screenshot weakness: distant flight and rain subjects. No additional PR is opened for rejected image changes.
+
+## Round 7 — flight and rainy-window photographs
+
+Key: B9 = retained V8; C4 = close flight photograph; N2 = that flight photograph plus a fly initially placed on the existing rainy window rail in Follow view. Non-screenshot artwork and the other six stories are identical. Orders: R1: C4, B9, N2; R2: N2, B9, C4; R3: N2, C4, B9; R4: N2, B9, C4. R4 is the regression reviewer.
+
+| Reviewer / set | Read | Appeal | Consistency | Story | Colour | Technical | Honesty | Mean |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| R1 / N2 | 6 | 7.5 | 9 | 7.5 | 7.2 | 9 | 9.5 | 7.96 |
+| R1 / C4 | 6 | 7.5 | 9 | 7 | 7 | 9 | 9.5 | 7.86 |
+| R1 / B9 | 6 | 7.5 | 9 | 6 | 6.5 | 9 | 9.5 | 7.64 |
+| R2 / N2 | 5 | 7 | 9 | 6.5 | 6.5 | 8.5 | 9 | 7.36 |
+| R2 / C4 | 5 | 7 | 9 | 7 | 7 | 8.5 | 9 | 7.50 |
+| R2 / B9 | 5 | 7 | 9 | 6 | 6.5 | 8.5 | 9 | 7.29 |
+| R3 / N2 | 5.5 | 7.5 | 9 | 7.5 | 7 | 9.5 | 9 | 7.86 |
+| R3 / C4 | 5.5 | 7.5 | 9 | 7 | 6.5 | 9.5 | 9 | 7.71 |
+| R3 / B9 | 5.5 | 7.5 | 9 | 6 | 6 | 9.5 | 9.5 | 7.57 |
+| R4 / N2 | 5 | 7 | 9 | 7 | 6.5 | 9 | 9 | 7.50 |
+| R4 / C4 | 5 | 7 | 9 | 6.5 | 6 | 9 | 9 | 7.36 |
+| R4 / B9 | 5 | 7 | 9 | 5.5 | 5.5 | 9 | 9 | 7.14 |
+
+R1/R3 and the regression reviewer rank N2 > C4 > B9; R2 ranks C4 > N2 > B9. Paired means: N2 **7.72**, C4 **7.69**, B9 **7.50**. Keep N2: both its mean and majority rank beat the retained control. The flight subject reads immediately; the rainy image retains a visible fly. The tradeoff is less environmental context in the rainy scene. Provenance discloses capture-only flight/group framing, staged rail/fruit positions and actual local three-brain multiplayer.
+
+This completes eight evidence rounds including the baseline. The 9/10 target was not reached; stop at the round cap. Small-icon wings and a rainy composition that balances fly, window and weather remain the next useful work. The existing icon is retained after the rejected round-6 alternatives. The first validated release-art step was marked ready under the owner's updated process and merged by the maintainer as PR #78. This round is prepared separately on feat-release-art-framing, with the latest dev merged and its behavior preserved. Capture sessions use ?alone for deterministic local peers, and the local room uses a valid ten-character code under dev's stricter welcome validation. Current regenerated evidence is identified separately from each frozen blind comparison.
+
+## Follow-up publication checks
+
+After syncing the maintainer's merged release-art step and subsequent dev changes, typecheck, lint, web build tests and platform-art regeneration passed. All 32 store stories then passed fresh-page verification (64 observations), with exact simulation fingerprints. Three X-ray pairs differed only by one channel level in 21, 190 and 18 pixels, inside the documented tolerance; their source images were preserved. The three-peer welcome probe also passed the production protocol parser. The old short capture room code was rejected by the stricter welcome guard; the capture now uses a valid ten-character code. The normal app's automatic joining is disabled only for the capture URL with ?alone. Current sheets show the regenerated submitted files, including dev's newer model/scene/nervous-system rendering. No gameplay or camera.ts edits are part of this change. GitHub CI is not awaited, per the owner's publication process.

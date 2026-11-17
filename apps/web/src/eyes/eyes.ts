@@ -251,8 +251,13 @@ export class Eyes {
 
   /** Before the flies' frame: hands each brain that has eyes its last picture. */
   beforeStep() {
+    // Early exploration can have a stand-in picture in flight when a brain
+    // arrives. Each fly receives only pixels sampled for its actual eye map.
     const sights = this.#sights;
-    for (let i = 0; i < sights.length; i++) sights[i].life.light = this.#inUse(sights[i]) && sights[i].hasLight ? sights[i].light : null;
+    for (let i = 0; i < sights.length; i++) {
+      const sight = sights[i];
+      sight.life.light = this.#inUse(sight) && sight.hasLight && sight.map === this.#mapOf(sight) ? sight.light : null;
+    }
   }
 
   /** The facets in use by the followed fly: its brain's, or the stand-in for the picture. */

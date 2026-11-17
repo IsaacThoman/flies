@@ -14,10 +14,10 @@
 // own light and weather there. No brains, no drawing and no sockets here (server.ts), so a
 // whole table can run in a test.
 
-import { BALL_RADIUS, Pace, VentilationClock, World, WORLDS, forecast, hourOfDay } from "@fly/world";
+import { BALL_RADIUS, Pace, VentilationClock, World, WORLDS, hourOfDay } from "@fly/world";
 import type { Happening } from "@fly/world";
 import {
-  MAX_FOUND, AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_FLIES, MAX_OWN, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
+  KINDS, forecast, MAX_FOUND, AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_FLIES, MAX_OWN, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
   TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, decodeFlies, encodeFlies, everyoneIndex, everyoneName,
   isTableCode, mayReturnTo, mix, roomName, roomTime, spawnSpot, stream, tableHours, toWire, wireScale,
 } from "@fly/net";
@@ -982,10 +982,7 @@ export class Table {
     const w = this.worldWire.weather;
     const m = this.#mix;
     if (w === "now") return forecast(this.hours, m);
-    m.cloud = w === "overcast" || w === "rain" ? 1 : 0;
-    m.mist = w === "mist" ? 1 : 0;
-    m.rain = w === "rain" ? 1 : 0;
-    m.wind = 0.4;
+    Object.assign(m, KINDS[w as keyof typeof KINDS] ?? KINDS.clear);
     return m;
   }
 
