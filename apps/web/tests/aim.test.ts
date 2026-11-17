@@ -54,5 +54,6 @@ test("play framing follows the room left by stacked or compact controls; on the 
   assert.ok(stacked.lower < -0.1 && stacked.wider > 1.1, JSON.stringify(stacked));
   assert.ok(Math.abs(side.lower) < 0.05 && side.wider > 1 && side.wider < stacked.wider, JSON.stringify(side));
   const upright = playRoom(frameFor(393, 852, { top: 59, right: 0, bottom: 34, left: 0 }, true));
-  assert.ok(Math.abs(upright.lower) < 0.15 && upright.wider < 1.05, JSON.stringify(upright));
+  // Upright, the shelf's groups are one over the other: a row more of the height under the fly.
+  assert.ok(Math.abs(upright.lower) < 0.15 && upright.wider < 1.1, JSON.stringify(upright));
 });

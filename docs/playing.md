@@ -103,7 +103,9 @@ takes the picture; the screen flashes white after the picture has been taken,
 so the flash, the hints and everything else drawn over the world are never in
 it). On the shelf the two groups stand
 apart, or, on a screen too narrow for them in a row, the fly's over its
-world's; Left and Right go along all of them. Hints in the
+world's, with the menu's button beside the fly's row; Left and Right go along
+all of them. On the TV more than eight tools come closer together rather than
+reach the pictures in the bottom corners. Hints in the
 corners show what the buttons do, until they have been used: the shelf's goes
 once you have gone along it, and what Select does with a tool once you have
 used it (held it, for Tickle and Blow), on later launches too; the Sky's

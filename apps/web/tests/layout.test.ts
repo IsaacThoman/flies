@@ -71,8 +71,9 @@ test("the TV keeps its HUD and title layout, with Settings below a separate head
   assert.equal(hud.cx, 427);
   assert.equal(hud.captionY, 25);
   assert.equal(hud.shelfY, 446);
-  assert.equal(hud.gap, 52);
-  assert.deepEqual([hud.shelfLeft, hud.split, hud.apart], [203, TOOLS.findIndex((t) => t.world), 32]);
+  // Nine tools come closer than eight did, keeping the shelf as wide as it was, clear of the bottom corners.
+  assert.equal(hud.gap, 46);
+  assert.deepEqual([hud.shelfLeft, hud.split, hud.apart], [204, TOOLS.findIndex((t) => t.world), 32]);
   assert.equal(hud.orb, 1);
   assert.equal(hud.labelY, 385);
   assert.deepEqual([hud.hintsX, hud.hintsY, hud.rightX, hud.rightY, hud.menuX, hud.menuY], [16, 446, 838, 446, 16, 24]);
