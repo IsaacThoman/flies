@@ -220,7 +220,7 @@ outgoingLight += wave * 0.14;
   };
   const drip = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), new THREE.MeshBasicMaterial({ color: "#b6d6da", transparent: true, opacity: 0.7 }));
   drip.scale.set(1, 1.8, 1); drip.visible = false; group.add(drip);
-  let age = -1, elapsed = 0;
+  let age = -1, elapsed = 0, lastTime = -1;
   return {
     group, materials: [opaque.material, water], seen,
     update(t, light, weather) {
@@ -232,7 +232,12 @@ outgoingLight += wave * 0.14;
       opaque.uniforms.uSun.value.copy(light.sunDirection);
       opaque.uniforms.uDirect.value = (1 - weather.cloud * 0.9) * (1 - light.stars * 0.8);
       const u = glass.uniforms;
-      u.uTime.value = t; u.uWet.value = weather.wet; u.uRain.value = weather.rain;
+      // Integrating the faster storm runoff keeps drops continuous as the weather changes.
+      const dt = lastTime < 0 ? 0 : Math.max(0, Math.min(0.1, t - lastTime));
+      lastTime = t;
+      u.uTime.value += dt * (1 + weather.heavy * 1.8);
+      u.uWet.value = weather.wet; u.uRain.value = weather.rain * (1 + weather.heavy * 0.35);
+      u.uFrost.value = weather.snowCover; u.uFlash.value = weather.lightning;
       const dawn = light.hours === null ? light.time === "morning" ? 0.55 : 0 : Math.max(0, 1 - Math.abs(light.hours - 6) / 2) * 0.65;
       u.uMist.value = Math.max(dawn, weather.mist * 0.65);
       u.uSky.value.copy(light.skyColor).multiplyScalar(0.7); u.uSun.value.copy(light.sunColor).multiplyScalar(light.sunIntensity);

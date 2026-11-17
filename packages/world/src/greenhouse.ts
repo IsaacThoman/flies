@@ -29,7 +29,7 @@ export const GREENHOUSE_SOLIDS: readonly Solid[] = [
   { name: "water saucer", footprint: { kind: "circle", x: SAUCER.x, z: SAUCER.z, r: SAUCER.r }, top: { kind: "dish", well: SAUCER.water, rim: 6, inner: 0.76, lip: 0.91 } },
   { name: "fallen tomato", footprint: { kind: "circle", x: -50, z: -12, r: 19 }, top: { kind: "dome", base: 0, height: 24, power: 0.55 } },
   { name: "fallen tomato", footprint: { kind: "circle", x: -82, z: 51, r: 13 }, top: { kind: "dome", base: 0, height: 17, power: 0.6 } },
-  { name: "split fig", footprint: { kind: "ellipse", x: 20, z: 56, rx: 19, rz: 25, angle: -0.35 }, top: { kind: "dome", base: 0, height: 9, power: 1 } },
+  { name: "split fig", footprint: { kind: "ellipse", x: 20, z: 56, rx: 19, rz: 25, angle: -0.35 }, top: { kind: "dish", well: 9, rim: 9, inner: 0.6, lip: 0.66 } },
   { name: "trowel blade", footprint: { kind: "ellipse", x: -187, z: 66, rx: 20, rz: 38, angle: -0.6 }, top: { kind: "dome", base: 0, height: 3.5, power: 1 } },
   { name: "trowel handle", footprint: { kind: "ellipse", x: -218, z: 111, rx: 9, rz: 24, angle: -0.6 }, top: { kind: "dome", base: 0, height: 13, power: 0.5 } },
   // The panes are beyond the bench and extend above the flight excursion.

@@ -2,12 +2,12 @@ import * as THREE from "three";
 import { NOISE } from "../windowsill/surfaces.ts";
 
 export function glazing() {
-  const uniforms = { uTime: { value: 0 }, uWet: { value: 0 }, uRain: { value: 0 }, uMist: { value: 0 }, uSky: { value: new THREE.Color() }, uSun: { value: new THREE.Color() }, uDirection: { value: new THREE.Vector3() } };
+  const uniforms = { uTime: { value: 0 }, uWet: { value: 0 }, uRain: { value: 0 }, uMist: { value: 0 }, uFrost: { value: 0 }, uFlash: { value: 0 }, uSky: { value: new THREE.Color() }, uSun: { value: new THREE.Color() }, uDirection: { value: new THREE.Vector3() } };
   const material = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms,
     vertexShader: `varying vec3 vWorld; varying vec3 vNormal;
 void main() { vWorld = (modelMatrix * vec4(position, 1.0)).xyz; vNormal = normal; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: `varying vec3 vWorld; varying vec3 vNormal;
-uniform float uTime; uniform float uWet; uniform float uRain; uniform float uMist;
+uniform float uTime; uniform float uWet; uniform float uRain; uniform float uMist; uniform float uFrost; uniform float uFlash;
 uniform vec3 uSky; uniform vec3 uSun; uniform vec3 uDirection;
 ${NOISE}
 void main() {
@@ -38,6 +38,18 @@ void main() {
  vec3 c = uSky * (0.85 + bead * 0.4 + still * 0.25) + uSun * glint * 0.65;
  c *= 1.0-max(bead,still)*0.4;
  c += uSun * pow(max(dot(-view, uDirection), 0.0), 10.0) * 0.12;
+ // Frost grows from the actual glazing bars, leaving the garden visible between them.
+ bool roof = abs(vNormal.y)>0.5;
+ float spacing = abs(vNormal.z)>0.5 ? 253.333 : 320.0;
+ float origin = abs(vNormal.z)>0.5 ? 760.0 : 640.0;
+ float post = abs(mod(p.x+origin+spacing*0.5,spacing)-spacing*0.5);
+ float rail = roof ? abs(mod(abs(vWorld.x)+126.6665,253.333)-126.6665) : min(abs(vWorld.y+160.0),min(abs(vWorld.y-320.0),abs(vWorld.y-880.0)));
+ float rim = 1.0-smoothstep(4.0,34.0,min(post,rail));
+ float crystal = vnoise(p*0.16)*0.55 + pow(abs(sin(p.x*0.13+p.y*0.07)),12.0)*0.45;
+ float frost = uFrost*rim*(0.35+0.65*crystal);
+ c = mix(c,mix(uSky,vec3(0.83,0.9,0.96),0.7),frost);
+ alpha += frost*(1.0-alpha)*0.85;
+ c += vec3(0.65,0.75,1.0)*uFlash*0.65;
  gl_FragColor = vec4(c, alpha);
 }` });
   return { material, uniforms };

@@ -244,7 +244,9 @@ seeds rather than on an empty part of the bench. The
 leak starts only during quiet rainy spells, at a fixed point on the roof, and reaches
 the fly through touch alone. Glazing bars lay moving shadows over the grain;
 the wood darkens when damp, rain beads and runs down the panes, and condensation
-clouds their lower edges at dawn. Weather reaches 70% of its light. The garden
+clouds their lower edges at dawn. Storms send faster runoff down the glass and
+lightning brightens it; snow and sleet frost the glazing bars while flakes fall
+in the garden beyond. Weather reaches 70% of its light. The garden
 backdrop is shared with the windowsill; there are no bubbles, and fireflies
 appear at dusk. Plant crowns are solid approximations, with leaf veins drawn
 in their surfaces rather than air beneath individual leaves.

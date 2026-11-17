@@ -6,6 +6,10 @@ import { buildBench, solidGeometry } from "../src/places/greenhouse/set.ts";
 import { foliage } from "../src/places/greenhouse/foliage.ts";
 import { EYE_LAYER } from "../src/eyes/eyes.ts";
 import { NO_PRINTS } from "../src/scene/prints.ts";
+import { Daylight } from "../src/scene/light.ts";
+import { WeatherNow } from "../src/scene/weather.ts";
+import { greenhouse } from "../src/places/greenhouse/index.ts";
+import { disposeAll } from "../src/scene/build.ts";
 
 test("greenhouse curved surfaces are sampled directly from their collision tops", () => {
   for (const solid of GREENHOUSE_SOLIDS) {
@@ -83,4 +87,33 @@ test("greenhouse pool is drawn at the felt water height and within its food foot
     if(d>31 && d<32.5 && cn.getY(i)>0.99) { assert.equal(cp.getY(i),SAUCER.water); rim++; }
   }
   assert.ok(rim>20,"the dry clay beside the water supports the feet too");
+});
+
+test("greenhouse glazing follows winter cover, mixed sleet and storm flashes without jumping its runoff", () => {
+  const set = buildBench();
+  while (set.more?.());
+  const pane = set.group.children.find(o => o instanceof THREE.Mesh && o.material instanceof THREE.ShaderMaterial && o.material.uniforms.uFrost) as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
+  assert.ok(pane);
+  const u = pane.material.uniforms;
+  const light = new Daylight("noon", greenhouse.palettes, greenhouse.open);
+  const weather = new WeatherNow();
+  const camera = new THREE.PerspectiveCamera();
+  const update = (t: number) => { light.update(0, weather); set.update(t, light, weather, camera); };
+  try {
+    weather.choose("snow", true); weather.snowCover = 0.7;
+    update(10);
+    assert.ok(u.uFrost.value > 0 && u.uRain.value === 0, "frost rims clear panes while snow falls in the shared garden backdrop");
+    weather.choose("sleet", true);
+    update(10.1);
+    assert.ok(u.uFrost.value > 0 && u.uRain.value > 0, "sleet leaves both icy edges and running water");
+    const before = u.uTime.value;
+    weather.choose("storm", true); weather.lightning = 1;
+    update(10.2);
+    assert.ok(u.uFlash.value > 0 && u.uRain.value > 1, "storm runoff and lightning reach the glass");
+    assert.ok(u.uTime.value > before && u.uTime.value - before < 0.3, "changing rain speed advances its phase instead of resetting it");
+    weather.choose("clear", true); weather.snowCover = 0; weather.lightning = 0;
+    update(10.3);
+    assert.equal(u.uFrost.value, 0);
+    assert.equal(u.uFlash.value, 0);
+  } finally { disposeAll(set.group); }
 });
