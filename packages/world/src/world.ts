@@ -11,7 +11,7 @@
 // which by a height: the surface at or below it, the underside above it.
 
 import type { FoodPatch } from "./pantry.ts";
-import { inside, prismSpan, sideNormal, solidBottom, topHeight, topNormal, topPeak } from "./shapes.ts";
+import { dishScales, domeScale, inside, prismSpan, sideNormal, solidBottom, topHeight, topNormal, topPeak } from "./shapes.ts";
 import type { Solid, Vec3 } from "./shapes.ts";
 
 /** The top the fly lives on, centred on the origin at y = 0: a disc, or a rectangle with half-sizes hx and hz. */
@@ -105,6 +105,9 @@ export class World {
   #heights = new Float64Array(0);
   #visited = new Uint32Array(0);
   #epoch = 0;
+  /** What `gather` last found. */
+  #near = new Int32Array(0);
+  #nearCount = 0;
   /** What `#layer` found: the surface's height and solid, and the underside over it. */
   #y = 0;
   #solid = -1;
@@ -216,6 +219,8 @@ export class World {
     this.#heights = new Float64Array(most + big.length);
     this.#visited = new Uint32Array(n);
     this.#epoch = 0;
+    this.#near = new Int32Array(n);
+    this.#nearCount = 0;
   }
 
   /** Over the floor (inside its edge). */
@@ -330,6 +335,57 @@ export class World {
   }
 
   /**
+   * Gathers what stands within `r` of a point (a square that wide, by what
+   * each thing covers seen from above) between the heights `low` and `high`,
+   * for `raycastNear`, and says how many there are: a body's short rays out
+   * from where it is need look at nothing else, and none when there is
+   * nothing.
+   */
+  gather(x: number, z: number, r: number, low: number, high: number): number {
+    const bounds = this.#bounds;
+    const items = this.#items;
+    const starts = this.#starts;
+    const near = this.#near;
+    const visited = this.#visited;
+    const epoch = this.#nextEpoch();
+    const x0 = this.#column(x - r);
+    const x1 = this.#column(x + r);
+    const z0 = this.#row(z - r);
+    const z1 = this.#row(z + r);
+    const nx = this.#nx;
+    const big = this.#big;
+    let count = 0;
+    for (let k = 0; k < big.length; k++) if (overlaps(bounds, big[k] * B, x, z, r, low, high)) near[count++] = big[k];
+    for (let row = z0; row <= z1; row++) {
+      for (let column = x0; column <= x1; column++) {
+        const c = row * nx + column;
+        for (let j = starts[c]; j < starts[c + 1]; j++) {
+          const i = items[j];
+          if (visited[i] === epoch) continue;
+          visited[i] = epoch;
+          if (overlaps(bounds, i * B, x, z, r, low, high)) near[count++] = i;
+        }
+      }
+    }
+    this.#nearCount = count;
+    return count;
+  }
+
+  /** The `k`th solid `gather` last found. */
+  gathered(k: number): number {
+    return this.#near[k];
+  }
+
+  /** `raycast` among only what `gather` last found, and never the floor: for a short ray within what it gathered. */
+  raycastNear(origin: Vec3, dir: Vec3, out: RayHit, maxDistance: number, height = 0): RayHit | null {
+    this.#bestT = maxDistance;
+    this.#found = -2;
+    const near = this.#near;
+    for (let k = 0; k < this.#nearCount; k++) this.#meet(near[k], origin, dir, height, out);
+    return this.#found >= 0 ? out : null;
+  }
+
+  /**
    * Where a point comes out of what it is in, going straight up: the top of
    * the solid it is inside, or of what rests on that (a plate on a table
    * top, a cup on its saucer); `y` itself when it is in nothing.
@@ -436,12 +492,7 @@ export class World {
       const dz = Math.abs(dir.z) < 1e-12 ? Infinity : cell / Math.abs(dir.z);
       let nextX = dx === Infinity ? Infinity : (gx0 + (ix + (sx > 0 ? 1 : 0)) * cell - origin.x) / dir.x;
       let nextZ = dz === Infinity ? Infinity : (gz0 + (iz + (sz > 0 ? 1 : 0)) * cell - origin.z) / dir.z;
-      this.#epoch = (this.#epoch + 1) >>> 0;
-      if (this.#epoch === 0) {
-        this.#visited.fill(0);
-        this.#epoch = 1;
-      }
-      const epoch = this.#epoch;
+      const epoch = this.#nextEpoch();
       const visited = this.#visited;
       const starts = this.#starts;
       const items = this.#items;
@@ -468,6 +519,16 @@ export class World {
       }
     }
     return this.#found >= -1 ? out : null;
+  }
+
+  /** A new mark for `#visited`, which no solid carries yet. */
+  #nextEpoch() {
+    this.#epoch = (this.#epoch + 1) >>> 0;
+    if (this.#epoch === 0) {
+      this.#visited.fill(0);
+      this.#epoch = 1;
+    }
+    return this.#epoch;
   }
 
   /** The grid cell a point is in, or -1 outside the grid. */
@@ -579,6 +640,11 @@ export class World {
   }
 }
 
+/** Whether a solid's box in `bounds` (at `b`) reaches into the square within `r` of a point, between `low` and `high`. */
+function overlaps(bounds: Float64Array, b: number, x: number, z: number, r: number, low: number, high: number) {
+  return bounds[b + 4] >= low && bounds[b + 5] <= high && bounds[b] <= x + r && bounds[b + 1] >= x - r && bounds[b + 2] <= z + r && bounds[b + 3] >= z - r;
+}
+
 const TOP = 0;
 const SIDE = 1;
 const UNDER = 2;
@@ -601,6 +667,9 @@ function clampInside(solid: Solid, x: number, z: number, axis: 0 | 1) {
   return axis === 0 ? f.x + (x - f.x) * k : f.z + (z - f.z) * k;
 }
 
+const crossing: [number, number] = [0, 0];
+const ring: [number, number] = [0, 0];
+
 /** The first distance in [t0, t1] where the ray passes down through the solid's top, or null. */
 function topCrossing(solid: Solid, o: Vec3, d: Vec3, t0: number, t1: number): number | null {
   const { top } = solid;
@@ -608,6 +677,26 @@ function topCrossing(solid: Solid, o: Vec3, d: Vec3, t0: number, t1: number): nu
     if (Math.abs(d.y) < 1e-12) return null;
     const t = (top.y - o.y) / d.y;
     return t >= t0 && t <= t1 ? t : null;
+  }
+  if (top.kind === "dome" && Math.abs(d.y) < 1e-12) {
+    // Level, it meets a dome where the dome first stands as high as it is: the footprint shrunk to that height's.
+    const scale = domeScale(top, o.y);
+    if (scale <= 0) return null;
+    const span = prismSpan(solid.footprint, o.x, o.z, d.x, d.z, crossing, scale);
+    if (!span) return null;
+    const t = Math.max(span[0], t0);
+    return t <= Math.min(span[1], t1) ? t : null;
+  }
+  if (top.kind === "dish" && Math.abs(d.y) < 1e-12) {
+    // Level, it meets a dish's ring where the ring first stands as high as it is.
+    if (!dishScales(top, solidBottom(solid), o.y, ring)) return null;
+    const outer = prismSpan(solid.footprint, o.x, o.z, d.x, d.z, crossing, ring[1]);
+    if (!outer) return null;
+    let t = Math.max(outer[0], t0);
+    const end = Math.min(outer[1], t1);
+    const inner = ring[0] > 0 ? prismSpan(solid.footprint, o.x, o.z, d.x, d.z, crossing, ring[0]) : null;
+    if (inner && inner[0] <= t && t < inner[1]) t = inner[1];
+    return t <= end ? t : null;
   }
   const steps = 16;
   let a = t0;

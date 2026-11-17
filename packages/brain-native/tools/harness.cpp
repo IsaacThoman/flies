@@ -4,7 +4,8 @@
 //
 //   fly-brain-harness brain <connectome.bin> <seed> [--light <frames>] [--columns <columns>]
 //     ticks from stdin, one per line:
-//       <dt, f64 bits> <loomLeft> <loomRight> <touch> <bumpLeft> <bumpRight> <wind> <sweet> <maleTaste> <wingbeat>  (f32 bits)  <grounded 0|1>  [<light> [<hunger>]]
+//       <dt, f64 bits> <loomLeft> <loomRight> <touch> <bumpLeft> <bumpRight> <wind> <sweet> <maleTaste> <wingbeat>  (f32 bits)  <grounded 0|1>
+//       <clockMorning> <clockEvening> <clockSleep> <sleepPressure> <sleepDepth>  (f32 bits)  [<light> [<hunger>]]
 //     where <light> is - (the eyes shut) or <left>,<right>, each the index of a frame in the frames file or x for an eye left out,
 //     and <hunger> f32 bits (1 when left out).
 //     The frames file is the frames one after another, each a u32 count and that many f32 (little-endian). Light the C
@@ -12,7 +13,7 @@
 //     The columns file replaces eye-columns.ts's table, a line per column: <left|right> <hex1> <hex2> <kind> <L1> <L2> <L3>.
 //     Prints "ready <neurons> <connections> <rate names, |-separated>" or "error <message>", then per tick
 //       <spikes> <active> <simMs> | <command, f64 ×8> | <rates, f64> | <command as the C interface gives it, f32 ×8> | <rates, f32>
-//       | <arousal> <scene left> <scene right> (f64) | <digest of both retinas' rates, or - without eyes>
+//       | <arousal> <scene left> <scene right> <sleep term> (f64) | <digest of both retinas' rates, or - without eyes>
 //       | <digest of every neuron's v, g and a every 50th tick, else ->
 //     or "error <message>".
 //   fly-brain-harness eyes <connectome.bin> [--columns <columns>]
@@ -206,10 +207,11 @@ int brain(const char* path, uint32_t seed, const Options& options) {
   uint32_t tick = 0;
   while (std::getline(std::cin, line)) {
     std::istringstream in(line);
-    std::string dt, v[9], light = "-", hunger = "3f800000";
+    std::string dt, v[9], s[5], light = "-", hunger = "3f800000";
     int grounded = 0;
-    in >> dt >> v[0] >> v[1] >> v[2] >> v[3] >> v[4] >> v[5] >> v[6] >> v[7] >> v[8] >> grounded >> light >> hunger;
-    fly_senses senses{f32(v[0]), f32(v[1]), f32(v[2]), f32(v[3]), f32(v[4]), f32(v[5]), f32(v[6]), grounded, nullptr, nullptr, f32(v[7]), f32(hunger), f32(v[8])};
+    in >> dt >> v[0] >> v[1] >> v[2] >> v[3] >> v[4] >> v[5] >> v[6] >> v[7] >> v[8] >> grounded >> s[0] >> s[1] >> s[2] >> s[3] >> s[4] >> light >> hunger;
+    fly_senses senses{f32(v[0]), f32(v[1]), f32(v[2]), f32(v[3]), f32(v[4]), f32(v[5]), f32(v[6]), grounded, nullptr, nullptr,
+                      f32(v[7]),  f32(hunger), f32(v[8]), f32(s[0]), f32(s[1]),  f32(s[2]),  f32(s[3]), f32(s[4])};
     fly_command command;
     fly_stats stats;
     int failed;
@@ -251,7 +253,7 @@ int brain(const char* path, uint32_t seed, const Options& options) {
     out += " |";
     for (float x : rates) out += " " + hex32(x);
     const fly::InternalState& state = b->brain.state();
-    out += " | " + hex64(state.arousal()) + " " + hex64(state.scene(fly::io::kLeft)) + " " + hex64(state.scene(fly::io::kRight)) + " | ";
+    out += " | " + hex64(state.arousal()) + " " + hex64(state.scene(fly::io::kLeft)) + " " + hex64(state.scene(fly::io::kRight)) + " " + hex64(state.sleep()) + " | ";
     out += retina_digest(b->brain) + " | ";
     out += tick++ % 50 == 49 ? digest(b->brain.sim()) : "-";
     std::puts(out.c_str());

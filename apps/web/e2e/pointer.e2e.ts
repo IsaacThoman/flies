@@ -25,11 +25,11 @@
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
 import type { Page } from "playwright";
-import { Fingers, canvasPoint, openGame, readState, screenOf, startServer, targetOf, waitFor, waitForGameTime } from "../../../scripts/play.ts";
+import { Fingers, canvasPoint, doubleClick, openGame, readState, screenOf, startServer, targetOf, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
 
 import type { Game } from "../src/game.ts";
+import { FLY_MIDDLE, FLY_REACH } from "../src/tools/aim.ts";
 import { dropFood, feedHoney } from "./feeding.ts";
-import { disableScreensaver } from "./settings.ts";
 
 /** The frame's budget on the Apple TV, as play.e2e.ts holds it to. */
 const MAX_CALLS = 150;
@@ -69,8 +69,18 @@ async function airOf(page: Page): Promise<[number, number] | null> {
       const c = g.director.camera;
       const hit = { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 1, z: 0 }, solid: -1, t: 0 };
       const { width, height } = g.shape.design;
+      // A click whose ray passes this near the fly points at the fly, in the air or not (tools/aim.ts).
+      const fly = g.life.body.position;
+      const nearFly = (d) => {
+        const cx = fly.x - c.position.x, cy = fly.y + ${FLY_MIDDLE} - c.position.y, cz = fly.z - c.position.z;
+        const t = cx * d.x + cy * d.y + cz * d.z;
+        return t > 0 && Math.hypot(d.x * t - cx, d.y * t - cy, d.z * t - cz) < ${FLY_REACH};
+      };
       // Air with air all round it, so that the camera following the fly a little doesn't put the table there.
-      const air = (x, y) => !g.life.world.raycast(c.position, new c.position.constructor(x * 2 - 1, 1 - y * 2, 0.5).unproject(c).sub(c.position).normalize(), hit) && !g.overlay.hits.at(x * width, y * height, 12);
+      const air = (x, y) => {
+        const d = new c.position.constructor(x * 2 - 1, 1 - y * 2, 0.5).unproject(c).sub(c.position).normalize();
+        return !g.life.world.raycast(c.position, d, hit) && !nearFly(d) && !g.overlay.hits.at(x * width, y * height, 12);
+      };
       for (let y = 0.08; y < 0.7; y += 0.02) for (let x = 0.1; x < 0.9; x += 0.05) {
         if (air(x, y) && air(x - 0.06, y) && air(x + 0.06, y) && air(x, y - 0.06) && air(x, y + 0.08)) return [x, y];
       }
@@ -93,8 +103,7 @@ function budget(page: Page) {
 }
 
 async function fingers() {
-  const { browser, page, errors } = await openGame({ url, device: "iPhone 15" });
-  await disableScreensaver(page);
+  const { browser, page, errors } = await openGame({ url, device: "iPhone 15", steady: true });
   // What a native host on a phone with a notch says it covers.
   await page.setViewportSize({ width: 393, height: 852 });
   await page.evaluate(() => {
@@ -126,13 +135,24 @@ async function fingers() {
     await tapOn("kind", 1);
     await waitFor(page, "time=noon");
     await waitForGameTime(page, 3);
-    await waitFor(page, "mode~standing|walking");
+    await waitWithin(page, "mode~standing|walking", 60);
 
     step("fingers: honey, dropped by tapping in front of the fly, reaches taste senses and produces a feed command");
     await tool("feed");
     await tapOn("kind", 1);
     await waitFor(page, "variant=honey");
     await feedHoney(page, () => dropFood(page, async () => touch.tap(await screenOf(page, "hand"))));
+
+    step("fingers: Clear dropped removes offerings without taking the place's food");
+    for (let i = 0; i < 3; i++) await tapOn("kind", 1);
+    await waitFor(page, "variant=clear");
+    const placeFoods = await game<number>(page, "g.life.pantry.foods.filter(f => f.kind === 'patch' || f.kind === 'found').length");
+    await touch.tap(await screenOf(page, "hand"));
+    await page.waitForFunction(() => {
+      const g = (globalThis as unknown as { __fly: Game }).__fly;
+      return g.hands.falling.length === 0 && !g.life.pantry.foods.some(f => f.kind !== "patch" && f.kind !== "found");
+    });
+    assert.equal(await game<number>(page, "g.life.pantry.foods.length"), placeFoods);
 
     step("fingers: a finger held on the fly strokes it with the feather");
     await tool("feather");
@@ -162,11 +182,24 @@ async function fingers() {
       console.log(`  camera setup ${turn}: ${sky ? "air in view" : "table fills the view"}`);
     }
     assert.ok(sky, "no air to point at after six camera drags");
-    await touch.drag(sky, [sky[0] + 0.25, sky[1] + 0.04], 500);
-    await waitFor(page, "looking=true");
+    // The camera follows the fly a little: where it walks before the finger lands (its brain's
+    // choice) can put the table or the fly under it, and the drag is then a press: again.
+    let turned = false;
+    for (let attempt = 1; attempt <= 4 && !turned; attempt++) {
+      for (let turn = 1; attempt > 1 && turn <= 6 && !(sky = await airOf(page)); turn++) {
+        await touch.drag([0.5, 0.6], [0.65, 0.3], 500);
+        await waitForGameTime(page, 0.6);
+      }
+      assert.ok(sky, "air to drag across");
+      await touch.drag(sky, [sky[0] + 0.25, sky[1] + 0.04], 500);
+      await waitForGameTime(page, 0.3);
+      turned = (await readState(page)).looking === "true";
+      if (!turned) console.log(`  drag ${attempt} didn't land in the air`);
+    }
+    assert.ok(turned, "a drag across the air turns the camera");
     await waitForGameTime(page, 2);
     assert.equal((await readState(page)).looking, "true", "it stays where it was put");
-    await waitFor(page, "looking=false");
+    await waitWithin(page, "looking=false", 15);
 
     step("fingers: the menu's button, its back button, and Settings changed by tapping");
     await tapOn("menu");
@@ -225,8 +258,7 @@ async function fingers() {
 }
 
 async function mouse() {
-  const { browser, page, errors } = await openGame({ url, width: 1280, height: 720 });
-  await disableScreensaver(page);
+  const { browser, page, errors } = await openGame({ url, width: 1280, height: 720, steady: true });
   const cost = budget(page);
   const click = async (kind: string, index?: number) => {
     const p = await canvasPoint(page, await targetOf(page, kind, index));
@@ -310,7 +342,7 @@ async function mouse() {
     await page.keyboard.up("Equal");
     await waitFor(page, "view=close");
     await page.keyboard.press("r");
-    await waitFor(page, `view=close,looking=false`);
+    await waitWithin(page, "view=close,looking=false", 15);
 
     step("mouse: a drag from the table, a right-drag and a middle-drag turn the camera, and drop nothing; a double click in the air, or R, gives it back");
     for (const button of ["left", "right", "middle"] as const) {
@@ -330,28 +362,38 @@ async function mouse() {
         assert.equal((await readState(page)).looking, "true", "it stays where the mouse put it");
       }
       await page.keyboard.press("r");
-      await waitFor(page, "looking=false");
+      await waitWithin(page, "looking=false", 15);
     }
     // Turned low and round with the right button until there is some air over the table to double-click, as
     // the game sees it under the pointer (a grab, not the hand): the camera glides on and follows the fly after
-    // a drag, so air found a moment before can have the table under it by the time the mouse gets there.
-    let at: { x: number; y: number } | null = null;
-    for (let i = 0; i < 6 && !at; i++) {
-      await rightDrag(page, [0.5, 0.6], [0.65, 0.3]);
-      // The game takes the drag a frame or more later, longer on a loaded machine: look for air once it has.
-      await waitForGameTime(page, 0.6);
-      const sky = await airOf(page);
-      if (!sky) continue;
-      const point = await canvasPoint(page, sky);
-      await page.mouse.move(point.x, point.y);
-      await waitForGameTime(page, 0.1);
-      if ((await page.evaluate(() => (document.getElementById("game") as HTMLCanvasElement).style.cursor)) === "grab") at = point;
+    // a drag, so air found a moment before can have the table under it by the time the mouse gets there. Where
+    // the fly walks in the frames before the clicks land (its brain's choice) can still put the table or the
+    // fly under them, and they drop food instead: again.
+    let inAir = false;
+    for (let attempt = 1; attempt <= 4 && !inAir; attempt++) {
+      let at: { x: number; y: number } | null = null;
+      for (let i = 0; i < 6 && !at; i++) {
+        await rightDrag(page, [0.5, 0.6], [0.65, 0.3]);
+        // The game takes the drag a frame or more later, longer on a loaded machine: look for air once it has.
+        await waitForGameTime(page, 0.6);
+        const sky = await airOf(page);
+        if (!sky) continue;
+        const point = await canvasPoint(page, sky);
+        await page.mouse.move(point.x, point.y);
+        await waitForGameTime(page, 0.1);
+        if ((await page.evaluate(() => (document.getElementById("game") as HTMLCanvasElement).style.cursor)) === "grab") at = point;
+      }
+      assert.ok(at, "some air to double-click");
+      await waitFor(page, "looking=true");
+      const food = (await readState(page)).food;
+      await doubleClick(page, at.x, at.y);
+      await waitForGameTime(page, 0.3);
+      inAir = (await readState(page)).food === food;
+      if (!inAir) console.log(`  double click ${attempt} landed on the table`);
     }
-    assert.ok(at, "some air to double-click");
-    await waitFor(page, "looking=true");
-    await page.mouse.dblclick(at.x, at.y);
+    assert.ok(inAir, "a double click in the air");
     // At once: left alone it would stay where the mouse put it.
-    await waitFor(page, "looking=false");
+    await waitWithin(page, "looking=false", 15);
 
     step("keys: a number picks a tool, and the hints are a keyboard's");
     await page.keyboard.press("2");
@@ -367,7 +409,9 @@ async function mouse() {
     await page.mouse.move(p.x + 3, p.y + 2, { steps: 2 });
     await waitForGameTime(page, 0.8);
     assert.equal((await readState(page)).wallpaper, "true", "a nudge doesn't wake it");
-    await page.mouse.move(p.x + 260, p.y + 80, { steps: 10 });
+    // In two steps, each far enough on its own: Playwright sends each step of a move only once the
+    // page has taken the last, frames apart on a slow machine.
+    await page.mouse.move(p.x + 260, p.y + 80, { steps: 2 });
     await waitFor(page, "wallpaper=false");
     await game(page, "(g.settings.wallpaperAfter = 0)");
 

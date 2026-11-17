@@ -32,7 +32,7 @@ void InternalState::step(double dt) {
 }
 
 double InternalState::level(io::Side eye) const {
-  const double x = kArousalWeight * arousal_.value + kSceneWeight * scene_[eye].value + kBias + kHungerWeight * (hunger_ - 1);
+  const double x = kArousalWeight * arousal_.value + kSceneWeight * scene_[eye].value + kBias + kHungerWeight * (hunger_ - 1) + sleep_;
   return 1 / (1 + fdlibm::exp(-x));
 }
 
