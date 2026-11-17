@@ -161,7 +161,7 @@ crossings become smaller than a pixel, without extra meshes or draws.
   `kind`) as their last argument, which a place that ignores it can leave off.
   A windowsill can run rain down its pane by `rain` and leave it streaked by
   `wet`; the picnic's rain, wet table, overcast deck, mist and rainbow are
-  worked examples (`places/picnic/rain.ts`, `table.ts`, `backdrop.ts`), and
+  worked examples (`places/picnic/rain.ts`, `places/picnic/table.ts`, `places/picnic/backdrop.ts`), and
   the lab shows it in the view through its windows (`places/lab/room.ts`). Rain
   bursts the bubbles and sends the fireflies to shelter wherever they are.
 - **What the fly's eyes see** (`SceneSet.seen`): the big shapes only. They are
@@ -324,3 +324,11 @@ collision surface. Only direct light is shadowed; the sky still fills it.
 Rain rings spread on the tabletop and in the saucer's pool. Hits on the fly
 or raised objects throw splash droplets without a suspended horizontal ring;
 the fly feels the same rain touch as before.
+
+<!-- docs-check: base apps/web/src -->
+
+<!-- docs-check: base apps/web/src/places/restaurant -->
+
+<!-- docs-check: base apps/web/src/places -->
+
+<!-- docs-check: base packages/world/src -->

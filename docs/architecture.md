@@ -12,7 +12,7 @@ The game currently has no sound, by design, pending a new sound design.
 | Path | What it is |
 | --- | --- |
 | `packages/brain` | The nervous system: 166,700 spiking neurons wired from the FlyEM male CNS connectome (CC-BY 4.0). TypeScript. Its README is the reference for the model and its limits. |
-| `packages/brain-native` | The same simulation in C++, behind the C interface in `include/fly_brain.h`, for the Apple TV, and built as WebAssembly for browsers. |
+| `packages/brain-native` | The same simulation in C++, behind the C interface in `packages/brain-native/include/fly_brain.h`, for the Apple TV, and built as WebAssembly for browsers. |
 | `packages/fly` | The fly's body: a 3D model that knows how a fly moves its legs, wings and mouthparts, with its nervous system drawn inside it. |
 | `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver, the weather outside, a table's line to its room, typing into a field the game draws. |
 | `packages/net` | How flies share a table: the wire format, the room's clock, other flies as they are heard of, the shared food, balls and bubbles, and what a player may do. Runs in a browser and in Node. |
