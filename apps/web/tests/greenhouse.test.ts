@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { GREENHOUSE, GREENHOUSE_SOLIDS, SAUCER, TRAY, World, inside, topHeight } from "@fly/world";
-import { solidGeometry } from "../src/places/greenhouse/set.ts";
+import { buildBench, solidGeometry } from "../src/places/greenhouse/set.ts";
 import { NO_PRINTS } from "../src/scene/prints.ts";
 
 test("greenhouse curved surfaces are sampled directly from their collision tops", () => {
@@ -30,4 +30,17 @@ test("greenhouse water and seedlings have exact supporting surfaces", () => {
     assert.equal(world.underside(s.footprint.x, s.footprint.z, TRAY.height), TRAY.height);
   }
   assert.ok(NO_PRINTS.has("greenhouse leaves") && NO_PRINTS.has("water saucer"));
+});
+
+test("greenhouse detail builds in bounded steps and keeps its eyes available throughout", () => {
+  const set = buildBench();
+  assert.equal(set.seen.length, 1);
+  const seen = set.seen[0];
+  let steps = 0;
+  while (set.more?.()) {
+    assert.equal(set.seen[0], seen);
+    assert.ok(++steps < 64);
+  }
+  assert.ok(steps > 10);
+  assert.ok(set.group.children.length <= 6);
 });

@@ -7,6 +7,10 @@ export const K = { wood: 0, clay: 1, soil: 2, leaf: 3, tomato: 4, fig: 5, metal:
 /** One material keeps all the bench's opaque detail in a single draw. */
 export function surfaces() {
   const uniforms = {
+    uCrowns: { value: GREENHOUSE_SOLIDS.filter(s => s.name === "greenhouse leaves" || s.name === "seedling crown").map(s => {
+      const f = s.footprint;
+      return new THREE.Vector4(f.x, f.z, f.kind === "circle" ? f.r : f.kind === "ellipse" ? f.rx : f.hx, s.top.kind === "dome" ? s.top.height : 1);
+    }) },
     uWet: { value: 0 }, uSun: { value: new THREE.Vector3(0, 1, 0) }, uDirect: { value: 1 },
     uContacts: { value: GREENHOUSE_SOLIDS.filter(s => ["terracotta pot", "watering can", "water saucer", "fallen tomato", "split fig", "trowel blade"].includes(s.name)).map(s => {
       const f = s.footprint;
@@ -21,6 +25,7 @@ export function surfaces() {
     shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>
 varying float vKind; varying vec3 vWorld;
 uniform float uWet; uniform vec3 uSun; uniform float uDirect;
+uniform vec4 uCrowns[14];
 uniform vec4 uContacts[${uniforms.uContacts.value.length}];
 ${NOISE}
 ${BUMP}
@@ -57,17 +62,27 @@ vec3 surface(vec3 c) {
    c *= 0.65 + fine * 0.8 + vnoise3(p * 0.9) * 0.35;
    relief = fine * 0.16; rough = 1.0;
  } else if (vKind < 3.5) {
-   // Overlapping pointed leaves, with a central vein and paired side veins.
-   vec2 q = p.xz * 0.17;
-   vec2 cell = floor(q);
-   q = fract(q) - 0.5;
-   float a = hash21(cell) * 6.28;
-   q = mat2(cos(a), -sin(a), sin(a), cos(a)) * q;
-   float edge = abs(q.x) / max(0.08, 0.5 - abs(q.y));
-   float vein = exp(-abs(q.x) * 70.0) + pow(max(0.0, cos((q.y + abs(q.x) * 0.7) * 50.0)), 22.0) * 0.3;
-   c *= 0.5 + 0.55 * smoothstep(1.8, 0.3, edge) + hash21(cell) * 0.35;
-   c += vec3(0.045, 0.075, 0.012) * vein * resolved(0.8);
-   relief = (1.0 - min(edge, 1.0)) * 0.15 * resolved(4.0); rough = 0.55;
+   vec2 q = p.xz;
+   float reach = 20.0;
+   float best = 1e6;
+   for (int i=0; i<14; i++) {
+     vec4 crown = uCrowns[i];
+     float d = length(p.xz - crown.xy) / crown.z;
+     if (d < best) { best = d; q = p.xz - crown.xy; reach = crown.z; }
+   }
+   // A rosette of overlapping pointed leaves, with paired side veins.
+   float r = length(q);
+   float ring = floor(r / (reach * 0.3));
+   float count = 5.0 + ring * 3.0;
+   float around = atan(q.y,q.x) / 6.28318 * count + ring * 0.37;
+   float w = (fract(around) - 0.5) * 2.0;
+   float along = fract(r / (reach * 0.3));
+   float edge = abs(w) / max(0.08, pow(sin(along * 3.14159),0.6));
+   float leaf = 1.0 - smoothstep(0.65,1.2,edge);
+   float vein = exp(-abs(w) * 60.0) + pow(max(0.0,cos((along + abs(w) * 0.25) * 42.0)),18.0) * 0.28;
+   c *= 0.55 + leaf * 0.5 + hash21(vec2(floor(around),ring)) * 0.22;
+   c += vec3(0.035,0.055,0.012) * vein * resolved(0.8);
+   relief = leaf * 0.18 * resolved(2.0); rough = 0.56;
  } else if (vKind < 4.5) {
    float bruise = smoothstep(0.57, 0.8, vnoise(p.xz * 0.17 + 7.0));
    c = mix(c, vec3(0.2, 0.037, 0.012), bruise * 0.7);
@@ -85,7 +100,7 @@ vec3 surface(vec3 c) {
    rough = 0.27 + fine * 0.2; shine = 0.72; relief = fine * 0.012;
  } else if (vKind < 7.5) {
    float chip = smoothstep(0.65, 0.78, vnoise3(p * 0.3));
-   c = mix(c, vec3(0.14, 0.085, 0.028), chip * 0.7); rough = 0.45; shine = 0.35;
+   c = mix(c, vec3(0.14, 0.085, 0.028), chip * 0.7 * resolved(3.0)); rough = 0.45; shine = 0.35;
  } else if (vKind < 8.5) {
    float line = step(0.7, sin(p.z * 6.0 + sin(p.x * 2.7))) * step(0.45, vnoise(p.xz * 0.5));
    c *= 1.0 - line * 0.6 * resolved(0.7); rough = 1.0;
