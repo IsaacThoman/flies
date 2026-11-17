@@ -83,8 +83,8 @@ test("the TV keeps its HUD and title layout, with Settings below a separate head
   const s = shell(TV_FRAME, "remote", false);
   const settings = settingsScreen(s);
   // Sized for its longest tab (On screen: the tabs and seven rows, as Wallpaper was on an Apple TV that can tell the weather), so it keeps its size from tab to tab.
-  assert.deepEqual(settings.pane.panel, { x: 157, y: 17, w: 540, h: 418 });
-  assert.deepEqual(settings.pane.list, { x: 185, y: 73, width: 484, row: 36, gap: 8, compact: false, columns: 1 });
+  assert.deepEqual(settings.pane.panel, { x: 157, y: 12, w: 540, h: 396 });
+  assert.deepEqual(settings.pane.list, { x: 185, y: 52, width: 484, row: 40, gap: 4, compact: false, columns: 1 });
   assert.equal(settings.menu.rows, settings.menu.items.length);
 
   const loading = loadingLayout(TV_FRAME);
@@ -218,7 +218,7 @@ test("the settings' tabs can be read at every shape: every one, or, where they a
   // The TV's three tabs are as big as a row's words.
   const g = blankCanvas();
   settingsScreen(shell(TV_FRAME, "remote")).draw(g, 0, new HitMap());
-  assert.ok(writtenOn(g).filter((w) => labels.includes(w.text)).every((w) => w.size === 17), "on the TV");
+  assert.ok(writtenOn(g).filter((w) => labels.includes(w.text)).every((w) => w.size === 18), "on the TV");
 });
 
 test("the title leaves room for the fly, clear of the name, the brain's state and the menu", () => {
@@ -369,4 +369,16 @@ test("the Settings tab strip stays available at the bottom of a short screen", (
   assert.ok(Array.from({ length: hits.count }, (_, i) => hits.get(i)!).some((h) => h.kind === "tab" && h.index === 0));
   screen.menu.scrollBy(-1);
   assert.ok(screen.menu.focus >= screen.menu.scroll + screen.menu.pinned);
+});
+
+test("code entry stays above a reserved phone keyboard area", () => {
+  for (const [width, height, bottom] of [[390, 844, 320], [844, 390, 200]]) {
+    const frame = frameFor(width, height, { top: 0, left: 0, right: 0, bottom }, true);
+    const screen = new OnlineScreen(shell(frame));
+    const hits = new HitMap();
+    screen.draw(blankCanvas(), 0, hits);
+    const all = Array.from({ length: hits.count }, (_, i) => hits.get(i)!);
+    assert.ok(all.some((h) => h.kind === "row" && h.index === 1), "the code field stays visible");
+    for (const h of all) assert.ok(inside(h, safeRect(frame)), `${width}×${height}: ${h.kind} above the keyboard area`);
+  }
 });

@@ -20,9 +20,13 @@ export type MenuLayout = { x: number; y: number; width: number; row: number; gap
 const COLUMN_GAP = 12;
 const SCROLL_BUTTON = { color: "glass", size: 14 } as const;
 const SCROLL_DISABLED = { ...SCROLL_BUTTON, disabled: true } as const;
+const FIELD_SUBMIT = { color: "aqua", size: 14 } as const;
+const FIELD_SUBMIT_DISABLED = { ...FIELD_SUBMIT, disabled: true } as const;
+const ACTION_HINT = { size: 10, color: INK_SOFT, align: "center", baseline: "middle" } as const;
+const ACTION_HINT_FOCUSED = { ...ACTION_HINT, color: "#ffffff" } as const;
 
 /** What a menu's targets are, as recorded in the hit map: `index` is the item's, `value` a chevron's or a "more"'s direction. */
-export const MENU_HITS = { row: "row", step: "step", track: "track", more: "more", tab: "tab" } as const;
+export const MENU_HITS = { row: "row", step: "step", track: "track", more: "more", tab: "tab", submit: "submit" } as const;
 
 /** The slider's track, from the row's right edge: where it starts and how long it is. */
 const TRACK = { from: 170, length: 140 };
@@ -145,7 +149,7 @@ export class MenuView {
       hits.add(MENU_HITS.row, x, y, width, row, i, 0, item.id);
       const caret = i === this.typing.index ? this.typing.caret : -1;
       if (item.kind === "choice" && item.tabs) drawTabs(g, item, x + this.tabInset, y, width - this.tabInset, row, hits, i, this.#tabs);
-      else if (item.kind === "field") drawField(g, item, x, y, width, row, focused, i === hover, caret, t, !!this.layout.compact);
+      else if (item.kind === "field") drawField(g, item, x, y, width, row, focused, i === hover, caret, t, !!this.layout.compact, hits, i);
       else if (this.layout.compact) drawStacked(g, item, x, y, width, row, focused, i === hover, press, hits, i, this.track);
       else drawItem(g, item, x, y, width, row, focused, i === hover, press, hits, i, this.track, size);
     }
@@ -228,7 +232,13 @@ function drawAction(g: CanvasRenderingContext2D, item: ActionItem, x: number, y:
     g.font = font(most);
     words = Math.max(8, Math.min(most, Math.floor((most * room) / Math.max(1, g.measureText(item.label).width))));
   }
-  pill(g, x, y, w, h, item.label, { focused, hover, disabled: item.disabled, press, size: words });
+  pill(g, x, y, w, h, item.hint ? "" : item.label, { focused, hover, disabled: item.disabled, press, size: words });
+  if (item.hint) {
+    if (item.disabled) g.globalAlpha *= 0.45;
+    text(g, item.label, x + w / 2, mid - 7, { size: words ?? Math.round(h * 0.46), color: focused ? "#ffffff" : INK, align: "center", baseline: "middle" });
+    text(g, item.hint, x + w / 2, mid + 12, focused ? ACTION_HINT_FOCUSED : ACTION_HINT);
+    if (item.disabled) g.globalAlpha /= 0.45;
+  }
   if (item.swatch) swatch(g, x + h * 0.62, mid, h * 0.22, item.swatch);
   if (!marks) return;
   const ink = focused ? "#ffffff" : INK;
@@ -291,7 +301,7 @@ function padlock(g: CanvasRenderingContext2D, x: number, y: number, s: number, i
  * typed into; a blinking caret while it is. Narrow, the label is over the
  * value, as a choice's is.
  */
-function drawField(g: CanvasRenderingContext2D, item: FieldItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, caret: number, t: number, compact: boolean) {
+function drawField(g: CanvasRenderingContext2D, item: FieldItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, caret: number, t: number, compact: boolean, hits: HitMap, index: number) {
   const typing = caret >= 0;
   pill(g, x, y, w, h, "", { focused: false, hover: hover || typing, color: "glass", disabled: item.disabled });
   const mid = compact ? y + h * 0.66 : y + h / 2 + 1;
@@ -299,7 +309,13 @@ function drawField(g: CanvasRenderingContext2D, item: FieldItem, x: number, y: n
   text(g, item.label, x + 22, compact ? y + h * 0.3 : mid, { size: labelSize, color: compact ? INK_SOFT : INK, baseline: "middle" });
   g.font = font(labelSize);
   const left = compact ? x + 22 : x + 22 + g.measureText(item.label).width + 18;
-  const right = x + w - 22;
+  const submit = item.submit;
+  if (submit) {
+    const sy = y + (h - 36) / 2;
+    pill(g, x + w - 64, sy, 56, 36, submit.label, submit.disabled ? FIELD_SUBMIT_DISABLED : FIELD_SUBMIT);
+    hits.add(MENU_HITS.submit, x + w - 64, sy, 56, 36, index);
+  }
+  const right = x + w - (submit ? 76 : 22);
   const room = right - left;
   const shown = item.secret ? "•".repeat([...item.value].length) : item.value;
   const before = item.secret ? "•".repeat([...item.value.slice(0, Math.max(0, caret))].length) : item.value.slice(0, Math.max(0, caret));

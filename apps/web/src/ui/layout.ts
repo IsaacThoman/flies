@@ -168,11 +168,12 @@ export function fitMenu(space: Rect, spec: MenuPanelSpec): MenuPanel {
   const tiers = [
     { row: compact ? 54 : spec.row, gap: compact ? 8 : 12, top: spec.heading ? 70 : 26, foot: spec.foot, heading: spec.heading ? { dy: 46, size: 28 } : null },
     { row: compact ? 52 : spec.row, gap: 8, top: spec.heading ? 56 : 18, foot: 18, heading: spec.heading ? { dy: 38, size: 24 } : null },
-    { row: compact ? 50 : Math.max(36, spec.row - 4), gap: 6, top: spec.heading ? 48 : 14, foot: 14, heading: spec.heading ? { dy: 32, size: 22 } : null },
+    { row: compact ? 50 : Math.max(36, spec.row - 4), gap: 4, top: spec.heading ? 40 : 14, foot: spec.heading ? 8 : 14, heading: spec.heading ? { dy: 27, size: 22 } : null },
+    { row: compact ? 50 : 36, gap: 4, top: spec.heading ? 36 : 10, foot: 2, heading: spec.heading ? { dy: 23, size: 18 } : null },
   ];
   const fits = (t: (typeof tiers)[number]) => Math.floor((room - t.top - t.foot + t.gap) / (t.row + t.gap));
   // A list short enough to show whole: the roomiest spacing that shows it all, in two columns if it may and one won't do. One that scrolls anyway: the roomiest that shows a few rows, keeping its heading.
-  const few = Math.min(want, 4);
+  const few = Math.min(want, spec.heading ? 5 : 4);
   const whole = want === spec.items;
   let columns = 1;
   let tier = whole ? tiers.find((t) => fits(t) >= want) : undefined;
@@ -195,7 +196,7 @@ export function fitMenu(space: Rect, spec: MenuPanelSpec): MenuPanel {
 
 /** A pane of text or readings: the TV's size if it fits, else as much of the safe area as it can have; on a screen taller than it is wide, as tall as it likes. */
 export function fitPane(frame: Frame, width: number, height: number, raise: number): Rect {
-  const a = safeRect(frame);
+  const a = menuSpace(frame);
   if (a.h > a.w) height = Math.max(height, a.h);
   const margin = Math.min(12, a.w * 0.03);
   const w = Math.min(width, a.w - 2 * margin);
@@ -221,6 +222,13 @@ function spot(frame: Frame, x: number, y: number) {
 
 /** What the menus' hints take along the foot of the safe area (drawMenuHints). */
 const HINTS_ROOM = 38;
+
+/** Keep the menus clear of button hints; a keyboard already takes that edge. */
+export function menuSpace(frame: Frame): Rect {
+  const a = safeRect(frame);
+  if (frame.safe.bottom < 80) a.h = Math.max(1, a.h - HINTS_ROOM);
+  return a;
+}
 
 /** The wordmark's size for a width: a 6.5th of it, in proportion to the brain's state under it. */
 const wordmarkFor = (width: number, most: number) => Math.max(24, Math.min(most, (width - 32) / 6.5));

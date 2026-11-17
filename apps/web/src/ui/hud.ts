@@ -105,7 +105,7 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   for (let i = 0; i < n; i++) {
     const x = L.shelfLeft + (i + 0.5) * gap + (i < split ? 0 : L.apart);
     const on = i === hands.tool;
-    const r = (on ? 22 : 17) * L.orb;
+    const r = on ? 22 * L.orb : Math.min(17, gap / 2 - 1);
     const y = on ? sy - 6 : sy;
     orb(g, x, y, r, on ? "aqua" : "glass");
     drawToolIcon(g, TOOLS[i].id, x, y + 1, r * 0.62);

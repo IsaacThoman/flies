@@ -3,19 +3,22 @@
 // screen, and that they never cover each other or what the HUD draws.
 
 import assert from "node:assert/strict";
+import { RESTING_SENSES } from "@fly/brain";
+import { HISTORY_SAMPLES } from "../src/brain/meter.ts";
 import { test } from "node:test";
 import { TV_FRAME } from "../src/display.ts";
 import type { Frame } from "../src/display.ts";
 import { insetLayout, insetWanted } from "../src/eyes/inset.ts";
 import { NERVES_PANEL, nervesLayout, nervesSlot, nervesWanted } from "../src/nerves/panel.ts";
-import { OVERLAY_SIZES } from "../src/settings.ts";
+import { OVERLAY_SIZES, freshDay } from "../src/settings.ts";
 import type { OverlaySize, ShowWhen, StatsKind } from "../src/settings.ts";
-import { statsLayout, statsSlot, statsWanted } from "../src/stats/panel.ts";
-import type { StatsLayout } from "../src/stats/panel.ts";
+import { drawStatsPanel, statsLayout, statsSlot, statsWanted } from "../src/stats/panel.ts";
+import type { StatsLayout, StatsState } from "../src/stats/panel.ts";
 import { TOOLS } from "../src/tools/hands.ts";
 import { CORNERS, CORNER_HOLD, CornerDeck, CornerPlacement, waitFor } from "../src/ui/corners.ts";
 import type { CornerPicture, CornerWanted } from "../src/ui/corners.ts";
 import { hudLayout, safeRect } from "../src/ui/layout.ts";
+import { blankCanvas, writtenOn } from "./canvas.ts";
 import { frames } from "./shapes.ts";
 
 type Rect = { x: number; y: number; width: number; height: number };
@@ -213,6 +216,7 @@ test("whatever happens, at every shape, size and choice of stats, they never ove
 });
 
 test("at every shape, size and choice of stats, at every corner, they are inside the safe area, clear of each other and of the caption, the menu's button, the shelf, the label and the hints", () => {
+  const sample: StatsState = { activity: "resting", spikes: 0, active: 0, speed: 1, history: new Float32Array(HISTORY_SAMPLES), head: 0, day: freshDay("2026-11-16"), sensed: RESTING_SENSES, brain: null };
   for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
     const hud = hudLayout(frame);
     const a = safeRect(frame);
@@ -254,7 +258,11 @@ test("at every shape, size and choice of stats, at every corner, they are inside
         // The stats may be across at the top left, over the hints at the bottom left.
         for (const r of stats.rects["top-right"]) assert.ok(!overlaps(r, leftHints), `${where}: while playing, the stats and the hints at the bottom left`);
         assert.ok(nerves.scale > 0.3, `${where}: its nervous system big enough to read (${nerves.scale.toFixed(2)}, ${nerves.across ? "beside" : "under"} what it sees)`);
-        assert.ok(stats.scale > 0.5, `${where}: the stats big enough to read (${stats.scale.toFixed(2)}, ${stats.across ? "across from" : "under"} the others)`);
+        const drawn = blankCanvas();
+        drawStatsPanel(drawn, stats.shape, sample);
+        const smallest = Math.min(...writtenOn(drawn).map((w) => w.size));
+        // Font size, rather than a nominal panel scale, survives changes to the cell grid.
+        assert.ok(stats.scale * smallest > 4.5, `${where}: the smallest stats caption is ${(stats.scale * smallest).toFixed(2)} design units`);
       }
     }
   }

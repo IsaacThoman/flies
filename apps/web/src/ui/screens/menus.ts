@@ -18,7 +18,7 @@ import type { PixelSize } from "../../display.ts";
 import { PLACES } from "../../places/catalog.ts";
 import { WALLPAPER_DELAYS } from "../../settings.ts";
 import type { EyesDetail, OverlayOpacity, OverlaySize, Settings, ShowWhen, StatsKind } from "../../settings.ts";
-import { fitMenu, safeRect, titleLayout } from "../layout.ts";
+import { fitMenu, menuSpace, titleLayout } from "../layout.ts";
 import { drawWordmark } from "../wordmark.ts";
 import { MenuScreen } from "./menu-screen.ts";
 import type { SettingsPage, Shell } from "./types.ts";
@@ -81,13 +81,13 @@ const EYES: Option<EyesDetail>[] = [
 /** For each picture that can show over the world in a corner. */
 const SHOWN: Option<ShowWhen>[] = [
   { value: "off", label: "Off" },
-  { value: "wallpaper", label: "In the screensaver" },
+  { value: "wallpaper", label: "Screensaver" },
   { value: "always", label: "Always" },
 ];
 const STATS: Option<StatsKind>[] = [
   { value: "brain", label: "Its brain" },
   { value: "day", label: "Its day" },
-  { value: "both", label: "Both" },
+  { value: "both", label: "Brain + day" },
   { value: "signals", label: "In and out" },
 ];
 const SIZE: Option<OverlaySize>[] = [
@@ -165,7 +165,7 @@ export function settingsScreen(shell: Shell) {
     id: "settings",
     heading: "Settings",
     menu,
-    place: (frame) => fitMenu(safeRect(frame), { items: most, width: 540, row: 36, heading: true, foot: 28, values: true, raise: 14 }),
+    place: (frame) => fitMenu(menuSpace(frame), { items: most, width: 540, row: frame.design.height >= 440 ? 44 : 36, heading: true, foot: 28, values: true, raise: 14 }),
     onEnter: show,
     onChange(item) {
       if (item === tabs) {
