@@ -60,8 +60,13 @@ try {
     }));
   });
   assert.ok(food.every((p) => p.name === p.tasted));
-  for (const name of ["red wine", "honey", "wine"])
-    assert.ok(food.find((p) => p.name === name)?.pool);
+  assert.deepEqual(
+    food
+      .filter((p) => p.pool)
+      .map((p) => p.name)
+      .sort(),
+    ["honey", "orange juice", "orange juice", "peach juice"],
+  );
   await tool("view");
   await press("ArrowDown", 2);
   await waitFor(page, "view=table");

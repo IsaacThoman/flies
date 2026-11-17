@@ -102,7 +102,7 @@ All four ranked B2 > C9 > M3 > V6. Retain C9 (670af78).
 The enclosing wall, grape support, subdued board highlights and lower triangle
 count all gained. The reference still won on household specificity, materials and
 weather. The largest remaining problems were the peach's pastry-like form, empty
-macro backgrounds, faint wine and a night key that did not originate at the pendant.
+macro backgrounds, a faint drink in the glass and a night key that did not originate at the pendant.
 The next experiment changes the peach geometry and starting surface, wet glass and
 pendant lighting. Changes to the shared camera were again rejected as out of scope.
 

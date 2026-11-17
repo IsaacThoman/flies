@@ -92,9 +92,7 @@ function floorShadows() {
 
 /** How much light a caster lets through, and in what colour (and how much it gathers it to a line). */
 const TINTS: Readonly<Record<string, [number, number, number, number]>> = {
-  "wine glass": [0.86, 0.66, 0.7, 0.5],
-  "glass foot": [0.9, 0.9, 0.9, 0.2],
-  "glass stem": [0.85, 0.85, 0.85, 0],
+  "juice glass": [0.88, 0.74, 0.5, 0.5],
   shaker: [0.55, 0.55, 0.55, 0.2],
   "bud vase": [0.7, 0.85, 0.72, 0.8],
   votive: [0.6, 0.5, 0.42, 0.2],
@@ -140,7 +138,7 @@ function surfaceOf(area: AreaSpec): number | null {
   return null;
 }
 
-/** Rings left on each marble table, by area: wine, coffee, water. The start table's wine ring is where the world's food is. */
+/** Rings left on each marble table, by area: juice, coffee, water. The start table's juice ring is where the world's food is. */
 function rings(area: AreaSpec, lit: Lit, seed: number) {
   const t = TABLES.find((t) => t.id === area.name);
   if (!t || t.kind === "four") return;

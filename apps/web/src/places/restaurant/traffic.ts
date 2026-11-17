@@ -26,7 +26,7 @@ import * as THREE from "three";
 import { DINING_ROOM, SHOPFRONT } from "@fly/world";
 import type { Daylight } from "../../scene/light.ts";
 import type { Weather } from "../../scene/weather.ts";
-import { CORNER_BAR, DOOR_RAIL, HEADLAMPS, NEAR_LAMP, STREET } from "./street/layout.ts";
+import { DOOR_RAIL, HEADLAMPS, NEAR_LAMP, PARLOUR, STREET } from "./street/layout.ts";
 
 /** Each lane of the road: where it runs, which way, and how often a car may come along it (s): one at a time, so the room has at most one car's light per lane. */
 const LANES = [
@@ -60,7 +60,7 @@ export const TRAFFIC = {
   lamps: 0,
   /** Headlamps: on after dark, and by day in rain and mist. */
   headlamps: 0,
-  /** The corner bar's neon, flickering now and then. */
+  /** The ice-cream parlour's neon, flickering now and then. */
   neon: 0,
 };
 
@@ -190,7 +190,7 @@ vec3 streetLight(vec3 p, vec3 n) {
     // The lantern outside throws most of its light down and out, the street across (its lamps, its lit windows, the neon) a soft glow from low down.
     float lamp = streetReach(p, n, vec3(${f(NEAR_LAMP.x)}, ${f(NEAR_LAMP.y)}, ${f(NEAR_LAMP.z)}), 140.0, l);
     light += uStreetLamp * lamp * (0.3 + 0.7 * smoothstep(-0.1, 0.8, l.y));
-    light += uStreetFar * streetReach(p, n, vec3(${f(CORNER_BAR.neon.x)}, ${f(CORNER_BAR.neon.y)}, ${f(CORNER_BAR.neon.z)}), 3000.0, l);
+    light += uStreetFar * streetReach(p, n, vec3(${f(PARLOUR.neon.x)}, ${f(PARLOUR.neon.y)}, ${f(PARLOUR.neon.z)}), 3000.0, l);
   }
   for (int i = 0; i < 2; i++) {
     vec4 car = uStreetCar[i];

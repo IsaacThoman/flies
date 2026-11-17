@@ -47,13 +47,13 @@ normal sampling promises before the next step. This prevents GPU fence timing fr
 which visual input reaches a given brain tick. Capture records include completed eye updates.
 
 The eight-story sequence is portrait, feeding on strawberry juice, Swoop flight, dusk X-ray
-with its normal nervous-system panel, fly's eyes, the rainy kitchen windowsill, the bar at night,
+with its normal nervous-system panel, fly's eyes, the rainy kitchen windowsill, the restaurant at night,
 and three flies at a morning picnic table. The rainy scene starts on the existing window rail
 at (66, -110), then runs the real brain for five simulated seconds in the normal Follow view.
 Other initial placements are on existing fruit for feeding and sharing. The flight photograph
 follows the director's real viewing direction with capture-only framing
 within 10.5 mm of the actual fly. Selection requires actual flying activity, beating wings and
-more than 4 mm of clearance above a real surface. The bar and sharing use the production
+more than 4 mm of clearance above a real surface. The night scene and sharing use the production
 watch mode and wait for its UI fade. Other stories retain the normal play interface.
 The game's camera implementation is unchanged; the flight and group photographs use capture-only framing.
 

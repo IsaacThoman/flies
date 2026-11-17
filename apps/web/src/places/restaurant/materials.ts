@@ -1,5 +1,5 @@
 // The restaurant's materials. Everything solid, the room included, is one
-// material, and everything clear (glass, wine, water, spills) another: each
+// material, and everything clear (glass, juice, water, spills) another: each
 // vertex says what it is (kinds.ts) and the shader gives it its look
 // (surfaces.ts) and its light (light.ts). The far stand-ins are the same
 // materials again with the near mask (set.ts): the vertex shader folds away
@@ -55,7 +55,7 @@ export function sharedUniforms(floorAO: THREE.Texture, clock: WallClock) {
     uCastBottom: { value: new Float32Array(CASTERS) },
     uCastBox: { value: new THREE.Vector4(1, -1, 1, -1) },
     uCastY: { value: new THREE.Vector2(1, -1) },
-    /** Rings, stains and smears on that area's table top: x, z, radius, and what (0 wine, 1 coffee, 2 water). */
+    /** Rings, stains and smears on that area's table top: x, z, radius, and what (0 juice, 1 coffee, 2 water). */
     uRings: { value: new Float32Array(6 * 4) },
     uRipples: { value: new Float32Array(RIPPLES * 4).fill(-100) },
     /** The clock's hands (scene/clock.ts). */
@@ -213,15 +213,15 @@ if (rK == K_GLASS) {
   float side = 1.0 - abs(dot(normalize(vWorldNormal), normalize(cameraPosition - vWorld)));
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.085, 0.07), smoothstep(0.6, 0.98, side));
 }
-if (rK == K_WINE) rAlpha = 0.86;
-if (rK == K_WHITE_WINE) rAlpha = 0.45;
+if (rK == K_JUICE) rAlpha = 0.97;
+if (rK == K_LEMONADE) rAlpha = 0.8;
 if (rK == K_WATER) { diffuseColor.rgb *= 0.15; rAlpha = 0.2; }
 if (rK == K_FILM) { rAlpha = 0.45; rRough = 0.03; }
 if (rK == K_BOTTLE) rAlpha = 0.82;
 `;
 
 const CLEAR_NORMAL = /* glsl */ `
-if (rK == K_FILM || rK == K_WINE || rK == K_WHITE_WINE) {
+if (rK == K_FILM || rK == K_JUICE || rK == K_LEMONADE) {
   // Rings spreading from where a foot touched, a millimetre apart, dying away.
   vec2 slope = vec2(0.0);
   float shade = 0.0;
@@ -253,13 +253,13 @@ const CLEAR_FINAL = /* glsl */ `
     outgoingLight += (uRoomTone * 0.5 + uWindowSeen * 0.3 + rRoomLight(vWorld, -normalize(vWorldNormal)) * 0.15 + rKeyLight(vWorld) * 0.12) * pow(edge, 1.5);
   }
   if (rK == K_FRIDGE_GLASS) rAlpha = 0.08 + edge * 0.5;
-  if (rK == K_WINE || rK == K_WHITE_WINE || rK == K_BOTTLE) rAlpha = min(1.0, rAlpha + edge * 0.3);
+  if (rK == K_JUICE || rK == K_LEMONADE || rK == K_BOTTLE) rAlpha = min(1.0, rAlpha + edge * 0.3);
   if (rK == K_FILM || rK == K_WATER) rAlpha = min(1.0, rAlpha + edge * 0.5 + dot(outgoingLight, vec3(0.05)));
   ${parts("clear", "final")}
   diffuseColor.a = clamp(rAlpha, 0.0, 1.0);
 }`;
 
-/** The clear things' material: glass, wine, water and spills. */
+/** The clear things' material: glass, juice, water and spills. */
 export function clearMaterial(shared: Shared, near: { value: number }) {
   const material = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.04, metalness: 0, transparent: true, depthWrite: false, envMapIntensity: 1.4 });
   patch(material, {
@@ -270,8 +270,8 @@ export function clearMaterial(shared: Shared, near: { value: number }) {
     surface: "roughnessFactor = rRough;",
     normal: CLEAR_NORMAL,
     ambient: ROOM_LIGHTS.replace("iblIrradiance *= 0.15;", "iblIrradiance *= 0.3;"),
-    // Light from all round comes through wine and out toward you: it glows its own colour a little.
-    emissive: "if (rK == K_WINE || rK == K_WHITE_WINE || rK == K_BOTTLE) totalEmissiveRadiance += diffuseColor.rgb * 0.04;\n" + parts("clear", "emissive"),
+    // Light from all round comes through juice and out toward you: it glows its own colour a little.
+    emissive: "if (rK == K_JUICE || rK == K_LEMONADE || rK == K_BOTTLE) totalEmissiveRadiance += diffuseColor.rgb * 0.04;\n" + parts("clear", "emissive"),
     final: CLEAR_FINAL,
   });
   return material;

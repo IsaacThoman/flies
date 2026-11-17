@@ -30,7 +30,7 @@ The default full run uses 200 circuits, 30 minutes per interaction phase, and
 | `--cycles 200` | Full five-place circuits in the places phase. |
 | `--minutes 30` | Minimum real minutes per other interaction phase (0.25 with `--quick`). Climate finishes a complete matrix even if this takes longer. |
 | `--wallpaper-minutes 60` | Real minutes per place, in one isolated context per selected place. |
-| `--places picnic,windowsill,lab,bar,restaurant` | Places to run screensaver in; interaction phases still visit every place. |
+| `--places picnic,windowsill,lab,greenhouse,restaurant` | Places to run screensaver in; interaction phases still visit every place. |
 | `--wallpaper-time clock` | Clock or a held daylight preset (morning/noon/golden/dusk/night). |
 | `--wallpaper-weather now` | Forecast or a held weather preset (clear/overcast/mist/rain). |
 | `--interval 10` | Sample interval in seconds (5 with `--quick`). Overruns skip a tick; GCs never queue indefinitely. |

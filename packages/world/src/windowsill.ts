@@ -207,8 +207,8 @@ function clockSolids(): Solid[] {
 }
 /** The fruit bowl: shallow stoneware with a rim a fly can walk round. */
 export const FRUIT_BOWL = { x: -40, z: -20, r: 80 };
-/** The bottle of red wine, corked, at the right of the sill. */
-export const WINE_BOTTLE = { x: 236, z: -54, r: 36, shoulder: 206, neck: 13.5, top: 300 };
+/** The glass bottle of orange juice, its cap screwed on, at the right of the sill: short and wide in the neck, as juice bottles are. */
+export const JUICE_BOTTLE = { x: 236, z: -54, r: 36, shoulder: 186, neck: 20, top: 246 };
 /** The small plate with half a peach on it. */
 export const PEACH_PLATE = { x: 95, z: 75, r: 48 };
 /** The teaspoon: its bowl's middle, the way its handle points (radians, as a footprint's angle), and its handle's length. */
@@ -236,9 +236,9 @@ export const SILL_SOLIDS: readonly Solid[] = [
   { name: "plum", footprint: { kind: "circle", x: FRUIT_BOWL.x + 20, z: FRUIT_BOWL.z + 30, r: 17 }, top: { kind: "dome", base: 24.5, height: 17, power: 0.5 } },
   // An overripe banana, freckled brown, its tip on the sill.
   ...bananaSolids(),
-  // The bottle: its body, its shoulder and its neck up to the cork.
-  { name: "bottle", footprint: { kind: "circle", x: WINE_BOTTLE.x, z: WINE_BOTTLE.z, r: WINE_BOTTLE.r }, top: { kind: "dome", base: WINE_BOTTLE.shoulder, height: 26, power: 0.5 } },
-  { name: "neck", footprint: { kind: "circle", x: WINE_BOTTLE.x, z: WINE_BOTTLE.z, r: WINE_BOTTLE.neck }, top: { kind: "flat", y: WINE_BOTTLE.top } },
+  // The bottle: its body, its shoulder and its neck up to the cap.
+  { name: "bottle", footprint: { kind: "circle", x: JUICE_BOTTLE.x, z: JUICE_BOTTLE.z, r: JUICE_BOTTLE.r }, top: { kind: "dome", base: JUICE_BOTTLE.shoulder, height: 26, power: 0.5 } },
+  { name: "neck", footprint: { kind: "circle", x: JUICE_BOTTLE.x, z: JUICE_BOTTLE.z, r: JUICE_BOTTLE.neck }, top: { kind: "flat", y: JUICE_BOTTLE.top } },
   // Half a peach, cut face up on a plate, with its stone.
   { name: "plate", footprint: { kind: "circle", x: PEACH_PLATE.x, z: PEACH_PLATE.z, r: PEACH_PLATE.r }, top: { kind: "dish", well: 1.2, rim: 5, inner: 0.7, lip: 0.86 } },
   // Its cut face is nearly flat, its skin rounding steeply down to the plate: a perch for a fly that flies there.
@@ -267,8 +267,8 @@ export const SILL_PATCHES: readonly FoodPatch[] = [
   // Juice from a split plum, run down into the bowl.
   { name: "plum juice", x: FRUIT_BOWL.x + 34, z: FRUIT_BOWL.z + 6, r: 6, sweet: 0.8 },
   { name: "honey", x: TEASPOON.x, z: TEASPOON.z, r: 5, sweet: 1 },
-  // A drip of wine run down the bottle and pooled on the sill.
-  { name: "wine", x: WINE_BOTTLE.x - 47, z: WINE_BOTTLE.z + 32, r: 9, sweet: 0.6, pool: true },
+  // A drip of juice run down the bottle and pooled on the sill.
+  { name: "orange juice", x: JUICE_BOTTLE.x - 47, z: JUICE_BOTTLE.z + 32, r: 9, sweet: 0.6, pool: true },
   // Water standing in the basil's saucer, round the pot's foot on the side toward the bowl.
   { name: "water", x: BASIL_POT.x + 57, z: BASIL_POT.z + 6, r: 2.6, sweet: 0, pool: true },
   { name: "spilt sugar", x: 38, z: 66, r: 4, sweet: 1 },

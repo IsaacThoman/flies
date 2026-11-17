@@ -24,7 +24,7 @@ the worked example.
 ## The world
 
 The world is in millimetres, y up, its floor at y = 0 and centred on the
-origin: a table top, a sill, a bench or a bar, or a room's own floor (the
+origin: a table top, a sill, a bench or a counter, or a room's own floor (the
 restaurant's). A fruit fly is about 2.5 mm long; it steps up nothing taller
 than 0.9 mm, can't stand on anything steeper than 65°, and needs 1.3 mm of
 room over its feet (`FLY_HEIGHT`, up to its folded wings).
@@ -135,7 +135,7 @@ crossings become smaller than a pixel, without extra meshes or draws.
 - **Two passes** (`apps/web/src/stage.ts`): the set (`buildSet`, from 0.5 mm to
   4 m from the camera, or its camera's `reach`) is drawn over the backdrop
   (`buildBackdrop`, from 200 mm to 3 km). Indoors, a room's far walls, a
-  window's view, a bar's lights can all be backdrop. A closed room whose
+  window's view, a street's lights can all be backdrop. A closed room whose
   backdrop shows through one opening gives its corners (`through`), and the
   backdrop is drawn only where that opening falls on the screen, or not at
   all while it is behind the camera (the restaurant's street, through its shop
@@ -165,9 +165,9 @@ crossings become smaller than a pixel, without extra meshes or draws.
   the Weather tool or, on "Now", the weather outside where the Apple TV can
   tell it (`scene/outside.ts`), else a forecast worked out from the clock. Every
   place gets its light from it without doing anything, as much as its
-  optional `open` lets in (1 if not said; the lab's is 0.4 and the bar's
-  0.35, as they see the sky only through windows, and after dark, lit by
-  their lamps, they hardly feel it): overcast greys the `Daylight`'s sky colours
+  optional `open` lets in (1 if not said; the lab's is 0.4, as it sees the
+  sky only through windows, and after dark, lit by its lamps, it hardly
+  feels it): overcast greys the `Daylight`'s sky colours
   and takes most of the sun's light (much less of the night's), mist whitens the
   horizon and the haze. Showing it in the place itself is up to the place,
   and optional: `SceneSet.update` takes the weather third, then the camera;
@@ -218,8 +218,8 @@ crossings become smaller than a pixel, without extra meshes or draws.
   place's `update`, turns a dial's hands to the real time by a uniform; the
   hands are drawn in the dial's own material (`CLOCK_GLSL`, found by where the
   dial is in the world, `onDial`), so they cost no draw. It tells the real
-  time under any chosen light. The windowsill's, the lab's and the bar's are
-  worked examples. The medium shot looks low across the table, so anything
+  time under any chosen light. The windowsill's and the lab's are worked
+  examples. The medium shot looks low across the table, so anything
   meant to be seen behind the fly, a clock included, should stand low.
 - **Bubbles and fireflies** are built for the picnic's open air and size; a
   place says whether it has them.
@@ -311,8 +311,8 @@ TV has (`places/restaurant/`):
   (Settings → Picture → Frame stats, or the canvas's `data-calls` and `data-triangles`);
   a new place should stay close to that, near the fly and in its whole view.
   Its GPU pays for every pixel's shader, too, 640×480 as the picture is: what
-  the bar and the restaurant cost there is their single materials' shading,
-  not their draws (`docs/apple-tv.md`, "Measured on peev"). Value noise comes from a texture (`scene/noise.ts`) rather than from
+  the restaurant costs there is its single materials' shading,
+  not its draws (`docs/apple-tv.md`, "Measured on peev"). Value noise comes from a texture (`scene/noise.ts`) rather than from
   hashes, a light's shadow and shading are worked out only where it can reach
   (`scene/lit.ts`), loops over things run only as far as there are things, and
   anything multiplied away (a pattern too fine for the pixel, a light that is
@@ -366,7 +366,7 @@ outside. The kitchen uses the same instanced outdoor flakes, with dust on
 the garden and faster pane streaks in heavy rain. Frost grows at the lab,
 windowsill and kitchen pane edges with the dusting;
 it is a visual illustration of winter, not a measured pane temperature.
-Bar and restaurant receive the shared weather light and do not show
+The restaurant receives the shared weather light and does not show
 snowflakes or frost. The restaurant's glass also responds to rain, wetness
 and mist (`places/restaurant/glass.ts`).
 

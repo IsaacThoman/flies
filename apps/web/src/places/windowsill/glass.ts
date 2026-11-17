@@ -183,7 +183,7 @@ diffuseColor.a = clamp(0.16 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
   return material;
 }
 
-/** The bottle shows a clear centre and thick green edges, with the window reflected in its curved wall. */
+/** The bottle shows a clear centre and darker edges, with the window reflected in its curved wall. */
 export function bottleMaterial(sunlight: Sunlight) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.06, metalness: 0, transparent: true, depthWrite: false, envMapIntensity: 1.3 });
   sunlit(material, sunlight, "bottle", {
@@ -204,7 +204,7 @@ opening *= smoothstep(${f(WINDOW.mullion.half)} - aa.x, ${f(WINDOW.mullion.half)
 opening *= step(0.0, toPane) * step(reflected.z, -0.001);
 vec3 windowLight = mix(vec3(0.7, 0.86, 1.0), uRoom * 0.2, uLamp);
 outgoingLight += windowLight * opening * (0.04 + edge * 0.6);
-// Multiple paths through the curved wall darken the rim, while the wine remains visible through the middle.
+// Multiple paths through the curved wall darken the rim, while the juice remains visible through the middle.
 outgoingLight *= mix(1.0, 0.75, edge);
 diffuseColor.a = clamp(0.24 + edge * 0.65 + opening * (0.08 + edge * 0.2), 0.0, 0.94);
 #include <opaque_fragment>`,

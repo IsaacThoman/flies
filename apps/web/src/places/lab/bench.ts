@@ -507,7 +507,7 @@ export function buildBench(): SceneSet {
   freeze(pupaMesh);
   group.add(pupaMesh);
 
-  // The dish of grape agar: a clear dish poured to the brim, the agar deep wine and wet, with a dab of yeast paste and eggs laid round it.
+  // The dish of grape agar: a clear dish poured to the brim, the agar deep plum and wet, with a dab of yeast paste and eggs laid round it.
   {
     const { x, z, r, rim, agar } = AGAR_DISH;
     glass.add(clear, paint(new THREE.CylinderGeometry(r, r, rim - 0.2, 64, 1, true).translate(x, rim / 2, z), "#eaf4fb"));

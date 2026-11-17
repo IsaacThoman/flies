@@ -168,10 +168,10 @@ test("the pebbles, shells and sea glass at the back of the sill can be climbed f
   }
 });
 
-test("the wine is a pool on the sill, and everything to eat lies within reach of the sill", () => {
-  const wine = SILL_PATCHES.find((f) => f.name === "wine")!;
-  assert.ok(wine.pool);
-  assert.equal(world.heightAt(wine.x, wine.z), 0);
+test("the orange juice is a pool on the sill, and everything to eat lies within reach of the sill", () => {
+  const juice = SILL_PATCHES.find((f) => f.name === "orange juice")!;
+  assert.ok(juice.pool);
+  assert.equal(world.heightAt(juice.x, juice.z), 0);
   for (const f of SILL_PATCHES) assert.ok(Math.abs(f.x) < SILL.hx && Math.abs(f.z) < SILL.hz, f.name);
 });
 

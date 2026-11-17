@@ -8,10 +8,60 @@ import { topHeight, topNormal } from "@fly/world";
 import type { Solid } from "@fly/world";
 import { paint } from "../../scene/build.ts";
 import type { ColorFn } from "../../scene/build.ts";
-import { tag } from "../bar/materials.ts";
 import { AREA_STRIDE } from "./kinds.ts";
 
-export { lathe, puddle, ringPuddle, scatter, sweepRect } from "../bar/geometry.ts";
+/** Says what a piece of painted geometry is made of (kinds.ts). */
+export function tag(geometry: THREE.BufferGeometry, kind: number) {
+  geometry.setAttribute("kind", new THREE.Float32BufferAttribute(new Float32Array(geometry.attributes.position.count).fill(kind), 1));
+  return geometry;
+}
+
+/** A lathe from (radius, height) pairs, bottom to top on the outside: faces outward and up. */
+export function lathe(profile: readonly (readonly [number, number])[], segments: number, x = 0, z = 0) {
+  return new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(Math.max(0, r), y)), segments).translate(x, 0, z);
+}
+
+/**
+ * Many copies of one small shape baked into one geometry, each placed by a
+ * matrix and coloured: position, normal, colour and kind, ready to batch.
+ * JavaScript on the Apple TV is slow, so many small things (drops, specks)
+ * are baked into one buffer straight from a single template.
+ */
+export function scatter(template: THREE.BufferGeometry, placements: readonly { matrix: THREE.Matrix4; color: THREE.Color }[], kind: number) {
+  const base = template.index ? template.toNonIndexed() : template;
+  if (!base.attributes.normal) base.computeVertexNormals();
+  const tp = base.attributes.position.array as Float32Array;
+  const tn = base.attributes.normal.array as Float32Array;
+  const count = tp.length / 3;
+  const positions = new Float32Array(count * 3 * placements.length);
+  const normals = new Float32Array(count * 3 * placements.length);
+  const colors = new Float32Array(count * 3 * placements.length);
+  const normalMatrix = new THREE.Matrix3();
+  const v = new THREE.Vector3();
+  placements.forEach(({ matrix, color }, k) => {
+    normalMatrix.getNormalMatrix(matrix);
+    const o = k * count * 3;
+    for (let i = 0; i < count * 3; i += 3) {
+      v.set(tp[i], tp[i + 1], tp[i + 2]).applyMatrix4(matrix);
+      positions[o + i] = v.x;
+      positions[o + i + 1] = v.y;
+      positions[o + i + 2] = v.z;
+      v.set(tn[i], tn[i + 1], tn[i + 2]).applyMatrix3(normalMatrix).normalize();
+      normals[o + i] = v.x;
+      normals[o + i + 1] = v.y;
+      normals[o + i + 2] = v.z;
+      colors[o + i] = color.r;
+      colors[o + i + 1] = color.g;
+      colors[o + i + 2] = color.b;
+    }
+  });
+  if (base !== template) base.dispose();
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  return tag(geometry, kind);
+}
 
 /** Painted and tagged in one go, and for a stand-in, which area it stands in for. */
 export function part(geometry: THREE.BufferGeometry, color: THREE.ColorRepresentation | ColorFn, kind: number, area = 0) {

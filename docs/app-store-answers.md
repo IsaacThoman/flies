@@ -36,17 +36,17 @@ Sources: [Apple App Privacy details](https://developer.apple.com/app-store/app-p
 | Advertising | No | No ads. |
 | Profanity or crude humour | None in authored content | Room names are user input and not filtered; UGC is disclosed separately. No promise of moderated or child-safe names. |
 | Horror or fear themes | None | Mild weather and a looming shadow startle a fly; no horror narrative or frightening authored imagery. |
-| Alcohol, tobacco or drug use/references | **Frequent** | Bar is a selectable, persistent scene with beer, cocktails and bottle shelves; restaurant also has drinkware. Not merely a fleeting reference. No smoking/drug feature. |
+| Alcohol, tobacco or drug use/references | None | No place depicts or names alcohol: the bar place was removed, and the restaurant's bottles, glasses and street, the kitchen's glass and spill and the windowsill's bottle hold syrups, juices and lemonade. No smoking or drug feature. Keep it that way: a single alcohol reference raises the rating to 13+. |
 | Medical or treatment information; health/wellness topics | None; No | The neuroscience model is entertainment/explanation, not medical advice or a health tool. |
 | Mature or suggestive themes; sexual content/nudity; graphic sexual content/nudity | None for all | Biological command names in technical docs are not sexual imagery or an adult narrative. |
-| Cartoon/fantasy violence | Infrequent | Ball impacts, startles, falls and a fly being knocked about; no combat, injury depiction, blood or death objective. Use this conservative answer rather than treating all impacts as absent. |
+| Cartoon/fantasy violence | None | A rolling ball can bump the fly, air puffs and shadows startle it, and it can tumble; it is never hurt, attacked or killed, and nothing aims to harm it. These are nudges and startles, not violent acts. |
 | Realistic violence; prolonged graphic/sadistic realistic violence; guns/other weapons | None for all | No such content or tools. |
 | Contests | None | No scores against others, prizes or competitive ranking. |
 | Simulated gambling; gambling | None; No | No bets, casino mechanics or prizes. |
 | Loot boxes | No | No random paid rewards or in-app purchases. |
-| Override, Kids Category, age suitability | Do not opt into Kids Category or lower a generated rating | Public unfiltered room names and persistent alcohol scenery require an honest generated rating. Review any remaining form-specific questions against the submitted build. |
+| Override, Kids Category, age suitability | Expect the generated 4+; do not opt into Kids Category or override it | With the answers above, only user-generated content and messaging/chat are affirmative, and Apple lists both under 4+. The Kids Category is separate and stricter: public unfiltered room names rule it out. Review any remaining form-specific questions against the submitted build. |
 
-Apple's current [age-rating definitions](https://developer.apple.com/help/app-store-connect/reference/app-information/age-ratings-values-and-definitions) are the source for interpreting the questions. **Frequent alcohol references may produce 18+ globally on OS 26+**, and regional/older OS labels differ. This is a consequence of the existing bar scene, not a recommendation to misclassify it. Changing that content or adding moderation is outside this paperwork change. Public room-name safety and App Review's UGC requirements need separate owner/legal review before submission.
+Apple's current [age-rating definitions](https://developer.apple.com/help/app-store-connect/reference/app-information/age-ratings-values-and-definitions) are the source for interpreting the questions. There, the rating is the highest tier any answer reaches. User-generated content and messaging/chat are 4+. Infrequent cartoon violence is 9+, any alcohol reference 13+ (frequent 18+), and social media 13+. 4+ therefore holds only while there is no alcohol, no cartoon violence and no social-media feature. Regional and older OS labels may differ. Public room-name safety and App Review's UGC requirements need separate owner/legal review before submission.
 
 ## Audit map
 
