@@ -33,7 +33,7 @@ test('trace distinguishes actual walking, rotation, grooming, feeding and air ti
   assert.ok(Math.abs(r.walkBoutMean! - 0.1) < 1e-12);
   assert.ok(Math.abs(r.groomBoutMean! - 0.2) < 1e-12);
   assert.ok(Math.abs(r.feedingBoutMean! - 0.3) < 1e-12);
-  assert.ok(Math.abs(r.flightBoutMean! - 0.4) < 1e-12);
+  assert.ok(Math.abs(r.airborneBoutMean! - 0.4) < 1e-12);
   assert.ok(Math.abs(r.edgeFraction! - 10 / 62) < 1e-12);
   assert.equal(r.takeoffs, 1);
   assert.equal(r.saccadeAngleMean, null);
@@ -137,4 +137,11 @@ test('nonfinite observations cannot corrupt the report', () => {
   const e = new Ethogram(0.01);
   for (const key of ['dt', 'speed', 'yawRate', 'yaw']) assert.throws(() => e.add({ ...sample, [key]: NaN }));
   assert.equal(e.result().seconds, 0);
+});
+
+test('a ground saccade window cannot include an airborne tail', () => {
+  const e = new Ethogram(0.01);
+  for (let i = 0; i < 30; i++) e.add({ ...sample, yawRate: i === 15 ? 5 : 0, yaw: i < 15 ? 0 : 0.05, onFeet: i !== 18 });
+  assert.equal(e.result().samples.saccades, 1);
+  assert.equal(e.result().samples.saccadeAngles, 0);
 });

@@ -11,9 +11,15 @@ import { InProcessBrain } from './fuzz/brain.ts';
 import { DEFAULT_CONNECTOME_PATH } from '../packages/brain/src/node.ts';
 import { Ethogram, distanceScore, mean } from './ethogram/metrics.ts';
 import { REFERENCES } from './ethogram/references.ts';
+import { HeavyLease } from './ethogram/lease.ts';
 
 export const ARENA: Place = { floor: { kind: 'circle', r: 21.5 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 30 };
 const DT = 0.01;
+export const STAND_INS = [
+  'InternalState uses stochastic arousal and per-eye scene backgrounds, outside the connectome, to drive spontaneous activity.',
+  'The body supplies edge avoidance and wall escape, tarsal flight support, grooming-pose persistence, and alignment to food after a neural feeding command.',
+  'Airborne duration and grooming display occupancy include those body mechanisms; this audit does not attribute them to additional neural decisions.',
+] as const;
 const PLACES: Readonly<Record<string, Place>> = { ...WORLDS, arena: ARENA };
 export type RunOptions = { hours: number; burnSeconds: number; seeds: number[]; place: string };
 
@@ -34,10 +40,11 @@ export function comparisons(measured: ReturnType<Ethogram['result']>) {
   });
 }
 
-export function measure(data: ArrayBuffer, options: RunOptions) {
+export async function measure(data: ArrayBuffer, options: RunOptions, checkpoint?: () => Promise<void>) {
   validateOptions(options);
   const results = [];
   for (const seed of options.seeds) {
+    await checkpoint?.();
     const driver = new InProcessBrain(data, seed);
     const life = new Life(new World(PLACES[options.place]), driver);
     // A uniform adapted field is reproducible without a renderer. It is not the game's visual world.
@@ -52,6 +59,7 @@ export function measure(data: ArrayBuffer, options: RunOptions) {
     const start = performance.now();
     try {
       for (let frame = 0; frame < burn + recorded; frame++) {
+        if (frame % 100 === 0) await checkpoint?.();
         const p = life.body.position;
         const { x, y, z } = p;
         const onFeet = life.body.onFeet;
@@ -79,8 +87,8 @@ export function measure(data: ArrayBuffer, options: RunOptions) {
   return results;
 }
 
-export function markdown(results: ReturnType<typeof measure>) {
-  const text = ['# Behaviour audit', '', 'Exploratory scores are descriptive distances, not validated biological agreement. Unsupported assays and absent events are N/A, never zero-valued observations.', '', '| Metric | Literature value ± comparison scale | Measured per seed | Exploratory /10 per seed | Source |', '|---|---:|---|---|---|'];
+export function markdown(results: Awaited<ReturnType<typeof measure>>) {
+  const text = ['# Behaviour audit', '', 'Exploratory scores are descriptive distances, not validated biological agreement. Unsupported assays and absent events are N/A, never zero-valued observations.', '', ...STAND_INS, '', '| Metric | Literature value ± comparison scale | Measured per seed | Exploratory /10 per seed | Source |', '|---|---:|---|---|---|'];
   for (let i = 0; i < REFERENCES.length; i++) {
     const ref = REFERENCES[i];
     const values = results.map(r => r.comparisons[i].measured?.toFixed(4) ?? 'N/A').join(', ');
@@ -91,10 +99,10 @@ export function markdown(results: ReturnType<typeof measure>) {
   return text.join('\n');
 }
 
-function main() {
+async function main() {
   const { values } = parseArgs({ options: { hours: { type: 'string', default: '1' }, 'burn-seconds': { type: 'string', default: '60' }, seeds: { type: 'string', default: '1,2,3' }, place: { type: 'string', default: 'arena' }, data: { type: 'string', default: DEFAULT_CONNECTOME_PATH }, out: { type: 'string' }, help: { type: 'boolean' } } });
   if (values.help) {
-    console.log('node scripts/ethogram.ts [--hours 1] [--seeds 1,2,3] [--place arena|lab|picnic|bar|restaurant|windowsill] [--burn-seconds 60] [--data path] [--out report.json]\nReserve a /tmp/flies-heavy/slot-N before a long run. No rendering, no sound.');
+    console.log('node scripts/ethogram.ts [--hours 1] [--seeds 1,2,3] [--place arena|lab|picnic|bar|restaurant|windowsill] [--burn-seconds 60] [--data path] [--out report.json]\nAutomatically leases one of eight heavy-work slots, yielding after 9.5 min and cooling down 2 min. No rendering, no sound.');
     return;
   }
   const options: RunOptions = { hours: Number(values.hours), burnSeconds: Number(values['burn-seconds']), seeds: values.seeds.split(',').map(Number), place: values.place };
@@ -102,19 +110,28 @@ function main() {
   const data = Uint8Array.from(readFileSync(values.data)).buffer;
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const dirty = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0;
-  const results = measure(data, options);
+  const branch = execFileSync('git', ['branch', '--show-current'], { encoding: 'utf8' }).trim();
+  const lease = new HeavyLease(branch);
+  const stop = () => { lease.release(); process.exit(130); };
+  process.once('SIGINT', stop);
+  process.once('SIGTERM', stop);
+  let results: Awaited<ReturnType<typeof measure>>;
+  try { results = await measure(data, options, () => lease.checkpoint()); }
+  finally { lease.release(); process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop); }
   const report = {
     schema: 1, options, dtSeconds: DT,
     commit, dirty,
     connectomeSha256: createHash('sha256').update(new Uint8Array(data)).digest('hex'),
     attribution: 'FlyEM male CNS connectome, Janelia Research Campus (CC-BY 4.0)',
+    standIns: STAND_INS,
     protocol: 'Unstimulated free behaviour; uniform facet luminance 0.5, natural Life hunger (its metabolism clock runs 60× faster than motion); no imposed commands, no teleportation, no sensory overrides. Arena is a 43 mm disc with the existing edge reflex, not a walled chamber. No feeding, dust, loom, air-puff or optomotor trial battery.',
-    definitions: '10 ms frames; walking = actual ground displacement >0.5 mm/s; activity = speed >0.5 mm/s OR |yaw|>20 deg/s, no paper-specific bout filtering; edge = outer half of floor area, only while on feet; speed histogram 0.1 mm/s bins, yaw histogram 1 deg/s bins; complete bout durations only, both window endpoints censored; saccades = contiguous ground |yaw|>200 deg/s; angle = ±50 ms around maximum |yaw| in each event; grooming = Life head-groom display state, not body-part-resolved grooming; flight includes falls.',
+    scheduling: 'At most 9.5 min per lease with 2 min cooldown; wall time includes fairness pauses and slot waits, CPU time excludes waits.',
+    definitions: '10 ms frames; walking = actual ground displacement >0.5 mm/s; activity = speed >0.5 mm/s OR |yaw|>20 deg/s, no paper-specific bout filtering; edge = outer half of floor area, only while on feet; speed histogram 0.1 mm/s bins, yaw histogram 1 deg/s bins; complete bout durations only, both window endpoints censored; saccades = contiguous ground |yaw|>200 deg/s; angle = ±50 ms around maximum |yaw| in each event; grooming = Life head-groom display state, not body-part-resolved grooming; airborne time includes jumps and falls; it is not sustained flight duration.',
     results,
   };
   if (values.out) writeFileSync(values.out, JSON.stringify(report, null, 2) + '\n');
   console.log(markdown(results));
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  try { main(); } catch (error) { console.error((error as Error).message); process.exitCode = 1; }
+  main().catch(error => { console.error((error as Error).message); process.exitCode = 1; });
 }

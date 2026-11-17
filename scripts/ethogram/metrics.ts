@@ -72,7 +72,7 @@ export class Ethogram {
   readonly stopping = new Bouts();
   readonly grooming = new Bouts();
   readonly feeding = new Bouts();
-  readonly flying = new Bouts();
+  readonly airborne = new Bouts();
   readonly saccades = new Bouts();
   readonly speed = new Histogram(0.1, 1000);
   readonly yawSpeed = new Histogram(1, 10000);
@@ -83,6 +83,7 @@ export class Ethogram {
   distance = 0;
   takeoffs = 0;
   #yaw: number[] = [];
+  #onFeet: boolean[] = [];
   #frame = 0;
   #event: Saccade | null = null;
   #pending: Saccade[] = [];
@@ -104,7 +105,7 @@ export class Ethogram {
     this.stopping.add(s.onFeet && !walking, s.dt);
     this.grooming.add(s.onFeet && s.grooming, s.dt);
     this.feeding.add(s.onFeet && s.eating, s.dt);
-    this.flying.add(!s.onFeet, s.dt);
+    this.airborne.add(!s.onFeet, s.dt);
     this.saccades.add(s.onFeet && yaw > 200, s.dt);
     if (walking) this.speed.add(s.speed, s.dt);
     if (s.onFeet) {
@@ -118,23 +119,26 @@ export class Ethogram {
 
     // A peak's angle is read over ±50 ms, rather than integrated only above threshold.
     this.#yaw.push(s.yaw);
-    if (this.#yaw.length > this.halfWindow + 1) this.#yaw.shift();
+    this.#onFeet.push(s.onFeet);
+    if (this.#yaw.length > this.halfWindow + 1) { this.#yaw.shift(); this.#onFeet.shift(); }
     const turning = s.onFeet && yaw > 200;
     if (turning) {
       if (!this.#event) this.#leftEvent = this.#frame === 0;
       if (!this.#event || yaw > this.#event.peak) {
-        this.#event = { peak: yaw, frame: this.#frame, preYaw: !this.#leftEvent && this.#yaw.length > this.halfWindow ? this.#yaw[0] : null, angle: null };
+        this.#event = { peak: yaw, frame: this.#frame, preYaw: !this.#leftEvent && this.#yaw.length > this.halfWindow && this.#onFeet.every(Boolean) ? this.#yaw[0] : null, angle: null };
       }
     } else if (this.#event) {
       this.#pending.push(this.#event);
       this.#event = null;
     }
+    if (!s.onFeet && this.#event) this.#event.preYaw = null;
     if (this.#event && this.#frame - this.#event.frame === this.halfWindow && this.#event.preYaw !== null) {
       this.#event.angle = Math.abs(s.yaw - this.#event.preYaw) * 180 / Math.PI;
     }
     for (let i = this.#pending.length - 1; i >= 0; i--) {
       const event = this.#pending[i];
       const age = this.#frame - event.frame;
+      if (!s.onFeet && age <= this.halfWindow) event.preYaw = null;
       if (age === this.halfWindow && event.preYaw !== null) event.angle = Math.abs(s.yaw - event.preYaw) * 180 / Math.PI;
       if (age >= this.halfWindow) {
         if (event.angle !== null) this.saccadeAngles.push(event.angle);
@@ -158,13 +162,13 @@ export class Ethogram {
       edgeFraction: this.onFeetSeconds ? this.edgeSeconds / this.onFeetSeconds : null,
       groomBoutMean: mean(this.grooming.complete), groomFraction: fraction(this.grooming.seconds),
       feedingBoutMean: mean(this.feeding.complete), feedingFraction: fraction(this.feeding.seconds),
-      flightBoutMean: mean(this.flying.complete), flightFraction: fraction(this.flying.seconds),
+      airborneBoutMean: mean(this.airborne.complete), airborneFraction: fraction(this.airborne.seconds),
       saccadeDurationMedianMs: this.saccades.complete.length ? quantile(this.saccades.complete, 0.5)! * 1000 : null,
       saccadeAngleMean: mean(this.saccadeAngles),
       saccadeRate: this.seconds ? this.saccades.starts / this.seconds : null,
       distanceMm: this.distance, takeoffs: this.takeoffs,
-      samples: { walkingBouts: this.walking.complete.length, stoppingBouts: this.stopping.complete.length, groomingBouts: this.grooming.complete.length, feedingBouts: this.feeding.complete.length, flightBouts: this.flying.complete.length, saccades: this.saccades.complete.length, saccadeAngles: this.saccadeAngles.length },
-      censoring: Object.fromEntries(['walking', 'stopping', 'grooming', 'feeding', 'flying', 'saccades'].map(name => {
+      samples: { walkingBouts: this.walking.complete.length, stoppingBouts: this.stopping.complete.length, groomingBouts: this.grooming.complete.length, feedingBouts: this.feeding.complete.length, airborneBouts: this.airborne.complete.length, saccades: this.saccades.complete.length, saccadeAngles: this.saccadeAngles.length },
+      censoring: Object.fromEntries(['walking', 'stopping', 'grooming', 'feeding', 'airborne', 'saccades'].map(name => {
         const b = this[name as 'walking'];
         return [name, { left: b.censored, right: b.rightCensored ? 1 : 0 }];
       })),

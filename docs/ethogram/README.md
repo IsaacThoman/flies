@@ -11,18 +11,25 @@ is reported separately with its coverage. N/A never earns a score.
 # Fetch the FlyEM male CNS connectome and install dependencies first.
 npm ci
 npm run brain:fetch
-# Reserve a heavy-work slot before a long run; release it when finished.
-mkdir /tmp/flies-heavy/slot-1
+# The CLI leases shared CPU slots itself; do not wrap it in another lease.
 node scripts/ethogram.ts --hours 1 --seeds 1,2,3 --place arena --out /tmp/ethogram.json
-rmdir /tmp/flies-heavy/slot-1
 ```
 
-The four slot names are shared with other work: if a mkdir fails, try another
-free slot (1–4); never remove someone else's slot. A run defaults to three
-independent seeds, each with a 60-second burn-in followed by one hour of motion
-time. `--place lab` and the other game places work too. Each seed is reported
-separately rather than pooled into one long pseudoreplicate. This is not a
-population experiment; three seeds cannot establish a reference distribution.
+The CLI atomically takes one of `/tmp/flies-heavy/slot-1` through `slot-8`,
+writes its branch to `owner`, and releases that directory when finished.
+It yields its lease after 9.5 minutes of wall time, keeps the animal's state
+in memory while doing no simulation work, and waits at least two minutes
+before reacquiring a slot. It checks the lease every simulated second;
+wall time includes fairness pauses, while process CPU time does not.
+No server, browser, or background simulation process is created. Interrupting
+the CLI releases its slot. Callers of the exported `measure` function must
+supply their own lease/checkpoint, or run within an existing slot.
+
+A run defaults to three independent seeds, each with a 60-second burn-in
+followed by one hour of motion time. `--place lab` and the other game places
+work too. Each seed is reported separately rather than pooled into one long
+pseudoreplicate. This is not a population experiment; three seeds cannot
+establish a reference distribution.
 
 The runner uses `Life` and the same in-process driver as the headless fuzz tools:
 real 166,700-neuron brain, `SenseTracker`, `Behavior`, `FlyBody`, food and hunger.
@@ -32,7 +39,7 @@ place**. The arena is a 43 mm disc with the existing edge reflex, without the
 paper's walls, glucose floor or confinement. Results are not claimed to match
 its experiment. Hunger retains the game's accelerated metabolic clock (60×);
 an hour of motion time is not an hour of physiological starvation. No runtime,
-body, brain, hunger, sleep, grounded or ON-pathway code is changed by the audit.
+body, brain, hunger, sleep, grounded or ON-pathway code is changed by the audit. The inherited stochastic background, edge/wall avoidance, tarsal support, grooming persistence and feeding alignment are explicitly listed in the JSON and console report; observed motion includes them.
 
 ## Measurements
 
@@ -42,7 +49,7 @@ but lacks Cruz's duration/gap filtering. This is an explicit mismatch, not a
 validated recreation of that classifier. Surface motion includes vertical
 movement while climbing. Walk and stop bouts are complementary only on the
 ground. Grooming is `Life`'s head-groom display state; feeding is actual eating,
-not simply proboscis extension. Flight is time off the feet, including falls.
+not simply proboscis extension. The airborne diagnostic is time off the feet, including jumps and falls; it is not called flight duration.
 These state categories can overlap except where `Life` gives them priority.
 
 Only completed bouts enter duration summaries. A bout already active at the
@@ -62,8 +69,8 @@ from angle summaries. At 10 ms sampling, timing resolution is 10 ms and narrow
 peaks may be missed. The body's documented 3 rad/s command gain is below
 200 deg/s; ordinary steering is not relabelled a saccade to conceal this.
 
-Speed quantiles use a 0.1 mm/s histogram; yaw quantiles use 1 deg/s bins. Each
-quantile's bin-centre error is at most one bin width. Overflow is counted and a
+Speed quantiles use a 0.1 mm/s histogram; yaw quantiles use 1 deg/s bins. They use the inverse weighted empirical CDF (not linear interpolation). Each
+quantile's bin-centre error relative to that definition is at most one bin width. Overflow is counted and a
 quantile falling in it is N/A. The edge diagnostic is occupancy of the outer
 half of the floor area while grounded; it is not claimed to measure a biological
 wall preference because the current disc has no wall. Full counts, censoring,
@@ -101,7 +108,7 @@ Unimplemented assays:
   invented from the qualitative ordering. See https://doi.org/10.7554/eLife.02951.
 - Air-puff startle, optomotor gain, centrophobism and flight-bout duration need
   a verified quantitative target **and** a matched protocol. The runner records
-  flight durations and spatial occupancy, without inventing literature ranges.
+  airborne durations and spatial occupancy, without inventing literature ranges.
 
 ## Calibration decisions
 
