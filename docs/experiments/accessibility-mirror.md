@@ -71,3 +71,41 @@ M4 mean **7.33**, K7 mean 1.05. All three ranked M4 higher. The independent regr
 
 Highest-value findings: retain room destination on password errors and place/occupancy/lock context at a joined room; verify list churn, focus returns, screensaver and veil transitions. Response: contextual semantic state and those black-box checks, plus a WebKit attempt. Zoom and sighted place dots remain separate adoption work. The full suite also caught a shifted Place row; Reduce Motion was moved after existing rows rather than changing the tests' expectations.
 
+### Round 2
+
+Key: M4 = d9004460 artifact; S9 = contextual-room/Watch corrections (game content represented by cd23d394). Orders randomized independently.
+
+| Reviewer | Set | Tasks | Names | Focus | Sighted/cost | Separation | Motion | Colour | Mean | Ranking |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | M4 | 8 | 6 | 7 | 6 | 8 | 7 | 6 | 6.86 | S9 > M4 |
+| 1 | S9 | 8 | 8 | 8 | 6 | 8 | 10 | 6 | 7.71 | S9 > M4 |
+| 2 | M4 | 8 | 6 | 7 | 7 | 8 | 9 | 5 | 7.14 | S9 > M4 |
+| 2 | S9 | 8 | 9 | 8 | 7 | 8 | 9 | 6 | 7.86 | S9 > M4 |
+| 3 | M4 | 8 | 7 | 7 | 7 | 8 | 6 | 5 | 6.86 | S9 > M4 |
+| 3 | S9 | 8 | 9 | 8 | 7 | 8 | 10 | 7 | 8.14 | S9 > M4 |
+
+S9 mean **7.90**, M4 6.95. All three ranked S9 higher. Independent runs reproduced the keyboard Watch failure in M4 and confirmed the S9 correction, room context and occupancy-focus continuity. The regression reviewer found no demonstrated S9 regression. Orders: 1: set-M4, set-S9; 2: set-S9, set-M4; 3: set-M4, set-S9; 4: set-S9, set-M4.
+
+Findings: semantic DOM focus lacked a visible canvas ring; both artifacts counted supplementary Unicode characters as UTF-16 units; place is still colour-only visually; zoom remains disabled. Response: use the existing canvas focus ring and preserve it through list rebuilds; follow the Unicode/composition fix now landed on dev; rebase on the current menu-target and whole-place changes. The integration artifact passes the keyboard task driver in Chromium and WebKit (Option-Tab for WebKit). Those engine checks are not VoiceOver tests. No viewport or room-rendering redesign was attempted because they overlap the touch/menu branches and need an explicit owner decision.
+
+A reviewer rerun encountered the shared driver disappearing during rebase; supplied runtime evidence remained available. Later sets carry frozen self-contained drivers to avoid that race. Two other reviewers completed independent runs; supplementary-character assertions were bypassed in their scratch drivers for these historical artifacts and retained as real findings, not hidden.
+
+### Round 3
+
+Key: S9 = prior room-context artifact; T2 = integration/focus/Unicode artifact at 527f53e0, rebased on dev 2f1d4a09. The native camera source changes in the base are upstream; this feature still does not edit camera.ts. Each set now carries a frozen driver.
+
+| Reviewer | Set | Tasks | Names | Focus | Sighted/cost | Separation | Motion | Colour | Mean | Ranking |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | S9 | 7 | 8 | 7 | 6 | 8 | 10 | 5 | 7.29 | T2 > S9 |
+| 1 | T2 | 7 | 9 | 8 | 7 | 8 | 10 | 5 | 7.71 | T2 > S9 |
+| 2 | S9 | 8 | 8 | 6 | 6 | 8 | 10 | 6 | 7.43 | T2 > S9 |
+| 2 | T2 | 8 | 9 | 8 | 7 | 8 | 10 | 6 | 8.00 | T2 > S9 |
+| 3 | S9 | 7 | 8 | 6 | 7 | 9 | 9 | 5 | 7.29 | T2 > S9 |
+| 3 | T2 | 7 | 9 | 8 | 8 | 9 | 9 | 5 | 7.86 | T2 > S9 |
+
+T2 mean **7.86**, S9 7.33 within this paired review. All three independently ran the frozen drivers in WebKit and preferred T2. Cross-round absolute means vary with reviewer calibration; paired controls show the improvement. Orders: 1: set-S9, set-T2; 2: set-T2, set-S9; 3: set-S9, set-T2; 4: set-S9, set-T2.
+
+Findings are now concentrated on the shared colour-only place dot, disabled page zoom, absent actual VoiceOver/native acceptance, and unmeasured no-AT CPU overhead. The keyboard focus ring and 24 supplementary-character name limit were independently reproduced. No new UI redesign is justified inside this adapter-only branch. A small subsequent correction makes failed-brain status truthful and announces retry immediately; it has a focused regression test. Follow-up controls will check whether fresh blind assessments find further progress without changing the shared visual/host policies.
+
+
+

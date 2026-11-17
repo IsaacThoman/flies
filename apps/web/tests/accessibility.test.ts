@@ -26,3 +26,9 @@ test("stale and disabled semantic actions cannot activate a different menu row",
   access.send({ id: "room:gone", action: "activate" });
   assert.equal(actions, 0);
 });
+
+
+test("a failed brain is never announced as awake on the title", () => {
+  const game = { loading: false, screen: "title", brain: { status: "failed" }, screens: { title: { heading: "Title", menu: new Menu([]) }, online: { view: "rooms" } }, rooms: [], table: null } as unknown as Game;
+  assert.equal(new MenuAccess(game).read().status, "Its brain could not wake");
+});
