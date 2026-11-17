@@ -19,7 +19,7 @@ export function assertLiveLease(file: string): void {
   if (!Number.isSafeInteger(holder.pid) || holder.pid <= 0) return;
   try { process.kill(holder.pid, 0); }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ESRCH") throw Error(`Abandoned measurement lease ${file}: PID ${holder.pid}, token ${holder.token}. Verify ownership before manually removing its slot and lease.`);
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") throw Error(`Abandoned measurement lease ${file}: PID ${holder.pid}, token ${holder.token}. Verify ownership before manually removing its slot and lease.`, { cause: error });
   }
 }
 
