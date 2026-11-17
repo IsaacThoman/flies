@@ -2,14 +2,13 @@
 //
 //   menu ─┬─ Play
 //         ├─ Watch
-//         ├─ About
 //         ├─ Settings: Screensaver (and how many flies) | On screen | Picture, as tabs
-//         └─ Online (where it can be): rooms with others (online.ts)
+//         ├─ Online (where it can be): rooms with others (online.ts)
+//         └─ About
 //
 // The menu is the title, at launch and from play alike (Back, Play/Pause or
 // the menu button), with the fly living on behind it; Back there carries on
 // playing (on the Apple TV it leaves the app, as the root of an app must).
-// Every setting is two steps from it.
 
 import { COLOURS } from "@fly/net";
 import { Menu, choiceValue, indexOf } from "@fly/ui";
@@ -19,7 +18,7 @@ import type { PixelSize } from "../../display.ts";
 import { PLACES } from "../../places/catalog.ts";
 import { WALLPAPER_DELAYS } from "../../settings.ts";
 import type { EyesDetail, OverlayOpacity, OverlaySize, Settings, ShowWhen, StatsKind } from "../../settings.ts";
-import { fitMenu, safeRect, titleLayout } from "../layout.ts";
+import { fitMenu, menuSpace, titleLayout } from "../layout.ts";
 import { arriving } from "../loading.ts";
 import { drawWordmark } from "../wordmark.ts";
 import { MenuScreen } from "./menu-screen.ts";
@@ -29,11 +28,11 @@ export function titleScreen(shell: Shell) {
   const menu = new Menu([
     { kind: "action", id: "play", label: "Play" },
     { kind: "action", id: "watch", label: "Watch" },
-    { kind: "action", id: "about", label: "About" },
     { kind: "action", id: "settings", label: "Settings" },
     // With others, where there is a way to reach them.
     ...(shell.canPlayOnline ? [{ kind: "action" as const, id: "online", label: "Online" }] : []),
-  ]);
+    { kind: "action", id: "about", label: "About" },
+  ], { wrap: true });
   // Laid out with the menu, for the backdrop to draw from.
   let title = titleLayout(shell.shape, menu.items.length);
   return new MenuScreen(shell, {
@@ -83,13 +82,13 @@ const EYES: Option<EyesDetail>[] = [
 /** For each picture that can show over the world in a corner. */
 const SHOWN: Option<ShowWhen>[] = [
   { value: "off", label: "Off" },
-  { value: "wallpaper", label: "In the screensaver" },
+  { value: "wallpaper", label: "Screensaver" },
   { value: "always", label: "Always" },
 ];
 const STATS: Option<StatsKind>[] = [
   { value: "brain", label: "Its brain" },
   { value: "day", label: "Its day" },
-  { value: "both", label: "Both" },
+  { value: "both", label: "Brain + day" },
   { value: "signals", label: "In and out" },
 ];
 const SIZE: Option<OverlaySize>[] = [
@@ -138,15 +137,16 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       choice("eyesInset", "Fly POV", SHOWN),
       choice("nerves", "Nervous system", SHOWN),
       choice("statsPanel", "Stats", SHOWN),
-      choice("statsKind", "Stats of", STATS),
-      choice("overlaySize", "Size", SIZE),
-      choice("overlayOpacity", "Opacity", OPACITY),
+      choice("statsKind", "Stats content", STATS),
+      choice("overlaySize", "Overlay size", SIZE),
+      choice("overlayOpacity", "Overlay opacity", OPACITY),
       choice("xray", "X-ray", SHOWN),
     ],
   },
   picture: {
     heading: "Picture",
-    rows: () => [choice("pixels", "Pixels", PIXELS), choice("eyes", "The fly's eyes", EYES), choice("hints", "Hints", ON_OFF), choice("rumble", "Rumble", ON_OFF), choice("stats", "Frame stats", ON_OFF)],
+    rows: () => [choice("pixels", "Pixels", PIXELS), choice("eyes", "Vision detail", EYES), choice("hints", "Hints", ON_OFF), choice("rumble", "Rumble", ON_OFF), choice("stats", "Frame stats", ON_OFF)],
+
   },
 };
 
@@ -157,7 +157,7 @@ export function settingsScreen(shell: Shell) {
   const pages = {} as Record<SettingsPage, MenuItem[]>;
   for (const id of ids) pages[id] = PAGES[id].rows(shell);
   const tabs: ChoiceItem<SettingsPage> = { kind: "choice", id: "page", label: "", options: ids.map((id) => ({ value: id, label: PAGES[id].heading })), index: 0, tabs: true };
-  const menu = new Menu([tabs, ...pages[ids[0]]]);
+  const menu = new Menu([tabs, ...pages[ids[0]]], { wrap: true });
   // Room for the longest page, so the pane keeps its size from tab to tab.
   const most = 1 + Math.max(...ids.map((id) => pages[id].length));
   // As they are now: the Place tool, or a script, may have changed them since.
@@ -170,8 +170,10 @@ export function settingsScreen(shell: Shell) {
   };
   return new MenuScreen(shell, {
     id: "settings",
+    heading: "Settings",
+    trimEmpty: true,
     menu,
-    place: (frame) => fitMenu(safeRect(frame), { items: most, width: 540, row: 36, heading: false, foot: 28, values: true, raise: 14 }),
+    place: (frame) => fitMenu(menuSpace(frame), { items: most, width: 540, row: frame.design.height >= 440 ? 44 : 36, heading: true, foot: 28, values: true, raise: 14 }),
     onEnter: show,
     onChange(item) {
       if (item === tabs) {

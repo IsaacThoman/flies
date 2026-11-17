@@ -79,13 +79,13 @@ export function settle(director: CameraDirector, body: FlyBody, seconds: number,
   for (let t = 0; t < seconds; t += dt) director.update(body, dt);
 }
 
-/** A few places for the fly beside what stands near where it starts, on what it starts on: a few mm off the nearest few things taller than it. */
-export function besideThings(world: World, start: { x: number; z: number; y?: number }, count: number) {
-  const floor = world.heightAt(start.x, start.z, start.y);
+/** Sample beside nearby obstacles, using `on` for a worktop below a small raised starting perch. */
+export function besideThings(world: World, start: { x: number; z: number; y?: number }, count: number, on?: { y: number; names: readonly string[] }) {
+  const floor = world.heightAt(start.x, start.z, on?.y ?? start.y);
   const centre = (s: Solid) => s.footprint;
   const size = (s: Solid) => (s.footprint.kind === "circle" ? s.footprint.r : s.footprint.kind === "ellipse" ? Math.max(s.footprint.rx, s.footprint.rz) : Math.hypot(s.footprint.hx, s.footprint.hz));
   const things = world.solids
-    .filter((s) => solidBottom(s) <= floor + 1 && topPeak(s.top) > floor + 2 && size(s) < 200 && Math.hypot(centre(s).x - start.x, centre(s).z - start.z) < 400)
+    .filter((s) => (!on || on.names.includes(s.name)) && solidBottom(s) <= floor + 1 && topPeak(s.top) > floor + 2 && size(s) < 200 && Math.hypot(centre(s).x - start.x, centre(s).z - start.z) < 400)
     .sort((a, b) => Math.hypot(centre(a).x - start.x, centre(a).z - start.z) - Math.hypot(centre(b).x - start.x, centre(b).z - start.z));
   const spots: { name: string; x: number; y: number; z: number }[] = [];
   for (const thing of things) {

@@ -23,6 +23,8 @@ export type ActionItem = {
   description?: string;
   /** How many of how many, as pips at its right (the flies in a room); a padlock, for what needs a password; a globe, for a room open to everyone. */
   count?: readonly [number, number];
+  /** A cached counter for lists where the capacity must be explicit. */
+  countLabel?: string;
   locked?: boolean;
   everyone?: boolean;
 };
@@ -33,7 +35,7 @@ export type ActionItem = {
 export type ChoiceItem<V = unknown> = { kind: "choice"; id: string; label: string; options: readonly Option<V>[]; index: number; disabled?: boolean; hint?: string; tabs?: boolean; dots?: readonly string[] };
 export type SliderItem = { kind: "slider"; id: string; label: string; min: number; max: number; step: number; value: number; disabled?: boolean; hint?: string };
 /** Words to type: a name, a password (`secret`: shown masked), a code. Select starts typing into it; `placeholder` shows while it is empty. */
-export type FieldItem = { kind: "field"; id: string; label: string; value: string; placeholder?: string; secret?: boolean; disabled?: boolean; hint?: string };
+export type FieldItem = { kind: "field"; id: string; label: string; value: string; placeholder?: string; secret?: boolean; disabled?: boolean; hint?: string; submit?: { label: string; disabled: boolean } };
 export type MenuItem = ActionItem | ChoiceItem | SliderItem | FieldItem;
 
 /** What a press did. */
@@ -70,14 +72,22 @@ export class Menu {
   columns = 1;
   /** How many rows there is room for, however many items there are now. */
   #room: number;
+  readonly #wrap: boolean;
 
-  constructor(items: MenuItem[], { rows = items.length, focus }: { rows?: number; focus?: string } = {}) {
+  constructor(items: MenuItem[], { rows = items.length, focus, wrap = false }: { rows?: number; focus?: string; wrap?: boolean } = {}) {
     this.items = items;
+    this.#wrap = wrap;
     this.#room = rows;
     this.rows = Math.min(items.length, Math.max(1, rows));
     const start = focus ? items.findIndex((item) => item.id === focus) : -1;
     this.focus = start >= 0 && !items[start].disabled ? start : this.#nextEnabled(-1, 1) ?? 0;
     this.#keepInView();
+  }
+
+  /** A tab strip stays available while its settings scroll beneath it. */
+  get pinned(): number {
+    const first = this.items[0];
+    return this.rows > 1 && first?.kind === "choice" && first.tabs ? 1 : 0;
   }
 
   get focused(): MenuItem | undefined {
@@ -166,7 +176,7 @@ export class Menu {
     if (next === this.scroll) return false;
     this.scroll = next;
     const last = this.scroll + this.rows - 1;
-    if (this.focus < this.scroll) this.focus = this.#nextEnabled(this.scroll - 1, 1) ?? this.focus;
+    if (this.focus >= this.pinned && this.focus < this.scroll + this.pinned) this.focus = this.#nextEnabled(this.scroll + this.pinned - 1, 1) ?? this.focus;
     else if (this.focus > last) this.focus = this.#nextEnabled(last + 1, -1) ?? this.focus;
     return true;
   }
@@ -175,7 +185,8 @@ export class Menu {
     switch (button) {
       case "up":
       case "down": {
-        const next = this.#nextEnabled(this.focus, button === "up" ? -1 : 1);
+        const dir = button === "up" ? -1 : 1;
+        const next = this.#nextEnabled(this.focus, dir) ?? (this.#wrap ? this.#nextEnabled(dir < 0 ? this.items.length : -1, dir) : null);
         if (next === null) return repeat ? NONE : BLOCKED;
         this.focus = next;
         this.#keepInView();
@@ -238,7 +249,7 @@ export class Menu {
 
   #keepInView() {
     const maxScroll = Math.max(0, this.items.length - this.rows);
-    if (this.focus < this.scroll) this.scroll = this.focus;
+    if (this.focus < this.scroll + this.pinned) this.scroll = Math.max(0, this.focus - this.pinned);
     if (this.focus >= this.scroll + this.rows) this.scroll = this.focus - this.rows + 1;
     this.scroll = Math.min(maxScroll, Math.max(0, this.scroll));
   }

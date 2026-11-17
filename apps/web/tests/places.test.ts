@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
 import { FLY_HEIGHT, FlyBody, createIntent } from "@fly/body";
+import { TABLE_PLACES } from "@fly/net";
 import { Pantry, TOUCH, World, createSurface, inside, topHeight } from "@fly/world";
 import { CameraDirector, WALLPAPER } from "../src/camera.ts";
 import { PLACES, nextPlace } from "../src/places/catalog.ts";
@@ -18,6 +19,7 @@ import { TIMES } from "../src/scene/light.ts";
 const STANDABLE = Math.cos((65 * Math.PI) / 180);
 
 test("every place in the catalog has a scene of the same id, and they take turns round all of them", () => {
+  assert.deepEqual([...TABLE_PLACES].sort(), PLACES.map(p => p.id).sort(), "online rooms can visit every catalogued place");
   for (const info of PLACES) assert.equal(SCENES[info.id].id, info.id);
   let id: PlaceId = PLACES[0].id;
   const seen = new Set<string>();

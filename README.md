@@ -232,6 +232,25 @@ in mist the houses fade to ghosts; in the rain it falls across the garden,
 drops bead on the pane and run down it, and it stays streaked as it dries.
 There are no bubbles or fireflies indoors.
 
+The greenhouse is a weathered wooden potting bench behind rain-streaked glass,
+with a garden beyond its green glazing bars. Filled terracotta pots hold solid
+leafy crowns, and a twelve-cell seed tray sits beside an old green watering can.
+A trowel, flat plant labels, coiled string and scattered soil keep their human
+scale beside the 2.5 mm fly. Fallen overripe tomatoes and an opened fig provide
+food on their surfaces and in a little juice on the wood; the water in a
+terracotta saucer responds with rings to the fly's feet and a roof leak. The
+fly is set down on the fig's flesh, so the shared close views begin among its
+seeds rather than on an empty part of the bench. The
+leak starts only during quiet rainy spells, at a fixed point on the roof, and reaches
+the fly through touch alone. Glazing bars lay moving shadows over the grain;
+the wood darkens when damp, rain beads and runs down the panes, and condensation
+clouds their lower edges at dawn. Storms send faster runoff down the glass and
+lightning brightens it; snow and sleet frost the glazing bars while flakes fall
+in the garden beyond. Weather reaches 70% of its light. The garden
+backdrop is shared with the windowsill; there are no bubbles, and fireflies
+appear at dusk. Plant crowns are solid approximations, with leaf veins drawn
+in their surfaces rather than air beneath individual leaves.
+
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
 wiring was traced: a stereo microscope with a fly pad on its stage (its base
 and pillar are solid; a fly can land on it), a rack of plugged vials with
@@ -887,11 +906,12 @@ each segment. Sense organs are small clusters: the bristles' sockets where
 the model's bristles are, the femoral chordotonal organs, the campaniform
 sensilla on the legs and at the bases of the wings and halteres.
 
-**Where each region is drawn** (`apps/web/src/nerves/regions.ts`). The 62
-placed regions each light their own anatomy. The remaining `unplaced` group
-mixes neurons whose annotations do not establish a location; its rate is
-retained but lights nothing. The connective's midline stays as unlit
-anatomical context, rather than locating those neurons in the neck.
+**Where each region is drawn** (`apps/web/src/nerves/regions.ts`). The 61
+placed regions each light their own anatomy. The `unplaced` group mixes
+neurons whose annotations do not establish a location; `head-sensory-other`
+has no recorded organ. Their rates are retained but light nothing. The
+connective's midline and pharyngeal nerves stay as unlit anatomical context,
+rather than assigning those neurons to an unsupported location or organ.
 Every lit part belongs to exactly one region or command group (a test holds it).
 Where several regions share a place in
 the fly, each is drawn as what is its own there: motor neurons as their
@@ -906,7 +926,8 @@ fill them.
 | optic lobe, other · visual projection · visual centrifugal | the inner chiasm's fibres · the optic tracts into the central brain · fibres back out |
 | antennal lobe, mushroom body, superior protocerebrum, lateral horn, ventrolateral (with the optic tubercle), inferior and ventromedial, subesophageal (each side); central complex | their neuropils; the mushroom body as calyx, peduncle and lobes; the central complex as bridge, fan-shaped body, ellipsoid body, noduli |
 | central brain, other | the rind of cell bodies round the central brain, drawn as an edge (that is where those neurons' cell bodies are) |
-| smell · Johnston's organ · head bristles · mouthparts · head sensory, other | the third antennal segment and its strand of the antennal nerve · the second segment's organ and its strand to the AMMC · the head's bristle sockets · the labellum, the pharynx's taste organs and the labial nerves' sensory axons · the pharyngeal nerves |
+| smell · Johnston's organ · head bristles · mouthparts | the third antennal segment and its strand of the antennal nerve · the second segment's organ and its strand to the AMMC · the head's bristle sockets · the labellum, the pharynx's taste organs and the labial nerves' sensory axons |
+| head sensory, other | organ unknown; no activity assigned to a specific organ |
 | head motor · neuroendocrine | the labial nerves' motor axons · the pars intercerebralis, its nerve to the corpora cardiaca, the frontal ganglion |
 | descending · ascending (each side) | tracts from the brain down the neck and along the cord's top · from the cord's floor up into the brain |
 | unplaced | not assigned an anatomical location; no activity drawn |

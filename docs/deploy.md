@@ -1,9 +1,10 @@
 # Self-hosting Flies
 
 The web image builds the web game and serves only `dist/` with Caddy. Node
-runs during its build, never in the web container; the room server for
-tables with others is a second, small Node service (below). Both `linux/amd64` and
-`linux/arm64` are supported. Nothing is deployed by the repository itself.
+runs during its build, never in the running web container; the room server for
+tables with others is a second, small Node service (below). Both `linux/amd64`
+and `linux/arm64` are supported. The repository does not deploy this web stack
+automatically.
 
 There are two ways to run it. [Coolify](#coolify) builds and runs
 `compose.yaml` behind its Traefik, for production and for each pull request.
@@ -18,7 +19,7 @@ that way.
 
 Coolify v4 with its default Traefik proxy.
 
-1. **New resource**: your private repository through Coolify's GitHub App
+1. **New resource**: your repository through Coolify's GitHub App
    (its webhooks are what start previews), branch `main`, build pack
    **Docker Compose**, Docker Compose location `/compose.yaml`. Leave **Raw
    Docker Compose Deployment** off: Coolify then names each preview's
@@ -28,8 +29,8 @@ Coolify v4 with its default Traefik proxy.
    port 80, which `expose` tells Coolify, so the domain needs no `:80`. Give
    `rooms` no domain: `web` proxies `/rooms` to it.
 3. **Advanced**: turn **Gzip compression** off. Caddy already compresses what is
-   worth it, and Traefik would gzip the brain's parts again, which are gzip
-   files already, without their lengths or byte ranges. Leave **Connect to
+   worth it. Keep Traefik from compressing the brain parts again: they are
+   slices of gzip streams and need intact lengths and byte ranges. Leave **Connect to
    Predefined Network** off and container names Coolify's own: on the shared
    `coolify` network, `rooms` could name another application's container.
 4. **Environment variables**: none are needed. Coolify supplies
@@ -46,11 +47,12 @@ Coolify v4 with its default Traefik proxy.
    entry file to itself on `127.0.0.1:8080/healthz`, and `rooms` answers
    `/health` on its port.
 
-Traefik passes the WebSocket upgrades on `/rooms` without settings, and its
-idle limits don't close a table: the room server pings every connection each
-15 s. Its tables are in the volume Coolify names `<uuid>_rooms-data`
-(Persistent Storage). Keep it across deploys, and don't tick volume deletion
-if you delete the resource.
+Traefik normally passes WebSocket upgrades on `/rooms` without extra settings.
+The room server pings every connection each 15 s; confirm your proxy's
+timeouts allow long sessions. Its tables are in the volume mounted at
+`/data` by `rooms`. Find its actual name in Coolify's Persistent Storage and
+confirm it with `docker volume ls` on the server. Keep it across deploys,
+and don't tick volume deletion if you delete the resource.
 
 If Cloudflare reaches the server over plain HTTP (a tunnel to port 80, or
 Flexible SSL), enter the domain as `http://…` so that Traefik doesn't
@@ -62,19 +64,23 @@ Turn on **Preview Deployments** in the resource's settings, with a URL
 template under a wildcard DNS name, such as `{{pr_id}}.flies.example.com`.
 Each pull request's preview gets its own build at its own address (baked in
 as its `SERVICE_URL_WEB`), its own containers and network, and its own empty
-rooms volume, `<uuid>_rooms-data-pr-<n>`. Coolify renames a preview's
-services `<name>-pr-<n>`, and its `web` reaches `rooms-pr-<n>`, read from
-`COOLIFY_BRANCH` (the Caddyfile), never production's rooms. Closing the pull
-request removes the preview's containers but leaves that volume; remove it
-with `docker volume rm <uuid>_rooms-data-pr-<n>`.
+rooms volume. In current Coolify, isolated previews keep their Compose service names and also expose
+`<name>-pr-<n>` aliases; shared-network previews rename the services. This
+repository's Caddyfile reads `COOLIFY_BRANCH` to reach `rooms-pr-<n>`.
+See [Coolify's preview naming rules](https://coolify.io/docs/applications/deployments/preview-deployments#docker-compose-preview-names).
+Check cleanup on your installed version after closing a pull request. If
+its unused preview volume remains, remove it with
+`docker volume rm <preview-volume-name>` after confirming its name with
+`docker volume ls` and confirming that no preview needs it. Never remove production's volume.
 
 ## First start
 
 Flies sits behind your own reverse proxy, which terminates HTTPS for
-`flies.isaacthoman.com`. Use a Linux server with Docker Engine, the Compose
-v2 plugin and Git installed. Caddy in the web container answers plain HTTP,
-for any host name, on `HTTP_PORT` (8080 unless set, so it can share a host
-with a proxy on 80 and 443), which `compose.override.yaml` publishes.
+`flies.isaacthoman.com`. Use a Linux server with Docker Engine, the Compose v2
+plugin and Git installed. Caddy in the web container answers plain HTTP for
+any host name on port 80. `compose.override.yaml` publishes it at the host
+binding `HTTP_PORT` (8080 unless set, so it can share a host with a proxy on
+80 and 443).
 
 ```sh
 git clone --branch main https://github.com/IsaacThoman/flies.git
@@ -85,10 +91,11 @@ cp .env.example .env
 docker compose up -d --build --wait
 ```
 
-Private repository access uses your own Git credentials. `.env` is ignored
-by Git and excluded from the image. `FLY_SITE_URL` is optional and supplies
-absolute social-preview URLs at build time. `HTTP_PORT` may name an address
-too: `127.0.0.1:8080` keeps the port to a proxy on the same host.
+If repository access requires authentication, use your own Git credentials.
+`.env` is ignored by Git and excluded from the image. `FLY_SITE_URL` is
+optional and supplies absolute social-preview URLs at build time. `HTTP_PORT`
+may name an address too: `127.0.0.1:8080` keeps the port to a proxy on the
+same host.
 
 ### Your reverse proxy
 
@@ -100,8 +107,8 @@ Point it at `http://<server>:8080/` (or your `HTTP_PORT`). It must:
 - set `X-Forwarded-For` and `X-Forwarded-Proto`.
 
 The site must reach visitors over `https://`: the service worker and the
-Cache API, which keep the game and its 14 MB brain for later visits, work
-only in a secure context. Plain HTTP is enough on `localhost` alone.
+Cache API, which keep the game and brain for later visits, require
+a secure context. Plain HTTP on `localhost` works for local checks.
 
 It must also pass on each visitor's address: see
 [visitors' addresses](#visitors-addresses).
@@ -153,28 +160,32 @@ the web container has no volumes. A server that ran an older stack, with
 its own certificates, can remove them after the update:
 `docker volume rm flies_caddy_data flies_caddy_config`.
 
-Plan for 2 GiB RAM and 4 GiB free disk for Node, npm and Docker's build
-cache, plus room for a rollback image. Serving needs far less: the site is
-about 17 MB, and the fly's simulation runs in each visitor's browser. A
-small server is sufficient; budget bandwidth for about 14.2 MB per first
-brain download. No database is needed.
+The earlier planning allowance was 2 GiB RAM and 4 GiB free disk for Node, npm
+and Docker's build cache, plus room for a rollback image. Earlier size
+estimates were about 17 MB for the site and 14.2 MB per first brain download;
+the capture date, machine and build revision are unknown. Check the current
+build's sizes before budgeting storage or bandwidth. The fly's simulation runs
+in each visitor's browser. No database is needed.
 
 ## Visitors' addresses
 
-The room server limits password guesses and new rooms by address, so it
-must see each visitor's own. Caddy believes `X-Forwarded-For` only from
-`TRUSTED_PROXIES` (Caddy's [`trusted_proxies`](https://caddyserver.com/docs/caddyfile/options#trusted-proxies)
+The room server limits password guesses and new rooms by address, so it must
+see each visitor's own. Caddy believes `X-Forwarded-For` only from
+`TRUSTED_PROXIES` (Caddy's
+[`trusted_proxies`](https://caddyserver.com/docs/caddyfile/options#trusted-proxies)
 ranges: `private_ranges` unless set). It reads the header from the right, so
-a visitor cannot claim another address, and hands the rooms service just the
-visitor's. Without the right setting, every visitor counts as the proxy, and
-one person's guesses lock everyone out. The rooms service in turn believes
-the header only from a loopback or private address, Caddy's on the stack's
-own network, and takes its last entry, so nothing that reaches it directly
-can choose what it is counted as.
+with correctly configured trusted proxies it can identify the visitor and hand
+the rooms service that address. Without the right setting, every visitor
+counts as the proxy, and one person's guesses can exhaust their shared
+password-guess budget. The rooms service in turn believes the header from
+loopback, private, link-local or carrier-grade NAT peers, and takes its last
+valid address. It does not authenticate that peer as Caddy. Keep `rooms`
+reachable only by trusted services: a direct caller from those ranges can
+supply its own forwarded address.
 
-- **Coolify**: Traefik reaches `web` over a Docker network, inside
-  `private_ranges`, and replaces any `X-Forwarded-For` a visitor sends with
-  the address it sees. Nothing to set.
+- **Coolify**: Traefik reaches `web` over a Docker network, normally inside
+  `private_ranges`. Confirm that Traefik supplies the visitor's address
+  and strips untrusted forwarded headers in your deployment.
 - **Your own proxy** on the same host, through Docker's bridge, or on the LAN
   is inside `private_ranges` too. If it reaches the server from a public
   address, set it, for example `TRUSTED_PROXIES=203.0.113.7/32`, with spaces
@@ -186,8 +197,9 @@ can choose what it is counted as.
   through Cloudflare, since anyone who reaches it directly could send that
   header.
 
-A visitor whose own address is private (on your LAN) is counted as the
-proxy.
+With the broad `private_ranges` trust setting, a LAN visitor's private
+address can be treated as another proxy hop. Use narrower trusted proxy
+ranges if LAN visitors must have separate rate limits.
 
 ## Updates and rollback
 
@@ -199,7 +211,7 @@ docker image tag flies-rooms:local flies-rooms:rollback
 git pull --ff-only && docker compose up -d --build --wait
 ```
 
-The second line is the update command. npm dependencies and the fetched brain
+The third line is the update command. npm dependencies and the fetched brain
 are separate cached layers, so ordinary game edits do not download them
 again. The brain layer includes `packages/brain/data/anatomy.bin`: its packer uses only npm
 dependencies, and both public downloads are hash checked. A failed download
@@ -261,35 +273,50 @@ and `/rooms/*` on the site's own origin, WebSocket upgrades included, to
 through your proxy. It counts visitors by the address Caddy passes on in
 `X-Forwarded-For` (`TRUST_PROXY=1`; see [visitors' addresses](#visitors-addresses)). It
 has no public port, and no `depends_on`: the site works while it is down
-(only `/rooms` answers 502 then).
+(`/rooms` and `/rooms/*` fail while its upstream is unavailable).
 
 ```sh
 docker compose ps                    # rooms should be healthy too
 docker compose logs --tail=100 rooms # one JSON line an event
-docker compose exec rooms wget -qO- http://127.0.0.1:3000/health
+docker compose exec rooms sh -c 'wget -qO- "http://127.0.0.1:$PORT/health"'
 ```
 
-It keeps its tables in the `rooms_data` volume (`/data/tables.json`), written
-every 30 s and when it stops: each room with its name, whether it is listed,
-and, for a locked one, a salted scrypt hash of its password (never the
-password; nor does the log ever have one). Tables kept by an older server
-are read as they are, unlisted and without a password. A new protocol (3,
-for rooms) reaches open tabs as a refusal they answer by reloading into the
-new site, once. The rooms open to everyone, which every device now sits in
-by default, need nothing set: the server opens Everyone as it starts and keeps
-it in the same file; they came within protocol 3, so open tabs and the apps
-already installed keep working across the update. Rolling the rooms back past it forgets nothing, but an older
-server would let anyone with a locked room's link in. An update restarts it with SIGTERM: it writes
-the tables, tells every connected device it is restarting, and the devices
-reconnect to their tables within a couple of seconds. Keep `rooms_data`, and
-do not run `docker compose down -v` on the server: deleting it forgets every table and every invitation. The
-only optional setting is `ROOMS_PORT`, the internal port, which Caddy and the
-service both read. Browsing the list of rooms uses the same `/rooms`
-WebSocket, so nothing about the proxy changes for it. Memory and CPU are
-small: it relays about 1 KB/s up and 7 KB/s down per player at a table of
-eight. Rolling back works as for the site: tag `flies-rooms:local` as `flies-rooms:rollback` before an update.
-The iPhone and iPad app reaches the same `wss://flies.isaacthoman.com/rooms`
-(docs/ios.md, "Tables with others").
+It keeps its tables in the `rooms_data` volume (`/data/tables.json`), saved
+when changed on a 30 s timer, and force-saved when it stops: each room with
+its name, whether it is listed, and, for a locked one, a salted scrypt hash of
+its password (never the password; nor does the log ever have one). Older
+records without listing or password fields load as unlisted and without a
+password. The current protocol is 5. Browser tabs can reload on a version
+refusal when session storage is available. If the same protocol comes back,
+reloads are retried with a delay starting at 30 s and doubling up to 30
+minutes. Without session storage, reload manually; bundled native apps need an
+app update. Rooms open to everyone were added within protocol 3, but later
+protocol changes still require compatible clients.
+
+Rolling the server back to before protocol 3 can discard names, listing flags
+and password hashes on its next save, and compatible older clients can enter
+by link without a password. Back up the volume before a downgrade. Older
+servers may also reject current multi-fly seat records entirely and omit those
+tables on their next save.
+
+An update stops the server with SIGTERM: it attempts to save the tables, then
+tells connected devices it is restarting. Active clients schedule their first
+reconnect attempt after 0.3–1.5 seconds of client update time; recovery also
+depends on server and network readiness.
+
+Keep `rooms_data`, and do not run `docker compose down -v` on the server:
+deleting it loses saved table state and player-created invitations. The
+built-in rooms open to everyone are recreated. Set `ROOMS_PORT` to change the
+internal port; Caddy and the service both read it. Other optional stack
+settings are listed in `.env.example`. Browsing the list of rooms uses the
+same `/rooms` WebSocket, so nothing about the proxy changes for it.
+
+Earlier traffic estimates were about 1 KB/s up and 7 KB/s down per player at a
+table of eight; the capture date, machine and workload are unknown. Actual
+traffic depends on activity and protocol overhead. Rolling back works as for
+the site: tag `flies-rooms:local` as `flies-rooms:rollback` before an update.
+By default the iPhone and iPad app reaches the same
+`wss://flies.isaacthoman.com/rooms` (docs/ios.md, "Tables with others").
 
 ## Privacy publication
 
@@ -309,8 +336,10 @@ To publish the policy, set **all four** public build variables in Coolify
 | `FLIES_SUPPORT_URL` | An HTTPS support page people can use. |
 | `FLIES_MARKETING_URL` | An HTTPS page describing the app. |
 
-Missing or blank values leave the policy unpublished. A complete configuration
-with placeholder values, an invalid email, or non-HTTPS URLs stops the build.
+Missing or blank values leave the policy unpublished. After trimming values,
+the build rejects angle brackets and characters below U+0020, checks basic
+email syntax, and requires HTTPS URLs without credentials. These checks
+cannot recognise every placeholder; supply real owner details.
 The name/contact replace the draft markers; support/marketing become links
 on the policy. These values are public, not secrets. Runtime container
 variables cannot change an already-built page. Docker and Compose pass these
@@ -331,18 +360,17 @@ contents through `checkGenerated()`; builds then emit the same notice text.
 
 ## The iPhone and iPad app's links
 
-By default the build writes
-`/.well-known/apple-app-site-association`: the site's side of the app's
-Associated Domains. It says that a table's link (`/?table=<code>`, and nothing
-else on the site) opens the Flies app where it is installed, and that the
-site's passwords are the app's too, for AutoFill. It names the app as
+By default the build writes `/.well-known/apple-app-site-association`: the
+site's side of the app's Associated Domains. Its app-link rule matches the
+root path with a ten-character `table` query value. It does not validate the
+invitation-code alphabet or exclude other query parameters. It also declares
+the app for the site's password AutoFill. It names the app as
 `PX72AL9366.com.isaacthoman.flies`, using the Apple apps' default team from
 `scripts/appleConfig.ts`. No setting is needed for a normal Docker or Coolify
 deploy. To use another team, set `APPLE_TEAM_ID` (a build variable in Coolify,
-or in `.env`) and rebuild. The Team ID is on
-[the developer account](https://developer.apple.com/account) under
-Membership details: ten capital letters and digits. It is public, and appears
-in every signed app.
+or in `.env`) and rebuild. The Team ID is on [the developer
+account](https://developer.apple.com/account) under Membership details: ten
+capital letters and digits. It is public, and appears in every signed app.
 
 ```sh
 docker compose up -d --build --wait
@@ -359,7 +387,7 @@ publish an association that names nobody. Unset or blank uses the default team.
 The fallback is inside the build script, so Coolify's build arguments cannot
 bypass it. Apple's devices fetch the file
 through Apple's CDN, which can take hours to see a change. The app's own side
-is enabled by default in TestFlight releases, with Associated Domains already
+is enabled by default in TestFlight releases; confirm Associated Domains is
 enabled on the App ID (docs/ios.md, "On a device, and in TestFlight"). Set the
 repository variable `IOS_LINKS=0` to omit the entitlement from releases.
 
