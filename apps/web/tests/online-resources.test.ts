@@ -100,10 +100,14 @@ test("a room removal cancels a remote offering still falling so it cannot reappe
 test("online clears wait for the room: rejected falling food still lands; accepted falling food never returns", async () => {
   const { Online } = await import("../src/online/online.ts");
   const { Hands } = await import("../src/tools/hands.ts");
-  const { FlyBody, Crowd } = await import("@fly/body");
+  const { Life } = await import("../src/life.ts");
+  const { Company } = await import("../src/company.ts");
   const { Table } = await import("../../server/src/table.ts");
   const world = new World(WORLDS.picnic);
-  const body = new FlyBody(world, world.place.start);
+  const brain = (): import("@fly/contracts").BrainDriver => ({ status: "running", error: null, neurons: 0, connections: 0, eyes: null, regionRates: new Float32Array(), state: null, stateAt: 0, tick() {}, dispose() {} });
+  const life = new Life(world, brain());
+  const company = new Company(world, brain);
+  const body = life.body;
   const hands = new Hands(world);
   const clock = { now: 1000 };
   const table = new Table("23456789ab", { place: "picnic", light: "noon", weather: "clear", zone: "", offset: 0 }, "player-key", 7, { now: () => clock.now, wall: () => clock.now });
@@ -119,14 +123,16 @@ test("online clears wait for the room: rejected falling food still lands; accept
     drain(text) { for (const m of inbox.splice(0)) text(m); },
     close() {},
   };
+  const scene = new THREE.Scene();
   const host = {
-    scene: new THREE.Scene(), life: { world, body, crowd: new Crowd(world), share() {} }, hands,
+    scene, life, company, others: new OtherFlies(scene, world), hands, felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] },
     stage: { weather: { rain: 0 }, set: {} }, fly: { model: { mark() {} } }, eyes: { see() {} }, bubbles: {},
+    flies: () => 1, seat() {}, share: (p: import("@fly/world").Pantry) => life.share(p),
     here: () => "picnic", moving: () => false, onWorld() {}, moveTo() {},
   } as unknown as import("../src/online/online.ts").TableHost;
   const online = new Online(host, () => socket, "ws://test", "23456789ab", "player-key", null);
   const camera = new THREE.PerspectiveCamera();
-  const update = () => online.update(0, camera, 480, 0, () => 0);
+  const update = () => online.update(0, camera, 0, () => 0);
   update();
   update();
   assert.ok(online.joined);

@@ -86,7 +86,7 @@ type House = { x: number; width: number; height: number; wall: string; roof: str
 
 export function buildBackdrop(light: Daylight): SceneBackdrop {
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(light.haze.getHex(), 20_000, 260_000);
+  scene.fog = new THREE.Fog(light.haze.getHex(), 7000, 110_000);
   scene.matrixWorldAutoUpdate = true;
   const rnd = random(41);
 
@@ -347,16 +347,27 @@ export function buildBackdrop(light: Daylight): SceneBackdrop {
   swayMaterial.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = sway;
     shader.uniforms.uBreeze = breeze;
-    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nuniform float uTime;\nuniform float uBreeze;\nattribute float give;").replace(
+    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nuniform float uTime;\nuniform float uBreeze;\nattribute float give;\nvarying vec3 vWorld;").replace(
       "#include <begin_vertex>",
       /* glsl */ `#include <begin_vertex>
 {
+  vWorld = position;
   float t = uTime;
   float gust = (0.6 + 0.4 * sin(t * 0.31) * sin(t * 0.17 + 1.0)) * uBreeze;
   transformed.x += give * (sin(t * 1.3 + position.x * 0.0004 + position.y * 0.0003) * 0.6 + sin(t * 2.7 + position.z * 0.001) * 0.25) * gust;
   transformed.z += give * sin(t * 1.1 + position.x * 0.0005) * 0.5 * gust;
 }`,
     );
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>\nvarying vec3 vWorld;\n${NOISE}`)
+      .replace("#include <color_fragment>", /* glsl */ `#include <color_fragment>
+// A crown reads as overlapping clusters, with smaller leaves catching the sky.
+float foliage = step(diffuseColor.r * 1.25, diffuseColor.g) * step(diffuseColor.b * 1.4, diffuseColor.g);
+float cluster = vnoise3(vWorld * 0.005);
+float leaves = vnoise3(vWorld * 0.025);
+float leafDetail = 1.0 - smoothstep(0.5, 2.0, length(fwidth(vWorld)) * 0.025);
+diffuseColor.rgb *= mix(1.0, mix(0.68, 1.2, cluster) * mix(1.0, mix(0.8, 1.12, leaves), leafDetail), foliage);
+`);
   };
   swayMaterial.customProgramCacheKey = () => "windowsill-sway";
   const swaying = new Batch();
@@ -381,13 +392,14 @@ export function buildBackdrop(light: Daylight): SceneBackdrop {
       swayed(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(crown, crown.clone().lerp(end, 0.5).add(new THREE.Vector3(0, 300, 0)), end), 5, 70, 5), "#6e5440", fromTrunk);
     }
     const leaves = [new THREE.Color("#4f9a3c"), new THREE.Color("#63b048"), new THREE.Color("#3f8432"), new THREE.Color("#77c055")];
-    for (let i = 0; i < 26; i++) {
+    const leafTint = new THREE.Color();
+    for (let i = 0; i < 48; i++) {
       const a = rnd.range(0, Math.PI * 2);
       const r = Math.sqrt(rnd.next()) * 1700;
       const at = crown.clone().add(new THREE.Vector3(Math.cos(a) * r, rnd.range(-200, 1300) - r * 0.25, Math.sin(a) * r * 0.8));
-      const s = rnd.range(650, 1050);
+      const s = rnd.range(420, 720);
       const color = leaves[i % 4];
-      swayed(new THREE.IcosahedronGeometry(s, 1).translate(at.x, at.y, at.z), (p) => color.clone().multiplyScalar(0.8 + 0.3 * Math.max(0, (p.y - at.y) / s)), fromTrunk);
+      swayed(new THREE.IcosahedronGeometry(s, 1).translate(at.x, at.y, at.z), (p) => leafTint.copy(color).multiplyScalar(0.8 + 0.3 * Math.max(0, (p.y - at.y) / s)), fromTrunk);
     }
     for (let i = 0; i < 30; i++) {
       const a = rnd.range(0, Math.PI * 2);
@@ -577,8 +589,8 @@ void main() {
       // Rain and mist close the distance in: in mist the houses are ghosts, and the hills gone.
       const fog = scene.fog as THREE.Fog;
       fog.color.copy(daylight.haze).lerp(skyUniforms.veil.value, weather.mist * 0.7);
-      fog.near = THREE.MathUtils.lerp(THREE.MathUtils.lerp(20_000, 8000, weather.rain), 2500, weather.mist);
-      fog.far = THREE.MathUtils.lerp(THREE.MathUtils.lerp(260_000, 90_000, weather.rain), 20_000, weather.mist);
+      fog.near = THREE.MathUtils.lerp(THREE.MathUtils.lerp(7000, 4000, weather.rain), 2500, weather.mist);
+      fog.far = THREE.MathUtils.lerp(THREE.MathUtils.lerp(110_000, 55_000, weather.rain), 20_000, weather.mist);
       // Lights come on as it gets dark, and on a grey day a few already.
       nightUniform.value = Math.min(1, daylight.stars * 1.4 + weather.cloud * 0.3);
       sway.value = time;

@@ -7,7 +7,7 @@
 
 import type * as THREE from "three";
 import {
-  ABDOMEN, ABDOMINAL_SEGMENTS, EYE, HALTERE, HEAD, J, LEG_COUNT, LEG_SEGMENTS, LEGS, PIVOT, PROBOSCIS,
+  ABDOMEN, ABDOMINAL_SEGMENTS, ANTENNA, EYE, HALTERE, HEAD, J, LEG_COUNT, LEG_SEGMENTS, LEGS, PIVOT, PROBOSCIS,
   SCUTELLUM, THORAX, legPair,
 } from "./anatomy.ts";
 import type { Vec3 } from "./anatomy.ts";
@@ -332,7 +332,7 @@ export function buildBody(): THREE.BufferGeometry {
 
 function antenna(b: MeshBuilder, mirror: boolean) {
   const joint = J.antenna + (mirror ? 1 : 0);
-  const ellipsoid = (centre: number[], axis: number[], len: number, w: number, th: number, color: Rgb, mat: Mat, nu = 8, nv = 5) => {
+  const ellipsoid = (centre: readonly number[], axis: readonly number[], len: number, w: number, th: number, color: Rgb, mat: Mat, nu = 8, nv = 5) => {
     const x = unit(axis), side = unit(cross(x, [0, 0, 1])), up = cross(side, x);
     b.surface({
       joint, pivot: [0, 0, 0], nu, nv, mat, color: () => color, mirror,
@@ -344,13 +344,13 @@ function antenna(b: MeshBuilder, mirror: boolean) {
   };
   // Scape and pedicel, then the large oval third segment hanging in front of the face.
   ellipsoid([0, 0, 0], [0.2, -0.3, 0.9], 0.01, 0.01, 0.01, C.pedicel, M.head);
-  const pedicelAxis = unit([0.25, -0.55, 0.8]);
+  const pedicelAxis = ANTENNA.pedicelAxis;
   const pedicel = scale(pedicelAxis, 0.014);
   ellipsoid(pedicel, pedicelAxis, 0.013, 0.011, 0.011, C.pedicel, M.head);
-  const funAxis = unit([0.15, -0.9, 0.38]);
+  const funAxis = ANTENNA.funiculusAxis;
   const funBase = scale(pedicelAxis, 0.024);
-  const fun = add(funBase, scale(funAxis, 0.026));
-  ellipsoid(fun, funAxis, 0.029, 0.016, 0.011, C.funiculus, M.soft, 12, 8);
+  const fun = ANTENNA.centre;
+  ellipsoid(fun, funAxis, ANTENNA.length, ANTENNA.width, ANTENNA.thickness, C.funiculus, M.soft, 12, 8);
 
   // The arista: a feathery bristle from the top of the third segment, with branches above and below.
   const root = add(funBase, add(scale(funAxis, 0.008), [0.01, 0, 0.005]));
@@ -392,7 +392,7 @@ function proboscis(b: MeshBuilder) {
       point: (u, v, out) => {
         const [sx, sy, sz] = sphere(u, v);
         const l = PROBOSCIS.labellum / 2;
-        out[0] = l + l * sz; out[1] = 0.015 * sy; out[2] = side * 0.013 + 0.015 * sx;
+        out[0] = l + l * sz; out[1] = PROBOSCIS.padDepth * sy; out[2] = side * 0.013 + 0.015 * sx;
       },
     });
   }
@@ -415,6 +415,14 @@ function addLeg(b: MeshBuilder, leg: number) {
   seg(1, spec.femur, (t) => fr * (0.75 + 0.3 * smooth(0, 0.25, t) - 0.3 * smooth(0.35, 1, t)), C.femur, 8);
   seg(2, spec.tibia, (t) => tr * (0.8 + 0.25 * smooth(0, 0.85, t)), C.tibia, 6);
   seg(3, spec.basitarsus, (t) => 0.0078 - 0.001 * t, (t) => (pair === 0 ? mix(C.tarsus, C.comb, 0.55 * smooth(0.15, 0.25, t) * smooth(0.5, 0.4, t)) : C.tarsus), 4, 6);
+  // Male sex combs carry stout teeth arranged along the basitarsus.
+  // Kopp 2011 doi:10.1111/j.1525-142X.2011.00507.x: ~10 teeth on tarsomere 1.
+  if (pair === 0) {
+    for (let tooth = 0; tooth < 10; tooth++) {
+      const x = spec.basitarsus * (0.24 + 0.025 * tooth);
+      bristle(b, base + 3, [x, -0.005, 0.005], [0.25, -0.8, 0.55], 0.013, 0.0015, [0.3, 0, 0], false);
+    }
+  }
   // Tarsomeres 2–5 with their joints, then the claws and pads.
   seg(4, spec.tarsus, (t) => 0.0066 - 0.0018 * t + 0.0009 * Math.cos(t * 4 * TAU), (t) => mix(C.tarsus, C.claw, smooth(0.7, 1, t) * 0.4), 12, 6);
   const tip = spec.tarsus;

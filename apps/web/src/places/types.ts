@@ -6,7 +6,7 @@
 import type * as THREE from "three";
 import type { Looming } from "@fly/body";
 import type { Food, Pantry, Place, Vec3, World } from "@fly/world";
-import type { Shot } from "../camera.ts";
+import type { Shot } from "../cameraman.ts";
 import type { Daylight, Palettes } from "../scene/light.ts";
 import type { Weather } from "../scene/weather.ts";
 import type { PlaceId } from "./catalog.ts";
@@ -40,6 +40,13 @@ export type SceneSet = {
    */
   live?(dt: number, around: Around): void;
   /**
+   * What the place's goings-on do this frame to another fly this device
+   * lives, at `at` (after `live`): left in `felt`, as `live` leaves in
+   * `around.felt` what reaches the one the player follows. Optional: a place
+   * without it does nothing to them.
+   */
+  feel?(dt: number, at: Readonly<Vec3>, felt: Felt): void;
+  /**
    * At a table with others the table says when a goings-on happens, and each
    * device starts it from the same random stream (`random`), so all see the
    * same visit; the place's own pace is off (`Around.shared`). Optional.
@@ -66,11 +73,19 @@ export type Around = {
   readonly quiet: boolean;
   /** Cleared by the game each frame, filled in by the place. */
   readonly felt: Felt;
-  /** At a table with others (apps/web/src/online): the other flies there, as this device sees them, and the one every device plans visits round. */
+  /** Where the other flies this device lives are (apps/web/src/company.ts), alone or at a table. */
+  readonly company: readonly Readonly<Vec3>[];
+  /** At a table with others (apps/web/src/online): the other players' flies there, as this device sees them, and the one every device plans visits round. */
   readonly shared: SharedTable | null;
 };
 
-export type SharedTable = { readonly others: readonly Readonly<Vec3>[]; readonly anchor: Readonly<Vec3> };
+/**
+ * The others at a table, and the fly the table's visits are planned round.
+ * `ownSky`: in a room open to everyone each device keeps its own light and
+ * weather, so a visit the table sends that doesn't suit this device's sky
+ * (a butterfly in its rain, a gull in its night) doesn't come here.
+ */
+export type SharedTable = { readonly others: readonly Readonly<Vec3>[]; readonly anchor: Readonly<Vec3>; ownSky: boolean };
 
 /** What the place does to the fly this frame, all through its senses. */
 export type Felt = {

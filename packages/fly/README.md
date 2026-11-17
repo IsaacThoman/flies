@@ -15,7 +15,7 @@ node --test packages/fly/tests/update.budget.ts   # its speed, alone
 ## Anatomy, and what each part is made of
 
 Units are body lengths (front of the head to the tip of the abdomen, about
-2.4 mm in a male). The fly stands on y = 0, faces +z, +x is its left. The
+2.5 mm in a male). The fly stands on y = 0, faces +z, +x is its left. The
 measurements are in `src/anatomy.ts`; the shapes and colours in `src/body.ts`.
 
 | Part | Built from |
@@ -24,11 +24,11 @@ measurements are in `src/anatomy.ts`; the shapes and colours in `src/body.ts`.
 | Compound eyes | Ellipsoid caps sunk into the sides of the head, deep brick red. The fragment shader draws a hexagonal lattice of about 900 facets, each a small dome that catches the light, and the **pseudopupil**: the dark spot where you look straight down the ommatidia, which follows the viewer across the eye. Both fade out by their screen-space derivatives once facets are smaller than a pixel, so the eye never shimmers. |
 | Ocelli | Three glossy amber domes in a triangle on a dark ocellar triangle on the vertex. |
 | Antennae | Scape, pedicel and the oval third segment hanging in front of the face, and the **arista**: a fine plumose bristle from the top of the third segment with branches above and below. Each antenna is a joint that twitches. |
-| Proboscis | Rostrum, haustellum and the two-lobed labellum with its food channels, each a joint. Folded up under the head at rest; extended it reaches the surface just in front of the head (the haustellum telescopes as far as it needs to), the lobes spread flat on the food and pulse. |
+| Proboscis | Rostrum, haustellum and the two-lobed labellum with its food channels, each a joint. Folded up under the head at rest; extended it reaches the surface just in front of the head through a fixed-length two-link reach, and the lobes spread flat on the food. |
 | Thorax | A deformed ellipsoid: broad blunt shoulders, the scutum arching up behind the neck, flatter sternum. Tan, darker above, paler pleura, faint dorsocentral stripes. The **microchaetae** (the rows of tiny hairs) are a procedural pattern that fades out when small; the **macrochaetae** are real geometry: humerals, notopleurals, supra- and post-alars, dorsocentrals, katepisternals. |
 | Scutellum | A flattened lobe over the base of the abdomen with its basal bristles and the long crossing apical scutellars. |
 | Abdomen | Six visible segments (a male), each tergite ridged where it overlaps the next and dark along its back edge, A5 and A6 dark all over; pale pleural membrane and sternites underneath. Two joints, so it breathes, lifts in flight and bows when feeding. |
-| Legs | Six, each coxa, femur (with the trochanter as a collar), tibia (with its preapical bristle), basitarsus and tarsomeres 2–5 ending in two claws and two pale pulvilli: five joints a leg. The coxae cluster under the thorax in the real arrangement, the front pair long and close together behind the head. The male's sex comb is a dark mark on the front basitarsus. |
+| Legs | Six, each coxa, femur (with the trochanter as a collar), tibia (with its preapical bristle), basitarsus and tarsomeres 2–5 ending in two claws and two pale pulvilli: five joints a leg. The coxae cluster under the thorax in the real arrangement, the front pair long and close together behind the head. The male's sex comb has ten stout teeth along the front basitarsus. |
 | Wings | Flat blades in the Drosophila outline (with the alula), venation painted into a 256×128 mipmapped `DataTexture`: costa, subcosta, L1–L6, anterior and posterior crossveins, a faint smoky membrane and a thin-film sheen (three's iridescence). Folded flat over the abdomen at rest, one over the other. |
 | Halteres | Pale knobs on short stalks behind the wings, which buzz with them. |
 | Bristles | Thin black cones curving back over the body. When a bristle gets thinner than about a third of a pixel it shrinks back to its root rather than being drawn as a broken line, so a small fly is not furred with flickering hairs. |
@@ -75,18 +75,24 @@ fills (a float a part), and `xray`, 0 to 1.
 smoothed first (first-order lags and rate limits), so any pose, however
 jumpy, gives continuous motion.
 
-- **Walking** (`src/gait.ts`). The alternating tripod: L1 R2 L3 then R1 L2
-  R3, with a small metachronal lag that lifts the hind leg of each tripod
-  just before the front one. A global phase advancing at the step frequency
-  decides when each leg lifts; stride length grows with speed (0.22 to 0.5
-  body lengths) and the swing stays short (30–100 ms) while the stance
-  varies, as in insects. Planted feet are carried backwards by exactly the
-  motion the pose says the body makes, so if the game moves the fly by
-  `speed` and `turn` they do not slide (the tests check this to 1e-9 at
-  several speeds, turning and backwards). A swinging foot lands where the
-  coming stance will be centred on its home; turning shortens the inside
-  steps by itself, and walking backwards lands feet behind home. A fly that
-  stops takes a few settling steps back to its homes and stands still.
+- **Walking** (`src/gait.ts`). A continuous speed-dependent phase spread
+  gives wave-like support when slow, tetrapod-like overlaps between, and
+  alternating tripods at speed. The stance advances each planted foot by the
+  pose's translation and yaw, including turning and backing; swing targets
+  centre the next stance around home. Stance travel is ~0.85–0.95 mm,
+  with a 22–35 ms recovery. This approximates the published stance-duration
+  scaling; it is not a replay or a fitted neural locomotor circuit. Contact
+  transitions are resolved within each display frame, so a complete recovery
+  between samples still starts the next stance at the right instant.
+  `node packages/fly/scripts/gait.ts` extracts contacts at 1 kHz, prints duty
+  factors, relative lift phases, stance travel and support counts, and compares
+  stance duration to DeAngelis et al.'s equation 1. Add `--fps 30` or
+  `--fps 60` to exercise the display update rate; liftoff/touchdown timestamps
+  preserve sub-frame timing while support occupancy is sampled. The numerical timing and
+  phase spread are animation choices informed by Mendes et al. (2013),
+  Wosnitza et al. (2013) and DeAngelis et al. (2019); those experiments differ
+  in substrate, temperature, sex and sampling, so the table is a dimensional
+  comparison rather than a claim of a universal gait.
 - **Legs** (`src/leg.ts`). The tarsus is laid along the ground back from the
   claw, the coxa turns partly toward it, and femur and tibia close the gap
   as a two-bone chain with the knee up and out. Each knee remembers its
@@ -97,15 +103,24 @@ jumpy, gives continuous motion.
   twitch, and now and then a foot shifts. This is animation, not behaviour:
   it never moves the fly, and it fades out whenever the pose asks for
   anything.
-- **Grooming**: the front legs leave the ground for the head and alternate
-  between sweeping over the eyes (top-back to the face, the head bowing and
-  rolling into each sweep) and rubbing against each other under the face.
-  Faster and wider as `groom` rises. The middle and hind legs step forward
-  to carry the fly on four. A fly that is feeding keeps its front legs down:
-  if the pose asks for both, feeding wins (the head is bowed to the food).
-- **Feeding**: the body lowers and the head bows, the proboscis unfolds to
-  the surface and its labellum spreads and pulses; the mouth anchor is on
-  the surface.
+- **Grooming**: a sustained command starts with foreleg rubbing, then eye
+  and antennal sweeps. The hind legs subsequently sweep the abdomen, folded
+  wings, and rub together. The opposite pair stays planted during each stage.
+  The sequence crossfades through six-foot support and repeats every 12 s.
+  Targets follow the posed eye, antenna, abdominal and wing surfaces, including
+  breathing and crop swelling. The thorax shifts toward supporting pairs.
+  Command strength controls vigour, while active strokes still reach the skin.
+  Seeds et al. (2014) motivates anterior-to-posterior ordering and interleaved
+  leg rubbing. The command has no dirt level or cleaning-site selection:
+  the clock and site targets are explicitly an animation stand-in, not a
+  simulated suppression hierarchy. Feeding takes precedence; walking and
+  flight suspend the sequence.
+- **Feeding**: the body lowers and the head bows. Rostrum lift, haustellum
+  extension, labellar extension and spreading use overlapping windows, in
+  that order (Schwarz et al. 2017), reversing on withdrawal. It unfolds to
+  the surface using a fixed-length two-link reach. Flat labellar pads remain
+  seated as the head breathes; internal intake pumping does not stretch the
+  stem. The mouth anchor sits on the pads' ventral surface.
 - **Wings**: opening sweeps them out from the folded position; beating
   spreads eight copies of each wing across the stroke (cosine-spaced, so
   denser at the stroke reversals where a real wing lingers) with a
@@ -117,8 +132,13 @@ jumpy, gives continuous motion.
   and raises the wings a little. When `airborne` turns on the legs stay
   extended for a moment as if pushing off, then fold (front legs under the
   head, the others trailing). In the air the body takes `pitch` and `roll`
-  and the stroke plane tilts. When `airborne` turns off the legs reach back
-  out to their homes and the body dips as they take its weight.
+  and the stroke plane tilts. `landing` extends them during approach while the wings keep beating. The
+  game's pose maps descending trajectory and height over the body's last
+  support plane to this amount;
+  it is a time-to-contact animation proxy, not optic-flow sensing or a command
+  to the physics (van Breugel & Dickinson 2012). Approaches to a different
+  height can therefore extend late; the pose adds no world sensing. Without an approach value,
+  `airborne` turning off extends them; the body dips as they take its weight.
 
 ## Why it is animated this way
 
@@ -140,6 +160,10 @@ follows the number of objects and draw calls. So:
   costs thousands of vertices of JavaScript. Here the per-frame JavaScript
   is a few hundred multiplies on typed arrays, and there is no scene-graph
   node per joint.
+- **Invisible wing copies reuse the solid copy's frame.** When blur opacity
+  is below 0.00001, the seven imperceptible copies on each side need no
+  independent posing; their alpha is zero. This pays for sub-frame contact
+  integration without adding a mesh or joint.
 - **Nothing allocated per frame.** All scratch is preallocated; the tests
   run the update in V8 with its compilers off and check that it allocates
   nothing but the boxed numbers V8's interpreter makes (JSC does not box
@@ -160,7 +184,7 @@ follows the number of objects and draw calls. So:
 | | |
 | --- | --- |
 | Draw calls | 2 (plus 1 each in any shadow pass); the X-ray 1 more |
-| Triangles | about 14,900 (body 14,400, wings 530); the nervous system about 16,100 |
+| Triangles | about 15,400 (body 14,900, wings 530); the nervous system about 16,100 |
 | Joints | 41 body joints (thorax, head, 2 antennae, 3 proboscis, 2 abdomen, 2 halteres, 30 leg segments) and 16 wing copies |
 | `update` | about 2.4 µs in Node with its JIT, about 78 µs in V8's interpreter alone (the nearest Node gets to the TV) |
 | Textures | one 256×128 RGBA `DataTexture` (wing venation) |
@@ -186,11 +210,11 @@ and show only some meshes on a plain background (`only`, `background`).
 
 Right, or close: the three tagmata and their proportions, the big red eyes
 with facets and a pseudopupil, three ocelli, antennae with a plumose arista,
-the proboscis and its extension, coxae arranged as in the fly, five-part legs
+the proboscis and its staged fixed-length extension, coxae arranged as in the fly, five-part legs
 with claws and pulvilli, the wing outline and its vein pattern, folded flat
 one over the other, halteres, the main thoracic and head macrochaetae, the
-male's banded abdomen with a dark tip and his sex combs, the tripod gait with
-short swings and a metachronal lag, feet that stay planted.
+male's banded abdomen with a dark tip and his sex combs, the speed-dependent coordination with
+short swings and metachronal phase spread, feet that stay planted.
 
 Simplified: tarsomeres 2–5 are one rigid piece; the trochanter is part of
 the femur; the coxae swing but do not twist; the eye is an ellipsoid cap and
@@ -206,8 +230,20 @@ groom path is a stylised sweep.
 - Shade the thorax with its sutures and sclerites (notopleural and
   transverse sutures, the humeral calli) and add hairs to the legs.
 - Model the tarsus as four bending segments that roll onto the ground.
-- Grooming of the wings and abdomen with the hind legs, and of the front
-  legs by each other in more varied bouts.
-- Tune the walking to measured Drosophila kinematics (step amplitude and
-  timing per leg pair, body yaw oscillation) rather than by eye.
+- Fit per-leg trajectories to a shared male walking dataset, including
+  curved walks and backing, beyond the dimensional stance comparison.
 - A female variant (pointed, striped abdomen, no sex combs).
+
+## Movement references
+
+- Mendes et al. (2013), [Quantification of gait parameters](https://doi.org/10.7554/eLife.00231).
+- Wosnitza et al. (2013), [Inter-leg coordination in the control of walking speed](https://doi.org/10.1242/jeb.078139).
+- DeAngelis et al. (2019), [The manifold structure of limb coordination](https://doi.org/10.7554/eLife.46409).
+- Seeds et al. (2014), [A suppression hierarchy among competing motor programs](https://doi.org/10.7554/eLife.02951).
+- van Breugel & Dickinson (2012), [The visual control of landing](https://doi.org/10.1242/jeb.066498).
+- Kopp (2011), [Drosophila sex combs as a model of evolutionary innovations](https://doi.org/10.1111/j.1525-142X.2011.00507.x).
+- Schwarz et al. (2017), [Motor control of Drosophila feeding behavior](https://doi.org/10.7554/eLife.19892).
+
+See `docs/fly-realism.md` for the experiment rubric, measurements and blind review log.
+
+<!-- docs-check: base packages/fly/src/nerves -->

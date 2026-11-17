@@ -1,7 +1,7 @@
 // Draws a Menu (packages/ui) as a column of glossy rows: actions as jelly
 // buttons (with, for a room, its place's colour, its flies as pips and a
-// padlock), choices with their value between chevrons (or, as tabs, all their
-// options side by side), sliders as glossy tracks, fields as what is typed
+// padlock), choices with their value between chevrons (a count as dots of
+// colour; or, as tabs, all their options side by side), sliders as glossy tracks, fields as what is typed
 // in them, with a caret while it is. The soap-bubble ring
 // glides to the focused row, for the remote, a keyboard and a pad; for a
 // mouse or a finger there is no ring, and what the mouse is over only
@@ -222,14 +222,14 @@ function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: n
   }
 }
 
-/** An action's jelly button, with whatever marks it: its swatch at the left, its pips and padlock at the right, its words between them. */
+/** An action's jelly button, with whatever marks it: its swatch at the left, its pips and padlock (or globe) at the right, its words between them. */
 function drawAction(g: CanvasRenderingContext2D, item: ActionItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, press: number, size?: number) {
   const mid = y + h / 2 - (focused ? 2 : 0) + press * 2;
-  const marks = item.count || item.locked;
+  const marks = item.count || item.locked || item.everyone;
   // Clear of the marks on both sides, the words centred, smaller if they must be.
   let words = size;
   if (marks) {
-    const room = w - 2 * (h * 0.4 + PIPS.width + (item.locked ? h * 0.5 : 0));
+    const room = w - 2 * (h * 0.4 + PIPS.width + (item.locked || item.everyone ? h * 0.5 : 0));
     const most = size ?? Math.round(h * 0.46);
     g.font = font(most);
     words = Math.max(8, Math.min(most, Math.floor((most * room) / Math.max(1, g.measureText(item.label).width))));
@@ -241,7 +241,8 @@ function drawAction(g: CanvasRenderingContext2D, item: ActionItem, x: number, y:
     text(g, item.hint, x + w / 2, mid + 12, focused ? ACTION_HINT_FOCUSED : ACTION_HINT);
     if (item.disabled) g.globalAlpha /= 0.45;
   }
-  if (item.swatch) swatch(g, x + h * 0.62, mid, h * 0.22, item.swatch);
+  if (typeof item.swatch === "string") swatch(g, x + h * 0.62, mid, h * 0.22, item.swatch);
+  else if (item.swatch) for (const [i, colour] of item.swatch.entries()) swatch(g, x + h * (0.62 + i * 0.5), mid, h * 0.2, colour);
   if (!marks) return;
   const ink = focused ? "#ffffff" : INK;
   let right = x + w - h * 0.4;
@@ -254,6 +255,24 @@ function drawAction(g: CanvasRenderingContext2D, item: ActionItem, x: number, y:
     right -= PIPS.width + h * 0.18;
   }
   if (item.locked) padlock(g, right - h * 0.16, mid, h * 0.3, ink, item.disabled);
+  else if (item.everyone) globe(g, right - h * 0.16, mid, h * 0.3, ink, item.disabled);
+}
+
+/** A room open to everyone: a globe, its equator and a meridian. */
+function globe(g: CanvasRenderingContext2D, x: number, y: number, s: number, ink: string, disabled = false) {
+  const r = s * 0.48;
+  g.save();
+  if (disabled) g.globalAlpha *= 0.45;
+  g.strokeStyle = ink;
+  g.lineWidth = Math.max(1.2, s * 0.11);
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  g.moveTo(x - r, y);
+  g.lineTo(x + r, y);
+  g.moveTo(x, y - r);
+  g.ellipse(x, y, r * 0.45, r, 0, -Math.PI / 2, Math.PI * 1.5);
+  g.stroke();
+  g.restore();
 }
 
 /** How many of how many, as two rows of small dots: those there filled. */
@@ -375,7 +394,8 @@ function drawItem(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: num
     const vx = right - 96;
     chevron(g, vx - 64, mid, -1, item.index > 0);
     chevron(g, right - 10, mid, 1, item.index < item.options.length - 1);
-    text(g, label, (vx - 64 + right - 10) / 2, mid, { size: Math.round(h * 0.38), color: focused ? "#0a6fc0" : INK, align: "center", baseline: "middle" });
+    if (item.dots) dots(g, item, (vx - 64 + right - 10) / 2, mid, h);
+    else text(g, label, (vx - 64 + right - 10) / 2, mid, { size: Math.round(h * 0.38), color: focused ? "#0a6fc0" : INK, align: "center", baseline: "middle" });
     hits.add(MENU_HITS.step, vx - 64 - 20, y, 44, h, index, -1, item.id);
     hits.add(MENU_HITS.step, right - 32, y, 44, h, index, 1, item.id);
   } else {
@@ -384,6 +404,15 @@ function drawItem(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: num
     text(g, String(Math.round(item.value)), right, mid, { size: Math.round(h * 0.36), color: INK, align: "right", baseline: "middle" });
     hits.add(MENU_HITS.track, track.x - 14, y, track.w + 28, h, index, 0, item.id);
   }
+}
+
+/** A choice's value as so many dots of its colours, centred on (x, y), for a row `h` tall. */
+function dots(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: number, h: number) {
+  const colours = item.dots!;
+  const n = Math.max(0, Math.round(Number(item.options[item.index].value)));
+  const r = h * 0.17;
+  const step = h * 0.5;
+  for (let i = 0; i < n; i++) swatch(g, x + (i - (n - 1) / 2) * step, y, r, colours[i % colours.length]);
 }
 
 /** A dot of colour, ringed so that a pale one shows on the glass. */
@@ -413,7 +442,8 @@ function drawStacked(g: CanvasRenderingContext2D, item: MenuItem, x: number, y: 
   if (item.kind === "choice") {
     chevron(g, x + 26, low, -1, item.index > 0);
     chevron(g, x + w - 26, low, 1, item.index < item.options.length - 1);
-    text(g, item.options[item.index].label, x + w / 2, low, { size: Math.round(h * 0.3), color: focused ? "#0a6fc0" : INK, align: "center", baseline: "middle" });
+    if (item.dots) dots(g, item, x + w / 2, low, h * 0.8);
+    else text(g, item.options[item.index].label, x + w / 2, low, { size: Math.round(h * 0.3), color: focused ? "#0a6fc0" : INK, align: "center", baseline: "middle" });
     hits.add(MENU_HITS.step, x, y, 56, h, index, -1, item.id);
     hits.add(MENU_HITS.step, x + w - 56, y, 56, h, index, 1, item.id);
   } else {

@@ -144,7 +144,7 @@ test("a table's line over the host's socket: hello, welcome, a drop while the ap
   host.line(0).status = NATIVE_SOCKET_OPEN;
   line.update(0.016);
   assert.equal(JSON.parse(host.line(0).sent[0] as string).type, "hello");
-  const welcome: ServerMessage = { type: "welcome", v: PROTOCOL, id: 1, colour: "#fff", starter: 1, seed: 1, now: 1000, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0, 0], room: { name: "Flies", listed: false, locked: false } };
+  const welcome: ServerMessage = { type: "welcome", v: PROTOCOL, id: 1, colour: "#fff", flies: [{ id: 1, colour: "#fff", at: [0, 0, 0, 0] }], starter: 1, seed: 1, now: 1000, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0, 0], room: { name: "Flies", listed: false, locked: false } };
   host.line(0).inbox.push(JSON.stringify(welcome), flies(2));
   let heard = 0;
   line.onFlies = () => heard++;
