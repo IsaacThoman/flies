@@ -276,7 +276,7 @@ async function fingers() {
     });
     await waitForGameTime(page, 0.5);
     assert.equal(await newestFood(), foodBeforeRotation, "the rotated release dropped no food");
-    assert.equal(await game<boolean>(page, "g.director.hand.held"), false, "the camera is released too");
+    assert.equal(await game<boolean>(page, "g.director.held"), false, "the camera is released too");
 
     step("fingers: the wallpaper comes, and a tap brings the controls back and does nothing else");
     await game(page, "(g.settings.wallpaperAfter = 2)");
