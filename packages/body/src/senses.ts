@@ -109,7 +109,7 @@ type EyeState = { value: number; hold: number };
 export type Tasting = { food: Food | null; byMouth: boolean };
 
 export class SenseTracker {
-  readonly senses: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0, wingbeat: 0 };
+  readonly senses: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0, wingbeat: 0, bitter: 0, water: 0 };
   readonly tasting: Tasting = { food: null, byMouth: false };
   /** How large each looming thing was in the eye last frame (rad), by id. */
   #sizes = new Map<number, number>();
@@ -185,6 +185,8 @@ export class SenseTracker {
     tasting.food = null;
     tasting.byMouth = false;
     let sweet = 0;
+    let water = 0;
+    let bitter = 0;
     if (body.onFeet) {
       const mouth = body.point(MOUTH_AHEAD, MOUTH_UP, 0, this.#probe);
       const reach = MOUTH_REACH + PROBOSCIS_REACH * clamp01(input.proboscis);
@@ -194,6 +196,8 @@ export class SenseTracker {
       tasting.food = atMouth ?? underfoot;
       tasting.byMouth = atMouth !== null;
       sweet = Math.max(atMouth ? tasteIntensity(atMouth) : 0, underfoot ? tasteIntensity(underfoot) : 0);
+      water = Math.max(atMouth ? tasteIntensity(atMouth, "water") : 0, underfoot ? tasteIntensity(underfoot, "water") : 0);
+      bitter = Math.max(atMouth ? tasteIntensity(atMouth, "bitter") : 0, underfoot ? tasteIntensity(underfoot, "bitter") : 0);
     }
 
     out.loomLeft = clamp01(this.#eyes.left.value);
@@ -207,6 +211,8 @@ export class SenseTracker {
     out.maleTaste = clamp01(this.#maleTaste);
     // Its own wings, as they beat in its last step: their strain sensors feel each stroke.
     out.wingbeat = clamp01(body.wingbeat);
+    out.bitter = clamp01(bitter);
+    out.water = clamp01(water);
     return out;
   }
 

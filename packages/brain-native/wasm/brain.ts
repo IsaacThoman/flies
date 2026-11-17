@@ -32,14 +32,16 @@ type Exports = {
 const MAX_TICK_MS = 1000;
 const ERROR_BYTES = 512;
 // fly_brain.h's structs as wasm32 lays them out: fly_senses is seven floats, an int, two pointers, three floats (maleTaste,
-// hunger, wingbeat) and five floats of internal state; fly_command eight floats; fly_stats two doubles and two uint32s.
-const SENSES_BYTES = 72;
+// hunger, wingbeat), five floats of internal state and two more (bitter, water); fly_command eight floats; fly_stats two
+// doubles and two uint32s.
+const SENSES_BYTES = 80;
 const COMMAND_BYTES = 32;
 const STATS_BYTES = 24;
 const SCALARS = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet"] as const;
 /** fly_senses's clock and sleep, after wingbeat. */
 const STATE = ["clockMorning", "clockEvening", "clockSleep", "sleepPressure", "sleepDepth"] as const;
 const STATE_AT = 52;
+const BITTER_AT = 72;
 
 const utf8 = new TextDecoder();
 
@@ -182,6 +184,8 @@ class WasmBrain implements Brain {
     // Left out, hunger is 1: the brain as it was before it had one.
     view.setFloat32(s + 44, senses.hunger ?? 1, true);
     view.setFloat32(s + 48, senses.wingbeat, true);
+    view.setFloat32(s + BITTER_AT, senses.bitter, true);
+    view.setFloat32(s + BITTER_AT + 4, senses.water, true);
     const failed = e.fly_brain_tick(this.#brain, dtMs, s, this.#command, this.#stats, this.#rates, this.#error, ERROR_BYTES);
     // The tick may have grown the memory, which leaves the old views empty.
     this.#views();

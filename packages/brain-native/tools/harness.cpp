@@ -4,7 +4,7 @@
 //
 //   fly-brain-harness brain <connectome.bin> <seed> [--light <frames>] [--columns <columns>]
 //     ticks from stdin, one per line:
-//       <dt, f64 bits> <loomLeft> <loomRight> <touch> <bumpLeft> <bumpRight> <wind> <sweet> <maleTaste> <wingbeat>  (f32 bits)  <grounded 0|1>
+//       <dt, f64 bits> <loomLeft> <loomRight> <touch> <bumpLeft> <bumpRight> <wind> <sweet> <maleTaste> <wingbeat> <bitter> <water>  (f32 bits)  <grounded 0|1>
 //       <clockMorning> <clockEvening> <clockSleep> <sleepPressure> <sleepDepth>  (f32 bits)  [<light> [<hunger>]]
 //     where <light> is - (the eyes shut) or <left>,<right>, each the index of a frame in the frames file or x for an eye left out,
 //     and <hunger> f32 bits (1 when left out).
@@ -209,11 +209,11 @@ int brain(const char* path, uint32_t seed, const Options& options) {
   uint32_t tick = 0;
   while (std::getline(std::cin, line)) {
     std::istringstream in(line);
-    std::string dt, v[9], s[5], light = "-", hunger = "3f800000";
+    std::string dt, v[11], s[5], light = "-", hunger = "3f800000";
     int grounded = 0;
-    in >> dt >> v[0] >> v[1] >> v[2] >> v[3] >> v[4] >> v[5] >> v[6] >> v[7] >> v[8] >> grounded >> s[0] >> s[1] >> s[2] >> s[3] >> s[4] >> light >> hunger;
-    fly_senses senses{f32(v[0]), f32(v[1]), f32(v[2]), f32(v[3]), f32(v[4]), f32(v[5]), f32(v[6]), grounded, nullptr, nullptr,
-                      f32(v[7]),  f32(hunger), f32(v[8]), f32(s[0]), f32(s[1]),  f32(s[2]),  f32(s[3]), f32(s[4])};
+    in >> dt >> v[0] >> v[1] >> v[2] >> v[3] >> v[4] >> v[5] >> v[6] >> v[7] >> v[8] >> v[9] >> v[10] >> grounded >> s[0] >> s[1] >> s[2] >> s[3] >> s[4] >> light >> hunger;
+    fly_senses senses{f32(v[0]), f32(v[1]), f32(v[2]), f32(v[3]), f32(v[4]),  f32(v[5]), f32(v[6]), grounded, nullptr,   nullptr,  f32(v[7]),
+                      f32(hunger), f32(v[8]), f32(s[0]), f32(s[1]), f32(s[2]), f32(s[3]), f32(s[4]), f32(v[9]), f32(v[10])};
     fly_command command;
     fly_stats stats;
     int failed;

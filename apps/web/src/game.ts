@@ -2125,7 +2125,7 @@ export class Game implements Shell {
     d.tool = this.hands.current.id;
     d.variant = this.hands.variant.id;
     d.pointer = this.hands.following ? "following" : "free";
-    d.senses = `loom ${s.loomLeft.toFixed(2)}/${s.loomRight.toFixed(2)} touch ${s.touch.toFixed(2)} bump ${s.bumpLeft.toFixed(2)}/${s.bumpRight.toFixed(2)} wind ${s.wind.toFixed(2)} sweet ${s.sweet.toFixed(2)} grounded ${s.grounded ? 1 : 0} male ${s.maleTaste.toFixed(2)}`;
+    d.senses = `loom ${s.loomLeft.toFixed(2)}/${s.loomRight.toFixed(2)} touch ${s.touch.toFixed(2)} bump ${s.bumpLeft.toFixed(2)}/${s.bumpRight.toFixed(2)} wind ${s.wind.toFixed(2)} sweet ${s.sweet.toFixed(2)} grounded ${s.grounded ? 1 : 0} male ${s.maleTaste.toFixed(2)} bitter ${s.bitter.toFixed(2)} water ${s.water.toFixed(2)}`;
     d.loom = Math.max(s.loomLeft, s.loomRight).toFixed(3);
     d.touch = s.touch.toFixed(3);
     d.wind = s.wind.toFixed(3);

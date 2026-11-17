@@ -77,12 +77,24 @@ const LOOMING: NeuronQuery = { type: ["LPLC2", "LC4"] };
 // grooming too, but answers neither a push nor vibration (what it senses is
 // unknown, Hampel et al. 2020).
 const ANTENNA: NeuronQuery = { superClass: "cb_sensory", type: /^JO-[CE]/ };
-// Nothing in the data says which taste neurons are sweet-sensing. These were
-// chosen by what they do in this model: built greedily from the head's taste
-// neuron types, each added for raising the proboscis motor neuron MN9's rate
-// most (README; `probe.ts --superClass cb_sensory --class gustatory --each type
-// --target MN9 --greedy`).
-export const SWEET_TYPES = ["dorsal_tpGRN", "LB3d", "PhG9", "LB3c", "LB2a", "LB4a", "LB3b", "PhG1c", "PhG3"];
+// The mouth's taste neurons, by what they are. Tastekin et al. (2026, Cell,
+// the gustatory connectome of the male CNS and FlyWire) typed every taste
+// neuron of the labellum, its taste pegs and the pharynx and matched each
+// type's projections to receptor GAL4 lines; FlyWire's annotations carry the
+// labellar types' putative tastes from them (release 3.2.0, cell_sub_class).
+// Each sense drives every type of the mouth matched to that taste's receptors
+// (`scripts/taste.ts` checks the types against FlyEM's annotations). The
+// legs' and wings' taste neurons aren't driven: the body tastes with its
+// mouthparts (README, Senses).
+// Sugar: the labellar bristles' LB3b and LB3c (Gr64f), the dorsal taste pegs'
+// (Gr5a) and the pharynx's PhG1 (Gr64e).
+export const SWEET_TYPES = ["LB3b", "LB3c", "dorsal_tpGRN", "PhG1a", "PhG1b", "PhG1c"];
+// Bitter: LB1a to LB1d (Gr33a). LB1e, once counted bitter, is Ir94e's.
+export const BITTER_TYPES = ["LB1a", "LB1b", "LB1c", "LB1d"];
+// Water: the labellar bristles' LB3a and the pharynx's PhG3 and PhG4 (ppk28).
+export const WATER_TYPES = ["LB3a", "PhG3", "PhG4"];
+/** The mouth's taste neurons of these types. */
+const mouthTaste = (types: readonly string[]): NeuronQuery => ({ superClass: "cb_sensory", class: "gustatory", type: [...types] });
 
 // The front legs' taste neurons that answer a male's cuticle. A male's
 // forelegs carry pheromone-sensing taste neurons: in each of their
@@ -168,8 +180,8 @@ export const SENSES: readonly SenseSpec[] = [
   {
     sense: "sweet",
     name: "sweet",
-    description: `Head taste neurons ${SWEET_TYPES.join(", ")}`,
-    select: { superClass: "cb_sensory", class: "gustatory", type: SWEET_TYPES },
+    description: `The mouth's sugar-sensing taste neurons: ${SWEET_TYPES.join(", ")}`,
+    select: mouthTaste(SWEET_TYPES),
     maxRate: 100,
   },
   {
@@ -198,6 +210,9 @@ export const SENSES: readonly SenseSpec[] = [
     maxRate: WINGBEAT_RATE,
     afterEyes: true,
   },
+  // The round rate of the other hard-driven sensory neurons, as `sweet`'s.
+  { sense: "bitter", name: "bitter", description: `The mouth's bitter-sensing taste neurons: ${BITTER_TYPES.join(", ")}`, select: mouthTaste(BITTER_TYPES), maxRate: 100, afterEyes: true },
+  { sense: "water", name: "water", description: `The mouth's water-sensing taste neurons: ${WATER_TYPES.join(", ")}`, select: mouthTaste(WATER_TYPES), maxRate: 100, afterEyes: true },
 ];
 
 /**
@@ -339,9 +354,14 @@ export function decode(rates: Readonly<Record<string, number>>): BrainCommand {
  * calcium at most synapses, so if anything this understates it. Between the
  * two the gain is linear in hunger, a round assumption.
  *
- * At 1 the brain is what it was before it had a hunger. That is a hungry
- * fly: the sweet neurons were chosen for driving the proboscis to extend
- * (Senses), as starved flies' do in the assays that found them.
+ * Inagaki et al. measured it in the labellum's Gr5a sugar neurons; the taste
+ * pegs' and the pharynx's sugar neurons get the same gain, an assumption.
+ *
+ * At 1 the brain is what it was before it had a hunger: the synapses'
+ * weights stand for a starved fly's, as in the proboscis extension assays,
+ * which starve flies first. Which end of the range the weights stand for is
+ * a choice the data can't make; it was made when the sweet neurons were
+ * still chosen by what they do, and is kept.
  */
 export const HUNGER = { sated: 1 / 1.4 } as const;
 

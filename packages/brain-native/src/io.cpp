@@ -52,13 +52,13 @@ const NeuronQuery kLooming = query({{kType, one_of({"LPLC2", "LC4"})}});
 const NeuronQuery kAntenna = query({{kSuperClass, is("cb_sensory")},
                                     {kType, [](std::string_view s) { return s.size() > 3 && s.starts_with("JO-") && (s[3] == 'C' || s[3] == 'E'); }}});
 
-// Nothing in the data says which taste neurons are sweet-sensing. These were
-// chosen by what they do in this model: built greedily from the head's taste
-// neuron types, each added for raising the proboscis motor neuron MN9's rate
-// most (packages/brain/README.md; `probe.ts --superClass cb_sensory --class
-// gustatory --each type --target MN9 --greedy`).
-Condition sweet_types() { return one_of({"dorsal_tpGRN", "LB3d", "PhG9", "LB3c", "LB2a", "LB4a", "LB3b", "PhG1c", "PhG3"}); }
-constexpr const char* kSweetDescription = "Head taste neurons dorsal_tpGRN, LB3d, PhG9, LB3c, LB2a, LB4a, LB3b, PhG1c, PhG3";
+// The mouth's taste neurons, by what they are: every type of the labellum,
+// its taste pegs and the pharynx matched to that taste's receptors (io.ts's
+// SWEET_TYPES, BITTER_TYPES and WATER_TYPES say whose matches and why).
+NeuronQuery mouth_taste(Condition types) { return query({{kSuperClass, is("cb_sensory")}, {kClass, is("gustatory")}, {kType, std::move(types)}}); }
+constexpr const char* kSweetDescription = "The mouth's sugar-sensing taste neurons: LB3b, LB3c, dorsal_tpGRN, PhG1a, PhG1b, PhG1c";
+constexpr const char* kBitterDescription = "The mouth's bitter-sensing taste neurons: LB1a, LB1b, LB1c, LB1d";
+constexpr const char* kWaterDescription = "The mouth's water-sensing taste neurons: LB3a, PhG3, PhG4";
 
 // The front legs' taste neurons that answer a male's cuticle: LgLG1a (ppk23
 // M cells) and LgAG1 (Gr32a/Gr33a) of the front legs, by root ID (io.ts's
@@ -104,7 +104,7 @@ std::vector<InputSpec> senses() {
        kLeft, {}, false, true},
       {"wind", "Wind- and gravity-sensitive Johnston's organ neurons of both antennae", query({{kSuperClass, is("cb_sensory")}, {kSubClass, is("wind_gravity")}}),
        100, "", kWind, kLeft, {}, false, true},
-      {"sweet", kSweetDescription, query({{kSuperClass, is("cb_sensory")}, {kClass, is("gustatory")}, {kType, sweet_types()}}), 100, "", kSweet, kLeft},
+      {"sweet", kSweetDescription, mouth_taste(one_of({"LB3b", "LB3c", "dorsal_tpGRN", "PhG1a", "PhG1b", "PhG1c"})), 100, "", kSweet, kLeft},
       {"grounded", "Campaniform sensilla (load sensors) of the legs (SNpp53), firing tonically while standing",
        query({{kSubClass, is("campaniform_sensilla")}, {kType, is(kLegCampaniform)}}), 20, "", kGrounded, kLeft, {}, false, true},
       {"maleTaste", "Front legs' taste neurons for a male's pheromones: LgLG1a (ppk23 M cells) and LgAG1 (Gr32a/Gr33a)",
@@ -114,6 +114,8 @@ std::vector<InputSpec> senses() {
               {kSubClass, is("campaniform_sensilla")},
               {kType, [](std::string_view t) { return t != kLegCampaniform; }}}),
        kWingbeatRate, "", kWingbeat, kLeft, {}, true},
+      {"bitter", kBitterDescription, mouth_taste(one_of({"LB1a", "LB1b", "LB1c", "LB1d"})), 100, "", kBitter, kLeft, {}, true},
+      {"water", kWaterDescription, mouth_taste(one_of({"LB3a", "PhG3", "PhG4"})), 100, "", kWater, kLeft, {}, true},
   };
 }
 
@@ -232,6 +234,8 @@ double intensity(const Senses& s, Sense sense) {
     case kGrounded: return s.grounded ? 1 : 0;
     case kMaleTaste: return js::clamp(s.male_taste, 0, 1);
     case kWingbeat: return js::clamp(s.wingbeat, 0, 1);
+    case kBitter: return js::clamp(s.bitter, 0, 1);
+    case kWater: return js::clamp(s.water, 0, 1);
     case kSenseCount: break;
   }
   return 0;

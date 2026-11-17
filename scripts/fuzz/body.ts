@@ -270,7 +270,7 @@ export function fuzzBody(id: string, seed: number, duration: number, highStarts 
     if (time >= nextIntent) {
       intent = { ...createIntent(), live: true, speed: random() < 0.3 ? 0 : (random() * 2 - 0.65) * 16, yawRate: random() < 0.3 ? 0 : (random() * 2 - 1) * 3, airYawRate: (random() * 2 - 1) * 5, wings: random() < 0.4 ? 0 : random(), takeOff: random() < 0.16 ? random() : null, feeding: random() < 0.2, feed: random() };
       forces.air = { x: (random() * 2 - 1) * 600, y: (random() * 2 - 1) * 60, z: (random() * 2 - 1) * 600 };
-      forces.meal = intent.feeding ? { id: 0, kind: "honey", name: "fuzz meal", ...body.position, x: body.position.x + random() * 3, r: 1.6, sweet: 1, amount: 1, pool: false } : null;
+      forces.meal = intent.feeding ? { id: 0, kind: "honey", name: "fuzz meal", ...body.position, x: body.position.x + random() * 3, r: 1.6, sweet: 1, water: 0, bitter: 0, amount: 1, pool: false } : null;
       nextIntent = time + 0.05 + random() * 5;
     }
     const dt = Math.min(duration - time, random() < 0.025 ? 0.2 + random() * 1.8 : random() < 0.05 ? 0.00001 : 1 / (20 + random() * 120));

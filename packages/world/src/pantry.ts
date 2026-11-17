@@ -17,6 +17,10 @@ export type FoodPatch = {
   r: number;
   /** 0 to 1. */
   sweet: number;
+  /** Plain water, 0 to 1: what the water-sensing taste neurons answer (left out, 0). Sugar or salt in it takes that away. */
+  water?: number;
+  /** Bitter, 0 to 1 (left out, 0). */
+  bitter?: number;
   /** A pool of liquid: a fly walking or drinking in it sets rings spreading. */
   pool?: boolean;
 };
@@ -24,11 +28,11 @@ export type FoodPatch = {
 export type FoodKind = "sugar" | "honey" | "berry" | "water";
 
 /** What the player can drop, and how each tastes to a fly (0 to 1). */
-export const FOODS: Readonly<Record<FoodKind, { name: string; sweet: number; r: number }>> = {
-  sugar: { name: "Sugar", sweet: 1, r: 0.9 },
-  honey: { name: "Honey", sweet: 1, r: 1.6 },
-  berry: { name: "Raspberry", sweet: 0.8, r: 1.6 },
-  water: { name: "Water", sweet: 0, r: 1.5 },
+export const FOODS: Readonly<Record<FoodKind, { name: string; sweet: number; water: number; bitter: number; r: number }>> = {
+  sugar: { name: "Sugar", sweet: 1, water: 0, bitter: 0, r: 0.9 },
+  honey: { name: "Honey", sweet: 1, water: 0, bitter: 0, r: 1.6 },
+  berry: { name: "Raspberry", sweet: 0.8, water: 0, bitter: 0, r: 1.6 },
+  water: { name: "Water", sweet: 0, water: 1, bitter: 0, r: 1.5 },
 };
 
 export type Food = {
@@ -42,14 +46,30 @@ export type Food = {
   /** It can be tasted within this distance of (x, z), mm. */
   r: number;
   sweet: number;
+  water: number;
+  bitter: number;
   /** 1 when whole, 0 when eaten up. */
   amount: number;
   /** A pool of liquid (see FoodPatch). */
   pool: boolean;
 };
 
-/** The sweetness sent to the brain: it fades only over the last quarter of a food. */
-export const tasteIntensity = (food: Food): number => food.sweet * Math.min(1, food.amount * 4);
+/** A taste sent to the brain: it fades only over the last quarter of a food. */
+export const tasteIntensity = (food: Food, taste: "sweet" | "water" | "bitter" = "sweet"): number => food[taste] * Math.min(1, food.amount * 4);
+
+/**
+ * How a food the room describes tastes besides sweet, which isn't sent (the wire
+ * carries sweet alone): a patch as its place has it, a dropped kind as FOODS
+ * has it, anything found as nothing else.
+ */
+export function otherTastes(patches: readonly FoodPatch[], id: number, kind: string, name: string): { water: number; bitter: number } {
+  if (kind === "patch") {
+    const patch = patches[id - 1];
+    return patch?.name === name ? { water: patch.water ?? 0, bitter: patch.bitter ?? 0 } : { water: 0, bitter: 0 };
+  }
+  const spec = Object.hasOwn(FOODS, kind) ? FOODS[kind as FoodKind] : null;
+  return { water: spec?.water ?? 0, bitter: spec?.bitter ?? 0 };
+}
 
 /** Amount eaten per second at `feed` 1. A dropped food lasts about 6 s with `feed` near 0.5. */
 export const EAT_RATE = 0.33;
@@ -79,7 +99,7 @@ export class Pantry {
   reset(patches: readonly FoodPatch[]) {
     this.foods.length = 0;
     for (const p of patches) {
-      this.foods.push({ id: this.#next++, kind: "patch", name: p.name, x: p.x, y: this.#world.heightAt(p.x, p.z, p.y), z: p.z, r: p.r, sweet: p.sweet, amount: 1, pool: p.pool ?? false });
+      this.foods.push({ id: this.#next++, kind: "patch", name: p.name, x: p.x, y: this.#world.heightAt(p.x, p.z, p.y), z: p.z, r: p.r, sweet: p.sweet, water: p.water ?? 0, bitter: p.bitter ?? 0, amount: 1, pool: p.pool ?? false });
     }
   }
 
@@ -88,14 +108,14 @@ export class Pantry {
     const dropped = this.foods.filter(isDropped);
     if (dropped.length >= MAX_DROPPED) this.remove(dropped[0]);
     const spec = FOODS[kind];
-    const food: Food = { id: this.#next++, kind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, amount: 1, pool: false };
+    const food: Food = { id: this.#next++, kind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, water: spec.water, bitter: spec.bitter, amount: 1, pool: false };
     this.foods.push(food);
     return food;
   }
 
   /** Puts out something new to be found at a point on the world's surface, the one at or below `y` (it is the place's, not the player's). Returns it. */
   add(name: string, x: number, z: number, r: number, sweet: number, y?: number): Food {
-    const food: Food = { id: this.#next++, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, amount: 1, pool: false };
+    const food: Food = { id: this.#next++, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, water: 0, bitter: 0, amount: 1, pool: false };
     this.foods.push(food);
     return food;
   }

@@ -38,6 +38,8 @@ typedef struct fly_senses {
    * struct initialised without them leaves them, is a rested fly with no clock.
    */
   float clock_morning, clock_evening, clock_sleep, sleep_pressure, sleep_depth;
+  /** Something bitter, and plain water, on the mouthparts, 0 to 1 each; 0, as a struct initialised without them leaves them. */
+  float bitter, water;
 } fly_senses;
 
 /** What the brain wants done. All 0 to 1 except turn, which runs -1 (hard left) to 1 (hard right). */

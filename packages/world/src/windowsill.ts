@@ -270,7 +270,7 @@ export const SILL_PATCHES: readonly FoodPatch[] = [
   // A drip of juice run down the bottle and pooled on the sill.
   { name: "orange juice", x: JUICE_BOTTLE.x - 47, z: JUICE_BOTTLE.z + 32, r: 9, sweet: 0.6, pool: true },
   // Water standing in the basil's saucer, round the pot's foot on the side toward the bowl.
-  { name: "water", x: BASIL_POT.x + 57, z: BASIL_POT.z + 6, r: 2.6, sweet: 0, pool: true },
+  { name: "water", x: BASIL_POT.x + 57, z: BASIL_POT.z + 6, r: 2.6, sweet: 0, water: 1, pool: true },
   { name: "spilt sugar", x: 38, z: 66, r: 4, sweet: 1 },
 ];
 

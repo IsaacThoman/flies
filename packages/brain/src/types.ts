@@ -49,6 +49,10 @@ export type BrainSenses = {
    * what the wings' and halteres' strain sensors feel of each stroke.
    */
   wingbeat: number;
+  /** Something bitter on the mouthparts. */
+  bitter: number;
+  /** Water on the mouthparts: plain water, not a sugary or salty liquid. */
+  water: number;
   /*
    * Internal state, not senses: the fly's daily clock and its need for
    * sleep, which the connectome can't supply (the clock is molecular and its
@@ -162,4 +166,6 @@ export const RESTING_SENSES: BrainSenses = {
   grounded: true,
   maleTaste: 0,
   wingbeat: 0,
+  bitter: 0,
+  water: 0,
 };

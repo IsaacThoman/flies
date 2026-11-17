@@ -2,14 +2,14 @@
   "toolchain": "wasi-sdk 34.0",
   "sources": {
     "wasm.sh": "d9af30248e51ae533d608616fb103d90c638b2f0ce5bcaea0ef6b99c79d8d898",
-    "include/fly_brain.h": "7d647f7a337fcce87d9f319a68f9ea39f4959abcacccf80b82a971aab82173fb",
+    "include/fly_brain.h": "e119936122364c14403b50e63d3cc130430afbf74fcd177f0ab8ac75f6e9f1b4",
     "src/brain.cpp": "bf47d8af8adbd0d0d1459f19a27f3be4532bf493597fedf090af801579216f66",
     "src/connectome.cpp": "6cb7a6695b97cc7c73b939cbdebf7375d7814cc8ca7253ac206fe2a2ee3a5e2e",
     "src/eye_columns.cpp": "1b9f42e5ee735d25298c21b74177626eec263b8dde73db12d80e4538253fce70",
     "src/eyes.cpp": "c0bdef0c06c810eaba378c3a08ec09a999b6501210ccfbe9ecd250addc59588a",
     "src/fdlibm.cpp": "4420beeefa36941b85190d5dfa9fb59fa32dda57bef99e34162da6472c02aac6",
-    "src/fly_brain.cpp": "5fb5ea82a25a603c81f11ffb37cca716d3328230d9cfb81d77ffb504b56129ee",
-    "src/io.cpp": "937515a1f25dd92382fdd508c8832c8585aef37a696cab90f67882e026a1f958",
+    "src/fly_brain.cpp": "24d20f7d790be0da372b0bf12dad27a1f12c38bc0a31bdfa632e48f9d3a2d059",
+    "src/io.cpp": "4d676d7b57c9a1a9fdeb1329ebb8b959001826ec1db7bb266524b4917206cf73",
     "src/json.cpp": "752d0e1d4753e314531d0d8dedacdfdb7773cf4eff72ea54b0eaa0d0b384aa5b",
     "src/params.cpp": "11e9817f313b4bdb0630a5b4c165fc937d3e345c3e970f86a6fbc63393b5f4b8",
     "src/regions.cpp": "63e216cb7eb18c9e3e060939745a0d681619f7415f60cd693b5b2cd80a15b917",
@@ -22,17 +22,17 @@
     "src/eyes.hpp": "c3a431a668700992f01f6570cca080f50996a9b95c6139781b6590911e8764ec",
     "src/fdlibm.hpp": "76ccd02de179a53355b44cb25de8d908980e21048cb28ac5ead603519147126c",
     "src/fly_brain_internal.hpp": "70567db81da1a283377674b68ad4c277b0b991579e3dfc8045f9f312aabdc0f8",
-    "src/io.hpp": "1c614f8fc25ffe4b794e8507223e56612080ab995c8ffed597979ce9e8101f80",
+    "src/io.hpp": "e7785198b364116f30a7699f21b4760c34a23fe3fa501f71c6671b8f35f55680",
     "src/json.hpp": "c6502967fc9e32ab4bf1a2003f89c9d41e86847bbde9b2761d8e5e1e2df6948a",
     "src/params.hpp": "0f711c04a24daf368c08d414de794ab6f98df31d10451c8bc357757ee9bf7be6",
     "src/regions.hpp": "9e89f95cedb61fa4f7a4be5727f5a6f8132b590c679b4f4d8d3e463b9a6403b5",
     "src/sim.hpp": "82127195e46e4822a58d1e3c4436761164f2468e478919f83944441fe52e8c73",
     "src/state.hpp": "776df39f21d493c53ae37fbdbb4b13914cd47921859af652acaa294831b19589",
     "src/vision.hpp": "1d0fa684829454eb437c2be979bbe83b88eac07cfa57453573752b7815b1ce99",
-    "tools/harness.cpp": "2c197a354ba3b95d52436ce6828f5772d8d7cb39cfca26b0a0c271e95b8169ab"
+    "tools/harness.cpp": "53d2221625750cfa9770f68ade9318c8534e48ca4696cd18fc6d0bf243b37000"
   },
   "modules": {
-    "fly-brain.wasm": "a54ff2e9dd6a39a5525dd29a36effc3d376c8b8c885098c79276534405505b71",
-    "fly-brain-harness.wasm": "df83a868e1e82244dee7d94a237ba61fc908a1625832c1eb26f8fdb6f1b49579"
+    "fly-brain.wasm": "6a0f1445068b28abcc9a0af3c952a2eb49c15caaae8ce434b73cb09bfb988c27",
+    "fly-brain-harness.wasm": "785c6280830e14c6c2d7c53a824a9305d1f03c67c42cbebd94a26857fa35922a"
   }
 }

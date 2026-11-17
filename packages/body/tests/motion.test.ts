@@ -127,7 +127,7 @@ test("it lands on top of a perch it comes down on", () => {
 
 test("with food to eat, the body brings its mouth to it", () => {
   const body = new FlyBody(openTable(300), { x: 0, z: 0, yaw: 0 });
-  const meal: Food = { id: 1, kind: "sugar", name: "Sugar", x: 1.5, y: 0, z: 2.5, r: 1.6, sweet: 1, amount: 1, pool: false };
+  const meal: Food = { id: 1, kind: "sugar", name: "Sugar", x: 1.5, y: 0, z: 2.5, r: 1.6, sweet: 1, water: 0, bitter: 0, amount: 1, pool: false };
   run(body, intent({ feeding: true, feed: 0.5 }), 2, { ...still, meal });
   const mouth = body.point(MOUTH_AHEAD, 0, 0, { x: 0, y: 0, z: 0 });
   assert.ok(Math.hypot(mouth.x - meal.x, mouth.z - meal.z) < meal.r, `mouth ${JSON.stringify(mouth)}`);
