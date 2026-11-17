@@ -50,9 +50,10 @@ initialization has an indeterminate moving bead because it reports only completi
 
 The translucent gesture diagrams are illustrations of player input and tool
 motion, never a depiction of a neural response. They do not call tool actions,
-change the world, send senses or move the fly. HTML startup bubbles are also
-abstract loading artwork. Its temporary 2D canvas is replaced before WebGL
-starts and its animation stops when detached. The native TV skips this prelude.
+change the world, send senses or move the fly. Before the game's script runs,
+the page draws nothing; only if that script fails to load does a temporary 2D
+canvas offer a reload, and the game replaces that canvas before WebGL starts.
+The native TV skips this prelude.
 
 ## Reproducing evidence
 
