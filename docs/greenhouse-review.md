@@ -108,7 +108,7 @@ Key: `A3` = leaf/feeding detail (a6470e5); `P7` = framing/glazing light (da8b334
 | 4 | A3 | 5.5, 5, 6, 4.5, 6.5, 8.5, 6.5, 6 | 6.06 | W2 > P7 > L6 > A3 |
 | 4 | P7 | 6.5, 6, 6.5, 5.5, 6.5, 9, 7, 7 | 6.75 | W2 > P7 > L6 > A3 |
 
-Accepted. All four panels prefer P7 to the preceding greenhouse candidates. Kept roof/wall light intersections, sealed gables, corrected foliage colour and the pool radius. The wide-camera tomato obstruction remains a concrete failure to address.
+Accepted. All four reviewers prefer P7 to the preceding greenhouse candidates. Kept roof/wall light intersections, sealed gables, corrected foliage colour and the pool radius. The wide-camera tomato obstruction remains a concrete failure to address.
 
 ## Round 5
 
@@ -133,13 +133,38 @@ Key: `U4` = layout/arched handle (f649fe6); `H2` = framing/glazing light (da8b33
 | 4 | H2 | 6.5, 5.5, 7, 6, 6.5, 8, 7, 7.5 | 6.75 | U4 > H2 > E9 > Z7 |
 | 4 | U4 | 7, 7, 7, 6, 6.5, 7.5, 7, 8 | 7.00 | U4 > H2 > E9 > Z7 |
 
-Accepted. All four panels prefer U4 to H2. Moving the tomato clears the shared wide view; the arched handle resolves the disconnected top bar. One reviewer notes a regression in the tomato bruise marking; the following surface candidate corrects its positional selection.
+Accepted. All four reviewers prefer U4 to H2. Moving the tomato clears the shared wide view; the arched handle resolves the disconnected top bar. One reviewer notes a regression in the tomato bruise marking; the following surface candidate corrects its positional selection.
+
+## Round 6
+
+Key: `S8` = surface/normals/full framing (9f62ebde); `K2` = layout/arched handle (f649fe6); `Y6` = framing/glazing light (da8b334); `C3` = windowsill reference.
+
+| Reviewer | Set | Scores (criteria 1–8) | Mean | Forced ranking |
+| --- | --- | --- | ---: | --- |
+| 1 | Y6 | 6, 5.5, 6.5, 5, 7, 7, 7, 6 | 6.25 | S8 > C3 > K2 > Y6 |
+| 1 | S8 | 6.5, 6.5, 6.5, 6, 7, 8, 7, 6.5 | 6.75 | S8 > C3 > K2 > Y6 |
+| 1 | C3 | 8, 8, 7.5, 7.5, 8, 5, 4, 7 | 6.88 | S8 > C3 > K2 > Y6 |
+| 1 | K2 | 6.5, 6, 6.5, 5.5, 7, 7.5, 7, 6.5 | 6.56 | S8 > C3 > K2 > Y6 |
+| 2 | K2 | 6, 7, 6, 5, 7, 8, 8, 7 | 6.75 | C3 > S8 > K2 > Y6 |
+| 2 | Y6 | 6, 5, 6, 5, 7, 7, 8, 5 | 6.12 | C3 > S8 > K2 > Y6 |
+| 2 | S8 | 7, 8, 6, 6, 7, 9, 8, 7 | 7.25 | C3 > S8 > K2 > Y6 |
+| 2 | C3 | 8, 8, 8, 8, 8, 6, 5, 7 | 7.25 | C3 > S8 > K2 > Y6 |
+| 3 | C3 | 8, 7, 6, 7, 7, 6, 5, 7 | 6.62 | S8 > C3 > K2 > Y6 |
+| 3 | K2 | 6, 6, 7, 5, 6, 7, 8, 6 | 6.38 | S8 > C3 > K2 > Y6 |
+| 3 | Y6 | 5, 4, 7, 5, 6, 7, 8, 4 | 5.75 | S8 > C3 > K2 > Y6 |
+| 3 | S8 | 6, 7, 7, 6, 7, 8, 8, 7 | 7.00 | S8 > C3 > K2 > Y6 |
+| 4 | S8 | 7, 7, 7, 6, 7, 8, 7, 7 | 7.00 | S8 > C3 > K2 > Y6 |
+| 4 | C3 | 8, 8, 7, 8, 8, 5, 5, 7 | 7.00 | S8 > C3 > K2 > Y6 |
+| 4 | K2 | 6, 6, 7, 5, 7, 7, 7, 6 | 6.38 | S8 > C3 > K2 > Y6 |
+| 4 | Y6 | 5, 4, 7, 5, 6, 6, 7, 5 | 5.62 | S8 > C3 > K2 > Y6 |
+
+Accepted. All four reviewers score and rank S8 above K2. Three also rank it above the reference on the combined rubric, while the reference retains stronger beauty/material scores. Kept shared leaf normals, lower-frequency irregular grain, calmer clay/paint, the corrected tomato-mark selector, complete whole-bench framing and a full liquid tasting footprint.
 
 ## Validation
 
 - Baseline full test suite, lint and typecheck passed. The browser play suite passed, including every registered place.
 - Body, seed 42, 1,800 simulated seconds: 41,409 steps, 30 starts and 60 recovery probes, passed.
 - Life, seed 42, 1,800 simulated seconds: 51,425 steps, 174 meals, 25 take-offs and 12 carries, passed.
-- Following the layout/handle change, body seed 42 passed another 1,800 seconds: 41,810 steps, 30 starts and 60 probes. Longer life validation and subsequent blind panels remain in progress.
+- Following the layout/handle change, body seed 42 passed another 1,800 seconds: 41,810 steps, 30 starts and 60 probes. Revised-layout life seeds 42 and 43 each passed 900 seconds (1,800 seconds total), recording 204 meals and 24 take-offs. A separate long attempt was stopped at the 10-minute heavy-slot limit with no assertion failure, and is not counted as a completed pass. Subsequent blind panels and final integration checks remain in progress.
 
 Images are held only on the orphan `pr-assets-place-greenhouse` branch and embedded in the draft PR. No screenshots or recordings belong in this branch.

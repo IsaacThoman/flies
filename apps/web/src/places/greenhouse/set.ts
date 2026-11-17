@@ -243,7 +243,7 @@ outgoingLight += wave * 0.22;
     ripple,
     live(dt, around) {
       elapsed += dt;
-      // A roof leak falls at a fixed joint; only touch reaches the fly.
+      // A roof leak falls at a fixed point; only touch reaches the fly.
       if (age < 0 && around.quiet && around.weather.rain > 0.1 && elapsed > 7) { age = 0; elapsed = 0; }
       if (age >= 0) {
         age += dt; const roof = GLAZING.ridge-Math.abs(SAUCER.x+7)*(GLAZING.ridge-GLAZING.eave)/GLAZING.x;

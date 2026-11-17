@@ -203,7 +203,7 @@ A trowel, flat plant labels, coiled string and scattered soil keep their human
 scale beside the 2.5 mm fly. Fallen overripe tomatoes and an opened fig provide
 food on their surfaces and in a little juice on the wood; the water in a
 terracotta saucer responds with rings to the fly's feet and a roof leak. The
-leak starts only during quiet rainy spells, at a fixed roof joint, and reaches
+leak starts only during quiet rainy spells, at a fixed point on the roof, and reaches
 the fly through touch alone. Glazing bars lay moving shadows over the grain;
 the wood darkens when damp, rain beads and runs down the panes, and condensation
 clouds their lower edges at dawn. Weather reaches 70% of its light. The garden
