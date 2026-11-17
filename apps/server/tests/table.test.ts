@@ -704,3 +704,52 @@ test("a clear request removes only the sender's offerings and broadcasts gone id
   assert.equal(table.food.find(mine), null);
   assert.deepEqual(table.food.foods.map((f) => f.id), patches);
 });
+
+test("refused bites are acknowledged and exact nutrition is delivered once", () => {
+  const { table, join, bite, step } = room();
+  const a = join("key-1");
+  const p = a.seat.state;
+  const food = table.food.drop(a.seat.id, DROP_ID + 1, "berry", p.x, p.z, p.y)!;
+  table.food.flush();
+  clear(a);
+  bite(a, food.id, 0.9);
+  step(100);
+  const refused = saidOf(a, "food").at(-1)!;
+  assert.ok(refused);
+  assert.equal(refused.ack, 1);
+  assert.deepEqual(refused.meal, [0, 0]);
+  assert.ok(refused.amounts.some(([id, amount]) => id === food.id && amount === 1));
+  clear(a);
+  bite(a, food.id, 0.1);
+  step(100);
+  const accepted = saidOf(a, "food").at(-1)!;
+  assert.equal(accepted.ack, 2);
+  assert.ok(Math.abs(accepted.meal![0] - 0.1) < 1e-6);
+  assert.ok(Math.abs(accepted.meal![1] - 0.08) < 1e-6);
+  bite(a, 99999999, 0.1);
+  step(100);
+  const missing = saidOf(a, "food").at(-1)!;
+  assert.equal(missing.ack, 3);
+  assert.deepEqual(missing.gone, []);
+  assert.deepEqual(missing.meal, [0, 0]);
+});
+
+test("many unknown-food refusals cannot overflow acknowledgements or lose another player's nutrition", () => {
+  const { table, join, bite, step } = room();
+  const a = join("key-1");
+  const b = join("key-2");
+  const p = b.seat.state;
+  const food = table.food.drop(b.seat.id, 2 * DROP_ID + 1, "berry", p.x, p.z, p.y)!;
+  table.food.flush(); clear(a, b);
+  for (let packet = 0; packet < 7; packet++) {
+    const view = new DataView(new ArrayBuffer(256));
+    const bites = Array.from({ length: 16 }, (_, i) => ({ food: 900100000 + packet * 16 + i, amount: 0.01 }));
+    const length = encodeBites(view, packet + 1, bites);
+    table.receive(a.seat, new Uint8Array(view.buffer, 0, length));
+  }
+  bite(b, food.id, 0.1); step(100);
+  const message = saidOf(b, "food").at(-1)!;
+  assert.ok(message);
+  assert.equal(message.gone.length, 0);
+  assert.ok(Math.abs(message.meal![1] - 0.08) < 1e-6);
+});

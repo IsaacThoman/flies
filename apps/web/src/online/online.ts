@@ -208,6 +208,7 @@ export class Online {
         this.colour = m.colour;
         this.starter = m.starter;
         this.pantry.player = m.id;
+        this.pantry.confirmed = m.meals === true;
         host.fly.model.mark(m.colour);
         this.#clock = { at: m.now, wall: m.wall, offset: m.offset };
         this.now = this.#roomNow();
@@ -264,7 +265,7 @@ export class Online {
       case "pop":
         this.#table?.pop(m.slot, m.cycle, m.at / 1000);
         return;
-      case "food":
+      case "food": {
         for (const id of m.gone) {
           const falling = this.pantry.forgetFood(id);
           if (falling) {
@@ -273,8 +274,10 @@ export class Online {
           }
           for (const hand of this.#handList) hand.forgetFood(id);
         }
-        this.pantry.mirror.apply(m.ack, m.amounts, m.gone, m.eaten);
+        const [amount, sugar] = this.pantry.mirror.apply(m.ack, m.amounts, m.gone, m.eaten, m.meal);
+        if (amount > 0) host.life.feed(amount, sugar);
         return;
+      }
     }
   }
 
