@@ -44,7 +44,7 @@ export const STATE_KEYS = ["clockMorning", "clockEvening", "clockSleep", "sleepP
 export type StateKey = (typeof STATE_KEYS)[number];
 
 /** The senses that are one intensity each; `light` is a picture, handled apart, and `hunger` and the clock and sleep internal state, not senses. */
-export type ScalarSense = Exclude<keyof BrainSenses, "light" | "hunger" | StateKey>;
+export type ScalarSense = Exclude<keyof BrainSenses, "light" | "hunger" | StateKey | "temperatureLeft" | "temperatureRight">;
 export type SenseSpec = InputSpec & {
   sense: ScalarSense;
   /**
@@ -56,6 +56,9 @@ export type SenseSpec = InputSpec & {
 
 /** An input that stands for internal state the connectome can't supply, driving the real neurons that carry it. */
 export type StateSpec = InputSpec & { state: StateKey };
+
+/** One antenna's heating or cooling cells, whose rates thermo.ts works out from the temperature there (maxRate is unused: 0). */
+export type ThermoSpec = InputSpec & { side: "left" | "right"; cell: "heating" | "cooling" };
 
 export type ReadoutSpec = {
   /** Name in `stats.rates`. */
@@ -279,6 +282,38 @@ export const STATE_INPUTS: readonly StateSpec[] = [
 ];
 
 /**
+ * The aristae's thermoreceptors. Each arista holds three heating cells (Gr28b.d)
+ * and three cooling cells (Ir21a, Ir25a, Ir93a), one of each in each of its
+ * three sensilla (Gallio et al. 2011; Ni et al. 2013; Budelli et al. 2019).
+ * Their axons end in the antennal lobe's VP2 (heating) and VP3 (cooling)
+ * glomeruli (Gallio et al. 2011; Frank et al. 2015; Marin et al. 2020, who
+ * reconstructed them: Gr28b.d in VP2, Ir21a in VP3), and the dataset's types
+ * are named for those: TRN_VP2, and TRN_VP3a and TRN_VP3b. Side is the
+ * antenna's (`scripts/thermo.ts` checks it against FlyEM's root sides). The
+ * sacculus's VP1 cells are left out: which of them answer cooling and which
+ * humidity is still a proposal (Marin et al. 2020), and the annotations name
+ * them the other way round from it.
+ */
+export const THERMO_INPUTS: readonly ThermoSpec[] = (["left", "right"] as const).flatMap((side) => [
+  {
+    name: `heating ${side}`,
+    side,
+    cell: "heating" as const,
+    description: `Heating cells (Gr28b.d) of the ${side} arista, TRN_VP2`,
+    select: { superClass: "cb_sensory", class: "thermosensory", type: "TRN_VP2", side },
+    maxRate: 0,
+  },
+  {
+    name: `cooling ${side}`,
+    side,
+    cell: "cooling" as const,
+    description: `Cooling cells (Ir21a) of the ${side} arista, TRN_VP3a and TRN_VP3b`,
+    select: { superClass: "cb_sensory", class: "thermosensory", type: ["TRN_VP3a", "TRN_VP3b"], side },
+    maxRate: 0,
+  },
+]);
+
+/**
  * Spontaneous input, always on: the visual scene a fly at rest still sees.
  * Every visual projection neuron except the looming detectors (nothing is
  * looming at rest) fires at a low background rate, set per eye by the
@@ -434,6 +469,8 @@ export type Wiring = {
   background: { spec: (typeof BACKGROUND)[number]; neurons: Uint32Array; maxRate: number }[];
   /** The internal-state inputs this connectome has neurons for. */
   state: { spec: StateSpec; neurons: Uint32Array; maxRate: number }[];
+  /** The thermoreceptor inputs this connectome has neurons for. */
+  thermo: { spec: ThermoSpec; neurons: Uint32Array }[];
   readouts: { spec: ReadoutSpec; neurons: Uint32Array }[];
 };
 
@@ -455,14 +492,15 @@ export function wire(connectome: Connectome): Wiring {
     }
   }
   const state = STATE_INPUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select), maxRate: spec.maxRate })).filter((g) => g.neurons.length > 0);
+  const thermo = THERMO_INPUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select) })).filter((g) => g.neurons.length > 0);
   const readouts = READOUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select) }));
   for (const group of [...senses, ...background, ...readouts]) {
     if (group.neurons.length === 0) throw new Error(`The connectome has no neurons for "${group.spec.name}" (${group.spec.description})`);
   }
   const driven = new Set<number>();
-  for (const group of [...senses, ...background, ...state]) for (const i of group.neurons) driven.add(i);
+  for (const group of [...senses, ...background, ...state, ...thermo]) for (const i of group.neurons) driven.add(i);
   for (const group of readouts) {
     for (const i of group.neurons) if (driven.has(i)) throw new Error(`Neuron ${i} is both driven and read (readout "${group.spec.name}")`);
   }
-  return { senses, background, state, readouts };
+  return { senses, background, state, thermo, readouts };
 }

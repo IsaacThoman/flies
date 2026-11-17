@@ -32,9 +32,9 @@ type Exports = {
 const MAX_TICK_MS = 1000;
 const ERROR_BYTES = 512;
 // fly_brain.h's structs as wasm32 lays them out: fly_senses is seven floats, an int, two pointers, three floats (maleTaste,
-// hunger, wingbeat), five floats of internal state and two more (bitter, water); fly_command eight floats; fly_stats two
-// doubles and two uint32s.
-const SENSES_BYTES = 80;
+// hunger, wingbeat), five floats of internal state, two more (bitter, water) and two of temperature; fly_command eight
+// floats; fly_stats two doubles and two uint32s.
+const SENSES_BYTES = 88;
 const COMMAND_BYTES = 32;
 const STATS_BYTES = 24;
 const SCALARS = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet"] as const;
@@ -42,6 +42,8 @@ const SCALARS = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "win
 const STATE = ["clockMorning", "clockEvening", "clockSleep", "sleepPressure", "sleepDepth"] as const;
 const STATE_AT = 52;
 const BITTER_AT = 72;
+/** fly_senses's temperatures, after bitter and water. */
+const TEMPERATURE_AT = 80;
 
 const utf8 = new TextDecoder();
 
@@ -186,6 +188,9 @@ class WasmBrain implements Brain {
     view.setFloat32(s + 48, senses.wingbeat, true);
     view.setFloat32(s + BITTER_AT, senses.bitter, true);
     view.setFloat32(s + BITTER_AT + 4, senses.water, true);
+    // Left out, or not a number, NaN: no temperature felt.
+    view.setFloat32(s + TEMPERATURE_AT, senses.temperatureLeft ?? Number.NaN, true);
+    view.setFloat32(s + TEMPERATURE_AT + 4, senses.temperatureRight ?? Number.NaN, true);
     const failed = e.fly_brain_tick(this.#brain, dtMs, s, this.#command, this.#stats, this.#rates, this.#error, ERROR_BYTES);
     // The tick may have grown the memory, which leaves the old views empty.
     this.#views();

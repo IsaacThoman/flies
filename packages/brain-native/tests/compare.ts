@@ -94,6 +94,8 @@ const SCALAR = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind
 type Scalar = (typeof SCALAR)[number];
 /** The internal state, after the senses in the harness's line, in fly_senses's order. */
 const STATE = ["clockMorning", "clockEvening", "clockSleep", "sleepPressure", "sleepDepth"] as const;
+/** The temperature at each antenna, last in the harness's line; left out, NaN. */
+const TEMPERATURE = ["temperatureLeft", "temperatureRight"] as const;
 
 /**
  * The scripted senses: rest standing and airborne, each sense alone, partial
@@ -114,6 +116,7 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     for (const key of SCALAR) each[key] = Math.fround(each[key]);
     if (each.hunger !== undefined) each.hunger = Math.fround(each.hunger);
     for (const key of STATE) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
+    for (const key of TEMPERATURE) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
     ticks.push({ dt, senses: each, what });
     if (dt >= 0 && dt <= 1000) total += dt;
   };
@@ -155,6 +158,13 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     hold(1000, 16, () => ({ clockSleep: 1, sleepDepth: 0.5, loomRight: 1 }), "half asleep, a loom");
     hold(500, 16, () => ({ clockMorning: 7, clockEvening: -1, clockSleep: Number.NaN, sleepPressure: Number.POSITIVE_INFINITY, sleepDepth: -0.5 }), "out-of-range state");
     hold(1000, 16, () => Object.fromEntries(STATE.map((s) => [s, random() < 0.5 ? random() : 0])), "random state");
+    hold(2000, 16, () => ({ temperatureLeft: 25, temperatureRight: 25 }), "at 25 °C");
+    hold(3000, 16, (t) => ({ temperatureLeft: 25 + t / 1000, temperatureRight: 25 + t / 1500 }), "warming, the left faster");
+    hold(2000, 33, (t) => ({ temperatureLeft: 28 - t / 400, temperatureRight: 27 }), "cooling on the left");
+    hold(1500, 16, () => ({ temperatureLeft: 16, temperatureRight: 16, touch: 0.5 }), "a step to 16 °C, touched");
+    for (let k = 0; k < 6; k++) add([100, 1000, 7.3][k % 3], { temperatureLeft: 20 + 3 * k, temperatureRight: 35 - 2 * k }, "long ticks at changing temperatures");
+    hold(1000, 16, (t) => ({ temperatureLeft: [Number.NaN, -40, 1e6, Number.POSITIVE_INFINITY][Math.floor(t / 250)], temperatureRight: 25 + Math.sin(t / 50) }), "out-of-range temperatures");
+    hold(1000, () => Math.floor(random() * 50 * 4) / 4, () => ({ temperatureLeft: random() * 40, temperatureRight: random() < 0.2 ? Number.NaN : random() * 40 }), "random temperatures");
     for (const dt of [-1, Number.NaN, 1000.5, Number.POSITIVE_INFINITY]) add(dt, {}, "an invalid tick");
     hold(5000, 16, () => ({}), "rest at the end of a cycle");
     if (eyes) sight(eyes, cycle, random, add, hold);
@@ -282,7 +292,15 @@ export function script(ticks: readonly Tick[]): { input: string; frames: Uint8Ar
   };
   const lines = ticks.map(({ dt, senses }) => {
     const light = senses.light ? `${ref(senses.light.left)},${ref(senses.light.right)}` : "-";
-    return [hex64(dt), ...SCALAR.map((s: Scalar) => hex32(senses[s])), senses.grounded ? 1 : 0, ...STATE.map((s) => hex32(senses[s] ?? 0)), light, hex32(senses.hunger ?? 1)].join(" ");
+    return [
+      hex64(dt),
+      ...SCALAR.map((s: Scalar) => hex32(senses[s])),
+      senses.grounded ? 1 : 0,
+      ...STATE.map((s) => hex32(senses[s] ?? 0)),
+      light,
+      hex32(senses.hunger ?? 1),
+      ...TEMPERATURE.map((s) => hex32(senses[s] ?? Number.NaN)),
+    ].join(" ");
   });
   const frames = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
   let at = 0;
@@ -362,6 +380,7 @@ export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick
           c.map(hex32).join(" "),
           rates.map(hex32).join(" "),
           [brain.state.arousal.value, brain.state.scene.left.value, brain.state.scene.right.value, brain.state.sleep].map(hex64).join(" "),
+          [brain.thermoreceptors.adapted.left, brain.thermoreceptors.adapted.right].map((t) => (Number.isNaN(t) ? "nan" : hex64(t))).join(" "),
           retinaDigest(brain),
           tick++ % 50 === 49 ? digest(brain.sim) : "-",
         ].join(" | "),

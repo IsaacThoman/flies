@@ -383,7 +383,9 @@ summer storms); it makes no claim about local temperature or hemisphere.
 room server and clients.
 
 **Cold proposal, not implemented:** real fruit flies become sluggish in the
-cold, but temperature and metabolic slowing are not modelled by this brain.
+cold, but metabolic slowing is not modelled by this brain. Its antennae feel
+the air's temperature (`World.temperature`), but no place takes it from the
+weather: every place is 25 °C unless something warm or cool is put in it.
 Do not infer a cold response from a fly standing still in snow. A future
 labelled physiological stand-in could scale body/brain time with a documented
 temperature curve, with explicit owner approval and tests distinguishing it

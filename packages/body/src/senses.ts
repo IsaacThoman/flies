@@ -6,7 +6,7 @@
 
 import type { BrainSenses } from "@fly/brain";
 import type { Food, Pantry, Vec3, World } from "@fly/world";
-import { tasteIntensity } from "@fly/world";
+import { AMBIENT_TEMPERATURE, tasteIntensity } from "@fly/world";
 import { ease } from "./behavior.ts";
 import { FLY_HEIGHT, FLY_LENGTH, HEAD_AHEAD, HEAD_UP, MOUTH_AHEAD, MOUTH_UP, STEP_UP } from "./motion.ts";
 import type { FlyBody } from "./motion.ts";
@@ -109,7 +109,22 @@ type EyeState = { value: number; hold: number };
 export type Tasting = { food: Food | null; byMouth: boolean };
 
 export class SenseTracker {
-  readonly senses: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0, wingbeat: 0, bitter: 0, water: 0 };
+  readonly senses: BrainSenses = {
+    loomLeft: 0,
+    loomRight: 0,
+    touch: 0,
+    bumpLeft: 0,
+    bumpRight: 0,
+    wind: 0,
+    sweet: 0,
+    grounded: true,
+    maleTaste: 0,
+    wingbeat: 0,
+    bitter: 0,
+    water: 0,
+    temperatureLeft: AMBIENT_TEMPERATURE,
+    temperatureRight: AMBIENT_TEMPERATURE,
+  };
   readonly tasting: Tasting = { food: null, byMouth: false };
   /** How large each looming thing was in the eye last frame (rad), by id. */
   #sizes = new Map<number, number>();
@@ -213,7 +228,16 @@ export class SenseTracker {
     out.wingbeat = clamp01(body.wingbeat);
     out.bitter = clamp01(bitter);
     out.water = clamp01(water);
+    // The air's temperature at each arista, as it is: the brain's thermoreceptors make of it what they do.
+    out.temperatureLeft = this.#temperature(body, world, 1);
+    out.temperatureRight = this.#temperature(body, world, -1);
     return out;
+  }
+
+  /** The air's temperature at that antenna's tip, where its arista's thermoreceptors are, at the arista's base (Gallio et al. 2011). */
+  #temperature(body: FlyBody, world: World, side: 1 | -1) {
+    const arista = body.point(HEAD_AHEAD + ANTENNA_AHEAD, HEAD_UP, side * ANTENNA_SIDE, this.#probe);
+    return world.temperature.at(arista.x, arista.y, arista.z);
   }
 
   #foreleg(body: FlyBody, side: 1 | -1, bodies: Bodies | undefined) {

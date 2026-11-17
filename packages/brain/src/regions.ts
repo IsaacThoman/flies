@@ -144,7 +144,7 @@ export const REGIONS: readonly Region[] = [
   {
     id: "antenna-smell",
     name: "Smell, humidity and temperature",
-    description: "Olfactory, hygrosensory and thermosensory receptor neurons of the antennae and maxillary palps. The model has no sense of smell, so they are not driven.",
+    description: "Olfactory, hygrosensory and thermosensory receptor neurons of the antennae and maxillary palps. The model has no sense of smell or humidity, so only the aristae's 14 heating and cooling cells are driven, by the temperature at each antenna.",
     place: "the antennae's third segments (with the sacculus and arista) and the maxillary palps, both sides; their axons go to the antennal lobes",
     side: "both",
     neurons: 2730,

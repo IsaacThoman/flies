@@ -10,6 +10,8 @@
 // floor, a chair seat, the table top over it. Questions about a point say
 // which by a height: the surface at or below it, the underside above it.
 
+import { Temperature } from "./climate.ts";
+import type { Climate } from "./climate.ts";
 import type { FoodPatch } from "./pantry.ts";
 import { dishScales, domeScale, inside, prismSpan, sideNormal, solidBottom, topHeight, topNormal, topPeak } from "./shapes.ts";
 import type { Solid, Vec3 } from "./shapes.ts";
@@ -28,6 +30,8 @@ export type Place = {
   start: { x: number; z: number; yaw: number; y?: number };
   /** In the air it is drawn back below this height, mm. */
   ceiling: number;
+  /** How warm its air is, and where it is warmer or cooler; left out, AMBIENT_TEMPERATURE all over. */
+  climate?: Climate;
 };
 
 /** A surface over a point: its height, which way it faces, and how much air there is over it. */
@@ -89,6 +93,8 @@ const B = 6;
 export class World {
   place!: Place;
   solids: readonly Solid[] = [];
+  /** The air's temperature, the place's own until something changes it. */
+  readonly temperature = new Temperature();
   floor!: Floor;
   #span: [number, number] = [0, 0];
   #bounds = new Float64Array(0);
@@ -123,6 +129,7 @@ export class World {
 
   load(place: Place) {
     this.place = place;
+    this.temperature.set(place.climate);
     this.solids = place.solids;
     this.floor = place.floor;
     const n = place.solids.length;

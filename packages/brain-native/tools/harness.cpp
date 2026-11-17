@@ -30,6 +30,7 @@
 //     (an index into them) on one line; or "error <message>".
 
 #include <cinttypes>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -209,11 +210,13 @@ int brain(const char* path, uint32_t seed, const Options& options) {
   uint32_t tick = 0;
   while (std::getline(std::cin, line)) {
     std::istringstream in(line);
-    std::string dt, v[11], s[5], light = "-", hunger = "3f800000";
+    std::string dt, v[11], s[5], light = "-", hunger = "3f800000", temperature[2] = {"7fc00000", "7fc00000"};
     int grounded = 0;
-    in >> dt >> v[0] >> v[1] >> v[2] >> v[3] >> v[4] >> v[5] >> v[6] >> v[7] >> v[8] >> v[9] >> v[10] >> grounded >> s[0] >> s[1] >> s[2] >> s[3] >> s[4] >> light >> hunger;
-    fly_senses senses{f32(v[0]), f32(v[1]), f32(v[2]), f32(v[3]), f32(v[4]),  f32(v[5]), f32(v[6]), grounded, nullptr,   nullptr,  f32(v[7]),
-                      f32(hunger), f32(v[8]), f32(s[0]), f32(s[1]), f32(s[2]), f32(s[3]), f32(s[4]), f32(v[9]), f32(v[10])};
+    in >> dt >> v[0] >> v[1] >> v[2] >> v[3] >> v[4] >> v[5] >> v[6] >> v[7] >> v[8] >> v[9] >> v[10] >> grounded >> s[0] >> s[1] >> s[2] >> s[3] >> s[4] >> light >>
+        hunger >> temperature[0] >> temperature[1];
+    fly_senses senses{f32(v[0]),  f32(v[1]),  f32(v[2]),          f32(v[3]),          f32(v[4]), f32(v[5]), f32(v[6]), grounded,  nullptr,
+                      nullptr,    f32(v[7]),  f32(hunger),        f32(v[8]),          f32(s[0]), f32(s[1]), f32(s[2]), f32(s[3]), f32(s[4]),
+                      f32(v[9]),  f32(v[10]), f32(temperature[0]), f32(temperature[1])};
     fly_command command;
     fly_stats stats;
     int failed;
@@ -256,6 +259,11 @@ int brain(const char* path, uint32_t seed, const Options& options) {
     for (float x : rates) out += " " + hex32(x);
     const fly::InternalState& state = b->brain.state();
     out += " | " + hex64(state.arousal()) + " " + hex64(state.scene(fly::io::kLeft)) + " " + hex64(state.scene(fly::io::kRight)) + " " + hex64(state.sleep()) + " | ";
+    for (fly::io::Side side : {fly::io::kLeft, fly::io::kRight}) {
+      const double adapted = b->brain.adapted(side);
+      out += (std::isnan(adapted) ? std::string("nan") : hex64(adapted)) + " ";
+    }
+    out += "| ";
     out += retina_digest(b->brain) + " | ";
     out += tick++ % 50 == 49 ? digest(b->brain.sim()) : "-";
     std::puts(out.c_str());

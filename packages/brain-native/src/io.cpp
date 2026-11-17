@@ -149,6 +149,20 @@ std::vector<StateSpec> state_inputs() {
   };
 }
 
+// The aristae's heating and cooling cells (io.ts's THERMO_INPUTS says why these).
+std::vector<ThermoSpec> thermo_inputs() {
+  std::vector<ThermoSpec> out;
+  for (Side side : {kLeft, kRight}) {
+    const std::string name = side == kLeft ? "left" : "right";
+    out.push_back({"heating " + name, "Heating cells (Gr28b.d) of the " + name + " arista, TRN_VP2",
+                   query({{kSuperClass, is("cb_sensory")}, {kClass, is("thermosensory")}, {kType, is("TRN_VP2")}, {kSide, is(name)}}), side, true});
+    out.push_back({"cooling " + name, "Cooling cells (Ir21a) of the " + name + " arista, TRN_VP3a and TRN_VP3b",
+                   query({{kSuperClass, is("cb_sensory")}, {kClass, is("thermosensory")}, {kType, one_of({"TRN_VP3a", "TRN_VP3b"})}, {kSide, is(name)}}), side,
+                   false});
+  }
+  return out;
+}
+
 std::vector<ReadoutSpec> readouts() {
   return {
       {"DNg100", "BDN2, forward walking", query({{kType, is("DNg100")}}), 150},
@@ -194,6 +208,10 @@ Wiring wire(const Connectome& c) {
     std::vector<uint32_t> neurons = c.find(spec.select);
     if (!neurons.empty()) w.state.push_back({std::move(spec), std::move(neurons)});
   }
+  for (ThermoSpec& spec : thermo_inputs()) {
+    std::vector<uint32_t> neurons = c.find(spec.select);
+    if (!neurons.empty()) w.thermo.push_back({std::move(spec), std::move(neurons)});
+  }
   for (ReadoutSpec& spec : readouts()) {
     std::vector<uint32_t> neurons = c.find(spec.select);
     w.readouts.push_back({std::move(spec), std::move(neurons)});
@@ -214,6 +232,7 @@ Wiring wire(const Connectome& c) {
     for (const Group& group : *groups) driven.insert(group.neurons.begin(), group.neurons.end());
   }
   for (const StateGroup& group : w.state) driven.insert(group.neurons.begin(), group.neurons.end());
+  for (const ThermoGroup& group : w.thermo) driven.insert(group.neurons.begin(), group.neurons.end());
   for (const ReadoutGroup& group : w.readouts) {
     for (uint32_t i : group.neurons) {
       if (driven.count(i) != 0) throw std::runtime_error("Neuron " + std::to_string(i) + " is both driven and read (readout \"" + group.spec.name + "\")");

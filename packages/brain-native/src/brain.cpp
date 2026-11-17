@@ -88,6 +88,8 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   for (size_t side = 0; side < retinas_.size(); side++) {
     withdrawn_inputs_[side] = sim_.add_rated_input(std::string("eye ") + (side == io::kLeft ? "left" : "right") + " withdrawn", retinas_[side].l1(), true);
   }
+  // The thermoreceptors after even those: with no temperature felt, every stream is as it was before them.
+  for (const io::ThermoGroup& group : wiring_.thermo) thermo_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
 }
 
 io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& light, TickStats& stats) {
@@ -121,6 +123,7 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
   state_.rest(js::max(io::state_of(senses, io::kClockMorning), io::state_of(senses, io::kClockEvening)), io::state_of(senses, io::kClockSleep),
               io::state_of(senses, io::kSleepPressure), io::state_of(senses, io::kSleepDepth));
   const double eye_gain = 1 - io::kSleepEyes * state_.sleepiness();
+  const double temperature[2] = {thermo::temperature_of(senses, io::kLeft), thermo::temperature_of(senses, io::kRight)};
   double left = dt_ms;
   while (left > 1e-9) {
     const double chunk = js::min(kChunkMs, left);
@@ -151,6 +154,13 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
       }
     }
     if (!retinas_.empty()) eye_gain_ = eye_gain;
+    for (io::Side side : {io::kLeft, io::kRight}) {
+      const thermo::Thermoreceptors::Rates rates = thermoreceptors_.step(side, temperature[side], chunk);
+      for (size_t k = 0; k < wiring_.thermo.size(); k++) {
+        const io::ThermoSpec& spec = wiring_.thermo[k].spec;
+        if (spec.side == side) sim_.set_rate(thermo_inputs_[k], spec.heating ? rates.heating : rates.cooling);
+      }
+    }
     const double before = sim_.time();
     sim_.advance(chunk);
     const double ran = sim_.time() - before;

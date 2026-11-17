@@ -12,6 +12,7 @@ import { OPERATING_POINT, buildWeights } from "./params.ts";
 import type { OperatingPoint } from "./params.ts";
 import { REGIONS, REGION_RATE_NAMES, REGION_TAU, regionOf } from "./regions.ts";
 import { Simulation } from "./sim.ts";
+import { Thermoreceptors, temperatureOf } from "./thermo.ts";
 import { InternalState, INTERNAL_STATE } from "./state.ts";
 import type { InternalStateParameters } from "./state.ts";
 import { RETINA, Retina, VISION_STAGES, stageName } from "./vision.ts";
@@ -63,6 +64,9 @@ export class FlyBrain implements Brain {
   /** The eyes' gain last set (SLEEP_EYES), and each eye's rates and L1's withdrawals scaled by it. */
   #eyeGain = 1;
   #gained: Record<"left" | "right", { rates: Float64Array; withdrawals: Float64Array }> | null = null;
+  /** What each antenna's thermoreceptors have adapted to. */
+  readonly thermoreceptors = new Thermoreceptors();
+  #thermoRates = { heating: 0, cooling: 0 };
 
   constructor(connectome: ReturnType<typeof loadConnectome>, options: BrainOptions = {}) {
     const seed = options.seed ?? 1;
@@ -120,6 +124,8 @@ export class FlyBrain implements Brain {
     for (const { spec, neurons } of this.wiring.state) this.sim.addInput(spec.name, neurons);
     // L1's withdrawals under brightening (vision.ts) last of all, so every other input's stream is as it was without them.
     if (this.vision) for (const side of ["left", "right"] as const) this.sim.addRatedInput(`eye ${side} withdrawn`, this.vision.retina[side].l1, { withdraw: true });
+    // The thermoreceptors after even those: with no temperature felt, every stream is as it was before them.
+    for (const { spec, neurons } of this.wiring.thermo) this.sim.addInput(spec.name, neurons);
     // A separate stream from the Poisson inputs', which inputSeed derives from the same seed.
     this.state = new InternalState((seed ^ 0x5bd1e995) >>> 0, options.internalState ?? INTERNAL_STATE);
     this.spontaneous = options.spontaneous ?? true;
@@ -149,6 +155,7 @@ export class FlyBrain implements Brain {
       stateOf(senses, "sleepDepth"),
     );
     const eyeGain = 1 - SLEEP_EYES * this.state.sleepiness();
+    const temperature = { left: temperatureOf(senses, "left"), right: temperatureOf(senses, "right") };
     let left = dtMs;
     while (left > 1e-9) {
       const chunk = Math.min(CHUNK_MS, left);
@@ -177,6 +184,7 @@ export class FlyBrain implements Brain {
         }
         this.#eyeGain = eyeGain;
       }
+      this.#feelTemperature(temperature, chunk);
       const before = this.sim.time;
       this.sim.advance(chunk);
       const ran = this.sim.time - before;
@@ -207,6 +215,15 @@ export class FlyBrain implements Brain {
         rates: { ...this.rates },
       },
     };
+  }
+
+  /** Sets each antenna's heating and cooling cells' rates for the next `ms`, and adapts them that much further (thermo.ts). */
+  #feelTemperature(temperature: { left: number; right: number }, ms: number) {
+    const rates = this.#thermoRates;
+    for (const side of ["left", "right"] as const) {
+      this.thermoreceptors.step(side, temperature[side], ms, rates);
+      for (const { spec } of this.wiring.thermo) if (spec.side === side) this.sim.setRate(spec.name, rates[spec.cell]);
+    }
   }
 }
 

@@ -19,6 +19,7 @@
 #include "io.hpp"
 #include "sim.hpp"
 #include "state.hpp"
+#include "thermo.hpp"
 #include "vision.hpp"
 
 namespace fly {
@@ -82,6 +83,8 @@ class Brain {
 
   const Simulation& sim() const { return sim_; }
   const InternalState& state() const { return state_; }
+  /** What that antenna's thermoreceptors have adapted to, °C; NaN while it feels no temperature. */
+  double adapted(io::Side side) const { return thermoreceptors_.adapted(side); }
 
  private:
   uint32_t neurons_;
@@ -94,6 +97,9 @@ class Brain {
   // The sweet neurons' output gain, which hunger sets (io::sweet_output_gain).
   uint32_t sweet_gain_ = 0;
   std::vector<uint32_t> state_inputs_;
+  // Each antenna's heating and cooling cells, in wiring_.thermo's order, and what they have adapted to.
+  std::vector<uint32_t> thermo_inputs_;
+  thermo::Thermoreceptors thermoreceptors_;
   std::vector<double> rates_;
   std::vector<std::string> rate_names_;
   std::vector<uint32_t> counts_;

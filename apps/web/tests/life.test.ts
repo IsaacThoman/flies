@@ -115,3 +115,24 @@ test("with a rhythm it tells the brain the clock and its sleep, and is asleep af
   assert.equal(life.rhythm.depth, 0);
   assert.equal(life.rhythm.bouts, 1);
 });
+
+test("the brain is told the air's temperature at its antennae only when the fly feels it, which the game leaves off", () => {
+  let told: BrainSenses | null = null;
+  const brain = new (class extends Commands {
+    override tick(_dt?: number, senses?: BrainSenses) { told = { ...senses! }; }
+  })();
+  const world = new World(places.picnic);
+  const life = new Life(world, brain);
+  life.step(1 / 60, performance.now());
+  assert.equal(told!.temperatureLeft, undefined);
+  assert.equal(told!.temperatureRight, undefined);
+  assert.equal(life.senses.senses.temperatureLeft, 25, "the body still feels it");
+  life.feelsTemperature = true;
+  world.temperature.ambient = 31;
+  life.step(1 / 60, performance.now());
+  assert.equal(told!.temperatureLeft, 31);
+  assert.equal(told!.temperatureRight, 31);
+  life.feelsTemperature = false;
+  life.step(1 / 60, performance.now());
+  assert.equal(told!.temperatureLeft, undefined);
+});

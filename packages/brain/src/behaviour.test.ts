@@ -65,7 +65,9 @@ test("every group finds its neurons in the real connectome, and none is both dri
     MN9: 2,
     pIP10: 2,
   });
-  const driven = new Set([...wiring.senses, ...wiring.background].flatMap((g) => [...g.neurons]));
+  // The aristae's thermoreceptors, each antenna's own: three of each in a real arista (Budelli et al. 2019).
+  assert.deepEqual(Object.fromEntries(wiring.thermo.map((g) => [g.spec.name, g.neurons.length])), { "heating left": 4, "cooling left": 3, "heating right": 3, "cooling right": 4 });
+  const driven = new Set([...wiring.senses, ...wiring.background, ...wiring.thermo].flatMap((g) => [...g.neurons]));
   for (const group of wiring.readouts) for (const i of group.neurons) assert.ok(!driven.has(i), `${group.spec.name} neuron ${i} is also driven`);
 });
 
