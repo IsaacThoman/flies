@@ -25,6 +25,8 @@ export function buildSet(): SceneSet {
     envMapIntensity: 1.5,
   });
   const glassBatch = new Batch();
+  const addGlass = (g: THREE.BufferGeometry) =>
+    glassBatch.add(glass, paint(g, "#ffffff"));
   const add = (
     g: THREE.BufferGeometry,
     c: THREE.ColorRepresentation,
@@ -48,7 +50,7 @@ export function buildSet(): SceneSet {
       }
       // The lower outside returns to the stem; the inside is exactly the world's dish.
       profile.push([42.2, 187], [35, 145], [22, 109], [3, 100]);
-      glassBatch.add(glass, lathe(profile, f.x, f.z));
+      addGlass(lathe(profile, f.x, f.z));
       add(
         new THREE.CircleGeometry(18, 64)
           .rotateX(-Math.PI / 2)
@@ -59,8 +61,7 @@ export function buildSet(): SceneSet {
       continue;
     }
     if (s.name.startsWith("kitchen glass")) {
-      glassBatch.add(
-        glass,
+      addGlass(
         s.name.endsWith("foot")
           ? surface(s, 12, 48)
           : new THREE.CylinderGeometry(3, 3, 100, 16).translate(f.x, 53, f.z),
@@ -85,8 +86,7 @@ export function buildSet(): SceneSet {
         "#ba741e",
         KIND.honey,
       );
-      glassBatch.add(
-        glass,
+      addGlass(
         lathe(
           [
             [34, 0],
