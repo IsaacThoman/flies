@@ -14,7 +14,7 @@
 import * as THREE from "three";
 import { FLY_HEIGHT, FLY_LENGTH, POINT_REACH } from "@fly/body";
 import type { Food, Vec3, World } from "@fly/world";
-import { BREEZE, PATCHES, Pace, SOLIDS, TABLE_RADIUS, createSurface } from "@fly/world";
+import { BREEZE, FOUND_TASTES, PATCHES, Pace, SOLIDS, TABLE_RADIUS, createSurface } from "@fly/world";
 import type { Happening } from "@fly/world";
 import { paint } from "../../scene/build.ts";
 import type { Daylight } from "../../scene/light.ts";
@@ -407,7 +407,7 @@ export class Goings {
       const z = f.z - u * Math.sin(f.angle) + v * Math.cos(f.angle);
       if (around.world.heightAt(x, z) > 0.3) continue;
       const lasts = this.#range(...JUICE_LASTS);
-      slot.food = around.pantry.add("strawberry juice", x, z, 1.1, 0.8, undefined, lasts + 20);
+      slot.food = around.pantry.add("strawberry juice", x, z, 1.1, FOUND_TASTES["strawberry juice"].sweet, undefined, lasts + 20);
       slot.to.set(x, slot.food.y, z);
       slot.from.copy(slot.to);
       this.#show(slot, lasts, 4);
@@ -463,7 +463,7 @@ export class Goings {
           // Rolling to a stop against the fly, it stops short of it.
           if (k >= 1 || Math.hypot(f.mesh.position.x - fly.x, f.mesh.position.z - fly.z) < 3) {
             const { x, z } = f.mesh.position;
-            f.food = pantry.add("biscuit crumb", x, z, 0.9, 0.5, undefined, Math.max(0.001, f.lasts + 20 - f.age));
+            f.food = pantry.add("biscuit crumb", x, z, 0.9, FOUND_TASTES["biscuit crumb"].sweet, undefined, Math.max(0.001, f.lasts + 20 - f.age));
           }
           continue;
         }

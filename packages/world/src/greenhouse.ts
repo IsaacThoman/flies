@@ -1,5 +1,6 @@
 // The bench top is y=0. Pots are filled, and foliage has solid crowns:
 // there is no unreachable pocket beneath a drawn leaf.
+import { TASTES } from "./tastes.ts";
 import type { FoodPatch } from "./pantry.ts";
 import type { Solid } from "./shapes.ts";
 import type { Place } from "./world.ts";
@@ -40,12 +41,12 @@ export const GREENHOUSE_SOLIDS: readonly Solid[] = [
 ];
 
 export const GREENHOUSE_PATCHES: readonly FoodPatch[] = [
-  { name: "tomato juice", x: -50, z: -12, r: 7, sweet: 0.72 },
-  { name: "tomato juice", x: -82, z: 51, r: 4, sweet: 0.72 },
-  { name: "fig flesh", x: 20, z: 56, r: 12, sweet: 0.95 },
-  { name: "tomato juice", x: -14, z: 8, r: 6, sweet: 0.72 },
-  ...Array.from({length: 4},(_,i) => ({name: "tomato juice",x:-30+i*4,z:-5+i*3,r:1.4+i*0.15,sweet:0.72})),
-  { name: "water", x: SAUCER.x, z: SAUCER.z, r: 31, sweet: 0.05, water: 1, pool: true },
+  { name: "tomato juice", x: -50, z: -12, r: 7, ...TASTES.tomato },
+  { name: "tomato juice", x: -82, z: 51, r: 4, ...TASTES.tomato },
+  { name: "fig flesh", x: 20, z: 56, r: 12, ...TASTES.fig },
+  { name: "tomato juice", x: -14, z: 8, r: 6, ...TASTES.tomato },
+  ...Array.from({length: 4},(_,i) => ({name: "tomato juice",x:-30+i*4,z:-5+i*3,r:1.4+i*0.15,...TASTES.tomato})),
+  { name: "water", x: SAUCER.x, z: SAUCER.z, r: 31, ...TASTES.water, pool: true },
 ];
 export const GREENHOUSE: Place = {
   floor: { kind: "rect", ...GREENHOUSE_BENCH }, solids: GREENHOUSE_SOLIDS, patches: GREENHOUSE_PATCHES,

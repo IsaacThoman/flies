@@ -8,6 +8,7 @@
 // chair seats, shelves and lamps are slabs (`bottom`): there is air under
 // them, and the fly can walk and fly beneath them.
 
+import { TASTES } from "./tastes.ts";
 import type { FoodPatch } from "./pantry.ts";
 import type { Footprint, Solid, Top } from "./shapes.ts";
 import { World } from "./world.ts";
@@ -592,36 +593,36 @@ const ZINC = ZINC_BAR.zinc.top;
 /** Food left about the place, each at the height it lies at (the surface there at or below `y`). */
 export const RESTAURANT_PATCHES: readonly FoodPatch[] = [
   // The window table, where the fly starts: spilt sugar, the last of a glass of orange juice, the ring it left.
-  { name: "sugar", x: START_TABLE.sugarSpill.x, z: START_TABLE.sugarSpill.z, y: TABLE, r: START_TABLE.sugarSpill.r, sweet: 1 },
-  { name: "sugar", x: START_TABLE.packet.x + 6, z: START_TABLE.packet.z - 3, y: TABLE + START_TABLE.packet.top, r: 6, sweet: 1 },
-  { name: "orange juice", x: JUICE_GLASSES[0].x, z: JUICE_GLASSES[0].z, y: TABLE + JUICE_GLASS.well, r: 12, sweet: 0.7, pool: true },
-  ...[0.4, 2.3, 4.4].map((a): FoodPatch => ({ name: "juice ring", x: START_TABLE.ring.x + Math.cos(a) * START_TABLE.ring.r, z: START_TABLE.ring.z + Math.sin(a) * START_TABLE.ring.r, y: TABLE, r: 5, sweet: 0.55 })),
+  { name: "sugar", x: START_TABLE.sugarSpill.x, z: START_TABLE.sugarSpill.z, y: TABLE, r: START_TABLE.sugarSpill.r, ...TASTES.sugar },
+  { name: "sugar", x: START_TABLE.packet.x + 6, z: START_TABLE.packet.z - 3, y: TABLE + START_TABLE.packet.top, r: 6, ...TASTES.sugar },
+  { name: "orange juice", x: JUICE_GLASSES[0].x, z: JUICE_GLASSES[0].z, y: TABLE + JUICE_GLASS.well, r: 12, ...TASTES.orangeJuice, pool: true },
+  ...[0.4, 2.3, 4.4].map((a): FoodPatch => ({ name: "juice ring", x: START_TABLE.ring.x + Math.cos(a) * START_TABLE.ring.r, z: START_TABLE.ring.z + Math.sin(a) * START_TABLE.ring.r, y: TABLE, r: 5, ...TASTES.juiceRing })),
   // The ketchup's crusted cap, and a smear on the menu beside it.
-  { name: "ketchup", x: KETCHUP.x, z: KETCHUP.z, y: TABLE + KETCHUP.cap.top, r: 13, sweet: 0.6 },
-  { name: "ketchup", x: MENU.x + 30, z: MENU.z - 40, y: TABLE + MENU.thick, r: 7, sweet: 0.6 },
+  { name: "ketchup", x: KETCHUP.x, z: KETCHUP.z, y: TABLE + KETCHUP.cap.top, r: 13, ...TASTES.ketchup },
+  { name: "ketchup", x: MENU.x + 30, z: MENU.z - 40, y: TABLE + MENU.thick, r: 7, ...TASTES.ketchup },
   // The bread basket's crumbs, and those brushed onto the table.
-  { name: "crumbs", x: BREAD.x - 60, z: BREAD.z + 20, y: TABLE + BREAD.well, r: 14, sweet: 0.3 },
-  { name: "crumbs", x: 1070, z: 2240, y: TABLE, r: 10, sweet: 0.3 },
-  // Sugar left in the bottom of an espresso cup, in the coffee's dregs: bitter as
-  // anything here, for an espresso has about 10 mM of caffeine, more as the dregs
-  // dry, which flies' bitter taste neurons answer and flies avoid (Moon et al. 2006).
-  { name: "espresso", x: ESPRESSO.x, z: ESPRESSO.z, y: TABLE + ESPRESSO.saucer.well + ESPRESSO.cup.well, r: 10, sweet: 0.9, bitter: 1 },
+  { name: "crumbs", x: BREAD.x - 60, z: BREAD.z + 20, y: TABLE + BREAD.well, r: 14, ...TASTES.bread },
+  { name: "crumbs", x: 1070, z: 2240, y: TABLE, r: 10, ...TASTES.bread },
+  // Sugar left in the bottom of an espresso cup, in the coffee's dregs: as much as
+  // the coffee dissolves, and its caffeine (about 10 mM in an espresso, thinned by
+  // the sugar), which flies' bitter taste neurons answer and flies avoid (Moon et al. 2006).
+  { name: "espresso", x: ESPRESSO.x, z: ESPRESSO.z, y: TABLE + ESPRESSO.saucer.well + ESPRESSO.cup.well, r: 10, ...TASTES.sugaredEspresso },
   // At the bar: the bruised peach in the fruit bowl, the cut lemon, orange juice and lemonade left in two glasses, syrup on the bar mat, crumbs of cake at the edge of its plate.
-  { name: "peach", x: ON_BAR.peach.x + 4, z: ON_BAR.peach.z - 4, y: ZINC + ON_BAR.bowl.well + ON_BAR.peach.r * 1.9, r: 10, sweet: 0.9 },
-  ...ON_BAR.slices.map((s): FoodPatch => ({ name: "lemon", x: s.x, z: s.z, y: ZINC + ON_BAR.board.thick + ON_BAR.sliceThick, r: 10, sweet: 0.3 })),
-  { name: "orange juice", x: JUICE_GLASSES[1].x, z: JUICE_GLASSES[1].z, y: ZINC + JUICE_GLASS.well, r: 12, sweet: 0.7, pool: true },
-  { name: "lemonade", x: JUICE_GLASSES[2].x, z: JUICE_GLASSES[2].z, y: ZINC + JUICE_GLASS.well, r: 12, sweet: 0.65, pool: true },
-  { name: "syrup", x: ON_BAR.mat.x + 120, z: ON_BAR.mat.z + 30, y: ZINC + ON_BAR.mat.thick, r: 12, sweet: 0.95 },
-  { name: "cake crumbs", x: ON_BAR.cake.x + 146 * Math.cos(0.7), z: ON_BAR.cake.z + 146 * Math.sin(0.7), y: ZINC + ON_BAR.cake.plate.top, r: 4, sweet: 1 },
+  { name: "peach", x: ON_BAR.peach.x + 4, z: ON_BAR.peach.z - 4, y: ZINC + ON_BAR.bowl.well + ON_BAR.peach.r * 1.9, r: 10, ...TASTES.peach },
+  ...ON_BAR.slices.map((s): FoodPatch => ({ name: "lemon", x: s.x, z: s.z, y: ZINC + ON_BAR.board.thick + ON_BAR.sliceThick, r: 10, ...TASTES.lemon })),
+  { name: "orange juice", x: JUICE_GLASSES[1].x, z: JUICE_GLASSES[1].z, y: ZINC + JUICE_GLASS.well, r: 12, ...TASTES.orangeJuice, pool: true },
+  { name: "lemonade", x: JUICE_GLASSES[2].x, z: JUICE_GLASSES[2].z, y: ZINC + JUICE_GLASS.well, r: 12, ...TASTES.lemonade, pool: true },
+  { name: "syrup", x: ON_BAR.mat.x + 120, z: ON_BAR.mat.z + 30, y: ZINC + ON_BAR.mat.thick, r: 12, ...TASTES.syrup },
+  { name: "cake crumbs", x: ON_BAR.cake.x + 146 * Math.cos(0.7), z: ON_BAR.cake.z + 146 * Math.sin(0.7), y: ZINC + ON_BAR.cake.plate.top, r: 4, ...TASTES.cake },
   // Sent back to the pass: crumbs of tart and a smear of raspberry coulis.
-  { name: "coulis", x: ON_PASS.dessert.x + 20, z: ON_PASS.dessert.z - 10, y: PASS.shelf.top + ON_PASS.dessert.well, r: 16, sweet: 1, pool: true },
-  { name: "tart crumbs", x: ON_PASS.dessert.x - 35, z: ON_PASS.dessert.z + 25, y: PASS.shelf.top + ON_PASS.dessert.well, r: 9, sweet: 1 },
+  { name: "coulis", x: ON_PASS.dessert.x + 20, z: ON_PASS.dessert.z - 10, y: PASS.shelf.top + ON_PASS.dessert.well, r: 16, ...TASTES.coulis, pool: true },
+  { name: "tart crumbs", x: ON_PASS.dessert.x - 35, z: ON_PASS.dessert.z + 25, y: PASS.shelf.top + ON_PASS.dessert.well, r: 9, ...TASTES.shortbread },
   // The host stand's sticky menu, and the dust of the mints.
-  { name: "syrup", x: ON_HOST.menus.x + 30, z: ON_HOST.menus.z - 50, y: HOST_STAND.top + ON_HOST.menus.thick, r: 9, sweet: 0.8 },
-  { name: "mints", x: ON_HOST.mints.x, z: ON_HOST.mints.z, y: HOST_STAND.top + ON_HOST.mints.well, r: 12, sweet: 0.6 },
+  { name: "syrup", x: ON_HOST.menus.x + 30, z: ON_HOST.menus.z - 50, y: HOST_STAND.top + ON_HOST.menus.thick, r: 9, ...TASTES.syrup },
+  { name: "mints", x: ON_HOST.mints.x, z: ON_HOST.mints.z, y: HOST_STAND.top + ON_HOST.mints.well, r: 12, ...TASTES.mints },
   // On the floor: a soda spilt at the end of the bar, and a grape that rolled under the window's left table.
-  { name: "soda", x: -2250, z: 1420, y: 0, r: 34, sweet: 0.9, pool: true },
-  { name: "grape", x: -1660, z: 2120, y: 0, r: 8, sweet: 0.85 },
+  { name: "soda", x: -2250, z: 1420, y: 0, r: 34, ...TASTES.cola, pool: true },
+  { name: "grape", x: -1660, z: 2120, y: 0, r: 8, ...TASTES.grape },
 ];
 
 /** Where the fly first stands: on the window table, between the sugar and the glass, facing the sugar, with the street behind. */

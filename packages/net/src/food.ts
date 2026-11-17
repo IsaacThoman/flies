@@ -120,7 +120,7 @@ export class TableFood {
     if (!Number.isFinite(lasts) || !(lasts > 0 && lasts <= FOUND_LASTS)) return null;
     const found = this.foods.filter((f) => f.kind === "found");
     if (found.length >= MAX_FOUND) this.#remove(found[0]);
-    const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, water: 0, bitter: 0, amount: 1, pool: false };
+    const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, ...otherTastes([], 0, "found", name), amount: 1, pool: false };
     this.foods.push(food);
     this.#expires.set(id, this.#wall() + lasts * 1000);
     return food;

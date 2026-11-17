@@ -3,6 +3,7 @@
 // here, in millimetres; a fruit fly is about 2.5 mm long. The table's centre
 // is the origin, its top is y = 0, and the lake lies toward -z.
 
+import { TASTES } from "./tastes.ts";
 import type { FoodPatch } from "./pantry.ts";
 import type { Solid } from "./shapes.ts";
 import { World } from "./world.ts";
@@ -52,20 +53,20 @@ export const SOLIDS: readonly Solid[] = [
 
 /** The table's own food. Heights come from the surface under each. */
 export const PATCHES: readonly FoodPatch[] = [
-  { name: "honey", x: 30, z: -64, r: 7, sweet: 1 },
-  { name: "jam", x: 72, z: -58, r: 6, sweet: 0.95 },
-  { name: "strawberry juice", x: 64, z: 62, r: 9, sweet: 0.8 },
+  { name: "honey", x: 30, z: -64, r: 7, ...TASTES.honey },
+  { name: "jam", x: 72, z: -58, r: 6, ...TASTES.jam },
+  { name: "strawberry juice", x: 64, z: 62, r: 9, ...TASTES.strawberry },
   // A bruise on top of the whole strawberry, for a fly that climbs it.
-  { name: "strawberry juice", x: 18, z: 52, r: 4, sweet: 0.7 },
+  { name: "strawberry juice", x: 18, z: 52, r: 4, ...TASTES.strawberry },
   // Lemonade dripped down the jar and pooled in the saucer's moat, on the side toward the middle of the table.
-  { name: "lemonade", x: -77.7, z: -45.7, r: 6, sweet: 0.7, pool: true },
-  { name: "orange", x: -128, z: 54, r: 18, sweet: 0.6 },
-  { name: "sugar", x: 126, z: 61, r: 8, sweet: 1 },
-  { name: "sugar", x: 112, z: 56, r: 5, sweet: 1 },
-  { name: "sugar", x: 140, z: 66, r: 5, sweet: 1 },
-  { name: "spilt sugar", x: 98, z: 40, r: 6, sweet: 1 },
+  { name: "lemonade", x: -77.7, z: -45.7, r: 6, ...TASTES.lemonade, pool: true },
+  { name: "orange", x: -128, z: 54, r: 18, ...TASTES.orange },
+  { name: "sugar", x: 126, z: 61, r: 8, ...TASTES.sugar },
+  { name: "sugar", x: 112, z: 56, r: 5, ...TASTES.sugar },
+  { name: "sugar", x: 140, z: 66, r: 5, ...TASTES.sugar },
+  { name: "spilt sugar", x: 98, z: 40, r: 6, ...TASTES.sugar },
   // A few grains of sugar spilt near where the fly starts: something to find on a walk.
-  { name: "spilt sugar", x: -36, z: -24, r: 4, sweet: 1 },
+  { name: "spilt sugar", x: -36, z: -24, r: 4, ...TASTES.sugar },
 ];
 
 /** Where the fly first stands, and which way it faces. */

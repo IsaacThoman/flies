@@ -3,6 +3,7 @@
 // 2.5 mm long. The sill's middle is the origin, its top is y = 0, the window
 // stands along its back edge (toward -z) and the kitchen lies toward +z.
 
+import { TASTES } from "./tastes.ts";
 import type { FoodPatch } from "./pantry.ts";
 import type { Solid } from "./shapes.ts";
 import { World } from "./world.ts";
@@ -262,16 +263,16 @@ export const SILL_SOLIDS: readonly Solid[] = [
 /** The sill's own food. Heights come from the surface under each. */
 export const SILL_PATCHES: readonly FoodPatch[] = [
   // Where the banana's skin has split, toward the stalk.
-  { name: "banana", x: -141.5, z: 97.6, r: 6, sweet: 0.9 },
-  { name: "peach juice", x: PEACH_PLATE.x + 7, z: PEACH_PLATE.z + 4, r: 8, sweet: 0.85 },
+  { name: "banana", x: -141.5, z: 97.6, r: 6, ...TASTES.banana },
+  { name: "peach juice", x: PEACH_PLATE.x + 7, z: PEACH_PLATE.z + 4, r: 8, ...TASTES.peach },
   // Juice from a split plum, run down into the bowl.
-  { name: "plum juice", x: FRUIT_BOWL.x + 34, z: FRUIT_BOWL.z + 6, r: 6, sweet: 0.8 },
-  { name: "honey", x: TEASPOON.x, z: TEASPOON.z, r: 5, sweet: 1 },
+  { name: "plum juice", x: FRUIT_BOWL.x + 34, z: FRUIT_BOWL.z + 6, r: 6, ...TASTES.plum },
+  { name: "honey", x: TEASPOON.x, z: TEASPOON.z, r: 5, ...TASTES.honey },
   // A drip of juice run down the bottle and pooled on the sill.
-  { name: "orange juice", x: JUICE_BOTTLE.x - 47, z: JUICE_BOTTLE.z + 32, r: 9, sweet: 0.6, pool: true },
+  { name: "orange juice", x: JUICE_BOTTLE.x - 47, z: JUICE_BOTTLE.z + 32, r: 9, ...TASTES.orangeJuice, pool: true },
   // Water standing in the basil's saucer, round the pot's foot on the side toward the bowl.
-  { name: "water", x: BASIL_POT.x + 57, z: BASIL_POT.z + 6, r: 2.6, sweet: 0, water: 1, pool: true },
-  { name: "spilt sugar", x: 38, z: 66, r: 4, sweet: 1 },
+  { name: "water", x: BASIL_POT.x + 57, z: BASIL_POT.z + 6, r: 2.6, ...TASTES.water, pool: true },
+  { name: "spilt sugar", x: 38, z: 66, r: 4, ...TASTES.sugar },
 ];
 
 /** Where the fly first stands, and which way it faces: in the sun among the crumbs, toward the window. */

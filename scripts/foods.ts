@@ -8,8 +8,8 @@
 // middle, facing away from the world's middle, at the hunger given, and left
 // to itself for --seconds, its hunger going down as it eats. The Feed tool's
 // foods are dropped on a bare table (`Pantry.drop`), and each place's own are
-// its patches where they lie (one of each name and taste). Per food: the most
-// `sweet` and `bitter` its brain was sent, and per hunger how many flies ate
+// its patches where they lie (one of each name and taste). Per food: its tastes,
+// the most `sweet` and `bitter` its brain was sent, and per hunger how many flies ate
 // it, for how long each, and how soon after it was set down. Eating another
 // food it walked to doesn't count. What it does is the brain's choice:
 // nothing here helps it.
@@ -64,7 +64,7 @@ function trial(place: Place, seed: number, hunger: number, pick: (life: Life) =>
   return out;
 }
 
-function report(label: string, sweet: number, bitter: number, run: (seed: number, hunger: number) => Trial) {
+function report(label: string, sweet: number, water: number, bitter: number, run: (seed: number, hunger: number) => Trial) {
   const cells: string[] = [];
   let tasted = 0;
   let tastedBitter = 0;
@@ -77,15 +77,15 @@ function report(label: string, sweet: number, bitter: number, run: (seed: number
     const first = trials.filter((t) => t.ate).map((t) => t.first.toFixed(1));
     cells.push(`${trials.filter((t) => t.ate).length}/${trials.length}; fed ${trials.map((t) => t.fed.toFixed(1)).join(", ")} s${first.length ? `; first bite at ${first.join(", ")} s` : ""}`);
   }
-  console.log(`| ${label} | ${sweet} | ${bitter} | ${tasted.toFixed(2)} / ${tastedBitter.toFixed(2)} | ${cells.join(" | ")} |`);
+  console.log(`| ${label} | ${sweet} | ${water} | ${bitter} | ${tasted.toFixed(2)} / ${tastedBitter.toFixed(2)} | ${cells.join(" | ")} |`);
 }
 
-console.log(`| Food | sweet | bitter | most sweet / bitter sent | ${hungers.map((h) => `ate at hunger ${h}`).join(" | ")} |`);
-console.log(`|---|---|---|---|${hungers.map(() => "---").join("|")}|`);
+console.log(`| Food | sweet | water | bitter | most sweet / bitter sent | ${hungers.map((h) => `ate at hunger ${h}`).join(" | ")} |`);
+console.log(`|---|---|---|---|---|${hungers.map(() => "---").join("|")}|`);
 if (values.part === "feed" || values.part === "all") {
   for (const kind of Object.keys(FOODS) as FoodKind[]) {
     const spec = FOODS[kind];
-    report(`Feed: ${spec.name}`, spec.sweet, spec.bitter, (seed, hunger) => trial(BARE, seed, hunger, (life) => life.pantry.drop(kind, 20, 20)));
+    report(`Feed: ${spec.name}`, spec.sweet, spec.water, spec.bitter, (seed, hunger) => trial(BARE, seed, hunger, (life) => life.pantry.drop(kind, 20, 20)));
   }
 }
 if (values.part === "places" || values.part === "all") {
@@ -96,7 +96,7 @@ if (values.part === "places" || values.part === "all") {
       const key = `${patch.name} ${patch.sweet} ${patch.bitter ?? 0} ${patch.water ?? 0}`;
       if (seen.has(key)) return;
       seen.add(key);
-      report(`${id}: ${patch.name}`, patch.sweet, patch.bitter ?? 0, (seed, hunger) => trial(place, seed, hunger, (life) => life.pantry.foods[i]));
+      report(`${id}: ${patch.name}`, patch.sweet, patch.water ?? 0, patch.bitter ?? 0, (seed, hunger) => trial(place, seed, hunger, (life) => life.pantry.foods[i]));
     });
   }
 }
