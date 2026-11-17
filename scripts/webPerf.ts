@@ -1,5 +1,6 @@
 // Repeatable web measurements; raw evidence stays outside git. See docs/web-perf.md.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -59,9 +60,18 @@ async function instrument(page: Page) {
   });
 }
 
+function artifact(dir: string) {
+  const walk = (folder: string): string[] => readdirSync(folder).flatMap(name => {
+    const file = path.join(folder, name);
+    return statSync(file).isDirectory() ? walk(file) : [file];
+  });
+  const files = walk(dir).sort().map(file => ({ file: path.relative(dir, file), bytes: statSync(file).size, sha256: createHash("sha256").update(readFileSync(file)).digest("hex") }));
+  return { sha256: createHash("sha256").update(JSON.stringify(files)).digest("hex"), files };
+}
+
 const root = path.join(import.meta.dirname, "..");
 async function bundle(out: string, dir: string) {
-  await withHeavySlot(async () => {
+  return withHeavySlot(async () => {
     const modules: { file: string; modules: { id: string; renderedBytes: number }[] }[] = [];
     const accounting: Plugin = {
       name: "web-perf-modules",
@@ -76,6 +86,7 @@ async function bundle(out: string, dir: string) {
       return statSync(file).isDirectory() ? walk(file) : [file];
     });
     writeFileSync(path.join(out, "bundle.json"), JSON.stringify(walk(dir).map(file => ({ file: path.relative(dir, file), bytes: statSync(file).size, gzipBytes: gzipSync(readFileSync(file), { level: 9 }).length })), null, 2));
+    return artifact(dir);
   });
 }
 
@@ -141,7 +152,7 @@ async function main() {
   } });
   assert.ok(values.out, "--out is required (outside the repository)");
   const out = path.resolve(values.out);
-  assert.ok(!out.startsWith(root + path.sep), "raw evidence belongs outside the repository");
+  assert.ok(out !== root && !out.startsWith(root + path.sep), "raw evidence belongs outside the repository");
   mkdirSync(out, { recursive: true });
   const dir = path.resolve(values.dir ?? path.join(out, "site"));
   const directories = values["compare-dir"] ? [dir, path.resolve(values["compare-dir"])] : [dir];
@@ -153,8 +164,12 @@ async function main() {
   assert.ok(phases.every(p => ["loads", "frames", "memory", "brain", "bundle"].includes(p)));
   assert.ok(!values["compare-dir"] || (!values.build && phases.every(p => ["loads", "frames"].includes(p))), "--compare-dir uses prebuilt sites and loads/frames phases");
   const batches = directories.length === 1 ? [Array.from({ length: runs }, (_, i) => i)] : Array.from({ length: runs }, (_, i) => [i]);
-  if (values.build) await bundle(out, dir);
-  const report: Record<string, unknown> = { complete: false, revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), dirty: execFileSync("git", ["diff", "--stat"], { encoding: "utf8" }), node: process.version, host: os.cpus()[0].model, options: values, notes: "Timings include instrumentation; title uses the canvas state, published about every 200 ms; frame submission is not GPU/display time. Phone CPU throttling affects page only. Memory includes worker Wasm separately; memory checkpoints n=1; active batches separated by a paused two-minute cooldown; GC queries hold frames briefly." };
+  const builtArtifact = values.build ? await bundle(out, dir) : null;
+  const report: Record<string, unknown> = { complete: false, runnerRevision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), dirty: execFileSync("git", ["diff", "--stat"], { encoding: "utf8" }), node: process.version, host: os.cpus()[0].model, options: values, notes: "Timings include instrumentation; title uses the canvas state, published about every 200 ms; frame submission is not GPU/display time. Phone CPU throttling affects page only. Memory includes worker Wasm separately; memory checkpoints n=1; active batches separated by a paused two-minute cooldown; GC queries hold frames briefly." };
+  const artifacts: Record<string, ReturnType<typeof artifact>> = {};
+  if (builtArtifact) artifacts["0"] = builtArtifact;
+  report.artifacts = artifacts;
+  const registerArtifact = (directory: string) => { artifacts[String(directories.indexOf(directory))] ??= artifact(directory); };
   const save = () => {
     const loads = (report.loads ?? []) as { variant?: number; profile: string; cache: string; title: number; firstFrame: number; titleBytes: number }[];
     const frames = (report.frames ?? []) as { variant?: number; place: string; mode: string; jsMs: { median: number }; taskMsPerFrame: number; longFrames50ms: number }[];
@@ -175,6 +190,7 @@ async function main() {
     report.loads = loads;
     for (const batch of batches) await withHeavySlot(async () => {
     for (const run of batch) for (const profile of ["desktop", "phone"]) for (const directory of order(run)) {
+      registerArtifact(directory);
       let serverBytes = 0;
       const site = await serveSite({ dir: directory, base: "/fly/", transferred: (_file, bytes) => { serverBytes += bytes; } });
       let browser: Browser | undefined;
@@ -216,6 +232,7 @@ async function main() {
     });
   }
   async function lane(directory = dir) {
+    registerArtifact(directory);
     const site = await serveSite({ dir: directory, base: "/fly/" });
     let browser: Browser | undefined;
     try {
