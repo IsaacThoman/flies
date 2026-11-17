@@ -48,8 +48,15 @@ which visual input reaches a given brain tick. Capture records include completed
 
 The eight-story sequence is portrait, feeding on strawberry juice, Swoop flight, dusk X-ray
 with its normal nervous-system panel, fly's eyes, the rainy kitchen windowsill, the bar at night,
-and three flies at a morning picnic table. These are normal camera/tool/settings choices,
-with initial placements on existing fruit for feeding and sharing. The flight camera uses the
-same close view and turn gesture available in play. The bar and sharing use the production
+and three flies at a morning picnic table. The rainy scene starts on the existing window rail
+at (66, -110), then runs the real brain for five simulated seconds in the normal Follow view.
+Other initial placements are on existing fruit for feeding and sharing. The flight photograph
+follows the director's real viewing direction with capture-only framing
+within 10.5 mm of the actual fly. Selection requires actual flying activity, beating wings and
+more than 4 mm of clearance above a real surface. The bar and sharing use the production
 watch mode and wait for its UI fade. Other stories retain the normal play interface.
-The game's camera implementation is unchanged; only the group photograph uses capture-only framing.
+The game's camera implementation is unchanged; the flight and group photographs use capture-only framing.
+
+The capture URL includes `?alone` so the game's automatic room joining stays off during
+recording. The shared-table story explicitly connects its three production clients to the
+fixed-clock local room.

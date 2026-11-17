@@ -12,6 +12,7 @@ import type { Hands, ToolId } from "./hands.ts";
 
 const KINDS: readonly FoodKind[] = ["sugar", "honey", "berry", "water"];
 const MAX_FOOD = 8;
+const BALL_COLORS = ["#b0183a", "#4a2060", "#e0284a", "#4a2060", "#b0183a", "#2c4a3a"];
 const PUFFS = 24;
 /** How far (a share of its size) a use presses the ring in, a held tool keeps it in, and how long food's landing ripples (s). */
 const PRESS_IN = 0.22;
@@ -80,9 +81,8 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolId, x: numbe
       break;
     }
     case "swoop": {
-      const colors = ["#b0183a", "#4a2060", "#e0284a", "#4a2060", "#b0183a", "#2c4a3a"];
       for (let i = 0; i < 6; i++) {
-        g.fillStyle = colors[i];
+        g.fillStyle = BALL_COLORS[i];
         g.beginPath();
         g.moveTo(0, 0);
         g.arc(0, 0, r * 0.75, (i / 6) * Math.PI * 2, ((i + 1) / 6) * Math.PI * 2);
