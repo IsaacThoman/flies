@@ -85,8 +85,8 @@ test("the TV keeps its HUD and title layout, with Settings below a separate head
   // The Apple TV has no way to a table yet.
   const s = shell(TV_FRAME, "remote", false);
   const settings = settingsScreen(s);
-  // Sized for its longest tab (On screen: the tabs and seven rows, as Wallpaper was on an Apple TV that can tell the weather), so it keeps its size from tab to tab.
-  assert.deepEqual(settings.pane.panel, { x: 157, y: 12, w: 540, h: 264 });
+  // Spaced for its longest tab (On screen: the tabs and seven rows), and as tall as the tab open: the Screensaver's tabs and five rows here.
+  assert.deepEqual(settings.pane.panel, { x: 157, y: 12, w: 540, h: 308 });
   assert.deepEqual(settings.pane.list, { x: 185, y: 52, width: 484, row: 40, gap: 4, compact: false, columns: 1 });
   assert.equal(settings.menu.rows, settings.menu.items.length);
 
