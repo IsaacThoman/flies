@@ -75,7 +75,7 @@ export function actionLabel(hands: Hands, here: PlaceId): { glyph: Glyph; label:
   const variant = hands.label.toLowerCase();
   switch (tool.id) {
     case "feed":
-      return { glyph: "select", label: `Drop ${variant}` };
+      return hands.variant.id === "clear" ? null : { glyph: "select", label: `Drop ${variant}` };
     case "swoop":
       return { glyph: "select", label: "Throw the ball" };
     case "feather":

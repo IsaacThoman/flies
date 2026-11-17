@@ -174,6 +174,7 @@ JSON, from the device:
 | `browse {v}` | instead of a hello: this connection only lists the rooms |
 | `ping {t}` | answered `pong {t, now}` with the room's time |
 | `drop {id, kind, x, z, y, at}` | food dropped onto the surface at or below `y` (the floor under a table, or the table), named by the device (player id × 1,000,000 + its count) so its fly can eat it before the room has heard |
+| `clearFood {epoch}` | clears only this player’s dropped offerings in the current place; the room sends their ids in `food.gone` |
 | `ball {at, from, via, to}` | a throw, starting at room time `at` |
 | `world {light, weather}`, `place {place}`, `remove {id}` | the starter's choices |
 | `pop {slot, cycle, at}` | its fly burst a bubble |
@@ -233,7 +234,7 @@ can't spoil the others' screens or their food (`packages/net/src/limits.ts`):
   stands on whatever is under it there, the floor beneath a table or the
   table. A state from
   the future or older than the last is dropped.
-- **Food.** Only under your own name, only on the table. A bite counts only
+- **Food.** Dropped offerings can be cleared only by their owner; patches and finds stay. Clear requests share the drop rate limit and must name the current place’s epoch. Only under your own name, only on the table. A bite counts only
   within 4 mm of the food's edge of where the room has the fly, at the
   food's height (not from the floor under its table), and no faster
   than a fly eats (with a second's appetite saved up). Two flies at one sugar

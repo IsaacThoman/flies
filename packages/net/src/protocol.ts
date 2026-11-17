@@ -433,6 +433,7 @@ export type ClientMessage =
   /** Instead of a hello: this connection only browses the listed rooms (answered with `rooms`, and again as they change). */
   | { type: "browse"; v: number }
   | { type: "ping"; t: number }
+  | { type: "clearFood"; epoch: number }
   /** `y`: the surface it falls to, at or below this height (the floor under a table, or the table). */
   | { type: "drop"; id: number; kind: string; x: number; z: number; y: number; at: number }
   | ({ type: "ball" } & Omit<BallWire, "by">)
