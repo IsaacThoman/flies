@@ -918,16 +918,18 @@ test("saving and loading keeps everyone rooms and seats, and advances their plac
 
 test("restoring an everyone room after its turn changes discards the old food and sets even an airborne fly down at its new spawn", () => {
   const { table, clock, options, join, fly, send, bite, step } = room(START, 7, EVERYONE);
+  assert.equal(table.place, everyonePlace(clock.wall));
   const a = join("key-1");
   const b = join("key-2");
-  const [x, z] = spawnSpot(table.world, a.seat.id);
+  const [x, z, , y] = spawnSpot(table.world, a.seat.id);
   const id = DROP_ID + 1;
-  send(a, { type: "drop", id, kind: "honey", x, z, y: 0, at: clock.now });
+  send(a, { type: "drop", id, kind: "honey", x, z, y: y!, at: clock.now });
   bite(a, id, 0.1);
   step();
   assert.ok(table.food.find(id));
   assert.ok(table.food.eaten.get(a.seat.id)! > 0);
-  fly(b, b.seat.flies[0].state.x + 0.5, b.seat.flies[0].state.z, { flags: AIRBORNE });
+  const before = b.seat.flies[0].state;
+  fly(b, before.x + 0.5, before.z, { flags: AIRBORNE, y: before.y + 0.5, scale: table.scale });
   assert.ok(b.seat.flies[0].state.flags & AIRBORNE);
   const record = table.record();
   clock.wall = (Math.floor(clock.wall / EVERYONE_TURN) + 1) * EVERYONE_TURN;

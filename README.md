@@ -232,6 +232,25 @@ in mist the houses fade to ghosts; in the rain it falls across the garden,
 drops bead on the pane and run down it, and it stays streaked as it dries.
 There are no bubbles or fireflies indoors.
 
+The greenhouse is a weathered wooden potting bench behind rain-streaked glass,
+with a garden beyond its green glazing bars. Filled terracotta pots hold solid
+leafy crowns, and a twelve-cell seed tray sits beside an old green watering can.
+A trowel, flat plant labels, coiled string and scattered soil keep their human
+scale beside the 2.5 mm fly. Fallen overripe tomatoes and an opened fig provide
+food on their surfaces and in a little juice on the wood; the water in a
+terracotta saucer responds with rings to the fly's feet and a roof leak. The
+fly is set down on the fig's flesh, so the shared close views begin among its
+seeds rather than on an empty part of the bench. The
+leak starts only during quiet rainy spells, at a fixed point on the roof, and reaches
+the fly through touch alone. Glazing bars lay moving shadows over the grain;
+the wood darkens when damp, rain beads and runs down the panes, and condensation
+clouds their lower edges at dawn. Storms send faster runoff down the glass and
+lightning brightens it; snow and sleet frost the glazing bars while flakes fall
+in the garden beyond. Weather reaches 70% of its light. The garden
+backdrop is shared with the windowsill; there are no bubbles, and fireflies
+appear at dusk. Plant crowns are solid approximations, with leaf veins drawn
+in their surfaces rather than air beneath individual leaves.
+
 The lab bench is the bench of a fruit-fly lab, a quiet nod to where this fly's
 wiring was traced: a stereo microscope with a fly pad on its stage (its base
 and pillar are solid; a fly can land on it), a rack of plugged vials with
