@@ -18,14 +18,14 @@
 // Needs the connectome (npm run brain:fetch) and a Playwright Chromium.
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
 import { build } from "vite";
-import { chromiumPath, gpuFlags, readState, waitFor, waitForGameTime } from "../../../scripts/play.ts";
+import { chromiumPath, gpuFlags, holdSteady, readState, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import { serveSite } from "../../../scripts/serve.ts";
-import { disableScreensaver } from "./settings.ts";
+import { PUBLIC_OWNER } from "../tests/privacy-fixture.ts";
 
 const root = path.join(import.meta.dirname, "../../..");
 const args = process.argv.slice(2);
@@ -36,11 +36,21 @@ const step = (name: string) => { currentStep = name; console.log(`· ${name}`); 
 const CUT_AT = 3_000_000;
 
 const out = mkdtempSync(path.join(tmpdir(), "fly-web-e2e-"));
-await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "warn", build: { outDir: out, emptyOutDir: true } });
+const savedOwner = Object.fromEntries(Object.keys(PUBLIC_OWNER).map((field) => [field, process.env[field]]));
+try {
+  Object.assign(process.env, PUBLIC_OWNER);
+  await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "warn", build: { outDir: out, emptyOutDir: true } });
+} finally {
+  for (const [field, value] of Object.entries(savedOwner)) {
+    if (value === undefined) delete process.env[field];
+    else process.env[field] = value;
+  }
+}
 let cuts = 0;
 const site = await serveSite({ dir: out, base: "/some/folder/fly/", cut: (file) => (file.startsWith("brain/connectome.") && cuts++ === 0 ? CUT_AT : null) });
 const browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
 const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+await holdSteady(context);
 const page = await context.newPage();
 const errors: string[] = [];
 const elsewhere: string[] = [];
@@ -89,7 +99,6 @@ try {
     }).observe(document, { subtree: true, attributes: true, attributeFilter: ["data-received"] });
   });
   await page.goto(site.url);
-  await disableScreensaver(page);
   await shot("1-downloading");
   const awake = await waitFor(page, "brain=running,screen=title", 120_000);
   const seen = await page.evaluate(() => [...(globalThis as unknown as { __downloadProgress: Set<number> }).__downloadProgress]);
@@ -119,7 +128,6 @@ try {
   await context.setOffline(true);
   const again = Date.now();
   await page.reload();
-  await disableScreensaver(page);
   const offline = await waitFor(page, "brain=running,screen=title", 60_000);
   console.log(`  awake after ${((Date.now() - again) / 1000).toFixed(1)} s`);
   assert.equal(offline.from, "cache");
@@ -132,13 +140,11 @@ try {
   step("?brain=typescript runs the TypeScript brain on the kept connectome, without the module");
   const asked = site.requests.length;
   await page.goto(`${site.url}?brain=typescript`);
-  await disableScreensaver(page);
   const typescript = await waitFor(page, "brain=running,screen=title", 60_000);
   assert.equal(typescript.brainEngine, "typescript");
   assert.equal(typescript.from, "cache");
   assert.deepEqual(site.requests.slice(asked).filter((r) => r.path.includes("/brain/")), [], "nothing of the brain fetched");
   await page.goto(site.url);
-  await disableScreensaver(page);
   await waitFor(page, "brain=running,screen=title,brainEngine=wasm", 60_000);
 
   step("the wallpaper keeps the screen awake");
@@ -213,18 +219,17 @@ try {
   await page.evaluate(() => ((globalThis as unknown as { __kept: boolean }).__kept = true));
   await page.goto("about:blank");
   await page.goBack();
-  await disableScreensaver(page);
   const returned = await waitFor(page, "brain=running", 60_000);
   const restored = await page.evaluate(() => (globalThis as unknown as { __kept?: boolean }).__kept === true);
   console.log(`  ${restored ? "restored from the back-forward cache" : "loaded afresh"}, on ${returned.screen}`);
 
   step("a first visit that loses the network says so, and wakes when it is back");
   const fresh = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  await holdSteady(fresh);
   const lonely = await fresh.newPage();
   lonely.on("pageerror", (error) => errors.push(error.message));
   await lonely.route("**/brain/**", (route) => route.abort("internetdisconnected"));
   await lonely.goto(site.url);
-  await disableScreensaver(lonely);
   await fresh.setOffline(true);
   await waitFor(lonely, "brain=failed,failure=offline", 30_000);
   if (shots) await lonely.locator("#game").screenshot({ path: path.join(shots, "4-offline.png") });
@@ -246,6 +251,19 @@ try {
   await waitFor(blind, "failure=webgl", 10_000);
   if (shots) await blind.locator("#game").screenshot({ path: path.join(shots, "5-no-webgl.png") });
   await flat.close();
+
+  step("the privacy policy remains a policy when opened offline");
+  await page.goto(new URL("privacy", site.url).href);
+  assert.match(await page.locator("main").innerText(), /Privacy policy/);
+  const policyFile = path.join(out, "privacy/index.html");
+  writeFileSync(policyFile, readFileSync(policyFile, "utf8").replace("</main>", "<p>Policy revision fixture</p></main>"));
+  await page.reload();
+  assert.match(await page.locator("main").innerText(), /Policy revision fixture/);
+  await context.setOffline(true);
+  await page.reload();
+  assert.match(await page.locator("main").innerText(), /Policy revision fixture/);
+  assert.equal(await page.locator("canvas").count(), 0);
+  await context.setOffline(false);
 
   step("nothing was asked of any other site");
   assert.deepEqual(elsewhere, []);

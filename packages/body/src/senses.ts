@@ -6,8 +6,9 @@
 
 import type { BrainSenses } from "@fly/brain";
 import type { Food, Pantry, Vec3, World } from "@fly/world";
+import { tasteIntensity } from "@fly/world";
 import { ease } from "./behavior.ts";
-import { FLY_HEIGHT, HEAD_AHEAD, HEAD_UP, MOUTH_AHEAD, MOUTH_UP, STEP_UP } from "./motion.ts";
+import { FLY_HEIGHT, FLY_LENGTH, HEAD_AHEAD, HEAD_UP, MOUTH_AHEAD, MOUTH_UP, STEP_UP } from "./motion.ts";
 import type { FlyBody } from "./motion.ts";
 import type { Bodies } from "./crowd.ts";
 
@@ -56,6 +57,19 @@ const WIND_SMOOTHING = 15;
 /** How far ahead of the head and to each side the antennae reach, in body lengths. */
 export const ANTENNA_AHEAD = 0.2;
 export const ANTENNA_SIDE = 0.12;
+/**
+ * How far an antenna's tip has to be pushed back (mm) to drive Johnston's
+ * organ's push neurons fully: zone E answered weakly below 0.04 mm of the
+ * arista's displacement and most after two steps of 0.033 mm, no more after a
+ * third (Yorozu et al. 2009, Nature 458:201). Anything that meets the antenna
+ * at all pushes it this far (its joint and its transducers' gating springs give
+ * at about 0.04 pN/nm each: Nadrowski, Albert & Göpfert 2008, Curr Biol 18:1365,
+ * supplement; 0.07 mm is a few nanonewtons, against the fly's 10 µN of
+ * weight), so contact is felt fully, and for as long as it lasts: zones C and
+ * E answer a held deflection for as long as it is held (10 s and 8 s, the
+ * longest tried: Kamikouchi et al. 2009, Nature 458:165; Yorozu et al. 2009).
+ */
+export const ANTENNA_FULL = 0.07;
 /** How far the mouthparts reach, mm, plus the proboscis's reach when extended. */
 export const MOUTH_REACH = 0.3;
 export const PROBOSCIS_REACH = 0.4;
@@ -69,6 +83,16 @@ export const FOOT_SPREAD = 0.9;
 export const FORELEG_AHEAD = 0.66;
 export const FORELEG_SIDE = 0.27;
 export const FORELEG_REACH = 0.1;
+/**
+ * Walking into a wall it faces, how far (mm) its head comes on past where it
+ * stands: its forelegs give, its antennae come up to the wall where their
+ * tarsi were (they stand ahead of the antennae's tips), and are pushed in far
+ * enough to be felt fully.
+ */
+export const PUSH_LEAN = (FORELEG_AHEAD - HEAD_AHEAD - ANTENNA_AHEAD) * FLY_LENGTH + ANTENNA_FULL;
+
+/** Something it would walk into at (x, z), standing with its feet at `feet`: between a step and its height over them. */
+const wallAt = (world: World, x: number, z: number, feet: number) => world.onTable(x, z) && world.underside(x, z, feet + STEP_UP) < feet + FLY_HEIGHT;
 
 const clamp01 = (value: number) => (Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0);
 
@@ -81,7 +105,7 @@ function release(value: number, target: number, seconds: number, dt: number) {
 
 type EyeState = { value: number; hold: number };
 
-/** The food it is touching: under its feet, or at its mouth. */
+/** The food at its mouth, or under its feet when its mouth touches nothing. */
 export type Tasting = { food: Food | null; byMouth: boolean };
 
 export class SenseTracker {
@@ -141,7 +165,7 @@ export class SenseTracker {
     const hit = clamp01(body.events.hit / HIT_FULL_SPEED);
     this.#touch = release(this.#touch, Math.max(clamp01(input.stroke), hit), RELEASE, dt);
 
-    // Antennae: just ahead of the head, one each side. Each feels a wall it presses into.
+    // Antennae: just ahead of the head, one each side. Each feels what pushes it back.
     this.#bumpLeft = release(this.#bumpLeft, this.#pressing(body, world, 1, input.bodies) ? 1 : 0, RELEASE, dt);
     this.#bumpRight = release(this.#bumpRight, this.#pressing(body, world, -1, input.bodies) ? 1 : 0, RELEASE, dt);
 
@@ -166,12 +190,10 @@ export class SenseTracker {
       const reach = MOUTH_REACH + PROBOSCIS_REACH * clamp01(input.proboscis);
       const atMouth = pantry.touching(mouth.x, body.position.y, mouth.z, reach);
       const underfoot = pantry.touching(body.position.x, body.position.y, body.position.z, FOOT_SPREAD);
-      const best = !atMouth ? underfoot : !underfoot ? atMouth : atMouth.sweet * atMouth.amount >= underfoot.sweet * underfoot.amount ? atMouth : underfoot;
-      if (best) {
-        tasting.food = best;
-        tasting.byMouth = best === atMouth;
-        sweet = best.sweet * Math.min(1, best.amount * 4);
-      }
+      // Stronger foot taste must not prevent eating a food already at the mouth.
+      tasting.food = atMouth ?? underfoot;
+      tasting.byMouth = atMouth !== null;
+      sweet = Math.max(atMouth ? tasteIntensity(atMouth) : 0, underfoot ? tasteIntensity(underfoot) : 0);
     }
 
     out.loomLeft = clamp01(this.#eyes.left.value);
@@ -194,13 +216,23 @@ export class SenseTracker {
     return bodies.inside(tarsus.x, tarsus.y, tarsus.z, FORELEG_REACH);
   }
 
-  /** On its feet, a wall it would walk into (something between a step and its height over its feet); in the air, the tip inside something. */
+  /**
+   * Something pushes this antenna back: its tip is inside another fly's body, or in the air inside something.
+   * On its feet, a wall (something between a step and its height over its feet) at the tip, unless that
+   * side's foreleg stands against the wall too and holds its head off it; or, walking into a wall it faces,
+   * one at the tip as its head comes on (PUSH_LEAN). Past the table's edge there is nothing to touch.
+   */
   #pressing(body: FlyBody, world: World, side: 1 | -1, bodies: Bodies | undefined) {
     const tip = body.point(HEAD_AHEAD + ANTENNA_AHEAD, HEAD_UP, side * ANTENNA_SIDE, this.#probe);
     if (bodies?.inside(tip.x, tip.y, tip.z, 0)) return true;
-    if (!world.onTable(tip.x, tip.z)) return body.onFeet;
+    if (!body.onFeet) return world.onTable(tip.x, tip.z) && world.solidAt(tip.x, tip.y, tip.z) >= 0;
     const feet = body.position.y;
-    return body.onFeet ? world.underside(tip.x, tip.z, feet + STEP_UP) < feet + FLY_HEIGHT : world.solidAt(tip.x, tip.y, tip.z) >= 0;
+    const wall = wallAt(world, tip.x, tip.z, feet);
+    if (body.blocked) return wall || wallAt(world, tip.x + Math.sin(body.yaw) * PUSH_LEAN, tip.z + Math.cos(body.yaw) * PUSH_LEAN, feet);
+    if (!wall) return false;
+    // Its foreleg's tarsus stands further ahead than the antenna's tip: on a wall, it keeps the antenna off it.
+    const tarsus = body.point(FORELEG_AHEAD, 0, side * FORELEG_SIDE, this.#probe);
+    return world.solidAt(tarsus.x, feet + STEP_UP, tarsus.z) < 0;
   }
 
   #eye(state: EyeState, seen: number, dt: number) {

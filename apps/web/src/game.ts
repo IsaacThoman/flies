@@ -31,7 +31,7 @@ import type { TableStart } from "@fly/net";
 import { TAP_SLOP } from "./input.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
 import { Life } from "./life.ts";
-import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart } from "./online/invite.ts";
+import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart, tryProtocolReload } from "./online/invite.ts";
 import type { Shared } from "./online/invite.ts";
 import { Lobby } from "./online/lobby.ts";
 import { Online } from "./online/online.ts";
@@ -171,7 +171,7 @@ export class Game implements Shell {
   /** The real weather outside, where the Apple TV can tell it; scripts feed it in a browser (`outside.feed`). */
   readonly outside = new Outside(nativeWeather());
   readonly nav = new Navigator<ScreenId>("title");
-  readonly screens: { title: MenuScreen; settings: MenuScreen; about: Screen; online: OnlineScreen };
+  readonly screens: { title: MenuScreen; settings: MenuScreen; about: AboutScreen; online: OnlineScreen };
   /** At a room with others (docs/online.md), its line to the room and the others there; null alone. */
   online: Online | null = null;
   /** How the room this device was last at, or tried to sit at, ended: it left, or was turned away (removed, the room gone, locked). */
@@ -419,6 +419,10 @@ export class Game implements Shell {
     return this.#lobby?.rooms ?? null;
   }
 
+  get lobbyStatus() {
+    return this.#lobby?.status ?? "connecting";
+  }
+
   /** The list of rooms is open while Online is up and this device is at none (on its other faces too, so that coming back to the list finds it as it is). */
   #browse(dt: number) {
     const wanted = this.nav.current === "online" && !this.online && this.canPlayOnline;
@@ -429,7 +433,7 @@ export class Game implements Shell {
     }
     this.#lobby?.update(dt);
     // A room server newer than this page: the newer page speaks its protocol.
-    if (this.#lobby?.status === "version") reloadOnce();
+    if (this.#lobby?.status === "version") tryProtocolReload(this.#app, reloadOnce);
   }
 
   /** Starts typing into a field as a tap on it lifts, while the browser still counts it as the player's doing. */
@@ -545,8 +549,9 @@ export class Game implements Shell {
     const ended = online.ended;
     if (!ended) return;
     // A page from before the server's last deploy: the newer page speaks its protocol.
-    if (ended === "version" && reloadOnce()) return;
+    if (ended === "version" && tryProtocolReload(this.#app, reloadOnce)) return;
     this.#stand(ended);
+    if (ended === "version" && this.nav.current !== "online") this.open("online");
   }
 
   /** What the table hears of the player with its fly: whether it is living, at the remote, and where the hand is. */
@@ -1676,6 +1681,7 @@ export class Game implements Shell {
     d.ring = String(shown !== "play" && this.#ringShown);
     d.tab = shown === "settings" ? settingsTab(this.screens.settings) : "";
     if (shown === "online") this.screens.online.publish(d);
+    if (shown === "about") this.screens.about.publish(d);
     d.atRoot = String((window as unknown as Record<string, unknown>)[AT_ROOT_PROPERTY]);
     d.wallpaper = String(this.wallpaper);
     d.brain = life.brain.status;

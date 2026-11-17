@@ -285,8 +285,6 @@ type Ring = { angles: readonly number[]; r: number; y: number };
 
 /** A polygon's corners' angles, `sides` of them from `start`. */
 const corners = (sides: number, start: number) => Array.from({ length: sides }, (_, i) => start + (i / sides) * Math.PI * 2);
-/** How much further out a polygon's corners are than the round it stands for, to be as wide on average over the ways it is seen. */
-const wide = (sides: number) => Math.PI / (sides * Math.sin(Math.PI / sides));
 
 /**
  * Far off, a round bottle's body is a hexagon with a corner toward the
@@ -363,7 +361,7 @@ export function farBottles(b: Builder, list: readonly Stocked[], fine: (bottle: 
     // The body: each face up from the foot in bands, changing where it is filled to and, on the faces toward the room, where the label is.
     const smooth = fine(bottle);
     const { body, neck } = SHAPES[smooth ? (square ? "fineSquare" : "fineRound") : square ? "square" : "round"];
-    const rb = square ? R * Math.SQRT2 : R * wide(body.length);
+    const rb = square ? R * Math.SQRT2 : R;
     const [l0, l1, half] = dress.label;
     const [b0, b1] = dress.band ?? [0, 0];
     for (let k = 0; k < body.length; k++) {
@@ -392,7 +390,7 @@ export function farBottles(b: Builder, list: readonly Stocked[], fine: (bottle: 
     }
 
     // The shoulder, from the body's top to the neck (by way of its middle, when fine); the neck to the capsule; the capsule, tapering to a flat top.
-    const rn = n * wide(neck.length);
+    const rn = n;
     const top = s.top - n * 0.2;
     const zip = (role: Role, lo: Ring, hi: Ring) => {
       const dr = lo.r - hi.r;

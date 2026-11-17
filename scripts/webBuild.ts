@@ -25,7 +25,7 @@ const sha256 = (data: Uint8Array | string) => createHash("sha256").update(data).
 /** The name the app is installed under: what the title screen's wordmark says. */
 export const APP_NAME = "flies";
 export const DESCRIPTION =
-  "A fruit fly that lives on your screen. Nothing it does is scripted: a simulation of its whole nervous system, 166,700 neurons wired from the FlyEM male CNS connectome (Janelia Research Campus, CC-BY 4.0), decides what it does.";
+  "A fruit fly that lives on your screen. A simplified simulation of its nervous system, 166,700 neurons wired from the FlyEM male CNS connectome (Janelia Research Campus, CC-BY 4.0), chooses through its senses; the game supplies physics, hunger and sleep drives, and a flight reflex.";
 /** The colour round the picture and behind the loading screen (apps/web/index.html). */
 export const BACKGROUND = "#04122b";
 
@@ -112,7 +112,8 @@ export function brain(): Plugin {
   const info = (file: Built | null): BrainFile | null => file && { bytes: file.bytes, parts: file.parts };
   return {
     name: "fly-brain",
-    config() {
+    config(_config, { command }) {
+      if (command === "build" && !fs.existsSync(CONNECTOME)) throw new Error("connectome.bin is missing: npm run brain:fetch before building");
       const connectome = brainFile();
       const module = moduleFile();
       const anatomy = anatomyFile();
@@ -170,6 +171,12 @@ export function siteAssociation(teamId = process.env.APPLE_TEAM_ID): string | nu
     webcredentials: { apps: [app] },
   };
   return `${JSON.stringify(association, null, 2)}\n`;
+}
+
+/** Fixed document names still need a content version: a policy-only release must replace offline text. */
+export function offlineVersion(files: readonly string[], documents: Readonly<Record<string, string | Uint8Array>>): string {
+  const contents = Object.entries(documents).sort(([a], [b]) => a.localeCompare(b)).map(([name, source]) => `${name}:${sha256(source)}`);
+  return sha256(files.join("\n") + contents.join("\n")).slice(0, 16);
 }
 
 /**
@@ -235,10 +242,15 @@ export function webApp({ siteUrl = process.env.FLY_SITE_URL, teamId = process.en
       if (page?.type !== "asset") throw new Error("The page must be written before the service worker's list");
       const files = ["./", ...[...Object.keys(bundle), ...emitted].filter((name) => name !== "sw.js" && name !== "index.html" && name !== SITE_ASSOCIATION && !/\.map$|\/preview-/.test(name))];
       const unique = [...new Set(files)].sort();
-      const version = sha256(unique.join("\n") + String(page.source)).slice(0, 16);
+      const documents: Record<string, string | Uint8Array> = { "index.html": page.source };
+      for (const name of unique) {
+        const asset = bundle[name];
+        if (asset?.type === "asset") documents[name] = asset.source;
+      }
+      const version = offlineVersion(unique, documents);
       const sw = bundle["sw.js"];
       if (sw?.type !== "chunk") throw new Error("The service worker wasn't built");
-      sw.code = sw.code.replace("__FLY_PRECACHE__", JSON.stringify(unique)).replace("__FLY_VERSION__", JSON.stringify(version));
+      sw.code = sw.code.replaceAll("__FLY_PRECACHE__", JSON.stringify(unique)).replace("__FLY_VERSION__", JSON.stringify(version));
     },
   };
 }
