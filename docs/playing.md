@@ -161,6 +161,10 @@ away, and a nudge of the desk doesn't end it; a mouse moved as if meant does.
 Its camera can take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
 (Lively), or keep the whole place in view with a slow drift (Whole place).
+Activity sets how its day goes: Lively, the default, keeps it about through
+the day and the evening and asleep in the small hours; Natural is a male
+fly's day, busy round dawn and dusk, with a long midday siesta and the night
+asleep ([Sleep and the daily rhythm](../README.md#sleep-and-the-daily-rhythm)).
 Recognized game buttons, pointer gestures and deliberate mouse movement
 bring the controls back; unrelated keyboard keys need not wake it. The wake
 event is consumed, though held inputs can act on subsequent frames.

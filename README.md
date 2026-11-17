@@ -95,6 +95,15 @@ pressure builds while it is awake (over about 12 hours) and discharges while it 
 (over about 3): a fly kept awake by play, or woken again and again at night, is
 sleepier, and it starts each visit as sleepy as the hour would leave a fly left to itself.
 
+That is the Natural pace (Settings → Screensaver → Activity). The game starts on
+Lively, a day shaped for watching rather than measured in a fly: its peaks spread
+four hours either side of dawn and dusk, its day is never shorter than a summer's
+(05:40 to 20:10, so a winter evening is still its evening peak), the clock pushes
+it a little toward sleep by day and somewhat at night, and it feels a fifth of its
+sleep pressure. It walks a quarter of a midday hour where a natural fly walks 2%,
+keeps its evening peak till about 22:00, and mostly rests from late evening to dawn,
+napping briefly (`packages/brain/README.md`, Sleep and the daily rhythm, has the numbers).
+
 None of this moves the fly. The body works the clock and the pressure out
 (`packages/body/src/rhythm.ts`) and tells the brain, which drives the clock neurons
 and the sleep-promoting neurons the connectome has and shifts its made-up arousal; it
