@@ -287,8 +287,43 @@ followed fly's. While the ball is in the air the followed fly gets priority at a
 others can refresh on frames when it is not due. No frame refreshes more than
 one fly's eyes. Pending readbacks and reflection refreshes can delay pictures.
 
-Brightness is weighted as a fly's outer photoreceptors (Rh1, mostly blue-green)
-see it, 0.1 R + 0.45 G + 0.45 B, so a blue sky is bright to it. The picture is
+Brightness is weighted as a fly's outer photoreceptors (R1–R6, rhodopsin Rh1,
+mostly blue-green) catch it in daylight, 0.1 R + 0.45 G + 0.45 B of the
+picture's linear colour, so a blue sky is bright to it. These are what R1–R6's
+response measured in the eye gives (Sharkey et al. 2020, Sci. Rep. 10:18242:
+0.11 to 0.13, 0.43, 0.44 to 0.46, fitted over smooth spectra with each colour,
+`packages/body/scripts/photoreceptors.ts`); the pigment's template alone gives
+no red (0, 0.39 to 0.46, 0.54 to 0.61), the eye's red coming from light that
+leaks through its screening pigment. Ultraviolet is left out. R1–R6 are more
+sensitive at 350 nm than in the blue (1.37 times by the whole eye's ERG; Ilić
+et al. 2018, Front. Cell. Neurosci. 12:34), and UV is about a fifth of what
+they catch from a white that reflects it, but a colour doesn't say how much a
+surface reflects, and most of what the game draws reflects little: skin, wood,
+leaves, and white paint (titanium dioxide absorbs below 400 nm). In daylight,
+UV included, light skin gives R1–R6 0.31 of a perfect white's light and a
+white-painted table 0.73, a contrast of 0.58; FLY_RGB on their colours gives
+0.35 and 0.88, 0.60. The sky is richer in UV than what it lights, but the
+game's sky is already about as bright as its table to the eyes, where a clear sky is
+a fraction as bright as a sunlit white surface (a few thousand candela per
+square metre against about 25,000 at 100,000 lux), with UV or without, so it
+isn't raised.
+
+How dark a thing is against the table is what the eyes' looming pathway
+answers (`packages/brain/README.md`, Seeing), and the picture flattens it.
+Measured in the game's own eyes at midday on the picnic table
+(`scripts/eyesContrast.ts`: a fingertip's size and shape lying 6 mm ahead
+of the fly, seen with and without it), the Finger tool's skin colour gives
+0.40 where the table behind it gives 0.56, a contrast of 0.29; glossy or
+matte makes no difference. The same shape in white gives 0.75 and in near
+black 0.17 (0.70). The table renders at about three quarters of a white
+thing's light, and skin at about half of white's where its colour says 0.43,
+so skin's contrast is half the 0.58 a fly would see from it on white paint.
+The kit's colours stay apart: blue 0.54 to 0.59, yellow 0.35 to 0.47 and red
+0.16 to 0.34 (dishes and tiles; contrasts against the table 0.14 to 0.15,
+0.29 to 0.41 and 0.48 to 0.73), and the ball's stripes 0.21 to 0.23 (0.61
+to 0.65).
+
+The picture is
 then adapted to the light, as a fly's photoreceptors adapt their gain to it
 (`Adaptation` in `vision.ts`): where the scene renders dim, it is scaled up
 toward the level midday has (a mean of 0.5), by up to 2 times, following the

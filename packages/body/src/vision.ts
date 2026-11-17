@@ -90,11 +90,17 @@ export function createSampler(directions: Float32Array, resolution: number): Sam
 }
 
 /**
- * How a fly weights red, green and blue light. Its outer photoreceptors
- * (R1-R6, rhodopsin Rh1), which feed the lamina cells the brain's eyes are
- * driven through, are most sensitive to blue-green light and barely to red, so
- * a blue sky is bright to a fly where human luminance would call it dim. A
- * rough three-band stand-in for Rh1's spectral sensitivity, not a fit.
+ * How a fly weights red, green and blue light: its outer photoreceptors'
+ * (R1-R6, rhodopsin Rh1) catch of a surface of that linear colour in daylight,
+ * the receptors that feed the lamina cells the brain's eyes are driven
+ * through. They are most sensitive to blue-green light, so a blue sky is
+ * bright to a fly where human luminance would call it dim. Fitted to R1-R6's
+ * measured response in the eye, these come out at 0.11 to 0.13, 0.43, 0.44 to
+ * 0.46; to the pigment's template alone, 0, 0.39 to 0.46, 0.54 to 0.61
+ * (packages/body/scripts/photoreceptors.ts says how). Ultraviolet, about a
+ * fifth of what R1-R6 catch from a white that reflects it, is left out: an
+ * sRGB colour doesn't tell it, and skin, paint, wood and leaves reflect
+ * little of it.
  */
 export const FLY_RGB = [0.1, 0.45, 0.45] as const;
 
