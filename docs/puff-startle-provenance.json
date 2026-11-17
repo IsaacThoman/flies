@@ -1,0 +1,577 @@
+{
+  "schemaVersion": 2,
+  "baseCommit": "1ebc3a446892349e88d1ff1dbf7c719f2d2ca3f2",
+  "captureCommit": "cecaab0d5ef50a64d837e592cd6160fe31468846",
+  "captures": [
+    {
+      "label": "wiring",
+      "command": "node packages/brain/scripts/puff.ts --wiring",
+      "header": {
+        "dataset": "FlyEM male CNS, Janelia Research Campus (CC-BY 4.0)",
+        "sha256": "51c97031b39f93c04a683f16683d88f15d291f1e1062694fc0a215e23c3b895c",
+        "provenance": {
+          "capturedAtUtc": "2026-11-17T02:25:30.133Z",
+          "node": "v26.12.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "argv": [
+            "/Users/isaacthoman/.t3/worktrees/apple-tv-fly/t3-82f07464-51c859f162e08a98/packages/brain/scripts/puff.ts",
+            "--wiring"
+          ],
+          "execArgv": [],
+          "options": {
+            "wiring": true,
+            "path": "/Users/isaacthoman/.t3/worktrees/apple-tv-fly/t3-82f07464-51c859f162e08a98/packages/brain/data/connectome.bin",
+            "seeds": "5",
+            "populations": "rest,wind,A,B,C,D,E,F,AB,ABCE,all,loom,AB+CE",
+            "rates": "25,50,100,200",
+            "durations": "20,100,1000"
+          },
+          "gitHead": "cecaab0d5ef50a64d837e592cd6160fe31468846",
+          "gitDirty": false,
+          "probeSha256": "e7b120e9b36da169549ce17c616d984c787a2f9ab37ed1a38cc068fc1647b35f",
+          "runtimeSources": {
+            "anatomy.ts": "56f9cbce4289bd8879b924bd599dd7aa4a077b4d196da8523145fc98a2df1c4e",
+            "eye-columns.ts": "e2a03854bed6e17a685656cb867ca7b4d22221e0c5d72a5d64937c46f2a9d0fc",
+            "eyes.ts": "c79273ce5af951676bd5dcdd1ab9303070696dd010e40d3529eb2ea4e033ed43",
+            "format.ts": "df1f83b8b86c945b32e16d1642c74af61dc8302e37d4c25586f8d22dfea9a56e",
+            "index.ts": "846e1925ac5c1ef974ef22df271cfd132433dde50732573129b2f6dc912b7d56",
+            "io.ts": "40e16c7ba42bf28b9c66b7c5f077552ee6f7ff2f2667bfbe296abeeba8838c6a",
+            "lz4js.d.ts": "dfaf07a1dbe57dc81844dd326c85c94671c1459dc33f7009d28706bf52e25bb5",
+            "node.ts": "5bd3b731c80ef713d96123f6a4a87bf5baedb5f964ba3477400716a41d9ff77a",
+            "observer.ts": "1bf4527be5c03365a45382644de0646b06890298c341ea0fac307c61af98146f",
+            "pack-anatomy.ts": "aee15cef48130edf5ab55904da2c0ad3d8670ba066c0868f947c36b2cd286e85",
+            "pack.ts": "3cdba9cfe96732d9cfd1ecb26a508844bef088e7d83f21acecc3ad703ec33fd1",
+            "params.ts": "2f096ff52569a87e7c2837e5ef10db2909206c3c6cfd8e3e64c58d56fef3dd77",
+            "regions.ts": "85676d46ea39ef9ee08327813af3aa331a0664cf26e26109e614e5be27a5600b",
+            "runtime.ts": "5a4442a8a21b31227f5268c79be0f57dc09092c3e2c5ede0fe3b63f97c97c831",
+            "sim.ts": "2e982a13194b9bb78a149098183e559e1cd38185d770f5fc548926efbb336fd9",
+            "state.ts": "a32c641e3d7006219b706150b48515c2c44b240aa2fa431d15e5e4248dc1888b",
+            "stimuli.ts": "b95687aa3f714131a5965b41380acecbe1f5433a3c5defd69b001bb59eca766c",
+            "types.ts": "c125f6e9f56742bce24e64eda3faf367a61b196ac93be5b0be2510f68533cf44",
+            "vision.ts": "b3f8942979f4b2fc52968c27b46ef37fbd5bd5c4fd4c8edf901080ad9ca21ea6"
+          }
+        },
+        "note": "Raw chemical synapse counts; no electrical coupling in this graph. Paths are anatomical, not evidence of activation."
+      },
+      "responseConditions": 0,
+      "trials": 0,
+      "rawCaptureSha256": "6c2d8d28f24e78a77a9cb3c82d1fc07a0b7c2e2ff45d03dc6bce814c208ef121",
+      "payloadSha256": "8b33de3ba12640840080b581d8a3d362e5fde90328d023ba6e0aceec22709043"
+    },
+    {
+      "label": "sim",
+      "command": "node packages/brain/scripts/puff.ts --simulate --seeds 3 --populations wind,A,B,AB,ABCE,all,loom",
+      "header": {
+        "dataset": "FlyEM male CNS, Janelia Research Campus (CC-BY 4.0)",
+        "sha256": "51c97031b39f93c04a683f16683d88f15d291f1e1062694fc0a215e23c3b895c",
+        "provenance": {
+          "capturedAtUtc": "2026-11-17T02:25:38.764Z",
+          "node": "v26.12.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "argv": [
+            "/Users/isaacthoman/.t3/worktrees/apple-tv-fly/t3-82f07464-51c859f162e08a98/packages/brain/scripts/puff.ts",
+            "--simulate",
+            "--seeds",
+            "3",
+            "--populations",
+            "wind,A,B,AB,ABCE,all,loom"
+          ],
+          "execArgv": [],
+          "options": {
+            "simulate": true,
+            "seeds": "3",
+            "populations": "wind,A,B,AB,ABCE,all,loom",
+            "path": "/Users/isaacthoman/.t3/worktrees/apple-tv-fly/t3-82f07464-51c859f162e08a98/packages/brain/data/connectome.bin",
+            "rates": "25,50,100,200",
+            "durations": "20,100,1000"
+          },
+          "gitHead": "cecaab0d5ef50a64d837e592cd6160fe31468846",
+          "gitDirty": false,
+          "probeSha256": "e7b120e9b36da169549ce17c616d984c787a2f9ab37ed1a38cc068fc1647b35f",
+          "runtimeSources": {
+            "anatomy.ts": "56f9cbce4289bd8879b924bd599dd7aa4a077b4d196da8523145fc98a2df1c4e",
+            "eye-columns.ts": "e2a03854bed6e17a685656cb867ca7b4d22221e0c5d72a5d64937c46f2a9d0fc",
+            "eyes.ts": "c79273ce5af951676bd5dcdd1ab9303070696dd010e40d3529eb2ea4e033ed43",
+            "format.ts": "df1f83b8b86c945b32e16d1642c74af61dc8302e37d4c25586f8d22dfea9a56e",
+            "index.ts": "846e1925ac5c1ef974ef22df271cfd132433dde50732573129b2f6dc912b7d56",
+            "io.ts": "40e16c7ba42bf28b9c66b7c5f077552ee6f7ff2f2667bfbe296abeeba8838c6a",
+            "lz4js.d.ts": "dfaf07a1dbe57dc81844dd326c85c94671c1459dc33f7009d28706bf52e25bb5",
+            "node.ts": "5bd3b731c80ef713d96123f6a4a87bf5baedb5f964ba3477400716a41d9ff77a",
+            "observer.ts": "1bf4527be5c03365a45382644de0646b06890298c341ea0fac307c61af98146f",
+            "pack-anatomy.ts": "aee15cef48130edf5ab55904da2c0ad3d8670ba066c0868f947c36b2cd286e85",
+            "pack.ts": "3cdba9cfe96732d9cfd1ecb26a508844bef088e7d83f21acecc3ad703ec33fd1",
+            "params.ts": "2f096ff52569a87e7c2837e5ef10db2909206c3c6cfd8e3e64c58d56fef3dd77",
+            "regions.ts": "85676d46ea39ef9ee08327813af3aa331a0664cf26e26109e614e5be27a5600b",
+            "runtime.ts": "5a4442a8a21b31227f5268c79be0f57dc09092c3e2c5ede0fe3b63f97c97c831",
+            "sim.ts": "2e982a13194b9bb78a149098183e559e1cd38185d770f5fc548926efbb336fd9",
+            "state.ts": "a32c641e3d7006219b706150b48515c2c44b240aa2fa431d15e5e4248dc1888b",
+            "stimuli.ts": "b95687aa3f714131a5965b41380acecbe1f5433a3c5defd69b001bb59eca766c",
+            "types.ts": "c125f6e9f56742bce24e64eda3faf367a61b196ac93be5b0be2510f68533cf44",
+            "vision.ts": "b3f8942979f4b2fc52968c27b46ef37fbd5bd5c4fd4c8edf901080ad9ca21ea6"
+          }
+        },
+        "note": "Raw chemical synapse counts; no electrical coupling in this graph. Paths are anatomical, not evidence of activation."
+      },
+      "responseConditions": 84,
+      "trials": 252,
+      "rawCaptureSha256": "afdd03406295c082988a436c35a2cf8d37f5df0d2d33938fb62c4b9df76d3ff5",
+      "payloadSha256": "99cda319394816b976fd4c285e06030148c9de1f30f085005388dab165142d1f"
+    },
+    {
+      "label": "zones",
+      "command": "node packages/brain/scripts/puff.ts --simulate --seeds 3 --populations C,D,E,F,rest --rates 0,50,100,200",
+      "header": {
+        "dataset": "FlyEM male CNS, Janelia Research Campus (CC-BY 4.0)",
+        "sha256": "51c97031b39f93c04a683f16683d88f15d291f1e1062694fc0a215e23c3b895c",
+        "provenance": {
+          "capturedAtUtc": "2026-11-17T02:29:46.121Z",
+          "node": "v26.12.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "argv": [
+            "/Users/isaacthoman/.t3/worktrees/apple-tv-fly/t3-82f07464-51c859f162e08a98/packages/brain/scripts/puff.ts",
+            "--simulate",
+            "--seeds",
+            "3",
+            "--populations",
+            "C,D,E,F,rest",
+            "--rates",
+            "0,50,100,200"
+          ],
+          "execArgv": [],
+          "options": {
+            "simulate": true,
+            "seeds": "3",
+            "populations": "C,D,E,F,rest",
+            "rates": "0,50,100,200",
+            "path": "/Users/isaacthoman/.t3/worktrees/apple-tv-fly/t3-82f07464-51c859f162e08a98/packages/brain/data/connectome.bin",
+            "durations": "20,100,1000"
+          },
+          "gitHead": "cecaab0d5ef50a64d837e592cd6160fe31468846",
+          "gitDirty": false,
+          "probeSha256": "e7b120e9b36da169549ce17c616d984c787a2f9ab37ed1a38cc068fc1647b35f",
+          "runtimeSources": {
+            "anatomy.ts": "56f9cbce4289bd8879b924bd599dd7aa4a077b4d196da8523145fc98a2df1c4e",
+            "eye-columns.ts": "e2a03854bed6e17a685656cb867ca7b4d22221e0c5d72a5d64937c46f2a9d0fc",
+            "eyes.ts": "c79273ce5af951676bd5dcdd1ab9303070696dd010e40d3529eb2ea4e033ed43",
+            "format.ts": "df1f83b8b86c945b32e16d1642c74af61dc8302e37d4c25586f8d22dfea9a56e",
+            "index.ts": "846e1925ac5c1ef974ef22df271cfd132433dde50732573129b2f6dc912b7d56",
+            "io.ts": "40e16c7ba42bf28b9c66b7c5f077552ee6f7ff2f2667bfbe296abeeba8838c6a",
+            "lz4js.d.ts": "dfaf07a1dbe57dc81844dd326c85c94671c1459dc33f7009d28706bf52e25bb5",
+            "node.ts": "5bd3b731c80ef713d96123f6a4a87bf5baedb5f964ba3477400716a41d9ff77a",
+            "observer.ts": "1bf4527be5c03365a45382644de0646b06890298c341ea0fac307c61af98146f",
+            "pack-anatomy.ts": "aee15cef48130edf5ab55904da2c0ad3d8670ba066c0868f947c36b2cd286e85",
+            "pack.ts": "3cdba9cfe96732d9cfd1ecb26a508844bef088e7d83f21acecc3ad703ec33fd1",
+            "params.ts": "2f096ff52569a87e7c2837e5ef10db2909206c3c6cfd8e3e64c58d56fef3dd77",
+            "regions.ts": "85676d46ea39ef9ee08327813af3aa331a0664cf26e26109e614e5be27a5600b",
+            "runtime.ts": "5a4442a8a21b31227f5268c79be0f57dc09092c3e2c5ede0fe3b63f97c97c831",
+            "sim.ts": "2e982a13194b9bb78a149098183e559e1cd38185d770f5fc548926efbb336fd9",
+            "state.ts": "a32c641e3d7006219b706150b48515c2c44b240aa2fa431d15e5e4248dc1888b",
+            "stimuli.ts": "b95687aa3f714131a5965b41380acecbe1f5433a3c5defd69b001bb59eca766c",
+            "types.ts": "c125f6e9f56742bce24e64eda3faf367a61b196ac93be5b0be2510f68533cf44",
+            "vision.ts": "b3f8942979f4b2fc52968c27b46ef37fbd5bd5c4fd4c8edf901080ad9ca21ea6"
+          }
+        },
+        "note": "Raw chemical synapse counts; no electrical coupling in this graph. Paths are anatomical, not evidence of activation."
+      },
+      "responseConditions": 51,
+      "trials": 153,
+      "rawCaptureSha256": "86ac7dbf547bec2491c1987462abd1cc513d67c1594a3fa7dfb5f52df8b189ec",
+      "payloadSha256": "09031379e98636c39b9ca5062e783c06ba045e109a5cafbe169e19eef00ba361"
+    },
+    {
+      "label": "dose",
+      "command": "node packages/brain/scripts/puff.ts --simulate --populations AB --rates 25,50,100,200 --durations 100 --seeds 20",
+      "header": {
+        "dataset": "FlyEM male CNS, Janelia Research Campus (CC-BY 4.0)",
+        "sha256": "51c97031b39f93c04a683f16683d88f15d291f1e1062694fc0a215e23c3b895c",
+        "provenance": {
+          "capturedAtUtc": "2026-11-17T02:33:50.009Z",
+          "node": "v26.12.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "argv": [
+            "/Users/isaacthoman/.t3/worktrees/apple-tv-fly/t3-82f07464-51c859f162e08a98/packages/brain/scripts/puff.ts",
+            "--simulate",
+            "--populations",
+            "AB",
+            "--rates",
+            "25,50,100,200",
+            "--durations",
+            "100",
+            "--seeds",
+            "20"
+          ],
+          "execArgv": [],
+          "options": {
+            "simulate": true,
+            "populations": "AB",
+            "rates": "25,50,100,200",
+            "durations": "100",
+            "seeds": "20",
+            "path": "/Users/isaacthoman/.t3/worktrees/apple-tv-fly/t3-82f07464-51c859f162e08a98/packages/brain/data/connectome.bin"
+          },
+          "gitHead": "cecaab0d5ef50a64d837e592cd6160fe31468846",
+          "gitDirty": false,
+          "probeSha256": "e7b120e9b36da169549ce17c616d984c787a2f9ab37ed1a38cc068fc1647b35f",
+          "runtimeSources": {
+            "anatomy.ts": "56f9cbce4289bd8879b924bd599dd7aa4a077b4d196da8523145fc98a2df1c4e",
+            "eye-columns.ts": "e2a03854bed6e17a685656cb867ca7b4d22221e0c5d72a5d64937c46f2a9d0fc",
+            "eyes.ts": "c79273ce5af951676bd5dcdd1ab9303070696dd010e40d3529eb2ea4e033ed43",
+            "format.ts": "df1f83b8b86c945b32e16d1642c74af61dc8302e37d4c25586f8d22dfea9a56e",
+            "index.ts": "846e1925ac5c1ef974ef22df271cfd132433dde50732573129b2f6dc912b7d56",
+            "io.ts": "40e16c7ba42bf28b9c66b7c5f077552ee6f7ff2f2667bfbe296abeeba8838c6a",
+            "lz4js.d.ts": "dfaf07a1dbe57dc81844dd326c85c94671c1459dc33f7009d28706bf52e25bb5",
+            "node.ts": "5bd3b731c80ef713d96123f6a4a87bf5baedb5f964ba3477400716a41d9ff77a",
+            "observer.ts": "1bf4527be5c03365a45382644de0646b06890298c341ea0fac307c61af98146f",
+            "pack-anatomy.ts": "aee15cef48130edf5ab55904da2c0ad3d8670ba066c0868f947c36b2cd286e85",
+            "pack.ts": "3cdba9cfe96732d9cfd1ecb26a508844bef088e7d83f21acecc3ad703ec33fd1",
+            "params.ts": "2f096ff52569a87e7c2837e5ef10db2909206c3c6cfd8e3e64c58d56fef3dd77",
+            "regions.ts": "85676d46ea39ef9ee08327813af3aa331a0664cf26e26109e614e5be27a5600b",
+            "runtime.ts": "5a4442a8a21b31227f5268c79be0f57dc09092c3e2c5ede0fe3b63f97c97c831",
+            "sim.ts": "2e982a13194b9bb78a149098183e559e1cd38185d770f5fc548926efbb336fd9",
+            "state.ts": "a32c641e3d7006219b706150b48515c2c44b240aa2fa431d15e5e4248dc1888b",
+            "stimuli.ts": "b95687aa3f714131a5965b41380acecbe1f5433a3c5defd69b001bb59eca766c",
+            "types.ts": "c125f6e9f56742bce24e64eda3faf367a61b196ac93be5b0be2510f68533cf44",
+            "vision.ts": "b3f8942979f4b2fc52968c27b46ef37fbd5bd5c4fd4c8edf901080ad9ca21ea6"
+          }
+        },
+        "note": "Raw chemical synapse counts; no electrical coupling in this graph. Paths are anatomical, not evidence of activation."
+      },
+      "responseConditions": 4,
+      "trials": 80,
+      "rawCaptureSha256": "5adaabffbc2dd6d8c6eca9b8e530b3f81350bf1e85b93a3fc983f7c222cd0267",
+      "payloadSha256": "11442ccfba287d6565e255f94813a659501c8b3f6d94efdf242b0ec5f5635402"
+    },
+    {
+      "label": "temporal",
+      "command": "node packages/brain/scripts/puff.ts --simulate --populations AB+CE --rates 50,100,200 --durations 20,100 --seeds 10",
+      "header": {
+        "dataset": "FlyEM male CNS, Janelia Research Campus (CC-BY 4.0)",
+        "sha256": "51c97031b39f93c04a683f16683d88f15d291f1e1062694fc0a215e23c3b895c",
+        "provenance": {
+          "capturedAtUtc": "2026-11-17T02:37:14.105Z",
+          "node": "v26.12.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "argv": [
+            "/Users/isaacthoman/.t3/worktrees/apple-tv-fly/t3-82f07464-51c859f162e08a98/packages/brain/scripts/puff.ts",
+            "--simulate",
+            "--populations",
+            "AB+CE",
+            "--rates",
+            "50,100,200",
+            "--durations",
+            "20,100",
+            "--seeds",
+            "10"
+          ],
+          "execArgv": [],
+          "options": {
+            "simulate": true,
+            "populations": "AB+CE",
+            "rates": "50,100,200",
+            "durations": "20,100",
+            "seeds": "10",
+            "path": "/Users/isaacthoman/.t3/worktrees/apple-tv-fly/t3-82f07464-51c859f162e08a98/packages/brain/data/connectome.bin"
+          },
+          "gitHead": "cecaab0d5ef50a64d837e592cd6160fe31468846",
+          "gitDirty": false,
+          "probeSha256": "e7b120e9b36da169549ce17c616d984c787a2f9ab37ed1a38cc068fc1647b35f",
+          "runtimeSources": {
+            "anatomy.ts": "56f9cbce4289bd8879b924bd599dd7aa4a077b4d196da8523145fc98a2df1c4e",
+            "eye-columns.ts": "e2a03854bed6e17a685656cb867ca7b4d22221e0c5d72a5d64937c46f2a9d0fc",
+            "eyes.ts": "c79273ce5af951676bd5dcdd1ab9303070696dd010e40d3529eb2ea4e033ed43",
+            "format.ts": "df1f83b8b86c945b32e16d1642c74af61dc8302e37d4c25586f8d22dfea9a56e",
+            "index.ts": "846e1925ac5c1ef974ef22df271cfd132433dde50732573129b2f6dc912b7d56",
+            "io.ts": "40e16c7ba42bf28b9c66b7c5f077552ee6f7ff2f2667bfbe296abeeba8838c6a",
+            "lz4js.d.ts": "dfaf07a1dbe57dc81844dd326c85c94671c1459dc33f7009d28706bf52e25bb5",
+            "node.ts": "5bd3b731c80ef713d96123f6a4a87bf5baedb5f964ba3477400716a41d9ff77a",
+            "observer.ts": "1bf4527be5c03365a45382644de0646b06890298c341ea0fac307c61af98146f",
+            "pack-anatomy.ts": "aee15cef48130edf5ab55904da2c0ad3d8670ba066c0868f947c36b2cd286e85",
+            "pack.ts": "3cdba9cfe96732d9cfd1ecb26a508844bef088e7d83f21acecc3ad703ec33fd1",
+            "params.ts": "2f096ff52569a87e7c2837e5ef10db2909206c3c6cfd8e3e64c58d56fef3dd77",
+            "regions.ts": "85676d46ea39ef9ee08327813af3aa331a0664cf26e26109e614e5be27a5600b",
+            "runtime.ts": "5a4442a8a21b31227f5268c79be0f57dc09092c3e2c5ede0fe3b63f97c97c831",
+            "sim.ts": "2e982a13194b9bb78a149098183e559e1cd38185d770f5fc548926efbb336fd9",
+            "state.ts": "a32c641e3d7006219b706150b48515c2c44b240aa2fa431d15e5e4248dc1888b",
+            "stimuli.ts": "b95687aa3f714131a5965b41380acecbe1f5433a3c5defd69b001bb59eca766c",
+            "types.ts": "c125f6e9f56742bce24e64eda3faf367a61b196ac93be5b0be2510f68533cf44",
+            "vision.ts": "b3f8942979f4b2fc52968c27b46ef37fbd5bd5c4fd4c8edf901080ad9ca21ea6"
+          }
+        },
+        "note": "Raw chemical synapse counts; no electrical coupling in this graph. Paths are anatomical, not evidence of activation."
+      },
+      "responseConditions": 6,
+      "trials": 60,
+      "rawCaptureSha256": "bd75be337cc74719fd992da268d8fa3361484be65d2ccb4667c0d3376143880b",
+      "payloadSha256": "0f59fe643704e5e5c48a947d7f60d04ca0745c0b8e714302a74667ed00652f79"
+    },
+    {
+      "label": "matched",
+      "command": "node packages/brain/scripts/puff.ts --simulate --populations rest,loom,AB+CE,AB --rates 100 --durations 100 --seeds 20",
+      "header": {
+        "dataset": "FlyEM male CNS, Janelia Research Campus (CC-BY 4.0)",
+        "sha256": "51c97031b39f93c04a683f16683d88f15d291f1e1062694fc0a215e23c3b895c",
+        "provenance": {
+          "capturedAtUtc": "2026-11-17T02:38:34.175Z",
+          "node": "v26.12.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "argv": [
+            "/Users/isaacthoman/.t3/worktrees/apple-tv-fly/t3-82f07464-51c859f162e08a98/packages/brain/scripts/puff.ts",
+            "--simulate",
+            "--populations",
+            "rest,loom,AB+CE,AB",
+            "--rates",
+            "100",
+            "--durations",
+            "100",
+            "--seeds",
+            "20"
+          ],
+          "execArgv": [],
+          "options": {
+            "simulate": true,
+            "populations": "rest,loom,AB+CE,AB",
+            "rates": "100",
+            "durations": "100",
+            "seeds": "20",
+            "path": "/Users/isaacthoman/.t3/worktrees/apple-tv-fly/t3-82f07464-51c859f162e08a98/packages/brain/data/connectome.bin"
+          },
+          "gitHead": "cecaab0d5ef50a64d837e592cd6160fe31468846",
+          "gitDirty": false,
+          "probeSha256": "e7b120e9b36da169549ce17c616d984c787a2f9ab37ed1a38cc068fc1647b35f",
+          "runtimeSources": {
+            "anatomy.ts": "56f9cbce4289bd8879b924bd599dd7aa4a077b4d196da8523145fc98a2df1c4e",
+            "eye-columns.ts": "e2a03854bed6e17a685656cb867ca7b4d22221e0c5d72a5d64937c46f2a9d0fc",
+            "eyes.ts": "c79273ce5af951676bd5dcdd1ab9303070696dd010e40d3529eb2ea4e033ed43",
+            "format.ts": "df1f83b8b86c945b32e16d1642c74af61dc8302e37d4c25586f8d22dfea9a56e",
+            "index.ts": "846e1925ac5c1ef974ef22df271cfd132433dde50732573129b2f6dc912b7d56",
+            "io.ts": "40e16c7ba42bf28b9c66b7c5f077552ee6f7ff2f2667bfbe296abeeba8838c6a",
+            "lz4js.d.ts": "dfaf07a1dbe57dc81844dd326c85c94671c1459dc33f7009d28706bf52e25bb5",
+            "node.ts": "5bd3b731c80ef713d96123f6a4a87bf5baedb5f964ba3477400716a41d9ff77a",
+            "observer.ts": "1bf4527be5c03365a45382644de0646b06890298c341ea0fac307c61af98146f",
+            "pack-anatomy.ts": "aee15cef48130edf5ab55904da2c0ad3d8670ba066c0868f947c36b2cd286e85",
+            "pack.ts": "3cdba9cfe96732d9cfd1ecb26a508844bef088e7d83f21acecc3ad703ec33fd1",
+            "params.ts": "2f096ff52569a87e7c2837e5ef10db2909206c3c6cfd8e3e64c58d56fef3dd77",
+            "regions.ts": "85676d46ea39ef9ee08327813af3aa331a0664cf26e26109e614e5be27a5600b",
+            "runtime.ts": "5a4442a8a21b31227f5268c79be0f57dc09092c3e2c5ede0fe3b63f97c97c831",
+            "sim.ts": "2e982a13194b9bb78a149098183e559e1cd38185d770f5fc548926efbb336fd9",
+            "state.ts": "a32c641e3d7006219b706150b48515c2c44b240aa2fa431d15e5e4248dc1888b",
+            "stimuli.ts": "b95687aa3f714131a5965b41380acecbe1f5433a3c5defd69b001bb59eca766c",
+            "types.ts": "c125f6e9f56742bce24e64eda3faf367a61b196ac93be5b0be2510f68533cf44",
+            "vision.ts": "b3f8942979f4b2fc52968c27b46ef37fbd5bd5c4fd4c8edf901080ad9ca21ea6"
+          }
+        },
+        "note": "Raw chemical synapse counts; no electrical coupling in this graph. Paths are anatomical, not evidence of activation."
+      },
+      "responseConditions": 4,
+      "trials": 80,
+      "rawCaptureSha256": "323d6ec9ba456306b155e1aa75c7cca8ff2289b6b9d1698b7d449ffcf396ad99",
+      "payloadSha256": "d9fd3c5cef847e8d079b980b5fb5a0f68f5baa24c4820ca02cb5602668fc5888"
+    }
+  ],
+  "payloadHashEncoding": "Parse JSONL, omit first header, JSON.stringify each remaining record preserving key order, join with LF including final LF.",
+  "captureCoverage": {
+    "conditionsBeforeDeduplication": 149,
+    "trialsBeforeDeduplication": 625,
+    "note": "Shared seeds and overlapping cohorts are not independent replicates and are never pooled."
+  },
+  "unchangedProduction": {
+    "paths": [
+      "packages/brain/src",
+      "packages/brain-native",
+      "packages/body",
+      "apps/web/src/tools",
+      "scripts/cpuBudget.ts"
+    ],
+    "trackedFiles": 110,
+    "gitTreeListingSha256": "df8a63b44bea4baea45b1afa502765647dc96ca62ca8dc765b3917ef4950fcd8",
+    "treeAtCaptureEqualsBase": true,
+    "workingTreeAtCaptureEqualsHead": true,
+    "runtimeSourceSha256EqualsBase": true,
+    "runtimeSourcesChecked": 19,
+    "wiringRecordsEqualHistorical": 70
+  },
+  "summaryRegeneration": {
+    "script": "packages/brain/scripts/summarize-puff.ts",
+    "scriptSha256": "5607a78b1f24910d7409944d90733a49fabfeb21f15e03d1ce14b3f079e498bb",
+    "responseRows": 148,
+    "wiringRows": 720,
+    "responseCsvSha256": "a52a05807e641a19a0853fc259f8b7efbc39e36b250a5525de89f0849839b7e4",
+    "wiringCsvSha256": "ba601adb786a2e9ecaa42dcd6794622155d564a46da7e58fd7ed8fcb65384b7a",
+    "pairedResultsSha256": "28a6c834df7835f34fe1307bd98e0d6affd563fefb8a54b6e5bcdec14be0310f"
+  },
+  "pairedSpikeUncertainty": {
+    "endpoint": "DNp01 spike count in first 100 ms, stimulated minus same-seed sham",
+    "seeds": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "bootstrap": {
+      "type": "paired percentile bootstrap of mean difference",
+      "resamples": 20000,
+      "sampleSize": 20,
+      "generator": "mulberry32",
+      "generatorSeedPerCondition": 1,
+      "endpointIndices": [
+        499,
+        19500
+      ],
+      "interpretation": "Approximate uncertainty across these model RNG seeds; not biological intervals or exact coverage."
+    },
+    "conditions": [
+      {
+        "population": "loom",
+        "pairedDifferences": [
+          66,
+          65,
+          65,
+          65,
+          66,
+          66,
+          65,
+          66,
+          65,
+          63,
+          65,
+          63,
+          65,
+          64,
+          65,
+          65,
+          66,
+          66,
+          66,
+          64
+        ],
+        "mean": 65.05,
+        "bootstrap95": [
+          64.65,
+          65.45
+        ]
+      },
+      {
+        "population": "AB+CE",
+        "pairedDifferences": [
+          1,
+          2,
+          2,
+          2,
+          2,
+          1,
+          2,
+          3,
+          1,
+          1,
+          3,
+          2,
+          0,
+          0,
+          1,
+          1,
+          1,
+          2,
+          2,
+          1
+        ],
+        "mean": 1.5,
+        "bootstrap95": [
+          1.15,
+          1.85
+        ]
+      },
+      {
+        "population": "AB",
+        "pairedDifferences": [
+          8,
+          7,
+          9,
+          10,
+          9,
+          9,
+          6,
+          7,
+          11,
+          10,
+          9,
+          9,
+          5,
+          7,
+          9,
+          7,
+          7,
+          10,
+          7,
+          9
+        ],
+        "mean": 8.25,
+        "bootstrap95": [
+          7.6,
+          8.9
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "gitHead": "cecaab0d5ef50a64d837e592cd6160fe31468846",
+    "gitDirty": false,
+    "trackedGitTreeSha256": "80ba5f597398c1737229e9e57e868f8f8e4685a4cf3087088434423c5a024300",
+    "node": "v26.12.0",
+    "checks": [
+      {
+        "name": "test",
+        "command": [
+          "npm",
+          "test"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 488.16,
+        "logSha256": "64ed95133d5ac8cfad3ba094e1f2968788ce560c0366d7cf9c5ec07aa8bbddd6"
+      },
+      {
+        "name": "typecheck",
+        "command": [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 17.36,
+        "logSha256": "14b3236da411098d61e3268a4044ccba8ea9ce7b74851153c9ee337451a9ddff"
+      },
+      {
+        "name": "lint",
+        "command": [
+          "npm",
+          "run",
+          "lint"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 20.7,
+        "logSha256": "6b148cf52572c95543b3992a0dfece0c25946ba5a35fa53b2071cc4cb129e99a"
+      }
+    ]
+  }
+}
