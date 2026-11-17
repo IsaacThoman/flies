@@ -114,7 +114,7 @@ export class TableFood {
   /** Something the place put out, on the surface at or below `y`, as a device saw it; the first to say so names it. The oldest found goes past MAX_FOUND. */
   found(id: number, name: string, x: number, z: number, r: number, sweet: number, y?: number, lasts = FOUND_LASTS): Food | null {
     if (!(id >= FOUND_ID) || typeof name !== "string" || name.length > 40 || this.find(id) || !this.#world.onTable(x, z) || !(r > 0 && r < 5) || !(sweet >= 0 && sweet <= 1)) return null;
-    if (!(lasts > 0 && lasts <= FOUND_LASTS)) return null;
+    if (!Number.isFinite(lasts) || !(lasts > 0 && lasts <= FOUND_LASTS)) return null;
     const found = this.foods.filter((f) => f.kind === "found");
     if (found.length >= MAX_FOUND) this.#remove(found[0]);
     const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, amount: 1, pool: false };

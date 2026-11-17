@@ -721,3 +721,32 @@ test("found food deadlines survive a saved idle room and are gone on welcome", (
   clock.wall += 1000;
   assert.ok(!table.record().foods.some((f) => f[0] === 900000001), "a room that never ticked expires before its next save");
 });
+
+test("a live idle room clears expired food before another welcome", () => {
+  const { table, clock, join, send } = room();
+  const a = join("key-1");
+  send(a, { type: "found", id: 900000001, name: "juice", x: 20, z: 20, y: 0, r: 1, sweet: 0.8, lasts: 10 });
+  clock.wall += 10001;
+  const b = join("key-2");
+  assert.ok(!saidOf(b, "welcome")[0].foods.some((f) => f[0] === 900000001));
+  assert.equal(table.food.find(900000001), null);
+});
+
+test("a replacement found food is announced after the previous lifetime's removal", () => {
+  const { table, clock, join, send, step } = room();
+  const a = join("key-1");
+  const b = join("key-2");
+  const found: ClientMessage = { type: "found", id: 900000001, name: "juice", x: 20, z: 20, y: 0, r: 1, sweet: 0.8, lasts: 10 };
+  send(a, found);
+  clear(b);
+  clock.wall += 10001;
+  table.food.update(0);
+  send(a, found);
+  step(100);
+  const messages = said(b);
+  const gone = messages.findIndex((m) => m.type === "food" && m.gone.includes(found.id));
+  const replacement = messages.findIndex((m) => m.type === "found" && m.food[0] === found.id);
+  assert.ok(gone >= 0 && replacement > gone);
+  assert.ok(!messages.slice(replacement).some((m) => m.type === "food" && m.gone.includes(found.id)));
+  assert.ok(table.food.find(found.id));
+});

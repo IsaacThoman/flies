@@ -146,3 +146,15 @@ test("found food expires from snapshots, including across a restart and while no
   late.restore(foods, expires);
   assert.equal(late.find(food.id), null, "expired food is not restored");
 });
+
+test("legacy found food receives a bounded lifetime", () => {
+  let now = 0;
+  const table = new TableFood(world, [], () => now);
+  const food = table.found(900000001, "crumb", 20, 20, 1, 0.5)!;
+  const legacy = table.foods.map(toWire);
+  now = 1000;
+  table.restore(legacy);
+  now += 1520001;
+  table.update(0);
+  assert.equal(table.find(food.id), null);
+});

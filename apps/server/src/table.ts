@@ -547,6 +547,10 @@ export class Table {
         return;
       case "found": {
         if (!finite(m.id, m.x, m.z, m.r, m.sweet) || !seat.rates.found.take(now)) return;
+        // A position-derived ID may be found again. Clear the previous
+        // lifetime on every device before broadcasting its replacement.
+        this.food.update(0);
+        this.#flushFood();
         const food = this.food.found(m.id, m.name, m.x, m.z, m.r, m.sweet, finite(m.y) ? m.y : undefined, m.lasts);
         if (food) this.#broadcast({ type: "found", food: toWire(food) }, seat);
         return;
@@ -671,6 +675,12 @@ export class Table {
     }
   }
 
+  #flushFood() {
+    const changes = this.food.flush();
+    if (!changes) return;
+    for (const p of this.seats.values()) if (p.link) this.#send(p, { type: "food", ack: p.ack, ...changes, eaten: Math.round((this.food.eaten.get(p.id) ?? 0) * 1e4) / 1e4 });
+  }
+
   /** The table's beat, every SEND_EVERY ms (@fly/net): the batch, presence, the food, the balls, the bubbles, the visitors. */
   tick() {
     const now = this.now;
@@ -698,12 +708,9 @@ export class Table {
     this.food.update(dt);
     if (now - this.#foodAt >= FOOD_EVERY) {
       this.#foodAt = now;
-      const changes = this.food.flush();
-      if (changes) {
-        // Each player is told which of its own bites have been counted.
-        for (const p of this.seats.values()) if (p.link) this.#send(p, { type: "food", ack: p.ack, ...changes, eaten: Math.round((this.food.eaten.get(p.id) ?? 0) * 1e4) / 1e4 });
-      }
+      this.#flushFood();
     }
+
     const bubbles = this.bubbles;
     // Balls that have flown are forgotten; while one flies, the bubbles it hits burst.
     for (let i = this.balls.length - 1; i >= 0; i--) {
