@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
 import { FLY_HEIGHT, FlyBody, createIntent } from "@fly/body";
-import { Pantry, World, createSurface, inside, topHeight } from "@fly/world";
+import { Pantry, TOUCH, World, createSurface, inside, topHeight } from "@fly/world";
 import { CameraDirector, WALLPAPER } from "../src/camera.ts";
 import { PLACES, nextPlace } from "../src/places/catalog.ts";
 import type { PlaceId } from "../src/places/catalog.ts";
@@ -59,6 +59,7 @@ for (const info of PLACES) {
       const support = world.surface(patch.x, patch.z, createSurface(), patch.y).solid;
       const solid = support >= 0 ? world.solids[support] : null;
       const surface = createSurface();
+      const lower = createSurface();
       let samples = 0;
       for (let dx = -patch.r; dx <= patch.r; dx += 0.25) {
         for (let dz = -patch.r; dz <= patch.r; dz += 0.25) {
@@ -68,9 +69,17 @@ for (const info of PLACES) {
           if (solid && !inside(solid.footprint, x, z)) continue;
           const height = solid ? topHeight(solid, x, z) : 0;
           world.surface(x, z, surface, height);
-          if (!surface.onTable || surface.solid !== support || surface.normal.y < STANDABLE || surface.underside - height < FLY_HEIGHT) continue;
+          if (surface.solid !== support || surface.underside <= height + TOUCH) {
+            assert.equal(alone.touching(x, height, z, 0), null, `${patch.name} is hidden at ${x}, ${height}, ${z}`);
+            continue;
+          }
+          if (!surface.onTable || surface.normal.y < STANDABLE || surface.underside - height < FLY_HEIGHT) continue;
           samples++;
           assert.equal(alone.touching(x, height, z, 0), alone.foods[0], `${patch.name} can be tasted at ${x}, ${height}, ${z}`);
+          world.surface(x, z, lower, height - 2 * TOUCH);
+          if (lower.solid !== support && lower.normal.y >= STANDABLE && lower.underside - lower.y >= FLY_HEIGHT) {
+            assert.equal(alone.touching(x, lower.y, z, 0.3), null, `${patch.name} cannot be tasted from the layer at ${lower.y}`);
+          }
         }
       }
       assert.ok(samples > 0, `${patch.name} has exposed, standable samples`);
