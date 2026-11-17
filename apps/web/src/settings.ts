@@ -38,8 +38,6 @@ export const WALLPAPER_DELAYS: Option<number>[] = [
 
 export type Settings = {
   pixels: PixelSize;
-  /** System preference unless explicitly overridden by the player. */
-  reduceMotion: "system" | "on" | "off";
   /** Seconds without a press before the game becomes a wallpaper; 0 never. */
   wallpaperAfter: number;
   /** How the camera moves in the wallpaper: "follow" keeps one shot on the fly, "calm" holds long shots, "lively" changes them more often, "whole" keeps the whole place in view. */
@@ -74,7 +72,6 @@ export type Settings = {
 
 export const DEFAULT_SETTINGS: Settings = {
   pixels: "classic",
-  reduceMotion: "system",
   wallpaperAfter: 30,
   wallpaperCamera: "follow",
   eyes: "low",
@@ -97,7 +94,6 @@ const showWhen = (v: ShowWhen) => ["off", "wallpaper", "always"].includes(v);
 
 /** What a saved setting may be, where not every value of its type will do. */
 const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean } = {
-  reduceMotion: (v) => ["system", "on", "off"].includes(v),
   pixels: (v) => Object.hasOwn(PIXEL_SIZES, v),
   wallpaperAfter: (v) => WALLPAPER_DELAYS.some((delay) => delay.value === v),
   wallpaperCamera: (v) => ["follow", "calm", "lively", "whole"].includes(v),

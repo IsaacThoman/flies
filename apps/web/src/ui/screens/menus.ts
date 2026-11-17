@@ -122,7 +122,6 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE)] : []),
       // Whether the sky follows the weather outside, only where the Apple TV can tell it.
       ...(shell.weatherOutside ? [choice("realWeather", "Real weather", ON_OFF)] : []),
-      choice("reduceMotion", "Reduce motion", [{ value: "system", label: "System" }, { value: "on", label: "On" }, { value: "off", label: "Off" }]),
     ],
   },
   // Everything that can show over the world: each picture in a corner, the stats and the fly seen through, each off, in the screensaver, or always; then how the corners' pictures look.

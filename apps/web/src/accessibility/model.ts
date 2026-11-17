@@ -43,7 +43,7 @@ export class MenuAccess {
     const id = g.screen;
     const screen = id === "title" || id === "settings" || id === "online" ? g.screens[id] : null;
     const table = g.table;
-    const rooms = g.screens.online.view === "rooms" ? g.rooms === null ? "Looking for rooms" : g.rooms.length ? `${g.rooms.length} ${g.rooms.length === 1 ? "room" : "rooms"} available` : "No rooms open" : "";
+    const rooms = g.screens.online.view === "rooms" ? g.lobbyStatus === "lost" ? "Can't reach rooms" : g.lobbyStatus === "stale" ? "Reconnecting to rooms" : g.lobbyStatus === "version" ? "Update needed" : g.rooms === null ? "Looking for rooms" : g.rooms.length ? `${g.rooms.length} ${g.rooms.length === 1 ? "room" : "rooms"} available` : "No rooms open" : "";
     const atDoor = g.screens.online.view === "door";
     const context = table?.joined && g.online ? `${placeInfo(g.online.place ?? g.here).name}, ${table.others.length + 1} of ${MAX_PLAYERS} flies, ${g.online.room?.locked ? "Password required" : "No password"}` : "";
     const status = id === "online" && atDoor ? `${g.knock?.name ?? "Room"}. ${g.screens.online.note ? g.screens.online.heading : "Password required"}` : id === "online" ? [g.screens.online.heading, table ? table.joined ? `Joined ${table.name ?? "room"}. Code ${table.code}` : "Joining room" : g.tableEnded === "left" ? "Left the room" : "", rooms, context].filter(Boolean).join(". ") : id === "title" ? g.brain.status === "running" ? "Brain awake" : g.brain.status === "failed" ? "Its brain could not wake" : "Its brain is waking" : "";

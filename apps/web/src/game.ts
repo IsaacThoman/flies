@@ -639,17 +639,12 @@ export class Game implements Shell {
 
   /** Optional host hook, never polled by the frame loop. */
   accessibilityChanged: (() => void) | null = null;
-  systemReduceMotion = false;
-  #cameraPlaced = false;
-  get reducedMotion() { return this.settings.reduceMotion === "on" || (this.settings.reduceMotion === "system" && this.systemReduceMotion); }
   get loading() { return this.#loading; }
   menuChanged() { this.accessibilityChanged?.(); }
 
-  /** Semantic activation is deliberate input, including waking the screensaver. */
+  /** Host commands consume their input before the next frame can wake Watch. */
   accessInput() {
     this.devices.at = performance.now();
-    // The command is consumed here, outside the remote queue. In particular,
-    // Watch must not be woken by its own activation on the next frame.
     this.#seenInput = this.devices.at;
     if (this.wallpaper) this.#stopWallpaper();
   }
@@ -786,7 +781,7 @@ export class Game implements Shell {
   #move(dt: number) {
     const moving = this.#moving;
     if (!moving) return;
-    moving.t += this.reducedMotion ? VEIL_OUT + VEIL_IN : dt;
+    moving.t += dt;
     if (!moving.arrived && moving.t >= VEIL_OUT) {
       // Black now: build the place. This frame is long (it is all JavaScript), and nobody sees it.
       this.stage.veil = 1;
@@ -800,7 +795,6 @@ export class Game implements Shell {
       moving.t = VEIL_OUT;
       return;
     }
-    if (this.reducedMotion && moving.arrived) moving.t = VEIL_OUT + VEIL_IN;
     const k = moving.arrived ? 1 - (moving.t - VEIL_OUT) / VEIL_IN : moving.t / VEIL_OUT;
     this.stage.veil = Math.max(0, Math.min(1, k * k * (3 - 2 * k)));
     if (moving.arrived && moving.t >= VEIL_OUT + VEIL_IN) {
@@ -818,7 +812,6 @@ export class Game implements Shell {
     this.prints.clear();
     this.hands.clear();
     this.director.useScene(scene.camera);
-    this.#cameraPlaced = false;
     this.#settle();
     this.settings.scene = id;
     saveSettings(this.settings);
@@ -850,7 +843,6 @@ export class Game implements Shell {
   }
 
   #syncCamera() {
-    this.#cameraPlaced = false;
     // The menu and what it opens keep the title's shot; once the menu has faded for the wallpaper, the fly is filmed as it is in play's.
     const playing = !this.#loading && this.nav.current === "play";
     this.director.title = !playing && !this.wallpaper;
@@ -953,11 +945,7 @@ export class Game implements Shell {
     this.online?.send(this.#playerNow());
     // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
     director.prefer = this.hands.current.id === "swoop" && this.nav.current === "play" && !this.wallpaper ? Math.PI - SWOOP_BEARING : null;
-    if (!this.reducedMotion || !this.#cameraPlaced) {
-      if (this.reducedMotion) director.snap();
-      director.update(life.body, this.reducedMotion ? 0 : dt);
-      this.#cameraPlaced = true;
-    }
+    director.update(life.body, dt);
     this.#xray(dt);
     if (this.time > this.#clockAt) this.#followLight();
     stage.update(this.time, dt, director.camera);
@@ -1191,8 +1179,7 @@ export class Game implements Shell {
       // Not while a finger or a button is still down on something, however still.
       this.#startWallpaper();
     }
-    if (this.reducedMotion) this.uiAlpha = this.wallpaper ? 0 : 1;
-    else this.uiAlpha += ((this.wallpaper ? 0 : 1) - this.uiAlpha) * Math.min(1, dt * (this.wallpaper ? 1.2 : 6));
+    this.uiAlpha += ((this.wallpaper ? 0 : 1) - this.uiAlpha) * Math.min(1, dt * (this.wallpaper ? 1.2 : 6));
 
     if (this.#loading) {
       // Select, or a touch, is "Try again" on a failure.

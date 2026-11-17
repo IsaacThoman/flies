@@ -4,6 +4,10 @@ import type { Game } from "../game.ts";
 import { MenuAccess } from "./model.ts";
 import type { AccessibleItem } from "./model.ts";
 
+export function accessibilityEnabled(search: string): boolean {
+  return new URLSearchParams(search).get("accessibility") === "1";
+}
+
 export function browserAccessibility(game: Game) {
   const model = new MenuAccess(game);
   const root = document.createElement("section");
@@ -108,10 +112,6 @@ export function browserAccessibility(game: Game) {
   game.accessibilityChanged = () => {
     if (!pending) { pending = true; queueMicrotask(sync); }
   };
-  const motion = matchMedia("(prefers-reduced-motion: reduce)");
-  const updateMotion = () => { game.systemReduceMotion = motion.matches; };
-  updateMotion();
-  motion.addEventListener("change", updateMotion);
   sync();
-  return () => { game.accessibilityChanged = null; motion.removeEventListener("change", updateMotion); root.remove(); };
+  return () => { game.accessibilityChanged = null; root.remove(); };
 }

@@ -33,10 +33,15 @@ const extraPeers: WebSocket[] = [];
 const transcript: string[] = [];
 const errors: string[] = [];
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, reducedMotion: "reduce" });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   page.on("pageerror", (error) => errors.push(error.message));
   await page.addInitScript(() => localStorage.setItem("flies.settings", JSON.stringify({ wallpaperAfter: 0 })));
   await page.goto(`${site.url}?rooms=${encodeURIComponent(`ws://127.0.0.1:${rooms.port}/rooms`)}`);
+  await waitFor(page, "screen=title", 120_000);
+  assert.equal(await page.getByRole("button", { name: "Play", exact: true }).count(), 0);
+  assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: { accessibilityChanged: unknown } }).__fly.accessibilityChanged), null);
+  transcript.push("Default entry: no semantic controls or host subscription; explicit accessibility=1 opts in.");
+  await page.goto(`${site.url}?accessibility=1&rooms=${encodeURIComponent(`ws://127.0.0.1:${rooms.port}/rooms`)}`);
   await waitFor(page, "screen=title", 120_000);
   async function dump(name: string) {
     const tree = await page.locator("body").ariaSnapshot();
@@ -136,60 +141,14 @@ try {
   await page.getByRole("button", { name: /^Garden, Picnic table, 1 of 8 flies, Password required$/ }).waitFor();
   await dump("left");
   await audit("left");
-  // Preference behavior is read from the actual camera across game time, without sleeping.
-  const camera = () => page.evaluate(() => { const g = (globalThis as unknown as { __fly: { director: { camera: { matrixWorld: { elements: number[] } } }; reducedMotion: boolean } }).__fly; return { reduced: g.reducedMotion, matrix: [...g.director.camera.matrixWorld.elements] }; });
   await page.evaluate(() => {
     const state = { count: 0 };
     (globalThis as unknown as { __accessMutations: typeof state }).__accessMutations = state;
     new MutationObserver((entries) => { state.count += entries.length; }).observe(document.querySelector("section")!, { subtree: true, childList: true, attributes: true, characterData: true });
   });
-  const first = await camera();
   await waitForGameTime(page, 2);
-  assert.deepEqual(await camera(), first);
-  assert.equal(first.reduced, true);
   assert.equal(await page.evaluate(() => (globalThis as unknown as { __accessMutations: { count: number } }).__accessMutations.count), 0);
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.waitForFunction(() => !(globalThis as unknown as { __fly: { reducedMotion: boolean } }).__fly.reducedMotion);
-  assert.equal((await camera()).reduced, false);
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await activate("Back");
-  await activate("Settings");
-  await tab("listbox", "Reduce motion");
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("Enter");
-  assert.equal((await camera()).reduced, false);
-  await page.keyboard.press("ArrowUp");
-  await page.keyboard.press("Enter");
-  assert.equal((await camera()).reduced, true);
-  await page.evaluate(() => {
-    const samples: { veil: number; alpha: number }[] = [];
-    (globalThis as unknown as { __motionSamples: typeof samples }).__motionSamples = samples;
-    const sample = () => {
-      const g = (globalThis as unknown as { __fly: { stage: { veil: number }; uiAlpha: number } }).__fly;
-      samples.push({ veil: g.stage.veil, alpha: g.uiAlpha });
-      requestAnimationFrame(sample);
-    };
-    requestAnimationFrame(sample);
-  });
-  await tab("listbox", "Where it lives");
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("ArrowDown");
-  await waitFor(page, "place=windowsill,moving=");
-  await activate("Back");
-  await activate("Watch");
-  await waitFor(page, "wallpaper=true");
-  const watching = await camera();
-  await waitForGameTime(page, 2);
-  assert.deepEqual(await camera(), watching);
-  await activate("Open menu");
-  await waitFor(page, "wallpaper=false");
-  const motion = await page.evaluate(() => (globalThis as unknown as { __motionSamples: { veil: number; alpha: number }[] }).__motionSamples);
-  assert.ok(motion.some((s) => s.veil === 1), "place change was observed behind the veil");
-  assert.ok(motion.every((s) => s.veil === 0 || s.veil === 1), "veil cuts without fading");
-  assert.ok(motion.every((s) => s.alpha === 0 || s.alpha === 1), "screensaver UI cuts without fading");
-  transcript.push("Reduced motion: place change sampled only opaque/clear veil; screensaver camera static across two seconds; UI opacity sampled only 0 or 1 on entry and exit.");
-  await activate("Settings");
+  transcript.push("Idle semantic DOM mutations across two seconds game time: 0.");
   if (evidence) {
     // Stop the game's RAF after its pending frame so two screenshots compare the
     // DOM adapter's paint alone, without the fly moving between captures.
@@ -202,9 +161,9 @@ try {
     await page.locator("section").evaluate((node) => node.remove());
     const canvasOnly = await page.screenshot({ path: path.join(evidence, "canvas.png") });
     assert.ok(mirrored.equals(canvasOnly), "hidden semantic tree changes no screen pixels");
-    transcript.push("Paused-frame full-page PNGs with and without semantic tree: byte-identical. Idle semantic DOM mutations across 2 seconds game time: 0.");
+    transcript.push("Paused-frame full-page PNGs with and without semantic tree: byte-identical.");
   }
-  transcript.push("Tasks complete; axe: no additional WCAG A/AA violations; existing meta-viewport violation recorded; system motion and overrides passed; camera static across 2 seconds game time.");
+  transcript.push("Tasks complete; axe: no additional WCAG A/AA violations; existing meta-viewport violation recorded;");
   assert.deepEqual(errors, []);
   console.log(transcript.join("\n"));
 } finally {

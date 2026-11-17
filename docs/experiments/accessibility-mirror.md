@@ -1,20 +1,32 @@
-# Optional menu semantics experiment
+# Optional browser menu semantics
 
-Status: exploration, draft; requires an explicit architecture decision and real VoiceOver acceptance testing.
+The canvas menus have no accessible controls. This browser adapter exposes the existing menu state as native buttons, inline selection lists, ranges and text fields, with actions routed through the same menu outcomes and stable identities as the canvas. A player can start play, change a setting, create or join a room, recover from a wrong password and leave.
 
-Architecture rule 5 protects two things: the Apple TV's JavaScriptCore host has no DOM, and the canvas is the sole visible UI and test-state publisher. The proposal adds a host-only semantic projection. Menu state and actions remain in the canvas screens; adapters may expose that state to an operating system without drawing anything. No simulation state is controlled through the projection. Existing canvas data-* tests remain valid.
+## Switch and scope
 
-The native adapter uses the same serializable projection, behind optional `__native.accessibility`. UIKit supplies the VoiceOver and Reduce Motion preferences; native elements activate existing menu outcomes and use the existing tvOS keyboard for fields. Password text is masked before serialization to the host. UIKit callbacks are handed to the JavaScript thread; UIKit elements are changed on the main thread. This is a prototype, syntax-checked against the tvOS SDK, with no claim of successful VoiceOver device testing.
+The adapter is **off by default**. Open the game with `?accessibility=1` (or append `&accessibility=1` to a room URL) to enable it. Without that explicit value, no semantic tree or host subscription is created. This permits landing the implementation while the owner decides on the DOM exception. Remove the bootstrap import/call to remove the adapter.
 
-The browser adapter creates native buttons, inline single-selection lists, ranges and text fields in a clipped tree. It is always discoverable: browsers cannot reliably detect assistive technology. It synchronizes on menu events, not frames. To reject the exception, remove the browser adapter's bootstrap call and import; the game still works. The game/model do not import DOM adapter code.
+This PR covers the browser mirror and an Open menu control during play. Native tvOS accessibility, Reduce Motion and the visual colour audit are follow-up work. The extended prototype is preserved in the exploration history, not in this PR's final diff. Follow-up PRs must branch from current origin/dev.
 
-Proposed rule-5 wording for the owner's decision: “Everything visible is drawn in engine. Hosts may optionally mirror the menu model into platform accessibility controls; the game must run without that adapter, native JavaScriptCore must not depend on DOM, and canvas data-* state remains the test interface.” This document proposes the exception; it does not amend the architecture rule.
+## Architecture decision
 
-Reduce Motion: System/On/Off setting, with the browser media query feeding the system value. The controller holds the director's current view instead of updating it, and place changes use an opaque cut while incremental construction finishes. Camera source is deliberately untouched; coordinate the controller policy with the camera branch before adoption. This policy also stops automatic following, including in play.
+Rule 5 protects the TV's JavaScriptCore host, which has no DOM, and keeps all visible UI and test-state publication in the canvas. The projection has no DOM dependency. The browser-only adapter is optional, owns its elements and focus, and synchronizes on menu changes rather than frame callbacks. The game retains all menu actions, room validation and simulation decisions. Canvas data-* remains the test interface.
 
-Colour audit: brain status is written in words already; a locked room has a padlock, not just a coloured mark. Occupancy pips convey number by count. The room-place dot has no visible alternative in the original canvas: the semantic name adds the place, occupancy and password requirement. The remaining visual colour-only place/player identifiers need a coordinated menu design change; a screen reader label does not fix colour blindness for sighted players.
+Proposed wording for the owner's decision: “Everything visible is drawn in engine. Hosts may optionally mirror the menu model into platform accessibility controls; the game must run without that adapter, native JavaScriptCore must not depend on DOM, and canvas data-* state remains the test interface.” The architecture rule itself is unchanged.
 
-## Rubric
+The adapter uses the stable action/removal identities from #102, Unicode/composition behavior from #100, and unavailable/reconnecting/version states from #119. Password fields remain protected; secret values are never added to live announcements. Keyboard focus uses the existing canvas ring. There is no sound or new visible caption.
+
+## Checking it
+
+`npm run e2e:accessibility` builds and serves the page, checks the default-disabled entry, then performs the tasks at the explicit opt-in URL through accessible names and keyboard input. `--browser webkit` uses Option-Tab, with `WEBKIT_PATH` pointing to an installed Playwright WebKit. The test records trees, checks wrong-password and navigation focus, changes occupancy under the focused room, checks supplementary Unicode, records zero idle semantic DOM mutations, and compares paused full-page screenshots with/without the semantic tree. The paired screenshots isolate DOM paint from the moving canvas.
+
+axe-core is a small dev-only dependency, excluded from the game bundle. The audit retains the existing viewport zoom violation and fails on additional A/AA violations. axe and browser-engine automation do not establish VoiceOver speech, rotor behavior, iPhone/iPad app behavior or native tvOS support; actual assistive-technology acceptance remains follow-up validation.
+
+## Blind exploration history
+
+The following tables retain the requested record of the broader experiment. They are historical scores across the original seven criteria, including work now deferred. Fresh reviewers received only neutral built sets, the rubric, runtime artifacts and drivers; they were not given earlier scores or implementation rationale.
+
+## Historical exploration rubric
 
 Each criterion is 0–10. Ten means:
 
@@ -30,7 +42,7 @@ Each criterion is 0–10. Ten means:
 
 ## Blind review log
 
-Evidence and scores will be recorded here. Reviewers receive only the rubric, neutral evidence sets and the driver, without the author's rationale or earlier scores. Scores reflect tested behavior, not promised platform support.
+These scores describe the earlier full-scope prototypes; tvOS and motion prototypes are deferred from this PR. Reviewers receive only the rubric, neutral evidence sets and the driver, without the author's rationale or earlier scores. Scores reflect tested behavior, not promised platform support.
 
 ### Baseline (duplicate decoy)
 

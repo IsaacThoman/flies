@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { MenuAccess, projectItem } from "../src/accessibility/model.ts";
 import type { Game } from "../src/game.ts";
 import { Menu } from "@fly/ui";
+import { accessibilityEnabled } from "../src/accessibility/browser.ts";
 
 test("room semantics carry the meaning of dots, occupancy and the lock", () => {
   assert.deepEqual(projectItem({ id: "room:abc", kind: "action", label: "Garden", description: "Picnic", count: [3, 8], locked: true }).name, "Garden, Picnic, 3 of 8 flies, Password required");
@@ -31,4 +32,12 @@ test("stale and disabled semantic actions cannot activate a different menu row",
 test("a failed brain is never announced as awake on the title", () => {
   const game = { loading: false, screen: "title", brain: { status: "failed" }, screens: { title: { heading: "Title", menu: new Menu([]) }, online: { view: "rooms" } }, rooms: [], table: null } as unknown as Game;
   assert.equal(new MenuAccess(game).read().status, "Its brain could not wake");
+});
+
+
+test("semantic DOM is enabled only by an explicit opt-in", () => {
+  assert.equal(accessibilityEnabled(""), false);
+  assert.equal(accessibilityEnabled("?accessibility=0"), false);
+  assert.equal(accessibilityEnabled("?accessibility=true"), false);
+  assert.equal(accessibilityEnabled("?accessibility=1"), true);
 });
