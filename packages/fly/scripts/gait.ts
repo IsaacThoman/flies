@@ -14,9 +14,9 @@ const fpsArg = process.argv.indexOf("--fps");
 const fps = fpsArg < 0 ? 1000 : Number(process.argv[fpsArg + 1]);
 if (!Number.isFinite(fps) || fps < 30 || fps > 1000) throw new Error("--fps must be 30 to 1000");
 const dt = 1 / fps, warmup = 3, seconds = 12;
-console.log("| mm/s | duty | swing ms | stance ms | step mm | R1−L1 phase | L2−L1 phase | L3−L1 phase | support 3/4/5+ % | fit stance ms | stance error % |");
+console.log("| mm/s | duty | swing ms | stance ms | stance travel mm (derived) | R1−L1 phase | L2−L1 phase | L3−L1 phase | support 3/4/5+ % | fit stance ms | stance error % |");
 console.log("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
-for (const speed of [0.5, 1.5, 3, 6, 10, 14]) {
+for (const speed of [0.5, 1.5, 3, 4, 6, 10, 14]) {
   const gait = new Gait(home), lifts: number[][] = Array.from({ length: 6 }, () => []);
   const swings: number[] = [], stances: number[] = [], steps: number[] = [];
   const lastLift = new Float64Array(6), lastLand = new Float64Array(6), landZ = new Float64Array(6);

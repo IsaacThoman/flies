@@ -14,7 +14,7 @@ console.log(`Solved tarsal-endpoint (claw-base) contacts at ${fps} Hz, threshold
 console.log("Swing excursion uses body coordinates; stride uses successive same-foot touchdowns transported into world coordinates. Canonical fast-tripod phases R1/L2/L3 relative to L1 are 0.5/0.5/0; these are idealised offsets, not population means.");
 console.log("| mm/s | turn rad/s | duty | swing ms | stance ms | stance excursion mm | swing excursion mm | footprint stride mm | R1−L1 | L2−L1 | L3−L1 | support 3/4/5+ % | fit stance ms | error % |");
 console.log("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
-for (const [speed, turn] of [[0.5, 0], [1.5, 0], [3, 0], [6, 0], [10, 0], [14, 0], [1, 2], [-1, 0]]) {
+for (const [speed, turn] of [[0.5, 0], [1.5, 0], [3, 0], [4, 0], [6, 0], [10, 0], [14, 0], [1, 2], [-1, 0]]) {
   const rig = new FlyRig(), pose = { ...RESTING_POSE, speed, turn };
   const planted = new Uint8Array(6).fill(1), touchdown = new Float64Array(18), takeoff = new Float64Array(18), worldTouchdown = new Float64Array(18), lifted = new Float64Array(6), landed = new Float64Array(6);
   const lifts: number[][] = Array.from({ length: 6 }, () => []), swings: number[] = [], stances: number[] = [], excursions: number[] = [], swingExcursions: number[] = [], strides: number[] = [], support = new Uint32Array(7);
