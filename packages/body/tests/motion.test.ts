@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { LAB, SOLIDS, WINDOWSILL, World, createPicnic } from "@fly/world";
 import type { Food } from "@fly/world";
-import { FlyBody, MOUTH_AHEAD, WALL_PATIENCE, createIntent } from "../src/index.ts";
+import { FEET_REACH, FLY_LENGTH, FlyBody, MOUTH_AHEAD, WALL_PATIENCE, createIntent } from "../src/index.ts";
 import type { Forces, Intent } from "../src/index.ts";
 
 /** A bare round table this wide, with nothing on it. */
@@ -248,4 +248,75 @@ test("the top of an outside wall cannot strand a landed fly", () => {
   run(body, intent(), 20);
   assert.equal(body.onFeet, true);
   assert.equal(world.onTable(body.position.x, body.position.z), true);
+});
+
+/** Where each of its feet is drawn (packages/fly's model stands on FEET_REACH): turned to its heading, tilted to `up` and held `lift` along it. */
+function drawnFeet(body: FlyBody) {
+  const { up, position: p, lift } = body;
+  // Rodrigues: the turn from straight up to `up`, about their cross product.
+  const sin = Math.hypot(up.x, up.z);
+  const kx = sin > 1e-9 ? up.z / sin : 0;
+  const kz = sin > 1e-9 ? -up.x / sin : 0;
+  const s = Math.sin(body.yaw);
+  const c = Math.cos(body.yaw);
+  const feet: { x: number; y: number; z: number }[] = [];
+  for (let k = 0; k < FEET_REACH.length; k += 2) {
+    const ahead = FEET_REACH[k] * FLY_LENGTH;
+    const left = FEET_REACH[k + 1] * FLY_LENGTH;
+    const vx = s * ahead + c * left;
+    const vz = c * ahead - s * left;
+    const along = kx * vx + kz * vz;
+    // v·cos + (k × v)·sin + k(k·v)(1 − cos), with k level and v level.
+    feet.push({
+      x: p.x + up.x * lift + vx * up.y + kx * along * (1 - up.y),
+      y: p.y + up.y * lift + (kz * vx - kx * vz) * sin,
+      z: p.z + up.z * lift + vz * up.y + kz * along * (1 - up.y),
+    });
+  }
+  return feet;
+}
+
+test("on the open table it stands level, its body on its feet", () => {
+  const body = new FlyBody(createPicnic(), { x: 0, z: -150, yaw: 0.4 });
+  run(body, intent({ speed: 10, walking: true, yawRate: 0.5 }), 1);
+  assert.deepEqual({ ...body.up }, { x: 0, y: 1, z: 0 });
+  assert.equal(body.lift, 0);
+});
+
+test("at the foot of a dewdrop smaller than it, it stands the way its feet set it, on the drop and the table, not tilted to the steep flank under its middle", () => {
+  const world = createPicnic();
+  const drop = SOLIDS.find((s) => s.name === "dew" && s.footprint.kind === "circle" && s.footprint.r === 4)!.footprint as { x: number; z: number };
+  for (let k = 0; k < 8; k++) {
+    const body = new FlyBody(world, { x: drop.x + 3.76, z: drop.z, yaw: (k * Math.PI) / 4 });
+    body.place(drop.x + 3.76, drop.z, (k * Math.PI) / 4);
+    assert.ok(body.surface.normal.y < Math.cos((60 * Math.PI) / 180), "the flank under its middle is steep");
+    assert.ok(body.up.y > Math.cos((50 * Math.PI) / 180), `facing ${k}/8 of a turn: tilted ${((Math.acos(body.up.y) * 180) / Math.PI).toFixed(0)}°`);
+  }
+});
+
+test("come down on a dewdrop, a crumb, a pip or a strawberry, its feet as drawn stand on what is under them, not deep in it", () => {
+  const world = createPicnic();
+  let landings = 0;
+  for (const solid of SOLIDS.filter((s) => ["dew", "crumb", "pip", "strawberry", "strawberry half"].includes(s.name))) {
+    const f = solid.footprint as { x: number; z: number; r?: number; rx?: number };
+    const r = f.r ?? f.rx!;
+    for (let k = 0; k < 40; k++) {
+      const a = (k * 2.399) % (Math.PI * 2);
+      const d = r * (0.5 + 0.55 * ((k * 0.618) % 1));
+      const body = new FlyBody(world, { x: f.x + Math.cos(a) * d, z: f.z + Math.sin(a) * d, yaw: k * 0.7 });
+      body.position.y += 3;
+      body.mode = "airborne";
+      body.velocity.y = -50;
+      run(body, intent(), 1.5);
+      if (!body.onFeet) continue;
+      landings++;
+      for (const foot of drawnFeet(body)) {
+        const under = world.surface(foot.x, foot.z, { y: 0, solid: -1, onTable: true, normal: { x: 0, y: 1, z: 0 }, underside: 0 }, foot.y + 5);
+        // A foot in a dewdrop is in water; elsewhere, no deeper than a foot sinks into a crumb's crust.
+        if (under.solid >= 0 && world.solids[under.solid].name === "dew") continue;
+        assert.ok(foot.y > under.y - 0.6, `${solid.name} at ${body.position.x.toFixed(2)}, ${body.position.z.toFixed(2)}: a foot ${(under.y - foot.y).toFixed(2)} mm in`);
+      }
+    }
+  }
+  assert.ok(landings > 300, `${landings} landings`);
 });

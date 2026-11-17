@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
-import type { FlyBody } from "@fly/body";
-import { DINING_ROOM, RESTAURANT, TABLES, TABLE_TOPS, World, ZINC_BAR, createPicnic } from "@fly/world";
+import { FlyBody, createIntent } from "@fly/body";
+import { DINING_ROOM, RESTAURANT, SOLIDS, TABLES, TABLE_TOPS, World, ZINC_BAR, createPicnic } from "@fly/world";
 import { picnic } from "../src/places/picnic/index.ts";
 import { SCENES } from "../src/places/index.ts";
 import { CameraDirector, NEAREST, PITCH, PRESETS } from "../src/camera.ts";
@@ -592,6 +592,72 @@ test("on every shape of screen the field of view is the same at every zoom and t
       assert.equal(director.camera.fov, fov, `${aspect.toFixed(2)}: ${director.camera.fov} at ${director.reach.toFixed(0)} mm`);
       const at = project(director.camera, middleOf(body));
       assert.ok(Math.abs(at.x) < 1e-3 && Math.abs(at.y) < 1e-3);
+    }
+  }
+});
+
+/** A fly that has walked up against each side of each of the picnic's things called `name` and stopped there. */
+function upAgainst(name: string) {
+  const still = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
+  const flies: FlyBody[] = [];
+  for (const solid of SOLIDS.filter((s) => s.name === name)) {
+    const f = solid.footprint as { x: number; z: number; r?: number; rx?: number; rz?: number };
+    const r = f.r ?? Math.max(f.rx!, f.rz!);
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4;
+      const body = new FlyBody(world, { x: f.x + Math.sin(a) * (r + 6), z: f.z + Math.cos(a) * (r + 6), yaw: a + Math.PI });
+      if (body.position.y !== 0) continue;
+      for (let t = 0; t < 3; t += 1 / 60) body.step({ ...createIntent(), live: true, speed: 8, walking: true }, still, 1 / 60);
+      if (body.onFeet) flies.push(body);
+    }
+  }
+  return flies;
+}
+
+test("turned round a fly up against a dewdrop or a crumb, the camera looks from higher rather than come in on it: at a steady drag about as far out as the player can zoom, and at any speed never through the fly", () => {
+  for (const name of ["dew", "crumb"]) {
+    const flies = upAgainst(name);
+    assert.ok(flies.length >= 12, `${name}: ${flies.length} flies`);
+    for (const body of flies) {
+      for (const view of ["close", "follow", "wide"] as const) {
+        for (const rate of [1.2, 3]) {
+          const director = new CameraDirector(world, 16 / 9, picnic.camera);
+          director.setView(view);
+          settle(director, body, 2);
+          const middle = middleOf(body);
+          let nearest = Infinity;
+          for (let i = 0; i < (60 * 2 * Math.PI) / rate; i++) {
+            director.turnBy(rate / 60, 0);
+            director.update(body, 1 / 60);
+            nearest = Math.min(nearest, director.camera.position.distanceTo(middle as THREE.Vector3));
+            const bad = badEye(world, director.camera);
+            assert.equal(bad, null, `${name} at ${body.position.x.toFixed(1)}, ${body.position.z.toFixed(1)}, ${view}, ${rate} rad/s: ${bad}`);
+          }
+          const least = rate < 2 ? 0.8 * NEAREST : 0.3;
+          assert.ok(nearest >= least, `${name} at ${body.position.x.toFixed(1)}, ${body.position.z.toFixed(1)}, ${view}, ${rate} rad/s: ${nearest.toFixed(2)} mm from the fly`);
+        }
+      }
+    }
+  }
+});
+
+test("landed by a dewdrop faster than the camera could come in, it looks from higher at once rather than come nearer than the player can zoom", () => {
+  const drop = SOLIDS.find((s) => s.name === "dew" && s.footprint.kind === "circle" && s.footprint.r === 4)!.footprint as { x: number; z: number };
+  for (let k = 0; k < 12; k++) {
+    const body = new FlyBody(world, { x: picnic.place.start.x, z: picnic.place.start.z, yaw: 0.6 });
+    const director = new CameraDirector(world, 16 / 9, picnic.camera);
+    director.setView("close");
+    settle(director, body, 2);
+    director.turnBy((k * Math.PI) / 6, 0);
+    settle(director, body, 1);
+    body.place(drop.x + 5.6, drop.z, 0.3);
+    const middle = middleOf(body);
+    for (let i = 0; i < 180; i++) {
+      director.update(body, 1 / 60);
+      // Once the point it circles has caught up with the fly.
+      if (i < 30) continue;
+      const distance = director.camera.position.distanceTo(middle as THREE.Vector3);
+      assert.ok(distance >= NEAREST - 0.01, `turned ${k}/12 round, ${(i / 60).toFixed(2)} s after: ${distance.toFixed(2)} mm from the fly`);
     }
   }
 });

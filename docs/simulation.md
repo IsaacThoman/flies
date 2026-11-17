@@ -58,7 +58,8 @@ in the air).
 Things the body does that the brain did not decide, each written down where it
 lives (`packages/body/src/motion.ts` unless noted):
 
-- **Physics.** It stays on the surface it walks on and tilts with it, slides
+- **Physics.** It stays on the surface it walks on and is drawn tilted to the
+  ground under its six feet (at a dewdrop's foot, partly on the table), slides
   along what it walks into, steps up nothing taller than 0.9 mm, and falls off
   ledges and slopes steeper than 65°. In the air it has weight, drag (7/s, through
   the air, which a puff or a gust moves) and

@@ -63,12 +63,12 @@ export class FlyView {
   update(body: FlyBody, intent: Intent, eating: boolean, fullness: number, dt: number, songSide: 1 | -1 = 1, asleep = false) {
     poseOf(body, intent, eating, fullness, songSide, asleep, this.pose);
     this.model.update(this.pose, dt);
-    this.place(body.position, body.yaw, body.up);
+    this.place(body.position, body.yaw, body.up, body.lift);
   }
 
-  /** Puts the model where a fly is, facing `yaw` and tilted to `up`, with its shadow: pose it first (another player's fly is posed from what its device sent). */
-  place(p: Vec3, yaw: number, up: Vec3) {
-    this.root.position.set(p.x, p.y, p.z);
+  /** Puts the model where a fly is, facing `yaw`, tilted to `up` and held `lift` mm along it over its feet, with its shadow: pose it first (another player's fly is posed from what its device sent). */
+  place(p: Vec3, yaw: number, up: Vec3, lift = 0) {
+    this.root.position.set(p.x + up.x * lift, p.y + up.y * lift, p.z + up.z * lift);
     this.#up.set(up.x, up.y, up.z);
     this.#yaw.setFromAxisAngle(AXIS_Y, yaw);
     this.#tilt.setFromUnitVectors(AXIS_Y, this.#up);
