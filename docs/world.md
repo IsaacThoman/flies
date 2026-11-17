@@ -122,9 +122,9 @@ butterfly that flutters over and may settle on the fruit a while, a ladybird
 that walks across and around anything standing, a sailboat crossing the lake,
 and now and then something new to find: a drop of juice seeping from a
 strawberry, or a crumb blown in on a gust, put out in the pantry for the fly
-to find by walking and tasting. The butterfly, the ladybird and the falling
-leaf are in the fly's world only as things it sees (and, for a brain without
-eyes, things that can loom); they keep clear of it, and none of it is aimed
+to find by walking and tasting. The butterfly and the ladybird reach the fly only as things it sees (or
+fallback looming when its eyes are off), and keep clear of it. A falling
+leaf can also brush it, giving touch 0.4 before sliding off, and none of it is aimed
 or timed at the fly: what it does about any of it is its brain's.
 
 ## Windowsill

@@ -14,10 +14,10 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | Sense | From |
 | --- | --- |
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
-| `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
+| `loomLeft`, `loomRight` | When the brain has no eyes, or Settings turns them Off: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
 | `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
 | `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, another fly's body, or past the table's edge. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
-| `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
+| `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. Picnic gusts last 4 to 10 s; their strength follows the weather, easing in and out with flutter (see `apps/web/src/places/picnic/life.ts`). |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
 | `grounded` | On its feet: its legs' load sensors bear its weight. |
 | `maleTaste` | A front leg's tarsus on another fly's body, while it stands (at a table with others; every fly there is a male): the taste of a male's cuticle, 1 while touching, easing out over 0.3 s. |
@@ -75,7 +75,8 @@ lives (`packages/body/src/motion.ts` unless noted):
   thrust is along its body, so a jump away from the ball would otherwise
   have its wings carry it straight back.
 - **Staying in the world.** It doesn't walk off the table's edge, and in the
-  air it is drawn back inside 360 mm of the middle and below 320 mm.
+  air restoring forces pull it back toward the current place's floor boundary
+  and below its ceiling. Those are soft limits; wind and wings can carry it past them.
 - **Turning from a wall.** Pressed against a wall it faces for 2 s, it turns
   away (about 125°). The brain feels the wall on its antennae and grooms
   them (Johnston's organ's displacement-sensitive neurons drive the
@@ -110,8 +111,9 @@ commands and the neurons themselves.
 
 ## Flight
 
-A swoop that fires the giant fiber makes the fly jump and fly: up for a second
-and a half to three, a few hundred millimetres away from the ball,
+A swoop that fires the giant fiber makes the fly jump and fly. The sampled
+bare-floor runs below kept it up for a second and a half to three, a few
+hundred millimetres away from the ball,
 then a glide down onto whatever is under it. Flight is simple physics (lift in
 proportion to the wings' drive, 0.6 holding its weight, and thrust along its
 body), driven by the brain's flight motor neurons and, while its feet are off
@@ -156,8 +158,8 @@ from it. Without a brain (its commands stale) there is no reflex either.
 floor makes as they would any others, so the reflex reaches the brain only
 through them, as a fly's own strokes would: no neuron is driven for it. They
 raise the brain's own wing drive in the air, but never to the floor, so they
-change no flight; and without the floor every take-off is the same hop with
-them as without. They don't make the reflex any less needed, and its floor
+changed no flight in those measurements; without the floor the sampled
+take-offs were short hops with them or without. They don't make the reflex any less needed, and its floor
 stays as it was. Measured in Node on the real connectome, the swoop thrown as
 `apps/web/tests/swoop-escape.budget.ts` throws it (eyes open, seeds 1 to 4, 8
 throws each):
@@ -174,7 +176,7 @@ second later the brain's `wings` is 0 to 0.12 with the floor or without it
 without the floor, lets its wings down within half a second
 (`packages/brain/README.md`, What it does and doesn't reproduce).
 
-Every take-off with the eyes open is a flight of 1.5 to 1.6 s, 375 to 407 mm
+In these sampled bare-floor runs, a take-off with the eyes open gave a flight of 1.5 to 1.6 s, 375 to 407 mm
 along its way, rising 59 to 72 mm, and lands on its feet; with the eyes shut
 (the hand-wired loom, 6 throws a seed), 2.0 to 3.2 s and 507 to 781 mm.
 Before the reflex they were in the air for 0.07 to 0.12 s. The
@@ -209,7 +211,8 @@ screen's dusk cut a dark ball's contrast from 0.89 to 0.70, and at night to
 goes below 1). What is left of a fly's poorer sight in dim light is the cap: at
 4, night came up to midday's level and a quiet night set the fly off more often
 with nothing thrown at it. While the ball
-is in the air the eyes refresh every frame: the looming detectors answer how
+is in the air the eyes target 60 Hz, skipping a refresh while an asynchronous
+readback or an environment reflection refresh is pending: the looming detectors answer how
 fast dark area grows, and at 20 Hz a throw set off the escape about one time in
 six against one in two at 60 Hz.
 
@@ -293,7 +296,9 @@ dataset's do (the hind leg's straight back off T3, as in the fly). The
 dataset is a CNS dissected out of the fly, so its brain–cord posture isn't
 the fly's: the two are placed separately and joined by a connective through
 the neck. The retina isn't in the dataset; it is drawn as a cup bent to the
-model's eye, 80–100 µm of photoreceptors under the lens. Nerves follow the
+model's eye. The source cites 80–100 µm for biological retinal depth,
+but the rendered cup is thinner: at most 62.4 µm (0.026 body lengths),
+thinning toward its rim. Nerves follow the
 literature and the dataset's nerve stubs: each leg's motor axons go as far as
 the tibia (there are no muscles in the tarsus), its sensory axons from the
 tip of the tarsus; the flight motor axons up the posterior dorsal

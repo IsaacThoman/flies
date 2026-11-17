@@ -21,7 +21,7 @@ fly's world.
 | Up / Down | Picks the tool's kind: which food, how hard to blow, the time of day, the weather, the camera. |
 | Select | Uses the tool: drops food, throws the ball. Hold it to tickle or blow. On Light, Weather and View it steps round the choices. |
 | Play/Pause, or Back | The menu. Play/Pause, or Play on it, carries on. |
-| Back on the menu | Leaves the app. |
+| Back on the menu | Apple TV leaves the app. In a browser it returns to play once play has begun; at first launch it stays at the menu. |
 
 ## Touch, mouse and trackpad
 
@@ -138,10 +138,10 @@ the top right while you play too), and under it a picture of its nervous
 system at work (Nervous system, the same choices). Each time the screensaver
 moves on to a new shot, and at least once a minute, they fade out and come
 back together in the next corner, so none is left in one place long
-enough to mark an OLED screen. The corners aren't chosen: a picture pinned
+enough to leave a fixed bright image for hours. The corners aren't chosen: a picture pinned
 to one would sit there for hours in a screensaver, its glass edge and its
-words the sharpest, brightest things on screen, which is how an OLED screen
-is marked, and keeping them moving costs nothing. Instead Size (small,
+words the sharpest, brightest things on screen, which can contribute to OLED wear. Moving them reduces a fixed pattern;
+it does not guarantee against burn-in. Instead Size (small,
 medium, the default, or large) and Opacity (solid, the default, soft or
 faint, which also dims them for the screen) set how much of the screensaver
 they take.
@@ -154,7 +154,7 @@ a trace of its last twenty seconds; and, headed by what the fly is doing now
 (the HUD's caption, so it can be read in the screensaver too), its day: how far
 it has walked, its meals, its take-offs, and its time flying and grooming.
 The day is counted from what the fly's life did (`life.ts`: its legs' steps
-on its feet, a meal from its first taste, each leap into the air, each
+on its feet, a meal when eating starts, each leap into the air, each
 second it was flying or grooming), once each, kept across launches as
 `flies.day` and begun again at midnight. The panel sits across the screen
 from the other pictures, at the same edge (at the top left while you play),
@@ -163,7 +163,7 @@ cells two to a row on a narrow screen, and its brain beside its day on a
 short one. In and out, also headed by what the fly is doing, is a bar for
 each sense going into the brain as the body sends it (a loom at either eye,
 touch, either antenna, wind, sweet, weight on its legs, a male's taste on
-its front legs, and the light, the mean over every facet), and its hunger, and for each
+its front legs, its wingbeat, and the light, the mean over every facet), and its hunger, and for each
 command coming out (walk, steer, back up, escape, wings, groom, feed, sing),
 with the firing rate of the neurons each is read from (DNg100, the two DNa02s,
 MDN, DNp01, the flight motor neurons, DNg12, MN9, pIP10) in Hz: the senses beside the commands, under them on a narrow

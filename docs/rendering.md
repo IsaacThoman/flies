@@ -7,11 +7,12 @@ Historical timings and trial counts have [measurement provenance](measurements.m
 On the Apple TV the game renders 640×480, laid out for 16:9 (the picture is
 squeezed into the 4:3 buffer and stretched back out), with no antialiasing and
 a pixel ratio of 1. Elsewhere (`apps/web/src/display.ts`) the frame takes the
-screen's shape with square pixels and the same number of them, 640×480 =
-307,200: 739×416 in a 16:9 window, exactly 640×480 at 4:3, 376×815 on a phone
+screen's shape with square pixels over the supported 1:4 to 4:1 aspect
+range, targeting about 640×480 = 307,200 pixels (dimensions are rounded): 739×416 in a 16:9 window, exactly 640×480 at 4:3, 376×815 on a phone
 held upright, 853×360 on an ultrawide. So the pixels are as chunky for the
 size of the screen as on the TV (each covers about the same area of it), the
-GPU fills as many, and nothing costs more for the shape. Settings → Picture →
+GPU fills about as many. Extreme aspect ratios are clamped to that range;
+this pixel target alone does not guarantee the same frame cost. Settings → Picture →
 Pixels renders the world at a half or a third of the frame each way (on the
 TV 320×240 or 214×160) under crisp menus at the frame's own size. Resizing or
 turning the screen lays the frame and every layout out again at the start of
@@ -45,7 +46,8 @@ a ring and a crown of droplets, one instanced draw) and the beads on the fruit;
 the table's own beads and puddles are in its shader, as many as there are
 pixels for. The ripple round food that has just landed is one draw for under
 a second. Each visitor is one draw while it is about, the gull's shadow is
-in the table's and the fly's own shading, and nothing is allocated per frame.
+in the table's and the fly's own shading. These paths reuse their animation
+state; the game as a whole does not promise zero allocations per frame.
 The footprints are one instanced draw while any are left (at most 128, two
 triangles each), multiplied into what they lie on, so they need no light; a
 print is written only when a foot is set down, and fades in the shader.

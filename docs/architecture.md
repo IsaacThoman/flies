@@ -1,9 +1,10 @@
 # Architecture
 
 Flies is a toy and a screensaver: a fruit fly in a small bright world on
-your TV, which you can feed, startle and watch. The fly is not scripted. A
-simulation of the fruit fly's whole central nervous system decides what it
-does, from what it sees, tastes and feels in the world.
+your TV, which you can feed, startle and watch. High-level actions come
+from a spiking model wired from the male fruit fly's central nervous system.
+It takes what the body sees, tastes and feels in the world; procedural
+animation and the body's named reflex stand-ins supply the visible motion.
 
 The game currently has no sound, by design.
 
@@ -17,21 +18,23 @@ The game currently has no sound, by design.
 | `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver, the weather outside, a table's line to its room, typing into a field the game draws. |
 | `packages/net` | How flies share a table: the wire format, the room's clock, other flies as they are heard of, the shared food, balls and bubbles, and what a player may do. Runs in a browser and in Node. |
 | `apps/web` | The game: the world, the fly's life in it, its senses, the remote's tools and menus. Runs in a browser as it is. |
-| `apps/server` | The room server for rooms of up to eight people's flies (`docs/online.md`), and the list of those open to anyone: one Node process over WebSockets. It runs no brains and draws nothing. |
+| `apps/server` | The room server for rooms of up to eight people's flies (`docs/online.md`), and the list of occupied public rooms, including locked ones: one Node process over WebSockets. It runs no brains and draws nothing. |
 | `apps/tvos` | The Apple TV app: a native host that runs the web build's JavaScript in JavaScriptCore and draws it through OpenGL ES. |
 | `apps/ios` | The iPhone and iPad app: the web build in a `WKWebView`, served from the app's bundle, in a small Swift shell ([ios.md](ios.md)). |
 
 ## How it fits together
 
-Each frame the game works out what the fly's body feels (what each facet of
-its eyes sees, what its feet and mouthparts taste, touch, wind, whether it is
-on its feet) and hands that to a `BrainDriver`. The brain answers with
+Each life step the game hands a `BrainDriver` the current body senses
+(taste, touch, wind and load on its legs) and the latest completed eye picture.
+Eye sampling runs separately at a rate set by detail, load and readback availability. The brain answers with
 commands read from the fly's own descending and motor neurons: walk, turn,
 back up, take off, beat the wings, groom, feed, sing. The game moves the body
 accordingly and poses the model (`FlyPose`).
 
 In a browser, and so in the iPhone and iPad app, the brain runs in a Web Worker, fed a compressed
-form of the connectome that the page downloads once and keeps (the app has it in its bundle):
+form of the connectome. Browsers cache verified parts when storage is
+available and fetch missing, changed or evicted parts again; the iOS app
+loads them from its bundle:
 `packages/brain-native` built as WebAssembly where the browser can run it, `packages/brain` itself
 where it can't; the browser build is plain files for any static host (`docs/web.md`). On the Apple TV
 JavaScript has no JIT and is far too slow for it, so the host runs
@@ -64,7 +67,9 @@ world, as yours do. Nothing else passes from fly to fly.
 
 ## Rules
 
-1. **The brain decides.** Nothing the fly does is scripted around the brain.
+1. **The brain decides.** Action selection comes from neural readouts.
+   Procedural breathing, glances, antenna twitches and foot fidgets are animation,
+   not evidence of those neurons firing.
    The body may add reflexes the model has no way to produce, and each one is
    written down as such where it lives and in [the body reference](simulation.md#what-the-body-adds). The largest is
    flight itself: in a fly, losing the ground under its feet keeps the wings
@@ -79,15 +84,16 @@ world, as yours do. Nothing else passes from fly to fly.
    documented in `packages/brain/README.md`.
 2. **Say what is real.** Anything shown to the player as "the brain doing X"
    has to be the brain doing X.
-3. **640×480.** On the TV the game renders 640×480 and is stretched to the
-   screen, laid out for 16:9. Elsewhere it renders the same number of
-   pixels, square, in the screen's shape (`apps/web/src/display.ts`). It is
-   a look, and it is what makes the TV fast.
+3. **640×480.** On the TV the output frame is 640×480 and is stretched to the
+   screen, laid out for 16:9. Elsewhere it renders about the same number of
+   pixels, square over the supported aspect range, in the screen's shape (`apps/web/src/display.ts`). It is
+   a look and a rendering budget. Pixel settings can reduce the world
+   resolution inside that frame; see [Rendering](rendering.md).
 4. **The TV is slow at JavaScript.** See `AGENTS.md`.
-5. **Everything is drawn in engine.** Menus too. No DOM, but for one
-   `<input>` that is never seen: a field the game draws is typed into
-   through it, so every keyboard, input method and password manager works
-   (`apps/web/src/ui/text-entry.ts`).
+5. **Menus are drawn in engine.** The browser has no visible DOM controls.
+   A reusable hidden `<input>` accepts typing into the fields the game draws,
+   and a hidden element measures the safe area. tvOS uses its system keyboard
+   instead (`apps/web/src/ui/text-entry.ts`).
 
 ## The brain belongs to this project
 

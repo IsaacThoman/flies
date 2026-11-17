@@ -17,6 +17,7 @@ test('documentation checks reject rot and accept valid local references', () => 
     ['package.json', JSON.stringify({ scripts: { dev: 'vite', 'brain:fetch': 'fetch' } })],
     ['scripts/real.ts', 'line one\nline two\n'],
     ['docs/other file.md', '# A heading\n# A heading\n<a id="named"></a>\n'],
+    ['docs/README.md', '# Directory\n'],
     ['README.md', `# Start\n[good](docs/other%20file.md#a-heading-1)\n[ref][target]\n[target]: docs/other%20file.md#named\n[code](scripts/real.ts#L2)\n\`scripts/real.ts\`\n\`package.json\`\nnpm run dev\n\`npm run brain:fetch\`\n<!-- docs-check: generated scripts/output.ts -->\n\`scripts/output.ts\`\n\n\`\`\`sh\n# Not a heading\n[not a link](missing.md)\n\`\`\`\n`],
   ]);
   try {
@@ -25,14 +26,21 @@ test('documentation checks reject rot and accept valid local references', () => 
       writeFileSync(join(root, file), contents);
     }
     assert.deepEqual(checkDocs(root, [...files.keys()]), []);
+    writeFileSync(join(root, 'README.md'), '[directory](docs/#directory)\n<!--\n[unused](gone.md)\nnpm run unused\n-->\n``scripts/real.ts``\n');
+    assert.deepEqual(checkDocs(root, [...files.keys()]), []);
     writeFileSync(join(root, 'README.md'), `[bad](missing.md)\n[bad](docs/other%20file.md#missing)\n[bad][absent]\n[bad](scripts/real.ts#L90)\n\`scripts/gone.ts\`\n\`absent.json\`\n\`\`\`sh\nnpm run removed\n\`\`\`\n`);
     const errors = checkDocs(root, [...files.keys()]);
     for (const needle of ['missing link target', 'missing anchor', 'undefined link reference', 'missing line', 'scripts/gone.ts', 'absent.json', 'unknown npm script removed']) {
       assert.ok(errors.some(error => error.includes(needle)), `${needle}: ${errors.join('\n')}`);
     }
+    writeFileSync(join(root, 'README.md'), '[directory](docs/#absent)\n[zero](scripts/real.ts#L0)\n[reversed](scripts/real.ts#L2-L1)\n``src/absent.ts``\n```sh\nnode scripts/absent.ts\n```\n');
+    const more = checkDocs(root, [...files.keys()]);
+    for (const needle of ['docs/#absent', '#L0', '#L2-L1', 'src/absent.ts', 'scripts/absent.ts']) {
+      assert.ok(more.some(error => error.includes(needle)), `${needle}: ${more.join('\n')}`);
+    }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('heading anchors follow punctuation, Unicode, repetition and fenced code', () => {
-  assert.deepEqual([...anchors("# Fly's eyes\n# Fly's eyes\n# 日本語\nTitle\n=====\n~~~md\n# hidden\n~~~\n")], ['flys-eyes', 'flys-eyes-1', '日本語', 'title']);
+  assert.deepEqual([...anchors("# Fly's eyes\n# Fly's eyes\n# 日本語\nTitle\n=====\n~~~md\n# hidden\n~~~\n<!--\n# Also hidden\n-->\n")], ['flys-eyes', 'flys-eyes-1', '日本語', 'title']);
 });

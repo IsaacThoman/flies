@@ -2,6 +2,10 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, normalize, relative, resolve } from 'node:path';
 
+function visible(text: string): string {
+  return text.replace(/<!--[\s\S]*?-->/g, match => match.replace(/[^\n]/g, ' '));
+}
+
 function prose(text: string): string {
   let fence = '';
   return text.split('\n').map(line => {
@@ -17,7 +21,7 @@ function prose(text: string): string {
 export function anchors(text: string): Set<string> {
   const found = new Set<string>();
   const counts = new Map<string, number>();
-  const body = prose(text);
+  const body = prose(visible(text));
   for (const match of body.matchAll(/(?:^|\n) {0,3}#{1,6}\s+(.+)|(?:^|\n)([^\n]+)\n {0,3}(?:=+|-+)\s*(?=\n|$)/g)) {
     const title = (match[1] ?? match[2]).replace(/\s+#+\s*$/, '')
       .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/<[^>]+>/g, '')
@@ -43,7 +47,8 @@ export function checkDocs(root: string, files: string[]): string[] {
   const has = (path: string) => sourceFiles.some(file => file === path || file.startsWith(`${path.replace(/\/$/, '')}/`));
   for (const doc of sourceFiles.filter(file => file.endsWith('.md'))) {
     const raw = readFileSync(join(root, doc), 'utf8');
-    const body = prose(raw);
+    const shown = visible(raw);
+    const body = prose(shown);
     const links = body.replace(/(`+)([\s\S]*?)\1/g, match => match.replace(/[^\n]/g, ' '));
     const report = (at: number, message: string) => {
       const line = body.slice(0, at).split('\n').length;
@@ -55,17 +60,22 @@ export function checkDocs(root: string, files: string[]): string[] {
       try { decoded = decodeURIComponent(url); } catch { report(at, `invalid URL ${url}`); return; }
       const [pathQuery, fragment] = decoded.split('#');
       const path = pathQuery.split('?')[0];
-      const target = path ? resolve(root, path.startsWith('/') ? `.${path}` : join(dirname(doc), path)) : resolve(root, doc);
+      let target = path ? resolve(root, path.startsWith('/') ? `.${path}` : join(dirname(doc), path)) : resolve(root, doc);
       if (relative(root, target).startsWith('..') || !existsSync(target)) {
         report(at, `missing link target ${url}`); return;
       }
-      if (!fragment || statSync(target).isDirectory()) return;
+      if (!fragment) return;
+      if (statSync(target).isDirectory()) {
+        target = join(target, 'README.md');
+        if (!existsSync(target)) { report(at, `cannot verify directory anchor ${url}`); return; }
+      }
       if (/\.md$/i.test(target)) {
         if (!mdAnchors.has(target)) mdAnchors.set(target, anchors(readFileSync(target, 'utf8')));
         if (!mdAnchors.get(target)!.has(fragment)) report(at, `missing anchor ${url}`);
       } else if (/^L\d+(?:-L\d+)?$/.test(fragment)) {
-        const lastLine = Number(fragment.split('-').at(-1)!.slice(1));
-        if (lastLine > readFileSync(target, 'utf8').split('\n').length) report(at, `missing line ${url}`);
+        const lines = fragment.split('-').map(line => Number(line.slice(1)));
+        const count = readFileSync(target, 'utf8').split('\n').length;
+        if (lines.some(line => line < 1 || line > count) || lines[0] > lines.at(-1)!) report(at, `missing line ${url}`);
       } else report(at, `cannot verify anchor ${url}`);
     };
     const definitions = new Map<string, string>();
@@ -95,8 +105,8 @@ export function checkDocs(root: string, files: string[]): string[] {
     }
     for (const match of links.matchAll(/\b(?:href|src)=["']([^"']+)["']/g)) checkLink(match[1], match.index);
     const generated = [...raw.matchAll(/<!-- docs-check: (?:generated|external) (.+?) -->/g)].map(match => match[1]);
-    for (const match of body.matchAll(/(?<!`)`([^`\n]+)`(?!`)/g)) {
-      const token = match[1];
+    for (const match of body.matchAll(/(?<!`)(`+)([^`\n]+)\1(?!`)/g)) {
+      const token = match[2];
       if (/\s|[<>{}*|=():?]/.test(token) || token.startsWith('/') || token.startsWith('--')) continue;
       if (!/^(?:\.?\.?\/|apps\/|packages\/|scripts\/|docs\/|assets\/|\.github\/)/.test(token)
           && !/^[\w./-]+\.(?:md|ts|js|mjs|json|mm|cpp|hpp|h|swift|yml|yaml|sh|wasm|bin|html|webmanifest|png|csv|txt|gz|xcprivacy)$/.test(token)) continue;
@@ -106,7 +116,7 @@ export function checkDocs(root: string, files: string[]): string[] {
       if (!clean.includes('/') && sourceFiles.some(file => file.endsWith(`/${clean}`))) continue;
       report(match.index, `missing file reference ${token}`);
     }
-    for (const match of raw.matchAll(/(?<![\w./-])(?:apps|packages|scripts|docs|assets|\.github)\/[\w./-]+\.(?:md|ts|js|mjs|json|mm|cpp|hpp|h|swift|yml|yaml|sh|wasm|bin)\b/g)) {
+    for (const match of shown.matchAll(/(?<![\w./-])(?:apps|packages|scripts|docs|assets|\.github)\/[\w./-]+\.(?:md|ts|js|mjs|json|mm|cpp|hpp|h|swift|yml|yaml|sh|wasm|bin)\b/g)) {
       const path = match[0];
       if (!has(path) && !has(normalize(join(dirname(doc), path))) && !generated.includes(path)) {
         const line = raw.slice(0, match.index).split('\n').length;
@@ -114,7 +124,7 @@ export function checkDocs(root: string, files: string[]): string[] {
         if (!errors.includes(message)) errors.push(message);
       }
     }
-    for (const match of raw.matchAll(/\bnpm\s+run\s+(?:(?:--silent|-s)\s+)?([\w:-]+)/g)) {
+    for (const match of shown.matchAll(/\bnpm\s+run\s+(?:(?:--silent|-s)\s+)?([\w:-]+)/g)) {
       if (!(match[1] in scripts)) {
         const line = raw.slice(0, match.index).split('\n').length;
         errors.push(`${doc}:${line}: unknown npm script ${match[1]}`);
