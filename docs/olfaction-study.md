@@ -5,9 +5,13 @@ This study asks whether independently identified olfactory receptor neurons
 them. The experiment uses the TypeScript brain, unchanged; no native brain,
 world, default behaviour or sound is changed.
 
-The inputs are identifiable and carry graded activity into the brain, but
-28/75 stimulated trials fail the declared command-recovery test. The study
-stops at gate 2; steering and a plume prototype remain untested.
+Annotated inputs and graded propagation are established. **Gate 2 still fails
+its declared one-second command-recovery bound after a 60 s washout:** 40/75
+pinned olfactory pulses fail, versus 46/75 matched non-olfactory pulses. The
+controls do not demonstrate persistent olfactory activation: every olfactory
+late readout and population test passes, no cell meets the persistence flag,
+and every final five-second command mean recovers. The record distinguishes a
+failed endpoint from sustained activation. No steering or plume is included.
 
 The questions are sequential gates: identify inputs from annotations; establish
 stable, graded, reversible responses with defensible valence; establish antenna
@@ -220,6 +224,153 @@ Gate 1 holds for selecting annotated inputs. Gate 2 fails the stated recovery
 criterion; valence remains unestablished. Gates 3 and 4 have not been run.
 No plume prototype is included.
 
+## Recovery-control follow-up
+
+Interpretation note: the archived protocol's comparator table uses “persistence”
+as shorthand for failure of its recovery endpoint. Those outcome labels alone
+do not establish sustained neuronal activation; the separate late-population,
+readout and cell tests determine what activity remains. The protocol is retained
+verbatim because its pre-measurement text is part of the locked assay hash.
+
+The [prospective control protocol](olfaction-recovery-protocol.md) was reviewed
+by three independent blind reviewers, revised without follow-up measurements,
+and assessed again by three fresh reviewers plus a relative regression audit.
+The scientific design was judged conditionally adequate for a descriptive
+fixed-seed screen. Implementation discrepancies were corrected before
+calibration and covered by helper tests; no approval of observed recovery is
+claimed. Review scores and decisions are in the PR description only.
+
+The follow-up uses fresh evaluation seeds 21–23, separate unstimulated calibration
+seeds 101–120, 20 s settling and a 60 s washout. It compares a wandering background
+with a seed-specific mean-matched constant background, pins hunger and all sleep/
+clock fields, records drift between equal windows in unstimulated runs, and
+compares each olfactory input to an independently selected, drive-matched
+non-olfactory bristle perturbation. It retains every condition and distinguishes
+primary recovery, persistent-cell/readout changes and permission to test steering.
+The pre-measurement implementation is commit `fa7231a1` (rebased without assay
+content changes as `88bf9e03`). Source, design, analysis and input hashes bind
+calibration and evaluation.
+
+The unstimulated calibration is complete: 40 runs, 20 seeds per context. Its
+nearest-rank 95th-percentile absolute walk/turn drift is 0.1247/0.1218 with the
+background pinned, and 0.6013/0.5964 with the background wandering. Wandering
+wings drift is 0.0808; the remaining practical tolerances are 0.05. Both contexts
+exceed the prospective 0.1 ceiling. Their broad drift benchmarks therefore grant
+**no tolerance relaxation**: every evaluation command still uses 0.05. A wide
+within-run drift range is not a null distribution for the difference between
+coupled trajectories and cannot establish that arousal caused a residual.
+
+The calibration file SHA-256 is
+`8aa7df44a4aafb14286ecf31eb9c585065808b50dc58c0d80f9b150b38f44738`.
+The acquisition/helper/protocol assay hash is
+`f594b36cb020db0e8f73ccfbfbb6f039fe75c4be5443b187af4b4127b84e70e5`;
+the separately locked reducer hash is
+`c78a0cf99ee10dc7623adddbd077ac9402c15ce14e752bd077ea46a6a1d048d9`.
+The 75 pinned olfactory trials are complete. **Forty fail the original command
+bound after 60 s washout**, despite fixed exogenous background rates:
+
+| Seed | Final command failures | Commands exceeding 0.05, trial counts | Largest absolute residual |
+|---|---:|---|---|
+| 21 | 21/25 | turn 20, walk 4 | turn +0.173903, V at 10 events/s |
+| 22 | 1/25 | walk 1 | walk −0.050290, DM1 at 200 events/s |
+| 23 | 18/25 | turn 11, walk 11, back 2 | turn +0.132878, DM5 at 100 events/s |
+
+Command counts overlap within trials. The largest turn residual exceeds the
+calibrated pinned turn-drift benchmark too (0.121762), although that broad
+benchmark is not an accepted tolerance. The initial 28/75 and follow-up 40/75
+counts use different seeds, settling and background contexts; they are not a
+paired estimate of the effect of extending washout.
+
+All **226 follow-up runs** are complete: 40 calibration and 186 evaluation,
+19,662 simulated seconds including settling. The locked reduction verifies
+identical pre-stimulus observations, identical exogenous state trajectories in
+each pair, complete condition matrices, source/calibration hashes and every
+binary cell-count hash. Results use the original 0.05 command bound because
+both drift calibrations were prospectively disqualified.
+
+| Context, pulse | Trials | Final 1 s command failures | Final population failures | Late 5 s readout failures | Persistent-cell flags |
+|---|---:|---:|---:|---:|---:|
+| Pinned, olfactory | 75 | 40 | 0 | 0 | 0 |
+| Pinned, bristle | 75 | 46 | 0 | 1 | 0 |
+| Wandering, olfactory, 100 events/s | 15 | 1 | 0 | 0 | 0 |
+| Wandering, bristle, 100 events/s | 15 | 0 | 0 | 0 | 0 |
+
+Every population is also within 1 Hz in each of the three late five-second
+blocks. The 15 pinned LH dose sequences still rise at every adjacent strength.
+All 180 pulses have final-five-second command means within 0.05; the largest
+olfactory one is 0.048127 (turn, pinned DA2, 25 events/s, seed 21). That secondary
+window cannot replace the predeclared failing final-one-second endpoint.
+The endpoint is therefore sensitive to sampling window, with fluctuating
+trajectory differences, rather than evidence of tonic olfactory activation.
+
+### What remains different, and where
+
+Pinned olfactory failures involve turn in 31 trials, walk in 16 and back in
+two (counts overlap); no other command fails. The wandering olfactory failure
+is walk +0.056131 for DM1 at 100 events/s, seed 21. In the largest pinned case
+(V, 10 events/s, seed 21), final-second DNa02-left is 5.054298 Hz below control
+and DNa02-right 1.901834 Hz above it, producing turn +0.173903. Their final-five-
+second differences are only −0.996798/+0.217205 Hz. The driven ORNs are silent
+at that endpoint. The largest pinned olfactory final population difference is
+0.103501 Hz in DNs, comfortably inside the declared 1 Hz bound.
+
+Every olfactory late-five-second readout meets its individual limit: the
+largest normalized difference is 0.893811 of its bound (DNa02-left +1.787623 Hz,
+pinned DM1, 10 events/s, seed 23; bound 2 Hz). The sole bristle readout failure
+is DNa02-right −2.043243 Hz (pinned DM1, 200 events/s, seed 23); that trial also
+fails a command bound. No cell has an absolute excess or suppression of 20 Hz
+in all three late blocks. The largest olfactory final-block cell difference is
+only +4.8 Hz: body 10205, `GNG003`, central-brain-other, pinned DM1 at 10 events/s,
+seed 23. Its three block differences are −0.2, +1.2 and +4.8 Hz. For the worst
+turn case, the largest final-block cell difference is `AVLP449`, body 523842,
+left ventrolateral protocerebrum: −2.4 Hz, preceded by −0.4/+1.8 Hz. These are
+descriptive extrema across the recorded cells, not identified memory circuits.
+
+Thus the strict mismatch remains in fluctuating descending/command trajectories,
+particularly steering, while sustained olfactory, population, individual-readout
+and sparse-cell activation are not demonstrated within these windows and bounds.
+No inference about unmeasured slow adaptation or longer times follows.
+
+### Perturbation and drift attribution
+
+Expected first-hop weight ratios range from 1.0068 to 1.1548. Measured emitted-
+spike-weighted ratios span 0.979150–1.228508; **89/90 pairs qualify**. Pinned DM1,
+10 events/s, seed 22 is unqualified (1.228508), stays in the recovery data and
+cannot support modality attribution. No input set is rematched or dropped.
+Among qualified pinned pairs, 32 have both pulses fail recovery, 20 both recover,
+eight only olfaction fail and 14 only bristle fail. Among wandering pairs,
+14 both recover and one only olfaction fails. These are descriptive outcomes,
+not independent replicate counts or proof of a common mechanism; bristle sets
+are reused between glomerulus-specific comparisons. Matching absolute first-hop
+drive does not match target topology, excitation/inhibition balance or downstream
+susceptibility.
+
+No channel/rate/context meets the prospective modality-excess rule for the same
+command in every evaluation seed. The reducer retains every signed residual,
+normalized maximum, paired contrast, across-seed mean/range and 100-Hz background
+interaction; no pooled p-value is inferred. This does not prove that modalities
+have identical effects. It establishes that command mismatch also follows these
+matched non-olfactory perturbations and is not an olfaction-exclusive failure.
+
+For the broad, **unqualified** drift benchmark alone, 66/75 pinned olfactory
+pulses and 67/75 bristle pulses lie within all practical command bounds; all
+wandering pulses do. Nine olfactory pinned pulses still exceed that broad
+benchmark. Merely being within natural drift cannot attribute the paired
+residual to arousal. Pinning rate variation does not remove the mismatch;
+hunger and clock/sleep values cannot drift in this open-loop protocol. The
+constant-background condition actually has more one-second residual failures
+than the wandering 100-Hz diagnostic subset. Its network susceptibility differs,
+so this is not an isolated causal estimate of an arousal contribution.
+
+**Decision:** recovery-qualified gate 2 does not pass. The result is a failed
+predeclared command-window criterion, not evidence of sustained olfactory firing
+or an olfactory-specific defect. Gate 3 and the plume remain untested. This PR
+is a reproducible research record, with no change to native/default behaviour.
+The follow-up protocol's conditional permission to test steering is a diagnostic
+next assay, not validation of the original gate's missing valence endpoint.
+Any future study must preregister that endpoint before claiming that full gate
+or authorizing a navigation prototype. Nothing advances in this study.
+
 ## Limits and the next experiment
 
 The model is a point-neuron rate-input experiment. One ORN spike reaches all
@@ -243,13 +394,11 @@ Node v26.12.0 ran the measurements. JSON records the operating point, data
 hashes and population sizes. Library defaults, including hunger 1 and the
 background's left/right balancing, are retained.
 
-The immediate follow-up is a recovery-control study, not a plume: preregister
-at least 20 seeds and a longer washout, compare the existing paired controls
-with an explicitly artificial tiny sensory perturbation, and compare distributions
-of washout command differences. That can distinguish sensitivity to trajectory
-perturbations from olfactory persistence without relaxing the failed tolerance
-after seeing these data. Obtain channel-specific baseline and stimulus rates
-from the relevant electrophysiology before claiming natural-odour responses.
+The recovery-control study above tests longer washout, mean-matched background
+pinning and a non-olfactory perturbation without changing the measured circuit.
+It does not establish population-level reliability from three evaluation seeds.
+Obtain channel-specific baseline and stimulus rates from the relevant
+electrophysiology before claiming natural-odour responses.
 
 Only after gates 2 and 3 independently pass should a maintainer add a separate
 opt-in TypeScript experiment: an analytic wind-advected, diffusion-broadened
@@ -283,6 +432,33 @@ node packages/brain/scripts/olfaction-summary.ts --results /tmp/olfaction-seed1.
 # Append --compact for a compact summary. A partial run needs --partial.
 ```
 
+For the recovery-control follow-up, choose an empty output directory. Run each
+acquisition command until it exits 0; exit 75 is an intentional checkpoint at
+the eight-minute batch limit, not a completed matrix. Release the shared slot,
+wait at least two minutes, and repeat the identical command to resume. Existing
+records and binary cell counts are checked, never silently overwritten. Do not
+edit the acquisition/helper/protocol/reducer between calibration and evaluation.
+
+```sh
+# Calibration: no stimulus trials may be present when the file is locked.
+node packages/brain/scripts/olfaction-controls.ts --out /tmp/olfaction-controls --context pinned --family none --seeds 101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120
+node packages/brain/scripts/olfaction-controls.ts --out /tmp/olfaction-controls --context wandering --family none --seeds 101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120
+node packages/brain/scripts/olfaction-controls-summary.ts --dir /tmp/olfaction-controls --calibrate /tmp/olfaction-calibration.json
+# Evaluation: repeat for each context (pinned, wandering) and family (none, odor, bristle).
+node packages/brain/scripts/olfaction-controls.ts --out /tmp/olfaction-controls --context pinned --family none --seeds 21,22,23 --calibration /tmp/olfaction-calibration.json
+# Reduction refuses an incomplete held-out matrix or mismatched provenance.
+node packages/brain/scripts/olfaction-controls-summary.ts --dir /tmp/olfaction-controls --calibration /tmp/olfaction-calibration.json > /tmp/olfaction-controls-summary.json
+# Optional scientific figure (Python 3 with matplotlib; no game dependency).
+python3 packages/brain/scripts/olfaction-controls-plot.py /tmp/olfaction-controls-summary.json /tmp/olfaction-controls.png
+```
+
+The complete follow-up has 40 calibration plus 186 evaluation runs. Every run
+settles for 20 s and records 67 s: 19,662 simulated seconds overall. Its generated
+JSON and hashed binary recordings are research outputs, not runtime assets;
+no checked-in results file is required by a script. The full reducer retains
+all one-second paired time courses, every failure, all qualifying persistent
+cells, and the 20 largest final-block cell differences for every pulse.
+
 Simulation and the full repository checks need a `/tmp/flies-heavy/slot-N` on
 the shared machine; release within ten minutes and wait two minutes between
 batches. Raw input data and full recordings remain outside git. Scripts refuse
@@ -291,21 +467,27 @@ provenance review rather than silently repinning the hash.
 
 ## Verification
 
-`npm run lint` and `npm run typecheck` pass. The full `npm test` run's functional
-phase reports 735 tests: 734 pass, one skipped (no wasi-sdk), none fail. Its
-four serial budget tests report three passes and one failure: the unmodified
-brain cost test measures all-senses cost at 0.508 M5 Pro CPU s/s against 0.5.
-A fresh-slot isolated rerun of `packages/brain/src/cost.budget.ts` also fails:
-construction 259 ms against 250, all-senses cost 0.580 s/s. Thus the full command
-is **not green**. No performance budget or runtime parameter was changed to
-remove that result; the runtime/native source diff against the study's base
-commit is empty. Shared-machine contention is a possible contributor, not a
-demonstrated explanation. No web/e2e behaviour is changed by these offline tools.
+The branch is rebased onto `dev` including #113, the contention-aware CPU-budget
+measurement change. **The full local `npm test` passes:** 894 functional tests
+pass, one skips for missing wasi-sdk, none fail; all four serial budgets pass,
+with no skips. Brain construction is 188 M5 Pro CPU ms, rest 0.068 CPU s/s,
+and all senses together 0.317 CPU s/s against bounds 250 ms / 0.16 / 0.5.
+The run finishes in one heavy-work slot without pausing. Earlier contended
+budget failures remain in the PR's historical validation record.
 
-The full test run was paused with its owned processes stopped, then resumed in
-a later slot, to respect the ten-minute limit. Budget tests ran subsequently,
-without that pause. The summary reducer also verifies identical pre-stimulation
-bins and rejects missing protocol seeds unless `--partial` is explicit; partial
-outputs are marked `completeProtocol: false`.
+Farm lint, typecheck, tvOS typecheck and build pass. Its supported unit suite
+reports 887 pass, three skips and no failures; Apple-silicon parity checks and
+calibrated budgets are covered locally. The farm wrapper's browser stage was
+stopped because these offline tools change no web/e2e behaviour. A separately
+queued farm recording check was cancelled before acquiring a slot or collecting
+any measurements; every study recording uses the same local Node v26.12.0.
+
+The five helper tests cover percentile ordering, calibration validation, the
+strict fallback, exogenous mean determinism and anatomy-only input matching.
+Both reducers check protocol completeness and pre-stimulus equality. The
+follow-up additionally validates paired exogenous states and hashed late-cell
+records. Model/runtime/native sources and parameters are unchanged; the only
+`packages/brain/src` difference from the study's base is the upstream budget
+**test** change. No performance bound is relaxed by this PR.
 
 Independent audit scores and comparison keys are recorded in the PR description.
