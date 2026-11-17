@@ -37,15 +37,16 @@ for (const tool of ["feather", "blow"]) for (const stop of ["away", "flag", "sil
     camera.position.set(0, 10, 20);
     const step = () => online.update(0.02, camera, 480, now / 1000, () => 0);
     const stimulus = () => tool === "feather" ? online.stroke : Math.hypot(online.air.x, online.air.y, online.air.z);
-    hear(); step();
+    step(); hear(); step();
     assert.ok(stimulus() > 0, "the live tool acts first");
     online.line.onMessage({ type: "drop", by: 2, id: 2000001, kind: "sugar", x: 10, z: 0, y: 0, at: now });
-    online.line.onMessage({ type: "ball", by: 2, at: now + 100, from: [0, 5, -10], via: [0, 5, 0], to: [0, 5, 10] });
+    online.line.onMessage({ type: "ball", by: 2, at: now - 1, from: [0, 5, -10], via: [0, 5, 0], to: [0, 5, 10] });
     if (stop === "away") online.line.onMessage({ type: "away", id: 2, away: true });
     else if (stop === "flag") { state.flags |= AWAY; state.seq++; state.t++; hear(); }
-    else now += 1501;
+    else { now += 1499; step(); assert.ok(stimulus() > 0); now += 2; }
     step();
     assert.equal(stimulus(), 0);
+    assert.ok(online.threat, "committed ball remains in flight");
     for (let i = 0; i < 100; i++) { now += 20; step(); }
     assert.ok(online.pantry.foods.some((f) => f.id === 2000001), "drop still lands");
     assert.equal(online.threat, null, "ball finishes");
