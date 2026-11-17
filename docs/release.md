@@ -31,6 +31,38 @@ The version is set at build time: `MARKETING_VERSION` is the release (`1.2.3`) a
 `CURRENT_PROJECT_VERSION` is the Unix time, which keeps increasing, reruns included. Neither is
 committed; `apps/version.yml` only numbers local builds.
 
+### Owner details and release paperwork
+
+The privacy policy is omitted until all four public build variables are set:
+`FLIES_OPERATOR_NAME` (responsible public name), `FLIES_CONTACT_EMAIL` (privacy
+mailbox), `FLIES_SUPPORT_URL` (HTTPS support page), and `FLIES_MARKETING_URL`
+(HTTPS app page). Set them at build time on the web host and rebuild; direct
+web/native builds read the same environment variables. Missing or blank
+values produce no `/privacy` file and that route answers 404. The game adds
+no privacy link. The policy and store-copy files in `docs/` remain clearly
+marked owner drafts. See [deployment](deploy.md#privacy-publication) for
+configuration and validation.
+
+Before App Store submission, publish the completed policy and supply its
+public URL, the support/marketing URLs, a review contact's name/email/phone,
+and the production room-service URL. Confirm the intended $0.99 price,
+territories and platforms. Confirm hosting/proxy access-log and room-data
+backup retention and update the policy; local size-based rotation is not a
+verified time limit for providers' logs or backups. Have a lawyer review the
+legal texts and confirm live WeatherKit attribution in a signed build.
+
+Listed rooms expose user-chosen names, with no chat channel. Decide whether
+to keep that public feature and answer the user-generated-content and
+public-posting questions accordingly. The bar/restaurant contain persistent
+alcohol imagery: review the frequency answers and accept Apple's resulting
+regional age rating; do not submit as a Kids Category app. The rationale is
+in [App Store answers](app-store-answers.md).
+
+The large notice files are committed generated output. `npm run notices`
+regenerates `THIRD_PARTY_NOTICES` and `apps/web/src/ui/notices.json`; tests
+and builds fail on stale contents, and builds emit the checked notices into
+the web and app bundles. No owner details are needed to ship these credits.
+
 ### What decides the version
 
 Every commit that landed counts as a patch, so merging anything into `main` releases. The
@@ -117,7 +149,10 @@ Done once, by the account holder, before the first release:
    if an Apple TV record already exists, add iOS to it).
    Sharing one bundle ID makes it a universal purchase: one listing, bought once for the
    iPhone, iPad and Apple TV, with one TestFlight group for all of them. Then add a TestFlight
-   group and the privacy answers (no data collected).
+   group and the privacy answers from [the audited draft](app-store-answers.md).
+   Online keeps pseudonymous identifiers and gameplay records: do not select "Data Not Collected".
+   Complete the [privacy policy](privacy.md), [store listing](store-listing.md) and
+   [licence audit](licenses.md), replace their placeholders and obtain legal review before submission.
 3. **The `testflight` environment** in this repository (Settings → Environments → New
    environment, `testflight`):
    - under **Deployment branches and tags**, choose "Selected branches and tags" and add the

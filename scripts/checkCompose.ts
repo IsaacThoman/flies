@@ -23,7 +23,8 @@ interface Compose {
 }
 
 // Shell variables beat env files, and COMPOSE_FILE can bypass default discovery.
-const variables = ["SERVICE_URL_WEB", "FLY_SITE_URL", "APPLE_TEAM_ID", "TRUSTED_PROXIES", "CLIENT_IP_HEADERS", "ROOMS_PORT", "ROOMS_HOST", "HTTP_PORT"];
+const owner = { FLIES_OPERATOR_NAME: "Example Operator", FLIES_CONTACT_EMAIL: "privacy@example.test", FLIES_SUPPORT_URL: "https://example.test/support", FLIES_MARKETING_URL: "https://example.test/flies" };
+const variables = ["SERVICE_URL_WEB", "FLY_SITE_URL", "APPLE_TEAM_ID", ...Object.keys(owner), "TRUSTED_PROXIES", "CLIENT_IP_HEADERS", "ROOMS_PORT", "ROOMS_HOST", "HTTP_PORT"];
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !variables.includes(key) && !key.startsWith("COMPOSE_")));
 const temp = mkdtempSync(join(tmpdir(), "fly-check-compose-"));
 function config(coolify: boolean, values: Record<string, string> = {}): Compose {
@@ -63,6 +64,14 @@ try {
   }
 
   const trusted = "203.0.113.7/32 10.0.0.0/8";
+  for (const coolify of [true, false]) {
+    const defaults = config(coolify).services.web.build?.args;
+    const supplied = config(coolify, owner).services.web.build?.args;
+    for (const [field, value] of Object.entries(owner)) {
+      assert.equal(defaults?.[field], "", `${field} must default to unpublished`);
+      assert.equal(supplied?.[field], value, `${field} must reach the build`);
+    }
+  }
   for (const team of ["", "ABCDE12345", "0"]) {
     for (const coolify of [true, false]) {
       assert.equal(config(coolify, { APPLE_TEAM_ID: team }).services.web.build?.args?.APPLE_TEAM_ID, team,
