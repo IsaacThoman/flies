@@ -25,7 +25,7 @@ const ROLE: Record<NerveRole, number> = { sensory: 0, central: 1, motor: 2 };
  * edge only): solid neuropils are seen as volumes, the rind only as an edge.
  */
 export const LOOK: Record<NerveKind, readonly [number, number]> = {
-  neuropil: [0.45, 0.5],
+  neuropil: [0.7, 0.5],
   rind: [0.45, 1],
   tract: [0.75, 0.25],
   nerve: [0.85, 0.2],
