@@ -1,3 +1,10 @@
+# Historical measurement — unclocked, old dev
+
+This report predates clock pinning and the current dev rebase. Its numerical
+exploratory distances are retired: all four comparisons have assay mismatches.
+It is preserved as diagnostic history, especially the 84.38% grooming occupancy.
+The antenna-contact owner is investigating that finding separately.
+
 # Behaviour audit
 
 Exploratory scores are descriptive distances, not validated biological agreement. Unsupported assays and absent events are N/A, never zero-valued observations.

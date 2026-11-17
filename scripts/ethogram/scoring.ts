@@ -1,7 +1,7 @@
 import { REFERENCES } from './references.ts';
 import { distanceScore, mean } from './metrics.ts';
 
-export type Measurements = Record<string, number | null | undefined>;
+export type Measurements = Record<string, unknown>;
 
 /** This is a preregistered engineering distance, not a statistical test of normality. */
 export function comparisons(measured: Measurements) {

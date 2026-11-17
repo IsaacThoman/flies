@@ -1,146 +1,95 @@
-# Offline behaviour audit
+# Offline behaviour scorecard
 
-This is an **incomplete scorecard**, not a calibrated fly. It registers 15
-independently checkable literature targets and records 25 body-motion and
-activity diagnostics. Six targets have exploratory comparisons; nine require
-assays or biology that are not implemented. None currently qualifies for a
-condition-matched overall biological score. A mean of the exploratory distances
-is reported separately with its coverage. N/A never earns a score.
+`node scripts/ethogram.ts` runs the real FlyEM male CNS spiking brain, `Life`,
+senses and body headlessly. It registers 21 verified literature conditions and
+records motion/bout diagnostics plus an optional optical escape battery.
+The [assay ledger](assays.md) explains every eligibility decision, including all
+nine previously unsupported rows. Eight feeding conditions cannot run because
+the model has no discrete sips/bursts or calibrated deprivation states; the
+ninth, optical escape, is executable through the actual eyes.
 
 ```sh
-# Fetch the FlyEM male CNS connectome and install dependencies first.
 npm ci
 npm run brain:fetch
-# The CLI leases shared CPU slots itself; do not wrap it in another lease.
-node scripts/ethogram.ts --hours 1 --seeds 1,2,3 --place arena --out /tmp/ethogram.json
+# One recorded hour, then independent visual trials; no extra slot wrapper.
+node scripts/ethogram.ts --assay all --hours 1 --seeds 1 --hour 6 \
+  --trials 8 --seed-base 20000 --out /tmp/ethogram.json
+# Optical battery only: 48 black-square + 48 checkerboard + 8 flash + 8 blank.
+node scripts/ethogram.ts --assay escape --hour 6 --trials 8 \
+  --seed-base 30000 --out /tmp/escape.json
 ```
 
-The CLI atomically takes one of `/tmp/flies-heavy/slot-1` through `slot-8`,
-writes its branch to `owner`, and releases that directory when finished.
-It yields its lease after 9.5 minutes of wall time, keeps the animal's state
-in memory while doing no simulation work, and waits at least two minutes
-before reacquiring a slot. It checks the lease every simulated second;
-wall time includes fairness pauses, while process CPU time does not.
-No server, browser, or background simulation process is created. Interrupting
-the CLI releases its slot. Callers of the exported `measure` function must
-supply their own lease/checkpoint, or run within an existing slot.
+The default free run uses three seeds, 60 s burn-in and one recorded hour each.
+Each seed is reported separately. `--place arena` selects a 43 mm open disc;
+the game's named places also work. **Every assay holds clock time at `--hour`
+(default 06:00, ZT0), sunrise 06:00, sunset 18:00.** Sleep pressure and stillness
+continue evolving; no sleep command is overridden. The cited assay populations
+do not establish a matching clock time. Hunger uses its existing 60× metabolic
+clock, so simulated motion hours are not physiological deprivation hours.
 
-A run defaults to three independent seeds, each with a 60-second burn-in
-followed by one hour of motion time. `--place lab` and the other game places
-work too. Each seed is reported separately rather than pooled into one long
-pseudoreplicate. This is not a population experiment; three seeds cannot
-establish a reference distribution.
+The CLI atomically leases one of eight `/tmp/flies-heavy/slot-N` directories,
+writes its branch to `owner`, releases after at most 9.5 minutes, and waits two
+minutes before reacquiring. Animal state survives fairness pauses. A checkpoint
+every simulated second also lets interrupt handlers release the lease. Wall
+time includes slot waits, CPU time does not. No renderer, server, sound or
+worker process is created. Exported assay functions require a caller-provided
+lease/checkpoint for heavy work.
 
-The runner uses `Life` and the same in-process driver as the headless fuzz tools:
-real 166,700-neuron brain, `SenseTracker`, `Behavior`, `FlyBody`, food and hunger.
-There are no imposed motor commands, forced choices, resets within a run, or
-neuron-specific inputs. The eyes see an adapted uniform field, **not a rendered
-place**. The arena is a 43 mm disc with the existing edge reflex, without the
-paper's walls, glucose floor or confinement. Results are not claimed to match
-its experiment. Hunger retains the game's accelerated metabolic clock (60×);
-an hour of motion time is not an hour of physiological starvation. No runtime,
-body, brain, hunger, sleep, grounded or ON-pathway code is changed by the audit. The inherited stochastic background, edge/wall avoidance, tarsal support, grooming persistence and feeding alignment are explicitly listed in the JSON and console report; observed motion includes them.
+## Measurement definitions
 
-## Measurements
+Displacement gives speed; commands do not substitute for movement. Translation
+is >0.5 mm/s on the ground; activity additionally includes |yaw|>20°/s.
+This does not reproduce Cruz's smoothing, duration and gap rules, so that
+comparison gets no score. Edge occupancy is the outer half of floor area;
+an open-disc edge is not a wall. Grooming is the game's visible head-groom
+state, not a dust-evoked body-part sequence. Eating is continuous consumption,
+not individual sips. Airborne bouts include jumps and falls and are not
+validated sustained-flight bouts. Categories can overlap.
 
-All speeds come from displacement, not the requested velocity or brain command.
-On-ground translation is >0.5 mm/s. Activity also includes rotation >20 deg/s,
-but lacks Cruz's duration/gap filtering. This is an explicit mismatch, not a
-validated recreation of that classifier. Surface motion includes vertical
-movement while climbing. Walk and stop bouts are complementary only on the
-ground. Grooming is `Life`'s head-groom display state; feeding is actual eating,
-not simply proboscis extension. The airborne diagnostic is time off the feet, including jumps and falls; it is not called flight duration.
-These state categories can overlap except where `Life` gives them priority.
+Durations include complete bouts only. Both observation endpoints are
+censored; censored time still contributes to occupancy. Bout rates count known
+starts. Zero observed events means zero event rate and undefined duration.
+Completed-bout summaries underrepresent long bouts; censor counts are retained.
 
-Only completed bouts enter duration summaries. A bout already active at the
-observation start is left-censored; one active at the end is right-censored.
-Both are counted in time occupancy, but neither is treated as a complete bout.
-Bout rates count known starts, excluding an unknown onset before the window.
-Zero bouts gives a zero event rate and an **undefined duration**, not duration 0.
-Conditioning on completed bouts biases long-duration estimates downwards: raw
-censor counts are retained rather than concealing that limitation.
+Saccades are contiguous ground |yaw|>200°/s. A peak-centred angle includes the
+whole ±50 ms window, with airborne or truncated windows rejected. Threshold
+duration is not the paper's full-turn duration. The existing body command gain
+is 3 rad/s (172°/s), below the detection threshold. Neither saccade reference
+is scored. Speed quantiles use 0.1 mm/s bins and yaw quantiles 1°/s bins, with
+inverse weighted CDF and overflow accounting. Free samples are 10 ms; optical
+frames are 5 ms. No-events durations and out-of-range quantiles stay N/A.
 
-Saccades require actual ground yaw >200 deg/s (Geurten et al. 2014). Their
-reported duration is the contiguous suprathreshold interval, which is not
-validated as the paper's complete turn-duration measure. Angles integrate the
-whole ±50 ms around the largest absolute yaw within each event, including
-subthreshold tails. Events whose windows run outside observation are omitted
-from angle summaries. At 10 ms sampling, timing resolution is 10 ms and narrow
-peaks may be missed. The body's documented 3 rad/s command gain is below
-200 deg/s; ordinary steering is not relabelled a saccade to conceal this.
+The JSON retains seed, commit and dirty flag captured before simulation,
+connectome SHA-256, trial/sample counts, readiness failures, censoring and
+CPU/wall cost. Additional attribution counters expose antenna-bump time,
+current neural grooming, visible grooming without a current command, ground
+yaw differing from intent, and sleep. They are diagnostics, not causal proofs.
 
-Speed quantiles use a 0.1 mm/s histogram; yaw quantiles use 1 deg/s bins. They use the inverse weighted empirical CDF (not linear interpolation). Each
-quantile's bin-centre error relative to that definition is at most one bin width. Overflow is counted and a
-quantile falling in it is N/A. The edge diagnostic is occupancy of the outer
-half of the floor area while grounded; it is not claimed to measure a biological
-wall preference because the current disc has no wall. Full counts, censoring,
-CPU/wall cost, commit, dirty flag and dataset hash accompany the report.
+## Scores and scope
 
-## Literature and scores
+The primary-paper registry states location, value, statistic, population,
+reported uncertainty and limitations. Arbitrary tolerance guesses were removed.
+Six free-motion comparisons are visible context only because their assays do
+not match. Feeding is explicitly unsupported. Optical probability uses bounded
+Bernoulli distance; timing fits use labelled reported fit spread as an
+engineering scale. No claimed biological acceptance range is inferred from
+SE, histogram bins or an author-selected width. See [the exact score
+policy](assays.md#score-definition).
 
-`scripts/ethogram/references.ts` is the provenance registry. Each entry includes
-paper, figure/table or named text location, statistic, units, population,
-limitations and the origin of its comparison scale. All 15 central values were
-checked against primary papers. These are not 15 independent traits: several
-feeding entries are conditions of the same measurement.
+An optical-subset mean is reported only over estimable comparisons. Missing
+latencies remain N/A, so an absent response cannot masquerade as a zero latency.
+A validated whole-animal point score is **not identified**. Overall bounds
+allow unavailable comparisons every score from 0 to 10. They express coverage,
+not confidence or biological normality. Multiple conditions and timing
+coefficients are correlated; they are not 21 independent traits.
 
-The descriptive distance is 10 inside target ± tolerance, falling linearly to
-0 at target ± 2 tolerances. Except where marked, tolerances are **audit policy**,
-not published biological ranges. Paulk's SEs describe uncertainty in a group
-mean, not individual variability, and must not be used to declare that a free
-walking fly is normal or abnormal. The exploratory mean excludes unsupported
-comparisons and always displays its denominator; it is not evidence of overall
-biological fidelity. Validated scores remain N/A until population, observable,
-stimulus, selection and uncertainty agree with a primary experiment.
+Inherited stand-ins are visible in every report: stochastic arousal and visual
+background drive, body edge/wall turns, food alignment, grooming persistence,
+and tarsal flight support. All observed behaviour includes these mechanisms.
+Protected sleep, hunger, grounded signals, visual ON pathway and antenna-contact
+work remain with their owners. No neural threshold is tuned to increase scores.
 
-Unimplemented assays:
-
-- Feeding contacts, ISIs, burst structure and calibrated 0/4/8 h deprivation:
-  continuous food consumption cannot substitute for individual sips.
-- Loom takeoff probability versus l/v and escape latency: a projected visual
-  stimulus through facets and repeated independent trials are required. The
-  registry's 82% is a pooled Fotowat et al. (2009) result, not von Reyn (2014),
-  not a separate 82% target at each l/v, and not evidence about a direct input
-  into LC4/LPLC2. Takeoff observations are available as spontaneous diagnostics.
-- Seeds et al. (2014), Figure 1 and Figure 3: eyes/antennae precede abdomen,
-  wings and notum after dusting. The model reads only head grooming and has
-  no body-part dust states. No numerical bout target or hierarchy score is
-  invented from the qualitative ordering. See https://doi.org/10.7554/eLife.02951.
-- Air-puff startle, optomotor gain, centrophobism and flight-bout duration need
-  a verified quantitative target **and** a matched protocol. The runner records
-  airborne durations and spatial occupancy, without inventing literature ranges.
-
-## Calibration decisions
-
-No behaviour change is accepted. Raising walk speed to the median of selected
-Oregon-R female trajectories would fit an unmatched assay. Raising turn gain
-until saccades appear would manufacture agreement without an independent
-neural-rate-to-yaw calibration. Adding sip oscillations or a posterior grooming
-sequence would script actions absent from the brain. All are rejected.
-
-The useful next experiments are a validated visual looming battery (including
-non-looming controls and per-l/v denominators), body-part grooming observables,
-and a rate-to-motion calibration from primary data. Sleep, hunger, grounded and
-the eyes' ON pathway remain owned by other experiments; any related findings
-belong in proposals rather than edits. No hill-climb improvement is claimed.
-
-Escape research also needs two distinct observables. [von Reyn et al. (2014),
-A spike-timing mechanism for action selection](https://doi.org/10.1038/nn.3741)
-shows that GF timing relative to parallel circuits selects fast versus longer
-escape sequences. A GF-only takeoff readout cannot establish that both paths
-are reproduced. [Card and Dickinson (2008), Visually mediated motor planning
-in the escape response of Drosophila](https://doi.org/10.1016/j.cub.2008.07.094)
-examines directional preparation, which a body choosing the direction away
-from `threat` cannot validate as a neural decision. Both should be explicit
-coverage gaps in a future battery; neither is a reason to inject stronger
-looming input or relabel a body reflex as brain fidelity.
-
-For a future steering calibration, [Rayshubskiy et al., Neural circuit mechanisms
-for steering control in walking Drosophila](https://doi.org/10.7554/eLife.102230),
-Figures 2–3, relates bilateral DNa02 firing-rate differences to yaw, including
-backward walking. The four paired recordings and analysis code are linked in
-its data-availability statement (Harvard Dataverse DOI
-10.7910/DVN/0NCLP1). This is an independent candidate calibration source;
-extracting a gain and its uncertainty from those recordings is required before
-changing the body mapping. An axis limit in a published plot is not a measured
-maximum or a defensible gain. No gain is inferred from it in this experiment.
+[Review record](review-log.md), [historical unclocked measurement](baseline.md),
+and [model proposals](proposals.md) preserve findings and rejected approaches.
+A broad biological score needs more matched assays; the registry alone cannot
+supply one.
