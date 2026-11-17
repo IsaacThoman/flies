@@ -34,6 +34,8 @@ export type HudLayout = {
   apart: number;
   /** The tool's label: its middle, down. */
   labelY: number;
+  /** Whether input hints need space beside the corner panels. */
+  reserveHints: boolean;
   /** The hints: the left column's left edge and its lowest chip's middle; the right one's right edge and middle. */
   hintsX: number;
   hintsY: number;
@@ -65,7 +67,7 @@ const SHELF_APART_LEAST = 12;
  */
 const PICTURE = { width: 0.84, top: 0.11, foot: 0.73, sides: 0.04, heading: 57.6, under: 24, stretch: (0.76 * 427) / (0.45 * 480), wrapsUnder: 480 };
 
-export function hudLayout(frame: Frame): HudLayout {
+export function hudLayout(frame: Frame, reserveHints = true): HudLayout {
   const tools = TOOLS.length;
   const split = WORLD_TOOLS;
   const a = safeRect(frame);
@@ -101,6 +103,7 @@ export function hudLayout(frame: Frame): HudLayout {
     split: apart > 0 ? split : tools,
     apart,
     labelY,
+    reserveHints,
     hintsX: a.x + 16,
     hintsY,
     rightX: a.x + a.w - 16,
@@ -275,8 +278,8 @@ export function titleLayout(frame: Frame, items: number): TitleLayout {
   const y = a.y + 22 + size * 0.85;
   const w = Math.min(356, a.w - 24);
   const status = { x: cx - w / 2, y: y + 22, w, h: 34, size: w < 300 ? 13 : 15 };
-  const fitted = fitMenu({ x: a.x, y: status.y + status.h, w: a.w, h: a.y + a.h - status.y - status.h }, { ...spec, raise: 0 });
-  const menu = shiftMenu(fitted, a.y + a.h - 12 - fitted.panel.h - fitted.panel.y);
+  const fitted = fitMenu({ x: a.x, y: status.y + status.h, w: a.w, h: a.y + a.h - HINTS_ROOM - status.y - status.h }, { ...spec, raise: 0 });
+  const menu = shiftMenu(fitted, a.y + a.h - HINTS_ROOM - 12 - fitted.panel.h - fitted.panel.y);
   const middle = (status.y + status.h + menu.panel.y) / 2;
   return { menu, wordmark: { x: cx, y, size }, status, fly: spot(frame, cx, middle) };
 }

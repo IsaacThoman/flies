@@ -184,7 +184,7 @@ export function statsLayout(frame: Frame, hud: HudLayout = hudLayout(frame), siz
   const topFor = (width: number) => (a.w / 2 - 120 - margin - 8 >= width ? a.y + margin : hud.captionY + 23);
   const floorFor = (width: number) => (hud.shelfLeft > a.x + margin + width ? a.y + a.h - margin : hud.labelY - 25);
   // While playing it is at the top: clear of the menu's button on the left, and of the hints under each side.
-  const reach = (left: boolean, width: number) => Math.min(floorFor(width), left ? hud.hintsY - 50 : hud.rightY - 20);
+  const reach = (left: boolean, width: number) => hud.reserveHints ? Math.min(floorFor(width), left ? hud.hintsY - 50 : hud.rightY - 20) : floorFor(width);
   const topOf = (left: boolean, width: number) => Math.max(topFor(width), left ? hud.menuY + 26 : -Infinity);
   // Under the others at the top, as they are when both show, and over them at the bottom.
   const columnTop = (left: boolean) => {
@@ -250,6 +250,8 @@ export const statsSlot = (layout: StatsLayout, eyes: CornerWanted, nerves: Corne
 /** What it shows, as the game has it now. */
 export type StatsState = {
   activity: Activity;
+  /** Keep activity visible when the HUD caption is hidden. */
+  activityHeading?: boolean;
   spikes: number;
   active: number;
   speed: number;
@@ -368,8 +370,7 @@ function cell(g: CanvasRenderingContext2D, x: number, y: number, cols: number, i
 export function drawStatsPanel(g: CanvasRenderingContext2D, shape: StatsShape, s: StatsState, signalsNow?: Float32Array) {
   const { kind, cols, side, width, height } = shape;
   glassPanel(g, 1, 1, width - 2, height - 2, RADIUS, { tint: "night", shadow: false });
-  // What it is doing heads its day, and what goes in and out; the brain alone is only the brain. Smaller, if it must be, to fit.
-  const heading = kind === "brain" ? "Its brain" : caption(s.activity, null);
+  const heading = kind === "brain" ? "Its brain" : s.activityHeading !== false ? caption(s.activity, null) : kind === "day" ? "Its day" : kind === "signals" ? "In and out" : "Brain + day";
   g.font = font(HEADING.size);
   const size = Math.min(HEADING.size, Math.floor((HEADING.size * (width - 2 * HEADING.x)) / g.measureText(heading).width));
   text(g, heading, HEADING.x, HEADING.y, { size, color: HEADING.color });
@@ -445,7 +446,7 @@ export class StatsPanel {
   #kind: StatsKind = "both";
   #since = 1;
   /** What it last drew, to tell when it has changed; what goes in and out as last drawn, and as it is now. */
-  readonly #drawn = { kind: "", activity: "", head: -1, walked: -1, meals: -1, takeOffs: -1, flown: -1, groomed: -1, date: "" };
+  readonly #drawn = { kind: "", activity: "", activityHeading: true, head: -1, walked: -1, meals: -1, takeOffs: -1, flown: -1, groomed: -1, date: "" };
   #signalsDrawn = new Float32Array(SIGNALS);
   #signalsNow = new Float32Array(SIGNALS);
 
@@ -537,7 +538,7 @@ export class StatsPanel {
   /** Whether anything it shows has changed since it was drawn, to the figure it is shown to. */
   #changed(s: StatsState) {
     const d = this.#drawn, day = s.day, kind = this.#kind;
-    if (d.kind !== kind) {
+    if (d.kind !== kind || d.activityHeading !== (s.activityHeading !== false)) {
       if (kind === "signals") readSignals(s, this.#signalsNow);
       return true;
     }
@@ -555,6 +556,7 @@ export class StatsPanel {
     const d = this.#drawn, day = s.day;
     d.kind = this.#kind;
     d.activity = s.activity;
+    d.activityHeading = s.activityHeading !== false;
     d.head = s.head;
     d.date = day.date;
     d.walked = Math.round(day.walked);

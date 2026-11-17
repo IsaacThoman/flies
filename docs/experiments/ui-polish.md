@@ -87,3 +87,18 @@ Use a contrasting backdrop behind anatomical tissue, without touching neural col
 The new phone code-entry browser check passes, as does the complete Play e2e suite, including nervous-system and X-ray steps. A rebased full functional run has zero failures; the unchanged brain budget remains narrowly over at 0.508 s/s. The new test's required `dataDir` type was corrected and typecheck passes afterward. Its check is included in `npm run e2e`.
 
 Round 3 key: C6 is M4 re-rendered on current `dev`; V9 is the candidate. Orders: P V9/C6; Q V9/C6; R C6/V9; S (regressions) V9/C6. Fresh scorers use `high` effort. Candidate navigation traces show five to nine remote inputs including adjustment, with X-ray reachable in five rather than six. Seventy-seven targeted tests pass; lint and typecheck pass. Comparative review is pending.
+
+| Round 3 scorer | Set | Clarity | Polish | Remote | Touch | Fit | Legibility | Redundancy | Accessibility | Mean | Rank |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| P | C6 | 7 | 7 | 7 | 9 | 8 | 6 | 8 | 6 | 7.25 | 2 |
+| P | V9 | 8 | 8 | 8 | 9 | 8 | 8 | 8 | 8 | 8.13 | 1 |
+| Q | C6 | 7 | 7 | 7 | 9 | 8 | 6 | 8 | 6 | 7.25 | 2 |
+| Q | V9 | 8 | 8 | 8 | 9 | 8 | 7 | 8 | 7 | 7.88 | 1 |
+| R | C6 | 8 | 7.5 | 7.5 | 8 | 7.5 | 7 | 8 | 7 | 7.56 | 2 |
+| R | V9 | 8.5 | 8 | 8 | 8 | 7.5 | 8 | 8 | 8 | 8.00 | 1 |
+
+**Accepted: V9, 8.00/10**, unanimously ranked first. Its paired reference averages 7.35: the fresh cohort's absolute calibration is lower than round 2, but each scorer gives the candidate a higher score and rank. The regression review confirms the two extra About presses and smaller iPad figures in exchange for less scene occlusion. Remaining problems: landscape corner labels, title footer spacing, field affordances, and repeated activity captions. Browser lifecycle/offline and phone code-entry checks pass.
+
+### Round 4 · preparation
+
+Reserve the title's footer in portrait layouts. Underline editable values without adding instructional text. Scale the anatomical panel's heading for its actual CSS size. Allow corner panels to use space occupied by remote hints only when those hints are absent, relaying out on input-mode changes rather than allocating each frame. During play the stats identify their contents; when watching they retain the activity caption that the hidden HUD would otherwise supply. Tests cover both hint modes across the existing full geometry matrix.

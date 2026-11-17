@@ -382,3 +382,13 @@ test("code entry stays above a reserved phone keyboard area", () => {
     for (const h of all) assert.ok(inside(h, safeRect(frame)), `${width}×${height}: ${h.kind} above the keyboard area`);
   }
 });
+
+
+test("the title panel clears the footer at every requested screen shape", () => {
+  for (const [w, h] of [[1920, 1080], [1440, 900], [390, 844], [844, 390], [1024, 1366]]) {
+    const frame = frameFor(w, h);
+    const a = safeRect(frame);
+    const { panel } = titleLayout(frame, 5).menu;
+    assert.ok(panel.y + panel.h <= a.y + a.h - 38, `${w}×${h}: title clears hints`);
+  }
+});

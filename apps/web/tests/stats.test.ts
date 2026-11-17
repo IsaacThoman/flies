@@ -173,6 +173,12 @@ test("the panel shows what it is doing over its day, and its brain's numbers, ea
   assert.deepEqual(written("signals", 2, true), ["Grooming", "In", "Loom L", "Loom R", "Touch", "Antenna L", "Antenna R", "Wind", "Sweet", "On legs", "Male taste", "Wingbeat", "Light", "Hunger", "Out", "Hz", "Walk", "0", "Steer", "0·0", "Back up", "0", "Escape", "0", "Wings", "0", "Groom", "0", "Feed", "0", "Sing", "0"]);
   assert.deepEqual(written("day"), ["Grooming", "1.42", "m", "walked", "3", "meals", "7", "take-offs", "42", "s", "flying", "2", "min", "grooming"]);
   for (const [cols, side] of [[3, false], [2, false], [3, true]] as const) assert.equal(written("both", cols, side).length, 1 + 2 * 8 + 3, `${cols} across${side ? ", side by side" : ""}`);
+  state.activityHeading = false;
+  assert.equal(written("day")[0], "Its day");
+  assert.equal(written("both")[0], "Brain + day");
+  assert.equal(written("signals")[0], "In and out");
+  state.activityHeading = true;
+  assert.equal(written("day")[0], "Grooming");
   // Every cell inside the panel, in every arrangement.
   for (const kind of ["brain", "day", "both", "signals"] as const) {
     const arrangements = kind === "signals" ? ([[2, true], [1, false], [3, true]] as const) : ([[3, false], [2, false], ...(kind === "both" ? [[3, true] as const] : [])] as const);

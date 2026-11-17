@@ -585,7 +585,7 @@ export class Game implements Shell {
       this.overlay.resize(frame);
       this.director.setAspect(frame.aspect);
     }
-    this.#hudLayout = hudLayout(frame);
+    this.#hudLayout = hudLayout(frame, !this.devices.pointing && this.settings.hints);
     this.#hud.layout = this.#hudLayout;
     this.#loadingLayout = loadingLayout(frame);
     this.eyes.layout(frame, this.#hudLayout);
@@ -598,6 +598,12 @@ export class Game implements Shell {
   /** Lays out the pictures in the corners for the screen and the size and stats chosen, if any has changed (or `now`). */
   #layCorners(now = false) {
     const { overlaySize, statsKind } = this.settings;
+    const reserveHints = !this.devices.pointing && this.settings.hints;
+    if (this.#hudLayout.reserveHints !== reserveHints) {
+      this.#hudLayout = hudLayout(this.display.frame, reserveHints);
+      this.#hud.layout = this.#hudLayout;
+      now = true;
+    }
     const laid = this.#laidOut;
     if (!now && laid.size === overlaySize && laid.kind === statsKind) return;
     laid.size = overlaySize;
@@ -965,6 +971,7 @@ export class Game implements Shell {
       this.nerves.update(dt, waitFor(nervesNow, this.corners, slot, this.nerves, pictures), this.corners, slot, opacity);
       const stats = this.#statsState;
       stats.activity = life.activity;
+      stats.activityHeading = this.wallpaper;
       stats.spikes = this.meter.spikesPerSecond;
       stats.active = this.meter.active;
       stats.speed = this.meter.speed;

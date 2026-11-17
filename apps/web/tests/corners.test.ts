@@ -217,8 +217,8 @@ test("whatever happens, at every shape, size and choice of stats, they never ove
 
 test("at every shape, size and choice of stats, at every corner, they are inside the safe area, clear of each other and of the caption, the menu's button, the shelf, the label and the hints", () => {
   const sample: StatsState = { activity: "resting", spikes: 0, active: 0, speed: 1, history: new Float32Array(HISTORY_SAMPLES), head: 0, day: freshDay("2026-11-16"), sensed: RESTING_SENSES, brain: null };
-  for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
-    const hud = hudLayout(frame);
+  for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) for (const reserveHints of [true, false]) {
+    const hud = hudLayout(frame, reserveHints);
     const a = safeRect(frame);
     const inside = (r: Rect) => r.x >= a.x - 1e-6 && r.y >= a.y - 1e-6 && r.x + r.width <= a.x + a.w + 1e-6 && r.y + r.height <= a.y + a.h + 1e-6;
     const shelf = { x: hud.shelfLeft, y: hud.shelfY - 26, width: hud.gap * TOOLS.length + hud.apart, height: 52 };
@@ -253,10 +253,10 @@ test("at every shape, size and choice of stats, at every corner, they are inside
         }
         // While playing they keep to the top right (the stats across from them, or under them), clear of the menu's button and the hints.
         for (const r of [eyes.rects["top-right"], ...nerves.rects["top-right"], ...stats.rects["top-right"]]) {
-          for (const [zone, z] of Object.entries({ menu, rightHint })) assert.ok(!overlaps(r, z), `${where}: while playing, and the ${zone}`);
+          for (const [zone, z] of Object.entries(reserveHints ? { menu, rightHint } : { menu })) assert.ok(!overlaps(r, z), `${where}: while playing, and the ${zone}`);
         }
         // The stats may be across at the top left, over the hints at the bottom left.
-        for (const r of stats.rects["top-right"]) assert.ok(!overlaps(r, leftHints), `${where}: while playing, the stats and the hints at the bottom left`);
+        for (const r of stats.rects["top-right"]) if (reserveHints) assert.ok(!overlaps(r, leftHints), `${where}: while playing, the stats and the hints at the bottom left`);
         assert.ok(nerves.scale > 0.3, `${where}: its nervous system big enough to read (${nerves.scale.toFixed(2)}, ${nerves.across ? "beside" : "under"} what it sees)`);
         const drawn = blankCanvas();
         drawStatsPanel(drawn, stats.shape, sample);

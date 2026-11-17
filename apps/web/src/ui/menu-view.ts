@@ -322,6 +322,12 @@ function drawField(g: CanvasRenderingContext2D, item: FieldItem, x: number, y: n
     hits.add(MENU_HITS.submit, x + w - 64, sy, 56, 36, index);
   }
   const right = x + w - (submit ? 76 : 22);
+  g.strokeStyle = typing ? "#0a6fc0" : INK_SOFT;
+  g.lineWidth = 1.4;
+  g.beginPath();
+  g.moveTo(left, y + h * (compact ? 0.9 : 0.8));
+  g.lineTo(right, y + h * (compact ? 0.9 : 0.8));
+  g.stroke();
   const room = right - left;
   const shown = item.secret ? "•".repeat([...item.value].length) : item.value;
   const before = item.secret ? "•".repeat([...item.value.slice(0, Math.max(0, caret))].length) : item.value.slice(0, Math.max(0, caret));
