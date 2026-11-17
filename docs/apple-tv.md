@@ -656,6 +656,40 @@ counts completed pictures; `data-eyes-ms` includes submission and resampling CPU
 the asynchronous wait. A readback's final data copy can still wait for queued render-thread
 commands; this is not a fully asynchronous native transfer.
 
+## Holding to what it can sustain
+
+A TV that draws a heavy place flat out at 60 frames a second warms until tvOS slows its GPU and
+CPU, and then it draws far fewer than a steady lower rate would have (the restaurant fell to 15,
+"Measured on peev"). So the host says how hot the device is (`thermalState()` on `__native`,
+`ProcessInfo.thermalState`, and every change of it in the log as `thermal state: …`), and the
+game holds itself to what the TV can sustain (`Warmth` in `apps/web/src/quality.ts`):
+
+| Level | Frames a second | Pixels |
+| --- | --- | --- |
+| 0 | 60 | as chosen |
+| 1 | 40 | as chosen |
+| 2 | 30 | as chosen |
+| 3 | 30 | no finer than Chunky |
+| 4 | 30 | no finer than Chunkier |
+
+- It asks once a second. Fair for 15 s steps down a level, and another each minute it stays fair;
+  serious steps down at once and every 45 s while it lasts; critical every 15 s.
+- It steps back up only after the TV has been nominal for a long while, a level at a time: 10
+  minutes at first, twice that each time a place warms the TV (once a spell, however many steps
+  it took), up to two hours. A step up that warms the TV within 10 minutes comes straight back
+  down.
+- Each place starts where it was last held, with the wait it had earned there, kept in
+  `localStorage` (`flies.warmth`): the bar and the restaurant warm the TV very differently. peev
+  goes from nominal straight to serious, never through fair, so a place that has once made it hot
+  starts where it stayed cool.
+- Only the frame rate and the pixels change. The brain is handed the same time whatever the frame
+  rate, and its senses and the eyes are the same at every level. At 40 a second on a 60 Hz screen
+  the frames alternate one and two refreshes apart (`main.ts`).
+- The canvas says where it is held (`data-warmth`, the level), how hot the TV says it is
+  (`data-thermal`) and the frame rate it is held to (`data-fps`), so the `stats` lines of a soak
+  show them. The iPhone app doesn't pass its thermal state to the page, so a browser keeps to its
+  frame-time quality alone.
+
 ## Checking it
 
 ### Measured on peev

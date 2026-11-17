@@ -248,7 +248,9 @@ falling behind, or the brain running slower than real time, and it draws less
 (the eyes' finer detail, then 30 frames a second, then bigger pixels, then the
 eyes refreshing half as often, then bigger pixels still), never more than
 Settings asks for, and never at the brain's expense. `docs/web.md` has the
-measurements. On the Apple TV it is drawn as it always was.
+measurements. On the Apple TV it is held instead to what the TV can sustain as
+it warms: the frame rate first, then the pixels (`docs/apple-tv.md`, "Holding to what
+it can sustain").
 
 <!-- docs-check: base apps/web/src -->
 
