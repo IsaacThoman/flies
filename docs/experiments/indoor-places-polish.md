@@ -126,4 +126,22 @@ Key: M7 = split incumbent; K8 = quieter sill crazing and area-filtered notebook 
 | **Panel** | **Sill** | | **7.24** | | **7.40** | **3/3 K8** |
 | **Panel** | **Lab** | | **7.14** | | **7.24** | **2/3 K8** |
 
-Retained both. The dissent preferred stronger ruling as a notebook identity cue; the majority preferred reduced stripe interference. Paired original/candidate construction medians: sill 41.05 / 40.95 ms, lab 48.6 / 48.5 ms; 12 warm samples each. Draw counts unchanged; shader/browser errors empty. Relative-weakness report pending.
+Retained both. The dissent preferred stronger ruling as a notebook identity cue; the majority preferred reduced stripe interference. Paired original/candidate construction medians: sill 41.05 / 40.95 ms, lab 48.6 / 48.5 ms; 12 warm samples each. Draw counts unchanged; shader/browser errors empty. The relative-weakness reviewer also preferred K8 for both places, citing quieter crack patterns and notebook striping.
+
+
+### Round 5 — retained
+
+Key: K8 and L2 = identical incumbent; J4 = more, smaller canopy clusters with reused construction colors, and shaded lab foliage. Orders L2/J4/K8, J4/K8/L2, K8/L2/J4; relative-weakness J4/K8.
+
+| Review | Place | K8 = L2 scores | Mean | J4 scores | Mean | First |
+| --- | --- | --- | ---: | --- | ---: | --- |
+| R1 | windowsill | 7,7,7,7.5,8,7,7.5 | 7.29 | 7.2,7,7,7.5,8,7.3,7.5 | 7.36 | set-J4 |
+| R1 | lab | 7,7.5,6.5,7.5,7.5,5.5,7 | 6.93 | 7,7.5,6.5,7.5,7.5,5.7,7 | 6.96 | set-J4 |
+| R2 | windowsill | 6.5,7,7,7.5,8,6.5,7.5 | 7.14 | 6.5,7,7,7.5,8,7,7.5 | 7.21 | set-J4 |
+| R2 | lab | 6.5,7,6.5,8,7.5,5.5,7 | 6.86 | 6.5,7,6.5,8,7.5,6,7 | 6.93 | set-J4 |
+| R3 | windowsill | 7.5,7,7.5,8,8,7,7.5 | 7.50 | 7.5,7,7.5,8,8,7.5,7.5 | 7.57 | set-J4 |
+| R3 | lab | 7,7.5,7,8,8,6,7.5 | 7.29 | 7,7.5,7,8,8,6.5,7.5 | 7.36 | set-J4 |
+| Panel | Sill | | 7.31 | | 7.38 | 3/3 J4 |
+| Panel | Lab | | 7.02 | | 7.08 | 3/3 J4 |
+
+Both retained, but gains are small and concentrated outside. All decoy criterion differences are zero. The relative-weakness reviewer preferred J4's sill and narrowly preferred its lab on a score tie. One reviewer noted exposed isolated foliage; the dominant mass still needs better structure. Paired build medians: sill 40.65 / 43.05 ms (+5.9%), lab 48.05 / 48.4 ms (+0.7%). Draw counts unchanged; all shader/browser errors empty. Lint, typecheck and place tests pass.

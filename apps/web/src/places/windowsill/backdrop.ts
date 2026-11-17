@@ -392,13 +392,14 @@ diffuseColor.rgb *= mix(1.0, mix(0.68, 1.2, cluster) * mix(1.0, mix(0.8, 1.12, l
       swayed(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(crown, crown.clone().lerp(end, 0.5).add(new THREE.Vector3(0, 300, 0)), end), 5, 70, 5), "#6e5440", fromTrunk);
     }
     const leaves = [new THREE.Color("#4f9a3c"), new THREE.Color("#63b048"), new THREE.Color("#3f8432"), new THREE.Color("#77c055")];
-    for (let i = 0; i < 26; i++) {
+    const leafTint = new THREE.Color();
+    for (let i = 0; i < 48; i++) {
       const a = rnd.range(0, Math.PI * 2);
       const r = Math.sqrt(rnd.next()) * 1700;
       const at = crown.clone().add(new THREE.Vector3(Math.cos(a) * r, rnd.range(-200, 1300) - r * 0.25, Math.sin(a) * r * 0.8));
-      const s = rnd.range(650, 1050);
+      const s = rnd.range(420, 720);
       const color = leaves[i % 4];
-      swayed(new THREE.IcosahedronGeometry(s, 1).translate(at.x, at.y, at.z), (p) => color.clone().multiplyScalar(0.8 + 0.3 * Math.max(0, (p.y - at.y) / s)), fromTrunk);
+      swayed(new THREE.IcosahedronGeometry(s, 1).translate(at.x, at.y, at.z), (p) => leafTint.copy(color).multiplyScalar(0.8 + 0.3 * Math.max(0, (p.y - at.y) / s)), fromTrunk);
     }
     for (let i = 0; i < 30; i++) {
       const a = rnd.range(0, Math.PI * 2);

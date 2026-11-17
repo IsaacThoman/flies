@@ -312,7 +312,15 @@ function roomAtlas() {
         const cr = size * rnd.range(0.1, 0.22);
         const shade = Math.max(0, Math.min(4, Math.floor((base - size * 0.6 - cy) / size * 3 + rnd.range(-0.6, 0.6))));
         both((ox, oy, mask) => {
-          g.fillStyle = mask ? "#0000ff" : ["#2d4c38", "#3e6240", "#527a46", "#6b9050", "#91a963"][shade];
+          if (mask) g.fillStyle = "#0000ff";
+          else {
+            const tones = ["#2d4c38", "#3e6240", "#527a46", "#6b9050", "#91a963"];
+            const volume = g.createRadialGradient(ox + cx - cr * 0.3, oy + cy - cr * 0.4, 0, ox + cx, oy + cy, cr * 1.2);
+            volume.addColorStop(0, tones[shade]);
+            volume.addColorStop(0.65, tones[Math.max(0, shade - 1)]);
+            volume.addColorStop(1, tones[0]);
+            g.fillStyle = volume;
+          }
           g.beginPath();
           g.ellipse(ox + cx, oy + cy, cr, cr * 0.75, angle, 0, Math.PI * 2);
           g.fill();
