@@ -18,13 +18,14 @@
 // Needs the connectome (npm run brain:fetch) and a Playwright Chromium.
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
 import { build } from "vite";
 import { chromiumPath, gpuFlags, holdSteady, readState, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import { serveSite } from "../../../scripts/serve.ts";
+import { PUBLIC_OWNER } from "../tests/privacy-fixture.ts";
 
 const root = path.join(import.meta.dirname, "../../..");
 const args = process.argv.slice(2);
@@ -35,7 +36,16 @@ const step = (name: string) => { currentStep = name; console.log(`· ${name}`); 
 const CUT_AT = 3_000_000;
 
 const out = mkdtempSync(path.join(tmpdir(), "fly-web-e2e-"));
-await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "warn", build: { outDir: out, emptyOutDir: true } });
+const savedOwner = Object.fromEntries(Object.keys(PUBLIC_OWNER).map((field) => [field, process.env[field]]));
+try {
+  Object.assign(process.env, PUBLIC_OWNER);
+  await build({ configFile: path.join(root, "vite.config.ts"), logLevel: "warn", build: { outDir: out, emptyOutDir: true } });
+} finally {
+  for (const [field, value] of Object.entries(savedOwner)) {
+    if (value === undefined) delete process.env[field];
+    else process.env[field] = value;
+  }
+}
 let cuts = 0;
 const site = await serveSite({ dir: out, base: "/some/folder/fly/", cut: (file) => (file.startsWith("brain/connectome.") && cuts++ === 0 ? CUT_AT : null) });
 const browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
@@ -241,6 +251,19 @@ try {
   await waitFor(blind, "failure=webgl", 10_000);
   if (shots) await blind.locator("#game").screenshot({ path: path.join(shots, "5-no-webgl.png") });
   await flat.close();
+
+  step("the privacy policy remains a policy when opened offline");
+  await page.goto(new URL("privacy", site.url).href);
+  assert.match(await page.locator("main").innerText(), /Privacy policy/);
+  const policyFile = path.join(out, "privacy/index.html");
+  writeFileSync(policyFile, readFileSync(policyFile, "utf8").replace("</main>", "<p>Policy revision fixture</p></main>"));
+  await page.reload();
+  assert.match(await page.locator("main").innerText(), /Policy revision fixture/);
+  await context.setOffline(true);
+  await page.reload();
+  assert.match(await page.locator("main").innerText(), /Policy revision fixture/);
+  assert.equal(await page.locator("canvas").count(), 0);
+  await context.setOffline(false);
 
   step("nothing was asked of any other site");
   assert.deepEqual(elsewhere, []);

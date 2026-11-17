@@ -11,6 +11,7 @@ import type { HudState } from "../src/ui/hud.ts";
 import { hudLayout, loadingLayout, roomLayout, safeRect, titleLayout } from "../src/ui/layout.ts";
 import { LOADING_HITS, drawLoading } from "../src/ui/loading.ts";
 import type { Rect } from "../src/ui/layout.ts";
+import NOTICES from "../src/ui/notices.json" with { type: "json" };
 import { AboutScreen } from "../src/ui/screens/about.ts";
 import { settingsScreen, titleScreen } from "../src/ui/screens/menus.ts";
 import { OnlineScreen } from "../src/ui/screens/online.ts";
@@ -338,6 +339,59 @@ test("selector arrows stay put across kinds, including Place's Go appearing", ()
       for (let j = 0; j < hits.count; j++) if (hits.get(j)!.kind === "kind") arrows.push(hits.get(j)!.x);
       if (!first) first = arrows;
       else assert.deepEqual(arrows, first, `${id}: the same place selects each next kind`);
+    }
+  }
+});
+
+test("Acknowledgements pages fit every screen and every document is reachable with a remote", () => {
+  for (const [name, frame] of frames()) {
+    let exits = 0;
+    const host = shell(frame);
+    host.back = () => { exits++; };
+    const screen = new AboutScreen(host);
+    const draw = () => {
+      const g = blankCanvas();
+      const hits = new HitMap();
+      hits.begin("about");
+      screen.draw(g, 0, hits);
+      for (let i = 0; i < hits.count; i++) assert.ok(inside(hits.get(i)!, safeRect(frame)), name);
+      return { words: writtenOn(g).map((w) => w.text), hits };
+    };
+    assert.ok(draw().words.includes("Acknowledgements →"));
+    screen.press("select", false);
+    const first = draw();
+    assert.ok(first.words.includes("Acknowledgements"));
+    assert.ok(first.words.join(" ").includes("FlyEM male CNS data"));
+    const seen = new Set<string>();
+    for (let page = 0; page < NOTICES.length; page++) {
+      const { words, hits } = draw();
+      const count = words.find((w) => /^\d+ \/ \d+$/.test(w))!;
+      if (seen.has(count)) break;
+      seen.add(count);
+      for (let i = 0; i < hits.count; i++) if (hits.get(i)!.kind === "notice") assert.ok(hits.get(i)!.h >= 40, name);
+      screen.press("down", false);
+      screen.press("right", false);
+    }
+    assert.equal(seen.size, NOTICES.length, `${name}: every notice category reachable`);
+    screen.press("back", false);
+    assert.equal(exits, 0, "Back returns from notices to About");
+    assert.ok(draw().words.includes("About the fly"));
+    screen.press("back", false);
+    assert.equal(exits, 1, "Back leaves About");
+  }
+});
+
+
+test("notice navigation clears the button hints on tall and short screens", () => {
+  for (const [name, frame] of frames()) {
+    const screen = new AboutScreen(shell(frame, "keys"));
+    screen.press("select", false);
+    const hits = new HitMap();
+    hits.begin("about");
+    screen.draw(blankCanvas(), 0, hits);
+    for (let i = 0; i < hits.count; i++) {
+      const hit = hits.get(i)!;
+      if (hit.kind === "notice") assert.ok(hit.y + hit.h < frame.design.height - frame.safe.bottom - 43, name);
     }
   }
 });

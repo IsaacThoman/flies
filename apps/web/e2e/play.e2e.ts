@@ -190,6 +190,14 @@ try {
   await press("ArrowUp");
   await press("Enter");
   await waitFor(page, "screen=about");
+  await press("Enter");
+  await waitFor(page, "acknowledgement=0,aboutScroll=0");
+  await press("ArrowDown");
+  await waitFor(page, "aboutScroll>0");
+  await press("ArrowRight");
+  await waitFor(page, "acknowledgement=1,aboutScroll=0");
+  await press("Escape");
+  await waitFor(page, "screen=about,acknowledgement=");
   await press("ArrowDown", 3);
   await press("Escape");
   await waitFor(page, "screen=title,focus=about");

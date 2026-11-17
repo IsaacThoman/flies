@@ -1,3 +1,4 @@
+import { releasePaperwork, shippedDependencyGuard } from "./scripts/notices.ts";
 import path from "node:path";
 import { defineConfig } from "vite";
 import { appSite, brain, webApp } from "./scripts/webBuild.ts";
@@ -12,10 +13,10 @@ export default defineConfig({
   publicDir: path.join(import.meta.dirname, "apps/web/public"),
   base: "./",
   build: { outDir: path.join(import.meta.dirname, "dist"), emptyOutDir: true, target: "es2022" },
-  worker: { format: "es" },
+  worker: { format: "es", plugins: () => [shippedDependencyGuard()] },
   // The iPhone and iPad app's room server and invitations (apps/web/src/online/invite.ts): the site's unless set.
   define: appSite(),
   // Tables with others: the room server (npm run rooms) on the same origin, as the site's web server has it.
   server: { proxy: { "/rooms": { target: `ws://localhost:${process.env.ROOMS_PORT ?? 8787}`, ws: true } } },
-  plugins: [brain(), webApp()],
+  plugins: [brain(), releasePaperwork(), webApp()],
 });
