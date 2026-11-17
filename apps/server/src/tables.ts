@@ -7,7 +7,7 @@
 // them when they reconnect. And the list of rooms anyone may browse: the
 // listed ones with someone there.
 
-import { mkdir, open, readFile, rename } from "node:fs/promises";
+import * as fs from "node:fs/promises";
 import path from "node:path";
 import { LISTED_MAX } from "@fly/net";
 import type { ClientMessage, Refusal, RoomWire } from "@fly/net";
@@ -23,6 +23,9 @@ export const TABLE_IDLE = 30 * 24 * 3_600_000;
  * that is left of it, and the people who had them have moved on.
  */
 export const LISTED_IDLE = 24 * 3_600_000;
+/** What the tables are kept with: the file system's, or a test's that fails when asked to. */
+export type Files = Pick<typeof fs, "mkdir" | "open" | "readFile" | "rename">;
+
 /** At most this many tables at once: past it, starting one forgets the one nobody has been at for longest. */
 export const MAX_TABLES = 10_000;
 
@@ -30,11 +33,13 @@ export class Tables {
   readonly #tables = new Map<string, Table>();
   readonly #options: TableOptions;
   readonly #max: number;
+  readonly #files: Files;
   #changed = false;
 
-  constructor(options: TableOptions, max = MAX_TABLES) {
+  constructor(options: TableOptions, max = MAX_TABLES, files: Files = fs) {
     this.#options = options;
     this.#max = max;
+    this.#files = files;
   }
 
   get size() {
@@ -115,21 +120,30 @@ export class Tables {
    * Writes every table to `file`, if anything has changed: atomically (a
    * crash halfway, or the power going, leaves the last good copy whole,
    * since the new one is on the disk before it takes the old one's name).
+   * A save that fails at any step leaves the tables changed, so the next
+   * one writes them, however little has happened since.
    */
   async save(file: string, force = false) {
     if (!this.#changed && !force) return;
+    // Cleared before the tables are read, so a change while the file is written is saved next time.
     this.#changed = false;
-    const records = [...this.#tables.values()].map((t) => t.record());
-    await mkdir(path.dirname(file), { recursive: true });
-    const partial = `${file}.${process.pid}.partial`;
-    const handle = await open(partial, "w");
     try {
-      await handle.writeFile(JSON.stringify({ v: 1, tables: records }));
-      await handle.sync();
-    } finally {
-      await handle.close();
+      const records = [...this.#tables.values()].map((t) => t.record());
+      const files = this.#files;
+      await files.mkdir(path.dirname(file), { recursive: true });
+      const partial = `${file}.${process.pid}.partial`;
+      const handle = await files.open(partial, "w");
+      try {
+        await handle.writeFile(JSON.stringify({ v: 1, tables: records }));
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+      await files.rename(partial, file);
+    } catch (error) {
+      this.#changed = true;
+      throw error;
     }
-    await rename(partial, file);
   }
 
   /**
@@ -141,7 +155,7 @@ export class Tables {
   async load(file: string): Promise<number> {
     let text: string;
     try {
-      text = await readFile(file, "utf8");
+      text = await this.#files.readFile(file, "utf8");
     } catch {
       return 0;
     }
@@ -153,7 +167,7 @@ export class Tables {
     }
     if (!kept || typeof kept !== "object" || kept.v !== 1 || !Array.isArray(kept.tables)) {
       const aside = `${file}.unreadable-${this.#options.wall()}`;
-      await rename(file, aside);
+      await this.#files.rename(file, aside);
       this.#options.log?.("unreadable", { file: aside });
       return 0;
     }

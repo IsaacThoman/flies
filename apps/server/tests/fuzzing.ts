@@ -13,7 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { WebSocket } from "ws";
 import {
-  BITES, DROP_ID, FLIES, FLY, FLY_MAX, FOUND_ID, HANDS, MAX_PLAYERS, PROTOCOL, ROOMS_PATH, TABLE_LIGHTS, TABLE_WEATHERS, WIRE_FOODS_MAX, createFlyState,
+  BITES, BITES_MAX, DROP_ID, FLIES, FLY, FLY_MAX, FOUND_ID, HANDS, MAX_PLAYERS, PROTOCOL, ROOMS_PATH, TABLE_LIGHTS, TABLE_WEATHERS, WIRE_FOODS_MAX, createFlyState,
   decodeFlies, encodeBites, encodeFly, readServerMessage, stream,
 } from "@fly/net";
 import type { ClientMessage, TableStart } from "@fly/net";
@@ -84,9 +84,14 @@ export class Fuzz {
     } as ClientMessage;
   }
 
-  /** A JSON message a device seated at a table might send, player `id`'s. */
-  message(id: number): unknown {
-    const m = this.pick<() => unknown>([
+  /** The place epoch an action says it was done in: the table's, one it has left, none (a device from before), or nonsense. */
+  epoch(epoch: number): unknown {
+    return this.pick<() => unknown>([() => epoch, () => epoch, () => (epoch + 255) & 0xff, () => undefined, () => this.weird()])();
+  }
+
+  /** A JSON message a device seated at a table might send, player `id`'s, at a table in `epoch`. */
+  message(id: number, epoch = 0): unknown {
+    const m = this.pick<() => Record<string, unknown> | unknown>([
       () => ({ type: "ping", t: this.num(1e6) }),
       () => ({ type: "drop", id: this.or(id * DROP_ID + this.int(0, 50)), kind: this.or(this.pick(["sugar", "honey", "berry", "water", "patch", "found"])), x: this.num(), z: this.num(), y: this.num(), at: this.num(1e6) }),
       () => ({ type: "ball", at: this.num(1e6), from: this.v3(), via: this.v3(), to: this.v3() }),
@@ -95,10 +100,12 @@ export class Fuzz {
       () => ({ type: "remove", id: this.or(this.int(0, MAX_PLAYERS + 1)) }),
       () => ({ type: "pop", slot: this.or(this.int(-1, 9)), cycle: this.or(this.int(0, 5)), at: this.num(1e6) }),
       () => ({ type: "found", id: this.or(FOUND_ID + this.int(0, 1e6)), name: this.or("juice"), x: this.num(), z: this.num(), y: this.num(), r: this.num(5), sweet: this.num(1) }),
+      () => ({ type: "clearFood", epoch: this.epoch(epoch) }),
       () => ({ type: "bye" }),
       () => ({ type: this.weird() }),
       () => this.weird(),
     ])();
+    if (m && typeof m === "object" && this.chance(0.7)) (m as Record<string, unknown>).epoch = this.epoch(epoch);
     return m;
   }
 
@@ -111,7 +118,7 @@ export class Fuzz {
 
   /** A binary message: a fly's state or bites, whole or broken, or noise. */
   binary(now: number, epoch: number): Uint8Array {
-    const view = new DataView(new ArrayBuffer(Math.max(FLY_MAX, 4 + 16 * 8)));
+    const view = new DataView(new ArrayBuffer(Math.max(FLY_MAX, BITES_MAX)));
     let n: number;
     const kind = this.next();
     if (kind < 0.6) {
@@ -127,7 +134,8 @@ export class Fuzz {
       n = encodeFly(view, this.pick([{ position: 50, pointer: 20, eye: 10 }, { position: 5, pointer: 4, eye: 2 }]), s);
     } else if (kind < 0.85) {
       const bites = Array.from({ length: this.int(0, 20) }, () => ({ food: this.chance(0.7) ? this.int(1, 30) : this.int(0, 2 ** 32 - 1), amount: this.chance(0.9) ? this.next() * 0.01 : (this.weird() as number) }));
-      n = encodeBites(view, this.int(0, 65535), bites);
+      const tag = this.epoch(epoch);
+      n = encodeBites(view, this.int(0, 65535), bites, bites.length, typeof tag === "number" ? tag : undefined);
     } else {
       n = this.int(0, view.byteLength);
       for (let i = 0; i < n; i++) view.setUint8(i, this.int(0, 255));
@@ -191,7 +199,7 @@ export function fuzzTable(seed: number, until: () => boolean) {
       const table = [...tables.values()].find((t) => device.seat && t.seats.get(device.seat.id) === device.seat);
       if (!table || !device.seat || !device.open) continue;
       messages++;
-      table.receive(device.seat, f.chance(0.6) ? f.text(f.message(device.seat.id)) : f.binary(clock.now, table.epoch));
+      table.receive(device.seat, f.chance(0.6) ? f.text(f.message(device.seat.id, table.epoch)) : f.binary(clock.now, table.epoch));
     }
     for (const t of tables.values()) {
       assert.ok(t.seats.size <= MAX_PLAYERS);

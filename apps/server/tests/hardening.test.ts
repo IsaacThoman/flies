@@ -3,19 +3,21 @@
 // spoil its file of tables. Each test is one way that once worked.
 
 import assert from "node:assert/strict";
+import * as fs from "node:fs/promises";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { WebSocket } from "ws";
-import { FOUND_ID, LIMITS, MAX_FOUND, PROTOCOL, ROOMS_PATH, ROOM_LIMITS, tableCode } from "@fly/net";
+import { DROP_ID, FLY_MAX, FOUND_ID, LIMITS, MAX_FOUND, PROTOCOL, ROOMS_PATH, ROOM_LIMITS, TABLETOP_SCALE, createFlyState, encodeBites, encodeFly, tableCode } from "@fly/net";
 import type { ClientMessage, ServerMessage, TableStart } from "@fly/net";
 import { clientAddress, post, startServer } from "../src/server.ts";
 import type { RoomServer } from "../src/server.ts";
 import { AWAY_LIMIT, REMOVED_MAX, Table } from "../src/table.ts";
 import type { Link, Seat } from "../src/table.ts";
 import { Tables } from "../src/tables.ts";
+import type { Files } from "../src/tables.ts";
 
 const START: TableStart = { place: "picnic", light: "noon", weather: "clear", zone: "UTC", offset: 0 };
 const WAIT = 2000;
@@ -286,4 +288,108 @@ test("bubbles start when the table does, is carried to the picnic, or wakes: nev
   clock.now += 86_400_000;
   table.hello(link, "starter", { type: "hello", v: PROTOCOL, table: "23456789ab", key: "k" });
   assert.ok(table.bubbles!.snapshot().every((b) => b.t0 >= clock.now / 1000 - 1));
+});
+
+test("a save that fails at any stage leaves the tables to be saved again: the next ordinary save keeps the latest of them", async () => {
+  for (const stage of ["mkdir", "open", "write", "sync", "rename"] as const) {
+    const dir = await scratch();
+    const file = path.join(dir, "rooms", "tables.json");
+    let failing: string | null = stage;
+    const fail = (at: string) => {
+      if (failing !== at) return;
+      failing = null;
+      throw new Error(`no space left (${at})`);
+    };
+    const files: Files = {
+      ...fs,
+      mkdir: (async (...a: Parameters<typeof fs.mkdir>) => (fail("mkdir"), fs.mkdir(...a))) as Files["mkdir"],
+      rename: async (...a: Parameters<typeof fs.rename>) => (fail("rename"), fs.rename(...a)),
+      open: async (...a: Parameters<typeof fs.open>) => {
+        fail("open");
+        const handle = await fs.open(...a);
+        const write = handle.writeFile.bind(handle);
+        const sync = handle.sync.bind(handle);
+        handle.writeFile = (async (...w: Parameters<typeof write>) => (fail("write"), write(...w))) as typeof handle.writeFile;
+        handle.sync = async () => (fail("sync"), sync());
+        return handle;
+      },
+    };
+    const clock = { now: 0, wall: Date.UTC(2026, 5, 1, 12) };
+    const tables = new Tables({ now: () => clock.now, wall: () => clock.wall }, undefined, files);
+    const table = tables.open("starter", { type: "hello", v: PROTOCOL, table: "23456789ab", key: newKey(), start: START }, 1) as Table;
+    const link: Link = { send() {}, close() {} };
+    const seat = table.hello(link, "starter", { type: "hello", v: PROTOCOL, table: "23456789ab", key: "k" }) as Seat;
+    tables.tick();
+    // The room empties: nothing after this marks the tables changed, so only the failed save's retry can keep it.
+    clock.wall += 5000;
+    table.disconnected(seat, link);
+    await assert.rejects(tables.save(file), /no space left/, stage);
+    await tables.save(file);
+    const kept = JSON.parse(await readFile(file, "utf8")) as { tables: { code: string; seats: { lastSeen: number }[] }[] };
+    assert.equal(kept.tables[0]?.code, "23456789ab", stage);
+    assert.equal(kept.tables[0].seats[0].lastSeen, clock.wall, `${stage}: the room as it was last, emptied`);
+  }
+});
+
+test("a drop, a find, a throw or a bite from the place the table was in before a move is dropped there, not done in the new one", () => {
+  const clock = { now: 1000, wall: Date.UTC(2026, 5, 1, 12) };
+  const table = new Table("23456789ab", START, "key-1", 7, { now: () => clock.now, wall: () => clock.wall });
+  const heard: string[] = [];
+  const hello = (key: string): ClientMessage & { type: "hello" } => ({ type: "hello", v: PROTOCOL, table: "23456789ab", key });
+  // The starter hears what the other does.
+  const starter = table.hello({ send: (d) => typeof d === "string" && heard.push(d), close() {} }, "key-1", hello("key-1")) as Seat;
+  const other = table.hello({ send() {}, close() {} }, "key-2", hello("key-2")) as Seat;
+  const before = table.epoch;
+  table.receive(starter, JSON.stringify({ type: "place", place: "lab" } satisfies ClientMessage));
+  assert.notEqual(table.epoch, before);
+  heard.length = 0;
+  const [x, z] = [table.world.place.start.x, table.world.place.start.z];
+  // In flight when the table moved: each still names the picnic's epoch.
+  const stale = [
+    { type: "drop", id: other.id * DROP_ID + 1, kind: "sugar", x, z, y: 1000, at: clock.now, epoch: before },
+    { type: "found", id: FOUND_ID + 5, name: "juice", x, z, y: 1000, r: 1, sweet: 0.5, epoch: before },
+    { type: "ball", at: clock.now, from: [x, 50, z], via: [x, 20, z], to: [x, 0, z], epoch: before },
+  ] satisfies ClientMessage[];
+  for (const m of stale) table.receive(other, JSON.stringify(m));
+  assert.deepEqual(heard.map((d) => (JSON.parse(d) as ServerMessage).type), [], "none of them reached anyone");
+  assert.ok(!table.food.foods.some((f) => f.id === other.id * DROP_ID + 1 || f.id === FOUND_ID + 5));
+  assert.equal(table.balls.length, 0);
+  // From the place it is in now, the same are done.
+  for (const m of stale) table.receive(other, JSON.stringify({ ...m, epoch: table.epoch }));
+  assert.deepEqual(heard.map((d) => (JSON.parse(d) as ServerMessage).type), ["drop", "found", "ball"]);
+  // A bite of a food of the same id, where the fly now stands within reach of it: only one from this place counts.
+  const food = table.food.foods[0];
+  Object.assign(other.state, { x: food.x, y: food.y, z: food.z });
+  const view = new DataView(new ArrayBuffer(64));
+  const bite = (epoch: number, seq: number) => table.receive(other, new Uint8Array(view.buffer, 0, encodeBites(view, seq, [{ food: food.id, amount: 0.001 }], 1, epoch)));
+  bite(before, 1);
+  assert.equal(table.food.eaten.get(other.id) ?? 0, 0, "a bite from the picnic eats nothing in the lab");
+  assert.equal(other.ack, 0);
+  bite(table.epoch, 2);
+  assert.ok((table.food.eaten.get(other.id) ?? 0) > 0);
+  assert.equal(other.ack, 2);
+});
+
+test("a fly's states go on being taken past 2^32 ms of room time, when the wire's u32 time wraps", () => {
+  const clock = { now: 2 ** 32 - 3000, wall: Date.UTC(2026, 5, 1, 12) };
+  const table = new Table("23456789ab", START, "key-1", 7, { now: () => clock.now, wall: () => clock.wall });
+  const hello = (key: string): ClientMessage & { type: "hello" } => ({ type: "hello", v: PROTOCOL, table: "23456789ab", key });
+  const mover = table.hello({ send() {}, close() {} }, "key-1", hello("key-1")) as Seat;
+  const view = new DataView(new ArrayBuffer(FLY_MAX));
+  const start = { x: mover.state.x, y: mover.state.y, z: mover.state.z };
+  let seq = 0;
+  for (let i = 0; i < 120; i++) {
+    clock.now += 50;
+    const s = createFlyState();
+    s.epoch = table.epoch;
+    s.seq = ++seq;
+    s.t = clock.now;
+    s.x = start.x + i * 0.05;
+    s.y = start.y;
+    s.z = start.z;
+    table.receive(mover, new Uint8Array(view.buffer, 0, encodeFly(view, TABLETOP_SCALE, s)));
+  }
+  assert.ok(clock.now > 2 ** 32 + 2000, "past the wrap");
+  assert.ok(Math.abs(mover.state.x - (start.x + 119 * 0.05)) < 0.05, `the fly is where its last state put it, not stuck at the wrap: ${mover.state.x - start.x}`);
+  assert.ok(Math.abs(mover.state.t - clock.now) < 1, "its time is the room's, past 2^32");
 });

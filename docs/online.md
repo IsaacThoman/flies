@@ -122,7 +122,7 @@ first; everything rare is JSON (`packages/net/src/protocol.ts`,
 | --- | --- | --- | --- |
 | 1 `FLY` | device to room, every 50 ms | type, state | 33, or 47 with the hand |
 | 2 `FLIES` | room to device, every 50 ms when anything is new | type, count, then each fly's player id and state | 2 + 33 or 47 a fly |
-| 3 `BITES` | device to room, at most every 100 ms | type, sequence (u16), count, then each food's id (u32) and amount (f32) | 4 + 8 a bite |
+| 3 `BITES` | device to room, at most every 100 ms | type, sequence (u16), count, then each food's id (u32) and amount (f32), then the epoch (u8) of the place they were taken in | 5 + 8 a bite |
 
 A fly's state (32 bytes, 46 with the hand). Its lengths are at its place's
 scale (`wireScale`), the finest that holds the place's floor and ceiling
@@ -158,7 +158,7 @@ rather than sitting at a table that may move to the restaurant.
 | flags | u8: airborne 1, away (its device has stopped) 2, eating 4, hand out 8, holding Select 16, at the remote 32 |
 | epoch | u8, the room's count of moves to another place: a state from before a move is dropped |
 | sequence | u16, wrapping |
-| time | u32, room ms when the fly was there |
+| time | u32, room ms when the fly was there, modulo 2^32 (it wraps after about 49.7 days of a room server's uptime): each end reads it as the room time nearest its own (`roomTime`) |
 | position | 3 × i16, at the place's scale |
 | heading | u16, a turn in 65,536 |
 | the ground's normal | 2 × i8, x and z (y follows) |
@@ -173,13 +173,21 @@ JSON, from the device:
 | `hello {v, table, key, start?, password?, at?, epoch?}` | the table's code; this device's key; `start` (place, light, weather, time zone and offset, and the room's `name` and whether it is `listed`) to start the table if it doesn't exist; `password`, the lock a new room is to have, or the key to a locked one, sent only until welcomed; `at`, where its fly is, coming back after a moment away, and the `epoch` of the place it is in |
 | `browse {v}` | instead of a hello: this connection only lists the rooms |
 | `ping {t}` | answered `pong {t, now}` with the room's time |
-| `drop {id, kind, x, z, y, at}` | food dropped onto the surface at or below `y` (the floor under a table, or the table), named by the device (player id × 1,000,000 + its count) so its fly can eat it before the room has heard |
+| `drop {id, kind, x, z, y, at, epoch}` | food dropped onto the surface at or below `y` (the floor under a table, or the table), named by the device (player id × 1,000,000 + its count) so its fly can eat it before the room has heard |
 | `clearFood {epoch}` | clears only this player’s dropped offerings in the current place; the room sends their ids in `food.gone` |
-| `ball {at, from, via, to}` | a throw, starting at room time `at` |
+| `ball {at, from, via, to, epoch}` | a throw, starting at room time `at` |
 | `world {light, weather}`, `place {place}`, `remove {id}` | the starter's choices |
-| `pop {slot, cycle, at}` | its fly burst a bubble |
-| `found {id, name, x, z, y, r, sweet}` | the place put food out on this device, named from where it lies |
+| `pop {slot, cycle, at, epoch}` | its fly burst a bubble |
+| `found {id, name, x, z, y, r, sweet, epoch}` | the place put food out on this device, named from where it lies |
 | `bye` | leaving for good |
+
+What a device does in its place (bites, a drop, a throw, a burst bubble,
+found food) names the epoch of the place it was done in, as its fly's
+states do: one in flight as the starter moves the table is dropped, not
+done in the place the table has gone to, where the same food ids and
+coordinates are something else. The epoch is an addition: a room from
+before reads the bites before it and ignores the field, and a device from
+before sends none, which the room takes wherever the table is.
 
 From the room:
 

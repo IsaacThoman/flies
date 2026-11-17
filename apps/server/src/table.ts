@@ -15,8 +15,8 @@ import { BALL_RADIUS, Pace, VentilationClock, World, WORLDS, forecast, hourOfDay
 import type { Happening } from "@fly/world";
 import {
   AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_PLAYERS, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
-  TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, createFlyState, decodeBites, encodeFlies, isTableCode, mayReturnTo, mix, readState,
-  roomName, spawnSpot, stream, tableHours, toWire, wireScale,
+  TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, encodeFlies, isTableCode, mayReturnTo, mix, readState,
+  roomName, roomTime, spawnSpot, stream, tableHours, toWire, wireScale,
 } from "@fly/net";
 import type {
   BallWire, ClientMessage, FlyState, FoodWire, HappeningWire, PlayerWire, Refusal, RoomInfo, RoomWire, ServerMessage, Spot, TableStart, V3, WireScale,
@@ -495,6 +495,8 @@ export class Table {
     }
     if (!m || typeof m !== "object") return;
     const now = this.now;
+    // Done in a place the table has since left (in flight as it moved): there is nothing of that place here to do it to.
+    if ((m.type === "drop" || m.type === "ball" || m.type === "pop" || m.type === "found") && m.epoch !== undefined && m.epoch !== this.epoch) return;
     switch (m.type) {
       case "ping":
         if (finite(m.t)) this.#send(seat, { type: "pong", t: m.t, now });
@@ -609,12 +611,16 @@ export class Table {
       const s = this.#scratch;
       // Read at this place's scale: one from before a move comes out wrong, and is dropped by its epoch before anything uses it.
       if (readState(view, 1, this.scale, s) < 0 || s.epoch !== this.epoch) return;
+      s.t = roomTime(s.t, this.now);
       const result = seat.leash.admit(this.world, seat.state, s, this.now);
       if (result === "refused") return;
       if (result !== "taken") seat.shortened++;
       seat.fresh = true;
       this.#update(seat);
     } else if (type === BITES) {
+      // Taken in a place the table has since left: not counted, nor acknowledged (the device has the new place's food from the move).
+      const epoch = bitesEpoch(view);
+      if (epoch !== null && epoch !== this.epoch) return;
       const st = seat.state;
       const now = this.now;
       const seq = decodeBites(view, (food, amount) => this.food.bite(seat.id, food, amount, st.x, st.y, st.z, now));
