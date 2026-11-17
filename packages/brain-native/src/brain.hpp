@@ -101,9 +101,11 @@ class Brain {
   // Indexed by io::Side, as are their rated inputs.
   std::vector<vision::Retina> retinas_;
   std::array<uint32_t, 2> eye_inputs_{};
-  /** The eyes' gain last set (io::kSleepEyes), and each eye's rates scaled by it. */
+  std::array<uint32_t, 2> withdrawn_inputs_{};
+  /** The eyes' gain last set (io::kSleepEyes), and each eye's rates and L1's withdrawals scaled by it. */
   double eye_gain_ = 1;
   std::array<std::vector<double>, 2> gained_;
+  std::array<std::vector<double>, 2> gained_withdrawals_;
   // The regions, which follow the readouts in rates(): each one's size and its spikes in a chunk.
   std::vector<double> region_sizes_;
   std::vector<uint32_t> region_counts_;

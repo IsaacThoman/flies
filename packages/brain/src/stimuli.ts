@@ -142,6 +142,24 @@ export function grating(name: string, axis: "azimuth" | "elevation", direction: 
   };
 }
 
+/** The same stimulus light on dark, for the ON pathway: its white ground becomes a dim 0.2 and its black shape white. */
+export function lit(name: string, stimulus: Stimulus): Stimulus {
+  const scene = stimulus.scene;
+  return { ...stimulus, name, ground: 0.2, scene: (t, a, e) => (scene(t, a, e) >= 0.5 ? 0.2 : 1) };
+}
+
+/** A light edge sweeping across the right eye at `speed` degrees/s from a dim ground, leaving it lit behind (the classic ON-motion stimulus). */
+export function onEdge(name: string, from: number, to: number, speed: number): Stimulus {
+  const sign = Math.sign(to - from);
+  return {
+    name,
+    seconds: Math.abs(to - from) / speed,
+    ground: 0.2,
+    eye: "right",
+    scene: (t, a) => ((a - (from + sign * speed * t)) * sign <= 0 ? 1 : 0.2),
+  };
+}
+
 export const BATTERY: readonly Stimulus[] = [
   loom("loom right fast", 70, 0, 0.01),
   loom("loom right", 70, 0, 0.04),
@@ -160,6 +178,13 @@ export const BATTERY: readonly Stimulus[] = [
   dot("dot right, back to front", "azimuth", 0, 160, -10, 100),
   dot("dot right, upward", "elevation", 70, -80, 85, 100),
   dot("dot right, downward", "elevation", 70, 85, -80, 100),
+  lit("light bar right, front to back", bar("", "azimuth", -10, 160, 100)),
+  lit("light bar right, back to front", bar("", "azimuth", 160, -10, 100)),
+  lit("light bar, upward", bar("", "elevation", -80, 85, 100)),
+  lit("light bar, downward", bar("", "elevation", 85, -80, 100)),
+  onEdge("ON edge right, front to back", -10, 160, 100),
+  onEdge("ON edge right, back to front", 160, -10, 100),
+  lit("light loom right", loom("", 70, 0, 0.04)),
   grating("grating right, front to back", "azimuth", 1, "right"),
   grating("grating right, back to front", "azimuth", -1, "right"),
   grating("grating right, upward", "elevation", 1, "right"),

@@ -769,8 +769,10 @@ is in the air the followed fly's eyes refresh every frame: the looming detectors
 fast dark area grows, and at 20 Hz a throw set off the escape about one time in
 six against one in two at 60 Hz.
 
-The ball is dark in green and blue for the same reason: the eyes answer
-darkening, not brightening. It dives in low from the fly's front-right (higher
+The ball is dark in green and blue because a dark shape growing is what the
+eyes' looming pathway answers best, as a fly's does: a light disc looming on a
+dim ground takes the fly off too, but only through LC4, a limitation of the
+model (`packages/brain/README.md`, Seeing). It dives in low from the fly's front-right (higher
 over anything standing in its way, and round what it can't come in over, such
 as a window), where the connectome's looming pathway is strongest and where the
 fly is seen against the bright table, stops just short, hangs a moment and
@@ -788,6 +790,30 @@ midday (8 minutes, escape at most 0.35) or at dusk (12 minutes, at most 0.37),
 and at night 0.3 times a minute (16 minutes). Before, the night gave 0.5 to 0.7
 a minute, mostly from soap bubbles drawn as bright as by day drifting past it.
 `apps/web/tests/swoop-escape.budget.ts` checks the chain in Node.
+
+Since the eyes have an ON pathway (brightening reaches it through L1, as in a
+fly; `packages/brain/README.md`, Seeing), a sudden brightening can set off the
+escape too, through the same looming detector, LC4, that a large darkening
+does. Measured in the game with the brain built both ways (the TypeScript
+brain, ON pathway off and on), at midday and at midnight (the fly's clock set
+to it too, so its sleepy eyes are measured), ordinary life never sets it off,
+with or without it: no take-off in four rounds of carrying the fly to every
+place (six seconds after each of 20 arrivals, by day and by night), ten
+switches of the bar's, the lab's and the restaurant's lights between night and
+midday, twenty jumps of the picnic's time of day by day and by night, three
+minutes of fireflies, five of soap bubbles drifting by and popping, five of the
+screensaver and five of free play by day and by night: about 5,700 seconds of
+its life each way, the escape peaking at 0.38 at most. (On the version of the
+game before the legs' load sensors were narrowed and sleep added, arriving at
+a place did set it off, at the restaurant without the ON pathway and at the
+picnic too with it.) The ball takes it off as before, and never in the half
+second after the ball has gone: through the brain's own eyes in Node
+(`apps/web/tests/swoop-escape.budget.ts`, seeds 1 to 5, 8 throws each), 38
+throws of 40 with the ON pathway against 39 without. In the game the count
+swings from run to run with where the fly comes to stand (40 throws at midday:
+29 and, in a run where it stopped seeing the ball after the second, 2 with it;
+33 without). There is no lightning in this game's weather, and the fireflies
+aren't drawn into the eyes.
 
 **View → Fly's eyes** shows the same picture to the player: one dot per facet
 (the brain's 1,772, or, for a brain without eyes, a stand-in layout labelled as
