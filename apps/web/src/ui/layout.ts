@@ -75,20 +75,20 @@ export function hudLayout(frame: Frame): HudLayout {
   const bottom = a.y + a.h;
   const compact = frame.coarse && a.h < 360 && a.w > a.h * 1.4 && a.w * frame.unit >= 700;
   const touchApart = Math.min(SHELF_APART, a.w - 16 - tools * (44 / frame.unit));
-  const apart = frame.coarse ? (touchApart >= 16 ? (compact ? 16 : touchApart) : 0) : split > 0 && split < tools ? Math.max(SHELF_APART_LEAST, Math.min(SHELF_APART, a.w - 16 - tools * SHELF_GAP)) : 0;
+  const apart = frame.coarse ? (a.w > a.h * 1.2 && frame.unit > 1.25 ? Math.max(SHELF_APART, a.w - 16 - tools * SHELF_GAP) : touchApart >= 16 ? (compact ? 16 : touchApart) : 0) : split > 0 && split < tools ? Math.max(SHELF_APART_LEAST, Math.min(SHELF_APART, a.w - 16 - tools * SHELF_GAP)) : 0;
   const gapWanted = compact ? Math.max(44 / frame.unit, Math.min(SHELF_GAP, (a.w - 32 - apart - 216) / tools)) : SHELF_GAP;
   const gap = Math.min(gapWanted, (a.w - 16 - apart) / tools);
   const shelfY = bottom - 34;
   const labelY = shelfY - 61;
   const shelfWidth = gap * tools + apart;
   const shelfLeft = compact ? a.x + 8 : cx - shelfWidth / 2;
-  const menuAtFoot = frame.coarse && a.w < a.h && a.w * frame.unit <= 600;
+  const menuAtFoot = frame.coarse;
   const menuBeside = menuAtFoot && a.w * frame.unit >= 375;
   const touch = frame.coarse ? {
     labelCx: compact ? (shelfLeft + shelfWidth + 16 + a.x + a.w - 8) / 2 : cx + (menuBeside ? 28 : 0),
     labelWidth: compact ? a.x + a.w - 8 - (shelfLeft + shelfWidth + 16) : a.w - 16 - (menuBeside ? 56 : 0),
     labelY: compact ? shelfY : labelY,
-    menuY: menuAtFoot ? labelY - (menuBeside ? 0 : 45) : a.y + 32,
+    menuY: compact ? shelfY - 52 : labelY - (menuBeside ? 0 : 45),
     menuAtFoot,
     targetHeight: Math.max(32, 44 / frame.unit),
   } : null;

@@ -117,7 +117,21 @@ sampled from state every 200 ms. No physical haptic or OS-edge measurements.
 ## Precision and field-focus pass
 
 Key: set-V2 is the precision/field-focus pass; set-Q7 is the preceding accepted
-interaction/layout pass. Scores and randomized order pending.
+interaction/layout pass. Order: V2/Q7, V2/Q7, Q7/V2; regression review Q7/V2.
+
+| Reviewer | Set | Intent | Reach | Visibility | Conventions | Response | Resize | Other | Mean |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| F3 | Q7 | 7 | 8 | 6 | 7 | 8 | 7 | 8 | 7.29 |
+| F3 | V2 | 9 | 8 | 9 | 9 | 10 | 9 | 8 | 8.86 |
+| J6 | Q7 | 7 | 8 | 6.5 | 7 | 8 | 8 | 8.5 | 7.57 |
+| J6 | V2 | 9 | 8.5 | 9 | 9 | 9.5 | 9 | 8.5 | 8.93 |
+| W8 | Q7 | 6.5 | 8 | 6 | 7 | 9 | 8 | 8 | 7.50 |
+| W8 | V2 | 9 | 8.5 | 8.5 | 9 | 10 | 9 | 8.5 | 8.93 |
+
+Mean: **8.90**, versus **7.45** for Q7 in this comparison. All three rank
+V2 first. Accepted. The regression reviewer found that a framebuffer-edge
+clamp could offset the loupe crosshair from contact; the following pass corrects
+the sample coordinates. The common remaining ergonomic finding is tablet reach.
 
 The keyboard's synchronous focus callback now receives only recognized taps,
 including pointer identity, maximum travel and interruption handling. Menu taps
@@ -135,5 +149,30 @@ errors.
 
 All eight intended taps drop one food; no interrupted rotation release drops
 food. Two-finger translation preserves zoom to numerical precision. Drop,
-held-tool onset, and camera response are measured separately. 52 focused tests
+held-tool onset, and camera response are measured separately. 56 focused tests
 pass, including synchronous focus cancellation and safe lens placement.
+
+## Reach and edge-alignment pass
+
+Key: set-R6 is this pass; set-V2 is the preceding precision/focus pass. Scores
+pending. This pass also rebases onto `b6bd5548` from dev: camera, sleep,
+food-contact, whole-place views, menu target identity and text-entry changes
+come from their owners and are not attributed to the touch experiment.
+
+The keyboard callback preserves the stable target captured at primary down,
+using the shared `sameTarget` helper introduced on dev. Tablet tool groups
+move toward their lower corners, and Menu moves near the shelf on tablets and
+landscape phones. The lens samples the actual contact at its center even when
+its source patch is clamped at framebuffer edges. 57 focused tests pass.
+
+Eight rendered sessions retain one drop per intended tap, no rotation-release
+drops, no page/GL errors and one-frame measured response. The view's zoom is
+unchanged by two-finger translation apart from numerical rounding.
+
+Validation on the rebased code: lint, typecheck, pointer e2e, web e2e and tables
+e2e pass. Remote play e2e passes the input/tool cases but stops at the existing
+nervous-system/X-ray region-glow assertion documented in the shared rules
+(#63). The full ordinary suite before rebase passed 735 tests (731 passed,
+4 skipped). Its separate TypeScript-brain cost budget failed at 0.592 CPU s/s
+against 0.5; the budget rerun after rebase failed at 0.570. No brain or budget
+code was changed. Final full run and iPad shell check pending.

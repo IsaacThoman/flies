@@ -325,7 +325,7 @@ test("the loading screen and its failure panel: where they always were on the TV
 
 test("phone and Split View touch targets stay distinct, with Menu in portrait thumb reach", () => {
   const world = createPicnic();
-  for (const [w, h] of [[390, 844], [430, 932], [375, 820], [507, 820], [844, 390], [932, 430]]) {
+  for (const [w, h] of [[390, 844], [430, 932], [375, 820], [507, 820], [844, 390], [932, 430], [820, 1180], [1180, 820]]) {
     const frame = frameFor(w, h, { top: 59, bottom: 34, left: 0, right: 0 }, true);
     const hands = new Hands(world);
     hands.chooseTool(TOOLS.findIndex(t => t.id === "place"));
@@ -339,7 +339,7 @@ test("phone and Split View touch targets stay distinct, with Menu in portrait th
       for (const other of all) if (other !== hit) assert.ok(Math.min(hit.x + hit.w, other.x + other.w) - Math.max(hit.x, other.x) < 1e-6 || Math.min(hit.y + hit.h, other.y + other.h) - Math.max(hit.y, other.y) < 1e-6, `${w}×${h}: ${hit.kind} overlaps ${other.kind}`);
     }
     const menu = all.find(hit => hit.kind === HUD_HITS.menu)!;
-    if (h > w) assert.ok(h - (menu.y + menu.h / 2) * frame.unit <= 200);
+    assert.ok(h - (menu.y + menu.h / 2) * frame.unit <= 200);
   }
 });
 
