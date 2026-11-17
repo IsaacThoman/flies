@@ -294,3 +294,55 @@ the portrait shelf has little room beyond its 44-pixel minimum. The next
 experiment previews a pending tool in the existing caption, without adding text
 or changing selection until release. Physical haptics, OS edge gestures, actual
 keyboard presentation and live Split View remain device-evidence gaps.
+
+## Pending-tool caption pass
+
+Key: S8 = accepted press-feedback foundation; W5 = caption preview. Both were
+recorded afresh on the same dev foundation, with the same cancellation driver,
+current artwork and safe-area changes during rotation. Orders: W5/S8, W5/S8,
+S8/W5; regression review W5/S8. All reviewers are fresh independent contexts
+using gpt-6.1-sol with reasoningEffort high.
+
+| Reviewer | Set | Intent | Reach | Visibility | Conventions | Response | Resize | Other | Mean |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| B3 | S8 | 9.5 | 8.5 | 8 | 9.5 | 10 | 9 | 9.5 | 9.14 |
+| B3 | W5 | 9.5 | 8.5 | 9 | 9.5 | 10 | 9 | 9.5 | 9.29 |
+| T8 | S8 | 10 | 8 | 8 | 9 | 10 | 9 | 9 | 9.00 |
+| T8 | W5 | 10 | 8 | 9 | 9 | 10 | 9 | 9 | 9.14 |
+| M5 | S8 | 9 | 9 | 8 | 9 | 10 | 9 | 9 | 9.00 |
+| M5 | W5 | 9 | 9 | 9 | 9 | 10 | 9 | 9 | 9.14 |
+
+Mean **9.19** versus **9.05** for S8. All three rank W5 first; accepted.
+The hill climb stops at the requested mean of at least 9. These are fresh
+absolute judgments, so adjacent rounds' means are not paired measurements.
+
+A pending shelf press now names its tool in the existing caption above or beside
+the finger; release still selects it, and cancellation restores the committed
+label. The caption's bounds and all hit targets remain unchanged. The added
+layout check covers every tool at all eight sizes and verifies unchanged
+selection and hit geometry.
+
+The regression reviewer finds no demonstrated interaction regression. All
+three scorers flag a visual ambiguity: a pending Tickle caption temporarily
+retains the committed Feed tool's variant chevrons. Kept as a limited tradeoff
+for stable controls throughout an active press, with no stray activation in
+the evidence. A proposed extra instruction was rejected to keep on-screen text
+minimal. A separate preview treatment is future work if device testing finds
+this confusing; the narrow shelf and physical-device checks remain higher-value
+follow-up measurements.
+
+All sixteen paired sessions retain one intended food drop, no extra rotation
+drops, Feed after a cancelled shelf press, and one rendered frame for drop,
+held-tool, camera and HUD response. All explicit WebGL probes pass. Each records
+one localhost WebSocket handshake error because the standalone capture Vite
+server has no /rooms service; both versions recover to local play. Raw errors
+are retained, not filtered. Focused checks pass 68/68 and 69/69; pointer e2e,
+lint and typecheck pass on the caption candidate.
+
+The complete Apple-silicon npm test run passes: 995 ordinary tests (990 pass,
+five skips) and all four CPU budgets. The TypeScript-brain budget now measures
+0.449 calibrated M5 Pro CPU s/s against 0.5, with dev's brain/budget work intact.
+The farm's shared foundation passes 953 ordinary tests with three skips; its
+five Apple-specific exact-name exclusions and CPU-budget exclusion are covered
+by the Apple-silicon run. Farm lint, web/tvOS types and build pass. E2e farm
+results and post-merge validation are recorded in the PR.
