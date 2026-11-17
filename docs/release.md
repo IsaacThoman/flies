@@ -64,6 +64,10 @@ npm run tvos -- archive --version 0.1.1             # signs into apps/tvos/build
 npm run ios -- archive --version 0.1.1 --upload     # and uploads to TestFlight
 ```
 
+Pull requests that change Apple host inputs also run `.github/workflows/apple-compile.yml`: both
+hosts compile for a generic simulator on macOS, without signing credentials or a running device.
+The job caches npm downloads, the connectome and Xcode build data. Documentation-only edits skip it.
+
 ## The weather outside
 
 The Apple TV app has WeatherKit only when built with `TVOS_WEATHERKIT=1`
