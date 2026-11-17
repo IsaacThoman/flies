@@ -320,3 +320,16 @@ verify the ground, lid, jar body, cup underside, window opening and mullion. The
 are functional perception repairs; the scored player-facing materials are retained.
 The final evidence is recaptured on this merged runtime. No further visual hill
 climb is claimed on this feature branch.
+
+At readiness, typecheck, lint and 61 focused tests pass on the merged branch. The
+browser carry/food/light/weather check passes all 20 combinations with a median of
+13 draws. Body seed 42 passes 1,800 simulated seconds (41,497 steps, 30 starts,
+60 recovery probes). Life seed 42 passes 1,800 seconds (51,425 steps, 161 meals,
+21 takeoffs, 8.85 m travel) at 4af2a5c1, with the same kitchen world before the last
+dev synchronization and coarse-eye repairs. The final browser and focused checks
+cover those repairs. Full farm validation against dev is queued at readiness.
+
+Set H8 contains all 65 final captures: no errors, 9–15 draws, 66 ms construction,
+and sweet 0.900 at spawn. These are desktop values; the reference recorded 20–37
+draws and 81 ms. CPU-budget tests report one pass and three explicit contention
+skips after three retries, with no cost-bound failure. No physical TV was used.
