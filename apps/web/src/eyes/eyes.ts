@@ -251,7 +251,8 @@ export class Eyes {
 
   /** Before the flies' frame: hands each brain that has eyes its last picture. */
   beforeStep() {
-    for (const sight of this.#sights) sight.life.light = this.#inUse(sight) && sight.hasLight ? sight.light : null;
+    const sights = this.#sights;
+    for (let i = 0; i < sights.length; i++) sights[i].life.light = this.#inUse(sights[i]) && sights[i].hasLight ? sights[i].light : null;
   }
 
   /** The facets in use by the followed fly: its brain's, or the stand-in for the picture. */
@@ -273,9 +274,10 @@ export class Eyes {
    * Refreshes the eyes when due, and draws the picture over the frame when
    * asked. Call after the world has been rendered. `forInset`: the corner
    * picture (inset.ts) is up, so the followed fly's render even when not for
-   * its brain. One fly's eyes refresh a frame, whichever is most overdue
-   * (with several, each a little less often); the followed fly's every
-   * frame too while something comes at it fast (`urgent`).
+   * its brain. One fly's eyes refresh a frame, never more: whichever is most
+   * overdue (with several, each a little less often), or while something
+   * comes at it fast (`urgent`), the followed fly's, every frame, and the
+   * others' wait until it has passed.
    */
   render(dt: number, showPicture: boolean, urgent = false, forInset = false) {
     const own = this.#sights[0];
@@ -287,26 +289,29 @@ export class Eyes {
     // A frame that rebuilt the reflections (34 draws) already costs about what the eyes' faces do: they refresh on the next, a frame
     // late, rather than double the frame's draws.
     const reflected = this.#stage.reflected;
-    let refreshed: Sight | null = null;
+    let refreshed = -1;
     let most = 0;
-    for (let i = 0; i < this.#sights.length; i++) {
-      const sight = this.#sights[i];
+    const sights = this.#sights;
+    for (let i = 0; i < sights.length; i++) {
+      const sight = sights[i];
       if (!(i === 0 ? this.active : this.#inUse(sight))) continue;
       sight.since += dt;
       sight.sinceSampled += dt;
       // One read in flight a fly: a slow GPU must not accumulate pictures or sampling work.
-      if (sight.pending) continue;
+      if (sight.pending || most === Infinity) continue;
       if (i === 0 && urgent && !reflected && sight.since >= 1 / URGENT_HZ - 1e-3) {
-        this.#refresh(sight, 0, detail.resolution);
+        // This frame's refresh is the followed fly's: nobody else's goes before it.
+        most = Infinity;
+        refreshed = 0;
         continue;
       }
       const need = !sight.light ? Infinity : reflected ? 0 : sight.since * hz;
       if (need >= 1 - 1e-3 * hz && need > most) {
         most = need;
-        refreshed = sight;
+        refreshed = i;
       }
     }
-    if (refreshed) this.#refresh(refreshed, this.#sights.indexOf(refreshed), detail.resolution);
+    if (refreshed >= 0) this.#refresh(sights[refreshed], refreshed, detail.resolution);
     this.standIns?.hideFromEyes(-1);
     if (showPicture) this.#drawPicture();
   }

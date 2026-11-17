@@ -149,18 +149,37 @@ test("several flies refresh one per frame, the most overdue first, with equal ra
   assert.equal(new Set(lives.map((l) => l.light)).size, 3, "each brain receives its own facet picture");
 });
 
-test("urgent followed eyes refresh every frame while companions continue to look", async () => {
+test("while a ball comes the followed fly's eyes refresh every frame and nobody else's that frame; the others look again once it has passed", async () => {
   const { eyes, reads, life } = setup();
   eyes.company([companion(life), companion(life)]);
-  for (let frame = 0; frame < 60; frame++) {
+  // Everyone has a first picture, so nobody's is owed at once.
+  for (let frame = 0; frame < 3; frame++) {
     const before = reads.length;
-    eyes.render(1 / 60, false, true);
+    eyes.render(1 / 60, false);
     for (const read of reads.slice(before)) read.finish();
     await settled();
-    assert.equal(eyes.updates, frame + 1, "the followed fly sees an approaching threat every frame");
   }
-  assert.ok(eyes.companyUpdates(0) > 0 && eyes.companyUpdates(1) > 0);
-  assert.ok(Math.abs(eyes.companyUpdates(0) - eyes.companyUpdates(1)) <= 1);
+  const companions = () => [eyes.companyUpdates(0), eyes.companyUpdates(1)];
+  const before = companions();
+  for (let frame = 0; frame < 60; frame++) {
+    const reading = reads.length;
+    eyes.render(1 / 60, false, true);
+    assert.equal(reads.length - reading, 1, "one refresh a frame, even while a ball comes");
+    for (const read of reads.slice(reading)) read.finish();
+    await settled();
+  }
+  assert.equal(eyes.updates, 61, "the followed fly sees an approaching threat every frame");
+  assert.deepEqual(companions(), before, "the others wait while it comes");
+  for (let frame = 0; frame < 60; frame++) {
+    const reading = reads.length;
+    eyes.render(1 / 60, false);
+    assert.ok(reads.length - reading <= 1);
+    for (const read of reads.slice(reading)) read.finish();
+    await settled();
+  }
+  const after = companions();
+  assert.ok(after[0] > before[0] && after[1] > before[1], "they take their turns again");
+  assert.ok(Math.abs(after[0] - after[1]) <= 1);
 });
 
 test("dropping a companion waits for its pending read before disposing its target", async () => {
