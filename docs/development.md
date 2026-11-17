@@ -34,7 +34,7 @@ rooms. They observe canvas `data-*` attributes because the game draws its UI.
 | Measure browsers and CPU throttling | `scripts/measure.ts`, [web measurements](web.md#measured) |
 | Reproduce a headless body/brain failure | [Fuzzing](fuzzing.md) |
 | Watch browser resources over time | [Browser soak](web-soak.md) |
-| Verify Apple hosts | [Apple TV checks](apple-tv.md#checking-it), [iOS checks](ios.md#checking-it) |
+| Verify Apple hosts | [Apple TV checks](apple-tv.md#device-and-simulator-checks), [iOS checks](ios.md#checking-it) |
 | Change the brain in both languages | [Native brain workflow](../packages/brain-native/README.md#when-the-model-changes) |
 
 ## Documentation checks

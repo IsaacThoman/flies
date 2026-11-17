@@ -8,11 +8,12 @@ it alone and the controls fade into a screensaver. There is no sound.
 
 ## Run it
 
-Use Node 22.18 or later and npm. From the repository root:
+CI uses Node 24; the declared minimum is 22.18. With npm, from the
+repository root:
 
 ```sh
 npm install
-npm run brain:fetch   # downloads and packs the connectome; run once
+npm run brain:fetch   # fetches the connectome and packs anatomy; run once
 npm run dev
 ```
 
@@ -24,8 +25,9 @@ a tool. See [controls and settings](docs/playing.md).
 
 For a phone on the same network, run `npm run dev -- --host 0.0.0.0` and open
 `http://<computer-LAN-address>:5173/` on it (use the port Vite prints). The
-computer's firewall must allow it. Plain LAN HTTP plays, but browser caching,
-offline support and wake lock need HTTPS; see [the web build](docs/web.md).
+computer's firewall must allow it. Plain LAN HTTP plays. The app's persistent
+brain cache and wake lock need a secure context; offline support also needs
+the production build and service worker. Use HTTPS for those on a phone; see [the web build](docs/web.md).
 The [native iPhone and iPad app](docs/ios.md#building-and-running) is another
 way to play on a phone. [Apple TV setup](docs/apple-tv.md#building-and-running)
 requires Xcode on a Mac.
@@ -47,7 +49,8 @@ the current sensory inputs do not produce courtship song.
 The [brain's limits](packages/brain/README.md#what-it-does-and-doesnt-reproduce)
 and [body's additions](docs/simulation.md#what-the-body-adds) say exactly what
 is real and what is a stand-in. [The eyes and nervous-system views](docs/simulation.md#the-eyes)
-show the simulation's inputs and activity, with their limits labelled.
+show the simulation's inputs and regional activity. The eye picture labels
+stand-ins; the guide explains the nervous-system drawing's limits.
 
 ## Find your way
 
@@ -87,9 +90,13 @@ with `npm run brain:wasm` as well.
 
 ## Sleep and the daily rhythm
 
+The sleep measurements are being remeasured separately. The account below
+describes the intended clock rhythm and retained observations, not a
+guarantee for every bout; no numeric sleep result or table is changed here.
+
 The fly keeps the real time of day, whatever light is chosen: its clock follows the
-device's clock and, on an Apple TV that knows them, today's real sunrise and sunset
-(otherwise the game's summer day, 05:40 to 20:10). Like a male fly's, its day has a
+device's clock and, on an Apple TV that knows them, the available real sunrise and sunset
+(otherwise the game's summer day, 05:40 to 20:10). Its clock drive is arranged around a
 morning peak of activity round dawn and an evening one round dusk, each beginning
 about three hours ahead, a siesta between them, and sleep through the night. Sleep
 pressure builds while it is awake (over about 12 hours) and discharges while it sleeps
@@ -101,11 +108,13 @@ None of this moves the fly. The body works the clock and the pressure out
 and the sleep-promoting neurons the connectome has and shifts its made-up arousal; it
 is the brain that stops walking (`packages/brain/README.md`, Sleep and the daily rhythm,
 says how, with what is real and what stands in). The body only watches: five minutes
-or more without moving is sleep, as the field scores it, and stillness deepens it.
+or more of resting or tasting activity counts as sleep, as the field scores it, and stillness deepens it.
 Asleep, the fly settles a little lower on its legs, its head bowed, without the idle
 glances and shifts of its feet (the pose's `sleep`, `packages/fly`), and the caption says
-"Asleep". Asleep, the feather resting on it or a raindrop doesn't wake it; stroking it
-nearly always does within a few seconds, and a swoop does. Moving at all wakes it. The canvas's `data-rhythm` gives the hour, the
+"Asleep". The retained stimulus observations discuss resting-feather, rain,
+stroking and swoop responses; the tests allow occasional responses to weak
+stimuli. See the [brain sleep reference](packages/brain/README.md#sleep-and-the-daily-rhythm). An activity outside resting/tasting wakes it; this is not a detector of every
+small displacement or joint movement. The canvas's `data-rhythm` gives the hour, the
 clock, the pressure, the depth and how long it has been still.
 
 

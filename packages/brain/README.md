@@ -8,7 +8,7 @@ A spiking model wired from the male fruit fly's central nervous system, about 16
 
 The wiring is the [FlyEM male CNS](https://male-cns.janelia.org/) connectome from Janelia Research Campus, published under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/). Anything that ships the packed file, or shows behaviour derived from it, should credit "FlyEM male CNS connectome, Janelia Research Campus (CC-BY 4.0)". The packed file records the dataset, license and URL in its header.
 
-It is not in git. The quickest way to get it is to download the packed file (21 MB) from the original data release, hosted in `IsaacThoman/ladybug`; the download is checked against a known hash. The same command downloads FlyEM's public annotations, checks their pinned hash and builds the optional anatomy sidecar locally:
+It is not in git. The quickest way to get it is to download the packed file (21 MB) from the pinned data release selected by `packages/brain/scripts/fetch.ts`; the download is checked against a known hash. The same command downloads FlyEM's public annotations, checks their pinned hash and builds the optional anatomy sidecar locally:
 
 ```sh
 npm run brain:fetch
@@ -44,7 +44,8 @@ Neurons are numbered in ascending root ID order. The sections:
 - `superClass`, `class`, `subClass`, `nt` (predicted transmitter), `side` (soma side), `nerve` u8[N] and `type` (primary cell type) u16[N]: indices into the header's sorted string tables. Blank is `""`, always code 0.
 - `ntConfidence` u8[N]: predicted transmitter confidence, 0 to 100 (0 when blank).
 
-`loadConnectome(buffer)` validates everything and returns typed-array views into the buffer, with `find({ type: "DNp01" })`, `find({ superClass: /^visual/, side: "left" })`, `filter(i => ...)` and `indexOf(rootId)` for picking neurons.
+`loadConnectome(buffer)` validates the header, supported column widths,
+indices and connection ordering and returns typed-array views into the buffer, with `find({ type: "DNp01" })`, `find({ superClass: /^visual/, side: "left" })`, `filter(i => ...)` and `indexOf(rootId)` for picking neurons.
 
 ## Anatomy sidecar
 
@@ -341,8 +342,10 @@ together, after the display lands. This PR does none of that.
 
 ### Serving and future bundling
 
-Vite serves `/brain/anatomy.bin` in dev and preview and copies it beside
-`brain/connectome.bin` in production; no fetch or consumer is added to the game.
+Vite serves content-addressed multipart assets in dev, preview and production:
+`brain/anatomy.<n>.<hash>.bin` and `brain/connectome.<n>.<hash>.bin`. Both are
+gzipped; the connectome also uses wire encoding. No anatomy fetch or game
+consumer is added. See [the web loader](../../docs/web.md#what-to-upload).
 The connectome URL and browser caching/loading code are unchanged. A later tvOS
 change would need to copy the matching sidecar into its app resources, expose
 its bytes to the display and use the same hash validation (or an equivalently
@@ -392,12 +395,12 @@ The signs come from a precomputed column in its data, not from code we could rea
 | Sensory neurons outside the eye with no prediction are cholinergic | 2,127, most head bristle neurons among them | Fly mechanosensory, gustatory and olfactory neurons are cholinergic; without this most of the head's touch neurons would be mute. |
 | Lateral antennal lobe local neurons predicted cholinergic are GABAergic | 75 (`lLN1_bc`, `lLN2T`, `lLN2X` and others) | The large majority of antennal lobe LNs are GABAergic (Chou et al. 2010). As predicted, these neurons are wired nearly all-to-all with ~200 synapses a pair, and any olfactory input, even spontaneous firing at 10 Hz, locked the antennal lobe at ~370 Hz for good. The least certain fix: we could not confirm these types' transmitter. |
 | Dopamine, serotonin and octopamine are muted | 951 after the fixes | Their effects are slow and modulatory, not fast synapses. Shiu et al. reportedly made them excitatory. |
-| No predicted transmitter: muted | 10,152, mostly motor neurons (674 of 708 in the VNC) and optic lobe neurons | Nothing to go on. Motor neurons are read, not relied on for their outputs. |
+| No predicted transmitter: muted | 10,152, mostly motor neurons (673 of 708 in the VNC) and optic lobe neurons | Nothing to go on. Motor neurons are read, not relied on for their outputs. |
 | Synaptic saturation: a connection of n synapses counts as 75 × (1 − e^(−n/75)) | all pairs: 10 → 9, 50 → 36, 100 → 55, 200 → 70, never above 75; 82% of all synapses kept | One presynaptic spike can't drive its target arbitrarily far (a real synapse's current falls as the membrane nears its reversal potential). Without it, pairs like the two DNg33 neurons, which excite each other through 1,496 synapses, ping-pong forever. |
 | Spike-frequency adaptation, 0.1 mV a spike, decaying over 1 s | every neuron | Recurrent excitatory clusters still sustained themselves, notably one in the gnathal ganglia (GNG019, GNG334, GNG065 with GNG479/GNG099 inhibition, driving pharyngeal motor neurons MN10/MN11) that kept pumping after any taste. Real neurons adapt, and slow currents are what end such bursts. Weak and slow, it barely touches brief responses. |
 | dt 1 ms instead of 0.1 ms | | Less than half the cost of 0.5 ms with much the same responses; the refractory period and delay round to 2 ms at either. |
 | Graded columnar relays: synapses of the optic lobe's columnar neurons count 2.3 times | 69,336 neurons of 61 types (see Seeing) | These are graded, non-spiking cells whose synapses release continuously. At one spike per synapse, a columnar relay passes on almost nothing: one spike of L2 onto Tm1 moves Tm1 by 2.6 mV against a 7 mV threshold, so each stage needs its input above 100 Hz and the eyes' signal died in the medulla. 2.3 is where one spike of the main relay (L2 to Tm1 and Tm2) brings its target to threshold. Columnar cells can occasionally fire with the eyes shut, so the gain can change a run even without `light` (see [native parity limits](../brain-native/README.md#found-in-the-typescript)). |
-| Johnston's organ, completeness | 174 neurons: the right antenna's zone C and E neurons (22 and 110), the left's zone F (42) | The two antennae were not traced equally completely (Johnston's organ, completeness, below). Each zone's less complete side counts its synapses as many times over as the other side has more (right C ×7.87, right E ×2.49, left F ×1.20), so the two sides deliver the same drive at the same rate. Derived from the wiring, not fitted, and applied to the gain after saturation: that brings each zone's saturated total within 3% of the other side's, where adding the missing synapses to each connection before saturating falls up to 35% short. Before this, `bump` balanced the two antennae the other way, slowing the left to 30.7 Hz, which left neither side driving anything: fewer synapse-spikes a second don't add up to threshold. That balancing is gone. |
+| Johnston's organ, completeness | 174 neurons: the right antenna's zone C and E neurons (22 and 110), the left's zone F (42) | The two antennae were not traced equally completely (Johnston's organ, completeness, below). Each zone's less complete side counts its synapses as many times over as the other side has more (right C ×7.87, right E ×2.49, left F ×1.20), so the two sides deliver the same drive at the same rate. Derived from the wiring, not fitted, and applied to the gain after saturation: that brings each zone's saturated total within about 3% of the other side's, where adding the missing synapses to each connection before saturating falls up to 35% short. Before this, `bump` balanced the two antennae the other way, slowing the left to 30.7 Hz, which left neither side driving anything: fewer synapse-spikes a second don't add up to threshold. That balancing is gone. |
 | Left/right input balancing | the visual background (see Spontaneous behaviour) | The two eyes' visual projection neurons were not reconstructed equally well (the right's have 19% more output synapses). At full strength each eye's group delivers the same synapse-spikes per second: the side with more synapses is driven slower. |
 
 The engine's `epsilon` is 0.01 mV here (against a 7 mV threshold).
@@ -423,11 +426,17 @@ So each zone's less complete side has its gain scaled by the ratio of the other 
 
 Zone C's is the largest factor and the least certain, with 22 truncated neurons standing for 46. The result doesn't rest on it: under a push on the right antenna, `groom` is 0.40–0.44 with it (seeds 1–3), 0.35–0.43 with C capped at the per-neuron ratio (×3.77) and 0.37–0.42 with C uncorrected. Zone E carries it.
 
-With these, from rest, any sense or pair of senses or everything at once, held at full strength for 2 s, is followed within 1 s by activity inside the resting band (`report.ts` section b, 37 of 37). With the eyes open, so is every stimulus of the vision battery, alone and with every other sense at full strength (section e, 50 of 50), counting from when the lamina falls quiet: going back to the steady scene can itself be a change the eyes signal, for 10 ms after most stimuli, 1.4 s after the flicker, 5 to 7 s after the gratings and 17 s after the brightening, whose dim scene afterwards is a dimming L3 keeps answering. Once quiet, nothing is left over: 1 s after the grating stops, the network fires 32,000 spikes a second against 30,000 in the control without it.
+In the retained recovery experiment, from rest, any sense or pair of senses or everything at once, held at full strength for 2 s, is followed within 1 s by activity inside the resting band (`report.ts` section b, then 37 of 37). The current report constructs
+56 cases (10 scalar conditions, 45 pairs and all-at-once); this pass does
+not remeasure their recovery outcomes. With the eyes open, so is every stimulus of the vision battery, alone and with every other sense at full strength (section e, 50 of 50), counting from when the lamina falls quiet: going back to the steady scene can itself be a change the eyes signal, for 10 ms after most stimuli, 1.4 s after the flicker, 5 to 7 s after the gratings and 17 s after the brightening, whose dim scene afterwards is a dimming L3 keeps answering. Once quiet, nothing is left over: 1 s after the grating stops, the network fires 32,000 spikes a second against 30,000 in the control without it.
 
 ## Senses
 
-`src/io.ts`. Each sense drives Poisson firing in its neurons at its intensity times the maximum rate. Left and right are the fly's own.
+`src/io.ts`. Each sense drives Poisson firing in its neurons at its intensity
+times the ungated maximum rate below. Sleep state can attenuate mechanosensory
+and eye inputs; [Sleep and the daily rhythm](#sleep-and-the-daily-rhythm)
+describes that gate and the clock/sleep neuron inputs. Left and right are
+the fly's own.
 
 | Sense | Neurons | Count | Max rate |
 |---|---|---|---|
@@ -501,17 +510,21 @@ No per-column table of measured optical axes is published for these optic lobes 
 
 **The input stage** stands in for the photoreceptors and their synapses onto the lamina (`RETINA`), per facet:
 
-- It adapts to the ambient level and answers to contrast (Weber's law): a change is measured against the facet's recent mean luminance, as a fraction of it plus a floor of 0.05 so that black doesn't divide by zero. The same fractional change gives the same response in a bright scene and a dim one.
+- It adapts to the ambient level and answers to contrast (Weber's law): a change is measured against the facet's recent mean luminance, as a fraction of it plus a floor of 0.05 so that black doesn't divide by zero. With floor zero and before adaptation, fractional contrast is brightness-invariant; the default floor reduces the response more in dim scenes.
 - Darkening excites, brightening doesn't: the photoreceptors' histamine hyperpolarises the lamina monopolar cells to light, so they depolarise to darkening.
 - L1 and L2 compare the light with its mean over the last 200 ms, so they answer a change and then adapt (transient); L3 compares it with its mean over 2 s, which is also the ambient level all three are normalised by (sustained). L1 and L2 are transient and L3 sustained in the fly (Silies et al. 2013; Ketkar et al. 2020); the time constants are round numbers of the right order, not fitted.
-- The contrast becomes a Poisson rate: 200 Hz at full darkening (contrast 1), proportionally less for less. 200 Hz is a scale, not a measurement: these cells are graded and don't spike. It uses most of the range a model neuron has (its 2 ms refractory period caps it near 330 Hz), so a 10% darkening gives 20 Hz.
+- The contrast becomes a Poisson rate: 200 Hz at full darkening (contrast 1), proportionally less for less. 200 Hz is a scale, not a measurement: these cells are graded and don't spike. It uses most of the range a model neuron has (its 2 ms refractory period caps it near 330 Hz), so a nominal 10% contrast maps to 20 Hz. A literal 10% darkening is not
+exactly that response: the means update first and the 0.05 denominator
+floor reduces it, especially in a dim scene.
 - No tonic rate: in a scene the eye has adapted to, every rate is 0, and the stage then only checks each tick whether the light has changed. A steady scene costs nothing.
 
 The floor stands for the light at which photoreceptors stop coding contrast, but the game's luminances are the screen's: its dusk renders at 0.15 and its night under 0.1. So the game adapts its picture to the light before it gets here (scaled up toward a mean of 0.5 by up to 2 times; [the game's eyes](../../docs/simulation.md#the-eyes)), as photoreceptors adapt their gain, and the stage sees a dim scene's contrasts much as a bright one's.
 
 Left out: L1's sustained component and L2's slight rectification; neural superposition (six photoreceptors of six neighbouring ommatidia that look the same way feed one cartridge, which here is just one facet feeding one column); colour, polarisation and the dorsal rim's own photoreceptors; and the graded potentials themselves.
 
-**The engine** drives the lamina with an input that gives each neuron a rate of its own (Neuron model). The eyes' inputs are added after every other input, so their random streams leave everything else as it was.
+**The engine** drives the lamina with an input that gives each neuron a rate of its own (Neuron model). Eye inputs follow the original sensory/background inputs, preserving
+those streams. `maleTaste`, `wingbeat` and the clock/sleep inputs are added
+after the eyes.
 
 **What reaches what.** `node packages/brain/scripts/vision.ts` runs a battery of stimuli (`src/stimuli.ts`) through each eye or both: dark discs looming at 10, 40 and 160 ms (half-size over speed) toward either eye, the front and above, the same disc receding, whole-field dimming and brightening, a dark 10-degree bar and an 8-degree dot crossing at 100 degrees per second in four directions, square-wave gratings (30 degrees, 2 Hz) drifting four ways in the right eye and rotating around both eyes, a 4 Hz whole-field flicker, and a steady checkerboard. Each is run with the same seed against a control that holds the steady scene, and the table gives the difference in mean rate over the stimulus, in Hz, for the eye it is aimed at. Seed 1:
 
@@ -794,7 +807,7 @@ Not reproduced:
 
 ### How neurons are placed
 
-The wiring file has no positions and no neuropil per neuron (the separate anatomy sidecar below now carries positions and segments), so each neuron is placed by its annotations: super class, class, sub class, cell type and soma side. Where a type's name says which neuropil it belongs to, that decides; where nothing places a neuron, it goes to its part of the body's catch-all rather than to a guess. A neuron of a left/right region whose soma is on the midline or has no side goes to the catch-all too. `regionOf(connectome)` gives each neuron's region; `scripts/regions.ts` prints what each region holds (below).
+The wiring file has no positions and no neuropil per neuron (the [separate anatomy sidecar](#anatomy-sidecar) carries positions and segments), so each neuron is placed by its annotations: super class, class, sub class, cell type and soma side. Where a type's name says which neuropil it belongs to, that decides; where nothing places a neuron, it goes to its part of the body's catch-all rather than to a guess. A neuron of a left/right region whose soma is on the midline or has no side goes to the catch-all too. `regionOf(connectome)` gives each neuron's region; `scripts/regions.ts` prints what each region holds (below).
 
 - **Eyes and optic lobes**, each side. The photoreceptors (`ol_sensory`) are the retina; the visual projection and visual centrifugal neurons are regions of their own. The optic lobe's 89,403 intrinsic neurons go by type, after the naming of Fischbach and Dittrich (1989) and the male optic lobe's inventory (Nern et al. 2025):
   - **lamina**: its own cell types as Tuthill et al. (2013) list them, less the photoreceptors: L1-L5, the amacrine Lai, T1, the centrifugal C2 and C3 and the wide-field Lawf1 and Lawf2 (C2, C3 and the Lawfs take their input in the medulla and feed it back), and the lamina tangential Lat cells: 15,025.
@@ -952,13 +965,27 @@ A display shows a region at `rate / fullHz`, clamped to 1. `fullHz` is measured 
 What it shows:
 
 - **At rest** the busy regions are the ones the made-up visual background drives: the visual projection neurons, at 2-3 Hz, wandering with it, the ventrolateral protocerebrum they end in, at 1-2 Hz, and the visual centrifugal neurons. On the display's scale they show at 12 to 24% of full. The wing and haltere motor neurons fire at 2.7 Hz (4% of full), the head and neck motor neurons at 0.5 Hz, and the proprioceptors at 0.3 Hz: the legs' 13 load sensors that `grounded` drives at 20 Hz, among 964. Until `grounded` was narrowed to those 13 it drove the wings' and halteres' sensors too (Senses), and at rest the flight motor neurons fired at 8.9 Hz, the proprioceptors at 8.7 and the neck motor neurons at 5.4. The descending and ascending neurons, the cord's interneurons and the leg motor neurons, at 0.1 to 0.6 Hz, show at 1 to 4%.
-- **Never fire**: the retina, smell, and the wings', halteres', thorax's and abdomen's sensory neurons other than the proprioceptors; the legs' fire only with every sense at once, and then at 1.6 Hz. No sense drives them: the light enters one synapse in, at the lamina (The eyes), the model has no sense of smell, and among the body's sensory neurons only the bristles and the proprioceptors are driven. What reaches them in the wiring doesn't fire them either. The photoreceptors' input is 96% inhibitory (Dm9 and the other photoreceptors' histamine; the retina's peak, 0.03 Hz under a grating, is a handful of them); the others get synapses onto their axon terminals, more of them inhibitory than excitatory, and the excitatory ones mostly from other sensory neurons like themselves, which nothing drives. They stay dark, as they should.
+- **Sparse or undriven sensory regions.** The retina and smell are not directly
+  stimulated: light enters at the lamina, and there is no smell sense. Other
+  body groups vary: `maleTaste` directly drives 44 leg-sensory neurons, and
+  wingbeat and load reach proprioceptors. The retained table's leg-sensory
+  peak of 1.6 Hz only under all senses predates that direct taste input;
+  it is not a current no-input guarantee. Even the retina's retained 0.03 Hz
+  peak under a grating is a handful of indirect spikes, not literal silence.
+  Its input is 96% inhibitory; other sensory terminals also receive wiring
+  without necessarily producing a visible regional glow.
 - **Barely fire**, under 2 Hz at their peak, and stay faint: the mushroom body (0.21 Hz), lateral horn and superior protocerebrum (0.7 to 1.1 Hz), antennal lobe (0.9 to 1.1) and central complex (1.2, with every sense at once), the lobula plate (0.7: T4 never fires because the ON pathway is silent, and T5 fires at about 1 Hz, Seeing), the optic lobe's other cells, the neuroendocrine neurons and the head's other sensory neurons. With no smell nothing reaches the olfactory centres, and the other senses reach the higher centres of the brain only weakly in this model.
-- **Fire, but drive nothing**: every motor region (their output is muted: no predicted transmitter, Operating point), and the dopaminergic neurons in the mushroom body region (their output is muted as modulatory). Their rates are their own; what they would do downstream isn't modelled.
+- **Muted output depends on transmitter, not a whole motor region.** Motor
+  neurons lacking a prediction are muted, as are the modulatory dopamine
+  neurons in the mushroom-body region. The current weights retain 55 motor
+  neurons with nonzero gain, 53 with outgoing connections; MN9 root 16949 is
+  cholinergic and has 25 outgoing pairs. A motor rate can therefore accompany
+  network effects as well as a command readout.
 
-### Cost
+### Region readout cost
 
-What the readout adds: one increment a spike, whichever neuron fires (23,000 a second at rest, 970,000 under the grating across both eyes), and every 10 ms chunk 63 smoothings; a byte a neuron for the partition; and, when the brain is built, classifying every neuron, 12 to 20 ms of string checks here and a few ms natively (in the native bench's runs the TypeScript brain built in 149 to 163 ms after against 155 to 159 before, the native one in 51 to 52 ms against 46 to 49). Measured on an M5 Pro against the commit before, runs alternating between the two, it is within the runs' own spread everywhere:
+What the readout adds: one increment a spike, whichever neuron fires (23,000 a second at rest, 970,000 under the grating across both eyes), and every 10 ms chunk 63 smoothings; two byte-per-neuron region arrays in TypeScript (333,400 bytes at
+166,700 neurons: the runtime map and the engine copy); and, when the brain is built, classifying every neuron, 12 to 20 ms of string checks here and a few ms natively (in the native bench's runs the TypeScript brain built in 149 to 163 ms after against 155 to 159 before, the native one in 51 to 52 ms against 46 to 49). Measured on an M5 Pro against the commit before, runs alternating between the two, it is within the runs' own spread everywhere:
 
 | Wall time per simulated second | Before | After |
 |---|---|---|
@@ -993,7 +1020,7 @@ The game's X-ray and nervous-system panel are such a display (`apps/web/src/nerv
 
 On an M5 Pro, one thread (`report.ts` section d), wall time per simulated second: 0.09 s at rest (`node packages/brain-native/scripts/bench.ts`, measured again when `grounded` was narrowed: about 23,000 spikes a second and 40,000 active neurons, against 49,000 and 58,000 while it drove the wings' and halteres' sensors too; the figures after it are from before), 0.14 s with the feather resting on the fly (touch 0.4), 0.13 s with a full looming pulse every second, 0.16 s with touch and wind while airborne (touch 1, wind 0.5: just over the 0.15 s aimed for), 0.21 s with every sense at full strength at once. Building the brain takes about 0.3 s. Almost all of it is the sweep over active neurons: at rest about 40,000 of them, nearly all genuinely depolarised by the background. The regions' readout costs nothing that can be measured (Regions).
 
-With the eyes open (`report.ts` section e): a steady scene costs what shut eyes do (0.122 to 0.125 s against 0.123 in interleaved runs: the input stage only checks whether the light has changed), a disc looming at one eye over and over 0.21 to 0.23 s, a 4 Hz whole-field flicker 0.33 to 0.38 s, and the worst case of the battery, a high-contrast grating drifting across both eyes, 0.39 to 0.42 s (three runs), under the 0.5 s aimed for. The eyes' input itself is cheap (one random draw per candidate spike, and nothing at all once adapted); what costs is the optic lobe answering, with the active set growing to about 120,000 neurons. Real screens move less of the field at lower contrast than that grating. If it ever needs cutting, halving the lamina's scale (`RETINA.maxRate` 100) halves the spikes the rotating grating causes (529,000 a second against 1,016,000), at the price of most of the motion pathway (Seeing).
+With the eyes open (`report.ts` section e): a steady scene costs what shut eyes do (0.122 to 0.125 s against 0.123 in interleaved runs: the input stage only checks whether the light has changed), a disc looming at one eye over and over 0.21 to 0.23 s, a 4 Hz whole-field flicker 0.33 to 0.38 s, and the worst case of the battery, a high-contrast grating drifting across both eyes, 0.39 to 0.42 s (three runs), under the 0.5 s aimed for. The eyes' input itself is cheap (an acceptance draw and, ordinarily, a geometric-gap draw per candidate spike, and nothing at all once adapted); what costs is the optic lobe answering, with the active set growing to about 120,000 neurons. Real screens move less of the field at lower contrast than that grating. If it ever needs cutting, halving the lamina's scale (`RETINA.maxRate` 100) halves the spikes the rotating grating causes (529,000 a second against 1,016,000), at the price of most of the motion pathway (Seeing).
 
 ## Tools
 

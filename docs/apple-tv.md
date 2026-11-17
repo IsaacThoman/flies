@@ -11,7 +11,8 @@ weather outside. Public APIs only, so it can go through App Review.
 
 ## How it works
 
-Four threads:
+Four principal execution contexts in the default render mode (other queues
+and Swift tasks also exist; modes 0 and 1 have no dedicated render thread):
 
 | Thread | Owns | Code |
 | --- | --- | --- |
@@ -51,8 +52,7 @@ Needs a Mac with Xcode 27 and XcodeGen (`brew install xcodegen`), and the connec
 The app used to be `com.isaacthoman.appletvfly`: a TV with that one installed gets this as a
 separate app, with its settings starting fresh, and the old one can be deleted.
 `TVOS_WEATHERKIT=1` builds in the weather outside, which needs the App ID set up first: see
-[Turning it on](#turning-it-on-for-the-owner). Without it the app is built as it always was, with
-no Swift, no WeatherKit, no location and no entitlements.
+[Turning it on](#turning-it-on-for-the-owner). Without it the normal game build has no weather Swift service, WeatherKit, location or weather entitlements. The simulator check can compile the Swift weather stand-in separately.
 
 ```sh
 npm run tvos -- build                    # the game, for an Apple TV
@@ -86,7 +86,8 @@ npm run tvos -- archive --version 0.1.1   # archive for the App Store (docs/rele
    without TLS: [Playing together](#playing-together)) and builds it with xcodebuild.
 
 The Xcode project compiles every source under `packages/brain-native/src/` with that
-package's release flags (`-O2 -DNDEBUG -ffp-contract=off`). `--stand-in-brain` compiles
+TV target flags (`-O2 -DNDEBUG -ffp-contract=off`); the standalone package
+uses `-O2 -DNDEBUG` and controls contraction in source. `--stand-in-brain` compiles
 `apps/tvos/tests/brain-stand-in/` instead: a fake `fly_brain` with predictable answers, for
 checking the bridge. The build stops with a message if the brain folder has no sources.
 
@@ -115,20 +116,26 @@ JSON, from `--config` on the command line, else `www/config.json` (what the home
 | `drive` | Scripted remote input for unattended runs, waiting on the canvas's `data-*` state: `[["wait", {"ready": "true"}], ["press", "ArrowRight", 650], ["swipe", "ArrowUp"], ["touch", 0.5, -0.2, true], ["sleep", 500], ["log", "mark"]]`. Presses, swipes and touches go through the same native code as the remote's (`apps/tvos/runtime/report.ts`) |
 
 `devicectl ... --console` (what `run --device` uses) attaches a debugger, which slows
-JavaScript down by about 1.5x (aerodance's measurement): don't trust frame timings taken that
+JavaScript down by about 1.5x (a historical host measurement): don't trust frame timings taken that
 way.
+
+### Unattended soak
 
 Use `--detached` with `logFile` for device measurements. `tvos:soak` installs and launches the
 last physical-device build without attaching. It logs when the splash lifts (`drive:
 {"ready":"true"}`; the line's `[js ms]` is the time since the host started), exercises feeding,
-ball throws, the eye picture at Low and High, and pause/settings, then carries the fly to each
-place in turn. It pins the first through Settings, so the screensaver doesn't move it on (each
+ball throws, the eye picture at Low and High, and pause/settings, then is intended to carry the fly to each place in turn. It pins the first through Settings, so the screensaver doesn't move it on (each
 step of that choice carries the fly at once, so it is set only once; the Place tool moves the
 pin after that), shows each place in every weather and light for 5 seconds, and watches its
 screensaver at midday and at night, `--minutes` in total split among them. Each screensaver phase
-starts after a minute without a press. A 30-minute soak takes about 55 minutes. It assumes the
-default tool variants and Low eyes, and restores Low before the screensaver phases. It leaves the
-app running, pinned to the last place. Do not attach a console or enable `profile`,
+normally starts after the default 30 seconds without input; saved settings
+can change or disable that delay. The earlier 55-minute total for a
+30-minute soak is a historical estimate, not a current completion bound. It assumes the
+default tool variants and Low eyes, and restores Low before the screensaver phases. A completed plan leaves the app running, pinned to the last place.
+The current setup has a navigation defect: four Down presses from Play
+select Online while the drive waits for Settings, so the matrix can stop
+there. This is a suspected harness bug; no successful current matrix is
+claimed by this documentation pass. Do not attach a console or enable `profile`,
 `gpuTiming` or `glDebug` for the final measurement. Pull its log while it runs or after `drive: soak complete`:
 
 ```sh
@@ -152,8 +159,8 @@ desktop browser.
 
 - **Window**: `window`/`self`/`globalThis`, `addEventListener` etc., `innerWidth`/`innerHeight`
   (1920×1080, never change), `devicePixelRatio` (1), `screen`, `matchMedia` (static answers),
-  `getComputedStyle` (the element's own `style`), `location` (read-only; navigation is
-  ignored), `history` (inert), `navigator` (`getGamepads()` is always empty).
+  `getComputedStyle` (the element's own `style`), `location` (URL fields have getters except writable `hash`; navigation
+  methods log and are ignored), `history` (inert), `navigator` (`getGamepads()` is always empty).
 - **Document**: `document.getElementById`, `querySelector(All)` (tag, `#id`, `.class` and
   combinations; no combinators), `createElement`, `body`, `head`, `activeElement`,
   `visibilityState` and `visibilitychange` (when the app goes to the background), `fonts`.
@@ -165,7 +172,7 @@ desktop browser.
 - **Canvas**: `getContext('webgl2')` on one canvas (the screen canvas; a second WebGL canvas
   gets `null`) and `getContext('2d')` on any number of others. No WebGL 1, no
   `OffscreenCanvas`, no `toDataURL` (returns `data:,`) or `toBlob` (gives `null`).
-- **WebGL 2**: all of it that three.js uses, on OpenGL ES 3.0. Extensions as the GPU has them.
+- **WebGL 2**: all of it that three.js uses, on OpenGL ES 3.0. Extensions are exposed through the whitelist in `apps/tvos/runtime/webgl.ts`, subject to GPU support.
   The simulator has `EXT_color_buffer_half_float` but not `EXT_color_buffer_float`: `RGBA16F`
   render targets work (the test scene checks one), `RGBA32F` ones are incomplete. three warns
   "EXT_color_buffer_float extension not supported" at start-up because it asks for that
@@ -174,18 +181,17 @@ desktop browser.
   targets, never `FloatType`. No timer queries, no
   transform feedback, no `KHR_parallel_shader_compile`: a shader compiles the first time it's
   drawn, which stalls that frame; warm materials up (`renderer.compile`) while the splash is up.
-  `antialias: true` gives a 4x MSAA default framebuffer; the game's look wants `false`.
+  `antialias: true` requests up to 4x MSAA, capped by `GL_MAX_SAMPLES`; the game's look wants `false`.
   Fences (`fenceSync`, `clientWaitSync`, `getSyncParameter`) are real.
 - **2D canvas**: CoreGraphics. Paths, `roundRect`, `Path2D`, fills and strokes, gradients
   (linear, radial, conic), patterns, line dashes, shadows, clipping, every
   `globalCompositeOperation`, transforms, `drawImage`, `get`/`putImageData`, `fillText`,
   `strokeText`, `measureText`, `letterSpacing`. Not: `filter` (accepted, ignored),
-  `isPointInPath`/`isPointInStroke` (always false), `direction` (always left to right).
-  Text uses the fonts the page has loaded with `FontFace`, else the system font (SF) for any
-  family.
+  `isPointInPath`/`isPointInStroke` (always false), `direction` (stored in JavaScript but not sent as a native drawing option).
+  Text uses the fonts the page has loaded with `FontFace`, else a system font, with a monospaced fallback for monospace.
 - **Fonts**: `new FontFace(family, 'url(fonts/x.woff2)' or bytes, { weight, style })`,
   `face.load()`, `document.fonts.add(face)`, `document.fonts.ready`, with TTF, OTF or WOFF
-  files from the app's own (aerodance ships WOFF this way; WOFF2 isn't checked). No CSS
+  files from the app's own bundle (WOFF is supported; WOFF2 isn't checked). No CSS
   `@font-face`.
 - **Images**: `Image`/`<img>`, `createImageBitmap` (from a `Blob`, an image or a canvas),
   `ImageBitmap`, from the app's files, `blob:` and `data:` URLs (PNG, JPEG, anything ImageIO
@@ -198,7 +204,7 @@ desktop browser.
   so is a table's line to its room, `__native.socket`: [Playing together](#playing-together).) No
   `XMLHttpRequest`, `WebSocket`, `EventSource`.
 - **Storage**: `localStorage`, kept in `NSUserDefaults` (keep it small: settings, not data).
-  `sessionStorage` lasts as long as the app runs. No IndexedDB, no cookies, no Cache API.
+  `sessionStorage` lasts as long as the app runs. No IndexedDB or Cache API. `document.cookie` is a mutable string shim, with no cookie jar or HTTP cookie behavior.
 - **Timers and frames**: `setTimeout`, `setInterval`, `requestAnimationFrame` (the display
   link, 60 Hz; a frame isn't started while two are still on their way to the screen),
   `requestIdleCallback`, `queueMicrotask`, `performance.now()` (no marks or measures),
@@ -209,7 +215,7 @@ desktop browser.
   `IntersectionObserver` and `MutationObserver` (inert).
 - **Not there**: `Worker` (it is `undefined`: the brain is `__native.brain`), modules and
   `import()` at run time (Vite inlines them; `import.meta.url` is `http://fly.local/game.js`),
-  WebGPU, WebXR, video, the Gamepad API, pointer and touch events, `alert`/`confirm` (logged),
+  WebGPU, WebXR, video, the Gamepad API, pointer and touch events, `alert` (logged), `confirm` (returns false),
   `navigator.clipboard` and `navigator.share` (a phone scans a table's code instead).
 
 ## The remote
@@ -263,7 +269,7 @@ implemented in `apps/tvos/src/BrainBridge.mm` over `packages/brain-native/includ
   publishes the result.
 - `read(out)` copies the latest state (`COMMAND_ORDER`, then `STATE_STATS`, then one rate per
   `rateNames()` entry) into a `Float32Array` and returns how many states there have been. The real
-  brain reports 83 rates: the eight command readouts, the 63 regions (`region.<id>`) and the 12
+  brain reports 84 rates: the nine neural readouts, the 63 regions (`region.<id>`) and the 12
   vision stages. Nothing on this side assumes a count: the bridge sizes everything from
   `fly_brain_rate_count`, and the stand-in reports as many rates so the simulator check sees them
   all arrive. `NativeBrainDriver` copies the regions into its `regionRates` in the catalog's order,
@@ -271,7 +277,7 @@ implemented in `apps/tvos/src/BrainBridge.mm` over `packages/brain-native/includ
 
 In the simulator the real brain (`packages/brain-native` as of 15 November) loads in about 150 ms
 and keeps up with real time at 60 submits a second, on an M5 Pro. How fast it runs on an Apple TV
-is not measured yet.
+is recorded separately in [device measurements](#device-and-simulator-checks).
 
 ## The weather outside
 
@@ -291,20 +297,22 @@ has no Swift and no `__native.weather`, and the game keeps its made-up forecast.
   (`requestLocation`) and uses it for six hours, a TV not being one to move. It rounds the
   coordinates to two decimal places (about a kilometre) and asks WeatherKit for the current
   conditions and today's daily forecast (for its sunrise, sunset and solar noon) in one
-  request. It asks again every 20 minutes while the app is open (not before WeatherKit's answer
-  expires, and at most an hour apart), and after a failure sooner, backing off from a minute to
+  request. Successful requests repeat after the expiry interval clamped to
+  20–60 minutes while the app is open; the one-hour cap can precede expiry, and after a failure sooner, backing off from a minute to
   20. Timers don't fire while the app is suspended; when it becomes active again it asks if the
   answer is 20 minutes old. A relaunch within 20 minutes of the last answer uses the kept one
   and doesn't ask. Apple Weather's attribution is asked for on its own once a run, as it starts,
   so About has it for a kept answer too. `stop()` stops it asking.
 - Nothing waits: `start` and `stop` hand over to the main actor and return, and the rest copy.
   The game looks at `version()` every two seconds and reads `conditions()` only when it changes,
-  so nothing is allocated per frame.
+  Condition snapshots are replaced on a version change; status/error strings
+  are also read during roughly 200 ms diagnostic publication. At a shared
+  table the local outside-weather update is bypassed.
 - What JavaScript gets (`OutsideConditions`): cloud cover, precipitation (mm an hour), visibility
   (m), wind speed (m/s), WeatherKit's condition (`foggy`, `snow`...), whether it is day, the
   observation's time, and sunrise, sunset and solar noon as local hours (null where the sun
   doesn't rise or set). Not the location. `status()` says what it has: `locating`, `fetching`,
-  `ok`, or why it has nothing: `denied` (location permission refused or restricted),
+  `ok`, `idle` when stopped or not started, or why it has nothing: `denied` (location permission refused or restricted),
   `no-location`, `offline`, `unauthorised` (WeatherKit refused the app: the capability isn't on
   its App ID), `failed`; `error()` says more. The game logs `weather outside: <status>
   (<error>)` on the console each time it changes, and puts it on the canvas as `data-outside`,
@@ -360,7 +368,7 @@ Checked against Apple's documentation in November 2026:
 
 ### Cost
 
-One request every 20 minutes while the app is open and Real weather is on: 72 a day for a TV
+At a 20-minute successful-refresh interval: 72 a day for a TV
 that shows the fly around the clock, about 2,200 a month, so the membership's 500,000 cover
 about 230 TVs doing that, and none while a TV sleeps (tvOS suspends the app). The attribution is
 asked for once a run; Apple doesn't say whether that counts.
@@ -391,17 +399,14 @@ are, without it, and the game uses its made-up forecast.
 Keep building with `TVOS_WEATHERKIT=1` from then on: a build without it has no weather service,
 and the game goes back to the made-up forecast.
 
-### Checking it
+### Checking the weather
 
 The simulator check (below) builds the stand-in service (`apps/tvos/tests/weather-stand-in/Service.swift`,
 `--stand-in-weather`): with no WeatherKit and no location, it answers with the same conditions
 every time, and the check makes sure they reach the test scene as sent and with nothing else in
 them, that it reports `fetching` then `ok`, and that stopped it says `idle`.
 `npm run tvos:check -- --weatherkit` builds the real service instead, grants the app location
-(`simctl privacy`) and sets the simulator's, and checks that it locates, asks WeatherKit and,
-unsigned as simulator builds are, is refused and says so: `unauthorised`, with WeatherKit's
-`WDSJWTAuthenticatorServiceProxy.Errors` error. A real answer needs a signed build on an App ID
-with the capability.
+(`simctl privacy`) and sets the simulator's, and checks that it locates and asks WeatherKit. The check accepts a valid answer or an `unauthorised` result; it does not require a particular error-domain string. Service acceptance depends on the build's signing and App ID capability.
 
 In a browser there is no service: scripts feed the game conditions (`__fly.outside.feed`, in the
 [development guide](development.md)).
@@ -428,7 +433,8 @@ whose delegate runs on a queue of the bridge's own, never the JavaScript or main
   or 256 KB waiting to be taken, and as much waiting to go. A line that falls further behind is
   closed with 1000, "line fell behind", its backlog dropped; the game opens it again and the
   room gives it the table as it is now. A binary message bigger than the game's buffer closes the
-  line with 1009 (the room sends nothing over 4 KB).
+  line with 1009 (binary fly batches are small; the 4 KB server limit is on incoming
+  client messages, not all outgoing JSON).
 - A line that can't open, fails or drops is closed with 1006 and no reason, as a browser's is;
   the room's own close keeps its code and reason. The line reports closed only once everything
   that came before the close has been taken, as a browser hands on its messages before its close
@@ -503,7 +509,8 @@ flies from this Mac (`fakeFly`, `scripts/tables.ts`: no brain, each walking a sm
 the TV's fly and sending its state 20 times a second, as a device does) start an unlisted room at
 midday in clear weather, and the TV, launched detached with `stats` and `logFile` and the room's
 code in its URL, sits down in it and plays: feeding, the ball every 20 s, then watching them as the screensaver, half the minutes each.
-The fakes keep walking until the soak is done; the process waits for them.
+The fakes run for a duration estimated from drive sleeps plus five minutes;
+this does not observe actual drive completion, so a slow drive can outlast them.
 
 Against the real room server, with a release build as it is:
 
@@ -547,9 +554,7 @@ decodes to the room's link.
 
 ## Reading pixels back
 
-The game renders what the fly's eyes see into a small render target and reads it back every
-frame or two. Both of three's ways work and are checked by the test scene (`apps/tvos/tests/scene.ts`, a
-32×16 target, red on the left and green on the right, read back pixel-exact):
+The game renders what the fly's eyes see into a small render target. Normal Low sampling is 20 Hz and High is 30 Hz; urgent sampling can request 60 Hz, subject to readback and reflection work ([the eye reference](simulation.md#the-eyes)). Both of three's readback paths are checked by the test scene (`apps/tvos/tests/scene.ts`): a 32×16 target, red on the left and green on the right, with one pixel checked on each side.
 
 - `renderer.readRenderTargetPixels(target, ...)` is synchronous: one `readPixels` query, so
   the JavaScript thread hands over its commands and waits until the render thread has replayed
@@ -558,9 +563,8 @@ frame or two. Both of three's ways work and are checked by the test scene (`apps
   JavaScript and GL replay that mode 2 exists for.
 - `renderer.readRenderTargetPixelsAsync(target, ...)` reads into a pixel-pack buffer, sets a
   fence and polls it. The fence is real: the render thread writes the newest signalled fence
-  into shared memory, so polling never waits. When it has signalled, `getBufferSubData` is
-  still a query (it waits for the render thread to catch up, but not for the GPU). The answer
-  arrives a few milliseconds later, in a timer between frames, and is a frame old.
+  into shared memory, so zero-timeout polling does not wait; a nonzero timeout can synchronize. When it has signalled, `getBufferSubData` is
+  still a query (it waits for the render thread to catch up, but not for the GPU). The promise resolves after a timer observes completion. Its latency and the picture's age depend on the queued work.
 
 Measured in the simulator (M5 Pro, the software renderer, mode 2): the synchronous read takes
 0.08 ms on average (0.5 ms at most) on tvOS 27 and 0.11 ms (1.9 ms at most) on tvOS 26, and the
@@ -576,7 +580,7 @@ counts completed pictures; `data-eyes-ms` includes submission and resampling CPU
 the asynchronous wait. A readback's final data copy can still wait for queued render-thread
 commands; this is not a fully asynchronous native transfer.
 
-## Checking it
+## Device and simulator checks
 
 ### Measured on peev
 
@@ -630,8 +634,8 @@ Steady screensaver by place. The windows at the start and end of each 3-minute p
 - This run found the picnic butterfly drawn with no wings on the Apple TV, since its wing
   texture used SVG path strings, which the runtime's `Path2D` doesn't read: fixed.
 
-Online can't be opened on the Apple TV yet (the host has no `WebSocket`, so the title has no
-Online), so it isn't measured.
+That historical measurement set did not include Online. The current native
+socket enables it; [eight-fly measurements](#eight-flies-on-a-tv) are separate.
 
 ### Sustained performance on Rufus
 
@@ -667,7 +671,7 @@ build, `--runtime tvOS-26-0` for the older system) builds the app with the test 
 stand-in brain and plain `ws://` to room servers on the Mac (`--local-rooms`), creates and boots a fresh Apple TV 4K simulator, installs and launches the app
 with a `drive`, and checks what the scene reports:
 
-- a held Right repeats (three times in 650 ms), Select, a swipe, Back and Play/Pause arrive as
+- a held Right repeats (the check accepts two to four repeats in 650 ms), Select, a swipe, Back and Play/Pause arrive as
   the right keys in order; a second Back, after the scene has said it is at its root, doesn't
   reach the game and the host says tvOS took it;
 - three touches arrive, and the finger lifts where it was;
@@ -680,7 +684,7 @@ with a `drive`, and checks what the scene reports:
   renderer but the simulator's, which gets it wrong (see below); the check prints how wrong;
 - `localStorage` keeps a value; `fetch` reads a bundled file;
 - the brain bridge: the stand-in loads the bundled connectome and reports its neuron and
-  connection counts (so the file arrived whole), its eyes, its rate names; all 83 of its rates
+  connection header counts (not a full-file integrity check), its eyes, its rate names; all 84 of its rates
   arrive, as many as the real brain reports; the commands it answers prove the senses and both
   light arrays arrived on the right sides; a 600 ms burst of submits is simulated in steps of at
   most 100 ms;
@@ -748,11 +752,10 @@ in a browser.
 
 ## What isn't verified
 
-No Apple TV was connected while this was built, so none of this has run on one:
+The original build-only verification predates the device measurements above.
+Those observations cover their named devices and workloads, not every
+configuration. Remaining limits include:
 
-- **Performance**: frame times with the real game, the cost of `readPixels` there, the brain's
-  speed, memory. The device build signs (team `PX72AL9366`, the team's wildcard tvOS
-  provisioning profile) but hasn't been installed.
 - **The real remote**: this Mac's Xcode has no Simulator app, so the simulated remote (its
   window and keyboard) couldn't be used either; every press, swipe and touch in the check is
   scripted, through the same native code as real input from the point UIKit hands it over. The

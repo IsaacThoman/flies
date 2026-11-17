@@ -3,8 +3,9 @@
 The fly can live in more than one place (`docs/places.md`), and the player can
 carry it from one to another: the **Place** tool, or Settings → Screensaver →
 Where it lives, once the choice rests there a second or the row is left (the
-places stepped past on the way aren't built). Living in each in turn (the default), it moves on after 20 minutes of
-screensaver. It is the same fly, its brain running on; the world fades out, the
+places stepped past on the way aren't built). Living in each in turn (the default), it moves on after 20 accumulated minutes of
+screensaver at that place. Rotation is for solo play; a shared room follows
+its starter's Place tool. It is the same fly, its brain running on; the world fades out, the
 place is built behind the veil, and it is set down there.
 
 [Adding a place](places.md) describes how the world and its scene are built.
@@ -72,19 +73,20 @@ the clock, the same for everyone at the same hour and on any restart: spells
 of a few hours each, changing over an hour, in systems a day or two long, so
 some days are fine and some grey. Mist forms only in the early morning and
 burns off before noon; clouds gather before rain and clear after it.
-Overcast greys every place's sky and takes the sun's light away, and mist
+Overcast greys every place's sky and reduces its sunlight, and mist
 whitens the distance. At the picnic rain falls past the camera, splashes on
 the table, the fruit and the lemonade's pool (crowns of droplets, rings in
 the wet), beads the table and the fruit, soaks the napkin darker, speckles
-the lake; the table dries over the next half hour or so, and if the sun
-comes out while it's wet a rainbow stands opposite it. Rain bursts the bubbles, and the fireflies shelter from it. A
+the lake; the table dries over the next half hour or so, and if it is wet and the sun is low, with little cloud or mist, a rainbow can
+stand opposite it. Rain bursts the bubbles, and the fireflies shelter from it. A
 drop landing on the fly is felt (`touch`).
 
 **The weather outside.** An Apple TV app built with WeatherKit
 ([docs/apple-tv.md](apple-tv.md#the-weather-outside)) follows the real
 weather instead (`apps/web/src/scene/outside.ts`). The first time, once the
 title is up, the TV asks whether the app may know where it is; from then on,
-while the app is open, Apple Weather is asked every 20 minutes for the
+while the app is open, successful Apple Weather requests repeat after 20 minutes to an hour,
+respecting expiry within that cap; failures retry sooner. They request the
 conditions about where the TV is and the day's sunrise and sunset. The Weather
 tool's "Now" then says "Outside" and is the real weather, as near as the
 game's four kinds go: the cloud cover is the cloud; fog, or seeing less than a
@@ -92,8 +94,8 @@ kilometre, is mist, fading out by eight, and a haze is some; precipitation is
 rain, light rain at the heaviest, since that is all the game has. There is no
 snow or thunder in the game yet, so each is the nearest it has: snow is a
 white mist under a grey sky, with nothing falling (rain would be wrong),
-flurries a grey sky; sleet, freezing rain and hail are rain; a thunderstorm is
-heavy rain, with no lightning. The real wind speed is how windy the day is, a
+flurries a grey sky; sleet, freezing rain and hail are rain; a thunderstorm uses near-full game rain (still the light-rain effect),
+with no lightning. The real wind speed is how windy the day is, a
 fresh breeze (10 m/s) the windiest, so the picnic's gusts come more often and
 harder on a windy day and the trees and the lake move more. The Light tool's
 "Now" stretches or squeezes the clock's day so that its sun comes up at the
@@ -107,8 +109,9 @@ answer (no permission, no network, WeatherKit refusing the app) or one more
 than two hours old (two days for sunrise and sunset, which move by minutes a
 day), it is the forecast and the summer day as before, and the tool says
 "Now". Settings → Screensaver → Real weather turns it off. Apple Weather's attribution is in
-About the fly. None of it reaches the fly but as everything else does: what
-it sees and the wind it feels.
+About the fly. Weather reaches the body through the picture, wind and rain touch.
+Sunrise and sunset also set the body's internal clock directly, independently
+of the chosen light; those clock/sleep inputs are labelled stand-ins.
 
 While nobody is using the remote (the screensaver, or a minute of play without
 a press), the picnic has its own goings-on, about ten an hour, never two
@@ -141,8 +144,8 @@ tiles round the window turn into its reveals. On the sill: a red enamel
 wind-up alarm clock with two bells and its alarm set for half past six, which
 a fly can land on and walk across; a spongeware bowl with a peach and two
 plums, whose side a fly can walk up, round its rim and down to where plum
-juice has run; an overripe, freckled banana it can climb from its tip, split
-near the stalk; half a peach on a plate with its stone; a pot of basil in a
+juice has run; an overripe, freckled banana it can climb from its tip, with edible flesh
+near the stalk (the current skin does not draw that split); half a peach on a plate with its stone; a pot of basil in a
 saucer with water round the pot's foot, a bushy mound of broad, glossy, veined
 leaves in opposite pairs, coming into flower, that a fly can land on; a bottle
 of red wine that has dripped a pool on the sill, where drips and the fly's
@@ -152,7 +155,8 @@ crumbs of toast and spilt sugar, drops from watering the basil, pebbles,
 shells and a piece of sea glass from the beach along the back, a postcard of a
 lighthouse propped at the end, and a linen tea towel woven thread by thread in
 its shader. A fly can stand on the rail at the foot of the glass but never get
-through it, and nor can the ball, which comes round from where it has room.
+through it, while the ball tries to approach from a clear direction. Its routing has
+fallbacks and does not guarantee collision-free motion.
 Across the kitchen are the dresser with its plates and cups, the range in its
 chimney breast with pans and tins on the mantel and the kitchen clock over it,
 a doorway and the fridge. Outside are a garden with a striped lawn, an apple
@@ -227,16 +231,16 @@ lights out of focus glow behind the fly.
 Wherever it lives, a fly that has stood in something sticky or wet leaves
 footprints (`apps/web/src/scene/prints.ts`): faint prints of the two pads of
 its feet, each where its gait set that foot down, lying on whatever it walks
-on (the table, a fruit, a jar's rim, the sill). Honey leaves them amber; jam,
-raspberry, wine and syrup red; the juices, lemonade, beer, the agar and the
+on (the table, a fruit, a jar's rim, the sill). Honey and syrup leave them amber; jam,
+raspberry, wine and cherry syrup red; the juices, lemonade, beer, the agar and the
 lab's fly food their own colours. Water (dropped, the basil's saucer, a drop
 or dew) leaves darker wet prints that dry in about half a minute; sticky ones
 fade over a minute and a half. A foot carries only a little: the first steps
 off the food print clearly, the next fainter and then only now and then, and
 after ten or so it is clean, until it walks back into food. Sugar and crumbs
 are dry and leave nothing. There are none on a drink, a head of foam or
-anything drawn rougher than the fly feels it, and they stay behind when the
-fly is carried somewhere else. They are only drawn: the fly doesn't taste or
+anything drawn rougher than the fly feels it, and they are cleared when the
+fly is carried somewhere else, not restored on returning. They are only drawn: the fly doesn't taste or
 feel its own prints, they aren't food, and nothing about them reaches its
 brain.
 

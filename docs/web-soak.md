@@ -14,9 +14,10 @@ npm run soak:web -- --phases wallpaper --places picnic --wallpaper-time noon --w
 
 `e2e:soak` is a quick check separate from `npm run e2e`; the current CI
 workflow does not invoke it. It makes four circuits (20 place visits), then
-table join/leave churn and five cleanup visits, with assertions that textures return exactly
-to each place's warmed baseline. Geometry may vary by one and programs by two:
-the fireflies' first appearance uploads a persistent mesh and its program.
+table join/leave churn and five cleanup visits. Matched checkpoints must have textures no greater than the first
+warmed measured baseline, geometry at most one above it, and programs at most
+two above it. Lower counts pass. Lazy resources such as fireflies motivate
+tolerance; these allowances do not establish the cause of every change.
 The default full run uses 200 circuits, 30 minutes per interaction phase, and
 60 minutes of screensaver **in each place**. The CLI retains `wallpaper` in phase and flag names; the player-facing name
 is screensaver. Options:
@@ -64,7 +65,9 @@ Place changes reset adaptive quality so baseline counts use the same render
 target; uninterrupted screensaver retains its normal adaptive behavior.
 Checkpoints after place changes
 compare a fresh place with the same settings and view. Other phases repeat
-those same checkpoints between stress rounds each minute and when they finish; their in-flight counts are deliberately variable.
+those same checkpoints after complete stress rounds when at least a minute has elapsed, and when
+they finish; a full climate round alone has 24 minutes of holds, so the
+minute is a minimum spacing, not a fixed checkpoint cadence; their in-flight counts are deliberately variable.
 Only checkpoints within the same phase/place, and continuous screensaver, get
 trend verdicts. At least four samples are required. Disjoint early/late
 quarters are averaged and their difference divided by elapsed hours. A small
@@ -73,7 +76,9 @@ series flat; raw values and hourly rates remain visible. This is evidence for
 the duration tested, not proof of an infinite bound. A growing count needs
 investigation; changing camera draw counts or lazy uploads alone are not leaks.
 
-Screensaver samples also verify that game time and completed eye readbacks keep advancing. Adaptive quality, FPS, pixel mode and eye detail are recorded so a cheaper picture cannot disguise a slowdown.
+Screensaver samples also verify that game time and completed eye readbacks keep advancing. Adaptive quality, the target FPS cap, pixel mode and eye detail are recorded
+to help interpret cost. The FPS field is not measured presentation rate,
+and these fields alone cannot rule out a slowdown.
 
 Each fixed-interval sample forces `HeapProfiler.collectGarbage` in the page and
 brain worker, then records page `Performance.getMetrics` heap bytes, worker
@@ -94,10 +99,12 @@ real device for precise performance comparisons.
 Room sockets bound both unread traffic and stalled sends. A reader that stops
 draining reconnects for a fresh snapshot instead of retaining and replaying old
 frames. The one-hour transport regression is synthetic; the browser case also
-checks a real hidden tab with seven peers and reconnection on wake.
+injects hidden-page state in a two-page room, tests reconnection separately
+through a server restart, and checks frame budgets with seven synthetic
+peers. It does not combine real OS hiding, seven peers and wake reconnection.
 
 Run `npm run tvos:soak -- --device <udid> --minutes 60` on the Apple TV for that
-last evidence. It now visits every place, weather and daylight preset, pins each
+last evidence. Its generated plan covers every place, weather and daylight preset, pins each
 place against rotation, and divides its requested screensaver minutes among all
 five places, half midday and half night. Interaction time is additional. Keep
 raw CSVs, logs and charts out of git; retain a compact results table in the PR.
@@ -112,3 +119,6 @@ its screensaver pages; interaction still visits every place. Keep
 A count that grows during play but returns at each warmed checkpoint is
 not itself evidence of a leak. The check cannot replay the exact same
 brain trajectory: the browser runs in real time.
+
+For the TV plan's known navigation limitation, see
+[the host soak guide](apple-tv.md#unattended-soak).

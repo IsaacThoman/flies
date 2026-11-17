@@ -34,14 +34,19 @@ to the shorter side, and at least 1.25 CSS pixels on a touch screen, so that
 a finger has room) inside the screen's safe area, and comes out exactly where
 it always was on the TV.
 
+The picnic examples below describe its own landscape and objects; the
+frame, two-pass renderer and quality policy are shared by the other places.
+
 The backdrop (sky, clouds, hills, lollipop trees, lawn, daisies,
 lake) and the table are two passes with their own depth ranges. Static things
 are merged by material into a handful of meshes with vertex colours and frozen
 matrices (the crumbs, pips and saucer go into those too, and the small things'
 contact shadows are one merged mesh); seeds, sugar grains, dew, trees,
-daisies, clouds, bubbles, fireflies, puffs and food are instanced. Rain is
-three draws, only while it rains: the streaks (one quad a drop, placed and
-moved entirely in the shader from the time), the splashes (a pool of 56, each
+daisies, clouds, bubbles, fireflies, puffs and player-dropped food are instanced. Static food is
+batched; found juice and crumbs use ordinary meshes. Rain has three meshes
+whose visibility follows rainfall, live splashes or remaining wetness:
+the streaks (one quad a drop, positioned in the shader from shared offset
+and fall uniforms that JavaScript updates), the splashes (a pool of 56, each
 a ring and a crown of droplets, one instanced draw) and the beads on the fruit;
 the table's own beads and puddles are in its shader, as many as there are
 pixels for. The ripple round food that has just landed is one draw for under
@@ -52,8 +57,8 @@ The footprints are one instanced draw while any are left (at most 128, two
 triangles each), multiplied into what they lie on, so they need no light; a
 print is written only when a foot is set down, and fades in the shader.
 Menus and hints are one 2D canvas drawn over the frame,
-uploaded only when something on it changes (at most 30 times a second; the
-in-game shimmer at 10).
+uploaded when its content changes, normally throttled to 30 times a second
+(the in-game shimmer at 10); resizing can force an immediate redraw.
 
 Measured in Chromium on an M-series Mac (Settings → Picture → Frame stats shows it live,
 and the canvas's `data-calls`, `data-triangles`, `data-frame-ms` and
@@ -65,7 +70,9 @@ and at most 256 triangles, and about 7 µs of JavaScript a frame in V8's
 interpreter); on a
 frame the eyes refresh, about 70 draws and 280,000 triangles (the most the
 end-to-end run sees is about 85 draws and 300,000), the eyes' own part about 45
-draws and 1.5 to 2.5 ms (mostly the read-back). JavaScript per frame about 1 to
+draws and 1.5 to 2.5 ms in that historical run. Current readback is
+asynchronous: the CPU metric counts rendering/submission and facet sampling,
+not the intervening GPU wait. JavaScript per frame about 1 to
 2.5 ms in the browser. The corner picture of what it sees (in the screensaver,
 or always) is one more draw (its panel and every facet are instances of one
 quad, drawn with the menus) and about 3,500 triangles, with no measurable

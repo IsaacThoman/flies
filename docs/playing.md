@@ -37,7 +37,7 @@ Pointing, the screen itself is what you press, and there are no button hints:
 | Round the fly | Drag anywhere but with the feather or the air in hand on the table (they go where the finger goes); or drag with two fingers. | Drag (the same), or drag with the right or middle button anywhere. A trackpad's sideways scroll. |
 | The camera back | Double-tap the air. | Double-click the air. |
 | Tools | Tap one on the shelf. | Click one; the wheel over the shelf steps along it. |
-| Menus | Tap a row, a tab, a choice's arrows; a slider follows the finger. The round button at the top left, or a tap outside the pane, goes back. | The same, and a right click goes back. Hovering only brightens what is under the cursor: the focus ring is the remote's and the keys'. |
+| Menus | Tap a row, a tab, a choice's arrows; a slider follows the finger. The round button at the top left, or a tap outside a submenu pane, goes back. Outside taps on the root menu do not dismiss it. | The same, and a right click goes back. Hovering only brightens what is under the cursor: the focus ring is the remote's and the keys'. |
 | The menu | The round button at the top left. | The same. |
 
 ## Keyboard and game pad
@@ -54,16 +54,17 @@ stick turns the camera round (pressed in, gives it back), the triggers bring
 it in and take it out as far as they are pressed; its hints are drawn as its
 buttons. A pad that can
 rumble (`apps/web/src/haptics.ts`) is felt in the hand: a tick when food is
-dropped and a softer one when it lands, a swell as the ball dives, two quick
+dropped and a softer one when it lands, one longer rumble when the ball is thrown, two quick
 knocks when a press can't do anything, light pulses while the feather is on
 the fly, a low one while you blow, and a knock when the fly takes off. A
 phone that can vibrate (Android) buzzes for the same; the iPhone and iPad app
 plays its own haptics. Settings → Picture → Rumble turns the pad and Android
 rumble off; it starts on and is kept between launches. It is never felt in
 the screensaver. The hints always
-show the thing last used, and the screen hides the system's cursor, text
+show the thing last used, and the screen suppresses text
 selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
-and scrolling.
+and page scrolling. The cursor is hidden over the world, but menus, HUD
+buttons and orbit drags use their own system cursor shapes.
 
 ## Tools
 
@@ -81,7 +82,8 @@ world and the camera; Left and Right go along all of them. Hints in the
 corners show what the buttons do, until they have been used: the shelf's goes
 once you have gone along it, and what Select does with a tool once you have
 used it (held it, for Tickle and Blow), on later launches too. The way to the
-menu, and how to move your hand while it waits by the fly, always show.
+menu and moving your hand are not permanently learned away; they still
+depend on Button hints, the device and the HUD being visible.
 Turning Settings → Picture → Button hints off and on again brings them all
 back. A caption at the top says what the fly is doing.
 
@@ -99,14 +101,14 @@ behind its side, with the table, the fruit or the place's view (the picnic's lak
 about twice that, Wide about a third. It keeps its place round the fly and
 moves only when it has to (the fly has turned its back for more than a
 second, something is in the way, or there is fruit or a jar to have behind
-it), never crossing over the fly when it can help it. Every move is a
-critically damped spring, so nothing overshoots or pops; walking it keeps
+it), never crossing over the fly when it can help it. Ordinary tracking uses critically damped springs; cuts, manual yaw and
+collision shortening can be immediate. walking it keeps
 pace a little ahead, and in a jump it pulls back, widens and whips round
-after the fly. It is never inside anything, nor closer to the fly than most of
-the shot's distance. With the ball in hand it goes round to the side across the
+after the fly. Collision checks try to keep it outside solids, taking precedence over
+the desired shot distance; in tight spaces it can come much closer. With the ball in hand it goes round to the side across the
 fly from where the ball will come, so the dive is seen past the fly. Behind the
-loading screen and the menu it keeps the fly small and to the left, clear of
-them.
+loading screen and the menu it frames it around the title/menu layout: small and left on wide screens,
+more central on tall ones.
 
 You can take the camera from the cameraman. Closer and farther is one smooth
 range, from the facets of the fly's eyes out to the whole table (where it
@@ -130,12 +132,15 @@ fly and follows it: the screensaver. A mouse resting on the desk doesn't keep it
 away, and a nudge of the desk doesn't end it; a mouse moved as if meant does.
 Its camera can take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
-(Lively). Any press, touch, tap, click, key or deliberate move of the mouse
-brings the controls back and does nothing else.
+(Lively). A bound press, tap, touch or deliberate mouse move brings the controls
+back. One-shot presses and pointer taps are consumed; held Select or camera
+axes can act immediately on waking. On an idle title screen the title
+framing remains, and play-only corner pictures stay hidden.
 A small picture of what the fly's eyes see sits in a corner of the screensaver
 (Settings → On screen → Fly POV: off, in the screensaver, or always, the default, which keeps it in
 the top right while you play too), and under it a picture of its nervous
-system at work (Nervous system, the same choices). Each time the screensaver
+system at work (Nervous system, the same choices), above at bottom corners
+or beside it on short screens. Each time the screensaver
 moves on to a new shot, and at least once a minute, they fade out and come
 back together in the next corner, so none is left in one place long
 enough to leave a fixed bright image for hours. The corners aren't chosen: a picture pinned
@@ -151,10 +156,9 @@ Stats of: its brain, its day, both, or in and out) is a small panel of numbers, 
 figure and a word: the brain's spikes a second, neurons active and speed
 against real time (from the brain's meter), under
 a trace of its last twenty seconds; and, headed by what the fly is doing now
-(the HUD's caption, so it can be read in the screensaver too), its day: how far
+(the activity caption without the HUD's food-name suffix), its day: how far
 it has walked, its meals, its take-offs, and its time flying and grooming.
-The day is counted from what the fly's life did (`life.ts`: its legs' steps
-on its feet, a meal when eating starts, each leap into the air, each
+The day is counted from what the fly's life did (`life.ts`: its displacement while on its feet, including crowd pushes, a meal when eating starts, each leap into the air, each
 second it was flying or grooming), once each, kept across launches as
 `flies.day` and begun again at midnight. The panel sits across the screen
 from the other pictures, at the same edge (at the top left while you play),
@@ -167,25 +171,24 @@ its front legs, its wingbeat, and the light, the mean over every facet), and its
 command coming out (walk, steer, back up, escape, wings, groom, feed, sing),
 with the firing rate of the neurons each is read from (DNg100, the two DNa02s,
 MDN, DNp01, the flight motor neurons, DNg12, MN9, pIP10) in Hz: the senses beside the commands, under them on a narrow
-screen, or split in two on a short one. It is drawn again only when a figure
-or a bar it shows changes, at most four times a second.
+screen, or split in two on a short one. It redraws when displayed content or trace history changes, normally
+throttled to four times a second; layout changes can invalidate it immediately.
 
 ## Menu and settings
 
 There is one menu: the title at launch, and the same menu from play (Back,
 Play/Pause, or the button at the top left), with the fly living on behind it.
 It has **Play**, **Watch** (the screensaver straight away), **About**, and
-**Settings**: a row of tabs over each part of the game, every setting two
-steps from the menu and none scrolling: **Screensaver** (when it starts, how
+**Settings**: a row of tabs over each part of the game, settings grouped by subject: **Screensaver** (when it starts, how
 its camera films, where the fly lives, and, on an Apple TV that can tell,
 the real weather), **On screen** (everything that can show over the world:
 what it sees, its nervous system and its stats in the corners, what the
 stats are of, the corners' size and opacity, and the X-ray), and **Picture**
 (pixel size, the eyes' detail, button hints, rumble, frame stats). It also has **Online**, rooms shared with others on the web, Apple TV,
-iPhone and iPad. The menu never scrolls
-either: on a screen too short for its rows (a phone on its side) they are
-in two columns, Left and Right going across, Up and Down along the list as
-ever. Where the settings' tabs are too
+iPhone and iPad. The root menu can use two columns
+on short screens; settings and Online lists can scroll when their rows do
+not fit. In the root menu's two-column layout, Left and Right go across, and Up
+and Down move along the list. Where the settings' tabs are too
 narrow to read (the smallest phones), they are one choice, the tab shown
 between arrows.
 

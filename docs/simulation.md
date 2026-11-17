@@ -54,11 +54,12 @@ contains its model and measurements.
 
 The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
 with thresholds, smoothing and hysteresis: walk above 0.3
-until below 0.15, back up when `back` beats `walk` by 0.15, take off as
+until below 0.15, back up when `back` is above 0.3 and beats `walk` by 0.15, then persist
+while `back` is at least 0.15 and no less than `walk`, take off as
 `escape` rises past 0.4 (the giant fiber at 80 Hz: why there, in `behavior.ts`), groom and wing poses above 0.2, feed above 0.15 until
 below 0.05, sing above 0.4 until below 0.2 and only on its feet (pIP10, the
 song command neuron: why there, in `behavior.ts`), commands older than 500 ms ignored). Steering is continuous: `turn`
-sets the yaw rate (3 rad/s at full turn walking, a third of that standing, 5
+sets the yaw rate (3 rad/s at full turn walking, about a third of that standing (0.35×), 5
 in the air).
 
 Things the body does that the brain did not decide, each written down where it
@@ -94,7 +95,8 @@ lives (`packages/body/src/motion.ts` unless noted):
   its mouth on it. Stopping is the brain's (sugar stops DNg100); the shuffle
   isn't.
 - **Other flies** (`packages/body/src/crowd.ts`, at a table with others:
-  `docs/online.md`). Two flies can't stand in the same spot: walking into
+  `docs/online.md`). Crowd separation is constrained by the world: a shove is rejected if it
+  cannot leave the fly standing somewhere valid, so overlap can remain. Walking into
   another fly's body it is pushed back out, so it stops against it or slides
   past, and flying into one it bounces off. Each device moves only its own
   fly, out of where it sees the others.
@@ -160,8 +162,8 @@ the model doesn't reproduce well enough to read, and no landing command is read
 from it. Without a brain (its commands stale) there is no reflex either.
 
 **The wings' own sensors** (`wingbeat`, The fly's senses) feel the strokes the
-floor makes as they would any others, so the reflex reaches the brain only
-through them, as a fly's own strokes would: no neuron is driven for it. They
+floor makes as they would any others, so its wingbeat feedback reaches the brain through them, as a fly's own strokes would: the floor is not injected directly into a neural readout. Flight also changes
+velocity and position, which reach wind, visual and collision senses. They
 raise the brain's own wing drive in the air, but never to the floor, so they
 changed no flight in those measurements; without the floor the sampled
 take-offs were short hops with them or without. They don't make the reflex any less needed, and its floor
@@ -175,7 +177,7 @@ throws each):
 | Without them | 29 of 32 flew: 1.5 to 1.6 s, 380 to 415 mm; the brain's `wings` 0.07 to 0.14, peaks 0.26 to 0.48 | 32 of 32 hopped: 0.05 to 0.10 s, 6 to 13 mm |
 
 With the floor each flight spends 0.78 s at power and the rest gliding, and
-lands on its feet. Nothing runs away: the wings fold the step it lands, and a
+lands on its feet. Nothing runs away: the wingbeat sense goes to zero on the landing step (the visible wing pose eases closed), and a
 second later the brain's `wings` is 0 to 0.12 with the floor or without it
 (as at rest). The brain alone, flying on its own drive as the body would
 without the floor, lets its wings down within half a second
@@ -191,12 +193,12 @@ back while it is in the air, and led ahead of it by up to 120 mm once it has
 been up for a quarter of a second (a hop is over by then), as it is led a
 little ahead of a walking fly. The caption says "Flying" and the
 stats count the time; the X-ray and the stats' In and out show the brain's own
-flight motor neurons, which the reflex reaches only through the wings' own
+flight motor neurons, which receive its wingbeat feedback through the wings' own
 sensors, so they glow only as much as the brain answers the strokes.
 
 ## The eyes
 
-`apps/web/src/eyes/eyes.ts` and `packages/body/src/vision.ts`. Every 50 ms
+`apps/web/src/eyes/eyes.ts` and `packages/body/src/vision.ts`. At the selected cadence
 (Settings → Picture → The fly's eyes: Low is 16×16 views at 20 Hz, High 32×32 at 30 Hz,
 Off sends no light) the world is rendered round the fly's head as six 90° views
 of a low-detail layer of the scene (sky, table, fruit and jars, ball, bubbles,
@@ -226,7 +228,8 @@ darkening, not brightening. It dives in low from the fly's front-right (higher
 over anything standing in its way, and round what it can't come in over, such
 as a window), where the connectome's looming pathway is strongest and where the
 fly is seen against the bright table, stops just short, hangs a moment and
-veers away on a side that is clear. It casts a shadow. With
+tries to depart on a clear side. Routing can graze obstacles or use a fallback
+when no clear path is found. It casts a shadow. With
 all that, measured in the game in a browser with the eyes on, two runs of 8
 throws at each time of day: the fly takes off from 11 of 16 at midday, 12 at
 golden hour, 11 at dusk and 9 at night; before the light adaptation, one run,
@@ -283,7 +286,9 @@ that draw the same model with the same glow, so they never disagree:
   while playing it keeps to the top right. It never shows over a menu or
   View → Fly's eyes.
 
-**The anatomy** (`packages/fly/src/nerves/`). The neuropils are measured from
+**The anatomy** (`packages/fly/src/nerves/`). Physical dimensions in this
+paragraph use the anatomy module's 2.4 mm reference body length; the game
+scales the model to 2.5 mm. The neuropils are measured from
 the FlyEM male CNS v1.0's own neuropil meshes (one male's brain, neck and
 cord in one EM volume, CC-BY 4.0) by `packages/fly/scripts/nerves.ts`, which
 writes `measured.ts`: each neuropil's surface as its radius in each direction
@@ -302,7 +307,8 @@ dataset is a CNS dissected out of the fly, so its brain–cord posture isn't
 the fly's: the two are placed separately and joined by a connective through
 the neck. The retina isn't in the dataset; it is drawn as a cup bent to the
 model's eye. The source cites 80–100 µm for biological retinal depth,
-but the rendered cup is thinner: at most 62.4 µm (0.026 body lengths),
+but the cup is thinner: 0.026 body lengths, 62.4 µm at the anatomy reference
+length of 2.4 mm or 65 µm at the game's 2.5 mm scale,
 thinning toward its rim. Nerves follow the
 literature and the dataset's nerve stubs: each leg's motor axons go as far as
 the tibia (there are no muscles in the tarsus), its sensory axons from the
@@ -370,8 +376,8 @@ strain sensors. A whole sensory region need not glow visibly when only a
 few of its neurons are active. The mushroom body, lateral horn, superior protocerebrum,
 antennal lobe and central complex fire under 2 Hz on a 5 Hz scale and stay
 nearly dark. A region glows with the mean of all its neurons, so a command
-carried by a few hardly shows: the giant fibre's escape is one neuron among
-660 descending ones, and what shows of an escape is the optic lobes, the
+carried by a few hardly shows: the giant-fibre command averages two DNp01 neurons, one in each side's
+descending region (662 neurons left, 654 right), and what shows of an escape is the optic lobes, the
 visual projection neurons and the motor neurons it sets going (the jump's
 are among the middle leg's). The cord's interneurons light their side's
 whole cord together, for now. The shapes are an anatomical drawing, not where

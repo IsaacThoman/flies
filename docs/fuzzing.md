@@ -23,11 +23,12 @@ npm run fuzz -- --kind body --place restaurant --seeds 1,2,3 --duration 21600 --
   body; every run also exercises the normal start. In a place with slabs a
   start also draws a height and stands on the surface at or below it, so
   starts fall on the floor under the tables, chair seats, table tops, the
-  bar, shelves and lamps alike. High starts also explore the window frame,
-  far above the documented flight ceiling, and in the restaurant the top
+  bar, shelves and lamps alike. The current windowsill frame is above even the high-start limit. In the
+  restaurant, high starts can explore the top
   shelves, the lamps and the exit sign.
 
-Reports are JSON lines on stdout, with life progress each simulated minute on
+The harness reports are JSON lines on stdout (`npm run --silent fuzz -- ...`
+suppresses npm's own banner), with life progress each simulated minute on
 stderr. Redirect stdout to keep summaries. A failure stops the run, naming the
 place, seed, step, simulated time, replay command and state. Body failures
 include the input and a single-step checkpoint; recovery failures identify
@@ -37,7 +38,7 @@ to small independent tests in `packages/body/tests/motion.test.ts`.
 
 The body fuzzer changes intents abruptly, including contradictory feeding,
 walking, backing and flight drives; varies frames from 10 microseconds to two
-seconds; blows gusts up to 600 mm/s; and starts elsewhere every simulated
+seconds; blows gusts with each horizontal component up to 600 mm/s; and starts elsewhere every simulated
 minute. Each step checks finite coordinates, velocities, normals and motion
 scalars, nonpenetration (its feet out of every solid, and its body's 1.3 mm
 over them clear of every underside, walking or flying), its reach (`checkReach`:
@@ -53,7 +54,8 @@ their chord. Dedicated regressions check thin walls and a grazing box corner,
 and what the body reaches at panes, walls, corners, a card thinner than its
 head, a slab's edge and a gap narrower than its legs (`packages/body/tests/reach.test.ts`).
 Every 30 simulated seconds, recovery probes remove wind and wings, require a
-landing inside 20 seconds, then try eight walking headings (3 seconds each)
+landing inside 20 seconds, then try up to eight walking headings (up to 3 seconds each, stopping at
+the first success)
 and take-off headings. At least one walking heading must travel 3 mm and at
 least one launch must rise 2 mm, except under something lower than that over
 its body, where walking out is the only way, and in a pocket it fell into
@@ -100,32 +102,20 @@ The windowsill used to have a 560 mm frame that could be sampled by high
 starts, letting a fly fall behind the window. The window and surrounding wall
 now extend to the kitchen ceiling (1350 mm), above the entire 660 mm flight
 excursion volume, matching the plaster already drawn above the opening.
-Room-wall tops are outside even the high-start domain. The former reproduction
-now passes:
+Room-wall tops are outside even the high-start domain. The regression case is:
 
 ```sh
 npm run fuzz -- --kind body --place windowsill --seeds 4 --duration 2017 --high-starts
 ```
 
-The basil's drawn leaves are also a separate scenery/collision design task.
+For the basil's visual/collision approximation, see [the place guide](places.md#the-world).
 
-The restaurant's pass is open through the back wall above its shelf, and
-beyond the wall nothing is modelled. A fly that goes through comes back
-across the shelf, which reaches 300 mm into the kitchen (past the 250 mm the
-checks allow beyond the floor), but one that drifts in the kitchen past the
-shelf's end falls down the wall's kitchen side and hangs there against it,
-with nothing beyond the floor to land on: put there, it fails the recovery
-probe. The body runs have not reached it from the room yet. Its first find was a fly
-falling onto the steep outside of the bar's fruit bowl, through it into the
-zinc under it, which hung there rather than sliding off; then, with high
-starts, a fly drawn back over the floor across the pass's shelf, inside the
-wall's thickness, held for good against the plates stacked there, since
-the pull back is square to the floor's edge and the stack's side is round:
-it now slides round what stands in its way back. The diner's first was a
-take-off from under its high rail that went nowhere: a fly that rose into
-an underside stopped dead there, rather than going on along under it. All
-three are regressions in `packages/body/tests/slabs.test.ts`.
-
+The restaurant's pass opens onto a modelled kitchen bench between side
+walls (`packages/world/src/restaurant.ts`, `PASS.kitchen`). The old account
+of an unmodelled void beyond the shelf no longer describes this geometry.
+Regressions in `packages/body/tests/slabs.test.ts` cover sliding off the
+fruit bowl, moving around plates beyond the floor, and continuing along an
+underside instead of stopping dead beneath it.
 
 ## Ordinary-frame cost
 
@@ -140,3 +130,9 @@ so other tasks descheduling this busy machine do not inflate the results.
 These are Node measurements, not a measurement of JavaScriptCore on the TV.
 The benchmark extracts only source files into a temporary directory and
 removes them before exiting.
+
+The benchmark currently fails for `--baseline HEAD` (and the inspected
+`origin/dev`): its extracted motion imports shape helpers from a generated
+world entry that does not export them. This is a suspected extraction bug
+in `scripts/bodyCost.ts`; the command describes the intended comparison,
+not a successfully reproduced benchmark on this revision.

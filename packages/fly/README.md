@@ -23,10 +23,10 @@ measurements are in `src/anatomy.ts`; the shapes and colours in `src/body.ts`.
 | Part | Built from |
 | --- | --- |
 | Head | A wide capsule flattened at the back where it meets the thorax: orange frons between the eyes, pale face below, darker vertex and occiput. A short membranous neck joins it to the thorax. |
-| Compound eyes | Ellipsoid caps sunk into the sides of the head, deep brick red. The fragment shader draws a hexagonal lattice of about 900 facets, each a small dome that catches the light, and the **pseudopupil**: the dark spot where you look straight down the ommatidia, which follows the viewer across the eye. Both fade out by their screen-space derivatives once facets are smaller than a pixel, so the eye never shimmers. |
+| Compound eyes | Ellipsoid caps sunk into the sides of the head, deep brick red. The fragment shader draws a hexagonal lattice of roughly 1,180 cells per full eye cap (a decorative lattice, not the brain's facet map), each a small dome that catches the light, and the **pseudopupil**: the dark spot where you look straight down the ommatidia, which follows the viewer across the eye. Facet detail fades with screen-space derivatives below a pixel; the pseudopupil is not faded by that detail term. |
 | Ocelli | Three glossy amber domes in a triangle on a dark ocellar triangle on the vertex. |
 | Antennae | Scape, pedicel and the oval third segment hanging in front of the face, and the **arista**: a fine plumose bristle from the top of the third segment with branches above and below. Each antenna is a joint that twitches. |
-| Proboscis | Rostrum, haustellum and the two-lobed labellum with its food channels, each a joint. Folded up under the head at rest; extended it reaches the surface just in front of the head (the haustellum telescopes as far as it needs to), the lobes spread flat on the food and pulse. |
+| Proboscis | Rostrum, haustellum and the two-lobed labellum with its food channels, each a joint. Folded up under the head at rest; extended it reaches the surface just in front of the head (the haustellum telescopes within 0.6–1.5 times its nominal length), the lobes spread flat on the food and pulse. |
 | Thorax | A deformed ellipsoid: broad blunt shoulders, the scutum arching up behind the neck, flatter sternum. Tan, darker above, paler pleura, faint dorsocentral stripes. The **microchaetae** (the rows of tiny hairs) are a procedural pattern that fades out when small; the **macrochaetae** are real geometry: humerals, notopleurals, supra- and post-alars, dorsocentrals, katepisternals. |
 | Scutellum | A flattened lobe over the base of the abdomen with its basal bristles and the long crossing apical scutellars. |
 | Abdomen | Six visible segments (a male), each tergite ridged where it overlaps the next and dark along its back edge, A5 and A6 dark all over; pale pleural membrane and sternites underneath. Two joints, so it breathes, lifts in flight and bows when feeding. |
@@ -83,9 +83,9 @@ jumpy, gives continuous motion.
   decides when each leg lifts; stride length grows with speed (0.22 to 0.5
   body lengths) and the swing stays short (30–100 ms) while the stance
   varies, as in insects. Planted feet are carried backwards by exactly the
-  motion the pose says the body makes, so if the game moves the fly by
-  `speed` and `turn` they do not slide (the tests check this to 1e-9 at
-  several speeds, turning and backwards). A swinging foot lands where the
+  motion the pose says the body makes, the standalone gait tests check this to 1e-9 at several speeds, turning
+  and backwards. The full rig smooths motion; its settled solved-claw test
+  permits less than 0.004 body lengths of slip. A swinging foot lands where the
   coming stance will be centred on its home; turning shortens the inside
   steps by itself, and walking backwards lands feet behind home. A fly that
   stops takes a few settling steps back to its homes and stands still.
@@ -97,8 +97,9 @@ jumpy, gives continuous motion.
   stretched to; each leg also has a reach the gait keeps its feet within.
 - **Standing**: the abdomen breathes, the head glances about, the antennae
   twitch, and now and then a foot shifts. This is animation, not behaviour:
-  it never moves the fly, and it fades out whenever the pose asks for
-  anything.
+  it does not move the body through the world. Activity suppresses glances
+  and new foot fidgets; awake antenna twitches and abdominal breathing can
+  continue. Sleep suppresses the idle glances and fidgets.
 - **Grooming**: the front legs leave the ground for the head and alternate
   between sweeping over the eyes (top-back to the face, the head bowing and
   rolling into each sweep) and rubbing against each other under the face.
@@ -140,7 +141,8 @@ follows the number of objects and draw calls. So:
   4×4 matrix per bone, an inverse-bind multiply and a bone texture upload,
   all in JavaScript; and over a CPU rewrite of the vertices because that
   costs thousands of vertices of JavaScript. Here the per-frame JavaScript
-  is a few hundred multiplies on typed arrays, and there is no scene-graph
+  uses typed-array frame calculations (the 16 wing-copy frames alone use
+  at least 1,296 scalar multiplications in the ordinary rest pose), and there is no scene-graph
   node per joint.
 - **Nothing allocated per frame.** All scratch is preallocated; the tests
   run the update in V8 with its compilers off and check that it allocates
@@ -151,10 +153,11 @@ follows the number of objects and draw calls. So:
   clearcoat and sheen come per vertex. When the scene has no environment
   map the shader reflects a soft painted sky with a studio "window", so the
   cuticle and eyes stay glossy under any lights; with one, it uses that.
-- **Thin parts stay at least a pixel wide.** Tubes (legs, arista, bristles)
+- **Thin parts stay at least a pixel wide.** Non-hair tubes (such as legs)
   carry their axis and radius; the vertex shader measures the radius in
   pixels and pushes the surface out to about half a pixel if it is thinner,
-  so legs never break into dots in a 640×480 frame without antialiasing.
+  to reduce leg breakup in a 640×480 frame without antialiasing.
+  Hairs, including bristles and arista branches, instead shrink/fade.
   The viewport height comes from `onBeforeRender`.
 
 ## Budgets
@@ -170,8 +173,8 @@ follows the number of objects and draw calls. So:
 
 ## The viewer
 
-`npm run fly:viewer` serves `viewer/` on port 5287: sliders for every pose
-value, presets for each behaviour, a turntable, slow motion, a fixed 30 or
+`npm run fly:viewer` serves `viewer/` on port 5287: numeric sliders for the pose except `sing`, an airborne checkbox,
+presets excluding song, a turntable, slow motion, a fixed 30 or
 60 fps step (to judge the wing blur), the environment map and shadows on or
 off, and the **in-game view**: a 640×480 buffer with no antialiasing,
 stretched to 16:9 like the TV, with the fly a chosen number of pixels long.

@@ -2,12 +2,7 @@
 
 Historical timings and trial counts have [measurement provenance](measurements.md).
 
-The fly can live in more than one place, and the player can carry it between
-them (the Place tool, or Settings → Screensaver → Where it lives, which carries it
-once the choice rests a second or the row is left, not to each place stepped
-past; "Each in turn" moves it on after 20 minutes of screensaver). It is the same fly with the same brain, running
-on: the world fades to black, the new place is built behind the veil, and the
-fly is set down where that place starts it.
+For selecting a place and screensaver rotation, see [the world guide](world.md).
 
 A place is two things, kept apart on purpose:
 
@@ -16,8 +11,8 @@ A place is two things, kept apart on purpose:
 | Its world | `packages/world/src/<place>.ts`, a `Place` | Exactly what the fly's body meets: the table top, what stands on it, its food, where the fly starts, how high it may fly. No three.js. |
 | Its scene | `apps/web/src/places/<id>/index.ts`, a `Scene` | How it looks: its light through the day, the table and everything on it, everything beyond, the camera's view of the whole place. |
 
-The scene is built from the world's description, so that what the fly stands
-on is exactly what is drawn. `apps/web/src/places/types.ts` is the contract;
+The scene is built from the world's description, so that the main visible shapes and collision geometry share their
+dimensions. Fine decoration and rough surfaces can still be approximations. `apps/web/src/places/types.ts` is the contract;
 the picnic (`packages/world/src/picnic.ts`, `apps/web/src/places/picnic/`) is
 the worked example.
 
@@ -50,7 +45,7 @@ room over its feet (`FLY_HEIGHT`, up to its folded wings).
   (`{ kind: "rect", hx, hz }`, half-sizes). The fly can't walk off it, and in
   the air it is drawn back over it once past its edge.
 - **Solids** are a footprint (circle, ellipse or box, turned by an angle) and
-  a top (flat, a dome, or a dish). Without a `bottom` a solid is a column
+  a top (flat, a dome, a dish, or a vault rounded across a box). Without a `bottom` a solid is a column
   standing on the floor. With one it is a slab, solid only from its bottom up
   to its top, with air beneath it: a table top on its legs, a chair seat, a
   shelf, a lamp. Its top's heights stay absolute, and a dish slab's outside
@@ -78,8 +73,8 @@ room over its feet (`FLY_HEIGHT`, up to its folded wings).
 Over one point there can be several surfaces, one above another (the floor,
 a chair seat, the table top over both), so the world's questions about a
 point say which by a height (`packages/world/src/world.ts`): `surface` and
-`heightAt` give the highest surface at or below one, and how far the air over
-it goes (`underside`); `underside` where the air over a height ends;
+`heightAt` select the highest surface at or below one. `surface` also
+reports the normal and air clearance (`underside`); `heightAt` returns only height; `underside` where the air over a height ends;
 `solidAt` whether a point is inside anything; `topAbove` where a point inside
 something comes out at the top; `wallNormal` the way out of whatever fills a
 band of heights; and `raycast` meets tops from above, undersides from below
@@ -95,8 +90,8 @@ body over them: an underside stops it with its body just under it and
 bounces it back down, and it goes on along under it; it lands on what it
 comes down onto from above (the top within a step under its feet, or of
 what its feet went into), never on something it is under; beside a slab it
-falls past it. Under something less than 2 mm higher than its body, it can
-only walk out.
+falls past it. The [recovery probe](fuzzing.md) requires only walking recovery when an
+underside is less than 2 mm above its body; that is not a runtime ban on take-off.
 
 Its body reaches past its feet: its head and its abdomen's tip half a body
 length ahead and behind, its thorax's sides, and on its feet its six legs,
@@ -117,20 +112,24 @@ So nothing it can reach may be closer to a wall than that: a gap narrower than
 the fly's legs is a gap it only stands in with its legs against both sides.
 
 The world files every solid in a grid of flat arrays, its cells 32 mm or,
-in a bigger place, doubled until there are no more than 16,384 of them (the
-restaurant's are 64 mm); a solid over more than 1,024 cells (the
+in a bigger place, doubled to target at most 16,384 of them (the
+restaurant's are 64 mm). Inclusive border cells can exceed that target: a
+4,096×4,096 mm rectangle allocates 16,641 cells at 32 mm. A solid over more than 1,024 cells (the
 restaurant's ceiling) is instead on a short list every query checks. A ray
 walks the cells it crosses, nearest first, so a long one costs what it
 passes. Circles and boxes at angle 0 are the cheapest footprints and flat
 the cheapest top; a ray finds a dome or a dish by sampling it, so keep big
-things flat. `World.load` files the restaurant's 415 solids in about a
-tenth of a millisecond in desktop Node.
+things flat. `World.load` was measured filing the then 415-solid restaurant in about a
+tenth of a millisecond in desktop Node; the current world has 430 solids.
+The timing is historical, with capture date and exact machine unrecorded.
 
 A round thing lying on its side (the windowsill's alarm clock) is a row of thin
 flat-topped boxes following its curve to a fraction of a millimetre. Don't let
 domes overlap so that they leave a hollow where they meet: a falling fly can
 be caught in it. A plant's leaves can't have air under them: the windowsill's
-basil is a solid crown the fly lands on, with every leaf drawn within it.
+basil is a solid crown the fly lands on. Leaves are clipped near that crown
+(with up to 1 mm drawing allowance) and its flowering tips, rather than
+modelled as separate walkable leaves.
 
 Anything drawn but not in the world must be flat enough not to matter to a fly
 (under half a millimetre, like the picnic's specks of biscuit), or out of its
@@ -140,13 +139,13 @@ reach (beyond the floor's edge, above it, or in the backdrop).
 
 - **Two passes** (`apps/web/src/stage.ts`): the set (`buildSet`, from 0.5 mm to
   4 m from the camera, or its camera's `reach`) is drawn over the backdrop
-  (`buildBackdrop`, from 200 mm to 3,000 km). Indoors, a room's far walls, a
+  (`buildBackdrop`, from 200 mm to 3 km). Indoors, a room's far walls, a
   window's view, a bar's lights can all be backdrop.
 - **Light** (`palettes`): the five times of day. Chosen on the Light tool, the
   light eases to one and holds it; on "Now" it follows the clock between them
   (`apps/web/src/scene/light.ts`, `clockLight`): each palette's colours are full at its
   hour (morning 7:30, midday 10:30 to 15:15, golden 17:45, dusk 20:00, night
-  21:30 to 4:30, and dawn borrows dusk's colours at 5:55). Where the dusk
+  21:30 to 4:36, and dawn borrows dusk's colours at 5:54). Where the dusk
   palette's sun is low (`sunUp` under 0.25: it is setting), the sun rises from
   under the horizon on the morning's bearing, passes through each day
   palette's place at its hour and sets past dusk's, and the night palette's
@@ -172,7 +171,8 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   horizon and the haze. Showing it in the place itself is up to the place,
   and optional: `SceneSet.update` and `SceneBackdrop.update` are handed the
   `Weather` (`cloud`, `mist`, `rain`, `wet`, `wind`, each 0 to 1, and its
-  `kind`) as their last argument, which a place that ignores it can leave off.
+  `kind`). The set receives `(time, light, weather, camera)`, the backdrop
+  `(time, camera, light, weather)`; implementations may omit unused trailing arguments.
   A windowsill can run rain down its pane by `rain` and leave it streaked by
   `wet`; the picnic's rain, wet table, overcast deck, mist and rainbow are
   worked examples (`apps/web/src/places/picnic/rain.ts`, `table.ts`, `backdrop.ts`), and
@@ -234,25 +234,27 @@ TV has (`places/restaurant/`):
   chairs and what is on it, the bar in three lengths, the back bar in two,
   the pass, the host's stand, the service station, the banquette in two, the
   window's ledge. Each area's detail is merged by material into a mesh or two
-  of its own, drawn only while the camera is within 650 mm of it.
+  of its own, shown when the camera comes within 650 mm of its bounding box and
+  retained until it is more than 800 mm away (150 mm of hysteresis).
 - **Two levels of detail.** Every area also has a stand-in: its things at
   their felt shapes, few-sided (a few hundred triangles a table), merged with
-  the room's shell (floor, walls, ceiling, the shop front) into one room-wide
-  mesh, always drawn. Each stand-in vertex carries its area in its `kind`
+  the room's shell (floor, walls, ceiling, the shop front) into room-wide
+  meshes by material, principally opaque plus clear geometry, always drawn. Each stand-in vertex carries its area in its `kind`
   (kind + 128 × area), and a uniform mask of the areas in detail folds their
   stand-ins away in the vertex shader. Each frame is a loop over the areas'
   distances from the camera, a few `visible` flags and the mask: no rebuilding
-  and no draws for what is far away (`set.ts`). `SceneSet.update` is handed the
+  and no area-detail draws for distant areas (`set.ts`). `SceneSet.update` is handed the
   camera for this.
-- **One material, kinds in the shader.** Everything solid in the room is one
-  physical material and everything clear another; what each vertex is made of
+- **One material, kinds in the shader.** Merged solid fabric and area detail use one
+  physical material and their clear geometry another. Separate materials
+  handle the eye layer, shopfront glass and glows; what each vertex is made of
   (marble, oak, zinc, the floor's penny rounds, the tin ceiling...) is its
   `kind`, shaded in the fragment shader from where it is in the room, so a
   whole area is one or two draws and the detail is in the shader, crisp close
   up and faded where a pixel can't show it (`kinds.ts`, `surfaces.ts`). The
   room is built in parts, each owning the world's solids it draws and a range
   of kinds of its own (`parts.ts`).
-- **The eyes' stand-in.** The fly's eyes see the room-wide mesh again, with
+- **The eyes' stand-in.** The fly's eyes reuse the room-wide opaque geometry, with
   nothing folded away and the shop front's openings bright: the big shapes,
   six times a refresh, so it is kept lean.
 - **Reach.** `SceneCamera.reach` (mm, 4,000 if not said) is how far the
@@ -268,25 +270,27 @@ TV has (`places/restaurant/`):
   glass doors, the exit sign, the heat lamps and the kitchen through the pass
   as more rectangles, the one pendant left on over the bar as a lamp with its
   highlights. The tables, chairs, stools and the zinc shadow the sun, the
-  street lamp and the pendant as blocks; the things of the area the camera is
-  in shadow them exactly, as upright columns (`light.ts`); soft shadows on
+  street lamp and the pendant as blocks. In the nearest eligible lit area
+  within 650 mm, up to 16 tall solids add approximate circular-column
+  shadows (`light.ts`); soft shadows on
   the floor under everything are painted once from the layout.
 - **Built in steps.** The whole room is several times the picnic's work to
   build, so it is built a part a frame behind the veil (`SceneSet.more`): the
-  game holds the veil until it is done, and no one frame is longer than the
-  picnic's whole build. Then each part of it that is hidden (an area's
+  game holds the veil until it is done. Each synchronous build step is
+  measured separately; this does not bound a complete frame against the picnic. Then each part of it that is hidden (an area's
   detail) is drawn once behind the veil, a frame each, so its buffers are on
-  the GPU before the veil lifts: nothing is uploaded when the camera first
-  comes near it, and what the place holds on the GPU is the same however the
-  camera has gone (the browser soak checks it, `docs/web-soak.md`).
+  the GPU before the veil lifts. This reduces arrival uploads; it does not
+  prove that every later shader variant or allocation is already present.
+  [Browser soak](web-soak.md) compares matched resource checkpoints.
 
 ## Rules
 
 - **Through the senses, never around them** (`docs/architecture.md`). Anything
   in a place that moves (a gust, a drip, a shadow) reaches the fly only through
   what it can see, feel or taste (`Felt`, the pantry, its eyes), and the brain
-  decides what to do about it. Nothing is aimed or timed at the fly: things
-  that move may keep clear of it, but not seek it.
+  decides what to do about it. Visitors are not aimed or timed at the fly and may keep clear of it.
+  Rain is an explicit local-sampling approximation: nearby splashes and
+  direct hits are generated around its position and reach it as touch.
 - **The Apple TV's budget.** JavaScript costs about 16 times what it does in a
   desktop browser, and the cost follows objects and draw calls. Merge static
   things by material (`Batch` in `apps/web/src/scene/build.ts`), instance

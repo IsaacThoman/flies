@@ -12,12 +12,12 @@ current performance claim.
 | --- | --- | --- |
 | [Frame cost](rendering.md#frame-and-cost), [flight and vision](simulation.md#flight) | `11f3a15`, 16 November 2026 | Chromium on an M-series Mac for the frame; Node/browser for flight and vision; exact model not recorded |
 | [World queries and build cost](places.md#the-world) | `1c8354f`, 16 November 2026 | Desktop Node/Chromium; exact machine not recorded |
-| [Browser comparisons](web.md#measured) | `ac957d9`, 16 November 2026 | M5 Pro, shared under load; browser versions and throttling are beside the tables |
+| [Browser comparisons](web.md#measured) | `ac957d9`, 16 November 2026 | M5 Pro, shared under load; WebKit 26 and throttling are recorded; the Chromium version was not retained |
 | [Native brain speed and memory](../packages/brain-native/README.md#speed-and-memory) | `7d452a3`, 16 November 2026 | Apple M5 Pro, one thread, release C++; TV figures there are estimates |
-| [Neuron engine](../packages/brain/README.md#neuron-model), [region cost](../packages/brain/README.md#cost-1) | `11f3a15`, 16 November 2026 | M5 Pro; parameters, stimuli and seeds are beside the tables |
+| [Neuron engine](../packages/brain/README.md#neuron-model), [region cost](../packages/brain/README.md#region-readout-cost) | `11f3a15`, 16 November 2026 | M5 Pro; workloads are described; scripts supply default seeds, while capture seeds were not recorded |
 | [Fly update cost](../packages/fly/README.md#budgets) | `d91c8dd`, 16 November 2026 | Node with JIT and V8 interpreter; exact machine not recorded |
 
-[Apple TV](apple-tv.md#checking-it) and [iOS](ios.md) retain their own dated,
+[Apple TV](apple-tv.md#device-and-simulator-checks) and [iOS](ios.md) retain their own dated,
 named-device measurements. CPU budget thresholds are separate from historical
 wall-time observations: `scripts/cpuBudget.ts` calibrates them in M5 Pro CPU
 milliseconds, and tests run the budgets serially.

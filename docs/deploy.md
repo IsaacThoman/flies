@@ -3,7 +3,8 @@
 The web image builds the web game and serves only `dist/` with Caddy. Node
 runs during its build, never in the web container; the room server for
 tables with others is a second, small Node service (below). Both `linux/amd64` and
-`linux/arm64` are supported. Nothing is deployed by the repository itself.
+`linux/arm64` are supported. Repository CI does not deploy this web/rooms stack; the separate
+[release workflow](release.md) can upload Apple apps.
 
 There are two ways to run it. [Coolify](#coolify) builds and runs
 `compose.yaml` behind its Traefik, for production and for each pull request.
@@ -47,8 +48,8 @@ Coolify v4 with its default Traefik proxy.
 
 Traefik passes the WebSocket upgrades on `/rooms` without settings, and its
 idle limits don't close a table: the room server pings every connection each
-15 s. Its tables are in the volume Coolify names `<uuid>_rooms-data`
-(Persistent Storage). Keep it across deploys, and don't tick volume deletion
+15 s. Its tables are in the volume assigned to Compose's `rooms_data` (Persistent Storage). Use the
+actual name shown there rather than assuming a prefix or separator. Keep it across deploys, and don't tick volume deletion
 if you delete the resource.
 
 If Cloudflare reaches the server over plain HTTP (a tunnel to port 80, or
@@ -61,11 +62,12 @@ Turn on **Preview Deployments** in the resource's settings, with a URL
 template under a wildcard DNS name, such as `{{pr_id}}.flies.example.com`.
 Each pull request's preview gets its own build at its own address (baked in
 as its `SERVICE_URL_WEB`), its own containers and network, and its own empty
-rooms volume, `<uuid>_rooms-data-pr-<n>`. Coolify renames a preview's
+rooms volume. Check its actual name in Persistent Storage. Coolify renames a preview's
 services `<name>-pr-<n>`, and its `web` reaches `rooms-pr-<n>`, read from
 `COOLIFY_BRANCH` (the Caddyfile), never production's rooms. Closing the pull
 request removes the preview's containers but leaves that volume; remove it
-with `docker volume rm <uuid>_rooms-data-pr-<n>`.
+by its actual volume name once the preview is gone. Do not infer that
+name from the production volume or delete a live room volume.
 
 ## First start
 
@@ -198,7 +200,7 @@ docker image tag flies-rooms:local flies-rooms:rollback
 git pull --ff-only && docker compose up -d --build --wait
 ```
 
-The second line is the update command. npm dependencies and the fetched brain
+The last command updates both services. npm dependencies and the fetched brain
 are separate cached layers, so ordinary game edits do not download them
 again. The brain layer includes `anatomy.bin`: its packer uses only npm
 dependencies, and both public downloads are hash checked. A failed download
@@ -265,7 +267,7 @@ has no public port, and no `depends_on`: the site works while it is down
 ```sh
 docker compose ps                    # rooms should be healthy too
 docker compose logs --tail=100 rooms # one JSON line an event
-docker compose exec rooms wget -qO- http://127.0.0.1:3000/health
+docker compose exec rooms wget -qO- http://127.0.0.1:3000/health # adapt 3000 if ROOMS_PORT differs
 ```
 
 It keeps its tables in the `rooms_data` volume (`/data/tables.json`), written
@@ -274,13 +276,15 @@ and, for a locked one, a salted scrypt hash of its password (never the
 password; nor does the log ever have one). Tables kept by an older server
 are read as they are, unlisted and without a password. A new protocol (3,
 for rooms) reaches open tabs as a refusal they answer by reloading into the
-new site, once. Rolling the rooms back past it forgets nothing, but an older
-server would let anyone with a locked room's link in. An update restarts it with SIGTERM: it writes
+new site, once. Before rolling rooms back past protocol 3, back up `rooms_data`. An older
+server admits anyone with a locked room's link and discards room names,
+listing choices and password hashes when it next saves. Codes and seats
+can survive, but that metadata does not. An update restarts it with SIGTERM: it writes
 the tables, tells every connected device it is restarting, and the devices
 reconnect to their tables within a couple of seconds. Keep `rooms_data`, and
-do not run `docker compose down -v` on the server: deleting it forgets every table and every invitation. The
-only optional setting is `ROOMS_PORT`, the internal port, which Caddy and the
-service both read. Browsing the list of rooms uses the same `/rooms`
+do not run `docker compose down -v` on the server: deleting it forgets every table and every invitation. `ROOMS_PORT` is the common internal-port setting read by Caddy and
+the service; other host, proxy and build settings are listed in
+[the environment example](../.env.example). Browsing the list of rooms uses the same `/rooms`
 WebSocket, so nothing about the proxy changes for it. Memory and CPU are
 small: it relays about 1 KB/s up and 7 KB/s down per player at a table of
 eight. Rolling back works as for the site: tag `flies-rooms:local` as `flies-rooms:rollback` before an update.

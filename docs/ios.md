@@ -2,12 +2,14 @@
 
 `apps/ios` is the game on an iPhone or an iPad: the web build, unchanged, in a `WKWebView` that
 fills the window, served from the app's own bundle through a custom URL scheme. No local server,
-and no network except a table's line to its room ([Tables with others](#tables-with-others)). The brain is the browser's, in a Web Worker: `packages/brain-native` built as
-WebAssembly on iOS and iPadOS 18.4 and later, `packages/brain` before that. The app itself is a
+and game networking only to the room service, including browsing its list ([Tables with others](#tables-with-others)). The brain is the browser's, in a Web Worker: `packages/brain-native` built as
+WebAssembly when its exception feature test passes, otherwise `packages/brain`.
+The current app targets iOS 26 and later; this is not an older-iOS app option. The app itself is a
 small Swift shell that does what a host should: it serves the page, tells the game the safe area,
 stops it when it can't be seen, decides when the screen may sleep, and adds haptics. It draws
-nothing of the game and knows nothing of it beyond the state the game publishes on its canvas for
-scripts and hosts.
+nothing of the game. Outside optional reporting/launch diagnostics it reads
+the published canvas state; those diagnostics can also inspect game internals
+and apply settings.
 
 iOS has what tvOS lacks: a public WebKit with a JIT, WebGL 2 and module workers. So the iPhone
 and iPad run the same game the browser does, and there is one game for the web, the phone and
@@ -115,7 +117,7 @@ again through the same handler.
 | --- | --- | --- |
 | Seen, playing | Runs | Sleeps as the phone's Auto-Lock says (touches keep it awake) |
 | Seen, the screensaver, on a charger | Runs | Kept on |
-| Seen, the screensaver, on battery | Runs | Kept on for 10 minutes after the last touch, then Auto-Lock |
+| Seen, the screensaver, on battery | Runs | Kept on for 10 minutes after the screensaver begins, then Auto-Lock |
 | Seen but not in focus: an iPad window beside another app's, Control Center or Notification Center over it, the app switcher | Runs | As above |
 | Low Power Mode | Runs (WebKit holds a page's animation frames to 30 a second then) | As the phone's Auto-Lock says |
 | Hot (`serious`) | Runs | As the phone's Auto-Lock says |
@@ -140,8 +142,10 @@ after more than half a minute away the sky and the weather are put where the clo
 WebKit hides an app's page in the background by itself; the still is for the heat, when the app
 is still on screen (hiding the web view, `isHidden`, doesn't hide the page).
 
-The brain keeps one core busy and the world is drawn 60 times a second, so a phone that kept the
-screensaver on for as long as it liked would go flat in a few hours and grow warm doing it. On a
+The brain workload varies with its input, and rendering adapts between
+30 and 60 fps with cheaper eye sampling where needed. Leaving it running
+uses power and produces heat; physical-phone battery life has not been
+measured here. On a
 charger the screensaver is the point; on battery it is a glance. The page's own wake lock
 (`navigator.wakeLock`, which a browser tab uses) is refused inside an app's web view, so the
 app's policy is the only one.
@@ -154,8 +158,9 @@ the game again. Its settings are kept; the fly's moment is not.
 While playing (never in the screensaver, where nobody's finger is on the glass): a soft tap with the
 fly's own touch sense while the feather is on it (`data-touch` above 0.35 with `data-tool`
 `feather`: resting on it 0.4, stroking 1), and a knock when it takes off. Both follow the fly's published
-state, so they are what happened to the fly. They come up to 200 ms late (the canvas's state is
-published five times a second). Off with the Haptics switch in the app's page of the Settings app,
+state, so they are what happened to the fly. They are sampled roughly every 200 ms while frames run. Frame scheduling
+and the asynchronous host message can add delay, and brief touches may be
+missed. Off with the Haptics switch in the app's page of the Settings app,
 or with the system's own. The game's Rumble setting controls game pads and
 Android vibration; these native iPhone and iPad haptics use the Haptics switch.
 
@@ -325,7 +330,7 @@ and builds it. Release by default; `--debug` makes the page inspectable in Safar
   Store Connect adds iOS as a platform to the Apple TV app's record.
 - **Version**: `apps/version.yml`, included by both XcodeGen specs, so the iPhone, iPad and Apple
   TV apps are numbered together.
-- **Name**: "Flies", the game's own, as on the Apple TV and the web.
+- **Display name**: "flies", the game's own, as on the Apple TV and the web.
 - **Icon and launch image**: rendered from the game by the art pipeline (`scripts/art.ts`,
   `apps/web/src/art.ts`) into `assets/ios` ([assets/README.md](../assets/README.md)): the web
   app's icon (the fly close up on the napkin) at full size, with a night version for the dark
@@ -353,7 +358,8 @@ browser's cache holds of the brain, where the menu's first row is, and the app's
 power and thermal state, as `report {json}` on the console and in
 `Library/Caches/report.log` (replaced each launch), and as the value of an accessibility element,
 `fly-report`, for UI tests. The page's errors and console warnings are passed on as they happen.
-`-FlySettings <json>` changes the game's settings through its own code once it has started. The
+`-FlySettings <json>` changes the game's settings through its own code once
+it has started, only when `-FlyReport` is also positive. The
 report includes the table in the page's address; the canvas's state says how the line is
 (`data-online`), the seat, its colour, the reconnects and the others there. `-FlyRooms <url>`,
 `-FlyInvite <link>` and `-FlyInviteLater <link>` are in [Tables with others](#tables-with-others);
@@ -370,9 +376,10 @@ simulator, runs them, then shuts it down and deletes it:
   the page and script the game is given for one;
 - the UI tests, driving the app as a person would. `apps/ios/tests/ui/AliveTests.swift`: the brain is read
   from the bundle, wakes, and the title shows, with nothing of the brain in the browser's cache;
-  frames go on being drawn and the brain keeps real time; a tap on the title's first row starts
+  frames and simulated time keep advancing; the test reports speed without
+  requiring real time; a tap on the title's first row starts
   play; away for 6 s (another app over the whole screen), most of that time passes with the brain
-  stopped, and in front again it carries on at real time; a setting changed in one run, the app
+  stopped, and in front again it carries on advancing; a setting changed in one run, the app
   killed, is there in the next, and the relaunch again copies nothing of the brain into the cache.
   `apps/ios/tests/ui/TablesTests.swift`, against a room server the check starts on a port of its own, with a
   fake fly (`scripts/tables.ts`) starting each of two tables: the app, launched by the first
