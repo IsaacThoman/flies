@@ -9,7 +9,7 @@
 // back button, is Back.
 
 import type { RemoteButton } from "@fly/contracts";
-import { INK, font, glassPanel, hintChip, hintWidth, iconButton, text } from "@fly/ui";
+import { INK, font, glassPanel, drawGlyph, iconButton, text } from "@fly/ui";
 import type { ChoiceItem, FieldItem, GlyphSet, HitMap, Menu, MenuItem, Outcome, SliderItem } from "@fly/ui";
 import type { Frame } from "../../display.ts";
 import { backButton } from "../layout.ts";
@@ -215,15 +215,14 @@ export class MenuScreen implements Screen {
 }
 
 /** The hints every menu shows for the buttons in hand: how to move, choose and go back, along the foot of the safe area. None for a pointer. */
-export function drawMenuHints(g: CanvasRenderingContext2D, t: number, shell: { shape: Frame; glyphs: GlyphSet | null; settings?: { hints: boolean } }, back = "Back") {
+export function drawMenuHints(g: CanvasRenderingContext2D, _t: number, shell: { shape: Frame; glyphs: GlyphSet | null; settings?: { hints: boolean } }) {
   const set = shell.glyphs;
   if (!set || shell.settings?.hints === false) return;
   const { design, safe } = shell.shape;
   const y = design.height - safe.bottom - 26;
-  const gap = 10;
-  const total = hintWidth(g, "Move", 13, "upDown", set) + hintWidth(g, "Choose", 13, "select", set) + hintWidth(g, back, 13, "back", set) + 2 * gap;
-  let x = safe.left + (design.width - safe.left - safe.right - total) / 2;
-  x += hintChip(g, x, y, "upDown", "Move", t, 13, set) + gap;
-  x += hintChip(g, x, y, "select", "Choose", t, 13, set) + gap;
-  hintChip(g, x, y, "back", back, t, 13, set);
+  const gap = Math.min(72, (design.width - safe.left - safe.right) / 4);
+  const cx = safe.left + (design.width - safe.left - safe.right) / 2;
+  drawGlyph(g, "upDown", cx - gap, y, 25, 0, set);
+  drawGlyph(g, "select", cx, y, 25, 0, set);
+  drawGlyph(g, "back", cx + gap, y, 25, 0, set);
 }

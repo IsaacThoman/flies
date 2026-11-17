@@ -9,7 +9,7 @@ import type { LoadingLayout } from "./layout.ts";
 import { drawWordmark } from "./wordmark.ts";
 
 /** A brain that arrives over the network (worker-driver.ts): what the loading screen follows. */
-type Arriving = BrainDriver & { phase: "download" | "build" | "done"; progress: number; failure: BrainFailure | null; source: BrainSource; retry(): void };
+export type Arriving = BrainDriver & { phase: "download" | "build" | "done"; progress: number; failure: BrainFailure | null; source: BrainSource; retry(): void };
 
 export const arriving = (brain: BrainDriver): brain is Arriving => "source" in brain && "phase" in brain;
 
@@ -63,9 +63,8 @@ export function drawLoading(g: CanvasRenderingContext2D, t: number, brain: Brain
     g.fillStyle = "#9ee8ff";
     g.fill();
   }
-  const button = { x: cx - 65, y: y + 90, w: 130, h: 32 };
-  pill(g, button.x, button.y, button.w, button.h, "Explore", { focused: true });
-  hits.add(LOADING_HITS.explore, button.x, button.y, button.w, button.h);
+  pill(g, cx - 65, y + 90, 130, 32, "Explore", { focused: true });
+  hits.add(LOADING_HITS.explore, cx - 65, y + 90, 130, 32);
 }
 
 /** What to say for each way it can fail: a heading, and a line on what happens next. */

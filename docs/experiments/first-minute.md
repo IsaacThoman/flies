@@ -68,7 +68,7 @@ records actual capture times, and waits for the title. A separate gated-download
 e2e checks early exploration and completion/relaunch for mouse, touch and remote.
 Wordless diagrams draw on the existing HUD quad, only for an incomplete lesson.
 Completed lessons omit the diagram and its projection; no extra overlay uploads
-or draw calls are scheduled. The pre-existing HUD pulse still refreshes at 10 Hz.
+or draw calls are scheduled. Round 1 retained the pre-existing HUD pulse at 10 Hz; the next candidate tests state-driven redraws.
 
 The Wide-view framing problem reported by the baseline player is left outside
 this experiment: `camera.ts` is explicitly excluded.
@@ -87,3 +87,51 @@ owner files, a ten-minute hold limit and a two-minute cooldown. One 1.08-second
 build ran when a failed shell assertion did not stop the next command. Heavy
 launch guards now use a single process that executes work only after successful
 slot acquisition. This is recorded as a protocol error, not omitted from the log.
+
+## Round 1
+
+Frozen key: R6 = candidate 245cbd6 (N5 collection alias), M4 = baseline,
+K7 = duplicate baseline. Report headers retaining the collection alias caused
+provenance uncertainty; future review copies must normalize all neutral aliases.
+Presentation orders: A K7/M4/R6; B R6/M4/K7; C R6/M4/K7;
+regression-only K7/M4/R6. Each reviewer was fresh and independent. No reviewer
+scored the identical baseline aliases differently, so extra noise reviewers were
+not triggered. New subagents now use high effort per the owner's updated rule.
+
+| Set | A | B | C | Mean | Ranking |
+|---|---|---|---|---|---|
+| R6 | 9,7,5,8,8,6,7 | 9,7,5,8,8,7,7 | 9,7,5,8,8,6,8 | 7.24 | First, all three |
+| M4 / K7 | 2,3,5,5,3,4,5 | 2,3,5,4,4,4,4 | 1,3,6,5,3,4,4 | 3.76 | Equal; alias order arbitrary |
+
+Accepted: first animated artwork at 0.195–0.197 seconds on 4G and
+0.485–0.515 seconds on slow 3G; truthful bytes/build status; persistent lessons.
+World arrival remains about 2.5 / 34.9 seconds, title about 17.4 / 330.2 seconds.
+The naive candidate player did hold Blow and Tickle, but never tested Weather
+and only selected View at input 20: discovery did not improve in reviewers' scores.
+
+Regressions and gaps: the shelf-navigation glyph clips below the viewport;
+"remote" validation actually used keyboard glyphs; Explore hides byte progress;
+menu instruction still repeats; completed redraw/allocation cost lacks measurements.
+These are the next targets. Requiring a particular fly reaction before retiring a
+lesson is rejected: the player learns successful tool operation, and the brain
+must remain free to respond or not. Physical-TV validation is excluded by the
+house rules; host-event emulation must be labeled accurately instead.
+
+Round 2 proposal: keep measured progress visible while exploring; silence menu
+teaching prose; move the clipped shelf cue inside the frame; make entry to Explore
+require Select instead of any remote contact; suppress the picture-only eye inset
+until the brain arrives. The startup canvas now shows a retry control when the
+application script fails. A real aborted-entry/reload check passes.
+
+The native-input check now boots the native-host path in Chromium and sends
+its actual DOM button/touch contract, with remote glyphs and `device=remote`.
+It still runs the real worker brain and is explicitly not a physical TV test.
+All eight lessons plus hand movement persist after relaunch in that harness.
+
+Completed-player runtime samples (8.016 game seconds, 481 frames each): the
+round-1 build allocated 481 distinct HUD callbacks and redrew 74 times with no
+activity changes; the proposal reused one callback and redrew twice for two
+activity changes. Whole-frame averages were 0.801 and 0.803 ms respectively,
+which does not establish a CPU speed difference. The intended proof is removal
+of callback allocation and periodic teaching uploads, not Apple TV timing.
+Shared dash/palette arrays also remove new explicit per-drawing array allocation.

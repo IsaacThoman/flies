@@ -6,6 +6,8 @@ import { drawToolIcon } from "../tools/view.ts";
 import type { ToolId } from "../tools/hands.ts";
 
 const TAU = Math.PI * 2;
+const DASH = [3, 4];
+const SOLID: number[] = [];
 
 /** A ghost finger landing, then a ring filling while it stays down. */
 export function ghostPress(g: CanvasRenderingContext2D, x: number, y: number, t: number, hold: boolean) {
@@ -39,11 +41,11 @@ export function drawDemonstration(g: CanvasRenderingContext2D, t: number, tool: 
   g.globalAlpha *= 0.65;
   g.strokeStyle = "#e4f8ff";
   g.lineWidth = 2;
-  g.setLineDash([3, 4]);
+  g.setLineDash(DASH);
   g.beginPath();
   g.ellipse(x, y + 12, 19, 6, 0, 0, TAU);
   g.stroke();
-  g.setLineDash([]);
+  g.setLineDash(SOLID);
   if (glyphs) drawGlyph(g, tool === "feather" || tool === "blow" ? "hold" : "select", x - 42, y + 2, 27, t, glyphs);
   else ghostPress(g, x - 36, y, t, tool === "feather" || tool === "blow");
   if (tool === "feed") {

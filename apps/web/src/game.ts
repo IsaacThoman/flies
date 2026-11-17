@@ -14,7 +14,7 @@ import { REGIONS } from "@fly/brain";
 import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttribution } from "@fly/contracts";
 import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
 import { Navigator } from "@fly/ui";
-import type { GlyphSet, Hit } from "@fly/ui";
+import type { GlyphSet, Hit, HitMap } from "@fly/ui";
 import { BALL_RADIUS, Pantry, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
 import type { RayHit } from "@fly/world";
 import { Haptics } from "./haptics.ts";
@@ -64,7 +64,7 @@ import type { StatsState } from "./stats/panel.ts";
 import { Tally } from "./stats/tally.ts";
 import { CornerDeck, waitFor } from "./ui/corners.ts";
 import type { CornerPicture } from "./ui/corners.ts";
-import { HUD_HITS, drawHud } from "./ui/hud.ts";
+import { HUD_HITS, drawHud, needsTeaching } from "./ui/hud.ts";
 import type { HudState } from "./ui/hud.ts";
 import { hudLayout, loadingLayout, playRoom, titleLayout, touchSlop } from "./ui/layout.ts";
 import type { HudLayout, LoadingLayout } from "./ui/layout.ts";
@@ -87,7 +87,7 @@ const AWAKE_HOLD_NOTE = 4;
 const AWAY_SETTLE_MS = 30_000;
 /** How sensitive the touch surface is: screen widths per full swipe. */
 const SWIPE_GAIN = 0.9;
-/** How often the HUD redraws for its shimmer alone, per second. */
+/** The refresh cap for animated teaching, loading status and frame stats, Hz. */
 const HUD_SHIMMER_FPS = 10;
 /** Seconds of wallpaper in one place before the fly moves on, when it lives in each in turn. */
 const PLACE_TURN = 20 * 60;
@@ -338,7 +338,7 @@ export class Game implements Shell {
     };
     this.#hudLayout = hudLayout(display.frame);
     this.#loadingLayout = loadingLayout(display.frame);
-    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, glyphs: this.glyphs, learned: this.#learned, teachSwipe: true, changed: 10, spikes: 0, brainRunning: false, eyes: null, layout: this.#hudLayout };
+    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, glyphs: this.glyphs, learned: this.#learned, teachSwipe: true, changed: 10, brainRunning: false, arrival: arriving(brain) ? brain : null, eyes: null, layout: this.#hudLayout };
     // Nothing points on the Apple TV: nothing to record.
     this.overlay.hits.enabled = !!inputs.pointers;
     this.#applyFrame();
@@ -937,7 +937,7 @@ export class Game implements Shell {
       const showEyes = this.#showEyes();
       const screen = this.#loading ? "loading" : this.nav.current;
       const settings = this.settings;
-      const eyesWanted = insetWanted(settings.eyesInset, screen, this.wallpaper, showEyes, this.eyes.detail === "off");
+      const eyesWanted = insetWanted(settings.eyesInset, screen, this.wallpaper, showEyes, this.eyes.detail === "off" || brain.status !== "running");
       const nervesNow = nervesWanted(settings.nerves, screen, this.wallpaper, showEyes);
       const statsNow = statsWanted(settings.statsPanel, screen, this.wallpaper, showEyes);
       this.#layCorners();
@@ -1150,7 +1150,7 @@ export class Game implements Shell {
       // The same focused control retries a failure or opens the world while it waits.
       const touched = remote.touch.touching && !this.#touchWas;
       this.#touchWas = remote.touch.touching;
-      let select = touched;
+      let select = touched && this.brain.status === "failed";
       for (const press of remote.presses) if (press.button === "select" && !press.repeat) select = true;
       if (pointers) for (const g of pointers.gestures) {
         if (g.type !== "up" || !g.tap) continue;
@@ -1610,7 +1610,6 @@ export class Game implements Shell {
       hud.glyphs = glyphs;
       hud.teachSwipe = !this.#touched;
       hud.changed = this.time - this.#changedAt;
-      hud.spikes = this.meter.spikesPerSecond;
       hud.brainRunning = this.brain.status === "running";
       if (this.#showEyes()) {
         const e = this.#eyesInfo;
@@ -1621,7 +1620,7 @@ export class Game implements Shell {
       } else hud.eyes = null;
       const k = this.#hudKey;
       const changed = k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught;
-      if (changed || hud.changed < 0.3 || this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS) {
+      if (changed || hud.changed < 0.3 || ((stats || !hud.brainRunning || needsTeaching(hud)) && this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS)) {
         k.tool = this.hands.tool;
         k.variant = this.hands.variants[this.hands.tool];
         k.activity = hud.activity;
@@ -1634,16 +1633,8 @@ export class Game implements Shell {
         this.#hudAt = this.time;
         overlay.dirty = true;
       }
-      overlay.redraw(dt, current, (g, hits) => {
-        if (hud.hints && !this.#learned[this.hands.current.id]) {
-          const p = this.hands.pointer;
-          this.#ndc.set(p.x, p.y, p.z).project(this.director.camera);
-          hud.aimX = (this.#ndc.x + 1) * this.shape.design.width / 2;
-          hud.aimY = (1 - this.#ndc.y) * this.shape.design.height / 2;
-        }
-        drawHud(g, this.time, hud, hits);
-        if (stats) drawStats(g, this, hud.layout.statsX, hud.layout.statsY);
-      });
+      overlay.redraw(dt, current, this.#drawPlay);
+
       return;
     }
     const screen = this.screens[current];
@@ -1653,6 +1644,19 @@ export class Game implements Shell {
       if (stats) drawStats(g, this, this.#hudLayout.statsX, this.#hudLayout.statsY);
     });
   }
+
+  // Kept once, rather than allocating a new redraw closure on every frame.
+  #drawPlay = (g: CanvasRenderingContext2D, hits: HitMap) => {
+    const hud = this.#hud;
+    if (hud.hints && !this.#learned[this.hands.current.id] && !this.hands.fixed.has(this.hands.current.id)) {
+      const p = this.hands.pointer;
+      this.#ndc.set(p.x, p.y, p.z).project(this.director.camera);
+      hud.aimX = (this.#ndc.x + 1) * this.shape.design.width / 2;
+      hud.aimY = (1 - this.#ndc.y) * this.shape.design.height / 2;
+    }
+    drawHud(g, this.time, hud, hits);
+    if (this.settings.stats) drawStats(g, this, hud.layout.statsX, hud.layout.statsY);
+  };
 
   /** The regions glowing now, brightest first, as id:glow, for scripts to read the nervous system's state. */
   #glowSummary() {

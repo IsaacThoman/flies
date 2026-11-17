@@ -6,7 +6,7 @@ import path from "node:path";
 import type { ChildProcess } from "node:child_process";
 import { parseArgs } from "node:util";
 import { chromium } from "playwright";
-import { Fingers, canvasPoint, chromiumPath, contextFor, gameUp, gpuFlags, readState, screenOf, startServer, targetOf, waitFor, waitForGameTime } from "../../../scripts/play.ts";
+import { Fingers, canvasPoint, chromiumPath, contextFor, gameUp, gpuFlags, readState, screenOf, startServer, swipe, targetOf, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
 import { TOOLS } from "../src/tools/hands.ts";
 
@@ -19,13 +19,37 @@ if (!url) {
   server = started.server;
 }
 const browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
+const deadline = setTimeout(() => { void browser.close(); }, 8 * 60_000);
 try {
+  const recovery = await browser.newContext();
+  try {
+    let failEntry = true;
+    await recovery.route((url) => /\/src\/main\.ts$|\/assets\/index-[^/]+\.js$/.test(url.pathname), async (route) => {
+      if (failEntry) { failEntry = false; await route.abort("failed"); }
+      else await route.continue();
+    });
+    const page = await recovery.newPage();
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => document.getElementById("game")?.dataset.bootFailure === "true");
+    if (values.shots) {
+      await mkdir(values.shots, { recursive: true });
+      await page.screenshot({ path: path.join(values.shots, "bootstrap-failure.png") });
+    }
+    await page.keyboard.press("Enter");
+    await gameUp(page);
+    await waitFor(page, "screen=title,brain=running");
+    if (values.shots) await page.screenshot({ path: path.join(values.shots, "bootstrap-recovered.png") });
+    console.log("passed: bootstrap script failure and keyboard retry");
+  } finally { await recovery.close(); }
   for (const device of ["mouse", "touch", "remote"] as const) {
     const context = await browser.newContext(contextFor({ url, ...(device === "touch" ? { device: "iPhone 15" } : {}) }));
     let release!: () => void;
     const gate = new Promise<void>((resolve) => { release = resolve; });
     await context.route("**/brain/connectome.*", async (route) => { await gate; await route.continue(); });
     try {
+      // The native host uses the same DOM button events, but identifies them as
+      // remote input. Its brain is still the actual worker brain in this harness.
+      if (device === "remote") await context.addInitScript(() => { (globalThis as unknown as { __native: object }).__native = {}; });
       const page = await context.newPage();
       const errors: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
@@ -46,6 +70,10 @@ try {
       const learned = () => page.evaluate(() => JSON.parse(localStorage.getItem("flies.learned") ?? "{}") as Record<string, true>);
       const lesson = (name: string) => page.waitForFunction((name) => JSON.parse(localStorage.getItem("flies.learned") ?? "{}")[name] === true, name);
       await shot("download");
+      if (device === "remote") {
+        await swipe(page, [0, 0], [0.05, 0.01]);
+        await waitFor(page, "screen=loading,device=remote");
+      }
       if (device === "remote") await page.keyboard.press("Enter");
       else await press("explore");
       await waitFor(page, "screen=play,brain=loading,activity=waiting");
@@ -53,6 +81,10 @@ try {
       await shot("exploring");
       release();
       await waitFor(page, "brain=running");
+      if (device === "remote") {
+        await swipe(page, [0, 0], [0.01, 0]);
+        await lesson("hand");
+      }
       for (let i = 0; i < TOOLS.length; i++) {
         const id = TOOLS[i].id;
         if (i > 0) {
@@ -93,7 +125,29 @@ try {
         await lesson(id);
         await shot(`${id}-used`);
       }
+      if (device === "remote") assert.equal((await readState(page)).device, "remote");
       const completed = await learned();
+      const redrawProbe = await page.evaluate(async () => {
+        const game = (globalThis as unknown as { __fly: Game }).__fly;
+        const overlay = game.overlay;
+        const original = overlay.redraw.bind(overlay);
+        const callbacks = new Set<unknown>();
+        let calls = 0;
+        overlay.redraw = (...args: Parameters<typeof overlay.redraw>) => {
+          if (args[1] === "play") { calls++; callbacks.add(args[2]); }
+          return original(...args);
+        };
+        const at = overlay.redraws;
+        const began = game.time;
+        try {
+          await new Promise<void>((resolve) => {
+            const observe = () => game.time - began >= 2 ? resolve() : requestAnimationFrame(observe);
+            requestAnimationFrame(observe);
+          });
+          return { frames: calls, distinctCallbacks: callbacks.size, redraws: overlay.redraws - at };
+        } finally { overlay.redraw = original; }
+      });
+      assert.equal(redrawProbe.distinctCallbacks, 1, "play reuses its draw callback on every frame");
       for (const id of ["tools", ...TOOLS.map((tool) => tool.id)]) assert.equal(completed[id], true, `${device}: ${id}`);
       // Switching hints off and on must not erase a player's history.
       await page.evaluate(() => {
@@ -111,7 +165,7 @@ try {
       await waitFor(page, "screen=play");
       await shot("returning");
       assert.deepEqual(errors, []);
-      if (values.shots) await writeFile(path.join(values.shots, device, "result.json"), JSON.stringify({ completed, state: await readState(page), errors }, null, 2));
+      if (values.shots) await writeFile(path.join(values.shots, device, "result.json"), JSON.stringify({ completed, redrawProbe, input: device === "remote" ? "native-host DOM events in Chromium; not physical hardware" : device, state: await readState(page), errors }, null, 2));
       console.log(`passed: ${device}, early exploration and all tool lessons persist`);
     } catch (error) {
       const page = context.pages()[0];
@@ -123,6 +177,7 @@ try {
     }
   }
 } finally {
+  clearTimeout(deadline);
   await browser.close();
   server?.kill();
 }
