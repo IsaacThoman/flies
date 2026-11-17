@@ -26,7 +26,8 @@ void main() {
  float trail = (1.0 - smoothstep(0.4, 1.0 + px, abs(p.x - x))) * step(y, p.y) * (1.0 - smoothstep(0.0, 230.0, p.y - y)) * step(seed, uRain * 0.85);
  vec2 cell = floor(p / 8.0);
  float h = hash21(cell);
- vec2 b = (p - (cell + vec2(0.25 + h * 0.5, 0.5)) * 8.0) / vec2(0.65 + h, 1.1 + h);
+ vec2 offset = vec2(hash21(cell+4.1),hash21(cell+9.3))*0.6+0.2;
+ vec2 b = (p - (cell + offset) * 8.0) / vec2(0.65 + h, 1.1 + h);
  float still = (1.0 - smoothstep(0.55, 1.0 + px, length(b))) * step(h, uWet * 0.5);
  fog *= 1.0 - trail * 0.9;
  float film = vnoise(p * vec2(0.25, 0.012)) * uWet * 0.08;

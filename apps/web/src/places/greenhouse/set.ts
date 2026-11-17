@@ -1,10 +1,11 @@
 import * as THREE from "three";
 import { GREENHOUSE_BENCH, GLAZING, GREENHOUSE_PATCHES, GREENHOUSE_SOLIDS, SAUCER, TRAY, topHeight, topNormal } from "@fly/world";
 import type { Solid } from "@fly/world";
-import { Batch, freeze, paint, random } from "../../scene/build.ts";
+import { Batch, paint, random } from "../../scene/build.ts";
 import type { SceneSet } from "../types.ts";
 import { tag } from "../windowsill/surfaces.ts";
 import { K, surfaces } from "./surfaces.ts";
+import { waterMaterial } from "../windowsill/glass.ts";
 import { foliage } from "./foliage.ts";
 import { sunShafts } from "./shafts.ts";
 import { glazing } from "./glass.ts";
@@ -78,6 +79,17 @@ export function buildBench(): SceneSet {
       if (s.name === "trowel blade") { color = "#99a6a0"; kind = K.metal; }
       if (s.name === "trowel handle") { color = "#ad7848"; kind = K.wood; }
       const g = solidGeometry(s, s.name === "terracotta pot" ? 60 : 28, 48);
+      if (s.name === "water saucer") {
+        // The world's well is the liquid surface; clay below it must not compete for depth.
+        const p = g.getAttribute("position");
+        for (let i=0;i<p.count;i++) {
+          const d=Math.hypot(p.getX(i)-SAUCER.x,p.getZ(i)-SAUCER.z);
+          if (d<32.68 && p.getY(i)<=SAUCER.water+1e-4) {
+            const t=Math.max(0,Math.min(1,(d-31.6)/1.08));
+            p.setY(i,p.getY(i)-0.24*(1-t*t*(3-2*t)));
+          }
+        }
+      }
       const colors = s.name === "terracotta pot" ? (p: THREE.Vector3) => {
         const f = s.footprint as { x: number; z: number; r: number };
         return Math.hypot(p.x - f.x, p.z - f.z) < f.r * 0.82 ? "#30251b" : color;
@@ -176,7 +188,7 @@ export function buildBench(): SceneSet {
     }
     add(box(0, GLAZING.ridge, 0, 22, 22, 1280), "#697f73", K.paint);
     yield;
-    batch.build(group);
+    batch.build(group,{renderOrder:new Map([[glass.material,4]])});
 
 
   }
@@ -185,8 +197,10 @@ export function buildBench(): SceneSet {
   const shafts = sunShafts(group);
   const ripples = Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, -100, 0));
   const time = { value: 0 };
-  const water = new THREE.MeshStandardMaterial({ color: "#7eaaa0", roughness: 0.12, metalness: 0.3, transparent: true, opacity: 0.7, envMapIntensity: 1.5, depthWrite: false });
-  water.onBeforeCompile = shader => {
+  const water = waterMaterial();
+  const compileWater = water.onBeforeCompile;
+  water.onBeforeCompile = (shader,renderer) => {
+    compileWater(shader,renderer);
     shader.uniforms.uRings = { value: ripples }; shader.uniforms.uTime = time;
     shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vPool;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvPool = position;");
     shader.fragmentShader = shader.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vPool; uniform vec4 uRings[4]; uniform float uTime;")
@@ -195,8 +209,11 @@ for (int i=0; i<4; i++) { float age = uTime-uRings[i].z; float d=length(vPool.xz
 outgoingLight += wave * 0.22;
 #include <opaque_fragment>`);
   };
-  const pool = new THREE.Mesh(new THREE.CircleGeometry(31, 64).rotateX(-Math.PI / 2).translate(SAUCER.x, SAUCER.water + 0.15, SAUCER.z), water);
-  freeze(pool); group.add(pool);
+  water.customProgramCacheKey = () => "greenhouse-water";
+  const pools = new Batch();
+  pools.add(water,paint(new THREE.CircleGeometry(31,64).rotateX(-Math.PI/2).translate(SAUCER.x,SAUCER.water,SAUCER.z),"#ffffff"));
+  pools.add(water,paint(new THREE.CylinderGeometry(31,31,0.24,64,1,true).translate(SAUCER.x,SAUCER.water-0.12,SAUCER.z),"#ffffff"));
+  pools.build(group);
   let nextRing = 0;
   const ripple = (x: number, z: number, strength: number) => {
     if (Math.hypot(x - SAUCER.x, z - SAUCER.z) > 32) return;
@@ -217,7 +234,7 @@ outgoingLight += wave * 0.22;
       opaque.uniforms.uDirect.value = (1 - weather.cloud * 0.9) * (1 - light.stars * 0.8);
       const u = glass.uniforms;
       u.uTime.value = t; u.uWet.value = weather.wet; u.uRain.value = weather.rain;
-      const dawn = light.hours === null ? light.time === "morning" ? 0.32 : 0 : Math.max(0, 1 - Math.abs(light.hours - 6) / 2) * 0.48;
+      const dawn = light.hours === null ? light.time === "morning" ? 0.55 : 0 : Math.max(0, 1 - Math.abs(light.hours - 6) / 2) * 0.65;
       u.uMist.value = Math.max(dawn, weather.mist * 0.65);
       u.uSky.value.copy(light.skyColor).multiplyScalar(0.7); u.uSun.value.copy(light.sunColor).multiplyScalar(light.sunIntensity);
       u.uDirection.value.copy(light.sunDirection);
@@ -229,7 +246,8 @@ outgoingLight += wave * 0.22;
       // A roof leak falls at a fixed joint; only touch reaches the fly.
       if (age < 0 && around.quiet && around.weather.rain > 0.1 && elapsed > 7) { age = 0; elapsed = 0; }
       if (age >= 0) {
-        age += dt; const y = 780 - 490 * age * age;
+        age += dt; const roof = GLAZING.ridge-Math.abs(SAUCER.x+7)*(GLAZING.ridge-GLAZING.eave)/GLAZING.x;
+        const y = roof - 490 * age * age;
         drip.visible = y > SAUCER.water; drip.position.set(SAUCER.x + 7, Math.max(SAUCER.water, y), SAUCER.z - 4);
         if (y <= SAUCER.water) {
           ripple(SAUCER.x + 7, SAUCER.z - 4, 0.65);

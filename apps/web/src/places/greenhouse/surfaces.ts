@@ -149,7 +149,8 @@ vec3 surface(vec3 c) {
    float rim = r<1.01 ? exp(-pow((r-edge)*28.0,2.0)) : 0.0;
    c = mix(vec3(0.287,0.191,0.076)*vec3(1.15,0.85,0.7),c,0.18+body*0.82);
    c *= 1.0-rim*0.28;
-   float pulp = step(0.965,hash21(floor(p.xz*3.0)))*resolved(0.35)*body;
+   vec2 piece = fract(p.xz*2.0)-0.5;
+   float pulp = step(0.94,hash21(floor(p.xz*2.0)))*(1.0-smoothstep(0.2,0.35,length(piece*vec2(1.0,1.8))))*resolved(0.35)*body;
    c = mix(c,vec3(0.6,0.28,0.055),pulp*0.4);
    rough = mix(0.2,0.1,body);
  }

@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { GREENHOUSE, GREENHOUSE_SOLIDS, SAUCER, TRAY, World, inside, topHeight } from "@fly/world";
@@ -55,4 +56,18 @@ test("greenhouse leaf detail stays on its solid crown", () => {
     }
     g.dispose();
   }
+});
+
+test("greenhouse pool is drawn at the felt water height and within its food footprint", () => {
+  const set=buildBench();
+  const pool=set.group.children.find(o => o instanceof THREE.Mesh && o.material === set.materials[1]) as THREE.Mesh;
+  assert.ok(pool);
+  const p=pool.geometry.attributes.position, n=pool.geometry.attributes.normal;
+  const patch=GREENHOUSE.patches.find(p=>p.pool)!;
+  let cap=0;
+  for (let i=0;i<p.count;i++) {
+    assert.ok(Math.hypot(p.getX(i)-patch.x,p.getZ(i)-patch.z) <= patch.r+1e-4);
+    if (n.getY(i)>0.99) { assert.equal(p.getY(i),SAUCER.water); cap++; }
+  }
+  assert.ok(cap>100);
 });
