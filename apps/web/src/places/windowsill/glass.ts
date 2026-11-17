@@ -2,7 +2,9 @@
 // on the glass.
 
 import * as THREE from "three";
-import { LAMP } from "./light.ts";
+import { SILL, WINDOW } from "@fly/world";
+import { FRAME_HEAD, LAMP, sunlit } from "./light.ts";
+import type { Sunlight } from "./light.ts";
 import { NOISE } from "./surfaces.ts";
 
 const f = (n: number) => n.toFixed(1);
@@ -178,5 +180,36 @@ diffuseColor.a = clamp(0.16 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
     );
   };
   material.customProgramCacheKey = () => "windowsill-water";
+  return material;
+}
+
+/** The bottle shows a clear centre and thick green edges, with the window reflected in its curved wall. */
+export function bottleMaterial(sunlight: Sunlight) {
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.06, metalness: 0, transparent: true, depthWrite: false, envMapIntensity: 1.3 });
+  sunlit(material, sunlight, "bottle", {
+    extra(shader) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <opaque_fragment>",
+        /* glsl */ `
+float facing = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
+float edge = pow(1.0 - facing, 3.0);
+vec3 reflected = inverseTransformDirection(reflect(-normalize(vViewPosition), normal), viewMatrix);
+float toPane = (${f(WINDOW.glass)} - vWorld.z) / min(reflected.z, -0.0001);
+vec2 pane = vWorld.xy + reflected.xy * toPane;
+vec2 aa = max(fwidth(pane), vec2(1.0));
+float opening = (1.0 - smoothstep(${f(SILL.hx - WINDOW.jamb.width)} - aa.x, ${f(SILL.hx - WINDOW.jamb.width)} + aa.x, abs(pane.x)))
+  * smoothstep(${f(WINDOW.rail.top)} - aa.y, ${f(WINDOW.rail.top)} + aa.y, pane.y)
+  * (1.0 - smoothstep(${f(FRAME_HEAD)} - aa.y, ${f(FRAME_HEAD)} + aa.y, pane.y));
+opening *= smoothstep(${f(WINDOW.mullion.half)} - aa.x, ${f(WINDOW.mullion.half)} + aa.x, abs(pane.x));
+opening *= step(0.0, toPane) * step(reflected.z, -0.001);
+vec3 windowLight = mix(vec3(0.7, 0.86, 1.0), uRoom * 0.2, uLamp);
+outgoingLight += windowLight * opening * (0.04 + edge * 0.6);
+// Multiple paths through the curved wall darken the rim, while the wine remains visible through the middle.
+outgoingLight *= mix(1.0, 0.75, edge);
+diffuseColor.a = clamp(0.24 + edge * 0.65 + opening * (0.08 + edge * 0.2), 0.0, 0.94);
+#include <opaque_fragment>`,
+      );
+    },
+  });
   return material;
 }

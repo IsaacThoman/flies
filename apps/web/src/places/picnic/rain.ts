@@ -106,7 +106,7 @@ const float LIFE = ${SPLASH_LIFE.toFixed(2)};
 const float CROWN = 0.26;
 void main() {
   float age = uTime - aSplash.w;
-  float size = aShape.x;
+  float size = abs(aShape.x);
   vec3 world;
   vUv = position.xy;
   if (aPart < 0.5) {
@@ -114,7 +114,7 @@ void main() {
     float k = clamp(age / LIFE, 0.0, 1.0);
     float r = size * (0.4 + 2.6 * sqrt(k));
     world = aSplash.xyz + vec3(position.x * r, 0.03, position.y * r);
-    vFade = 1.0 - k;
+    vFade = (1.0 - k) * step(0.0, aShape.x);
     vRing = 1.0;
   } else {
     // A droplet of the crown, thrown out and up and falling back.
@@ -250,12 +250,12 @@ export class Rain {
     this.group.add(this.#beads);
   }
 
-  /** A drop landing at a point: a crown and a ring, `size` mm across or so. */
-  splash(x: number, y: number, z: number, size: number) {
+  /** Curved surfaces and the fly throw a crown, but cannot support a flat spreading ring. */
+  splash(x: number, y: number, z: number, size: number, ring = true) {
     const i = this.#next;
     this.#next = (this.#next + 1) % SPLASHES;
     this.#splash.setXYZW(i, x, y, z, this.#splashUniforms.uTime.value);
-    this.#shape.setXY(i, size, Math.random());
+    this.#shape.setXY(i, ring ? size : -size, Math.random());
     this.#splash.needsUpdate = true;
     this.#shape.needsUpdate = true;
     this.#last = this.#splashUniforms.uTime.value;

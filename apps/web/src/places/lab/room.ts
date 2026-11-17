@@ -287,24 +287,42 @@ function roomAtlas() {
         g.fill();
       }
     });
-    // Trees: round crowns of leaves in a few greens, lit from above, trunks below.
-    for (let t = 0; t < 16; t++) {
-      const x = rnd.range(-20, r.w + 20);
-      const base = rnd.range(296, 312);
-      const size = rnd.range(46, 92) * (x > 280 && x < 880 ? 0.85 : 1.15);
+    // Layered crowns leave glimpses of the building; small lobes and exposed branches keep the silhouettes from reading as discs.
+    for (let t = 0; t < 11; t++) {
+      const x = ((t + 0.5) / 11) * r.w + rnd.range(-38, 38);
+      const base = rnd.range(310, 340);
+      const size = rnd.range(42, 78);
       both((ox, oy, mask) => {
-        g.fillStyle = mask ? "#000000" : "#5a4632";
-        g.fillRect(ox + x - 4, oy + base - size * 0.9, 8, size * 0.9);
+        g.strokeStyle = mask ? "#0000ff" : "#534f3b";
+        g.lineWidth = 3.5;
+        g.beginPath();
+        g.moveTo(ox + x, oy + base);
+        g.lineTo(ox + x - 1, oy + base - size * 1.3);
+        g.moveTo(ox + x, oy + base - size * 0.5);
+        g.lineTo(ox + x - size * 0.35, oy + base - size * 1.25);
+        g.moveTo(ox + x, oy + base - size * 0.7);
+        g.lineTo(ox + x + size * 0.4, oy + base - size * 1.4);
+        g.stroke();
       });
-      for (let k = 0; k < 14; k++) {
-        const cx = x + rnd.range(-0.6, 0.6) * size;
-        const cy = base - size * 1.05 + rnd.range(-0.55, 0.45) * size;
-        const cr = size * rnd.range(0.28, 0.48);
-        const lit = (base - size * 1.4 - cy) / size;
+      for (let k = 0; k < 52; k++) {
+        const angle = rnd.range(0, Math.PI * 2);
+        const radius = Math.sqrt(rnd.next());
+        const cx = x + Math.cos(angle) * radius * size * 0.62;
+        const cy = base - size * 1.18 + Math.sin(angle) * radius * size * 0.7;
+        const cr = size * rnd.range(0.1, 0.22);
+        const shade = Math.max(0, Math.min(4, Math.floor((base - size * 0.6 - cy) / size * 3 + rnd.range(-0.6, 0.6))));
         both((ox, oy, mask) => {
-          g.fillStyle = mask ? "#000000" : ["#3f6b34", "#4f7d3a", "#5f8f44", "#6d9c4c"][Math.max(0, Math.min(3, Math.floor(1.6 - lit * 2.2 + rnd.next())))];
+          if (mask) g.fillStyle = "#0000ff";
+          else {
+            const tones = ["#2d4c38", "#3e6240", "#527a46", "#6b9050", "#91a963"];
+            const volume = g.createRadialGradient(ox + cx - cr * 0.3, oy + cy - cr * 0.4, 0, ox + cx, oy + cy, cr * 1.2);
+            volume.addColorStop(0, tones[shade]);
+            volume.addColorStop(0.65, tones[Math.max(0, shade - 1)]);
+            volume.addColorStop(1, tones[0]);
+            g.fillStyle = volume;
+          }
           g.beginPath();
-          g.arc(ox + cx, oy + cy, cr, 0, Math.PI * 2);
+          g.ellipse(ox + cx, oy + cy, cr, cr * 0.75, angle, 0, Math.PI * 2);
           g.fill();
         });
       }
@@ -432,17 +450,32 @@ void main() {
   // The scenery, where it is, tinted by the light of the day, with windows and a lamp lit at night.
   vec2 p = (vWorld.xy - band.xy) / band.zw;
   vec3 c = sky;
+  float openSky = 1.0;
   if (p.x > 0.0 && p.x < 1.0 && p.y < 1.0) {
     vec2 q = vec2(p.x, max(p.y, 0.0));
     vec3 there = texture2D(map, scenery.xy + q * scenery.zw).rgb;
     vec3 m = texture2D(map, mask.xy + q * mask.zw).rgb;
+    openSky = m.g;
     vec3 tint = mix(vec3(0.06, 0.08, 0.15), mix(vec3(1.0), low * 1.15, 0.3), day);
-    vec3 lit = there * tint + vec3(1.0, 0.8, 0.5) * m.r * stars * 0.9;
+    vec3 lit = there * tint + vec3(1.0, 0.8, 0.5) * m.r * stars * 0.55;
     // Haze toward the far things, more by day; under cloud the colours flatten and darken.
-    lit = mix(lit, low, 0.22 * day + 0.15 * cover);
+    // Foliage keeps a darker body than the pale masonry, with sky light on its upper lobes.
+    float leaf = m.b * (0.82 + 0.18 * noise(q * vec2(320.0, 160.0) + vec2(time * 0.035, 0.0)));
+    lit *= 1.0 - leaf * 0.12;
+    lit = mix(lit, low, 0.07 * day + 0.15 * cover);
     lit = mix(lit, vec3(dot(lit, vec3(0.3, 0.55, 0.15))), cover * 0.35) * (1.0 - cover * 0.2);
     c = mix(lit, sky, m.g * step(0.0, p.y));
   } else if (p.y < 0.0) c = mix(vec3(0.3, 0.42, 0.22), vec3(0.04, 0.05, 0.08), stars) * mix(vec3(1.0), low, 0.3);
+  // A distant pair crosses the courtyard independently of the fly, their wingbeats only a few pixels wide.
+  vec2 birdPlane = d.xy / max(-d.z, 0.1);
+  for (int i = 0; i < 2; i++) {
+    float seed = float(i);
+    vec2 centre = vec2(mod(time * 0.009 + seed * 0.13 + 0.27, 0.9) - 0.45, 0.19 + seed * 0.018 + sin(time * 0.12 + seed) * 0.008);
+    vec2 b = birdPlane - centre;
+    float wing = abs(b.y - abs(b.x) * (0.25 + 0.3 * sin(time * 4.0 + seed * 2.0)));
+    float bird = (1.0 - smoothstep(0.0005, 0.0005 + length(fwidth(b)), wing)) * (1.0 - smoothstep(0.0025, 0.005, abs(b.x)));
+    c = mix(c, vec3(0.1, 0.14, 0.2), bird * openSky * day * (1.0 - cover * 0.65));
+  }
   // Mist: the building across the way a ghost, the trees grey shapes, the sky gone white; the lawn, nearest, keeps a little colour.
   c = mix(c, veil, mist * mix(0.8, 0.55, smoothstep(0.08, -0.02, h)));
   // Rain falling past the window: thin streaks, slanting a little, as many as it rains.

@@ -117,6 +117,11 @@ Anything drawn but not in the world must be flat enough not to matter to a fly
 (under half a millimetre, like the picnic's specks of biscuit), or out of its
 reach (beyond the floor's edge, above it, or in the backdrop).
 
+The picnic's cotton uses a 0.22 mm weave with 0.015 mm thread relief in
+its material normals, plus shading along its fold creases. This is a visual
+stand-in: the world's cloth remains level. Thread relief fades out as the
+crossings become smaller than a pixel, without extra meshes or draws.
+
 ## The scene
 
 - **Two passes** (`apps/web/src/stage.ts`): the set (`buildSet`, from 0.5 mm to
@@ -156,7 +161,7 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   `kind`) as their last argument, which a place that ignores it can leave off.
   A windowsill can run rain down its pane by `rain` and leave it streaked by
   `wet`; the picnic's rain, wet table, overcast deck, mist and rainbow are
-  worked examples (`places/picnic/rain.ts`, `table.ts`, `backdrop.ts`), and
+  worked examples (`places/picnic/rain.ts`, `places/picnic/table.ts`, `places/picnic/backdrop.ts`), and
   the lab shows it in the view through its windows (`places/lab/room.ts`). Rain
   bursts the bubbles and sends the fireflies to shelter wherever they are.
 - **What the fly's eyes see** (`SceneSet.seen`): the big shapes only. They are
@@ -178,9 +183,11 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   and the fly (a wall behind it, a table top over the fly) brings it in front
   of that: taken out by hand in a room, it stops at the walls.
 - **Goings-on** (`SceneSet.live`, optional): the place's own life, called each
-  frame the fly lives with an `Around`: where the fly is, the world, the
-  pantry, the weather, and `quiet` (nobody has touched the remote for a
-  while). It leaves what reaches the fly in `around.felt`: `air` (a gust, mm/s:
+  frame the fly lives with an `Around`: where the fly is, where the device's
+  other flies are (`company`), the world, the pantry, the weather, and
+  `quiet` (nobody has touched the remote for a while). Anything that keeps
+  clear of the fly keeps clear of whichever is nearest; `SceneSet.feel`
+  gives what reaches each of the others. It leaves what reaches the fly in `around.felt`: `air` (a gust, mm/s:
   felt as wind, and it carries the fly in flight as a puff does), `touch` (a
   raindrop landing on it, 0 to 1) and `looming` (things it could see coming,
   for a brain without eyes). Food goes into the pantry with `pantry.add`, to
@@ -277,8 +284,8 @@ TV has (`places/restaurant/`):
   (Settings → Picture → Frame stats, or the canvas's `data-calls` and `data-triangles`);
   a new place should stay close to that, near the fly and in its whole view.
 - **Building is a pause behind the veil.** `data-place-ms` on the canvas says
-  how long the place took to build: the picnic 36 ms in desktop Chromium, so
-  about half a second on the TV. Keep it there, or build in steps
+  how long the place took to build. A reference picnic build was 36 ms in
+  desktop Chromium, so about half a second on the TV. Keep it there, or build in steps
   (`SceneSet.more`, above): then `data-place-step-ms` is the longest frame
   of it, and that is what to keep there.
 - **Register it** in `catalog.ts` and `index.ts`. `apps/web/tests/places.test.ts`
@@ -333,3 +340,43 @@ Do not infer a cold response from a fly standing still in snow. A future
 labelled physiological stand-in could scale body/brain time with a documented
 temperature curve, with explicit owner approval and tests distinguishing it
 from neural decisions. That proposal is not active in this change.
+
+## Checking the picnic's picture
+
+Compare the picnic at 1920×1080 with `scripts/play.ts`, keeping its chunky
+internal resolution. Hold the same fly pose and camera for title, follow,
+close, wide, whole table, screensaver, fruit and glass studies; repeat under
+midday, golden hour, dusk, night and midday rain. Pinned poses belong only in
+the capture harness: ordinary play remains the brain's choice.
+
+Judge composition at TV distance, light and colour, materials, millimetre
+scale, detail without clutter, life and weather, and rendering artefacts.
+Record `data-calls` and `data-place-ms` alongside the pictures. Compare calls
+at the same eye-refresh phase: frames that refresh the brain's six eye views
+include those extra draws. Compare repeated builds on the same machine;
+wall-clock build times on a busy machine vary considerably.
+
+The picnic shares one fruit material between the glazed things, cherries,
+apple, citrus and berries; a per-vertex skin kind chooses the surface in the
+shader. The strawberry skin varies its roughness; the cut berry has a pale
+core, radiating flesh fibres and a darker rind. The cut fruit still follows
+the world's low dome, rather than pretending to be a flat walkable slice.
+Fine cloth detail fades with its pixel footprint and stays subordinate to
+the fly's legs. Small glass base and fill-edge accents join the existing
+glazed batch.
+
+Tabletop shadows follow the chosen sun or moon without extra lights, shadow
+maps or draws. They use the world's footprints and peak heights as columns:
+a deliberate silhouette approximation for rounded fruit, not a change to its
+collision surface. Only direct light is shadowed; the sky still fills it.
+Rain rings spread on the tabletop and in the saucer's pool. Hits on the fly
+or raised objects throw splash droplets without a suspended horizontal ring;
+the fly feels the same rain touch as before.
+
+<!-- docs-check: base apps/web/src -->
+
+<!-- docs-check: base apps/web/src/places/restaurant -->
+
+<!-- docs-check: base apps/web/src/places -->
+
+<!-- docs-check: base packages/world/src -->

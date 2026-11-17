@@ -3,7 +3,8 @@
 //
 // - the rooms: a new one, a code to type, and every listed room with someone
 //   in it, by its name, its place's colour, its flies as pips and a padlock
-//   if it has a password; the list follows the room server as it changes;
+//   if it has a password, the rooms open to everyone first, each with a
+//   globe; the list follows the room server as it changes;
 // - a new room: its name (one is suggested), its place, whether it is listed
 //   or only reached by its link, and a password if it is to have one;
 // - a locked room's door: its password;
@@ -11,12 +12,15 @@
 //   to: not on the Apple TV), one to leave, and for whoever started it each
 //   other fly by its player's colour, to take it off; beside them, the room's
 //   QR code for a phone to scan and its code to type. Who is there shows in
-//   the world itself, a dab of each player's colour on their fly.
+//   the world itself, a dab of each player's colour on their fly. In a room
+//   open to everyone (where a device is by default), also the rooms, to go
+//   to another from: the list, with this room still about the fly until
+//   another is chosen.
 //
 // What goes wrong is said in the heading's place, briefly, in pink.
 
 import type { RemoteButton } from "@fly/contracts";
-import { CODE_LENGTH, MAX_PLAYERS, PASSWORD_MAX, ROOM_NAME_MAX, isTableCode, roomName } from "@fly/net";
+import { CODE_LENGTH, MAX_FLIES, PASSWORD_MAX, ROOM_NAME_MAX, isTableCode, roomName } from "@fly/net";
 import { Menu, choiceValue, indexOf } from "@fly/ui";
 import type { ChoiceItem, FieldItem, HitMap, MenuItem, Option } from "@fly/ui";
 import type { Frame } from "../../display.ts";
@@ -76,6 +80,8 @@ export class OnlineScreen implements Screen {
   #ended: Ended | null = null;
   /** The door last come to (Knock's seq). */
   #knocked = -1;
+  /** In a room open to everyone, looking at the other rooms (or making one, or at a door) without having left it. */
+  #looking = false;
   #copied = -1;
   #time = 0;
   readonly #occupants = new WeakMap<object, number>();
@@ -116,7 +122,8 @@ export class OnlineScreen implements Screen {
       if (note && note in NOTES) this.#note = note;
     }
     if (this.#note === "version" && shell.lobbyStatus === "open") this.#note = null;
-    if (table && (table.joined || this.view !== "door")) this.view = "room";
+    if (!table?.everyone) this.#looking = false;
+    if (table && !this.#looking && (table.joined || this.view !== "door")) this.view = "room";
     else if (!table && this.view === "room") this.view = knock ? "door" : "rooms";
     if (this.view === "door" && !knock && !table) this.view = "rooms";
   }
@@ -144,7 +151,9 @@ export class OnlineScreen implements Screen {
         else if (!rooms) rows.push({ kind: "action", id: "looking", label: "Looking for rooms…", disabled: true });
         else if (!rooms.length) rows.push({ kind: "action", id: "none", label: "No rooms open", disabled: true });
         for (const r of rooms ?? []) {
-          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), count: [r.flies, MAX_PLAYERS], locked: r.locked, disabled: unavailable || r.flies >= MAX_PLAYERS });
+          // A full room open to everyone sends whoever chooses it on to the next.
+          const everyone = r.everyone === true;
+          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), count: [r.flies, MAX_FLIES], locked: r.locked, everyone, disabled: unavailable || (r.flies >= MAX_FLIES && !everyone) });
         }
         return rows;
       }
@@ -161,7 +170,8 @@ export class OnlineScreen implements Screen {
         ];
       }
       case "door": {
-        const joining = !!shell.table;
+        // On the way into this room: not merely still in a room open to everyone, looking at others.
+        const joining = !!shell.table && shell.table.code === shell.knock?.code;
         return [
           { kind: "field", id: "password", label: "Password", value: this.#password, secret: true, disabled: !shell.typing || joining },
           { kind: "action", id: "join", label: joining ? "Joining…" : "Join", disabled: joining || !this.#password || this.#incompatible() },
@@ -172,7 +182,8 @@ export class OnlineScreen implements Screen {
         if (!table) return [];
         const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
         const rows: MenuItem[] = shell.canShare ? [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", disabled: !table.joined }] : [];
-        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", swatch: o.colour });
+        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", swatch: o.colours });
+        if (table.everyone) rows.push({ kind: "action", id: "rooms", label: "Other rooms" });
         rows.push({ kind: "action", id: "leave", label: "Leave the room" });
         return rows;
       }
@@ -189,7 +200,7 @@ export class OnlineScreen implements Screen {
     return "Online";
   }
 
-  /** A seat number can be reused between frames; the previous occupant's removal must expire. */
+  /** A device's player id can be another device's between frames (one left and another sat down there): the one before's removal must expire. */
   #removalId(other: TableNow["others"][number]) {
     let sequence = this.#occupants.get(other);
     if (sequence === undefined) this.#occupants.set(other, sequence = ++this.#occupantSequence);
@@ -201,7 +212,7 @@ export class OnlineScreen implements Screen {
     const table = shell.table;
     const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
     const rooms = shell.rooms ? shell.rooms.map((r) => `${r.code}:${r.name}:${r.place}:${r.flies}:${r.locked}`).join(",") : "?";
-    const at = table ? `${table.name}|${table.joined}|${table.starting}|${copied}|${table.others.map((o) => this.#removalId(o)).join(",")}` : "alone";
+    const at = table ? `${table.name}|${table.joined}|${table.starting}|${table.everyone}|${this.#looking}|${copied}|${table.others.map((o) => `${this.#removalId(o)}/${o.colours.length}`).join(",")}` : "alone";
     return `${this.view}|${this.#note}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}|${shell.lobbyStatus}`;
   }
 
@@ -248,10 +259,19 @@ export class OnlineScreen implements Screen {
       this.#draft.listed = true;
       this.#draft.place = shell.here;
       this.#show("new", "create");
+    } else if (id === "rooms") {
+      this.#looking = true;
+      this.#show("rooms", "new");
     } else if (id.startsWith("room:")) {
       const code = id.slice(5);
       const room = shell.rooms?.find((r) => r.code === code);
       if (!room) return;
+      // The room the fly is in already: back to it.
+      if (code === shell.table?.code) {
+        this.#looking = false;
+        this.#show("room");
+        return;
+      }
       // A locked one's door first: its password, then in.
       if (room.locked) shell.door({ code, name: room.name });
       else shell.joinRoom(code);
@@ -311,6 +331,12 @@ export class OnlineScreen implements Screen {
     if (this.view === "new" || this.view === "door") {
       this.view = "rooms";
       this.#refresh("new");
+      return;
+    }
+    // Looking from a room open to everyone: back to it.
+    if (this.#looking) {
+      this.#looking = false;
+      this.#show("room");
       return;
     }
     shell.back();

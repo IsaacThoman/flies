@@ -74,3 +74,33 @@ test("resting on Each in turn, or on where it is, carries it nowhere", () => {
   wait(SETTLE + 0.1);
   assert.deepEqual(carried, []);
 });
+
+test("a settled callback runs exactly once, and an idle choice never runs it", () => {
+  let calls = 0;
+  const settle = new Settle(() => true, () => calls++);
+  settle.update(5);
+  assert.equal(calls, 0);
+  settle.changed();
+  settle.update(0.75);
+  assert.equal(calls, 0);
+  settle.changed();
+  settle.update(0.75);
+  assert.equal(calls, 0, "changing the choice starts a fresh pause");
+  settle.update(0.25);
+  assert.equal(calls, 1, "one whole second settles it");
+  settle.update(5);
+  assert.equal(calls, 1, "the expensive action must not repeat");
+});
+
+test("a change outside its row acts immediately and cancels any pending action", () => {
+  let choosing = true;
+  let calls = 0;
+  const settle = new Settle(() => choosing, () => calls++);
+  settle.changed();
+  settle.update(0.5);
+  choosing = false;
+  settle.changed();
+  assert.equal(calls, 1);
+  settle.update(5);
+  assert.equal(calls, 1);
+});

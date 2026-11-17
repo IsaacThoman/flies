@@ -4,6 +4,7 @@ import * as THREE from "three";
 import type { BrainDriver, TableSocket } from "@fly/contracts";
 import { Life } from "../src/life.ts";
 import { Online } from "../src/online/online.ts";
+import { OtherFlies } from "../src/online/others.ts";
 import type { TableHost } from "../src/online/online.ts";
 import { Hands } from "../src/tools/hands.ts";
 import { Hunger } from "@fly/body";
@@ -28,7 +29,7 @@ for (const outcome of ["refused", "trimmed", "accepted"] as const) test(`${outco
   expected.step(0.3, 0);
   assert.deepEqual(hunger, expected);
   pantry.mirror.sent(1);
-  const result = table.bite(1, mine.id, 0.099, outcome === "refused" ? 200 : 20, mine.y, 20, 0);
+  const result = table.bite(1, mine.id, 0.099, [{ x: outcome === "refused" ? 200 : 20, y: mine.y, z: 20 }], 0);
   const changed = table.flush()!;
   const meal = pantry.mirror.apply(1, changed.amounts, changed.gone, table.eaten.get(1) ?? 0, table.takeMeal(1));
   assert.ok(Math.abs(meal[0] - result.granted) < 1e-8);
@@ -52,7 +53,7 @@ test("a refused final bite restores food removed by local prediction", () => {
   const mine = pantry.foods[0];
   pantry.eat(mine, 1, 0.1);
   pantry.mirror.sent(1);
-  table.bite(1, mine.id, 0.01, 200, mine.y, 20, 0);
+  table.bite(1, mine.id, 0.01, [{ x: 200, y: mine.y, z: 20 }], 0);
   const change = table.flush()!;
   pantry.mirror.apply(1, change.amounts, change.gone, 0, table.takeMeal(1));
   assert.equal(pantry.foods[0]?.amount, 0.01);
@@ -75,7 +76,11 @@ test("an online food receipt feeds Life and its hunger exactly once", (t) => {
   const world = createPicnic();
   const brain = { status: "running", stateAt: 0, state: { command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 } }, tick() {} } as unknown as BrainDriver;
   const life = new Life(world, brain);
-  const host = { scene: new THREE.Scene(), life, hands: new Hands(world), fly: { model: { mark() {} } }, bubbles: { table: null } } as unknown as TableHost;
+  const scene = new THREE.Scene();
+  const host = {
+    scene, life, company: { list: [] }, others: new OtherFlies(scene, world), hands: new Hands(world), fly: { model: { mark() {} } }, bubbles: { table: null },
+    felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] }, flies: () => 1, seat() {}, share() {},
+  } as unknown as TableHost;
   const socket: TableSocket = { status: "connecting", closeCode: 0, closeReason: "", send() {}, drain() {}, close() {} };
   const online = new Online(host, () => socket, "ws://test", "abcdefghjk", "key", null);
   t.after(() => { online.leave(); online.dispose(); });

@@ -22,12 +22,21 @@ export async function dropFood(page: Page, drop: () => Promise<void>) {
   }
 }
 
-/** The brain can leave a meal. Retry at its new mouth position, keeping the guaranteed path separate from its choice to eat. */
+/** The brain can leave a meal: drop again, keeping the guaranteed path (honey reaches its taste senses) separate from its choice to eat. */
 export async function feedHoney(page: Page, drop: () => Promise<void>) {
   let sweet = 0, feed = 0, eaten = 0;
   for (let attempt = 1; attempt <= 5; attempt++) {
-    await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.hands.release());
-    await waitForGameTime(page, 0.4);
+    // Set down where the place starts it, on open table: wherever it has walked to (its brain's
+    // choice) may be the edge of something raised, and honey dropped in front of it there lands on
+    // the surface below, which it can't taste from where it stands.
+    await page.evaluate(() => {
+      const { hands, life } = (globalThis as unknown as { __fly: Game }).__fly;
+      hands.release();
+      const start = life.world.place.start;
+      life.body.place(start.x, start.z, start.yaw, start.y);
+    });
+    // The hand and the camera ease after it (a quarter of a second or so): settled, the hand is at its mouth.
+    await waitForGameTime(page, 1.5);
     const observation = page.evaluate(() => new Promise<{ sweet: number; feed: number; eaten: number }>((resolve, reject) => {
       const g = (globalThis as unknown as { __fly: Game }).__fly;
       const until = g.time + 4;

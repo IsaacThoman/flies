@@ -9,7 +9,7 @@
 import * as THREE from "three";
 import { FLY_LENGTH } from "@fly/body";
 import type { Looming } from "@fly/body";
-import { POP_SECONDS } from "@fly/net";
+import { MAX_OWN, POP_SECONDS } from "@fly/net";
 import type { TableBubbles } from "@fly/net";
 import { BREEZE, createSurface } from "@fly/world";
 import type { World } from "@fly/world";
@@ -76,6 +76,10 @@ export class Bubbles {
   #surface = createSurface();
   /** A bubble burst on the fly this frame: how hard it felt it (0 if none). */
   brushed = 0;
+  /** The same for each of the other flies this device lives, by their place in line, this frame. */
+  readonly brushedBy = new Float32Array(MAX_OWN);
+  /** Their middles, as the game last gave them: a bubble that reaches one bursts on it. */
+  #others: readonly THREE.Vector3Like[] = [];
   /** Bubbles drift over this place (Scene.bubbles). Without them there is nothing to see or feel of them. */
   enabled = true;
   /** How hard it is raining (the weather's rain, 0 to 1). */
@@ -163,8 +167,9 @@ export class Bubbles {
     if (table.bubbles.alive(s, t)) {
       table.bubbles.position(s, t, b);
       b.popping = 0;
-      if (Math.hypot(b.x - fly.x, b.y - fly.y, b.z - fly.z) >= b.r + FLY_LENGTH / 2 || !table.bubbles.pop(slot, s.cycle, t)) return;
-      this.brushed = BUBBLE_TOUCH;
+      const on = this.#on(b, fly);
+      if (on < 0 || !table.bubbles.pop(slot, s.cycle, t)) return;
+      this.#brush(on);
       table.burst(slot, s.cycle, t);
     }
     if (s.poppedAt >= 0 && t - s.poppedAt < POP_SECONDS) {
@@ -190,11 +195,33 @@ export class Bubbles {
     this.#uniforms.glint.value = Math.min(1, daylight.sunIntensity / GLINT_FULL);
   }
 
-  /** Moves the bubbles on. `fly` is the fly's middle: a bubble that reaches it bursts on it. */
-  update(time: number, dt: number, camera: THREE.Camera, sun: THREE.Vector3, gust: THREE.Vector3Like, fly: THREE.Vector3Like) {
+  /** Which fly a bubble has reached: 0 the followed one, then the others in line; -1 none (each about as round as half its length). */
+  #on(b: Bubble, fly: THREE.Vector3Like) {
+    if (Math.hypot(b.x - fly.x, b.y - fly.y, b.z - fly.z) < b.r + FLY_LENGTH / 2) return 0;
+    const others = this.#others;
+    for (let i = 0; i < others.length; i++) {
+      const o = others[i];
+      if (Math.hypot(b.x - o.x, b.y - o.y, b.z - o.z) < b.r + FLY_LENGTH / 2) return i + 1;
+    }
+    return -1;
+  }
+
+  #brush(on: number) {
+    if (on === 0) this.brushed = BUBBLE_TOUCH;
+    else this.brushedBy[on - 1] = BUBBLE_TOUCH;
+  }
+
+  /**
+   * Moves the bubbles on. `fly` is the followed fly's middle, and `others`
+   * the other flies' this device lives: a bubble that reaches one bursts on
+   * it. The four low ones bob past the followed fly.
+   */
+  update(time: number, dt: number, camera: THREE.Camera, sun: THREE.Vector3, gust: THREE.Vector3Like, fly: THREE.Vector3Like, others: readonly THREE.Vector3Like[] = []) {
     this.#uniforms.time.value = time;
     this.#uniforms.light.value.copy(sun).transformDirection(camera.matrixWorldInverse);
     this.brushed = 0;
+    this.brushedBy.fill(0);
+    this.#others = others;
     this.mesh.visible = this.enabled;
     if (!this.enabled) return;
     const world = this.#world;
@@ -220,10 +247,13 @@ export class Bubbles {
       let burst = b.y - b.r < s.y + 0.5 || b.y < b.r;
       // Raindrops hitting it.
       if (!burst && this.rain > 0 && this.#rnd.next() < this.rain * dt * 0.5) burst = true;
-      // Into the fly, or the fly into it (the fly about as round as half its length).
-      else if (!burst && Math.hypot(b.x - fly.x, b.y - fly.y, b.z - fly.z) < b.r + FLY_LENGTH / 2) {
-        burst = true;
-        this.brushed = BUBBLE_TOUCH;
+      // Into a fly, or a fly into it.
+      else if (!burst) {
+        const on = this.#on(b, fly);
+        if (on >= 0) {
+          burst = true;
+          this.#brush(on);
+        }
       }
       if (burst) {
         b.popping = 0.001;

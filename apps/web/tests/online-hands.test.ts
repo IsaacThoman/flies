@@ -6,6 +6,7 @@ import { AWAY, HANDS, HOLDING, TABLETOP_SCALE, createFlyState, encodeFlies } fro
 import { World } from "@fly/world";
 import { Life } from "../src/life.ts";
 import { Online } from "../src/online/online.ts";
+import { OtherFlies } from "../src/online/others.ts";
 import type { TableHost } from "../src/online/online.ts";
 import { Hands, TOOLS } from "../src/tools/hands.ts";
 
@@ -20,11 +21,15 @@ for (const tool of ["feather", "blow"]) for (const stop of ["away", "flag", "sil
     t.mock.method(performance, "now", () => now);
     const world = new World({ floor: { kind: "rect", hx: 500, hz: 500 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 300 });
     const life = new Life(world, {} as BrainDriver);
-    const host = { scene: new THREE.Scene(), life, hands: new Hands(world), eyes: { see() {} }, stage: { weather: { rain: 0 }, set: {} }, fly: { model: { mark() {} } }, bubbles: { table: null } } as unknown as TableHost;
+    const scene = new THREE.Scene();
+    const host = {
+      scene, life, company: { list: [] }, others: new OtherFlies(scene, world), hands: new Hands(world), eyes: { see() {} }, stage: { weather: { rain: 0 }, set: {} }, fly: { model: { mark() {} } },
+      bubbles: { table: null }, felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] }, flies: () => 1, seat() {}, share() {},
+    } as unknown as TableHost;
     const socket: TableSocket = { status: "connecting", closeCode: 0, closeReason: "", send() {}, drain() {}, close() {} };
     const online = new Online(host, () => socket, "ws://test", "abcdefghjk", "key", null);
     t.after(() => { online.leave(); online.dispose(); });
-    online.line.onMessage({ type: "joined", id: 2, colour: "#ffffff", away: false });
+    online.line.onMessage({ type: "joined", id: 2, colour: "#ffffff", away: false, of: 2 });
     const state = createFlyState();
     state.id = 2;
     state.t = now;
@@ -35,7 +40,11 @@ for (const tool of ["feather", "blow"]) for (const stop of ["away", "flag", "sil
     const hear = () => { const n = encodeFlies(batch, TABLETOP_SCALE, [state]); online.line.onFlies(new DataView(batch.buffer, 0, n)); };
     const camera = new THREE.PerspectiveCamera();
     camera.position.set(0, 10, 20);
-    const step = () => online.update(0.02, camera, 480, now / 1000, () => 0);
+    // The other flies posed where the table has them (the game does it each frame, others.ts), then the table's frame, which their hands act in.
+    const step = () => {
+      online.others.update(online.line.clock.now(now), 0.02, camera.position, 480, life.body);
+      online.update(0.02, camera, now / 1000, () => 0);
+    };
     const stimulus = () => tool === "feather" ? online.stroke : Math.hypot(online.air.x, online.air.y, online.air.z);
     step(); hear(); step();
     assert.ok(stimulus() > 0, "the live tool acts first");

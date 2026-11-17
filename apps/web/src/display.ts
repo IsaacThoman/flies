@@ -16,6 +16,22 @@ import type { SafeArea } from "@fly/contracts";
 export const TV_WIDTH = 640;
 export const TV_HEIGHT = 480;
 export const TV_ASPECT = 16 / 9;
+/**
+ * How the camera follows a screen narrower than the TV's: the share of the
+ * extra height kept as field of view. 1 would keep the TV's width in the
+ * picture (the fly as small across as on the TV, with a great deal of sky
+ * and table); 0.5 would keep the fly as many pixels long (and on a phone held
+ * upright, too big to turn round in). Shots of the whole table keep its
+ * width: it must fit.
+ */
+export const NARROW_KEEP = 0.7;
+
+/** A vertical field of view (degrees), framed for the TV's 16:9, on a screen of this shape. */
+export function fieldOfView(fov: number, aspect: number, keep = NARROW_KEEP): number {
+  if (aspect >= TV_ASPECT) return fov;
+  const t = Math.tan((fov * Math.PI) / 360) * Math.pow(TV_ASPECT / aspect, keep);
+  return (Math.atan(t) * 360) / Math.PI;
+}
 /** How many pixels every frame has, about. */
 export const PIXEL_BUDGET = TV_WIDTH * TV_HEIGHT;
 /** The TV's overlays are laid out in these units: 16:9, as wide as the screen looks. */
