@@ -1018,6 +1018,12 @@ separates real-fly evidence from what this chemical-only model can reproduce.
 `scripts/summarize-puff.ts` regenerates its response/wiring CSVs and paired
 bootstrap intervals from retained JSONL captures, without running the brain.
 
+`node packages/brain/scripts/olfaction.ts --part audit` checks glomerulus-labelled
+ORNs against the pinned release annotations and traces their anatomical routes.
+`--part simulate` measures fixed-rate channel stimulation without changing the
+game's senses. The [olfaction study](../../docs/olfaction-study.md) gives the
+protocols, reproduction commands, recovery controls and model limitations.
+
 `node packages/brain/scripts/probe.ts --type LPLC2,LC4 --side left` drives any group (by `--type`, `--superClass`, `--class`, `--subClass`, `--side`, `--nt`: comma-separated values or a `/regex/`) at `--rate` Hz for `--ms` and lists what responds, by super class and type, at the operating point. `--only <regex>` limits the list to some super classes, `--after <ms>` keeps running with the drive off to show what keeps going (driven neurons included), and `--set excitatory=0.2`, `--set saturation=0` and so on try another operating point. `--each type --target MN9` ranks each type in the selection by what it does to a target, and `--greedy` builds a set as `sweet`'s was built. The comment at the top of the file lists every option.
 
 `node packages/brain/scripts/wingbeat.ts` checks which campaniform sensilla are the legs' against FlyEM's nerves when the anatomy sidecar exists (otherwise reporting that the annotation check was skipped), and measures `grounded` and `wingbeat`: rest standing and in the air, `wingbeat` held, and the loop it closes with the body, with and without the body's floor (Senses; What it does and doesn't reproduce). `--rate` tries another rate for `wingbeat`.
