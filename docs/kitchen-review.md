@@ -355,7 +355,7 @@ Typecheck, lint and all 233 requested place, weather, server and net tests pass.
 The kitchen passes 3,028 top and 2,798 side samples in the drawn/felt check, with
 two static meshes and 85,346 triangles, without exceptions.
 
-## Orbit clearance investigation
+## Orbit clearance investigation at 44631136
 
 The exact reported failure reproduces at the bowl point
 (-76.4167, 39.5555, -59.9554), on a walkable roughly 54-degree inner slope.
@@ -370,5 +370,28 @@ points. Finer angular sampling reduces this to 0.041–0.043 mm and adds a surfa
 regression, keeping two meshes and 89,186 triangles inside the 90,000 budget.
 The world's bowl and banana dimensions are unchanged. No camera rule or existing
 test was changed. Places, drawn/felt, room rotation, eight-fly spawning, typecheck
-and lint pass; the orbit test remains blocked on the camera clearance rule. This
-head is not cleared for merging on an all-tests-pass basis.
+and lint passed; the orbit test at that head remained blocked on the camera
+clearance rule. The resolution is recorded below.
+
+
+## Dev integration and clearance resolution
+
+Merged origin/dev at 6db09581 with merge commit 242647ca. This includes the
+maintainer's bowl-camera correction (#163), greenhouse (#84), and the short
+README/documentation index (#164). Both greenhouse and kitchen remain in the
+world and scene registries, catalog, online room rotation, footprint rules,
+geometry budgets and fuzzers. The README follows dev; the kitchen description
+now lives in [the world guide](world.md#kitchen-counter).
+
+No camera code was changed relative to dev. The kitchen's Close orbit past the
+banana now passes, as do the bowl-slope camera regressions. Drawn/felt sampling
+passes 3,028 tops and 2,798 sides for the kitchen, with two static meshes and
+89,186 triangles. Greenhouse passes its own surface and rendering checks.
+
+`npm run typecheck`, `npm run lint` and `npm run tvos:typecheck` pass.
+All 199 tests in the requested batch pass without skips: documentation, orbit,
+camera, places, kitchen rendering and world, greenhouse, drawn/felt, footprints,
+protocol, body fuzz, room fuzz and room table behavior. Another 21 net limits and
+wire tests pass, including eight distinct level spawn positions in every place
+and kitchen room/food messages. Default-room rotation is derived from the shared
+place registry. No additional blind visual score is claimed for this merge.
