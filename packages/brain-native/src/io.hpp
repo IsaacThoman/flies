@@ -9,6 +9,7 @@
 #include "exact.hpp"
 
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -34,6 +35,8 @@ struct Senses {
   double bitter = 0, water = 0;
   /** Internal state, not a sense (types.ts's BrainSenses.thirst): 0 just drunk to 1 thirsty; anything not a number counts as 1. */
   double thirst = 1;
+  /** The air's temperature at each antenna's arista, °C (types.ts's BrainSenses.temperatureLeft and Right); NaN, left out: no input. */
+  double temperature_left = std::numeric_limits<double>::quiet_NaN(), temperature_right = std::numeric_limits<double>::quiet_NaN();
 };
 
 struct Command {
@@ -81,6 +84,14 @@ struct StateSpec {
   StateKey state;
 };
 
+/** One antenna's heating or cooling cells, whose rates thermo.hpp works out from the temperature there (io.ts's ThermoSpec). */
+struct ThermoSpec {
+  std::string name;
+  std::string description;
+  NeuronQuery select;
+  Side side;
+  bool heating;
+};
 struct ExcitabilityGroup { StateKey state; double mv; std::vector<uint32_t> neurons; };
 
 bool dfb_sleep(std::string_view type);
@@ -98,6 +109,8 @@ struct ReadoutSpec {
 std::vector<InputSpec> senses();
 std::vector<InputSpec> background();
 std::vector<StateSpec> state_inputs();
+/** io.ts's THERMO_INPUTS, in its order. */
+std::vector<ThermoSpec> thermo_inputs();
 std::vector<ReadoutSpec> readouts();
 
 /** decode() reads the readouts by these positions in readouts(). */
@@ -114,6 +127,11 @@ struct StateGroup {
   std::vector<uint32_t> neurons;
 };
 
+struct ThermoGroup {
+  ThermoSpec spec;
+  std::vector<uint32_t> neurons;
+};
+
 struct ReadoutGroup {
   ReadoutSpec spec;
   std::vector<uint32_t> neurons;
@@ -124,6 +142,8 @@ struct Wiring {
   std::vector<Group> background;
   /** The internal-state inputs this connectome has neurons for. */
   std::vector<StateGroup> state;
+  /** The thermoreceptor inputs this connectome has neurons for. */
+  std::vector<ThermoGroup> thermo;
   std::vector<ExcitabilityGroup> excitability;
   std::vector<ReadoutGroup> readouts;
 };

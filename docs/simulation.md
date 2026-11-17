@@ -21,6 +21,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | `maleTaste` | A front leg's tarsus on another fly's body, while it stands (on this device or at a table with others; every fly is a male): the taste of a male's cuticle, 1 while touching, easing out over 0.3 s. |
 | `hunger` | Not a sense: how hungry it is (below). |
 | `thirst` | Not a sense: how thirsty it is (below). |
+| `temperatureLeft`, `temperatureRight` | The air's temperature, °C, at each antenna's tip, where its arista's heating and cooling cells are: the world's (`packages/world/src/climate.ts`), the place's ambient (25 °C where it names none, the temperature flies are kept at and choose) plus its warm and cool spots, each a Gaussian of distance around a point. The brain's thermoreceptors turn it into firing as recorded from the arista, mostly answering change (`packages/brain/README.md`, Temperature). The game says only how warm the air is; nothing in the body judges it. The body works it out every frame, but `Life` doesn't send it (`feelsTemperature`, off): the brain so far doesn't avoid warmth that flies avoid. |
 | `wingbeat` | How hard its own wings beat, felt by their and the halteres' strain sensors: in the air, the drive it flies with (the brain's `wings`, or the tarsal reflex's floor where that is higher, see Flight); on its feet, only as far as the pose opens them, so 0 with the wings folded, and 0 from the step it lands in (tarsal contact stops a fly's wings). |
 
 **Hunger** (`packages/body/src/hunger.ts`). The body keeps account of how

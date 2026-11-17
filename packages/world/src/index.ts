@@ -3,6 +3,7 @@
 
 export * from "./shapes.ts";
 export * from "./world.ts";
+export * from "./climate.ts";
 export * from "./picnic.ts";
 export * from "./windowsill.ts";
 export * from "./lab.ts";

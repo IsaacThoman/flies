@@ -80,6 +80,16 @@ export type BrainSenses = {
   sleepPressure?: number;
   /** How deeply it sleeps: 0 awake, rising to 1 over a bout's first quarter of an hour. */
   sleepDepth?: number;
+  /**
+   * The air's temperature at the left and right antenna's arista, °C: what
+   * its heating and cooling cells feel (thermo.ts turns it into their
+   * firing; the brain does the rest). A physical temperature, not a
+   * judgement of it: the game sets what the world is, at each antenna, every
+   * tick. Left out, or not a number, that antenna's thermoreceptors get no
+   * input: the brain as it was before it had them.
+   */
+  temperatureLeft?: number;
+  temperatureRight?: number;
 };
 
 /**

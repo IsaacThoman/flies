@@ -44,6 +44,13 @@ export class Life {
    * they give it one). The game gives it one set to the real time of day.
    */
   rhythm: Rhythm | null = null;
+  /**
+   * Whether the brain is told the air's temperature at its antennae. Off in the
+   * game: so far its thermoreceptors don't keep it off a warm floor, as a fly's
+   * do, and a steady 25 °C makes it walk a quarter less
+   * (packages/brain/README.md, Temperature). scripts/thermotaxis.ts turns it on.
+   */
+  feelsTemperature = false;
   /** The eyes' picture for this frame, when the brain has eyes and they're open. Set by the eyes before `step`. */
   light: { left: Float32Array; right: Float32Array } | null = null;
   /** The wing it sings with: 1 its left, -1 its right, toward the nearest other fly where there is one. */
@@ -155,6 +162,13 @@ export class Life {
     sent.wingbeat = felt.wingbeat;
     sent.bitter = felt.bitter;
     sent.water = felt.water;
+    if (this.feelsTemperature) {
+      sent.temperatureLeft = felt.temperatureLeft;
+      sent.temperatureRight = felt.temperatureRight;
+    } else {
+      delete sent.temperatureLeft;
+      delete sent.temperatureRight;
+    }
     if (this.light) sent.light = this.light;
     else delete sent.light;
     const rhythm = this.rhythm;

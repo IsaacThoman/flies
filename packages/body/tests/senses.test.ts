@@ -215,3 +215,19 @@ test("mouth food remains eligible when the feet taste something stronger", () =>
   assert.equal(tracker.tasting.food, null);
   assert.equal(tracker.tasting.byMouth, false);
 });
+
+test("each antenna feels the air's temperature at its tip: 25 °C on a plain table, more on the side nearer a warm spot", () => {
+  const table = openTable(100);
+  const body = new FlyBody(table, { x: 0, z: 0, yaw: 0 });
+  const tracker = new SenseTracker();
+  const plain = tracker.update(input(body, { world: table, pantry: new Pantry(table, []) }));
+  assert.equal(plain.temperatureLeft, 25);
+  assert.equal(plain.temperatureRight, 25);
+  // Facing +z, its left is +x: a warm spot off to its left.
+  table.temperature.spots.push({ x: 3, y: 0, z: 1, radius: 2, delta: 6 });
+  const s = tracker.update(input(body, { world: table, pantry: new Pantry(table, []) }));
+  assert.ok(s.temperatureLeft! > s.temperatureRight! + 0.1, `left ${s.temperatureLeft}, right ${s.temperatureRight}`);
+  assert.ok(s.temperatureRight! > 25);
+  const tip = body.point(HEAD_AHEAD + ANTENNA_AHEAD, 0.3, 0.12, { x: 0, y: 0, z: 0 });
+  assert.equal(s.temperatureLeft, table.temperature.at(tip.x, tip.y, tip.z));
+});

@@ -47,6 +47,13 @@ typedef struct fly_senses {
    * initialised without it leaves: that is a fly that has just drunk.
    */
   float thirst;
+  /**
+   * The air's temperature at the left and right antenna's arista, °C
+   * (BrainSenses.temperatureLeft and Right). NAN for a host that has no
+   * temperature: those thermoreceptors get no input, the brain as it was
+   * before them. Not 0: that is freezing.
+   */
+  float temperature_left, temperature_right;
 } fly_senses;
 
 /** What the brain wants done. All 0 to 1 except turn, which runs -1 (hard left) to 1 (hard right). */

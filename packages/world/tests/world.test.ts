@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FOODS, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TABLE_RADIUS, World, createPicnic, createSurface, isDropped } from "../src/index.ts";
+import { AMBIENT_TEMPERATURE, FOODS, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TABLE_RADIUS, World, createPicnic, createSurface, isDropped } from "../src/index.ts";
 import type { RayHit, Solid } from "../src/index.ts";
 
 /** A bare round table this wide, with nothing on it. */
@@ -347,4 +347,24 @@ test("a short ray among what was gathered round a point meets what a ray through
     }
   }
   assert.ok(near > 50);
+});
+
+test("the air is the place's ambient temperature, 25 °C where it names none, warmer or cooler near its spots, and its own again when loaded", () => {
+  const plain = openTable(50);
+  assert.equal(AMBIENT_TEMPERATURE, 25);
+  assert.equal(plain.temperature.at(10, 1, -20), 25);
+  const spot = { x: 10, y: 0, z: 0, radius: 4, delta: 6 };
+  const place = { floor: { kind: "circle" as const, r: 50 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320, climate: { ambient: 22, spots: [spot] } };
+  const warm = new World(place);
+  assert.equal(warm.temperature.at(10, 0, 0), 28);
+  assert.ok(Math.abs(warm.temperature.at(10 + 1.1774 * 4, 0, 0) - 25) < 0.01, "half as much warmer at 1.18 radii");
+  assert.ok(warm.temperature.at(40, 0, 0) - 22 < 1e-6);
+  // Something warm put down while the place is loaded, then the place loaded again.
+  warm.temperature.spots.push({ x: -10, y: 0, z: 0, radius: 2, delta: -9 });
+  assert.equal(warm.temperature.at(-10, 0, 0), 22 - 9 + 6 * Math.exp(-400 / 32));
+  warm.load(place);
+  assert.equal(warm.temperature.spots.length, 1);
+  assert.equal(place.climate.spots.length, 1, "the place's own spots aren't changed");
+  warm.load(plain.place);
+  assert.equal(warm.temperature.at(10, 0, 0), 25);
 });
