@@ -8,7 +8,6 @@ import { startServer as startRooms } from "../../server/src/server.ts";
 import { Fingers, openGame, startServer, targetOf, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import { fakeFly } from "../../../scripts/tables.ts";
 import type { FakeFly } from "../../../scripts/tables.ts";
-import { disableScreensaver } from "./settings.ts";
 
 const rooms = await startRooms({ port: 0, dataDir: null, log() {} });
 const endpoint = `ws://127.0.0.1:${rooms.port}/rooms`;
@@ -23,7 +22,6 @@ try {
   opened = await openGame({ url: `${served.url}?rooms=${encodeURIComponent(endpoint)}`, device: "iPhone 13" });
   const { page, errors } = opened;
   await waitFor(page, "screen=title");
-  await disableScreensaver(page);
   const fingers = await Fingers.on(page);
   await fingers.tap(await targetOf(page, "row", 3));
   await waitFor(page, "onlineView=rooms,rooms~Input");

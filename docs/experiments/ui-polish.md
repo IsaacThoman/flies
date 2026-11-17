@@ -102,3 +102,18 @@ Round 3 key: C6 is M4 re-rendered on current `dev`; V9 is the candidate. Orders:
 ### Round 4 · preparation
 
 Reserve the title's footer in portrait layouts. Underline editable values without adding instructional text. Scale the anatomical panel's heading for its actual CSS size. Allow corner panels to use space occupied by remote hints only when those hints are absent, relaying out on input-mode changes rather than allocating each frame. During play the stats identify their contents; when watching they retain the activity caption that the hidden HUD would otherwise supply. Tests cover both hint modes across the existing full geometry matrix.
+
+Round 4 key: H2 is the candidate; V9 is the accepted reference. Orders U/V/W: H2/V9; X (regressions): V9/H2. All reviewers are fresh, independent and high-effort, with only the rubric and neutral evidence. Every screen has five-size renders and setting navigation traces.
+
+| Round 4 scorer | Set | Clarity | Polish | Remote | Touch | Fit | Legibility | Redundancy | Accessibility | Mean | Rank |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| U | V9 | 7 | 7 | 8 | 8 | 8 | 7 | 7 | 7 | 7.38 | 2 |
+| U | H2 | 8 | 8 | 8 | 9 | 9 | 8 | 9 | 8 | 8.38 | 1 |
+| V | V9 | 7 | 7 | 8 | 8 | 8 | 7 | 8 | 7 | 7.50 | 2 |
+| V | H2 | 8 | 8 | 8 | 9 | 9 | 8 | 9 | 7 | 8.25 | 1 |
+| W | V9 | 7 | 7 | 8 | 7 | 7 | 7 | 8 | 7 | 7.25 | 2 |
+| W | H2 | 8 | 8 | 8 | 8 | 8 | 7 | 9 | 7 | 7.88 | 1 |
+
+**Accepted: H2, 8.17/10**, unanimously ranked first, against a paired reference mean of 7.38. The regression review flags taller phone-landscape corner panels consuming more play space; they remain clear of controls and provide larger text. Remaining concerns: unexplained tool icons, unused space below short Settings pages, dense About copy and contrast of white text on selected cyan buttons.
+
+The owner's later process instruction supersedes the initial draft-only rule: merge current dev with a merge commit, preserve dev's behavior, run local typecheck/lint/area tests, then mark a validated PR ready for the merge shepherd without waiting on GitHub CI. `origin/dev` was merged at 1ebc3a44, preserving its menu identities, text entry, held input, Online failure states and other behavior. Code Join retains field identity and rejects stale targets. Local targeted UI tests: 100 pass. Typecheck and lint pass. A helper removed upstream was removed from the new e2e check; openGame now supplies that screensaver setup itself. The unreviewed next candidate is held outside this PR for a new branch after landing.
