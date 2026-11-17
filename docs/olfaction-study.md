@@ -5,6 +5,10 @@ This study asks whether independently identified olfactory receptor neurons
 them. The experiment uses the TypeScript brain, unchanged; no native brain,
 world, default behaviour or sound is changed.
 
+The inputs are identifiable and carry graded activity into the brain, but
+28/75 stimulated trials fail the declared command-recovery test. The study
+stops at gate 2; steering and a plume prototype remain untested.
+
 The questions are sequential gates: identify inputs from annotations; establish
 stable, graded, reversible responses with defensible valence; establish antenna
 steering; only then build a flagged plume prototype. The [protocol and review
@@ -58,20 +62,22 @@ VA2, DP1m and VM2. Their silencing and receptor rescue assays establish attracti
 for DM1 (Or42b) and VA2 (Or92a). Response to vinegar alone does not establish an
 attraction channel for DM2 or DM4. Figures 4–5 identify DM5 as the additional
 channel responsible for reduced attraction at stronger vinegar; this is not a
-claim that any activation of DM5 causes universal aversion.
+claim that any activation of DM5 causes universal aversion. Their behaviour assay
+used starved females; transfer to this male model is a hypothesis, not a matched
+sex/state replication.
 [Paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC2702439/),
 [DOI](https://doi.org/10.1038/nature07983).
 
 **DA2 is the geosmin avoidance comparator.** Stensmyr et al. (2012), Summary
 and Figures 2–4, identify Or56a ORNs projecting to DA2 and geosmin-selective PNs.
-DA2 activation is necessary and sufficient for the avoidance they measure,
-and suppresses attraction, feeding and egg laying. This supports a harmful-food
+DA2 activation is necessary and sufficient for the avoidance they measure;
+Figures 5–6 show suppression of attraction, feeding and egg laying. This supports a harmful-food
 comparator, not a numerical geosmin concentration-to-spike function here.
 [Paper record](https://pubmed.ncbi.nlm.nih.gov/23217715/),
 [author manuscript](https://pure.mpg.de/rest/items/item_1577953_11/component/file_1577957/content),
 [DOI](https://doi.org/10.1016/j.cell.2012.09.046).
 
-**V is the CO₂ avoidance comparator.** Suh et al. (2004), Figures 3–4,
+**V is the CO₂ avoidance comparator.** Suh et al. (2004), Figure 3,
 identify the CO₂-sensitive V glomerulus and Gr21a-positive neurons, and show
 that blocking their transmission blocks avoidance. That is a defined assay's
 avoidance circuit, not a claim that CO₂ always means danger in every context.
@@ -139,28 +145,81 @@ and washout failures against the protocol's 1 Hz / 0.05 tolerances.
 
 ### Recorded response
 
-The current evidence contains seed 1 of the protocol; replication is needed.
-At 100 events/s, mean rates during the five-second drive are:
+All 78 trials are complete (936 simulated seconds), with seeds 1–3 and no
+parameter or input-population changes. At 100 events/s, rates averaged over
+the five-second drive, then equally over seeds, are:
 
 | Group driven | Actual driven ORN Hz | ALPN Hz | LH Hz | KC Hz | MBON Hz | DN Hz |
 |---|---:|---:|---:|---:|---:|---:|
-| DM1 | 90.83 | 2.14 | 1.57 | 0.83 | 1.53 | 0.31 |
-| VA2 | 90.68 | 1.08 | 1.52 | 0.51 | 0.56 | 0.39 |
-| DA2 | 90.35 | 1.97 | 0.46 | 0.001 | 0.01 | 0.31 |
-| V | 90.35 | 2.01 | 1.85 | 0.13 | 0.56 | 0.41 |
-| DM5 | 91.14 | 1.37 | 0.22 | 0.003 | 0.02 | 0.31 |
+| DM1 | 91.21 | 2.15 | 1.58 | 0.83 | 1.53 | 0.28 |
+| VA2 | 90.86 | 1.09 | 1.52 | 0.51 | 0.56 | 0.39 |
+| DA2 | 90.59 | 1.98 | 0.46 | 0.001 | 0.02 | 0.29 |
+| V | 90.40 | 2.00 | 1.84 | 0.13 | 0.53 | 0.39 |
+| DM5 | 90.89 | 1.37 | 0.22 | 0.003 | 0.01 | 0.29 |
 
 Population sizes are ALPN 686, LH 2,028, KC 4,064, MBON 97 and DN 1,314;
 the means include silent cells and cannot exclude a small active subgroup.
-Propagation clearly differs by channel. That does not establish useful valence.
-For DM1 at 100 events/s, command changes against the paired control are walk
-+0.034 and turn −0.107; VA2 gives walk −0.019 and turn −0.028. DA2 gives walk
-+0.008, turn −0.006 and no backing; V gives backing +0.031. Feeding and grooming
-remain zero. These are commands with no spatial task, and neither a reduction
-in walking nor a fixed turn is proof of attraction or avoidance.
+Propagation clearly differs by channel. The lateral horn's whole-population
+mean is graded at **every adjacent rate step in every seed**, not just in this
+average (15 monotonic five-point sequences):
 
-Gate 1 holds for selecting annotated inputs. Gate 2 is not established by this
-evidence; gates 3 and 4 have not been run. No plume prototype is included.
+| Input events/s | 10 | 25 | 50 | 100 | 200 |
+|---|---:|---:|---:|---:|---:|
+| DM1: LH Hz | 0.153 | 0.501 | 0.979 | 1.584 | 1.927 |
+| VA2: LH Hz | 0.105 | 0.437 | 0.925 | 1.516 | 1.753 |
+| DA2: LH Hz | 0.002 | 0.038 | 0.174 | 0.464 | 0.861 |
+| V: LH Hz | 0.073 | 0.396 | 1.008 | 1.844 | 2.705 |
+| DM5: LH Hz | 0.004 | 0.034 | 0.097 | 0.217 | 0.369 |
+
+All commands are also measured. At 100 events/s, mean stimulus-minus-control
+commands over the drive, averaged equally over seeds (turn negative is left):
+
+| Driven | walk | turn | back | escape | wings | groom | feed | sing |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| DM1 | 0.006 | −0.070 | −0.001 | 0.000 | −0.001 | 0 | 0 | 0 |
+| VA2 | −0.022 | −0.015 | 0.002 | −0.006 | −0.001 | 0 | 0 | 0 |
+| DA2 | −0.014 | 0.013 | 0.003 | 0.000 | 0.000 | 0 | 0 | 0 |
+| V | −0.024 | 0.025 | 0.023 | −0.007 | −0.001 | 0 | 0 | 0.003 |
+| DM5 | −0.006 | 0.009 | 0.002 | −0.001 | −0.002 | 0 | 0 | 0 |
+
+These are commands without a spatial task. A reduction in walking or a fixed
+turn is not proof of attraction or avoidance. For example, DM1's walk change
+ranges from −0.016 to +0.034 across seeds at 100 events/s; V consistently raises
+backing a little (+0.016 to +0.031), while DA2 does not show an equally clear
+avoidance command. Both antennae are driven; DM1's leftward turn cannot be
+called turning toward an odour. The [compact results](olfaction-results.json)
+retain every rate and seed, across-seed means/ranges, all commands, readouts,
+peaks and washout differences. The unabridged reducer additionally retains
+each seed's 1 s time course.
+
+**Gate 2 fails its preregistered command-recovery test: 28 of 75 stimulated
+trials fail**, even though all 75 pass the watched-population recovery test.
+
+| Seed | Stimulated trials failing recovery | Largest final command difference, magnitude | Largest final population difference, Hz |
+|---|---:|---:|---:|
+| 1 | 16/25 | 0.131399 | 0.061644 |
+| 2 | 12/25 | 0.105376 | 0.133181 |
+| 3 | 0/25 | 0.012500 | 0.023592 |
+
+Final means refer to the last washout second, 4–5 s after offset, compared with
+the same seed's time-matched control. The worst residual is turn −0.131399 for
+DM5 at 25 events/s, seed 1. All driven ORN groups are silent then. Watched region
+mean rates peak at at most 6.208 Hz during stimulation; the active set reaches
+85,367 neurons across all trial windows. These finite, short responses and
+quiet population washouts do not look like a population runaway, but cannot
+exclude high rates in a small subgroup or establish long-term stability.
+
+A failed command tolerance does **not** prove persistent olfactory activation:
+a transient input can change a nonlinear network's subsequent spontaneous
+trajectory. The protocol used fixed paired-control tolerances, not a calibrated
+noise distribution. Nor did it specify a validated quantitative valence endpoint:
+this bilateral assay cannot establish valence even if recovery passes. These are
+limits of the experiment, not reasons to loosen its criteria after measurement.
+No claim that real flies, or a better olfactory model, lack this behaviour follows.
+
+Gate 1 holds for selecting annotated inputs. Gate 2 fails the stated recovery
+criterion; valence remains unestablished. Gates 3 and 4 have not been run.
+No plume prototype is included.
 
 ## Limits and the next experiment
 
@@ -168,13 +227,40 @@ The model is a point-neuron rate-input experiment. One ORN spike reaches all
 its targets from one membrane state: axonal branch-specific release differences,
 receptor transduction, sensillum interactions and stimulus adaptation are absent.
 Presynaptic inhibition onto an ORN terminal cannot be represented faithfully by
-synapses onto a single whole-cell state. Most ORNs in a real fly are not silent
-in clean air; this assay starts from the existing model's silent ORN baseline.
+synapses onto a single whole-cell state. Hallem & Carlson's Table S1 includes
+spontaneous ORN firing; this assay starts from the model's silent ORN baseline.
 Neuropeptides and receptor-specific hunger gain are absent, and dopamine,
 octopamine and serotonin outputs are muted. Consequently, neither state-dependent
 odour attraction nor mushroom-body learning/reinforcement is established by a
 short fixed-rate response. The existing lateral-LN transmitter override is
 especially material to an olfactory assay; this study does not retune it.
+Root et al. (2011) directly show that sNPF signalling in Or42b neurons is needed
+for starvation-induced food search; a fixed-rate input with no peptide signalling
+cannot reproduce that gate. [Primary paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC3073827/).
+
+The model files are those of `dev` at
+`c53a64c043cf84c2b7d2d1b7e69d76798ce0b051`; none is edited in this study.
+Node v26.12.0 ran the measurements. JSON records the operating point, data
+hashes and population sizes. Library defaults, including hunger 1 and the
+background's left/right balancing, are retained.
+
+The immediate follow-up is a recovery-control study, not a plume: preregister
+at least 20 seeds and a longer washout, compare the existing paired controls
+with an explicitly artificial tiny sensory perturbation, and compare distributions
+of washout command differences. That can distinguish sensitivity to trajectory
+perturbations from olfactory persistence without relaxing the failed tolerance
+after seeing these data. Obtain channel-specific baseline and stimulus rates
+from the relevant electrophysiology before claiming natural-odour responses.
+
+Only after gates 2 and 3 independently pass should a maintainer add a separate
+opt-in TypeScript experiment: an analytic wind-advected, diffusion-broadened
+concentration field per food patch, sampled at two antenna offsets into reused
+buffers, delivered through labelled sensory inputs. No direct steering, distance
+bonus or food-directed background term is permissible. Keep native/default
+behaviour unchanged, predeclare plume constants and food-reach radius/time,
+and compare paired trials with odour on/off across held-out seeds and mirrored
+source layouts. Report successes over all trials with uncertainty, including
+failures; do not choose a plume by navigation success on the reported trials.
 
 For a later steering gate, Borst & Heisenberg (1982), Summary, demonstrate
 turning toward higher antennal concentration under their open-loop conditions.
@@ -195,6 +281,7 @@ node packages/brain/scripts/olfaction.ts --part audit > /tmp/olfaction-audit.jso
 node packages/brain/scripts/olfaction.ts --part simulate --seeds 1 > /tmp/olfaction-seed1.json
 node packages/brain/scripts/olfaction.ts --part simulate --seeds 2,3 > /tmp/olfaction-seed23.json
 node packages/brain/scripts/olfaction-summary.ts --results /tmp/olfaction-seed1.json,/tmp/olfaction-seed23.json > /tmp/olfaction-summary.json
+# For the checked-in compact summary, append --compact. A partial run needs --partial.
 ```
 
 Simulation and the full repository checks need a `/tmp/flies-heavy/slot-N` on
@@ -202,3 +289,25 @@ the shared machine; release within ten minutes and wait two minutes between
 batches. Raw input data and full recordings remain outside git. Scripts refuse
 different wiring or annotation bytes; reviewing another release needs an explicit
 provenance review rather than silently repinning the hash.
+
+## Verification
+
+`npm run lint` and `npm run typecheck` pass. The full `npm test` run's functional
+phase reports 735 tests: 734 pass, one skipped (no wasi-sdk), none fail. Its
+four serial budget tests report three passes and one failure: the unmodified
+brain cost test measures all-senses cost at 0.508 M5 Pro CPU s/s against 0.5.
+A fresh-slot isolated rerun of `packages/brain/src/cost.budget.ts` also fails:
+construction 259 ms against 250, all-senses cost 0.580 s/s. Thus the full command
+is **not green**. No performance budget or runtime parameter was changed to
+remove that result; the runtime/native source diff against the study's base
+commit is empty. Shared-machine contention is a possible contributor, not a
+demonstrated explanation. No web/e2e behaviour is changed by these offline tools.
+
+The full test run was paused with its owned processes stopped, then resumed in
+a later slot, to respect the ten-minute limit. Budget tests ran subsequently,
+without that pause. The summary reducer also verifies identical pre-stimulation
+bins and rejects missing protocol seeds unless `--partial` is explicit; partial
+outputs are marked `completeProtocol: false`.
+
+Independent audit scores and comparison keys are in the
+[review log](olfaction-review.md).
