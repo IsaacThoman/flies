@@ -119,4 +119,97 @@ adds deterministic connection clocks plus reproducible report fingerprints.
 The lamp boundary is checked at 22:00. The rain-boundary challenge above
 was rejected as a test target; its survival is reported honestly.
 
-Final blind scores and validation are being collected.
+Round 2 key: C9; H3 is Q2 under a neutral name; V6 is an identical C9
+decoy. Presentation orders were C9/H3/V6, H3/C9/V6, and H3/V6/C9.
+Every reviewer gave the duplicate sets identical scores, so no noise
+expansion was needed.
+
+| Round | Reviewer | Set | Scores /10 | Ranking |
+| --- | --- | --- | --- | --- |
+| 2 | 1 | C9 and V6 | 9.5, 8.5, 8.5, 9, 9 | C9 = V6 > H3 |
+| 2 | 1 | H3 | 8.5, 7.5, 6, 9, 7 | |
+| 2 | 2 | C9 and V6 | 9.8, 9, 8, 9, 8.5 | C9 = V6 > H3 |
+| 2 | 2 | H3 | 8.5, 8.5, 6, 9, 6.5 | |
+| 2 | 3 | C9 and V6 | 9.45, 9, 8, 10, 8 | C9 = V6 > H3 |
+| 2 | 3 | H3 | 8.27, 8, 6, 10, 7 | |
+
+Round 2 mean: **8.88**. All three ranked it higher. The separate regression
+reviewer found an unbounded pong barrier introduced by replacing the sleep.
+That finding was accepted. The rain equality survivor was retained as
+reported above; it was never counted as killed or mathematically equivalent.
+
+Round 3 bounds the acknowledgement by a failure watchdog and rejects a
+closed/errored socket, with listeners cleaned up. Suppressing all pongs
+now produces a normal test failure after about two seconds, rather than
+an indefinite hang. Successful tests still wait for the event, never a
+wall-clock delay. A public wire test now checks initial and periodic pings
+and the subsequent clock update; deleting the ping send survives C9 but
+is killed here. This adds an eighth independent challenge, for **7/8**
+kills. The fixed sample remains **68/68**. Workspace package manifests
+also keep archived runs isolated when dependency links point elsewhere.
+
+Round 3 key: R8; C9 is the retained comparison set. Presentation orders
+were R8/C9, R8/C9, and C9/R8. Reviewers were fresh and used the owner's
+updated effort setting.
+
+| Round | Reviewer | Set | Scores /10 | Ranking |
+| --- | --- | --- | --- | --- |
+| 3 | 1 | R8 | 9.55, 9, 9, 9.5, 9 | R8 > C9 |
+| 3 | 1 | C9 | 9.36, 8.5, 8, 9.5, 8.5 | |
+| 3 | 2 | R8 | 9.55, 9, 8, 9, 8.5 | R8 > C9 |
+| 3 | 2 | C9 | 9.36, 8.5, 7, 9, 8 | |
+| 3 | 3 | R8 | 9.82, 9.5, 8.5, 9, 9 | R8 > C9 |
+| 3 | 3 | C9 | 9.73, 9, 7.5, 9, 8.5 | |
+
+Round 3 mean: **9.06** (module scores averaged equally, then the five
+criteria and three primary reviewers; regression reviewers are not folded
+into that mean). All three scored and ranked R8 higher. The separate
+regression reviewer found no introduced regression. The experiment stops
+at the requested mean of at least nine.
+
+| Round | Mean | Sample kills | Independent challenges |
+| --- | --- | --- | --- |
+| 0 | 4.29 | 20/68; corrected covering-test control 21/68 | not yet proposed |
+| 1 | 7.92 | 67/68 | 0/7 in retrospective probes of Q2 |
+| 2 | 8.88 | 68/68 | 6/7 |
+| 3 | 9.06 | 68/68 | 7/8 |
+
+The single best result is the room-save retry regression: it protects
+unsaved rooms after a filesystem failure. The additions are worth merging
+as a test-hardening change, with the limited mutation sample and remaining
+gaps stated plainly. The pull request stays draft for the maintainer.
+
+## Validation
+
+`npm test` includes the project's serial CPU budget tests. All added tests
+run unconditionally; the optional-data/tool skips below predate this change.
+
+| Configuration | Tests | Passed | Existing skips | CPU seconds | Elapsed seconds |
+| --- | --- | --- | --- | --- | --- |
+| Control bd88a01, optional connectome absent | 725 | 683 | 42 | 134.76 | 106.79 |
+| Branch, same optional-data configuration | 763 | 721 | 42 | 105.46 | 65.95 |
+| Branch with cached real connectome | 763 | 759 | 4 | 515.92 | 393.90 |
+
+The matched configuration shows no >10% CPU growth. These are shared-machine
+measurements, not evidence of a speedup; the real-connectome run does more
+work and is not compared with the data-free control. An earlier control
+snapshot lost executable bits; that failed setup run was discarded and
+replaced by the passing control above.
+
+`npm run lint` and `npm run typecheck` pass. The affected room e2e suite
+passes with the real brain: two devices share food, rest and reconnect,
+survive a server restart, move places, enforce passwords and removal, and
+an eight-fly room stays within the existing budgets over every screen
+shape. It completed in 128 s. Servers, browser and heavy slots were released.
+
+No camera, body collision, world collision, native-brain or rendering code
+was edited. Broader mutations of floor/rays and other online adapters, and
+deeper runtime validation of welcome fields, remain useful follow-up work.
+
+
+The legacy room-list test helper bounds each individual message wait but
+not the total number of incorrect lists; a flooding faulty server can keep
+it waiting. Reviewers also identified incomplete welcome payloads with a
+finite clock and unsolicited future-timestamp pongs as useful next input
+validation cases. Those are follow-up gaps, not claims that the normal
+server emits them or that this experiment proves complete wire validation.
