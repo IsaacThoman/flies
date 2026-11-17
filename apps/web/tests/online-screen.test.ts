@@ -52,7 +52,7 @@ class FakeTyping implements TextEntry {
 }
 
 const ROOMS: RoomWire[] = [
-  { code: "aaaaaaaaaa", name: "Sunny Crumbs", place: "bar", flies: 3, locked: false },
+  { code: "aaaaaaaaaa", name: "Sunny Crumbs", place: "greenhouse", flies: 3, locked: false },
   { code: "bbbbbbbbbb", name: "Secret Sugar", place: "lab", flies: 1, locked: true },
   { code: "cccccccccc", name: "Packed", place: "picnic", flies: MAX_FLIES, locked: false },
 ];
@@ -131,7 +131,7 @@ test("the rooms: a new one, a code, then each listed room by its name, its place
   step();
   const rows = screen.menu.items as ActionItem[];
   assert.deepEqual(rows.map((i) => i.id), ["new", "code", "room:aaaaaaaaaa", "room:bbbbbbbbbb", "room:cccccccccc"]);
-  assert.deepEqual([rows[2].label, rows[2].swatch, rows[2].count, rows[2].locked], ["Sunny Crumbs", placeInfo("bar").colour, [3, MAX_FLIES], false]);
+  assert.deepEqual([rows[2].label, rows[2].swatch, rows[2].count, rows[2].locked], ["Sunny Crumbs", placeInfo("greenhouse").colour, [3, MAX_FLIES], false]);
   assert.equal(rows[3].locked, true);
   assert.equal(rows[4].disabled, true, "full");
   // The list changes as the room server says: a room empties out of it.

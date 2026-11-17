@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import { random } from "../../scene/build.ts";
 import type { Builder } from "./builder.ts";
-import { tag } from "../bar/materials.ts";
+import { tag } from "./geometry.ts";
 import { KIND } from "./kinds.ts";
 import { Faces, film } from "./rest-shapes.ts";
 

@@ -3,7 +3,6 @@
 // is apps/web/src/places/catalog.ts (a test holds them to the same ids).
 
 import { GREENHOUSE } from "./greenhouse.ts";
-import { BAR } from "./bar.ts";
 import { KITCHEN } from "./kitchen.ts";
 import { LAB } from "./lab.ts";
 import { PICNIC } from "./picnic.ts";
@@ -11,4 +10,4 @@ import { RESTAURANT } from "./restaurant.ts";
 import { WINDOWSILL } from "./windowsill.ts";
 import type { Place } from "./world.ts";
 
-export const WORLDS: Readonly<Record<string, Place>> = { greenhouse: GREENHOUSE, picnic: PICNIC, windowsill: WINDOWSILL, lab: LAB, bar: BAR, restaurant: RESTAURANT, kitchen: KITCHEN };
+export const WORLDS: Readonly<Record<string, Place>> = { greenhouse: GREENHOUSE, picnic: PICNIC, windowsill: WINDOWSILL, lab: LAB, restaurant: RESTAURANT, kitchen: KITCHEN };

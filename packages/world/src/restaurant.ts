@@ -169,17 +169,21 @@ export const WALL_THINGS = {
   exit: { x: 3350, z: DINING_ROOM.hz - 40, hx: 170, hz: 40, bottom: 2480, top: 2660 },
 };
 
-/** A bottle: a round (or square) body to its shoulder, then a neck. */
-export type BottleKind = "wine" | "spirit" | "square" | "tall";
+/**
+ * A bottle: a round (or square) body to its shoulder, then a neck. Mineral
+ * water; juice, its neck wide for a screw cap; a square bottle of oil or
+ * syrup; and the tall, slim bottles of the coffee syrups.
+ */
+export type BottleKind = "water" | "juice" | "square" | "syrup";
 export const BOTTLE_SHAPES: Readonly<Record<BottleKind, { r: number; body: number; neck: number; top: number }>> = {
-  wine: { r: 37, body: 220, neck: 14, top: 300 },
-  spirit: { r: 40, body: 200, neck: 15, top: 270 },
+  water: { r: 37, body: 220, neck: 17, top: 275 },
+  juice: { r: 40, body: 200, neck: 20, top: 255 },
   square: { r: 42, body: 210, neck: 14, top: 265 },
-  tall: { r: 33, body: 260, neck: 12, top: 330 },
+  syrup: { r: 33, body: 260, neck: 13, top: 315 },
 };
 export type BottlePlace = { kind: BottleKind; x: number; z: number; on: number };
 
-const KINDS: readonly BottleKind[] = ["wine", "spirit", "square", "tall", "spirit", "wine", "tall", "square"];
+const KINDS: readonly BottleKind[] = ["water", "juice", "square", "syrup", "juice", "water", "syrup", "square"];
 /** The back bar's bottles: along its counter and on each shelf, spaced along the wall. */
 export const BOTTLES: readonly BottlePlace[] = [
   ...Array.from({ length: 6 }, (_, i): BottlePlace => ({ kind: KINDS[(i + 3) % KINDS.length], x: -4100, z: -2050 + i * 140 + (i > 2 ? 1500 : 0), on: ZINC_BAR.back.top })),
@@ -187,14 +191,18 @@ export const BOTTLES: readonly BottlePlace[] = [
     Array.from({ length: 8 }, (_, i): BottlePlace => ({ kind: KINDS[(i + s * 3) % KINDS.length], x: -4080, z: -1850 + i * 360 + (s % 2) * 120, on })),
   ),
   // Three on the window's ledge, for the look of the place.
-  { kind: "wine", x: -3700, z: 2900, on: SHOPFRONT.ledge.top },
-  { kind: "tall", x: -3580, z: 2920, on: SHOPFRONT.ledge.top },
-  { kind: "wine", x: -3480, z: 2890, on: SHOPFRONT.ledge.top },
+  { kind: "syrup", x: -3700, z: 2900, on: SHOPFRONT.ledge.top },
+  { kind: "water", x: -3580, z: 2920, on: SHOPFRONT.ledge.top },
+  { kind: "syrup", x: -3480, z: 2890, on: SHOPFRONT.ledge.top },
 ];
 
-/** A wine glass where it was left: on a table top or the bar, with a little wine in the bottom. */
-export const WINE_GLASS = { foot: { r: 36, height: 3 }, stem: { r: 4, top: 95 }, bowl: { r: 42, well: 110, rim: 205, inner: 0.35, lip: 0.96 } };
-export const WINE_GLASSES: readonly { x: number; z: number; on: number }[] = [
+/**
+ * A tumbler where it was left, on a table top or the bar, a third full: its
+ * straight side, its rim, the thick glass of its bottom rounding up into the
+ * side, and the drink's surface its well.
+ */
+export const JUICE_GLASS = { r: 38, well: 40, rim: 105, inner: 0.9, lip: 0.97 };
+export const JUICE_GLASSES: readonly { x: number; z: number; on: number }[] = [
   { x: -150, z: 2235, on: TABLE_TOPS.round.top },
   { x: -2720, z: -310, on: ZINC_BAR.zinc.top },
   { x: -2790, z: -140, on: ZINC_BAR.zinc.top },
@@ -224,7 +232,7 @@ export const START_TABLE = {
   votive: { x: -430, z: 2370, r: 30, wax: 20, rim: 62 },
   packet: { x: -265, z: 2405, hx: 25, hz: 18, angle: -0.5, top: 0.5 },
   sugarSpill: { x: -305, z: 2425, r: 9 },
-  ring: { x: -205, z: 2345, r: 34 },
+  ring: { x: -205, z: 2345, r: 37 },
 };
 
 /** The ketchup bottle on the left window table, its cap crusted, and a laminated menu left there. */
@@ -237,7 +245,7 @@ export const BREAD = { x: 1180, z: 2390, rx: 130, rz: 85, angle: 0.4, well: 20, 
 /** An espresso cup on its saucer, sugar left in the bottom, on the banquette's middle table. */
 export const ESPRESSO = { x: 3400, z: -260, saucer: { r: 60, well: 4, rim: 12 }, cup: { r: 30, well: 12, rim: 60 }, handle: { out: 44, half: 2, bottom: 16, top: 44 } };
 
-/** On the zinc: the fruit bowl near the front end, the cutting board with a cut lemon, the bar mat with a shaker tin drying on it, and a cake under a glass cloche at the back end. */
+/** On the zinc: the fruit bowl near the front end, the cutting board with a cut lemon, the bar mat with the milk jug drying on it, and a cake under a glass cloche at the back end. */
 export const ON_BAR = {
   bowl: { x: -2800, z: 800, r: 150, well: 12, rim: 80, inner: 0.55, lip: 0.9 },
   // Each wholly inside the bowl's lip, touching its neighbours at most.
@@ -258,7 +266,7 @@ export const ON_BAR = {
   sliceThick: 6,
   knife: { x: -2880, z: 390, angle: 0.2 + Math.PI / 2, blade: { hx: 55, hz: 7, thick: 3 }, handle: { hx: 26, hz: 6, thick: 14 } },
   mat: { x: -2780, z: -900, hx: 225, hz: 75, thick: 10 },
-  shaker: { x: -2760, z: -940, r: 45, top: 170 },
+  jug: { x: -2760, z: -940, r: 45, top: 170 },
   cake: { x: -2850, z: -1900, foot: { r: 90, height: 6 }, stem: { r: 22, top: 95 }, plate: { r: 150, top: 108 }, cloche: { r: 142, height: 210 }, knob: { r: 14, height: 15 } },
 };
 
@@ -434,13 +442,9 @@ function table(t: TablePlace): Solid[] {
   return out;
 }
 
-function wineGlass(g: { x: number; z: number; on: number }): Solid[] {
-  const { foot, stem, bowl } = WINE_GLASS;
-  return [
-    solid("glass foot", circle(g.x, g.z, foot.r), dome(g.on + foot.height - 1, 1, 1), g.on),
-    solid("glass stem", circle(g.x, g.z, stem.r), flat(g.on + stem.top), g.on + foot.height),
-    solid("wine glass", circle(g.x, g.z, bowl.r), { kind: "dish", well: g.on + bowl.well, rim: g.on + bowl.rim, inner: bowl.inner, lip: bowl.lip }, g.on + stem.top),
-  ];
+function juiceGlass(g: { x: number; z: number; on: number }): Solid {
+  const t = JUICE_GLASS;
+  return solid("juice glass", circle(g.x, g.z, t.r), { kind: "dish", well: g.on + t.well, rim: g.on + t.rim, inner: t.inner, lip: t.lip }, g.on);
 }
 
 function tableThings(): Solid[] {
@@ -455,7 +459,7 @@ function tableThings(): Solid[] {
     solid("sugar packet", box(t.packet.x, t.packet.z, t.packet.hx, t.packet.hz, t.packet.angle), flat(on + t.packet.top), on),
   ];
   for (const s of SHAKERS) out.push(solid("shaker", circle(s.x, s.z, SHAKER.r), dome(s.on + SHAKER.top - SHAKER.cap, SHAKER.cap, 0.5), s.on));
-  for (const g of WINE_GLASSES) out.push(...wineGlass(g));
+  for (const g of JUICE_GLASSES) out.push(juiceGlass(g));
   const k = KETCHUP;
   out.push(
     solid("ketchup", circle(k.x, k.z, k.r), dome(on + k.shoulder, k.crown, 1), on),
@@ -504,7 +508,7 @@ function barThings(): Solid[] {
   );
   out.push(
     solid("bar mat", box(b.mat.x, b.mat.z, b.mat.hx, b.mat.hz), flat(on + b.mat.thick), on),
-    solid("shaker tin", circle(b.shaker.x, b.shaker.z, b.shaker.r), dome(on + b.mat.thick + b.shaker.top - 10, 10, 1), on + b.mat.thick),
+    solid("milk jug", circle(b.jug.x, b.jug.z, b.jug.r), dome(on + b.mat.thick + b.jug.top - 10, 10, 1), on + b.mat.thick),
   );
   const k = b.cake;
   out.push(
@@ -587,11 +591,11 @@ const ZINC = ZINC_BAR.zinc.top;
 
 /** Food left about the place, each at the height it lies at (the surface there at or below `y`). */
 export const RESTAURANT_PATCHES: readonly FoodPatch[] = [
-  // The window table, where the fly starts: spilt sugar, the dregs of a glass of red, the ring it left.
+  // The window table, where the fly starts: spilt sugar, the last of a glass of orange juice, the ring it left.
   { name: "sugar", x: START_TABLE.sugarSpill.x, z: START_TABLE.sugarSpill.z, y: TABLE, r: START_TABLE.sugarSpill.r, sweet: 1 },
   { name: "sugar", x: START_TABLE.packet.x + 6, z: START_TABLE.packet.z - 3, y: TABLE + START_TABLE.packet.top, r: 6, sweet: 1 },
-  { name: "red wine", x: WINE_GLASSES[0].x, z: WINE_GLASSES[0].z, y: TABLE + WINE_GLASS.bowl.well, r: 12, sweet: 0.7, pool: true },
-  ...[0.4, 2.3, 4.4].map((a): FoodPatch => ({ name: "wine ring", x: START_TABLE.ring.x + Math.cos(a) * START_TABLE.ring.r, z: START_TABLE.ring.z + Math.sin(a) * START_TABLE.ring.r, y: TABLE, r: 5, sweet: 0.55 })),
+  { name: "orange juice", x: JUICE_GLASSES[0].x, z: JUICE_GLASSES[0].z, y: TABLE + JUICE_GLASS.well, r: 12, sweet: 0.7, pool: true },
+  ...[0.4, 2.3, 4.4].map((a): FoodPatch => ({ name: "juice ring", x: START_TABLE.ring.x + Math.cos(a) * START_TABLE.ring.r, z: START_TABLE.ring.z + Math.sin(a) * START_TABLE.ring.r, y: TABLE, r: 5, sweet: 0.55 })),
   // The ketchup's crusted cap, and a smear on the menu beside it.
   { name: "ketchup", x: KETCHUP.x, z: KETCHUP.z, y: TABLE + KETCHUP.cap.top, r: 13, sweet: 0.6 },
   { name: "ketchup", x: MENU.x + 30, z: MENU.z - 40, y: TABLE + MENU.thick, r: 7, sweet: 0.6 },
@@ -600,11 +604,11 @@ export const RESTAURANT_PATCHES: readonly FoodPatch[] = [
   { name: "crumbs", x: 1070, z: 2240, y: TABLE, r: 10, sweet: 0.3 },
   // Sugar left in the bottom of an espresso cup.
   { name: "espresso", x: ESPRESSO.x, z: ESPRESSO.z, y: TABLE + ESPRESSO.saucer.well + ESPRESSO.cup.well, r: 10, sweet: 0.9 },
-  // At the bar: the bruised peach in the fruit bowl, the cut lemon, wine left in two glasses, syrup on the bar mat, crumbs of cake at the edge of its plate.
+  // At the bar: the bruised peach in the fruit bowl, the cut lemon, orange juice and lemonade left in two glasses, syrup on the bar mat, crumbs of cake at the edge of its plate.
   { name: "peach", x: ON_BAR.peach.x + 4, z: ON_BAR.peach.z - 4, y: ZINC + ON_BAR.bowl.well + ON_BAR.peach.r * 1.9, r: 10, sweet: 0.9 },
   ...ON_BAR.slices.map((s): FoodPatch => ({ name: "lemon", x: s.x, z: s.z, y: ZINC + ON_BAR.board.thick + ON_BAR.sliceThick, r: 10, sweet: 0.3 })),
-  { name: "red wine", x: WINE_GLASSES[1].x, z: WINE_GLASSES[1].z, y: ZINC + WINE_GLASS.bowl.well, r: 12, sweet: 0.7, pool: true },
-  { name: "white wine", x: WINE_GLASSES[2].x, z: WINE_GLASSES[2].z, y: ZINC + WINE_GLASS.bowl.well, r: 12, sweet: 0.65, pool: true },
+  { name: "orange juice", x: JUICE_GLASSES[1].x, z: JUICE_GLASSES[1].z, y: ZINC + JUICE_GLASS.well, r: 12, sweet: 0.7, pool: true },
+  { name: "lemonade", x: JUICE_GLASSES[2].x, z: JUICE_GLASSES[2].z, y: ZINC + JUICE_GLASS.well, r: 12, sweet: 0.65, pool: true },
   { name: "syrup", x: ON_BAR.mat.x + 120, z: ON_BAR.mat.z + 30, y: ZINC + ON_BAR.mat.thick, r: 12, sweet: 0.95 },
   { name: "cake crumbs", x: ON_BAR.cake.x + 146 * Math.cos(0.7), z: ON_BAR.cake.z + 146 * Math.sin(0.7), y: ZINC + ON_BAR.cake.plate.top, r: 4, sweet: 1 },
   // Sent back to the pass: crumbs of tart and a smear of raspberry coulis.

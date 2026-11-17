@@ -61,11 +61,11 @@ export const LAMPS: readonly Lamp[] = [
 export const NEAR_LAMP = LAMPS[0];
 
 /**
- * The corner bar across the road, on the corner of the side street: its
- * window (x0..x1, y0..y1 on its front) and the neon in it, a wine glass;
- * the late shop further along, lit inside all night.
+ * The ice-cream parlour across the road, on the corner of the side street:
+ * its window (x0..x1, y0..y1 on its front) and the neon in it, a cone; the
+ * late shop further along, lit inside all night.
  */
-export const CORNER_BAR = { x0: -4800, x1: 300, y0: STREET.pavement + 500, y1: STREET.pavement + 3300, neon: { x: -2300, y: STREET.pavement + 2050, z: STREET.facades + 250 } };
+export const PARLOUR = { x0: -4800, x1: 300, y0: STREET.pavement + 500, y1: STREET.pavement + 3300, neon: { x: -2300, y: STREET.pavement + 2050, z: STREET.facades + 250 } };
 export const LATE_SHOP = { x0: -20_200, x1: -15_800, y0: STREET.pavement + 300, y1: STREET.pavement + 3100 };
 
 /** The cars parked along this kerb (their middles along x, and lengths), leaving the view from the window tables open. */

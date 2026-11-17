@@ -370,19 +370,12 @@ if (rK == K_BB_INSIDE || rK == K_BB_COLD) {
   clear: {
     head: /* glsl */ `
 const int K_BB_FLINT = ${BB_KINDS.flint};
-const int K_BB_GIN = ${BB_KINDS.gin};
-const int K_BB_DARK = ${BB_KINDS.dark};
 `,
     color: /* glsl */ `
 if (rK == K_BB_FLINT) diffuseColor.rgb *= 0.06;
-if (rK == K_BB_GIN) diffuseColor.rgb *= 0.14;
-if (rK == K_BB_DARK) rRough = 0.03;
 `,
     final: /* glsl */ `
 if (rK == K_BB_FLINT) rAlpha = 0.06 + edge * 0.6 + min(dot(outgoingLight, vec3(0.1)), 0.2);
-if (rK == K_BB_GIN) rAlpha = 0.16 + edge * 0.55 + min(dot(outgoingLight, vec3(0.12)), 0.25);
-// A full bottle of red wine lets almost nothing through but at its edges, where the glass is thin against the light.
-if (rK == K_BB_DARK) rAlpha = 0.96 - edge * 0.2;
 `,
   },
 };

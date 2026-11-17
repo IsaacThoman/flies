@@ -85,7 +85,7 @@ async function capture(story: StoreStory, tv = false) {
     await unpackConnectome(data.slice(0), bytes => wasm.connectomeSpace(bytes));
     const driver = new CaptureBrain(wasm.create(179 + index));
     localStorage.clear();
-    const place = story === "06-rain" ? "windowsill" : story === "07-night" ? "bar" : "picnic";
+    const place = story === "06-rain" ? "windowsill" : story === "07-night" ? "restaurant" : "picnic";
     localStorage.setItem("flies.settings", JSON.stringify({ place, scene: place, wallpaperAfter: 0, hints: false, stats: false, eyesInset: "off", nerves: story === "04-inside" ? "always" : "off", statsPanel: "off", xray: story === "04-inside" ? "always" : "off", realWeather: false }));
     localStorage.setItem("flies.shelf", JSON.stringify({ light: { kind: story === "04-inside" ? "dusk" : story === "07-night" ? "night" : "noon", at: Date.now() }, weather: { kind: story === "06-rain" ? "rain" : "clear", at: Date.now() } }));
     const canvas = index === 0 ? document.getElementById("game") as HTMLCanvasElement : document.body.appendChild(document.createElement("canvas"));

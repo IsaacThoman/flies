@@ -51,8 +51,8 @@ together; the binary fly-state layout itself is unchanged.
   have no password and no starter, so nobody chooses for anyone else,
   nobody can take a device off, and no seat is kept for anyone gone:
   - **The place** takes turns by the server's clock, 20 minutes in each
-    (picnic, windowsill, lab, bar, restaurant, by the wall clock, so every
-    restart agrees), and carries everyone there together. The Place tool
+    (greenhouse, picnic, windowsill, lab, restaurant, kitchen, by the wall
+    clock, so every restart agrees), and carries everyone there together. The Place tool
     shows it and refuses to change it, and Settings → Screensaver → Where it
     lives waits until the fly is alone again: neither fights the room.
   - **The light and the weather** are each device's own, as alone: "Now" is
@@ -219,7 +219,7 @@ with room for a fly in the air past the edge:
 
 | Scale | Places | Position | Pointer | Camera |
 | --- | --- | --- | --- | --- |
-| A tabletop's | picnic, windowsill, lab, bar (floors within 500 mm of their middle) | 1/50 mm (±655 mm) | 1/20 mm (±1.6 m) | 1/10 mm (±3.3 m) |
+| A tabletop's | picnic, windowsill, lab, greenhouse, kitchen (floors within 500 mm of their middle) | 1/50 mm (±655 mm) | 1/20 mm (±1.6 m) | 1/10 mm (±3.3 m) |
 | A room's | restaurant (within 5 m: its floor is 4.2 by 3 m from its middle) | 1/5 mm (±6.5 m) | 1/4 mm (±8.2 m) | 1/2 mm (±16 m) |
 
 A length out of its scale's range is held at its end, never wrapped. Both

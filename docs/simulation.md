@@ -32,9 +32,8 @@ what takes a real fly an hour takes this one a minute. Nothing else does. A
 fly starts at 0.7, hungry enough to go and look for food.
 
 What changes, all through the brain: a just-fed fly leaves weak sugar alone
-that a hungry one stops to eat (sweetness 0.4, as the bar's beer foam: 2 flies
-in 20 start to feed, against 20 in 20 starved), takes strong sugar less
-eagerly and leaves a little more of it, and walks about a third less.
+that a hungry one stops to eat (sweetness 0.4: 2 flies in 20 start
+to feed, against 20 in 20 starved), takes strong sugar less eagerly and leaves a little more of it, and walks about a third less.
 
 The crop fills with what it eats and empties by half every minute (an hour,
 over 60), and the abdomen swells with it: up to 12% wider and deeper and 5%
@@ -261,8 +260,8 @@ brain, ON pathway off and on), at midday and at midnight (the fly's clock set
 to it too, so its sleepy eyes are measured), ordinary life never sets it off,
 with or without it: no take-off in four rounds of carrying the fly to every
 place (six seconds after each of 20 arrivals, by day and by night), ten
-switches of the bar's, the lab's and the restaurant's lights between night and
-midday, twenty jumps of the picnic's time of day by day and by night, three
+switches of the indoor places' lights between night and midday, twenty
+jumps of the picnic's time of day by day and by night, three
 minutes of fireflies, five of soap bubbles drifting by and popping, five of the
 screensaver and five of free play by day and by night: about 5,700 seconds of
 its life each way, the escape peaking at 0.38 at most. (On the version of the

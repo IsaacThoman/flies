@@ -215,11 +215,11 @@ float sillTop;`,
   float peel = vnoise(vec2(u, v) * 1.3) * resolved(0.5);
   paintHeight = (grain * 0.003 + brush * 0.004 + peel * 0.004) * (1.0 - bare) * resolved(0.3) - chipped * 0.06 - bare * 0.05 - crack * 0.001 + speck * 0.04 + paintHeightRail;
   if (sillTop > 0.5) {
-    // A ring left by a glass: a hairline of dried wine, darker where it pooled at its edge.
+    // A ring left by a glass: a hairline of dried juice, darker where it pooled at its edge.
     float d = abs(length(vWorld.xz - uRing.xy) - uRing.z);
     float ringA = (1.0 - smoothstep(0.35, 0.35 + fwidth(d) + 0.2, d)) * (0.55 + 0.45 * vnoise(vWorld.xz * 0.2));
     float arc = smoothstep(-0.2, 0.4, sin(atan(vWorld.z - uRing.y, vWorld.x - uRing.x) * 1.0 + 0.8));
-    c = mix(c, c * vec3(0.78, 0.6, 0.63), ringA * arc * 0.8);
+    c = mix(c, c * vec3(0.9, 0.72, 0.5), ringA * arc * 0.8);
     paintRough = mix(paintRough, 0.12, ringA * arc);
   }
   diffuseColor.rgb = c;
@@ -353,13 +353,14 @@ export function clayMaterial(sunlight: Sunlight) {
 }
 
 /**
- * Fruit skins, by `skin` (an attribute): 0 plain and glossy (the wine, the
- * honey), 1 a banana (freckles, darker brown where it is bruised, ridged), 2 a
- * peach's fuzz (a soft sheen at its edges), 3 a plum's bloom (dusty pale over
- * deep purple), 4 a peach's cut flesh (fibres running out from the stone,
- * wet), 5 the peach's stone (deeply wrinkled), 6 toast (a dry, open crumb,
- * its little holes dark), 7 honey in its jar and sea glass (glowing with the
- * light through them).
+ * Fruit skins, by `skin` (an attribute): 0 plain and glossy (the honey on
+ * the spoon, the plum's juice), 1 a banana (freckles, darker brown where it
+ * is bruised, ridged), 2 a peach's fuzz (a soft sheen at its edges), 3 a
+ * plum's bloom (dusty pale over deep purple), 4 a peach's cut flesh (fibres
+ * running out from the stone, wet), 5 the peach's stone (deeply wrinkled),
+ * 6 toast (a dry, open crumb, its little holes dark), 7 honey in its jar, the
+ * orange juice in its bottle and sea glass (glowing with the light through
+ * them).
  */
 export function fruitMaterial(sunlight: Sunlight, stone: THREE.Vector2) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0, envMapIntensity: 0.6 });
@@ -436,7 +437,7 @@ export function fruitMaterial(sunlight: Sunlight, stone: THREE.Vector2) {
 // Fuzz and bloom catch the light at the skin's edge.
 reflectedLight.indirectDiffuse += sheen * pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 3.0) * diffuseColor.rgb * 0.9;
 if (int(vSkin + 0.5) == 7) {
-  // Honey and sea glass let the light through: lit from behind, they glow.
+  // Honey, juice and sea glass let the light through: lit from behind, they glow.
   vec3 sunDirView = normalize((viewMatrix * vec4(uSun, 0.0)).xyz);
   float behind = max(dot(-normal, sunDirView), 0.0) * (0.35 + 0.65 * max(dot(normalize(vViewPosition), sunDirView), 0.0));
   reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(1.0, 0.8, 0.45) * behind * 1.4 * sunReach(vWorld, -inverseTransformDirection(normal, viewMatrix)) * directionalLights[0].color;

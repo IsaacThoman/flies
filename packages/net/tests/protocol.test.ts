@@ -59,13 +59,13 @@ test("a fly's state goes over the wire in 35 bytes, 49 with the hand, and comes 
 
 test("a tabletop's state keeps its original bytes inside the protocol 4 batch", () => {
   const view = new DataView(new ArrayBuffer(FLY_MAX));
-  const n = encodeFly(view, wireScale(WORLDS.bar), sampleState());
+  const n = encodeFly(view, wireScale(WORLDS.lab), sampleState());
   // Existing state bytes remain compatible inside the new batch envelope.
   assert.equal(Buffer.from(view.buffer, 0, n).toString("hex"), "0101061d2cffff40e20100e3e71f11d43a249a26e79a01f4ff0300f323b31ae6664bc4d2002d00defca00fb50448f40301");
 });
 
 test("each place has the finest scale that holds it: a tabletop's for the tables, a room's for the restaurant", () => {
-  for (const id of ["picnic", "windowsill", "lab", "bar", "greenhouse", "kitchen"]) assert.deepEqual(wireScale(WORLDS[id]), { position: 50, pointer: 20, eye: 10 }, id);
+  for (const id of ["picnic", "windowsill", "lab", "greenhouse", "kitchen"]) assert.deepEqual(wireScale(WORLDS[id]), { position: 50, pointer: 20, eye: 10 }, id);
   assert.equal(wireScale(RESTAURANT), ROOM_SCALE);
 });
 

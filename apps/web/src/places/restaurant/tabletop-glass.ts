@@ -1,5 +1,5 @@
-// The glass on the tables, and what is in it: the wine glass left with red in
-// its bowl, the bud vase with its rose, the votive with its tealight, the
+// The glass on the tables, and what is in it: the tumbler left with orange
+// juice in it, the bud vase with its rose, the votive with its tealight, the
 // salt and pepper, the ketchup bottle. Each drawn to the world's felt shape
 // (its outside where the world has it, its rim and inside the world's top),
 // what is inside it within that, and a stand-in of a few faces for far off.
@@ -9,7 +9,7 @@ import type { Solid } from "@fly/world";
 import { mat4, random } from "../../scene/build.ts";
 import type { Builder } from "./builder.ts";
 import { KIND } from "./kinds.ts";
-import { BOWL_BASE, TOP } from "./tabletop-glsl.ts";
+import { TOP } from "./tabletop-glsl.ts";
 import { dishEdge, dishProfile, domeRun, feltAt, feltRun, raw, revolve, roundOf, turned } from "./tabletop-shapes.ts";
 import type { Paint, Place, Profile, RevolveOptions } from "./tabletop-shapes.ts";
 
@@ -40,69 +40,43 @@ function wetEdge(solid: Solid, above: number) {
   return lo;
 }
 
+/** What is left in a tumbler: its kind, its colour at the edge and in the middle, and whether it has filmed the glass above it. */
+export type Drink = { kind: number; color: THREE.ColorRepresentation; middle: THREE.ColorRepresentation; film: boolean };
+// Bright and cloudy, so that neither could be taken for anything stronger.
+export const ORANGE_JUICE: Drink = { kind: KIND.juice, color: "#ffa21e", middle: "#ffb43c", film: true };
+export const LEMONADE: Drink = { kind: KIND.lemonade, color: "#f6ecaa", middle: "#fbf4c8", film: false };
+
 /**
- * The wine glass: a foot, a stem and the bowl as the world has them, the
- * bowl's glass thick at its rim, wine film and tears up its inside, and the
- * red left in it: a pool whose surface is the world's well, deeper in the
- * middle where the bowl dips under it, so darker there, and climbing the
- * glass a little at its edge.
+ * A tumbler, as the world has it: a straight side, a rounded rim, the inside
+ * running down to the drink, whose surface is the world's well; under it the
+ * glass's thick bottom. Orange juice films the glass a little above where
+ * it stands.
  */
-export function wineGlass(b: Builder, area: number, foot: Solid, stem: Solid, bowl: Solid) {
-  const g = roundOf(bowl);
+export function juiceGlass(b: Builder, area: number, glass: Solid, drink: Drink) {
+  const g = roundOf(glass);
   const at = { x: g.x, z: g.z };
   const R = g.rx;
-  const top = bowl.top as { well: number; rim: number; lip: number };
-  const footR = roundOf(foot).rx;
-  const stemR = roundOf(stem).rx;
-  const under = bowl.bottom ?? 0;
-  const ground = foot.bottom ?? 0;
-  const footTop = (r: number) => feltAt(foot, r / footR);
-  const edge = dishEdge(bowl) * R;
-  const outer: [number, number][] = [
-    [footR, ground - 0.1],
-    [footR, footTop(footR) - 0.7],
-    [footR - 0.3, footTop(footR) - 0.15],
-    ...Array.from({ length: 7 }, (_, i): [number, number] => {
-      const r = footR - 1 - (footR - 1 - stemR - 0.6) * (i / 6) ** 0.7;
-      return [r, footTop(r)];
-    }),
-    [stemR, stem.bottom ?? 0],
-    [stemR, under - 0.5],
-    [stemR + 0.5, under],
-    [edge - 0.8, under],
-    [edge - 0.3, under + 0.3],
-    ...mm(R, feltRun(bowl, dishEdge(bowl), top.lip, 8, (t) => t * t)).slice(1),
-  ];
-  put(b, area, KIND.glass, outer, 64, at, WHITE);
-  // The inside, down to where the wine meets it; under the wine the glass dips to a well of its own.
-  const wet = wetEdge(bowl, 0.45);
+  const top = glass.top as { well: number; rim: number; lip: number };
+  const on = glass.bottom ?? 0;
+  const outer = mm(R, feltRun(glass, dishEdge(glass), top.lip, 10, (t) => t * t));
+  put(b, area, KIND.glass, [[outer[0][0], on - 0.1], ...outer], 48, at, WHITE);
+  // The inside, down to where the drink meets it, then straight down to the bottom's thick glass.
+  const wet = wetEdge(glass, 0.45);
   const rW = wet * R;
-  const depth = 7;
-  const dip = (r: number) => feltAt(bowl, r / R) - depth * (1 - (r / rW) ** 2) ** 2;
-  const inside: [number, number][] = [
-    ...mm(R, feltRun(bowl, top.lip, wet, 16, (t) => 0.5 - 0.5 * Math.cos(Math.PI * t))),
-    ...Array.from({ length: 6 }, (_, i): [number, number] => {
-      const r = rW * (1 - (i + 1) / 6);
-      return [r, dip(r)];
-    }),
-  ];
-  const stain = (out: THREE.Color, x: number, y: number, z: number) => raw(out, (x - g.x) / 84 + 0.5, (z - g.z) / 84 + 0.5, (y - BOWL_BASE) / 120);
-  put(b, area, TOP.bowl, inside, 64, at, stain);
-  // The wine: its underside on the glass, its edge pinched where it meets it, its surface level but for the meniscus.
-  const wine: [number, number][] = [];
-  for (let i = 0; i <= 4; i++) {
-    const r = (rW - 0.15) * (i / 4) ** 0.8;
-    wine.push([r, dip(r) + 0.05]);
-  }
-  for (const [back, up] of [[0.15, 0.4], [0.35, 0.24], [0.75, 0.1], [1.5, 0.025], [3, 0], [rW, 0]] as const) wine.push([Math.max(0, rW - back), top.well + up]);
-  const deep = new THREE.Color("#1c0206");
-  const garnet = new THREE.Color("#7a1424");
-  put(b, area, KIND.wine, wine, 64, at, (out, x, _y, z) => {
-    const r = Math.hypot(x - g.x, z - g.z);
-    out.copy(garnet).lerp(deep, THREE.MathUtils.smoothstep(top.well - dip(Math.min(r, rW)), 0.2, 4.5));
+  const floor = on + 7;
+  const inside: [number, number][] = [...mm(R, feltRun(glass, top.lip, wet, 16, (t) => 0.5 - 0.5 * Math.cos(Math.PI * t))), [rW - 0.4, floor + 1.5], [rW - 2, floor], [0, floor - 0.6]];
+  const film = (out: THREE.Color, _x: number, y: number) => raw(out, 0, 0, (y - on) / 120);
+  put(b, area, drink.film ? TOP.inside : KIND.glass, inside, 48, at, drink.film ? film : WHITE);
+  // The drink: its underside on the bottom, its edge pinched where it meets the glass, its surface level but for the meniscus.
+  const d: [number, number][] = [[0, floor - 0.55], [rW - 2.05, floor + 0.05], [rW - 0.45, floor + 1.5]];
+  for (const [back, up] of [[0.15, 0.4], [0.35, 0.24], [0.75, 0.1], [1.5, 0.025], [3, 0], [rW, 0]] as const) d.push([Math.max(0, rW - back), top.well + up]);
+  const edge = new THREE.Color(drink.color);
+  const middle = new THREE.Color(drink.middle);
+  put(b, area, drink.kind, d, 48, at, (out, x, _y, z) => {
+    out.copy(edge).lerp(middle, 1 - Math.hypot(x - g.x, z - g.z) / rW);
   });
-  far(b, area, KIND.glass, "#ffffff", [[footR, ground], [footR, ground + 2.5], [stemR, ground + 3], [stemR, under], [edge, under], [edge, top.rim], [0, top.well + 10]], 6, at);
-  far(b, area, KIND.wine, "#3a0610", [[rW, top.well], [0, top.well]], 6, at);
+  far(b, area, KIND.glass, "#ffffff", [[R, on], [R, top.rim], [rW, top.well + 10]], 6, at);
+  far(b, area, drink.kind, drink.color, [[rW, on + 2], [rW, top.well], [0, top.well]], 6, at);
 }
 
 /**

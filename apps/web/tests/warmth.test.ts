@@ -135,8 +135,8 @@ test("each place starts where it was last held, kept across runs; a place that n
   run(first.w, 2);
   assert.equal(first.w.level, 1);
   first.d.state = NOMINAL;
-  first.w.enter("bar");
-  assert.equal(first.w.level, 0, "the bar never warmed it");
+  first.w.enter("lab");
+  assert.equal(first.w.level, 0, "the lab never warmed it");
   first.w.enter("restaurant");
   assert.equal(first.w.level, 1, "the restaurant did");
 
