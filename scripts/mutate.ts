@@ -2,7 +2,7 @@
 // leaves the developer's sources mutated. No test or production dependency.
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,7 +54,8 @@ try {
     if (entry !== "@fly") symlinkSync(path.join(root, "node_modules", entry), path.join(sandbox, "node_modules", entry));
   }
   for (const entry of readdirSync(path.join(root, "node_modules", "@fly"))) {
-    symlinkSync(path.join(sandbox, "packages", entry), path.join(sandbox, "node_modules", "@fly", entry));
+    const relative = path.relative(root, realpathSync(path.join(root, "node_modules", "@fly", entry)));
+    symlinkSync(path.join(sandbox, relative), path.join(sandbox, "node_modules", "@fly", entry));
   }
   for (const campaign of selected) {
     const file = path.join(sandbox, campaign.file);
