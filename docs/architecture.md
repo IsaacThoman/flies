@@ -16,7 +16,7 @@ The game currently has no sound, by design, pending a new sound design.
 | `packages/fly` | The fly's body: a 3D model that knows how a fly moves its legs, wings and mouthparts, with its nervous system drawn inside it. |
 | `packages/contracts` | The interfaces the parts agree on: the remote, the fly's pose, the brain driver, the weather outside, a table's line to its room, typing into a field the game draws. |
 | `packages/net` | How flies share a table: the wire format, the room's clock, other flies as they are heard of, the shared food, balls and bubbles, and what a player may do. Runs in a browser and in Node. |
-| `apps/web` | The game: the world, each fly's life in it and its senses, the remote's tools and menus. `company.ts` keeps the other flies this device simulates beside the one the camera follows. Runs in a browser as it is. |
+| `apps/web` | The game: the world, each fly's life in it and its senses, the remote's tools and menus. `apps/web/src/company.ts` keeps the other flies this device simulates beside the one the camera follows. Runs in a browser as it is. |
 | `apps/server` | The room server for rooms of up to eight flies, one to four per device (`docs/online.md`): the rooms open to everyone, which it keeps and every device sits in by default, the rooms people make, and the list of the public ones: one Node process over WebSockets. It runs no brains and draws nothing. |
 | `apps/tvos` | The Apple TV app: a native host that runs the web build's JavaScript in JavaScriptCore and draws it through OpenGL ES. |
 | `apps/ios` | The iPhone and iPad app: the web build in a `WKWebView`, served from the app's bundle, in a small Swift shell ([ios.md](ios.md)). |
