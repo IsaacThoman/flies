@@ -313,13 +313,18 @@ table), at a new fly's hunger and starved, and watches ten seconds, seeds 1
 to 3:
 
 - **Eaten every time**: dropped sugar, honey and raspberry, and every place's
-  sugar, honey, jam, syrups, juices, fruit, cake and tart crumbs, coulis,
-  ketchup, mints, soda, and the lab's agar and fly food. Weaker foods are eaten
-  more briefly: a starved fly feeds about 9 s of the ten on sugar, 2 to 4 on
-  orange (0.6).
+  sugar, honey, jam, syrups, juices and fruit as sweet as 0.65 or more, cake
+  and tart crumbs, coulis, soda, and the lab's agar and fly food. A starved
+  fly feeds 8 to 10 s of the ten on sugar, 4 to 7 on raspberry.
+- **Mostly, briefly**: the weakest of the rest, the picnic's orange, the
+  windowsill's orange juice, ketchup and the mints (0.6) and the restaurant's
+  juice ring (0.55). Starved flies all took them, for 1 to 3 s; of new flies
+  two in three took those at 0.6, for under a second, and one in three the
+  juice ring.
 - **Hardly ever**: the restaurant's bread crumbs and lemon (0.3) and the
   kitchen's toast crumbs (0.25): no new fly ate them, and of starved flies
-  one in three took the restaurant's for a moment and none the kitchen's. They are among the least sweet things there (a lemon
+  one in three took the restaurant's for a moment and none the kitchen's.
+  They are among the least sweet things there (a lemon
   has 2.5 g of sugar in 100 g; bread's starch is most of it, which sugar
   neurons hardly answer), and this fly needs stronger sugar than a real one:
   sugar moves its proboscis more weakly than in a fly
