@@ -693,7 +693,7 @@ game holds itself to what the TV can sustain (`Warmth` in `apps/web/src/quality.
   starts where it stayed cool.
 - Only the frame rate and the pixels change. The brain is handed the same time whatever the frame
   rate, and its senses and the eyes are the same at every level. At 40 a second on a 60 Hz screen
-  the frames alternate one and two refreshes apart (`main.ts`).
+  the frames alternate one and two refreshes apart (`apps/web/src/main.ts`).
 - The canvas says where it is held (`data-warmth`, the level), how hot the TV says it is
   (`data-thermal`) and the frame rate it is held to (`data-fps`), so the `stats` lines of a soak
   show them. The iPhone app doesn't pass its thermal state to the page, so a browser keeps to its
