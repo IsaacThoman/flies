@@ -35,8 +35,9 @@ room over its feet (`FLY_HEIGHT`, up to its folded wings).
   (`{ kind: "rect", hx, hz }`, half-sizes). The fly can't walk off it, and in
   the air it is drawn back over it once past its edge.
 - **Solids** are a footprint (circle, ellipse or box, turned by an angle) and
-  a top (flat, a dome, a dish, or a box-only `vault`, rounded across its
-  narrower side and level along its length). Without a `bottom` a solid is a column
+  a top (flat, a dome, a dish, a box-only `vault`, rounded across its
+  narrower side and level along its length, or a box-only `ramp`, sloping
+  straight up along it). Without a `bottom` a solid is a column
   standing on the floor. With one it is a slab, solid only from its bottom up
   to its top, with air beneath it: a table top on its legs, a chair seat, a
   shelf, a lamp. Its top's heights stay absolute, and a dish slab's outside
@@ -227,6 +228,24 @@ crossings become smaller than a pixel, without extra meshes or draws.
   place says whether it has them.
 - **The Place tool's name** for it, what it is carried "to", and what the fly
   stands on there ("Whole sill"), are in `apps/web/src/places/catalog.ts`.
+
+## What the player builds
+
+The Build tool's pieces (`packages/world/src/kit.ts`) are added to a
+place's world after its own solids (`withPieces`), so the place's indices
+stay as they are, and the one `World` is loaded again when they change; a
+copy of the place without them judges where a piece may go. Each is one
+solid: a dish, a box with a flat top, a dome, a vault, or a box whose top
+is a `ramp` (sloping straight up along its length from `low` to `high`, level
+across it). They rest only on the place's own level surfaces, so a place
+needs nothing for them but flat places to put them; anything a place adds
+that a piece should never be set onto (a slope, a drink) already isn't
+level. They are drawn by `scene/kit.ts` over the stage's set, not by the
+place: every piece in one merged mesh of one material, what each is made of
+in its vertices, and their shadows in one more, built again only when they
+change, so a place with the most it keeps costs two draws and the fly's eyes
+one a view. `apps/web/tests/kit.budget.ts` holds a frame among 40 pieces to a
+budget.
 
 ## A large place
 

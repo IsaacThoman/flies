@@ -37,11 +37,17 @@ export type Top =
    * for a dish without one). Each slope is
    * a smoothstep, so the rim's crest and both feet are level.
    */
-  | { kind: "dish"; well: number; rim: number; inner: number; lip: number };
+  | { kind: "dish"; well: number; rim: number; inner: number; lip: number }
+  /**
+   * A box's top sloping straight up along its length (its own x axis), from
+   * `low` at one end to `high` at the other, and level across it: a ramp.
+   * Only on a box.
+   */
+  | { kind: "ramp"; low: number; high: number };
 
 /** The highest point of a top. */
 export function topPeak(top: Top): number {
-  return top.kind === "flat" ? top.y : top.kind === "dish" ? top.rim : top.base + top.height;
+  return top.kind === "flat" ? top.y : top.kind === "dish" ? top.rim : top.kind === "ramp" ? Math.max(top.low, top.high) : top.base + top.height;
 }
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
@@ -138,6 +144,13 @@ function vaultS2(f: Footprint, x: number, z: number): number {
   return Math.min(1, f.hx <= f.hz ? (u / f.hx) ** 2 : (v / f.hz) ** 2);
 }
 
+/** How far along a ramp a point is, 0 at its low end to 1 at its high end. */
+function rampAlong(f: Footprint, x: number, z: number): number {
+  if (f.kind !== "box") throw new Error("A ramp's top needs a box");
+  const { u } = local(f, x, z, scratch);
+  return Math.min(1, Math.max(0, (u / f.hx + 1) / 2));
+}
+
 /**
  * How far out from its middle (as a share of its footprint's size) a dome
  * stands at least `y` high: 1 at or below its base, 0 at or above its peak.
@@ -168,6 +181,7 @@ export function topHeight(solid: Solid, x: number, z: number): number {
   const { top } = solid;
   if (top.kind === "flat") return top.y;
   if (top.kind === "vault") return top.base + top.height * Math.pow(1 - vaultS2(solid.footprint, x, z), top.power);
+  if (top.kind === "ramp") return top.low + (top.high - top.low) * rampAlong(solid.footprint, x, z);
   const s2 = Math.min(1, footprintS2(solid.footprint, x, z));
   if (top.kind === "dish") return dishProfile(top, solidBottom(solid), Math.sqrt(s2), scratchProfile).y;
   return top.base + top.height * Math.pow(1 - s2, top.power);
@@ -192,7 +206,15 @@ export function topNormal(solid: Solid, x: number, z: number, out: Vec3): Vec3 {
     out.z = -back.z / length;
     return out;
   }
-  if (top.kind === "flat" || top.kind === "vault" || f.kind === "box") {
+  if (top.kind === "ramp" && f.kind === "box") {
+    const back = world(f, (top.high - top.low) / (2 * f.hx), 0, scratchXZ);
+    const length = Math.hypot(back.x, 1, back.z);
+    out.x = -back.x / length;
+    out.y = 1 / length;
+    out.z = -back.z / length;
+    return out;
+  }
+  if (top.kind === "flat" || top.kind === "vault" || top.kind === "ramp" || f.kind === "box") {
     out.x = 0;
     out.y = 1;
     out.z = 0;

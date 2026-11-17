@@ -1,7 +1,7 @@
 // What the game keeps between launches, in localStorage: the player's
 // settings, the few choices on the shelf worth coming back to, what the
-// button hints have already taught, and this device's key and table for
-// playing with others. A save from
+// button hints have already taught, this device's key and table for
+// playing with others, and what the player has built in each place. A save from
 // another build, or a broken one, never stops the game: anything that isn't
 // one of today's values is left at its default.
 
@@ -296,4 +296,15 @@ export function loadDay(date: string, store: Storage | null = storage()): Day {
 
 export function saveDay(day: Day, store: Storage | null = storage()) {
   write(store, DAY_KEY, day);
+}
+
+const BUILDS_KEY = "flies.builds";
+
+/** What the player has built in each place, as kept (packages/world/src/kit.ts, `keepPieces`): each place's pieces are checked against it when it is built. */
+export function loadBuilds(store: Storage | null = storage()): Record<string, unknown> {
+  return read(store, BUILDS_KEY) ?? {};
+}
+
+export function saveBuilds(builds: Record<string, unknown>, store: Storage | null = storage()) {
+  write(store, BUILDS_KEY, builds);
 }

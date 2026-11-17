@@ -36,8 +36,8 @@ fly's world.
 | --- | --- |
 | Swipe on the touch surface | Moves your hand across the table. With View in hand, turns the camera round the fly and up or down instead. |
 | Left / Right | Picks a tool from the shelf. |
-| Up / Down | Picks the tool's kind: which food, how hard to blow, the time of day, the camera. |
-| Select | Uses the tool: drops food, throws the ball. Hold it to tickle or blow. On the Sky it steps round the weathers, on View round the views. |
+| Up / Down | Picks the tool's kind: which food, how hard to blow, which piece to build, the time of day, the camera. |
+| Select | Uses the tool: drops food, throws the ball, sets a piece down, turns or takes one away. Hold it to tickle or blow. On the Sky it steps round the weathers, on View round the views. |
 | Play/Pause, or Back | The menu. Play/Pause, or Play on it, carries on. |
 | Back on the menu | On Apple TV, leaves at the root. In the browser, returns to play after play has begun. |
 
@@ -46,7 +46,7 @@ Pointing, the screen itself is what you press, and there are no button hints:
 | | With a finger | With a mouse or trackpad |
 | --- | --- | --- |
 | Your hand | Where you touch the table. Touching the fly is touching the fly, not the table behind it. | Under the cursor, on whatever it is over (the cursor is hidden there: the ring is the cursor). |
-| Feed, Swoop | Tap where you mean. | Click there. |
+| Feed, Swoop, Build | Tap where you mean. | Click there. |
 | Tickle, Blow | Touch and hold, and drag: the feather strokes the fly while you hold it on it, and rests on it lightly while the hand is there; the puff follows the finger. | Hold the button, and drag. Hovering over the fly rests the feather on it. |
 | Sky, View, Place | The arrows either side of the tool's label (or a tap on the label, or a swipe along it) step its kind; tapping the tool again does too (on the Sky, its weather). The Sky has two labels side by side, the time of day and the weather, each with its own arrows (one over the other where they don't fit). Place has a Go button for somewhere the fly isn't. | The same, or the wheel over a label. |
 | Closer and farther | Pinch. | The wheel, or a trackpad's pinch. |
@@ -85,7 +85,8 @@ removes your offerings, including those still falling, leaving the place’s own
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot) and **Swoop** (a dark
 beach ball dives at the spot and veers away); and, about its world and the
-camera, **Sky** (the time of day: now, which follows the clock, or morning,
+camera, **Build** (pieces of a kit set down in the place the fly lives,
+below), **Sky** (the time of day: now, which follows the clock, or morning,
 midday, golden hour, dusk, night, on Up and Down; and the weather: now, which
 follows the forecast, or clear, overcast, mist, rain, heavy rain, thunderstorm,
 snow, sleet, on Select, round and round), **Place** (where it lives; Up and
@@ -101,6 +102,23 @@ shows Up and Down over its time of day and Select over its weather. The way to t
 menu stays visible. With hints enabled, a remote or pad also teaches hand
 movement until that lesson is learned; it is kept between launches.
 Settings → Picture → Hints controls whether this teaching is shown. A caption at the top says what the fly is doing.
+
+**Build** sets pieces of a kit down on the table, the sill or the bench
+where the fly lives: a blue and a yellow dish (food dropped into one lies in
+its well), blue, yellow and red tiles, a crumb, a twig, a leaf, a ramp and a
+wall. Up and Down pick the piece; a glassy ghost of it shows where Select
+will set it down, on a grid so that walls meet end to end into a maze or an
+arena, and turns red where it won't go (into something, off the edge, onto
+a slope, on the fly or on food). Waiting in front of the fly, the hand sets a
+piece down just beyond it, as near as it has room. Past the pieces in the
+list, Turn turns the piece under the hand an eighth of a turn (and the next
+pieces go down that way), Take away takes it away, and Clear built takes
+away everything built there. A place keeps up to 40 pieces, between launches
+too, each place its own. Building is for home: on a visit or at a table the
+tool says "Only at home", and the pieces are put away until the fly is home
+again ([online](online.md#who-owns-what)).
+The pieces are real to the fly: it stands on them, walks into them and sees
+them, and the camera keeps out of them ([the world](world.md#what-you-build)).
 
 A launch starts on Feed with sugar, so that one press of Select gives the fly
 something to find. It comes back to the view last chosen (but never through

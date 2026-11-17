@@ -7,16 +7,30 @@
 import type { Looming } from "@fly/body";
 import { FLY_LENGTH, MOUTH_AHEAD, STEP_UP } from "@fly/body";
 import { BALL_RADIUS, SWOOP_SECONDS, createSurface, swoopAt } from "@fly/world";
-import type { FoodKind, Pantry, Vec3, World } from "@fly/world";
+import type { FoodKind, Pantry, PieceKind, Vec3, World } from "@fly/world";
 import type { View } from "../camera.ts";
 import { PLACES } from "../places/catalog.ts";
 import type { PlaceId } from "../places/catalog.ts";
 import type { TimeOfDay } from "../scene/light.ts";
 import type { WeatherKind } from "../scene/weather.ts";
 
-export type ToolId = "feed" | "feather" | "blow" | "swoop" | "sky" | "view" | "place";
+export type ToolId = "feed" | "feather" | "blow" | "swoop" | "build" | "sky" | "view" | "place";
 
 export type Variant = { id: string; label: string };
+
+/** The Build tool's pieces, by the names they go by on the shelf. */
+const BUILD_PIECES: readonly { id: PieceKind; label: string }[] = [
+  { id: "dish-blue", label: "Blue dish" },
+  { id: "dish-yellow", label: "Yellow dish" },
+  { id: "tile-blue", label: "Blue tile" },
+  { id: "tile-yellow", label: "Yellow tile" },
+  { id: "tile-red", label: "Red tile" },
+  { id: "crumb", label: "Crumb" },
+  { id: "twig", label: "Twig" },
+  { id: "leaf", label: "Leaf" },
+  { id: "ramp", label: "Ramp" },
+  { id: "wall", label: "Wall" },
+];
 export type Tool = {
   id: ToolId;
   name: string;
@@ -47,6 +61,8 @@ export const TOOLS: readonly Tool[] = [
   { id: "feather", name: "Tickle", verb: "Tickle", hold: true, variants: [{ id: "feather", label: "Feather" }] },
   { id: "blow", name: "Blow", verb: "Blow", hold: true, variants: [{ id: "gentle", label: "Gently" }, { id: "strong", label: "Hard" }] },
   { id: "swoop", name: "Swoop", verb: "Throw the ball", hold: false, variants: [{ id: "ball", label: "Beach ball" }] },
+  // The kit's pieces (packages/world/src/kit.ts), then what can be done to those already down.
+  { id: "build", name: "Build", verb: "Place", hold: false, world: true, variants: [...BUILD_PIECES, { id: "turn", label: "Turn" }, { id: "remove", label: "Take away" }, { id: "clear", label: "Clear built" }] },
   // The time of day, and the weather. "Now" follows the clock, so the wallpaper's light changes with the day outside; the weather's
   // "Now" is the weather outside where the Apple TV can tell it ("Outside"), else wanders as a forecast worked out from the clock would; the others hold.
   { id: "sky", name: "Sky", verb: "", hold: false, world: true, variants: LIGHTS, second: WEATHERS },
@@ -110,7 +126,7 @@ export type Ball = {
 
 export type Falling = { kind: FoodKind; x: number; z: number; y: number; floor: number; vy: number };
 
-export type HandsEvents = { dropped: FoodKind | null; landed: FoodKind | null; swooped: boolean; toolChanged: boolean; variantChanged: boolean; blocked: boolean };
+export type HandsEvents = { dropped: FoodKind | null; landed: FoodKind | null; swooped: boolean; built: boolean; toolChanged: boolean; variantChanged: boolean; blocked: boolean };
 
 /** What the hands do this frame, from the remote. */
 export type HandsInput = {
@@ -144,7 +160,7 @@ export class Hands {
   /** The feather is stroking now. */
   stroking = false;
   readonly looming: Looming[] = [{ id: 1, position: this.ball.position, r: BALL_RADIUS }];
-  readonly events: HandsEvents = { dropped: null, landed: null, swooped: false, toolChanged: false, variantChanged: false, blocked: false };
+  readonly events: HandsEvents = { dropped: null, landed: null, swooped: false, built: false, toolChanged: false, variantChanged: false, blocked: false };
   /** Where the last food landed, and the way the surface there faces. */
   readonly landedAt = v3();
   readonly landedNormal = v3(0, 1, 0);
@@ -241,7 +257,7 @@ export class Hands {
     return dial === 1 ? kindsOf(this.current, 1)[this.seconds[this.tool]] : this.variant;
   }
 
-  /** The kind's name as shown: the whole-place view is named for what the fly stands on there. */
+  /** The kind's name as shown: the whole-place view is named for what the fly stands on there, and away from home, that building is off. */
   get label(): string {
     return this.labelOf(0);
   }
@@ -249,6 +265,7 @@ export class Hands {
   /** The name of the current tool's kind on a dial: the weather's "Now" is "Outside" when it is the weather outside. */
   labelOf(dial: Dial): string {
     const v = this.variantOf(dial);
+    if (this.current.id === "build" && this.fixed.has("build")) return "Only at home";
     if (this.current.id === "view" && v.id === "table") return `Whole ${this.surface}`;
     return dial === 1 && this.current.id === "sky" && v.id === "now" && this.outside ? "Outside" : v.label;
   }
@@ -407,6 +424,7 @@ export class Hands {
     this.events.dropped = null;
     this.events.landed = null;
     this.events.swooped = false;
+    this.events.built = false;
     this.events.toolChanged = false;
     this.events.variantChanged = false;
     this.events.blocked = false;

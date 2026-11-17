@@ -15,7 +15,7 @@ import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttr
 import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
 import { Navigator, sameTarget } from "@fly/ui";
 import type { GlyphSet, Hit, HitMap } from "@fly/ui";
-import { BALL_RADIUS, Pantry, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
+import { BALL_RADIUS, Pantry, TOUCH, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
 import type { RayHit, Vec3 } from "@fly/world";
 import { Haptics } from "./haptics.ts";
 import type { Brains } from "./brain/create.ts";
@@ -59,6 +59,7 @@ import { Bubbles } from "./scene/bubbles.ts";
 import { Fireflies } from "./scene/fireflies.ts";
 import { clockHours, timeAt } from "./scene/light.ts";
 import { Outside, nativeWeather } from "./scene/outside.ts";
+import { KitView } from "./scene/kit.ts";
 import { Footprints } from "./scene/prints.ts";
 import { cheaperEyes, cheaperPixels } from "./quality.ts";
 import type { Quality, Warmth } from "./quality.ts";
@@ -66,6 +67,8 @@ import { KEPT, OVERLAY_OPACITIES, OVERLAY_SIZES, loadLearned, loadSettings, load
 import type { Learned, Lesson, Settings, ShelfChoices, TableSeat } from "./settings.ts";
 import { Stage } from "./stage.ts";
 import { aimAt } from "./tools/aim.ts";
+import { Builder, buildAction } from "./tools/build.ts";
+import type { Aim } from "./tools/build.ts";
 import { DIALS, Hands, TOOLS } from "./tools/hands.ts";
 import type { Dial, DialId, ToolId } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
@@ -122,7 +125,9 @@ const PAD_ZOOM = 1.6;
 
 type MenuScreenId = Exclude<ScreenId, "play">;
 
-const FIXED_AT_TABLE: ReadonlySet<ToolId> = new Set(["sky", "place"]);
+const FIXED_AT_TABLE: ReadonlySet<ToolId> = new Set(["sky", "place", "build"]);
+/** Away from home building is off: every fly at a table meets the place as it is made (docs/online.md). */
+const BUILD_FIXED: ReadonlySet<ToolId> = new Set(["build"]);
 const NOTHING_FIXED: ReadonlySet<ToolId> = new Set();
 
 /** Adds each of `from` to `to`, without the iterator a for…of would make: it runs every frame for every fly. */
@@ -154,7 +159,7 @@ const isArrow = (button: RemoteButton) => button === "up" || button === "down" |
 
 /** How a tool is used on the table, by a pointer. */
 function toolUse(id: string): ToolUse {
-  return id === "feed" || id === "swoop" ? "once" : id === "feather" || id === "blow" ? "hold" : "none";
+  return id === "feed" || id === "swoop" || id === "build" ? "once" : id === "feather" || id === "blow" ? "hold" : "none";
 }
 
 export class Game implements Shell {
@@ -181,6 +186,11 @@ export class Game implements Shell {
   readonly bubbles: Bubbles;
   readonly hands: Hands;
   readonly handsView: HandsView;
+  /** What the player has built where the fly lives (the Build tool), and how it looks. */
+  readonly builder: Builder;
+  readonly kit: KitView;
+  /** What the Build tool in hand points at this frame, if it is in hand. */
+  #buildAim: Aim | null = null;
   readonly haptics: Haptics;
   readonly eyes: Eyes;
   readonly inset: EyesInset;
@@ -234,6 +244,8 @@ export class Game implements Shell {
   readonly #middles: THREE.Vector3[] = [];
   /** Where each of the company is, for the place's visitors to keep clear of. */
   readonly #companyAt: Vec3[] = [];
+  /** Where every fly this device lives is: a piece built keeps clear of them all. */
+  readonly #fliesAt: Vec3[] = [];
   /** The Flies setting as last seen: when the player changes it, flies taken off for brains that wouldn't run may be tried again. */
   #fliesChosen = 0;
   /** How hard this player's feather is on any of the other flies this device lives, this frame. */
@@ -350,6 +362,8 @@ export class Game implements Shell {
     this.#here = this.settings.place;
     const scene = SCENES[this.#here];
     const world = new World(scene.place);
+    this.builder = new Builder(world);
+    this.builder.enter(this.#here, scene.place);
     this.#shelf = loadShelf(Date.now());
     this.hands = new Hands(world, this.#shelf);
     // The light and the weather are already as chosen, or as the clock (and an answer kept from the
@@ -383,10 +397,13 @@ export class Game implements Shell {
     this.director = new CameraDirector(world, display.frame.aspect, scene.camera);
     this.bubbles = new Bubbles(this.stage.scene, world);
     this.handsView = new HandsView(this.stage.scene);
+    this.kit = new KitView(this.stage.scene);
     this.eyes = new Eyes(this.stage, this.life);
     this.eyes.standIns = this.others;
     this.#around = { fly: this.life.body.position, airborne: false, world, pantry: this.life.pantry, weather: this.stage.weather, quiet: false, felt: this.#felt, company: this.#companyAt, shared: null };
     this.eyes.see(this.bubbles.mesh);
+    this.eyes.see(this.kit.built);
+    this.#fliesAt.push(this.life.body.position);
     for (const object of this.handsView.seen) this.eyes.see(object);
     this.inset = new EyesInset(this.eyes);
     this.overlay.scene.add(this.inset.mesh);
@@ -689,6 +706,8 @@ export class Game implements Shell {
     this.#middles.length = list.length;
     this.#companyAt.length = 0;
     for (const c of list) this.#companyAt.push(c.life.body.position);
+    this.#fliesAt.length = 1;
+    for (const c of list) this.#fliesAt.push(c.life.body.position);
     if (!this.online) this.#markFollowed(list.length > 0 ? COLOURS[0] : null);
     this.overlay.dirty = true;
   }
@@ -757,11 +776,63 @@ export class Game implements Shell {
     this.overlay.dirty = true;
   }
 
-  /** At a table, the light, the weather and the place are the starter's to choose; in a room open to everyone, they are each player's own (the place is chosen by going to its room). */
+  /** At a table, the light, the weather and the place are the starter's to choose; in a room open to everyone, they are each player's own (the place is chosen by going to its room). Building is for home alone. */
   #fixedTools(): ReadonlySet<ToolId> {
     const online = this.online;
-    if (!online || !online.joined || online.starting || online.everyone) return NOTHING_FIXED;
+    if (!online?.welcomed) return this.#atHome ? NOTHING_FIXED : BUILD_FIXED;
+    if (!online.joined || online.starting || online.everyone) return BUILD_FIXED;
     return FIXED_AT_TABLE;
+  }
+
+  /** At home: not visiting a room open to everyone (from the moment the player chooses to), and not at a table once it has let this device in. */
+  get #atHome() {
+    return !this.visiting && !this.online?.welcomed;
+  }
+
+  /** The pieces built here are in the world at home, and put away on a visit or at a table (docs/online.md). */
+  #buildHere() {
+    const home = this.#atHome;
+    if (home !== this.builder.active) {
+      this.builder.setActive(home);
+      this.#rebuilt();
+    }
+    if (this.hands.fixed !== this.#fixedTools()) this.#lockTools();
+  }
+
+  /** What is built has changed: each fly stands on what is under it now, and food lies on it, or falls to it. */
+  #rebuilt() {
+    const world = this.life.world;
+    const bodies = this.company.list;
+    for (let i = -1; i < bodies.length; i++) {
+      const body = i < 0 ? this.life.body : bodies[i].life.body;
+      const p = body.position;
+      world.surface(p.x, p.z, body.surface, p.y + TOUCH);
+    }
+    for (const food of this.life.pantry.foods) food.y = world.heightAt(food.x, food.z, food.y + TOUCH);
+    for (const f of this.hands.falling) f.floor = world.heightAt(f.x, f.z, f.y);
+  }
+
+  /** Uses the Build tool where the hand is: sets the piece down, turns it, takes it away, or clears them. */
+  #build() {
+    const hands = this.hands;
+    const action = buildAction(hands.variant.id);
+    const aim = action && !hands.fixed.has("build") ? this.#pointBuild() : null;
+    if (action && aim && this.builder.use(action, this.#fliesAt, this.life.pantry.foods)) {
+      hands.events.built = true;
+      this.#rebuilt();
+      this.#learn("build");
+      this.haptics.feel("drop");
+      return;
+    }
+    hands.events.blocked = true;
+    this.#refuse();
+  }
+
+  /** What the Build tool in hand points at, if it is in hand and building is on here. */
+  #pointBuild(): Aim | null {
+    const hands = this.hands;
+    const action = hands.current.id === "build" && !hands.fixed.has("build") ? buildAction(hands.variant.id) : null;
+    return action && this.builder.point(action, hands.pointer, hands.following, this.life.body.position, this.#fliesAt, this.life.pantry.foods);
   }
 
   #lockTools() {
@@ -1109,6 +1180,7 @@ export class Game implements Shell {
     this.tour.arrived();
     this.stage.load(scene);
     this.life.move(scene.place);
+    this.builder.enter(id, scene.place);
     for (const [i, c] of this.company.list.entries()) {
       const [x, z, yaw, y] = companionSpot(this.life.world, i);
       c.life.setDown(x, z, yaw, y);
@@ -1205,6 +1277,7 @@ export class Game implements Shell {
     this.#placeChoice.update(dt);
     this.#move(dt);
     this.#table(dt);
+    this.#buildHere();
     this.#flock();
     this.#autoJoin(dt);
     this.#browse(dt);
@@ -1278,6 +1351,8 @@ export class Game implements Shell {
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
     this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
     this.handsView.update(this.hands, life.pantry, director.camera, this.time, dt, this.#floorAt, life.body.position);
+    this.#buildAim = playing ? this.#pointBuild() : null;
+    this.kit.update(this.builder, this.#buildAim, this.hands.variant.id === "remove", this.handsView.opacity, this.time, stage.light, stage.weather, (stage.current.open ?? 1) >= 1);
 
     this.#overlay(dt);
 
@@ -1695,6 +1770,10 @@ export class Game implements Shell {
   /** Uses the tool in hand where the pointer is, as Select does. */
   #useTool() {
     const hands = this.hands;
+    if (hands.current.id === "build") {
+      this.#build();
+      return;
+    }
     this.#copyEye();
     hands.update(0, { use: true, holding: true, eye: this.#eye }, this.life.body, this.life.pantry);
     if (hands.events.blocked) this.#refuse();
@@ -2147,6 +2226,13 @@ export class Game implements Shell {
     d.thirst = life.thirst.level.toFixed(3);
     d.meals = String(life.meals);
     d.food = String(life.pantry.foods.filter(isDropped).length);
+    // What is built here, whether it is in the world, where the Build tool points, and what the fly stands on.
+    d.built = String(this.builder.pieces.length);
+    d.building = this.builder.active ? "on" : "off";
+    const aim = this.#buildAim;
+    d.buildAim = !aim || aim.showing === "none" ? "" : `${aim.showing === "piece" ? aim.piece.kind : `piece ${aim.target}`} ${aim.ok ? "ok" : "blocked"} ${aim.piece.x.toFixed(1)},${aim.piece.z.toFixed(1)}`;
+    const under = life.body.surface.solid;
+    d.standsOn = !life.body.onFeet ? "" : under >= 0 ? life.world.solids[under].name : "floor";
     d.prints = String(this.prints.prints.count(this.time));
     d.takeoffs = String(life.takeOffs);
     d.escape = (life.brain.state?.command.escape ?? 0).toFixed(3);

@@ -126,6 +126,33 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolIcon, x: num
       }
       break;
     }
+    case "build": {
+      // A blue tile, a yellow dish on it and a little wooden wall behind.
+      g.lineWidth = r * 0.08;
+      g.fillStyle = "#e2c18e";
+      g.strokeStyle = "#8a6640";
+      g.beginPath();
+      g.rect(-r * 0.75, -r * 0.7, r * 0.5, r * 1.1);
+      g.fill();
+      g.stroke();
+      g.fillStyle = "#3d8ef0";
+      g.strokeStyle = "#1d4f8a";
+      g.beginPath();
+      g.moveTo(-r * 0.2, r * 0.25);
+      g.lineTo(r * 0.45, -r * 0.05);
+      g.lineTo(r * 0.9, r * 0.25);
+      g.lineTo(r * 0.25, r * 0.6);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      g.fillStyle = "#f5c01a";
+      g.strokeStyle = "#a36a00";
+      g.beginPath();
+      g.ellipse(r * 0.35, r * 0.1, r * 0.32, r * 0.17, 0, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      break;
+    }
     case "light": {
       g.fillStyle = "#ffcf2e";
       g.strokeStyle = "#e88a00";
@@ -464,7 +491,7 @@ export class HandsView {
     // in and it springs back, holding one keeps it in a little, and a refusal shakes it.
     const ev = hands.events;
     const holding = hands.stroking || hands.blowing;
-    if (ev.dropped !== null || ev.swooped || (holding && !this.#held)) this.#pressAge = 0;
+    if (ev.dropped !== null || ev.swooped || ev.built || (holding && !this.#held)) this.#pressAge = 0;
     if (ev.blocked) this.#shakeAge = 0;
     this.#held = holding;
     this.#pressAge += dt;

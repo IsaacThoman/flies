@@ -262,6 +262,34 @@ room is dark round it but for lit windows across the way. Under a grey sky the
 view outside goes flat and grey, in mist it fades to a pale veil, and in the
 rain it falls past the windows. There are no bubbles or fireflies indoors.
 
+## What you build
+
+The Build tool (`apps/web/src/tools/build.ts`) sets pieces of a kit down in
+whichever place the fly lives (`packages/world/src/kit.ts`, drawn in
+`apps/web/src/scene/kit.ts`): glazed dishes 22 mm across in blue and yellow,
+with a gentle outside to walk up, a rounded rim and a flat well where food
+lies; glazed tiles 14 mm square and half a millimetre high, in blue, yellow
+and red; a biscuit crumb, a boulder to a fly but low and round enough to
+climb; a twig, a rail too high to step over and round on top; a fallen leaf
+lying flat, a green floor; a wooden ramp up to a wall's height; and walls
+20 mm long and 3 mm high, too high to step over, that meet end to end and
+at corners into a maze or an arena. The colours are told apart by a fly's
+eyes as by ours: the blue is bright to its blue-green photoreceptors, the
+yellow middling and the red dark ([the eyes](../packages/body/src/vision.ts)).
+
+A piece set down is a solid like the place's own: the fly stands on it,
+walks into it, steps onto the tiles and the leaf, up the ramp and into a
+dish, and sees it; the camera and the cameraman keep out of it; food dropped
+on it lies on it. Pieces rest on the place's own level surfaces (the table,
+a slab such as the restaurant's tables, the flat top of something standing
+there), never on one another, and keep clear of the fly, of where the place
+sets the fly down and of food they would cover. They are kept per place
+between launches, up to 40 each; a save made by a build whose place has
+changed keeps only those that still fit. In the open air they get wet in
+the rain and take the snow, and the gull's shadow passes over them;
+indoors they stay dry, as the rooms' own things do. Nothing about them
+reaches the brain except through what it sees, feels and tastes.
+
 ## Footprints
 
 Wherever it lives, a fly that has stood in something sticky or wet leaves
