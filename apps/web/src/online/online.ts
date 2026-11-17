@@ -400,7 +400,7 @@ export class Online {
       const hand = this.#handList[i];
       const other = this.others.get(hand.player);
       const newest = other?.present ? other.track.newest : null;
-      if (newest) hand.heard(newest);
+      hand.heard(newest && !other?.resting && !(newest.flags & AWAY) ? newest : null);
       hand.update(dt, roomNow, life.body, camera, time, floorAt);
       const h = hand.hands;
       this.stroke = Math.max(this.stroke, h.stroke);
