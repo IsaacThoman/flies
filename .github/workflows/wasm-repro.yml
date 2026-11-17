@@ -2,8 +2,16 @@ name: WebAssembly reproducibility
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      # wasm.sh also holds the pinned SDK version and download digests.
+      - 'packages/brain-native/**'
+      - '.github/workflows/wasm-repro.yml'
   push:
     branches: [dev, main]
+    paths:
+      - 'packages/brain-native/**'
+      - '.github/workflows/wasm-repro.yml'
 
 permissions:
   contents: read
@@ -14,6 +22,7 @@ concurrency:
 
 jobs:
   rebuild:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: macos-latest
     timeout-minutes: 10
     steps:
