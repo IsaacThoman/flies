@@ -6,7 +6,7 @@
 // and falls with 400 ms, so a burst of a few tens of milliseconds is seen for
 // about half a second while nothing flickers from one brain state to the
 // next. Command-group somata use the same envelope on their existing mean
-// readout rates, scaled as the commands are. No individual spikes are inferred.
+// readout rates, on documented display scales. No individual spikes are inferred.
 // Nothing else lights it: a group that doesn't fire stays dark.
 //
 // The shaders take the glow in linear light, so the screen's gamma shows a
