@@ -28,7 +28,7 @@ import { fitMenu, roomLayout, safeRect } from "../layout.ts";
 import type { MenuPanelSpec, RoomLayout } from "../layout.ts";
 import { RoomCard } from "../room-card.ts";
 import { MenuScreen } from "./menu-screen.ts";
-import type { NewRoom, Point, Screen, Shell } from "./types.ts";
+import type { NewRoom, Point, Screen, Shell, TableNow } from "./types.ts";
 
 /** Seconds "Link copied" shows before the button says what it does again. */
 const COPIED_FOR = 2.5;
@@ -41,6 +41,7 @@ export type OnlineView = "rooms" | "new" | "door" | "room";
 
 /** What went wrong, as the heading says it instead of its name. */
 const NOTES: Partial<Record<Ended | "wrong" | "name" | "code", string>> = {
+  version: "Update needed",
   wrong: "Wrong password",
   busy: "Too many tries. Wait a minute",
   full: "That room is full",
@@ -77,6 +78,8 @@ export class OnlineScreen implements Screen {
   #knocked = -1;
   #copied = -1;
   #time = 0;
+  readonly #occupants = new WeakMap<object, number>();
+  #occupantSequence = 0;
   /** At a room: where its card is, and the card. */
   #room: RoomLayout | null = null;
   readonly #card = new RoomCard();
@@ -112,9 +115,15 @@ export class OnlineScreen implements Screen {
       const note = this.#ended && this.#ended !== "locked" && this.#ended !== "left" ? this.#ended : null;
       if (note && note in NOTES) this.#note = note;
     }
+    if (this.#note === "version" && shell.lobbyStatus === "open") this.#note = null;
     if (table && (table.joined || this.view !== "door")) this.view = "room";
     else if (!table && this.view === "room") this.view = knock ? "door" : "rooms";
     if (this.view === "door" && !knock && !table) this.view = "rooms";
+  }
+
+  #incompatible() {
+    const shell = this.#shell;
+    return shell.lobbyStatus === "version" || (shell.tableEnded === "version" && shell.lobbyStatus !== "open");
   }
 
   /** The rows for the view as it is now. */
@@ -123,14 +132,19 @@ export class OnlineScreen implements Screen {
     switch (this.view) {
       case "rooms": {
         const rows: MenuItem[] = [
-          { kind: "action", id: "new", label: "New room", disabled: !shell.canPlayOnline },
-          { kind: "field", id: "code", label: "Code", value: this.#code, disabled: !shell.typing },
+          { kind: "action", id: "new", label: "New room", disabled: !shell.canPlayOnline || this.#incompatible() },
+          { kind: "field", id: "code", label: "Code", value: this.#code, disabled: !shell.typing || this.#incompatible() },
         ];
         const rooms = shell.rooms;
-        if (!rooms) rows.push({ kind: "action", id: "looking", label: "Looking for rooms…", disabled: true });
+        const status = shell.lobbyStatus;
+        const unavailable = status === "lost" || status === "stale" || this.#incompatible();
+        if (unavailable) {
+          if (!this.#incompatible()) rows.push({ kind: "action", id: "unavailable", label: status === "stale" ? "Reconnecting…" : "Can't reach rooms", disabled: true });
+        }
+        else if (!rooms) rows.push({ kind: "action", id: "looking", label: "Looking for rooms…", disabled: true });
         else if (!rooms.length) rows.push({ kind: "action", id: "none", label: "No rooms open", disabled: true });
         for (const r of rooms ?? []) {
-          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), count: [r.flies, MAX_PLAYERS], locked: r.locked, disabled: r.flies >= MAX_PLAYERS });
+          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, swatch: colourOf(r.place), count: [r.flies, MAX_PLAYERS], locked: r.locked, disabled: unavailable || r.flies >= MAX_PLAYERS });
         }
         return rows;
       }
@@ -143,14 +157,14 @@ export class OnlineScreen implements Screen {
           place,
           listed,
           { kind: "field", id: "password", label: "Password", value: d.password, placeholder: "None", secret: true, disabled: !shell.typing },
-          { kind: "action", id: "create", label: "Create" },
+          { kind: "action", id: "create", label: "Create", disabled: this.#incompatible() },
         ];
       }
       case "door": {
         const joining = !!shell.table;
         return [
           { kind: "field", id: "password", label: "Password", value: this.#password, secret: true, disabled: !shell.typing || joining },
-          { kind: "action", id: "join", label: joining ? "Joining…" : "Join", disabled: joining || !this.#password },
+          { kind: "action", id: "join", label: joining ? "Joining…" : "Join", disabled: joining || !this.#password || this.#incompatible() },
         ];
       }
       case "room": {
@@ -158,7 +172,7 @@ export class OnlineScreen implements Screen {
         if (!table) return [];
         const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
         const rows: MenuItem[] = shell.canShare ? [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", disabled: !table.joined }] : [];
-        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: `remove:${o.id}`, label: "Remove", swatch: o.colour });
+        if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", swatch: o.colour });
         rows.push({ kind: "action", id: "leave", label: "Leave the room" });
         return rows;
       }
@@ -167,6 +181,7 @@ export class OnlineScreen implements Screen {
 
   #heading() {
     const shell = this.#shell;
+    if (this.#incompatible()) return "Update needed";
     if (this.#note) return NOTES[this.#note] ?? "";
     if (this.view === "new") return "New room";
     if (this.view === "door") return shell.knock?.name ?? "Online";
@@ -174,13 +189,20 @@ export class OnlineScreen implements Screen {
     return "Online";
   }
 
+  /** A seat number can be reused between frames; the previous occupant's removal must expire. */
+  #removalId(other: TableNow["others"][number]) {
+    let sequence = this.#occupants.get(other);
+    if (sequence === undefined) this.#occupants.set(other, sequence = ++this.#occupantSequence);
+    return `remove:${other.id}:${sequence}`;
+  }
+
   #key() {
     const shell = this.#shell;
     const table = shell.table;
     const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
     const rooms = shell.rooms ? shell.rooms.map((r) => `${r.code}:${r.name}:${r.place}:${r.flies}:${r.locked}`).join(",") : "?";
-    const at = table ? `${table.name}|${table.joined}|${table.starting}|${copied}|${table.others.map((o) => o.id).join(",")}` : "alone";
-    return `${this.view}|${this.#note}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}`;
+    const at = table ? `${table.name}|${table.joined}|${table.starting}|${copied}|${table.others.map((o) => this.#removalId(o)).join(",")}` : "alone";
+    return `${this.view}|${this.#note}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}|${shell.lobbyStatus}`;
   }
 
   #build(focus?: string) {
@@ -252,7 +274,10 @@ export class OnlineScreen implements Screen {
       shell.leaveTable();
       this.view = "rooms";
       this.#refresh("new");
-    } else if (id.startsWith("remove:")) shell.removeFly(Number(id.slice(7)));
+    } else if (id.startsWith("remove:")) {
+      const other = shell.table?.others.find((o) => this.#removalId(o) === id);
+      if (other) shell.removeFly(other.id);
+    }
   }
 
   /** Into the locked room with the password typed. */
@@ -273,9 +298,9 @@ export class OnlineScreen implements Screen {
     typing.begin({ id: item.id, kind, value: item.value, max, label: item.label });
   }
 
-  typeNow(index: number) {
+  typeNow(index: number, id: string) {
     const item = this.menu.items[index];
-    if (item?.kind === "field") this.#type(item);
+    if (item?.kind === "field" && item.id === id) this.#type(item);
   }
 
   #back() {

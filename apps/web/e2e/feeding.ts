@@ -55,7 +55,15 @@ export async function feedHoney(page: Page, drop: () => Promise<void>) {
     console.log(`  drop ${attempt}: sweet ${result.sweet.toFixed(3)}, feed ${result.feed.toFixed(3)}, eaten ${result.eaten.toFixed(3)}`);
     if (sweet > 0 && feed > 0.05 && eaten > 0.05) break;
   }
-  assert.ok(sweet > 0, "five drops: honey never reached the taste senses");
+  if (sweet <= 0) {
+    // Where it landed, for telling a fly that wouldn't from honey that couldn't be reached (another surface, out of reach).
+    const where = await page.evaluate(() => {
+      const { life } = (globalThis as unknown as { __fly: Game }).__fly;
+      const p = life.body.position;
+      return life.pantry.foods.filter((f) => f.kind === "honey").map((f) => `${Math.hypot(f.x - p.x, f.z - p.z).toFixed(1)} mm off, ${(f.y - p.y).toFixed(1)} up, r ${f.r.toFixed(1)}`).join("; ");
+    });
+    assert.fail(`five drops: honey never reached the taste senses (from the fly: ${where})`);
+  }
   assert.ok(feed > 0.05, "five drops: the brain never produced a feed command");
   if (eaten <= 0.05) console.log("  tasted and commanded feeding; chose not to stay and eat within five drops (consumption is covered by life.test.ts)");
 }

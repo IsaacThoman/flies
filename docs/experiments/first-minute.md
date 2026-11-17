@@ -12,7 +12,7 @@ Score each criterion 0–10 (10 described below), absolute scores for each evide
 
 ## Protocol and baseline
 
-Draft PR only; never merge this experiment. No audio, surrogate brain, camera
+The owner initially required drafts only. Their later process update authorizes marking PR #75 ready after integrating dev and local checks; the maintainer merges it. Further validated rounds use a new branch and PR. No audio, surrogate brain, camera
 changes or Online room-policy changes. Evidence images live only on the orphan
 `pr-assets-first-minute` branch. The screenshot driver uses `scripts/play.ts`
 and production builds; heavy work acquires one `/tmp/flies-heavy/slot-N`.
@@ -165,3 +165,34 @@ first-visit controls stay visible; after entry the normal wallpaper resumes.
 The browser checks pass every input mode and confirm Go clears after arrival.
 A completed-player probe reuses one callback and redraws eleven times for eleven
 activity changes across 481 frames; no periodic shimmer or upload is added.
+
+
+## Round 3
+
+Frozen key: P7 = accepted a2af514; J2 = 7d5d8590; T5 = duplicate J2.
+Presentation orders: A T5/P7/J2; B P7/J2/T5; C J2/T5/P7;
+regression-only J2/T5/P7. Fresh high-effort reviewers all prefer J2/T5;
+identical aliases receive identical scores, so no extra noise reviewers trigger.
+
+| Set | A | B | C | Mean | Ranking |
+|---|---|---|---|---|---|
+| J2 / T5 | 9,7,5,9,9,7,8 | 9,6,5,9,9,8,8 | 9,7,5,9,9,7,8 | 7.71 | First, all three |
+| P7 | 9,7,5,9,7,6,8 | 9,6,5,9,7,7,8 | 9,7,5,9,7,6,8 | 7.29 | Second, all three |
+
+Accepted: stable selector targets, first-visit control retention, arrival/menu
+lesson retirement and explicit HUD invalidation. The regression reviewer notes
+that a retained title obstructs more of the initial view and retirement on entry
+does not establish mastery of every menu command. This is the first-visit-only
+tradeoff; returning players retain the normal screensaver behavior. Discovery
+still scores 5: the naive run left Light and Weather untested and View unchanged.
+
+## Integration for PR #75
+
+Per the owner's process update, origin/dev is merged rather than rebased. Its
+sleep rhythm, whole-place screensaver/camera, lifecycle resets, menu-target
+identity, food clearing, room fixes, production guards and e2e fixes are retained.
+The wordless HUD suppresses the sugar-drop diagram for Clear dropped, matching
+the new dev variant. Type checking, lint and 117 relevant area tests pass.
+Recorded blind evidence predates this integration; integrated browser validation
+is recorded separately, without claiming a fresh usability score for dev changes.
+The maintainer reviews and merges; this agent does not wait on GitHub CI.

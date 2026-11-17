@@ -39,9 +39,23 @@ export type InputSpec = {
   afterEyes?: boolean;
 };
 
-/** The senses that are one intensity each; `light` is a picture, handled apart, and `hunger` internal state, not a sense. */
-export type ScalarSense = Exclude<keyof BrainSenses, "light" | "hunger">;
-export type SenseSpec = InputSpec & { sense: ScalarSense };
+/** The internal state that comes with the senses (types.ts): the daily clock and sleep, 0 to 1 each. */
+export const STATE_KEYS = ["clockMorning", "clockEvening", "clockSleep", "sleepPressure", "sleepDepth"] as const;
+export type StateKey = (typeof STATE_KEYS)[number];
+
+/** The senses that are one intensity each; `light` is a picture, handled apart, and `hunger` and the clock and sleep internal state, not senses. */
+export type ScalarSense = Exclude<keyof BrainSenses, "light" | "hunger" | StateKey>;
+export type SenseSpec = InputSpec & {
+  sense: ScalarSense;
+  /**
+   * Mechanosensory: reaches the brain at less than its strength while the fly
+   * sleeps (SLEEP_GATE). The eyes and taste aren't gated.
+   */
+  gated?: boolean;
+};
+
+/** An input that stands for internal state the connectome can't supply, driving the real neurons that carry it. */
+export type StateSpec = InputSpec & { state: StateKey };
 
 export type ReadoutSpec = {
   /** Name in `stats.rates`. */
@@ -117,6 +131,7 @@ export const SENSES: readonly SenseSpec[] = [
     description: "Mechanosensory bristle neurons of the head (BM types)",
     select: { superClass: "cb_sensory", type: /^BM/ },
     maxRate: 50,
+    gated: true,
   },
   {
     sense: "touch",
@@ -124,6 +139,7 @@ export const SENSES: readonly SenseSpec[] = [
     description: "Mechanosensory bristle neurons of the thorax, abdomen and legs",
     select: { superClass: "vnc_sensory", subClass: "mechanosensory_bristle" },
     maxRate: 10,
+    gated: true,
   },
   {
     sense: "bumpLeft",
@@ -131,6 +147,7 @@ export const SENSES: readonly SenseSpec[] = [
     description: "Displacement-sensitive Johnston's organ neurons (zones C and E) of the left antenna",
     select: sided(ANTENNA, "left"),
     maxRate: 100,
+    gated: true,
   },
   {
     sense: "bumpRight",
@@ -138,6 +155,7 @@ export const SENSES: readonly SenseSpec[] = [
     description: "Displacement-sensitive Johnston's organ neurons (zones C and E) of the right antenna",
     select: sided(ANTENNA, "right"),
     maxRate: 100,
+    gated: true,
   },
   {
     sense: "wind",
@@ -145,6 +163,7 @@ export const SENSES: readonly SenseSpec[] = [
     description: "Wind- and gravity-sensitive Johnston's organ neurons of both antennae",
     select: { superClass: "cb_sensory", subClass: "wind_gravity" },
     maxRate: 100,
+    gated: true,
   },
   {
     sense: "sweet",
@@ -159,6 +178,7 @@ export const SENSES: readonly SenseSpec[] = [
     description: "Campaniform sensilla (load sensors) of the legs (SNpp53), firing tonically while standing",
     select: { subClass: "campaniform_sensilla", type: LEG_CAMPANIFORM },
     maxRate: 20,
+    gated: true,
   },
   {
     sense: "maleTaste",
@@ -177,6 +197,69 @@ export const SENSES: readonly SenseSpec[] = [
     select: { superClass: ["vnc_sensory", "sensory_ascending"], subClass: "campaniform_sensilla", type: (t: string) => t !== LEG_CAMPANIFORM },
     maxRate: WINGBEAT_RATE,
     afterEyes: true,
+  },
+];
+
+/**
+ * How much of a mechanosensory sense's strength is lost at full sleep depth.
+ * A stand-in for sleep's raised arousal threshold: sleeping flies need
+ * stronger stimuli to respond, more so the longer a bout has lasted (van
+ * Alphen et al. 2013; Faville et al. 2015), and their brains answer stimuli
+ * less (Nitz et al. 2002; van Swinderen et al. 2004). How sleep does that in
+ * the fly isn't known circuit by circuit, and the model has none of it, so
+ * the senses that arousal thresholds are measured with (touch, the antennae,
+ * the legs' load) reach the brain at a lower rate: at depth 1, 60% of it.
+ * Chosen by what it does (README, Sleep and the daily rhythm): stroking (touch
+ * 1) then arrives as touch 0.6, which rouses a fly that is only still, and the
+ * feather resting (0.4) as 0.24, less than a raindrop; at half, stroking hardly
+ * woke it. The eyes aren't gated: a loom still reaches the giant fiber.
+ */
+export const SLEEP_GATE = 0.4;
+
+/**
+ * How much of the eyes' input is lost when the fly is as sleepy as the clock
+ * makes it at night (state.ts, `sleepiness`). A stand-in for vision's gain
+ * following arousal: fly visual neurons answer more strongly when the fly is
+ * active (Maimon et al. 2010; Chiappe et al. 2010; Suver et al. 2012), and a
+ * sleepy fly's less. It is needed because lowering arousal takes away the
+ * background that holds the giant fiber back: without it a night scene seen
+ * through the eyes, which brings the escape command near take-off in an awake
+ * fly, set a sleepy one off every half a minute or so. 0.3 is chosen by what it
+ * does (README, Sleep and the daily rhythm): the night's picture then drives
+ * the giant fiber no harder than it does an awake fly, and a loom still wakes it.
+ */
+export const SLEEP_EYES = 0.3;
+
+/**
+ * Internal state the connectome can't supply, fed to the real neurons that
+ * carry it in the fly (README, Sleep and the daily rhythm). What makes the
+ * fly sleep is not these: as modelled they reach no command (measured there),
+ * and the sleep term in state.ts does it. A connectome without them (a test's)
+ * leaves them out.
+ */
+export const STATE_INPUTS: readonly StateSpec[] = [
+  {
+    state: "clockMorning",
+    name: "clock morning",
+    // Their daily rhythm of firing, higher in the morning, is the molecular clock's (Flourakis et al. 2015); a few Hz at its height.
+    description: "The morning oscillator's clock neurons, s-LNv and l-LNv (the M cells)",
+    select: { type: ["s-LNv", "l-LNv"] },
+    maxRate: 5,
+  },
+  {
+    state: "clockEvening",
+    name: "clock evening",
+    description: "The evening oscillator's clock neurons, LNd and the 5th s-LNv (the E cells)",
+    select: { type: ["LNd_b", "LNd_c", "5thsLNv_LNd6"] },
+    maxRate: 5,
+  },
+  {
+    state: "sleepPressure",
+    name: "sleep pressure",
+    // Sleep need makes the dorsal fan-shaped body neurons fire (Donlea et al. 2014) and the R5 ring neurons fire more (Liu et al. 2016).
+    description: "Tangential neurons of the fan-shaped body's dorsal layers 6 and 7 (FB6, FB7) and the R5 ring neurons (ER5)",
+    select: { type: (t: string) => /^FB[67]/.test(t) || t === "ER5" },
+    maxRate: 10,
   },
 ];
 
@@ -280,10 +363,22 @@ export function intensity(senses: BrainSenses, sense: ScalarSense): number {
   return clamp(value, 0, 1);
 }
 
+/** An internal state's value, 0..1 (0 when left out). */
+export function stateOf(senses: BrainSenses, key: StateKey): number {
+  return clamp(senses[key] ?? 0, 0, 1);
+}
+
+/** What a mechanosensory sense keeps of its strength at this sleep depth (SLEEP_GATE). */
+export function sleepGate(senses: BrainSenses): number {
+  return 1 - SLEEP_GATE * stateOf(senses, "sleepDepth");
+}
+
 /** Each sense input's rate, Hz per neuron, for these senses. */
 export function senseRates(wiring: Pick<Wiring, "senses">, senses: BrainSenses): Map<string, number> {
-  return new Map(wiring.senses.map(({ spec, maxRate }) => [spec.name, maxRate * intensity(senses, spec.sense)]));
+  const gate = sleepGate(senses);
+  return new Map(wiring.senses.map(({ spec, maxRate }) => [spec.name, maxRate * intensity(senses, spec.sense) * (spec.gated ? gate : 1)]));
 }
+
 
 /** Each background input's rate, Hz per neuron, for the eyes' levels (0..1). */
 export function backgroundRates(wiring: Pick<Wiring, "background">, level: { left: number; right: number }): Map<string, number> {
@@ -317,6 +412,8 @@ export function outputSynapses(connectome: Connectome, neurons: ArrayLike<number
 export type Wiring = {
   senses: { spec: SenseSpec; neurons: Uint32Array; maxRate: number }[];
   background: { spec: (typeof BACKGROUND)[number]; neurons: Uint32Array; maxRate: number }[];
+  /** The internal-state inputs this connectome has neurons for. */
+  state: { spec: StateSpec; neurons: Uint32Array; maxRate: number }[];
   readouts: { spec: ReadoutSpec; neurons: Uint32Array }[];
 };
 
@@ -337,14 +434,15 @@ export function wire(connectome: Connectome): Wiring {
       if (other) each.maxRate = each.spec.maxRate * balanceFactor(connectome, each.neurons, other.neurons);
     }
   }
+  const state = STATE_INPUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select), maxRate: spec.maxRate })).filter((g) => g.neurons.length > 0);
   const readouts = READOUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select) }));
   for (const group of [...senses, ...background, ...readouts]) {
     if (group.neurons.length === 0) throw new Error(`The connectome has no neurons for "${group.spec.name}" (${group.spec.description})`);
   }
   const driven = new Set<number>();
-  for (const group of [...senses, ...background]) for (const i of group.neurons) driven.add(i);
+  for (const group of [...senses, ...background, ...state]) for (const i of group.neurons) driven.add(i);
   for (const group of readouts) {
     for (const i of group.neurons) if (driven.has(i)) throw new Error(`Neuron ${i} is both driven and read (readout "${group.spec.name}")`);
   }
-  return { senses, background, readouts };
+  return { senses, background, state, readouts };
 }

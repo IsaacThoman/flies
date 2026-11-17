@@ -43,6 +43,7 @@ export const HUD_HITS = { tool: "tool", kind: "kind", label: "label", go: "go", 
 
 const CAPTIONS: Record<Activity, string> = {
   resting: "Resting",
+  sleeping: "Asleep",
   walking: "Walking",
   backing: "Backing away",
   turning: "Turning",
@@ -63,9 +64,10 @@ export function caption(activity: Activity, food: string | null) {
 /** No periodic teaching redraws are needed once the visible lessons are done. */
 export function needsTeaching(s: HudState): boolean {
   if (!s.hints) return false;
-  return (!s.learned[s.hands.current.id] && !s.hands.fixed.has(s.hands.current.id)) ||
+  return (!s.learned[s.hands.current.id] && !s.hands.fixed.has(s.hands.current.id) && !(s.hands.current.id === "feed" && s.hands.variant.id === "clear")) ||
     (!!s.glyphs && !s.learned.tools) ||
     (!!s.glyphs && s.glyphs !== "keys" && s.teachSwipe && !s.learned.hand);
+
 }
 
 export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hits: HitMap) {
@@ -140,7 +142,7 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
   }
 
   if (s.hints) {
-    if (!s.learned[tool.id] && !hands.fixed.has(tool.id)) {
+    if (!s.learned[tool.id] && !hands.fixed.has(tool.id) && !(tool.id === "feed" && hands.variant.id === "clear")) {
       if (tool.id === "light" || tool.id === "weather" || tool.id === "view" || tool.id === "place") {
         if (pointing) ghostPress(g, go ? lx + lw + 40 : lx + lw - 18, L.labelY - 8, t, false);
         else drawGlyph(g, tool.id === "place" && hands.place !== s.here ? "select" : "upDown", cx, L.labelY - 48, 28, t, s.glyphs!);

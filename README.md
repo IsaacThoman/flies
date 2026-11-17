@@ -351,7 +351,8 @@ show the thing last used, and the screen hides the system's cursor, text
 selection, long-press menus, pull-to-refresh, double-tap and pinch zoom,
 and scrolling.
 
-The tools are **Feed** (sugar, honey, raspberry, water), **Swoop** (a dark
+The tools are **Feed** (sugar, honey, raspberry, water, and Clear dropped, which
+removes your offerings, including those still falling, leaving the place’s own food), **Swoop** (a dark
 beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot), **Light** (now, which follows the clock,
@@ -410,7 +411,8 @@ fly and follows it: the screensaver. A mouse resting on the desk doesn't keep it
 away, and a nudge of the desk doesn't end it; a mouse moved as if meant does.
 Its camera can take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
-(Lively). Any press, touch, tap, click, key or deliberate move of the mouse
+(Lively), or keep the whole place in view with a slow drift (Whole place).
+Any press, touch, tap, click, key or deliberate move of the mouse
 brings the controls back and does nothing else.
 A small picture of what the fly's eyes see sits in a corner of the screensaver
 (Settings → On screen → Fly POV: off, in the screensaver, or always, the default, which keeps it in
@@ -477,7 +479,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
 | `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
 | `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
-| `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, another fly's body, or past the table's edge. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
+| `bumpLeft`, `bumpRight` | Something pushing an antenna back: its tip, just ahead of the head and to its side, inside another fly's body or, in the air, inside anything; on its feet, at anything taller than a step that it walks into, or that it stands against where its foreleg on that side doesn't (standing, its forelegs' tarsi reach further forward than its antennae, so a wall they meet holds its head off it, while a stem between them still touches). Nothing past the table's edge, where there is nothing to touch. 1 while it lasts, however long (any contact deflects an antenna further than its push neurons need, and they answer for as long as it is held), easing out over 0.3 s. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
 | `grounded` | On its feet: its legs' load sensors bear its weight. |
@@ -506,6 +508,11 @@ over 60), and the abdomen swells with it: up to 12% wider and deeper and 5%
 longer, round numbers chosen to be seen. Another player's fly at a table
 doesn't show it: the crop isn't sent to the room.
 
+With them go the fly's daily clock and its need for sleep (`packages/body/src/rhythm.ts`),
+not senses but internal state the connectome can't supply: the morning and evening
+oscillators, the clock's push toward sleep, sleep pressure and how deeply it sleeps (below,
+Sleep and the daily rhythm).
+
 ## What the body adds
 
 The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
@@ -525,7 +532,11 @@ lives (`packages/body/src/motion.ts` unless noted):
   ledges and slopes steeper than 65°. In the air it has weight, drag (7/s, through
   the air, which a puff or a gust moves) and
   the push of its wings: lift in proportion to the `wings` command (0.6 holds
-  its weight) and thrust along its heading.
+  its weight) and thrust along its heading. Its head, abdomen and legs keep
+  out of what they reach, as its feet do: flying at a pane it bounces off with
+  its head on the near side, and turning beside a wall its legs swing clear;
+  between two things too close for it as it faces, they turn it a quarter
+  turn if it fits so.
 - **The take-off's direction.** The escape command launches it (380 to 620 mm/s
   up and 160 to 340 away, by how far past 0.4 it went); the direction is the
   body's: away from the ball if the ball is in the air, else straight ahead.
@@ -565,9 +576,33 @@ lives (`packages/body/src/motion.ts` unless noted):
   about 1.5 s after the command fades. The crouch follows the
   raw escape command.
 
-The caption ("Walking", "Eating honey", "Grooming", "Flying") names what the
+The caption ("Walking", "Eating honey", "Grooming", "Flying", "Asleep") names what the
 body is doing on the brain's commands; the stats' In and out shows the
 commands and the neurons themselves.
+
+## Sleep and the daily rhythm
+
+The fly keeps the real time of day, whatever light is chosen: its clock follows the
+device's clock and, on an Apple TV that knows them, today's real sunrise and sunset
+(otherwise the game's summer day, 05:40 to 20:10). Like a male fly's, its day has a
+morning peak of activity round dawn and an evening one round dusk, each beginning
+about three hours ahead, a siesta between them, and sleep through the night. Sleep
+pressure builds while it is awake (over about 12 hours) and discharges while it sleeps
+(over about 3): a fly kept awake by play, or woken again and again at night, is
+sleepier, and it starts each visit as sleepy as the hour would leave a fly left to itself.
+
+None of this moves the fly. The body works the clock and the pressure out
+(`packages/body/src/rhythm.ts`) and tells the brain, which drives the clock neurons
+and the sleep-promoting neurons the connectome has and shifts its made-up arousal; it
+is the brain that stops walking (`packages/brain/README.md`, Sleep and the daily rhythm,
+says how, with what is real and what stands in). The body only watches: five minutes
+or more without moving is sleep, as the field scores it, and stillness deepens it.
+Asleep, the fly settles a little lower on its legs, its head bowed, without the idle
+glances and shifts of its feet (the pose's `sleep`, `packages/fly`), and the caption says
+"Asleep". Asleep, the feather resting on it or a raindrop doesn't wake it; stroking it
+nearly always does within a few seconds, and a swoop does. Moving at all wakes it. The canvas's `data-rhythm` gives the hour, the
+clock, the pressure, the depth and how long it has been still.
+
 
 ## Flight
 

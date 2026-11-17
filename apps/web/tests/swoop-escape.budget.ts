@@ -13,7 +13,7 @@ import { test } from "node:test";
 import { ESCAPE_ON, ESCAPE_REARM, HEAD_AHEAD, HEAD_UP } from "@fly/body";
 import { BALL_RADIUS, World } from "@fly/world";
 import type { Place, Vec3 } from "@fly/world";
-import { CpuMeter } from "../../../scripts/cpuBudget.ts";
+import { CpuMeter, measureBudget } from "../../../scripts/cpuBudget.ts";
 import { Hands, TOOLS } from "../src/tools/hands.ts";
 import { Life } from "../src/life.ts";
 import { DEFAULT_CONNECTOME_PATH } from "../../../packages/brain/src/node.ts";
@@ -150,27 +150,32 @@ const scratch: Vec3 = { x: 0, y: 0, z: 0 };
 
 const summary = (results: Throw[]) => results.map((r) => `${r.escape.toFixed(2)}${r.tookOff ? ` flew ${r.air.toFixed(1)} s ${r.distance.toFixed(0)} mm` : ""}`).join(", ");
 
-test("the swoop seen through the brain's own eyes fires the giant fiber and the fly takes off and flies, in at least 6 of 8 throws", { skip }, () => {
-  const meter = new CpuMeter();
-  const { results, time } = swoops("open", 1, THROWS, meter);
-  meter.lap();
-  const cpu = meter.ms / 1000;
-  const off = results.filter((r) => r.tookOff).length;
-  console.log(`  eyes open: ${off} of ${results.length} took off (escape peaks: ${summary(results)}); ${time.toFixed(0)} s of its life in ${cpu.toFixed(1)} M5 Pro CPU s (${(meter.rawMs / 1000).toFixed(1)} here)`);
-  // Seed 1 takes off from 7 of 8 (escape 0.51 to 0.70; the eighth peaks at 0.32), each a flight of 1.5 to 1.6 s and 382 to 396 mm along its way.
-  assert.ok(off >= 6, `${off} of ${results.length} took off: ${summary(results)}`);
-  // Every throw that crossed the line took off: the body did what the giant fiber said.
-  for (const r of results) if (r.escape >= ESCAPE_ON + 0.02) assert.ok(r.tookOff, `escape reached ${r.escape.toFixed(2)} and it stayed: ${summary(results)}`);
-  // And every take-off is a flight (the tarsal reflex: packages/body/src/behavior.ts): up for over a second, away, and down safely on its feet.
-  for (const r of results.filter((r) => r.tookOff)) {
-    assert.ok(r.air >= 1, `in the air for ${r.air.toFixed(2)} s: ${summary(results)}`);
-    assert.ok(r.distance > 100, `flew ${r.distance.toFixed(0)} mm: ${summary(results)}`);
-    assert.ok(r.top > 10, `rose ${r.top.toFixed(0)} mm`);
-    assert.ok(r.landed, `didn't land: ${summary(results)}`);
-    assert.ok(r.lowest >= 0, "never below the floor");
-    // The wings' own sensors don't keep them going once it is down (measured, seeds 1 to 4: at most 0.03 at any moment).
-    assert.ok(r.beatAfter < 0.05, `its wings beat at ${r.beatAfter.toFixed(2)} after it landed`);
-  }
+test("the swoop seen through the brain's own eyes fires the giant fiber and the fly takes off and flies, in at least 6 of 8 throws", { skip }, async (t) => {
+  const measured = await measureBudget(t, () => {
+    const meter = new CpuMeter();
+    const { results, time } = swoops("open", 1, THROWS, meter);
+    meter.lap();
+    const cpu = meter.ms / 1000;
+    const off = results.filter((r) => r.tookOff).length;
+    console.log(`  eyes open: ${off} of ${results.length} took off (escape peaks: ${summary(results)}); ${time.toFixed(0)} s of its life in ${cpu.toFixed(1)} M5 Pro CPU s (${(meter.rawMs / 1000).toFixed(1)} here)`);
+    // Seed 1 takes off from 7 of 8 (escape 0.51 to 0.70; the eighth peaks at 0.32), each a flight of 1.5 to 1.6 s and 382 to 396 mm along its way.
+    assert.ok(off >= 6, `${off} of ${results.length} took off: ${summary(results)}`);
+    // Every throw that crossed the line took off: the body did what the giant fiber said.
+    for (const r of results) if (r.escape >= ESCAPE_ON + 0.02) assert.ok(r.tookOff, `escape reached ${r.escape.toFixed(2)} and it stayed: ${summary(results)}`);
+    // And every take-off is a flight (the tarsal reflex: packages/body/src/behavior.ts): up for over a second, away, and down safely on its feet.
+    for (const r of results.filter((r) => r.tookOff)) {
+      assert.ok(r.air >= 1, `in the air for ${r.air.toFixed(2)} s: ${summary(results)}`);
+      assert.ok(r.distance > 100, `flew ${r.distance.toFixed(0)} mm: ${summary(results)}`);
+      assert.ok(r.top > 10, `rose ${r.top.toFixed(0)} mm`);
+      assert.ok(r.landed, `didn't land: ${summary(results)}`);
+      assert.ok(r.lowest >= 0, "never below the floor");
+      // The wings' own sensors don't keep them going once it is down (measured, seeds 1 to 4: at most 0.03 at any moment).
+      assert.ok(r.beatAfter < 0.05, `its wings beat at ${r.beatAfter.toFixed(2)} after it landed`);
+    }
+    return { value: { cpu, time }, references: meter.references };
+  });
+  if (!measured) return;
+  const { cpu, time } = measured;
   // The fly's life with its eyes open to the swoop takes a fifth of an M5 Pro CPU second per simulated second.
   assert.ok(cpu < 0.34 * time, `${cpu.toFixed(1)} M5 Pro CPU s for ${time.toFixed(0)} s; budget ${(0.34 * time).toFixed(1)}`);
 });

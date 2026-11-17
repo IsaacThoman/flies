@@ -207,7 +207,8 @@ export function buildShell(b: Builder) {
     b.shell(new THREE.ShapeGeometry(leaf, 24).translate(porthole.x, 0, -hz), "#24382e", KIND.paint);
     b.shell(new THREE.RingGeometry(porthole.r - 0.01, porthole.r + 26, 40).translate(porthole.x, porthole.y, -hz + 0.4), "#ffffff", KIND.steel);
     b.shell(new THREE.CircleGeometry(porthole.r, 32).translate(porthole.x, porthole.y, -hz - 12), "#46504c", KIND.kitchen);
-    b.shell(box(door.x0 + 40, 0, -hz, door.x1 - 40, 280, -hz + 0.4), "#ffffff", KIND.steel);
+    // Let it into the door, leaving a hair over the paint to avoid coplanar faces.
+    b.shell(box(door.x0 + 40, 0, -hz - 0.35, door.x1 - 40, 280, -hz + 0.05), "#ffffff", KIND.steel);
     for (const x of [dx0, door.x1]) b.shell(face("back", x, x + frame, 0, door.head + frame), "#ffffff", KIND.mahogany);
     b.shell(face("back", door.x0, door.x1, door.head, door.head + frame), "#ffffff", KIND.mahogany);
   }

@@ -6,7 +6,7 @@ import type { EyeColumn } from "./eye-columns.ts";
 import { buildEyes } from "./eyes.ts";
 import type { Eyes } from "./eyes.ts";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
-import { backgroundRates, decode, hungerOf, senseRates, smooth, sweetOutputGain, wire } from "./io.ts";
+import { SLEEP_EYES, backgroundRates, decode, hungerOf, senseRates, smooth, stateOf, sweetOutputGain, wire } from "./io.ts";
 import type { Wiring } from "./io.ts";
 import { OPERATING_POINT, buildWeights } from "./params.ts";
 import type { OperatingPoint } from "./params.ts";
@@ -60,6 +60,9 @@ export class FlyBrain implements Brain {
   #regionCounts = new Uint32Array(REGIONS.length);
   // The sweet neurons' input, whose output gain hunger sets.
   #sweet = "";
+  /** The eyes' gain last set (SLEEP_EYES), and each eye's rates scaled by it. */
+  #eyeGain = 1;
+  #gained: { left: Float64Array; right: Float64Array } | null = null;
 
   constructor(connectome: ReturnType<typeof loadConnectome>, options: BrainOptions = {}) {
     const seed = options.seed ?? 1;
@@ -95,6 +98,7 @@ export class FlyBrain implements Brain {
       const parameters = options.retina ?? RETINA;
       const retina = { left: new Retina(eyes.left, parameters), right: new Retina(eyes.right, parameters) };
       this.vision = { ...eyes, retina };
+      this.#gained = { left: new Float64Array(retina.left.rates.length), right: new Float64Array(retina.right.rates.length) };
       const read = new Set(this.wiring.readouts.flatMap((group) => [...group.neurons]));
       for (const side of ["left", "right"] as const) {
         for (const i of retina[side].neurons) if (read.has(i)) throw new Error(`Neuron ${i} is both driven by the ${side} eye and read`);
@@ -111,6 +115,8 @@ export class FlyBrain implements Brain {
       }
     }
     for (const { spec, neurons } of this.wiring.senses) if (spec.afterEyes) this.sim.addInput(spec.name, neurons);
+    // Last of all, so they too leave every other input's stream as it was.
+    for (const { spec, neurons } of this.wiring.state) this.sim.addInput(spec.name, neurons);
     // A separate stream from the Poisson inputs', which inputSeed derives from the same seed.
     this.state = new InternalState((seed ^ 0x5bd1e995) >>> 0, options.internalState ?? INTERNAL_STATE);
     this.spontaneous = options.spontaneous ?? true;
@@ -132,6 +138,14 @@ export class FlyBrain implements Brain {
     const hunger = hungerOf(senses);
     this.sim.setOutputGain(this.#sweet, sweetOutputGain(hunger));
     this.state.hunger = hunger;
+    for (const { spec, maxRate } of this.wiring.state) this.sim.setRate(spec.name, maxRate * stateOf(senses, spec.state));
+    this.state.rest(
+      Math.max(stateOf(senses, "clockMorning"), stateOf(senses, "clockEvening")),
+      stateOf(senses, "clockSleep"),
+      stateOf(senses, "sleepPressure"),
+      stateOf(senses, "sleepDepth"),
+    );
+    const eyeGain = 1 - SLEEP_EYES * this.state.sleepiness();
     let left = dtMs;
     while (left > 1e-9) {
       const chunk = Math.min(CHUNK_MS, left);
@@ -144,8 +158,16 @@ export class FlyBrain implements Brain {
       if (this.vision) {
         for (const side of ["left", "right"] as const) {
           const retina = this.vision.retina[side];
-          if (retina.step(chunk, senses.light ? senses.light[side] : null)) this.sim.setRates(`eye ${side}`, retina.rates);
+          const changed = retina.step(chunk, senses.light ? senses.light[side] : null);
+          if (!changed && eyeGain === this.#eyeGain) continue;
+          if (eyeGain === 1) this.sim.setRates(`eye ${side}`, retina.rates);
+          else {
+            const gained = this.#gained![side];
+            for (let n = 0; n < gained.length; n++) gained[n] = retina.rates[n] * eyeGain;
+            this.sim.setRates(`eye ${side}`, gained);
+          }
         }
+        this.#eyeGain = eyeGain;
       }
       const before = this.sim.time;
       this.sim.advance(chunk);

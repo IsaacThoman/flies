@@ -49,6 +49,24 @@ export type BrainSenses = {
    * what the wings' and halteres' strain sensors feel of each stroke.
    */
   wingbeat: number;
+  /*
+   * Internal state, not senses: the fly's daily clock and its need for
+   * sleep, which the connectome can't supply (the clock is molecular and its
+   * outputs are mostly peptides; README, Sleep and the daily rhythm). The body
+   * works them out from the time of day and its own stillness. Each runs 0 to
+   * 1; left out, 0: a rested fly with no clock, the brain as it ran before
+   * them.
+   */
+  /** The morning oscillator, the M cells (s-LNv, l-LNv): up around dawn. */
+  clockMorning?: number;
+  /** The evening oscillator, the E cells (LNd, the 5th s-LNv): up around dusk. */
+  clockEvening?: number;
+  /** The clock's push toward sleep: whenever neither oscillator is up, most at night. */
+  clockSleep?: number;
+  /** Homeostatic sleep pressure: builds while it is awake and discharges while it sleeps. */
+  sleepPressure?: number;
+  /** How deeply it sleeps: 0 awake, rising to 1 over a bout's first quarter of an hour. */
+  sleepDepth?: number;
 };
 
 /**

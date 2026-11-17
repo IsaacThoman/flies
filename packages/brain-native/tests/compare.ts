@@ -92,6 +92,8 @@ export type Columns = { readonly right: readonly EyeColumn[]; readonly left: rea
 
 const SCALAR = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet", "maleTaste", "wingbeat"] as const;
 type Scalar = (typeof SCALAR)[number];
+/** The internal state, after the senses in the harness's line, in fly_senses's order. */
+const STATE = ["clockMorning", "clockEvening", "clockSleep", "sleepPressure", "sleepDepth"] as const;
 
 /**
  * The scripted senses: rest standing and airborne, each sense alone, partial
@@ -111,6 +113,7 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     const each: BrainSenses = { ...RESTING_SENSES, ...senses };
     for (const key of SCALAR) each[key] = Math.fround(each[key]);
     if (each.hunger !== undefined) each.hunger = Math.fround(each.hunger);
+    for (const key of STATE) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
     ticks.push({ dt, senses: each, what });
     if (dt >= 0 && dt <= 1000) total += dt;
   };
@@ -145,6 +148,12 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     for (let k = 0; k < 10; k++) add(100, { bumpLeft: k / 10 }, "100 ms ticks");
     for (let k = 0; k < 30; k++) add(7.3, { bumpRight: 1 - k / 30 }, "7.3 ms ticks");
     hold(500, 16, () => ({ wind: 7, touch: -1, sweet: Number.NaN, loomLeft: Number.POSITIVE_INFINITY }), "out-of-range senses");
+    hold(2000, 16, (t) => ({ clockMorning: 1 - t / 2000, clockEvening: t / 2000, clockSleep: 0.5, sleepPressure: 0.3 }), "the clock turning, a little sleepy");
+    hold(3000, 16, () => ({ clockSleep: 1, sleepPressure: 0.6, sleepDepth: 1 }), "asleep at night");
+    hold(1500, 16, () => ({ clockSleep: 1, sleepPressure: 0.6, sleepDepth: 1, touch: 1, wind: 0.5, bumpLeft: 1 }), "asleep and stroked");
+    hold(1000, 16, () => ({ clockSleep: 1, sleepDepth: 0.5, loomRight: 1 }), "half asleep, a loom");
+    hold(500, 16, () => ({ clockMorning: 7, clockEvening: -1, clockSleep: Number.NaN, sleepPressure: Number.POSITIVE_INFINITY, sleepDepth: -0.5 }), "out-of-range state");
+    hold(1000, 16, () => Object.fromEntries(STATE.map((s) => [s, random() < 0.5 ? random() : 0])), "random state");
     for (const dt of [-1, Number.NaN, 1000.5, Number.POSITIVE_INFINITY]) add(dt, {}, "an invalid tick");
     hold(5000, 16, () => ({}), "rest at the end of a cycle");
     if (eyes) sight(eyes, cycle, random, add, hold);
@@ -203,6 +212,9 @@ function sight(eyes: EyeMap, cycle: number, random: () => number, add: Add, hold
   show(scene("grating, clockwise"), 1500, 16, "a grating with every other sense at full strength", () => everything);
   show(loom, 1000, 1000 / 60, "a loom while held and dragged", () => ({ touch: 0.4, wind: 0.5, grounded: false }));
   show(scene("flicker"), 1000, 16, "flicker while sweet", () => ({ sweet: 1 }));
+  show(loom, 1000, 16, "a loom while asleep, the eyes at a sleepy gain", () => ({ clockSleep: 1, sleepPressure: 0.6, sleepDepth: 1 }));
+  hold(600, 16, (t) => ({ light: grey, clockSleep: t / 600, sleepPressure: 0.2 }), "a steady scene as sleepiness rises, the gain alone changing");
+  show(scene("grating, clockwise"), 600, 16, "a grating waking up", (t) => ({ clockSleep: 1 - t / 600 }));
   show(scene("bar right, front to back"), 1000, 16, "a bar with random senses", () =>
     Object.fromEntries(["loomLeft", "touch", "bumpRight", "wind"].map((s) => [s, random() < 0.5 ? random() : 0])),
   );
@@ -268,7 +280,7 @@ export function script(ticks: readonly Tick[]): { input: string; frames: Uint8Ar
   };
   const lines = ticks.map(({ dt, senses }) => {
     const light = senses.light ? `${ref(senses.light.left)},${ref(senses.light.right)}` : "-";
-    return [hex64(dt), ...SCALAR.map((s: Scalar) => hex32(senses[s])), senses.grounded ? 1 : 0, light, hex32(senses.hunger ?? 1)].join(" ");
+    return [hex64(dt), ...SCALAR.map((s: Scalar) => hex32(senses[s])), senses.grounded ? 1 : 0, ...STATE.map((s) => hex32(senses[s] ?? 0)), light, hex32(senses.hunger ?? 1)].join(" ");
   });
   const frames = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
   let at = 0;
@@ -345,7 +357,7 @@ export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick
           rates.map(hex64).join(" "),
           c.map(hex32).join(" "),
           rates.map(hex32).join(" "),
-          [brain.state.arousal.value, brain.state.scene.left.value, brain.state.scene.right.value].map(hex64).join(" "),
+          [brain.state.arousal.value, brain.state.scene.left.value, brain.state.scene.right.value, brain.state.sleep].map(hex64).join(" "),
           retinaDigest(brain),
           tick++ % 50 === 49 ? digest(brain.sim) : "-",
         ].join(" | "),

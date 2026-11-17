@@ -87,6 +87,7 @@ const SLIDERS: Slider[] = [
   { key: "groom", min: 0, max: 1, step: 0.01 },
   { key: "feed", min: 0, max: 1, step: 0.01 },
   { key: "crouch", min: 0, max: 1, step: 0.01 },
+  { key: "sleep", min: 0, max: 1, step: 0.01 },
   { key: "pitch", min: -1, max: 1, step: 0.01 },
   { key: "roll", min: -1, max: 1, step: 0.01 },
   { key: "fullness", min: 0, max: 1, step: 0.01 },
@@ -107,8 +108,8 @@ const airborneBox = document.getElementById("airborne") as HTMLInputElement;
 airborneBox.addEventListener("change", () => { pose.airborne = airborneBox.checked; });
 function syncInputs() {
   for (const [key, { input, out }] of inputs) {
-    input.value = String(pose[key]);
-    out.textContent = (pose[key] as number).toFixed(2);
+    input.value = String(pose[key] ?? 0);
+    out.textContent = ((pose[key] as number | undefined) ?? 0).toFixed(2);
   }
   airborneBox.checked = pose.airborne;
 }
@@ -125,6 +126,7 @@ const PRESETS: Record<string, Partial<FlyPose>> = {
   "after a meal": { fullness: 1 },
   buzz: { wings: 0.4 },
   crouch: { crouch: 1, wings: 0 },
+  sleep: { sleep: 1 },
   fly: { airborne: true, wings: 1, pitch: 0.5 },
   bank: { airborne: true, wings: 1, pitch: 0.4, roll: 0.5, speed: 4, turn: 1.5 },
 };
