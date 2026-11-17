@@ -54,7 +54,7 @@ Pointing, the screen itself is what you press, and there are no button hints:
 In a browser the keyboard is the remote (arrows, Enter for Select, Escape for
 Back, space for Play/Pause), its hints drawn as keys; the number keys pick a
 tool, + and − held bring the camera in and take it out, Q and E held turn it
-round the fly, and R (or Home) takes it back to Follow's distance and height. After a mouse
+round the fly, W and S up and down, and R (or Home) takes it back to Follow's distance and height. After a mouse
 or a finger the menus show no focus; the first arrow shows it, on what was
 last pressed. A standard game pad (the Gamepad API) is the remote too: A is
 Select, B Back, Start Play/Pause, the d-pad and the shoulder buttons the

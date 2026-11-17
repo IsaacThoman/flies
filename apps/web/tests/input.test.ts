@@ -120,7 +120,7 @@ test("on the TV the remote's keys are the remote's, as they always were", () => 
   assert.equal(remote.held.size, 0);
 });
 
-test("a keyboard's own keys: the numbers pick tools, R or Home takes the camera back to Follow; held, Q and E turn it and + and − zoom it", () => {
+test("a keyboard's own keys: the numbers pick tools, R or Home takes the camera back to Follow; held, Q and E turn it, W and S tilt it and + and − zoom it", () => {
   assert.deepEqual(keyAction("Digit1", "1"), { kind: "tool", index: 0 });
   assert.deepEqual(keyAction("Numpad8", "8"), { kind: "tool", index: 7 });
   assert.deepEqual(keyAction("KeyR", "r"), { kind: "home" });
@@ -130,6 +130,8 @@ test("a keyboard's own keys: the numbers pick tools, R or Home takes the camera 
   assert.deepEqual(keyAxis("Equal", "+"), { axis: "zoom", dir: -1 });
   assert.deepEqual(keyAxis("Minus", "-"), { axis: "zoom", dir: 1 });
   assert.deepEqual(keyAxis("KeyQ", "q"), { axis: "turn", dir: -1 });
+  assert.deepEqual(keyAxis("KeyW", "w"), { axis: "tilt", dir: 1 });
+  assert.deepEqual(keyAxis("KeyS", "s"), { axis: "tilt", dir: -1 });
   assert.equal(keyAxis("ArrowLeft", "ArrowLeft"), null, "the arrows are the remote's");
 
   const devices = new Devices("mouse");
@@ -138,12 +140,14 @@ test("a keyboard's own keys: the numbers pick tools, R or Home takes the camera 
   const keyboard = new Keyboard(target as unknown as Window, remote, devices, () => 7);
   const key = (type: string, code: string, k: string, extra = {}) => target.dispatchEvent(Object.assign(new Event(type), { code, key: k, repeat: false, ...extra }));
   key("keydown", "KeyE", "e");
+  key("keydown", "KeyS", "s");
   key("keydown", "Equal", "=");
-  assert.deepEqual([keyboard.turn, keyboard.zoom, keyboard.holding, devices.current], [1, -1, true, "keys"]);
+  assert.deepEqual([keyboard.turn, keyboard.tilt, keyboard.zoom, keyboard.holding, devices.current], [1, -1, -1, true, "keys"]);
   key("keydown", "Equal", "=", { repeat: true });
   assert.equal(keyboard.zoom, -1, "a key's repeats are the same key held");
   key("keyup", "KeyE", "e");
-  assert.equal(keyboard.turn, 0);
+  key("keyup", "KeyS", "s");
+  assert.deepEqual([keyboard.turn, keyboard.tilt], [0, 0]);
   target.dispatchEvent(new Event("blur"));
   assert.deepEqual([keyboard.zoom, keyboard.holding], [0, false], "keys held when the window lost focus are let go");
   key("keydown", "KeyR", "r");
