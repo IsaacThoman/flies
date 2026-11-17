@@ -5,6 +5,7 @@
 // another build, or a broken one, never stops the game: anything that isn't
 // one of today's values is left at its default.
 
+import { MAX_OWN } from "@fly/net";
 import type { Option } from "@fly/ui";
 import type { WallpaperStyle } from "./camera.ts";
 import { PIXEL_SIZES } from "./display.ts";
@@ -66,8 +67,12 @@ export type Settings = {
   realWeather: boolean;
   /** Where the fly lives: one place, or each in turn (it moves on during a long wallpaper). */
   place: PlaceId | "turns";
+  /** How many flies this device lives, each with a brain of its own: the first is the one the player follows. */
+  flies: number;
   /** Where it was last, to come back to. */
   scene: PlaceId;
+  /** Sit with everyone, in a room open to all, once the brain is awake (docs/online.md, "Everyone"). */
+  joinOthers: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -87,7 +92,9 @@ export const DEFAULT_SETTINGS: Settings = {
   stats: false,
   realWeather: true,
   place: "turns",
+  flies: 1,
   scene: "picnic",
+  joinOthers: true,
 };
 
 const showWhen = (v: ShowWhen) => ["off", "wallpaper", "always"].includes(v);
@@ -106,6 +113,7 @@ const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean 
   overlaySize: (v) => Object.hasOwn(OVERLAY_SIZES, v),
   overlayOpacity: (v) => Object.hasOwn(OVERLAY_OPACITIES, v),
   place: (v) => v === "turns" || isPlaceId(v),
+  flies: (v) => Number.isInteger(v) && v >= 1 && v <= MAX_OWN,
   scene: isPlaceId,
 };
 
@@ -205,7 +213,7 @@ export function saveShelf(shelf: ShelfChoices, store: Storage | null = storage()
  * with a tool (by its id). Once the player has done it, its hint goes, and a
  * later launch doesn't teach it again.
  */
-export type Lesson = "tools" | ToolId;
+export type Lesson = "arrival" | "tools" | "hand" | ToolId;
 export type Learned = { [L in Lesson]?: true };
 
 /** What the hints have taught, of the lessons this build has. */
@@ -213,7 +221,7 @@ export function loadLearned(store: Storage | null = storage()): Learned {
   const learned: Learned = {};
   const saved = read(store, LEARNED_KEY);
   if (!saved) return learned;
-  for (const lesson of ["tools", ...TOOLS.map((t) => t.id)] as Lesson[]) if (saved[lesson] === true) learned[lesson] = true;
+  for (const lesson of ["arrival", "tools", "hand", ...TOOLS.map((t) => t.id)] as Lesson[]) if (saved[lesson] === true) learned[lesson] = true;
   return learned;
 }
 

@@ -1,13 +1,38 @@
 # The iPhone and iPad app
 
+<!-- docs-check: base apps/ios -->
+<!-- docs-check: generated www/ -->
+<!-- docs-check: generated www/brain/ -->
+<!-- docs-check: generated apps/ios/www/ -->
+<!-- docs-check: generated Flies.xcodeproj -->
+<!-- docs-check: generated Library/Caches/report.log -->
+
+Historical simulator observations and sizes below are retained as reported, not remeasured.
+Where stated, the capture month was November 2026 and the machine was an M5 Pro; the checking
+runs are dated 16 November 2026. Other capture dates, machine details and source revisions are
+unknown unless specified. The raw captures are unavailable here, so these observations,
+platform-specific behavior and developer-account status remain unverifiable in this source audit.
+
 `apps/ios` is the game on an iPhone or an iPad: the web build, unchanged, in a `WKWebView` that
 fills the window, served from the app's own bundle through a custom URL scheme. No local server,
-and no network except a table's line to its room ([Tables with others](#tables-with-others)). The brain is the browser's, in a Web Worker: `packages/brain-native` built as
-WebAssembly on iOS and iPadOS 18.4 and later, `packages/brain` before that. The app itself is a
+with network use for online tables and the public room list ([Tables with others](#tables-with-others)). Each fly's brain is the browser's, in its own Web Worker: `packages/brain-native` built as
+WebAssembly when its feature probe succeeds and the Wasm module is bundled, otherwise
+`packages/brain` in TypeScript. The app's deployment target is iOS 26.0; selection is not an OS-version check. The app itself is a
 small Swift shell that does what a host should: it serves the page, tells the game the safe area,
-stops it when it can't be seen, decides when the screen may sleep, and adds haptics. It draws
-nothing of the game and knows nothing of it beyond the state the game publishes on its canvas for
-scripts and hosts.
+stops it on background transitions or critical heat, decides when the screen may sleep, and adds haptics. It draws
+nothing of the game. Normal host policy follows the canvas state; optional reports also inspect
+the game's internals and can apply settings.
+
+Settings → Screensaver → Flies chooses one to four, shown as enamel dots,
+kept between launches. Each has its own body, senses, eyes and brain worker;
+the camera and readouts follow the first. Workers load the brain's files from the bundle
+one after another (`InTurn`, `apps/web/src/brain/create.ts`). The previously reported
+memory per WebAssembly worker is about 95 MB; its capture date, machine and source revision
+are unknown here. Eye refreshes are scheduled one fly per frame, subject to cadence and pending
+readbacks; urgent looming prioritizes the followed fly. A companion whose brain fails is
+given a replacement twice, then removed if it still fails (`apps/web/src/company.ts`).
+The followed fly instead uses the main loading/retry flow. Several local brains have not
+been measured on an iPhone or iPad device in the available evidence.
 
 iOS has what tvOS lacks: a public WebKit with a JIT, WebGL 2 and module workers. So the iPhone
 and iPad run the same game the browser does, and there is one game for the web, the phone and
@@ -27,8 +52,8 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
   time they simulate on one of the Mac's cores, about what Node's V8 takes (packages/brain-native,
   Speed and memory). JavaScriptCore with its JIT is no handicap.
 - The native brain could be offered to the page, but not cheaply, and it isn't needed for speed.
-  The page runs in WebKit's process and the app in its own, so they can share no memory: every
-  tick would cross two processes through a script message handler, asynchronously (the
+  The page runs in WebKit's process and the app in its own, so a bridge using script messages would exchange serialized data
+  asynchronously between them (the
   synchronous `NativeBrainBridge` of the Apple TV can't be built on it; it would be a third driver
   shaped like the worker's). Measured: a tick with the eyes' 1,772 values as an array costs the
   page 0.43 ms to post and 1.6 ms there and back, 0.17 ms of the app's main thread; packed as
@@ -49,23 +74,23 @@ Decided by a spike in the iPhone 18 Pro simulator (iOS 27.0, on an M5 Pro), Nove
 | Process | Runs |
 | --- | --- |
 | The app | UIKit: the window, the launch image, the power policy, haptics, the scheme handler serving `www/` |
-| WebKit's page process (WebContent) | The game's JavaScript, and the brain in a Web Worker on a thread of its own |
+| WebKit's page process (WebContent) | The game's JavaScript, and each brain in its own Web Worker |
 | WebKit's GPU process | WebGL 2 on Metal |
 | WebKit's networking process | Storage (`localStorage`) |
 
 | File | What it does |
 | --- | --- |
-| `src/App.swift` | The app and its one scene: one window, since a second would be a second fly with a second brain; a table's link that opened it, or reached it while running |
+| `src/App.swift` | The app and its one scene: one window, since a second would run another set of flies and brains; a table's link that opened it, or reached it while running |
 | `src/Links.swift` | Which links are a table's, and the page's address: the room server and the table |
-| `src/GameViewController.swift` | The web view, edge to edge; the launch image over it until the game is ready; the safe area; stopping the game when it can't be seen; a reload if iOS ends the page's process |
-| `src/BundleSchemeHandler.swift` | Serves `www/` at `fly://app/`: memory-mapped, in 1 MB slices, one per turn of the main run loop, so the brain's progress is real and nothing outside `www/` is served |
+| `src/GameViewController.swift` | The web view, edge to edge; the launch image over it until readiness or a 30-second fallback; the safe area; stopping the game when it can't be seen; a reload if iOS ends the page's process |
+| `src/BundleSchemeHandler.swift` | Serves `www/` at `fly://app/`: memory-mapped, in 1 MiB slices, with subsequent slices dispatched asynchronously on the main queue, with lexical path confinement to `www/` |
 | `src/PageScripts.swift` | What the app adds to the page: a watch on the canvas's state |
 | `src/Power.swift` | When the screen may sleep and when the game must stop (below) |
 | `src/Haptics.swift` | The feather on the fly, and its take-offs, felt through the glass |
 | `src/Report.swift` | Reports for checks and measurements (below); off unless asked for |
 | `src/Launch.storyboard` | The launch screen: the launch image filling a screen of any shape |
 | `src/Settings.bundle` | The app's page in the Settings app: the Haptics switch |
-| `src/PrivacyInfo.xcprivacy` | No tracking, no data collected; `NSUserDefaults` for the Haptics switch (CA92.1) |
+| `src/PrivacyInfo.xcprivacy` | No tracking; Online data collection is declared (see [App Privacy draft](app-store-answers.md)); `NSUserDefaults` for the Haptics switch (CA92.1) |
 
 ### What the app tells the page, and what it reads
 
@@ -97,16 +122,16 @@ and whenever it is shown again). The app adds no input of its own.
 The web build cuts the brain into gzipped parts of at most 4 MiB, named for their contents
 ([web.md](web.md)), and the page fetches them, checks each against the SHA-256 the build
 recorded, and keeps each in the browser's cache (the Cache API) for next time. In the app the
-parts are in the bundle (`www/brain/`, 14 MB, and the WebAssembly brain, 268 KB) and come through
-the scheme handler; the module is compiled from its bytes, so its `Content-Type` doesn't matter. The page there
-is a secure context, so it has the Cache API and `crypto.subtle`: every part's digest is checked.
+parts are in the bundle (`www/brain/`; historically reported as 14 MB, with a 268 KB WebAssembly brain) and come through
+the scheme handler; the module is compiled from its bytes, so its `Content-Type` doesn't matter. The historical simulator observation was a secure context with the Cache API and
+`crypto.subtle`. The loader checks byte length and, when SHA-256 succeeds, the digest; it
+accepts a matching-length part without a digest check if that API is missing or throws.
 But the Cache API keeps only `http` and `https` responses, so keeping a `fly://` part fails
-quietly and nothing is copied: every launch reads the 14 MB from the bundle, as fast as the
-phone's storage gives it, and the bundle is the only copy on the phone. Measured in the
+quietly and nothing is copied: launches fetch the parts from the bundle rather than an application Cache API entry.
+This does not rule out WebKit's own disk or compiled copies. Measured in the
 simulator: the `fly-brain` and `fly-brain-module` caches hold nothing after a first launch or a
-relaunch (the check asserts it, and that the brain running is the WebAssembly one), and WebKit's storage for the app stays at about 240 KB. (The app's caches folder
-grows by about 20 MB, WebKit's own compiled Metal shaders, which make every launch after the first
-quicker.) A damaged part is caught by its digest, and the loading screen's **Try again** fetches it
+relaunch (the check accepts a nil cache count or zero; a cache-query error reported as -1 fails, and requires the WebAssembly engine), and WebKit's storage for the app stays at about 240 KB. (The app's caches folder
+grows by about 20 MB, WebKit's own compiled Metal shaders, associated with quicker later launches in that observation.) A digest mismatch is rejected, and the loading screen's **Try again** fetches it
 again through the same handler.
 
 ### When the game runs, and when the screen may sleep
@@ -122,6 +147,13 @@ again through the same handler.
 | Critically hot (`critical`) | Stopped | As the phone's Auto-Lock says |
 | Can't be seen: the home screen, another app over the whole screen, the screen locked | Stopped, then suspended by iOS | (the app has no say) |
 
+The table above is retained historical wording, not a complete statement of the current
+implementation. In particular, its last-touch description is inaccurate: the host's 10-minute
+battery budget begins on entry into wallpaper mode (`PowerPolicy.wallpaperSince`), including
+time since that entry spent charging or backgrounded. Individual touches do not reset that
+timestamp. The 30 fps Low Power Mode entry is a historical WebKit observation, not a limit
+imposed by this host.
+
 **Can't be seen** is the scene in the background (`sceneDidEnterBackground`, until
 `sceneWillEnterForeground`), which is where iOS puts an app when nothing of it is on screen. Seen
 in the simulator: on an iPad, an app opened over the whole screen moves the fly's window to the
@@ -133,15 +165,18 @@ rate, its brain still at real time, until the window is uncovered or the app lea
 
 Stopping takes the web view out of the window and puts a still of its last frame in its place. A
 page out of a window is hidden, and the game sleeps as in a hidden browser tab
-(`apps/web/src/page.ts`): no frames, so the fly's life and the brain stop with them (the worker is
-only ever given time by the frame loop). Shown again it carries on where it was:
-the game's step is capped at 100 ms and the brain's at 100 ms of fly time, so nothing jumps, and
-after more than half a minute away the sky and the weather are put where the clock has them.
+(`apps/web/src/page.ts`): no frames, so no further simulation time is issued to the workers
+(already-issued ticks can finish). Shown again each fly carries on where it was:
+the game's step is capped at 100 ms and the brain's at 100 ms of fly time, which bounds the time advanced on resuming, and
+after more than half a minute away the solo sky follows the clock only when Light is set to
+Now (the internal value `clock`), and weather follows the forecast only when weather is set to Now; fixed choices remain.
+At player-created tables the room's clock supplies the Now choices; rooms open to everyone
+use each device's own clock and forecast. Fixed Light and Weather choices are applied instead
+when selected.
 WebKit hides an app's page in the background by itself; the still is for the heat, when the app
 is still on screen (hiding the web view, `isHidden`, doesn't hide the page).
 
-The brain keeps one core busy and the world is drawn 60 times a second, so a phone that kept the
-screensaver on for as long as it liked would go flat in a few hours and grow warm doing it. On a
+Drawing and simulating the screensaver costs power; phone battery life and heat have not been measured. On a
 charger the screensaver is the point; on battery it is a glance. The page's own wake lock
 (`navigator.wakeLock`, which a browser tab uses) is refused inside an app's web view, so the
 app's policy is the only one.
@@ -154,8 +189,9 @@ the game again. Its settings are kept; the fly's moment is not.
 While playing (never in the screensaver, where nobody's finger is on the glass): a soft tap with the
 fly's own touch sense while the feather is on it (`data-touch` above 0.35 with `data-tool`
 `feather`: resting on it 0.4, stroking 1), and a knock when it takes off. Both follow the fly's published
-state, so they are what happened to the fly. They come up to 200 ms late (the canvas's state is
-published five times a second). Off with the Haptics switch in the app's page of the Settings app,
+state. The feather check uses the selected tool and aggregate touch, so it does not identify
+whether that touch came from the local feather, another player or the environment. Canvas publication is checked after more than 200 ms between samples, so its nominal
+five-times-a-second cadence can be slower with frame scheduling. Off with the Haptics switch in the app's page of the Settings app,
 or with the system's own. The game's Rumble setting controls game pads and
 Android vibration; these native iPhone and iPad haptics use the Haptics switch.
 
@@ -163,7 +199,10 @@ Android vibration; these native iPhone and iPad haptics use the Haptics switch.
 
 A table ([online.md](online.md)) works in the app as it does in a browser: the game's own
 `BrowserSocket`, the page's WebSocket, to the apps' room server, `wss://flies.isaacthoman.com/rooms`
-(`apps/web/src/online/invite.ts`). The links it hands on are the site's,
+(`apps/web/src/online/invite.ts`). Settings → Screensaver → Join others is on by default:
+once the brain is awake, the game tries a room open to everyone, unless a table link or a
+manual choice takes precedence. Unreachable rooms leave it alone while it retries quietly
+(`apps/web/src/online/auto-join.ts`). The links it hands on are the site's,
 `https://flies.isaacthoman.com/?table=<code>`, never `fly://`.
 
 ### The socket: the web view's own
@@ -178,15 +217,16 @@ Tried in the simulator (iPhone 18 Pro Max, iOS 27.0), November 2026, from a page
 | plain `ws://` to a host named on the internet (two tried, one of them a name for 127.0.0.1) | refused at once (1006) |
 
 The page is a secure context, and WebKit doesn't take its plain `ws://` to an address or a local
-name for mixed content. What refuses the named hosts is App Transport Security, whose documented
-exceptions are IP addresses, `localhost` and `.local` names: every other host needs TLS. That is
-all a room server needs (`wss` in production, an address or a `.local` name for development), so
-**the app has no ATS exception, in any build**.
+name for mixed content. The original probe attributed the named-host refusals to App Transport Security,
+with IP addresses, `localhost` and `.local` names as exceptions; the cause was not independently
+verified in this source audit. Use `wss` in production; the local addresses above are historical
+development observations. The source establishes that
+**the app has no ATS exception declared in its project specification**.
 
 So the app bridges nothing. The socket already lives off the page's thread, in WebKit's networking
-process; the game's line to the room is the same code as in every browser, and is tested there
+process; the game's line to the room is the same code as in every browser, and has tests there
 (`apps/web/e2e/tables.e2e.ts`); a native socket would add a hop through a script message handler
-and two processes for each of the 20 states a second each way, to do what the web view already
+and two processes for state traffic (nominally up to 20 batches a second each way), to do what the web view already
 does. (The Apple TV needs its bridge because its runtime has no WebSocket at all.)
 
 ### Which room server
@@ -208,14 +248,14 @@ as it does.
 
 iOS suspends an app in the background, so away is the usual state on a phone. As the app goes,
 WebKit hides the page and the app takes the web view out of the window (When the game runs, above):
-the game says at once that its fly is resting (`Online.away`, the away flag in its state) and stops
-with its frames. The room keeps the fly there, resting, for 10 minutes.
+the game marks its flies resting (`Online.away`, the away flag in each state) and stops
+with its frames. The room keeps them there, resting together, for 10 minutes.
 
 Coming back, the line may or may not still be open. In the simulator WebKit's networking process
 kept it open through 10 s in the background; on a phone iOS suspends that process too, and the room
 drops a line whose pings go unanswered for 15 to 30 s. Either way the game carries on: shown again
-it hurries a dropped line (`Online.wake`), says hello with its key and where its fly is, and the
-room gives back the same seat and colour. The check drops the line from the room's side while the
+it hurries a dropped line (`Online.wake`), says hello with its key and each fly's spot, and, if the room still retains their seats,
+the room gives back the same ids and colours. The check drops the line from the room's side while the
 app is away, as a phone's would be dropped, and sees it back at the table about 2 s after it is in
 front again ([Checking it](#checking-it)).
 
@@ -242,19 +282,20 @@ A table's link opens the app where it is installed, instead of Safari, when both
   (`apps/ios/links.yml`, merged into `project.yml` as `apps/tvos/weatherkit.yml` is for the Apple
   TV). TestFlight releases turn it on by default; set the repository variable `IOS_LINKS` to `0`
   to turn it off. Local builds and archives still require `IOS_LINKS=1` to opt in (omit it or
-  use `IOS_LINKS=0` to leave it out). Associated Domains is already enabled on the owner's App ID;
-  another App ID needs the capability before signing a build with links.
+  use `IOS_LINKS=0` to leave it out). The owner's App ID was reported to have Associated Domains
+  enabled; current account status is unverified. Check the capability before signing a build with links.
 
 The app takes a link (`src/Links.swift`, unit-tested) only if it is https, to
 `flies.isaacthoman.com`, its own page, with a `table` that could be a table's code; anything else
 is ignored. The game is given the code and nothing more, so a link can't point it at another room
-server.
+server. Admission still depends on the room server: locked rooms may require a password,
+and room capacity, refusal or network failures can prevent joining.
 
 - **Opened by a link** (the scene's connection options): the page is loaded as
-  `fly://app/index.html?table=<code>` (with `?rooms=` too, if asked for), and the game sits down
+  `fly://app/index.html?table=<code>` (with `?rooms=` too, if asked for), and the game attempts to join
   there as it starts, as a browser opening the link would.
 - **A link while it runs** (`scene(_:continue:)`): the app dispatches `INVITE_EVENT` with the link on
-  the page, and the game leaves the table it is at, if any, and sits down at that one. A link that
+  the page, and the game leaves the table it is at, if any, and attempts to join that one. A link that
   arrives before the game has started waits until it has.
 - **For checks**, `-FlyInvite <link>` at launch goes through the same test as a link that opened
   the app. `-FlyInviteLater <link>` hands the link to the running app through
@@ -292,7 +333,7 @@ Online → New room, and with a page of its own for what the game doesn't do:
   keyboard is up the menus lay themselves out above it, in the app and in Safari alike, and back
   when it goes. The app tells the page nothing for it.
 - Nothing in the app stands in the way: the web view is the first responder, and the page's own
-  focus decides the rest.
+  focus handles text entry.
 
 ## Building and running
 
@@ -325,10 +366,10 @@ and builds it. Release by default; `--debug` makes the page inspectable in Safar
   Store Connect adds iOS as a platform to the Apple TV app's record.
 - **Version**: `apps/version.yml`, included by both XcodeGen specs, so the iPhone, iPad and Apple
   TV apps are numbered together.
-- **Name**: "Flies", the game's own, as on the Apple TV and the web.
+- **Name**: "flies", the game's own, as on the Apple TV and the web.
 - **Icon and launch image**: rendered from the game by the art pipeline (`scripts/art.ts`,
   `apps/web/src/art.ts`) into `assets/ios` ([assets/README.md](../assets/README.md)): the web
-  app's icon (the fly close up on the napkin) at full size, with a night version for the dark
+  app's icon (the fly close up on the napkin) at full size, with a dusk version for the dark
   appearance; and a square picnic with the fly in the middle, which the launch screen crops to the
   screen's shape.
 - **Devices**: iPhone and iPad, iOS 26 or later (the Apple TV app's floor too), every orientation
@@ -340,20 +381,19 @@ Two XcodeGen specs, `apps/tvos/project.yml` and `apps/ios/project.yml`, sharing
 `apps/version.yml`. The apps share no native code: the Apple TV hosts the page's JavaScript
 itself, with its own browser, renderer and the C++ brain, where the phone hands the page to
 WebKit. They bundle different builds of the page (one classic script there, the module build
-here), and each is built and checked by its own script. One project would regenerate and rebuild
-the TV app for every change to the phone's and couple their checks. What they do share, the
+here), and each is built and checked by its own script. What they do share, the
 version, the bundle ID, the art pipeline and the web build, lives outside both.
 
 ### Reports
 
-`-FlyReport <seconds>` on the command line (as `npm run ios -- --report`, and the check, pass it):
+`-FlyReport <seconds>` on the command line (for example, `npm run ios -- --report 2`, or the check):
 that often the app reports the canvas's state, the brain's speed against real time and what its
 steps cost, frames, taps and keys the page saw, the safe area the page was given, what the
 browser's cache holds of the brain, where the menu's first row is, and the app's own memory,
 power and thermal state, as `report {json}` on the console and in
 `Library/Caches/report.log` (replaced each launch), and as the value of an accessibility element,
 `fly-report`, for UI tests. The page's errors and console warnings are passed on as they happen.
-`-FlySettings <json>` changes the game's settings through its own code once it has started. The
+With a positive `-FlyReport` interval, `-FlySettings <json>` changes the game's settings through its own code once it has started. The
 report includes the table in the page's address; the canvas's state says how the line is
 (`data-online`), the seat, its colour, the reconnects and the others there. `-FlyRooms <url>`,
 `-FlyInvite <link>` and `-FlyInviteLater <link>` are in [Tables with others](#tables-with-others);
@@ -369,10 +409,10 @@ simulator, runs them, then shuts it down and deletes it:
   nothing outside it, JavaScript as JavaScript); when haptics play; which links are a table's, and
   the page and script the game is given for one;
 - the UI tests, driving the app as a person would. `tests/ui/AliveTests.swift`: the brain is read
-  from the bundle, wakes, and the title shows, with nothing of the brain in the browser's cache;
-  frames go on being drawn and the brain keeps real time; a tap on the title's first row starts
+  from the bundle, wakes, and the title shows (the test disables Join others), with nothing of the brain in the browser's cache;
+  frames and simulated brain time advance (no real-time speed threshold is asserted); a tap on the title's first row starts
   play; away for 6 s (another app over the whole screen), most of that time passes with the brain
-  stopped, and in front again it carries on at real time; a setting changed in one run, the app
+  stopped, and in front again frames and brain time advance; a setting changed in one run, the app
   killed, is there in the next, and the relaunch again copies nothing of the brain into the cache.
   `tests/ui/TablesTests.swift`, against a room server the check starts on a port of its own, with a
   fake fly (`scripts/tables.ts`) starting each of two tables: the app, launched by the first
@@ -383,11 +423,11 @@ simulator, runs them, then shuts it down and deletes it:
   to it while it runs (`-FlyInviteLater`), takes it there in the same run of the app;
 - the memory of the app and of WebKit's processes, sampled from the Mac while it runs.
 
-It prints what it measured, saves two screenshots (the title, and play at a table), the test
+It prints what it measured, saves two screenshots (the final AliveTests screen, and play at a table), the test
 results and the app's log outside the repo, and prints where. About two minutes after the build. Whether a keyboard reaches the game it reports but
-doesn't require: a headless simulator, as the check makes, has no keyboard attached (one shown in
-Simulator or T3 Code's device panel does), and XCUITest's own Return and Escape never reach a web
-page on iOS (its newline does, as Enter; WebKit's own tests send a hardware Escape to the page).
+doesn't require. Earlier simulator checks reported no keyboard attached in headless runs,
+and reported that XCUITest Return and Escape did not reach the page, while newline arrived
+as Enter. Those input observations are not assertions made by this test.
 
 Measured by it over several runs, 16 November 2026, fresh iPhone 18 Pro simulator, iOS 27.0, M5
 Pro shared with other work: the brain awake and the title up 20 to 31 s after the first launch
@@ -407,7 +447,7 @@ front again, one reconnect (0.2 s in an earlier run where the line had stayed op
 table's link seating it there in 0.7 to 0.8 s.
 
 These are the Mac's speeds: the simulator runs the page's JavaScript on the Mac's cores and draws
-with its GPU. They say the app works, not how a phone runs it.
+with its GPU. They are historical simulator observations, not measurements of a phone.
 
 ## On a device, and in TestFlight
 
@@ -420,7 +460,8 @@ with its GPU. They say the app works, not how a phone runs it.
    `npm run ios -- build` (Xcode's automatic signing makes the profile; `-allowProvisioningUpdates`
    is passed) and `npm run ios -- run --device <udid>` (`xcrun devicectl list devices` gives the
    UDID). Without `--report` it runs as from the home screen.
-3. For TestFlight: releases upload it, with the Apple TV app, when `dev` is merged into `main`
+3. For TestFlight: when a merge of `dev` into `main` produces a semantic release and its
+   prerequisites pass, the release workflow uploads it with the Apple TV app
    ([release.md](release.md)), once the one-time setup there is done. By hand,
    `npm run ios -- archive --version <x.y.z> --upload`. Add the iPhone and iPad screenshots
    in App Store Connect.
@@ -437,7 +478,7 @@ with its GPU. They say the app works, not how a phone runs it.
       fetches it from there (`https://app-site-association.cdn-apple.com/a/v1/flies.isaacthoman.com`
       shows what it has), and can take a while to see a change.
    3. In the developer account, Certificates, Identifiers & Profiles → Identifiers →
-      `com.isaacthoman.flies`, Associated Domains is already on. For another App ID, turn it on
+      `com.isaacthoman.flies`, verify that Associated Domains is on. If needed, turn it on
       and save. (Xcode may say the profile
       must be made again; automatic signing does that on the next build.)
    4. Build with it: `IOS_LINKS=1 npm run ios -- build`, then `npm run ios -- run --device <udid>`.
@@ -445,7 +486,7 @@ with its GPU. They say the app works, not how a phone runs it.
       [release.md](release.md)); set the repository variable `IOS_LINKS=0` to disable it.
       Archives by hand need `IOS_LINKS=1` explicitly.
    5. On the phone: send yourself a room's link (Online → New room in a browser, then Share the
-      link) in Messages or Notes and tap it: the app opens and sits down in that room. A link typed
+      link) in Messages or Notes and tap it: check that the app opens and attempts to join that room. A link typed
       into Safari's address bar opens the page in Safari, by design. A password given to a new room
       in the app is offered for saving under flies.isaacthoman.com, and offered again at its door,
       in Safari and in the app.

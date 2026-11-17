@@ -179,7 +179,7 @@ function bodyVertex(shader: THREE.WebGLProgramParametersWithUniforms, withNormal
 const GLASS = /* glsl */ `
 {
   float flyEdge = 1.0 - abs(dot(normal, normalize(vViewPosition)));
-  float flyClear = (vFlyMat.w > 0.5 && vFlyMat.w < 1.5 ? 0.18 : 0.16) + 0.55 * flyEdge * flyEdge * flyEdge;
+  float flyClear = (vFlyMat.w > 0.5 && vFlyMat.w < 1.5 ? 0.10 : 0.07) + 0.55 * flyEdge * flyEdge * flyEdge;
   float flyA0 = mix(1.0, flyClear, uXray);
   vec3 flyShine = max(outgoingLight - totalDiffuse, vec3(0.0));
   float flyA1 = min(1.0, flyA0 + dot(flyShine, vec3(0.2126, 0.7152, 0.0722)) * uXray);

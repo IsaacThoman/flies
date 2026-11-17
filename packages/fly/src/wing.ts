@@ -105,8 +105,9 @@ export function buildWingGeometry(): THREE.BufferGeometry {
     }
     for (const [a, b, c] of triangles) index.push(base + a, base + b, base + c);
   }
-  // The haze: spokes along each copy's mid-chord line, fainter at the hinge and the tip.
-  const SPOKE: [number, number, number][] = [[0.06, 0.0, 0.3], [0.3, -0.05, 1], [0.6, -0.045, 1], [0.85, -0.02, 0.7], [0.99, 0, 0.35]];
+  // The blur envelope retains an outer contour at the game's pixel size.
+  // This opacity distribution is a display approximation, not measured aerodynamics.
+  const SPOKE: [number, number, number][] = [[0.06, 0.0, 0.1], [0.3, -0.05, 0.5], [0.6, -0.045, 0.75], [0.85, -0.02, 1], [0.99, 0, 1.2]];
   for (const side of [0, 1]) {
     for (let copy = 0; copy + 1 < WING_COPIES; copy++) {
       const base = position.length / 3;

@@ -35,11 +35,13 @@ All of `dist/`, as it is, to any folder of the host. About 17 MB:
 | `brain/connectome.<n>.<hash>.bin` | the brain, in four parts of at most 4 MiB, 14.2 MB in all | the same | `application/octet-stream` (any will do) |
 | `brain/fly-brain.0.<hash>.wasm` | the brain's simulation as WebAssembly, 268 KB (106 KB gzipped) | the same | `application/wasm` (what hosts send for `.wasm`; any will do) |
 | `brain/anatomy.<n>.<hash>.bin` | where each neuron is (`packages/brain/src/anatomy.ts`), 0.9 MB, if `npm run brain:fetch` built it; nothing loads it yet | the same | the same |
+| `THIRD_PARTY_NOTICES` | generated legal notices | `no-cache` | `text/plain` |
+| `privacy/index.html` | static policy, served at `/privacy` | `no-cache` | `text/html` |
 | `.well-known/apple-app-site-association` | which links open the iPhone and iPad app, on by default (`APPLE_TEAM_ID=0` disables it; [deploy.md](deploy.md#the-iphone-and-ipad-apps-links)); it must be at the host's root, with no redirect, and is never kept by the service worker | `no-cache` | `application/json` |
 
 Every file whose contents can change has its contents in its name, so it can
 be kept forever; the few that can't (the page, its manifest, the service
-worker, and the app association when there is one) are small and must be asked for again each time (`no-cache`, which
+worker, the legal documents, and the app association when there is one) must be asked for again each time (`no-cache`, which
 still lets a browser revalidate and keep the page in its back-forward cache;
 not `no-store`). `scripts/serve.ts` serves exactly this.
 
@@ -77,6 +79,18 @@ script. Both are the same simulation, to the bit (the C++'s README says how);
 the WebAssembly one is faster in Chromium and needs half the memory
 (measured below). `?brain=typescript` or `?brain=wasm` on the page's address
 picks one, for tests and for comparing them; nothing shows it to players.
+
+Settings → Screensaver → Flies chooses one to four, shown as enamel dots.
+Each has its own brain in its own worker, its own body, senses and eyes;
+the camera and readouts follow the first. `InTurn`
+(`apps/web/src/brain/create.ts`) loads their files one brain after another
+from the same cache, so nothing downloads twice at once. Where files can't
+be kept they are fetched again, still in turn. The eyes take turns too:
+one fly's refresh a frame, the most overdue; while a ball comes the
+followed fly's, every frame, and the others wait. A fly whose worker fails
+gets a new one after 5 s and 30 s, and is then taken off. At a table the same flies travel
+in one batch over one connection, up to the table's eight-fly limit
+([online.md](online.md)).
 
 The module, `brain/fly-brain.0.<hash>.wasm`, is fetched first (it is small)
 and kept the same way as the connectome's parts, in a cache of its own
@@ -272,7 +286,7 @@ WebAssembly run). The eyes are open throughout; every run kept 60 frames.
   times less. JavaScriptCore compiles the TypeScript's typed-array loops
   nearly as well as the C++, so the gain is small, but it is there, and an
   iPhone's brain is no slower for it.
-- **Memory**: the module holds 95 MB once the brain is built, the
+- **Memory**: each WebAssembly worker holds 95 MB once its brain is built, the
   TypeScript brain about 180 MB (`node packages/brain-native/scripts/bench.ts`);
   the page's process was 45 to 70 MB smaller with it in four runs of six,
   and in the other two it went either way by more, as garbage collection
@@ -295,7 +309,7 @@ what more speed would cost.
 
 `apps/web/src/page.ts`, in a browser only:
 
-- **Hidden**, the fly's life and its brain stop with the frames (the game
+- **Hidden**, every fly's life and its brain stop with the frames (the game
   skips them even where a browser keeps frames coming for a hidden page).
   Shown again, it carries on from where it was, the first frame no longer
   than any other; after more than half a minute away,
@@ -437,3 +451,26 @@ lifetimes in the table above, a `_headers` file in `dist/`:
 GitHub Pages works too, if the repository is public or on a paid plan, but
 nothing about its responses can be set. Netlify's free traffic would run out
 after about a thousand first visits a month.
+
+
+## Release documents
+
+The build checks and emits [third-party notices](licenses.md). A static [privacy policy](privacy.md)
+is emitted only when all four [owner build variables](deploy.md#privacy-publication) are complete.
+Serve `/privacy` as `privacy/index.html` (a directory redirect is fine), never as the game's SPA fallback.
+The supplied Caddy config and `scripts/serve.ts` handle that path. The service worker keeps the policy
+for offline navigation too. About → Acknowledgements reads its bundled notice sections without a fetch.
+Otherwise `/privacy` must answer 404. Owner draft placeholders are never shipped.
+Before publishing, verify production log/backup retention.
+
+<!-- docs-check: base apps/web/src -->
+
+<!-- docs-check: generated index.html -->
+
+<!-- docs-check: generated sw.js -->
+
+<!-- docs-check: generated manifest.webmanifest -->
+
+<!-- docs-check: generated privacy/index.html -->
+
+<!-- docs-check: generated ./dist -->

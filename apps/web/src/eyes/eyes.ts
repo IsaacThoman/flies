@@ -1,7 +1,9 @@
-// The fly's eyes. Every few frames the world is rendered round the fly's head
+// The flies' eyes. Every few frames the world is rendered round a fly's head
 // as six tiny views, from a low-detail layer of the scene (the big shapes, the
-// ball, the bubbles and the food; not the menus or the pointer), read back
-// once and resampled to each facet (packages/body/src/vision.ts).
+// other flies, the ball, the bubbles and the food; not the menus or the
+// pointer), read back once and resampled to each facet
+// (packages/body/src/vision.ts). Each fly this device lives has eyes of its
+// own, and they take turns: one fly's refresh a frame.
 //
 // When the brain has eyes (BrainDriver.eyes), the result is its `light`
 // sense, and the game sends no hand-wired looming. Until then the same
@@ -78,32 +80,50 @@ void main() {
   gl_FragColor = vec4(facetColor(vLight, vSide) * lens, 1.0);
 }`;
 
+/** One fly's eyes: where it renders what it sees, the last complete picture of its facets, and how long since it looked. */
+class Sight {
+  readonly life: Life;
+  map: EyeMap | null = null;
+  samplers: { left: Sampler; right: Sampler } | null = null;
+  target: THREE.WebGLRenderTarget | null = null;
+  pixels: Uint8Array | null = null;
+  light: { left: Float32Array; right: Float32Array } | null = null;
+  hasLight = false;
+  since = 0;
+  /** Seconds since the last picture was sampled, for its light adaptation. */
+  sinceSampled = 0;
+  readonly adaptation = new Adaptation();
+  pending = false;
+  /** Its fly is gone: its target goes once a read in flight has come back. */
+  dropped = false;
+  /** Pictures completed. */
+  updates = 0;
+
+  constructor(life: Life) {
+    this.life = life;
+  }
+}
+
 export class Eyes {
   /** From the settings: how finely to render, or off. */
   detail: EyesDetail = "low";
   /** How often they refresh, as a share of their detail's rate: lowered on a device that can't keep up (quality.ts). */
   rate = 1;
-  /** CPU time of the last refresh, ms (render submission and resampling), and its draws. */
+  /** CPU time of the last frame's refreshes, ms (render submission and resampling), and their draws. */
   costMs = 0;
   costCalls = 0;
-  /** Refreshes so far. */
-  updates = 0;
+  /**
+   * What the eyes see of the flies, which takes a fly's own stand-in away
+   * while its eyes look round (`index`: 0 the followed fly, then the others
+   * this device lives, in order; -1 none): other flies are seen, never itself.
+   */
+  standIns: { hideFromEyes(index: number): void } | null = null;
   readonly #stage: Stage;
-  readonly #life: Life;
+  /** The followed fly's eyes first, then each of the others this device lives. */
+  readonly #sights: Sight[];
   readonly #standIn: EyeMap = standInEyes();
-  #map: EyeMap | null = null;
-  #samplers: { left: Sampler; right: Sampler } | null = null;
-  #target: THREE.WebGLRenderTarget | null = null;
-  #pixels: Uint8Array | null = null;
   #cameras = FACES.map(() => new THREE.PerspectiveCamera(90, 1, 0.3, 4000));
   #faceQ = FACES.map((f) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(...f.right), new THREE.Vector3(...f.up), new THREE.Vector3(...f.forward).negate())));
-  #light: { left: Float32Array; right: Float32Array } | null = null;
-  #hasLight = false;
-  #since = 0;
-  /** Seconds since the last picture was sampled, for its light adaptation. */
-  #sinceSampled = 0;
-  readonly #adaptation = new Adaptation();
-  #pending = false;
   #sky: THREE.Mesh;
   picture: { scene: THREE.Scene; camera: THREE.Camera; points: THREE.Points; backing: THREE.Mesh; light: THREE.BufferAttribute; map: EyeMap } | null = null;
   /** Where the picture goes: clip space per radian and its middle, its panel, and how big its dots are for their count. */
@@ -117,7 +137,7 @@ export class Eyes {
 
   constructor(stage: Stage, life: Life) {
     this.#stage = stage;
-    this.#life = life;
+    this.#sights = [new Sight(life)];
     for (const camera of this.#cameras) camera.layers.set(EYE_LAYER);
     // What the eyes see beyond the table: the sky and the lawn, as a simple gradient round the head.
     const light = stage.light;
@@ -144,6 +164,23 @@ export class Eyes {
     // Lights answer to layers too: the eyes' views need them.
     stage.hemi.layers.enable(EYE_LAYER);
     stage.sun.layers.enable(EYE_LAYER);
+  }
+
+  /** The other flies this device lives, besides the followed one: each looks round with eyes of its own. */
+  company(lives: readonly Life[]) {
+    const sights = this.#sights;
+    for (let i = sights.length - 1; i >= 1; i--) {
+      if (lives.includes(sights[i].life)) continue;
+      const [gone] = sights.splice(i, 1);
+      gone.dropped = true;
+      if (!gone.pending) gone.target?.dispose();
+    }
+    for (let i = 0; i < lives.length; i++) {
+      if (sights[i + 1]?.life === lives[i]) continue;
+      const k = sights.findIndex((s) => s.life === lives[i]);
+      const sight = k > 0 ? sights.splice(k, 1)[0] : new Sight(lives[i]);
+      sights.splice(i + 1, 0, sight);
+    }
   }
 
   /** Places the picture where the HUD's layout has it (between the caption and the tool's label). */
@@ -175,12 +212,16 @@ export class Eyes {
     object.traverse((o) => o.layers.enable(EYE_LAYER));
   }
 
-  /** The brain has eyes and they're switched on: the brain gets light, not hand-wired looming. */
-  get inUse() {
-    return this.detail !== "off" && !!this.#life.brain.eyes && this.#life.brain.status === "running";
+  #inUse(sight: Sight) {
+    return this.detail !== "off" && !!sight.life.brain.eyes && sight.life.brain.status === "running";
   }
 
-  /** Rendering for the brain or for the picture. */
+  /** The followed fly's brain has eyes and they're switched on: the brain gets light, not hand-wired looming. */
+  get inUse() {
+    return this.#inUse(this.#sights[0]);
+  }
+
+  /** Rendering for the followed fly's brain or for the picture. */
   active = false;
 
   /** How many facets there are now. */
@@ -188,84 +229,127 @@ export class Eyes {
     return (this.map.left.directions.length + this.map.right.directions.length) / 3;
   }
 
-  /** How far its light adaptation brightens the picture now (1 at midday). */
+  /** How far the followed fly's light adaptation brightens the picture now (1 at midday). */
   get gain() {
-    return this.#adaptation.gain;
+    return this.#sights[0].adaptation.gain;
   }
 
   /** Whether the facets are the brain's own or the stand-in. */
   get standIn() {
-    return !this.#life.brain.eyes;
+    return !this.#sights[0].life.brain.eyes;
   }
 
-  /** Before the fly's frame: hands the brain the last picture, if it has eyes. */
+  /** The followed fly's pictures completed. */
+  get updates() {
+    return this.#sights[0].updates;
+  }
+
+  /** Each of the other flies' pictures completed, in order. */
+  companyUpdates(i: number) {
+    return this.#sights[i + 1]?.updates ?? 0;
+  }
+
+  /** Before the flies' frame: hands each brain that has eyes its last picture. */
   beforeStep() {
-    this.#life.light = this.inUse && this.#hasLight ? this.#light : null;
+    // Early exploration can have a stand-in picture in flight when a brain
+    // arrives. Each fly receives only pixels sampled for its actual eye map.
+    const sights = this.#sights;
+    for (let i = 0; i < sights.length; i++) {
+      const sight = sights[i];
+      sight.life.light = this.#inUse(sight) && sight.hasLight && sight.map === this.#mapOf(sight) ? sight.light : null;
+    }
   }
 
-  /** The facets in use: the brain's, or the stand-in for the picture. */
+  /** The facets in use by the followed fly: its brain's, or the stand-in for the picture. */
   get map(): EyeMap {
-    return this.#life.brain.eyes ?? this.#standIn;
+    return this.#mapOf(this.#sights[0]);
   }
 
-  /** The last complete picture of the facets in use (`map`), one value per facet, or null until there is one. */
+  #mapOf(sight: Sight): EyeMap {
+    return sight.life.brain.eyes ?? this.#standIn;
+  }
+
+  /** The followed fly's last complete picture of the facets in use (`map`), one value per facet, or null until there is one. */
   get light(): { readonly left: Float32Array; readonly right: Float32Array } | null {
-    return this.#hasLight && this.#map === this.map ? this.#light : null;
+    const own = this.#sights[0];
+    return own.hasLight && own.map === this.map ? own.light : null;
   }
 
   /**
    * Refreshes the eyes when due, and draws the picture over the frame when
    * asked. Call after the world has been rendered. `forInset`: the corner
-   * picture (inset.ts) is up, so they render even when not for the brain.
+   * picture (inset.ts) is up, so the followed fly's render even when not for
+   * its brain. One fly's eyes refresh a frame, never more: whichever is most
+   * overdue (with several, each a little less often), or while something
+   * comes at it fast (`urgent`), the followed fly's, every frame, and the
+   * others' wait until it has passed.
    */
   render(dt: number, showPicture: boolean, urgent = false, forInset = false) {
-    this.active = this.inUse || showPicture || forInset;
-    if (!this.active) {
-      this.costMs = 0;
-      this.costCalls = 0;
-      return;
-    }
+    const own = this.#sights[0];
+    this.active = this.#inUse(own) || showPicture || forInset;
+    this.costMs = 0;
+    this.costCalls = 0;
     const detail = DETAIL[this.detail === "high" ? "high" : "low"];
-    this.#since += dt;
-    this.#sinceSampled += dt;
-    const hz = urgent ? URGENT_HZ : detail.hz * this.rate;
-    // One read in flight: a slow GPU must not accumulate pictures or sampling work. A frame that
-    // rebuilt the reflections (34 draws) already costs about what the eyes' faces do: they refresh
-    // on the next, a frame late, rather than double the frame's draws.
-    const due = this.#since >= 1 / hz - 1e-3 && !this.#stage.reflected;
-    if (!this.#pending && (due || !this.#light)) {
-      this.#since = 0;
-      this.#refresh(detail.resolution);
+    const hz = detail.hz * this.rate;
+    // A frame that rebuilt the reflections (34 draws) already costs about what the eyes' faces do: they refresh on the next, a frame
+    // late, rather than double the frame's draws.
+    const reflected = this.#stage.reflected;
+    let refreshed = -1;
+    let most = 0;
+    const sights = this.#sights;
+    for (let i = 0; i < sights.length; i++) {
+      const sight = sights[i];
+      if (!(i === 0 ? this.active : this.#inUse(sight))) continue;
+      sight.since += dt;
+      sight.sinceSampled += dt;
+      // One read in flight a fly: a slow GPU must not accumulate pictures or sampling work.
+      if (sight.pending || most === Infinity) continue;
+      if (i === 0 && urgent && !reflected && sight.since >= 1 / URGENT_HZ - 1e-3) {
+        // This frame's refresh is the followed fly's: nobody else's goes before it.
+        most = Infinity;
+        refreshed = 0;
+        continue;
+      }
+      const need = !sight.light ? Infinity : reflected ? 0 : sight.since * hz;
+      if (need >= 1 - 1e-3 * hz && need > most) {
+        most = need;
+        refreshed = i;
+      }
     }
+    if (refreshed >= 0) this.#refresh(sights[refreshed], refreshed, detail.resolution);
+    this.standIns?.hideFromEyes(-1);
     if (showPicture) this.#drawPicture();
   }
 
   /** The graphics context was lost and given back: a read in flight then will never finish. */
   contextRestored() {
-    this.#pending = false;
+    for (const sight of this.#sights) sight.pending = false;
   }
 
-  #prepare(resolution: number) {
-    const map = this.map;
-    if (this.#target && this.#map === map && this.#samplers?.left.resolution === resolution) return;
-    const sameMap = this.#map === map;
-    this.#map = map;
-    this.#target?.dispose();
-    this.#target = new THREE.WebGLRenderTarget(resolution * FACES.length, resolution, { depthBuffer: true, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
-    this.#pixels = new Uint8Array(resolution * FACES.length * resolution * 4);
-    this.#samplers = { left: createSampler(map.left.directions, resolution), right: createSampler(map.right.directions, resolution) };
+  #prepare(sight: Sight, resolution: number) {
+    const map = this.#mapOf(sight);
+    if (sight.target && sight.map === map && sight.samplers?.left.resolution === resolution) return;
+    const sameMap = sight.map === map;
+    sight.map = map;
+    sight.target?.dispose();
+    sight.target = new THREE.WebGLRenderTarget(resolution * FACES.length, resolution, { depthBuffer: true, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    sight.pixels = new Uint8Array(resolution * FACES.length * resolution * 4);
+    sight.samplers = { left: createSampler(map.left.directions, resolution), right: createSampler(map.right.directions, resolution) };
     if (!sameMap) {
-      this.#light = { left: new Float32Array(this.#samplers.left.count), right: new Float32Array(this.#samplers.right.count) };
-      this.#hasLight = false;
+      sight.light = { left: new Float32Array(sight.samplers.left.count), right: new Float32Array(sight.samplers.right.count) };
+      sight.hasLight = false;
     }
   }
 
-  #refresh(resolution: number) {
+  /** Renders what one fly sees, `index` its place among them (its own stand-in left out), and reads it back. */
+  #refresh(sight: Sight, index: number, resolution: number) {
     const started = performance.now();
-    this.#prepare(resolution);
+    sight.since = 0;
+    this.#prepare(sight, resolution);
+    this.standIns?.hideFromEyes(index);
     const stage = this.#stage;
     const renderer = stage.renderer;
-    const body = this.#life.body;
+    const body = sight.life.body;
     const callsBefore = renderer.info.render.calls;
     // The head, and the way the body faces (tilted to the surface it stands on).
     const p = body.position;
@@ -277,7 +361,7 @@ export class Eyes {
     this.#q.setFromUnitVectors(UP, scratchUp.set(body.up.x, body.up.y, body.up.z)).multiply(this.#yaw);
     this.#sky.position.copy(this.#head);
     this.#sky.updateMatrixWorld();
-    const target = this.#target!;
+    const target = sight.target!;
     target.viewport.set(0, 0, resolution * FACES.length, resolution);
     target.scissorTest = false;
     renderer.setRenderTarget(target);
@@ -299,27 +383,32 @@ export class Eyes {
       renderer.render(stage.renderScene, camera);
     }
     target.scissorTest = false;
-    const pixels = this.#pixels!;
+    const pixels = sight.pixels!;
+    const samplers = sight.samplers!;
     const read = renderer.readRenderTargetPixelsAsync(target, 0, 0, resolution * FACES.length, resolution, pixels);
     renderer.setRenderTarget(null);
-    this.#pending = true;
-    this.costCalls = renderer.info.render.calls - callsBefore;
-    this.costMs = performance.now() - started;
+    sight.pending = true;
+    this.costCalls += renderer.info.render.calls - callsBefore;
+    this.costMs += performance.now() - started;
     // Keep the last completed light while the GPU works; the frame never waits for it.
     void read.then(() => {
+      if (sight.dropped) return;
       const sampled = performance.now();
-      const light = this.#light!;
-      sample(pixels, this.#samplers!.left, light.left);
-      sample(pixels, this.#samplers!.right, light.right);
-      this.#adaptation.apply(light, this.#sinceSampled);
-      this.#sinceSampled = 0;
-      this.#hasLight = true;
-      this.updates++;
-      if (this.picture) this.#fillPicture();
+      const light = sight.light!;
+      sample(pixels, samplers.left, light.left);
+      sample(pixels, samplers.right, light.right);
+      sight.adaptation.apply(light, sight.sinceSampled);
+      sight.sinceSampled = 0;
+      sight.hasLight = true;
+      sight.updates++;
+      if (index === 0 && this.picture) this.#fillPicture();
       this.costMs += performance.now() - sampled;
     }).catch((error: unknown) => {
       console.warn("The fly's eye readback failed", error);
-    }).finally(() => { this.#pending = false; });
+    }).finally(() => {
+      sight.pending = false;
+      if (sight.dropped) target.dispose();
+    });
   }
 
   /** The picture of what the eyes take in: every facet a dot, both eyes laid out by where they look. */
@@ -370,8 +459,9 @@ export class Eyes {
 
   #fillPicture() {
     const picture = this.picture;
-    const light = this.#light;
-    if (!picture || !light || picture.map !== this.#map) return;
+    const own = this.#sights[0];
+    const light = own.light;
+    if (!picture || !light || picture.map !== own.map) return;
     const array = picture.light.array as Float32Array;
     array.set(light.left, 0);
     array.set(light.right, light.left.length);

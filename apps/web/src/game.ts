@@ -14,29 +14,37 @@ import { REGIONS } from "@fly/brain";
 import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttribution } from "@fly/contracts";
 import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
 import { Navigator, sameTarget } from "@fly/ui";
-import type { GlyphSet, Hit } from "@fly/ui";
+import type { GlyphSet, Hit, HitMap } from "@fly/ui";
 import { BALL_RADIUS, Pantry, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
-import type { RayHit } from "@fly/world";
+import type { RayHit, Vec3 } from "@fly/world";
 import { Haptics } from "./haptics.ts";
+import type { Brains } from "./brain/create.ts";
 import { BrainMeter } from "./brain/meter.ts";
+import { Company, companionSpot } from "./company.ts";
 import { CameraDirector, VIEWS } from "./camera.ts";
 import { TV_FRAME, worldSize } from "./display.ts";
 import type { Display, Frame } from "./display.ts";
 import { Eyes } from "./eyes/eyes.ts";
 import { EyesInset, insetWanted } from "./eyes/inset.ts";
 import { FlyView } from "./fly-view.ts";
-import { PlayControls } from "./controls.ts";
+import { DRAG_ROUND, DRAG_UP, PlayControls } from "./controls.ts";
 import type { PlayTarget, ToolUse } from "./controls.ts";
-import type { TableStart } from "@fly/net";
-import { TAP_SLOP } from "./input.ts";
+import { COLOURS, MAX_OWN, PROTOCOL, everyoneIndex } from "@fly/net";
+import type { SeatedFly, TableStart } from "@fly/net";
+import { TouchLoupe } from "./ui/touch-loupe.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
 import { Life } from "./life.ts";
 import { inApp, inviteLink, invitedTo, newDeviceKey, newTableCode, roomsUrl, share, showInAddress, tableStart, tryProtocolReload } from "./online/invite.ts";
 import type { Shared } from "./online/invite.ts";
+import { AutoJoin } from "./online/auto-join.ts";
+import type { AutoJoinNow } from "./online/auto-join.ts";
 import { Lobby } from "./online/lobby.ts";
 import { Online } from "./online/online.ts";
 import type { Ended, PlayerNow, TableHost } from "./online/online.ts";
 import { nativeSocketBridge, nativeSockets } from "./online/native-socket.ts";
+import { NEWER_KEY, reloadForNewer } from "./online/newer.ts";
+import { OtherFlies, devicesOf } from "./online/others.ts";
+import type { Device, Other } from "./online/others.ts";
 import { BrowserSocket } from "./online/socket.ts";
 import { isPlaceId, nextPlace, placeInfo } from "./places/catalog.ts";
 import type { PlaceId } from "./places/catalog.ts";
@@ -56,7 +64,7 @@ import { KEPT, OVERLAY_OPACITIES, OVERLAY_SIZES, loadLearned, loadSettings, load
 import type { Learned, Lesson, Settings, ShelfChoices, TableSeat } from "./settings.ts";
 import { Stage } from "./stage.ts";
 import { aimAt } from "./tools/aim.ts";
-import { Hands, SWOOP_BEARING, TOOLS } from "./tools/hands.ts";
+import { Hands, TOOLS } from "./tools/hands.ts";
 import type { ToolId } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
 import { StatsPanel, statsSlot, statsWanted } from "./stats/panel.ts";
@@ -64,7 +72,7 @@ import type { StatsState } from "./stats/panel.ts";
 import { Tally } from "./stats/tally.ts";
 import { CornerDeck, waitFor } from "./ui/corners.ts";
 import type { CornerPicture } from "./ui/corners.ts";
-import { HUD_HITS, drawHud } from "./ui/hud.ts";
+import { HUD_HITS, drawHud, needsTeaching } from "./ui/hud.ts";
 import type { HudState } from "./ui/hud.ts";
 import { hudLayout, loadingLayout, playRoom, titleLayout, touchSlop } from "./ui/layout.ts";
 import type { HudLayout, LoadingLayout } from "./ui/layout.ts";
@@ -81,13 +89,16 @@ import { OnlineScreen } from "./ui/screens/online.ts";
 import { BrowserTextEntry, NativeTextEntry, nativeKeyboard } from "./ui/text-entry.ts";
 
 /** Seconds the loading screen stays after the brain wakes, so "Awake!" is seen; longer when it has more to say. */
-const AWAKE_HOLD = 1.2;
+const AWAKE_HOLD = 0.2;
 const AWAKE_HOLD_NOTE = 4;
 /** Hidden longer than this (ms), the page wakes with the sky and the weather where the clock has them now, not easing there. */
 const AWAY_SETTLE_MS = 30_000;
 /** How sensitive the touch surface is: screen widths per full swipe. */
 const SWIPE_GAIN = 0.9;
-/** How often the HUD redraws for its shimmer alone, per second. */
+/** With the View tool in hand, a swipe across the touch surface (2 units) turns the camera as far round as a drag across the screen, and one up it about as far up. */
+const SWIPE_ROUND = DRAG_ROUND / 2;
+const SWIPE_UP = DRAG_UP / 2;
+/** The refresh cap for animated teaching, loading status and frame stats, Hz. */
 const HUD_SHIMMER_FPS = 10;
 /** Seconds of wallpaper in one place before the fly moves on, when it lives in each in turn. */
 const PLACE_TURN = 20 * 60;
@@ -98,7 +109,7 @@ const VEIL_IN = 0.9;
 const QUIET_AFTER = 60;
 /** How often the clock, the forecast and the weather outside are looked at again, s: the light moves on that slowly. */
 const CLOCK_EVERY = 2;
-/** Seconds of tickling or blowing that teach holding Select, longer than a press. */
+/** Seconds of sustained tickling or blowing that distinguish a hold from a press. */
 const HOLD_TAUGHT = 0.5;
 /** A pad's right stick at full tilt: radians a second round the fly, and up; and Q or E held, round. */
 const PAD_ROUND = 2.4;
@@ -111,14 +122,23 @@ const PAD_ZOOM = 1.6;
 type MenuScreenId = Exclude<ScreenId, "play">;
 
 const FIXED_AT_TABLE: ReadonlySet<ToolId> = new Set(["light", "weather", "place"]);
+/** In a room open to everyone the light and the weather are each player's own; the place is the room's clock's. */
+const FIXED_FOR_EVERYONE: ReadonlySet<ToolId> = new Set(["place"]);
 const NOTHING_FIXED: ReadonlySet<ToolId> = new Set();
 
-/** Reloads the page, once a session: whether it did. */
-function reloadOnce(): boolean {
+/** Adds each of `from` to `to`, without the iterator a for…of would make: it runs every frame for every fly. */
+function pushAll<T>(to: T[], from: readonly T[]) {
+  for (let i = 0; i < from.length; i++) to.push(from[i]);
+}
+
+/** Reloads the page into the build that speaks the room's newer protocol, when it may (online/newer.ts): whether it did. */
+function reloadForNewerProtocol(): boolean {
   try {
-    if (sessionStorage.getItem("flies.reloaded")) return false;
-    sessionStorage.setItem("flies.reloaded", "1");
+    const next = reloadForNewer(sessionStorage.getItem(NEWER_KEY), PROTOCOL, Date.now());
+    if (!next) return false;
+    sessionStorage.setItem(NEWER_KEY, next);
   } catch {
+    // Without the session's memory a reload that brought this page back would reload again every frame.
     return false;
   }
   location.reload();
@@ -146,8 +166,15 @@ export class Game implements Shell {
   readonly settings: Settings;
   readonly stage: Stage;
   readonly director: CameraDirector;
+  /** The fly the player follows: the camera, the pointer, the pictures in the corners and the stats are its. */
   readonly life: Life;
   readonly fly: FlyView;
+  /** The other flies this device lives, each with a brain of its own (Settings → Flies). */
+  readonly company: Company;
+  /** Every fly but the followed one, as drawn: this device's others, and the other players' at a table. */
+  readonly others: OtherFlies;
+  /** How many flies this device can live: one where it can run only one brain. */
+  readonly maxFlies: number;
   /** What its feet leave after it has stood in something sticky or wet: only drawn, never felt. */
   readonly prints: Footprints;
   readonly meter = new BrainMeter();
@@ -171,7 +198,7 @@ export class Game implements Shell {
   /** The real weather outside, where the Apple TV can tell it; scripts feed it in a browser (`outside.feed`). */
   readonly outside = new Outside(nativeWeather());
   readonly nav = new Navigator<ScreenId>("title");
-  readonly screens: { title: MenuScreen; settings: MenuScreen; about: Screen; online: OnlineScreen };
+  readonly screens: { title: MenuScreen; settings: MenuScreen; about: AboutScreen; online: OnlineScreen };
   /** At a room with others (docs/online.md), its line to the room and the others there; null alone. */
   online: Online | null = null;
   /** How the room this device was last at, or tried to sit at, ended: it left, or was turned away (removed, the room gone, locked). */
@@ -180,6 +207,8 @@ export class Game implements Shell {
   knock: Knock | null = null;
   /** Typing into the fields the game draws (a room's name, its password), where there is a way to. */
   readonly typing: TextEntry | null;
+  #typingHit: Hit | null = null;
+  readonly touchLoupe: TouchLoupe | null;
   /** The line that lists the rooms, while Online shows them. */
   #lobby: Lobby | null = null;
   /** The fly's own food, kept while it tries a room, to have back if the room never lets it in. */
@@ -197,6 +226,16 @@ export class Game implements Shell {
   quality: Quality | null = null;
   /** The graphics context was lost, and nothing can be drawn until it is restored. */
   glLost = false;
+  /** The middles of the other flies this device lives, for the bubbles: one each, kept. */
+  readonly #middles: THREE.Vector3[] = [];
+  /** Where each of the company is, for the place's visitors to keep clear of. */
+  readonly #companyAt: Vec3[] = [];
+  /** The Flies setting as last seen: when the player changes it, flies taken off for brains that wouldn't run may be tried again. */
+  #fliesChosen = 0;
+  /** How hard this player's feather is on any of the other flies this device lives, this frame. */
+  #companyStroke = 0;
+  /** The enamel the followed fly wears now (none alone with no others to tell it from). */
+  #mark: string | null = null;
   /** Recent peaks of the giant fibre's escape command, the hand-wired loom, and the eyes' looming detectors (Hz). */
   readonly peaks = { escape: 0, loom: 0, looming: 0 };
   #loading = true;
@@ -204,7 +243,7 @@ export class Game implements Shell {
   #awakeAt = -1;
   #datasetAt = 0;
   /** What the HUD last drew, to tell when it needs drawing again. */
-  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1 };
+  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1, here: null as PlaceId | null, fixed: false, outside: false, surface: "", running: false, pressed: null as Readonly<Hit> | null };
   #hudAt = 0;
   #changedAt = -10;
   #touched = false;
@@ -250,10 +289,8 @@ export class Game implements Shell {
   /** What the hints have taught, as saved; and how many times that has changed, for the HUD to redraw. */
   #learned: Learned = loadLearned();
   #taught = 0;
-  /** Seconds Select has been tickling or blowing. */
+  /** Seconds the held tool has been tickling or blowing. */
   #held = 0;
-  /** Button hints as last applied: turned on again, they teach everything again. */
-  #hints = true;
   /** The weather outside's state when last logged. */
   #outsideState = "";
   readonly #inputs: Inputs;
@@ -274,6 +311,7 @@ export class Game implements Shell {
   #ringShown = true;
   /** A game has been played since launch: Back from the menu carries on with it. */
   #played = false;
+  #firstVisit = Object.keys(this.#learned).length === 0;
   #cursor = "";
   #seenInput = 0;
   #glyphsDrawn: GlyphSet | null | undefined = undefined;
@@ -284,9 +322,18 @@ export class Game implements Shell {
   readonly #app: boolean;
   readonly #player: PlayerNow = { away: false, playing: false, handsOut: false, holding: false, eye: { x: 0, y: 0, z: 0 } };
   readonly #tableHost: TableHost;
+  /** The other devices at the table as the screens have them, by the first of their flies heard of. */
+  readonly #devices = new WeakMap<Other, Device>();
   readonly #titleItems: number;
+  /** Sitting this device with others by default, once the brain is awake (null where it can't play online); and whether the room this device is at, or trying, is its doing (it ends quietly). */
+  #auto: AutoJoin | null = null;
+  #autoOnline = false;
+  /** "Join others" as last applied, to tell when it changes. */
+  #joinOthers = true;
+  /** What sitting with everyone is told each frame, kept: nothing is made per frame. */
+  readonly #autoNow: AutoJoinNow = { enabled: true, awake: false, network: true, atRoom: false };
 
-  constructor(canvas: HTMLCanvasElement, remote: Remote, brain: BrainDriver, display: Display, inputs: Inputs) {
+  constructor(canvas: HTMLCanvasElement, remote: Remote, brains: Brains, display: Display, inputs: Inputs) {
     this.canvas = canvas;
     this.remote = remote;
     this.display = display;
@@ -310,16 +357,21 @@ export class Game implements Shell {
     this.stage = new Stage(canvas, time === "clock" ? timeAt(this.outside.lightHours(clockHours(new Date()))) : time, scene);
     this.#followLight(true);
     this.fireflies = new Fireflies(this.stage.scene);
-    this.life = new Life(world, brain);
+    this.life = new Life(world, brains.first);
     // Its clock keeps the real time of day, whatever light is chosen, and its sleep pressure starts as the hour makes it.
-    this.life.rhythm = new Rhythm(clockHours(new Date()), this.outside.sunTimes ?? SUMMER);
+    this.life.rhythm = this.#rhythm();
     this.fly = new FlyView(this.stage.scene, world);
+    this.maxFlies = brains.another ? MAX_OWN : 1;
+    this.company = new Company(world, brains.another ?? (() => brains.first), () => this.#rhythm());
+    this.others = new OtherFlies(this.stage.scene, world);
+    this.others.company = this.company.list;
     this.prints = new Footprints(this.stage.scene);
     this.director = new CameraDirector(world, display.frame.aspect, scene.camera);
     this.bubbles = new Bubbles(this.stage.scene, world);
     this.handsView = new HandsView(this.stage.scene);
     this.eyes = new Eyes(this.stage, this.life);
-    this.#around = { fly: this.life.body.position, airborne: false, world, pantry: this.life.pantry, weather: this.stage.weather, quiet: false, felt: this.#felt, shared: null };
+    this.eyes.standIns = this.others;
+    this.#around = { fly: this.life.body.position, airborne: false, world, pantry: this.life.pantry, weather: this.stage.weather, quiet: false, felt: this.#felt, company: this.#companyAt, shared: null };
     this.eyes.see(this.bubbles.mesh);
     for (const object of this.handsView.seen) this.eyes.see(object);
     this.inset = new EyesInset(this.eyes);
@@ -327,9 +379,11 @@ export class Game implements Shell {
     this.nerves = new NervesPanel(this.fly.model.nerves);
     this.overlay.scene.add(this.nerves.mesh);
     this.overlay.scene.add(this.statsPanel.mesh);
+    this.touchLoupe = inputs.pointers ? new TouchLoupe() : null;
+    if (this.touchLoupe) this.overlay.scene.add(this.touchLoupe.mesh);
     this.#pictures = [this.inset, this.nerves, this.statsPanel];
     this.tally = new Tally(this.life, Date.now());
-    this.#statsState = { activity: "waiting", spikes: 0, active: 0, speed: 0, history: this.meter.history, head: 0, day: this.tally.day, sensed: this.life.sensed, brain: null };
+    this.#statsState = { spikes: 0, active: 0, speed: 0, history: this.meter.history, head: 0, day: this.tally.day, sensed: this.life.sensed, brain: null };
     this.glow = new NerveGlow(this.fly.model.nerves.glow);
     this.#settle();
     const title = titleScreen(this);
@@ -342,8 +396,7 @@ export class Game implements Shell {
     };
     this.#hudLayout = hudLayout(display.frame);
     this.#loadingLayout = loadingLayout(display.frame);
-    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, glyphs: this.glyphs, learned: this.#learned, teachSwipe: true, changed: 10, spikes: 0, brainRunning: false, eyes: null, layout: this.#hudLayout };
-    this.#hints = this.settings.hints;
+    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, glyphs: this.glyphs, learned: this.#learned, teachSwipe: true, changed: 10, brainRunning: false, arrival: arriving(this.brain) ? this.brain : null, eyes: null, layout: this.#hudLayout };
     // Nothing points on the Apple TV: nothing to record.
     this.overlay.hits.enabled = !!inputs.pointers;
     this.#applyFrame();
@@ -354,10 +407,15 @@ export class Game implements Shell {
       scene: this.stage.scene,
       stage: this.stage,
       life: this.life,
+      company: this.company,
+      others: this.others,
       hands: this.hands,
       fly: this.fly,
       eyes: this.eyes,
       bubbles: this.bubbles,
+      flies: () => this.#fliesWanted(),
+      seat: (flies) => this.#seated(flies),
+      share: (pantry) => this.#share(pantry),
       felt: this.#felt,
       here: () => this.#here,
       moving: () => !!this.#moving && !this.#moving.arrived,
@@ -370,12 +428,23 @@ export class Game implements Shell {
     const keyboard = nativeKeyboard();
     const native = !!(globalThis as { __native?: unknown }).__native;
     this.typing = !this.canPlayOnline ? null : keyboard ? new NativeTextEntry(keyboard) : typeof document !== "undefined" && !native ? new BrowserTextEntry() : null;
-    // Invited to a room, or still at the one it was at when it last closed: it sits down there.
+    // Invited to a room, or still at one of its own it was at when it last closed: it sits down there.
+    // Otherwise, once the brain is awake, with everyone (AutoJoin), unless invited or opened `?alone` (for checks and scripts).
     if (this.canPlayOnline) {
-      const code = invitedTo(location.href) ?? this.#seat.table;
+      const invited = invitedTo(location.href);
+      const kept = this.#seat.table;
+      this.#auto = new AutoJoin(kept);
+      if (invited || new URL(location.href).searchParams.has("alone")) this.#auto.stop();
+      const code = invited ?? (kept && everyoneIndex(kept) < 0 ? kept : null);
       if (code) this.#sit(code, null);
       // A phone's keyboard comes up only for a field focused during the tap itself: the frame that handles the tap is too late.
-      if (inputs.pointers) this.#typeOnTap(canvas);
+      if (inputs.pointers) {
+        inputs.pointers.onDown = (x, y) => {
+          const hit = this.#hitAt(x, y);
+          this.#typingHit = hit && { ...hit };
+        };
+        inputs.pointers.onTap = (x, y) => this.#typeOnTap(x, y);
+      }
       // A link opened while the app runs (a universal link on a phone): this room, leaving any other.
       window.addEventListener?.(INVITE_EVENT, (event) => {
         const code = invitedTo(String((event as CustomEvent<unknown>).detail));
@@ -386,6 +455,10 @@ export class Game implements Shell {
     }
   }
 
+  get teachingMenu() {
+    return this.#firstVisit && !this.#played;
+  }
+
   /** Rooms with others need a line to the room server: a WebSocket, or the Apple TV host's. */
   get canPlayOnline() {
     return this.#openSocket !== null;
@@ -393,15 +466,40 @@ export class Game implements Shell {
 
   /** Makes a room and sits at it, under this light and weather: its link can be shared at once. */
   startRoom(room: NewRoom) {
-    if (this.online || !this.canPlayOnline) return;
+    if (!this.#mayChoose()) return;
     const start = { ...tableStart(room.place, this.hands.timeOfDay, this.hands.weather), name: room.name, listed: room.listed };
     this.#sit(newTableCode(), start, room.password || null);
   }
 
   /** Sits at a room by its code, with its password if it is locked. */
   joinRoom(code: string, password?: string) {
-    if (this.online || !this.canPlayOnline) return;
+    if (this.online?.code === code || !this.#mayChoose()) return;
     this.#sit(code, null, password || null);
+  }
+
+  /**
+   * Whether the player may go to a room of their choosing now: alone, or in
+   * a room open to everyone (or on the way to one), which is left for it.
+   * Either way, being sat with everyone by default is over for this launch.
+   */
+  #mayChoose() {
+    if (!this.canPlayOnline) return false;
+    this.#auto?.stop();
+    const online = this.online;
+    if (online && !online.everyone && !this.#pending) return false;
+    this.leaveTable();
+    return true;
+  }
+
+  /** On the way to a room open to everyone by default, not yet let in: to the player, still alone. */
+  get #pending() {
+    return !!this.online && this.#autoOnline && !this.online.welcomed;
+  }
+
+  /** The network is back: the brain's download, and sitting with others, are tried again now. */
+  networkBack() {
+    this.retryBrain(true);
+    this.#auto?.hurry();
   }
 
   /** Comes to a locked room's door from the list (or goes away from it). */
@@ -425,7 +523,8 @@ export class Game implements Shell {
 
   /** The list of rooms is open while Online is up and this device is at none (on its other faces too, so that coming back to the list finds it as it is). */
   #browse(dt: number) {
-    const wanted = this.nav.current === "online" && !this.online && this.canPlayOnline;
+    // In a room open to everyone the list is there too, to go to another from.
+    const wanted = this.nav.current === "online" && this.canPlayOnline && (!this.online || this.online.everyone || this.#pending);
     if (wanted && !this.#lobby && this.#openSocket) this.#lobby = new Lobby(this.#openSocket, roomsUrl(location.href, this.#app));
     else if (!wanted && this.#lobby) {
       this.#lobby.close();
@@ -433,30 +532,14 @@ export class Game implements Shell {
     }
     this.#lobby?.update(dt);
     // A room server newer than this page: the newer page speaks its protocol.
-    if (this.#lobby?.status === "version") tryProtocolReload(this.#app, reloadOnce);
+    if (this.#lobby?.status === "version") tryProtocolReload(this.#app, reloadForNewerProtocol);
   }
 
   /** Starts typing into a field as a tap on it lifts, while the browser still counts it as the player's doing. */
-  #typeOnTap(canvas: HTMLCanvasElement) {
-    let from = { x: 0, y: 0 };
-    let pressed: Hit | null = null;
-    const at = (e: PointerEvent) => {
-      const box = canvas.getBoundingClientRect();
-      return { x: (e.clientX - box.left) / Math.max(1, box.width), y: (e.clientY - box.top) / Math.max(1, box.height) };
-    };
-    canvas.addEventListener("pointerdown", (e) => {
-      from = at(e);
-      const hit = this.#hitAt(from.x, from.y);
-      pressed = hit && { ...hit };
-    });
-    canvas.addEventListener("pointerup", (e) => {
-      const p = at(e);
-      const { width, height } = this.shape.design;
-      if (Math.hypot((p.x - from.x) * width, (p.y - from.y) * height) > TAP_SLOP.touch) return;
-      const hit = this.#hitAt(p.x, p.y);
-      const current = this.nav.current;
-      if (hit?.kind === MENU_HITS.row && sameTarget(pressed, hit) && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index, hit.id ?? "");
-    });
+  #typeOnTap(x: number, y: number) {
+    const hit = this.#hitAt(x, y);
+    const current = this.nav.current;
+    if (hit?.kind === MENU_HITS.row && sameTarget(this.#typingHit, hit) && current !== "play") (this.screens[current] as Screen).typeNow?.(hit.index, hit.id ?? "");
   }
 
   /** The link to the table this device is at. */
@@ -475,52 +558,152 @@ export class Game implements Shell {
     return link ? share(link) : Promise.resolve("failed");
   }
 
-  /** The room as the screens show it. */
+  /** The room as the screens show it: each other device there by its player, with its flies' colours. */
   get table(): TableNow | null {
     const online = this.online;
     const link = this.tableLink;
-    return online && link ? { name: online.room?.name ?? null, code: online.code, link, starting: online.starting, joined: online.joined, others: online.others.list } : null;
+    if (!online || !link || this.#pending) return null;
+    return { name: online.room?.name ?? null, code: online.code, link, starting: online.starting, joined: online.joined, everyone: online.everyone, others: devicesOf(online.others.list, this.#devices) };
   }
 
-  /** The starter takes another's fly off the table. */
+  /** A fly's clock, as every fly's here keeps it: the real time of day, and the sun's times where the TV can tell them. */
+  #rhythm() {
+    return new Rhythm(clockHours(new Date()), this.outside.sunTimes ?? SUMMER);
+  }
+
+  /** How many flies this device lives now, the followed one among them. */
+  get flies() {
+    return 1 + this.company.list.length;
+  }
+
+  /** How many the player keeps, as many as this device can live (less any whose brains wouldn't run). */
+  #fliesWanted() {
+    return Math.max(1, Math.min(this.maxFlies - this.company.lost, this.settings.flies));
+  }
+
+  /**
+   * As many flies as there should be: alone, as many as the player keeps
+   * (once the first fly's brain is awake, so that every brain after it finds
+   * the connectome already here); at a table, as many as the table seated,
+   * asking it again when the player changes how many.
+   */
+  #flock() {
+    if (this.settings.flies !== this.#fliesChosen) {
+      this.#fliesChosen = this.settings.flies;
+      this.company.lost = 0;
+    }
+    // A companion whose brain wouldn't run, even given new ones, is taken off: alone the rest move up in line, at a table it asks for one fewer.
+    if (this.company.tend(this.time)) {
+      if (!this.online) this.#colourAlone();
+      this.#companyChanged();
+    }
+    const online = this.online;
+    if (online) {
+      if (online.joined) online.recount(this.#fliesWanted());
+      return;
+    }
+    const wanted = this.#fliesWanted() - 1;
+    const company = this.company.list;
+    if (wanted === company.length || (wanted > company.length && this.brain.status !== "running")) return;
+    this.company.resize(wanted, this.life.pantry);
+    this.#colourAlone();
+    this.#companyChanged();
+  }
+
+  /** Alone, each of the company wears the colour of its place in line. */
+  #colourAlone() {
+    const list = this.company.list;
+    for (let i = 0; i < list.length; i++) {
+      list[i].id = 0;
+      list[i].colour = COLOURS[(i + 1) % COLOURS.length];
+    }
+  }
+
+  /** The table seats these of this device's flies, in line: as many as it lives, each in its colour. */
+  #seated(flies: readonly SeatedFly[]) {
+    this.company.resize(Math.min(this.maxFlies, flies.length) - 1, this.life.pantry);
+    for (const [i, c] of this.company.list.entries()) {
+      c.id = flies[i + 1].id;
+      c.colour = flies[i + 1].colour;
+    }
+    this.#markFollowed(flies[0].colour);
+    this.#companyChanged();
+  }
+
+  /** The followed fly's enamel: its colour at a table; alone, the first colour when there are others to tell it from. */
+  #markFollowed(colour: string | null) {
+    if (colour === this.#mark) return;
+    this.#mark = colour;
+    this.fly.model.mark(colour);
+  }
+
+  /** The company has changed: their eyes, and their middles for the bubbles. */
+  #companyChanged() {
+    const list = this.company.list;
+    this.eyes.company(list.map((c) => c.life));
+    while (this.#middles.length < list.length) this.#middles.push(new THREE.Vector3());
+    this.#middles.length = list.length;
+    this.#companyAt.length = 0;
+    for (const c of list) this.#companyAt.push(c.life.body.position);
+    if (!this.online) this.#markFollowed(list.length > 0 ? COLOURS[0] : null);
+    this.overlay.dirty = true;
+  }
+
+  /** Every fly this device lives eats from `pantry` from now on. */
+  #share(pantry: Pantry) {
+    this.life.share(pantry);
+    this.company.share(pantry);
+  }
+
+  /** The starter takes another device's flies off the table. */
   removeFly(id: number) {
     this.online?.remove(id);
   }
 
-  /** Leaves the table: the fly is alone again where it is. */
+  /** Leaves the table: the fly is alone again where it is, and not sat with everyone again this launch. */
   leaveTable() {
     if (!this.online) return;
+    this.#auto?.stop();
+    const quiet = this.#pending;
     this.online.leave();
-    this.#stand("left");
+    this.#stand("left", quiet);
   }
 
-  #sit(code: string, start: TableStart | null, password: string | null = null) {
+  /** `auto`: sat with everyone by default (AutoJoin), not by the player: how it ends is not news. */
+  #sit(code: string, start: TableStart | null, password: string | null = null, auto = false) {
     this.tableEnded = null;
     if (!this.#openSocket) return;
     this.#alone = this.life.pantry;
     this.online = new Online(this.#tableHost, this.#openSocket, roomsUrl(location.href, this.#app), code, this.#seat.key, start, password);
+    this.#autoOnline = auto;
     this.#seat.table = code;
     saveTableSeat(this.#seat);
-    showInAddress(code);
+    // A room of the player's own goes in the address, for a reload to come back to; everyone's are anyone's anyway.
+    if (everyoneIndex(code) < 0) showInAddress(code);
     this.#lockTools();
   }
 
-  /** Takes the table out of the world: it ended (`why`), or the player left. */
-  #stand(why: Ended) {
+  /** Takes the table out of the world: it ended (`why`), or the player left. `quiet`: a try at sitting with everyone by default, which nobody needs to hear about. */
+  #stand(why: Ended, quiet = false) {
     const online = this.online;
     if (!online) return;
     online.dispose();
     this.online = null;
-    this.tableEnded = why;
+    this.#autoOnline = false;
+    this.tableEnded = quiet ? null : why;
     if (this.canvas.dataset) Online.unpublish(this.canvas.dataset);
-    // A locked room: its door, to try its password (again).
-    if (why === "locked") {
+    // A locked room: its door, to try its password (again). Quietly, there is no door to come to.
+    if (!quiet && why === "locked") {
       this.knock = { code: online.code, name: online.line.lockedName ?? this.knock?.name ?? "", wrong: online.triedPassword, seq: (this.knock?.seq ?? 0) + 1 };
       if (this.nav.current !== "online") this.open("online");
-    } else if (why !== "busy") this.knock = null;
+    } else if (!quiet && why !== "busy") this.knock = null;
     // Its own food again (as it was, if the room never let it in), and its own light and weather, as its shelf had them.
-    this.life.share(!online.welcomed && this.#alone ? this.#alone : new Pantry(this.life.world, this.life.world.place.patches));
+    this.#share(!online.welcomed && this.#alone ? this.#alone : new Pantry(this.life.world, this.life.world.place.patches));
     this.#alone = null;
+    // Its flies are its own again, in their colours alone.
+    this.#markFollowed(null);
+    this.#colourAlone();
+    this.#companyChanged();
     for (const id of ["light", "weather"] as const) {
       const i = TOOLS.findIndex((t) => t.id === id);
       const kind = TOOLS[i].variants.findIndex((v) => v.id === this.#shelf[id]?.kind);
@@ -534,24 +717,56 @@ export class Game implements Shell {
     this.overlay.dirty = true;
   }
 
-  /** At a table, the light, the weather and the place are the starter's to choose. */
-  #lockTools() {
+  /** At a table, the light, the weather and the place are the starter's to choose; in a room open to everyone, the place is its clock's. */
+  #fixedTools(): ReadonlySet<ToolId> {
     const online = this.online;
-    this.hands.fixed = online && online.joined && !online.starting ? FIXED_AT_TABLE : NOTHING_FIXED;
+    if (!online || !online.joined || online.starting) return NOTHING_FIXED;
+    return online.everyone ? FIXED_FOR_EVERYONE : FIXED_AT_TABLE;
+  }
+
+  #lockTools() {
+    this.hands.fixed = this.#fixedTools();
   }
 
   /** The table, each frame: its line, the others, and how it ends. */
   #table(dt: number) {
     const online = this.online;
     if (!online) return;
-    online.update(dt, this.director.camera, this.shape.height, this.time, this.#floorAt);
-    if (this.hands.fixed !== (online.starting || !online.joined ? NOTHING_FIXED : FIXED_AT_TABLE)) this.#lockTools();
+    online.update(dt, this.director.camera, this.time, this.#floorAt);
+    if (this.hands.fixed !== this.#fixedTools()) this.#lockTools();
+    // A room open to everyone may not be the one asked for: a reload comes back to the one it is.
+    if (online.welcomed && this.#seat.table !== online.code) {
+      this.#seat.table = online.code;
+      saveTableSeat(this.#seat);
+    }
     const ended = online.ended;
     if (!ended) return;
     // A page from before the server's last deploy: the newer page speaks its protocol.
-    if (ended === "version" && tryProtocolReload(this.#app, reloadOnce)) return;
-    this.#stand(ended);
-    if (ended === "version" && this.nav.current !== "online") this.open("online");
+    if (ended === "version" && tryProtocolReload(this.#app, reloadForNewerProtocol)) return;
+    // Sat with everyone by default: alone again, quietly, and perhaps another try later.
+    const quiet = this.#autoOnline;
+    if (quiet) this.#auto?.ended(ended);
+    this.#stand(ended, quiet);
+    if (ended === "version" && !quiet && this.nav.current !== "online") this.open("online");
+  }
+
+  /** Sitting with everyone by default, once the brain is awake: or giving up a try that comes to nothing, quietly. */
+  #autoJoin(dt: number) {
+    const auto = this.#auto;
+    if (!auto) return;
+    const online = this.online;
+    const mine = online && this.#autoOnline ? online : null;
+    const now = this.#autoNow;
+    now.enabled = this.settings.joinOthers;
+    now.awake = !this.#loading && this.brain.status === "running";
+    now.network = typeof navigator === "undefined" || navigator.onLine !== false;
+    now.atRoom = !!online;
+    const act = auto.update(dt, now, !!mine?.welcomed, (mine?.line.reconnects ?? 0) > 0);
+    if (act === "join") this.#sit(auto.code, null, null, true);
+    else if (act === "abandon" && mine) {
+      mine.leave();
+      this.#stand("left", true);
+    }
   }
 
   /** What the table hears of the player with its fly: whether it is living, at the remote, and where the hand is. */
@@ -561,7 +776,7 @@ export class Game implements Shell {
     p.away = typeof document !== "undefined" && document.hidden;
     p.handsOut = playing;
     p.playing = playing && (performance.now() - Math.max(this.remote.lastInputAt, this.devices.at)) / 1000 < QUIET_AFTER;
-    p.holding = playing && (this.remote.held.has("select") || this.#controls.holding);
+    p.holding = playing && (this.remote.held.has("select") || (this.#controls.holding && this.#aim.onWorld));
     this.#copyEye();
     p.eye = this.#eye;
     return p;
@@ -584,6 +799,10 @@ export class Game implements Shell {
     const first = this.#frameVersion < 0;
     this.#frameVersion = this.display.version;
     const frame = this.display.frame;
+    if (!first) {
+      this.#inputs.pointers?.cancel();
+      this.#letGo();
+    }
     // The Apple TV's frame is the one everything starts in: nothing to resize there.
     if (frame !== TV_FRAME) {
       this.stage.resize(frame);
@@ -637,6 +856,18 @@ export class Game implements Shell {
     return this.outside.attribution();
   }
 
+  /** Optional host hook, never polled by the frame loop. */
+  accessibilityChanged: (() => void) | null = null;
+  get loading() { return this.#loading; }
+  menuChanged() { this.accessibilityChanged?.(); }
+
+  /** Host commands consume their input before the next frame can wake Watch. */
+  accessInput() {
+    this.devices.at = performance.now();
+    this.#seenInput = this.devices.at;
+    if (this.wallpaper) this.#stopWallpaper();
+  }
+
   get screen(): ScreenId {
     return this.nav.current;
   }
@@ -657,6 +888,7 @@ export class Game implements Shell {
 
   play() {
     this.#played = true;
+    this.#learn("arrival");
     this.nav.reset("title");
     this.nav.push("play");
     this.#entered();
@@ -685,11 +917,17 @@ export class Game implements Shell {
     this.#chosen.eyes = s.eyes;
     this.#applyPicture();
     this.director.wallpaperStyle = s.wallpaperCamera;
-    if (s.hints && !this.#hints) this.#unlearn();
-    this.#hints = s.hints;
     if (this.outside.enabled !== s.realWeather) {
       this.outside.enabled = s.realWeather;
       this.#clockAt = 0;
+    }
+    // Not with others by default any more: out of the room it was sat in for it. On again: with them soon, whatever stopped it before.
+    if (s.joinOthers !== this.#joinOthers) {
+      this.#joinOthers = s.joinOthers;
+      if (!s.joinOthers && this.#autoOnline && this.online) {
+        this.online.leave();
+        this.#stand("left", true);
+      } else if (s.joinOthers) this.#auto?.resume();
     }
     if (save) saveSettings(s);
   }
@@ -797,6 +1035,10 @@ export class Game implements Shell {
     this.#stayed = 0;
     this.stage.load(scene);
     this.life.move(scene.place);
+    for (const [i, c] of this.company.list.entries()) {
+      const [x, z, yaw, y] = companionSpot(this.life.world, i);
+      c.life.setDown(x, z, yaw, y);
+    }
     this.prints.clear();
     this.hands.clear();
     this.director.useScene(scene.camera);
@@ -825,8 +1067,9 @@ export class Game implements Shell {
     this.#syncCamera();
     this.#grip = this.#grip && { kind: "spent" };
     this.#controls.spend();
-    this.director.hand.held = false;
+    this.director.held = false;
     this.overlay.dirty = true;
+    this.menuChanged();
   }
 
   #syncCamera() {
@@ -871,9 +1114,10 @@ export class Game implements Shell {
       // A finger already down isn't "Try again".
       this.#touchWas = remote.touch.touching;
       this.#syncCamera();
+      this.menuChanged();
     }
     if (this.#loading) {
-      if (brain.status !== "loading" && this.#awakeAt < 0) this.#awakeAt = this.time;
+      if (brain.status !== "loading" && this.#awakeAt < 0) { this.#awakeAt = this.time; this.menuChanged(); }
       const hold = brain.status === "running" ? (arriving(brain) && brain.source.storageFull ? AWAKE_HOLD_NOTE : AWAKE_HOLD) : arriving(brain) ? Infinity : 3;
       if (this.#awakeAt >= 0 && this.time - this.#awakeAt > hold) {
         this.#loading = false;
@@ -887,7 +1131,10 @@ export class Game implements Shell {
     this.#placeChoice.update(dt);
     this.#move(dt);
     this.#table(dt);
+    this.#flock();
+    this.#autoJoin(dt);
     this.#browse(dt);
+    this.#drawOthers(dt);
     // Living in each place in turn, it moves on during a long wallpaper (alone: a table's place is the table's).
     if (this.wallpaper && !this.#moving && !this.online) {
       this.#stayed += dt;
@@ -896,20 +1143,20 @@ export class Game implements Shell {
 
     const playing = this.nav.current === "play" && !this.wallpaper;
     this.#copyEye();
-    const holding = remote.held.has("select") || this.#controls.holding;
+    const holding = remote.held.has("select") || (this.#controls.holding && this.#aim.onWorld);
     this.hands.update(dt, { use: false, holding: playing && holding, eye: this.#eye }, life.body, life.pantry);
-    // Holding Select is taught by holding it: a finger or a mouse button held teaches the remote nothing.
-    this.#held = (this.hands.stroking || this.hands.blowing) && remote.held.has("select") ? this.#held + dt : 0;
+    this.#held = this.hands.stroking || this.hands.blowing ? this.#held + dt : 0;
     if (this.#held > HOLD_TAUGHT) this.#learn(this.hands.current.id);
     this.#live(dt);
     this.#feel();
     this.eyes.beforeStep();
     life.step(dt, now);
+    this.#liveCompany(dt, now);
     this.tally.update(life, Date.now(), dt);
     this.#reactions();
     this.#paddle(dt);
     const hands = this.hands;
-    this.haptics.held(playing && hands.current.id === "feather" ? hands.stroke : 0, hands.blowing ? (hands.variant.id === "strong" ? 1 : 0.55) : 0, dt);
+    this.haptics.held(playing && hands.current.id === "feather" ? Math.max(hands.stroke, this.#companyStroke) : 0, hands.blowing ? (hands.variant.id === "strong" ? 1 : 0.55) : 0, dt);
     this.meter.update(life.brain, now);
     if (this.quality) {
       // Loading and the building of a place aren't this device's everyday pace.
@@ -925,12 +1172,10 @@ export class Game implements Shell {
     this.peaks.escape = Math.max(this.peaks.escape * fade, command?.escape ?? 0);
     this.peaks.loom = Math.max(this.peaks.loom * fade, life.sensed.loomLeft, life.sensed.loomRight);
     this.peaks.looming = Math.max(this.peaks.looming * fade, rates?.["vision.looming left"] ?? 0, rates?.["vision.looming right"] ?? 0);
-    this.glow.update(life.brain.regionRates, dt);
+    this.glow.update(life.brain.regionRates, dt, rates);
     this.fly.update(life.body, life.intent, life.eating, life.hunger.fullness, dt, life.songSide, life.activity === "sleeping");
     this.prints.update(this.fly.model, life.body.onFeet, this.fly.pose.groom > 0.02, life.world, life.pantry, this.time);
     this.online?.send(this.#playerNow());
-    // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
-    director.prefer = this.hands.current.id === "swoop" && this.nav.current === "play" && !this.wallpaper ? Math.PI - SWOOP_BEARING : null;
     director.update(life.body, dt);
     this.#xray(dt);
     if (this.time > this.#clockAt) this.#followLight();
@@ -942,7 +1187,12 @@ export class Game implements Shell {
     this.bubbles.rain = stage.weather.rain;
     const middle = this.#middle.set(life.body.position.x, life.body.position.y + 0.75, life.body.position.z);
     this.bubbles.lightBy(stage.light);
-    this.bubbles.update(this.time, dt, director.camera, stage.light.sunDirection, this.#air, middle);
+    const company = this.company.list;
+    for (let i = 0; i < company.length; i++) {
+      const p = company[i].life.body.position;
+      this.#middles[i].set(p.x, p.y + 0.75, p.z);
+    }
+    this.bubbles.update(this.time, dt, director.camera, stage.light.sunDirection, this.#air, middle, this.#middles);
     if (this.hands.ball.active) this.bubbles.popNear(this.hands.ball.position, BALL_RADIUS);
     this.handsView.opacity += ((this.nav.current === "play" && !this.wallpaper ? 1 : 0) - this.handsView.opacity) * Math.min(1, dt * 5);
     this.handsView.update(this.hands, life.pantry, director.camera, this.time, dt, this.#floorAt, life.body.position);
@@ -953,10 +1203,11 @@ export class Game implements Shell {
     if (!this.glLost) {
       stage.beginFrame();
       stage.render(director.camera, dt);
+      this.touchLoupe?.update(stage.renderer, this.shape, this.#aim.x, this.#aim.y, this.devices.current === "touch" && this.#controls.holding && this.#aim.onWorld && playing);
       const showEyes = this.#showEyes();
       const screen = this.#loading ? "loading" : this.nav.current;
       const settings = this.settings;
-      const eyesWanted = insetWanted(settings.eyesInset, screen, this.wallpaper, showEyes, this.eyes.detail === "off");
+      const eyesWanted = insetWanted(settings.eyesInset, screen, this.wallpaper, showEyes, this.eyes.detail === "off" || brain.status !== "running");
       const nervesNow = nervesWanted(settings.nerves, screen, this.wallpaper, showEyes);
       const statsNow = statsWanted(settings.statsPanel, screen, this.wallpaper, showEyes);
       this.#layCorners();
@@ -969,7 +1220,6 @@ export class Game implements Shell {
       this.inset.update(dt, waitFor(eyesWanted, this.corners, 0, this.inset, pictures), this.corners, opacity);
       this.nerves.update(dt, waitFor(nervesNow, this.corners, slot, this.nerves, pictures), this.corners, slot, opacity);
       const stats = this.#statsState;
-      stats.activity = life.activity;
       stats.spikes = this.meter.spikesPerSecond;
       stats.active = this.meter.active;
       stats.speed = this.meter.speed;
@@ -1039,6 +1289,62 @@ export class Game implements Shell {
     live.call(this.stage.set, dt, around);
   }
 
+  /**
+   * Every fly but the followed one drawn where it is now, and every fly this
+   * device lives put in the others' way: before any of them lives its frame.
+   */
+  #drawOthers(dt: number) {
+    const camera = this.director.camera;
+    const pixels = this.shape.height / (2 * Math.tan((camera.fov * Math.PI) / 360));
+    const body = this.life.body;
+    this.others.update(this.online?.now ?? 0, dt, camera.position, pixels, body);
+    this.others.crowd(this.life.crowd, body, body);
+    const company = this.company.list;
+    for (let i = 0; i < company.length; i++) this.others.crowd(company[i].life.crowd, company[i].life.body, body);
+  }
+
+  /**
+   * The other flies this device lives, each its frame: what the hands (this
+   * player's and, at a table, the others'), the bubbles and the place do to
+   * it, as they reach the followed fly, and what it does about it. The
+   * followed fly has lived its frame already.
+   */
+  #liveCompany(dt: number, now: number) {
+    const list = this.company.list;
+    this.#companyStroke = 0;
+    if (list.length === 0) return;
+    const hands = this.hands;
+    const online = this.online;
+    const set = this.#moving ? null : this.stage.set;
+    const own = this.life.stimuli;
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i];
+      const { life, felt, air } = c;
+      felt.air.x = felt.air.y = felt.air.z = 0;
+      felt.touch = 0;
+      felt.looming.length = 0;
+      set?.feel?.(dt, life.body.position, felt);
+      air.x = felt.air.x;
+      air.y = felt.air.y;
+      air.z = felt.air.z;
+      const stroked = hands.reach(life.body, air);
+      if (stroked >= 1) hands.stroking = true;
+      this.#companyStroke = Math.max(this.#companyStroke, stroked);
+      const stimuli = life.stimuli;
+      stimuli.stroke = Math.max(stroked, this.bubbles.brushedBy[i], felt.touch, online?.reach(life.body, air) ?? 0);
+      stimuli.air = air;
+      // What could loom is wherever it is: the same balls, bubbles and visitors as the followed fly's, and what the place says of this one.
+      stimuli.looming.length = 0;
+      stimuli.looming.push(hands.looming[0]);
+      if (this.bubbles.enabled) pushAll(stimuli.looming, this.bubbles.looming);
+      pushAll(stimuli.looming, felt.looming);
+      if (online) pushAll(stimuli.looming, online.looming);
+      stimuli.threat = own.threat;
+      life.step(dt, now);
+    }
+    this.company.pose();
+  }
+
   /** What the hands and the world do to the fly this frame, for its senses. */
   #feel() {
     const { stimuli } = this.life;
@@ -1080,8 +1386,12 @@ export class Game implements Shell {
   /** Sets the light and the weather to the tools' choices; on "Now", to the clock's and the weather outside's (or the forecast's), looked at again every few seconds. With `settle`, there at once. */
   #followLight(settle = false) {
     const now = new Date();
-    // The fly's own clock is set right from the real hour and today's sun, at a table too: it lives here.
-    this.life?.rhythm?.setTime(clockHours(now), this.outside.sunTimes ?? SUMMER);
+    // Each fly's own clock is set right from the real hour and today's sun, at a table too: they live here.
+    const hours = clockHours(now);
+    const sun = this.outside.sunTimes ?? SUMMER;
+    this.life?.rhythm?.setTime(hours, sun);
+    // Before the company is made, the first time.
+    if (this.company) for (const c of this.company.list) c.life.rhythm?.setTime(hours, sun);
     // At a table its clock is the starter's, and its weather the forecast's from that clock: the same for everyone there.
     const tableHours = this.online?.hours() ?? null;
     if (tableHours !== null) {
@@ -1161,21 +1471,31 @@ export class Game implements Shell {
           pointers.gestures.length = 0;
         }
       }
-    } else if (!this.#loading && after > 0 && idle > after && (current === "play" || current === "title") && !this.#grip && !this.#controls.pressed && !this.director.hand.held && !keyboard?.holding) {
+    } else if (!this.#loading && after > 0 && idle > after && (current === "play" || (current === "title" && !this.teachingMenu)) && !this.#grip && !this.#controls.pressed && !this.director.held && !keyboard?.holding) {
       // Not while a finger or a button is still down on something, however still.
       this.#startWallpaper();
     }
     this.uiAlpha += ((this.wallpaper ? 0 : 1) - this.uiAlpha) * Math.min(1, dt * (this.wallpaper ? 1.2 : 6));
 
     if (this.#loading) {
-      // Select, or a touch, is "Try again" on a failure.
+      // The same focused control retries a failure or opens the world while it waits.
       const touched = remote.touch.touching && !this.#touchWas;
       this.#touchWas = remote.touch.touching;
-      let select = touched;
+      let select = touched && this.brain.status === "failed";
       for (const press of remote.presses) if (press.button === "select" && !press.repeat) select = true;
-      // A tap or a click on "Try again".
-      if (pointers) for (const g of pointers.gestures) if (g.type === "up" && g.tap && this.#hitAt(g.x, g.y)?.kind === LOADING_HITS.retry) select = true;
-      if (select && this.brain.status === "failed") this.retryBrain();
+      if (pointers) for (const g of pointers.gestures) {
+        if (g.type !== "up" || !g.tap) continue;
+        const kind = this.#hitAt(g.x, g.y)?.kind;
+        if (kind === LOADING_HITS.retry || kind === LOADING_HITS.explore) select = true;
+      }
+      if (select) {
+        if (this.brain.status === "failed") this.retryBrain();
+        else {
+          this.#loading = false;
+          this.play();
+          this.outside.begin();
+        }
+      }
       remote.presses.length = 0;
       return;
     }
@@ -1194,14 +1514,15 @@ export class Game implements Shell {
     if (keyboard && playing) {
       for (const action of keyboard.actions) {
         if (action.kind === "tool") this.#chooseTool(action.index);
-        else this.#handBack();
+        else this.#home();
       }
     }
-    if (playing && (remote.dx !== 0 || remote.dy !== 0)) this.#movePointer(remote.dx, remote.dy);
-    if (playing) {
-      this.#steer(dt);
-      this.#controls.glide(dt, this.#target);
+    if (playing && (remote.dx !== 0 || remote.dy !== 0)) {
+      // With the View tool in hand the hand has nothing to do, so a swipe turns the camera, as a drag does.
+      if (this.hands.current.id === "view") this.#turnCamera(-remote.dx * SWIPE_ROUND, -remote.dy * SWIPE_UP);
+      else this.#movePointer(remote.dx, remote.dy);
     }
+    if (playing) this.#steer(dt);
     if (pointers) {
       for (const g of pointers.gestures) this.#gesture(g);
       this.#followAim();
@@ -1224,14 +1545,14 @@ export class Game implements Shell {
       round += pads.look.x * PAD_ROUND;
       up += pads.look.y * PAD_UP;
       zoom += pads.zoom * PAD_ZOOM;
-      if (pads.handBack) this.#handBack();
+      if (pads.home) this.#home();
     }
     const turning = round !== 0 || up !== 0;
     // Let go only when they are let go themselves: a finger or the mouse may be holding the camera too.
     if (turning) {
-      this.director.hand.held = true;
+      this.director.held = true;
       this.#turnCamera(round * dt, up * dt);
-    } else if (this.#turning) this.director.hand.held = false;
+    } else if (this.#turning) this.director.held = false;
     this.#turning = turning;
     if (zoom !== 0) this.#zoomCamera(Math.exp(zoom * dt));
   }
@@ -1260,16 +1581,18 @@ export class Game implements Shell {
     if (hands.current.id === "view") this.#changedAt = this.time;
   }
 
-  /** The camera back to the cameraman, now. */
-  #handBack() {
+  /** The camera back to Follow's distance and pitch, at the same yaw. */
+  #home() {
     if (this.hands.view === "eyes") return;
-    this.director.handBack();
+    this.director.home();
+    this.#viewFollows();
   }
 
   /** Picks a tool from the shelf by its place (a tap on it, a number key); picking the one in hand steps its kind instead. */
   #chooseTool(index: number) {
     const hands = this.hands;
     if (hands.chooseTool(index)) {
+      this.#learn("tools");
       this.#changedAt = this.time;
     } else if (index === hands.tool && hands.stepVariant(1, true)) this.#variantChanged();
   }
@@ -1300,6 +1623,7 @@ export class Game implements Shell {
     // At a table the whole table goes, when the table says so.
     if (online) {
       online.choosePlace(hands.place);
+      this.#learn("place");
       return true;
     }
     // Chosen by hand: if it lives in one place, this is now that place.
@@ -1308,6 +1632,7 @@ export class Game implements Shell {
       saveSettings(this.settings);
     }
     this.moveTo(hands.place);
+    this.#learn("place");
     return true;
   }
 
@@ -1316,7 +1641,8 @@ export class Game implements Shell {
     const hits = this.overlay.hits;
     if (hits.owner !== (this.#loading ? "loading" : this.nav.current)) return null;
     const { width, height } = this.shape.design;
-    const hit = hits.at(x * width, y * height, touchSlop(this.shape));
+    // Play targets already take a finger; padding them steals taps on the nearby world.
+    const hit = hits.at(x * width, y * height, this.nav.current === "play" ? 0 : touchSlop(this.shape));
     return hit?.kind === "panel" && this.nav.current === "play" ? null : hit;
   }
 
@@ -1360,12 +1686,9 @@ export class Game implements Shell {
       turn: (yaw, pitch) => this.#turnCamera(yaw, pitch),
       zoom: (factor) => this.#zoomCamera(factor),
       holdCamera: (held) => {
-        this.director.hand.held = held;
+        this.director.held = held;
       },
-      keepCamera: () => {
-        if (this.hands.view !== "eyes") this.director.hand.kept = true;
-      },
-      handBack: () => this.#handBack(),
+      home: () => this.#home(),
     };
   }
 
@@ -1374,7 +1697,7 @@ export class Game implements Shell {
     this.#grip = null;
     this.#controls.reset();
     this.#aim.active = false;
-    this.director.hand.held = false;
+    this.director.held = false;
   }
 
   /** A tap on something on the HUD. */
@@ -1433,7 +1756,7 @@ export class Game implements Shell {
         p.dy = (g.y - grip.y) * height;
         if (g.type === "up") {
           p.hit = this.#hitAt(g.x, g.y);
-          p.tap = g.tap;
+          p.tap = g.tap && sameTarget(grip.hit, p.hit);
           this.#grip = null;
         }
         break;
@@ -1469,7 +1792,10 @@ export class Game implements Shell {
     aim.onWorld = false;
     if (!follow) return false;
     const hit = this.#cast(x, y);
-    if (hit) this.hands.movePointer(hit.point, hit.normal);
+    if (hit) {
+      this.hands.movePointer(hit.point, hit.normal);
+      this.#learn("hand");
+    }
     aim.onWorld = !!hit;
     return !!hit;
   }
@@ -1545,13 +1871,14 @@ export class Game implements Shell {
   #variantChanged() {
     this.#changedAt = this.time;
     const id = this.hands.current.id;
+    if (id === "light" || id === "weather" || id === "view") this.#learn(id);
     if (id === "light" || id === "weather") {
       this.#followLight();
       this.online?.chooseWorld(this.hands.timeOfDay, this.hands.weather);
     }
     if (id === "view") this.#syncCamera();
-    // A table's light and weather aren't this player's own to come back to.
-    if (!this.online || (id !== "light" && id !== "weather")) this.#remember();
+    // A table's light and weather aren't this player's own to come back to; in a room open to everyone they are.
+    if (!this.online || this.online.everyone || (id !== "light" && id !== "weather")) this.#remember();
   }
 
   /** Keeps the kind just chosen, if it is one a launch comes back to. */
@@ -1570,15 +1897,10 @@ export class Game implements Shell {
     saveLearned(this.#learned);
   }
 
-  #unlearn() {
-    for (const lesson of Object.keys(this.#learned) as Lesson[]) delete this.#learned[lesson];
-    this.#taught++;
-    saveLearned(this.#learned);
-  }
-
   /** The finger moved on the touch surface: the pointer moves the same way across the screen, staying on the world. */
   #movePointer(dx: number, dy: number) {
     this.#touched = true;
+    this.#learn("hand");
     const camera = this.director.camera;
     const p = this.hands.pointer;
     const ndc = this.#ndc.set(p.x, p.y, p.z).project(camera);
@@ -1620,8 +1942,8 @@ export class Game implements Shell {
       hud.glyphs = glyphs;
       hud.teachSwipe = !this.#touched;
       hud.changed = this.time - this.#changedAt;
-      hud.spikes = this.meter.spikesPerSecond;
       hud.brainRunning = this.brain.status === "running";
+      hud.pressed = this.#controls.preview;
       if (this.#showEyes()) {
         const e = this.#eyesInfo;
         e.facets = this.eyes.facets;
@@ -1630,8 +1952,9 @@ export class Game implements Shell {
         hud.eyes = e;
       } else hud.eyes = null;
       const k = this.#hudKey;
-      const changed = k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught;
-      if (changed || hud.changed < 0.3 || this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS) {
+      const pressedChanged = k.pressed !== hud.pressed;
+      const changed = pressedChanged || k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught || k.here !== hud.here || k.fixed !== this.hands.fixed.has(this.hands.current.id) || k.outside !== this.hands.outside || k.surface !== this.hands.surface || k.running !== hud.brainRunning;
+      if (changed || hud.changed < 0.3 || ((stats || !hud.brainRunning || needsTeaching(hud)) && this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS)) {
         k.tool = this.hands.tool;
         k.variant = this.hands.variants[this.hands.tool];
         k.activity = hud.activity;
@@ -1641,13 +1964,17 @@ export class Game implements Shell {
         k.hints = hud.hints;
         k.eyes = !!hud.eyes;
         k.taught = this.#taught;
+        k.here = hud.here;
+        k.fixed = this.hands.fixed.has(this.hands.current.id);
+        k.outside = this.hands.outside;
+        k.surface = this.hands.surface;
+        k.running = hud.brainRunning;
+        k.pressed = hud.pressed ?? null;
         this.#hudAt = this.time;
         overlay.dirty = true;
       }
-      overlay.redraw(dt, current, (g, hits) => {
-        drawHud(g, this.time, hud, hits);
-        if (stats) drawStats(g, this, hud.layout.statsX, hud.layout.statsY);
-      });
+      overlay.redraw(dt, current, this.#drawPlay, pressedChanged);
+
       return;
     }
     const screen = this.screens[current];
@@ -1657,6 +1984,19 @@ export class Game implements Shell {
       if (stats) drawStats(g, this, this.#hudLayout.statsX, this.#hudLayout.statsY);
     });
   }
+
+  // Kept once, rather than allocating a new redraw closure on every frame.
+  #drawPlay = (g: CanvasRenderingContext2D, hits: HitMap) => {
+    const hud = this.#hud;
+    if (hud.hints && !this.#learned[this.hands.current.id] && !this.hands.fixed.has(this.hands.current.id)) {
+      const p = this.hands.pointer;
+      this.#ndc.set(p.x, p.y, p.z).project(this.director.camera);
+      hud.aimX = (this.#ndc.x + 1) * this.shape.design.width / 2;
+      hud.aimY = (1 - this.#ndc.y) * this.shape.design.height / 2;
+    }
+    drawHud(g, this.time, hud, hits);
+    if (this.settings.stats) drawStats(g, this, hud.layout.statsX, hud.layout.statsY);
+  };
 
   /** The regions glowing now, brightest first, as id:glow, for scripts to read the nervous system's state. */
   #glowSummary() {
@@ -1678,9 +2018,11 @@ export class Game implements Shell {
     const menu = shown === "play" ? null : (this.screens[shown] as { menu?: { focused?: { id: string } } }).menu;
     d.focus = menu?.focused?.id ?? "";
     // Whether the menus show their focus (the remote's, the keys', a pad's): hidden while a pointer is in use.
-    d.ring = String(shown !== "play" && this.#ringShown);
+    const semanticRing = (shown === "title" || shown === "settings" || shown === "online") && this.screens[shown].semanticFocus;
+    d.ring = String(shown !== "play" && (this.#ringShown || semanticRing));
     d.tab = shown === "settings" ? settingsTab(this.screens.settings) : "";
     if (shown === "online") this.screens.online.publish(d);
+    if (shown === "about") this.screens.about.publish(d);
     d.atRoot = String((window as unknown as Record<string, unknown>)[AT_ROOT_PROPERTY]);
     d.wallpaper = String(this.wallpaper);
     d.brain = life.brain.status;
@@ -1749,6 +2091,13 @@ export class Game implements Shell {
       const why = outside.error;
       console.log(`weather outside: ${outside.state}${why ? ` (${why})` : ""}`);
     }
+    // This device's flies: how many, the followed one's neighbours as its body meets them, and each other one as it lives (its table id, its brain,
+    // what it is doing, where, its eyes' pictures so far, and how many flies its body meets).
+    d.flies = String(this.flies);
+    d.crowd = String(life.crowd.count);
+    d.company = this.company.list
+      .map((c, i) => `${c.id}:${c.life.brain.status}:${c.life.activity}:${c.life.body.position.x.toFixed(2)},${c.life.body.position.z.toFixed(2)}:${this.eyes.companyUpdates(i)}:${c.life.crowd.count}:${c.colour}`)
+      .join(";");
     d.view = this.hands.view;
     d.place = this.#here;
     d.placeMs = this.stage.buildMs.toFixed(0);
@@ -1756,6 +2105,8 @@ export class Game implements Shell {
     d.moving = this.#moving ? this.#moving.to : "";
     d.table = this.online ? "yes" : "";
     d.roomName = this.online?.room?.name ?? "";
+    d.everyone = this.online?.everyone && this.online.welcomed ? "yes" : "";
+    d.autoJoin = !this.#auto ? "" : this.#auto.stopped ? "stopped" : this.#auto.trying ? "trying" : "waiting";
     this.online?.publish(d);
     d.speed = this.meter.speed.toFixed(2);
     d.gl = this.glLost ? "lost" : "ok";
@@ -1777,7 +2128,8 @@ export class Game implements Shell {
     }
     d.device = this.devices.current;
     d.frame = `${this.shape.width}x${this.shape.height}`;
-    d.looking = String(this.director.handled);
+    d.yaw = this.director.yaw.toFixed(4);
+    d.pitch = this.director.pitch.toFixed(4);
     d.reach = this.director.reach.toFixed(1);
   }
 }

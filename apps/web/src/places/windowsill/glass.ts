@@ -2,7 +2,9 @@
 // on the glass.
 
 import * as THREE from "three";
-import { LAMP } from "./light.ts";
+import { SILL, WINDOW } from "@fly/world";
+import { FRAME_HEAD, LAMP, sunlit } from "./light.ts";
+import type { Sunlight } from "./light.ts";
 import { NOISE } from "./surfaces.ts";
 
 const f = (n: number) => n.toFixed(1);
@@ -26,6 +28,7 @@ export function windowGlass() {
     uLampColor: { value: new THREE.Color("#ffd29a") },
     uRain: { value: 0 },
     uWet: { value: 0 },
+    uFrost: { value: 0 },
     uTime: { value: 0 },
     /** The light outside, as a drop shows it (a drop is a lens: the sky in it is at its foot). */
     uOutside: { value: new THREE.Color() },
@@ -52,6 +55,7 @@ uniform vec3 uRoom;
 uniform vec3 uLampColor;
 uniform float uRain;
 uniform float uWet;
+uniform float uFrost;
 uniform float uTime;
 uniform vec3 uOutside;
 uniform vec3 uGlint;
@@ -143,6 +147,13 @@ void main() {
     c = c * (1.0 - wet.a) + (wet.rgb + room * mirror) * wet.a;
     a = a + wet.a * (1.0 - a);
   }
+  float xFrame = abs(mod(vWorld.x + 80.0, 160.0) - 80.0);
+  float yFrame = min(abs(vWorld.y - 34.0), min(abs(vWorld.y - 300.0), abs(vWorld.y - 560.0)));
+  float rim = max(1.0 - smoothstep(0.0, 24.0, xFrame), 1.0 - smoothstep(0.0, 42.0, yFrame));
+  float fern = pow(abs(sin(vWorld.x * 0.16 + vWorld.y * 0.1)), 12.0);
+  float frost = uFrost * rim * (0.35 + 0.65 * fern) * (0.55 + 0.45 * vnoise(vWorld.xy * 0.12));
+  c = c * (1.0 - frost) + mix(uOutside, vec3(0.85, 0.92, 1.0), 0.6) * frost;
+  a += frost * (1.0 - a);
   gl_FragColor = vec4(c / max(a, 1e-3), a);
 }`,
   });
@@ -169,5 +180,36 @@ diffuseColor.a = clamp(0.16 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
     );
   };
   material.customProgramCacheKey = () => "windowsill-water";
+  return material;
+}
+
+/** The bottle shows a clear centre and thick green edges, with the window reflected in its curved wall. */
+export function bottleMaterial(sunlight: Sunlight) {
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.06, metalness: 0, transparent: true, depthWrite: false, envMapIntensity: 1.3 });
+  sunlit(material, sunlight, "bottle", {
+    extra(shader) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <opaque_fragment>",
+        /* glsl */ `
+float facing = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
+float edge = pow(1.0 - facing, 3.0);
+vec3 reflected = inverseTransformDirection(reflect(-normalize(vViewPosition), normal), viewMatrix);
+float toPane = (${f(WINDOW.glass)} - vWorld.z) / min(reflected.z, -0.0001);
+vec2 pane = vWorld.xy + reflected.xy * toPane;
+vec2 aa = max(fwidth(pane), vec2(1.0));
+float opening = (1.0 - smoothstep(${f(SILL.hx - WINDOW.jamb.width)} - aa.x, ${f(SILL.hx - WINDOW.jamb.width)} + aa.x, abs(pane.x)))
+  * smoothstep(${f(WINDOW.rail.top)} - aa.y, ${f(WINDOW.rail.top)} + aa.y, pane.y)
+  * (1.0 - smoothstep(${f(FRAME_HEAD)} - aa.y, ${f(FRAME_HEAD)} + aa.y, pane.y));
+opening *= smoothstep(${f(WINDOW.mullion.half)} - aa.x, ${f(WINDOW.mullion.half)} + aa.x, abs(pane.x));
+opening *= step(0.0, toPane) * step(reflected.z, -0.001);
+vec3 windowLight = mix(vec3(0.7, 0.86, 1.0), uRoom * 0.2, uLamp);
+outgoingLight += windowLight * opening * (0.04 + edge * 0.6);
+// Multiple paths through the curved wall darken the rim, while the wine remains visible through the middle.
+outgoingLight *= mix(1.0, 0.75, edge);
+diffuseColor.a = clamp(0.24 + edge * 0.65 + opening * (0.08 + edge * 0.2), 0.0, 0.94);
+#include <opaque_fragment>`,
+      );
+    },
+  });
   return material;
 }
