@@ -223,7 +223,7 @@ All three scoring reviewers ranked the retained result over the original for bot
 
 The strongest result is the quieter, correctly scaled painted sill. The lab gains clearer outside layers, less intrusive notebook/window striping, stronger lamp-source cues and a better separated beaker liquid. No solids or food changed. Remaining weaknesses include glass optics, night shadow banding and equipment separation, simplified exterior foliage, and fly visibility in whole-place framing. A useful next experiment would be a restrained millimetre calibration mark or slide near the fly, alongside better local night lighting; camera work remains outside this experiment.
 
-The visual gains are worth maintainer review. Keep the PR draft: the score target was not reached and unrelated validation failures remain. It has never been marked ready or merged.
+The visual gains are worth landing under the owner's revised local-check process: the final matched blind panel preferred the retained scenes over the original for both places. The 9/10 target remains unmet. Further attempts belong in separate branches and PRs, one validated round at a time.
 
 
 ## Final checks on the rebased branch
@@ -231,3 +231,12 @@ The visual gains are worth maintainer review. Keep the PR draft: the score targe
 The final branch includes the current dev camera/menu/room fixes without editing those systems. `places.test.ts` now passes **33/33**, including the incoming whole-place screensaver cases. Lint and typecheck pass. The final paired original/selected build medians are **39.25 / 39.35 ms** for the sill (+0.25%) and **42.3 / 42.55 ms** for the lab (+0.59%); 12 alternating warm samples each. The selected lab adds one draw; the sill adds none. These are desktop measurements, not TV timings. R8's 42 final screenshots have no shader/browser errors.
 
 The earlier play e2e run passed. Its final rerun after rebasing failed at the known nervous-system check, `its brain’s regions glow at rest`, while still in the untouched picnic scene. The failure is recorded alongside the unchanged brain CPU-budget failure; neither is claimed green. The original full npm test run's main suite was green (732 pass, 2 skip), but its serialized brain budget and targeted retry failed. No brain, camera, bar or restaurant code was changed by this branch.
+
+
+## Integration with current dev
+
+Merged `origin/dev` at `1ebc3a446892349e88d1ff1dbf7c719f2d2ca3f2` with a merge commit, retaining its input, collision, geometry-alignment and test-runner changes. Local typecheck and lint pass. The place, drawn-versus-felt and world suites pass **60/60**, including every sampled indoor top and side.
+
+The incoming geometry-count fixture recorded the collision-repair baseline. Its explicit indoor counts now include the already reviewed decoration and liquid: sill **15 meshes / 62,304 triangles** (+160 triangles), lab **10 meshes / 71,756 triangles** (+1 mesh / 736 triangles). Physical alignment assertions and all other places' budgets are retained. The one additional lab draw remains within the task's two-draw allowance.
+
+The earlier full-suite budget and e2e failures above remain historical results; those suites were not rerun for this integration. The owner now requests local typecheck, lint and area tests followed by a ready PR, without waiting for GitHub CI. PR #74 meets that handoff threshold.
