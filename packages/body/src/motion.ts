@@ -25,10 +25,12 @@
 //   drawn back toward it near the edges of the world, sliding round
 //   anything standing in its way back.
 // - Turning away from a wall it has been pressed against, facing it, for
-//   WALL_PATIENCE seconds. The brain feels the wall on its antennae and
-//   grooms them, but nothing in the model turns it away or backs it off (a
-//   real fly's touched antenna drives MDN; here no route from Johnston's
-//   organ to MDN is strong enough: packages/brain/README.md).
+//   WALL_PATIENCE seconds. The brain feels the wall on its antennae, stops
+//   and grooms them, but nothing in the model turns it away or backs it off
+//   (a real fly's touched antenna drives MDN and turns it from that side;
+//   here no antennal sensory neuron reaches MDN or the far side's DNa02
+//   through more than a couple of dozen synapses: packages/brain/README.md,
+//   A push on an antenna → backing away, or turning from it).
 // - Landing: touching down on something it can stand on puts it on its feet.
 // - Lining its mouth up with food the brain has already decided to eat
 //   (FEED_ALIGN): stopping is the brain's doing, the last shuffle isn't.

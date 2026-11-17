@@ -14,17 +14,17 @@ import path from "node:path";
 import { WebSocket } from "ws";
 import {
   BITES, DROP_ID, EVERYONE, EVERYONE_ROOMS, FLIES, FLY, FOUND_ID, HANDS, MAX_FLIES, MAX_OWN, PROTOCOL, ROOMS_PATH, TABLE_LIGHTS, TABLE_WEATHERS, WIRE_FOODS_MAX,
-  createFlyState, decodeFlies, encodeBites, encodeOwn, everyoneCode, everyoneIndex, readServerMessage, stream,
+  EVERYONE_SERIES, createFlyState, decodeFlies, encodeBites, encodeOwn, everyoneCode, everyoneIndex, readServerMessage, seriesCode, stream,
 } from "@fly/net";
 import type { ClientMessage, ServerMessage, TableStart } from "@fly/net";
 import { WORLDS } from "@fly/world";
 import { hashKey, isHello, startServer } from "../src/server.ts";
-import { REMOVED_MAX, Table, everyonePlace, isTableRecord } from "../src/table.ts";
+import { REMOVED_MAX, Table, isTableRecord, placeOf } from "../src/table.ts";
 import type { Link, Seat } from "../src/table.ts";
 import { Tables } from "../src/tables.ts";
 
 const PLACES = Object.keys(WORLDS);
-const CODES = ["23456789ab", "bcdefghjkm", "npqrstuvwx", EVERYONE, everyoneCode(1), everyoneCode(EVERYONE_ROOMS - 1), everyoneCode(EVERYONE_ROOMS)];
+const CODES = ["23456789ab", "bcdefghjkm", "npqrstuvwx", EVERYONE, everyoneCode(1), everyoneCode(EVERYONE_ROOMS - 1), seriesCode(1), seriesCode(EVERYONE_SERIES - 1, 1), everyoneCode(EVERYONE_ROOMS * EVERYONE_SERIES)];
 const KEYS = 32;
 
 /** What a device could send, drawn from a seed. */
@@ -248,7 +248,7 @@ export function fuzzTable(seed: number, until: () => boolean) {
         assert.equal(t.lock, null);
         assert.equal(t.starter, null);
         assert.deepEqual(t.worldWire, { light: "clock", weather: "now" });
-        if (ticked && t.present > 0) assert.equal(t.place, everyonePlace(clock.wall));
+        if (ticked && t.present > 0) assert.equal(t.place, placeOf(t.code, clock.wall));
       }
       assert.ok(t.seats.size <= MAX_FLIES);
       assert.ok(t.food.foods.length <= WIRE_FOODS_MAX, `${t.food.foods.length} foods`);
@@ -275,10 +275,14 @@ export function fuzzTable(seed: number, until: () => boolean) {
       }
     }
     everyone.sort((a, b) => everyoneIndex(a.code) - everyoneIndex(b.code));
-    assert.ok(everyone.length > 0, "Everyone always exists");
-    assert.deepEqual(everyone.map((t) => t.code), everyone.map((_, i) => everyoneCode(i)));
+    // Each series opens its rooms in order, its first always.
+    for (let series = 0; series < EVERYONE_SERIES; series++) {
+      const of = everyone.filter((t) => Math.floor(everyoneIndex(t.code) / EVERYONE_ROOMS) === series);
+      assert.ok(of.length > 0, `series ${series} always exists`);
+      assert.deepEqual(of.map((t) => t.code), of.map((_, i) => seriesCode(series, i)));
+    }
     const listed = tables.listed();
-    const visible = everyone.filter((t) => t.code === EVERYONE || t.present > 0);
+    const visible = everyone.filter((t) => everyoneIndex(t.code) % EVERYONE_ROOMS === 0 || t.present > 0);
     assert.deepEqual(listed.slice(0, visible.length), visible.map((t) => t.room()));
     for (const room of listed) if (everyoneIndex(room.code) >= 0) assert.equal(room.everyone, true);
   }

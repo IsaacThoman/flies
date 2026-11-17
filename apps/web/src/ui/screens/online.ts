@@ -1,26 +1,29 @@
 // Playing with others online: rooms of up to 128 flies
 // (docs/online.md). Few words, one pane, four faces:
 //
-// - the rooms: a new one, a code to type, and every listed room with someone
-//   in it, by its name, its place's colour, its flies as pips and a padlock
-//   if it has a password, the rooms open to everyone first, each with a
-//   globe; the list follows the room server as it changes;
+// - the rooms: Go online (or Disconnect, while it is on the way to its
+//   room), a new one, a code to type, and every listed room with someone in
+//   it, by its name, its place's colour, its flies as pips and a padlock if
+//   it has a password, the rooms open to everyone first (Everyone's, then
+//   each place's), each with a globe; the list follows the room server as it
+//   changes;
 // - a new room: its name (one is suggested), its place, whether it is listed
 //   or only reached by its link, and a password if it is to have one;
 // - a locked room's door: its password;
 // - at a room: its name, a button to hand its link on (where there is a way
-//   to: not on the Apple TV), one to leave, and for whoever started it each
-//   other fly by its player's colour, to take it off; beside them, the room's
-//   QR code for a phone to scan and its code to type. Who is there shows in
-//   the world itself, a dab of each player's colour on their fly. In a room
-//   open to everyone (where a device is by default), also the rooms, to go
-//   to another from: the list, with this room still about the fly until
-//   another is chosen.
+//   to: not on the Apple TV), and for whoever started it each other fly by
+//   its player's colour, to take it off; beside them, the room's QR code for
+//   a phone to scan and its code to type. Who is there shows in the world
+//   itself, a dab of each player's colour on their fly. In a room open to
+//   everyone (where a device is by default), Browse rooms, to go to another
+//   from: the list, with this room still about the fly until another is
+//   chosen; in one of someone's own, Leave the room, back to everyone. Then
+//   Disconnect, to be alone until going online again.
 //
 // What goes wrong is said in the heading's place, briefly, in pink.
 
 import type { RemoteButton } from "@fly/contracts";
-import { CODE_LENGTH, MAX_FLIES, PASSWORD_MAX, ROOM_NAME_MAX, isTableCode, roomName } from "@fly/net";
+import { CODE_LENGTH, MAX_FLIES, PASSWORD_MAX, ROOM_NAME_MAX, everyoneSeries, isTableCode, roomName } from "@fly/net";
 import { Menu, choiceValue, indexOf } from "@fly/ui";
 import type { ChoiceItem, FieldItem, HitMap, MenuItem, Option } from "@fly/ui";
 import type { Frame } from "../../display.ts";
@@ -165,10 +168,13 @@ export class OnlineScreen implements Screen {
     const shell = this.#shell;
     switch (this.view) {
       case "rooms": {
-        const rows: MenuItem[] = [
+        const rows: MenuItem[] = [];
+        // Not looking from a room: whether it is with everyone (on its way, or unable to reach them) or alone by choice.
+        if (!this.#looking && shell.canPlayOnline) rows.push(shell.isOnline ? { kind: "action", id: "disconnect", label: "Disconnect" } : { kind: "action", id: "online", label: "Go online" });
+        rows.push(
           { kind: "action", id: "new", label: "New room", disabled: !shell.canPlayOnline || this.#incompatible() },
           { kind: "field", id: "code", label: "Code", value: this.#code, disabled: !shell.typing || this.#incompatible(), submit: { label: "Join", disabled: !this.#codeValid } },
-        ];
+        );
         const rooms = shell.rooms;
         const status = shell.lobbyStatus;
         const unavailable = status === "lost" || status === "stale" || this.#incompatible();
@@ -180,7 +186,9 @@ export class OnlineScreen implements Screen {
         for (const r of rooms ?? []) {
           // A full room open to everyone sends whoever chooses it on to the next.
           const everyone = r.everyone === true;
-          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, hint: isPlaceId(r.place) ? placeInfo(r.place).name : undefined, swatch: colourOf(r.place), description: isPlaceId(r.place) ? placeInfo(r.place).name : r.place, count: [r.flies, MAX_FLIES], countLabel: `${r.flies}/${MAX_FLIES}`, locked: r.locked, everyone, disabled: unavailable || (r.flies >= MAX_FLIES && !everyone) });
+          // A place's own room is called what its place is: Everyone's say where they are now.
+          const where = isPlaceId(r.place) && !(everyone && everyoneSeries(r.code) > 0) ? placeInfo(r.place).name : undefined;
+          rows.push({ kind: "action", id: `room:${r.code}`, label: r.name, hint: where, swatch: colourOf(r.place), description: where ?? (isPlaceId(r.place) ? undefined : r.place), count: [r.flies, MAX_FLIES], countLabel: `${r.flies}/${MAX_FLIES}`, locked: r.locked, everyone, disabled: unavailable || (r.flies >= MAX_FLIES && !everyone) });
         }
         return rows;
       }
@@ -210,8 +218,9 @@ export class OnlineScreen implements Screen {
         const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
         const rows: MenuItem[] = shell.canShare ? [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", disabled: !table.joined }] : [];
         if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", description: `Player ${o.id}, ${o.colours.length} ${o.colours.length === 1 ? "fly" : "flies"}`, swatch: o.colours });
-        if (table.everyone) rows.push({ kind: "action", id: "rooms", label: "Other rooms" });
-        rows.push({ kind: "action", id: "leave", label: "Leave the room" });
+        if (table.everyone) rows.push({ kind: "action", id: "rooms", label: "Browse rooms" });
+        else rows.push({ kind: "action", id: "leave", label: "Leave the room" });
+        rows.push({ kind: "action", id: "disconnect", label: "Disconnect" });
         return rows;
       }
     }
@@ -240,7 +249,7 @@ export class OnlineScreen implements Screen {
     const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
     const rooms = shell.rooms ? shell.rooms.map((r) => `${r.code}:${r.name}:${r.place}:${r.flies}:${r.locked}`).join(",") : "?";
     const at = table ? `${table.name}|${shell.here}|${table.joined}|${table.starting}|${table.everyone}|${this.#looking}|${copied}|${table.others.map((o) => `${this.#removalId(o)}/${o.colours.length}`).join(",")}` : "alone";
-    return `${this.view}|${this.#note}|${this.#codeValid}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}|${shell.lobbyStatus}`;
+    return `${this.view}|${this.#note}|${this.#codeValid}|${at}|${this.view === "rooms" ? rooms : ""}|${!!this.#password}|${shell.knock?.name}|${shell.canPlayOnline}|${shell.isOnline}|${shell.lobbyStatus}`;
   }
 
   #build(focus?: string) {
@@ -324,9 +333,18 @@ export class OnlineScreen implements Screen {
         this.#refresh("share");
       });
     } else if (id === "leave") {
+      // Back to everyone, in the place it lives: its card once the room there has let it in.
       shell.leaveTable();
       this.view = "rooms";
-      this.#refresh("new");
+      this.#refresh("disconnect");
+    } else if (id === "disconnect") {
+      shell.disconnect();
+      this.#looking = false;
+      this.view = "rooms";
+      this.#refresh("online");
+    } else if (id === "online") {
+      shell.goOnline();
+      this.#refresh("disconnect");
     } else if (id.startsWith("remove:")) {
       const other = shell.table?.others.find((o) => this.#removalId(o) === id);
       if (other) shell.removeFly(other.id);
@@ -392,9 +410,10 @@ export class OnlineScreen implements Screen {
     this.#shell.menuChanged?.();
   }
 
+  /** Opened: at the top of the view (or a door's password), not wherever the focus was left last time. */
   enter() {
     this.#reconcile();
-    this.#refresh(this.view === "door" ? "password" : undefined);
+    this.#refresh(this.view === "door" ? "password" : "");
     this.#atDoor();
   }
 
@@ -423,7 +442,8 @@ export class OnlineScreen implements Screen {
     this.#reconcile();
     // Someone came or went, a room opened or filled, the room answered, or "Link copied" has had its moment.
     if (this.#key() !== this.#shape) {
-      this.#refresh(view !== this.view ? (this.view === "door" ? "password" : undefined) : undefined);
+      // Another view: at its top (or a door's password), not on a row that happens to share an id.
+      this.#refresh(view !== this.view ? (this.view === "door" ? "password" : "") : undefined);
       if (view !== this.view) this.#atDoor();
       return true;
     }

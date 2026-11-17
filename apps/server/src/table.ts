@@ -18,8 +18,8 @@ import { BALL_RADIUS, Pace, VentilationClock, World, WORLDS, hourOfDay } from "@
 import type { Happening } from "@fly/world";
 import {
   KINDS, forecast, MAX_FOUND, AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_FLIES, MAX_OWN, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
-  TABLE_PLACES, TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, decodeFlies, encodeFlies, everyoneIndex, everyoneName,
-  isTableCode, mayReturnTo, mix, roomName, roomTime, spawnSpot, stream, tableHours, toWire, wireScale,
+  TABLE_PLACES, TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, decodeFlies, encodeFlies, everyoneIndex, everyoneName, everyoneSeries,
+  isTableCode, mayReturnTo, mix, roomName, roomTime, seriesPlace, spawnSpot, stream, tableHours, toWire, wireScale,
 } from "@fly/net";
 import type {
   BallWire, ClientMessage, FlyState, FoodWire, HappeningWire, PlayerWire, Refusal, RoomInfo, RoomWire, SeatedFly, ServerMessage, Spot, TableStart, V3,
@@ -47,11 +47,14 @@ export type Going = Happening | "ventilation";
 /** Seconds each visitor keeps the table busy, roughly, so the table doesn't send another of it meanwhile (the ventilation keeps its own clock). */
 const BUSY: Readonly<Record<Going, number>> = { gust: 10, gull: 80, leaf: 40, butterfly: 100, ladybird: 120, juice: 0, boat: 240, ventilation: 0 };
 
-/** A room open to everyone stays in each place this long (ms), then moves on to the next, by the wall clock: every server agrees where it is. */
+/** Everyone's rooms stay in each place this long (ms), then move on to the next, by the wall clock: every server agrees where they are. */
 export const EVERYONE_TURN = 20 * 60_000;
 
-/** Where the rooms open to everyone are at this moment (ms since 1970). */
+/** Where Everyone's rooms, which take turns, are at this moment (ms since 1970). */
 export const everyonePlace = (wall: number) => TABLE_PLACES[Math.floor(wall / EVERYONE_TURN) % TABLE_PLACES.length];
+
+/** Where a room open to everyone is at this moment: a place's own rooms stay there; Everyone's take turns. */
+export const placeOf = (code: string, wall: number) => seriesPlace(everyoneSeries(code)) ?? everyonePlace(wall);
 
 /** The weather a room open to everyone has for its own goings-on: none of note, since each device there has its own sky. */
 const CALM = Object.freeze({ cloud: 0, mist: 0, rain: 0, wind: 0.4 });
@@ -255,8 +258,8 @@ export class Table {
     this.#options = options;
     this.seed = seed >>> 0;
     this.created = record?.created ?? options.wall();
-    // A room open to everyone is wherever the clock has it, whatever was kept.
-    this.place = this.everyone ? everyonePlace(options.wall()) : Object.hasOwn(WORLDS, start.place) ? start.place : "picnic";
+    // A room open to everyone is in its own place, or wherever the clock has Everyone's, whatever was kept.
+    this.place = this.everyone ? placeOf(code, options.wall()) : Object.hasOwn(WORLDS, start.place) ? start.place : "picnic";
     // Moved on while the server was down: what was kept is of another place, and a device still there must know it isn't.
     const moved = !!record && record.place !== this.place;
     this.epoch = ((record?.epoch ?? 0) + (moved ? 1 : 0)) & 0xff;
@@ -343,9 +346,9 @@ export class Table {
     return { name: this.name, listed: this.listed, locked: !!this.lock, code: this.code, everyone: this.everyone };
   }
 
-  /** A room open to everyone nobody is in keeps no beat, so not its place either: the list says where the clock has it, where whoever comes is sat (Tables.everyone). */
+  /** A room open to everyone nobody is in keeps no beat, so not its place either: the list says where it is now, where whoever comes is sat (Tables.everyone). */
   room(): RoomWire {
-    const place = this.everyone ? everyonePlace(this.#options.wall()) : this.place;
+    const place = this.everyone ? placeOf(this.code, this.#options.wall()) : this.place;
     return { code: this.code, name: this.name, place, flies: this.taken, locked: !!this.lock, ...(this.everyone ? { everyone: true } : {}) };
   }
 
@@ -600,10 +603,10 @@ export class Table {
     return seat;
   }
 
-  /** A room open to everyone moves on when the clock says, everyone there together. Returns the table. */
+  /** One of Everyone's rooms moves on when the clock says, everyone there together; a place's own stays. Returns the table. */
   keepTurn(): this {
     if (!this.everyone) return this;
-    const turn = everyonePlace(this.#options.wall());
+    const turn = placeOf(this.code, this.#options.wall());
     if (turn !== this.place) this.moveTo(turn);
     return this;
   }

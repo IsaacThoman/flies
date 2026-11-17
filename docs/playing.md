@@ -223,8 +223,9 @@ the real weather), **On screen** (everything that can show over the world:
 what it sees, its nervous system and its stats in the corners, what the
 stats are of, the corners' size and opacity, and the X-ray), and **Picture**
 (pixel size, the eyes' detail, Hints, rumble, frame stats). Where it
-can be online, Screensaver also has Join others (sitting with everyone by
-default), and the menu has **Online**, rooms shared with others. The title menu shows all its rows: on a screen too short for its rows (a phone on its side) they are
+can be online, the menu has **Online**, rooms shared with others: the game
+sits with everyone where the fly lives by default, and Online → Disconnect
+plays alone until Go online. The title menu shows all its rows: on a screen too short for its rows (a phone on its side) they are
 in two columns, Left and Right going across, Up and Down along the list as
 ever. Where the settings' tabs are too
 narrow to read (the smallest phones), they are one choice, the tab shown

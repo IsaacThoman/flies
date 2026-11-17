@@ -1,13 +1,14 @@
 // Sitting with everyone waits for the brain and the network, gives up quietly,
-// and never undoes a player's choice to leave.
+// never undoes a player's choice to disconnect, and follows the place chosen
+// to that place's room.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { EVERYONE, everyoneCode } from "@fly/net";
+import { EVERYONE, EVERYONE_SERIES, everyoneCode, seriesCode, seriesFor } from "@fly/net";
 import { ATTEMPT, AutoJoin, RETRY } from "../src/online/auto-join.ts";
 import type { AutoJoinNow } from "../src/online/auto-join.ts";
 
-const READY: AutoJoinNow = { enabled: true, awake: true, network: true, atRoom: false };
+const READY: AutoJoinNow = { enabled: true, awake: true, network: true, atRoom: false, series: 0, atSeries: -1 };
 const TRYING: AutoJoinNow = { ...READY, atRoom: true };
 
 test("joining waits until the brain is awake, the setting is on, a network is available and no room is occupied", () => {
@@ -85,8 +86,8 @@ test("a welcome ends the try and resets the next failure to the shortest delay",
   assert.equal(auto.update(0.25, READY, false, false), "join");
 });
 
-test("leaving, losing the seat to another window, an unknown room or removal stops joining for the launch", () => {
-  for (const reason of ["left", "elsewhere", "unknown", "removed"] as const) {
+test("losing the seat to another window, an unknown room or removal stops joining for the launch", () => {
+  for (const reason of ["elsewhere", "unknown", "removed"] as const) {
     const auto = new AutoJoin(null);
     assert.equal(auto.update(0, READY, false, false), "join");
     auto.ended(reason);
@@ -98,8 +99,8 @@ test("leaving, losing the seat to another window, an unknown room or removal sto
   }
 });
 
-test("a full or busy room is tried again later with increasing delays", () => {
-  for (const reason of ["full", "busy"] as const) {
+test("a full or busy room, or one left, is tried again later with increasing delays", () => {
+  for (const reason of ["full", "busy", "left"] as const) {
     const auto = new AutoJoin(null);
     assert.equal(auto.update(0, READY, false, false), "join");
     for (const wait of RETRY.slice(0, 2)) {
@@ -124,7 +125,40 @@ test("resuming after a stop permits an immediate try while still respecting the 
   assert.equal(auto.update(0, READY, false, false), "join");
 });
 
-test("the last room is kept only if it was open to everyone", () => {
+test("the last room is kept only if it was open to everyone, and only for its own series", () => {
   for (const code of [EVERYONE, everyoneCode(7), everyoneCode(63)]) assert.equal(new AutoJoin(code).code, code);
   for (const code of [null, "abcdefghjk"]) assert.equal(new AutoJoin(code).code, EVERYONE);
+  const auto = new AutoJoin(everyoneCode(7));
+  const lab = seriesFor("lab");
+  assert.ok(lab > 0 && lab < EVERYONE_SERIES);
+  assert.equal(auto.update(0, { ...READY, series: lab }, false, false), "join");
+  assert.equal(auto.code, seriesCode(lab), "another place's: the first of its rooms");
+  auto.at(seriesCode(lab, 3));
+  assert.equal(auto.code, seriesCode(lab, 3), "where it was let in, to come back to");
+  auto.at("abcdefghjk");
+  assert.equal(auto.code, seriesCode(lab, 3), "a room of someone's own is not where it comes back to by default");
+  assert.equal(seriesFor("turns"), 0);
+});
+
+test("a device in another place's room than the one it lives in goes to its own at once, as a try, and never while disconnecting", () => {
+  const auto = new AutoJoin(null);
+  const lab = seriesFor("lab");
+  const kitchen = seriesFor("kitchen");
+  assert.equal(auto.update(0, READY, false, false), "join");
+  assert.equal(auto.update(0, TRYING, true, false), null);
+  const there = { ...TRYING, atSeries: 0 };
+  assert.equal(auto.update(1, there, true, false), null, "where it belongs");
+  assert.equal(auto.update(0, { ...there, series: lab }, true, false), "switch");
+  assert.equal(auto.code, seriesCode(lab));
+  assert.equal(auto.trying, true);
+  // On the way: not welcomed yet, so in no room's series.
+  assert.equal(auto.update(0, { ...TRYING, series: lab }, false, false), null);
+  assert.equal(auto.update(0, { ...TRYING, series: lab, atSeries: lab }, true, false), null);
+  assert.equal(auto.trying, false);
+  assert.equal(auto.update(0, { ...TRYING, series: kitchen, atSeries: lab, enabled: false }, true, false), null);
+  // A switch that isn't let in in time is given up like any try.
+  assert.equal(auto.update(0, { ...TRYING, series: kitchen, atSeries: lab }, true, false), "switch");
+  assert.equal(auto.update(ATTEMPT + 0.25, { ...TRYING, series: kitchen }, false, false), "abandon");
+  assert.equal(auto.update(RETRY[0] - 0.25, { ...READY, series: kitchen }, false, false), null);
+  assert.equal(auto.update(0.25, { ...READY, series: kitchen }, false, false), "join");
 });

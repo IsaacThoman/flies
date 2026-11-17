@@ -7,7 +7,7 @@ import { performance } from "node:perf_hooks";
 import { after, test } from "node:test";
 import { WebSocket } from "ws";
 import { createPicnic } from "@fly/world";
-import { CLOSE, COLOURS, EVERYONE, FLY_MAX, MAX_FLIES, MAX_OWN, OWN_MAX, PROTOCOL, ROOMS_PATH, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, encodeOwn, everyoneCode, tableCode } from "@fly/net";
+import { CLOSE, COLOURS, EVERYONE, EVERYONE_SERIES, FLY_MAX, MAX_FLIES, MAX_OWN, OWN_MAX, PROTOCOL, ROOMS_PATH, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, encodeOwn, everyoneCode, tableCode } from "@fly/net";
 import type { ClientMessage, FlyState, RoomWire, ServerMessage, Spot, TableStart } from "@fly/net";
 import { startServer } from "../src/server.ts";
 import type { RoomServer } from "../src/server.ts";
@@ -222,7 +222,8 @@ test("two devices at a table hear each other's flies in the room's batches, and 
   const body = (await health.json()) as Record<string, unknown>;
   assert.equal(body.ok, true);
   assert.equal(body.protocol, PROTOCOL);
-  assert.equal(body.tables, 2);
+  // This one, and the first room of each series open to everyone, which the server opens as it starts.
+  assert.equal(body.tables, 1 + EVERYONE_SERIES);
   assert.equal(body.devices, 2);
   assert.equal(body.flies, 2);
 });

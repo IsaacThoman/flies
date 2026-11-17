@@ -364,7 +364,7 @@ const CLOCK_SHIFT = ((((MORNING - start.getHours() - start.getMinutes() / 60 - s
  * apps/web/src/quality.ts (0, the full one) instead of following how fast this machine draws,
  * which without a GPU would draw the fly in pixels too big for the X-ray; the screensaver never
  * comes by itself (Never, as the saved setting), however long a step takes; the fly stays alone
- * (Join others off) unless `joinOthers`, so that only a test of playing with others sits with
+ * (disconnected) unless `joinOthers`, so that only a test of playing with others sits with
  * everyone; and the clock reads morning, whatever the hour, so the fly is awake rather than
  * asleep on the real night's clock. The tests check what the game does; the steps about the
  * screensaver bring it themselves.
