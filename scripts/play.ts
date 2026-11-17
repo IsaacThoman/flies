@@ -207,7 +207,7 @@ export async function swipe(page: Page, from: Pt, to: Pt, steps = 12) {
 }
 
 /** Until the game is drawing and has published its state. */
-export const gameUp = (page: Page) => page.waitForFunction(() => !!(document.getElementById("game") as HTMLCanvasElement | null)?.dataset.screen, null, { timeout: 30_000 });
+export const gameUp = (page: Page, timeout = 30_000) => page.waitForFunction(() => !!(document.getElementById("game") as HTMLCanvasElement | null)?.dataset.screen, null, { timeout });
 
 /** A point on the canvas (0 to 1 across and down) in the page's CSS pixels. */
 export async function canvasPoint(page: Page, [x, y]: Pt) {

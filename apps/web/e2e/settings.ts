@@ -2,9 +2,13 @@ import type { Page } from "playwright";
 import type { Game } from "../src/game.ts";
 import { gameUp, readState, waitFor } from "../../../scripts/play.ts";
 
-/** Idle time on a slow runner must not hide the controls between steps. */
+/**
+ * Idle time on a slow runner must not hide the controls between steps. A tab
+ * opened beside others already living several brains can take longer than 30 s
+ * to draw its first frame on a CI runner, so this waits as long as a brain may.
+ */
 export async function disableScreensaver(page: Page) {
-  await gameUp(page);
+  await gameUp(page, 120_000);
   await page.evaluate(() => {
     (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 0;
   });
