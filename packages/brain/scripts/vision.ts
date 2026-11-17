@@ -62,6 +62,9 @@ export const STAGES: readonly (readonly [string, readonly (string | RegExp)[]])[
   ["L1", ["L1"]],
   ["L2", ["L2"]],
   ["L3", ["L3"]],
+  ["L5", ["L5"]],
+  ["C2", ["C2"]],
+  ["C3", ["C3"]],
   ["Mi1", ["Mi1"]],
   ["Tm3", ["Tm3"]],
   ["Mi4", ["Mi4"]],
@@ -70,7 +73,10 @@ export const STAGES: readonly (readonly [string, readonly (string | RegExp)[]])[
   ["Tm2", ["Tm2"]],
   ["Tm4", ["Tm4"]],
   ["Tm9", ["Tm9"]],
-  ["T4", [/^T4[a-d]$/]],
+  ["T4a", ["T4a"]],
+  ["T4b", ["T4b"]],
+  ["T4c", ["T4c"]],
+  ["T4d", ["T4d"]],
   ["T5a", ["T5a"]],
   ["T5b", ["T5b"]],
   ["T5c", ["T5c"]],
@@ -172,7 +178,7 @@ function main() {
   for (const stimulus of battery) rows.push([stimulus, measure(connectome, stimulus, { seed: Number(values.seed), operatingPoint, retina })]);
   const cell = (x: number) => (Math.abs(x) < 0.05 ? "." : Math.abs(x) >= 99.5 ? x.toFixed(0) : x.toFixed(1)).padStart(6);
   const width = Math.max(...battery.map((s) => s.name.length)) + 2;
-  const halves = [STAGES.slice(0, 18), STAGES.slice(18)];
+  const halves = [STAGES.slice(0, 24), STAGES.slice(24)];
   halves.forEach((half, h) => {
     const offset = h === 0 ? 0 : halves[0].length;
     console.log(`\n${"".padEnd(width)}${half.map(([label]) => label.padStart(6)).join("")}`);

@@ -108,15 +108,17 @@ std::string digest(const fly::Simulation& sim) {
   return buffer;
 }
 
-// FNV-1a over the bits of both retinas' rates, as doubles (tests/compare.ts has the same).
+// FNV-1a over the bits of both retinas' rates, then their withdrawals, as doubles (tests/compare.ts has the same).
 std::string retina_digest(const fly::Brain& brain) {
   if (brain.retinas().empty()) return "-";
   uint32_t h = 2166136261u;
   for (const fly::vision::Retina& retina : brain.retinas()) {
-    for (double x : retina.rates()) {
-      uint32_t words[2];
-      std::memcpy(words, &x, 8);
-      for (uint32_t bits : words) h = (h ^ bits) * 16777619u;
+    for (const std::vector<double>* list : {&retina.rates(), &retina.withdrawals()}) {
+      for (double x : *list) {
+        uint32_t words[2];
+        std::memcpy(words, &x, 8);
+        for (uint32_t bits : words) h = (h ^ bits) * 16777619u;
+      }
     }
   }
   char buffer[12];
@@ -345,7 +347,10 @@ int engine() {
   }
   // Rated inputs follow the group inputs, so their indices do too.
   const fly::json::Value* rated = doc.member(spec, "rated");
-  for (uint32_t k = 0; k < rated->items.size(); k++) sim.add_rated_input("rated " + std::to_string(k), indices(doc.member(doc.at(rated->items[k]), "neurons")));
+  for (uint32_t k = 0; k < rated->items.size(); k++) {
+    const fly::json::Value& input = doc.at(rated->items[k]);
+    sim.add_rated_input("rated " + std::to_string(k), indices(doc.member(input, "neurons")), doc.member(input, "withdraw")->type == fly::json::Type::True);
+  }
   // Changes, each applied just before its step: {step, input, rate}, {step, rated, rates} or {step, bias}.
   const fly::json::Value* changes = doc.member(spec, "changes");
   size_t next = 0;

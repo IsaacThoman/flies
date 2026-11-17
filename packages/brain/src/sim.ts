@@ -14,10 +14,13 @@
 // count × gain[pre] × postScale[post].
 //
 // Step s (counting from 0) does, in order:
-//   1. deliver the spikes fired at step s - delay, in ascending neuron order;
+//   1. deliver the spikes fired at step s - delay, in ascending neuron order,
+//      then the withdrawals drawn then, each its synapses' opposite;
 //   2. update every active neuron: decay g and a; if refractory, count down
 //      and hold v at 0, otherwise integrate v and fire at threshold;
-//   3. fire the neurons the Poisson inputs pick, unless refractory.
+//   3. fire the neurons the Poisson inputs pick, unless refractory, and note
+//      the withdrawals the withdrawing inputs pick (the neuron itself is left
+//      as it is).
 // Delivering in a fixed order keeps g's float sums, and so the whole run,
 // independent of where neurons happen to sit in the active set.
 //
@@ -149,11 +152,16 @@ export class Simulation {
   #ring: Uint32Array[];
   #ringLength: Uint32Array;
   #lastSlot = -1;
+  // Withdrawals by the step they were drawn in, modulo the delay: neurons
+  // whose release fell below its resting level, delivered as their synapses'
+  // opposite (see addRatedInput's `withdraw`). They are not spikes.
+  #withdrawn: Uint32Array[];
+  #withdrawnLength: Uint32Array;
 
   // Inputs in the order they were added, which seeds each one's stream. A
   // group input has one rate for all its neurons; a rated input (rates set)
   // has one per neuron, in the order given.
-  #inputs: { name: string; neurons: Uint32Array; rate: number; rates: Float64Array | null; on: boolean; source: PoissonInput | RatedPoissonInput }[] = [];
+  #inputs: { name: string; neurons: Uint32Array; rate: number; rates: Float64Array | null; on: boolean; withdraw: boolean; source: PoissonInput | RatedPoissonInput }[] = [];
   #inputIndex = new Map<string, number>();
   #scratch: Uint32Array;
   #bins = new Uint32Array((1 << SORT_BITS) + 1);
@@ -222,6 +230,8 @@ export class Simulation {
     this.#watched = new Uint8Array(n);
     this.#ring = Array.from({ length: this.delaySteps }, () => new Uint32Array(Math.min(n, 256)));
     this.#ringLength = new Uint32Array(this.delaySteps);
+    this.#withdrawn = Array.from({ length: this.delaySteps }, () => new Uint32Array(Math.min(n, 256)));
+    this.#withdrawnLength = new Uint32Array(this.delaySteps);
     let bits = 1;
     while (2 ** bits < n) bits++;
     this.#sortPasses = Math.ceil(bits / SORT_BITS);
@@ -352,7 +362,7 @@ export class Simulation {
     const members = this.#members(neurons, `input "${name}"`);
     const source = new PoissonInput(members, inputSeed(this.seed, this.#inputs.length));
     this.#inputIndex.set(name, this.#inputs.length);
-    this.#inputs.push({ name, neurons: members, rate: 0, rates: null, on: false, source });
+    this.#inputs.push({ name, neurons: members, rate: 0, rates: null, on: false, withdraw: false, source });
     this.setRate(name, rateHz);
   }
 
@@ -374,8 +384,15 @@ export class Simulation {
    * draws from its own stream, like a group input, and costs per spike plus
    * a little per neuron when its fastest neuron is much faster than the rest
    * (see RatedPoissonInput).
+   *
+   * With `withdraw`, a picked neuron doesn't fire: its release falls below
+   * its resting level for a moment, which its targets feel, after the
+   * synaptic delay, as the opposite of what one of its spikes would do. That
+   * is how a graded neuron that releases tonically signals hyperpolarisation
+   * (the eyes use it for L1 under brightening). The neuron's own state is
+   * untouched and nothing counts it as a spike.
    */
-  addRatedInput(name: string, neurons: ArrayLike<number>) {
+  addRatedInput(name: string, neurons: ArrayLike<number>, options: { withdraw?: boolean } = {}) {
     if (this.#inputIndex.has(name)) throw new Error(`There is already an input called "${name}"`);
     const members = Uint32Array.from(neurons);
     for (let k = 0; k < neurons.length; k++) {
@@ -385,7 +402,7 @@ export class Simulation {
     if (new Set(members).size !== members.length) throw new Error(`input "${name}": a neuron is listed twice`);
     const source = new RatedPoissonInput(members, inputSeed(this.seed, this.#inputs.length));
     this.#inputIndex.set(name, this.#inputs.length);
-    this.#inputs.push({ name, neurons: members, rate: 0, rates: new Float64Array(members.length), on: false, source });
+    this.#inputs.push({ name, neurons: members, rate: 0, rates: new Float64Array(members.length), on: false, withdraw: options.withdraw ?? false, source });
   }
 
   /** Changes each neuron's rate, Hz, of a rated input from the next step on, in the order its neurons were given. */
@@ -515,6 +532,7 @@ export class Simulation {
     this.#activeCount = 0;
     this.#sorted = 0;
     this.#ringLength.fill(0);
+    this.#withdrawnLength.fill(0);
     this.#lastSlot = -1;
     this.#carryMs = 0;
     this.stats.steps = 0;
@@ -571,6 +589,33 @@ export class Simulation {
       }
       this.stats.events += events;
     }
+    // The withdrawals from then, as the spikes' loop with the sign reversed
+    // (kept apart so the spikes' loop, the hottest in the engine, stays as it is).
+    const withdrawn = this.#withdrawn[slot];
+    const withdrawnLength = this.#withdrawnLength[slot];
+    if (withdrawnLength > 0) {
+      const ptr = this.#ptr;
+      const post = this.#post;
+      const weight = this.#weight;
+      const silent = this.#silent;
+      let events = 0;
+      for (let k = 0; k < withdrawnLength; k++) {
+        const pre = withdrawn[k];
+        if (silent[pre] !== 0) continue;
+        const start = ptr[pre];
+        const end = ptr[pre + 1];
+        events += end - start;
+        for (let e = start; e < end; e++) {
+          const j = post[e] | 0;
+          state[(j << SHIFT) + G] -= weight[e];
+          if (inSet[j] === 0) {
+            inSet[j] = 1;
+            active[count++] = j;
+          }
+        }
+      }
+      this.stats.events += events;
+    }
 
     // 2. Update the active neurons. This step's spikes overwrite the slot just
     // delivered; room is made up front because a call inside the sweep would
@@ -613,16 +658,23 @@ export class Simulation {
       fired = sweepBiased(biased, state, this.#bias, out, fired, this.#leak, this.#decay, this.threshold, this.refractorySteps, this.#keepDrive, this.#adaptDecay, this.#adaptStep);
     }
 
-    // 3. Poisson inputs.
+    // 3. Poisson inputs; withdrawals go to their own slot, in ascending order.
     const inputs = this.#inputs;
     const picked = this.#scratch;
     const refractorySteps = this.refractorySteps;
     const resetDrive = this.resetDrive;
     const adaptStep = this.#adaptStep;
+    let withdrawing = 0;
     for (let q = 0; q < inputs.length; q++) {
       const input = inputs[q];
       if (!input.on) continue;
       const m = input.source.sample(picked);
+      if (input.withdraw) {
+        let into = this.#withdrawn[slot];
+        if (into.length < withdrawing + m) into = this.#growWithdrawn(slot, withdrawing + m);
+        for (let k = 0; k < m; k++) into[withdrawing++] = picked[k];
+        continue;
+      }
       if (out.length < fired + m) out = this.#grow(slot, fired + m);
       for (let k = 0; k < m; k++) {
         const i = picked[k];
@@ -640,6 +692,8 @@ export class Simulation {
       }
     }
     this.#activeCount = count;
+    if (withdrawing > 1) this.#sort(this.#withdrawn[slot], withdrawing);
+    this.#withdrawnLength[slot] = withdrawing;
 
     if (fired > 1) this.#sort(out, fired);
     this.#ringLength[slot] = fired;
@@ -665,6 +719,15 @@ export class Simulation {
       const counts = this.#partCounts;
       for (let k = 0; k < fired; k++) counts[partOf[out[k]]]++;
     }
+  }
+
+  // Makes room for `needed` withdrawals in a slot, keeping what is there.
+  #growWithdrawn(slot: number, needed: number) {
+    const old = this.#withdrawn[slot];
+    const bigger = new Uint32Array(Math.min(this.neurons, Math.max(needed, old.length * 2)));
+    bigger.set(old);
+    this.#withdrawn[slot] = bigger;
+    return bigger;
   }
 
   // Makes room for `needed` spikes in a slot, keeping what is there.

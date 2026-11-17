@@ -112,6 +112,7 @@ Simulation::Simulation(std::vector<uint32_t> ptr, std::vector<Edge> edges, const
   // A neuron fires at most once a step, so a slot never holds more than every neuron.
   ring_.assign(delay_steps_, std::vector<uint32_t>(neurons_));
   ring_length_.assign(delay_steps_, 0);
+  withdrawn_.assign(delay_steps_, {});
   scratch_.resize(neurons_);
   watch_ptr_.assign(static_cast<size_t>(neurons_) + 1, 0);
 }
@@ -173,7 +174,7 @@ void Simulation::check_name(const std::string& name) const {
 uint32_t Simulation::add_input(const std::string& name, std::span<const uint32_t> neurons, double rate_hz) {
   check_name(name);
   const auto index = static_cast<uint32_t>(inputs_.size());
-  inputs_.push_back(Input{name, 0, false, PoissonInput(members(neurons, "input \"" + name + "\""), js::input_seed(seed_, index))});
+  inputs_.push_back(Input{name, 0, false, false, PoissonInput(members(neurons, "input \"" + name + "\""), js::input_seed(seed_, index))});
   set_rate(index, rate_hz);
   return index;
 }
@@ -213,7 +214,7 @@ void Simulation::set_output_gain(uint32_t index, double factor) {
   for (size_t k = 0; k < group.edges.size(); k++) edges_[group.edges[k]].weight = static_cast<float>(static_cast<double>(group.base[k]) * factor);
 }
 
-uint32_t Simulation::add_rated_input(const std::string& name, std::span<const uint32_t> neurons) {
+uint32_t Simulation::add_rated_input(const std::string& name, std::span<const uint32_t> neurons, bool withdraw) {
   check_name(name);
   for (uint32_t i : neurons) {
     if (i >= neurons_) throw std::invalid_argument("input \"" + name + "\": no neuron " + std::to_string(i));
@@ -223,7 +224,7 @@ uint32_t Simulation::add_rated_input(const std::string& name, std::span<const ui
   if (std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end()) throw std::invalid_argument("input \"" + name + "\": a neuron is listed twice");
   const auto index = static_cast<uint32_t>(inputs_.size());
   inputs_.push_back(
-      Input{name, 0, false, RatedPoissonInput(std::vector<uint32_t>(neurons.begin(), neurons.end()), js::input_seed(seed_, index))});
+      Input{name, 0, false, withdraw, RatedPoissonInput(std::vector<uint32_t>(neurons.begin(), neurons.end()), js::input_seed(seed_, index))});
   return index;
 }
 
@@ -460,6 +461,28 @@ void Simulation::step() {
     }
     events_ += events;
   }
+  // Then the withdrawals from then: the same with the sign reversed (sim.ts
+  // subtracts in double and stores a float, which is the float difference).
+  std::vector<uint32_t>& withdrawn = withdrawn_[slot];
+  if (!withdrawn.empty()) {
+    const uint32_t* const ptr = ptr_.data();
+    const Edge* const edges = edges_.data();
+    const uint8_t* const silent = silent_.data();
+    uint64_t events = 0;
+    for (const uint32_t pre : withdrawn) {
+      if (silent[pre] != 0) continue;
+      const uint32_t start = ptr[pre];
+      const uint32_t end = ptr[pre + 1];
+      events += end - start;
+      for (uint32_t e = start; e < end; e++) {
+        const uint32_t j = edges[e].post;
+        state[j].g -= edges[e].weight;
+        join(j);
+      }
+    }
+    events_ += events;
+    withdrawn.clear();
+  }
 
   // 2. Update the active neurons. This step's spikes overwrite the slot just delivered.
   const bool cleanup = steps_ % cleanup_interval_ == cleanup_interval_ - 1;
@@ -467,11 +490,15 @@ void Simulation::step() {
   const uint32_t sorted = fired;
   if (!biased_.empty()) fired = sweep_biased(out, fired);
 
-  // 3. Poisson inputs.
+  // 3. Poisson inputs; withdrawals go to their own slot, ascending.
   uint32_t* const picked = scratch_.data();
   for (Input& input : inputs_) {
     if (!input.on) continue;
     const uint32_t m = std::visit([picked](auto& source) { return source.sample(picked); }, input.source);
+    if (input.withdraw) {
+      withdrawn.insert(withdrawn.end(), picked, picked + m);
+      continue;
+    }
     for (uint32_t k = 0; k < m; k++) {
       const uint32_t i = picked[k];
       Neuron& s = state[i];
@@ -485,6 +512,7 @@ void Simulation::step() {
     }
   }
 
+  std::sort(withdrawn.begin(), withdrawn.end());
   if (fired > sorted) merge_tail(out, sorted, fired);
   ring_length_[slot] = fired;
   last_slot_ = slot;
