@@ -293,6 +293,9 @@ export function buildRestaurant(): SceneSet {
       flyAt.set(around.fly.x, around.fly.y, around.fly.z);
       ventilation.step(dt, around);
     },
+    feel(_dt, at, felt) {
+      ventilation.feel(at, felt);
+    },
     happen(kind, random) {
       if (kind === "ventilation") ventilation.run(random);
     },

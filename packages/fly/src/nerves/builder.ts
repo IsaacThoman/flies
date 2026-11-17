@@ -30,6 +30,8 @@ export const LOOK: Record<NerveKind, readonly [number, number]> = {
   tract: [0.75, 0.25],
   nerve: [0.85, 0.2],
   organ: [0.75, 0.35],
+  // A negative edge fraction tags measured soma glyphs for their pixel floor.
+  soma: [0.75, -0.35],
 };
 
 export type Ring = { p: V3; r: number; joint: number };

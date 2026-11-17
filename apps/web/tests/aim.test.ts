@@ -47,10 +47,12 @@ test("a pointer beside the fly, or anywhere else, is on whatever is there", () =
   assert.equal(aimAt(world, sky.origin, sky.dir, fly, hit()), null, "the air over the table's edge is nothing");
 });
 
-test("playing on a short screen the fly rises clear of the shelf and is drawn a little smaller; on the TV, as ever", () => {
+test("play framing follows the room left by stacked or compact controls; on the TV, as ever", () => {
   assert.deepEqual(playRoom(TV_FRAME), { lower: 0, wider: 1 });
   const side = playRoom(frameFor(852, 393, { top: 0, right: 59, bottom: 21, left: 59 }, true));
-  assert.ok(side.lower < -0.1 && side.wider > 1.1, JSON.stringify(side));
+  const stacked = playRoom(frameFor(852, 393, { top: 0, right: 59, bottom: 21, left: 59 }, false));
+  assert.ok(stacked.lower < -0.1 && stacked.wider > 1.1, JSON.stringify(stacked));
+  assert.ok(Math.abs(side.lower) < 0.05 && side.wider > 1 && side.wider < stacked.wider, JSON.stringify(side));
   const upright = playRoom(frameFor(393, 852, { top: 59, right: 0, bottom: 34, left: 0 }, true));
   assert.ok(Math.abs(upright.lower) < 0.15 && upright.wider < 1.05, JSON.stringify(upright));
 });

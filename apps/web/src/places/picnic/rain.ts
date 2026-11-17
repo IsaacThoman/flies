@@ -25,6 +25,8 @@ const LAYERS = [
   { size: 3200, count: 1400 },
 ] as const;
 const WRAP = 3200;
+const BASE_DROPS = LAYERS.reduce((n, l) => n + l.count, 0);
+const HEAVY_DROPS = 5600;
 /** How many splashes can be under way at once. */
 const SPLASHES = 56;
 /** Seconds a splash's ring takes to spread and fade; its crown is quicker. */
@@ -37,6 +39,8 @@ attribute vec4 drop;
 uniform vec3 uOffset;
 uniform vec3 uFall;
 uniform float uRain;
+uniform float uHeavy;
+uniform float uTime;
 uniform float uHalfHeight;
 uniform vec4 uJars[2];
 varying vec2 vUv;
@@ -45,12 +49,12 @@ const float WIDTH = 0.45;
 const float SHUTTER = 0.011;
 float hash(vec3 p) { return fract(sin(dot(p, vec3(91.7, 13.1, 47.3))) * 43758.5453); }
 void main() {
-  float size = drop.w;
+  float size = abs(drop.w);
   // Where the drop is in the box round the camera, the box moving with the camera and the rain falling through it.
   vec3 rel = mod(drop.xyz * size + uOffset - cameraPosition + 0.5 * size, size) - 0.5 * size;
   vec3 head = cameraPosition + rel;
   vec3 axis = normalize(uFall);
-  vec3 at = head - axis * length(uFall) * SHUTTER * position.y;
+  vec3 at = head - axis * length(uFall) * mix(SHUTTER, 0.0035, uHeavy) * position.y;
   vec3 toEye = cameraPosition - at;
   float dist = length(toEye);
   vec3 side = normalize(cross(toEye, axis));
@@ -65,8 +69,11 @@ void main() {
     vec2 d = head.xz - uJars[i].xy;
     if (dot(d, d) < uJars[i].z * uJars[i].z && head.y < uJars[i].w) dry = 0.0;
   }
-  float shown = step(hash(drop.xyz), uRain);
-  vAlpha = shown * inBox * dry * smoothstep(5.0, 30.0, dist) * (WIDTH / width);
+  float sheet = 0.55 + 0.45 * sin(head.x * 0.004 + head.z * 0.001 + uTime * 0.55);
+  float coverage = uRain * mix(1.0, 0.3 + 0.7 * sheet, uHeavy);
+  coverage *= drop.w < 0.0 ? uHeavy : 1.0;
+  float shown = step(hash(drop.xyz), coverage);
+  vAlpha = shown * inBox * dry * smoothstep(mix(5.0, 80.0, uHeavy), mix(30.0, 200.0, uHeavy), dist) * (WIDTH / width * (1.0 + uHeavy * 0.5));
   vUv = position.xy;
   gl_Position = projectionMatrix * viewMatrix * vec4(at, 1.0);
 }`;
@@ -99,7 +106,7 @@ const float LIFE = ${SPLASH_LIFE.toFixed(2)};
 const float CROWN = 0.26;
 void main() {
   float age = uTime - aSplash.w;
-  float size = aShape.x;
+  float size = abs(aShape.x);
   vec3 world;
   vUv = position.xy;
   if (aPart < 0.5) {
@@ -107,7 +114,7 @@ void main() {
     float k = clamp(age / LIFE, 0.0, 1.0);
     float r = size * (0.4 + 2.6 * sqrt(k));
     world = aSplash.xyz + vec3(position.x * r, 0.03, position.y * r);
-    vFade = 1.0 - k;
+    vFade = (1.0 - k) * step(0.0, aShape.x);
     vRing = 1.0;
   } else {
     // A droplet of the crown, thrown out and up and falling back.
@@ -167,6 +174,8 @@ export class Rain {
     uOffset: { value: new THREE.Vector3() },
     uFall: { value: new THREE.Vector3(0, -FALL_SPEED, 0) },
     uRain: { value: 0 },
+    uHeavy: { value: 0 },
+    uTime: { value: 0 },
     uHalfHeight: { value: 240 },
     uJars: { value: [new THREE.Vector4(), new THREE.Vector4()] },
     uColor: { value: new THREE.Color() },
@@ -185,14 +194,18 @@ export class Rain {
     const streaks = new THREE.InstancedBufferGeometry();
     streaks.setIndex([0, 1, 2, 0, 2, 3]);
     streaks.setAttribute("position", new THREE.Float32BufferAttribute([-1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1, 0], 3));
-    const total = LAYERS.reduce((n, l) => n + l.count, 0);
+    const total = BASE_DROPS + HEAVY_DROPS;
     const drops = new Float32Array(total * 4);
     let k = 0;
     for (const layer of LAYERS) {
       for (let i = 0; i < layer.count; i++, k++) drops.set([rnd.next(), rnd.next(), rnd.next(), layer.size], k * 4);
     }
+    for (; k < total; k++) {
+      const size = k < BASE_DROPS + 1400 ? 400 : k < BASE_DROPS + 3500 ? 800 : 3200;
+      drops.set([rnd.next(), rnd.next(), rnd.next(), -size], k * 4);
+    }
     streaks.setAttribute("drop", new THREE.InstancedBufferAttribute(drops, 4));
-    streaks.instanceCount = total;
+    streaks.instanceCount = BASE_DROPS;
     const jars = SOLIDS.filter((s) => s.name === "lemonade" || s.name === "jam");
     jars.forEach((jar, i) => {
       const f = jar.footprint as { x: number; z: number; r: number };
@@ -237,12 +250,12 @@ export class Rain {
     this.group.add(this.#beads);
   }
 
-  /** A drop landing at a point: a crown and a ring, `size` mm across or so. */
-  splash(x: number, y: number, z: number, size: number) {
+  /** Curved surfaces and the fly throw a crown, but cannot support a flat spreading ring. */
+  splash(x: number, y: number, z: number, size: number, ring = true) {
     const i = this.#next;
     this.#next = (this.#next + 1) % SPLASHES;
     this.#splash.setXYZW(i, x, y, z, this.#splashUniforms.uTime.value);
-    this.#shape.setXY(i, size, Math.random());
+    this.#shape.setXY(i, ring ? size : -size, Math.random());
     this.#splash.needsUpdate = true;
     this.#shape.needsUpdate = true;
     this.#last = this.#splashUniforms.uTime.value;
@@ -255,9 +268,13 @@ export class Rain {
     this.#streaks.visible = rain > 0.01;
     if (this.#streaks.visible) {
       s.uRain.value = Math.min(1, rain * 1.1);
-      s.uFall.value.set(wind.x, -FALL_SPEED, wind.z);
+      const speed = FALL_SPEED * (1 + weather.heavy * 0.7);
+      s.uHeavy.value = weather.heavy;
+      (this.#streaks.geometry as THREE.InstancedBufferGeometry).instanceCount = BASE_DROPS + Math.ceil(HEAVY_DROPS * weather.heavy);
+      s.uTime.value = time;
+      s.uFall.value.set(wind.x, -speed, wind.z);
       const o = s.uOffset.value;
-      o.set((o.x + wind.x * dt) % WRAP, (o.y - FALL_SPEED * dt) % WRAP, (o.z + wind.z * dt) % WRAP);
+      o.set((o.x + wind.x * dt) % WRAP, (o.y - speed * dt) % WRAP, (o.z + wind.z * dt) % WRAP);
       // Drops are lit by the sky behind and round them: pale, a little brighter than the haze.
       s.uColor.value.copy(light.haze).lerp(light.skyColor, 0.5).multiplyScalar(1.25 + light.sunIntensity * 0.15);
       s.uShade.value.copy(light.groundColor).lerp(light.haze, 0.3).multiplyScalar(0.45);

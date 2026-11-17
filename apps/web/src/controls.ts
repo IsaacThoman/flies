@@ -3,20 +3,19 @@
 // and the camera. The game is the target: it says what is under a point and
 // does what it is asked.
 //
-// The conventions are a map's and a 3D viewer's. The wheel, a trackpad's
-// two-finger scroll up and down and a pinch bring the camera in and take it
-// out; a drag turns it round the fly, wherever it starts, with whichever
-// button, unless the tool in hand is one that is held on the fly (the
-// feather, the air), which a left-button drag over the table carries; a
-// click or a tap uses the tool where it lands; a double click or tap in the
-// air gives the camera back to the cameraman.
-//
-// A mouse and a trackpad orbit freely, as in a 3D viewer: where they turn or
-// zoom the camera it stays, until it is given back, rather than the
-// cameraman taking it again a few seconds later. Each click of a mouse wheel
-// eases in over a moment, so turning the wheel moves the camera in one smooth
-// glide, as a trackpad's scroll does, not in hops.
+// The conventions are a map's and a 3D viewer's, and the camera is a plain
+// orbit round the fly (orbit.ts). A drag turns it round the fly and up or
+// down, wherever it starts, with whichever button, by the same amount for the
+// same distance dragged every time, unless the tool in hand is one that is
+// held on the fly (the feather, the air), which a left-button drag over the
+// table carries. The wheel, a trackpad's two-finger scroll up and down and a
+// pinch bring it in and take it out, and nothing else; a trackpad's scroll
+// across turns it. A click or a tap uses the tool where it lands; a double
+// click or tap in the air takes the camera back to Follow's distance and
+// height, still on the same side of the fly. Where they leave the camera it
+// stays: nothing else moves it.
 
+import { sameTarget } from "@fly/ui";
 import type { Hit } from "@fly/ui";
 import type { Gesture } from "./input.ts";
 import { HUD_HITS } from "./ui/hud.ts";
@@ -47,18 +46,15 @@ export interface PlayTarget {
   zoom(factor: number): void;
   /** The hand is on the camera, or has let go of it. */
   holdCamera(held: boolean): void;
-  /** A mouse or a trackpad has moved the camera: it stays where they leave it until it is given back. */
-  keepCamera(): void;
-  /** Gives the camera back to the cameraman. */
-  handBack(): void;
+  /** Back to Follow's distance and height, on the same side of the fly. */
+  home(): void;
 }
 
 /** A drag the screen's width turns the camera this far round the fly (radians), and one its height this far up. */
 export const DRAG_ROUND = 3;
 export const DRAG_UP = 1.6;
-/** One click of a mouse wheel brings the camera this much nearer or farther, easing in with this time constant (s): most of the way in a fifth of a second, so a turn of the wheel runs its clicks together. */
+/** One click of a mouse wheel brings the camera this much nearer or farther (the camera eases it in). */
 export const NOTCH_ZOOM = 1.2;
-export const NOTCH_EASE = 0.07;
 /** A trackpad's scroll and pinch: how much nearer or farther per CSS pixel scrolled (as a power of e). */
 const SCROLL_ZOOM = 0.004;
 const PINCH_ZOOM = 0.01;
@@ -73,7 +69,7 @@ const SHELF_IDLE = 300;
 /** What a press is doing, until it lifts. */
 type Grip =
   /** Down on the HUD: a tap presses it; along the label, a swipe steps the kind. */
-  | { kind: "hud"; hit: Hit; x: number; swiped: number }
+  | { kind: "hud"; hit: Hit; x: number; y: number; swiped: number; valid: boolean; over: boolean }
   /** Down on the table with a tool used once: a tap uses it; moved, it turns the camera instead. */
   | { kind: "press"; x: number; y: number }
   /** Holding a held tool on the table. */
@@ -86,14 +82,18 @@ type Grip =
 export class PlayControls {
   #grip: Grip | null = null;
   #shelf = { scrolled: 0, at: -Infinity };
-  /** How much of the wheel's clicks has still to arrive, as a power of e. */
-  #glide = 0;
   readonly #design: () => { width: number; height: number };
   readonly #now: () => number;
 
   constructor(design: () => { width: number; height: number }, now: () => number = () => performance.now()) {
     this.#design = design;
     this.#now = now;
+  }
+
+  /** The provisional HUD target; no action occurs until an eligible release. */
+  get preview(): Readonly<Hit> | null {
+    const grip = this.#grip;
+    return grip?.kind === "hud" && grip.valid && grip.over && grip.swiped === 0 ? grip.hit : null;
   }
 
   /** A held tool is being held on the table. */
@@ -114,22 +114,11 @@ export class PlayControls {
   /** Whatever is pressed now does nothing more until it lifts (the wallpaper took over, a menu opened). */
   spend() {
     if (this.#grip) this.#grip = { kind: "spent" };
-    this.#glide = 0;
   }
 
   /** Lets go of everything at once, without acting. */
   reset() {
     this.#grip = null;
-    this.#glide = 0;
-  }
-
-  /** Brings in the next share of the wheel's clicks still easing in, once a frame in play. */
-  glide(dt: number, target: PlayTarget) {
-    if (this.#glide === 0) return;
-    let step = this.#glide * (1 - Math.exp(-dt / NOTCH_EASE));
-    if (Math.abs(this.#glide - step) < 1e-4) step = this.#glide;
-    this.#glide -= step;
-    target.zoom(Math.exp(step));
   }
 
   gesture(g: Gesture, target: PlayTarget, mouse: boolean) {
@@ -149,7 +138,7 @@ export class PlayControls {
       case "down": {
         const hit = target.hudAt(g.x, g.y);
         if (hit) {
-          this.#grip = { kind: "hud", hit: { ...hit }, x: g.x * design.width, swiped: 0 };
+          this.#grip = { kind: "hud", hit: { ...hit }, x: g.x * design.width, y: g.y * design.height, swiped: 0, valid: true, over: true };
           return;
         }
         // The right and middle buttons turn the camera wherever they are pressed.
@@ -173,12 +162,16 @@ export class PlayControls {
           this.gesture(g, target, mouse);
         } else if (grip.kind === "turn") {
           target.turn(-(g.x - grip.x) * DRAG_ROUND, (g.y - grip.y) * DRAG_UP);
-          if (mouse) target.keepCamera();
           grip.x = g.x;
           grip.y = g.y;
-        } else if (grip.kind === "hud" && (grip.hit.kind === HUD_HITS.kind || grip.hit.kind === HUD_HITS.label)) {
+        } else if (grip.kind === "hud") {
+          if (g.far) grip.valid = false;
+          grip.over = sameTarget(grip.hit, target.hudAt(g.x, g.y));
+          if (grip.hit.kind !== HUD_HITS.kind && grip.hit.kind !== HUD_HITS.label) return;
           // Swiped along the label: the kinds go by as a carousel's would, the next coming from the right.
-          const steps = Math.trunc((g.x * design.width - grip.x) / LABEL_SWIPE) - grip.swiped;
+          const dx = g.x * design.width - grip.x;
+          if (grip.swiped === 0 && Math.abs(dx) <= Math.abs(g.y * design.height - grip.y)) return;
+          const steps = Math.trunc(dx / LABEL_SWIPE) - grip.swiped;
           grip.swiped += steps;
           for (let i = 0; i < Math.abs(steps); i++) target.stepKind(steps < 0 ? 1 : -1);
         }
@@ -187,19 +180,17 @@ export class PlayControls {
         this.#grip = null;
         if (!grip) return;
         if (grip.kind === "hud") {
-          if (g.tap && grip.swiped === 0) target.pressHud(grip.hit);
+          const hit = target.hudAt(g.x, g.y);
+          if (g.tap && grip.valid && grip.swiped === 0 && sameTarget(grip.hit, hit)) target.pressHud(grip.hit);
         } else if (grip.kind === "press") {
-          if (target.tool() === "once") target.use();
+          if (g.tap && target.tool() === "once" && !target.hudAt(g.x, g.y) && target.aim(g.x, g.y, true)) target.use();
           if (!mouse) target.unaim();
         } else if (grip.kind === "tool") {
           if (!mouse) target.unaim();
         } else if (grip.kind === "turn") {
           target.holdCamera(false);
-          // A double click or tap in the air: back to the cameraman, without the rest of a wheel's clicks taking it on again.
-          if (g.double) {
-            this.#glide = 0;
-            target.handBack();
-          }
+          // A double click or tap in the air: back to Follow.
+          if (g.double) target.home();
           if (mouse) target.aim(g.x, g.y, !target.hudAt(g.x, g.y));
         }
         return;
@@ -247,9 +238,8 @@ export class PlayControls {
       else if (hit.kind === HUD_HITS.kind || hit.kind === HUD_HITS.label) target.stepKind(dir);
       return;
     }
-    target.keepCamera();
     if (g.zoom) target.zoom(Math.exp(g.dy * PINCH_ZOOM));
-    else if (g.notch) this.#glide += Math.sign(g.dy) * Math.log(NOTCH_ZOOM);
+    else if (g.notch) target.zoom(Math.pow(NOTCH_ZOOM, Math.sign(g.dy)));
     else {
       if (g.dy !== 0) target.zoom(Math.exp(g.dy * SCROLL_ZOOM));
       if (g.dx !== 0) target.turn(g.dx * SCROLL_ROUND, 0);

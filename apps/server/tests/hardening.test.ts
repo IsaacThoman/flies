@@ -10,11 +10,11 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { WebSocket } from "ws";
-import { DROP_ID, FLY_MAX, FOUND_ID, LIMITS, MAX_FOUND, PROTOCOL, ROOMS_PATH, ROOM_LIMITS, TABLETOP_SCALE, createFlyState, encodeBites, encodeFly, tableCode } from "@fly/net";
+import { DROP_ID, FLY_MAX, FOUND_ID, LIMITS, MAX_FOUND, MAX_OWN, PROTOCOL, ROOMS_PATH, ROOM_LIMITS, TABLETOP_SCALE, createFlyState, encodeBites, encodeFly, tableCode } from "@fly/net";
 import type { ClientMessage, ServerMessage, TableStart } from "@fly/net";
 import { clientAddress, post, startServer } from "../src/server.ts";
 import type { RoomServer } from "../src/server.ts";
-import { AWAY_LIMIT, REMOVED_MAX, Table } from "../src/table.ts";
+import { AWAY_LIMIT, REMOVED_MAX, Table, isTableRecord } from "../src/table.ts";
 import type { Link, Seat } from "../src/table.ts";
 import { Tables } from "../src/tables.ts";
 import type { Files } from "../src/tables.ts";
@@ -163,7 +163,8 @@ test("a file of tables that can't be read is set aside and the server starts wit
   await writeFile(file, '{"v":1,"tables":[{"code":');
   const logged: unknown[][] = [];
   const server = await serve({ dataDir: dir, logged });
-  assert.equal((await healthy(server)).tables, 0);
+  // None but Everyone, which the server opens itself.
+  assert.equal((await healthy(server)).tables, 1);
   assert.ok((await readdir(dir)).some((f) => f.startsWith("tables.json.unreadable-")), "the damaged file is kept for whoever looks after the server");
   assert.ok(logged.some(([, event]) => event === "unreadable"));
   await server.stop();
@@ -174,7 +175,7 @@ test("a file of tables that can't be read is set aside and the server starts wit
   tables.open("starter-key-hash", { type: "hello", v: PROTOCOL, table: code, key: newKey(), start: START }, 1);
   await tables.save(file, true);
   const kept = JSON.parse(await readFile(file, "utf8")) as { v: number; tables: Record<string, unknown>[] };
-  const good = kept.tables[0];
+  const good = kept.tables.find((t) => t.code === code)!;
   const bad = [
     null,
     "a table",
@@ -191,7 +192,7 @@ test("a file of tables that can't be read is set aside and the server starts wit
   ];
   await writeFile(file, JSON.stringify({ v: 1, tables: [good, ...bad] }));
   const back = await serve({ dataDir: dir });
-  assert.equal((await healthy(back)).tables, 1);
+  assert.equal((await healthy(back)).tables, 2, "the good one, and Everyone");
   assert.ok(back.tables.get(code));
 });
 
@@ -318,16 +319,23 @@ test("a save that fails at any stage leaves the tables to be saved again: the ne
     const tables = new Tables({ now: () => clock.now, wall: () => clock.wall }, undefined, files);
     const table = tables.open("starter", { type: "hello", v: PROTOCOL, table: "23456789ab", key: newKey(), start: START }, 1) as Table;
     const link: Link = { send() {}, close() {} };
-    const seat = table.hello(link, "starter", { type: "hello", v: PROTOCOL, table: "23456789ab", key: "k" }) as Seat;
+    const seat = table.hello(link, "starter", { type: "hello", v: PROTOCOL, table: "23456789ab", key: "k", flies: 3 }) as Seat;
+    table.hello({ send() {}, close() {} }, "guest", { type: "hello", v: PROTOCOL, table: "23456789ab", key: "g", flies: 2 });
     tables.tick();
     // The room empties: nothing after this marks the tables changed, so only the failed save's retry can keep it.
     clock.wall += 5000;
     table.disconnected(seat, link);
     await assert.rejects(tables.save(file), /no space left/, stage);
     await tables.save(file);
-    const kept = JSON.parse(await readFile(file, "utf8")) as { tables: { code: string; seats: { lastSeen: number }[] }[] };
-    assert.equal(kept.tables[0]?.code, "23456789ab", stage);
-    assert.equal(kept.tables[0].seats[0].lastSeen, clock.wall, `${stage}: the room as it was last, emptied`);
+    const kept = JSON.parse(await readFile(file, "utf8")) as { tables: { code: string; seats: { lastSeen: number; flies?: { id: number }[] }[] }[] };
+    const room = kept.tables.find((t) => t.code === "23456789ab");
+    assert.ok(room, stage);
+    assert.equal(room.seats[0].lastSeen, clock.wall, `${stage}: the room as it was last, emptied`);
+    assert.deepEqual(room.seats.map((s) => s.flies?.map((f) => f.id)), [[1, 2, 3], [4, 5]], `${stage}: every device's flies`);
+    // And what the retry kept comes back as it was.
+    const back = new Tables({ now: () => clock.now, wall: () => clock.wall }, undefined, fs);
+    assert.ok((await back.load(file)) >= 1, stage);
+    assert.deepEqual([...back.get("23456789ab")!.seats.values()].map((s) => s.flies.map((f) => f.id)), [[1, 2, 3], [4, 5]]);
   }
 });
 
@@ -359,7 +367,7 @@ test("a drop, a find, a throw or a bite from the place the table was in before a
   assert.deepEqual(heard.map((d) => (JSON.parse(d) as ServerMessage).type), ["drop", "found", "ball"]);
   // A bite of a food of the same id, where the fly now stands within reach of it: only one from this place counts.
   const food = table.food.foods[0];
-  Object.assign(other.state, { x: food.x, y: food.y, z: food.z });
+  Object.assign(other.flies[0].state, { x: food.x, y: food.y, z: food.z });
   const view = new DataView(new ArrayBuffer(64));
   const bite = (epoch: number, seq: number) => table.receive(other, new Uint8Array(view.buffer, 0, encodeBites(view, seq, [{ food: food.id, amount: 0.001 }], 1, epoch)));
   bite(before, 1);
@@ -376,11 +384,13 @@ test("a fly's states go on being taken past 2^32 ms of room time, when the wire'
   const hello = (key: string): ClientMessage & { type: "hello" } => ({ type: "hello", v: PROTOCOL, table: "23456789ab", key });
   const mover = table.hello({ send() {}, close() {} }, "key-1", hello("key-1")) as Seat;
   const view = new DataView(new ArrayBuffer(FLY_MAX));
-  const start = { x: mover.state.x, y: mover.state.y, z: mover.state.z };
+  const fly = mover.flies[0].state;
+  const start = { x: fly.x, y: fly.y, z: fly.z };
   let seq = 0;
   for (let i = 0; i < 120; i++) {
     clock.now += 50;
     const s = createFlyState();
+    s.id = mover.id;
     s.epoch = table.epoch;
     s.seq = ++seq;
     s.t = clock.now;
@@ -390,6 +400,35 @@ test("a fly's states go on being taken past 2^32 ms of room time, when the wire'
     table.receive(mover, new Uint8Array(view.buffer, 0, encodeFly(view, TABLETOP_SCALE, s)));
   }
   assert.ok(clock.now > 2 ** 32 + 2000, "past the wrap");
-  assert.ok(Math.abs(mover.state.x - (start.x + 119 * 0.05)) < 0.05, `the fly is where its last state put it, not stuck at the wrap: ${mover.state.x - start.x}`);
-  assert.ok(Math.abs(mover.state.t - clock.now) < 1, "its time is the room's, past 2^32");
+  assert.ok(Math.abs(fly.x - (start.x + 119 * 0.05)) < 0.05, `the fly is where its last state put it, not stuck at the wrap: ${fly.x - start.x}`);
+  assert.ok(Math.abs(fly.t - clock.now) < 1, "its time is the room's, past 2^32");
+});
+
+test("a kept table's seats are checked fly by fly: each device 1 to MAX_OWN flies, the first its own id, no id two flies', and old single-fly seats still load", () => {
+  const clock = { now: 1000, wall: Date.UTC(2026, 5, 1, 12) };
+  const table = new Table("23456789ab", START, "key-1", 7, { now: () => clock.now, wall: () => clock.wall });
+  const hello = (key: string, flies: number): ClientMessage & { type: "hello" } => ({ type: "hello", v: PROTOCOL, table: "23456789ab", key, flies });
+  table.hello({ send() {}, close() {} }, "key-1", hello("key-1", 3));
+  table.hello({ send() {}, close() {} }, "key-2", hello("key-2", 2));
+  const good = JSON.parse(JSON.stringify(table.record())) as ReturnType<Table["record"]>;
+  assert.ok(isTableRecord(good));
+  const [a, b] = good.seats;
+  const fly = (id: number) => ({ id, at: [0, 0, 0, 0], airborne: false });
+  const legacy = { id: 6, key: "old", at: [0, 0, 0, 0], airborne: false, lastSeen: 0 };
+  assert.ok(isTableRecord({ ...good, seats: [a, b, legacy] }), "a seat kept before devices had several flies");
+  const bad = [
+    [a, { ...b, flies: [fly(4), fly(3)] }],
+    [a, { ...b, flies: [fly(4), fly(4)] }],
+    [a, { ...b, flies: [] }],
+    [a, { ...b, flies: "two" }],
+    [a, { ...b, flies: [fly(5), fly(4)] }],
+    [{ ...a, flies: Array.from({ length: MAX_OWN + 1 }, (_, i) => fly(i + 1)) }],
+    [a, { ...b, flies: [fly(4), fly(9)] }],
+    [a, { ...b, flies: [fly(4), { ...fly(5), at: [0, 0, 1e9, 0] }] }],
+    [a, { ...b, flies: [fly(4), { ...fly(5), airborne: "yes" }] }],
+    [a, { ...b, flies: [fly(4), null] }],
+    [a, { ...legacy, id: 2 }],
+    [a, b, { ...legacy, id: 7, at: undefined }],
+  ];
+  for (const seats of bad) assert.equal(isTableRecord({ ...good, seats }), false, JSON.stringify(seats).slice(0, 200));
 });

@@ -1,0 +1,15 @@
+{
+  "width": 3840,
+  "height": 2160,
+  "story": "03-flight",
+  "wallpaper": false,
+  "staging": null,
+  "fingerprint": "83d3dd85",
+  "frames": 451,
+  "neurons": 166700,
+  "activity": "flying",
+  "eaten": 0,
+  "takeOffs": 1,
+  "eyeUpdates": 235,
+  "peers": 0
+}
