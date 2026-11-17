@@ -81,3 +81,28 @@ now explicitly lists those stand-ins. All three implementation reviewers ranked 
   condition-matched overall score is claimed. The additional replicate sweep was
   cancelled without a completed report; more unmatched hours do not establish
   validity.
+
+## Registry verification with optical policy
+
+Three fresh reviewers received identical copies P6/H2 of the 21-row registry,
+metric/scoring utilities and assay ledger, in orders P6/H2, H2/P6, H2/P6.
+This duplicate control checks transcription; it is not a blind preference
+comparison against the prior implementation. All corresponding scores matched.
+
+| Reviewer | Both sets: validity | Honesty | Behaviour | Regressions | Mean | Forced presentation tie-break |
+|---|---:|---:|---:|---:|---:|---|
+| L5 | 7 | 7 | 0 | 0 | 3.50 | P6 > H2 |
+| C8 | 7 | 7 | 0 | 0 | 3.50 | H2 > P6 |
+| W1 | 7 | 6 | 0 | 0 | 3.25 | H2 > P6 |
+
+Mean 3.42. All 21 central values and SD/SE ambiguity were independently
+confirmed. No raw measurements or runner code were in this restricted packet,
+so the zero behaviour/regression scores signify absent evidence. Remaining
+findings and dispositions: explicit 200 Hz stimulus / 400 fps video metadata;
+w1118 feeding strain; trial-backed scoring gate that rejects scalar coefficients
+and recomputes estimates; separate probability/timing means with equal composite
+weight; and registry-only bounds, never whole-animal fidelity bounds. These
+changes are incorporated. Their integration still requires a fresh code review.
+
+No duplicate-control noise threshold was exceeded. This transcription check
+by itself is not counted as a behavioural hill-climb improvement.

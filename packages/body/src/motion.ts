@@ -77,7 +77,7 @@ export const LIFT = GRAVITY / 0.6;
 export const THRUST = 3200;
 /** Air drag, 1/s: a fly without its wings falls at GRAVITY / DRAG. */
 export const DRAG = 7;
-/** A take-off's speed, mm/s, upward and away, from the weakest to the strongest. */
+/** Legacy launch components (mm/s), retained to preserve the command's kinetic-energy envelope. */
 export const TAKEOFF_UP = [380, 620] as const;
 export const TAKEOFF_AWAY = [160, 340] as const;
 /**
@@ -525,9 +525,14 @@ export class FlyBody {
     }
     const up = TAKEOFF_UP[0] + (TAKEOFF_UP[1] - TAKEOFF_UP[0]) * strength;
     const away = TAKEOFF_AWAY[0] + (TAKEOFF_AWAY[1] - TAKEOFF_AWAY[0]) * strength;
-    this.velocity.x = ax * away;
-    this.velocity.y = up;
-    this.velocity.z = az * away;
+    // Card & Dickinson 2008, JEB Fig. 7: near-equal vertical/horizontal peak
+    // accelerations and roughly 45° launches (doi:10.1242/jeb.012682). Use that
+    // mechanical balance, preserving speed/energy rather than fitting speed to
+    // their female cohort. Direction remains a body stand-in; the brain decides when.
+    const component = Math.hypot(up, away) / Math.SQRT2;
+    this.velocity.x = ax * component;
+    this.velocity.y = component;
+    this.velocity.z = az * component;
     this.mode = "airborne";
     ev.tookOff = true;
     ev.jumped = true;

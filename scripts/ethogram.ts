@@ -106,7 +106,7 @@ export function markdown(results: Awaited<ReturnType<typeof measure>>, escape: A
 async function main() {
   const { values } = parseArgs({ options: { hours: { type: 'string', default: '1' }, 'burn-seconds': { type: 'string', default: '60' }, seeds: { type: 'string', default: '1,2,3' }, place: { type: 'string', default: 'arena' }, hour: { type: 'string', default: '6' }, assay: { type: 'string', default: 'free' }, trials: { type: 'string', default: '8' }, 'seed-base': { type: 'string', default: '20000' }, data: { type: 'string', default: DEFAULT_CONNECTOME_PATH }, out: { type: 'string' }, analyse: { type: 'string' }, help: { type: 'boolean' } } });
   if (values.help) {
-    console.log('node scripts/ethogram.ts [--hours 1] [--seeds 1,2,3] [--place arena|lab|picnic|bar|restaurant|windowsill] [--burn-seconds 60] [--hour 6] [--assay free|escape|all] [--trials 8] [--data path] [--out report.json]\nAutomatically leases one of eight heavy-work slots, yielding after 9.5 min and cooling down 2 min. No rendering, no sound.');
+    console.log('node scripts/ethogram.ts [--hours 1] [--seeds 1,2,3] [--place arena|lab|picnic|bar|restaurant|windowsill] [--burn-seconds 60] [--hour 6] [--assay free|escape|all] [--trials 8] [--data path] [--out report.json] [--analyse recording.json]\nAutomatically leases one of eight heavy-work slots, yielding after 9.5 min and cooling down 2 min. No rendering, no sound.');
     return;
   }
   if (values.analyse) {
