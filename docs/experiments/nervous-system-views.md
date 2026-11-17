@@ -151,3 +151,72 @@ verified exclusive behavioural ground truth for transition clips.
 
 Round-2 presented order: R1 Q8/N6/P4; R2 N6/Q8/P4; R3 Q8/P4/N6.
 The regression audit saw N6/P4/Q8.
+
+
+## Matched round 3
+
+Key: V2 = the retained transfer function on updated dev, with the mandatory
+triangle-budget repair; U7 = intermediate colour threshold 0.35 and emission
+coefficient 1.0. Both share the same updated dev behaviour. Fresh scorers saw
+V2/U7, U7/V2, V2/U7 respectively, with no author rationale or previous scores.
+A separate fresh losses audit also preferred U7 narrowly.
+
+The refreshed evidence captures eight consecutive game frames during actual
+observed rest, walking, grooming, feeding and flight. Escape is the actual
+jump onset (one falling frame, seven flying frames). Actual frame times, the
+measured initial display glow, rate values and body joint frames are replayed
+in both variants; the corner panel remains in its normal resting pose. Eight
+frames span about 0.117 seconds. GIFs play at 7 fps for inspection; production
+timing is unchanged. This is a short diagnostic window, not evidence of
+recognising complete sustained behaviours. Shared live-layout PNGs are the
+same reference images in both sets, not comparative shader evidence.
+
+| Reviewer | Set | Beauty | Recognition | Truth | Legibility | Cost | Text | Mean | Ranking |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| R1 | V2 | 6.5 | 4 | 8 | 5.5 | 7.5 | 6 | 6.25 | 2 |
+| R1 | U7 | 7 | 4 | 8 | 6 | 7.5 | 6 | 6.42 | 1 |
+| R2 | V2 | 6.3 | 4 | 8 | 5.3 | 7 | 6 | 6.10 | 2 |
+| R2 | U7 | 6.5 | 4 | 8 | 5.5 | 7 | 6 | 6.17 | 1 |
+| R3 | V2 | 6.5 | 4 | 9 | 5.5 | 8 | 4 | 6.17 | 2 |
+| R3 | U7 | 6.7 | 4 | 8.5 | 6 | 8 | 4 | 6.20 | 1 |
+| Mean | V2 | 6.43 | 4.00 | 8.33 | 5.43 | 7.50 | 5.33 | 6.17 | 2 |
+| Mean | U7 | 6.73 | 4.00 | 8.17 | 5.83 | 7.50 | 5.33 | 6.26 | 1 |
+
+Decision: retain U7. All three scorers preferred it and its mean is higher,
+but the margin is small. Recognition did not improve. Against the observed
+window key, each variant matched 10 of 18 locked assignments (six recordings,
+three reviewers); this small slowed benchmark is not a generalisation claim.
+The losses audit identified mildly reduced depth within bright overlapping
+anatomy in U7, against V2's reduced visibility of weak activity.
+
+Two scorers reported stale transfer coefficients in U7's README. Direct
+inspection of the frozen file shows 0.35 and glow², matching its shader.
+No correction was needed. Their scores are retained without adjustment.
+
+Both matched scenes: 4 draws, 48,206 triangles; nervous-system mesh 16,639 triangles,
+under the unchanged 18,000 limit. Shared identical glow JavaScript: 16.73 µs CPU
+and 17.09 µs elapsed in one interpreter probe. The separate test log's 35 µs is a
+different run, not another component or a speedup. Both permit boxed numbers.
+No new worker fields/readouts or simulation changes were introduced.
+
+Full validation after the earlier rebase: 792 tests passed, 2 skipped, plus all 4
+budget tests passed; lint/typecheck passed. Brain cost: build 205 ms, rest 0.086
+CPU s/s, full 0.471 against 0.5. Earlier failures remain recorded: the original
+untouched task base also failed full CPU at 0.505 s/s; no threshold was relaxed.
+
+Round-3 key (P = portrait):
+
+set-V2: 11=TV swoop, 12=TV walk, 13=P swoop, 14=P groom, 15=P flight, 16=P rest, 17=P feed, 18=TV rest, 19=TV feed, 20=P walk, 21=TV groom, 22=TV flight
+set-U7: 11=TV feed, 12=TV flight, 13=TV walk, 14=P groom, 15=P swoop, 16=P walk, 17=TV swoop, 18=P flight, 19=TV groom, 20=P feed, 21=P rest, 22=TV rest
+
+## Owner process update
+
+The owner subsequently requested merging latest origin/dev with a merge
+commit, promoting any blind winner to ready after local checks, and leaving
+merging to the maintainer. This supersedes the earlier draft-only process.
+The latest dev merge is retained without changing dev behaviour. Subsequent
+validated rounds belong on new branches and PRs. No GitHub CI wait is used.
+
+Post-merge validation (c7c3de66): typecheck, lint and all 40 area tests passed.
+The updated full play e2e also passed, including the nervous-system/X-ray,
+stats, place and frame-budget steps. No e2e expectations were changed.
