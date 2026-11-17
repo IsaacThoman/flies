@@ -410,12 +410,14 @@ export class Table {
     seat.lastSeen = wall;
     seat.fresh = true;
     seat.ack = 0;
+    this.food.takeMeal(seat.id);
     const shown = returning && seat.present;
     seat.present = true;
     seat.away = false;
     this.food.update(0);
     this.#send(seat, {
       type: "welcome",
+      meals: true,
       v: PROTOCOL,
       id: seat.id,
       colour: seat.colour,
@@ -678,7 +680,7 @@ export class Table {
   #flushFood() {
     const changes = this.food.flush();
     if (!changes) return;
-    for (const p of this.seats.values()) if (p.link) this.#send(p, { type: "food", ack: p.ack, ...changes, eaten: Math.round((this.food.eaten.get(p.id) ?? 0) * 1e4) / 1e4 });
+    for (const p of this.seats.values()) if (p.link) this.#send(p, { type: "food", ack: p.ack, ...changes, eaten: Math.round((this.food.eaten.get(p.id) ?? 0) * 1e4) / 1e4, meal: this.food.takeMeal(p.id) });
   }
 
   /** The table's beat, every SEND_EVERY ms (@fly/net): the batch, presence, the food, the balls, the bubbles, the visitors. */

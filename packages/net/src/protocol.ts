@@ -517,6 +517,8 @@ export type ServerMessage =
       epoch: number;
       world: WorldWire;
       players: PlayerWire[];
+      /** Supports exact nutrition receipts in food acknowledgements. */
+      meals?: boolean;
       foods: FoodWire[];
       balls: BallWire[];
       happenings: HappeningWire[];
@@ -547,7 +549,7 @@ export type ServerMessage =
    * player has eaten by the room's account, and the last of its bites the
    * room has counted.
    */
-  | { type: "food"; ack: number; amounts: [number, number][]; gone: number[]; eaten: number };
+  | { type: "food"; ack: number; amounts: [number, number][]; gone: number[]; eaten: number; meal?: [amount: number, sugar: number] };
 
 /** Each player's colour, as a dab of paint on the thorax: bright enamels, as researchers mark flies. By player id. */
 export const COLOURS = ["#ffd21f", "#2fb8ff", "#ff4fa3", "#59e05a", "#ff7a1a", "#f4f4f4", "#a466ff", "#ff2a2a"] as const;

@@ -54,14 +54,21 @@ jobs:
       - uses: ./.github/actions/brain
       - run: npm test
 
-  e2e:
-    # The game in headless Chromium with the real brain, then the built site (npm run e2e). It
-    # reports without blocking: with no GPU, the game's adaptive quality draws in bigger pixels
-    # here, and the fly is then too few of them for the X-ray step's view inside it
-    # (apps/web/src/nerves/xray.ts). Run it locally before merging.
+  e2e-suite:
+    # The game in headless Chromium with the real brain, then the built site (npm run e2e, a suite
+    # a job, side by side). There's no GPU here, so Chromium draws in software, a few frames a
+    # second. The suites hold the picture at its full level, keep the screensaver away and set the
+    # pages' clocks to morning (holdSteady in scripts/play.ts), rather than let the game's adaptive
+    # quality (apps/web/src/quality.ts) draw the fly in pixels too big for the X-ray or the real
+    # hour put it to sleep, and they wait on game time or frames, not the clock.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    name: e2e (${{ matrix.suite }})
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [play, pointer, web, tables]
     runs-on: ubuntu-latest
-    continue-on-error: true
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -71,7 +78,15 @@ jobs:
       - run: npm ci
       - uses: ./.github/actions/brain
       - run: npx playwright install --with-deps chromium
-      - run: npm run e2e
+      - run: node apps/web/e2e/${{ matrix.suite }}.e2e.ts
+
+  e2e:
+    # One check for the suites, whatever they are, to require before merging: passed, or skipped with them on a draft.
+    if: always()
+    needs: e2e-suite
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.e2e-suite.result }}" = success || test "${{ needs.e2e-suite.result }}" = skipped
 
   release:
     # A push to main with something new since the last v* tag (release.config.mjs) tags it and

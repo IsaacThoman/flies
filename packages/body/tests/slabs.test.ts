@@ -121,13 +121,14 @@ test("walking off a table's edge, it falls onto the chair seat pushed in under i
   assert.ok(body.position.y > 44 && body.position.y < 48);
 });
 
-test("under a table its antennae feel a leg they press into, not the table top over them; in the air, the table top's edge", () => {
+test("under a table its antennae feel a leg they walk into, not the table top over them; in the air, the table top's edge", () => {
   const senses = new SenseTracker();
   const pantry = new Pantry(world, []);
   const feel = (body: FlyBody) => senses.update({ dt: DT, body, world, pantry, looming: [], stroke: 0, air: still.air, eyesOpen: false, proboscis: 0 });
   const open = new FlyBody(world, { x: -50, z: 0, yaw: 0, y: 0 });
   assert.equal(feel(open).bumpLeft + feel(open).bumpRight, 0);
-  const leg = new FlyBody(world, { x: -90 - 4 - HEAD_AHEAD * FLY_LENGTH - 0.2, z: -50, yaw: Math.PI / 2, y: 0 });
+  const leg = new FlyBody(world, { x: -90 - 4 - HEAD_AHEAD * FLY_LENGTH - 2, z: -50, yaw: Math.PI / 2, y: 0 });
+  for (let t = 0; t < 3 && !leg.blocked; t += DT) leg.step(intent({ speed: 10, walking: true }), still, DT);
   const touched = feel(leg);
   assert.ok(touched.bumpLeft > 0 && touched.bumpRight > 0);
   const edge = airborne(-100 - HEAD_AHEAD * FLY_LENGTH - 0.2, 73, 0, { x: 0, y: 0, z: 0 }, Math.PI / 2);
