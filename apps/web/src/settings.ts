@@ -128,9 +128,9 @@ const SHELF_KEY = "flies.shelf";
 const LEARNED_KEY = "flies.learned";
 const TABLE_KEY = "flies.table";
 
-type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
+export type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 
-function storage(): Storage | null {
+export function storage(): Storage | null {
   try {
     return typeof localStorage === "undefined" ? null : localStorage;
   } catch {
@@ -139,7 +139,7 @@ function storage(): Storage | null {
 }
 
 /** A saved object, or null if there is none or it can't be read. */
-function read(store: Storage | null, key: string): Record<string, unknown> | null {
+export function read(store: Storage | null, key: string): Record<string, unknown> | null {
   try {
     const saved: unknown = JSON.parse(store?.getItem(key) ?? "null");
     return saved && typeof saved === "object" && !Array.isArray(saved) ? (saved as Record<string, unknown>) : null;
@@ -148,9 +148,14 @@ function read(store: Storage | null, key: string): Record<string, unknown> | nul
   }
 }
 
-function write(store: Storage | null, key: string, value: unknown) {
+export function write(store: Storage | null, key: string, value: unknown) {
+  writeText(store, key, JSON.stringify(value));
+}
+
+/** Saves what is already JSON. */
+export function writeText(store: Storage | null, key: string, text: string) {
   try {
-    store?.setItem(key, JSON.stringify(value));
+    store?.setItem(key, text);
   } catch {
     // Full or blocked: it lasts until the app closes.
   }

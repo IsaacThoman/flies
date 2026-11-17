@@ -103,17 +103,39 @@ export function pressureAfter(pressure: number, seconds: number, asleep: boolean
 }
 
 /**
+ * Sleep pressure after `seconds` lived as a fly left to itself would live
+ * them, from `pressure` at the hour `from`: asleep whenever the clock pushes it
+ * more than halfway toward sleep, awake otherwise, on a model day in steps of
+ * five minutes. This is how time away is lived (the game closed or hidden): a
+ * stand-in, as nothing watches the fly then. Two days are enough to forget
+ * where it started (the pressure keeps 2% of it after two days awake), so a
+ * longer absence is lived as its last two days, from nothing.
+ */
+export function pressureLeftAlone(pressure: number, from: number, seconds: number, sun: Sun, pace: DayPace = "natural") {
+  if (!(seconds > 0)) return clamp01(pressure);
+  const step = 1 / 12;
+  let hours = seconds / 3600;
+  if (hours > 2 * DAY) {
+    from += hours - 2 * DAY;
+    hours = 2 * DAY;
+    pressure = 0;
+  }
+  const clock = { morning: 0, evening: 0, sleep: 0 };
+  for (let t = 0; t < hours; t += step) {
+    const dt = Math.min(step, hours - t);
+    pressure = pressureAfter(pressure, dt * 3600, clockAt(from + t, sun, clock, pace).sleep > 0.5);
+  }
+  return clamp01(pressure);
+}
+
+/**
  * The sleep pressure a fly left to itself would have at this hour: two days
- * lived through on a model day, asleep whenever the clock pushes it more than
- * halfway toward sleep. So a fly that has just arrived (the page loaded) is as
- * sleepy as the hour makes it, not freshly rested.
+ * lived through from nothing (`pressureLeftAlone`). So a fly with nothing to
+ * remember (the first launch, or a fly away for days) is as sleepy as the hour
+ * makes it, not freshly rested.
  */
 export function usualPressure(hours: number, sun: Sun, pace: DayPace = "natural") {
-  const step = 1 / 12;
-  const clock = { morning: 0, evening: 0, sleep: 0 };
-  let pressure = 0;
-  for (let h = hours - 2 * DAY; h < hours; h += step) pressure = pressureAfter(pressure, step * 3600, clockAt(h, sun, clock, pace).sleep > 0.5);
-  return pressure;
+  return pressureLeftAlone(0, hours - 2 * DAY, 2 * DAY * 3600, sun, pace);
 }
 
 /** The fly's clock and sleep, moved on frame by frame. Allocates nothing per frame. */
