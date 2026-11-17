@@ -114,7 +114,7 @@ async function main() {
   }
   if (values.analyse) {
     const input = JSON.parse(readFileSync(values.analyse, 'utf8'));
-    if (input.schema !== 2 || !Array.isArray(input.results)) throw new Error('analyse requires a schema 2 ethogram recording');
+    if (input.schema !== 3 || !Array.isArray(input.results)) throw new Error('analyse requires schema 3 continuous-flight recording; schema 2 is historical and must be rerun');
     const results: Awaited<ReturnType<typeof measure>> = input.results.map((r: Awaited<ReturnType<typeof measure>>[number]) => ({ ...r, hour: r.hour ?? input.clock?.heldHour ?? input.options?.hour, comparisons: comparisons(r.measured) }));
     const escape: Awaited<ReturnType<typeof escapeBattery>> | null = input.escape ? { ...input.escape, summary: summarizeEscape(input.escape.trials) } : null;
     const report = { ...input, results, escape, scorecard: scorecard(results.at(-1)?.measured ?? {}, escape), analysis: { commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), dirty: execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0, sourceRecording: values.analyse } };
@@ -142,7 +142,7 @@ async function main() {
   }
   finally { lease.release(); process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop); }
   const report = {
-    schema: 2, options, assay: values.assay, dtSeconds: DT, clock: { heldHour: options.hour, sunrise: 6, sunset: 18, initialPressure: 'Rhythm default usualPressure(hour); subsequent homeostasis evolves' },
+    schema: 3, options, assay: values.assay, dtSeconds: DT, clock: { heldHour: options.hour, sunrise: 6, sunset: 18, initialPressure: 'Rhythm default usualPressure(hour); subsequent homeostasis evolves' },
     commit, dirty,
     connectomeSha256: createHash('sha256').update(new Uint8Array(data)).digest('hex'),
     attribution: 'FlyEM male CNS connectome, Janelia Research Campus (CC-BY 4.0)',

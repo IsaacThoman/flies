@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { loomGeometry, facetLuminance, screenAt, regression, summarizeEscape, wilson, SCREEN, LV_MS, validateEscapeOptions } from '../../../scripts/ethogram/escape.ts';
+import { loomGeometry, facetLuminance, screenAt, regression, summarizeEscape, wilson, SCREEN, LV_MS, validateEscapeOptions, EscapeFlight } from '../../../scripts/ethogram/escape.ts';
 import type { EscapeTrial } from '../../../scripts/ethogram/escape.ts';
 import { scorecard, validateOpticalEvidence } from '../../../scripts/ethogram/scoring.ts';
 import { validateOptions } from '../../../scripts/ethogram.ts';
 
 const eye = { x: 0, y: 1, z: 0 };
-const trial: EscapeTrial = { seed: 1, kind: 'black', lvMs: 20, eligible: true, quietWaitSeconds: 3, baselineTakeoffs: 0, readyActivity: 'resting', takeoffMs: null, ttcMs: null, jumpSpeedMmS: null, jumpAngleDeg: null, flown: false, maxEscape: 0, maxLoomInput: 0, hour: 6 };
+const trial: EscapeTrial = { seed: 1, kind: 'black', lvMs: 20, eligible: true, quietWaitSeconds: 3, baselineTakeoffs: 0, readyActivity: 'resting', takeoffMs: null, ttcMs: null, jumpSpeedMmS: null, jumpAngleDeg: null, flown: false, longestPoweredFlightSeconds: 0, maxEscape: 0, maxLoomInput: 0, hour: 6 };
 
 test('loom obeys the published angular expansion, pixel rounding and endpoints', () => {
   const g = loomGeometry(40);
@@ -47,7 +47,7 @@ test('checkerboard has eight white and eight black tiles at every size', () => {
 });
 
 test('timing keeps negative TTC and does not invent latencies for nonresponses', () => {
-  const trials = [5, 20, 80].map((lvMs, i) => ({ ...trial, seed: i, lvMs, takeoffMs: 300, ttcMs: 2 * lvMs - 22, flown: true }));
+  const trials = [5, 20, 80].map((lvMs, i) => ({ ...trial, seed: i, lvMs, takeoffMs: 300, ttcMs: 2 * lvMs - 22, flown: true, longestPoweredFlightSeconds: 0.05 }));
   const s = summarizeEscape([...trials, { ...trial, seed: 4 }]);
   assert.equal(s.black.successes, 3);
   assert.equal(s.black.probability, 0.75);
@@ -72,7 +72,7 @@ function evidence(respond: boolean) {
   const trials: EscapeTrial[] = [];
   for (const kind of ['black', 'checkerboard'] as const) for (const lvMs of LV_MS) {
     const ttcMs = (kind === 'black' ? 2 * lvMs - 6 : 2.1 * lvMs - 22);
-    trials.push({ ...trial, kind, lvMs, seed: seed++, flown: respond, takeoffMs: respond ? loomGeometry(lvMs).collisionSeconds * 1000 - ttcMs : null, ttcMs: respond ? ttcMs : null });
+    trials.push({ ...trial, kind, lvMs, seed: seed++, flown: respond, longestPoweredFlightSeconds: respond ? 0.05 : 0, takeoffMs: respond ? loomGeometry(lvMs).collisionSeconds * 1000 - ttcMs : null, ttcMs: respond ? ttcMs : null });
   }
   for (const kind of ['flash', 'blank'] as const) trials.push({ ...trial, kind, lvMs: 40, seed: seed++ });
   return { protocol: { hour: 6, perRatio: 1, firstSeed: 0, lvMs: LV_MS, screen: SCREEN }, trials };
@@ -122,8 +122,25 @@ test('optical options fail before an expensive free-behaviour run begins', () =>
 
 
 test('control takeoffs never acquire a fabricated zero TTC', () => {
-  const s = summarizeEscape([{ ...trial, kind: 'flash', lvMs: 40, takeoffMs: 30, flown: true }]);
+  const s = summarizeEscape([{ ...trial, kind: 'flash', lvMs: 40, takeoffMs: 30, flown: true, longestPoweredFlightSeconds: 0.05 }]);
   assert.equal(s.flash.takeoffMsMean, 30);
   assert.equal(s.flash.ttcMsMean, null);
   assert.equal(s.flash.perLv.find(r => r.lvMs === 40)!.ttcMsMean, null);
+});
+
+
+test('flight needs ten consecutive powered frames in the first airborne bout', () => {
+  const flight = new EscapeFlight();
+  for (let i = 0; i < 6; i++) flight.step(true, true);
+  flight.step(true, false);
+  for (let i = 0; i < 6; i++) flight.step(true, true);
+  assert.equal(flight.longestSeconds, 0.03);
+  assert.equal(flight.flown, false);
+  flight.step(false, false);
+  for (let i = 0; i < 20; i++) flight.step(true, true);
+  assert.equal(flight.flown, false, 'a later jump cannot qualify the first departure');
+  const continuous = new EscapeFlight();
+  for (let i = 0; i < 10; i++) continuous.step(true, true);
+  assert.equal(continuous.longestSeconds, 0.05);
+  assert.equal(continuous.flown, true);
 });

@@ -18,7 +18,7 @@ export function validateOpticalEvidence(e: OpticalEvidence) {
     seen.add(t.seed);
     if (typeof t.eligible !== 'boolean' || typeof t.flown !== 'boolean' || t.hour !== p.hour || !Number.isFinite(t.quietWaitSeconds) || t.quietWaitSeconds < 0 || !Number.isFinite(t.maxEscape) || t.maxLoomInput !== 0 || (t.eligible && t.quietWaitSeconds < 3)) throw new Error('invalid optical readiness, clock or sensory route');
     if (t.takeoffMs !== null && (!t.eligible || !Number.isFinite(t.takeoffMs) || t.takeoffMs < 0)) throw new Error('invalid takeoff observation');
-    if (t.flown && t.takeoffMs === null) throw new Error('flight has no takeoff observation');
+    if (!Number.isFinite(t.longestPoweredFlightSeconds) || t.longestPoweredFlightSeconds < 0 || t.flown !== (t.takeoffMs !== null && t.longestPoweredFlightSeconds >= 0.05)) throw new Error('flight does not match a continuous powered episode');
     if (t.kind === 'black' || t.kind === 'checkerboard') {
       if (!LV_MS.includes(t.lvMs as typeof LV_MS[number])) throw new Error('unregistered expansion rate');
       if (t.takeoffMs !== null && (t.ttcMs === null || !Number.isFinite(t.ttcMs) || Math.abs(t.ttcMs - (loomGeometry(t.lvMs).collisionSeconds * 1000 - t.takeoffMs)) > 1e-6)) throw new Error('TTC inconsistent with stimulus and takeoff');

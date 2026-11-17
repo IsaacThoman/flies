@@ -12,7 +12,7 @@ export const ESCAPE_PLACE: Place = { floor: { kind: 'circle', r: 2.5 }, solids: 
 export type EscapeKind = 'black' | 'checkerboard' | 'flash' | 'blank';
 export type Vec = { x: number; y: number; z: number };
 export type ScreenPose = { center: Vec; right: Vec; horizontal: Vec };
-export type EscapeTrial = { seed: number; kind: EscapeKind; lvMs: number; eligible: boolean; quietWaitSeconds: number; baselineTakeoffs: number; readyActivity: string; takeoffMs: number | null; ttcMs: number | null; jumpSpeedMmS: number | null; jumpAngleDeg: number | null; flown: boolean; maxEscape: number; maxLoomInput: number; hour: number };
+export type EscapeTrial = { seed: number; kind: EscapeKind; lvMs: number; eligible: boolean; quietWaitSeconds: number; baselineTakeoffs: number; readyActivity: string; takeoffMs: number | null; ttcMs: number | null; jumpSpeedMmS: number | null; jumpAngleDeg: number | null; flown: boolean; longestPoweredFlightSeconds: number; maxEscape: number; maxLoomInput: number; hour: number };
 
 /** Pixel rounding and endpoints follow Fotowat et al. 2009, Visual stimulation. */
 export function loomGeometry(lvMs: number) {
@@ -78,6 +78,21 @@ export function summarizeEscape(trials: readonly EscapeTrial[]) {
   return { black, checkerboard, flash, blank, values: { escapeBWProbability: black.probability, escapeCBProbability: checkerboard.probability, escapeFlashProbability: flash.probability, escapeBWSlope: black.fit?.slope ?? null, escapeBWIntercept: black.fit?.intercept ?? null, escapeCBSlope: checkerboard.fit?.slope ?? null, escapeCBIntercept: checkerboard.fit?.intercept ?? null } };
 }
 
+/** Only one airborne episode can follow the measured first departure. */
+export class EscapeFlight {
+  #run = 0;
+  #longest = 0;
+  #landed = false;
+  step(airborne: boolean, powered: boolean) {
+    if (this.#landed) return;
+    if (!airborne) { this.#landed = true; this.#run = 0; return; }
+    this.#run = powered ? this.#run + 1 : 0;
+    this.#longest = Math.max(this.#longest, this.#run);
+  }
+  get longestSeconds() { return this.#longest * SCREEN.frameSeconds; }
+  get flown() { return this.longestSeconds >= 0.05; }
+}
+
 export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: number, seed: number, hour: number, checkpoint: () => Promise<void>): Promise<EscapeTrial> {
   await checkpoint();
   const driver = new InProcessBrain(data, seed);
@@ -101,7 +116,7 @@ export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: nu
     const speed = Math.hypot(p.x - x, p.y - y, p.z - z) / dt;
     quiet = life.body.onFeet && speed <= 0.5 && angular <= 20 * Math.PI / 180 ? quiet + dt : 0;
   }
-  const result: EscapeTrial = { seed, kind, lvMs, eligible: quiet >= 3, quietWaitSeconds: frame * dt, baselineTakeoffs: life.takeOffs, readyActivity: life.activity, takeoffMs: null, ttcMs: null, jumpSpeedMmS: null, jumpAngleDeg: null, flown: false, maxEscape: 0, maxLoomInput: 0, hour };
+  const result: EscapeTrial = { seed, kind, lvMs, eligible: quiet >= 3, quietWaitSeconds: frame * dt, baselineTakeoffs: life.takeOffs, readyActivity: life.activity, takeoffMs: null, ttcMs: null, jumpSpeedMmS: null, jumpAngleDeg: null, flown: false, longestPoweredFlightSeconds: 0, maxEscape: 0, maxLoomInput: 0, hour };
   if (!result.eligible) { driver.dispose(); return result; }
   life.body.point(0.42, 0.3, 0, eye);
   const pose = screenAt(eye, life.body.yaw);
@@ -109,7 +124,7 @@ export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: nu
   const presentation = kind === 'flash' ? 0.025 : geometry.seconds;
   const responseEnd = kind === 'flash' ? 0.25 : presentation + 0.25;
   const duration = responseEnd + 0.1;
-  let airAfterJump = 0;
+  const flight = new EscapeFlight();
   try {
     for (let i = 0; i < Math.ceil(duration / dt); i++) {
       if (i % 200 === 0) await checkpoint();
@@ -130,11 +145,12 @@ export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: nu
         result.jumpSpeedMmS = Math.hypot(v.x, v.y, v.z);
         result.jumpAngleDeg = Math.atan2(v.y, Math.hypot(v.x, v.z)) * 180 / Math.PI;
       }
-      if (result.takeoffMs !== null && !life.body.onFeet && life.intent.wings >= 0.6 && life.body.wingbeat > 0.15) airAfterJump += dt;
+      if (result.takeoffMs !== null) flight.step(!life.body.onFeet, life.intent.wings >= 0.6 && life.body.wingbeat > 0.15);
+      result.longestPoweredFlightSeconds = flight.longestSeconds;
     }
   } finally { driver.dispose(); }
-  // A jump followed by at least 50 ms of powered airborne wing drive operationalizes jump-and-flight; report the rule.
-  result.flown = result.takeoffMs !== null && airAfterJump >= 0.05;
+  // A jump followed by one continuous ≥50 ms episode of powered airborne wing drive operationalizes jump-and-flight; report the rule.
+  result.flown = result.takeoffMs !== null && flight.flown;
   return result;
 }
 
@@ -153,5 +169,5 @@ export async function escapeBattery(data: ArrayBuffer, perRatio: number, hour: n
     process.stderr.write(`${kind} l/v=${lv} ms: ${n + 1}/${perRatio}\n`);
   }
   for (const kind of ['flash', 'blank'] as const) for (let n = 0; n < perRatio; n++) trials.push(await opticalTrial(data, kind, 40, seedBase++, hour, checkpoint));
-  return { protocol: { hour, sunrise: 6, sunset: 18, lvMs: LV_MS, perRatio, firstSeed, screen: SCREEN, source: 'Fotowat et al. 2009, Figures 1–3; Visual stimulation; Video recordings and analysis', limitations: ['Clock time was not reported in the publication; assay pins ZT0 to remove clock variation.', 'The virtual 5 mm platform reproduces the funnel exit diameter, not climbing inside the funnel.', 'Facet luminance preserves measured contrast ratios; spectral composition and absolute photon flux are not modeled.', 'Flash is a uniform 25 ms luminance-off surrogate, not a geometric model of four LEDs.', 'Takeoff time resolution is 5 ms; powered-flight criterion is 50 ms with wing drive ≥0.6 and wingbeat >0.15, not a reconstruction of wing kinematics.', 'The final square is held for a 250 ms response window; negative TTC responses are retained. Flash has a 250 ms onset response window.'] }, trials, summary: summarizeEscape(trials) };
+  return { protocol: { hour, sunrise: 6, sunset: 18, lvMs: LV_MS, perRatio, firstSeed, screen: SCREEN, source: 'Fotowat et al. 2009, Figures 1–3; Visual stimulation; Video recordings and analysis', limitations: ['Clock time was not reported in the publication; assay pins ZT0 to remove clock variation.', 'The virtual 5 mm platform reproduces the funnel exit diameter, not climbing inside the funnel.', 'Facet luminance preserves measured contrast ratios; spectral composition and absolute photon flux are not modeled.', 'Flash is a uniform 25 ms luminance-off surrogate, not a geometric model of four LEDs.', 'Takeoff time resolution is 5 ms; powered-flight criterion is one continuous 50 ms episode in the first airborne bout with wing drive ≥0.6 and wingbeat >0.15, not a reconstruction of wing kinematics.', 'The final square is held for a 250 ms response window; negative TTC responses are retained. Flash has a 250 ms onset response window.'] }, trials, summary: summarizeEscape(trials) };
 }

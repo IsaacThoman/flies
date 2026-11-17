@@ -63,3 +63,23 @@ body-level launch mapping cannot manufacture the absent descending decision.
 Do not lower ESCAPE_ON to make checkerboards succeed. Eye ON-pathway or
 other protected neural work belongs to its owners; this finding is a proposal
 for pathway/readout validation, not a code change to those areas.
+
+The fixed 112-trial cohort (seeds 20000–20111, 06:00) confirmed the pattern:
+20/48 black squares, 1/48 checkerboards, 7/8 uniform flashes, 0/8 blanks;
+all met stationary readiness. Black-square TTC fit: slope 2.259 (model SE
+0.442), intercept −81.574 ms (model SE 11.833). The paper's central intercept
+is −6 ms; negative model TTC was retained. One checkerboard response cannot
+support a timing fit. The body impulse-direction experiment preserved every
+first-response time and success in this paired cohort; changing launch
+mechanics cannot create the missing visually guided decision.
+
+A further readout mismatch deserves a separate neural/interface experiment:
+`DNp01` is smoothed with tau=40 ms and normalized at 200 Hz before the body's
+0.4 (80 Hz) takeoff threshold. A single spike in one of the two GF neurons,
+observed over a 5 ms chunk, produces `(1-exp(-5/40))*1000/(5*2*200)` =
+0.05875 command units, far below 0.4. Fotowat et al. describes single-GF-spike
+motor activation, while WT visually guided escape can use a parallel non-GF
+pathway. Lowering the body threshold to manufacture checkerboard success
+would neither restore that missing pathway nor establish correct WT light-off
+selectivity. The clipped, smoothed command also cannot be treated as an exact
+single-spike timestamp. No threshold change is made here.

@@ -42,3 +42,12 @@ failed at 0.520 versus 0.500 CPU s/s; identical dev brain sources failed at
 0.546. The graphical play e2e passed, including neural takeoff, at a maximum
 90 draws and 350,627 triangles. Paired optical evidence and the blind decision
 remain required.
+
+
+## Disposition
+
+The paired optical cohort did not improve any response or timing score. Blind
+reviewers preferred the control on completed regression evidence despite the
+mechanical rationale. The launch change is therefore **reverted**; production
+body source matches dev. The experiment and its limitations are retained here
+as a rejected candidate, not an accepted fidelity improvement.
