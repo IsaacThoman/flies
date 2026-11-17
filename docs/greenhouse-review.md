@@ -227,6 +227,27 @@ Key: `A7` = greenhouse `17806e45`; `C6` = greenhouse `8fd2a350`; `L3` = windowsi
 
 Accepted over C6: every reviewer scores and ranks A7 higher (7.03 versus 6.25). Two rank it above the reference, but the reference mean remains 7.16; **landing bar not met**. Retained the fig perch, sparser rain filtering, roof reflection in water and revised light. Reviewers still find uniform fig seeds, striped condensation and cone-like crowns. One also identifies elliptical drawn flesh extending beyond the circular taste patch; the following candidate makes that boundary explicit from the food definition.
 
+## Round 10
+
+Key: `G2` = greenhouse `5b56304b`; `N8` = greenhouse `17806e45`; `K5` = windowsill from `8fd2a350`. All evidence uses the matched fixture, native starts, five shared views and eight lighting/weather conditions.
+
+| Reviewer | Set | Scores (criteria 1–8) | Mean | Forced ranking |
+| --- | --- | --- | ---: | --- |
+| 1 | K5 | 7.5, 7, 6.5, 7, 7, 8, 6.5, 7.5 | 7.12 | G2 > K5 > N8 |
+| 1 | G2 | 7, 7, 7, 6.5, 7.5, 8.5, 8, 7 | 7.31 | G2 > K5 > N8 |
+| 1 | N8 | 6.5, 6.5, 6.5, 6, 7, 7, 7.5, 6 | 6.62 | G2 > K5 > N8 |
+| 2 | K5 | 8, 5.5, 7, 7, 7.5, 8, 6, 6.5 | 6.94 | G2 > N8 > K5 |
+| 2 | N8 | 7, 7, 7, 6.5, 7.5, 7.5, 8.5, 7 | 7.25 | G2 > N8 > K5 |
+| 2 | G2 | 7.5, 7, 7.5, 7.5, 8, 9, 9, 8 | 7.94 | G2 > N8 > K5 |
+| 3 | G2 | 6.5, 6.5, 6.5, 6.5, 8, 9, 8, 7 | 7.25 | K5 > G2 > N8 |
+| 3 | K5 | 8, 7, 7.5, 7, 8, 6.5, 6, 7 | 7.12 | K5 > G2 > N8 |
+| 3 | N8 | 6, 6.5, 6, 5.5, 7.5, 7, 7.5, 6.5 | 6.56 | K5 > G2 > N8 |
+| 4 | N8 | 6, 6, 6, 5, 7, 7, 8, 6 | 6.38 | G2 > K5 > N8 |
+| 4 | G2 | 6.5, 6, 6, 6, 7, 8, 8.5, 7 | 6.88 | G2 > K5 > N8 |
+| 4 | K5 | 7.5, 7, 7, 6.5, 7, 6.5, 6, 7 | 6.81 | G2 > K5 > N8 |
+
+**Accepted; landing bar met.** G2 averages 7.34, the existing reference 7.00, and N8 6.70. Every reviewer scores and ranks G2 above N8; three rank it above the reference. Kept the food-derived flesh boundary, varied seed clusters, restrained highlights, continuous dawn fog and broad lower crowns. Reviewer 4 notes that the lower foliage loses presence; this tradeoff is retained rather than omitted. The reference still wins whole-place beauty and prop variety. Further polish should improve plant silhouettes, grouping and wet-wood/clear-water material specificity on a separate branch after this place lands.
+
 ## Validation
 
 - Baseline full test suite, lint and typecheck passed. The browser play suite passed, including every registered place.
@@ -264,3 +285,16 @@ Evidence for every round uses five views at all five times of day, plus rain, ov
 - Landing reference: [contact sheet](https://github.com/IsaacThoman/flies/blob/pr-assets-place-greenhouse/landing-reference/contact.png?raw=true).
 
 Round 9 evidence: [all views](https://github.com/IsaacThoman/flies/tree/pr-assets-place-greenhouse/fig-perch). Its capture measured 12–26 calls, 96 ms total construction and a 33 ms largest step, with no browser errors. From the fig start, body seed 42 passed 1,800 seconds; life seeds 42 and 43 each passed 900 seconds, recording 139 meals and 24 take-offs. Typecheck, lint and all place/geometry tests passed on that source.
+
+## Landing validation
+
+The accepted rendered/runtime source is `5b56304b`. Later commits only record evidence. The place is catalogued, shares its world geometry with the scene, includes footprints for its food, and documents solid crowns in the README.
+
+- Final `npm run typecheck` and `npm run lint`: passed.
+- Final place, greenhouse and drawn-versus-felt suites: 52 tests passed. Greenhouse samples: 826 tops and 510 sides, no added exceptions; five main-camera meshes, 82,108 triangles. Footprint tests passed earlier with unchanged footprint definitions.
+- Final body fuzzer, seed 42: 1,800 simulated seconds, 41,810 steps, 30 starts, 60 probes, passed.
+- Final life fuzzers: seeds 42 and 43, 900 simulated seconds each, 51,435 total steps, 143 meals, 24 take-offs, passed. Batches honor the ten-minute heavy-slot limit and two-minute cooldown. The earlier baseline also passed a continuous 1,800-second life run.
+- Full local `npm test`, including Apple-specific checks and budgets, passed during integration. Farm lint, web/TV typechecks, build and 905 unit tests passed (902 passed, 3 skipped); the farm excludes architecture-specific exact-math tests and M5 CPU budgets. Its wrapper changed during the run and failed parsing after unit completion; e2e was submitted separately and is queued. Earlier local browser play e2e passed, including every registered place.
+- Final browser evidence: 11–26 frame draws, 120,235–142,261 frame triangles, 72 ms total construction and 25 ms largest step. No browser errors. These desktop measurements do not certify device timings or prove absence of temporal flicker.
+
+Round 10 evidence: [contact sheet](https://github.com/IsaacThoman/flies/blob/pr-assets-place-greenhouse/crown-and-flesh/contact.png?raw=true), [all views](https://github.com/IsaacThoman/flies/tree/pr-assets-place-greenhouse/crown-and-flesh). All 533 image files are held only on the parentless assets branch. The PR is ready for the maintainer; this task does not merge it and does not wait for GitHub CI.
