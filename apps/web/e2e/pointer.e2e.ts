@@ -262,6 +262,22 @@ async function fingers() {
     assert.equal(await game<string>(page, "g.stage.set.group.userData.mark"), "still here");
     await tool("feed");
 
+    step("fingers: rotating during a held world press cancels the obsolete release");
+    await waitForGameTime(page, 0.5);
+    const newestFood = () => game<number>(page, "Math.max(0, ...g.life.pantry.foods.filter(f => f.kind !== 'patch' && f.kind !== 'found').map(f => f.id))");
+    const foodBeforeRotation = await newestFood();
+    await touch.hold(await screenOf(page, "fly"), async () => {
+      await page.setViewportSize({ width: 393, height: 852 });
+      await page.evaluate(() => {
+        (window as unknown as Record<string, unknown>).__flySafeArea = { top: 59, right: 0, bottom: 34, left: 0 };
+        window.dispatchEvent(new Event("resize"));
+      });
+      await waitFor(page, "frame=376x815");
+    });
+    await waitForGameTime(page, 0.5);
+    assert.equal(await newestFood(), foodBeforeRotation, "the rotated release dropped no food");
+    assert.equal(await game<boolean>(page, "g.director.hand.held"), false, "the camera is released too");
+
     step("fingers: the wallpaper comes, and a tap brings the controls back and does nothing else");
     await game(page, "(g.settings.wallpaperAfter = 2)");
     await waitFor(page, "wallpaper=true");

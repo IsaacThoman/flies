@@ -23,6 +23,8 @@ export type HudLayout = {
   /** The middle of the safe area, across, and its width. */
   cx: number;
   width: number;
+  /** Touch layouts keep portrait Menu in thumb range and a short screen's label beside its shelf. */
+  touch: { labelCx: number; labelY: number; labelWidth: number; menuY: number; menuAtFoot: boolean; targetHeight: number } | null;
   /** The caption's middle, down. */
   captionY: number;
   /** The shelf: its middle, down; the space each tool has; how big the orbs are (1 on the TV); where the first slot starts; the first tool of its second half, and how far that half is apart. */
@@ -71,11 +73,25 @@ export function hudLayout(frame: Frame): HudLayout {
   const a = safeRect(frame);
   const cx = a.x + a.w / 2;
   const bottom = a.y + a.h;
-  const apart = split > 0 && split < tools ? Math.max(SHELF_APART_LEAST, Math.min(SHELF_APART, a.w - 16 - tools * SHELF_GAP)) : 0;
-  const gap = Math.min(SHELF_GAP, (a.w - 16 - apart) / tools);
+  const compact = frame.coarse && a.h < 360 && a.w > a.h * 1.4 && a.w * frame.unit >= 700;
+  const touchApart = Math.min(SHELF_APART, a.w - 16 - tools * (44 / frame.unit));
+  const apart = frame.coarse ? (a.w > a.h * 1.2 && frame.unit > 1.25 ? Math.max(SHELF_APART, a.w - 16 - tools * SHELF_GAP) : touchApart >= 16 ? (compact ? 16 : touchApart) : 0) : split > 0 && split < tools ? Math.max(SHELF_APART_LEAST, Math.min(SHELF_APART, a.w - 16 - tools * SHELF_GAP)) : 0;
+  const gapWanted = compact ? Math.max(44 / frame.unit, Math.min(SHELF_GAP, (a.w - 32 - apart - 216) / tools)) : SHELF_GAP;
+  const gap = Math.min(gapWanted, (a.w - 16 - apart) / tools);
   const shelfY = bottom - 34;
   const labelY = shelfY - 61;
-  const shelfLeft = cx - (gap * tools + apart) / 2;
+  const shelfWidth = gap * tools + apart;
+  const shelfLeft = compact ? a.x + 8 : cx - shelfWidth / 2;
+  const menuAtFoot = frame.coarse;
+  const menuBeside = menuAtFoot && a.w * frame.unit >= 375;
+  const touch = frame.coarse ? {
+    labelCx: compact ? (shelfLeft + shelfWidth + 16 + a.x + a.w - 8) / 2 : cx + (menuBeside ? 28 : 0),
+    labelWidth: compact ? a.x + a.w - 8 - (shelfLeft + shelfWidth + 16) : a.w - 16 - (menuBeside ? 56 : 0),
+    labelY: compact ? shelfY : labelY,
+    menuY: compact ? shelfY - 52 : labelY - (menuBeside ? 0 : 45),
+    menuAtFoot,
+    targetHeight: Math.max(32, 44 / frame.unit),
+  } : null;
   // The hints keep to the corners beside the shelf (the lowest, "Tools", is beside it), unless the shelf reaches them: then above the label.
   const beside = shelfLeft - 8 > a.x + 16 + 100;
   const hintsY = beside ? shelfY : labelY - 36;
@@ -93,6 +109,7 @@ export function hudLayout(frame: Frame): HudLayout {
   return {
     cx,
     width: a.w,
+    touch,
     captionY: a.y + 25,
     shelfY,
     gap,
@@ -353,7 +370,7 @@ export function loadingLayout(frame: Frame): LoadingLayout {
 /** The room the HUD leaves the fly while playing, between the caption and the tool's label: its share of the height, and where the fly's middle falls in it (a share of the half-height below the middle), about two thirds of the way down. */
 function playSpot(frame: Frame, hud: HudLayout) {
   const top = hud.captionY + 15;
-  const bottom = hud.labelY - 17;
+  const bottom = hud.touch && hud.touch.labelY === hud.shelfY ? hud.shelfY - 26 : hud.labelY - 17;
   const half = frame.design.height / 2;
   return { share: (bottom - top) / frame.design.height, low: (top + 0.7 * (bottom - top) - half) / half };
 }

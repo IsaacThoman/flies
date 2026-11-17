@@ -21,8 +21,8 @@ measurements are in `src/anatomy.ts`; the shapes and colours in `src/body.ts`.
 | Part | Built from |
 | --- | --- |
 | Head | A wide capsule flattened at the back where it meets the thorax: orange frons between the eyes, pale face below, darker vertex and occiput. A short membranous neck joins it to the thorax. |
-| Compound eyes | Ellipsoid caps sunk into the sides of the head, deep brick red. The fragment shader draws a hexagonal lattice of about 900 facets, each a small dome that catches the light, and the **pseudopupil**: the dark spot where you look straight down the ommatidia, which follows the viewer across the eye. Both fade out by their screen-space derivatives once facets are smaller than a pixel, so the eye never shimmers. |
-| Ocelli | Three glossy amber domes in a triangle on a dark ocellar triangle on the vertex. |
+| Compound eyes | Ellipsoid caps sunk into the sides of the head, deep brick red. The fragment shader draws a hexagonal lattice of about 1,180 decorative facet cells per eye cap, each a small dome that catches the light, and the **pseudopupil**: the dark spot where you look straight down the ommatidia, which follows the viewer across the eye. The facet detail fades with its screen-space derivatives once it is smaller than a pixel; the pseudopupil depends on viewing angle and does not share that fade. |
+| Ocelli | Three glossy amber domes in a triangle on a dark patch on the vertex. |
 | Antennae | Scape, pedicel and the oval third segment hanging in front of the face, and the **arista**: a fine plumose bristle from the top of the third segment with branches above and below. Each antenna is a joint that twitches. |
 | Proboscis | Rostrum, haustellum and the two-lobed labellum with its food channels, each a joint. Folded up under the head at rest; extended it reaches the surface just in front of the head through a fixed-length two-link reach, and the lobes spread flat on the food. |
 | Thorax | A deformed ellipsoid: broad blunt shoulders, the scutum arching up behind the neck, flatter sternum. Tan, darker above, paler pleura, faint dorsocentral stripes. The **microchaetae** (the rows of tiny hairs) are a procedural pattern that fades out when small; the **macrochaetae** are real geometry: humerals, notopleurals, supra- and post-alars, dorsocentrals, katepisternals. |
@@ -37,21 +37,23 @@ measurements are in `src/anatomy.ts`; the shapes and colours in `src/body.ts`.
 
 `src/nerves/` builds the fly's brain, optic lobes, neck connective, ventral
 nerve cord and nerves, inside the body, for the game's X-ray and its corner
-panel (the game's README, Its nervous system, says how they are shown and
-lit). `createFly()` returns it as `nerves`: its 93 parts (`parts.ts`: each
-with a role, sensory, central or motor, and a kind), a `glow` array the game
-fills (a float a part), and `xray`, 0 to 1.
+panel ([Its nervous system](../../README.md#its-nervous-system) says how they
+are shown and lit). `createFly()` returns it as `nerves`: its 102 parts
+(`parts.ts`: each with a role, sensory, central or motor, and a kind), a
+`glow` array the game fills (one float per part, padded to 104), and `xray`,
+0 to 1.
 
 - **Measured.** The neuropils' shapes are fitted to the FlyEM male CNS v1.0's
   neuropil meshes by `scripts/nerves.ts` (`node packages/fly/scripts/nerves.ts`,
-  which downloads about 150 MB of meshes once and rewrites
+  which caches roughly 150 MB of meshes and rewrites
   `src/nerves/measured.ts`): each as its radius in a grid of directions round
   its centre, the lamina as a curved plate round the sphere that fits it, the
   mushroom body's lobes and the protocerebral bridge as rods, the ellipsoid
-  body as a torus, and where the cord's nerves leave it. `anatomy.ts` places
-  the brain in the head (0.88 of true size, its optic lobes under the eyes)
-  and the cord on the thorax's floor (true size), and says what the dataset
-  doesn't hold (the retina, the neck's path, the pars intercerebralis).
+  body as a torus, and where the cord's nerves leave it.
+  `src/nerves/anatomy.ts` uses 2.4 mm per body length to place the brain
+  in the head at 0.88 scale, its optic lobes under the eyes, and the cord
+  on the thorax's floor at full scale. It also identifies stand-ins for
+  the retina, the neck's path and the pars intercerebralis.
 - **Posed by the rig.** Like the body, every vertex belongs to one joint and is
   stored in its space (the shapes are laid out on a rest pose and carried
   into each joint's frame); a tube can run through several joints, a ring to
@@ -72,8 +74,8 @@ fills (a float a part), and `xray`, 0 to 1.
 ## How it moves
 
 `src/rig.ts` turns the pose into a frame for every rigid piece. Inputs are
-smoothed first (first-order lags and rate limits), so any pose, however
-jumpy, gives continuous motion.
+smoothed with first-order lags and rate limits. Ground-foot transport uses
+the supplied speed and turn directly; wing blur also jitters each update.
 
 - **Walking** (`src/gait.ts`). A continuous speed-dependent phase spread
   gives wave-like support when slow, tetrapod-like overlaps between, and
@@ -101,20 +103,24 @@ jumpy, gives continuous motion.
   stretched to; each leg also has a reach the gait keeps its feet within.
 - **Standing**: the abdomen breathes, the head glances about, the antennae
   twitch, and now and then a foot shifts. This is animation, not behaviour:
-  it never moves the fly, and it fades out whenever the pose asks for
-  anything.
+  it never moves the fly through the world. Activity suppresses head glances
+  and foot shifts; antenna twitches continue while awake, and abdominal
+  breathing continues during activity.
 - **Grooming**: a sustained command starts with foreleg rubbing, then eye
   and antennal sweeps. The hind legs subsequently sweep the abdomen, folded
-  wings, and rub together. The opposite pair stays planted during each stage.
-  The sequence crossfades through six-foot support and repeats every 12 s.
+  wings, and rub together. Away from the handoffs, the opposite pair
+  stays on its ground targets.
+  Front- and hind-leg activity crossfade; the sequence repeats every 12 s
+  of its animation clock.
   Targets follow the posed eye, antenna, abdominal and wing surfaces, including
   breathing and crop swelling. The thorax shifts toward supporting pairs.
-  Command strength controls vigour, while active strokes still reach the skin.
+  Command strength controls vigour; active strokes target the skin.
   Seeds et al. (2014) motivates anterior-to-posterior ordering and interleaved
   leg rubbing. The command has no dirt level or cleaning-site selection:
   the clock and site targets are explicitly an animation stand-in, not a
-  simulated suppression hierarchy. Feeding takes precedence; walking and
-  flight suspend the sequence.
+  simulated suppression hierarchy. Feeding suppresses visible grooming
+  without pausing its clock. Walking and leg tucking reduce the visible
+  blend and slow the clock, stopping it at full walking or full tuck.
 - **Feeding**: the body lowers and the head bows. Rostrum lift, haustellum
   extension, labellar extension and spreading use overlapping windows, in
   that order (Schwarz et al. 2017), reversing on withdrawal. It unfolds to
@@ -129,7 +135,7 @@ jumpy, gives continuous motion.
   frames a second instead of strobing, because it does not depend on
   sampling a 200 Hz beat. On the ground the amplitude follows `wings`.
 - **Take-off and flight**: `crouch` lowers the body, draws the middle legs in
-  and raises the wings a little. When `airborne` turns on the legs stay
+  during take-off preparation. When `airborne` turns on the legs stay
   extended for a moment as if pushing off, then fold (front legs under the
   head, the others trailing). In the air the body takes `pitch` and `roll`
   and the stroke plane tilts. `landing` extends them during approach while the wings keep beating. The
@@ -154,47 +160,50 @@ follows the number of objects and draw calls. So:
   own space; the rig writes each joint's 3×4 matrix into a `Float32Array`
   that *is* the uniform (`vec4 uJoints[123]`), and the shader applies one
   matrix per vertex. This was chosen over a `SkinnedMesh` because that would
-  mean 41 bone `Object3D`s for three to traverse and update every frame, a
-  4×4 matrix per bone, an inverse-bind multiply and a bone texture upload,
-  all in JavaScript; and over a CPU rewrite of the vertices because that
-  costs thousands of vertices of JavaScript. Here the per-frame JavaScript
-  is a few hundred multiplies on typed arrays, and there is no scene-graph
-  node per joint.
+  add bone objects and skeleton updates; and over a CPU rewrite of the
+  vertices because that would process thousands of vertices in JavaScript.
+  Here the rig writes typed arrays, with no scene-graph node per joint.
 - **Invisible wing copies reuse the solid copy's frame.** When blur opacity
   is below 0.00001, the seven imperceptible copies on each side need no
   independent posing; their alpha is zero. This pays for sub-frame contact
   integration without adding a mesh or joint.
-- **Nothing allocated per frame.** All scratch is preallocated; the tests
-  run the update in V8 with its compilers off and check that it allocates
-  nothing but the boxed numbers V8's interpreter makes (JSC does not box
-  doubles at all).
+- **Preallocated scratch.** The allocation test samples updates in V8 with
+  its compilers off and rejects sampled allocations whose sizes differ
+  from its boxed numbers. Sampling does not establish zero allocations or
+  JavaScriptCore allocation behaviour.
 - **Built on three's physical material** (via `onBeforeCompile`), so the fly
   takes the game's lights, shadows, fog and environment. Roughness,
   clearcoat and sheen come per vertex. When the scene has no environment
   map the shader reflects a soft painted sky with a studio "window", so the
   cuticle and eyes stay glossy under any lights; with one, it uses that.
-- **Thin parts stay at least a pixel wide.** Tubes (legs, arista, bristles)
+- **Thin legs are widened on screen.** Leg tubes
   carry their axis and radius; the vertex shader measures the radius in
   pixels and pushes the surface out to about half a pixel if it is thinner,
-  so legs never break into dots in a 640×480 frame without antialiasing.
+  to keep legs visible in a 640×480 frame without antialiasing.
+  The arista and fine bristles shrink toward their roots as described above.
   The viewport height comes from `onBeforeRender`.
 
 ## Budgets
 
 | | |
 | --- | --- |
-| Draw calls | 2 (plus 1 each in any shadow pass); the X-ray 1 more |
-| Triangles | about 15,400 (body 14,900, wings 530); the nervous system about 16,100 |
+| Draw calls | 2 visible meshes; the X-ray adds 1. Body and wings each add a draw in a shadow-map pass when shadow casting is enabled |
+| Triangles | historical counts: about 15,400 (body 14,900, wings 530); the nervous system about 16,100; no current count is recorded here |
 | Joints | 41 body joints (thorax, head, 2 antennae, 3 proboscis, 2 abdomen, 2 halteres, 30 leg segments) and 16 wing copies |
-| `update` | about 2.4 µs in Node with its JIT, about 78 µs in V8's interpreter alone (the nearest Node gets to the TV) |
+| `update` | historical timings: about 2.4 µs in Node with its JIT, about 78 µs in V8's interpreter alone; not Apple TV measurements |
 | Textures | one 256×128 RGBA `DataTexture` (wing venation) |
-| Uniforms | the body's 41 joints (123 vec4), the nervous system's glow (24 vec4) |
+| Uniforms | the body's 41 joints (123 vec4), the nervous system's glow (26 vec4) |
+
+The historical triangle counts and timings above have no recorded capture date,
+machine or runtime version here; they are not current budgets or measurements.
+The current JIT update limit is 5.6 M5 Pro CPU µs in
+`packages/fly/tests/update.budget.ts`.
 
 ## The viewer
 
-`npm run fly:viewer` serves `viewer/` on port 5287: sliders for every pose
-value, presets for each behaviour, a turntable, slow motion, a fixed 30 or
-60 fps step (to judge the wing blur), the environment map and shadows on or
+`npm run fly:viewer` serves `viewer/` on port 5287: sliders for most numeric pose
+values (not `sing` or `landing`), an `airborne` checkbox, behaviour presets,
+a turntable, slow motion, a fixed 30 or 60 fps step (to judge the wing blur), the environment map and shadows on or
 off, and the **in-game view**: a 640×480 buffer with no antialiasing,
 stretched to 16:9 like the TV, with the fly a chosen number of pixels long.
 With "walk over the ground" on, the fly moves over a grid as the pose says,
@@ -214,7 +223,8 @@ the proboscis and its staged fixed-length extension, coxae arranged as in the fl
 with claws and pulvilli, the wing outline and its vein pattern, folded flat
 one over the other, halteres, the main thoracic and head macrochaetae, the
 male's banded abdomen with a dark tip and his sex combs, the speed-dependent coordination with
-short swings and metachronal phase spread, feet that stay planted.
+short swings and metachronal phase spread, and planted-foot transport
+compensation when world motion matches the pose and leg targets stay in reach.
 
 Simplified: tarsomeres 2–5 are one rigid piece; the trochanter is part of
 the femur; the coxae swing but do not twist; the eye is an ellipsoid cap and

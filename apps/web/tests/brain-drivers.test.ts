@@ -29,7 +29,7 @@ function fakeWorker() {
     factory: (m: typeof onMessage, e: typeof onError) => {
       onMessage = m;
       onError = e;
-      return { post: (request: BrainRequest, transfer?: Transferable[]) => sent.push({ request, transfer }), terminate: () => void (terminated = true) };
+      return { post: (request: BrainRequest, transfer?: Transferable[]) => sent.push({ request: request.type === "tick" ? structuredClone(request) : request, transfer }), terminate: () => void (terminated = true) };
     },
   };
 }
@@ -127,6 +127,45 @@ test("the senses are copied, light arrays included, so the caller can reuse them
   const sent = (worker.sent.at(-1)!.request as { senses: BrainSenses }).senses;
   assert.equal(sent.sweet, 1);
   assert.ok(Math.abs(sent.light!.left[0] - 0.1) < 1e-6);
+});
+
+test("successive ticks keep independent snapshots of a caller's reused senses", async () => {
+  const { worker, driver } = await running();
+  const left = new Float32Array([0.25]);
+  const right = new Float32Array([0.5]);
+  const senses: BrainSenses = { ...RESTING_SENSES, sweet: 1, light: { left, right } };
+  driver.tick(16, senses);
+  worker.reply({ type: "state", state: state() });
+  left[0] = 0.75;
+  right[0] = 1;
+  senses.sweet = 0;
+  driver.tick(32, senses);
+  const ticks = worker.sent.map(s => s.request).filter(r => r.type === "tick");
+  assert.equal(ticks[0].dtMs, 16);
+  assert.equal(ticks[1].dtMs, 32);
+  assert.equal(ticks[0].senses.light!.left[0], 0.25);
+  assert.equal(ticks[0].senses.light!.right[0], 0.5);
+  assert.equal(ticks[0].senses.sweet, 1);
+  assert.equal(ticks[1].senses.light!.left[0], 0.75);
+  assert.equal(ticks[1].senses.sweet, 0);
+});
+
+test("eye inputs retain Float32 rounding and compact, unshared snapshots", async () => {
+  for (const left of [[1 / 3], new Float64Array([1 / 3]), new Float32Array(new ArrayBuffer(64), 8, 1), new Float32Array(new SharedArrayBuffer(4))]) {
+    left[0] = 1 / 3;
+    const { worker, driver } = await running();
+    driver.tick(16, { ...RESTING_SENSES, light: { left, right: new Float32Array([0.5]) } });
+    const request = worker.sent.at(-1)!.request;
+    assert.equal(request.type, "tick");
+    if (request.type !== "tick") throw Error("not a tick");
+    const sent = request.senses.light!.left as Float32Array;
+    left[0] = 9;
+    assert.equal(sent[0], Math.fround(1 / 3));
+    assert.ok(sent instanceof Float32Array);
+    assert.ok(sent.buffer instanceof ArrayBuffer);
+    assert.equal(sent.buffer.byteLength, Float32Array.BYTES_PER_ELEMENT);
+    driver.dispose();
+  }
 });
 
 test("a brain that stops answering while the game runs fails; a page asleep for an hour doesn't count", async () => {
