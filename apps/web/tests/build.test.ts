@@ -88,7 +88,7 @@ test("every path is relative, so the site works from any folder", () => {
 
 test("what may be kept forever has its contents in its name; the few that may not are small", () => {
   const unhashed = files().filter((f) => !/[.-][A-Za-z0-9_-]{8,}\.[a-z]+$/.test(f));
-  assert.deepEqual(unhashed.sort(), [".well-known/apple-app-site-association", "THIRD_PARTY_NOTICES", "index.html", "manifest.webmanifest", "privacy/index.html", "sw.js"]);
+  assert.deepEqual(unhashed.sort(), [".well-known/apple-app-site-association", "THIRD_PARTY_NOTICES", "car.html", "index.html", "manifest.webmanifest", "privacy/index.html", "sw.js"]);
   for (const file of unhashed.filter((f) => f !== "THIRD_PARTY_NOTICES" && f !== "privacy/index.html")) assert.ok(statSync(path.join(out, file)).size < 8_000, `${file} is small`);
 });
 
@@ -141,7 +141,8 @@ test("the brain is beside the page in its wire form, in parts named for their co
   const whole = Buffer.concat(parts.map((part) => readFileSync(path.join(out, part))));
   assert.deepEqual([whole[0], whole[1]], [0x1f, 0x8b], "together they are gzip");
   assert.equal(gunzipSync(whole).subarray(0, 4).toString(), "FLYW", "of the wire form");
-  const js = files().filter((f) => f.startsWith("assets/index-") && f.endsWith(".js")).map(read).join("");
+  // The game and Drive share the brain's loading, in a chunk of its own.
+  const js = files().filter((f) => f.startsWith("assets/") && f.endsWith(".js")).map(read).join("");
   for (const part of parts) assert.ok(js.includes(part), `the page knows ${part}`);
 });
 
@@ -153,7 +154,8 @@ test("the brain built as WebAssembly is beside the page as it is, one file named
   const bytes = readFileSync(path.join(out, module));
   assert.deepEqual(bytes, readFileSync(path.join(root, "packages/brain-native/wasm/fly-brain.wasm")), "the committed module, not gzipped");
   assert.equal(createHash("sha256").update(bytes).digest("hex").slice(0, 16), module.split(".")[2]);
-  const js = files().filter((f) => f.startsWith("assets/index-") && f.endsWith(".js")).map(read).join("");
+  // The game and Drive share the brain's loading, in a chunk of its own.
+  const js = files().filter((f) => f.startsWith("assets/") && f.endsWith(".js")).map(read).join("");
   assert.ok(js.includes(module), "the page knows it");
 });
 

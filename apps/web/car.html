@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>flies: drive</title>
+    <meta name="description" content="Drive a car down a country loop, or hand the wheel to the fruit fly on the dashboard: a simplified model of its nervous system, 166,700 neurons wired from the FlyEM male CNS connectome (Janelia Research Campus, CC-BY 4.0), sees the road through its eyes and walks and turns on a ball, and that drives the car." />
+    <meta name="theme-color" content="#04122b" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" type="image/png" href="../../assets/web/favicon.png" />
+    <style>
+      /* Drawn entirely in the canvas, which fills the screen: the page never scrolls, zooms or selects. */
+      html, body { margin: 0; height: 100%; background: #04122b; overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+      canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; image-rendering: crisp-edges; outline: none; touch-action: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="game" width="640" height="480"></canvas>
+    <script type="module" src="/src/car/main.ts"></script>
+  </body>
+</html>

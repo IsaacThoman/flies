@@ -12,7 +12,13 @@ export default defineConfig({
   root: path.join(import.meta.dirname, "apps/web"),
   publicDir: path.join(import.meta.dirname, "apps/web/public"),
   base: "./",
-  build: { outDir: path.join(import.meta.dirname, "dist"), emptyOutDir: true, target: "es2022" },
+  build: {
+    outDir: path.join(import.meta.dirname, "dist"),
+    emptyOutDir: true,
+    target: "es2022",
+    // The game, and Drive (car.html): the car the fly can take the wheel of.
+    rolldownOptions: { input: { index: path.join(import.meta.dirname, "apps/web/index.html"), car: path.join(import.meta.dirname, "apps/web/car.html") } },
+  },
   worker: { format: "es", plugins: () => [shippedDependencyGuard()] },
   // The iPhone and iPad app's room server and invitations (apps/web/src/online/invite.ts): the site's unless set.
   define: appSite(),

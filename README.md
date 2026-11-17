@@ -39,6 +39,10 @@ a room and staying alone. [The world](docs/world.md) describes the places,
 weather, food and visitors; [adding a place](docs/places.md) is the authoring
 reference.
 
+[Drive](docs/drive.md) (`apps/web/car.html`, in a browser) puts you at the wheel of a
+car with the fly on the dashboard; hand it the wheel and its brain drives
+from what its eyes see.
+
 ## What is real
 
 The wiring comes from the FlyEM male CNS connectome; the reference data is
@@ -60,6 +64,7 @@ unknown capture dates and machines are identified rather than inferred.
 | --- | --- |
 | Find the package boundaries and platform runtimes | [Architecture](docs/architecture.md) |
 | Use the controls, settings and neural displays | [Playing](docs/playing.md) |
+| Drive a car the fly can take the wheel of | [Drive](docs/drive.md) |
 | Understand places, weather and visitors | [The world](docs/world.md) |
 | Add a place, including shared world registration | [Place authoring](docs/places.md) |
 | <a id="the-flys-senses"></a><a id="what-the-body-adds"></a>Trace senses and body stand-ins | [Simulation](docs/simulation.md) |
