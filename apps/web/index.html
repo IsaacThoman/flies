@@ -27,6 +27,72 @@
   </head>
   <body>
     <canvas id="game" width="640" height="480"></canvas>
+    <script>
+      // This canvas needs no downloads. The game replaces it before requesting
+      // WebGL, since a canvas that has drawn in 2D cannot become a WebGL canvas.
+      (() => {
+        const canvas = document.getElementById("game");
+        const g = canvas.getContext("2d");
+        if (!g) return;
+        let failed = false;
+        const failure = (event) => {
+          if (event.target === window || event.target instanceof HTMLScriptElement) failed = true;
+        };
+        const retry = (event) => {
+          if (failed && (event.type === "pointerup" || event.key === "Enter")) location.reload();
+        };
+        window.addEventListener("error", failure, true);
+        window.addEventListener("unhandledrejection", failure);
+        window.addEventListener("keydown", retry);
+        canvas.addEventListener("pointerup", retry);
+        function draw(now) {
+          if (!canvas.isConnected) {
+            window.removeEventListener("error", failure, true);
+            window.removeEventListener("unhandledrejection", failure);
+            window.removeEventListener("keydown", retry);
+            canvas.removeEventListener("pointerup", retry);
+            return;
+          }
+          const h = 480, w = Math.max(240, Math.round(h * innerWidth / innerHeight)), t = now / 1000;
+          if (canvas.width !== w) canvas.width = w;
+          const sky = g.createLinearGradient(0, 0, 0, h);
+          sky.addColorStop(0, "#377dba");
+          sky.addColorStop(1, "#c9eaff");
+          g.fillStyle = sky;
+          g.fillRect(0, 0, w, h);
+          for (let i = 0; i < 9; i++) {
+            const x = w * (0.12 + (i * 0.137) % 0.8) + Math.sin(t * 0.5 + i) * 18;
+            const y = h - ((t * (9 + i % 3) + i * 61) % (h + 60));
+            g.beginPath();
+            g.arc(x, y, 5 + i % 4 * 3, 0, Math.PI * 2);
+            g.fillStyle = "rgba(240,252,255,0.16)";
+            g.fill();
+            g.lineWidth = 1.5;
+            g.strokeStyle = "rgba(240,252,255,0.5)";
+            g.stroke();
+          }
+          g.textAlign = "center";
+          g.font = "bold 58px ui-rounded, system-ui, sans-serif";
+          g.fillStyle = "#effaff";
+          g.fillText("flies", w / 2, h * 0.42);
+          g.font = "16px ui-rounded, system-ui, sans-serif";
+          g.fillText(failed ? "Couldn't load" : "Loading", w / 2, h * 0.55);
+          if (failed) {
+            const y = h * 0.65;
+            g.fillStyle = "rgba(240,252,255,0.2)";
+            g.fillRect(w / 2 - 70, y - 22, 140, 38);
+            g.strokeStyle = "#effaff";
+            g.strokeRect(w / 2 - 70, y - 22, 140, 38);
+            g.fillStyle = "#effaff";
+            g.fillText("Try again", w / 2, y + 3);
+            canvas.dataset.bootFailure = "true";
+          }
+          if (!canvas.dataset.boot) canvas.dataset.boot = "true";
+          requestAnimationFrame(draw);
+        }
+        draw(performance.now());
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

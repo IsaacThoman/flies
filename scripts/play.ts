@@ -21,6 +21,7 @@
 //   wheel:<x>,<y>:<dy>[:ctrl|:<dx>] the wheel there (ctrl: a trackpad's pinch; a number: scrolled across too)
 //   tap:<x>,<y>[:<ms>]        a finger taps there (held for ms)
 //   touchdrag:<x0>,<y0>:<x1>,<y1>[:<ms>]  a finger drags between points
+//   twofingerdrag:<x0>,<y0>:<x1>,<y1> two fingers move together, without changing spread
 //   pinch:<x>,<y>:<from>:<to> two fingers about a point, from one spread to another (shares of the width)
 //   tapon:<kind>[:<index>]    a finger taps the middle of a target drawn on screen (from the game's hit map: tool, kind, label, go, menu, row, step, tab, back...)
 //   clickon:<kind>[:<index>]  the mouse clicks one
@@ -233,6 +234,7 @@ export async function mouseDrag(page: Page, from: Pt, to: Pt, button: "left" | "
 export class Fingers {
   #cdp: CDPSession;
   #page: Page;
+  #active = false;
 
   private constructor(page: Page, cdp: CDPSession) {
     this.#page = page;
@@ -243,13 +245,19 @@ export class Fingers {
     return new Fingers(page, await page.context().newCDPSession(page));
   }
 
-  async #send(type: "touchStart" | "touchMove" | "touchEnd", points: Pt[]) {
+  async #send(type: "touchStart" | "touchMove" | "touchEnd" | "touchCancel", points: Pt[]) {
     const touchPoints = [];
     for (let i = 0; i < points.length; i++) {
       const p = await canvasPoint(this.#page, points[i]);
       touchPoints.push({ x: p.x, y: p.y, id: i, radiusX: 8, radiusY: 8, force: 1 });
     }
-    await this.#cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : touchPoints });
+    await this.#cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" || type === "touchCancel" ? [] : touchPoints });
+    this.#active = type === "touchStart" || type === "touchMove";
+  }
+
+  /** The system took the contacts; no pending press should commit. */
+  async cancel() {
+    await this.#send("touchCancel", []);
   }
 
   async tap(at: Pt, ms = 60) {
@@ -262,7 +270,7 @@ export class Fingers {
     try {
       return await until();
     } finally {
-      await this.#send("touchEnd", []);
+      if (this.#active) await this.#send("touchEnd", []);
     }
   }
 
@@ -272,6 +280,18 @@ export class Fingers {
       const k = i / steps;
       await this.#page.waitForTimeout(ms / steps);
       await this.#send("touchMove", [[from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k]]);
+    }
+    await this.#send("touchEnd", []);
+  }
+
+  /** Two fingers moving together at a constant spread: orbit without pinching. */
+  async pan(from: Pt, to: Pt, spread = 0.2, steps = 14) {
+    const pair = (x: number, y: number): Pt[] => [[x - spread / 2, y], [x + spread / 2, y]];
+    await this.#send("touchStart", pair(...from));
+    for (let i = 1; i <= steps; i++) {
+      await this.#page.waitForTimeout(24);
+      const k = i / steps;
+      await this.#send("touchMove", pair(from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k));
     }
     await this.#send("touchEnd", []);
   }
@@ -504,6 +524,7 @@ async function main() {
         await page.mouse.click(p.x, p.y);
       }
       else if (kind === "touchdrag") await fingers.drag(pt(rest[0]), pt(rest[1]), Number(rest[2] ?? 400));
+      else if (kind === "twofingerdrag") await fingers.pan(pt(rest[0]), pt(rest[1]));
       else if (kind === "pinch") await fingers.pinch(pt(rest[0]), Number(rest[1]), Number(rest[2]));
       else if (kind === "resize") {
         const [w, h] = arg.split("x").map(Number);

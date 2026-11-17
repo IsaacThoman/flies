@@ -12,8 +12,9 @@ function setup() {
     right: { directions: new Float32Array([0, 1, 0]) },
     acceptance: 0.1,
   };
+  const brain = { eyes: map as EyeMap | null, status: "running" };
   const life = {
-    brain: { eyes: map, status: "running" },
+    brain,
     body: { position: { x: 0, y: 0, z: 0 }, yaw: 0, up: { x: 0, y: 1, z: 0 } },
     light: null,
   } as unknown as Life;
@@ -38,7 +39,7 @@ function setup() {
     light: {},
     current: { camera: {} },
   } as unknown as Stage;
-  return { eyes: new Eyes(stage, life), life, reads, stage };
+  return { eyes: new Eyes(stage, life), life, reads, stage, brain };
 }
 
 const settled = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -120,6 +121,27 @@ test("eyes with no picture yet refresh even in a frame that rebuilt the reflecti
   stage.reflected = true;
   eyes.render(1 / 60, false);
   assert.equal(reads.length, 1);
+});
+
+
+test("an arriving brain never receives a picture sampled for stand-in eyes", async () => {
+  const { eyes, life, reads, brain } = setup();
+  const actual = life.brain.eyes;
+  brain.eyes = null;
+  brain.status = "loading";
+  eyes.render(1, false, false, true);
+  reads[0].finish();
+  await settled();
+  assert.ok(eyes.light, "the loading inset has a complete stand-in picture");
+  brain.eyes = actual;
+  brain.status = "running";
+  eyes.beforeStep();
+  assert.equal(life.light, null, "stand-in facet counts cannot reach the brain");
+  eyes.render(1, false);
+  reads[1].finish();
+  await settled();
+  eyes.beforeStep();
+  assert.equal(life.light!.left.length, actual!.left.directions.length / 3);
 });
 
 function companion(life: Life): Life {

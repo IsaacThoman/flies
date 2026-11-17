@@ -15,6 +15,7 @@
 // height, still on the same side of the fly. Where they leave the camera it
 // stays: nothing else moves it.
 
+import { sameTarget } from "@fly/ui";
 import type { Hit } from "@fly/ui";
 import type { Gesture } from "./input.ts";
 import { HUD_HITS } from "./ui/hud.ts";
@@ -68,7 +69,7 @@ const SHELF_IDLE = 300;
 /** What a press is doing, until it lifts. */
 type Grip =
   /** Down on the HUD: a tap presses it; along the label, a swipe steps the kind. */
-  | { kind: "hud"; hit: Hit; x: number; swiped: number }
+  | { kind: "hud"; hit: Hit; x: number; y: number; swiped: number; valid: boolean; over: boolean }
   /** Down on the table with a tool used once: a tap uses it; moved, it turns the camera instead. */
   | { kind: "press"; x: number; y: number }
   /** Holding a held tool on the table. */
@@ -89,6 +90,12 @@ export class PlayControls {
   constructor(design: () => { width: number; height: number }, now: () => number = () => performance.now()) {
     this.#design = design;
     this.#now = now;
+  }
+
+  /** The provisional HUD target; no action occurs until an eligible release. */
+  get preview(): Readonly<Hit> | null {
+    const grip = this.#grip;
+    return grip?.kind === "hud" && grip.valid && grip.over && grip.swiped === 0 ? grip.hit : null;
   }
 
   /** A held tool is being held on the table. */
@@ -140,7 +147,7 @@ export class PlayControls {
         const hit = target.hudAt(g.x, g.y);
         this.previewTool = hit?.kind === HUD_HITS.tool ? hit.index : -1;
         if (hit) {
-          this.#grip = { kind: "hud", hit: { ...hit }, x: g.x * design.width, swiped: 0 };
+          this.#grip = { kind: "hud", hit: { ...hit }, x: g.x * design.width, y: g.y * design.height, swiped: 0, valid: true, over: true };
           return;
         }
         // The right and middle buttons turn the camera wherever they are pressed.
@@ -155,6 +162,7 @@ export class PlayControls {
         return;
       }
       case "drag":
+        this.previewTool = -1;
         if (!grip) return;
         if (grip.kind === "tool") target.aim(g.x, g.y, true);
         else if (grip.kind === "press") {
@@ -166,9 +174,14 @@ export class PlayControls {
           target.turn(-(g.x - grip.x) * DRAG_ROUND, (g.y - grip.y) * DRAG_UP);
           grip.x = g.x;
           grip.y = g.y;
-        } else if (grip.kind === "hud" && (grip.hit.kind === HUD_HITS.kind || grip.hit.kind === HUD_HITS.label)) {
+        } else if (grip.kind === "hud") {
+          if (g.far) grip.valid = false;
+          grip.over = sameTarget(grip.hit, target.hudAt(g.x, g.y));
+          if (grip.hit.kind !== HUD_HITS.kind && grip.hit.kind !== HUD_HITS.label) return;
           // Swiped along the label: the kinds go by as a carousel's would, the next coming from the right.
-          const steps = Math.trunc((g.x * design.width - grip.x) / LABEL_SWIPE) - grip.swiped;
+          const dx = g.x * design.width - grip.x;
+          if (grip.swiped === 0 && Math.abs(dx) <= Math.abs(g.y * design.height - grip.y)) return;
+          const steps = Math.trunc(dx / LABEL_SWIPE) - grip.swiped;
           grip.swiped += steps;
           for (let i = 0; i < Math.abs(steps); i++) target.stepKind(steps < 0 ? 1 : -1);
         }
@@ -178,9 +191,10 @@ export class PlayControls {
         this.#grip = null;
         if (!grip) return;
         if (grip.kind === "hud") {
-          if (g.tap && grip.swiped === 0) target.pressHud(grip.hit);
+          const hit = target.hudAt(g.x, g.y);
+          if (g.tap && grip.valid && grip.swiped === 0 && sameTarget(grip.hit, hit)) target.pressHud(grip.hit);
         } else if (grip.kind === "press") {
-          if (target.tool() === "once") target.use();
+          if (g.tap && target.tool() === "once" && !target.hudAt(g.x, g.y) && target.aim(g.x, g.y, true)) target.use();
           if (!mouse) target.unaim();
         } else if (grip.kind === "tool") {
           if (!mouse) target.unaim();
@@ -208,6 +222,7 @@ export class PlayControls {
       case "pinchEnd":
         return;
       case "wheel":
+        this.previewTool = -1;
         this.#wheel(g, target);
         return;
     }

@@ -128,7 +128,7 @@ async function capture(story: StoreStory, tv = false) {
         here: () => g.here, moving: () => false, moveTo: id => g.moveTo(id),
         onWorld: () => { g.stage.setTime("morning"); g.stage.weather.choose("clear", true); },
       };
-      g.online = new Online(host, () => connection(`capture-${i}`), location.href, "abcd1234", `capture-${i}`, i ? null : start);
+      g.online = new Online(host, () => connection(`capture-${i}`), location.href, "abcd234567", `capture-${i}`, i ? null : start);
     });
   }
   if (story === "02-feeding" || story === "04-inside") {
@@ -136,18 +136,35 @@ async function capture(story: StoreStory, tv = false) {
     game.life.body.place(18, 52, 0.6);
     if (story === "02-feeding") tool("feed", "honey");
   }
+  if (story === "06-rain") game.life.body.place(66, -110, Math.PI - 0.55);
   if (story === "03-flight") tool("swoop");
   if (story === "05-eyes") {
     game.hands.chooseView("eyes");
     game.director.setView("follow");
     tool("view", "eyes");
   } else {
-    const view = story === "07-night" || story === "06-rain" ? "table" : story === "08-together" ? "wide" : "close";
+    const view = story === "07-night" ? "table" : story === "06-rain" ? "follow" : story === "08-together" ? "wide" : "close";
     game.hands.chooseView(view); game.director.setView(view);
   }
   if (story === "04-inside") tool("view", "inside");
   const observing = ["07-night", "08-together"].includes(story);
   if (observing) for (const g of games) g.watch();
+  // Keep the actual airborne subject central in the store photograph.
+  if (story === "03-flight") {
+    const update = game.director.update.bind(game.director);
+    game.director.update = (body, dt) => {
+      update(body, dt);
+      if (body.mode !== "airborne") return;
+      const p = body.position, camera = game.director.camera;
+      const dx = camera.position.x - p.x, dy = camera.position.y - p.y, dz = camera.position.z - p.z;
+      const scale = Math.min(1, 10.5 / Math.hypot(dx, dy, dz));
+      camera.position.set(p.x + dx * scale, p.y + dy * scale, p.z + dz * scale);
+      camera.fov = 30;
+      camera.lookAt(p.x, p.y + 0.4, p.z);
+      camera.updateProjectionMatrix();
+      camera.updateMatrixWorld();
+    };
+  }
   if (story === "08-together") {
     const update = game.director.update.bind(game.director);
     game.director.update = (body, dt) => {
@@ -177,15 +194,15 @@ async function capture(story: StoreStory, tv = false) {
     // Complete the eyes' sample/cleanup promise chain before advancing game time.
     for (let i = 0; i < 4; i++) await Promise.resolve();
     const ready = frame >= (story === "03-flight" ? 240 : observing ? 420 : 300);
-    const chosen = story === "02-feeding" ? game.life.eating && game.fly.pose.feed > 0.15 : story === "03-flight" ? game.life.body.mode === "airborne" && game.fly.model.rig.wingHaze > 0.4 && game.canvas.dataset.activity === "flying" : true;
+    const chosen = story === "02-feeding" ? game.life.eating && game.fly.pose.feed > 0.15 : story === "03-flight" ? game.life.body.mode === "airborne" && game.life.body.position.y - game.life.world.heightAt(game.life.body.position.x, game.life.body.position.z, game.life.body.position.y) > 4 && game.fly.model.rig.wingHaze > 0.4 && game.canvas.dataset.activity === "flying" : true;
     if (ready && chosen) { captured = true; break; }
   }
   if (!captured) throw new Error(`The brain did not choose ${story} within 30 seconds`);
-  if (story === "08-together" && game.online!.others.list.filter(o => o.present).length !== 2) throw new Error("Missing real peers");
+  if (story === "08-together" && game.online!.others.list.filter(o => o.present).length !== 2) throw new Error(`Missing real peers: ${JSON.stringify(games.map(g => ({ id: g.online?.id, status: g.online?.line.status, refusal: g.online?.line.refusal, received: g.online?.line.bytesIn, sent: g.online?.line.bytesOut, others: g.online?.others.list.map(o => ({ id: o.id, present: o.present })) })))}`);
   const body = game.life.body;
   const state = JSON.stringify({ position: body.position, yaw: body.yaw, velocity: body.velocity, command: game.brain.state?.command, rates: Array.from(game.brain.regionRates), light: game.life.light });
   let fingerprint = 2166136261;
   for (let i = 0; i < state.length; i++) fingerprint = Math.imul(fingerprint ^ state.charCodeAt(i), 16777619) >>> 0;
-  return { story, wallpaper: game.wallpaper, staging: story === "08-together" ? "three initial positions on existing strawberry juice" : null, fingerprint: fingerprint.toString(16), frames: Math.round(now * 60 / 1000), neurons: game.brain.neurons, activity: game.life.activity, eaten: game.life.eaten, takeOffs: game.life.takeOffs, eyeUpdates: game.eyes.updates, peers: game.online?.others.list.filter(o => o.present).length ?? 0 };
+  return { story, wallpaper: game.wallpaper, staging: story === "08-together" ? "three initial positions on existing strawberry juice" : story === "06-rain" ? "initial position on existing window rail" : null, fingerprint: fingerprint.toString(16), frames: Math.round(now * 60 / 1000), neurons: game.brain.neurons, activity: game.life.activity, eaten: game.life.eaten, takeOffs: game.life.takeOffs, eyeUpdates: game.eyes.updates, peers: game.online?.others.list.filter(o => o.present).length ?? 0 };
 }
 (globalThis as unknown as { __store: unknown }).__store = { capture, ready: true };
