@@ -46,6 +46,20 @@ test("precipitation preserves light and heavy rain", () => {
   assert.equal(outsideMix(outside({ precipitation: 0.02 }), mix()).rain, 0, "a trace isn't rain");
 });
 
+test("WeatherKit sun showers reach the fly and wet surfaces under sparse cloud", () => {
+  for (const cloudCover of [0, 0.1, 0.4]) {
+    const conditions = outside({ condition: "sunShowers", precipitation: 0.5, cloudCover });
+    const target = outsideMix(conditions, mix());
+    const w = new WeatherNow();
+    w.follow(NOW / 3_600_000, false, { blend: m => outsideMix(conditions, m) });
+    for (let i = 0; i < 600; i++) w.update(0.1);
+    assert.equal(w.rain, target.rain);
+    assert.equal(w.cloud, target.cloud);
+    assert.equal(w.kind, "rain");
+    assert.ok(w.wet > 0.4);
+  }
+});
+
 test("conditions distinguish snow, flurries, sleet and electrical storms", () => {
   const snow = outsideMix(outside({ condition: "snow", precipitation: 1.5, cloudCover: 0.7, visibility: 3000 }), mix());
   assert.equal(snow.rain, 0, "no rain falls in snow");

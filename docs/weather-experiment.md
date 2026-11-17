@@ -49,7 +49,7 @@ file. The repository now has the typed `scripts/weatherEvidence.ts`.
 ## Evidence and measurements
 
 PNG/GIF artifacts live only on the orphan `pr-assets-weather-storm-snow`
-branch and are embedded in the draft PR. Canvas `frameMs` is desktop
+branch and are embedded in the PR. Canvas `frameMs` is desktop
 JavaScript CPU/frame; it is not a TV hardware result or GPU duration. Total
 draw samples include occasional eye-cubemap work. Controlled two-pass draw
 measurements are kept separate, excluding eyes, UI and environment rebuilds.
@@ -107,6 +107,48 @@ The source was then rebased onto `dev` (`b8d87399`). The frozen comparison
 snapshot predates that rebase and remains isolated, including its package
 resolution. The rebased feature diff leaves the excluded areas unchanged.
 
+## Round 2
+
+Key: J9 = first implementation with supplemental event/window evidence;
+T7 = refined implementation at `181c6420` with lab/sky refinement `0071627e`;
+N2 = byte-identical T7 decoy. Orders were N2/T7/J9, T7/N2/J9,
+J9/N2/T7; the regression assessment received T7/J9/N2. Reviewers saw only
+the rubric, neutral evidence and isolated source. All three scored the
+decoy identically; no additional scorers were needed.
+
+| Criterion | J9 reader 1 | T7 reader 1 | J9 reader 2 | T7 reader 2 | J9 reader 3 | T7 reader 3 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Beauty | 5 | 7 | 5 | 7 | 5.5 | 7 |
+| Transitions | 6 | 8 | 6 | 8 | 6 | 8 |
+| Lightning | 7 | 8 | 7 | 8 | 7 | 8 |
+| Snow | 5 | 7 | 5 | 7 | 5.5 | 7 |
+| Windows | 6 | 7 | 5 | 7 | 6 | 7.5 |
+| Budget | 8 | 8 | 7 | 7 | 7.5 | 7.5 |
+| Honesty | 10 | 10 | 10 | 10 | 9.5 | 9.5 |
+| Regressions | 5 | 8 | 5 | 7 | 6 | 8 |
+| Mean | 6.500 | 7.875 | 6.250 | 7.625 | 6.625 | 7.8125 |
+
+Paired means: **J9 6.46 → T7 7.77**. Every scorer preferred T7/N2 to J9;
+their forced order within the identical pair was arbitrary. The refinement
+was accepted. The separate regression reader reproduced the earlier snow
+teleportation and rain-density problems and found the lab's dot lattice
+reduced, while noting that 5,600 extra instanced quads add 11,200 triangles.
+
+Remaining visual problems are a repeating lawn snow pattern, subdued
+windowsill precipitation, uniformly bright snow, general rather than local
+melt wetness, and repetitive/overexposed flash peaks. Desktop draw evidence
+does not establish hardware TV performance or frame allocation counts.
+Some supplemental picnic event captures precede the minor sky-contrast
+refinement; the main picnic matrix uses it. Future rounds should capture
+all evidence from one frozen revision.
+
+The regression reader also reproduced suppressed low-cloud WeatherKit
+sun showers. This was accepted as a bug and corrected for handoff: cloud
+precedence is relative to the reported target deck and sparse-cloud showers
+remain rain. A test covers zero, 0.1 and 0.4 cloud coverage through
+WeatherKit mapping, easing, wetness and kind classification. The frozen
+review evidence remains unchanged; the fix is not claimed as blind-scored.
+
 ## Validation record
 
 The first full run passed all ordinary tests (725 passed, four skipped),
@@ -136,13 +178,12 @@ The owner changed the process to ready validated steps without waiting on
 GitHub CI. `origin/dev` was merged into this branch with a merge commit;
 conflict resolution retained dev's antenna description and network
 hardening while preserving the shared weather extension. Typecheck, lint
-and 117 area tests passed on that integration. Earlier full-run failures
+and 121 area tests passed after the latest integration and sun-shower correction. Earlier full-run failures
 above are historical results from before this merge; no budget was relaxed.
 
-The completed first comparison unanimously beat the baseline. Two second
-comparison scorers have returned 7.875 and 7.625 for T7 and its identical
-decoy, with both ranking them above J9; the remaining assessments are pending.
-They found no decoy scoring discrepancy. The pending rain-veil, near-flake
+Both completed comparisons unanimously preferred the implementation.
+The second comparison averaged 7.77 against 6.46, with no decoy scoring
+discrepancy. The pending rain-veil, near-flake
 and melt-trail experiments are preserved separately and excluded from this
 handoff. Further climbing uses a new branch and PR, with newly spawned
 reviewers at high reasoning effort.
