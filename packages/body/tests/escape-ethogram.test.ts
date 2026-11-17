@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { loomGeometry, facetLuminance, screenAt, regression, summarizeEscape, wilson, SCREEN } from '../../../scripts/ethogram/escape.ts';
+import { loomGeometry, facetLuminance, screenAt, regression, summarizeEscape, wilson, SCREEN, LV_MS } from '../../../scripts/ethogram/escape.ts';
 import type { EscapeTrial } from '../../../scripts/ethogram/escape.ts';
-import { scorecard } from '../../../scripts/ethogram/scoring.ts';
+import { scorecard, validateOpticalEvidence } from '../../../scripts/ethogram/scoring.ts';
 import { validateOptions } from '../../../scripts/ethogram.ts';
 
 const eye = { x: 0, y: 1, z: 0 };
@@ -67,18 +67,43 @@ test('readiness failures remain in the denominator accounting, never become a no
   assert.ok(Math.abs(wilson(0, 10)![1] - 0.2775328) < 1e-6);
 });
 
-test('incompatible references cannot earn numeric scores, even at exact target values', () => {
-  const card = scorecard({ speedMedian: 20, activeFraction: 0.54, walkBoutMean: 22.6195, escapeBWProbability: 0.82, escapeCBProbability: 0.87 });
-  assert.equal(card.scored, 2);
-  assert.equal(card.opticalBenchmarkMean, 10);
+function evidence(respond: boolean) {
+  let seed = 0;
+  const trials: EscapeTrial[] = [];
+  for (const kind of ['black', 'checkerboard'] as const) for (const lvMs of LV_MS) {
+    const ttcMs = (kind === 'black' ? 2 * lvMs - 6 : 2.1 * lvMs - 22);
+    trials.push({ ...trial, kind, lvMs, seed: seed++, flown: respond, takeoffMs: respond ? loomGeometry(lvMs).collisionSeconds * 1000 - ttcMs : null, ttcMs: respond ? ttcMs : null });
+  }
+  for (const kind of ['flash', 'blank'] as const) trials.push({ ...trial, kind, lvMs: 40, seed: seed++ });
+  return { protocol: { hour: 6, perRatio: 1, firstSeed: 0, lvMs: LV_MS, screen: SCREEN }, trials };
+}
+
+test('scalar claims cannot earn scores; complete records recompute fits and exclude mismatched metrics', () => {
+  const raw = { speedMedian: 20, activeFraction: 0.54, escapeBWProbability: 0.82, escapeCBProbability: 0.87, escapeBWSlope: 2 };
+  assert.equal(scorecard(raw).scored, 0);
+  const card = scorecard(raw, evidence(true));
+  assert.equal(card.scored, 6);
+  assert.ok(Math.abs(card.opticalProbabilityMean! - 8.45) < 1e-12);
+  assert.equal(card.opticalTimingMean, 10);
+  assert.ok(Math.abs(card.opticalComposite! - 9.225) < 1e-12);
   assert.equal(card.rows.find(r => r.id === 'speed-median')!.score, null);
   assert.equal(card.overall, null);
-  assert.equal(card.overallBounds[0], 20 / 21);
-  assert.equal(card.overallBounds[1], 10);
-  assert.throws(() => scorecard({ escapeBWProbability: 1.1 }));
-  const none = scorecard({ escapeBWProbability: 0, escapeCBProbability: 0 });
+  assert.ok(card.registeredComparisonBounds[1] <= 10);
+  const none = scorecard(raw, evidence(false));
+  assert.equal(none.scored, 2);
   assert.equal(none.rows.find(r => r.id === 'loom-bw-slope')!.measured, null);
   assert.equal(none.rows.find(r => r.id === 'loom-bw-slope')!.score, null);
+  assert.equal(none.opticalComposite, null);
+});
+
+test('evidence gate rejects missing trials, duplicate seeds, direct loom input and fabricated timing', () => {
+  const valid = evidence(true);
+  validateOpticalEvidence(valid);
+  assert.throws(() => validateOpticalEvidence({ ...valid, trials: valid.trials.slice(1) }));
+  for (const change of [{ seed: 1 }, { maxLoomInput: 1 }, { hour: 12 }, { ttcMs: 9 }, { ttcMs: NaN }, { quietWaitSeconds: 1 }]) {
+    assert.throws(() => validateOpticalEvidence({ ...valid, trials: valid.trials.map((t, i) => i ? t : { ...t, ...change }) }));
+  }
+  assert.throws(() => validateOpticalEvidence({ ...valid, protocol: { ...valid.protocol, perRatio: 2 } }));
 });
 
 test('clock is explicit and invalid hours are refused', () => {

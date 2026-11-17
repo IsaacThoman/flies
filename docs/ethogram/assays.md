@@ -80,7 +80,7 @@ Published Cruz/Paulk dispersions remain source context, not acceptance bands.
 There are 21 registered reference conditions, not 21 independent behaviours.
 
 No validated whole-animal point estimate follows from these observations.
-The report gives an optical-subset mean and overall coverage bounds: assign
+The report gives separate optical probability/timing means and registry-average coverage bounds: assign
 every unavailable row any score from 0 to 10. These are missing-evidence
 bounds, not statistical confidence intervals. An unsupported assay never earns
 10; a missing duration never becomes a zero-valued biological observation.
@@ -96,3 +96,10 @@ An open-disc edge occupancy is not wall-following or centrophobism. Airborne
 time includes falls and body-maintained flight, so it is not a calibrated flight
 bout. Air-puff flow geometry and quantitative optomotor gain need separately
 verified protocols/targets; neither receives an invented target.
+
+Only complete, trial-backed optical records can earn scores. The estimator validates
+the condition grid, unique seed cohort, fixed clock, geometry, sensory route and
+TTC consistency, then recomputes all coefficients from raw trials. Scalars cannot
+earn credit. The composite weights probability and timing equally and is N/A if
+either pattern or any timing fit is unavailable. Registry-average bounds are
+not bounds on whole-animal fidelity; whole-animal coverage is listed by domain.

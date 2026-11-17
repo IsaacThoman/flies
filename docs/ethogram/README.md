@@ -76,9 +76,9 @@ engineering scale. No claimed biological acceptance range is inferred from
 SE, histogram bins or an author-selected width. See [the exact score
 policy](assays.md#score-definition).
 
-An optical-subset mean is reported only over estimable comparisons. Missing
+Separate optical probability/timing means is reported only over estimable comparisons. Missing
 latencies remain N/A, so an absent response cannot masquerade as a zero latency.
-A validated whole-animal point score is **not identified**. Overall bounds
+A validated whole-animal point score is **not identified**. Registry-average bounds
 allow unavailable comparisons every score from 0 to 10. They express coverage,
 not confidence or biological normality. Multiple conditions and timing
 coefficients are correlated; they are not 21 independent traits.
@@ -93,3 +93,10 @@ work remain with their owners. No neural threshold is tuned to increase scores.
 and [model proposals](proposals.md) preserve findings and rejected approaches.
 A broad biological score needs more matched assays; the registry alone cannot
 supply one.
+
+Only complete, trial-backed optical records can earn scores. The estimator validates
+the condition grid, unique seed cohort, fixed clock, geometry, sensory route and
+TTC consistency, then recomputes all coefficients from raw trials. Scalars cannot
+earn credit. The composite weights probability and timing equally and is N/A if
+either pattern or any timing fit is unavailable. Registry-average bounds are
+not bounds on whole-animal fidelity; whole-animal coverage is listed by domain.
