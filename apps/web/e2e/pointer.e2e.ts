@@ -51,6 +51,12 @@ let failed = false;
 /** The game's own object in the page, for reading what isn't on the canvas's data-*. */
 const game = <T>(page: Page, js: string) => page.evaluate(`(() => { const g = globalThis.__fly; return ${js}; })()`) as Promise<T>;
 
+/** Turns the camera round to the fly's side, as a drag would, and waits for it to get there. */
+async function sideOn(page: Page) {
+  await game(page, "g.director.turnBy(Math.atan2(Math.sin(g.life.body.yaw + Math.PI / 2 - g.director.yaw), Math.cos(g.life.body.yaw + Math.PI / 2 - g.director.yaw)), 0)");
+  await waitForGameTime(page, 0.5);
+}
+
 /** Waits until the camera has turned from a yaw, and gives the yaw it went to once it has settled there. */
 async function turnedFrom(page: Page, yaw: string) {
   await page.waitForFunction((yaw) => (document.getElementById("game") as HTMLCanvasElement).dataset.yaw !== yaw, yaw, { timeout: 60_000 });
@@ -148,7 +154,13 @@ async function fingers() {
     await tool("feed");
     await tapOn("kind", 1);
     await waitFor(page, "variant=honey");
-    await feedHoney(page, () => dropFood(page, async () => touch.tap(await screenOf(page, "hand"))));
+    // The camera stays where it was put however the fly turns, so, as a player would, turn it to the fly's side first, where the spot in front of its mouth is in sight.
+    await feedHoney(page, () =>
+      dropFood(page, async () => {
+        await sideOn(page);
+        await touch.tap(await screenOf(page, "hand"));
+      }),
+    );
 
     step("fingers: Clear dropped removes offerings without taking the place's food");
     for (let i = 0; i < 3; i++) await tapOn("kind", 1);
