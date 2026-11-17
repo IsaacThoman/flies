@@ -45,7 +45,7 @@ if (game) {
   (globalThis as { __fly?: Game }).__fly = game;
   let page: Page | null = null;
   if (!native) {
-    game.quality = new Quality(storage());
+    game.quality = new Quality(storage(), (globalThis as { __quality?: number }).__quality ?? null);
     game.applySettings(false);
     page = new Page(game, canvas);
     browserAccessibility(game);

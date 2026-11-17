@@ -60,7 +60,7 @@ const ROOMS: RoomWire[] = [
 function world(canShare = true) {
   const typing = new FakeTyping();
   const did: string[] = [];
-  const state = { rooms: null as RoomWire[] | null, table: null as TableNow | null, knock: null as Knock | null, ended: null as Shell["tableEnded"], started: null as NewRoom | null };
+  const state = { lobbyStatus: "connecting" as Lobby["status"], rooms: null as RoomWire[] | null, table: null as TableNow | null, knock: null as Knock | null, ended: null as Shell["tableEnded"], started: null as NewRoom | null };
   const shell: Shell = {
     settings: { ...DEFAULT_SETTINGS },
     brain: { status: "running" } as unknown as Shell["brain"],
@@ -93,6 +93,7 @@ function world(canShare = true) {
       return state.rooms;
     },
     typing,
+    get lobbyStatus() { return state.lobbyStatus; },
     canShare,
     startRoom(room) {
       state.started = room;
@@ -352,7 +353,7 @@ test("the lobby asks to browse once open, takes each list it is told (only well-
   sockets[0].status = "closed";
   sockets[0].closeCode = 1006;
   lobby.update(0.016);
-  assert.equal(lobby.status, "lost");
+  assert.equal(lobby.status, "stale");
   assert.deepEqual(lobby.rooms, [ROOMS[0]], "the last list it had, until it hears again");
   lobby.update(1);
   assert.equal(sockets.length, 2, "again");
@@ -465,4 +466,52 @@ test("pointer release uses the redrawn target and cancels a changed room", () =>
   pointers.up({ ...event, buttons: 0 }, false);
   send();
   assert.deepEqual(did, []);
+});
+
+test("room discovery failures replace searching, stale choices are disabled, and recovery clears the message", () => {
+  const { screen, state, step, press, did } = world();
+  state.lobbyStatus = "lost";
+  step();
+  assert.equal(screen.menu.items.at(-1)?.label, "Can't reach rooms");
+  state.rooms = ROOMS;
+  state.lobbyStatus = "stale";
+  step();
+  assert.equal(screen.menu.items[2].label, "Reconnecting…");
+  assert.ok(screen.menu.items.slice(3).every((item) => item.disabled));
+  state.lobbyStatus = "version";
+  step();
+  const g = blankCanvas(); screen.draw(g, 0, new HitMap());
+  assert.equal(writtenOn(g).filter((w) => w.text === "Update needed").length, 1);
+  assert.ok(screen.menu.items.every((item) => item.disabled));
+  state.lobbyStatus = "open";
+  step();
+  assert.ok(!screen.menu.items.some((item) => item.id === "unavailable"));
+  assert.equal(screen.menu.items[2].disabled, false);
+  press("back");
+  assert.deepEqual(did, ["back"], "solo remains reachable");
+});
+
+test("a version mismatch disables forms already open and says an update is needed", () => {
+  const { screen, state, step, press, focus, did } = world();
+  focus("new"); press("select");
+  state.lobbyStatus = "version"; step();
+  assert.equal(screen.menu.items.find((i) => i.id === "create")?.disabled, true);
+  const g = blankCanvas(); screen.draw(g, 0, new HitMap());
+  assert.ok(writtenOn(g).some((w) => w.text === "Update needed"));
+  press("select"); assert.deepEqual(did, []);
+  press("back"); press("back"); assert.deepEqual(did, ["back"]);
+  state.knock = { code: "bbbbbbbbbb", name: "Secret Sugar", wrong: false, seq: 1 }; step();
+  assert.equal(screen.menu.items.find((i) => i.id === "join")?.disabled, true);
+});
+
+test("an invitation's version failure clears when compatible discovery recovers", () => {
+  const { screen, state, step, press, focus } = world();
+  state.ended = "version"; step();
+  assert.equal(screen.note, "version");
+  assert.equal(screen.menu.items[0].disabled, true);
+  state.lobbyStatus = "open"; state.rooms = []; step();
+  assert.equal(screen.note, "");
+  assert.equal(screen.menu.items[0].disabled, false);
+  focus("new"); press("select");
+  assert.equal(screen.menu.items.find((item) => item.id === "create")?.disabled, false);
 });
