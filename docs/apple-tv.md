@@ -232,6 +232,9 @@ desktop browser; capture date, workload and comparison machine are unknown.
   `XMLHttpRequest`, `WebSocket`, `EventSource`.
 - **Storage**: `localStorage`, kept in `NSUserDefaults`, which tvOS limits to 500 KB in all (keep it
   small: settings, and each fly's record of at most 96 KB, [From launch to launch](simulation.md#from-launch-to-launch)).
+  The fly's journal is the one exception, held to about 120,000 characters of small JPEGs
+  (`apps/web/src/journal/store.ts`), since the TV has nowhere else to keep them. Every write to
+  `localStorage` here copies the whole store into `NSUserDefaults`, the journal's pictures with it.
   `sessionStorage` lasts as long as the app runs. No IndexedDB, cookie jar or Cache API (`document.cookie` is only a string property).
 - **Timers and frames**: `setTimeout`, `setInterval`, `requestAnimationFrame` (the display
   link, 60 Hz; a frame isn't started while two are still on their way to the screen),

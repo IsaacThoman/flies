@@ -14,7 +14,7 @@ import type { PlaceId } from "../places/catalog.ts";
 import type { TimeOfDay } from "../scene/light.ts";
 import type { WeatherKind } from "../scene/weather.ts";
 
-export type ToolId = "feed" | "feather" | "blow" | "swoop" | "build" | "sky" | "view" | "place";
+export type ToolId = "feed" | "feather" | "blow" | "swoop" | "build" | "sky" | "view" | "place" | "photo";
 
 export type Variant = { id: string; label: string };
 
@@ -70,6 +70,8 @@ export const TOOLS: readonly Tool[] = [
   ...(PLACES.length > 1 ? [{ id: "place", name: "Place", verb: "Go", hold: false, world: true, variants: PLACES.map((p) => ({ id: p.id, label: p.name })) } satisfies Tool] : []),
   // Nearest first, so Up brings the camera in and Down takes it out; then through its eyes, inside it (close up, its body as glass), and its last seconds played back.
   { id: "view", name: "View", verb: "", hold: false, world: true, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }, { id: "inside", label: "Inside it" }, { id: "why", label: "Why?" }] },
+  // A picture of the world as the camera sees it, for the fly's journal: framed with the camera (swipes turn it, Up and Down bring it in and out), Select takes it.
+  { id: "photo", name: "Photo", verb: "Take", hold: false, world: true, variants: [{ id: "picture", label: "Picture" }] },
 ];
 
 /** The tools before this one act on the fly; from it on, they are about its world and the camera. */

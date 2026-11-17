@@ -4,6 +4,7 @@
 // draw, and nothing is drawn that isn't there.
 
 import * as THREE from "three";
+import { roundedRect } from "@fly/ui";
 import { BALL_RADIUS, FOODS, isDropped } from "@fly/world";
 import type { FoodKind, Pantry, Vec3 } from "@fly/world";
 import { canvas2d, canvasTexture, paint, random } from "../scene/build.ts";
@@ -263,6 +264,23 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolIcon, x: num
       g.fill();
       break;
     }
+    case "photo": {
+      // A still camera: its body, the shutter button, and a big glass lens.
+      g.fillStyle = "#3a4a6a";
+      roundedRect(g, -r * 0.8, -r * 0.42, r * 1.6, r * 1.02, r * 0.18);
+      g.fill();
+      g.fillRect(-r * 0.3, -r * 0.6, r * 0.6, r * 0.24);
+      g.fillStyle = "#ffb11c";
+      g.fillRect(r * 0.42, -r * 0.6, r * 0.24, r * 0.14);
+      g.fillStyle = "#9fe0ff";
+      g.strokeStyle = "#e8f6ff";
+      g.lineWidth = r * 0.1;
+      g.beginPath();
+      g.arc(0, r * 0.08, r * 0.34, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      break;
+    }
   }
   g.restore();
 }
@@ -474,6 +492,11 @@ export class HandsView {
     for (const geometry of geometries) geometry.dispose();
     for (const material of materials) material.dispose();
     this.group.removeFromParent();
+  }
+
+  /** For this frame only, the pointer and the tool over it aren't drawn (a photo is being taken of it); the next update shows them again. */
+  hidePointer() {
+    this.#ring.visible = this.#ripple.visible = this.#icon.visible = false;
   }
 
   /** Colours the pointer's ring and its ripple: another player's hand at a table shows in their colour. */

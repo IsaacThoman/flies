@@ -84,6 +84,10 @@ The settings, the shelf's kept choices, what the hints have taught and what has 
 `localStorage` (`apps/web/src/settings.ts`), and so is each fly's record
 (`apps/web/src/fly-record.ts`, [From launch to launch](simulation.md#from-launch-to-launch));
 from a save made by another build, or a broken one, only what this build can use is kept.
+The followed fly's journal is in IndexedDB, or `localStorage` where there is none, under
+its record's id (`apps/web/src/journal/store.ts`), never in the record itself; the canvas
+says what it holds (`data-journal`, each entry's first, or `photo`, with `+` for a picture)
+and whether a picture is being taken (`data-photos`).
 
 <!-- docs-check: base apps/web/src -->
 

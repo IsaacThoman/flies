@@ -7,6 +7,8 @@ import type { RoomWire } from "@fly/net";
 import type { GlyphSet, Hit, HitMap } from "@fly/ui";
 import type { BrainMeter } from "../../brain/meter.ts";
 import type { Frame } from "../../display.ts";
+import type { HandedOn } from "../../journal/hand-on.ts";
+import type { Entry, Journal } from "../../journal/store.ts";
 import type { Life } from "../../life.ts";
 import type { Ended } from "../../online/online.ts";
 import type { PlaceId } from "../../places/catalog.ts";
@@ -15,7 +17,7 @@ import type { Settings } from "../../settings.ts";
 /** The settings' tabs. */
 export type SettingsPage = "wallpaper" | "screen" | "picture";
 /** The menu (the title, at launch and from play alike), play, and what the menu opens. */
-export type ScreenId = "title" | "play" | "settings" | "about" | "online";
+export type ScreenId = "title" | "play" | "settings" | "about" | "online" | "journal";
 
 /** The room this device is at, as the screens show it: what it is called (once it has said), its code and link, whether this player started it, whether it is a room open to everyone, and the others there. */
 export type TableNow = {
@@ -68,6 +70,10 @@ export interface Shell {
   watch(): void;
   /** The settings changed: apply and save them. */
   applySettings(): void;
+  /** The fly's journal, once it is open; whether a picture can be handed on here (not on the Apple TV); and handing one on (from a press). */
+  readonly journal: Journal | null;
+  readonly canSavePictures: boolean;
+  savePicture(entry: Entry): Promise<HandedOn>;
   /** Playing with others online: whether this device can at all, and the room it is at (null alone). */
   readonly canPlayOnline: boolean;
   readonly table: TableNow | null;
