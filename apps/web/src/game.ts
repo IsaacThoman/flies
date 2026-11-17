@@ -856,6 +856,18 @@ export class Game implements Shell {
     return this.outside.attribution();
   }
 
+  /** Optional host hook, never polled by the frame loop. */
+  accessibilityChanged: (() => void) | null = null;
+  get loading() { return this.#loading; }
+  menuChanged() { this.accessibilityChanged?.(); }
+
+  /** Host commands consume their input before the next frame can wake Watch. */
+  accessInput() {
+    this.devices.at = performance.now();
+    this.#seenInput = this.devices.at;
+    if (this.wallpaper) this.#stopWallpaper();
+  }
+
   get screen(): ScreenId {
     return this.nav.current;
   }
@@ -1058,6 +1070,7 @@ export class Game implements Shell {
     this.#controls.spend();
     this.director.held = false;
     this.overlay.dirty = true;
+    this.menuChanged();
   }
 
   #syncCamera() {
@@ -1102,9 +1115,10 @@ export class Game implements Shell {
       // A finger already down isn't "Try again".
       this.#touchWas = remote.touch.touching;
       this.#syncCamera();
+      this.menuChanged();
     }
     if (this.#loading) {
-      if (brain.status !== "loading" && this.#awakeAt < 0) this.#awakeAt = this.time;
+      if (brain.status !== "loading" && this.#awakeAt < 0) { this.#awakeAt = this.time; this.menuChanged(); }
       const hold = brain.status === "running" ? (arriving(brain) && brain.source.storageFull ? AWAKE_HOLD_NOTE : AWAKE_HOLD) : arriving(brain) ? Infinity : 3;
       if (this.#awakeAt >= 0 && this.time - this.#awakeAt > hold) {
         this.#loading = false;
@@ -1974,7 +1988,8 @@ export class Game implements Shell {
     const menu = shown === "play" ? null : (this.screens[shown] as { menu?: { focused?: { id: string } } }).menu;
     d.focus = menu?.focused?.id ?? "";
     // Whether the menus show their focus (the remote's, the keys', a pad's): hidden while a pointer is in use.
-    d.ring = String(shown !== "play" && this.#ringShown);
+    const semanticRing = (shown === "title" || shown === "settings" || shown === "online") && this.screens[shown].semanticFocus;
+    d.ring = String(shown !== "play" && (this.#ringShown || semanticRing));
     d.tab = shown === "settings" ? settingsTab(this.screens.settings) : "";
     if (shown === "online") this.screens.online.publish(d);
     if (shown === "about") this.screens.about.publish(d);
