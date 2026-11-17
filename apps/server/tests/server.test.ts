@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { once } from "node:events";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -273,7 +274,20 @@ test("a listed room shows in the list, by its name, place, flies and lock, as it
   assert.ok(look.heard.every((r) => !("json" in r) || r.json.type !== "rooms" || r.json.rooms.every((room) => room.code !== unlisted)), "never the unlisted room");
   // Browsing, it is told nothing else, and nothing it says sits it anywhere.
   look.send({ type: "hello", v: PROTOCOL, table: unlisted, key: newKey() });
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  // A pong follows the preceding frames on this socket, so the assertion
+  // observes a processed hello rather than guessing how long loopback takes.
+  const controller = new AbortController();
+  const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(WAIT)]);
+  const pong = Promise.race([
+    once(look.ws, "pong", { signal }),
+    once(look.ws, "close", { signal }).then(() => { throw new Error("browsing socket closed before acknowledging"); }),
+  ]);
+  try {
+    look.ws.ping();
+    await pong;
+  } finally {
+    controller.abort();
+  }
   assert.ok(look.heard.every((r) => "json" in r && r.json.type === "rooms"));
   look.ws.close();
 });

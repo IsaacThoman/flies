@@ -374,10 +374,11 @@ export class Goings {
       const x = f.x + u * Math.cos(f.angle) + v * Math.sin(f.angle);
       const z = f.z - u * Math.sin(f.angle) + v * Math.cos(f.angle);
       if (around.world.heightAt(x, z) > 0.3) continue;
-      slot.food = around.pantry.add("strawberry juice", x, z, 1.1, 0.8);
+      const lasts = this.#range(...JUICE_LASTS);
+      slot.food = around.pantry.add("strawberry juice", x, z, 1.1, 0.8, undefined, lasts + 20);
       slot.to.set(x, slot.food.y, z);
       slot.from.copy(slot.to);
-      this.#show(slot, this.#range(...JUICE_LASTS), 4);
+      this.#show(slot, lasts, 4);
       return;
     }
   }
@@ -430,7 +431,7 @@ export class Goings {
           // Rolling to a stop against the fly, it stops short of it.
           if (k >= 1 || Math.hypot(f.mesh.position.x - fly.x, f.mesh.position.z - fly.z) < 3) {
             const { x, z } = f.mesh.position;
-            f.food = pantry.add("biscuit crumb", x, z, 0.9, 0.5);
+            f.food = pantry.add("biscuit crumb", x, z, 0.9, 0.5, undefined, Math.max(0.001, f.lasts + 20 - f.age));
           }
           continue;
         }

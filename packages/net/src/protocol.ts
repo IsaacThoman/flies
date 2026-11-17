@@ -484,7 +484,7 @@ export type ClientMessage =
   | { type: "place"; place: string }
   | { type: "remove"; id: number }
   | { type: "pop"; slot: number; cycle: number; at: number; epoch?: number }
-  | { type: "found"; id: number; name: string; x: number; z: number; y: number; r: number; sweet: number; epoch?: number }
+  | { type: "found"; id: number; name: string; x: number; z: number; y: number; r: number; sweet: number; lasts?: number; epoch?: number }
   | { type: "bye" };
 
 /** Why the room turned a device away (and closed its connection with the matching code). */

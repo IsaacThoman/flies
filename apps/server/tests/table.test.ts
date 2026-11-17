@@ -974,6 +974,118 @@ test("a room open to everyone that nobody was in keeps no beat, yet whoever come
   assert.equal(saidOf(link, "welcome")[0].place, everyonePlace(clock.wall));
 });
 
+test("room listings return only the first fifty populated rooms in name order when occupancy ties", () => {
+  const tables = new Tables({ now: () => 0, wall: () => 0 });
+  for (let i = 50; i >= 0; i--) {
+    const alphabet = "23456789abcdefghjkmnpqrstuvwxyz";
+    const code = `aaaaaaaa${alphabet[Math.floor(i / 31)]}${alphabet[i % 31]}`;
+    const key = `key-${i}`;
+    const hello: Hello = { type: "hello", v: PROTOCOL, table: code, key, start: { ...START, name: `Room ${String(i).padStart(2, "0")}`, listed: true } };
+    const table = tables.open(key, hello, i);
+    assert.ok(table instanceof Table);
+    assert.equal(typeof table.hello(fakeLink(), key, hello), "object");
+  }
+  // Everyone first, always, then the first 49 of these.
+  assert.deepEqual(tables.listed().map((r) => r.name), ["Everyone", ...Array.from({ length: 49 }, (_, i) => `Room ${String(i).padStart(2, "0")}`)]);
+});
+
+test("a connected room cannot expire even when no message has refreshed its wall-clock timestamp", () => {
+  let wall = 0;
+  const tables = new Tables({ now: () => 0, wall: () => wall });
+  const hello: Hello = { type: "hello", v: PROTOCOL, table: CODE, key: "starter", start: { ...START, listed: true } };
+  const table = tables.open("starter", hello, 7);
+  assert.ok(table instanceof Table);
+  table.hello(fakeLink(), "starter", hello);
+  wall = TABLE_IDLE + 1;
+  tables.tick();
+  assert.equal(tables.get(CODE), table);
+  assert.deepEqual(tables.listed().map((r) => r.code), [EVERYONE, CODE]);
+});
+
+test("an unsupported save version does not restore rooms", async (t) => {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "flies-version-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const file = join(dir, "tables.json");
+  const { table, options } = room();
+  await writeFile(file, JSON.stringify({ v: 2, tables: [table.record()] }));
+  const tables = new Tables(options);
+  assert.equal(await tables.load(file), 0);
+  assert.equal(tables.size, 1, "Everyone alone, which the server opens itself");
+});
+
+test("a room lock accepts canonically equivalent passwords, uses a full random salt, and rejects malformed records", async () => {
+  const { lock, opens, isLock } = await import("../src/lock.ts");
+  const secured = await lock("Café");
+  assert.equal(await opens("Cafe\u0301", secured), true);
+  assert.equal(await opens("Cafe", secured), false);
+  assert.equal(Buffer.from(secured.salt, "base64url").length, 16);
+  const other = await lock("Café");
+  assert.notEqual(other.salt, secured.salt, "the same password is salted independently at each room");
+  assert.notEqual(other.hash, secured.hash);
+  assert.equal(isLock(secured), true);
+  for (const value of [null, {}, { salt: secured.salt }, { salt: secured.salt, hash: 42 }, { salt: secured.salt, hash: [] }, { salt: secured.salt, hash: { length: 32 } }]) assert.equal(isLock(value), false);
+});
+
+test("equally full rooms with the same name have a stable code order regardless of arrival order", () => {
+  const tables = new Tables({ now: () => 0, wall: () => 0 });
+  for (const code of ["bbbbbbbbbb", "aaaaaaaaaa"]) {
+    const hello: Hello = { type: "hello", v: PROTOCOL, table: code, key: code, start: { ...START, name: "Same", listed: true } };
+    const table = tables.open(code, hello, 7);
+    assert.ok(table instanceof Table);
+    table.hello(fakeLink(), code, hello);
+  }
+  assert.deepEqual(tables.listed().filter((room) => !room.everyone).map((room) => room.code), ["aaaaaaaaaa", "bbbbbbbbbb"]);
+});
+
+test("found food deadlines survive a saved idle room and are gone on welcome", () => {
+  const { table, clock, join, send, options } = room();
+  const a = join("key-1");
+  send(a, { type: "found", id: 900000001, name: "strawberry juice", x: 20, z: 20, y: 0, r: 1, sweet: 0.8, lasts: 10, epoch: table.epoch });
+  const saved = table.record();
+  assert.equal(saved.foodExpires?.length, 1);
+  clock.wall += 10001;
+  const restored = new Table(CODE, START, "key-1", 7, options, saved);
+  const link = fakeLink();
+  restored.hello(link, "key-1", { type: "hello", v: PROTOCOL, table: CODE, key: "key-1" });
+  assert.ok(!saidOf(link, "welcome")[0].foods.some((f) => f[0] === 900000001));
+  assert.ok(!restored.record().foods.some((f) => f[0] === 900000001));
+  assert.deepEqual(restored.record().foodExpires, []);
+  clock.wall += 1000;
+  assert.ok(!table.record().foods.some((f) => f[0] === 900000001), "a room that never ticked expires before its next save");
+});
+
+test("a live idle room clears expired food before another welcome", () => {
+  const { table, clock, join, send } = room();
+  const a = join("key-1");
+  send(a, { type: "found", id: 900000001, name: "juice", x: 20, z: 20, y: 0, r: 1, sweet: 0.8, lasts: 10 });
+  clock.wall += 10001;
+  const b = join("key-2");
+  assert.ok(!saidOf(b, "welcome")[0].foods.some((f) => f[0] === 900000001));
+  assert.equal(table.food.find(900000001), null);
+});
+
+test("a replacement found food is announced after the previous lifetime's removal", () => {
+  const { table, clock, join, send, step } = room();
+  const a = join("key-1");
+  const b = join("key-2");
+  const found: ClientMessage = { type: "found", id: 900000001, name: "juice", x: 20, z: 20, y: 0, r: 1, sweet: 0.8, lasts: 10 };
+  send(a, found);
+  clear(b);
+  clock.wall += 10001;
+  table.food.update(0);
+  send(a, found);
+  step(100);
+  const messages = said(b);
+  const gone = messages.findIndex((m) => m.type === "food" && m.gone.includes(found.id));
+  const replacement = messages.findIndex((m) => m.type === "found" && m.food[0] === found.id);
+  assert.ok(gone >= 0 && replacement > gone);
+  assert.ok(!messages.slice(replacement).some((m) => m.type === "food" && m.gone.includes(found.id)));
+  assert.ok(table.food.find(found.id));
+});
+
 test("refused bites are acknowledged and exact nutrition is delivered once", () => {
   const { table, join, bite, step } = room();
   const a = join("key-1");
@@ -1021,4 +1133,24 @@ test("many unknown-food refusals cannot overflow acknowledgements or lose anothe
   assert.ok(message);
   assert.equal(message.gone.length, 0);
   assert.ok(Math.abs(message.meal![1] - 0.08) < 1e-6);
+});
+
+test("expiry replacement flushes pending bite receipts exactly once", () => {
+  const { table, clock, join, send, bite, step } = room();
+  const a = join("key-1");
+  const p = a.seat.state;
+  const food = table.food.drop(a.seat.id, DROP_ID + 1, "berry", p.x, p.z, p.y)!;
+  const found: ClientMessage = { type: "found", id: 900000001, name: "juice", x: 20, z: 20, y: 0, r: 1, sweet: 0.8, lasts: 10, epoch: table.epoch };
+  send(a, found);
+  clear(a);
+  clock.wall += 10001;
+  bite(a, food.id, 0.1);
+  send(a, found);
+  const receipt = saidOf(a, "food").at(-1)!;
+  assert.equal(receipt.ack, 1);
+  assert.ok(receipt.gone.includes(found.id));
+  assert.ok(Math.abs(receipt.meal![1] - 0.08) < 1e-6);
+  clear(a);
+  step(100);
+  assert.ok(saidOf(a, "food").every((m) => m.meal![1] === 0));
 });

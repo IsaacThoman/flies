@@ -356,3 +356,9 @@ test("the Rumble row applies Off and On like the other on/off settings", () => {
   assert.equal(shell.settings.rumble, true);
   assert.deepEqual(shell.asked, ["apply", "apply"]);
 });
+
+test("a kept weather expires exactly six hours after the choice, while a view is kept", () => {
+  const store = shelfSaved({ weather: { kind: "rain", at: NOW }, view: { kind: "wide", at: NOW } });
+  assert.equal(loadShelf(NOW + 6 * HOUR - 1, store).weather?.kind, "rain");
+  assert.deepEqual(loadShelf(NOW + 6 * HOUR, store), { view: { kind: "wide", at: NOW } });
+});
