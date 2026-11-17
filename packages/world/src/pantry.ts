@@ -4,6 +4,7 @@
 // found (a drop of juice, a crumb). Those last two are eaten up and gone.
 
 import type { World } from "./world.ts";
+import { TOUCH, createSurface } from "./world.ts";
 
 /** A patch of food built into a place: it can be eaten down and slowly comes back. */
 export type FoodPatch = {
@@ -63,6 +64,8 @@ export class Pantry {
   readonly foods: Food[] = [];
   #next = 1;
   #world: World;
+  #contact = createSurface();
+  #support = createSurface();
 
   constructor(world: World, patches: readonly FoodPatch[] = []) {
     this.#world = world;
@@ -94,6 +97,12 @@ export class Pantry {
     return food;
   }
 
+  /** Removes the player's offerings, leaving the place's patches and finds alone. True: falling food can go too; a shared pantry waits for its room. */
+  clearDropped() {
+    for (let i = this.foods.length - 1; i >= 0; i--) if (isDropped(this.foods[i])) this.remove(this.foods[i]);
+    return true;
+  }
+
   remove(food: Food) {
     const i = this.foods.indexOf(food);
     if (i >= 0) this.foods.splice(i, 1);
@@ -106,14 +115,23 @@ export class Pantry {
    */
   touching(x: number, y: number, z: number, reach: number): Food | null {
     let best: Food | null = null;
+    let contact = false;
     // Indexed: asked several times a frame, and an iterator is an allocation without a JIT.
     for (let i = 0; i < this.foods.length; i++) {
       const food = this.foods[i];
-      if (food.amount <= 0 || Math.abs(y - food.y) > TASTE_HEIGHT + reach) continue;
+      if (food.amount <= 0) continue;
       const d = food.r + reach;
       const dx = x - food.x;
       const dz = z - food.z;
       if (dx * dx + dz * dz > d * d) continue;
+      if (!contact) {
+        this.#world.surface(x, z, this.#contact, y);
+        if (y < this.#contact.y - TOUCH || y - this.#contact.y > TASTE_HEIGHT + reach || this.#contact.underside <= y + TOUCH) return null;
+        contact = true;
+      }
+      // Follow the food's supporting surface, not its centre's height or a different layer.
+      this.#world.surface(food.x, food.z, this.#support, food.y);
+      if (this.#support.solid !== this.#contact.solid) continue;
       if (!best || food.sweet * food.amount > best.sweet * best.amount) best = food;
     }
     return best;

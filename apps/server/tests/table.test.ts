@@ -685,3 +685,22 @@ test("a room's name, whether it is listed, and its lock are kept across a restar
   }
   assert.deepEqual(locked.info, { name: "Locked", listed: false, locked: true });
 });
+
+test("a clear request removes only the sender's offerings and broadcasts gone ids; stale epochs do nothing", () => {
+  const { table, join, send, step, clock } = room();
+  const a = join("key-1"), b = join("key-2");
+  const mine = DROP_ID + 1, theirs = 2 * DROP_ID + 1;
+  send(a, { type: "drop", id: mine, kind: "honey", x: 0, z: 0, y: 0, at: clock.now });
+  send(b, { type: "drop", id: theirs, kind: "water", x: 0, z: 0, y: 0, at: clock.now });
+  const patches = table.food.foods.filter((f) => f.kind === "patch").map((f) => f.id);
+  send(a, { type: "clearFood", epoch: table.epoch + 1 });
+  assert.ok(table.food.find(mine), "a delayed request for another place is ignored");
+  send(b, { type: "clearFood", epoch: table.epoch });
+  assert.ok(table.food.find(mine), "the starter's offering is not the guest's to clear");
+  assert.equal(table.food.find(theirs), null);
+  step(150);
+  for (const player of [a, b]) assert.ok(saidOf(player, "food").some((m) => m.gone.includes(theirs)), "both devices hear the room's removal");
+  send(a, { type: "clearFood", epoch: table.epoch });
+  assert.equal(table.food.find(mine), null);
+  assert.deepEqual(table.food.foods.map((f) => f.id), patches);
+});

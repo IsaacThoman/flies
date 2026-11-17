@@ -11,6 +11,7 @@ import { HANDS, HOLDING, ballProgress } from "@fly/net";
 import type { BallWire, FlyState } from "@fly/net";
 import { Pantry, SWOOP_SECONDS, createSurface } from "@fly/world";
 import type { FoodKind, Vec3, World } from "@fly/world";
+import type { Falling } from "../tools/hands.ts";
 import { DROP_HEIGHT, FALL, Hands, TOOLS, WORLD_TOOLS } from "../tools/hands.ts";
 import { HandsView } from "../tools/view.ts";
 import type { TablePantry } from "./table-pantry.ts";
@@ -32,7 +33,7 @@ export class OtherHand {
   readonly #world: World;
   readonly #input = { use: false, holding: false, eye: this.#eye };
   /** Their food in the air: what it will be called when it lands. */
-  readonly #falling: { id: number; kind: FoodKind }[] = [];
+  readonly #falling: { id: number; falling: Falling }[] = [];
   /** Hands drops landed food into a pantry; theirs lands in the table's, under their name. */
   readonly #landing: Pantry;
   /** Theirs draws only what is in their hand: the table's food is drawn once, by this player's own view. */
@@ -53,7 +54,7 @@ export class OtherHand {
     const falling = this.#falling;
     this.#landing = new (class extends Pantry {
       drop(kind: FoodKind, x: number, z: number, y?: number) {
-        const i = falling.findIndex((f) => f.kind === kind);
+        const i = falling.findIndex(({ falling: f }) => f.kind === kind && f.x === x && f.z === z && f.floor === y);
         if (i >= 0) table.landed(falling.splice(i, 1)[0].id, kind, x, z, y);
         return table.foods[table.foods.length - 1];
       }
@@ -102,8 +103,18 @@ export class OtherHand {
   drop(id: number, kind: FoodKind, x: number, z: number, y: number, age: number) {
     const floor = this.#world.heightAt(x, z, y);
     const t = Math.max(0, age);
-    this.#falling.push({ id, kind });
-    this.hands.falling.push({ kind, x, z, y: Math.max(floor, floor + DROP_HEIGHT - 0.5 * FALL * t * t), floor, vy: -FALL * t });
+    const falling = { kind, x, z, y: Math.max(floor, floor + DROP_HEIGHT - 0.5 * FALL * t * t), floor, vy: -FALL * t };
+    this.#falling.push({ id, falling });
+    this.hands.falling.push(falling);
+  }
+
+  /** A removed offering must not land later and put itself back in the pantry. */
+  forgetFood(id: number) {
+    const i = this.#falling.findIndex((f) => f.id === id);
+    if (i < 0) return;
+    const fall = this.#falling.splice(i, 1)[0].falling;
+    const at = this.hands.falling.indexOf(fall);
+    if (at >= 0) this.hands.falling.splice(at, 1);
   }
 
   /** The table moved: nothing of theirs is in the air any more. */
