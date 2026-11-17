@@ -574,7 +574,7 @@ export class Game implements Shell {
 
   /** A fly's clock, as every fly's here keeps it: the real time of day, and the sun's times where the TV can tell them. */
   #rhythm() {
-    return new Rhythm(clockHours(new Date()), this.outside.sunTimes ?? SUMMER);
+    return new Rhythm(clockHours(new Date()), this.outside.sunTimes ?? SUMMER, undefined, this.settings.pace);
   }
 
   /** How many flies this device lives now, the followed one among them. */
@@ -933,6 +933,8 @@ export class Game implements Shell {
       this.outside.enabled = s.realWeather;
       this.#clockAt = 0;
     }
+    // The flies' clocks take a new pace when they are next put right: on the next frame.
+    if (this.life?.rhythm && this.life.rhythm.pace !== s.pace) this.#clockAt = 0;
     // Not with others by default any more: out of the room it was sat in for it. On again: with them soon, whatever stopped it before.
     if (s.joinOthers !== this.#joinOthers) {
       this.#joinOthers = s.joinOthers;
@@ -1417,9 +1419,10 @@ export class Game implements Shell {
     // Each fly's own clock is set right from the real hour and today's sun, at a table too: they live here.
     const hours = clockHours(now);
     const sun = this.outside.sunTimes ?? SUMMER;
-    this.life?.rhythm?.setTime(hours, sun);
+    const pace = this.settings.pace;
+    this.life?.rhythm?.setTime(hours, sun, pace);
     // Before the company is made, the first time.
-    if (this.company) for (const c of this.company.list) c.life.rhythm?.setTime(hours, sun);
+    if (this.company) for (const c of this.company.list) c.life.rhythm?.setTime(hours, sun, pace);
     // At a table its clock is the starter's, and its weather the forecast's from that clock: the same for everyone there.
     const tableHours = this.online?.hours() ?? null;
     if (tableHours !== null) {
@@ -2019,12 +2022,6 @@ export class Game implements Shell {
   // Kept once, rather than allocating a new redraw closure on every frame.
   #drawPlay = (g: CanvasRenderingContext2D, hits: HitMap) => {
     const hud = this.#hud;
-    if (hud.hints && !this.#learned[this.hands.current.id] && !this.hands.fixed.has(this.hands.current.id)) {
-      const p = this.hands.pointer;
-      this.#ndc.set(p.x, p.y, p.z).project(this.director.camera);
-      hud.aimX = (this.#ndc.x + 1) * this.shape.design.width / 2;
-      hud.aimY = (1 - this.#ndc.y) * this.shape.design.height / 2;
-    }
     drawHud(g, this.time, hud, hits);
     if (this.settings.stats) drawStats(g, this, hud.layout.statsX, hud.layout.statsY);
   };
@@ -2062,7 +2059,7 @@ export class Game implements Shell {
     d.activity = life.activity;
     const r = life.rhythm;
     // The fly's clock and sleep as the brain is told them, and how long it has been still (s).
-    d.rhythm = r ? `hours ${r.hours.toFixed(2)} morning ${r.clock.morning.toFixed(2)} evening ${r.clock.evening.toFixed(2)} sleep ${r.clock.sleep.toFixed(2)} pressure ${r.pressure.toFixed(3)} depth ${r.depth.toFixed(2)} still ${r.still.toFixed(0)}` : "";
+    d.rhythm = r ? `hours ${r.hours.toFixed(2)} morning ${r.clock.morning.toFixed(2)} evening ${r.clock.evening.toFixed(2)} sleep ${r.clock.sleep.toFixed(2)} pressure ${r.pressure.toFixed(3)} felt ${r.felt.toFixed(3)} pace ${r.pace} depth ${r.depth.toFixed(2)} still ${r.still.toFixed(0)}` : "";
     d.mode = life.body.mode;
     d.tool = this.hands.current.id;
     d.variant = this.hands.variant.id;

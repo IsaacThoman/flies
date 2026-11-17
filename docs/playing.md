@@ -44,8 +44,8 @@ Pointing, the screen itself is what you press, and there are no button hints:
 | Feed, Swoop | Tap where you mean. | Click there. |
 | Tickle, Blow | Touch and hold, and drag: the feather strokes the fly while you hold it on it, and rests on it lightly while the hand is there; the puff follows the finger. | Hold the button, and drag. Hovering over the fly rests the feather on it. |
 | Light, Weather, View, Place | The arrows either side of the tool's label (or a tap on the label, or a swipe along it) step its kind; tapping the tool again does too. Place has a Go button for somewhere the fly isn't. | The same, or the wheel over the label. |
-| Closer and farther | Pinch. | The wheel, a trackpad's scroll up and down, or its pinch. |
-| Round the fly | Drag anywhere but with the feather or the air in hand on the table (they go where the finger goes); or drag with two fingers. | Drag (the same), or drag with the right or middle button outside the HUD. A trackpad's sideways scroll. |
+| Closer and farther | Pinch. | The wheel, or a trackpad's pinch. |
+| Round the fly | Drag anywhere but with the feather or the air in hand on the table (they go where the finger goes); or drag with two fingers. | Drag (the same), or drag with the right or middle button outside the HUD. A trackpad's two-finger scroll, round and up or down. |
 | Back to Follow | Double-tap the air. | Double-click the air, or R. |
 | Tools | Tap one on the shelf. | Click one; the wheel over the shelf steps along it. |
 | Menus | Tap a row, a tab, a choice's arrows; a slider follows the finger. The round button at the top left, or a tap outside the pane, goes back. | The same, and a right click goes back. Hovering only brightens what is under the cursor: the focus ring is the remote's and the keys'. |
@@ -106,8 +106,8 @@ The camera in play (`apps/web/src/orbit.ts`) is a plain orbit round the
 fly, on three numbers that only you change: how far round it is, how far up,
 and how far out. A drag turns it round and up by the same amount for the same
 distance dragged, every time, at every zoom, and stops when you stop; it can
-go from just above the table to nearly overhead. The wheel, a pinch or a
-trackpad's scroll brings it in or takes it out, from near enough for the fly
+go from just above the table to nearly overhead; a trackpad's two-finger
+scroll turns it the same way. The wheel or a pinch brings it in or takes it out, from near enough for the fly
 to fill the picture to the whole place, and changes nothing else: the fly
 remains the tracking target and zoom leaves the field of view unchanged. HUD
 layout and aspect changes can offset the target or alter the field of view. The
@@ -161,6 +161,10 @@ away, and a nudge of the desk doesn't end it; a mouse moved as if meant does.
 Its camera can take long slow shots of the
 fly from one angle after another instead (Calm), or change them more often
 (Lively), or keep the whole place in view with a slow drift (Whole place).
+Activity sets how its day goes: Lively, the default, keeps it about through
+the day and the evening and asleep in the small hours; Natural is a male
+fly's day, busy round dawn and dusk, with a long midday siesta and the night
+asleep ([Sleep and the daily rhythm](../README.md#sleep-and-the-daily-rhythm)).
 Recognized game buttons, pointer gestures and deliberate mouse movement
 bring the controls back; unrelated keyboard keys need not wake it. The wake
 event is consumed, though held inputs can act on subsequent frames.

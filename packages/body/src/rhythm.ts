@@ -26,17 +26,6 @@
 const DAY = 24;
 
 export const RHYTHM = {
-  /** Hours either side of dawn and dusk that the M and E oscillators are up. A round number from the anticipation's three hours. */
-  spread: 3,
-  /**
-   * How much of the clock's push toward sleep is left while the sun is up:
-   * light keeps a fly awake through the large ventral lateral neurons (Shang et
-   * al. 2008; Sheeba et al. 2008), so a male's midday siesta is lighter than his
-   * night's sleep. A round number, chosen by what it does: at 0.6 the fly
-   * hardly sleeps at midday (14 to 35% of 90 minutes), at 0.8 it sleeps much of
-   * it, as males do (packages/brain/README.md, Sleep and the daily rhythm).
-   */
-  daylight: 0.8,
   /** Hours for sleep pressure to build most of the way (1 - 1/e) while awake, and to discharge while asleep. Round numbers, with discharge faster than build-up as in the two-process model (Daan et al. 1984). */
   build: 12,
   discharge: 3,
@@ -45,6 +34,36 @@ export const RHYTHM = {
   /** Seconds still for its depth to come most of the way (1 - 1/e) to 1. */
   deepen: 300,
 } as const;
+
+/**
+ * How the clock shapes the day: a fly's ("natural") or one livelier to watch
+ * ("lively", the game's default), each with
+ * - spread: hours either side of dawn and dusk that the M and E oscillators are up;
+ * - daylight: the clock's push toward sleep while the sun is up;
+ * - night: its push in the dark;
+ * - need: how much of its sleep pressure it feels (what the brain is told);
+ * - summer: whether its day is at least a summer's, whatever the sun.
+ *
+ * Natural: 3 hours, a round number from the anticipation's three hours. Light
+ * keeps a fly awake through the large ventral lateral neurons (Shang et al.
+ * 2008; Sheeba et al. 2008), so a male's midday siesta is lighter than his
+ * night's sleep: 0.8 of it, a round number chosen by what it does: at 0.6 the
+ * fly hardly sleeps at midday (14 to 35% of 90 minutes), at 0.8 it sleeps much
+ * of it, as males do (packages/brain/README.md, Sleep and the daily rhythm).
+ *
+ * Lively is chosen for a wallpaper, not measured in a fly: four hours either
+ * side, so the peaks run into the day and the evening; a summer's day at
+ * least, so a winter evening is still its evening; a light push by day (0.1:
+ * held alone, a push of 0.2 already halves its walking) and a moderate one at
+ * night (0.6); and a fifth of its pressure felt, as a fly that hardly sleeps by
+ * day would otherwise come to the evening with nearly the night's push from
+ * pressure alone (packages/brain/README.md, The lively pace).
+ */
+export type DayPace = "lively" | "natural";
+export const PACES: Record<DayPace, { readonly spread: number; readonly daylight: number; readonly night: number; readonly need: number; readonly summer: boolean }> = {
+  lively: { spread: 4, daylight: 0.1, night: 0.6, need: 0.2, summer: true },
+  natural: { spread: 3, daylight: 0.8, night: 1, need: 1, summer: false },
+};
 
 /** Where the sun is: hours of sunrise and sunset, 0 to 24, local time. */
 export type Sun = { sunrise: number; sunset: number };
@@ -66,11 +85,14 @@ function bump(hours: number, at: number, spread: number) {
 }
 
 /** The clock at an hour of the day: the M and E oscillators, and its push toward sleep. */
-export function clockAt(hours: number, sun: Sun, out = { morning: 0, evening: 0, sleep: 0 }) {
-  out.morning = bump(hours, sun.sunrise, RHYTHM.spread);
-  out.evening = bump(hours, sun.sunset, RHYTHM.spread);
-  const up = wrap(hours - sun.sunrise) < wrap(sun.sunset - sun.sunrise);
-  out.sleep = (1 - Math.max(out.morning, out.evening)) * (up ? RHYTHM.daylight : 1);
+export function clockAt(hours: number, sun: Sun, out = { morning: 0, evening: 0, sleep: 0 }, pace: DayPace = "natural") {
+  const { spread, daylight, night, summer } = PACES[pace];
+  const sunrise = summer ? Math.min(sun.sunrise, SUMMER.sunrise) : sun.sunrise;
+  const sunset = summer ? Math.max(sun.sunset, SUMMER.sunset) : sun.sunset;
+  out.morning = bump(hours, sunrise, spread);
+  out.evening = bump(hours, sunset, spread);
+  const up = wrap(hours - sunrise) < wrap(sunset - sunrise);
+  out.sleep = (1 - Math.max(out.morning, out.evening)) * (up ? daylight : night);
   return out;
 }
 
@@ -86,11 +108,11 @@ export function pressureAfter(pressure: number, seconds: number, asleep: boolean
  * halfway toward sleep. So a fly that has just arrived (the page loaded) is as
  * sleepy as the hour makes it, not freshly rested.
  */
-export function usualPressure(hours: number, sun: Sun) {
+export function usualPressure(hours: number, sun: Sun, pace: DayPace = "natural") {
   const step = 1 / 12;
   const clock = { morning: 0, evening: 0, sleep: 0 };
   let pressure = 0;
-  for (let h = hours - 2 * DAY; h < hours; h += step) pressure = pressureAfter(pressure, step * 3600, clockAt(h, sun, clock).sleep > 0.5);
+  for (let h = hours - 2 * DAY; h < hours; h += step) pressure = pressureAfter(pressure, step * 3600, clockAt(h, sun, clock, pace).sleep > 0.5);
   return pressure;
 }
 
@@ -99,6 +121,8 @@ export class Rhythm {
   /** The hour of the day, 0 to 24, local time: set from the real clock now and then (`setTime`) and run on between. */
   hours: number;
   sun: Sun;
+  /** How the clock shapes its day (PACES): changed with `setTime`, which then starts its pressure afresh. */
+  pace: DayPace;
   /** The internal state the brain is told (types.ts), each 0 to 1. */
   readonly clock = { morning: 0, evening: 0, sleep: 0 };
   pressure: number;
@@ -110,11 +134,17 @@ export class Rhythm {
   bouts = 0;
   slept = 0;
 
-  constructor(hours: number, sun: Sun = SUMMER, pressure = usualPressure(hours, sun)) {
+  constructor(hours: number, sun: Sun = SUMMER, pressure?: number, pace: DayPace = "natural") {
     this.hours = wrap(hours);
     this.sun = sun;
-    this.pressure = clamp01(pressure);
-    clockAt(this.hours, sun, this.clock);
+    this.pace = pace;
+    this.pressure = clamp01(pressure ?? usualPressure(hours, sun, pace));
+    clockAt(this.hours, sun, this.clock, pace);
+  }
+
+  /** The sleep pressure it feels, as its pace has it: what the brain is told. */
+  get felt() {
+    return this.pressure * PACES[this.pace].need;
   }
 
   /** Asleep: still for five minutes or more. */
@@ -122,11 +152,17 @@ export class Rhythm {
     return this.still >= RHYTHM.still;
   }
 
-  /** Puts the clock right: the hour now and today's sun, where it is known. */
-  setTime(hours: number, sun: Sun = this.sun) {
+  /**
+   * Puts the clock right: the hour now, today's sun where it is known, and the
+   * pace chosen. A new pace starts it as sleepy as that pace leaves a fly at
+   * this hour: the pressure a lively day builds would make a natural fly drowsy.
+   */
+  setTime(hours: number, sun: Sun = this.sun, pace: DayPace = this.pace) {
     this.hours = wrap(hours);
     this.sun = sun;
-    clockAt(this.hours, sun, this.clock);
+    if (pace !== this.pace) this.pressure = usualPressure(this.hours, sun, pace);
+    this.pace = pace;
+    clockAt(this.hours, sun, this.clock, pace);
   }
 
   /** `dt` seconds on, in which the fly moved or didn't. */
@@ -134,7 +170,7 @@ export class Rhythm {
     if (!(dt > 0)) return;
     const wasAsleep = this.asleep;
     this.hours = wrap(this.hours + dt / 3600);
-    clockAt(this.hours, this.sun, this.clock);
+    clockAt(this.hours, this.sun, this.clock, this.pace);
     this.still = moving ? 0 : this.still + dt;
     const asleep = this.asleep;
     if (asleep && !wasAsleep) this.bouts++;

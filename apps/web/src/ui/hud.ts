@@ -1,5 +1,5 @@
-// The shelf and gesture demonstrations share one HUD texture. A successful
-// action permanently retires its diagram; no diagram ever acts on the fly.
+// The shelf and its button hints share one HUD texture. Using a tool
+// permanently retires its hint.
 
 import { INK, INK_SOFT, bubbleRing, chevron, font, glassPanel, drawGlyph, hintWidth, iconButton, orb, pill, roundedRect, text, wrap } from "@fly/ui";
 import type { GlyphSet, Hit, HitMap } from "@fly/ui";
@@ -11,7 +11,6 @@ import type { Hands } from "../tools/hands.ts";
 import { drawToolIcon } from "../tools/view.ts";
 import type { Arriving } from "./loading.ts";
 import type { HudLayout } from "./layout.ts";
-import { drawDemonstration, ghostPress } from "./demonstration.ts";
 
 export type HudState = {
   hands: Hands;
@@ -35,8 +34,6 @@ export type HudState = {
   /** Looking through the fly's eyes: how many facets, whether they're a stand-in, and whether they're off in Settings. */
   eyes: { facets: number; standIn: boolean; off: boolean } | null;
   layout: HudLayout;
-  aimX?: number;
-  aimY?: number;
   pressed?: Readonly<Hit> | null;
 };
 
@@ -156,21 +153,13 @@ export function drawHud(g: CanvasRenderingContext2D, t: number, s: HudState, hit
     menuRight = L.menuX + 36;
   }
 
-  if (s.hints && !preview) {
+  // Pointing has no button hints: what can be pressed is on the screen.
+  if (s.hints && !pointing) {
     if (!s.learned[tool.id] && !hands.fixed.has(tool.id) && !(tool.id === "feed" && hands.variant.id === "clear")) {
-      if (tool.id === "light" || tool.id === "weather" || tool.id === "view" || tool.id === "place") {
-        if (pointing) {
-          // Actual press feedback takes precedence over the gesture being taught.
-          if (!s.pressed) ghostPress(g, go ? lx + lw + 40 : lx + lw - 18, labelY - 8, t, false);
-        }
-        else drawGlyph(g, tool.id === "place" && hands.place !== s.here ? "select" : "upDown", cx, labelY - 48, 28, t, s.glyphs!);
-      } else {
-        const x = Math.max(L.cx - L.width / 2 + 65, Math.min(L.cx + L.width / 2 - 65, s.aimX ?? cx));
-        const y = Math.max(L.captionY + (s.brainRunning ? 70 : 110), Math.min(labelY - 58, s.aimY ?? labelY - 85));
-        drawDemonstration(g, t, tool.id, x, y, s.glyphs);
-      }
+      const choose = tool.id === "light" || tool.id === "weather" || tool.id === "view" || (tool.id === "place" && hands.place === s.here);
+      drawGlyph(g, tool.id === "feather" || tool.id === "blow" ? "hold" : choose ? "upDown" : "select", cx, labelY - 48, 28, t, s.glyphs!);
     }
-    if (!s.learned.tools && !pointing) drawGlyph(g, "leftRight", L.shelfLeft + L.split * gap / 2, sy - 34, 23, t, s.glyphs!);
+    if (!s.learned.tools) drawGlyph(g, "leftRight", L.shelfLeft + L.split * gap / 2, sy - 34, 23, t, s.glyphs!);
     if (!s.learned.hand && s.teachSwipe && s.glyphs && s.glyphs !== "keys") drawGlyph(g, "swipe", L.rightX - 20, L.rightY - 30, 28, t, s.glyphs);
   }
 

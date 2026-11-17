@@ -34,7 +34,7 @@ const NOW = Date.UTC(2026, 10, 16, 20);
 
 test("settings come back as they were saved", () => {
   const store = memory();
-  const settings: Settings = { flies: 3, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "whole", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, rumble: false, stats: true, realWeather: false, place: "lab", scene: "bar", joinOthers: false };
+  const settings: Settings = { flies: 3, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "whole", pace: "natural", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, rumble: false, stats: true, realWeather: false, place: "lab", scene: "bar", joinOthers: false };
   saveSettings(settings, store);
   assert.deepEqual(loadSettings(store), settings);
 });
@@ -116,6 +116,7 @@ test("each setting keeps only a value the game can use", () => {
     pixels: ["huge", "toString", "__proto__", 2],
     wallpaperAfter: [-30, "60"],
     wallpaperCamera: ["drone", 0],
+    pace: ["sleepy", "toString", 1],
     eyes: ["medium", false],
     eyesInset: ["sometimes", "corner"],
     nerves: ["glowing", 1],
@@ -339,6 +340,22 @@ test("every value a tab offers is one a save keeps", () => {
       }
     }
   });
+});
+
+test("the Activity row is lively at first and goes natural, last on the screensaver's tab", () => {
+  const shell = fakeShell();
+  const screen = settingsScreen(shell);
+  screen.enter();
+  const rows = screen.menu.items.slice(1);
+  const pace = rows.at(-1);
+  assert.ok(pace?.kind === "choice" && pace.id === "pace");
+  assert.equal(pace.label, "Activity");
+  assert.equal(pace.options[pace.index].label, "Lively");
+  screen.menu.focusOn("pace");
+  press(screen, "right");
+  assert.equal(shell.settings.pace, "natural");
+  assert.equal(pace.options[pace.index].label, "Natural");
+  assert.deepEqual(shell.asked, ["apply"]);
 });
 
 test("the Rumble row applies Off and On like the other on/off settings", () => {
