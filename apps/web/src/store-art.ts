@@ -93,7 +93,7 @@ async function capture(story: StoreStory, tv = false) {
     const display = new Display(tv);
     const devices = new Devices(tv ? "remote" : "touch");
     const remote = new Remote(window, undefined, devices);
-    const game = new Game(canvas, remote, driver, display, { devices });
+    const game = new Game(canvas, remote, { first: driver, another: null }, display, { devices });
     // Each visual sample must reach the next fixed step, independent of GPU fence timing.
     const renderer = game.stage.renderer;
     renderer.readRenderTargetPixelsAsync = async (...args) => {
@@ -121,8 +121,10 @@ async function capture(story: StoreStory, tv = false) {
     }) });
     games.forEach((g, i) => {
       const host: TableHost = {
-        scene: g.stage.scene, stage: g.stage, life: g.life, hands: g.hands, fly: g.fly, eyes: g.eyes, bubbles: g.bubbles,
+        scene: g.stage.scene, stage: g.stage, life: g.life, company: g.company, others: g.others, hands: g.hands, fly: g.fly, eyes: g.eyes, bubbles: g.bubbles,
         felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] },
+        // One fly each: the picture is of three devices' flies together.
+        flies: () => 1, seat: () => {}, share: (pantry) => g.life.share(pantry),
         here: () => g.here, moving: () => false, moveTo: id => g.moveTo(id),
         onWorld: () => { g.stage.setTime("morning"); g.stage.weather.choose("clear", true); },
       };

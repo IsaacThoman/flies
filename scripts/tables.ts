@@ -14,7 +14,7 @@
 //   --size WxH    each tab's window
 //   --url         a running game to open instead of starting Vite
 //
-// At most eight flies sit at a table (MAX_PLAYERS), the tabs and the fakes together.
+// At most eight flies sit at a table (MAX_FLIES), the tabs and the fakes together.
 //
 // The summary, for each tab: every other fly it saw (how often it was there,
 // resting, and drawn as the real model, and how far in the past it was drawn),
@@ -28,7 +28,7 @@ import { performance } from "node:perf_hooks";
 import { chromium } from "playwright";
 import type { Browser, Page } from "playwright";
 import { FLY_LENGTH } from "@fly/body";
-import { FLY_MAX, MAX_PLAYERS, PROTOCOL, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, wireScale } from "@fly/net";
+import { FLY_MAX, MAX_FLIES, PROTOCOL, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, wireScale } from "@fly/net";
 import type { FlyState, ServerMessage, Spot, TableStart, WireScale } from "@fly/net";
 import { World, WORLDS } from "@fly/world";
 import { startServer as startRooms } from "../apps/server/src/server.ts";
@@ -101,6 +101,7 @@ export function fakeFly(rooms: string, table: string, k: number, fakes: Set<numb
       }
       const m = JSON.parse(event.data) as ServerMessage;
       if (m.type === "welcome") {
+        state.id = m.id;
         id = m.id;
         fakes.add(id);
         state.epoch = m.epoch;
@@ -222,7 +223,7 @@ async function main() {
   const seconds = Number(option("seconds", "60"));
   const fakeCount = Number(option("fake", "0"));
   const [width, height] = option("size", "960x540").split("x").map(Number);
-  if (clients + fakeCount > MAX_PLAYERS) throw new Error(`At most ${MAX_PLAYERS} flies sit at a table`);
+  if (clients + fakeCount > MAX_FLIES) throw new Error(`At most ${MAX_FLIES} flies sit at a table`);
 
   const rooms = await startRooms({ port: 0, dataDir: null, log: () => {} });
   const roomsUrl = `ws://127.0.0.1:${rooms.port}/rooms`;

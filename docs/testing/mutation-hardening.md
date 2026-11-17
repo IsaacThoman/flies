@@ -69,7 +69,7 @@ Validation after integration:
 - Matched data-free full-suite CPU: **149.44 s control, 148.29 s branch**,
   within the 10% growth budget. One shared-machine pair is not a speedup claim.
 
-The harness remains confined to `scripts/mutate.ts`, `mutation-cases.ts`
-and `mutation-challenges.ts`. Neither the package test commands nor test
+The harness remains confined to `scripts/mutate.ts`, `scripts/mutation-cases.ts`
+and `scripts/mutation-challenges.ts`. Neither the package test commands nor test
 files import or invoke it. The owner has authorized marking #79 ready;
 the merge shepherd handles CI and merging.

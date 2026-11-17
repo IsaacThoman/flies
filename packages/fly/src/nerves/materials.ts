@@ -6,7 +6,7 @@
 // What lights a part is activity and nothing else. Its glow g (0 to 1, which
 // the game sets from a real firing rate) takes it from its tissue's colour
 // toward its role's (blue for sensory neurons, amber for the neurons between,
-// red for motor and neurosecretory ones) by (g / 0.4)², all the way at 0.4,
+// red for motor and neurosecretory ones) by (g / 0.35)², all the way at 0.35,
 // and it covers more of what is behind it as it does; and it gives off light
 // in that colour in proportion to g². The square keeps the low hum of
 // background activity close to the tissue's colour and lets a burst stand out
@@ -30,16 +30,16 @@ import { GLOW_SLOTS } from "./parts.ts";
 /** Each role's colour at full glow, linear. */
 export const ROLE_COLORS = { sensory: [0.1, 0.5, 1.0], central: [1.0, 0.6, 0.1], motor: [1.0, 0.12, 0.26] } as const;
 /** The tissue's own colour, under the scene's light. */
-const TISSUE = "#b4afc4";
+const TISSUE = "#456179";
 /**
  * In the world, a faint cool tone over every part, strongest at its edge, the
  * same at all times for every part, as an X-ray shows bone: the shape stays
  * legible in a dark room, and nothing about it changes with activity. As the
  * screen shows it, to add.
  */
-const OUTLINE = [0.09, 0.11, 0.2] as const;
+const OUTLINE = [0.12, 0.19, 0.25] as const;
 /** The panel's stain: the anatomy, faint, at no time lit by activity. Linear. */
-const STAIN = [0.035, 0.04, 0.07] as const;
+const STAIN = [0.065, 0.095, 0.14] as const;
 
 const vec3 = (c: readonly number[]) => `vec3(${c.map((x) => x.toFixed(3)).join(", ")})`;
 
@@ -76,12 +76,12 @@ vec3 nerveHue(float role) {
   return role < 0.5 ? ${vec3(ROLE_COLORS.sensory)} : role < 1.5 ? ${vec3(ROLE_COLORS.central)} : ${vec3(ROLE_COLORS.motor)};
 }
 vec4 nerveCover(vec3 tissue, vec4 nerve, float facing) {
-  float lit = min(1.0, nerve.x * nerve.x / 0.16);
-  float tissueCover = nerve.z * mix(1.0, 1.0 - facing, nerve.w);
+  float lit = min(1.0, nerve.x * nerve.x / 0.1225);
+  float tissueCover = nerve.z * mix(1.0, 1.0 - facing, abs(nerve.w));
   return vec4(mix(tissue, nerveHue(nerve.y), lit), mix(tissueCover, 0.85 * (0.5 + 0.5 * facing), lit));
 }
 vec3 nerveShine(vec4 nerve, float facing) {
-  return linearToOutputTexel(vec4(nerveHue(nerve.y), 1.0)).rgb * nerve.x * nerve.x * 0.8 * (0.5 + 0.5 * facing);
+  return linearToOutputTexel(vec4(nerveHue(nerve.y), 1.0)).rgb * nerve.x * nerve.x * 1.0 * (0.5 + 0.5 * facing);
 }
 `;
 
@@ -92,7 +92,8 @@ vec3 nerveShine(vec4 nerve, float facing) {
  */
 const GROW = /* glsl */ `
 if (aTube.w > 0.0) {
-  float flyGrow = max(1.0, ${MIN_RADIUS_PX} / max(flyPx, 1e-6));
+  float nerveMin = aInfo.w < 0.0 ? 1.0 : ${MIN_RADIUS_PX};
+  float flyGrow = max(1.0, nerveMin / max(flyPx, 1e-6));
   transformed = aTube.xyz + (position - aTube.xyz) * flyGrow;
 }
 `;

@@ -6,6 +6,7 @@ import { TABLETOP_SCALE, createFlyState, encodeFlies } from "@fly/net";
 import { createPicnic } from "@fly/world";
 import { Life } from "../src/life.ts";
 import { Online } from "../src/online/online.ts";
+import { OtherFlies } from "../src/online/others.ts";
 import type { TableHost } from "../src/online/online.ts";
 import { Hands } from "../src/tools/hands.ts";
 
@@ -19,18 +20,26 @@ test("other flies keep moving across u32 room-time wraps, including a synchroniz
   t.mock.method(performance, "now", () => now);
   const world = createPicnic();
   const life = new Life(world, {} as BrainDriver);
-  const host = { scene: new THREE.Scene(), life, hands: new Hands(world), eyes: { see() {} }, stage: { weather: { rain: 0 }, set: {} }, fly: { model: { mark() {} } }, bubbles: { table: null } } as unknown as TableHost;
+  const scene = new THREE.Scene();
+    const host = {
+      scene, life, company: { list: [] }, others: new OtherFlies(scene, world), hands: new Hands(world), eyes: { see() {} }, stage: { weather: { rain: 0 }, set: {} }, fly: { model: { mark() {} } },
+      bubbles: { table: null }, felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] }, flies: () => 1, seat() {}, share() {},
+    } as unknown as TableHost;
   const socket: TableSocket = { status: "connecting", closeCode: 0, closeReason: "", send() {}, drain() {}, close() {} };
   const online = new Online(host, () => socket, "ws://test", "abcdefghjk", "key", null);
   t.after(() => { online.leave(); online.dispose(); });
   const camera = new THREE.PerspectiveCamera();
   camera.position.set(0, 10, 20);
-  const step = () => online.update(0.05, camera, 480, now / 1000, () => 0);
+  // As the game does: the table's frame, then the other flies posed where it has them (others.ts).
+    const step = () => {
+      online.update(0.05, camera, now / 1000, () => 0);
+      online.others.update(online.now, 0.05, camera.position, 480, life.body);
+    };
   const batch = new DataView(new ArrayBuffer(100));
   for (const cycle of [1, 3]) {
     online.others.forget();
     online.line.clock.reset();
-    online.line.onMessage({ type: "joined", id: 2, colour: "#ffffff", away: false });
+    online.line.onMessage({ type: "joined", id: 2, colour: "#ffffff", away: false, of: 2 });
     const offset = cycle === 3 ? 3 * 2 ** 32 - 400 : -6000;
     for (let i = -2; i <= 3; i++) {
       const roomNow = cycle * 2 ** 32 + i * 50;
