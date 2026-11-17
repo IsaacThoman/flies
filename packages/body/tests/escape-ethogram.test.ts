@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { loomGeometry, facetLuminance, screenAt, regression, summarizeEscape, wilson, SCREEN, LV_MS } from '../../../scripts/ethogram/escape.ts';
+import { loomGeometry, facetLuminance, screenAt, regression, summarizeEscape, wilson, SCREEN, LV_MS, validateEscapeOptions } from '../../../scripts/ethogram/escape.ts';
 import type { EscapeTrial } from '../../../scripts/ethogram/escape.ts';
 import { scorecard, validateOpticalEvidence } from '../../../scripts/ethogram/scoring.ts';
 import { validateOptions } from '../../../scripts/ethogram.ts';
@@ -110,4 +110,12 @@ test('clock is explicit and invalid hours are refused', () => {
   const o = { hours: 1, burnSeconds: 60, seeds: [1], place: 'arena' };
   for (const hour of [-1, 24, Infinity, NaN]) assert.throws(() => validateOptions({ ...o, hour }));
   for (const hour of [0, 6, 23.5]) validateOptions({ ...o, hour });
+});
+
+
+test('optical options fail before an expensive free-behaviour run begins', () => {
+  validateEscapeOptions(8, 6, 20000);
+  for (const n of [0, -1, 1.5, 101, NaN]) assert.throws(() => validateEscapeOptions(n, 6, 20000));
+  for (const seed of [-1, 1.5, 0xffffffff]) assert.throws(() => validateEscapeOptions(8, 6, seed));
+  assert.throws(() => validateEscapeOptions(8, 24, 20000));
 });

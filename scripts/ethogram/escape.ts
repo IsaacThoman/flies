@@ -137,10 +137,14 @@ export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: nu
   return result;
 }
 
-export async function escapeBattery(data: ArrayBuffer, perRatio: number, hour: number, checkpoint: () => Promise<void>, seedBase = 10000) {
+export function validateEscapeOptions(perRatio: number, hour: number, seedBase: number) {
   if (!Number.isInteger(perRatio) || perRatio < 1 || perRatio > 100) throw new Error('trials must be an integer in [1,100] per ratio and pattern');
   if (!Number.isFinite(hour) || hour < 0 || hour >= 24) throw new Error('hour must be in [0,24)');
   if (!Number.isInteger(seedBase) || seedBase < 0 || seedBase + 14 * perRatio > 0x100000000) throw new Error('trial seeds must be uint32');
+}
+
+export async function escapeBattery(data: ArrayBuffer, perRatio: number, hour: number, checkpoint: () => Promise<void>, seedBase = 10000) {
+  validateEscapeOptions(perRatio, hour, seedBase);
   const firstSeed = seedBase;
   const trials: EscapeTrial[] = [];
   for (const kind of ['black', 'checkerboard'] as const) for (const lv of LV_MS) for (let n = 0; n < perRatio; n++) {

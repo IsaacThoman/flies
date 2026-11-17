@@ -14,7 +14,7 @@ import { comparisons, scorecard } from './ethogram/scoring.ts';
 export { comparisons } from './ethogram/scoring.ts';
 import { HeavyLease } from './ethogram/lease.ts';
 import { Rhythm } from '@fly/body';
-import { escapeBattery, summarizeEscape } from './ethogram/escape.ts';
+import { escapeBattery, summarizeEscape, validateEscapeOptions } from './ethogram/escape.ts';
 
 export const ARENA: Place = { floor: { kind: 'circle', r: 21.5 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 30 };
 const DT = 0.01;
@@ -107,7 +107,7 @@ export function markdown(results: Awaited<ReturnType<typeof measure>>, escape: A
 }
 
 async function main() {
-  const { values } = parseArgs({ options: { hours: { type: 'string', default: '1' }, 'burn-seconds': { type: 'string', default: '60' }, seeds: { type: 'string', default: '1,2,3' }, place: { type: 'string', default: 'arena' }, hour: { type: 'string', default: '6' }, assay: { type: 'string', default: 'free' }, trials: { type: 'string', default: '8' }, 'seed-base': { type: 'string', default: '20000' }, data: { type: 'string', default: DEFAULT_CONNECTOME_PATH }, out: { type: 'string' }, analyse: { type: 'string' }, help: { type: 'boolean' } } });
+  const { values } = parseArgs({ options: { hours: { type: 'string', default: '1' }, 'burn-seconds': { type: 'string', default: '60' }, seeds: { type: 'string', default: '1,2,3' }, place: { type: 'string', default: 'arena' }, hour: { type: 'string', default: '6' }, assay: { type: 'string', default: 'all' }, trials: { type: 'string', default: '8' }, 'seed-base': { type: 'string', default: '20000' }, data: { type: 'string', default: DEFAULT_CONNECTOME_PATH }, out: { type: 'string' }, analyse: { type: 'string' }, help: { type: 'boolean' } } });
   if (values.help) {
     console.log('node scripts/ethogram.ts [--hours 1] [--seeds 1,2,3] [--place arena|lab|picnic|bar|restaurant|windowsill] [--burn-seconds 60] [--hour 6] [--assay free|escape|all] [--trials 8] [--data path] [--out report.json] [--analyse recording.json]\nAutomatically leases one of eight heavy-work slots, yielding after 9.5 min and cooling down 2 min. No rendering, no sound.');
     return;
@@ -125,6 +125,7 @@ async function main() {
   const options: RunOptions = { hours: Number(values.hours), burnSeconds: Number(values['burn-seconds']), seeds: values.seeds.split(',').map(Number), place: values.place, hour: Number(values.hour) };
   validateOptions(options);
   if (!['free', 'escape', 'all'].includes(values.assay)) throw new Error('assay must be free, escape or all');
+  if (values.assay !== 'free') validateEscapeOptions(Number(values.trials), options.hour!, Number(values['seed-base']));
   const data = Uint8Array.from(readFileSync(values.data)).buffer;
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const dirty = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0;
