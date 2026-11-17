@@ -5,6 +5,8 @@
 
 export { createBrain } from "./runtime.ts";
 export { RESTING_SENSES } from "./types.ts";
+export { ODORANTS } from "./olfaction.ts";
+export type { Odorant } from "./olfaction.ts";
 export type { Brain, BrainCommand, BrainEngine, BrainRequest, BrainResponse, BrainSenses, BrainState, BrainStats, Eye, EyeMap } from "./types.ts";
 export {
   CATEGORY_COLUMNS,

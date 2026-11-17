@@ -3,7 +3,7 @@
 // this wrapper allocates nothing per frame: the senses go out through reused
 // arrays, and each new state is decoded into the same objects.
 
-import { REGION_RATE_NAMES } from "@fly/brain";
+import { ODORANTS, REGION_RATE_NAMES } from "@fly/brain";
 import type { BrainSenses, BrainState, EyeMap } from "@fly/brain";
 import { COMMAND_ORDER, SENSE_ORDER, STATE_STATS } from "@fly/contracts";
 import type { BrainDriver, BrainStatus, NativeBrainBridge } from "@fly/contracts";
@@ -23,7 +23,8 @@ export class NativeBrainDriver implements BrainDriver {
   readonly regionRates = new Float32Array(REGION_RATE_NAMES.length);
   readonly #bridge: NativeBrainBridge;
   readonly #now: () => number;
-  readonly #scalars = new Float32Array(SENSE_ORDER.length + 10);
+  // The scalar senses, then each odorant at the left antenna and the right.
+  readonly #scalars = new Float32Array(SENSE_ORDER.length + 2 * ODORANTS.length);
   #lightLeft: Float32Array | null = null;
   #lightRight: Float32Array | null = null;
   #rateNames: string[] = [];
@@ -65,9 +66,9 @@ export class NativeBrainDriver implements BrainDriver {
         const name = SENSE_ORDER[i];
         s[i] = name === "grounded" ? (senses.grounded ? 1 : 0) : name === "hunger" || name === "thirst" ? (senses[name] ?? 1) : (senses[name] ?? 0);
       }
-      for (let k = 0; k < 5; k++) {
+      for (let k = 0; k < ODORANTS.length; k++) {
         s[SENSE_ORDER.length + k] = senses.odor?.left?.[k] ?? 0;
-        s[SENSE_ORDER.length + 5 + k] = senses.odor?.right?.[k] ?? 0;
+        s[SENSE_ORDER.length + ODORANTS.length + k] = senses.odor?.right?.[k] ?? 0;
       }
       let left: Float32Array | null = null;
       let right: Float32Array | null = null;

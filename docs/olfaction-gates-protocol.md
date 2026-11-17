@@ -95,7 +95,7 @@ whether CO₂ is called avoided.
 
 ## Part D: gate 4, the plume (only if gates 2 and 3 pass)
 
-Opt-in, in a plume assay script to be added if this gate is reached; the game is not changed by it.
+Opt-in, in a script (`scripts/plume.ts`); the game is not changed by it.
 
 - **Field.** A steady point source on the floor in uniform wind: the exact
   solution of steady advection–diffusion in three dimensions, doubled by the
