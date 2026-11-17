@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { TableSocket, TableSocketStatus, TextEntry, TextRequest } from "@fly/contracts";
-import { CLOSE, MAX_PLAYERS, PROTOCOL } from "@fly/net";
+import { CLOSE, MAX_FLIES, PROTOCOL } from "@fly/net";
 import type { RoomWire } from "@fly/net";
 import { HitMap } from "@fly/ui";
 import type { ActionItem, FieldItem } from "@fly/ui";
@@ -53,7 +53,7 @@ class FakeTyping implements TextEntry {
 const ROOMS: RoomWire[] = [
   { code: "aaaaaaaaaa", name: "Sunny Crumbs", place: "bar", flies: 3, locked: false },
   { code: "bbbbbbbbbb", name: "Secret Sugar", place: "lab", flies: 1, locked: true },
-  { code: "cccccccccc", name: "Packed", place: "picnic", flies: MAX_PLAYERS, locked: false },
+  { code: "cccccccccc", name: "Packed", place: "picnic", flies: MAX_FLIES, locked: false },
 ];
 
 function world(canShare = true) {
@@ -62,6 +62,7 @@ function world(canShare = true) {
   const state = { rooms: null as RoomWire[] | null, table: null as TableNow | null, knock: null as Knock | null, ended: null as Shell["tableEnded"], started: null as NewRoom | null };
   const shell: Shell = {
     settings: { ...DEFAULT_SETTINGS },
+    maxFlies: 4,
     brain: { status: "running" } as unknown as Shell["brain"],
     meter: {} as Shell["meter"],
     life: {} as Shell["life"],
@@ -125,7 +126,7 @@ test("the rooms: a new one, a code, then each listed room by its name, its place
   step();
   const rows = screen.menu.items as ActionItem[];
   assert.deepEqual(rows.map((i) => i.id), ["new", "code", "room:aaaaaaaaaa", "room:bbbbbbbbbb", "room:cccccccccc"]);
-  assert.deepEqual([rows[2].label, rows[2].swatch, rows[2].count, rows[2].locked], ["Sunny Crumbs", placeInfo("bar").colour, [3, MAX_PLAYERS], false]);
+  assert.deepEqual([rows[2].label, rows[2].swatch, rows[2].count, rows[2].locked], ["Sunny Crumbs", placeInfo("bar").colour, [3, MAX_FLIES], false]);
   assert.equal(rows[3].locked, true);
   assert.equal(rows[4].disabled, true, "full");
   // The list changes as the room server says: a room empties out of it.
@@ -189,7 +190,7 @@ test("while the door opens it says so, and once in, the room's own face: its nam
   step();
   assert.equal(screen.view, "door", "on its way in");
   assert.deepEqual(screen.menu.items.map((i) => [i.id, i.label, !!i.disabled]), [["password", "Password", true], ["join", "Joining…", true]]);
-  state.table = { name: "Secret Sugar", code: "bbbbbbbbbb", link: "https://x/?table=bbbbbbbbbb", starting: false, joined: true, others: [{ id: 1, colour: "#ffd21f" }] };
+  state.table = { name: "Secret Sugar", code: "bbbbbbbbbb", link: "https://x/?table=bbbbbbbbbb", starting: false, joined: true, others: [{ id: 1, colours: ["#ffd21f"] }] };
   state.knock = null;
   step();
   assert.equal(screen.view, "room");
@@ -359,4 +360,18 @@ test("the lobby asks to browse once open, takes each list it is told (only well-
   sockets[1].closeCode = CLOSE.version;
   lobby.update(0.016);
   assert.equal(lobby.status, "version", "a newer room server: the page reloads");
+});
+
+test("the starter removes a whole device using one row with all its flies' colour swatches", () => {
+  const { screen, state, step, focus, did } = world();
+  const colours = ["#2fb8ff", "#ff4fa3", "#59e05a"];
+  state.table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://x/?table=abcdefghjk", starting: true, joined: true, others: [{ id: 2, colours }] };
+  step();
+  const row = screen.menu.items.find((i) => i.id === "remove:2");
+  assert.ok(row?.kind === "action");
+  assert.equal(row.label, "Remove");
+  assert.deepEqual(row.swatch, colours);
+  focus(row.id);
+  screen.press("select", false);
+  assert.deepEqual(did, ["remove 2"]);
 });

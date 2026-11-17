@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { Pantry, World } from "@fly/world";
 import type { Place } from "@fly/world";
 import { DINER } from "../../../packages/world/tests/diner.ts";
-import { Hands, TOOLS } from "../src/tools/hands.ts";
+import { FEATHER_REACH, FEATHER_REST, PUFF_RADIUS, PUFF_SPEED, Hands, TOOLS } from "../src/tools/hands.ts";
 
 const bare: Place = { floor: { kind: "rect", hx: 500, hz: 500 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 300 };
 
@@ -119,3 +119,42 @@ test("food lands on what is under it, and the hands say where and which way it f
   assert.deepEqual(hands.landedAt, { x: 2, y: 12, z: 31 });
   assert.deepEqual(hands.landedNormal, { x: 0, y: 1, z: 0 });
 });
+
+
+test("the feather reaches another fly at the pointer, resting and stroking, but not beyond reach or off its feet", () => {
+  const { hands, update } = setup();
+  hands.tool = TOOLS.findIndex((t) => t.id === "feather");
+  hands.movePointer({ x: 25, y: 0, z: 30 }, { x: 0, y: 1, z: 0 });
+  const other = { position: { x: 25 + FEATHER_REACH / 2, y: 0, z: 30 }, onFeet: true };
+  const air = { x: 0, y: 0, z: 0 };
+  update(0);
+  assert.equal(hands.stroke, 0, "the followed fly is far from the pointer");
+  assert.equal(hands.reach(other, air), FEATHER_REST);
+  update(0, true);
+  assert.equal(hands.reach(other, air), 1);
+  assert.deepEqual(air, { x: 0, y: 0, z: 0 });
+  assert.equal(hands.reach({ ...other, onFeet: false }, air), 0);
+  other.position.x = 25 + FEATHER_REACH + 0.1;
+  assert.equal(hands.reach(other, air), 0);
+});
+
+for (const [variant, speed] of Object.entries(PUFF_SPEED)) {
+  test(`a ${variant} puff adds air at another fly and leaves a fly outside the puff alone`, () => {
+    const { hands, update } = setup();
+    hands.tool = TOOLS.findIndex((t) => t.id === "blow");
+    hands.variants[hands.tool] = hands.current.variants.findIndex((v) => v.id === variant);
+    hands.movePointer({ x: 30, y: 0, z: 0 }, { x: 0, y: 1, z: 0 });
+    update(0, true);
+    const air = { x: 2, y: 3, z: 4 };
+    const other = { position: { x: 30 + PUFF_RADIUS / 2, y: 0, z: 0 }, onFeet: false };
+    assert.equal(hands.reach(other, air), 0);
+    assert.deepEqual(air, { x: 2 + hands.puffDirection.x * speed / 2, y: 3 + hands.puffDirection.y * speed / 2, z: 4 + hands.puffDirection.z * speed / 2 });
+    const far = { x: 2, y: 3, z: 4 };
+    other.position.x = 30 + PUFF_RADIUS;
+    hands.reach(other, far);
+    assert.deepEqual(far, { x: 2, y: 3, z: 4 });
+    update(0);
+    hands.reach({ ...other, position: hands.pointer }, far);
+    assert.deepEqual(far, { x: 2, y: 3, z: 4 }, "releasing stops the puff");
+  });
+}

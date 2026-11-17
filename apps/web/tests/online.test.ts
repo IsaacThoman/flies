@@ -39,7 +39,7 @@ class FakeSocket implements TableSocket {
   }
 }
 
-const welcome = (now: number): ServerMessage => ({ type: "welcome", v: PROTOCOL, id: 2, colour: "#2fb8ff", starter: 1, seed: 1, now, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0], room: { name: "Flies", listed: false, locked: false } });
+const welcome = (now: number): ServerMessage => ({ type: "welcome", v: PROTOCOL, id: 2, colour: "#2fb8ff", flies: [{ id: 2, colour: "#2fb8ff", at: [0, 0, 0] }], starter: 1, seed: 1, now, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0], room: { name: "Flies", listed: false, locked: false } });
 
 function line() {
   const sockets: FakeSocket[] = [];
@@ -48,7 +48,7 @@ function line() {
     const s = new FakeSocket();
     sockets.push(s);
     return s;
-  }, "ws://test/rooms", () => ({ type: "hello", v: PROTOCOL, table: "abcdefghjk", key: "0123456789abcdef", at }));
+  }, "ws://test/rooms", () => ({ type: "hello", v: PROTOCOL, table: "abcdefghjk", key: "0123456789abcdef", at: at && [at] }));
   return { line: l, sockets, setAt: (spot: [number, number, number]) => (at = spot) };
 }
 
@@ -82,7 +82,7 @@ test("a dropped line is opened again, later each time, and the hello says where 
   assert.equal(sockets.length, 2, "opened again");
   sockets[1].status = "open";
   l.update(0.016);
-  assert.deepEqual((JSON.parse(sockets[1].sent[0]) as Extract<ClientMessage, { type: "hello" }>).at, [12, -3, 1]);
+  assert.deepEqual((JSON.parse(sockets[1].sent[0]) as Extract<ClientMessage, { type: "hello" }>).at, [[12, -3, 1]]);
   // Failing again, it waits longer.
   sockets[1].drop(1006);
   l.update(0.016);

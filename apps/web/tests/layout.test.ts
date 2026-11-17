@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HitMap } from "@fly/ui";
+import { COLOURS } from "@fly/net";
 import { TV_FRAME, frameFor } from "../src/display.ts";
 import type { Frame } from "../src/display.ts";
 import { DEFAULT_SETTINGS } from "../src/settings.ts";
@@ -28,6 +29,7 @@ const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y
 function shell(frame: Frame, glyphs: Shell["glyphs"] = null, online = true): Shell {
   return {
     settings: { ...DEFAULT_SETTINGS },
+    maxFlies: 4,
     brain: { status: "running", neurons: 166700, connections: 6242118, state: null } as unknown as Shell["brain"],
     meter: { history: new Float32Array(120), head: 0, spikesPerSecond: 0, active: 0, speed: 1 } as unknown as Shell["meter"],
     life: { sensed: { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, light: null }, activity: "resting" } as unknown as Shell["life"],
@@ -239,7 +241,7 @@ test("the title leaves room for the fly, clear of the name, the brain's state an
 
 test("at a room, its QR code and code are beside the menu or over it, inside the safe area, clear of the hints, and big enough to scan across a room", () => {
   // The starter of a full room: Remove for each of the other seven, and Share and Leave.
-  const others = Array.from({ length: 7 }, (_, i) => ({ id: i + 2, colour: "#e53" }));
+  const others = Array.from({ length: 7 }, (_, i) => ({ id: i + 2, colours: ["#e53"] }));
   const table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://flies.isaacthoman.com/?table=abcdefghjk", starting: true, joined: true, others };
   const spec = { items: 9, maxRows: 7, width: 460, row: 40, heading: true, foot: 34, values: false, raise: 12 };
   for (const [name, frame] of [...frames(), ["the TV", TV_FRAME] as const]) {
@@ -320,5 +322,31 @@ test("the loading screen and its failure panel: where they always were on the TV
     drawLoading(blankCanvas(), 0, failed, l, hits);
     const hit = hits.at(l.retry.x + l.retry.w / 2, l.retry.y + l.retry.h / 2);
     assert.equal(hit?.kind, LOADING_HITS.retry, `${name}: Try again is where it is drawn`);
+  }
+});
+
+
+test("the Flies row draws one enamel dot per fly on wide and compact screens, with chevrons to choose", () => {
+  for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
+    for (let count = 1; count <= 4; count++) {
+      const host = shell(frame);
+      host.settings.flies = count;
+      const screen = settingsScreen(host);
+      screen.enter();
+      const row = screen.menu.items.findIndex((i) => i.id === "flies");
+      screen.menu.focusOn("flies");
+      const g = blankCanvas();
+      const colours: string[] = [];
+      g.fill = () => {
+        if (COLOURS.some((colour) => colour === String(g.fillStyle))) colours.push(String(g.fillStyle));
+      };
+      const hits = new HitMap();
+      hits.begin(screen.id);
+      screen.draw(g, 0, hits);
+      assert.deepEqual(colours, COLOURS.slice(0, count), `${name}: ${count} enamel dots`);
+      assert.ok(!writtenOn(g).some((w) => w.text === String(count)), "count shown as dots");
+      const steps = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).filter((h) => h.kind === "step" && h.index === row);
+      assert.equal(steps.length, 2, `${name}: both chevrons target this row`);
+    }
   }
 });

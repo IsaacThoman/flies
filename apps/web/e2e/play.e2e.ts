@@ -22,7 +22,7 @@ import { openGame, readState, startServer, waitFor, waitForGameTime } from "../.
 import { dropFood, feedHoney } from "./feeding.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import type { Game } from "../src/game.ts";
-import { disableScreensaver } from "./settings.ts";
+import { chooseFlies, companyAwake, companyOf, disableScreensaver } from "./settings.ts";
 
 /** The frame's budget on the Apple TV. */
 const MAX_CALLS = 150;
@@ -382,6 +382,32 @@ try {
   assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["feed", "sugar", "wide", "noon", "clear"]);
   const learned = await page.evaluate(() => JSON.parse(localStorage.getItem("flies.learned") ?? "{}") as Record<string, true>);
   assert.deepEqual(Object.keys(learned).sort(), ["feed", "place", "swoop", "tools"], "the hints for what was used aren't taught again");
+
+  step("three flies chosen in Settings live, see and meet each other, survive a reload, then return to one");
+  await chooseFlies(page, 3);
+  const companions = companyOf(await companyAwake(page, 3));
+  assert.equal(new Set(companions.map((c) => `${c.x},${c.z}`)).size, 2, "companions stand apart");
+  await waitFor(page, "crowd=2");
+  await waitFor(page, "screen=play");
+  // A brain can rest for a while; observe each companion for at most 30 seconds of fly time.
+  const moved = new Set<number>();
+  for (let i = 0; i < 15 && moved.size < companions.length; i++) {
+    await waitForGameTime(page, 2);
+    const living = companyOf(await readState(page));
+    for (const [j, c] of living.entries()) {
+      assert.equal(c.crowd, 2, "each fly meets the other two");
+      assert.ok(c.eyes > companions[j].eyes, "each fly keeps seeing");
+      if (Math.hypot(c.x - companions[j].x, c.z - companions[j].z) > 0.05) moved.add(j);
+    }
+  }
+  assert.equal(moved.size, 2, "both companion brains move their own bodies");
+  await page.reload();
+  await disableScreensaver(page);
+  await waitFor(page, "brain=running,screen=title", 120_000);
+  await companyAwake(page, 3);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("flies.settings")!).flies), 3);
+  await chooseFlies(page, 1);
+  await waitFor(page, "flies=1,company=,crowd=0");
 
   step(`the frame's budget: at most ${maxCalls} draws and ${maxTriangles.toLocaleString("en-US")} triangles`);
   assert.ok(maxCalls > 0 && maxCalls < MAX_CALLS, `${maxCalls} draws`);

@@ -24,15 +24,15 @@ import os from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
 import type { BrowserContextOptions, Page } from "playwright";
-import { MAX_PLAYERS, tableCode } from "@fly/net";
+import { MAX_FLIES, tableCode } from "@fly/net";
 import { startServer as startRooms } from "../../server/src/server.ts";
 import type { RoomServer } from "../../server/src/server.ts";
-import { chromiumPath, gpuFlags, readState, startServer, waitFor } from "../../../scripts/play.ts";
+import { chromiumPath, gpuFlags, readState, startServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import { fakeFly } from "../../../scripts/tables.ts";
 import type { FakeFly } from "../../../scripts/tables.ts";
 import { frameFor } from "../src/display.ts";
 import { SHAPES } from "../tests/shapes.ts";
-import { disableScreensaver } from "./settings.ts";
+import { chooseFlies, companyAwake, disableScreensaver } from "./settings.ts";
 
 /** The frame's budget on the Apple TV, as play.e2e.ts holds it to. */
 const MAX_CALLS = 150;
@@ -75,14 +75,20 @@ async function open(options: BrowserContextOptions = { viewport: { width: 960, h
   return tab;
 }
 
-type Other = { id: number; present: boolean; resting: boolean; near: boolean; x: number; z: number; delay: number };
+type Other = { id: number; present: boolean; resting: boolean; near: boolean; x: number; z: number; delay: number; of: number };
 /** The other flies as a tab draws them, from its `others`. */
 const othersOf = (s: Record<string, string>): Other[] =>
   (s.others ?? "").split(";").filter(Boolean).map((entry) => {
-    const [id, present, resting, near, at, delay] = entry.split(":");
+    const [id, present, resting, near, at, delay, of] = entry.split(":");
     const [x, z] = at.split(",").map(Number);
-    return { id: Number(id), present: present === "1", resting: resting === "1", near: near === "1", x, z, delay: Number(delay) };
+    return { id: Number(id), present: present === "1", resting: resting === "1", near: near === "1", x, z, delay: Number(delay), of: Number(of) };
   });
+/** The flies this device has been seated, in line, with their enamel. */
+const mineOf = (s: Record<string, string>) => (s.mine ?? "").split(";").filter(Boolean).map((f) => {
+  const [id, colour] = f.split(":");
+  return { id: Number(id), colour };
+});
+
 /** Its food at the table, by id, from its `tableFoods`. */
 const foodsOf = (s: Record<string, string>) => new Map((s.tableFoods ?? "").split(";").filter(Boolean).map((f) => f.split(":").map(Number) as [number, number]));
 
@@ -114,7 +120,7 @@ async function drawnApart(seer: Page, own: Page, id: number) {
       apart = Math.min(apart, Math.hypot(o.x - at.x, o.z - at.z));
       looked++;
     }
-    await seer.waitForTimeout(250);
+    await waitForGameTime(seer, 0.25);
   }
   return apart;
 }
@@ -246,7 +252,7 @@ try {
     const since = Date.now();
     await waitUntil(b.page, `tab 1 down to tab 0's ${left.toFixed(3)} of the sugar`, (s) => (foodsOf(s).get(sugar) ?? 0) <= left + 0.005, FOOD_WITHIN);
     console.log(`  ${left.toFixed(3)} of the sugar left on tab 0, on tab 1 within ${Date.now() - since} ms`);
-    await a.page.waitForTimeout(700);
+    await waitForGameTime(a.page, 0.7);
   }
   const pages = [a.page, b.page];
   const states = await Promise.all(pages.map(readState));
@@ -263,7 +269,7 @@ try {
   await hide(b.page, true);
   await waitFor(b.page, "hidden=true", 3000);
   await seesFly(a.page, 2, true, 8000);
-  await b.page.waitForTimeout(2000);
+  await waitForGameTime(a.page, 2);
   await hide(b.page, false);
   await seesFly(a.page, 2, false, 8000);
 
@@ -301,6 +307,104 @@ try {
   await waitUntil(a.page, "fly 2 gone from tab 0", (s) => !othersOf(s).some((o) => o.id === 2), 5000);
   await a.page.context().close();
   await b.page.context().close();
+
+  step("devices bring three and two flies: every fly is seen under its device, with distinct enamel and room-list pips");
+  const many = await open();
+  const pair = await open();
+  for (const tab of [many, pair]) {
+    await tab.page.goto(`${url}?rooms=${roomsAt}`);
+    await disableScreensaver(tab.page);
+    await waitFor(tab.page, "brain=running,screen=title", 120_000);
+  }
+  await chooseFlies(many.page, 3);
+  await chooseFlies(pair.page, 2);
+  await companyAwake(many.page, 3);
+  await companyAwake(pair.page, 2);
+  await fly(many.page, "g.startRoom({ name: 'Five flies', listed: true, password: '', place: g.here })");
+  await waitFor(many.page, "online=joined,flies=3");
+  const multiCode = await fly<string>(many.page, "g.online.code");
+  const multiLink = await fly<string>(many.page, "g.tableLink");
+  await pair.page.goto(`${multiLink}&rooms=${roomsAt}`);
+  await disableScreensaver(pair.page);
+  await waitFor(pair.page, "online=joined,brain=running,flies=2", 120_000);
+  const ownMany = mineOf(await readState(many.page));
+  const ownPair = mineOf(await readState(pair.page));
+  assert.equal(ownMany.length, 3);
+  assert.equal(ownPair.length, 2);
+  assert.equal(new Set([...ownMany, ...ownPair].map((f) => f.colour)).size, 5);
+  const seesDevice = async (page: Page, own: typeof ownMany) => {
+    await waitUntil(page, `all flies of device ${own[0].id}`, (s) => {
+      const others = othersOf(s).filter((o) => o.of === own[0].id);
+      return others.length === own.length && own.every((f) => others.some((o) => o.id === f.id && o.present));
+    }, 20_000);
+  };
+  await seesDevice(many.page, ownPair);
+  await seesDevice(pair.page, ownMany);
+  assert.equal(othersOf(await readState(many.page)).length, 2);
+  assert.equal(othersOf(await readState(pair.page)).length, 3);
+  const listing = await open();
+  await listing.page.goto(`${url}?rooms=${roomsAt}`);
+  await disableScreensaver(listing.page);
+  await fly(listing.page, "g.open('online')");
+  await waitFor(listing.page, `rooms~${multiCode}:Five flies:picnic:5:0`, 20_000);
+  await listing.page.context().close();
+
+  step("a seated device drops to one and grows back, capped by the remaining seats; peers see every join and leave");
+  await chooseFlies(many.page, 1);
+  await waitFor(many.page, "flies=1,company=,asked=1");
+  await waitUntil(pair.page, "only the followed fly of the starter remains", (s) => {
+    const others = othersOf(s);
+    return others.length === 1 && others[0].id === ownMany[0].id;
+  });
+  // Three more devices leave only two additional seats for the starter's request of four.
+  const fillers: FakeFly[] = [];
+  const multiFakes = new Set<number>();
+  for (let i = 0; i < 3; i++) {
+    const filler = await fakeFly(roomsAt, multiCode, i, multiFakes);
+    fillers.push(filler);
+    fakeFlies.push(filler);
+  }
+  await chooseFlies(many.page, 4);
+  const capped = await waitFor(many.page, "flies=3,asked=4", 20_000);
+  assert.equal(mineOf(capped).length, 3);
+  assert.equal(mineOf(capped)[0].id, ownMany[0].id, "the followed fly keeps its seat");
+  await companyAwake(many.page, 3);
+  await seesDevice(pair.page, mineOf(capped));
+  await waitUntil(pair.page, "six other flies fill the table", (s) => othersOf(s).length === 6);
+
+  step("reloading the two-fly device preserves every fly id and colour; removing either fly removes the whole device");
+  await pair.page.reload();
+  await disableScreensaver(pair.page);
+  const backPair = await waitFor(pair.page, "online=joined,brain=running,flies=2", 120_000);
+  assert.deepEqual(mineOf(backPair), ownPair);
+  await companyAwake(pair.page, 2);
+  await seesDevice(many.page, ownPair);
+  await fly(many.page, `g.removeFly(${ownPair[1].id})`);
+  await waitUntil(pair.page, "the whole two-fly device removed", (s) => s.table === "" && !("online" in s));
+  assert.equal(await fly(pair.page, "g.tableEnded"), "removed");
+  await waitUntil(many.page, "both removed flies gone", (s) => othersOf(s).every((o) => o.of !== ownPair[0].id && !ownPair.some((f) => f.id === o.id)));
+  for (const filler of fillers) filler.close();
+  for (const tab of [many, pair]) await tab.page.context().close();
+
+  step("six fake flies leave two seats: a new device asking for four lives only the two it is seated");
+  const limitedCode = tableCode((bytes) => crypto.getRandomValues(bytes));
+  const limitedFakes: FakeFly[] = [];
+  const limitedIds = new Set<number>();
+  for (let i = 0; i < MAX_FLIES - 2; i++) {
+    const filler = await fakeFly(roomsAt, limitedCode, i, limitedIds, i === 0 ? { place: "picnic", light: "noon", weather: "clear", zone: "UTC", offset: 0 } : undefined);
+    limitedFakes.push(filler);
+    fakeFlies.push(filler);
+  }
+  const limited = await open();
+  await limited.page.addInitScript(() => localStorage.setItem("flies.settings", JSON.stringify({ flies: 4, wallpaperAfter: 0 })));
+  await limited.page.goto(`${url}?table=${limitedCode}&rooms=${roomsAt}`);
+  await disableScreensaver(limited.page);
+  const twoSeats = await waitFor(limited.page, "online=joined,brain=running,flies=2,asked=4", 120_000);
+  assert.equal(mineOf(twoSeats).length, 2);
+  await companyAwake(limited.page, 2);
+  await waitUntil(limited.page, "six other flies present", (s) => othersOf(s).length === 6 && othersOf(s).every((o) => o.present));
+  await limited.page.context().close();
+  for (const filler of limitedFakes) filler.close();
 
   step("a named, locked room made from the menus with the keys; another tab finds it in Online's list, is told a wrong password is wrong, and gets in with the right one; its link alone opens only its door");
   const maker = await open();
@@ -367,11 +471,11 @@ try {
   assert.ok(soloCost.calls < MAX_CALLS && soloCost.triangles < MAX_TRIANGLES, "the frame's budget alone");
   await solo.page.context().close();
 
-  step(`a full table on every screen: one tab and ${MAX_PLAYERS - 1} fake flies walking round its fly, followed and close up, the frame in its budget`);
+  step(`a full table on every screen: one tab and ${MAX_FLIES - 1} fake flies walking round its fly, followed and close up, the frame in its budget`);
   // A fake starts it, at midday in clear weather, so that each tab can take and give back a seat.
   const code = tableCode((bytes) => crypto.getRandomValues(bytes));
   const start = { place: "picnic", light: "noon", weather: "clear", zone: "UTC", offset: 0 };
-  for (let k = 0; k < MAX_PLAYERS - 1; k++) fakeFlies.push(await fakeFly(roomsAt, code, k, fakes, k === 0 ? start : undefined));
+  for (let k = 0; k < MAX_FLIES - 1; k++) fakeFlies.push(await fakeFly(roomsAt, code, k, fakes, k === 0 ? start : undefined));
   const worst = { calls: 0, triangles: 0, eyes: 0 };
   // The windows, then the phones and tablets: what follows the screen's shape (and the size of what is pressed) is read once, from the pointer.
   const kinds: [boolean, BrowserContextOptions][] = [
@@ -384,7 +488,7 @@ try {
     await page.goto(`${url}?table=${code}&rooms=${roomsAt}`);
     await disableScreensaver(page);
     await waitFor(page, "brain=running,screen=title,online=joined", 120_000);
-    await waitUntil(page, `${MAX_PLAYERS - 1} other flies there`, (s) => othersOf(s).filter((o) => o.present && !o.resting).length === MAX_PLAYERS - 1, 15_000);
+    await waitUntil(page, `${MAX_FLIES - 1} other flies there`, (s) => othersOf(s).filter((o) => o.present && !o.resting).length === MAX_FLIES - 1, 15_000);
     await page.keyboard.press("Enter");
     await waitFor(page, "screen=play");
     await toTool(page, "view");
@@ -403,7 +507,7 @@ try {
         if (key) await page.keyboard.press(key);
         await waitFor(page, `view=${view}`, 3000);
         // The camera comes round to its new view.
-        await page.waitForTimeout(1500);
+        await waitForGameTime(page, 1.5);
         const cost = await frameCost(page, 2000);
         const near = othersOf(await readState(page)).filter((o) => o.near).length;
         const most = cost.eyeFrames ? `${cost.eyeCalls} refreshing the eyes (${cost.eyesOwn} of them the eyes')` : `at most ${cost.calls}`;
