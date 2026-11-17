@@ -6,6 +6,7 @@
 // however close the camera comes.
 
 import * as THREE from "three";
+import { LAB_START } from "@fly/world";
 
 /** The lab's back wall, mm from the bench's middle, and its windows: their middles across, their open part, and where the blinds begin. */
 export const BACK_Z = -2300;
@@ -299,6 +300,20 @@ reflectedLight.indirectSpecular += labGlints(labReflect(normal), 0.06) * (0.02 +
   // A soft mottle, a few millimetres across, as poured resin has.
   float mottle = labNoise(vWorld * 0.09) * 0.6 + labNoise(vWorld * 0.31) * 0.4;
   diffuseColor.rgb *= mix(0.982, tone, detail) * (1.0 - grain * 0.1) * (0.975 + mottle * 0.05);
+  // A flat strip of calibration tape gives the nearby fly a familiar millimetre scale.
+  vec2 tape = vWorld.xz - vec2(${LAB_START.x.toFixed(1)}, ${(LAB_START.z - 5).toFixed(1)});
+  vec2 pixel = max(fwidth(tape), vec2(0.01));
+  vec2 edge = 1.0 - smoothstep(vec2(7.5, 1.5) - pixel, vec2(7.5, 1.5) + pixel, abs(tape));
+  float label = edge.x * edge.y;
+  float at = tape.x + 7.0;
+  float nearest = floor(at + 0.5);
+  float major = 1.0 - step(0.1, mod(nearest, 5.0));
+  float tick = (1.0 - smoothstep(0.04, 0.04 + pixel.x, abs(at - nearest))) * min(1.0, 0.08 / pixel.x);
+  tick *= smoothstep(-1.05 - pixel.y, -1.05 + pixel.y, tape.y) * (1.0 - smoothstep(-0.4 + major * 0.55, -0.4 + major * 0.55 + pixel.y, tape.y));
+  float line = (1.0 - smoothstep(0.04, 0.04 + pixel.y, abs(tape.y + 1.0))) * min(1.0, 0.08 / pixel.y);
+  float ends = 1.0 - smoothstep(7.0, 7.0 + pixel.x, abs(tape.x));
+  vec3 paper = mix(vec3(0.82, 0.80, 0.70), vec3(0.13, 0.16, 0.18), max(tick, line) * ends * 0.85);
+  diffuseColor.rgb = mix(diffuseColor.rgb, paper, label * 0.94);
 }`,
       )
       .replace(
