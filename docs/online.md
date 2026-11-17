@@ -69,6 +69,14 @@ and the iPhone and iPad app's, whose web view has a WebSocket of its own
   wrong password, too many tries, a full room, one that has closed, being
   taken off one.
 
+Discovery gives a connection or first list 10 seconds before saying it
+cannot reach rooms. It retries automatically. A quiet list is checked by
+reopening its line after 30 seconds; if that gets no answer within 10
+seconds, the retained list is marked reconnecting and cannot be chosen.
+A fresh list clears the failure. A protocol mismatch says “Update needed”;
+installed apps need an app update and never reload their bundled game.
+Browsers still try one reload. Back always leaves Online for solo play.
+
 ### Typing
 
 Names, passwords and codes are typed into fields the game draws. In a
