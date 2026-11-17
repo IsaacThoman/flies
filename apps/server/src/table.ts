@@ -8,15 +8,17 @@
 // started it, the seed and the clock every device blows the same bubbles
 // from, and when a visitor comes. It is a room too: it has a name, may be
 // listed for anyone browsing to find, and may be locked with a password
-// (lock.ts). No brains, no drawing and no sockets here (server.ts), so a
+// (lock.ts). Or it is one of the rooms open to everyone, which nobody starts:
+// the server's clock takes it from place to place, and each device keeps its
+// own light and weather there. No brains, no drawing and no sockets here (server.ts), so a
 // whole table can run in a test.
 
 import { BALL_RADIUS, Pace, VentilationClock, World, WORLDS, forecast, hourOfDay } from "@fly/world";
 import type { Happening } from "@fly/world";
 import {
-  AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_PLAYERS, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
-  TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, encodeFlies, isTableCode, mayReturnTo, mix, readState,
-  roomName, roomTime, spawnSpot, stream, tableHours, toWire, wireScale,
+  MAX_FOUND, AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_PLAYERS, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
+  TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, encodeFlies, everyoneIndex, everyoneName, isTableCode,
+  mayReturnTo, mix, readState, roomName, roomTime, spawnSpot, stream, tableHours, toWire, wireScale,
 } from "@fly/net";
 import type {
   BallWire, ClientMessage, FlyState, FoodWire, HappeningWire, PlayerWire, Refusal, RoomInfo, RoomWire, ServerMessage, Spot, TableStart, V3, WireScale,
@@ -43,6 +45,16 @@ const HAPPENING_KEPT = 5_000;
 export type Going = Happening | "ventilation";
 /** Seconds each visitor keeps the table busy, roughly, so the table doesn't send another of it meanwhile (the ventilation keeps its own clock). */
 const BUSY: Readonly<Record<Going, number>> = { gust: 10, gull: 80, leaf: 40, butterfly: 100, ladybird: 120, juice: 0, boat: 240, ventilation: 0 };
+
+/** A room open to everyone stays in each place this long (ms), then moves on to the next, by the wall clock: every server agrees where it is. */
+export const EVERYONE_TURN = 20 * 60_000;
+const TURNS = Object.keys(WORLDS);
+
+/** Where the rooms open to everyone are at this moment (ms since 1970). */
+export const everyonePlace = (wall: number) => TURNS[Math.floor(wall / EVERYONE_TURN) % TURNS.length];
+
+/** The weather a room open to everyone has for its own goings-on: none of note, since each device there has its own sky. */
+const CALM = Object.freeze({ cloud: 0, mist: 0, rain: 0, wind: 0.4 });
 
 /** A device's line to the table. */
 export type Link = {
@@ -93,6 +105,7 @@ export type TableRecord = {
   /** `gone`: it had left (said goodbye, or was away too long), so a restart doesn't bring its fly back. */
   seats: { id: number; key: string; at: [x: number, y: number, z: number, yaw: number]; airborne: boolean; lastSeen: number; gone?: boolean }[];
   foods: FoodWire[];
+  foodExpires?: [id: number, at: number][];
   /** How much each player has eaten by the table's account, by id (older files have none). */
   eaten?: [id: number, amount: number][];
   /** The room's name, whether it is listed, and its lock (older files have none: unnamed, unlisted, open to its link). */
@@ -135,6 +148,7 @@ export function isTableRecord(v: unknown): v is TableRecord {
   if (!Array.isArray(r.removed) || r.removed.length > REMOVED_MAX || !r.removed.every((k) => text(k, 64))) return false;
   const ids = new Set<number>();
   if (!Array.isArray(r.seats) || r.seats.length > MAX_PLAYERS || !r.seats.every((seat) => isSeatRecord(seat, ids))) return false;
+  if (r.foodExpires !== undefined && (!Array.isArray(r.foodExpires) || r.foodExpires.length > MAX_FOUND || !r.foodExpires.every((e) => Array.isArray(e) && e.length === 2 && finite(e[0]) && finite(e[1])))) return false;
   if (!Array.isArray(r.foods) || r.foods.length > WIRE_FOODS_MAX || !r.foods.every(isFoodRecord)) return false;
   if (r.eaten !== undefined && (!Array.isArray(r.eaten) || r.eaten.length > MAX_PLAYERS || !r.eaten.every((e) => Array.isArray(e) && e.length === 2 && finite(e[0], e[1])))) return false;
   return (r.name === undefined || roomName(r.name) === r.name) && (r.listed === undefined || typeof r.listed === "boolean") && (r.lock === undefined || r.lock === null || isLock(r.lock));
@@ -173,6 +187,8 @@ export class Table {
   bubbles: TableBubbles | null = null;
   /** Keys that were removed from the table, hashed: they can't sit down again. */
   readonly removed: Set<string>;
+  /** One of the rooms open to everyone: nobody started it, and nobody chooses its place, light or weather. */
+  readonly everyone: boolean;
   /** What it is called; whether anyone browsing sees it; its password, hashed, if it has one. */
   readonly name: string;
   readonly listed: boolean;
@@ -198,34 +214,47 @@ export class Table {
 
   constructor(code: string, start: TableStart, starterKey: string, seed: number, options: TableOptions, record?: TableRecord, lock: Lock | null = record?.lock ?? null) {
     this.code = code;
-    this.name = roomName(start.name) ?? UNNAMED;
-    this.listed = start.listed === true;
-    this.lock = lock;
+    const everyone = everyoneIndex(code);
+    this.everyone = everyone >= 0;
+    this.name = this.everyone ? everyoneName(everyone) : (roomName(start.name) ?? UNNAMED);
+    this.listed = this.everyone || start.listed === true;
+    this.lock = this.everyone ? null : lock;
     this.#options = options;
     this.seed = seed >>> 0;
     this.created = record?.created ?? options.wall();
-    this.place = Object.hasOwn(WORLDS, start.place) ? start.place : "picnic";
-    this.epoch = record?.epoch ?? 0;
+    // A room open to everyone is wherever the clock has it, whatever was kept.
+    this.place = this.everyone ? everyonePlace(options.wall()) : Object.hasOwn(WORLDS, start.place) ? start.place : "picnic";
+    // Moved on while the server was down: what was kept is of another place, and a device still there must know it isn't.
+    const moved = !!record && record.place !== this.place;
+    this.epoch = ((record?.epoch ?? 0) + (moved ? 1 : 0)) & 0xff;
     this.world = new World(WORLDS[this.place]);
     this.scale = wireScale(this.world.place);
-    this.food = new TableFood(this.world, this.world.place.patches);
-    this.worldWire = { light: TABLE_LIGHTS.includes(start.light as never) ? start.light : "clock", weather: TABLE_WEATHERS.includes(start.weather as never) ? start.weather : "now" };
-    this.#starter = starterKey;
+    this.food = new TableFood(this.world, this.world.place.patches, options.wall);
+    const light = !this.everyone && TABLE_LIGHTS.includes(start.light as never) ? start.light : "clock";
+    this.worldWire = { light, weather: !this.everyone && TABLE_WEATHERS.includes(start.weather as never) ? start.weather : "now" };
+    // Nobody's key is empty: nobody started a room open to everyone.
+    this.#starter = this.everyone ? "" : starterKey;
     this.#zone = typeof start.zone === "string" ? start.zone.slice(0, 64) : "";
     this.#offset = finite(start.offset) ? Math.max(-14 * 60, Math.min(14 * 60, Math.round(start.offset))) : 0;
     this.removed = new Set(record?.removed ?? []);
     this.#pace = this.#newPace();
     this.#lastTick = options.now();
     this.#settle();
-    if (record) {
-      this.food.restore(record.foods);
+    if (record && !moved) {
+      this.food.restore(record.foods, record.foodExpires);
       for (const [id, amount] of record.eaten ?? []) this.food.eaten.set(id, amount);
+    }
+    if (record) {
       const now = options.now();
       for (const r of record.seats) {
         const seat = this.#seat(r.id, r.key);
         const s = seat.state;
-        [s.x, s.y, s.z, s.yaw] = r.at;
-        s.flags = (r.airborne ? AIRBORNE : 0) | AWAY;
+        if (moved) {
+          const spot = spawnSpot(this.world, r.id);
+          [s.x, s.z, s.yaw] = spot;
+          s.y = this.world.heightAt(s.x, s.z, spot[3]);
+        } else [s.x, s.y, s.z, s.yaw] = r.at;
+        s.flags = (r.airborne && !moved ? AIRBORNE : 0) | AWAY;
         s.t = now;
         s.epoch = this.epoch;
         seat.lastSeen = r.lastSeen;
@@ -245,6 +274,7 @@ export class Table {
 
   /** The table as it is to be kept. */
   record(): TableRecord {
+    this.food.update(0);
     return {
       code: this.code,
       created: this.created,
@@ -258,6 +288,7 @@ export class Table {
       removed: [...this.removed],
       seats: [...this.seats.values()].map((s) => ({ id: s.id, key: s.key, at: [s.state.x, s.state.y, s.state.z, s.state.yaw], airborne: !!(s.state.flags & AIRBORNE), lastSeen: s.lastSeen, gone: !s.present })),
       foods: this.food.foods.map(toWire),
+      foodExpires: this.food.expiries(),
       eaten: [...this.food.eaten],
       name: this.name,
       listed: this.listed,
@@ -267,11 +298,13 @@ export class Table {
 
   /** What it says of itself: in its welcome, and in the list of rooms. */
   get info(): RoomInfo {
-    return { name: this.name, listed: this.listed, locked: !!this.lock };
+    return { name: this.name, listed: this.listed, locked: !!this.lock, code: this.code, everyone: this.everyone };
   }
 
+  /** A room open to everyone nobody is in keeps no beat, so not its place either: the list says where the clock has it, where whoever comes is sat (Tables.everyone). */
   room(): RoomWire {
-    return { code: this.code, name: this.name, place: this.place, flies: this.present, locked: !!this.lock };
+    const place = this.everyone ? everyonePlace(this.#options.wall()) : this.place;
+    return { code: this.code, name: this.name, place, flies: this.present, locked: !!this.lock, ...(this.everyone ? { everyone: true } : {}) };
   }
 
   /** Whether a device with this key (hashed) may sit down without the password: it has sat here before, or started the table. */
@@ -377,17 +410,10 @@ export class Table {
       const here = message.epoch === this.epoch && isSpot(message.at);
       at = here && mayReturnTo(this.world, message.at!, s.x, s.y, s.z, away) ? message.at! : [s.x, s.z, s.yaw, s.y];
     } else {
-      let id = 1;
-      while (this.seats.has(id) && id <= MAX_PLAYERS) id++;
-      if (id > MAX_PLAYERS) {
-        // Full: the seat of whoever has been gone longest is given up, if anyone has.
-        let oldest: Seat | null = null;
-        // Never the starter's: theirs is the table.
-        for (const s of this.seats.values()) if (!s.present && !s.link && s.key !== this.#starter && (!oldest || s.lastSeen < oldest.lastSeen)) oldest = s;
-        if (!oldest) return "full";
-        this.seats.delete(oldest.id);
-        id = oldest.id;
-      }
+      const free = this.#free();
+      if (free === null) return "full";
+      if (typeof free !== "number") this.seats.delete(free.id);
+      const id = typeof free === "number" ? free : free.id;
       seat = this.#seat(id, key);
       at = spawnSpot(this.world, id);
     }
@@ -410,6 +436,7 @@ export class Table {
     const shown = returning && seat.present;
     seat.present = true;
     seat.away = false;
+    this.food.update(0);
     this.#send(seat, {
       type: "welcome",
       meals: true,
@@ -441,6 +468,38 @@ export class Table {
     this.#broadcast(shown ? { type: "away", id: seat.id, away: false } : { type: "joined", ...this.#player(seat) }, seat);
     this.#options.log?.("joined", { table: this.code, player: seat.id, returning });
     return seat;
+  }
+
+  /** A seat for a newcomer: an id nobody has had, or the seat of whoever has been gone longest; null if every seat is someone's still. */
+  #free(): number | Seat | null {
+    let id = 1;
+    while (this.seats.has(id) && id <= MAX_PLAYERS) id++;
+    if (id <= MAX_PLAYERS) return id;
+    let oldest: Seat | null = null;
+    // Never the starter's: theirs is the table.
+    for (const s of this.seats.values()) if (!s.present && !s.link && s.key !== this.#starter && (!oldest || s.lastSeen < oldest.lastSeen)) oldest = s;
+    return oldest;
+  }
+
+  /** A room open to everyone moves on when the clock says, everyone there together. Returns the table. */
+  keepTurn(): this {
+    if (!this.everyone) return this;
+    const turn = everyonePlace(this.#options.wall());
+    if (turn !== this.place) this.moveTo(turn);
+    return this;
+  }
+
+  /** Whether a device with this key (hashed) is still at the table: its fly there, perhaps resting, not yet gone. */
+  seated(key: string) {
+    for (const s of this.seats.values()) if (s.key === key) return s.present;
+    return false;
+  }
+
+  /** Whether a device with this key (hashed) could sit down: it has a seat here, or there is one for it. */
+  hasRoomFor(key: string) {
+    if (this.removed.has(key)) return false;
+    for (const s of this.seats.values()) if (s.key === key) return true;
+    return this.#free() !== null;
   }
 
   #player(seat: Seat): PlayerWire {
@@ -544,7 +603,11 @@ export class Table {
         return;
       case "found": {
         if (!finite(m.id, m.x, m.z, m.r, m.sweet) || !seat.rates.found.take(now)) return;
-        const food = this.food.found(m.id, m.name, m.x, m.z, m.r, m.sweet, finite(m.y) ? m.y : undefined);
+        // A position-derived ID may be found again. Clear the previous
+        // lifetime on every device before broadcasting its replacement.
+        this.food.update(0);
+        this.#flushFood();
+        const food = this.food.found(m.id, m.name, m.x, m.z, m.r, m.sweet, finite(m.y) ? m.y : undefined, m.lasts);
         if (food) this.#broadcast({ type: "found", food: toWire(food) }, seat);
         return;
       }
@@ -668,6 +731,12 @@ export class Table {
     }
   }
 
+  #flushFood() {
+    const changes = this.food.flush();
+    if (!changes) return;
+    for (const p of this.seats.values()) if (p.link) this.#send(p, { type: "food", ack: p.ack, ...changes, eaten: Math.round((this.food.eaten.get(p.id) ?? 0) * 1e4) / 1e4, meal: this.food.takeMeal(p.id) });
+  }
+
   /** The table's beat, every SEND_EVERY ms (@fly/net): the batch, presence, the food, the balls, the bubbles, the visitors. */
   tick() {
     const now = this.now;
@@ -683,6 +752,7 @@ export class Table {
         this.#options.log?.("gone", { table: this.code, player: seat.id });
       }
     }
+    this.keepTurn();
     // The table's clock's offset changes twice a year where the starter is.
     if (wall - this.#offsetAt > 60_000 && this.#zone) {
       this.#offsetAt = wall;
@@ -695,12 +765,9 @@ export class Table {
     this.food.update(dt);
     if (now - this.#foodAt >= FOOD_EVERY) {
       this.#foodAt = now;
-      const changes = this.food.flush();
-      if (changes) {
-        // Each player is told which of its own bites have been counted.
-        for (const p of this.seats.values()) if (p.link) this.#send(p, { type: "food", ack: p.ack, ...changes, eaten: Math.round((this.food.eaten.get(p.id) ?? 0) * 1e4) / 1e4, meal: this.food.takeMeal(p.id) });
-      }
+      this.#flushFood();
     }
+
     const bubbles = this.bubbles;
     // Balls that have flown are forgotten; while one flies, the bubbles it hits burst.
     for (let i = this.balls.length - 1; i >= 0; i--) {
@@ -750,6 +817,8 @@ export class Table {
 
   #can(h: Happening, now: number) {
     if ((this.#busy.get(h) ?? 0) > now) return false;
+    // Each device's own sky says whether a visitor suits it there (SharedTable.ownSky).
+    if (this.everyone) return true;
     const hour = hourOfDay(this.hours);
     const light = this.worldWire.light;
     const day = light === "clock" ? hour > 7 && hour < 19.5 : light !== "night" && light !== "dusk";
@@ -769,6 +838,7 @@ export class Table {
 
   /** The table's weather: chosen, or the forecast by its clock. */
   #weather() {
+    if (this.everyone) return CALM;
     const w = this.worldWire.weather;
     const m = this.#mix;
     if (w === "now") return forecast(this.hours, m);

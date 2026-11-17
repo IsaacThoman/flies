@@ -4,7 +4,7 @@
 //         ├─ Watch
 //         ├─ About
 //         ├─ Settings: Screensaver | On screen | Picture, as tabs
-//         └─ Online (in a browser): rooms with others (online.ts)
+//         └─ Online (where it can be): rooms with others (online.ts)
 //
 // The menu is the title, at launch and from play alike (Back, Play/Pause or
 // the menu button), with the fly living on behind it; Back there carries on
@@ -120,6 +120,8 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       choice("wallpaperCamera", "Camera", CAMERA),
       // Only when there is somewhere else to live.
       ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE)] : []),
+      // With everyone, in a room open to all, once awake: only where the device can be online.
+      ...(shell.canPlayOnline ? [choice("joinOthers", "Join others", ON_OFF)] : []),
       // Whether the sky follows the weather outside, only where the Apple TV can tell it.
       ...(shell.weatherOutside ? [choice("realWeather", "Real weather", ON_OFF)] : []),
     ],

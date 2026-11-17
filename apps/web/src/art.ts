@@ -21,7 +21,7 @@ import type { TimeOfDay } from "./scene/light.ts";
 import { FAR, NEAR, Stage } from "./stage.ts";
 import { drawWordmark } from "./ui/wordmark.ts";
 
-export type ArtLayer = "backdrop" | "table" | "fly" | "all";
+export type ArtLayer = "backdrop" | "table" | "picnic" | "fly" | "all";
 
 export type ArtShot = {
   width: number;
@@ -35,6 +35,9 @@ export type ArtShot = {
   turn: number;
   time: TimeOfDay;
   pose?: Partial<FlyPose>;
+  /** A fixed exposure into the model's own transition, rather than its settled pose. */
+  poseFrames?: number;
+  bubbles?: boolean;
   /** Draws the wordmark over the picture, centred at this height (fraction of the height) and this tall (fraction). */
   wordmark?: { y: number; size: number };
 };
@@ -56,7 +59,7 @@ function arrange(shot: ArtShot) {
   stage.light.set(shot.time);
   for (let i = 0; i < 40; i++) {
     stage.weather.update(0.1);
-    stage.light.update(0.1, stage.weather);
+    stage.update(i * 0.1, 0.1, camera);
   }
   const c = shot.camera;
   const y = world.heightAt(shot.fly.x, shot.fly.z);
@@ -79,7 +82,8 @@ function arrange(shot: ArtShot) {
   Object.assign(intent, createIntent(), { live: true });
   fly.update(body, intent, false, 0, 1 / 60);
   const pose = { ...fly.pose, ...shot.pose };
-  for (let i = 0; i < 200; i++) fly.model.update(pose, 1 / 60);
+  if (shot.poseFrames !== undefined) for (let i = 0; i < 200; i++) fly.model.update(fly.pose, 1 / 60);
+  for (let i = 0; i < (shot.poseFrames ?? 200); i++) fly.model.update(pose, 1 / 60);
   for (let i = 0; i < 240; i++) bubbles.update(i / 60, 1 / 60, camera, stage.light.sunDirection, new THREE.Vector3(), new THREE.Vector3(0, -1e4, 0));
   stage.update(10, 1 / 60, camera);
   // Builds the reflections for this light.
@@ -92,8 +96,8 @@ function renderTo(target: THREE.WebGLRenderTarget, shot: ArtShot) {
   r.setClearColor(0x000000, 0);
   r.clear(true, true, true);
   const showFly = shot.layer === "fly" || shot.layer === "all";
-  const showTable = shot.layer === "table" || shot.layer === "all";
-  if (shot.layer === "backdrop" || shot.layer === "all") {
+  const showTable = shot.layer === "table" || shot.layer === "picnic" || shot.layer === "all";
+  if (shot.layer === "backdrop" || shot.layer === "picnic" || shot.layer === "all") {
     camera.near = FAR.near;
     camera.far = FAR.far;
     camera.updateProjectionMatrix();
@@ -104,7 +108,7 @@ function renderTo(target: THREE.WebGLRenderTarget, shot: ArtShot) {
   camera.far = NEAR.far;
   camera.updateProjectionMatrix();
   stage.set.group.visible = showTable;
-  bubbles.mesh.visible = showTable;
+  bubbles.mesh.visible = showTable && shot.bubbles !== false;
   fly.root.visible = showFly;
   if (fly.shadow) fly.shadow.visible = showTable;
   r.render(stage.scene, camera);
@@ -123,7 +127,7 @@ function render(shot: ArtShot): string {
   const out = document.createElement("canvas");
   out.width = width;
   out.height = height;
-  const g = out.getContext("2d")!;
+  const g = out.getContext("2d", { alpha: shot.layer === "fly" || shot.layer === "table" })!;
   const image = g.createImageData(width, height);
   for (let y = 0; y < height; y++) {
     const from = (height - 1 - y) * width * 4;

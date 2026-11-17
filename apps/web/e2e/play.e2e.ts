@@ -190,6 +190,14 @@ try {
   await press("ArrowUp");
   await press("Enter");
   await waitFor(page, "screen=about");
+  await press("Enter");
+  await waitFor(page, "acknowledgement=0,aboutScroll=0");
+  await press("ArrowDown");
+  await waitFor(page, "aboutScroll>0");
+  await press("ArrowRight");
+  await waitFor(page, "acknowledgement=1,aboutScroll=0");
+  await press("Escape");
+  await waitFor(page, "screen=about,acknowledgement=");
   await press("ArrowDown", 3);
   await press("Escape");
   await waitFor(page, "screen=title,focus=about");
@@ -299,9 +307,19 @@ try {
     settings.xray = "always";
   });
   await waitFor(page, "view=follow,eyesInset=top-right,nerves=top-right,xray>0.9");
-  // At rest its activity comes and goes: some of its regions glow within a few seconds.
-  const inside = await waitWithin(page, "glow~.", 5);
-  console.log(`  glowing: ${inside.glow.split(" ").slice(0, 4).join(" ")}`);
+  // At rest its brain can be all but silent: the fly keeps the real time of day,
+  // and in its siesta or at night it lies still with no region glowing. So it is
+  // stroked with the feather, which its brain answers at any hour (a sleeping fly
+  // included), and the glow is read while the stroke goes on.
+  await toTool("feather");
+  await page.keyboard.down("Enter");
+  await waitFor(page, "touch>0.9");
+  const inside = await waitFor(page, "glow~.");
+  await page.keyboard.up("Enter");
+  console.log(`  glowing while stroked: ${inside.glow.split(" ").slice(0, 4).join(" ")}`);
+  assert.ok(/head-bristles|bristles/.test(inside.glow), `the touch it feels lights its touch neurons: ${inside.glow}`);
+  await toTool("view");
+  await waitFor(page, "tool=view,view=follow,xray>0.9");
   await press("ArrowDown");
   await waitFor(page, "view=wide,xray<0.05");
   await press("ArrowUp");
