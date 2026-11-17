@@ -37,6 +37,10 @@ and neural runs and their replay limits.
 
 Native brain changes and comparison limits belong in
 [the native brain reference](../packages/brain-native/README.md#when-the-model-changes).
+The committed Wasm parity comparisons target Apple-silicon Node math;
+x86-64 or Linux ARM can differ. Preserve the build's floating-point
+contraction settings (off outside fdlibm) when changing the implementation;
+see `.github/workflows/ci.yml` and `packages/brain-native/wasm.sh`.
 Apple host checks belong in [iOS](ios.md#checking-it) and
 [Apple TV](apple-tv.md#checking-it-1). Release automation and account setup
 belong in [the release guide](release.md).
