@@ -173,7 +173,7 @@ export class FlyRig {
     // Take-off: the legs stay extended against the ground for a moment as the
     // body leaves it, then fold. Landing: they reach back out to their homes.
     if (airborne && !this.airborne) this.airTime = 0;
-    if (!airborne && this.airborne) this.dipVelocity -= 0.6 * this.tuck;
+    if (!airborne && this.airborne) this.dipVelocity -= 0.6 * this.flight;
     this.airborne = airborne;
     if (airborne) this.airTime += dt;
     const tuckTarget = airborne ? smooth(0.05, 0.22, this.airTime) * (1 - clamp01(pose.landing ?? 0)) : 0;
@@ -344,12 +344,18 @@ export class FlyRig {
 
   private proboscis(t: number): void {
     const jt = this.joints, s = this.scratch, head = J.head * 12;
-    const e = smooth(0.05, 0.8, this.feed);
-    const pump = e * 0.5 * (1 + Math.sin(TAU * 1.7 * t));
+    // Schwarz et al. 2017 doi:10.7554/eLife.19892: rostrum lift,
+    // haustellum extension, labellar extension, then lobe spreading.
+    // Overlapping windows preserve a continuous reverse order on withdrawal.
+    const r = smooth(0.05, 0.45, this.feed);
+    const e = smooth(0.2, 0.7, this.feed);
+    const l = smooth(0.4, 0.85, this.feed);
+    const pad = smooth(0.65, 0.95, this.feed);
+    const pump = pad * 0.5 * (1 + Math.sin(TAU * 1.7 * t));
 
     // The rostrum hinges down and forward out of the head.
     transformPoint(jt, head, 0, PIVOT.proboscis[1] - PIVOT.neck[1], PIVOT.proboscis[2] - PIVOT.neck[2], s, 0);
-    this.sagittal(head, -1.25 + 1.75 * e, s, 9);
+    this.sagittal(head, -1.25 + 1.75 * r, s, 9);
     this.alongLateral(J.rostrum * 12, head, s[0], s[1], s[2], s[9], s[10], s[11]);
     transformPoint(jt, J.rostrum * 12, PROBOSCIS.rostrum, 0, 0, s, 3);
 
@@ -369,13 +375,13 @@ export class FlyRig {
 
     // The labellum: folded up against the face at rest, its pad pressed flat to the surface when feeding.
     this.sagittal(head, 2.4, s, 15);
-    let lx = s[15] * (1 - e), ly = s[16] + (-1 - s[16]) * e, lz = s[17] + (0.08 - s[17]) * e;
+    let lx = s[15] * (1 - l), ly = s[16] + (-1 - s[16]) * l, lz = s[17] + (0.08 - s[17]) * l;
     const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
     lx /= ll; ly /= ll; lz /= ll;
     const lab = J.labellum * 12;
     this.alongLateral(lab, head, s[6], s[7], s[8], lx, ly, lz);
     // Its two lobes spread open on the food and work in quick pulses.
-    const spread = 1 + e * (0.3 + 0.12 * Math.sin(TAU * 5.3 * t));
+    const spread = 1 + pad * (0.3 + 0.12 * Math.sin(TAU * 5.3 * t));
     jt[lab + 2] *= spread; jt[lab + 6] *= spread; jt[lab + 10] *= spread;
   }
 
@@ -548,6 +554,14 @@ export class FlyRig {
       const elevationStrength = Math.max(strength, song * 0.2);
       const raise = (lift - 0.25 * this.crouch * open) * (1 - song) + SONG_LIFT * song;
       for (let c = 0; c < WING_COPIES; c++) {
+        // An imperceptible blur needs only its solid copy's frame. Reusing
+        // that frame avoids posing seven invisible copies on each side.
+        if (c > 0 && blur < 1e-5) {
+          const o = (w * WING_COPIES + c) * 12;
+          copy(wf, o, wf, w * WING_COPIES * 12);
+          this.wingAlpha[w * WING_COPIES + c] = 0;
+          continue;
+        }
         const phase = jitter + blur * (c / WING_COPIES) * 0.5;
         const sweepAngle = centre + 0.5 * arc * Math.cos(TAU * phase);
         const elevation = raise + 0.07 * Math.sin(2 * TAU * phase) * blur * elevationStrength;

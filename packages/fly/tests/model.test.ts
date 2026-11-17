@@ -108,17 +108,21 @@ test("the fly stands on the ground: feet at y = 0, body above it, about one long
 });
 
 test("solved claws stay planted while the fly walks", () => {
-  for (const [speed, turn] of [[0.7, 0], [2.5, 0], [6, 0], [12, 0], [-1, 0], [-3, 0], [1.5, 1.5], [0, 3], [4, -3]]) {
+  for (const fps of [30, 60, 120]) for (const [speed, turn] of [[0.7, 0], [2.5, 0], [6, 0], [12, 0], [14, 0], [-1, 0], [-3, 0], [1.5, 1.5], [0, 3], [4, -3]]) {
     const fly = createFly();
     const walker = new Walker();
     const planted: ([number, number] | null)[] = Array(LEG_COUNT).fill(null);
     let worst = 0;
     const p = pose({ speed, turn });
+    const previousSteps = new Uint32Array(LEG_COUNT);
     for (let f = 0; f < 240; f++) {
-      walker.advance(speed, turn, DT);
-      fly.update(p, DT);
-      if (f < 60) continue; // let the smoothed speed settle onto the pose's
+      walker.advance(speed, turn, 1 / fps);
+      fly.update(p, 1 / fps);
+      if (f < fps) continue; // let the smoothed speed settle onto the pose's
       for (let leg = 0; leg < LEG_COUNT; leg++) {
+        // A recovery can begin and end between two display samples.
+        if (previousSteps[leg] !== fly.rig.gait.steps[leg]) planted[leg] = null;
+        previousSteps[leg] = fly.rig.gait.steps[leg];
         if (fly.rig.gait.swinging[leg]) {
           planted[leg] = null;
           continue;

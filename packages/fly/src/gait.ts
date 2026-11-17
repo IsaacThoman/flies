@@ -42,6 +42,10 @@ export class Gait {
   private readonly elapsed = new Float64Array(LEG_COUNT);
   private readonly duration = new Float64Array(LEG_COUNT);
   private sinceLift = 0;
+  /** Contact timestamps include events between display samples. */
+  time = 0;
+  readonly lastLift = new Float64Array(LEG_COUNT);
+  readonly lastLand = new Float64Array(LEG_COUNT);
   private readonly offsets = new Float64Array(OFFSET);
 
   constructor(home: Float64Array) {
@@ -53,6 +57,8 @@ export class Gait {
     this.feet.set(home);
     this.lifted.fill(0);
     this.swinging.fill(0);
+    this.lastLift.fill(this.time);
+    this.lastLand.fill(this.time);
   }
 
   update(speed: number, turn: number, dt: number, home: Float64Array): void {
@@ -68,69 +74,70 @@ export class Gait {
     this.phase = (this.phase + frequency * dt) % 64;
     this.sinceLift += dt;
 
-    // Planted feet ride backwards with the ground.
-    const a = turn * dt, c = Math.cos(a), s = Math.sin(a), forward = speed * dt;
-    for (let leg = 0; leg < LEG_COUNT; leg++) {
-      if (this.swinging[leg]) continue;
-      const i = leg * 3, x = feet[i], z = feet[i + 2];
-      feet[i] = x * c - z * s;
-      feet[i + 2] = x * s + z * c - forward;
-      feet[i + 1] = 0;
-    }
-
+    const frameStart = this.time;
+    this.time += dt;
+    const a = turn * dt, c = Math.cos(a), s = Math.sin(a);
     const fast = Math.min(1, Math.max(0, (effective - 0.5) / 4));
     const blend = fast * fast * (3 - 2 * fast);
     for (let leg = 0; leg < LEG_COUNT; leg++) {
-      const i = leg * 3;
-      const hx = home[i], hz = home[i + 2];
-      // Where to land: ahead of home by half the coming stance's travel.
+      const i = leg * 3, hx = home[i], hz = home[i + 2];
       let tx = hx + turn * hz * stanceHalf;
       let tz = hz + (speed - turn * hx) * stanceHalf;
-      // Land no further out than leaves room for the stance that follows.
       const reach = LEGS[legPair(leg)].reach;
       const ox = tx - hx, oz = tz - hz, offset = Math.sqrt(ox * ox + oz * oz), limit = reach * 0.95;
-      if (offset > limit) {
-        tx = hx + (ox * limit) / offset;
-        tz = hz + (oz * limit) / offset;
-      }
-
-      // Ipsilateral offsets spread into a metachronal wave as speed falls.
-      // Offset changes are rate limited so a speed jump cannot skip a cycle.
+      if (offset > limit) { tx = hx + ox * limit / offset; tz = hz + oz * limit / offset; }
       const pair = legPair(leg), oldOffset = this.offsets[leg];
       const wave = pair / 3 + (leg & 1) * 0.5;
       const tripod = pair === 0 ? -0.02 : pair === 1 ? 0.5 : 1.02;
       const target = wave + (tripod + (leg & 1) * 0.5 - wave) * blend;
       this.offsets[leg] += Math.max(-dt, Math.min(dt, target - oldOffset));
-      const due = moving && Math.floor(this.phase + this.offsets[leg]) !== Math.floor(oldPhase + oldOffset);
-
-      if (!this.swinging[leg]) {
-        const dx = feet[i] - hx, dz = feet[i + 2] - hz, away = Math.sqrt(dx * dx + dz * dz);
-        const settle = !moving && away > SETTLE && this.sinceLift > 0.05 && !this.neighbourSwinging(leg);
-        // A foot dragged to the edge of its reach lifts whatever the phase.
-        if (due || settle || away > reach) {
-          this.lift(leg, swing);
-          // Sample the first swing near its midpoint; a 30 Hz frame must not
-          // skip an entire 25–35 ms recovery and show a teleporting foot.
-          this.elapsed[leg] = -Math.min(dt * 0.5, swing * 0.5);
+      const startPhase = oldPhase + oldOffset;
+      const rate = dt > 0 ? Math.max(0, frequency + (this.offsets[leg] - oldOffset) / dt) : frequency;
+      let nextLift = moving && rate > 0 ? (Math.floor(startPhase) + 1 - startPhase) / rate : Infinity;
+      let cursor = 0;
+      // Resolve contact events inside a display frame. At 30 Hz a complete
+      // recovery can fit between samples; its following stance must still
+      // start at the right time, instead of dropping a step or teleporting.
+      for (let event = 0; event < 8 && cursor < dt; event++) {
+        if (this.swinging[leg]) {
+          const span = Math.min(dt - cursor, Math.max(0, this.duration[leg] - this.elapsed[leg]));
+          this.elapsed[leg] += span; cursor += span;
+          const t = Math.min(1, this.elapsed[leg] / this.duration[leg]);
+          const e = t * t * t * (t * (t * 6 - 15) + 10);
+          const fx = this.from[i], fz = this.from[i + 2], dx = tx - fx, dz = tz - fz;
+          const height = Math.min(0.07, 0.03 + 0.25 * Math.sqrt(dx * dx + dz * dz));
+          const arc = Math.sin(Math.PI * t);
+          feet[i] = fx + dx * e; feet[i + 1] = this.from[i + 1] * (1 - e) + height * arc; feet[i + 2] = fz + dz * e;
+          this.lifted[leg] = arc;
+          if (t < 1) break;
+          this.swinging[leg] = 0; this.lifted[leg] = 0; feet[i + 1] = 0;
+          this.lastLand[leg] = frameStart + cursor;
+          if (nextLift <= cursor && rate > 0) nextLift += (Math.floor((cursor - nextLift) * rate) + 1) / rate;
+        } else {
+          let span = Math.min(dt - cursor, Math.max(0, nextLift - cursor));
+          const dx = feet[i] - hx, dz = feet[i + 2] - hz;
+          const away2 = dx * dx + dz * dz;
+          const settle = !moving && away2 > SETTLE * SETTLE && this.sinceLift > 0.05 && !this.neighbourSwinging(leg);
+          let forced = away2 > reach * reach || settle;
+          if (forced) span = 0;
+          let ca = span === dt ? c : Math.cos(turn * span), sa = span === dt ? s : Math.sin(turn * span);
+          const x = feet[i], z = feet[i + 2];
+          let nx = x * ca - z * sa, nz = x * sa + z * ca - speed * span;
+          const ex = nx - hx, ez = nz - hz;
+          if (!forced && ex * ex + ez * ez > reach * reach && span > 0) {
+            // Clip the ground segment to its reach circle. The small inset
+            // covers the difference between a turn's chord and its arc.
+            const vx = nx - x, vz = nz - z, aa = vx * vx + vz * vz, bb = dx * vx + dz * vz;
+            const cc = away2 - reach * reach * 0.99;
+            const fraction = aa > 0 ? Math.max(0, Math.min(1, (-bb + Math.sqrt(Math.max(0, bb * bb - aa * cc))) / aa)) : 0;
+            span *= fraction; ca = Math.cos(turn * span); sa = Math.sin(turn * span);
+            nx = x * ca - z * sa; nz = x * sa + z * ca - speed * span; forced = true;
+          }
+          feet[i] = nx; feet[i + 1] = 0; feet[i + 2] = nz; cursor += span;
+          if (!forced && cursor >= dt) break;
+          this.lift(leg, swing); this.lastLift[leg] = frameStart + cursor;
+          if (rate > 0 && nextLift <= cursor + 1e-10) nextLift += 1 / rate;
         }
-        else continue;
-      }
-
-      this.elapsed[leg] += dt;
-      const t = Math.min(1, this.elapsed[leg] / this.duration[leg]);
-      const e = t * t * t * (t * (t * 6 - 15) + 10);
-      const fx = this.from[i], fz = this.from[i + 2];
-      const dx = tx - fx, dz = tz - fz;
-      const height = Math.min(0.07, 0.03 + 0.25 * Math.sqrt(dx * dx + dz * dz));
-      const arc = Math.sin(Math.PI * t);
-      feet[i] = fx + dx * e;
-      feet[i + 1] = this.from[i + 1] * (1 - e) + height * arc;
-      feet[i + 2] = fz + dz * e;
-      this.lifted[leg] = arc;
-      if (t >= 1) {
-        this.swinging[leg] = 0;
-        this.lifted[leg] = 0;
-        feet[i + 1] = 0;
       }
     }
   }

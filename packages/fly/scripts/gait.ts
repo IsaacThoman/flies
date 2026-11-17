@@ -10,7 +10,10 @@ for (let l = 0; l < LEG_COUNT; l++) {
   home[3 * l] = LEGS[legPair(l)].foot[0] * legSide(l);
   home[3 * l + 2] = LEGS[legPair(l)].foot[2];
 }
-const dt = 1 / 1000, warmup = 3, seconds = 12;
+const fpsArg = process.argv.indexOf("--fps");
+const fps = fpsArg < 0 ? 1000 : Number(process.argv[fpsArg + 1]);
+if (!Number.isFinite(fps) || fps < 30 || fps > 1000) throw new Error("--fps must be 30 to 1000");
+const dt = 1 / fps, warmup = 3, seconds = 12;
 console.log("| mm/s | duty | swing ms | stance ms | step mm | R1−L1 phase | L2−L1 phase | L3−L1 phase | support 3/4/5+ % | fit stance ms | stance error % |");
 console.log("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
 for (const speed of [0.5, 1.5, 3, 6, 10, 14]) {
@@ -21,22 +24,28 @@ for (const speed of [0.5, 1.5, 3, 6, 10, 14]) {
   let planted = 0;
   for (let f = 0; f < (warmup + seconds) / dt; f++) {
     const t = f * dt, prev = gait.swinging.slice();
+    const previousLift = gait.lastLift?.slice(), previousLand = gait.lastLand?.slice();
     gait.update(speed, 0, dt, home);
     let n = 0;
     for (let l = 0; l < 6; l++) {
       if (!gait.swinging[l]) n++;
-      if (!prev[l] && gait.swinging[l]) {
-        if (t >= warmup) {
-          lifts[l].push(t);
-          stances.push(t - lastLand[l]);
-          steps.push(Math.abs(landZ[l] - gait.feet[l * 3 + 2]) * 2.5);
+      if (previousLift && previousLand) {
+        const lift = gait.lastLift[l], land = gait.lastLand[l];
+        if (lift !== previousLift[l] && lift >= warmup) {
+          const stance = lift - (land < lift ? land : previousLand[l]);
+          lifts[l].push(lift); stances.push(stance); steps.push(stance * speed * 2.5);
         }
-        lastLift[l] = t;
-      }
-      if (prev[l] && !gait.swinging[l]) {
-        if (t >= warmup) swings.push(t - lastLift[l]);
-        lastLand[l] = t;
-        landZ[l] = gait.feet[l * 3 + 2];
+        if (land !== previousLand[l] && land >= warmup) swings.push(land - (lift < land ? lift : previousLift[l]));
+      } else {
+        // A rig without event timestamps can only be sampled at frame boundaries.
+        if (!prev[l] && gait.swinging[l]) {
+          if (t >= warmup) { lifts[l].push(t); stances.push(t - lastLand[l]); steps.push(Math.abs(landZ[l] - gait.feet[l * 3 + 2]) * 2.5); }
+          lastLift[l] = t;
+        }
+        if (prev[l] && !gait.swinging[l]) {
+          if (t >= warmup) swings.push(t - lastLift[l]);
+          lastLand[l] = t; landZ[l] = gait.feet[l * 3 + 2];
+        }
       }
     }
     if (t >= warmup) { support[n]++; planted += n; }

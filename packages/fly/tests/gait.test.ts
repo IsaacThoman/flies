@@ -181,3 +181,24 @@ test('recovery is visible at the 30 Hz display rate', () => {
   }
   assert.ok(lifted>50, `visible recovery frames ${lifted}`);
 });
+
+test("contact events retain their timing at 30, 60 and 120 Hz", () => {
+  for (const fps of [30, 60, 120]) for (const speed of [0.5, 3, 6, 10, 14]) {
+    const gait = new Gait(homes()), home = homes(), dt = 1 / fps;
+    let stance = 0, count = 0, lifted = 0;
+    for (let f = 0; f < fps * 6; f++) {
+      const prevLift = gait.lastLift.slice(), prevLand = gait.lastLand.slice();
+      gait.update(speed, 0, dt, home);
+      if (f < fps * 3) continue;
+      for (let l = 0; l < 6; l++) {
+        if (gait.lastLift[l] !== prevLift[l]) {
+          stance += gait.lastLift[l] - (gait.lastLand[l] < gait.lastLift[l] ? gait.lastLand[l] : prevLand[l]); count++;
+        }
+        if (gait.lifted[l] > 0.2) lifted++;
+      }
+    }
+    const reference = 0.9328 * (speed * 2.5) ** -1.025;
+    assert.ok(Math.abs(stance / count / reference - 1) < 0.2, `${fps} Hz, ${speed} BL/s: ${stance / count}, fit ${reference}`);
+    assert.ok(lifted > fps / 2, `${fps} Hz, ${speed} BL/s: visible recovery ${lifted}`);
+  }
+});

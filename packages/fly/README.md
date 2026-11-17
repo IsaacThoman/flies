@@ -81,11 +81,14 @@ jumpy, gives continuous motion.
   pose's translation and yaw, including turning and backing; swing targets
   centre the next stance around home. Stance travel is ~0.85–0.95 mm,
   with a 22–35 ms recovery. This approximates the published stance-duration
-  scaling; it is not a replay or a fitted neural locomotor circuit. First
-  swing samples use a half-frame offset so recovery remains visible at 30 Hz.
+  scaling; it is not a replay or a fitted neural locomotor circuit. Contact
+  transitions are resolved within each display frame, so a complete recovery
+  between samples still starts the next stance at the right instant.
   `node packages/fly/scripts/gait.ts` extracts contacts at 1 kHz, prints duty
-  factors, relative lift phases, step travel and support counts, and compares
-  stance duration to DeAngelis et al.'s equation 1. The numerical timing and
+  factors, relative lift phases, stance travel and support counts, and compares
+  stance duration to DeAngelis et al.'s equation 1. Add `--fps 30` or
+  `--fps 60` to exercise the display update rate; liftoff/touchdown timestamps
+  preserve sub-frame timing while support occupancy is sampled. The numerical timing and
   phase spread are animation choices informed by Mendes et al. (2013),
   Wosnitza et al. (2013) and DeAngelis et al. (2019); those experiments differ
   in substrate, temperature, sex and sampling, so the table is a dimensional
@@ -109,7 +112,9 @@ jumpy, gives continuous motion.
   the clock and site targets are explicitly an animation stand-in, not a
   simulated suppression hierarchy. Feeding takes precedence; walking and
   flight suspend the sequence.
-- **Feeding**: the body lowers and the head bows, the proboscis unfolds to
+- **Feeding**: the body lowers and the head bows. Rostrum lift, haustellum
+  extension, labellar extension and spreading use overlapping windows, in
+  that order (Schwarz et al. 2017), reversing on withdrawal. It unfolds to
   the surface and its labellum spreads and pulses; the mouth anchor is on
   the surface.
 - **Wings**: opening sweeps them out from the folded position; beating
@@ -124,9 +129,11 @@ jumpy, gives continuous motion.
   extended for a moment as if pushing off, then fold (front legs under the
   head, the others trailing). In the air the body takes `pitch` and `roll`
   and the stroke plane tilts. `landing` extends them during approach while the wings keep beating. The
-  game's pose maps descending trajectory and surface distance to this amount;
+  game's pose maps descending trajectory and height over the body's last
+  support plane to this amount;
   it is a time-to-contact animation proxy, not optic-flow sensing or a command
-  to the physics (van Breugel & Dickinson 2012). Without an approach value,
+  to the physics (van Breugel & Dickinson 2012). Approaches to a different
+  height can therefore extend late; the pose adds no world sensing. Without an approach value,
   `airborne` turning off extends them; the body dips as they take its weight.
 
 ## Why it is animated this way
@@ -149,6 +156,10 @@ follows the number of objects and draw calls. So:
   costs thousands of vertices of JavaScript. Here the per-frame JavaScript
   is a few hundred multiplies on typed arrays, and there is no scene-graph
   node per joint.
+- **Invisible wing copies reuse the solid copy's frame.** When blur opacity
+  is below 0.00001, the seven imperceptible copies on each side need no
+  independent posing; their alpha is zero. This pays for sub-frame contact
+  integration without adding a mesh or joint.
 - **Nothing allocated per frame.** All scratch is preallocated; the tests
   run the update in V8 with its compilers off and check that it allocates
   nothing but the boxed numbers V8's interpreter makes (JSC does not box
@@ -227,5 +238,7 @@ groom path is a stylised sweep.
 - Seeds et al. (2014), [A suppression hierarchy among competing motor programs](https://doi.org/10.7554/eLife.02951).
 - van Breugel & Dickinson (2012), [The visual control of landing](https://doi.org/10.1242/jeb.066498).
 - Kopp (2011), [Drosophila sex combs as a model of evolutionary innovations](https://doi.org/10.1111/j.1525-142X.2011.00507.x).
+
+- Schwarz et al. (2017), [Motor control of Drosophila feeding behavior](https://doi.org/10.7554/eLife.19892).
 
 See `docs/fly-realism.md` for the experiment rubric, measurements and blind review log.

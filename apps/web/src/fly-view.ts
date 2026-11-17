@@ -73,14 +73,10 @@ export class FlyView {
     pose.sing = !airborne && intent.singing ? songSide * Math.min(1, intent.sing * 1.5) : 0;
     pose.sleep = asleep && !airborne ? 1 : 0;
     const v = body.velocity;
-    // The body supplies trajectory, not a separate landing command. This
-    // animation stand-in anticipates contact; it never steers or lands it.
+    // The body supplies trajectory and its last support plane, not a
+    // visual landing command. This animation proxy adds no surface sensing.
     // van Breugel & Dickinson 2012 doi:10.1242/jeb.066498: legs extend in approach.
-    pose.landing = 0;
-    if (airborne && v.y < 0) {
-      const surface = this.#world.surface(body.position.x, body.position.z, scratchSurface, body.position.y);
-      pose.landing = landingExtension(body.position.y - surface.y, v.y);
-    }
+    pose.landing = airborne ? landingExtension(Math.max(0, body.position.y - body.surface.y), v.y) : 0;
     const horizontal = Math.hypot(v.x, v.z);
     pose.pitch = airborne ? Math.max(-0.6, Math.min(0.8, Math.atan2(v.y, Math.max(60, horizontal)) * 0.6)) : 0;
     pose.roll = airborne ? Math.max(-0.6, Math.min(0.6, -body.turnRate * 0.12)) : 0;
