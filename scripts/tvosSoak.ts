@@ -28,10 +28,11 @@ function chooseFlies(flies: number): Step[] {
   if (!Number.isInteger(flies) || flies < 1 || flies > NATIVE_MOST) throw Error(`--flies must be 1 to ${NATIVE_MOST}`);
   const press = (key: string, times = 1): Step[] => Array.from({ length: times }, () => ["press", key]);
   return [
-    // The title may already be the wallpaper: the first press only wakes it.
-    ...press("ArrowUp"),
+    // The title may already be the wallpaper: the first press only wakes it, and Left does
+    // nothing on the title (its Up and Down wrap round).
+    ...press("ArrowLeft"),
     ["wait", { wallpaper: "false", focus: "play" }],
-    ...press("ArrowDown", 3),
+    ...press("ArrowDown", 2),
     ["wait", { focus: "settings" }],
     ...press("Enter"),
     ["wait", { screen: "settings", tab: "wallpaper", focus: "page" }],
@@ -46,7 +47,7 @@ function chooseFlies(flies: number): Step[] {
     ["wait", { focus: "page" }],
     ...press("Escape"),
     ["wait", { screen: "title", focus: "settings" }],
-    ...press("ArrowUp", 3),
+    ...press("ArrowUp", 2),
     ["wait", { focus: "play" }],
   ];
 }
@@ -89,7 +90,7 @@ export function soakConfig(minutes = 30, flies?: number) {
   // The menu (Play/Pause), Settings, the Picture tab, the fly's eyes up a step, and back to play.
   press("MediaPlayPause");
   wait({ screen: "title", focus: "play" });
-  press("ArrowDown", 3);
+  press("ArrowDown", 2);
   wait({ focus: "settings" });
   press("Enter");
   wait({ screen: "settings", focus: "page" });
@@ -103,8 +104,8 @@ export function soakConfig(minutes = 30, flies?: number) {
   phase("eye picture high", 15000);
   // Restore Low so an unattended run leaves the user's usual eye detail in place: the menu and Settings remember where they were.
   press("MediaPlayPause");
-  wait({ screen: "title" });
-  press("ArrowDown", 3);
+  wait({ screen: "title", focus: "play" });
+  press("ArrowDown", 2);
   press("Enter");
   wait({ screen: "settings", tab: "picture", focus: "eyes" });
   press("ArrowLeft");
@@ -132,11 +133,11 @@ export function soakConfig(minutes = 30, flies?: number) {
     if (index === 0) {
       press("MediaPlayPause");
       wait({ screen: "title", focus: "play" });
-      press("ArrowUp", 4);
-      press("ArrowDown", 3);
+      press("ArrowDown", 2);
       press("Enter");
-      wait({ screen: "settings" });
-      press("ArrowUp", 8);
+      // Settings is where it was left, on the fly's eyes, two below the tabs; its rows wrap round.
+      wait({ screen: "settings", tab: "picture", focus: "eyes" });
+      press("ArrowUp", 2);
       wait({ focus: "page" });
       press("ArrowLeft", 3);
       wait({ tab: "wallpaper" });

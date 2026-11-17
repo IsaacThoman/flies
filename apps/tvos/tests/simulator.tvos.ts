@@ -308,9 +308,10 @@ try {
     ['wait', { ready: 'true', brain: 'running', screen: 'title' }, 180_000],
     // A step at a time, each seen to land: the simulator's software renderer can be slow enough
     // that the title is already the wallpaper, and that presses close together share a frame.
-    press('ArrowUp'),
+    // Left wakes it and does nothing more on the title, whose Up and Down wrap round.
+    press('ArrowLeft'),
     ['wait', { wallpaper: 'false', focus: 'play' }, 60_000],
-    ...['watch', 'about', 'settings'].flatMap((focus) => [press('ArrowDown'), ['wait', { focus }, 60_000]]),
+    ...['watch', 'settings'].flatMap((focus) => [press('ArrowDown'), ['wait', { focus }, 60_000]]),
     // Two flies, the second a brain of its own from the host's spawn(), on a thread of its own.
     press('Enter'),
     ['wait', { screen: 'settings' }, 60_000],
