@@ -117,6 +117,11 @@ Anything drawn but not in the world must be flat enough not to matter to a fly
 (under half a millimetre, like the picnic's specks of biscuit), or out of its
 reach (beyond the floor's edge, above it, or in the backdrop).
 
+The picnic's cotton uses a 0.22 mm weave with 0.015 mm thread relief in
+its material normals, plus shading along its fold creases. This is a visual
+stand-in: the world's cloth remains level. Thread relief fades out as the
+crossings become smaller than a pixel, without extra meshes or draws.
+
 ## The scene
 
 - **Two passes** (`apps/web/src/stage.ts`): the set (`buildSet`, from 0.5 mm to
