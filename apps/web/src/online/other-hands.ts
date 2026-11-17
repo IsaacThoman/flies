@@ -67,15 +67,16 @@ export class OtherHand {
   }
 
   /** What their device last said of their hand. */
-  heard(state: FlyState) {
-    const h = state.hand;
-    this.out = !!(state.flags & HANDS);
-    this.#holding = !!(state.flags & HOLDING);
+  heard(state: FlyState | null) {
+    this.out = !!state && !!(state.flags & HANDS);
+    this.#holding = !!state && !!(state.flags & HOLDING);
     // A hand put away does nothing: the shelf's first tool about the world, which acts on no fly.
     if (!this.out) {
       this.hands.tool = WORLD_TOOLS;
       return;
     }
+    if (!state) return;
+    const h = state.hand;
     this.hands.tool = Math.min(TOOLS.length - 1, h.tool);
     this.hands.variants[this.hands.tool] = Math.min(this.hands.current.variants.length - 1, h.variant);
     this.#eye.x = h.eyeX;

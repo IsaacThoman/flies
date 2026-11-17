@@ -145,8 +145,8 @@ function postcardSolids(): Solid[] {
   const lean = Math.asin(foot / length);
   const out: Solid[] = [];
   for (let k = 0; k < foot; k++) {
-    // How high the card stands over a slice: where it is k mm in from its foot.
-    const y = (k / foot) * length * Math.cos(lean);
+    // Fill up to the card at the far edge, so its sloping face never stands outside a slice.
+    const y = ((k + 1) / foot) * length * Math.cos(lean);
     out.push({ name: "postcard", footprint: { kind: "box", x: SILL.hx - foot + k + 0.5, z, hx: 0.5, hz: width / 2, angle: 0 }, top: { kind: "flat", y: Math.max(y, 1) } });
   }
   return out;
