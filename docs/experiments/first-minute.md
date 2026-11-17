@@ -72,3 +72,18 @@ or draw calls are scheduled. The pre-existing HUD pulse still refreshes at 10 Hz
 
 The Wide-view framing problem reported by the baseline player is left outside
 this experiment: `camera.ts` is explicitly excluded.
+
+Candidate validation caught an early-access boundary defect: the existing
+picture-only stand-in eyes had 889 left facets, while the arriving brain had
+880. Sending that last picture failed the worker. The handoff now uses only a
+completed picture belonging to the actual eye map. A regression test exercises
+that transition, and the gated-download e2e passes all eight tools, persisted
+completion, and relaunch for mouse, touch and remote. No visual ON-pathway
+processing was changed. The preliminary P8 build is retained as rejected probe
+evidence; it is not the source used for comparative review.
+
+Resource protocol was expanded to eight slots during the run, with branch-name
+owner files, a ten-minute hold limit and a two-minute cooldown. One 1.08-second
+build ran when a failed shell assertion did not stop the next command. Heavy
+launch guards now use a single process that executes work only after successful
+slot acquisition. This is recorded as a protocol error, not omitted from the log.

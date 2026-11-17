@@ -98,7 +98,7 @@ const VEIL_IN = 0.9;
 const QUIET_AFTER = 60;
 /** How often the clock, the forecast and the weather outside are looked at again, s: the light moves on that slowly. */
 const CLOCK_EVERY = 2;
-/** Seconds of tickling or blowing that teach holding Select, longer than a press. */
+/** Seconds of sustained tickling or blowing that distinguish a hold from a press. */
 const HOLD_TAUGHT = 0.5;
 /** A pad's right stick at full tilt: radians a second round the fly, and up; and Q or E held, round. */
 const PAD_ROUND = 2.4;
@@ -250,7 +250,7 @@ export class Game implements Shell {
   /** What the hints have taught, as saved; and how many times that has changed, for the HUD to redraw. */
   #learned: Learned = loadLearned();
   #taught = 0;
-  /** Seconds Select has been tickling or blowing. */
+  /** Seconds the held tool has been tickling or blowing. */
   #held = 0;
   /** The weather outside's state when last logged. */
   #outsideState = "";
@@ -1152,8 +1152,11 @@ export class Game implements Shell {
       this.#touchWas = remote.touch.touching;
       let select = touched;
       for (const press of remote.presses) if (press.button === "select" && !press.repeat) select = true;
-      // A tap or a click on "Try again".
-      if (pointers) for (const g of pointers.gestures) if (g.type === "up" && g.tap && (this.#hitAt(g.x, g.y)?.kind === LOADING_HITS.retry || this.#hitAt(g.x, g.y)?.kind === LOADING_HITS.explore)) select = true;
+      if (pointers) for (const g of pointers.gestures) {
+        if (g.type !== "up" || !g.tap) continue;
+        const kind = this.#hitAt(g.x, g.y)?.kind;
+        if (kind === LOADING_HITS.retry || kind === LOADING_HITS.explore) select = true;
+      }
       if (select) {
         if (this.brain.status === "failed") this.retryBrain();
         else {

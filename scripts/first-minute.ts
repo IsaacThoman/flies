@@ -12,16 +12,18 @@ process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
 
 const { values } = parseArgs({ options: { url: { type: "string" }, out: { type: "string" } } });
 if (!values.url || !values.out) throw new Error("Pass --url and --out; use a production build for network timings.");
+const url = values.url;
 const out = path.resolve(values.out);
 const networks = { "4G": { latency: 170, downloadThroughput: 1_125_000, uploadThroughput: 112_500 }, slow3G: { latency: 400, downloadThroughput: 50_000, uploadThroughput: 50_000 } };
 const seconds = [0.5, 2, 5, 10, 20, 40, 60];
 const browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
+const deadline = setTimeout(() => { void browser.close(); }, 9 * 60_000);
 try {
-  for (const device of ["desktop", "phone"]) {
+  await Promise.all(["desktop", "phone"].map(async (device) => {
     for (const [network, throttle] of Object.entries(networks)) {
       const dir = path.join(out, `${device}-${network}`);
       await mkdir(dir, { recursive: true });
-      const context = await browser.newContext({ ...contextFor({ url: values.url, ...(device === "phone" ? { device: "iPhone 15" } : { width: 1280, height: 720 }) }), serviceWorkers: "block" });
+      const context = await browser.newContext({ ...contextFor({ url, ...(device === "phone" ? { device: "iPhone 15" } : { width: 1280, height: 720 }) }), serviceWorkers: "block" });
       try {
         const page = await context.newPage();
         const cdp = await context.newCDPSession(page);
@@ -43,7 +45,7 @@ try {
         const errors: string[] = [];
         page.on("pageerror", (error) => errors.push(error.message));
         const start = Date.now();
-        await page.goto(values.url, { waitUntil: "commit" });
+        await page.goto(url, { waitUntil: "commit" });
         const photographs = [];
         for (const second of seconds) {
           await page.waitForTimeout(Math.max(0, start + second * 1000 - Date.now()));
@@ -60,7 +62,7 @@ try {
         await context.close();
       }
     }
-  }
+  }));
   // A plain contact sheet makes the same photographs reviewable at a glance.
   const sheet = await browser.newPage({ viewport: { width: 1400, height: 650 }, deviceScaleFactor: 1 });
   for (const device of ["desktop", "phone"]) for (const network of Object.keys(networks)) {
@@ -70,5 +72,6 @@ try {
     await sheet.screenshot({ path: path.join(out, `${device}-${network}-strip.png`), fullPage: true });
   }
 } finally {
+  clearTimeout(deadline);
   await browser.close();
 }

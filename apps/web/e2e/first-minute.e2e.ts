@@ -3,18 +3,25 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { ChildProcess } from "node:child_process";
 import { parseArgs } from "node:util";
 import { chromium } from "playwright";
-import { Fingers, canvasPoint, chromiumPath, contextFor, gameUp, gpuFlags, readState, screenOf, targetOf, waitFor, waitForGameTime } from "../../../scripts/play.ts";
+import { Fingers, canvasPoint, chromiumPath, contextFor, gameUp, gpuFlags, readState, screenOf, startServer, targetOf, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
 import { TOOLS } from "../src/tools/hands.ts";
 
 const { values } = parseArgs({ options: { url: { type: "string" }, shots: { type: "string" } } });
-if (!values.url) throw new Error("Pass --url for the game under test.");
+let url = values.url;
+let server: ChildProcess | null = null;
+if (!url) {
+  const started = await startServer();
+  url = started.url;
+  server = started.server;
+}
 const browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
 try {
   for (const device of ["mouse", "touch", "remote"] as const) {
-    const context = await browser.newContext(contextFor({ url: values.url, ...(device === "touch" ? { device: "iPhone 15" } : {}) }));
+    const context = await browser.newContext(contextFor({ url, ...(device === "touch" ? { device: "iPhone 15" } : {}) }));
     let release!: () => void;
     const gate = new Promise<void>((resolve) => { release = resolve; });
     await context.route("**/brain/connectome.*", async (route) => { await gate; await route.continue(); });
@@ -22,7 +29,7 @@ try {
       const page = await context.newPage();
       const errors: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
-      await page.goto(values.url);
+      await page.goto(url);
       await gameUp(page);
       await page.evaluate(() => { (globalThis as unknown as { __fly: Game }).__fly.settings.wallpaperAfter = 0; });
       const fingers = await Fingers.on(page);
@@ -117,4 +124,5 @@ try {
   }
 } finally {
   await browser.close();
+  server?.kill();
 }
