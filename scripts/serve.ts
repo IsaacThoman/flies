@@ -25,7 +25,7 @@ export const TYPES: Readonly<Record<string, string>> = {
 };
 
 /** A built file's type: by its extension, and the site's association with the app, which has none, as JSON (Apple's devices ask for that). */
-export const contentType = (file: string) => TYPES[path.extname(file)] ?? (file === SITE_ASSOCIATION ? "application/json" : "application/octet-stream");
+export const contentType = (file: string) => TYPES[path.extname(file)] ?? (file === SITE_ASSOCIATION ? "application/json" : file === "THIRD_PARTY_NOTICES" ? "text/plain; charset=utf-8" : "application/octet-stream");
 
 /** Files named for their contents (assets/, brain/) can be kept for a year; the page, its manifest and the service worker must be asked for again each time. */
 export const cacheControl = (file: string) => (/^(assets|brain)\//.test(file) ? "public, max-age=31536000, immutable" : "no-cache");
@@ -66,6 +66,7 @@ export async function serveSite({ dir, base = "/", port = 0, cut }: SiteOptions)
     }
     let file = suffix || "index.html";
     if (file.endsWith("/")) file += "index.html";
+    if (file === "privacy") file = "privacy/index.html";
     const full = path.resolve(dir, file);
     const relative = path.relative(dir, full);
     if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
