@@ -7,7 +7,7 @@
 // away (removed from the table, the table gone, the protocol changed) ends it.
 
 import type { OpenTableSocket, TableSocket } from "@fly/contracts";
-import { CLOSE, FLIES, FLY_MAX, MAX_BITES, RoomClock, bitesLength, encodeBites, encodeFly } from "@fly/net";
+import { CLOSE, FLIES, FLY_MAX, MAX_BITES, RoomClock, bitesLength, encodeBites, encodeFly, readServerMessage } from "@fly/net";
 import type { Bite, ClientMessage, FlyState, Refusal, ServerMessage, WireScale } from "@fly/net";
 
 /** The clock is asked often at first, to settle quickly, then once a second. */
@@ -83,12 +83,8 @@ export class TableLine {
 
   #receiveText(text: string) {
     this.bytesIn += text.length;
-    let message: ServerMessage;
-    try {
-      message = JSON.parse(text) as ServerMessage;
-    } catch {
-      return;
-    }
+    const message = readServerMessage(text);
+    if (!message) return;
     if (message.type === "pong") this.clock.sample(message.t, message.now, performance.now());
     else if (message.type === "welcome") {
       this.status = "joined";

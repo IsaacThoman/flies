@@ -13,6 +13,8 @@ import { FOUND_ID, dropOwner, seqAtOrAfter } from "./protocol.ts";
 
 /** A fly's mouth and feet reach this far past a food's edge, mm, measured from where it stands: its length, and some slack for being seen late. */
 export const BITE_REACH = 4;
+/** At most this many foods the place put out at once at a table; the oldest goes past it. A place puts out a few at a time. */
+export const MAX_FOUND = 16;
 /** A player may eat at most this much faster than EAT_RATE allows, to forgive uneven sends; any more is refused. */
 const APPETITE_SLACK = 1.5;
 /** Seconds of appetite a player may save up. */
@@ -92,9 +94,11 @@ export class TableFood {
     }
   }
 
-  /** Something the place put out, on the surface at or below `y`, as a device saw it; the first to say so names it. */
+  /** Something the place put out, on the surface at or below `y`, as a device saw it; the first to say so names it. The oldest found goes past MAX_FOUND. */
   found(id: number, name: string, x: number, z: number, r: number, sweet: number, y?: number): Food | null {
     if (!(id >= FOUND_ID) || typeof name !== "string" || name.length > 40 || this.find(id) || !this.#world.onTable(x, z) || !(r > 0 && r < 5) || !(sweet >= 0 && sweet <= 1)) return null;
+    const found = this.foods.filter((f) => f.kind === "found");
+    if (found.length >= MAX_FOUND) this.#remove(found[0]);
     const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, amount: 1, pool: false };
     this.foods.push(food);
     return food;

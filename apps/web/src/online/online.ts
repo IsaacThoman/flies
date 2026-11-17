@@ -256,7 +256,7 @@ export class Online {
         for (const hand of this.#handList) hand.clear();
         this.#mineFlying = false;
         this.#visits.length = 0;
-        this.#arrive(m.place, m.epoch, m.foods, m.spots[this.id] ?? null, null);
+        this.#arrive(m.place, m.epoch, m.foods, m.spots[this.id] ?? null, m.bubbles ?? null);
         return;
       case "happening":
         this.#visits.push(m);

@@ -15,17 +15,21 @@ import { BALL_RADIUS, Pace, VentilationClock, World, WORLDS, forecast, hourOfDay
 import type { Happening } from "@fly/world";
 import {
   AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_PLAYERS, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
-  TABLE_WEATHERS, TableBubbles, TableFood, ballProgress, createFlyState, decodeBites, encodeFlies, mayReturnTo, mix, readState, roomName, spawnSpot,
-  stream, tableHours, toWire, wireScale,
+  TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, createFlyState, decodeBites, encodeFlies, isTableCode, mayReturnTo, mix, readState,
+  roomName, spawnSpot, stream, tableHours, toWire, wireScale,
 } from "@fly/net";
 import type {
   BallWire, ClientMessage, FlyState, FoodWire, HappeningWire, PlayerWire, Refusal, RoomInfo, RoomWire, ServerMessage, Spot, TableStart, V3, WireScale,
   WorldWire,
 } from "@fly/net";
+import { isLock } from "./lock.ts";
 import type { Lock } from "./lock.ts";
 
 /** A room started without a name (by a page from before rooms had them) is called this. */
 export const UNNAMED = "Flies";
+
+/** At most this many keys a table remembers removing; past it, the longest-removed may sit down again. */
+export const REMOVED_MAX = 256;
 
 /** A fly whose device has stopped (or gone) is kept at the table, resting, this long (ms); then it leaves. */
 export const AWAY_LIMIT = 10 * 60_000;
@@ -109,6 +113,33 @@ export type TableOptions = {
 const isV3 = (v: unknown): v is V3 => Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === "number" && Number.isFinite(x) && Math.abs(x) < 10_000);
 const isSpot = (v: unknown): v is Spot => Array.isArray(v) && (v.length === 3 || v.length === 4) && v.every((x) => typeof x === "number" && Number.isFinite(x) && Math.abs(x) < 10_000);
 const finite = (...xs: unknown[]) => xs.every((x) => typeof x === "number" && Number.isFinite(x));
+const text = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
+const isSeatRecord = (v: unknown, ids: Set<number>) => {
+  const r = v as TableRecord["seats"][number];
+  if (!r || typeof r !== "object" || !Number.isInteger(r.id) || r.id < 1 || r.id > MAX_PLAYERS || ids.has(r.id)) return false;
+  ids.add(r.id);
+  return text(r.key, 64) && Array.isArray(r.at) && r.at.length === 4 && r.at.every((x) => finite(x) && Math.abs(x) < 10_000) && typeof r.airborne === "boolean" && finite(r.lastSeen) && (r.gone === undefined || typeof r.gone === "boolean");
+};
+const isFoodRecord = (v: unknown) =>
+  Array.isArray(v) && (v.length === 9 || v.length === 10) && finite(v[0], v[3], v[4], v[5], v[6], v[7]) && text(v[1], 16) && text(v[2], 40) && (v[8] === 0 || v[8] === 1) && (v[9] === undefined || finite(v[9]));
+
+/**
+ * Whether something read back from the file of tables is a table as it was
+ * kept: every field of the shape `record()` writes, in bounds, so that a
+ * damaged or hand-edited file can't bring back a table that breaks.
+ */
+export function isTableRecord(v: unknown): v is TableRecord {
+  const r = v as TableRecord;
+  if (!r || typeof r !== "object" || !isTableCode(r.code) || !finite(r.created, r.seed, r.offset) || !text(r.place, 32) || !Number.isInteger(r.epoch) || r.epoch < 0 || r.epoch > 255) return false;
+  if (!r.world || !text(r.world.light, 16) || !text(r.world.weather, 16) || !text(r.zone, 64) || !text(r.starter, 64)) return false;
+  if (!Array.isArray(r.removed) || r.removed.length > REMOVED_MAX || !r.removed.every((k) => text(k, 64))) return false;
+  const ids = new Set<number>();
+  if (!Array.isArray(r.seats) || r.seats.length > MAX_PLAYERS || !r.seats.every((seat) => isSeatRecord(seat, ids))) return false;
+  if (!Array.isArray(r.foods) || r.foods.length > WIRE_FOODS_MAX || !r.foods.every(isFoodRecord)) return false;
+  if (r.eaten !== undefined && (!Array.isArray(r.eaten) || r.eaten.length > MAX_PLAYERS || !r.eaten.every((e) => Array.isArray(e) && e.length === 2 && finite(e[0], e[1])))) return false;
+  return (r.name === undefined || roomName(r.name) === r.name) && (r.listed === undefined || typeof r.listed === "boolean") && (r.lock === undefined || r.lock === null || isLock(r.lock));
+}
+
 const clampTime = (t: unknown, now: number) => (typeof t === "number" && Number.isFinite(t) ? Math.max(now - 2000, Math.min(now + 1000, t)) : now);
 
 /** A zone's offset from UTC at a moment, minutes east, from its name; `fallback` if the name isn't one. */
@@ -283,13 +314,18 @@ export class Table {
     return new Pace({ next, range: (lo, hi) => lo + (hi - lo) * next() });
   }
 
-  /** What follows the place: its bubbles (only the picnic has them), the restaurant's ventilation, and nothing of what was happening in the last. */
+  /** What follows the place: its bubbles (only the picnic has them, starting now), the restaurant's ventilation, and nothing of what was happening in the last. */
   #settle() {
-    this.bubbles = this.place === "picnic" ? new TableBubbles(mix(this.seed, this.epoch), this.world, TABLE_BUBBLES) : null;
+    this.#freshBubbles();
     this.#ventilation = this.place === "restaurant" ? new VentilationClock(stream(mix(this.seed, this.epoch, 0x7e47))) : null;
     this.balls.length = 0;
     this.happenings.length = 0;
     this.#busy.clear();
+  }
+
+  /** The bubbles start afresh now: every device is told them as they stand (a welcome, a move). */
+  #freshBubbles() {
+    this.bubbles = this.place === "picnic" ? new TableBubbles(mix(this.seed, this.epoch), this.world, TABLE_BUBBLES, this.now / 1000) : null;
   }
 
   #seat(id: number, key: string): Seat {
@@ -324,6 +360,8 @@ export class Table {
   hello(link: Link, key: string, message: Extract<ClientMessage, { type: "hello" }>): Seat | Refusal {
     if (message.v !== PROTOCOL) return "version";
     if (this.removed.has(key)) return "removed";
+    // Nobody has been here since its beat stopped (Tables.tick): nobody has seen its bubbles, which start afresh rather than catch up on all that time.
+    if (this.connected === 0 && this.present === 0) this.#freshBubbles();
     const now = this.now;
     const wall = this.#options.wall();
     let seat: Seat | null = null;
@@ -491,7 +529,7 @@ export class Table {
         return;
       case "remove": {
         const other = this.seats.get(m.id);
-        if (seat.key !== this.#starter || !other || other === seat) return;
+        if (seat.key !== this.#starter || !other || other === seat || !seat.rates.changes.take(now)) return;
         this.remove(other);
         return;
       }
@@ -545,13 +583,15 @@ export class Table {
       // Everyone is told where everyone was set down.
       seat.fresh = true;
     }
-    this.#broadcast({ type: "place", place, epoch: this.epoch, foods: this.food.foods.map(toWire), spots });
+    this.#broadcast({ type: "place", place, epoch: this.epoch, foods: this.food.foods.map(toWire), spots, ...(this.bubbles ? { bubbles: this.bubbles.snapshot() } : {}) });
     this.#options.log?.("moved", { table: this.code, place });
   }
 
   /** The starter took a fly off the table: it goes, and its device can't sit down here again. */
   remove(seat: Seat) {
     this.removed.add(seat.key);
+    // A Set keeps the order keys were added in: the first is the longest removed.
+    if (this.removed.size > REMOVED_MAX) this.removed.delete(this.removed.values().next().value!);
     this.seats.delete(seat.id);
     if (seat.link) {
       seat.link.send(JSON.stringify({ type: "refused", reason: "removed" } satisfies ServerMessage));

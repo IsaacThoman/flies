@@ -502,8 +502,8 @@ export type ServerMessage =
   | { type: "drop"; by: number; id: number; kind: string; x: number; z: number; y: number; at: number }
   | ({ type: "ball" } & BallWire)
   | ({ type: "world"; offset: number } & WorldWire)
-  /** The table is carried to another place: everyone's fly is set down there, where `spots` says. */
-  | { type: "place"; place: string; epoch: number; foods: FoodWire[]; spots: Record<number, Spot> }
+  /** The table is carried to another place: everyone's fly is set down there, where `spots` says, and its bubbles are as `bubbles` says (the picnic's; a room from before it said starts them at 0). */
+  | { type: "place"; place: string; epoch: number; foods: FoodWire[]; spots: Record<number, Spot>; bubbles?: BubbleSnapshot }
   | ({ type: "happening" } & HappeningWire)
   | { type: "pop"; slot: number; cycle: number; at: number }
   | { type: "found"; food: FoodWire }
