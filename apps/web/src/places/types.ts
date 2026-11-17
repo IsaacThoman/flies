@@ -6,7 +6,7 @@
 import type * as THREE from "three";
 import type { Looming } from "@fly/body";
 import type { Food, Pantry, Place, Vec3, World } from "@fly/world";
-import type { Shot } from "../camera.ts";
+import type { Shot } from "../cameraman.ts";
 import type { Daylight, Palettes } from "../scene/light.ts";
 import type { Weather } from "../scene/weather.ts";
 import type { PlaceId } from "./catalog.ts";

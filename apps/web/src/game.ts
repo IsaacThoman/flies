@@ -25,7 +25,7 @@ import type { Display, Frame } from "./display.ts";
 import { Eyes } from "./eyes/eyes.ts";
 import { EyesInset, insetWanted } from "./eyes/inset.ts";
 import { FlyView } from "./fly-view.ts";
-import { PlayControls } from "./controls.ts";
+import { DRAG_ROUND, DRAG_UP, PlayControls } from "./controls.ts";
 import type { PlayTarget, ToolUse } from "./controls.ts";
 import { everyoneIndex } from "@fly/net";
 import type { TableStart } from "@fly/net";
@@ -59,7 +59,7 @@ import { KEPT, OVERLAY_OPACITIES, OVERLAY_SIZES, loadLearned, loadSettings, load
 import type { Learned, Lesson, Settings, ShelfChoices, TableSeat } from "./settings.ts";
 import { Stage } from "./stage.ts";
 import { aimAt } from "./tools/aim.ts";
-import { Hands, SWOOP_BEARING, TOOLS } from "./tools/hands.ts";
+import { Hands, TOOLS } from "./tools/hands.ts";
 import type { ToolId } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
 import { StatsPanel, statsSlot, statsWanted } from "./stats/panel.ts";
@@ -90,6 +90,9 @@ const AWAKE_HOLD_NOTE = 4;
 const AWAY_SETTLE_MS = 30_000;
 /** How sensitive the touch surface is: screen widths per full swipe. */
 const SWIPE_GAIN = 0.9;
+/** With the View tool in hand, a swipe across the touch surface (2 units) turns the camera as far round as a drag across the screen, and one up it about as far up. */
+const SWIPE_ROUND = DRAG_ROUND / 2;
+const SWIPE_UP = DRAG_UP / 2;
 /** How often the HUD redraws for its shimmer alone, per second. */
 const HUD_SHIMMER_FPS = 10;
 /** Seconds of wallpaper in one place before the fly moves on, when it lives in each in turn. */
@@ -915,7 +918,7 @@ export class Game implements Shell {
     this.#syncCamera();
     this.#grip = this.#grip && { kind: "spent" };
     this.#controls.spend();
-    this.director.hand.held = false;
+    this.director.held = false;
     this.overlay.dirty = true;
   }
 
@@ -1020,8 +1023,6 @@ export class Game implements Shell {
     this.fly.update(life.body, life.intent, life.eating, life.hunger.fullness, dt, life.songSide, life.activity === "sleeping");
     this.prints.update(this.fly.model, life.body.onFeet, this.fly.pose.groom > 0.02, life.world, life.pantry, this.time);
     this.online?.send(this.#playerNow());
-    // With the ball in hand, the camera stands where its dive will be seen: across the fly from where it comes.
-    director.prefer = this.hands.current.id === "swoop" && this.nav.current === "play" && !this.wallpaper ? Math.PI - SWOOP_BEARING : null;
     director.update(life.body, dt);
     this.#xray(dt);
     if (this.time > this.#clockAt) this.#followLight();
@@ -1252,7 +1253,7 @@ export class Game implements Shell {
           pointers.gestures.length = 0;
         }
       }
-    } else if (!this.#loading && after > 0 && idle > after && (current === "play" || current === "title") && !this.#grip && !this.#controls.pressed && !this.director.hand.held && !keyboard?.holding) {
+    } else if (!this.#loading && after > 0 && idle > after && (current === "play" || current === "title") && !this.#grip && !this.#controls.pressed && !this.director.held && !keyboard?.holding) {
       // Not while a finger or a button is still down on something, however still.
       this.#startWallpaper();
     }
@@ -1285,14 +1286,15 @@ export class Game implements Shell {
     if (keyboard && playing) {
       for (const action of keyboard.actions) {
         if (action.kind === "tool") this.#chooseTool(action.index);
-        else this.#handBack();
+        else this.#home();
       }
     }
-    if (playing && (remote.dx !== 0 || remote.dy !== 0)) this.#movePointer(remote.dx, remote.dy);
-    if (playing) {
-      this.#steer(dt);
-      this.#controls.glide(dt, this.#target);
+    if (playing && (remote.dx !== 0 || remote.dy !== 0)) {
+      // With the View tool in hand the hand has nothing to do, so a swipe turns the camera, as a drag does.
+      if (this.hands.current.id === "view") this.#turnCamera(-remote.dx * SWIPE_ROUND, -remote.dy * SWIPE_UP);
+      else this.#movePointer(remote.dx, remote.dy);
     }
+    if (playing) this.#steer(dt);
     if (pointers) {
       for (const g of pointers.gestures) this.#gesture(g);
       this.#followAim();
@@ -1315,14 +1317,14 @@ export class Game implements Shell {
       round += pads.look.x * PAD_ROUND;
       up += pads.look.y * PAD_UP;
       zoom += pads.zoom * PAD_ZOOM;
-      if (pads.handBack) this.#handBack();
+      if (pads.home) this.#home();
     }
     const turning = round !== 0 || up !== 0;
     // Let go only when they are let go themselves: a finger or the mouse may be holding the camera too.
     if (turning) {
-      this.director.hand.held = true;
+      this.director.held = true;
       this.#turnCamera(round * dt, up * dt);
-    } else if (this.#turning) this.director.hand.held = false;
+    } else if (this.#turning) this.director.held = false;
     this.#turning = turning;
     if (zoom !== 0) this.#zoomCamera(Math.exp(zoom * dt));
   }
@@ -1351,10 +1353,11 @@ export class Game implements Shell {
     if (hands.current.id === "view") this.#changedAt = this.time;
   }
 
-  /** The camera back to the cameraman, now. */
-  #handBack() {
+  /** The camera back to Follow's distance and pitch, at the same yaw. */
+  #home() {
     if (this.hands.view === "eyes") return;
-    this.director.handBack();
+    this.director.home();
+    this.#viewFollows();
   }
 
   /** Picks a tool from the shelf by its place (a tap on it, a number key); picking the one in hand steps its kind instead. */
@@ -1451,12 +1454,9 @@ export class Game implements Shell {
       turn: (yaw, pitch) => this.#turnCamera(yaw, pitch),
       zoom: (factor) => this.#zoomCamera(factor),
       holdCamera: (held) => {
-        this.director.hand.held = held;
+        this.director.held = held;
       },
-      keepCamera: () => {
-        if (this.hands.view !== "eyes") this.director.hand.kept = true;
-      },
-      handBack: () => this.#handBack(),
+      home: () => this.#home(),
     };
   }
 
@@ -1465,7 +1465,7 @@ export class Game implements Shell {
     this.#grip = null;
     this.#controls.reset();
     this.#aim.active = false;
-    this.director.hand.held = false;
+    this.director.held = false;
   }
 
   /** A tap on something on the HUD. */
@@ -1871,7 +1871,8 @@ export class Game implements Shell {
     }
     d.device = this.devices.current;
     d.frame = `${this.shape.width}x${this.shape.height}`;
-    d.looking = String(this.director.handled);
+    d.yaw = this.director.yaw.toFixed(4);
+    d.pitch = this.director.pitch.toFixed(4);
     d.reach = this.director.reach.toFixed(1);
   }
 }
