@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DINING_ROOM, PASS, RESTAURANT, TABLE_TOPS, WORLDS } from "@fly/world";
 import {
-  AIRBORNE, BITES, CLOSE, EATING, FLIES, FLY, FLY_MAX, HANDS, HOLDING, PROTOCOL, createFlyState, decodeBites, decodeFlies, dropOwner,
-  AIR_BEYOND, BITES_MAX, MAX_BITES, ROOM_SCALE, TABLETOP_SCALE, bitesEpoch, bitesLength, roomTime, encodeBites, encodeFlies, encodeFly, foundId, isTableCode, readState, seqAtOrAfter, stateLength, tableCode, wireScale,
+  AIRBORNE, BITES, CLOSE, EATING, FLIES, FLY, FLY_MAX, HANDS, MAX_OWN, OWN_MAX, HOLDING, PROTOCOL, createFlyState, decodeBites, decodeFlies, dropOwner,
+  AIR_BEYOND, BITES_MAX, MAX_BITES, ROOM_SCALE, TABLETOP_SCALE, bitesEpoch, bitesLength, roomTime, encodeBites, encodeFlies, encodeFly, encodeOwn, foundId, isTableCode, readState, seqAtOrAfter, stateLength, tableCode, wireScale,
 } from "../src/index.ts";
 import type { FlyState } from "../src/index.ts";
 
 function sampleState(): FlyState {
   const s = createFlyState();
+  s.id = 6;
   s.flags = AIRBORNE | EATING | HANDS | HOLDING;
   s.seq = 65535;
   s.epoch = 300;
@@ -27,18 +28,20 @@ function sampleState(): FlyState {
   return s;
 }
 
-test("a fly's state goes over the wire in 33 bytes, 47 with the hand, and comes back as near as the eye can tell", () => {
+test("a fly's state goes over the wire in 35 bytes, 49 with the hand, and comes back as near as the eye can tell", () => {
   const view = new DataView(new ArrayBuffer(FLY_MAX));
   const s = sampleState();
   const n = encodeFly(view, TABLETOP_SCALE, s);
-  assert.equal(n, 47);
+  assert.equal(n, 49);
   s.flags &= ~HANDS;
-  assert.equal(encodeFly(view, TABLETOP_SCALE, s), 33);
+  assert.equal(encodeFly(view, TABLETOP_SCALE, s), 35);
   s.flags |= HANDS;
   encodeFly(view, TABLETOP_SCALE, s);
   assert.equal(view.getUint8(0), FLY);
+  assert.equal(view.getUint8(1), 1);
+  assert.equal(view.getUint8(2), s.id);
   const back = createFlyState();
-  assert.equal(readState(view, 1, TABLETOP_SCALE, back), 1 + stateLength(s.flags));
+  assert.equal(readState(view, 3, TABLETOP_SCALE, back), 3 + stateLength(s.flags));
   assert.equal(back.flags, s.flags);
   assert.equal(back.seq, 65535);
   assert.equal(back.epoch, 300 & 0xff, "the place's count wraps at a byte");
@@ -54,11 +57,11 @@ test("a fly's state goes over the wire in 33 bytes, 47 with the hand, and comes 
   assert.equal(back.hand.variant, 1);
 });
 
-test("a tabletop's fly goes on the wire byte for byte as it always has: protocol 1's layout", () => {
+test("a tabletop's state keeps its original bytes inside the protocol 4 batch", () => {
   const view = new DataView(new ArrayBuffer(FLY_MAX));
   const n = encodeFly(view, wireScale(WORLDS.bar), sampleState());
-  // As protocol 1 encoded it, before each place had its own scale.
-  assert.equal(Buffer.from(view.buffer, 0, n).toString("hex"), "011d2cffff40e20100e3e71f11d43a249a26e79a01f4ff0300f323b31ae6664bc4d2002d00defca00fb50448f40301");
+  // Existing state bytes remain compatible inside the new batch envelope.
+  assert.equal(Buffer.from(view.buffer, 0, n).toString("hex"), "0101061d2cffff40e20100e3e71f11d43a249a26e79a01f4ff0300f323b31ae6664bc4d2002d00defca00fb50448f40301");
 });
 
 test("each place has the finest scale that holds it: a tabletop's for the four tables, a room's for the restaurant", () => {
@@ -85,7 +88,7 @@ test("in the restaurant a fly, its pointer and its camera go anywhere in the roo
     for (const hxp of reach) for (const hzp of across) {
       Object.assign(s.hand, { x: hxp, y: y / 2, z: hzp, eyeX: -hxp, eyeY: height, eyeZ: -hzp });
       encodeFly(view, scale, s);
-      readState(view, 1, scale, back);
+      readState(view, 3, scale, back);
       for (const k of ["x", "y", "z"] as const) assert.ok(Math.abs(back[k] - s[k]) <= 0.5 / scale.position + 1e-9, `${k} ${s[k]}`);
       for (const k of ["x", "y", "z"] as const) assert.ok(Math.abs(back.hand[k] - s.hand[k]) <= 0.5 / scale.pointer + 1e-9, `pointer ${k} ${s.hand[k]}`);
       for (const k of ["eyeX", "eyeY", "eyeZ"] as const) assert.ok(Math.abs(back.hand[k] - s.hand[k]) <= 0.5 / scale.eye + 1e-9, `camera ${k} ${s.hand[k]}`);
@@ -103,7 +106,7 @@ test("a length past a scale's range is held at its end, never wrapped round to t
     s.hand.x = 1e6;
     s.hand.eyeZ = -1e6;
     encodeFly(view, scale, s);
-    readState(view, 1, scale, back);
+    readState(view, 3, scale, back);
     assert.equal(back.x, 32767 / scale.position);
     assert.equal(back.z, -32768 / scale.position);
     assert.equal(back.hand.x, 32767 / scale.pointer);
@@ -171,7 +174,8 @@ test("a fly's time on the wire wraps at 2^32 ms, and is read back as the room ti
       s.t = t;
       encodeFly(view, TABLETOP_SCALE, s);
       const back = createFlyState();
-      readState(view, 1, TABLETOP_SCALE, back);
+      // After the batch's type, count and the fly's id.
+      readState(view, 3, TABLETOP_SCALE, back);
       assert.ok(back.t < wrap);
       assert.equal(roomTime(back.t, now), t, `${t} read at ${now}`);
     }
@@ -184,8 +188,8 @@ test("sequence numbers compare across their wrap", () => {
   assert.ok(seqAtOrAfter(7, 7));
 });
 
-test("the protocol is 3: a device that doesn't know rooms can be locked is turned away (and reloads into one that does)", () => {
-  assert.equal(PROTOCOL, 3);
+test("protocol 5 retains fly batches and agrees on seasonal weather", () => {
+  assert.equal(PROTOCOL, 5);
   assert.equal(CLOSE.locked, 4008);
 });
 
@@ -210,6 +214,45 @@ test("a table's code is ten letters and digits that can't be mistaken for one an
   for (const bad of ["", "abc", "ABCDEFGHJK", "abcdefghj1", "abcdefghjkm", null, 12345]) assert.ok(!isTableCode(bad), String(bad));
 });
 
+test("an own batch carries up to MAX_OWN fly ids, one hand and only the requested count, at either place scale", () => {
+  for (const scale of [TABLETOP_SCALE, ROOM_SCALE]) {
+    const states = Array.from({ length: MAX_OWN }, (_, i) => {
+      const s = sampleState();
+      s.id = i + 2;
+      if (i > 0) s.flags &= ~HANDS;
+      s.x += i;
+      return s;
+    });
+    const view = new DataView(new ArrayBuffer(OWN_MAX));
+    const n = encodeOwn(view, scale, states);
+    assert.equal(n, OWN_MAX);
+    assert.equal(view.getUint8(0), FLY);
+    const seen: [number, number, boolean][] = [];
+    const decode = (bytes: number) => decodeFlies(new DataView(view.buffer, 0, bytes), scale, createFlyState(), (s) => seen.push([s.id, s.x, !!(s.flags & HANDS)]), FLY);
+    assert.equal(decode(n), MAX_OWN);
+    assert.deepEqual(seen.map(([id, , hand]) => [id, hand]), [[2, true], [3, false], [4, false], [5, false]]);
+    for (const [i, [, x]] of seen.entries()) assert.ok(Math.abs(x - states[i].x) <= 0.5 / scale.position);
+    seen.length = 0;
+    const short = encodeOwn(view, scale, states, 2);
+    assert.equal(decode(short), 2);
+    assert.deepEqual(seen.map(([id]) => id), [2, 3]);
+    assert.equal(decodeFlies(new DataView(view.buffer, 0, short), scale, createFlyState(), () => {}), -1, "a FLY is not a room's FLIES");
+    assert.equal(decode(short - 1), -1, "a truncated own batch is refused");
+  }
+});
+
+test("the single-fly helper is byte-identical to a one-element own batch, including its fly id", () => {
+  const s = sampleState();
+  const single = new DataView(new ArrayBuffer(FLY_MAX));
+  const own = new DataView(new ArrayBuffer(OWN_MAX));
+  const n = encodeFly(single, TABLETOP_SCALE, s);
+  assert.equal(n, encodeOwn(own, TABLETOP_SCALE, [s]));
+  assert.deepEqual(new Uint8Array(single.buffer, 0, n), new Uint8Array(own.buffer, 0, n));
+  const ids: number[] = [];
+  assert.equal(decodeFlies(new DataView(single.buffer, 0, n), TABLETOP_SCALE, createFlyState(), (s) => ids.push(s.id), FLY), 1);
+  assert.deepEqual(ids, [6]);
+});
+
 test("every truncated hand state is refused without changing the caller's state", () => {
   const encoded = new DataView(new ArrayBuffer(FLY_MAX));
   const n = encodeFly(encoded, TABLETOP_SCALE, sampleState());
@@ -217,7 +260,7 @@ test("every truncated hand state is refused without changing the caller's state"
     const state = createFlyState();
     state.x = 42;
     const untouched = structuredClone(state);
-    assert.equal(readState(new DataView(encoded.buffer, 0, length), 1, TABLETOP_SCALE, state), -1, `length ${length}`);
+    assert.equal(readState(new DataView(encoded.buffer, 0, length), 3, TABLETOP_SCALE, state), -1, `length ${length}`);
     assert.deepEqual(state, untouched);
   }
 });

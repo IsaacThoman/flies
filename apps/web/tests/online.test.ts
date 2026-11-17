@@ -13,6 +13,7 @@ import type { Pantry } from "@fly/world";
 import { TableLine } from "../src/online/connection.ts";
 import { APP_ROOMS, APP_SITE, inApp, invitedTo, inviteLink, roomsUrl } from "../src/online/invite.ts";
 import { Online } from "../src/online/online.ts";
+import { OtherFlies } from "../src/online/others.ts";
 import type { TableHost } from "../src/online/online.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import { Hands, TOOLS } from "../src/tools/hands.ts";
@@ -56,7 +57,7 @@ class FakeSocket implements TableSocket {
   }
 }
 
-const welcome = (now: number): Extract<ServerMessage, { type: "welcome" }> => ({ type: "welcome", v: PROTOCOL, id: 2, colour: "#2fb8ff", starter: 1, seed: 1, now, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0], room: { name: "Flies", listed: false, locked: false } });
+const welcome = (now: number): Extract<ServerMessage, { type: "welcome" }> => ({ type: "welcome", v: PROTOCOL, id: 2, colour: "#2fb8ff", flies: [{ id: 2, colour: "#2fb8ff", at: [0, 0, 0] }], starter: 1, seed: 1, now, wall: 0, offset: 0, place: "picnic", epoch: 0, world: { light: "clock", weather: "now" }, players: [], foods: [], balls: [], happenings: [], bubbles: [], at: [0, 0, 0], room: { name: "Flies", listed: false, locked: false } });
 
 function line() {
   const sockets: FakeSocket[] = [];
@@ -65,7 +66,7 @@ function line() {
     const s = new FakeSocket();
     sockets.push(s);
     return s;
-  }, "ws://test/rooms", () => ({ type: "hello", v: PROTOCOL, table: "abcdefghjk", key: "0123456789abcdef", at }));
+  }, "ws://test/rooms", () => ({ type: "hello", v: PROTOCOL, table: "abcdefghjk", key: "0123456789abcdef", at: at && [at] }));
   return { line: l, sockets, setAt: (spot: [number, number, number]) => (at = spot) };
 }
 
@@ -81,12 +82,19 @@ function atTable(t: TestContext, code = EVERYONE) {
   const hands = new Hands(world, { light: { kind: "golden" }, weather: { kind: "mist" } });
   const shares: Pantry[] = [];
   const worldChanges: boolean[] = [];
+  const scene = new THREE.Scene();
   const host: TableHost = {
-    scene: new THREE.Scene(),
+    scene,
+    company: { list: [] } as unknown as TableHost["company"],
+    others: new OtherFlies(scene, world),
+    flies: () => 1,
+    seat() {},
+    share: (pantry) => shares.push(pantry),
     life: {
       world,
       body: { position: { x: 0, y: 0, z: 0 }, yaw: 0, place() {} },
-      share: (pantry: Pantry) => shares.push(pantry),
+      setDown() {},
+      share() {},
       crowd: { clear() {} },
     } as unknown as TableHost["life"],
     hands,
@@ -205,7 +213,7 @@ test("a dropped line is opened again, later each time, and the hello says where 
   assert.equal(sockets.length, 2, "opened again");
   sockets[1].status = "open";
   l.update(0.016);
-  assert.deepEqual((JSON.parse(sockets[1].sent[0]) as Extract<ClientMessage, { type: "hello" }>).at, [12, -3, 1]);
+  assert.deepEqual((JSON.parse(sockets[1].sent[0]) as Extract<ClientMessage, { type: "hello" }>).at, [[12, -3, 1]]);
   // Failing again, it waits longer.
   sockets[1].drop(1006);
   l.update(0.016);
@@ -313,7 +321,7 @@ test("only a joined line sends tools and binary state; an empty bite report send
   fly.x = 12;
   const send = () => {
     l.send({ type: "world", light: "night" });
-    l.sendFly(TABLETOP_SCALE, fly);
+    l.sendFlies(TABLETOP_SCALE, [fly], 1);
     l.sendBites(42, [{ food: 7, amount: 0.25 }], 1, 7);
   };
   send();
@@ -332,7 +340,8 @@ test("only a joined line sends tools and binary state; an empty bite report send
   assert.equal(socket.binary.length, 2);
   const back = createFlyState();
   const view = (data: Uint8Array) => new DataView(data.buffer, data.byteOffset, data.byteLength);
-  assert.equal(readState(view(socket.binary[0]), 1, TABLETOP_SCALE, back), 33);
+  // After the batch's type, count and the fly's id.
+  assert.equal(readState(view(socket.binary[0]), 3, TABLETOP_SCALE, back), 35);
   assert.equal(back.x, 12);
   const bites: [number, number][] = [];
   assert.equal(decodeBites(view(socket.binary[1]), (id, amount) => bites.push([id, amount])), 42);

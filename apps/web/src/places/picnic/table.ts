@@ -1,3 +1,4 @@
+import { Snow, snowDust } from "../../scene/snow.ts";
 // The picnic's table and everything on it, built from the world's description
 // (packages/world/src/picnic.ts) so that what the fly stands on is exactly
 // what is drawn. Merged by material into a few meshes. Everything on it gets
@@ -113,6 +114,7 @@ ${TABLE_SHADOWS}
 float enamelRough;
 vec2 enamelPeel;
 ${GINGHAM}
+${BUMP}
 const float CHECK = ${(napkin.size / 12).toFixed(3)};
 // Where the water lies thickest on the enamel: soft blobs a few centimetres across, spreading as it gets wetter.
 float puddles(vec2 p) {
@@ -152,6 +154,8 @@ vec3 cloth = gingham(uv, CHECK, vec3(0.16, 0.34, 0.62));
 // The hem: folded under (a touch darker) and stitched in blue.
 float hem = smoothstep(-2.6, -2.4, edge);
 cloth *= 1.0 - hem * 0.06;
+float fold = exp(-uv.x * uv.x / 5.0) + exp(-uv.y * uv.y / 5.0);
+cloth *= 1.0 - fold * 0.035;
 float stitchLine = 1.0 - smoothstep(0.07, 0.07 + fwidth(edge) + 0.03, abs(edge + 1.7));
 float along = (abs(uv.x) > abs(uv.y) ? uv.y : uv.x) / 1.7;
 float dash = step(0.35, fract(along));
@@ -189,7 +193,7 @@ if (uWet > 0.02 && inside < 0.5) {
   // Where it was folded in four: two soft ridges across the middle.
   vec3 nap2 = napkinUV();
   float inside2 = 1.0 - step(0.0, nap2.z);
-  vec2 slope = vec2(-nap2.x * exp(-nap2.x * nap2.x / 3.0), -nap2.y * exp(-nap2.y * nap2.y / 3.0)) * 0.06 * inside2;
+  vec2 slope = vec2(-nap2.x * exp(-nap2.x * nap2.x / 3.0), -nap2.y * exp(-nap2.y * nap2.y / 3.0)) * 0.10 * inside2;
   vec3 tilted = normalize(vec3(-slope.x, 1.0, -slope.y));
   float c = cos(uNapkin.w), s = sin(uNapkin.w);
   tilted = vec3(tilted.x * c + tilted.z * s, tilted.y, -tilted.x * s + tilted.z * c);
@@ -198,6 +202,7 @@ if (uWet > 0.02 && inside < 0.5) {
   tilted = normalize(tilted - vec3(uGust.x, 0.0, uGust.y) * cos(dot(vTable, uGust.xy) * 0.35 - uTime * 7.0) * 0.06 * uGust.z * inside2);
   tilted = normalize(mix(tilted, normalize(vec3(-drop.x, 1.0, -drop.y)), beading));
   normal = normalize((viewMatrix * vec4(tilted, 0.0)).xyz);
+  normal = bumped(normal, wovenHeight(nap2.xy) * inside2);
 }`,
       );
   };
@@ -862,6 +867,14 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
   seen.push(...goings.seen);
   const all = [glossy, juicy, matte, tableMaterial, cloth, glass, liquid, dewMaterial, ...materials];
   for (const material of all) shaded(material);
+  const snow = new Snow(2200, 0);
+  group.add(snow.mesh);
+  const snowCover = { value: 0 };
+  const shelters = [one("lemonade"), one("jam")].map(s => {
+    const f = s.footprint as { x:number; z:number; r:number };
+    return new THREE.Vector4(f.x, f.z, f.r, (s.top as { y:number }).y);
+  });
+  for (const material of all) if (material !== glass && material !== liquid && material !== dewMaterial) snowDust(material, snowCover, shelters);
   let wetNow = -1;
   return {
     group,
@@ -869,6 +882,8 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
     seen,
     update(time, light, weather) {
       goings.update(time, light, weather);
+      snow.update(time, light, weather);
+      snowCover.value = weather.snowCover;
       tableUniforms.uPicnicSun.value.copy(light.sunDirection);
       // Wet, glazes and fruit shine more, crumbs and cloth darken.
       const wet = weather.wet;
@@ -901,6 +916,9 @@ diffuseColor.a = clamp(0.18 + edge * 0.85 + lens * 0.25 + dot(outgoingLight, vec
     },
     live(dt, around) {
       goings.live(dt, around);
+    },
+    feel(dt, at, felt) {
+      goings.feel(dt, at, felt);
     },
   };
 }

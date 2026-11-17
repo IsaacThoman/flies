@@ -121,3 +121,80 @@ test("eyes with no picture yet refresh even in a frame that rebuilt the reflecti
   eyes.render(1 / 60, false);
   assert.equal(reads.length, 1);
 });
+
+function companion(life: Life): Life {
+  return { ...life, body: { ...life.body, position: { x: 10, y: 0, z: 10 } }, light: null } as Life;
+}
+
+test("several flies refresh one per frame, the most overdue first, with equal rates and their own light", async () => {
+  const { eyes, reads, life } = setup();
+  const lives = [life, companion(life), companion(life)];
+  eyes.company(lives.slice(1));
+  const hidden: number[] = [];
+  eyes.standIns = { hideFromEyes(index) { hidden.push(index); } };
+  for (let frame = 0; frame < 180; frame++) {
+    hidden.length = 0;
+    const before = reads.length;
+    eyes.render(1 / 60, false);
+    assert.ok(reads.length - before <= 1, "only one GPU read per ordinary frame");
+    if (reads.length > before) {
+      assert.deepEqual(hidden, [frame % 3, -1], "oldest sight looks, excluding itself, then restores the stand-ins");
+      reads.at(-1)!.finish();
+      await settled();
+    } else assert.deepEqual(hidden, [-1]);
+  }
+  assert.deepEqual([eyes.updates, eyes.companyUpdates(0), eyes.companyUpdates(1)], [60, 60, 60]);
+  eyes.beforeStep();
+  assert.ok(lives.every((l) => l.light?.left[0] === 1));
+  assert.equal(new Set(lives.map((l) => l.light)).size, 3, "each brain receives its own facet picture");
+});
+
+test("while a ball comes the followed fly's eyes refresh every frame and nobody else's that frame; the others look again once it has passed", async () => {
+  const { eyes, reads, life } = setup();
+  eyes.company([companion(life), companion(life)]);
+  // Everyone has a first picture, so nobody's is owed at once.
+  for (let frame = 0; frame < 3; frame++) {
+    const before = reads.length;
+    eyes.render(1 / 60, false);
+    for (const read of reads.slice(before)) read.finish();
+    await settled();
+  }
+  const companions = () => [eyes.companyUpdates(0), eyes.companyUpdates(1)];
+  const before = companions();
+  for (let frame = 0; frame < 60; frame++) {
+    const reading = reads.length;
+    eyes.render(1 / 60, false, true);
+    assert.equal(reads.length - reading, 1, "one refresh a frame, even while a ball comes");
+    for (const read of reads.slice(reading)) read.finish();
+    await settled();
+  }
+  assert.equal(eyes.updates, 61, "the followed fly sees an approaching threat every frame");
+  assert.deepEqual(companions(), before, "the others wait while it comes");
+  for (let frame = 0; frame < 60; frame++) {
+    const reading = reads.length;
+    eyes.render(1 / 60, false);
+    assert.ok(reads.length - reading <= 1);
+    for (const read of reads.slice(reading)) read.finish();
+    await settled();
+  }
+  const after = companions();
+  assert.ok(after[0] > before[0] && after[1] > before[1], "they take their turns again");
+  assert.ok(Math.abs(after[0] - after[1]) <= 1);
+});
+
+test("dropping a companion waits for its pending read before disposing its target", async () => {
+  const { eyes, life, reads } = setup();
+  eyes.company([companion(life)]);
+  eyes.render(1 / 60, false);
+  reads[0].finish();
+  await settled();
+  eyes.render(1 / 60, false);
+  let disposed = 0;
+  reads[1].target.addEventListener("dispose", () => { disposed++; });
+  eyes.company([]);
+  assert.equal(disposed, 0, "the GPU still owns the target");
+  reads[1].finish();
+  await settled();
+  assert.equal(disposed, 1);
+  assert.equal(eyes.companyUpdates(0), 0);
+});

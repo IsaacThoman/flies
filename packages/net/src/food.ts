@@ -126,20 +126,22 @@ export class TableFood {
   }
 
   /**
-   * A player's fly took `amount` of a food at room time `now` (ms), standing
-   * at (x, y, z). It gets what is there, if it could reach it (not from the
-   * floor under the table it is on) and isn't eating faster than a fly can.
+   * A player's flies took `amount` of a food at room time `now` (ms),
+   * standing where `flies` are. It gets what is there, if one of them could
+   * reach it (not from the floor under the table it is on) and they aren't
+   * eating faster than so many flies can.
    */
-  bite(by: number, id: number, amount: number, x: number, y: number, z: number, now: number): Granted {
+  bite(by: number, id: number, amount: number, flies: readonly { readonly x: number; readonly y: number; readonly z: number }[], now: number): Granted {
     this.#bitten = true;
     const food = this.find(id);
     if (!food) return this.#refuse("unknown");
     // Even a refused bite needs an authoritative amount and an acknowledgement.
     this.#changed.add(id);
-    if (!(amount > 0)) return this.#refuse("unknown");
-    if (Math.hypot(food.x - x, food.z - z) > food.r + BITE_REACH || Math.abs(food.y - y) > TASTE_HEIGHT + BITE_REACH) return this.#refuse("far");
-    const appetite = this.#appetite.get(by) ?? { stored: EAT_RATE * APPETITE_STORE * APPETITE_SLACK, at: now };
-    appetite.stored = Math.min(EAT_RATE * APPETITE_STORE * APPETITE_SLACK, appetite.stored + ((now - appetite.at) / 1000) * EAT_RATE * APPETITE_SLACK);
+    if (!(amount > 0) || flies.length === 0) return this.#refuse("unknown");
+    if (!flies.some((f) => Math.hypot(food.x - f.x, food.z - f.z) <= food.r + BITE_REACH && Math.abs(food.y - f.y) <= TASTE_HEIGHT + BITE_REACH)) return this.#refuse("far");
+    const rate = EAT_RATE * APPETITE_SLACK * flies.length;
+    const appetite = this.#appetite.get(by) ?? { stored: rate * APPETITE_STORE, at: now };
+    appetite.stored = Math.min(rate * APPETITE_STORE, appetite.stored + ((now - appetite.at) / 1000) * rate);
     appetite.at = now;
     this.#appetite.set(by, appetite);
     if (amount > appetite.stored + 1e-6) return this.#refuse("greedy");
@@ -209,8 +211,8 @@ export class TableFood {
 type Pending = { seq: number; food: number; amount: number };
 
 /**
- * A device's side of it: its pantry is the room's food, less what its own fly
- * has eaten that the room hasn't counted yet.
+ * A device's side of it: its pantry is the room's food, less what its own
+ * flies have eaten that the room hasn't counted yet.
  */
 export class FoodMirror {
   readonly #pantry: Pantry;
@@ -219,7 +221,7 @@ export class FoodMirror {
   readonly #pending: Pending[] = [];
   /** Bites not yet sent: food id to amount. */
   readonly unsent = new Map<number, number>();
-  /** Everything this fly has eaten by its own reckoning, and what the room has granted it. */
+  /** Everything its flies have eaten by its own reckoning, and what the room has granted them. */
   predicted = 0;
   granted = 0;
   /** Food the room has said is gone that this device was still eating. */
@@ -230,7 +232,7 @@ export class FoodMirror {
     this.#pantry = pantry;
   }
 
-  /** The fly ate this much of a food just now (already taken from the pantry). */
+  /** One of its flies ate this much of a food just now (already taken from the pantry). */
   ate(food: Food, amount: number) {
     if (!(amount > 0)) return;
     this.predicted += amount;

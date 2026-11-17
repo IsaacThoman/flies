@@ -1,4 +1,4 @@
-// The fly's brain on a thread of its own. JavaScript has no JIT on the Apple TV, far too slow
+// Each fly's brain on a thread of its own. JavaScript has no JIT on the Apple TV, far too slow
 // for 166,700 spiking neurons, so the game hands its senses to native code and reads back the
 // latest answer (NativeBrainBridge in packages/contracts/src/brain.ts):
 //
@@ -9,10 +9,14 @@
 //     to at most one step of kMaxStepMs; anything beyond is dropped, so a brain slower than real
 //     time runs slow instead of falling further and further behind.
 //   - the brain thread steps whenever time is waiting, then publishes its state for read().
+//   - spawn() (the first brain's bridge only) makes another, for another fly the game lives:
+//     a bridge of its own, its own thread and brain; stop() ends that thread and frees its
+//     brain. The first brain is the host's for the app's lifetime.
 #import "BrainBridge.h"
 #import "JSHost.h"
 #include "fly_brain.h"
 #include <condition_variable>
+#include <memory>
 #include <pthread.h>
 
 namespace {
@@ -28,6 +32,8 @@ enum Status { kLoading, kRunning, kFailed };
 struct BrainHost {
   NSString *path;
   uint32_t seed = 0;
+  // A spawned brain: stop() may end it.
+  bool spawned = false;
   std::atomic<bool> started{false};
   std::atomic<int> status{kLoading};
   // Written once, before status leaves kLoading.
@@ -37,10 +43,11 @@ struct BrainHost {
   std::vector<float> directions[2];
   float acceptance = 0;
   std::vector<std::string> rateNames;
-  // Time and senses submitted and not yet taken by the brain thread.
+  // Time and senses submitted and not yet taken by the brain thread, and whether its fly is gone.
   std::mutex inputLock;
   std::condition_variable inputReady;
   double pendingMs = 0;
+  bool stopping = false;
   float scalars[kScalars] = {};
   std::vector<float> light[2];
   bool eyesOpen = false;
@@ -48,64 +55,79 @@ struct BrainHost {
   std::mutex stateLock;
   std::vector<float> state;
   uint32_t states = 0;
+
+  void Fail(const std::string &why) {
+    error = why;
+    status.store(kFailed, std::memory_order_release);
+    HostLog(2, [NSString stringWithFormat:@"brain: %s", why.c_str()]);
+  }
+
+  bool Running() const { return status.load(std::memory_order_acquire) == kRunning; }
 };
-BrainHost gBrain;
 
-void Fail(const std::string &why) {
-  gBrain.error = why;
-  gBrain.status.store(kFailed, std::memory_order_release);
-  HostLog(2, [NSString stringWithFormat:@"brain: %s", why.c_str()]);
-}
+// What a bridge object holds: its brain, shared with its thread for as long as either needs it.
+using Shared = std::shared_ptr<BrainHost>;
+JSClassRef gBridgeClass = nullptr;
+NSString *gConnectome = nil;
+// Each brain's thread is numbered in its name, for profiles.
+std::atomic<int> gBrains{0};
 
-fly_brain *Load() {
+fly_brain *Load(BrainHost &b) {
   @autoreleasepool {
     double t = NowMs();
     NSError *error = nil;
-    NSData *data = [NSData dataWithContentsOfFile:gBrain.path options:NSDataReadingMappedIfSafe error:&error];
-    if (!data) { Fail(std::string("can't read the connectome: ") + (error.localizedDescription ?: @"missing").UTF8String); return nullptr; }
+    NSData *data = [NSData dataWithContentsOfFile:b.path options:NSDataReadingMappedIfSafe error:&error];
+    if (!data) { b.Fail(std::string("can't read the connectome: ") + (error.localizedDescription ?: @"missing").UTF8String); return nullptr; }
     char message[512] = "";
-    fly_brain *brain = fly_brain_create((const uint8_t *)data.bytes, data.length, gBrain.seed, message, sizeof message);
-    if (!brain) { Fail(message[0] ? message : "fly_brain_create failed"); return nullptr; }
-    gBrain.neurons = fly_brain_neurons(brain);
-    gBrain.connections = fly_brain_connections(brain);
+    fly_brain *brain = fly_brain_create((const uint8_t *)data.bytes, data.length, b.seed, message, sizeof message);
+    if (!brain) { b.Fail(message[0] ? message : "fly_brain_create failed"); return nullptr; }
+    b.neurons = fly_brain_neurons(brain);
+    b.connections = fly_brain_connections(brain);
     for (int side = 0; side < 2; side++) {
       uint32_t n = fly_brain_facets(brain, side);
       const float *d = n ? fly_brain_eye_directions(brain, side) : nullptr;
-      gBrain.facets[side] = d ? n : 0;
-      if (d) gBrain.directions[side].assign(d, d + 3 * n);
-      gBrain.light[side].assign(gBrain.facets[side], 0);
+      b.facets[side] = d ? n : 0;
+      if (d) b.directions[side].assign(d, d + 3 * n);
+      b.light[side].assign(b.facets[side], 0);
     }
-    gBrain.acceptance = fly_brain_eye_acceptance(brain);
+    b.acceptance = fly_brain_eye_acceptance(brain);
     for (uint32_t i = 0, n = fly_brain_rate_count(brain); i < n; i++) {
       const char *name = fly_brain_rate_name(brain, i);
-      gBrain.rateNames.push_back(name ? name : "");
+      b.rateNames.push_back(name ? name : "");
     }
-    gBrain.state.assign(kCommands + kStats + gBrain.rateNames.size(), 0);
+    b.state.assign(kCommands + kStats + b.rateNames.size(), 0);
     HostLog(0, [NSString stringWithFormat:@"brain: %u neurons, %u connections, %u + %u facets, %zu rates, %.1f MB loaded in %.0f ms",
-                gBrain.neurons, gBrain.connections, gBrain.facets[0], gBrain.facets[1], gBrain.rateNames.size(), data.length / 1048576.0, NowMs() - t]);
+                b.neurons, b.connections, b.facets[0], b.facets[1], b.rateNames.size(), data.length / 1048576.0, NowMs() - t]);
     return brain;
   }
 }
 
-void *Run(void *) {
-  pthread_setname_np("flies.brain");
-  fly_brain *brain = Load();
+void *Run(void *arg) {
+  // The thread's own hold on its brain: it outlives the bridge object if the game lets go first.
+  Shared host = *static_cast<Shared *>(arg);
+  delete static_cast<Shared *>(arg);
+  BrainHost &b = *host;
+  char name[32];
+  snprintf(name, sizeof name, "flies.brain.%d", gBrains.fetch_add(1));
+  pthread_setname_np(name);
+  fly_brain *brain = Load(b);
   if (!brain) return nullptr;
-  gBrain.status.store(kRunning, std::memory_order_release);
+  b.status.store(kRunning, std::memory_order_release);
   float scalars[kScalars];
-  std::vector<float> light[2] = { gBrain.light[0], gBrain.light[1] };
-  std::vector<float> rates(gBrain.rateNames.size());
+  std::vector<float> light[2] = { b.light[0], b.light[1] };
+  std::vector<float> rates(b.rateNames.size());
   for (;;) {
     double dt;
     bool eyes;
     {
-      std::unique_lock<std::mutex> g(gBrain.inputLock);
-      gBrain.inputReady.wait(g, [] { return gBrain.pendingMs > 0; });
-      dt = gBrain.pendingMs;
-      gBrain.pendingMs = 0;
-      std::copy(gBrain.scalars, gBrain.scalars + kScalars, scalars);
-      eyes = gBrain.eyesOpen;
-      if (eyes) for (int side = 0; side < 2; side++) std::copy(gBrain.light[side].begin(), gBrain.light[side].end(), light[side].begin());
+      std::unique_lock<std::mutex> g(b.inputLock);
+      b.inputReady.wait(g, [&b] { return b.pendingMs > 0 || b.stopping; });
+      if (b.stopping) break;
+      dt = b.pendingMs;
+      b.pendingMs = 0;
+      std::copy(b.scalars, b.scalars + kScalars, scalars);
+      eyes = b.eyesOpen;
+      if (eyes) for (int side = 0; side < 2; side++) std::copy(b.light[side].begin(), b.light[side].end(), light[side].begin());
     }
     fly_senses senses = {
       scalars[0], scalars[1], scalars[2], scalars[3], scalars[4], scalars[5], scalars[6], scalars[7] > 0.5f,
@@ -116,21 +138,26 @@ void *Run(void *) {
     fly_stats stats = {};
     char message[512] = "";
     if (fly_brain_tick(brain, dt, &senses, &c, &stats, rates.empty() ? nullptr : rates.data(), message, sizeof message)) {
-      Fail(message[0] ? message : "fly_brain_tick failed");
-      fly_brain_destroy(brain);
-      return nullptr;
+      b.Fail(message[0] ? message : "fly_brain_tick failed");
+      break;
     }
-    std::lock_guard<std::mutex> g(gBrain.stateLock);
-    float *s = gBrain.state.data();
+    std::lock_guard<std::mutex> g(b.stateLock);
+    float *s = b.state.data();
     const float head[kCommands + kStats] = { c.walk, c.turn, c.back, c.escape, c.wings, c.groom, c.feed, c.sing,
                                              (float)stats.sim_ms, (float)stats.wall_ms, (float)stats.spikes, (float)stats.active };
     std::copy(head, head + kCommands + kStats, s);
     std::copy(rates.begin(), rates.end(), s + kCommands + kStats);
-    gBrain.states++;
+    b.states++;
   }
+  fly_brain_destroy(brain);
+  return nullptr;
 }
 
-bool Running() { return gBrain.status.load(std::memory_order_acquire) == kRunning; }
+BrainHost &Host(JSObjectRef self) {
+  static BrainHost none;
+  auto *shared = static_cast<Shared *>(JSObjectGetPrivate(self));
+  return shared ? **shared : none;
+}
 
 double Arg(JSContextRef ctx, size_t argc, const JSValueRef argv[], size_t i) {
   return i < argc ? JSValueToNumber(ctx, argv[i], nullptr) : 0;
@@ -152,11 +179,13 @@ JSObjectRef MakeFloat32Array(JSContextRef ctx, const std::vector<float> &values)
   return array;
 }
 
-#define NATIVE(name) JSValueRef name(JSContextRef ctx, JSObjectRef, JSObjectRef, size_t argc, const JSValueRef argv[], JSValueRef *)
+#define NATIVE(name) JSValueRef name(JSContextRef ctx, JSObjectRef, JSObjectRef self, size_t argc, const JSValueRef argv[], JSValueRef *)
 
 NATIVE(B_start) {
-  if (gBrain.started.exchange(true)) return JSValueMakeUndefined(ctx);
-  gBrain.seed = (uint32_t)(int64_t)Arg(ctx, argc, argv, 0);
+  auto *shared = static_cast<Shared *>(JSObjectGetPrivate(self));
+  if (!shared || (*shared)->started.exchange(true)) return JSValueMakeUndefined(ctx);
+  BrainHost &b = **shared;
+  b.seed = (uint32_t)(int64_t)Arg(ctx, argc, argv, 0);
   // A thread of its own with room for the simulation's stack; below the JavaScript and render
   // threads, which keep the frame rate.
   pthread_attr_t attr;
@@ -165,71 +194,119 @@ NATIVE(B_start) {
   pthread_attr_set_qos_class_np(&attr, QOS_CLASS_USER_INITIATED, 0);
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
   pthread_t thread;
-  if (pthread_create(&thread, &attr, Run, nullptr)) Fail("can't start the brain thread");
+  auto *hold = new Shared(*shared);
+  if (pthread_create(&thread, &attr, Run, hold)) {
+    delete hold;
+    b.Fail("can't start the brain thread");
+  }
   pthread_attr_destroy(&attr);
   return JSValueMakeUndefined(ctx);
 }
 NATIVE(B_status) {
   static const char *names[] = { "loading", "running", "failed" };
-  return JSStringValue(ctx, @(names[gBrain.status.load(std::memory_order_acquire)]));
+  return JSStringValue(ctx, @(names[Host(self).status.load(std::memory_order_acquire)]));
 }
 NATIVE(B_error) {
-  return JSStringValue(ctx, gBrain.status.load(std::memory_order_acquire) == kFailed ? @(gBrain.error.c_str()) : @"");
+  BrainHost &b = Host(self);
+  return JSStringValue(ctx, b.status.load(std::memory_order_acquire) == kFailed ? @(b.error.c_str()) : @"");
 }
-NATIVE(B_neurons) { return JSValueMakeNumber(ctx, Running() ? gBrain.neurons : 0); }
-NATIVE(B_connections) { return JSValueMakeNumber(ctx, Running() ? gBrain.connections : 0); }
+NATIVE(B_neurons) { BrainHost &b = Host(self); return JSValueMakeNumber(ctx, b.Running() ? b.neurons : 0); }
+NATIVE(B_connections) { BrainHost &b = Host(self); return JSValueMakeNumber(ctx, b.Running() ? b.connections : 0); }
 NATIVE(B_eyeDirections) {
+  BrainHost &b = Host(self);
   int side = Arg(ctx, argc, argv, 0) ? 1 : 0;
-  return MakeFloat32Array(ctx, Running() ? gBrain.directions[side] : std::vector<float>());
+  return MakeFloat32Array(ctx, b.Running() ? b.directions[side] : std::vector<float>());
 }
-NATIVE(B_eyeAcceptance) { return JSValueMakeNumber(ctx, Running() ? gBrain.acceptance : 0); }
+NATIVE(B_eyeAcceptance) { BrainHost &b = Host(self); return JSValueMakeNumber(ctx, b.Running() ? b.acceptance : 0); }
 NATIVE(B_rateNames) {
+  BrainHost &b = Host(self);
   JSObjectRef names = JSObjectMakeArray(ctx, 0, nullptr, nullptr);
-  if (!Running()) return names;
-  for (size_t i = 0; i < gBrain.rateNames.size(); i++) JSObjectSetPropertyAtIndex(ctx, names, (unsigned)i, JSStringValue(ctx, @(gBrain.rateNames[i].c_str())), nullptr);
+  if (!b.Running()) return names;
+  for (size_t i = 0; i < b.rateNames.size(); i++) JSObjectSetPropertyAtIndex(ctx, names, (unsigned)i, JSStringValue(ctx, @(b.rateNames[i].c_str())), nullptr);
   return names;
 }
 // submit(dtMs, scalars, lightLeft, lightRight)
 NATIVE(B_submit) {
+  BrainHost &b = Host(self);
   double dt = Arg(ctx, argc, argv, 0);
-  if (!Running() || !(dt > 0)) return JSValueMakeUndefined(ctx);
+  if (!b.Running() || !(dt > 0)) return JSValueMakeUndefined(ctx);
   size_t ns = 0, nl = 0, nr = 0;
   const float *scalars = Floats(ctx, argc, argv, 1, &ns);
   const float *left = Floats(ctx, argc, argv, 2, &nl), *right = Floats(ctx, argc, argv, 3, &nr);
   {
-    std::lock_guard<std::mutex> g(gBrain.inputLock);
-    gBrain.pendingMs = std::min(gBrain.pendingMs + dt, kMaxStepMs);
-    std::fill(gBrain.scalars, gBrain.scalars + kScalars, 0.f);
-    gBrain.scalars[kHunger] = 1.f;
-    if (scalars) std::copy(scalars, scalars + std::min<size_t>(ns, kScalars), gBrain.scalars);
-    gBrain.eyesOpen = left && right && gBrain.facets[0] && gBrain.facets[1];
-    if (gBrain.eyesOpen) {
-      std::vector<float> &l = gBrain.light[0], &r = gBrain.light[1];
+    std::lock_guard<std::mutex> g(b.inputLock);
+    b.pendingMs = std::min(b.pendingMs + dt, kMaxStepMs);
+    std::fill(b.scalars, b.scalars + kScalars, 0.f);
+    b.scalars[kHunger] = 1.f;
+    if (scalars) std::copy(scalars, scalars + std::min<size_t>(ns, kScalars), b.scalars);
+    b.eyesOpen = left && right && b.facets[0] && b.facets[1];
+    if (b.eyesOpen) {
+      std::vector<float> &l = b.light[0], &r = b.light[1];
       std::fill(std::copy(left, left + std::min<size_t>(nl, l.size()), l.begin()), l.end(), 0.f);
       std::fill(std::copy(right, right + std::min<size_t>(nr, r.size()), r.begin()), r.end(), 0.f);
     }
   }
-  gBrain.inputReady.notify_one();
+  b.inputReady.notify_one();
   return JSValueMakeUndefined(ctx);
 }
 // read(out): copies the latest state into out and returns how many states there have been.
 NATIVE(B_read) {
+  BrainHost &b = Host(self);
   size_t n = 0;
   float *out = (float *)Floats(ctx, argc, argv, 0, &n);
-  if (!Running()) return JSValueMakeNumber(ctx, 0);
-  std::lock_guard<std::mutex> g(gBrain.stateLock);
-  if (out) std::copy(gBrain.state.begin(), gBrain.state.begin() + std::min(n, gBrain.state.size()), out);
-  return JSValueMakeNumber(ctx, gBrain.states);
+  if (!b.Running()) return JSValueMakeNumber(ctx, 0);
+  std::lock_guard<std::mutex> g(b.stateLock);
+  if (out) std::copy(b.state.begin(), b.state.begin() + std::min(n, b.state.size()), out);
+  return JSValueMakeNumber(ctx, b.states);
 }
-}  // namespace
+// stop(): a spawned brain's fly is gone; its thread ends and frees the brain.
+NATIVE(B_stop) {
+  BrainHost &b = Host(self);
+  if (!b.spawned) return JSValueMakeUndefined(ctx);
+  {
+    std::lock_guard<std::mutex> g(b.inputLock);
+    b.stopping = true;
+  }
+  b.inputReady.notify_one();
+  return JSValueMakeUndefined(ctx);
+}
 
-JSObjectRef MakeBrainBridge(JSContextRef ctx, NSString *connectome) {
-  gBrain.path = connectome;
-  JSObjectRef bridge = JSObjectMake(ctx, nullptr, nullptr);
+JSObjectRef MakeBridge(JSContextRef ctx, bool spawned);
+
+// spawn(): another brain's bridge, for another fly.
+NATIVE(B_spawn) { return MakeBridge(ctx, true); }
+
+void Finalize(JSObjectRef self) {
+  auto *shared = static_cast<Shared *>(JSObjectGetPrivate(self));
+  if (!shared) return;
+  // A spawned brain the game let go of without stopping stops now; the thread holds its own reference until it has.
+  BrainHost &b = **shared;
+  if (b.spawned) {
+    {
+      std::lock_guard<std::mutex> g(b.inputLock);
+      b.stopping = true;
+    }
+    b.inputReady.notify_one();
+  }
+  delete shared;
+}
+
+JSObjectRef MakeBridge(JSContextRef ctx, bool spawned) {
+  if (!gBridgeClass) {
+    JSClassDefinition definition = kJSClassDefinitionEmpty;
+    definition.className = "NativeBrainBridge";
+    definition.finalize = Finalize;
+    gBridgeClass = JSClassCreate(&definition);
+  }
+  auto *shared = new Shared(std::make_shared<BrainHost>());
+  (*shared)->path = gConnectome;
+  (*shared)->spawned = spawned;
+  JSObjectRef bridge = JSObjectMake(ctx, gBridgeClass, shared);
   struct { const char *name; JSObjectCallAsFunctionCallback fn; } fns[] = {
     { "start", B_start }, { "status", B_status }, { "error", B_error }, { "neurons", B_neurons },
     { "connections", B_connections }, { "eyeDirections", B_eyeDirections }, { "eyeAcceptance", B_eyeAcceptance },
     { "rateNames", B_rateNames }, { "submit", B_submit }, { "read", B_read },
+    { spawned ? "stop" : "spawn", spawned ? B_stop : B_spawn },
   };
   for (auto &f : fns) {
     JSStringRef s = JSStringCreateWithUTF8CString(f.name);
@@ -237,4 +314,10 @@ JSObjectRef MakeBrainBridge(JSContextRef ctx, NSString *connectome) {
     JSStringRelease(s);
   }
   return bridge;
+}
+}  // namespace
+
+JSObjectRef MakeBrainBridge(JSContextRef ctx, NSString *connectome) {
+  gConnectome = connectome;
+  return MakeBridge(ctx, false);
 }

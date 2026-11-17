@@ -577,7 +577,10 @@ export class Leaves {
   #spin = 0;
   #yaw = 0;
   #side = 0;
-  #brushed = false;
+  /** The flies it has brushed on this fall (their positions), each only once. */
+  readonly #brushed: Readonly<Vec3>[] = [];
+  /** It came down this frame. */
+  #landed = false;
   #lift = 0;
   #looseLift = 0;
 
@@ -624,7 +627,7 @@ export class Leaves {
       this.#yaw = this.random() * TAU;
       this.#spin = (this.random() - 0.5) * 1.5;
       this.#t = 0;
-      this.#brushed = false;
+      this.#brushed.length = 0;
       this.state = "falling";
       this.loose.visible = true;
       return true;
@@ -645,6 +648,25 @@ export class Leaves {
     return true;
   }
 
+  /**
+   * How hard the loose leaf brushes a fly at `fly` this frame (0 if not): as
+   * it comes down past it, or landing on it, when it slides off. Once a fall
+   * for each fly; after `step`, for every fly this device lives.
+   */
+  brush(fly: Readonly<Vec3>): number {
+    if (this.state !== "falling" && !this.#landed) return 0;
+    const p = this.#p;
+    const passing = this.state === "falling" && p.distanceTo(scratch.set(fly.x, fly.y + 0.8, fly.z)) < 8;
+    const under = this.#landed && flat(p, fly) < 10;
+    if (under && this.state === "lying") {
+      this.#v.set(p.x - fly.x, 0, p.z - fly.z).setLength(25);
+      this.state = "sliding";
+    }
+    if (!(passing || under) || this.#brushed.includes(fly)) return 0;
+    this.#brushed.push(fly);
+    return 0.4;
+  }
+
   /** Moves the leaves on; returns how hard a loose leaf brushed the fly this frame (0 if not). */
   step(dt: number, time: number, world: World, fly: Vec3, gust: Gust): number {
     // The table's leaf lifts in a gust, less with the fly on it.
@@ -653,6 +675,7 @@ export class Leaves {
     this.#rest.uniforms.uLift.value = this.#lift;
     this.#rest.uniforms.uTime.value = time;
     this.#free.uniforms.uTime.value = time;
+    this.#landed = false;
     if (this.state === "off") return 0;
     let touch = 0;
     const p = this.#p;
@@ -670,19 +693,11 @@ export class Leaves {
       roll = Math.cos(this.#t * 4.6) * 0.8 * settle;
       this.#yaw += this.#spin * dt * settle;
       this.#looseLift = 0.5 * settle;
-      if (!this.#brushed && p.distanceTo(scratch.set(fly.x, fly.y + 0.8, fly.z)) < 8) {
-        this.#brushed = true;
-        touch = 0.4;
-      }
       if (k >= 1) {
         this.state = "lying";
-        // Landing on the fly, it slides off it.
-        if (flat(p, fly) < 10) {
-          this.#v.set(p.x - fly.x, 0, p.z - fly.z).setLength(25);
-          this.state = "sliding";
-          if (!this.#brushed) touch = 0.4;
-        }
+        this.#landed = true;
       }
+      touch = this.brush(fly);
     } else if (this.state === "lying") {
       this.#looseLift += (gust.strength - this.#looseLift) * Math.min(1, dt * 3);
       // A strong gust takes it on, if it isn't under the fly.

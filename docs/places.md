@@ -117,6 +117,11 @@ Anything drawn but not in the world must be flat enough not to matter to a fly
 (under half a millimetre, like the picnic's specks of biscuit), or out of its
 reach (beyond the floor's edge, above it, or in the backdrop).
 
+The picnic's cotton uses a 0.22 mm weave with 0.015 mm thread relief in
+its material normals, plus shading along its fold creases. This is a visual
+stand-in: the world's cloth remains level. Thread relief fades out as the
+crossings become smaller than a pixel, without extra meshes or draws.
+
 ## The scene
 
 - **Two passes** (`apps/web/src/stage.ts`): the set (`buildSet`, from 0.5 mm to
@@ -142,7 +147,7 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   the "sun" is the light coming in at the window and the sky what is seen
   through it; a lamp at night can be a warm "sun". `stars` (0 to 1) is how
   dark it is. `env` scales the reflections in the set's `materials`.
-- **Weather** (`scene/weather.ts`): clear, overcast, mist or light rain, from
+- **Weather** (`scene/weather.ts`): clear, overcast, mist, light/heavy rain, thunderstorm, snow or sleet, from
   the Weather tool or, on "Now", the weather outside where the Apple TV can
   tell it (`scene/outside.ts`), else a forecast worked out from the clock. Every
   place gets its light from it without doing anything, as much as its
@@ -152,11 +157,11 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   and takes most of the sun's light (much less of the night's), mist whitens the
   horizon and the haze. Showing it in the place itself is up to the place,
   and optional: `SceneSet.update` and `SceneBackdrop.update` are handed the
-  `Weather` (`cloud`, `mist`, `rain`, `wet`, `wind`, each 0 to 1, and its
+  `Weather` (`cloud`, `mist`, `rain`, `wet`, `wind`, `heavy`, `storm`, `snow`, `snowCover`, `lightning`, each 0 to 1, and its
   `kind`) as their last argument, which a place that ignores it can leave off.
   A windowsill can run rain down its pane by `rain` and leave it streaked by
   `wet`; the picnic's rain, wet table, overcast deck, mist and rainbow are
-  worked examples (`places/picnic/rain.ts`, `table.ts`, `backdrop.ts`), and
+  worked examples (`places/picnic/rain.ts`, `places/picnic/table.ts`, `places/picnic/backdrop.ts`), and
   the lab shows it in the view through its windows (`places/lab/room.ts`). Rain
   bursts the bubbles and sends the fireflies to shelter wherever they are.
 - **What the fly's eyes see** (`SceneSet.seen`): the big shapes only. They are
@@ -178,9 +183,11 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   and the fly (a wall behind it, a table top over the fly) brings it in front
   of that: taken out by hand in a room, it stops at the walls.
 - **Goings-on** (`SceneSet.live`, optional): the place's own life, called each
-  frame the fly lives with an `Around`: where the fly is, the world, the
-  pantry, the weather, and `quiet` (nobody has touched the remote for a
-  while). It leaves what reaches the fly in `around.felt`: `air` (a gust, mm/s:
+  frame the fly lives with an `Around`: where the fly is, where the device's
+  other flies are (`company`), the world, the pantry, the weather, and
+  `quiet` (nobody has touched the remote for a while). Anything that keeps
+  clear of the fly keeps clear of whichever is nearest; `SceneSet.feel`
+  gives what reaches each of the others. It leaves what reaches the fly in `around.felt`: `air` (a gust, mm/s:
   felt as wind, and it carries the fly in flight as a puff does), `touch` (a
   raindrop landing on it, 0 to 1) and `looming` (things it could see coming,
   for a brain without eyes). Food goes into the pantry with `pantry.add`, to
@@ -288,6 +295,52 @@ TV has (`places/restaurant/`):
   the fly in the picture. Add it to the fuzzers' places too
   (`scripts/fuzz/body.ts`).
 
+### Storms and winter precipitation
+
+The Weather tool also holds Heavy rain, Thunderstorm, Snow or Sleet. Heavy
+rain reuses the instanced rain pass with denser windblown sheets and faster
+drops. Storm gusts go to `Felt.air`; heavier drops use the existing touch
+path, never a movement command. Thunderstorms are **silent**. Lightning
+changes the existing hemisphere and directional lights and the cloud colours;
+a distant fork sometimes shows through the picnic's cloud deck. The fly's
+six eye renders use those same scene lights. No escape, looming or motor
+input is manufactured for lightning.
+
+The current retina has no ON response: sudden brightening produces zero
+L1/L2/L3 input rates. The flash's falling edge can excite its OFF pathway as
+the adapted light falls again. `apps/web/tests/storm.test.ts` checks this
+with the unchanged retina. This is a limit of the model, not evidence that
+a fly detected a lightning strike or was startled by it. Short flashes can
+also fall between eye refreshes. No brain code is changed here.
+
+Snowflakes are instanced and animated in the shader. Exposed upward picnic
+surfaces and the windowsill garden acquire a cosmetic dusting, less than
+0.35 mm (no added collision surface). It grows over roughly a minute and
+melts over minutes, faster in rain, leaving wetness. Snowfall is not rain:
+it does not trigger raindrop touch. Flakes through the windows remain
+outside. Frost grows at the lab and windowsill pane edges with the dusting;
+it is a visual illustration of winter, not a measured pane temperature.
+Bar and restaurant receive the shared weather light only, as their scene
+files are outside this experiment's scope. Their precipitation and glass
+shaders are unchanged; they do not yet show snowflakes or frost.
+
+WeatherKit's heavyRain and electrical storm conditions retain their kinds;
+snow, blowing snow, heavy snow and blizzards fall as snow, flurries more
+sparsely, and sleet/wintry mix combine rain and snow. Hail and freezing rain
+use rain as a visual approximation; no ice collision or hail impact is
+modelled. WeatherKit visibility, cloud and wind still blend over minutes.
+The invented forecast assumes northern temperate seasons (winter snow,
+summer storms); it makes no claim about local temperature or hemisphere.
+`packages/net/src/weather.ts` extends the world's original forecast for both
+the room server and clients without changing `packages/world`.
+
+**Cold proposal, not implemented:** real fruit flies become sluggish in the
+cold, but temperature and metabolic slowing are not modelled by this brain.
+Do not infer a cold response from a fly standing still in snow. A future
+labelled physiological stand-in could scale body/brain time with a documented
+temperature curve, with explicit owner approval and tests distinguishing it
+from neural decisions. That proposal is not active in this change.
+
 ## Checking the picnic's picture
 
 Compare the picnic at 1920×1080 with `scripts/play.ts`, keeping its chunky
@@ -319,3 +372,11 @@ collision surface. Only direct light is shadowed; the sky still fills it.
 Rain rings spread on the tabletop and in the saucer's pool. Hits on the fly
 or raised objects throw splash droplets without a suspended horizontal ring;
 the fly feels the same rain touch as before.
+
+<!-- docs-check: base apps/web/src -->
+
+<!-- docs-check: base apps/web/src/places/restaurant -->
+
+<!-- docs-check: base apps/web/src/places -->
+
+<!-- docs-check: base packages/world/src -->

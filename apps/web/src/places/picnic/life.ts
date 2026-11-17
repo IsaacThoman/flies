@@ -7,8 +7,9 @@
 // reaches the fly only through its senses (places/types.ts, Felt): the wind
 // it feels, a drop or a leaf landing on it, what it sees. None is timed to it
 // or aimed at it. At a table with others the table says when each comes,
-// and its chances are the table's, so every device sees the same visit; the
-// visitors keep clear of whichever fly is nearest them.
+// and its chances are the table's, so every device sees the same visit. The
+// visitors keep clear of whichever fly is nearest them, this device's others
+// among them, and a falling leaf brushes any of this device's flies.
 
 import * as THREE from "three";
 import type { Food, Vec3, World } from "@fly/world";
@@ -18,7 +19,7 @@ import { paint } from "../../scene/build.ts";
 import type { Daylight } from "../../scene/light.ts";
 import { SHADE, shaded } from "../../scene/shade.ts";
 import type { Weather } from "../../scene/weather.ts";
-import type { Around } from "../types.ts";
+import type { Around, Felt } from "../types.ts";
 import { outside } from "./outside.ts";
 import { Rain } from "./rain.ts";
 import { Butterfly, Ladybird, Leaves } from "./visitors.ts";
@@ -171,14 +172,23 @@ export class Goings {
     this.#start(kind, around);
   }
 
-  /** The fly a visitor at `p` keeps clear of: the nearest at a table with others, else this one. */
+  /** The fly a visitor at `p` keeps clear of: the nearest of this device's and, at a table with others, everyone else's. */
   #nearest(p: Vec3, around: Around): Readonly<Vec3> {
     let best = around.fly;
-    const shared = around.shared;
-    if (!shared) return best;
     let d = Math.hypot(p.x - best.x, p.z - best.z);
-    for (let i = 0; i < shared.others.length; i++) {
-      const o = shared.others[i];
+    const company = around.company;
+    for (let i = 0; i < company.length; i++) {
+      const o = company[i];
+      const e = Math.hypot(p.x - o.x, p.z - o.z);
+      if (e < d) {
+        d = e;
+        best = o;
+      }
+    }
+    const others = around.shared?.others;
+    if (!others) return best;
+    for (let i = 0; i < others.length; i++) {
+      const o = others[i];
       const e = Math.hypot(p.x - o.x, p.z - o.z);
       if (e < d) {
         d = e;
@@ -204,6 +214,11 @@ export class Goings {
     }
 
     this.#stepGust(dt);
+    // Storm wind reaches the same felt air as the visible rain's slant.
+    const stormWind = weather.heavy * 500 * Math.pow(0.5 + 0.5 * Math.sin(this.#time * 0.43 + 1.2), 3);
+    outside.gust.x += Math.cos(BREEZE_ANGLE) * stormWind;
+    outside.gust.z += Math.sin(BREEZE_ANGLE) * stormWind;
+    outside.gust.strength = Math.min(1, outside.gust.strength + stormWind / 600);
     felt.air.x += outside.gust.x;
     felt.air.z += outside.gust.z;
     const brushed = this.#leaves.step(dt, this.#time, world, fly, outside.gust);
@@ -215,6 +230,22 @@ export class Goings {
     this.#stepBoat(dt, weather);
     this.#stepFound(dt, around);
     this.#rainOn(dt, around);
+    if (this.#butterfly.active) felt.looming.push(this.#butterfly.looming);
+    if (this.#ladybird.active) felt.looming.push(this.#ladybird.looming);
+    if (this.#leaves.state === "falling") felt.looming.push(this.#leaves.looming);
+  }
+
+  /** What this frame's goings-on do to another fly, at `at`: the gust, a falling leaf brushing it, a raindrop now and then, and what it could see coming. */
+  feel(dt: number, at: Readonly<Vec3>, felt: Felt) {
+    felt.air.x += outside.gust.x;
+    felt.air.z += outside.gust.z;
+    const brushed = this.#leaves.brush(at);
+    if (brushed > 0) felt.touch = Math.max(felt.touch, brushed);
+    const rain = this.#around?.weather.rain ?? 0;
+    if (rain >= 0.01 && Math.random() < (dt * rain) / RAIN_HIT_EVERY) {
+      felt.touch = Math.max(felt.touch, RAIN_TOUCH);
+      this.rain.splash(at.x, at.y + 0.9, at.z, 0.9);
+    }
     if (this.#butterfly.active) felt.looming.push(this.#butterfly.looming);
     if (this.#ladybird.active) felt.looming.push(this.#ladybird.looming);
     if (this.#leaves.state === "falling") felt.looming.push(this.#leaves.looming);
@@ -453,7 +484,7 @@ export class Goings {
 
   /** Rain landing: splashes round the fly and over the table, rings in the lemonade, and now and then a drop on the fly. */
   #rainOn(dt: number, around: Around) {
-    const rain = around.weather.rain;
+    const rain = around.weather.rain * (1 + 2 * around.weather.heavy);
     if (rain < 0.01) return;
     const { world, fly, felt } = around;
     const s = this.#splashes;
