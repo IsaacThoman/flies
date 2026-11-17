@@ -1,0 +1,139 @@
+// Deliberate, stable faults at public contracts. Keep the catalogue unchanged
+// between measurements so a score compares the same bugs.
+export type Campaign = { file: string; tests: string[]; faults: [id: string, from: string, to: string][] };
+export const campaigns: Campaign[] = [
+  {
+    file: "packages/net/src/protocol.ts",
+    tests: ["packages/net/tests/protocol.test.ts"],
+    faults: [
+      ["hand-truncation", "if (at + stateLength(flags) > view.byteLength) return -1;", ""],
+      ["batch-type", "view.getUint8(0) !== FLIES", "view.getUint8(0) === FLIES"],
+      ["bite-limit", "n > MAX_BITES", "n > MAX_BITES + 1"],
+      ["bite-truncation", "view.byteLength < bitesLength(n)", "view.byteLength < bitesLength(n) - 1"],
+      ["encode-bite-limit", "Math.min(count, MAX_BITES)", "count"],
+      ["sequence-half-turn", "< 0x8000", "<= 0x8000"],
+      ["signed-position", "s.z = view.getInt16", "s.z = view.getUint16"],
+      ["fly-count", "out.setUint8(1, count);", "out.setUint8(1, count - 1);"],
+    ],
+  },
+  {
+    file: "packages/net/src/limits.ts",
+    tests: ["packages/net/tests/limits.test.ts"],
+    faults: [
+      ["rate-burst-cap", "Math.min(this.#burst, this.#tokens +", "Math.max(this.#burst, this.#tokens +"],
+      ["rate-debit", "this.#tokens -= 1;", ""],
+      ["rate-refill", "/ 60_000", "/ 54_000"],
+      ["rate-inclusive", "this.#tokens < 1", "this.#tokens <= 1"],
+      ["leash-equal-time", "next.t <= last.t", "next.t < last.t"],
+      ["leash-future-boundary", "next.t > now + AHEAD", "next.t >= now + AHEAD"],
+      ["password-empty", "raw.length > 0", "raw.length >= 0"],
+      ["name-boundary", "[...name].length > ROOM_NAME_MAX", "[...name].length >= ROOM_NAME_MAX"],
+    ],
+  },
+  {
+    file: "apps/server/src/tables.ts",
+    tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts", "apps/server/tests/hardening.test.ts"],
+    faults: [
+      ["unlisted-leak", "table.listed && table.present > 0", "table.present > 0"],
+      ["room-order", "b.flies - a.flies", "a.flies - b.flies"],
+      ["live-room-expiry", "if (table.connected > 0)", "if (table.connected < 0)"],
+      ["listed-retention", "table.listed ? LISTED_IDLE : TABLE_IDLE", "table.listed ? TABLE_IDLE : LISTED_IDLE"],
+      ["list-cap", "rooms.slice(0, LISTED_MAX)", "rooms"],
+      ["load-version", "kept.v !== 1", "kept.v === 1"],
+    ],
+  },
+  {
+    file: "apps/server/src/lock.ts",
+    tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts", "apps/server/tests/hardening.test.ts"],
+    faults: [
+      ["password-check", "timingSafeEqual(got, want)", "true"],
+      ["salt-size", "randomBytes(16)", "randomBytes(1)"],
+      ["normalization", "password.normalize(\"NFC\")", "password"],
+      ["lock-shape", "typeof l.hash === \"string\"", "true"],
+    ],
+  },
+  {
+    file: "apps/web/src/settings.ts",
+    tests: ["apps/web/tests/settings.test.ts"],
+    faults: [
+      ["shelf-expiry", "now - at < kept.for", "now - at <= kept.for"],
+      ["shelf-forbidden", "kept.not?.includes(kind)", "false"],
+      ["invalid-choice", "(!valid || valid(value))", "true"],
+      ["day-negative", "value >= 0", "true"],
+      ["day-date", "saved.date !== date", "saved.date === date"],
+      ["learned-literal", "saved[lesson] === true", "!!saved[lesson]"],
+    ],
+  },
+  {
+    file: "apps/web/src/ui/settle.ts",
+    tests: ["apps/web/tests/settle.test.ts"],
+    faults: [
+      ["settle-boundary", "this.#wait >= SETTLE", "this.#wait > SETTLE"],
+      ["settle-reset", "this.#wait = 0", "this.#wait = 0.5"],
+      ["settle-consume", "this.#wait = -1;", "this.#wait = 0;"],
+      ["settle-idle", "if (this.#wait < 0) return;", ""],
+      ["settle-immediate", "else this.#settle();", "else this.#wait = 0;"],
+    ],
+  },
+  {
+    file: "apps/web/src/quality.ts",
+    tests: ["apps/web/tests/quality.test.ts"],
+    faults: [
+      ["brain-threshold", "BRAIN_BEHIND = 0.95", "BRAIN_BEHIND = 0.855"],
+      ["brain-quorum", "this.#brainSamples * 2 >= this.#frames", "this.#brainSamples >= 1"],
+      ["good-streak", "this.#good = 0;\n      if (this.#trial", "if (this.#trial"],
+      ["bad-streak", "this.#bad = 0;\n    if (this.#trial", "if (this.#trial"],
+      ["ignore-gap", "intervalMs > HITCH_MS", "intervalMs < HITCH_MS"],
+      ["reset-bound", "this.#brainBound = false;", "this.#brainBound = true;"],
+      ["storage-level", "saved < LEVELS.length", "saved <= LEVELS.length"],
+    ],
+  },
+  {
+    file: "packages/world/src/pantry.ts",
+    tests: ["packages/world/tests/world.test.ts"],
+    faults: [
+      ["taste-circle", "dx * dx + dz * dz > d * d", "dx * dx + dz * dz > d"],
+      ["taste-amount", "food.sweet * food.amount > best.sweet * best.amount", "food.sweet > best.sweet"],
+      ["appetite-cap", "Math.max(0, Math.min(1, appetite))", "appetite"],
+      ["time-clamp", "Math.max(0, dt)", "dt"],
+      ["patch-recovery-cap", "Math.min(1, food.amount + dt / PATCH_RECOVERY)", "food.amount + dt / PATCH_RECOVERY"],
+      ["remove-unknown", "if (i >= 0)", "if (i >= -1)"],
+    ],
+  },
+  {
+    file: "apps/web/src/scene/light.ts",
+    tests: ["apps/web/tests/light.test.ts", "apps/web/tests/light-cache.test.ts"],
+    faults: [
+      ["negative-hour", "const h = ((hours % 24) + 24) % 24;\n  const keys", "const h = hours % 24;\n  const keys"],
+      ["time-morning", "h >= 5.5", "h > 5.5"],
+      ["sun-short-turn", "Math.atan2(Math.sin(to - from), Math.cos(to - from))", "to - from"],
+      ["lamp-threshold", "p.dusk.sunUp >= SETTING", "p.dusk.sunUp > SETTING"],
+      ["weather-rain-dirty", " || w.rain !== weather.rain", ""],
+      ["place-openness", "this.#open = open;", "this.#open = 1;"],
+    ],
+  },
+  {
+    file: "apps/web/src/scene/weather.ts",
+    tests: ["apps/web/tests/weather.test.ts"],
+    faults: [
+      ["rain-priority", "if (w.rain > 0.3)", "if (w.rain > 0.6)"],
+      ["mist-priority", "if (w.mist > 0.5)", "if (w.mist > 0.8)"],
+      ["wind-transition", "this.wind = toward(this.wind, t.wind);", ""],
+      ["chosen-flag", "this.chosen = kind;", ""],
+      ["follow-flag", "this.chosen = null;", ""],
+      ["jump-wind", "this.wind = this.#target.wind;", ""],
+    ],
+  },
+  {
+    file: "apps/web/src/online/connection.ts",
+    tests: ["apps/web/tests/online.test.ts", "apps/web/tests/socket-lifetime.test.ts"],
+    faults: [
+      ["send-unjoined", "if (this.status !== \"joined\") return;\n    const text", "if (this.status === \"joined\") return;\n    const text"],
+      ["hello-once", "this.#saidHello = true;", ""],
+      ["empty-bites", " || count === 0", ""],
+      ["welcome-reset", "this.clock.reset();", ""],
+      ["welcome-timeout", "WELCOME_WITHIN = 10", "WELCOME_WITHIN = 11"],
+      ["leave-terminal", "this.refusal = \"left\";", ""],
+    ],
+  },
+];

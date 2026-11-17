@@ -5,7 +5,7 @@
 
 import type * as THREE from "three";
 import type { Looming } from "@fly/body";
-import type { Pantry, Place, Vec3, World } from "@fly/world";
+import type { Food, Pantry, Place, Vec3, World } from "@fly/world";
 import type { Shot } from "../camera.ts";
 import type { Daylight, Palettes } from "../scene/light.ts";
 import type { Weather } from "../scene/weather.ts";
@@ -53,7 +53,10 @@ export type Around = {
   readonly fly: Readonly<Vec3>;
   readonly airborne: boolean;
   readonly world: World;
-  readonly pantry: Pantry;
+  readonly pantry: Pantry & {
+    /** A place may give found food a lifetime in seconds; solo pantries simply remove it when its visit ends. */
+    add(name: string, x: number, z: number, r: number, sweet: number, y?: number, lasts?: number): Food;
+  };
   readonly weather: Weather;
   /**
    * Nobody has touched the remote for a while (the wallpaper, or a minute of
@@ -67,7 +70,13 @@ export type Around = {
   readonly shared: SharedTable | null;
 };
 
-export type SharedTable = { readonly others: readonly Readonly<Vec3>[]; readonly anchor: Readonly<Vec3> };
+/**
+ * The others at a table, and the fly the table's visits are planned round.
+ * `ownSky`: in a room open to everyone each device keeps its own light and
+ * weather, so a visit the table sends that doesn't suit this device's sky
+ * (a butterfly in its rain, a gull in its night) doesn't come here.
+ */
+export type SharedTable = { readonly others: readonly Readonly<Vec3>[]; readonly anchor: Readonly<Vec3>; ownSky: boolean };
 
 /** What the place does to the fly this frame, all through its senses. */
 export type Felt = {

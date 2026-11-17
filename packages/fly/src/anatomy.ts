@@ -1,5 +1,5 @@
 // The fly's measurements, shared by the geometry and the rig. Units are body
-// lengths (front of the head to the tip of the abdomen, 2.4 mm in a male
+// lengths (front of the head to the tip of the abdomen, 2.5 mm in a male
 // Drosophila melanogaster); the space is the model's: standing on y = 0,
 // facing +z, +x on the fly's left. Left-side values are given; the right side
 // is the mirror image. Proportions follow a male: head about a fifth of the
@@ -29,7 +29,7 @@ export const ABDOMEN = { centre: [0, 0.295, -0.25] as Vec3, radii: [0.128, 0.11,
 /** Where each abdominal segment (A1 to A6) ends, as a fraction of the abdomen from front to tip. */
 export const ABDOMINAL_SEGMENTS = [0.12, 0.3, 0.47, 0.63, 0.8, 1];
 
-export const PROBOSCIS = { rostrum: 0.05, haustellum: 0.062, labellum: 0.04 };
+export const PROBOSCIS = { rostrum: 0.05, haustellum: 0.085, labellum: 0.04, padDepth: 0.015 };
 export const HALTERE = { stalk: 0.045, knob: 0.0125 };
 export const WING = { length: 0.8 };
 
@@ -66,17 +66,17 @@ export const LEGS: readonly LegSpec[] = [
   {
     hip: [0.045, 0.22, 0.29], coxaDir: [0.25, -0.62, 0.74], coxaFollow: 0.45,
     coxa: 0.085, femur: 0.19, tibia: 0.17, basitarsus: 0.075, tarsus: 0.09,
-    femurRadius: 0.0155, tibiaRadius: 0.0095, foot: [0.27, 0, 0.66], knee: [0.8, 0.35, 0.45], reach: 0.15,
+    femurRadius: 0.0155, tibiaRadius: 0.0095, foot: [0.24, 0, 0.60], knee: [0.8, 0.35, 0.45], reach: 0.195,
   },
   {
     hip: [0.068, 0.2, 0.175], coxaDir: [0.55, -0.82, 0.12], coxaFollow: 0.25,
     coxa: 0.05, femur: 0.22, tibia: 0.21, basitarsus: 0.085, tarsus: 0.095,
-    femurRadius: 0.0135, tibiaRadius: 0.0088, foot: [0.53, 0, 0.1], knee: [0.9, 0.6, 0], reach: 0.21,
+    femurRadius: 0.0135, tibiaRadius: 0.0088, foot: [0.48, 0, 0.1], knee: [0.9, 0.6, 0], reach: 0.22,
   },
   {
     hip: [0.07, 0.205, 0.075], coxaDir: [0.45, -0.8, -0.38], coxaFollow: 0.25,
     coxa: 0.055, femur: 0.24, tibia: 0.23, basitarsus: 0.09, tarsus: 0.095,
-    femurRadius: 0.0145, tibiaRadius: 0.0088, foot: [0.38, 0, -0.34], knee: [0.75, 0.6, -0.3], reach: 0.19,
+    femurRadius: 0.0145, tibiaRadius: 0.0088, foot: [0.34, 0, -0.27], knee: [0.75, 0.6, -0.3], reach: 0.22,
   },
 ];
 

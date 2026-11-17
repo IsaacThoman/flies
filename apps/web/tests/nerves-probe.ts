@@ -4,7 +4,7 @@
 
 import { Session } from "node:inspector/promises";
 import { REGIONS } from "@fly/brain";
-import { NERVE_PARTS } from "@fly/fly";
+import { NERVE_PARTS, SOMA_GROUPS } from "@fly/fly";
 import { NerveGlow } from "../src/nerves/glow.ts";
 import { nervesSlot, nervesWanted } from "../src/nerves/panel.ts";
 import { Xray, xrayWanted } from "../src/nerves/xray.ts";
@@ -13,11 +13,13 @@ import { CornerDeck, CornerPlacement } from "../src/ui/corners.ts";
 const parts = new Float32Array(NERVE_PARTS.length + 3);
 const glow = new NerveGlow(parts);
 const rates = new Float32Array(REGIONS.length);
+const readouts = Object.fromEntries(SOMA_GROUPS.map((g) => [g.rate, 0]));
 const xray = new Xray();
 const deck = new CornerDeck(), placement = new CornerPlacement();
 const frame = (i: number) => {
   for (let r = 0; r < rates.length; r++) rates[r] = ((i * 7 + r * 13) % 50) * 0.3;
-  glow.update(rates, 1 / 60);
+  for (let s = 0; s < SOMA_GROUPS.length; s++) readouts[SOMA_GROUPS[s].rate] = ((i * 11 + s * 7) % 100);
+  glow.update(rates, 1 / 60, readouts);
   xray.update(1 / 60, xrayWanted("always", "play", (i & 64) !== 0, false), 40 + (i % 200));
   const wanted = nervesWanted("wallpaper", "play", (i & 128) !== 0, false);
   deck.update(1 / 60, wanted === "show", (i & 128) !== 0, i >> 8);
@@ -29,8 +31,11 @@ const run = (n: number) => {
 
 run(1500);
 const start = performance.now();
+const cpuStart = process.cpuUsage();
 run(1500);
 const micros = ((performance.now() - start) / 1500) * 1000;
+const cpu = process.cpuUsage(cpuStart);
+const cpuMicros = (cpu.user + cpu.system) / 1500;
 
 type Node = { id: number; callFrame: { functionName: string; url: string }; children: Node[] };
 type Profile = { head: Node; samples: { size: number; nodeId: number }[] };
@@ -65,4 +70,4 @@ for (const { size, where } of await sample(() => run(600), true)) {
   if (!seen.includes(where)) seen.push(where);
 }
 session.disconnect();
-console.log(JSON.stringify({ micros, numberSize, sizes }));
+console.log(JSON.stringify({ micros, cpuMicros, numberSize, sizes }));
