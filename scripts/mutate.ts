@@ -2,7 +2,7 @@
 // leaves the developer's sources mutated. No test or production dependency.
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,9 +53,16 @@ try {
   for (const entry of readdirSync(path.join(root, "node_modules"))) {
     if (entry !== "@fly") symlinkSync(path.join(root, "node_modules", entry), path.join(sandbox, "node_modules", entry));
   }
-  for (const entry of readdirSync(path.join(root, "node_modules", "@fly"))) {
-    const relative = path.relative(root, realpathSync(path.join(root, "node_modules", "@fly", entry)));
-    symlinkSync(path.join(sandbox, relative), path.join(sandbox, "node_modules", "@fly", entry));
+  // Resolve names from manifests: archived dependency links may still point
+  // to another checkout, which must never become a mutation's test subject.
+  for (const parent of ["apps", "packages"]) {
+    for (const entry of readdirSync(path.join(sandbox, parent))) {
+      const directory = path.join(sandbox, parent, entry);
+      const manifest = path.join(directory, "package.json");
+      if (!existsSync(manifest)) continue;
+      const { name } = JSON.parse(readFileSync(manifest, "utf8")) as { name: string };
+      if (name.startsWith("@fly/")) symlinkSync(directory, path.join(sandbox, "node_modules", name));
+    }
   }
   for (const campaign of selected) {
     const file = path.join(sandbox, campaign.file);

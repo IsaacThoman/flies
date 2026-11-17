@@ -4,6 +4,11 @@ import type { Campaign } from "./mutation-cases.ts";
 // adding them cannot change the denominator of the original comparison.
 export const challenges: Campaign[] = [
   {
+    file: "apps/web/src/online/connection.ts",
+    tests: ["apps/web/tests/online.test.ts", "apps/web/tests/socket-lifetime.test.ts"],
+    faults: [["drop-clock-pings", 'this.send({ type: "ping", t: now });', ""]],
+  },
+  {
     file: "apps/server/src/lock.ts",
     tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts"],
     faults: [["constant-salt", "randomBytes(16)", "Buffer.alloc(16)"]],

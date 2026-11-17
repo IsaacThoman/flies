@@ -306,3 +306,33 @@ test("a malformed clock message cannot welcome a line or poison an established r
   assert.equal(messages.length, 1, "only the valid welcome reached the game");
   l.leave();
 });
+
+test("a joined line samples the clock frequently at first, then keeps resynchronizing once a second", (t) => {
+  let now = 1000;
+  t.mock.method(performance, "now", () => now);
+  const { line: l, sockets } = line();
+  const socket = sockets[0];
+  socket.status = "open";
+  l.update(0);
+  now = 1020;
+  socket.say(welcome(5000));
+  l.update(0);
+  const pings = () => socket.sent.map((text) => JSON.parse(text) as ClientMessage).filter((m) => m.type === "ping");
+  assert.deepEqual(pings().map((m) => m.t), [1020]);
+  for (const at of [1170, 1320, 1470, 1620, 1770, 2770]) {
+    const count = pings().length;
+    now = at - 1;
+    l.update(0);
+    assert.equal(pings().length, count, "no ping before its interval");
+    now = at;
+    l.update(0);
+    assert.equal(pings().length, count + 1);
+  }
+  assert.deepEqual(pings().map((m) => m.t), [1020, 1170, 1320, 1470, 1620, 1770, 2770]);
+  now = 2780;
+  socket.say({ type: "pong", t: 2770, now: 9000 });
+  l.update(0);
+  assert.equal(l.clock.rtt, 10);
+  assert.equal(l.clock.now(now), 9005, "the quicker round trip replaces the welcome's clock sample");
+  l.leave();
+});
