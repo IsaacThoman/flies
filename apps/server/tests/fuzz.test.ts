@@ -8,6 +8,7 @@ import { fuzzServer, fuzzTable } from "./fuzzing.ts";
 
 const seed = Number(process.env.FUZZ_SEED ?? Math.floor(Math.random() * 2 ** 31));
 
+// This bounds fuzz exploration, not an awaited result: a slower run does less work.
 const within = (ms: number) => {
   const end = performance.now() + ms;
   return () => performance.now() > end;
