@@ -1,0 +1,15 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "story": "05-eyes",
+  "wallpaper": false,
+  "staging": null,
+  "fingerprint": "76ca3c50",
+  "frames": 301,
+  "neurons": 166700,
+  "activity": "resting",
+  "eaten": 0,
+  "takeOffs": 0,
+  "eyeUpdates": 101,
+  "peers": 0
+}
