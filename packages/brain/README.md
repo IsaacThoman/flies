@@ -923,6 +923,8 @@ routes to escape and landing descending neurons. `--simulate --seeds 5` compares
 20/100 ms transients with a 1 s step at several input rates. This is a research
 probe, not a gameplay sense; [the air-puff investigation](../../docs/puff-startle.md)
 separates real-fly evidence from what this chemical-only model can reproduce.
+`scripts/summarize-puff.ts` regenerates its response/wiring CSVs and paired
+bootstrap intervals from retained JSONL captures, without running the brain.
 
 `node packages/brain/scripts/probe.ts --type LPLC2,LC4 --side left` drives any group (by `--type`, `--superClass`, `--class`, `--subClass`, `--side`, `--nt`: comma-separated values or a `/regex/`) at `--rate` Hz for `--ms` and lists what responds, by super class and type, at the operating point. `--only <regex>` limits the list to some super classes, `--after <ms>` keeps running with the drive off to show what keeps going (driven neurons included), and `--set excitatory=0.2`, `--set saturation=0` and so on try another operating point. `--each type --target MN9` ranks each type in the selection by what it does to a target, and `--greedy` builds a set as `sweet`'s was built. The comment at the top of the file lists every option.
 

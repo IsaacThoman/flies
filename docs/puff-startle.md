@@ -338,7 +338,7 @@ node packages/brain/scripts/puff.ts --simulate --populations AB+CE --rates 50,10
 
 Against base `bd88a01` (the origin/dev tip when this branch was created), the
 production brain, native brain, body and tool sources are unchanged. The diff
-adds this report, two numerical summaries, the Node-only research probe and a
+adds this report, numerical/provenance summaries, the Node-only research probe and a
 README link. New commits on dev are not treated as part of this experiment.
 
 - Full `npm test`: main suite **717 passed, 0 failed, 4 skipped** (721 tests).
@@ -380,12 +380,12 @@ the earlier sweep, not selected to induce a threshold crossing. Earlier
 three-/ten-seed captures overlap these expanded cohorts; they are not extra
 independent replicates and are never pooled into the condition fractions.
 
-| Condition | Escape peak range over 1.5 s | Events at >= 0.4 | Trials with any GF spike in first 100 ms | Mean excess GF spikes in first 100 ms, paired to sham |
+| Condition | Escape peak range over 1.5 s | Events at >= 0.4 | Trials with any GF spike in first 100 ms | Mean excess GF spikes in first 100 ms, paired to sham (approximate 95% bootstrap interval) |
 | --- | ---: | ---: | ---: | ---: |
-| rest | 0.000–0.167 | 0/20 | 4/20 | 0.00 |
-| AB | 0.147–0.315 | 0/20 | 20/20 | 7.80 |
-| AB+CE | 0.055–0.176 | 0/20 | 17/20 | 0.95 |
-| loom | 1.000–1.000 | 20/20 | 20/20 | 65.10 |
+| rest | 0.000–0.167 | 0/20 | 4/20 | reference |
+| AB | 0.147–0.315 | 0/20 | 20/20 | 7.80 (7.20–8.45) |
+| AB+CE | 0.055–0.176 | 0/20 | 17/20 | 0.95 (0.50–1.35) |
+| loom | 1.000–1.000 | 20/20 | 20/20 | 65.10 (64.70–65.45) |
 
 This separates GF activity from its rate-based command: A/B produces GF spikes
 in every trial, yet no escape threshold event. A simplistic offline rule that
@@ -401,9 +401,73 @@ cohort bounds spontaneous threshold events here; it does not remove missing
 physiology or calibrate a puff to neural firing.
 
 ```sh
-node packages/brain/scripts/puff.ts --simulate --populations rest,loom,AB+CE --rates 100 --durations 100 --seeds 20
+node packages/brain/scripts/puff.ts --simulate --populations rest,AB,AB+CE,loom --rates 100 --durations 100 --seeds 20
 ```
 
 The condition summary now contains 148 rows. All trial fractions are per
 condition; shared seeds, overlapping expansions and repeated sham captures
 must not be treated as independent animals.
+
+The intervals resample the twenty paired seed differences, with replacement,
+20,000 times, taking the mean of each resample and the sorted elements at
+zero-based indices 499 and 19,500. Each condition starts `mulberry32(1)`;
+each draw selects `floor(random() * 20)`. They describe uncertainty across
+model RNG seeds, with approximate percentile-bootstrap coverage; they are
+not biological intervals or a guarantee of exact coverage. The paired
+differences and complete algorithm settings are in the provenance summary.
+
+## Regenerating the summaries
+
+[`summarize-puff.ts`](../packages/brain/scripts/summarize-puff.ts) consumes
+JSONL captures without loading or simulating the connectome. It regenerates
+the two CSV summaries and the paired differences/intervals. Give captures in
+the desired row order; identical condition summaries are emitted once, while
+conflicting duplicates fail. The cohort size is part of the condition key,
+so expanded trials never overwrite a smaller cohort or get pooled with it.
+Historical empty sham inputs labelled with a requested rate are normalized
+to zero drive. Their zero-neuron membership is checked.
+
+Retain the exploratory captures as `puff-sim.jsonl` and `puff-zones.jsonl`
+using the reproduction commands, and redirect the dose and timing commands
+above to `puff-dose.jsonl` and `puff-temporal.jsonl`. Capture the matched
+cohort with:
+
+```sh
+node packages/brain/scripts/puff.ts --simulate --populations rest,loom,AB+CE,AB --rates 100 --durations 100 --seeds 20 > /tmp/puff-matched.jsonl
+node packages/brain/scripts/summarize-puff.ts responses /tmp/puff-sim.jsonl /tmp/puff-zones.jsonl /tmp/puff-dose.jsonl /tmp/puff-temporal.jsonl /tmp/puff-matched.jsonl > /tmp/puff-results.csv
+node packages/brain/scripts/summarize-puff.ts wiring /tmp/puff-wiring.jsonl > /tmp/puff-wiring.csv
+node packages/brain/scripts/summarize-puff.ts paired /tmp/puff-matched.jsonl > /tmp/puff-paired.json
+```
+
+The retained captures reproduce all **148 response rows**, all **720 wiring
+rows**, and all three paired bootstrap intervals. The CSVs use six-decimal
+rounding; the paired calculation uses the unrounded trial counts. These
+regeneration checks run without a heavy simulation sweep. They verify the
+summary transformation, not the missing capture provenance of historical
+exploratory trials.
+
+## Capture provenance and replay
+
+The [provenance summary](puff-startle-provenance.json) records two canonical
+captures from clean commit `01b1da5f5704cd017371d42c519813088fad4ee0`:
+the wiring query and the four matched twenty-seed conditions above. Headers
+record Node/architecture/arguments, the probe's SHA-256, all 19 runtime source
+hashes, and the packed dataset hash. Raw-capture and payload hashes are
+supplied; payload hashing omits the changing provenance header. Generate
+JSONL with the commands above to reproduce the numerical payload. Source
+hashes identify the captured revision even after this report changes.
+
+The canonical replay exactly matches all **80/80 trial records** from the
+earlier matched captures and **70/70 wiring records**. All 19 recorded runtime
+source SHA-256 values match the branch's base commit. The Git tree listing
+for 105 tracked production files across the brain, native brain, body, tools
+and CPU-budget helper also matches that base, and those working-tree paths
+were clean at capture. This is explicit source evidence, rather than an
+empty diff presented without its command or exit status.
+
+Earlier exploratory captures did not record the probe revision/hash. Their
+full provenance cannot be recovered retroactively: the canonical replay
+certifies the wiring and fixed controls, **not** every cell of the historical
+exploratory grid. The report does not claim a complete archived environment
+or a replay of physical flight. The current probe emits provenance on every
+run so future sweeps can retain that information.
