@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { once } from "node:events";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -6,7 +7,7 @@ import { performance } from "node:perf_hooks";
 import { after, test } from "node:test";
 import { WebSocket } from "ws";
 import { createPicnic } from "@fly/world";
-import { CLOSE, COLOURS, FLY_MAX, OWN_MAX, PROTOCOL, ROOMS_PATH, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, encodeOwn, tableCode } from "@fly/net";
+import { CLOSE, COLOURS, EVERYONE, FLY_MAX, OWN_MAX, PROTOCOL, ROOMS_PATH, TABLETOP_SCALE, createFlyState, decodeFlies, encodeFly, encodeOwn, everyoneCode, tableCode } from "@fly/net";
 import type { ClientMessage, FlyState, RoomWire, ServerMessage, Spot, TableStart } from "@fly/net";
 import { startServer } from "../src/server.ts";
 import type { RoomServer } from "../src/server.ts";
@@ -150,6 +151,42 @@ test("a hello for a table nobody has started, without starting it, is refused as
   assert.equal((await d.closed).code, CLOSE.unknown);
 });
 
+test("a device saying hello to Everyone without starting a room is welcomed into an unlocked listed room with no starter", async () => {
+  const { server } = await serve();
+  const d = await device(server.port);
+  const welcome = await d.hello(EVERYONE, newKey());
+  assert.ok(welcome.type === "welcome");
+  assert.deepEqual(welcome.room, { code: EVERYONE, everyone: true, name: "Everyone", listed: true, locked: false });
+  assert.equal(welcome.starter, 0);
+  assert.equal(welcome.id, 1);
+  assert.deepEqual(welcome.world, { light: "clock", weather: "now" });
+  d.ws.close();
+  await d.closed;
+});
+
+test("hellos for everyone codes ignore starts and passwords without spending the address's allowance for starting rooms", async () => {
+  const { server } = await serve();
+  // This code has never opened: a start there must not use the ordinary room's creation path.
+  for (let i = 0; i < 6; i++) {
+    const d = await device(server.port);
+    const welcome = await d.hello(everyoneCode(7), newKey(), { start: { ...START, name: "Mine", listed: false }, password: "a password" });
+    assert.ok(welcome.type === "welcome");
+    assert.deepEqual(welcome.room, { code: EVERYONE, everyone: true, name: "Everyone", listed: true, locked: false });
+    assert.equal(welcome.starter, 0);
+    d.ws.close();
+    await d.closed;
+  }
+  for (let i = 0; i < 5; i++) {
+    const d = await device(server.port);
+    assert.equal((await d.hello(newCode(), newKey(), { start: START })).type, "welcome");
+    d.ws.close();
+    await d.closed;
+  }
+  const limited = await device(server.port);
+  assert.deepEqual(await limited.hello(newCode(), newKey(), { start: START }), { type: "refused", reason: "busy" });
+  assert.equal((await limited.closed).code, CLOSE.busy);
+});
+
 test("two devices at a table hear each other's flies in the room's batches, and the health check counts them", async () => {
   const { server } = await serve();
   const code = newCode();
@@ -183,7 +220,7 @@ test("two devices at a table hear each other's flies in the room's batches, and 
   const body = (await health.json()) as Record<string, unknown>;
   assert.equal(body.ok, true);
   assert.equal(body.protocol, PROTOCOL);
-  assert.equal(body.tables, 1);
+  assert.equal(body.tables, 2);
   assert.equal(body.devices, 2);
   assert.equal(body.flies, 2);
 });
@@ -250,22 +287,32 @@ test("a listed room shows in the list, by its name, place, flies and lock, as it
   const u = await device(server.port);
   const welcome = await u.hello(unlisted, newKey(), { start: { ...START, name: "Secret", listed: false } });
   assert.ok(welcome.type === "welcome");
-  assert.deepEqual(welcome.room, { name: "Secret", listed: false, locked: false });
+  assert.deepEqual(welcome.room, { code: unlisted, everyone: false, name: "Secret", listed: false, locked: false });
 
   const look = await browser(server.port);
   const first = await look.list(() => true);
-  assert.deepEqual(first, [{ code: listed, name: "Sunny crumbs", place: "lab", flies: 1, locked: false }]);
+  assert.deepEqual(first.filter((room) => !room.everyone), [{ code: listed, name: "Sunny crumbs", place: "lab", flies: 1, locked: false }]);
   // Someone sits down: the list says so, on its own.
   const b = await device(server.port);
   await b.hello(listed, newKey());
-  await look.list((rooms) => rooms[0]?.flies === 2);
+  await look.list((rooms) => rooms.find((room) => room.code === listed)?.flies === 2);
   assert.ok(look.heard.every((r) => !("json" in r) || r.json.type !== "rooms" || r.json.rooms.every((room) => room.code !== unlisted)), "never the unlisted room");
   // Browsing, it is told nothing else, and nothing it says sits it anywhere.
   look.send({ type: "hello", v: PROTOCOL, table: unlisted, key: newKey() });
-  const from = look.heard.length;
-  a.send({ type: "flies", count: 2 });
-  await a.message("seated");
-  await look.message("rooms", from);
+  // A pong follows the preceding frames on this socket, so the assertion
+  // observes a processed hello rather than guessing how long loopback takes.
+  const controller = new AbortController();
+  const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(WAIT)]);
+  const pong = Promise.race([
+    once(look.ws, "pong", { signal }),
+    once(look.ws, "close", { signal }).then(() => { throw new Error("browsing socket closed before acknowledging"); }),
+  ]);
+  try {
+    look.ws.ping();
+    await pong;
+  } finally {
+    controller.abort();
+  }
   assert.ok(look.heard.every((r) => "json" in r && r.json.type === "rooms"));
   look.ws.close();
 });
@@ -282,10 +329,10 @@ test("a locked room lets in only whoever gives its password; its code alone does
   const a = await device(server.port);
   const started = await a.hello(code, starterKey, { start: { ...START, name: "Locked", listed: true }, password });
   assert.ok(started.type === "welcome");
-  assert.deepEqual(started.room, { name: "Locked", listed: true, locked: true });
+  assert.deepEqual(started.room, { code, everyone: false, name: "Locked", listed: true, locked: true });
 
   const look = await browser(server.port);
-  assert.deepEqual((await look.list(() => true)).map((r) => [r.name, r.locked]), [["Locked", true]]);
+  assert.deepEqual((await look.list(() => true)).filter((room) => !room.everyone).map((r) => [r.name, r.locked]), [["Locked", true]]);
 
   const joinerKey = newKey();
   const bare = await device(server.port);
@@ -309,7 +356,7 @@ test("a locked room lets in only whoever gives its password; its code alone does
 
   await server.stop();
   const kept = await readFile(path.join(dir, "tables.json"), "utf8");
-  const table = (JSON.parse(kept) as { tables: { code: string; name: string; listed: boolean; lock: { salt: string; hash: string } }[] }).tables[0];
+  const table = (JSON.parse(kept) as { tables: { code: string; name: string; listed: boolean; lock: { salt: string; hash: string } }[] }).tables.find((table) => table.code === code)!;
   assert.equal(table.name, "Locked");
   assert.ok(table.lock.salt && table.lock.hash, "kept as a salted hash");
   for (const where of [kept, ...lines]) assert.ok(!where.includes(password) && !where.includes("battery staple"), `a password in ${where.slice(0, 80)}`);

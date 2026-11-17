@@ -11,22 +11,21 @@ does. Run it again after changing the scene; `--out <dir>` writes them somewhere
 first, and `--only <path>` renders just the files whose paths start with it (`--only web/` for
 the web's, `--only ios/` for the iPhone and iPad's).
 
-- **Icon**: the fly close up on the napkin, the hills and trees beyond. Back to front: `1-sky`
-  (the backdrop: sky, hills, lake; opaque), `2-table` (the table and the picnic, transparent
-  where the sky was), `3-fly` (the fly alone, transparent).
+- **Icon**: the red-eyed fly close up over blue gingham with a seeded strawberry behind it.
+  Back to front: `1-picnic` (the picnic and backdrop together, opaque), `2-fly` (the fly alone, transparent).
 - **Top Shelf**: a wide, low look across the napkin on a morning, the strawberry to one side
   and the cherries to the other.
 - **Launch image**: what the loading screen shows behind its panel, with the wordmark where the
   loading screen draws it, so the one gives way to the other.
 - **iPhone and iPad icon**: the fly close up on the napkin, square and opaque, and the same at
-  night for the dark appearance.
+  dusk for the dark appearance.
 - **iPhone and iPad launch image**: the picnic with the fly in the middle of a square, which the
   launch screen crops to the screen's shape; no wordmark, since where the loading screen draws it
   depends on the screen.
 
 | Path | What | Sizes |
 | --- | --- | --- |
-| `tv-icon/<size>/` | The home-screen icon, in layers numbered back to front (`1-sky.png`, `2-table.png`, `3-fly.png`). tvOS moves them apart for the parallax effect. Two to five layers; the back one opaque, the others transparent. | `1280x768` (App Store), `400x240` and `800x480` (home screen, 1x and 2x) |
+| `tv-icon/<size>/` | The home-screen icon, in layers numbered back to front (`1-picnic.png`, `2-fly.png`). tvOS moves them apart for the parallax effect. Two to five layers; the back one opaque, the others transparent. | `1280x768` (App Store), `400x240` and `800x480` (home screen, 1x and 2x) |
 | `top-shelf/standard/` | The Top Shelf banner, shown above the top row when the app is in it: `top-shelf.png`, `top-shelf@2x.png`. tvOS may crop the edges. | 1920×720, 3840×1440 |
 | `top-shelf/wide/` | The wide Top Shelf banner, the same way. | 2320×720, 4640×1440 |
 | `splash/` | The launch image, which stays up until the game says it is ready. | `splash-1920x1080.png`, `splash-3840x2160.png` |
@@ -35,4 +34,10 @@ the web's, `--only ios/` for the iPhone and iPad's).
 | `web/apple-touch-icon.png` | The icon an iPhone or iPad puts on its home screen. | 180×180 |
 | `web/favicon.png` | The browser tab's icon: the fly alone, from nearly above, transparent. | 64×64 |
 | `web/preview.png` | The picture a link to the site shows in chats and feeds: the launch image's shot, with the wordmark. | 1200×630 |
-| `ios/` | The iPhone and iPad app's icon, the web app's at full size (`icon.png`) and at night for the dark appearance (`icon-dark.png`), and its launch image (`launch.png`). | 1024×1024; 2048×2048 |
+| `ios/` | The iPhone and iPad app's icon, the web app's at full size (`icon.png`) and at dusk for the dark appearance (`icon-dark.png`), and its launch image (`launch.png`). | 1024×1024; 2048×2048 |
+
+`npm run store:shots` regenerates eight actual game captures per device in `store/`, with JSON
+capture records. `--verify` repeats them in fresh pages and checks simulation state, dimensions,
+RGB encoding and image repeatability. See [capture provenance](../docs/release-art/captures.md).
+The requested landscape sets are iPhone 6.9-inch (2868×1320), iPad 13-inch (2752×2064),
+Apple TV 1080p (1920×1080) and Apple TV 4K (3840×2160).

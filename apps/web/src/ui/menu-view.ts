@@ -192,14 +192,14 @@ function drawTabs(g: CanvasRenderingContext2D, item: ChoiceItem, x: number, y: n
   }
 }
 
-/** An action's jelly button, with whatever marks it: its swatch at the left, its pips and padlock at the right, its words between them. */
+/** An action's jelly button, with whatever marks it: its swatch at the left, its pips and padlock (or globe) at the right, its words between them. */
 function drawAction(g: CanvasRenderingContext2D, item: ActionItem, x: number, y: number, w: number, h: number, focused: boolean, hover: boolean, press: number, size?: number) {
   const mid = y + h / 2 - (focused ? 2 : 0) + press * 2;
-  const marks = item.count || item.locked;
+  const marks = item.count || item.locked || item.everyone;
   // Clear of the marks on both sides, the words centred, smaller if they must be.
   let words = size;
   if (marks) {
-    const room = w - 2 * (h * 0.4 + PIPS.width + (item.locked ? h * 0.5 : 0));
+    const room = w - 2 * (h * 0.4 + PIPS.width + (item.locked || item.everyone ? h * 0.5 : 0));
     const most = size ?? Math.round(h * 0.46);
     g.font = font(most);
     words = Math.max(8, Math.min(most, Math.floor((most * room) / Math.max(1, g.measureText(item.label).width))));
@@ -215,6 +215,24 @@ function drawAction(g: CanvasRenderingContext2D, item: ActionItem, x: number, y:
     right -= PIPS.width + h * 0.18;
   }
   if (item.locked) padlock(g, right - h * 0.16, mid, h * 0.3, ink, item.disabled);
+  else if (item.everyone) globe(g, right - h * 0.16, mid, h * 0.3, ink, item.disabled);
+}
+
+/** A room open to everyone: a globe, its equator and a meridian. */
+function globe(g: CanvasRenderingContext2D, x: number, y: number, s: number, ink: string, disabled = false) {
+  const r = s * 0.48;
+  g.save();
+  if (disabled) g.globalAlpha *= 0.45;
+  g.strokeStyle = ink;
+  g.lineWidth = Math.max(1.2, s * 0.11);
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  g.moveTo(x - r, y);
+  g.lineTo(x + r, y);
+  g.moveTo(x, y - r);
+  g.ellipse(x, y, r * 0.45, r, 0, -Math.PI / 2, Math.PI * 1.5);
+  g.stroke();
+  g.restore();
 }
 
 /** How many of how many, as two rows of small dots: those there filled. */

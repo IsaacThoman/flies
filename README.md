@@ -26,18 +26,26 @@ of the brain's commands, how it moves, what its eyes see) and `packages/ui`
 to add one, and `docs/web.md` about the web build: getting the brain to a
 browser, running well on what people have, being a good tab, and hosting.
 `docs/online.md` is about tables with others: up to eight flies at
-one table, one to four per device, joined by a link, and the room server
-between them. For a Docker
+one table, one to four per device, in a room open to everyone or joined by a
+link, and the room server between them. For a Docker
 Compose stack on your own server, behind your own HTTPS reverse proxy, see
 [Self-hosting Flies](docs/deploy.md).
 Releases to TestFlight, and setting them up, are in [docs/release.md](docs/release.md).
 
 ## Playing
 
-In a browser, **Online** (on the menu) lists the rooms open to anyone and
-makes new ones: named, public or unlisted, with a password if you like.
-Whoever joins, by the list, a code or the room's link, sits their flies down
-beside yours, up to eight altogether, each marked with its own dab of enamel
+By default the flies aren't alone: once their brains are awake, on the web,
+the Apple TV, an iPhone or an iPad, they sit down in **Everyone**, a public
+room the room server keeps, with up to eight flies in all, each marked with
+its own dab of enamel. A device whose flies don't all fit goes on to
+Everyone 2, and so on. The room's place takes turns by the clock; its light
+and weather are your own. Nothing is said if the room server can't be
+reached: the flies play alone and the game tries again later. Settings →
+Screensaver → Join others turns it off, and leaving the room from **Online**
+keeps them alone until the next launch. **Online** (on the menu) also lists
+the other public rooms and makes new ones: named, public or unlisted, with a
+password if you like. Whoever joins, by the list, a code or the room's link,
+sits their flies down beside yours, up to eight altogether, each marked with its own dab of enamel
 (`docs/online.md`).
 
 **Settings → Screensaver → Flies** chooses one to four, shown as enamel
@@ -475,8 +483,9 @@ its camera films, where the flies live, how many, and, on an Apple TV that can t
 the real weather), **On screen** (everything that can show over the world:
 what it sees, its nervous system and its stats in the corners, what the
 stats are of, the corners' size and opacity, and the X-ray), and **Picture**
-(pixel size, the eyes' detail, button hints, rumble, frame stats). In a browser it
-also has **Online**, rooms shared with others. The menu never scrolls
+(pixel size, the eyes' detail, button hints, rumble, frame stats). Where it
+can be online, Screensaver also has Join others (sitting with everyone by
+default), and the menu has **Online**, rooms shared with others. The menu never scrolls
 either: on a screen too short for its rows (a phone on its side) they are
 in two columns, Left and Right going across, Up and Down along the list as
 ever. Where the settings' tabs are too

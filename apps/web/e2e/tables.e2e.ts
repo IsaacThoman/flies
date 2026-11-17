@@ -8,8 +8,11 @@
 // down on the window table and see each other at a room's scale; the
 // starter takes the other's fly off and it is alone again; a named, locked
 // room is made from the menus and joined from Online's list with its
-// password, and its link alone leads only to its door; alone,
-// nothing of tables happens at all; and a full table (one tab, seven fake
+// password, and its link alone leads only to its door; by default, two tabs
+// that open the game find each other in the room open to everyone, one
+// leaves it from Online and stays alone, and one whose room server can't be
+// reached plays alone without a word; with "Join others" off, nothing of
+// tables happens at all; and a full table (one tab, seven fake
 // flies from Node walking round its fly) keeps the frame to the Apple TV's
 // budget on every screen shape, followed and close up.
 //
@@ -24,7 +27,8 @@ import os from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
 import type { BrowserContextOptions, Page } from "playwright";
-import { MAX_FLIES, tableCode } from "@fly/net";
+import { createServer } from "node:net";
+import { EVERYONE, MAX_FLIES, tableCode } from "@fly/net";
 import { startServer as startRooms } from "../../server/src/server.ts";
 import type { RoomServer } from "../../server/src/server.ts";
 import { chromiumPath, gpuFlags, holdSteady, readState, startServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
@@ -62,11 +66,12 @@ type Tab = { page: Page; errors: string[]; sockets: string[] };
 const tabs: Tab[] = [];
 
 /** A tab in a context of its own: storage of its own, so a device key of its own. */
-async function open(options: BrowserContextOptions = { viewport: { width: 960, height: 540 } }): Promise<Tab> {
+/** `joinOthers`: left on, as a launch has it, for the steps about sitting with everyone by default. */
+async function open(options: BrowserContextOptions = { viewport: { width: 960, height: 540 } }, joinOthers = false): Promise<Tab> {
   const context = await browser.newContext(options);
   // What is shared at a table, not how it looks: the cheapest picture, so that two tabs drawing on a
   // software GPU (and building the restaurant, a part a frame) keep their frames short.
-  await holdSteady(context, LEVELS.length - 1);
+  await holdSteady(context, LEVELS.length - 1, { joinOthers });
   const page = await context.newPage();
   const tab: Tab = { page, errors: [], sockets: [] };
   page.on("pageerror", (error) => tab.errors.push(error.message));
@@ -459,7 +464,52 @@ try {
   assert.ok(!("online" in door), "not at the room");
   for (const tab of [maker, guest, linked]) await tab.page.context().close();
 
-  step("alone, nothing changes: no table, no line to a room, and the frame in its budget");
+  step("by default, with everyone: two tabs that just open the game sit in the room open to everyone once awake, nobody its starter, and see each other");
+  const [one, two] = [await open(undefined, true), await open(undefined, true)];
+  for (const tab of [one, two]) await tab.page.goto(`${url}?rooms=${roomsAt}`);
+  const sat = await Promise.all([one, two].map((tab) => waitFor(tab.page, "brain=running,online=joined,everyone=yes,roomName=Everyone", 120_000)));
+  assert.deepEqual(sat.map((s) => s.starter), ["0", "0"], "nobody started it");
+  assert.equal(await fly(one.page, "g.online.code"), EVERYONE);
+  await seesFly(one.page, Number(sat[1].player));
+  await seesFly(two.page, Number(sat[0].player));
+  // Online says where it is, and lets it look at the other rooms without leaving.
+  await fly(one.page, "g.open('online')");
+  await waitFor(one.page, "screen=online,onlineView=room");
+  assert.deepEqual(await fly(one.page, "g.screens.online.menu.items.map((i) => i.id)"), ["share", "rooms", "leave"]);
+  await keyTo(one.page, "rooms", "ArrowDown");
+  await one.page.keyboard.press("Enter");
+  await waitFor(one.page, `onlineView=rooms,rooms~^${EVERYONE}:Everyone:[a-z]+:2:0,online=joined`, 10_000);
+  await one.page.keyboard.press("Escape");
+  await waitFor(one.page, "onlineView=room,online=joined");
+
+  step("leaving it from Online: alone again where it is, and not sat with everyone again until the next launch");
+  await keyTo(one.page, "leave", "ArrowDown");
+  await one.page.keyboard.press("Enter");
+  await waitUntil(one.page, "tab 0 alone", (s) => s.table === "" && !("online" in s), 5000);
+  await waitUntil(two.page, "tab 0's fly gone from tab 1", (s) => !othersOf(s).some((o) => o.id === Number(sat[0].player)), 5000);
+  assert.equal((await readState(one.page)).autoJoin, "stopped");
+  await one.page.waitForTimeout(3000);
+  assert.equal((await readState(one.page)).table, "", "still alone");
+  for (const tab of [one, two]) await tab.page.context().close();
+
+  step("a room server that can't be reached: the fly plays alone, with nothing said, and the game tries again later");
+  const closed = await new Promise<number>((resolve) => {
+    const probe = createServer().listen(0, "127.0.0.1", () => {
+      const at = (probe.address() as { port: number }).port;
+      probe.close(() => resolve(at));
+    });
+  });
+  const cut = await open(undefined, true);
+  await cut.page.goto(`${url}?rooms=ws://127.0.0.1:${closed}/rooms`);
+  await waitFor(cut.page, "brain=running,screen=title", 120_000);
+  await waitUntil(cut.page, "a try made and given up", (s) => cut.sockets.length > 0 && s.autoJoin === "waiting" && s.table === "", 20_000);
+  assert.equal(await fly(cut.page, "g.tableEnded"), null, "nothing to say about it");
+  await fly(cut.page, "g.open('online')");
+  const quiet = await waitFor(cut.page, "screen=online,onlineView=rooms");
+  assert.equal(quiet.note, "", "no note on Online either");
+  await cut.page.context().close();
+
+  step("with Join others off, nothing changes: no table, no line to a room, and the frame in its budget");
   const solo = await open();
   await solo.page.goto(url);
   await waitFor(solo.page, "brain=running,screen=title", 120_000);

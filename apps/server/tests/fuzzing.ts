@@ -13,18 +13,19 @@ import os from "node:os";
 import path from "node:path";
 import { WebSocket } from "ws";
 import {
-  BITES, DROP_ID, FLIES, FLY, FOUND_ID, HANDS, MAX_FLIES, MAX_OWN, PROTOCOL, ROOMS_PATH, TABLE_LIGHTS, TABLE_WEATHERS, WIRE_FOODS_MAX, createFlyState, decodeFlies,
-  encodeBites, encodeOwn, readServerMessage, stream,
+  BITES, DROP_ID, EVERYONE, EVERYONE_ROOMS, FLIES, FLY, FOUND_ID, HANDS, MAX_FLIES, MAX_OWN, PROTOCOL, ROOMS_PATH, TABLE_LIGHTS, TABLE_WEATHERS, WIRE_FOODS_MAX,
+  createFlyState, decodeFlies, encodeBites, encodeOwn, everyoneCode, everyoneIndex, readServerMessage, stream,
 } from "@fly/net";
 import type { ClientMessage, ServerMessage, TableStart } from "@fly/net";
 import { WORLDS } from "@fly/world";
 import { hashKey, isHello, startServer } from "../src/server.ts";
-import { REMOVED_MAX, Table, isTableRecord } from "../src/table.ts";
+import { REMOVED_MAX, Table, everyonePlace, isTableRecord } from "../src/table.ts";
 import type { Link, Seat } from "../src/table.ts";
 import { Tables } from "../src/tables.ts";
 
 const PLACES = Object.keys(WORLDS);
-const CODES = ["23456789ab", "bcdefghjkm", "npqrstuvwx"];
+const CODES = ["23456789ab", "bcdefghjkm", "npqrstuvwx", EVERYONE, everyoneCode(1), everyoneCode(EVERYONE_ROOMS - 1), everyoneCode(EVERYONE_ROOMS)];
+const KEYS = 32;
 
 /** What a device could send, drawn from a seed. */
 export class Fuzz {
@@ -174,7 +175,7 @@ export function fuzzTable(seed: number, until: () => boolean) {
   const f = new Fuzz(seed);
   const clock = { now: 1000, wall: Date.UTC(2026, 5, 1, 12) };
   const tables = new Tables({ now: () => clock.now, wall: () => clock.wall });
-  const keys = Array.from({ length: 12 }, (_, i) => `fuzz-key-${seed}-${i}`);
+  const keys = Array.from({ length: KEYS }, (_, i) => `fuzz-key-${seed}-${i}`);
   const devices: Fake[] = [];
   let messages = 0;
   /** Everything the table sends must be a message the game reads; every batch, one it decodes. */
@@ -203,36 +204,52 @@ export function fuzzTable(seed: number, until: () => boolean) {
   const steps = { count: 0 };
   while (!until()) {
     steps.count++;
-    const code = f.pick(CODES);
-    const action = f.next();
-    if (action < 0.08 || devices.length === 0) {
-      // A device says hello, through the table as the server would have it: its checks, the key hashed, Tables.open, then Table.hello.
-      const hello = f.hello(code, f.pick(keys)) as Extract<ClientMessage, { type: "hello" }>;
-      if (!isHello(hello)) continue;
-      const key = hashKey(hello.key);
-      const opened = tables.open(key, hello, f.int(0, 2 ** 31));
-      if (typeof opened === "string") continue;
-      const device: Fake = { open: true, seat: null, key, send: (d) => heard(d, opened), close: () => (device.open = false) };
-      const sat = opened.hello(device, key, hello);
-      if (typeof sat === "string") continue;
-      device.seat = sat;
-      devices.push(device);
-    } else if (action < 0.12) {
-      // One goes, closing its line.
-      const device = devices.splice(f.int(0, devices.length - 1), 1)[0];
-      for (const t of tables.values()) if (device.seat && t.seats.get(device.seat.id) === device.seat) t.disconnected(device.seat, device);
-    } else if (action < 0.3) {
-      clock.now += f.int(0, 3000);
-      clock.wall += f.int(0, f.chance(0.01) ? 30 * 60_000 : 3000);
-      tables.tick();
-    } else {
-      const device = f.pick(devices);
-      const table = [...tables.values()].find((t) => device.seat && t.seats.get(device.seat.id) === device.seat);
-      if (!table || !device.seat || !device.open) continue;
-      messages++;
-      table.receive(device.seat, f.chance(0.6) ? f.text(f.message(device.seat.id, table.epoch)) : f.binary(clock.now, table.epoch, device.seat.flies.map((fly) => fly.id)));
+    let ticked = false;
+    step: {
+      const code = f.pick(CODES);
+      const action = f.next();
+      // More arrivals than departures let the rooms open to everyone fill and overflow.
+      if (action < 0.16 || devices.length === 0) {
+        // A device says hello, through the table as the server would have it: its checks, the key hashed, Tables.open, then Table.hello.
+        const hello = f.hello(code, f.pick(keys)) as Extract<ClientMessage, { type: "hello" }>;
+        if (!isHello(hello)) break step;
+        const key = hashKey(hello.key);
+        const opened = tables.open(key, hello, f.int(0, 2 ** 31));
+        if (typeof opened === "string") break step;
+        const device: Fake = { open: true, seat: null, key, send: (d) => heard(d, opened), close: () => (device.open = false) };
+        const sat = opened.hello(device, key, hello);
+        if (typeof sat === "string") break step;
+        device.seat = sat;
+        devices.push(device);
+      } else if (action < 0.2) {
+        // One goes, closing its line.
+        const device = devices.splice(f.int(0, devices.length - 1), 1)[0];
+        for (const t of tables.values()) if (device.seat && t.seats.get(device.seat.id) === device.seat) t.disconnected(device.seat, device);
+      } else if (action < 0.38) {
+        clock.now += f.int(0, 3000);
+        clock.wall += f.int(0, f.chance(0.01) ? 30 * 60_000 : 3000);
+        tables.tick();
+        ticked = true;
+      } else {
+        const device = f.pick(devices);
+        const table = [...tables.values()].find((t) => device.seat && t.seats.get(device.seat.id) === device.seat);
+        if (!table || !device.seat || !device.open) break step;
+        messages++;
+        table.receive(device.seat, f.chance(0.6) ? f.text(f.message(device.seat.id, table.epoch)) : f.binary(clock.now, table.epoch, device.seat.flies.map((fly) => fly.id)));
+      }
     }
+    const everyone: Table[] = [];
     for (const t of tables.values()) {
+      const index = everyoneIndex(t.code);
+      assert.equal(t.everyone, index >= 0);
+      if (t.everyone) {
+        everyone.push(t);
+        assert.equal(t.listed, true);
+        assert.equal(t.lock, null);
+        assert.equal(t.starter, null);
+        assert.deepEqual(t.worldWire, { light: "clock", weather: "now" });
+        if (ticked && t.present > 0) assert.equal(t.place, everyonePlace(clock.wall));
+      }
       assert.ok(t.seats.size <= MAX_FLIES);
       assert.ok(t.food.foods.length <= WIRE_FOODS_MAX, `${t.food.foods.length} foods`);
       assert.ok(t.balls.length <= MAX_FLIES);
@@ -250,15 +267,29 @@ export function fuzzTable(seed: number, until: () => boolean) {
         }
       }
       assert.ok(t.taken <= MAX_FLIES);
+      // Nobody started a room open to everyone, so nobody's seat is kept there once they have gone: what it counts as taken is the flies shown or on the line.
+      if (t.everyone) {
+        let shown = 0;
+        for (const s of t.seats.values()) if (s.present || s.link) shown += s.flies.length;
+        assert.equal(t.taken, shown);
+      }
     }
+    everyone.sort((a, b) => everyoneIndex(a.code) - everyoneIndex(b.code));
+    assert.ok(everyone.length > 0, "Everyone always exists");
+    assert.deepEqual(everyone.map((t) => t.code), everyone.map((_, i) => everyoneCode(i)));
+    const listed = tables.listed();
+    const visible = everyone.filter((t) => t.code === EVERYONE || t.present > 0);
+    assert.deepEqual(listed.slice(0, visible.length), visible.map((t) => t.room()));
+    for (const room of listed) if (everyoneIndex(room.code) >= 0) assert.equal(room.everyone, true);
   }
   // What it keeps comes back as it was kept.
   for (const t of tables.values()) {
     const record = JSON.parse(JSON.stringify(t.record())) as unknown;
     assert.ok(isTableRecord(record), `a table that wouldn't come back from its own file: ${JSON.stringify(record).slice(0, 3000)}`);
-    Table.restore(record, { now: () => clock.now, wall: () => clock.wall });
+    const restored = Table.restore(record, { now: () => clock.now, wall: () => clock.wall });
+    assert.equal(restored.everyone, t.everyone);
   }
-  return { steps: steps.count, messages };
+  return { steps: steps.count, messages, everyoneRooms: [...tables.values()].filter((t) => t.everyone).length };
 }
 
 /**
@@ -284,7 +315,7 @@ export async function fuzzServer(seed: number, until: () => boolean, sockets = 6
       ws.on("error", () => {});
       ws.on("close", () => live.delete(ws));
       ws.on("open", () => {
-        const first = f.chance(0.15) ? { type: "browse", v: f.or(PROTOCOL, 0.9) } : f.hello(f.pick(CODES), `fuzz-key-${seed}-${f.int(0, 11)}`);
+        const first = f.chance(0.15) ? { type: "browse", v: f.or(PROTOCOL, 0.9) } : f.hello(f.pick(CODES), `fuzz-key-${seed}-${f.int(0, KEYS - 1)}`);
         ws.send(f.chance(0.1) ? f.binary(0, 0) : f.text(first));
       });
     };
@@ -310,6 +341,20 @@ export async function fuzzServer(seed: number, until: () => boolean, sockets = 6
     });
     ws.close();
     assert.equal(welcomed, "welcome");
+    const everyone = new WebSocket(url);
+    try {
+      const welcome = await new Promise<ReturnType<typeof readServerMessage>>((resolve, reject) => {
+        everyone.once("error", reject);
+        everyone.once("open", () => everyone.send(JSON.stringify({ type: "hello", v: PROTOCOL, table: EVERYONE, key: "a-fair-device-in-everyone" } satisfies ClientMessage)));
+        everyone.once("message", (d: Buffer) => resolve(readServerMessage(d.toString())));
+      });
+      assert.equal(welcome?.type, "welcome");
+      assert.ok(welcome?.type === "welcome");
+      assert.equal(welcome.room.everyone, true);
+      assert.equal(welcome.starter, 0);
+    } finally {
+      everyone.close();
+    }
     assert.deepEqual(errors, [], "nothing a device sent made the server fail");
   } finally {
     await server.stop();

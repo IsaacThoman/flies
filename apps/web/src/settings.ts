@@ -71,6 +71,8 @@ export type Settings = {
   flies: number;
   /** Where it was last, to come back to. */
   scene: PlaceId;
+  /** Sit with everyone, in a room open to all, once the brain is awake (docs/online.md, "Everyone"). */
+  joinOthers: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -92,6 +94,7 @@ export const DEFAULT_SETTINGS: Settings = {
   place: "turns",
   flies: 1,
   scene: "picnic",
+  joinOthers: true,
 };
 
 const showWhen = (v: ShowWhen) => ["off", "wallpaper", "always"].includes(v);

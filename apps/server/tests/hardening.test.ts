@@ -163,7 +163,8 @@ test("a file of tables that can't be read is set aside and the server starts wit
   await writeFile(file, '{"v":1,"tables":[{"code":');
   const logged: unknown[][] = [];
   const server = await serve({ dataDir: dir, logged });
-  assert.equal((await healthy(server)).tables, 0);
+  // None but Everyone, which the server opens itself.
+  assert.equal((await healthy(server)).tables, 1);
   assert.ok((await readdir(dir)).some((f) => f.startsWith("tables.json.unreadable-")), "the damaged file is kept for whoever looks after the server");
   assert.ok(logged.some(([, event]) => event === "unreadable"));
   await server.stop();
@@ -174,7 +175,7 @@ test("a file of tables that can't be read is set aside and the server starts wit
   tables.open("starter-key-hash", { type: "hello", v: PROTOCOL, table: code, key: newKey(), start: START }, 1);
   await tables.save(file, true);
   const kept = JSON.parse(await readFile(file, "utf8")) as { v: number; tables: Record<string, unknown>[] };
-  const good = kept.tables[0];
+  const good = kept.tables.find((t) => t.code === code)!;
   const bad = [
     null,
     "a table",
@@ -191,7 +192,7 @@ test("a file of tables that can't be read is set aside and the server starts wit
   ];
   await writeFile(file, JSON.stringify({ v: 1, tables: [good, ...bad] }));
   const back = await serve({ dataDir: dir });
-  assert.equal((await healthy(back)).tables, 1);
+  assert.equal((await healthy(back)).tables, 2, "the good one, and Everyone");
   assert.ok(back.tables.get(code));
 });
 
@@ -327,12 +328,13 @@ test("a save that fails at any stage leaves the tables to be saved again: the ne
     await assert.rejects(tables.save(file), /no space left/, stage);
     await tables.save(file);
     const kept = JSON.parse(await readFile(file, "utf8")) as { tables: { code: string; seats: { lastSeen: number; flies?: { id: number }[] }[] }[] };
-    assert.equal(kept.tables[0]?.code, "23456789ab", stage);
-    assert.equal(kept.tables[0].seats[0].lastSeen, clock.wall, `${stage}: the room as it was last, emptied`);
-    assert.deepEqual(kept.tables[0].seats.map((s) => s.flies?.map((f) => f.id)), [[1, 2, 3], [4, 5]], `${stage}: every device's flies`);
+    const room = kept.tables.find((t) => t.code === "23456789ab");
+    assert.ok(room, stage);
+    assert.equal(room.seats[0].lastSeen, clock.wall, `${stage}: the room as it was last, emptied`);
+    assert.deepEqual(room.seats.map((s) => s.flies?.map((f) => f.id)), [[1, 2, 3], [4, 5]], `${stage}: every device's flies`);
     // And what the retry kept comes back as it was.
     const back = new Tables({ now: () => clock.now, wall: () => clock.wall }, undefined, fs);
-    assert.equal(await back.load(file), 1, stage);
+    assert.ok((await back.load(file)) >= 1, stage);
     assert.deepEqual([...back.get("23456789ab")!.seats.values()].map((s) => s.flies.map((f) => f.id)), [[1, 2, 3], [4, 5]]);
   }
 });

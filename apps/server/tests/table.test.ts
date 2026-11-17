@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 import { EAT_RATE, LAB, RESTAURANT_START, TABLE_TOPS, World, WORLDS } from "@fly/world";
 import {
-  AIRBORNE, AWAY, CLOSE, COLOURS, DROP_ID, FLY_MAX, LIMITS, MAX_FLIES, MAX_OWN, MAX_WALK, OWN_MAX, PLAYING, PROTOCOL, ROOM_SCALE, TABLETOP_SCALE, createFlyState, decodeFlies, encodeBites, encodeFly, encodeOwn,
-  spawnSpot, toWire,
+  AIRBORNE, AWAY, CLOSE, COLOURS, DROP_ID, EVERYONE, EVERYONE_ROOMS, FLY_MAX, LIMITS, MAX_FLIES, MAX_OWN, MAX_WALK, OWN_MAX, PLAYING, PROTOCOL, ROOM_SCALE, TABLETOP_SCALE, createFlyState, decodeFlies,
+  encodeBites, encodeFly, encodeOwn, everyoneCode, spawnSpot, toWire,
 } from "@fly/net";
 import type { ClientMessage, FlyState, ServerMessage, Spot, TableStart, WireScale } from "@fly/net";
-import { AWAY_LIMIT, SILENT_AFTER, Table, UNNAMED } from "../src/table.ts";
+import { AWAY_LIMIT, EVERYONE_TURN, SILENT_AFTER, Table, UNNAMED, everyonePlace } from "../src/table.ts";
 import type { Link, Seat, TableRecord } from "../src/table.ts";
 import { LISTED_IDLE, TABLE_IDLE, Tables } from "../src/tables.ts";
 
@@ -57,11 +59,11 @@ function batches(to: FakeLink | Player, scale: WireScale = TABLETOP_SCALE) {
 }
 
 /** A table with clocks the test moves on: room time and the wall clock, ms. */
-function room(start: TableStart = START, seed = 7) {
+function room(start: TableStart = START, seed = 7, code = CODE) {
   const clock = { now: 1000, wall: Date.UTC(2026, 5, 1, 12) };
   const options = { now: () => clock.now, wall: () => clock.wall };
-  const table = new Table(CODE, start, "key-1", seed, options);
-  const hello = (key: string, extra: Partial<Hello> = {}): Hello => ({ type: "hello", v: PROTOCOL, table: CODE, key, ...extra });
+  const table = new Table(code, start, "key-1", seed, options);
+  const hello = (key: string, extra: Partial<Hello> = {}): Hello => ({ type: "hello", v: PROTOCOL, table: code, key, ...extra });
   /** A device sitting down; fails the test if it is refused. */
   const join = (key: string, extra: Partial<Hello> = {}): Player => {
     const link = fakeLink();
@@ -104,6 +106,22 @@ function room(start: TableStart = START, seed = 7) {
 const clear = (...players: Player[]) => {
   for (const p of players) p.link.sent.length = 0;
 };
+
+function pool(wall = Date.UTC(2026, 5, 1, 12)) {
+  const clock = { now: 1000, wall };
+  const options = { now: () => clock.now, wall: () => clock.wall };
+  const tables = new Tables(options);
+  const join = (key: string, extra: Partial<Hello> = {}) => {
+    const hello: Hello = { type: "hello", v: PROTOCOL, table: EVERYONE, key, ...extra };
+    const table = tables.open(key, hello, 7);
+    assert.ok(table instanceof Table, `${key} refused: ${String(table)}`);
+    const link = fakeLink();
+    const seat = table.hello(link, key, hello);
+    assert.ok(typeof seat === "object", `${key} refused: ${String(seat)}`);
+    return { table, key, link, seat, seq: 0, bites: 0 };
+  };
+  return { clock, options, tables, join };
+}
 
 test("the first to say hello with a start is the starter; the others are welcomed with who is there, each in its id's colour, set down where spawnSpot says", () => {
   const clock = { now: 0, wall: 0 };
@@ -662,7 +680,7 @@ test("rooms: only listed ones with someone there are listed, fullest first; a li
   sit(quiet, "k1");
   for (const key of ["k2", "k5", "k6"]) sit(busy, key);
   sit(hidden, "k3");
-  assert.deepEqual(tables.listed(), [
+  assert.deepEqual(tables.listed().filter((room) => !room.everyone), [
     { code: "bbbbbbbbbb", name: "Busy", place: "bar", flies: 3, locked: false },
     { code: "aaaaaaaaaa", name: "Quiet", place: "picnic", flies: 1, locked: false },
   ]);
@@ -673,10 +691,11 @@ test("rooms: only listed ones with someone there are listed, fullest first; a li
   for (const table of [quiet, busy, hidden]) for (const seat of table.seats.values()) table.disconnected(seat, seat.link!);
   clock.wall += LISTED_IDLE + 60_000;
   tables.tick();
-  assert.deepEqual([...tables.values()].map((t) => t.code).sort(), ["cccccccccc", "eeeeeeeeee"]);
+  assert.deepEqual([...tables.values()].map((t) => t.code).sort(), [EVERYONE, "cccccccccc", "eeeeeeeeee"].sort());
   clock.wall += TABLE_IDLE;
   tables.tick();
-  assert.equal(tables.size, 0);
+  assert.equal(tables.size, 1);
+  assert.ok(tables.get(EVERYONE));
 });
 
 test("a room's name, whether it is listed, and its lock are kept across a restart", () => {
@@ -687,7 +706,244 @@ test("a room's name, whether it is listed, and its lock are kept across a restar
     assert.deepEqual(back.info, t.info);
     assert.deepEqual(back.lock, t.lock);
   }
-  assert.deepEqual(locked.info, { name: "Locked", listed: false, locked: true });
+  assert.deepEqual(locked.info, { code: "ffffffffff", everyone: false, name: "Locked", listed: false, locked: true });
+});
+
+test("a fresh pool lists Everyone even empty, keeps it listed after the last fly leaves, and puts it before rooms with more flies", () => {
+  const { tables, clock, join } = pool();
+  assert.equal(EVERYONE, everyoneCode(0));
+  assert.equal(tables.size, 1);
+  const table = tables.get(EVERYONE);
+  assert.ok(table);
+  assert.equal(table.everyone, true);
+  assert.equal(table.listed, true);
+  assert.equal(table.lock, null);
+  const empty = { code: EVERYONE, name: "Everyone", place: everyonePlace(clock.wall), flies: 0, locked: false, everyone: true };
+  assert.deepEqual(tables.listed(), [empty]);
+
+  const ordinary = join("ordinary", { table: CODE, start: { ...START, name: "Fuller", listed: true } });
+  join("ordinary-2", { table: CODE });
+  assert.deepEqual(tables.listed(), [empty, { code: CODE, name: "Fuller", place: "picnic", flies: 2, locked: false }]);
+  const a = join("key-1");
+  assert.equal(tables.listed()[0].flies, 1);
+  a.table.receive(a.seat, JSON.stringify({ type: "bye" }));
+  assert.equal(a.table.present, 0);
+  assert.deepEqual(tables.listed(), [empty, ordinary.table.room()]);
+});
+
+test("a ninth and tenth device overflow into Everyone 2, a newcomer takes a freed seat in Everyone first, and a returning fly stays in Everyone 2", () => {
+  const { tables, clock, join } = pool();
+  const first = Array.from({ length: MAX_FLIES }, (_, i) => join(`key-${i + 1}`));
+  assert.ok(first.every((p) => p.table.code === EVERYONE));
+  assert.equal(tables.size, 1, "the next room opens only when needed");
+  const ninth = join("key-9");
+  const tenth = join("key-10");
+  assert.equal(ninth.table.code, everyoneCode(1));
+  assert.equal(tenth.table, ninth.table);
+  assert.equal(ninth.table.name, "Everyone 2");
+  assert.deepEqual(tables.listed(), [
+    { ...first[0].table.room(), flies: MAX_FLIES },
+    { code: everyoneCode(1), name: "Everyone 2", place: everyonePlace(clock.wall), flies: 2, locked: false, everyone: true },
+  ]);
+  assert.equal(tables.size, 2);
+
+  const leaving = first[0];
+  leaving.table.disconnected(leaving.seat, leaving.link);
+  assert.equal(leaving.table.seated(leaving.key), true, "a dropped line still holds its seat");
+  assert.equal(leaving.table.roomFor("newcomer"), 0);
+  clock.wall += AWAY_LIMIT + 1;
+  clock.now += 50;
+  tables.tick();
+  assert.equal(leaving.table.seated(leaving.key), false);
+  assert.equal(leaving.table.present, MAX_FLIES - 1);
+  assert.equal(leaving.table.roomFor("newcomer"), 1);
+
+  // Even with room in Everyone, a dropped line returns to the fly in the room it asked for.
+  ninth.table.disconnected(ninth.seat, ninth.link);
+  const back = join(ninth.key, { table: everyoneCode(1) });
+  assert.equal(back.table, ninth.table);
+  assert.equal(back.seat, ninth.seat);
+  assert.equal(saidOf(back, "welcome")[0].room?.code, everyoneCode(1));
+  const newcomer = join("newcomer");
+  assert.equal(newcomer.table, leaving.table);
+  assert.equal(newcomer.seat.id, leaving.seat.id);
+  assert.equal(newcomer.table.present, MAX_FLIES);
+
+  for (const p of [back, tenth]) p.table.receive(p.seat, JSON.stringify({ type: "bye" }));
+  assert.deepEqual(tables.listed().map((room) => room.code), [EVERYONE]);
+  assert.equal(tables.get(everyoneCode(1)), ninth.table, "an empty overflow room is hidden, not forgotten");
+});
+
+test("a start and password cannot make an everyone room private or give anyone control of its world, place or flies", () => {
+  const { tables, clock, join } = pool();
+  const wanted = everyoneCode(7);
+  const start = { ...START, name: "Mine", listed: false, place: "lab", light: "night", weather: "rain" };
+  const hello: Hello = { type: "hello", v: PROTOCOL, table: wanted, key: "key-1", start, password: "a password" };
+  const opened = tables.open("key-1", hello, 7, { salt: "c2FsdA", hash: "aGFzaA" });
+  assert.equal(opened, tables.get(EVERYONE));
+  assert.equal(tables.get(wanted), null);
+  const a = join("key-1", hello);
+  const b = join("key-2");
+  const table = a.table;
+  assert.deepEqual(table.info, { code: EVERYONE, everyone: true, name: "Everyone", listed: true, locked: false });
+  assert.equal(table.starter, null);
+  assert.equal(table.lock, null);
+  assert.equal(table.place, everyonePlace(clock.wall));
+  assert.deepEqual(table.worldWire, { light: "clock", weather: "now" });
+  for (const p of [a, b]) assert.equal(saidOf(p, "welcome")[0].starter, 0);
+  const before = table.record();
+  clear(a, b);
+  for (const [p, other] of [[a, b], [b, a]]) {
+    table.receive(p.seat, JSON.stringify({ type: "world", light: "night", weather: "rain" }));
+    table.receive(p.seat, JSON.stringify({ type: "place", place: "lab" }));
+    table.receive(p.seat, JSON.stringify({ type: "remove", id: other.seat.id }));
+  }
+  assert.deepEqual(table.record(), before);
+  for (const p of [a, b]) {
+    assert.deepEqual(said(p), []);
+    assert.equal(p.link.closed, null);
+  }
+});
+
+test("empty everyone rooms survive both idle limits while an ordinary listed room is forgotten", () => {
+  const { tables, clock, join } = pool();
+  const players = Array.from({ length: MAX_FLIES + 1 }, (_, i) => join(`key-${i + 1}`));
+  for (const p of players) p.table.receive(p.seat, JSON.stringify({ type: "bye" }));
+  const ordinary = join("ordinary", { table: CODE, start: { ...START, listed: true } });
+  ordinary.table.disconnected(ordinary.seat, ordinary.link);
+  const first = tables.get(EVERYONE);
+  const second = tables.get(everyoneCode(1));
+
+  for (const elapsed of [LISTED_IDLE + 1, TABLE_IDLE + 1]) {
+    clock.wall += elapsed;
+    clock.now += 50;
+    tables.tick();
+    assert.equal(tables.get(CODE), null);
+    assert.equal(tables.size, 2);
+    assert.equal(tables.get(EVERYONE), first);
+    assert.equal(tables.get(everyoneCode(1)), second);
+    assert.deepEqual(tables.listed(), [{ code: EVERYONE, name: "Everyone", place: everyonePlace(clock.wall), flies: 0, locked: false, everyone: true }]);
+  }
+});
+
+test("everyone rooms follow the places in world order and tell every device when a wall clock turn moves them", () => {
+  const places = Object.keys(WORLDS);
+  for (const [i, place] of places.entries()) {
+    assert.equal(everyonePlace(i * EVERYONE_TURN), place);
+    assert.equal(everyonePlace((i + 1) * EVERYONE_TURN - 1), place);
+  }
+  assert.equal(everyonePlace(places.length * EVERYONE_TURN), places[0]);
+  const { tables, clock, join } = pool(EVERYONE_TURN - 1);
+  const a = join("key-1");
+  const b = join("key-2");
+  const table = a.table;
+  assert.equal(table.place, places[0]);
+  const epoch = table.epoch;
+  clear(a, b);
+  tables.tick();
+  assert.deepEqual(saidOf(a, "place"), []);
+  assert.equal(table.epoch, epoch);
+
+  clock.wall++;
+  clock.now += 50;
+  tables.tick();
+  assert.equal(table.place, places[1]);
+  assert.equal(table.epoch, epoch + 1);
+  for (const p of [a, b]) {
+    const moves = saidOf(p, "place");
+    assert.equal(moves.length, 1);
+    assert.equal(moves[0].place, places[1]);
+    assert.equal(moves[0].epoch, epoch + 1);
+    assert.deepEqual(moves[0].spots, { 1: spawnSpot(table.world, 1), 2: spawnSpot(table.world, 2) });
+    assert.deepEqual(moves[0].foods, table.food.foods.map(toWire));
+  }
+  clear(a, b);
+  clock.now += 50;
+  tables.tick();
+  assert.equal(table.epoch, epoch + 1);
+  for (const p of [a, b]) assert.deepEqual(saidOf(p, "place"), []);
+});
+
+test("saving and loading keeps everyone rooms and seats, and advances their place and epoch if their turn changed during a restart", async (t) => {
+  const dir = await mkdtemp(path.join(import.meta.dirname, ".everyone-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const file = path.join(dir, "tables.json");
+  const { tables, clock, options, join } = pool(EVERYONE_TURN - 1000);
+  const players = Array.from({ length: MAX_FLIES + 1 }, (_, i) => join(`key-${i + 1}`));
+  for (const p of players) p.table.disconnected(p.seat, p.link);
+  await tables.save(file);
+  const restored = new Tables(options);
+  assert.equal(await restored.load(file), 2);
+  assert.equal(restored.size, 2);
+  assert.deepEqual(restored.listed(), tables.listed());
+  for (const before of tables.values()) {
+    const back = restored.get(before.code);
+    assert.ok(back);
+    assert.equal(back.everyone, true);
+    assert.deepEqual(back.record(), before.record());
+  }
+  const ninth = players[MAX_FLIES];
+  const hello: Hello = { type: "hello", v: PROTOCOL, table: everyoneCode(1), key: ninth.key };
+  const back = restored.open(ninth.key, hello, 9);
+  assert.equal(back, restored.get(everyoneCode(1)));
+  assert.ok(back instanceof Table);
+  const link = fakeLink();
+  const seat = back.hello(link, ninth.key, hello);
+  assert.ok(typeof seat === "object");
+  assert.equal(seat.id, ninth.seat.id);
+  assert.equal(seat.flies[0].colour, ninth.seat.flies[0].colour);
+
+  clock.wall += 2000;
+  clock.now += 50;
+  const moved = new Tables(options);
+  assert.equal(await moved.load(file), 2);
+  for (const before of tables.values()) {
+    const after = moved.get(before.code);
+    assert.ok(after);
+    assert.equal(after.place, everyonePlace(clock.wall));
+    assert.notEqual(after.place, before.place);
+    assert.equal(after.epoch, before.epoch + 1);
+    assert.equal(after.present, before.present);
+    for (const old of before.seats.values()) {
+      const kept = after.seats.get(old.id);
+      assert.ok(kept);
+      assert.equal(kept.key, old.key);
+      assert.equal(kept.flies[0].colour, old.flies[0].colour);
+      assert.equal(kept.flies[0].state.epoch, after.epoch);
+      const [x, z, yaw, y] = spawnSpot(after.world, old.id);
+      assert.deepEqual([kept.flies[0].state.x, kept.flies[0].state.z, kept.flies[0].state.yaw, kept.flies[0].state.y], [x, z, yaw, after.world.heightAt(x, z, y)]);
+    }
+  }
+});
+
+test("restoring an everyone room after its turn changes discards the old food and sets even an airborne fly down at its new spawn", () => {
+  const { table, clock, options, join, fly, send, bite, step } = room(START, 7, EVERYONE);
+  const a = join("key-1");
+  const b = join("key-2");
+  const [x, z] = spawnSpot(table.world, a.seat.id);
+  const id = DROP_ID + 1;
+  send(a, { type: "drop", id, kind: "honey", x, z, y: 0, at: clock.now });
+  bite(a, id, 0.1);
+  step();
+  assert.ok(table.food.find(id));
+  assert.ok(table.food.eaten.get(a.seat.id)! > 0);
+  fly(b, b.seat.flies[0].state.x + 0.5, b.seat.flies[0].state.z, { flags: AIRBORNE });
+  assert.ok(b.seat.flies[0].state.flags & AIRBORNE);
+  const record = table.record();
+  clock.wall = (Math.floor(clock.wall / EVERYONE_TURN) + 1) * EVERYONE_TURN;
+  const restored = Table.restore(record, options);
+  assert.equal(restored.place, everyonePlace(clock.wall));
+  assert.equal(restored.epoch, record.epoch + 1);
+  assert.equal(restored.food.find(id), null);
+  assert.deepEqual([...restored.food.eaten], []);
+  assert.deepEqual(restored.food.foods.map((f) => [f.name, f.amount]), WORLDS[restored.place].patches.map((f) => [f.name, 1]));
+  for (const p of [a, b]) {
+    const seat = restored.seats.get(p.seat.id)!;
+    assert.equal(seat.flies[0].state.flags, AWAY);
+    assert.equal(seat.flies[0].state.epoch, restored.epoch);
+    const [sx, sz, yaw, sy] = spawnSpot(restored.world, seat.id);
+    assert.deepEqual([seat.flies[0].state.x, seat.flies[0].state.z, seat.flies[0].state.yaw, seat.flies[0].state.y], [sx, sz, yaw, restored.world.heightAt(sx, sz, sy)]);
+  }
 });
 
 function nextStates(p: Player, now: number, flags = 0): FlyState[] {
@@ -835,7 +1091,7 @@ test("a starter who leaves keeps one seat, not four: their others are given up w
   assert.equal(table.present, 4);
   // Four flies there, and the starter's four seats held until someone needs them: the list says five are taken, the one the starter keeps among them.
   assert.equal(table.room().flies, 5);
-  assert.deepEqual(tables.listed().map((r) => r.flies), [5]);
+  assert.deepEqual(tables.listed().filter((r) => !r.everyone).map((r) => r.flies), [5]);
   const e = sit("key-e") as Seat;
   assert.equal(typeof e, "object", "not refused as full");
   assert.deepEqual(e.flies.map((f) => f.id), [2]);
@@ -1120,6 +1376,85 @@ test("clearing dropped food from a multi-fly device clears that device's drops o
   for (const p of [a, b]) assert.ok(saidOf(p, "food").some((m) => m.gone.includes(mine)));
 });
 
+test("a room open to everyone that nobody was in keeps no beat, yet whoever comes is sat in the place the clock has it now, as the list says", () => {
+  const { tables, clock, join } = pool(EVERYONE_TURN * 10);
+  const before = tables.get(EVERYONE)!.place;
+  clock.wall += EVERYONE_TURN;
+  clock.now += 50;
+  tables.tick();
+  assert.equal(tables.get(EVERYONE)!.place, before, "an empty room isn't ticked");
+  assert.equal(tables.listed()[0].place, everyonePlace(clock.wall), "the list says where it is now");
+  const { table, link } = join("late");
+  assert.equal(table.place, everyonePlace(clock.wall));
+  assert.equal(saidOf(link, "welcome")[0].place, everyonePlace(clock.wall));
+});
+
+test("room listings return only the first fifty populated rooms in name order when occupancy ties", () => {
+  const tables = new Tables({ now: () => 0, wall: () => 0 });
+  for (let i = 50; i >= 0; i--) {
+    const alphabet = "23456789abcdefghjkmnpqrstuvwxyz";
+    const code = `aaaaaaaa${alphabet[Math.floor(i / 31)]}${alphabet[i % 31]}`;
+    const key = `key-${i}`;
+    const hello: Hello = { type: "hello", v: PROTOCOL, table: code, key, start: { ...START, name: `Room ${String(i).padStart(2, "0")}`, listed: true } };
+    const table = tables.open(key, hello, i);
+    assert.ok(table instanceof Table);
+    assert.equal(typeof table.hello(fakeLink(), key, hello), "object");
+  }
+  // Everyone first, always, then the first 49 of these.
+  assert.deepEqual(tables.listed().map((r) => r.name), ["Everyone", ...Array.from({ length: 49 }, (_, i) => `Room ${String(i).padStart(2, "0")}`)]);
+});
+
+test("a connected room cannot expire even when no message has refreshed its wall-clock timestamp", () => {
+  let wall = 0;
+  const tables = new Tables({ now: () => 0, wall: () => wall });
+  const hello: Hello = { type: "hello", v: PROTOCOL, table: CODE, key: "starter", start: { ...START, listed: true } };
+  const table = tables.open("starter", hello, 7);
+  assert.ok(table instanceof Table);
+  table.hello(fakeLink(), "starter", hello);
+  wall = TABLE_IDLE + 1;
+  tables.tick();
+  assert.equal(tables.get(CODE), table);
+  assert.deepEqual(tables.listed().map((r) => r.code), [EVERYONE, CODE]);
+});
+
+test("an unsupported save version does not restore rooms", async (t) => {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "flies-version-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const file = join(dir, "tables.json");
+  const { table, options } = room();
+  await writeFile(file, JSON.stringify({ v: 2, tables: [table.record()] }));
+  const tables = new Tables(options);
+  assert.equal(await tables.load(file), 0);
+  assert.equal(tables.size, 1, "Everyone alone, which the server opens itself");
+});
+
+test("a room lock accepts canonically equivalent passwords, uses a full random salt, and rejects malformed records", async () => {
+  const { lock, opens, isLock } = await import("../src/lock.ts");
+  const secured = await lock("Café");
+  assert.equal(await opens("Cafe\u0301", secured), true);
+  assert.equal(await opens("Cafe", secured), false);
+  assert.equal(Buffer.from(secured.salt, "base64url").length, 16);
+  const other = await lock("Café");
+  assert.notEqual(other.salt, secured.salt, "the same password is salted independently at each room");
+  assert.notEqual(other.hash, secured.hash);
+  assert.equal(isLock(secured), true);
+  for (const value of [null, {}, { salt: secured.salt }, { salt: secured.salt, hash: 42 }, { salt: secured.salt, hash: [] }, { salt: secured.salt, hash: { length: 32 } }]) assert.equal(isLock(value), false);
+});
+
+test("equally full rooms with the same name have a stable code order regardless of arrival order", () => {
+  const tables = new Tables({ now: () => 0, wall: () => 0 });
+  for (const code of ["bbbbbbbbbb", "aaaaaaaaaa"]) {
+    const hello: Hello = { type: "hello", v: PROTOCOL, table: code, key: code, start: { ...START, name: "Same", listed: true } };
+    const table = tables.open(code, hello, 7);
+    assert.ok(table instanceof Table);
+    table.hello(fakeLink(), code, hello);
+  }
+  assert.deepEqual(tables.listed().filter((room) => !room.everyone).map((room) => room.code), ["aaaaaaaaaa", "bbbbbbbbbb"]);
+});
+
 test("found food deadlines survive a saved idle room and are gone on welcome", () => {
   const { table, clock, join, send, options } = room();
   const a = join("key-1");
@@ -1250,4 +1585,70 @@ test("expiry replacement flushes pending bite receipts exactly once", () => {
   clear(a);
   step(100);
   assert.ok(saidOf(a, "food").every((m) => m.meal![1] === 0));
+});
+
+test("a device's flies sit together in a room open to everyone: rooms fill by flies, and one that can't seat them all sends the device on to the next", () => {
+  const { tables, join } = pool();
+  const a = join("key-1", { flies: 4 });
+  const b = join("key-2", { flies: 3 });
+  assert.equal(a.table.code, EVERYONE);
+  assert.equal(b.table, a.table);
+  assert.deepEqual([a.seat.flies.length, b.seat.flies.length], [4, 3]);
+  assert.equal(a.table.taken, 7);
+  // One seat left in Everyone: four flies go on to Everyone 2, all of them, and a single fly still fits in Everyone.
+  const c = join("key-3", { flies: 4 });
+  assert.equal(c.table.code, everyoneCode(1));
+  assert.equal(c.seat.flies.length, 4);
+  assert.deepEqual(saidOf(c, "welcome")[0].flies.map((f) => f.id), [1, 2, 3, 4]);
+  const d = join("key-4");
+  assert.equal(d.table, a.table);
+  assert.equal(a.table.taken, MAX_FLIES);
+  assert.deepEqual(tables.listed().filter((r) => r.everyone).map((r) => [r.code, r.flies]), [[EVERYONE, MAX_FLIES], [everyoneCode(1), 4]]);
+  // Coming back, a device's flies are in the room they were in, as many as before.
+  c.table.disconnected(c.seat, c.link);
+  const back = join("key-3", { flies: 4, table: everyoneCode(1) });
+  assert.equal(back.table, c.table);
+  assert.equal(back.seat.flies.length, 4);
+});
+
+test("nobody started a room open to everyone, so nobody's seats are kept there once they have gone", () => {
+  const { tables, clock, join } = pool();
+  const a = join("key-1", { flies: 4 });
+  const b = join("key-2", { flies: 4 });
+  assert.equal(a.table.starter, null);
+  assert.equal(b.table, a.table);
+  // The first to sit down says goodbye: all four of its seats are free for the next device, none kept.
+  a.table.receive(a.seat, JSON.stringify({ type: "bye" }));
+  assert.equal(a.table.taken, 4);
+  assert.equal(a.table.roomFor("newcomer"), 4);
+  const c = join("key-3", { flies: 4 });
+  assert.equal(c.table, a.table);
+  assert.deepEqual(c.seat.flies.map((f) => f.id), [1, 2, 3, 4]);
+  // So with those gone a long while, too.
+  b.table.disconnected(b.seat, b.link);
+  clock.wall += AWAY_LIMIT + 1;
+  clock.now += 50;
+  tables.tick();
+  assert.equal(b.table.taken, 4);
+  assert.equal(join("key-4", { flies: 4 }).table, a.table);
+});
+
+test("the rooms open to everyone hold at most 512 flies: past that a device is turned away as full, and short of it one gets the seats there are", () => {
+  const { tables, join } = pool();
+  for (let i = 0; i < EVERYONE_ROOMS; i++) {
+    join(`full-${i}-a`, { flies: 4 });
+    join(`full-${i}-b`, { flies: 3 });
+  }
+  assert.equal([...tables.values()].filter((t) => t.everyone).length, EVERYONE_ROOMS);
+  // Every room has one seat: four flies asked for, one given, in the first.
+  const one = join("one-more", { flies: 4 });
+  assert.equal(one.table.code, EVERYONE);
+  assert.equal(one.seat.flies.length, 1);
+  for (let i = 1; i < EVERYONE_ROOMS; i++) join(`last-${i}`);
+  let flies = 0;
+  for (const t of tables.values()) if (t.everyone) flies += t.taken;
+  assert.equal(flies, EVERYONE_ROOMS * MAX_FLIES);
+  assert.equal(flies, 512);
+  const hello: Hello = { type: "hello", v: PROTOCOL, table: EVERYONE, key: "too-many", flies: 1 };
+  assert.equal(tables.open("too-many", hello, 7), "full");
 });

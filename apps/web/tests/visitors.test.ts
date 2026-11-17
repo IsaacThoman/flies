@@ -21,7 +21,7 @@ const felt = (): Felt => ({ air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] });
 function around(fly: Vec3, company: Vec3[], others: Vec3[] | null): Around {
   const world = new World(WORLDS.picnic);
   const weather = { wind: 0, rain: 0, cloud: 0, mist: 0, wet: 0 } as unknown as Weather;
-  return { fly, airborne: false, world, pantry: new Pantry(world), weather, quiet: false, felt: felt(), company, shared: others && { others, anchor: fly } };
+  return { fly, airborne: false, world, pantry: new Pantry(world), weather, quiet: false, felt: felt(), company, shared: others && { others, anchor: fly, ownSky: false } };
 }
 
 test("alone, the butterfly and the ladybird keep clear of whichever of this device's flies is nearest them, as of another player's at a table", (t) => {

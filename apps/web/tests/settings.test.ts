@@ -34,9 +34,21 @@ const NOW = Date.UTC(2026, 10, 16, 20);
 
 test("settings come back as they were saved", () => {
   const store = memory();
-  const settings: Settings = { flies: 3, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "whole", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, rumble: false, stats: true, realWeather: false, place: "lab", scene: "bar" };
+  const settings: Settings = { flies: 3, pixels: "chunkier", wallpaperAfter: 300, wallpaperCamera: "whole", eyes: "high", eyesInset: "always", nerves: "off", xray: "always", statsPanel: "wallpaper", statsKind: "day", overlaySize: "large", overlayOpacity: "faint", hints: false, rumble: false, stats: true, realWeather: false, place: "lab", scene: "bar", joinOthers: false };
   saveSettings(settings, store);
   assert.deepEqual(loadSettings(store), settings);
+});
+
+test("joining others starts on for new and older saves and keeps an explicit opt-out", () => {
+  assert.equal(DEFAULT_SETTINGS.joinOthers, true);
+  assert.equal(loadSettings(null).joinOthers, true);
+  assert.equal(loadSettings(memory()).joinOthers, true);
+  assert.equal(loadSettings(settingsSaved({ hints: false })).joinOthers, true);
+  const store = memory();
+  saveSettings({ ...DEFAULT_SETTINGS, joinOthers: false }, store);
+  assert.equal(loadSettings(store).joinOthers, false);
+  saveSettings({ ...DEFAULT_SETTINGS, joinOthers: true }, store);
+  assert.equal(loadSettings(store).joinOthers, true);
 });
 
 test("rumble starts on, including saves without the setting or with an invalid value", () => {
@@ -117,6 +129,7 @@ test("each setting keeps only a value the game can use", () => {
     realWeather: ["off", 0],
     place: ["moon", 3, null],
     scene: ["turns", "moon", {}],
+    joinOthers: ["off", 0, null],
   };
   for (const [key, values] of Object.entries(bad)) {
     for (const value of values) assert.deepEqual(loadSettings(settingsSaved({ [key]: value })), DEFAULT_SETTINGS, `${key}: ${JSON.stringify(value)}`);
@@ -216,13 +229,14 @@ test("the weather kept is Now by its id, whether Now was the real weather outsid
 });
 
 /** A game for the screens to ask things of: it keeps the settings and remembers what it was asked. */
-function fakeShell(settings: Settings = { ...DEFAULT_SETTINGS }, weatherOutside = false) {
+function fakeShell(settings: Settings = { ...DEFAULT_SETTINGS }, weatherOutside = false, canPlayOnline = false) {
   const asked: string[] = [];
   const shell = {
     settings,
     maxFlies: 4,
     asked,
     weatherOutside,
+    canPlayOnline,
     shape: TV_FRAME,
     glyphs: "remote" as const,
     open: (screen: ScreenId) => asked.push(`open ${screen}`),
@@ -237,7 +251,8 @@ const press = (screen: MenuScreen, ...buttons: RemoteButton[]) => buttons.forEac
 function eachTab(screen: MenuScreen, visit: (tab: string) => void) {
   screen.enter();
   screen.menu.focusOn("page");
-  for (let i = 0; i < 3; i++) {
+  const tabs = screen.menu.items[0];
+  for (let i = 0; i < (tabs.kind === "choice" ? tabs.options.length : 0); i++) {
     visit(settingsTab(screen));
     press(screen, "right");
   }
@@ -271,9 +286,9 @@ test("the settings are a row of tabs over each part's settings: Left and Right o
 });
 
 test("every setting the player chooses is on exactly one tab, and every tab fits without scrolling", () => {
-  // Real weather only where the Apple TV can tell the weather outside.
-  for (const weatherOutside of [false, true]) {
-    const screen = settingsScreen(fakeShell(undefined, weatherOutside));
+  // Real weather only where the Apple TV can tell the weather outside; joining others only where the device can be online.
+  for (const [weatherOutside, online] of [[false, false], [true, false], [false, true], [true, true]]) {
+    const screen = settingsScreen(fakeShell(undefined, weatherOutside, online));
     const ids: string[] = [];
     eachTab(screen, (tab) => {
       const rows = screen.menu.items.slice(1);
@@ -286,7 +301,7 @@ test("every setting the player chooses is on exactly one tab, and every tab fits
     assert.deepEqual(
       [...ids].sort(),
       Object.keys(DEFAULT_SETTINGS)
-        .filter((key) => key !== "scene" && (weatherOutside || key !== "realWeather"))
+        .filter((key) => key !== "scene" && (weatherOutside || key !== "realWeather") && (online || key !== "joinOthers"))
         .sort(),
     );
   }
@@ -367,4 +382,10 @@ test("Flies is offered only where several brains can run, with counts up to the 
     }
     assert.deepEqual(shell.asked, Array(maxFlies - 1).fill("apply"));
   }
+});
+
+test("a kept weather expires exactly six hours after the choice, while a view is kept", () => {
+  const store = shelfSaved({ weather: { kind: "rain", at: NOW }, view: { kind: "wide", at: NOW } });
+  assert.equal(loadShelf(NOW + 6 * HOUR - 1, store).weather?.kind, "rain");
+  assert.deepEqual(loadShelf(NOW + 6 * HOUR, store), { view: { kind: "wide", at: NOW } });
 });

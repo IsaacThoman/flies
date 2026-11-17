@@ -146,6 +146,7 @@ test("bites carry the food and how much, with the sender's count", () => {
   assert.equal(got[0][0], 3);
   assert.ok(Math.abs(got[0][1] - 0.0123) < 1e-6);
   assert.equal(got[1][0], 2_000_007);
+  assert.ok(Math.abs(got[1][1] - 0.5) < 1e-6, "each bite carries its own amount");
 });
 
 test("bites name the place's epoch after them, where a reader of the bites alone still finds them as before", () => {
@@ -250,4 +251,40 @@ test("the single-fly helper is byte-identical to a one-element own batch, includ
   const ids: number[] = [];
   assert.equal(decodeFlies(new DataView(single.buffer, 0, n), TABLETOP_SCALE, createFlyState(), (s) => ids.push(s.id), FLY), 1);
   assert.deepEqual(ids, [6]);
+});
+
+test("every truncated hand state is refused without changing the caller's state", () => {
+  const encoded = new DataView(new ArrayBuffer(FLY_MAX));
+  const n = encodeFly(encoded, TABLETOP_SCALE, sampleState());
+  for (let length = 0; length < n; length++) {
+    const state = createFlyState();
+    state.x = 42;
+    const untouched = structuredClone(state);
+    assert.equal(readState(new DataView(encoded.buffer, 0, length), 3, TABLETOP_SCALE, state), -1, `length ${length}`);
+    assert.deepEqual(state, untouched);
+  }
+});
+
+test("bites are bounded to sixteen, and incomplete or oversized requests deliver no bites", () => {
+  const out = new DataView(new ArrayBuffer(4 + 17 * 8));
+  const bites = Array.from({ length: 17 }, (_, i) => ({ food: i + 1, amount: 0.25 }));
+  const length = encodeBites(out, 42, bites);
+  assert.equal(length, 4 + 16 * 8);
+  const seen: number[] = [];
+  assert.equal(decodeBites(new DataView(out.buffer, 0, length), (id) => seen.push(id)), 42);
+  assert.deepEqual(seen, bites.slice(0, 16).map((b) => b.food));
+  for (let n = 0; n < length; n++) {
+    let calls = 0;
+    assert.equal(decodeBites(new DataView(out.buffer, 0, n), () => calls++), -1, `length ${n}`);
+    assert.equal(calls, 0);
+  }
+  out.setUint8(3, 17);
+  assert.equal(decodeBites(out, () => assert.fail("oversized request delivered a bite")), -1);
+});
+
+test("half a sequence space is ambiguous and never counts as a newer packet", () => {
+  for (const a of [0, 1, 12345, 32767]) {
+    assert.equal(seqAtOrAfter(a, a + 32768), false);
+    assert.equal(seqAtOrAfter(a + 32768, a), false);
+  }
 });

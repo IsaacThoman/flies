@@ -143,7 +143,7 @@ try {
     xcrun('simctl', 'privacy', udid, 'grant', 'location', BUNDLE_ID);
     xcrun('simctl', 'location', udid, 'set', '51.5072,-0.1276');
   }
-  const config = { script: 'game.js', url: `http://fly.local/?echo=${echo.url}`, fit: 'fill', pixelated: true, stats: 2, drive, typed: [TYPED] };
+  const config = { script: 'game.js', url: `http://fly.local/?echo=${echo.url}&alone`, fit: 'fill', pixelated: true, stats: 2, drive, typed: [TYPED] };
   app = spawn('xcrun', ['simctl', 'launch', '--console-pty', udid, BUNDLE_ID, '--config', JSON.stringify(config)], { stdio: ['ignore', 'pipe', 'pipe'] });
   let latest: Report | null = null, lastStats: Stats | null = null, done = false;
   const allStats: Stats[] = [];
@@ -335,7 +335,7 @@ try {
     ['wait', { screen: 'play' }, 60_000],
     ['log', 'playing in the room'],
   ];
-  const gameConfig = { ...config, script: 'real-game.js', url: `http://fly.local/?rooms=${roomsUrl}`, typed: [code.toUpperCase()], drive: gameDrive };
+  const gameConfig = { ...config, script: 'real-game.js', url: `http://fly.local/?rooms=${roomsUrl}&alone`, typed: [code.toUpperCase()], drive: gameDrive };
   app = spawn('xcrun', ['simctl', 'launch', '--console-pty', '--terminate-running-process', udid, BUNDLE_ID, '--config', JSON.stringify(gameConfig)], { stdio: ['ignore', 'pipe', 'pipe'] });
   app.stdout?.on('data', reader());
   app.stderr?.on('data', reader());

@@ -279,8 +279,8 @@ TV has (`places/restaurant/`):
   (Settings → Picture → Frame stats, or the canvas's `data-calls` and `data-triangles`);
   a new place should stay close to that, near the fly and in its whole view.
 - **Building is a pause behind the veil.** `data-place-ms` on the canvas says
-  how long the place took to build: the picnic 36 ms in desktop Chromium, so
-  about half a second on the TV. Keep it there, or build in steps
+  how long the place took to build. A reference picnic build was 36 ms in
+  desktop Chromium, so about half a second on the TV. Keep it there, or build in steps
   (`SceneSet.more`, above): then `data-place-step-ms` is the longest frame
   of it, and that is what to keep there.
 - **Register it** in `catalog.ts` and `index.ts`. `apps/web/tests/places.test.ts`
@@ -289,3 +289,35 @@ TV has (`places/restaurant/`):
   every time of day, and every shot keeps the camera out of everything with
   the fly in the picture. Add it to the fuzzers' places too
   (`scripts/fuzz/body.ts`).
+
+## Checking the picnic's picture
+
+Compare the picnic at 1920×1080 with `scripts/play.ts`, keeping its chunky
+internal resolution. Hold the same fly pose and camera for title, follow,
+close, wide, whole table, screensaver, fruit and glass studies; repeat under
+midday, golden hour, dusk, night and midday rain. Pinned poses belong only in
+the capture harness: ordinary play remains the brain's choice.
+
+Judge composition at TV distance, light and colour, materials, millimetre
+scale, detail without clutter, life and weather, and rendering artefacts.
+Record `data-calls` and `data-place-ms` alongside the pictures. Compare calls
+at the same eye-refresh phase: frames that refresh the brain's six eye views
+include those extra draws. Compare repeated builds on the same machine;
+wall-clock build times on a busy machine vary considerably.
+
+The picnic shares one fruit material between the glazed things, cherries,
+apple, citrus and berries; a per-vertex skin kind chooses the surface in the
+shader. The strawberry skin varies its roughness; the cut berry has a pale
+core, radiating flesh fibres and a darker rind. The cut fruit still follows
+the world's low dome, rather than pretending to be a flat walkable slice.
+Fine cloth detail fades with its pixel footprint and stays subordinate to
+the fly's legs. Small glass base and fill-edge accents join the existing
+glazed batch.
+
+Tabletop shadows follow the chosen sun or moon without extra lights, shadow
+maps or draws. They use the world's footprints and peak heights as columns:
+a deliberate silhouette approximation for rounded fruit, not a change to its
+collision surface. Only direct light is shadowed; the sky still fills it.
+Rain rings spread on the tabletop and in the saucer's pool. Hits on the fly
+or raised objects throw splash droplets without a suspended horizontal ring;
+the fly feels the same rain touch as before.

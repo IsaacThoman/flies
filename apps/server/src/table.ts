@@ -9,15 +9,17 @@
 // started it, the seed and the clock every device blows the same bubbles
 // from, and when a visitor comes. It is a room too: it has a name, may be
 // listed for anyone browsing to find, and may be locked with a password
-// (lock.ts). No brains, no drawing and no sockets here (server.ts), so a
+// (lock.ts). Or it is one of the rooms open to everyone, which nobody starts:
+// the server's clock takes it from place to place, and each device keeps its
+// own light and weather there. No brains, no drawing and no sockets here (server.ts), so a
 // whole table can run in a test.
 
 import { BALL_RADIUS, Pace, VentilationClock, World, WORLDS, forecast, hourOfDay } from "@fly/world";
 import type { Happening } from "@fly/world";
 import {
   MAX_FOUND, AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_FLIES, MAX_OWN, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
-  TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, decodeFlies, encodeFlies, isTableCode, mayReturnTo, mix,
-  roomName, roomTime, spawnSpot, stream, tableHours, toWire, wireScale,
+  TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, decodeFlies, encodeFlies, everyoneIndex, everyoneName,
+  isTableCode, mayReturnTo, mix, roomName, roomTime, spawnSpot, stream, tableHours, toWire, wireScale,
 } from "@fly/net";
 import type {
   BallWire, ClientMessage, FlyState, FoodWire, HappeningWire, PlayerWire, Refusal, RoomInfo, RoomWire, SeatedFly, ServerMessage, Spot, TableStart, V3,
@@ -44,6 +46,16 @@ const HAPPENING_KEPT = 5_000;
 export type Going = Happening | "ventilation";
 /** Seconds each visitor keeps the table busy, roughly, so the table doesn't send another of it meanwhile (the ventilation keeps its own clock). */
 const BUSY: Readonly<Record<Going, number>> = { gust: 10, gull: 80, leaf: 40, butterfly: 100, ladybird: 120, juice: 0, boat: 240, ventilation: 0 };
+
+/** A room open to everyone stays in each place this long (ms), then moves on to the next, by the wall clock: every server agrees where it is. */
+export const EVERYONE_TURN = 20 * 60_000;
+const TURNS = Object.keys(WORLDS);
+
+/** Where the rooms open to everyone are at this moment (ms since 1970). */
+export const everyonePlace = (wall: number) => TURNS[Math.floor(wall / EVERYONE_TURN) % TURNS.length];
+
+/** The weather a room open to everyone has for its own goings-on: none of note, since each device there has its own sky. */
+const CALM = Object.freeze({ cloud: 0, mist: 0, rain: 0, wind: 0.4 });
 
 /** A device's line to the table. */
 export type Link = {
@@ -165,6 +177,9 @@ export function isTableRecord(v: unknown): v is TableRecord {
   return (r.name === undefined || roomName(r.name) === r.name) && (r.listed === undefined || typeof r.listed === "boolean") && (r.lock === undefined || r.lock === null || isLock(r.lock));
 }
 
+/** How many flies a device asks for (a hello's `flies`, a recount's `count`), as far as one may bring: 1 if it says nothing that is a number. */
+export const wantedFlies = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? Math.max(1, Math.min(MAX_OWN, Math.floor(n))) : 1);
+
 const clampTime = (t: unknown, now: number) => (typeof t === "number" && Number.isFinite(t) ? Math.max(now - 2000, Math.min(now + 1000, t)) : now);
 
 /** A zone's offset from UTC at a moment, minutes east, from its name; `fallback` if the name isn't one. */
@@ -198,6 +213,8 @@ export class Table {
   bubbles: TableBubbles | null = null;
   /** Keys that were removed from the table, hashed: they can't sit down again. */
   readonly removed: Set<string>;
+  /** One of the rooms open to everyone: nobody started it, and nobody chooses its place, light or weather. */
+  readonly everyone: boolean;
   /** What it is called; whether anyone browsing sees it; its password, hashed, if it has one. */
   readonly name: string;
   readonly listed: boolean;
@@ -227,37 +244,49 @@ export class Table {
 
   constructor(code: string, start: TableStart, starterKey: string, seed: number, options: TableOptions, record?: TableRecord, lock: Lock | null = record?.lock ?? null) {
     this.code = code;
-    this.name = roomName(start.name) ?? UNNAMED;
-    this.listed = start.listed === true;
-    this.lock = lock;
+    const everyone = everyoneIndex(code);
+    this.everyone = everyone >= 0;
+    this.name = this.everyone ? everyoneName(everyone) : (roomName(start.name) ?? UNNAMED);
+    this.listed = this.everyone || start.listed === true;
+    this.lock = this.everyone ? null : lock;
     this.#options = options;
     this.seed = seed >>> 0;
     this.created = record?.created ?? options.wall();
-    this.place = Object.hasOwn(WORLDS, start.place) ? start.place : "picnic";
-    this.epoch = record?.epoch ?? 0;
+    // A room open to everyone is wherever the clock has it, whatever was kept.
+    this.place = this.everyone ? everyonePlace(options.wall()) : Object.hasOwn(WORLDS, start.place) ? start.place : "picnic";
+    // Moved on while the server was down: what was kept is of another place, and a device still there must know it isn't.
+    const moved = !!record && record.place !== this.place;
+    this.epoch = ((record?.epoch ?? 0) + (moved ? 1 : 0)) & 0xff;
     this.world = new World(WORLDS[this.place]);
     this.scale = wireScale(this.world.place);
     this.food = new TableFood(this.world, this.world.place.patches, options.wall);
-    this.worldWire = { light: TABLE_LIGHTS.includes(start.light as never) ? start.light : "clock", weather: TABLE_WEATHERS.includes(start.weather as never) ? start.weather : "now" };
-    this.#starter = starterKey;
+    const light = !this.everyone && TABLE_LIGHTS.includes(start.light as never) ? start.light : "clock";
+    this.worldWire = { light, weather: !this.everyone && TABLE_WEATHERS.includes(start.weather as never) ? start.weather : "now" };
+    // Nobody's key is empty: nobody started a room open to everyone.
+    this.#starter = this.everyone ? "" : starterKey;
     this.#zone = typeof start.zone === "string" ? start.zone.slice(0, 64) : "";
     this.#offset = finite(start.offset) ? Math.max(-14 * 60, Math.min(14 * 60, Math.round(start.offset))) : 0;
     this.removed = new Set(record?.removed ?? []);
     this.#pace = this.#newPace();
     this.#lastTick = options.now();
     this.#settle();
-    if (record) {
+    if (record && !moved) {
       this.food.restore(record.foods, record.foodExpires);
       for (const [id, amount] of record.eaten ?? []) this.food.eaten.set(id, amount);
+    }
+    if (record) {
       const now = options.now();
       for (const r of record.seats) {
         const kept = r.flies ?? (r.at ? [{ id: r.id, at: r.at, airborne: !!r.airborne }] : []);
         if (kept.length === 0) continue;
         const seat = this.#seat(kept[0].id, r.key);
-        for (const k of kept) {
-          const s = (kept.indexOf(k) === 0 ? seat.flies[0] : this.#addFly(seat, k.id)).state;
-          [s.x, s.y, s.z, s.yaw] = k.at;
-          s.flags = (k.airborne ? AIRBORNE : 0) | AWAY;
+        for (const [i, k] of kept.entries()) {
+          const fly = i === 0 ? seat.flies[0] : this.#addFly(seat, k.id);
+          const s = fly.state;
+          // Moved on while the server was down: each fly is set down where the table sets that fly down in the place it is in now.
+          if (moved) this.#setDown(fly, spawnSpot(this.world, k.id));
+          else [s.x, s.y, s.z, s.yaw] = k.at;
+          s.flags = (k.airborne && !moved ? AIRBORNE : 0) | AWAY;
           s.t = now;
           s.epoch = this.epoch;
         }
@@ -308,11 +337,13 @@ export class Table {
 
   /** What it says of itself: in its welcome, and in the list of rooms. */
   get info(): RoomInfo {
-    return { name: this.name, listed: this.listed, locked: !!this.lock };
+    return { name: this.name, listed: this.listed, locked: !!this.lock, code: this.code, everyone: this.everyone };
   }
 
+  /** A room open to everyone nobody is in keeps no beat, so not its place either: the list says where the clock has it, where whoever comes is sat (Tables.everyone). */
   room(): RoomWire {
-    return { code: this.code, name: this.name, place: this.place, flies: this.taken, locked: !!this.lock };
+    const place = this.everyone ? everyonePlace(this.#options.wall()) : this.place;
+    return { code: this.code, name: this.name, place, flies: this.taken, locked: !!this.lock, ...(this.everyone ? { everyone: true } : {}) };
   }
 
   /** Whether a device with this key (hashed) may sit down without the password: it has sat here before, or started the table. */
@@ -480,7 +511,7 @@ export class Table {
 
   /** How many flies a device asks for, as far as one may bring. */
   #wanted(n: unknown) {
-    return typeof n === "number" && Number.isFinite(n) ? Math.max(1, Math.min(MAX_OWN, Math.floor(n))) : 1;
+    return wantedFlies(n);
   }
 
   #seated(seat: Seat): SeatedFly[] {
@@ -564,6 +595,31 @@ export class Table {
     for (const fly of seat.flies) this.#broadcast(shown ? { type: "away", id: fly.id, away: false } : { type: "joined", ...this.#player(seat, fly) }, seat);
     this.#options.log?.("joined", { table: this.code, player: seat.id, flies: seat.flies.length, asked: wanted, returning });
     return seat;
+  }
+
+  /** A room open to everyone moves on when the clock says, everyone there together. Returns the table. */
+  keepTurn(): this {
+    if (!this.everyone) return this;
+    const turn = everyonePlace(this.#options.wall());
+    if (turn !== this.place) this.moveTo(turn);
+    return this;
+  }
+
+  /** Whether a device with this key (hashed) is still at the table: its flies there, perhaps resting, not yet gone. */
+  seated(key: string) {
+    for (const s of this.seats.values()) if (s.key === key) return s.present;
+    return false;
+  }
+
+  /**
+   * How many flies a device with this key (hashed) could have here: as many as
+   * it brings, if it has a seat here already; otherwise the seats a newcomer
+   * can have (`taken`, which those gone give up). 0 if it was removed.
+   */
+  roomFor(key: string): number {
+    if (this.removed.has(key)) return 0;
+    for (const s of this.seats.values()) if (s.key === key) return MAX_OWN;
+    return MAX_FLIES - this.taken;
   }
 
   #player(seat: Seat, fly: SeatFly): PlayerWire {
@@ -836,6 +892,7 @@ export class Table {
         this.#options.log?.("gone", { table: this.code, player: seat.id });
       }
     }
+    this.keepTurn();
     // The table's clock's offset changes twice a year where the starter is.
     if (wall - this.#offsetAt > 60_000 && this.#zone) {
       this.#offsetAt = wall;
@@ -900,6 +957,8 @@ export class Table {
 
   #can(h: Happening, now: number) {
     if ((this.#busy.get(h) ?? 0) > now) return false;
+    // Each device's own sky says whether a visitor suits it there (SharedTable.ownSky).
+    if (this.everyone) return true;
     const hour = hourOfDay(this.hours);
     const light = this.worldWire.light;
     const day = light === "clock" ? hour > 7 && hour < 19.5 : light !== "night" && light !== "dusk";
@@ -919,6 +978,7 @@ export class Table {
 
   /** The table's weather: chosen, or the forecast by its clock. */
   #weather() {
+    if (this.everyone) return CALM;
     const w = this.worldWire.weather;
     const m = this.#mix;
     if (w === "now") return forecast(this.hours, m);
