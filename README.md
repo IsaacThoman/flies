@@ -833,9 +833,9 @@ nothing flickers between brain states. **How a glow is drawn**
 (`packages/fly/src/nerves/materials.ts`, one function for both views): a
 part's colour goes from its tissue's toward its role's, blue for sensory
 neurons, amber for the neurons between, red for motor and neurosecretory
-ones, by (glow / 0.4)², all the way at 0.4, covering more of what is behind
+ones, by (glow / 0.35)², all the way at 0.35, covering more of what is behind
 it as it does, and it gives off light in that colour in proportion to
-0.8 × glow². The square keeps the low hum of background activity near the tissue's
+glow². The square keeps the low hum of background activity near the tissue's
 colour and lets a burst stand out: in a ball's dive the optic lobes go from
 about 0.07 to 0.35. Nothing else lights a part. Its tissue is drawn
 unlit by activity: in the world lit by the scene's lights like the rest of the

@@ -6,7 +6,7 @@
 // What lights a part is activity and nothing else. Its glow g (0 to 1, which
 // the game sets from a real firing rate) takes it from its tissue's colour
 // toward its role's (blue for sensory neurons, amber for the neurons between,
-// red for motor and neurosecretory ones) by (g / 0.4)², all the way at 0.4,
+// red for motor and neurosecretory ones) by (g / 0.35)², all the way at 0.35,
 // and it covers more of what is behind it as it does; and it gives off light
 // in that colour in proportion to g². The square keeps the low hum of
 // background activity close to the tissue's colour and lets a burst stand out
@@ -76,12 +76,12 @@ vec3 nerveHue(float role) {
   return role < 0.5 ? ${vec3(ROLE_COLORS.sensory)} : role < 1.5 ? ${vec3(ROLE_COLORS.central)} : ${vec3(ROLE_COLORS.motor)};
 }
 vec4 nerveCover(vec3 tissue, vec4 nerve, float facing) {
-  float lit = min(1.0, nerve.x * nerve.x / 0.16);
+  float lit = min(1.0, nerve.x * nerve.x / 0.1225);
   float tissueCover = nerve.z * mix(1.0, 1.0 - facing, abs(nerve.w));
   return vec4(mix(tissue, nerveHue(nerve.y), lit), mix(tissueCover, 0.85 * (0.5 + 0.5 * facing), lit));
 }
 vec3 nerveShine(vec4 nerve, float facing) {
-  return linearToOutputTexel(vec4(nerveHue(nerve.y), 1.0)).rgb * nerve.x * nerve.x * 0.8 * (0.5 + 0.5 * facing);
+  return linearToOutputTexel(vec4(nerveHue(nerve.y), 1.0)).rgb * nerve.x * nerve.x * 1.0 * (0.5 + 0.5 * facing);
 }
 `;
 

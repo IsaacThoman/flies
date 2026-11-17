@@ -100,3 +100,54 @@ P means portrait phone. Labels name observation triggers; the anatomy remains
 at rest in the diagnostic replay. Every scorer classified activity-only GIFs
 before screenshots/source/measurements. Existing app captions were visible only
 in the later live-game evidence, and still lower the text score.
+
+## Matched round 2
+
+Key: P4 = round-1 incumbent; Q8 = an identical copy of P4, a consistency
+control; N6 = 2f2278f, two-pixel soma floor, restrained activity emission,
+compact stats with retained values/units and no duplicate activity headings.
+All scorers were fresh contexts, now using the owner's updated high effort.
+Six unlabelled TV activity clips per set were classified before other evidence;
+phone evidence remained available for layout and legibility. Source/evidence
+were frozen, with review logs and keys excluded from source snapshots.
+
+| Reviewer | Set | Beauty | Recognition | Truth | Legibility | Cost | Text | Mean | Ranking |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| R1 | P4 = Q8 | 7 | 6 | 8 | 6.5 | 8 | 6 | 6.92 | tied 2 |
+| R1 | N6 | 7.5 | 6 | 8.5 | 7 | 8 | 7 | 7.33 | 1 |
+| R2 | P4 = Q8 | 6 | 5 | 8 | 5 | 8 | 5 | 6.17 | tied 2 |
+| R2 | N6 | 6 | 5 | 8 | 5 | 8 | 6 | 6.33 | 1 |
+| R3 | P4 = Q8 | 7 | 5.5 | 8 | 5.5 | 8 | 4 | 6.33 | tied 2 |
+| R3 | N6 | 7.5 | 5.5 | 8 | 6 | 8 | 5 | 6.67 | 1 |
+| Mean | P4 = Q8 | 6.67 | 5.50 | 8.00 | 5.67 | 8.00 | 5.00 | 6.47 | 2 |
+| Mean | N6 | 7.00 | 5.50 | 8.17 | 6.00 | 8.00 | 6.00 | 6.78 | 1 |
+
+Decision: retain N6, unanimously preferred and higher scored. Identical sets
+received identical criterion scores from all three reviewers; no extra noise
+reviewers were needed. Duplicate control scores are not counted twice.
+Recognition again did not improve. The separate losses audit preferred N6,
+but found weaker regional contrast than P4/Q8; it recommended testing an
+intermediate response. Some marker merging remains possible at two pixels.
+
+Matched cost remains 4 draws and 51,794 triangles. Logic CPU: 15.79 versus
+15.93 µs/frame, an equivalent-workload result consistent with no meaningful
+CPU difference. Live message ranges fluctuate with numeric values; no new
+message fields/readouts were introduced. Targeted tests: 29 passed.
+
+Mandatory validation correction after evidence was frozen: full tests exposed
+18,433 nervous-system triangles against the existing 18,000 limit. The soma
+glyphs were reduced to eight faces, preserving centres and pixel footprint,
+in f065461a. The mesh is now 16,639 triangles; all 16 targeted model/anatomy
+tests passed. No budget was relaxed. Full rerun: 722 tests passed, 2 skipped;
+the unchanged brain's independent CPU budget then failed at 0.607 s/s against
+0.5. Both brain source trees are unchanged from the task's base. Lint and
+typecheck passed. A separate budget rerun is being used to investigate shared
+machine variability; the failure is not hidden or counted as a visual win.
+
+N6 matched key (clip suffixes 11–22): TV swoop, P feed, P groom, TV feed,
+P walk, TV rest, P rest, TV walk, P swoop, TV groom, P flight, TV flight.
+P4/Q8 retain the round-1 P4 key. These are observation-trigger labels, not
+verified exclusive behavioural ground truth for transition clips.
+
+Round-2 presented order: R1 Q8/N6/P4; R2 N6/Q8/P4; R3 Q8/P4/N6.
+The regression audit saw N6/P4/Q8.
