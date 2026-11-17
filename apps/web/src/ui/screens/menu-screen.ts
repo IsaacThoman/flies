@@ -28,6 +28,8 @@ export type MenuScreenOptions = {
   place(frame: Frame): MenuPanel;
   /** The root of the game, which a pointer can't go back from. */
   root?: boolean;
+  /** Keep the header and rows still while hiding unused panel space. */
+  trimEmpty?: boolean;
   /** Each time it comes to the top. */
   onEnter?(): void;
   onActivate?(item: MenuItem): void;
@@ -50,6 +52,8 @@ export class MenuScreen implements Screen {
   #shell: Shell;
   #dirty = true;
   #pane: MenuPanel;
+  #fullHeight: number;
+  #fullRows: number;
   /** What a pointer went down on: a slider it is sliding, or the list it may drag. */
   #held: { slider: number; hit: Hit | null; scroll: number; dragging: boolean } | null = null;
   #wheel = 0;
@@ -62,9 +66,12 @@ export class MenuScreen implements Screen {
     this.#options = options;
     this.id = options.id;
     this.#pane = options.place(shell.shape);
+    this.#fullHeight = this.#pane.panel.h;
+    this.#fullRows = this.#pane.rows;
     options.menu.setRows(this.#pane.rows);
     options.menu.columns = this.#pane.list.columns;
     this.view = new MenuView(options.menu, this.#pane.list);
+    this.#trimPane();
   }
 
   get menu() {
@@ -83,10 +90,21 @@ export class MenuScreen implements Screen {
 
   layout(frame: Frame) {
     this.#pane = this.#options.place(frame);
+    this.#fullHeight = this.#pane.panel.h;
+    this.#fullRows = this.#pane.rows;
     this.menu.setRows(this.#pane.rows);
     this.menu.columns = this.#pane.list.columns;
     this.view.place(this.#pane.list);
+    this.#trimPane();
     this.#dirty = true;
+  }
+
+  #trimPane() {
+    if (!this.#options.trimEmpty) return;
+    const { row, gap, columns } = this.#pane.list;
+    const empty = Math.max(0, Math.ceil(this.#fullRows / columns) - Math.ceil(this.menu.rows / columns));
+    this.#pane.panel.h = this.#fullHeight - empty * (row + gap);
+    this.#pane.rows = this.menu.rows;
   }
 
   press(button: RemoteButton, repeat: boolean) {
@@ -127,6 +145,7 @@ export class MenuScreen implements Screen {
         this.#options.onBack();
         break;
     }
+    this.#trimPane();
     this.#dirty = true;
     this.#shell.menuChanged?.();
   }

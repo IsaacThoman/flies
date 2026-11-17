@@ -117,3 +117,22 @@ Round 4 key: H2 is the candidate; V9 is the accepted reference. Orders U/V/W: H2
 **Accepted: H2, 8.17/10**, unanimously ranked first, against a paired reference mean of 7.38. The regression review flags taller phone-landscape corner panels consuming more play space; they remain clear of controls and provide larger text. Remaining concerns: unexplained tool icons, unused space below short Settings pages, dense About copy and contrast of white text on selected cyan buttons.
 
 The owner's later process instruction supersedes the initial draft-only rule: merge current dev with a merge commit, preserve dev's behavior, run local typecheck/lint/area tests, then mark a validated PR ready for the merge shepherd without waiting on GitHub CI. `origin/dev` was merged at 1ebc3a44, preserving its menu identities, text entry, held input, Online failure states and other behavior. Code Join retains field identity and rejects stale targets. Local targeted UI tests: 100 pass. Typecheck and lint pass. A helper removed upstream was removed from the new e2e check; openGame now supplies that screensaver setup itself. The unreviewed next candidate is held outside this PR for a new branch after landing.
+
+### Round 5 · accepted discovery and spacing step
+
+Key: J3 is H2 rendered on a matched base, D4 is its identical decoy, L8 is the candidate. Orders Y/Z: J3/D4/L8; AA and regression BB: L8/D4/J3. All reviewers are freshly spawned with high effort, with only rubric and neutral evidence. Each set has 87 screenshots: every original screen at five shapes, plus a feather-hover state. All corresponding decoy PNGs, navigation and supplied source match byte for byte. All three scorers give the duplicate identical scores; no extra scorers are required.
+
+| Round 5 scorer | Set | Clarity | Polish | Remote | Touch | Fit | Legibility | Redundancy | Accessibility | Mean | Rank |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Y | J3 / D4 | 8 | 8 | 8 | 8 | 8 | 7.5 | 8 | 7 | 7.81 | tied |
+| Y | L8 | 8.5 | 8.5 | 8.5 | 8.5 | 8.5 | 7.5 | 8 | 7 | 8.13 | 1 |
+| Z | J3 / D4 | 8 | 8.5 | 8.5 | 8.5 | 9 | 8.5 | 8.5 | 8 | 8.44 | tied |
+| Z | L8 | 9 | 9 | 9 | 9 | 9 | 8.5 | 8.5 | 8 | 8.69 | 1 |
+| AA | J3 / D4 | 7 | 7 | 8 | 7 | 8 | 8 | 9 | 7.5 | 7.69 | tied |
+| AA | L8 | 8 | 8 | 8.5 | 9 | 8.5 | 8 | 9 | 7.5 | 8.31 | 1 |
+
+**Accepted: L8, 8.38/10**, unanimously ranked first, against a paired reference of 7.98. Settings trims unused glass without moving headers, tabs or rows. About takes Up + Select instead of four Down + Select. The shelf shows a tool name on hover or touch-down without selecting it until tap release. The regression reviewer notes that the preview replaces the current-tool caption and that the panel's bottom moves between tabs; keep those tradeoffs explicit in subsequent work. Main concerns remain dense About copy, white text contrast and small secondary diagnostics.
+
+An initial, unscored capture exposed a row-count bug in trimming. It used the menu's already-clamped row count and left the panel unchanged. The saved full row count now drives trimming, the test requires a strictly shorter panel, and all candidate screenshots were recaptured before review.
+
+The owner now requests one ready PR per validated step. This step is on feat-ui-discovery, created from current origin/dev. It carries #77 as its validated foundation until the shepherd lands that PR; the additional implementation is confined to seven UI/control/test files. Latest dev behavior, scientific caveats, acknowledgements and mutation coverage are preserved. Typecheck/lint and targeted UI tests pass, as do Play and pointer e2e. The full run on the foundation exits 0 with 875 functional passes, four skips, and three contention-calibrated budget skips. No CPU threshold was edited.

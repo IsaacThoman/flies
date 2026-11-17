@@ -86,7 +86,7 @@ test("the TV keeps its HUD and title layout, with Settings below a separate head
   const s = shell(TV_FRAME, "remote", false);
   const settings = settingsScreen(s);
   // Sized for its longest tab (On screen: the tabs and seven rows, as Wallpaper was on an Apple TV that can tell the weather), so it keeps its size from tab to tab.
-  assert.deepEqual(settings.pane.panel, { x: 157, y: 12, w: 540, h: 396 });
+  assert.deepEqual(settings.pane.panel, { x: 157, y: 12, w: 540, h: 264 });
   assert.deepEqual(settings.pane.list, { x: 185, y: 52, width: 484, row: 40, gap: 4, compact: false, columns: 1 });
   assert.equal(settings.menu.rows, settings.menu.items.length);
 
@@ -532,6 +532,35 @@ test("notice navigation clears the button hints on tall and short screens", () =
   }
 });
 
+test("Settings trims unused space while each tab and setting keeps its position", () => {
+  for (const [w, h] of [[1920, 1080], [390, 844], [844, 390], [1024, 1366]]) {
+    const s = settingsScreen(shell(frameFor(w, h)));
+    const first = { ...s.pane.panel };
+    const hits = new HitMap();
+    s.draw(blankCanvas(), 0, hits);
+    let rowBottom = 0;
+    for (let i = 0; i < hits.count; i++) {
+      const hit = hits.get(i)!;
+      if (hit.kind === "row") rowBottom = Math.max(rowBottom, hit.y + hit.h);
+    }
+    assert.ok(first.y + first.h - rowBottom <= 34, `${w}×${h}: no empty rows after the content`);
+    const tabY = s.pane.list.y;
+    s.press("right", false);
+    assert.equal(s.pane.panel.y, first.y);
+    assert.equal(s.pane.list.y, tabY);
+    assert.ok(s.pane.panel.h >= first.h, `${w}×${h}: the longer tab gets enough room`);
+    s.press("left", false);
+    assert.deepEqual(s.pane.panel, first);
+  }
+});
+
+test("About is a single upward step from Play", () => {
+  const title = titleScreen(shell(TV_FRAME));
+  title.press("up", false);
+  assert.equal(title.menu.focused?.id, "about");
+  title.press("down", false);
+  assert.equal(title.menu.focused?.id, "play");
+});
 
 test("a pending tool is shown as an icon clear of the shelf without changing its committed tool or hit targets", () => {
   for (const [w, h] of [[390, 844], [844, 390], [430, 932], [932, 430], [820, 1180], [1180, 820], [507, 820], [375, 820]]) {
@@ -546,6 +575,7 @@ test("a pending tool is shown as an icon clear of the shelf without changing its
     const original = Array.from({ length: hits.count }, (_, i) => ({ ...hits.get(i)! }));
     for (let i = 0; i < TOOLS.length; i++) {
       const pressed = original.find(hit => hit.kind === HUD_HITS.tool && hit.index === i)!;
+      s.previewTool = pressed.index;
       s.pressed = pressed;
       const g = blankCanvas();
       const iconOrigins: { x: number; y: number }[] = [];
@@ -559,6 +589,7 @@ test("a pending tool is shown as an icon clear of the shelf without changing its
       assert.deepEqual(Array.from({ length: previewHits.count }, (_, i) => ({ ...previewHits.get(i)! })), original, "press feedback cannot move hit targets");
     }
     s.pressed = null;
+    s.previewTool = -1;
     const g = blankCanvas();
     drawHud(g, 0, s, new HitMap());
     assert.ok(writtenOn(g).some(word => word.text.includes("Sugar")), "cancellation restores the committed label");
