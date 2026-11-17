@@ -149,7 +149,7 @@ export class Online {
     this.pantry.onClear = () => {
       if (this.joined && !this.#arrival && !this.#host.moving()) this.line.send({ type: "clearFood", epoch: this.epoch });
     };
-    this.pantry.onFound = (food) => this.line.send({ type: "found", id: food.id, name: food.name, x: food.x, z: food.z, y: food.y, r: food.r, sweet: food.sweet, epoch: this.epoch });
+    this.pantry.onFound = (food, lasts) => this.line.send({ type: "found", id: food.id, name: food.name, x: food.x, z: food.z, y: food.y, r: food.r, sweet: food.sweet, lasts, epoch: this.epoch });
     this.shared = { others: this.#othersAt, anchor: this.#anchor };
     this.triedPassword = !!password;
     let starting = start;
