@@ -9,9 +9,10 @@
 // the pointer, the pictures in the corners and the stats are the followed
 // fly's; these are drawn among the other flies (online/others.ts). A
 // companion whose brain fails is given a new one a couple of times, and then
-// taken off: a fly with no brain is never left standing as if it lived.
+// taken off: a fly with no brain is never left standing as if it lived. Each
+// keeps the place in line it came in at, which is the fly it is from launch
+// to launch (fly-record.ts), however the others move up round it.
 
-import type { Rhythm } from "@fly/body";
 import type { BrainDriver, FlyPose } from "@fly/contracts";
 import { RESTING_POSE } from "@fly/contracts";
 import type { Pantry, Vec3, World } from "@fly/world";
@@ -23,6 +24,8 @@ import type { Felt } from "./places/types.ts";
 
 export type Companion = {
   readonly life: Life;
+  /** Its place in line when it came, 1 on (0 is the followed fly's): the fly it is kept as. */
+  readonly slot: number;
   /** How it is posed this frame, for drawing it and for the table. */
   readonly pose: FlyPose;
   /** Its dab of enamel: its fly's colour at a table; alone, the colour of its place in line. */
@@ -49,32 +52,45 @@ export class Company {
   lost = 0;
   readonly #world: World;
   readonly #newBrain: () => BrainDriver;
-  readonly #newRhythm: () => Rhythm | null;
+  readonly #arrive: (c: Companion) => void;
+  readonly #leave: (c: Companion) => void;
 
-  /** `newRhythm`: each new fly's clock and sleep, as the followed fly's is kept. */
-  constructor(world: World, newBrain: () => BrainDriver, newRhythm: () => Rhythm | null = () => null) {
+  /** `arrive`: each new fly, standing where it is set down, is given its clock and what it was before; `leave`: one is going, its brain not yet stopped. */
+  constructor(world: World, newBrain: () => BrainDriver, arrive: (c: Companion) => void = () => {}, leave: (c: Companion) => void = () => {}) {
     this.#world = world;
     this.#newBrain = newBrain;
-    this.#newRhythm = newRhythm;
+    this.#arrive = arrive;
+    this.#leave = leave;
   }
 
   /**
    * Makes it `n` flies: the last go first, their brains stopped; each new one
-   * gets a brain of its own (waking, as the first did) and stands where
-   * `spot` says (`companionSpot` alone), eating from `pantry`.
+   * gets a brain of its own (waking, as the first did) and the first place in
+   * line no other has, stands where `spot` says (`companionSpot` alone),
+   * eating from `pantry`.
    */
   resize(n: number, pantry: Pantry, spot: (index: number) => Spot = (i) => companionSpot(this.#world, i)) {
-    while (this.list.length > n) this.list.pop()!.life.brain.dispose();
+    while (this.list.length > n) this.#remove(this.list.length - 1);
     while (this.list.length < n) {
       const i = this.list.length;
+      let slot = 1;
+      while (this.list.some((c) => c.slot === slot)) slot++;
       const life = new Life(this.#world, this.#newBrain());
       life.share(pantry);
       life.tendsPantry = false;
-      life.rhythm = this.#newRhythm();
       const [x, z, yaw, y] = spot(i);
       life.setDown(x, z, yaw, y);
-      this.list.push({ life, pose: { ...RESTING_POSE }, colour: COLOURS[(i + 1) % COLOURS.length], id: 0, felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] }, air: { x: 0, y: 0, z: 0 }, tries: 0, retryAt: -1 });
+      const c: Companion = { life, slot, pose: { ...RESTING_POSE }, colour: COLOURS[(i + 1) % COLOURS.length], id: 0, felt: { air: { x: 0, y: 0, z: 0 }, touch: 0, looming: [] }, air: { x: 0, y: 0, z: 0 }, tries: 0, retryAt: -1 };
+      this.list.push(c);
+      this.#arrive(c);
     }
+  }
+
+  #remove(i: number) {
+    const c = this.list[i];
+    this.#leave(c);
+    c.life.brain.dispose();
+    this.list.splice(i, 1);
   }
 
   /**
@@ -92,8 +108,7 @@ export class Company {
       if (c.retryAt < 0) {
         if (c.tries < COMPANION_RETRIES.length) c.retryAt = time + COMPANION_RETRIES[c.tries];
         else {
-          brain.dispose();
-          this.list.splice(i, 1);
+          this.#remove(i);
           this.lost++;
           changed = true;
         }

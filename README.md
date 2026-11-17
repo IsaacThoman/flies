@@ -81,7 +81,7 @@ unknown capture dates and machines are identified rather than inferred.
 | Find dated artifact sizes and measurement limits | [Measurement provenance](docs/measurements.md) |
 | Regenerate icons and launch images | [Assets](assets/README.md) |
 
-The following sleep reference is retained unchanged for its separate follow-up.
+The following sleep reference is retained for its separate follow-up.
 Its response observations have no retained captures and are not guarantees.
 
 ## Sleep and the daily rhythm
@@ -93,7 +93,11 @@ morning peak of activity round dawn and an evening one round dusk, each beginnin
 about three hours ahead, a siesta between them, and sleep through the night. Sleep
 pressure builds while it is awake (over about 12 hours) and discharges while it sleeps
 (over about 3): a fly kept awake by play, or woken again and again at night, is
-sleepier, and it starts each visit as sleepy as the hour would leave a fly left to itself.
+sleepier. It starts each visit as sleepy as it left, the time away lived as a fly left
+to itself would live it, asleep whenever the clock pushes it more than halfway toward
+sleep: a stand-in, as nothing watches it then. A fly new to the device, or away two days
+or more, starts as sleepy as the hour leaves a fly left to itself
+([From launch to launch](docs/simulation.md#from-launch-to-launch)).
 
 That is the Natural pace (Settings → Screensaver → Activity). The game starts on
 Lively, a day shaped for watching rather than measured in a fly: its peaks spread

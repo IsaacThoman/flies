@@ -21,6 +21,7 @@ import { Haptics } from "./haptics.ts";
 import type { Brains } from "./brain/create.ts";
 import { BrainMeter } from "./brain/meter.ts";
 import { Company, companionSpot } from "./company.ts";
+import { Remembered, liveAway } from "./fly-record.ts";
 import { CameraDirector, VIEWS } from "./camera.ts";
 import { TV_FRAME, worldSize } from "./display.ts";
 import type { Display, Frame } from "./display.ts";
@@ -190,6 +191,8 @@ export class Game implements Shell {
   /** Its stats in a corner, and the day they count. */
   readonly statsPanel = new StatsPanel();
   readonly tally: Tally;
+  /** Each of its flies from launch to launch: who it is, and the body it had. */
+  readonly remembered = new Remembered(newDeviceKey);
   /** How brightly each part of its nervous system glows, from the brain's region rates. */
   readonly glow: NerveGlow;
   readonly xray = new Xray();
@@ -365,13 +368,22 @@ export class Game implements Shell {
     this.#followLight(true);
     this.fireflies = new Fireflies(this.stage.scene);
     this.life = new Life(world, brains.first);
-    // Its clock keeps the real time of day, whatever light is chosen, and its sleep pressure starts as the hour makes it.
+    // Its clock keeps the real time of day, whatever light is chosen; its body is as it was last time, the time since lived out (fly-record.ts).
     this.life.rhythm = this.#rhythm();
+    this.remembered.arrive(0, this.life, Date.now(), this.outside.sunTimes ?? SUMMER, this.#here, true);
     this.fly = new FlyView(this.stage.scene, world);
     this.maxFlies = brains.another ? Math.min(MAX_OWN, brains.most) : 1;
     // A count chosen where more could live (or by an older build) shows as what lives here.
     this.settings.flies = Math.min(this.settings.flies, this.maxFlies);
-    this.company = new Company(world, brains.another ?? (() => brains.first), () => this.#rhythm());
+    this.company = new Company(
+      world,
+      brains.another ?? (() => brains.first),
+      (c) => {
+        c.life.rhythm = this.#rhythm();
+        this.remembered.arrive(c.slot, c.life, Date.now(), this.outside.sunTimes ?? SUMMER, this.#here, !this.online);
+      },
+      (c) => this.remembered.leave(c.slot, c.life, this.#here, Date.now()),
+    );
     this.others = new OtherFlies(this.stage.scene, world);
     this.others.company = this.company.list;
     this.prints = new Footprints(this.stage.scene);
@@ -1028,11 +1040,24 @@ export class Game implements Shell {
   sleep() {
     this.online?.away(this.#playerNow());
     this.tally.save();
+    this.#keepFlies();
+  }
+
+  /** Saves each fly as it is now. */
+  #keepFlies() {
+    const now = Date.now();
+    this.remembered.save(0, this.life, this.#here, now);
+    for (const c of this.company.list) this.remembered.save(c.slot, c.life, this.#here, now);
   }
 
   /** The page is back after `awayMs`: everything carries on from where it was, under the sky of the hour it is now. */
   wake(awayMs: number) {
     this.#lastNow = -1;
+    // Its body lives the time out as it would have (fly-record.ts), from the hour its clock stopped at; the clock is put right on the next frame.
+    const sun = this.outside.sunTimes ?? SUMMER;
+    liveAway(this.life, awayMs / 1000, this.life.rhythm?.hours ?? 0, sun);
+    for (const c of this.company.list) liveAway(c.life, awayMs / 1000, c.life.rhythm?.hours ?? 0, sun);
+    this.#clockAt = 0;
     this.online?.wake();
     if (this.online) this.#followLight(awayMs > AWAY_SETTLE_MS);
     else if (awayMs > AWAY_SETTLE_MS) {
@@ -1225,6 +1250,7 @@ export class Game implements Shell {
     life.step(dt, now);
     this.#liveCompany(dt, now);
     this.tally.update(life, Date.now(), dt);
+    if (this.remembered.due(dt)) this.#keepFlies();
     this.#reactions();
     this.#paddle(dt);
     const hands = this.hands;
@@ -2183,6 +2209,14 @@ export class Game implements Shell {
     // This device's flies: how many, the followed one's neighbours as its body meets them, and each other one as it lives (its table id, its brain,
     // what it is doing, where, its eyes' pictures so far, and how many flies its body meets).
     d.flies = String(this.flies);
+    // Where the followed fly stands; and who each is, by its place in line (the followed fly first), and when it first arrived (ms since 1970).
+    d.at = `${life.body.position.x.toFixed(2)},${life.body.position.z.toFixed(2)}`;
+    d.kept = [0, ...this.company.list.map((c) => c.slot)]
+      .map((slot) => {
+        const fly = this.remembered.get(slot);
+        return `${slot}:${fly?.id ?? ""}:${fly?.born ?? ""}`;
+      })
+      .join(";");
     d.crowd = String(life.crowd.count);
     d.company = this.company.list
       .map((c, i) => `${c.id}:${c.life.brain.status}:${c.life.activity}:${c.life.body.position.x.toFixed(2)},${c.life.body.position.z.toFixed(2)}:${this.eyes.companyUpdates(i)}:${c.life.crowd.count}:${c.colour}`)

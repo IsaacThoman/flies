@@ -6,7 +6,10 @@ Online works on the browser and Apple hosts; see [joining and hosting rooms](onl
 
 **Settings → Screensaver → Flies** chooses one to four (up to three on Apple TV), shown as enamel
 dots in the table colours, kept between launches. Each is a whole fly, with
-its own brain, body, senses and eyes; they see and meet one another, eat
+its own brain, body, senses and eyes, and the same fly from launch to launch,
+as hungry and as sleepy as it left and, alone, where it stood
+([From launch to launch](simulation.md#from-launch-to-launch)); a fly taken
+off by a lower count comes back when the count is raised again; they see and meet one another, eat
 from the same pantry, feel the place's wind and goings-on where they are,
 and the tools and bubbles reach any of them. Movement and activity commands come from their brains; body reflexes and
 procedural posing still apply (`apps/web/src/company.ts`). The camera follows the first:
@@ -196,7 +199,8 @@ it has walked, its meals, its take-offs, and its time flying and grooming.
 The day is counted from what the fly's life did (`life.ts`: its displacement while
 on its feet, a meal when actual eating begins, each leap into the air, each
 second it was flying or grooming), once each, kept across launches as
-`flies.day` and begun again at midnight. The panel sits across the screen
+`flies.day` and begun again at midnight. It is the followed fly's: the first
+in line, the same fly from launch to launch. The panel sits across the screen
 from the other pictures, at the same edge (at the top left while you play),
 and moves round with them; on a screen too narrow for that, under them; its
 cells two to a row on a narrow screen, and its brain beside its day on a

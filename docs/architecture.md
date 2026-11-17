@@ -33,7 +33,10 @@ The first fly is the one followed by the camera and shown in the eye picture,
 nervous-system display and stats. `Company` keeps the companions;
 `OtherFlies` draws them alongside remote flies. A companion whose brain fails
 is retried after delays of 5 and 30 game seconds, then removed if it still fails,
-until the player changes the count (`apps/web/src/company.ts`).
+until the player changes the count (`apps/web/src/company.ts`). Each fly is the
+same fly from launch to launch: a record on the device keeps who it is and its
+body's state, and the body lives out the time away by its own sums
+(`apps/web/src/fly-record.ts`, [From launch to launch](simulation.md#from-launch-to-launch)).
 
 Each life step ([Life](../apps/web/src/life.ts)) works out what each body feels: taste, touch,
 wind, whether it is on its feet, and the other scalar senses. It sends these,

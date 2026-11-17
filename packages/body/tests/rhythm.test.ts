@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { PACES, RHYTHM, Rhythm, SUMMER, clockAt, pressureAfter, usualPressure } from "../src/rhythm.ts";
+import { PACES, RHYTHM, Rhythm, SUMMER, clockAt, pressureAfter, pressureLeftAlone, usualPressure } from "../src/rhythm.ts";
 
 const at = (hours: number, sun = SUMMER) => clockAt(hours, sun);
 
@@ -125,4 +125,23 @@ test("a step allocates nothing but boxed numbers, even without a JIT", () => {
   const { numberSize, sizes } = JSON.parse(result.stdout) as { numberSize: number; sizes: Record<string, string[]> };
   const others = Object.entries(sizes).filter(([size]) => Number(size) !== numberSize);
   assert.deepEqual(others, [], `allocations other than ${numberSize}-byte numbers`);
+});
+
+test("time away is lived as a fly left to itself would live it, and forgets where it started after two days", () => {
+  const hour = 3600;
+  // Awake through a lively afternoon, as the clock pushes it less than halfway to sleep: building.
+  const afternoon = pressureLeftAlone(0.2, 15, 2 * hour, SUMMER, "lively");
+  assert.ok(Math.abs(afternoon - pressureAfter(0.2, 2 * hour, false)) < 1e-12, `${afternoon}`);
+  // Asleep through the small hours (and a natural fly's midday siesta): discharging.
+  assert.ok(Math.abs(pressureLeftAlone(0.8, 13, hour, SUMMER) - pressureAfter(0.8, hour, true)) < 1e-12);
+  const night = pressureLeftAlone(0.8, 0.5, 2 * hour, SUMMER);
+  assert.ok(Math.abs(night - pressureAfter(0.8, 2 * hour, true)) < 1e-12, `${night}`);
+  // However the time is split, the same: a step that doesn't land on five minutes is lived exactly.
+  const split = pressureLeftAlone(pressureLeftAlone(0.3, 9, 1000, SUMMER), 9 + 1000 / hour, 2000, SUMMER);
+  assert.ok(Math.abs(split - pressureLeftAlone(0.3, 9, 3000, SUMMER)) < 1e-12);
+  // Days away, wherever it started: as sleepy as the hour leaves a fly left to itself.
+  for (const start of [0, 1]) assert.ok(Math.abs(pressureLeftAlone(start, 10, 5 * 24 * hour, SUMMER, "lively") - usualPressure(10 + 5 * 24, SUMMER, "lively")) < 1e-9);
+  // Nearly two days away, it has nearly forgotten.
+  assert.ok(Math.abs(pressureLeftAlone(1, 10, 47 * hour, SUMMER) - usualPressure(10 + 47, SUMMER)) < 0.05);
+  for (const seconds of [0, -hour, Number.NaN]) assert.equal(pressureLeftAlone(0.4, 10, seconds, SUMMER), 0.4, `${seconds} s (a clock gone backwards) changes nothing`);
 });
