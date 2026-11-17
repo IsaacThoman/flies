@@ -44,3 +44,22 @@ sips, head grooming cannot establish a whole-body hierarchy, and injecting the
 loom-detector input cannot validate a projected visual escape. Hunger and the eyes'
 ON pathway remain with their existing owners. More unconditioned simulation hours
 cannot repair these measurement gaps.
+
+## Optical pattern selectivity and light-off (do not tune the motor threshold)
+
+The optical pilot at 06:00 (ZT0), with the real facets and zero direct loom
+inputs, yielded 1/6 black-square jump-and-flight responses, 0/6 checkerboard,
+1/1 uniform dark flash and 0/1 blank. These tiny pilot counts motivate the
+independent cohort; they do not estimate population probabilities reliably.
+Fotowat et al. (2009), Results/Figures 2–3, reports 82% and 87% looming
+responses, while red-eyed WT light-off had 0/10 responses. Our uniform flash
+is not the paper's four-LED apparatus and pigmentation is absent, so it remains
+an unscored diagnostic. The contrast between the model's patterns may expose
+luminance-driven escape rather than robust expansion selectivity.
+
+The source distinguishes parallel non-GF visually guided escape from the GF
+light-off pathway. The model's takeoff command reads the giant fibers; a
+body-level launch mapping cannot manufacture the absent descending decision.
+Do not lower ESCAPE_ON to make checkerboards succeed. Eye ON-pathway or
+other protected neural work belongs to its owners; this finding is a proposal
+for pathway/readout validation, not a code change to those areas.

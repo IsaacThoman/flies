@@ -85,7 +85,7 @@ export async function measure(data: ArrayBuffer, options: RunOptions, checkpoint
     const measured = ethogram.result();
     const rows = comparisons(measured);
     const usedCpu = process.cpuUsage(cpu);
-    results.push({ seed, measured, attribution, comparisons: rows, cpuSeconds: (usedCpu.user + usedCpu.system) / 1e6, wallSeconds: (performance.now() - start) / 1000 });
+    results.push({ seed, hour: options.hour ?? 6, measured, attribution, comparisons: rows, cpuSeconds: (usedCpu.user + usedCpu.system) / 1e6, wallSeconds: (performance.now() - start) / 1000 });
   }
   return results;
 }
@@ -93,11 +93,14 @@ export async function measure(data: ArrayBuffer, options: RunOptions, checkpoint
 export function markdown(results: Awaited<ReturnType<typeof measure>>, escape: Awaited<ReturnType<typeof escapeBattery>> | null = null) {
   const latest = results.at(-1)?.measured ?? {};
   const card = scorecard(latest, escape);
-  const text = ['# Behaviour audit', '', 'Time of day is held at the reported hour; default 06:00 (ZT0), sunrise 06:00, sunset 18:00. No validated whole-animal point score is identified. Optical scores are limited engineering comparisons; unmatched and unsupported metrics remain N/A.', '', ...STAND_INS, '', '| Metric | Literature value (reported spread) | Measured | Benchmark /10 | Source |', '|---|---:|---|---|---|'];
+  const text = ['# Behaviour audit', '', `Clock held at ${escape?.protocol.hour ?? results[0]?.hour ?? 'see recording'} h; sunrise 06:00, sunset 18:00. No validated whole-animal point score is identified. Optical scores are limited engineering comparisons; unmatched and unsupported metrics remain N/A.`, '', ...STAND_INS, '', '| Metric | Literature value (reported spread) | Measured | Benchmark /10 | Source |', '|---|---:|---|---|---|'];
   for (const row of card.rows) {
     const free = results.map(r => r.comparisons.find(c => c.id === row.id)?.measured).filter(v => v !== null && v !== undefined);
     const value = row.observable?.startsWith('escape') ? row.measured?.toFixed(4) ?? 'N/A' : free.length ? free.map(v => v!.toFixed(4)).join(', ') : 'N/A';
     text.push(`| ${row.label} (${row.unit}) | ${row.value}${row.tolerance === null ? '' : ` (±${row.tolerance})`} | ${value} | ${row.score?.toFixed(2) ?? 'N/A'} | [${row.paper.split(',')[0]}](${row.url}), ${row.location} |`);
+  }
+  if (escape) for (const [label, group] of [['Black square', escape.summary.black], ['Checkerboard', escape.summary.checkerboard], ['Flash surrogate', escape.summary.flash], ['Blank', escape.summary.blank]] as const) {
+    text.push('', `${label}: ${group.successes}/${group.n} eligible responses; ${group.readinessFailures}/${group.attempted} readiness failures; model Wilson 95% interval ${group.probabilityCI95?.map(v => v.toFixed(3)).join('–') ?? 'N/A'}; timing fit ${group.fit ? `${group.fit.n} successes across ${group.fit.ratios} l/v values, slope SE ${group.fit.slopeSE.toFixed(3)}, intercept SE ${group.fit.interceptSE.toFixed(3)} ms` : 'N/A'}.`);
   }
   text.push('', `Optical probability mean: **${card.opticalProbabilityMean?.toFixed(2) ?? 'N/A'}/10**; timing mean **${card.opticalTimingMean?.toFixed(2) ?? 'N/A'}/10**; equal probability/timing composite **${card.opticalComposite?.toFixed(2) ?? 'N/A'}/10**. ${card.scored}/${card.registered} registered comparisons estimable. Whole-animal score: **N/A**. Registry-average bounds **${card.registeredComparisonBounds.map(v => v.toFixed(2)).join('–')}/10** describe only these rows, not biological fidelity or confidence intervals.`, '', ...results.map(r => `Seed ${r.seed}: ${(r.measured.seconds / 3600).toFixed(4)} recorded hours; ${r.cpuSeconds.toFixed(1)} CPU seconds.`), '', 'Full sample counts, trial denominators, readiness failures, censoring, assay blockers and uncertainty labels are in JSON.', '', 'FlyEM male CNS connectome, Janelia Research Campus (CC-BY 4.0).');
   return text.join('\n');
@@ -112,7 +115,7 @@ async function main() {
   if (values.analyse) {
     const input = JSON.parse(readFileSync(values.analyse, 'utf8'));
     if (input.schema !== 2 || !Array.isArray(input.results)) throw new Error('analyse requires a schema 2 ethogram recording');
-    const results: Awaited<ReturnType<typeof measure>> = input.results.map((r: Awaited<ReturnType<typeof measure>>[number]) => ({ ...r, comparisons: comparisons(r.measured) }));
+    const results: Awaited<ReturnType<typeof measure>> = input.results.map((r: Awaited<ReturnType<typeof measure>>[number]) => ({ ...r, hour: r.hour ?? input.clock?.heldHour ?? input.options?.hour, comparisons: comparisons(r.measured) }));
     const escape: Awaited<ReturnType<typeof escapeBattery>> | null = input.escape ? { ...input.escape, summary: summarizeEscape(input.escape.trials) } : null;
     const report = { ...input, results, escape, scorecard: scorecard(results.at(-1)?.measured ?? {}, escape), analysis: { commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), dirty: execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0, sourceRecording: values.analyse } };
     if (values.out) writeFileSync(values.out, JSON.stringify(report, null, 2) + '\n');

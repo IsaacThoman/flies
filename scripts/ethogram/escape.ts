@@ -52,7 +52,9 @@ export function regression(points: readonly { x: number; y: number }[]) {
   let xx = 0, xy = 0;
   for (const p of points) { xx += (p.x - x) ** 2; xy += (p.x - x) * (p.y - y); }
   const slope = xy / xx;
-  return { slope, intercept: y - slope * x, n: points.length, ratios: new Set(points.map(p => p.x)).size };
+  const intercept = y - slope * x;
+  const variance = points.reduce((sum, p) => sum + (p.y - intercept - slope * p.x) ** 2, 0) / (points.length - 2);
+  return { slope, intercept, n: points.length, ratios: new Set(points.map(p => p.x)).size, slopeSE: Math.sqrt(variance / xx), interceptSE: Math.sqrt(variance * (1 / points.length + x * x / xx)) };
 }
 export function wilson(successes: number, n: number): [number, number] | null {
   if (!n) return null;

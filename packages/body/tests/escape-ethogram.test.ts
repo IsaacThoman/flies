@@ -51,7 +51,7 @@ test('timing keeps negative TTC and does not invent latencies for nonresponses',
   const s = summarizeEscape([...trials, { ...trial, seed: 4 }]);
   assert.equal(s.black.successes, 3);
   assert.equal(s.black.probability, 0.75);
-  assert.deepEqual(s.black.fit, { slope: 2, intercept: -22, n: 3, ratios: 3 });
+  assert.deepEqual(s.black.fit, { slope: 2, intercept: -22, n: 3, ratios: 3, slopeSE: 0, interceptSE: 0 });
   assert.equal(s.values.escapeCBProbability, null);
   assert.equal(regression([{ x: 1, y: 2 }, { x: 1, y: 4 }, { x: 1, y: 7 }]), null);
 });

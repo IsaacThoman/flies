@@ -36,5 +36,9 @@ whether response probability/timing, frame-end motion and flight regress.
 No change is accepted solely for reproducing a 45° constant. Blind reviewers
 must judge the source transfer, energy preservation and independent outcomes.
 
-Targeted motion/ethogram suites at this candidate: 43 passed. Full checks,
-paired optical evidence and blind decision remain required.
+Targeted motion/ethogram suites at this candidate: 43 passed. The current candidate full functional suite passed 781 tests (two optional
+data/toolchain skips); lint and typecheck passed. The all-senses brain budget
+failed at 0.520 versus 0.500 CPU s/s; identical dev brain sources failed at
+0.546. The graphical play e2e passed, including neural takeoff, at a maximum
+90 draws and 350,627 triangles. Paired optical evidence and the blind decision
+remain required.
