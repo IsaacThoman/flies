@@ -190,6 +190,7 @@ export function buildBench(): SceneSet {
   const ripples = Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, -100, 0));
   const time = { value: 0 };
   const water = waterMaterial();
+  water.color.set("#718a77"); water.roughness=0.08; water.envMapIntensity=1.4;
   water.polygonOffset=true; water.polygonOffsetFactor=-1; water.polygonOffsetUnits=-2;
   const compileWater = water.onBeforeCompile;
   water.onBeforeCompile = (shader,renderer) => {
@@ -199,7 +200,13 @@ export function buildBench(): SceneSet {
     shader.fragmentShader = shader.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vPool; uniform vec4 uRings[4]; uniform float uTime;")
       .replace("#include <opaque_fragment>", `float wave = 0.0;
 for (int i=0; i<4; i++) { float age = uTime-uRings[i].z; float d=length(vPool.xz-uRings[i].xy); wave += exp(-pow((d-age*9.0)*2.0,2.0)) * max(0.0,1.0-age/3.0) * uRings[i].w; }
-outgoingLight += wave * 0.22;
+vec3 reflection = reflect(normalize(vPool-cameraPosition),vec3(0.0,1.0,0.0));
+vec2 roof = vPool.xz+reflection.xz*(1100.0-vPool.y)/max(0.03,reflection.y);
+float across = abs(mod(roof.x+886.6665,253.333)-126.6665);
+float along = abs(mod(roof.y+800.0,320.0)-160.0);
+float bar = 1.0-smoothstep(7.0,15.0,min(across,along)+wave*12.0);
+outgoingLight *= 1.0-bar*0.55;
+outgoingLight += wave * 0.14;
 #include <opaque_fragment>`);
   };
   water.customProgramCacheKey = () => "greenhouse-water";

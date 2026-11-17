@@ -6,7 +6,11 @@ import { buildBench } from "./set.ts";
 
 export const greenhouse: Scene = {
   id: "greenhouse", place: GREENHOUSE,
-  palettes: picnic.palettes,
+  palettes: {
+    ...picnic.palettes,
+    morning: { ...picnic.palettes.morning, sun: "#ffe0b0", sunUp: 0.34, hemiIntensity: 0.86 },
+    night: { ...picnic.palettes.night, sky: "#7189b5", ground: "#354944", hemiIntensity: 0.65, sunIntensity: 0.38, env: 0.55 },
+  },
   buildSet: buildBench,
   buildBackdrop,
   camera: {

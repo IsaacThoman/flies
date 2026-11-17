@@ -126,12 +126,18 @@ vec3 surface(vec3 c) {
    vec2 d = p.xz-vec2(20.0,56.0);
    vec2 q = vec2(0.939373*d.x+0.342898*d.y,-0.342898*d.x+0.939373*d.y) / vec2(19.0,25.0);
    float flesh = 1.0 - smoothstep(0.62, 0.78, length(q));
-   float fibres = pow(abs(sin(atan(q.y, q.x) * 34.0 + length(q) * 18.0)), 9.0) * resolved(0.6);
-   vec3 inside = mix(vec3(0.45, 0.055, 0.09), vec3(0.83, 0.29, 0.26), fibres * 0.7 + 0.2);
-   float seeds = step(0.86, hash21(floor(p.xz * 3.2))) * resolved(0.3);
-   inside = mix(inside, vec3(0.85, 0.65, 0.31), seeds * 0.7);
+   float radius = length(q);
+   float fibres = pow(abs(sin(atan(q.y, q.x) * 46.0 + radius * 24.0 + vnoise(p.xz*0.8)*3.0)), 6.0) * resolved(0.45);
+   vec3 inside = mix(vec3(0.29, 0.035, 0.055), vec3(0.71, 0.22, 0.23), fibres * 0.65 + 0.2 + vnoise(p.xz*0.65)*0.15);
+   vec2 cell = floor(p.xz * 2.1);
+   vec2 seedPoint = fract(p.xz * 2.1) - vec2(hash21(cell+1.7),hash21(cell+6.1))*0.5-0.25;
+   float seed = 1.0-smoothstep(0.13,0.21,length(seedPoint*vec2(0.85,1.5)));
+   seed *= smoothstep(0.03,0.18,radius)*resolved(0.22);
+   inside = mix(inside,vec3(0.83,0.55,0.25),seed*0.85);
+   float pith = smoothstep(0.53,0.65,radius)*(1.0-smoothstep(0.75,0.82,radius));
+   inside = mix(inside,vec3(0.76,0.53,0.39),pith*0.85);
    c = mix(c * (0.8 + fine * 0.4), inside, flesh);
-   rough = mix(0.75, 0.32, flesh); relief = fine * 0.02;
+   rough = mix(0.75,0.37,flesh); relief = (fibres*0.035+seed*0.055)*flesh + fine*0.012;
  } else if (vKind < 6.5) {
    rough = 0.27 + fine * 0.2; shine = 0.72; relief = fine * 0.012;
  } else if (vKind < 7.5) {
