@@ -133,6 +133,8 @@ JSON, from `--config` on the command line, else `www/config.json` (what the home
 | `logFile` | Redirects stderr to `Library/Caches/performance.log` in the app container, replacing the previous run's log; defaults to `false` |
 | `profile` | With `stats`: time spent in each WebGL and 2D canvas method |
 | `gpuTiming` | `glFinish` after every frame, to time the GPU (slows it down) |
+| `thermal` | Reports this thermal state (0 nominal to 3 critical) to the game in place of the TV's own, to check how it holds itself to what the TV can sustain ([Holding to what it can sustain](#holding-to-what-it-can-sustain)) |
+| `deferReads` | Reads into a pixel-pack buffer wait for their copy rather than for the GPU ([Reading pixels back](#reading-pixels-back)): on by default on a device, off in the simulator |
 | `glDebug` | Checks `glGetError` after every GL command |
 | `typed` | Answers for the keyboard in unattended runs: each keyboard shown is answered with the next after 1.5 s, as if typed and confirmed (`null`: as if the player went back). The check uses it; nothing else should |
 | `drive` | Scripted remote input for unattended runs, waiting on the canvas's `data-*` state: `[["wait", {"ready": "true"}], ["press", "ArrowRight", 650], ["swipe", "ArrowUp"], ["touch", 0.5, -0.2, true], ["sleep", 500], ["log", "mark"]]`. Presses, swipes and touches go through the same native code as the remote's (`runtime/report.ts`) |
@@ -627,6 +629,28 @@ described above. Both of three's ways work and are checked by the test scene (`t
   still a query (it waits for the render thread to catch up, but not for the GPU). The answer arrives later through timer polling and represents an earlier picture; its age
   depends on completion and scheduling.
 
+  On the Apple TV, OpenGL ES's `glReadPixels` into a pixel-pack buffer waits until the GPU has
+  drawn what it reads. The fly's eyes are drawn just after the frame's scene, so reading them
+  held the render thread for the GPU's whole frame, and the next frame could only start once
+  the GPU was idle: JavaScript, GL replay and the GPU in turn rather than side by side. Where the
+  GPU took most of a frame, that was 40 frames a second (the bar and the restaurant, "Measured
+  on peev"). So the executor reads an RGBA8 picture
+  in two halves (`Executor::deferRead`): at once, a blit on the GPU into a renderbuffer of its
+  own, with a GL fence after it; then, when the render thread finds that fence signalled, the
+  `glReadPixels` from its copy into the page's buffer, which no longer waits. WebGL fences the
+  page makes in between are held until the read is done, so a fence after a read still
+  signals after it, and anything that would see the buffer (`getBufferSubData`, deleting it, new
+  data in it, `finish`, a `clientWaitSync` with a timeout) finishes the reads into it first:
+  several flies' eyes, each read into a buffer of its own, don't wait on one another. Other formats, and
+  the multisampled default framebuffer, are read at once as before. The simulator renders in
+  software, with no GPU for a read to wait for, so there it reads at once unless the launch
+  config asks otherwise (`deferReads`): the simulator check's test scene does, so its
+  `readbackAsync` goes this way, and its real game doesn't. With the deferral on, the real game's
+  table of eight in the simulator, which already stalls for 10 to 30 seconds rendering in
+  software, lost its room more often: 1 of 5 checks passed against 3 of 5 on `dev`, run turn
+  about. With it off there, 3 of 5 against 4 of 5, the same stalls and the same failures on
+  both: that part of the check is at the mercy of how busy the Mac is.
+
 Historically measured in the simulator (M5 Pro, the software renderer, mode 2; capture date unknown): the synchronous read takes
 0.08 ms on average (0.5 ms at most) on tvOS 27 and 0.11 ms (1.9 ms at most) on tvOS 26, and the
 frame rate is the same with or without it (60 fps); the async read resolves about 5 ms after it
@@ -641,59 +665,110 @@ counts completed pictures; `data-eyes-ms` includes submission and resampling CPU
 the asynchronous wait. A readback's final data copy can still wait for queued render-thread
 commands; this is not a fully asynchronous native transfer.
 
+## Holding to what it can sustain
+
+A TV that draws a heavy place flat out at 60 frames a second warms until tvOS slows its GPU and
+CPU, and then it draws far fewer than a steady lower rate would have (the restaurant fell to 15,
+"Measured on peev"). So the host says how hot the device is (`thermalState()` on `__native`,
+`ProcessInfo.thermalState`, and every change of it in the log as `thermal state: …`), and the
+game holds itself to what the TV can sustain (`Warmth` in `apps/web/src/quality.ts`):
+
+| Level | Frames a second | Pixels |
+| --- | --- | --- |
+| 0 | 60 | as chosen |
+| 1 | 40 | as chosen |
+| 2 | 30 | as chosen |
+| 3 | 30 | no finer than Chunky |
+| 4 | 30 | no finer than Chunkier |
+
+- It asks once a second. Fair for 15 s steps down a level, and another each minute it stays fair;
+  serious steps down at once and every 45 s while it lasts; critical every 15 s.
+- It steps back up only after the TV has been nominal for a long while, a level at a time: 10
+  minutes at first, twice that each time a place warms the TV (once a spell, however many steps
+  it took), up to two hours. A step up that warms the TV within 10 minutes comes straight back
+  down.
+- Each place starts where it was last held, with the wait it had earned there, kept in
+  `localStorage` (`flies.warmth`): the bar and the restaurant warm the TV very differently. peev
+  goes from nominal straight to serious, never through fair, so a place that has once made it hot
+  starts where it stayed cool.
+- Only the frame rate and the pixels change. The brain is handed the same time whatever the frame
+  rate, and its senses and the eyes are the same at every level. At 40 a second on a 60 Hz screen
+  the frames alternate one and two refreshes apart (`apps/web/src/main.ts`).
+- The canvas says where it is held (`data-warmth`, the level), how hot the TV says it is
+  (`data-thermal`) and the frame rate it is held to (`data-fps`), so the `stats` lines of a soak
+  show them. The iPhone app doesn't pass its thermal state to the page, so a browser keeps to its
+  frame-time quality alone.
+
+On peev on the night of 16 November, starting cool: the picnic's, the windowsill's, the lab's
+and the bar's screensavers at midday and at night held 59.9–60 FPS at level 0, nominal
+throughout. The restaurant, from a fresh install, held 59.7–60 FPS in every 10-second window of
+10 minutes of its midday screensaver and 10 of its night one, at level 0 and nominal; run again
+straight after, with its weather and light sweep first (56.6–60 FPS), the same, until the TV went
+to sleep for want of a press of its remote. The TV never warmed that night, so the governor had
+nothing to do there; its steps are checked by `apps/web/tests/warmth.test.ts`, and on a TV by
+the launch config's `thermal`. Earlier the same day, on a TV already hot from hours of tests,
+the restaurant at 60 sank as low as 15 FPS ("Measured on peev").
+
 ## Checking it
 
 ### Measured on peev
 
 Measured 16 November 2026 on peev, Apple TV 4K (3rd generation, A15), tvOS 27.2.1: signed
-Release of `dev` at `8e50250` (sound removed), 640×480, mode 2, real 166,700-neuron connectome,
-Low eyes except for the High phase, no WeatherKit. `tvos:soak --minutes 30` ran detached, with
-10-second stats written to the app's cache. It finished (`soak complete`) in 54 minutes 23
-seconds, with no drive timeouts or runtime errors. A TV whose display is asleep launches the
-app but draws nothing (`frames: 0`, a 300×150 framebuffer): wake it first.
+Release, 640×480, mode 2, real 166,700-neuron connectome, Low eyes except for the High phase, no
+WeatherKit. `tvos:soak --minutes 30` ran detached, with 10-second stats written to the app's
+cache, on the code that reads the eyes back without waiting ([Reading pixels back](#reading-pixels-back)),
+draws behind a black veil into one pixel, and shades the bar and the restaurant more cheaply
+for the same picture (`docs/places.md`, "The Apple TV's budget"). It finished (`soak complete`)
+in 53 minutes 46 seconds, with no drive timeouts or runtime errors. A TV whose display is asleep
+launches the app but draws nothing (`frames: 0`, a 300×150 framebuffer): wake it first.
 
-The splash lifted 1.65 seconds after the host started (1.54 in an earlier run): `game.js`
-evaluated in 1.36 s, and the connectome loaded in 0.12 s. Feeding, sixteen ball throws, the
-daylight change, the eye picture at Low and High, and the menu and Settings ran at 59.3–60 FPS.
-Mean JavaScript was 3.8 ms a frame, the highest window's p95 7.35 ms and the longest frame
-31.6 ms. Memory was 169–173 MB. The one longer frame after the splash was 265 ms, in the first
-10 seconds.
-
-Steady screensaver by place. The windows at the start and end of each 3-minute phase are left out.
-"Built" is the place's `data-place-ms`, the JavaScript that builds it behind the veil, and
-"Select to arrival" runs from the Place tool's press until the veil has lifted.
+The splash lifted 2.4 seconds after the host started. Steady screensaver by place; the windows
+at the start and end of each 3-minute phase are left out. "Built" is the place's
+`data-place-ms`, the JavaScript that builds it behind the veil, and "Select to arrival" runs from
+the Place tool's press until the veil has lifted.
 
 | Place | Built | Select to arrival | FPS, midday / night | Mean JavaScript per frame | Highest window's JavaScript p95 | Mean GL replay per frame | Draws per frame | Memory |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Picnic | 568 ms (at launch) | n/a | 59.9–60 / 59.9–60 | 3.53 / 3.64 ms | 8.85 ms | 13.8 ms | 37–45 | 175 MB |
-| Windowsill | 998 ms | 4.2 s | 59.9–60 / 59.9–60 | 3.27 / 3.31 ms | 6.69 ms | 14.1 ms | 26–27 | 162 MB |
-| Lab | 1,072 ms | 4.2 s | 59.9–60 / 59.9–60 | 3.75 / 3.53 ms | 8.08 ms | 13.7 ms | 27–29 | 206 MB |
-| Bar | 1,082 ms | 4.7 s | 40–57.9 / 40.7–56.5 (about 50) | 3.47 / 3.79 ms | 10.29 ms | 17.0 ms | 27–31 | 172 MB |
-| Restaurant | 1,736 ms in steps (longest 350 ms) | 11.1 s | 39.9–40.1 / 39.9–40.1 | 3.83 / 3.00 ms | 9.92 ms | 22.0 ms | 23–24 | 225 MB |
+| Picnic | 568 ms (at launch) | 2.1 s | 59–60 / 59.9–60 | 3.48 / 3.40 ms | 7.78 ms | 7.5 ms | 33–39 | 182 MB |
+| Windowsill | 1,100 ms | 2.5 s | 59–60 / 60 | 2.73 / 2.86 ms | 6.85 ms | 14.0 ms | 25–28 | 166 MB |
+| Lab | 1,273 ms | 2.8 s | 59.1–60 / 59.9–60 | 3.09 / 2.90 ms | 7.10 ms | 13.8 ms | 25–27 | 210 MB |
+| Bar | 1,130 ms | 2.5 s | 59.1–60 / 60 | 2.80 / 2.95 ms | 8.44 ms | 13.9 ms | 25 | 176 MB |
+| Restaurant | 2,137 ms in steps (longest 416 ms) | 4.1 s | 15–60 / 15.3–37.6 | 4.30 / 4.54 ms | 17.68 ms | 32.4 ms | 18–20 | 229 MB |
 
-- **The restaurant runs at 40 FPS, and the bar at 40–58 depending on the shot. Neither is
-  JavaScript's cost.** JavaScript stays under 4 ms and the draw count is lower than at the
-  picnic. It is the render thread's GL replay (`execMs`), 22 ms a frame with a 35 ms p95 in
-  the restaurant, 17 ms in the bar, and about 14 ms in the other three. This suggests render-side cost, but does not isolate GPU, driver or other replay waits: per-pixel cost (materials, lights, transparent layers
-  covering the screen) or what three.js asks of the driver each frame. `gpuTiming` and
-  `profile` runs in those two places are the next step. Frame-start p95 is 36–37 ms there,
-  against 19–20 ms elsewhere.
-- **The restaurant takes 11 seconds behind the veil, against about 4 for the others.** Its
-  JavaScript was reported as 1.7 s in steps of at most 350 ms, with a first 701 ms phase.
-  The retained summary does not reconcile those bounds; the capture is unavailable. But one render-thread frame
-  took 2.57 s while it was uploaded: consistent with upload or driver work, without an isolated GPU measurement. The others
-  each block one frame for 1.8–2.2 s (the build, then the first draw).
-- During the restaurant's weather and light sweep, the TV's thermal state was serious (2) for
-  about two minutes. It was nominal again for both screensaver phases, which were at 40 FPS all
-  the same.
-- Memory goes down again when the fly leaves a place (206 MB at the lab, 172 MB at the bar
-  next). The restaurant is the largest, at 225–238 MB.
-- Against Rufus on 15 November (below; code from before PR #2, so only the picnic, and with
-  sound), the picnic's screensaver is as smooth: JavaScript is down from 4.22/4.60 to 3.53/3.64 ms
-  and the p95 from 10.40/11.84 to 8.85/7.49 ms. Memory is up from 140–143 to 175 MB, and nothing
-  in this run says which of the changes since added it.
-- This run found the picnic butterfly drawn with no wings on the Apple TV, since its wing
-  texture used SVG path strings, which the runtime's `Path2D` doesn't read: fixed.
+The same soak on `dev` at `8e50250`, before these changes: the bar at 40–58 FPS (about 50) and the
+restaurant at a flat 40, with GL replay 17.0 and 22.0 ms a frame; select to arrival 4.2–4.7 s for
+the windowsill, the lab and the bar and 11.1 s for the restaurant; GL replay about 14 ms
+everywhere else.
+
+- **The render thread waited for the GPU at every reading of the fly's eyes.** With the eyes off,
+  or only their read skipped, the restaurant and the bar ran at 60 FPS and the restaurant's GL
+  replay fell from 20 to 0.4 ms a frame (`gpuTiming` on): the eyes are drawn just after the
+  frame's scene, and the pixel-pack read of them waited until the GPU had drawn it, so JavaScript,
+  GL replay and the GPU took turns. Read a frame later, they no longer do ([Reading pixels
+  back](#reading-pixels-back)). The GL replay that remains, about 14 ms where a place's GPU work
+  fills most of a frame, is the render thread waiting to present, not working: the picnic's is
+  7.5 ms.
+- **The bar holds 60 FPS.** Every 10-second window of its screensaver, at midday and at night,
+  was 59.1–60 FPS, and the TV stayed thermally nominal.
+- **The restaurant holds 60 FPS while the TV is cool, not for long once it is hot** (the game now
+  holds itself to what the TV can sustain: [Holding to what it can sustain](#holding-to-what-it-can-sustain)). Its GPU work
+  fills most of a frame at 60 FPS, where the read's waiting had held it to 40, and the TV heats
+  up: its thermal state went to serious (2) during its weather sweep and stayed there, and the
+  screensaver fell from 60 to as low as 15 FPS as the TV slowed its GPU and CPU (JavaScript rose
+  from 2.5 to 12 ms a frame). Shading it once a fragment and drawing its street only through the
+  shop front (after this soak) gave, in a restaurant-only run starting serious: the weather
+  sweep at 39–59 FPS (mean 55), the midday screensaver at 60 FPS for over 3 minutes until the TV
+  went critical (3), then 20–55; the night at 36–58 (mean 39). The other places, at nominal,
+  never left 59–60. To hold 60 hot, the restaurant's per-pixel work has to fall by about a third
+  again: the largest costs left are the casters' exact shadows (a quarter to a third of its GPU
+  time in desktop measurements), its transparent layers, its clear coat and its reflections.
+- **The restaurant comes in after about 4 seconds, against 11.** Behind a black veil the world is
+  drawn into one pixel, so the frames that build it and send each part of it to the GPU don't
+  wait for a full picture of the room. The first visit after an update compiles its two big
+  programs, about 2 seconds each on the TV (the arrival in a verification run was 8.0 s); tvOS
+  keeps them compiled after that, across launches.
+- Memory goes down again when the fly leaves a place (210 MB at the lab, 176 MB at the bar next).
+  The restaurant is the largest, at 229 MB.
 
 These historical single-player measurements did not include Online. The current app uses
 the native socket bridge described above, including the separate eight-fly observation.

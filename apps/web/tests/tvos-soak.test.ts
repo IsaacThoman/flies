@@ -17,7 +17,8 @@ test("the device soak visits every place, weather and daylight and divides wallp
       wallpaperMs += config.drive[i + 1][1] as number;
     }
   });
-  assert.equal(wallpaperMs, 60 * 60000);
+  // Split among seven places, the phases are fractions of a millisecond: summed, a hair off.
+  assert.ok(Math.abs(wallpaperMs - 60 * 60000) < 1, `${wallpaperMs} ms`);
   const waits = config.drive.filter((s) => s[0] === "wait").map((s) => s[1] as Record<string, string>);
   // The first wait marks when the splash lifts.
   assert.deepEqual(waits[0], { ready: "true" });

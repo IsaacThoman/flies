@@ -367,6 +367,12 @@ NATIVE(N_setAtRoot) {
   gHost.atRoot = argc && JSValueToBoolean(ctx, argv[0]);
   return JSValueMakeUndefined(ctx);
 }
+// thermalState(): how hot the device is, as tvOS says (ProcessInfo.thermalState): 0 nominal, 1 fair, 2 serious, 3
+// critical; or as the launch config's "thermal" says, to check what the game does as a device warms.
+static NSNumber *gPretendThermal;
+NATIVE(N_thermalState) {
+  return JSValueMakeNumber(ctx, gPretendThermal ? gPretendThermal.doubleValue : (double)NSProcessInfo.processInfo.thermalState);
+}
 NATIVE(N_ready) {
   dispatch_async(dispatch_get_main_queue(), ^{
     void (^onReady)(void) = gHost.onReady;
@@ -426,7 +432,14 @@ NATIVE(N_input) {
     _display = display;
     _wwwRoot = [[NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"www"] stringByStandardizingPath];
     gHost = self;
+    gPretendThermal = [config[@"thermal"] isKindOfClass:NSNumber.class] ? config[@"thermal"] : nil;
     _pending = [NSMutableArray array];
+    // Every change of the thermal state, in the log: the stats only sample it every few seconds.
+    [NSNotificationCenter.defaultCenter addObserverForName:NSProcessInfoThermalStateDidChangeNotification object:nil queue:nil usingBlock:^(NSNotification *) {
+      static NSString *const names[] = { @"nominal", @"fair", @"serious", @"critical" };
+      NSInteger state = NSProcessInfo.processInfo.thermalState;
+      HostLog(0, [NSString stringWithFormat:@"thermal state: %@", state >= 0 && state < 4 ? names[state] : @(state).stringValue]);
+    }];
   }
   return self;
 }
@@ -527,7 +540,7 @@ static void Define(JSContextRef ctx, JSObjectRef obj, const char *name, JSValueR
     { "readFile", N_readFile }, { "wake", N_wake }, { "now", N_now }, { "log", N_log },
     { "storageGet", N_storageGet }, { "storageSet", N_storageSet }, { "storageKeys", N_storageKeys },
     { "randomBytes", N_randomBytes }, { "setAtRoot", N_setAtRoot }, { "ready", N_ready },
-    { "registerFont", N_registerFont }, { "input", N_input },
+    { "registerFont", N_registerFont }, { "input", N_input }, { "thermalState", N_thermalState },
   };
   for (auto &f : fns) {
     JSStringRef s = JSStringCreateWithUTF8CString(f.name);
@@ -569,7 +582,9 @@ static void Define(JSContextRef ctx, JSObjectRef obj, const char *name, JSValueR
   self.runLoop = CFRunLoopGetCurrent();
   NSDictionary *c = self.config;
   int mode = c[@"mode"] ? [c[@"mode"] intValue] : 2;
-  _renderer = std::make_unique<Renderer>(mode, self.display, [c[@"gpuTiming"] boolValue], [c[@"glDebug"] boolValue]);
+  // The simulator renders in software, with no GPU for a read to wait for: it reads at once, as a device did before.
+  bool deferReads = c[@"deferReads"] ? [c[@"deferReads"] boolValue] : !TARGET_OS_SIMULATOR;
+  _renderer = std::make_unique<Renderer>(mode, self.display, [c[@"gpuTiming"] boolValue], [c[@"glDebug"] boolValue], deferReads);
   JSContextGroupRef group = JSContextGroupCreate();
   self.context = JSGlobalContextCreateInGroup(group, nullptr);
   [self installNatives];

@@ -4,6 +4,7 @@
 
 import { accessibilityEnabled, browserAccessibility } from "./accessibility/browser.ts";
 import { AT_ROOT_PROPERTY } from "@fly/contracts";
+import type { NativeThermal } from "@fly/contracts";
 import { HitMap } from "@fly/ui";
 import { Display } from "./display.ts";
 import { createBrains } from "./brain/create.ts";
@@ -11,7 +12,7 @@ import { Game } from "./game.ts";
 import type { Inputs } from "./game.ts";
 import { Devices, Gamepads, Keyboard, Pointers, Remote, initialDevice } from "./input.ts";
 import { Page } from "./page.ts";
-import { Quality } from "./quality.ts";
+import { Quality, Warmth } from "./quality.ts";
 import { loadingLayout } from "./ui/layout.ts";
 import { drawFailure } from "./ui/loading.ts";
 import { drawWordmark } from "./ui/wordmark.ts";
@@ -51,6 +52,9 @@ try {
 if (game) {
   (globalThis as { __fly?: Game }).__fly = game;
   let page: Page | null = null;
+  // A host that says how hot the device is: the game holds to what it can sustain.
+  const thermal = (globalThis as { __native?: { thermalState?: NativeThermal } }).__native?.thermalState;
+  if (thermal) game.warmth = new Warmth(() => thermal(), storage());
   if (!native) {
     game.quality = new Quality(storage(), (globalThis as { __quality?: number }).__quality ?? null);
     game.applySettings(false);
@@ -86,9 +90,9 @@ if (game) {
     }
     if (offered >= 0) offeredEvery += (Math.min(100, now - offered) - offeredEvery) * 0.1;
     offered = now;
-    const every = game.quality ? 1000 / game.quality.current.fps : 0;
-    // Only a display well over the game's rate is held back (120 Hz, or 60 Hz when the game wants 30): one just
-    // over it would otherwise lose a frame every few seconds, a judder in every pan.
+    const every = 1000 / game.fps;
+    // Only a display well over the game's rate is held back (120 Hz, or 60 Hz when the game wants 40 or 30): one
+    // just over it would otherwise lose a frame every few seconds, a judder in every pan.
     if (every > offeredEvery * 1.33) {
       if (now < due - offeredEvery / 2) return;
       due = Math.max(due + every, now);

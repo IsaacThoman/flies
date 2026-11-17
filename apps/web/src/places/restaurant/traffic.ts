@@ -172,12 +172,16 @@ float streetReach(vec3 p, vec3 n, vec3 h, float size, out vec3 l) {
   vec3 d = h - p;
   float len = length(d);
   l = d / len;
+  // Facing away, or outside, nothing reaches it: the way through the glass needn't be worked out.
+  float facing = dot(n, l);
+  if (facing <= 0.0 || p.z > ${f(GLASS)}) return 0.0;
   float dz = max(d.z, 1.0);
   float t = (${f(GLASS)} - p.z) / dz;
   vec2 q = p.xy + d.xy * t;
   float w = 1.0 + size * t;
-  float through = streetOpening(q, abs(d.xy) / dz, w) * (1.0 + uStreetWet * streetRunning(q, w));
-  return through * step(p.z, ${f(GLASS)}) * max(dot(n, l), 0.0) * 1e6 / (len * len);
+  float through = streetOpening(q, abs(d.xy) / dz, w);
+  if (uStreetWet > 0.0) through *= 1.0 + uStreetWet * streetRunning(q, w);
+  return through * facing * 1e6 / (len * len);
 }
 vec3 streetLight(vec3 p, vec3 n) {
   vec3 light = vec3(0.0);

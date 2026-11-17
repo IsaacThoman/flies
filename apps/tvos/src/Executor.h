@@ -19,7 +19,7 @@ class Canvas2D;
 
 class Executor {
  public:
-  Executor(DisplayTarget *display, bool gpuTiming, bool checkErrors, int32_t *fencesDone);
+  Executor(DisplayTarget *display, bool gpuTiming, bool checkErrors, bool deferReads, int32_t *fencesDone);
   ~Executor();
   /** Creates the GL context on first use and makes it current on this thread. */
   void makeCurrent();
@@ -50,12 +50,30 @@ class Executor {
   DisplayTarget *display_;
   EAGLContext *context_ = nil;
   bool gpuTiming_, checkErrors_;
+  // Reads into a pixel-pack buffer are deferred (reads_): on a device, unless the launch config says otherwise.
+  bool deferReads_;
   // WebGL fences, oldest first. GL signals them in order, so JavaScript only needs the newest
   // signalled one, which pollFences writes to fencesDone_ without JavaScript having to wait.
   std::deque<std::pair<int, GLsync>> fences_;
   int32_t *fencesDone_;
   void pollFences();
   int clientWait(int jsId, uint64_t timeoutNs);
+  // A read into a pixel-pack buffer waits in OpenGL ES until the GPU has drawn what it reads.
+  // Right after a frame's scene (the fly's eyes are drawn there) that holds this thread for the
+  // GPU's whole frame, and the next frame can't start until the GPU is idle. So the pixels are
+  // copied on the GPU at once, into a renderbuffer of ours, and read into the buffer only once
+  // that copy has finished (pollReads); the WebGL fences made meanwhile are held until then,
+  // so a fence after a read still signals after it.
+  struct PendingRead { GLuint fbo, rb; GLsync copied; GLsizei width, height; GLuint pbo; GLintptr offset; int alignment; std::vector<int> fences; };
+  std::deque<PendingRead> reads_;
+  std::vector<std::array<GLuint, 4>> staging_;  // free copies' framebuffer, renderbuffer, width, height
+  bool deferRead(GLint x, GLint y, GLsizei w, GLsizei h, GLenum format, GLenum type, GLintptr offset);
+  void finishRead();
+  void pollReads();
+  void flushReads() { while (!reads_.empty()) finishRead(); }
+  void finishReadsInto(GLuint pbo);
+  int boundPixelPack_ = 0;
+  int packRowLength_ = 0, packSkipPixels_ = 0, packSkipRows_ = 0;
   GLuint copyFBO_ = 0;
   GLenum defaultReadBuffer_ = GL_COLOR_ATTACHMENT0;
   std::unordered_map<int, std::array<int, 2>> rgba8Textures_;

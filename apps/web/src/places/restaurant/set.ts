@@ -109,7 +109,7 @@ const TINTS: Readonly<Record<string, [number, number, number, number]>> = {
   "bottle neck": [0.3, 0.35, 0.25, 0],
 };
 
-type Lit = { cast: Float32Array<ArrayBuffer>; tint: Float32Array<ArrayBuffer>; bottom: Float32Array<ArrayBuffer>; box: THREE.Vector4; y: THREE.Vector2; rings: Float32Array<ArrayBuffer> };
+type Lit = { count: number; cast: Float32Array<ArrayBuffer>; tint: Float32Array<ArrayBuffer>; bottom: Float32Array<ArrayBuffer>; box: THREE.Vector4; y: THREE.Vector2; rings: Float32Array<ArrayBuffer> };
 
 /** The things standing on an area's top that cast exact shadows (the tallest, as many as there is room for), and the rings on its marble. */
 function lighting(area: AreaSpec, surface: number): Lit {
@@ -118,7 +118,7 @@ function lighting(area: AreaSpec, surface: number): Lit {
     const bottom = s.bottom ?? 0;
     return f.x > area.x0 && f.x < area.x1 && f.z > area.z0 && f.z < area.z1 && bottom >= surface - 1 && bottom < surface + 400 && !s.name.startsWith("chair") && topPeak(s.top) - bottom > 25;
   }).sort((a, b) => topPeak(b.top) - topPeak(a.top)).slice(0, CASTERS);
-  const lit: Lit = { cast: new Float32Array(CASTERS * 4), tint: new Float32Array(CASTERS * 4), bottom: new Float32Array(CASTERS), box: new THREE.Vector4(area.x0, area.x1, area.z0, area.z1), y: new THREE.Vector2(surface - 6, surface + 420), rings: new Float32Array(24) };
+  const lit: Lit = { count: things.length, cast: new Float32Array(CASTERS * 4), tint: new Float32Array(CASTERS * 4), bottom: new Float32Array(CASTERS), box: new THREE.Vector4(area.x0, area.x1, area.z0, area.z1), y: new THREE.Vector2(surface - 6, surface + 420), rings: new Float32Array(24) };
   things.forEach((s: Solid, i) => {
     const f = s.footprint;
     const r = f.kind === "circle" ? f.r : f.kind === "ellipse" ? Math.max(f.rx, f.rz) * 0.85 : (f.hx + f.hz) / 2;
@@ -212,11 +212,12 @@ export function buildRestaurant(): SceneSet {
   ];
   let step = 0;
   let casting: Lit | null = null;
-  const noLight: Lit = { cast: new Float32Array(CASTERS * 4), tint: new Float32Array(CASTERS * 4), bottom: new Float32Array(CASTERS), box: new THREE.Vector4(1, -1, 1, -1), y: new THREE.Vector2(1, -1), rings: new Float32Array(24) };
+  const noLight: Lit = { count: 0, cast: new Float32Array(CASTERS * 4), tint: new Float32Array(CASTERS * 4), bottom: new Float32Array(CASTERS), box: new THREE.Vector4(1, -1, 1, -1), y: new THREE.Vector2(1, -1), rings: new Float32Array(24) };
   const useLight = (lit: Lit) => {
     if (casting === lit) return;
     casting = lit;
     shared.uCast.value = lit.cast;
+    shared.uCastCount.value = lit.count;
     shared.uCastTint.value = lit.tint;
     shared.uCastBottom.value = lit.bottom;
     shared.uCastBox.value = lit.box;

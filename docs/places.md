@@ -135,7 +135,11 @@ crossings become smaller than a pixel, without extra meshes or draws.
 - **Two passes** (`apps/web/src/stage.ts`): the set (`buildSet`, from 0.5 mm to
   4 m from the camera, or its camera's `reach`) is drawn over the backdrop
   (`buildBackdrop`, from 200 mm to 3 km). Indoors, a room's far walls, a
-  window's view, a bar's lights can all be backdrop.
+  window's view, a bar's lights can all be backdrop. A closed room whose
+  backdrop shows through one opening gives its corners (`through`), and the
+  backdrop is drawn only where that opening falls on the screen, or not at
+  all while it is behind the camera (the restaurant's street, through its shop
+  front).
 - **Light** (`palettes`): the five times of day. Chosen on the Light tool, the
   light eases to one and holds it; on "Now" it follows the clock between them
   (`scene/light.ts`, `clockLight`): each palette's colours are full at its
@@ -280,9 +284,12 @@ TV has (`places/restaurant/`):
   (`SceneSet.more`); the game holds the veil until it is done. At startup,
   `Stage` runs all build steps synchronously instead. Hidden area detail is
   exposed to rendering behind the transition veil, one group per frame,
-  to warm its buffers. This does not guarantee a frame-time ceiling or that
-  every later shader variant is ready. The browser soak compares resource
-  counts at matched checkpoints (`docs/web-soak.md`).
+  to warm its buffers. While the veil is black the world is drawn into a
+  single pixel (`stage.ts`): buffers and programs still go to the GPU, but no
+  frame behind it waits for the GPU to shade a whole picture of the room.
+  This does not guarantee a frame-time ceiling or that every later shader
+  variant is ready. The browser soak compares resource counts at matched
+  checkpoints (`docs/web-soak.md`).
 
 ## Rules
 
@@ -303,6 +310,13 @@ TV has (`places/restaurant/`):
   while playing (capture date, machine and play state unknown)
   (Settings → Picture → Frame stats, or the canvas's `data-calls` and `data-triangles`);
   a new place should stay close to that, near the fly and in its whole view.
+  Its GPU pays for every pixel's shader, too, 640×480 as the picture is: what
+  the bar and the restaurant cost there is their single materials' shading,
+  not their draws (`docs/apple-tv.md`, "Measured on peev"). Value noise comes from a texture (`scene/noise.ts`) rather than from
+  hashes, a light's shadow and shading are worked out only where it can reach
+  (`scene/lit.ts`), loops over things run only as far as there are things, and
+  anything multiplied away (a pattern too fine for the pixel, a light that is
+  off) is better not worked out at all.
 - **Building is a pause behind the veil.** `data-place-ms` on the canvas says
   the accumulated synchronous build work, excluding rendering and intervening
   frames. A historical reference picnic build was 36 ms in desktop Chromium

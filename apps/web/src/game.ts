@@ -59,7 +59,7 @@ import { clockHours, timeAt } from "./scene/light.ts";
 import { Outside, nativeWeather } from "./scene/outside.ts";
 import { Footprints } from "./scene/prints.ts";
 import { cheaperEyes, cheaperPixels } from "./quality.ts";
-import type { Quality } from "./quality.ts";
+import type { Quality, Warmth } from "./quality.ts";
 import { KEPT, OVERLAY_OPACITIES, OVERLAY_SIZES, loadLearned, loadSettings, loadShelf, loadTableSeat, saveLearned, saveSettings, saveShelf, saveTableSeat } from "./settings.ts";
 import type { Learned, Lesson, Settings, ShelfChoices, TableSeat } from "./settings.ts";
 import { Stage } from "./stage.ts";
@@ -224,6 +224,8 @@ export class Game implements Shell {
   uiAlpha = 1;
   /** In a browser, what this device can afford to draw (quality.ts); null on the Apple TV, which is drawn as it is. */
   quality: Quality | null = null;
+  /** On a host that says how hot the device is (the Apple TV), the frame rate and pixels it can sustain (quality.ts). */
+  warmth: Warmth | null = null;
   /** The graphics context was lost, and nothing can be drawn until it is restored. */
   glLost = false;
   /** The middles of the other flies this device lives, for the bubbles: one each, kept. */
@@ -264,6 +266,7 @@ export class Game implements Shell {
   #lastScreen: ScreenId | "loading" = "loading";
   #lastNow = -1;
   #qualitySeen = 0;
+  #warmthSeen = 0;
   /** The pixels and eyes last chosen in Settings, to tell when the player changes them. */
   #chosen: { pixels: string; eyes: string } = { pixels: "", eyes: "" };
   #touchWas = false;
@@ -940,15 +943,23 @@ export class Game implements Shell {
     if (save) saveSettings(s);
   }
 
-  /** The pixels and eyes the player chose, or cheaper ones if this device can't afford them. */
+  /** The pixels and eyes the player chose, or cheaper ones if this device can't afford them or sustain them. */
   #applyPicture() {
     const s = this.settings;
     const limit = this.quality?.current;
-    const pixels = limit ? cheaperPixels(s.pixels, limit.pixels) : s.pixels;
+    const warm = this.warmth?.current;
+    let pixels = limit ? cheaperPixels(s.pixels, limit.pixels) : s.pixels;
+    if (warm) pixels = cheaperPixels(pixels, warm.pixels);
     if (pixels !== this.stage.pixels) this.stage.setPixels(pixels);
     this.eyes.detail = limit ? cheaperEyes(s.eyes, limit.eyes) : s.eyes;
     this.eyes.rate = limit?.eyesRate ?? 1;
     this.#qualitySeen = this.quality?.changes ?? 0;
+    this.#warmthSeen = this.warmth?.changes ?? 0;
+  }
+
+  /** Frames a second the game draws at most: what this device can afford, and sustain. */
+  get fps() {
+    return Math.min(this.quality?.current.fps ?? 60, this.warmth?.current.fps ?? 60);
   }
 
   /** Tries the brain again after it failed: on the player's say-so, or (`network`) when the network comes back. */
@@ -1171,6 +1182,13 @@ export class Game implements Shell {
       const steady = !this.#loading && !this.#moving && this.#lastNow >= 0;
       this.quality.frame(steady ? now - this.#lastNow : 0, steady && life.brain.status === "running" ? this.meter.speed : -1);
       if (this.quality.changes !== this.#qualitySeen) this.#applyPicture();
+    }
+    const warmth = this.warmth;
+    if (warmth) {
+      // The device's warmth goes on whatever is shown; where it is held starts from the place's own.
+      if (warmth.place !== this.#here) warmth.enter(this.#here);
+      warmth.update(dt);
+      if (warmth.changes !== this.#warmthSeen) this.#applyPicture();
     }
     this.#lastNow = now;
     // Peaks of the brief things scripts wait for, held for a few seconds.
@@ -2134,9 +2152,13 @@ export class Game implements Shell {
     }
     if (this.quality) {
       d.quality = String(this.quality.level);
-      d.fps = String(this.quality.current.fps);
       d.windowMs = this.quality.frameMs.toFixed(1);
     }
+    if (this.warmth) {
+      d.warmth = String(this.warmth.level);
+      d.thermal = String(this.warmth.state);
+    }
+    d.fps = String(this.fps);
     d.device = this.devices.current;
     d.frame = `${this.shape.width}x${this.shape.height}`;
     d.yaw = this.director.yaw.toFixed(4);

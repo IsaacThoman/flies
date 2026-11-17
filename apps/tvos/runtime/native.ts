@@ -50,6 +50,8 @@ export interface Native {
   setAtRoot(atRoot: boolean): void;
   /** Tells the host the game is showing its first screen (the splash then fades out). */
   ready(): void;
+  /** How hot the device is (ProcessInfo.thermalState): 0 nominal, 1 fair, 2 serious, 3 critical. */
+  thermalState(): number;
   /** Scripted remote input, through the same native code as the remote's own:
    *  ('press', key, holdMs), ('swipe', key) or ('touch', x, y, touching). */
   input(kind: 'press', key: string, holdMs: number): void;

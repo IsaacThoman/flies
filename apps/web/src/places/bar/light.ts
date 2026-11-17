@@ -9,6 +9,8 @@
 
 import * as THREE from "three";
 import { BAR_TOP } from "@fly/world";
+import { litOnly } from "../../scene/lit.ts";
+import { noiseGlsl } from "../../scene/noise.ts";
 
 /** The room, in the counter's millimetres: its floor, ceiling and walls. */
 export const ROOM = { floor: -1100, ceiling: 1600, left: -900, right: 2300, back: -1000, front: 2100 };
@@ -23,16 +25,11 @@ export const WINDOW = { x: ROOM.left, z0: -560, z1: 760, y0: -20, y1: 1240, mull
 /** Something on the counter that casts a shadow: an upright column, and the colour of the light through it (and how much a glass of liquid focuses it). */
 export type Caster = { x: number; z: number; r: number; h: number; tint: THREE.ColorRepresentation; focus?: number };
 
-/** Hash, value noise and a few octaves of it. */
+/** Hash, value noise (scene/noise.ts) and a few octaves of it. */
 const NOISE = /* glsl */ `
 float barHash(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
 float barHash1(float n) { return fract(sin(n * 127.1) * 43758.5453); }
-float barNoise(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(barHash(i), barHash(i + vec2(1.0, 0.0)), u.x), mix(barHash(i + vec2(0.0, 1.0)), barHash(i + vec2(1.0, 1.0)), u.x), u.y);
-}
+${noiseGlsl("barNoise", "uNoise")}
 float barFbm(vec2 p) { return barNoise(p) * 0.55 + barNoise(p * 2.1 + 3.1) * 0.3 + barNoise(p * 4.3 + 7.7) * 0.15; }
 // How much of a pattern of this frequency a pixel can show: 1 where it is fine enough, fading to 0 where it would shimmer.
 float barDetail(vec2 p) { return 1.0 - smoothstep(0.3, 0.8, max(fwidth(p.x), fwidth(p.y))); }
@@ -129,6 +126,8 @@ vec3 barCast(vec3 p, vec3 l, float size, bool sun) {
     float t = min(along, top);
     float dist = length(c - dxz * t);
     float w = (sun ? size * t * len : size * t / max(1.0 - t, 0.03)) + 0.35;
+    // Clear of its penumbra, it lets all the light by.
+    if (dist >= o.z + w) continue;
     float s = 1.0 - smoothstep(o.z - w, o.z + w, dist);
     vec4 tint = uCastTint[i];
     // A glass of liquid is a lens: it gathers the light into a bright line down the middle of its shadow.
@@ -161,17 +160,11 @@ vec3 barLamp(vec3 posView, float size) {
 
 /** The light loop with a hook after each light is found. The candle is small; the pendants' shades are wide. */
 function hookedLights() {
-  let chunk = THREE.ShaderChunk.lights_fragment_begin;
-  const hooks: [string, string][] = [
-    ["getPointLightInfo( pointLight, geometryPosition, directLight );", "directLight.color *= barLamp( pointLight.position, 4.0 );"],
-    ["getSpotLightInfo( spotLight, geometryPosition, directLight );", "directLight.color *= barLamp( spotLight.position, 70.0 );"],
-    ["getDirectionalLightInfo( directionalLight, directLight );", "directLight.color *= barSun( directionalLight.direction );"],
-  ];
-  for (const [find, add] of hooks) {
-    if (!chunk.includes(find)) throw new Error(`three.js light chunk changed: ${find}`);
-    chunk = chunk.replace(find, `${find}\n\t\t${add}`);
-  }
-  return chunk;
+  return litOnly(THREE.ShaderChunk.lights_fragment_begin, [
+    ["getPointLightInfo( pointLight, geometryPosition, directLight );", "barLamp( pointLight.position, 4.0 )"],
+    ["getSpotLightInfo( spotLight, geometryPosition, directLight );", "barLamp( spotLight.position, 70.0 )"],
+    ["getDirectionalLightInfo( directionalLight, directLight );", "barSun( directionalLight.direction )"],
+  ]);
 }
 
 export type Patch = {

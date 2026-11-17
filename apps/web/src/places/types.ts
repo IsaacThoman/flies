@@ -102,6 +102,13 @@ export type SceneBackdrop = {
   scene: THREE.Scene;
   /** Keeps it round the camera and moves its light, water, clouds, whatever lives there, and its weather if it shows it. */
   update(time: number, camera: THREE.Camera, light: Daylight, weather: Weather): void;
+  /**
+   * In a closed room, the corners of the one opening (a flat rectangle) the
+   * backdrop is seen through, wherever the camera is in it: the stage draws
+   * the backdrop only where that falls on the screen (stage.ts). Optional: a
+   * place without it has its backdrop drawn over the whole screen.
+   */
+  through?: readonly THREE.Vector3[];
 };
 
 /** The camera's view of the whole place (View → Whole table); the shots round the fly are every place's. */

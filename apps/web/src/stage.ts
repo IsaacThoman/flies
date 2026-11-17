@@ -286,10 +286,22 @@ export class Stage {
   render(camera: THREE.PerspectiveCamera, dt: number) {
     const r = this.renderer;
     this.#refreshEnvironment(dt);
-    r.setRenderTarget(this.#lowRes);
-    r.clear(true, true, false);
-    this.renderPasses(camera);
-    if (this.#lowRes && this.#blit) {
+    if (this.veil >= 1) {
+      // Nothing of the world shows through a black veil, but a place being built behind it is still
+      // drawn, so that its buffers and programs are on the GPU before it lifts: into one pixel, as
+      // shading a whole frame of a large place would make each of those frames as slow as the GPU.
+      r.setRenderTarget(null);
+      r.clear(true, true, false);
+      r.setScissor(0, 0, 1, 1);
+      r.setScissorTest(true);
+      this.renderPasses(camera);
+      r.setScissorTest(false);
+    } else {
+      r.setRenderTarget(this.#lowRes);
+      r.clear(true, true, false);
+      this.renderPasses(camera);
+    }
+    if (this.veil < 1 && this.#lowRes && this.#blit) {
       r.setRenderTarget(null);
       r.clear(true, true, false);
       r.render(this.#blit.scene, this.#blit.camera);
@@ -307,7 +319,19 @@ export class Stage {
     camera.near = FAR.near;
     camera.far = FAR.far;
     camera.updateProjectionMatrix();
-    r.render(this.backdrop.scene, camera);
+    // Through a room's one opening (SceneBackdrop.through): the GPU shades the backdrop only where it can show.
+    const shown = r.getScissorTest() ? null : this.#throughOpening(camera);
+    if (shown !== "none") {
+      if (shown) {
+        r.setScissor(shown);
+        r.setScissorTest(true);
+      }
+      r.render(this.backdrop.scene, camera);
+      if (shown) {
+        r.setScissorTest(false);
+        r.setScissor(0, 0, this.frame.width, this.frame.height);
+      }
+    }
     r.clearDepth();
     camera.near = NEAR.near;
     camera.far = this.current.camera.reach ?? NEAR.far;
@@ -315,6 +339,47 @@ export class Stage {
     r.render(scene, camera);
     camera.near = near;
     camera.far = far;
+  }
+
+  #corner = new THREE.Vector3();
+  #shown = new THREE.Vector4();
+
+  /**
+   * Where on the screen the backdrop's opening falls (pixels, a little
+   * over), "none" when it is wholly behind the camera, or null for the whole
+   * screen: no opening, or one reaching round behind the camera.
+   */
+  #throughOpening(camera: THREE.PerspectiveCamera): THREE.Vector4 | "none" | null {
+    const corners = this.backdrop.through;
+    if (!corners) return null;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    let behind = 0;
+    for (const c of corners) {
+      const v = this.#corner.copy(c).applyMatrix4(camera.matrixWorldInverse);
+      if (v.z > -camera.near) {
+        behind++;
+        continue;
+      }
+      v.applyMatrix4(camera.projectionMatrix);
+      x0 = Math.min(x0, v.x);
+      x1 = Math.max(x1, v.x);
+      y0 = Math.min(y0, v.y);
+      y1 = Math.max(y1, v.y);
+    }
+    if (behind === corners.length) return "none";
+    if (behind) return null;
+    const target = this.renderer.getRenderTarget();
+    const w = target ? target.width : this.frame.width;
+    const h = target ? target.height : this.frame.height;
+    const left = Math.max(0, Math.floor((x0 * 0.5 + 0.5) * w) - 1);
+    const right = Math.min(w, Math.ceil((x1 * 0.5 + 0.5) * w) + 1);
+    const bottom = Math.max(0, Math.floor((y0 * 0.5 + 0.5) * h) - 1);
+    const top = Math.min(h, Math.ceil((y1 * 0.5 + 0.5) * h) + 1);
+    if (right <= left || top <= bottom) return "none";
+    return this.#shown.set(left, bottom, right - left, top - bottom);
   }
 
   /** Starts a frame's cost count. */

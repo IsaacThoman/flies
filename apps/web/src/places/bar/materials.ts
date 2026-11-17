@@ -9,6 +9,7 @@
 import * as THREE from "three";
 import { BAR_DECOR, BAR_TOP } from "@fly/world";
 import { canvasTexture } from "../../scene/build.ts";
+import { noiseTexture } from "../../scene/noise.ts";
 import { CLOCK_GLSL, onDial } from "../../scene/clock.ts";
 import type { Dial } from "../../scene/clock.ts";
 import { casterUniforms, patch } from "./light.ts";
@@ -502,6 +503,7 @@ export function solidMaterial(casters: readonly Caster[], contact: readonly { x:
   const material = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.6, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 0.9 });
   const uniforms = {
     ...casterUniforms(casters),
+    uNoise: { value: noiseTexture() },
     uSunSoft: shared.sunSoft,
     uContact: { value: contactTexture(contact) },
     uNapkin: { value: new THREE.Vector4(BAR_DECOR.napkin.x, BAR_DECOR.napkin.z, BAR_DECOR.napkin.size / 2, BAR_DECOR.napkin.angle) },
@@ -665,7 +667,7 @@ const CLEAR_FINAL = /* glsl */ `
 /** The clear things' material: glass, the drinks, ice, foam and drops. */
 export function clearMaterial(casters: readonly Caster[], shared: Shared, beer: THREE.Vector4, drink: number) {
   const material = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.05, metalness: 0, transparent: true, depthWrite: false, envMapIntensity: 1.6 });
-  const uniforms = { ...casterUniforms(casters), uSunSoft: shared.sunSoft, uTime: shared.time, uBeer: { value: beer }, uRipples: shared.ripples, uThrough: shared.through, uDrink: { value: drink } };
+  const uniforms = { ...casterUniforms(casters), uNoise: { value: noiseTexture() }, uSunSoft: shared.sunSoft, uTime: shared.time, uBeer: { value: beer }, uRipples: shared.ripples, uThrough: shared.through, uDrink: { value: drink } };
   patch(material, {
     key: "clear",
     uniforms,

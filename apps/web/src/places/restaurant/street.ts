@@ -17,6 +17,7 @@
 // the wet are worked out per pixel.
 
 import * as THREE from "three";
+import { DINING_ROOM, SHOPFRONT } from "@fly/world";
 import { freeze } from "../../scene/build.ts";
 import type { Daylight } from "../../scene/light.ts";
 import type { SceneBackdrop } from "../types.ts";
@@ -651,8 +652,12 @@ export function buildStreet(light: Daylight): SceneBackdrop {
   scene.add(rain);
 
   const scratch = new THREE.Color();
+  // The shop front's glass and its door, from the left wall to the door's far post: the street is seen through nothing else.
+  const right = SHOPFRONT.door.x1 + SHOPFRONT.mullion.half + 20;
+  const through = [[-DINING_ROOM.hx, 0], [right, 0], [right, SHOPFRONT.head + 20], [-DINING_ROOM.hx, SHOPFRONT.head + 20]].map(([x, y]) => new THREE.Vector3(x, y, SHOPFRONT.glass));
   return {
     scene,
+    through,
     update(time, camera, daylight, weather) {
       sky.position.copy(camera.position);
       sky.updateMatrixWorld();
