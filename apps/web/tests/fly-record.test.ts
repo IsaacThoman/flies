@@ -9,7 +9,7 @@ import type { BrainDriver } from "@fly/contracts";
 import { HUNGER, Rhythm, SUMMER, THIRST_START, pressureLeftAlone, usualPressure } from "@fly/body";
 import { Pantry, createPicnic } from "@fly/world";
 import { Company } from "../src/company.ts";
-import { FLY_LIMIT, FLY_VERSION, KEEP_EVERY, Remembered, liveAway, loadFly, note, restore, saveFly } from "../src/fly-record.ts";
+import { FLY_LIMIT, FLY_VERSION, KEEP_EVERY, LEARNED_VERSION, Remembered, fromBase64, liveAway, loadFly, note, restore, saveFly, toBase64 } from "../src/fly-record.ts";
 import { Life } from "../src/life.ts";
 import { clockHours } from "../src/scene/light.ts";
 
@@ -247,4 +247,58 @@ test("the flies are saved every half a minute while the game runs", () => {
   let saves = 0;
   for (let t = 0; t < 4 * KEEP_EVERY; t += 0.5) if (remembered.due(0.5)) saves++;
   assert.equal(saves, 4);
+});
+
+test("base64 goes both ways at every length, and anything else isn't read", () => {
+  for (let n = 0; n < 7; n++) {
+    const bytes = Uint8Array.from({ length: n }, (_, k) => (k * 97 + 255) & 255);
+    const text = toBase64(bytes);
+    assert.equal(text, Buffer.from(bytes).toString("base64"));
+    assert.deepEqual(fromBase64(text), bytes);
+  }
+  for (const bad of ["abc", "ab!d", "a=bc", "===="]) assert.equal(fromBase64(bad), null);
+});
+
+test("what its brain learned is kept with the fly: given back as it arrives, taken again at each save", async () => {
+  const store = memory();
+  const taken: Uint8Array[] = [];
+  let learned = Uint8Array.of(1, 2, 3);
+  const learner = () => ({ ...brain(), importMemory: async (m: Uint8Array) => (taken.push(m), true), exportMemory: async () => learned });
+  const remembered = new Remembered(make, store);
+  const first = new Life(createPicnic(), learner());
+  remembered.arrive(0, first, NOON, SUMMER, "picnic", true);
+  assert.equal(taken.length, 0, "a new fly has nothing to give back");
+  remembered.save(0, first, "picnic", NOON);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const saved = JSON.parse(store.saved["flies.fly.0"]);
+  assert.deepEqual(saved.learned, { v: LEARNED_VERSION, data: toBase64(learned) }, "saved again once the brain answered");
+
+  learned = Uint8Array.of(9);
+  const again = new Remembered(make, store);
+  const second = new Life(createPicnic(), learner());
+  again.arrive(0, second, NOON + HOUR, SUMMER, "picnic", true);
+  assert.deepEqual(taken, [Uint8Array.of(1, 2, 3)], "the brain is given what it had learned");
+
+  // A brain with no memory to give (a stand-in, or one not running) leaves what was kept.
+  const plain = new Remembered(make, store);
+  const third = new Life(createPicnic(), brain());
+  plain.arrive(0, third, NOON + 2 * HOUR, SUMMER, "picnic", true);
+  plain.save(0, third, "picnic", NOON + 2 * HOUR);
+  assert.deepEqual(JSON.parse(store.saved["flies.fly.0"]).learned, saved.learned);
+});
+
+test("a memory this build can't read is carried through saves as it was; the largest this brain can learn fits in a record", () => {
+  const store = memory();
+  const fly = loadFly(0, NOON, make, store);
+  store.saved["flies.fly.0"] = JSON.stringify({ ...JSON.parse(store.saved["flies.fly.0"]), learned: { v: 99, data: "future" } });
+  const back = loadFly(0, NOON, make, store);
+  assert.equal(back.learned, null);
+  assert.ok(saveFly(0, back, store));
+  assert.deepEqual(JSON.parse(store.saved["flies.fly.0"]).learned, { v: 99, data: "future" });
+  // Every one of its 33,496 learning synapses changed: the memory's dense form, 24 bytes and one a synapse.
+  fly.learned = { v: LEARNED_VERSION, data: toBase64(new Uint8Array(24 + 33_496).fill(200)) };
+  fly.body = { hunger: 0.5, fullness: 0.5, sleep: { pressure: 0.5, pace: "natural" } };
+  fly.where = { place: "picnic", x: 1, y: 2, z: 3, yaw: 4 };
+  assert.ok(saveFly(0, fly, store));
+  assert.ok(store.saved["flies.fly.0"].length < FLY_LIMIT / 2);
 });

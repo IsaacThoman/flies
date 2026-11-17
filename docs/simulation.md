@@ -102,17 +102,23 @@ when it is shown again. A clock gone backwards is no time away.
 
 Alone, in the place it was in, it stands where it stood, if that spot is still
 on the table; at a table, or elsewhere, it stands where the place or the table
-sets it. Its brain is not kept: it wakes afresh at every launch, as it always
-has. How deeply it sleeps and how long it has been still start again from
-nothing, as the brain does. Only the body's own state is kept, never what the
-brain makes of it.
+sets it. Its brain's activity is not kept: it wakes afresh at every launch,
+as it always has. What its mushroom body has learned is (the record's
+`learned`, packages/brain/README.md, Learning): the brain is asked for it at
+each save and the answer saved as it comes, so the record is at most one save
+behind; coming back, the brain takes it back as it starts, or refuses it if it
+is of another connectome. As the brain stands, nothing the fly senses in the
+game teaches it, so that memory is the wiring's. How deeply it sleeps and how
+long it has been still start again from nothing, as the brain does. Of the
+body, only its own state is kept, never what the brain makes of it.
 
 Nothing of the record leaves the device. At a table, another player sees the
 fly as ever, its body's pose; the crop isn't sent.
 
 The record is JSON with a version, `v` (1). A feature that keeps more about a
-fly (what its brain has learned, its first moments) adds one field of its own,
-versioned inside. A record from a newer build keeps its id and every field it
+fly (its first moments) adds one field of its own, versioned inside, as
+`learned` is: `{ v: 1, data }`, the memory's bytes as base64, at most 44,694
+characters (the bytes carry their own version and connectome). A record from a newer build keeps its id and every field it
 has, carried through each save, but none of its state is read. A record that
 can't be read is a new fly in that place in line; a field that can't be read
 starts fresh. A record is at most 96 KB of JSON: a larger one isn't saved, and
