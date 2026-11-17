@@ -27,9 +27,11 @@ Baseline key: `set-K7`. All 75 requested screenshots captured with the real rend
 
 | Baseline reviewer | Clarity | Polish | Remote | Touch | Fit | Legibility | Redundancy | Accessibility | Mean |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | pending | | | | | | | | |
+| 1 | 7 | 7 | 7 | 6 | 7 | 6 | 8 | 6 | 6.75 |
 | 2 | 8 | 8 | 7 | 6 | 7 | 7 | 8 | 7 | 7.25 |
 | 3 | 7 | 8 | 8 | 6 | 7 | 7 | 8 | 6 | 7.13 |
+
+Baseline mean: **7.04/10**.
 
 The recurring problems were Back overlapping the landscape New room form, touch targets under 44 CSS pixels, disappearing Settings tabs during scrolling, ambiguous overlay labels, and small low-contrast diagnostic captions.
 

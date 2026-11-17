@@ -96,7 +96,7 @@ export function hudLayout(frame: Frame): HudLayout {
     captionY: a.y + 25,
     shelfY,
     gap,
-    orb: Math.min(1, gap / SHELF_GAP + 0.2),
+    orb: Math.min(1, (gap / 2 - 1) / 22),
     shelfLeft,
     split: apart > 0 ? split : tools,
     apart,
