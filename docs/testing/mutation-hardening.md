@@ -32,10 +32,17 @@ The fixed sample has 68 faults over 11 modules. Initial targeted routing
 killed 20; including the existing server restart test in the table campaign
 kills 21 in the control. All scores below use that covering-test correction
 where noted. No equivalent faults have been excluded.
-The three independent challenges (repeating the first bite amount, a 0.94
-brain threshold, and missing mist-only light invalidation) all survived
-Q2 and all are killed by the candidate. They are kept in a separate
-catalogue and do not change the original 68-fault denominator.
+Seven independent challenges were proposed. Six are killed: constant salt,
+double patch recovery, reversing tied room codes, repeating the first bite
+amount, a 0.94 brain threshold, and missing mist-only light invalidation.
+All seven survived Q2. They stay in a separate catalogue and never change
+the original 68-fault denominator.
+
+The seventh, changing rain naming from `> 0.3` to `>= 0.3`, remains visible
+as a survivor. It is not mathematically equivalent. No caller-facing
+contract specifies that exact internal blend threshold, so an assertion
+locking it down was rejected as implementation coupling. This is a triage
+decision, not an excluded kill or a claim of complete mutation coverage.
 
 Reports include Node/platform information, SHA-256 fingerprints of the
 catalogue and each source/test input, exit status, and failure diagnostics.
@@ -75,4 +82,41 @@ receive only the rubric, evidence and paths, never this log or its key.
 Baseline key: K7. First candidate key: Q2. Later comparisons randomize the
 presentation order; reviewers independently score each set and force a ranking.
 
-Scores and final validation are being collected.
+Scores are in rubric order: mutation, behaviour, determinism/speed, real
+bugs, readability. Baseline reviewers saw one set. Comparison reviewers
+were all fresh and received sets without version labels.
+
+| Round | Reviewer | Set | Scores /10 | Ranking |
+| --- | --- | --- | --- | --- |
+| 0 | 1 | K7 | 2.8, 6, 5, 2, 6 | single set |
+| 0 | 2 | K7 | 2.8, 6, 5, 1, 6 | single set |
+| 0 | 3 | K7 | 2.8, 6, 5, 2, 6 | single set |
+| 1 | 1 | Q2 | 8.9, 8.5, 6, 9, 7 | Q2 > K7 |
+| 1 | 1 | K7 | 2.8, 6, 6, 0, 5 | |
+| 1 | 2 | Q2 | 8.6, 8, 7, 9, 7 | Q2 > K7 |
+| 1 | 2 | K7 | 2.6, 6, 6.5, 0, 5.5 | |
+| 1 | 3 | Q2 | 8.74, 8, 7, 9, 7 | Q2 > K7 |
+| 1 | 3 | K7 | 2.65, 6, 6, 0, 5 | |
+
+Round 0 mean: **4.29**. Round 1 candidate mean: **7.92**; all three
+reviewers ranked it higher. The separate regression reviewer found no
+concrete regressions. Reviewer 2's prose misstated K7's total as 22; its
+per-module table and the measurement file total 20. Measured counts take
+precedence over that arithmetic error.
+
+Round 1 acted on survivors with packet boundaries, exact callback counts,
+public clocks, persistence recovery, and light/weather transitions. It
+also corrected two real failures. Reviewers independently reproduced both.
+Rejected: calling the lamp-threshold survivor equivalent (a probe outside
+midnight distinguishes it); treating a target-only routing survivor as
+proof the whole suite misses it. The control was re-measured with the
+server restart test included, raising it from 20 to 21 kills.
+
+Round 2 adds the independently proposed cases, fixes invalid clock
+messages in a separate test/fix pair, bounds the food-consumption loop,
+replaces the inherited server sleep with a socket acknowledgement, and
+adds deterministic connection clocks plus reproducible report fingerprints.
+The lamp boundary is checked at 22:00. The rain-boundary challenge above
+was rejected as a test target; its survival is reported honestly.
+
+Final blind scores and validation are being collected.

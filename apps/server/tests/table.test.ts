@@ -758,3 +758,14 @@ test("a room lock accepts canonically equivalent passwords, uses a full random s
   assert.equal(isLock(secured), true);
   for (const value of [null, {}, { salt: secured.salt }, { salt: secured.salt, hash: 42 }]) assert.equal(isLock(value), false);
 });
+
+test("equally full rooms with the same name have a stable code order regardless of arrival order", () => {
+  const tables = new Tables({ now: () => 0, wall: () => 0 });
+  for (const code of ["bbbbbbbbbb", "aaaaaaaaaa"]) {
+    const hello: Hello = { type: "hello", v: PROTOCOL, table: code, key: code, start: { ...START, name: "Same", listed: true } };
+    const table = tables.open(code, hello, 7);
+    assert.ok(table instanceof Table);
+    table.hello(fakeLink(), code, hello);
+  }
+  assert.deepEqual(tables.listed().map((room) => room.code), ["aaaaaaaaaa", "bbbbbbbbbb"]);
+});

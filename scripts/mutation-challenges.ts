@@ -4,6 +4,26 @@ import type { Campaign } from "./mutation-cases.ts";
 // adding them cannot change the denominator of the original comparison.
 export const challenges: Campaign[] = [
   {
+    file: "apps/server/src/lock.ts",
+    tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts"],
+    faults: [["constant-salt", "randomBytes(16)", "Buffer.alloc(16)"]],
+  },
+  {
+    file: "packages/world/src/pantry.ts",
+    tests: ["packages/world/tests/world.test.ts"],
+    faults: [["double-patch-recovery", "dt / PATCH_RECOVERY", "2 * dt / PATCH_RECOVERY"]],
+  },
+  {
+    file: "apps/server/src/tables.ts",
+    tests: ["apps/server/tests/table.test.ts", "apps/server/tests/server.test.ts"],
+    faults: [["reverse-room-tie", "a.code.localeCompare(b.code)", "b.code.localeCompare(a.code)"]],
+  },
+  {
+    file: "apps/web/src/scene/weather.ts",
+    tests: ["apps/web/tests/weather.test.ts"],
+    faults: [["rain-boundary", "w.rain > 0.3", "w.rain >= 0.3"]],
+  },
+  {
     file: "packages/net/src/protocol.ts",
     tests: ["packages/net/tests/protocol.test.ts"],
     faults: [["repeat-first-bite-amount", "view.getFloat32(8 + i * BITE_BYTES, true)", "view.getFloat32(8, true)"]],

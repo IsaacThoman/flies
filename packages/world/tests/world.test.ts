@@ -274,3 +274,14 @@ test("removing a food that is already gone leaves the others on the table", () =
   pantry.remove(gone);
   assert.deepEqual(pantry.foods, [kept]);
 });
+
+test("an exhausted patch recovers gradually, half full halfway through its recovery time", () => {
+  const pantry = new Pantry(openTable(300), [{ name: "honey", x: 0, z: 0, r: 5, sweet: 1 }]);
+  const patch = pantry.foods[0];
+  pantry.eat(patch, 1, 100);
+  assert.equal(patch.amount, 0);
+  pantry.update(45);
+  assert.equal(patch.amount, 0.5);
+  pantry.update(45);
+  assert.equal(patch.amount, 1);
+});
