@@ -18,7 +18,7 @@ import { BALL_RADIUS, Pace, VentilationClock, World, WORLDS, hourOfDay } from "@
 import type { Happening } from "@fly/world";
 import {
   KINDS, forecast, MAX_FOUND, AIRBORNE, AWAY, BITES, CLOSE, TABLE_BUBBLES, COLOURS, FLIES_MAX, FLY, LIMITS, Leash, MAX_FLIES, MAX_OWN, PLAYING, PROTOCOL, ROOM_LIMITS, Rate, TABLE_LIGHTS,
-  TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, decodeFlies, encodeFlies, everyoneIndex, everyoneName,
+  TABLE_PLACES, TABLE_WEATHERS, TableBubbles, TableFood, WIRE_FOODS_MAX, ballProgress, bitesEpoch, createFlyState, decodeBites, decodeFlies, encodeFlies, everyoneIndex, everyoneName,
   isTableCode, mayReturnTo, mix, roomName, roomTime, spawnSpot, stream, tableHours, toWire, wireScale,
 } from "@fly/net";
 import type {
@@ -49,10 +49,9 @@ const BUSY: Readonly<Record<Going, number>> = { gust: 10, gull: 80, leaf: 40, bu
 
 /** A room open to everyone stays in each place this long (ms), then moves on to the next, by the wall clock: every server agrees where it is. */
 export const EVERYONE_TURN = 20 * 60_000;
-const TURNS = Object.keys(WORLDS);
 
 /** Where the rooms open to everyone are at this moment (ms since 1970). */
-export const everyonePlace = (wall: number) => TURNS[Math.floor(wall / EVERYONE_TURN) % TURNS.length];
+export const everyonePlace = (wall: number) => TABLE_PLACES[Math.floor(wall / EVERYONE_TURN) % TABLE_PLACES.length];
 
 /** The weather a room open to everyone has for its own goings-on: none of note, since each device there has its own sky. */
 const CALM = Object.freeze({ cloud: 0, mist: 0, rain: 0, wind: 0.4 });

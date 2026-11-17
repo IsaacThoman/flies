@@ -244,6 +244,21 @@ groom path is a stylised sweep.
   curved walks and backing, beyond the dimensional stance comparison.
 - A female variant (pointed, striped abdomen, no sex combs).
 
+## Measuring the gait
+
+From the repository root, `node packages/fly/scripts/gait.ts` reports sub-frame
+controller events. `node packages/fly/scripts/gait-solved.ts` measures the full
+rig's solved tarsal endpoints (the claw bases), using a height threshold for
+contact. It reports duty, swing/stance times, phase, body-relative excursions
+and world-relative successive-footprint stride, including turning and backing.
+The body-length assumption is 2.5 mm. The straight-walk stance comparison uses
+DeAngelis's power law; it is not a fit of every kinematic quantity.
+
+The default 1000 Hz sampling resolves short swings. `--fps 30` exposes display
+aliasing: a whole swing can occur between samples, so coarse excursion, stride
+and phase estimates must not be treated as biological measurements. The report
+states its contact threshold, coordinate frames and timing resolution.
+
 ## Movement references
 
 - Mendes et al. (2013), [Quantification of gait parameters](https://doi.org/10.7554/eLife.00231).

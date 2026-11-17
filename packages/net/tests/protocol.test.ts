@@ -65,7 +65,7 @@ test("a tabletop's state keeps its original bytes inside the protocol 4 batch", 
 });
 
 test("each place has the finest scale that holds it: a tabletop's for the four tables, a room's for the restaurant", () => {
-  for (const id of ["picnic", "windowsill", "lab", "bar"]) assert.deepEqual(wireScale(WORLDS[id]), { position: 50, pointer: 20, eye: 10 }, id);
+  for (const id of ["picnic", "windowsill", "lab", "bar", "greenhouse"]) assert.deepEqual(wireScale(WORLDS[id]), { position: 50, pointer: 20, eye: 10 }, id);
   assert.equal(wireScale(RESTAURANT), ROOM_SCALE);
 });
 

@@ -243,7 +243,7 @@ export class Game implements Shell {
   #awakeAt = -1;
   #datasetAt = 0;
   /** What the HUD last drew, to tell when it needs drawing again. */
-  #hudKey = { tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1, here: null as PlaceId | null, fixed: false, outside: false, surface: "", running: false, pressed: null as Readonly<Hit> | null };
+  #hudKey = { preview: -1, tool: -1, variant: -1, activity: "", food: null as string | null, following: false, touched: false, hints: false, eyes: false, taught: -1, here: null as PlaceId | null, fixed: false, outside: false, surface: "", running: false, pressed: null as Readonly<Hit> | null };
   #hudAt = 0;
   #changedAt = -10;
   #touched = false;
@@ -809,7 +809,7 @@ export class Game implements Shell {
       this.overlay.resize(frame);
       this.director.setAspect(frame.aspect);
     }
-    this.#hudLayout = hudLayout(frame);
+    this.#hudLayout = hudLayout(frame, !this.devices.pointing && this.settings.hints);
     this.#hud.layout = this.#hudLayout;
     this.#loadingLayout = loadingLayout(frame);
     this.eyes.layout(frame, this.#hudLayout);
@@ -822,6 +822,12 @@ export class Game implements Shell {
   /** Lays out the pictures in the corners for the screen and the size and stats chosen, if any has changed (or `now`). */
   #layCorners(now = false) {
     const { overlaySize, statsKind } = this.settings;
+    const reserveHints = !this.devices.pointing && this.settings.hints;
+    if (this.#hudLayout.reserveHints !== reserveHints) {
+      this.#hudLayout = hudLayout(this.display.frame, reserveHints);
+      this.#hud.layout = this.#hudLayout;
+      now = true;
+    }
     const laid = this.#laidOut;
     if (!now && laid.size === overlaySize && laid.kind === statsKind) return;
     laid.size = overlaySize;
@@ -1220,6 +1226,7 @@ export class Game implements Shell {
       this.inset.update(dt, waitFor(eyesWanted, this.corners, 0, this.inset, pictures), this.corners, opacity);
       this.nerves.update(dt, waitFor(nervesNow, this.corners, slot, this.nerves, pictures), this.corners, slot, opacity);
       const stats = this.#statsState;
+
       stats.spikes = this.meter.spikesPerSecond;
       stats.active = this.meter.active;
       stats.speed = this.meter.speed;
@@ -1936,6 +1943,7 @@ export class Game implements Shell {
       const life = this.life;
       const hud = this.#hud;
       hud.activity = life.activity;
+      hud.previewTool = this.#controls.previewTool;
       hud.here = this.#here;
       hud.food = life.senses.tasting.food?.name ?? null;
       hud.hints = this.settings.hints;
@@ -1953,8 +1961,9 @@ export class Game implements Shell {
       } else hud.eyes = null;
       const k = this.#hudKey;
       const pressedChanged = k.pressed !== hud.pressed;
-      const changed = pressedChanged || k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught || k.here !== hud.here || k.fixed !== this.hands.fixed.has(this.hands.current.id) || k.outside !== this.hands.outside || k.surface !== this.hands.surface || k.running !== hud.brainRunning;
+      const changed = pressedChanged || k.preview !== hud.previewTool || k.tool !== this.hands.tool || k.variant !== this.hands.variants[this.hands.tool] || k.activity !== hud.activity || k.food !== hud.food || k.following !== this.hands.following || k.touched !== this.#touched || k.hints !== hud.hints || k.eyes !== !!hud.eyes || k.taught !== this.#taught || k.here !== hud.here || k.fixed !== this.hands.fixed.has(this.hands.current.id) || k.outside !== this.hands.outside || k.surface !== this.hands.surface || k.running !== hud.brainRunning;
       if (changed || hud.changed < 0.3 || ((stats || !hud.brainRunning || needsTeaching(hud)) && this.time - this.#hudAt > 1 / HUD_SHIMMER_FPS)) {
+        k.preview = hud.previewTool;
         k.tool = this.hands.tool;
         k.variant = this.hands.variants[this.hands.tool];
         k.activity = hud.activity;
