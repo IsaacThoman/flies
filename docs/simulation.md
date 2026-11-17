@@ -404,6 +404,85 @@ show: rendering them for the picture would bring back the cost that setting
 saves, and it would no longer be what the brain is sent. It never shows on the
 title, over a menu, or while View → Fly's eyes is up.
 
+## A light on the table
+
+Fruit flies go to light: they walk and fly toward it, the basis of Benzer's
+countercurrent assay (1967, PNAS 58:1112) and of open-field phototaxis
+assays since. This fly doesn't, so the building kit has no lamp: a lamp that
+drew the fly to it would be the game pretending, and one it ignores is not
+the toy it was meant to be.
+
+`scripts/phototaxis.ts` measures it with the real brain, `Life`, senses and
+body, headless as the [behaviour scorecard](ethogram/README.md) is, and with
+its clock held at 06:00 as the scorecard holds it. The fly stands on an open
+table 300 mm across, in a steady scene at the luminances the game renders at
+dusk or at night (table and sky), adapted as the game adapts its picture
+(above), 20 pictures a second as the Low eyes take them. After 10 s a light
+comes on, square to the way it started facing, on its right or on its left:
+a bulb 3 mm across on a stand 4 mm high, or a glowing panel 20 mm across,
+10 mm up, the strongest light a table might hold. Each is as bright as the
+screen goes and lights the table under it as a point light would. Its light
+reaches the facets and nothing else: nothing turns, walks or draws the fly.
+Each run lasts 3 minutes and is paired with the same seed and side with the
+light off, which cancels the connectome's lean to the left (Spontaneous
+behaviour in `packages/brain/README.md`). With it off, the scene is the same
+at dusk and at night once adapted, and so is every spike. Seeds 1 to 8 (1 to
+4 for the bulb at 30 mm at night), both sides; each cell is the lit run minus
+its unlit pair, mean ± SD, and in brackets how many pairs went the light's way.
+Measured at `f8a9225` ([provenance](measurements.md)); at `e862fa6`, before
+the brain's neuromodulation and thermosensation, it came out the same:
+
+| Light | Pairs | Lamina, Hz (unlit: 0) | Turn toward it | Facing it | End distance, mm | Took off (unlit: never) |
+| --- | --- | --- | --- | --- | --- | --- |
+| bulb, dusk, 30 mm | 16 | 0.63 | +0.002 ± 0.014 (9) | −0.10 ± 0.15 (5) | +24 ± 50 (5 nearer) | 2 of 16 |
+| panel, dusk, 30 mm | 16 | 3.10 | +0.002 ± 0.013 (11) | −0.00 ± 0.14 (8) | +6 ± 70 (8 nearer) | 5 of 16 |
+| bulb, night, 30 mm | 8 | 0.77 | +0.004 ± 0.014 (6) | +0.06 ± 0.17 (4) | +8 ± 61 (5 nearer) | 1 of 8 |
+| bulb, night, 10 mm | 16 | 1.34 | −0.002 ± 0.017 (8) | −0.06 ± 0.16 (6) | +9 ± 55 (7 nearer) | 5 of 16 |
+
+"Turn toward it" is the brain's own turn command (DNa02, right minus left)
+signed toward the light's side, over the whole run; with the light off it
+averages 0.02 to 0.03, at the left lean's level. "Facing it" is the cosine of
+the light's bearing (1 facing it). The fly walks half the time, lit or
+not, and goes 900 mm or so in 3 minutes, past the light and away from it as
+it does past the place an unlit one would stand. Lit, it goes a little
+further (40 to 100 mm more, in 10 to 13 pairs of 16), in no particular
+direction.
+
+The eyes do see the light: the lamina, silent in a steady scene, fires each
+time the fly's own movement sweeps the light or its pool across the facets,
+and the ON pathway answers. But nothing downstream turns the fly toward the
+bright side. The input stage codes contrast, a change against the facet's
+recent mean (`packages/brain/README.md`, Seeing): a steady light, once
+adapted to, drives nothing. What it does drive comes as brightening and
+motion while the fly moves, and none of it moves DNa02 toward the light's
+side. The fly's phototaxis
+rests on what the model leaves out: colour, the eyes' light being what R1–R6
+alone catch with ultraviolet left out (The eyes, above), where the fly's
+phototaxis is strongest to ultraviolet, through the inner photoreceptors R7
+and R8 and their medulla targets Dm8 and Tm5 (Gao et al. 2008, Neuron 60:328;
+Karuppudurai et al. 2014, Neuron 81:603); and lasting levels of light (L1's
+sustained component). Whether the fly can go
+to a light waits on those, on the brain's side, and is worth measuring again
+with this script when they come.
+
+Brightening has one answer the fly shouldn't give: it takes the fly off,
+through LC4 (`packages/brain/README.md`, Seeing). The panel did it in 7 of
+16 runs, the bulb in 2 of 16 at dusk and 6 of 24 at night; with the light
+off, never.
+
+```sh
+# Dusk, 30 mm: both lights and the unlit control, seeds 1 to 8.
+node scripts/phototaxis.ts --out /tmp/phototaxis-dusk.json
+# Night: the bulb and the control, at 10 mm (seeds 1 to 8) and 30 mm (1 to 4).
+node scripts/phototaxis.ts --scene night --distance 10 --conditions bulb-right,bulb-left,off-right,off-left --out /tmp/phototaxis-night10.json
+node scripts/phototaxis.ts --scene night --distance 30 --seeds 1,2,3,4 --conditions bulb-right,bulb-left,off-right,off-left --out /tmp/phototaxis-night30.json
+# Runs side by side, read together: the paired differences above.
+node scripts/phototaxis.ts --summarise /tmp/phototaxis-dusk.json /tmp/phototaxis-night10.json /tmp/phototaxis-night30.json
+```
+
+Each run takes a heavy slot as the scorecard does (`/tmp/flies-heavy`) and
+costs about 0.19 s of CPU per simulated second on an M5 Pro, about 37 s a run.
+
 <!-- docs-check: base apps/web/src -->
 
 <!-- docs-check: base packages/body/src -->
