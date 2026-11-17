@@ -31,7 +31,7 @@
 // Adding --greedy builds a set instead: starting from nothing, it adds the
 // value that raises the target's rate most when driven together with those
 // already chosen, and stops when no value adds at least 1 Hz. That is how
-// io.ts's SWEET_TYPES were chosen.
+// `sweet`'s types were chosen before they were chosen by what they are (README, Senses).
 
 import { parseArgs } from "node:util";
 import type { Connectome, NeuronQuery } from "../src/format.ts";

@@ -43,7 +43,8 @@ export type Synthetic = { bytes: Uint8Array; index: Record<string, number[]>; ne
 /**
  * Every group the brain needs, a few neurons each, with:
  * looming detectors -> giant fiber -> flight motor neurons; head bristles ->
- * MDN; wind JO -> DNg12; sweet taste -> MN9; a male's taste on the front
+ * MDN; wind JO -> DNg12; sweet taste -> MN9; bitter taste -> an inhibitory
+ * interneuron -> MN9; water taste -> nothing; a male's taste on the front
  * legs -> pIP10; the wings' campaniform sensilla -> the flight motor neurons;
  * each eye's LC10a -> that side's
  * DNa02 and DNg100. Each eye also has four columns of L1, L2 and L3 (see
@@ -77,6 +78,7 @@ export function syntheticConnectome({ without = [], change = {} }: { without?: r
   add("bristle", 6, { type: "SNta02", superClass: "vnc_sensory", class: "mechanosensory_tactile", subClass: "mechanosensory_bristle", nt: "ACH" });
   add("sweet", 4, { type: "dorsal_tpGRN", superClass: "cb_sensory", class: "gustatory", side: "left", nt: "ACH" });
   add("bitter", 4, { type: "LB1a", superClass: "cb_sensory", class: "gustatory", side: "left", nt: "ACH" });
+  add("water", 2, { type: "LB3a", superClass: "cb_sensory", class: "gustatory", side: "left", nt: "ACH" });
   add("campaniform", 4, { type: "SNpp53", superClass: "vnc_sensory", class: "mechanosensory_proprioceptive", subClass: "campaniform_sensilla", nt: "ACH" });
   add("wing campaniform", 3, { type: "SApp10", superClass: "sensory_ascending", class: "mechanosensory_proprioceptive", subClass: "campaniform_sensilla", nt: "ACH" });
   add("DNg100", 2, { type: "DNg100", superClass: "descending_neuron", side: "left", nt: "ACH" });

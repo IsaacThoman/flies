@@ -102,6 +102,21 @@ test("grounded drives the legs' load sensors, and wingbeat every other campanifo
   assert.equal(senseRates(wiring, { ...RESTING_SENSES, wingbeat: 0.5 }).get("wingbeat"), WINGBEAT_RATE / 2);
 });
 
+test("the mouth's taste: sweet, bitter and water each drive their own types, bitter and water added after the eyes", () => {
+  const wiring = wire(load());
+  const neurons = (sense: string) => [...wiring.senses.find((s) => s.spec.sense === sense)!.neurons];
+  assert.deepEqual(neurons("sweet"), synthetic.index["sweet"]);
+  assert.deepEqual(neurons("bitter"), synthetic.index["bitter"]);
+  assert.deepEqual(neurons("water"), synthetic.index["water"]);
+  assert.deepEqual(
+    SENSES.filter((s) => s.afterEyes).map((s) => s.sense),
+    ["maleTaste", "wingbeat", "bitter", "water"],
+  );
+  const rates = senseRates(wiring, { ...RESTING_SENSES, bitter: 0.5, water: 2 });
+  assert.equal(rates.get("bitter"), 50);
+  assert.equal(rates.get("water"), 100);
+});
+
 test("balancing turns down the side whose neurons make more synapses", () => {
   const c = load();
   const left = synthetic.index["LC10a left"];
@@ -191,6 +206,8 @@ test("createBrain runs the synthetic connectome end to end", () => {
   assert.ok(loom.command.wings > 0.1, `wings ${loom.command.wings}`);
   assert.ok(loom.stats.rates.DNp01 > 50);
   assert.ok(run({ sweet: 1 }).command.feed > 0.3);
+  // In the synthetic wiring bitter reaches MN9 only through an inhibitory interneuron.
+  assert.ok(run({ sweet: 1, bitter: 1 }).stats.rates.MN9 < run({ sweet: 1 }).stats.rates.MN9);
   assert.ok(run({ touch: 1 }).command.back > 0.3);
   assert.ok(run({ wind: 1 }).command.groom > 0.3);
   assert.ok(run({ maleTaste: 1 }).command.sing > 0.3);

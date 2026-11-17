@@ -42,7 +42,8 @@ test("with the eyes shut the brain is what it was before it had eyes, wherever n
   // on the commit before the eyes were added (b373345), and again, with the
   // columnar synapses at 1 as they were then, when Johnston's organ's right
   // half was made to count as much as its left (it changes wind and bump) and
-  // when `grounded` was narrowed to the legs' load sensors (it changes rest):
+  // when `grounded` was narrowed to the legs' load sensors (it changes rest)
+  // and when `sweet` was given the mouth's sugar neurons by what they are:
   // the same as a brain built without eyes, the columnar synapses at 1.
   const b = new FlyBrain(connectome!, { seed: 1 });
   const phases = [
@@ -61,7 +62,7 @@ test("with the eyes shut the brain is what it was before it had eyes, wherever n
       hash = (Math.imul(hash, 31) + spikes) >>> 0;
     }
   }
-  assert.deepEqual({ total, hash }, { total: 469326, hash: 1682535622 });
+  assert.deepEqual({ total, hash }, { total: 460567, hash: 2187919625 });
 });
 
 test("a dark disc looming at an eye fires the giant fiber through the optic lobe; a passing dot or a receding disc doesn't", { skip }, () => {
@@ -181,7 +182,7 @@ test("no seizures: after a loom, a drifting grating or a flicker, alone and with
   reference.show(() => 1, 2000);
   let band = 0;
   for (let w = 0; w < 120; w++) band = Math.max(band, windowRate(reference.show, 1));
-  const everything: BrainSenses = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1 };
+  const everything: BrainSenses = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1 };
   for (const name of ["loom right fast", "grating, clockwise", "flicker"]) {
     for (const others of [RESTING_SENSES, everything]) {
       const s = stimulus(name);

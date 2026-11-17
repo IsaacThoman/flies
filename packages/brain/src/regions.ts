@@ -172,11 +172,11 @@ export const REGIONS: readonly Region[] = [
   {
     id: "mouthparts",
     name: "Taste and touch of the mouthparts",
-    description: "Taste neurons of the labellum's bristles and taste pegs and of the pharynx, and the mouthparts' touch neurons (TPMN, aPhM). `sweet` drives nine of the taste types.",
+    description: "Taste neurons of the labellum's bristles and taste pegs and of the pharynx, and the mouthparts' touch neurons (TPMN, aPhM). `sweet`, `bitter` and `water` drive the types matched to those tastes' receptors.",
     place: "the proboscis on the underside of the head, on the midline: the labellum at its tip and the pharynx inside; their axons go to the subesophageal zone",
     side: "midline",
     neurons: 374,
-    fullHz: 22,
+    fullHz: 29,
   },
   {
     id: "head-sensory-other",
@@ -282,7 +282,7 @@ export const REGIONS: readonly Region[] = [
     place: "the subesophageal zone at the bottom of the brain, both sides; axons out through the head's nerves, most to the proboscis",
     side: "both",
     neurons: 107,
-    fullHz: 38,
+    fullHz: 30,
   },
   {
     id: "brain-endocrine",

@@ -14,7 +14,7 @@ import type { BrainSenses } from "./types.ts";
 const skip = existsSync(DEFAULT_CONNECTOME_PATH) ? false : `no ${DEFAULT_CONNECTOME_PATH}; run npm run brain:pack`;
 const connectome = skip ? undefined : readConnectomeFile();
 const TICK = 16;
-const FULL: BrainSenses = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1 };
+const FULL: BrainSenses = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1 };
 const SAMPLES = 5;
 
 const run = (b: FlyBrain, ms: number, senses: BrainSenses, meter?: CpuMeter) => {

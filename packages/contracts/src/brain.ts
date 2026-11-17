@@ -60,6 +60,8 @@ export const SENSE_ORDER = [
   "clockSleep",
   "sleepPressure",
   "sleepDepth",
+  "bitter",
+  "water",
 ] as const;
 /** The order commands come back in from the native brain. */
 export const COMMAND_ORDER = ["walk", "turn", "back", "escape", "wings", "groom", "feed", "sing"] as const;

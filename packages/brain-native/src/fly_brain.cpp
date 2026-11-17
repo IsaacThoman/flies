@@ -111,6 +111,8 @@ int tick(fly_brain* brain, double dt_ms, const fly_senses* senses, const Light& 
     in.state[fly::io::kClockSleep] = senses->clock_sleep;
     in.state[fly::io::kSleepPressure] = senses->sleep_pressure;
     in.state[fly::io::kSleepDepth] = senses->sleep_depth;
+    in.bitter = senses->bitter;
+    in.water = senses->water;
     fly::TickStats out;
     const fly::io::Command c = brain->brain.tick(dt_ms, in, light, out);
     if (command != nullptr) {

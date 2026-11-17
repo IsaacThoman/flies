@@ -17,7 +17,7 @@
 namespace fly::io {
 
 /** The senses that are one intensity each (types.ts's BrainSenses less light). */
-enum Sense : uint8_t { kLoomLeft, kLoomRight, kTouch, kBumpLeft, kBumpRight, kWind, kSweet, kGrounded, kMaleTaste, kWingbeat, kSenseCount };
+enum Sense : uint8_t { kLoomLeft, kLoomRight, kTouch, kBumpLeft, kBumpRight, kWind, kSweet, kGrounded, kMaleTaste, kWingbeat, kBitter, kWater, kSenseCount };
 
 /** The internal state that comes with the senses (types.ts's STATE_KEYS), 0 to 1 each. */
 enum StateKey : uint8_t { kClockMorning, kClockEvening, kClockSleep, kSleepPressure, kSleepDepth, kStateCount };
@@ -31,6 +31,7 @@ struct Senses {
   double wingbeat = 0;
   /** In StateKey's order; 0, left out. */
   double state[kStateCount] = {};
+  double bitter = 0, water = 0;
 };
 
 struct Command {

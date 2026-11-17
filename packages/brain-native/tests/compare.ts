@@ -90,7 +90,7 @@ export type Tick = { dt: number; senses: BrainSenses; what: string };
 /** Columns for the eyes in place of eye-columns.ts's (runtime.ts's eyeColumns option). */
 export type Columns = { readonly right: readonly EyeColumn[]; readonly left: readonly EyeColumn[] };
 
-const SCALAR = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet", "maleTaste", "wingbeat"] as const;
+const SCALAR = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet", "maleTaste", "wingbeat", "bitter", "water"] as const;
 type Scalar = (typeof SCALAR)[number];
 /** The internal state, after the senses in the harness's line, in fly_senses's order. */
 const STATE = ["clockMorning", "clockEvening", "clockSleep", "sleepPressure", "sleepDepth"] as const;
@@ -140,7 +140,8 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     hold(2000, 16, (t) => ({ sweet: 0.6, hunger: t / 2000 }), "weak sugar as hunger rises");
     hold(500, 16, (t) => ({ sweet: 0.5, hunger: [Number.NaN, -1, 7, Number.NEGATIVE_INFINITY][Math.floor(t / 125)] }), "out-of-range hunger");
     hold(1000, 16, () => ({ loomLeft: 1, loomRight: 1 }), "looming on both sides");
-    hold(2000, 16, () => ({ loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, maleTaste: 1, wingbeat: 1 }), "everything at once");
+    hold(1500, 16, () => ({ sweet: 1, bitter: 0.5 }), "sugar laced with something bitter");
+    hold(2000, 16, () => ({ loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1 }), "everything at once");
     hold(4000, 16, (t) => ({ loomRight: t % 1000 < 100 ? 1 : 0 }), "a looming pulse every second");
     hold(3000, () => Math.floor(random() * 50 * 4) / 4, () => Object.fromEntries(SCALAR.map((s) => [s, random() < 0.3 ? random() : 0])), "random ticks and senses");
     for (const dt of [0.4, 0.6, 0.25, 0, 0, 0.75, 1, 1.5, 2.5]) add(dt, { touch: 0.3 }, "short ticks");

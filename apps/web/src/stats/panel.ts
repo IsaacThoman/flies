@@ -54,6 +54,8 @@ const SENSES = [
   ["bumpRight", "Antenna R"],
   ["wind", "Wind"],
   ["sweet", "Sweet"],
+  ["bitter", "Bitter"],
+  ["water", "Water"],
   ["grounded", "On legs"],
   ["maleTaste", "Male taste"],
   ["wingbeat", "Wingbeat"],

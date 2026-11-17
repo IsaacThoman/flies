@@ -602,8 +602,10 @@ export const RESTAURANT_PATCHES: readonly FoodPatch[] = [
   // The bread basket's crumbs, and those brushed onto the table.
   { name: "crumbs", x: BREAD.x - 60, z: BREAD.z + 20, y: TABLE + BREAD.well, r: 14, sweet: 0.3 },
   { name: "crumbs", x: 1070, z: 2240, y: TABLE, r: 10, sweet: 0.3 },
-  // Sugar left in the bottom of an espresso cup.
-  { name: "espresso", x: ESPRESSO.x, z: ESPRESSO.z, y: TABLE + ESPRESSO.saucer.well + ESPRESSO.cup.well, r: 10, sweet: 0.9 },
+  // Sugar left in the bottom of an espresso cup, in the coffee's dregs: bitter as
+  // anything here, for an espresso has about 10 mM of caffeine, more as the dregs
+  // dry, which flies' bitter taste neurons answer and flies avoid (Moon et al. 2006).
+  { name: "espresso", x: ESPRESSO.x, z: ESPRESSO.z, y: TABLE + ESPRESSO.saucer.well + ESPRESSO.cup.well, r: 10, sweet: 0.9, bitter: 1 },
   // At the bar: the bruised peach in the fruit bowl, the cut lemon, orange juice and lemonade left in two glasses, syrup on the bar mat, crumbs of cake at the edge of its plate.
   { name: "peach", x: ON_BAR.peach.x + 4, z: ON_BAR.peach.z - 4, y: ZINC + ON_BAR.bowl.well + ON_BAR.peach.r * 1.9, r: 10, sweet: 0.9 },
   ...ON_BAR.slices.map((s): FoodPatch => ({ name: "lemon", x: s.x, z: s.z, y: ZINC + ON_BAR.board.thick + ON_BAR.sliceThick, r: 10, sweet: 0.3 })),

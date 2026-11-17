@@ -6,7 +6,7 @@
 // room last heard from it. So two flies at the same sugar eat it down
 // together, and between them never eat more than there was.
 
-import { EAT_RATE, FOODS, MAX_DROPPED, PATCH_RECOVERY, TASTE_HEIGHT } from "@fly/world";
+import { EAT_RATE, FOODS, MAX_DROPPED, PATCH_RECOVERY, TASTE_HEIGHT, otherTastes } from "@fly/world";
 import type { Food, FoodKind, FoodPatch, Pantry, World } from "@fly/world";
 import type { FoodWire } from "./protocol.ts";
 import { FOUND_ID, dropOwner, seqAtOrAfter } from "./protocol.ts";
@@ -27,7 +27,8 @@ export const toWire = (f: Food): FoodWire => [f.id, f.kind, f.name, f.x, f.z, f.
 /** A food as the room has it, at the height it lies at (the highest surface there, kept before foods had one). */
 export function fromWire(world: World, w: FoodWire): Food {
   const [id, kind, name, x, z, r, sweet, amount, pool, y] = w;
-  return { id, kind: kind as Food["kind"], name, x, y: typeof y === "number" && Number.isFinite(y) ? y : world.heightAt(x, z), z, r, sweet, amount, pool: pool === 1 };
+  const { water, bitter } = otherTastes(world.place.patches, id, kind, name);
+  return { id, kind: kind as Food["kind"], name, x, y: typeof y === "number" && Number.isFinite(y) ? y : world.heightAt(x, z), z, r, sweet, water, bitter, amount, pool: pool === 1 };
 }
 
 /** What a bite came to. */
@@ -65,7 +66,7 @@ export class TableFood {
     this.#expires.clear();
     this.#changed.clear();
     // Numbered 1 upward, in order: the place's patches are always the same food.
-    patches.forEach((p, i) => this.foods.push({ id: i + 1, kind: "patch", name: p.name, x: p.x, y: this.#world.heightAt(p.x, p.z, p.y), z: p.z, r: p.r, sweet: p.sweet, amount: 1, pool: p.pool ?? false }));
+    patches.forEach((p, i) => this.foods.push({ id: i + 1, kind: "patch", name: p.name, x: p.x, y: this.#world.heightAt(p.x, p.z, p.y), z: p.z, r: p.r, sweet: p.sweet, water: p.water ?? 0, bitter: p.bitter ?? 0, amount: 1, pool: p.pool ?? false }));
   }
 
   /** The food as it was kept (a restarted room). */
@@ -99,7 +100,7 @@ export class TableFood {
     const dropped = this.foods.filter((f) => f.kind !== "patch" && f.kind !== "found");
     if (dropped.length >= MAX_DROPPED) this.#remove(dropped[0]);
     const spec = FOODS[kind as FoodKind];
-    const food: Food = { id, kind: kind as FoodKind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, amount: 1, pool: false };
+    const food: Food = { id, kind: kind as FoodKind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, water: spec.water, bitter: spec.bitter, amount: 1, pool: false };
     this.foods.push(food);
     return food;
   }
@@ -119,7 +120,7 @@ export class TableFood {
     if (!Number.isFinite(lasts) || !(lasts > 0 && lasts <= FOUND_LASTS)) return null;
     const found = this.foods.filter((f) => f.kind === "found");
     if (found.length >= MAX_FOUND) this.#remove(found[0]);
-    const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, amount: 1, pool: false };
+    const food: Food = { id, kind: "found", name, x, y: this.#world.heightAt(x, z, y), z, r, sweet, water: 0, bitter: 0, amount: 1, pool: false };
     this.foods.push(food);
     this.#expires.set(id, this.#wall() + lasts * 1000);
     return food;

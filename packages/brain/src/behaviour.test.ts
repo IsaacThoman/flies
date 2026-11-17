@@ -32,7 +32,7 @@ const mean = (b: FlyBrain, ms: number, senses: BrainSenses) => {
   }
   return Object.fromEntries(Object.entries(sum).map(([k, v]) => [k, v / n])) as BrainCommand;
 };
-const FULL: BrainSenses = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1 };
+const FULL: BrainSenses = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1 };
 const only = (key: keyof BrainSenses): BrainSenses => ({ ...RESTING_SENSES, [key]: FULL[key] });
 const SENSES = Object.keys(FULL) as (keyof BrainSenses)[];
 
@@ -47,10 +47,12 @@ test("every group finds its neurons in the real connectome, and none is both dri
     bumpLeft: 203,
     bumpRight: 132,
     wind: 475,
-    sweet: 88,
+    sweet: 52,
     grounded: 13,
     maleTaste: 44,
     wingbeat: 413,
+    bitter: 38,
+    water: 23,
     "background left": 4424,
     "background right": 4466,
     DNg100: 2,
@@ -157,22 +159,38 @@ test("left and right mirror each other: either eye's loom escapes alike, and a s
 });
 
 test("a fed fly leaves alone sugar that a starved one feeds on", { skip }, () => {
-  // Sugar at 0.5 for 3 s after 2 s of rest, seeds 1 to 3: the body feeds above 0.15. Measured: fed 0.10 to 0.14, starved
-  // 0.22 to 0.25. At 0.6 a fed fly feeds (0.16 to 0.18) since `grounded` stopped driving the wings' sensors at rest.
+  // Sugar at 0.8 for 3 s after 2 s of rest, seeds 1 to 3: the body feeds above 0.15. Measured since `sweet` drives the
+  // mouth's sugar neurons by what they are: fed 0.06 to 0.10, starved 0.16 to 0.19.
   const feed = (hunger: number) => {
     let sum = 0;
     for (const seed of [1, 2, 3]) {
       const b = new FlyBrain(connectome!, { seed });
       run(b, 2000, { ...RESTING_SENSES, hunger });
-      sum += mean(b, 3000, { ...RESTING_SENSES, sweet: 0.5, hunger }).feed;
+      sum += mean(b, 3000, { ...RESTING_SENSES, sweet: 0.8, hunger }).feed;
     }
     return sum / 3;
   };
   const fed = feed(0);
   const starved = feed(1);
-  assert.ok(starved > 0.2, `starved ${starved}`);
-  assert.ok(fed < 0.15, `fed ${fed}`);
+  assert.ok(starved > 0.15, `starved ${starved}`);
+  assert.ok(fed < 0.12, `fed ${fed}`);
   assert.ok(fed < 0.6 * starved, `fed ${fed} against starved ${starved}`);
+});
+
+test("bitter on sugar stops the proboscis; water alone doesn't move it", { skip }, () => {
+  const feed = (senses: Partial<BrainSenses>) => {
+    let sum = 0;
+    for (const seed of [1, 2, 3]) {
+      const b = new FlyBrain(connectome!, { seed });
+      run(b, 2000);
+      sum += mean(b, 3000, { ...RESTING_SENSES, ...senses }).feed;
+    }
+    return sum / 3;
+  };
+  const sugar = feed({ sweet: 1 });
+  assert.ok(sugar > 0.2, `sugar ${sugar}`);
+  assert.ok(feed({ sweet: 1, bitter: 0.25 }) < 0.05);
+  assert.ok(feed({ water: 1 }) < 0.02);
 });
 
 test("touch makes it back away, wind or a push on either antenna makes it groom, sweet makes it feed, and looming opens the wings", { skip }, () => {

@@ -100,7 +100,7 @@ function wiring() {
 
 const SETTLE_MS = 2000;
 const DRIVE_MS = 1000;
-const REST: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0, wingbeat: 0 };
+const REST: BrainSenses = { loomLeft: 0, loomRight: 0, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0, sweet: 0, grounded: true, maleTaste: 0, wingbeat: 0, bitter: 0, water: 0 };
 
 function simulate(label: string, driven: { name: string; side: Side }[]) {
   const means: Record<string, number[]> = {};

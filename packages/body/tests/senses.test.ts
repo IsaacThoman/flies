@@ -121,6 +121,22 @@ test("it tastes sugar with its feet and its mouth, only while on its feet", () =
   assert.equal(m.tasting.byMouth, true);
 });
 
+test("it tastes water and bitterness as it tastes sugar: plain water as water, sugar as not, coffee's dregs as bitter", () => {
+  const table = openTable(300);
+  const pantry = new Pantry(table, [
+    { name: "water", x: 0, z: 0, r: 3, sweet: 0, water: 1, pool: true },
+    { name: "espresso", x: 100, z: 0, r: 3, sweet: 0.9, bitter: 1 },
+  ]);
+  const at = (x: number) => new SenseTracker().update({ ...input(new FlyBody(table, { x, z: 0, yaw: 0 })), world: table, pantry });
+  assert.deepEqual([at(0).water, at(0).bitter, at(0).sweet], [1, 0, 0]);
+  assert.deepEqual([at(100).water, at(100).bitter, at(100).sweet], [0, 1, 0.9]);
+  assert.deepEqual([at(-100).water, at(-100).bitter], [0, 0]);
+  // A dropped drop of water is water.
+  const dropped = new Pantry(table);
+  dropped.drop("water", 50, 50);
+  assert.equal(new SenseTracker().update({ ...input(new FlyBody(table, { x: 50, z: 50, yaw: 0 })), world: table, pantry: dropped }).water, 1);
+});
+
 test("wind is its own speed through the air; touch follows a stroke and eases out", () => {
   const body = new FlyBody(openTable(300), { x: 0, z: 0, yaw: 0 });
   const tracker = new SenseTracker();

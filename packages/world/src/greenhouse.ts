@@ -45,7 +45,7 @@ export const GREENHOUSE_PATCHES: readonly FoodPatch[] = [
   { name: "fig flesh", x: 20, z: 56, r: 12, sweet: 0.95 },
   { name: "tomato juice", x: -14, z: 8, r: 6, sweet: 0.72 },
   ...Array.from({length: 4},(_,i) => ({name: "tomato juice",x:-30+i*4,z:-5+i*3,r:1.4+i*0.15,sweet:0.72})),
-  { name: "water", x: SAUCER.x, z: SAUCER.z, r: 31, sweet: 0.05, pool: true },
+  { name: "water", x: SAUCER.x, z: SAUCER.z, r: 31, sweet: 0.05, water: 1, pool: true },
 ];
 export const GREENHOUSE: Place = {
   floor: { kind: "rect", ...GREENHOUSE_BENCH }, solids: GREENHOUSE_SOLIDS, patches: GREENHOUSE_PATCHES,
