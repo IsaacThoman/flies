@@ -22,7 +22,7 @@ import { WeatherNow } from "../src/scene/weather.ts";
 import { Builder } from "../src/tools/build.ts";
 
 const DT = 1 / 60;
-const FRAMES = 1800;
+const FRAMES = 9000;
 const SAMPLES = 5;
 
 /** A brain that walks the fly round in a slow circle, so that it meets what is built: its command always fresh at the frames' own clock. */
@@ -94,7 +94,7 @@ function kit(full: boolean) {
     for (let i = 0; i < FRAMES; i++) {
       frame(at++ * 16);
       // Few laps, each long: a frame with nothing built is a few microseconds, so laps of 60 held under a millisecond of work beside each reference.
-      if (i % 300 === 299) meter.lap();
+      if (i % 1500 === 1499) meter.lap();
     }
     return { ms: meter.ms / FRAMES, raw: meter.rawMs / FRAMES, references: meter.references };
   };

@@ -54,7 +54,8 @@
 // and indexers together at up to three), which a retry a second later meets
 // again: so each attempt first waits for a second in which the others keep under
 // QUIET_CORES busy, up to a minute in CI and three seconds locally, where the
-// others are usually there for good.
+// others are usually there for good, then runs the reference for 50 ms to bring
+// the core back up before measuring.
 //
 // Three contended attempts skip locally with an explicit rerun message; in CI
 // they fail with that reason. Functional assertions
@@ -211,6 +212,9 @@ export async function measureBudget<T>(t: BudgetContext, measure: () => Measurem
     // A shared machine is busy in bursts, so a retry a moment later would land in the same one. Locally the
     // others are usually there for good, and a short wait spares rerunning by hand.
     await untilQuiet(watch, wait, ci ? 60 : 3);
+    // A core left idle through the wait comes back slow and its caches cold, which spread the first sample after it
+    // to twice the others on the CI runner.
+    for (const until = threadMs() + 50; threadMs() < until; ) reference();
     const others = watch();
     const measured = measure();
     const busy = contention(measured, ci, others());
