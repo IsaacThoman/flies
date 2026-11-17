@@ -19,6 +19,9 @@ const TYPE: Record<TextKind, string> = { name: "text", password: "password", "ne
 /** What a password manager is to make of it: nothing to fill or keep, a password to fill, or one to keep. */
 const AUTOCOMPLETE: Record<TextKind, string> = { name: "off", password: "current-password", "new-password": "new-password", code: "off" };
 
+/** Field limits match the server's code points; DOM selections still use UTF-16 offsets. */
+const limitText = (value: string, max: number) => [...value].slice(0, max).join("");
+
 export class BrowserTextEntry implements TextEntry {
   active: string | null = null;
   value = "";
@@ -27,9 +30,21 @@ export class BrowserTextEntry implements TextEntry {
   /** What the field held when typing began, to go back to on Escape. */
   #before = "";
   #input: HTMLInputElement | null = null;
+  #max = 0;
+  #composing = false;
   readonly #sync = () => {
     const input = this.#input;
     if (!input || !this.active) return;
+    if (!this.#composing) {
+      const limited = limitText(input.value, this.#max);
+      if (limited !== input.value) {
+        const start = Math.min(input.selectionStart ?? limited.length, limited.length);
+        const end = Math.min(input.selectionEnd ?? limited.length, limited.length);
+        const direction = input.selectionDirection ?? "none";
+        input.value = limited;
+        input.setSelectionRange(start, end, direction);
+      }
+    }
     this.value = input.value;
     this.caret = input.selectionEnd ?? input.value.length;
   };
@@ -60,6 +75,11 @@ export class BrowserTextEntry implements TextEntry {
       this.#sync();
     });
     input.addEventListener("keypress", own);
+    input.addEventListener("compositionstart", () => { this.#composing = true; });
+    input.addEventListener("compositionend", () => {
+      this.#composing = false;
+      this.#sync();
+    });
     input.addEventListener("input", this.#sync);
     input.addEventListener("select", this.#sync);
     document.addEventListener("selectionchange", this.#sync);
@@ -76,7 +96,10 @@ export class BrowserTextEntry implements TextEntry {
     input.autocomplete = AUTOCOMPLETE[request.kind] as AutoFill;
     input.autocapitalize = request.kind === "name" ? "sentences" : "none";
     input.name = request.id;
-    input.maxLength = request.max;
+    // maxlength counts UTF-16 units and can reject a valid password before the server would.
+    input.removeAttribute("maxlength");
+    this.#max = request.max;
+    this.#composing = false;
     input.value = request.value;
     this.#before = request.value;
     this.value = request.value;
@@ -89,6 +112,7 @@ export class BrowserTextEntry implements TextEntry {
 
   end() {
     if (!this.active) return;
+    this.#composing = false;
     this.#sync();
     this.active = null;
     this.#input?.blur();
@@ -96,6 +120,7 @@ export class BrowserTextEntry implements TextEntry {
 
   #finish(how: "done" | "cancel") {
     if (!this.active) return;
+    this.#composing = false;
     this.#sync();
     if (how === "cancel") this.value = this.#before;
     this.active = null;
@@ -136,7 +161,7 @@ export class NativeTextEntry implements TextEntry {
     this.#ended = null;
     this.#bridge.ask(request.label ?? request.id, request.value, request.kind, (text) => {
       if (asked !== this.#asked) return;
-      if (text !== null) this.value = text.slice(0, request.max);
+      if (text !== null) this.value = limitText(text, request.max);
       this.caret = this.value.length;
       this.active = null;
       this.#ended = text === null ? "cancel" : "done";
