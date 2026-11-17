@@ -584,9 +584,28 @@ export function regionIdOf(n: Annotations): string {
 export function regionOf(connectome: Connectome): Uint8Array {
   const { superClass, class: klass, subClass, type, side } = connectome.columns;
   const out = new Uint8Array(connectome.neurons);
-  for (let i = 0; i < connectome.neurons; i++) {
-    const id = regionIdOf({ superClass: superClass.value(i), class: klass.value(i), subClass: subClass.value(i), type: type.value(i), side: side.value(i) });
-    out[i] = INDEX.get(id)!;
+  // A region follows from the annotations alone, and few neurons' differ:
+  // 24,000 sets among 167,000 neurons, about two to a type. So each type keeps
+  // a list of the sets of its neurons' other annotations, with their regions.
+  const n = connectome.neurons;
+  const first = new Int32Array(type.table.length).fill(-1);
+  const others = new Int32Array(n);
+  const regions = new Uint8Array(n);
+  const next = new Int32Array(n);
+  let sets = 0;
+  for (let i = 0; i < n; i++) {
+    const t = type.codes[i];
+    const rest = ((superClass.codes[i] * klass.table.length + klass.codes[i]) * subClass.table.length + subClass.codes[i]) * side.table.length + side.codes[i];
+    let k = first[t];
+    while (k >= 0 && others[k] !== rest) k = next[k];
+    if (k < 0) {
+      k = sets++;
+      others[k] = rest;
+      regions[k] = INDEX.get(regionIdOf({ superClass: superClass.value(i), class: klass.value(i), subClass: subClass.value(i), type: type.value(i), side: side.value(i) }))!;
+      next[k] = first[t];
+      first[t] = k;
+    }
+    out[i] = regions[k];
   }
   return out;
 }

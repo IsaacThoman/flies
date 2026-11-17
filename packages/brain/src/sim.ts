@@ -173,6 +173,7 @@ export class Simulation {
   #watched: Uint8Array;
   #watchPtr = new Uint32Array(0);
   #watchIds = new Uint32Array(0);
+  #watchStale = false;
 
   // Which part of a partition each neuron is in, and each part's spikes since the last drain.
   #partOf: Uint8Array | null = null;
@@ -289,12 +290,28 @@ export class Simulation {
     const post = this.#post;
     const count = this.#count;
     const weight = this.#weight;
+    // A muted neuron's every weight is its gain's zero, sign and all, when no count is negative or not a number.
+    const unsigned = count instanceof Uint16Array;
     for (let i = 0; i < n; i++) {
       const gi = gain[i];
+      const start = ptr[i];
+      const end = ptr[i + 1];
+      if (gi === 0 && unsigned) {
+        weight.fill(gi, start, end);
+        this.#silent[i] = 1;
+        continue;
+      }
       let silent = 1;
-      for (let e = ptr[i], end = ptr[i + 1]; e < end; e++) {
-        weight[e] = postScale ? count[e] * gi * postScale[post[e]] : count[e] * gi;
-        if (weight[e] !== 0) silent = 0;
+      if (postScale) {
+        for (let e = start; e < end; e++) {
+          weight[e] = count[e] * gi * postScale[post[e]];
+          if (weight[e] !== 0) silent = 0;
+        }
+      } else {
+        for (let e = start; e < end; e++) {
+          weight[e] = count[e] * gi;
+          if (weight[e] !== 0) silent = 0;
+        }
       }
       this.#silent[i] = silent;
     }
@@ -533,7 +550,12 @@ export class Simulation {
     const counts = new Uint32Array(this.#readoutNames.length);
     counts.set(this.#readoutCounts);
     this.#readoutCounts = counts;
-    // Neuron -> readouts, as CSR.
+    this.#watchStale = true;
+  }
+
+  // Neuron -> readouts, as CSR: made when spikes are next counted, not once per readout added.
+  #indexReadouts() {
+    this.#watchStale = false;
     const n = this.neurons;
     const ptr = new Uint32Array(n + 1);
     for (const members of this.#readoutMembers) for (const i of members) ptr[i + 1]++;
@@ -802,6 +824,7 @@ export class Simulation {
     const recording = this.#recording;
     if (recording !== null) for (let k = 0; k < fired; k++) recording[out[k]]++;
     if (this.#readoutNames.length > 0) {
+      if (this.#watchStale) this.#indexReadouts();
       const watched = this.#watched;
       const watchPtr = this.#watchPtr;
       const watchIds = this.#watchIds;
@@ -850,6 +873,14 @@ export class Simulation {
   }
 
   #members(neurons: ArrayLike<number>, what: string) {
+    // The usual case, indices already whole and unsigned, without a set and a comparator.
+    if (neurons instanceof Uint32Array) {
+      const sorted = neurons.slice().sort();
+      let unique = 0;
+      for (let k = 0; k < sorted.length; k++) if (k === 0 || sorted[k] !== sorted[k - 1]) sorted[unique++] = sorted[k];
+      if (unique > 0 && sorted[unique - 1] >= this.neurons) throw new Error(`${what}: no neuron ${sorted.find((i) => i >= this.neurons)}`);
+      return sorted.slice(0, unique);
+    }
     const unique = [...new Set(Array.from(neurons))].sort((a, b) => a - b);
     for (const i of unique) if (!Number.isInteger(i) || i < 0 || i >= this.neurons) throw new Error(`${what}: no neuron ${i}`);
     return Uint32Array.from(unique);
