@@ -21,6 +21,7 @@
 //   wheel:<x>,<y>:<dy>[:ctrl|:<dx>] the wheel there (ctrl: a trackpad's pinch; a number: scrolled across too)
 //   tap:<x>,<y>[:<ms>]        a finger taps there (held for ms)
 //   touchdrag:<x0>,<y0>:<x1>,<y1>[:<ms>]  a finger drags between points
+//   twofingerdrag:<x0>,<y0>:<x1>,<y1> two fingers move together, without changing spread
 //   pinch:<x>,<y>:<from>:<to> two fingers about a point, from one spread to another (shares of the width)
 //   tapon:<kind>[:<index>]    a finger taps the middle of a target drawn on screen (from the game's hit map: tool, kind, label, go, menu, row, step, tab, back...)
 //   clickon:<kind>[:<index>]  the mouse clicks one
@@ -276,6 +277,18 @@ export class Fingers {
     await this.#send("touchEnd", []);
   }
 
+  /** Two fingers moving together at a constant spread: orbit without pinching. */
+  async pan(from: Pt, to: Pt, spread = 0.2, steps = 14) {
+    const pair = (x: number, y: number): Pt[] => [[x - spread / 2, y], [x + spread / 2, y]];
+    await this.#send("touchStart", pair(...from));
+    for (let i = 1; i <= steps; i++) {
+      await this.#page.waitForTimeout(24);
+      const k = i / steps;
+      await this.#send("touchMove", pair(from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k));
+    }
+    await this.#send("touchEnd", []);
+  }
+
   /** Two fingers either side of a point, `from` apart (a share of the width) to `to` apart. */
   async pinch(at: Pt, from: number, to: number, steps = 14) {
     const pair = (d: number): Pt[] => [[at[0] - d / 2, at[1]], [at[0] + d / 2, at[1]]];
@@ -502,6 +515,7 @@ async function main() {
         await page.mouse.click(p.x, p.y);
       }
       else if (kind === "touchdrag") await fingers.drag(pt(rest[0]), pt(rest[1]), Number(rest[2] ?? 400));
+      else if (kind === "twofingerdrag") await fingers.pan(pt(rest[0]), pt(rest[1]));
       else if (kind === "pinch") await fingers.pinch(pt(rest[0]), Number(rest[1]), Number(rest[2]));
       else if (kind === "resize") {
         const [w, h] = arg.split("x").map(Number);

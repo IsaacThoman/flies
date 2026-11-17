@@ -282,6 +282,152 @@ test("a finger dragging or pinching is input still, to keep the wallpaper away; 
   assert.equal(remote.lastInputAt, 9, "though it was input");
 });
 
+test("release displacement counts even when the browser sends no final move", () => {
+  for (const type of ["touch", "mouse"]) {
+    const { pointers, raw } = rig();
+    pointers.down(raw(1, type, 100, 100));
+    pointers.up(raw(1, type, 180, 100, 0), false);
+    assert.equal((pointers.gestures.at(-1) as Extract<Gesture, { type: "up" }>).tap, false);
+  }
+});
+
+test("an extra finger can move and lift without ending the original pair's pinch", () => {
+  const { pointers, raw } = rig();
+  pointers.down(raw(1, "touch", 400, 250));
+  pointers.down(raw(2, "touch", 600, 250));
+  pointers.down(raw(3, "touch", 800, 250));
+  pointers.endFrame();
+  pointers.move(raw(3, "touch", 900, 250));
+  pointers.up(raw(3, "touch", 900, 250, 0), false);
+  assert.deepEqual(types(pointers.gestures), []);
+  pointers.move(raw(2, "touch", 700, 250));
+  assert.ok(Math.abs((pointers.gestures[0] as Extract<Gesture, { type: "pinch" }>).scale - 1.5) < 1e-9);
+  pointers.up(raw(1, "touch", 400, 250, 0), false);
+  assert.deepEqual(types(pointers.gestures), ["pinch", "pinchEnd"]);
+});
+
+test("a layout or focus interruption drops queued actions and spends all surviving fingers", () => {
+  const { pointers, raw } = rig();
+  pointers.down(raw(1, "touch", 100, 100));
+  pointers.up(raw(1, "touch", 100, 100, 0), false);
+  pointers.down(raw(2, "touch", 200, 100));
+  pointers.cancel();
+  pointers.move(raw(2, "touch", 250, 100));
+  pointers.down(raw(3, "touch", 400, 100));
+  pointers.up(raw(2, "touch", 250, 100, 0), false);
+  pointers.up(raw(3, "touch", 400, 100, 0), false);
+  assert.deepEqual(types(pointers.gestures), ["cancel"]);
+  pointers.endFrame();
+  pointers.down(raw(4, "touch", 100, 100));
+  pointers.up(raw(4, "touch", 100, 100, 0), false);
+  assert.equal((pointers.gestures.at(-1) as Extract<Gesture, { type: "up" }>).double, false);
+});
+
+test("focus loss forgets contacts whose releases may never reach the page", () => {
+  const { pointers, raw } = rig();
+  pointers.down(raw(1, "touch", 100, 100));
+  pointers.cancel(true);
+  pointers.endFrame();
+  pointers.move(raw(1, "touch", 150, 100));
+  pointers.down(raw(2, "touch", 200, 100));
+  pointers.up(raw(2, "touch", 200, 100, 0), false);
+  assert.deepEqual(types(pointers.gestures), ["down", "up"]);
+});
+
+test("synchronous field focus uses the recognized tap, never a cancelled or returning drag", () => {
+  const { pointers, raw } = rig();
+  const taps: number[][] = [];
+  pointers.onTap = (...at) => taps.push(at);
+  pointers.down(raw(1, "touch", 100, 100));
+  pointers.move(raw(1, "touch", 300, 100));
+  pointers.move(raw(1, "touch", 100, 100));
+  pointers.up(raw(1, "touch", 100, 100, 0), false);
+  pointers.down(raw(2, "touch", 100, 100));
+  pointers.down(raw(3, "touch", 200, 100));
+  pointers.up(raw(3, "touch", 200, 100, 0), false);
+  pointers.up(raw(2, "touch", 100, 100, 0), false);
+  pointers.down(raw(4, "touch", 100, 100));
+  pointers.cancel();
+  pointers.up(raw(4, "touch", 100, 100, 0), false);
+  assert.deepEqual(taps, []);
+  pointers.down(raw(5, "touch", 100, 100));
+  pointers.up(raw(5, "touch", 104, 100, 0), false);
+  assert.deepEqual(taps, [[0.104, 0.2, 0.1, 0.2]], "the callback ran in the release's own stack");
+  pointers.up(raw(6, "touch", 104, 100, 0), false);
+  assert.equal(taps.length, 1, "an unrelated release cannot open another field");
+});
+
+test("secondary mouse buttons cannot focus a text field", () => {
+  const { pointers, raw } = rig();
+  let taps = 0;
+  pointers.onTap = () => { taps++; };
+  for (const button of [1, 2]) {
+    pointers.down(raw(1, "mouse", 100, 100, 1, button));
+    pointers.up(raw(1, "mouse", 100, 100, 0, button), false);
+  }
+  assert.equal(taps, 0);
+});
+
+test("a resize invalidates synchronous field focus before another game frame runs", () => {
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  const viewport = new EventTarget();
+  const windowEvents = Object.assign(new EventTarget(), { visualViewport: viewport });
+  const canvas = new EventTarget();
+  Object.defineProperty(globalThis, "window", { value: windowEvents, configurable: true });
+  Object.defineProperty(globalThis, "document", { value: new EventTarget(), configurable: true });
+  try {
+    const { pointers, raw } = rig();
+    let taps = 0;
+    pointers.onTap = () => { taps++; };
+    pointers.attach(canvas as HTMLCanvasElement);
+    for (const [target, type] of [[windowEvents, "resize"], [windowEvents, "orientationchange"], [viewport, "resize"]] as const) {
+      canvas.dispatchEvent(Object.assign(new Event("pointerdown"), raw(1, "touch", 100, 100)));
+      target.dispatchEvent(new Event(type));
+      canvas.dispatchEvent(Object.assign(new Event("pointerup"), raw(1, "touch", 100, 100, 0)));
+      assert.equal(taps, 0);
+    }
+    canvas.dispatchEvent(Object.assign(new Event("pointerdown"), raw(2, "touch", 100, 100)));
+    canvas.dispatchEvent(Object.assign(new Event("pointerup"), raw(2, "touch", 100, 100, 0)));
+    assert.equal(taps, 1);
+  } finally {
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+    if (previousDocument) Object.defineProperty(globalThis, "document", previousDocument);
+    else Reflect.deleteProperty(globalThis, "document");
+  }
+});
+
+test("coalesced out-and-back travel cancels a tap while queuing only the latest drag", () => {
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  Object.defineProperty(globalThis, "window", { value: new EventTarget(), configurable: true });
+  Object.defineProperty(globalThis, "document", { value: new EventTarget(), configurable: true });
+  try {
+    for (const type of ["touch", "mouse"]) {
+      const { pointers, raw } = rig();
+      const canvas = new EventTarget();
+      let taps = 0;
+      pointers.onTap = () => { taps++; };
+      pointers.attach(canvas as HTMLCanvasElement);
+      canvas.dispatchEvent(Object.assign(new Event("pointerdown"), raw(1, type, 100, 100)));
+      canvas.dispatchEvent(Object.assign(new Event("pointermove"), raw(1, type, 100, 100), {
+        getCoalescedEvents: () => [raw(1, type, 150, 100), raw(1, type, 100, 100)],
+      }));
+      canvas.dispatchEvent(Object.assign(new Event("pointerup"), raw(1, type, 100, 100, 0)));
+      assert.equal(taps, 0);
+      assert.deepEqual(types(pointers.gestures), ["down", "drag", "up"]);
+      assert.equal((pointers.gestures[1] as Extract<Gesture, { type: "drag" }>).far, true);
+      assert.equal((pointers.gestures[2] as Extract<Gesture, { type: "up" }>).tap, false);
+    }
+  } finally {
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+    if (previousDocument) Object.defineProperty(globalThis, "document", previousDocument);
+    else Reflect.deleteProperty(globalThis, "document");
+  }
+});
+
 test("lost focus, suspension and text focus release buttons and pending input", () => {
   const document = Object.assign(new EventTarget(), { hidden: false });
   const target = Object.assign(new EventTarget(), { document });
@@ -392,4 +538,5 @@ test("disconnecting an unused controller does not repeat the selected controller
   pad.connected = false;
   target.dispatchEvent(Object.assign(new Event("gamepaddisconnected"), { gamepad: { index: 0 } }));
   assert.equal(remote.held.has("select"), false);
+
 });
