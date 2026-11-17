@@ -48,7 +48,7 @@ password if you like. Whoever joins, by the list, a code or the room's link,
 sits their flies down beside yours, up to eight altogether, each marked with its own dab of enamel
 (`docs/online.md`).
 
-**Settings → Screensaver → Flies** chooses one to four, shown as enamel
+**Settings → Screensaver → Flies** chooses one to four (three on an Apple TV), shown as enamel
 dots in the table colours, kept between launches. Each is a whole fly, with
 its own brain, body, senses and eyes; they see and meet one another, eat
 from the same pantry, feel the place's wind and goings-on where they are,

@@ -361,7 +361,9 @@ export class Game implements Shell {
     // Its clock keeps the real time of day, whatever light is chosen, and its sleep pressure starts as the hour makes it.
     this.life.rhythm = this.#rhythm();
     this.fly = new FlyView(this.stage.scene, world);
-    this.maxFlies = brains.another ? MAX_OWN : 1;
+    this.maxFlies = brains.another ? Math.min(MAX_OWN, brains.most) : 1;
+    // A count chosen where more could live (or by an older build) shows as what lives here.
+    this.settings.flies = Math.min(this.settings.flies, this.maxFlies);
     this.company = new Company(world, brains.another ?? (() => brains.first), () => this.#rhythm());
     this.others = new OtherFlies(this.stage.scene, world);
     this.others.company = this.company.list;

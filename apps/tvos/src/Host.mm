@@ -91,6 +91,53 @@ static double PhysFootprintMB() {
   return info.phys_footprint / 1048576.0;
 }
 
+/**
+ * CPU each named thread used since the last call, as a percentage of one core: the JavaScript and
+ * render threads, each brain's (one per fly, so a brain that can't keep up shows near 100), the
+ * rest as "other", and the whole process as "total". Called from the stats interval only.
+ */
+static NSDictionary *ThreadCpu() {
+  static std::unordered_map<uint64_t, double> lastNs;
+  static double lastAt = -1;
+  double now = NowMs();
+  thread_act_array_t threads;
+  mach_msg_type_number_t count = 0;
+  if (task_threads(mach_task_self(), &threads, &count) != KERN_SUCCESS) return @{};
+  std::unordered_map<uint64_t, double> seen;
+  NSMutableDictionary<NSString *, NSNumber *> *ms = [NSMutableDictionary dictionary];
+  for (mach_msg_type_number_t i = 0; i < count; i++) {
+    thread_extended_info_data_t info;
+    mach_msg_type_number_t n = THREAD_EXTENDED_INFO_COUNT;
+    thread_identifier_info_data_t ident;
+    mach_msg_type_number_t m = THREAD_IDENTIFIER_INFO_COUNT;
+    if (thread_info(threads[i], THREAD_EXTENDED_INFO, (thread_info_t)&info, &n) == KERN_SUCCESS &&
+        thread_info(threads[i], THREAD_IDENTIFIER_INFO, (thread_info_t)&ident, &m) == KERN_SUCCESS) {
+      double used = (double)(info.pth_user_time + info.pth_system_time);
+      seen[ident.thread_id] = used;
+      auto before = lastNs.find(ident.thread_id);
+      double delta = (used - (before == lastNs.end() ? 0 : before->second)) / 1e6;
+      NSString *name = [NSString stringWithUTF8String:info.pth_name];
+      if (![name hasPrefix:@"flies."]) name = @"other";
+      ms[name] = @(ms[name].doubleValue + delta);
+    }
+    mach_port_deallocate(mach_task_self(), threads[i]);
+  }
+  vm_deallocate(mach_task_self(), (vm_address_t)threads, count * sizeof(thread_act_t));
+  double span = now - lastAt;
+  bool first = lastAt < 0;
+  lastNs.swap(seen);
+  lastAt = now;
+  if (first || span <= 0) return @{};
+  double total = 0;
+  NSMutableDictionary *percent = [NSMutableDictionary dictionary];
+  for (NSString *name in ms) {
+    total += ms[name].doubleValue;
+    percent[name] = @(std::round(ms[name].doubleValue / span * 1000) / 10);
+  }
+  percent[@"total"] = @(std::round(total / span * 1000) / 10);
+  return percent;
+}
+
 static NSDictionary *Stat(std::vector<double> v) {
   if (v.empty()) return @{ @"mean": [NSNull null], @"p95": [NSNull null] };
   std::sort(v.begin(), v.end());
@@ -119,7 +166,7 @@ NSString *FrameStats::summary(double fromMs, double toMs) {
   }
   NSDictionary *d = @{ @"memMB": @(std::round(PhysFootprintMB() * 10) / 10), @"frames": @(js.size()), @"jsMs": Stat(js), @"submitMs": Stat(submit), @"execMs": Stat(exec),
                        @"gpuFinishMs": gpu.empty() ? [NSNull null] : Stat(gpu), @"copyMs": Stat(copy), @"presentMs": Stat(present), @"wordsPerFrame": Stat(words), @"intervalMs": Stat(interval),
-                       @"completedIntervalMs": Stat(completedInterval), @"thermalState": @(NSProcessInfo.processInfo.thermalState) };
+                       @"completedIntervalMs": Stat(completedInterval), @"thermalState": @(NSProcessInfo.processInfo.thermalState), @"cpu": ThreadCpu() };
   NSData *data = [NSJSONSerialization dataWithJSONObject:d options:0 error:nil];
   return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 }
