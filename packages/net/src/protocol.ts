@@ -20,8 +20,14 @@ import type { BubbleSnapshot } from "./bubbles.ts";
  * know the restaurant would read at a tabletop's. 3: rooms have names, may
  * be listed and locked, and a device may browse them; a device speaking 2
  * would sit at a locked room's door forever, not knowing why it was refused.
+ * The rooms open to everyone (`everyoneCode`) came within 3: they only add
+ * to what is said, and a device that doesn't know them is seated there as at
+ * any room.
+ * 4: a device may bring several flies, each with an id and colour of its
+ * own: its FLY message is a batch, as FLIES is, and the room's seats are
+ * flies, not devices.
  */
-export const PROTOCOL = 3;
+export const PROTOCOL = 4;
 
 /** Where the room server answers WebSockets, on the site's own host. */
 export const ROOMS_PATH = "/rooms";
@@ -31,8 +37,14 @@ export const FLY = 1;
 export const FLIES = 2;
 export const BITES = 3;
 
-/** At most this many flies at a table. Player ids are 1 to this: one byte on the wire. */
-export const MAX_PLAYERS = 8;
+/** At most this many flies at a table, whoever's they are. Fly ids are 1 to this: one byte on the wire. */
+export const MAX_FLIES = 8;
+/**
+ * At most this many flies from one device, at a table or alone: each is a
+ * whole brain of its own, and the Apple TV fits four (docs/online.md, Cost).
+ * At a table it leaves room for at least one other device.
+ */
+export const MAX_OWN = 4;
 
 /** How often a device sends its fly, and the room sends the batch, ms. */
 export const SEND_EVERY = 50;
@@ -109,7 +121,7 @@ export type Hand = {
 
 /** One fly as it travels. */
 export type FlyState = {
-  /** The player it belongs to (set by the room in a batch). */
+  /** Which fly it is at the table (the room gives each its id). */
   id: number;
   flags: number;
   /** Which place the table was in when this was sent (the room's count of moves, wrapping at 256): a state from before a move is dropped. */
@@ -290,15 +302,6 @@ export function readState(view: DataView, at: number, scale: WireScale, s: FlySt
   return end;
 }
 
-/** The biggest FLY message: type, state, hand. */
-export const FLY_MAX = 1 + STATE_BYTES + HANDS_BYTES;
-
-/** Encodes the device's own fly into `out` (at least FLY_MAX bytes). Returns its length. */
-export function encodeFly(out: DataView, scale: WireScale, s: FlyState): number {
-  out.setUint8(0, FLY);
-  return writeState(out, 1, scale, s);
-}
-
 /** A batch: type, count, then each fly's id and state. */
 export function batchLength(states: readonly FlyState[], count = states.length) {
   let n = 2;
@@ -306,11 +309,33 @@ export function batchLength(states: readonly FlyState[], count = states.length) 
   return n;
 }
 
-/** The biggest batch: every other fly at the table, each with its hand. */
-export const FLIES_MAX = 2 + MAX_PLAYERS * (1 + STATE_BYTES + HANDS_BYTES);
+/** The biggest FLY message: a device's flies, each by its id, the hand with one of them. */
+export const OWN_MAX = 2 + MAX_OWN * (1 + STATE_BYTES) + HANDS_BYTES;
+/** A FLY message of one fly, with the hand. */
+export const FLY_MAX = 2 + 1 + STATE_BYTES + HANDS_BYTES;
+
+/** The biggest batch: every other fly at the table, each with a hand. */
+export const FLIES_MAX = 2 + MAX_FLIES * (1 + STATE_BYTES + HANDS_BYTES);
+
+/** Encodes a device's own flies into `out` (OWN_MAX bytes holds them all), as a batch of type FLY: each state carries its fly's id. Returns its length. */
+export function encodeOwn(out: DataView, scale: WireScale, states: readonly FlyState[], count = states.length): number {
+  return encodeBatch(FLY, out, scale, states, count);
+}
+
+/** A device with one fly: encodes it alone (FLY_MAX bytes). */
+export function encodeFly(out: DataView, scale: WireScale, s: FlyState): number {
+  out.setUint8(0, FLY);
+  out.setUint8(1, 1);
+  out.setUint8(2, s.id);
+  return writeState(out, 3, scale, s);
+}
 
 export function encodeFlies(out: DataView, scale: WireScale, states: readonly FlyState[], count = states.length): number {
-  out.setUint8(0, FLIES);
+  return encodeBatch(FLIES, out, scale, states, count);
+}
+
+function encodeBatch(type: number, out: DataView, scale: WireScale, states: readonly FlyState[], count: number): number {
+  out.setUint8(0, type);
   out.setUint8(1, count);
   let at = 2;
   for (let i = 0; i < count; i++) {
@@ -324,10 +349,10 @@ export function encodeFlies(out: DataView, scale: WireScale, states: readonly Fl
  * Reads a batch at the scale of the place expected, handing every fly's
  * state in turn to `each` (the same `scratch` object each time: copy what you
  * keep, and drop one from another epoch). Returns how many, or -1 if the
- * batch is broken.
+ * batch is broken. `type`: FLY for a device's own, as the room reads them.
  */
-export function decodeFlies(view: DataView, scale: WireScale, scratch: FlyState, each: (s: FlyState) => void): number {
-  if (view.byteLength < 2 || view.getUint8(0) !== FLIES) return -1;
+export function decodeFlies(view: DataView, scale: WireScale, scratch: FlyState, each: (s: FlyState) => void, type = FLIES): number {
+  if (view.byteLength < 2 || view.getUint8(0) !== type) return -1;
   const count = view.getUint8(1);
   let at = 2;
   for (let i = 0; i < count; i++) {
@@ -418,8 +443,11 @@ export type WorldWire = { light: string; weather: string };
 export const TABLE_LIGHTS = ["clock", "morning", "noon", "golden", "dusk", "night"] as const;
 export const TABLE_WEATHERS = ["now", "clear", "overcast", "mist", "rain"] as const;
 
-/** A player at the table: who, in what colour, and whether its device has stopped. */
-export type PlayerWire = { id: number; colour: string; away: boolean };
+/** A fly at the table: which, in what colour, whether its device has stopped, and which device's it is (`of`: the id of that device's first fly, the player's own id). */
+export type PlayerWire = { id: number; colour: string; away: boolean; of: number };
+
+/** One of this device's flies at the table: its id, its colour, and where it is to stand. */
+export type SeatedFly = { id: number; colour: string; at: Spot };
 
 /** What the one who starts a table says of it. */
 export type TableStart = {
@@ -434,11 +462,21 @@ export type TableStart = {
   listed?: boolean;
 };
 
-/** A room as the list shows it: its code (to join it), name, place, how many flies are there now, and whether it needs a password. */
-export type RoomWire = { code: string; name: string; place: string; flies: number; locked: boolean };
+/**
+ * A room as the list shows it: its code (to join it), name, place, how many of
+ * its seats are taken (`flies`: each fly shown there, and the one place a
+ * starter who has gone keeps), whether it needs a password, and whether it is
+ * one of the rooms open to everyone.
+ */
+export type RoomWire = { code: string; name: string; place: string; flies: number; locked: boolean; everyone?: boolean };
 
-/** What a table says of itself in its welcome: its name, whether it is listed, and whether it is locked. */
-export type RoomInfo = { name: string; listed: boolean; locked: boolean };
+/**
+ * What a table says of itself in its welcome: its name, whether it is listed,
+ * whether it is locked; its code, which for a room open to everyone may not
+ * be the one asked for (a full one sends the device on to the next); and
+ * whether it is one of those.
+ */
+export type RoomInfo = { name: string; listed: boolean; locked: boolean; code?: string; everyone?: boolean };
 
 export type ClientMessage =
   | {
@@ -456,8 +494,13 @@ export type ClientMessage =
        * over this socket, and only until welcomed.
        */
       password?: string;
-      /** Where this device's fly is, coming back to the table after a moment away (a reconnection), and the epoch of the place it is in: from before a move, it isn't anywhere at the table. */
-      at?: Spot;
+      /**
+       * How many flies this device brings, 1 to MAX_OWN (1 if left out): it
+       * is given as many of them as there are seats for.
+       */
+      flies?: number;
+      /** Where this device's flies are, in the order they were seated, coming back to the table after a moment away (a reconnection), and the epoch of the place they are in: from before a move, they aren't anywhere at the table. */
+      at?: Spot[];
       epoch?: number;
     }
   /** Instead of a hello: this connection only browses the listed rooms (answered with `rooms`, and again as they change). */
@@ -474,7 +517,10 @@ export type ClientMessage =
   | ({ type: "ball"; epoch?: number } & Omit<BallWire, "by">)
   | { type: "world"; light?: string; weather?: string }
   | { type: "place"; place: string }
+  /** The starter takes a device off the table, by any of its flies: all of them go. */
   | { type: "remove"; id: number }
+  /** How many flies this device now wants at the table: answered with `seated`, as many as there are seats for. */
+  | { type: "flies"; count: number }
   | { type: "pop"; slot: number; cycle: number; at: number; epoch?: number }
   | { type: "found"; id: number; name: string; x: number; z: number; y: number; r: number; sweet: number; lasts?: number; epoch?: number }
   | { type: "bye" };
@@ -500,9 +546,11 @@ export type ServerMessage =
   | {
       type: "welcome";
       v: number;
-      /** This player at the table, and its colour. */
+      /** This player at the table, its first fly's id, and that fly's colour. */
       id: number;
       colour: string;
+      /** Every fly of this device's at the table, the first included, each with its colour and where it is to stand. */
+      flies: SeatedFly[];
       /** Who started the table: they can remove a fly, and choose the place, the light and the weather. */
       starter: number;
       /** The table's seed, for its bubbles and its visitors. */
@@ -524,7 +572,7 @@ export type ServerMessage =
       happenings: HappeningWire[];
       /** Each of the table's bubbles as it stands. */
       bubbles: BubbleSnapshot;
-      /** Where this player's fly is to stand: where it was, coming back; where the table finds room for it, new. */
+      /** Where this player's first fly is to stand: where it was, coming back; where the table finds room for it, new. */
       at: Spot;
       room: RoomInfo;
     }
@@ -534,6 +582,11 @@ export type ServerMessage =
   | { type: "rooms"; rooms: RoomWire[] }
   | { type: "pong"; t: number; now: number }
   | ({ type: "joined" } & PlayerWire)
+  /**
+   * This device's flies now, after it asked for another count (`flies`): as many as there were seats for, each new one with where it is to
+   * stand. `asked`: the count this answers.
+   */
+  | { type: "seated"; flies: SeatedFly[]; asked: number }
   | { type: "away"; id: number; away: boolean }
   | { type: "left"; id: number }
   | { type: "drop"; by: number; id: number; kind: string; x: number; z: number; y: number; at: number }
@@ -551,11 +604,11 @@ export type ServerMessage =
    */
   | { type: "food"; ack: number; amounts: [number, number][]; gone: number[]; eaten: number; meal?: [amount: number, sugar: number] };
 
-/** Each player's colour, as a dab of paint on the thorax: bright enamels, as researchers mark flies. By player id. */
+/** Each fly's colour, as a dab of paint on the thorax: bright enamels, as researchers mark flies. By fly id. */
 export const COLOURS = ["#ffd21f", "#2fb8ff", "#ff4fa3", "#59e05a", "#ff7a1a", "#f4f4f4", "#a466ff", "#ff2a2a"] as const;
 
 /**
- * Food a player drops is named by its device, so its fly can eat it before
+ * Food a player drops is named by its device, so its flies can eat it before
  * the room has heard of it: the player's id times this, plus the device's count.
  */
 export const DROP_ID = 1_000_000;
@@ -593,3 +646,32 @@ export function tableCode(random: (bytes: Uint8Array<ArrayBuffer>) => Uint8Array
   }
   return code;
 }
+
+/**
+ * The rooms open to everyone, which the room server keeps and nobody starts
+ * (docs/online.md, "Everyone"): this many at most, each the code below. A
+ * hello for any of them is a hello for whichever has room, that one first.
+ */
+export const EVERYONE_ROOMS = 64;
+const EVERYONE_PREFIX = "222222";
+
+/** The code of the `i`th room open to everyone: "2222222222", "2222222223", …, plainly a code where it is shown, never a word. */
+export function everyoneCode(i: number): string {
+  let code = "";
+  for (let k = 0, n = i; k < CODE_LENGTH - EVERYONE_PREFIX.length; k++, n = Math.floor(n / CODE_ALPHABET.length)) code = CODE_ALPHABET[n % CODE_ALPHABET.length] + code;
+  return EVERYONE_PREFIX + code;
+}
+
+/** Which room open to everyone a code is, or -1 if it isn't one. */
+export function everyoneIndex(code: string): number {
+  if (!isTableCode(code) || !code.startsWith(EVERYONE_PREFIX)) return -1;
+  let i = 0;
+  for (const c of code.slice(EVERYONE_PREFIX.length)) i = i * CODE_ALPHABET.length + CODE_ALPHABET.indexOf(c);
+  return i < EVERYONE_ROOMS ? i : -1;
+}
+
+/** The first room open to everyone: where a device goes to be with others. */
+export const EVERYONE = everyoneCode(0);
+
+/** What the `i`th room open to everyone is called. */
+export const everyoneName = (i: number) => (i === 0 ? "Everyone" : `Everyone ${i + 1}`);

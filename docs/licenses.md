@@ -28,7 +28,7 @@ The WebGL build does not import Three.js's WebGPU/TSL MaterialX nodes or the Scu
 
 ## Runtime provenance
 
-The toolchain is pinned by `packages/brain-native/wasm.sh` and `wasm/build.json`: wasi-sdk 34.0. The [SDK's source submodules](https://github.com/WebAssembly/wasi-sdk/tree/wasi-sdk-34/src) pin wasi-libc `2e6fb9d8ee0cdf9e431fbcabe8af3115de000a13` and LLVM `895aa2c896ada719451be2e3673c83da8ddf1141`. `docs/licenses/sources.json` records exact source-package URLs for every copied licence. These copies include the umbrella and third-party grants rather than assuming the compiler's licence covers libc. The SDK archive itself contains no separate licence inventory. The notice deliberately covers the runtime source set conservatively, even where dead stripping omits some functions. The native Apple runtime is supplied by Apple; the fdlibm notice applies there too.
+The toolchain is pinned by `packages/brain-native/wasm.sh` and `packages/brain-native/wasm/build.json`: wasi-sdk 34.0. The [SDK's source submodules](https://github.com/WebAssembly/wasi-sdk/tree/wasi-sdk-34/src) pin wasi-libc `2e6fb9d8ee0cdf9e431fbcabe8af3115de000a13` and LLVM `895aa2c896ada719451be2e3673c83da8ddf1141`. `docs/licenses/sources.json` records exact source-package URLs for every copied licence. These copies include the umbrella and third-party grants rather than assuming the compiler's licence covers libc. The SDK archive itself contains no separate licence inventory. The notice deliberately covers the runtime source set conservatively, even where dead stripping omits some functions. The native Apple runtime is supplied by Apple; the fdlibm notice applies there too.
 
 ## Generation and enforcement
 
@@ -41,3 +41,5 @@ The web host must serve a configured `/privacy` as the directory's index (normal
 ## Before submission
 
 Confirm WeatherKit's live attribution on a signed device and the App Store build's bundled notice. Replace the privacy/operator and support/marketing/review-contact placeholders listed in the PR. Have counsel review the privacy policy, attribution coverage and store disclosures, including whether App Store terms or distribution protections could restrict recipients’ CC BY data rights. The public web distribution provides the same data without App Store packaging; it does not replace that legal check. Do not publish a draft with placeholders as the final policy.
+
+<!-- docs-check: generated privacy/index.html -->

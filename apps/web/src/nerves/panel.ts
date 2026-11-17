@@ -6,7 +6,7 @@
 // neck into the cord and out to the legs and wings.
 //
 // One draw: the fly's own nervous system geometry, whose first two triangles
-// are the panel's backdrop (the glass and its label, a small canvas drawn
+// are the panel's backdrop (the glass, a small canvas drawn
 // with the menu kit), placed in the frame by the panel's shader. It is drawn
 // with the overlay, under the menus and hints, and fades by itself, as what it
 // sees does. It is the second picture in the corner (ui/corners.ts): under
@@ -16,7 +16,7 @@
 import * as THREE from "three";
 import { createNervesPanelMaterial } from "@fly/fly";
 import type { FlyNervesModel, NervesPanelUniforms } from "@fly/fly";
-import { glassPanel, roundedRect, text } from "@fly/ui";
+import { glassPanel, roundedRect } from "@fly/ui";
 import { TV_FRAME, pixelsPerUnit } from "../display.ts";
 import type { Frame } from "../display.ts";
 import { INSET_PANEL, cornerScale, insetLayout } from "../eyes/inset.ts";
@@ -35,9 +35,8 @@ export const NERVES_VIEW = { halfWidth: 0.16, top: 0.53, bottom: 0.05 };
 /** Design units per body length in the picture, at full size. */
 const SCALE = 350;
 /** The picture in the panel, and the panel, design units at full size. */
-export const NERVES_PICTURE = { x: 10, y: 27, width: Math.round(2 * NERVES_VIEW.halfWidth * SCALE), height: Math.round((NERVES_VIEW.top - NERVES_VIEW.bottom) * SCALE) };
+export const NERVES_PICTURE = { x: 10, y: 12, width: Math.round(2 * NERVES_VIEW.halfWidth * SCALE), height: Math.round((NERVES_VIEW.top - NERVES_VIEW.bottom) * SCALE) };
 export const NERVES_PANEL = { width: NERVES_PICTURE.width + 20, height: NERVES_PICTURE.y + NERVES_PICTURE.height + 10, radius: 14 };
-const LABEL = { x: 12, y: 19, size: 12, color: "#eaf6ff" };
 /** Between it and what it sees, design units. */
 const GAP = 8;
 /** Below this share of its full size under what it sees, it goes beside it instead. */
@@ -190,7 +189,7 @@ export class NervesPanel {
     return texture;
   }
 
-  /** The glass and the label, drawn in the panel's own design units at its size. */
+  /** The glass, drawn in the panel's own design units at its size. */
   #draw() {
     const g = this.#canvas.getContext("2d");
     if (!g) throw new Error("No 2D canvas for the nervous system's panel");
@@ -204,7 +203,6 @@ export class NervesPanel {
     roundedRect(g, p.x - 2, p.y - 2, p.width + 4, p.height + 4, 6);
     g.fillStyle = "rgba(0, 16, 50, 0.5)";
     g.fill();
-    text(g, "Nervous system", LABEL.x, LABEL.y, { size: LABEL.size, color: LABEL.color });
     this.#texture.needsUpdate = true;
   }
 }

@@ -204,3 +204,17 @@ The gesture checks now run while the real connectome is held at the network
 boundary, followed by the real brain handoff and relaunch checks. This exercises
 the supported early-exploration path without requiring a biological reaction
 or changing gameplay. Earlier complete modality runs also passed.
+
+
+## Approved integration with current dev
+
+The merge includes several local flies, the orbit camera, default-room auto-join
+and acknowledgements. Camera and default-room policy files are retained from dev.
+The multi-fly eyes scheduler retains the eye-map handoff guard for every fly.
+The HUD reads the primary brain from the new brain pool.
+
+Type checking, lint and 172 area tests pass. The integrated browser check holds
+the real connectome at the network boundary and observes zero room connections
+on the loading screen and after entering Explore. Releasing the brain results
+in one successful automatic Everyone join. Bootstrap recovery and tool learning
+and persistence pass for mouse, touch and native-host input emulation.

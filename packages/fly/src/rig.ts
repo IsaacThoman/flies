@@ -9,10 +9,10 @@
 // shifting now and then), is animation, not behaviour: it never moves the
 // fly, and it stops whenever the pose asks for anything else.
 
-import { copy, identity, multiply, rotateX, rotateY, rotateZ, scale, scaleX, setFrame, transformPoint, translate } from "./affine.ts";
+import { copy, identity, multiply, rotateX, rotateY, rotateZ, scale, setFrame, transformPoint, translate } from "./affine.ts";
 import {
-  BODY_JOINTS, EYE, FOOT_CLEARANCE, HEAD, J, LEG_COUNT, LEG_SEGMENTS, LEGS, PIVOT, PROBOSCIS, THORAX,
-  WING_COPIES, WING_JOINTS, legPair, legSide,
+  ABDOMEN, ABDOMINAL_SEGMENTS, ANTENNA, BODY_JOINTS, EYE, FOOT_CLEARANCE, HEAD, J, LEG_COUNT, LEG_SEGMENTS, LEGS, PIVOT, PROBOSCIS, THORAX,
+  WING, WING_COPIES, WING_JOINTS, legPair, legSide,
 } from "./anatomy.ts";
 import type { Vec3 } from "./anatomy.ts";
 import type { FlyAnchor, FlyPose } from "@fly/contracts";
@@ -20,6 +20,8 @@ import { Gait } from "./gait.ts";
 import { solveLeg } from "./leg.ts";
 import type { LegInput } from "./leg.ts";
 
+const EYE_C = Math.cos(EYE.yaw), EYE_S = Math.sin(EYE.yaw);
+const EYE_SWEEP_R = 0.65, EYE_SWEEP_X = Math.sqrt(1 - EYE_SWEEP_R * EYE_SWEEP_R);
 const TAU = Math.PI * 2;
 const smooth = (e0: number, e1: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
@@ -34,7 +36,8 @@ const lag = (dt: number, tau: number) => 1 - Math.exp(-dt / tau);
  * courting males), level, and vibrated through a small arc far too fast to
  * see as strokes (the song's 150 to 250 Hz), so it shows as a haze.
  */
-const SONG_ANGLE = 0.25;
+// Bennet-Clark & Ewing 1968 doi:10.1242/jeb.49.1.117: unilateral song.
+const SONG_ANGLE = 0.08;
 const SONG_ARC = 0.18;
 const SONG_LIFT = 0.04;
 /** Moves `x` toward `target` by at most `rate` per second: limbs take a moment to get anywhere. */
@@ -91,6 +94,8 @@ export class FlyRig {
   private dip = 0;
   private dipVelocity = 0;
   private speed = 0;
+  private travelSpeed = 0;
+  private travelTurn = 0;
   private turn = 0;
   private sing = 0;
   /** The singing wing: 1 the left, -1 the right; it fades out on the side it sang with. */
@@ -99,6 +104,7 @@ export class FlyRig {
 
   private groomPhase = 0;
   private boutPhase = 0;
+  private groomTime = 0;
   private readonly seed = new Uint32Array([0x2545f491]);
   private readonly idle = new Float64Array(8); // head yaw, pitch; antenna L yaw, pitch; R yaw, pitch; spare
   private readonly idleTarget = new Float64Array(8);
@@ -145,13 +151,17 @@ export class FlyRig {
 
     const speed = Math.max(-20, Math.min(20, finite(pose.speed)));
     const turn = Math.max(-30, Math.min(30, finite(pose.turn)));
+    // Ground compensation follows measured body travel exactly. Only the
+    // posture is filtered; delaying foot transport makes planted feet slide.
+    this.travelSpeed = speed;
+    this.travelTurn = turn;
     this.speed += (speed - this.speed) * lag(dt, 0.08);
     this.turn += (turn - this.turn) * lag(dt, 0.08);
     this.crouch += (clamp01(pose.crouch) - this.crouch) * lag(dt, 0.07);
     // It settles into sleep over a few seconds and is up at once when it wakes.
     const sleep = clamp01(pose.sleep ?? 0);
     this.sleep += (sleep - this.sleep) * lag(dt, sleep > this.sleep ? 2.5 : 0.15);
-    this.feed += (clamp01(pose.feed) - this.feed) * lag(dt, 0.16);
+    this.feed += (smooth(0.05, 0.3, clamp01(pose.feed)) - this.feed) * lag(dt, 0.16);
     this.groom += (clamp01(pose.groom) - this.groom) * lag(dt, 0.12);
     this.beat += (clamp01(pose.wings) - this.beat) * lag(dt, 0.05);
     const airborne = pose.airborne === true;
@@ -161,20 +171,22 @@ export class FlyRig {
     this.pitch += (Math.max(-1.6, Math.min(1.6, finite(pose.pitch))) - this.pitch) * lag(dt, 0.06);
     this.roll += (Math.max(-1.6, Math.min(1.6, finite(pose.roll))) - this.roll) * lag(dt, 0.06);
     const sing = Math.max(-1, Math.min(1, finite(pose.sing)));
-    if (sing !== 0) this.singSide = sing > 0 ? 1 : -1;
-    this.sing += (Math.abs(sing) * (airborne ? 0 : 1) - this.sing) * lag(dt, 0.06);
+    const requestedSide = sing > 0 ? 1 : -1;
+    if (sing !== 0 && this.sing < 0.005) this.singSide = requestedSide;
+    const songTarget = requestedSide === this.singSide ? Math.abs(sing) : 0;
+    this.sing += (songTarget * (airborne ? 0 : 1) - this.sing) * lag(dt, 0.14);
     // The crop fills over a meal and empties over minutes: a slow lag only keeps a jump from showing.
     this.fullness += (clamp01(pose.fullness ?? 0) - this.fullness) * lag(dt, 0.5);
 
     // Take-off: the legs stay extended against the ground for a moment as the
     // body leaves it, then fold. Landing: they reach back out to their homes.
     if (airborne && !this.airborne) this.airTime = 0;
-    if (!airborne && this.airborne) this.dipVelocity -= 0.6 * this.tuck;
+    if (!airborne && this.airborne) this.dipVelocity -= 0.6 * this.flight;
     this.airborne = airborne;
     if (airborne) this.airTime += dt;
-    const tuckTarget = airborne ? smooth(0.05, 0.22, this.airTime) : 0;
+    const tuckTarget = airborne ? smooth(0.05, 0.22, this.airTime) * (1 - clamp01(pose.landing ?? 0)) : 0;
     // Legs fold up fast after take-off and reach out again a little more slowly to land.
-    this.tuck = toward(this.tuck, tuckTarget, airborne ? 7 : 5, dt);
+    this.tuck = toward(this.tuck, tuckTarget, airborne ? 6 : 5, dt);
     const push = airborne ? 1 - smooth(0.0, 0.12, this.airTime) : 0;
     // A damped spring for the dip as the legs take the weight on landing.
     this.dipVelocity += (-180 * this.dip - 20 * this.dipVelocity) * dt;
@@ -188,16 +200,32 @@ export class FlyRig {
 
     // Grooming rhythm: sweeps over the eyes alternate with bouts of rubbing the legs together.
     const vigour = this.groom;
-    this.groomPhase += dt * (2.2 + 2.6 * vigour);
+    this.groomPhase += dt * (2 + 1.3 * vigour);
     this.boutPhase += dt * 0.32;
+    // Seeds et al. 2014 doi:10.7554/eLife.02951: anterior cleaning precedes
+    // abdomen and wings, interleaved with leg rubbing. The command has no
+    // body-site information: this cycle is animation, not a dust hierarchy.
+    if (this.groom < 0.02) this.groomTime = 0;
+    else this.groomTime += dt * (1 - walking) * ground;
     // A feeding fly keeps its front legs down: the head is bowed to the food
     // and the proboscis is out, so grooming waits until it has finished.
-    this.groomBlend = toward(this.groomBlend, smooth(0.02, 0.3, this.groom) * (1 - smooth(0.1, 0.6, this.feed)), 5, dt);
+    // Command strength changes vigour; an active cleaning foot still has
+    // to reach the cuticle instead of stopping between it and the ground.
+    this.groomBlend = toward(this.groomBlend, smooth(0.02, 0.12, this.groom) * (1 - smooth(0.1, 0.6, this.feed)) * (1 - walking), 4, dt);
     const groomOn = ease(this.groomBlend) * ground;
-    const rub = smooth(0.25, 0.75, 0.5 - 0.5 * Math.cos(TAU * this.boutPhase));
-    const sweep = 1 - rub;
-    const sweepS = this.groomPhase - Math.floor(this.groomPhase);
-    const stroke = sweepS < 0.62 ? smooth(0, 0.62, sweepS) : 1 - smooth(0.62, 1, sweepS);
+    let frontOn = 0, rearOn = 0, antenna = 0, wingClean = 0, rearRub = 0, rub = 0, sweep = 0, sweepS = 0, stroke = 0;
+    // Inactive cleaning paths need no trigonometry or surface work. This
+    // leaves the contact calculation's budget for the pair actually cleaning.
+    if (groomOn > 0) {
+      const cycle = this.groomTime % 12;
+      const rear = smooth(4.7, 5.2, cycle) * (1 - smooth(11.3, 11.8, cycle));
+      frontOn = groomOn * (1 - rear); rearOn = groomOn * rear;
+      antenna = smooth(2.7, 3.1, cycle) * (1 - smooth(4.2, 4.6, cycle));
+      wingClean = smooth(7.1, 7.6, cycle); rearRub = smooth(9.4, 9.8, cycle);
+      rub = 1 - smooth(0.5, 0.85, cycle) * (1 - smooth(4.1, 4.6, cycle));
+      sweep = 1 - rub; sweepS = this.groomPhase - Math.floor(this.groomPhase);
+      stroke = sweepS < 0.62 ? smooth(0, 0.62, sweepS) : 1 - smooth(0.62, 1, sweepS);
+    }
 
     // Thorax.
     const gaitPhase = this.gait.phase;
@@ -205,19 +233,20 @@ export class FlyRig {
     const sway = walking * 0.025 * Math.sin(TAU * gaitPhase);
     const breathe = Math.sin(TAU * 0.45 * t);
     // Asleep it sits lower, body nearer the ground, head a little bowed: drawn to read as rest, its stillness is what is real.
-    const height = PIVOT.thorax[1] - 0.075 * this.crouch - 0.04 * this.sleep - 0.032 * this.feed - 0.012 * groomOn + bob + this.dip + 0.002 * breathe * (1 - walking);
+    const height = PIVOT.thorax[1] - 0.075 * this.crouch - 0.04 * this.sleep - 0.075 * this.feed - 0.012 * groomOn + bob + this.dip + 0.002 * breathe * (1 - walking);
     const noseDown = 0.07 * this.feed - 0.045 * groomOn + 0.03 * this.crouch + 0.02 * this.sleep;
     const jt = this.joints;
     identity(jt, 0);
-    translate(jt, 0, PIVOT.thorax[0], height, PIVOT.thorax[2]);
+    // Transfer visible weight toward the supporting pairs as the other pair lifts.
+    translate(jt, 0, PIVOT.thorax[0], height, PIVOT.thorax[2] - 0.018 * frontOn + 0.035 * rearOn);
     rotateY(jt, 0, sway * 0.4 + 0.02 * this.turn * walking);
     rotateX(jt, 0, noseDown - this.pitch * this.flight);
     rotateZ(jt, 0, this.roll * this.flight + sway * ground);
 
     // Head: idle glances, leading the turn, bowing to feed and into the grooming sweeps.
     const head = J.head * 12;
-    const groomPitch = groomOn * sweep * (0.08 + 0.22 * stroke) * (0.6 + 0.4 * vigour);
-    const groomRoll = groomOn * sweep * 0.14 * Math.sin(TAU * 2 * this.boutPhase);
+    const groomPitch = frontOn * sweep * (0.08 + 0.22 * stroke) * (0.6 + 0.4 * vigour);
+    const groomRoll = frontOn > 0 ? frontOn * sweep * 0.14 * Math.sin(TAU * 2 * this.boutPhase) : 0;
     this.child(head, 0, PIVOT.neck, PIVOT.thorax, 1);
     rotateY(jt, head, this.idle[0] + 0.06 * this.turn * walking);
     rotateX(jt, head, this.idle[1] + 0.26 * this.feed + groomPitch - 0.1 * this.flight + 0.06 * this.crouch + 0.1 * this.sleep);
@@ -227,7 +256,7 @@ export class FlyRig {
       const o = (J.antenna + side) * 12, sign = side === 0 ? 1 : -1;
       this.child(o, head, PIVOT.antenna, PIVOT.neck, sign);
       rotateY(jt, o, sign * this.idle[2 + side * 2]);
-      rotateX(jt, o, this.idle[3 + side * 2] - 0.25 * this.flight + 0.15 * groomOn * rub);
+      rotateX(jt, o, this.idle[3 + side * 2] - 0.25 * this.flight + 0.15 * frontOn * rub);
     }
 
     this.proboscis(t);
@@ -250,8 +279,8 @@ export class FlyRig {
       rotateX(jt, o, flutter * 0.7 * (this.random() * 2 - 1) + 0.04 * breathe);
     }
 
-    this.legs(t, dt, push, groomOn, sweep, rub, sweepS, vigour);
     this.wingFrames();
+    this.legs(t, dt, push, frontOn, rearOn, antenna, wingClean, rearRub, sweep, rub, sweepS, vigour);
   }
 
   /** Where an anchor is in the model's space. */
@@ -259,7 +288,7 @@ export class FlyRig {
     const s = this.scratch;
     let x = 0, y = 0, z = 0;
     switch (name) {
-      case "mouth": x = PROBOSCIS.labellum * 0.75; break;
+      case "mouth": x = PROBOSCIS.labellum * 0.75; y = PROBOSCIS.padDepth * smooth(0.4, 0.85, this.feed); break;
       case "head": x = HEAD.centre[0]; y = HEAD.centre[1] - PIVOT.neck[1]; z = HEAD.centre[2] - PIVOT.neck[2]; break;
       case "leftEye":
       case "rightEye": {
@@ -328,38 +357,54 @@ export class FlyRig {
 
   private proboscis(t: number): void {
     const jt = this.joints, s = this.scratch, head = J.head * 12;
-    const e = smooth(0.05, 0.8, this.feed);
-    const pump = e * 0.5 * (1 + Math.sin(TAU * 1.7 * t));
+    // Schwarz et al. 2017 doi:10.7554/eLife.19892: rostrum lift,
+    // haustellum extension, labellar extension, then lobe spreading.
+    // Overlapping windows preserve a continuous reverse order on withdrawal.
+    const r = smooth(0.05, 0.45, this.feed);
+    const e = smooth(0.2, 0.7, this.feed);
+    const l = smooth(0.4, 0.85, this.feed);
+    const pad = smooth(0.65, 0.95, this.feed);
 
-    // The rostrum hinges down and forward out of the head.
+    const forwardLength = Math.hypot(jt[head + 2], jt[head + 10]) || 1;
+    const forwardX = jt[head + 2] / forwardLength, forwardZ = jt[head + 10] / forwardLength;
     transformPoint(jt, head, 0, PIVOT.proboscis[1] - PIVOT.neck[1], PIVOT.proboscis[2] - PIVOT.neck[2], s, 0);
-    this.sagittal(head, -1.25 + 1.75 * e, s, 9);
+    const targetX = s[0] + forwardX * 0.06, targetZ = s[2] + forwardZ * 0.06;
+    this.sagittal(head, -1.25, s, 9);
+    if (r > 0) {
+      // A fixed-length two-link reach keeps the pads seated as the head
+      // breathes. The cuticular stem must not telescope to imitate pumping.
+      const drop = s[1] - PROBOSCIS.padDepth;
+      const distance = Math.hypot(drop, 0.06), lr = PROBOSCIS.rostrum, lh = PROBOSCIS.haustellum;
+      const cosine = Math.max(-1, Math.min(1, (lr * lr + distance * distance - lh * lh) / (2 * lr * distance)));
+      const angle = Math.atan2(0.06, drop) - Math.acos(cosine);
+      const horizontal = Math.sin(angle);
+      s[9] += (forwardX * horizontal - s[9]) * r;
+      s[10] += (-Math.cos(angle) - s[10]) * r;
+      s[11] += (forwardZ * horizontal - s[11]) * r;
+      const length = Math.hypot(s[9], s[10], s[11]) || 1;
+      s[9] /= length; s[10] /= length; s[11] /= length;
+    }
     this.alongLateral(J.rostrum * 12, head, s[0], s[1], s[2], s[9], s[10], s[11]);
     transformPoint(jt, J.rostrum * 12, PROBOSCIS.rostrum, 0, 0, s, 3);
-
-    // The haustellum folds forward at rest; feeding, it reaches for the surface
-    // just ahead of the mouth, telescoping as far as it needs to.
-    const lift = PROBOSCIS.labellum * 0.55;
-    const dy = lift - s[4], dz = 0.035, reach = Math.sqrt(dy * dy + dz * dz);
+    const dx = targetX - s[3], dy = PROBOSCIS.padDepth - s[4], dz = targetZ - s[5];
+    const reach = Math.hypot(dx, dy, dz) || 1;
     this.sagittal(head, 1.4, s, 12);
-    let ax = s[12] * (1 - e), ay = s[13] + (dy / reach - s[13]) * e, az = s[14] + (dz / reach - s[14]) * e;
-    const al = Math.sqrt(ax * ax + ay * ay + az * az);
+    let ax = s[12] + (dx / reach - s[12]) * e, ay = s[13] + (dy / reach - s[13]) * e, az = s[14] + (dz / reach - s[14]) * e;
+    const al = Math.hypot(ax, ay, az) || 1;
     ax /= al; ay /= al; az /= al;
     const length = PROBOSCIS.haustellum;
-    const wanted = Math.min(length * 1.5, Math.max(length * 0.6, reach));
     this.alongLateral(J.haustellum * 12, head, s[3], s[4], s[5], ax, ay, az);
-    scaleX(jt, J.haustellum * 12, (1 + (wanted / length - 1) * e) * (1 - 0.06 * pump));
     transformPoint(jt, J.haustellum * 12, length, 0, 0, s, 6);
 
     // The labellum: folded up against the face at rest, its pad pressed flat to the surface when feeding.
     this.sagittal(head, 2.4, s, 15);
-    let lx = s[15] * (1 - e), ly = s[16] + (-1 - s[16]) * e, lz = s[17] + (0.08 - s[17]) * e;
+    let lx = s[15] * (1 - l) + forwardX * l, ly = s[16] * (1 - l), lz = s[17] * (1 - l) + forwardZ * l;
     const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
     lx /= ll; ly /= ll; lz /= ll;
     const lab = J.labellum * 12;
     this.alongLateral(lab, head, s[6], s[7], s[8], lx, ly, lz);
     // Its two lobes spread open on the food and work in quick pulses.
-    const spread = 1 + e * (0.3 + 0.12 * Math.sin(TAU * 5.3 * t));
+    const spread = 1 + pad * (0.3 + 0.025 * Math.sin(TAU * 5.3 * t));
     jt[lab + 2] *= spread; jt[lab + 6] *= spread; jt[lab + 10] *= spread;
   }
 
@@ -381,7 +426,7 @@ export class FlyRig {
     setFrame(jt, o, ax, ay, az, yx, yy, yz, ay * yz - az * yy, az * yx - ax * yz, ax * yy - ay * yx, x, y, z);
   }
 
-  private legs(t: number, dt: number, push: number, groomOn: number, sweep: number, rub: number, sweepS: number, vigour: number): void {
+  private legs(t: number, dt: number, push: number, groomOn: number, rearOn: number, antenna: number, wingClean: number, rearRub: number, sweep: number, rub: number, sweepS: number, vigour: number): void {
     const jt = this.joints, s = this.scratch, L = this.leg;
     const ground = 1 - ease(this.tuck);
 
@@ -392,8 +437,8 @@ export class FlyRig {
       this.home[i] = this.restHome[i] * inward + this.fidget[i];
       this.home[i + 2] = this.restHome[i + 2] + this.fidget[i + 2] + (pair === 1 ? 0.05 * groomOn : 0) + (pair === 2 ? 0.03 * groomOn : 0);
     }
-    if (this.flight > 0.5 || this.tuck > 0.5) this.gait.reset(this.home);
-    else this.gait.update(this.speed * ground, this.turn * ground, dt, this.home);
+    if (this.airborne && (this.flight > 0.5 || this.tuck > 0.5)) this.gait.reset(this.home);
+    else this.gait.update(this.travelSpeed, this.travelTurn, dt, this.home);
 
     const thorax = 0;
     for (let leg = 0; leg < LEG_COUNT; leg++) {
@@ -408,8 +453,9 @@ export class FlyRig {
       const hl = Math.sqrt(hx * hx + hz * hz) || 1;
       hx /= hl; hz /= hl;
       const g = 0.14 + 0.9 * lifted + 0.4 * push, b = 0.62 + 0.45 * lifted + 0.3 * push;
-      let dx = hx * Math.cos(g), dy = -Math.sin(g), dz = hz * Math.cos(g);
-      let bx = hx * Math.cos(b), by = -Math.sin(b), bz = hz * Math.cos(b);
+      const cg = Math.cos(g), cb = Math.cos(b);
+      let dx = hx * cg, dy = -Math.sin(g), dz = hz * cg;
+      let bx = hx * cb, by = -Math.sin(b), bz = hz * cb;
       let px = side * spec.knee[0], py = spec.knee[1], pz = spec.knee[2];
 
       // Grooming: the front legs leave the ground for the head.
@@ -420,14 +466,64 @@ export class FlyRig {
         transformPoint(jt, head, s[0], s[1], s[2], s, 9);
         rotateVector(jt, head, s[3], s[4], s[5], s, 12);
         rotateVector(jt, head, s[6], s[7], s[8], s, 15);
+        if (antenna > 0) {
+          const q = -0.75 + 1.5 * s[21], radial = ANTENNA.width * Math.sqrt(1 - q * q) + s[22];
+          const a = ANTENNA.funiculusAxis, c = ANTENNA.centre, n = ANTENNA.outward;
+          const x = side * (c[0] + a[0] * ANTENNA.length * q + n[0] * radial);
+          const y = c[1] + a[1] * ANTENNA.length * q + n[1] * radial;
+          const z = c[2] + a[2] * ANTENNA.length * q;
+          transformPoint(jt, (J.antenna + (side > 0 ? 0 : 1)) * 12, x, y, z, s, 18);
+          const blend = antenna * sweep;
+          s[9] += (s[18] - s[9]) * blend; s[10] += (s[19] - s[10]) * blend; s[11] += (s[20] - s[11]) * blend;
+        }
         fx += (s[9] - fx) * w; fy += (s[10] - fy) * w; fz += (s[11] - fz) * w;
         dx += (s[12] - dx) * w; dy += (s[13] - dy) * w; dz += (s[14] - dz) * w;
         bx += (s[15] - bx) * w; by += (s[16] - by) * w; bz += (s[17] - bz) * w;
         px += (side * 0.7 - px) * w; py += (0.1 - py) * w; pz += (0.7 - pz) * w;
       }
 
+      if (pair === 2 && rearOn > 0) {
+        // A contact stroke runs forward along the ipsilateral abdomen/wing;
+        // its return clears the cuticle. Tarsi point back along the surface.
+        const u = (this.groomPhase + (side > 0 ? 0 : 0.08)) % 1;
+        const stroke = u < 0.65 ? smooth(0, 0.65, u) : 1 - smooth(0.65, 1, u);
+        const clear = u < 0.65 ? 0 : 0.035 * Math.sin(Math.PI * (u - 0.65) / 0.35);
+        const rubPhase = TAU * this.groomPhase * 2 + (side > 0 ? 0 : Math.PI);
+        // Follow the posed cuticle and wing, including crop swelling and
+        // breathing, rather than sweeping an orbit outside their surfaces.
+        const q = -0.62 + 0.85 * stroke, t = (1 - q) / 2, radius = Math.sqrt(1 - q * q);
+        let start = 0, within = 0;
+        for (let seg = 0; seg < ABDOMINAL_SEGMENTS.length; seg++) {
+          const end = ABDOMINAL_SEGMENTS[seg];
+          if (t <= end) { within = (t - start) / (end - start); break; }
+          start = end;
+        }
+        const ridge = 1 + 0.018 * ease(within), offset = 0.003 + clear;
+        const z = ABDOMEN.centre[2] + ABDOMEN.radii[2] * q;
+        const x = side * (ABDOMEN.radii[0] * radius * 0.8660254 * ridge + 0.8660254 * offset);
+        const y = ABDOMEN.centre[1] + ABDOMEN.radii[1] * radius * 0.5 * ridge * 0.93 - 0.04 * t * t + 0.5 * offset;
+        const joint = z < PIVOT.abdomenTip[2] ? J.abdomenTip : J.abdomen;
+        const pivot = joint === J.abdomenTip ? PIVOT.abdomenTip : PIVOT.abdomen;
+        transformPoint(jt, joint * 12, x - pivot[0], y - pivot[1], z - pivot[2], s, 9);
+        if (wingClean > 0) {
+          transformPoint(this.wings, (side > 0 ? 0 : WING_COPIES) * 12, (0.3 + 0.3 * stroke) * WING.length, -0.04 * WING.length, 0, s, 18);
+          s[19] += offset;
+          s[9] += (s[18] - s[9]) * wingClean; s[10] += (s[19] - s[10]) * wingClean; s[11] += (s[20] - s[11]) * wingClean;
+        }
+        if (rearRub > 0) {
+          transformPoint(jt, thorax, side * 0.012, -0.17 + 0.016 * Math.cos(rubPhase), -0.49 + 0.035 * Math.sin(rubPhase), s, 18);
+          s[9] += (s[18] - s[9]) * rearRub; s[10] += (s[19] - s[10]) * rearRub; s[11] += (s[20] - s[11]) * rearRub;
+        }
+        rotateVector(jt, thorax, side * -0.2, -0.3, -0.93, s, 12);
+        rotateVector(jt, thorax, side * -0.15, 0.4, -0.9, s, 15);
+        fx += (s[9] - fx) * rearOn; fy += (s[10] - fy) * rearOn; fz += (s[11] - fz) * rearOn;
+        dx += (s[12] - dx) * rearOn; dy += (s[13] - dy) * rearOn; dz += (s[14] - dz) * rearOn;
+        bx += (s[15] - bx) * rearOn; by += (s[16] - by) * rearOn; bz += (s[17] - bz) * rearOn;
+        px += (side * 0.9 - px) * rearOn; py += (0.4 - py) * rearOn; pz += (-0.6 - pz) * rearOn;
+      }
+
       // In the air: folded and trailing, with a little swing from the airflow.
-      const a = ease(this.tuck);
+      const a = 1 - ground;
       if (a > 0) {
         const tk = TUCK[pair], wob = 0.012 * Math.sin(TAU * (3.1 + leg * 0.37) * t + leg);
         transformPoint(jt, thorax, side * tk.foot[0], tk.foot[1] + wob, tk.foot[2], s, 9);
@@ -465,8 +561,11 @@ export class FlyRig {
     const p = forward ? smooth(0, 0.62, u) : 1 - smooth(0.62, 1, u);
     const reach = 0.55 + 0.45 * vigour;
     const psi = -0.5 + 2.7 * p * reach;
-    const off = forward ? 0.012 : 0.05 * Math.sin(Math.PI * (u - 0.62) / 0.38);
-    const sx = ex + ax * 0.75 + 0.02 + off, sy = ey + ay * 0.95 * Math.cos(psi), sz = ez + az * 0.95 * Math.sin(psi);
+    const off = forward ? 0.003 : 0.035 * Math.sin(Math.PI * (u - 0.62) / 0.38);
+    const lx = ax * EYE_SWEEP_X, lz = az * EYE_SWEEP_R * Math.sin(psi);
+    const sx = ex + lx * EYE_C - lz * EYE_S + off;
+    const sy = ey + ay * EYE_SWEEP_R * Math.cos(psi), sz = ez + lx * EYE_S + lz * EYE_C;
+    s[21] = p; s[22] = off;
     // The tarsus lies back along the eye, the leg coming up from below.
     let tx = -0.35, ty = ay * Math.sin(psi), tz = -az * Math.cos(psi);
     const tl = Math.sqrt(tx * tx + ty * ty + tz * tz);
@@ -481,7 +580,9 @@ export class FlyRig {
     const rbx = -0.35, rby = 0.55, rbz = 0.75;
 
     const w = sweep, v = rub;
-    s[0] = side * (sx * w + rx * v); s[1] = sy * w + ry * v; s[2] = sz * w + rz * v;
+    s[0] = side * (sx * w + rx * v);
+    s[1] = sy * w + ry * v;
+    s[2] = sz * w + rz * v;
     s[3] = side * (tx * w + rdx * v); s[4] = ty * w + rdy * v; s[5] = tz * w + rdz * v;
     s[6] = side * (bx0 * w + rbx * v); s[7] = by0 * w + rby * v; s[8] = bz0 * w + rbz * v;
   }
@@ -506,12 +607,22 @@ export class FlyRig {
       haze = Math.max(haze, blur);
       const arc = amplitude * (1 - song) + SONG_ARC * song;
       const centre = mean * (1 - song) + SONG_ANGLE * song;
+      const rotationStrength = Math.max(strength, song * 0.12);
+      const elevationStrength = Math.max(strength, song * 0.2);
       const raise = (lift - 0.25 * this.crouch * open) * (1 - song) + SONG_LIFT * song;
       for (let c = 0; c < WING_COPIES; c++) {
+        // An imperceptible blur needs only its solid copy's frame. Reusing
+        // that frame avoids posing seven invisible copies on each side.
+        if (c > 0 && blur < 1e-5) {
+          const o = (w * WING_COPIES + c) * 12;
+          copy(wf, o, wf, w * WING_COPIES * 12);
+          this.wingAlpha[w * WING_COPIES + c] = 0;
+          continue;
+        }
         const phase = jitter + blur * (c / WING_COPIES) * 0.5;
         const sweepAngle = centre + 0.5 * arc * Math.cos(TAU * phase);
-        const elevation = raise + 0.07 * Math.sin(2 * TAU * phase) * blur;
-        const rotation = 0.7 * Math.sin(TAU * phase) * blur;
+        const elevation = raise + 0.07 * Math.sin(2 * TAU * phase) * blur * elevationStrength;
+        const rotation = 0.7 * Math.sin(TAU * phase) * blur * rotationStrength;
         const strokeAngle = (Math.PI / 2 + 0.13) * (1 - open) + sweepAngle * open;
         const elev = -0.1 * (1 - open) + elevation * open;
         const alpha = (c === 0 ? 1 : 0) * (1 - blur) + blur * (0.16 + (c === bright ? 0.2 : 0));

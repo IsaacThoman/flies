@@ -2,7 +2,8 @@
 // brain: boots it, waits for the brain, walks the menus with the keys (stepping
 // through where the fly lives carries it only where the choice rests), feeds
 // the fly and checks its taste senses and feed command, throws the ball until the fly takes
-// off, checks the wallpaper comes and goes with what it sees and its nervous
+// off, turns the camera with a swipe while the View tool is in hand, checks
+// the wallpaper comes and goes with what it sees and its nervous
 // system in a corner, that the X-ray comes where the fly is big enough,
 // carries the fly to every place, leaving its footprints behind each time,
 // feeds it the weather outside as the Apple TV would, reloads and finds the
@@ -18,10 +19,11 @@
 
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
-import { gameUp, openGame, readState, startServer, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
+import { gameUp, openGame, readState, startServer, swipe, waitFor, waitForGameTime, waitWithin } from "../../../scripts/play.ts";
 import { dropFood, feedHoney } from "./feeding.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import type { Game } from "../src/game.ts";
+import { chooseFlies, companyAwake, companyOf, disableScreensaver } from "./settings.ts";
 
 /** The frame's budget on the Apple TV. */
 const MAX_CALLS = 150;
@@ -300,6 +302,17 @@ try {
   });
   await waitFor(page, "eyesInset=top-right");
 
+  step("with View in hand a swipe on the touch surface turns the camera round the fly, as far as it went, and it stays there");
+  const unturned = Number((await readState(page)).yaw);
+  await swipe(page, [-0.5, 0], [0.3, 0]);
+  await page.waitForFunction((yaw) => Math.abs(Number((document.getElementById("game") as HTMLCanvasElement).dataset.yaw) - yaw) > 1, unturned, { timeout: 30_000 });
+  await waitForGameTime(page, 0.5);
+  const swiped = Number((await readState(page)).yaw);
+  // Round by three quarters of a drag across the screen for four tenths of the surface's width: 1.2 rad, the other way.
+  assert.ok(Math.abs(Math.atan2(Math.sin(swiped - unturned + 1.2), Math.cos(swiped - unturned + 1.2))) < 0.02, `${unturned} → ${swiped}`);
+  await waitForGameTime(page, 3);
+  assert.equal(Number((await readState(page)).yaw), swiped, "left alone, it stays");
+
   step("its nervous system: in the corner with what it sees, the fly as glass where it is big enough to see inside, never over the full picture");
   await page.evaluate(() => {
     const settings = (globalThis as unknown as { __fly: { settings: { nerves: string; xray: string } } }).__fly.settings;
@@ -307,9 +320,19 @@ try {
     settings.xray = "always";
   });
   await waitFor(page, "view=follow,eyesInset=top-right,nerves=top-right,xray>0.9");
-  // At rest its activity comes and goes: some of its regions glow within a few seconds.
-  const inside = await waitWithin(page, "glow~.", 5);
-  console.log(`  glowing: ${inside.glow.split(" ").slice(0, 4).join(" ")}`);
+  // At rest its brain can be all but silent: the fly keeps the real time of day,
+  // and in its siesta or at night it lies still with no region glowing. So it is
+  // stroked with the feather, which its brain answers at any hour (a sleeping fly
+  // included), and the glow is read while the stroke goes on.
+  await toTool("feather");
+  await page.keyboard.down("Enter");
+  await waitFor(page, "touch>0.9");
+  const inside = await waitFor(page, "glow~.");
+  await page.keyboard.up("Enter");
+  console.log(`  glowing while stroked: ${inside.glow.split(" ").slice(0, 4).join(" ")}`);
+  assert.ok(/head-bristles|bristles/.test(inside.glow), `the touch it feels lights its touch neurons: ${inside.glow}`);
+  await toTool("view");
+  await waitFor(page, "tool=view,view=follow,xray>0.9");
   await press("ArrowDown");
   await waitFor(page, "view=wide,xray<0.05");
   await press("ArrowUp");
@@ -411,6 +434,32 @@ try {
   assert.deepEqual([again.tool, again.variant, again.view, again.time, again.weather], ["feed", "sugar", "wide", "noon", "clear"]);
   const learned = await page.evaluate(() => JSON.parse(localStorage.getItem("flies.learned") ?? "{}") as Record<string, true>);
   assert.deepEqual(Object.keys(learned).sort(), ["arrival", "feed", "light", "place", "swoop", "tools", "view", "weather"], "the hints for what was used aren't taught again");
+
+  step("three flies chosen in Settings live, see and meet each other, survive a reload, then return to one");
+  await chooseFlies(page, 3);
+  const companions = companyOf(await companyAwake(page, 3));
+  assert.equal(new Set(companions.map((c) => `${c.x},${c.z}`)).size, 2, "companions stand apart");
+  await waitFor(page, "crowd=2");
+  await waitFor(page, "screen=play");
+  // A brain can rest for a while; observe each companion for at most 30 seconds of fly time.
+  const moved = new Set<number>();
+  for (let i = 0; i < 15 && moved.size < companions.length; i++) {
+    await waitForGameTime(page, 2);
+    const living = companyOf(await readState(page));
+    for (const [j, c] of living.entries()) {
+      assert.equal(c.crowd, 2, "each fly meets the other two");
+      assert.ok(c.eyes > companions[j].eyes, "each fly keeps seeing");
+      if (Math.hypot(c.x - companions[j].x, c.z - companions[j].z) > 0.05) moved.add(j);
+    }
+  }
+  assert.equal(moved.size, 2, "both companion brains move their own bodies");
+  await page.reload();
+  await disableScreensaver(page);
+  await waitFor(page, "brain=running,screen=title", 120_000);
+  await companyAwake(page, 3);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("flies.settings")!).flies), 3);
+  await chooseFlies(page, 1);
+  await waitFor(page, "flies=1,company=,crowd=0");
 
   step(`the frame's budget: at most ${maxCalls} draws and ${maxTriangles.toLocaleString("en-US")} triangles`);
   assert.ok(maxCalls > 0 && maxCalls < MAX_CALLS, `${maxCalls} draws`);

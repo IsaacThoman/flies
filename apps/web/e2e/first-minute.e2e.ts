@@ -1,7 +1,8 @@
 // Hold the real connectome at the network boundary: exploration must work
 // without a surrogate brain, then remain quiet after real use and a relaunch.
 import assert from "node:assert/strict";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import type { ChildProcess } from "node:child_process";
 import { parseArgs } from "node:util";
@@ -9,6 +10,7 @@ import { chromium } from "playwright";
 import { Fingers, canvasPoint, chromiumPath, contextFor, gameUp, gpuFlags, readState, screenOf, startServer, swipe, targetOf, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import type { Game } from "../src/game.ts";
 import { TOOLS } from "../src/tools/hands.ts";
+import { startServer as startRooms } from "../../server/src/server.ts";
 
 const { values } = parseArgs({ options: { url: { type: "string" }, shots: { type: "string" } } });
 let url = values.url;
@@ -49,6 +51,38 @@ try {
     await waitFor(page, "wallpaper=true");
     console.log("passed: bootstrap script failure and keyboard retry");
   } finally { await recovery.close(); }
+  const roomData = await mkdtemp(path.join(tmpdir(), "flies-first-minute-"));
+  const rooms = await startRooms({ port: 0, dataDir: roomData, log: () => {} });
+  const arriving = await browser.newContext();
+  let letBrainArrive!: () => void;
+  const brainGate = new Promise<void>((resolve) => { letBrainArrive = resolve; });
+  try {
+    await arriving.route("**/brain/connectome.*", async (route) => { await brainGate; await route.continue(); });
+    const page = await arriving.newPage();
+    const sockets: string[] = [];
+    page.on("websocket", (socket) => sockets.push(socket.url()));
+    const launch = new URL(url);
+    launch.searchParams.set("rooms", `ws://127.0.0.1:${rooms.port}/rooms`);
+    await page.goto(launch.href);
+    await gameUp(page);
+    await waitFor(page, "screen=loading,brain=loading,autoJoin=waiting");
+    await waitForGameTime(page, 0.5);
+    assert.deepEqual(sockets, [], "the loading screen never joins before the real brain arrives");
+    await page.keyboard.press("Enter");
+    await waitFor(page, "screen=play,brain=loading,autoJoin=waiting");
+    await waitForGameTime(page, 0.5);
+    assert.deepEqual(sockets, [], "Explore keeps the brain gate on automatic joining");
+    letBrainArrive();
+    await waitFor(page, "screen=play,brain=running,online=joined,everyone=yes");
+    assert.equal(sockets.length, 1, "the real brain waking starts one automatic room connection");
+    if (values.shots) await page.screenshot({ path: path.join(values.shots, "explore-auto-joined.png") });
+    console.log("passed: default room waits for the real brain, including early Explore");
+  } finally {
+    letBrainArrive();
+    await arriving.close();
+    await rooms.stop();
+    await rm(roomData, { recursive: true, force: true });
+  }
   for (const device of ["mouse", "touch", "remote"] as const) {
     const context = await browser.newContext(contextFor({ url, ...(device === "touch" ? { device: "iPhone 15" } : {}) }));
     let release!: () => void;
