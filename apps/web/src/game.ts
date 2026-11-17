@@ -579,6 +579,10 @@ export class Game implements Shell {
     const first = this.#frameVersion < 0;
     this.#frameVersion = this.display.version;
     const frame = this.display.frame;
+    if (!first) {
+      this.#inputs.pointers?.cancel();
+      this.#letGo();
+    }
     // The Apple TV's frame is the one everything starts in: nothing to resize there.
     if (frame !== TV_FRAME) {
       this.stage.resize(frame);
@@ -1311,7 +1315,8 @@ export class Game implements Shell {
     const hits = this.overlay.hits;
     if (hits.owner !== (this.#loading ? "loading" : this.nav.current)) return null;
     const { width, height } = this.shape.design;
-    const hit = hits.at(x * width, y * height, touchSlop(this.shape));
+    // Play targets already take a finger; padding them steals taps on the nearby world.
+    const hit = hits.at(x * width, y * height, this.nav.current === "play" ? 0 : touchSlop(this.shape));
     return hit?.kind === "panel" && this.nav.current === "play" ? null : hit;
   }
 

@@ -257,3 +257,55 @@ test("a finger dragging or pinching is input still, to keep the wallpaper away; 
   assert.equal(devices.at, 0);
   assert.equal(remote.lastInputAt, 9, "though it was input");
 });
+
+test("release displacement counts even when the browser sends no final move", () => {
+  for (const type of ["touch", "mouse"]) {
+    const { pointers, raw } = rig();
+    pointers.down(raw(1, type, 100, 100));
+    pointers.up(raw(1, type, 180, 100, 0), false);
+    assert.equal((pointers.gestures.at(-1) as Extract<Gesture, { type: "up" }>).tap, false);
+  }
+});
+
+test("an extra finger can move and lift without ending the original pair's pinch", () => {
+  const { pointers, raw } = rig();
+  pointers.down(raw(1, "touch", 400, 250));
+  pointers.down(raw(2, "touch", 600, 250));
+  pointers.down(raw(3, "touch", 800, 250));
+  pointers.endFrame();
+  pointers.move(raw(3, "touch", 900, 250));
+  pointers.up(raw(3, "touch", 900, 250, 0), false);
+  assert.deepEqual(types(pointers.gestures), []);
+  pointers.move(raw(2, "touch", 700, 250));
+  assert.ok(Math.abs((pointers.gestures[0] as Extract<Gesture, { type: "pinch" }>).scale - 1.5) < 1e-9);
+  pointers.up(raw(1, "touch", 400, 250, 0), false);
+  assert.deepEqual(types(pointers.gestures), ["pinch", "pinchEnd"]);
+});
+
+test("a layout or focus interruption drops queued actions and spends all surviving fingers", () => {
+  const { pointers, raw } = rig();
+  pointers.down(raw(1, "touch", 100, 100));
+  pointers.up(raw(1, "touch", 100, 100, 0), false);
+  pointers.down(raw(2, "touch", 200, 100));
+  pointers.cancel();
+  pointers.move(raw(2, "touch", 250, 100));
+  pointers.down(raw(3, "touch", 400, 100));
+  pointers.up(raw(2, "touch", 250, 100, 0), false);
+  pointers.up(raw(3, "touch", 400, 100, 0), false);
+  assert.deepEqual(types(pointers.gestures), ["cancel"]);
+  pointers.endFrame();
+  pointers.down(raw(4, "touch", 100, 100));
+  pointers.up(raw(4, "touch", 100, 100, 0), false);
+  assert.equal((pointers.gestures.at(-1) as Extract<Gesture, { type: "up" }>).double, false);
+});
+
+test("focus loss forgets contacts whose releases may never reach the page", () => {
+  const { pointers, raw } = rig();
+  pointers.down(raw(1, "touch", 100, 100));
+  pointers.cancel(true);
+  pointers.endFrame();
+  pointers.move(raw(1, "touch", 150, 100));
+  pointers.down(raw(2, "touch", 200, 100));
+  pointers.up(raw(2, "touch", 200, 100, 0), false);
+  assert.deepEqual(types(pointers.gestures), ["down", "up"]);
+});
