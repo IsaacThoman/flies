@@ -9,7 +9,7 @@ Airborne duration and grooming display occupancy include those body mechanisms; 
 | Metric | Literature value (reported spread) | Measured | Benchmark /10 | Source |
 |---|---:|---|---|---|
 | Walking speed median (mm/s) | 20 | 9.6500 | N/A | [Katsov et al. (2017)](https://doi.org/10.7554/eLife.26410), Table 4, Katsov row (2.0 cm/s) |
-| Time walking (fraction) | 0.54 (±0.17) | 0.5454 | N/A | [Cruz et al. (2021)](https://pmc.ncbi.nlm.nih.gov/articles/PMC8556163/), STAR Methods, Unsupervised segmentation of movement dynamics, opening paragraph |
+| Paper walking fraction; model activity proxy (fraction) | 0.54 (±0.17) | 0.5454 | N/A | [Cruz et al. (2021)](https://pmc.ncbi.nlm.nih.gov/articles/PMC8556163/), STAR Methods, Unsupervised segmentation of movement dynamics, opening paragraph |
 | Walk bout mean (s) | 22.6195 (±12.6052) | 1.8812 | N/A | [Paulk et al. (2013)](https://pmc.ncbi.nlm.nih.gov/articles/PMC4868374/), Table 1, No Electrode |
 | Walk bout frequency (1/s) | 0.0482 (±0.0039) | 0.2292 | N/A | [Paulk et al. (2013)](https://pmc.ncbi.nlm.nih.gov/articles/PMC4868374/), Table 1, No Electrode |
 | Saccade duration median (ms) | 90 | N/A | N/A | [Geurten et al. (2014)](https://doi.org/10.3389/fnbeh.2014.00365), Figure 1G and Results, Walking Drosophila perform saccades |
@@ -40,7 +40,7 @@ Blank: 0/8 eligible responses; 0/8 readiness failures; model Wilson 95% interval
 
 Optical probability mean: **6.21/10**; timing mean **0.00/10**; equal probability/timing composite **3.10/10**. 6/21 registered comparisons estimable. Whole-animal score: **N/A**. Registry-average bounds **0.59–7.73/10** describe only these rows, not biological fidelity or confidence intervals.
 
-Seed 1: 1.0000 recorded hours; 391.1 CPU seconds.
+Seed 1: 1.0000 recorded hours; 349.4 CPU seconds in the traced capture.
 
 Full sample counts, trial denominators, readiness failures, censoring, assay blockers and uncertainty labels are in JSON.
 
@@ -48,8 +48,8 @@ FlyEM male CNS connectome, Janelia Research Campus (CC-BY 4.0).
 
 ## Replication and source provenance
 
-Both recordings used clean runtime `29942c80c01ad5117290ac225205a58bf6ee9fb0`,
-rebased onto dev `cb9b9da277a0cfe1f84dd16538ea41286fd5b6a6`, including the
+The initial schema-3 recordings used clean runtime
+`29942c80c01ad5117290ac225205a58bf6ee9fb0`, rebased onto dev `cb9b9da277a0cfe1f84dd16538ea41286fd5b6a6`, including the
 upstream ON pathway (#104). Brain/body/world/Life/native production source has
 zero feature diff from that dev. The connectome SHA-256 remains
 `51c97031b39f93c04a683f16683d88f15d291f1e1062694fc0a215e23c3b895c`.
@@ -115,9 +115,8 @@ output remain separate validation questions.
 Flight requires ten consecutive 5 ms powered airborne frames in the first
 bout; a landing ends eligibility. Interrupted bursts and later jumps cannot
 qualify the first departure. Replay bounds takeoff and powered duration by the
-actual response/follow-up windows. Frame-level traces are not retained, so
-continuity is independently testable in the tracker but not reconstructible
-from raw frames in these captures. Body tarsal support makes flight follow
+actual response/follow-up windows. The initial schema-3 captures retained only summaries. The subsequent schema-4
+captures below retain the underlying frames and reproduce every observation. Body tarsal support makes flight follow
 most departures; this does not validate an autonomous neural flight controller.
 
 The balanced launch experiment was rejected and reverted (blind means 6.625
@@ -127,6 +126,31 @@ post-trigger impulse cannot restore a missing descending decision. No accepted
 body or brain change remains. Further mappings need an independently calibrated
 command-to-motion relationship, not a constant selected to improve this table.
 
+## Frame-verified replication
+
+Both cohorts were rerun with exact binary observations. The first capture used
+clean runtime `bb92d33f2985e5617da0a2e584f9917423489869`; replication used
+`3936fa39d151f15b00b64c253f05aea7ebba5c7f` (documentation-only difference).
+Production brain/body/world/Life/native code still equals dev `cb9b9da2`.
+All original free metrics and all 224 original optical trial observations are
+**exactly equal** to their schema-3 counterparts. Scores remain 3.104167 and
+3.413598. Raw data total **225 files / 20,723,976 bytes**: 360,000 free frames
+and 224 optical traces. All digests and supplied replay checks pass.
+Three fresh blind reviewers independently decoded the files and reconstructed
+the free motion, first departures and uninterrupted powered-flight classifications.
+
+Across the two optical cohorts, **4,403/4,403** and **4,331/4,331** counted
+powered first-bout frames have raw neural wing command below 0.6 alongside a
+body reflex floor at least 0.6. This is a descriptive association, not an
+ablation proving causation; command smoothing also exists. It prevents these
+flight endpoints from being presented as autonomous neural flight control.
+Readiness waiting frames and retinal arrays are not retained; stationary
+eligibility and sensory delivery therefore lack the same frame-level proof.
+
+The traced free run used **349.413 CPU s / 350.068 wall s**. Variation from
+the earlier run is not a controlled performance comparison. A separate
+synthetic observer-cost experiment is described in [trace format](traces.md).
+
 The review history and test provenance are in `review-log.md`. Earlier
 unclocked and clock-pinned reports remain versioned history, rather than being
 silently overwritten or presented as current evidence.
@@ -134,10 +158,12 @@ silently overwritten or presented as current evidence.
 
 ## Verification on this runtime
 
-The farm tested merge `dfdf08c9`, tree
-`17a1ba9502b7dff360974f5fb1c6461e222c3389`, identical to capture/runtime
-`29942c80`. Lint, web types, tvOS types and build pass. Functional unit tests:
-**1105 passed, zero failed, three recorded platform/data/toolchain skips**.
+The final exact-source farm run `20261117T051219-241399` tested runtime
+`bb92d33f`, including trace/replay code: lint, web types, tvOS types and build
+pass; **1108 functional tests passed, zero failed, three recorded
+platform/data/toolchain skips**. Focused audit tests: **28/28 passed**.
+The earlier merge `dfdf08c9`, tree `17a1ba9502b7dff360974f5fb1c6461e222c3389`,
+identical to runtime `29942c80`, passed 1105 functional tests with three skips.
 The farm omits five named Apple-silicon WASM cases by policy; seven WASM cases
 including those five passed on the Mac, as did its additional arm64 FMA guard.
 All **five current CPU budgets pass**, zero skips. The all-senses brain case is
@@ -156,7 +182,8 @@ The extra browser play test fails waiting for `wallpaper=false` on the feature
 and the unchanged `cb9b9da2` control (549 s and 626 s). Pointer e2e fails reading
 an undefined `held` property during orientation-change testing (860 s).
 These are recorded failures, not passes or fixes claimed here; no production
-UI or browser-test feature diff exists. Remaining browser-suite results are
-recorded in the review log when complete. Historical CPU failures and skips
+UI or browser-test feature diff exists. Web/offline passed (257 s); tables failed waiting for restaurant/epoch 1 after
+a move (441 s). Only play was independently repeated on unchanged dev.
+The final exact-source audit run selected unit tests, not browser suites. Historical CPU failures and skips
 remain preserved in the earlier reports and review log rather than being
 erased by the later passing run.

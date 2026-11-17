@@ -317,3 +317,56 @@ script-only container failure under 20261117T041210-195633; unchanged-dev play
 control under 20261117T043112-212105. The script-only container cannot see linked
 Git metadata; its intended eight tests pass on the farm host in the matching
 checkout. This is a wrapper workaround, not an infrastructure fix.
+
+
+## Raw-frame verification round
+
+Key: **B4 = summary-only cb9b9da2; J6 = traced cb9b9da2**. Orders were H4
+B4/J6, P7 J6/B4, A3 J6/B4. Fresh independent reviewers saw only rubric,
+neutral source archives and unlabelled measurements; each searched primary
+papers independently. Production sources and all original observations match.
+
+| Reviewer | Set | Validity | Honesty | Behaviour | Regressions/cost | Mean | Ranking |
+|---|---|---:|---:|---:|---:|---:|---|
+| H4 | B4 | 6 | 7 | 2 | 8 | 5.75 | J6 > B4 |
+| H4 | J6 | 7 | 7 | 2 | 8 | 6.00 | |
+| P7 | B4 | 6.5 | 6.5 | 2 | 8 | 5.75 | J6 > B4 |
+| P7 | J6 | 7.5 | 7 | 2 | 8 | 6.125 | |
+| A3 | B4 | 6.5 | 7.5 | 2 | 8 | 6.00 | J6 > B4 |
+| A3 | J6 | 7.5 | 8 | 2 | 8.5 | 6.50 | |
+
+Mean **J6 6.2083**, **B4 5.8333**; all three prefer J6. The gain is audit
+assurance, not changed biological behaviour. All three checked source hashes
+and independently decoded 360,000 free frames plus all 224 optical traces.
+Free motion, complete/censored bouts, first departure and uninterrupted power
+reproduce. The 9.65 mm/s speed median is the documented histogram-bin centre;
+the exact frame median is 9.6004 mm/s. Current optical composites reproduce
+3.104167 and 3.413598. Central numeric reference values hold up again. H4
+could not complete the light-off and SD/SE wording checks; P7/A3 independently
+confirmed those primary-source statements. No acceptance range is inferred.
+
+All 8,734 counted powered first-bout frames have raw wing command below 0.6
+and reflex floor at least 0.6. Reviewers correctly treat this as descriptive,
+not a causal ablation. One connectome, one free seed, unmatched assays,
+unsupported feeding and missing broad validation keep behaviour at 2/10.
+Retaining readiness waiting and delivered facet fields is their shared next
+idea. Those arrays are not in this trace format; the limitation is explicit.
+
+Fresh regression-only reviewer W5, order B4/J6, scored no-regression assurance
+**J6 8/10, B4 7/10**, preferring J6. Its rubric vectors were J6 [7,8,2,8] and
+B4 [6,7,2,8]. It found no production regression, independently reproduced the
+frames and rejected corrupt in-memory records. Its three findings were the
+old activity-as-walking label (corrected), unresolved browser failures, and
+unmeasured observer cost. The latter prompted a subsequent deterministic
+fixture: five fresh processes per condition, 360,000 frames each, identical
+metric hashes, median CPU 0.033760 s off / 0.616647 s on; peak RSS 82,688 /
+83,456 KiB; 14,400,008 bytes per traced fixture. This measures writing, not
+full replay or CNS throughput. Procedure/scope are in `traces.md`. Reviewers
+did not see this later fixture; their scores are not retrospectively raised.
+
+The final exact-source farm run 20261117T051219-241399 tested bb92d33f:
+1108 functional passes, zero failures, three skips; lint/web types/tvOS types/
+build pass. Eight host script tests pass. The unchanged production core also
+has seven local WASM parity passes, its arm64 FMA guard and all five CPU
+budgets passing. Browser failures and missing active-ON workload cost coverage
+remain recorded; no all-green or idle-machine claim follows.

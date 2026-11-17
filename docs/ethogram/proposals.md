@@ -129,3 +129,28 @@ change belongs to the upstream visual work, not the ethogram feature diff.
 All five current CPU budgets pass, but the all-senses brain case supplies only
 scalar senses; it does not exercise active visual withdrawals. A controlled
 native/WASM checkerboard, grating and flicker cost replay remains needed.
+
+
+## Steering raw-data audit — no calibrated gain claimed
+
+The public bilateral DNa02 source is [Rayshubskiy et al., eLife 102230,
+Figures 2–3](https://pmc.ncbi.nlm.nih.gov/articles/PMC12279373/), with
+[data DOI 10.7910/DVN/0NCLP1](https://doi.org/10.7910/DVN/0NCLP1). Four paired recordings are
+available. The shortest file (a2_d_13) was downloaded and matched its published
+MD5 `c3f95c76e9efc1a5b2277e7ee958143e`; SHA-256
+`a460eb313b503b039b3eeec554efd902b54119aadfd783c72210efaee2daee24`.
+It contains 5,750,000 samples in each voltage channel and 57,500 ball samples,
+not a ready-made neuronal-rate-to-yaw calibration. The paper uses virgin
+females 1–2 days after eclosion on a spherical treadmill, unlike the male model.
+
+The [archived secondary-analysis import notebook](https://github.com/wilson-lab/rayshubskiy_elife_102230_secondary_analysis_code/blob/7e2895349266b5cc5fa1bf53ad56e8ecc6c842e8/import_preprocess_data.ipynb) identifies ephys_A/B as left/
+right DNa02 and selects a prominence of 15 for its a2_d_13 example, while noting
+that thresholds need per-recording inspection. It uses 12.5 ms bins / 25 ms
+Gaussian smoothing; the paper's Methods state 1.25 ms / 2.5 ms. These describe
+different preprocessing scales and must be reconciled against the final figure
+pipeline before a transfer gain is promoted as validated. The notebook also
+contains provisional unit-scaling notes. Neither plot-axis limits nor one
+unreconciled recording supplies a universal body gain. No steering constant is
+changed or numeric calibration target invented here. A further experiment
+should establish units, per-recording spike extraction, temporal alignment,
+state conditioning and between-fly uncertainty across all four recordings.

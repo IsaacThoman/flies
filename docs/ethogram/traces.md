@@ -37,3 +37,34 @@ Schema 3 has no such trace proof. Either can supply the same limited optical
 engineering comparison; raw traces do not make mismatched assays biologically
 valid or create absent feeding, grooming or flight-control circuits. Whole-fly
 fidelity stays unidentified. A score is not increased merely for retaining data.
+
+## Recorded verification and observer cost
+
+The dev cb9b9da2 capture retains 360,000 free frames and 224 optical traces in
+225 files, 20,723,976 bytes. Three blind reviewers used independent decoders
+and reproduced the reported observations; the two engineering composites stay
+3.104167 and 3.413598. See [current measurements](current-dev.md) for exact
+runtime hashes and the distinction between neural command and body support.
+
+A synthetic on/off fixture isolates writing cost without running a brain.
+It feeds 360,000 identical 10 ms frames to `Ethogram`, moving 0.1 mm per frame
+for the middle 100 frames of each 200-frame cycle, otherwise stopping.
+Tracing additionally writes the resulting position and flags through
+`FrameWriter` and closes/hashes the file. Ten fresh Node processes use order
+off/on/on/off/off/on/on/off/off/on, five measurements per condition. Every
+result has the same metric SHA-256. Files are removed after each sample.
+
+| Measurement | Tracing off, median | Tracing on, median |
+|---|---:|---:|
+| Loop plus close CPU time | 0.033760 s | 0.616647 s |
+| Whole-process peak RSS | 82,688 KiB | 83,456 KiB |
+| Bytes written | 0 | 14,400,008 |
+
+Incremental median CPU is **0.582887 s per 360,000 frames**; median peak-RSS
+difference is 768 KiB. CPU excludes imports/construction and includes file
+close/hash. RSS includes process startup; Node reports `resourceUsage().maxRSS`
+in [KiB](https://nodejs.org/api/process.html#processresourceusage). Local cached
+filesystem behaviour and host load (about 3.4) limit extrapolation. This fixture
+measures writing, not whole-file replay cost or complete real-CNS throughput.
+It establishes identical observed metrics for this deterministic input and
+quantifies offline observer cost; it is not an app CPU-budget result.
