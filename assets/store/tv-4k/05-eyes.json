@@ -1,0 +1,13 @@
+{
+  "width": 3840,
+  "height": 2160,
+  "story": "05-eyes",
+  "fingerprint": "9928b0be",
+  "frames": 301,
+  "neurons": 166700,
+  "activity": "walking",
+  "eaten": 0,
+  "takeOffs": 0,
+  "eyeUpdates": 101,
+  "peers": 0
+}

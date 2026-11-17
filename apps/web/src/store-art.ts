@@ -97,14 +97,20 @@ async function capture(story: StoreStory, tv = false) {
     const driver = new CaptureBrain(wasm.create(179 + index));
     localStorage.clear();
     const place = story === "06-rain" ? "windowsill" : story === "07-night" ? "bar" : "picnic";
-    localStorage.setItem("flies.settings", JSON.stringify({ place, scene: place, wallpaperAfter: 0, hints: false, stats: false, eyesInset: "off", nerves: "off", statsPanel: "off", xray: story === "04-inside" ? "always" : "off", realWeather: false }));
-    localStorage.setItem("flies.shelf", JSON.stringify({ light: { kind: story === "07-night" ? "night" : "noon", at: Date.now() }, weather: { kind: story === "06-rain" ? "rain" : "clear", at: Date.now() } }));
+    localStorage.setItem("flies.settings", JSON.stringify({ place, scene: place, wallpaperAfter: 0, hints: false, stats: false, eyesInset: "off", nerves: story === "04-inside" ? "always" : "off", statsPanel: "off", xray: story === "04-inside" ? "always" : "off", realWeather: false }));
+    localStorage.setItem("flies.shelf", JSON.stringify({ light: { kind: story === "07-night" || story === "04-inside" ? "night" : "noon", at: Date.now() }, weather: { kind: story === "06-rain" ? "rain" : "clear", at: Date.now() } }));
     const canvas = index === 0 ? document.getElementById("game") as HTMLCanvasElement : document.body.appendChild(document.createElement("canvas"));
     if (index) canvas.className = "peer";
     const display = new Display(tv);
     const devices = new Devices(tv ? "remote" : "touch");
     const remote = new Remote(window, undefined, devices);
     const game = new Game(canvas, remote, driver, display, { devices });
+    // Each visual sample must reach the next fixed step, independent of GPU fence timing.
+    const renderer = game.stage.renderer;
+    renderer.readRenderTargetPixelsAsync = async (...args) => {
+      renderer.readRenderTargetPixels(...args);
+      return args[5];
+    };
     game.play();
     games.push(game);
     return game;
@@ -141,25 +147,32 @@ async function capture(story: StoreStory, tv = false) {
     game.director.setView("follow");
     tool("view", "eyes");
   } else {
-    const view = story === "06-rain" || story === "07-night" ? "wide" : story === "08-together" ? "follow" : "close";
+    const view = story === "07-night" || story === "06-rain" ? "table" : story === "08-together" || story === "03-flight" ? "wide" : "close";
     game.hands.chooseView(view); game.director.setView(view);
   }
   if (story === "04-inside") tool("view", "inside");
   let captured = false;
   for (let frame = 0; frame < 1800; frame++) {
     now = (frame + 1) * (1000 / 60);
+    if (story === "03-flight" && frame === 220) game.director.turnBy(-0.5, 0.45);
     if (story === "03-flight" && frame >= 240 && frame % 180 === 60) {
       game.hands.release();
       game.hands.update(0, { use: true, holding: false, eye: game.director.camera.position }, game.life.body, game.life.pantry);
     }
     for (const g of games) g.frame(1 / 60, now);
     table?.tick();
+    // Complete the eyes' sample/cleanup promise chain before advancing game time.
+    for (let i = 0; i < 4; i++) await Promise.resolve();
     const ready = frame >= 300;
     const chosen = story === "02-feeding" ? game.life.eating && game.fly.pose.feed > 0.15 : story === "03-flight" ? game.life.body.mode === "airborne" && game.fly.pose.wings > 0.4 : true;
     if (ready && chosen) { captured = true; break; }
   }
   if (!captured) throw new Error(`The brain did not choose ${story} within 30 seconds`);
   if (story === "08-together" && game.online!.others.list.filter(o => o.present).length !== 2) throw new Error("Missing real peers");
-  return { story, frames: Math.round(now * 60 / 1000), neurons: game.brain.neurons, activity: game.life.activity, eaten: game.life.eaten, takeOffs: game.life.takeOffs, peers: game.online?.others.list.filter(o => o.present).length ?? 0 };
+  const body = game.life.body;
+  const state = JSON.stringify({ position: body.position, yaw: body.yaw, velocity: body.velocity, command: game.brain.state?.command, rates: Array.from(game.brain.regionRates), light: game.life.light });
+  let fingerprint = 2166136261;
+  for (let i = 0; i < state.length; i++) fingerprint = Math.imul(fingerprint ^ state.charCodeAt(i), 16777619) >>> 0;
+  return { story, fingerprint: fingerprint.toString(16), frames: Math.round(now * 60 / 1000), neurons: game.brain.neurons, activity: game.life.activity, eaten: game.life.eaten, takeOffs: game.life.takeOffs, eyeUpdates: game.eyes.updates, peers: game.online?.others.list.filter(o => o.present).length ?? 0 };
 }
 (globalThis as unknown as { __store: unknown }).__store = { capture, ready: true };

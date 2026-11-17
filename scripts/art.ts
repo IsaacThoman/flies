@@ -5,7 +5,7 @@
 //
 //   node scripts/art.ts [--out <dir>] [--only <path prefix>]   (default: all of them, into assets/)
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
 import type { ArtShot } from "../apps/web/src/art.ts";
@@ -17,16 +17,16 @@ const only = args.includes("--only") ? args[args.indexOf("--only") + 1] : "";
 
 type Shot = Omit<ArtShot, "width" | "height">;
 
-// The home-screen icon: the fly in close-up on the napkin, with the whole
-// strawberry and the cherries behind it and the lake beyond. Three layers,
-// back to front, that tvOS moves apart: the sky and hills, the table and
-// fruit, the fly.
-const ICON: Omit<Shot, "layer"> = {
-  fly: { x: -14, z: 56 },
-  camera: { around: Math.PI + 0.4, distance: 6.6, height: 2.0, fov: 36, aimAbove: 1.25 },
-  turn: -0.6,
-  time: "noon",
+// Alternate shots share only the actual picnic scene: the fruit is far enough
+// behind the fly to read as fruit without dwarfing its silhouette.
+const compositions: Record<string, Omit<Shot, "layer">> = {
+  picnic: { fly: { x: -9, z: -40 }, camera: { around: Math.PI + 0.15, distance: 6.0, height: 1.8, fov: 34, aimAbove: 0.8 }, turn: -0.6, time: "noon", bubbles: false },
+  berry: { fly: { x: -40, z: 30 }, camera: { around: Math.PI + 0.96, distance: 6.0, height: 3.2, fov: 34, aimAbove: 0.8 }, turn: -0.6, time: "golden", bubbles: false },
+  cherry: { fly: { x: -60, z: 35 }, camera: { around: Math.PI + 0.12, distance: 6.0, height: 2.0, fov: 34, aimAbove: 0.8 }, turn: -0.6, time: "morning", bubbles: false },
 };
+const composition = args.includes("--composition") ? args[args.indexOf("--composition") + 1] : "picnic";
+if (!compositions[composition]) throw new Error(`Unknown composition: ${composition}`);
+const ICON = compositions[composition];
 const ICON_LAYERS = [
   ["1-sky", "backdrop"],
   ["2-table", "table"],
@@ -36,8 +36,8 @@ const ICON_LAYERS = [
 // The Top Shelf: a wide, low look across the napkin, the fly to one side of the middle (tvOS may crop the edges).
 const SHELF: Shot = {
   layer: "all",
-  fly: { x: -14, z: 56 },
-  camera: { around: Math.PI + 0.4, distance: 10, height: 1.6, fov: 26, aimAbove: 1.1, shiftRight: 1.6 },
+  fly: { x: -9, z: -40 },
+  camera: { around: Math.PI + 0.15, distance: 8.5, height: 1.4, fov: 26, aimAbove: 0.8, shiftRight: 1.2 },
   turn: -0.5,
   time: "morning",
 };
@@ -45,8 +45,8 @@ const SHELF: Shot = {
 // The launch image: what the loading screen shows (the fly small and to the left, as the camera's title shot frames it), with the wordmark.
 const SPLASH: Shot = {
   layer: "all",
-  fly: { x: -14, z: 56 },
-  camera: { around: Math.PI + 0.4, distance: 16, height: 2.2, fov: 30, aimAbove: 1.0, shiftRight: 4.3 },
+  fly: { x: -9, z: -40 },
+  camera: { around: Math.PI + 0.15, distance: 12, height: 1.6, fov: 30, aimAbove: 0.9, shiftRight: 2.9 },
   turn: -0.6,
   time: "noon",
   wordmark: { y: 0.31, size: 0.133 },
@@ -54,18 +54,18 @@ const SPLASH: Shot = {
 
 // The web app's icons: the fly close up on the napkin, square. The maskable
 // one is framed looser, since a launcher may cut it to a circle 80% as wide.
-const WEB_ICON: Shot = { ...ICON, layer: "all", camera: { ...ICON.camera, distance: 7.2, fov: 34, aimAbove: 1.0 } };
-const WEB_MASKABLE: Shot = { ...WEB_ICON, camera: { ...WEB_ICON.camera, distance: 10 } };
+const WEB_ICON: Shot = { ...ICON, layer: "all", camera: { ...ICON.camera, distance: 6.3, fov: 34, aimAbove: 0.8 } };
+const WEB_MASKABLE: Shot = { ...WEB_ICON, camera: { ...WEB_ICON.camera, distance: 8.3 } };
 // The browser tab's icon: the fly alone, nearly from above, so it reads at 32 pixels.
 const FAVICON: Shot = { ...ICON, layer: "fly", camera: { around: Math.PI + 0.4, distance: 1.2, height: 4.0, fov: 34, aimAbove: 0.3 }, turn: -0.9 };
 // The link preview: the launch image's shot at the shape link previews use.
-const PREVIEW: Shot = { ...SPLASH, camera: { ...SPLASH.camera, distance: 14, shiftRight: 3.6 }, wordmark: { y: 0.3, size: 0.15 } };
+const PREVIEW: Shot = { ...SPLASH, camera: { ...SPLASH.camera, distance: 10, shiftRight: 2.2 }, wordmark: { y: 0.3, size: 0.15 } };
 // The iPhone and iPad icon is the web app's, at 1024, opaque (the system rounds the corners), and
 // the same at night for the dark appearance. Their launch image: the fly in the middle of a square
 // that the launch screen crops to the screen's shape, from a tall phone's narrow strip to a wide
 // iPad's band, so the fly is in every crop; no wordmark, since where the loading screen puts it
 // depends on the screen.
-const IOS_LAUNCH: Shot = { ...ICON, layer: "all", camera: { ...ICON.camera, distance: 26, height: 3.4, fov: 30, aimAbove: 0.9 } };
+const IOS_LAUNCH: Shot = { ...ICON, layer: "all", camera: { ...ICON.camera, distance: 16, height: 3.4, fov: 30, aimAbove: 0.9 } };
 
 const jobs: { file: string; shot: ArtShot }[] = [];
 for (const [file, size] of [["icon-512", 512], ["icon-192", 192], ["apple-touch-icon", 180]] as const) jobs.push({ file: `web/${file}.png`, shot: { ...WEB_ICON, width: size, height: size } });
@@ -84,20 +84,33 @@ for (const [variant, w] of [["standard", 1920], ["wide", 2320]] as const) {
 for (const [w, h] of [[1920, 1080], [3840, 2160]]) jobs.push({ file: `splash/splash-${w}x${h}.png`, shot: { ...SPLASH, width: w, height: h } });
 
 const { url, server } = await startServer();
-const browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
+let browser;
 try {
+  browser = await chromium.launch({ executablePath: chromiumPath(), args: gpuFlags() });
   const page = await browser.newPage();
   page.on("pageerror", (error) => console.error(error.message));
   await page.goto(new URL("art.html", url).href);
   await page.waitForFunction(() => (globalThis as unknown as { __art?: { ready: boolean } }).__art?.ready, null, { timeout: 60_000 });
+  await page.addStyleTag({ content: "html,body{background:transparent!important}canvas{display:none}#export{display:block}" });
+  await page.evaluate(() => {
+    const img = document.createElement("img");
+    img.id = "export";
+    document.body.appendChild(img);
+  });
   for (const { file, shot } of jobs.filter((j) => j.file.startsWith(only))) {
     const data = await page.evaluate((s) => (globalThis as unknown as { __art: { render(s: ArtShot): string } }).__art.render(s), shot);
     const target = path.join(out, file);
     mkdirSync(path.dirname(target), { recursive: true });
-    writeFileSync(target, Buffer.from(data.split(",")[1], "base64"));
+    await page.evaluate(async data => {
+      const img = document.getElementById("export") as HTMLImageElement;
+      img.src = data;
+      await img.decode();
+    }, data);
+    // Chromium's opaque screenshots encode RGB; canvas.toDataURL retains an alpha channel.
+    await page.locator("#export").screenshot({ path: target, omitBackground: shot.layer === "fly" || shot.layer === "table" });
     console.log(`${file} ${shot.width}x${shot.height}`);
   }
 } finally {
-  await browser.close();
+  await browser?.close();
   server.kill();
 }

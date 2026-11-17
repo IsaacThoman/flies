@@ -35,6 +35,7 @@ export type ArtShot = {
   turn: number;
   time: TimeOfDay;
   pose?: Partial<FlyPose>;
+  bubbles?: boolean;
   /** Draws the wordmark over the picture, centred at this height (fraction of the height) and this tall (fraction). */
   wordmark?: { y: number; size: number };
 };
@@ -104,7 +105,7 @@ function renderTo(target: THREE.WebGLRenderTarget, shot: ArtShot) {
   camera.far = NEAR.far;
   camera.updateProjectionMatrix();
   stage.set.group.visible = showTable;
-  bubbles.mesh.visible = showTable;
+  bubbles.mesh.visible = showTable && shot.bubbles !== false;
   fly.root.visible = showFly;
   if (fly.shadow) fly.shadow.visible = showTable;
   r.render(stage.scene, camera);

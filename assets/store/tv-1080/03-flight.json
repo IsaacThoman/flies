@@ -1,0 +1,13 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "story": "03-flight",
+  "fingerprint": "3aee4d40",
+  "frames": 301,
+  "neurons": 166700,
+  "activity": "flying",
+  "eaten": 0,
+  "takeOffs": 1,
+  "eyeUpdates": 141,
+  "peers": 0
+}

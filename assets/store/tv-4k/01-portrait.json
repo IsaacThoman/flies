@@ -1,0 +1,13 @@
+{
+  "width": 3840,
+  "height": 2160,
+  "story": "01-portrait",
+  "fingerprint": "bab7b97",
+  "frames": 301,
+  "neurons": 166700,
+  "activity": "turning",
+  "eaten": 0,
+  "takeOffs": 0,
+  "eyeUpdates": 101,
+  "peers": 0
+}

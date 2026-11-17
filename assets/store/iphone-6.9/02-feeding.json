@@ -1,0 +1,13 @@
+{
+  "width": 2868,
+  "height": 1320,
+  "story": "02-feeding",
+  "fingerprint": "8170232a",
+  "frames": 301,
+  "neurons": 166700,
+  "activity": "feeding",
+  "eaten": 0.43871583204344466,
+  "takeOffs": 0,
+  "eyeUpdates": 101,
+  "peers": 0
+}

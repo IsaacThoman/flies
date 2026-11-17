@@ -31,4 +31,19 @@ iPhone 6.9-inch 2868×1320, iPad 13-inch 2752×2064, TV 1920×1080 and 3840×216
 Phone captures use a 956×440 CSS viewport at 3×, and iPad uses 1376×1032 at 2×, with
 coarse touch input. TV captures use the actual 640×480 game buffer stretched to 16:9,
 with the remote's interface. There are no promotional overlays or retouched game pixels.
-`--verify` repeats each selected capture in a fresh page and fails if PNG bytes differ.
+`--verify` repeats each selected capture in a fresh page. Simulation records and a fingerprint
+of body position/velocity, motor commands, neural region rates and eye input must match exactly.
+PNGs are compared byte for byte first. Where GPU glass/nerve rasterization rounds differently,
+the verifier permits at most three channel levels in no more than 0.01% of pixels; larger image
+differences fail. A TV capture also showed a two-level difference in 30 pixels. The first observation was a one-level blue difference in 12 of 3,785,760
+pixels. The script preserves the first image unchanged.
+
+The eyes read back the real rendered eye views synchronously for capture, then complete their
+normal sampling promises before the next step. This prevents GPU fence timing from changing
+which visual input reaches a given brain tick. Capture records include completed eye updates.
+
+The eight-story sequence is portrait, feeding on strawberry juice, Swoop flight, night X-ray
+with its normal nervous-system panel, fly's eyes, the rainy kitchen windowsill, the bar at night,
+and three flies at a morning picnic table. These are normal camera/tool/settings choices,
+with one initial placement on existing fruit for feeding. The flight camera uses the same
+turn gesture available in play; the camera implementation is unchanged.
