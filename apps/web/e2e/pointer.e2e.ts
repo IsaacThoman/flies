@@ -29,7 +29,7 @@ import { Fingers, canvasPoint, openGame, readState, screenOf, startServer, targe
 
 import type { Game } from "../src/game.ts";
 import { dropFood, feedHoney } from "./feeding.ts";
-import { disableScreensaver } from "./settings.ts";
+import { pinSettings } from "./settings.ts";
 
 /** The frame's budget on the Apple TV, as play.e2e.ts holds it to. */
 const MAX_CALLS = 150;
@@ -94,7 +94,7 @@ function budget(page: Page) {
 
 async function fingers() {
   const { browser, page, errors } = await openGame({ url, device: "iPhone 15" });
-  await disableScreensaver(page);
+  await pinSettings(page);
   // What a native host on a phone with a notch says it covers.
   await page.setViewportSize({ width: 393, height: 852 });
   await page.evaluate(() => {
@@ -237,7 +237,7 @@ async function fingers() {
 
 async function mouse() {
   const { browser, page, errors } = await openGame({ url, width: 1280, height: 720 });
-  await disableScreensaver(page);
+  await pinSettings(page);
   const cost = budget(page);
   const click = async (kind: string, index?: number) => {
     const p = await canvasPoint(page, await targetOf(page, kind, index));

@@ -240,7 +240,7 @@ test("the title leaves room for the fly, clear of the name, the brain's state an
 test("at a room, its QR code and code are beside the menu or over it, inside the safe area, clear of the hints, and big enough to scan across a room", () => {
   // The starter of a full room: Remove for each of the other seven, and Share and Leave.
   const others = Array.from({ length: 7 }, (_, i) => ({ id: i + 2, colour: "#e53" }));
-  const table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://flies.isaacthoman.com/?table=abcdefghjk", starting: true, joined: true, others };
+  const table = { name: "Sunny Crumbs", code: "abcdefghjk", link: "https://flies.isaacthoman.com/?table=abcdefghjk", starting: true, joined: true, everyone: false, others };
   const spec = { items: 9, maxRows: 7, width: 460, row: 40, heading: true, foot: 34, values: false, raise: 12 };
   for (const [name, frame] of [...frames(), ["the TV", TV_FRAME] as const]) {
     const a = safeRect(frame);

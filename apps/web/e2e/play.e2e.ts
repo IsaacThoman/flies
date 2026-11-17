@@ -22,7 +22,7 @@ import { openGame, readState, startServer, waitFor, waitForGameTime } from "../.
 import { dropFood, feedHoney } from "./feeding.ts";
 import { PLACES } from "../src/places/catalog.ts";
 import type { Game } from "../src/game.ts";
-import { disableScreensaver } from "./settings.ts";
+import { pinSettings } from "./settings.ts";
 
 /** The frame's budget on the Apple TV. */
 const MAX_CALLS = 150;
@@ -38,7 +38,7 @@ if (!url) {
 }
 
 const { browser, page, errors } = await openGame({ url });
-await disableScreensaver(page);
+await pinSettings(page);
 let maxCalls = 0;
 let maxTriangles = 0;
 const watch = setInterval(() => {
@@ -82,6 +82,7 @@ try {
   const firstFrame = await startup.evaluate(async () => {
     const { __fly: game, __drawFrame: draw } = globalThis as unknown as { __fly: Game; __drawFrame: () => void };
     game.settings.wallpaperAfter = 0;
+    game.settings.joinOthers = false;
     const canvas = document.getElementById("game") as HTMLCanvasElement;
     const before = canvas.dataset.ready;
     let writes = 0, renders = 0, early = false;
@@ -374,7 +375,7 @@ try {
 
   step("a reload: the settings, the view, the light and the weather as they were left, the shelf on Feed, and the hints for what was used gone");
   await page.reload();
-  await disableScreensaver(page);
+  await pinSettings(page);
   await waitFor(page, "brain=running,screen=title", 90_000);
   assert.equal(await page.evaluate(() => (globalThis as unknown as { __fly: Game }).__fly.haptics.enabled), false, "rumble stays off after reloading");
   await press("Enter");

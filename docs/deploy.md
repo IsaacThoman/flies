@@ -274,7 +274,10 @@ and, for a locked one, a salted scrypt hash of its password (never the
 password; nor does the log ever have one). Tables kept by an older server
 are read as they are, unlisted and without a password. A new protocol (3,
 for rooms) reaches open tabs as a refusal they answer by reloading into the
-new site, once. Rolling the rooms back past it forgets nothing, but an older
+new site, once. The rooms open to everyone, which every device now sits in
+by default, need nothing set: the server opens Everyone as it starts and keeps
+it in the same file; they came within protocol 3, so open tabs and the apps
+already installed keep working across the update. Rolling the rooms back past it forgets nothing, but an older
 server would let anyone with a locked room's link in. An update restarts it with SIGTERM: it writes
 the tables, tells every connected device it is restarting, and the devices
 reconnect to their tables within a couple of seconds. Keep `rooms_data`, and

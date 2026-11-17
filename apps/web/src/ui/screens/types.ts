@@ -16,13 +16,14 @@ export type SettingsPage = "wallpaper" | "screen" | "picture";
 /** The menu (the title, at launch and from play alike), play, and what the menu opens. */
 export type ScreenId = "title" | "play" | "settings" | "about" | "online";
 
-/** The room this device is at, as the screens show it: what it is called (once it has said), its code and link, whether this player started it, and the others there. */
+/** The room this device is at, as the screens show it: what it is called (once it has said), its code and link, whether this player started it, whether it is a room open to everyone, and the others there. */
 export type TableNow = {
   readonly name: string | null;
   readonly code: string;
   readonly link: string;
   readonly starting: boolean;
   readonly joined: boolean;
+  readonly everyone: boolean;
   readonly others: readonly { readonly id: number; readonly colour: string }[];
 };
 

@@ -15,10 +15,50 @@ and the iPhone and iPad app's, whose web view has a WebSocket of its own
 
 ## Playing
 
-- **The rooms.** The menu → Online lists every public room with someone in
-  it, fullest first: its name, its place's colour, its flies as eight pips
+- **Everyone.** Nobody has to do anything to be with others. Once the brain
+  is awake, the game sits this device's fly in **Everyone**, a public room the
+  room server keeps (below), unless Settings → Screensaver → Join others is off,
+  the game was opened by a room's link (or code), or the device is offline.
+  It is quiet about it: a room server that can't be reached, or one that
+  turns the device away, leaves the fly playing alone as if nothing had been
+  tried, with no note, and the game tries again in the background after 30 s,
+  1, 2 and then every 5 minutes (at once when the network comes back). A try
+  not let in within 10 s, or whose line fails once, is given up the same way.
+  Until it is let in, the fly eats its own food and Online shows the rooms
+  as if it were alone. Leaving the room from Online (or going to another, or
+  turning Join others off) keeps the fly alone until the next launch; turning
+  Join others on again sits it with everyone soon.
+- **The rooms open to everyone** (`EVERYONE_ROOMS`, `packages/net/src/protocol.ts`)
+  are Everyone, Everyone 2, Everyone 3, …, up to 64, with the codes
+  `2222222222`, `2222222223`, …. The server opens Everyone as it starts, and
+  each next one only when every one before is full; it never forgets them.
+  A hello for any of their codes is a hello for whichever has room: the one
+  named, if this device's fly is still there (a dropped line, a reload),
+  otherwise the first with a seat for it. So a full Everyone sends a
+  newcomer on to Everyone 2, and its link leads to whichever has room. They
+  have no password and no starter, so nobody chooses for anyone else and
+  nobody can take a fly off:
+  - **The place** takes turns by the server's clock, 20 minutes in each
+    (picnic, windowsill, lab, bar, restaurant, by the wall clock, so every
+    restart agrees), and carries everyone there together. The Place tool
+    shows it and refuses to change it, and Settings → Screensaver → Where it
+    lives waits until the fly is alone again: neither fights the room.
+  - **The light and the weather** are each device's own, as alone: "Now" is
+    its own clock and sky (on an Apple TV, the weather outside), and the
+    Light and Weather tools change only what this device sees, and are kept
+    as alone. What the room shares doesn't depend on them: its visitors come
+    by its own pace, and each device lets pass any its own sky doesn't suit
+    (no butterfly in its rain, no gull in its night); the shared bubbles
+    don't burst in anyone's rain.
+  - Online, in one of them, shows its name, its QR code and code, and Share
+    the link, Other rooms and Leave the room. Other rooms is the list, with
+    the fly still in the room until another is chosen (or Back).
+- **The rooms.** The menu → Online lists the rooms open to everyone first
+  (Everyone always, the others while someone is there), each with a globe,
+  then every other public room with someone in it, fullest first: its name, its place's colour, its flies as eight pips
   and a padlock if it has a password. The list follows the room server as
-  rooms open, fill and empty. A full one can't be chosen. Above the list are
+  rooms open, fill and empty. A full one can't be chosen, but for a room
+  open to everyone, which sends whoever chooses it on to the next. Above the list are
   New room, and Code, for an unlisted room's code (the ten letters of its
   link).
 - **A new room.** New room → its name (two words are suggested, to keep or
@@ -43,7 +83,7 @@ and the iPhone and iPad app's, whose web view has a WebSocket of its own
   thorax in its player's colour, as researchers mark flies. Other players'
   pointers show as rings in their colours. Your fly is the one the camera
   follows.
-- **The starter** chooses the place (the Place tool carries the whole table
+- **The starter** (of a room someone made) chooses the place (the Place tool carries the whole table
   there together), the light and the weather (their tools). Everyone else's
   Light, Weather and Place tools show the table's choice and refuse to change
   it. The starter can also take a fly off the table: Online lists the
@@ -88,7 +128,9 @@ through `TextEntry` (`packages/contracts/src/text-entry.ts`), polled each
 frame, so the Apple TV can bring its own keyboard through the bridge.
 
 When not at a table nothing here runs: no connection, no other bodies, and
-the single-player game as it was.
+the single-player game as it was. With Join others off, or opened with
+`?alone` (for checks and scripts: `npm run tvos:check` opens the app so),
+that is every launch.
 
 ## Who owns what
 
@@ -99,7 +141,7 @@ the single-player game as it was.
 | The food: the place's patches, what is dropped, what the place puts out | The room (`TableFood`) | Each device eats at once and tells the room; the room's account, less what the device has eaten since, is what is left (`FoodMirror`) |
 | A thrown ball | The room's clock | Its path and the moment its dive starts: every device (and the room) puts it in the same place at the same moment (`ball.ts`), a round trip after Select so everyone sees the whole dive |
 | The place | The room | `place` tells every device to carry its fly there, and where each fly is set down |
-| The light, the weather, the clock | The room, chosen by the starter | `world` and the welcome's clock; "Now" follows the starter's time zone |
+| The light, the weather, the clock | The room, chosen by the starter; in a room open to everyone, each device | `world` and the welcome's clock; "Now" follows the starter's time zone. In a room open to everyone the room says "clock" and "now" and nobody listens: each device keeps its own |
 | The high bubbles | The room's seed and clock | Each device works them out (`bubbles.ts`); a device whose fly bursts one says so |
 | Visitors (gust, gull, leaf, butterfly, ladybird, juice, boat) | The room says when, with a seed (the picnic's pace, `@fly/world`) | Each device starts the visit from that seed (`SceneSet.happen`); visitors keep clear of whichever fly is nearest |
 | The restaurant's ventilation | The room says when it comes on, by the same clock as alone (`VentilationClock`, `@fly/world`), with a seed | Each device draws how long it runs from the seed (`SceneSet.happen`), so every fly feels the same draught at the same time |
@@ -142,6 +184,14 @@ carried to, during a move), and drops theirs from any other epoch. Another
 fly is drawn half a step up from where the wire puts it, so rounding never
 sinks one on its feet into what it stands on.
 
+The rooms open to everyone came within protocol 3: they only add fields
+(`room.code` and `room.everyone` in the welcome, `everyone` in the list),
+so the apps already installed keep working. Such a device sees them in the
+list and sits there as at any room; it follows the room's "clock" and "now"
+by the room's clock (UTC) rather than its own. A new device and a room server
+from before them: its hello for Everyone is refused as unknown, and it stays
+alone, quietly, without trying again that launch.
+
 Protocol 3 is protocol 2 with rooms: names, the list, and passwords. A
 device speaking 2 doesn't know a room can be locked, and would knock at a
 locked door forever, so it is turned away and reloads into 3.
@@ -170,7 +220,7 @@ JSON, from the device:
 
 | Message | |
 | --- | --- |
-| `hello {v, table, key, start?, password?, at?, epoch?}` | the table's code; this device's key; `start` (place, light, weather, time zone and offset, and the room's `name` and whether it is `listed`) to start the table if it doesn't exist; `password`, the lock a new room is to have, or the key to a locked one, sent only until welcomed; `at`, where its fly is, coming back after a moment away, and the `epoch` of the place it is in |
+| `hello {v, table, key, start?, password?, at?, epoch?}` | the table's code (for a room open to everyone, the one wanted: `start` and `password` are ignored, and the device is seated wherever there is room); this device's key; `start` (place, light, weather, time zone and offset, and the room's `name` and whether it is `listed`) to start the table if it doesn't exist; `password`, the lock a new room is to have, or the key to a locked one, sent only until welcomed; `at`, where its fly is, coming back after a moment away, and the `epoch` of the place it is in |
 | `browse {v}` | instead of a hello: this connection only lists the rooms |
 | `ping {t}` | answered `pong {t, now}` with the room's time |
 | `drop {id, kind, x, z, y, at, epoch}` | food dropped onto the surface at or below `y` (the floor under a table, or the table), named by the device (player id × 1,000,000 + its count) so its fly can eat it before the room has heard |
@@ -193,9 +243,9 @@ From the room:
 
 | Message | |
 | --- | --- |
-| `welcome {v, id, colour, starter, seed, now, wall, offset, place, epoch, world, players, foods, balls, happenings, bubbles, at, room}` | the table as it is, where this fly stands, and the room's `{name, listed, locked}`; then a `FLIES` batch of every other fly where it is now |
+| `welcome {v, id, colour, starter, seed, now, wall, offset, place, epoch, world, players, foods, balls, happenings, bubbles, at, room}` | the table as it is, where this fly stands, and the room's `{name, listed, locked, code, everyone}` (`code`: the room it is, which for a room open to everyone may not be the one asked for; `starter` 0 there); then a `FLIES` batch of every other fly where it is now |
 | `refused {reason, name?}` | then the connection closes with the matching code: version 4001, full 4002, removed 4003, unknown table 4004, busy 4005 (too many rooms started, or passwords tried), malformed 4006, the same key sat down elsewhere 4007, locked 4008 (no password, or the wrong one: with the room's `name`, for its door); 4010 after `bye` |
-| `rooms {rooms}` | to a browsing connection: each listed room with a fly there, fullest first, at most 50, as `{code, name, place, flies, locked}` |
+| `rooms {rooms}` | to a browsing connection: the rooms open to everyone (Everyone always, the others with a fly there), then each listed room with a fly there, fullest first, at most 50 in all, as `{code, name, place, flies, locked, everyone?}` |
 | `joined {id, colour, away}`, `away {id, away}`, `left {id}` | who is at the table, and whose device has stopped |
 | `drop`, `ball`, `found`, `pop` | as above, to everyone else (`by` the player); a drop's `y` is the surface it lands on |
 | `world {light, weather, offset}`, `place {place, epoch, foods, spots, bubbles?}` | the starter's choices, to everyone; `spots` is where each fly is set down, and `bubbles` the picnic's bubbles as they stand (a room server from before them says none, and a device starts them at 0) |
@@ -218,11 +268,15 @@ up to 10 s, on the same table or floor); otherwise it is put back where the
 room had it. The room keeps every table in a file (`DATA_DIR/tables.json`)
 every 30 s and as it stops, and reads it back as it starts, with each
 room's name, whether it is listed, and its lock (tables kept before rooms
-had them come back unlisted, unlocked, named "Flies"). Room time is
+had them come back unlisted, unlocked, named "Flies"). A room open to
+everyone comes back in the place the clock has it now: if that is another,
+its epoch moves on, its kept food is dropped and its flies are set down
+there afresh. Room time is
 each server process's own, so a device takes up the restarted room's clock
 from its welcome. A table nobody has sat at for 30 days is forgotten; a
 listed one after a day (it has long since dropped out of the list, which
-shows only rooms with a fly there).
+shows only rooms with a fly there). The rooms open to everyone are never
+forgotten.
 
 ## The limits
 
@@ -254,8 +308,11 @@ can't spoil the others' screens or their food (`packages/net/src/limits.ts`):
   once; past either, the oldest goes.
 - **Messages.** At most 60 a second from a device (120 at once); more are
   dropped. A message is at most 4 KB, and a device has 10 s to say hello.
-  At most 24 connections open from one address, 60 opened a minute (30 at
-  once), and 30 rooms started from one an hour (5 at once). At most 8 flies a table; a seat gone more than 10 minutes is given
+  At most 64 connections open from one address (a house, a school or a
+  phone network behind one address, now that every device sits with
+  everyone by default), 60 opened a minute (30 at once), and 30 rooms
+  started from one an hour (5 at once; the rooms open to everyone aren't
+  counted: nobody starts them). At most 8 flies a table; a seat gone more than 10 minutes is given
   up to a newcomer, never the starter's. What an address has done is kept
   for an hour after its last connection closes, so closing and opening
   again doesn't start its counts afresh.
@@ -389,7 +446,9 @@ npm run rooms        # the room server on ws://localhost:8787/rooms
 npm run dev          # the game; Vite proxies /rooms to it
 ```
 
-Open the game, Online → New room → Create, and open the copied link in
+Open the game and it sits in Everyone once awake; open it in another
+browser (or a private window: a device is its storage) and the two flies are
+together. Or Online → New room → Create, and open the copied link in
 another browser (or a private window: a device is its storage), or choose
 the room from that browser's own list. `?rooms=ws://host:port/rooms`
 points a page at another room server. `npm run rooms` keeps its tables only
@@ -406,19 +465,33 @@ in memory; set `DATA_DIR` to keep them across restarts.
 log is one JSON object a line on stdout. In production the room server is
 the `rooms` service of the Docker stack (`docs/deploy.md`).
 
+The rooms open to everyone hold at most 64 × 8 = 512 flies on one server.
+Each costs about 1 KB/s up and 7 KB/s down at a full room, so a server whose
+rooms fill should be watched (`/health`'s `devices` and `flies`); a device
+turned away as full tries again later on its own.
+
 Checks: `npm test` covers the protocol, the limits (names, passwords),
 interpolation, the shared food, the table (presence, the away rule,
 removal, the starter's choices, keeping tables across restarts), rooms
 (the list, locks, guessing slowed, starting slowed, a listed room
-forgotten) and the server over real sockets, what hostile devices send
-(`apps/server/tests/hardening.test.ts`, and the fuzzing above), and
-Online's screen and its list's line. `npm run e2e` runs two headless tabs at a table: they see each other, share
+forgotten), the rooms open to everyone (the first always there, the next
+opened as one fills, a returning device back in its own, nobody's to choose
+for, never forgotten, the place by the clock, kept across restarts) and the
+server over real sockets, what hostile devices send
+(`apps/server/tests/hardening.test.ts`, and the fuzzing above), Online's
+screen and its list's line, and sitting with everyone by default
+(`AutoJoin`: only once awake, enabled and online, quiet when it can't, no
+rejoining after leaving). `npm run e2e` runs two headless tabs at a table: they see each other, share
 food, rest while hidden, survive a server restart and a removal; then a
 named, locked room is made from the menus with the keys and joined from
 another tab's list, a wrong password first, and its link alone opens only
-its door. It also
+its door; two tabs that just open the game find each other in Everyone, one
+leaves it from Online and stays alone, and a tab whose room server can't be
+reached plays alone without a word. It also
 holds eight flies to the frame's budget on every screen shape, and checks
-that single-player opens no connection. `npm run tables -- --clients 4 --seconds 120`
+that with Join others off single-player opens no connection. Every other
+end-to-end suite pins Join others off as it pins the screensaver off
+(`apps/web/e2e/settings.ts`), so it stays single-player. `npm run tables -- --clients 4 --seconds 120`
 is a longer run with several tabs and fake flies, summing up what each saw.
 
 ## The Apple TV and the iPhone
@@ -444,8 +517,9 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
   `apps/web/src/ui/text-entry.ts`). There is no share sheet or clipboard, so
   no Share the link: at a room, Online shows its QR code and its code (as it
   does everywhere) for a phone to scan or another TV to type. The simulator
-  check sits the app in a room of eight, and on an Apple TV 4K a room of
-  eight holds 60 fps (`npm run tvos:soak -- --table`, `docs/apple-tv.md`,
+  check opens the app `?alone`, so that it never sits with everyone on the
+  site's room server, and then sits it in a room of eight of its own; on an
+  Apple TV 4K a room of eight holds 60 fps (`npm run tvos:soak -- --table`, `docs/apple-tv.md`,
   "Eight flies on a TV").
 - **iPhone and iPad.** No bridge: the app is the web build in a web view,
   whose own WebSocket reaches `wss://flies.isaacthoman.com/rooms` (and a room
@@ -456,4 +530,6 @@ arrived. The browser's is a WebSocket (`apps/web/src/online/socket.ts`).
   with `IOS_LINKS=1`, they open the app (universal links), and AutoFill
   offers the site's passwords in it. iOS suspends a
   backgrounded app, so away is the normal state there; the 10 minutes and
-  coming back are what make it work. `docs/ios.md`, "Tables with others".
+  coming back are what make it work. `npm run ios:check` turns Join others
+  off for its first launch (`-FlySettings`), and its tables test opens the
+  app by a room's link, which it sits in instead. `docs/ios.md`, "Tables with others".

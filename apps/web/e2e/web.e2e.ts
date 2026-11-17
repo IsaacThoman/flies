@@ -25,7 +25,7 @@ import { chromium } from "playwright";
 import { build } from "vite";
 import { chromiumPath, gpuFlags, readState, waitFor, waitForGameTime } from "../../../scripts/play.ts";
 import { serveSite } from "../../../scripts/serve.ts";
-import { disableScreensaver } from "./settings.ts";
+import { pinSettings } from "./settings.ts";
 
 const root = path.join(import.meta.dirname, "../../..");
 const args = process.argv.slice(2);
@@ -89,7 +89,7 @@ try {
     }).observe(document, { subtree: true, attributes: true, attributeFilter: ["data-received"] });
   });
   await page.goto(site.url);
-  await disableScreensaver(page);
+  await pinSettings(page);
   await shot("1-downloading");
   const awake = await waitFor(page, "brain=running,screen=title", 120_000);
   const seen = await page.evaluate(() => [...(globalThis as unknown as { __downloadProgress: Set<number> }).__downloadProgress]);
@@ -119,7 +119,7 @@ try {
   await context.setOffline(true);
   const again = Date.now();
   await page.reload();
-  await disableScreensaver(page);
+  await pinSettings(page);
   const offline = await waitFor(page, "brain=running,screen=title", 60_000);
   console.log(`  awake after ${((Date.now() - again) / 1000).toFixed(1)} s`);
   assert.equal(offline.from, "cache");
@@ -132,13 +132,13 @@ try {
   step("?brain=typescript runs the TypeScript brain on the kept connectome, without the module");
   const asked = site.requests.length;
   await page.goto(`${site.url}?brain=typescript`);
-  await disableScreensaver(page);
+  await pinSettings(page);
   const typescript = await waitFor(page, "brain=running,screen=title", 60_000);
   assert.equal(typescript.brainEngine, "typescript");
   assert.equal(typescript.from, "cache");
   assert.deepEqual(site.requests.slice(asked).filter((r) => r.path.includes("/brain/")), [], "nothing of the brain fetched");
   await page.goto(site.url);
-  await disableScreensaver(page);
+  await pinSettings(page);
   await waitFor(page, "brain=running,screen=title,brainEngine=wasm", 60_000);
 
   step("the wallpaper keeps the screen awake");
@@ -213,7 +213,7 @@ try {
   await page.evaluate(() => ((globalThis as unknown as { __kept: boolean }).__kept = true));
   await page.goto("about:blank");
   await page.goBack();
-  await disableScreensaver(page);
+  await pinSettings(page);
   const returned = await waitFor(page, "brain=running", 60_000);
   const restored = await page.evaluate(() => (globalThis as unknown as { __kept?: boolean }).__kept === true);
   console.log(`  ${restored ? "restored from the back-forward cache" : "loaded afresh"}, on ${returned.screen}`);
@@ -224,7 +224,7 @@ try {
   lonely.on("pageerror", (error) => errors.push(error.message));
   await lonely.route("**/brain/**", (route) => route.abort("internetdisconnected"));
   await lonely.goto(site.url);
-  await disableScreensaver(lonely);
+  await pinSettings(lonely);
   await fresh.setOffline(true);
   await waitFor(lonely, "brain=failed,failure=offline", 30_000);
   if (shots) await lonely.locator("#game").screenshot({ path: path.join(shots, "4-offline.png") });

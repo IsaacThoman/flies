@@ -8,8 +8,11 @@
 // down on the window table and see each other at a room's scale; the
 // starter takes the other's fly off and it is alone again; a named, locked
 // room is made from the menus and joined from Online's list with its
-// password, and its link alone leads only to its door; alone,
-// nothing of tables happens at all; and a full table (one tab, seven fake
+// password, and its link alone leads only to its door; by default, two tabs
+// that open the game find each other in the room open to everyone, one
+// leaves it from Online and stays alone, and one whose room server can't be
+// reached plays alone without a word; with "Join others" off, nothing of
+// tables happens at all; and a full table (one tab, seven fake
 // flies from Node walking round its fly) keeps the frame to the Apple TV's
 // budget on every screen shape, followed and close up.
 //
@@ -24,7 +27,8 @@ import os from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
 import type { BrowserContextOptions, Page } from "playwright";
-import { MAX_PLAYERS, tableCode } from "@fly/net";
+import { createServer } from "node:net";
+import { EVERYONE, MAX_PLAYERS, tableCode } from "@fly/net";
 import { startServer as startRooms } from "../../server/src/server.ts";
 import type { RoomServer } from "../../server/src/server.ts";
 import { chromiumPath, gpuFlags, readState, startServer, waitFor } from "../../../scripts/play.ts";
@@ -32,7 +36,7 @@ import { fakeFly } from "../../../scripts/tables.ts";
 import type { FakeFly } from "../../../scripts/tables.ts";
 import { frameFor } from "../src/display.ts";
 import { SHAPES } from "../tests/shapes.ts";
-import { disableScreensaver } from "./settings.ts";
+import { pinSettings } from "./settings.ts";
 
 /** The frame's budget on the Apple TV, as play.e2e.ts holds it to. */
 const MAX_CALLS = 150;
@@ -209,7 +213,7 @@ try {
   step("two tabs at one table: each its own player, the first its starter, and each sees the other's fly where it is");
   const [a, b] = [await open(), await open()];
   await a.page.goto(`${url}?rooms=${roomsAt}`);
-  await disableScreensaver(a.page);
+  await pinSettings(a.page);
   await waitFor(a.page, "brain=running,screen=title", 120_000);
   await fly(a.page, "g.startRoom({ name: 'Two tabs', listed: false, password: '', place: g.here })");
   const first = await waitFor(a.page, "online=joined,table=yes", 20_000);
@@ -218,7 +222,7 @@ try {
   const link = await fly<string>(a.page, "g.tableLink");
   assert.match(link, /\?table=[2-9a-z]{10}$/);
   await b.page.goto(`${link}&rooms=${roomsAt}`);
-  await disableScreensaver(b.page);
+  await pinSettings(b.page);
   const second = await waitFor(b.page, "online=joined,brain=running", 120_000);
   assert.equal(second.player, "2", "a player of its own");
   assert.equal(second.starter, "1");
@@ -305,7 +309,7 @@ try {
   step("a named, locked room made from the menus with the keys; another tab finds it in Online's list, is told a wrong password is wrong, and gets in with the right one; its link alone opens only its door");
   const maker = await open();
   await maker.page.goto(`${url}?rooms=${roomsAt}`);
-  await disableScreensaver(maker.page);
+  await pinSettings(maker.page);
   await waitFor(maker.page, "brain=running,screen=title", 120_000);
   await fly(maker.page, "g.open('online')");
   await waitFor(maker.page, "screen=online,onlineView=rooms,focus=new");
@@ -323,7 +327,7 @@ try {
 
   const guest = await open();
   await guest.page.goto(`${url}?rooms=${roomsAt}`);
-  await disableScreensaver(guest.page);
+  await pinSettings(guest.page);
   await waitFor(guest.page, "brain=running,screen=title", 120_000);
   await fly(guest.page, "g.open('online')");
   const listed = await waitFor(guest.page, `screen=online,rooms~${lockedCode}:Locked Lab:picnic:1:1`, 10_000);
@@ -344,15 +348,65 @@ try {
 
   const linked = await open();
   await linked.page.goto(`${url}?table=${lockedCode}&rooms=${roomsAt}`);
-  await disableScreensaver(linked.page);
+  await pinSettings(linked.page);
   const door = await waitFor(linked.page, "screen=online,onlineView=door,table=", 60_000);
   assert.ok(!("online" in door), "not at the room");
   for (const tab of [maker, guest, linked]) await tab.page.context().close();
 
-  step("alone, nothing changes: no table, no line to a room, and the frame in its budget");
+  step("by default, with everyone: two tabs that just open the game sit in the room open to everyone once awake, nobody its starter, and see each other");
+  const [one, two] = [await open(), await open()];
+  for (const tab of [one, two]) {
+    await tab.page.goto(`${url}?rooms=${roomsAt}`);
+    await pinSettings(tab.page, { joinOthers: true });
+  }
+  const sat = await Promise.all([one, two].map((tab) => waitFor(tab.page, "brain=running,online=joined,everyone=yes,roomName=Everyone", 120_000)));
+  assert.deepEqual(sat.map((s) => s.starter), ["0", "0"], "nobody started it");
+  assert.equal(await fly(one.page, "g.online.code"), EVERYONE);
+  await seesFly(one.page, Number(sat[1].player));
+  await seesFly(two.page, Number(sat[0].player));
+  // Online says where it is, and lets it look at the other rooms without leaving.
+  await fly(one.page, "g.open('online')");
+  await waitFor(one.page, "screen=online,onlineView=room");
+  assert.deepEqual(await fly(one.page, "g.screens.online.menu.items.map((i) => i.id)"), ["share", "rooms", "leave"]);
+  await keyTo(one.page, "rooms", "ArrowDown");
+  await one.page.keyboard.press("Enter");
+  await waitFor(one.page, `onlineView=rooms,rooms~^${EVERYONE}:Everyone:[a-z]+:2:0,online=joined`, 10_000);
+  await one.page.keyboard.press("Escape");
+  await waitFor(one.page, "onlineView=room,online=joined");
+
+  step("leaving it from Online: alone again where it is, and not sat with everyone again until the next launch");
+  await keyTo(one.page, "leave", "ArrowDown");
+  await one.page.keyboard.press("Enter");
+  await waitUntil(one.page, "tab 0 alone", (s) => s.table === "" && !("online" in s), 5000);
+  await waitUntil(two.page, "tab 0's fly gone from tab 1", (s) => !othersOf(s).some((o) => o.id === Number(sat[0].player)), 5000);
+  assert.equal((await readState(one.page)).autoJoin, "stopped");
+  await one.page.waitForTimeout(3000);
+  const stayed = await readState(one.page);
+  assert.equal(stayed.table, "", "still alone");
+  for (const tab of [one, two]) await tab.page.context().close();
+
+  step("a room server that can't be reached: the fly plays alone, with nothing said, and the game tries again later");
+  const closed = await new Promise<number>((resolve) => {
+    const probe = createServer().listen(0, "127.0.0.1", () => {
+      const at = (probe.address() as { port: number }).port;
+      probe.close(() => resolve(at));
+    });
+  });
+  const cut = await open();
+  await cut.page.goto(`${url}?rooms=ws://127.0.0.1:${closed}/rooms`);
+  await pinSettings(cut.page, { joinOthers: true });
+  await waitFor(cut.page, "brain=running,screen=title", 120_000);
+  await waitUntil(cut.page, "a try made and given up", (s) => cut.sockets.length > 0 && s.autoJoin === "waiting" && s.table === "", 20_000);
+  assert.equal(await fly(cut.page, "g.tableEnded"), null, "nothing to say about it");
+  await fly(cut.page, "g.open('online')");
+  const quiet = await waitFor(cut.page, "screen=online,onlineView=rooms");
+  assert.equal(quiet.note, "", "no note on Online either");
+  await cut.page.context().close();
+
+  step("with Join others off, nothing changes: no table, no line to a room, and the frame in its budget");
   const solo = await open();
   await solo.page.goto(url);
-  await disableScreensaver(solo.page);
+  await pinSettings(solo.page);
   await waitFor(solo.page, "brain=running,screen=title", 120_000);
   await solo.page.keyboard.press("Enter");
   await waitFor(solo.page, "screen=play");
@@ -382,7 +436,7 @@ try {
     const tab = await open(options);
     const page = tab.page;
     await page.goto(`${url}?table=${code}&rooms=${roomsAt}`);
-    await disableScreensaver(page);
+    await pinSettings(page);
     await waitFor(page, "brain=running,screen=title,online=joined", 120_000);
     await waitUntil(page, `${MAX_PLAYERS - 1} other flies there`, (s) => othersOf(s).filter((o) => o.present && !o.resting).length === MAX_PLAYERS - 1, 15_000);
     await page.keyboard.press("Enter");
