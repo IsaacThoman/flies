@@ -1,6 +1,7 @@
 // Isolates the render-thread cost of sending senses: both versions serialize
 // through structuredClone, as a worker's postMessage does before returning.
 import assert from "node:assert/strict";
+import { Session } from "node:inspector";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -15,7 +16,7 @@ import { distribution } from "./webPerf.ts";
 import { withHeavySlot } from "./heavySlot.ts";
 
 const root = path.join(import.meta.dirname, "..");
-const { values } = parseArgs({ options: { baseline: { type: "string", default: "origin/dev" }, out: { type: "string" } } });
+const { values } = parseArgs({ options: { baseline: { type: "string", default: "origin/dev" }, out: { type: "string" }, allocations: { type: "boolean", default: false } } });
 const revision = execFileSync("git", ["rev-parse", values.baseline], { encoding: "utf8" }).trim();
 const temp = mkdtempSync(path.join(tmpdir(), "fly-worker-cost-"));
 try {
@@ -55,7 +56,20 @@ try {
         const cost = await run(variant ? WorkerBrainDriver : Reference, facets);
         if (round >= 0) samples[variant].push(cost);
       }
-      report.push({ facets, unit: "thread CPU microseconds/tick", reference: revision, node: process.version, variants: samples.map(distribution) });
+      const allocationProfiles: unknown[] = [];
+      if (values.allocations && facets === 1000) {
+        const session = new Session();
+        session.connect();
+        const post = (method: string, params: object = {}) => new Promise<object | undefined>((resolve, reject) => session.post(method, params, (error, result) => error ? reject(error) : resolve(result)));
+        try {
+          for (const Driver of [Reference, WorkerBrainDriver]) {
+            await post("HeapProfiler.startSampling", { samplingInterval: 512, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+            await run(Driver, facets);
+            allocationProfiles.push(await post("HeapProfiler.stopSampling"));
+          }
+        } finally { session.disconnect(); }
+      }
+      report.push({ facets, unit: "thread CPU microseconds/tick", reference: revision, node: process.version, variants: samples.map(distribution), allocationProfiles, allocationNote: "Sampled JS allocations include collected objects, exclude external ArrayBuffer backing; separate from CPU timing." });
     }
   });
   const output = JSON.stringify(report, null, 2);

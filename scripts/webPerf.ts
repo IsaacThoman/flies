@@ -148,7 +148,7 @@ async function main() {
   assert.ok(Number.isInteger(runs) && runs >= 3, "at least 3 runs");
   assert.ok(Number.isFinite(seconds) && seconds >= 2 && Number.isFinite(memorySeconds) && memorySeconds >= 0);
   const phases = values.phases.split(",");
-  assert.ok(phases.every(p => ["loads", "frames", "memory", "brain"].includes(p)));
+  assert.ok(phases.every(p => ["loads", "frames", "memory", "brain", "bundle"].includes(p)));
   if (values.build) await bundle(out, dir);
   const report: Record<string, unknown> = { complete: false, revision: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), dirty: execFileSync("git", ["diff", "--stat"], { encoding: "utf8" }), node: process.version, host: os.cpus()[0].model, options: values, notes: "Timings include instrumentation; frame submission is not GPU/display time. Phone CPU throttling affects page only. Memory includes worker Wasm separately; memory checkpoints n=1; active batches separated by a paused two-minute cooldown; GC queries hold frames briefly." };
   const save = () => {

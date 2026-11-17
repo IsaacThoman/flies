@@ -73,3 +73,16 @@ microbenchmark, not a substitute for measured browser frames.
 
 Independent reviewers assign absolute scores to each neutral evidence set
 and rank them. The experiment log records keys, scores and rejected attempts.
+
+`node scripts/workerCost.ts --allocations --out /tmp/worker-cost.json`
+also records a separate Node sampling-heap profile for each transport version.
+It includes collected JS objects, excludes external ArrayBuffer backing, and
+is kept separate from the CPU timings.
+`node scripts/brainCost.ts --out /tmp/brain-cost.json` measures both the
+TypeScript and Wasm engines with five repetitions and the budget tests' CPU
+calibration, and compares their float32 command/rate and exact spike fingerprints.
+
+For a bundle-only pass, use `--build --phases bundle`. For frame comparisons,
+retain the whole distributions and long-frame counts: a low median does not
+exclude a visible first-use or readback stall. Match actual pixels, eye detail,
+eye cadence and frame rate as well as the adaptive-level label.
