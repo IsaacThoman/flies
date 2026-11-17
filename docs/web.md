@@ -14,6 +14,8 @@ npm run build            # the site, into dist/
 npm run serve -- --base /fly/   # try it as a host would serve it: http://127.0.0.1:8080/fly/
 ```
 
+The build fails if the connectome is missing; the development server only warns.
+
 `FLY_SITE_URL=https://example.org/fly/ npm run build` makes the link
 preview's picture and address absolute, which most sites that show link
 previews need; without it they are relative and the rest works the same.

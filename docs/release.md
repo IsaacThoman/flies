@@ -25,6 +25,8 @@ and the iPhone and iPad app (`apps/ios`) go together, as one app, "Flies", at on
    `npm run tvos -- archive` (`scripts/apple.ts`) and uploads them to App Store Connect. They
    appear in TestFlight once Apple has processed them.
 
+Archives reject `TVOS_ENTRY`: diagnostic entries are for local tvOS builds only.
+
 The version is set at build time: `MARKETING_VERSION` is the release (`1.2.3`) and
 `CURRENT_PROJECT_VERSION` is the Unix time, which keeps increasing, reruns included. Neither is
 committed; `apps/version.yml` only numbers local builds.
