@@ -16,8 +16,13 @@
 // it, the camera comes in along its line of sight until it isn't: it looks
 // with a thin cone of rays, where it is and where the turn and the fly are
 // taking it a moment from now. It comes in quickly and goes back out gently
-// once the way has been clear for a moment, and that distance is all it
-// changes.
+// once the way has been clear for a moment. Where coming in would bring it
+// nearer than the player can zoom (down in a bowl, on a slope), it looks from
+// higher instead, as little higher as opens the way: how low it may look
+// from rises as quickly as it comes in, and comes back down as gently as it
+// goes out, step by step, only where that keeps it as far out. Above that the
+// player's pitch is untouched. How far out and how low it may look from are
+// all it changes.
 //
 // The View tool's views are places on the same rig: each sets a distance and
 // a pitch (Whole table and From above a yaw too), eased over a moment, and the
@@ -69,6 +74,10 @@ const AHEAD_STEPS = 4;
 const MARGIN = 0.25;
 /** The nearest it comes in for something in the way (mm). */
 const CLOSEST = 0.3;
+/** How far under its line of sight it keeps clear, as it goes out along it (mm): more than the eye keeps over what is under it. */
+const UNDER = 2 * MARGIN + 0.1;
+/** Looking for a higher place to look from: in steps this big (rad). */
+const RISE_STEP = 0.1;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -105,6 +114,20 @@ export class OrbitRig {
   readonly #armV = new Float64Array(1);
   #held = Infinity;
   #clearFor = 0;
+  /** The lowest pitch the way lets it look from, on a spring (PITCH[0]: anywhere), the spring's speed, where the way last wanted it, and how long until it looks again (s). */
+  #floor: number = PITCH[0];
+  readonly #floorV = new Float64Array(1);
+  #floorHeld: number = PITCH[0];
+  #lookIn = 0;
+  /** Where the turn and the fly are taking it a moment from now, this frame: the fly's velocity, how long ahead it gets (s), how far round and up the turn takes it (rad); `#ahead` < 0: neither is moving. */
+  #vx = 0;
+  #vy = 0;
+  #vz = 0;
+  #ahead = -1;
+  #round = 0;
+  #up = 0;
+  /** Whether the eye is clear where `#fit` last left it. */
+  #fits = false;
   /** Coming from the title's or the screensaver's camera: how far off the fly it was aimed, and its field of view, both easing away. */
   readonly #aimOff = new THREE.Vector3();
   #fov = PLAY_FOV;
@@ -232,6 +255,9 @@ export class OrbitRig {
     this.#armV[0] = 0;
     this.#held = Infinity;
     this.#clearFor = 0;
+    this.#floor = this.#floorHeld = PITCH[0];
+    this.#floorV[0] = 0;
+    this.#lookIn = 0;
     this.#started = true;
   }
 
@@ -275,13 +301,12 @@ export class OrbitRig {
     // What is in the way, where it is and a moment ahead: the one rule.
     const distance = this.#distance;
     const near = this.#nearRadius() + MARGIN;
-    let room = this.#free(t.x, t.y, t.z, this.#yaw, this.#pitch, distance, near);
     const turning = dt > 0 ? (Math.abs(this.#yaw - yawWas) + Math.abs(this.#pitch - pitchWas)) / dt : 0;
     const speed = Math.hypot(v.x, v.y, v.z);
+    this.#ahead = -1;
     if (turning > 1e-3 || speed > 1e-3) {
-      // Along the way it is going, in even steps, so nothing narrow is missed between them.
-      const round = clamp(((this.#yaw - yawWas) / dt) * LOOK_AHEAD, -MOST_AHEAD, MOST_AHEAD);
-      const up = clamp(((this.#pitch - pitchWas) / dt) * LOOK_AHEAD, -MOST_AHEAD, MOST_AHEAD);
+      this.#round = clamp(((this.#yaw - yawWas) / dt) * LOOK_AHEAD, -MOST_AHEAD, MOST_AHEAD);
+      this.#up = clamp(((this.#pitch - pitchWas) / dt) * LOOK_AHEAD, -MOST_AHEAD, MOST_AHEAD);
       // The fly gets no farther than what is in its way.
       let lead = speed * LOOK_AHEAD;
       if (lead > 0) {
@@ -291,12 +316,42 @@ export class OrbitRig {
         ray.z = v.z / speed;
         if (this.#world.raycast(t, ray, this.#hit, lead + near)) lead = Math.max(0, this.#hit.t - near);
       }
-      const ahead = speed > 0 ? lead / speed : 0;
-      for (let i = 1; i <= AHEAD_STEPS; i++) {
-        const k = i / AHEAD_STEPS;
-        room = Math.min(room, this.#free(t.x + v.x * ahead * k, t.y + v.y * ahead * k, t.z + v.z * ahead * k, this.#yaw + round * k, clamp(this.#pitch + up * k, PITCH[0], PITCH[1]), distance, near, false));
-      }
+      this.#ahead = speed > 0 ? lead / speed : 0;
+      this.#vx = v.x;
+      this.#vy = v.y;
+      this.#vz = v.z;
     }
+    let room = this.#room(this.#floor, distance, near);
+    // Nearer than the player can zoom: as little higher as opens the way, at once (and if nowhere does, not looking again for a moment). Looking from higher already: every moment, lower where that keeps it as far out, so it never trades distance for height.
+    const open = Math.min(distance, NEAREST) - 1e-4;
+    if (!this.#started) {
+      this.#floorHeld = PITCH[0];
+      this.#lookIn = 0;
+    } else this.#lookIn -= dt;
+    if (this.#lookIn <= 0 && (room < open || this.#floorHeld > PITCH[0])) {
+      const closed = room < open;
+      const need = closed ? this.#higher(distance, near, open) : this.#lower(distance, near, room - 1e-3);
+      if (need >= 0) this.#floorHeld = need;
+      this.#lookIn = closed && need >= 0 ? 0 : CLEAR_FOR;
+    }
+    if (this.#floorHeld > PITCH[0] || this.#floor > PITCH[0]) {
+      const fv = this.#floorV;
+      if (!this.#started) this.#floor = this.#floorHeld;
+      // From where it is looking, not from below it, when it has to rise.
+      else if (this.#floorHeld > this.#floor && this.#floor < this.#pitch) {
+        this.#floor = this.#pitch;
+        fv[0] = 0;
+      }
+      if (Math.abs(this.#floorHeld - this.#floor) > 1e-5 || Math.abs(fv[0]) > 1e-4) this.#floor = damp(this.#floor, this.#floorHeld, fv, 0, this.#floorHeld > this.#floor ? PULL_IN : LET_OUT, dt);
+      else this.#floor = this.#floorHeld;
+      // Back down to where the player has it once nothing wants it higher: anywhere again.
+      if (this.#floorHeld <= PITCH[0] && this.#floor <= this.#pitch) {
+        this.#floor = PITCH[0];
+        fv[0] = 0;
+      }
+      room = this.#room(this.#floor, distance, near);
+    }
+    let pitch = Math.max(this.#pitch, this.#floor);
     // Something in the way: the nearest it has let the camera be, until it has been clear farther out for a moment.
     const clear = room >= distance - 1e-4;
     if (!this.#started) {
@@ -314,9 +369,22 @@ export class OrbitRig {
       v0[0] = 0;
     } else if (Math.abs(allowed - reach) > 1e-4 || Math.abs(v0[0]) > 1e-3) reach = Math.min(distance, damp(reach, allowed, v0, 0, allowed < reach ? PULL_IN : LET_OUT, dt));
     // Faster than it could come in (a landing, something thrown in the way): in front of what it would be in, at once.
-    if (!this.#clearAt(this.#yaw, this.#pitch, reach, fov)) {
-      reach = Math.min(reach, this.#free(t.x, t.y, t.z, this.#yaw, this.#pitch, distance, near));
-      for (let i = 0; i < 6 && reach > CLOSEST && !this.#clearAt(this.#yaw, this.#pitch, reach, fov); i++) reach = Math.max(CLOSEST, reach * 0.7);
+    if (!this.#clearAt(this.#yaw, pitch, reach, fov)) {
+      reach = this.#fit(pitch, Math.min(reach, this.#free(t.x, t.y, t.z, this.#yaw, pitch, distance, near)), fov);
+      if (!this.#fits) {
+        // Not even nearest: as little higher as it can be anywhere at all, at once.
+        for (let rise = pitch + RISE_STEP; rise < PITCH[1] + RISE_STEP; rise += RISE_STEP) {
+          const higher = Math.min(PITCH[1], rise);
+          const there = this.#fit(higher, this.#free(t.x, t.y, t.z, this.#yaw, higher, distance, near), fov);
+          if (this.#fits) {
+            pitch = this.#floor = this.#floorHeld = higher;
+            this.#floorV[0] = 0;
+            this.#lookIn = CLEAR_FOR;
+            reach = there;
+            break;
+          }
+        }
+      }
     }
     if (reach >= distance - 1e-4) {
       this.#arm = Infinity;
@@ -324,8 +392,8 @@ export class OrbitRig {
     } else this.#arm = reach;
     this.#started = true;
 
-    const cp = Math.cos(this.#pitch);
-    const eye = this.#eye.set(t.x + Math.sin(this.#yaw) * cp * reach, t.y + Math.sin(this.#pitch) * reach, t.z + Math.cos(this.#yaw) * cp * reach);
+    const cp = Math.cos(pitch);
+    const eye = this.#eye.set(t.x + Math.sin(this.#yaw) * cp * reach, t.y + Math.sin(pitch) * reach, t.z + Math.cos(this.#yaw) * cp * reach);
     cam.position.copy(eye);
     cam.lookAt(this.#aim.copy(t).add(this.#aimOff));
     if (Math.abs(cam.fov - this.#fov) > 0.01) {
@@ -335,6 +403,50 @@ export class OrbitRig {
     // Tilted up a little where the HUD wants the fly lower: the same for every distance, so zooming never moves it.
     if (low !== 0) cam.rotateX(Math.atan(low * Math.tan((cam.fov * Math.PI) / 360)));
     cam.updateMatrixWorld();
+  }
+
+  /** How far out the way lets it be, looking from no lower than `floor`, where it is and (if it is going anywhere) a moment ahead, in even steps so nothing narrow is missed between them. */
+  #room(floor: number, distance: number, near: number) {
+    const t = this.target;
+    let room = this.#free(t.x, t.y, t.z, this.#yaw, Math.max(this.#pitch, floor), distance, near);
+    const ahead = this.#ahead;
+    for (let i = 1; ahead >= 0 && i <= AHEAD_STEPS; i++) {
+      const k = i / AHEAD_STEPS;
+      const pitch = Math.max(floor, clamp(this.#pitch + this.#up * k, PITCH[0], PITCH[1]));
+      room = Math.min(room, this.#free(t.x + this.#vx * ahead * k, t.y + this.#vy * ahead * k, t.z + this.#vz * ahead * k, this.#yaw + this.#round * k, pitch, distance, near, false));
+    }
+    return room;
+  }
+
+  /** The least it may look from, higher in steps than it is, for the way to leave it `want` mm out here and a moment ahead; -1 if nowhere does. */
+  #higher(distance: number, near: number, want: number) {
+    for (let rise = Math.max(this.#pitch, this.#floor) + RISE_STEP; rise < PITCH[1] + RISE_STEP; rise += RISE_STEP) {
+      const floor = Math.min(PITCH[1], rise);
+      if (this.#room(floor, distance, near) >= want) return floor;
+    }
+    return -1;
+  }
+
+  /** How low it may look from, lower in steps than it does and no lower than the first step that leaves it less than `want` mm out, so the way down is clear all along (PITCH[0]: down to the player's own pitch); -1 if not even a step. */
+  #lower(distance: number, near: number, want: number) {
+    let low = -1;
+    for (let fall = this.#floorHeld - RISE_STEP; fall > this.#pitch - RISE_STEP; fall -= RISE_STEP) {
+      const floor = Math.max(this.#pitch, fall);
+      if (this.#room(floor, distance, near) < want) break;
+      low = floor <= this.#pitch ? PITCH[0] : floor;
+    }
+    return low;
+  }
+
+  /** Coming in by steps from `reach` toward (yaw, pitch) until the eye is clear, or as near as the steps go: how far out it is, and in `#fits` whether it is clear there. */
+  #fit(pitch: number, reach: number, fov: number) {
+    let fits = this.#clearAt(this.#yaw, pitch, reach, fov);
+    for (let i = 0; i < 6 && reach > CLOSEST && !fits; i++) {
+      reach = Math.max(CLOSEST, reach * 0.7);
+      fits = this.#clearAt(this.#yaw, pitch, reach, fov);
+    }
+    this.#fits = fits;
+    return reach;
   }
 
   /** How far the picture's near corners are from the eye, mm. */
@@ -347,7 +459,7 @@ export class OrbitRig {
   /**
    * How far out from a point toward (yaw, pitch) the eye may be, up to
    * `distance`, keeping `r` clear of everything: short of what the line of
-   * sight meets (measured square to it), and of what four rays fanning out
+   * sight meets (measured square to it), of what it passes just over, and of what four rays fanning out
    * from the point to `r` either side of the eye and above and below it
    * meet, so an edge beside the line of sight counts too (unless `!wide`:
    * looking ahead, the line of sight alone).
@@ -372,6 +484,10 @@ export class OrbitRig {
     let free = distance;
     const hit = world.raycast(o, ray, this.#hit, distance + r);
     if (hit) free = Math.min(free, hit.t - r / Math.max(0.25, -(dx * hit.normal.x + dy * hit.normal.y + dz * hit.normal.z)));
+    // What the line of sight only passes over, too near to have the eye over it: a bowl's far side, a slope looked along.
+    o.y = y - UNDER;
+    if (free > CLOSEST && world.raycast(o, ray, this.#hit, free)) free = this.#hit.t;
+    o.y = y;
     for (let k = 0; k < (wide ? 4 : 0); k++) {
       // Across (level, square to the line of sight) and up (square to both).
       const a = k === 0 ? r : k === 1 ? -r : 0;

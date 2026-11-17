@@ -64,8 +64,8 @@ test("a tabletop's state keeps its original bytes inside the protocol 4 batch", 
   assert.equal(Buffer.from(view.buffer, 0, n).toString("hex"), "0101061d2cffff40e20100e3e71f11d43a249a26e79a01f4ff0300f323b31ae6664bc4d2002d00defca00fb50448f40301");
 });
 
-test("each place has the finest scale that holds it: a tabletop's for the five tables, a room's for the restaurant", () => {
-  for (const id of ["picnic", "windowsill", "lab", "bar", "kitchen"]) assert.deepEqual(wireScale(WORLDS[id]), { position: 50, pointer: 20, eye: 10 }, id);
+test("each place has the finest scale that holds it: a tabletop's for the tables, a room's for the restaurant", () => {
+  for (const id of ["picnic", "windowsill", "lab", "bar", "greenhouse", "kitchen"]) assert.deepEqual(wireScale(WORLDS[id]), { position: 50, pointer: 20, eye: 10 }, id);
   assert.equal(wireScale(RESTAURANT), ROOM_SCALE);
 });
 

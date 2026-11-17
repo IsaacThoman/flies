@@ -32,6 +32,8 @@ export const WATER: Ink = { tint: 0x8c939c, wet: true };
  * (sugar, a crumb) and leaves nothing.
  */
 export const INKS: Readonly<Record<string, Ink>> = {
+  "tomato juice": sticky(0xc74725),
+  "fig flesh": sticky(0xb94862),
   honey: sticky(0xd8861a),
   jam: sticky(0xb02838),
   "strawberry juice": sticky(0xd23c4e),
@@ -76,7 +78,7 @@ export const WET_SOLIDS: ReadonlySet<string> = new Set(["dew", "drop", "ice"]);
  * foam, water, and things drawn rougher than the world's smooth shape of them
  * (a heap of peanuts, a crumpled wipe, a brush's bristles, a bush of basil).
  */
-export const NO_PRINTS: ReadonlySet<string> = new Set(["kitchen wine", "cocktail", "beer", "wine glass", "espresso cup", "ice", "dew", "drop", "peanuts", "wipe", "bristles", "stems"]);
+export const NO_PRINTS: ReadonlySet<string> = new Set(["greenhouse leaves", "seedling crown", "water saucer", "kitchen wine", "cocktail", "beer", "wine glass", "espresso cup", "ice", "dew", "drop", "peanuts", "wipe", "bristles", "stems"]);
 
 /** How many prints there can be at once; a new one takes the oldest's place. */
 export const PRINTS = 128;

@@ -93,7 +93,7 @@ async function capture(story: StoreStory, tv = false) {
     const display = new Display(tv);
     const devices = new Devices(tv ? "remote" : "touch");
     const remote = new Remote(window, undefined, devices);
-    const game = new Game(canvas, remote, { first: driver, another: null }, display, { devices });
+    const game = new Game(canvas, remote, { first: driver, another: null, most: 1 }, display, { devices });
     // Each visual sample must reach the next fixed step, independent of GPU fence timing.
     const renderer = game.stage.renderer;
     renderer.readRenderTargetPixelsAsync = async (...args) => {

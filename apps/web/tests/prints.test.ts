@@ -28,6 +28,8 @@ test("every food in every place either leaves an ink or is dry, and water leaves
   for (const kind of Object.keys(FOODS) as FoodKind[]) assert.ok(kind in DROPPED);
   assert.equal(DROPPED.sugar, null);
   assert.equal(DROPPED.water, WATER);
+  assert.ok(INKS["tomato juice"] && !INKS["tomato juice"].wet);
+  assert.ok(INKS["fig flesh"] && !INKS["fig flesh"].wet);
   assert.ok(WATER.wet && !INKS.honey.wet && !DROPPED.berry!.wet);
   const [r, g, b] = rgb(INKS.honey.tint);
   assert.ok(r > g && g > b, "honey is amber");

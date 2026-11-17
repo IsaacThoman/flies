@@ -81,6 +81,8 @@ type Grip =
 
 export class PlayControls {
   #grip: Grip | null = null;
+  /** The shelf names a tool under the pointer without selecting it. */
+  previewTool = -1;
   #shelf = { scrolled: 0, at: -Infinity };
   readonly #design: () => { width: number; height: number };
   readonly #now: () => number;
@@ -113,11 +115,13 @@ export class PlayControls {
 
   /** Whatever is pressed now does nothing more until it lifts (the wallpaper took over, a menu opened). */
   spend() {
+    this.previewTool = -1;
     if (this.#grip) this.#grip = { kind: "spent" };
   }
 
   /** Lets go of everything at once, without acting. */
   reset() {
+    this.previewTool = -1;
     this.#grip = null;
   }
 
@@ -129,14 +133,19 @@ export class PlayControls {
     }
     const design = this.#design();
     switch (g.type) {
-      case "hover":
-        if (mouse) target.aim(g.x, g.y, !target.hudAt(g.x, g.y));
+      case "hover": {
+        const hit = target.hudAt(g.x, g.y);
+        this.previewTool = hit?.kind === HUD_HITS.tool ? hit.index : -1;
+        if (mouse) target.aim(g.x, g.y, !hit);
         return;
+      }
       case "leave":
+        this.previewTool = -1;
         target.unaim();
         return;
       case "down": {
         const hit = target.hudAt(g.x, g.y);
+        this.previewTool = hit?.kind === HUD_HITS.tool ? hit.index : -1;
         if (hit) {
           this.#grip = { kind: "hud", hit: { ...hit }, x: g.x * design.width, y: g.y * design.height, swiped: 0, valid: true, over: true };
           return;
@@ -153,6 +162,7 @@ export class PlayControls {
         return;
       }
       case "drag":
+        this.previewTool = -1;
         if (!grip) return;
         if (grip.kind === "tool") target.aim(g.x, g.y, true);
         else if (grip.kind === "press") {
@@ -177,6 +187,7 @@ export class PlayControls {
         }
         return;
       case "up":
+        this.previewTool = -1;
         this.#grip = null;
         if (!grip) return;
         if (grip.kind === "hud") {
@@ -195,11 +206,13 @@ export class PlayControls {
         }
         return;
       case "cancel":
+        this.previewTool = -1;
         if (grip?.kind === "turn") target.holdCamera(false);
         this.#grip = null;
         target.unaim();
         return;
       case "pinch":
+        this.previewTool = -1;
         // Two fingers: spread or pinched, nearer or farther; moved together, round.
         if (grip?.kind === "turn") target.holdCamera(false);
         this.#grip = null;
@@ -209,6 +222,7 @@ export class PlayControls {
       case "pinchEnd":
         return;
       case "wheel":
+        this.previewTool = -1;
         this.#wheel(g, target);
         return;
     }
