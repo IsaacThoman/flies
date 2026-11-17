@@ -434,3 +434,34 @@ body support and missing domains remain its objections. It independently
 confirmed the 0.582887 CPU s observer increment and 768 KiB median RSS difference.
 Its readiness/retina-digest proposal is retained; no unreviewed causal or
 whole-animal success claim is added.
+
+Completed integration results, after all blind reviewers finished:
+
+| Stage | Result |
+|---|---|
+| Lint, web/tvOS types, build | Pass |
+| Functional suite | 1172 pass, 1 reproduced inherited failure, 3 skips |
+| Root scripts on matching farm host | 8 pass |
+| Local documentation links/commands | 4 pass |
+| Browser play | Pass, 810 s |
+| Browser pointer | Pass, 695 s |
+| Browser web/offline | Pass, 166 s |
+| Browser tables | Fail, 525 s; extra-device brain loading wait |
+| Rebase budgets | 4 pass, brain calibration skip; bounded repeat also skips |
+| Earlier matching CNS source budgets | 5 pass; brain 0.263 vs 0.500 |
+| Earlier matching CNS native checks | 7 WASM passes and arm64 FMA guard pass |
+
+Tables passed the restaurant/epoch transition that failed previously, then
+its additional-device tab timed out after 30 s with brain=loading, neurons=0,
+phase=download and 0/14,288,331 bytes received. It was not repeated on the
+unchanged-dev control, so attribution remains unestablished. No production
+UI or browser-test feature diff exists. Only the TV-soak unit failure and the
+earlier wallpaper failure have direct unchanged-dev controls. Later successful
+play/pointer runs include upstream fixes and are not gains of this auditor.
+
+The helper removed its owned checkout and containers after completion. Raw
+logs and binaries remain outside git. A post-rebase CLI replay of the primary
+recording matched every one of its 360,000 free frames and 112 trial results;
+its one full analysis cost observation is recorded in `traces.md` and is not
+retrospectively included in frozen reviewer scores. No accepted production
+body mapping or neural change remains in the feature diff.

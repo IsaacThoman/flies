@@ -222,3 +222,19 @@ The analysis records head 5feae07b and dirty=true for documentation edits.
 A single whole CLI analysis, including imports, JSON I/O, hash checks and
 reconstruction, used 0.42 user + 0.04 system CPU s and 0.35 wall s. This is
 one offline observation, not a repeated throughput or production benchmark.
+
+The integration farm completed all four browser suites: **play pass (810 s)**,
+**pointer pass (695 s)**, **web/offline pass (166 s)**, **tables fail (525 s)**.
+Tables passed the previous restaurant/epoch transition, then timed out after
+30 s while adding devices with three/two flies. The final extra tab was still
+loading its brain, with zero neurons and download progress 0/14,288,331 bytes.
+No matching unchanged-dev tables rerun was performed; this is an unattributed
+integration failure, not a demonstrated regression introduced by this auditor.
+There is no production game or browser-test feature diff from the rebase base.
+
+The matching farm host separately passed **all eight root-script tests**.
+Final documentation additions pass the four local link/command tests.
+The completed helper removed its owned checkout and containers. No owned
+Mac server, browser, simulator or heavy slot remains. Historical failures are
+retained, not relabelled by the later play/pointer successes. These checks were
+completed after the last blind packet froze and do not change its review scores.
