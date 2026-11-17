@@ -362,7 +362,7 @@ function foodGeometry(kind: FoodKind) {
     case "laced": {
       // A sugar lump dipped in coffee: soaked brown from its foot, white above the line.
       const s = r * 1.3;
-      return paint(new THREE.BoxGeometry(s, s, s, 1, 3, 1).translate(0, s / 2, 0), (p) => (p.y < s * 0.34 ? "#7a4520" : p.y < s * 0.67 ? "#c08850" : p.y > r ? "#fbf3e6" : "#efe2cc"));
+      return paint(new THREE.BoxGeometry(s, s, s, 1, 3, 1).translate(0, s / 2, 0), (p) => (p.y < s * 0.1 ? "#6e3a16" : p.y < s * 0.4 ? "#d2ab7e" : p.y > r ? "#ffffff" : "#f2f6fa"));
     }
   }
 }
