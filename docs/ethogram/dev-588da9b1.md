@@ -1,4 +1,9 @@
-# Current dev observation — held at 06:00
+# Historical dev 588da9b1 observation — held at 06:00
+
+This schema 2 recording predates the continuous first-airborne-bout flight gate.
+Its response counts use cumulative powered time and must not be pooled with
+schema 3 records or presented as final biological validation. The launch
+candidate was rejected after blind review and is reverted.
 
 Clock held at 6 h; sunrise 06:00, sunset 18:00. No validated whole-animal point score is identified. Optical scores are limited engineering comparisons; unmatched and unsupported metrics remain N/A.
 
@@ -116,8 +121,8 @@ and flight forces act during those 5 ms. Neither speed is compared to Card &
 Dickinson's mean over the first 2 ms. Their roughly 45° launch is a mechanical
 approximation from female flies on an angled pipette, not a condition-matched
 male angle distribution or a source for a guessed tolerance. See
-[calibration limits](calibration.md). The candidate remains subject to blind
-review; these data do not establish a whole-fly fidelity improvement.
+[calibration limits](calibration.md). Blind review preferred the control. The candidate is reverted; these data do
+not establish a whole-fly fidelity improvement.
 
 ## Exact-source validation and CPU variability
 
