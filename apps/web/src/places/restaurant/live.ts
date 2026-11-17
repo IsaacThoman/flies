@@ -50,7 +50,9 @@ export class Ventilation {
     // Falling, it spreads and slows; it eddies a little.
     const spread = SPREAD * (0.4 + drop / 2500);
     const speed = THROW * this.#on * (SPREAD / spread) * (0.85 + 0.15 * Math.sin(this.#time * 1.3) * Math.sin(this.#time * 0.47 + 1));
-    for (const d of DIFFUSERS) {
+    // Indexed: it runs every frame for each fly this device lives.
+    for (let i = 0; i < DIFFUSERS.length; i++) {
+      const d = DIFFUSERS[i];
       const dx = fly.x - d.x;
       const dz = fly.z - d.z;
       const r = Math.hypot(dx, dz);

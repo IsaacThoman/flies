@@ -7,8 +7,9 @@
 // reaches the fly only through its senses (places/types.ts, Felt): the wind
 // it feels, a drop or a leaf landing on it, what it sees. None is timed to it
 // or aimed at it. At a table with others the table says when each comes,
-// and its chances are the table's, so every device sees the same visit; the
-// visitors keep clear of whichever fly is nearest them.
+// and its chances are the table's, so every device sees the same visit. The
+// visitors keep clear of whichever fly is nearest them, this device's others
+// among them, and a falling leaf brushes any of this device's flies.
 
 import * as THREE from "three";
 import type { Food, Vec3, World } from "@fly/world";
@@ -169,14 +170,23 @@ export class Goings {
     this.#start(kind, around);
   }
 
-  /** The fly a visitor at `p` keeps clear of: the nearest at a table with others, else this one. */
+  /** The fly a visitor at `p` keeps clear of: the nearest of this device's and, at a table with others, everyone else's. */
   #nearest(p: Vec3, around: Around): Readonly<Vec3> {
     let best = around.fly;
-    const shared = around.shared;
-    if (!shared) return best;
     let d = Math.hypot(p.x - best.x, p.z - best.z);
-    for (let i = 0; i < shared.others.length; i++) {
-      const o = shared.others[i];
+    const company = around.company;
+    for (let i = 0; i < company.length; i++) {
+      const o = company[i];
+      const e = Math.hypot(p.x - o.x, p.z - o.z);
+      if (e < d) {
+        d = e;
+        best = o;
+      }
+    }
+    const others = around.shared?.others;
+    if (!others) return best;
+    for (let i = 0; i < others.length; i++) {
+      const o = others[i];
       const e = Math.hypot(p.x - o.x, p.z - o.z);
       if (e < d) {
         d = e;
@@ -218,10 +228,12 @@ export class Goings {
     if (this.#leaves.state === "falling") felt.looming.push(this.#leaves.looming);
   }
 
-  /** What this frame's goings-on do to another fly, at `at`: the gust, a raindrop now and then, and what it could see coming. */
+  /** What this frame's goings-on do to another fly, at `at`: the gust, a falling leaf brushing it, a raindrop now and then, and what it could see coming. */
   feel(dt: number, at: Readonly<Vec3>, felt: Felt) {
     felt.air.x += outside.gust.x;
     felt.air.z += outside.gust.z;
+    const brushed = this.#leaves.brush(at);
+    if (brushed > 0) felt.touch = Math.max(felt.touch, brushed);
     const rain = this.#around?.weather.rain ?? 0;
     if (rain >= 0.01 && Math.random() < (dt * rain) / RAIN_HIT_EVERY) {
       felt.touch = Math.max(felt.touch, RAIN_TOUCH);

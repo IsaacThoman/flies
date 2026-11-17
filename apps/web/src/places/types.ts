@@ -70,7 +70,9 @@ export type Around = {
   readonly quiet: boolean;
   /** Cleared by the game each frame, filled in by the place. */
   readonly felt: Felt;
-  /** At a table with others (apps/web/src/online): the other flies there, as this device sees them, and the one every device plans visits round. */
+  /** Where the other flies this device lives are (apps/web/src/company.ts), alone or at a table. */
+  readonly company: readonly Readonly<Vec3>[];
+  /** At a table with others (apps/web/src/online): the other players' flies there, as this device sees them, and the one every device plans visits round. */
   readonly shared: SharedTable | null;
 };
 
