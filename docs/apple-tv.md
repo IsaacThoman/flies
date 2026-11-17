@@ -645,8 +645,10 @@ described above. Both of three's ways work and are checked by the test scene (`t
   software, with no GPU for a read to wait for, so there it reads at once unless the launch
   config asks otherwise (`deferReads`): the simulator check's test scene does, so its
   `readbackAsync` goes this way, and its real game doesn't. With the deferral on, the real game's
-  table of eight in the simulator, which already stalls for 10 to 25 seconds rendering in
-  software, lost its room more often: 1 of 5 checks passed against 3 of 5 on `dev`.
+  table of eight in the simulator, which already stalls for 10 to 30 seconds rendering in
+  software, lost its room more often: 1 of 5 checks passed against 3 of 5 on `dev`, run turn
+  about. With it off there, 3 of 5 against 4 of 5, the same stalls and the same failures on
+  both: that part of the check is at the mercy of how busy the Mac is.
 
 Historically measured in the simulator (M5 Pro, the software renderer, mode 2; capture date unknown): the synchronous read takes
 0.08 ms on average (0.5 ms at most) on tvOS 27 and 0.11 ms (1.9 ms at most) on tvOS 26, and the
