@@ -133,6 +133,7 @@ JSON, from `--config` on the command line, else `www/config.json` (what the home
 | `logFile` | Redirects stderr to `Library/Caches/performance.log` in the app container, replacing the previous run's log; defaults to `false` |
 | `profile` | With `stats`: time spent in each WebGL and 2D canvas method |
 | `gpuTiming` | `glFinish` after every frame, to time the GPU (slows it down) |
+| `thermal` | Reports this thermal state (0 nominal to 3 critical) to the game in place of the TV's own, to check how it holds itself to what the TV can sustain ([Holding to what it can sustain](#holding-to-what-it-can-sustain)) |
 | `deferReads` | Reads into a pixel-pack buffer wait for their copy rather than for the GPU ([Reading pixels back](#reading-pixels-back)): on by default on a device, off in the simulator |
 | `glDebug` | Checks `glGetError` after every GL command |
 | `typed` | Answers for the keyboard in unattended runs: each keyboard shown is answered with the next after 1.5 s, as if typed and confirmed (`null`: as if the player went back). The check uses it; nothing else should |

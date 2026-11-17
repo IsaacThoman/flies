@@ -367,8 +367,12 @@ NATIVE(N_setAtRoot) {
   gHost.atRoot = argc && JSValueToBoolean(ctx, argv[0]);
   return JSValueMakeUndefined(ctx);
 }
-// thermalState(): how hot the device is, as tvOS says (ProcessInfo.thermalState): 0 nominal, 1 fair, 2 serious, 3 critical.
-NATIVE(N_thermalState) { return JSValueMakeNumber(ctx, (double)NSProcessInfo.processInfo.thermalState); }
+// thermalState(): how hot the device is, as tvOS says (ProcessInfo.thermalState): 0 nominal, 1 fair, 2 serious, 3
+// critical; or as the launch config's "thermal" says, to check what the game does as a device warms.
+static NSNumber *gPretendThermal;
+NATIVE(N_thermalState) {
+  return JSValueMakeNumber(ctx, gPretendThermal ? gPretendThermal.doubleValue : (double)NSProcessInfo.processInfo.thermalState);
+}
 NATIVE(N_ready) {
   dispatch_async(dispatch_get_main_queue(), ^{
     void (^onReady)(void) = gHost.onReady;
@@ -428,6 +432,7 @@ NATIVE(N_input) {
     _display = display;
     _wwwRoot = [[NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"www"] stringByStandardizingPath];
     gHost = self;
+    gPretendThermal = [config[@"thermal"] isKindOfClass:NSNumber.class] ? config[@"thermal"] : nil;
     _pending = [NSMutableArray array];
     // Every change of the thermal state, in the log: the stats only sample it every few seconds.
     [NSNotificationCenter.defaultCenter addObserverForName:NSProcessInfoThermalStateDidChangeNotification object:nil queue:nil usingBlock:^(NSNotification *) {
