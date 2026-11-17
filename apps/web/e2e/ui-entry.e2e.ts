@@ -26,7 +26,8 @@ try {
   const fingers = await Fingers.on(page);
   await fingers.tap(await targetOf(page, "row", 3));
   await waitFor(page, "onlineView=rooms,rooms~Input");
-  await fingers.tap(await targetOf(page, "row", 1));
+  // Past Go online and New room, to Code.
+  await fingers.tap(await targetOf(page, "row", 2));
   await waitFor(page, "typing=code");
   await page.keyboard.type(code.toUpperCase());
   await waitForGameTime(page, 0.2);

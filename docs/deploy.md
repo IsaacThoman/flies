@@ -290,8 +290,11 @@ password. The current protocol is 5. Browser tabs can reload on a version
 refusal when session storage is available. If the same protocol comes back,
 reloads are retried with a delay starting at 30 s and doubling up to 30
 minutes. Without session storage, reload manually; bundled native apps need an
-app update. Rooms open to everyone were added within protocol 3, but later
-protocol changes still require compatible clients.
+app update. Rooms open to everyone were added within protocol 3, and each
+place's own within protocol 5, but later protocol changes still require
+compatible clients. Deploy the room server before a web build that asks for a
+place's own room: one from before them refuses it as unknown, and the game
+stays alone for that launch.
 
 Rolling the server back to before protocol 3 can discard names, listing flags
 and password hashes on its next save, and compatible older clients can enter

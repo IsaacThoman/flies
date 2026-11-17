@@ -9,10 +9,12 @@
 // starter takes the other's fly off and it is alone again; a named, locked
 // room is made from the menus and joined from Online's list with its
 // password, and its link alone leads only to its door; by default, two tabs
-// that open the game find each other in the room open to everyone, one
-// leaves it from Online and stays alone, and one whose room server can't be
-// reached plays alone without a word; with "Join others" off, nothing of
-// tables happens at all; and a full table (one tab, MAX_FLIES - 1 fake
+// that open the game find each other in the room open to everyone, one goes
+// to the lab with the Place tool and is in the lab's own room, the other
+// follows it there from Settings and they see each other again, one
+// disconnects from Online and stays alone, and one whose room server can't
+// be reached plays alone without a word; disconnected, nothing of tables
+// happens at all; and a full table (one tab, MAX_FLIES - 1 fake
 // flies from Node walking round its fly) keeps the frame to the Apple TV's
 // budget on every screen shape, followed and close up.
 //
@@ -28,7 +30,7 @@ import path from "node:path";
 import { chromium } from "playwright";
 import type { BrowserContextOptions, Page } from "playwright";
 import { createServer } from "node:net";
-import { EVERYONE, MAX_FLIES, tableCode } from "@fly/net";
+import { EVERYONE, MAX_FLIES, seriesCode, seriesFor, tableCode } from "@fly/net";
 import { startServer as startRooms } from "../../server/src/server.ts";
 import type { RoomServer } from "../../server/src/server.ts";
 import { chromiumPath, gpuFlags, holdSteady, readState, startServer, waitFor, waitForGameTime } from "../../../scripts/play.ts";
@@ -67,7 +69,7 @@ type Tab = { page: Page; errors: string[]; sockets: string[] };
 const tabs: Tab[] = [];
 
 /** A tab in a context of its own: storage of its own, so a device key of its own. */
-/** `joinOthers`: left on, as a launch has it, for the steps about sitting with everyone by default. */
+/** `joinOthers`: online, as a launch has it, for the steps about sitting with everyone by default; otherwise disconnected. */
 async function open(options: BrowserContextOptions = { viewport: { width: 960, height: 540 } }, joinOthers = false): Promise<Tab> {
   const context = await browser.newContext(options);
   // What is shared at a table, not how it looks: the cheapest picture, so that two tabs drawing on a
@@ -426,7 +428,9 @@ try {
   await maker.page.goto(`${url}?rooms=${roomsAt}`);
   await waitFor(maker.page, "brain=running,screen=title", 120_000);
   await fly(maker.page, "g.open('online')");
-  await waitFor(maker.page, "screen=online,onlineView=rooms,focus=new");
+  // Disconnected, Go online comes first.
+  await waitFor(maker.page, "screen=online,onlineView=rooms,focus=online");
+  await keyTo(maker.page, "new", "ArrowDown");
   await maker.page.keyboard.press("Enter");
   await waitFor(maker.page, "onlineView=new,focus=create");
   await keyTo(maker.page, "name", "ArrowUp");
@@ -473,22 +477,49 @@ try {
   assert.equal(await fly(one.page, "g.online.code"), EVERYONE);
   await seesFly(one.page, Number(sat[1].player));
   await seesFly(two.page, Number(sat[0].player));
-  // Online says where it is, and lets it look at the other rooms without leaving.
+  // Online says where it is, and lets it browse the rooms without leaving: Everyone's first, then each place's own.
   await fly(one.page, "g.open('online')");
   await waitFor(one.page, "screen=online,onlineView=room");
-  assert.deepEqual(await fly(one.page, "g.screens.online.menu.items.map((i) => i.id)"), ["share", "rooms", "leave"]);
+  assert.deepEqual(await fly(one.page, "g.screens.online.menu.items.map((i) => i.id)"), ["share", "rooms", "disconnect"]);
   await keyTo(one.page, "rooms", "ArrowDown");
   await one.page.keyboard.press("Enter");
-  await waitFor(one.page, `onlineView=rooms,rooms~^${EVERYONE}:Everyone:[a-z]+:2:0,online=joined`, 10_000);
+  // Somewhere Everyone's room isn't now, by the clock.
+  const [to, toName] = (await readState(one.page)).place === "lab" ? ["kitchen", "Kitchen counter"] : ["lab", "Lab bench"];
+  const lab = seriesCode(seriesFor(to));
+  await waitFor(one.page, `onlineView=rooms,rooms~^${EVERYONE}:Everyone:[a-z]+:2:0;.*${lab}:${toName}:${to}:0:0,online=joined`, 10_000);
   await one.page.keyboard.press("Escape");
   await waitFor(one.page, "onlineView=room,online=joined");
+  await one.page.keyboard.press("Escape");
+  await waitFor(one.page, "screen=title");
 
-  step("leaving it from Online: alone again where it is, and not sat with everyone again until the next launch");
-  await keyTo(one.page, "leave", "ArrowDown");
+  step("the Place tool goes to another place, and to that place's own room: the other tab no longer sees it, until it follows from Settings");
+  await one.page.keyboard.press("Enter");
+  await waitFor(one.page, "screen=play");
+  await toTool(one.page, "place");
+  await fly(one.page, `g.hands.variants[g.hands.tool] = g.hands.current.variants.findIndex((v) => v.id === '${to}')`);
+  await one.page.keyboard.press("Enter");
+  const inLab = await waitFor(one.page, `online=joined,everyone=yes,roomName=${toName},place=${to},moving=`, 240_000);
+  assert.equal(await fly(one.page, "g.online.code"), lab);
+  assert.equal(await fly(one.page, "g.settings.place"), to, "it lives there now");
+  await waitUntil(two.page, "tab 0's fly gone from Everyone", (s) => !othersOf(s).some((o) => o.id === Number(sat[0].player)), 10_000);
+  await fly(two.page, `(g.settings.place = '${to}', g.applySettings())`);
+  const followed = await waitFor(two.page, `online=joined,everyone=yes,roomName=${toName},place=${to},moving=`, 240_000);
+  await seesFly(one.page, Number(followed.player), false, 10_000);
+  await seesFly(two.page, Number(inLab.player), false, 10_000);
+
+  step("disconnecting from Online: alone again where it is, and not sat with anyone again until it goes online");
+  // Back to the menu, as Back does from play, and Online from there.
+  await fly(one.page, "g.back()");
+  await waitFor(one.page, "screen=title");
+  await fly(one.page, "g.open('online')");
+  await waitFor(one.page, "screen=online,onlineView=room");
+  await keyTo(one.page, "disconnect", "ArrowDown");
   await one.page.keyboard.press("Enter");
   await waitUntil(one.page, "tab 0 alone", (s) => s.table === "" && !("online" in s), 5000);
-  await waitUntil(two.page, "tab 0's fly gone from tab 1", (s) => !othersOf(s).some((o) => o.id === Number(sat[0].player)), 5000);
-  assert.equal((await readState(one.page)).autoJoin, "stopped");
+  await waitUntil(two.page, "tab 0's fly gone from tab 1", (s) => !othersOf(s).some((o) => o.id === Number(inLab.player)), 5000);
+  assert.equal(await fly(one.page, "g.settings.joinOthers"), false, "kept for the next launch");
+  assert.equal((await readState(one.page)).place, to, "still where it was");
+  await waitFor(one.page, "onlineView=rooms,focus=online");
   await one.page.waitForTimeout(3000);
   assert.equal((await readState(one.page)).table, "", "still alone");
   for (const tab of [one, two]) await tab.page.context().close();
@@ -510,7 +541,7 @@ try {
   assert.equal(quiet.note, "", "no note on Online either");
   await cut.page.context().close();
 
-  step("with Join others off, nothing changes: no table, no line to a room, and the frame in its budget");
+  step("disconnected, nothing changes: no table, no line to a room, and the frame in its budget");
   const solo = await open();
   await solo.page.goto(url);
   await waitFor(solo.page, "brain=running,screen=title", 120_000);

@@ -75,7 +75,7 @@ export type Settings = {
   flies: number;
   /** Where it was last, to come back to. */
   scene: PlaceId;
-  /** Sit with everyone, in a room open to all, once the brain is awake (docs/online.md, "Everyone"). */
+  /** Online: sit with everyone in a room open to all, once the brain is awake (docs/online.md, "Everyone"); off after Online → Disconnect. */
   joinOthers: boolean;
 };
 

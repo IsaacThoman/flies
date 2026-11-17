@@ -59,6 +59,9 @@ function shell(frame: Frame, glyphs: Shell["glyphs"] = null, online = true): She
     shareTable: async () => "failed",
     removeFly() {},
     leaveTable() {},
+    isOnline: true,
+    disconnect() {},
+    goOnline() {},
   };
 }
 
@@ -407,6 +410,8 @@ test("the room form keeps its focused field above a phone or Split View keyboard
     const s = { ...shell(frame), typing: { active: null, end() {} } as Shell["typing"] };
     const screen = new OnlineScreen(s);
     screen.enter();
+    // Past Disconnect, to New room.
+    screen.press("down", false);
     screen.press("select", false);
     assert.equal(screen.view, "new");
     screen.layout(frame);

@@ -287,7 +287,7 @@ test("the settings are a row of tabs over each part's settings: Left and Right o
 });
 
 test("every setting the player chooses is on exactly one tab, and every tab fits without scrolling", () => {
-  // Real weather only where the Apple TV can tell the weather outside; joining others only where the device can be online.
+  // Real weather only where the Apple TV can tell the weather outside; being online is the Online menu's (Disconnect, Go online), not a setting's.
   for (const [weatherOutside, online] of [[false, false], [true, false], [false, true], [true, true]]) {
     const screen = settingsScreen(fakeShell(undefined, weatherOutside, online));
     const ids: string[] = [];
@@ -302,7 +302,7 @@ test("every setting the player chooses is on exactly one tab, and every tab fits
     assert.deepEqual(
       [...ids].sort(),
       Object.keys(DEFAULT_SETTINGS)
-        .filter((key) => key !== "scene" && (weatherOutside || key !== "realWeather") && (online || key !== "joinOthers"))
+        .filter((key) => key !== "scene" && key !== "joinOthers" && (weatherOutside || key !== "realWeather"))
         .sort(),
     );
   }

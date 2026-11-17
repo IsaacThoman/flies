@@ -199,9 +199,9 @@ Android vibration; these native iPhone and iPad haptics use the Haptics switch.
 
 A table ([online.md](online.md)) works in the app as it does in a browser: the game's own
 `BrowserSocket`, the page's WebSocket, to the apps' room server, `wss://flies.isaacthoman.com/rooms`
-(`apps/web/src/online/invite.ts`). Settings → Screensaver → Join others is on by default:
-once the brain is awake, the game tries a room open to everyone, unless a table link or a
-manual choice takes precedence. Unreachable rooms leave it alone while it retries quietly
+(`apps/web/src/online/invite.ts`). Online is the default: once the brain is awake, the game
+tries the room open to everyone for where the fly lives, unless a player-created room's link
+or a manual choice takes precedence, or the player has disconnected. Unreachable rooms leave it alone while it retries quietly
 (`apps/web/src/online/auto-join.ts`). The links it hands on are the site's,
 `https://flies.isaacthoman.com/?table=<code>`, never `fly://`.
 
@@ -409,7 +409,7 @@ simulator, runs them, then shuts it down and deletes it:
   nothing outside it, JavaScript as JavaScript); when haptics play; which links are a table's, and
   the page and script the game is given for one;
 - the UI tests, driving the app as a person would. `tests/ui/AliveTests.swift`: the brain is read
-  from the bundle, wakes, and the title shows (the test disables Join others), with nothing of the brain in the browser's cache;
+  from the bundle, wakes, and the title shows (the test starts disconnected), with nothing of the brain in the browser's cache;
   frames and simulated brain time advance (no real-time speed threshold is asserted); a tap on the title's first row starts
   play; away for 6 s (another app over the whole screen), most of that time passes with the brain
   stopped, and in front again frames and brain time advance; a setting changed in one run, the app

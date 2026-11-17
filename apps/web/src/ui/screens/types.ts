@@ -91,6 +91,11 @@ export interface Shell {
   shareTable(): Promise<"shared" | "copied" | "failed">;
   removeFly(id: number): void;
   leaveTable(): void;
+  /** Whether the player is online: sat with everyone in the place it lives by default (when it can be), or at a room. */
+  readonly isOnline: boolean;
+  /** Alone, and not sat with anyone by default until `goOnline`, this launch or a later one. */
+  disconnect(): void;
+  goOnline(): void;
 }
 
 /**

@@ -117,8 +117,6 @@ const PAGES: Record<SettingsPage, { heading: string; rows: (shell: Shell) => Men
       ...(PLACES.length > 1 ? [choice("place", "Where it lives", PLACE)] : []),
       // How many flies live here; only where this device can run more than one brain.
       ...(shell.maxFlies > 1 ? [choice("flies", "Flies", flyCounts(shell.maxFlies))] : []),
-      // With everyone, in a room open to all, once awake: only where the device can be online.
-      ...(shell.canPlayOnline ? [choice("joinOthers", "Join others", ON_OFF)] : []),
       // Whether the sky follows the weather outside, only where the Apple TV can tell it.
       ...(shell.weatherOutside ? [choice("realWeather", "Real weather", ON_OFF)] : []),
       // How its day goes: livelier than a fly's, or as a fly's.
