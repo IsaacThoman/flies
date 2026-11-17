@@ -162,7 +162,13 @@ async function fingers() {
     );
 
     step("fingers: Clear dropped removes offerings without taking the place's food");
-    for (let i = 0; i < 3; i++) await tapOn("kind", 1);
+    // Along the kinds, one tap and one shown change at a time, to the last.
+    for (let i = 0; i < 12; i++) {
+      const at = (await readState(page)).variant;
+      if (at === "clear") break;
+      await tapOn("kind", 1);
+      await waitFor(page, `variant~^(?!${at}$)`);
+    }
     await waitFor(page, "variant=clear");
     const placeFoods = await game<number>(page, "g.life.pantry.foods.filter(f => f.kind === 'patch' || f.kind === 'found').length");
     await touch.tap(await screenOf(page, "hand"));
