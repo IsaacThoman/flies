@@ -468,11 +468,10 @@ README's Tests).
 ## Playing together
 
 The Apple TV plays online, in rooms with others, as a browser does (`docs/online.md`).
-Settings → Screensaver → Join others is on by default: once the brain is running, the game
-tries a room open to everyone. A room invitation or `?alone` suppresses that automatic attempt
-for the launch; retained player-created rooms are resumed instead of automatically choosing a
-room. Failed automatic attempts leave the fly alone and may retry. The player can turn Join
-others off. Its runtime has no
+Online is the default: once the brain is running, the game tries the room open to everyone for
+where the fly lives. A player-created room's invitation or a retained one is resumed instead,
+and `?alone` suppresses the automatic attempt for the launch. Failed automatic attempts leave
+the fly alone and may retry. Online → Disconnect plays alone until Go online. Its runtime has no
 `WebSocket`, so the host gives it one, and tvOS's own keyboard for typing a table's code.
 
 ### The line to the room

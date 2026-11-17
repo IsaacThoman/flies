@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { WebSocket } from "ws";
-import { DROP_ID, FLY_MAX, FOUND_ID, LIMITS, MAX_FLIES, MAX_FOUND, MAX_OWN, PROTOCOL, ROOMS_PATH, ROOM_LIMITS, TABLETOP_SCALE, createFlyState, encodeBites, encodeFly, tableCode } from "@fly/net";
+import { DROP_ID, EVERYONE_SERIES, FLY_MAX, FOUND_ID, LIMITS, MAX_FLIES, MAX_FOUND, MAX_OWN, PROTOCOL, ROOMS_PATH, ROOM_LIMITS, TABLETOP_SCALE, createFlyState, encodeBites, encodeFly, tableCode } from "@fly/net";
 import type { ClientMessage, ServerMessage, TableStart } from "@fly/net";
 import { clientAddress, post, startServer } from "../src/server.ts";
 import type { RoomServer } from "../src/server.ts";
@@ -163,8 +163,8 @@ test("a file of tables that can't be read is set aside and the server starts wit
   await writeFile(file, '{"v":1,"tables":[{"code":');
   const logged: unknown[][] = [];
   const server = await serve({ dataDir: dir, logged });
-  // None but Everyone, which the server opens itself.
-  assert.equal((await healthy(server)).tables, 1);
+  // None but the first of each series open to everyone, which the server opens itself.
+  assert.equal((await healthy(server)).tables, EVERYONE_SERIES);
   assert.ok((await readdir(dir)).some((f) => f.startsWith("tables.json.unreadable-")), "the damaged file is kept for whoever looks after the server");
   assert.ok(logged.some(([, event]) => event === "unreadable"));
   await server.stop();
@@ -192,7 +192,7 @@ test("a file of tables that can't be read is set aside and the server starts wit
   ];
   await writeFile(file, JSON.stringify({ v: 1, tables: [good, ...bad] }));
   const back = await serve({ dataDir: dir });
-  assert.equal((await healthy(back)).tables, 2, "the good one, and Everyone");
+  assert.equal((await healthy(back)).tables, 1 + EVERYONE_SERIES, "the good one, and the rooms open to everyone");
   assert.ok(back.tables.get(code));
 });
 
@@ -235,7 +235,8 @@ test("the starter removes players only at the rate of its other changes, and the
 
 test("a table nobody is at costs no beat; when the tables are full, starting one forgets the one nobody has been at for longest", () => {
   const clock = { now: 0, wall: Date.UTC(2026, 5, 1, 12) };
-  const tables = new Tables({ now: () => clock.now, wall: () => clock.wall }, 3);
+  // Room for the rooms open to everyone the server opens itself, and two more.
+  const tables = new Tables({ now: () => clock.now, wall: () => clock.wall }, EVERYONE_SERIES + 2);
   const start = (code: string) => tables.open(`starter-${code}`, { type: "hello", v: PROTOCOL, table: code, key: newKey(), start: START }, 1);
   const codes = ["2222222222", "3333333333", "4444444444"];
   for (const code of codes) {
@@ -257,7 +258,7 @@ test("a table nobody is at costs no beat; when the tables are full, starting one
   tables.tick();
   assert.deepEqual([...ticked], [codes[0]]);
   assert.equal(typeof start("5555555555"), "object", "not refused as busy");
-  assert.equal(tables.size, 3);
+  assert.equal(tables.size, EVERYONE_SERIES + 2);
   assert.ok(tables.get(codes[0]), "the table someone is at stays");
   assert.equal(tables.get(codes[1]), null, "the longest unvisited is forgotten");
 });

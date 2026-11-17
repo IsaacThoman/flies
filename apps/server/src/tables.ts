@@ -6,16 +6,17 @@
 // back as it starts, so everyone's devices find their tables as they left
 // them when they reconnect. And the list of rooms anyone may browse: the
 // listed ones with someone there. And the rooms open to everyone, which the
-// server keeps itself: the first always, the next ones as the ones before
-// fill, none ever forgotten.
+// server keeps itself, a series of them for Everyone and one for each place:
+// the first of each always, the next ones as the ones before fill, none ever
+// forgotten.
 
 import { randomInt } from "node:crypto";
 import * as fs from "node:fs/promises";
 import path from "node:path";
-import { EVERYONE_ROOMS, LISTED_MAX, everyoneCode, everyoneIndex } from "@fly/net";
+import { EVERYONE_ROOMS, EVERYONE_SERIES, LISTED_MAX, everyoneCode, everyoneIndex, everyoneSeries } from "@fly/net";
 import type { ClientMessage, Refusal, RoomWire } from "@fly/net";
 import type { Lock } from "./lock.ts";
-import { Table, everyonePlace, isTableRecord, wantedFlies } from "./table.ts";
+import { Table, isTableRecord, placeOf, wantedFlies } from "./table.ts";
 import type { TableOptions, TableRecord } from "./table.ts";
 
 /** A table nobody has sat at for this long (ms) is forgotten, and its invitation leads nowhere. */
@@ -43,7 +44,7 @@ export class Tables {
     this.#options = options;
     this.#max = max;
     this.#files = files;
-    this.#everyone(0);
+    for (let series = 0; series < EVERYONE_SERIES; series++) this.#everyone(series * EVERYONE_ROOMS);
   }
 
   get size() {
@@ -92,12 +93,12 @@ export class Tables {
     return true;
   }
 
-  /** The `i`th room open to everyone, opened now if it hasn't been. */
+  /** The `i`th room open to everyone (counted across the series), opened now if it hasn't been. */
   #everyone(i: number): Table {
     const code = everyoneCode(i);
     const known = this.#tables.get(code);
     if (known) return known;
-    const start = { place: everyonePlace(this.#options.wall()), light: "clock", weather: "now", zone: "", offset: 0 };
+    const start = { place: placeOf(code, this.#options.wall()), light: "clock", weather: "now", zone: "", offset: 0 };
     const table = new Table(code, start, "", randomInt(2 ** 31), this.#options);
     this.#tables.set(code, table);
     this.#changed = true;
@@ -107,20 +108,21 @@ export class Tables {
 
   /**
    * The room open to everyone a device (its key, hashed) is to sit in,
-   * bringing `flies`: that one if its flies are still there (coming back
-   * after a moment away), otherwise the first with a seat for every one of
-   * them, opening the next when every one before is full (rooms fill by
-   * flies, not devices); only if none has, the first with a seat for some of
-   * them, which it is given. A refusal when all of them are full. Where it
-   * sits, it is in the place the clock has it now: a room nobody was in
-   * hasn't been keeping time.
+   * bringing `flies`, in the series of the one it asked for: that one if its
+   * flies are still there (coming back after a moment away), otherwise the
+   * first with a seat for every one of them, opening the next when every one
+   * before is full (rooms fill by flies, not devices); only if none has, the
+   * first with a seat for some of them, which it is given. A refusal when all
+   * of them are full. Where it sits, one of Everyone's is in the place the
+   * clock has it now: a room nobody was in hasn't been keeping time.
    */
   everyone(key: string, wanted: string, flies: unknown = 1): Table | Refusal {
     const there = this.#tables.get(wanted);
     if (there?.everyone && there.seated(key)) return there.keepTurn();
     const n = wantedFlies(flies);
+    const first = everyoneSeries(wanted) * EVERYONE_ROOMS;
     let some: Table | null = null;
-    for (let i = 0; i < EVERYONE_ROOMS; i++) {
+    for (let i = first; i < first + EVERYONE_ROOMS; i++) {
       const table = this.#everyone(i);
       const room = table.roomFor(key);
       if (room >= n) return table.keepTurn();
@@ -131,8 +133,8 @@ export class Tables {
 
   /**
    * The rooms anyone may see: those open to everyone first, in order (the
-   * first always, so there is always somewhere to go; the others while
-   * someone is there), then the listed ones with someone there, fullest
+   * first of each series always, so there is always somewhere to go, in
+   * every place; the others while someone is there), then the listed ones with someone there, fullest
    * first (then by name), at most LISTED_MAX in all.
    */
   listed(): RoomWire[] {
@@ -140,7 +142,7 @@ export class Tables {
     const rooms: RoomWire[] = [];
     for (const table of this.#tables.values()) {
       if (table.everyone) {
-        if (table.present > 0 || table.code === everyoneCode(0)) everyone.push(table);
+        if (table.present > 0 || everyoneIndex(table.code) % EVERYONE_ROOMS === 0) everyone.push(table);
       } else if (table.listed && table.present > 0) rooms.push(table.room());
     }
     everyone.sort((a, b) => everyoneIndex(a.code) - everyoneIndex(b.code));

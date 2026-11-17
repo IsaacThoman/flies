@@ -662,29 +662,70 @@ export function tableCode(random: (bytes: Uint8Array<ArrayBuffer>) => Uint8Array
 
 /**
  * The rooms open to everyone, which the room server keeps and nobody starts
- * (docs/online.md, "Everyone"): this many at most, each the code below. A
- * hello for any of them is a hello for whichever has room, that one first.
+ * (docs/online.md, "Everyone"). They come in series: Everyone, whose place
+ * takes turns by the clock, then one for each place, which stays there. Each
+ * series has this many rooms at most; a hello for any of a series' codes is a
+ * hello for whichever of that series has room, that one first.
  */
 export const EVERYONE_ROOMS = 64;
 const EVERYONE_PREFIX = "222222";
 
-/** The code of the `i`th room open to everyone: "2222222222", "2222222223", …, plainly a code where it is shown, never a word. */
+/**
+ * The places with a series of rooms of their own, in the order their codes
+ * were given out: a place added to the game is added at the end, so no code
+ * ever leads somewhere else. Each with what its rooms are called.
+ */
+export const SCENE_ROOMS: readonly (readonly [place: string, name: string])[] = Object.freeze([
+  ["picnic", "Picnic table"],
+  ["windowsill", "Windowsill"],
+  ["lab", "Lab bench"],
+  ["greenhouse", "Greenhouse"],
+  ["restaurant", "Restaurant"],
+  ["kitchen", "Kitchen counter"],
+] as const);
+
+/** How many series of rooms open to everyone there are: Everyone's, then each place's. */
+export const EVERYONE_SERIES = 1 + SCENE_ROOMS.length;
+
+/** The code of the `i`th room open to everyone, counted across the series: "2222222222", "2222222223", …, plainly a code where it is shown, never a word. */
 export function everyoneCode(i: number): string {
   let code = "";
   for (let k = 0, n = i; k < CODE_LENGTH - EVERYONE_PREFIX.length; k++, n = Math.floor(n / CODE_ALPHABET.length)) code = CODE_ALPHABET[n % CODE_ALPHABET.length] + code;
   return EVERYONE_PREFIX + code;
 }
 
-/** Which room open to everyone a code is, or -1 if it isn't one. */
+/** Which room open to everyone a code is, counted across the series, or -1 if it isn't one. */
 export function everyoneIndex(code: string): number {
   if (!isTableCode(code) || !code.startsWith(EVERYONE_PREFIX)) return -1;
   let i = 0;
   for (const c of code.slice(EVERYONE_PREFIX.length)) i = i * CODE_ALPHABET.length + CODE_ALPHABET.indexOf(c);
-  return i < EVERYONE_ROOMS ? i : -1;
+  return i < EVERYONE_ROOMS * EVERYONE_SERIES ? i : -1;
 }
+
+/** The series a room open to everyone is in (0: Everyone, whose place takes turns), or -1 for any other room. */
+export function everyoneSeries(code: string): number {
+  const i = everyoneIndex(code);
+  return i < 0 ? -1 : Math.floor(i / EVERYONE_ROOMS);
+}
+
+/** The series for a place's rooms; for anything else ("turns", a place without rooms of its own), Everyone's. */
+export function seriesFor(place: string): number {
+  return 1 + SCENE_ROOMS.findIndex(([p]) => p === place);
+}
+
+/** The place a series' rooms stay in, or null for Everyone's, which take turns. */
+export const seriesPlace = (series: number): string | null => SCENE_ROOMS[series - 1]?.[0] ?? null;
+
+/** The code of the `n`th room of a series. */
+export const seriesCode = (series: number, n = 0) => everyoneCode(series * EVERYONE_ROOMS + n);
 
 /** The first room open to everyone: where a device goes to be with others. */
 export const EVERYONE = everyoneCode(0);
 
-/** What the `i`th room open to everyone is called. */
-export const everyoneName = (i: number) => (i === 0 ? "Everyone" : `Everyone ${i + 1}`);
+/** What the `i`th room open to everyone (counted across the series) is called: "Everyone", "Everyone 2", …, "Picnic table", "Picnic table 2", …. */
+export function everyoneName(i: number): string {
+  const series = Math.floor(i / EVERYONE_ROOMS);
+  const n = i % EVERYONE_ROOMS;
+  const name = series === 0 ? "Everyone" : SCENE_ROOMS[series - 1][1];
+  return n === 0 ? name : `${name} ${n + 1}`;
+}

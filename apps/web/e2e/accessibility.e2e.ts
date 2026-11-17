@@ -92,7 +92,7 @@ try {
   await waitFor(page, "online=joined,everyone=yes");
   await activate("Online");
   await waitFor(page, "screen=online");
-  await activate("Other rooms");
+  await activate("Browse rooms");
   await waitFor(page, "onlineView=rooms");
   await dump("rooms");
   const garden = await tab("button", /^Garden, Picnic table, 1 of 128 flies, Password required$/);
@@ -122,7 +122,10 @@ try {
   await waitFor(page, "online=joined");
   await dump("joined");
   await audit("joined");
+  // Leaving a room of someone's own is back with everyone, whose rooms are a step away.
   await activate("Leave the room");
+  await waitFor(page, "online=joined,everyone=yes,onlineView=room");
+  await activate("Browse rooms");
   await waitFor(page, "onlineView=rooms");
   await activate(/^Garden, Picnic table, 1 of 128 flies, Password required$/);
   // Password fields have no implicit textbox role in browsers.
@@ -139,7 +142,10 @@ try {
   await page.keyboard.press("Enter");
   await waitFor(page, "online=joined");
   await dump("joined-locked");
+  // Leaving a room of someone's own is back with everyone, whose rooms are a step away.
   await activate("Leave the room");
+  await waitFor(page, "online=joined,everyone=yes,onlineView=room");
+  await activate("Browse rooms");
   await waitFor(page, "onlineView=rooms");
   await page.getByRole("button", { name: /^Garden, Picnic table, 1 of 128 flies, Password required$/ }).waitFor();
   await dump("left");

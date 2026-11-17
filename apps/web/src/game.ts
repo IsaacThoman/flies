@@ -29,7 +29,7 @@ import { EyesInset, insetWanted } from "./eyes/inset.ts";
 import { FlyView } from "./fly-view.ts";
 import { DRAG_ROUND, DRAG_UP, PlayControls } from "./controls.ts";
 import type { PlayTarget, ToolUse } from "./controls.ts";
-import { COLOURS, MAX_OWN, PROTOCOL, everyoneIndex } from "@fly/net";
+import { COLOURS, MAX_OWN, PROTOCOL, everyoneSeries, seriesFor, seriesPlace } from "@fly/net";
 import type { SeatedFly, TableStart } from "@fly/net";
 import { TouchLoupe } from "./ui/touch-loupe.ts";
 import type { Devices, Gamepads, Gesture, Keyboard, Pointers, Remote } from "./input.ts";
@@ -123,8 +123,6 @@ const PAD_ZOOM = 1.6;
 type MenuScreenId = Exclude<ScreenId, "play">;
 
 const FIXED_AT_TABLE: ReadonlySet<ToolId> = new Set(["light", "weather", "place"]);
-/** In a room open to everyone the light and the weather are each player's own; the place is the room's clock's. */
-const FIXED_FOR_EVERYONE: ReadonlySet<ToolId> = new Set(["place"]);
 const NOTHING_FIXED: ReadonlySet<ToolId> = new Set();
 
 /** Adds each of `from` to `to`, without the iterator a for…of would make: it runs every frame for every fly. */
@@ -204,8 +202,9 @@ export class Game implements Shell {
   online: Online | null = null;
   /** How the room this device was last at, or tried to sit at, ended: it left, or was turned away (removed, the room gone, locked). */
   tableEnded: Ended | null = null;
-  /** A locked room's door, waiting for its password. */
+  /** A locked room's door, waiting for its password; and how many doors have been come to, each its own (a refusal at the same door is news). */
   knock: Knock | null = null;
+  #knocks = 0;
   /** Typing into the fields the game draws (a room's name, its password), where there is a way to. */
   readonly typing: TextEntry | null;
   #typingHit: Hit | null = null;
@@ -283,6 +282,8 @@ export class Game implements Shell {
   #moving: { to: PlaceId; t: number; arrived: boolean } | null = null;
   /** Seconds of wallpaper spent where it is now. */
   #stayed = 0;
+  /** Where it lives, once the player has settled on it in Settings: online, the room open to everyone it belongs in follows it. */
+  #lives: Settings["place"];
   /** A place stepped to in Settings, waiting for the player to settle on it. */
   #placeChoice = new Settle(
     () => this.#choosingPlace(),
@@ -332,10 +333,10 @@ export class Game implements Shell {
   /** Sitting this device with others by default, once the brain is awake (null where it can't play online); and whether the room this device is at, or trying, is its doing (it ends quietly). */
   #auto: AutoJoin | null = null;
   #autoOnline = false;
-  /** "Join others" as last applied, to tell when it changes. */
+  /** Whether the player is online (Online → Disconnect, Go online), as last applied, to tell when it changes. */
   #joinOthers = true;
   /** What sitting with everyone is told each frame, kept: nothing is made per frame. */
-  readonly #autoNow: AutoJoinNow = { enabled: true, awake: false, network: true, atRoom: false };
+  readonly #autoNow: AutoJoinNow = { enabled: true, awake: false, network: true, atRoom: false, series: 0, atSeries: -1 };
 
   constructor(canvas: HTMLCanvasElement, remote: Remote, brains: Brains, display: Display, inputs: Inputs) {
     this.canvas = canvas;
@@ -348,6 +349,8 @@ export class Game implements Shell {
     this.#target = this.#playTarget();
     this.settings = loadSettings();
     const place = this.settings.place;
+    this.#lives = place;
+    this.#joinOthers = this.settings.joinOthers;
     this.#here = place !== "turns" && isPlaceId(place) ? place : isPlaceId(this.settings.scene) ? this.settings.scene : "picnic";
     const scene = SCENES[this.#here];
     const world = new World(scene.place);
@@ -435,13 +438,15 @@ export class Game implements Shell {
     const native = !!(globalThis as { __native?: unknown }).__native;
     this.typing = !this.canPlayOnline ? null : keyboard ? new NativeTextEntry(keyboard) : typeof document !== "undefined" && !native ? new BrowserTextEntry() : null;
     // Invited to a room, or still at one of its own it was at when it last closed: it sits down there.
-    // Otherwise, once the brain is awake, with everyone (AutoJoin), unless invited or opened `?alone` (for checks and scripts).
+    // Otherwise, once the brain is awake, with everyone in the place it lives (AutoJoin), unless disconnected or opened `?alone` (for checks and scripts).
     if (this.canPlayOnline) {
       const invited = invitedTo(location.href);
       const kept = this.#seat.table;
       this.#auto = new AutoJoin(kept);
-      if (invited || new URL(location.href).searchParams.has("alone")) this.#auto.stop();
-      const code = invited ?? (kept && everyoneIndex(kept) < 0 ? kept : null);
+      if (new URL(location.href).searchParams.has("alone")) this.#auto.stop();
+      // A link to a room open to everyone is to its place, with everyone there, as soon as the brain is awake.
+      if (invited && everyoneSeries(invited) >= 0) this.#belongIn(invited);
+      const code = invited && everyoneSeries(invited) < 0 ? invited : !invited && kept && everyoneSeries(kept) < 0 ? kept : null;
       if (code) this.#sit(code, null);
       // A phone's keyboard comes up only for a field focused during the tap itself: the frame that handles the tap is too late.
       if (inputs.pointers) {
@@ -477,23 +482,55 @@ export class Game implements Shell {
     this.#sit(newTableCode(), start, room.password || null);
   }
 
-  /** Sits at a room by its code, with its password if it is locked. */
+  /** Sits at a room by its code, with its password if it is locked. A room open to everyone is the player's place from now on, sat in as by default. */
   joinRoom(code: string, password?: string) {
-    if (this.online?.code === code || !this.#mayChoose()) return;
-    this.#sit(code, null, password || null);
+    if (this.online?.code === code || !this.#mayChoose(code)) return;
+    if (everyoneSeries(code) < 0) {
+      this.#sit(code, null, password || null);
+      return;
+    }
+    this.#belongIn(code);
+    this.#auto?.begin();
+    this.#sit(code, null, null, true);
   }
 
-  /**
-   * Whether the player may go to a room of their choosing now: alone, or in
-   * a room open to everyone (or on the way to one), which is left for it.
-   * Either way, being sat with everyone by default is over for this launch.
-   */
-  #mayChoose() {
+  /** A room open to everyone, chosen by the player (from the list, by its code or its link): the fly lives in its place now (each in turn, for Everyone's), online, and that room is where it comes back to. */
+  #belongIn(code: string) {
+    const place = seriesPlace(everyoneSeries(code));
+    this.settings.place = place !== null && isPlaceId(place) ? place : "turns";
+    this.#lives = this.settings.place;
+    this.settings.joinOthers = this.#joinOthers = true;
+    saveSettings(this.settings);
+    this.#auto?.at(code);
+    this.#auto?.resume();
+  }
+
+  /** Online → Disconnect: alone, and not sat with anyone by default until the player goes online again, this launch or a later one. */
+  disconnect() {
+    this.settings.joinOthers = false;
+    this.applySettings();
+  }
+
+  /** Online → Go online: with everyone in the place it lives, as soon as it can be. */
+  goOnline() {
+    this.settings.joinOthers = true;
+    this.applySettings();
+  }
+
+  /** Whether the player is online: sat with everyone by default, or at a room. */
+  get isOnline() {
+    return this.settings.joinOthers;
+  }
+
+  /** Whether the player may go to a room of their choosing now (`code`, if it is one already made): alone, or in a room open to everyone (or on the way to one), which is left for it. */
+  #mayChoose(code?: string) {
     if (!this.canPlayOnline) return false;
-    this.#auto?.stop();
     const online = this.online;
     if (online && !online.everyone && !this.#pending) return false;
+    // Left for this room's door: still at it, on the way in.
+    const knock = this.knock;
     this.leaveTable();
+    if (knock?.code === code) this.knock = knock;
     return true;
   }
 
@@ -510,7 +547,7 @@ export class Game implements Shell {
 
   /** Comes to a locked room's door from the list (or goes away from it). */
   door(room: { code: string; name: string } | null) {
-    this.knock = room && { code: room.code, name: room.name, wrong: false, seq: (this.knock?.seq ?? 0) + 1 };
+    this.knock = room && { code: room.code, name: room.name, wrong: false, seq: ++this.#knocks };
   }
 
   /** Where the fly is now. */
@@ -666,13 +703,13 @@ export class Game implements Shell {
     this.online?.remove(id);
   }
 
-  /** Leaves the table: the fly is alone again where it is, and not sat with everyone again this launch. */
+  /** Leaves the table: the fly is alone again where it is, until it is sat with everyone in its place again (at once, if the player is online). */
   leaveTable() {
     if (!this.online) return;
-    this.#auto?.stop();
     const quiet = this.#pending;
     this.online.leave();
     this.#stand("left", quiet);
+    this.#auto?.hurry();
   }
 
   /** `auto`: sat with everyone by default (AutoJoin), not by the player: how it ends is not news. */
@@ -685,7 +722,7 @@ export class Game implements Shell {
     this.#seat.table = code;
     saveTableSeat(this.#seat);
     // A room of the player's own goes in the address, for a reload to come back to; everyone's are anyone's anyway.
-    if (everyoneIndex(code) < 0) showInAddress(code);
+    if (everyoneSeries(code) < 0) showInAddress(code);
     this.#lockTools();
   }
 
@@ -700,7 +737,7 @@ export class Game implements Shell {
     if (this.canvas.dataset) Online.unpublish(this.canvas.dataset);
     // A locked room: its door, to try its password (again). Quietly, there is no door to come to.
     if (!quiet && why === "locked") {
-      this.knock = { code: online.code, name: online.line.lockedName ?? this.knock?.name ?? "", wrong: online.triedPassword, seq: (this.knock?.seq ?? 0) + 1 };
+      this.knock = { code: online.code, name: online.line.lockedName ?? this.knock?.name ?? "", wrong: online.triedPassword, seq: ++this.#knocks };
       if (this.nav.current !== "online") this.open("online");
     } else if (!quiet && why !== "busy") this.knock = null;
     // Its own food again (as it was, if the room never let it in), and its own light and weather, as its shelf had them.
@@ -723,11 +760,11 @@ export class Game implements Shell {
     this.overlay.dirty = true;
   }
 
-  /** At a table, the light, the weather and the place are the starter's to choose; in a room open to everyone, the place is its clock's. */
+  /** At a table, the light, the weather and the place are the starter's to choose; in a room open to everyone, they are each player's own (the place is chosen by going to its room). */
   #fixedTools(): ReadonlySet<ToolId> {
     const online = this.online;
-    if (!online || !online.joined || online.starting) return NOTHING_FIXED;
-    return online.everyone ? FIXED_FOR_EVERYONE : FIXED_AT_TABLE;
+    if (!online || !online.joined || online.starting || online.everyone) return NOTHING_FIXED;
+    return FIXED_AT_TABLE;
   }
 
   #lockTools() {
@@ -744,6 +781,7 @@ export class Game implements Shell {
     if (online.welcomed && this.#seat.table !== online.code) {
       this.#seat.table = online.code;
       saveTableSeat(this.#seat);
+      this.#auto?.at(online.code);
     }
     const ended = online.ended;
     if (!ended) return;
@@ -756,7 +794,7 @@ export class Game implements Shell {
     if (ended === "version" && !quiet && this.nav.current !== "online") this.open("online");
   }
 
-  /** Sitting with everyone by default, once the brain is awake: or giving up a try that comes to nothing, quietly. */
+  /** Sitting with everyone in the place it lives by default, once the brain is awake, and going to another place's room when it lives somewhere else: or giving up a try that comes to nothing, quietly. */
   #autoJoin(dt: number) {
     const auto = this.#auto;
     if (!auto) return;
@@ -766,10 +804,20 @@ export class Game implements Shell {
     now.enabled = this.settings.joinOthers;
     now.awake = !this.#loading && this.brain.status === "running";
     now.network = typeof navigator === "undefined" || navigator.onLine !== false;
-    now.atRoom = !!online;
+    // At a locked room's door in Online, on the way in: sat with everyone now, the door would give way to that room's face.
+    now.atRoom = !!online || (!!this.knock && this.nav.current === "online");
+    now.series = seriesFor(this.#lives);
+    now.atSeries = mine?.welcomed ? everyoneSeries(mine.code) : -1;
     const act = auto.update(dt, now, !!mine?.welcomed, (mine?.line.reconnects ?? 0) > 0);
     if (act === "join") this.#sit(auto.code, null, null, true);
-    else if (act === "abandon" && mine) {
+    else if (act === "switch" && mine) {
+      mine.leave();
+      this.#stand("left", true);
+      // Carried there at once, as alone, while its room lets it in; Everyone's say where they are once they have.
+      const place = seriesPlace(now.series);
+      if (place !== null && isPlaceId(place)) this.moveTo(place);
+      this.#sit(auto.code, null, null, true);
+    } else if (act === "abandon" && mine) {
       mine.leave();
       this.#stand("left", true);
     }
@@ -935,12 +983,13 @@ export class Game implements Shell {
     }
     // The flies' clocks take a new pace when they are next put right: on the next frame.
     if (this.life?.rhythm && this.life.rhythm.pace !== s.pace) this.#clockAt = 0;
-    // Not with others by default any more: out of the room it was sat in for it. On again: with them soon, whatever stopped it before.
+    // Disconnected: out of whatever room it is in. Online again: with everyone soon, whatever stopped it before.
     if (s.joinOthers !== this.#joinOthers) {
       this.#joinOthers = s.joinOthers;
-      if (!s.joinOthers && this.#autoOnline && this.online) {
+      if (!s.joinOthers && this.online) {
+        const quiet = this.#autoOnline;
         this.online.leave();
-        this.#stand("left", true);
+        this.#stand("left", quiet);
       } else if (s.joinOthers) this.#auto?.resume();
     }
     if (save) saveSettings(s);
@@ -1011,9 +1060,10 @@ export class Game implements Shell {
     return this.nav.current === "settings" && this.screens.settings.menu.focused?.id === "place";
   }
 
-  /** Carries the fly to the place it lives in, if it lives in one and isn't there. At a table, the table's place is the starter's to choose, with the Place tool. */
+  /** Carries the fly to the place it lives in, if it lives in one and isn't there; in a room open to everyone, to that place's room (#autoJoin). At a table, the table's place is the starter's to choose, with the Place tool. */
   #settlePlace() {
     const place = this.settings.place;
+    this.#lives = place;
     if (!this.online && place !== "turns" && isPlaceId(place) && place !== this.#here) this.moveTo(place);
   }
 
@@ -1647,8 +1697,19 @@ export class Game implements Shell {
   #goToPlace(): boolean {
     const hands = this.hands;
     const online = this.online;
+    if (hands.place === this.#here) {
+      this.#refuse();
+      return false;
+    }
+    // In a room open to everyone, it lives there now, and goes to that place's room (#autoJoin).
+    if (online?.everyone && this.#autoOnline) {
+      this.settings.place = this.#lives = hands.place;
+      saveSettings(this.settings);
+      this.#learn("place");
+      return true;
+    }
     // At a table only its starter carries it, and only to a place a table can be in.
-    if (hands.place === this.#here || (online && (!online.starting || !Object.hasOwn(WORLDS, hands.place)))) {
+    if (online && (!online.starting || !Object.hasOwn(WORLDS, hands.place))) {
       this.#refuse();
       return false;
     }

@@ -21,10 +21,13 @@ together; the binary fly-state layout itself is unchanged.
 ## Playing
 
 - **Everyone.** Nobody has to do anything to be with others. Once the brain
-  is awake, the game sits this device's flies in **Everyone**, a public room the
-  room server keeps (below), unless Settings → Screensaver → Join others is off,
-  the game was opened by a room's link (or code), it remembers a
-  player-created room, or the device is offline.
+  is awake, the game sits this device's flies in a public room the room
+  server keeps (below), the one for where they live (Settings → Screensaver →
+  Where it lives): **Everyone**, whose place takes turns, for Each in turn,
+  the default; the place's own room for a place. Unless the player has
+  disconnected (Online → Disconnect, kept until Online → Go online), the game
+  was opened by a player-created room's link (or code), it remembers one, or
+  the device is offline.
   It is quiet about it: a room server that can't be reached, or one that
   turns the device away, leaves the fly playing alone as if nothing had been
   tried, with no note, and the game tries again in the background after 30 s,
@@ -33,28 +36,43 @@ together; the binary fly-state layout itself is unchanged.
   Unknown rooms, incompatible versions, removal and another window taking
   the same seat stop retries for that launch.
   Until it is let in, the fly eats its own food and Online shows the rooms
-  as if it were alone. Leaving the room from Online or turning Join others off stops automatic
-  joining until the next launch; choosing another room also stops it; turning
-  Join others on again sits it with everyone soon.
-- **The rooms open to everyone** (`EVERYONE_ROOMS`, `packages/net/src/protocol.ts`)
-  are Everyone, Everyone 2, Everyone 3, …, up to 64, with the codes
-  `2222222222`, `2222222223`, …. The server opens Everyone as it starts, and
-  opens further rooms while searching for enough seats for an arriving
-  group, even if an earlier room has some free seats. They are exempt from
-  runtime expiry and eviction; restore capacity has a limit (Coming back).
-  A hello for any of their codes is a hello for whichever has room: the one
-  named, if this device's flies are still there (a dropped line, a reload),
-  otherwise the first with a seat for every fly it brings, by flies, not
-  devices (only if none has, the first with a seat for some of them, which
-  it is given). So a full Everyone sends a newcomer on to Everyone 2, and
-  its link leads to whichever has room; the 64 hold at most 8,192 flies. They
-  have no password and no starter, so nobody chooses for anyone else,
-  nobody can take a device off, and no seat is kept for anyone gone:
-  - **The place** takes turns by the server's clock, 20 minutes in each
-    (greenhouse, picnic, windowsill, lab, restaurant, kitchen, by the wall
-    clock, so every restart agrees), and carries everyone there together. The Place tool
-    shows it and refuses to change it, and Settings → Screensaver → Where it
-    lives waits until the fly is alone again: neither fights the room.
+  as if it were alone, with Disconnect above them. Disconnecting stops
+  automatic joining, this launch and later ones, until Go online. At a
+  player-created room nothing is tried; leaving it sits the device with
+  everyone again at once.
+- **Going somewhere else.** The place is the player's to choose, with
+  others as alone: in a room open to everyone, the Place tool and Where it
+  lives carry the fly to that place's own room (the fly is carried there at
+  once, and the others there appear as it is let in). The Place tool makes
+  the place where the fly lives, as Where it lives does. Choosing a room
+  open to everyone from the list, by its code or by its link does the same
+  the other way round: the fly lives in its place now (each in turn, for
+  Everyone's), and goes online if it was disconnected.
+- **The rooms open to everyone** (`EVERYONE_ROOMS`, `SCENE_ROOMS`,
+  `packages/net/src/protocol.ts`) come in series of up to 64 each.
+  Everyone's are Everyone, Everyone 2, Everyone 3, …, with the codes
+  `2222222222`, `2222222223`, …; then each place's, in a fixed order (a
+  place added later goes at the end, so no code ever changes where it
+  leads): Picnic table, Picnic table 2, …, Windowsill, …, Kitchen counter.
+  The server opens the first of each series as it starts, and opens further
+  rooms of a series while searching for enough seats for an arriving group,
+  even if an earlier room has some free seats. They are exempt from runtime
+  expiry and eviction; restore capacity has a limit (Coming back). A hello
+  for any of a series' codes is a hello for whichever of that series has
+  room: the one named, if this device's flies are still there (a dropped
+  line, a reload), otherwise the first with a seat for every fly it brings,
+  by flies, not devices (only if none has, the first with a seat for some of
+  them, which it is given). So a full Everyone sends a newcomer on to
+  Everyone 2, a full Lab bench to Lab bench 2, and a link leads to whichever
+  of its series has room; each series holds at most 8,192 flies. They have
+  no password and no starter, so nobody chooses for anyone else, nobody can
+  take a device off, and no seat is kept for anyone gone:
+  - **The place** of a place's own rooms is that place, always. Everyone's
+    take turns by the server's clock, 20 minutes in each (greenhouse,
+    picnic, windowsill, lab, restaurant, kitchen, by the wall clock, so every
+    restart agrees), and carry everyone there together. In either, the
+    Place tool and Where it lives go to another place's room (Going
+    somewhere else), never fighting the room.
   - **The light and the weather** are each device's own, as alone: "Now" is
     its own clock and sky (on an Apple TV, the weather outside), and the
     Light and Weather tools change only what this device sees, and are kept
@@ -63,15 +81,17 @@ together; the binary fly-state layout itself is unchanged.
     (no butterfly in its rain, no gull in its night); the shared bubbles
     don't burst in anyone's rain.
   - Online, in one of them, shows its name, its QR code and code, and Share
-    the link, Other rooms and Leave the room. Other rooms is the list, with
+    the link, Browse rooms and Disconnect. Browse rooms is the list, with
     the fly still in the room until another is chosen (or Back).
 - **The rooms.** The menu → Online lists the rooms open to everyone first
-  (Everyone always, the others while someone is there), each with a globe,
+  (the first of each series always, the others while someone is there),
+  each with a globe, Everyone's saying where they are now,
   then other public rooms with someone in them, fullest first (at most 50 rooms in all): its name, its place's colour, its eight seats as pips
   (one per present or still-connected fly, plus a departed starter's reserved first seat)
   and a padlock if it has a password. The list follows the room server as
   rooms open, fill and empty. A full one can't be chosen, but for a room
   open to everyone, which sends whoever chooses it on to the next. Above the list are
+  Disconnect (Go online, when disconnected; not while browsing from a room),
   New room, and Code, for an unlisted room's code (the ten letters and digits of its
   link).
 - **A new room.** New room → its name (two words are suggested, to keep or
@@ -123,8 +143,10 @@ together; the binary fly-state layout itself is unchanged.
   device's flies at the table, resting together: wings folded, still, their
   near models dimmed. After 10 minutes away they leave; when the device comes
   back, retained seats keep their colours and positions are checked (Coming back).
-- **Leaving.** Online → Leave the room. The flies stay where they are, alone,
-  with the place's own food, and the light and weather its shelf had.
+- **Leaving.** Online → Leave the room, in a player-created room: back with
+  everyone where the fly lives, as by default. Online → Disconnect, in any
+  room: the flies stay where they are, alone, with the place's own food, and
+  the light and weather its shelf had, until Go online.
 - **What goes wrong** is said in the heading's place, in a few words: a
   wrong password, too many tries, a full room, one that has closed, being
   taken off one.
@@ -160,9 +182,9 @@ through `TextEntry` (`packages/contracts/src/text-entry.ts`), polled each
 frame, so the Apple TV can bring its own keyboard through the bridge.
 
 Solo play has no other players' bodies or room connection, except while
-Online browses or the game tries to join Everyone. Join others off and
-`?alone` disable automatic Everyone joining; neither blocks an invitation
-or a remembered player-created room. Leave that room and remove any
+Online browses or the game tries to join a room open to everyone.
+Disconnecting and `?alone` disable automatic joining; neither blocks an
+invitation or a remembered player-created room. Disconnect and remove any
 `?table=` invitation for a solo launch. `npm run tvos:check` uses `?alone`
 with controlled test settings. The device's own flies still live together, each with its own brain, senses and
 eyes, all eating from one pantry (`apps/web/src/company.ts`). A companion whose
@@ -241,7 +263,13 @@ turned away; a browser tries the current game.
 
 The rooms open to everyone came within protocol 3, adding fields only
 (`room.code` and `room.everyone` in the welcome, `everyone` in the list),
-and protocol 4 carries them as they are. A current device and a room server
+and protocol 4 carries them as they are. Each place's own rooms came
+within protocol 5, as more codes only: a device from before them knows
+Everyone's codes, sees the others in the list as rooms open to everyone
+(by `everyone`) and can choose them, and keeps to their place as it would
+to Everyone's turns. A current device and a room server from before them:
+a hello for a place's room is refused as unknown, and it stays alone,
+quietly, for that launch. A current device and a room server
 speaking protocol 5 but without Everyone: its hello is refused as unknown, and it stays
 alone, quietly, without trying again that launch.
 
