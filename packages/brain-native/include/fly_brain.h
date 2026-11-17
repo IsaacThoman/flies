@@ -47,6 +47,8 @@ typedef struct fly_senses {
    * initialised without it leaves: that is a fly that has just drunk.
    */
   float thirst;
+  /** Odor strengths 0..1 in ODORANTS order: ethyl acetate, acetic acid, ethanol, isoamyl acetate, CO2. Zero-initialised = no odour. */
+  float odor_left[5], odor_right[5];
 } fly_senses;
 
 /** What the brain wants done. All 0 to 1 except turn, which runs -1 (hard left) to 1 (hard right). */

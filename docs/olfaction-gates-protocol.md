@@ -95,7 +95,7 @@ whether CO₂ is called avoided.
 
 ## Part D: gate 4, the plume (only if gates 2 and 3 pass)
 
-Opt-in, in a script (`scripts/plume.ts`); the game is not changed by it.
+Opt-in, in a plume assay script to be added if this gate is reached; the game is not changed by it.
 
 - **Field.** A steady point source on the floor in uniform wind: the exact
   solution of steady advection–diffusion in three dimensions, doubled by the
@@ -151,3 +151,9 @@ Part C again on seeds 41–50, used by nothing before, with the same rule (the
 reducer's seed list is the only change). Part D, if reached, runs on it too.
 Also reported, with no decision: the touch trial above with fermenting-fruit
 odour (the five odorants at 1) at both antennae.
+
+<!-- docs-check: base packages/brain/src -->
+
+<!-- docs-check: base packages/brain -->
+
+<!-- docs-check: base packages/brain/scripts -->

@@ -18,6 +18,7 @@
 #include "eyes.hpp"
 #include "io.hpp"
 #include "modulation.hpp"
+#include "olfaction.hpp"
 #include "sim.hpp"
 #include "state.hpp"
 #include "vision.hpp"
@@ -93,6 +94,8 @@ class Brain {
   Simulation sim_;
   InternalState state_;
   Modulation modulation_;
+  std::vector<olfaction::Group> smell_;
+  std::vector<uint32_t> smell_inputs_;
   std::vector<uint32_t> sense_inputs_;
   std::vector<uint32_t> background_inputs_;
   // The water neurons' output gain, which thirst sets (io::water_output_gain).

@@ -34,6 +34,8 @@ struct Senses {
   double bitter = 0, water = 0;
   /** Internal state, not a sense (types.ts's BrainSenses.thirst): 0 just drunk to 1 thirsty; anything not a number counts as 1. */
   double thirst = 1;
+  /** Odor strengths in ODORANTS order, left then right; absent is zero. */
+  double odor_left[5] = {}, odor_right[5] = {};
 };
 
 struct Command {

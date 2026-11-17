@@ -233,7 +233,12 @@ int brain(const char* path, uint32_t seed, const Options& options) {
     int grounded = 0;
     in >> dt >> v[0] >> v[1] >> v[2] >> v[3] >> v[4] >> v[5] >> v[6] >> v[7] >> v[8] >> v[9] >> v[10] >> grounded >> s[0] >> s[1] >> s[2] >> s[3] >> s[4] >> light >> hunger >> thirst;
     fly_senses senses{f32(v[0]), f32(v[1]), f32(v[2]), f32(v[3]), f32(v[4]),  f32(v[5]), f32(v[6]), grounded, nullptr,   nullptr,  f32(v[7]),
-                      f32(hunger), f32(v[8]), f32(s[0]), f32(s[1]), f32(s[2]), f32(s[3]), f32(s[4]), f32(v[9]), f32(v[10]), f32(thirst)};
+                      f32(hunger), f32(v[8]), f32(s[0]), f32(s[1]), f32(s[2]), f32(s[3]), f32(s[4]), f32(v[9]), f32(v[10]), f32(thirst), {}, {}};
+    for (float* side : {senses.odor_left, senses.odor_right}) for (size_t k = 0; k < 5; k++) {
+      std::string odor = "00000000";
+      in >> odor;
+      side[k] = f32(odor);
+    }
     fly_command command;
     fly_stats stats;
     int failed;

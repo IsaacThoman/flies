@@ -114,6 +114,10 @@ int tick(fly_brain* brain, double dt_ms, const fly_senses* senses, const Light& 
     in.bitter = senses->bitter;
     in.water = senses->water;
     in.thirst = senses->thirst;
+    for (size_t k = 0; k < 5; k++) {
+      in.odor_left[k] = senses->odor_left[k];
+      in.odor_right[k] = senses->odor_right[k];
+    }
     fly::TickStats out;
     const fly::io::Command c = brain->brain.tick(dt_ms, in, light, out);
     if (command != nullptr) {

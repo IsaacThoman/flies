@@ -22,7 +22,7 @@
 namespace {
 constexpr double kMaxStepMs = 100;
 // SENSE_ORDER, COMMAND_ORDER and STATE_STATS in packages/contracts/src/brain.ts.
-constexpr int kScalars = 19, kCommands = 8, kStats = 4;
+constexpr int kScalars = 29, kCommands = 8, kStats = 4;
 // Where hunger is among the scalars; a game that sends fewer keeps no account of it, which is 1.
 constexpr int kHunger = 9;
 // And thirst, which is 1 the same way.
@@ -135,6 +135,8 @@ void *Run(void *arg) {
       scalars[0], scalars[1], scalars[2], scalars[3], scalars[4], scalars[5], scalars[6], scalars[7] > 0.5f,
       eyes ? light[0].data() : nullptr, eyes ? light[1].data() : nullptr, scalars[8], scalars[kHunger], scalars[kWingbeat],
       scalars[11], scalars[12], scalars[13], scalars[14], scalars[15], scalars[16], scalars[17], scalars[kThirst],
+      {scalars[19], scalars[20], scalars[21], scalars[22], scalars[23]},
+      {scalars[24], scalars[25], scalars[26], scalars[27], scalars[28]},
     };
     fly_command c = {};
     fly_stats stats = {};

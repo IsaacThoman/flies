@@ -95,6 +95,16 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   for (size_t side = 0; side < retinas_.size(); side++) {
     withdrawn_inputs_[side] = sim_.add_rated_input(std::string("eye ") + (side == io::kLeft ? "left" : "right") + " withdrawn", retinas_[side].l1(), true);
   }
+  // After the withdrawals, preserving all earlier inputs' streams.
+  smell_ = olfaction::wire(connectome);
+  std::unordered_set<uint32_t> read;
+  for (const auto& group : wiring_.readouts) read.insert(group.neurons.begin(), group.neurons.end());
+  for (const auto& group : smell_) {
+    for (uint32_t i : group.neurons) {
+      if (read.count(i)) throw std::runtime_error("Neuron " + std::to_string(i) + " is both driven by \"" + group.name + "\" and read");
+    }
+    smell_inputs_.push_back(sim_.add_input(group.name, group.neurons, 0));
+  }
 }
 
 io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& light, TickStats& stats) {
@@ -118,6 +128,8 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
     const io::Group& group = wiring_.senses[k];
     sim_.set_rate(sense_inputs_[k], group.max_rate * io::intensity(senses, group.spec.sense) * (group.spec.gated ? gate : 1));
   }
+  const auto odor = olfaction::odor_of(senses);
+  for (size_t k = 0; k < smell_.size(); k++) sim_.set_rate(smell_inputs_[k], olfaction::rate(smell_[k], odor));
   const double hunger = io::hunger_of(senses);
   modulation_.set_state(senses, hunger);
   modulation_.update(0);

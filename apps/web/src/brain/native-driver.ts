@@ -23,7 +23,7 @@ export class NativeBrainDriver implements BrainDriver {
   readonly regionRates = new Float32Array(REGION_RATE_NAMES.length);
   readonly #bridge: NativeBrainBridge;
   readonly #now: () => number;
-  readonly #scalars = new Float32Array(SENSE_ORDER.length);
+  readonly #scalars = new Float32Array(SENSE_ORDER.length + 10);
   #lightLeft: Float32Array | null = null;
   #lightRight: Float32Array | null = null;
   #rateNames: string[] = [];
@@ -64,6 +64,10 @@ export class NativeBrainDriver implements BrainDriver {
       for (let i = 0; i < SENSE_ORDER.length; i++) {
         const name = SENSE_ORDER[i];
         s[i] = name === "grounded" ? (senses.grounded ? 1 : 0) : name === "hunger" || name === "thirst" ? (senses[name] ?? 1) : (senses[name] ?? 0);
+      }
+      for (let k = 0; k < 5; k++) {
+        s[SENSE_ORDER.length + k] = senses.odor?.left?.[k] ?? 0;
+        s[SENSE_ORDER.length + 5 + k] = senses.odor?.right?.[k] ?? 0;
       }
       let left: Float32Array | null = null;
       let right: Float32Array | null = null;

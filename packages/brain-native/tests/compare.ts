@@ -115,6 +115,7 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
     if (each.hunger !== undefined) each.hunger = Math.fround(each.hunger);
     if (each.thirst !== undefined) each.thirst = Math.fround(each.thirst);
     for (const key of STATE) if (each[key] !== undefined) each[key] = Math.fround(each[key]);
+    if (each.odor) each.odor = { left: Float32Array.from(each.odor.left), right: Float32Array.from(each.odor.right) };
     ticks.push({ dt, senses: each, what });
     if (dt >= 0 && dt <= 1000) total += dt;
   };
@@ -129,6 +130,14 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
   for (let cycle = 0; total < seconds * 1000; cycle++) {
     hold(3000, 16, () => ({}), "rest");
     hold(1000, frame, () => ({ grounded: false }), "rest, airborne");
+    for (const [what, left, right] of [
+      ["odor at left antenna", [0.3, 0, 0, 0, 0], []],
+      ["odor at right antenna", [], [0, 0, 0, 0, 1]],
+      ["odor at both antennae", [0, 0, 0, 0.7, 0], [0, 0, 0, 0.7, 0]],
+      ["odor mixture", [0.6, 0.2, 0.4, 0.9, 0.1], [0.1, 0.8, 0.3, 0.4, 0.7]],
+      ["invalid odor strengths", [Number.NaN, -1, 7, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY], [1, 0, -0.1, 2, 0.3]],
+    ] as const) hold(500, 16, () => ({ odor: { left, right } }), what);
+    hold(500, 16, () => ({}), "odor absent");
     for (const sense of SCALAR) {
       hold(1500, cycle % 2 === 0 ? 16 : 33, () => ({ [sense]: 1 }), `${sense} at full strength`);
       hold(800, 16, () => ({}), `rest after ${sense}`);
@@ -285,7 +294,7 @@ export function script(ticks: readonly Tick[]): { input: string; frames: Uint8Ar
   };
   const lines = ticks.map(({ dt, senses }) => {
     const light = senses.light ? `${ref(senses.light.left)},${ref(senses.light.right)}` : "-";
-    return [hex64(dt), ...SCALAR.map((s: Scalar) => hex32(senses[s])), senses.grounded ? 1 : 0, ...STATE.map((s) => hex32(senses[s] ?? 0)), light, hex32(senses.hunger ?? 1), hex32(senses.thirst ?? 1)].join(" ");
+    return [hex64(dt), ...SCALAR.map((s: Scalar) => hex32(senses[s])), senses.grounded ? 1 : 0, ...STATE.map((s) => hex32(senses[s] ?? 0)), light, hex32(senses.hunger ?? 1), hex32(senses.thirst ?? 1), ...Array.from({ length: 5 }, (_, k) => hex32(senses.odor?.left?.[k] ?? 0)), ...Array.from({ length: 5 }, (_, k) => hex32(senses.odor?.right?.[k] ?? 0))].join(" ");
   });
   const frames = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
   let at = 0;

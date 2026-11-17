@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "fdlibm.hpp"
+#include "olfaction.hpp"
 
 namespace fly::params {
 
@@ -157,6 +158,23 @@ std::vector<double> completeness(const Connectome& c) {
     const std::vector<uint32_t>& weaker = l < r ? left : right;
     const double factor = l < r ? r / l : l / r;
     for (uint32_t i : weaker) out[i] = factor;
+  }
+  std::map<std::string, std::array<std::vector<uint32_t>, 2>> by_type;
+  for (uint32_t i = 0; i < c.neurons(); i++) {
+    if (c.value(kSuperClass, i) != "cb_sensory" || c.value(kClass, i) != "olfactory" || !olfaction::corrected(c.value(kType, i))) continue;
+    const auto& side = c.value(kSide, i);
+    if (side == "left" || side == "right") by_type[c.value(kType, i)][side == "left" ? 0 : 1].push_back(i);
+  }
+  for (const auto& [type, sides] : by_type) {
+    const auto synapses = [&](const std::vector<uint32_t>& neurons) {
+      double total = 0;
+      for (uint32_t i : neurons) for (uint32_t e = c.ptr(i); e < c.ptr(i + 1); e++) total += c.count(e);
+      return total;
+    };
+    const double l = synapses(sides[0]), r = synapses(sides[1]);
+    if (l == 0 || r == 0 || l == r) continue;
+    const double factor = l < r ? r / l : l / r;
+    for (uint32_t i : sides[l < r ? 0 : 1]) out[i] = factor;
   }
   return out;
 }
