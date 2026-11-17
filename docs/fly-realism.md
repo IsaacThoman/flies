@@ -46,3 +46,31 @@ absent posterior grooming, and discontinuous song-side switching as the worst
 problems. They also requested full feeding/landing transitions and small-scale
 action evidence. Their full assessments are retained with the local experiment
 evidence; this document records all numerical scores and decisions.
+
+### Round 1
+
+Key: D8 = reference (`bd88a01`, expanded evidence); Q2 = first candidate
+(`8972514` prior to rebase, equivalent fly changes in `d6f3f0bf`). Evidence
+order was Q2, D8 (randomised), with the version key withheld. All four ranked Q2 above D8.
+
+| Reviewer | D8 scores | Q2 scores | D8 mean | Q2 mean | Ranking |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 7.5,3.5,4,5,5,4.5,6,8.5 | 8,7.5,7,5,7,7.5,6.5,8.5 | 5.500 | 7.125 | Q2 > D8 |
+| 2 | 7.5,3,3,4.5,4.5,4,5,8 | 8,6.5,7,4.5,6.5,6,5.5,8 | 4.938 | 6.500 | Q2 > D8 |
+| 3 | 8,3.5,3.5,5,5.5,4.5,5.5,8 | 8.5,7.5,7,5,7,7.5,6,8 | 5.438 | 7.063 | Q2 > D8 |
+| Tradeoff assessment | 7.5,3.5,3.5,5,4.5,4.5,5.5,8.5 | 8,7.5,7,5,7,7,6,8.5 | 5.313 | 7.000 | Q2 > D8 |
+
+Primary-review mean: **5.292 → 6.896**. Accepted: stance/recovery scaling,
+speed-dependent phase spread, less sprawling leg homes, posterior and antennal
+grooming, actual sex-comb teeth, song-side handoff and approach leg extension.
+No proposal rejected this round. The extra review identified reduced leg
+excursion/readability, a pause during song handoff, and weakened landing dip
+when legs already extended; it still preferred Q2.
+
+The remaining highest-value problems were loss of recovery at the fastest
+30 Hz update rate, feeding contact/sequence evidence, and weak load acceptance.
+The honey render revealed an existing visual-puddle height discrepancy with
+the physical surface, outside this model/animation experiment's allowed scope.
+It is retained as a limitation, not corrected through animation or collisions.
+The game-scale output is a 640×480 buffer displayed at 16:9; subsequent evidence
+will include its unscaled buffer as well as the displayed view.
