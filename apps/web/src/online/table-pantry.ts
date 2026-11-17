@@ -78,6 +78,6 @@ export class TablePantry extends Pantry {
   eat(food: Food, appetite: number, dt: number): number {
     const bite = super.eat(food, appetite, dt);
     this.mirror.ate(food, bite);
-    return bite;
+    return 0;
   }
 }
