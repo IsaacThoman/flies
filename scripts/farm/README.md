@@ -18,7 +18,7 @@ time out after 30 minutes; complete logs
 remain under `~/flies-farm/logs/<id>/`. Remove old logs when no longer needed.
 
 Four advisory file locks in `~/flies-farm/locks/` cap simultaneous runs; others
-wait. Kernel locks release even if the caller dies. Each run uses a detached git
+wait. Kernel locks release when the run's processes exit. Each run uses a detached git
 worktree, independent `npm ci --prefer-offline` installation with the warm npm
 cache, and the shared connectome mounted read-only. Worktrees and containers are
 removed on exit, including errors, Ctrl-C and SSH disconnect. SIGKILL cannot run

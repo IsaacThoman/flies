@@ -90,8 +90,8 @@ stage() {
   if ((status)); then
     echo "FAIL $name ($((SECONDS-start))s, exit $status)"
     # TAP failures retain their test names; other checks retain the useful error context.
-    grep -E '^not ok|^✖|^FAIL|^Error:' "$logs/$name.log" || true
-    tail -40 "$logs/$name.log"
+    grep -E '^not ok|^✖|^FAIL|^Error:|^failed \(' "$logs/$name.log" | cut -c1-500 || true
+    tail -12 "$logs/$name.log" | cut -c1-300
     failed=1
   else
     echo "PASS $name ($((SECONDS-start))s)"
