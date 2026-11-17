@@ -329,7 +329,7 @@ export class Game implements Shell {
     this.overlay.scene.add(this.statsPanel.mesh);
     this.#pictures = [this.inset, this.nerves, this.statsPanel];
     this.tally = new Tally(this.life, Date.now());
-    this.#statsState = { activity: "waiting", spikes: 0, active: 0, speed: 0, history: this.meter.history, head: 0, day: this.tally.day, sensed: this.life.sensed, brain: null };
+    this.#statsState = { spikes: 0, active: 0, speed: 0, history: this.meter.history, head: 0, day: this.tally.day, sensed: this.life.sensed, brain: null };
     this.glow = new NerveGlow(this.fly.model.nerves.glow);
     this.#settle();
     const title = titleScreen(this);
@@ -964,7 +964,6 @@ export class Game implements Shell {
       this.inset.update(dt, waitFor(eyesWanted, this.corners, 0, this.inset, pictures), this.corners, opacity);
       this.nerves.update(dt, waitFor(nervesNow, this.corners, slot, this.nerves, pictures), this.corners, slot, opacity);
       const stats = this.#statsState;
-      stats.activity = life.activity;
       stats.spikes = this.meter.spikesPerSecond;
       stats.active = this.meter.active;
       stats.speed = this.meter.speed;

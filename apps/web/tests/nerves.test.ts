@@ -16,7 +16,7 @@ import { DEFAULT_SETTINGS } from "../src/settings.ts";
 const SENSORY = /^(retina|antenna-smell|johnston|head-bristles|mouthparts|head-sensory-other|leg-sensory|thorax-sensory|abdomen-sensory|proprioceptors|bristles)/;
 const MOTOR = /(motor|endocrine|efferent)/;
 
-test("every region is drawn, and every part of the drawing is lit by exactly one region", () => {
+test("every region is drawn, and every part is lit by one measured region or command group", () => {
   const parts = new Map(NERVE_PARTS.map((p) => [p.id, p]));
   const owner = new Map<string, string>();
   for (const region of REGIONS) {

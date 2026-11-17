@@ -46,3 +46,57 @@ and native-only telemetry were rejected: they would either misstate the data
 or require a separate simulation/transport change. Segment-specific cord
 rates remain a separate possible experiment; this candidate leaves both
 simulation implementations and their readouts unchanged.
+
+## Matched round 1
+
+Key: H7 = baseline; P4 = d371ddb (64 somata, darker tissue, stronger emission,
+no nervous-system heading). Source snapshots and evidence were frozen. Display
+order: R1 P4/H7, R2 H7/P4, R3 P4/H7. All three were fresh independent contexts;
+a fourth fresh reviewer audited losses in both directions without chronology.
+
+Matched renders replay the same recorded live rates at fixed resting anatomy,
+lighting and cameras. TV is native 640×480, exported at its displayed 16:9
+aspect; portrait phone is also rendered. This isolates rendering and prevents
+body poses or activity captions answering the matching task. Live captures
+remain separate. These scores should be compared within this round, not
+numerically attributed to the change from the baseline live-only review.
+
+| Reviewer | Set | Beauty | Recognition | Truth | Legibility | Cost | Text | Mean | Ranking |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| R1 | H7 | 6 | 5.5 | 8 | 5 | 8 | 6 | 6.42 | 2 |
+| R1 | P4 | 7 | 5.5 | 8.5 | 6.5 | 7.5 | 7 | 7.00 | 1 |
+| R2 | H7 | 6 | 6 | 8 | 5 | 8 | 6 | 6.50 | 2 |
+| R2 | P4 | 7 | 6 | 9 | 6 | 8 | 8 | 7.33 | 1 |
+| R3 | H7 | 6 | 5 | 8.5 | 4.5 | 9 | 6 | 6.50 | 2 |
+| R3 | P4 | 6.5 | 5 | 9 | 6 | 8 | 8 | 7.08 | 1 |
+| Mean | H7 | 6.00 | 5.50 | 8.17 | 4.83 | 8.33 | 6.00 | 6.47 | 2 |
+| Mean | P4 | 6.83 | 5.50 | 8.83 | 6.17 | 7.83 | 7.67 | 7.14 | 1 |
+
+Decision: retain P4, unanimously preferred and higher scored. No recognition
+gain was demonstrated. All three still confused walking/grooming and broad
+motor events. The source recordings include mixed activities: especially the
+short grooming observation, which transitions into backing. Forced clip
+assignments are subjective recognition evidence, not verified six-way accuracy.
+
+The losses audit also preferred P4, but identified compressed bright amber
+masses, tiny marker visibility and extra geometry. It recommended retaining
+the darker tissue while testing the earlier activity threshold/emission.
+Other reviewers independently proposed a 2–3-pixel soma footprint.
+
+Matched cost: 4 draws in each version; 47,174 versus 51,794 triangles across
+both views. P4 logic: 15.93 µs CPU/frame without JIT, 68.06 µs elapsed in that
+run. Baseline elapsed: 9.89 µs. These are not an equivalent timing delta:
+the probe workloads differ and shared-machine scheduling is noisy. Only boxed
+numbers were sampled. No simulation/driver source changes or new message fields.
+
+Matched key (clip suffixes 11–22):
+
+| Set | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| H7 | P walk | P feed | TV rest | P flight | P swoop | TV walk | TV swoop | TV feed | P rest | TV groom | TV flight | P groom |
+| P4 | TV flight | P swoop | TV feed | P groom | P rest | P flight | TV walk | TV swoop | P walk | TV groom | TV rest | P feed |
+
+P means portrait phone. Labels name observation triggers; the anatomy remains
+at rest in the diagnostic replay. Every scorer classified activity-only GIFs
+before screenshots/source/measurements. Existing app captions were visible only
+in the later live-game evidence, and still lower the text score.

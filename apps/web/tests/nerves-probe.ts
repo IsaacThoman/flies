@@ -31,8 +31,11 @@ const run = (n: number) => {
 
 run(1500);
 const start = performance.now();
+const cpuStart = process.cpuUsage();
 run(1500);
 const micros = ((performance.now() - start) / 1500) * 1000;
+const cpu = process.cpuUsage(cpuStart);
+const cpuMicros = (cpu.user + cpu.system) / 1500;
 
 type Node = { id: number; callFrame: { functionName: string; url: string }; children: Node[] };
 type Profile = { head: Node; samples: { size: number; nodeId: number }[] };
@@ -67,4 +70,4 @@ for (const { size, where } of await sample(() => run(600), true)) {
   if (!seen.includes(where)) seen.push(where);
 }
 session.disconnect();
-console.log(JSON.stringify({ micros, numberSize, sizes }));
+console.log(JSON.stringify({ micros, cpuMicros, numberSize, sizes }));

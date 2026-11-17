@@ -432,8 +432,7 @@ they take.
 Stats of: its brain, its day, both, or in and out) is a small panel of numbers, each a
 figure and a word: the brain's spikes a second, neurons active and speed
 against real time (from the brain's meter), under
-a trace of its last twenty seconds; and, headed by what the fly is doing now
-(the HUD's caption, so it can be read in the screensaver too), its day: how far
+a trace of its last twenty seconds; and its day: how far
 it has walked, its meals, its take-offs, and its time flying and grooming.
 The day is counted from what the fly's life did (`life.ts`: its legs' steps
 on its feet, a meal from its first taste, each leap into the air, each
@@ -442,7 +441,8 @@ second it was flying or grooming), once each, kept across launches as
 from the other pictures, at the same edge (at the top left while you play),
 and moves round with them; on a screen too narrow for that, under them; its
 cells two to a row on a narrow screen, and its brain beside its day on a
-short one. In and out, also headed by what the fly is doing, is a bar for
+short one. It retains the values and their units, without repeating the
+behaviour caption. In and out is a bar for
 each sense going into the brain as the body sends it (a loom at either eye,
 touch, either antenna, wind, sweet, weight on its legs, a male's taste on
 its front legs, and the light, the mean over every facet), and its hunger, and for each
@@ -833,9 +833,9 @@ nothing flickers between brain states. **How a glow is drawn**
 (`packages/fly/src/nerves/materials.ts`, one function for both views): a
 part's colour goes from its tissue's toward its role's, blue for sensory
 neurons, amber for the neurons between, red for motor and neurosecretory
-ones, by (glow / 0.3)², all the way at 0.3, covering more of what is behind
+ones, by (glow / 0.4)², all the way at 0.4, covering more of what is behind
 it as it does, and it gives off light in that colour in proportion to
-1.2 × glow². The square keeps the low hum of background activity near the tissue's
+0.8 × glow². The square keeps the low hum of background activity near the tissue's
 colour and lets a burst stand out: in a ball's dive the optic lobes go from
 about 0.07 to 0.35. Nothing else lights a part. Its tissue is drawn
 unlit by activity: in the world lit by the scene's lights like the rest of the
@@ -852,7 +852,8 @@ regenerates the static atlas after validating the anatomy/connectome SHA-256
 pair. The same fitted brain and cord frames used for the neuropil meshes
 register these points; they retain the specimen's asymmetry. Every member is
 included, with no subsampling and no `tosomaLocation` fibre fallbacks. A
-3.6 µm nominal radius is enlarged to a 1.1-pixel diameter when necessary.
+3.6 µm nominal glyph radius is enlarged to a two-pixel diameter when necessary.
+This is a display convention, not a measurement of soma size.
 They are merged into the existing nervous-system geometry: no extra draws.
 
 These are **group-rate markers, not individual spike flashes**. Every soma
