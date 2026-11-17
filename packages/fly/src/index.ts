@@ -21,6 +21,7 @@ import { buildWingGeometry, buildWingTexture } from "./wing.ts";
 export type { FlyRig } from "./rig.ts";
 export { NERVE_PARTS, LEG_NAMES, SIDES } from "./nerves/parts.ts";
 export { SOMA_GROUPS } from "./nerves/somata.ts";
+export { somaPlaces } from "./nerves/build.ts";
 export type { NervePart, NerveRole, NerveKind, NerveSide } from "./nerves/parts.ts";
 export { createNervesPanelMaterial, ROLE_COLORS } from "./nerves/materials.ts";
 export type { NervesPanelUniforms } from "./nerves/materials.ts";

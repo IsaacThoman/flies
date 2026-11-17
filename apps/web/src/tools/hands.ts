@@ -68,8 +68,8 @@ export const TOOLS: readonly Tool[] = [
   { id: "sky", name: "Sky", verb: "", hold: false, world: true, variants: LIGHTS, second: WEATHERS },
   // Where it lives: Up and Down choose, Select carries it there. Only when there is somewhere else to go.
   ...(PLACES.length > 1 ? [{ id: "place", name: "Place", verb: "Go", hold: false, world: true, variants: PLACES.map((p) => ({ id: p.id, label: p.name })) } satisfies Tool] : []),
-  // Nearest first, so Up brings the camera in and Down takes it out; then through its eyes, and inside it (close up, its body as glass).
-  { id: "view", name: "View", verb: "", hold: false, world: true, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }, { id: "inside", label: "Inside it" }] },
+  // Nearest first, so Up brings the camera in and Down takes it out; then through its eyes, inside it (close up, its body as glass), and its last seconds played back.
+  { id: "view", name: "View", verb: "", hold: false, world: true, initial: 1, variants: [{ id: "close", label: "Close up" }, { id: "follow", label: "Follow" }, { id: "wide", label: "Wide" }, { id: "table", label: "Whole table" }, { id: "above", label: "From above" }, { id: "eyes", label: "Fly's eyes" }, { id: "inside", label: "Inside it" }, { id: "why", label: "Why?" }] },
 ];
 
 /** The tools before this one act on the fly; from it on, they are about its world and the camera. */
@@ -280,9 +280,9 @@ export class Hands {
     if (PLACE_TOOL >= 0) this.variants[PLACE_TOOL] = Math.max(0, PLACES.findIndex((p) => p.id === id));
   }
 
-  /** The view chosen on the View tool ("eyes" is the fly's-eye picture; "inside", close up with its body as glass). */
-  get view(): View | "eyes" | "inside" {
-    return TOOLS[VIEW_TOOL].variants[this.variants[VIEW_TOOL]].id as View | "eyes" | "inside";
+  /** The view chosen on the View tool ("eyes" is the fly's-eye picture; "inside", close up with its body as glass; "why", its last seconds played back). */
+  get view(): View | "eyes" | "inside" | "why" {
+    return TOOLS[VIEW_TOOL].variants[this.variants[VIEW_TOOL]].id as View | "eyes" | "inside" | "why";
   }
 
   /** Chooses a view on the View tool (the camera brought in or taken out by hand). */

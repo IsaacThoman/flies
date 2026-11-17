@@ -12,7 +12,8 @@ import * as THREE from "three";
 import { FLY_LENGTH, Rhythm, SUMMER } from "@fly/body";
 import { REGIONS } from "@fly/brain";
 import type { BrainDriver, OpenTableSocket, RemoteButton, TextEntry, WeatherAttribution } from "@fly/contracts";
-import { AT_ROOT_PROPERTY, INVITE_EVENT } from "@fly/contracts";
+import { AT_ROOT_PROPERTY, COMMAND_ORDER, INVITE_EVENT } from "@fly/contracts";
+import { SOMA_GROUPS } from "@fly/fly";
 import { Navigator, sameTarget } from "@fly/ui";
 import type { GlyphSet, Hit, HitMap } from "@fly/ui";
 import { BALL_RADIUS, Pantry, TOUCH, World, WORLDS, forecastHours, hourOfDay, isDropped } from "@fly/world";
@@ -72,9 +73,12 @@ import type { Aim } from "./tools/build.ts";
 import { DIALS, Hands, TOOLS } from "./tools/hands.ts";
 import type { Dial, DialId, ToolId } from "./tools/hands.ts";
 import { HandsView } from "./tools/view.ts";
-import { StatsPanel, statsSlot, statsWanted } from "./stats/panel.ts";
+import { SENSES, StatsPanel, statsSlot, statsWanted } from "./stats/panel.ts";
 import type { StatsState } from "./stats/panel.ts";
 import { Tally } from "./stats/tally.ts";
+import { Recorder } from "./why/recorder.ts";
+import type { Recorded } from "./why/recorder.ts";
+import { ReplayView } from "./why/replay.ts";
 import { CornerDeck, waitFor } from "./ui/corners.ts";
 import type { CornerPicture } from "./ui/corners.ts";
 import { HUD_HITS, drawHud, needsTeaching } from "./ui/hud.ts";
@@ -205,6 +209,10 @@ export class Game implements Shell {
   /** How brightly each part of its nervous system glows, from the brain's region rates. */
   readonly glow: NerveGlow;
   readonly xray = new Xray();
+  /** The followed fly's last few seconds, kept for Why? (View), and Why? playing them back. */
+  readonly recorder = new Recorder();
+  readonly why: ReplayView;
+  #recorded: Recorded;
   readonly fireflies: Fireflies;
   /** The real weather outside, where the Apple TV can tell it; scripts feed it in a browser (`outside.feed`). */
   readonly outside = new Outside(nativeWeather());
@@ -410,6 +418,9 @@ export class Game implements Shell {
     this.nerves = new NervesPanel(this.fly.model.nerves);
     this.overlay.scene.add(this.nerves.mesh);
     this.overlay.scene.add(this.statsPanel.mesh);
+    this.why = new ReplayView(this.fly.model.nerves);
+    this.overlay.scene.add(this.why.mesh, this.why.card);
+    this.#recorded = { regionRates: this.life.brain.regionRates, state: null, sensed: this.life.sensed, intent: this.life.intent, onFeet: true, jumped: false };
     this.touchLoupe = inputs.pointers ? new TouchLoupe() : null;
     if (this.touchLoupe) this.overlay.scene.add(this.touchLoupe.mesh);
     this.#pictures = [this.inset, this.nerves, this.statsPanel];
@@ -961,6 +972,7 @@ export class Game implements Shell {
     this.inset.layout(frame, this.#hudLayout, size);
     this.nerves.layout(frame, this.#hudLayout, size);
     this.statsPanel.layout(frame, this.#hudLayout, size, statsKind);
+    this.why.layout(frame, this.#hudLayout);
   }
 
   /** Where the camera leaves the fly on the title and the loading screen, clear of what is drawn there. */
@@ -1225,7 +1237,8 @@ export class Game implements Shell {
     } else {
       this.director.stopWallpaper();
       const view = this.hands.view;
-      this.director.setView(view === "eyes" ? "follow" : view === "inside" ? "close" : view);
+      // Why? leaves the camera where it is: the fly lives on behind it.
+      if (view !== "why") this.director.setView(view === "eyes" ? "follow" : view === "inside" ? "close" : view);
     }
   }
 
@@ -1298,6 +1311,7 @@ export class Game implements Shell {
     this.#feel();
     this.eyes.beforeStep();
     life.step(dt, now);
+    this.#record(dt);
     this.#liveCompany(dt, now);
     this.tally.update(life, Date.now(), dt);
     if (this.remembered.due(dt)) this.#keepFlies();
@@ -1362,11 +1376,14 @@ export class Game implements Shell {
       stage.render(director.camera, dt);
       this.touchLoupe?.update(stage.renderer, this.shape, this.#aim.x, this.#aim.y, this.devices.current === "touch" && this.#controls.holding && this.#aim.onWorld && playing);
       const showEyes = this.#showEyes();
+      const showWhy = this.#showWhy();
+      // Either fills the middle of the screen: the corner pictures make way.
+      const full = showEyes || showWhy;
       const screen = this.#loading ? "loading" : this.nav.current;
       const settings = this.settings;
-      const eyesWanted = insetWanted(settings.eyesInset, screen, this.wallpaper, showEyes, this.eyes.detail === "off" || brain.status !== "running");
-      const nervesNow = nervesWanted(settings.nerves, screen, this.wallpaper, showEyes);
-      const statsNow = statsWanted(settings.statsPanel, screen, this.wallpaper, showEyes);
+      const eyesWanted = insetWanted(settings.eyesInset, screen, this.wallpaper, full, this.eyes.detail === "off" || brain.status !== "running");
+      const nervesNow = nervesWanted(settings.nerves, screen, this.wallpaper, full);
+      const statsNow = statsWanted(settings.statsPanel, screen, this.wallpaper, full);
       this.#layCorners();
       this.corners.update(dt, eyesWanted === "show" || nervesNow === "show" || statsNow === "show", this.wallpaper, director.shotChanges);
       // What it sees takes the corner itself; its nervous system is next to it, or there when it isn't; the stats across from them, or under them. None comes in where another still shows.
@@ -1385,6 +1402,7 @@ export class Game implements Shell {
       stats.day = this.tally.day;
       stats.brain = life.brain.state;
       this.statsPanel.update(dt, waitFor(statsNow, this.corners, statsAt, this.statsPanel, pictures), this.corners, statsAt, opacity, stats);
+      this.why.update(dt, showWhy);
       this.eyes.render(dt, showEyes, this.hands.ball.active, this.inset.watching);
       stage.renderer.render(this.overlay.scene, this.overlay.camera);
       if (!this.#ready) {
@@ -1415,6 +1433,24 @@ export class Game implements Shell {
     const pixels = pixelsLong(this.director.camera, this.fly.root.position, FLY_LENGTH, rows);
     this.xray.update(dt, xrayWanted(this.settings.xray, screen, this.wallpaper, inside), pixels);
     this.fly.model.nerves.xray = this.xray.amount;
+  }
+
+  /** What the followed fly's brain was told and answered this frame, kept for Why?. */
+  #record(dt: number) {
+    const { life } = this;
+    const r = this.#recorded;
+    r.regionRates = life.brain.regionRates;
+    r.state = life.brain.state;
+    r.sensed = life.sensed;
+    r.intent = life.intent;
+    r.onFeet = life.body.onFeet;
+    r.jumped = life.body.events.jumped;
+    this.recorder.record(dt, r);
+  }
+
+  /** The player is watching its last seconds played back. */
+  #showWhy() {
+    return this.hands.view === "why" && this.nav.current === "play" && !this.wallpaper && !this.#loading;
   }
 
   /** The player is looking through the fly's eyes. */
@@ -1708,8 +1744,10 @@ export class Game implements Shell {
       if (pads.home) this.#home();
     }
     const turning = round !== 0 || up !== 0;
+    // Watching Why?, round goes through what was recorded instead, later the way the keys and the stick point (E, right).
+    if (turning && this.hands.view === "why") this.why.scrub((round * dt) / DRAG_ROUND);
     // Let go only when they are let go themselves: a finger or the mouse may be holding the camera too.
-    if (turning) {
+    else if (turning) {
       this.director.held = true;
       this.#turnCamera(round * dt, up * dt);
     } else if (this.#turning) this.director.held = false;
@@ -1717,9 +1755,15 @@ export class Game implements Shell {
     if (zoom !== 0) this.#zoomCamera(Math.exp(zoom * dt));
   }
 
-  /** The camera turned by hand, unless the player is looking through the fly's eyes, where there is no camera to turn. */
+  /**
+   * The camera turned by hand, unless the player is looking through the fly's
+   * eyes, where there is no camera to turn. Watching Why?, a drag or a swipe
+   * moves through what was recorded instead, later to the right: a drag the
+   * screen's width, the whole of it.
+   */
   #turnCamera(yaw: number, pitch: number) {
-    if (this.hands.view !== "eyes") this.director.turnBy(yaw, pitch);
+    if (this.hands.view === "why") this.why.scrub(-yaw / DRAG_ROUND);
+    else if (this.hands.view !== "eyes") this.director.turnBy(yaw, pitch);
   }
 
   /** The camera brought in or taken out by hand; the View tool shows the view it is nearest. */
@@ -2055,7 +2099,11 @@ export class Game implements Shell {
       this.#followLight();
       this.online?.chooseWorld(this.hands.timeOfDay, this.hands.weather);
     }
-    if (id === "view") this.#syncCamera();
+    if (id === "view") {
+      this.#syncCamera();
+      // Asked: what was kept until now, frozen while it plays.
+      if (this.hands.view === "why") this.why.open(this.recorder);
+    }
     // A table's light and weather aren't this player's own to come back to; in a room open to everyone they are.
     if (!this.online || this.online.everyone || id !== "sky") this.#remember(dial);
   }
@@ -2294,6 +2342,15 @@ export class Game implements Shell {
       .map((c, i) => `${c.id}:${c.life.brain.status}:${c.life.activity}:${c.life.body.position.x.toFixed(2)},${c.life.body.position.z.toFixed(2)}:${this.eyes.companyUpdates(i)}:${c.life.crowd.count}:${c.colour}`)
       .join(";");
     d.view = this.hands.view;
+    // Why?, as shown: what it plays back, the neurons and commands marked, the senses and input regions picked out, and where it is from when the body acted (s).
+    const why = this.why.why;
+    const replaying = this.why.mesh.visible;
+    d.why = replaying ? (why.action ?? "nothing") : "";
+    d.whyNeurons = replaying ? why.groups.map((g) => SOMA_GROUPS[g].rate).join(",") : "";
+    d.whyCommands = replaying ? why.commands.map((c) => COMMAND_ORDER[c]).join(",") : "";
+    d.whySenses = replaying ? why.senses.map((s) => SENSES[s][0]).join(",") : "";
+    d.whyRegions = replaying ? why.regions.map((r) => REGIONS[r].id).join(",") : "";
+    d.whyAt = replaying ? this.why.at.toFixed(2) : "";
     d.place = this.#here;
     // Where it lives, and the series of rooms open to everyone it is visiting (-1 at home).
     d.home = this.settings.place;
