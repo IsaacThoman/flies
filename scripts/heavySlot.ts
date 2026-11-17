@@ -50,6 +50,9 @@ export async function withHeavySlot<T>(work: () => Promise<T>): Promise<T> {
     rmSync(lock, { force: true });
   };
   process.once("exit", release);
+  // Explicit exit runs our lease cleanup and Playwright’s registered child-process cleanup.
+  const terminate = () => process.exit(143);
+  process.once("SIGTERM", terminate);
   let deadline: ReturnType<typeof globalThis.setTimeout> | undefined;
   try {
     let last = 0;
@@ -69,5 +72,5 @@ export async function withHeavySlot<T>(work: () => Promise<T>): Promise<T> {
     // Leave thirty seconds for a browser's termination handler to close its owned children.
     deadline = globalThis.setTimeout(() => { console.error("Heavy batch exceeded 9m30s; split it into smaller batches."); process.kill(process.pid, "SIGTERM"); }, 570_000);
     return await work();
-  } finally { if (deadline) clearTimeout(deadline); process.off("exit", release); release(); }
+  } finally { if (deadline) clearTimeout(deadline); process.off("exit", release); process.off("SIGTERM", terminate); release(); }
 }
