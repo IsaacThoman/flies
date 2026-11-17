@@ -127,3 +127,33 @@ round did not establish a further speed gain. The model remains two draws.
 
 Remaining priorities: actual grooming-surface contact, clearer posterior-action
 silhouettes, and a wing envelope that survives bright backgrounds at game scale.
+
+### Round 4
+
+Key: B2 = round-3 candidate; N5 = posed-surface grooming candidate.
+Orders: B2,N5; B2,N5; N5,B2; B2,N5. All four reviewers ranked N5 first.
+
+| Reviewer | B2 scores | N5 scores | B2 mean | N5 mean | Ranking |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 8,8,3,7.5,7,7,6,8 | 8,8,8,7.5,7,7.5,6,8 | 6.813 | 7.500 | N5 > B2 |
+| 2 | 8,7,3,7,6.5,7.5,5.5,7.5 | 8,7,7.5,7,6.5,7.5,5.5,7.5 | 6.500 | 7.063 | N5 > B2 |
+| 3 | 8,7.5,3,8,6.5,7.5,5.5,7.5 | 8,7.5,7.5,8,6.5,7.5,5.5,7.5 | 6.688 | 7.250 | N5 > B2 |
+| Tradeoff assessment | 8,7.5,3,7.5,7,7.5,6,8 | 8,7.5,7,7.5,7,7.5,5.5,8 | 6.813 | 7.250 | N5 > B2 |
+
+Primary-review mean: **6.667 → 7.271**. Accepted: eye/antenna targets attached
+to the articulated head; posterior targets attached to the breathing, swollen
+abdomen and folded wings; a small posture shift toward supporting feet; and
+full surface reach for weak grooming commands. Strength still controls vigour.
+No proposal rejected. The anatomy geometry and draw counts are unchanged.
+Interpreter medians overlap (140.999 vs 139.097 µs/update), establishing no speed
+advantage. Contact-stroke samples, including return strokes, reach surfaces in
+66–75% of samples at strength 0.2 and 69–75% at strength 1. The predecessor
+reaches none at strength 0.2 and only antennae at strength 1.
+
+The tradeoff reviewer reduced chunky readability from 6 to 5.5: surface-hugging
+hind legs merge into the body silhouette. Remaining problems include local
+tarsal orientation, whole-leg penetration checks, and faint flight wings. The
+contact diagnostic measures actual solved claws against posed mesh surfaces
+(head/antenna/abdomen) and a bounded wing plane; it does not establish rubbing
+area or segment clearance. The Seeds-inspired 12-second sequence remains an
+animation stand-in, not a model of dust-driven suppression.
