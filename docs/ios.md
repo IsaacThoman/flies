@@ -15,7 +15,9 @@ kept between launches. Each is a whole fly with its own body, senses and eyes;
 the camera and readouts follow the first. Their workers load the brain's files
 from the bundle one after another (`InTurn`, `apps/web/src/brain/create.ts`),
 and each WebAssembly worker holds about 95 MB. The eyes take turns, one fly's
-refresh a frame, with the followed fly's still every frame while a ball comes.
+refresh a frame: while a ball comes the followed fly's, every frame. A fly
+whose brain won't run (a phone out of memory with four) is tried twice more,
+then taken off.
 Several local brains have not yet been measured on an iPhone or iPad device.
 
 iOS has what tvOS lacks: a public WebKit with a JIT, WebGL 2 and module workers. So the iPhone

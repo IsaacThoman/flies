@@ -39,8 +39,13 @@ sees every other and meets it through `Life.crowd`; the player's tools
 reach any of them through the world. A place can supply
 `SceneSet.feel(dt, at, felt)` to let its wind, touch and visitors reach each
 where it is. The eyes take
-turns, the most overdue fly's refresh each frame; the followed fly's still
-refresh every frame while a ball comes.
+turns, the most overdue fly's refresh each frame; while a ball comes the
+followed fly's refresh every frame and the others' wait, so no frame
+refreshes two. A companion whose brain fails (a worker out of memory, a
+download failed offline) is given a new brain after 5 s and again after
+30 s; if that fails too it is taken off rather than left standing as if it
+lived, and the device lives one fly fewer (at a table it asks for one
+fewer) until the player changes the count.
 
 In a browser, and so in the iPhone and iPad app, each brain runs in its own Web Worker, fed a compressed
 form of the connectome that the page downloads once and keeps (the app has it in its bundle):

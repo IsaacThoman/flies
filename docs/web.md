@@ -82,8 +82,9 @@ the camera and readouts follow the first. `InTurn`
 (`apps/web/src/brain/create.ts`) loads their files one brain after another
 from the same cache, so nothing downloads twice at once. Where files can't
 be kept they are fetched again, still in turn. The eyes take turns too:
-one fly's refresh a frame, the most overdue; the followed fly's still
-refresh every frame while a ball comes. At a table the same flies travel
+one fly's refresh a frame, the most overdue; while a ball comes the
+followed fly's, every frame, and the others wait. A fly whose worker fails
+gets a new one after 5 s and 30 s, and is then taken off. At a table the same flies travel
 in one batch over one connection, up to the table's eight-fly limit
 ([online.md](online.md)).
 

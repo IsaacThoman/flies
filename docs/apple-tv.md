@@ -288,8 +288,9 @@ Settings → Screensaver → Flies chooses one to four, shown as enamel dots and
 other settings. An older host without `spawn()` runs one fly and shows no Flies row. Each extra
 fly has its own body, senses and eyes (`apps/web/src/company.ts`); the camera, pointer and
 readouts follow the first. The eyes take turns, normally one fly's refresh a frame, whichever
-is most overdue; four at 60 fps each get about 15 Hz rather than 20. The followed fly's still
-refresh every frame while a ball comes.
+is most overdue; four at 60 fps each get about 15 Hz rather than 20. While a ball comes the
+followed fly's refresh every frame and the others' wait, so a frame never refreshes two. A fly
+whose brain thread fails is given a new one twice (after 5 s, then 30 s) and is then taken off.
 
 Four native brains take about 4 × 58 MB. Each is estimated to use 13 to 45% of an A15
 performance core (`packages/brain-native/README.md`), on its own thread. The four flies'

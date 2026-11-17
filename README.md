@@ -170,7 +170,8 @@ and now and then something new to find: a drop of juice seeping from a
 strawberry, or a crumb blown in on a gust, put out in the pantry for the fly
 to find by walking and tasting. The butterfly, the ladybird and the falling
 leaf are in the fly's world only as things it sees (and, for a brain without
-eyes, things that can loom); they keep clear of it, and none of it is aimed
+eyes, things that can loom); they keep clear of it (of whichever fly is
+nearest, with several), a falling leaf brushes any of them, and none of it is aimed
 or timed at the fly: what it does about any of it is its brain's.
 
 The windowsill is the deep sill of a cottage kitchen window, painted cream
@@ -705,7 +706,8 @@ With several flies their eyes take turns, normally one fly's refresh a frame,
 whichever is most overdue: four at 60 fps each get about 15 Hz instead of
 20. Each has its own picture and light adaptation, and its own stand-in is
 left out while it looks round. The pictures shown on screen are still the
-followed fly's.
+followed fly's. While the ball is in the air the others wait, so a frame
+never refreshes more than one fly's eyes.
 
 Brightness is weighted as a fly's outer photoreceptors (Rh1, mostly blue-green)
 see it, 0.1 R + 0.45 G + 0.45 B, so a blue sky is bright to it. The picture is

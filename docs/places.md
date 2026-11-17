@@ -160,9 +160,11 @@ reach (beyond the floor's edge, above it, or in the backdrop).
   and the fly (a wall behind it, a table top over the fly) brings it in front
   of that: taken out by hand in a room, it stops at the walls.
 - **Goings-on** (`SceneSet.live`, optional): the place's own life, called each
-  frame the fly lives with an `Around`: where the fly is, the world, the
-  pantry, the weather, and `quiet` (nobody has touched the remote for a
-  while). It leaves what reaches the fly in `around.felt`: `air` (a gust, mm/s:
+  frame the fly lives with an `Around`: where the fly is, where the device's
+  other flies are (`company`), the world, the pantry, the weather, and
+  `quiet` (nobody has touched the remote for a while). Anything that keeps
+  clear of the fly keeps clear of whichever is nearest; `SceneSet.feel`
+  gives what reaches each of the others. It leaves what reaches the fly in `around.felt`: `air` (a gust, mm/s:
   felt as wind, and it carries the fly in flight as a puff does), `touch` (a
   raindrop landing on it, 0 to 1) and `looming` (things it could see coming,
   for a brain without eyes). Food goes into the pantry with `pantry.add`, to
