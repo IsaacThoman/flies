@@ -31,7 +31,8 @@ strongly the sweet taste neurons pass on what they taste and how restless the
 fly is (`packages/brain/README.md`, Hunger). A real fly gets hungry over hours
 and is starved after a day, so hunger runs 60 times faster than life here:
 what takes a real fly an hour takes this one a minute. Nothing else does. A
-fly starts at 0.7, hungry enough to go and look for food.
+new fly starts at 0.7, hungry enough to go and look for food; one that has
+lived here before comes back as it left ([From launch to launch](#from-launch-to-launch)).
 
 What changes, all through the brain: a just-fed fly leaves weak sugar alone
 that a hungry one stops to eat (sweetness 0.4: 2 flies in 20 start
@@ -45,6 +46,57 @@ doesn't show it: the crop isn't sent to the room.
 With them go the fly's daily clock and its need for sleep (`packages/body/src/rhythm.ts`),
 not senses but internal state the connectome can't supply: the morning and evening
 oscillators, the clock's push toward sleep, sleep pressure and how deeply it sleeps ([Sleep and the daily rhythm](../README.md#sleep-and-the-daily-rhythm)).
+
+## From launch to launch
+
+Each fly this device lives is one fly from launch to launch
+(`apps/web/src/fly-record.ts`). Its record, kept on the device under
+`flies.fly.0` to `flies.fly.3` by its place in line (0 the followed fly), says
+who it is (a random id, and when it first arrived) and what its body was when
+it was last seen: its hunger, how full its crop, its sleep pressure and the
+pace that pressure was built at, and where it stood (the place, and the spot
+there). It is saved every 30 s while the game runs, as the page is hidden or
+left, and as a fly goes. Fewer flies in Settings, or a companion whose brain
+wouldn't run, leaves its record as it was: with more flies again, it comes
+back, not a new fly. A companion keeps the place in line it came in at however
+the others come and go.
+
+Coming back, the body lives out the time away by its own sums, with no brain
+run: what it did while nobody watched is a stand-in. Its crop empties and its
+hunger grows as they would here (`Hunger.away`), but no further than the 0.7
+a new fly arrives with, a game rule: at hunger's pace any absence of more than
+half an hour would otherwise always end in a starved fly. A fly that left
+hungrier than that is no less hungry. Its sleep pressure goes as a fly left to
+itself would have it (`pressureLeftAlone`): asleep whenever the clock pushes it
+more than halfway toward sleep, awake otherwise, in five-minute steps of a
+model day under today's sun. Two days are enough to forget where it started,
+so a longer absence ends as sleepy as the hour leaves any fly, which is how a
+new fly starts. Pressure built at another pace than the one now chosen isn't
+kept: the fly starts as sleepy as the new pace leaves it, as when the pace
+changes while it lives. A page hidden while the game runs (a tab in the
+background, the Apple TV app out of sight) lives out its time the same way
+when it is shown again. A clock gone backwards is no time away.
+
+Alone, in the place it was in, it stands where it stood, if that spot is still
+on the table; at a table, or elsewhere, it stands where the place or the table
+sets it. Its brain is not kept: it wakes afresh at every launch, as it always
+has. How deeply it sleeps and how long it has been still start again from
+nothing, as the brain does. Only the body's own state is kept, never what the
+brain makes of it.
+
+Nothing of the record leaves the device. At a table, another player sees the
+fly as ever, its body's pose; the crop isn't sent.
+
+The record is JSON with a version, `v` (1). A feature that keeps more about a
+fly (what its brain has learned, its first moments) adds one field of its own,
+versioned inside. A record from a newer build keeps its id and every field it
+has, carried through each save, but none of its state is read. A record that
+can't be read is a new fly in that place in line; a field that can't be read
+starts fresh. A record is at most 96 KB of JSON: a larger one isn't saved, and
+the one before it stays. That bound is for the Apple TV, which keeps
+`localStorage` in its app's `NSUserDefaults`, limited to 500 KB in all: three
+flies' records fit there beside the settings. A browser allows about 5 MB to a
+site, and the iPhone and iPad app's `WKWebView` the same.
 
 ## What the body adds
 

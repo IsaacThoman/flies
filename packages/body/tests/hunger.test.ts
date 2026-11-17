@@ -50,3 +50,29 @@ test("the crop empties by half in its half-life, and nothing leaves the 0 to 1 r
     assert.deepEqual({ level: h.level, fullness: h.fullness }, before, `dt ${dt} changes nothing`);
   }
 });
+
+test("time away empties the crop and grows hunger as here, but never past a fly's arriving hunger, and never makes it less hungry", () => {
+  const fed = new Hunger();
+  fed.level = 0.1;
+  fed.fullness = 0.8;
+  const here = new Hunger();
+  here.level = 0.1;
+  here.fullness = 0.8;
+  fed.away(60);
+  here.step(60, 0);
+  assert.deepEqual([fed.level, fed.fullness], [here.level, here.fullness], "a minute away is a minute here");
+  fed.away(30 * 24 * 3600);
+  assert.equal(fed.level, HUNGER.start, "a month away comes back as hungry as a fly arrives, not starved");
+  assert.equal(fed.fullness, 0);
+  const starving = new Hunger();
+  starving.level = 0.9;
+  starving.away(3600);
+  assert.equal(starving.level, 0.9, "it left hungrier than that, and is no less hungry");
+  for (const seconds of [0, -3600, Number.NaN]) {
+    const h = new Hunger();
+    h.level = 0.2;
+    h.fullness = 0.5;
+    h.away(seconds);
+    assert.deepEqual([h.level, h.fullness], [0.2, 0.5], `${seconds} s away (a clock gone backwards) changes nothing`);
+  }
+});

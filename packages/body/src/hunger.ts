@@ -50,6 +50,21 @@ export class Hunger {
     this.level = clamp01(this.level + (1 - this.level) * -Math.expm1(-dt / HUNGER.tau) - fed);
     this.fullness = clamp01(this.fullness * Math.exp((-dt * Math.LN2) / HUNGER.cropHalfLife) + fed);
   }
+
+  /**
+   * `seconds` spent away, the game closed or hidden, with nothing to eat: the
+   * crop empties and hunger grows as they would here, but no further than the
+   * hunger a fly arrives with (HUNGER.start). Hunger runs 60 times fast, so any
+   * absence longer than half an hour would otherwise always end in a starved
+   * fly; a fly that left hungrier than that comes back no less hungry. The cap
+   * is a game rule, not a measurement.
+   */
+  away(seconds: number) {
+    if (!(seconds > 0)) return;
+    const before = this.level;
+    this.step(seconds, 0);
+    this.level = Math.max(before, Math.min(this.level, HUNGER.start));
+  }
 }
 
 const clamp01 = (x: number) => (x > 0 ? (x < 1 ? x : 1) : 0);
