@@ -920,7 +920,7 @@ export class Game implements Shell {
     this.peaks.escape = Math.max(this.peaks.escape * fade, command?.escape ?? 0);
     this.peaks.loom = Math.max(this.peaks.loom * fade, life.sensed.loomLeft, life.sensed.loomRight);
     this.peaks.looming = Math.max(this.peaks.looming * fade, rates?.["vision.looming left"] ?? 0, rates?.["vision.looming right"] ?? 0);
-    this.glow.update(life.brain.regionRates, dt);
+    this.glow.update(life.brain.regionRates, dt, rates);
     this.fly.update(life.body, life.intent, life.eating, life.hunger.fullness, dt, life.songSide, life.activity === "sleeping");
     this.prints.update(this.fly.model, life.body.onFeet, this.fly.pose.groom > 0.02, life.world, life.pantry, this.time);
     this.online?.send(this.#playerNow());

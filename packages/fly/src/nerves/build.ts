@@ -13,6 +13,7 @@ import { NerveBuilder, add, lerp3, scale, unit } from "./builder.ts";
 import { AMMC, BLOB_GRID, BRAIN_BLOBS, BRAIN_NERVES, BRAIN_RIND, BRAIN_RODS, CONNECTIVE_EXIT, CORD_BLOBS, CORD_NERVES, ELLIPSOID_BODY, LAMINA } from "./measured.ts";
 import type { Blob } from "./measured.ts";
 import { LEG_NAMES, SIDES } from "./parts.ts";
+import { SOMA_GROUPS } from "./somata.ts";
 
 type Sign = 1 | -1;
 type Place = (p: readonly number[], m: number) => V3;
@@ -45,6 +46,13 @@ export function buildNerves(rest: Float32Array = restFrames()): THREE.BufferGeom
   for (let leg = 0; leg < LEG_COUNT; leg++) legNerves(b, rest, leg);
   abdominalNerves(b);
   bristles(b);
+  // Built last so the panel's transparent volumes cannot bury tiny somata.
+  for (const group of SOMA_GROUPS) {
+    for (const neuron of group.neurons) {
+      const p = neuron.cord ? cordPoint(neuron.p, 1) : brainPoint(neuron.p, 1);
+      b.ellipsoid(group.id, neuron.cord ? J.thorax : J.head, p, [0.0015, 0.0015, 0.0015], { nu: 6, nv: 4, dot: true });
+    }
+  }
   const missing = b.missing();
   if (missing.length) throw new Error(`Nerve parts with nothing drawn: ${missing.join(", ")}`);
   return b.build();
