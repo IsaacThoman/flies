@@ -96,3 +96,66 @@ test("a room removal cancels a remote offering still falling so it cannot reappe
   assert.ok(pantry.foods.some((f) => f.id === 2_000_002), "an offering not removed lands normally");
   hand.dispose();
 });
+
+test("online clears wait for the room: rejected falling food still lands; accepted falling food never returns", async () => {
+  const { Online } = await import("../src/online/online.ts");
+  const { Hands } = await import("../src/tools/hands.ts");
+  const { FlyBody, Crowd } = await import("@fly/body");
+  const { Table } = await import("../../server/src/table.ts");
+  const world = new World(WORLDS.picnic);
+  const body = new FlyBody(world, world.place.start);
+  const hands = new Hands(world);
+  const clock = { now: 1000 };
+  const table = new Table("23456789ab", { place: "picnic", light: "noon", weather: "clear", zone: "", offset: 0 }, "player-key", 7, { now: () => clock.now, wall: () => clock.now });
+  const inbox: string[] = [];
+  let seat: import("../../server/src/table.ts").Seat;
+  const socket: import("@fly/contracts").TableSocket = {
+    status: "open", closeCode: 0, closeReason: "",
+    send(data) {
+      if (typeof data === "string" && JSON.parse(data).type === "hello") {
+        seat = table.hello({ send: (m) => { if (typeof m === "string") inbox.push(m); }, close() {} }, "player-key", JSON.parse(data)) as typeof seat;
+      } else table.receive(seat, data);
+    },
+    drain(text) { for (const m of inbox.splice(0)) text(m); },
+    close() {},
+  };
+  const host = {
+    scene: new THREE.Scene(), life: { world, body, crowd: new Crowd(world), share() {} }, hands,
+    stage: { weather: { rain: 0 }, set: {} }, fly: { model: { mark() {} } }, eyes: { see() {} }, bubbles: {},
+    here: () => "picnic", moving: () => false, onWorld() {}, moveTo() {},
+  } as unknown as import("../src/online/online.ts").TableHost;
+  const online = new Online(host, () => socket, "ws://test", "23456789ab", "player-key", null);
+  const camera = new THREE.PerspectiveCamera();
+  const update = () => online.update(0, camera, 480, 0, () => 0);
+  update();
+  update();
+  assert.ok(online.joined);
+  const use = (kind: number) => {
+    hands.variants[0] = kind;
+    hands.update(0, { use: true, holding: true, eye: camera.position }, body, online.pantry);
+    update();
+    hands.clearEvents();
+  };
+  for (let i = 0; i < 6; i++) use(0);
+  assert.equal(hands.falling.length, 6);
+  use(4);
+  assert.equal(hands.falling.length, 6, "rate-limited clear preserves the pending offerings");
+  hands.update(0.3, { use: false, holding: false, eye: camera.position }, body, online.pantry);
+  assert.equal(online.pantry.foods.filter((f) => f.kind === "sugar").length, 6, "rejected clear still lands locally");
+  clock.now += 4000;
+  use(4);
+  table.tick();
+  update();
+  assert.ok(!online.pantry.foods.some((f) => f.kind === "sugar"), "accepted removal arrives through food.gone");
+  clock.now += 4000;
+  use(0);
+  assert.equal(hands.falling.length, 1);
+  use(4);
+  table.tick();
+  update();
+  assert.equal(hands.falling.length, 0, "accepted clear cancels the exact pending fall");
+  hands.update(1, { use: false, holding: false, eye: camera.position }, body, online.pantry);
+  assert.ok(!online.pantry.foods.some((f) => f.kind === "sugar"));
+  assert.ok(online.pantry.foods.some((f) => f.kind === "patch"));
+  online.dispose();
+});

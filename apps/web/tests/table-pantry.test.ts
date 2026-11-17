@@ -20,10 +20,11 @@ test("online clearing requests the room's decision and waits for its food update
   assert.ok(pantry.foods.some((f) => f.id === id), "nothing removed before the room agrees");
   room.clearDropped(1);
   const change = room.flush()!;
+  for (const gone of change.gone) pantry.forgetFood(gone);
   pantry.mirror.apply(0, change.amounts, change.gone, undefined);
   assert.ok(!pantry.foods.some((f) => f.id === id));
   assert.ok(pantry.foods.some((f) => f.id === 2 * DROP_ID + 1));
-  // Clearing food still falling discards its unused name, too.
+  // The next drop still receives its own name.
   const next = pantry.name("honey");
   assert.equal(pantry.drop("honey", 10, 0).id, next);
 });

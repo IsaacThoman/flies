@@ -265,7 +265,14 @@ export class Online {
         this.#table?.pop(m.slot, m.cycle, m.at / 1000);
         return;
       case "food":
-        for (const id of m.gone) for (const hand of this.#handList) hand.forgetFood(id);
+        for (const id of m.gone) {
+          const falling = this.pantry.forgetFood(id);
+          if (falling) {
+            const i = host.hands.falling.indexOf(falling);
+            if (i >= 0) host.hands.falling.splice(i, 1);
+          }
+          for (const hand of this.#handList) hand.forgetFood(id);
+        }
         this.pantry.mirror.apply(m.ack, m.amounts, m.gone, m.eaten);
         return;
     }
@@ -455,7 +462,7 @@ export class Online {
     }
     if (ev.dropped) {
       const f = hands.falling[hands.falling.length - 1];
-      if (f) this.line.send({ type: "drop", id: this.pantry.name(f.kind), kind: f.kind, x: f.x, z: f.z, y: f.floor, at: roomNow });
+      if (f) this.line.send({ type: "drop", id: this.pantry.name(f.kind, f), kind: f.kind, x: f.x, z: f.z, y: f.floor, at: roomNow });
     }
   }
 

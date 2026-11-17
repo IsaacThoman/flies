@@ -263,8 +263,7 @@ export class Hands {
     if (input.use) {
       if (tool === "feed") {
         if (this.variant.id === "clear") {
-          pantry.clearDropped();
-          this.falling.length = 0;
+          if (pantry.clearDropped()) this.falling.length = 0;
         } else this.#drop(this.variant.id as FoodKind);
       }
       else if (tool === "swoop") this.#swoop(fly.yaw);
