@@ -67,24 +67,25 @@ function memories(typescript: Brain, wasm: Brain) {
   typescript.remember(wasm.memory());
   assert.deepEqual(wasm.memory(), memory);
   assert.deepEqual(typescript.memory(), memory);
-  const changed = (at: number, value: number, as: "u32" | "f32" = "u32") => {
+  const view = new DataView(memory.buffer);
+  const changed = (at: number, value: number) => {
     const bytes = memory.slice();
-    const view = new DataView(bytes.buffer);
-    if (as === "u32") view.setUint32(at, value, true);
-    else view.setFloat32(at, value, true);
+    new DataView(bytes.buffer).setUint32(at, value, true);
     return bytes;
   };
   const refused = [
     new Uint8Array(0),
-    memory.subarray(0, 19),
+    memory.subarray(0, 23),
     changed(0, 0x4d594c47),
     changed(4, 2),
-    changed(8, new DataView(memory.buffer).getUint32(8, true) ^ 1),
-    changed(12, new DataView(memory.buffer).getUint32(12, true) + 1),
-    changed(16, new DataView(memory.buffer).getUint32(16, true) + 1),
+    changed(8, view.getUint32(8, true) ^ 1),
+    changed(12, view.getUint32(12, true) + 1),
+    changed(16, 2),
+    changed(20, view.getUint32(20, true) + 1),
     Uint8Array.from([...memory, 0]),
   ];
-  if (memory.length >= 36) refused.push(changed(28, 0), changed(24, 1.5, "f32"), changed(24, Number.NaN, "f32"), changed(20, 0xffffffff));
+  // Sparse, with two entries or more: one past the last synapse, and two out of order.
+  if (view.getUint32(16, true) === 0 && view.getUint32(20, true) >= 2) refused.push(changed(24, view.getUint32(12, true)), changed(29, 0));
   for (const bytes of refused) {
     let message = "";
     try {
@@ -110,14 +111,16 @@ test("this Node runs the module, as the browsers it is for do", () => {
 
 test("on the synthetic connectome every tick is the TypeScript's, as the C interface shows it", async () => {
   const synthetic = syntheticConnectome();
+  const learned: number[] = [];
   for (const seed of [1, 0xdeadbeef]) {
     const ticks = scenario(70, seed, NOWHERE);
     const { expected, typescript, wasm, difference } = await compare(synthetic.bytes, seed, ticks);
     assert.equal(difference, null, `seed ${seed}: ${difference}`);
     assert.equal(wasm.eyes, null);
-    assert.ok(memories(typescript, wasm).length > 20, "the run taught it something");
+    learned.push(memories(typescript, wasm).length);
     assert.ok(expected.some((each) => each.startsWith("error tick takes 0 to 1000 ms, not NaN")));
   }
+  assert.ok(learned.some((length) => length > 24), "a run taught it something to remember");
 });
 
 test("a broken connectome or seed is refused with the TypeScript's message", async () => {

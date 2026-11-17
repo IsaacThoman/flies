@@ -91,6 +91,35 @@ every unavailable row any score from 0 to 10. These are missing-evidence
 bounds, not statistical confidence intervals. An unsupported assay never earns
 10; a missing duration never becomes a zero-valued biological observation.
 
+## Training
+
+`node scripts/ethogram.ts --assay training [--seeds 1,2,3] [--hour 6] [--out report.json]`
+(`scripts/ethogram/training.ts`) asks whether the fly can be taught which of
+two coloured dishes is good or bad, as a player could teach it. It follows the
+design of the colour-learning assay of Vogt et al. (2014, eLife 3:e02395,
+Figure 1): differential conditioning, then a choice between the two colours
+without reinforcement, sugar the reward and a punishment the other. That
+paper's memory scores are given only in its figures, so no number is
+transcribed and nothing is scored: the row is context, `learning` in the
+scorecard's coverage.
+
+The whole animal runs through `Life`, its real brain, body, senses and
+hunger, in the 43 mm arena with two dishes on the floor, 8 mm in radius, their
+centres 10 mm either side of the middle: red and blue, which a fly sees as dark
+and bright (packages/body's `FLY_RGB`: 0.22 and 0.58 on a floor of 0.42). What
+its eyes see is drawn from its pose, not rendered: each facet's ray from the
+head meets a dish, the floor, the drop beyond the edge or the sky (the body's
+tilt and the facets' acceptance cones are left out). Training, 300 s: sugar
+lies on one dish, a food patch tasted through `Life` as any food is; or,
+instead of sugar, whenever the fly stands on that dish a dark disc looms from
+straight above (the swoop as its eyes would see it), at most once every 10 s.
+Test, 180 s: no sugar, no swoop; the preference is (time on the trained dish −
+time on the other) / their sum, on its feet. Each seed is run with red and
+with blue trained, each reinforcement, and each with the brain's learning on
+and off from the same start: the paired difference is what learning did.
+
+TRAINING_TABLE
+
 ## Other requested domains
 
 The source code records walking/stop bouts, speed/yaw distributions, edge

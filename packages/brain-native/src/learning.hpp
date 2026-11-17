@@ -35,7 +35,7 @@ std::vector<uint8_t> write_memory(uint32_t hash, uint32_t count, const std::vect
 /** learning.ts's readMemory: the entries of a memory for a brain of this layout, or std::invalid_argument saying why it isn't one. */
 struct MemoryEntries {
   std::vector<uint32_t> index;
-  std::vector<float> factor;
+  std::vector<double> factor;
 };
 MemoryEntries read_memory(std::span<const uint8_t> memory, uint32_t hash, uint32_t count);
 

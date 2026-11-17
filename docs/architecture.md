@@ -48,7 +48,9 @@ priority during an approaching ball; it does not necessarily get a picture
 every frame (`apps/web/src/eyes/eyes.ts`). The brain answers asynchronously with
 commands read from descending and motor neurons: walk, turn, back up, take
 off, beat the wings, groom, feed and sing. The game moves the body accordingly
-and poses the model (`FlyPose`).
+and poses the model (`FlyPose`). What its mushroom body has learned travels the
+other way on request, as bytes tied to the connectome: the driver's
+`exportMemory` and `importMemory` (packages/brain/README.md, Learning).
 
 In a browser, including the iPhone and iPad app, each brain runs in its own Web
 Worker. It uses `packages/brain-native` built as WebAssembly by default where

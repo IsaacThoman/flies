@@ -155,8 +155,8 @@ export type LearningParameters = {
    * S3A). Smaller than the depression so that, when the two come together,
    * depression wins, as Handler et al. found with the DANs and KCs
    * stimulated at once. Chosen, not measured: at 0.1, a KC firing five times
-   * a second after its compartment's DANs fired five times each restores
-   * three quarters of what was lost.
+   * in the second after its compartment's DANs fired five times each
+   * restores about four fifths of what was lost.
    */
   potentiation: number;
 };
@@ -167,18 +167,25 @@ const HEMISPHERES = ["left", "right"] as const;
 
 /**
  * What a mushroom body has learned, as bytes to keep (MushroomBody.memory),
- * little-endian: "FLYM", the format's version (u32), the layout hash of the
- * brain that wrote it (u32, `layoutHash`), how many learning synapses it has
- * (u32), how many follow (u32), then for each synapse whose factor isn't 1,
- * ascending, its index (u32) and its factor (f32). A brain refuses a memory
- * of another layout: another connectome, or other compartment tables.
+ * little-endian: "FLYM"; the format's version (u32); the layout hash of the
+ * brain that wrote it (u32, `layoutHash`); how many learning synapses it has
+ * (u32); how the factors follow (u32): 0, sparse, or 1, dense; and how many
+ * entries (u32). Each factor is kept to a 255th, a byte (round(factor × 255)).
+ * Sparse: for each synapse whose byte isn't 255, ascending, its index (u32)
+ * and its byte, 5 bytes. Dense: every synapse's byte, in order. The writer
+ * takes whichever is shorter, so a memory is never more than a byte a
+ * synapse and the header. A brain refuses a memory of another layout:
+ * another connectome, or other compartment tables.
  */
-export const MEMORY = { magic: 0x4d594c46, version: 1, header: 20, entry: 8 } as const;
+export const MEMORY = { magic: 0x4d594c46, version: 1, header: 24, entry: 5, steps: 255 } as const;
 
 /** FNV-1a's offset basis: the layout hash of a brain with no learning synapses. */
 export const EMPTY_LAYOUT_HASH = 2166136261;
 const FNV_BASIS = EMPTY_LAYOUT_HASH;
 const fnv = (h: number, word: number) => Math.imul(h ^ word, 16777619) >>> 0;
+
+/** A factor kept to a 255th. */
+const quantum = (factor: number) => Math.round(factor * MEMORY.steps);
 
 /** The memory of a brain with no learning synapses (it has learned nothing, and can take only another such). */
 export function emptyMemory(): Uint8Array {
@@ -186,45 +193,55 @@ export function emptyMemory(): Uint8Array {
 }
 
 function writeMemory(hash: number, count: number, factors: Float64Array): Uint8Array {
-  let entries = 0;
-  for (let p = 0; p < factors.length; p++) if (Math.fround(factors[p]) !== 1) entries++;
-  const out = new Uint8Array(MEMORY.header + MEMORY.entry * entries);
+  let changed = 0;
+  for (let p = 0; p < factors.length; p++) if (quantum(factors[p]) !== MEMORY.steps) changed++;
+  const dense = MEMORY.entry * changed > factors.length;
+  const out = new Uint8Array(MEMORY.header + (dense ? factors.length : MEMORY.entry * changed));
   const view = new DataView(out.buffer);
   view.setUint32(0, MEMORY.magic, true);
   view.setUint32(4, MEMORY.version, true);
   view.setUint32(8, hash, true);
   view.setUint32(12, count, true);
-  view.setUint32(16, entries, true);
+  view.setUint32(16, dense ? 1 : 0, true);
+  view.setUint32(20, dense ? factors.length : changed, true);
   let at = MEMORY.header;
   for (let p = 0; p < factors.length; p++) {
-    if (Math.fround(factors[p]) === 1) continue;
-    view.setUint32(at, p, true);
-    view.setFloat32(at + 4, factors[p], true);
-    at += MEMORY.entry;
+    const q = quantum(factors[p]);
+    if (dense) {
+      out[at++] = q;
+    } else if (q !== MEMORY.steps) {
+      view.setUint32(at, p, true);
+      out[at + 4] = q;
+      at += MEMORY.entry;
+    }
   }
   return out;
 }
 
 /**
- * Reads a memory for a brain of this layout: its entries as [index, factor]
- * pairs, or throws, saying why, if it isn't one (the same messages as
- * packages/brain-native's learning.cpp).
+ * Reads a memory for a brain of this layout: the factor of every synapse it
+ * changes, as [index, factor] pairs, or throws, saying why, if it isn't one
+ * (the same messages as packages/brain-native's learning.cpp).
  */
-export function readMemory(memory: Uint8Array, hash: number, count: number): { index: Uint32Array; factor: Float32Array } {
+export function readMemory(memory: Uint8Array, hash: number, count: number): { index: Uint32Array; factor: Float64Array } {
   const view = new DataView(memory.buffer, memory.byteOffset, memory.byteLength);
   if (memory.byteLength < MEMORY.header || view.getUint32(0, true) !== MEMORY.magic) throw new Error("This isn't a fly's memory");
   if (view.getUint32(4, true) !== MEMORY.version) throw new Error(`This memory is of version ${view.getUint32(4, true)}, not ${MEMORY.version}`);
   if (view.getUint32(8, true) !== hash || view.getUint32(12, true) !== count) throw new Error("This memory is another brain's");
-  const entries = view.getUint32(16, true);
-  if (memory.byteLength !== MEMORY.header + MEMORY.entry * entries) throw new Error("This memory is damaged: its length is wrong");
+  const kind = view.getUint32(16, true);
+  const entries = view.getUint32(20, true);
+  if (kind > 1) throw new Error("This memory is damaged: its kind is unknown");
+  if (kind === 1 ? entries !== count || memory.byteLength !== MEMORY.header + count : memory.byteLength !== MEMORY.header + MEMORY.entry * entries) {
+    throw new Error("This memory is damaged: its length is wrong");
+  }
   const index = new Uint32Array(entries);
-  const factor = new Float32Array(entries);
+  const factor = new Float64Array(entries);
   for (let n = 0; n < entries; n++) {
-    const at = MEMORY.header + MEMORY.entry * n;
-    index[n] = view.getUint32(at, true);
-    factor[n] = view.getFloat32(at + 4, true);
+    const at = MEMORY.header + (kind === 1 ? n : MEMORY.entry * n);
+    index[n] = kind === 1 ? n : view.getUint32(at, true);
+    const q = memory[kind === 1 ? at : at + 4];
     if (index[n] >= count || (n > 0 && index[n] <= index[n - 1])) throw new Error("This memory is damaged: its synapses are out of order");
-    if (!(factor[n] >= 0 && factor[n] <= 1)) throw new Error("This memory is damaged: a factor isn't from 0 to 1");
+    factor[n] = q / MEMORY.steps;
   }
   return { index, factor };
 }

@@ -95,14 +95,17 @@ test("what it learned goes into a memory a few bytes a synapse, and another brai
   run(b, 300);
   run(b, 500, { touch: 1 });
   const memory = b.memory();
-  const changed = [...b.learning!.factors].filter((f) => Math.fround(f) !== 1).length;
+  const kept = (f: number) => Math.round(f * MEMORY.steps) / MEMORY.steps;
+  const changed = [...b.learning!.factors].filter((f) => kept(f) !== 1).length;
+  const synapses = b.learning!.edges.length;
   assert.ok(changed > 0);
-  assert.equal(memory.length, MEMORY.header + MEMORY.entry * changed);
+  // Sparse, five bytes a changed synapse, or dense, a byte each, whichever is shorter.
+  assert.equal(memory.length, MEMORY.header + Math.min(MEMORY.entry * changed, synapses));
 
   const again = new FlyBrain(loadConnectome(bufferOf(synthetic.bytes)), { seed: 9 });
   again.remember(memory);
-  assert.deepEqual([...again.learning!.factors], [...b.learning!.factors].map(Math.fround));
-  again.learning!.edges.forEach((e) => assert.equal(again.sim.weightOf(e), b.sim.weightOf(e)));
+  assert.deepEqual([...again.learning!.factors], [...b.learning!.factors].map(kept));
+  again.learning!.edges.forEach((e, p) => assert.equal(again.sim.weightOf(e), Math.fround(new FlyBrain(loadConnectome(bufferOf(synthetic.bytes)), { learning: false }).sim.weightOf(e) * kept(b.learning!.factors[p]))));
   assert.deepEqual(again.memory(), memory);
   // Taking back a memory of nothing learned undoes what was.
   again.remember(new FlyBrain(loadConnectome(bufferOf(synthetic.bytes))).memory());

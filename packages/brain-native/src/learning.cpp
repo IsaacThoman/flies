@@ -81,7 +81,11 @@ int hemisphere(const Connectome& c, uint32_t i) {
 
 uint32_t fnv(uint32_t h, uint32_t word) { return (h ^ word) * 16777619u; }
 
-constexpr uint32_t kMagic = 0x4d594c46u, kVersion = 1, kHeader = 20, kEntry = 8;
+constexpr uint32_t kMagic = 0x4d594c46u, kVersion = 1, kHeader = 24, kEntry = 5;
+constexpr double kSteps = 255;
+
+/** A factor kept to a 255th (learning.ts's quantum). */
+uint8_t quantum(double factor) { return static_cast<uint8_t>(js::round(factor * kSteps)); }
 
 void put32(std::vector<uint8_t>& out, size_t at, uint32_t x) {
   for (int b = 0; b < 4; b++) out[at + b] = static_cast<uint8_t>(x >> (8 * b));
@@ -94,25 +98,28 @@ uint32_t get32(std::span<const uint8_t> in, size_t at) {
 }  // namespace
 
 std::vector<uint8_t> write_memory(uint32_t hash, uint32_t count, const std::vector<double>& factors) {
-  uint32_t entries = 0;
+  uint32_t changed = 0;
   for (double f : factors) {
-    if (static_cast<float>(f) != 1) entries++;
+    if (quantum(f) != kSteps) changed++;
   }
-  std::vector<uint8_t> out(kHeader + kEntry * static_cast<size_t>(entries));
+  const bool dense = static_cast<uint64_t>(kEntry) * changed > factors.size();
+  std::vector<uint8_t> out(kHeader + (dense ? factors.size() : kEntry * static_cast<size_t>(changed)));
   put32(out, 0, kMagic);
   put32(out, 4, kVersion);
   put32(out, 8, hash);
   put32(out, 12, count);
-  put32(out, 16, entries);
+  put32(out, 16, dense ? 1 : 0);
+  put32(out, 20, dense ? static_cast<uint32_t>(factors.size()) : changed);
   size_t at = kHeader;
   for (uint32_t p = 0; p < factors.size(); p++) {
-    const float f = static_cast<float>(factors[p]);
-    if (f == 1) continue;
-    uint32_t bits;
-    std::memcpy(&bits, &f, 4);
-    put32(out, at, p);
-    put32(out, at + 4, bits);
-    at += kEntry;
+    const uint8_t q = quantum(factors[p]);
+    if (dense) {
+      out[at++] = q;
+    } else if (q != kSteps) {
+      put32(out, at, p);
+      out[at + 4] = q;
+      at += kEntry;
+    }
   }
   return out;
 }
@@ -121,18 +128,21 @@ MemoryEntries read_memory(std::span<const uint8_t> memory, uint32_t hash, uint32
   if (memory.size() < kHeader || get32(memory, 0) != kMagic) throw std::invalid_argument("This isn't a fly's memory");
   if (get32(memory, 4) != kVersion) throw std::invalid_argument("This memory is of version " + std::to_string(get32(memory, 4)) + ", not 1");
   if (get32(memory, 8) != hash || get32(memory, 12) != count) throw std::invalid_argument("This memory is another brain's");
-  const uint32_t entries = get32(memory, 16);
-  if (memory.size() != kHeader + kEntry * static_cast<uint64_t>(entries)) throw std::invalid_argument("This memory is damaged: its length is wrong");
+  const uint32_t kind = get32(memory, 16);
+  const uint32_t entries = get32(memory, 20);
+  if (kind > 1) throw std::invalid_argument("This memory is damaged: its kind is unknown");
+  if (kind == 1 ? entries != count || memory.size() != kHeader + static_cast<uint64_t>(count) : memory.size() != kHeader + kEntry * static_cast<uint64_t>(entries)) {
+    throw std::invalid_argument("This memory is damaged: its length is wrong");
+  }
   MemoryEntries out;
   out.index.resize(entries);
   out.factor.resize(entries);
   for (uint32_t n = 0; n < entries; n++) {
-    const size_t at = kHeader + kEntry * static_cast<size_t>(n);
-    out.index[n] = get32(memory, at);
-    const uint32_t bits = get32(memory, at + 4);
-    std::memcpy(&out.factor[n], &bits, 4);
+    const size_t at = kHeader + (kind == 1 ? n : kEntry * static_cast<size_t>(n));
+    out.index[n] = kind == 1 ? n : get32(memory, at);
+    const uint8_t q = memory[kind == 1 ? at : at + 4];
     if (out.index[n] >= count || (n > 0 && out.index[n] <= out.index[n - 1])) throw std::invalid_argument("This memory is damaged: its synapses are out of order");
-    if (!(out.factor[n] >= 0 && out.factor[n] <= 1)) throw std::invalid_argument("This memory is damaged: a factor isn't from 0 to 1");
+    out.factor[n] = q / kSteps;
   }
   return out;
 }
