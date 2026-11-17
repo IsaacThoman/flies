@@ -12,11 +12,11 @@ and upload in separate jobs, so one can succeed while the other fails.
    in the repository settings checked on 16 November 2026; recheck them if the workflow changes.
 2. To release, open a pull request from `dev` into `main` and merge it with a **merge commit**,
    not a squash, so `main` keeps `dev`'s history and the two don't drift apart.
-3. CI (`.github/workflows/ci.yml`) runs the checks on `main`, as it does on every pull request
-   and push to `dev` (draft pull requests skip tests and E2E):
+3. CI (`.github/workflows/ci.yml`) runs the checks on `main`, as it does on every push to `dev`
+   (not on pull requests: a full run takes about a quarter of an hour):
    - the Compose configuration check, lint, both typechecks and the web build, on Linux;
    - `npm test`, including CPU budgets, on `macos-latest` (the brain parity tests need Apple silicon);
-   - the four E2E suites in separate jobs, with an aggregate `e2e` check that fails if a suite fails.
+   - the four E2E suites in separate jobs.
 
    The release job waits for `checks` and `test`, not E2E.
 

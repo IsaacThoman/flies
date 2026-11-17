@@ -157,7 +157,7 @@ export class Life {
       sent.clockMorning = rhythm.clock.morning;
       sent.clockEvening = rhythm.clock.evening;
       sent.clockSleep = rhythm.clock.sleep;
-      sent.sleepPressure = rhythm.pressure;
+      sent.sleepPressure = rhythm.felt;
       sent.sleepDepth = rhythm.depth;
     } else {
       delete sent.clockMorning;

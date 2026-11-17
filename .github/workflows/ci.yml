@@ -1,17 +1,15 @@
 name: CI
 
+# Not on pull requests: a full run takes a quarter of an hour, too long to hold every pull request
+# for, so breakage shows on dev instead.
 on:
-  pull_request:
-    # ready_for_review: a draft that becomes ready gets the jobs it skipped.
-    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [dev, main]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  # Only a pull request's newer push cancels its run. On dev and main a push waits
-  # for the run in progress, so busy branches still finish runs and show breakage.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A push waits for the run in progress, so busy branches still finish runs and show breakage.
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -41,9 +39,6 @@ jobs:
     # WebAssembly reproduce Node's Math there, where V8 is built with clang and fuses
     # multiply-adds (packages/brain-native/wasm.sh, README.md). Node on x86-64 or on Linux arm64
     # rounds some of them differently in the last bit, and those tests fail there.
-    # Not for a draft: the macOS runners are few and dear, and a draft is pushed to often. It runs
-    # when the pull request is marked ready.
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
@@ -62,7 +57,6 @@ jobs:
     # pages' clocks to morning (holdSteady in scripts/play.ts), rather than let the game's adaptive
     # quality (apps/web/src/quality.ts) draw the fly in pixels too big for the X-ray or the real
     # hour put it to sleep, and they wait on game time or frames, not the clock.
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: e2e (${{ matrix.suite }})
     strategy:
       fail-fast: false
@@ -80,14 +74,6 @@ jobs:
       - uses: ./.github/actions/brain
       - run: npx playwright install --with-deps chromium
       - run: node apps/web/e2e/${{ matrix.suite }}.e2e.ts
-
-  e2e:
-    # One check for the suites, whatever they are, to require before merging: passed, or skipped with them on a draft.
-    if: always()
-    needs: e2e-suite
-    runs-on: ubuntu-latest
-    steps:
-      - run: test "${{ needs.e2e-suite.result }}" = success || test "${{ needs.e2e-suite.result }}" = skipped
 
   release:
     # A push to main with something new since the last v* tag (release.config.mjs) tags it and

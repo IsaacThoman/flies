@@ -5,6 +5,8 @@
 // another build, or a broken one, never stops the game: anything that isn't
 // one of today's values is left at its default.
 
+import { PACES } from "@fly/body";
+import type { DayPace } from "@fly/body";
 import { MAX_OWN } from "@fly/net";
 import type { Option } from "@fly/ui";
 import type { WallpaperStyle } from "./camera.ts";
@@ -43,6 +45,8 @@ export type Settings = {
   wallpaperAfter: number;
   /** How the camera moves in the wallpaper: "follow" keeps one shot on the fly, "calm" holds long shots, "lively" changes them more often, "whole" keeps the whole place in view. */
   wallpaperCamera: WallpaperStyle;
+  /** How its day goes: livelier than a fly's, to watch, or as a fly's, with a long midday siesta and the night asleep (packages/body rhythm.ts). */
+  pace: DayPace;
   /** How finely the fly's eyes are rendered. */
   eyes: EyesDetail;
   /** What its eyes see, small in a corner. */
@@ -79,6 +83,7 @@ export const DEFAULT_SETTINGS: Settings = {
   pixels: "classic",
   wallpaperAfter: 30,
   wallpaperCamera: "follow",
+  pace: "lively",
   eyes: "low",
   eyesInset: "always",
   nerves: "wallpaper",
@@ -104,6 +109,7 @@ const VALID: { readonly [K in keyof Settings]?: (value: Settings[K]) => boolean 
   pixels: (v) => Object.hasOwn(PIXEL_SIZES, v),
   wallpaperAfter: (v) => WALLPAPER_DELAYS.some((delay) => delay.value === v),
   wallpaperCamera: (v) => ["follow", "calm", "lively", "whole"].includes(v),
+  pace: (v) => Object.hasOwn(PACES, v),
   eyes: (v) => ["off", "low", "high"].includes(v),
   eyesInset: showWhen,
   nerves: showWhen,
