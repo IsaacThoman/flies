@@ -312,10 +312,15 @@ try {
     // Left wakes it and does nothing more on the title, whose Up and Down wrap round.
     press('ArrowLeft'),
     ['wait', { wallpaper: 'false', focus: 'play' }, 60_000],
+    // Exercise the title's Play action itself; Play/Pause later bypasses menu navigation.
+    press('Enter'),
+    ['wait', { screen: 'play', wallpaper: 'false' }, 60_000],
+    press('Escape'),
+    ['wait', { screen: 'title', focus: 'play', wallpaper: 'false' }, 60_000],
     ...['watch', 'settings'].flatMap((focus) => [press('ArrowDown'), ['wait', { focus }, 60_000]]),
     // Two flies, the second a brain of its own from the host's spawn(), on a thread of its own.
     press('Enter'),
-    ['wait', { screen: 'settings' }, 60_000],
+    ['wait', { screen: 'settings', tab: 'wallpaper', focus: 'page' }, 60_000],
     ...['wallpaperAfter', 'wallpaperCamera', 'place', 'flies'].flatMap((focus) => [press('ArrowDown'), ['wait', { focus }, 60_000]]),
     press('ArrowRight'),
     ['wait', { flies: '2' }, 180_000],

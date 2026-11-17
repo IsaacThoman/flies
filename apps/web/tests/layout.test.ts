@@ -562,6 +562,39 @@ test("About is a single upward step from Play", () => {
   assert.equal(title.menu.focused?.id, "play");
 });
 
+test("the TV remote reaches Play, Settings and Online from the title", () => {
+  const s = shell(TV_FRAME, "remote");
+  const actions: string[] = [];
+  s.play = () => actions.push("play");
+  s.open = (id) => actions.push(id);
+  const title = titleScreen(s);
+  title.enter();
+  // Left safely wakes the screensaver without moving the title's focus.
+  title.press("left", false);
+  assert.equal(title.menu.focused?.id, "play");
+  title.press("select", false);
+  assert.deepEqual(actions, ["play"]);
+  for (const id of ["watch", "settings"]) {
+    title.press("down", false);
+    assert.equal(title.menu.focused?.id, id);
+  }
+  title.press("select", false);
+  assert.deepEqual(actions, ["play", "settings"]);
+  const settings = settingsScreen(s);
+  settings.enter();
+  assert.equal(settings.menu.focused?.id, "page");
+  for (const id of ["wallpaperAfter", "wallpaperCamera", "place", "flies"]) {
+    settings.press("down", false);
+    assert.equal(settings.menu.focused?.id, id);
+  }
+  title.enter();
+  assert.equal(title.menu.focused?.id, "settings");
+  title.press("down", false);
+  assert.equal(title.menu.focused?.id, "online");
+  title.press("select", false);
+  assert.deepEqual(actions, ["play", "settings", "online"]);
+});
+
 test("a pending tool is shown as an icon clear of the shelf without changing its committed tool or hit targets", () => {
   for (const [w, h] of [[390, 844], [844, 390], [430, 932], [932, 430], [820, 1180], [1180, 820], [507, 820], [375, 820]]) {
     const hands = new Hands(createPicnic());
