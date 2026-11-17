@@ -97,11 +97,12 @@ export async function feedHoney(page: Page, drop: () => Promise<void>) {
  */
 export async function refuseBitterSugar(page: Page, drop: () => Promise<void>) {
   let tasted: Tasted | null = null;
-  for (let attempt = 1; attempt <= 3 && !tasted; attempt++) {
+  // As many drops as honey gets: a lump is smaller than a drop of honey, and lands off the mouth more often.
+  for (let attempt = 1; attempt <= 5 && !tasted; attempt++) {
     const result = await dropAtMouth(page, drop);
     console.log(`  drop ${attempt}: sweet ${result.sweet.toFixed(3)}, bitter ${result.bitter.toFixed(3)}, feed ${result.feed.toFixed(3)}, eaten ${result.eaten.toFixed(3)}`);
     if (result.bitter > 0 && result.sweet > 0) tasted = result;
   }
-  if (!tasted) assert.fail(`three drops: the bitter sugar never reached the taste senses (from the fly: ${await whereIs(page, "laced")})`);
+  if (!tasted) assert.fail(`five drops: the bitter sugar never reached the taste senses (from the fly: ${await whereIs(page, "laced")})`);
   assert.ok(tasted.eaten < 0.05, `it ate ${tasted.eaten.toFixed(3)} of sugar this bitter, which its brain's measurements say it leaves`);
 }
