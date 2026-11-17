@@ -210,10 +210,10 @@ float sillTop;`,
   float dh = hash21(dc + 5.1);
   float speck = step(0.985, dh) * (1.0 - smoothstep(0.06, 0.12, length(fract(vWorld.xz * 3.0) - 0.5 - (vec2(hash21(dc), hash21(dc + 9.0)) - 0.5) * 0.5))) * resolved(0.2) * step(0.5, wn.y);
   c = mix(c, dh > 0.994 ? vec3(0.35, 0.3, 0.26) : vec3(0.86, 0.84, 0.8), speck * 0.6);
-  paintRough = bareWood ? 0.42 + 0.1 * grain : mix(mix(0.22 + brush * 0.12, 0.5, chipped), 0.72, bare);
+  paintRough = bareWood ? 0.42 + 0.1 * grain : mix(mix(0.32 + brush * 0.08, 0.5, chipped), 0.72, bare);
   // Gloss paint's orange-peel, the grain under it, the brush's furrows, the step down into a chip, the cracks.
   float peel = vnoise(vec2(u, v) * 1.3) * resolved(0.5);
-  paintHeight = (grain * 0.012 + brush * 0.014 + peel * 0.01) * (1.0 - bare) * resolved(0.3) - chipped * 0.06 - bare * 0.05 - crack * 0.004 + speck * 0.04 + paintHeightRail;
+  paintHeight = (grain * 0.003 + brush * 0.004 + peel * 0.004) * (1.0 - bare) * resolved(0.3) - chipped * 0.06 - bare * 0.05 - crack * 0.001 + speck * 0.04 + paintHeightRail;
   if (sillTop > 0.5) {
     // A ring left by a glass: a hairline of dried wine, darker where it pooled at its edge.
     float d = abs(length(vWorld.xz - uRing.xy) - uRing.z);

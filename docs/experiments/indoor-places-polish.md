@@ -22,7 +22,20 @@ Fresh independent reviewers receive only the rubric, neutral evidence directorie
 
 ## Score log
 
-Baseline evidence and independent scoring pending.
+Baseline: R4 = origin/dev at experiment start. Scores below follow rubric column order: composition, lighting, materials, scale, detail, outside, artefacts.
+
+| Review | Windowsill scores | Mean | Lab scores | Mean |
+| --- | --- | ---: | --- | ---: |
+| B1 | 6.5, 6.5, 6, 6.5, 7.5, 6.5, 5 | 6.36 | 6.5, 6, 5.5, 7, 7.5, 4.5, 5 | 6.00 |
+| B2 | 6, 7, 6.5, 6, 7.5, 6, 6 | 6.43 | 6.5, 6.5, 6, 7, 7, 4.5, 6.5 | 6.29 |
+| B3 | 6, 6, 6.5, 6, 7.5, 6.5, 6 | 6.36 | 6.5, 7, 6.5, 7, 8, 5.5, 6.5 | 6.71 |
+| **Mean** | | **6.38** | | **6.33** |
+
+The most consistent findings were oversized surface wear, night silhouette loss, weak glass/liquid separation and shallow exterior scenery. Camera/fly-shadow findings remain outside this experiment's scope.
+
+Candidate 1 (`2b52613`, N6) refines paint and pottery detail, bottle Fresnel reflections, twilight fill, filtered lab window shadows, finish contrast, foliage and distant birds. C2 is an exact R4 duplicate. The three scoring reviewers receive orders C2/N6/R4, N6/R4/C2 and R4/C2/N6, plus an independent relative-weakness review of N6/R4. All use fresh contexts. Selection pending.
+
+N6: windowsill 48.1 ms and lab 51.2 ms construction in this run; steady draw counts exactly match R4. Shader/browser errors: none. The timing difference is treated as shared-machine noise, not a speedup claim.
 
 ## Reproducibility and measurement limits
 
@@ -31,3 +44,41 @@ The retained fixture uses the fly's world-defined start; eye offsets for follow,
 Initial L8 evidence is excluded: its fixture bypassed stage light application, had unsettled HUD fades and unpinned camera scouting. Three independent assessments scored it, but those numbers do not measure the product consistently and are not used to select changes. The fixture was corrected and baseline evidence recaptured as R4, with fresh independent reviewers. No game-camera code was changed.
 
 R4 build measurements: windowsill 65.3 ms, lab 56.0 ms. Steady screenshot draw counts: windowsill 21–23, lab 18–19. UI and fly-eye passes are excluded in this visual fixture; these counts are for comparisons within the experiment. Construction timings on the shared desktop are noisy and do not establish Apple TV frame performance.
+
+### Round 1 — retained
+
+Key: R4 and C2 = baseline (identical PNGs); N6 = first candidate. Vectors use the rubric order above.
+
+| Review | Place | R4 = C2 scores | Mean | N6 scores | Mean | Forced order |
+| --- | --- | --- | ---: | --- | ---: | --- |
+| R1 | Sill | 7,6,6.5,7.5,7.5,6,6.5 | 6.71 | 7,6.5,7,8,7.5,6.5,7.5 | 7.14 | N6 > C2 > R4 |
+| R1 | Lab | 7,6.5,6.5,8,8,5,7 | 6.86 | 7,6.5,7,8,8,6.5,7 | 7.14 | N6 > C2 > R4 |
+| R2 | Sill | 7,7,7,6.5,7.5,7,6.5 | 6.93 | 7,7.5,7.5,7.5,8,7,7.5 | 7.43 | N6 > R4 > C2 |
+| R2 | Lab | 7,7,7,8,8,5.5,7 | 7.07 | 7,7.5,7.5,8,8,6,7.5 | 7.36 | N6 > R4 > C2 |
+| R3 | Sill | 7.5,7,7,6.5,8,7,7 | 7.14 | 7.5,7.5,7.5,7.5,8,7,7.5 | 7.50 | N6 > R4 > C2 |
+| R3 | Lab | 7,6.5,6.5,7,7.5,4.5,7.5 | 6.64 | 7,6.5,7,7,7.5,7,7.5 | 7.07 | N6 > R4 > C2 |
+| **Panel** | **Sill** | | **6.93** | | **7.36** | **3/3 N6** |
+| **Panel** | **Lab** | | **6.86** | | **7.19** | **3/3 N6** |
+
+R4/C2 ordering is arbitrary: reviewers recognized identical evidence and gave every criterion identical scores (decoy noise = 0). The independent relative-weakness reviewer also ranked N6 first for both places. Retained all scene changes. Remaining problems: dotted grazing-angle paint highlights, daytime lab glare, a weakly glowing lamp interior, glass/liquid bands and simplified foliage. Fly poses varied with the brain snapshot and were excluded from rankings. Panel-to-panel absolute score drift is not counted as progress; only paired scores/rankings select candidates.
+
+Round 2 hypothesis: quieter paint relief, less opaque lab glass and weaker enamel glints, less dominant exterior night windows, and eight small nearby grains per place for scale. No solids or food changed; the grains are flat decoration under half a millimetre.
+
+### Round 2 — retained, narrow result
+
+Key: N6 = incumbent; H9 = second candidate. Orders H9/N6, N6/H9, H9/N6; relative-weakness reviewer N6/H9.
+
+| Review | Place | N6 scores | Mean | H9 scores | Mean | Forced preference |
+| --- | --- | --- | ---: | --- | ---: | --- |
+| R1 | Sill | 7.5,7,7,6.5,7.5,7,6.5 | 7.00 | 7.5,7,7,7.5,8,7,7 | 7.29 | H9 |
+| R1 | Lab | 7.5,7.5,6.5,6.5,7,5.5,7 | 6.79 | 7,7.5,6.5,7.5,7.5,5.5,7 | 6.93 | H9 |
+| R2 | Sill | 7.5,7.5,7,7,8,7,7.5 | 7.36 | 7,7.5,7,7.5,7.5,7,6.5 | 7.14 | N6 |
+| R2 | Lab | 7.5,6.5,6.5,7,7.5,5.5,7 | 6.79 | 7,6.5,6.5,7.5,7,5.5,6 | 6.57 | N6 |
+| R3 | Sill | 7.5,7.5,7.5,7,7.5,7.5,7.5 | 7.43 | 7.5,7.5,8,8,8,7.5,8 | 7.79 | H9 |
+| R3 | Lab | 7.5,8,7.5,7,7.5,6.5,7.5 | 7.36 | 7.5,8,7.5,8,8,6.5,7.5 | 7.57 | H9 |
+| **Panel** | **Sill** | | **7.26** | | **7.40** | **2/3 H9** |
+| **Panel** | **Lab** | | **6.98** | | **7.02** | **2/3 H9** |
+
+The relative-weakness reviewer preferred H9's scale cues on the sill but preferred N6 in the lab, citing waxy-looking food and broad oval shadows. Retained on the scoring panel's paired means and majority ranking, with that dissent recorded for the next iteration. This is a small result, particularly in the lab, not a decisive gain.
+
+The isolated H9 build sweep measured 71.5 / 83.7 ms, so construction was checked by alternating original and candidate builds in the same browser, 12 warm samples each. Median original/candidate: sill 40.6 / 40.1 ms; lab 48.05 / 48.0 ms. Both satisfy the 20% limit. Original decoration was restored during each original measurement. Every screenshot's draw count remains unchanged; browser/shader errors are empty.

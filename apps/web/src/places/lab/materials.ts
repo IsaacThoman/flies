@@ -234,7 +234,7 @@ ${BEAM_FRAGMENT}
 if (vSurface.x < 0.35) {
   float f = pow(1.0 - max(dot(normal, normalize(vViewPosition)), 0.0), 3.0);
   vec3 spec = mix(vec3(0.04), diffuseColor.rgb, vSurface.y);
-  reflectedLight.indirectSpecular += labGlints(labReflect(normal), vSurface.x * 0.25) * (spec + (1.0 - spec) * f) * (1.0 - vSurface.x * 2.2);
+  reflectedLight.indirectSpecular += labGlints(labReflect(normal), vSurface.x * 0.25) * (spec + (1.0 - spec) * f) * (1.0 - vSurface.x * 2.2) * mix(0.55, 1.0, vSurface.y);
 }`,
       )
   };
@@ -255,8 +255,8 @@ export function clearMaterial(shine: Glints): THREE.MeshStandardMaterial {
       /* glsl */ `float facing = abs(dot(normal, normalize(vViewPosition)));
 float edge = pow(1.0 - facing, 2.5);
 // The windows and the panels, bright in the glass.
-outgoingLight += labGlints(labReflect(normal), 0.01) * (0.05 + edge * 0.9);
-diffuseColor.a = clamp(0.1 + edge * 0.8 + dot(outgoingLight, vec3(0.33)) * 0.1, 0.0, 0.9);
+outgoingLight += labGlints(labReflect(normal), 0.01) * (0.04 + edge * 0.65);
+diffuseColor.a = clamp(0.055 + edge * 0.6 + dot(outgoingLight, vec3(0.33)) * 0.07, 0.0, 0.85);
 #include <opaque_fragment>`,
     );
   };

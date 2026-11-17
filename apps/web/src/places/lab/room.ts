@@ -449,7 +449,7 @@ void main() {
     vec3 m = texture2D(map, mask.xy + q * mask.zw).rgb;
     openSky = m.g;
     vec3 tint = mix(vec3(0.06, 0.08, 0.15), mix(vec3(1.0), low * 1.15, 0.3), day);
-    vec3 lit = there * tint + vec3(1.0, 0.8, 0.5) * m.r * stars * 0.9;
+    vec3 lit = there * tint + vec3(1.0, 0.8, 0.5) * m.r * stars * 0.55;
     // Haze toward the far things, more by day; under cloud the colours flatten and darken.
     // Foliage keeps a darker body than the pale masonry, with sky light on its upper lobes.
     float leaf = m.b * (0.82 + 0.18 * noise(q * vec2(320.0, 160.0) + vec2(time * 0.035, 0.0)));
