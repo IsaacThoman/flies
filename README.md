@@ -100,7 +100,7 @@ hands are drawn in its dial's shader, turned by the time each frame, so they
 cost no draw and stay sharp however close the camera comes.
 
 So does the weather, unless you choose one (the **Weather** tool): clear,
-overcast, mist or light rain. On "Now" it follows a forecast worked out from
+overcast, mist, light or heavy rain, thunderstorm, snow or sleet. On "Now" it follows a forecast worked out from
 the clock, the same for everyone at the same hour and on any restart: spells
 of a few hours each, changing over an hour, in systems a day or two long, so
 some days are fine and some grey. Mist forms only in the early morning and
@@ -111,7 +111,22 @@ the table, the fruit and the lemonade's pool (crowns of droplets, rings in
 the wet), beads the table and the fruit, soaks the napkin darker, speckles
 the lake; the table dries over the next half hour or so, and if the sun
 comes out while it's wet a rainbow stands opposite it. Rain bursts the bubbles, and the fireflies shelter from it. A
-drop landing on the fly is felt (`touch`).
+drop landing on the fly is felt (`touch`). Heavy rain thickens into windblown
+sheets; storm gusts enter through the same wind sense. Thunderstorms are
+silent: lightning brightens actual scene lights and the eyes, with an
+occasional distant fork. The current retinal model has no ON response to
+brightening; its darkening tail can excite the OFF pathway. No startle
+command is manufactured.
+
+Snow drifts past the picnic and through indoor views, dusts exposed picnic
+surfaces, and gradually melts into wetness. The layer is cosmetic and thinner
+than 0.35 mm, with no changed collision surface. Lab and windowsill panes
+frost at their edges; bar and restaurant receive the shared weather light.
+Cold itself is not modelled in the brain and no sluggishness is imposed.
+A possible labelled stand-in is a proposal requiring owner approval, not an
+active behavior ([weather details](docs/places.md#storms-and-winter-precipitation)).
+The invented forecast assumes northern temperate seasons: winter snow and
+summer storms. Shared tables use protocol 4 so clients agree on that forecast.
 
 **The weather outside.** An Apple TV app built with WeatherKit
 ([docs/apple-tv.md](docs/apple-tv.md#the-weather-outside)) follows the real
@@ -120,13 +135,12 @@ title is up, the TV asks whether the app may know where it is; from then on,
 while the app is open, Apple Weather is asked every 20 minutes for the
 conditions about where the TV is and the day's sunrise and sunset. The Weather
 tool's "Now" then says "Outside" and is the real weather, as near as the
-game's four kinds go: the cloud cover is the cloud; fog, or seeing less than a
-kilometre, is mist, fading out by eight, and a haze is some; precipitation is
-rain, light rain at the heaviest, since that is all the game has. There is no
-snow or thunder in the game yet, so each is the nearest it has: snow is a
-white mist under a grey sky, with nothing falling (rain would be wrong),
-flurries a grey sky; sleet, freezing rain and hail are rain; a thunderstorm is
-heavy rain, with no lightning. The real wind speed is how windy the day is, a
+game can show it: cloud cover is the cloud; fog, or seeing less than a
+kilometre, is mist, fading out by eight, and haze is some. Heavy rain and
+thunderstorm conditions retain their intensity and lightning; snow and
+flurries fall as snow, while sleet and wintry mix combine rain and snow.
+Freezing rain and hail use rain as a visual approximation; no ice impact
+or cold physiology is modelled. The real wind speed is how windy the day is, a
 fresh breeze (10 m/s) the windiest, so the picnic's gusts come more often and
 harder on a windy day and the trees and the lake move more. The Light tool's
 "Now" stretches or squeezes the clock's day so that its sun comes up at the
@@ -356,7 +370,7 @@ beach ball dives at the spot and veers away), **Tickle** (a feather: resting on
 the fly is a light touch, holding Select strokes it), **Blow** (gently or hard,
 from where you sit toward the spot), **Light** (now, which follows the clock,
 or morning, midday, golden hour, dusk, night), **Weather** (now, which
-follows the forecast, or clear, overcast, mist, rain), **View** (close up, follow, wide, the whole table, from above,
+follows the forecast, or clear, overcast, mist, rain, heavy rain, thunderstorm, snow, sleet), **View** (close up, follow, wide, the whole table, from above,
 through the fly's eyes, and inside it, close up with the fly as glass; Up
 brings the camera in, Down takes it out) and
 **Place** (where it lives; Up and Down choose, Select carries it there). On
@@ -476,7 +490,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | --- | --- |
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). Then no hand-wired looming is sent. |
 | `loomLeft`, `loomRight` | Only when the brain has no eyes: how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
-| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, a rate chosen for a fly in drizzle, not measured). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
+| `touch` | The feather: 0.4 resting on the fly, 1 stroking. A soap bubble bursting on it: 0.3. Another fly pushing against it (at a table with others): 0.3. A raindrop landing on it: 0.25 (in light rain about one every 40 s, at full heavy rain about one every 13 s: chosen rates, not measured biology). A falling leaf brushing it: 0.4. Hitting something in the air: full at 400 mm/s. Eases out over 0.3 s. |
 | `bumpLeft`, `bumpRight` | Each antenna's tip, just ahead of the head and to its side, pressing into anything taller than a step, another fly's body, or past the table's edge. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic blows 0.2 to 0.6 m/s over the table for 4 to 10 s. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Water is touched but isn't sweet. |
