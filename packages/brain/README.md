@@ -965,7 +965,7 @@ Not modelled: compartments learning at different rates (α2 needed a minute of p
 
 An odour teaches a little on its own: when it stops, PPL1-γ1pedc and PPL1-γ1 (PPL101, PPL102) fire for 2 to 5 s through the wiring, which depresses the odour's own γ1 synapses (mean 0.94 with no US, as low as 0.73). Hige et al. saw the unpaired odour's response fall too, by 27%, without saying why.
 
-**Coloured dishes** (`--part dishes`, seeds 1 to 3): DISHES_RESULT
+**Coloured dishes** (`--part dishes`, seeds 1 to 3): the same conditioning with what the game's eyes would see instead of an odour, a red and a blue dish (0.22 and 0.58 to the fly, on a table of 0.42; packages/body's `FLY_RGB`) swinging into view 50 degrees across, paired with sugar or with a dark disc looming from above as the game's swoop would be seen. No KC fires to either dish, in any seed, so no synapse changes: with learning on and off every trial is the same brain, spike for spike, and the turn toward a dish and the walking at it after training differ by exactly 0. A visual cue the player could place can't teach it anything.
 
 **The whole animal** (`node scripts/ethogram.ts --assay training`; docs/ethogram/assays.md, Training): TRAINING_RESULT
 
