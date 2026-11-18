@@ -131,14 +131,22 @@ site, and the iPhone and iPad app's `WKWebView` the same.
 
 ## What the body adds
 
-The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
-with thresholds, smoothing and hysteresis: walk above 0.3
-until below 0.15, back up above `back` 0.3 when it also beats `walk` by 0.15, take off on its feet when rearmed and outside the 1.5 s refractory period, as
-`escape` reaches 0.4 (the giant fiber at 80 Hz: why there, in `behavior.ts`), groom and wing poses above 0.2, feed above 0.15 until
-below 0.05, sing above 0.4 until below 0.2 and only on its feet (pIP10, the
-song command neuron: why there, in `behavior.ts`), commands older than 500 ms ignored). Steering is continuous: `turn`
-sets the yaw rate (3 rad/s at full turn walking, 35% of that standing, 5
-in the air).
+The brain decides; the body carries it out (`packages/body/src/behavior.ts`).
+How each command becomes motion, and where each number comes from:
+
+| Command | Becomes | Numbers, and where they come from |
+|---|---|---|
+| `walk` (DNg100) | walking forward | starts above 0.3 and stops below 0.15 (chosen); 5 mm/s at no drive to 16 at full, chosen to span a fruit fly's 5 to 20 mm/s: no recording relates DNg100's firing to walking speed ([steering](ethogram/steering.md#forward-speed)) |
+| `turn` (DNa02, right minus left) | yaw, continuously | 3 rad/s at full `turn` walking (4.3 °/s per Hz of difference), 35% of that standing, 5 in the air: chosen. Paired recordings of DNa02 in walking flies put the walking gain at 6.4 ± 1.5 °/s per Hz, about 110 ms later, but read through the brain's rate readout they predict a held-out fly's turning too poorly to replace it ([steering](ethogram/steering.md)) |
+| `back` (MDN) | backing up | above 0.3 when it also beats `walk` by 0.15, until below 0.15 or `walk` catches up, at 6 mm/s (chosen) |
+| `escape` (DNp01, the giant fiber) | a take-off, on its feet | at 0.4, the giant fiber at 80 Hz, above what it does in the model at rest (why there, in `behavior.ts`); again only once it has fallen below 0.3, and 1.5 s apart (chosen) |
+| `wings` (the flight power muscles' motor neurons) | the wings' pose; in the air, their lift (below) | the pose above 0.2 (chosen) |
+| `groom` (DNg12) | grooming, shown while it stands | above 0.2 (chosen) |
+| `feed` (MN9) | eating, with food in reach | above 0.15 until below 0.05 (chosen) |
+| `sing` (pIP10, the song command neuron) | song, on its feet | above 0.4 until below 0.2, above pIP10's measured peak in a lone fly (why there, in `behavior.ts`) |
+
+Each command is smoothed at 12/s, as they arrive unevenly, and ignored once
+500 ms old (both chosen).
 
 Things the body does that the brain did not decide, each written down where it
 lives (`packages/body/src/motion.ts` unless noted):

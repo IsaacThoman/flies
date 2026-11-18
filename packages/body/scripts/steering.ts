@@ -367,7 +367,7 @@ const report = {
   scales: { yaw: YAW_SCALE, forward: FORWARD_SCALE },
   perFly,
   betweenFlies: { walking: { mean: meanOf(walkingSlopes), sd: sdOf(walkingSlopes), cv: cv(walkingSlopes) }, still: { mean: meanOf(stillSlopes), sd: sdOf(stillSlopes), cv: cv(stillSlopes) } },
-  allFour: { tau: all.tau, delay: all.delay, trainingR2: all.trainingR2, walking: all.walking, still: all.still, walkingOnFileUnits: all.walking / YAW_SCALE },
+  allPassing: { recordings: passing.map((f) => f.name), tau: all.tau, delay: all.delay, trainingR2: all.trainingR2, walking: all.walking, still: all.still, walkingOnFileUnits: all.walking / YAW_SCALE },
   folds,
   decision,
 };
@@ -384,6 +384,6 @@ console.log(`\nbetween flies, walking slope ${f(report.betweenFlies.walking.mean
 for (const fold of folds) {
   console.log(`held out ${fold.heldOut}: τ ${fold.tau} ms, d ${fold.delay} ms, gain ${f(fold.walking.gain)} → R² ${f(fold.walking.r2)}, b ${f(fold.walking.calibration)}; not walking gain ${f(fold.still.gain)} → R² ${f(fold.still.r2)}, b ${f(fold.still.calibration)}; present mapping R² ${f(fold.presentWalking.r2)}, b ${f(fold.presentWalking.calibration)} (not walking R² ${f(fold.presentStill.r2)}, b ${f(fold.presentStill.calibration)})`);
 }
-console.log(`\nall four: τ ${all.tau} ms, d ${all.delay} ms, walking ${f(all.walking, 3)} °/s per Hz (${f((all.walking * Math.PI) / 180, 5)} rad/s per Hz; files' units ${f(all.walking / YAW_SCALE, 3)}), not walking ${f(all.still, 3)}`);
+console.log(`\nall passing (${passing.length}): τ ${all.tau} ms, d ${all.delay} ms, walking ${f(all.walking, 3)} °/s per Hz (${f((all.walking * Math.PI) / 180, 5)} rad/s per Hz; files' units ${f(all.walking / YAW_SCALE, 3)}), not walking ${f(all.still, 3)}`);
 console.log(`decision: D1 as registered ${decision.D1AsRegistered} (${passingAsRegistered.join(", ") || "none"} pass); amended D1 ${decision.D1}, D2 ${decision.D2}, D3 ${decision.D3}; not walking: D2 ${decision.still.D2}, D3 ${decision.still.D3}`);
 if (values.out) writeFileSync(values.out, JSON.stringify(report, null, 2));

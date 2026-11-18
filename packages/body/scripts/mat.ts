@@ -67,7 +67,7 @@ function matrix(view: DataView, e: Element, into: Map<string, MatArray>, wanted:
   if (!wanted(name)) return;
   const real = element(view, nameElement.next);
   // A double matrix may be stored as a narrower integer type; numbers() widens it.
-  if (real.type === MI_DOUBLE && real.start % 8 === 0) {
+  if (real.type === MI_DOUBLE) {
     into.set(name, { dims, data: new Float64Array(view.buffer.slice(view.byteOffset + real.start, view.byteOffset + real.start + real.size)) });
   } else {
     into.set(name, { dims, data: numbers(view, real) });
