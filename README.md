@@ -77,6 +77,7 @@ unknown capture dates and machines are identified rather than inferred.
 | Build and check the Apple hosts | [iOS](docs/ios.md), [Apple TV](docs/apple-tv.md) |
 | Get a release to TestFlight | [Release](docs/release.md) |
 | Understand wiring, model behavior and limitations | [Brain](packages/brain/README.md) |
+| See whether the central complex can hold a heading and steer by it | [Central complex probe](docs/central-complex.md) |
 | Change C++/Wasm and check comparison limits | [Native brain](packages/brain-native/README.md) |
 | Change the fly's model or posing | [Fly](packages/fly/README.md) |
 | Find dated artifact sizes and measurement limits | [Measurement provenance](docs/measurements.md) |

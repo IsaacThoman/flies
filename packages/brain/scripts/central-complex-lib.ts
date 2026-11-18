@@ -113,6 +113,7 @@ export function groups(c: Connectome, names: readonly string[]): Groups {
   for (const type of ["ER2_a", "ER2_b", "ER2_c", "ER2_d", "ER4d", "ER4m", "ER5", "ER3w_b", "ER3m", "ER3p_a"])
     for (const side of sides) read.set(`${type} ${side}`, c.find({ type: [type], side }));
   for (let k = 1; k <= 10; k++) for (const side of sides) read.set(`TuBu${String(k).padStart(2, "0")} ${side}`, c.find({ type: [`TuBu${String(k).padStart(2, "0")}`], side }));
+  for (const type of ["L1", "L2", "L3", "Mi1", "Tm1", "Tm2", "Tm9", "Dm2", "Mi15"]) for (const side of sides) read.set(`${type} ${side}`, c.find({ type: [type], side }));
   for (const family of ["MeTu1", "MeTu2", "MeTu3", "MeTu4"]) for (const side of sides) read.set(`${family} ${side}`, c.find({ type: new RegExp(`^${family}`), side }));
   return { epg: epg.map((ns) => Uint32Array.from(ns)), pen, pfl3, fc2: new Map([...fc2].map(([k, v]) => [k, Uint32Array.from(v)])), read };
 }
@@ -236,6 +237,11 @@ export const LIFTS: readonly Lift[] = [
       { reason: "diagnostic: LNO1 as FlyEM's consensus", select: { type: ["LNO1"] }, nt: "GABA" },
       { reason: "diagnostic: GLNO inhibitory", select: { type: ["GLNO"] }, nt: "GLUT" },
     ],
+  },
+  {
+    name: "glno-excitatory",
+    what: "GLNO alone made excitatory (added after the protocol, to tell the nodulus lift's two changes apart)",
+    fixes: () => [{ reason: "diagnostic: GLNO excitatory", select: { type: ["GLNO"] }, nt: "ACH" }],
   },
   {
     name: "modulators",

@@ -13,7 +13,10 @@
 //           the circuit runs at (static; FlyEM's transmitter table is used
 //           when present, see the doc)
 //   bump    (1) a bump: E-PG wedges kicked and let go, the whole ring driven
-//           evenly, and each visual ring neuron against an evenly driven ring
+//           evenly, and each visual ring neuron against an evenly driven ring;
+//           then, added after the protocol, the even drive as a depolarising
+//           bias (forced spikes can't be inhibited) and a kick on a ring
+//           depolarised below threshold
 //   move    (2) the eyes under rotation, the brain's own turns at rest, and a
 //           bump pushed by one side's P-ENs
 //   steer   (3) a bump held at each position with a goal in each FB column:
@@ -152,6 +155,8 @@ function wiring() {
   inputs("  P-EN (PEN_a, PEN_b)", Uint32Array.from([...g.pen.left, ...g.pen.right]), 14);
   inputs("  E-PG", c.find({ type: ["EPG"] }), 14);
   inputs("  PFL3", c.find({ type: ["PFL3"] }), 10);
+  inputs("  MeTu1 (the anterior visual pathway's way in)", c.find({ type: ["MeTu1"] }), 4);
+  inputs("  MeTu3c", c.find({ type: ["MeTu3c"] }), 4);
 
   // W4: the noduli's inputs, what they reach of the ring's cells and what reaches them.
   console.log("W4. The noduli's inputs: synapses onto the P-ENs and the PFNs, their status, and their own largest inputs");
@@ -162,17 +167,18 @@ function wiring() {
   for (const type of ["GLNO", "LNO1", "LNO2", "LNO3", "LNOa", "LCNOp", "LCNOpm", "LPsP"]) {
     const ns = c.find({ type: [type] });
     if (ns.length === 0) continue;
-    let toPen = 0, toPfn = 0;
+    let toPen = 0, toPfn = 0, fromPen = 0;
     for (const i of ns) for (let e = c.ptr[i]; e < c.ptr[i + 1]; e++) {
       if (penSet[c.post[e]]) toPen += c.count[e];
       if (pfn[c.post[e]]) toPfn += c.count[e];
     }
+    for (const i of [...g.pen.left, ...g.pen.right]) for (let e = c.ptr[i]; e < c.ptr[i + 1]; e++) if (ns.includes(c.post[e])) fromPen += c.count[e];
     const into = new Map<string, number>();
     const set = new Uint8Array(c.neurons);
     for (const i of ns) set[i] = 1;
     for (let i = 0; i < c.neurons; i++) for (let e = c.ptr[i]; e < c.ptr[i + 1]; e++) if (set[c.post[e]]) into.set(typeOf(i), (into.get(typeOf(i)) ?? 0) + c.count[e]);
     const top = [...into].filter(([k]) => k !== type && !/^PEN|^EPG/.test(k)).sort((a, b) => b[1] - a[1]).slice(0, 4);
-    console.log(`  ${type.padEnd(7)} ${ns.length} cells  ${status(ns[0]).padEnd(5)} predicted ${c.columns.nt.value(ns[0]) || "none"}${consensus ? `, FlyEM ${consensus.get(type) ?? "-"}` : ""}; → P-EN ${toPen}, → PFN ${toPfn}; from ${top.map(([k, n]) => `${k} ${n}`).join(", ")}`);
+    console.log(`  ${type.padEnd(7)} ${ns.length} cells  ${status(ns[0]).padEnd(5)} predicted ${c.columns.nt.value(ns[0]) || "none"}${consensus ? `, FlyEM ${consensus.get(type) ?? "-"}` : ""}; → P-EN ${toPen}, ← P-EN ${fromPen}, → PFN ${toPfn}; from ${top.map(([k, n]) => `${k} ${n}`).join(", ")}`);
   }
   console.log();
 
@@ -388,15 +394,60 @@ function bumpPart() {
     console.log(`  in the last 250 ms of the kick (seed ${seeds[0]}, centred on R3): ${show.map((n) => `${n} ${rates[bins.index(n)].toFixed(1)}`).join(", ")} Hz\n`);
   }
 
+  // 1c and 1b as the protocol has them: an even drive of forced spikes.
+  evenParts({ kind: "forced" });
+
+  // Added after the protocol (the doc says why): a forced spike can't be inhibited, so the
+  // even drive is also given as a depolarising bias on every E-PG, which inhibition can act on.
+  console.log("Added after the protocol: the even drive as a bias on every E-PG instead of forced spikes. Calibration, every E-PG biased for 2 s:");
+  const calibration = EVEN_BIAS.map((mV) => ({ mV, mean: seeds.map((seed) => bump(evenWith(seed, null, { kind: "bias", mV })).mean) }));
+  for (const { mV, mean } of calibration) console.log(`  ${mV} mV: E-PG mean ${range(mean)} Hz`);
+  const chosen = calibration.reduce((a, b) => (Math.abs(avg(b.mean) - DRIVE.epgEven) < Math.abs(avg(a.mean) - DRIVE.epgEven) ? b : a));
+  console.log(`  the bias nearest the even rate (${DRIVE.epgEven} Hz) on average: ${chosen.mV} mV\n`);
+  evenParts({ kind: "bias", mV: chosen.mV });
+
+  // 1d, added after the protocol: a kicked bump on a ring made excitable, to see how far it is from holding.
+  console.log("1d (added after the protocol). Every E-PG biased below threshold, then three positions kicked as in 1a (centred on R3), and let go");
+  for (const mV of [3, 5, 6, 6.5]) {
+    const held: number[] = [];
+    for (const seed of seeds) {
+      const brain = settled(seed, (b) => {
+        b.sim.addInput("kick", epgAt(around(4)), 0);
+        b.sim.addExcitability("epg bias", allEpg());
+        b.sim.setExcitability("epg bias", new Float64Array(allEpg().length).fill(mV));
+      });
+      const bins = new Bins(brain, g.read);
+      brain.sim.setRate("kick", DRIVE.epg);
+      run(brain, bins, 1000, () => {});
+      brain.sim.setRate("kick", 0);
+      let t0 = 0;
+      let lost = false;
+      run(brain, bins, 10000, (r, t) => {
+        const b = bump(epgRates(bins, r));
+        if (!lost && localised(b) && Math.abs(wrap(b.phase - 4 * STEP)) <= CRITERIA.phaseTolerance) t0 = t;
+        else lost = true;
+      });
+      held.push(t0 / 1000);
+    }
+    console.log(`  ${mV} mV: held ${range(held, 2)} s after the kick`);
+  }
+}
+
+type Even = { kind: "forced" } | { kind: "bias"; mV: number };
+const EVEN_BIAS = [7.5, 8, 9, 10];
+const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+function evenParts(even: Even) {
+  const how = even.kind === "forced" ? `forced at ${DRIVE.epgEven} Hz` : `biased by ${even.mV} mV`;
   // 1c: the whole ring evenly, 2 s, then let go: does a bump form by itself?
-  console.log(`1c. Every E-PG at ${DRIVE.epgEven} Hz for 2 s, then nothing for 3 s: a bump forming from an even drive`);
+  console.log(`1c. Every E-PG ${how} for 2 s, then nothing for 3 s: a bump forming from an even drive`);
   for (const seed of seeds) {
-    const brain = settled(seed, (b) => b.sim.addInput("even", allEpg(), 0));
+    const brain = settled(seed, (b) => addEven(b, even));
     const bins = new Bins(brain, g.read);
-    brain.sim.setRate("even", DRIVE.epgEven);
+    setEven(brain, even, true);
     const during: ReturnType<typeof bump>[] = [];
     run(brain, bins, 2000, (r) => during.push(bump(epgRates(bins, r))));
-    brain.sim.setRate("even", 0);
+    setEven(brain, even, false);
     const after: ReturnType<typeof bump>[] = [];
     run(brain, bins, 3000, (r) => after.push(bump(epgRates(bins, r))));
     const formed = during.filter(localised).length;
@@ -405,13 +456,13 @@ function bumpPart() {
   console.log();
 
   // 1b: each visual ring neuron against an evenly driven ring.
-  console.log(`1b. Each ring neuron of the visual types (ER2_a–d, ER4d) at ${DRIVE.ring} Hz, with every E-PG at ${DRIVE.epgEven} Hz, 2 s: the E-PG pattern against the even drive alone`);
+  console.log(`1b. Each ring neuron of the visual types (ER2_a–d, ER4d) at ${DRIVE.ring} Hz, with every E-PG ${how}, 2 s: the E-PG pattern against the even drive alone`);
   const ring = c.find({ type: ["ER2_a", "ER2_b", "ER2_c", "ER2_d", "ER4d"] });
   const byType = new Map<string, { lengths: number[]; drops: number[]; localisedCount: number; n: number }>();
   for (const seed of seeds) {
-    const control = evenWith(seed, null);
+    const control = evenWith(seed, null, even);
     for (const i of ring) {
-      const r = evenWith(seed, i);
+      const r = evenWith(seed, i, even);
       // The pattern the ring neuron carves: how much each position lost.
       const lost = r.map((x, p) => Math.max(0, control[p] - x));
       const shaped = bump(r);
@@ -429,16 +480,27 @@ function bumpPart() {
     t.lengths.sort((a, b) => a - b);
     console.log(`  ${type.padEnd(6)} ${t.n} runs: E-PG mean lowered by ${range(t.drops)} Hz; the loss's population vector length median ${t.lengths[t.lengths.length >> 1].toFixed(2)}, largest ${t.lengths.at(-1)!.toFixed(2)}; a localised bump left in ${t.localisedCount}`);
   }
+  console.log();
+}
+
+function addEven(brain: FlyBrain, even: Even) {
+  if (even.kind === "forced") brain.sim.addInput("even", allEpg(), 0);
+  else brain.sim.addExcitability("even", allEpg());
+}
+
+function setEven(brain: FlyBrain, even: Even, on: boolean) {
+  if (even.kind === "forced") brain.sim.setRate("even", on ? DRIVE.epgEven : 0);
+  else brain.sim.setExcitability("even", new Float64Array(allEpg().length).fill(on ? even.mV : 0));
 }
 
 /** E-PG rate by position over 2 s of an evenly driven ring, with one ring neuron driven too (or none). */
-function evenWith(seed: number, ringNeuron: number | null): Float64Array {
+function evenWith(seed: number, ringNeuron: number | null, even: Even): Float64Array {
   const brain = settled(seed, (b) => {
-    b.sim.addInput("even", allEpg(), 0);
+    addEven(b, even);
     b.sim.addInput("ring", ringNeuron === null ? [] : [ringNeuron], 0);
   });
   const bins = new Bins(brain, g.read);
-  brain.sim.setRate("even", DRIVE.epgEven);
+  setEven(brain, even, true);
   if (ringNeuron !== null) brain.sim.setRate("ring", DRIVE.ring);
   const sum = new Float64Array(POSITIONS);
   let n = 0;
@@ -604,6 +666,7 @@ function steerPart() {
     const held = curves.get(0)!.phase.filter((ph, p) => Math.abs(wrap(ph - p * STEP)) <= CRITERIA.phaseTolerance).length;
     console.log(`seed ${seed}: the bump sat within ${deg(CRITERIA.phaseTolerance)}° of where it was held at ${held} of ${POSITIONS} positions (no goal)`);
     const follow: number[] = [];
+    const pflFollow: number[] = [];
     let strong = 0;
     for (const col of [0, ...columns]) {
       const { dna, pfl } = curves.get(col)!;
@@ -612,6 +675,7 @@ function steerPart() {
       const crosses = f.amplitude > Math.abs(f.offset);
       if (col) {
         follow.push(wrap(f.phase - goals.get(col)!));
+        pflFollow.push(wrap(fp.phase - goals.get(col)!));
         if (f.amplitude >= CRITERIA.minSteer && crosses) strong++;
       }
       // Where the steering crosses zero rising: a right turn moves the bump toward falling position, so that heading is held.
@@ -620,6 +684,10 @@ function steerPart() {
     }
     const R = Math.hypot(follow.reduce((x, a) => x + Math.cos(a), 0), follow.reduce((x, a) => x + Math.sin(a), 0)) / follow.length;
     const pass = strong >= columns.length - 2 && R >= CRITERIA.minFollow;
+    // Reported, not judged (added after the protocol): the same for PFL3's own difference.
+    const px = pflFollow.reduce((x, a) => x + Math.cos(a), 0);
+    const py = pflFollow.reduce((x, a) => x + Math.sin(a), 0);
+    console.log(`  PFL3's phase follows the goal with resultant length ${(Math.hypot(px, py) / pflFollow.length).toFixed(2)}, ${deg(Math.atan2(py, px)).toFixed(0)}° from the column's angle on average`);
     verdicts.push(`seed ${seed}: ${strong} of ${columns.length} goal columns steer ≥ ${CRITERIA.minSteer} Hz both ways; the steering's phase follows the goal with resultant length ${R.toFixed(2)}: ${pass ? "PASS" : "FAIL"}`);
     console.log();
   }
@@ -672,6 +740,12 @@ function eyesPart() {
         return { bins, rates: sum };
       };
       const control = measure(null);
+      if (seed === seeds[0]) {
+        // Where along the way in the bar's signal stops: absolute rates, the right eye, a bar at 60°.
+        const m = measure(60);
+        const way = ["L1", "L2", "L3", "Mi1", "Tm1", "Tm2", "Tm9", "Dm2", "Mi15", "MeTu1", "MeTu3"];
+        console.log(`  seed ${seed}, the bar at 60°, right eye, Hz (ground alone in brackets): ${way.map((n) => `${n} ${m.rates[m.bins.index(`${n} right`)].toFixed(1)} (${control.rates[control.bins.index(`${n} right`)].toFixed(1)})`).join(", ")}`);
+      }
       const row: number[] = [];
       azimuths.forEach((az, ai) => {
         const m = measure(az);

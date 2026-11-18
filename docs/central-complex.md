@@ -8,10 +8,19 @@ the model's or the game's behaviour changes here: the measurements are
 diagnostic inputs on top of the brain as the game runs it, and every change
 to the operating point below is a labelled lift for one run, not a proposal.
 
-**Status: protocol.** This file was committed with the scripts before any
-measurement it describes; the results, what blocks each step and the
-recommendation follow in later commits, under the protocol, which stays as
-it is.
+**No-go.** At this model's operating point the ring cannot hold a heading:
+a bump put on the E-PGs is localised while it is driven (12 of 12 runs) and
+gone within 250 ms of letting go (held 0.00 s in all 12, against 5 s), and
+no diagnostic lift changes that. Each lift leaves the bump dying at once or
+throws the ring into seizure. Nothing the model has moves a bump: the
+eyes' rotation reaches the noduli's input neurons' own input, one direction
+only, and the P-ENs not at all. The steering read-out is there in the wiring
+but too weak to use: PFL3's left-right difference follows a goal put in the
+fan-shaped body as the fly's would, at about 1 Hz, where DNa02 needs 2 Hz
+to compete. The protocol was committed before any measurement (`cafb80aa`)
+and is unchanged below; two of its stimuli turned out unable to show what
+they were for, and that is reported beside the variants added after it
+([Changes after the protocol](#changes-after-the-protocol)).
 
 ## Why
 
@@ -337,6 +346,233 @@ by azimuth is reported if there is one.
   missing knowledge would decide it.
 - Anything else is reported as it falls, question by question, with the
   recommendation weighing it; this rule is not changed after the results.
+
+## Results
+
+Every part, at the operating point and under every lift, seeds 1 to 3, on
+`dev` at `b9a88b6d` with the probe of `cafb80aa` (the variants since are
+marked). Ranges are over seeds and positions.
+
+### 1. A bump forms only while it is driven
+
+- **1a.** Three neighbouring positions' E-PGs at 30 Hz make a localised bump
+  where they were put in 12 of 12 runs (mean 4.9 to 6.8 Hz over the ring,
+  length 0.94 to 0.95, 3 positions wide, within 4° of the centre). No
+  undriven E-PG fires: the bump is the drive and nothing more. Let go, it is
+  gone in the first 250 ms bin in all 12 (**held 0.00 s, against 5 s:
+  fail**). In the kick's last 250 ms (seed 1, centred on R3) the P-ENs fire
+  at 1.5 and 1.9 Hz (left and right PB), the P-EGs at 1.8 to 2.2, Delta7 at 0
+  and 6.9, PFL3 at 0, and the glutamatergic ExR6 at 60 Hz and ExR4 at 12 and
+  24.
+- **1c and 1b as written** (an even drive of forced spikes) can show nothing:
+  a forced spike can't be inhibited or added to, so the ring stays as even as
+  its drive (length 0.04 to 0.19) and no ring neuron changes the E-PGs at all
+  (0.0 Hz in all 201 runs). See Changes after the protocol.
+- **Added after the protocol, the even drive as a bias.** A 10 mV
+  depolarisation of every E-PG (9.6 to 11.1 Hz on its own; 7.5, 8 and 9 mV gave
+  6.3 to 9.8 Hz) breaks into a bump by itself: localised in 5 or 6 of its 8
+  bins in each seed, 3 to 7 positions wide, length 0.53 to 0.76 at the end,
+  in a different place in each seed (−45°, −108°, −153°). So the ring has
+  a state with a bump, but only while every E-PG is held above threshold:
+  1 s after the bias goes, the ring is silent in every seed. One ring neuron
+  of the visual types at 30 Hz on that biased ring lowers the E-PG mean by
+  −1.3 to +1.2 Hz, inside the run-to-run spread, and leaves no localised bump
+  in any of the 201 runs: no ring neuron places the bump. Their wiring says
+  the same: each spreads its synapses nearly evenly around the ring (The
+  circuit, above), as a ring neuron would before experience had shaped its
+  synapses (Fisher et al. 2019; Kim et al. 2019).
+- **1d, added after the protocol.** Every E-PG depolarised by 3, 5, 6 or 6.5 mV
+  (below the 7 mV threshold), then kicked as in 1a: held 0.00 s at every bias
+  and seed. Even a ring a quarter of a millivolt from firing doesn't keep the
+  bump.
+
+### 2. Nothing moves the bump
+
+- **2b, the eyes under rotation.** A grating turning clockwise raises PS196_b
+  on the right over the left by 5.0 to 7.0 Hz (and DNa02's difference by 12.0
+  to 16.0 Hz); turning anticlockwise, by −0.3 to +0.5 Hz (DNa02 −3.8 to +3.0).
+  So the one rotation signal there is comes in one direction only. GLNO, the
+  cells PS196_b feeds and the P-ENs' largest input, stays at 0 Hz (at most
+  0.5 Hz on one side with the ring driven evenly), as do the P-ENs, LNO1,
+  LNO2, LNOa and LCNOpm; LCNOp and LPsP move by 1.5 Hz at most, with no
+  consistent sign. No cell
+  differs by 1 Hz with the sign reversing in all three seeds.
+- **2c, the brain's own turns.** Over 60 s at rest, no pair's right-minus-left
+  rate correlates with DNa02's at |r| above 0.17 (LNO1, LNO2, LNOa, LCNOp,
+  PS196_b, LPsP); GLNO, LCNOpm and the P-ENs are silent throughout. No signal
+  (**fail**).
+- **2d, a bump pushed.** With the kick let go there is no bump left to move
+  (0 Hz at the end, every bias and seed). With it held, one PB half's P-ENs
+  depolarised by 6 mV fire at 10.6 to 21.0 Hz against 1.0 to 1.6 without,
+  and the bump moves −5° to +1°, recruiting no new position; at 3 mV, −4° to
+  +3°. Moved 45° the way the wiring says in 0 of 6 runs in every condition
+  (**fail**).
+
+### 3. PFL3 compares heading and goal; the steering is too weak to use
+
+- **DNa02.** In no seed does any goal column steer by 2 Hz both ways: 0 of 9
+  in each (**fail**). The fitted DNa02 amplitude over the bump's position is
+  0.08 to 2.01 Hz, on offsets of −4.6 Hz (seed 1) and −21.6 Hz (seed 2) that
+  are the visual background's leftward lean; in seed 3 DNa02 hardly fires in
+  this window (amplitude 0.34 Hz at most). How well its phase follows the
+  goal: resultant length 0.91, 0.69 and 0.42.
+- **PFL3**, reported, not judged: with a goal, PFL3's right-minus-left
+  difference varies with the bump's position by 0.73 to 1.42 Hz (0.00 to 0.03
+  without one), and the phase at which it favours the right follows the goal
+  column at a fixed offset: over the 9 columns, resultant length 0.98 in every
+  seed, 87° from the column's angle on average (0.97 to 0.98 under every lift
+  but the two glutamate ones and `all`). So the heading-against-goal
+  comparison is in the wiring and works: the heading it would hold (the
+  phase less 90°, the right turn moving the bump to falling position) is
+  within a few degrees of each column's angle from the wiring. But about 1
+  Hz of PFL3 difference, from FC2 and E-PG both at 30 Hz, is a quarter of
+  what a full odour at one antenna gives DNa02 (4 Hz), and in DNa02 it is lost
+  under the background's swings.
+
+### 4. No lift opens the way
+
+| Lift | 1a: localised while driven, held after | 1c bias: bump while biased, after | 2: moved, signal | 3: columns ≥ 2 Hz (per seed), DNa02 follows |
+| --- | --- | --- | --- | --- |
+| none | 12/12, 0.00 s | 5–6 of 8 bins, silent | 0 of 6, none | 0, 0, 0; 0.42–0.91 |
+| `nodulus` | 12/12, 0.00 s | 2–4 of 8, at 7 to 27 Hz; seed 1 still 19 Hz 1 s after | 0 of 6, none (GLNO 0 Hz under rotation) | 3, 0, 7; 0.09–0.33 |
+| `nodulus-inhibitory` | 12/12, 0.00 s | 3–5 of 8, silent | 0 of 6, none | 0, 0, 0; 0.41–0.89 |
+| `modulators` | 12/12, 0.00 s | 7 of 8, silent | 0 of 6, none | 0, 0, 0; 0.57–0.94 |
+| `glutamate-excitatory` | 0/12: the ring at 267 to 289 Hz, all 16 positions, and stays there | seizure (257 to 268 Hz) | 0 of 6 | 0, 0, 0; 0.13–0.41 |
+| `glutamate-muted` | 0/12: the ring at 196 to 201 Hz, and stays there | seizure (193 to 200 Hz) | 0 of 6 | 0, 0, 0; 0.29–0.47 |
+| `unsaturated` | 12/12, 0.00 s | 6–7 of 8, silent | 0 of 6, none | 0, 0, 0; 0.32–0.88 |
+| `no-adaptation` | 12/12, 0.00 s | 7 of 8, silent | 0 of 6, none | 0, 0, 0; 0.31–0.94 |
+| `all` | 11/12, 0.00 s; in seed 2 the ring seizes at about 100 Hz a second later | seizure (99 to 120 Hz) | 0 of 6; GLNO and the P-ENs seize (110 to 324 Hz) in some runs, either direction | 0, 0, 0; 0.12–0.80 |
+
+- **The nodulus lift.** With GLNO excitatory, DNa02 swings by 3 to 10 Hz with
+  the bump's position, goal or none, which passes the amplitude bound for 3
+  and 7 columns in two seeds but follows no goal (resultant 0.09 to 0.33).
+  Taken apart (`glno-excitatory`, added after the protocol), GLNO alone does
+  it: DNa02 swings by 3.1 to 7.1 Hz with no goal, 3, 0 and 8 columns pass
+  the amplitude bound, and its phase follows no goal (resultant 0.03 to
+  0.24); DNa02's difference spans up to 43 Hz over the bump's positions
+  (−33 to +22 Hz in all), against at most 7.3 Hz at the operating point. GLNO's loop with the
+  P-ENs (W4) can run away, as 2b catches it under `all` (GLNO and the P-ENs
+  at 110 to 324 Hz): a loop out of control, not a heading read out.
+- **Glutamate.** Made excitatory or muted, the central complex's glutamatergic
+  neurons (Delta7, ExR4–6, the FB types) no longer hold it back, and the ring
+  seizes and stays seized after the drive. As it is, their inhibition keeps
+  it silent. Between the two there is no setting of this one switch where the
+  ring holds activity and stays local.
+- **Saturation and adaptation** change nothing measurable: the bump dies as
+  fast without either, and PFL3 follows the goal as well
+  (resultant 0.98 at 86° to 88° from the column's angle in all three seeds,
+  both lifts), no more strongly.
+- **Monoamines** made fast and excitatory leave every question where it was.
+
+### 5. The eyes don't reach it
+
+A dark or light bar at any azimuth changes nothing anywhere along the
+anterior visual pathway: MeTu, TuBu01–10 and every ring neuron type read
+0.0 Hz above the ground alone, in every seed, both sides, both contrasts,
+and no E-PG fires (**fail**). The bar reaches the lamina and the medulla's
+relays (seed 1, the right eye, a dark bar at 60°: L3 12.8 Hz, L1 and L2 3.0,
+Tm9 2.1, Tm1, Tm2 and Mi1 0.7 to 0.8; a light bar: Mi1 1.6, L1 0.7; all 0
+without it), but not Dm2 or Mi15, which give MeTu1 and MeTu3c 42% and 59% of
+their input synapses (`--part wiring`, W3): both stay at 0 Hz. The MeTu cells
+do fire (MeTu1 0.4 Hz, MeTu3 0.5 there), but that is the visual background,
+which drives every visual projection neuron (brain README, Spontaneous
+behaviour), identically with and without the bar; at that rate the TuBu
+neurons stay silent. Under `all`, some ring neurons answer a bar straight ahead by 11 to
+66 Hz, as much from the far side as their own (ER2_a left 15.0 Hz at the
+contralateral 90°), where the ring is near seizure; the TuBu neurons still
+answer by 1 Hz at most.
+
+## What blocks each step
+
+In the model's own terms, from the runs above:
+
+1. **Recurrent excitation is too weak for a bump to hold itself.** The fly's
+   bump rests on local excitation around the ring (E-PG → P-EN and P-EG → E-PG)
+   and inhibition across it (Kim et al. 2017; Kakaria & de Bivort 2017). Here
+   E-PGs at 30 Hz bring their P-ENs to 1.5 to 2 Hz, and P-ENs driven to 10 to
+   21 Hz recruit no new E-PG. A P-EN → E-PG connection has 40 synapses on
+   average, 28 after saturation: one spike moves an E-PG by about 1.4 mV
+   (0.275 mV a synapse, 0.177 at the membrane's peak; brain README, The
+   operating point) against a 7 mV threshold, so it takes five P-EN spikes
+   together. Undoing saturation brings it to 2 mV and changes nothing.
+   Kakaria & de Bivort's spiking model, with the same rest and threshold,
+   held a bump indefinitely with connections of 20 unit currents each, whatever
+   the overlap: the point neuron is not what fails, the strength of the
+   loop at this operating point is, and no measurement gives the right one.
+2. **The inhibition is all or nothing.** The P-ENs' inputs include the
+   glutamatergic ExR4 (9%), Delta7 (9%) and ExR6 (7%), which fire at up to 60 Hz
+   under a bump (ExR6; ExR4 12 to 24, Delta7 0 to 7). Glutamate counted as inhibitory is right for Delta7 as far
+   as it is known (VGlut, GluClα proposed: Turner-Evans et al. 2020), though
+   Delta7 "may excite the P-EN2" there; for ExR4 and ExR6 nothing says.
+   Either way round, muted or excitatory, the ring seizes: the network has
+   no state between silent and saturated that this switch reaches.
+3. **The turn signal is muted, and wouldn't arrive.** GLNO, the P-ENs' largest
+   input (21%), has no transmitter here or in FlyEM's call ("unclear"), and
+   Hulse et al. give none. Given one, it still doesn't fire under rotation:
+   PS196_b's 5 to 7 Hz, one way only, don't bring it to threshold. Given
+   acetylcholine, its loop with the P-ENs (3,500 synapses one way, 16,400 the
+   other) runs away when the bump sits at some positions.
+4. **The eyes stop in the medulla.** Dm2 and Mi15, MeTu's main inputs, don't
+   answer a bar, so no position reaches the tubercle or the ring neurons; and
+   the ring neurons' synapses onto the E-PGs carry no map of the world, which
+   in a fly experience writes there by plasticity this model doesn't have
+   (Fisher et al. 2019; Kim et al. 2019).
+5. **The read-out is there but faint.** PFL3 → DNa02 is direct (356 and 380
+   synapses), as in the fly (Rayshubskiy et al. 2025), and PFL3's difference
+   follows the goal as Mussells Pires et al. (2024) and Westeinde et al.
+   (2024) describe; at 1 Hz it can't compete with the visual projection
+   neurons' direct drive of DNa02, which is all the steering this model has.
+6. **Monoamines** (EL, ExR2, ExR3, PFGs, PFR_a and FB types, muted for being
+   slow) don't stand in the way of any of it.
+
+## Recommendation: no-go
+
+By the rule fixed before measuring: question 1 fails under every lift, `all`
+included, and so does question 3. A follow-up that gave the fly a heading
+the brain itself keeps can't be built on this operating point. A bump would
+have to be held by something outside the network, which the project's rules
+don't allow, or the central complex's loop strengthened by a factor nobody
+has measured, which they don't allow either.
+
+What would decide it, if anyone takes it up again:
+
+- **A measured strength for the ring's recurrent synapses**, or E-PG and P-EN
+  rates in a bump to fit the loop against (no E-PG rate in Hz was found;
+  P-ENs fire at 3.9 Hz standing and change by 5.6 Hz with turning:
+  Turner-Evans et al. 2017). The optic lobe's graded relays got a factor
+  derived from one relay's response (brain README, The operating point); a
+  stand-in for the E-PG → P-EN → E-PG loop would need a measurement of the same
+  kind, and a fix for the seizures that appear once its inhibition gives
+  way.
+- **GLNO's transmitter.** The P-ENs' turn input hangs on it.
+- **Dm2 and Mi15 answering light**, so the anterior visual pathway carries a
+  bar's position, and ring neuron plasticity to map it onto the ring.
+- **What the body would send**: the fly's own turning, as the sense a fly has
+  of it (the visual rotation it already sees, and the proprioceptive and
+  efference signals that reach the noduli in a fly, which the data doesn't
+  identify beyond PS196_b's inputs), would have to reach GLNO; nothing it sends
+  now does.
+
+The finding worth keeping: PFL3's comparison works. If a heading were ever
+held, the goal-directed steering read out from it would point the right way.
+
+## Changes after the protocol
+
+- **1b and 1c as written could show nothing.** The diagnostic inputs fire
+  their neurons directly (brain README, Neuron model), so an evenly forced ring
+  can't be shaped by inhibition or recurrence. Both are reported as written,
+  and again with the even drive given as a depolarisation (the bias whose
+  mean rate came nearest the protocol's 10 Hz, from 7.5, 8, 9 and 10 mV; the
+  script prints the calibration). Their criteria are unchanged; they had
+  none to pass.
+- **1d** (a kick on a ring depolarised below threshold) was added to see how
+  far the ring is from holding a bump.
+- **PFL3's own phase-following** is printed beside DNa02's in question 3
+  (`steer`); the runs were repeated to print it, with the same results.
+- **`glno-excitatory`** was added to tell apart the nodulus lift's two
+  changes.
+- The first launch of the runs started all 20 at once; it was stopped and
+  run again four at a time. Nothing from it is reported.
 
 ## Reproducing
 
