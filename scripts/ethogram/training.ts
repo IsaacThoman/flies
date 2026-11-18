@@ -146,7 +146,7 @@ export async function trainingTrial(
     const swooping = t - swoopStart < swoop.seconds ? t - swoopStart : null;
     // A swoop is drawn every frame, as the game refreshes a fly's eyes while something comes at it (URGENT_HZ).
     if (k % every === 0 || swooping !== null) look(swooping);
-    life.step(DT, t * 1000);
+    life.step(DT, performance.now());
     if (life.eating) training.eating += DT;
     if (k % 100 === 99) await checkpoint();
   }
@@ -158,7 +158,7 @@ export async function trainingTrial(
     if (life.body.onFeet && on(pieces[0], x, z)) test.onTrained += DT;
     if (life.body.onFeet && on(pieces[1], x, z)) test.onOther += DT;
     if (k % every === 0) look(null);
-    life.step(DT, t * 1000);
+    life.step(DT, performance.now());
     if (k % 100 === 99) await checkpoint();
   }
   const time = test.onTrained + test.onOther;

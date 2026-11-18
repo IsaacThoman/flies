@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PIECE_LIGHT, SCENE, arenaPieces, draw, summarizeTraining } from '../../../scripts/ethogram/training.ts';
+import { existsSync } from 'node:fs';
+import { Behavior } from '../src/behavior.ts';
+import { brainData } from '../../../scripts/fuzz/brain.ts';
+import { DEFAULT_CONNECTOME_PATH } from '../../brain/src/node.ts';
+import { PIECE_LIGHT, SCENE, arenaPieces, draw, summarizeTraining, trainingTrial } from '../../../scripts/ethogram/training.ts';
 import type { TrainingTrial } from '../../../scripts/ethogram/training.ts';
 
 test("the kit's colours are bright, middling and dark to a fly, as the kit means them to be", () => {
@@ -40,4 +44,21 @@ test('the training summary pairs each fly with learning against the same fly wit
   assert.equal(summary.pairedDifference, 0.5);
   assert.equal(summary.identicalPairs, 0);
   assert.deepEqual(summary.synapsesChanged, [3]);
+});
+
+test('training and test phases age brain commands on the driver clock', { skip: !existsSync(DEFAULT_CONNECTOME_PATH) }, async (t) => {
+  // The driver stamps synchronous commands with performance.now, far from assay time.
+  t.mock.method(performance, 'now', () => 1_000_000);
+  const update = Behavior.prototype.update;
+  const ages: number[] = [];
+  t.mock.method(Behavior.prototype, 'update', function (this: Behavior, ...args: Parameters<Behavior['update']>) {
+    ages.push(args[1]);
+    const intent = update.apply(this, args);
+    assert.ok(intent.live);
+    return intent;
+  });
+  const result = await trainingTrial(brainData(), 1, 'dish-blue', 'dish-yellow', 'sugar', true, async () => {}, 6, { trainSeconds: 0.02, testSeconds: 0.02, swoopEvery: 10 });
+  assert.equal(result.training.seconds, 0.02);
+  assert.equal(result.test.seconds, 0.02);
+  assert.deepEqual(ages, [0, 0, 0, 0]);
 });
