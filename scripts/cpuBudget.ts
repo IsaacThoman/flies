@@ -58,7 +58,8 @@
 // the core back up before measuring.
 //
 // Three contended attempts skip locally with an explicit rerun message; in CI
-// they fail with that reason. Functional assertions
+// they fail with that reason, and scripts/budgets.ts runs the file again a few
+// minutes later, for a host slow for longer than the attempts. Functional assertions
 // and measurement errors always fail. Only this thread's CPU counts, not helpers.
 //
 // After a change of Node that moves the reference, `node scripts/cpuBudget.ts`
@@ -171,6 +172,9 @@ async function untilQuiet(watch: typeof watchOthers, wait: (ms: number) => Promi
   return false;
 }
 
+/** How a measurement contended on every attempt begins its message, which scripts/budgets.ts looks for. */
+export const CONTENDED = "machine too busy to measure";
+
 type Measurement<T> = {
   value: T;
   references: readonly number[];
@@ -222,7 +226,7 @@ export async function measureBudget<T>(t: BudgetContext, measure: () => Measurem
     reason = busy;
     t.diagnostic(`CPU measurement ${attempt}/3 contended: ${reason}`);
   }
-  const message = `machine too busy to measure; rerun when idle (${reason}; 3 attempts)`;
+  const message = `${CONTENDED}; rerun when idle (${reason}; 3 attempts)`;
   if (ci) throw Error(message);
   t.skip(message);
   return undefined;

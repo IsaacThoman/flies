@@ -29,11 +29,13 @@ the rules the whole thing is built on.
 - Tests wait on game time or canvas state, not wall-clock sleeps. Speed budgets
   are in M5 Pro CPU time: this thread's CPU time, scaled by a reference load
   run beside it (`scripts/cpuBudget.ts`). They live in `*.budget.ts` files,
-  which `npm test` runs one at a time after the rest. Contended measurements,
-  including any taken while other processes keep more than a core busy,
-  retry three times, each after waiting for the machine to go quiet, then skip
-  locally (rerun when idle) or fail explicitly in CI; `scripts/cpuBudget.ts`
-  states the acceptance bounds.
+  which `npm test` runs one at a time after the rest (`scripts/budgets.ts`).
+  Contended measurements, including any taken while other processes keep more
+  than a core busy, retry three times, each after waiting for the machine to go
+  quiet, then skip locally (rerun when idle) or fail explicitly in CI, where a
+  file whose only failures are that contention runs again, three runs in all,
+  two minutes apart. Any other failure, over budget included, fails at once;
+  `scripts/cpuBudget.ts` states the acceptance bounds.
   The brain chooses: observe its inputs and commands, and bound retries for its choices.
 - Comments say why, not what. No dead code, no leftover experiments.
 - Shut down what you start as soon as you no longer need it: dev and
