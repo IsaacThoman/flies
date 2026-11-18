@@ -73,6 +73,8 @@ class Connectome {
   const uint8_t* count_ = nullptr;
   std::array<const uint8_t*, kCategories> codes_{};
   std::array<std::vector<std::string>, kCategories> tables_;
+  // How many neurons have each code of each column.
+  std::array<std::vector<uint32_t>, kCategories> code_counts_;
 };
 
 }  // namespace fly

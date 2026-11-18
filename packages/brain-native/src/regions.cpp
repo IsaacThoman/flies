@@ -127,9 +127,17 @@ std::vector<uint8_t> of(const Connectome& connectome) {
   std::unordered_map<std::string, uint8_t> index;
   for (size_t k = 0; k < ids().size(); k++) index.emplace(ids()[k], static_cast<uint8_t>(k));
   std::vector<uint8_t> out(connectome.neurons());
+  // A region follows from the annotations alone, and few neurons' differ: 24,000 sets among 167,000 neurons.
+  std::unordered_map<uint64_t, uint8_t> known;
   for (uint32_t i = 0; i < connectome.neurons(); i++) {
-    out[i] = index.at(id_of({connectome.value(kSuperClass, i), connectome.value(kClass, i), connectome.value(kSubClass, i), connectome.value(kType, i),
-                             connectome.value(kSide, i)}));
+    uint64_t key = 0;
+    for (Category column : {kType, kSuperClass, kClass, kSubClass, kSide}) key = key * connectome.table(column).size() + connectome.code(column, i);
+    const auto [at, added] = known.try_emplace(key, 0);
+    if (added) {
+      at->second = index.at(id_of({connectome.value(kSuperClass, i), connectome.value(kClass, i), connectome.value(kSubClass, i), connectome.value(kType, i),
+                                   connectome.value(kSide, i)}));
+    }
+    out[i] = at->second;
   }
   return out;
 }

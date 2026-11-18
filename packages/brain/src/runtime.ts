@@ -122,7 +122,7 @@ export class FlyBrain implements Brain {
     }
     // Every region is reported, after the readouts, whether or not it has neurons (an empty one stays at 0).
     this.regions = regionOf(connectome);
-    for (const r of this.regions) this.#regionSizes[r]++;
+    for (let i = 0; i < this.regions.length; i++) this.#regionSizes[this.regions[i]]++;
     this.sim.setPartition(this.regions, REGIONS.length);
     for (const name of REGION_RATE_NAMES) this.rates[name] = 0;
     // The eyes come after every other input but the senses added since
