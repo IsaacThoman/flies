@@ -65,6 +65,14 @@ const BODY_RADIUS = reachOf(BODY_REACH);
 const FEET_RADIUS = Math.max(BODY_RADIUS, reachOf(FEET_REACH));
 /** The underside of its thorax over its feet, in body lengths. */
 export const BODY_LOW = 0.18;
+/**
+ * How far (mm) up and down from where it stands a foot reaches ground. Up a
+ * slope steeper than it reaches, a foot is as high as it reaches (#clear keeps
+ * its feet out of what is steeper than a slope); over lower ground, it hangs,
+ * as over a ledge.
+ */
+export const FOOT_UP = FLY_LENGTH;
+export const FOOT_DOWN = FLY_HEIGHT;
 /** Highest step (mm) its legs take in their stride. */
 export const STEP_UP = 0.9;
 /** A drop deeper than this (mm) is a ledge it falls from. */
@@ -153,8 +161,10 @@ export class FlyBody {
   /** Velocity, mm/s: through the air when airborne, over the surface when walking. */
   readonly velocity = v3();
   mode: BodyMode = "standing";
-  /** The surface's normal under its feet, eased, for tilting the pose. */
+  /** The tilt of the ground its feet stand on (#stance), eased, for tilting the pose. */
   readonly up = v3(0, 1, 0);
+  /** How far its legs hold its body over where it stands, along `up` (#stance), eased, mm: for placing the pose. */
+  lift = 0;
   /** The surface it stands on. */
   readonly surface: Surface = createSurface();
   /** Pressed against something it is facing (its head is at a wall). */
@@ -194,6 +204,11 @@ export class FlyBody {
   #flightOrigin = v3();
   #flightDir = v3();
   #flightHit: RayHit = { point: v3(), normal: v3(), solid: -1, t: 0 };
+  /** The ground's tilt under its feet, and where and facing which way it was found (y NaN: not yet). */
+  #ground = v3(0, 1, 0);
+  #groundLift = 0;
+  #groundAt = v3(NaN);
+  #groundYaw = 0;
 
   /** Standing at `start`: on the surface there at or below its `y` (the highest, if left out). */
   constructor(world: World, start: { x: number; z: number; yaw: number; y?: number }) {
@@ -250,7 +265,7 @@ export class FlyBody {
     this.#cleared.y = NaN;
     this.events.tookOff = this.events.jumped = this.events.landed = false;
     this.events.hit = 0;
-    this.#easeUp(this.surface.normal, 1);
+    this.#easeUp(this.#stance(), this.#groundLift, 1);
   }
 
   step(intent: Intent, forces: Forces, dt: number) {
@@ -315,7 +330,7 @@ export class FlyBody {
     this.velocity.x = mx / dt;
     this.velocity.y = 0;
     this.velocity.z = mz / dt;
-    this.#easeUp(this.surface.normal, dt);
+    this.#easeUp(this.#stance(), this.#groundLift, dt);
   }
 
   /**
@@ -818,7 +833,7 @@ export class FlyBody {
         p.y = under.y;
         if (v.y < 0) v.y = 0;
         this.groundSpeed = 0;
-        this.#easeUp(levelUp, dt);
+        this.#easeUp(levelUp, 0, dt);
         return;
       }
       if (under.normal.y >= MAX_SLOPE_COS) {
@@ -828,7 +843,7 @@ export class FlyBody {
         this.mode = "standing";
         this.events.landed = true;
         copySurface(under, this.surface);
-        this.#easeUp(under.normal, 1);
+        this.#easeUp(this.#stance(), this.#groundLift, 1);
         return;
       }
       // Too steep to stand on: slides off it.
@@ -871,7 +886,7 @@ export class FlyBody {
     }
     this.groundSpeed = 0;
     // In the air its "up" follows level flight.
-    this.#easeUp(levelUp, dt);
+    this.#easeUp(levelUp, 0, dt);
   }
 
   /** Moves it level by (mx, mz) in the air, if nothing is in the way and there is room for its body there. */
@@ -901,7 +916,86 @@ export class FlyBody {
     return Math.max(s.y, Math.min(to, s.underside - FLY_HEIGHT));
   }
 
-  #easeUp(normal: Vec3, dt: number) {
+  /**
+   * The ground under its six feet (FEET_REACH), as its legs would set its
+   * body on it: the plane nearest where they stand, into #ground (its tilt)
+   * and #groundLift (how far over its feet that plane is at its middle, if it
+   * is over them). The slope at its middle alone would tilt its whole body to
+   * the flank of a dewdrop smaller than it, sinking the side whose feet are on
+   * the table into it; and tilted about its middle, with feet up on something
+   * to one side, the feet on the other would be under the table. A foot over
+   * ground lower than it reaches (FOOT_DOWN) hangs, as over a ledge, and has
+   * no say; with too few down to say, the slope at its middle.
+   */
+  #stance(): Vec3 {
+    const p = this.position;
+    const at = this.#groundAt;
+    const g = this.#ground;
+    if (at.x === p.x && at.y === p.y && at.z === p.z && this.#groundYaw === this.yaw) return g;
+    at.x = p.x;
+    at.y = p.y;
+    at.z = p.z;
+    this.#groundYaw = this.yaw;
+    const s = Math.sin(this.yaw);
+    const c = Math.cos(this.yaw);
+    const L = FLY_LENGTH;
+    const world = this.#world;
+    const top = p.y + FOOT_UP;
+    // Least squares for height = a·ahead + b·left + h0 over its feet, in mm from its middle.
+    let n = 0;
+    let su = 0;
+    let sv = 0;
+    let sh = 0;
+    let suu = 0;
+    let svv = 0;
+    let suv = 0;
+    let suh = 0;
+    let svh = 0;
+    for (let k = 0; k < FEET_REACH.length; k += 2) {
+      const u = FEET_REACH[k] * L;
+      const v = FEET_REACH[k + 1] * L;
+      const fx = p.x + s * u + c * v;
+      const fz = p.z + c * u - s * v;
+      const ground = world.heightAt(fx, fz, top);
+      // Under ground higher than it reaches (in a fruit's side, not under it), as high as it reaches.
+      const h = (world.underside(fx, fz, ground) < top ? top : ground) - p.y;
+      if (!(h >= -FOOT_DOWN)) continue;
+      n++;
+      su += u;
+      sv += v;
+      sh += h;
+      suu += u * u;
+      svv += v * v;
+      suv += u * v;
+      suh += u * h;
+      svh += v * h;
+    }
+    // The normal equations, by Cramer's rule.
+    const det = suu * (svv * n - sv * sv) - suv * (suv * n - sv * su) + su * (suv * sv - svv * su);
+    if (n < 3 || !(Math.abs(det) > 1e-9)) {
+      g.x = this.surface.normal.x;
+      g.y = this.surface.normal.y;
+      g.z = this.surface.normal.z;
+      this.#groundLift = 0;
+      return g;
+    }
+    const a = (suh * (svv * n - sv * sv) - suv * (svh * n - sv * sh) + su * (svh * sv - svv * sh)) / det;
+    const b = (suu * (svh * n - sv * sh) - suh * (suv * n - sv * su) + su * (suv * sh - svh * su)) / det;
+    const h0 = (suu * (svv * sh - svh * sv) - suv * (suv * sh - svh * su) + suh * (suv * sv - svv * su)) / det;
+    // Its slope ahead and to its left, in the world's x and z.
+    const gx = s * a + c * b;
+    const gz = c * a - s * b;
+    const length = Math.hypot(gx, 1, gz);
+    g.x = -gx / length;
+    g.y = 1 / length;
+    g.z = -gz / length;
+    // Square to the plane; never lower than its feet, which would put its middle into what it stands on.
+    this.#groundLift = Math.max(0, h0) * g.y;
+    return g;
+  }
+
+  /** Eases its tilt toward `normal` and its body to `lift` over its feet. */
+  #easeUp(normal: Vec3, lift: number, dt: number) {
     const k = dt >= 1 ? 1 : ease(10, dt);
     const u = this.up;
     u.x += (normal.x - u.x) * k;
@@ -911,6 +1005,7 @@ export class FlyBody {
     u.x /= l;
     u.y /= l;
     u.z /= l;
+    this.lift += (lift - this.lift) * k;
   }
 }
 

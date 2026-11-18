@@ -114,11 +114,12 @@ export class OrbitRig {
   readonly #armV = new Float64Array(1);
   #held = Infinity;
   #clearFor = 0;
-  /** The lowest pitch the way lets it look from, on a spring (PITCH[0]: anywhere), the spring's speed, where the way last wanted it, and how long until it looks again (s). */
+  /** The lowest pitch the way lets it look from, on a spring (PITCH[0]: anywhere), the spring's speed, where the way last wanted it, how long until it looks again (s), and whether it last looked for higher and found nowhere. */
   #floor: number = PITCH[0];
   readonly #floorV = new Float64Array(1);
   #floorHeld: number = PITCH[0];
   #lookIn = 0;
+  #nowhere = false;
   /** Where the turn and the fly are taking it a moment from now, this frame: the fly's velocity, how long ahead it gets (s), how far round and up the turn takes it (rad); `#ahead` < 0: neither is moving. */
   #vx = 0;
   #vy = 0;
@@ -258,6 +259,7 @@ export class OrbitRig {
     this.#floor = this.#floorHeld = PITCH[0];
     this.#floorV[0] = 0;
     this.#lookIn = 0;
+    this.#nowhere = false;
     this.#started = true;
   }
 
@@ -327,11 +329,14 @@ export class OrbitRig {
     if (!this.#started) {
       this.#floorHeld = PITCH[0];
       this.#lookIn = 0;
+      this.#nowhere = false;
     } else this.#lookIn -= dt;
-    if (this.#lookIn <= 0 && (room < open || this.#floorHeld > PITCH[0])) {
-      const closed = room < open;
+    const closed = room < open;
+    // Waiting to look lower again doesn't hold up looking higher: it would come in meanwhile.
+    if ((this.#lookIn <= 0 || (closed && !this.#nowhere)) && (closed || this.#floorHeld > PITCH[0])) {
       const need = closed ? this.#higher(distance, near, open) : this.#lower(distance, near, room - 1e-3);
       if (need >= 0) this.#floorHeld = need;
+      this.#nowhere = closed && need < 0;
       this.#lookIn = closed && need >= 0 ? 0 : CLEAR_FOR;
     }
     if (this.#floorHeld > PITCH[0] || this.#floor > PITCH[0]) {
@@ -349,10 +354,12 @@ export class OrbitRig {
         this.#floor = PITCH[0];
         fv[0] = 0;
       }
-      room = this.#room(this.#floor, distance, near);
+      // How far out the way lets it be from where it is rising to: rising clears it, so it doesn't come in as well.
+      room = this.#room(Math.max(this.#floor, this.#floorHeld), distance, near);
     }
     let pitch = Math.max(this.#pitch, this.#floor);
-    // Something in the way: the nearest it has let the camera be, until it has been clear farther out for a moment.
+    // Something in the way: the nearest it has let the camera be, until it has been clear farther out for a moment, from as
+    // high as it is rising to (going out on the way up and back in as the turn goes on would have it in and out).
     const clear = room >= distance - 1e-4;
     if (!this.#started) {
       this.#held = clear ? Infinity : room;
@@ -360,28 +367,38 @@ export class OrbitRig {
     } else if (!clear && room <= this.#held) {
       this.#held = room;
       this.#clearFor = 0;
-    } else if (this.#held !== Infinity && (this.#clearFor += dt) >= CLEAR_FOR) this.#held = clear ? Infinity : room;
+    } else if (this.#held !== Infinity && this.#floor >= this.#floorHeld - 1e-3 && (this.#clearFor += dt) >= CLEAR_FOR) this.#held = clear ? Infinity : room;
     const allowed = Math.min(this.#held, distance);
     let reach = Math.min(this.#arm, distance);
     const v0 = this.#armV;
     if (!this.#started) {
       reach = allowed;
       v0[0] = 0;
-    } else if (Math.abs(allowed - reach) > 1e-4 || Math.abs(v0[0]) > 1e-3) reach = Math.min(distance, damp(reach, allowed, v0, 0, allowed < reach ? PULL_IN : LET_OUT, dt));
-    // Faster than it could come in (a landing, something thrown in the way): in front of what it would be in, at once.
+    } else if (Math.abs(allowed - reach) > 1e-4 || Math.abs(v0[0]) > 1e-3) {
+      reach = Math.min(distance, damp(reach, allowed, v0, 0, allowed < reach ? PULL_IN : LET_OUT, dt));
+      // Still coming in quickly where it has to stop: a spring would carry it past, on through the fly.
+      if (reach < CLOSEST) {
+        reach = CLOSEST;
+        v0[0] = 0;
+      }
+    }
+    // Faster than it could come in (a landing, something thrown in the way): in front of what it would be in, at once, and at rest there.
     if (!this.#clearAt(this.#yaw, pitch, reach, fov)) {
       reach = this.#fit(pitch, Math.min(reach, this.#free(t.x, t.y, t.z, this.#yaw, pitch, distance, near)), fov);
-      if (!this.#fits) {
-        // Not even nearest: as little higher as it can be anywhere at all, at once.
+      v0[0] = 0;
+      if (!this.#fits || reach < open) {
+        // Nearer than the player can zoom, or not even nearest: as little higher as leaves it as far out as the player
+        // can zoom, at once; or failing that and not even nearest, as little higher as it can be anywhere at all.
+        const fitted = this.#fits;
         for (let rise = pitch + RISE_STEP; rise < PITCH[1] + RISE_STEP; rise += RISE_STEP) {
           const higher = Math.min(PITCH[1], rise);
           const there = this.#fit(higher, this.#free(t.x, t.y, t.z, this.#yaw, higher, distance, near), fov);
-          if (this.#fits) {
+          if (this.#fits && (there >= open || !fitted)) {
             pitch = this.#floor = this.#floorHeld = higher;
             this.#floorV[0] = 0;
             this.#lookIn = CLEAR_FOR;
             reach = there;
-            break;
+            if (there >= open) break;
           }
         }
       }
