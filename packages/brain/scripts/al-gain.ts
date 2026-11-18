@@ -7,15 +7,22 @@
 //
 //   node packages/brain/scripts/al-gain.ts --part rest [--seeds 1,2,3] [--mechanisms R,N0,B]
 //   node packages/brain/scripts/al-gain.ts --part gains
+//   node packages/brain/scripts/al-gain.ts --part drive
 //
 // (rest) each mechanism's broad local neurons, MZ_lv2PN, uniglomerular
 //     projection neurons, Kenyon cells and every local neuron at rest, and
 //     whether it passes the protocol's criteria.
 // (gains) each mechanism's gain on each antenna at rest and under ethyl
 //     acetate at full strength.
+// (drive) why, added after the rest measurements, descriptive: each broad
+//     local neuron family's ORN partners, the drive one ORN spike gives it
+//     (mV, after saturation and completeness), and the mean synaptic drive
+//     the ORNs' resting rates hold it at (each partner's mV x its rate x
+//     tauSyn), against the 7 mV threshold.
 import assert from "node:assert/strict";
 import { parseArgs } from "node:util";
 import { readConnectomeFile } from "../src/node.ts";
+import { OPERATING_POINT, buildWeights } from "../src/params.ts";
 import { ODORANTS, odorOf, ornRate } from "../src/olfaction.ts";
 import type { OrnGroup } from "../src/olfaction.ts";
 import { ORN_TABLE } from "../src/orn-table.ts";
@@ -24,7 +31,7 @@ import { RESTING_SENSES } from "../src/types.ts";
 import type { BrainSenses } from "../src/types.ts";
 
 const { values } = parseArgs({ options: { part: { type: "string" }, seeds: { type: "string", default: "1,2,3" }, mechanisms: { type: "string", default: "R,N,N0,B" } } });
-assert(values.part === "rest" || values.part === "gains", "--part rest or gains");
+assert(["rest", "gains", "drive"].includes(values.part ?? ""), "--part rest, gains or drive");
 
 /** Olsen, Bhandawat & Wilson 2010 (Neuron 66: 287): σ, Hz; m, VM7's (their simulations' default); the field potential's ORN sum divided by 190. */
 const OLSEN = { sigma: 12, m: 10.63, lfp: 190, exponent: 1.5 } as const;
@@ -80,7 +87,40 @@ function brainWith(seed: number, mechanism: Mechanism) {
   return { b, tick };
 }
 
-if (values.part === "gains") {
+if (values.part === "drive") {
+  const { b } = brainWith(1, "R");
+  const weights = buildWeights(c, OPERATING_POINT);
+  const rateOf = new Float64Array(c.neurons).fill(-1);
+  for (const group of b.smell) for (const i of group.neurons) rateOf[i] = group.spontaneous;
+  const families: [string, RegExp][] = [
+    ["il3LN6", /^il3LN6$/],
+    ["lLN2F", /^lLN2F_/],
+    ["lLN2T", /^lLN2T_/],
+    ["lLN2P", /^lLN2P_/],
+    ["uPN", /_(ad|l|v|lv)PN$/],
+  ];
+  const member = new Int8Array(c.neurons).fill(-1);
+  for (let i = 0; i < c.neurons; i++) families.forEach(([, re], k) => re.test(c.columns.type.value(i)) && (member[i] = k));
+  const stats = families.map(() => ({ neurons: 0, partners: 0, raw: 0, mV: 0, drive: 0 }));
+  for (let k = 0; k < families.length; k++) for (let i = 0; i < c.neurons; i++) if (member[i] === k) stats[k].neurons++;
+  for (let i = 0; i < c.neurons; i++) {
+    if (rateOf[i] < 0) continue;
+    for (let e = c.ptr[i]; e < c.ptr[i + 1]; e++) {
+      const k = member[c.post[e]];
+      if (k < 0) continue;
+      const mV = weights.network.count[e] * weights.gain[i];
+      stats[k].partners++;
+      stats[k].raw += c.count[e];
+      stats[k].mV += mV;
+      // Each spike adds its mV to the drive, which decays over tauSyn: at a steady rate its mean is mV x rate x tauSyn.
+      stats[k].drive += mV * rateOf[i] * (OPERATING_POINT.neuron.tauSyn / 1000);
+    }
+  }
+  for (const [k, [name]] of families.entries()) {
+    const s = stats[k];
+    console.log(`${name.padEnd(7)} ${s.neurons} neurons; ORN partners ${(s.partners / s.neurons).toFixed(0)} each, ${(s.raw / s.neurons).toFixed(0)} synapses; ${(s.mV / s.partners).toFixed(2)} mV a partner's spike; mean drive at rest ${(s.drive / s.neurons).toFixed(0)} mV (threshold 7)`);
+  }
+} else if (values.part === "gains") {
   const { b } = brainWith(1, "R");
   for (const mechanism of MECHANISMS) {
     for (const [what, strength] of [["rest", 0], ["ethyl acetate 1", 1]] as const) {

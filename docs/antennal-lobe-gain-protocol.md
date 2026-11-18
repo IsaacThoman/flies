@@ -85,3 +85,39 @@ file, the script and the result stay. If one passes, whether resting smell
 should be on by default is decided on the measurements above and its cost,
 and only then is `scripts/resting.ts` run to ask, by the criteria that script
 already fixes, whether the made-up visual background could be smaller.
+
+## Result
+
+Measured on the commit that added this file, as written; nothing above was
+changed afterwards. Every mechanism fails at rest on criterion 1, in every
+seed, so none was taken further (`al-gain.ts --part rest`, seeds 1 to 3; each
+family's mean, Hz; the projection neurons' mean and median; the Kenyon cells'
+mean):
+
+| Mechanism | Release at rest | il3LN6 | lLN2F | lLN2T | lLN2P | MZ_lv2PN | uPN mean, median | KC |
+|---|---|---|---|---|---|---|---|---|
+| R, resting firing alone | ×1 | 304–306 | 199–200 | 41 | 14 | 116–117 | 8.7–8.8, 0 | 0.038–0.039 |
+| N, as published | ×1 | 304–306 | 199–200 | 41 | 14 | 116–117 | 8.7–8.8, 0 | 0.038–0.039 |
+| N₀, resting rates counted in | ×0.52 | 225–227 | 119–120 | 22 | 6.2 | 66–67 | 3.7, 0 | 0.002 |
+| B, the bound | ×0.40 | 198–199 | 93 | 16 | 4.7 | 51–52 | 2.6, 0 | 0–0.00002 |
+
+N is R at rest, spike for spike, as the protocol said it would be: its rates
+are odour-evoked. Under ethyl acetate at full strength N would scale release
+×0.26 and N₀ ×0.19, but neither passed at rest.
+
+Why, from the wiring (`al-gain.ts --part drive`, added after these runs and
+descriptive): at the recorded resting rates the ORNs hold the mean synaptic
+drive (each partner's weight × its rate × the 5 ms synaptic time constant) of
+each il3LN6 at 649 mV, each lLN2F at 277, each lLN2T at 90 and each lLN2P at
+29, against a 7 mV threshold; a uniglomerular projection neuron's at 21.
+il3LN6 sums 35,000 synapses from 1,600 ORNs, 5.9 mV a spike. A gain control
+at the terminals of any measured size leaves the broad local neurons tens of
+times over threshold. What keeps a fly's at a few hertz is their
+compartmentalised dendrites, which a point neuron can't hold and for which no
+measured constant was found.
+
+So the model is unchanged: `restingSmell` stays off, the made-up visual
+background stays as it is, and `scripts/resting.ts` was not run, since that
+step was conditional on a mechanism passing.
+
+<!-- docs-check: base packages/brain -->
