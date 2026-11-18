@@ -716,6 +716,22 @@ Not reached at all: the small-object detectors (LC11, LC10, LC17), and anything 
 
 **`stats.rates`** gains, per eye, `vision.lamina`, `vision.medulla` (Mi1, Tm3, Mi4, Mi9, Tm1, Tm2, Tm4, Tm9), `vision.T4/T5`, `vision.lobula` (the LC, LPLC, LLPC and LPC types but the looming detectors), `vision.looming` (LPLC2, LC4) and `vision.tangential` (HS, VS), each as `vision.<stage> left` or `right`, in that order, smoothed over 100 ms. They are for display and feed no command. The lamina's is the driven cells' own rate, the looming detectors are also what `loomLeft` and `loomRight` drive, and the lobula's and tangential cells' rates include the background.
 
+### Which way it jumps
+
+A fly jumps away from a loom: about 200 ms before take-off it shifts its centre of mass so that its middle legs' push carries it away from the stimulus, a plan made whether or not it then jumps (Card & Dickinson 2008, Curr. Biol. 18:1300). Dombrovski et al. (2023, Nature 613:534) found how the direction gets there. LC4 makes graded synapses onto two looming-sensitive descending neurons: its anterior cells more onto DNp02, its posterior cells more onto DNp11, along the eye's front-to-back axis (FAFB and the hemibrain, Fig. 2: the counts one LC4 makes onto the two are anticorrelated). Activating DNp02 leans the fly backward, and with DNp04 it takes off backward; DNp11 leans it forward and it takes off forward (Fig. 1). Silencing either spoils the direction of looming-evoked take-offs (Extended Data Fig. 2). Recorded, DNp02 fired 44 spikes to anterior looms against 13 to posterior ones, DNp11 the reverse; the giant fiber and DNp04 had no front-to-back tuning (Fig. 3). The gradient is LC4's: LPLC2 doesn't synapse onto DNp02 or DNp11, here or in their data. Whether the left and right DNs of one type also vote for a sideways jump is the paper's speculation, not a finding (Discussion).
+
+The male CNS carries the same gradient: across each side's LC4 (71 left, 55 right), the synapses each makes onto its side's DNp02 and DNp11 are anticorrelated (Spearman −0.65 left, −0.73 right; with DNp04, −0.09 and 0.04). Today the body picks the jump's direction from the game's knowledge of the ball (`packages/body/src/motion.ts`, `threat`). Whether the model's DNp02 and DNp11 can replace that is measured with `node packages/brain/scripts/escape-direction.ts`.
+
+**Protocol, fixed before measuring.** Eyes open, a dark disc on white looms (half-size over speed 40 ms, the battery's) from the front (azimuth 0), behind (180), the left (−90), the right (90) and above (elevation 90), and within each eye from its front (±30) and its rear (±130), the span over which Dombrovski et al.'s model of the gradient holds (30 to 130 degrees). Each eye sees from 9 degrees across the midline to 152 degrees back, so a loom from behind reaches both eyes' rear. Seeds 1 to 6, each from 1 s of the white ground. The endpoint is each side's DNp01, DNp02, DNp04 and DNp11 mean rate per neuron over the 200 ms before `escape` first reaches the body's take-off threshold (0.4), or before contact if it never does. A side's forward-backward index is its DNp11 minus its DNp02, in Hz: positive leans it forward.
+
+- (i) Within each eye, rear minus front, on that eye's side: the index is higher for the loom at its rear than at its front in all six seeds, by a mean more than twice its standard deviation across seeds. Judged for each eye separately, since the left eye's looming pathway is weaker (Seeing, Left and right differ).
+- (ii) Behind minus front, both sides' indices summed: the same test.
+- (iii) Read as a sign, with no offset fitted: the summed index is negative (backward) for the loom from the front and positive (forward) for the loom from behind, each in at least 5 of the 6 seeds.
+
+The forward-backward direction counts as carried if (i) holds for both eyes and (ii) holds; if (i) holds for one eye only, it is carried for that side only, and not read, since the jump would then go the wrong way for looms on the other. It is read as a command only if (iii) holds too. Then the jump goes forward or backward along the fly's heading by the sign of the summed index, with no knowledge of the ball. With nothing to tell the two apart (the index at 0), the fly jumps forward, as one whose posture is not shifted does (Dombrovski et al., the giant fiber's slight forward bias). With the eyes shut there is no picture, only the hand-wired looming input on each side, which drives every LC4 of an eye alike; the body then reads the same command, and the script reports what it gives (`pulse left`, `pulse right`, `pulse both`).
+
+Sideways is not a criterion and is not read whatever it shows, since no published finding gives the left and right DNs' difference a function. The script reports each side's four types together, right minus left, for the side looms and pulses.
+
 ## Commands
 
 Each command is read from a group's mean firing rate, smoothed exponentially, divided by the rate at which the command reaches 1 and clamped. `stats.rates` reports the smoothed rates by group name.
@@ -1386,6 +1402,8 @@ divergence assays, `scripts/olfaction-kc.ts` the Kenyon cells' answers (Smell).
 `node packages/brain/scripts/eyes.ts --columns <xlsx>` regenerates `src/eye-columns.ts` (The eyes).
 
 `node packages/brain/scripts/fingertip.ts [--skins 0.69,0.05] [--speeds 600,15] [--azimuth 0]` slides a fingertip-sized disc of each light (a fraction of the table's) at the fly and prints the looming detectors' peak, the giant fiber, the escape command and the take-offs over `--seeds` (Seeing, Looming follows contrast).
+
+`node packages/brain/scripts/escape-direction.ts [--seeds 1,2,3,4,5,6] [--only <regex>]` looms a dark disc from each direction with the eyes open, and gives the hand-wired looming input with them shut, and prints each side's giant fiber, DNp02, DNp04 and DNp11 in the 200 ms before the take-off threshold, their forward-backward index and the fixed criteria (Which way it jumps).
 
 `node packages/brain/scripts/bench.ts` times the bare engine.
 
