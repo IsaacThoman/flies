@@ -73,7 +73,6 @@ export function fuzzLife(id: PlaceId, seed: number, duration: number, data: Arra
           counts.looms++;
           Object.assign(loom.position, { x: life.body.position.x + 18, y: life.body.position.y + 8, z: life.body.position.z + 60 });
           life.stimuli.looming = [loom];
-          life.stimuli.threat = loom.position;
         }
       }
       // A feather somewhere on it or near it, from above.
@@ -87,7 +86,6 @@ export function fuzzLife(id: PlaceId, seed: number, duration: number, data: Arra
         loom.position.z -= 80 * dt;
       } else {
         life.stimuli.looming = [];
-        life.stimuli.threat = null;
       }
       life.step(dt, performance.now());
       checkBody(life.body, life.world);

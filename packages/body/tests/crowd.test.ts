@@ -6,7 +6,7 @@ import type { Forces, Intent } from "../src/index.ts";
 
 const openTable = (r: number) => new World({ floor: { kind: "circle", r }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320 });
 const DT = 1 / 60;
-const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
+const still: Forces = { air: { x: 0, y: 0, z: 0 }, meal: null };
 const intent = (i: Partial<Intent> = {}): Intent => ({ ...createIntent(), live: true, ...i });
 const scratch = { ax: 0, az: 0, bx: 0, bz: 0 };
 

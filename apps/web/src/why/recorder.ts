@@ -80,7 +80,7 @@ const RATE_NAMES = SOMA_GROUPS.map((g) => g.rate);
 
 /** The senses and commands in the order readNow reads them, which must be SENSES' and COMMAND_ORDER's (a test holds it). */
 export const READ_SENSES = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet", "bitter", "water", "smell", "grounded", "maleTaste", "wingbeat", "legs", "light", "hunger", "thirst"] as const;
-export const READ_COMMANDS = ["walk", "turn", "back", "escape", "wings", "groom", "feed", "sing"] as const;
+export const READ_COMMANDS = ["walk", "turn", "back", "escape", "wings", "groom", "feed", "sing", "lean"] as const;
 
 /**
  * This frame's rates, commands and senses into `out` at their places in a

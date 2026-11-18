@@ -93,7 +93,7 @@ import { HUD_HITS, SHUTTER_FLASH, drawHud, needsTeaching } from "./ui/hud.ts";
 import type { HudState } from "./ui/hud.ts";
 import { hudLayout, loadingLayout, playRoom, titleLayout, touchSlop } from "./ui/layout.ts";
 import type { HudLayout, LoadingLayout } from "./ui/layout.ts";
-import { LOADING_HITS, arriving, drawLoading } from "./ui/loading.ts";
+import { LOADING_HITS, arrival, drawLoading } from "./ui/loading.ts";
 import { Overlay } from "./ui/overlay.ts";
 import { Settle } from "./ui/settle.ts";
 import { AboutScreen } from "./ui/screens/about.ts";
@@ -468,7 +468,7 @@ export class Game implements Shell {
     };
     this.#hudLayout = hudLayout(display.frame);
     this.#loadingLayout = loadingLayout(display.frame);
-    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, glyphs: this.glyphs, learned: this.#learned, teachSwipe: true, changed: 10, shutter: Infinity, brainRunning: false, arrival: arriving(this.brain) ? this.brain : null, eyes: null, layout: this.#hudLayout };
+    this.#hud = { hands: this.hands, here: this.#here, activity: "waiting", food: null, hints: true, glyphs: this.glyphs, learned: this.#learned, teachSwipe: true, changed: 10, shutter: Infinity, brainRunning: false, arrival: arrival(this.brain), eyes: null, layout: this.#hudLayout };
     // Nothing points on the Apple TV: nothing to record.
     this.overlay.hits.enabled = !!inputs.pointers;
     this.#applyFrame();
@@ -1136,8 +1136,8 @@ export class Game implements Shell {
 
   /** Tries the brain again after it failed: on the player's say-so, or (`network`) when the network comes back. */
   retryBrain(network = false) {
-    const brain = this.brain;
-    if (!arriving(brain) || brain.status !== "failed") return;
+    const brain = arrival(this.brain);
+    if (!brain || brain.status !== "failed") return;
     if (network && brain.failure !== "offline" && brain.failure !== "download") return;
     brain.retry();
     this.#awakeAt = -1;
@@ -1317,7 +1317,8 @@ export class Game implements Shell {
     // The brain waking: the loading screen until it has, then the title. A brain
     // that can be tried again (in a browser) keeps its failure on screen until it is.
     const brain = this.brain;
-    if (!this.#loading && brain.status === "failed" && arriving(brain)) {
+    const arriving = arrival(brain);
+    if (!this.#loading && brain.status === "failed" && arriving) {
       this.#loading = true;
       this.#awakeAt = -1;
       // A finger already down isn't "Try again".
@@ -1327,7 +1328,7 @@ export class Game implements Shell {
     }
     if (this.#loading) {
       if (brain.status !== "loading" && this.#awakeAt < 0) { this.#awakeAt = this.time; this.menuChanged(); }
-      const hold = brain.status === "running" ? (arriving(brain) && brain.source.storageFull ? AWAKE_HOLD_NOTE : AWAKE_HOLD) : arriving(brain) ? Infinity : 3;
+      const hold = brain.status === "running" ? (arriving?.source.storageFull ? AWAKE_HOLD_NOTE : AWAKE_HOLD) : arriving ? Infinity : 3;
       if (this.#awakeAt >= 0 && this.time - this.#awakeAt > hold) {
         this.#loading = false;
         this.#entered();
@@ -1569,7 +1570,6 @@ export class Game implements Shell {
     const hands = this.hands;
     const online = this.online;
     const set = this.#moving ? null : this.stage.set;
-    const own = this.life.stimuli;
     for (let i = 0; i < list.length; i++) {
       const c = list[i];
       const { life, felt, air, wind } = c;
@@ -1607,7 +1607,6 @@ export class Game implements Shell {
       if (this.bubbles.enabled) pushAll(stimuli.looming, this.bubbles.looming);
       pushAll(stimuli.looming, felt.looming);
       if (online) pushAll(stimuli.looming, online.looming);
-      stimuli.threat = own.threat;
       life.step(dt, now);
     }
     this.company.pose();
@@ -1645,7 +1644,6 @@ export class Game implements Shell {
     if (this.bubbles.enabled) for (const b of this.bubbles.looming) stimuli.looming.push(b);
     for (const l of felt.looming) stimuli.looming.push(l);
     if (online) for (const l of online.looming) stimuli.looming.push(l);
-    stimuli.threat = hands.ball.active ? hands.ball.position : (this.finger.threat ?? online?.threat ?? null);
   }
 
   /**
@@ -2549,8 +2547,8 @@ export class Game implements Shell {
     d.pixels = this.stage.pixels;
     d.eyesDetail = this.eyes.detail;
     d.eyesRate = String(this.eyes.rate);
-    const brain = life.brain;
-    if (arriving(brain)) {
+    const brain = arrival(life.brain);
+    if (brain) {
       d.phase = brain.phase;
       d.received = String(brain.source.received);
       d.total = String(brain.source.total);

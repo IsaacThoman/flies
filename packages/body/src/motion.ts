@@ -16,9 +16,9 @@
 //   force, and bounces off what it flies into, an underside included. Its
 //   head, abdomen and legs keep out of what they reach (#clear), which can
 //   turn it between things too close for it as it faces (#turnToFit). A
-//   take-off is the escape command's; its direction is the body's: away
-//   from a threat it knows of, else straight ahead. In the air it turns to
-//   face its course (VANE_RATE).
+//   take-off is the escape command's, forward or backward by the brain's
+//   `lean` (behavior.ts, ESCAPE_ON). In the air it turns to face its course
+//   (VANE_RATE).
 // - Flight itself, once its feet are off the ground, is held up by the
 //   tarsal reflex in behavior.ts (TARSAL_ONSET), not the brain.
 // - Staying in the world: it doesn't walk off the table, and in the air is
@@ -86,9 +86,9 @@ export const TAKEOFF_AWAY = [160, 340] as const;
  * In the air it turns to face the way it is going through the air, at up to
  * VANE_RATE (1/s, of the angle between) once it moves at VANE_SPEED (mm/s) or
  * more, and the brain's `turn` steers on top. A fly's thrust is along its
- * body, and it flies forwards: a take-off's jump away from a threat, which
- * leaves it facing where it faced, would otherwise have its wings carry it
- * straight back.
+ * body, and it flies forwards: a take-off's jump backward, which leaves it
+ * facing where it faced, would otherwise have its wings carry it straight
+ * back.
  */
 export const VANE_RATE = 8;
 export const VANE_SPEED = 150;
@@ -120,8 +120,6 @@ export type BodyEvents = {
 export type Forces = {
   /** The air's own velocity around the fly (a breeze or a puff), mm/s. */
   air: Vec3;
-  /** Where something threatening is, if anything is, so a take-off can be away from it. */
-  threat: Vec3 | null;
   /** Food it is eating, to line its mouth up with. */
   meal: Food | null;
 };
@@ -260,7 +258,7 @@ export class FlyBody {
     ev.landed = false;
     ev.hit = 0;
     if (!(dt > 0) || !Number.isFinite(dt)) return;
-    if (this.mode !== "airborne" && intent.takeOff !== null) this.#takeOff(intent.takeOff, forces.threat);
+    if (this.mode !== "airborne" && intent.takeOff !== null) this.#takeOff(intent.takeOff, intent.takeOffAhead);
     const flying = this.mode === "airborne";
     // Long frames must not destabilize drag or skip a wall between samples.
     const steps = dt <= 1 / 60 ? 1 : Math.ceil(dt / (1 / 60));
@@ -527,19 +525,10 @@ export class FlyBody {
     return top - origin.y + CLEAR;
   }
 
-  #takeOff(strength: number, threat: Vec3 | null) {
+  #takeOff(strength: number, ahead: 1 | -1) {
     const ev = this.events;
-    let ax = Math.sin(this.yaw);
-    let az = Math.cos(this.yaw);
-    if (threat) {
-      const dx = this.position.x - threat.x;
-      const dz = this.position.z - threat.z;
-      const d = Math.hypot(dx, dz);
-      if (d > 1e-6) {
-        ax = dx / d;
-        az = dz / d;
-      }
-    }
+    const ax = Math.sin(this.yaw) * ahead;
+    const az = Math.cos(this.yaw) * ahead;
     const up = TAKEOFF_UP[0] + (TAKEOFF_UP[1] - TAKEOFF_UP[0]) * strength;
     const away = TAKEOFF_AWAY[0] + (TAKEOFF_AWAY[1] - TAKEOFF_AWAY[0]) * strength;
     this.velocity.x = ax * away;

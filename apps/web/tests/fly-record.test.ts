@@ -8,8 +8,10 @@ import { test } from "node:test";
 import type { BrainDriver } from "@fly/contracts";
 import { HUNGER, Rhythm, SUMMER, THIRST_START, pressureLeftAlone, usualPressure } from "@fly/body";
 import { Pantry, createPicnic } from "@fly/world";
-import { Company } from "../src/company.ts";
-import { FLY_LIMIT, FLY_VERSION, KEEP_EVERY, LEARNED_VERSION, Remembered, fromBase64, liveAway, loadFly, note, restore, saveFly, toBase64 } from "../src/fly-record.ts";
+import { MirroredBrain, unmirrored } from "../src/brain/mirror.ts";
+import { COMPANION_RETRIES, Company } from "../src/company.ts";
+import { FLY_LIMIT, FLY_VERSION, KEEP_EVERY, LEARNED_VERSION, Remembered, fromBase64, liveAway, loadFly, mirroredFly, note, restore, saveFly, toBase64 } from "../src/fly-record.ts";
+import { newDeviceKey } from "../src/online/invite.ts";
 import { Life } from "../src/life.ts";
 import { clockHours } from "../src/scene/light.ts";
 
@@ -222,7 +224,7 @@ test("each companion keeps its own record as others come and go", () => {
   // The middle one goes (its brain, and each new one, wouldn't run): the third moves up in line but stays the third fly.
   const middle = company.list[1];
   for (let time = 0; company.list.includes(middle); time += 100) {
-    (middle.life.brain as ReturnType<typeof brain>).status = "failed";
+    (unmirrored(middle.life.brain) as ReturnType<typeof brain>).status = "failed";
     company.tend(time);
   }
   assert.deepEqual(company.list.map((c) => c.slot), [1, 3]);
@@ -301,4 +303,56 @@ test("a memory this build can't read is carried through saves as it was; the lar
   fly.where = { place: "picnic", x: 1, y: 2, z: 3, yaw: 4 };
   assert.ok(saveFly(0, fly, store));
   assert.ok(store.saved["flies.fly.0"].length < FLY_LIMIT / 2);
+});
+
+test("half the flies are the traced fly's mirror image, each by its id from launch to launch; a fly from before keeps everything it has", async () => {
+  let mirrored = 0;
+  const n = 20_000;
+  for (let i = 0; i < n; i++) if (mirroredFly(newDeviceKey())) mirrored++;
+  // Within 3 standard deviations of half (0.35% at this many).
+  assert.ok(Math.abs(mirrored / n - 0.5) < 0.0106, `${mirrored} of ${n}`);
+
+  // A fly saved before there were mirrored flies, its id's last digit odd: everything it had, and nothing added.
+  const store = memory();
+  const old = { v: 1, id: "0123456789abcdef0123456789abcdef", born: NOON - HOUR, at: NOON - HOUR, body: { hunger: 0.2, fullness: 0.3, thirst: 0.4, sleep: null }, where: null, learned: { v: LEARNED_VERSION, data: toBase64(Uint8Array.of(7, 8)) } };
+  store.saved["flies.fly.0"] = JSON.stringify(old);
+  const taken: Uint8Array[] = [];
+  const own = { ...brain(), importMemory: async (m: Uint8Array) => (taken.push(m), true), exportMemory: async () => Uint8Array.of(7, 8) };
+  const fly = new Life(createPicnic(), own);
+  const remembered = new Remembered(make, store);
+  remembered.arrive(0, fly, NOON, SUMMER, "picnic", true);
+  assert.ok(fly.mirrored);
+  assert.ok(fly.brain instanceof MirroredBrain);
+  assert.equal(unmirrored(fly.brain), own);
+  assert.deepEqual(taken, [Uint8Array.of(7, 8)], "what it learned still loads: the wiring is the same");
+  remembered.save(0, fly, "picnic", NOON);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const saved = JSON.parse(store.saved["flies.fly.0"]);
+  assert.deepEqual(Object.keys(saved).sort(), Object.keys(old).sort());
+  assert.equal(saved.id, old.id);
+  assert.deepEqual(saved.learned, old.learned);
+  const again = new Life(createPicnic(), brain());
+  new Remembered(make, store).arrive(0, again, NOON + HOUR, SUMMER, "picnic", true);
+  assert.ok(again.mirrored, "the same fly, mirrored again");
+
+  // One whose id's last digit is even isn't.
+  store.saved["flies.fly.1"] = JSON.stringify({ ...old, id: "0123456789abcdef0123456789abcdee" });
+  const plain = brain();
+  const other = new Life(createPicnic(), plain);
+  remembered.arrive(1, other, NOON, SUMMER, "picnic", true);
+  assert.ok(!other.mirrored);
+  assert.equal(other.brain, plain);
+});
+
+test("a mirrored companion whose brain failed gets its new brain behind the mirror too", () => {
+  const world = createPicnic();
+  const company = new Company(world, brain, (c) => c.life.mirror(true));
+  company.resize(1, new Pantry(world));
+  const c = company.list[0];
+  const first = unmirrored(c.life.brain);
+  (first as ReturnType<typeof brain>).status = "failed";
+  company.tend(0);
+  company.tend(COMPANION_RETRIES[0]);
+  assert.notEqual(unmirrored(c.life.brain), first);
+  assert.ok(c.life.brain instanceof MirroredBrain);
 });

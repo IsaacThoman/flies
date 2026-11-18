@@ -66,7 +66,7 @@ test("its legs feel how fast they step: still, nothing; walking, both sides alik
   const body = new FlyBody(open, { x: 0, z: 0, yaw: 0 });
   const tracker = new SenseTracker();
   const step = (intent: Partial<Intent>) => {
-    body.step({ ...createIntent(), live: true, ...intent }, { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null }, DT);
+    body.step({ ...createIntent(), live: true, ...intent }, { air: { x: 0, y: 0, z: 0 }, meal: null }, DT);
     return tracker.update(input(body, { world: open }));
   };
   const still = step({});
@@ -89,7 +89,7 @@ test("its legs feel how fast they step: still, nothing; walking, both sides alik
 /** Walks `body` forward until it is pushing against what it faces (bounded). */
 function walkInto(body: FlyBody) {
   const walk: Intent = { ...createIntent(), live: true, walking: true, speed: 10 };
-  for (let t = 0; t < 3 && !body.blocked; t += DT) body.step(walk, { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null }, DT);
+  for (let t = 0; t < 3 && !body.blocked; t += DT) body.step(walk, { air: { x: 0, y: 0, z: 0 }, meal: null }, DT);
   assert.ok(body.blocked, "it walked into it");
 }
 

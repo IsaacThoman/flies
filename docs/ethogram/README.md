@@ -57,8 +57,9 @@ Completed-bout summaries underrepresent long bouts; censor counts are retained.
 
 Saccades are contiguous ground |yaw|>200°/s. A peak-centred angle includes the
 whole ±50 ms window, with airborne or truncated windows rejected. Threshold
-duration is not the paper's full-turn duration. The existing body command gain
-is 3 rad/s (172°/s), below the detection threshold. Neither saccade reference
+duration is not the paper's full-turn duration. The body's chosen command gain
+is 3 rad/s (172°/s), below the detection threshold; recordings of DNa02 don't
+support a measured one ([steering](steering.md)). Neither saccade reference
 is scored. Speed quantiles use 0.1 mm/s bins and yaw quantiles 1°/s bins, with
 inverse weighted CDF and overflow accounting. Free samples are 10 ms; optical
 frames are 5 ms. No-events durations and out-of-range quantiles stay N/A.

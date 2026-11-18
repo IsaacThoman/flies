@@ -8,7 +8,7 @@ import type { Place, Vec3 } from "@fly/world";
 export const places = { greenhouse: GREENHOUSE, picnic: PICNIC, windowsill: WINDOWSILL, lab: LAB, restaurant: RESTAURANT, kitchen: KITCHEN };
 export type PlaceId = keyof typeof places;
 export const CEILING_EXCURSION = 400;
-export const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
+export const still: Forces = { air: { x: 0, y: 0, z: 0 }, meal: null };
 const surface = createSurface();
 const inward = { x: 0, y: 0, z: 0 };
 const hit = { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 0 }, solid: -1, t: 0 };
@@ -254,7 +254,7 @@ export function fuzzBody(id: string, seed: number, duration: number, highStarts 
   const world = new World(place);
   const body = new FlyBody(world, randomStart(world, random, highStarts));
   let intent = createIntent();
-  const forces: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
+  const forces: Forces = { air: { x: 0, y: 0, z: 0 }, meal: null };
   let nextIntent = 0;
   let nextStart = 0;
   let nextProbe = 0;

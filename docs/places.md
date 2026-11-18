@@ -190,16 +190,16 @@ crossings become smaller than a pixel, without extra meshes or draws.
 - **The camera** (`SceneCamera`): in play, `orbit.ts` keeps a player-controlled
   yaw, pitch and distance around the fly. View → Whole table uses `whole`'s
   distance, height and side to set that orbit; it still follows the fly.
+  The orbit can pass through scenery at the chosen pitch and distance.
   Behind the title and in the screensaver, `cameraman.ts` chooses shots.
   Its Whole place mode uses the place's `whole` shot and `focus`: the point
   it circles, how much it follows the fly, and how far toward it it aims.
   `vista` guides the cameraman's background preference, not the player's
   orbit. A wall beyond the floor's edge adds no background score; the view
   counts for about as much as a tall object some 280 mm behind the fly.
-  The fly-centered automatic shots are shared by every place. Both camera
-  rigs try to clear solids and intervening obstructions by pulling inward,
-  with eased movement; these are bounded corrections, not a guarantee for
-  every possible layout.
+  The fly-centered automatic shots are shared by every place. The cameraman
+  tries to clear solids and intervening obstructions by pulling inward
+  with eased movement.
 - **Goings-on** (`SceneSet.live`, optional): the place's own life, called each
   frame the fly lives with an `Around`: where the fly is, where the device's
   other flies are (`company`), the world, the pantry, the weather, and

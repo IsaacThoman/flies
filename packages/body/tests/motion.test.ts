@@ -9,7 +9,7 @@ import type { Forces, Intent } from "../src/index.ts";
 const openTable = (r: number) => new World({ floor: { kind: "circle", r }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 320 });
 
 const DT = 1 / 60;
-const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
+const still: Forces = { air: { x: 0, y: 0, z: 0 }, meal: null };
 const intent = (i: Partial<Intent> = {}): Intent => ({ ...createIntent(), live: true, ...i });
 
 function run(body: FlyBody, i: Intent, seconds: number, forces: Forces = still) {
@@ -74,9 +74,12 @@ test("walking off a ledge it falls, and lands on what's below", () => {
   assert.ok(body.position.y < 1);
 });
 
-test("a take-off goes up and away from the threat; without wings it comes back down", () => {
-  const body = new FlyBody(createPicnic(), { x: 0, z: -150, yaw: 0 });
-  body.step(intent({ takeOff: 1 }), { ...still, threat: { x: 20, y: 5, z: -150 } }, DT);
+test("a take-off goes up and along its heading, backward when asked; without wings it comes back down", () => {
+  const ahead = new FlyBody(createPicnic(), { x: 0, z: -150, yaw: 0 });
+  ahead.step(intent({ takeOff: 1 }), still, DT);
+  assert.ok(ahead.velocity.y > 0 && ahead.velocity.z > 0 && Math.abs(ahead.velocity.x) < 1e-9);
+  const body = new FlyBody(createPicnic(), { x: 0, z: -150, yaw: Math.PI / 2 });
+  body.step(intent({ takeOff: 1, takeOffAhead: -1 }), still, DT);
   assert.equal(body.mode, "airborne");
   assert.ok(body.velocity.y > 0 && body.velocity.x < 0);
   let top = 0;

@@ -36,7 +36,7 @@ export class NativeBrainDriver implements BrainDriver {
   #memories: { request: number; resolve: (memory: Uint8Array | null) => void }[] = [];
   #remembering: { request: number; taken: (taken: boolean) => void }[] = [];
   #decoded: BrainState = {
-    command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 },
+    command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, lean: 0 },
     stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: {} },
   };
 

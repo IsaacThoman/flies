@@ -118,7 +118,7 @@ export class Company {
       }
       if (time < c.retryAt) continue;
       brain.dispose();
-      c.life.brain = this.#newBrain();
+      c.life.rebrain(this.#newBrain());
       c.tries++;
       c.retryAt = -1;
     }

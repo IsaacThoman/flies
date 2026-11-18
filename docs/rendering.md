@@ -41,6 +41,19 @@ played back in a third:
   the positions the drawing puts them (`somaPlaces`). The corner pictures make
   way for it, as for View → Fly's eyes.
 
+**A mirrored fly** ([Handedness](simulation.md#handedness)). The wiring
+drawn and run is one real male's, and half the flies are his mirror image.
+For one of those, each side's rates are exchanged before anything is drawn
+(`apps/web/src/brain/mirror.ts`): its left optic lobe, its left DNa02 and
+every region on its left glow with what the brain's right side does, which is
+what that side of the mirrored fly does, and so do the stats' In and out and
+Why?. The neuropils are drawn symmetric (below), so the drawing is the
+mirrored fly's as much as the traced one's; the command groups' cell bodies
+stay where the traced fly's are, not reflected, a few micrometres off for a
+mirrored fly. The corner picture of what it sees is what its own eyes see:
+its left eye is the brain's right, reflected, with the 12 facets the right
+eye has more.
+
 **The anatomy** (`packages/fly/src/nerves/`). The neuropils are measured from
 the FlyEM male CNS v1.0's own neuropil meshes (one male's brain, neck and
 cord in one EM volume, CC-BY 4.0) by `packages/fly/scripts/nerves.ts`, which
@@ -126,9 +139,9 @@ reads in a dark room (the same at all times for every part, as an X-ray
 shows bone); in the panel a faint constant stain on the dark glass, as a
 neuropil stain shows anatomy in a micrograph.
 
-**Command-group somata** (`packages/fly/src/nerves/somata.ts`). The 64
+**Command-group somata** (`packages/fly/src/nerves/somata.ts`). The 68
 neurons already read for walking, steering, backing, escape, flight power,
-grooming, feeding and song are also drawn as tiny cell bodies at their actual
+grooming, feeding, song and which way a take-off leans are also drawn as tiny cell bodies at their actual
 `somaLocation` from `packages/brain/data/anatomy.bin`. `node packages/fly/scripts/somata.ts`
 regenerates the static atlas after validating the anatomy/connectome SHA-256
 pair. The same fitted brain and cord frames used for the neuropil meshes
@@ -146,10 +159,10 @@ settling, each full scalar sense, the combined senses, a looming pulse and
 the region calibration's vision battery. The reference is the larger of
 the observed peak, four times the largest resting mean and 5 Hz, rounded
 upward to two significant figures; the two steering sides share the larger
-reference. The atlas uses these measured references: walking 56 Hz,
-steering 43 Hz,
-backing 45 Hz, escape 350 Hz, flight 160 Hz, grooming 44 Hz, feeding 50 Hz
-and song 11 Hz.
+reference. The atlas uses these measured references: walking 55 Hz,
+steering 44 Hz,
+backing 35 Hz, escape 340 Hz, flight 170 Hz, grooming 44 Hz, feeding 28 Hz,
+song 14 Hz, and the lean's DNp02 190 Hz and DNp11 150 Hz.
 The pinned measurements, connectome hash and brain-tree revision are in
 `packages/fly/src/nerves/soma-rates.ts`. To recalibrate, run
 `node packages/fly/scripts/soma-rates.ts`, then

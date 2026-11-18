@@ -43,7 +43,7 @@ for (const info of PLACES) {
     assert.ok(world.surface(x, z, createSurface(), y).normal.y >= STANDABLE, "level enough to stand on");
     const body = new FlyBody(world, place.start);
     const intent = createIntent();
-    for (let i = 0; i < 60; i++) body.step(intent, { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null }, 1 / 60);
+    for (let i = 0; i < 60; i++) body.step(intent, { air: { x: 0, y: 0, z: 0 }, meal: null }, 1 / 60);
     assert.equal(body.mode, "standing");
     assert.ok(Math.hypot(body.position.x - x, body.position.z - z) < 1e-6 && body.yaw === yaw);
   });
@@ -95,7 +95,7 @@ for (const info of PLACES) {
     assert.ok(place.ceiling > 0);
   });
 
-  test(`${info.name}: the whole-place view and every wallpaper shot keep the camera out of everything, with the fly in the picture`, () => {
+  test(`${info.name}: the automatic follow and rotating wallpaper shots keep the camera out of everything, with the fly in the picture`, () => {
     const world = new World(place);
     const { x, z, yaw } = place.start;
     const body = { position: { x, y: world.heightAt(x, z, place.start.y), z }, velocity: { x: 0, y: 0, z: 0 }, yaw, mode: "standing" } as unknown as FlyBody;
@@ -107,19 +107,8 @@ for (const info of PLACES) {
       const at = new THREE.Vector3(x, body.position.y + 0.75, z).project(director.camera);
       assert.ok(Math.abs(at.x) < 1 && Math.abs(at.y) < 1 && at.z < 1, `${what}: the fly is out of the picture (${at.x.toFixed(2)}, ${at.y.toFixed(2)})`);
     };
-    director.setView("table");
-    check("whole place");
-    // Brought in by hand all the way, and out again, a wheel's click at a time.
-    director.setView("follow");
-    for (let i = 0; i < 60; i++) {
-      director.zoomBy(i < 20 ? 1 / 1.2 : 1.2);
-      for (let t = 0; t < 0.3; t += 1 / 30) director.update(body, 1 / 30);
-      const cam = director.camera.position;
-      assert.ok(world.solidAt(cam.x, cam.y, cam.z) < 0 && cam.y >= world.heightAt(cam.x, cam.z, cam.y) + 0.5, `zoomed to ${director.reach.toFixed(1)} mm: the camera is inside something at ${cam.x.toFixed(0)}, ${cam.y.toFixed(0)}, ${cam.z.toFixed(0)}`);
-    }
-    check("zoomed all the way out");
-    director.startWallpaper();
     director.wallpaperStyle = "follow";
+    director.startWallpaper();
     check("wallpaper, following");
     director.wallpaperStyle = "calm";
     for (let i = 0; i < WALLPAPER.length; i++) {

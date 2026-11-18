@@ -26,7 +26,7 @@
 namespace {
 constexpr double kMaxStepMs = 100;
 // SENSE_ORDER, COMMAND_ORDER and STATE_STATS in packages/contracts/src/brain.ts.
-constexpr int kScalars = 45, kCommands = 8, kStats = 4;
+constexpr int kScalars = 45, kCommands = 9, kStats = 4;
 // Where hunger is among the scalars; a game that sends fewer keeps no account of it, which is 1.
 constexpr int kHunger = 9;
 // And thirst, which is 1 the same way.
@@ -192,7 +192,7 @@ void *Run(void *arg) {
     }
     std::lock_guard<std::mutex> g(b.stateLock);
     float *s = b.state.data();
-    const float head[kCommands + kStats] = { c.walk, c.turn, c.back, c.escape, c.wings, c.groom, c.feed, c.sing,
+    const float head[kCommands + kStats] = { c.walk, c.turn, c.back, c.escape, c.wings, c.groom, c.feed, c.sing, c.lean,
                                              (float)stats.sim_ms, (float)stats.wall_ms, (float)stats.spikes, (float)stats.active };
     std::copy(head, head + kCommands + kStats, s);
     std::copy(rates.begin(), rates.end(), s + kCommands + kStats);

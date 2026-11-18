@@ -66,6 +66,8 @@ test("every group finds its neurons in the real connectome, and none is both dri
     "DNa02 right": 1,
     MDN: 4,
     DNp01: 2,
+    DNp02: 2,
+    DNp11: 2,
     flight: 24,
     DNg12: 26,
     MN9: 2,

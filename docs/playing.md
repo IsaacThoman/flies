@@ -277,23 +277,14 @@ camera goes along with the fly, a little smoothed so a stride doesn't shake
 the picture, but never turns by itself: not when the fly turns, not after a
 while, not to find a better side. Where you leave it, it stays.
 
-One rule keeps it out of things. When something comes between the fly and
-the camera, or the camera would be in it or so near it that the edge of the
-picture cuts into it, the camera comes in along its line of sight until it
-isn't, quickly but smoothly, looking a moment ahead of where your turn and the
-fly are taking it, so it is in front of a bottle before the bottle is in the
-way. Once the way has been clear for a moment it goes back out, gently. Where
-coming in would bring it nearer than you can zoom, down in a bowl or on a
-slope, it looks from a little higher instead, as little as opens the way, and
-comes back down to where you had it once it can. It never turns round
-anything. An obstruction that outruns the
-smoothing can pull the camera inward immediately during collision recovery.
+The camera follows your orbit through scenery. A prop or wall can block the
+view of the fly as you turn or zoom past it.
 
 The View tool's views are places on the same orbit, reached over a moment.
 Follow is nominally 11 mm out, low over the table. A historical TV-sized
 reference put the fly about 170 pixels long, Close up about twice that size
 and Wide about a third (capture date, machine and pose unknown); framing
-depends on aspect and obstruction correction. Whole table goes out
+depends on aspect. Whole table goes out
 to the whole place, to the side the screensaver films it from; From above
 looks down from behind the fly. Each sets only how far out and how far up
 (and those two, which way round); you can turn and zoom from there at once,

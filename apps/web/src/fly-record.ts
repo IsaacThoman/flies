@@ -10,6 +10,10 @@
 // mushroom body had learned (BrainDriver.exportMemory, packages/brain/README.md,
 // Learning).
 //
+// Whether it is the traced fly's mirror image (brain/mirror.ts) is who it
+// is, read from its id: kept nowhere, so a fly from before there were mirrored
+// flies has its answer as every fly does, and loses nothing.
+//
 // Of the body, only its own state is kept, never what the brain makes of it,
 // so the record means the same whatever the brain does with hunger, thirst or sleep.
 //
@@ -118,6 +122,15 @@ function readWhere(saved: unknown): Where | null {
   return finite(x) && finite(y) && finite(z) && finite(yaw) ? { place: saved.place, x, y, z, yaw } : null;
 }
 
+/**
+ * Whether the fly with this id is the traced fly's mirror image: the last
+ * of its id's random hex digits, odd or even, so half of all flies are, each
+ * from launch to launch.
+ */
+export function mirroredFly(id: string): boolean {
+  return (parseInt(id[id.length - 1], 16) & 1) === 1;
+}
+
 /** The fly in this place in line, as saved; or, if there is none or it can't be read, a new one, saved at once so that it is the same fly from now on. */
 export function loadFly(slot: number, now: number, make: () => string, store: Storage | null = storage()): FlyRecord {
   const saved = read(store, KEY + slot);
@@ -219,9 +232,10 @@ export class Remembered {
     this.#store = store;
   }
 
-  /** The fly in `slot` arrives in `life`, given the body it had (`restore`). */
+  /** The fly in `slot` arrives in `life`, mirrored or not as it is, given the body it had (`restore`). */
   arrive(slot: number, life: Life, now: number, sun: Sun, here: PlaceId, alone: boolean) {
     const fly = loadFly(slot, now, this.#make, this.#store);
+    life.mirror(mirroredFly(fly.id));
     restore(fly, life, now, sun, here, alone);
     this.#flies.set(slot, fly);
   }

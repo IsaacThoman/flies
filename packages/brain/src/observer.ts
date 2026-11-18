@@ -50,7 +50,7 @@ export class BehaviorObserver {
     turnsLeft: 0,
     turnsRight: 0,
     escapes: 0,
-    peak: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 },
+    peak: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, lean: 0 },
   };
   #smoothed: { walk: number; turn: number; back: number } | null = null;
   #walking = false;
@@ -64,7 +64,7 @@ export class BehaviorObserver {
     const t = this.tally;
     t.seconds += dt;
     for (const key of Object.keys(t.peak) as (keyof BrainCommand)[]) {
-      t.peak[key] = key === "turn" ? (Math.abs(command.turn) > Math.abs(t.peak.turn) ? command.turn : t.peak.turn) : Math.max(t.peak[key], command[key]);
+      t.peak[key] = key === "turn" || key === "lean" ? (Math.abs(command[key]) > Math.abs(t.peak[key]) ? command[key] : t.peak[key]) : Math.max(t.peak[key], command[key]);
     }
     if (!this.#smoothed) this.#smoothed = { walk: command.walk, turn: command.turn, back: command.back };
     else for (const key of ["walk", "turn", "back"] as const) this.#smoothed[key] += (command[key] - this.#smoothed[key]) * ease(OBSERVER.smoothing, dt);
