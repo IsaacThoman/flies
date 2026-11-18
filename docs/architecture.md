@@ -39,7 +39,7 @@ body's state, and the body lives out the time away by its own sums
 (`apps/web/src/fly-record.ts`, [From launch to launch](simulation.md#from-launch-to-launch)).
 
 Each life step ([Life](../apps/web/src/life.ts)) works out what each body feels: taste, touch,
-wind, whether it is on its feet, and the other scalar senses. It sends these,
+wind, smell at each antenna, whether it is on its feet, and the other senses. It sends these,
 hunger and clock/sleep state, and the latest completed eye picture to a
 [`BrainDriver`](../packages/contracts/src/brain.ts). The eyes sample the
 scene separately: at most one fly's eyes refresh per rendered frame, subject

@@ -31,8 +31,8 @@ hungry the fly is, from 0 just fed to 1 starved, and of how full its crop is.
 Hunger rises toward 1 with a time constant of 12 minutes; what it eats brings
 it down by the food's sweetness times how much it ate, so a whole lump of
 sugar takes a starved fly to fed. The brain is sent it every frame: it sets how
-strongly the sweet taste neurons pass on what they taste and how restless the
-fly is (`packages/brain/README.md`, Hunger). A real fly gets hungry over hours
+strongly the sweet taste neurons, and three glomeruli's smell neurons, pass on
+what they sense, and how restless the fly is (`packages/brain/README.md`, Hunger). A real fly gets hungry over hours
 and is starved after a day, so hunger runs 60 times faster than life here:
 what takes a real fly an hour takes this one a minute. Nothing else does. A
 new fly starts at 0.7, hungry enough to go and look for food; one that has
@@ -110,8 +110,10 @@ as it always has. What its mushroom body has learned is (the record's
 `learned`, packages/brain/README.md, Learning): the brain is asked for it at
 each save and the answer saved as it comes, so the record is at most one save
 behind; coming back, the brain takes it back as it starts, or refuses it if it
-is of another connectome. As the brain stands, nothing the fly senses in the
-game teaches it, so that memory is the wiring's. How deeply it sleeps and how
+is of another connectome. What it smells teaches it (the
+smells of food that fed it, or of where a swoop startled it), though what it
+learns doesn't change what it does; after six hours beside the lab's fly food
+the memory was about 6 KB (packages/brain/README.md, Learning, In play). How deeply it sleeps and how
 long it has been still start again from nothing, as the brain does. Of the
 body, only its own state is kept, never what the brain makes of it.
 
