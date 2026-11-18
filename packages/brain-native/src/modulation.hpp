@@ -12,6 +12,9 @@ class Modulation {
   struct StandIn {
     double level = 0, target = 0;
     bool started = false;
+    // Linear from low to high over hunger, or, with points, through the level measured after so many hours without food.
+    double low = 0, high = 0;
+    std::vector<std::pair<double, double>> hours;
   };
   struct Route {
     std::string receptor;
