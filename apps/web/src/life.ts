@@ -8,6 +8,7 @@ import { Behavior, Contacts, Crowd, FlyBody, Hunger, SenseTracker, TOUCH_PARTS, 
 import type { Forces, Intent, Looming, Rhythm } from "@fly/body";
 import { Pantry } from "@fly/world";
 import type { Food, Place, Vec3, World } from "@fly/world";
+import { handed, unmirrored } from "./brain/mirror.ts";
 
 /** What the fly is doing, in a word, for the screen and for tests. */
 export type Activity = "resting" | "sleeping" | "walking" | "backing" | "turning" | "grooming" | "feeding" | "tasting" | "singing" | "flying" | "falling" | "waiting";
@@ -33,8 +34,9 @@ export class Life {
   readonly hunger = new Hunger();
   /** How thirsty it is, from what it has drunk: the brain is sent it. */
   readonly thirst = new Thirst();
-  /** Its brain; a companion's that failed is replaced by a new one (company.ts). */
+  /** Its brain, behind the mirror for a mirrored fly (`mirror`); a companion's that failed is replaced by a new one (`rebrain`). */
   brain: BrainDriver;
+  #mirrored = false;
   /** Other flies (at a table with others, and the others this device lives): bodies it can't walk through, which its antennae and its body feel. */
   readonly crowd: Crowd;
   readonly stimuli: Stimuli = { looming: [], contacts: new Contacts(), air: { x: 0, y: 0, z: 0 }, threat: null };
@@ -86,6 +88,22 @@ export class Life {
     this.pantry = new Pantry(world, world.place.patches);
     this.body = new FlyBody(world, world.place.start);
     this.crowd = new Crowd(world);
+  }
+
+  /** Whether it is the traced fly's mirror image (brain/mirror.ts). */
+  get mirrored() {
+    return this.#mirrored;
+  }
+
+  /** Makes it the traced fly's mirror image, or not: as it arrives, before its brain is first told anything (fly-record.ts). */
+  mirror(mirrored: boolean) {
+    this.#mirrored = mirrored;
+    this.brain = handed(unmirrored(this.brain), mirrored);
+  }
+
+  /** Gives it a new brain, behind the mirror if it is mirrored. */
+  rebrain(brain: BrainDriver) {
+    this.brain = handed(brain, this.#mirrored);
   }
 
   /** Food accepted by the pantry, now or in a room acknowledgement. */
