@@ -23,8 +23,8 @@
 //   touchdrag:<x0>,<y0>:<x1>,<y1>[:<ms>]  a finger drags between points
 //   twofingerdrag:<x0>,<y0>:<x1>,<y1> two fingers move together, without changing spread
 //   pinch:<x>,<y>:<from>:<to> two fingers about a point, from one spread to another (shares of the width)
-//   tapon:<kind>[:<index>[:<dial>]]  a finger taps the middle of a target drawn on screen (from the game's hit map: tool, kind, label, go, menu, row, step, tab, back...);
-//                             a kind's index is its direction, and its dial which of the tool's (the Sky's weather is 1)
+//   tapon:<kind>[:<index>[:<dial>]]  a finger taps the middle of a target drawn on screen (from the game's hit map: tool, kind, label, go, menu, row, step, tab, option, back...);
+//                             a kind's index is its direction, and its dial which of the tool's (the Sky's weather is 1); an option's or a step's index is its row's, and its dial which option, or which way (-1, 1)
 //   clickon:<kind>[:<index>[:<dial>]]  the mouse clicks one
 //   resize:<w>x<h>            the window (or the device's screen) changes shape
 //   sleep:<ms>                wait
@@ -310,7 +310,7 @@ export class Fingers {
 }
 
 /** The middle of a target drawn on screen (0 to 1 across and down the canvas), found in the game's hit map by its kind and index. */
-/** `dial`: for a kind's arrow or a label, which of the tool's dials (the Sky's weather is 1); any, the last drawn, without. */
+/** `dial`: for a kind's arrow or a label, which of the tool's dials (the Sky's weather is 1); for a row's option, which one, and for its arrows, which way; any, the last drawn, without. */
 export async function targetOf(page: Page, kind: string, index?: number, dial?: number): Promise<Pt> {
   // A screen just opened may not have been drawn yet: give it a moment.
   const until = Date.now() + 60_000;
@@ -330,6 +330,7 @@ function findTarget(page: Page, kind: string, index?: number, dial?: number): Pr
       for (let i = hits.count - 1; i >= 0; i--) {
         const h = hits.get(i);
         if (dial !== null && (kind === "kind" || kind === "label") && h.index !== dial) continue;
+        if (dial !== null && (kind === "option" || kind === "step") && h.value !== dial) continue;
         if (h.kind === kind && (index === null || ((kind === "kind" || kind === "tab") ? h.value === index : h.index === index))) return [(h.x + h.w / 2) / game.shape.design.width, (h.y + h.h / 2) / game.shape.design.height];
       }
       return null;

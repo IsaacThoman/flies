@@ -286,13 +286,28 @@ async function fingers() {
     await waitFor(page, "screen=settings,tab=wallpaper");
     await tapOn("tab", 2);
     await waitFor(page, "tab=picture");
+    // Pixels shows its three options side by side: each is pressed where it is.
     const pixels = await game<number>(page, "g.screens.settings.menu.items.findIndex((i) => i.id === 'pixels')");
-    await tapOn("step", pixels);
+    await touch.tap(await targetOf(page, "option", pixels, 1));
     await waitFor(page, "pixels=chunky");
-    await tapOn("step", pixels);
+    await touch.tap(await targetOf(page, "option", pixels, 2));
     await waitFor(page, "pixels=chunkier");
-    await tapOn("row", pixels);
+    await touch.tap(await targetOf(page, "option", pixels, 0));
     await waitFor(page, "pixels=classic");
+    // Hints is a switch: a tap anywhere on its row turns it off, and another on again.
+    const hints = await game<number>(page, "g.screens.settings.menu.items.findIndex((i) => i.id === 'hints')");
+    await tapOn("row", hints);
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem("flies.settings") ?? "{}").hints === false);
+    await tapOn("row", hints);
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem("flies.settings") ?? "{}").hints === true);
+    // The screensaver's delay has too many options to show at once: the one chosen, between arrows.
+    await tapOn("tab", 0);
+    await waitFor(page, "tab=wallpaper");
+    const delay = await game<number>(page, "g.screens.settings.menu.items.findIndex((i) => i.id === 'wallpaperAfter')");
+    const delayBefore = await game<number>(page, "g.settings.wallpaperAfter");
+    await touch.tap(await targetOf(page, "step", delay, -1));
+    await page.waitForFunction((was) => (globalThis as unknown as { __fly: { settings: { wallpaperAfter: number } } }).__fly.settings.wallpaperAfter !== was, delayBefore);
+    await game(page, `(g.settings.wallpaperAfter = ${delayBefore}, g.applySettings())`);
     // Outside the pane is Back.
     await touch.tap([0.5, 0.97]);
     await waitFor(page, "screen=title");

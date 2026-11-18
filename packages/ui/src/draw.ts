@@ -82,6 +82,116 @@ export function glassPanel(g: Ctx, x: number, y: number, w: number, h: number, r
   g.restore();
 }
 
+/**
+ * A menu's pane: calmer glass than a panel's, bright only along its top edge,
+ * so the rows and buttons on it are what shines.
+ */
+export function sheet(g: Ctx, x: number, y: number, w: number, h: number, r: number) {
+  softShadow(g, x, y, w, h, r, 12, 0.3);
+  const body = g.createLinearGradient(0, y, 0, y + h);
+  body.addColorStop(0, "rgba(250, 253, 255, 0.95)");
+  body.addColorStop(1, "rgba(198, 229, 252, 0.93)");
+  roundedRect(g, x, y, w, h, r);
+  g.fillStyle = body;
+  g.fill();
+  const band = Math.min(h * 0.4, 46);
+  const gloss = g.createLinearGradient(0, y, 0, y + band);
+  gloss.addColorStop(0, "rgba(255, 255, 255, 0.9)");
+  gloss.addColorStop(1, "rgba(255, 255, 255, 0)");
+  roundedRect(g, x + 3, y + 3, w - 6, band, Math.max(0, r - 3));
+  g.fillStyle = gloss;
+  g.fill();
+  roundedRect(g, x, y, w, h, r);
+  g.lineWidth = 2;
+  g.strokeStyle = "rgba(40, 130, 210, 0.55)";
+  g.stroke();
+  roundedRect(g, x + 2, y + 2, w - 4, h - 4, Math.max(0, r - 2));
+  g.lineWidth = 1.5;
+  g.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  g.stroke();
+}
+
+/** How round a list's rows are: less than a button, so the two are told apart at a glance. */
+export const PLATE_RADIUS = 14;
+
+/** A row of a list, under a setting or an entry: flat glass, white with the focus on it, a little brighter under a pointer. */
+export function plate(g: Ctx, x: number, y: number, w: number, h: number, style: { focused?: boolean; hover?: boolean; disabled?: boolean } = {}) {
+  g.save();
+  if (style.disabled) g.globalAlpha *= 0.45;
+  roundedRect(g, x, y, w, h, PLATE_RADIUS);
+  g.fillStyle = style.focused ? "rgba(255, 255, 255, 0.97)" : style.hover ? "rgba(255, 255, 255, 0.78)" : "rgba(255, 255, 255, 0.5)";
+  g.fill();
+  g.lineWidth = 1.2;
+  g.strokeStyle = style.focused ? "rgba(20, 120, 200, 0.55)" : "rgba(40, 120, 200, 0.26)";
+  g.stroke();
+  g.restore();
+}
+
+/** The track a row of options or typed words sits in: pressed into the glass. */
+export function well(g: Ctx, x: number, y: number, w: number, h: number, r: number) {
+  roundedRect(g, x, y, w, h, r);
+  const body = g.createLinearGradient(0, y, 0, y + h);
+  body.addColorStop(0, "rgba(13, 59, 102, 0.2)");
+  body.addColorStop(1, "rgba(13, 59, 102, 0.1)");
+  g.fillStyle = body;
+  g.fill();
+}
+
+/** The chosen one of a row of options: a raised tile, white, or lit where it is the thing in hand. */
+export function thumb(g: Ctx, x: number, y: number, w: number, h: number, r: number, lit: boolean) {
+  roundedRect(g, x, y + 1.5, w, h, r);
+  g.fillStyle = "rgba(4, 40, 90, 0.16)";
+  g.fill();
+  const body = g.createLinearGradient(0, y, 0, y + h);
+  const [top, mid, bottom] = lit ? PILL_COLORS.aqua : (["#ffffff", "#f6fbff", "#e2f1fd"] as const);
+  body.addColorStop(0, top);
+  body.addColorStop(0.5, mid);
+  body.addColorStop(1, bottom);
+  roundedRect(g, x, y, w, h, r);
+  g.fillStyle = body;
+  g.fill();
+  g.lineWidth = 1.2;
+  g.strokeStyle = lit ? "rgba(0, 80, 150, 0.6)" : "rgba(40, 110, 180, 0.45)";
+  g.stroke();
+}
+
+/** A switch's size, design units. */
+export const SWITCH = { w: 46, h: 26 };
+
+/** A switch, centred on (x, y): its knob to the right and its track green when it is on. */
+export function toggle(g: Ctx, x: number, y: number, on: boolean) {
+  const { w, h } = SWITCH;
+  const left = x - w / 2;
+  const top = y - h / 2;
+  roundedRect(g, left, top, w, h, h / 2);
+  const track = g.createLinearGradient(0, top, 0, top + h);
+  if (on) {
+    track.addColorStop(0, "#3cb52a");
+    track.addColorStop(1, "#7fdb4e");
+  } else {
+    track.addColorStop(0, "rgba(13, 59, 102, 0.34)");
+    track.addColorStop(1, "rgba(13, 59, 102, 0.18)");
+  }
+  g.fillStyle = track;
+  g.fill();
+  g.lineWidth = 1.2;
+  g.strokeStyle = on ? "rgba(20, 110, 20, 0.55)" : "rgba(13, 59, 102, 0.4)";
+  g.stroke();
+  orb(g, on ? left + w - h / 2 : left + h / 2, y, h / 2 - 2.5, "glass");
+}
+
+/** How far down a list is: a thumb `share` of the track long (0 to 1), `at` of the way along what is left (0 to 1). */
+export function scrollbar(g: Ctx, x: number, y: number, h: number, at: number, share: number) {
+  const w = 5;
+  roundedRect(g, x, y, w, h, w / 2);
+  g.fillStyle = "rgba(13, 59, 102, 0.12)";
+  g.fill();
+  const length = Math.max(24, h * Math.max(0, Math.min(1, share)));
+  roundedRect(g, x, y + (h - length) * Math.max(0, Math.min(1, at)), w, length, w / 2);
+  g.fillStyle = "rgba(20, 110, 190, 0.6)";
+  g.fill();
+}
+
 /** `focused`: the remote's focus is on it; `hover`: a pointer is over it, which only brightens it a little. */
 export type PillStyle = { focused?: boolean; hover?: boolean; color?: "aqua" | "green" | "orange" | "pink" | "glass"; disabled?: boolean; press?: number; /** The label's size, if not the pill's own. */ size?: number };
 
@@ -262,6 +372,26 @@ export function wrap(g: Ctx, value: string, width: number, size: number, weight 
   return lines;
 }
 
+/** Words as they fit somewhere: how big, and how wide at that size. */
+export type Fit = { value: string; room: number; most: number; size: number; width: number };
+/** What was last measured for each thing written (an item, an option): measuring crosses into the host on the Apple TV, so it is done when something changes, not every frame. */
+const FITS = new WeakMap<object, Fit>();
+
+/** The biggest `value` can be written in `room`, from `most` down to `least`; `of` is what it is written for, which remembers it. */
+export function fitText(g: Ctx, of: object, value: string, room: number, most: number, least = 8): Fit {
+  let f = FITS.get(of);
+  if (f && f.value === value && f.room === room && f.most === most) return f;
+  if (!f) FITS.set(of, (f = { value, room, most, size: 0, width: 0 }));
+  g.font = font(most);
+  const width = g.measureText(value).width;
+  f.value = value;
+  f.room = room;
+  f.most = most;
+  f.size = Math.max(least, Math.min(most, Math.floor((most * room) / Math.max(1, width))));
+  f.width = (width * f.size) / most;
+  return f;
+}
+
 /** A glossy track with a jelly thumb, `value` from 0 to 1. */
 export function slider(g: Ctx, x: number, y: number, w: number, value: number, focused: boolean) {
   const h = 12;
@@ -321,8 +451,8 @@ export function chevron(g: Ctx, x: number, y: number, dir: -1 | 1, enabled: bool
   g.restore();
 }
 
-/** A round glass button with a symbol on it, for a pointer to press: back (a chevron) or the menu (two bars, as for pause). */
-export function iconButton(g: Ctx, x: number, y: number, r: number, icon: "back" | "menu", hot = false) {
+/** A round glass button with a symbol on it, for a pointer to press: back or on (a chevron), or the menu (three bars). */
+export function iconButton(g: Ctx, x: number, y: number, r: number, icon: "back" | "next" | "menu", hot = false) {
   g.save();
   softShadow(g, x - r, y - r, r * 2, r * 2, r, 5, 0.18);
   orb(g, x, y, r, hot ? "aqua" : "glass");
@@ -334,10 +464,11 @@ export function iconButton(g: Ctx, x: number, y: number, r: number, icon: "back"
     const h = r * 0.16;
     for (let i = -1; i <= 1; i++) g.fillRect(x - w / 2, y + i * r * 0.3 - h / 2, w, h);
   } else {
+    const dir = icon === "next" ? -1 : 1;
     g.beginPath();
-    g.moveTo(x + r * 0.16, y - r * 0.36);
-    g.lineTo(x - r * 0.22, y);
-    g.lineTo(x + r * 0.16, y + r * 0.36);
+    g.moveTo(x + dir * r * 0.16, y - r * 0.36);
+    g.lineTo(x - dir * r * 0.22, y);
+    g.lineTo(x + dir * r * 0.16, y + r * 0.36);
     g.lineWidth = r * 0.2;
     g.lineCap = "round";
     g.lineJoin = "round";

@@ -3,12 +3,13 @@
 // attribution, which Apple requires of an app showing its data.
 
 import type { RemoteButton, WeatherAttribution } from "@fly/contracts";
-import { INK, INK_SOFT, Scroller, glassPanel, hintChip, hintWidth, iconButton, orb, pill, roundedRect, text, wrap } from "@fly/ui";
+import { INK, INK_SOFT, Scroller, iconButton, orb, pill, scrollbar, sheet, text, wrap } from "@fly/ui";
 import type { HitMap } from "@fly/ui";
 import type { Frame } from "../../display.ts";
+import { drawHintBar } from "../hint-bar.ts";
+import type { Hint } from "../hint-bar.ts";
 import { backButton, fitPane } from "../layout.ts";
 import type { Rect } from "../layout.ts";
-import { drawMenuHints } from "./menu-screen.ts";
 import { SCREEN_HITS } from "./types.ts";
 import type { Point, Screen, Shell } from "./types.ts";
 
@@ -43,6 +44,10 @@ export function weatherBlock(a: WeatherAttribution): Block {
 const BODY = 16;
 const LINE = 23;
 const HEADING = 19;
+
+/** What the buttons do: on the page, and among the acknowledgements. */
+const PAGE_HINTS: readonly Hint[] = [{ glyph: "upDown", label: "Scroll" }, { glyph: "select", label: "Open" }, { glyph: "back", label: "Back" }];
+const NOTICE_HINTS: readonly Hint[] = [{ glyph: "upDown", label: "Scroll" }, { glyph: "leftRight", label: "Notice" }, { glyph: "back", label: "Back" }];
 
 /** Keep the footer above button hints, even when a keyboard is used on a tall screen. */
 function readingPane(frame: Frame): Rect {
@@ -159,19 +164,18 @@ export class AboutScreen implements Screen {
       this.#scroll.setExtent(content, h - 150);
     }
     hits.add(SCREEN_HITS.panel, x, y, w, h);
-    glassPanel(g, x, y, w, h, 28);
+    sheet(g, x, y, w, h, 28);
     text(g, this.#notice < 0 ? "About the fly" : "Acknowledgements", x + w / 2 + (this.#shell.glyphs === null ? 16 : 0), y + 44, { size: this.#notice < 0 ? 26 : w < 420 ? 18 : 24, align: "center", color: INK });
     if (this.#shell.glyphs === null) {
       const b = backButton(this.#pane, y + 44);
       iconButton(g, b.x, b.y, b.r, "back");
       hits.add(SCREEN_HITS.back, b.x - 24, b.y - 24, 48, 48);
     }
-    // The page, clipped to its window.
+    // The page, in its window: whole lines only, so none is cut through.
     const top = y + 70;
     const bottom = y + h - 66;
     let ly = top + 22 - this.#scroll.offset;
     for (const line of this.#lines) {
-      // Whole lines only: the Apple TV's canvas has no clipping.
       if (ly - 16 > top && ly < bottom) {
         if (line.heading) {
           if (line.bullet) orb(g, x + pad + 4, ly - 6, 6, "green");
@@ -181,38 +185,20 @@ export class AboutScreen implements Screen {
       ly += line.heading ? LINE + 6 : LINE;
     }
     // How far down the page is.
-    if (this.#scroll.max > 0) {
-      const track = bottom - top - 20;
-      const thumb = Math.max(30, track * ((h - 150) / (h - 150 + this.#scroll.max)));
-      const at = top + 10 + (track - thumb) * (this.#scroll.offset / this.#scroll.max);
-      roundedRect(g, x + w - 18, at, 6, thumb, 3);
-      g.fillStyle = "rgba(20, 110, 190, 0.5)";
-      g.fill();
-    }
-    text(g, this.#scroll.offset < this.#scroll.max ? "▼ more" : "", x + w - 40, bottom + 8, { size: 12, color: INK_SOFT, align: "right" });
+    if (this.#scroll.max > 0) scrollbar(g, x + w - 17, top + 10, bottom - top - 20, this.#scroll.offset / this.#scroll.max, (h - 150) / (h - 150 + this.#scroll.max));
     const foot = y + h - 46;
     if (this.#notice < 0) {
       const bw = Math.min(230, w - 48);
       pill(g, x + (w - bw) / 2, foot, bw, 34, "Acknowledgements →", { focused: this.#shell.glyphs !== null, size: 15 });
       hits.add("notice", x + (w - bw) / 2, foot - 7, bw, 48, 0);
     } else {
-      pill(g, x + 24, foot, 48, 34, "←", { size: 20 });
-      pill(g, x + w - 72, foot, 48, 34, "→", { size: 20 });
+      iconButton(g, x + 48, foot + 17, 17, "back");
+      iconButton(g, x + w - 48, foot + 17, 17, "next");
       hits.add("notice", x + 24, foot - 7, 48, 48, 0);
       hits.add("notice", x + w - 72, foot - 7, 48, 48, 1);
       text(g, this.#pageLabel, x + w / 2, foot + 23, { size: 14, align: "center", color: INK_SOFT });
     }
-    if (this.#notice < 0) drawMenuHints(g, t, this.#shell);
-    else if (this.#shell.glyphs) {
-      const set = this.#shell.glyphs;
-      const total = hintWidth(g, "Scroll", 13, "upDown", set) + hintWidth(g, "Notice", 13, "leftRight", set) + hintWidth(g, "Back", 13, "back", set) + 20;
-      const frame = this.#shell.shape;
-      const hy = frame.design.height - frame.safe.bottom - 26;
-      let hx = frame.safe.left + (frame.design.width - frame.safe.left - frame.safe.right - total) / 2;
-      hx += hintChip(g, hx, hy, "upDown", "Scroll", t, 13, set) + 10;
-      hx += hintChip(g, hx, hy, "leftRight", "Notice", t, 13, set) + 10;
-      hintChip(g, hx, hy, "back", "Back", t, 13, set);
-    }
+    drawHintBar(g, t, this.#shell, this.#notice < 0 ? PAGE_HINTS : NOTICE_HINTS);
   }
 }
 

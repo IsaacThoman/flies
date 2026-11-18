@@ -7,9 +7,11 @@
 // place a picture is kept.
 
 import type { RemoteButton } from "@fly/contracts";
-import { INK, INK_SOFT, bubbleRing, drawGlyph, font, glassPanel, iconButton, orb, pill, roundedRect, text } from "@fly/ui";
-import type { Glyph, HitMap } from "@fly/ui";
+import { INK, INK_SOFT, bubbleRing, font, iconButton, orb, pill, roundedRect, scrollbar, sheet, text } from "@fly/ui";
+import type { HitMap } from "@fly/ui";
 import type { Frame } from "../../display.ts";
+import { drawHintBar } from "../hint-bar.ts";
+import type { Hint } from "../hint-bar.ts";
 import type { Entry, Journal } from "../../journal/store.ts";
 import { PLACES } from "../../places/catalog.ts";
 import { drawToolIcon } from "../../tools/view.ts";
@@ -25,8 +27,8 @@ export type JournalGrid = { x: number; y: number; w: number; h: number; columns:
 
 const CAPTION = 24;
 const GAP = 12;
-/** A picture in the grid is about this wide, design units. */
-const CELL = 150;
+/** A picture in the grid is between these wide, design units: big enough to see the fly in, small enough for a few to show. */
+const CELL = { least: 110, most: 230 };
 
 export function journalGrid(pane: Rect): JournalGrid {
   const pad = pane.w < 520 ? 16 : 28;
@@ -34,12 +36,18 @@ export function journalGrid(pane: Rect): JournalGrid {
   const y = pane.y + 72;
   const w = pane.w - 2 * pad;
   const h = Math.max(1, pane.y + pane.h - 20 - y);
-  const columns = Math.max(2, Math.min(5, Math.floor((w + GAP) / (CELL + GAP))));
-  const cellW = (w - GAP * (columns - 1)) / columns;
-  const cellH = Math.round((cellW * 9) / 16);
-  const rowH = cellH + CAPTION + GAP;
-  const rows = Math.max(1, Math.floor((h + GAP) / rowH));
-  return { x, y, w, h, columns, rows, cellW, cellH, rowH, gap: GAP };
+  // As many across as fills the pane's height with whole rows; of those that fill it as well, the fewest, so the pictures are as big as they can be.
+  const fewest = Math.max(2, Math.ceil((w + GAP) / (CELL.most + GAP)));
+  const most = Math.max(fewest, Math.min(5, Math.floor((w + GAP) / (CELL.least + GAP))));
+  let best: JournalGrid | null = null;
+  for (let columns = fewest; columns <= most; columns++) {
+    const cellW = (w - GAP * (columns - 1)) / columns;
+    const cellH = Math.round((cellW * 9) / 16);
+    const rowH = cellH + CAPTION + GAP;
+    const rows = Math.max(1, Math.floor((h + GAP) / rowH));
+    if (!best || Math.min(h, rows * rowH) > Math.min(h, best.rows * best.rowH) + 8) best = { x, y, w, h, columns, rows, cellW, cellH, rowH, gap: GAP };
+  }
+  return best!;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -187,10 +195,15 @@ export function drawMomentIcon(g: CanvasRenderingContext2D, entry: Pick<Entry, "
   g.restore();
 }
 
-const GRID_HINTS: readonly Glyph[] = ["arrows", "select", "back"];
-const BACK_HINT: readonly Glyph[] = ["back"];
-const OPEN_HINTS: readonly Glyph[] = ["leftRight", "upDown", "back"];
-const OPEN_BARE_HINTS: readonly Glyph[] = ["leftRight", "back"];
+/** What the buttons do: in the grid; with nothing in it; with a picture open (and, where it has buttons under it, on the picture and on them). */
+const BACK: Hint = { glyph: "back", label: "Back" };
+const CLOSE: Hint = { glyph: "back", label: "Close" };
+const BROWSE: Hint = { glyph: "leftRight", label: "Next" };
+const GRID_HINTS: readonly Hint[] = [{ glyph: "arrows" }, { glyph: "select", label: "Open" }, BACK];
+const EMPTY_HINTS: readonly Hint[] = [BACK];
+const OPEN_HINTS: readonly Hint[] = [BROWSE, { glyph: "upDown", label: "More" }, CLOSE];
+const OPEN_BARE_HINTS: readonly Hint[] = [BROWSE, CLOSE];
+const ACTION_HINTS: readonly Hint[] = [{ glyph: "leftRight" }, { glyph: "select", label: "Select" }, CLOSE];
 
 /** Pictures decoded and kept for drawing, at most: the rest are decoded again when they come into view. */
 const DECODED = 48;
@@ -223,6 +236,9 @@ export class JournalScreen implements Screen {
   #time = 0;
   /** Where a drag started, rows. */
   #from = -1;
+  #countedAt = -1;
+  #countedOf = -1;
+  #countedAs = "";
 
   constructor(shell: Shell) {
     this.#shell = shell;
@@ -426,7 +442,7 @@ export class JournalScreen implements Screen {
     const { x, y, w, h } = this.#pane;
     const shell = this.#shell;
     hits.add(SCREEN_HITS.panel, x, y, w, h);
-    glassPanel(g, x, y, w, h, 28);
+    sheet(g, x, y, w, h, 28);
     const pointing = shell.glyphs === null;
     text(g, "Journal", x + w / 2 + (pointing ? 16 : 0), y + 44, { size: 26, align: "center", color: INK });
     if (pointing) {
@@ -438,7 +454,7 @@ export class JournalScreen implements Screen {
     if (this.#open >= 0 && this.#entries[this.#open]) this.#drawOpen(g, t, hits);
     else this.#drawGrid(g, t, hits);
     this.shown = this.#drawn;
-    if (this.#open < 0) this.#drawHints(g, this.#entries.length ? GRID_HINTS : BACK_HINT);
+    if (this.#open < 0) drawHintBar(g, t, shell, this.#entries.length ? GRID_HINTS : EMPTY_HINTS);
   }
 
   #drawGrid(g: CanvasRenderingContext2D, t: number, hits: HitMap) {
@@ -467,17 +483,18 @@ export class JournalScreen implements Screen {
       hits.add(JOURNAL_HITS.cell, cx, cy, grid.cellW, grid.cellH + CAPTION, i);
       if (focusShown && i === this.#focus) bubbleRing(g, cx, cy, grid.cellW, grid.cellH, 10, t);
     }
-    // More above or below.
+    // How far down the pictures are.
     const rows = Math.ceil(entries.length / grid.columns);
-    if (this.#top > 0) text(g, "▲", this.#pane.x + this.#pane.w - 22, grid.y + 8, { size: 12, color: INK_SOFT, align: "center" });
-    if (this.#top + grid.rows < rows) text(g, "▼", this.#pane.x + this.#pane.w - 22, grid.y + grid.h - 4, { size: 12, color: INK_SOFT, align: "center" });
+    if (rows > grid.rows) scrollbar(g, this.#pane.x + this.#pane.w - 14, grid.y, grid.h, this.#top / (rows - grid.rows), grid.rows / rows);
   }
 
   #drawOpen(g: CanvasRenderingContext2D, t: number, hits: HitMap) {
     const { x, y, w, h } = this.#pane;
     const entry = this.#entries[this.#open];
-    const pad = w < 520 ? 16 : 28;
-    const arrows = 48 + 12;
+    const narrow = w < 520;
+    const pad = narrow ? 16 : 28;
+    // Narrow, the picture has the pane's width and the arrows are over its edges; wide, they stand either side of it.
+    const arrows = narrow ? 0 : 48 + 12;
     const area = { x: x + pad + arrows, y: y + 66, w: w - 2 * (pad + arrows), h: h - 66 - 100 };
     const aspect = entry.size ? entry.w / entry.h : 16 / 9;
     const pw = Math.min(area.w, area.h * aspect);
@@ -486,11 +503,20 @@ export class JournalScreen implements Screen {
     const py = area.y + (area.h - ph) / 2;
     this.#drawPicture(g, entry, px, py, pw, ph, false);
     this.#drawCaption(g, entry, px, py + ph + 26, pw, 16, Date.now());
-    const mid = py + ph / 2 - 17;
-    pill(g, x + pad, mid, 48, 34, "←", { size: 20, disabled: this.#open <= 0 });
-    pill(g, x + w - pad - 48, mid, 48, 34, "→", { size: 20, disabled: this.#open >= this.#entries.length - 1 });
-    hits.add(JOURNAL_HITS.prev, x + pad, mid - 7, 48, 48);
-    hits.add(JOURNAL_HITS.next, x + w - pad - 48, mid - 7, 48, 48);
+    // Either side of it, the way to the one before and the one after, dimmed at the ends; over its corner, which of how many it is.
+    const mid = py + ph / 2;
+    const first = this.#open <= 0;
+    const last = this.#open >= this.#entries.length - 1;
+    if (first) g.globalAlpha *= 0.35;
+    const inset = narrow ? 6 : 0;
+    iconButton(g, x + pad + inset + 24, mid, 19, "back");
+    if (first) g.globalAlpha /= 0.35;
+    if (last) g.globalAlpha *= 0.35;
+    iconButton(g, x + w - pad - inset - 24, mid, 19, "next");
+    if (last) g.globalAlpha /= 0.35;
+    hits.add(JOURNAL_HITS.prev, x + pad + inset, mid - 24, 48, 48);
+    hits.add(JOURNAL_HITS.next, x + w - pad - inset - 48, mid - 24, 48, 48);
+    text(g, this.#counted(), x + w - pad, y + 46, { size: 13, weight: 400, align: "right", color: INK_SOFT });
     const actions = this.#actions();
     const coarse = this.#shell.shape.coarse;
     const labels = { save: coarse ? "Share" : "Save", remove: "Remove" };
@@ -505,7 +531,18 @@ export class JournalScreen implements Screen {
       bx += bw + 16;
     });
     if (this.#shell.glyphs && this.#action < 0) bubbleRing(g, px, py, pw, ph, 10, t, 0.6);
-    this.#drawHints(g, actions.length ? OPEN_HINTS : OPEN_BARE_HINTS);
+    drawHintBar(g, t, this.#shell, this.#action >= 0 ? ACTION_HINTS : actions.length ? OPEN_HINTS : OPEN_BARE_HINTS);
+  }
+
+  /** Which of how many the open picture is, written again only when it changes. */
+  #counted() {
+    const count = this.#entries.length;
+    if (this.#countedAt !== this.#open || this.#countedOf !== count) {
+      this.#countedAt = this.#open;
+      this.#countedOf = count;
+      this.#countedAs = `${this.#open + 1} / ${count}`;
+    }
+    return this.#countedAs;
   }
 
   /** A picture, filling its place (cropped to it, in the grid) or fitted (open big); a first without one shows its icon instead. */
@@ -547,17 +584,6 @@ export class JournalScreen implements Screen {
     text(g, date, x + w - 2, y, { size, weight: 400, align: "right", color: INK_SOFT });
     const room = x + w - 2 - g.measureText(date).width - 8 - left;
     if (label && room > size * 2) text(g, fit(g, label, room, size), left, y, { size, color: INK });
-  }
-
-  /** The remote's hints along the bottom: in the grid, the arrows, Select and Back; open big, Left and Right through the pictures, Down to its buttons, and Back. */
-  #drawHints(g: CanvasRenderingContext2D, glyphs: readonly Glyph[]) {
-    const set = this.#shell.glyphs;
-    if (!set || this.#shell.settings.hints === false) return;
-    const { design, safe } = this.#shell.shape;
-    const y = design.height - safe.bottom - 26;
-    const gap = Math.min(72, (design.width - safe.left - safe.right) / 4);
-    const cx = safe.left + (design.width - safe.left - safe.right) / 2;
-    glyphs.forEach((glyph, i) => drawGlyph(g, glyph, cx + (i - (glyphs.length - 1) / 2) * gap, y, 25, 0, set));
   }
 }
 

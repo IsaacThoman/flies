@@ -5,7 +5,7 @@
 // one drawImage, not a path of hundreds of squares, which the Apple TV's 2D
 // canvas would pay for in every redraw.
 
-import { INK, glassPanel, qrCode, roundedRect, text } from "@fly/ui";
+import { INK, qrCode, roundedRect, sheet, text } from "@fly/ui";
 import { pixelsPerUnit } from "../display.ts";
 import type { Frame } from "../display.ts";
 import type { RoomLayout } from "./layout.ts";
@@ -20,7 +20,7 @@ export class RoomCard {
 
   draw(g: CanvasRenderingContext2D, frame: Frame, layout: RoomLayout, room: { code: string; link: string }) {
     const { card, qr, code } = layout;
-    glassPanel(g, card.x, card.y, card.w, card.h, 24);
+    sheet(g, card.x, card.y, card.w, card.h, 24);
     roundedRect(g, qr.x, qr.y, qr.w, qr.h, 10);
     g.fillStyle = "#ffffff";
     g.fill();
