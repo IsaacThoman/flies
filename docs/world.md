@@ -519,7 +519,16 @@ and the patchiness of real plumes, the time a smell takes to spread, walls
 and lids in its way. Each device works out the smell of a shared table's food
 itself, from what it is; nothing about smell crosses the wire.
 [The protocol](smell-protocol.md) fixed all of this before anything was
-measured, and says what was measured with it ([simulation.md](simulation.md#the-flys-senses), Smell).
+measured.
+
+In still air the places' fruit leaves a trace over most of each table: at each
+place's start the strongest odorant is about 0.01 (the restaurant) to 0.13
+(the greenhouse's tomatoes and fig, the kitchen's banana); at the lab, beside
+its vials of fermenting food, 0.16 to 0.2 of all five. What the fly does with
+it is measured in [the brain's Smell](../packages/brain/README.md#smell): it
+turns toward a smell at one antenna, but fermenting food 12 mm upwind doesn't
+bring it there detectably sooner, and beside such food it sleeps a little less
+at night.
 
 ## Footprints
 

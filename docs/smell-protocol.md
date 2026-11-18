@@ -121,3 +121,15 @@ eats if it eats that food at all. **Fails** (a check of the ship rule) if
 fewer trials eat with smell, exact one-sided McNemar p < 0.05 on the
 discordant pairs; every food whose count changes is reported.
 
+
+## What came of it
+
+Reported in full in [the brain's Smell](../packages/brain/README.md#smell).
+Smell doesn't help by the rule above: 36 of 40 against 34 of 40 in the draught
+(p = 0.36), 34 against 34 in still air. No check fails, so smell is in the
+game by default. Two things the protocol didn't foresee, reported and left as
+they are: in 12 of the 40 pairs the 30 s of settling had already carried the
+fly to the food when the odour began; and a 20 mm/s draught isn't felt as wind
+at all (the body's wind sense drops anything under 0.005 each step before a
+slow, steady air can build up), so the two airs' runs without odour are the
+same runs, spike for spike.

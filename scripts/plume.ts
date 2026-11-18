@@ -188,12 +188,15 @@ function reduce(dir: string) {
     const on = new Map(rs.filter((r) => r.odour).map((r) => [key(r), r]));
     const off = new Map(rs.filter((r) => !r.odour).map((r) => [key(r), r]));
     let b = 0, c = 0, eatOnly = 0, eatOffOnly = 0, mismatched = 0;
+    // Described, not decided on: in pairs where both reach after odour starts, the difference in time.
+    const sooner: number[] = [];
     for (const [k, r] of on) {
       const o = off.get(k);
       if (!o) continue;
       if (JSON.stringify(r.onset) !== JSON.stringify(o.onset)) mismatched++;
       if (r.reached && !o.reached) b++;
       if (!r.reached && o.reached) c++;
+      if (r.reached && o.reached && (r.time as number) > 0.01 && (o.time as number) > 0.01) sooner.push((o.time as number) - (r.time as number));
       if (r.reached && o.reached) {
         if (r.ateWithin && !o.ateWithin) eatOnly++;
         if (!r.ateWithin && o.ateWithin) eatOffOnly++;
@@ -213,6 +216,7 @@ function reduce(dir: string) {
       discordant: { onOnly: b, offOnly: c, mcnemarOneSidedP: mcnemar(b, c) },
       feeding: { pairsBothReached: [...on.keys()].filter((k) => on.get(k)!.reached && off.get(k)?.reached).length, ateOnlyWithOdour: eatOnly, ateOnlyWithout: eatOffOnly, breakP: mcnemar(eatOffOnly, eatOnly) },
       settlingMismatches: mismatched,
+      pairedTimes: { pairs: sooner.length, soonerWithOdour: sooner.filter((d) => d > 0).length, laterWithOdour: sooner.filter((d) => d < 0).length, medianSecondsSooner: sooner.length ? sooner.sort((x, y) => x - y)[Math.floor((sooner.length - 1) / 2)] : null },
       runs: rs.map((r) => ({ seed: r.seed, layout: r.layout as number, odour: r.odour, reached: r.reached, time: r.time, ate: r.ateWithin, closest: Number((r.closest as number).toFixed(2)) })).sort((x, y) => x.seed - y.seed || x.layout - y.layout || Number(x.odour) - Number(y.odour)),
     };
   }
