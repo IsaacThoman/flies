@@ -78,6 +78,8 @@ unknown capture dates and machines are identified rather than inferred.
 | Get a release to TestFlight | [Release](docs/release.md) |
 | Understand wiring, model behavior and limitations | [Brain](packages/brain/README.md) |
 | See whether the central complex can hold a heading and steer by it | [Central complex probe](docs/central-complex.md) |
+| See how smell was put in the world and what it does | [Smell in the world](docs/smell-protocol.md), [hunger on smell](docs/smell-hunger-protocol.md), [the antennal lobe's gain](docs/antennal-lobe-gain-protocol.md), [learning from smells](docs/smell-learning-protocol.md) |
+| See whether DNa02's recordings can set the fly's steering | [Steering](docs/ethogram/steering.md) |
 | Change C++/Wasm and check comparison limits | [Native brain](packages/brain-native/README.md) |
 | Change the fly's model or posing | [Fly](packages/fly/README.md) |
 | Find dated artifact sizes and measurement limits | [Measurement provenance](docs/measurements.md) |

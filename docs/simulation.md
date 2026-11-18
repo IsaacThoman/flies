@@ -31,8 +31,8 @@ hungry the fly is, from 0 just fed to 1 starved, and of how full its crop is.
 Hunger rises toward 1 with a time constant of 12 minutes; what it eats brings
 it down by the food's sweetness times how much it ate, so a whole lump of
 sugar takes a starved fly to fed. The brain is sent it every frame: it sets how
-strongly the sweet taste neurons pass on what they taste and how restless the
-fly is (`packages/brain/README.md`, Hunger). A real fly gets hungry over hours
+strongly the sweet taste neurons, and three glomeruli's smell neurons, pass on
+what they sense, and how restless the fly is (`packages/brain/README.md`, Hunger). A real fly gets hungry over hours
 and is starved after a day, so hunger runs 60 times faster than life here:
 what takes a real fly an hour takes this one a minute. Nothing else does. A
 new fly starts at 0.7, hungry enough to go and look for food; one that has
