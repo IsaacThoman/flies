@@ -4,6 +4,7 @@
 import type { BrainDriver } from "@fly/contracts";
 import { INK, INK_SOFT, font, glassPanel, pill, roundedRect, text, wrap } from "@fly/ui";
 import type { HitMap } from "@fly/ui";
+import { unmirrored } from "../brain/mirror.ts";
 import type { BrainFailure, BrainSource } from "../brain/worker-driver.ts";
 import type { LoadingLayout } from "./layout.ts";
 import { drawWordmark } from "./wordmark.ts";
@@ -11,7 +12,11 @@ import { drawWordmark } from "./wordmark.ts";
 /** A brain that arrives over the network (worker-driver.ts): what the loading screen follows. */
 export type Arriving = BrainDriver & { phase: "download" | "build" | "done"; progress: number; failure: BrainFailure | null; source: BrainSource; retry(): void };
 
-export const arriving = (brain: BrainDriver): brain is Arriving => "source" in brain && "phase" in brain;
+/** The brain that arrives over the network, behind the mirror or not (brain/mirror.ts), or null for one that doesn't. */
+export function arrival(brain: BrainDriver): Arriving | null {
+  const inner = unmirrored(brain);
+  return "source" in inner && "phase" in inner ? (inner as Arriving) : null;
+}
 
 /** Why it can't run when the page can't even draw the world: the browser lacks WebGL 2. */
 export type PageFailure = "webgl";
@@ -23,7 +28,7 @@ const format = (n: number) => Math.round(n).toLocaleString("en-US");
 const megabytes = (bytes: number) => (bytes / 1e6).toFixed(1);
 
 export function drawLoading(g: CanvasRenderingContext2D, t: number, brain: BrainDriver, layout: LoadingLayout, hits: HitMap) {
-  const loading = arriving(brain) ? brain : null;
+  const loading = arrival(brain);
   const phase = loading?.phase ?? (brain.status === "running" ? "done" : "build");
   const progress = loading?.progress ?? 0;
   const { wordmark } = layout;

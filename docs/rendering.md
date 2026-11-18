@@ -41,6 +41,19 @@ played back in a third:
   the positions the drawing puts them (`somaPlaces`). The corner pictures make
   way for it, as for View → Fly's eyes.
 
+**A mirrored fly** ([Handedness](simulation.md#handedness)). The wiring
+drawn and run is one real male's, and half the flies are his mirror image.
+For one of those, each side's rates are exchanged before anything is drawn
+(`apps/web/src/brain/mirror.ts`): its left optic lobe, its left DNa02 and
+every region on its left glow with what the brain's right side does, which is
+what that side of the mirrored fly does, and so do the stats' In and out and
+Why?. The neuropils are drawn symmetric (below), so the drawing is the
+mirrored fly's as much as the traced one's; the command groups' cell bodies
+stay where the traced fly's are, not reflected, a few micrometres off for a
+mirrored fly. The corner picture of what it sees is what its own eyes see:
+its left eye is the brain's right, reflected, with the 12 facets the right
+eye has more.
+
 **The anatomy** (`packages/fly/src/nerves/`). The neuropils are measured from
 the FlyEM male CNS v1.0's own neuropil meshes (one male's brain, neck and
 cord in one EM volume, CC-BY 4.0) by `packages/fly/scripts/nerves.ts`, which
