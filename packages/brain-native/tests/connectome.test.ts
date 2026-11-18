@@ -28,7 +28,7 @@ for (const target of BUILDS) {
     const { ticks, expected } = typescriptRun();
     const actual = native(target.dir(), CONNECTOME, seed, ticks);
     assert.equal(firstDifference(expected, actual, ticks), null);
-    assert.match(expected[0], /^ready 166700 .*\|MN9\|pIP10\|region\.retina-left\|.*\|region\.unplaced\|vision\.lamina left\|.*\|vision\.tangential right$/);
+    assert.match(expected[0], /^ready 166700 .*\|MN9\|pIP10\|DNp02\|DNp11\|region\.retina-left\|.*\|region\.unplaced\|vision\.lamina left\|.*\|vision\.tangential right$/);
     const simulated = ticks.reduce((sum, { dt }) => sum + (dt >= 0 && dt <= 1000 ? dt : 0), 0);
     assert.ok(simulated >= 70_000, `${simulated} ms simulated`);
     assert.ok(ticks.filter((tick) => tick.senses.light).length > 3000);

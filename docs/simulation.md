@@ -263,16 +263,17 @@ lives (`packages/body/src/motion.ts` unless noted):
   its head on the near side, and turning beside a wall its legs swing clear;
   between two things too close for it as it faces, they turn it a quarter
   turn if it fits so.
-- **The take-off's direction.** The escape command launches it (380 to 620 mm/s
-  up and 160 to 340 away, by how far past 0.4 it went); the direction is the
-  body's: away from the ball if the ball is in the air, or from the
-  fingertip while it moves fast, else straight ahead.
+- **The take-off's speed.** The escape command launches it (380 to 620 mm/s
+  up and 160 to 340 along its heading, by how far past 0.4 it went). Whether
+  along its heading forward or backward is the brain's `lean` (DNp11 against
+  DNp02, `packages/brain/README.md`, Which way it jumps); it never jumps
+  sideways, since nothing read carries left against right.
 - **Flying on: the tarsal reflex** (`behavior.ts`, see Flight). Off its feet,
   the body keeps a floor under the wings' drive until it lands.
 - **Facing its course.** In the air it turns to face the way it is going (at
   up to 8/s of the angle between), and the brain's `turn` steers on top:
-  thrust is along its body, so a jump away from the ball would otherwise
-  have its wings carry it straight back.
+  thrust is along its body, so a jump backward would otherwise have its
+  wings carry it straight back; turning, it flies off to one side.
 - **Staying in the world.** It doesn't walk off the table's edge, and in the
   air soft forces draw it toward the place's floor boundary and below its ceiling;
   these are place-dependent, not hard clamps.
@@ -311,14 +312,16 @@ commands and the neurons themselves.
 ## Flight
 
 In recorded swoop samples the fly jumped and flew: up for a second
-and a half to three, a few hundred millimetres away from the ball,
-then a glide down onto whatever is under it. Flight is simple physics (lift in
+and a half to three, a few hundred millimetres, then a glide down onto
+whatever is under it. Flight is simple physics (lift in
 proportion to the wings' drive, 0.6 holding its weight, and thrust along its
 body), driven by the brain's flight motor neurons and, while its feet are off
 the ground, by a body reflex standing in for circuitry the model lacks.
 
 **What the brain does.** It decides whether to go: the body takes off only when
-the giant fiber (DNp01) fires, and nothing else starts a take-off. It steers in
+the giant fiber (DNp01) fires, and nothing else starts a take-off. It decides
+whether the jump goes forward or backward (`lean`, DNp11 minus DNp02, read
+when the giant fiber fires). It steers in
 the air (`turn`, 5 rad/s at full). Its own wing drive counts whenever it is
 higher than the reflex's: the hand-wired loom (eyes off) drives the flight motor
 neurons to `wings` 0.8 to 0.9, and the fly then climbs and flies longer.
@@ -368,8 +371,10 @@ throws each):
 
 | | With the floor | Without it |
 | --- | --- | --- |
-| With the wings' sensors | 29 of 32 flew: 1.5 to 1.6 s, 375 to 409 mm; the brain's `wings` 0.18 to 0.23 on average in the air, peaks 0.26 to 0.53 | 32 of 32 hopped: 0.05 to 0.12 s, 5 to 15 mm |
+| With the wings' sensors | 30 of 32 flew: 1.5 to 1.6 s, 369 to 402 mm, every one jumping backward from the ball coming in ahead; the brain's `wings` 0.18 to 0.22 on average in the air | 32 of 32 hopped: 0.05 to 0.12 s, 5 to 15 mm |
 | Without them | 31 of 32 flew: 1.5 to 1.6 s, 376 to 408 mm; the brain's `wings` 0.06 to 0.15, peaks 0.23 to 0.46 | 32 of 32 hopped: 0.05 to 0.08 s, 6 to 13 mm |
+
+The first cell is remeasured since the jump's direction came from the brain's `lean`; the others were measured while the body jumped away from the ball, which moves where a flight goes but not how long it lasts.
 
 With the floor each flight spends 0.78 s at power and the rest gliding, and
 lands on its feet. Nothing runs away: the wings fold the step it lands, and a
@@ -378,9 +383,10 @@ second later the brain's `wings` is 0 to 0.15 with the floor or without it
 without the floor, lets its wings down within half a second
 (`packages/brain/README.md`, What it does and doesn't reproduce).
 
-The recorded take-offs with the eyes open were flights of 1.5 to 1.6 s, 375 to 409 mm
-along their way, rising 58 to 70 mm, and landed on their feet; with the eyes shut
-(the hand-wired loom, 6 throws a seed), 1.9 to 3.7 s and 485 to 922 mm.
+The recorded take-offs with the eyes open were flights of 1.5 to 1.6 s, 369 to 402 mm
+along their way, rising 58 to 72 mm, and landed on their feet; with the eyes shut
+(the hand-wired loom, 6 throws a seed, seeds 1 to 3), 2.8 to 3.9 s and 719 to 970 mm,
+backward in 13 and forward in 4 of the 17 whose direction was recorded (the brain's `lean` at 0 or a spike of DNp02).
 Before the reflex they were in the air for 0.07 to 0.12 s. The
 fly often crosses the edge of the picnic table and is drawn back over it to land
 (Staying in the world). The automatic camera pulls back in flight and can lead the fly by up to

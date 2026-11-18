@@ -434,7 +434,7 @@ export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick
   for (const { dt, senses } of ticks) {
     try {
       const { command, stats } = brain.tick(dt, senses);
-      const c = [command.walk, command.turn, command.back, command.escape, command.wings, command.groom, command.feed, command.sing];
+      const c = [command.walk, command.turn, command.back, command.escape, command.wings, command.groom, command.feed, command.sing, command.lean];
       const rates = names.map((name) => stats.rates[name]);
       lines.push(
         [

@@ -100,7 +100,7 @@ export class MirroredBrain implements BrainDriver {
     this.inner = inner;
     const rates = () => this.#mirroredRates();
     this.#state = {
-      command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 },
+      command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, lean: 0 },
       stats: {
         simMs: 0,
         wallMs: 0,

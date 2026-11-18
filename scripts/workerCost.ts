@@ -28,7 +28,7 @@ try {
   const { WorkerBrainDriver: Reference } = await import(pathToFileURL(path.join(temp, "driver.ts")).href) as { WorkerBrainDriver: typeof WorkerBrainDriver };
   const run = async (Driver: typeof WorkerBrainDriver, facets: number) => {
     let reply: (response: BrainResponse) => void = () => {};
-    const state: BrainState = { command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 }, stats: { simMs: 16, wallMs: 0, spikes: 0, active: 0, rates: {} } };
+    const state: BrainState = { command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, lean: 0 }, stats: { simMs: 16, wallMs: 0, spikes: 0, active: 0, rates: {} } };
     let checksum = 0;
     const createWorker: BrainWorkerFactory = onMessage => {
       reply = onMessage;

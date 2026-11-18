@@ -296,11 +296,11 @@ int brain(const char* path, uint32_t seed, const Options& options) {
     }
     const fly::io::Command c = fly::io::decode(b->brain.rates());
     std::string out = std::to_string(stats.spikes) + " " + std::to_string(stats.active) + " " + hex64(stats.sim_ms) + " |";
-    for (double x : {c.walk, c.turn, c.back, c.escape, c.wings, c.groom, c.feed, c.sing}) out += " " + hex64(x);
+    for (double x : {c.walk, c.turn, c.back, c.escape, c.wings, c.groom, c.feed, c.sing, c.lean}) out += " " + hex64(x);
     out += " |";
     for (double x : b->brain.rates()) out += " " + hex64(x);
     out += " |";
-    for (float x : {command.walk, command.turn, command.back, command.escape, command.wings, command.groom, command.feed, command.sing}) out += " " + hex32(x);
+    for (float x : {command.walk, command.turn, command.back, command.escape, command.wings, command.groom, command.feed, command.sing, command.lean}) out += " " + hex32(x);
     out += " |";
     for (float x : rates) out += " " + hex32(x);
     const fly::InternalState& state = b->brain.state();

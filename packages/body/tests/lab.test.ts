@@ -7,7 +7,7 @@ import { FlyBody, createIntent } from "../src/index.ts";
 import type { Forces, Intent } from "../src/index.ts";
 
 const DT = 1 / 60;
-const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
+const still: Forces = { air: { x: 0, y: 0, z: 0 }, meal: null };
 const walk: Intent = { ...createIntent(), live: true, walking: true, speed: 6 };
 /** The yaw that faces along a footprint's own u axis (turned by `angle`). */
 const along = (angle: number) => Math.atan2(Math.cos(angle), -Math.sin(angle));

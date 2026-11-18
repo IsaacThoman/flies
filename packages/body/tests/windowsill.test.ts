@@ -8,7 +8,7 @@ import { FlyBody, createIntent } from "../src/index.ts";
 import type { Forces } from "../src/index.ts";
 
 const DT = 1 / 60;
-const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
+const still: Forces = { air: { x: 0, y: 0, z: 0 }, meal: null };
 
 test("walking, it climbs onto the banana's back from its tip", () => {
   const a = bananaAt(0, { x: 0, z: 0 });

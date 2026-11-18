@@ -76,7 +76,7 @@ struct Senses {
 };
 
 struct Command {
-  double walk = 0, turn = 0, back = 0, escape = 0, wings = 0, groom = 0, feed = 0, sing = 0;
+  double walk = 0, turn = 0, back = 0, escape = 0, wings = 0, groom = 0, feed = 0, sing = 0, lean = 0;
 };
 
 enum Side : uint8_t { kLeft, kRight };
@@ -176,7 +176,7 @@ std::vector<RestingSpec> resting();
 std::vector<ReadoutSpec> readouts();
 
 /** decode() reads the readouts by these positions in readouts(). */
-enum Readout : uint8_t { kDNg100, kDNa02Left, kDNa02Right, kMDN, kDNp01, kFlight, kDNg12, kMN9, kPIP10 };
+enum Readout : uint8_t { kDNg100, kDNa02Left, kDNa02Right, kMDN, kDNp01, kFlight, kDNg12, kMN9, kPIP10, kDNp02, kDNp11 };
 
 struct Group {
   InputSpec spec;

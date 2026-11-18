@@ -34,7 +34,7 @@ class Walker implements BrainDriver {
   readonly eyes = null;
   readonly regionRates = new Float32Array(REGIONS.length);
   stateAt = 0;
-  state: BrainState = { command: { walk: 0.6, turn: 0.15, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 }, stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: {} } };
+  state: BrainState = { command: { walk: 0.6, turn: 0.15, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, lean: 0 }, stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: {} } };
   tick() {}
   dispose() {}
 }

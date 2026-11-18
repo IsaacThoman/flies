@@ -1568,7 +1568,6 @@ export class Game implements Shell {
     const hands = this.hands;
     const online = this.online;
     const set = this.#moving ? null : this.stage.set;
-    const own = this.life.stimuli;
     for (let i = 0; i < list.length; i++) {
       const c = list[i];
       const { life, felt, air } = c;
@@ -1602,7 +1601,6 @@ export class Game implements Shell {
       if (this.bubbles.enabled) pushAll(stimuli.looming, this.bubbles.looming);
       pushAll(stimuli.looming, felt.looming);
       if (online) pushAll(stimuli.looming, online.looming);
-      stimuli.threat = own.threat;
       life.step(dt, now);
     }
     this.company.pose();
@@ -1635,7 +1633,6 @@ export class Game implements Shell {
     if (this.bubbles.enabled) for (const b of this.bubbles.looming) stimuli.looming.push(b);
     for (const l of felt.looming) stimuli.looming.push(l);
     if (online) for (const l of online.looming) stimuli.looming.push(l);
-    stimuli.threat = hands.ball.active ? hands.ball.position : (this.finger.threat ?? online?.threat ?? null);
   }
 
   /**

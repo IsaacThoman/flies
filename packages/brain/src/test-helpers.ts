@@ -93,6 +93,8 @@ export function syntheticConnectome({ without = [], change = {} }: { without?: r
   add("MN9", 2, { type: "MN9", superClass: "cb_motor", side: "left" });
   add("interneuron", 2, { type: "GNG001", superClass: "cb_intrinsic", side: "center", nt: "GABA" });
   add("pIP10", 2, { type: "pIP10", superClass: "descending_neuron", side: "left", nt: "ACH" });
+  add("DNp02", 1, { type: "DNp02", superClass: "descending_neuron", side: "left", nt: "ACH" });
+  add("DNp11", 1, { type: "DNp11", superClass: "descending_neuron", side: "right", nt: "ACH" });
   // Slow neuromodulation (modulation.ts): a wake-promoting dopaminergic neuron
   // of the dorsal fan-shaped body (its transmitter blank, as in the data, for
   // params.ts to fix), the sleep-promoting neurons it reaches, and the R5 ring
@@ -149,6 +151,8 @@ export function syntheticConnectome({ without = [], change = {} }: { without?: r
   wire("wing campaniform", "DLM", 40);
   wire("bristle", "MDN", 20);
   wire("LgLG1a", "pIP10", 120);
+  wire("LC4 left", "DNp02", 120);
+  wire("LC4 right", "DNp11", 120);
   // Looming on the left fires the KCs and touch PPL1-γ1pedc, so the senses
   // pair them either way round; MBON-γ1pedc inhibits the left DNa02.
   wire("LC4 left", "KCg", 30);

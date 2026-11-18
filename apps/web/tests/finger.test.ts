@@ -9,7 +9,7 @@ import { AWAY, FINGER_HALF_WIDTH, FINGER_LENGTH, FINGER_THICKNESS, Finger, LIFT,
 
 const DT = 1 / 60;
 const bare: Place = { floor: { kind: "rect", hx: 500, hz: 500 }, solids: [], patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 300 };
-const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
+const still: Forces = { air: { x: 0, y: 0, z: 0 }, meal: null };
 
 /** A fly at the middle facing +z, and a finger pointing at it. */
 function setup(place: Place = bare) {

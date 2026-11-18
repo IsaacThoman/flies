@@ -52,6 +52,12 @@ export const AIR_TURN_RATE = 5;
  * and almost never at dusk; the hand-wired looming pulse, 1. 200 Hz for 1 is
  * the hand-wired pulse's full drive of every looming detector at once, which no
  * picture reaches.
+ *
+ * Which way it jumps is the brain's too: forward or backward along its
+ * heading by the sign of `lean`, DNp11 (forward) minus DNp02 (backward), which
+ * a loom drives by where it is (Dombrovski et al. 2023; packages/brain/README.md,
+ * Which way it jumps). They carry front against behind, not left against
+ * right, so it never jumps sideways.
  */
 export const ESCAPE_ON = 0.4;
 export const ESCAPE_REARM = 0.3;
@@ -150,6 +156,8 @@ export type Intent = {
   airYawRate: number;
   /** A take-off this frame, with its strength 0 to 1; null otherwise. */
   takeOff: number | null;
+  /** Which way along its heading a take-off goes: 1 forward, -1 backward (the brain's `lean`, see ESCAPE_ON). */
+  takeOffAhead: 1 | -1;
   /** The flight muscles' drive, 0 to 1, for the wings' force in the air: the brain's, or the tarsal reflex's floor where that is higher. */
   wings: number;
   /** The floor the tarsal reflex (TARSAL_ONSET) keeps under `wings` now: 0 on its feet. */
@@ -178,6 +186,7 @@ export const createIntent = (): Intent => ({
   yawRate: 0,
   airYawRate: 0,
   takeOff: null,
+  takeOffAhead: 1,
   wings: 0,
   reflex: 0,
   wingPose: 0,
@@ -268,6 +277,8 @@ export class Behavior {
       this.#armed = false;
       this.#refractory = ESCAPE_REFRACTORY;
       out.takeOff = clamp((escape - ESCAPE_ON) / (1 - ESCAPE_ON), 0, 1);
+      // Backward only when DNp02 outweighs DNp11; a fly whose posture hasn't shifted jumps forward.
+      out.takeOffAhead = command.lean < 0 ? -1 : 1;
       // Into flight with the jump (see TARSAL_ONSET).
       this.#aloft = TARSAL_ONSET;
     }

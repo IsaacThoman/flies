@@ -27,7 +27,7 @@ class Commands implements BrainDriver {
   readonly eyes = null;
   readonly regionRates = new Float32Array(REGIONS.length);
   stateAt = 0;
-  state: BrainState = { command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 }, stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: {} } };
+  state: BrainState = { command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, lean: 0 }, stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: {} } };
   tick() {
     this.stateAt = performance.now();
   }
@@ -192,7 +192,7 @@ test("the panel shows real figures and their units without a duplicate activity 
 test("in and out are the senses as sent and the commands as answered, each to the step it is drawn in, with the rates of the neurons each is read from", () => {
   const sensed = { loomLeft: 0.5, loomRight: 0.004, touch: 0, bumpLeft: 0, bumpRight: 0, wind: 0.25, sweet: 1, grounded: false, maleTaste: 0.75, hunger: 0.3, thirst: 0.5, wingbeat: 0.5, bitter: 0.25, water: 0, legsLeft: 0.25, legsRight: 0.125, light: { left: [0.2, 0.4], right: [0.6, 0.8] } };
   const brain: BrainState = {
-    command: { walk: 0.8, turn: -0.5, back: 0, escape: 0, wings: 1, groom: 0, feed: 0.25, sing: 0 },
+    command: { walk: 0.8, turn: -0.5, back: 0, escape: 0, wings: 1, groom: 0, feed: 0.25, sing: 0, lean: 0 },
     stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: { DNg100: 41.6, "DNa02 left": 30.2, "DNa02 right": 12.7, flight: 180, MN9: 3.4, pIP10: 0.2 } },
   };
   const state: StatsState = { spikes: 0, active: 0, speed: 1, history: new Float32Array(HISTORY_SAMPLES), head: 0, day: freshDay("2026-11-16"), sensed, brain };

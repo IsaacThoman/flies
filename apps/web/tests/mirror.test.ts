@@ -136,7 +136,7 @@ class EchoBrain implements BrainDriver {
   stateAt = 0;
   regionRates = new Float32Array(REGIONS.length);
   sent: BrainSenses | null = null;
-  readonly #state: BrainState = { command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 }, stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: {} } };
+  readonly #state: BrainState = { command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, lean: 0 }, stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: {} } };
   #clock = 0;
 
   tick(_dt: number, senses: BrainSenses) {

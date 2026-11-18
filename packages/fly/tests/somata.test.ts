@@ -14,7 +14,7 @@ const skip = !existsSync(new URL("anatomy.bin", data)) || !existsSync(new URL("c
 test("the command somata are the exact readout neurons, registered from true dataset somata", { skip }, async () => {
   const wiring = read("connectome.bin"), c = loadConnectome(wiring);
   const anatomy = await loadAnatomy(read("anatomy.bin"), wiring);
-  assert.equal(SOMA_GROUPS.reduce((n, g) => n + g.neurons.length, 0), 64);
+  assert.equal(SOMA_GROUPS.reduce((n, g) => n + g.neurons.length, 0), 68);
   assert.equal(SOMA_RATE_REFERENCE.connectomeSha256, anatomy.header.connectomeSha256);
   assert.equal(SOMA_GROUPS[1].fullHz, SOMA_GROUPS[2].fullHz, "steering sides share a display scale");
   for (let k = 0; k < READOUTS.length; k++) {

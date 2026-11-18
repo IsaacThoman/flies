@@ -33,7 +33,6 @@ test("with its eyes shut, a finger slid at it fast looms fully, and slid slowly 
     finger.update(DT, true, pointer, life.body.position, bodies);
     life.stimuli.looming.length = 0;
     life.stimuli.looming.push(finger.looming);
-    life.stimuli.threat = finger.threat;
     life.stimuli.contacts.clear();
     finger.touch(life.body, life.stimuli.contacts);
     life.step(DT, performance.now());

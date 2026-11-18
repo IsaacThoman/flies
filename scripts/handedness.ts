@@ -162,7 +162,7 @@ if (values.part === "rest") {
     eyes = null;
     stateAt = 0;
     regionRates = new Float32Array(REGIONS.length);
-    state: BrainState = { command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 }, stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: Object.fromEntries(names.map((n) => [n, 0])) } };
+    state: BrainState = { command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0, lean: 0 }, stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: Object.fromEntries(names.map((n) => [n, 0])) } };
     tick(dtMs: number, senses: BrainSenses) {
       this.stateAt += dtMs;
       this.state.command.turn = senses.loomLeft - senses.loomRight;
