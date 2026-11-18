@@ -95,6 +95,25 @@ export const FORELEG_REACH = 0.1;
  */
 export const PUSH_LEAN = (FORELEG_AHEAD - HEAD_AHEAD - ANTENNA_AHEAD) * FLY_LENGTH + ANTENNA_FULL;
 
+/** The speed of the feet against the body at which the legs' sense is full (BrainSenses.legsLeft), mm/s: about the fastest a fly walks. */
+export const LEGS_FULL_SPEED = 20;
+/**
+ * How far its feet stand out to each side, mm: their mean over the three legs
+ * (packages/fly's LEGS put the feet 0.24, 0.48 and 0.34 body lengths out).
+ */
+export const FEET_SIDE = ((0.24 + 0.48 + 0.34) / 3) * FLY_LENGTH;
+
+/**
+ * How fast the legs on one side (1 its left, -1 its right) move through their
+ * steps, 0 to 1: the speed its planted feet are carried back at against its
+ * body, walking at `speed` (mm/s) and turning at `yawRate` (rad/s, positive
+ * toward its left), as a share of LEGS_FULL_SPEED. Turning, the outer side's
+ * feet travel further. Standing still, 0.
+ */
+export function legMovement(speed: number, yawRate: number, side: 1 | -1): number {
+  return clamp01(Math.abs(speed - side * yawRate * FEET_SIDE) / LEGS_FULL_SPEED);
+}
+
 /** Something it would walk into at (x, z), standing with its feet at `feet`: between a step and its height over them. */
 const wallAt = (world: World, x: number, z: number, feet: number) => world.onTable(x, z) && world.underside(x, z, feet + STEP_UP) < feet + FLY_HEIGHT;
 
@@ -128,6 +147,8 @@ export class SenseTracker {
     water: 0,
     temperatureLeft: AMBIENT_TEMPERATURE,
     temperatureRight: AMBIENT_TEMPERATURE,
+    legsLeft: 0,
+    legsRight: 0,
   };
   readonly tasting: Tasting = { food: null, byMouth: false };
   /** How large each looming thing was in the eye last frame (rad), by id. */
@@ -257,6 +278,9 @@ export class SenseTracker {
     // The air's temperature at each arista, as it is: the brain's thermoreceptors make of it what they do.
     out.temperatureLeft = this.#temperature(body, world, 1);
     out.temperatureRight = this.#temperature(body, world, -1);
+    // Its legs, as they stepped in its last step: their proprioceptors feel each step. In the air they don't step.
+    out.legsLeft = body.onFeet ? legMovement(body.groundSpeed, body.turnRate, 1) : 0;
+    out.legsRight = body.onFeet ? legMovement(body.groundSpeed, body.turnRate, -1) : 0;
     return out;
   }
 

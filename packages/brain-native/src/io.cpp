@@ -8,6 +8,7 @@
 #include <unordered_set>
 
 #include "fdlibm.hpp"
+#include "leg_sensors.hpp"
 
 namespace fly::io {
 
@@ -74,6 +75,19 @@ const std::vector<uint32_t> kForelegMaleTaste = {
 // at full flight power (io.ts's LEG_CAMPANIFORM and WINGBEAT_RATE say why).
 constexpr const char* kLegCampaniform = "SNpp53";
 constexpr double kWingbeatRate = 100;
+
+// The legs' proprioceptors, driven by how fast that side's legs step (io.ts's
+// LEG_RATE and LEG_STEPPING, and leg-sensors.ts, say why).
+constexpr double kLegRate = 50;
+constexpr double kLegStepping = 0.05;
+struct LegOrgan {
+  const char* name;
+  const char* description;
+  Condition types;
+  const std::vector<uint32_t>& left;
+  const std::vector<uint32_t>& right;
+  double full;
+};
 
 // Touch lands somewhere: each part of the body's bristles is its own sense
 // (io.ts's HEAD_TOUCH and BODY_TOUCH say why each is what it is).
@@ -165,7 +179,7 @@ double balance_factor(const Connectome& c, const std::vector<uint32_t>& mine, co
 }  // namespace
 
 std::vector<InputSpec> senses() {
-  return {
+  std::vector<InputSpec> out = {
       {"loomLeft", "Looming detectors (LPLC2, LC4) of the left eye", sided(kLooming, kLeft), 100, "", kLoomLeft, kLeft},
       {"loomRight", "Looming detectors (LPLC2, LC4) of the right eye", sided(kLooming, kRight), 100, "", kLoomRight, kLeft},
       {"touch head", "Mechanosensory bristle neurons of the head (BM types), by part and side", query({{kSuperClass, is("cb_sensory")}, {kType, starts_with("BM")}}),
@@ -191,6 +205,23 @@ std::vector<InputSpec> senses() {
       {"bitter", kBitterDescription, mouth_taste(one_of({"LB1a", "LB1b", "LB1c", "LB1d"})), 100, "", kBitter, kLeft, {}, true},
       {"water", kWaterDescription, mouth_taste(one_of({"LB3a", "PhG3", "PhG4"})), 100, "", kWater, kLeft, {}, true},
   };
+  const LegOrgan organs[] = {
+      {"claw", "Femoral chordotonal organ claw neurons (tibia position)", one_of({"SNpp50", "SNpp51"}), kClawLeft, kClawRight, kLegStepping},
+      {"club", "Femoral chordotonal organ club neurons (tibia movement and vibration)", one_of({"SNpp40", "SNpp47", "SNpp56", "SNpp57", "SNpp60"}),
+       kClubLeft, kClubRight, 0},
+      {"hair plates", "Hair plates (joint limits)", one_of({"SNpp45", "SNpp52"}), kHairPlateLeft, kHairPlateRight, kLegStepping},
+  };
+  for (const LegOrgan& organ : organs) {
+    for (Side side : {kLeft, kRight}) {
+      const std::string name = side == kLeft ? "left" : "right";
+      InputSpec spec{std::string(organ.name) + " " + name, std::string(organ.description) + " of the " + name + " legs", query({{kType, organ.types}}),
+                     kLegRate, "", side == kLeft ? kLegsLeft : kLegsRight, kLeft, side == kLeft ? organ.left : organ.right, false, true};
+      spec.last = true;
+      spec.full = organ.full;
+      out.push_back(std::move(spec));
+    }
+  }
+  return out;
 }
 
 // Spontaneous input, always on: the visual scene a fly at rest still sees.
@@ -354,6 +385,8 @@ double intensity(const Senses& s, Sense sense) {
     case kWingbeat: return js::clamp(s.wingbeat, 0, 1);
     case kBitter: return js::clamp(s.bitter, 0, 1);
     case kWater: return js::clamp(s.water, 0, 1);
+    case kLegsLeft: return js::clamp(s.legs_left, 0, 1);
+    case kLegsRight: return js::clamp(s.legs_right, 0, 1);
     case kSenseCount: break;
     default: return js::clamp(s.touch_parts[sense - kTouchEyeLeft], 0, 1);
   }

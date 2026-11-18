@@ -106,7 +106,7 @@ export class FlyBrain implements Brain {
     const weights = buildWeights(connectome, point);
     this.sim = new Simulation(weights.network, { ...point.neuron, gain: weights.gain, seed });
     for (const group of this.wiring.senses) {
-      if (group.spec.afterEyes) continue;
+      if (group.spec.afterEyes || group.spec.last) continue;
       if (group.ends) {
         // A rate for each region: one input still, so every later input's stream is where it was.
         this.sim.addRatedInput(group.spec.name, group.neurons);
@@ -173,12 +173,14 @@ export class FlyBrain implements Brain {
     for (const { spec, neurons } of this.wiring.senses) if (spec.afterEyes) this.sim.addInput(spec.name, neurons);
     // After those, so they too leave every other input's stream as it was.
     for (const { spec, neurons } of this.wiring.state) this.sim.addInput(spec.name, neurons);
-    // L1's withdrawals under brightening (vision.ts) last of all, so every other input's stream is as it was without them.
+    // L1's withdrawals under brightening (vision.ts) after those, so every other input's stream is as it was without them.
     if (this.vision) for (const side of ["left", "right"] as const) this.sim.addRatedInput(`eye ${side} withdrawn`, this.vision.retina[side].l1, { withdraw: true });
     // The thermoreceptors after even those: with no temperature felt, every stream is as it was before them.
     for (const { spec, neurons } of this.wiring.thermo) this.sim.addInput(spec.name, neurons);
     // The reinforcement stand-ins after even those (io.ts, REINFORCEMENT).
     for (const { spec, neurons } of this.wiring.reinforcement) this.sim.addInput(spec.name, neurons);
+    // The senses added since (io.ts's InputSpec.last) last of all.
+    for (const { spec, neurons } of this.wiring.senses) if (spec.last) this.sim.addInput(spec.name, neurons);
     const learning = options.learning === false ? null : new MushroomBody(connectome, options.learning ?? LEARNING);
     this.learning = learning && learning.kcs.length > 0 ? learning : null;
     if (this.learning) this.sim.setSpikeLog(this.learning.watched);

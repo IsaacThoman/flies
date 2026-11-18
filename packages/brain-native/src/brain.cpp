@@ -24,7 +24,7 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   sense_inputs_.assign(wiring_.senses.size(), 0);
   for (size_t k = 0; k < wiring_.senses.size(); k++) {
     const io::Group& group = wiring_.senses[k];
-    if (group.spec.after_eyes) continue;
+    if (group.spec.after_eyes || group.spec.last) continue;
     if (group.ends.empty()) {
       sense_inputs_[k] = sim_.add_input(group.spec.name, group.neurons);
       continue;
@@ -100,7 +100,7 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   }
   // After those, so they too leave every other input's stream as it was.
   for (const io::StateGroup& group : wiring_.state) state_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
-  // L1's withdrawals under brightening last of all, so every other input's stream is as it was without them.
+  // L1's withdrawals under brightening after those, so every other input's stream is as it was without them.
   for (size_t side = 0; side < retinas_.size(); side++) {
     withdrawn_inputs_[side] = sim_.add_rated_input(std::string("eye ") + (side == io::kLeft ? "left" : "right") + " withdrawn", retinas_[side].l1(), true);
   }
@@ -108,6 +108,10 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   for (const io::ThermoGroup& group : wiring_.thermo) thermo_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
   // The reinforcement stand-ins after even those (io.ts, REINFORCEMENT).
   for (const io::Group& group : wiring_.reinforcement) reinforcement_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
+  // The senses added since (io.ts's InputSpec.last) last of all.
+  for (size_t k = 0; k < wiring_.senses.size(); k++) {
+    if (wiring_.senses[k].spec.last) sense_inputs_[k] = sim_.add_input(wiring_.senses[k].spec.name, wiring_.senses[k].neurons);
+  }
   // The receptor neurons of smell after even those, so every earlier input's stream is as it was.
   smell_ = olfaction::wire(connectome);
   std::unordered_set<uint32_t> read;
@@ -160,7 +164,8 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
   for (size_t k = 0; k < wiring_.senses.size(); k++) {
     const io::Group& group = wiring_.senses[k];
     if (!group.ends.empty()) continue;
-    sim_.set_rate(sense_inputs_[k], group.max_rate * io::intensity(senses, group.spec.sense) * (group.spec.gated ? gate : 1));
+    const double felt = io::intensity(senses, group.spec.sense);
+    sim_.set_rate(sense_inputs_[k], group.max_rate * (group.spec.full == 0 ? felt : js::min(1, felt / group.spec.full)) * (group.spec.gated ? gate : 1));
   }
   for (Regional& regional : regional_) touch(regional, senses);
   for (size_t k = 0; k < wiring_.reinforcement.size(); k++) {

@@ -198,7 +198,7 @@ test("no seizures: after a loom, a drifting grating or a flicker, alone and with
   reference.show(() => 1, 2000);
   let band = 0;
   for (let w = 0; w < 120; w++) band = Math.max(band, windowRate(reference.show, 1));
-  const everything: BrainSenses = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1 };
+  const everything: BrainSenses = { loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1, bitter: 1, water: 1, legsLeft: 1, legsRight: 1 };
   for (const name of ["loom right fast", "grating, clockwise", "flicker"]) {
     for (const others of [RESTING_SENSES, everything]) {
       const s = stimulus(name);

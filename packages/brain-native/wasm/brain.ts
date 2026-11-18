@@ -35,9 +35,9 @@ type Exports = {
 const MAX_TICK_MS = 1000;
 const ERROR_BYTES = 512;
 // fly_brain.h's structs as wasm32 lays them out: fly_senses is seven floats, an int, two pointers, three floats (maleTaste,
-// hunger, wingbeat), five floats of internal state, three more (bitter, water, thirst), two of temperature and the twelve
-// touch parts, then each odorant at the left antenna and the right; fly_command eight floats; fly_stats two doubles and two uint32s.
-const SENSES_BYTES = 180;
+// hunger, wingbeat), five floats of internal state, three more (bitter, water, thirst), two of temperature, the twelve
+// touch parts, two of the legs, then each odorant at the left antenna and the right; fly_command eight floats; fly_stats two doubles and two uint32s.
+const SENSES_BYTES = 188;
 const COMMAND_BYTES = 32;
 const STATS_BYTES = 24;
 const SCALARS = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet"] as const;
@@ -49,7 +49,9 @@ const BITTER_AT = 72;
 const TEMPERATURE_AT = 84;
 /** fly_senses's touch parts, after the temperatures, in TOUCH_SENSES's order. */
 const TOUCH_AT = 92;
-const ODOR_AT = TOUCH_AT + 4 * TOUCH_SENSES.length;
+/** fly_senses's legs, after the touch parts. */
+const LEGS_AT = 140;
+const ODOR_AT = LEGS_AT + 8;
 
 const utf8 = new TextDecoder();
 
@@ -200,6 +202,8 @@ class WasmBrain implements Brain {
     view.setFloat32(s + TEMPERATURE_AT, senses.temperatureLeft ?? Number.NaN, true);
     view.setFloat32(s + TEMPERATURE_AT + 4, senses.temperatureRight ?? Number.NaN, true);
     for (let k = 0; k < TOUCH_SENSES.length; k++) view.setFloat32(s + TOUCH_AT + 4 * k, senses[TOUCH_SENSES[k]] ?? 0, true);
+    view.setFloat32(s + LEGS_AT, senses.legsLeft ?? 0, true);
+    view.setFloat32(s + LEGS_AT + 4, senses.legsRight ?? 0, true);
     for (let k = 0; k < ODORANTS.length; k++) {
       view.setFloat32(s + ODOR_AT + 4 * k, senses.odor?.left?.[k] ?? 0, true);
       view.setFloat32(s + ODOR_AT + 4 * (ODORANTS.length + k), senses.odor?.right?.[k] ?? 0, true);

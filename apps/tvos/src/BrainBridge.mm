@@ -26,7 +26,7 @@
 namespace {
 constexpr double kMaxStepMs = 100;
 // SENSE_ORDER, COMMAND_ORDER and STATE_STATS in packages/contracts/src/brain.ts.
-constexpr int kScalars = 43, kCommands = 8, kStats = 4;
+constexpr int kScalars = 45, kCommands = 8, kStats = 4;
 // Where hunger is among the scalars; a game that sends fewer keeps no account of it, which is 1.
 constexpr int kHunger = 9;
 // And thirst, which is 1 the same way.
@@ -37,8 +37,11 @@ constexpr int kWingbeat = 10;
 constexpr int kTemperatureLeft = 19, kTemperatureRight = 20;
 // Where touch where it lands starts, FLY_TOUCH_PARTS of it; a game that sends fewer is touched nowhere but by `touch`, 0.
 constexpr int kTouchParts = 21;
+// Where the legs' stepping is, left and right; a game that sends fewer has its legs still, 0.
+constexpr int kLegs = 33;
+static_assert(kTouchParts + FLY_TOUCH_PARTS == kLegs, "the legs come after the touch parts");
 // Then each odorant at the left antenna and the right (ODORANTS in packages/brain/src/olfaction.ts).
-constexpr int kOdor = kTouchParts + FLY_TOUCH_PARTS, kOdorants = 5;
+constexpr int kOdor = kLegs + 2, kOdorants = 5;
 static_assert(kOdor + 2 * kOdorants == kScalars, "the odours are the last scalars");
 enum Status { kLoading, kRunning, kFailed };
 
@@ -175,6 +178,7 @@ void *Run(void *arg) {
       scalars[0], scalars[1], scalars[2], scalars[3], scalars[4], scalars[5], scalars[6], scalars[7] > 0.5f,
       eyes ? light[0].data() : nullptr, eyes ? light[1].data() : nullptr, scalars[8], scalars[kHunger], scalars[kWingbeat],
       scalars[11], scalars[12], scalars[13], scalars[14], scalars[15], scalars[16], scalars[17], scalars[kThirst], scalars[kTemperatureLeft], scalars[kTemperatureRight], {},
+      scalars[kLegs], scalars[kLegs + 1],
     };
     std::copy(scalars + kTouchParts, scalars + kTouchParts + FLY_TOUCH_PARTS, senses.touch_parts);
     std::copy(scalars + kOdor, scalars + kOdor + kOdorants, senses.odor_left);

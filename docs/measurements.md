@@ -17,6 +17,7 @@ current performance claim.
 | [Neuron engine](../packages/brain/README.md#neuron-model), [region cost](../packages/brain/README.md#cost) | `11f3a15`, 16 November 2026 | M5 Pro; workloads are described; scripts supply default seeds, while capture seeds were not recorded |
 | [Fly update cost](../packages/fly/README.md) | `d91c8dd`, 16 November 2026 | Node with JIT and V8 interpreter; exact machine not recorded |
 | [Phototaxis](simulation.md#a-light-on-the-table) | `f8a9225` with `scripts/phototaxis.ts`, 17 November 2026 | Apple M5 Pro, Node 26.12.0, shared with other work (load 8 to 31); seeds and setups are in the table |
+| [What would carry phototaxis](simulation.md#what-would-carry-it) | `9c66161` with `packages/brain/scripts/routes.ts`; the experiment branch `exp-l1-sustained-luminance` (`739a44a`, `c3ac446`) with `scripts/phototaxis.ts` and its lamp script, 17 November 2026 | Apple M5 Pro, Node 26.12.0, shared with other work (load 11 to 16); seeds are in the text and table |
 
 [Apple TV](apple-tv.md#checking-it-1) and [iOS](ios.md) retain their own dated,
 named-device measurements. CPU budget thresholds are separate from historical

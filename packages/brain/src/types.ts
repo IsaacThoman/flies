@@ -127,6 +127,14 @@ export type BrainSenses = {
   touchAbdomen?: number;
   /** The six legs. */
   touchLegs?: number;
+  /**
+   * How fast the legs on its left or right side move through their steps:
+   * the speed of their feet against its body, from 0 (still) to 1 at 20 mm/s,
+   * about the fastest a fly walks. What the legs' own proprioceptors feel of
+   * walking (README, Senses). Left out, 0: its legs still.
+   */
+  legsLeft?: number;
+  legsRight?: number;
 };
 
 /**

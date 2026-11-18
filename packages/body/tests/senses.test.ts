@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PATCHES, Pantry, SOLIDS, WINDOWSILL, World, createPicnic } from "@fly/world";
-import { ANTENNA_AHEAD, CONTACT_TOUCH, Contacts, FLY_HEIGHT, FLY_LENGTH, FlyBody, HIT_FULL_SPEED, HEAD_AHEAD, LOOM_DECAY, LOOM_HOLD, MOUTH_AHEAD, SenseTracker, WIND_FULL_SPEED, createIntent } from "../src/index.ts";
+import { ANTENNA_AHEAD, CONTACT_TOUCH, Contacts, FLY_HEIGHT, FLY_LENGTH, FlyBody, HIT_FULL_SPEED, HEAD_AHEAD, LOOM_DECAY, LOOM_HOLD, MOUTH_AHEAD, SenseTracker, WIND_FULL_SPEED, createIntent, FEET_SIDE, LEGS_FULL_SPEED, legMovement } from "../src/index.ts";
 import type { Intent, Looming, SenseInput } from "../src/index.ts";
 
 /** A bare round table this wide, with nothing on it. */
@@ -59,6 +59,31 @@ test("a loom holds briefly then fades; with the eyes open there is no hand-wired
   assert.equal(s.loomLeft, 0);
   const open = approach(new SenseTracker(), body, { x: 300, y: 60, z: -150 }, 900, 0.4, true);
   assert.equal(open.left + open.right, 0);
+});
+
+test("its legs feel how fast they step: still, nothing; walking, both sides alike; turning, the outer side more; in the air, nothing", () => {
+  const open = openTable(200);
+  const body = new FlyBody(open, { x: 0, z: 0, yaw: 0 });
+  const tracker = new SenseTracker();
+  const step = (intent: Partial<Intent>) => {
+    body.step({ ...createIntent(), live: true, ...intent }, { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null }, DT);
+    return tracker.update(input(body, { world: open }));
+  };
+  const still = step({});
+  assert.equal(still.legsLeft, 0);
+  assert.equal(still.legsRight, 0);
+  const walking = step({ walking: true, speed: 10 });
+  assert.ok(Math.abs(walking.legsLeft! - 10 / LEGS_FULL_SPEED) < 0.01, `${walking.legsLeft}`);
+  assert.equal(walking.legsLeft, walking.legsRight);
+  // Toward its left: its right legs travel further.
+  const turning = step({ walking: true, speed: 10, yawRate: 2 });
+  assert.ok(turning.legsRight! > turning.legsLeft!);
+  assert.equal(legMovement(0, 1, 1), FEET_SIDE / LEGS_FULL_SPEED);
+  assert.equal(legMovement(-40, 0, -1), 1);
+  body.position.y += 20;
+  body.mode = "airborne";
+  const aloft = tracker.update(input(body, { world: open }));
+  assert.equal(aloft.legsLeft! + aloft.legsRight!, 0);
 });
 
 /** Walks `body` forward until it is pushing against what it faces (bounded). */

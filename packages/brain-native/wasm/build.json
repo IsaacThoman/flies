@@ -2,14 +2,14 @@
   "toolchain": "wasi-sdk 34.0",
   "sources": {
     "wasm.sh": "69f049b54d1491c364e3fadece32aac307c6660440dba92bf496f15df43d7002",
-    "include/fly_brain.h": "66a8272d9c2b24e641485817c4d2326c3137460ddb71c90c9e1b34f660c13179",
-    "src/brain.cpp": "0b8273a35b02e7769673eae4730595334bff3d0ea2bca33d833838e3dcefe0fa",
+    "include/fly_brain.h": "256d544c619c83307fd2ad62d2ec2fee0e00f6b28e2f2a38d635237627b58a80",
+    "src/brain.cpp": "b8d718e256a83a2161fc825999f999cddeff4b428cef06b40e9b1dd79d1dbd79",
     "src/connectome.cpp": "3b031b5f720cab29dd8ef10cf2e3e7c10c48935f09e497b6745ff83ffc49dd91",
     "src/eye_columns.cpp": "1b9f42e5ee735d25298c21b74177626eec263b8dde73db12d80e4538253fce70",
     "src/eyes.cpp": "c0bdef0c06c810eaba378c3a08ec09a999b6501210ccfbe9ecd250addc59588a",
     "src/fdlibm.cpp": "4420beeefa36941b85190d5dfa9fb59fa32dda57bef99e34162da6472c02aac6",
-    "src/fly_brain.cpp": "87e5e592336254a3f7dd1910c09afffda837a73f5214439ad22d187488117c5b",
-    "src/io.cpp": "a50f2209db184b21a56d86f4e51dc6aacfb13643f5e0e823c85e989d63a5c38d",
+    "src/fly_brain.cpp": "b02143efe1b6506dbd1d3a0db0f22310987f8d7f1cdaa65a3a29dc4866058438",
+    "src/io.cpp": "4c1e7b6c4e9347cf7bb72e2b5f3cc033d4b70af394e4ca6ddfe579e2934d91a0",
     "src/json.cpp": "752d0e1d4753e314531d0d8dedacdfdb7773cf4eff72ea54b0eaa0d0b384aa5b",
     "src/learning.cpp": "d1e1b388d826c1bcdedc80b5b3fb1d8e510c1ddf741d20c70b24acf8b6e3f0cf",
     "src/modulation.cpp": "d90d5c086975a0890ce2d2fb31e05acd85c0fb8c6f86091cd262236dc2f06063",
@@ -27,9 +27,10 @@
     "src/eyes.hpp": "c3a431a668700992f01f6570cca080f50996a9b95c6139781b6590911e8764ec",
     "src/fdlibm.hpp": "76ccd02de179a53355b44cb25de8d908980e21048cb28ac5ead603519147126c",
     "src/fly_brain_internal.hpp": "70567db81da1a283377674b68ad4c277b0b991579e3dfc8045f9f312aabdc0f8",
-    "src/io.hpp": "a337ed46c76d09990b95a3b6533e457a1c567cb432ca1ebe02659734d62e0ee9",
+    "src/io.hpp": "a371eb479fedcf3060316b4887edc9149a7d85e1fca0f6f3d22294d215f0a337",
     "src/json.hpp": "c6502967fc9e32ab4bf1a2003f89c9d41e86847bbde9b2761d8e5e1e2df6948a",
     "src/learning.hpp": "39d8450e2a2e0bd2b568318489496f891133b85ec41ed2dd93d7425e49bbcdde",
+    "src/leg_sensors.hpp": "265cb00d299e28af1b9662115a04cbf69e178394233990a9faef45d7dd10340d",
     "src/modulation.hpp": "f77b874f6f9fe9e185d4f0fb2f9e81e65de624433c8ef405f0ac56497b3ccdb3",
     "src/olfaction.hpp": "e2ab06f46421d5f1189e8e804d93113e8da4997e566a688e8ffde574c04c66c4",
     "src/params.hpp": "5e6649666cadfc7cb82cf629bcee6d179004266793264caa12a71cd73a122043",
@@ -38,10 +39,10 @@
     "src/state.hpp": "776df39f21d493c53ae37fbdbb4b13914cd47921859af652acaa294831b19589",
     "src/thermo.hpp": "bc04eaf21dfac9c8f6629aa50c2df81dafa4c99617390edeede75cae49812d15",
     "src/vision.hpp": "1d0fa684829454eb437c2be979bbe83b88eac07cfa57453573752b7815b1ce99",
-    "tools/harness.cpp": "b4b090b1f9917140569e750c25f38e01668073b9ca63bcb58c05792c738e731f"
+    "tools/harness.cpp": "89d84e5a8b69f8720d012da848e565570fd9190277074efeb99f189fbb988ced"
   },
   "modules": {
-    "fly-brain.wasm": "6aaa9eff022f428c0b1946d092d94cc4d2b20d13c855ebe33c42d0bcd22f5f12",
-    "fly-brain-harness.wasm": "e93edb90e3186fcd82e2d29c068d3e03bf461845cb9bd6c40c49d890d5563d3e"
+    "fly-brain.wasm": "e6985ef600e7c8e58a1e25873f007a91b3c163bbaa0110188ec85cc21c15fad5",
+    "fly-brain-harness.wasm": "98ae082642f4267fbb2ca15a5cfa85ce5e13841415206a28744ee302dfe95b77"
   }
 }

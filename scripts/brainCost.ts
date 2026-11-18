@@ -24,7 +24,7 @@ await withHeavySlot(async () => {
     wasm.connectomeSpace(raw.length).set(raw);
     return wasm.create(1);
   };
-  const full: BrainSenses = { ...RESTING_SENSES, loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1 };
+  const full: BrainSenses = { ...RESTING_SENSES, loomLeft: 1, loomRight: 1, touch: 1, bumpLeft: 1, bumpRight: 1, wind: 1, sweet: 1, grounded: false, maleTaste: 1, wingbeat: 1, legsLeft: 1, legsRight: 1 };
   const report: unknown[] = [];
   const fingerprints: string[] = [];
   for (const engine of ["typescript", "wasm"]) {

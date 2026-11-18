@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
-import { BACKGROUND, BRISTLE_RATE, READOUTS, SCALES, SENSES, SLEEP_GATE, THIRST, WINGBEAT_RATE, backgroundRates, balanceFactor, decode, hungerOf, intensity, outputSynapses, regionRate, senseRates, smooth, thirstOf, waterOutputGain, wire } from "./io.ts";
+import { BACKGROUND, BRISTLE_RATE, LEG_RATE, LEG_STEPPING, READOUTS, SCALES, SENSES, SLEEP_GATE, THIRST, WINGBEAT_RATE, backgroundRates, balanceFactor, decode, hungerOf, intensity, outputSynapses, regionRate, senseRates, smooth, thirstOf, waterOutputGain, wire } from "./io.ts";
 import { RECEPTORS, STAND_INS } from "./modulation.ts";
 import { OPERATING_POINT, buildWeights, completenessFactors } from "./params.ts";
 import { REGIONS, REGION_RATE_NAMES } from "./regions.ts";
@@ -104,14 +104,16 @@ test("each sense drives its groups at its intensity times the stated maximum", (
   assert.equal(background.get("background right"), BACKGROUND[1].maxRate);
 });
 
-test("a male's taste drives only the front legs' LgLG1a and LgAG1, picked by root ID, and is added after every other input", () => {
+test("a male's taste drives only the front legs' LgLG1a and LgAG1, picked by root ID, and is added after the eyes", () => {
   const c = load();
   const wiring = wire(c);
   const taste = wiring.senses.find((s) => s.spec.sense === "maleTaste")!;
   assert.deepEqual([...taste.neurons], [...synthetic.index["LgAG1"], ...synthetic.index["LgLG1a"]]);
   assert.ok(!taste.neurons.includes(synthetic.index["LgLG1a mid leg"][0]));
-  const after = SENSES.filter((s) => s.afterEyes);
+  const after = SENSES.filter((s) => s.afterEyes || s.last);
   assert.deepEqual(after, SENSES.slice(SENSES.length - after.length), "only the last senses come after the eyes");
+  const last = SENSES.filter((s) => s.last);
+  assert.deepEqual(last, SENSES.slice(SENSES.length - last.length), "and the last of all after them");
   // (seeing.test.ts's fingerprint holds that the inputs before it draw what they drew without it.)
   const brain = new FlyBrain(c, { eyeColumns: syntheticEyeColumns(synthetic) });
   assert.deepEqual([...brain.sim.members("maleTaste")], [...taste.neurons]);
@@ -138,6 +140,25 @@ test("the mouth's taste: sweet, bitter and water each drive their own types, bit
   const rates = senseRates(wiring, { ...RESTING_SENSES, bitter: 0.5, water: 2 });
   assert.equal(rates.get("bitter"), 50);
   assert.equal(rates.get("water"), 100);
+});
+
+test("each side's legs drive that side's claw, club and hair plate neurons, the unlisted left out; claw and hair plates are full once the legs step", () => {
+  const wiring = wire(load());
+  for (const [name, organ] of [
+    ["claw", "claw"],
+    ["club", "club"],
+    ["hair plates", "hairPlate"],
+  ]) {
+    for (const side of ["left", "right"]) assert.deepEqual([...wiring.senses.find((s) => s.spec.name === `${name} ${side}`)!.neurons], synthetic.index[`${organ} ${side}`]);
+  }
+  const rates = (legsLeft: number) => senseRates(wiring, { ...RESTING_SENSES, legsLeft });
+  assert.equal(rates(0).get("claw left"), 0);
+  assert.equal(rates(LEG_STEPPING / 2).get("claw left"), LEG_RATE / 2);
+  assert.equal(rates(LEG_STEPPING).get("hair plates left"), LEG_RATE);
+  assert.equal(rates(0.5).get("claw left"), LEG_RATE);
+  assert.equal(rates(0.5).get("club left"), LEG_RATE / 2);
+  assert.equal(rates(0.5).get("club right"), 0);
+  assert.equal(senseRates(wiring, { ...RESTING_SENSES, legsRight: 1, sleepDepth: 1 }).get("club right"), LEG_RATE * (1 - SLEEP_GATE));
 });
 
 test("balancing turns down the side whose neurons make more synapses", () => {

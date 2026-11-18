@@ -3,6 +3,8 @@
 // game's 0..1 values. No Node APIs; this runs in the browser game's Web Worker.
 
 import type { Connectome, NeuronQuery } from "./format.ts";
+import { LEG_ORGANS, LEG_PROPRIOCEPTORS } from "./leg-sensors.ts";
+import type { LegOrgan } from "./leg-sensors.ts";
 import { DFB_DOPAMINERGIC } from "./params.ts";
 import type { BrainCommand, BrainSenses } from "./types.ts";
 
@@ -38,6 +40,8 @@ export type InputSpec = {
    * nothing until it is felt.
    */
   afterEyes?: boolean;
+  /** Added after every other input, the eyes' withdrawals, the internal state's, the thermoreceptors' and the reinforcement stand-ins' too, for the same reason. */
+  last?: boolean;
 };
 
 /** The internal state that comes with the senses (types.ts): the daily clock and sleep, 0 to 1 each. */
@@ -65,6 +69,8 @@ export type SenseSpec = InputSpec & {
    * own sense and the group's (`touch`, the whole body at once).
    */
   regions?: readonly TouchRegion[];
+  /** The sense's intensity at which these neurons reach their full rate, below 1 for those that saturate (1 when left out). */
+  full?: number;
 };
 
 /** The touch senses that say where a touch lands. */
@@ -169,6 +175,30 @@ export const LEG_CAMPANIFORM = "SNpp53";
 // its other hard-driven sensory neurons at; anywhere from 100 to 250 Hz the
 // loop it closes with the body dies away the same (README, Senses).
 export const WINGBEAT_RATE = 100;
+
+// The legs' proprioceptors (leg-sensors.ts says which), driven by how fast
+// that side's legs move through their steps (BrainSenses.legsLeft and
+// legsRight). Standing still they are silent: a claw neuron answers the
+// tibia flexed or extended away from the middle of its range, and a resting
+// fly holds it there, at about 90 degrees (Mamiya, Gurung & Tuthill 2018,
+// Neuron 100:636, Figure 5; Dallmann et al. 2025, Nature 647:445, Figure 2),
+// and club neurons and the hair plates answer movement (Mamiya et al. 2018;
+// Pratt et al. 2026, Nat Commun 17:2664). Walking, each step takes the tibia
+// from about 40 to 120 degrees (Mamiya et al. 2018) and the joints to the
+// limits the hair plates detect, whatever the speed, so the claw neurons and
+// hair plates fire fully once the legs step at all (LEG_STEPPING, 1 mm/s); the
+// club neurons answer how fast the joint moves, so follow the legs' speed. No
+// Drosophila leg proprioceptor's spikes have been recorded (the papers above
+// imaged calcium); LEG_RATE is chosen, a round rate among what Drosophila
+// chordotonal neurons fire (26 to 102 Hz spontaneously in the larva: Warren &
+// Göpfert 2024, J Exp Biol 227:jeb246197). README, Senses.
+export const LEG_RATE = 50;
+export const LEG_STEPPING = 0.05;
+const LEG_SENSES: readonly { organ: LegOrgan; name: string; description: string; full?: number }[] = [
+  { organ: "claw", name: "claw", description: "Femoral chordotonal organ claw neurons (tibia position)", full: LEG_STEPPING },
+  { organ: "club", name: "club", description: "Femoral chordotonal organ club neurons (tibia movement and vibration)" },
+  { organ: "hairPlate", name: "hair plates", description: "Hair plates (joint limits)", full: LEG_STEPPING },
+];
 
 // Touch lands somewhere: each part of the body's bristles is its own sense
 // (README, Senses). The head's are told apart by type, which FlyEM gives by
@@ -307,6 +337,20 @@ export const SENSES: readonly SenseSpec[] = [
   // The round rate of the other hard-driven sensory neurons, as `sweet`'s.
   { sense: "bitter", name: "bitter", description: `The mouth's bitter-sensing taste neurons: ${BITTER_TYPES.join(", ")}`, select: mouthTaste(BITTER_TYPES), maxRate: 100, afterEyes: true },
   { sense: "water", name: "water", description: `The mouth's water-sensing taste neurons: ${WATER_TYPES.join(", ")}`, select: mouthTaste(WATER_TYPES), maxRate: 100, afterEyes: true },
+  ...LEG_SENSES.flatMap(({ organ, name, description, full }) =>
+    (["left", "right"] as const).map(
+      (side): SenseSpec => ({
+        sense: side === "left" ? "legsLeft" : "legsRight",
+        name: `${name} ${side}`,
+        description: `${description} of the ${side} legs`,
+        select: { type: [...LEG_ORGANS[organ]], rootIds: LEG_PROPRIOCEPTORS[organ][side] },
+        maxRate: LEG_RATE,
+        last: true,
+        gated: true,
+        ...(full === undefined ? {} : { full }),
+      }),
+    ),
+  ),
 ];
 
 /**
@@ -577,7 +621,12 @@ export function sleepGate(senses: BrainSenses): number {
 export function senseRates(wiring: Pick<Wiring, "senses">, senses: BrainSenses): Map<string, number> {
   const gate = sleepGate(senses);
   return new Map(
-    wiring.senses.filter(({ spec }) => !spec.regions).map(({ spec, maxRate }) => [spec.name, maxRate * intensity(senses, spec.sense) * (spec.gated ? gate : 1)]),
+    wiring.senses
+      .filter(({ spec }) => !spec.regions)
+      .map(({ spec, maxRate }) => {
+        const felt = intensity(senses, spec.sense);
+        return [spec.name, maxRate * (spec.full === undefined ? felt : Math.min(1, felt / spec.full)) * (spec.gated ? gate : 1)];
+      }),
   );
 }
 
