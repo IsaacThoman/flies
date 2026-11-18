@@ -258,19 +258,19 @@ throws each):
 
 | | With the floor | Without it |
 | --- | --- | --- |
-| With the wings' sensors | 31 of 32 flew: 1.5 to 1.6 s, 375 to 407 mm; the brain's `wings` 0.19 to 0.23 on average in the air, peaks 0.32 to 0.49 | 32 of 32 hopped: 0.05 to 0.10 s, 5 to 13 mm |
-| Without them | 29 of 32 flew: 1.5 to 1.6 s, 380 to 415 mm; the brain's `wings` 0.07 to 0.14, peaks 0.26 to 0.48 | 32 of 32 hopped: 0.05 to 0.10 s, 6 to 13 mm |
+| With the wings' sensors | 29 of 32 flew: 1.5 to 1.6 s, 375 to 409 mm; the brain's `wings` 0.18 to 0.23 on average in the air, peaks 0.26 to 0.53 | 32 of 32 hopped: 0.05 to 0.12 s, 5 to 15 mm |
+| Without them | 31 of 32 flew: 1.5 to 1.6 s, 376 to 408 mm; the brain's `wings` 0.06 to 0.15, peaks 0.23 to 0.46 | 32 of 32 hopped: 0.05 to 0.08 s, 6 to 13 mm |
 
 With the floor each flight spends 0.78 s at power and the rest gliding, and
 lands on its feet. Nothing runs away: the wings fold the step it lands, and a
-second later the brain's `wings` is 0 to 0.12 with the floor or without it
+second later the brain's `wings` is 0 to 0.15 with the floor or without it
 (as at rest). The brain alone, flying on its own drive as the body would
 without the floor, lets its wings down within half a second
 (`packages/brain/README.md`, What it does and doesn't reproduce).
 
-The recorded take-offs with the eyes open were flights of 1.5 to 1.6 s, 375 to 407 mm
-along their way, rising 59 to 72 mm, and landed on their feet; with the eyes shut
-(the hand-wired loom, 6 throws a seed), 2.0 to 3.2 s and 507 to 781 mm.
+The recorded take-offs with the eyes open were flights of 1.5 to 1.6 s, 375 to 409 mm
+along their way, rising 58 to 70 mm, and landed on their feet; with the eyes shut
+(the hand-wired loom, 6 throws a seed), 1.9 to 3.7 s and 485 to 922 mm.
 Before the reflex they were in the air for 0.07 to 0.12 s. The
 fly often crosses the edge of the picnic table and is drawn back over it to land
 (Staying in the world). The automatic camera pulls back in flight and can lead the fly by up to
@@ -399,8 +399,8 @@ game before the legs' load sensors were narrowed and sleep added, arriving at
 a place did set it off, at the restaurant without the ON pathway and at the
 picnic too with it.) The ball takes it off as before, and never in the half
 second after the ball has gone: through the brain's own eyes in Node
-(`apps/web/tests/swoop-escape.budget.ts`, seeds 1 to 5, 8 throws each), 38
-throws of 40 with the ON pathway against 39 without. In the game the count
+(`apps/web/tests/swoop-escape.budget.ts`, seeds 1 to 5, 8 throws each), 37
+throws of 40 with the ON pathway against 35 without. In the game the count
 swings from run to run with where the fly comes to stand (40 throws at midday:
 29 and, in a run where it stopped seeing the ball after the second, 2 with it;
 33 without). Those observations predate the current lightning effects;
@@ -448,40 +448,42 @@ behaviour in `packages/brain/README.md`). With it off, the scene is the same
 at dusk and at night once adapted, and so is every spike. Seeds 1 to 8 (1 to
 4 for the bulb at 30 mm at night), both sides; each cell is the lit run minus
 its unlit pair, mean ± SD, and in brackets how many pairs went the light's way.
-Measured at `f8a9225` ([provenance](measurements.md)); at `e862fa6`, before
-the brain's neuromodulation and thermosensation, it came out the same:
+Refreshed at `56d9f3b` ([provenance](measurements.md)). The earlier capture
+at `f8a9225` matched `e862fa6`, before the brain's neuromodulation and
+thermosensation:
 
 | Light | Pairs | Lamina, Hz (unlit: 0) | Turn toward it | Facing it | End distance, mm | Took off (unlit: never) |
 | --- | --- | --- | --- | --- | --- | --- |
-| bulb, dusk, 30 mm | 16 | 0.63 | +0.002 ± 0.014 (9) | −0.10 ± 0.15 (5) | +24 ± 50 (5 nearer) | 2 of 16 |
-| panel, dusk, 30 mm | 16 | 3.10 | +0.002 ± 0.013 (11) | −0.00 ± 0.14 (8) | +6 ± 70 (8 nearer) | 5 of 16 |
-| bulb, night, 30 mm | 8 | 0.77 | +0.004 ± 0.014 (6) | +0.06 ± 0.17 (4) | +8 ± 61 (5 nearer) | 1 of 8 |
-| bulb, night, 10 mm | 16 | 1.34 | −0.002 ± 0.017 (8) | −0.06 ± 0.16 (6) | +9 ± 55 (7 nearer) | 5 of 16 |
+| bulb, dusk, 30 mm | 16 | 1.02 | +0.011 ± 0.015 (13) | +0.04 ± 0.12 (12) | −4 ± 45 (7 nearer) | 0 of 16 |
+| panel, dusk, 30 mm | 16 | 2.29 | +0.001 ± 0.011 (8) | +0.08 ± 0.17 (9) | +37 ± 47 (3 nearer) | 8 of 16 |
+| bulb, night, 30 mm | 8 | 1.02 | +0.005 ± 0.011 (6) | +0.05 ± 0.14 (3) | −1 ± 63 (5 nearer) | 1 of 8 |
+| bulb, night, 10 mm | 16 | 1.60 | +0.005 ± 0.015 (13) | +0.04 ± 0.22 (7) | +9 ± 56 (8 nearer) | 3 of 16 |
 
 "Turn toward it" is the brain's own turn command (DNa02, right minus left)
 signed toward the light's side, over the whole run; with the light off it
 averages 0.02 to 0.03, at the left lean's level. "Facing it" is the cosine of
 the light's bearing (1 facing it). The fly walks half the time, lit or
-not, and goes 900 mm or so in 3 minutes, past the light and away from it as
+not, and goes 800 mm or so in 3 minutes, past the light and away from it as
 it does past the place an unlit one would stand. Lit, it goes a little
-further (40 to 100 mm more, in 10 to 13 pairs of 16), in no particular
-direction.
+further (17 to 179 mm more on average, further in 7 of 8 and 11 to 12 of 16
+pairs), in no particular direction: it ends no nearer the light.
 
 The eyes do see the light: the lamina, silent in a steady scene, fires each
 time the fly's own movement sweeps the light or its pool across the facets,
 and the ON pathway answers. But nothing downstream turns the fly toward the
-bright side. The input stage codes contrast, a change against the facet's
+bright side by more than about a hundredth of a full turn. The input stage codes contrast, a change against the facet's
 recent mean (`packages/brain/README.md`, Seeing): a steady light, once
 adapted to, drives nothing. What it does drive comes as brightening and
 motion while the fly moves, and none of it moves DNa02 toward the light's
-side. Two things the model leaves out could carry a steady light: colour,
+side by more than that (+0.001 to +0.011 against the light off, the spread
+from pair to pair larger). Two things the model leaves out could carry a steady light: colour,
 through the inner photoreceptors R7 and R8, and lasting levels of light,
 through L1's sustained component. Both were tried (What would carry it,
 below), and neither makes the fly go to the light.
 
 Brightening has one answer the fly shouldn't give: it takes the fly off,
-through LC4 (`packages/brain/README.md`, Seeing). The panel did it in 7 of
-16 runs, the bulb in 2 of 16 at dusk and 6 of 24 at night; with the light
+through LC4 (`packages/brain/README.md`, Seeing). The panel did it in 8 of
+16 runs, the bulb in 0 of 16 at dusk and 4 of 24 at night; with the light
 off, never.
 
 ```sh
@@ -506,15 +508,15 @@ seed. Turn toward the driven eye, seeds 1 to 3, left eye then right:
 
 | Driven | Turn toward that eye | What else |
 | --- | --- | --- |
-| Mi1 (ON, L1's main partner) | +0.56, +0.46, +0.49; +0.52, +0.58, +0.44 | its own side's DNa02 up 14 to 20 Hz, every seed |
-| Tm3 (ON) | +0.09, −0.10, 0; −0.07, +0.24, 0 | stops walking (−0.13 to −0.35) |
-| Tm5a | +0.02, 0.00, 0; +0.11, +0.15, +0.06 | the right eye only |
-| Tm5b, Tm5c | −0.05 to +0.05 | nothing consistent |
-| Tm20 | +0.02, −0.10, −0.06; +0.11, +0.27, +0.15 | the right eye only; the left's walks |
-| MeTu (all types) | +0.16, +0.07, +0.06; −0.01, +0.08, 0 | the left eye only |
-| Dm8, L3, Tm9 | −0.03 to +0.05 | nothing |
-| R7, R8, firing | −0.02 to +0.02 | nothing anywhere: their histamine inhibits cells silent at rest |
-| R7, R8, withdrawing | −0.03 to +0.03 | Dm8, Dm9, MeTu and TuBu fire; nothing steers |
+| Mi1 (ON, L1's main partner) | +0.59, +0.49, +0.50; +0.53, +0.56, +0.45 | its own side's DNa02 up 14 to 21 Hz, every seed |
+| Tm3 (ON) | +0.11, −0.13, 0.00; −0.07, +0.22, 0.00 | stops walking (−0.15 to −0.34) |
+| Tm5a | +0.06, +0.03, 0.00; +0.11, +0.18, +0.05 | the right eye only |
+| Tm5b, Tm5c | −0.04 to +0.03 | nothing consistent |
+| Tm20 | +0.04, −0.10, +0.01; +0.10, +0.21, +0.18 | the right eye only; the left's walks |
+| MeTu (all types) | +0.16, +0.08, +0.03; +0.01, +0.07, +0.01 | the left eye only |
+| Dm8, L3, Tm9 | −0.04 to +0.06 | nothing |
+| R7, R8, firing | 0.00 to +0.01 | nothing anywhere: their histamine inhibits cells silent at rest |
+| R7, R8, withdrawing | −0.01 to +0.05 | Dm8, Dm9, MeTu and TuBu fire; nothing steers |
 
 Seed 3's DNa02s are silent in this scene, so it shows only what fires them
 outright.
