@@ -26,8 +26,9 @@ try {
   const fingers = await Fingers.on(page);
   await fingers.tap(await targetOf(page, "row", 3));
   await waitFor(page, "onlineView=rooms,rooms~Input");
-  // Past Go online and New room, to Code.
-  await fingers.tap(await targetOf(page, "row", 2));
+  // The code's field, wherever the rows above it put it (Go home, on a visit; New room).
+  const field = await page.evaluate(() => (globalThis as unknown as { __fly: { screens: { online: { menu: { items: { id: string }[] } } } } }).__fly.screens.online.menu.items.findIndex((item) => item.id === "code"));
+  await fingers.tap(await targetOf(page, "row", field));
   await waitFor(page, "typing=code");
   await page.keyboard.type(code.toUpperCase());
   await waitForGameTime(page, 0.2);
