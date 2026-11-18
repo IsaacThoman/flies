@@ -202,8 +202,10 @@ export type MenuPanel = {
   panel: Rect;
   /** The heading's baseline and size, or none where there isn't room. */
   heading: { y: number; size: number } | null;
-  list: { x: number; y: number; width: number; row: number; gap: number; compact: boolean; columns: number; scrollControls?: boolean };
+  list: { x: number; y: number; width: number; row: number; gap: number; compact: boolean; columns: number };
   rows: number;
+  /** A line under the rows on what the focused one is for: how far above the pane's foot its middle is, or none where there isn't room. */
+  detail: { up: number; size: number } | null;
 };
 
 export type MenuPanelSpec = {
@@ -222,6 +224,8 @@ export type MenuPanelSpec = {
   raise: number;
   /** Two columns rather than scrolling, where one doesn't fit: for a list of actions short enough to show whole. */
   columns?: 2;
+  /** Room under the rows for a line on what the focused one is for, where the screen has it to spare. */
+  detail?: boolean;
 };
 
 /** Fits a menu's pane into a space: the TV's size if it fits, else narrower and with tighter rows, scrolling what doesn't fit. */
@@ -235,11 +239,14 @@ export function fitMenu(space: Rect, spec: MenuPanelSpec): MenuPanel {
   const want = Math.min(spec.items, spec.maxRows ?? spec.items);
   const room = space.h - 2 * margin;
   // From the TV's spacing to the tightest that still takes a finger.
+  // A line of detail takes a little more under the rows: a narrow pane, whose rows are two lines each already, does without, and so does a screen too tight for it at any spacing but the tightest.
+  const detail = spec.detail && !compact ? 20 : 0;
   const tiers = [
-    { row: compact ? 54 : spec.row, gap: compact ? 8 : 12, top: spec.heading ? 70 : 26, foot: spec.foot, heading: spec.heading ? { dy: 46, size: 28 } : null },
-    { row: compact ? 52 : spec.row, gap: 8, top: spec.heading ? 56 : 18, foot: 18, heading: spec.heading ? { dy: 38, size: 24 } : null },
-    { row: compact ? 50 : Math.max(36, spec.row - 4), gap: 4, top: spec.heading ? 40 : 14, foot: spec.heading ? 8 : 14, heading: spec.heading ? { dy: 27, size: 22 } : null },
-    { row: compact ? 50 : 36, gap: 4, top: spec.heading ? 36 : 10, foot: 2, heading: spec.heading ? { dy: 23, size: 18 } : null },
+    { row: compact ? 54 : spec.row, gap: compact ? 8 : 12, top: spec.heading ? 70 : 26, foot: spec.foot + detail, detail, heading: spec.heading ? { dy: 46, size: 28 } : null },
+    { row: compact ? 52 : spec.row, gap: 8, top: spec.heading ? 56 : 18, foot: 18 + detail, detail, heading: spec.heading ? { dy: 38, size: 24 } : null },
+    { row: compact ? 50 : Math.max(36, spec.row - 4), gap: 4, top: spec.heading ? 40 : 14, foot: (spec.heading ? 8 : 14) + detail, detail, heading: spec.heading ? { dy: 27, size: 22 } : null },
+    ...(detail ? [{ row: compact ? 50 : Math.max(36, spec.row - 4), gap: 4, top: spec.heading ? 40 : 14, foot: spec.heading ? 8 : 14, detail: 0, heading: spec.heading ? { dy: 27, size: 22 } : null }] : []),
+    { row: compact ? 50 : 36, gap: 4, top: spec.heading ? 36 : 10, foot: 2, detail: 0, heading: spec.heading ? { dy: 23, size: 18 } : null },
   ];
   const fits = (t: (typeof tiers)[number]) => Math.floor((room - t.top - t.foot + t.gap) / (t.row + t.gap));
   // A list short enough to show whole: the roomiest spacing that shows it all, in two columns if it may and one won't do. One that scrolls anyway: the roomiest that shows a few rows, keeping its heading.
@@ -259,8 +266,9 @@ export function fitMenu(space: Rect, spec: MenuPanelSpec): MenuPanel {
   return {
     panel: { x, y, w: width, h },
     heading: tier.heading ? { y: y + tier.heading.dy, size: tier.heading.size } : null,
-    list: { x: x + pad, y: y + tier.top, width: listWidth - (rows < spec.items ? 44 : 0), row: tier.row, gap: tier.gap, compact: compact || (spec.values && listWidth - (rows < spec.items ? 44 : 0) < 380), columns, ...(rows < spec.items ? { scrollControls: true } : {}) },
+    list: { x: x + pad, y: y + tier.top, width: listWidth, row: tier.row, gap: tier.gap, compact, columns },
     rows,
+    detail: tier.detail ? { up: tier.foot / 2, size: 12 } : null,
   };
 }
 
@@ -290,7 +298,7 @@ function spot(frame: Frame, x: number, y: number) {
   return { across: x / (width / 2) - 1, low: y / (height / 2) - 1 };
 }
 
-/** What the menus' hints take along the foot of the safe area (drawMenuHints). */
+/** What the menus' hints take along the foot of the safe area (hint-bar.ts). */
 const HINTS_ROOM = 38;
 
 /** Keep the menus clear of button hints; a keyboard already takes that edge. */

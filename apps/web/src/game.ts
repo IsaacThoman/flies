@@ -106,6 +106,8 @@ import { MENU_HITS } from "./ui/menu-view.ts";
 import { OnlineScreen } from "./ui/screens/online.ts";
 import { BrowserTextEntry, NativeTextEntry, nativeKeyboard } from "./ui/text-entry.ts";
 
+/** Seconds a menu screen takes to arrive. */
+const SCREEN_ARRIVES = 0.18;
 /** Seconds the loading screen stays after the brain wakes, so "Awake!" is seen; longer when it has more to say. */
 const AWAKE_HOLD = 0.2;
 const AWAKE_HOLD_NOTE = 4;
@@ -305,6 +307,8 @@ export class Game implements Shell {
   #hit: RayHit = { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 1, z: 0 }, solid: -1, t: 0 };
   #eye = { x: 0, y: 0, z: 0 };
   #lastScreen: ScreenId | "loading" = "loading";
+  /** Seconds the menu screen showing has been up: it arrives over a moment. */
+  #shownFor = 0;
   #lastNow = -1;
   #qualitySeen = 0;
   #warmthSeen = 0;
@@ -2293,6 +2297,7 @@ export class Game implements Shell {
     const current = this.#loading ? "loading" : this.nav.current;
     if (current !== this.#lastScreen) {
       this.#lastScreen = current;
+      this.#shownFor = 0;
       overlay.dirty = true;
     }
     // The hints and the buttons follow what the player picked up.
@@ -2358,8 +2363,18 @@ export class Game implements Shell {
     }
     const screen = this.screens[current];
     if (screen.update(dt)) overlay.dirty = true;
+    // A screen fades in, rising a little into place, so that going from one to the next reads as going somewhere; its targets are where it comes to rest from the first frame.
+    const arriving = this.#shownFor < SCREEN_ARRIVES;
+    this.#shownFor += dt;
+    if (arriving) overlay.dirty = true;
+    const shown = 1 - (1 - Math.min(1, this.#shownFor / SCREEN_ARRIVES)) ** 3;
     overlay.redraw(dt, current, (g, hits) => {
+      if (shown < 1) {
+        g.globalAlpha = Math.max(0, shown);
+        g.translate(0, (1 - shown) * 12);
+      }
       screen.draw(g, this.time, hits);
+      g.globalAlpha = 1;
       if (stats) drawStats(g, this, this.#hudLayout.statsX, this.#hudLayout.statsY);
     });
   }

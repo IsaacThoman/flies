@@ -2,11 +2,11 @@
 // (docs/online.md). Few words, one pane, four faces:
 //
 // - the rooms: Go home (while on the way to a room it is visiting), a new
-//   one, a code to type, and every listed room with someone in it, by its
-//   name, its place's colour, its flies as pips and a padlock if it has a
-//   password, the rooms open to everyone first (Everyone's, then each
-//   place's), each with a globe, to take the fly to visit; the list follows
-//   the room server as it changes;
+//   one, a code to type, and every listed room with someone in it, an entry
+//   each: its place's colour, its name and where it is, a padlock if it has
+//   a password, and how many flies of how many, the rooms open to everyone
+//   first (Everyone's, then each place's), each with a globe, to take the
+//   fly to visit; the list follows the room server as it changes;
 // - a new room: its name (one is suggested), its place, whether it is listed
 //   or only reached by its link, and a password if it is to have one;
 // - a locked room's door: its password;
@@ -169,19 +169,19 @@ export class OnlineScreen implements Screen {
       case "rooms": {
         const rows: MenuItem[] = [];
         // Not looking from a room: on a visit, on its way to the room or unable to reach it, home is a step away.
-        if (!this.#looking && shell.canPlayOnline && shell.visiting) rows.push({ kind: "action", id: "home", label: "Go home" });
+        if (!this.#looking && shell.canPlayOnline && shell.visiting) rows.push({ kind: "action", id: "home", label: "Go home", icon: "home" });
         rows.push(
-          { kind: "action", id: "new", label: "New room", disabled: !shell.canPlayOnline || this.#incompatible() },
+          { kind: "action", id: "new", label: "New room", icon: "add", disabled: !shell.canPlayOnline || this.#incompatible() },
           { kind: "field", id: "code", label: "Code", value: this.#code, disabled: !shell.typing || this.#incompatible(), submit: { label: "Join", disabled: !this.#codeValid } },
         );
         const rooms = shell.rooms;
         const status = shell.lobbyStatus;
         const unavailable = status === "lost" || status === "stale" || this.#incompatible();
         if (unavailable) {
-          if (!this.#incompatible()) rows.push({ kind: "action", id: "unavailable", label: status === "stale" ? "Reconnecting…" : "Can't reach rooms", disabled: true });
+          if (!this.#incompatible()) rows.push({ kind: "action", id: "unavailable", label: status === "stale" ? "Reconnecting…" : "Can't reach rooms", disabled: true, quiet: true });
         }
-        else if (!rooms) rows.push({ kind: "action", id: "looking", label: "Looking for rooms…", disabled: true });
-        else if (!rooms.length) rows.push({ kind: "action", id: "none", label: "No rooms open", disabled: true });
+        else if (!rooms) rows.push({ kind: "action", id: "looking", label: "Looking for rooms…", disabled: true, quiet: true });
+        else if (!rooms.length) rows.push({ kind: "action", id: "none", label: "No rooms open", disabled: true, quiet: true });
         for (const r of rooms ?? []) {
           // A full room open to everyone sends whoever chooses it on to the next.
           const everyone = r.everyone === true;
@@ -193,14 +193,14 @@ export class OnlineScreen implements Screen {
       }
       case "new": {
         const d = this.#draft;
-        const place: ChoiceItem<PlaceId> = { kind: "choice", id: "place", label: "Place", options: WHERE, index: indexOf(WHERE, d.place) };
-        const listed: ChoiceItem<boolean> = { kind: "choice", id: "listed", label: "Listing", options: LISTED, index: indexOf(LISTED, d.listed) };
+        const place: ChoiceItem<PlaceId> = { kind: "choice", id: "place", label: "Place", detail: "Where the room is", options: WHERE, index: indexOf(WHERE, d.place) };
+        const listed: ChoiceItem<boolean> = { kind: "choice", id: "listed", label: "Listing", detail: "Public: in everyone's list. Unlisted: by its link or code", options: LISTED, index: indexOf(LISTED, d.listed) };
         return [
-          { kind: "field", id: "name", label: "Name", value: d.name, disabled: !shell.typing },
+          { kind: "field", id: "name", label: "Name", detail: "What the room is called", value: d.name, disabled: !shell.typing },
           place,
           listed,
-          { kind: "field", id: "password", label: "Password", value: d.password, placeholder: "None", secret: true, disabled: !shell.typing },
-          { kind: "action", id: "create", label: "Create", disabled: this.#incompatible() },
+          { kind: "field", id: "password", label: "Password", detail: "With one, only those who know it get in", value: d.password, placeholder: "None", secret: true, disabled: !shell.typing },
+          { kind: "action", id: "create", label: "Create", primary: true, disabled: this.#incompatible() },
         ];
       }
       case "door": {
@@ -208,17 +208,17 @@ export class OnlineScreen implements Screen {
         const joining = !!shell.table && shell.table.code === shell.knock?.code;
         return [
           { kind: "field", id: "password", label: "Password", value: this.#password, secret: true, disabled: !shell.typing || joining },
-          { kind: "action", id: "join", label: joining ? "Joining…" : "Join", disabled: joining || !this.#password || this.#incompatible() },
+          { kind: "action", id: "join", label: joining ? "Joining…" : "Join", primary: true, disabled: joining || !this.#password || this.#incompatible() },
         ];
       }
       case "room": {
         const table = shell.table;
         if (!table) return [];
         const copied = this.#copied >= 0 && this.#time - this.#copied < COPIED_FOR;
-        const rows: MenuItem[] = shell.canShare ? [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", disabled: !table.joined }] : [];
+        const rows: MenuItem[] = shell.canShare ? [{ kind: "action", id: "share", label: copied ? "Link copied" : "Share the link", icon: copied ? "check" : "share", disabled: !table.joined }] : [];
         if (table.starting) for (const o of table.others) rows.push({ kind: "action", id: this.#removalId(o), label: "Remove", description: `Player ${o.id}, ${o.colours.length} ${o.colours.length === 1 ? "fly" : "flies"}`, swatch: o.colours });
-        if (table.everyone) rows.push({ kind: "action", id: "rooms", label: "Browse rooms" });
-        rows.push({ kind: "action", id: "home", label: "Go home" });
+        if (table.everyone) rows.push({ kind: "action", id: "rooms", label: "Browse rooms", icon: "rooms" });
+        rows.push({ kind: "action", id: "home", label: "Go home", icon: "home" });
         return rows;
       }
     }
@@ -257,7 +257,7 @@ export class OnlineScreen implements Screen {
     const menu = new Menu(items, { focus });
     const note = !!this.#note;
     const values = this.view === "new" || this.view === "door" || this.view === "rooms";
-    const spec: MenuPanelSpec = { items: items.length, maxRows: MOST_ROWS, width: 460, row: 40, heading: true, foot: 34, values, raise: 12 };
+    const spec: MenuPanelSpec = { items: items.length, maxRows: MOST_ROWS, width: 460, row: 40, heading: true, foot: 34, values, raise: 12, detail: this.view === "new" };
     // Its card once the room has let this device in.
     const card = this.view === "room" && !!shell.table?.joined;
     return new MenuScreen(shell, {

@@ -8,6 +8,7 @@
 // Node.
 
 import type { RemoteButton } from "@fly/contracts";
+import type { Icon } from "./icons.ts";
 
 export type Option<V> = { value: V; label: string };
 
@@ -17,22 +18,34 @@ export type ActionItem = {
   label: string;
   disabled?: boolean;
   hint?: string;
+  /** A line on what it is for, shown while it has the focus. */
+  detail?: string;
+  /** A picture of what it does, at its left. */
+  icon?: Icon;
+  /** The thing most players came to do: coloured so that it is seen first. */
+  primary?: boolean;
+  /** Not a button but a word on how things stand (still looking, nothing found): written plainly, where a disabled button would look broken. */
+  quiet?: boolean;
   /** A dot of colour at its left, or a few in a row: what it is about, where words would be too many (a player's flies at a table, by their colours; a room's place). */
   swatch?: string | readonly string[];
   /** Meaning of a decorative swatch, without relying on colour. */
   description?: string;
-  /** How many of how many, as pips at its right (the flies in a room); a padlock, for what needs a password; a globe, for a room open to everyone. */
+  /** How many of how many (the flies in a room), which makes it an entry of a list, not a button; written at its right as `countLabel`. A padlock, for what needs a password; a globe, for a room open to everyone. */
   count?: readonly [number, number];
-  /** A cached counter for lists where the capacity must be explicit. */
   countLabel?: string;
   locked?: boolean;
   everyone?: boolean;
 };
-/** A choice; `tabs` draws its options side by side, every one to be pressed, as the tabs across the top of a page. */
-export type ChoiceItem<V = unknown> = { kind: "choice"; id: string; label: string; options: readonly Option<V>[]; index: number; disabled?: boolean; hint?: string; tabs?: boolean };
-export type SliderItem = { kind: "slider"; id: string; label: string; min: number; max: number; step: number; value: number; disabled?: boolean; hint?: string };
+/**
+ * A choice; `tabs` draws its options side by side, every one to be pressed, as
+ * the tabs across the top of a page; `toggle` is one of two, off then on,
+ * drawn as a switch. `detail`: a line on what it is for, shown while it has
+ * the focus.
+ */
+export type ChoiceItem<V = unknown> = { kind: "choice"; id: string; label: string; options: readonly Option<V>[]; index: number; disabled?: boolean; hint?: string; detail?: string; tabs?: boolean; toggle?: boolean };
+export type SliderItem = { kind: "slider"; id: string; label: string; min: number; max: number; step: number; value: number; disabled?: boolean; hint?: string; detail?: string };
 /** Words to type: a name, a password (`secret`: shown masked), a code. Select starts typing into it; `placeholder` shows while it is empty. */
-export type FieldItem = { kind: "field"; id: string; label: string; value: string; placeholder?: string; secret?: boolean; disabled?: boolean; hint?: string; submit?: { label: string; disabled: boolean } };
+export type FieldItem = { kind: "field"; id: string; label: string; value: string; placeholder?: string; secret?: boolean; disabled?: boolean; hint?: string; detail?: string; submit?: { label: string; disabled: boolean } };
 export type MenuItem = ActionItem | ChoiceItem | SliderItem | FieldItem;
 
 /** What a press did. */

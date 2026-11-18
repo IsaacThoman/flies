@@ -60,6 +60,8 @@ export interface Shell {
   readonly shape: Frame;
   /** Whose buttons the hints show, or null when the player is pointing at the screen (no hints; things to press instead). */
   readonly glyphs: GlyphSet | null;
+  /** Whether the menus still say what the buttons do: on a first visit, until the first game. Without it, they do. */
+  readonly teachingMenu?: boolean;
   /** Opens a screen over the current one. */
   open(screen: ScreenId): void;
   /** Back one screen (leaving the app at the root). */

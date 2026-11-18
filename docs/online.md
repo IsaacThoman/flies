@@ -84,7 +84,7 @@ together; the binary fly-state layout itself is unchanged.
 - **The rooms.** The menu → Online lists the rooms open to everyone first
   (the first of each series always, the others while someone is there),
   each with a globe, Everyone's saying where they are now,
-  then other public rooms with someone in them, fullest first (at most 50 rooms in all): its name, its place's colour, its eight seats as pips
+  then other public rooms with someone in them, fullest first (at most 50 rooms in all): an entry each, with its place's colour and its name at the left, and at the right how many of its seats are taken
   (one per present or still-connected fly, plus a departed starter's reserved first seat)
   and a padlock if it has a password. The list follows the room server as
   rooms open, fill and empty. A full one can't be chosen, but for a room

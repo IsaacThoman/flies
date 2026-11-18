@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HitMap } from "@fly/ui";
-import type { Hit } from "@fly/ui";
+import type { ChoiceItem, Hit } from "@fly/ui";
 import { TV_FRAME, frameFor } from "../src/display.ts";
 import type { Frame } from "../src/display.ts";
 import { DEFAULT_SETTINGS } from "../src/settings.ts";
@@ -90,8 +90,9 @@ test("the TV keeps its HUD and title layout, with Settings below a separate head
   // The Apple TV has no way to a table yet.
   const s = shell(TV_FRAME, "remote", false);
   const settings = settingsScreen(s);
-  // Spaced for its longest tab (On screen: the tabs and seven rows), and as tall as the tab open: the Screensaver's tabs and six rows here.
-  assert.deepEqual(settings.pane.panel, { x: 157, y: 12, w: 540, h: 352 });
+  // Spaced for its longest tab (On screen: the tabs and seven rows), and as tall as the tab open: the Screensaver's tabs and six rows here, over the line on what the focused one is for.
+  assert.deepEqual(settings.pane.panel, { x: 157, y: 12, w: 540, h: 372 });
+  assert.deepEqual(settings.pane.detail, { up: 14, size: 12 });
   assert.deepEqual(settings.pane.list, { x: 185, y: 52, width: 484, row: 40, gap: 4, compact: false, columns: 1 });
   assert.equal(settings.menu.rows, settings.menu.items.length);
 
@@ -494,7 +495,7 @@ test("selector arrows stay put across kinds, including Place's Go appearing", ()
   }
 });
 
-test("the Flies row writes its count on wide and compact screens, with chevrons to choose", () => {
+test("the Flies row writes every count it can be on wide and compact screens, each to be pressed, the one chosen raised", () => {
   for (const [name, frame] of [["the TV", TV_FRAME] as const, ...frames()]) {
     for (let count = 1; count <= 4; count++) {
       const host = shell(frame);
@@ -507,9 +508,10 @@ test("the Flies row writes its count on wide and compact screens, with chevrons 
       const hits = new HitMap();
       hits.begin(screen.id);
       screen.draw(g, 0, hits);
-      assert.ok(writtenOn(g).some((w) => w.text === String(count)), `${name}: ${count} written`);
-      const steps = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).filter((h) => h.kind === "step" && h.index === row);
-      assert.equal(steps.length, 2, `${name}: both chevrons target this row`);
+      for (let n = 1; n <= 4; n++) assert.ok(writtenOn(g).some((w) => w.text === String(n)), `${name}: ${n} written`);
+      const options = Array.from({ length: hits.count }, (_, i) => hits.get(i)!).filter((h) => h.kind === "option" && h.index === row);
+      assert.deepEqual(options.map((h) => h.value), [0, 1, 2, 3], `${name}: every count targets this row`);
+      assert.equal((screen.menu.items[row] as ChoiceItem).index, count - 1, `${name}: ${count} chosen`);
     }
   }
 });
@@ -578,7 +580,8 @@ test("Settings trims unused space while each tab and setting keeps its position"
       const hit = hits.get(i)!;
       if (hit.kind === "row") rowBottom = Math.max(rowBottom, hit.y + hit.h);
     }
-    assert.ok(first.y + first.h - rowBottom <= 34, `${w}×${h}: no empty rows after the content`);
+    // Under the last row, the pane's foot, and the line on what the focused row is for where there is one.
+    assert.ok(first.y + first.h - rowBottom <= 34 + (s.pane.detail ? 20 : 0), `${w}×${h}: no empty rows after the content`);
     const tabY = s.pane.list.y;
     s.press("right", false);
     assert.equal(s.pane.panel.y, first.y);
