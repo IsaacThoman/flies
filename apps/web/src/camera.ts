@@ -42,7 +42,7 @@ export class CameraDirector {
 
   constructor(world: World, aspect: number, scene: SceneCamera) {
     this.camera = new THREE.PerspectiveCamera(30, aspect, 0.5, 4000);
-    this.#rig = new OrbitRig(world, this.camera, scene);
+    this.#rig = new OrbitRig(this.camera, scene);
     this.#cameraman = new Cameraman(world, this.camera, scene, this.room);
     this.useScene(scene);
   }
