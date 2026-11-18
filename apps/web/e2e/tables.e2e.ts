@@ -305,12 +305,15 @@ try {
   console.log(`  back after ${(await readState(a.page)).reconnects} and ${(await readState(b.page)).reconnects} tries`);
 
   step("the starter carries the table to the restaurant: both flies are set down on the window table, and each sees the other where it is");
+  // Where each is set down is taken as it is set down: carried there, a fly lives on before both tabs have drawn the
+  // place, and one that is startled and flies in that time lands wherever it comes down (the window's ledge, 450 mm up).
+  for (const t of [a, b]) await fly(t.page, "(() => { const life = g.life, setDown = life.setDown.bind(life); life.setDown = (...at) => { setDown(...at); globalThis.__setDownAt = life.body.position.y; }; })()");
   await fly(a.page, "g.online.choosePlace('restaurant')");
   // Built a part a frame behind the veil, fifty frames or so: a minute or more on a software GPU drawing two tabs.
   for (const t of [a, b]) await waitFor(t.page, "place=restaurant,moving=,epoch=1", 240_000);
   await seesFly(a.page, 2, false, 10_000);
   await seesFly(b.page, 1, false, 10_000);
-  const heights = await Promise.all([a, b].map((t) => fly<number>(t.page, "g.life.body.position.y")));
+  const heights = await Promise.all([a, b].map((t) => t.page.evaluate("globalThis.__setDownAt") as Promise<number>));
   // On the window table's top, 760 mm up: past a tabletop's wire, so only a room's scale carries them.
   for (const y of heights) assert.ok(y > 700, `set down ${y.toFixed(1)} mm up, on the table`);
   const roomApart = await drawnApart(a.page, b.page, 2);
