@@ -9,7 +9,8 @@
 // right or the left. Nothing moves: the fly's turns don't move the light across
 // its eyes. Each run is set against an unlit control of the same seed. Per
 // seed and side: the mean turn command toward the light, less the control's,
-// over the whole run and in windows after the light comes on.
+// over the whole run and in windows after the light comes on, and the unlit
+// control's own mean turn command, which the visual background sets.
 
 import { parseArgs } from "node:util";
 import { DEFAULT_CONNECTOME_PATH, readConnectomeFile } from "../src/node.ts";
@@ -71,7 +72,7 @@ function run(seed: number, lamp: "left" | "right" | null) {
 const mean = (v: readonly number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 const fixed = (n: number) => (n >= 0 ? "+" : "") + n.toFixed(3);
 console.log(`A light ${values.radius}° in radius, ${values.azimuth}° from ahead, for ${seconds} s; turn toward it less the unlit control's`);
-console.log(`  seed side   whole run  ${WINDOWS.slice(0, -1).map((a, i) => `${a}-${WINDOWS[i + 1]} s`.padStart(9)).join(" ")}   spikes/s (unlit)`);
+console.log(`  seed side   whole run  ${WINDOWS.slice(0, -1).map((a, i) => `${a}-${WINDOWS[i + 1]} s`.padStart(9)).join(" ")}   spikes/s (unlit)   unlit turn`);
 const all: number[] = [];
 for (const seed of seeds) {
   const off = run(seed, null);
@@ -81,7 +82,7 @@ for (const seed of seeds) {
     const d = lit.turn.map((x, i) => (x - off.turn[i]) * toward);
     all.push(mean(d));
     const windows = WINDOWS.slice(0, -1).map((a, i) => fixed(mean(d.slice((a * 1000) / TICK, (WINDOWS[i + 1] * 1000) / TICK))).padStart(9));
-    console.log(`  ${String(seed).padStart(4)} ${side.padEnd(6)} ${fixed(mean(d)).padStart(9)}  ${windows.join(" ")}   ${Math.round(lit.spikes)} (${Math.round(off.spikes)})`);
+    console.log(`  ${String(seed).padStart(4)} ${side.padEnd(6)} ${fixed(mean(d)).padStart(9)}  ${windows.join(" ")}   ${Math.round(lit.spikes)} (${Math.round(off.spikes)})   ${fixed(mean(off.turn))}`);
   }
 }
 const m = mean(all);
