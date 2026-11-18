@@ -29,7 +29,7 @@ import { Fingers, canvasPoint, doubleClick, openGame, readState, screenOf, start
 
 import type { Game } from "../src/game.ts";
 import { FLY_MIDDLE, FLY_REACH } from "../src/tools/aim.ts";
-import { FEATHER_REACH } from "../src/tools/hands.ts";
+import { FEATHER_REACH, TOOLS } from "../src/tools/hands.ts";
 import { dropFood, feedHoney } from "./feeding.ts";
 
 /** The frame's budget on the Apple TV, as play.e2e.ts holds it to. */
@@ -521,7 +521,8 @@ async function mouse() {
     await waitWithin(page, `view=follow,reach~^11\\.1$,yaw=${before}`, 15);
 
     step("keys: a number picks a tool, and the hints are a keyboard's");
-    await page.keyboard.press("2");
+    // The key for the feather is its place on the shelf, which grows as tools are added.
+    await page.keyboard.press(String(TOOLS.findIndex((t) => t.id === "feather") + 1));
     await waitFor(page, "tool=feather,device=keys");
     await page.keyboard.press("1");
     await waitFor(page, "tool=feed");
