@@ -5,7 +5,8 @@
 
 import type { World } from "./world.ts";
 import { TOUCH, createSurface } from "./world.ts";
-import { FOUND_TASTES, TASTES } from "./tastes.ts";
+import { FOUND_TASTES, NO_ODOR, TASTES } from "./tastes.ts";
+import type { Odor } from "./tastes.ts";
 
 /** A patch of food built into a place: it can be eaten down and slowly comes back. */
 export type FoodPatch = {
@@ -24,6 +25,8 @@ export type FoodPatch = {
   bitter?: number;
   /** A pool of liquid: a fly walking or drinking in it sets rings spreading. */
   pool?: boolean;
+  /** What it gives off, each odorant at its edge (tastes.ts; left out, nothing). */
+  odor?: Odor;
 };
 
 export type FoodKind = "sugar" | "honey" | "berry" | "water" | "coffee" | "laced";
@@ -34,7 +37,7 @@ export type FoodKind = "sugar" | "honey" | "berry" | "water" | "coffee" | "laced
  * caffeine, which is `bitter`'s 1; Bitter sugar a lump soaked in it, the
  * coffee's water as sweet as sugar makes it and its caffeine thinned by that.
  */
-export const FOODS: Readonly<Record<FoodKind, { name: string; sweet: number; water: number; bitter: number; r: number }>> = {
+export const FOODS: Readonly<Record<FoodKind, { name: string; sweet: number; water: number; bitter: number; odor: Odor; r: number }>> = {
   sugar: { name: "Sugar", ...TASTES.sugar, r: 0.9 },
   honey: { name: "Honey", ...TASTES.honey, r: 1.6 },
   berry: { name: "Raspberry", ...TASTES.raspberry, r: 1.6 },
@@ -60,23 +63,25 @@ export type Food = {
   amount: number;
   /** A pool of liquid (see FoodPatch). */
   pool: boolean;
+  /** What it gives off (FoodPatch); left out, nothing. */
+  odor?: Odor;
 };
 
 /** A taste sent to the brain: it fades only over the last quarter of a food. */
 export const tasteIntensity = (food: Food, taste: "sweet" | "water" | "bitter" = "sweet"): number => food[taste] * Math.min(1, food.amount * 4);
 
 /**
- * How a food the room describes tastes besides sweet, which isn't sent (the wire
- * carries sweet alone): a patch as its place has it, a dropped kind as FOODS
- * has it, anything found as what it is named (FOUND_TASTES).
+ * How a food the room describes tastes besides sweet, and how it smells, which
+ * aren't sent (the wire carries sweet alone): a patch as its place has it, a
+ * dropped kind as FOODS has it, anything found as what it is named (FOUND_TASTES).
  */
-export function otherTastes(patches: readonly FoodPatch[], id: number, kind: string, name: string): { water: number; bitter: number } {
+export function otherTastes(patches: readonly FoodPatch[], id: number, kind: string, name: string): { water: number; bitter: number; odor: Odor } {
   if (kind === "patch") {
     const patch = patches[id - 1];
-    return patch?.name === name ? { water: patch.water ?? 0, bitter: patch.bitter ?? 0 } : { water: 0, bitter: 0 };
+    return patch?.name === name ? { water: patch.water ?? 0, bitter: patch.bitter ?? 0, odor: patch.odor ?? NO_ODOR } : { water: 0, bitter: 0, odor: NO_ODOR };
   }
   const spec = kind === "found" ? (Object.hasOwn(FOUND_TASTES, name) ? FOUND_TASTES[name] : null) : Object.hasOwn(FOODS, kind) ? FOODS[kind as FoodKind] : null;
-  return { water: spec?.water ?? 0, bitter: spec?.bitter ?? 0 };
+  return { water: spec?.water ?? 0, bitter: spec?.bitter ?? 0, odor: spec?.odor ?? NO_ODOR };
 }
 
 /** Amount eaten per second at `feed` 1. A dropped food lasts about 6 s with `feed` near 0.5. */
@@ -107,7 +112,7 @@ export class Pantry {
   reset(patches: readonly FoodPatch[]) {
     this.foods.length = 0;
     for (const p of patches) {
-      this.foods.push({ id: this.#next++, kind: "patch", name: p.name, x: p.x, y: this.#world.heightAt(p.x, p.z, p.y), z: p.z, r: p.r, sweet: p.sweet, water: p.water ?? 0, bitter: p.bitter ?? 0, amount: 1, pool: p.pool ?? false });
+      this.foods.push({ id: this.#next++, kind: "patch", name: p.name, x: p.x, y: this.#world.heightAt(p.x, p.z, p.y), z: p.z, r: p.r, sweet: p.sweet, water: p.water ?? 0, bitter: p.bitter ?? 0, amount: 1, pool: p.pool ?? false, odor: p.odor ?? NO_ODOR });
     }
   }
 
@@ -116,7 +121,7 @@ export class Pantry {
     const dropped = this.foods.filter(isDropped);
     if (dropped.length >= MAX_DROPPED) this.remove(dropped[0]);
     const spec = FOODS[kind];
-    const food: Food = { id: this.#next++, kind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, water: spec.water, bitter: spec.bitter, amount: 1, pool: false };
+    const food: Food = { id: this.#next++, kind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, water: spec.water, bitter: spec.bitter, amount: 1, pool: false, odor: spec.odor };
     this.foods.push(food);
     return food;
   }

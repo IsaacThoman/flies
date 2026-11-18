@@ -46,7 +46,7 @@ export const REDRAWS = 4;
 const VALUE = { size: 18, color: "#ffffff" };
 const UNIT = { size: 14, color: "#e4f3ff" };
 
-/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger and thirst, internal state, 1 when left out; touch, the most any part of it is touched; the legs, the faster side's. */
+/** What goes in, each as the body sends it, and the light as the mean over every facet; "grounded" is 1 or 0; hunger and thirst, internal state, 1 when left out; touch, the most any part of it is touched; the legs, the faster side's; smell, the strongest odorant at either antenna. */
 export const SENSES = [
   ["loomLeft", "Loom L"],
   ["loomRight", "Loom R"],
@@ -57,6 +57,7 @@ export const SENSES = [
   ["sweet", "Sweet"],
   ["bitter", "Bitter"],
   ["water", "Water"],
+  ["smell", "Smell"],
   ["grounded", "On legs"],
   ["maleTaste", "Male taste"],
   ["wingbeat", "Wingbeat"],
@@ -304,6 +305,16 @@ function touchOf(sensed: BrainSenses) {
   return most;
 }
 
+/** The strongest odorant at either antenna. */
+export function smellOf(sensed: BrainSenses) {
+  const odor = sensed.odor;
+  if (!odor) return 0;
+  let most = 0;
+  for (let k = 0; k < odor.left.length; k++) most = Math.max(most, odor.left[k]);
+  for (let k = 0; k < odor.right.length; k++) most = Math.max(most, odor.right[k]);
+  return most;
+}
+
 /** A bar's length in whole design units of its width: the steps it is drawn in, so only a change that shows counts. */
 const step = (v: number) => Math.round(Math.max(-1, Math.min(1, Number.isFinite(v) ? v : 0)) * BAR.width) / BAR.width;
 
@@ -314,7 +325,7 @@ export function readSignals(s: StatsState, out: Float32Array) {
   for (let k = 0; k < SENSES.length; k++) {
     const key = SENSES[k][0];
     out[i++] = step(
-      key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : key === "hunger" || key === "thirst" ? (sensed[key] ?? 1) : key === "touch" ? touchOf(sensed) : key === "legs" ? Math.max(sensed.legsLeft ?? 0, sensed.legsRight ?? 0) : sensed[key],
+      key === "grounded" ? (sensed.grounded ? 1 : 0) : key === "light" ? meanLight(sensed.light) : key === "hunger" || key === "thirst" ? (sensed[key] ?? 1) : key === "touch" ? touchOf(sensed) : key === "legs" ? Math.max(sensed.legsLeft ?? 0, sensed.legsRight ?? 0) : key === "smell" ? smellOf(sensed) : sensed[key],
     );
   }
   const command = s.brain?.command;

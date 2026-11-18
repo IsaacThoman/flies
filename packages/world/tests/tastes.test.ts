@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CAFFEINE_SPIKES, CONTENTS, FOODS, FOUND_TASTES, SUGAR_SPIKES, TASTES, WORLDS, WATER_SIGNAL, mix, mixtureSpikes, otherTastes, solution, tastesOf } from "../src/index.ts";
+import { CAFFEINE_SPIKES, CONTENTS, FOODS, FOUND_TASTES, NO_ODOR, ODORANTS, SUGAR_SPIKES, TASTES, WORLDS, WATER_SIGNAL, mix, mixtureSpikes, otherTastes, solution, tastesOf } from "../src/index.ts";
 import type { Tastes } from "../src/index.ts";
 
 const near = (a: number, b: number, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} ≉ ${b}`);
@@ -71,16 +71,26 @@ test("water is the water neurons' recorded answer to the food's sugar, and none 
 
 const same = (a: Tastes, b: Tastes) => a.sweet === b.sweet && a.water === b.water && a.bitter === b.bitter;
 
-test("every food anywhere tastes as some food's contents make it, none set by hand", () => {
+test("every food anywhere tastes and smells as some food makes it, none set by hand", () => {
   const derived = Object.values(TASTES);
-  for (const [kind, spec] of Object.entries(FOODS)) assert.ok(derived.some((t) => same(t, { sweet: spec.sweet, water: spec.water, bitter: spec.bitter })), `Feed's ${kind}`);
+  for (const [kind, spec] of Object.entries(FOODS)) assert.ok(derived.some((t) => same(t, { sweet: spec.sweet, water: spec.water, bitter: spec.bitter }) && t.odor === spec.odor), `Feed's ${kind}`);
   for (const [id, place] of Object.entries(WORLDS)) {
-    for (const p of place.patches) assert.ok(derived.some((t) => same(t, { sweet: p.sweet, water: p.water ?? 0, bitter: p.bitter ?? 0 })), `${id}'s ${p.name}`);
+    for (const p of place.patches) assert.ok(derived.some((t) => same(t, { sweet: p.sweet, water: p.water ?? 0, bitter: p.bitter ?? 0 }) && t.odor === p.odor), `${id}'s ${p.name}`);
   }
   for (const [name, t] of Object.entries(FOUND_TASTES)) {
     assert.ok(derived.includes(t), name);
     // Found food crosses a room as its name and sweetness: every device rebuilds the rest from the name.
-    assert.deepEqual(otherTastes([], 0, "found", name), { water: t.water, bitter: t.bitter });
+    assert.deepEqual(otherTastes([], 0, "found", name), { water: t.water, bitter: t.bitter, odor: t.odor });
   }
-  assert.deepEqual(otherTastes([], 0, "found", "something new"), { water: 0, bitter: 0 });
+  assert.deepEqual(otherTastes([], 0, "found", "something new"), { water: 0, bitter: 0, odor: NO_ODOR });
+});
+
+test("each food gives off what it is: banana its isoamyl acetate, ketchup its vinegar, the lab's fermenting food all five, ripe fruit a trace; sugar nothing", () => {
+  const of = (food: keyof typeof TASTES) => Object.fromEntries(ODORANTS.map((k, i) => [k, TASTES[food].odor[i]]).filter(([, v]) => v));
+  assert.deepEqual(of("banana"), { isoamylAcetate: 1, ethylAcetate: 0.1, ethanol: 0.1 });
+  assert.deepEqual(of("ketchup"), { aceticAcid: 1 });
+  assert.deepEqual(of("flyFood"), { ethylAcetate: 1, aceticAcid: 1, ethanol: 1, isoamylAcetate: 1, co2: 1 });
+  assert.deepEqual(of("strawberry"), { ethylAcetate: 0.1, ethanol: 0.1 });
+  for (const none of ["sugar", "honey", "water", "jam", "syrup", "espresso", "bread", "toast", "shortbread", "juiceRing"] as const) assert.deepEqual(of(none), {}, none);
+  for (const t of Object.values(TASTES)) assert.ok(t.odor.length === ODORANTS.length && t.odor.every((v) => v >= 0 && v <= 1));
 });

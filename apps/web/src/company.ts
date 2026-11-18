@@ -33,9 +33,10 @@ export type Companion = {
   colour: string;
   /** Its fly's id at a table, once the table has seated it (0 alone). */
   id: number;
-  /** What the place's goings-on do to it this frame, and the air at it. */
+  /** What the place's goings-on do to it this frame, the air at it as it feels it, and as it blows there (which carries smells). */
   readonly felt: Felt;
   readonly air: Vec3;
+  readonly wind: Vec3;
   /** New brains it has been given after its brain failed, and when it gets the next (game seconds; -1 until its brain has failed). */
   tries: number;
   retryAt: number;
@@ -81,7 +82,7 @@ export class Company {
       life.tendsPantry = false;
       const [x, z, yaw, y] = spot(i);
       life.setDown(x, z, yaw, y);
-      const c: Companion = { life, slot, pose: { ...RESTING_POSE }, colour: COLOURS[(i + 1) % COLOURS.length], id: 0, felt: { air: { x: 0, y: 0, z: 0 }, contacts: new Contacts(), looming: [] }, air: { x: 0, y: 0, z: 0 }, tries: 0, retryAt: -1 };
+      const c: Companion = { life, slot, pose: { ...RESTING_POSE }, colour: COLOURS[(i + 1) % COLOURS.length], id: 0, felt: { air: { x: 0, y: 0, z: 0 }, contacts: new Contacts(), looming: [] }, air: { x: 0, y: 0, z: 0 }, wind: { x: 0, y: 0, z: 0 }, tries: 0, retryAt: -1 };
       this.list.push(c);
       this.#arrive(c);
     }

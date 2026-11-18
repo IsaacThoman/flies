@@ -102,10 +102,12 @@ export class EscapeFlight {
   get flown() { return this.longestSeconds >= 0.05; }
 }
 
-export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: number, seed: number, hour: number, checkpoint: () => Promise<void>, traceDir?: string): Promise<EscapeTrial> {
+/** `setup` changes the fly's world before the trial, as scripts/plume.ts sets an odour source beside it. */
+export async function opticalTrial(data: ArrayBuffer, kind: EscapeKind, lvMs: number, seed: number, hour: number, checkpoint: () => Promise<void>, traceDir?: string, setup?: (life: Life) => void): Promise<EscapeTrial> {
   await checkpoint();
   const driver = new InProcessBrain(data, seed);
   const life = new Life(new World(ESCAPE_PLACE), driver);
+  setup?.(life);
   life.rhythm = new Rhythm(hour, { sunrise: 6, sunset: 18 });
   if (!driver.eyes) throw new Error('optical assay requires the real eye map');
   const light = { left: new Float32Array(driver.eyes.left.directions.length / 3), right: new Float32Array(driver.eyes.right.directions.length / 3) };

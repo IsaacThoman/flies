@@ -6,7 +6,7 @@
 
 import type { BrainSenses } from "@fly/brain";
 import type { Food, Pantry, Vec3, World } from "@fly/world";
-import { AMBIENT_TEMPERATURE, tasteIntensity } from "@fly/world";
+import { AMBIENT_TEMPERATURE, ODORANTS, smellAt, tasteIntensity } from "@fly/world";
 import { ease } from "./behavior.ts";
 import { FLY_HEIGHT, FLY_LENGTH, HEAD_AHEAD, HEAD_UP, MOUTH_AHEAD, MOUTH_UP, STEP_UP } from "./motion.ts";
 import type { FlyBody } from "./motion.ts";
@@ -33,6 +33,8 @@ export type SenseInput = {
   pushed?: { readonly touch: number; readonly contact: Readonly<Vec3> };
   /** The air's own velocity at the fly, mm/s. */
   air: Vec3;
+  /** The air's velocity where the fly is as it blows there, which carries smells (mm/s; left out, `air`): what the fly feels less its own carrying, say on a fingertip. */
+  wind?: Vec3;
   /** The brain's eyes see the world: no hand-wired looming then. */
   eyesOpen: boolean;
   /** How far the proboscis reaches now (0 to 1, the feeding pose), adding to what the mouth can taste. */
@@ -132,6 +134,9 @@ type EyeState = { value: number; hold: number };
 export type Tasting = { food: Food | null; byMouth: boolean };
 
 export class SenseTracker {
+  /** Each odorant at each antenna (BrainSenses.odor), written over each step. */
+  readonly #odorLeft = new Float64Array(ODORANTS.length);
+  readonly #odorRight = new Float64Array(ODORANTS.length);
   readonly senses: BrainSenses = {
     loomLeft: 0,
     loomRight: 0,
@@ -149,6 +154,7 @@ export class SenseTracker {
     temperatureRight: AMBIENT_TEMPERATURE,
     legsLeft: 0,
     legsRight: 0,
+    odor: { left: this.#odorLeft, right: this.#odorRight },
   };
   readonly tasting: Tasting = { food: null, byMouth: false };
   /** How large each looming thing was in the eye last frame (rad), by id. */
@@ -281,7 +287,16 @@ export class SenseTracker {
     // Its legs, as they stepped in its last step: their proprioceptors feel each step. In the air they don't step.
     out.legsLeft = body.onFeet ? legMovement(body.groundSpeed, body.turnRate, 1) : 0;
     out.legsRight = body.onFeet ? legMovement(body.groundSpeed, body.turnRate, -1) : 0;
+    // Smell: the food's odour at each antenna's third segment, carried by the air (@fly/world plume.ts), on the ground or in the air.
+    this.#smell(body, pantry, input.wind ?? input.air, 1, this.#odorLeft);
+    this.#smell(body, pantry, input.wind ?? input.air, -1, this.#odorRight);
     return out;
+  }
+
+  /** What one antenna smells, at its tip, where its smell sensilla are. */
+  #smell(body: FlyBody, pantry: Pantry, wind: Vec3, side: 1 | -1, into: Float64Array) {
+    const tip = body.point(HEAD_AHEAD + ANTENNA_AHEAD, HEAD_UP, side * ANTENNA_SIDE, this.#probe);
+    smellAt(pantry.foods, wind, tip.x, tip.y, tip.z, into);
   }
 
   /** The air's temperature at that antenna's tip, where its arista's thermoreceptors are, at the arista's base (Gallio et al. 2011). */

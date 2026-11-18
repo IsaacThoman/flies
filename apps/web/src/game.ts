@@ -294,6 +294,8 @@ export class Game implements Shell {
   #felt: Felt = { air: { x: 0, y: 0, z: 0 }, contacts: new Contacts(), looming: [] };
   #around: { -readonly [K in keyof Around]: Around[K] };
   #puff = { x: 0, y: 0, z: 0 };
+  /** The air as it blows at the followed fly, which carries smells: the puff before its own carrying. */
+  #wind = { x: 0, y: 0, z: 0 };
   #middle = new THREE.Vector3();
   #floorAt = (x: number, z: number, below: number) => this.life.world.heightAt(x, z, below);
   #ndc = new THREE.Vector3();
@@ -1570,7 +1572,7 @@ export class Game implements Shell {
     const own = this.life.stimuli;
     for (let i = 0; i < list.length; i++) {
       const c = list[i];
-      const { life, felt, air } = c;
+      const { life, felt, air, wind } = c;
       felt.air.x = felt.air.y = felt.air.z = 0;
       felt.contacts.clear();
       felt.looming.length = 0;
@@ -1593,6 +1595,10 @@ export class Game implements Shell {
         online.reach(life.body, air);
         online.touch(life.body, contacts);
       }
+      wind.x = air.x;
+      wind.y = air.y;
+      wind.z = air.z;
+      stimuli.wind = wind;
       this.#carriedAir(life.body, air);
       stimuli.air = air;
       // What could loom is wherever it is: the same balls, bubbles and visitors as the followed fly's, and what the place says of this one.
@@ -1626,6 +1632,11 @@ export class Game implements Shell {
     air.x = hands.air.x + felt.air.x + (online?.air.x ?? 0);
     air.y = hands.air.y + felt.air.y + (online?.air.y ?? 0);
     air.z = hands.air.z + felt.air.z + (online?.air.z ?? 0);
+    const wind = this.#wind;
+    wind.x = air.x;
+    wind.y = air.y;
+    wind.z = air.z;
+    stimuli.wind = wind;
     this.#carriedAir(this.life.body, air);
     stimuli.air = air;
     // Things that could loom: the balls, the fingertip, the bubbles, and whatever comes by.

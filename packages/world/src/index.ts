@@ -18,3 +18,4 @@ export * from "./kitchen.ts";
 export * from "./greenhouse.ts";
 export * from "./kit.ts";
 export * from "./tastes.ts";
+export * from "./plume.ts";

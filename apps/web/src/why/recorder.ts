@@ -15,7 +15,7 @@ import type { Intent } from "@fly/body";
 import { AIR_TURN_RATE, STANDING_TURN, TURN_RATE } from "@fly/body";
 import { SOMA_GROUPS } from "@fly/fly";
 import { COMMAND_ORDER } from "@fly/contracts";
-import { SENSES, meanLight } from "../stats/panel.ts";
+import { SENSES, meanLight, smellOf } from "../stats/panel.ts";
 
 /** Samples a second of fly time, and how many seconds are kept. */
 export const SAMPLE_HZ = 30;
@@ -79,7 +79,7 @@ const TURN = AT.commands + COMMAND_ORDER.indexOf("turn");
 const RATE_NAMES = SOMA_GROUPS.map((g) => g.rate);
 
 /** The senses and commands in the order readNow reads them, which must be SENSES' and COMMAND_ORDER's (a test holds it). */
-export const READ_SENSES = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet", "bitter", "water", "grounded", "maleTaste", "wingbeat", "legs", "light", "hunger", "thirst"] as const;
+export const READ_SENSES = ["loomLeft", "loomRight", "touch", "bumpLeft", "bumpRight", "wind", "sweet", "bitter", "water", "smell", "grounded", "maleTaste", "wingbeat", "legs", "light", "hunger", "thirst"] as const;
 export const READ_COMMANDS = ["walk", "turn", "back", "escape", "wings", "groom", "feed", "sing"] as const;
 
 /**
@@ -111,13 +111,14 @@ function readNow(state: BrainState, s: BrainSenses, out: Float32Array) {
   out[n + 6] = s.sweet;
   out[n + 7] = s.bitter;
   out[n + 8] = s.water;
-  out[n + 9] = s.grounded ? 1 : 0;
-  out[n + 10] = s.maleTaste;
-  out[n + 11] = s.wingbeat;
-  out[n + 12] = Math.max(s.legsLeft ?? 0, s.legsRight ?? 0);
-  out[n + 13] = 0;
-  out[n + 14] = s.hunger ?? 1;
-  out[n + 15] = s.thirst ?? 1;
+  out[n + 9] = smellOf(s);
+  out[n + 10] = s.grounded ? 1 : 0;
+  out[n + 11] = s.maleTaste;
+  out[n + 12] = s.wingbeat;
+  out[n + 13] = Math.max(s.legsLeft ?? 0, s.legsRight ?? 0);
+  out[n + 14] = 0;
+  out[n + 15] = s.hunger ?? 1;
+  out[n + 16] = s.thirst ?? 1;
 }
 
 /** Seconds kept in order, oldest first: what the recorder had when it was asked. */

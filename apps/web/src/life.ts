@@ -18,6 +18,8 @@ export type Stimuli = {
   contacts: Contacts;
   /** The air's velocity at the fly. */
   air: Vec3;
+  /** The air's velocity where the fly is, as it blows there, which carries smells: `air` less the fly's own carrying (left out, `air`). */
+  wind?: Vec3;
   /** Where the thing that loomed is, for the direction of a take-off. */
   threat: Vec3 | null;
 };
@@ -144,6 +146,7 @@ export class Life {
       // Another fly pushing against it is felt where it pushes, as anything touching it is.
       pushed: this.crowd,
       air: stimuli.air,
+      wind: stimuli.wind,
       eyesOpen,
       proboscis: this.#proboscis,
       bodies: this.crowd,
@@ -166,6 +169,7 @@ export class Life {
     sent.water = felt.water;
     sent.legsLeft = felt.legsLeft;
     sent.legsRight = felt.legsRight;
+    sent.odor = felt.odor;
     if (this.feelsTemperature) {
       sent.temperatureLeft = felt.temperatureLeft;
       sent.temperatureRight = felt.temperatureRight;
