@@ -261,8 +261,10 @@ throws each):
 
 | | With the floor | Without it |
 | --- | --- | --- |
-| With the wings' sensors | 29 of 32 flew: 1.5 to 1.6 s, 375 to 409 mm; the brain's `wings` 0.18 to 0.23 on average in the air, peaks 0.26 to 0.53 | 32 of 32 hopped: 0.05 to 0.12 s, 5 to 15 mm |
+| With the wings' sensors | 30 of 32 flew: 1.5 to 1.6 s, 369 to 402 mm, every one jumping backward from the ball coming in ahead; the brain's `wings` 0.18 to 0.22 on average in the air | 32 of 32 hopped: 0.05 to 0.12 s, 5 to 15 mm |
 | Without them | 31 of 32 flew: 1.5 to 1.6 s, 376 to 408 mm; the brain's `wings` 0.06 to 0.15, peaks 0.23 to 0.46 | 32 of 32 hopped: 0.05 to 0.08 s, 6 to 13 mm |
+
+The first cell is remeasured since the jump's direction came from the brain's `lean`; the others were measured while the body jumped away from the ball, which moves where a flight goes but not how long it lasts.
 
 With the floor each flight spends 0.78 s at power and the rest gliding, and
 lands on its feet. Nothing runs away: the wings fold the step it lands, and a
@@ -271,9 +273,10 @@ second later the brain's `wings` is 0 to 0.15 with the floor or without it
 without the floor, lets its wings down within half a second
 (`packages/brain/README.md`, What it does and doesn't reproduce).
 
-The recorded take-offs with the eyes open were flights of 1.5 to 1.6 s, 375 to 409 mm
-along their way, rising 58 to 70 mm, and landed on their feet; with the eyes shut
-(the hand-wired loom, 6 throws a seed), 1.9 to 3.7 s and 485 to 922 mm.
+The recorded take-offs with the eyes open were flights of 1.5 to 1.6 s, 369 to 402 mm
+along their way, rising 58 to 72 mm, and landed on their feet; with the eyes shut
+(the hand-wired loom, 6 throws a seed, seeds 1 to 3), 2.8 to 3.9 s and 719 to 970 mm,
+backward in 13 and forward in 4 of the 17 whose direction was recorded (the brain's `lean` at 0 or a spike of DNp02).
 Before the reflex they were in the air for 0.07 to 0.12 s. The
 fly often crosses the edge of the picnic table and is drawn back over it to land
 (Staying in the world). The automatic camera pulls back in flight and can lead the fly by up to
