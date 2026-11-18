@@ -91,6 +91,55 @@ every unavailable row any score from 0 to 10. These are missing-evidence
 bounds, not statistical confidence intervals. An unsupported assay never earns
 10; a missing duration never becomes a zero-valued biological observation.
 
+## Training
+
+`node scripts/ethogram.ts --assay training [--pieces dish-blue,dish-yellow] [--seeds 1,2,3] [--hour 6] [--out report.json]`
+(`scripts/ethogram/training.ts`) asks whether the fly can be taught which of
+two of the Build kit's coloured pieces is good or bad, as a player could teach
+it. It follows the design of the colour-learning assay of Vogt et al. (2014,
+eLife 3:e02395, Figure 1): differential conditioning, then a choice between
+the two colours without reinforcement, sugar the reward and a punishment the
+other. That paper's memory scores are given only in its figures, so no number
+is transcribed and nothing is scored: the row is context, `learning` in the
+scorecard's coverage.
+
+The whole animal runs through `Life`, its real brain, body, senses and
+hunger, in an open disc 60 mm across with two of the kit's own pieces set down
+as the world's solids (packages/world's `withPieces`), their middles 14 mm
+either side of the middle; any two of the coloured ones (`--pieces`; blue and
+yellow dishes by default). It starts 20 mm from the middle, between them.
+What its eyes see is drawn from its pose 20 times a second, as the game's eyes
+refresh at their low detail: each facet's ray from the head is marched over the
+pieces' own shapes (a dish's 1.6 mm rim stands above the fly's eyes) and the
+floor, and takes the colour of what it meets, made light by packages/body's
+`FLY_RGB` and unshaded: blue 0.70, yellow 0.48, red 0.25, the floor 0.41 (the
+body's tilt, the facets' acceptance cones and the scene's lighting are left
+out). Training, 300 s: sugar lies in the trained dish's well, a food patch
+tasted through `Life` as any food is; or, instead, whenever the fly stands on
+the trained piece a dark disc looms from straight above (the swoop as its eyes
+would see it, drawn every frame), at most once every 10 s. Test, 180 s: no
+sugar, no swoop; the preference is (time on the trained piece − time on the
+other) / their sum, on its feet. Each seed is run with each piece trained, each
+reinforcement (sugar only in a dish), and each with the brain's learning on
+and off from the same start: the paired difference is what learning did.
+
+Measured (seeds 1 to 3, 06:00; each line is six flies with learning and the
+same six without):
+
+| Pieces, reinforcement | Trained piece's time in training (s) | Preference with learning / without | Paired difference | Pairs alike to the frame | KC spikes | Synapses changed |
+|---|---|---|---|---|---|---|
+| Blue and yellow dishes, sugar | 0 to 245 (eating 0 to 81) | 0.24 / 0.38 (four and five flies on a dish) | 0.02 (0 to 0.07) | 4 of 6 | 4 to 16 | 13 to 22 |
+| Blue and yellow dishes, swoop | 0.5 to 0.9 (one swoop each) | none on a dish in the test | none | 6 of 6 | 11 to 25 | 16 to 19 |
+| Blue and red tiles, swoop | 0 to 1.0 (one swoop or none) | none on a tile in the test | none | 6 of 6 | 8 to 18 | 13 to 16 |
+
+No learning shows. The KCs fire a few times in 8 minutes, to the swoop's loom
+and the scene going by, not to a piece: no KC fires to any of the kit's
+colours (packages/brain/README.md, Learning). A fly that found the sugar
+stayed on its dish and chose it again without learning. The pairs that
+parted in training (one with sugar, one with the tiles) did so from the first
+changed synapse, the brain's chaos rather than a learned cue.
+
+
 ## Other requested domains
 
 The source code records walking/stop bouts, speed/yaw distributions, edge

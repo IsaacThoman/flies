@@ -73,6 +73,6 @@ export function scorecard(measured: Measurements, evidence?: OpticalEvidence | n
     opticalComposite: probabilityMean !== null && timingMean !== null ? (probabilityMean + timingMean) / 2 : null,
     scored: scores.length, registered: compared.length, overall: null,
     registeredComparisonBounds: [sum / compared.length, (sum + 10 * missing) / compared.length], missing,
-    coverage: { walking: 'context only', turning: 'context only', exploration: 'diagnostics only', grooming: 'diagnostics only', feeding: 'unsupported sip biology', escape: optical ? 'optical engineering benchmark' : 'not run', flight: 'body-maintained, unmatched', airPuff: 'not run', optomotor: 'not run' },
+    coverage: { walking: 'context only', turning: 'context only', exploration: 'diagnostics only', grooming: 'diagnostics only', feeding: 'unsupported sip biology', escape: optical ? 'optical engineering benchmark' : 'not run', flight: 'body-maintained, unmatched', airPuff: 'not run', optomotor: 'not run', learning: 'training assay, context only' },
     interpretation: 'No whole-animal point score or bounds are identified. Registry-average bounds allow unavailable rows [0,10] and are not biological fidelity bounds. Optical composite gives equal weight to probability and timing, requires both patterns and all fits, and remains a limited engineering comparison.' };
 }

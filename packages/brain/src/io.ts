@@ -436,6 +436,31 @@ export const STATE_EXCITABILITY: readonly ExcitabilitySpec[] = [
 ];
 
 /**
+ * Stand-ins for what reaches the mushroom body's dopaminergic neurons and
+ * that the wiring doesn't carry there (README, Learning). Sugar on the
+ * mouthparts excites the reward DANs of the β'2 and γ4 compartments (Burke
+ * et al. 2012, Nature 492:433; Liu et al. 2012, Nature 488:512; Huetteroth et
+ * al. 2015, Curr Biol 25:751), PAM02 (PAM-β'2a), PAM07 and PAM08 (PAM-γ4),
+ * but in this model nothing from the `sweet` taste neurons reaches any PAM
+ * (they stay silent under sugar). Driven at the sweet sense's intensity, at
+ * most 20 Hz: chosen, the order of what PPL1 fires here under a loom (19 Hz),
+ * which reaches them through the wiring, so that sugar and a threat teach at
+ * comparable strength. Their output is muted, as every DAN's is (params.ts):
+ * they change nothing but what the mushroom body learns, their own slow
+ * modulatory levels (modulation.ts) and the region rates. Added after every
+ * other input, so every other stream is as it was.
+ */
+export const REINFORCEMENT: readonly SenseSpec[] = [
+  {
+    sense: "sweet",
+    name: "sweet reward",
+    description: "Reward dopaminergic neurons of the mushroom body's β'2a and γ4 compartments (PAM02, PAM07, PAM08), which sugar excites",
+    select: { type: ["PAM02", "PAM07", "PAM08"] },
+    maxRate: 20,
+  },
+];
+
+/**
  * Spontaneous input, always on: the visual scene a fly at rest still sees.
  * Every visual projection neuron except the looming detectors (nothing is
  * looming at rest) fires at a low background rate, set per eye by the
@@ -601,6 +626,8 @@ export type Wiring = {
   thermo: { spec: ThermoSpec; neurons: Uint32Array }[];
   /** The internal state that sets excitability, where this connectome has its neurons. */
   excitability: { spec: ExcitabilitySpec; neurons: Uint32Array }[];
+  /** The reinforcement stand-ins this connectome has neurons for. */
+  reinforcement: { spec: SenseSpec; neurons: Uint32Array; maxRate: number }[];
   readouts: { spec: ReadoutSpec; neurons: Uint32Array }[];
 };
 
@@ -649,14 +676,15 @@ export function wire(connectome: Connectome): Wiring {
   const state = STATE_INPUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select), maxRate: spec.maxRate })).filter((g) => g.neurons.length > 0);
   const thermo = THERMO_INPUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select) })).filter((g) => g.neurons.length > 0);
   const excitability = STATE_EXCITABILITY.map((spec) => ({ spec, neurons: select(connectome, spec.select) })).filter((g) => g.neurons.length > 0);
+  const reinforcement = REINFORCEMENT.map((spec) => ({ spec, neurons: select(connectome, spec.select), maxRate: spec.maxRate })).filter((g) => g.neurons.length > 0);
   const readouts = READOUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select) }));
   for (const group of [...senses, ...background, ...readouts]) {
     if (group.neurons.length === 0) throw new Error(`The connectome has no neurons for "${group.spec.name}" (${group.spec.description})`);
   }
   const driven = new Uint8Array(connectome.neurons);
-  for (const group of [...senses, ...background, ...state, ...excitability, ...thermo]) for (const i of group.neurons) driven[i] = 1;
+  for (const group of [...senses, ...background, ...state, ...excitability, ...thermo, ...reinforcement]) for (const i of group.neurons) driven[i] = 1;
   for (const group of readouts) {
     for (const i of group.neurons) if (driven[i] === 1) throw new Error(`Neuron ${i} is both driven and read (readout "${group.spec.name}")`);
   }
-  return { senses, background, state, excitability, thermo, readouts };
+  return { senses, background, state, excitability, thermo, reinforcement, readouts };
 }

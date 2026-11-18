@@ -373,15 +373,25 @@ test("the eyes: shut, the brain is the same as one without them; open, darkness 
   assert.deepEqual(names.slice(READOUTS.length + REGIONS.length), ["lamina", "lobula", "looming"].flatMap((stage) => [`vision.${stage} left`]).concat(["lamina", "lobula", "looming"].map((stage) => `vision.${stage} right`)));
   assert.ok(VISION_STAGES.every(({ stage }) => stage !== "lamina" || names.includes(`vision.${stage} left`)));
 
-  // Shut eyes: spike for spike the brain without eyes, whatever else is going on.
+  // Shut eyes: spike for spike the brain without eyes, whatever else is going
+  // on, but for the reward DANs sugar drives: their input comes after the
+  // eyes', so its stream isn't the same. Their output is muted, but what they
+  // teach (γ4 here) can differ.
   const blind = new FlyBrain(load(), { seed: 4 });
   const eyes = seeing();
+  const reward = blind.wiring.reinforcement.flatMap((group) => [...group.neurons]);
+  assert.ok(reward.length > 0);
+  for (const brain of [blind, eyes]) brain.sim.setRecording(true);
+  const counted = (brain: FlyBrain, spikes: number) => spikes - reward.reduce((n, i) => n + brain.sim.recording![i], 0);
+  let before = [0, 0];
   const senses = [RESTING_SENSES, { ...RESTING_SENSES, loomLeft: 0.6, touch: 1 }, { ...RESTING_SENSES, sweet: 1, grounded: false }];
   for (let k = 0; k < 90; k++) {
     const s = senses[Math.floor(k / 30)];
     const a = blind.tick(16, s);
     const b = eyes.tick(16, s);
-    assert.equal(b.stats.spikes, a.stats.spikes, `tick ${k}`);
+    const now = [counted(blind, blind.sim.stats.spikes), counted(eyes, eyes.sim.stats.spikes)];
+    assert.equal(now[1] - before[1], now[0] - before[0], `tick ${k}`);
+    before = now;
     assert.deepEqual(b.command, a.command);
   }
 

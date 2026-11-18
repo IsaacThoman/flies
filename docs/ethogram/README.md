@@ -19,6 +19,10 @@ node scripts/ethogram.ts --assay escape --hour 6 --trials 8 \
   --seed-base 30000 --trace-dir /tmp/escape-frames --out /tmp/escape.json
 ```
 
+`--assay training` runs the [training assay](assays.md#training): two
+coloured dishes, sugar or a swoop on one, then a choice, with the brain's
+learning on and off. It is context, not scored.
+
 The default free run uses three seeds, 60 s burn-in and one recorded hour each.
 Each seed is reported separately. `--place arena` selects a 43 mm open disc;
 the game's named places also work. **Every assay holds clock time at `--hour`

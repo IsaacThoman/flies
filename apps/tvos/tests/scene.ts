@@ -290,6 +290,38 @@ function tickBrain(dtMs: number) {
     const command = Object.fromEntries(COMMAND_ORDER.map((k, i) => [k, Math.round(state[i] * 1000) / 1000]));
     Object.assign(report.brain ?? {}, { states: count, command, simMs, maxSimMsAfterBurst: maxSimMs, simulatedMs: state[COMMAND_ORDER.length + STATE_STATS.length + 1], lastRate: state[state.length - 1] });
   }
+  checkMemory();
+}
+
+// Memory through the brain thread: what it has, a memory it takes and one it refuses, then what it has after.
+let memoryStep = 0, memoryRequest = 0, refusedRequest = 0;
+function checkMemory() {
+  if (!brain?.requestMemory || !brain.memory || !brain.remember || !brain.remembered || !report.brain || memoryStep > 2) return;
+  const text = (bytes: Uint8Array) => String.fromCharCode(...bytes);
+  const m = (report.brain.memory ??= {}) as { first?: string; taken?: string; refused?: string; after?: string };
+  if (memoryStep === 0) {
+    memoryRequest = brain.requestMemory();
+    memoryStep = 1;
+  } else if (memoryStep === 1) {
+    const first = brain.memory(memoryRequest);
+    if (!first) return;
+    m.first = text(first);
+    memoryRequest = brain.remember(Uint8Array.from([83, 84, 86]));
+    refusedRequest = brain.remember(Uint8Array.from([1, 2]));
+    memoryStep = 2;
+  } else {
+    const taken = brain.remembered(memoryRequest);
+    const refused = brain.remembered(refusedRequest);
+    if (taken === null || refused === null) return;
+    m.taken = taken;
+    m.refused = refused;
+    memoryStep = 3;
+    const after = brain.requestMemory();
+    const poll = setInterval(() => {
+      const bytes = brain.memory!(after);
+      if (bytes) { m.after = text(bytes); clearInterval(poll); }
+    }, 20);
+  }
 }
 brain?.start(7);
 

@@ -18,9 +18,10 @@ const load = () => loadConnectome(bufferOf(synthetic.bytes));
 test("the modulatory neurons are the sources, named octopaminergic and dopaminergic cells included", () => {
   const brain = new FlyBrain(load());
   const m = brain.modulation;
-  // FB6H and OA-VUMa1 have no prediction in the fixture; params.ts makes them dopamine and octopamine.
-  assert.deepEqual([...m.sources], [...synthetic.index["dFB dopamine"], ...synthetic.index.OA].sort((a, b) => a - b));
-  assert.deepEqual(m.transmitters, ["DA", "OCT"]);
+  // FB6H and OA-VUMa1 have no prediction in the fixture; params.ts makes them dopamine and octopamine. The mushroom
+  // body's DANs are dopaminergic too; its Kenyon cells, predicted dopaminergic, are made cholinergic (params.ts).
+  assert.deepEqual([...m.sources], [...synthetic.index["dFB dopamine"], ...synthetic.index.OA, ...synthetic.index.PPL101, ...synthetic.index.PAM08].sort((a, b) => a - b));
+  assert.deepEqual(m.transmitters, ["DA", "OCT", "DA", "DA", "DA"]);
   assert.equal(m.levelOf(synthetic.index.sweet[0]), 0);
 });
 

@@ -106,6 +106,28 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
   }
   // The thermoreceptors after even those: with no temperature felt, every stream is as it was before them.
   for (const io::ThermoGroup& group : wiring_.thermo) thermo_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
+  // The reinforcement stand-ins after even those (io.ts, REINFORCEMENT).
+  for (const io::Group& group : wiring_.reinforcement) reinforcement_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
+  // runtime.ts finds the learning connections only when first needed, to keep building quick; natively building
+  // them takes a few ms, so they are found at once, which gives the same results.
+  learning::MushroomBody body(connectome);
+  if (!body.kcs().empty()) {
+    sim_.set_plastic_edges(body.edges());
+    sim_.set_spike_log(body.watched());
+    learning_.emplace(std::move(body));
+  }
+}
+
+std::vector<uint8_t> Brain::memory() const {
+  return learning_ ? learning_->memory() : learning::write_memory(learning::kEmptyLayoutHash, 0, {});
+}
+
+void Brain::remember(std::span<const uint8_t> memory) {
+  if (learning_) {
+    learning_->remember(memory, sim_);
+  } else {
+    learning::read_memory(memory, learning::kEmptyLayoutHash, 0);
+  }
 }
 
 io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& light, TickStats& stats) {
@@ -131,6 +153,10 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
     sim_.set_rate(sense_inputs_[k], group.max_rate * io::intensity(senses, group.spec.sense) * (group.spec.gated ? gate : 1));
   }
   for (Regional& regional : regional_) touch(regional, senses);
+  for (size_t k = 0; k < wiring_.reinforcement.size(); k++) {
+    const io::Group& group = wiring_.reinforcement[k];
+    sim_.set_rate(reinforcement_inputs_[k], group.max_rate * io::intensity(senses, group.spec.sense));
+  }
   const double hunger = io::hunger_of(senses);
   modulation_.set_state(senses, hunger);
   modulation_.update(0);
@@ -189,6 +215,7 @@ io::Command Brain::tick(double dt_ms, const io::Senses& senses, const Light& lig
     sim_.drain_tally(modulation_.counts);
     modulation_.update(ran);
     modulate();
+    if (learning_) learning_->learn(sim_, sim_.time());
     sim_.drain_readouts(counts_);
     for (size_t r = 0; r < wiring_.readouts.size(); r++) {
       const double hz = (counts_[r] / static_cast<double>(wiring_.readouts[r].neurons.size()) / ran) * 1000;

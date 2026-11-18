@@ -147,12 +147,14 @@ struct ReadoutSpec {
   double tau;
 };
 
-/** io.ts's SENSES, BACKGROUND and READOUTS, in their order. */
+/** io.ts's SENSES, BACKGROUND, STATE_INPUTS, REINFORCEMENT and READOUTS, in their order. */
 std::vector<InputSpec> senses();
 std::vector<InputSpec> background();
 std::vector<StateSpec> state_inputs();
 /** io.ts's THERMO_INPUTS, in its order. */
 std::vector<ThermoSpec> thermo_inputs();
+/** io.ts's REINFORCEMENT. */
+std::vector<InputSpec> reinforcement();
 std::vector<ReadoutSpec> readouts();
 
 /** decode() reads the readouts by these positions in readouts(). */
@@ -189,6 +191,8 @@ struct Wiring {
   /** The thermoreceptor inputs this connectome has neurons for. */
   std::vector<ThermoGroup> thermo;
   std::vector<ExcitabilityGroup> excitability;
+  /** The reinforcement stand-ins this connectome has neurons for. */
+  std::vector<Group> reinforcement;
   std::vector<ReadoutGroup> readouts;
 };
 

@@ -27,6 +27,20 @@ export function createBrainHost(create: BrainFactory, post: (response: BrainResp
       } else if (request.type === "tick") {
         if (!brain) throw new Error("The brain hasn't been loaded.");
         post({ type: "state", state: brain.tick(request.dtMs, request.senses) });
+      } else if (request.type === "memory") {
+        if (!brain) throw new Error("The brain hasn't been loaded.");
+        const memory = brain.memory();
+        post({ type: "memory", memory: memory.buffer.slice(memory.byteOffset, memory.byteOffset + memory.byteLength) as ArrayBuffer });
+      } else if (request.type === "remember") {
+        if (!brain) throw new Error("The brain hasn't been loaded.");
+        // A memory the brain can't take is refused, not a failure: it carries on with what it has.
+        let refused: string | null = null;
+        try {
+          brain.remember(new Uint8Array(request.memory));
+        } catch (error) {
+          refused = messageOf(error);
+        }
+        post({ type: "remembered", refused });
       } else {
         throw new Error(`Unknown request: ${String((request as { type?: unknown }).type)}`);
       }

@@ -194,6 +194,18 @@ export class Simulation {
   #tallyIndex: Int32Array | null = null;
   #tally = new Uint32Array(0);
 
+  // Edges whose weights are set one by one (setPlasticFactor): each edge, its
+  // weight at factor 1, and its factor now.
+  #plasticEdges = new Uint32Array(0);
+  #plasticBase = new Float32Array(0);
+  #plasticFactor = new Float64Array(0);
+
+  // Neurons whose spikes are logged with the step they fired in (setSpikeLog), and the log since the last drain.
+  #logged: Uint8Array | null = null;
+  #logNeurons = new Uint32Array(0);
+  #logSteps = new Float64Array(0);
+  #logLength = 0;
+
   #recording: Uint32Array | null = null;
   #carryMs = 0;
   #sweepResult = new Uint32Array(2);
@@ -319,6 +331,75 @@ export class Simulation {
       for (let k = 0; k < group.edges.length; k++) group.base[k] = weight[group.edges[k]];
       for (let m = 0; m < group.members.length; m++) this.#scaleOutputs(group, m);
     }
+    for (let k = 0; k < this.#plasticEdges.length; k++) {
+      this.#plasticBase[k] = weight[this.#plasticEdges[k]];
+      weight[this.#plasticEdges[k]] = this.#plasticBase[k] * this.#plasticFactor[k];
+    }
+  }
+
+  /**
+   * Makes these edges' weights settable one by one (ascending), each as a factor on its
+   * weight now (setPlasticFactor), all at 1 to begin with. Edges, not
+   * neurons: a synapse that learns. An edge can't also be in an output gain,
+   * and a neuron stays as it was for #silent (its spikes still go out at a
+   * factor of 0, adding nothing), so the active set doesn't depend on the factors.
+   */
+  setPlasticEdges(edges: ArrayLike<number>) {
+    // An edge is in an output gain when the neuron it leaves is. Ascending, the edges are checked against
+    // those neurons, and for being listed twice, without a set of them all: building the brain must stay quick.
+    const inGain = new Set<number>();
+    for (const group of this.#outputGains) for (const i of group.members) inGain.add(i);
+    for (let k = 0, pre = 0; k < edges.length; k++) {
+      const e = edges[k];
+      if (!Number.isInteger(e) || e < 0 || e >= this.connections) throw new Error(`No edge ${e}`);
+      if (k > 0 && e <= edges[k - 1]) throw new Error("Plastic edges are listed once each, ascending");
+      while (this.#ptr[pre + 1] <= e) pre++;
+      if (inGain.has(pre)) throw new Error(`Edge ${e} is in an output gain`);
+    }
+    const list = Uint32Array.from(edges);
+    for (let k = 0; k < this.#plasticEdges.length; k++) this.#weight[this.#plasticEdges[k]] = this.#plasticBase[k];
+    this.#plasticEdges = list;
+    this.#plasticBase = Float32Array.from(list, (e) => this.#weight[e]);
+    this.#plasticFactor = new Float64Array(list.length).fill(1);
+  }
+
+  /** Sets plastic edge k's weight to its weight at 1 times `factor` (0 or more), from the next spike delivered on. */
+  setPlasticFactor(k: number, factor: number) {
+    if (!(factor >= 0 && Number.isFinite(factor))) throw new Error("A plastic factor must be a number of 0 or more");
+    this.#plasticFactor[k] = factor;
+    this.#weight[this.#plasticEdges[k]] = this.#plasticBase[k] * factor;
+  }
+
+  /** Edge e's weight now, mV. */
+  weightOf(e: number) {
+    return this.#weight[e];
+  }
+
+  /**
+   * Logs every spike of these neurons with the step it was fired in, in the
+   * order fired (by step, then ascending neuron), until drainSpikeLog. Costs
+   * one look-up a spike while set; null stops it.
+   */
+  setSpikeLog(neurons: ArrayLike<number> | null) {
+    this.#logLength = 0;
+    if (neurons === null) {
+      this.#logged = null;
+      return;
+    }
+    const logged = new Uint8Array(this.neurons);
+    for (const i of this.#members(neurons, "spike log")) logged[i] = 1;
+    this.#logged = logged;
+    if (this.#logNeurons.length === 0) {
+      this.#logNeurons = new Uint32Array(256);
+      this.#logSteps = new Float64Array(256);
+    }
+  }
+
+  /** The spikes logged since the last drain: their neurons and steps, `count` of each (views, good until the next step); then empties the log. */
+  drainSpikeLog(): { count: number; neurons: Uint32Array; steps: Float64Array } {
+    const count = this.#logLength;
+    this.#logLength = 0;
+    return { count, neurons: this.#logNeurons, steps: this.#logSteps };
   }
 
   /**
@@ -337,6 +418,8 @@ export class Simulation {
       starts[m + 1] = edges.length;
     });
     const list = Uint32Array.from(edges);
+    const plastic = new Set(this.#plasticEdges);
+    for (const e of list) if (plastic.has(e)) throw new Error(`output gain "${name}": edge ${e} is plastic`);
     this.#outputGains.push({ name, members, starts, edges: list, base: Float32Array.from(list, (e) => this.#weight[e]), factors: new Float64Array(members.length).fill(1) });
   }
 
@@ -661,6 +744,7 @@ export class Simulation {
     this.#partCounts.fill(0);
     this.#tally.fill(0);
     this.#recording?.fill(0);
+    this.#logLength = 0;
     this.#inputs.forEach((input, k) => {
       if (input.rates) {
         const source = new RatedPoissonInput(input.neurons, inputSeed(this.seed, k));
@@ -823,6 +907,17 @@ export class Simulation {
     this.stats.spikes += fired;
     const recording = this.#recording;
     if (recording !== null) for (let k = 0; k < fired; k++) recording[out[k]]++;
+    const logged = this.#logged;
+    if (logged !== null) {
+      const step = this.stats.steps - 1;
+      for (let k = 0; k < fired; k++) {
+        const i = out[k];
+        if (logged[i] === 0) continue;
+        if (this.#logLength === this.#logNeurons.length) this.#growLog();
+        this.#logNeurons[this.#logLength] = i;
+        this.#logSteps[this.#logLength++] = step;
+      }
+    }
     if (this.#readoutNames.length > 0) {
       if (this.#watchStale) this.#indexReadouts();
       const watched = this.#watched;
@@ -848,6 +943,15 @@ export class Simulation {
         if (t >= 0) tally[t]++;
       }
     }
+  }
+
+  #growLog() {
+    const neurons = new Uint32Array(this.#logNeurons.length * 2);
+    const steps = new Float64Array(this.#logSteps.length * 2);
+    neurons.set(this.#logNeurons);
+    steps.set(this.#logSteps);
+    this.#logNeurons = neurons;
+    this.#logSteps = steps;
   }
 
   // Makes room for `needed` withdrawals in a slot, keeping what is there.
