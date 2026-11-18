@@ -416,74 +416,74 @@ table), at a new fly's hunger and starved, and watches ten seconds, seeds 1
 to 3:
 
 - **Eaten as before**: sugar, honey, jam, the syrups, cake, tart and figs,
-  every time, 8.5 to 10 s of the ten; and never plain water, Coffee, Bitter
+  every time, 7.6 to 10 s of the ten; and never plain water, Coffee, Bitter
   sugar or the espresso's dregs (sweet as they are, 0.85 bitter is past where
   the brain's taste stops feeding).
 - **Eaten much more**: whatever holds its sugar in little water. The bread and
-  toast crumbs, which no new fly ate, every fly now eats for 5 to 9 s; ketchup,
+  toast crumbs, which no new fly ate, every fly now eats for 6 to 10 s; ketchup,
   the mints, the dried juice ring, the orange, orange juice and lemonade, once
-  taken for a second or two, for 4 to 9 s.
+  taken for a second or two, for 4 to 10 s.
 - **Eaten much less**: the dilute ones, sweet at 0.7 or so and tasting of water
   as much as of sugar, which takes from sugar's answer. Feed's Raspberry and
-  the picnic's strawberry juice are taken by every fly, but a new fly feeds 0.3
-  to 2 s of the ten (4 to 7 before) and a starved one 2.4 to 3.2 (6 to 9); the
+  the picnic's strawberry juice are taken by every fly but one new one, and a
+  new fly feeds 0 to 1.6 s of the ten (4 to 7 before) and a starved one 1.4 to 3.4 (6 to 9); the
   lab's agar and fly food likewise. The greenhouse's tomato juice (0.58) is all
-  but left: two new flies in three and one starved fly took it, for under a
-  second. The lemon (0.63) is as it was, a moment's taste for one or two flies
+  but left: one new fly in three and two starved flies took it, for a
+  second at most. The lemon (0.63) is as it was, a moment's taste for one or two flies
   in three.
 
 | Food | New fly (hunger 0.7): ate; seconds fed, before → now | Starved (1) |
 |---|---|---|
-| Feed: Sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.1 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
-| Feed: Honey | 3/3, 8.5–9.3 s → 3/3, 8.5–9.3 s | 3/3, 8.5–9.8 s → 3/3, 8.5–9.8 s |
-| Feed: Raspberry | 3/3, 4.1–6.8 s → 3/3, 0.3–1.1 s | 3/3, 6.3–8.7 s → 3/3, 2.4–2.9 s |
+| Feed: Sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.7 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| Feed: Honey | 3/3, 8.5–9.3 s → 3/3, 7.6–8.7 s | 3/3, 8.5–9.8 s → 3/3, 8.7–9.7 s |
+| Feed: Raspberry | 3/3, 4.1–6.8 s → 3/3, 0.4–1.3 s | 3/3, 6.3–8.7 s → 3/3, 1.4–3.4 s |
 | Feed: Water | 0/3, 0.0 s → 0/3, 0.0 s | 0/3, 0.0 s → 0/3, 0.0 s |
 | Feed: Coffee | 0/3, 0.0 s → 0/3, 0.0 s | 0/3, 0.0 s → 0/3, 0.0 s |
 | Feed: Bitter sugar | 0/3, 0.0 s → 0/3, 0.0 s | 0/3, 0.0 s → 0/3, 0.0 s |
-| greenhouse: tomato juice | 3/3, 3.1–5.4 s → 2/3, 0.0–0.7 s | 3/3, 3.6–5.9 s → 1/3, 0.0–0.4 s |
-| greenhouse: fig flesh | 3/3, 7.2–9.3 s → 3/3, 8.7–9.2 s | 3/3, 9.6–9.9 s → 3/3, 9.2–9.9 s |
+| greenhouse: tomato juice | 3/3, 3.1–5.4 s → 1/3, 0.0–0.3 s | 3/3, 3.6–5.9 s → 2/3, 0.0–1.0 s |
+| greenhouse: fig flesh | 3/3, 7.2–9.3 s → 3/3, 8.7–9.7 s | 3/3, 9.6–9.9 s → 3/3, 9.2–9.9 s |
 | greenhouse: water | 0/3, 0.0 s → 0/3, 0.0 s | 0/3, 0.0 s → 0/3, 0.0 s |
-| picnic: honey | 3/3, 8.5–9.3 s → 3/3, 8.5–9.3 s | 3/3, 8.5–9.8 s → 3/3, 8.5–9.8 s |
-| picnic: jam | 3/3, 7.2–9.3 s → 3/3, 8.7–9.2 s | 3/3, 9.6–9.9 s → 3/3, 9.2–9.9 s |
-| picnic: strawberry juice (and the 0.7 bruise) | 3/3, 4.1–6.8 s → 3/3, 0.6–2.2 s | 3/3, 6.4–8.7 s → 3/3, 2.4–3.2 s |
-| picnic: lemonade | 3/3, 1.6–4.2 s → 3/3, 7.1–8.7 s | 3/3, 4.9–5.9 s → 3/3, 8.8–9.7 s |
-| picnic: orange | 3/3, 0.0–0.9 s → 3/3, 5.7–6.9 s | 3/3, 2.2–2.7 s → 3/3, 7.6–8.4 s |
-| picnic: sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.2 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
-| picnic: spilt sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.2 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
-| windowsill: banana | 3/3, 7.1–8.9 s → 3/3, 7.4–9.0 s | 3/3, 8.2–9.5 s → 3/3, 8.6–9.7 s |
-| windowsill: peach juice | 3/3, 4.9–8.0 s → 3/3, 3.7–6.5 s | 3/3, 7.7–8.8 s → 3/3, 7.8–8.9 s |
-| windowsill: plum juice | 3/3, 4.1–6.8 s → 3/3, 6.9–8.9 s | 3/3, 6.4–8.7 s → 3/3, 8.7–9.7 s |
-| windowsill: honey | 3/3, 8.5–9.3 s → 3/3, 8.5–9.3 s | 3/3, 8.5–9.8 s → 3/3, 8.5–9.8 s |
-| windowsill: orange juice | 3/3, 0.0–0.9 s → 3/3, 4.1–6.8 s | 3/3, 1.8–2.7 s → 3/3, 5.9–9.1 s |
+| picnic: honey | 3/3, 8.5–9.3 s → 3/3, 7.6–8.7 s | 3/3, 8.5–9.8 s → 3/3, 8.7–9.7 s |
+| picnic: jam | 3/3, 7.2–9.3 s → 3/3, 8.7–9.7 s | 3/3, 9.6–9.9 s → 3/3, 9.2–9.9 s |
+| picnic: strawberry juice (and the 0.7 bruise) | 3/3, 4.1–6.8 s → 2/3, 0.0–1.6 s | 3/3, 6.4–8.7 s → 3/3, 1.4–2.8 s |
+| picnic: lemonade | 3/3, 1.6–4.2 s → 3/3, 7.3–7.9 s | 3/3, 4.9–5.9 s → 3/3, 7.6–8.7 s |
+| picnic: orange | 3/3, 0.0–0.9 s → 3/3, 4.0–6.0 s | 3/3, 2.2–2.7 s → 3/3, 7.2–8.9 s |
+| picnic: sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.7 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| picnic: spilt sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.7 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| windowsill: banana | 3/3, 7.1–8.9 s → 3/3, 6.2–8.9 s | 3/3, 8.2–9.5 s → 3/3, 9.3–9.9 s |
+| windowsill: peach juice | 3/3, 4.9–8.0 s → 3/3, 4.4–7.7 s | 3/3, 7.7–8.8 s → 3/3, 5.7–8.5 s |
+| windowsill: plum juice | 3/3, 4.1–6.8 s → 3/3, 7.7–8.2 s | 3/3, 6.4–8.7 s → 3/3, 8.6–9.6 s |
+| windowsill: honey | 3/3, 8.5–9.3 s → 3/3, 7.6–8.7 s | 3/3, 8.5–9.8 s → 3/3, 8.7–9.7 s |
+| windowsill: orange juice | 3/3, 0.0–0.9 s → 3/3, 4.1–7.7 s | 3/3, 1.8–2.7 s → 3/3, 6.1–9.4 s |
 | windowsill: water | 0/3, 0.0 s → 0/3, 0.0 s | 0/3, 0.0 s → 0/3, 0.0 s |
-| windowsill: spilt sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.2 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
-| lab: grape agar | 3/3, 3.7–5.4 s → 3/3, 0.3–2.0 s | 3/3, 4.8–8.0 s → 3/3, 1.3–2.9 s |
-| lab: fly food | 3/3, 4.9–8.0 s → 3/3, 1.5–4.4 s | 3/3, 7.7–8.8 s → 3/3, 3.8–7.4 s |
-| restaurant: sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.2 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
-| restaurant: orange juice | 3/3, 1.6–4.2 s → 3/3, 4.1–6.8 s | 3/3, 4.9–5.9 s → 3/3, 5.9–9.1 s |
-| restaurant: juice ring | 1/3, 0.0–0.9 s → 3/3, 8.5–9.3 s | 3/3, 1.3–1.8 s → 3/3, 8.5–9.8 s |
-| restaurant: ketchup | 3/3, 0.0–0.9 s → 3/3, 6.5–9.6 s | 3/3, 1.8–2.7 s → 3/3, 7.9–9.5 s |
-| restaurant: crumbs | 0/3, 0.0 s → 3/3, 5.3–6.5 s | 1/3, 0.0–0.3 s → 3/3, 5.6–8.2 s |
+| windowsill: spilt sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.7 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| lab: grape agar | 3/3, 3.7–5.4 s → 2/3, 0.0–0.8 s | 3/3, 4.8–8.0 s → 3/3, 1.6–2.5 s |
+| lab: fly food | 3/3, 4.9–8.0 s → 3/3, 2.8–3.6 s | 3/3, 7.7–8.8 s → 3/3, 2.9–5.8 s |
+| restaurant: sugar | 3/3, 8.5–9.3 s → 3/3, 8.7–9.7 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| restaurant: orange juice | 3/3, 1.6–4.2 s → 3/3, 4.1–7.7 s | 3/3, 4.9–5.9 s → 3/3, 6.1–9.4 s |
+| restaurant: juice ring | 1/3, 0.0–0.9 s → 3/3, 7.6–8.7 s | 3/3, 1.3–1.8 s → 3/3, 8.7–9.7 s |
+| restaurant: ketchup | 3/3, 0.0–0.9 s → 3/3, 8.9–9.3 s | 3/3, 1.8–2.7 s → 3/3, 7.8–9.5 s |
+| restaurant: crumbs | 0/3, 0.0 s → 3/3, 5.5–8.1 s | 1/3, 0.0–0.3 s → 3/3, 7.3–9.0 s |
 | restaurant: espresso | 0/3, 0.0 s → 0/3, 0.0 s | 0/3, 0.0 s → 0/3, 0.0 s |
-| restaurant: peach | 3/3, 7.1–8.9 s → 3/3, 3.7–6.5 s | 3/3, 8.2–9.5 s → 3/3, 7.8–8.9 s |
-| restaurant: lemon | 0/3, 0.0 s → 1/3, 0.0–0.5 s | 1/3, 0.0–0.3 s → 2/3, 0.0–0.4 s |
-| restaurant: lemonade | 3/3, 1.0–3.4 s → 3/3, 7.1–8.7 s | 3/3, 3.1–5.3 s → 3/3, 8.8–9.7 s |
-| restaurant: syrup | 3/3, 7.2–9.3 s → 3/3, 8.7–9.2 s | 3/3, 9.6–9.9 s → 3/3, 9.2–9.9 s |
-| restaurant: cake crumbs | 3/3, 8.5–9.3 s → 3/3, 8.7–9.2 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
-| restaurant: coulis | 3/3, 8.5–9.3 s → 3/3, 7.5–9.1 s | 3/3, 8.5–9.8 s → 3/3, 8.8–9.8 s |
-| restaurant: tart crumbs | 3/3, 8.5–9.3 s → 3/3, 8.7–9.2 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
-| restaurant: mints | 3/3, 0.0–0.9 s → 3/3, 8.7–9.2 s | 3/3, 1.8–2.7 s → 3/3, 9.2–9.9 s |
-| restaurant: soda | 3/3, 7.1–8.9 s → 3/3, 6.6–7.5 s | 3/3, 8.2–9.5 s → 3/3, 7.8–9.0 s |
-| restaurant: grape | 3/3, 4.9–8.0 s → 3/3, 8.7–8.9 s | 3/3, 7.7–8.8 s → 3/3, 9.3–9.9 s |
-| kitchen: banana | 3/3, 7.1–9.3 s → 3/3, 7.4–9.0 s | 3/3, 9.6–9.9 s → 3/3, 8.6–9.7 s |
-| kitchen: peach juice | 3/3, 7.1–8.9 s → 3/3, 3.7–6.5 s | 3/3, 8.2–9.5 s → 3/3, 7.8–8.9 s |
-| kitchen: grape juice | 3/3, 4.1–6.8 s → 3/3, 7.2–9.9 s | 3/3, 6.3–8.7 s → 3/3, 8.8–9.7 s |
-| kitchen: orange juice | 3/3, 1.0–3.4 s → 3/3, 4.1–6.8 s | 3/3, 3.1–5.3 s → 3/3, 5.9–9.1 s |
-| kitchen: honey | 3/3, 8.5–9.3 s → 3/3, 8.5–9.3 s | 3/3, 8.5–9.8 s → 3/3, 8.5–9.8 s |
-| kitchen: crumbs | 0/3, 0.0 s → 3/3, 7.1–9.1 s | 0/3, 0.0 s → 3/3, 9.2–9.9 s |
+| restaurant: peach | 3/3, 7.1–8.9 s → 3/3, 4.4–7.7 s | 3/3, 8.2–9.5 s → 3/3, 5.7–8.5 s |
+| restaurant: lemon | 0/3, 0.0 s → 2/3, 0.0–0.4 s | 1/3, 0.0–0.3 s → 2/3, 0.0–1.0 s |
+| restaurant: lemonade | 3/3, 1.0–3.4 s → 3/3, 7.3–7.9 s | 3/3, 3.1–5.3 s → 3/3, 7.6–8.7 s |
+| restaurant: syrup | 3/3, 7.2–9.3 s → 3/3, 8.7–9.7 s | 3/3, 9.6–9.9 s → 3/3, 9.2–9.9 s |
+| restaurant: cake crumbs | 3/3, 8.5–9.3 s → 3/3, 8.7–9.7 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| restaurant: coulis | 3/3, 8.5–9.3 s → 3/3, 7.4–8.4 s | 3/3, 8.5–9.8 s → 3/3, 8.4–9.6 s |
+| restaurant: tart crumbs | 3/3, 8.5–9.3 s → 3/3, 8.7–9.7 s | 3/3, 8.5–9.8 s → 3/3, 9.2–9.9 s |
+| restaurant: mints | 3/3, 0.0–0.9 s → 3/3, 8.7–9.7 s | 3/3, 1.8–2.7 s → 3/3, 9.2–9.9 s |
+| restaurant: soda | 3/3, 7.1–8.9 s → 3/3, 4.1–7.6 s | 3/3, 8.2–9.5 s → 3/3, 6.7–9.2 s |
+| restaurant: grape | 3/3, 4.9–8.0 s → 3/3, 7.0–9.3 s | 3/3, 7.7–8.8 s → 3/3, 9.4–9.9 s |
+| kitchen: banana | 3/3, 7.1–9.3 s → 3/3, 6.0–8.9 s | 3/3, 9.6–9.9 s → 3/3, 9.3–9.9 s |
+| kitchen: peach juice | 3/3, 7.1–8.9 s → 3/3, 4.4–7.7 s | 3/3, 8.2–9.5 s → 3/3, 5.7–8.5 s |
+| kitchen: grape juice | 3/3, 4.1–6.8 s → 3/3, 8.2–9.9 s | 3/3, 6.3–8.7 s → 3/3, 8.5–9.1 s |
+| kitchen: orange juice | 3/3, 1.0–3.4 s → 3/3, 4.1–7.7 s | 3/3, 3.1–5.3 s → 3/3, 6.1–9.4 s |
+| kitchen: honey | 3/3, 8.5–9.3 s → 3/3, 7.6–8.7 s | 3/3, 8.5–9.8 s → 3/3, 8.7–9.7 s |
+| kitchen: crumbs | 0/3, 0.0 s → 3/3, 7.1–8.9 s | 0/3, 0.0 s → 3/3, 7.9–9.7 s |
 
 (Before: the hand-set tastes, at the commit before these; now: these, on
-it. "3/3" with 0.0 s means a bite in the last frame.)
+`56d9f3b`. "3/3" with 0.0 s means a bite in the last frame.)
 
 ## Footprints
 

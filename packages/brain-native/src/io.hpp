@@ -145,6 +145,14 @@ struct ThermoSpec {
 };
 struct ExcitabilityGroup { StateKey state; double mv; std::vector<uint32_t> neurons; };
 
+/** Resting activity a neuron has in the fly, measured (io.ts's RestingSpec): a rate it fires at whatever else happens. */
+struct RestingSpec {
+  std::string name;
+  std::string description;
+  NeuronQuery select;
+  double rate;
+};
+
 bool dfb_sleep(std::string_view type);
 
 struct ReadoutSpec {
@@ -164,6 +172,7 @@ std::vector<StateSpec> state_inputs();
 std::vector<ThermoSpec> thermo_inputs();
 /** io.ts's REINFORCEMENT. */
 std::vector<InputSpec> reinforcement();
+std::vector<RestingSpec> resting();
 std::vector<ReadoutSpec> readouts();
 
 /** decode() reads the readouts by these positions in readouts(). */
@@ -187,6 +196,11 @@ struct ThermoGroup {
   std::vector<uint32_t> neurons;
 };
 
+struct RestingGroup {
+  RestingSpec spec;
+  std::vector<uint32_t> neurons;
+};
+
 struct ReadoutGroup {
   ReadoutSpec spec;
   std::vector<uint32_t> neurons;
@@ -202,6 +216,8 @@ struct Wiring {
   std::vector<ExcitabilityGroup> excitability;
   /** The reinforcement stand-ins this connectome has neurons for. */
   std::vector<Group> reinforcement;
+  /** The measured resting activity this connectome has neurons for. */
+  std::vector<RestingGroup> resting;
   std::vector<ReadoutGroup> readouts;
 };
 

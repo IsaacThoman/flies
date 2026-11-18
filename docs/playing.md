@@ -221,7 +221,7 @@ drawn exactly as it is felt.
 What its brain makes of it, measured on the real connectome:
 
 - **Walking onto it.** A fly set down facing the finger, the edge of its tip
-  4 mm ahead of its head, walked onto it in 0 of 5, 0 of 5 and 3 of 8 tries
+  4 mm ahead of its head, walked onto it in 0 of 5, 0 of 5 and 2 of 7 tries
   of up to a minute each, over 5 minutes of its life at 10:00, seeds 1 to 3
   (`node scripts/finger.ts`, its eyes given a ray-cast picture of the
   finger, the table and the sky). Most of that time it rests. A fly stood on
@@ -248,7 +248,7 @@ What its brain makes of it, measured on the real connectome:
   even black, because the looming detectors that face forward (LPLC2) hardly
   answer here. From its side one can, through LC4, if it is dark enough
   against what is behind it: a 12 mm disc at 600 mm/s and real skin's
-  contrast (0.57) took it off for 3 of 6 seeds from its front right, and 0 of
+  contrast (0.57) took it off for 2 of 6 seeds from its front right, and 0 of
   6 at the contrast skin had in the picture
   (`packages/brain/scripts/fingertip.ts`). Skin on the table, as the game's
   eyes see it, isn't dark enough. With its brain's eyes shut, the tip looms as the

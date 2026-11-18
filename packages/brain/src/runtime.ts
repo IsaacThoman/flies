@@ -114,6 +114,8 @@ export class FlyBrain implements Brain {
       } else this.sim.addInput(group.spec.name, group.neurons);
     }
     for (const { spec, neurons } of this.wiring.background) this.sim.addInput(spec.name, neurons);
+    // Measured resting activity, at its constant rate. Before the eyes, so that with them shut the brain is the one without them.
+    for (const { spec, neurons } of this.wiring.resting) this.sim.addInput(spec.name, neurons, spec.rate);
     // Thirst scales how strongly the water neurons' spikes reach their targets (io.ts, THIRST).
     for (const { spec, neurons } of this.wiring.senses) {
       if (spec.sense !== "water") continue;

@@ -34,6 +34,8 @@ Brain::Brain(const Connectome& connectome, uint32_t seed, const eyes::Columns& c
     regional_.push_back({k, std::vector<double>(group.neurons.size(), 0), std::vector<double>(group.ends.size(), 0)});
   }
   for (const io::Group& group : wiring_.background) background_inputs_.push_back(sim_.add_input(group.spec.name, group.neurons));
+  // Measured resting activity, at its constant rate. Before the eyes, so that with them shut the brain is the one without them.
+  for (const io::RestingGroup& group : wiring_.resting) sim_.add_input(group.spec.name, group.neurons, group.spec.rate);
   // Thirst scales how strongly the water neurons' spikes reach their targets (io.ts, THIRST).
   for (const io::Group& group : wiring_.senses) {
     if (group.spec.sense == io::kWater) water_gain_ = sim_.add_output_gain(group.spec.name, group.neurons);
