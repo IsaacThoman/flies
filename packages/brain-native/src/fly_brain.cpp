@@ -5,6 +5,7 @@
 
 #include "fly_brain.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <exception>
 #include <new>
@@ -84,6 +85,26 @@ int fly_brain_tick(fly_brain* brain, double dt_ms, const fly_senses* senses, fly
     if (senses->light_right != nullptr) light.right = std::span<const float>(senses->light_right, brain->brain.facets(fly::io::kRight));
   }
   return fly::tick(brain, dt_ms, senses, light, command, stats, rates, error, error_size);
+}
+
+size_t fly_brain_memory(const fly_brain* brain, uint8_t* out, size_t capacity) {
+  if (brain == nullptr) return 0;
+  try {
+    const std::vector<uint8_t> memory = brain->brain.memory();
+    if (out != nullptr && capacity >= memory.size()) std::copy(memory.begin(), memory.end(), out);
+    return memory.size();
+  } catch (...) {
+    return 0;
+  }
+}
+
+int fly_brain_remember(fly_brain* brain, const uint8_t* data, size_t length, char* error, size_t error_size) {
+  const bool ok = guarded(error, error_size, [&] {
+    if (brain == nullptr || (data == nullptr && length > 0)) throw std::invalid_argument("fly_brain_remember needs a brain and the memory's bytes");
+    static const uint8_t kNothing = 0;
+    brain->brain.remember(std::span<const uint8_t>(data != nullptr ? data : &kNothing, length));
+  });
+  return ok ? 0 : 1;
 }
 
 }  // extern "C"

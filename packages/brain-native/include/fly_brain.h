@@ -109,6 +109,24 @@ const char* fly_brain_rate_name(const fly_brain* brain, uint32_t index);
  */
 int fly_brain_tick(fly_brain* brain, double dt_ms, const fly_senses* senses, fly_command* command, fly_stats* stats, float* rates, char* error, size_t error_size);
 
+/**
+ * What the brain's mushroom body has learned, as bytes to keep (the format
+ * of packages/brain/src/learning.ts's MEMORY: versioned and tied to this
+ * brain's connectome, eight bytes for each synapse that has changed).
+ * Returns their length; writes them to `out` when `capacity` is at least
+ * that (call with NULL and 0 to ask the length); 0 if it couldn't (out of
+ * memory). Not during a tick.
+ */
+size_t fly_brain_memory(const fly_brain* brain, uint8_t* out, size_t capacity);
+
+/**
+ * Takes back what fly_brain_memory wrote, from this brain or one built from
+ * the same connectome. Returns 0; or nonzero with a message in `error`, and
+ * nothing changed, for anything else: another connectome, another version,
+ * damaged bytes. Not during a tick.
+ */
+int fly_brain_remember(fly_brain* brain, const uint8_t* data, size_t length, char* error, size_t error_size);
+
 #ifdef __cplusplus
 }
 #endif

@@ -36,6 +36,20 @@ export interface BrainDriver {
    * slower than real time instead of falling further behind.
    */
   tick(dtMs: number, senses: BrainSenses): void;
+  /**
+   * What the fly's mushroom body has learned (`Brain.memory` in @fly/brain),
+   * as bytes to keep with the fly: versioned and tied to the connectome, a
+   * few bytes for each synapse that has changed. Resolves once the brain
+   * answers, or null if it isn't running or stops first. A stand-in has none.
+   */
+  exportMemory?(): Promise<Uint8Array | null>;
+  /**
+   * Gives the brain back what `exportMemory` gave, from this fly's last run:
+   * resolves true once it has taken it, false if it refused it (another
+   * connectome, another version, damaged bytes) or isn't running, keeping
+   * what it had. Given while it loads, it is taken as it starts.
+   */
+  importMemory?(memory: Uint8Array): Promise<boolean>;
   dispose(): void;
 }
 
@@ -125,4 +139,16 @@ export interface NativeBrainBridge {
   spawn?(): NativeBrainBridge;
   /** Stops a spawned brain's thread and frees it: its fly is gone. Not the first's, which the host keeps. */
   stop?(): void;
+  /**
+   * Asks the brain thread for what the brain has learned (fly_brain_memory),
+   * between its steps; returns the request's number, for `memory`. A host
+   * from before the brain learned has none of these four.
+   */
+  requestMemory?(): number;
+  /** The bytes the brain thread wrote for request `request` or a later one, or null until it has. */
+  memory?(request: number): Uint8Array | null;
+  /** Hands the brain thread a memory to take back (fly_brain_remember) before its next step, even while it loads; returns the request's number. */
+  remember?(memory: Uint8Array): number;
+  /** For request `request`: null until the brain thread has dealt with it, then "" if it took the memory or why it didn't. */
+  remembered?(request: number): string | null;
 }

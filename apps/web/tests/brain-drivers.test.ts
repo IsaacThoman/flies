@@ -258,7 +258,7 @@ test("trying again loads again, and a kept copy the brain couldn't be built from
 
 test("the worker host builds the brain once and answers every tick", async () => {
   const posted: BrainResponse[] = [];
-  const brain = { neurons: 3, connections: 2, eyes: null, tick: () => state(0.25) };
+  const brain = { neurons: 3, connections: 2, eyes: null, tick: () => state(0.25), memory: () => new Uint8Array([1, 2]), remember: () => {} };
   const host = createBrainHost(async () => ({ brain, engine: "wasm" }), (r) => posted.push(r));
   host({ type: "tick", dtMs: 10, senses: RESTING_SENSES });
   assert.equal(posted[0].type, "error");
@@ -278,6 +278,63 @@ test("the worker host builds the brain once and answers every tick", async () =>
   assert.deepEqual(failing, [{ type: "error", message: "Corrupt connectome: x" }]);
 });
 
+test("the worker host hands over the brain's memory, and a memory it refuses is a refusal, not a failure", async () => {
+  const posted: BrainResponse[] = [];
+  let kept = new Uint8Array([7, 7]);
+  const brain = {
+    neurons: 3,
+    connections: 2,
+    eyes: null,
+    tick: () => state(),
+    memory: () => kept,
+    remember: (memory: Uint8Array) => {
+      if (memory[0] !== 7) throw new Error("This memory is another brain's");
+      kept = memory.slice();
+    },
+  };
+  const host = createBrainHost(async () => ({ brain, engine: "typescript" }), (r) => posted.push(r));
+  host({ type: "memory" });
+  assert.equal(posted[0].type, "error", "not loaded yet");
+  host({ type: "init", data: new ArrayBuffer(1) });
+  await flush();
+  host({ type: "remember", memory: new Uint8Array([7, 1, 2]).buffer });
+  host({ type: "remember", memory: new Uint8Array([9]).buffer });
+  host({ type: "memory" });
+  assert.deepEqual(posted.slice(2, 4), [{ type: "remembered", refused: null }, { type: "remembered", refused: "This memory is another brain's" }]);
+  const answer = posted[4] as Extract<BrainResponse, { type: "memory" }>;
+  assert.deepEqual([...new Uint8Array(answer.memory)], [7, 1, 2]);
+});
+
+test("the worker driver asks for memories in turn, takes one given while it loads as it starts, and gives up on all of them when it fails", async () => {
+  const worker = fakeWorker();
+  const driver = new WorkerBrainDriver({ createWorker: worker.factory, source: fakeSource(async () => new ArrayBuffer(8)) });
+  assert.equal(await driver.exportMemory(), null, "nothing to ask while loading");
+  const early = driver.importMemory(new Uint8Array([1, 2, 3]));
+  await flush();
+  worker.reply({ type: "ready", neurons: 1, connections: 1, eyes: null, engine: "typescript" });
+  const remember = worker.sent.find((each) => each.request.type === "remember")!;
+  assert.deepEqual([...new Uint8Array((remember.request as Extract<BrainRequest, { type: "remember" }>).memory)], [1, 2, 3]);
+  assert.equal(remember.transfer?.length, 1, "a copy, transferred");
+  worker.reply({ type: "remembered", refused: null });
+  assert.equal(await early, true);
+  const refused = driver.importMemory(new Uint8Array([4]));
+  worker.reply({ type: "remembered", refused: "This memory is damaged: its length is wrong" });
+  assert.equal(await refused, false);
+  assert.equal(driver.status, "running", "a refusal isn't a failure");
+  const first = driver.exportMemory();
+  const second = driver.exportMemory();
+  worker.reply({ type: "memory", memory: new Uint8Array([5]).buffer });
+  worker.reply({ type: "memory", memory: new Uint8Array([6]).buffer });
+  assert.deepEqual([...(await first)!], [5]);
+  assert.deepEqual([...(await second)!], [6]);
+  const lost = driver.exportMemory();
+  const unanswered = driver.importMemory(new Uint8Array([8]));
+  worker.crash("gone");
+  assert.equal(await lost, null);
+  assert.equal(await unanswered, false);
+  assert.equal(await driver.importMemory(new Uint8Array([8])), false, "nothing taken while failed");
+});
+
 function fakeBridge() {
   let status: BrainStatus = "loading";
   let count = 0;
@@ -285,6 +342,10 @@ function fakeBridge() {
   // Two regions, not in the catalog's order: the driver finds them by name.
   const rates = ["DNg100", "MN9", "region.mouthparts", "region.retina-left"];
   const values = new Float32Array(COMMAND_ORDER.length + STATE_STATS.length + rates.length);
+  let memoryRequests = 0;
+  let memoryAnswered = 0;
+  const remembering: number[] = [];
+  const remembered: string[] = [];
   const bridge: NativeBrainBridge = {
     start: () => {},
     status: () => status,
@@ -299,10 +360,21 @@ function fakeBridge() {
       out.set(values);
       return count;
     },
+    // The brain thread answers what it is asked when the test says so.
+    requestMemory: () => ++memoryRequests,
+    memory: (request) => (request <= memoryAnswered ? Uint8Array.of(request) : null),
+    remember: (memory) => {
+      remembering.push(memory[0]);
+      return remembering.length;
+    },
+    remembered: (request) => (request <= remembered.length ? remembered[request - 1] : null),
   };
   return {
     bridge,
     submitted,
+    remembering,
+    answerMemory: () => void (memoryAnswered = memoryRequests),
+    answerRemember: (refusal: string) => void remembered.push(refusal),
     setStatus: (s: BrainStatus) => void (status = s),
     produce: (walk: number) => {
       values[0] = walk;
@@ -423,4 +495,35 @@ test("an Apple TV lives at most NATIVE_MOST flies, and one where its host can't 
   } finally {
     delete host.__native;
   }
+});
+
+test("the native driver hands memories to the brain thread, even while it loads, and settles each as the thread answers", async () => {
+  const fake = fakeBridge();
+  const driver = new NativeBrainDriver(fake.bridge);
+  const early = driver.importMemory(Uint8Array.of(3));
+  assert.deepEqual(fake.remembering, [3], "handed over at once, for the thread to take as it starts");
+  assert.equal(await driver.exportMemory(), null, "nothing to ask while loading");
+  fake.setStatus("running");
+  driver.tick(16, RESTING_SENSES);
+  const memory = driver.exportMemory();
+  let settled = false;
+  void early.then(() => (settled = true));
+  await flush();
+  assert.equal(settled, false, "not until the thread has answered");
+  fake.answerRemember("");
+  fake.answerMemory();
+  driver.tick(16, RESTING_SENSES);
+  assert.equal(await early, true);
+  assert.deepEqual([...(await memory)!], [1]);
+  const refused = driver.importMemory(Uint8Array.of(4));
+  fake.answerRemember("This memory is another brain's");
+  driver.tick(16, RESTING_SENSES);
+  assert.equal(await refused, false);
+  assert.equal(driver.status, "running");
+  const lost = driver.exportMemory();
+  fake.setStatus("failed");
+  driver.tick(16, RESTING_SENSES);
+  assert.equal(await lost, null);
+  const bare = new NativeBrainDriver({ ...fakeBridge().bridge, requestMemory: undefined, memory: undefined, remember: undefined, remembered: undefined });
+  assert.equal(await bare.importMemory(Uint8Array.of(1)), false, "a host from before the brain learned");
 });

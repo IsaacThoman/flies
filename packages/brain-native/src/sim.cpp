@@ -4,6 +4,7 @@
 #include <bit>
 #include <cmath>
 #include <stdexcept>
+#include <unordered_set>
 
 #include "fdlibm.hpp"
 
@@ -201,8 +202,10 @@ uint32_t Simulation::add_output_gain(const std::string& name, std::span<const ui
   group.name = name;
   group.members = members(neurons, "output gain \"" + name + "\"");
   group.starts.push_back(0);
+  const std::unordered_set<uint32_t> plastic(plastic_edges_.begin(), plastic_edges_.end());
   for (uint32_t i : group.members) {
     for (uint32_t e = ptr_[i]; e < ptr_[i + 1]; e++) {
+      if (plastic.count(e) != 0) throw std::invalid_argument("output gain \"" + name + "\": edge " + std::to_string(e) + " is plastic");
       group.edges.push_back(e);
       group.base.push_back(edges_[e].weight);
     }
@@ -312,6 +315,35 @@ void Simulation::set_tally(std::span<const uint32_t> neurons) {
 void Simulation::drain_tally(std::vector<uint32_t>& into) {
   into = tally_;
   std::fill(tally_.begin(), tally_.end(), 0);
+}
+
+void Simulation::set_plastic_edges(std::span<const uint32_t> edges) {
+  // sim.ts says why the edges are checked against the gains' neurons, ascending.
+  std::unordered_set<uint32_t> in_gain;
+  for (const OutputGain& group : output_gains_) in_gain.insert(group.members.begin(), group.members.end());
+  uint32_t pre = 0;
+  for (size_t k = 0; k < edges.size(); k++) {
+    const uint32_t e = edges[k];
+    if (e >= edges_.size()) throw std::invalid_argument("No edge " + std::to_string(e));
+    if (k > 0 && e <= edges[k - 1]) throw std::invalid_argument("Plastic edges are listed once each, ascending");
+    while (ptr_[pre + 1] <= e) pre++;
+    if (in_gain.count(pre) != 0) throw std::invalid_argument("Edge " + std::to_string(e) + " is in an output gain");
+  }
+  for (size_t k = 0; k < plastic_edges_.size(); k++) edges_[plastic_edges_[k]].weight = plastic_base_[k];
+  plastic_edges_.assign(edges.begin(), edges.end());
+  plastic_base_.clear();
+  for (uint32_t e : plastic_edges_) plastic_base_.push_back(edges_[e].weight);
+}
+
+void Simulation::set_plastic_factor(uint32_t k, double factor) {
+  if (!(factor >= 0 && std::isfinite(factor))) throw std::invalid_argument("A plastic factor must be a number of 0 or more");
+  edges_[plastic_edges_.at(k)].weight = static_cast<float>(static_cast<double>(plastic_base_[k]) * factor);
+}
+
+void Simulation::set_spike_log(std::span<const uint32_t> neurons) {
+  clear_spike_log();
+  logged_.assign(neurons_, 0);
+  for (uint32_t i : members(neurons, "spike log")) logged_[i] = 1;
 }
 
 uint32_t Simulation::add_rated_input(const std::string& name, std::span<const uint32_t> neurons, bool withdraw) {
@@ -634,6 +666,14 @@ void Simulation::step() {
   if (!tally_index_.empty()) for (uint32_t k = 0; k < fired; k++) {
     const int32_t t = tally_index_[out[k]];
     if (t >= 0) tally_[t]++;
+  }
+  if (!logged_.empty()) {
+    const uint8_t* const logged = logged_.data();
+    for (uint32_t k = 0; k < fired; k++) {
+      if (logged[out[k]] == 0) continue;
+      log_neurons_.push_back(out[k]);
+      log_steps_.push_back(steps_ - 1);
+    }
   }
 }
 

@@ -86,7 +86,7 @@ for source in src/*.cpp; do library="$library $obj/$(basename "$source" .cpp).o"
 # A reactor: no main; _initialize runs the constructors, then the exports are called.
 exports=""
 for name in fly_brain_create fly_brain_destroy fly_brain_neurons fly_brain_connections fly_brain_facets fly_brain_eye_directions \
-  fly_brain_eye_acceptance fly_brain_rate_count fly_brain_rate_name fly_brain_tick malloc free; do
+  fly_brain_eye_acceptance fly_brain_rate_count fly_brain_rate_name fly_brain_tick fly_brain_memory fly_brain_remember malloc free; do
   exports="$exports -Wl,--export=$name"
 done
 link="-O2 -fwasm-exceptions -lunwind -Wl,--strip-all -Wl,-z,stack-size=1048576"

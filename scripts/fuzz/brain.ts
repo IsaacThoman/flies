@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { createBrain, REGIONS, REGION_RATE_NAMES } from "@fly/brain";
-import type { Brain, BrainSenses, BrainState } from "@fly/brain";
+import { loadConnectome } from "@fly/brain";
+import type { BrainSenses, BrainState } from "@fly/brain";
+import { FlyBrain } from "../../packages/brain/src/runtime.ts";
 import type { BrainDriver } from "@fly/contracts";
 import { DEFAULT_CONNECTOME_PATH } from "../../packages/brain/src/node.ts";
 
@@ -8,13 +10,14 @@ import { DEFAULT_CONNECTOME_PATH } from "../../packages/brain/src/node.ts";
 export class InProcessBrain implements BrainDriver {
   readonly status = "running";
   readonly error = null;
-  readonly brain: Brain;
+  readonly brain: FlyBrain;
   readonly regionRates = new Float32Array(REGIONS.length);
   state: BrainState | null = null;
   stateAt = 0;
 
-  constructor(data: ArrayBuffer, seed: number) {
-    this.brain = createBrain(data, { seed });
+  /** `learns` false: a brain whose mushroom body doesn't learn, for comparison. */
+  constructor(data: ArrayBuffer, seed: number, learns = true) {
+    this.brain = learns ? (createBrain(data, { seed }) as FlyBrain) : new FlyBrain(loadConnectome(data), { seed, learning: false });
   }
 
   get neurons() { return this.brain.neurons; }

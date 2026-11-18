@@ -131,6 +131,8 @@ class Simulation {
   Simulation(std::vector<uint32_t> ptr, std::vector<Edge> edges, const SimulationOptions& options);
 
   uint32_t neurons() const { return neurons_; }
+  /** Step, ms. */
+  double dt() const { return dt_; }
   uint64_t steps() const { return steps_; }
   uint64_t spikes() const { return spikes_; }
   /** Spike deliveries to individual targets (muted neurons' spikes excluded). */
@@ -187,6 +189,32 @@ class Simulation {
   void drain_tally(std::vector<uint32_t>& into);
   void set_weights(std::span<const float> weights);
   void reset();
+
+  /**
+   * Makes these edges' weights settable one by one (ascending), each as a factor on its
+   * weight now, all at 1 to begin with (sim.ts's setPlasticEdges): a synapse
+   * that learns. An edge can't also be in an output gain, and silent_ stays
+   * as it was, so the active set doesn't depend on the factors.
+   */
+  void set_plastic_edges(std::span<const uint32_t> edges);
+  /** Sets plastic edge k's weight to its weight at 1 times factor (0 or more), from the next spike delivered on. */
+  void set_plastic_factor(uint32_t k, double factor);
+  /** Edge e's weight now, mV. */
+  float weight_of(uint32_t e) const { return edges_.at(e).weight; }
+
+  /**
+   * Logs every spike of these neurons with the step it was fired in, in the
+   * order fired (by step, then ascending neuron), until cleared (sim.ts's
+   * setSpikeLog). Costs one look-up a spike while set.
+   */
+  void set_spike_log(std::span<const uint32_t> neurons);
+  /** The spikes logged since the last clear_spike_log: their neurons and the steps they fired in, in the order fired. */
+  const std::vector<uint32_t>& logged_neurons() const { return log_neurons_; }
+  const std::vector<uint64_t>& logged_steps() const { return log_steps_; }
+  void clear_spike_log() {
+    log_neurons_.clear();
+    log_steps_.clear();
+  }
 
   /** Adds a group of neurons whose spikes drain_readouts counts; returns its index. */
   uint32_t add_readout(const std::string& name, std::span<const uint32_t> neurons);
@@ -301,6 +329,15 @@ class Simulation {
   std::vector<uint8_t> pinned_;
   std::vector<int32_t> tally_index_;
   std::vector<uint32_t> tally_;
+
+  // Edges whose weights are set one by one: each edge and its weight at factor 1.
+  std::vector<uint32_t> plastic_edges_;
+  std::vector<float> plastic_base_;
+
+  // Neurons whose spikes are logged (empty for none), and the log since it was last cleared.
+  std::vector<uint8_t> logged_;
+  std::vector<uint32_t> log_neurons_;
+  std::vector<uint64_t> log_steps_;
 
   std::vector<std::string> readout_names_;
   std::vector<std::vector<uint32_t>> readout_members_;

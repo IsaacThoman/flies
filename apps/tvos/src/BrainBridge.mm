@@ -9,6 +9,9 @@
 //     to at most one step of kMaxStepMs; anything beyond is dropped, so a brain slower than real
 //     time runs slow instead of falling further and further behind.
 //   - the brain thread steps whenever time is waiting, then publishes its state for read().
+//   - requestMemory() and remember() queue requests the brain thread serves between steps, a
+//     memory to take back first (even one given while the brain loads), then what it has
+//     learned; memory() and remembered() hand over its answers. Neither thread waits on them.
 //   - spawn() (the first brain's bridge only) makes another, for another fly the game lives:
 //     a bridge of its own, its own thread and brain; stop() ends that thread and frees its
 //     brain. The first brain is the host's for the app's lifetime.
@@ -61,10 +64,18 @@ struct BrainHost {
   float scalars[kScalars] = {};
   std::vector<float> light[2];
   bool eyesOpen = false;
-  // The latest state: commands, stats, rates.
+  // Memory requests not yet served: the latest request for what it has learned, and memories to take back, by number.
+  uint32_t memoryWanted = 0;
+  uint32_t rememberRequests = 0;
+  std::vector<std::pair<uint32_t, std::vector<uint8_t>>> toRemember;
+  // The latest state: commands, stats, rates. With it, the answers to memory requests: the
+  // last request served and what the brain had learned then, and each memory's refusal, "" if taken.
   std::mutex stateLock;
   std::vector<float> state;
   uint32_t states = 0;
+  uint32_t memoryServed = 0;
+  std::vector<uint8_t> memory;
+  std::vector<std::string> remembered;
 
   void Fail(const std::string &why) {
     error = why;
@@ -126,19 +137,40 @@ void *Run(void *arg) {
   float scalars[kScalars];
   std::vector<float> light[2] = { b.light[0], b.light[1] };
   std::vector<float> rates(b.rateNames.size());
+  uint32_t served = 0;
   for (;;) {
     double dt;
     bool eyes;
+    uint32_t wanted;
+    std::vector<std::pair<uint32_t, std::vector<uint8_t>>> memories;
     {
       std::unique_lock<std::mutex> g(b.inputLock);
-      b.inputReady.wait(g, [&b] { return b.pendingMs > 0 || b.stopping; });
+      b.inputReady.wait(g, [&b, served] { return b.pendingMs > 0 || b.stopping || b.memoryWanted > served || !b.toRemember.empty(); });
       if (b.stopping) break;
       dt = b.pendingMs;
       b.pendingMs = 0;
       std::copy(b.scalars, b.scalars + kScalars, scalars);
       eyes = b.eyesOpen;
       if (eyes) for (int side = 0; side < 2; side++) std::copy(b.light[side].begin(), b.light[side].end(), light[side].begin());
+      wanted = b.memoryWanted;
+      memories.swap(b.toRemember);
     }
+    for (auto &[request, bytes] : memories) {
+      char message[512] = "";
+      const bool taken = fly_brain_remember(brain, bytes.data(), bytes.size(), message, sizeof message) == 0;
+      if (!taken) HostLog(1, [NSString stringWithFormat:@"brain: memory refused: %s", message]);
+      std::lock_guard<std::mutex> g(b.stateLock);
+      b.remembered.resize(std::max<size_t>(b.remembered.size(), request), "");
+      b.remembered[request - 1] = taken ? "" : (message[0] ? message : "refused");
+    }
+    if (wanted > served) {
+      std::vector<uint8_t> bytes(fly_brain_memory(brain, nullptr, 0));
+      bytes.resize(fly_brain_memory(brain, bytes.data(), bytes.size()));
+      std::lock_guard<std::mutex> g(b.stateLock);
+      b.memory.swap(bytes);
+      b.memoryServed = served = wanted;
+    }
+    if (!(dt > 0)) continue;
     fly_senses senses = {
       scalars[0], scalars[1], scalars[2], scalars[3], scalars[4], scalars[5], scalars[6], scalars[7] > 0.5f,
       eyes ? light[0].data() : nullptr, eyes ? light[1].data() : nullptr, scalars[8], scalars[kHunger], scalars[kWingbeat],
@@ -274,6 +306,53 @@ NATIVE(B_read) {
   if (out) std::copy(b.state.begin(), b.state.begin() + std::min(n, b.state.size()), out);
   return JSValueMakeNumber(ctx, b.states);
 }
+// requestMemory(): asks the brain thread for what the brain has learned; returns the request's number.
+NATIVE(B_requestMemory) {
+  BrainHost &b = Host(self);
+  uint32_t request;
+  {
+    std::lock_guard<std::mutex> g(b.inputLock);
+    request = ++b.memoryWanted;
+  }
+  b.inputReady.notify_one();
+  return JSValueMakeNumber(ctx, request);
+}
+// memory(request): what the brain had learned when the thread served that request or a later one, as a Uint8Array, or null until then.
+NATIVE(B_memory) {
+  BrainHost &b = Host(self);
+  const double request = Arg(ctx, argc, argv, 0);
+  std::lock_guard<std::mutex> g(b.stateLock);
+  if (!(request >= 1 && request <= b.memoryServed)) return JSValueMakeNull(ctx);
+  JSObjectRef out = JSObjectMakeTypedArray(ctx, kJSTypedArrayTypeUint8Array, b.memory.size(), nullptr);
+  if (!b.memory.empty()) memcpy(JSObjectGetTypedArrayBytesPtr(ctx, out, nullptr), b.memory.data(), b.memory.size());
+  return out;
+}
+// remember(memory): hands the brain thread a Uint8Array to take back before its next step; returns the request's number.
+NATIVE(B_remember) {
+  BrainHost &b = Host(self);
+  std::vector<uint8_t> bytes;
+  if (argc > 0 && JSValueGetTypedArrayType(ctx, argv[0], nullptr) == kJSTypedArrayTypeUint8Array) {
+    size_t n = 0;
+    const uint8_t *data = (const uint8_t *)JSBytesOf(ctx, argv[0], &n);
+    if (data) bytes.assign(data, data + n);
+  }
+  uint32_t request;
+  {
+    std::lock_guard<std::mutex> g(b.inputLock);
+    request = ++b.rememberRequests;
+    b.toRemember.emplace_back(request, std::move(bytes));
+  }
+  b.inputReady.notify_one();
+  return JSValueMakeNumber(ctx, request);
+}
+// remembered(request): null until the brain thread has dealt with that memory, then "" if it took it, or why it didn't.
+NATIVE(B_remembered) {
+  BrainHost &b = Host(self);
+  const double request = Arg(ctx, argc, argv, 0);
+  std::lock_guard<std::mutex> g(b.stateLock);
+  if (!(request >= 1 && request <= b.remembered.size())) return JSValueMakeNull(ctx);
+  return JSStringValue(ctx, @(b.remembered[(size_t)request - 1].c_str()));
+}
 // stop(): a spawned brain's fly is gone; its thread ends and frees the brain.
 NATIVE(B_stop) {
   BrainHost &b = Host(self);
@@ -321,6 +400,7 @@ JSObjectRef MakeBridge(JSContextRef ctx, bool spawned) {
     { "start", B_start }, { "status", B_status }, { "error", B_error }, { "neurons", B_neurons },
     { "connections", B_connections }, { "eyeDirections", B_eyeDirections }, { "eyeAcceptance", B_eyeAcceptance },
     { "rateNames", B_rateNames }, { "submit", B_submit }, { "read", B_read },
+    { "requestMemory", B_requestMemory }, { "memory", B_memory }, { "remember", B_remember }, { "remembered", B_remembered },
     { spawned ? "stop" : "spawn", spawned ? B_stop : B_spawn },
   };
   for (auto &f : fns) {

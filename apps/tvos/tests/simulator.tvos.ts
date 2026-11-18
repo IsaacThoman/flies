@@ -95,13 +95,13 @@ type Report = {
   clipping: { renderer: string; wrong: number; pixels: number } | null;
   halfFloat: boolean | null;
   storage: boolean | null; fetched: string | null;
-  brain: { neurons?: number; connections?: number; facets?: number[]; rates?: string[]; states?: number; command?: Record<string, number>; maxSimMsAfterBurst?: number; rateCount?: number; lastRate?: number; error?: string } | null;
+  brain: { neurons?: number; connections?: number; facets?: number[]; rates?: string[]; states?: number; command?: Record<string, number>; maxSimMsAfterBurst?: number; rateCount?: number; lastRate?: number; error?: string; memory?: { first?: string; taken?: string; refused?: string; after?: string } } | null;
   weather: { error?: string; statuses: string[]; version: number; conditions: OutsideConditions | null; attribution: WeatherAttribution | null; failure: { status: string; error: string } | null; stopped: string | null } | null;
   socket: { error?: string; notASocket?: unknown[]; nowhere?: unknown[]; text?: string; bytes?: number[]; idleFrameUs?: number; tooBig?: unknown[]; forgotten?: boolean; fellBehind?: unknown[]; serverClosed?: unknown[] } | null;
   keyboard: { answers: (string | null)[]; framesWhileUp: number } | null;
 };
 type Stats = { fps: number; frames: number; jsMs: { mean: number; p95: number }; execMs: { mean: number }; drawsPerFrame: number; memMB: number; state: Record<string, string> };
-const complete = (r: Report) => !!(r.readbackAsync && r.fetched && (r.brain?.states ?? 0) > 2 && (r.weather?.stopped || r.weather?.error) &&
+const complete = (r: Report) => !!(r.readbackAsync && r.fetched && (r.brain?.states ?? 0) > 2 && r.brain?.memory?.after && (r.weather?.stopped || r.weather?.error) &&
   (r.socket?.serverClosed || r.socket?.error) && r.keyboard?.answers.length === 2);
 
 /**
@@ -232,6 +232,8 @@ try {
   assert.deepEqual(b.facets, [8, 8], 'eye facets');
   assert.deepEqual(b.rates, ['standin.ticks', 'standin.simulatedMs', 'standin.rate83'], 'rate names');
   assert.equal(b.rateCount, 84, 'as many rates as the real brain reports');
+  // Memory goes through the brain thread both ways, and one it refuses is refused, saying why, without stopping it.
+  assert.deepEqual(b.memory, { first: 'SI', taken: '', refused: "not the stand-in's memory", after: 'STV' });
   assert.equal(b.lastRate, 83, 'the last rate arrived');
   assert.ok(Math.abs((b.command?.turn ?? 0) - 0.6) < 1e-3, `turn follows the light (right 0.8, left 0.2): ${b.command?.turn}`);
   assert.equal(b.command?.walk, 0.8, 'walk');

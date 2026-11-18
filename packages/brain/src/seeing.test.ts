@@ -49,8 +49,15 @@ test("with the eyes shut the brain is what it was before it had eyes, wherever n
   // octopaminergic and stepped the dorsal fan-shaped body's sleep-promoting
   // neurons always (modulation.ts), and when touch landed where it does (touch
   // everywhere drives the body's bristles at 50 Hz, where it drove them at 10):
-  // the same as a brain built without eyes, the columnar synapses at 1.
+  // the same as a brain built without eyes, the columnar synapses at 1. The
+  // reward DANs that sugar drives since the mushroom body learns (io.ts,
+  // REINFORCEMENT) aren't counted: their output is muted, so leaving them out
+  // is the brain as it was before them.
   const b = new FlyBrain(connectome!, { seed: 1 });
+  const reward = b.wiring.reinforcement.flatMap((group) => [...group.neurons]);
+  b.sim.setRecording(true);
+  const recording = b.sim.recording!;
+  let rewarded = 0;
   const phases = [
     RESTING_SENSES,
     { ...RESTING_SENSES, loomLeft: 1 },
@@ -62,7 +69,11 @@ test("with the eyes shut the brain is what it was before it had eyes, wherever n
   let hash = 0;
   for (const senses of phases) {
     for (let t = 0; t < 1000; t += 16) {
-      const spikes = b.tick(16, senses).stats.spikes;
+      let spikes = b.tick(16, senses).stats.spikes;
+      let now = 0;
+      for (const i of reward) now += recording[i];
+      spikes -= now - rewarded;
+      rewarded = now;
       total += spikes;
       hash = (Math.imul(hash, 31) + spikes) >>> 0;
     }

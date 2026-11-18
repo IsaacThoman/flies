@@ -27,6 +27,8 @@ type Exports = {
   fly_brain_rate_count(brain: number): number;
   fly_brain_rate_name(brain: number, index: number): number;
   fly_brain_tick(brain: number, dtMs: number, senses: number, command: number, stats: number, rates: number, error: number, errorSize: number): number;
+  fly_brain_memory(brain: number, out: number, capacity: number): number;
+  fly_brain_remember(brain: number, data: number, length: number, error: number, errorSize: number): number;
 };
 
 /** The longest tick the brain takes, ms (runtime.ts's MAX_TICK_MS). */
@@ -220,6 +222,33 @@ class WasmBrain implements Brain {
         rates,
       },
     };
+  }
+
+  memory(): Uint8Array {
+    const e = this.#e;
+    const length = e.fly_brain_memory(this.#brain, 0, 0);
+    const out = length > 0 ? e.malloc(length) : 0;
+    if (!out) throw new Error("Out of memory");
+    try {
+      if (e.fly_brain_memory(this.#brain, out, length) !== length) throw new Error("Out of memory");
+      return new Uint8Array(e.memory.buffer, out, length).slice();
+    } finally {
+      e.free(out);
+    }
+  }
+
+  remember(memory: Uint8Array): void {
+    if (!(memory instanceof Uint8Array)) throw new Error("This isn't a fly's memory");
+    const e = this.#e;
+    const data = e.malloc(Math.max(1, memory.byteLength));
+    if (!data) throw new Error("Out of memory");
+    try {
+      new Uint8Array(e.memory.buffer, data, memory.byteLength).set(memory);
+      const failed = e.fly_brain_remember(this.#brain, data, memory.byteLength, this.#error, ERROR_BYTES);
+      if (failed) throw new Error(readString(e.memory, this.#error));
+    } finally {
+      e.free(data);
+    }
   }
 
   #directions(side: number, facets: number): Float32Array {

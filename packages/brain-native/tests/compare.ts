@@ -397,6 +397,16 @@ export function digest(sim: Simulation): string {
   return h.toString(16).padStart(8, "0");
 }
 
+/** FNV-1a over the bits of every learning synapse's factor, as doubles, or - when the brain doesn't learn (tools/harness.cpp has the same). */
+export function learningDigest(brain: FlyBrain): string {
+  if (!brain.learning) return "-";
+  const factors = brain.learning.factors;
+  const words = new Uint32Array(factors.buffer, factors.byteOffset, factors.length * 2);
+  let h = 2166136261;
+  for (let k = 0; k < words.length; k++) h = Math.imul(h ^ words[k], 16777619) >>> 0;
+  return h.toString(16).padStart(8, "0");
+}
+
 /** What the harness prints for these ticks, computed by the TypeScript brain. */
 export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick[], columns?: Columns): string[] {
   let brain: FlyBrain;
@@ -425,7 +435,7 @@ export function typescript(data: ArrayBuffer, seed: number, ticks: readonly Tick
           [brain.thermoreceptors.adapted.left, brain.thermoreceptors.adapted.right].map((t) => (Number.isNaN(t) ? "nan" : hex64(t))).join(" "),
           retinaDigest(brain),
           modulationDigest(brain),
-          tick++ % 50 === 49 ? digest(brain.sim) : "-",
+          tick++ % 50 === 49 ? `${digest(brain.sim)} ${learningDigest(brain)}` : "-",
         ].join(" | "),
       );
     } catch (error) {

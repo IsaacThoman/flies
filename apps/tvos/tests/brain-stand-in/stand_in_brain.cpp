@@ -7,6 +7,8 @@
 //   - each eye has kFacets facets; turn is mean(right light) - mean(left light), so a test can
 //     tell the light arrays arrived, and on the right sides;
 //   - walk is always 0.8; feed follows `sweet`; sing follows `male_taste`; escape is 1 while grounded is 0;
+//   - its memory is "SI" until it is given another starting with 'S', which it keeps; it
+//     refuses any other, saying so;
 //   - the stats count ticks (spikes) and the simulated time of each (sim_ms); the rates are the
 //     ticks so far and the total simulated time, then numbered ones (each its own index) up to as
 //     many as the real brain reports with its eyes and regions, so a test can tell they all arrive.
@@ -47,6 +49,7 @@ struct fly_brain {
   std::vector<float> directions[2];
   uint64_t ticks = 0;
   double simulated = 0;
+  std::vector<uint8_t> memory = {'S', 'I'};
 };
 
 fly_brain *fly_brain_create(const uint8_t *data, size_t length, uint32_t, char *error, size_t error_size) {
@@ -111,5 +114,19 @@ int fly_brain_tick(fly_brain *brain, double dt_ms, const fly_senses *senses, fly
     rates[1] = (float)brain->simulated;
     for (uint32_t k = 2; k < kRates; k++) rates[k] = (float)k;
   }
+  return 0;
+}
+
+size_t fly_brain_memory(const fly_brain *brain, uint8_t *out, size_t capacity) {
+  if (out && capacity >= brain->memory.size()) std::copy(brain->memory.begin(), brain->memory.end(), out);
+  return brain->memory.size();
+}
+
+int fly_brain_remember(fly_brain *brain, const uint8_t *data, size_t length, char *error, size_t error_size) {
+  if (length == 0 || data[0] != 'S') {
+    snprintf(error, error_size, "not the stand-in's memory");
+    return 1;
+  }
+  brain->memory.assign(data, data + length);
   return 0;
 }

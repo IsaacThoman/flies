@@ -15,7 +15,7 @@
 //     Prints "ready <neurons> <connections> <rate names, |-separated>" or "error <message>", then per tick
 //       <spikes> <active> <simMs> | <command, f64 ×8> | <rates, f64> | <command as the C interface gives it, f32 ×8> | <rates, f32>
 //       | <arousal> <scene left> <scene right> <sleep term> (f64) | <digest of both retinas' rates, or - without eyes>
-//       | <digest of every neuron's v, g and a every 50th tick, else ->
+//       | <digest of every neuron's v, g and a, then of the learning synapses' factors (- without), every 50th tick, else ->
 //     or "error <message>".
 //   fly-brain-harness eyes <connectome.bin> [--columns <columns>]
 //     prints "ready", the facets of each eye and the acceptance (f32 bits) through the C interface, then a line per facet,
@@ -104,6 +104,20 @@ std::string digest(const fly::Simulation& sim) {
       std::memcpy(&bits, &x, 4);
       h = (h ^ bits) * 16777619u;
     }
+  }
+  char buffer[12];
+  std::snprintf(buffer, sizeof buffer, "%08" PRIx32, h);
+  return buffer;
+}
+
+// FNV-1a over the bits of every learning synapse's factor, as doubles, or - when the brain doesn't learn (tests/compare.ts has the same).
+std::string learning_digest(const fly::Brain& brain) {
+  if (!brain.learning()) return "-";
+  uint32_t h = 2166136261u;
+  for (double x : brain.learning()->factors()) {
+    uint32_t words[2];
+    std::memcpy(words, &x, 8);
+    for (uint32_t bits : words) h = (h ^ bits) * 16777619u;
   }
   char buffer[12];
   std::snprintf(buffer, sizeof buffer, "%08" PRIx32, h);
@@ -297,7 +311,7 @@ int brain(const char* path, uint32_t seed, const Options& options) {
     out += "| ";
     out += retina_digest(b->brain) + " | ";
     out += modulation_digest(b->brain.modulation()) + " | ";
-    out += tick++ % 50 == 49 ? digest(b->brain.sim()) : "-";
+    out += tick++ % 50 == 49 ? digest(b->brain.sim()) + " " + learning_digest(b->brain) : "-";
     std::puts(out.c_str());
   }
   fly_brain_destroy(b);

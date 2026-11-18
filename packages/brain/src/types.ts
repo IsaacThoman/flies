@@ -190,6 +190,18 @@ export interface Brain {
   readonly eyes: EyeMap | null;
   /** Advances the simulation by `dtMs` of fly time under these senses. */
   tick(dtMs: number, senses: BrainSenses): BrainState;
+  /**
+   * What its mushroom body has learned (README, Learning), as bytes to keep:
+   * versioned and tied to this brain's connectome, a few bytes for each
+   * synapse that has changed.
+   */
+  memory(): Uint8Array;
+  /**
+   * Takes back what `memory` gave, from this brain or one built from the same
+   * connectome. Throws, saying why and changing nothing, for anything else:
+   * another connectome, another version, damaged bytes.
+   */
+  remember(memory: Uint8Array): void;
 }
 
 /** Which build of the brain runs: this TypeScript, or packages/brain-native's C++ as WebAssembly or native code. */
@@ -203,12 +215,19 @@ export type BrainRequest =
    * (its fly-brain.wasm), the same simulation compiled. Transferred, not copied.
    */
   | { type: "init"; data: ArrayBuffer; module?: ArrayBuffer }
-  | { type: "tick"; dtMs: number; senses: BrainSenses };
+  | { type: "tick"; dtMs: number; senses: BrainSenses }
+  /** What the brain has learned: answered by one "memory". */
+  | { type: "memory" }
+  /** What to take back (Brain.remember): answered by one "remembered". */
+  | { type: "remember"; memory: ArrayBuffer };
 
 /** Messages from the worker. Every "tick" gets exactly one "state". */
 export type BrainResponse =
   | { type: "ready"; neurons: number; connections: number; eyes: EyeMap | null; engine: BrainEngine }
   | { type: "state"; state: BrainState }
+  | { type: "memory"; memory: ArrayBuffer }
+  /** null when taken; otherwise why not, and the brain keeps what it had. */
+  | { type: "remembered"; refused: string | null }
   | { type: "error"; message: string };
 
 export const RESTING_SENSES: BrainSenses = {

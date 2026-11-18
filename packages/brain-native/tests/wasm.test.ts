@@ -55,6 +55,52 @@ async function compare(bytes: Uint8Array, seed: number, ticks: readonly Tick[]) 
   return { expected, typescript, wasm, difference: k < 0 ? null : `tick ${k} (${ticks[k].what}, dt ${ticks[k].dt}):\n  typescript  ${expected[k]}\n  WebAssembly ${actual[k]}` };
 }
 
+/**
+ * After the same run: the same memory, byte for byte; each takes back the
+ * other's, the same afterwards; and the same refusal, with the same message,
+ * of anything that isn't one, keeping what it had.
+ */
+function memories(typescript: Brain, wasm: Brain) {
+  const memory = typescript.memory();
+  assert.deepEqual(wasm.memory(), memory);
+  wasm.remember(memory);
+  typescript.remember(wasm.memory());
+  assert.deepEqual(wasm.memory(), memory);
+  assert.deepEqual(typescript.memory(), memory);
+  const view = new DataView(memory.buffer);
+  const changed = (at: number, value: number) => {
+    const bytes = memory.slice();
+    new DataView(bytes.buffer).setUint32(at, value, true);
+    return bytes;
+  };
+  const refused = [
+    new Uint8Array(0),
+    memory.subarray(0, 23),
+    changed(0, 0x4d594c47),
+    changed(4, 2),
+    changed(8, view.getUint32(8, true) ^ 1),
+    changed(12, view.getUint32(12, true) + 1),
+    changed(16, 2),
+    changed(20, view.getUint32(20, true) + 1),
+    Uint8Array.from([...memory, 0]),
+  ];
+  // Sparse, with two entries or more: one past the last synapse, and two out of order.
+  if (view.getUint32(16, true) === 0 && view.getUint32(20, true) >= 2) refused.push(changed(24, view.getUint32(12, true)), changed(29, 0));
+  for (const bytes of refused) {
+    let message = "";
+    try {
+      typescript.remember(bytes);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    assert.ok(message, `refused: ${[...bytes.subarray(0, 24)]}`);
+    assert.throws(() => wasm.remember(bytes), { message });
+  }
+  assert.deepEqual(wasm.memory(), memory);
+  assert.deepEqual(typescript.memory(), memory);
+  return memory;
+}
+
 // Light for an eyeless brain, which it must ignore.
 const NOWHERE: EyeMap = { left: { directions: new Float32Array(12) }, right: { directions: new Float32Array(12) }, acceptance: 0.05 };
 
@@ -65,13 +111,16 @@ test("this Node runs the module, as the browsers it is for do", () => {
 
 test("on the synthetic connectome every tick is the TypeScript's, as the C interface shows it", async () => {
   const synthetic = syntheticConnectome();
+  const learned: number[] = [];
   for (const seed of [1, 0xdeadbeef]) {
     const ticks = scenario(70, seed, NOWHERE);
-    const { expected, wasm, difference } = await compare(synthetic.bytes, seed, ticks);
+    const { expected, typescript, wasm, difference } = await compare(synthetic.bytes, seed, ticks);
     assert.equal(difference, null, `seed ${seed}: ${difference}`);
     assert.equal(wasm.eyes, null);
+    learned.push(memories(typescript, wasm).length);
     assert.ok(expected.some((each) => each.startsWith("error tick takes 0 to 1000 ms, not NaN")));
   }
+  assert.ok(learned.some((length) => length > 24), "a run taught it something to remember");
 });
 
 test("a broken connectome or seed is refused with the TypeScript's message", async () => {
@@ -102,6 +151,11 @@ test("on the real connectome the eyes are the TypeScript's and every tick is, th
   assert.deepEqual(wasm.eyes!.right.directions, typescript.eyes!.right.directions);
   assert.equal(wasm.eyes!.acceptance, Math.fround(ACCEPTANCE));
   assert.ok(expected.includes("error The left eye has 880 facets, but the light gives undefined"));
+  memories(typescript, wasm);
+  // A memory of another connectome, the synthetic one's, is refused.
+  const other = createBrain(syntheticConnectome().bytes.slice().buffer);
+  assert.throws(() => typescript.remember(other.memory()), { message: "This memory is another brain's" });
+  assert.throws(() => wasm.remember(other.memory()), { message: "This memory is another brain's" });
 });
 
 const digest = (file: string) => createHash("sha256").update(readFileSync(join(PACKAGE, file))).digest("hex");

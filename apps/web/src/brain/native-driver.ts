@@ -32,6 +32,9 @@ export class NativeBrainDriver implements BrainDriver {
   readonly #regionAt = new Int32Array(REGION_RATE_NAMES.length).fill(-1);
   #out = new Float32Array(COMMAND_ORDER.length + STATE_STATS.length);
   #seen = 0;
+  // Requests the brain thread hasn't answered yet, by number.
+  #memories: { request: number; resolve: (memory: Uint8Array | null) => void }[] = [];
+  #remembering: { request: number; taken: (taken: boolean) => void }[] = [];
   #decoded: BrainState = {
     command: { walk: 0, turn: 0, back: 0, escape: 0, wings: 0, groom: 0, feed: 0, sing: 0 },
     stats: { simMs: 0, wallMs: 0, spikes: 0, active: 0, rates: {} },
@@ -47,15 +50,63 @@ export class NativeBrainDriver implements BrainDriver {
     }
   }
 
+  exportMemory(): Promise<Uint8Array | null> {
+    const bridge = this.#bridge;
+    if (this.status !== "running" || !bridge.requestMemory || !bridge.memory) return Promise.resolve(null);
+    try {
+      const request = bridge.requestMemory();
+      return new Promise((resolve) => this.#memories.push({ request, resolve }));
+    } catch {
+      return Promise.resolve(null);
+    }
+  }
+
+  importMemory(memory: Uint8Array): Promise<boolean> {
+    const bridge = this.#bridge;
+    if (this.status === "failed" || !bridge.remember || !bridge.remembered) return Promise.resolve(false);
+    try {
+      const request = bridge.remember(memory);
+      return new Promise((taken) => this.#remembering.push({ request, taken }));
+    } catch {
+      return Promise.resolve(false);
+    }
+  }
+
+  // Hands over what the brain thread has answered since the last frame; nothing to do, and nothing allocated, when nothing is awaited.
+  #settle() {
+    const bridge = this.#bridge;
+    if (this.#memories.length > 0) {
+      this.#memories = this.#memories.filter(({ request, resolve }) => {
+        const memory = bridge.memory!(request);
+        if (memory) resolve(memory);
+        return !memory;
+      });
+    }
+    if (this.#remembering.length > 0) {
+      this.#remembering = this.#remembering.filter(({ request, taken }) => {
+        const refused = bridge.remembered!(request);
+        if (refused !== null) taken(refused === "");
+        return refused === null;
+      });
+    }
+  }
+
+  #abandon() {
+    for (const { resolve } of this.#memories.splice(0)) resolve(null);
+    for (const { taken } of this.#remembering.splice(0)) taken(false);
+  }
+
   tick(dtMs: number, senses: BrainSenses): void {
     if (this.status === "failed") return;
     const bridge = this.#bridge;
     try {
+      this.#settle();
       if (this.status === "loading") {
         const status = bridge.status();
         if (status === "failed") {
           this.status = "failed";
           this.error = bridge.error() || "The fly's brain failed to start.";
+          this.#abandon();
           return;
         }
         if (status !== "running") return;
@@ -99,6 +150,7 @@ export class NativeBrainDriver implements BrainDriver {
       if (bridge.status() === "failed") {
         this.status = "failed";
         this.error = bridge.error() || "The fly's brain stopped.";
+        this.#abandon();
       }
     } catch (error) {
       this.#fail(error);
@@ -108,6 +160,7 @@ export class NativeBrainDriver implements BrainDriver {
   dispose(): void {
     // The host keeps the first brain's thread for the app's lifetime; another fly's goes with it.
     this.#bridge.stop?.();
+    this.#abandon();
     this.status = "failed";
     this.error = "Stopped.";
   }
@@ -151,6 +204,7 @@ export class NativeBrainDriver implements BrainDriver {
   }
 
   #fail(error: unknown) {
+    this.#abandon();
     this.status = "failed";
     this.error = error instanceof Error ? error.message : String(error);
   }
