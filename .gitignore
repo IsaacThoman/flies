@@ -26,3 +26,6 @@ apps/ios/src/generated/
 apps/ios/*.xcodeproj
 apps/ios/Info.plist
 apps/ios/Flies.entitlements
+
+# Recordings packages/body/scripts/steering.ts downloads (about 930 MB)
+packages/body/data/

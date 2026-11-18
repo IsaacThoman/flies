@@ -129,16 +129,126 @@ the one before it stays. That bound is for the Apple TV, which keeps
 flies' records fit there beside the settings. A browser allows about 5 MB to a
 site, and the iPhone and iPad app's `WKWebView` the same.
 
+## Handedness
+
+The connectome is one male's, and its spontaneous turns lean left
+(packages/brain/README.md, Symmetry): no fault in the tracing explains it,
+and nothing is tuned to remove it. Real flies each have a turning bias of
+their own that lasts their life, but a population's averages none: in
+Y-mazes every line tested turns right about half the time on average, while
+nearly a quarter of Canton-S flies turn right more than 70% or less than 30%
+of the time; a fly's bias on one day predicts its bias a day later (r = 0.81)
+and four weeks later (r = 0.57), and isn't passed on to its offspring
+(Buchanan, Kain & de Bivort 2015, PNAS 112:6700, read in its preprint,
+arXiv:1408.6896). A fly that is the traced fly's mirror image is as true a
+rendering of that animal as the fly itself, so half the flies here are
+mirrored. Each still leans, one way or the other.
+
+The wiring isn't changed. The mirror is at the boundary between the body
+and the brain (`apps/web/src/brain/mirror.ts`, one wrapper round whichever
+brain runs: TypeScript, WebAssembly or the Apple TV's): every sense with a
+side goes to the brain's other side (each eye's looming, each antenna's push
+and temperature, each side's touch on the eye, the front, the back and
+underside of the head, each side's legs, each antenna's smell, and the two
+eyes' pictures), and what comes out with a side goes back to the other side
+(`turn`, the two DNa02's rates, each region's and each vision stage's
+rate). The eyes are exchanged whole: the body's left eye is the brain's right
+eye, its facets looking where the right eye's look, reflected. The same
+column looks in exactly mirrored directions in each eye (packages/brain/README.md,
+Orientation, Viewing directions), so for the 880 columns both eyes have,
+that is the column-for-column exchange; the right eye has 12 columns the
+left lacks, and a mirrored fly's left eye has them, so nothing is dropped or
+matched. The game renders each fly's pictures at the facets its brain's eyes
+have, so a mirrored fly's eyes see the world from where they are on its head,
+and the picture shown in the corner is what they see.
+
+Which flies: decided from each fly's id (`mirroredFly` in
+`apps/web/src/fly-record.ts`), a random one, by whether its last hex digit is
+odd: half of all flies, each the same from launch to launch. Nothing is kept
+for it, so a fly from before there were mirrored flies has its answer as
+every fly does, and its record loses nothing and gains nothing; about half of
+those flies now lean right. What its mushroom body has learned is tied to the
+wiring, which is the same, so it loads as before. At a table nothing of the
+brain crosses the wire: another player's fly is its body's pose, worked out on
+its owner's device after the mirror.
+
+### Measuring it
+
+Fixed before measuring (`node scripts/handedness.ts`, seeds 1 to 3, each
+seed's two flies built alike, the brain in process):
+
+- **At rest** (`--part rest`): 10 minutes of the brain's resting senses at
+  16 ms ticks, unmirrored and mirrored, through the diagnostic observer that
+  `packages/brain/scripts/report.ts` (c) counts turn events with. At rest
+  every sense is the same on both sides, so the mirrored brain gets exactly
+  the unmirrored one's input. Passes if, for every seed, the mirrored fly's
+  left turn events are the unmirrored fly's right ones and the other way
+  round, and every tick's commands are the unmirrored ones reflected (`turn`
+  negated, the rest equal); fails on any difference.
+- **A loom at each eye** (`--part loom`): from 2 s at rest, the game's
+  fallback looming pulse (full for 80 ms, fading over 200 ms) at the left eye,
+  and from a new brain at the right: escape's peak, when it passes 0.5, and
+  the mean `turn` over the 500 ms from onset. Passes if the mirrored fly's
+  answer to a loom at one eye is exactly the unmirrored fly's to a loom at
+  the other, `turn` negated; fails on any difference.
+- **The whole fly** (`--part life`): its life frame by frame at 60 fps
+  (`apps/web/src/life.ts`) in an open disc 43 mm across, from the centre,
+  facing along the disc's line of symmetry, for 10 minutes, eyes shut (Node
+  draws nothing). The world and the start are their own mirror image and the
+  body has no randomness, so the mirrored fly's path should be the unmirrored
+  one's reflected. Reported: turn events (the observer, on the commands the
+  body was given), how far the mirrored fly ever was from the reflection,
+  and when it first parted from it by more than 1 µm. Passes if it never
+  does; if it does, where and why is reported, not tuned away.
+- **Cost** (`--part cost`, interpreted): what the mirror adds to a frame,
+  for the followed fly and for another.
+
+Measured on 18 November 2026, every part passing:
+
+| seed | at rest: turn events left / right, unmirrored · mirrored | ticks not the reflection | whole fly: turn events left / right, unmirrored · mirrored | walked | furthest from the reflection |
+|---|---|---|---|---|---|
+| 1 | 64 / 33 · 33 / 64 | 0 of 37,500 | 67 / 22 · 22 / 67 | 1,771 mm | 0 |
+| 2 | 89 / 26 · 26 / 89 | 0 of 37,500 | 94 / 15 · 15 / 94 | 1,649 mm | 0 |
+| 3 | 85 / 25 · 25 / 85 | 0 of 37,500 | 91 / 20 · 20 / 91 | 1,866 mm | 0 |
+
+At rest the unmirrored fly turns left 1.9 to 3.4 times as often as right,
+and the mirrored one right as often, tick for tick. The whole fly leans
+harder (3.0 to 6.3 times); its legs' sensors fire as it walks, which
+`node scripts/legs.ts` found to lean it further left too (packages/brain/README.md,
+the legs' proprioceptors). Its path in the disc
+is the unmirrored one's reflected to the last bit through every frame, the
+walls included (it ended 12 to 21 mm from the centre each time, x negated,
+yaw negated). The loom: the escape command peaks at 0.98, 0.89 and 0.97
+(seeds 1 to 3) at the left eye and 1.00 at the right, passing 0.5 within 32 ms
+either way, and the mirrored fly's answer to each eye is the unmirrored
+fly's to the other, tick for tick: escape the same, `turn` negated. The
+mirror itself costs, interpreted on an M5 Pro, about 9 µs a frame for the
+followed fly, whose rates and regions the display reads, and about 3 µs for
+another, whose commands alone are read (each rate and region is mirrored only
+when it is read): under a thousandth of a 60 fps frame. It wasn't measured
+on an Apple TV. With the eyes open it can't be exact: each picture is the
+world from where that fly's eyes are, and a world that isn't its own mirror
+image shows the two flies different things.
+
+
 ## What the body adds
 
-The brain decides; the body carries it out (`packages/body/src/behavior.ts`,
-with thresholds, smoothing and hysteresis: walk above 0.3
-until below 0.15, back up above `back` 0.3 when it also beats `walk` by 0.15, take off on its feet when rearmed and outside the 1.5 s refractory period, as
-`escape` reaches 0.4 (the giant fiber at 80 Hz: why there, in `behavior.ts`), groom and wing poses above 0.2, feed above 0.15 until
-below 0.05, sing above 0.4 until below 0.2 and only on its feet (pIP10, the
-song command neuron: why there, in `behavior.ts`), commands older than 500 ms ignored). Steering is continuous: `turn`
-sets the yaw rate (3 rad/s at full turn walking, 35% of that standing, 5
-in the air).
+The brain decides; the body carries it out (`packages/body/src/behavior.ts`).
+How each command becomes motion, and where each number comes from:
+
+| Command | Becomes | Numbers, and where they come from |
+|---|---|---|
+| `walk` (DNg100) | walking forward | starts above 0.3 and stops below 0.15 (chosen); 5 mm/s at no drive to 16 at full, chosen to span a fruit fly's 5 to 20 mm/s: no recording relates DNg100's firing to walking speed ([steering](ethogram/steering.md#forward-speed)) |
+| `turn` (DNa02, right minus left) | yaw, continuously | 3 rad/s at full `turn` walking (4.3 °/s per Hz of difference), 35% of that standing, 5 in the air: chosen. Paired recordings of DNa02 in walking flies put the walking gain at 6.4 ± 1.5 °/s per Hz, about 110 ms later, but read through the brain's rate readout they predict a held-out fly's turning too poorly to replace it ([steering](ethogram/steering.md)) |
+| `back` (MDN) | backing up | above 0.3 when it also beats `walk` by 0.15, until below 0.15 or `walk` catches up, at 6 mm/s (chosen) |
+| `escape` (DNp01, the giant fiber) | a take-off, on its feet | at 0.4, the giant fiber at 80 Hz, above what it does in the model at rest (why there, in `behavior.ts`); again only once it has fallen below 0.3, and 1.5 s apart (chosen) |
+| `wings` (the flight power muscles' motor neurons) | the wings' pose; in the air, their lift (below) | the pose above 0.2 (chosen) |
+| `groom` (DNg12) | grooming, shown while it stands | above 0.2 (chosen) |
+| `feed` (MN9) | eating, with food in reach | above 0.15 until below 0.05 (chosen) |
+| `sing` (pIP10, the song command neuron) | song, on its feet | above 0.4 until below 0.2, above pIP10's measured peak in a lone fly (why there, in `behavior.ts`) |
+
+Each command is smoothed at 12/s, as they arrive unevenly, and ignored once
+500 ms old (both chosen).
 
 Things the body does that the brain did not decide, each written down where it
 lives (`packages/body/src/motion.ts` unless noted):
