@@ -47,7 +47,7 @@ faster: Root et al., Figures 2 and 5).
 
 ## Part C: the Kenyon cells
 
-`scripts/olfaction-kc.ts`'s measure (ethyl acetate at full strength at both
+`packages/brain/scripts/olfaction-kc.ts`'s measure (ethyl acetate at full strength at both
 antennae for 2 s after 2 s of rest, seeds 1 to 3) at hunger 0 with and
 without, 0.5 and 1: the share of the 4,064 Kenyon cells that fire, and the
 projection neurons' and output neurons' mean rates (`smell-hunger.ts --part
@@ -56,7 +56,7 @@ kc`). Reported, no decision: a real odour fires about 5 to 10% of them.
 ## Part D: cost
 
 The receptor's weights rewritten (the three glomeruli's receptor neurons' outgoing
-connections), timed as `scripts/hunger.ts` section d times DopEcR's
+connections), timed as `packages/brain/scripts/hunger.ts` section d times DopEcR's
 (`smell-hunger.ts --part cost`). They are rewritten only while hunger is
 under the plateau's, about 0.28, and a factor changes.
 
@@ -76,3 +76,14 @@ under the plateau's, about 0.28, and a factor changes.
 
 If it is not kept, the receptor and its stand-in are removed, the brain left
 as it was, and this file and the script stay, with the result.
+
+## Result
+
+Measured on the commit that added this file, as written; nothing above was
+changed afterwards. Decision 1 holds (DM1's projection neurons fire less at
+hunger 0 with the receptor than without, at both strengths, in each of seeds
+1 to 3), decision 2 doesn't apply (D is negative), and by decision 3 hunger
+turns smell up in steering: at ethyl acetate 1, D = −0.066 (95% interval
+−0.073 to −0.060), negative in 10 of 10 seeds. At 0.25 the turn is too faint
+to judge with or without. So the receptor is kept. The numbers are in
+[packages/brain/README.md, Hunger](../packages/brain/README.md#hunger).
