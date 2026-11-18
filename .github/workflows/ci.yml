@@ -41,6 +41,10 @@ jobs:
     # rounds some of them differently in the last bit, and those tests fail there.
     runs-on: macos-latest
     steps:
+      # The runner boots minutes before the job, and Spotlight indexes the checkout and node_modules
+      # on one or two of its three cores into the speed budgets, which turn measurements taken beside
+      # other processes away (scripts/cpuBudget.ts).
+      - run: sudo mdutil -a -i off
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:

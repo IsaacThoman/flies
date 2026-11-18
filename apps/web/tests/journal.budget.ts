@@ -32,16 +32,21 @@ test("making the Apple TV's picture of a first into a JPEG costs little, all of 
     while (!encoder.step(2));
     return jpegDataUrl(encoder.bytes).length;
   };
-  for (let i = 0; i < 20; i++) encode();
+  // Each sample tens of milliseconds of pictures, after as many unmeasured, so neither the JIT nor one burst decides it.
+  const PICTURES = 100;
+  for (let i = 0; i < PICTURES; i++) encode();
   const measured = await measureBudget(t, () => {
     const samples: number[] = [];
     const references: number[] = [];
     let chars = 0;
     for (let s = 0; s < SAMPLES; s++) {
       const meter = new CpuMeter();
-      for (let i = 0; i < 20; i++) chars = encode();
-      meter.lap();
-      samples.push(meter.ms / 20);
+      // A lap every 20, so the five samples have 30 references beside them and one slow one moves none of their percentiles.
+      for (let i = 0; i < PICTURES; i++) {
+        chars = encode();
+        if (i % 20 === 19) meter.lap();
+      }
+      samples.push(meter.ms / PICTURES);
       references.push(...meter.references);
     }
     return { value: { ms: median(samples), chars }, references, samples: [samples] };
@@ -57,11 +62,14 @@ test("watching for the fly's firsts costs next to nothing a frame", async (t) =>
   const life: { -readonly [K in keyof Lived]: Lived[K] } = { activity: "walking", meals: 0, takeOffs: 0, body: { mode: "walking", surface: { solid: -1 } }, world: { solids: [] }, senses: { tasting: { food: null } } };
   const found: Moment[] = [];
   const moments = new Moments(["flight", "groom", "climb", "escape", "sleep"]);
-  const FRAMES = 200_000;
-  const run = () => {
+  // Tens of milliseconds of frames a sample.
+  const FRAMES = 5_000_000;
+  const run = (meter?: CpuMeter) => {
     for (let i = 0; i < FRAMES; i++) {
       life.activity = i % 3 ? "walking" : "grooming";
       moments.watch(life, 1 / 60, found);
+      // A lap every million, so the five samples have 30 references beside them and one slow one moves none of their percentiles.
+      if (meter && i % 1_000_000 === 999_999) meter.lap();
     }
   };
   run();
@@ -70,8 +78,7 @@ test("watching for the fly's firsts costs next to nothing a frame", async (t) =>
     const references: number[] = [];
     for (let s = 0; s < SAMPLES; s++) {
       const meter = new CpuMeter();
-      run();
-      meter.lap();
+      run(meter);
       samples.push(meter.ms / FRAMES);
       references.push(...meter.references);
     }
