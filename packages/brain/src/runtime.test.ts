@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
 import { BACKGROUND, BRISTLE_RATE, LEG_RATE, LEG_STEPPING, READOUTS, SCALES, SENSES, SLEEP_GATE, THIRST, WINGBEAT_RATE, backgroundRates, balanceFactor, decode, hungerOf, intensity, outputSynapses, regionRate, senseRates, smooth, thirstOf, waterOutputGain, wire } from "./io.ts";
-import { RECEPTORS, STAND_INS } from "./modulation.ts";
+import { RECEPTORS, STAND_INS, standInLevel } from "./modulation.ts";
 import { OPERATING_POINT, buildWeights, completenessFactors } from "./params.ts";
 import { REGIONS, REGION_RATE_NAMES } from "./regions.ts";
 import { createBrain, FlyBrain, MAX_TICK_MS } from "./runtime.ts";
@@ -335,7 +335,7 @@ test("hunger: left out it is 1, the brain as it was; lower, the sweet neurons pa
     return route.factors![0];
   };
   const [vum] = STAND_INS;
-  assert.equal(vum.low + (vum.high - vum.low), RECEPTORS[0].full, "TH-VUM starved engages DopEcR fully");
+  assert.equal(standInLevel(vum, 1), RECEPTORS[0].full, "TH-VUM starved engages DopEcR fully");
   assert.equal(factor(1), 1, "starved, the weights as wired");
   assert.ok(Math.abs(factor(0) - (1 + 0.4 / 25) / 1.4) < 1e-12, `fed ${factor(0)}`);
   assert.ok(factor(0.5) > factor(0) && factor(0.5) < 1);
