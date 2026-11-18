@@ -340,6 +340,23 @@ chosen, 5 to 16 mm/s over the range of `walk`.
   (a brain change, outside this calibration), tested on the held-out fly the
   same way.
 
+### The scorecard, as observations
+
+No constant changed, so there is no after: the free hour on this branch is
+the free hour on dev (`b9a88b6d`; the run's commit `76ecec04` adds only the
+counter of time at the turn limit), seeds 1, 2 and 3.
+
+| Seed | Walking | Active | Walking bouts (mean, per s) | Median walking speed | Ground yaw speed, median / 90th percentile | Saccades | Outer half | Take-offs | `turn` at ±1 |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 39.9% | 53.0% | 1.44 s, 0.278 | 8.65 mm/s | 16.5 / 96.5 °/s | 0 | 68.5% | 0 | 9.4 s |
+| 2 | 38.8% | 49.6% | 1.45 s, 0.268 | 8.65 mm/s | 13.5 / 94.5 °/s | 0 | 63.4% | 0 | 8.5 s |
+| 3 | 40.1% | 52.7% | 1.45 s, 0.276 | 8.65 mm/s | 16.5 / 99.5 °/s | 0 | 68.3% | 0 | 10.9 s |
+
+The brain's `turn` sits at its ±40 Hz limit for 0.2 to 0.3% of the hour. The
+scorecard's own seed 1 at `cb9b9da2` ([current dev](current-dev.md)) differs
+(43% walking, 1.88 s bouts, 9.65 mm/s): dev has moved since, and this page
+changes none of it.
+
 ### What remains uncertain
 
 - Units: the files' yaw is about 10% above the authors' final calibration;
