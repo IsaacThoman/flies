@@ -152,6 +152,8 @@ reducer's seed list is the only change). Part D, if reached, runs on it too.
 Also reported, with no decision: the touch trial above with fermenting-fruit
 odour (the five odorants at 1) at both antennae.
 
+<!-- docs-check: generated scripts/plume.ts -->
+
 <!-- docs-check: base packages/brain/src -->
 
 <!-- docs-check: base packages/brain -->

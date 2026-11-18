@@ -151,7 +151,8 @@ dark. Region surfaces remain region averages. The static blue tissue stain
 and outline have higher contrast; only activity changes their warm glow.
 
 **What stays dark, and what it can't show.** The retina and smell have no
-direct sensory drive: light enters at the lamina and there is no smell input.
+direct sensory drive: light enters at the lamina, and the smell neurons
+fire only for an odour, which nothing in the world gives off.
 Body inputs also include antenna displacement, wind, sweet, bitter and water taste, male taste,
 leg load and wingbeat, as well as touch; sensory regions must not be assumed
 silent. Historical observations put the mushroom body, lateral horn, superior
