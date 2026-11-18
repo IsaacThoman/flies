@@ -89,6 +89,8 @@ async function capture(story: StoreStory, tv = false) {
     const place = story === "06-rain" ? "windowsill" : story === "07-night" ? "restaurant" : "picnic";
     localStorage.setItem("flies.settings", JSON.stringify({ place, scene: place, wallpaperAfter: 0, hints: false, stats: false, eyesInset: "off", nerves: story === "04-inside" ? "always" : "off", statsPanel: "off", xray: story === "04-inside" ? "always" : "off", realWeather: false }));
     localStorage.setItem("flies.shelf", JSON.stringify({ light: { kind: story === "04-inside" ? "dusk" : story === "07-night" ? "night" : "noon", at: Date.now() }, weather: { kind: story === "06-rain" ? "rain" : "clear", at: Date.now() } }));
+    // A fly of its own, unmirrored (brain/mirror.ts), so each capture is the same fly's: a new one's id is random, and so whether it is mirrored.
+    localStorage.setItem("flies.fly.0", JSON.stringify({ v: 1, id: "0".repeat(32), born: Date.now(), at: Date.now() }));
     const canvas = index === 0 ? document.getElementById("game") as HTMLCanvasElement : document.body.appendChild(document.createElement("canvas"));
     if (index) canvas.className = "peer";
     const display = new Display(tv);
