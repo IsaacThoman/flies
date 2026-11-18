@@ -39,10 +39,10 @@
     "src/state.hpp": "776df39f21d493c53ae37fbdbb4b13914cd47921859af652acaa294831b19589",
     "src/thermo.hpp": "bc04eaf21dfac9c8f6629aa50c2df81dafa4c99617390edeede75cae49812d15",
     "src/vision.hpp": "1d0fa684829454eb437c2be979bbe83b88eac07cfa57453573752b7815b1ce99",
-    "tools/harness.cpp": "89e9d04e766c0bf24261f338a93a8a6623f05a8e7245f4cbe664554247bd786b"
+    "tools/harness.cpp": "7fa7b18819dc264901d1acd356c458b1bab9725c9db4cb50393ed1bc568d93a0"
   },
   "modules": {
     "fly-brain.wasm": "1ef8a5a5d09dd5263c5174e8da65a42335e1e0b0c39b3ae0fac857eb9093c8b4",
-    "fly-brain-harness.wasm": "9b4fc42c30db1e5c63691d5d1989537324191886d7473c0eac68b9427b139afe"
+    "fly-brain-harness.wasm": "87554883dc0ccd57d226133feb84b1aa559e1c18c477a47d3a76645630f1dc6a"
   }
 }

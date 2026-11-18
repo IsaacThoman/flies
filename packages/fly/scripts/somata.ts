@@ -1,4 +1,4 @@
-// The nine command readouts' true somata, joined to the pinned anatomy by
+// The command readouts' true somata, joined to the pinned anatomy by
 // neuron index. No fibre fallbacks, mirroring, sampling or invented axons.
 import { readFileSync, writeFileSync } from "node:fs";
 import { loadAnatomy, loadConnectome } from "@fly/brain";
