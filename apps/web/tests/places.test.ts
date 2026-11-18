@@ -43,7 +43,7 @@ for (const info of PLACES) {
     assert.ok(world.surface(x, z, createSurface(), y).normal.y >= STANDABLE, "level enough to stand on");
     const body = new FlyBody(world, place.start);
     const intent = createIntent();
-    for (let i = 0; i < 60; i++) body.step(intent, { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null }, 1 / 60);
+    for (let i = 0; i < 60; i++) body.step(intent, { air: { x: 0, y: 0, z: 0 }, meal: null }, 1 / 60);
     assert.equal(body.mode, "standing");
     assert.ok(Math.hypot(body.position.x - x, body.position.z - z) < 1e-6 && body.yaw === yaw);
   });

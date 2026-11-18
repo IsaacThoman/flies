@@ -8,6 +8,7 @@ import { Behavior, Contacts, Crowd, FlyBody, Hunger, SenseTracker, TOUCH_PARTS, 
 import type { Forces, Intent, Looming, Rhythm } from "@fly/body";
 import { Pantry } from "@fly/world";
 import type { Food, Place, Vec3, World } from "@fly/world";
+import { handed, unmirrored } from "./brain/mirror.ts";
 
 /** What the fly is doing, in a word, for the screen and for tests. */
 export type Activity = "resting" | "sleeping" | "walking" | "backing" | "turning" | "grooming" | "feeding" | "tasting" | "singing" | "flying" | "falling" | "waiting";
@@ -18,8 +19,6 @@ export type Stimuli = {
   contacts: Contacts;
   /** The air's velocity at the fly. */
   air: Vec3;
-  /** Where the thing that loomed is, for the direction of a take-off. */
-  threat: Vec3 | null;
 };
 
 export class Life {
@@ -33,11 +32,12 @@ export class Life {
   readonly hunger = new Hunger();
   /** How thirsty it is, from what it has drunk: the brain is sent it. */
   readonly thirst = new Thirst();
-  /** Its brain; a companion's that failed is replaced by a new one (company.ts). */
+  /** Its brain, behind the mirror for a mirrored fly (`mirror`); a companion's that failed is replaced by a new one (`rebrain`). */
   brain: BrainDriver;
+  #mirrored = false;
   /** Other flies (at a table with others, and the others this device lives): bodies it can't walk through, which its antennae and its body feel. */
   readonly crowd: Crowd;
-  readonly stimuli: Stimuli = { looming: [], contacts: new Contacts(), air: { x: 0, y: 0, z: 0 }, threat: null };
+  readonly stimuli: Stimuli = { looming: [], contacts: new Contacts(), air: { x: 0, y: 0, z: 0 } };
   /**
    * Its daily clock and need for sleep, told to the brain with the senses, or
    * null for a fly with neither (the brain as it was before them; tests, unless
@@ -74,7 +74,7 @@ export class Life {
    * the one that owns it.
    */
   tendsPantry = true;
-  #forces: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
+  #forces: Forces = { air: { x: 0, y: 0, z: 0 }, meal: null };
   #wasEating = false;
   #sugar = 0;
   #proboscis = 0;
@@ -86,6 +86,22 @@ export class Life {
     this.pantry = new Pantry(world, world.place.patches);
     this.body = new FlyBody(world, world.place.start);
     this.crowd = new Crowd(world);
+  }
+
+  /** Whether it is the traced fly's mirror image (brain/mirror.ts). */
+  get mirrored() {
+    return this.#mirrored;
+  }
+
+  /** Makes it the traced fly's mirror image, or not: as it arrives, before its brain is first told anything (fly-record.ts). */
+  mirror(mirrored: boolean) {
+    this.#mirrored = mirrored;
+    this.brain = handed(unmirrored(this.brain), mirrored);
+  }
+
+  /** Gives it a new brain, behind the mirror if it is mirrored. */
+  rebrain(brain: BrainDriver) {
+    this.brain = handed(brain, this.#mirrored);
   }
 
   /** Food accepted by the pantry, now or in a room acknowledgement. */
@@ -195,7 +211,6 @@ export class Life {
     const food: Food | null = this.senses.tasting.food;
     const forces = this.#forces;
     forces.air = stimuli.air;
-    forces.threat = stimuli.threat;
     forces.meal = intent.feeding && food && (food.sweet > 0 || food.water > 0) ? food : null;
     const { x, y, z } = body.position;
     const wasOnFeet = body.onFeet;

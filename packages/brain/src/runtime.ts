@@ -8,7 +8,7 @@ import type { Eyes } from "./eyes.ts";
 import { ConnectomeFormatError, loadConnectome } from "./format.ts";
 import { SLEEP_EYES, backgroundRates, decode, hungerOf, intensity, regionRate, senseRates, smooth, stateOf, thirstOf, waterOutputGain, wire } from "./io.ts";
 import type { Wiring } from "./io.ts";
-import { Modulation } from "./modulation.ts";
+import { Modulation, releaseName } from "./modulation.ts";
 import { LEARNING, EMPTY_LAYOUT_HASH, MushroomBody, emptyMemory, readMemory } from "./learning.ts";
 import type { LearningParameters } from "./learning.ts";
 import { ODORANTS, odorOf, ornRate, wireOlfaction } from "./olfaction.ts";
@@ -132,7 +132,7 @@ export class FlyBrain implements Brain {
     this.sim.setTally(this.modulation.sources);
     this.modulation.routes.forEach((route, r) => {
       if (!route.factors || route.carriers.length === 0) return;
-      const name = `release ${route.spec.receptor}`;
+      const name = releaseName(route.spec);
       this.sim.addOutputGain(name, route.carriers);
       this.#release.push({ route: r, name });
     });

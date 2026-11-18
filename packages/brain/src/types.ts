@@ -169,6 +169,12 @@ export type BrainCommand = {
   feed: number;
   /** Courtship song: one wing out and vibrating (pIP10, the song command neuron). */
   sing: number;
+  /**
+   * Which way a take-off would go, -1 to 1: DNp11 (forward) minus DNp02
+   * (backward), whose looming input is graded from the eye's front to its
+   * back (packages/brain/README.md, Which way it jumps). Positive leans forward.
+   */
+  lean: number;
 };
 
 export type BrainStats = {

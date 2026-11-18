@@ -21,7 +21,7 @@ test("the recorder allocates nothing as it goes", () => {
   for (const stage of ["lamina", "medulla", "T4/T5", "lobula", "looming", "tangential"]) for (const side of ["left", "right"]) rates[`vision.${stage} ${side}`] = 1.5;
   const live: Recorded = {
     regionRates: new Float32Array(REGIONS.length).fill(3.25),
-    state: { command: { walk: 0.41, turn: -0.12, back: 0.03, escape: 0.07, wings: 0.11, groom: 0.02, feed: 0.01, sing: 0.04 }, stats: { simMs: 1.5, wallMs: 0.5, spikes: 120, active: 80, rates } },
+    state: { command: { walk: 0.41, turn: -0.12, back: 0.03, escape: 0.07, wings: 0.11, groom: 0.02, feed: 0.01, sing: 0.04, lean: 0 }, stats: { simMs: 1.5, wallMs: 0.5, spikes: 120, active: 80, rates } },
     sensed: { loomLeft: 0.13, loomRight: 0.27, touch: 0.31, bumpLeft: 0.05, bumpRight: 0.06, wind: 0.21, sweet: 0.5, bitter: 0.02, water: 0.03, grounded: true, maleTaste: 0.08, wingbeat: 0.09, hunger: 0.45, thirst: 0.35 },
     intent: { ...createIntent(), live: true, walking: true, yawRate: 0.7 },
     onFeet: true,

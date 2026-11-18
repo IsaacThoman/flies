@@ -58,7 +58,7 @@ export async function measure(data: ArrayBuffer, options: RunOptions, checkpoint
     let yaw = life.body.yaw;
     let previousYaw = yaw;
     let nextReport = 6000;
-    const attribution = { bumpSeconds: 0, neuralGroomSeconds: 0, poseGroomWithoutCurrentCommandSeconds: 0, groundYawDifferentFromIntentSeconds: 0, sleepingSeconds: 0 };
+    const attribution = { bumpSeconds: 0, neuralGroomSeconds: 0, poseGroomWithoutCurrentCommandSeconds: 0, groundYawDifferentFromIntentSeconds: 0, sleepingSeconds: 0, turnAtLimitSeconds: 0 };
     const cpu = process.cpuUsage();
     const start = performance.now();
     const writer = options.traceDir ? new FrameWriter(join(options.traceDir, `free-${seed}.bin`), 'free') : null;
@@ -83,6 +83,8 @@ export async function measure(data: ArrayBuffer, options: RunOptions, checkpoint
           else if (life.activity === 'grooming') attribution.poseGroomWithoutCurrentCommandSeconds += DT;
           if (onFeet && life.body.onFeet && Math.abs(deltaYaw / DT - life.intent.yawRate) > 1e-3) attribution.groundYawDifferentFromIntentSeconds += DT;
           if (life.activity === 'sleeping') attribution.sleepingSeconds += DT;
+          // The brain's command range ends at ±40 Hz of DNa02 difference: past it the body's turn can't follow (docs/ethogram/steering.md).
+          if (Math.abs(driver.state?.command.turn ?? 0) >= 1) attribution.turnAtLimitSeconds += DT;
           const floor = life.world.floor;
           const edge = floor.kind === 'circle' ? Math.hypot(p.x, p.z) >= floor.r / Math.sqrt(2) : Math.abs(p.x) >= floor.hx / Math.sqrt(2) || Math.abs(p.z) >= floor.hz / Math.sqrt(2);
           ethogram.add({ dt: DT, speed: onFeet && life.body.onFeet ? Math.hypot(p.x - x, p.y - y, p.z - z) / DT : 0, yawRate: deltaYaw / DT, yaw, onFeet: onFeet && life.body.onFeet, grooming: life.activity === 'grooming', eating: life.eating, edge, jumped: life.body.events.jumped });

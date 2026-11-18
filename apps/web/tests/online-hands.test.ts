@@ -62,10 +62,17 @@ for (const tool of ["feather", "blow"]) for (const stop of ["away", "flag", "sil
     else { now += 1499; step(); assert.ok(stimulus() > 0); now += 2; }
     step();
     assert.equal(stimulus(), 0);
-    assert.ok(online.threat, "committed ball remains in flight");
+    const ball = online.looming[0].position;
+    const moves = () => {
+      const { x, y, z } = ball;
+      now += 20;
+      step();
+      return ball.x !== x || ball.y !== y || ball.z !== z;
+    };
+    assert.ok(moves(), "committed ball remains in flight");
     for (let i = 0; i < 100; i++) { now += 20; step(); }
     assert.ok(online.pantry.foods.some((f) => f.id === 2000001), "drop still lands");
-    assert.equal(online.threat, null, "ball finishes");
+    assert.ok(!moves(), "ball finishes");
     now += 50;
     state.flags = HANDS | HOLDING;
     state.seq++;

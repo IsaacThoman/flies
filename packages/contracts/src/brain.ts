@@ -96,7 +96,7 @@ export const SENSE_ORDER = [
   "legsRight",
 ] as const;
 /** The order commands come back in from the native brain. */
-export const COMMAND_ORDER = ["walk", "turn", "back", "escape", "wings", "groom", "feed", "sing"] as const;
+export const COMMAND_ORDER = ["walk", "turn", "back", "escape", "wings", "groom", "feed", "sing", "lean"] as const;
 /** After the commands in a native state: simulated ms, wall ms, spikes and active neurons of the last step, then one rate per `rateNames()` entry. */
 export const STATE_STATS = ["simMs", "wallMs", "spikes", "active"] as const;
 

@@ -60,7 +60,6 @@ function swoops(eyes: "open" | "shut", seed: number, throws = THROWS, meter?: Cp
     hands.update(DT, { use, holding: use, eye }, fly, life.pantry);
     life.stimuli.looming.length = 0;
     life.stimuli.looming.push(hands.looming[0]);
-    life.stimuli.threat = hands.ball.active ? hands.ball.position : null;
     if (eyes === "open") {
       see(life, hands, map, light);
       life.light = light;
@@ -158,7 +157,7 @@ test("the swoop seen through the brain's own eyes fires the giant fiber and the 
     const cpu = meter.ms / 1000;
     const off = results.filter((r) => r.tookOff).length;
     console.log(`  eyes open: ${off} of ${results.length} took off (escape peaks: ${summary(results)}); ${time.toFixed(0)} s of its life in ${cpu.toFixed(1)} M5 Pro CPU s (${(meter.rawMs / 1000).toFixed(1)} here)`);
-    // Seed 1 takes off from 7 of 8 (escape 0.51 to 0.70; the eighth peaks at 0.32), each a flight of 1.5 to 1.6 s and 382 to 396 mm along its way.
+    // Seed 1 takes off from 7 of 8 (escape 0.44 to 0.72; the eighth peaks at 0.30), each a flight of 1.5 to 1.6 s and 375 to 402 mm along its way.
     assert.ok(off >= 6, `${off} of ${results.length} took off: ${summary(results)}`);
     // Every throw that crossed the line took off: the body did what the giant fiber said.
     for (const r of results) if (r.escape >= ESCAPE_ON + 0.02) assert.ok(r.tookOff, `escape reached ${r.escape.toFixed(2)} and it stayed: ${summary(results)}`);

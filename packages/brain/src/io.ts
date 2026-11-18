@@ -556,6 +556,9 @@ export const READOUTS: readonly ReadoutSpec[] = [
   { name: "DNg12", description: "Head-grooming descending neurons DNg12_a, _b and _c", select: { type: ["DNg12_a", "DNg12_b", "DNg12_c"] }, tau: 150 },
   { name: "MN9", description: "Proboscis extension motor neuron", select: { type: "MN9" }, tau: 150 },
   { name: "pIP10", description: "Courtship song command descending neurons", select: { type: "pIP10" }, tau: 150 },
+  // Smoothed over 200 ms, chosen: a fly shifts its posture over about the 200 ms before it jumps (Card & Dickinson 2008).
+  { name: "DNp02", description: "Looming descending neurons, backward lean before a take-off", select: { type: "DNp02" }, tau: 200 },
+  { name: "DNp11", description: "Looming descending neurons, forward lean before a take-off", select: { type: "DNp11" }, tau: 200 },
 ];
 
 /** Rate, Hz, at which each command reaches 1 (decode says which readouts each is read from). */
@@ -568,6 +571,8 @@ export const SCALES = {
   groom: 60,
   feed: 40,
   sing: 40,
+  // Chosen, as the other descending neurons' 40 Hz: the body reads only its sign.
+  lean: 40,
 } as const;
 
 const clamp = (value: number, min: number, max: number) => (Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : 0);
@@ -585,6 +590,7 @@ export function decode(rates: Readonly<Record<string, number>>): BrainCommand {
     groom: clamp(r("DNg12") / SCALES.groom, 0, 1),
     feed: clamp(r("MN9") / SCALES.feed, 0, 1),
     sing: clamp(r("pIP10") / SCALES.sing, 0, 1),
+    lean: clamp((r("DNp11") - r("DNp02")) / SCALES.lean, -1, 1),
   };
 }
 

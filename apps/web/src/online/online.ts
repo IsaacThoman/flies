@@ -100,7 +100,6 @@ export class Online {
   /** What the others' hands do to this fly this frame: their puffs, their balls coming (their feathers' touch is `touch`). */
   readonly air: Vec3 = { x: 0, y: 0, z: 0 };
   readonly looming: Looming[] = [];
-  threat: Vec3 | null = null;
   /** This player at the table (its first fly's id), that fly's colour, and who started it (they choose the place, the light and the weather, and can take a device's flies off). */
   id = 0;
   colour = "";
@@ -531,8 +530,6 @@ export class Online {
     // Their hands on this fly: a puff, a ball coming.
     this.air.x = this.air.y = this.air.z = 0;
     this.looming.length = 0;
-    this.threat = null;
-    let threatAt = Infinity;
     for (let i = 0; i < this.#handList.length; i++) {
       const hand = this.#handList[i];
       const other = this.others.get(hand.player);
@@ -544,13 +541,6 @@ export class Online {
       this.air.y += h.air.y;
       this.air.z += h.air.z;
       this.looming.push(h.looming[0]);
-      if (h.ball.active && h.ball.t >= 0) {
-        const d = Math.hypot(h.ball.position.x - mine.x, h.ball.position.y - mine.y, h.ball.position.z - mine.z);
-        if (d < threatAt) {
-          threatAt = d;
-          this.threat = h.ball.position;
-        }
-      }
       // Every device bursts the table's bubbles a thrown ball meets, from its path: they agree without saying so.
       const wire = hand.ball;
       if (wire && this.#table && ballProgress(wire, roomNow) > 0) this.#table.hitBy(Math.max(wire.at, prev) / 1000, roomNow / 1000, BALL_RADIUS, wire);

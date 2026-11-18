@@ -15,7 +15,7 @@ import { FlyBody, WALL_PATIENCE, createIntent } from "../src/index.ts";
 import type { Forces, Intent } from "../src/index.ts";
 
 const DT = 1 / 60;
-const still: Forces = { air: { x: 0, y: 0, z: 0 }, threat: null, meal: null };
+const still: Forces = { air: { x: 0, y: 0, z: 0 }, meal: null };
 const intent = (i: Partial<Intent> = {}): Intent => ({ ...createIntent(), live: true, ...i });
 const box = (x: number, z: number, hx: number, hz: number) => ({ kind: "box", x, z, hx, hz, angle: 0 }) as const;
 const room = (solids: Solid[]): Place => ({ floor: { kind: "rect", hx: 100, hz: 100 }, solids, patches: [], start: { x: 0, z: 0, yaw: 0 }, ceiling: 200 });
