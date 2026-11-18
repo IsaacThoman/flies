@@ -225,7 +225,7 @@ walking and activity fractions, walking bouts (mean, rate), median and 90th
 percentile ground yaw speed, saccades (count, median duration, mean angle),
 median walking speed, outer-half occupancy and take-offs; and how often the
 brain's `turn` is at its ±1 limit. None is a target: no constant changes after
-they are seen. The brain-only diagnostics (`scripts/report.ts`, turn events)
+they are seen. The brain-only diagnostics (`packages/brain/scripts/report.ts`, turn events)
 don't involve the body and can't change.
 
 ## Results
