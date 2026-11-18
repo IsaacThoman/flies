@@ -1,7 +1,7 @@
 // Slow neuromodulation, measured on the real connectome (README, Slow
 // neuromodulation):
 //
-//   node packages/brain/scripts/modulation.ts [--part census|levels|sleep|restless] [--seeds 1,2,3] [--path connectome.bin]
+//   node packages/brain/scripts/modulation.ts [--part census|levels|sleep|restless] [--seeds 1,2,3] [--seconds 60] [--path connectome.bin]
 //
 // census: the modulatory neurons by transmitter, what params.ts's fixes made
 //   of them, each receptor's carriers and where their transmitter comes from;
@@ -13,7 +13,7 @@
 //   that only the fan-shaped body differs);
 // restless: a diagnostic, not the model. A release raised 1.5 fold on every
 //   partner of each group of the gnathal ganglia's octopaminergic neurons,
-//   and how much the fly walks at rest over a minute: whether octopamine
+//   with learning off, and how much the fly walks at rest over a minute: whether octopamine
 //   from them could reach walking at all (README, Hunger).
 
 import { parseArgs } from "node:util";
@@ -29,6 +29,7 @@ const { values } = parseArgs({
   options: {
     part: { type: "string" },
     seeds: { type: "string", default: "1,2,3" },
+    seconds: { type: "string", default: "60" },
     path: { type: "string", default: DEFAULT_CONNECTOME_PATH },
   },
 });
@@ -36,6 +37,8 @@ const connectome = readConnectomeFile(values.path);
 const seeds = values.seeds!.split(",").map(Number);
 const parts = values.part ? [values.part] : ["census", "levels", "sleep", "restless"];
 const TICK = 16;
+const restlessMs = Number(values.seconds) * 1000;
+if (!Number.isFinite(restlessMs) || restlessMs <= 0) throw new Error("seconds must be positive and finite");
 const type = (i: number) => connectome.columns.type.value(i);
 
 if (parts.includes("census")) {
@@ -130,10 +133,11 @@ if (parts.includes("restless")) {
     ["OA-VPM3, OA-VPM4", /^OA-VPM[34]$/],
     ["OA-VUMa1 to 8", /^OA-VUMa/],
   ];
-  console.log(`\n(restless) Diagnostic: every partner's release 1.5 fold, seeds ${seeds.join(", ")}, walking at rest over a minute:`);
+  console.log(`\n(restless) Diagnostic: every partner's release 1.5 fold, seeds ${seeds.join(", ")}, learning off, walking at rest over ${values.seconds} seconds:`);
   for (const [name, pattern] of groups) {
     const shares = seeds.map((seed) => {
-      const brain = new FlyBrain(connectome, { seed });
+      // This release probe owns KC outputs too; plasticity cannot also rewrite those weights.
+      const brain = new FlyBrain(connectome, { seed, learning: false });
       if (name !== "none") {
         const partners = new Set<number>();
         for (const i of connectome.filter((j) => pattern.test(type(j)))) {
@@ -145,7 +149,7 @@ if (parts.includes("restless")) {
         brain.sim.addOutputGain("probe", [...partners]);
         brain.sim.setOutputGains("probe", new Float64Array(brain.sim.outputGainMembers("probe").length).fill(1.5));
       }
-      return run(brain, RESTING_SENSES, 60_000);
+      return run(brain, RESTING_SENSES, restlessMs);
     });
     console.log(`    ${name.padEnd(32)} ${shares.map((s) => `${(100 * s).toFixed(1)}%`).join(", ")}`);
   }
