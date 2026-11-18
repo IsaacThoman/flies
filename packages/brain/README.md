@@ -732,6 +732,28 @@ The forward-backward direction counts as carried if (i) holds for both eyes and 
 
 Sideways is not a criterion and is not read whatever it shows, since no published finding gives the left and right DNs' difference a function. The script reports each side's four types together, right minus left, for the side looms and pulses.
 
+**Measured** (seeds 1 to 6; one neuron of each type a side, so 5 Hz is one spike in the 200 ms). Every criterion holds:
+
+| Loom from | Escape reached 0.4 at (ms) | DNp02 left, right (Hz) | DNp11 left, right (Hz) | Index, both sides (Hz) |
+|---|---|---|---|---|
+| front (0) | 950 to 980 | 40–55, 65–90 | 0, 0 | −145 to −110 |
+| behind (180) | 930 to 940 | 0–5, 5–15 | 20–40, 20–30 | +30 to +55 |
+| left (−90) | 930 to 960 | 70–80, 0 | 60–70, 0 | −15 to −10 |
+| right (90) | 860 to 910 | 0, 40–75 | 0, 5–25 | −55 to −35 |
+| above | 880 to 930 | 5–20, 20–50 | 15–25, 0–20 | −30 to −5 |
+| left eye's front (−30) | 920 to 980, once never (peak 0.31) | 50–90, 10–55 | 0, 0 | −140 to −60 |
+| left eye's rear (−130) | 940 to 1,060, once never (peak 0.34) | 20–75, 0 | 80–95, 0–5 | +10 to +60 |
+| right eye's front (30) | 940 to 950 | 5–20, 85–105 | 0, 0 | −125 to −95 |
+| right eye's rear (130) | 860 to 920 | 0, 20–50 | 0, 15–30 | −30 to 0 |
+
+- (i) Rear minus front within the right eye: +75 to +105 Hz on the right side (mean 81, sd 12); within the left eye, +100 to +125 on the left side (mean 112, sd 8). Both pass.
+- (ii) Behind minus front, both sides: +145 to +190 (mean 163, sd 16). Passes.
+- (iii) The summed index is backward for the front loom in 6 of 6 seeds and forward for the loom from behind in 6 of 6. Passes.
+
+So the model's DNp02 and DNp11 carry front against behind, through the gradient in the wiring, as Dombrovski et al. found it: a loom in front drives DNp02 and leaves DNp11 silent, one behind the reverse, and the giant fiber and DNp04 are driven by both. The gradient is there within each eye, the left's (the weaker) included. Where the sign lands is another matter, and that is what a jump goes by: of the nine directions, the index has the sign that takes the fly away from the loom's front-back component for the front, behind, the left eye's front and rear and the right eye's front. The right eye's rear (130 degrees) still leans backward (−30 to 0 Hz), toward the loom: on the right side DNp02 outweighs DNp11 at every position tried, the gradient only narrowing the gap. Straight to the side (±90), where a fly jumps sideways (Card & Dickinson 2008), the index leans backward, more on the right (−55 to −35) than the left (−15 to −10). From above it leans backward. The eye's sideways difference is large and has the loom's side in every seed (each side's four types together, right minus left: −370 to −310 Hz for a loom on the left, +120 to +255 on the right), but it isn't read (above).
+
+With the eyes shut, the hand-wired input drives every LC4 of an eye at once, so nothing in it says front or back, and the giant fiber crosses the threshold within 20 to 30 ms, before either DN has fired more than a spike or two: the index is 0 (forward) in 5 of 6 seeds on the left, 4 of 6 on the right, and −50 Hz (one spike, backward) in 5 of 6 with both.
+
 ## Commands
 
 Each command is read from a group's mean firing rate, smoothed exponentially, divided by the rate at which the command reaches 1 and clamped. `stats.rates` reports the smoothed rates by group name.
