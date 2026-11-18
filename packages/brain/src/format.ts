@@ -268,6 +268,22 @@ export function loadConnectome(buffer: ArrayBuffer): Connectome {
     for (let i = 0; i < n; i++) if (predicate(i)) out.push(i);
     return Uint32Array.from(out);
   };
+  // Each column's neurons grouped by code, ascending within a code, made the
+  // first time a query asks about the column: a brain asks some sixty queries,
+  // and scanning every neuron for each was most of its construction.
+  const byCode: Partial<Record<CategoryName, { start: Uint32Array; neurons: Uint32Array }>> = {};
+  const groups = (name: CategoryName) => {
+    const made = byCode[name];
+    if (made) return made;
+    const { codes, table } = columns[name];
+    const start = new Uint32Array(table.length + 1);
+    for (let i = 0; i < n; i++) start[codes[i] + 1]++;
+    for (let k = 0; k < table.length; k++) start[k + 1] += start[k];
+    const next = start.slice(0, table.length);
+    const neurons = new Uint32Array(n);
+    for (let i = 0; i < n; i++) neurons[next[codes[i]]++] = i;
+    return (byCode[name] = { start, neurons });
+  };
 
   return {
     neurons: n,
@@ -293,9 +309,9 @@ export function loadConnectome(buffer: ArrayBuffer): Connectome {
       return -1;
     },
     find(query) {
-      // Each condition is resolved once per table entry, then neurons are
-      // matched by code.
-      const masks: [Codes, Uint8Array][] = [];
+      // Each condition is resolved once per table entry. The neurons meeting
+      // the condition that fewest meet are gathered by code, then narrowed by the others.
+      const masks: { name: CategoryName; codes: Codes; mask: Uint8Array; matching: number[]; size: number }[] = [];
       for (const name of CATEGORY_NAMES) {
         const condition = query[name];
         if (condition === undefined) continue;
@@ -308,9 +324,43 @@ export function loadConnectome(buffer: ArrayBuffer): Connectome {
               : typeof condition === "function"
                 ? condition
                 : (s: string) => condition.includes(s);
-        masks.push([codes, Uint8Array.from(table, (s) => (test(s) ? 1 : 0))]);
+        const { start } = groups(name);
+        const mask = new Uint8Array(table.length);
+        const matching: number[] = [];
+        let size = 0;
+        for (let k = 0; k < table.length; k++) {
+          if (!test(table[k])) continue;
+          mask[k] = 1;
+          matching.push(k);
+          size += start[k + 1] - start[k];
+        }
+        masks.push({ name, codes, mask, matching, size });
       }
-      return filter((i) => masks.every(([codes, mask]) => mask[codes[i]] === 1));
+      if (masks.length === 0) return filter(() => true);
+      const narrowest = masks.reduce((a, b) => (b.size < a.size ? b : a));
+      const { start, neurons } = groups(narrowest.name);
+      let out = new Uint32Array(narrowest.size);
+      if (narrowest.matching.length > 1 && narrowest.size > n / 16) {
+        // Many neurons of several codes: marked and read back in order, which costs less than sorting them.
+        const marked = new Uint8Array(n);
+        for (const k of narrowest.matching) for (let j = start[k]; j < start[k + 1]; j++) marked[neurons[j]] = 1;
+        let found = 0;
+        for (let i = 0; i < n; i++) if (marked[i] === 1) out[found++] = i;
+      } else {
+        let found = 0;
+        for (const k of narrowest.matching) {
+          out.set(neurons.subarray(start[k], start[k + 1]), found);
+          found += start[k + 1] - start[k];
+        }
+        if (narrowest.matching.length > 1) out.sort();
+      }
+      for (const { codes, mask } of masks) {
+        if (mask === narrowest.mask) continue;
+        let kept = 0;
+        for (let j = 0; j < out.length; j++) if (mask[codes[out[j]]] === 1) out[kept++] = out[j];
+        out = out.subarray(0, kept);
+      }
+      return out.length === narrowest.size ? out : out.slice();
     },
     filter,
   };

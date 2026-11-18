@@ -1,7 +1,8 @@
 #include "params.hpp"
 
-#include <map>
 #include <memory>
+#include <string_view>
+#include <unordered_map>
 
 #include "fdlibm.hpp"
 
@@ -38,11 +39,30 @@ bool dfb_dopaminergic(std::string_view t) { return t == "FB5H" || t == "FB6H" ||
 std::vector<std::string> transmitters(const Connectome& c) {
   const uint32_t n = c.neurons();
   const auto starts = [](const std::string& s, const char* prefix) { return s.rfind(prefix, 0) == 0; };
+  // The fixes read a neuron's predicted transmitter, super class and type
+  // alone, so each condition is judged once per table entry, not per neuron.
+  const auto judged = [&](Category column, auto condition) {
+    std::vector<uint8_t> out;
+    out.reserve(c.table(column).size());
+    for (const std::string& s : c.table(column)) out.push_back(condition(s) ? 1 : 0);
+    return out;
+  };
+  const auto blank = judged(kNt, [](const std::string& s) { return s.empty(); });
+  const auto monoamine = judged(kNt, [](const std::string& s) { return s == "DA" || s == "SER" || s == "OCT"; });
+  const auto cholinergic = judged(kNt, [](const std::string& s) { return s == "ACH"; });
+  const auto eye_sensory = judged(kSuperClass, [](const std::string& s) { return s == "ol_sensory"; });
+  const auto other_sensory = judged(kSuperClass, [](const std::string& s) { return s.find("sensory") != std::string::npos && s != "ol_sensory"; });
+  const auto head_sensory = judged(kSuperClass, [](const std::string& s) { return s == "cb_sensory"; });
+  const auto kenyon = judged(kType, [&](const std::string& s) { return starts(s, "KC"); });
+  const auto head_mechanosensory = judged(kType, [&](const std::string& s) { return starts(s, "BM") || starts(s, "JO-"); });
+  const auto lateral_ln = judged(kType, [&](const std::string& s) { return starts(s, "lLN"); });
+  const auto oa = judged(kType, [](const std::string& s) { return octopaminergic(s); });
+  const auto dfb = judged(kType, [](const std::string& s) { return dfb_dopaminergic(s); });
   std::vector<std::string> out(n);
   for (uint32_t i = 0; i < n; i++) {
-    const std::string& predicted = c.value(kNt, i);
-    const std::string& super_class = c.value(kSuperClass, i);
-    const std::string& type = c.value(kType, i);
+    const uint32_t predicted = c.code(kNt, i);
+    const uint32_t super_class = c.code(kSuperClass, i);
+    const uint32_t type = c.code(kType, i);
     // Each fix is judged on the predicted transmitter, before any fix, and
     // applied unless the neuron already has the fix's transmitter.
     struct Fix {
@@ -53,32 +73,32 @@ std::vector<std::string> transmitters(const Connectome& c) {
         // Kenyon cells are cholinergic (Barnstedt et al. 2016). This dataset
         // predicts them as dopaminergic, and dopamine is muted here, which
         // would cut the mushroom body's output.
-        {starts(type, "KC"), "ACH"},
+        {kenyon[type] != 0, "ACH"},
         // Photoreceptors are histaminergic; the prediction is blank for most of them.
-        {super_class == "ol_sensory" && predicted.empty(), "HIST"},
+        {eye_sensory[super_class] != 0 && blank[predicted] != 0, "HIST"},
         // Mechanosensory, gustatory, olfactory and other primary sensory
         // neurons outside the eye are cholinergic; the prediction is blank for
         // about 2,100 of them, most head bristle neurons among them.
-        {super_class.find("sensory") != std::string::npos && super_class != "ol_sensory" && predicted.empty(), "ACH"},
+        {other_sensory[super_class] != 0 && blank[predicted] != 0, "ACH"},
         // The head's mechanosensory neurons, its bristles' (BM) and Johnston's
         // organ's (JO), are cholinergic like the rest of their types: the
         // dataset's own type-level transmitter for them is acetylcholine.
         // Eleven are predicted a monoamine one by one, at low confidence, and
         // so were muted, among them the right side's whole route from the
         // head's bristles to grooming.
-        {super_class == "cb_sensory" && (starts(type, "BM") || starts(type, "JO-")) && (predicted == "DA" || predicted == "SER" || predicted == "OCT"), "ACH"},
+        {head_sensory[super_class] != 0 && head_mechanosensory[type] != 0 && monoamine[predicted] != 0, "ACH"},
         // Antennal lobe local neurons are overwhelmingly GABAergic (Chou et al.
         // 2010). The prediction makes 75 lateral LNs (lLN1, lLN2T, lLN2X and
         // others) cholinergic; wired densely to each other, they then lock the
         // antennal lobe into saturated firing after any olfactory input. The
         // least certain fix.
-        {starts(type, "lLN") && predicted == "ACH", "GABA"},
-        {octopaminergic(type), "OCT"},
-        {dfb_dopaminergic(type), "DA"},
+        {lateral_ln[type] != 0 && cholinergic[predicted] != 0, "GABA"},
+        {oa[type] != 0, "OCT"},
+        {dfb[type] != 0, "DA"},
     };
-    out[i] = predicted;
+    out[i] = c.table(kNt)[predicted];
     for (const Fix& fix : fixes) {
-      if (out[i] != fix.nt && fix.applies) out[i] = fix.nt;
+      if (fix.applies && out[i] != fix.nt) out[i] = fix.nt;
     }
   }
   return out;
@@ -117,13 +137,22 @@ bool columnar_class(std::string_view s) {
 }
 
 std::vector<uint8_t> columnar(const Connectome& c) {
-  std::vector<uint32_t> candidates;
-  for (uint32_t i = 0; i < c.neurons(); i++) {
-    if (c.value(kSuperClass, i) == "ol_intrinsic" && columnar_class(c.value(kType, i))) candidates.push_back(i);
-  }
-  // Counted by the strings, as params.ts does, so a table that repeats a value counts it as one.
-  std::map<std::pair<std::string, std::string>, uint32_t> counts;
-  const auto key = [&](uint32_t i) { return std::pair{c.value(kType, i), c.value(kSide, i)}; };
+  NeuronQuery q;
+  q[kSuperClass] = [](std::string_view s) { return s == "ol_intrinsic"; };
+  q[kType] = columnar_class;
+  const std::vector<uint32_t> candidates = c.find(q);
+  // Counted by type and side, each by the first code with its name, as params.ts does, so a table that repeats a name counts it as one.
+  const auto named = [&](Category column) {
+    std::unordered_map<std::string_view, uint32_t> first;
+    std::vector<uint32_t> out;
+    for (const std::string& s : c.table(column)) out.push_back(first.try_emplace(s, static_cast<uint32_t>(out.size())).first->second);
+    return out;
+  };
+  const std::vector<uint32_t> types = named(kType);
+  const std::vector<uint32_t> sides = named(kSide);
+  const size_t stride = sides.size();
+  const auto key = [&](uint32_t i) { return types[c.code(kType, i)] * stride + sides[c.code(kSide, i)]; };
+  std::vector<uint32_t> counts(types.size() * stride, 0);
   for (uint32_t i : candidates) counts[key(i)]++;
   std::vector<uint8_t> out(c.neurons(), 0);
   for (uint32_t i : candidates) {

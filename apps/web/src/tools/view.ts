@@ -84,6 +84,35 @@ export function drawToolIcon(g: CanvasRenderingContext2D, tool: ToolIcon, x: num
       g.stroke();
       break;
     }
+    case "finger": {
+      // A fingertip pointing down at the table from the top right, its nail toward us.
+      g.rotate(0.55);
+      g.fillStyle = "#f2b79c";
+      g.strokeStyle = "#b8604a";
+      g.lineWidth = r * 0.08;
+      g.beginPath();
+      g.moveTo(-r * 0.36, -r * 0.95);
+      g.lineTo(-r * 0.36, r * 0.42);
+      g.arc(0, r * 0.42, r * 0.36, Math.PI, 0, true);
+      g.lineTo(r * 0.36, -r * 0.95);
+      g.fill();
+      g.stroke();
+      g.fillStyle = "#fbe3dc";
+      g.beginPath();
+      g.moveTo(-r * 0.2, r * 0.05);
+      g.lineTo(-r * 0.2, r * 0.48);
+      g.arc(0, r * 0.48, r * 0.2, Math.PI, 0, true);
+      g.lineTo(r * 0.2, r * 0.05);
+      g.closePath();
+      g.fill();
+      g.lineWidth = r * 0.05;
+      g.stroke();
+      g.beginPath();
+      g.moveTo(-r * 0.22, -r * 0.35);
+      g.quadraticCurveTo(0, -r * 0.28, r * 0.22, -r * 0.35);
+      g.stroke();
+      break;
+    }
     case "swoop": {
       for (let i = 0; i < 6; i++) {
         g.fillStyle = BALL_COLORS[i];
@@ -553,7 +582,8 @@ export class HandsView {
       const bob = Math.sin(time * 2.4) * size * 0.05;
       const out = size * 1.35 * this.#iconSide;
       icon.position.set(p.x + r.x * out, p.y + size * 0.3 + bob, p.z + r.z * out);
-      icon.visible = this.icon && id !== "feather";
+      // The feather and the fingertip are in the world themselves.
+      icon.visible = this.icon && id !== "feather" && id !== "finger";
     } else this.#icon.visible = false;
 
     // Food landing leaves the ring's impression, spreading and fading where it fell.

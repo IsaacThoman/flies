@@ -324,7 +324,6 @@ export class MushroomBody {
       const lobe = kcLobe(t);
       return lobe === null ? -1 : LOBES.indexOf(lobe);
     });
-    const isDan = Uint8Array.from(types.table, (t) => (Object.hasOwn(DAN_COMPARTMENTS, t) ? 1 : 0));
     // An MBON type's compartments are needed for a DAN's share and to find the learning connections.
     this.#isMbon = Uint8Array.from(types.table, (t) => (Object.hasOwn(MBON_COMPARTMENTS, t) ? 1 : 0));
     this.#hemisphereOf = Int8Array.from(sides.table, (h) => HEMISPHERES.indexOf(h as "left" | "right"));
@@ -333,15 +332,10 @@ export class MushroomBody {
     const per = COMPARTMENTS.length;
     this.compartments = HEMISPHERES.flatMap((h) => COMPARTMENTS.map((c) => `${c.id} ${h}`));
 
-    const kcs: number[] = [];
-    const dans: number[] = [];
-    for (let i = 0; i < connectome.neurons; i++) {
-      const code = types.codes[i];
-      if (lobeOf[code] >= 0 && hemisphere(i) >= 0) kcs.push(i);
-      else if (isDan[code]) dans.push(i);
-    }
-    this.kcs = Uint32Array.from(kcs);
-    this.dans = Uint32Array.from(dans);
+    const kcs = connectome.find({ type: (t) => kcLobe(t) !== null, side: HEMISPHERES });
+    const dans = connectome.find({ type: (t) => Object.hasOwn(DAN_COMPARTMENTS, t) });
+    this.kcs = kcs;
+    this.dans = dans;
     this.#role = new Int32Array(connectome.neurons).fill(-1);
     kcs.forEach((i, k) => (this.#role[i] = k));
     dans.forEach((i, d) => (this.#role[i] = -2 - d));

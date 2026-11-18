@@ -165,23 +165,21 @@ MushroomBody::MushroomBody(const Connectome& c, const Parameters& parameters) : 
   const Table& mbons_table = mbon_compartments();
   // Decided once per type and side (learning.ts says why), not per neuron or edge.
   const std::vector<std::string>& types = c.table(kType);
-  std::vector<uint8_t> lobe_of(types.size()), is_dan(types.size()), is_mbon(types.size());
+  std::vector<uint8_t> lobe_of(types.size()), is_mbon(types.size());
   for (size_t t = 0; t < types.size(); t++) {
     lobe_of[t] = kc_lobe(types[t]);
-    is_dan[t] = dans_table.count(types[t]) != 0;
     is_mbon[t] = mbons_table.count(types[t]) != 0;
   }
   std::vector<int8_t> hemisphere_of;
   for (const std::string& side : c.table(kSide)) hemisphere_of.push_back(side == "left" ? 0 : side == "right" ? 1 : -1);
   const auto hemi = [&](uint32_t i) { return hemisphere_of[c.code(kSide, i)]; };
-  for (uint32_t i = 0; i < c.neurons(); i++) {
-    const uint32_t t = c.code(kType, i);
-    if (lobe_of[t] != kLobes && hemi(i) >= 0) {
-      kcs_.push_back(i);
-    } else if (is_dan[t] != 0) {
-      dans_.push_back(i);
-    }
-  }
+  NeuronQuery kcs;
+  kcs[kType] = [](std::string_view t) { return kc_lobe(t) != kLobes; };
+  kcs[kSide] = [](std::string_view h) { return h == "left" || h == "right"; };
+  kcs_ = c.find(kcs);
+  NeuronQuery dans;
+  dans[kType] = [&](std::string_view t) { return dans_table.count(t) != 0; };
+  dans_ = c.find(dans);
   kc_of_.assign(c.neurons(), -1);
   dan_of_.assign(c.neurons(), -1);
   for (size_t k = 0; k < kcs_.size(); k++) kc_of_[kcs_[k]] = static_cast<int32_t>(k);

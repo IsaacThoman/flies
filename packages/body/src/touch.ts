@@ -122,6 +122,11 @@ const OF_PART = Float64Array.from(TOUCH_PARTS, (name) => STANDING.filter((p) => 
 /** The most contacts in a frame; more are dropped (a frame has a handful at most). */
 export const MAX_CONTACTS = 16;
 
+/** What a flat thing pressing down from above covers, seen from above (a fingertip's underside): whether it is over a point of the world. */
+export interface Over {
+  covers(x: number, z: number): boolean;
+}
+
 /** What touches the fly this frame, from outside: added to, read once, and cleared, without allocating. */
 export class Contacts {
   readonly x = new Float64Array(MAX_CONTACTS);
@@ -129,6 +134,8 @@ export class Contacts {
   readonly z = new Float64Array(MAX_CONTACTS);
   readonly reach = new Float64Array(MAX_CONTACTS);
   readonly strength = new Float64Array(MAX_CONTACTS);
+  /** For a flat press from above (`addFlat`), what it covers; null for a contact at a point. */
+  readonly over: (Over | null)[] = new Array<Over | null>(MAX_CONTACTS).fill(null);
   count = 0;
 
   /** Something at (x, y, z) in the world reaching `reach` mm round it, pressing `strength` (0 to 1). */
@@ -140,11 +147,26 @@ export class Contacts {
     this.z[k] = z;
     this.reach[k] = Math.max(0, reach);
     this.strength[k] = Math.min(1, strength);
+    this.over[k] = null;
+  }
+
+  /** Something flat pressing down on it from above, only where `over` covers it, bending what stands highest there and within `reach` mm under that. */
+  addFlat(over: Over, reach: number, strength: number) {
+    if (!(strength > 0) || this.count >= MAX_CONTACTS) return;
+    const k = this.count++;
+    this.x[k] = this.y[k] = this.z[k] = 0;
+    this.reach[k] = Math.max(0, reach);
+    this.strength[k] = Math.min(1, strength);
+    this.over[k] = over;
   }
 
   /** Adds every contact of another's. */
   addAll(other: Contacts) {
-    for (let k = 0; k < other.count; k++) this.add(other.x[k], other.y[k], other.z[k], other.reach[k], other.strength[k]);
+    for (let k = 0; k < other.count; k++) {
+      const over = other.over[k];
+      if (over) this.addFlat(over, other.reach[k], other.strength[k]);
+      else this.add(other.x[k], other.y[k], other.z[k], other.reach[k], other.strength[k]);
+    }
   }
 
   /** The strongest contact's strength, 0 with none. */
@@ -225,6 +247,39 @@ export function pressFlat(body: Placed, nx: number, ny: number, nz: number, reac
   for (let p = 0; p < distance.length; p++) furthest = Math.max(furthest, A[p] * ahead + U[p] * up + S[p] * left);
   for (let p = 0; p < distance.length; p++) distance[p] = furthest - (A[p] * ahead + U[p] * up + S[p] * left);
   bend(reach / FLY_LENGTH, strength, out);
+}
+
+/**
+ * How hard something flat pressing down from above presses each part (into
+ * `out`, as `press`), where `over` covers the fly: what stands highest under
+ * it is bent, and whatever under it lies within its reach (mm) below that.
+ * Nothing is bent where nothing of the fly is under it.
+ */
+export function pressFlatOver(body: Placed, over: Over, reach: number, strength: number, out: Float64Array) {
+  if (!(strength > 0)) return;
+  const s = Math.sin(body.yaw);
+  const c = Math.cos(body.yaw);
+  const L = FLY_LENGTH;
+  const { ahead: A, up: U, left: S } = body.onFeet ? ON_FEET : IN_AIR;
+  let highest = -Infinity;
+  for (let p = 0; p < distance.length; p++) {
+    // The point in the world, from the fly's frame: ahead is (sin yaw, 0, cos yaw), its left (cos yaw, 0, -sin yaw).
+    const under = over.covers(body.position.x + (s * A[p] + c * S[p]) * L, body.position.z + (c * A[p] - s * S[p]) * L);
+    away[p] = under ? U[p] : -Infinity;
+    highest = Math.max(highest, away[p]);
+  }
+  if (highest === -Infinity) return;
+  for (let p = 0; p < distance.length; p++) distance[p] = highest - away[p];
+  bend(reach / L, strength, out);
+}
+
+/** What every contact presses on each part (into `out`, as `press`): a point's, or a flat press from above. */
+export function pressContacts(body: Placed, contacts: Contacts, out: Float64Array) {
+  for (let k = 0; k < contacts.count; k++) {
+    const over = contacts.over[k];
+    if (over) pressFlatOver(body, over, contacts.reach[k], contacts.strength[k], out);
+    else press(body, contacts.x[k], contacts.y[k], contacts.z[k], contacts.reach[k], contacts.strength[k], out);
+  }
 }
 
 /** The points of the surface, for tests: where each is (body lengths, as `press` reads them) and its part, standing and flying. */

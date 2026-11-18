@@ -11,7 +11,7 @@ Each frame `packages/body/src/senses.ts` works out what the body feels and
 | --- | --- |
 | `light` | When the brain has eyes (`BrainDriver.eyes`) and they're on: the brightness along each facet (below). It stops generating hand-wired looming; an existing held pulse can decay after the switch. |
 | `loomLeft`, `loomRight` | When no eye picture is supplied (including eyes Off): how fast anything (the ball, the bubbles) grows in each eye, from its angular size frame to frame. Nothing below 0.8 rad/s or smaller than 0.08 rad; full at 4 rad/s. Held 80 ms, fading over 200 ms. |
-| `touchEyeLeft` … `touchLegs` | Touch where it lands (`packages/body/src/touch.ts`): each eye's, each side's front of the head (the antennae, the frons and the top of the head between the eyes), back of the head and mouthparts, the notum, the wings and halteres, the abdomen and the legs. Each thing touching it is a contact, a point with a reach and a strength: it meets the fly at the point of its surface nearest it, a set of points placed on the drawn model as it stands (its legs drawn in, in the air), and bends the bristles there and at any point within its reach of that. Each part feels the contact's strength times the share of its points bent. The feather: its tip where the pointer is, from above, reaching 0.5 mm (chosen) and 0.5 mm more stroking, as far as it is drawn brushing; 0.4 resting, 1 stroking. Pointed at the fly it rests on its back (notum 0.29, wings 0.16); following the fly, just ahead of its mouth, on its face. A soap bubble bursting on it: 0.3, where its film meets it. Another fly pushing against it (on this device or at a table with others): 0.3, where they meet. A raindrop landing on it: 0.25, anywhere within half the fly's length round its middle, from above, 0.5 mm round (light rain's drops are about 1 mm across), in light rain about one every 40 s, for the followed fly at full heavy rain about one every 13 s (companions use the base rain rate): chosen rates, not measured biology. A falling leaf brushing it: 0.4, on the side facing it. Hitting something in the air, or the ground landing: full at 400 mm/s, on what stands out furthest toward it (flying into a wall, its face; landing, its feet). Eases out over 0.3 s. `touch`, every part at once, stays 0: the body knows where. |
+| `touchEyeLeft` … `touchLegs` | Touch where it lands (`packages/body/src/touch.ts`): each eye's, each side's front of the head (the antennae, the frons and the top of the head between the eyes), back of the head and mouthparts, the notum, the wings and halteres, the abdomen and the legs. Each thing touching it is a contact, a point with a reach and a strength: it meets the fly at the point of its surface nearest it, a set of points placed on the drawn model as it stands (its legs drawn in, in the air), and bends the bristles there and at any point within its reach of that. Each part feels the contact's strength times the share of its points bent. The feather: its tip where the pointer is, from above, reaching 0.5 mm (chosen) and 0.5 mm more stroking, as far as it is drawn brushing; 0.4 resting, 1 stroking. Pointed at the fly it rests on its back (notum 0.29, wings 0.16); following the fly, just ahead of its mouth, on its face. The fingertip (the Finger tool): its underside resting on the fly, or moving over it, presses flat from above wherever it covers the fly (a contact limited to its footprint, `Contacts.addFlat`): what stands highest under it and whatever is within 0.12 mm below that, about a bristle's length (chosen); 0.4 resting, 1 moving. Over its back, notum 0.40 and wings 0.08 (over its abdomen alone, the folded wings, 0.16); over all of it, its face too (eyes 0.10, front 0.13); its tip come down on one side of the head, that side's eye. Slid along the table into its side, its edge presses where it meets it, 0.5 mm round, 1. A soap bubble bursting on it: 0.3, where its film meets it. Another fly pushing against it (on this device or at a table with others): 0.3, where they meet. A raindrop landing on it: 0.25, anywhere within half the fly's length round its middle, from above, 0.5 mm round (light rain's drops are about 1 mm across), in light rain about one every 40 s, for the followed fly at full heavy rain about one every 13 s (companions use the base rain rate): chosen rates, not measured biology. A falling leaf brushing it: 0.4, on the side facing it. Hitting something in the air, or the ground landing: full at 400 mm/s, on what stands out furthest toward it (flying into a wall, its face; landing, its feet). Eases out over 0.3 s. `touch`, every part at once, stays 0: the body knows where. |
 | `bumpLeft`, `bumpRight` | Something pushing an antenna back: its tip, just ahead of the head and to its side, inside another fly's body (on this device or at a table) or, in the air, inside anything; on its feet, at anything taller than a step that it walks into, or that it stands against where its foreleg on that side doesn't (standing, its forelegs' tarsi reach further forward than its antennae, so a wall they meet holds its head off it, while a stem between them still touches). Nothing past the table's edge, where there is nothing to touch. 1 while it lasts, however long (any contact deflects an antenna further than its push neurons need, and they answer for as long as it is held), easing out over 0.3 s. It drives that antenna's Johnston's organ neurons that sense a push (zones C and E). |
 | `wind` | Its own speed through the air (its velocity less the air's: a puff, a gust, or flying, or falling), full at 1 m/s. A gust at the picnic lasts 4 to 10 s; its speed depends on forecast wind, event strength, fade and flutter. |
 | `sweet` | Food under its feet or at its mouthparts (flies taste with both), while it stands: the food's sweetness, less as it runs out. Its mouth tastes the ground under its head, which up a fruit's curve is higher than its feet. How sweet each food is comes from the sugar it holds, through recordings of the sugar taste neurons ([the world's food](world.md#food)); plain water isn't sweet. |
@@ -153,7 +153,8 @@ lives (`packages/body/src/motion.ts` unless noted):
   turn if it fits so.
 - **The take-off's direction.** The escape command launches it (380 to 620 mm/s
   up and 160 to 340 away, by how far past 0.4 it went); the direction is the
-  body's: away from the ball if the ball is in the air, else straight ahead.
+  body's: away from the ball if the ball is in the air, or from the
+  fingertip while it moves fast, else straight ahead.
 - **Flying on: the tarsal reflex** (`behavior.ts`, see Flight). Off its feet,
   the body keeps a floor under the wings' drive until it lands.
 - **Facing its course.** In the air it turns to face the way it is going (at
@@ -320,12 +321,20 @@ How dark a thing is against the table is what the eyes' looming pathway
 answers (`packages/brain/README.md`, Seeing), and the picture flattens it.
 Measured in the game's own eyes at midday on the picnic table
 (`scripts/eyesContrast.ts`: a fingertip's size and shape lying 6 mm ahead
-of the fly, seen with and without it), the Finger tool's skin colour gives
-0.40 where the table behind it gives 0.56, a contrast of 0.29; glossy or
-matte makes no difference. The same shape in white gives 0.75 and in near
-black 0.17 (0.70). The table renders at about three quarters of a white
-thing's light, and skin at about half of white's where its colour says 0.43,
-so skin's contrast is half the 0.58 a fly would see from it on white paint.
+of the fly, seen with and without it), a photograph's skin colour (#eab39a,
+the Finger tool's first) gives 0.39 where the table behind it gives 0.56, a
+contrast of 0.30; glossy or matte makes no difference. The same shape in white
+gives 0.75 and in near black 0.15 (0.72). The table renders at about three
+quarters of a white thing's light, and a photograph's skin at about half of
+white's where its colour says 0.43: its contrast is half the 0.58 a fly
+would see from skin on white paint. The Finger tool's skin is now drawn as
+skin reflects (#cb9b89, linear 0.60, 0.33, 0.25: about 0.6 of red light, a
+third of green and a quarter of blue; Anderson & Parrish 1981, J. Invest.
+Dermatol. 77:13), 0.32 of a white's light to R1–R6. It gives 0.34 against the
+table's 0.56, a contrast of 0.40 (0.41 matte). The rest is lost in the
+picture: dark things render brighter than their colour says (near black at
+0.15, a fifth of white's), partly in the facets at their edges, which see
+some of the table with them.
 The kit's colours stay apart: blue 0.54 to 0.59, yellow 0.35 to 0.47 and red
 0.16 to 0.34 (dishes and tiles; contrasts against the table 0.14 to 0.15,
 0.29 to 0.41 and 0.48 to 0.73), and the ball's stripes 0.21 to 0.23 (0.61
@@ -344,7 +353,7 @@ screen's dusk cut a dark ball's contrast from 0.89 to 0.70, and at night to
 goes below 1). What is left of a fly's poorer sight in dim light is the cap: at
 4, night came up to midday's level and a quiet night set the fly off more often
 with nothing thrown at it. While the ball
-is in the air the followed fly's eyes target 60 Hz, subject to those delays: the looming detectors answer how
+is in the air, or the fingertip moves fast near it, the followed fly's eyes target 60 Hz, subject to those delays: the looming detectors answer how
 fast dark area grows, and at 20 Hz a throw set off the escape about one time in
 six against one in two at 60 Hz.
 

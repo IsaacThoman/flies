@@ -135,7 +135,12 @@ together; the binary fly-state layout itself is unchanged.
   reach everyone's flies through the world. A ball thrown is seen coming by
   every fly, a feather or a puff is felt by whichever fly it touches, and
   food dropped is food for all. This follows rule 1: other players act on
-  your fly only through its senses.
+  your fly only through its senses. The fingertip (Finger) is the exception:
+  it is in its own player's flies' world only, at home and on a visit alike.
+  On a visit, a stranger's finger is their hand's ring and nothing more: it
+  can't be seen by your fly, wall it in, press on it, loom at it or carry it
+  off, and your finger can't do any of that to theirs. Nothing of it goes on
+  the wire.
 - **Away.** A hidden tab, a sleeping phone or a dropped connection leaves the
   device's flies at the table, resting together: wings folded, still, their
   near models dimmed. After 10 minutes away they leave; when the device comes
@@ -195,6 +200,7 @@ colours; a lone fly wears none.
 | --- | --- | --- |
 | A fly: where it is, its pose | Its player's device, where its brain and body run | About 20 states a second through the room, in one batch of the device's flies, drawn 100–600 ms in the past with adaptive interpolation (`packages/net/src/track.ts`); only its first fly carries the player's hand |
 | What a fly feels and does about the others | Its own device | The others are bodies its eyes see and its body meets (`packages/body/src/crowd.ts`); their hands are the same `Hands` as yours, driven from the wire (`apps/web/src/online/other-hands.ts`) |
+| Your fingertip (the Finger tool) | Your device alone | Nothing but your hand's ring, in your colour, where the finger is: it is in your flies' world only (Tools on other flies, above) |
 | The food: the place's patches, what is dropped, what the place puts out | The room (`TableFood`) | Each device eats at once and tells the room; the room's account, less what the device has eaten since, is what is left (`FoodMirror`) |
 | A thrown ball | The room's clock | Its path and the moment its dive starts: every device (and the room) puts it in the same place at the same moment (`packages/net/src/ball.ts`), after a lead of 1.5 times the estimated round trip, clamped to 200–600 ms |
 | The place | The room | `place` tells every device to carry its flies there, and where each fly is set down |
@@ -307,6 +313,14 @@ rather than sitting at a table that may move to the restaurant.
 | velocity | 3 × i16, mm/s |
 | pose | i8 speed (¼ body length/s), i8 turn (1/16 rad/s), u8 wings, groom, feed, crouch (1/255), i8 pitch (1/150 rad), i8 roll (1/200 rad) |
 | the hand, if out | 3 × i16 pointer, 3 × i16 camera (for the way a puff blows), each at the place's scale, u8 tool, u8 kind |
+
+The tool is its own code, not its place on the shelf, so the shelf can change
+without the protocol (`apps/web/src/tools/hands.ts`, `toolToWire`): Feed 0,
+Swoop 1, Tickle 2, Blow 3, Sky 4 (Light's code in released builds, whose
+kinds are the Sky's times of day; Weather's 5 is read as the Sky too), View 6,
+Place 7, Finger 8, Build 9, Photo 10, new
+tools after. A code a device doesn't know (a newer device's tool) is no tool
+there, and acts on no fly.
 
 JSON, from the device:
 

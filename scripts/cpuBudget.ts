@@ -30,13 +30,41 @@
 // as well: by its own two alone, one outlier could move it by half and spread
 // five samples of it past 1.35x. The strict local limit follows a
 // contended M5 Pro run: a 5.1 ms reference (27% slow) accompanied a false failure.
-// Three contended attempts, separated by one-second pauses, skip locally with an
-// explicit rerun message; in CI they fail with that reason. Functional assertions
+//
+// The reference corrects for a machine's speed, not for sharing it. Beside
+// other processes the brain slows far more than the reference does: with ten
+// other cores busy on an M5 Pro, its work at once read 0.4 to 0.55 M5 Pro CPU s
+// per simulated second against 0.28 alone, while the reference slowed 15%; on
+// CI, beside a freshly booted runner indexing its disk for Spotlight, 0.36 to
+// 0.45 against 0.26 to 0.29 in a quiet one, the reference 12% slower, and the
+// fly's update up to 1.8 times its quiet cost. On the M5 Pro neither preemption
+// nor V8's compiler explains it (ticks run between no context switches were as
+// slow, and so was compiling on the main thread); arithmetic and random tables of
+// 16 KB and 4 MB slowed 15 to 25% while the brain doubled, and tables of 64 and
+// 256 MB, a streamed one and a sparse sweep like the brain's followed none of
+// its swings. The likeliest reason is the cache the cores share, which holds the
+// busiest of the brain's 50 MB of synapse rows only while nothing else fills it,
+// a working set no fixed reference matches on every machine. So each attempt also watches the whole machine's CPU time, and other
+// processes keeping more than OTHERS_LIMIT cores busy on average beside it is
+// contention as well. A quiet runner's other processes keep about a tenth of a
+// core busy during the budgets; Spotlight kept one to one and a half, so CI turns
+// it off before checking out (.github/workflows/ci.yml). The runner's desktop
+// session still wakes its daemons in bursts of seconds (GitHub's provisioning
+// agent every ten seconds or so at a quarter of a core, and assistants, updates
+// and indexers together at up to three), which a retry a second later meets
+// again: so each attempt first waits for a second in which the others keep under
+// QUIET_CORES busy, up to a minute in CI and three seconds locally, where the
+// others are usually there for good, then runs the reference for 50 ms to bring
+// the core back up before measuring.
+//
+// Three contended attempts skip locally with an explicit rerun message; in CI
+// they fail with that reason. Functional assertions
 // and measurement errors always fail. Only this thread's CPU counts, not helpers.
 //
 // After a change of Node that moves the reference, `node scripts/cpuBudget.ts`
 // on an M5 Pro, with nothing else busy, prints the new REFERENCE_MS.
 
+import { cpus } from "node:os";
 import { setTimeout as pause } from "node:timers/promises";
 
 /** CPU milliseconds this thread has used. */
@@ -113,6 +141,36 @@ export const median = (samples: number[]) => {
 /** The same robust reference statistic used to judge the measurement conditions. */
 export const scaleCpuMs = (rawMs: number, references: readonly number[]) => rawMs * REFERENCE_MS / median([...references]);
 
+/** The busiest that other processes may keep the machine, in cores on average over an attempt. */
+export const OTHERS_LIMIT = 1;
+
+const machineBusyMs = () => cpus().reduce((sum, { times }) => sum + times.user + times.nice + times.sys + times.irq, 0);
+const processMs = () => {
+  const { user, system } = process.cpuUsage();
+  return (user + system) / 1000;
+};
+
+/** Starts watching the machine; the function returned gives the cores other processes have kept busy since, on average. */
+export function watchOthers() {
+  const machine = machineBusyMs();
+  const own = processMs();
+  const start = performance.now();
+  return () => (machineBusyMs() - machine - (processMs() - own)) / (performance.now() - start);
+}
+
+/** How few cores other processes must keep busy for a second for the machine to count as quiet. */
+export const QUIET_CORES = 0.25;
+
+/** Waits, a second at a time, until a quiet second or `seconds` of them have passed; whether it found one. */
+async function untilQuiet(watch: typeof watchOthers, wait: (ms: number) => Promise<unknown>, seconds: number) {
+  for (let i = 0; i < seconds; i++) {
+    const others = watch();
+    await wait(1_000);
+    if (others() < QUIET_CORES) return true;
+  }
+  return false;
+}
+
 type Measurement<T> = {
   value: T;
   references: readonly number[];
@@ -120,12 +178,13 @@ type Measurement<T> = {
   samples?: readonly (readonly number[])[];
 };
 type BudgetContext = { skip(message: string): void; diagnostic(message: string): void };
-type Conditions = { ci?: boolean; pause?: (ms: number) => Promise<unknown> };
+type Conditions = { ci?: boolean; pause?: (ms: number) => Promise<unknown>; others?: typeof watchOthers };
 
-function contention<T>({ references, samples = [] }: Measurement<T>, ci: boolean): string | null {
+function contention<T>({ references, samples = [] }: Measurement<T>, ci: boolean, others: number): string | null {
   for (const series of [references, ...samples]) {
     if (!series.length || series.some((sample) => !Number.isFinite(sample) || sample <= 0)) throw Error("Invalid CPU measurement: samples must be finite and positive");
   }
+  if (others > OTHERS_LIMIT) return `other processes kept ${others.toFixed(1)} cores busy; at most ${OTHERS_LIMIT} may`;
   const sorted = references.toSorted((a, b) => a - b);
   const middle = median(sorted);
   const limit = REFERENCE_MS * (ci ? 4 : 1.2);
@@ -147,14 +206,21 @@ function contention<T>({ references, samples = [] }: Measurement<T>, ci: boolean
 export async function measureBudget<T>(t: BudgetContext, measure: () => Measurement<T>, conditions: Conditions = {}): Promise<T | undefined> {
   const ci = conditions.ci ?? Boolean(process.env.CI);
   const wait = conditions.pause ?? pause;
+  const watch = conditions.others ?? watchOthers;
   let reason = "";
   for (let attempt = 1; attempt <= 3; attempt++) {
+    // A shared machine is busy in bursts, so a retry a moment later would land in the same one. Locally the
+    // others are usually there for good, and a short wait spares rerunning by hand.
+    await untilQuiet(watch, wait, ci ? 60 : 3);
+    // A core left idle through the wait comes back slow and its caches cold, which spread the first sample after it
+    // to twice the others on the CI runner.
+    for (const until = threadMs() + 50; threadMs() < until; ) reference();
+    const others = watch();
     const measured = measure();
-    const busy = contention(measured, ci);
+    const busy = contention(measured, ci, others());
     if (!busy) return measured.value;
     reason = busy;
     t.diagnostic(`CPU measurement ${attempt}/3 contended: ${reason}`);
-    if (attempt < 3) await wait(1_000);
   }
   const message = `machine too busy to measure; rerun when idle (${reason}; 3 attempts)`;
   if (ci) throw Error(message);

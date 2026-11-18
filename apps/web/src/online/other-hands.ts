@@ -12,7 +12,7 @@ import type { BallWire, FlyState } from "@fly/net";
 import { Pantry, SWOOP_SECONDS, createSurface } from "@fly/world";
 import type { FoodKind, Vec3, World } from "@fly/world";
 import type { Falling } from "../tools/hands.ts";
-import { DROP_HEIGHT, FALL, Hands, TOOLS, WORLD_TOOLS } from "../tools/hands.ts";
+import { DROP_HEIGHT, FALL, Hands, WORLD_TOOLS, toolFromWire } from "../tools/hands.ts";
 import { HandsView } from "../tools/view.ts";
 import type { TablePantry } from "./table-pantry.ts";
 
@@ -77,7 +77,9 @@ export class OtherHand {
     }
     if (!state) return;
     const h = state.hand;
-    this.hands.tool = Math.min(TOOLS.length - 1, h.tool);
+    // A tool this shelf hasn't (a newer device's) is one that acts on no fly here.
+    const tool = toolFromWire(h.tool);
+    this.hands.tool = tool < 0 ? WORLD_TOOLS : tool;
     this.hands.variants[this.hands.tool] = Math.min(this.hands.current.variants.length - 1, h.variant);
     this.#eye.x = h.eyeX;
     this.#eye.y = h.eyeY;

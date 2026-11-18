@@ -10,7 +10,8 @@
 //
 // The things: a fingertip's size and shape (a flattened capsule 15 mm wide,
 // 9 high and 27 long, lying 6 mm ahead of the head, pointing at it) in white,
-// the Finger tool's skin (#eab39a; glossy as that skin is, and matte) and near
+// skin as a photograph shows it (#eab39a, the Finger tool's first) and as it
+// reflects (#cb9b89, the Finger tool's now; glossy as that skin is, and matte), and near
 // black; the Build kit's colours as a dish (22 mm across, 5 high) and a tile
 // (14 mm square, 0.5 high); and the ball's stripes as a 20 mm sphere. Each is
 // a plain MeshStandardMaterial, not the tool's own mesh.
@@ -26,8 +27,9 @@ const { values } = parseArgs({ options: { url: { type: "string", default: "" } }
 type Shape = "finger" | "dish" | "tile" | "ball";
 const THINGS: [string, string, Shape, number][] = [
   ["white", "#ffffff", "finger", 0.55],
-  ["skin", "#eab39a", "finger", 0.55],
-  ["skin", "#eab39a", "finger", 1],
+  ["skin, photographed", "#eab39a", "finger", 0.55],
+  ["skin", "#cb9b89", "finger", 0.55],
+  ["skin", "#cb9b89", "finger", 1],
   ["near black", "#202020", "finger", 0.55],
   ...Object.entries(KIT_COLOURS).flatMap(([name, colour]) => [[`kit ${name}`, colour, "dish", 0.5], [`kit ${name}`, colour, "tile", 0.5]] as [string, string, Shape, number][]),
   ...["#b0183a", "#e0284a", "#4a2060", "#2c4a3a"].map((colour) => ["ball stripe", colour, "ball", 0.5] as [string, string, Shape, number]),

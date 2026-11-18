@@ -188,6 +188,8 @@ export class FlyBody {
   #cleared = v3(NaN);
   #clearedYaw = 0;
   #clearedOnFeet = false;
+  /** The world's version then: something in it that moves (a fingertip) may have come into its reach since. */
+  #clearedVersion = -1;
   #inward = v3();
   #flightOrigin = v3();
   #flightDir = v3();
@@ -368,7 +370,7 @@ export class FlyBody {
     const p = this.position;
     const c = this.#cleared;
     this.#front = false;
-    // The world stands still: a body where it was clear last time, as it was, still is (a fly at rest).
+    // The world stands still but for what moves (its version): a body where it was clear last time, as it was, still is (a fly at rest).
     if (feet && this.#clearHere()) return true;
     for (let pass = 0; pass < CLEAR_PASSES; pass++) {
       const result = this.#clearOnce(intent, feet);
@@ -379,6 +381,7 @@ export class FlyBody {
         c.z = p.z;
         this.#clearedYaw = this.yaw;
         this.#clearedOnFeet = this.mode !== "airborne";
+        this.#clearedVersion = this.#world.version;
       } else c.y = NaN;
       return result === CLEARED;
     }
@@ -390,7 +393,7 @@ export class FlyBody {
   #clearHere() {
     const p = this.position;
     const c = this.#cleared;
-    return c.y === p.y && c.x === p.x && c.z === p.z && this.#clearedYaw === this.yaw && this.#clearedOnFeet === (this.mode !== "airborne");
+    return c.y === p.y && c.x === p.x && c.z === p.z && this.#clearedYaw === this.yaw && this.#clearedOnFeet === (this.mode !== "airborne") && this.#clearedVersion === this.#world.version;
   }
 
   /**
