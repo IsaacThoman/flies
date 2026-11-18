@@ -203,6 +203,34 @@ seed's two flies built alike, the brain in process):
 - **Cost** (`--part cost`, interpreted): what the mirror adds to a frame,
   for the followed fly and for another.
 
+Measured on 18 November 2026, every part passing:
+
+| seed | at rest: turn events left / right, unmirrored · mirrored | ticks not the reflection | whole fly: turn events left / right, unmirrored · mirrored | walked | furthest from the reflection |
+|---|---|---|---|---|---|
+| 1 | 64 / 33 · 33 / 64 | 0 of 37,500 | 67 / 22 · 22 / 67 | 1,771 mm | 0 |
+| 2 | 89 / 26 · 26 / 89 | 0 of 37,500 | 94 / 15 · 15 / 94 | 1,649 mm | 0 |
+| 3 | 85 / 25 · 25 / 85 | 0 of 37,500 | 91 / 20 · 20 / 91 | 1,866 mm | 0 |
+
+At rest the unmirrored fly turns left 1.9 to 3.4 times as often as right,
+and the mirrored one right as often, tick for tick. The whole fly leans
+harder (3.0 to 6.3 times); its legs' sensors fire as it walks, which
+`node scripts/legs.ts` found to lean it further left too (packages/brain/README.md,
+the legs' proprioceptors). Its path in the disc
+is the unmirrored one's reflected to the last bit through every frame, the
+walls included (it ended 12 to 21 mm from the centre each time, x negated,
+yaw negated). The loom: the escape command peaks at 0.98, 0.89 and 0.97
+(seeds 1 to 3) at the left eye and 1.00 at the right, passing 0.5 within 32 ms
+either way, and the mirrored fly's answer to each eye is the unmirrored
+fly's to the other, tick for tick: escape the same, `turn` negated. The
+mirror itself costs, interpreted on an M5 Pro, about 9 µs a frame for the
+followed fly, whose rates and regions the display reads, and about 3 µs for
+another, whose commands alone are read (each rate and region is mirrored only
+when it is read): under a thousandth of a 60 fps frame. It wasn't measured
+on an Apple TV. With the eyes open it can't be exact: each picture is the
+world from where that fly's eyes are, and a world that isn't its own mirror
+image shows the two flies different things.
+
+
 ## What the body adds
 
 The brain decides; the body carries it out (`packages/body/src/behavior.ts`,

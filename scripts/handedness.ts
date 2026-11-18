@@ -87,10 +87,12 @@ if (values.part === "rest") {
   const data = brainData();
   console.log("The fallback looming pulse (full for 80 ms, fading over 200 ms) after 2 s at rest: escape's peak, when it passes 0.5, mean turn over 500 ms from onset");
   for (const seed of seeds) {
+    const answers: Record<string, BrainCommand[]> = {};
     for (const eye of ["left", "right"] as const) {
       for (const side of ["plain", "mirrored"] as const) {
         const brain = pair(data, seed)[side];
         for (let t = 0; t < 2000; t += TICK) brain.tick(TICK, RESTING_SENSES);
+        const answer: BrainCommand[] = (answers[`${eye} ${side}`] = []);
         let top = 0;
         let up = -1;
         let turn = 0;
@@ -100,6 +102,7 @@ if (values.part === "rest") {
           const loom = elapsed < 80 ? 1 : Math.max(0, 1 - (elapsed - 80) / 200);
           brain.tick(TICK, { ...RESTING_SENSES, loomLeft: eye === "left" ? loom : 0, loomRight: eye === "right" ? loom : 0 });
           const { command } = brain.state!;
+          answer.push({ ...command });
           top = Math.max(top, command.escape);
           if (up < 0 && command.escape >= 0.5) up = t;
           if (t <= 500) {
@@ -110,6 +113,8 @@ if (values.part === "rest") {
         console.log(`  seed ${seed}, ${eye.padEnd(5)} eye, ${side.padEnd(8)}  escape ${top.toFixed(4)}, passes 0.5 at ${up} ms, turn ${(turn / n).toFixed(4)}`);
       }
     }
+    const exact = (a: BrainCommand[], b: BrainCommand[]) => a.every((c, i) => reflected(c, b[i]));
+    console.log(`  seed ${seed}           the mirrored fly's answer to each eye is exactly the unmirrored fly's to the other, reflected, every tick: ${exact(answers["left plain"], answers["right mirrored"]) && exact(answers["right plain"], answers["left mirrored"]) ? "yes" : "no"}`);
   }
 } else if (values.part === "life") {
   const data = brainData();
