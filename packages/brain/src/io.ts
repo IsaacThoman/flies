@@ -417,6 +417,31 @@ export const STATE_INPUTS: readonly StateSpec[] = [
   },
 ];
 
+/** Resting activity a neuron has in the fly, measured: a rate it fires at whatever else happens. */
+export type RestingSpec = { name: string; description: string; select: Selection; rate: number; source: string };
+
+/**
+ * Spontaneous firing measured in the fly, for the neurons whose resting rate
+ * is known and can't come from the wiring: sensory neurons, whose spontaneous
+ * spikes are the receptor's own (README, Spontaneous behaviour, says which
+ * other cells were looked for and why they aren't here). Added after the
+ * background and before the eyes, so that with the eyes shut the brain is the
+ * one without them.
+ */
+export const RESTING: readonly RestingSpec[] = [
+  {
+    name: "resting taste",
+    description: "The labellum's sugar, bitter and water taste neurons (LB3b, LB3c, LB1a to LB1d, LB3a), firing spontaneously",
+    select: { superClass: "cb_sensory", class: "gustatory", type: ["LB3b", "LB3c", "LB1a", "LB1b", "LB1c", "LB1d", "LB3a"] },
+    // The labellum's taste neurons fire "on the order of 1 or 2 spikes/s" with
+    // nothing on them: bitter 0.7 to 1.6 by sensillum class, sugar and water
+    // under 2 (Dweck & Carlson 2023, Sci Adv 9: eadj7032, Fig 2). Which class
+    // each LB1 type sits in isn't known, so one round rate for all.
+    rate: 1,
+    source: "Dweck & Carlson 2023, Sci Adv 9: eadj7032, Fig 2",
+  },
+];
+
 /**
  * The aristae's thermoreceptors. Each arista holds three heating cells (Gr28b.d)
  * and three cooling cells (Ir21a, Ir25a, Ir93a), one of each in each of its
@@ -678,6 +703,8 @@ export type Wiring = {
   excitability: { spec: ExcitabilitySpec; neurons: Uint32Array }[];
   /** The reinforcement stand-ins this connectome has neurons for. */
   reinforcement: { spec: SenseSpec; neurons: Uint32Array; maxRate: number }[];
+  /** The measured resting activity this connectome has neurons for. */
+  resting: { spec: RestingSpec; neurons: Uint32Array }[];
   readouts: { spec: ReadoutSpec; neurons: Uint32Array }[];
 };
 
@@ -727,14 +754,15 @@ export function wire(connectome: Connectome): Wiring {
   const thermo = THERMO_INPUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select) })).filter((g) => g.neurons.length > 0);
   const excitability = STATE_EXCITABILITY.map((spec) => ({ spec, neurons: select(connectome, spec.select) })).filter((g) => g.neurons.length > 0);
   const reinforcement = REINFORCEMENT.map((spec) => ({ spec, neurons: select(connectome, spec.select), maxRate: spec.maxRate })).filter((g) => g.neurons.length > 0);
+  const resting = RESTING.map((spec) => ({ spec, neurons: select(connectome, spec.select) })).filter((g) => g.neurons.length > 0);
   const readouts = READOUTS.map((spec) => ({ spec, neurons: select(connectome, spec.select) }));
   for (const group of [...senses, ...background, ...readouts]) {
     if (group.neurons.length === 0) throw new Error(`The connectome has no neurons for "${group.spec.name}" (${group.spec.description})`);
   }
   const driven = new Uint8Array(connectome.neurons);
-  for (const group of [...senses, ...background, ...state, ...excitability, ...thermo, ...reinforcement]) for (const i of group.neurons) driven[i] = 1;
+  for (const group of [...senses, ...background, ...state, ...excitability, ...thermo, ...reinforcement, ...resting]) for (const i of group.neurons) driven[i] = 1;
   for (const group of readouts) {
     for (const i of group.neurons) if (driven[i] === 1) throw new Error(`Neuron ${i} is both driven and read (readout "${group.spec.name}")`);
   }
-  return { senses, background, state, excitability, thermo, reinforcement, readouts };
+  return { senses, background, state, excitability, thermo, reinforcement, resting, readouts };
 }

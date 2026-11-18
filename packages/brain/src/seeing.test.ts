@@ -48,8 +48,9 @@ test("with the eyes shut the brain is what it was before it had eyes, wherever n
   // touch and bump), and when slow neuromodulation muted OA-VL2 (DNd03) as
   // octopaminergic and stepped the dorsal fan-shaped body's sleep-promoting
   // neurons always (modulation.ts), and when touch landed where it does (touch
-  // everywhere drives the body's bristles at 50 Hz, where it drove them at 10):
-  // the same as a brain built without eyes, the columnar synapses at 1. The
+  // everywhere drives the body's bristles at 50 Hz, where it drove them at 10),
+  // and when the labellum's taste neurons were given their measured resting
+  // rate (io.ts, RESTING): the same as a brain built without eyes, the columnar synapses at 1. The
   // reward DANs that sugar drives since the mushroom body learns (io.ts,
   // REINFORCEMENT) aren't counted: their output is muted, so leaving them out
   // is the brain as it was before them.
@@ -78,7 +79,7 @@ test("with the eyes shut the brain is what it was before it had eyes, wherever n
       hash = (Math.imul(hash, 31) + spikes) >>> 0;
     }
   }
-  assert.deepEqual({ total, hash }, { total: 637295, hash: 2167988677 });
+  assert.deepEqual({ total, hash }, { total: 637986, hash: 36197240 });
 });
 
 test("a dark disc looming at an eye fires the giant fiber through the optic lobe; a passing dot or a receding disc doesn't", { skip }, () => {

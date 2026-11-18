@@ -198,7 +198,8 @@ function rested() {
 test("on the real connectome the rates respond where they should, and rest leaves the giant fibre's neighbours quiet", { skip }, () => {
   const rest = measure(rested(), 2000, () => RESTING_SENSES);
   for (const side of ["left", "right"]) assert.ok(rest(`descending-${side}`) < 1.5, `descending ${side} at rest ${rest(`descending-${side}`)}`);
-  assert.equal(rest("mouthparts"), 0);
+  // The labellum's 89 sugar, bitter and water neurons at their resting 1 Hz (io.ts, RESTING), among the mouthparts' 374, and nothing more.
+  assert.ok(rest("mouthparts") > 0.15 && rest("mouthparts") < 0.35, `mouthparts at rest ${rest("mouthparts")}`);
   assert.ok(rest("visual-projection-left") > 0.5, "the visual background");
 
   // The game's fallback looming pulse, straight into the left eye's looming detectors.

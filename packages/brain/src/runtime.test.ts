@@ -140,6 +140,11 @@ test("the mouth's taste: sweet, bitter and water each drive their own types, bit
   const rates = senseRates(wiring, { ...RESTING_SENSES, bitter: 0.5, water: 2 });
   assert.equal(rates.get("bitter"), 50);
   assert.equal(rates.get("water"), 100);
+  // The labellum's bitter and water neurons fire at their measured resting rate whatever is tasted (io.ts, RESTING); the taste pegs' don't.
+  const resting = wiring.resting.find((group) => group.spec.name === "resting taste")!;
+  assert.deepEqual([...resting.neurons], [...synthetic.index["bitter"], ...synthetic.index["water"]].sort((a, b) => a - b));
+  const brain = new FlyBrain(load(), { eyeColumns: syntheticEyeColumns(synthetic) });
+  assert.deepEqual([...brain.sim.members("resting taste")], [...resting.neurons]);
 });
 
 test("each side's legs drive that side's claw, club and hair plate neurons, the unlisted left out; claw and hair plates are full once the legs step", () => {
@@ -305,9 +310,15 @@ test("the internal state wanders around 0 with unit spread, reproducibly", () =>
   assert.equal(a.level("left"), b.level("left"));
   assert.ok(a.level("left") > 0 && a.level("left") < 1);
   assert.notEqual(a.level("left"), a.level("right"));
-  // Off, nothing spontaneous happens.
+  // Off, nothing spontaneous happens but the measured resting activity (io.ts, RESTING).
   const quiet = new FlyBrain(load(), { spontaneous: false });
-  for (let t = 0; t < 500; t += 16) assert.equal(quiet.tick(16, { ...RESTING_SENSES, grounded: false }).stats.spikes, 0);
+  const resting = new Set(quiet.wiring.resting.flatMap((group) => [...group.neurons]));
+  assert.ok(resting.size > 0);
+  quiet.sim.setRecording(true);
+  for (let t = 0; t < 5000; t += 16) quiet.tick(16, { ...RESTING_SENSES, grounded: false });
+  const fired = [...quiet.sim.recording!].flatMap((spikes, i) => (spikes > 0 ? [i] : []));
+  assert.ok(fired.length > 0);
+  for (const i of fired) assert.ok(resting.has(i), `neuron ${i} fired`);
 });
 
 test("hunger: left out it is 1, the brain as it was; lower, the sweet neurons pass on less and the background quietens", () => {

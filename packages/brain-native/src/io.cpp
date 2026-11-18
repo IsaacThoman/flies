@@ -270,6 +270,15 @@ std::vector<ThermoSpec> thermo_inputs() {
   return out;
 }
 
+// Spontaneous firing measured in the fly, for sensory neurons whose resting
+// rate is known (io.ts's RESTING says where each is from).
+std::vector<RestingSpec> resting() {
+  return {
+      {"resting taste", "The labellum's sugar, bitter and water taste neurons (LB3b, LB3c, LB1a to LB1d, LB3a), firing spontaneously",
+       mouth_taste(one_of({"LB3b", "LB3c", "LB1a", "LB1b", "LB1c", "LB1d", "LB3a"})), 1},
+  };
+}
+
 std::vector<ReadoutSpec> readouts() {
   return {
       {"DNg100", "BDN2, forward walking", query({{kType, is("DNg100")}}), 150},
@@ -340,6 +349,10 @@ Wiring wire(const Connectome& c) {
     const double rate = spec.max_rate;
     if (!neurons.empty()) w.reinforcement.push_back({std::move(spec), std::move(neurons), rate});
   }
+  for (RestingSpec& spec : resting()) {
+    std::vector<uint32_t> neurons = c.find(spec.select);
+    if (!neurons.empty()) w.resting.push_back({std::move(spec), std::move(neurons)});
+  }
   for (ReadoutSpec& spec : readouts()) {
     std::vector<uint32_t> neurons = c.find(spec.select);
     w.readouts.push_back({std::move(spec), std::move(neurons)});
@@ -363,6 +376,7 @@ Wiring wire(const Connectome& c) {
   for (const ThermoGroup& group : w.thermo) driven.insert(group.neurons.begin(), group.neurons.end());
   for (const auto& group : w.excitability) driven.insert(group.neurons.begin(), group.neurons.end());
   for (const Group& group : w.reinforcement) driven.insert(group.neurons.begin(), group.neurons.end());
+  for (const RestingGroup& group : w.resting) driven.insert(group.neurons.begin(), group.neurons.end());
   for (const ReadoutGroup& group : w.readouts) {
     for (uint32_t i : group.neurons) {
       if (driven.count(i) != 0) throw std::runtime_error("Neuron " + std::to_string(i) + " is both driven and read (readout \"" + group.spec.name + "\")");
