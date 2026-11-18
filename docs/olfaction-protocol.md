@@ -60,3 +60,49 @@ evidence paths, and give per-criterion scores, three worst problems and one idea
 Subsequent comparisons randomise neutral names, ask for absolute scores for
 each and a forced ranking, plus a fresh regression-only review. Keep the key
 and scores in the study log. Never tune the model to improve the score.
+
+## Amendment, 17 November 2026: gate 2 against a matched non-olfactory control
+
+**Made after gate 2 failed, and after seeing its result.** This is a post-hoc
+change of criterion, decided openly by the maintainers and written before any
+measurement it describes. The failed result stands as recorded (olfaction study,
+second round): 44 of 75 pinned odour pulses missed the 0.05 one-second command
+bound 60 s later, against 39 of 75 matched bristle pulses, with no population,
+readout or cell left changed, while one forced spike almost never moved the
+commands. The reason for the change: the bound fails touch on the head's
+bristles, a sense the game already delivers, about as often as it fails smell,
+so as written it holds smell to a stricter bar than the senses the fly has. The
+amended gate asks instead whether odour leaves the commands any further from
+their course than an equally strong touch does.
+
+Everything below is fixed before any measurement on it:
+
+- **Assay.** The recovery follow-up's pinned context exactly (20 s settling, 2 s
+  rest, 5 s pulse, 60 s washout, its pinned background levels, every input group
+  appended in the same order), on the model of the second round as it is, with
+  the ORNs silent at rest: for each seed, the no-stimulus control, the five
+  glomeruli (DM1, VA2, DA2, V, DM5) at the five rates (10, 25, 50, 100, 200
+  events/s), and each pulse's matched bristle comparator (`matchedInputs`):
+  51 runs a seed (`packages/brain/scripts/olfaction-noninferiority.ts`).
+- **Seeds.** 141–148, used by nothing before.
+- **Statistic.** For each pulse, M = the largest absolute final-second command
+  residual against the seed's control, over all eight commands. For each pair
+  (the odour pulse and its bristle comparator, same seed, glomerulus and rate),
+  D = M(odour) − M(bristle). The unit is the seed: d = the mean D of its 25
+  pairs, since a seed's pairs share one background and reuse bristle sets.
+- **Margin.** δ = 0.05, the original gate's own command bound: odour may leave
+  the commands at most that much further off their course than touch does.
+- **Decision.** Non-inferior when the one-sided 95% upper bound of the mean of
+  the eight d, mean + t(0.95, 7) × sd / √8 with t = 1.8946, is below δ.
+- **Kept, each required of every odour pulse:** every watched population within
+  1 Hz of the control in each of the three late five-second blocks; no cell with
+  a 20 Hz excess or suppression in all three; every readout's last-five-second
+  residual within 0.05 of its decoder scale (the recovery protocol's bounds); the
+  lateral horn rising at every adjacent rate in every seed.
+- **Reported beside it, deciding nothing:** each seed's d, the original endpoint's
+  failures for odour and bristle pulses, and their difference.
+
+Gate 2 passes, as amended, only if it is non-inferior and every kept check
+passes. If it fails, that is the result: the study stops there and says so. If
+it passes, gate 4 (the plume) runs as the second-round protocol's Part D
+specifies, in its own pull request, with its constants as written there.
