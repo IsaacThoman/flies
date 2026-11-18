@@ -18,7 +18,7 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p .",
     "test": "node --test 'scripts/*.test.ts' 'apps/*/tests/*.test.ts' 'packages/*/src/**/*.test.ts' 'packages/*/tests/*.test.ts' && npm run -s test:budgets",
-    "test:budgets": "node --test --test-concurrency=1 'apps/*/tests/*.budget.ts' 'packages/*/src/**/*.budget.ts' 'packages/*/tests/*.budget.ts'",
+    "test:budgets": "node scripts/budgets.ts",
     "e2e": "node apps/web/e2e/play.e2e.ts && node apps/web/e2e/pointer.e2e.ts && node apps/web/e2e/web.e2e.ts && node apps/web/e2e/tables.e2e.ts && node apps/web/e2e/first-minute.e2e.ts && node apps/web/e2e/ui-entry.e2e.ts && node apps/web/e2e/kitchen.e2e.ts && node apps/web/e2e/remembers.e2e.ts && node apps/web/e2e/home.e2e.ts && node apps/web/e2e/build.e2e.ts && node apps/web/e2e/why.e2e.ts && node apps/web/e2e/journal.e2e.ts && node apps/web/e2e/finger.e2e.ts",
     "serve": "node scripts/serve.ts",
     "rooms": "node apps/server/src/server.ts",
