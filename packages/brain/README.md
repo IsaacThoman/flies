@@ -774,6 +774,19 @@ Each command is read from a group's mean firing rate, smoothed exponentially, di
 
 No neuron is both driven and read (`wire()` refuses a connectome where one would be, and the tests check it), and nothing outside the network produces a command: each comes from spikes that travelled through it.
 
+### `wings`' scale
+
+`wings` reads the 24 indirect flight power muscle motor neurons at 120 Hz for 1, and the body needs 0.6 (72 Hz) to hold the fly up. The brain's own loop through the wings' strain sensors reaches 0.30 (36 to 41 Hz), so the body keeps a floor under the wings while the fly is off its feet (Losing ground contact → flight, below). Whether that floor only makes up for a scale that is wrong is measured with `node packages/brain/scripts/flight-scale.ts`.
+
+**What a fly's motor neurons fire at.** The power muscles are asynchronous: the wingbeat, about 200 Hz, is myogenic, and their motor neurons fire far slower, setting the muscles' calcium and with it their power. Gordon & Dickinson (2006, PNAS 103:4311) recorded them in tethered flight: "≈5 Hz in Drosophila", every DLM and DVM fiber firing together, and mechanical power rising with the rate, from about 52 W/kg at 2.7 Hz to 81 at 8.5 Hz, roughly linearly (Figure 1e, binned steady states read off the figure; "a 3-fold increase in spike frequency (from 3 to 9 Hz) results in a 1.7-fold increase in power output"). Flight began with a brief burst of spikes. Hürkey et al. (2023, Nature 618:118, Figure 1c and e) put the working range in tethered flight at about 3 to 12 Hz, each DLM motor neuron firing once every 20 to 40 wingbeats, its rate linear with the wingbeat's frequency within an animal. Neither paper gives the rate that holds a free fly's weight, and power at 0 Hz is not on the line: the muscle needs its motor neuron's calcium to beat at all. Harcombe & Wyman (1977, J. Neurophysiol. 40:1066) could not be read here and is not relied on. So on a fly's scale, a few Hz is flying and the model's 36 to 41 Hz under its own wingbeat is several times what a flying fly's motor neurons fire.
+
+**Protocol, fixed before measuring.** Seeds 1 to 3. The endpoint is the 24 motor neurons' mean rate as `wings` reads it (smoothed over 100 ms), and the share of time it is over 2.7 Hz (the lowest rate in flight in Gordon & Dickinson's Figure 1e) and over 5 Hz (their typical one).
+
+- (a) What they fire at: 10 minutes at rest standing (split by whether `walk` is past the body's 0.3), a minute at rest in the air; each sense alone at full strength for 3 s after 2 s of rest; the eyes open on a steady white and under the battery's dark disc looming from the front; the hand-wired loom on both sides; and a flight's 5 s with the wings' sensors fed the drive it flies with, with the body's floor and without it.
+- (b) The loop on a physiological scale: `wings` as 0.6 (what holds the fly up) at 5 Hz, their typical rate, chosen for want of a measured rate that holds a free fly up, and at 3 and 9 Hz, the ends of Gordon & Dickinson's range, to bracket it; capped at 1. In the air from a take-off's 0.62, the wings' sensors fed that drive as the body smooths it, no floor, 10 s: when it first falls below 0.6 and stays there for 0.5 s, and the share of the time at or above it.
+- Pass, both required: (R) at rest standing the rate is over 2.7 Hz for at most 1% of the time in every seed, and sweet, bitter and water alone (a fly feeds standing) keep its mean at or under 2.7 Hz; otherwise the resting firing would make it fly, and the scale fails. (L) at 5 Hz for 0.6 the drive stays at or above 0.6 for at least 2 s after the take-off in every seed (an escape flight with the floor is 1.5 to 1.6 s).
+- Only if both pass does the game change, to `wings` on the measured scale, with the body's rule cut to what is left (the wings stopping when the feet touch down) and any rule against flying at rest weighed as a new stand-in. Otherwise flight stays as it is, and this is the record of why.
+
 ## Spontaneous behaviour
 
 A leaky integrate-and-fire neuron with no input stays at rest, so with nothing felt and no background the network is silent but for the measured resting activity below, which reaches almost nothing. With clock and sleep state omitted, three things keep it going at rest, and none touches a neuron that is read, though the first two barely count:
@@ -1429,6 +1442,8 @@ divergence assays, `scripts/olfaction-kc.ts` the Kenyon cells' answers (Smell).
 `node packages/brain/scripts/fingertip.ts [--skins 0.69,0.05] [--speeds 600,15] [--azimuth 0]` slides a fingertip-sized disc of each light (a fraction of the table's) at the fly and prints the looming detectors' peak, the giant fiber, the escape command and the take-offs over `--seeds` (Seeing, Looming follows contrast).
 
 `node packages/brain/scripts/escape-direction.ts [--seeds 1,2,3,4,5,6] [--only <regex>]` looms a dark disc from each direction with the eyes open, and gives the hand-wired looming input with them shut, and prints each side's giant fiber, DNp02, DNp04 and DNp11 in the 200 ms before the take-off threshold, their forward-backward index and the fixed criteria (Which way it jumps).
+
+`node packages/brain/scripts/flight-scale.ts [--seeds 1,2,3] [--minutes 10] [--part a|b]` measures what the 24 flight power motor neurons fire at, at rest, under each sense, in a take-off and through a flight, against what a fly's fire at, and whether the brain's own loop would hold the fly up on a physiological scale (`wings`' scale).
 
 `node packages/brain/scripts/bench.ts` times the bare engine.
 
