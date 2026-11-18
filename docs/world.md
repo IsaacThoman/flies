@@ -485,6 +485,51 @@ to 3:
 (Before: the hand-set tastes, at the commit before these; now: these, on
 `56d9f3b`. "3/3" with 0.0 s means a bite in the last frame.)
 
+### Smell
+
+Food also gives off odour, which the air carries to the fly's antennae
+(`packages/world/src/plume.ts`) and which reaches the brain as `odor`, each of
+five odorants at each antenna, 0 to 1, where 1 is as strong as the 10⁻²
+dilutions its smell neurons were recorded with
+([the brain's Smell](../packages/brain/README.md#smell)). Which odorants a food
+gives off is from what it is; how strongly is chosen, in three steps, since
+nothing measured turns a food's own air into that scale. What the brain can't
+smell (none of the five) a food doesn't give off here.
+
+| Food | Gives off | Why |
+|---|---|---|
+| The lab's fly food | ethyl acetate, acetic acid, ethanol, isoamyl acetate and CO₂, each 1 | it ferments once flies and their yeasts live on it. Fermenting yeast gives off ethanol and acetic acid, which with three others make a mimic of its odour as attractive to flies as fermenting fruit (Becher et al. 2012, Funct Ecol 26:822, abstract), CO₂ one molecule for each of ethanol, and yeast's esters ethyl and isoamyl acetate (Verstrepen et al. 2003, J Biosci Bioeng 95:110, known from its abstract and citing work only). The strengths are the olfaction protocol's fermenting fruit (chosen) |
+| Banana | isoamyl acetate 1, ethyl acetate and ethanol 0.1 | isoamyl acetate is among banana essence's most abundant and most often smelled volatiles (Jordán et al. 2001, J Agric Food Chem 49:4813, abstract); a ripe fruit's trace, below |
+| Ketchup | acetic acid 1 | it is made with vinegar (21 CFR 155.194(a)(2)(i)) |
+| Spilt soda | CO₂ 0.3 | the gas it is made fizzy with, less once spilt (chosen) |
+| Ripe fruit and its juice, the coulis and the grape agar | ethyl acetate and ethanol, 0.1 each | ripe fruit makes ethanol and ethyl acetate, more as it goes off (strawberries kept short of air: Larsen and Watkins, known from abstracts only; in overripe mango ethanol and acetic acid are among what flies' antennae answer: Zhu, Park & Baker 2003, J Chem Ecol 29:899, abstract). A fresh fruit's own esters, its butanoates and hexanoates, aren't among the five: a trace (chosen) |
+| Sugar, honey, syrup, jam, sweets, cake, biscuit, bread and toast, coffee, water, a dried juice ring | nothing | sugar isn't volatile; what the others smell of (honey's, coffee's and baked bread's aromas, cooked fruit's) isn't among the five, or how much of it reaches the air (coffee's acetic acid) wasn't found |
+
+The air carries it as the steady solution of advection and diffusion from a
+point on a floor in uniform air, normalised to the food's edge:
+C = min(1, (r₀/r) · exp(−U(r − x)/2D)), r the distance from the food's centre
+to the antenna, x its part downwind, r₀ the food's radius, D 10 mm²/s (about
+these volatiles' diffusivity in air), U the air's own speed where the fly is:
+a gust, the restaurant's draught, a puff. In still air, most of the time, it
+is diffusion's r₀/r, the same every way. Each odorant is the food's strength
+times C, summed over every food and held at 1; it fades with the food's taste
+over its last quarter, and under 0.01 it is none, so a fly away from food
+smells nothing and its brain runs as it did. What it leaves out: turbulence
+and the patchiness of real plumes, the time a smell takes to spread, walls
+and lids in its way. Each device works out the smell of a shared table's food
+itself, from what it is; nothing about smell crosses the wire.
+[The protocol](smell-protocol.md) fixed all of this before anything was
+measured.
+
+In still air the places' fruit leaves a trace over most of each table: at each
+place's start the strongest odorant is about 0.01 (the restaurant) to 0.13
+(the greenhouse's tomatoes and fig, the kitchen's banana); at the lab, beside
+its vials of fermenting food, 0.16 to 0.2 of all five. What the fly does with
+it is measured in [the brain's Smell](../packages/brain/README.md#smell): it
+turns toward a smell at one antenna, but fermenting food 12 mm upwind doesn't
+bring it there detectably sooner, and beside such food it sleeps a little less
+at night.
+
 ## Footprints
 
 Wherever it lives, a fly that has stood in something sticky or wet leaves

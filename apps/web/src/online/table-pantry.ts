@@ -78,7 +78,7 @@ export class TablePantry extends Pantry {
   /** Food landed, on the surface at or below `y`: this player's, or another's under the name they gave it. */
   landed(id: number, kind: FoodKind, x: number, z: number, y?: number) {
     const spec = FOODS[kind];
-    this.mirror.add({ id, kind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, water: spec.water, bitter: spec.bitter, amount: 1, pool: false });
+    this.mirror.add({ id, kind, name: spec.name, x, y: this.#world.heightAt(x, z, y), z, r: spec.r, sweet: spec.sweet, water: spec.water, bitter: spec.bitter, amount: 1, pool: false, odor: spec.odor });
   }
 
   add(name: string, x: number, z: number, r: number, sweet: number, y?: number, lasts?: number): Food {

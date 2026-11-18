@@ -19,6 +19,8 @@ export type Stimuli = {
   contacts: Contacts;
   /** The air's velocity at the fly. */
   air: Vec3;
+  /** The air's velocity where the fly is, as it blows there, which carries smells: `air` less the fly's own carrying (left out, `air`). */
+  wind?: Vec3;
 };
 
 export class Life {
@@ -51,6 +53,12 @@ export class Life {
    * (packages/brain/README.md, Temperature). scripts/thermotaxis.ts turns it on.
    */
   feelsTemperature = false;
+  /**
+   * Whether the brain is told what its antennae smell. On in the game
+   * (docs/smell-protocol.md); off, the brain as it was before food smelled,
+   * for scripts that compare the two (scripts/foods.ts --no-smell).
+   */
+  smells = true;
   /** The eyes' picture for this frame, when the brain has eyes and they're open. Set by the eyes before `step`. */
   light: { left: Float32Array; right: Float32Array } | null = null;
   /** The wing it sings with: 1 its left, -1 its right, toward the nearest other fly where there is one. */
@@ -160,6 +168,7 @@ export class Life {
       // Another fly pushing against it is felt where it pushes, as anything touching it is.
       pushed: this.crowd,
       air: stimuli.air,
+      wind: stimuli.wind,
       eyesOpen,
       proboscis: this.#proboscis,
       bodies: this.crowd,
@@ -182,6 +191,8 @@ export class Life {
     sent.water = felt.water;
     sent.legsLeft = felt.legsLeft;
     sent.legsRight = felt.legsRight;
+    if (this.smells) sent.odor = felt.odor;
+    else delete sent.odor;
     if (this.feelsTemperature) {
       sent.temperatureLeft = felt.temperatureLeft;
       sent.temperatureRight = felt.temperatureRight;

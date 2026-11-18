@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PATCHES, Pantry, SOLIDS, WINDOWSILL, World, createPicnic } from "@fly/world";
+import { ODORANTS, PATCHES, Pantry, SOLIDS, TASTES, WINDOWSILL, World, createPicnic, smellAt } from "@fly/world";
 import { ANTENNA_AHEAD, CONTACT_TOUCH, Contacts, FLY_HEIGHT, FLY_LENGTH, FlyBody, HIT_FULL_SPEED, HEAD_AHEAD, LOOM_DECAY, LOOM_HOLD, MOUTH_AHEAD, SenseTracker, WIND_FULL_SPEED, createIntent, FEET_SIDE, LEGS_FULL_SPEED, legMovement } from "../src/index.ts";
 import type { Intent, Looming, SenseInput } from "../src/index.ts";
 
@@ -299,4 +299,25 @@ test("each antenna feels the air's temperature at its tip: 25 °C on a plain tab
   assert.ok(s.temperatureRight! > 25);
   const tip = body.point(HEAD_AHEAD + ANTENNA_AHEAD, 0.3, 0.12, { x: 0, y: 0, z: 0 });
   assert.equal(s.temperatureLeft, table.temperature.at(tip.x, tip.y, tip.z));
+});
+
+test("each antenna smells the food's odour at its tip, the nearer the stronger, in the brain's odorants' order; a fly far from food smells nothing", async () => {
+  const { ODORANTS: BRAIN_ODORANTS } = await import("@fly/brain");
+  assert.deepEqual([...ODORANTS], [...BRAIN_ODORANTS]);
+  const table = openTable(100);
+  const food = new Pantry(table, []);
+  const body = new FlyBody(table, { x: 0, z: 0, yaw: 0 });
+  const tracker = new SenseTracker();
+  const none = tracker.update(input(body, { world: table, pantry: food }));
+  assert.deepEqual([...Array.from(none.odor!.left), ...Array.from(none.odor!.right)], new Array(10).fill(0));
+  // Facing +z, its left is +x: the lab's fermenting food off to its left.
+  food.foods.push({ id: 1, kind: "patch", name: "fly food", x: 6, y: 0, z: 2, r: 2, sweet: 0, water: 0, bitter: 0, amount: 1, pool: false, odor: TASTES.flyFood.odor });
+  const s = tracker.update(input(body, { world: table, pantry: food }));
+  assert.ok(s.odor!.left[0] > s.odor!.right[0] && s.odor!.right[0] > 0.2, `left ${s.odor!.left[0]}, right ${s.odor!.right[0]}`);
+  const tip = body.point(HEAD_AHEAD + ANTENNA_AHEAD, 0.3, 0.12, { x: 0, y: 0, z: 0 });
+  assert.deepEqual(Array.from(s.odor!.left), [...smellAt(food.foods, { x: 0, y: 0, z: 0 }, tip.x, tip.y, tip.z, new Float64Array(5))]);
+  // The air as it blows carries it, not as the fly feels it carried.
+  const blown = tracker.update(input(body, { world: table, pantry: food, air: { x: 300, y: 0, z: 0 }, wind: { x: -300, y: 0, z: 0 } }));
+  assert.ok(blown.odor!.left[0] > 0);
+  assert.equal(tracker.update(input(body, { world: table, pantry: food, air: { x: -300, y: 0, z: 0 }, wind: { x: 300, y: 0, z: 0 } })).odor!.left[0], 0);
 });

@@ -216,8 +216,8 @@ test("the card fits between the caption and the tool's label on every screen, as
     const { rect, scale, shape } = cardLayout(frame, hud);
     assert.ok(rect.x >= a.x - 1e-6 && rect.x + rect.width <= a.x + a.w + 1e-6, `${name}: across`);
     assert.ok(rect.y >= hud.captionY + 23 - 1e-6 && rect.y + rect.height <= hud.labelY - 29 + 1e-6, `${name}: down`);
-    // The smallest phone upright, short for fifteen senses in a column, is the least (0.58).
-    assert.ok(scale > 0.55, `${name}: readable (${scale.toFixed(2)})`);
+    // The smallest phone upright, short for seventeen senses in a column, is the least (0.54).
+    assert.ok(scale > 0.53, `${name}: readable (${scale.toFixed(2)})`);
     for (const kind of CARD_KINDS) {
       const other = cardShape(kind);
       assert.ok(scale >= Math.min(1.6, (a.w * 0.84) / other.width, (Math.min(a.y + a.h * 0.73, hud.labelY - 29) - Math.max(a.y + a.h * 0.11, hud.captionY + 23)) / other.height) - 1e-9, `${name}: none larger than ${kind}`);

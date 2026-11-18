@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { AMBIENT_TEMPERATURE, FOODS, MAX_DROPPED, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TASTES, TABLE_RADIUS, World, createPicnic, createSurface, isDropped, otherTastes } from "../src/index.ts";
+import { AMBIENT_TEMPERATURE, FOODS, MAX_DROPPED, NO_ODOR, PATCHES, PATCH_RECOVERY, Pantry, SOLIDS, TASTES, TABLE_RADIUS, World, createPicnic, createSurface, isDropped, otherTastes } from "../src/index.ts";
 import type { RayHit, Solid } from "../src/index.ts";
 
 /** A bare round table this wide, with nothing on it. */
@@ -122,8 +122,8 @@ test("dropped coffee is an espresso and bitter sugar a lump soaked in one, and a
   assert.ok(laced.bitter > 0 && laced.bitter < coffee.bitter);
   assert.equal(pantry.touching(50, 0, 0, 0.3), laced);
   // The wire carries sweetness alone: the rest comes from the kind.
-  assert.deepEqual(otherTastes([], laced.id, "laced", laced.name), { water: laced.water, bitter: laced.bitter });
-  assert.deepEqual(otherTastes([], coffee.id, "coffee", coffee.name), { water: coffee.water, bitter: 1 });
+  assert.deepEqual(otherTastes([], laced.id, "laced", laced.name), { water: laced.water, bitter: laced.bitter, odor: laced.odor });
+  assert.deepEqual(otherTastes([], coffee.id, "coffee", coffee.name), { water: coffee.water, bitter: 1, odor: NO_ODOR });
 });
 
 test("at most a few dropped foods at once: the oldest makes way", () => {

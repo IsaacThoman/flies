@@ -4,11 +4,13 @@ This study asks whether independently identified olfactory receptor neurons
 (ORNs) can support an honest smell sense. Its first round, after the second,
 used the TypeScript brain unchanged. In its [second round](#second-round-the-orns-as-recorded)
 the ORNs answer the world's odorants as they were recorded, and the brain has
-an `odor` sense ([brain README, Smell](../packages/brain/README.md#smell));
-nothing in the game's world smells.
+an `odor` sense ([brain README, Smell](../packages/brain/README.md#smell)).
+After it, on the owner's decision of 18 November 2026, food in the game's world
+smells ([the owner's decision](#the-owners-decision-18-november-2026)).
 
-**Gate 3 passes; gate 2 fails, as written and as amended, so no odour enters
-the world.** Odour at one antenna turns the fly toward it in 10 of 10 held-out
+**Gate 3 passes; gate 2 fails, as written and as amended, so by this study's
+rule no odour entered the world; the owner has since retired gate 2 and food
+smells ([the decision](#the-owners-decision-18-november-2026)).** Odour at one antenna turns the fly toward it in 10 of 10 held-out
 seeds, and toward the stronger of two. Five-second pulses still leave the
 commands more than 0.05 from a paired control 60 s later in 44 of 75 trials,
 and matched bristle pulses in 39 of 75, with no population, readout or cell left
@@ -91,7 +93,7 @@ escape, wings and groom (one-sided Mann–Whitney, p from 7 × 10⁻⁴ down to
 **Decision: gate 2 fails.** Five seconds of odour, or of touch on the head's
 bristles, leaves the steering and walking commands on another course a minute
 later, while nothing the populations, readouts or cells show stays changed.
-Part D, the plume, was not run, and no odour is in the world.
+Part D, the plume, was not run then, and no odour was in the world.
 
 ### Gate 2, amended after it failed
 
@@ -123,8 +125,8 @@ than 2 Hz; DNa02-right in two), and the amendment required that of every one,
 so **the amended gate 2 fails**. Nine of the 200 bristle pulses do the same
 (DNa02 nine times, DNg100 once): like the original endpoint, this check
 separates neither sense, but it was fixed as a requirement before the
-measurement and stands. The plume was not run, and nothing in the world
-smells. Across the 200 pulses of each kind the original endpoint failed 110
+measurement and stands. The plume was not run then, and nothing in the world
+smelled. Across the 200 pulses of each kind the original endpoint failed 110
 odour pulses and 100 bristle pulses.
 
 ### Gate 3, steering
@@ -167,6 +169,29 @@ then be judged against the parting the smallest effective perturbation leaves.
 That must be preregistered as such: this round's rule didn't allow it.
 Separately, a resting antennal lobe needs local neurons that don't saturate:
 compartmentalised local neurons or presynaptic inhibition, from measurements.
+
+### The owner's decision, 18 November 2026
+
+The owner retired gate 2 as mis-specified. It measures the network's
+sensitivity to any perturbation, not a fault in smell: a matched pulse on the
+head's bristles fails it about as often as odour does, as written and as
+amended, and touch is already in the game. Gate 2 is **not passed**; it is
+retired, and not amended again. Gate 3 passed. The owner approved putting
+smell in the world, validated by the whole-animal experiment of the section
+above and of Part D, run as [its own protocol](smell-protocol.md) fixed before
+measuring: food gives off odour, carried by the air to each antenna
+([world.md, Smell](world.md#smell)).
+
+The result ([brain README, Smell](../packages/brain/README.md#smell), with every
+number): with fermenting food 12 mm upwind in a 20 mm/s draught, a hungry fly
+reached it within 180 s in 36 of 40 runs with its odour and 34 of 40 without
+(5 and 3 discordant pairs, exact one-sided McNemar p = 0.36): **smell doesn't
+help, by Part D's rule.** In still air, 34 against 34. Nothing it was checked
+against (feeding on reaching food, the world's food table, escape from a loom,
+sleep at night beside fermenting food, the CPU budgets, the tests) broke by the
+protocol's bounds, so under the owner's ship rule smell is in the game by
+default. Beside fermenting food the fly sleeps less at night (67% of the hour
+against 82%, seeds 1–6), within the bound.
 
 ### Reproduce
 

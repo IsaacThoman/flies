@@ -273,11 +273,57 @@ export const MADE = {
 } as const satisfies Record<string, Contents>;
 
 const all = { ...CONTENTS, ...MADE };
-/** How each food tastes, from what it is made of. */
-export const TASTES = Object.fromEntries(Object.entries(all).map(([k, c]) => [k, tastesOf(c)])) as Record<keyof typeof all, Tastes>;
+
+// How each food smells to a fly: how strongly it gives off each odorant the
+// brain's smell neurons were recorded answering (packages/brain/README.md,
+// Smell), where 1 is as strong, at the food's edge, as the 10^-2 dilutions
+// they were recorded with. Which odorants a food gives off is from what it is
+// (docs/world.md, Smell, has the sources); how strongly is chosen, in three
+// steps (1 what it smells of most, 0.3 less, 0.1 a trace), as nothing measured
+// turns a food's own air into the recordings' scale. What none of the five
+// carries (sugar, honey's and toast's aromas, a fresh fruit's butanoates)
+// the fly can't smell here, and those foods give off nothing.
+
+/** The odorants, in the order of the brain's `ODORANTS` (packages/brain olfaction.ts; a body test holds them alike). */
+export const ODORANTS = ["ethylAcetate", "aceticAcid", "ethanol", "isoamylAcetate", "co2"] as const;
+export type Odorant = (typeof ODORANTS)[number];
+/** Each odorant's strength at the food's edge, 0 to 1, in ODORANTS' order. */
+export type Odor = readonly number[];
+const smell = (o: Partial<Record<Odorant, number>>): Odor => ODORANTS.map((k) => o[k] ?? 0);
+export const NO_ODOR: Odor = smell({});
+/** Ripe fruit: a trace of the ethanol and ethyl acetate it makes more of as it over-ripens; its own esters are others. */
+const FRUIT = smell({ ethylAcetate: 0.1, ethanol: 0.1 });
+
+/** How each food smells. Those left out give off none of the odorants. */
+const SMELLS: Partial<Record<keyof typeof all, Odor>> = {
+  raspberry: FRUIT,
+  strawberry: FRUIT,
+  orange: FRUIT,
+  peach: FRUIT,
+  grape: FRUIT,
+  plum: FRUIT,
+  fig: FRUIT,
+  tomato: FRUIT,
+  lemon: FRUIT,
+  grapeJuice: FRUIT,
+  orangeJuice: FRUIT,
+  coulis: FRUIT,
+  grapeAgar: FRUIT,
+  /** Isoamyl acetate is banana's own smell, the most of its esters. */
+  banana: smell({ isoamylAcetate: 1, ethylAcetate: 0.1, ethanol: 0.1 }),
+  /** Ketchup is made with vinegar. */
+  ketchup: smell({ aceticAcid: 1 }),
+  /** Soda gives off the carbon dioxide it is made fizzy with, less once it is spilt. */
+  cola: smell({ co2: 0.3 }),
+  /** The lab's food ferments once flies and their yeasts live on it: yeast's ethanol and CO2, its esters, and the acetic acid that follows. */
+  flyFood: smell({ ethylAcetate: 1, aceticAcid: 1, ethanol: 1, isoamylAcetate: 1, co2: 1 }),
+};
+
+/** How each food tastes, from what it is made of, and how it smells. */
+export const TASTES = Object.fromEntries(Object.entries(all).map(([k, c]) => [k, { ...tastesOf(c), odor: SMELLS[k as keyof typeof all] ?? NO_ODOR }])) as Record<keyof typeof all, Tastes & { odor: Odor }>;
 
 /** What the places put out to be found, by the name they give it: each device rebuilds its tastes from that. */
-export const FOUND_TASTES: Readonly<Record<string, Tastes>> = {
+export const FOUND_TASTES: Readonly<Record<string, Tastes & { odor: Odor }>> = {
   "strawberry juice": TASTES.strawberry,
   "biscuit crumb": TASTES.shortbread,
 };
