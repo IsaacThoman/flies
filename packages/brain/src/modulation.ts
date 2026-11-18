@@ -11,7 +11,8 @@
 // modulatory neurons make onto them (a carrier is exposed to those neurons'
 // levels, weighted by its synapses from each), or, where the data doesn't
 // identify the neuron that releases it, from a stand-in source set by
-// internal state (STAND_INS), labelled as such.
+// internal state (STAND_INS), labelled as such. Neuropeptides aren't in the
+// data at all, so a neuropeptide's receptor always takes a stand-in.
 //
 // Where nothing says which receptor a cell carries, it is left alone: no
 // default. Each transmitter has receptors of both signs in the fly (dopamine's
@@ -35,6 +36,22 @@ import type { BrainSenses } from "./types.ts";
 /** The modulatory transmitters, as params.ts's transmitter names them. */
 export const MODULATORS = ["DA", "OCT", "SER"] as const;
 export type Modulator = (typeof MODULATORS)[number];
+/** What a stand-in source or a receptor's transmitter can be: a modulator, or a neuropeptide, which the data has no transmitter for. */
+export type Transmitter = Modulator | "sNPF";
+
+/**
+ * Hours over which the body's hunger goes most of the way (1 - 1/e) from
+ * fed to starved, in a real fly's time: @fly/body's HUNGER.tau (720 s of fly
+ * time, which runs 60 times fast) as hours. A stand-in whose level was
+ * measured against hours without food reads hunger as hours by it
+ * (`hoursStarved`); the tests hold it to the body's.
+ */
+export const HUNGER_HOURS = 12;
+
+/** How many hours without food the body's hunger stands for: hunger = 1 - e^(-hours / HUNGER_HOURS), Infinity at 1. */
+export function hoursStarved(hunger: number): number {
+  return hunger >= 1 ? Infinity : -HUNGER_HOURS * Math.log1p(-hunger);
+}
 
 export const MODULATION = {
   /**
@@ -49,17 +66,30 @@ export const MODULATION = {
 
 /**
  * A source of a transmitter the data doesn't identify, standing in for a
- * neuron the fly has: its rate, Hz, follows internal state linearly, from
- * `low` at 0 to `high` at 1.
+ * neuron or a signal the fly has. Its level follows hunger either linearly,
+ * from `low` at 0 to `high` at 1 (a neuron's rate, Hz), or through `hours`:
+ * the level measured after so many hours without food, linear between the
+ * points and held after the last.
  */
 export type StandInSpec = {
   name: string;
-  transmitter: Modulator;
+  transmitter: Transmitter;
   description: string;
   state: "hunger";
-  low: number;
-  high: number;
-};
+} & ({ low: number; high: number } | { hours: readonly (readonly [hours: number, level: number])[] });
+
+/** A stand-in's level for this hunger (StandInSpec). */
+export function standInLevel(spec: StandInSpec, hunger: number): number {
+  if ("low" in spec) return spec.low + (spec.high - spec.low) * hunger;
+  const hours = hoursStarved(hunger);
+  const points = spec.hours;
+  let k = 1;
+  while (k < points.length && points[k][0] < hours) k++;
+  if (k === points.length) return points[k - 1][1];
+  const [h0, l0] = points[k - 1];
+  const [h1, l1] = points[k];
+  return l0 + ((l1 - l0) * (hours - h0)) / (h1 - h0);
+}
 
 export const STAND_INS: readonly StandInSpec[] = [
   {
@@ -76,18 +106,44 @@ export const STAND_INS: readonly StandInSpec[] = [
     low: 1,
     high: 25,
   },
+  {
+    name: "sNPF",
+    transmitter: "sNPF",
+    // Root et al. 2011, Cell 145: 133: the olfactory receptor neurons release
+    // short neuropeptide F (sNPF) and carry its receptor, sNPFR1, and
+    // starvation raises the receptor (about four-fold in the antennae's mRNA,
+    // their Figure 7B), not the peptide, through falling insulin signalling.
+    // So what hunger sets is how far sNPF's receptor is engaged: 0 in a fed fly
+    // (a bath of sNPF does nothing to its ORN terminals: Figure 4F, -3%, not
+    // significant) and 1 in a starved one. The time course is their Figure
+    // 2D, the DM1 projection neurons' answer to a fixed stimulation of the
+    // antennal nerve against hours without food, as a share of its plateau
+    // (1.29, 1.60 and 1.70 times the fed answer at 1, 2 and 4 hours, 1.70 at
+    // 12): read off the figure. The level stands for the receptor's
+    // signalling, not a neuron's rate: the data has no neuropeptides.
+    description: "sNPF signalling at the olfactory receptor neurons' terminals, as starvation raises its receptor",
+    state: "hunger",
+    hours: [
+      [0, 0],
+      [1, 0.29 / 0.7],
+      [2, 0.6 / 0.7],
+      [4, 1],
+    ],
+  },
 ];
 
 export type ReceptorSpec = {
   receptor: string;
-  transmitter: Modulator;
+  /** Where it is, where one receptor has carriers of several kinds with effects of their own; names its release group with the receptor. */
+  site?: string;
+  transmitter: Transmitter;
   /** What it does, and the evidence. */
   description: string;
   /** Its carriers: a sense's neurons (so it follows whatever that sense drives), or a selection. */
   on: { sense: ScalarSense } | { select: Selection };
   /** The neurons it gets its transmitter from, through their synapses onto each carrier; or a stand-in source, reaching every carrier alike. */
   from: { select: Selection } | { standIn: string };
-  /** The level, Hz, at which it is fully engaged; linear below that. */
+  /** The level (Hz, or a stand-in's own unit) at which it is fully engaged; linear below that. */
   full: number;
   /** How fast its effect follows the level, ms, as it rises and as it falls; left out, at once. */
   kinetics?: { rise: number; fall: number };
@@ -140,7 +196,47 @@ export const RECEPTORS: readonly ReceptorSpec[] = [
     kinetics: { rise: 5 * 60_000, fall: 26 * 60_000 },
     effect: { excitability: -7 },
   },
+  // Root et al. 2011, Cell 145: 133: starvation raises what three glomeruli's
+  // receptor neurons pass on, DM1 (Or42b), DM4 (Or59b) and DM2 (Or22a), at
+  // their terminals and not at their cell bodies, and leaves VM2 and VA3 as
+  // they were; sNPF and its receptor in the ORNs are needed for it, and DM1's
+  // for starved flies' faster finding of food (their Figures 1, 3, 4 and 5).
+  // The magnitude is their Figure 4G: a bath of sNPF raises the calcium that a
+  // fixed train of spikes in the antennal nerve brings into a starved fly's
+  // ORN terminals by 40% in DM1, 28% in DM4 and 20% in DM2 (VM2 3% and VA3 -5%,
+  // neither significant), read off the figure; taken as release, one for one,
+  // as DopEcR's is. Fed, the bath does nothing (Figure 4F). The odour-evoked
+  // terminal calcium, starved against fed, is 1.25 to 2.1 times in DM1 over
+  // their concentrations (Figure 4C), and the DM1 projection neurons' answer to
+  // ethyl acetate 1.56 times (Figure 1E). The connectome's weights stand for a
+  // starved fly's, as DopEcR's do: engaged all the way. The other glomeruli
+  // weren't measured, so they are left alone. The peptide comes from the ORNs
+  // themselves (Figure 5), activity the model doesn't track: a stand-in that
+  // reaches every carrier alike.
+  ...(
+    [
+      ["DM1", 0.4],
+      ["DM4", 0.28],
+      ["DM2", 0.2],
+    ] as const
+  ).map(
+    ([glomerulus, release]): ReceptorSpec => ({
+      receptor: "sNPFR1",
+      site: glomerulus,
+      transmitter: "sNPF",
+      description: `sNPF on ${glomerulus}'s receptor neurons' terminals raises their release in a starved fly`,
+      on: { select: { superClass: "cb_sensory", class: "olfactory", type: `ORN_${glomerulus}` } },
+      from: { standIn: "sNPF" },
+      full: 1,
+      effect: { release, wired: 1 },
+    }),
+  ),
 ];
+
+/** The name of a release receptor's output gain in the simulation. */
+export function releaseName(spec: ReceptorSpec): string {
+  return spec.site ? `release ${spec.receptor} ${spec.site}` : `release ${spec.receptor}`;
+}
 
 /** A receptor resolved against a connectome. */
 type Route = {
@@ -273,8 +369,7 @@ export class Modulation {
   /** Takes internal state for this tick: the stand-ins' rates (each starts at its first) and the excitability internal state sets. */
   setState(senses: BrainSenses, hunger: number, stateOf: (senses: BrainSenses, key: StateKey) => number) {
     for (const standIn of this.standIns) {
-      const { low, high } = standIn.spec;
-      standIn.target = low + (high - low) * hunger;
+      standIn.target = standInLevel(standIn.spec, hunger);
       if (!standIn.started) {
         standIn.level = standIn.target;
         standIn.started = true;

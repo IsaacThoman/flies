@@ -4,12 +4,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loadConnectome } from "./format.ts";
-import { MODULATION, Modulation, RECEPTORS } from "./modulation.ts";
+import { HUNGER as BODY_HUNGER } from "@fly/body";
+import { HUNGER_HOURS, MODULATION, Modulation, RECEPTORS, STAND_INS, releaseName, standInLevel } from "./modulation.ts";
 import type { ReceptorSpec } from "./modulation.ts";
 import { smooth } from "./io.ts";
 import { TRANSMITTER_FIXES, transmitters } from "./params.ts";
 import { FlyBrain } from "./runtime.ts";
-import { bufferOf, syntheticConnectome } from "./test-helpers.ts";
+import { bufferOf, packSynthetic, syntheticConnectome } from "./test-helpers.ts";
 import { RESTING_SENSES } from "./types.ts";
 
 const synthetic = syntheticConnectome();
@@ -88,4 +89,44 @@ test("DopEcR follows the sweet sense's neurons, whatever they are", () => {
   // Fed, TH-VUM fires at 1 Hz: the release of a starved fly's sweet neurons, less dopamine's 1.4 fold.
   brain.tick(16, { ...RESTING_SENSES, hunger: 0 });
   assert.equal(route.factors![0], (1 + 0.4 * (1 / 25)) / 1.4);
+});
+
+test("sNPFR1: hunger read as hours without food engages it as Root et al. measured, and starved the ORNs' weights are as wired", () => {
+  assert.equal(HUNGER_HOURS, (BODY_HUNGER.tau * 60) / 3600, "hours as the body's hunger counts them");
+  const [, sNPF] = STAND_INS;
+  const at = (hours: number) => standInLevel(sNPF, -Math.expm1(-hours / HUNGER_HOURS));
+  assert.equal(at(0), 0);
+  assert.ok(Math.abs(at(1) - 0.29 / 0.7) < 1e-12 && Math.abs(at(2) - 0.6 / 0.7) < 1e-12, `${at(1)}, ${at(2)}`);
+  assert.equal(at(4), 1);
+  assert.equal(at(12), 1);
+  assert.equal(standInLevel(sNPF, 1), 1);
+
+  // The fixture with two receptor neurons of each of the measured glomeruli and of VA3, which starvation leaves alone.
+  const c = load();
+  const neurons = [...synthetic.neurons];
+  const edges: [number, number, number][] = [];
+  for (let i = 0; i < c.neurons; i++) for (let e = c.ptr[i]; e < c.ptr[i + 1]; e++) edges.push([i, c.post[e], c.count[e]]);
+  for (const glomerulus of ["DM1", "DM4", "DM2", "VA3"]) {
+    for (const side of ["left", "right"]) {
+      const i = neurons.length;
+      neurons.push({ type: `ORN_${glomerulus}`, side, superClass: "cb_sensory", class: "olfactory", nt: "ACH", rootId: c.rootId[c.neurons - 1] + i - c.neurons + 1 });
+      edges.push([i, synthetic.index["DNa02 left"][0], 5]);
+    }
+  }
+  const smelling = bufferOf(packSynthetic(neurons, edges));
+  const brain = new FlyBrain(loadConnectome(smelling));
+  const routes = brain.modulation.routes.filter((r) => r.spec.receptor === "sNPFR1");
+  assert.deepEqual(
+    routes.map((r) => [r.spec.site, [...r.carriers]]),
+    ["DM1", "DM4", "DM2"].map((g) => [g, brain.smell.filter((s) => s.glomerulus === g).flatMap((s) => [...s.neurons])]),
+  );
+  for (const route of routes) assert.deepEqual([...brain.sim.outputGainMembers(releaseName(route.spec))], [...route.carriers]);
+  const factors = (hunger: number) => {
+    const b = new FlyBrain(loadConnectome(smelling));
+    b.tick(0, { ...RESTING_SENSES, hunger });
+    return b.modulation.routes.filter((r) => r.spec.receptor === "sNPFR1").map((r) => r.factors![0]);
+  };
+  assert.deepEqual(factors(1), [1, 1, 1]);
+  assert.deepEqual(factors(0.5), [1, 1, 1], "8 hours without food is past the plateau");
+  assert.deepEqual(factors(0), [1 / 1.4, 1 / 1.28, 1 / 1.2]);
 });

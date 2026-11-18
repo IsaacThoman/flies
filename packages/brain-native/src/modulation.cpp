@@ -1,8 +1,10 @@
 #include "modulation.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <set>
 
+#include "fdlibm.hpp"
 #include "params.hpp"
 
 namespace fly {
@@ -12,6 +14,23 @@ namespace {
 constexpr double kTau = 1000;
 // TH-VUM's rate, Hz, just fed and starved.
 constexpr double kVumLow = 1, kVumHigh = 25;
+// HUNGER_HOURS: the hours over which the body's hunger goes most of the way from fed to starved.
+constexpr double kHungerHours = 12;
+// sNPF's engagement of its receptor after 0, 1, 2 and 4 hours without food, held after.
+const std::vector<std::pair<double, double>> kSnpfHours = {{0, 0}, {1, 0.29 / 0.7}, {2, 0.6 / 0.7}, {4, 1}};
+// sNPFR1 on three glomeruli's receptor neurons: fully engaged at 1, release 1.4, 1.28 and 1.2 fold, the weights as wired fully engaged.
+constexpr std::pair<const char*, double> kSnpfR1[] = {{"DM1", 0.4}, {"DM4", 0.28}, {"DM2", 0.2}};
+
+double stand_in_level(const Modulation::StandIn& s, double hunger) {
+  if (s.hours.empty()) return s.low + (s.high - s.low) * hunger;
+  const double hours = hunger >= 1 ? std::numeric_limits<double>::infinity() : -kHungerHours * fdlibm::log1p(-hunger);
+  size_t k = 1;
+  while (k < s.hours.size() && s.hours[k].first < hours) k++;
+  if (k == s.hours.size()) return s.hours[k - 1].second;
+  const auto [h0, l0] = s.hours[k - 1];
+  const auto [h1, l1] = s.hours[k];
+  return l0 + ((l1 - l0) * (hours - h0)) / (h1 - h0);
+}
 // DopEcR on the sweet neurons: fully engaged at 25 Hz, release 1.4 fold, the weights as wired fully engaged.
 constexpr double kDopEcRFull = 25, kDopEcRRelease = 0.4, kDopEcRWired = 1;
 // Dop1R2 on the dorsal fan-shaped body's sleep-promoting neurons: fully engaged at 10 Hz, over 5 minutes up and 26 down, -7 mV.
@@ -28,7 +47,10 @@ Modulation::Modulation(const Connectome& c, const io::Wiring& wiring) {
   }
   level.assign(sources.size(), 0);
   counts.assign(sources.size(), 0);
-  stand_ins.resize(1);
+  stand_ins.resize(2);
+  stand_ins[0].low = kVumLow;
+  stand_ins[0].high = kVumHigh;
+  stand_ins[1].hours = kSnpfHours;
   Route sweet{};
   sweet.receptor = "DopEcR";
   sweet.release = true;
@@ -77,6 +99,23 @@ Modulation::Modulation(const Connectome& c, const io::Wiring& wiring) {
   sleep.engaged.assign(sleep.carriers.size(), 0);
   routes.push_back(std::move(sleep));
 
+  for (const auto& [glomerulus, release] : kSnpfR1) {
+    Route orn{};
+    orn.receptor = std::string("sNPFR1 ") + glomerulus;
+    orn.release = true;
+    orn.full = 1;
+    orn.effect = release;
+    orn.wired = 1;
+    orn.stand_in = 1;
+    const std::string type = std::string("ORN_") + glomerulus;
+    for (uint32_t i = 0; i < c.neurons(); i++) {
+      if (c.value(kSuperClass, i) == "cb_sensory" && c.value(kClass, i) == "olfactory" && c.value(kType, i) == type) orn.carriers.push_back(i);
+    }
+    orn.engaged.assign(orn.carriers.size(), 1);
+    orn.factors.assign(orn.carriers.size(), 1);
+    routes.push_back(std::move(orn));
+  }
+
   std::set<uint32_t> all;
   for (const auto& each : wiring.excitability) all.insert(each.neurons.begin(), each.neurons.end());
   for (const auto& route : routes) if (!route.release) all.insert(route.carriers.begin(), route.carriers.end());
@@ -98,7 +137,7 @@ double Modulation::level_of(uint32_t neuron) const {
 
 void Modulation::set_state(const io::Senses& senses, double hunger) {
   for (auto& stand_in : stand_ins) {
-    stand_in.target = kVumLow + (kVumHigh - kVumLow) * hunger;
+    stand_in.target = stand_in_level(stand_in, hunger);
     if (!stand_in.started) {
       stand_in.level = stand_in.target;
       stand_in.started = true;

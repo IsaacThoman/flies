@@ -25,6 +25,13 @@ export const BACK_SPEED = 0.6;
  * Yaw rate (rad/s) at full `turn`. Standing still it turns at
  * STANDING_TURN of that: DNa02 steers a walking fly, and a standing one turns
  * on the spot only slowly.
+ *
+ * Both are chosen, as is the turn's share of COMMAND_SMOOTHING. The paired
+ * DNa02 recordings of walking flies (Rayshubskiy et al. 2025, eLife 13:
+ * RP102230) put the walking gain at 6.4 ± 1.5 °/s per Hz of right-minus-left
+ * rate, about 110 ms later, against 4.3 here; but read through the brain's
+ * rate readout they predict a held-out fly's turning too poorly to take its
+ * place (docs/ethogram/steering.md, packages/body/scripts/steering.ts).
  */
 export const TURN_RATE = 3;
 export const STANDING_TURN = 0.35;

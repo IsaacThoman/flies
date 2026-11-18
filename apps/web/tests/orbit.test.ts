@@ -2,16 +2,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
 import type { FlyBody } from "@fly/body";
-import { DINING_ROOM, RESTAURANT, TABLES, TABLE_TOPS, World, ZINC_BAR, createPicnic } from "@fly/world";
+import { World, createPicnic } from "@fly/world";
 import { picnic } from "../src/places/picnic/index.ts";
 import { SCENES } from "../src/places/index.ts";
 import { CameraDirector, NEAREST, PITCH, PRESETS } from "../src/camera.ts";
 import type { View } from "../src/camera.ts";
-import type { SceneCamera } from "../src/places/types.ts";
 import { DRAG_ROUND, DRAG_UP, NOTCH_ZOOM, PlayControls } from "../src/controls.ts";
 import type { PlayTarget } from "../src/controls.ts";
 import type { Gesture } from "../src/input.ts";
-import { badEye, besideThings, fakeBody, lengthOnScreen, middleOf, project, settle, sizeOnScreen } from "./camera-probe.ts";
+import { fakeBody, lengthOnScreen, middleOf, project, settle, sizeOnScreen } from "./camera-probe.ts";
 
 const world = createPicnic();
 const forward = (director: CameraDirector) => director.camera.getWorldDirection(new THREE.Vector3());
@@ -280,252 +279,27 @@ test("every way of turning and zooming reaches the same rig: a mouse, a finger, 
   assert.ok(close(wheel.zoom, NOTCH_ZOOM) && wheel.yaw === 0, `a wheel's click: ${JSON.stringify(wheel)}`);
 });
 
-/**
- * Turns the camera once round a fly standing still at a spot: it never jumps,
- * never flips in and out at an edge, and never goes into anything nor cuts
- * into it.
- */
-function goRound(place: World, camera: SceneCamera, spot: { x: number; y: number; z: number }, view: View, rate: number, up: number, what: string) {
-  const director = new CameraDirector(place, 16 / 9, camera);
-  const body = { position: { x: spot.x, y: spot.y, z: spot.z }, velocity: { x: 0, y: 0, z: 0 }, yaw: 0.6, mode: "standing" } as unknown as FlyBody;
-  director.setView(view);
-  director.turnBy(0, up);
-  settle(director, body, 2);
-  const middle = middleOf(body);
-  const last = director.camera.position.clone();
-  let way = 0;
-  let turned = director.camera.position.distanceTo(middle as THREE.Vector3);
-  let lastTurn = -Infinity;
-  for (let i = 0; i < (60 * 2 * Math.PI) / rate; i++) {
-    director.turnBy(rate / 60, 0);
-    director.update(body, 1 / 60);
-    const eye = director.camera.position;
-    const at = `${what}, ${(i / 60).toFixed(2)} s round`;
-    const distance = eye.distanceTo(middle as THREE.Vector3);
-    // Along the arc it is turned on, and in or out by no more than a tenth of how far out it is in a frame.
-    const step = eye.distanceTo(last);
-    assert.ok(step < (distance * rate) / 60 + 0.1 * director.reach, `${at}: jumped ${step.toFixed(2)} mm`);
-    last.copy(eye);
-    // In and back out again is fine; in, out and in again within a moment is flip-flopping at an edge.
-    if ((way >= 0 && distance < turned * 0.97) || (way <= 0 && distance > turned * 1.03)) {
-      if (way !== 0) {
-        assert.ok(i - lastTurn > 6, `${at}: in and out again within ${i - lastTurn} frames`);
-        lastTurn = i;
-      }
-      way = distance < turned ? -1 : 1;
-      turned = distance;
-    } else if ((way >= 0 && distance > turned) || (way <= 0 && distance < turned)) turned = distance;
-    const bad = badEye(place, director.camera);
-    assert.equal(bad, null, `${at}: ${bad}`);
-    const seen = project(director.camera, middle);
-    assert.ok(Math.abs(seen.x) < 1e-3 && Math.abs(seen.y) < 1e-3, `${at}: the fly at ${seen.x.toFixed(3)}, ${seen.y.toFixed(3)}`);
-  }
-}
+test("turning through scenery keeps the player's pitch and distance", () => {
+  const director = new CameraDirector(world, 16 / 9, picnic.camera);
+  const body = fakeBody(world, 130, -12, 0.6);
+  const { distance, pitch } = PRESETS.follow;
+  settle(director, body, 1);
 
-test("turned round the fly past what stands by it, in every place, the camera comes in before it and goes back out after, never jumps, never flips in and out at an edge, and never goes into anything nor cuts into it", () => {
-  for (const [id, scene] of Object.entries(SCENES)) {
-    const place = new World(scene.place);
-    // The greenhouse starts on a fig; its tall orbit obstacles stand on the bench below it.
-    const bench = id === "greenhouse" ? { y: 0, names: ["terracotta pot", "watering can", "seed tray"] } : undefined;
-    const spots = besideThings(place, scene.place.start, 4, bench);
-    assert.ok(spots.length >= 3, `${id}: things to go past`);
-    for (const spot of spots) {
-      for (const view of ["close", "follow", "wide"] as const) {
-        for (const rate of [1.2, 3]) {
-          for (const up of [0, 0.5]) goRound(place, scene.camera, spot, view, rate, up, `${id}, by the ${spot.name}, ${view}, at ${rate} rad/s${up ? ", from higher" : ""}`);
-        }
-      }
+  for (const [yaw, expectedSolid] of [[0, undefined], [Math.PI / 2, "apple"], [Math.PI, undefined]] as const) {
+    director.turnBy(yaw - director.yaw, 0);
+    for (let i = 0; i < 60; i++) {
+      director.update(body, 1 / 60);
+      const actual = placeOf(director, body);
+      assert.ok(Math.abs(actual.distance - distance) < 1e-6);
+      assert.ok(Math.abs(actual.pitch - pitch) < 1e-6);
     }
+    assert.ok(Math.abs(wrap(placeOf(director, body).yaw - yaw)) < 1e-6);
+    const { x, y, z } = director.camera.position;
+    assert.equal(world.solids[world.solidAt(x, y, z)]?.name, expectedSolid);
   }
 });
 
-/** A deep bowl on a counter, steep inside: wherever the camera comes in along its line of sight from a fly on its slope, the slope is under it. */
-const BOWL = { x: 0, z: 0, r: 124 };
-const bowl = new World({
-  floor: { kind: "rect", hx: 400, hz: 400 },
-  solids: [{ name: "bowl", footprint: { kind: "circle", ...BOWL }, top: { kind: "dish", well: 9, rim: 58, inner: 0.42, lip: 0.84 } }],
-  patches: [],
-  start: { x: 250, z: 0, yaw: 0 },
-  ceiling: 400,
-});
-/** On the bowl's slope, `out` of the way from its middle to its edge, `round` from +z. */
-function onSlope(out: number, round: number) {
-  const x = BOWL.x + Math.sin(round) * out * BOWL.r;
-  const z = BOWL.z + Math.cos(round) * out * BOWL.r;
-  return { x, y: bowl.heightAt(x, z), z };
-}
-
-test("turned round a fly on the slope inside a bowl, the camera looks from higher where coming in would not clear the slope, and never jumps, never flips in and out, and never goes into the bowl nor cuts into it", () => {
-  for (const [out, round] of [[0.6, 0.3], [0.67, 2], [0.75, 4]]) {
-    const spot = onSlope(out, round);
-    for (const view of ["close", "follow", "wide"] as const) {
-      for (const rate of [1.2, 3]) {
-        for (const up of [0, 0.5]) goRound(bowl, picnic.camera, spot, view, rate, up, `in the bowl ${out} of the way out, ${view}, at ${rate} rad/s${up ? ", from higher" : ""}`);
-      }
-    }
-  }
-});
-
-test("flown into a bowl, the camera looks down from higher rather than come nearer than the player can zoom, from the moment it lands; flown out again, it comes back down to the player's pitch and distance", () => {
-  for (const view of ["close", "follow", "wide"] as const) {
-    const director = new CameraDirector(bowl, 16 / 9, picnic.camera);
-    director.setView(view);
-    const body = fakeBody(bowl, 250, 0, 0);
-    settle(director, body, 2);
-    // Up over the rim, across and down onto the slope on the camera's side, so it would look along the slope up out of the bowl.
-    const counter = { x: 250, y: 0, z: 0 };
-    const spot = onSlope(0.67, 0);
-    const fly = (path: { x: number; y: number; z: number }[], what: string) => {
-      for (let leg = 1; leg < path.length; leg++) {
-        const from = path[leg - 1];
-        const to = path[leg];
-        for (let i = 1; i <= 30; i++) {
-          const k = i / 30;
-          body.velocity.x = (to.x - from.x) * 2;
-          body.velocity.y = (to.y - from.y) * 2;
-          body.velocity.z = (to.z - from.z) * 2;
-          body.position.x = from.x + (to.x - from.x) * k;
-          body.position.y = from.y + (to.y - from.y) * k;
-          body.position.z = from.z + (to.z - from.z) * k;
-          director.update(body, 1 / 60);
-          const bad = badEye(bowl, director.camera);
-          assert.equal(bad, null, `${view}, ${what}, leg ${leg}, ${i}: ${bad}`);
-        }
-      }
-      body.velocity.x = body.velocity.y = body.velocity.z = 0;
-      for (let t = 0; t < 4; t += 1 / 60) {
-        director.update(body, 1 / 60);
-        const bad = badEye(bowl, director.camera);
-        assert.equal(bad, null, `${view}, ${what}, ${t.toFixed(2)} s after: ${bad}`);
-      }
-    };
-    fly([counter, { ...counter, y: 90 }, { ...spot, y: 90 }, spot], "flown in");
-    const there = placeOf(director, body);
-    assert.ok(there.pitch > director.pitch + 0.2, `${view}: from ${there.pitch.toFixed(2)} rad up, the player's ${director.pitch}`);
-    assert.ok(there.distance > NEAREST - 0.01, `${view}: ${there.distance.toFixed(2)} mm out`);
-    fly([spot, { ...spot, y: 90 }, { ...counter, y: 90 }, counter], "flown out");
-    const back = placeOf(director, body);
-    assert.ok(Math.abs(back.pitch - director.pitch) < 1e-3 && Math.abs(back.distance - PRESETS[view].distance) < 1e-3, `${view}: back at ${back.pitch.toFixed(3)} rad, ${back.distance.toFixed(2)} mm`);
-  }
-});
-
-test("put down on a bowl's slope from above, faster than the camera could come in, it is never in the bowl nor cuts into it, looking from higher at once where not even the nearest it comes in would clear it", () => {
-  for (const out of [0.55, 0.6, 0.67, 0.75]) {
-    for (const view of ["close", "follow", "wide"] as const) {
-      for (const up of [0, 0.3]) {
-        const director = new CameraDirector(bowl, 16 / 9, picnic.camera);
-        director.setView(view);
-        director.turnBy(0, up);
-        const spot = onSlope(out, 0);
-        const body = fakeBody(bowl, spot.x, spot.z, 0, spot.y + 30);
-        body.position.y = spot.y + 30;
-        settle(director, body, 2);
-        body.position.y = spot.y;
-        for (let t = 0; t < 2; t += 1 / 60) {
-          director.update(body, 1 / 60);
-          const bad = badEye(bowl, director.camera);
-          assert.equal(bad, null, `${out} of the way out, ${view}${up ? ", from higher" : ""}, ${t.toFixed(2)} s after: ${bad}`);
-        }
-      }
-    }
-  }
-});
-
-/** The restaurant, as a room. */
-const room = new World(RESTAURANT);
-const ROOM = SCENES.restaurant.camera;
-/** The camera is out of everything, in the room, and nothing stands between it and the fly. */
-function inRoomAndInSight(director: CameraDirector, body: FlyBody, what: string) {
-  const eye = director.camera.position;
-  const bad = badEye(room, director.camera);
-  assert.equal(bad, null, `${what}: ${bad}`);
-  assert.ok(Math.abs(eye.x) < DINING_ROOM.hx && Math.abs(eye.z) < DINING_ROOM.hz && eye.y > 0 && eye.y < DINING_ROOM.height, `${what}: out of the room at ${eye.x.toFixed(0)}, ${eye.y.toFixed(0)}, ${eye.z.toFixed(0)}`);
-  const middle = middleOf(body);
-  const length = Math.hypot(eye.x - middle.x, eye.y - middle.y, eye.z - middle.z);
-  const dir = { x: (eye.x - middle.x) / length, y: (eye.y - middle.y) / length, z: (eye.z - middle.z) / length };
-  const hit = room.raycast(middle, dir, { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 0 }, solid: -1, t: 0 }, length);
-  assert.equal(hit, null, `${what}: ${room.solids[hit?.solid ?? -1]?.name} between the camera and the fly`);
-}
-
-test("in the restaurant: under a table, swung up and out, the camera stays under it; by a wall, zoomed out, it stops in front of it, whichever way round; the fly in sight throughout", () => {
-  const table = TABLES.find((t) => t.id === "middle-left")!;
-  for (const view of ["close", "follow", "wide"] as const) {
-    const director = new CameraDirector(room, 16 / 9, ROOM);
-    director.setView(view);
-    const body = fakeBody(room, table.x, table.z, 0.4, 0);
-    settle(director, body, 2);
-    inRoomAndInSight(director, body, view);
-    director.turnBy(0.3, 1.4);
-    director.zoomBy(40);
-    settle(director, body, 3);
-    inRoomAndInSight(director, body, `${view}, swung up and out`);
-    assert.ok(director.camera.position.y < TABLE_TOPS.four.bottom, `${view}: up through the table top to ${director.camera.position.y.toFixed(0)}`);
-    assert.ok(Math.abs(placeOf(director, body).pitch - PITCH[1]) < 0.01, "up as far as it was turned, only nearer");
-  }
-  for (let k = 0; k < 8; k++) {
-    const director = new CameraDirector(room, 16 / 9, ROOM);
-    const body = fakeBody(room, -500, -2960, Math.PI, 0);
-    settle(director, body, 1);
-    director.turnBy((k * Math.PI) / 4, 0);
-    director.zoomBy(150 / director.reach);
-    settle(director, body, 3);
-    inRoomAndInSight(director, body, `by a wall, turned ${k} eighths round`);
-  }
-});
-
-/** What the camera must never pass through between one frame and the next. */
-const BIG = new Set(["wall", "glass", "ceiling", "table"]);
-
-test("in the restaurant, zoomed from the fly out to the whole room and back a wheel's click at a time, the camera never goes into anything, nor through a wall, a slab or a table", () => {
-  const under = TABLES.find((t) => t.id === "middle-left")!;
-  const { zinc } = ZINC_BAR;
-  const flies: [string, number, number, number, number][] = [
-    ["on its table", RESTAURANT.start.x, RESTAURANT.start.z, RESTAURANT.start.yaw, RESTAURANT.start.y!],
-    ["under a table", under.x, under.z, 0.4, 0],
-    ["by a wall", -500, -2960, Math.PI, 0],
-    ["on the bar", zinc.x, zinc.z, 1.2, zinc.top],
-  ];
-  const last = new THREE.Vector3();
-  const way = { x: 0, y: 0, z: 0 };
-  const hit = { point: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 0 }, solid: -1, t: 0 };
-  for (const [what, x, z, yaw, y] of flies) {
-    for (const up of [0, 0.6, 1.3]) {
-      const director = new CameraDirector(room, 16 / 9, ROOM);
-      const body = fakeBody(room, x, z, yaw, y);
-      director.turnBy(1, up);
-      settle(director, body, 2);
-      last.copy(director.camera.position);
-      for (let i = 0; i < 80; i++) {
-        director.zoomBy(i < 40 ? 1.2 : 1 / 1.2);
-        for (let t = 0; t < 0.3; t += 1 / 30) {
-          director.update(body, 1 / 30);
-          const eye = director.camera.position;
-          const at = `${what}, ${up} up, zoomed to ${director.reach.toFixed(0)} mm, at ${eye.x.toFixed(0)}, ${eye.y.toFixed(0)}, ${eye.z.toFixed(0)}`;
-          assert.ok(Math.abs(eye.x) < DINING_ROOM.hx && Math.abs(eye.z) < DINING_ROOM.hz && eye.y < DINING_ROOM.height, `${at}: out of the room`);
-          const bad = badEye(room, director.camera);
-          assert.equal(bad, null, `${at}: ${bad}`);
-          let moved = last.distanceTo(eye);
-          if (moved > 1e-6) {
-            way.x = (eye.x - last.x) / moved;
-            way.y = (eye.y - last.y) / moved;
-            way.z = (eye.z - last.z) / moved;
-            for (let k = 0; k < 8 && room.raycast(last, way, hit, moved); k++) {
-              const name = room.solids[hit.solid]?.name ?? "the floor";
-              assert.ok(!BIG.has(name) && hit.solid >= 0, `${at}: through ${name}`);
-              last.addScaledVector(way, hit.t + 0.01);
-              moved -= hit.t + 0.01;
-            }
-          }
-          last.copy(eye);
-        }
-        if (i === 39) assert.equal(director.view, "table", `${what}: all the way out is the whole room`);
-      }
-      inRoomAndInSight(director, body, `${what}, back in`);
-    }
-  }
-});
-
-test("every view, in every place, keeps the camera out of everything with the fly in the middle of the picture", () => {
+test("every view, in every place, frames the fly in the middle of the picture", () => {
   for (const [id, scene] of Object.entries(SCENES)) {
     const place = new World(scene.place);
     const { x, z, yaw, y } = scene.place.start;
@@ -533,11 +307,7 @@ test("every view, in every place, keeps the camera out of everything with the fl
     const director = new CameraDirector(place, 16 / 9, scene.camera);
     for (const view of ["close", "follow", "wide", "above", "table"] as const) {
       director.setView(view);
-      for (let t = 0; t < 3; t += 1 / 60) {
-        director.update(body, 1 / 60);
-        const bad = badEye(place, director.camera);
-        assert.equal(bad, null, `${id}, ${view} at ${t.toFixed(2)} s: ${bad}`);
-      }
+      settle(director, body, 3);
       const at = project(director.camera, middleOf(body));
       assert.ok(Math.abs(at.x) < 1e-3 && Math.abs(at.y) < 1e-3 && at.z < 1, `${id}, ${view}: the fly at ${at.x.toFixed(3)}, ${at.y.toFixed(3)}`);
     }

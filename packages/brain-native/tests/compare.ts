@@ -147,6 +147,7 @@ export function scenario(seconds: number, seed = 1, eyes?: EyeMap): Tick[] {
       ["invalid odor strengths", [Number.NaN, -1, 7, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY], [1, 0, -0.1, 2, 0.3]],
     ] as const) hold(500, 16, () => ({ odor: { left, right } }), what);
     hold(500, 16, () => ({}), "odor absent");
+    hold(1500, 16, (t) => ({ odor: { left: [1, 0, 0, 0.5, 0], right: [0.4, 0, 0, 0, 0] }, hunger: (t / 1500) * 0.4 }), "odor as hunger rises from a meal");
     for (const sense of SCALAR) {
       hold(1500, cycle % 2 === 0 ? 16 : 33, () => ({ [sense]: 1 }), `${sense} at full strength`);
       hold(800, 16, () => ({}), `rest after ${sense}`);
