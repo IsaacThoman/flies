@@ -194,9 +194,9 @@ export class Modulation {
 
   constructor(connectome: Connectome, options: ModulationOptions) {
     const n = connectome.neurons;
-    const isModulator = (t: string): t is Modulator => (MODULATORS as readonly string[]).includes(t);
+    const modulators = new Set<string>(MODULATORS);
     const sources: number[] = [];
-    for (let i = 0; i < n; i++) if (isModulator(options.nt[i])) sources.push(i);
+    for (let i = 0; i < n; i++) if (modulators.has(options.nt[i])) sources.push(i);
     this.sources = Uint32Array.from(sources);
     this.transmitters = sources.map((i) => options.nt[i] as Modulator);
     this.level = new Float64Array(sources.length);

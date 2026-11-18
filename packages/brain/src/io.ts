@@ -618,15 +618,17 @@ export function balanceFactor(connectome: Connectome, mine: ArrayLike<number>, t
  * reaches anything.
  */
 function regional(connectome: Connectome, spec: SenseSpec): Wiring["senses"][number] {
-  const within = new Set(select(connectome, spec.select));
-  const seen = new Set<number>();
+  // Marks, not sets: a group's neurons are thousands, checked one by one.
+  const within = new Uint8Array(connectome.neurons);
+  for (const i of select(connectome, spec.select)) within[i] = 1;
+  const seen = new Uint8Array(connectome.neurons);
   const ends = new Uint32Array(spec.regions!.length);
   const neurons: number[] = [];
   spec.regions!.forEach((region, r) => {
     for (const i of select(connectome, region.select)) {
-      if (!within.has(i)) throw new Error(`Neuron ${i} of "${region.sense}" is outside "${spec.name}"`);
-      if (seen.has(i)) throw new Error(`Neuron ${i} of "${region.sense}" is in another region of "${spec.name}" too`);
-      seen.add(i);
+      if (within[i] === 0) throw new Error(`Neuron ${i} of "${region.sense}" is outside "${spec.name}"`);
+      if (seen[i] === 1) throw new Error(`Neuron ${i} of "${region.sense}" is in another region of "${spec.name}" too`);
+      seen[i] = 1;
       neurons.push(i);
     }
     ends[r] = neurons.length;
@@ -651,10 +653,10 @@ export function wire(connectome: Connectome): Wiring {
   for (const group of [...senses, ...background, ...readouts]) {
     if (group.neurons.length === 0) throw new Error(`The connectome has no neurons for "${group.spec.name}" (${group.spec.description})`);
   }
-  const driven = new Set<number>();
-  for (const group of [...senses, ...background, ...state, ...excitability, ...thermo]) for (const i of group.neurons) driven.add(i);
+  const driven = new Uint8Array(connectome.neurons);
+  for (const group of [...senses, ...background, ...state, ...excitability, ...thermo]) for (const i of group.neurons) driven[i] = 1;
   for (const group of readouts) {
-    for (const i of group.neurons) if (driven.has(i)) throw new Error(`Neuron ${i} is both driven and read (readout "${group.spec.name}")`);
+    for (const i of group.neurons) if (driven[i] === 1) throw new Error(`Neuron ${i} is both driven and read (readout "${group.spec.name}")`);
   }
   return { senses, background, state, excitability, thermo, readouts };
 }
