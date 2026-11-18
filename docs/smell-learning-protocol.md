@@ -123,3 +123,71 @@ otherwise the model is left as it is and that is said.
 All of it, every seed, with ranges; the CPU it took. The README's Learning,
 the About screen's sentence on learning and docs/simulation.md say what was
 measured and no more.
+
+## Results
+
+Measured on 18 November 2026 on this protocol's commit, as written, every
+trial complete (`node scripts/smell-learning.ts --part select|train|long
+--out <dir>`, then `--reduce <dir>`; [the brain's Learning](../packages/brain/README.md#learning)
+has the numbers in its own words).
+
+**Part A.** The KCs each smell fires, seeds 1 to 12: banana 4.9 to 5.3%,
+soda 1.7 to 1.9%, ripe fruit 2.1 to 2.7%, the fly food 11.8 to 12.2%,
+ketchup 0.9 to 1.0% (under 1% in some seeds, so not eligible). Banana and
+soda overlap least (Jaccard 0.007; banana and the fly food most, 0.32), so
+they are the pair. Their own KCs: 197 to 213 for banana, 65 to 73 for soda.
+
+**Part B, synapses.** 83 to 304 KCs fire in training (82 to 310 without
+learning), and 171 to 783 learning connections change.
+
+| Paired, US | γ1, paired / other | γ2 | α′1 | α3 | γ4 | β′2a |
+|---|---|---|---|---|---|---|
+| banana, loom | 0.36 (0.21–0.49) / 0.82 | 0.69 / 0.95 | 0.88 / 1.00 | 0.93 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
+| soda, loom | 0.66 (0.47–0.96) / 0.56 | 0.86 / 0.83 | 0.96 / 0.98 | 0.97 / 0.98 | 1.00 / 1.00 | 1.00 / 1.00 |
+| banana, sugar | 0.92 / 0.82 | 0.97 / 0.95 | 1.00 / 1.00 | 1.00 / 1.00 | 0.76 (0.72–0.81) / 1.00 | 0.00 / 1.00 |
+| soda, sugar | 0.79 / 0.62 | 0.92 / 0.89 | 1.00 / 1.00 | 1.00 / 1.00 | 0.62 (0.53–0.72) / 0.63 | 0.78 / 1.00 |
+
+Each odour's own KCs' synapses after training, the mean factor over 12 flies.
+The specific depression (the other's less the paired one's, γ1 for the loom,
+γ4 for sugar) is 0.18 (95% 0.04 to 0.32) and 0.12 (0.06 to 0.18): both pass,
+both from the banana-paired flies alone. After the test: under sugar banana's
+γ4 back to 0.97 and soda's to 0.83, both odours' γ1 down to 0.55 to 0.66;
+under the loom none moved by more than 0.01 (no fly came near a source again).
+
+**Part B, behaviour.** Loom: every fly met the swoop exactly once and left,
+and in the test none of the 48, learning or not, came within 5 mm of either
+source. No pair has a preference, so the arm is **inconclusive**, which the
+protocol didn't foresee (the colour assay's swoops did the same). Sugar: the
+preference for the paired source 0.23 with learning and 0.20 without; the
+paired difference **+0.03 (95% −0.18 to +0.26)**, 11 pairs up and 13 down,
+24 pairs: **no conditioned approach detected**. Time near, visits, visit
+length and first approach to either source: every paired interval spans 0
+(time near the paired source −0.1 s, −2.9 to +2.7).
+
+**Part C.** Weights: 1,227 to 1,264 learning connections changed at 6 hours
+(191 to 197 below 0.05, 465 to 624 below half); the fly food's KCs at 0.62 to
+0.64 in γ1, 0.87 to 0.88 in γ2, 0.46 to 0.57 in α3 (17 to 20% below 0.05),
+0.99 to 1.00 elsewhere; `exportMemory` 6,054 to 6,304 bytes. **Saturated** in
+seed 2 only (asleep or still from its second hour); in seeds 1 and 3, γ1 or
+α3 moved 0.22 and 0.12 in the last two hours. **Not clearly unlike a fly's**:
+no compartment had half the fly food's connections below 0.05. **No drift**:
+time near smelling food in the last two hours was 0 in all six runs, walking
+differed by −0.5, −0.3 and −0.3 percentage points (learning on less off). The
+flies fed there 84 to 237 times in their first hours with learning and 0 to
+169 without: the same seed parts from itself as soon as a synapse changes.
+
+Part B's banana-fed flies are the case the fix rule was written for, though
+it came from Part B: all of banana's β′2a connections below 0.05 after five
+minutes' feeding. No measurement fixes a forgetting rate, a floor or β′2a's
+own rate (Hige et al. 2015 found 90 ± 3.7% of the charge gone after one
+pairing, no floor, little recovery in 40 minutes, and α2 slower with no rate
+given), so the model is left as it is.
+
+**Changed after the protocol's commit.** Counting the KCs' spikes in the long
+runs without learning (the script counted them only with it); seed 1's run
+without learning was run again for it. Nothing else.
+
+**Cost.** A conditioning trial took 64 to 97 CPU seconds for 480 s of game
+time (TypeScript brain, this machine, four processes); a 6-hour run 1,240 to
+2,139 CPU seconds. These runs can't part learning's own cost from how
+differently the two flies lived; the README's Learning, Cost, measures it.

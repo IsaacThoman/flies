@@ -238,7 +238,7 @@ function long(sets: Sets, seed: number, learns: boolean, hours: number) {
   life.setDown(LONG.food.x + LONG.start, LONG.food.z, 0);
   brain.sim.setRecording(true);
   const r = brain.sim.recording!;
-  const kcs = brain.learning?.kcs;
+  const kcs = sets.all;
   const flyFood = new Set(sets.sets[seed]['fly food']);
   const smelly = life.pantry.foods.filter((f) => f.odor && f.odor.some((x) => x > 0));
   const head = { x: 0, y: 0, z: 0 };
@@ -260,7 +260,7 @@ function long(sets: Sets, seed: number, learns: boolean, hours: number) {
     w.odour += most * DT;
     if ((f + 1) % per === 0) {
       let kcNow = 0;
-      if (kcs) for (const i of kcs) kcNow += r[i];
+      for (const i of kcs) kcNow += r[i];
       w.kcSpikes = kcNow - kcBefore;
       kcBefore = kcNow;
       const at = { hours: ((f + 1) * DT) / 3600, x: life.body.position.x, z: life.body.position.z, hunger: life.hunger.level, meals: life.meals };
